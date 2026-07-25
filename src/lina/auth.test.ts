@@ -45,6 +45,34 @@ describe('Anmeldung', () => {
 
   afterAll(() => mock.stop())
 
+  /**
+   * Am 25.07.2026 stand ein Lauf über zehn Minuten still: `fetch` hat von sich
+   * aus KEIN Zeitlimit, und LINA ließ eine Verbindung offen, ohne zu antworten.
+   * Der Posten davor hatte 614 ms gebraucht.
+   *
+   * Besonders übel zusammen mit der Advisory-Sperre aus `sync/worker.ts`: der
+   * hängende Lauf hält sie, jeder folgende wird abgewiesen, und
+   * `haengende_posten_freigeben()` läuft nur beim START eines Laufs. Der
+   * Importer wäre dauerhaft still gewesen, ohne dass es jemandem auffällt.
+   */
+  test('eine Anmeldung gegen einen stummen Server läuft in ein Zeitlimit', async () => {
+    // Server, der die Verbindung annimmt und dann nie antwortet.
+    const stumm = Bun.serve({ port: 0, fetch: () => new Promise<Response>(() => {}) })
+    try {
+      const s = new auth.LinaSession({
+        basis: `http://localhost:${stumm.port}`,
+        benutzer: 'testuser', passwort: 'geheim', hashverfahren: 'md5', system: 'a360',
+        timeoutMs: 300,
+      })
+      const begonnen = Date.now()
+      await expect(s.anmelden()).rejects.toThrow()
+      const gedauert = Date.now() - begonnen
+      // Muss abbrechen, statt zu hängen — mit Luft für langsame CI-Maschinen.
+      expect(gedauert).toBeLessThan(5_000)
+      expect(s.istAngemeldet).toBe(false)
+    } finally { stumm.stop(true) }
+  })
+
   test('findet window.secret in der Loginseite', () => {
     const s = 'a'.repeat(64)
     expect(auth.secretAusSeite(`<script>window.secret = '${s}';</script>`)).toBe(s)

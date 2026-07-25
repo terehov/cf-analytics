@@ -66,6 +66,8 @@ export type Zugang = {
   system: string
   userAgent: string
   plattform: string
+  /** Zeitlimit je Anfrage. Ohne das hängt eine tote Verbindung ewig. */
+  timeoutMs: number
 }
 
 export function zugangAusKonfiguration(): Zugang {
@@ -77,6 +79,7 @@ export function zugangAusKonfiguration(): Zugang {
     system: config.LINA_SYSTEM,
     userAgent: config.LINA_USER_AGENT,
     plattform: config.LINA_PLATTFORM,
+    timeoutMs: config.ANFRAGE_TIMEOUT_MS,
   }
 }
 
@@ -188,6 +191,7 @@ export class LinaSession {
     const seite = await fetch(basis + LOGIN_SEITE, {
       redirect: 'manual',
       headers: this.browserHeader('dokument'),
+      signal: AbortSignal.timeout(this.zugang.timeoutMs),
     })
     this.cookiesUebernehmen(seite)
     const html = await seite.text()
@@ -224,6 +228,7 @@ export class LinaSession {
         referer: basis + LOGIN_SEITE,
       },
       body,
+      signal: AbortSignal.timeout(this.zugang.timeoutMs),
     })
     this.cookiesUebernehmen(res)
     const antwort = await res.text()
@@ -233,6 +238,7 @@ export class LinaSession {
     const probe = await fetch(basis + PROBE, {
       headers: { ...this.browserHeader('xhr'), cookie: this.cookieHeader(), referer: basis + '/' },
       redirect: 'manual',
+      signal: AbortSignal.timeout(this.zugang.timeoutMs),
     })
     const text = await probe.text()
 

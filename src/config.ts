@@ -81,6 +81,26 @@ const Schema = z.object({
   FENSTER_BIS_STUNDE: z.coerce.number().int().min(1).max(24).default(24),
 
   // --- Fehlerverhalten ---------------------------------------------------
+  /**
+   * Zeitlimit je HTTP-Anfrage an LINA.
+   *
+   * Ohne dieses Limit hängt ein einzelner Aufruf, der nie antwortet, den
+   * gesamten Worker auf — `fetch` wartet von sich aus unbegrenzt. Am
+   * 25.07.2026 genau so passiert: `getUmsatzbericht:speisen` stand über zehn
+   * Minuten „in Arbeit", während der Posten davor 614 ms gebraucht hatte.
+   *
+   * Besonders übel im Zusammenspiel mit der Advisory-Sperre in
+   * `src/sync/worker.ts`: Der hängende Lauf hält die Sperre, jeder folgende
+   * Lauf wird abgewiesen, und `sync.haengende_posten_freigeben()` läuft nur
+   * beim START eines Laufs — der nie zustande kommt. Der Importer wäre
+   * dauerhaft still, ohne dass jemand etwas merkt.
+   *
+   * 60 s ist reichlich: die beobachteten Antwortzeiten liegen bei
+   * Millisekunden. Ein Abbruch ist ein wiederholbarer Fehler, der Posten
+   * kommt also mit Wiedervorlage zurück.
+   */
+  ANFRAGE_TIMEOUT_MS: z.coerce.number().int().min(1_000).default(60_000),
+
   MAX_VERSUCHE: z.coerce.number().int().min(1).default(4),
   /** Ab so vielen Fehlern in Folge pausiert der Worker den ganzen Lauf. */
   ABBRUCH_NACH_FEHLERN: z.coerce.number().int().min(1).default(10),

@@ -136,6 +136,9 @@ export class LinaClient {
     return fetch(url, {
       headers: this.session.header({ referer: `${config.LINA_BASE_URL}${ep.pfad.split('/').slice(0, 3).join('/')}` }),
       redirect: 'manual',
+      // Ohne Zeitlimit wartet fetch unbegrenzt und hängt den ganzen Worker auf.
+      // Begründung ausführlich bei ANFRAGE_TIMEOUT_MS in src/config.ts.
+      signal: AbortSignal.timeout(config.ANFRAGE_TIMEOUT_MS),
     })
   }
 }
