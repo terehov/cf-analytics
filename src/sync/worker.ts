@@ -105,6 +105,18 @@ export async function workerLauf(
   }
 }
 
+/** Signale, die im Container und auf der Konsole ein Ende bedeuten. */
+const ENDESIGNALE = ['SIGINT', 'SIGTERM'] as const
+
+/**
+ * Wie lange nach dem Signal auf den sauberen Ausstieg gewartet wird, bevor der
+ * Lauf notfalls von aussen geschlossen wird.
+ *
+ * Bewusst kurz: Docker schickt beim Stoppen SIGTERM und danach binnen zehn
+ * Sekunden SIGKILL. Was bis dahin nicht geschrieben ist, ist verloren.
+ */
+const ABSCHLUSSFRIST_MS = 5_000
+
 async function workerLaufIntern(
   ausloeser: 'zeitplan' | 'manuell' | 'backfill',
 ): Promise<LaufErgebnis> {
@@ -123,8 +135,73 @@ async function workerLaufIntern(
   let status: 'ok' | 'teilweise' | 'fehlgeschlagen' | 'abgebrochen' = 'ok'
   let notiz: string | null = null
 
+  /**
+   * Sauberes Herunterfahren bei Ctrl-C und beim Containerstopp.
+   *
+   * Ohne das bleibt der Eintrag in `sync.lauf` für immer auf `laeuft` stehen —
+   * `beendet_am` wird im `finally` geschrieben, und ein Signal beendet den
+   * Prozess davor. Am 25.07.2026 genau so passiert. In `mart.sync_status` sieht
+   * ein abgewürgter Lauf dann aus wie einer, der noch arbeitet, und der Posten
+   * bleibt bis zur Stundengrenze auf `in_arbeit_seit` hängen.
+   *
+   * Zwei Wege, weil einer nicht reicht:
+   *   * Das Flag lässt die Schleife am nächsten Prüfpunkt sauber aussteigen —
+   *     der Normalweg, alle Zähler stimmen.
+   *   * Zwischen zwei Durchläufen liegt aber die Drosselpause von 20–40 s. So
+   *     lange darf ein Containerstopp nicht warten, deshalb das Sicherheitsnetz
+   *     nach ABSCHLUSSFRIST_MS: es schreibt den Lauf selbst fort und beendet.
+   *
+   * Ein zweites Signal heißt „jetzt sofort" und wird auch so behandelt.
+   */
+  let abbruchSignal: string | null = null
+  let aktuellerPosten: string | null = null
+  let abgeschlossen = false
+
+  const laufFortschreiben = async (endStatus: typeof status, endNotiz: string | null) => {
+    if (abgeschlossen) return
+    abgeschlossen = true
+    // Den reservierten Posten freigeben, sonst wartet er eine Stunde auf
+    // sync.haengende_posten_freigeben(), obwohl niemand mehr an ihm arbeitet.
+    if (aktuellerPosten) {
+      await query(`UPDATE sync.warteschlange SET in_arbeit_seit = NULL WHERE posten_id = $1`,
+        [aktuellerPosten]).catch(() => {})
+    }
+    await query(
+      `UPDATE sync.lauf
+          SET beendet_am = now(), status = $1, notiz = $2,
+              aufgaben_gesamt = $3, aufgaben_ok = $4, aufgaben_fehler = $5,
+              aufgaben_uebersprungen = $6
+        WHERE lauf_id = $7`,
+      [endStatus, endNotiz, ok + keineDaten + fehler, ok, fehler, uebersprungen, laufId],
+    ).catch(() => {})
+  }
+
+  const behandler = new Map<string, () => void>()
+  for (const signal of ENDESIGNALE) {
+    const fn = () => {
+      if (abbruchSignal) { log.warn('zweites Signal — sofortiger Abbruch', { signal }); process.exit(130) }
+      abbruchSignal = signal
+      log.warn('abbruch angefordert — Lauf wird geschlossen', { signal, laufId })
+      const netz = setTimeout(async () => {
+        await laufFortschreiben('abgebrochen', `durch ${signal} beendet (Frist abgelaufen)`)
+        log.warn('lauf nach Signal geschlossen', { laufId, signal, ok, keineDaten, fehler })
+        process.exit(130)
+      }, ABSCHLUSSFRIST_MS)
+      // Das Netz darf den Prozess nicht am Leben halten, wenn die Schleife
+      // rechtzeitig von selbst herauskommt.
+      netz.unref?.()
+    }
+    behandler.set(signal, fn)
+    process.on(signal, fn)
+  }
+
   try {
     while (true) {
+      if (abbruchSignal) {
+        status = 'abgebrochen'
+        notiz = `durch ${abbruchSignal} beendet`
+        break
+      }
       if (!client.imFenster()) { notiz = 'Arbeitsfenster beendet'; break }
       if (client.budgetUebrig === 0) { notiz = 'Tagesbudget aufgebraucht'; break }
       if (config.MAX_POSTEN_PRO_LAUF > 0 && ok + keineDaten + fehler >= config.MAX_POSTEN_PRO_LAUF) {
@@ -139,6 +216,8 @@ async function workerLaufIntern(
 
       const posten = await eine<any>(`SELECT * FROM sync.posten_holen($1)`, [laufId])
       if (!posten?.posten_id) { notiz ??= 'Schlange leer'; break }
+      // Merken, damit ein Signal die Reservierung wieder lösen kann.
+      aktuellerPosten = String(posten.posten_id)
 
       const ep = endpunkt(posten.endpunkt)
       // postgres.js gibt date als Date zurueck - hier einmal normalisieren.
@@ -228,13 +307,12 @@ async function workerLaufIntern(
 
     if (fehler > 0 && status === 'ok') status = 'teilweise'
   } finally {
-    await query(
-      `UPDATE sync.lauf
-          SET beendet_am = now(), status = $1, notiz = $2,
-              aufgaben_gesamt = $3, aufgaben_ok = $4, aufgaben_fehler = $5,
-              aufgaben_uebersprungen = $6
-        WHERE lauf_id = $7`,
-      [status, notiz, ok + keineDaten + fehler, ok, fehler, uebersprungen, laufId])
+    // Handler wieder abmelden: workerLauf kann mehrfach im selben Prozess
+    // laufen (Tests), und hängengebliebene Listener wären ein Leck.
+    for (const [signal, fn] of behandler) process.off(signal, fn)
+    // Derselbe idempotente Pfad wie im Signalfall — wer zuerst kommt, gewinnt,
+    // der zweite Aufruf tut nichts.
+    await laufFortschreiben(status, notiz)
     log.info('lauf beendet', {
       laufId, status, ok, keineDaten, fehler, uebersprungen,
       budgetVerbraucht: client.budgetVerbraucht, notiz,
