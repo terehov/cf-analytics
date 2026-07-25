@@ -1,0 +1,26 @@
+{
+  "_endpoint": "GET /intranet/analytics/getKennzahlen",
+  "_params": {"von":"01.06.2026","bis":"30.06.2026","mode":"absolut"},
+  "_note": "Kein report-Parameter. mode=absolut|relativ. Werte in EUR je Monat. Hierarchie: groups(Marke) > children(Betrieb) > children(5 feste Kennzahlen). Anonymisiert, je 1 Beispiel pro Ebene.",
+  "year": "2026",
+  "_groupCount": 14,
+  "groups": [
+    {
+      "key": "group_75",
+      "data": {"name":"Konzept A","jan":0,"feb":0,"mar":0,"apr":0,"may":0,"jun":1101.9133333333386,"jul":0,"aug":0,"sep":0,"oct":0,"nov":0,"dec":0,"kum":150.26090909090982},
+      "children": [
+        {
+          "key": "4210",
+          "data": {"name":"Betrieb XX","jan":0,"feb":0,"mar":0,"apr":0,"may":0,"jun":-20500.78,"jul":0,"aug":0,"sep":0,"oct":0,"nov":0,"dec":0,"kum":-20500.78},
+          "children": [
+            {"data":{"name":"Umsatz","may":0,"jun":68433.72,"kum":68433.72}},
+            {"data":{"name":"EBIT","may":0,"jun":-20500.78,"kum":-20500.78}},
+            {"data":{"name":"WE Bar","may":0,"jun":4954.27,"kum":4954.27}},
+            {"data":{"name":"WE Küche","may":0,"jun":12057.28,"kum":12057.28}},
+            {"data":{"name":"Personalkosten ohne GF","may":0,"jun":27362.87,"kum":27362.87}}
+          ]
+        }
+      ]
+    }
+  ]
+}

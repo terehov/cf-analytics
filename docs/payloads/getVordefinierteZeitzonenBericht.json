@@ -1,0 +1,16 @@
+{
+  "_endpoint": "GET /intranet/analytics/getVordefinierteZeitzonenBericht",
+  "_params": {"report":"intranet-vordefinierte-zeitzonen","von":"01.06.2026","bis":"30.06.2026","reltime":"custom","brutto":"0"},
+  "_note": "time_from/time_to = Minuten seit Mitternacht. Zone 5 laeuft ueber Mitternacht (1320 -> 60).",
+  "timeframe": "01.06.2026 - 30.06.2026",
+  "zeitzonen": [
+    {"id":1,"name":"Mittagszeit","time_from":690,"time_to":840},
+    {"id":2,"name":"Nachmittag","time_from":840,"time_to":1050},
+    {"id":3,"name":"Happy Hour","time_from":1050,"time_to":1140},
+    {"id":4,"name":"Abendessen","time_from":1140,"time_to":1320},
+    {"id":5,"name":"Late Night","time_from":1320,"time_to":60},
+    {"id":6,"name":"Frühstück","time_from":480,"time_to":690}
+  ],
+  "stores": [{"name":"Betrieb 01","encId":"ENCID_000","values":{"1":0,"2":0,"3":0,"4":0,"5":0,"6":0}}],
+  "_storeCount": 141
+}

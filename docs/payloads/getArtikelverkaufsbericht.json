@@ -1,0 +1,17 @@
+{
+  "_endpoint": "GET /intranet/analytics/getArtikelverkaufsbericht",
+  "_params": {"report":"intranet-artikel","von":"01.06.2026","bis":"30.06.2026","reltime":"custom","brutto":"0"},
+  "_note": "Groesste Response: ca. 2,0 MB. columns = 6451 Artikel, rows = 141 Betriebe. counts/netto/brutto/prices sind Maps artnr -> Wert. fixed_we = hinterlegter Wareneinsatz je Artikel (Basis fuer theoretischen WE).",
+  "timeframe": "01.06.2026 - 30.06.2026",
+  "columns": [
+    {"artnr":9990006,"name":"Fax","fixed_we":0},
+    {"artnr":4070029,"name":"Kuhmilch._","fixed_we":0},
+    {"artnr":450003,"name":"Aperol Spritz","fixed_we":0.83}
+  ],
+  "rows": [
+    {"name":"Betrieb 01","encId":"ENCID_000",
+     "counts":{"450003":128},"netto":{"450003":812.48},"brutto":{"450003":966.85},"prices":{"450003":7.55}}
+  ],
+  "_columnCount": 6451,
+  "_rowCount": 141
+}

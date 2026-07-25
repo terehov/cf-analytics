@@ -1,0 +1,53 @@
+﻿excel_datei;blatt;spalte;kennzahl;lina_endpunkt;lina_feld;transformation;status;offene_frage
+JULI_Round_Table_Ampelsystem.xlsx;Eingabe;A;Betrieb;getUmsatzbericht;stores[].name;Join auf dim_store;direkt;
+JULI_Round_Table_Ampelsystem.xlsx;Eingabe;B;Stadt/Region;analyticsFilterOptions / getStoreData;betriebe[].name / stadt;Stammdaten;direkt;
+JULI_Round_Table_Ampelsystem.xlsx;Eingabe;C;Umsatz Ist;getUmsatzbericht;umsatzNetto;von/bis = Monat, brutto=0;direkt;
+JULI_Round_Table_Ampelsystem.xlsx;Eingabe;D;Umsatz VJ;getUmsatzbericht;umsatzNettoV;vergleichTyp=vorjahr;direkt;
+JULI_Round_Table_Ampelsystem.xlsx;Eingabe;E;Umsatz %;getUmsatzbericht;diff;LINA liefert Prozent, Excel Dezimalbruch -> /100;direkt;
+JULI_Round_Table_Ampelsystem.xlsx;Eingabe;F;Ampel Umsatz;-;-;>=10% gruen, >=0% orange, sonst rot (Regeln!B2/C2);ableitbar;
+JULI_Round_Table_Ampelsystem.xlsx;Eingabe;G;Umsatz YTD;getUmsatzbericht;umsatzNetto;zweiter Call von=01.01.JJJJ bis=Monatsende;direkt;
+JULI_Round_Table_Ampelsystem.xlsx;Eingabe;H;Umsatz YTD Vorjahr;getUmsatzbericht;umsatzNettoV;YTD-Call mit vergleichTyp=vorjahr;direkt;
+JULI_Round_Table_Ampelsystem.xlsx;Eingabe;I;Umsatz kumuliert %;getUmsatzbericht;diff (YTD-Call);/100;direkt;
+JULI_Round_Table_Ampelsystem.xlsx;Eingabe;J;Personalkosten ohne GF %;getKennzahlen (mode=relativ);Personalkosten ohne GF;direkt in Prozent - verifiziert Bayreuth Mai 24,79 = Excel 0,2479;direkt;
+JULI_Round_Table_Ampelsystem.xlsx;Eingabe;K;Ampel Personal;getPersonalkosten;pekThreshold;Excel global 28/32 vs LINA pekThreshold je Betrieb;ableitbar;ENTSCHIEDEN: beide, umschaltbar - global als Default
+JULI_Round_Table_Ampelsystem.xlsx;Eingabe;L;WE Bar %;getKennzahlen (mode=relativ);WE Bar;direkt in Prozent - verifiziert Bayreuth Mai 23,64 = Excel 0,2364. KEINE eigene Berechnung, Nenner ist BWA-Erloeskonto;direkt;
+JULI_Round_Table_Ampelsystem.xlsx;Eingabe;M;Ampel WE Bar;-;-;<=23% gruen, <=26% orange, sonst rot;ableitbar;
+JULI_Round_Table_Ampelsystem.xlsx;Eingabe;N;WE Kueche %;getKennzahlen (mode=relativ);WE Kueche;direkt in Prozent - verifiziert Bayreuth Mai 31,08 = Excel 0,3108;direkt;
+JULI_Round_Table_Ampelsystem.xlsx;Eingabe;O;Ampel WE Kueche;-;-;<=25% gruen, <=30% orange, sonst rot;ableitbar;
+JULI_Round_Table_Ampelsystem.xlsx;Eingabe;P;Wareneinsatz gesamt;getKennzahlen;WE Bar + WE Kueche;/ umsatzNetto gesamt;ableitbar;
+JULI_Round_Table_Ampelsystem.xlsx;Eingabe;Q;Online Bewertung;NICHT IN LINA;-;Quelle YEXT laut BUCHHALTUNG!Datenquellen;fehlt;YEXT anbinden oder manuell?
+JULI_Round_Table_Ampelsystem.xlsx;Eingabe;R;Ampel Bewertung;-;-;>=4,4 gruen, >=4,0 orange;ableitbar;
+JULI_Round_Table_Ampelsystem.xlsx;Eingabe;S;OM Score;NICHT IN LINA;-;subjektive Vor-Ort-Einschaetzung Operations Manager;fehlt;manuelle Eingabetabelle?
+JULI_Round_Table_Ampelsystem.xlsx;Eingabe;T;Ampel OM;-;-;>=4 gruen, >=3 orange;ableitbar;
+JULI_Round_Table_Ampelsystem.xlsx;Eingabe;U-X;Ursachen je Bereich;NICHT IN LINA;-;Dropdown mit 21 Ursachen (Regeln!G2:G22);fehlt;manuelle Klassifikation
+JULI_Round_Table_Ampelsystem.xlsx;Eingabe;Z;Gesamtstatus;-;-;"1x rot -> rot; sonst 1x orange -> orange; sonst gruen";ableitbar;
+JULI_Round_Table_Ampelsystem.xlsx;Eingabe;AA;Intensitaet;-;-;">=2 rot: Sofort eskalieren; =1 rot: Sofort handeln; >=2 orange: Nachforschung; sonst Beobachten/OK";ableitbar;
+JULI_Round_Table_Ampelsystem.xlsx;Eingabe;AC;Massnahme?;-;-;rot ODER Nachforschung -> Ja;ableitbar;
+JULI_Round_Table_Ampelsystem.xlsx;Eingabe;AE;Prioritaet;-;-;"rot -> Hoch; Nachforschung -> Mittel; sonst Niedrig";ableitbar;
+JULI_Round_Table_Ampelsystem.xlsx;Massnahmen;A-L;Massnahmen-Tracking;NICHT IN LINA;-;eigene Postgres-Tabelle + Eingabe-UI noetig;fehlt;Wo pflegen?
+Umsetzung Berichte (1).xlsx;Laden;;Umsatz pro Verkaufsstelle;getUmsatzbericht;umsatzNetto + verkaufsstellen;Filter verkaufsstellen;direkt;
+Umsetzung Berichte (1).xlsx;Laden;;Personalkosten/Effektivitaet;getPersonalkosten;pekGesamt / effGesamt;;direkt;
+Umsetzung Berichte (1).xlsx;Laden;;Personalkosten/Effektivitaet pro Bereich;getPersonalkosten;pek/eff Service|Bar|Kueche;;direkt;
+Umsetzung Berichte (1).xlsx;Laden;;Wareneinsatz;getKennzahlen;WE Bar, WE Kueche;nur monatlich, BWA-Lag;ableitbar;BWA-Lag
+Umsetzung Berichte (1).xlsx;Laden;;Rendite;getKennzahlen (mode=relativ);EBIT;faellt als Prozentwert gratis mit ab;direkt;
+Umsetzung Berichte (1).xlsx;Laden;;Abverkaufszahlen pro Artikel;getArtikelverkaufsbericht;rows[].counts;;direkt;
+Umsetzung Berichte (1).xlsx;Laden;;Durchschnittsbon / Umsatz pro Kopf;getUmsatzbericht;avgTicket, avgGuest;;direkt;
+Umsetzung Berichte (1).xlsx;Laden;;Lohnniveau, Krankenstand;Team > Zeitkonten;-;nicht erschlossen;fehlt;Phase 1b
+Umsetzung Berichte (1).xlsx;Laden;;Theoretische WE vs. BWA;getArtikelverkaufsbericht + getKennzahlen;fixed_we * counts vs WE Bar/Kueche;fixed_we x counts vs getKennzahlen - Rezepturaufloesung NICHT noetig;ableitbar;
+Umsetzung Berichte (1).xlsx;Laden;;WE und DB pro Artikel;getArtikelverkaufsbericht;fixed_we, prices, netto;DB = netto - fixed_we*counts;ableitbar;
+Umsetzung Berichte (1).xlsx;Laden;;MA-Kosten pro Stunde;Team > Zeitkonten;-;;fehlt;Phase 1b
+Umsetzung Berichte (1).xlsx;Laden;;Stornobericht;finanzen/analytics/getReport?report=38&storeId=<encId>;Artikelnummer, Artikel, Stornotyp, Anzahl, Umsatz_Brutto, Umsatz_Netto;Betriebs-Reportcenter, per storeId adressierbar;direkt;Stornotyp-Auspraegungen unverifiziert - kein Betrieb mit Stornodaten gefunden
+Umsetzung Berichte (1).xlsx;Laden;;Gutscheinverkauf und Einloesung;getUmsatzbericht + Voucher;hauptsparten 10003/95;;ableitbar;
+Umsetzung Berichte (1).xlsx;Laden;;Umsatzentwicklung nach Sparte/Artikel/Tageszeit;getUmsatzbericht + getZeitzonenbericht;hauptsparten/feinsparten + hours;;ableitbar;
+Umsetzung Berichte (1).xlsx;Franchise;;Zeitzonenbericht;getZeitzonenbericht;stores[].hours;Geschaeftstag 08:00-07:59;direkt;
+Umsetzung Berichte (1).xlsx;Franchise;;Zeitzonenbericht vordefiniert;getVordefinierteZeitzonenBericht;zeitzonen, values;time_from/to = Minuten seit Mitternacht;direkt;
+Umsetzung Berichte (1).xlsx;Franchise;;Umsatz nach Karte (Sparte/Feinsparte);getUmsatzbericht;hauptsparten / feinsparten;hauptsparten erwartet posId;direkt;
+Umsetzung Berichte (1).xlsx;Franchise;;Umsatz Marketingaktion;getAktionsbericht;aktionen, rows[].cells;;direkt;
+Umsetzung Berichte (1).xlsx;Holding;;Darlehen / Verbindlichkeiten / Budget / Jahresplanung / EK-Konsolidierung;NICHT IN LINA;-;Ebene existiert in LINA noch nicht;fehlt;externe Quelle noetig
+JULI_Round_Table_Ampelsystem.xlsx;Eingabe;-;Rendite / EBIT %;getKennzahlen (mode=relativ);EBIT;Prozent vom BWA-Umsatz;direkt;
+Umsetzung Berichte (1).xlsx;Laden;;Stornogrundbericht;finanzen/analytics/getReport?report=39&storeId=<encId>;+ Stornogrund;4 Gruende: 0 Keine Zuordnung, 1 Bruch/Kork, 2 verderb, 5 schwund;direkt;Werte unverifiziert
+Umsetzung Berichte (1).xlsx;Laden;;Tenderverkauf / Rabattbericht;finanzen/analytics/getReport?report=92&storeId=<encId>;Rabatt, Artikel, Brutto, Netto, Anzahl;;direkt;Werte unverifiziert
+Umsetzung Berichte (1).xlsx;Laden;;Zusatzverkauf pro Kellner;finanzen/analytics/getReport?report=60/61&storeId=<encId>;Umsatz pro Kellner;;direkt;
+Umsetzung Berichte (1).xlsx;Laden;;Persoverzehr / Kost-Sach-Bezug;finanzen/analytics/getReport?report=114&storeId=<encId>;Mitarbeiter Verpflegung;;direkt;
+Umsetzung Berichte (1).xlsx;Laden;;Einkaufsartikel Verbrauch;wawi/api/items + wawi/api/orders + wawi/inventory/inventory;items, orders.posten, units.factor;vollstaendige JSON-API, ohne Foodnotify;direkt;
+Projektbeschreibung;-;-;Rezepturaufloesung (Trend-Zutaten);wawi/rezept/recipeedit?items=b-<base64>&tab=ingred;Zutat, Anzahl, Einheit, Zubereitungsverlust;nur HTML, kein JSON;fehlt;Nice-to-have, Scraping ueber 1428 Artikel unrealistisch
