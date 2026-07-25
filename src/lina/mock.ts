@@ -1,0 +1,172 @@
+/**
+ * LINA-Attrappe für den Ende-zu-Ende-Test.
+ *
+ * Bildet die Eigenheiten nach, die in Phase 1 beobachtet wurden — nicht ein
+ * ideales API, sondern das echte Verhalten:
+ *   * Formular-Login mit den drei Eigenheiten aus `/js/common/login.js`:
+ *     POST auf `/common/index/dologin` (nicht auf `/login`), Passwort als
+ *     MD5-Hex, und ein `secret` aus der Loginseite, das je Aufruf neu
+ *     vergeben und nur einmal akzeptiert wird
+ *   * `dologin` antwortet IMMER mit 200 und JSON, auch im Fehlerfall:
+ *     `{"status":"SUCCESS","url":...}` bzw. `{"status":"ERROR","message":...}`.
+ *     Entschieden wird an `status`, nie am Statuscode.
+ *   * Session als Cookie
+ *   * abgelaufene Session -> HTML statt JSON
+ *   * HTTP 500 mit LEEREM Body, wenn ein Betrieb keine Daten hat
+ *   * Konzern-Endpunkte liefern alle Betriebe je Antwort
+ *
+ * Die Attrappe ist absichtlich streng: sie lehnt ab, was das echte LINA
+ * ablehnt. Sonst würde der Ende-zu-Ende-Test einen Anmeldeablauf grün melden,
+ * den es so nicht gibt — genau der Fall, der beim ersten echten Lauf auf
+ * "Login 200, Probe 302" hinauslief.
+ *
+ * Nur für Tests. Läuft nie im Container mit.
+ */
+import { createHash } from 'node:crypto'
+
+const fixture = (name: string) => require(`../transform/fixtures/${name}.json`)
+
+const md5 = (s: string) => createHash('md5').update(s).digest('hex')
+
+/** Wie LINAs Loginseite: `window.secret` als 64 Hex-Zeichen im Seitenkopf. */
+function loginSeite(secret: string): string {
+  return `<!doctype html><html><head>
+<script>window.secret = '${secret}';</script>
+<script src="/js/common/md5.js"></script>
+</head><body>
+<form id="loginform"><input name="username"><input name="password" type="password">
+<input type="hidden" name="system" value="a360"></form>
+</body></html>`
+}
+
+/** Muss mit LOGIN_ZIEL in auth.ts übereinstimmen — bewusst hier gespiegelt. */
+const LOGIN_ZIEL = '/common/index/dologin'
+
+export type MockOptionen = {
+  port?: number
+  /** Nach so vielen Aufrufen die Session einmal für ungültig erklären. */
+  sessionAblaufNach?: number
+  /** Endpunkte, die 500 mit leerem Body liefern (der "keine Daten"-Fall). */
+  keineDatenFuer?: string[]
+  benutzer?: string
+  /** Klartext; die Attrappe erwartet auf der Leitung den MD5-Hex davon. */
+  passwort?: string
+  system?: string
+}
+
+export function mockStarten(opt: MockOptionen = {}) {
+  const gueltigeSessions = new Set<string>()
+  /** Ausgegebene, noch nicht eingelöste secrets — je Aufruf eins, einmal gültig. */
+  const offeneSecrets = new Set<string>()
+  let secretZaehler = 0
+  let aufrufe = 0
+  let anmeldungen = 0
+  let abgelaufen = false
+  const zaehler: Record<string, number> = {}
+  let letzteHeader: Record<string, string> = {}
+  const passwortHash = md5(opt.passwort ?? 'geheim')
+
+  const server = Bun.serve({
+    port: opt.port ?? 0,
+    async fetch(req) {
+      const url = new URL(req.url)
+      const pfad = url.pathname
+      letzteHeader = Object.fromEntries(req.headers)
+      const cookie = req.headers.get('cookie') ?? ''
+      const sid = /LINASESS=([^;]+)/.exec(cookie)?.[1]
+
+      if (pfad === '/login' && req.method === 'GET') {
+        // 64 Hex-Zeichen wie im Original, aber deterministisch: Math.random()
+        // hier würde den Test von Zufall abhängig machen.
+        const secret = md5(`secret-${++secretZaehler}`) + md5(`salt-${secretZaehler}`)
+        offeneSecrets.add(secret)
+        return new Response(loginSeite(secret), {
+          headers: { 'content-type': 'text/html', 'set-cookie': 'LINASESS=vorlaeufig; Path=/; HttpOnly' },
+        })
+      }
+
+      if (pfad === LOGIN_ZIEL && req.method === 'POST') {
+        anmeldungen++
+        const body = new URLSearchParams(await req.text())
+        const secret = body.get('secret') ?? ''
+
+        // LINA antwortet auf `dologin` IMMER mit 200 und JSON — auch im
+        // Fehlerfall. Entschieden wird an `status`, nie am Statuscode.
+        // `login.js` zeigt `message` dem Nutzer wörtlich an.
+        //
+        // Am 25.07.2026 gegen das echte LINA abgelesen; der Fehlerfall lautet
+        // dort wörtlich:
+        //   {"status":"ERROR","message":"Benutzername oder Passwort ist falsch!"}
+        // Die Attrappe hatte hier vorher HTML bzw. eine 302 stehen — beides
+        // hat das echte LINA nie geschickt.
+        const fehlschlag = (message: string) =>
+          Response.json({ status: 'ERROR', message }, { status: 200 })
+
+        if (!offeneSecrets.delete(secret)) return fehlschlag('Ihre Sitzung ist abgelaufen!')
+        if (body.get('username') !== (opt.benutzer ?? 'testuser')) {
+          return fehlschlag('Benutzername oder Passwort ist falsch!')
+        }
+        // Erwartet wird der Hash, nicht das Klartextpasswort.
+        if (body.get('password') !== passwortHash) {
+          return fehlschlag('Benutzername oder Passwort ist falsch!')
+        }
+        if (body.get('system') !== (opt.system ?? 'a360')) {
+          return fehlschlag('Benutzername oder Passwort ist falsch!')
+        }
+
+        const neu = `sess-${anmeldungen}-${secretZaehler}`
+        gueltigeSessions.add(neu)
+        abgelaufen = false
+        aufrufe = 0
+        return Response.json(
+          { status: 'SUCCESS', url: '/common/dashboard/index' },
+          { status: 200, headers: { 'set-cookie': `LINASESS=${neu}; Path=/; HttpOnly` } })
+      }
+
+      const angemeldet = sid !== undefined && gueltigeSessions.has(sid) && !abgelaufen
+      if (!angemeldet) {
+        // Genau wie LINA: HTML statt JSON, kein 401.
+        return new Response(loginSeite('0'.repeat(64)),
+          { status: 200, headers: { 'content-type': 'text/html' } })
+      }
+
+      if (pfad === '/common/api/account') {
+        return Response.json({ user: { vorname: 'Test', nachname: 'Nutzer' } })
+      }
+
+      aufrufe++
+      if (opt.sessionAblaufNach && aufrufe > opt.sessionAblaufNach) abgelaufen = true
+
+      const map: Record<string, string> = {
+        '/intranet/analytics/getUmsatzbericht': 'getUmsatzbericht',
+        '/intranet/analytics/getPersonalkosten': 'getPersonalkosten',
+        '/intranet/analytics/getKennzahlen': 'getKennzahlen',
+        '/intranet/analytics/getZeitzonenbericht': 'getZeitzonenbericht',
+        '/intranet/analytics/getVordefinierteZeitzonenBericht': 'getVordefinierteZeitzonenBericht',
+        '/intranet/analytics/getArtikelverkaufsbericht': 'getArtikelverkaufsbericht',
+        '/intranet/analytics/getAktionsbericht': 'getAktionsbericht',
+      }
+      const name = map[pfad]
+      if (!name) return new Response('nicht gefunden', { status: 404 })
+
+      zaehler[name] = (zaehler[name] ?? 0) + 1
+
+      if (opt.keineDatenFuer?.includes(name)) {
+        // Der Phase-1-Sonderfall: 500 mit leerem Body ist KEIN Fehler.
+        return new Response('', { status: 500 })
+      }
+      return Response.json(fixture(name))
+    },
+  })
+
+  return {
+    url: `http://localhost:${server.port}`,
+    zaehler,
+    /** Wie oft angemeldet wurde. Der Test prüft damit auf Login-Schleifen. */
+    get anmeldungen() { return anmeldungen },
+    /** Header des letzten Aufrufs — damit prüfbar ist, wie wir uns ausgeben. */
+    get letzteHeader() { return letzteHeader },
+    sessionErzwingenAblaufen: () => { abgelaufen = true },
+    stop: () => server.stop(true),
+  }
+}
