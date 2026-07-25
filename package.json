@@ -1,0 +1,24 @@
+{
+  "name": "concept-family-analytics",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "health": "bun run src/health.ts",
+    "sync": "bun run src/sync.ts",
+    "einreihen": "bun run src/einreihen.ts",
+    "migrate": "bun run src/db/migrate.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "pg": "^8.22.0",
+    "tslog": "^5.1.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/pg": "^8.20.0",
+    "typescript": "^5.9.3"
+  }
+}

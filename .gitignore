@@ -1,0 +1,19 @@
+node_modules/
+.env
+.env.*
+!.env.example
+*.log
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Arbeitsdokumente einzelner Aufgaben - der bleibende Erkenntniswert steht in docs/
+PROMPT-*.md
+
+# Quelle der Anforderung, aber echte Geschaeftsdaten der Concept Family AG
+# (Buchhaltung, Round-Table-Zahlen) plus ~31 MB Screenshots. Bewusst NICHT
+# versioniert: das Repo soll spaeter auf GitHub deployt werden, und aus einer
+# Git-Historie bekommt man so etwas nur schwer wieder heraus.
+# Die Dateien bleiben lokal vorhanden.
+examples/
