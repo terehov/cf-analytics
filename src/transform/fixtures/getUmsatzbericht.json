@@ -1,0 +1,16 @@
+{
+  "_endpoint": "GET /intranet/analytics/getUmsatzbericht",
+  "_params": {"report":"intranet-umsatz","von":"01.06.2026","bis":"30.06.2026","reltime":"custom","brutto":"0","preExistingRevenue":"0","vergleichTyp":"vorjahr"},
+  "_note": "Betriebsnamen und encId anonymisiert. stores gekuerzt auf 3 von 141.",
+  "timeframe": "01.06.2026 - 30.06.2026",
+  "vergleichTimeframe": "01.06.2025 - 30.06.2025",
+  "hasVergleich": true,
+  "brutto": false,
+  "stores": [
+    {"name":"Betrieb 01","encId":"ENCID_000","umsatzNetto":2.86,"umsatzBrutto":3.4,"bills":1,"guests":0,"avgTicket":2.86,"avgGuest":0,"umsatzNettoV":137.23,"umsatzBruttoV":163.3,"diff":-97.92},
+    {"name":"Betrieb 02","encId":"ENCID_001","umsatzNetto":436198.85,"umsatzBrutto":484614.8,"bills":14477,"guests":14977,"avgTicket":30.13,"avgGuest":29.12,"umsatzNettoV":394391.24,"umsatzBruttoV":469284.59,"diff":10.6},
+    {"name":"Betrieb 03","encId":"ENCID_002","umsatzNetto":226434.23,"umsatzBrutto":251923.85,"bills":8623,"guests":12687,"avgTicket":26.26,"avgGuest":17.85,"umsatzNettoV":216773.81,"umsatzBruttoV":257826.33,"diff":4.46}
+  ],
+  "totals": {"umsatzNetto":8984319.71,"umsatzBrutto":10048421.89,"bills":318437,"guests":354751,"avgTicket":28.21,"avgGuest":25.33,"umsatzNettoV":8884242.5,"umsatzBruttoV":10549333.85,"diff":1.13},
+  "_storeCount": 141
+}

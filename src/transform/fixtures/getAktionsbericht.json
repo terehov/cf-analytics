@@ -1,0 +1,9 @@
+{
+  "_endpoint": "GET /intranet/analytics/getAktionsbericht",
+  "_params": {"report":"intranet-aktion","von":"01.06.2026","bis":"30.06.2026","reltime":"custom","brutto":"0"},
+  "timeframe": "01.06.2026 - 30.06.2026",
+  "brutto": false,
+  "aktionen": [{"id":4,"name":"Sekt alkoholfrei"}],
+  "rows": [{"name":"Betrieb 01","encId":"ENCID_000","cells":{"4":0}}],
+  "_rowCount": 141
+}

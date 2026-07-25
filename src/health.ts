@@ -1,0 +1,69 @@
+/**
+ * Hält den Container am Leben und macht ihn für Dokploy sichtbar.
+ *
+ * Der Importer ist kein Webservice — aber Dokploy Schedule Jobs führen
+ * Kommandos per `docker exec` in einem LAUFENDEN Container aus, sie starten
+ * keinen neuen. Der Container braucht also einen Prozess, der oben bleibt.
+ * Statt `sleep infinity` ein winziger HTTP-Endpunkt: damit funktionieren
+ * Dokploys Health-Checks und Monitoring, und man sieht von außen, wann der
+ * letzte Lauf war.
+ *
+ * Der eigentliche Sync läuft als eigener Prozess (`bun run sync`) und startet
+ * bei jedem Lauf frisch — keine wochenlang laufenden Scheduler, keine
+ * Speicherlecks, und ein Absturz kostet nur den laufenden Lauf.
+ */
+import { config } from './config'
+import { eine } from './db/pool'
+
+type Zustand = {
+  status: 'ok' | 'veraltet' | 'unbekannt' | 'db_nicht_erreichbar'
+  letzterLauf: { laufId: string; status: string; beendetAm: string | null } | null
+  offeneAbweichungen: number
+  pausierteKombinationen: number
+  offeneWarteschlange: number
+}
+
+async function erheben(): Promise<Zustand> {
+  const lauf = await eine<any>(
+    `SELECT lauf_id::text AS lauf_id, status, beendet_am FROM sync.lauf ORDER BY lauf_id DESC LIMIT 1`)
+  const abw = await eine<any>(
+    `SELECT count(*)::int AS n FROM sync.schema_abweichung WHERE quittiert_am IS NULL`)
+  const pausiert = await eine<any>(
+    `SELECT count(*)::int AS n FROM sync.fortschritt WHERE pausiert_bis > now()`)
+  const offen = await eine<any>(
+    `SELECT count(*)::int AS n FROM sync.warteschlange WHERE erledigt_am IS NULL`)
+
+  // "veraltet" = seit über 36 Stunden kein abgeschlossener Lauf. Bei einem
+  // täglichen Sync heißt das: mindestens ein Lauf ist ausgefallen.
+  const veraltet = !lauf?.beendet_am ||
+    Date.now() - new Date(lauf.beendet_am).getTime() > 36 * 3600 * 1000
+
+  return {
+    status: !lauf ? 'unbekannt' : veraltet ? 'veraltet' : 'ok',
+    letzterLauf: lauf
+      ? { laufId: lauf.lauf_id, status: lauf.status, beendetAm: lauf.beendet_am?.toISOString?.() ?? null }
+      : null,
+    offeneAbweichungen: abw?.n ?? 0,
+    pausierteKombinationen: pausiert?.n ?? 0,
+    offeneWarteschlange: offen?.n ?? 0,
+  }
+}
+
+Bun.serve({
+  port: config.PORT,
+  async fetch(req) {
+    if (new URL(req.url).pathname === '/health') {
+      try {
+        // 200 auch bei "veraltet": ein verpasster Sync ist kein Grund, den
+        // Container neu zu starten — das würde das Problem nicht lösen.
+        return Response.json(await erheben())
+      } catch (e) {
+        return Response.json({ status: 'db_nicht_erreichbar', fehler: String(e) }, { status: 503 })
+      }
+    }
+    return new Response('cf-analytics importer', { status: 200 })
+  },
+})
+
+console.log(JSON.stringify({ t: new Date().toISOString(), stufe: 'info',
+  msg: 'health lauscht', port: config.PORT, tz: process.env.TZ }))

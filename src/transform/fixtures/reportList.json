@@ -1,0 +1,14 @@
+{
+  "_endpoint": "GET /intranet/analytics/reportList",
+  "reports": [
+    {"id":"intranet-umsatz","name":"Umsatzbericht","route":"vue:IntranetUmsatzbericht","type":"item","date_select":"dateRange","disabled":false},
+    {"id":"intranet-zeitzonen","name":"Zeitzonenbericht","route":"vue:IntranetZeitzonenbericht","type":"item","date_select":"dateRange","disabled":false},
+    {"id":"intranet-artikel","name":"Artikelverkaufsbericht","route":"vue:IntranetArtikelverkaufsbericht","type":"item","date_select":"dateRange","disabled":false},
+    {"id":"intranet-aktion","name":"Aktionsbericht","route":"vue:IntranetAktionsbericht","type":"item","date_select":"dateRange","disabled":false},
+    {"id":"intranet-personalkosten","name":"Personalkosten","route":"vue:IntranetPersonalkosten","type":"item","date_select":"dateRange","disabled":false},
+    {"id":"intranet-vordefinierte-zeitzonen","name":"Vordefinierte Zeitzonen","route":"vue:IntranetVordefinierteZeitzonen","type":"item","date_select":"dateRange","disabled":false},
+    {"id":"intranet-kennzahlen","name":"Kennzahlen","route":"vue:IntranetKennzahlen","type":"item","date_select":"year","disabled":false}
+  ],
+  "favs": [],
+  "starrocksAllowed": true
+}
