@@ -63,6 +63,59 @@ Rückgriff in `core.artikel_warengruppe_zeitraum` da.
 > Eine Priorität sichert die Reihenfolge, nicht die Voraussetzung. „Läuft nach X" heißt nicht
 > „X hat etwas geliefert".
 
+### Ein Bericht fiel in den `default`-Zweig und landete nur in `raw`
+
+**Symptom.** `getAktionsbericht` wird seit dem ersten Lauf geholt. Posten `ok`, `zeilen: 0`,
+und in `core` nichts. Von den 206 Backfill-Posten war einer gelaufen — der auch nichts schrieb.
+
+**Ursache.** Im `switch` über die Endpunkte in `src/sync/laden.ts` gab es keinen `case` dafür.
+Der `default`-Zweig ist absichtlich still — „noch keine Transformation, der Raw-Layer hat die
+Daten trotzdem" — und genau deshalb sah der Ausfall nach nichts aus.
+
+**Kein Datenverlust.** Der Raw-Layer hatte alles. Nachträglich transformieren ging ohne einen
+einzigen LINA-Aufruf: `core.aktion` wurde per SQL aus `raw.api_antwort` gefüllt. Das ist der
+Zweck des Raw-Layers, einmal eingelöst.
+
+**Heute.** `transform.aktionsbericht()` löst die Kreuztabelle auf, `core.aktion` +
+`core.aktionsumsatz_tag`, drei `mart`-Sichten. Beim ersten Lauf standen 205 von 206 Tagen
+noch in der Warteschlange — sie laufen jetzt gegen einen Ladepfad, der sie auch schreibt.
+
+> „Der Raw-Layer hat es ja" ist eine Versicherung, keine Auswertung. Ein Endpunkt ohne
+> `case` bleibt still, bis jemand die Tabellen zählt.
+
+### Eine Tabelle mit Kommentar, mit Zweck — und ohne einen einzigen Schreiber
+
+**Symptom.** `core.bwa_buchungsstand`: 0 Zeilen. `grep -r bwa_buchungsstand src/` ohne Treffer.
+
+**Ursache.** Die Tabelle steht seit `0003` im Schema, mit einem Kommentar, der genau erklärt,
+wozu sie da ist, und `docs/lina-api-korrekturen.md` beschreibt seit Phase 1, warum es sie
+braucht. Nur schrieb nie jemand hinein. Derselbe Befundtyp wie bei der Markenebene: Absicht
+vollständig dokumentiert, Umsetzung fehlt.
+
+**Warum sie gebraucht wird.** `getKennzahlen` liefert ohne volle BWA-Rechte **stillschweigend
+Nullen statt eines Fehlers**. Die naheliegende Gegenprobe „Null-Quote über X % ⇒ Alarm" geht
+nicht, weil eine hohe Null-Quote der Normalfall ist. Gemessen am 26.07.2026 über 141 Betriebe:
+
+| Zustand | Betriebe |
+|---|---|
+| auf Höhe der Spitze (Juni 2026) | 23 |
+| im Rückstand, davon 8 mehr als einen Monat | 46 |
+| nie eine BWA gebucht | 62 |
+| in keiner `getKennzahlen`-Antwort aufgetaucht | 10 |
+
+**Beim Bauen selbst hineingetappt.** Die erste Fassung der Kommentare nannte „72 von 141 haben
+nie eine BWA". Die Zahl stammte aus einer Abfrage mit `LEFT JOIN`, die NULL für „kam vor, nie
+gebucht" **und** für „kam gar nicht vor" liefert — also genau die Unterscheidung nicht machte,
+um die es in der Tabelle geht. Richtig sind 62 und 10. Korrigiert in Migration `0016`.
+
+**Heute.** `src/sync/laden.ts` schreibt den Stand nach jedem `getKennzahlen`-Posten,
+`mart.bwa_rueckstand` wertet ihn aus, und `/status` prüft die **Spitze** — nicht die Zahl der
+Nachzügler. Ein Alarm auf Nachzügler wäre dauerhaft gelb, und eine dauerhaft gelbe Ampel liest
+nach zwei Wochen niemand mehr.
+
+> Wer drei Zustände in zwei Werte presst, misst am Ende seinen eigenen Filter. Genau der
+> Fehler, den die Tabelle verhindern soll — und er ist beim Bauen dieser Tabelle passiert.
+
 ### Die Markenebene war vollständig gebaut — und wurde nie geladen
 
 **Symptom.** `SELECT * FROM mart.konzept_zuordnung` meldete für **alle 141 Betriebe**
@@ -580,3 +633,60 @@ Drei Muster, die sich durchziehen:
    Euro/Prozent, die leeren letzten Tage) brauchen genau die Konstellation, die nur echte Daten
    liefern. Nach jeder Schemaänderung gehört ein Blick in `mart.pruefung_uebersicht` und
    `mart.betrieb_ohne_lina_id` dazu.
+
+---
+
+## Freitextfilter statt Auswahlliste — der lautlose Leerbefund
+
+**Symptom.** Der Filter „Betrieb" auf allen Dashboards war ein Freitextfeld.
+
+**Warum das schlimmer ist als es klingt.** Ein Tippfehler oder eine abweichende
+Schreibweise — „Enchilada Bremen" gegen „Enchilada Bremen GmbH" — führt nicht zu einer
+Fehlermeldung, sondern zu einem **vollständig aufgebauten, leeren Dashboard**. Das ist optisch
+nicht davon zu unterscheiden, dass dieser Betrieb kein Geschäft macht. Und da 79 der 141
+Betriebe tatsächlich dauerhaft 0 € melden, ist der Leerbefund hier sogar plausibel.
+
+**Erster, wirkungsloser Versuch.** `values_source_config` mit `value_field` auf die Feld-ID
+von `mart.betrieb.betrieb` — im Browser nachgemessen: unverändert ein Freitextfeld. Grund:
+die Karten sind natives SQL, ihre Filter hängen an einer *Variablen* statt an einer Spalte,
+und ein Feld-Dropdown bietet Metabase nur an, wo es die Spalte kennt.
+
+**Lösung.** `values_source_type: 'static-list'` mit den beim Übernehmen aus der Datenbank
+gelesenen Werten. Nachgewiesen: 141 Einträge, alphabetisch, als Auswahlliste im Browser.
+
+**Regel.** Ein Textfilter ohne hinterlegte Auswahlliste ist ein Fehler, keine Vereinfachung.
+
+---
+
+## Zwei Zeitfilter, die verschiedene Teile derselben Seite bewegen
+
+**Symptom.** Auf *Warenwirtschaft* standen „Monat" und „Zeitraum" nebeneinander.
+
+**Befund.** Sie waren nicht redundant, sondern **schlimmer**: der Zeitraum wirkte auf zwei
+Karten, der Monat auf genau eine, und zwei weitere Karten lasen keinen von beiden. Wer den
+Monat umstellte, sah drei von fünf Karten unverändert stehenbleiben — ohne Hinweis, warum.
+
+**Lösung.** Eine Zeitangabe je Seite. Da der Deckungsbeitrag nur je Monat vorliegt, nimmt er
+jetzt alle Monate, die der gewählte Zeitraum berührt; dass ein halber Monat ganz zählt, steht
+im Kopftext.
+
+**Prüfung, die das findet.** Karten-Variablen — einschließlich der aus `gemeinsam.ts`
+geerbten, sonst meldet die Prüfung `monat` überall fälschlich als tot — gegen die Filterliste
+des Dashboards halten.
+
+---
+
+## Division durch null bei einer Marke ohne Umsatz
+
+**Symptom.** *Wochenprofil je Marke* scheiterte mit `ERROR: division by zero`.
+
+**Ursache.** Der Wochenanteil wird als `umsatz / sum(umsatz) OVER (PARTITION BY konzept)`
+gerechnet. Eine Marke, deren Betriebe durchgehend 0 € melden, hat eine Wochensumme von 0.
+
+**Lösung.** `nullif(…, 0)` — die Marke erscheint ohne Linie, statt die ganze Karte scheitern
+zu lassen.
+
+**Warum das hier lauert.** Die 79 umsatzlosen Betriebe sind kein Sonderfall, sondern über die
+Hälfte des Bestands. Jede Division durch eine Umsatzsumme braucht einen Schutz. Die übrigen
+drei Stellen im Kartenbestand waren bereits über `HAVING sum(...) > 0` bzw. `CASE WHEN > 0`
+abgesichert; nachgeprüft am 26.07.2026.

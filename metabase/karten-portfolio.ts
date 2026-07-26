@@ -33,7 +33,7 @@ export const karten: Karte[] = [
     schluessel: 'pf_konzentration',
     name: 'Umsatzkonzentration',
     beschreibung:
-      'Wie stark hängt der Gesamtumsatz an wenigen Häusern? Die Betriebe nach Umsatz sortiert, dazu der kumulierte Anteil. Am 26.07.2026 kamen 70 % des Umsatzes aus dem stärksten Fünftel — jede Störung dort wiegt entsprechend schwerer als eine Verbesserung im langen Schwanz.',
+      'Wie stark hängt der Gesamtumsatz an wenigen Häusern? Die Betriebe nach Umsatz sortiert, dazu der aufsummierte Anteil. Je mehr Umsatz auf die ersten Zeilen entfällt, desto schwerer wiegt dort eine Störung — und desto weniger bringt eine Verbesserung ganz unten.',
     anzeige: 'table',
     parameter: [P_MARKE],
     sql: `
@@ -64,7 +64,7 @@ SELECT row_number() OVER (ORDER BY umsatz DESC)                          AS "Ran
     schluessel: 'pf_konzentration_kurve',
     name: 'Konzentrationskurve',
     beschreibung:
-      'Derselbe Zusammenhang als Kurve: wie viel Prozent des Umsatzes die stärksten x Prozent der Betriebe tragen. Je steiler der Anstieg links, desto abhängiger ist die Gruppe von wenigen Häusern. Eine Diagonale wäre Gleichverteilung.',
+      'Derselbe Zusammenhang als Kurve: wie viel Prozent des Umsatzes die stärksten Betriebe tragen. Je steiler die Kurve links ansteigt, desto abhängiger ist die Gruppe von wenigen Häusern. Eine gerade Linie würde heißen, alle Betriebe tragen gleich viel bei.',
     anzeige: 'line',
     parameter: [P_MARKE],
     sql: `
@@ -103,7 +103,7 @@ SELECT round(100.0 * r / n)                AS "Betriebe (%)",
     schluessel: 'pf_karteileichen',
     name: 'Betriebe ohne laufendes Geschäft',
     beschreibung:
-      'Betriebe, die in der Struktur stehen und täglich Umsatzberichte liefern — aber durchgehend 0 €. Am 26.07.2026 waren das 79 von 141; nur 62 Betriebe machen überhaupt Umsatz. Das ist keine Datenlücke: die Berichte kommen an, sie sind leer. Beteiligungsgesellschaften, geschlossene oder noch nicht eröffnete Häuser, Testeinträge. Sie verzerren jeden Mittelwert und erzeugen absurde Quoten — „Enchilada Bremen" stand mit 1109 % Personalkosten bei 0 € Umsatz in der Ampel. Diese Liste ist die Arbeitsvorlage, um sie auf inaktiv zu setzen; bis dahin ist bei jeder Auswertung mitzudenken, dass 56 % der Zeilen leer sind.',
+      'Betriebe, die täglich Umsatzberichte liefern — aber durchgehend 0 €. Das ist keine Datenlücke: die Berichte kommen an, sie sind leer. Dahinter stehen Beteiligungsgesellschaften, geschlossene oder noch nicht eröffnete Häuser und Testeinträge. Solche Betriebe verzerren jeden Durchschnitt und erzeugen unsinnige Quoten — etwa über 1000 % Personalkosten bei 0 € Umsatz. Diese Liste ist die Vorlage, um sie auf inaktiv zu setzen.',
     anzeige: 'table',
     sql: `
 SELECT d.betrieb                       AS "Betrieb",
@@ -154,9 +154,9 @@ SELECT count(*) FILTER (WHERE u.umsatz > 0)::text || ' von ' || count(*)::text
     // Die Frage, die ein Round Table eigentlich stellen sollte: nicht
     // "wer ist rot", sondern "was kostet uns der Abstand".
     schluessel: 'pf_potenzial',
-    name: 'Potenzial bis zum Median',
+    name: 'Potenzial bis zum Mittelfeld',
     beschreibung:
-      'Was wäre rechnerisch zu holen, wenn jeder Betrieb über dem Median seine Personalkostenquote nur auf den Median senkte? Kein Ziel und keine Prognose — eine Größenordnung, die sagt, wo sich Arbeit lohnt. Betriebe ohne Umsatz sind ausgeschlossen, sonst dominiert der Unsinn die Liste.',
+      'Was wäre rechnerisch zu holen, wenn jeder überdurchschnittliche Betrieb seine Personalkostenquote auf das Mittelfeld senken würde? Das ist kein Ziel und keine Prognose, sondern eine Größenordnung: sie zeigt, wo sich Arbeit am meisten lohnt. Betriebe ohne Umsatz sind ausgenommen.',
     anzeige: 'table',
     parameter: [P_MONAT, P_MARKE],
     sql: `${MONAT_CTE},
@@ -195,7 +195,7 @@ SELECT b.betrieb                                                   AS "Betrieb",
     schluessel: 'pf_streuung',
     name: 'Streuung der Personalquote',
     beschreibung:
-      'Wie weit vergleichbare Betriebe auseinanderliegen. Eine enge Verteilung heißt, die Quote ist strukturell bedingt; eine breite heißt, sie ist beeinflussbar — und dann lohnt die Frage, was die unteren anders machen. Die Klassenbreite ist bewusst grob: bei mehr als etwa sieben Klassen verwischen benachbarte ohnehin.',
+      'Wie weit vergleichbare Betriebe auseinanderliegen. Liegen alle eng beieinander, ist die Quote durch das Geschäft vorgegeben und kaum zu ändern. Streuen sie weit, ist sie beeinflussbar — dann lohnt die Frage, was die günstigen Häuser anders machen.',
     anzeige: 'bar',
     parameter: [P_MONAT, P_MARKE],
     sql: `${MONAT_CTE},
@@ -238,7 +238,7 @@ SELECT klasse   AS "Personalkostenquote",
     schluessel: 'pf_wochentag',
     name: 'Umsatz nach Wochentag',
     beschreibung:
-      'Der durchschnittliche Tagesumsatz je Wochentag. Am 26.07.2026 stand Samstag bei rund dem Zweieinhalbfachen des Montags — die Grundlage für jede Diskussion über Öffnungszeiten, Dienstpläne und Ruhetage.',
+      'Der durchschnittliche Tagesumsatz je Wochentag. Das Verhältnis zwischen starken und schwachen Tagen ist die Grundlage für jede Diskussion über Öffnungszeiten, Dienstpläne und Ruhetage.',
     anzeige: 'bar',
     parameter: [P_BETRIEB, P_MARKE],
     sql: `
@@ -267,7 +267,7 @@ SELECT trim(to_char(t.geschaeftstag, 'TMDay'))  AS "Wochentag",
     schluessel: 'pf_wochentag_marke',
     name: 'Wochenprofil je Marke',
     beschreibung:
-      'Derselbe Wochenrhythmus, aber je Marke und in Prozent der eigenen Woche. Dadurch vergleichbar, egal wie groß die Marke ist. Ein Mittagskonzept und eine Abendgastronomie haben hier sichtbar verschiedene Kurven — und brauchen verschiedene Maßnahmen.',
+      'Derselbe Wochenrhythmus je Marke, jeweils in Prozent der eigenen Woche — dadurch vergleichbar, egal wie groß die Marke ist. Ein Mittagskonzept und eine Abendgastronomie zeigen hier sichtbar verschiedene Kurven und brauchen verschiedene Maßnahmen.',
     anzeige: 'line',
     sql: `
 WITH je_tag AS (
@@ -278,9 +278,13 @@ WITH je_tag AS (
       FROM mart.umsatz_tag
      GROUP BY 1, 2, 3
 )
+-- nullif: Marken, deren Betriebe durchgehend 0 EUR melden, haben eine
+-- Wochensumme von 0 und wuerden die Division sprengen. Sie erscheinen
+-- dann ohne Linie statt die ganze Karte scheitern zu lassen.
 SELECT tag      AS "Wochentag",
        konzept  AS "Marke",
-       round(100 * umsatz / sum(umsatz) OVER (PARTITION BY konzept), 1) AS "Anteil an der Woche (%)"
+       round(100 * umsatz / nullif(sum(umsatz) OVER (PARTITION BY konzept), 0), 1)
+                AS "Anteil an der Woche (%)"
   FROM je_tag
  ORDER BY tag_nr`,
     visualisierung: {
@@ -296,7 +300,7 @@ SELECT tag      AS "Wochentag",
     schluessel: 'pf_stabilitaet',
     name: 'Wie stabil läuft ein Betrieb',
     beschreibung:
-      'Schwankung des Tagesumsatzes, gemessen als Variationskoeffizient (Standardabweichung geteilt durch Mittelwert). Ein niedriger Wert heißt planbares Geschäft, ein hoher heißt Abhängigkeit von Wochenenden, Events oder Wetter — und macht Personalplanung teuer. Bewusst relativ, damit große und kleine Häuser vergleichbar bleiben.',
+      'Wie stark der Tagesumsatz schwankt, gemessen im Verhältnis zum eigenen Durchschnitt. Ein niedriger Wert heißt planbares Geschäft; ein hoher heißt Abhängigkeit von Wochenenden, Veranstaltungen oder Wetter — und macht die Personalplanung teuer. Der Bezug auf den eigenen Durchschnitt macht große und kleine Häuser vergleichbar.',
     anzeige: 'table',
     parameter: [P_MARKE],
     sql: `
@@ -325,7 +329,7 @@ HAVING count(*) >= 30
     schluessel: 'pf_gaeste_bon',
     name: 'Kommen mehr Gäste oder geben sie mehr aus?',
     beschreibung:
-      'Umsatzveränderung zerlegt in ihre beiden Ursachen: mehr Gäste oder höherer Umsatz je Gast. Die Unterscheidung entscheidet über die Maßnahme — Frequenz ist ein Marketing- und Standortthema, der Bon ein Karten-, Preis- und Verkaufsthema. Im Excel war beides in einer Zahl vermischt.',
+      'Woher eine Umsatzveränderung kommt: von mehr Gästen oder von höherem Umsatz je Gast. Die Unterscheidung entscheidet über die Maßnahme — mehr Gäste sind ein Marketing- und Standortthema, ein höherer Bon ein Karten-, Preis- und Verkaufsthema.',
     anzeige: 'table',
     parameter: [P_MARKE],
     sql: `
@@ -373,9 +377,9 @@ SELECT betrieb                                                        AS "Betrie
   // ===================================================================
   {
     schluessel: 'pf_marken_matrix',
-    name: 'Marken über alle Metriken',
+    name: 'Marken über alle Kennzahlen',
     beschreibung:
-      'Jede Marke in jeder Metrik, als Median, mit dem Abstand zum Gesamtmedian. So sieht man, ob eine Marke durchgehend schwächer ist oder nur in einer Disziplin — und ob ein auffälliger Betrieb Ausreißer ist oder Symptom seiner Marke. Vorsicht beim Vorzeichen: bei Umsatz ist mehr besser, bei den Quoten weniger.',
+      'Jede Marke in jeder Kennzahl, jeweils der mittlere Betrieb, mit dem Abstand zum Gesamtmittelfeld. So wird sichtbar, ob eine Marke durchgehend schwächer ist oder nur in einer Disziplin — und ob ein auffälliger Betrieb ein Einzelfall ist oder typisch für seine Marke. Achtung beim Vorzeichen: beim Umsatz ist mehr besser, bei den Quoten weniger.',
     anzeige: 'table',
     parameter: [P_MONAT],
     sql: `${MONAT_CTE},
@@ -410,7 +414,7 @@ SELECT m.bereich_name                       AS "Metrik",
     schluessel: 'pf_marken_umsatzanteil',
     name: 'Umsatzanteil je Marke',
     beschreibung:
-      'Wie sich der Gesamtumsatz auf die Marken verteilt, Monat für Monat. Zeigt Verschiebungen im Portfolio, die in den Einzelbetrieben untergehen.',
+      'Wie sich der Gesamtumsatz Monat für Monat auf die Marken verteilt. Zeigt Verschiebungen zwischen den Marken, die man dem einzelnen Betrieb nicht ansieht.',
     anzeige: 'bar',
     sql: `
 SELECT monat                                   AS "Monat",

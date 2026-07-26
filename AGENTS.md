@@ -143,7 +143,7 @@ sync/worker.ts         die Schleife
 sync/laden.ts          raw → core
 transform/index.ts     reine Transformationsfunktionen
 health.ts              /health und /status, hält den Container oben
-status.ts              Statusbericht fürs Monitoring — sechs Prüfungen
+status.ts              Statusbericht fürs Monitoring — sieben Prüfungen
 sync.ts / einreihen.ts Einstiegspunkte
 ```
 

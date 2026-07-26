@@ -178,6 +178,10 @@ const definitionen = {
       slug: p.name,
       type: p.type,
       sectionId: p.type.startsWith('date') ? 'date' : 'string',
+      // Auswahlliste statt Freitext. Das Feld wird erst in der Seite zur
+      // Feld-ID aufgeloest, weil die IDs je Metabase-Installation andere
+      // sind und hier nicht fest stehen duerfen.
+      ...(p.werteliste ? { werteliste: p.werteliste } : {}),
     })),
     kacheln: layoutVon.get(d.schluessel)!,
   })),
@@ -185,17 +189,17 @@ const definitionen = {
     {
       name: 'Drill-Down',
       beschreibung:
-        'Die Kette Marke → Filiale → Betrieb, plus Zeitraum- und Standortvergleich. Hier fängt man an; ein Klick führt jeweils eine Ebene tiefer.',
+        'Die Kette Marke → Filiale → Betrieb, dazu der Vergleich von Zeiträumen und Standorten. Hier fängt man an; ein Klick führt jeweils eine Ebene tiefer.',
     },
     {
       name: 'Round Table',
       beschreibung:
-        'Der monatliche Round Table. Ersetzt JULI_Round_Table_Ampelsystem.xlsx vollständig — Eingabe, Dashboard, Trend, Ursachen, Maßnahmen und Ampelhistorie.',
+        'Alles für den monatlichen Round Table: Übersicht und Betriebstabelle, Trend und Historie, Ursachen und Maßnahmen.',
     },
     {
       name: 'Betrieb',
       beschreibung:
-        'Die Fachberichte aus „Umsetzung Berichte": Umsatz, Struktur, Personal, Warenwirtschaft, BWA — und die Seite, mit der man prüft, ob man den übrigen glauben darf.',
+        'Die Detailauswertungen: Umsatz, Struktur, Personal, Warenwirtschaft und BWA — dazu die Seite, auf der man prüft, ob man den übrigen glauben darf.',
     },
   ],
 }
@@ -316,6 +320,27 @@ async function uebernehmen() {
     dashId[d.schluessel] = id;
   }
 
+  // Die Werte fuer eine Auswahlliste holen. Ueber Metabases eigene
+  // Abfrage-Schnittstelle, damit hier keine zweite Datenbankverbindung
+  // noetig ist. Wird je Liste nur einmal gelesen und danach gemerkt.
+  const listenSpeicher = {};
+  async function werteHolen(feld) {
+    const schluessel = feld.join('.');
+    if (listenSpeicher[schluessel]) return listenSpeicher[schluessel];
+    const [schema, tabelle, spalte] = feld;
+    const antwort = await mb('/dataset', 'POST', {
+      type: 'native',
+      database: def.db_id,
+      native: {query:
+        'SELECT DISTINCT "' + spalte + '" FROM "' + schema + '"."' + tabelle + '" ' +
+        'WHERE "' + spalte + '" IS NOT NULL ORDER BY 1'},
+    });
+    const werte = (antwort.data?.rows || []).map(r => r[0]).filter(v => v !== null && v !== '');
+    listenSpeicher[schluessel] = werte;
+    log('  Auswahlliste ' + schluessel + ': ' + werte.length + ' Werte');
+    return werte;
+  }
+
   // Klickverhalten einer Kachel in Metabases Struktur uebersetzen.
   // parameterMapping bildet einen Parameter des ZIELS auf eine Spalte der
   // QUELLE ab; ohne diese Abbildung oeffnet der Klick das Zieldashboard
@@ -404,7 +429,33 @@ async function uebernehmen() {
         });
       }
 
-      await mb('/dashboard/' + id, 'PUT', {parameters: d.parameter, dashcards});
+      // Auswahllisten setzen. Ohne sie zeigt Metabase ein Freitextfeld:
+      // wer "Enchilada Bremen" nicht auf den Buchstaben genau trifft, sieht
+      // ein leeres Dashboard und keinen Hinweis, dass der Filter schuld ist.
+      //
+      // Bewusst eine FESTE Liste und kein Verweis auf ein Feld: die Karten
+      // sind natives SQL, ihre Filter haengen deshalb an einer Variablen und
+      // nicht an einer Spalte. Metabase bietet ein Feld-Dropdown nur dort an,
+      // wo es die Spalte kennt — bei einer Variablen bleibt es beim
+      // Freitextfeld, egal was in values_source_config steht.
+      const parameter = [];
+      for (const p of d.parameter) {
+        if (!p.werteliste) { parameter.push(p); continue; }
+        const {werteliste, ...rest} = p;
+        const werte = await werteHolen(werteliste);
+        if (!werte.length) {
+          log('  Werteliste ' + werteliste.join('.') + ' leer', 'fehler');
+          parameter.push(rest); continue;
+        }
+        parameter.push({
+          ...rest,
+          values_query_type: 'list',
+          values_source_type: 'static-list',
+          values_source_config: {values: werte},
+        });
+      }
+
+      await mb('/dashboard/' + id, 'PUT', {parameters: parameter, dashcards});
       log('  ' + dashcards.length + ' Kacheln gesetzt', 'ok');
     } catch (e) { log('Dashboard ' + d.payload.name + ' — FEHLER: ' + e.message, 'fehler'); }
   }

@@ -119,6 +119,26 @@ Damit verschiebt sich aber die Frage: wenn niemand mehr eingreifen *muss*, merkt
 ### Befunde gehören in `docs/`, nicht in die Commit-Nachricht
 *Eugene:* „Ich möchte sichergehen, dass alle Explorationen, alle Erkenntnisse, alle Entscheidungen, alle Probleme innerhalb des docs-Ordners stehen und aus `AGENTS.md` verlinkt sind." — Auslöser war der Befund, dass **kein einziger** der gefundenen Fehler in `docs/` stand: das Wissen lag ausschließlich in Commit-Nachrichten und Code-Kommentaren, für den nächsten Agenten praktisch unauffindbar. Daraus `fehlerkatalog.md` und `datenherkunft.md` sowie die Dokumentationspflicht als harte Regel in `AGENTS.md`.
 
+### Der Aktionsbericht wird transformiert, und die leeren Zellen fallen weg
+*Eugene:* „Implementiere die beiden Befunde." — `getAktionsbericht` wurde seit dem ersten Lauf geholt und fiel im `switch` in den `default`-Zweig: Posten `ok`, `zeilen: 0`, alles nur in `raw`.
+
+Drei Entscheidungen beim Nachbauen:
+
+**Leere Zellen werden verworfen**, wie beim Artikelverkauf. Am 25.07.2026 waren alle 423 Zellen (141 Betriebe × 3 Aktionen) `null` — wer sie mitschreibt, sammelt 87.000 Zeilen Nichts im Jahr. Der Preis ist derselbe: eine fehlende Zeile heißt „keine Aktion an diesem Tag" **und** „Tag nicht geholt". Welcher Fall vorliegt, beantwortet `sync.warteschlange`.
+
+**Netto oder brutto entscheidet die Antwort, nicht die Anfrage.** Wir fragen immer mit `brutto=0`, gespeichert wird trotzdem nach dem Feld `brutto` im Payload. Wer sich auf die eigene Anfrage verlässt, beschriftet irgendwann Bruttowerte als netto — und das sieht man einer Zahl nicht an.
+
+**Der Nenner für `anteil_pct` kommt aus dem Umsatzbericht**, nicht aus der Summe aller Aktionen. „Anteil an allen Aktionen" wäre eine andere Frage; gefragt ist, wie viel vom *Geschäft* auf eine Aktion entfällt.
+
+### Die BWA-Plausibilität misst die Spitze, nicht die Nachzügler
+`core.bwa_buchungsstand` stand seit `0003` im Schema, mit Kommentar und Zweck, und niemand schrieb hinein. Beim Nachrüsten stellte sich die eigentliche Frage: *worauf* soll die Prüfung anschlagen?
+
+Gemessen am 26.07.2026 über 141 Betriebe: 23 auf Höhe der Spitze, 46 im Rückstand (davon 8 mehr als einen Monat), 62 nie gebucht, 10 in keiner Antwort aufgetaucht. Ein Alarm auf die Zahl der Nachzügler wäre also dauerhaft gelb — und eine dauerhaft gelbe Ampel liest nach zwei Wochen niemand mehr.
+
+**Also bewacht `/status` die Spitze:** rückt der jüngste gebuchte Monat über Monate nicht mehr vor, fehlen vermutlich die BWA-Rechte, und dann liefert `getKennzahlen` kommentarlos Nullen — der Ausfall, vor dem `lina-api-inventar.md` seit Phase 1 warnt. Wer im Einzelnen hinterherhängt, steht in `mart.bwa_rueckstand` und wird dort gesucht, nicht gemeldet.
+
+**Drei Zustände, nicht zwei.** `letzter_monat` gesetzt / `NULL` / keine Zeile trennt „hat geliefert" von „nie gebucht" von „nie geprüft". Beim ersten Schreiben der Kommentare wurden die letzten beiden zu einer „72" zusammengefasst — genau der Fehler, den die Tabelle verhindern soll, begangen beim Bauen der Tabelle. Korrigiert in `0016`, festgehalten im `fehlerkatalog.md`.
+
 ---
 
 ## Drei widerlegte Annahmen aus der Exploration
@@ -128,3 +148,43 @@ Alle drei klangen plausibel und waren falsch. Details in `lina-api-korrekturen.m
 1. **„Der Account sieht die BWA-Zahlen nicht"** — falsch. Verallgemeinerung aus einem einzigen Betrieb, der tatsächlich keine BWA hat. Es ist ein Datenverfügbarkeitsproblem, kein Rechteproblem. Der Blocker war keiner.
 2. **„WE-% muss man aus POS-Sparten rechnen"** — falsch und gefährlich: ergibt 45,90 statt 23,64. `getKennzahlen?mode=relativ` liefert die Ampelwerte fertig.
 3. **„Der Betriebswechsel ist die offene Architekturfrage"** — gelöst: `storeId=<encId>` als Parameter, kein Session-Wechsel nötig.
+
+---
+
+## Beschreibungen in der Sprache des Fachbereichs (26.07.2026)
+
+**Entscheidung.** Alle in Metabase sichtbaren Texte — Kartennamen, Beschreibungen,
+Überschriften, Sammlungen — richten sich an Fachbereichs-Mitarbeitende ohne technischen
+Hintergrund. Technische Begründungen wandern in den Quelltext.
+
+**Anlass.** Rückmeldung am Beispiel des Warenwirtschafts-Kopftextes: *„mart.artikelverkauf
+liegt bei rund 20 Millionen Zeilen im Jahr und ist monatlich partitioniert."* Für die
+lesende Person ist die einzig verwertbare Information: **zuerst einen Zeitraum wählen, sonst
+dauert es lange.** Der Rest erklärt eine Bauentscheidung.
+
+**Grenze.** Nicht gekürzt wird, was vor einem Fehlschluss schützt — dass ein weißer Punkt
+„keine Daten" heißt und nicht „in Ordnung", dass ein Monat auf null nicht gebucht ist. Diese
+Sätze sind der Zweck der Beschreibungen.
+
+**Nebenwirkung, die zählt.** Feste Messwerte („Am 26.07.2026 waren es 79 von 141") sind aus
+den Texten verschwunden. Sie veralten still und werden zu falschen Aussagen, die niemand
+bemerkt, weil sie plausibel aussehen. Die Aussage bleibt, die Zahl liefert die Karte daneben.
+
+---
+
+## Feste Werteliste statt Feldverweis für Textfilter (26.07.2026)
+
+**Entscheidung.** Die Filter „Betrieb" und „Marke" bekommen ihre Auswahl als feste Liste, die
+beim Übernehmen aus der Datenbank gelesen wird.
+
+**Verworfene Alternative.** Verweis auf die Spalte über `value_field`. Im Browser nachgemessen
+wirkungslos: Metabase bietet ein Feld-Dropdown nur bei Karten an, deren Filter an einer Spalte
+hängt. Bei nativem SQL hängt er an einer Variablen.
+
+**Preis.** Die Liste ist eine Momentaufnahme. **Nach jedem neuen Betrieb muss
+`bun run metabase/uebernehmen.ts` einmal laufen**, sonst fehlt er in der Auswahl. Das ist
+dokumentiert in `docs/dashboards.md`; der Lauf ist ohnehin nach jeder Änderung nötig.
+
+**Warum trotzdem richtig.** Ein Freitextfeld beantwortet einen Tippfehler mit einem leeren
+Dashboard statt mit einer Fehlermeldung — und ein leeres Dashboard ist hier eine plausible,
+falsche Auskunft.

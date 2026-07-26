@@ -54,6 +54,8 @@ Ein bewusster Unterschied zwischen den beiden: die **Warengruppe** gilt rückwir
 
 **Die Kinder liegen im Schema `part`, nicht neben der Elterntabelle.** Postgres legt sie standardmäßig daneben; bei monatlicher Partitionierung über acht Jahre stehen dann rund hundert Tabellen namens `artikelverkauf_tag_2023_07` in `core` und die fünf, um die es geht, gehen darin unter. Am 26.07.2026 waren es 84 von 110 Tabellen. In Postico ist das lästig, in Metabase unbenutzbar. Ein Test in `src/sync/e2e.test.ts` hält die Regel fest, weil sie bei der nächsten Änderung an `partition_anlegen()` lautlos kaputtginge.
 
+**Was bewusst *nicht* partitioniert ist.** `core.aktionsumsatz_tag` ist ebenfalls eine Tagesfaktentabelle, bleibt aber eine einzige Tabelle: 141 Betriebe × drei Aktionen, und davon ist fast alles leer — am 25.07.2026 waren *alle* 423 Zellen `null`. Eine Partitionierung wäre hier reine Verwaltung ohne Gegenwert, und jede Partition, die niemand braucht, ist genau die Tabelle zu viel, um die es beim Aufräumen von `core` ging.
+
 **BRIN braucht `autosummarize = on`.** Ohne das bleiben frisch angehängte Blöcke bis zum nächsten VACUUM unsummiert — also genau die Zeilen, die eine Round-Table-Auswertung am häufigsten liest. Bei append-only-Tabellen ist das der Normalfall.
 **Und:** Storage-Parameter lassen sich **nicht** auf dem partitionierten Index setzen (`This operation is not supported for partitioned indexes`), nur je Kindindex. Deshalb legt `partition_anlegen()` den BRIN gleich richtig an.
 

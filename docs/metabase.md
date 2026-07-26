@@ -52,7 +52,10 @@ stellen: Admin → Tabellenmetadaten → Schema `core` → Sichtbarkeit.
 | Artikel, Renner und Penner, Deckungsbeitrag | `mart.artikelverkauf` |
 | Sortiment nach Warengruppe | `mart.deckungsbeitrag_warengruppe` |
 | Einkaufspreise über die Zeit | `mart.preisentwicklung_ware` |
+| Was bringen die Marketingaktionen? | `mart.aktionsumsatz_monat` — mit Anteil am Gesamtumsatz |
+| Welche Aktionen gibt es, laufen sie noch? | `mart.aktion` — hinterlegte gegen tatsächliche Laufzeit |
 | BWA-Kennzahlen, jüngster Stand | `mart.kennzahlen_aktuell` |
+| Wer hängt bei der BWA hinterher? | `mart.bwa_rueckstand` — „nie gebucht" ist kein Rückstand |
 | Stimmen die Zahlen? | `mart.pruefung_uebersicht` |
 | Läuft der Import? | `mart.sync_status`, `mart.backfill_fortschritt` |
 | Fehlt einem Betrieb die BWA-Brücke? | `mart.betrieb_ohne_lina_id` — Erwartung: leer |

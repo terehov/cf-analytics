@@ -43,8 +43,8 @@ Backfill so billig ist — acht Aufrufe je Kalendertag, nicht 8 × 141.
 | `getVordefinierteZeitzonenBericht` | `/intranet/analytics/getVordefinierteZeitzonenBericht` | Tag | `core.zeitzonenbericht_zone` |
 | `getArtikelverkaufsbericht` | `/intranet/analytics/getArtikelverkaufsbericht` | Tag | `core.artikelverkauf_tag` **+ `core.artikel` + `core.artikel_stand`** |
 | `getPersonalkosten` | `/intranet/analytics/getPersonalkosten` | Tag | `core.personalkosten` **+ `core.schwellenwert_betrieb`** |
-| `getAktionsbericht` | `/intranet/analytics/getAktionsbericht` | Tag | — noch keine Transformation, nur `raw` |
-| `getKennzahlen:absolut` | `/intranet/analytics/getKennzahlen`, `mode=absolut` | **Jahr** | `core.kennzahlen_monat.wert_absolut` **+ `core.betrieb_konzept`** |
+| `getAktionsbericht` | `/intranet/analytics/getAktionsbericht` | Tag | `core.aktionsumsatz_tag` **+ `core.aktion`** |
+| `getKennzahlen:absolut` | `/intranet/analytics/getKennzahlen`, `mode=absolut` | **Jahr** | `core.kennzahlen_monat.wert_absolut` **+ `core.betrieb_konzept` + `core.bwa_buchungsstand`** |
 | `getKennzahlen:relativ` | derselbe, `mode=relativ` | **Jahr** | `core.kennzahlen_monat.wert_prozent` |
 
 **`getKennzahlen` ist zwei Aufrufe je Jahr, nicht je Tag.** Euro und Prozent kommen getrennt und
@@ -204,6 +204,56 @@ Ein bewusster Unterschied zwischen den beiden Sichten:
 |---|---|---|
 | `artikel_stand_zeitraum` (Wareneinsatzansatz) | **nein** | Ein Preis von heute auf 2023 angewandt ist eine konkret falsche Zahl. |
 | `artikel_warengruppe_zeitraum` (Einordnung) | **ja**, bis `-infinity` | Die Momentaufnahme läuft nur vorwärts; ohne Rückgriff hätte die gesamte Historie keine Warengruppe. Eine Einordnung ändert sich selten, die älteste bekannte ist die beste Schätzung. Ausgewiesen als `mart.artikelverkauf.warengruppe_geschaetzt`. |
+
+### Aktion — der Spaltenkopf einer Kreuztabelle
+
+`getAktionsbericht` ist als einziger Bericht **nicht zeilenweise, sondern als Kreuztabelle**
+aufgebaut: Betriebe in den Zeilen, Aktionen in den Spalten.
+
+```json
+{"timeframe":"25.07.2026", "brutto":false,
+ "aktionen":[{"id":8,"name":"Mexican Summer","dateFrom":1780264800,"dateTo":1785448800}],
+ "rows":[{"name":"…","encId":"…","cells":{"4":null,"6":null,"8":128.40}}]}
+```
+
+Der **Schlüssel einer Zelle ist die `id` aus `aktionen`** — ohne die Liste im Kopf der Antwort
+ist `cells` unlesbar. Deshalb wird die Dimension bei jedem Posten mitgeschrieben, auch wenn
+keine einzige Zelle gefüllt ist.
+
+Zwei Punkte, die man leicht falsch macht:
+
+- **Leere Zellen werden verworfen.** Am 25.07.2026 waren *alle* 423 Zellen (141 Betriebe ×
+  3 Aktionen) `null`. Wer sie mitschreibt, sammelt 87.000 Zeilen Nichts im Jahr. Der Preis
+  ist derselbe wie beim Artikelverkauf: eine fehlende Zeile heißt „keine Aktion an diesem
+  Tag" **und** „Tag nicht geholt". Welcher Fall vorliegt, beantwortet `sync.warteschlange`.
+- **Netto oder brutto entscheidet `brutto` in der Antwort**, nicht unser Anfrageparameter.
+  Wir fragen zwar immer mit `brutto=0`, aber wer sich auf die eigene Anfrage verlässt statt
+  auf die Antwort, beschriftet irgendwann Bruttowerte als netto — und das sieht man einer
+  Zahl nicht an.
+
+`gueltig_von`/`gueltig_bis` kommen aus `dateFrom`/`dateTo` als Unix-Sekunden und sind
+meistens `NULL`: zwei der drei bekannten Aktionen laufen unbefristet. Die *tatsächliche*
+Laufzeit steht daneben in `mart.aktion.erster_umsatztag`/`letzter_umsatztag`.
+
+### Buchungsstand — was „keine BWA" jeweils bedeutet
+
+`core.bwa_buchungsstand` hält je Betrieb den jüngsten Monat, für den je eine BWA gebucht war.
+Ein **Höchststand**: er sinkt nie. Geschrieben nach jedem `getKennzahlen`-Posten.
+
+Nötig ist er, weil „keine BWA für Juni" drei verschiedene Dinge heißen kann (gemessen am
+26.07.2026, 141 Betriebe):
+
+| Zustand | Betriebe | heißt |
+|---|---|---|
+| `letzter_monat` gesetzt | 69 | hat schon einmal geliefert |
+| `letzter_monat IS NULL` | 62 | kam in `getKennzahlen` vor, nie etwas gebucht |
+| keine Zeile | 10 | kam in **keiner** `getKennzahlen`-Antwort vor |
+
+Ohne diese Unterscheidung schlägt jede Plausibilitätsprüfung jeden Monatsanfang grundlos an
+— eine Null-Quote über 70 % ist hier der Normalzustand. Auswertung: `mart.bwa_rueckstand`.
+
+**„Gebucht" heißt `wert_absolut IS NOT NULL AND <> 0`**, wortgleich mit
+`mart.round_table_basis`. Zwei Definitionen wären zwei Wahrheiten.
 
 ### Die übrigen Fremdschlüssel
 

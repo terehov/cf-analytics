@@ -366,3 +366,78 @@ Abo-Mail funktioniert. Das entspricht der Excel-Darstellung.
 
 **Eine leere Karte ist eine Aussage.** Wo sie „noch nicht erfasst" heißt und nicht „keine
 Probleme", gehört das in die Beschreibung — die Metabase als Kartentext anzeigt.
+
+---
+
+## Sprache der Beschreibungen
+
+**Zielgruppe sind Fachbereichs-Mitarbeitende, keine Techniker.** Jede Beschreibung, jeder
+Kartenname und jeder Überschriftentext in Metabase ist so formuliert, dass er ohne Kenntnis
+der Datenbank, des Importers oder der Excel-Vorlagen verständlich ist.
+
+Am 26.07.2026 wurden dafür **98 Kartenbeschreibungen, 17 Dashboard-Beschreibungen, 37
+Überschriftentexte, 16 Kartennamen und 3 Sammlungsbeschreibungen** überarbeitet.
+
+### Was aus den Texten verschwunden ist
+
+| Weg | Warum |
+|---|---|
+| Tabellennamen (`mart.artikelverkauf`, `manual.massnahme`) | Sagt niemandem etwas, der die Datenbank nicht kennt |
+| Implementierungsgründe („monatlich partitioniert", „zwei Y-Achsen erfinden eine Beziehung") | Begründet eine Entscheidung, die längst getroffen ist. Gehört in den Quelltext, nicht auf den Bildschirm |
+| Excel-Zellbezüge (`00_Dashboard!A5`, Blatt „Eingabe") | Verweist auf eine Datei, die abgelöst werden soll |
+| Verweise auf `docs/…` und „Umsetzung Berichte" | Interne Projektunterlagen |
+| Fachbegriffe aus der Statistik („Variationskoeffizient", „Standardabweichung") | Durch die Bedeutung ersetzt: „wie stark der Umsatz im Verhältnis zum eigenen Durchschnitt schwankt" |
+| Begriffe aus dem Datenfluss („Backfill", „Endpunkt", „Importer", „Feldfilter") | Ersetzt durch „Datenabruf", „Berichtsart" |
+| Feste Messwerte („Am 26.07.2026 waren es 79 von 141") | **Veraltet still.** Ersetzt durch die Aussage; die Zahl steht in der Karte daneben |
+
+### Was bewusst geblieben ist
+
+- **BWA, EBIT, YTD, Deckungsbeitrag, Bon** — Vokabular des Fachbereichs, kein Technikjargon.
+- **Jede Warnung, die vor einem Fehlschluss schützt.** „Ein weißer Punkt heißt keine Daten,
+  nicht in Ordnung", „ein Monat auf null ist nicht gebucht, nicht umsatzlos", „zuerst auf die
+  Abdeckung sehen". Diese Sätze sind der Grund, warum die Beschreibungen überhaupt existieren.
+- **Median**, aber nie unerklärt — immer als „der mittlere Betrieb" oder „das Mittelfeld".
+
+### Regel für neue Karten
+
+> Die Beschreibung beantwortet **was sehe ich hier** und **worauf muss ich achten, um daraus
+> nicht das Falsche zu schließen.** Sie beantwortet nicht, wie die Karte gebaut ist.
+> Begründungen für Bauentscheidungen gehören als Kommentar in die `karten-*.ts`.
+
+---
+
+## Filter
+
+### Auswahllisten statt Freitext
+
+Die Filter **Betrieb** und **Marke** sind Auswahllisten. Das war nicht immer so: bis zum
+26.07.2026 zeigte Metabase dort ein Freitextfeld, und wer „Enchilada Bremen" nicht auf den
+Buchstaben genau traf, bekam **keine Fehlermeldung, sondern ein leeres Dashboard** — nicht zu
+unterscheiden von einem Betrieb ohne Geschäft.
+
+Die Liste wird beim Übernehmen aus der Datenbank gelesen (141 Betriebe, 11 Marken) und als
+feste Werteliste am Dashboard hinterlegt.
+
+> **Warum eine feste Liste und kein Verweis auf die Spalte:** Die Karten sind natives SQL,
+> ihre Filter hängen deshalb an einer *Variablen* und nicht an einer Spalte. Metabase bietet
+> ein Feld-Dropdown nur dort an, wo es die Spalte kennt; bei einer Variablen bleibt es beim
+> Freitextfeld, gleichgültig was in `values_source_config` steht. Das wurde am 26.07.2026
+> erst mit der Feld-Variante versucht und im Browser als wirkungslos nachgewiesen.
+
+**Nach jedem neuen Betrieb einmal `bun run metabase/uebernehmen.ts` laufen lassen** — sonst
+fehlt er in der Auswahlliste.
+
+### Kein Filter ohne Wirkung
+
+Jeder Filter am Dashboard muss von mindestens einer Karte darauf gelesen werden. Auf
+*Warenwirtschaft* standen bis zum 26.07.2026 **Monat und Zeitraum nebeneinander**, und keiner
+von beiden bewegte die ganze Seite: der Zeitraum wirkte nur auf die Artikellisten, der Monat
+nur auf den Deckungsbeitrag, zwei Karten reagierten auf gar nichts. Zwei Zeitfilter, von denen
+jeder einen anderen Teil der Seite bewegt, sind für Lesende nicht auseinanderzuhalten.
+
+Aufgelöst, indem der Deckungsbeitrag denselben Zeitraum verwendet. Da diese Auswertung nur je
+Monat vorliegt, nimmt sie alle Monate, die der gewählte Zeitraum berührt — **ein halber Monat
+zählt ganz**, und genau das steht auch im Kopftext der Seite.
+
+Die Prüfung lässt sich wiederholen: Karten-Variablen (auch die aus `gemeinsam.ts` geerbten)
+gegen die Filterliste des Dashboards halten; was übrig bleibt, ist tot.

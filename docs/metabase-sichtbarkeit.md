@@ -108,13 +108,14 @@ Fallen** — genau die, die `mart` ausräumt:
 | `artikel_stand`, `artikel_stand_zeitraum` | ebd. | Momentaufnahmen; `fixer_we` ist der **heutige** Ansatz |
 | `artikel_warengruppe_stand`, `_zeitraum` | ebd. | Warengruppe gilt rückwirkend, der Wareneinsatzansatz nicht |
 | `betrieb_konzept` | `konzept_zuordnung` | Ist n:m — ein Markenschnitt darüber zählt mehrfach zugeordnete Betriebe **mehrfach** |
-| `konzept` | ebd. | Derzeit leer; alle Betriebe laufen als „(nicht zugeordnet)" |
+| `konzept` | ebd. | Reine Dimension; in `mart` überall als `konzept`/`hauptkonzept` aufgelöst |
 | `personalkosten` | `mart.personalkosten` | Posten decken Zeiträume ab, die sich überlappen können — Summieren zählt doppelt |
 | `zeitzonenbericht_stunde`, `_zone` | `umsatz_stunde`, `umsatz_zeitzone` | Geschäftstag läuft 08:00–07:59; Stunden 0–7 gehören ans **Ende** |
 | `einkaufspreis_stand` | `preisentwicklung_ware` | Ohne Vormonatsvergleich schwer zu lesen |
 | `ware`, `ware_stand`, `warengruppe`, `einheit`, `lieferant` | `preisentwicklung_ware`, `deckungsbeitrag_warengruppe` | Reine Dimensionen, in den Sichten schon aufgelöst |
 | `hauptsparte`, `feinsparte`, `verkaufsstelle`, `zeitzone` | in allen Umsatzsichten | Dimensionen mit Namen — in `mart` bereits gejoint |
-| `bwa_buchungsstand` | `datenstand` | Sagt allein nicht, ob ein Monat gebucht **oder** leer ist |
+| `bwa_buchungsstand` | `bwa_rueckstand`, `datenstand` | Rohe Höchststände ohne Vergleichsmaßstab; „keine Zeile" und `NULL` bedeuten Verschiedenes |
+| `aktion`, `aktionsumsatz_tag` | `aktion`, `aktionsumsatz`, `aktionsumsatz_monat` | Fehlende Zeile heißt „kein Umsatz" **oder** „Tag nicht geholt"; der Anteil am Gesamtumsatz fehlt |
 | `schwellenwert_betrieb` | `round_table_vergleich()` | Betriebsindividuelle Schwellen; ohne Regelwerk-Kontext irreführend |
 | `bestellung`, `bestellposten`, `inventurtermin` | — | Noch nicht ausgewertet, Struktur steht |
 | `betrieb` | `mart.betrieb`, `mart.bwa_kennzahl`, jede `mart`-Sicht | Trägt die BWA-Brücke `lina_betrieb_id`; in `mart` überall schon aufgelöst |

@@ -27,7 +27,7 @@ export const karten: Karte[] = [
     schluessel: 'dd_marken_tabelle',
     name: 'Marken im Überblick',
     beschreibung:
-      'Eine Zeile je Marke mit allen sechs Round-Table-Metriken und der Ampelverteilung. Ein Klick auf eine Zeile öffnet die Filialen dieser Marke. Die Prozentwerte sind MEDIANE — ein einzelner Ausreißer soll den Maßstab einer ganzen Marke nicht verziehen.',
+      'Eine Zeile je Marke mit allen sechs Kennzahlen und der Ampelverteilung. Ein Klick auf eine Zeile öffnet die Filialen dieser Marke. Die Prozentwerte sind Mediane, also der mittlere Betrieb der Marke — ein einzelner Ausreißer verzieht so nicht das Bild der ganzen Marke.',
     anzeige: 'table',
     parameter: [P_MONAT],
     sql: `${MONAT_CTE}
@@ -61,7 +61,7 @@ SELECT r.konzept                                                          AS "Ma
   {
     schluessel: 'dd_marken_ampeln',
     name: 'Ampeln je Marke',
-    beschreibung: 'Wie sich die Gesamtampel innerhalb jeder Marke verteilt. Ein Klick auf einen Balken öffnet die Filialen.',
+    beschreibung: 'Wie sich die Gesamtampel innerhalb jeder Marke verteilt. Ein Klick auf einen Balken öffnet die Filialen dieser Marke.',
     anzeige: 'bar',
     parameter: [P_MONAT],
     sql: `${MONAT_CTE}
@@ -111,7 +111,7 @@ SELECT monat                        AS "Monat",
     schluessel: 'dd_filialen_tabelle',
     name: 'Filialen im Vergleich',
     beschreibung:
-      'Alle Betriebe der gewählten Marke über sämtliche Metriken, jede mit ihrer Ampel. Ein Klick auf eine Zeile öffnet das Betriebsblatt. Sortiert nach Handlungsdruck.',
+      'Alle Betriebe der gewählten Marke über sämtliche Kennzahlen, jede mit ihrer Ampel. Sortiert nach Handlungsdruck. Ein Klick auf eine Zeile öffnet die Detailseite des Betriebs.',
     anzeige: 'table',
     parameter: [P_MONAT, P_MARKE],
     sql: `${MONAT_CTE}
@@ -164,7 +164,7 @@ SELECT r.betrieb                                            AS "Betrieb",
     schluessel: 'dd_filialen_rangliste',
     name: 'Filialen nach Personalkostenquote',
     beschreibung:
-      'Die 20 Betriebe mit der höchsten Personalkostenquote — die Metrik mit den meisten roten Ampeln. Waagerechte Balken, weil Betriebsnamen lang sind und senkrecht übereinanderliegen würden. Klick auf einen Balken öffnet das Betriebsblatt; die vollständige Reihe steht in der Tabelle oben.',
+      'Die 20 Betriebe mit der höchsten Personalkostenquote — die Kennzahl mit den meisten roten Ampeln. Ein Klick auf einen Balken öffnet die Detailseite des Betriebs; die vollständige Liste steht in der Tabelle oben.',
     anzeige: 'row',
     parameter: [P_MONAT, P_MARKE],
     sql: `${MONAT_CTE}
@@ -190,7 +190,7 @@ SELECT r.betrieb                AS "Betrieb",
     schluessel: 'dd_filialen_streuung',
     name: 'Umsatz gegen Personalkostenquote',
     beschreibung:
-      'Jeder Punkt ein Betrieb. Rechts unten steht, was man sich wünscht: viel Umsatz bei niedriger Quote. Links oben die Betriebe, bei denen beides nicht stimmt.',
+      'Jeder Punkt ist ein Betrieb. Rechts unten steht der Wunschfall: viel Umsatz bei niedriger Personalkostenquote. Links oben stehen die Betriebe, bei denen beides nicht stimmt.',
     anzeige: 'scatter',
     parameter: [P_MONAT, P_MARKE],
     sql: `${MONAT_CTE}
@@ -210,9 +210,9 @@ SELECT r.umsatz_ist             AS "Umsatz",
   },
   {
     schluessel: 'dd_filialen_metrikvergleich',
-    name: 'Alle Metriken nebeneinander',
+    name: 'Alle Kennzahlen nebeneinander',
     beschreibung:
-      'Dieselben Betriebe, aber nach Bereich gruppiert statt nach Betrieb — so sieht man, welche Metrik in dieser Marke insgesamt klemmt und welche nur bei einzelnen.',
+      'Dieselben Betriebe, aber nach Bereich sortiert statt nach Betrieb. So wird sichtbar, welche Kennzahl in dieser Marke durchgehend klemmt und welche nur bei einzelnen Häusern.',
     anzeige: 'bar',
     parameter: [P_MONAT, P_MARKE],
     sql: `${MONAT_CTE}
@@ -245,7 +245,7 @@ SELECT a.bereich_name                             AS "Bereich",
   {
     schluessel: 'dd_betrieb_kopf',
     name: 'Betrieb — Kennzahlen des Monats',
-    beschreibung: 'Alle sechs Round-Table-Metriken des gewählten Betriebs mit Ampel, Wert und Vormonatsveränderung.',
+    beschreibung: 'Alle sechs Kennzahlen des gewählten Betriebs mit Ampel, Wert und Veränderung zum Vormonat.',
     anzeige: 'table',
     parameter: [P_MONAT, P_BETRIEB],
     sql: `${MONAT_CTE}
@@ -352,7 +352,7 @@ SELECT geschaeftstag     AS "Geschäftstag",
     schluessel: 'dd_betrieb_ampelverlauf',
     name: 'Betrieb — Ampelverlauf je Bereich',
     beschreibung:
-      'Wie sich die einzelnen Metriken dieses Betriebs über die Monate entwickelt haben. Die Reihe bricht ab, wo keine Daten vorliegen — eine Lücke ist eine Lücke, keine Null.',
+      'Wie sich die Kennzahlen dieses Betriebs über die Monate entwickelt haben. Wo die Linie abbricht, fehlen die Daten — das ist eine Lücke, kein Nullwert.',
     anzeige: 'line',
     parameter: [P_BETRIEB],
     sql: `
@@ -394,7 +394,7 @@ SELECT monat             AS "Monat",
   {
     schluessel: 'dd_betrieb_zeitzone',
     name: 'Betrieb — Zeitzonen',
-    beschreibung: 'Wovon dieser Betrieb lebt: Frühstück, Mittag, Happy Hour, Abend, Late Night.',
+    beschreibung: 'Wovon dieser Betrieb lebt: Frühstück, Mittag, Happy Hour, Abend und Late Night im Vergleich.',
     anzeige: 'bar',
     parameter: [P_BETRIEB],
     sql: `
@@ -414,7 +414,7 @@ SELECT zeitzone          AS "Zeitzone",
     schluessel: 'dd_betrieb_stunde',
     name: 'Betrieb — Tagesverlauf',
     beschreibung:
-      'Umsatz je Stunde. Sortiert nach Geschäftstag-Logik: der Tag beginnt um 08:00, die Stunden 0–7 stehen deshalb am Ende.',
+      'Umsatz je Stunde. Der Geschäftstag beginnt um 08:00 — die Nachtstunden stehen deshalb am Ende und nicht am Anfang.',
     anzeige: 'bar',
     parameter: [P_BETRIEB],
     sql: `
@@ -433,7 +433,7 @@ SELECT lpad(stunde::text, 2, '0') || ':00' AS "Stunde",
   {
     schluessel: 'dd_betrieb_personal',
     name: 'Betrieb — Personal je Bereich',
-    beschreibung: 'Personalkostenquoten und Effektivitäten für Service, Bar und Küche.',
+    beschreibung: 'Personalkostenquoten und Umsatz je Personalstunde für Service, Bar und Küche.',
     anzeige: 'table',
     parameter: [P_BETRIEB],
     sql: `
@@ -457,7 +457,7 @@ SELECT zeitraum_von AS "Von",
     schluessel: 'dd_betrieb_artikel',
     name: 'Betrieb — Meistverkaufte Artikel',
     beschreibung:
-      'Die 30 stärksten Artikel dieses Betriebs im gewählten Monat, mit Deckungsbeitrag. Leer, solange der Artikel-Backfill läuft.',
+      'Die 30 meistverkauften Artikel dieses Betriebs im gewählten Monat, mit Deckungsbeitrag. Bleibt leer, solange die Artikeldaten noch eingelesen werden.',
     anzeige: 'table',
     parameter: [P_MONAT, P_BETRIEB],
     sql: `${MONAT_CTE_UMSATZ}
@@ -478,7 +478,7 @@ SELECT av.artikel                 AS "Artikel",
   {
     schluessel: 'dd_betrieb_bwa',
     name: 'Betrieb — BWA im Verlauf',
-    beschreibung: 'Umsatz, Wareneinsatz, Personalkosten und EBIT aus der Buchhaltung. Nur gebuchte Monate.',
+    beschreibung: 'Umsatz, Wareneinsatz, Personalkosten und Ergebnis aus den Zahlen des Steuerberaters. Es werden nur gebuchte Monate gezeigt.',
     anzeige: 'line',
     parameter: [P_BETRIEB],
     sql: `
@@ -501,7 +501,7 @@ HAVING count(*) FILTER (WHERE k.wert_absolut IS NOT NULL AND k.wert_absolut <> 0
   {
     schluessel: 'dd_betrieb_massnahmen',
     name: 'Betrieb — Maßnahmen',
-    beschreibung: 'Was für diesen Betrieb offen ist. Wird von Hand in manual.massnahme gepflegt.',
+    beschreibung: 'Welche Maßnahmen für diesen Betrieb offen sind. Die Liste wird von Hand gepflegt — bleibt sie leer, heißt das „nichts erfasst", nicht „nichts zu tun".',
     anzeige: 'table',
     parameter: [P_BETRIEB],
     sql: `
@@ -524,7 +524,7 @@ SELECT CASE WHEN ueberfaellig THEN '⚠' ELSE '' END AS "!",
     schluessel: 'dd_betrieb_datenstand',
     name: 'Betrieb — Datenstand',
     beschreibung:
-      'Woher die Zahlen dieses Blatts kommen und wie alt sie sind. Vor jeder Schlussfolgerung die erste Karte, auf die man sieht.',
+      'Woher die Zahlen dieser Seite stammen und wie aktuell sie sind. Der erste Blick, bevor man aus den Zahlen darüber etwas schließt.',
     anzeige: 'table',
     parameter: [P_BETRIEB],
     sql: `
@@ -554,7 +554,7 @@ SELECT befund              AS "Befund",
     schluessel: 'vg_zeit_betrieb',
     name: 'Zeitraumvergleich je Betrieb',
     beschreibung:
-      'Zwei frei wählbare Zeiträume nebeneinander. Vorbelegt ist der laufende Monat bis heute gegen denselben Ausschnitt des Vormonats — ein Vergleich ganzer Monate wäre schief, solange der laufende noch läuft. Die Tage-Spalten sagen, ob die Zeiträume überhaupt gleich lang sind.',
+      'Zwei frei wählbare Zeiträume nebeneinander. Voreingestellt ist der laufende Monat bis heute gegen denselben Ausschnitt des Vormonats — ein ganzer Monat gegen einen halben wäre kein fairer Vergleich. Die Tage-Spalten zeigen, ob beide Zeiträume gleich lang sind.',
     anzeige: 'table',
     parameter: [
       { id: 'von-a-param', name: 'von_a', 'display-name': 'Zeitraum A von', type: 'date/single' },
@@ -602,7 +602,7 @@ HAVING sum(u.umsatz_netto) > 0
   {
     schluessel: 'vg_zeit_summe',
     name: 'Zeitraumvergleich gesamt',
-    beschreibung: 'Beide Zeiträume als Summe über alle Betriebe, mit Tageszahl zur Einordnung.',
+    beschreibung: 'Beide Zeiträume als Summe über alle Betriebe. Die Tageszahl steht daneben, weil unterschiedlich lange Zeiträume sonst falsche Schlüsse nahelegen.',
     anzeige: 'table',
     parameter: [
       { id: 'von-a-param', name: 'von_a', 'display-name': 'Zeitraum A von', type: 'date/single' },
@@ -635,7 +635,7 @@ SELECT s.zeitraum                                       AS "Zeitraum",
     schluessel: 'vg_zeit_verlauf',
     name: 'Beide Zeiträume im Tagesverlauf',
     beschreibung:
-      'Die zwei Zeiträume auf eine gemeinsame Achse gelegt: Tag 1 gegen Tag 1, Tag 2 gegen Tag 2. Damit sind auch unterschiedlich lange Zeiträume vergleichbar.',
+      'Beide Zeiträume übereinandergelegt: erster Tag gegen ersten Tag, zweiter gegen zweiten. So lassen sich auch unterschiedlich lange Zeiträume vergleichen.',
     anzeige: 'line',
     parameter: [
       { id: 'von-a-param', name: 'von_a', 'display-name': 'Zeitraum A von', type: 'date/single' },
@@ -671,9 +671,9 @@ SELECT (u.geschaeftstag - s.von + 1)   AS "Tag im Zeitraum",
   // ===================================================================
   {
     schluessel: 'vg_ort_metriken',
-    name: 'Standorte über alle Metriken',
+    name: 'Standorte über alle Kennzahlen',
     beschreibung:
-      'Die gewählten Betriebe nebeneinander, eine Zeile je Metrik. Ohne Auswahl stehen hier alle Betriebe mit einem Urteil — in den Filter oben so viele eintragen, wie man vergleichen will.',
+      'Die gewählten Betriebe nebeneinander, eine Zeile je Kennzahl. Ohne Auswahl stehen hier alle bewerteten Betriebe — oben im Filter die auswählen, die verglichen werden sollen.',
     anzeige: 'table',
     parameter: [P_MONAT, P_BETRIEB, P_MARKE],
     sql: `${MONAT_CTE}
@@ -724,7 +724,7 @@ SELECT monat        AS "Monat",
     schluessel: 'vg_ort_profil',
     name: 'Standorte — Umsatzprofil über den Tag',
     beschreibung:
-      'Der Tagesverlauf der gewählten Betriebe als Anteil am eigenen Tagesumsatz. In Prozent, damit ein großer und ein kleiner Betrieb vergleichbar bleiben.',
+      'Der Tagesverlauf der gewählten Betriebe, jeweils als Anteil am eigenen Tagesumsatz. In Prozent, damit ein großes und ein kleines Haus vergleichbar bleiben.',
     anzeige: 'line',
     parameter: [P_BETRIEB, P_MARKE],
     sql: `
@@ -750,7 +750,7 @@ SELECT lpad(s.stunde::text, 2, '0') || ':00'                       AS "Stunde",
     schluessel: 'vg_ort_sparte',
     name: 'Standorte — Speisen- und Getränkeanteil',
     beschreibung:
-      'Speisen- und Getränkeumsatz je Betrieb, die 25 umsatzstärksten. Der Getränkeanteil ist der Hebel für den Wareneinsatz Bar und erklärt oft, warum zwei Betriebe derselben Marke unterschiedliche Quoten haben. Für einen echten Vergleich oben zwei bis vier Betriebe wählen — ohne Filter ist das eine Übersicht, kein Vergleich.',
+      'Speisen- und Getränkeumsatz der 25 umsatzstärksten Betriebe. Der Getränkeanteil ist der größte Hebel für den Wareneinsatz an der Bar und erklärt oft, warum zwei Häuser derselben Marke verschiedene Quoten haben. Für einen echten Vergleich oben zwei bis vier Betriebe auswählen.',
     anzeige: 'row',
     parameter: [P_MONAT, P_BETRIEB, P_MARKE],
     sql: `${MONAT_CTE_UMSATZ}

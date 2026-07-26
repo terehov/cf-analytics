@@ -1,9 +1,18 @@
 {
   "_endpoint": "GET /intranet/analytics/getAktionsbericht",
-  "_params": {"report":"intranet-aktion","von":"01.06.2026","bis":"30.06.2026","reltime":"custom","brutto":"0"},
+  "_params": {"report":"intranet-aktion","von":"01.06.2026","bis":"30.06.2026","reltime":"custom","brutto":"0","preExistingRevenue":"0"},
+  "_note": "Betriebsnamen und encId anonymisiert, rows gekuerzt auf 3 von 141. Struktur nach dem echten Bestand vom 26.07.2026: eine Zelle ist ein OBJEKT {revenue, percent}, keine Zahl. percent ist der Anteil am Netto-Tagesumsatz des Betriebs (ueber 946 Zellen gegengeprueft, 0 Abweichungen). Die dritte Zeile behaelt eine blosse Zahl, damit der Rueckfallpfad der Transformation abgedeckt bleibt.",
   "timeframe": "01.06.2026 - 30.06.2026",
   "brutto": false,
-  "aktionen": [{"id":4,"name":"Sekt alkoholfrei"}],
-  "rows": [{"name":"Betrieb 01","encId":"ENCID_000","cells":{"4":0}}],
+  "aktionen": [
+    {"id":4,"name":"Sekt alkoholfrei","dateFrom":null,"dateTo":null},
+    {"id":6,"name":"Sarti Aktion","dateFrom":null,"dateTo":null},
+    {"id":8,"name":"Mexican Summer","dateFrom":1780264800,"dateTo":1785448800}
+  ],
+  "rows": [
+    {"name":"Betrieb 01","encId":"ENCID_000","cells":{"4":null,"6":null,"8":{"revenue":128.40,"percent":1.55}}},
+    {"name":"Betrieb 02","encId":"ENCID_001","cells":{"4":null,"6":null,"8":null}},
+    {"name":"Betrieb 03","encId":"ENCID_002","cells":{"4":19.90,"6":null,"8":{"revenue":2405.60,"percent":1.06}}}
+  ],
   "_rowCount": 141
 }

@@ -125,10 +125,27 @@ export const ArtikelverkaufSchema = z.object({
 
 export const AktionsberichtSchema = z.object({
   timeframe: z.string(),
-  aktionen: z.array(z.object({ id: z.number(), name: z.string() })).optional(),
+  // `brutto` sagt, wie die Zellen zu lesen sind. Wir fragen zwar immer mit
+  // brutto=0, aber gespeichert wird nach diesem Feld — siehe transform.aktionsbericht.
+  brutto: z.boolean().optional(),
+  aktionen: z.array(z.object({
+    id: z.number(), name: z.string(),
+    // Unix-Sekunden, meist null: zwei der drei am 26.07.2026 bekannten
+    // Aktionen laufen unbefristet.
+    dateFrom: z.number().nullable().optional(),
+    dateTo: z.number().nullable().optional(),
+  })).optional(),
   rows: z.array(z.object({
     name: z.string(), encId: z.string(),
-    cells: z.record(z.string(), z.number().nullable()).optional(),
+    // Der Wert einer Zelle ist ein OBJEKT, keine Zahl — die erste Fassung
+    // stand hier auf `z.number()`, gebaut gegen den einen Tag, an dem alle
+    // Zellen null waren. Die Strukturprüfung hat den Irrtum korrekt gemeldet
+    // (26 Einträge in sync.schema_abweichung), siehe Migration 0017.
+    cells: z.record(z.string(), z.union([
+      z.object({ revenue: z.number().nullable(), percent: z.number().nullable() }),
+      z.number(),
+      z.null(),
+    ])).optional(),
   })),
 })
 

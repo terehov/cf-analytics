@@ -615,6 +615,194 @@ lauf('BWA-Sichten', () => {
 })
 
 /**
+ * Zwei Dinge, die geholt wurden und nirgends ankamen — beide am 26.07.2026
+ * bei der Bestandsaufnahme gefunden, beide hier durch die ganze Kette geprüft:
+ *
+ *   getAktionsbericht      wurde geholt und fiel im `switch` in den
+ *                          default-Zweig. Posten `ok`, `zeilen: 0`, alles nur
+ *                          im Raw-Layer.
+ *   core.bwa_buchungsstand stand seit 0003 im Schema, mit einem Kommentar, der
+ *                          genau erklärt wozu — und kein Ladepfad schrieb je
+ *                          hinein.
+ *
+ * Beide Fehler sahen im Betrieb nach nichts aus. Genau deshalb ein Test, der
+ * die geschriebenen Zeilen zählt und sich nicht auf `status = ok` verlässt.
+ */
+lauf('Aktionsbericht und BWA-Buchungsstand', () => {
+  let mock: ReturnType<typeof mockStarten>
+  let db: Client
+  const TAG = '2026-06-15'
+
+  beforeAll(async () => {
+    const { config } = await import('../config')
+    mock = mockStarten({ port: Number(new URL(config.LINA_BASE_URL).port) })
+    db = new Client({ connectionString: DB })
+    await db.connect()
+    await db.query(`TRUNCATE sync.warteschlange, sync.aufgabe, sync.lauf,
+                       core.aktionsumsatz_tag, core.aktion, core.bwa_buchungsstand,
+                       core.kennzahlen_monat, core.umsatzbericht_tag
+                     RESTART IDENTITY CASCADE`)
+
+    // getKennzahlen kennt Betriebe nur über eine numerische LINA-ID. Ohne
+    // Brücke fällt jede BWA-Zeile durch den Filter — der Ausfall vom
+    // 26.07.2026. Der Fixture-Betrieb heisst dort 4210.
+    await db.query(
+      `INSERT INTO core.betrieb (enc_id, lina_betrieb_id, name, aktiv, hat_bwa)
+       VALUES ('ENCID_BWA_STAND', 4210, 'Prüfbetrieb Buchungsstand', true, true)
+       ON CONFLICT (enc_id) DO UPDATE SET lina_betrieb_id = EXCLUDED.lina_betrieb_id`)
+
+    await db.query(
+      `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet) VALUES
+         ('getUmsatzbericht',     $1::date, $1::date, 10),
+         ('getAktionsbericht',    $1::date, $1::date, 10),
+         ('getKennzahlen:absolut','2026-01-01','2026-12-31', 10)
+       ON CONFLICT DO NOTHING`, [TAG])
+
+    const { workerLauf } = await import('./worker')
+    await workerLauf('manuell')
+  })
+
+  afterAll(async () => { mock.stop(); await db.end() })
+
+  test('alle drei Posten laufen fehlerfrei durch', async () => {
+    const { rows: [{ n }] } = await db.query(
+      `SELECT count(*)::int AS n FROM sync.aufgabe WHERE status = 'fehler'`)
+    expect(n).toBe(0)
+  })
+
+  test('die Aktionen landen als Dimension, samt Laufzeit', async () => {
+    const { rows } = await db.query(
+      `SELECT lina_id, name, gueltig_von, gueltig_bis FROM core.aktion ORDER BY lina_id`)
+    expect(rows).toHaveLength(3)
+    const sommer = rows.find(r => Number(r.lina_id) === 8)!
+    expect(sommer.name).toBe('Mexican Summer')
+    // Unix-Sekunden über die Berliner Wanduhr — in UTC wäre es der 31.05.
+    expect(String(sommer.gueltig_von).slice(0, 10)).toBe('2026-06-01')
+    // Zwei der drei Aktionen laufen unbefristet — das ist kein Fehlen.
+    expect(rows.find(r => Number(r.lina_id) === 4)!.gueltig_von).toBeNull()
+  })
+
+  /**
+   * Der Kern des Befunds: vorher stand hier 0.
+   *
+   * Geprüft wird die ZEILENZAHL, nicht der Postenstatus. Der Posten meldete
+   * auch vorher `ok` — das war ja das Problem.
+   */
+  test('die Aktionsumsätze landen in core, leere Zellen nicht', async () => {
+    const { rows: [{ n }] } = await db.query(
+      `SELECT count(*)::int AS n FROM core.aktionsumsatz_tag`)
+    // 3 Betriebe × 3 Aktionen = 9 Zellen, davon 3 mit Umsatz.
+    expect(n).toBe(3)
+    const { rows: [{ n: leer }] } = await db.query(
+      `SELECT count(*)::int AS n FROM core.aktionsumsatz_tag
+        WHERE coalesce(umsatz_netto, umsatz_brutto, 0) = 0`)
+    expect(leer).toBe(0)
+  })
+
+  /**
+   * Eine Zelle ist ein Objekt `{revenue, percent}`, keine Zahl. Die erste
+   * Fassung nahm eine Zahl an und hätte für jeden gefüllten Tag null Zeilen
+   * geschrieben — bei Status `ok`.
+   */
+  test('der Tagesanteil kommt von LINA, nicht aus eigener Rechnung', async () => {
+    const { rows } = await db.query(
+      `SELECT anteil_pct FROM mart.aktionsumsatz
+        WHERE betrieb = 'Betrieb 03' AND aktion = 'Mexican Summer'`)
+    expect(rows).toHaveLength(1)
+    expect(Number(rows[0].anteil_pct)).toBeCloseTo(1.06, 2)
+  })
+
+  test('mart.aktionsumsatz_monat setzt den Umsatz ins Verhältnis', async () => {
+    const { rows } = await db.query(
+      `SELECT aktion, umsatz_netto, umsatz_betrieb_gesamt, anteil_pct
+         FROM mart.aktionsumsatz_monat
+        WHERE betrieb = 'Betrieb 03' AND aktion = 'Mexican Summer'`)
+    expect(rows).toHaveLength(1)
+    expect(Number(rows[0].umsatz_netto)).toBeCloseTo(2405.60, 2)
+    // Der Nenner kommt aus dem Umsatzbericht, nicht aus der Summe der Aktionen:
+    // 2405,60 von 226.434,23 = 1,06 %.
+    expect(Number(rows[0].umsatz_betrieb_gesamt)).toBeCloseTo(226434.23, 2)
+    expect(Number(rows[0].anteil_pct)).toBeCloseTo(1.06, 2)
+  })
+
+  test('mart.aktion trennt hinterlegte von tatsächlicher Laufzeit', async () => {
+    const { rows } = await db.query(
+      `SELECT aktion, unbefristet, erster_umsatztag FROM mart.aktion WHERE lina_id = 4`)
+    expect(rows[0].unbefristet).toBe(true)
+    expect(String(rows[0].erster_umsatztag).slice(0, 10)).toBe(TAG)
+  })
+
+  /**
+   * Der Buchungsstand entsteht beim Laden, nicht per Hand.
+   *
+   * Der Fixture-Betrieb hat Mai auf 0,00 und Juni auf 68.433,72. Gebucht ist
+   * damit Juni — „gebucht" heisst wert_absolut IS NOT NULL AND <> 0, wortgleich
+   * mit mart.round_table_basis.
+   */
+  test('getKennzahlen schreibt den Buchungsstand mit', async () => {
+    const { rows } = await db.query(
+      `SELECT s.letzter_monat FROM core.bwa_buchungsstand s
+         JOIN core.betrieb b USING (betrieb_key) WHERE b.lina_betrieb_id = 4210`)
+    expect(rows).toHaveLength(1)
+    expect(String(rows[0].letzter_monat).slice(0, 10)).toBe('2026-06-01')
+  })
+
+  /**
+   * Und er sinkt nicht wieder.
+   *
+   * `getKennzahlen:relativ` füllt NUR wert_prozent. Ohne `greatest` würde der
+   * relative Abruf den eben gesetzten Stand auf NULL zurücksetzen — und aus
+   * einem Betrieb mit gebuchter BWA würde einer, der nie eine hatte.
+   */
+  test('ein relativer Abruf setzt den Stand nicht zurück', async () => {
+    await db.query(
+      `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet)
+       VALUES ('getKennzahlen:relativ','2026-01-01','2026-12-31', 10)`)
+    const { workerLauf } = await import('./worker')
+    await workerLauf('manuell')
+
+    const { rows } = await db.query(
+      `SELECT s.letzter_monat FROM core.bwa_buchungsstand s
+         JOIN core.betrieb b USING (betrieb_key) WHERE b.lina_betrieb_id = 4210`)
+    expect(String(rows[0].letzter_monat).slice(0, 10)).toBe('2026-06-01')
+  }, 60_000)
+
+  /**
+   * Die drei Zustände, die die Tabelle überhaupt erst rechtfertigen.
+   *
+   * Ohne sie hiesse „keine BWA für Juni" für alle dasselbe. Am 26.07.2026
+   * hatten 72 von 141 Betrieben NIE eine BWA — ein Alarm auf die Null-Quote
+   * ginge jeden Monat los und wäre jedes Mal falsch.
+   */
+  test('mart.bwa_rueckstand unterscheidet nie gebucht, ungeprüft und aktuell', async () => {
+    // So sieht ein Betrieb aus, dessen BWA-Zeilen alle auf 0,00 stehen: der
+    // Ladepfad schreibt ihn mit letzter_monat = NULL.
+    await db.query(
+      `INSERT INTO core.betrieb (enc_id, lina_betrieb_id, name, aktiv)
+       VALUES ('ENCID_OHNE_BWA', 999998, 'Prüfbetrieb ohne BWA', true)
+       ON CONFLICT (enc_id) DO NOTHING`)
+    await db.query(
+      `INSERT INTO core.bwa_buchungsstand (betrieb_key, letzter_monat)
+       SELECT betrieb_key, NULL FROM core.betrieb WHERE enc_id = 'ENCID_OHNE_BWA'
+       ON CONFLICT (betrieb_key) DO NOTHING`)
+
+    const { rows } = await db.query(
+      `SELECT betrieb, lage, rueckstand_monate, auffaellig FROM mart.bwa_rueckstand
+        WHERE betrieb IN ('Prüfbetrieb Buchungsstand', 'Prüfbetrieb ohne BWA', 'Betrieb 03')`)
+    const lage = Object.fromEntries(rows.map(r => [r.betrieb, r]))
+
+    expect(lage['Prüfbetrieb Buchungsstand'].lage).toBe('aktuell')
+    expect(lage['Prüfbetrieb Buchungsstand'].rueckstand_monate).toBe(0)
+    // Nie gebucht ist KEIN Befund — genau dafür gibt es die Tabelle.
+    expect(lage['Prüfbetrieb ohne BWA'].lage).toBe('nie gebucht')
+    expect(lage['Prüfbetrieb ohne BWA'].auffaellig).toBe(false)
+    // Wer nie in einem getKennzahlen-Posten vorkam, ist ungeprüft — ein
+    // dritter Zustand, den ein NULL nicht ausdrücken könnte.
+    expect(lage['Betrieb 03'].lage).toBe('ungeprueft')
+  })
+})
+
+/**
  * Was passiert, wenn LINA dichtmacht.
  *
  * Der einzige Fall, den man nicht abwarten kann, sondern bauen muss — und der

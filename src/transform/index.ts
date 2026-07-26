@@ -270,6 +270,79 @@ export function artikelverkauf(daten: any, geschaeftstag: string): {
   return { stamm, zeilen }
 }
 
+export type AktionStamm = {
+  linaId: number; name: string; gueltigVon: string | null; gueltigBis: string | null
+}
+export type AktionsumsatzZeile = {
+  encId: string; geschaeftstag: string; linaAktionId: number
+  umsatzNetto: number | null; umsatzBrutto: number | null; anteilPct: number | null
+}
+
+/**
+ * Der Aktionsbericht ist eine Kreuztabelle: Betriebe in den Zeilen, Aktionen
+ * in den Spalten. Der Schlüssel einer Zelle ist die `id` aus `aktionen`.
+ *
+ * **Der Wert einer Zelle ist ein OBJEKT, keine Zahl:**
+ *
+ *     "cells": {"12": {"revenue": 798.15, "percent": 8.73}}
+ *
+ * Die erste Fassung nahm eine blosse Zahl an — gebaut gegen den einzigen Tag
+ * im Bestand, an dem alle 423 Zellen auf `null` standen. Aus einer leeren
+ * Antwort lässt sich die Struktur der gefüllten nicht ablesen. `Number({…})`
+ * ist `NaN`, also wäre jede Zelle verworfen worden: null Zeilen bei Status
+ * `ok`, genau der Ausfall, den diese Transformation beheben sollte.
+ *
+ * `percent` ist der Anteil am Netto-**Tages**umsatz des Betriebs. Nachgemessen
+ * über alle 946 gefüllten Zellen gegen `core.umsatzbericht_tag`: 0 Abweichungen.
+ * Übernommen wird trotzdem LINAs Wert — wer selbst rechnet, weicht irgendwann
+ * in einem Randfall ab und merkt es nicht.
+ *
+ * Leere Zellen fallen weg, wie beim Artikelverkauf. Über 27 Tage gemessen:
+ * 15.510 Zellen, davon 946 gefüllt.
+ *
+ * Netto oder brutto entscheidet `daten.brutto` — das Feld IN DER ANTWORT, nicht
+ * unser Anfrageparameter. Wir fragen zwar immer mit `brutto=0`, aber wer sich
+ * dabei auf die eigene Anfrage verlässt statt auf die Antwort, beschriftet
+ * irgendwann Bruttowerte als netto, und das sieht man einer Zahl nicht an.
+ */
+export function aktionsbericht(daten: any, geschaeftstag: string): {
+  aktionen: AktionStamm[]
+  zeilen: AktionsumsatzZeile[]
+} {
+  const aktionen: AktionStamm[] = (daten?.aktionen ?? [])
+    .map((a: any) => ({
+      linaId: Number(a?.id),
+      name: String(a?.name ?? ''),
+      gueltigVon: linaEpochAlsDatum(a?.dateFrom),
+      gueltigBis: linaEpochAlsDatum(a?.dateTo),
+    }))
+    // Dieselbe Prüfung wie bei betriebeMitLinaId: Number(null) ist 0 und damit
+    // endlich. Eine Aktion 0 gibt es nicht, sie würde nur einen Namen belegen.
+    .filter((a: AktionStamm) => Number.isFinite(a.linaId) && a.linaId > 0 && a.name !== '')
+
+  const brutto = daten?.brutto === true
+  const zeilen: AktionsumsatzZeile[] = []
+  for (const r of daten?.rows ?? []) {
+    for (const [idStr, zelle] of Object.entries(r?.cells ?? {})) {
+      // Beobachtet ist nur die Objektform. Eine blosse Zahl wird trotzdem
+      // angenommen — sie kostet eine Zeile und verhindert, dass eine
+      // vereinfachte Antwort wieder still zu null Zeilen führt.
+      const objekt = zelle !== null && typeof zelle === 'object'
+      const w = z(objekt ? (zelle as any).revenue : zelle)
+      if (w === null || w === 0) continue
+      zeilen.push({
+        encId: r.encId,
+        geschaeftstag,
+        linaAktionId: Number(idStr),
+        umsatzNetto: brutto ? null : w,
+        umsatzBrutto: brutto ? w : null,
+        anteilPct: objekt ? z((zelle as any).percent) : null,
+      })
+    }
+  }
+  return { aktionen, zeilen }
+}
+
 /** Betriebsstammdaten fallen bei jedem Umsatzbericht mit ab. */
 export function betriebeAus(daten: any): { encId: string; name: string }[] {
   return (daten?.stores ?? daten?.rows ?? []).map((s: any) => ({ encId: s.encId, name: s.name }))

@@ -35,7 +35,7 @@ export const karten: Karte[] = [
     schluessel: 'rt_kachel_rot',
     name: 'Rote Betriebe',
     beschreibung:
-      'Betriebe mit mindestens einer roten Ampel im gewählten Monat. Entspricht 00_Dashboard!A5.',
+      'Betriebe mit mindestens einer roten Ampel im gewählten Monat.',
     anzeige: 'scalar',
     parameter: [MONAT.monat],
     sql: `${MONAT_CTE}
@@ -54,7 +54,7 @@ SELECT count(*) AS "Rote Betriebe"
   {
     schluessel: 'rt_kachel_orange',
     name: 'Orange Betriebe',
-    beschreibung: 'Betriebe ohne rote, aber mit oranger Ampel. Entspricht 00_Dashboard!D5.',
+    beschreibung: 'Betriebe ohne rote, aber mit mindestens einer orangen Ampel.',
     anzeige: 'scalar',
     parameter: [MONAT.monat],
     sql: `${MONAT_CTE}
@@ -67,7 +67,7 @@ SELECT count(*) AS "Orange Betriebe"
   {
     schluessel: 'rt_kachel_gruen',
     name: 'Grüne Betriebe',
-    beschreibung: 'Betriebe, bei denen alle bewerteten Ampeln grün sind. Entspricht 00_Dashboard!G5.',
+    beschreibung: 'Betriebe, bei denen alle bewerteten Ampeln grün sind.',
     anzeige: 'scalar',
     parameter: [MONAT.monat],
     sql: `${MONAT_CTE}
@@ -83,7 +83,7 @@ SELECT count(*) AS "Grüne Betriebe"
     schluessel: 'rt_kachel_ohne_urteil',
     name: 'Ohne Urteil',
     beschreibung:
-      'Betriebe, für die im gewählten Monat KEINE einzige Ampel berechnet werden konnte — meist weil die BWA fehlt. Im Excel fielen sie unsichtbar unter den Tisch.',
+      'Betriebe, für die im gewählten Monat keine einzige Ampel berechnet werden konnte — meist weil die Zahlen vom Steuerberater noch fehlen. Diese Betriebe sind nicht unauffällig, sie sind unbeurteilt.',
     anzeige: 'scalar',
     parameter: [MONAT.monat],
     sql: `${MONAT_CTE}
@@ -97,7 +97,7 @@ SELECT count(*) AS "Ohne Urteil"
     schluessel: 'rt_kachel_massnahmen',
     name: 'Offene Maßnahmen',
     beschreibung:
-      'Maßnahmen im Status Offen, In Arbeit, Eskalieren oder Wartet auf Rückmeldung. Entspricht 00_Dashboard!J5 — dort fehlte der vierte Status.',
+      'Maßnahmen im Status Offen, In Arbeit, Eskalieren oder Wartet auf Rückmeldung.',
     anzeige: 'scalar',
     parameter: [MONAT.monat],
     sql: `${MONAT_CTE}
@@ -111,7 +111,7 @@ SELECT count(*) AS "Offene Maßnahmen"
     schluessel: 'rt_kachel_bewertung',
     name: 'Ø Online-Bewertung',
     beschreibung:
-      'Mittelwert der Online-Bewertungen im gewählten Monat. Entspricht 00_Dashboard!M5. Zeigt „– nicht erfasst", solange manual.online_bewertung leer ist — LINA kennt keine Bewertungen, die Quelle wäre YEXT.',
+      'Durchschnitt der Online-Bewertungen im gewählten Monat. Zeigt „– nicht erfasst", solange keine Bewertungen eingespielt sind.',
     anzeige: 'scalar',
     parameter: [MONAT.monat],
     sql: `${MONAT_CTE}
@@ -132,7 +132,7 @@ SELECT coalesce(to_char(round(avg(r.online_bewertung), 2), 'FM0.00'), '– nicht
     schluessel: 'rt_treiber',
     name: 'Ampeln nach Bereich',
     beschreibung:
-      'Wie viele Betriebe stehen je Bereich auf rot, orange, grün — und für wie viele fehlen die Daten. Entspricht dem Block „Rot-Treiber nach Bereich", zeigt aber auch die Lücken.',
+      'Wie viele Betriebe je Bereich auf rot, orange oder grün stehen — und für wie viele die Daten fehlen. Zeigt, woran die roten Ampeln insgesamt hängen.',
     anzeige: 'bar',
     parameter: [MONAT.monat],
     sql: `${MONAT_CTE}
@@ -165,7 +165,7 @@ SELECT a.bereich_name                                   AS "Bereich",
     schluessel: 'rt_intensitaet',
     name: 'Eskalationsstufen',
     beschreibung:
-      'Verteilung der Intensität: Sofort eskalieren (≥2 Rot), Sofort handeln (1 Rot), Nachforschung (≥2 Orange), Beobachten/OK.',
+      'Wie dringend gehandelt werden muss: Sofort eskalieren (2 oder mehr rote Ampeln), Sofort handeln (eine rote), Nachforschung (2 oder mehr orange), Beobachten beziehungsweise in Ordnung.',
     anzeige: 'row',
     parameter: [MONAT.monat],
     sql: `${MONAT_CTE}
@@ -199,7 +199,7 @@ SELECT r.intensitaet AS "Intensität",
     schluessel: 'rt_tabelle',
     name: 'Round Table — Betriebstabelle',
     beschreibung:
-      'Das Blatt „Eingabe" in einer Zeile je Betrieb: Umsatz mit Vorjahr und YTD, Personal- und Wareneinsatzquoten, Bewertung, OM-Score, alle sechs Ampeln, Gesamtstatus, Intensität, Priorität. Sortiert nach Handlungsdruck.',
+      'Eine Zeile je Betrieb mit allem, was für den Round Table zählt: Umsatz mit Vorjahr und Jahressumme, Personal- und Wareneinsatzquoten, Bewertung, Vor-Ort-Score, alle sechs Ampeln, Gesamturteil und Priorität. Sortiert nach Handlungsdruck — oben steht, was zuerst besprochen gehört.',
     anzeige: 'table',
     parameter: [MONAT.monat, KONZEPT.konzept],
     sql: `${MONAT_CTE}
@@ -277,7 +277,7 @@ SELECT r.betrieb                                            AS "Betrieb",
     schluessel: 'rt_ampelwechsel',
     name: 'Wer hat die Farbe gewechselt',
     beschreibung:
-      'Betriebe, deren Ampel sich gegenüber dem Vormonat verändert hat — die Liste, mit der ein Round Table anfangen sollte. Verschlechterungen zuerst.',
+      'Betriebe, deren Ampel sich gegenüber dem Vormonat verändert hat. Verschlechterungen zuerst — hier fängt ein Round Table an.',
     anzeige: 'table',
     parameter: [MONAT.monat],
     sql: `${MONAT_CTE_WECHSEL}
@@ -303,7 +303,7 @@ SELECT t.betrieb                          AS "Betrieb",
     schluessel: 'rt_trend_tabelle',
     name: 'Drei-Monats-Trend je Betrieb',
     beschreibung:
-      'Das Blatt „Trend_2Monate": vorletzter Monat, Vormonat, aktueller Monat je Bereich, mit der Excel-Beschriftung ↗ besser/gleich bzw. ↘ schlechter. Die Vormonate müssen hier nicht mehr von Hand eingetragen werden.',
+      'Die letzten drei Monate je Betrieb und Bereich nebeneinander: ↗ besser oder gleich, ↘ schlechter. Die Vormonate stehen automatisch da und müssen nicht mehr eingetragen werden.',
     anzeige: 'table',
     parameter: [MONAT.monat],
     sql: `${MONAT_CTE}
@@ -325,7 +325,7 @@ SELECT betrieb            AS "Betrieb",
     schluessel: 'rt_historie',
     name: 'Ampelhistorie',
     beschreibung:
-      'Verteilung der Gesamtampel über alle Monate. Ersetzt das Blatt „Ampelhistorie", das im Excel durch Kopieren und Als-Werte-Einfügen gepflegt werden musste — hier ist die Historie ohne Zutun da.',
+      'Wie sich die Gesamtampel über die Monate verteilt hat. Die Historie schreibt sich von selbst fort.',
     anzeige: 'bar',
     sql: `
 SELECT monat                                        AS "Monat",
@@ -352,7 +352,7 @@ SELECT monat                                        AS "Monat",
   {
     schluessel: 'rt_historie_bereich',
     name: 'Ampelhistorie je Bereich',
-    beschreibung: 'Wie sich die einzelnen Bereiche über die Monate entwickelt haben — rote Ampeln je Bereich.',
+    beschreibung: 'Wie viele rote Ampeln je Bereich über die Monate zusammenkamen — zeigt, ob ein Problem neu ist oder mitläuft.',
     anzeige: 'line',
     sql: `
 SELECT monat                                  AS "Monat",
@@ -374,7 +374,7 @@ SELECT monat                                  AS "Monat",
     schluessel: 'rt_ursachen',
     name: 'Ursachen je Bereich',
     beschreibung:
-      'Das Blatt „Ursachenanalyse": wie oft welche Ursache hinter einer roten oder orangen Ampel steht, aufgeteilt nach Bereich. Priorität nach Excel-Regel (ab 3 Fällen Hoch, bei 2 Mittel).',
+      'Wie oft welche Ursache hinter einer roten oder orangen Ampel steht, aufgeteilt nach Bereich. Ab drei Fällen gilt die Priorität als hoch, bei zwei als mittel.',
     anzeige: 'table',
     parameter: [MONAT.monat],
     sql: `${MONAT_CTE}
@@ -394,7 +394,7 @@ SELECT ursache      AS "Ursache",
   {
     schluessel: 'rt_ursachen_verlauf',
     name: 'Ursachen im Zeitverlauf',
-    beschreibung: 'Welche Ursachen über die Monate hinweg häufiger werden — die Frage, die das Excel gar nicht stellen konnte.',
+    beschreibung: 'Welche Ursachen über die Monate hinweg häufiger werden. Eine Ursache, die jeden Monat wiederkommt, ist ein anderes Problem als eine einmalige.',
     anzeige: 'bar',
     sql: `
 SELECT monat    AS "Monat",
@@ -413,7 +413,7 @@ SELECT monat    AS "Monat",
     schluessel: 'rt_massnahmen_offen',
     name: 'Offene Maßnahmen',
     beschreibung:
-      'Das Blatt „Massnahmen", gefiltert auf alles, was nicht erledigt ist. Überfällige zuerst — die Spalte pflegte im Excel niemand.',
+      'Alle Maßnahmen, die noch nicht erledigt sind. Überfällige zuerst.',
     anzeige: 'table',
     sql: `
 SELECT CASE WHEN ueberfaellig THEN '⚠ überfällig' ELSE '' END AS "!",
@@ -438,7 +438,7 @@ SELECT CASE WHEN ueberfaellig THEN '⚠ überfällig' ELSE '' END AS "!",
   {
     schluessel: 'rt_massnahmen_status',
     name: 'Maßnahmen nach Status',
-    beschreibung: 'Verteilung aller Maßnahmen über die Status — entspricht den Zählern in 00_Dashboard!I10:K11.',
+    beschreibung: 'Wie sich alle Maßnahmen auf die Status verteilen.',
     anzeige: 'row',
     sql: `
 SELECT status   AS "Status",
@@ -461,9 +461,9 @@ SELECT status   AS "Status",
   // -------------------------------------------------------------------
   {
     schluessel: 'rt_marke',
-    name: 'Markenschnitt',
+    name: 'Marken im Kennzahlenvergleich',
     beschreibung:
-      'Eine Zeile je Marke: Umsatzsumme, Mediane der Quoten, Ampelverteilung. Die Prozentwerte sind MEDIANE — ein einzelner Ausreißer soll den Vergleichsmaßstab einer ganzen Marke nicht verziehen.',
+      'Eine Zeile je Marke: Umsatzsumme, mittlere Quoten und Ampelverteilung. Die Prozentwerte sind Mediane, also der mittlere Betrieb der Marke — ein einzelner Ausreißer verzieht so nicht das Bild der ganzen Marke.',
     anzeige: 'table',
     parameter: [MONAT.monat],
     sql: `${MONAT_CTE}
@@ -485,7 +485,7 @@ SELECT konzept                AS "Marke",
     schluessel: 'rt_marke_abweichung',
     name: 'Betrieb gegen Marke und Gesamt',
     beschreibung:
-      'Je Kennzahl die Abweichung zum Median aller Betriebe UND zum Median der eigenen Marke. Damit ist unterscheidbar, ob ein Betrieb schwach ist oder ob gerade seine ganze Marke schwächelt — der Fall, in dem eine Maßnahme beim einzelnen Betrieb ins Leere läuft. Vorsicht beim Vorzeichen: bei Umsatz ist mehr besser, bei den Quoten weniger.',
+      'Je Kennzahl der Abstand zum Mittelfeld aller Betriebe und zum Mittelfeld der eigenen Marke. So ist unterscheidbar, ob ein einzelner Betrieb schwächelt oder seine ganze Marke — im zweiten Fall läuft eine Maßnahme beim einzelnen Betrieb ins Leere. Achtung beim Vorzeichen: beim Umsatz ist mehr besser, bei den Quoten weniger.',
     anzeige: 'table',
     parameter: [MONAT.monat],
     sql: `${MONAT_CTE}
@@ -508,9 +508,9 @@ SELECT betrieb                AS "Betrieb",
   },
   {
     schluessel: 'rt_regelwerk_vergleich',
-    name: 'Regelwerk-Vergleich',
+    name: 'Vergleich der Schwellenwerte',
     beschreibung:
-      'Wo die Wahl der Schwellen tatsächlich ein anderes Urteil ergibt: globale Round-Table-Schwellen (28/32 %) gegen die betriebsindividuellen aus LINA. Nur die abweichenden Betriebe — bei allen übrigen erübrigt sich die Diskussion.',
+      'Betriebe, bei denen die einheitlichen Round-Table-Schwellen (28/32 %) zu einem anderen Urteil führen als die betriebsindividuellen Schwellen aus LINA. Nur diese Fälle sind strittig — bei allen übrigen erübrigt sich die Diskussion.',
     anzeige: 'table',
     parameter: [MONAT.monat],
     sql: `${MONAT_CTE}

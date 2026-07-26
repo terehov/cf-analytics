@@ -11,9 +11,9 @@ import {
   zeitzonenbericht, vordefinierteZeitzonen, artikelverkauf,
   warengruppeAusText, artikelWarengruppen, feinsparten, lieferanten,
   waren, einheiten, bestellungen, inventurtermine, betriebeMitLinaId,
-  konzepte, betriebKonzepte,
+  konzepte, betriebKonzepte, aktionsbericht,
 } from './index'
-import { PersonalkostenSchema } from '../lina/schemas'
+import { PersonalkostenSchema, AktionsberichtSchema } from '../lina/schemas'
 
 const fixture = (name: string) =>
   require(`./fixtures/${name}.json`) as any
@@ -197,6 +197,83 @@ describe('artikelverkauf', () => {
   })
 })
 
+describe('Aktionsbericht', () => {
+  const daten = fixture('getAktionsbericht')
+
+  test('liest die Aktionen samt Laufzeit', () => {
+    const { aktionen } = aktionsbericht(daten, '2026-06-15')
+    expect(aktionen).toHaveLength(3)
+    const sommer = aktionen.find(a => a.linaId === 8)!
+    expect(sommer.name).toBe('Mexican Summer')
+    // Unix-Sekunden über die Berliner Wanduhr — in UTC wäre es der 31.05.
+    expect(sommer.gueltigVon).toBe('2026-06-01')
+    expect(sommer.gueltigBis).toBe('2026-07-31')
+  })
+
+  test('unbefristete Aktionen haben keine Laufzeit, sind aber gültig', () => {
+    const { aktionen } = aktionsbericht(daten, '2026-06-15')
+    const sekt = aktionen.find(a => a.linaId === 4)!
+    expect(sekt.gueltigVon).toBeNull()
+    expect(sekt.gueltigBis).toBeNull()
+  })
+
+  /**
+   * Eine Zelle ist ein OBJEKT, keine Zahl.
+   *
+   * Die erste Fassung nahm eine blosse Zahl an — gebaut gegen den einzigen
+   * Tag im Bestand, an dem alle 423 Zellen auf null standen. `Number({…})`
+   * ist `NaN`, also hätte die Transformation für JEDEN gefüllten Tag null
+   * Zeilen geschrieben und dabei `ok` gemeldet.
+   */
+  test('liest revenue und percent aus der Zelle', () => {
+    const { zeilen } = aktionsbericht(daten, '2026-06-15')
+    const z = zeilen.find(x => x.encId === 'ENCID_002' && x.linaAktionId === 8)!
+    expect(z.umsatzNetto).toBe(2405.6)
+    expect(z.anteilPct).toBe(1.06)
+    expect(z.geschaeftstag).toBe('2026-06-15')
+  })
+
+  test('eine blosse Zahl bleibt lesbar, dann ohne Anteil', () => {
+    const { zeilen } = aktionsbericht(daten, '2026-06-15')
+    const z = zeilen.find(x => x.encId === 'ENCID_002' && x.linaAktionId === 4)!
+    expect(z.umsatzNetto).toBe(19.9)
+    expect(z.anteilPct).toBeNull()
+  })
+
+  test('verwirft leere und auf null stehende Zellen', () => {
+    // Am 25.07.2026 waren ALLE 423 Zellen null; über 27 Tage gemessen sind es
+    // 946 gefüllte von 15.510. Wer die leeren mitschreibt, sammelt
+    // Hunderttausende Zeilen Nichts im Jahr.
+    const { zeilen } = aktionsbericht(daten, '2026-06-15')
+    expect(zeilen).toHaveLength(3)
+    expect(zeilen.every(z => (z.umsatzNetto ?? z.umsatzBrutto) !== 0)).toBe(true)
+    expect(zeilen.some(z => z.encId === 'ENCID_001')).toBe(false)
+  })
+
+  test('folgt dem brutto-Feld der ANTWORT, nicht unserem Anfrageparameter', () => {
+    const { zeilen } = aktionsbericht({ ...daten, brutto: true }, '2026-06-15')
+    expect(zeilen[0].umsatzBrutto).toBe(128.4)
+    expect(zeilen[0].umsatzNetto).toBeNull()
+  })
+
+  test('die Strukturprüfung kennt die Objektform', () => {
+    // Sie hat den Irrtum gemeldet, als er passierte — 26 Einträge in
+    // sync.schema_abweichung. Ab jetzt soll sie schweigen.
+    expect(AktionsberichtSchema.safeParse(daten).success).toBe(true)
+  })
+
+  test('eine Antwort ohne einen einzigen Umsatz ist kein Fehler', () => {
+    // Der gemessene Normalfall: Aktionen stehen da, Zellen sind leer.
+    const leer = {
+      ...daten,
+      rows: daten.rows.map((r: any) => ({ ...r, cells: { '4': null, '6': null, '8': null } })),
+    }
+    const { aktionen, zeilen } = aktionsbericht(leer, '2026-06-15')
+    expect(aktionen).toHaveLength(3)
+    expect(zeilen).toHaveLength(0)
+  })
+})
+
 describe('Robustheit', () => {
   test('leere und kaputte Antworten werfen nicht', () => {
     for (const fn of [
@@ -205,6 +282,9 @@ describe('Robustheit', () => {
       () => zeitzonenbericht({ stores: [] }, '2026-06-15'),
       () => artikelverkauf({}, '2026-06-15'),
       () => kennzahlen({}, 2026),
+      () => aktionsbericht({}, '2026-06-15'),
+      () => aktionsbericht(null, '2026-06-15'),
+      () => aktionsbericht({ rows: [{ encId: 'X' }] }, '2026-06-15'),
     ]) {
       expect(fn).not.toThrow()
     }

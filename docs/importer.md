@@ -95,7 +95,7 @@ Der Container läuft über `health.ts` und beantwortet zwei **verschiedene** Fra
 
 **`/health` darf nur rot werden, wenn ein Neustart hilft.** Bei einer Zugangssperre hilft er nicht — er macht es schlimmer: Dokploy drehte den Container im Kreis, während LINA ohnehin gerade nichts von uns hören will.
 
-`/status` prüft sechs Dinge und sagt zu jedem, was daraus folgt:
+`/status` prüft sieben Dinge und sagt zu jedem, was daraus folgt:
 
 | Prüfung | Stufe | wann |
 |---|---|---|
@@ -105,13 +105,15 @@ Der Container läuft über `health.ts` und beantwortet zwei **verschiedene** Fra
 | `aufgegebene_posten` | Warnung | in 24 h wurde ein Zeitraum endgültig aufgegeben — der fehlt dauerhaft |
 | `schema` | Warnung | LINA liefert etwas anderes als erwartet |
 | `bwa_bruecke` | Warnung | aktive Betriebe ohne LINA-ID — sie tauchen in keiner BWA-Auswertung auf |
+| `bwa_fortschritt` | Warnung | die **Spitze** steht mehr als `STATUS_BWA_RUECKSTAND_MONATE` (3) Monate zurück — Verdacht auf fehlende BWA-Rechte, denn dann liefert `getKennzahlen` kommentarlos Nullen |
 
 `warnung` bleibt bei **HTTP 200**: Dinge, die man wissen sollte, wecken niemanden nachts. Nur `stoerung` gibt 503.
 
-Zwei Entwurfsentscheidungen, die den Alarm brauchbar halten:
+Drei Entwurfsentscheidungen, die den Alarm brauchbar halten:
 
 * **Ruht der Zugang, meldet `fortschritt` keinen Stillstand.** Zwei Alarme für dieselbe Ursache sind einer zu viel.
 * **Jede Prüfung liefert `naechster_schritt` mit.** Ein Alarm ohne Handlungsanweisung kostet nur Zeit — meist steht dort direkt das SQL, das man als Nächstes braucht.
+* **`bwa_fortschritt` misst die Spitze, nicht die Nachzügler.** Dass einzelne Betriebe hinterherhängen, ist Normalzustand — am 26.07.2026 hatten 62 von 141 nie eine gebuchte BWA, und 38 der 69 buchenden lagen einen Monat zurück. Wer darauf alarmiert, hat eine dauerhaft gelbe Ampel, und die liest nach zwei Wochen niemand mehr. Die Namen stehen in `mart.bwa_rueckstand`, wenn jemand sie sucht.
 
 Einrichten: einen HTTP-Monitor auf `https://<host>/status` legen, Intervall 5–15 Minuten. Er schlägt bei 503 an. Der Rumpf ist JSON und lässt sich in die Benachrichtigung übernehmen.
 

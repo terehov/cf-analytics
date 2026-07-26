@@ -108,6 +108,28 @@ const Schema = z.object({
    */
   STATUS_STILLSTAND_STUNDEN: z.coerce.number().min(0.1).default(3),
   /**
+   * Ab wann `/status` meldet, dass die BWA insgesamt stehengeblieben ist —
+   * Monate zwischen dem laufenden Monat und dem jüngsten Monat, den irgendein
+   * Betrieb gebucht hat.
+   *
+   * Bewacht wird damit genau ein Ausfall: `getKennzahlen` liefert ohne volle
+   * BWA-Rechte stillschweigend Nullen statt eines Fehlers. Dann rückt die
+   * Spitze nie wieder vor, und sonst fällt es niemandem auf.
+   *
+   * NICHT bewacht wird, wie viele einzelne Betriebe hinterherhängen — das ist
+   * Normalzustand und kein Importfehler: am 26.07.2026 hatten 62 von 141
+   * Betrieben nie eine gebuchte BWA, zehn weitere tauchen in getKennzahlen
+   * überhaupt nicht auf, und 38 der 69 buchenden lagen einen Monat hinter der
+   * Spitze. Wer darauf alarmiert, hat eine dauerhaft gelbe Ampel, und die
+   * liest nach zwei Wochen niemand mehr. Die Namen stehen in
+   * mart.bwa_rueckstand, wenn jemand sie sucht.
+   *
+   * Drei Monate, weil zwei noch erklärbar sind: am Monatsersten ist der
+   * Vormonat regelmäßig noch ungebucht, die Spitze steht dann auf dem
+   * Vorvormonat. Gemessen am 26.07.2026: Spitze Juni, also ein Monat.
+   */
+  STATUS_BWA_RUECKSTAND_MONATE: z.coerce.number().min(1).default(3),
+  /**
    * Zweite Bremse: harte Obergrenze pro Kalendertag (UTC).
    *
    * Bewusst ÜBER dem, was der Takt zulässt: 20–40 s ergeben im Mittel 30 s,

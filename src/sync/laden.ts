@@ -291,6 +291,49 @@ export async function laden(k: Kontext): Promise<number> {
             `INSERT INTO core.kennzahlen_monat (${sp.join(',')}) VALUES ${platzhalter}
              ON CONFLICT DO NOTHING`, werte)
         })
+
+        /**
+         * Der Buchungsstand — je Betrieb der jüngste Monat, für den je eine
+         * BWA gebucht war.
+         *
+         * Ohne ihn kann die Plausibilitätsprüfung „hat nie eine BWA" nicht von
+         * „dieser Monat ist noch nicht gebucht" unterscheiden und schlägt
+         * jeden Monatsanfang grundlos an: am 26.07.2026 hatten 62 von 141
+         * Betrieben nie eine gebuchte BWA, und von den 69 buchenden waren 38
+         * einen Monat hinter der Spitze. Eine Null-Quote von über 70 % ist
+         * hier der Normalzustand, kein Befund.
+         *
+         * Geschrieben werden ALLE Betriebe der Antwort, auch die ohne einen
+         * einzigen gebuchten Monat — die bekommen letzter_monat = NULL. Der
+         * Unterschied zwischen „NULL" und „gar keine Zeile" ist die Aussage:
+         * nie gebucht gegen nie geprüft.
+         *
+         * `greatest` macht den Wert zu einem Höchststand. Das ist nötig, nicht
+         * hübsch: gebucht heisst `wert_absolut`, und ein Posten aus
+         * `getKennzahlen:relativ` allein füllt nur `wert_prozent`. Ohne
+         * `greatest` würde jeder relative Abruf den Stand auf NULL zurück-
+         * setzen. `greatest` überspringt NULL-Argumente.
+         */
+        const betroffen = [...new Set(rows.map(r => r.betrieb_key))]
+        if (betroffen.length) {
+          await c.query(
+            `INSERT INTO core.bwa_buchungsstand (betrieb_key, letzter_monat, geprueft_am)
+             SELECT v.betrieb_key,
+                    (SELECT max(km.monat)
+                       FROM core.kennzahlen_monat km
+                      WHERE km.betrieb_key = v.betrieb_key
+                        -- Wortgleich mit mart.round_table_basis. Zwei
+                        -- Definitionen von "gebucht" wären zwei Wahrheiten.
+                        AND km.wert_absolut IS NOT NULL
+                        AND km.wert_absolut <> 0),
+                    now()
+               FROM unnest($1::int[]) AS v(betrieb_key)
+             ON CONFLICT (betrieb_key) DO UPDATE SET
+               letzter_monat = greatest(core.bwa_buchungsstand.letzter_monat,
+                                        EXCLUDED.letzter_monat),
+               geprueft_am = now()`,
+            [betroffen])
+        }
         /**
          * Die Markenzuordnung — nur aus diesem Endpunkt zu bekommen.
          *
@@ -346,6 +389,71 @@ export async function laden(k: Kontext): Promise<number> {
         }
 
         geschrieben += rows.length
+        break
+      }
+
+      case 'getAktionsbericht': {
+        const { aktionen, zeilen } = t.aktionsbericht(k.daten, k.von)
+
+        // 1. Die Aktionen als Dimension. Kommen in JEDER Antwort mit, auch
+        //    wenn keine einzige Zelle gefüllt ist — deshalb steht die
+        //    Dimension selbst dann, wenn es nichts zu buchen gibt.
+        if (aktionen.length) {
+          await c.query(
+            `INSERT INTO core.aktion (lina_id, name, gueltig_von, gueltig_bis)
+             SELECT v.lina_id, v.name, v.von, v.bis
+               FROM unnest($1::int[], $2::text[], $3::date[], $4::date[])
+                    AS v(lina_id, name, von, bis)
+             ON CONFLICT (lina_id) DO UPDATE SET
+               name = EXCLUDED.name,
+               -- COALESCE und nicht EXCLUDED: eine Laufzeit, die LINA einmal
+               -- kannte, soll eine spätere Antwort ohne Datumsangabe nicht
+               -- wieder löschen.
+               gueltig_von = COALESCE(EXCLUDED.gueltig_von, core.aktion.gueltig_von),
+               gueltig_bis = COALESCE(EXCLUDED.gueltig_bis, core.aktion.gueltig_bis),
+               zuletzt_am = now()`,
+            [aktionen.map(a => a.linaId), aktionen.map(a => a.name),
+             aktionen.map(a => a.gueltigVon), aktionen.map(a => a.gueltigBis)])
+        }
+        const akt = await c.query(`SELECT aktion_key, lina_id FROM core.aktion`)
+        const akey = new Map(akt.rows.map(r => [Number(r.lina_id), Number(r.aktion_key)]))
+
+        // 2. Die Umsätze. Null- und Nullwert-Zellen sind schon in der
+        //    Transformation weggefallen; ein Tag ohne Aktionsumsatz schreibt
+        //    hier also gar nichts. Das ist der Normalfall und kein Befund —
+        //    am 25.07.2026 waren alle 423 Zellen leer.
+        const sp = ['betrieb_key','geschaeftstag','aktion_key',
+                    'umsatz_netto','umsatz_brutto','anteil_pct','raw_id'] as const
+        const rows = zeilen
+          .filter(z => bk(z.encId) && akey.has(z.linaAktionId))
+          .map(z => ({
+            betrieb_key: bk(z.encId)!, geschaeftstag: z.geschaeftstag,
+            aktion_key: akey.get(z.linaAktionId)!,
+            umsatz_netto: z.umsatzNetto, umsatz_brutto: z.umsatzBrutto,
+            anteil_pct: z.anteilPct, raw_id: rawId,
+          }))
+        await inBloecken(rows, 500, async b => {
+          const { platzhalter, werte } = mehrzeilig(sp, b)
+          await c.query(
+            `INSERT INTO core.aktionsumsatz_tag (${sp.join(',')}) VALUES ${platzhalter}
+             ON CONFLICT (geschaeftstag, betrieb_key, aktion_key) DO UPDATE SET
+               umsatz_netto = EXCLUDED.umsatz_netto, umsatz_brutto = EXCLUDED.umsatz_brutto,
+               anteil_pct = EXCLUDED.anteil_pct,
+               raw_id = EXCLUDED.raw_id, geladen_am = now()`, werte)
+        })
+
+        // Zellen mit Umsatz, die keiner bekannten Aktion zuzuordnen sind,
+        // wären ein echter Verlust: die Zahl ist da, nur der Name fehlt.
+        // Nach demselben Muster wie bei der BWA-Brücke laut statt still.
+        if (zeilen.length > rows.length) {
+          log.warn('Aktionsumsätze ohne zuordenbare Aktion oder Betrieb verworfen', {
+            endpunkt: k.ep.key, tag: k.von,
+            verworfen: zeilen.length - rows.length, uebernommen: rows.length,
+            bekannteAktionen: akey.size,
+          })
+        }
+
+        geschrieben = aktionen.length + rows.length
         break
       }
 

@@ -15,6 +15,17 @@ export type Parameter = {
   required?: boolean
   default?: unknown
   dimension?: unknown
+  /**
+   * Woher die Auswahlliste kommt. Ohne diese Angabe zeigt Metabase ein
+   * Freitextfeld — wer den Betrieb nicht auf den Buchstaben genau tippt,
+   * bekommt ein leeres Dashboard und keine Fehlermeldung.
+   *
+   * Die Karten sind natives SQL; Metabase kann die moeglichen Werte
+   * deshalb nicht selbst herleiten und braucht eine Quelle. Angegeben
+   * wird [schema, tabelle, spalte] — beim Provisionieren aufgeloest zu
+   * einer Feld-ID.
+   */
+  werteliste?: [string, string, string]
 }
 
 export type Karte = {

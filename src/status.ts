@@ -176,6 +176,43 @@ export async function statusErheben(): Promise<Statusbericht> {
       }
     : { name: 'bwa_bruecke', stufe: 'ok', meldung: 'alle aktiven Betriebe haben ihre LINA-ID' })
 
+  // --- 7. Rückt die BWA überhaupt noch vor? -------------------------------
+  //
+  // Der Ausfall, den docs/lina-api-inventar.md beschreibt: ohne volle
+  // BWA-Rechte liefert getKennzahlen stillschweigend Nullen statt eines
+  // Fehlers. Jeder Posten meldet `ok`, jede Zahl ist 0, und niemand merkt es.
+  //
+  // Gemessen wird die SPITZE — der jüngste Monat, den irgendein Betrieb
+  // gebucht hat. Nicht, wie viele Betriebe hinterherhängen: das ist
+  // Normalzustand (26.07.2026: 62 von 141 nie gebucht, 38 der 69 buchenden
+  // einen Monat hinter der Spitze) und würde die Ampel dauerhaft gelb färben.
+  // Wer hinterherhängt, steht in mart.bwa_rueckstand.
+  const bwa = await eine<{ spitze: string | null; monate: number | null }>(
+    `SELECT max(letzter_monat) AS spitze,
+            (EXTRACT(year  FROM age(date_trunc('month', now())::date, max(letzter_monat))) * 12
+           + EXTRACT(month FROM age(date_trunc('month', now())::date, max(letzter_monat))))::int
+              AS monate
+       FROM core.bwa_buchungsstand`)
+  const monate = bwa?.spitze === null || bwa?.spitze === undefined ? null : Number(bwa.monate)
+  p.push(monate !== null && monate > config.STATUS_BWA_RUECKSTAND_MONATE
+    ? {
+        name: 'bwa_fortschritt',
+        stufe: 'warnung',
+        meldung: `jüngster gebuchter BWA-Monat ist ${bwa!.spitze} — ${monate} Monate zurück`,
+        naechster_schritt:
+          'Hat der Importer-Account noch volle BWA-Rechte? Ohne sie liefert getKennzahlen ' +
+          'kommentarlos Nullen. Gegenprobe: SELECT * FROM mart.bwa_rueckstand ORDER BY letzter_monat;',
+        werte: { spitze: bwa!.spitze, monateZurueck: monate },
+      }
+    : {
+        name: 'bwa_fortschritt',
+        stufe: 'ok',
+        meldung: monate === null
+          ? 'noch kein BWA-Buchungsstand erhoben'
+          : `BWA gebucht bis ${bwa!.spitze}`,
+        werte: { spitze: bwa?.spitze ?? null, monateZurueck: monate },
+      })
+
   return {
     status: schlimmste(p.map(x => x.stufe)),
     geprueft_am: new Date().toISOString(),

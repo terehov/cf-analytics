@@ -100,7 +100,7 @@ wird.
 ## Betrieb
 
 - **Restore testen**, nicht nur das Backup. Dokploys Testfunktion prüft nur den Upload.
-- **Plausibilitätsprüfung** muss „Betrieb hat nie BWA" von „Monat noch nicht gebucht" unterscheiden (`core.bwa_buchungsstand`). Sonst schlägt sie jeden Monatsanfang grundlos Alarm: Juni 2026 war am 25.07. erst bei 22 von 131 Betrieben gebucht.
+- ~~**Plausibilitätsprüfung** muss „Betrieb hat nie BWA" von „Monat noch nicht gebucht" unterscheiden (`core.bwa_buchungsstand`).~~ **Erledigt am 26.07.2026.** Der Ladepfad schreibt den Stand, `mart.bwa_rueckstand` wertet ihn aus, `/status` prüft die Spitze statt der Nachzügler. Drei Zustände statt zwei — siehe `datenherkunft.md`.
 - **Postgres nicht ins Internet exponieren** — Postico über SSH-Tunnel.
 
 ## Phase 4

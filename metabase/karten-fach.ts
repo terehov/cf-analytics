@@ -30,7 +30,7 @@ export const karten: Karte[] = [
   {
     schluessel: 'um_kachel_monat',
     name: 'Umsatz laufender Monat',
-    beschreibung: 'Netto-Umsatz aller Betriebe im laufenden Monat, bis zum letzten geladenen Geschäftstag.',
+    beschreibung: 'Netto-Umsatz aller Betriebe im laufenden Monat, bis zum letzten verfügbaren Geschäftstag.',
     anzeige: 'scalar',
     sql: `
 SELECT sum(umsatz_netto) AS "Umsatz"
@@ -56,7 +56,7 @@ SELECT sum(gaeste) AS "Gäste"
     schluessel: 'um_kachel_bon',
     name: 'Ø Bon laufender Monat',
     beschreibung:
-      'Umsatz je Rechnung, aus Summen gerechnet — nicht der Mittelwert der Tages-Durchschnittsbons, der Tage unterschiedlicher Größe gleich gewichten würde.',
+      'Umsatz je Rechnung im laufenden Monat. Gerechnet als Gesamtumsatz geteilt durch Gesamtzahl der Rechnungen, damit umsatzstarke Tage stärker zählen als schwache.',
     anzeige: 'scalar',
     sql: `
 SELECT round(sum(umsatz_netto) / nullif(sum(rechnungen), 0), 2) AS "Ø Bon"
@@ -71,7 +71,7 @@ SELECT round(sum(umsatz_netto) / nullif(sum(rechnungen), 0), 2) AS "Ø Bon"
   {
     schluessel: 'um_verlauf_tag',
     name: 'Umsatz je Tag',
-    beschreibung: 'Tagesumsatz aller Betriebe. Der Wochenrhythmus ist hier das eigentliche Muster.',
+    beschreibung: 'Tagesumsatz aller Betriebe. Das auffälligste Muster ist der Wochenrhythmus.',
     anzeige: 'line',
     parameter: [ZEITRAUM, BETRIEB],
     sql: `
@@ -94,7 +94,7 @@ SELECT geschaeftstag       AS "Geschäftstag",
     schluessel: 'um_verlauf_monat',
     name: 'Umsatz je Monat mit Vorjahr',
     beschreibung:
-      'Monatsumsatz gegen den gleichen Monat des Vorjahres, beides in Euro auf EINER Achse. Die prozentuale Veränderung steht bewusst in einer eigenen Karte daneben — zwei Y-Achsen in einem Bild erfinden eine Beziehung, die in den Daten nicht steht. Solange der Historien-Backfill läuft, ist die Vorjahresreihe leer; das ist fehlende Vergangenheit, kein Nullumsatz.',
+      'Monatsumsatz gegen den gleichen Monat des Vorjahres, beides in Euro. Fehlt die Vorjahreslinie, sind die alten Daten noch nicht eingelesen — das heißt nicht, dass damals kein Umsatz war.',
     anzeige: 'bar',
     parameter: [BETRIEB],
     sql: `
@@ -121,7 +121,7 @@ SELECT monat                AS "Monat",
     schluessel: 'um_verlauf_delta',
     name: 'Veränderung zum Vorjahr',
     beschreibung:
-      'Prozentuale Abweichung zum gleichen Monat des Vorjahres. Balken über der Nulllinie sind Wachstum, darunter Rückgang. Bewusst getrennt vom Euro-Diagramm nebenan: Euro und Prozent auf zwei Achsen desselben Bildes lassen sich beliebig gegeneinander verschieben.',
+      'Veränderung zum gleichen Monat des Vorjahres in Prozent. Balken über der Nulllinie sind Wachstum, darunter Rückgang.',
     anzeige: 'bar',
     parameter: [BETRIEB],
     sql: `
@@ -148,7 +148,7 @@ HAVING sum(umsatz_monat_vj) > 0
   {
     schluessel: 'um_rangliste',
     name: 'Betriebe nach Umsatz',
-    beschreibung: 'Rangliste im gewählten Monat, mit Bon und Umsatz je Gast. Die letzten Zeilen sind die interessanten.',
+    beschreibung: 'Rangliste der Betriebe im gewählten Monat, mit Durchschnittsbon und Umsatz je Gast. Die letzten Zeilen sind die interessanten.',
     anzeige: 'table',
     parameter: [MONAT],
     sql: `${MONAT_CTE_UMSATZ}
@@ -180,7 +180,7 @@ SELECT y.betrieb          AS "Betrieb",
   {
     schluessel: 'um_wochentag',
     name: 'Umsatz nach Wochentag',
-    beschreibung: 'Durchschnittlicher Tagesumsatz je Wochentag — die Grundlage für jede Frage nach Öffnungszeiten.',
+    beschreibung: 'Durchschnittlicher Tagesumsatz je Wochentag — die Grundlage für jede Frage nach Öffnungszeiten und Ruhetagen.',
     anzeige: 'bar',
     parameter: [BETRIEB],
     sql: `
@@ -212,7 +212,7 @@ SELECT to_char(geschaeftstag, 'ID')                       AS sortier,
     schluessel: 'um_bon_gast',
     name: 'Durchschnittsbon und Umsatz je Gast',
     beschreibung:
-      'Beide Kennzahlen kommen fertig von LINA und werden hier nur gemittelt. Sie laufen selten parallel: ein steigender Bon bei fallendem Umsatz je Gast heißt größere Tische, nicht mehr Umsatz.',
+      'Durchschnittsbon und Umsatz je Gast im Verlauf. Die beiden laufen selten parallel: steigt der Bon, während der Umsatz je Gast fällt, sitzen größere Gruppen am Tisch — mehr Umsatz je Rechnung, aber nicht je Person.',
     anzeige: 'line',
     parameter: [BETRIEB],
     sql: `
@@ -237,7 +237,7 @@ SELECT monat                                                    AS "Monat",
     schluessel: 'st_sparte',
     name: 'Speisen gegen Getränke',
     beschreibung:
-      'Umsatz je Hauptsparte. ACHTUNG: geholt werden bisher nur Speisen und Getränke — die Summe beider ist deshalb kleiner als der Gesamtumsatz aus mart.umsatz_tag.',
+      'Umsatz nach Speisen und Getränken. Achtung: bisher werden nur diese beiden Sparten geliefert, ihre Summe ist deshalb kleiner als der Gesamtumsatz.',
     anzeige: 'bar',
     parameter: [BETRIEB],
     sql: `
@@ -258,7 +258,7 @@ SELECT monat              AS "Monat",
   {
     schluessel: 'st_sparte_anteil',
     name: 'Spartenanteil je Betrieb',
-    beschreibung: 'Wie sich der Umsatz je Betrieb auf Speisen und Getränke verteilt — der Getränkeanteil ist der Hebel für den Wareneinsatz Bar.',
+    beschreibung: 'Wie sich der Umsatz je Betrieb auf Speisen und Getränke verteilt. Der Getränkeanteil ist der größte Hebel für den Wareneinsatz an der Bar.',
     anzeige: 'table',
     parameter: [MONAT],
     sql: `${MONAT_CTE_UMSATZ}
@@ -278,7 +278,7 @@ SELECT sp.betrieb                                                          AS "B
   {
     schluessel: 'st_verkaufsstelle',
     name: 'Umsatz je Verkaufsstelle',
-    beschreibung: 'Außer Haus, Delivery, To Go und die übrigen Verkaufsstellen. Prio 1 in „Umsetzung Berichte".',
+    beschreibung: 'Umsatz nach Verkaufsstelle: Außer Haus, Delivery, To Go und die übrigen.',
     anzeige: 'bar',
     parameter: [BETRIEB],
     sql: `
@@ -300,7 +300,7 @@ SELECT verkaufsstelle     AS "Verkaufsstelle",
     schluessel: 'st_stunde',
     name: 'Tagesverlauf nach Stunde',
     beschreibung:
-      'Umsatz je Stunde über alle Tage. Sortiert nach Geschäftstag-Logik: der Tag beginnt um 08:00 und endet um 07:59, die Stunden 0–7 stehen deshalb am Ende und nicht am Anfang.',
+      'Umsatz je Stunde über alle Tage. Der Geschäftstag beginnt um 08:00 und endet um 07:59 des Folgetags — die Nachtstunden stehen deshalb am Ende und nicht am Anfang.',
     anzeige: 'bar',
     parameter: [BETRIEB],
     sql: `
@@ -321,7 +321,7 @@ SELECT lpad(stunde::text, 2, '0') || ':00' AS "Stunde",
     schluessel: 'st_zeitzone',
     name: 'Umsatz nach Zeitzone',
     beschreibung:
-      'Die vordefinierten Zeitzonen aus LINA: Frühstück, Mittagszeit, Nachmittag, Happy Hour, Abendessen, Late Night. „Late Night" läuft über Mitternacht.',
+      'Umsatz nach Tageszeit: Frühstück, Mittagszeit, Nachmittag, Happy Hour, Abendessen und Late Night. „Late Night" läuft über Mitternacht hinaus.',
     anzeige: 'bar',
     parameter: [BETRIEB],
     sql: `
@@ -340,7 +340,7 @@ SELECT zeitzone           AS "Zeitzone",
   {
     schluessel: 'st_zeitzone_betrieb',
     name: 'Zeitzonen je Betrieb',
-    beschreibung: 'Welcher Betrieb wovon lebt — ein Mittagsgeschäft und eine Abendgastronomie brauchen verschiedene Maßnahmen.',
+    beschreibung: 'Welcher Betrieb wovon lebt. Ein Mittagsgeschäft und eine Abendgastronomie brauchen verschiedene Maßnahmen.',
     anzeige: 'table',
     parameter: [MONAT],
     sql: `${MONAT_CTE_UMSATZ}
@@ -368,7 +368,7 @@ SELECT uz.betrieb                                                  AS "Betrieb",
     schluessel: 'pe_quote_betrieb',
     name: 'Personalkostenquote je Betrieb',
     beschreibung:
-      'Die 20 Betriebe mit der höchsten Personalkostenquote ohne Geschäftsführung — die Liste, an der man arbeitet. Bewusst gekappt: alle 69 Betriebe nebeneinander ergeben einen Balkenwald, in dem die Namen übereinanderliegen und niemand mehr etwas abliest. Die vollständige Reihe steht in der Tabelle darunter.',
+      'Die 20 Betriebe mit der höchsten Personalkostenquote ohne Geschäftsführung. Auf 20 begrenzt, damit die Namen lesbar bleiben — die vollständige Liste steht in der Tabelle darunter.',
     anzeige: 'row',
     parameter: [MONAT],
     sql: `${MONAT_CTE}
@@ -396,7 +396,7 @@ SELECT r.betrieb                AS "Betrieb",
     schluessel: 'pe_quote_tabelle',
     name: 'Personalkostenquote — alle Betriebe',
     beschreibung:
-      'Die vollständige Reihe zum gekappten Diagramm darüber, mit Ampel und Abstand zur 28-%-Schwelle. Positive Werte in „Δ Schwelle" sind die Überschreitung in Prozentpunkten.',
+      'Alle Betriebe mit Ampel und Abstand zur 28-%-Schwelle. Ein positiver Wert in „Δ Schwelle" heißt: um so viele Prozentpunkte liegt der Betrieb über der Grenze.',
     anzeige: 'table',
     parameter: [MONAT],
     sql: `${MONAT_CTE}
@@ -417,7 +417,7 @@ SELECT r.betrieb                            AS "Betrieb",
     schluessel: 'pe_bereich',
     name: 'Personalkosten je Bereich',
     beschreibung:
-      'Quoten für Service, Bar und Küche nebeneinander. Prio 1 in „Umsetzung Berichte" — pek_* sind Prozentquoten, nicht Euro.',
+      'Personalkostenquoten für Service, Bar und Küche nebeneinander. Alle Werte in Prozent vom Umsatz, nicht in Euro.',
     anzeige: 'table',
     parameter: [BETRIEB],
     sql: `
@@ -440,7 +440,7 @@ SELECT betrieb        AS "Betrieb",
     schluessel: 'pe_effektivitaet',
     name: 'Effektivität je Bereich',
     beschreibung:
-      'Umsatz je Personalstunde in Euro, gesamt und je Bereich. Nicht mit der Personalkostenquote in ein Diagramm legen — das sind zwei verschiedene Einheiten.',
+      'Umsatz je geleisteter Personalstunde in Euro, gesamt und je Bereich. Sagt, was eine Arbeitsstunde einbringt — anders als die Quote, die sagt, was sie kostet.',
     anzeige: 'table',
     parameter: [BETRIEB],
     sql: `
@@ -459,7 +459,7 @@ SELECT betrieb        AS "Betrieb",
   {
     schluessel: 'pe_verlauf',
     name: 'Personalkostenquote im Verlauf',
-    beschreibung: 'Die Quote über die Monate, aus der BWA. Die 28-%-Linie ist die Grün-Schwelle des Round Table.',
+    beschreibung: 'Die Personalkostenquote über die Monate, aus den Zahlen des Steuerberaters. Die Linie bei 28 % ist die Grenze, ab der die Ampel im Round Table auf Grün steht.',
     anzeige: 'line',
     parameter: [BETRIEB],
     sql: `
@@ -486,9 +486,9 @@ SELECT monat                                                     AS "Monat",
   // ===================================================================
   {
     schluessel: 'wa_renner',
-    name: 'Renner — meistverkaufte Artikel',
+    name: 'Meistverkaufte Artikel',
     beschreibung:
-      'Die 50 Artikel mit der höchsten Menge im gewählten Zeitraum. Immer erst den Zeitraum setzen: die Tabelle darunter ist monatlich partitioniert, ohne Zeitfilter wird die ganze Historie gelesen.',
+      'Die 50 meistverkauften Artikel im gewählten Zeitraum. Bitte zuerst einen Zeitraum wählen — ohne Eingrenzung wertet die Karte die gesamte Historie aus und braucht entsprechend lange.',
     anzeige: 'table',
     parameter: [ZEITRAUM, BETRIEB],
     sql: `
@@ -510,9 +510,9 @@ SELECT artikel                        AS "Artikel",
   },
   {
     schluessel: 'wa_penner',
-    name: 'Penner — Artikel mit dem geringsten Absatz',
+    name: 'Artikel mit dem geringsten Absatz',
     beschreibung:
-      'Die Artikel, die verkauft wurden, aber kaum. Sortimentskandidaten. Artikel ohne einen einzigen Verkauf stehen hier nicht — die kennt der Verkaufsbericht gar nicht.',
+      'Artikel, die verkauft wurden, aber kaum — Kandidaten zum Streichen. Artikel ohne einen einzigen Verkauf tauchen hier nicht auf, weil der Verkaufsbericht sie nicht kennt.',
     anzeige: 'table',
     parameter: [ZEITRAUM, BETRIEB],
     sql: `
@@ -535,10 +535,16 @@ HAVING sum(menge) > 0
     schluessel: 'wa_db_warengruppe',
     name: 'Deckungsbeitrag je Warengruppe',
     beschreibung:
-      'ZUERST AUF DIE ABDECKUNG SEHEN. Sie sagt, welcher Anteil des Umsatzes überhaupt einen hinterlegten Wareneinsatzansatz hat. Bei 60 % Abdeckung ist der Deckungsbeitrag strukturell zu hoch, ohne dass man es der Zahl ansieht.',
+      'Deckungsbeitrag je Warengruppe. Bitte zuerst die Spalte „Abdeckung" lesen: sie sagt, für welchen Anteil des Umsatzes überhaupt Rezepturen hinterlegt sind. Steht dort 60 %, ist der ausgewiesene Deckungsbeitrag zu günstig — man sieht es der Zahl selbst nicht an.',
     anzeige: 'table',
-    parameter: [MONAT],
-    sql: `${MONAT_CTE_UMSATZ}
+    parameter: [ZEITRAUM, BETRIEB],
+    // Diese Auswertung liegt je Monat vor, der Zeitraumfilter arbeitet auf
+    // Tagen. Deshalb werden alle Monate genommen, die der gewaehlte
+    // Zeitraum beruehrt -- ein halber Monat zaehlt ganz. Die Alternative
+    // waere ein zweiter Zeitfilter nur fuer diese eine Karte gewesen: dann
+    // stehen oben zwei Datumsfelder, von denen jedes einen anderen Teil
+    // der Seite bewegt, und niemand sieht welches.
+    sql: `
 SELECT d.warengruppe              AS "Warengruppe",
        sum(d.menge)               AS "Menge",
        sum(d.umsatz_netto_pos)    AS "Umsatz",
@@ -547,16 +553,19 @@ SELECT d.warengruppe              AS "Warengruppe",
        round(100 * sum(d.deckungsbeitrag) / nullif(sum(d.umsatz_netto_pos), 0), 1) AS "DB %",
        round(avg(d.abdeckung_pct), 1) AS "Abdeckung %"
   FROM mart.deckungsbeitrag_warengruppe d
-  CROSS JOIN gewaehlt g
- WHERE d.monat = g.monat
+ WHERE 1 = 1
+   [[ AND d.monat IN (SELECT DISTINCT monat FROM mart.artikelverkauf
+                       WHERE {{zeitraum}}) ]]
+   [[ AND d.betrieb = {{betrieb}} ]]
  GROUP BY d.warengruppe
  ORDER BY sum(d.umsatz_netto_pos) DESC NULLS LAST`,
+    template_tag_dimension: { zeitraum: ['mart', 'artikelverkauf', 'geschaeftstag'] },
   },
   {
     schluessel: 'wa_we_pruefung',
-    name: 'Theoretischer Wareneinsatz gegen BWA',
+    name: 'Rechnerischer gegen tatsächlichen Wareneinsatz',
     beschreibung:
-      'Soll-Wareneinsatz aus der LINA-Kalkulation gegen den Ist-Wareneinsatz aus der BWA. Eine Lücke ist hier der NORMALFALL und die eigentliche Kennzahl: sie enthält Schwund, Bruch, Portionierung, Personalverzehr und Lagerbewegung. Unter 90 % Abdeckung ist der Vergleich nicht aussagekräftig.',
+      'Was laut Rezeptur verbraucht werden müsste, gegen das, was tatsächlich eingekauft wurde. Eine Lücke ist normal und genau die interessante Zahl: in ihr stecken Schwund, Bruch, Portionsgrößen, Personalverzehr und Lagerbewegung. Unter 90 % Abdeckung ist der Vergleich nicht belastbar.',
     anzeige: 'table',
     sql: `
 SELECT betrieb            AS "Betrieb",
@@ -574,7 +583,7 @@ SELECT betrieb            AS "Betrieb",
     schluessel: 'wa_preise',
     name: 'Einkaufspreise im Verlauf',
     beschreibung:
-      'Preis je Basiseinheit je Ware und Lieferant, mit Vormonatsvergleich. Die Reihe beginnt mit der ersten Momentaufnahme — rückwirkend gibt es nichts, weil LINA keine Preishistorie führt.',
+      'Einkaufspreis je Ware und Lieferant mit Vergleich zum Vormonat. Die Reihe beginnt mit der ersten Erfassung — für die Zeit davor gibt es keine Preise, weil sie nirgends gespeichert wurden.',
     anzeige: 'table',
     sql: `
 SELECT ware                  AS "Ware",
@@ -599,7 +608,7 @@ SELECT ware                  AS "Ware",
     schluessel: 'bwa_kennzahlen',
     name: 'BWA-Kennzahlen je Monat',
     beschreibung:
-      'Umsatz, Wareneinsatz, Personalkosten und EBIT aus der BWA. Nur gebuchte Monate — ein Monat, in dem alle Werte null sind, ist nicht gebucht, sondern leer.',
+      'Umsatz, Wareneinsatz, Personalkosten und Ergebnis aus den Zahlen des Steuerberaters. Es werden nur gebuchte Monate gezeigt: ein Monat, in dem alles auf null steht, ist noch nicht gebucht — nicht umsatzlos.',
     anzeige: 'line',
     parameter: [BETRIEB],
     sql: `
@@ -622,7 +631,7 @@ HAVING count(*) FILTER (WHERE k.wert_absolut IS NOT NULL AND k.wert_absolut <> 0
   {
     schluessel: 'bwa_ebit',
     name: 'EBIT je Betrieb',
-    beschreibung: 'Rendite aus der BWA. In „Umsetzung Berichte" als „Rendite" geführt, Status live 0,2 — die Datenbasis ist da.',
+    beschreibung: 'Die Rendite je Betrieb aus den Zahlen des Steuerberaters.',
     anzeige: 'row',
     parameter: [MONAT],
     sql: `${MONAT_CTE_BWA}
@@ -653,7 +662,7 @@ SELECT k.betrieb                     AS "Betrieb",
     schluessel: 'bwa_buchungsstand',
     name: 'Buchungsstand der BWA',
     beschreibung:
-      'Bis wann ist je Betrieb gebucht? Die BWA kommt vom Steuerberater und hinkt ein bis zwei Monate nach; vier Monate Verzug sind eine Nachfrage wert. Betriebe ohne Brücke zur BWA bekommen überhaupt keine Zeile.',
+      'Bis wann ist je Betrieb gebucht? Die Zahlen kommen vom Steuerberater und liegen üblicherweise ein bis zwei Monate zurück; vier Monate Verzug sind eine Nachfrage wert. Betriebe, die dem Steuerberater nicht zugeordnet sind, erscheinen hier gar nicht.',
     anzeige: 'table',
     sql: `
 SELECT betrieb            AS "Betrieb",
@@ -671,9 +680,9 @@ SELECT betrieb            AS "Betrieb",
   // ===================================================================
   {
     schluessel: 'dq_pruefung',
-    name: 'Gegenrechnungen',
+    name: 'Nachgerechnete Zahlen',
     beschreibung:
-      'LINAs Aggregate gegen unsere eigene Neuberechnung. Die Spalte „auffällig" ist eine Arbeitsliste, kein Alarm. Erste Abfrage nach jedem größeren Backfill.',
+      'Die Summen aus LINA gegen unsere eigene Nachrechnung. Die Spalte „auffällig" ist eine Arbeitsliste, kein Alarm — sie sagt, wo ein zweiter Blick lohnt.',
     anzeige: 'table',
     sql: `
 SELECT pruefung   AS "Prüfung",
@@ -684,8 +693,8 @@ SELECT pruefung   AS "Prüfung",
   },
   {
     schluessel: 'dq_backfill',
-    name: 'Backfill je Endpunkt',
-    beschreibung: 'Wie weit ist der Import je LINA-Endpunkt? Die Sicht, die man morgens aufmacht.',
+    name: 'Datenabruf je Berichtsart',
+    beschreibung: 'Wie weit ist der Datenabruf je Berichtsart? Die Seite für den Blick am Morgen.',
     anzeige: 'table',
     sql: `
 SELECT endpunkt          AS "Endpunkt",
@@ -703,7 +712,7 @@ SELECT endpunkt          AS "Endpunkt",
   },
   {
     schluessel: 'dq_backfill_balken',
-    name: 'Backfill-Fortschritt',
+    name: 'Fortschritt des Datenabrufs',
     beschreibung: 'Derselbe Fortschritt als Balken — auf einen Blick, was noch fehlt.',
     anzeige: 'bar',
     sql: `
@@ -720,8 +729,8 @@ SELECT endpunkt AS "Endpunkt",
   },
   {
     schluessel: 'dq_sync',
-    name: 'Letzte Importläufe',
-    beschreibung: 'Gesundheit der letzten Läufe, jüngster zuerst. Erste Anlaufstelle, wenn Zahlen fehlen.',
+    name: 'Letzte Datenabrufe',
+    beschreibung: 'Die letzten Datenabrufe, der jüngste zuerst. Erste Anlaufstelle, wenn irgendwo Zahlen fehlen.',
     anzeige: 'table',
     sql: `
 SELECT lauf_id                 AS "Lauf",
@@ -743,7 +752,7 @@ SELECT lauf_id                 AS "Lauf",
     schluessel: 'dq_datenstand',
     name: 'Datenstand je Betrieb',
     beschreibung:
-      'Welche Betriebe sind überhaupt beurteilbar? Ohne diese Karte sieht ein Betrieb, dessen Daten fehlen, genauso aus wie ein Betrieb, bei dem alles in Ordnung ist — der teuerste Irrtum, den dieses System anbieten kann.',
+      'Für welche Betriebe liegen überhaupt genug Daten für ein Urteil vor? Ohne diese Liste sieht ein Betrieb, dessen Daten fehlen, genauso aus wie einer, bei dem alles in Ordnung ist.',
     anzeige: 'table',
     sql: `
 SELECT betrieb           AS "Betrieb",
@@ -767,8 +776,8 @@ SELECT betrieb           AS "Betrieb",
   },
   {
     schluessel: 'dq_befund',
-    name: 'Befunde',
-    beschreibung: 'Verteilung der Befunde über alle Betriebe. „vollständig" ist das Ziel.',
+    name: 'Datenlage je Betrieb',
+    beschreibung: 'Wie die Betriebe sich auf die Befunde verteilen. „vollständig" ist das Ziel.',
     anzeige: 'row',
     sql: `
 SELECT befund   AS "Befund",
@@ -784,9 +793,9 @@ SELECT befund   AS "Befund",
   },
   {
     schluessel: 'dq_ohne_bruecke',
-    name: 'Betriebe ohne BWA-Brücke',
+    name: 'Betriebe ohne Zuordnung zum Steuerberater',
     beschreibung:
-      'ERWARTUNG: leer. Jede Zeile hier ist ein Betrieb, der in keiner Kennzahlenauswertung auftaucht — ohne Fehlermeldung, weil der Importer ihn schlicht nicht zuordnen kann.',
+      'Diese Liste sollte leer sein. Jede Zeile ist ein Betrieb, der in keiner Kennzahlenauswertung auftaucht, weil er den Zahlen des Steuerberaters nicht zugeordnet werden kann — stillschweigend, ohne Fehlermeldung.',
     anzeige: 'table',
     sql: `
 SELECT betrieb    AS "Betrieb",
@@ -800,7 +809,7 @@ SELECT betrieb    AS "Betrieb",
     schluessel: 'dq_konzept',
     name: 'Markenzuordnung',
     beschreibung:
-      'Woher die Marke je Betrieb kommt. Die Zeilen mit „mehrdeutig — Entscheidung fehlt" sind die Arbeitsliste: solange sie offen sind, laufen diese Betriebe in allen Markenauswertungen unter „(nicht zugeordnet)".',
+      'Woher die Marke je Betrieb stammt. Zeilen mit „mehrdeutig — Entscheidung fehlt" sind zu klären: solange das offen ist, laufen diese Betriebe in allen Markenauswertungen unter „(nicht zugeordnet)".',
     anzeige: 'table',
     sql: `
 SELECT herkunft        AS "Herkunft",
@@ -812,9 +821,9 @@ SELECT herkunft        AS "Herkunft",
   },
   {
     schluessel: 'dq_umsatz_abweichung',
-    name: 'Umsatz: Artikelsumme gegen Umsatzbericht',
+    name: 'Artikelsumme gegen gemeldeten Umsatz',
     beschreibung:
-      'Tagesumsatz aus den Artikelzeilen neu aufaddiert gegen getUmsatzbericht. Toleranz 0,5 % — Rundungen je Artikel summieren sich, echte Aggregationsfehler liegen deutlich darüber. Erwartung: keine auffälligen Zeilen.',
+      'Der Tagesumsatz, aus den einzelnen Artikelverkäufen neu zusammengezählt und gegen den gemeldeten Umsatz gehalten. Abweichungen bis 0,5 % sind Rundung und unbedenklich; darüber lohnt ein Blick. Erwartung: keine auffälligen Zeilen.',
     anzeige: 'table',
     sql: `
 SELECT betrieb       AS "Betrieb",
