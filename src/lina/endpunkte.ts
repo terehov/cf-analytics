@@ -37,6 +37,47 @@ export type Schrittweite = 'tag' | 'monat' | 'jahr' | 'momentaufnahme'
  */
 export const istMomentaufnahme = (e: Endpunkt) => e.schrittweite === 'momentaufnahme'
 
+/**
+ * In welcher Reihenfolge ein Endpunkt eingereiht wird — und warum das keine
+ * Geschmacksfrage ist.
+ *
+ * Zwei Endpunkte hängen von anderen ab, und beide Abhängigkeiten scheitern
+ * LEISE, wenn die Reihenfolge nicht stimmt:
+ *
+ *   analyticsFilterOptions liefert die numerischen Betriebs-IDs. Ohne sie
+ *   findet keine einzige Zeile aus getKennzahlen ihren Betrieb. Der Posten
+ *   meldet trotzdem `ok`, und core.kennzahlen_monat bleibt leer. Am
+ *   26.07.2026 sind so 7.860 BWA-Zeilen durchgefallen — die BWA trägt den
+ *   Round Table, ein leiserer Totalausfall ist schwer vorstellbar.
+ *
+ *   articleApi:franchise ordnet Warengruppen nur Artikeln zu, die
+ *   core.artikel schon kennt; gefüllt wird der Katalog vom
+ *   Artikelverkaufsbericht. Läuft die Momentaufnahme davor, ordnet sie in
+ *   diesem Monat nichts zu — und rückwirkend gibt es keine zweite Chance.
+ *
+ * Bis zum 26.07.2026 hing beides an der Einfügereihenfolge: gleiche
+ * Priorität, dann entscheidet die posten_id. Auf einer frisch aufgesetzten
+ * Datenbank ging das prompt schief, getKennzahlen lag auf Posten 9 und
+ * analyticsFilterOptions auf 12. Eine Abhängigkeit gehört nicht in eine
+ * Zufälligkeit.
+ */
+export const PRIORITAET = {
+  /** Vor allem anderen: liefert Schlüssel, die andere Endpunkte brauchen. */
+  vorlauf: 5,
+  /** Die Tagesberichte. */
+  laufend: 10,
+  /** Momentaufnahmen, die auf den Tagesberichten aufbauen. */
+  nachlauf: 20,
+  /** Nacharbeit nach einem Fehler. */
+  nacharbeit: 50,
+  /** Historie, rückwärts. */
+  historie: 90,
+} as const
+
+export function einreihPrioritaet(key: string): number {
+  return key === 'analyticsFilterOptions' ? PRIORITAET.vorlauf : PRIORITAET.nachlauf
+}
+
 export type Endpunkt = {
   /** Schlüssel in der Warteschlange und in raw.api_antwort. */
   key: string

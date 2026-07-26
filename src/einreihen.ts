@@ -11,13 +11,14 @@
  */
 import { query, eine, pool } from './db/pool'
 import { log } from './lib/log'
-import { AKTIVE_ENDPUNKTE, istMomentaufnahme } from './lina/endpunkte'
+import { AKTIVE_ENDPUNKTE, istMomentaufnahme, einreihPrioritaet, PRIORITAET } from './lina/endpunkte'
 import { geschaeftstag } from './lib/time'
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`)
   return i >= 0 ? process.argv[i + 1] : undefined
 }
+
 
 if (process.argv.includes('--taeglich')) {
   // Gestern bezogen auf den Geschäftstag, nicht den Kalendertag.
@@ -27,7 +28,7 @@ if (process.argv.includes('--taeglich')) {
     if (ep.schrittweite !== 'tag') continue
     const r = await query(
       `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet)
-       VALUES ($1, $2, $2, 10) ON CONFLICT DO NOTHING RETURNING posten_id`, [ep.key, gestern])
+       VALUES ($1, $2, $2, $3) ON CONFLICT DO NOTHING RETURNING posten_id`, [ep.key, gestern, PRIORITAET.laufend])
     n += r.length
   }
   // Kennzahlen laufen jahresweise und werden erneut geholt, weil die BWA
@@ -36,8 +37,8 @@ if (process.argv.includes('--taeglich')) {
   for (const ep of AKTIVE_ENDPUNKTE.filter(e => e.schrittweite === 'jahr')) {
     const r = await query(
       `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet)
-       VALUES ($1, $2, $3, 10) ON CONFLICT DO NOTHING RETURNING posten_id`,
-      [ep.key, `${jahr}-01-01`, `${jahr}-12-31`])
+       VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING RETURNING posten_id`,
+      [ep.key, `${jahr}-01-01`, `${jahr}-12-31`, PRIORITAET.laufend])
     n += r.length
   }
   /**
@@ -64,12 +65,12 @@ if (process.argv.includes('--taeglich')) {
   for (const ep of AKTIVE_ENDPUNKTE.filter(istMomentaufnahme)) {
     const r = await query(
       `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet)
-       SELECT $1, $2::date, $2::date, 10
+       SELECT $1, $2::date, $2::date, $3
         WHERE NOT EXISTS (
               SELECT 1 FROM sync.warteschlange
                WHERE endpunkt = $1 AND zeitraum_von = $2::date)
        RETURNING posten_id`,
-      [ep.key, monatsErster])
+      [ep.key, monatsErster, einreihPrioritaet(ep.key)])
     m += r.length
   }
   if (m > 0) log.info('momentaufnahmen eingereiht', { monat: monatsErster, posten: m })

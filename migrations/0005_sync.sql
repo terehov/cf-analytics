@@ -98,12 +98,19 @@ Monate spaeter in falschen Tagesumsaetzen.';
 -- dieselbe Sache: Eintraege in dieser Schlange, die ein einzelner Worker
 -- konstant und langsam abarbeitet.
 --
+--   prioritaet  5  Vorlauf: liefert Schluessel, die andere Endpunkte brauchen
 --   prioritaet 10  laufende Daten (gestern), taeglich eingereiht
+--   prioritaet 20  Nachlauf: Momentaufnahmen, die auf die Tagesberichte aufbauen
 --   prioritaet 50  Nacharbeiten nach Fehlern
 --   prioritaet 90  Historie, rueckwaerts
 --
 -- Damit kann aktuelle Daten nie hinter dem Backfill verhungern, und es gibt
 -- nur einen Codepfad statt zweier, die auseinanderlaufen.
+--
+-- 5 und 20 sind keine Feinheit, sondern eine echte Abhaengigkeit: ohne
+-- analyticsFilterOptions findet keine BWA-Zeile ihren Betrieb, und
+-- articleApi ordnet nur Artikeln zu, die der Verkaufsbericht schon angelegt
+-- hat. Begruendung ausfuehrlich in src/einreihen.ts.
 -- =====================================================================
 
 CREATE TABLE sync.warteschlange (
@@ -124,7 +131,7 @@ CREATE TABLE sync.warteschlange (
 );
 
 COMMENT ON TABLE  sync.warteschlange                IS 'Eine Zeile je zu holendem Zeitraum. Der Zustand des Importers liegt vollstaendig hier - ein Containerabsturz kostet damit nichts.';
-COMMENT ON COLUMN sync.warteschlange.prioritaet     IS '10 = laufende Daten, 50 = Nacharbeit nach Fehler, 90 = Historie. Kleiner gewinnt.';
+COMMENT ON COLUMN sync.warteschlange.prioritaet     IS '5 = Vorlauf (liefert Schluessel fuer andere Endpunkte), 10 = laufende Daten, 20 = Nachlauf (Momentaufnahmen, die auf die Tagesberichte aufbauen), 50 = Nacharbeit nach Fehler, 90 = Historie. Kleiner gewinnt.';
 COMMENT ON COLUMN sync.warteschlange.faellig_ab     IS 'Wiedervorlage. Nach einem Fehler in die Zukunft gesetzt (exponentielles Backoff mit Jitter), statt sofort erneut zu versuchen.';
 COMMENT ON COLUMN sync.warteschlange.in_arbeit_seit IS 'Reservierung durch den Worker. Bleibt ein Posten haengen (Absturz mitten im Lauf), gibt ihn die Aufraeumfunktion nach einer Stunde wieder frei.';
 COMMENT ON COLUMN sync.warteschlange.ergebnis       IS 'keine_daten ist ein NORMALZUSTAND, kein Fehler: LINA antwortet mit HTTP 500 und leerem Body, wenn ein Betrieb fuer diesen Bericht keine Daten hat.';
