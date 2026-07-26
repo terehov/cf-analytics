@@ -115,6 +115,8 @@ Handgeschriebenes SQL, nummeriert, wird der Reihe nach angewendet. Bewusst handg
 
 Migration hinzufügen: neue Datei `NNNN_name.sql`, aufsteigend. **Bereits angewendete Dateien nie ändern** — der Stand steht in `public.schema_migration`.
 
+**Vor dem Anlegen `ls migrations/` — die Nummer muss frei sein.** Der Runner merkt sich Dateinamen, nicht Nummern: zwei Dateien mit derselben Nummer laufen beide, in alphabetischer Reihenfolge ihrer Namen. Das ist deterministisch, aber niemand sieht es der Nummer an. Am 26.07.2026 ist es passiert, als zwei Agenten parallel arbeiteten (`0009_kennzahlen_namen` und `0009_zugangssperre`) — nachträglich umbenennen hätte bedeutet, `public.schema_migration` in einer laufenden Datenbank von Hand zu korrigieren, also blieb es stehen.
+
 Am 26.07.2026 sind die vorherigen zehn Dateien zu diesen sechs zusammengefasst worden, weil sich der Stand nur noch durch Nachspielen der Historie lesen ließ: `0005` korrigierte eine Aussage aus `0000`, `0007` einen Entwurfsfehler aus `0000`, `0009` einen aus `0003`. Die Begründungen sind dabei erhalten geblieben — sie stehen jetzt an der Stelle, die sie erklären.
 
 ### `metabase/` — Dashboards als Code
