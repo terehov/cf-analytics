@@ -217,3 +217,36 @@ richtig aus, es fehlt nur ein Betrieb im Dropdown, und niemand vermisst, was er 
 Deshalb hinterlegt das Skript in `sync.merker`, mit wie vielen Betrieben es abgeglichen hat,
 und `/status` zählt nach. Ohne diese Rückmeldung wäre die Automatisierung eine Scheinlösung
 gewesen — sie hätte den Fehler nur seltener gemacht, nicht sichtbarer.
+
+---
+
+## Der Listenabgleich hängt am Sync-Lauf (26.07.2026, ersetzt die Cron-Entscheidung von vorhin)
+
+**Anlass.** Die Cron-Lösung war richtig gedacht und in der Praxis wertlos: Sie hätte
+eingerichtet werden müssen, und bis dahin wäre nichts gelaufen. Ein Automatismus, der erst
+durch eine manuelle Einrichtung entsteht, ist keiner.
+
+**Entscheidung.** `src/sync.ts` ruft den Abgleich nach dem Import auf. Der Sync-Lauf läuft
+ohnehin — damit passiert es von selbst, ohne zweiten Zeitplan und ohne dass jemand etwas tut.
+Die Adresse von Metabases Datenbank wird aus `DATABASE_URL` abgeleitet, damit auch keine
+Umgebungsvariable vergessen werden kann.
+
+**Was das kostet.** Der Importer weiß jetzt von Metabase, was er architektonisch nicht müsste.
+Das ist die Kopplung, die in der Entscheidung davor ausdrücklich vermieden wurde — hier
+bewusst in Kauf genommen, weil die sauberere Lösung nur auf dem Papier funktioniert hätte.
+
+**Wodurch der Preis gedeckelt ist.** Zwei Zusicherungen, beide mit Test:
+
+1. **Der Nachlauf kann einen Sync-Lauf niemals scheitern lassen.** Die Funktion fängt alles
+   und wirft nie. Ein abgestürztes, abgeschaltetes oder nie eingerichtetes Metabase ist kein
+   Importproblem. Der Test gibt eine unerreichbare Datenbank vor und prüft, dass der Lauf
+   sauber durchläuft.
+2. **Er läuft nach dem Import, nie davor.** Die Daten sind wichtiger, und der Abgleich braucht
+   den frischen Bestand.
+
+Die Kopplung geht damit nur in eine Richtung: das Berichtswesen hängt am Import, der Import
+nie am Berichtswesen.
+
+**Das Skript `metabase/auswahllisten.ts` bleibt** — für den Blick zwischendurch und für eine
+frische Metabase-Instanz. Es ruft dieselbe Funktion auf; zwei Umsetzungen desselben Abgleichs
+wären zwei Gelegenheiten, dass eine davon still etwas anderes tut.

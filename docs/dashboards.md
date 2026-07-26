@@ -426,48 +426,49 @@ feste Werteliste am Dashboard hinterlegt.
 
 ### Wie die Liste aktuell bleibt
 
-Man weiß nicht, wann ein Betrieb dazukommt — der Importer legt ihn stillschweigend an, sobald
-LINA ihn liefert. Deshalb wird die Liste **nicht von Hand** gepflegt, sondern abgeglichen:
+**Von selbst.** Man weiß nicht, wann ein Betrieb dazukommt — der Importer legt ihn
+stillschweigend an, sobald LINA ihn liefert. Deshalb hängt der Abgleich am Sync-Lauf:
+`src/sync.ts` ruft ihn als **Nachlauf** auf, nach dem Import. Ein neuer Betrieb steht damit
+spätestens nach dem nächsten Importlauf im Filter, ohne dass jemand etwas tut.
+
+Kein Cron-Auftrag, kein API-Schlüssel, keine zusätzliche Umgebungsvariable: die Adresse von
+Metabases Datenbank wird aus `DATABASE_URL` abgeleitet (dieselbe Instanz, Datenbank
+`lina_metabase`). `METABASE_DB_URL` überschreibt das, falls Metabase woanders liegt.
+
+> **Zwei Regeln, die den Preis dafür bezahlen.** Der Importer weiß damit von Metabase, was er
+> eigentlich nicht müsste. Abgefedert durch: **(1)** Der Nachlauf kann einen Sync-Lauf niemals
+> scheitern lassen — die Funktion fängt alles und wirft nie; ein abgestürztes, abgeschaltetes
+> oder nie eingerichtetes Metabase ist kein Importproblem. **(2)** Er läuft **nach** dem
+> Import, nie davor. Beides ist mit einem Test festgehalten, der eine unerreichbare
+> Metabase-Datenbank vorgibt.
+
+**Von Hand geht auch** — nachsehen, ohne einen Import abzuwarten:
 
 ```bash
 bun run metabase/auswahllisten.ts            # zeigt nur, was sich ändern würde
-bun run metabase/auswahllisten.ts --setzen   # schreibt es
+bun run metabase/auswahllisten.ts --setzen   # schreibt es sofort
 ```
 
-Das Skript fasst **ausschließlich die Auswahllisten** an. Es baut keine Dashboards, ändert
-kein Layout, braucht keinen Browser und keinen API-Schlüssel — es schreibt direkt in
-Metabases Datenbank, auf die ohnehin Zugriff besteht. Metabase zeigt die neuen Werte sofort,
-ein Neustart ist nicht nötig.
+Ohne `--setzen` endet der Lauf mit Rückgabewert 1, sobald es etwas zu tun gibt. Beide Wege
+benutzen **dieselbe Funktion** (`src/sync/auswahllisten.ts`) — zwei Umsetzungen desselben
+Abgleichs wären zwei Gelegenheiten, dass eine davon still etwas anderes tut.
 
-**Als täglichen Cron-Auftrag einrichten:**
+### Und wenn der Nachlauf ausfällt
 
-```cron
-15 5 * * *  cd /pfad/zu/analytics && bun run metabase/auswahllisten.ts --setzen >> /var/log/auswahllisten.log 2>&1
-```
-
-Ohne `--setzen` endet der Lauf mit Rückgabewert 1, sobald es etwas zu tun gibt — brauchbar
-für einen Monitor, der nur prüfen und nicht ändern soll.
-
-> **Warum nicht im Importer:** Der bräuchte dafür Metabase-Zugang. Zwei Systeme, die nichts
-> voneinander wissen müssen, wären aneinander gebunden, und ein Metabase-Ausfall könnte einen
-> Importlauf scheitern lassen. Dieselbe Trennung wie bei `/health` und `/status`: der Import
-> liefert Daten, das Berichtswesen liest sie.
-
-### Und wenn der Cron-Auftrag ausfällt
-
-Dann veraltet die Liste **still** — das Dashboard sieht vollständig richtig aus, es fehlt nur
-ein Betrieb im Dropdown, und niemand vermisst, was er nicht sieht. Deshalb zählt `/status`
-nach:
+Etwa weil der Importer selbst steht. Dann veraltet die Liste **still** — das Dashboard sieht
+vollständig richtig aus, es fehlt nur ein Betrieb im Dropdown, und niemand vermisst, was er
+nicht sieht. Deshalb zählt `/status` nach:
 
 ```json
 { "name": "dashboard_filter", "stufe": "warnung",
   "meldung": "3 Betrieb(e) fehlen in der Filterauswahl der Dashboards",
-  "naechster_schritt": "bun run metabase/auswahllisten.ts --setzen — läuft der tägliche Cron-Auftrag noch?" }
+  "naechster_schritt": "bun run metabase/auswahllisten.ts --setzen — läuft der Importer noch?" }
 ```
 
-Das Skript hinterlegt dafür bei jedem Lauf in `sync.merker`, mit wie vielen Betrieben es
-abgeglichen hat; `/status` vergleicht das mit dem Bestand. Der Zeitstempel dort sagt
-zusätzlich, wann der Abgleich zuletzt lief.
+Der Abgleich hinterlegt dafür bei jedem Lauf in `sync.merker`, mit wie vielen Betrieben er
+gearbeitet hat; `/status` vergleicht das mit dem Bestand. Der Zeitstempel dort sagt
+zusätzlich, wann zuletzt abgeglichen wurde — ein alter Zeitstempel heißt, dass auch der Import
+steht.
 
 **Nach einem größeren Umbau** an Karten oder Layout weiterhin `bun run metabase/uebernehmen.ts` —
 das ist der vollständige Lauf und setzt die Listen nebenbei mit.

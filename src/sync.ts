@@ -9,6 +9,7 @@ import { config, konfigZumLoggen } from './config'
 import { log } from './lib/log'
 import { pool } from './db/pool'
 import { workerLauf } from './sync/worker'
+import { auswahllistenNachlauf } from './sync/auswahllisten'
 
 const ausloeser = process.argv.includes('--backfill') ? 'backfill'
                 : process.argv.includes('--manuell')  ? 'manuell'
@@ -21,6 +22,14 @@ log.info('start', konfigZumLoggen())
 // Prozess nur genau einmal aufrufen.
 try {
   const r = await workerLauf(ausloeser as any)
+
+  // Nachlauf: die Auswahllisten der Metabase-Filter aktuell halten. Steht
+  // bewusst NACH dem Import und kann ihn nicht scheitern lassen — die
+  // Funktion wirft nie, siehe Kopf von sync/auswahllisten.ts. Hier
+  // angehängt, damit ein neuer Betrieb ohne Zutun im Filter auftaucht,
+  // statt auf einen eigenen Zeitplan zu warten, den jemand einrichten muss.
+  await auswahllistenNachlauf()
+
   await pool.end().catch(() => {})
   // Exitcode 1 nur bei Abbruch - 'teilweise' ist normal (einzelne Betriebe ohne Daten).
   process.exit(r.status === 'abgebrochen' ? 1 : 0)

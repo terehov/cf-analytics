@@ -938,6 +938,35 @@ lauf('Zugangssperre', () => {
   })
 
   /**
+   * Der Nachlauf hängt am Sync-Lauf. Damit hängt das Berichtswesen am Import —
+   * erlaubt, solange es NIE in die andere Richtung wirkt: ein abgestürztes,
+   * abgeschaltetes oder nie eingerichtetes Metabase ist kein Importproblem.
+   *
+   * Das ist die Zusicherung, auf der die ganze Konstruktion steht. Ohne sie
+   * hätte ein Metabase-Ausfall den Datenimport mitgerissen.
+   */
+  test('ein kaputtes Metabase lässt den Sync-Lauf unberührt', async () => {
+    const { auswahllistenAbgleichen, auswahllistenNachlauf } =
+      await import('./auswahllisten')
+
+    const vorher = process.env.METABASE_DB_URL
+    try {
+      // Adresse, an der garantiert nichts antwortet.
+      process.env.METABASE_DB_URL = 'postgresql://postgres@127.0.0.1:9/nirgendwo'
+
+      const r = await auswahllistenAbgleichen()
+      expect(r.status).toBe('fehler')
+      expect(r.geaendert).toBe(0)
+
+      // Und der Nachlauf, wie sync.ts ihn aufruft: protokolliert, wirft nicht.
+      await auswahllistenNachlauf()
+    } finally {
+      if (vorher === undefined) delete process.env.METABASE_DB_URL
+      else process.env.METABASE_DB_URL = vorher
+    }
+  }, 30_000)
+
+  /**
    * Die Auswahllisten der Dashboard-Filter sind Momentaufnahmen. Veralten sie,
    * fehlt ein Betrieb im Dropdown — und das Dashboard sieht dabei vollständig
    * richtig aus. Genau deshalb muss /status es melden.

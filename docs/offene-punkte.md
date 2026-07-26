@@ -109,17 +109,9 @@ Metabase: zweistufig (Übersicht über alle Marken → Drill-Down je Betrieb), r
 
 ---
 
-## Cron-Auftrag für die Auswahllisten einrichten (beim Hetzner-Deploy)
+## ~~Cron-Auftrag für die Auswahllisten einrichten~~ — erledigt (26.07.2026)
 
-`metabase/auswahllisten.ts --setzen` muss täglich laufen, sonst veralten die Filterlisten
-„Betrieb" und „Marke" — ein neuer Betrieb fehlt dann im Dropdown, ohne dass es auffällt.
+Nicht nötig geworden. Der Abgleich hängt jetzt als Nachlauf am Sync-Lauf (`src/sync.ts`) und
+passiert damit von selbst, sobald der Importer läuft — kein eigener Zeitplan, nichts
+einzurichten. Begründung in `docs/entscheidungen.md`, Beschreibung in `docs/dashboards.md`.
 
-```cron
-15 5 * * *  cd /pfad/zu/analytics && bun run metabase/auswahllisten.ts --setzen >> /var/log/auswahllisten.log 2>&1
-```
-
-Bis dahin **von Hand nach jedem größeren Import** einmal laufen lassen.
-
-`/status` meldet es als Warnung, wenn die Listen zurückfallen (Prüfung `dashboard_filter`) —
-der Cron-Auftrag ist also abgesichert, aber noch nicht eingerichtet. Zusammen mit den beiden
-anderen Punkten für den Umzug (`site-url` auf die echte Domain, siehe unten) zu erledigen.
