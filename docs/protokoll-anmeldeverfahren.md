@@ -134,24 +134,61 @@ Harte Regel 6 hat gehalten.
 10–16 Uhr   75 … 143 je Stunde
 17 Uhr      279
 18 Uhr      321
-19:20       Anmeldung abgelehnt
+18:52       letzte ERFOLGREICHE Anmeldung
+19:20       Anmeldung abgelehnt   (1. Versuch)
+19:30       Anmeldung im Browser  -> funktioniert, frisch eingetippt
+19:37       Anmeldung abgelehnt   (2. Versuch)
 ```
 
-Das ist ein zeitlicher Zusammenhang, kein bewiesener ursächlicher — LINA
-schickt keinen Grund mit. Aber es ist die einzige Änderung im Verhalten, und
-eine Abwehrmaßnahme, die sich als „Passwort falsch" ausgibt statt als 429,
-passt zum Bild.
+### Was geprüft wurde — ohne einen dritten Anmeldeversuch
 
-**Was jetzt zu tun ist — in dieser Reihenfolge:**
+Die Loginseite und die eingebundenen Skripte sind öffentlich abrufbar. Ein GET
+darauf ist **kein Anmeldeversuch**: es werden keine Zugangsdaten gesendet, kein
+Formular abgeschickt, und nichts davon kann ein Konto sperren. Genau dafür ist
+diese Prüfung da — sie liefert die Hypothese, die Regel 6 vor dem nächsten
+Versuch verlangt.
 
-1. **Im Browser anmelden.** Geht es dort, war es eine Drosselung und kein
-   gesperrtes Konto. Geht es dort nicht, bitte **nicht** weiterprobieren —
-   es gibt genau einen Zugang.
-2. Danach, und nur danach: `SELECT sync.sperre_aufheben('<name>');`
-3. Vor dem nächsten Start sicherstellen, dass `TAKT_MIN_MS`/`TAKT_MAX_MS` auf
-   der Voreinstellung 10.000/20.000 stehen. Der abgestürzte Lauf lief mit
-   5.000/12.000.
+| geprüft | Ergebnis |
+|---|---|
+| `GET /login` | HTTP 200, 12.574 Bytes, Titel „LINA TeamCloud" |
+| `window.secret` | vorhanden, 64 Hex — `secretAusSeite()` greift |
+| Hashverfahren | **MD5, unverändert** |
+| `login.js` | ruft `hex_md5(password)`, `forge_sha256` weiter auskommentiert |
+| gesendete Felder | `username, password, secret, system` — identisch zu `login.js` |
+| `system` | `a360`, wie im `<select id="login-system">` |
+| Sessioncookie | heißt jetzt `PHPSESSID`; `cookiesUebernehmen()` ist namensunabhängig |
+| Header | inkl. `x-requested-with`, `sec-ch-ua`, `sec-fetch-*` |
 
-Der Importer selbst braucht kein Zutun: Die Sperre läuft von allein ab, und
-`sperre_aktiv()` wird vor jedem Lauf geprüft — ein Neustart des Containers
-nimmt bis dahin keinen Kontakt zu LINA auf.
+**Eine Falle dabei, und sie wurde fast zur falschen Diagnose.** Die Loginseite
+bindet `/js/common/sha256.js` ein und **kein** `md5.js` mehr. Das sah nach der
+lange erwarteten Umstellung auf SHA-256 aus. Die Datei heißt aber nur so —
+**sie enthält MD5**: `hex_md5`, `binl_md5`, `md5_cmn`. Ebenso trügerisch ist
+der Cache-Buster `login.js?time=1785094953`; der Wert ist die aktuelle Uhrzeit,
+kein Versionsdatum.
+
+> Ein Dateiname ist keine Aussage über den Inhalt, und ein `?time=` ist kein
+> Änderungsdatum. Beides sah nach Beweis aus und war keiner.
+
+### Was übrig bleibt
+
+Auf unserer Seite ist nichts kaputt, und das Konto ist gesund — der Browser
+kommt von **derselben IP mit demselben Konto** rein. Also weder Kontosperre
+noch IP-Sperre.
+
+Übrig bleibt: **LINA weist gezielt unseren Client an der Anmeldung ab**,
+vermutlich eine Begrenzung auf dem Login-Endpunkt nach ~1.500 Aufrufen an einem
+Tag, ausgeliefert als generisches „Passwort falsch". Belegen lässt sich das nur
+durch einen weiteren Versuch nach längerer Pause — und der ist einer wert,
+nicht zehn.
+
+**Vor dem nächsten Start:**
+
+1. `TAKT_MIN_MS`/`TAKT_MAX_MS` auf 10.000/20.000. Der Lauf, nach dem es kippte,
+   lief mit 5.000/12.000.
+2. `SELECT sync.sperre_aufheben('<name>');` — erst nachdem im Browser geprüft
+   wurde, dass der Zugang geht.
+3. **Genau ein Versuch.** Wird er abgelehnt, stoppt der Importer von selbst und
+   setzt die nächste Pause. Nicht nachhelfen.
+
+Der Importer braucht sonst kein Zutun: `sperre_aktiv()` wird vor jedem Lauf
+geprüft — ein Neustart nimmt bis zum Ablauf keinen Kontakt zu LINA auf.

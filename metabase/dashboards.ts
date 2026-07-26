@@ -444,4 +444,51 @@ export const dashboards: Dashboard[] = [
       ] },
     ],
   },
+
+  // ===================================================================
+  // Die technische Seite. Bewusst in eigener Sammlung: sie beantwortet
+  // keine fachliche Frage, sondern die davor -- laeuft der Import, und
+  // wenn nicht, woran liegt es.
+  //
+  // Reihenfolge ist die Reihenfolge des Nachfragens:
+  //   laeuft es? -> woran haengt es? -> was macht er? -> wie weit ist er?
+  // ===================================================================
+  {
+    schluessel: 'db_import',
+    name: 'Import — Überwachung',
+    beschreibung:
+      'Läuft der Datenimport, wie weit ist er, was macht er als Nächstes — und wenn etwas scheitert, woran es liegt. Die technische Seite; für die fachliche Sicht auf Lücken siehe „Datenqualität".',
+    sammlung: 'Technik',
+    reihen: [
+      { teile: [{ text: '# Import — Überwachung\n\nOben der Zustand in vier Zahlen, darunter die Ursachen, dann was gerade läuft, unten die Vollständigkeit.\n\n> **„keine Daten" ist kein Fehler.** LINA antwortet mit HTTP 500 und leerem Body, wenn ein Betrieb für einen Bericht nichts hat — ein geschlossenes Haus oder ein Bericht, den dieser Betrieb nicht führt. Nur was unter „Fehler" steht, ist einer.' }] },
+      { teile: [
+        { karte: 'im_ampel' },
+        { karte: 'im_prozent' },
+        { karte: 'im_tempo' },
+        { karte: 'im_restzeit' },
+      ] },
+      { teile: [{ karte: 'im_kopf' }] },
+
+      { teile: [{ text: '## Woran hängt es?\n\n**Zuerst hierher sehen, wenn Zahlen fehlen.** Ruht der Zugang, steht alles andere still — dann ist keine weitere Suche nötig.\n\nSperren laufen von selbst ab; der Importer kommt ohne Zutun zurück. Ein Anmeldefehler ist die Ausnahme: den muss jemand ansehen, weil es nur diesen einen Zugang gibt.' }] },
+      { teile: [{ karte: 'im_sperre' }] },
+      { teile: [{ karte: 'im_fehler', hoehe: 9 }] },
+      { teile: [{ karte: 'im_schema' }] },
+      { teile: [{ karte: 'im_laeufe', hoehe: 11 }] },
+
+      { teile: [{ text: '## Was läuft gerade?\n\nDer Puls zeigt, ob überhaupt etwas passiert. Eine Lücke ist eine Pause — Sperre, Tagesbudget oder kein laufender Prozess.' }] },
+      { teile: [
+        { karte: 'im_puls', breite: 14 },
+        { karte: 'im_wartezeit', breite: 10 },
+      ] },
+      { teile: [{ karte: 'im_naechste', hoehe: 12 }] },
+
+      { teile: [{ text: '## Wie vollständig ist es?\n\n**„Tage alt"** ist die Spalte, an der ein hängender Bericht auffällt: bei täglichen Berichten sind ein bis zwei Tage normal.\n\n**„wartet"** heißt nicht kaputt. Der laufende Betrieb hat Vorrang vor der Historie, deshalb können Historienposten länger unberührt bleiben.' }] },
+      { teile: [{ karte: 'im_bericht', hoehe: 11 }] },
+      { teile: [
+        { karte: 'im_bericht_balken', breite: 12 },
+        { karte: 'im_reichweite', breite: 12 },
+      ] },
+      { teile: [{ karte: 'im_betrieb', hoehe: 12 }] },
+    ],
+  },
 ]

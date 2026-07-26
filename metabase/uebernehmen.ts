@@ -26,6 +26,7 @@ import { karten as kartenRoundTable } from './karten-round-table'
 import { karten as kartenFach } from './karten-fach'
 import { karten as kartenDrilldown } from './karten-drilldown'
 import { karten as kartenPortfolio } from './karten-portfolio'
+import { karten as kartenImport } from './karten-import'
 import { dashboards } from './dashboards'
 import { auslegen, MINDESTHOEHE } from './layout'
 import type { Karte, Kachel } from './typen'
@@ -35,7 +36,7 @@ const PORT = 8899
 const METABASE = 'http://localhost:3000'
 
 const alleKarten: Karte[] = [
-  ...kartenDrilldown, ...kartenPortfolio, ...kartenRoundTable, ...kartenFach,
+  ...kartenDrilldown, ...kartenPortfolio, ...kartenRoundTable, ...kartenFach, ...kartenImport,
 ]
 
 // Reihen in Kacheln umrechnen — EINMAL, damit Pruefung und Ausgabe
@@ -195,6 +196,11 @@ const definitionen = {
       name: 'Round Table',
       beschreibung:
         'Alles für den monatlichen Round Table: Übersicht und Betriebstabelle, Trend und Historie, Ursachen und Maßnahmen.',
+    },
+    {
+      name: 'Technik',
+      beschreibung:
+        'Läuft der Datenimport? Die Seite, die man aufschlägt, wenn Zahlen fehlen — und die einzige, die sagt, woran es liegt.',
     },
     {
       name: 'Betrieb',
