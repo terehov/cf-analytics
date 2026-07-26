@@ -27,15 +27,56 @@ export type Ergebnis =
    * Ein Retry darauf läuft in eine Endlosschleife.
    */
   | { art: 'keine_daten'; status: number; dauerMs: number }
+  /**
+   * LINA hat den Zugang verweigert — kein Fehler dieses Postens, sondern
+   * einer des Zugangs. Getrennt behandelt, weil die richtige Antwort darauf
+   * die einzige ist, die der Importer bisher nicht kannte: aufhören.
+   * Siehe migrations/0009_zugangssperre.sql.
+   */
+  | {
+      art: 'gesperrt'
+      sperrArt: 'http_429' | 'http_403' | 'challenge' | 'anmeldung'
+      status: number | null
+      fehler: string
+      /** Aus dem Retry-After-Header, falls LINA einen mitschickt. */
+      wartenBis: Date | null
+      dauerMs: number
+    }
   | { art: 'fehler'; status: number | null; fehler: string; dauerMs: number; wiederholbar: boolean }
 
 const schlaf = (ms: number) => new Promise(r => setTimeout(r, ms))
+
+/**
+ * `Retry-After` kommt entweder als Sekundenzahl oder als HTTP-Datum.
+ * Beides wird gelesen; alles andere ergibt null, dann gilt die eigene Basisdauer.
+ */
+function retryAfter(header: string | null): Date | null {
+  if (!header) return null
+  const sekunden = Number(header.trim())
+  if (Number.isFinite(sekunden) && sekunden >= 0) return new Date(Date.now() + sekunden * 1000)
+  const datum = new Date(header)
+  return Number.isNaN(datum.getTime()) ? null : datum
+}
+
+/**
+ * Sieht die Antwort nach einer Abwehrseite aus?
+ *
+ * Bewusst eng gefasst: eine Fehlklassifikation legt den Importer für Stunden
+ * lahm. Ein abgelaufener Session-Redirect ist KEINE Sperre — den behandelt
+ * `sessionAbgelaufen()` und meldet sich einmal neu an.
+ */
+function nachAbwehrseiteAussehend(text: string): boolean {
+  return /captcha|cloudflare|attention required|access denied|zugriff verweigert|too many requests/i
+    .test(text.slice(0, 2000))
+}
 
 export class LinaClient {
   private session = new LinaSession()
   private letzterRequest = 0
   private heute = ''
   private heuteVerbraucht = 0
+  /** Einmal gescheiterte Anmeldung heißt: in diesem Prozess kein zweiter Versuch. */
+  private anmeldungGescheitert = false
   /** Wartezeit vor dem letzten Request — wird zur Prüfbarkeit mitgeschrieben. */
   letzteWartezeitMs = 0
 
@@ -99,11 +140,41 @@ export class LinaClient {
       return { art: 'fehler', status: null, fehler: 'Tagesbudget aufgebraucht', dauerMs: 0, wiederholbar: true }
     }
 
+    /**
+     * Nach einem Anmeldefehler wird in diesem Prozess nichts mehr versucht.
+     *
+     * Ohne diese Sperre lief genau das, was harte Regel 6 verbietet: `holen()`
+     * fing `AnmeldungFehlgeschlagen` als gewöhnlichen Fehler ab, beim nächsten
+     * Posten war die Session immer noch nicht angemeldet, also wurde erneut
+     * angemeldet — bis zu zehnmal in Folge, und der stündliche Zeitplan
+     * wiederholte das. Bei einem Konto, das sich sperren lässt, und genau
+     * einem Zugang ist das der teuerste Fehler, den dieser Code machen kann.
+     */
+    if (this.anmeldungGescheitert) {
+      return {
+        art: 'gesperrt', sperrArt: 'anmeldung', status: null, wartenBis: null, dauerMs: 0,
+        fehler: 'Anmeldung ist in diesem Lauf bereits gescheitert — kein weiterer Versuch',
+      }
+    }
+
     const warten = this.naechsteWartezeit()
     this.letzteWartezeitMs = warten
     if (warten > 0) await schlaf(warten)
 
-    if (!this.session.istAngemeldet) await this.session.anmelden()
+    if (!this.session.istAngemeldet) {
+      try {
+        await this.session.anmelden()
+      } catch (e) {
+        if (e instanceof AnmeldungFehlgeschlagen) {
+          this.anmeldungGescheitert = true
+          return {
+            art: 'gesperrt', sperrArt: 'anmeldung', status: null, wartenBis: null, dauerMs: 0,
+            fehler: e.message,
+          }
+        }
+        throw e
+      }
+    }
 
     const start = Date.now()
     try {
@@ -126,11 +197,37 @@ export class LinaClient {
       if (res.status >= 500 && text.trim() === '') {
         return { art: 'keine_daten', status: res.status, dauerMs }
       }
+
+      /**
+       * Sperre erkennen, bevor irgendetwas als Postenfehler durchgeht.
+       *
+       * 429 heißt „zu schnell", 403 heißt „nicht mehr". Beides ist eine
+       * Aussage über den Zugang, nicht über diesen Zeitraum — den Posten
+       * deshalb als aufgegeben zu quittieren wäre schlicht falsch, und ihn
+       * gleich darauf mit dem nächsten Posten erneut zu versuchen erst recht.
+       */
+      if (res.status === 429 || res.status === 403) {
+        return {
+          art: 'gesperrt',
+          sperrArt: res.status === 429 ? 'http_429' : 'http_403',
+          status: res.status, dauerMs,
+          wartenBis: retryAfter(res.headers.get('retry-after')),
+          fehler: `HTTP ${res.status}${res.headers.get('retry-after') ? ` (Retry-After: ${res.headers.get('retry-after')})` : ''}`,
+        }
+      }
+      if (nachAbwehrseiteAussehend(text)) {
+        return {
+          art: 'gesperrt', sperrArt: 'challenge', status: res.status, dauerMs,
+          wartenBis: retryAfter(res.headers.get('retry-after')),
+          fehler: `Abwehrseite statt Daten (HTTP ${res.status}, ${text.length} Bytes, beginnt mit "${text.slice(0, 60)}")`,
+        }
+      }
+
       if (!res.ok) {
         return {
           art: 'fehler', status: res.status, dauerMs,
           fehler: `HTTP ${res.status}`,
-          wiederholbar: res.status === 429 || res.status >= 500,
+          wiederholbar: res.status >= 500,
         }
       }
 
@@ -152,9 +249,15 @@ export class LinaClient {
     } catch (e) {
       this.letzterRequest = Date.now()
       const dauerMs = Date.now() - start
-      // Falsche Zugangsdaten NICHT wiederholen — der schnellste Weg zur Kontosperre.
+      // Falsche Zugangsdaten NICHT wiederholen — der schnellste Weg zur
+      // Kontosperre. Kann hier noch aus der Neuanmeldung nach Sessionablauf
+      // kommen; ab jetzt ruht der Zugang.
       if (e instanceof AnmeldungFehlgeschlagen) {
-        return { art: 'fehler', status: null, fehler: e.message, dauerMs, wiederholbar: false }
+        this.anmeldungGescheitert = true
+        return {
+          art: 'gesperrt', sperrArt: 'anmeldung', status: null,
+          fehler: e.message, wartenBis: null, dauerMs,
+        }
       }
       return { art: 'fehler', status: null, fehler: String(e), dauerMs, wiederholbar: true }
     }

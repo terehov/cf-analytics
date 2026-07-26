@@ -52,6 +52,18 @@ export type MockOptionen = {
   /** Klartext; die Attrappe erwartet auf der Leitung den MD5-Hex davon. */
   passwort?: string
   system?: string
+  /**
+   * Ab dem wievielten Datenaufruf gesperrt wird — der Fall, den man nicht
+   * proben kann, ohne ihn zu bauen.
+   *
+   * `sperreArt` entscheidet, wie: `429` und `403` als Statuscode,
+   * `challenge` als HTML-Abwehrseite mit 200, `anmeldung` lässt schon die
+   * Anmeldung scheitern.
+   */
+  sperreAb?: number
+  sperreArt?: 429 | 403 | 'challenge' | 'anmeldung'
+  /** Sekundenwert für den Retry-After-Header, falls gesetzt. */
+  retryAfter?: number
 }
 
 export function mockStarten(opt: MockOptionen = {}) {
@@ -62,6 +74,8 @@ export function mockStarten(opt: MockOptionen = {}) {
   let aufrufe = 0
   let anmeldungen = 0
   let abgelaufen = false
+  /** Wie oft die Attrappe eine Sperre geliefert hat -- der Test misst daran das Nachfassen. */
+  let gesperrteAufrufe = 0
   const zaehler: Record<string, number> = {}
   let letzteHeader: Record<string, string> = {}
   const passwortHash = md5(opt.passwort ?? 'geheim')
@@ -103,6 +117,9 @@ export function mockStarten(opt: MockOptionen = {}) {
           Response.json({ status: 'ERROR', message }, { status: 200 })
 
         if (!offeneSecrets.delete(secret)) return fehlschlag('Ihre Sitzung ist abgelaufen!')
+        if (opt.sperreArt === 'anmeldung' && opt.sperreAb !== undefined) {
+          return fehlschlag('Benutzername oder Passwort ist falsch!')
+        }
         if (body.get('username') !== (opt.benutzer ?? 'testuser')) {
           return fehlschlag('Benutzername oder Passwort ist falsch!')
         }
@@ -136,6 +153,19 @@ export function mockStarten(opt: MockOptionen = {}) {
 
       aufrufe++
       if (opt.sessionAblaufNach && aufrufe > opt.sessionAblaufNach) abgelaufen = true
+
+      // Sperre — der Fall, den man nicht proben kann, ohne ihn zu bauen.
+      if (opt.sperreAb && aufrufe >= opt.sperreAb && opt.sperreArt !== 'anmeldung') {
+        gesperrteAufrufe++
+        const kopf = opt.retryAfter ? { 'retry-after': String(opt.retryAfter) } : undefined
+        if (opt.sperreArt === 'challenge') {
+          return new Response(
+            '<!doctype html><html><head><title>Attention Required</title></head>' +
+            '<body><h1>Access denied</h1><p>Please complete the captcha.</p></body></html>',
+            { status: 200, headers: { 'content-type': 'text/html', ...kopf } })
+        }
+        return new Response('', { status: opt.sperreArt ?? 429, headers: kopf })
+      }
 
       const map: Record<string, string> = {
         '/intranet/analytics/getUmsatzbericht': 'getUmsatzbericht',
@@ -186,6 +216,8 @@ export function mockStarten(opt: MockOptionen = {}) {
     zaehler,
     /** Wie oft angemeldet wurde. Der Test prüft damit auf Login-Schleifen. */
     get anmeldungen() { return anmeldungen },
+    /** Wie oft die Attrappe gesperrt geantwortet hat. Erwartung nach einer Sperre: 1. */
+    get gesperrteAufrufe() { return gesperrteAufrufe },
     /** Header des letzten Aufrufs — damit prüfbar ist, wie wir uns ausgeben. */
     get letzteHeader() { return letzteHeader },
     sessionErzwingenAblaufen: () => { abgelaufen = true },

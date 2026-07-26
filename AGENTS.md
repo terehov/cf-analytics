@@ -190,6 +190,7 @@ Alles in Postico, keine Log-Wühlerei nötig:
 SELECT * FROM mart.sync_status LIMIT 5;              -- letzte Läufe
 SELECT * FROM mart.backfill_fortschritt;             -- Fortschritt je Endpunkt
 SELECT * FROM mart.betrieb_ohne_lina_id;             -- Betriebe ohne Brücke zur BWA (Erwartung: leer)
+SELECT * FROM mart.zugangssperre;                    -- ruht der Zugang? (Erwartung: leer)
 SELECT * FROM sync.aufgabe ORDER BY aufgabe_id DESC LIMIT 50;
 SELECT * FROM sync.schema_abweichung WHERE quittiert_am IS NULL;
 SELECT * FROM sync.warteschlange WHERE letzter_fehler IS NOT NULL;

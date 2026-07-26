@@ -221,6 +221,53 @@ tot. Bei zwölf Tagen Backfill ein täglicher Abbruch.
 Nachgewiesen durch einen Test, der dem laufenden Worker mitten im Betrieb die Verbindungen
 abschießt (`pg_terminate_backend`).
 
+### Ein Anmeldefehler lief in einer Schleife — direkt gegen harte Regel 6
+
+**Der teuerste Fehler, den dieser Code machen konnte.** Gefunden am 26.07.2026 beim Bauen der
+Sperrbehandlung, nicht im Betrieb — er ist nie ausgelöst worden.
+
+**Ursache.** `client.holen()` fing `AnmeldungFehlgeschlagen` ab und gab einen *gewöhnlichen*
+Fehler zurück. Der Worker verbuchte den Posten als aufgegeben und ging zum nächsten. Dort war
+`session.istAngemeldet` immer noch `false`, also wurde **erneut angemeldet** — bis
+`ABBRUCH_NACH_FEHLERN` (10) erreicht war. Und der stündliche Zeitplan begann von vorn.
+
+Zehn falsche Anmeldungen in Folge, stündlich, gegen ein Konto, das sich sperren lässt — bei genau
+einem Zugang, den Concept Family bewusst nicht offiziell bekommt. Regel 6 verbietet exakt das,
+und der Code tat es trotzdem.
+
+**Heute.** Ein gescheiterter Anmeldeversuch setzt `anmeldungGescheitert`; jeder weitere Aufruf im
+selben Prozess gibt sofort `gesperrt` zurück, ohne das Netz anzufassen. Der Lauf endet, und die
+Sperre wird mit 24 Stunden Basisdauer in `sync.zugangssperre` geschrieben — hier hilft kein
+Abwarten, sondern nur ein Mensch, der sich im Browser anmeldet und nachsieht. Ein Test misst
+`mock.anmeldungen === 1`.
+
+### Eine Sperre kostete zehn Posten je Lauf
+
+**Ursache.** HTTP 403 galt als „nicht wiederholbar", also wurde der Posten als **`aufgegeben`**
+quittiert. Das ist eine Falschaussage über die Daten: mit dem Zeitraum ist nichts verkehrt, nur
+mit dem Zugang. Zehn Posten pro Lauf waren so dauerhaft verloren, und der nächste Lauf eine
+Stunde später schickte dieselben zehn Anfragen gegen ein System, das gerade „nein" gesagt hatte.
+
+**Heute.** 429, 403 und HTML-Abwehrseiten sind eine eigene Ergebnisart. Der Posten bleibt offen,
+sein verbrauchter Versuch wird zurückgegeben (`versuche - 1`), der Lauf endet sofort, und die
+Pause steht in der **Datenbank** — sonst wäre sie beim stündlichen Neustart wieder weg.
+
+### `istTransient` kannte die Abschiedsmeldung des Servers nicht
+
+**Symptom.** Der Ausfalltest schlug plötzlich fehl, nachdem eine Abfrage im Lauf weiter nach vorn
+gerückt war — mit `terminating connection due to administrator command`.
+
+**Ursache.** Die Liste der wiederholbaren Fehler kannte `Connection terminated` (die Meldung des
+*Treibers*), aber nicht `terminating connection due to …` (die Meldung des **Servers**, etwa nach
+`pg_terminate_backend`). Aufgefallen ist das nie, weil der erste Datenbankzugriff eines Laufs
+zufällig spät genug kam: der Pool hatte die tote Verbindung bis dahin selbst aussortiert.
+
+**Heute.** `/terminating connection/i` ist mit in der Liste. Semantisch unbedenklich: wenn der
+Server die Verbindung abräumt, lief die Anweisung nicht zu Ende, ein Commit kann es nicht gegeben
+haben.
+
+> Ein Test, der nur bei bestimmter Reihenfolge grün ist, hat nichts bewiesen.
+
 ### Ein `error`-Ereignis ohne Zuhörer ist in Node ein Absturz
 
 **Ursache.** `pg.Pool` gibt `error` aus, wenn eine gerade **unbenutzte** Verbindung wegbricht —

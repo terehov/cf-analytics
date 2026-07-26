@@ -581,6 +581,157 @@ lauf('BWA-Sichten', () => {
 })
 
 /**
+ * Was passiert, wenn LINA dichtmacht.
+ *
+ * Der einzige Fall, den man nicht abwarten kann, sondern bauen muss — und der
+ * teuerste, wenn er falsch behandelt wird: es gibt genau einen Zugang, und
+ * eine Kontosperre wäre nicht rückgängig zu machen.
+ *
+ * Geprüft wird deshalb nicht nur, dass der Lauf endet, sondern vor allem, wie
+ * oft danach noch angeklopft wird. Die richtige Antwort ist: kein einziges Mal.
+ */
+lauf('Zugangssperre', () => {
+  let db: Client
+  let port: number
+
+  const frisch = async () => {
+    await db.query(`DELETE FROM sync.zugangssperre`)
+    await db.query(`TRUNCATE sync.warteschlange, sync.aufgabe, sync.lauf RESTART IDENTITY CASCADE`)
+    for (let i = 1; i <= 5; i++) {
+      await db.query(
+        `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet)
+         VALUES ('getUmsatzbericht', $1::date, $1::date, 10)`, [`2026-06-0${i}`])
+    }
+  }
+
+  beforeAll(async () => {
+    const { config } = await import('../config')
+    port = Number(new URL(config.LINA_BASE_URL).port)
+    db = new Client({ connectionString: DB })
+    await db.connect()
+  })
+
+  afterAll(async () => {
+    // Nicht liegen lassen: eine aktive Sperre würde jeden weiteren Lauf
+    // stilllegen — auch die anderer Testdateien.
+    await db.query(`DELETE FROM sync.zugangssperre`)
+    await db.end()
+  })
+
+  test('HTTP 429: ein einziger Versuch, dann Ruhe', async () => {
+    await frisch()
+    const mock = mockStarten({ port, sperreAb: 1, sperreArt: 429 })
+    try {
+      const { workerLauf } = await import('./worker')
+      const r = await workerLauf('manuell')
+      expect(r.status).toBe('abgebrochen')
+      // Der Punkt der ganzen Übung: NICHT zehnmal nachfassen.
+      expect(mock.gesperrteAufrufe).toBe(1)
+    } finally { mock.stop() }
+
+    const { rows: [s] } = await db.query(
+      `SELECT art, http_status, aktiv FROM mart.zugangssperre LIMIT 1`)
+    expect(s.art).toBe('http_429')
+    expect(s.http_status).toBe(429)
+    expect(s.aktiv).toBe(true)
+  }, 30_000)
+
+  /**
+   * Der Posten ist in Ordnung, der Zugang nicht. Ihn als „aufgegeben" zu
+   * quittieren wäre eine Falschaussage über die Daten — und nach vier Sperren
+   * wäre er dauerhaft weg, ohne je an LINA gescheitert zu sein.
+   */
+  test('der Posten wird weder aufgegeben noch mit einem Versuch belastet', async () => {
+    const { rows: [p] } = await db.query(
+      `SELECT ergebnis, erledigt_am, in_arbeit_seit, versuche, letzter_fehler
+         FROM sync.warteschlange ORDER BY posten_id LIMIT 1`)
+    expect(p.ergebnis).toBeNull()
+    expect(p.erledigt_am).toBeNull()
+    expect(p.in_arbeit_seit).toBeNull()
+    expect(Number(p.versuche)).toBe(0)
+    expect(String(p.letzter_fehler)).toContain('429')
+
+    const { rows: [{ n: offen }] } = await db.query(
+      `SELECT count(*)::int AS n FROM sync.warteschlange WHERE erledigt_am IS NULL`)
+    expect(offen).toBe(5)
+  })
+
+  test('der nächste Lauf nimmt gar keinen Kontakt auf', async () => {
+    const mock = mockStarten({ port })
+    try {
+      const { workerLauf } = await import('./worker')
+      const r = await workerLauf('zeitplan')
+      expect(r.status).toBe('gesperrt')
+      // Kein Datenaufruf UND keine Anmeldung. Auch das Anmelden ist Kontakt.
+      expect(mock.anmeldungen).toBe(0)
+      expect(Object.keys(mock.zaehler)).toHaveLength(0)
+    } finally { mock.stop() }
+  }, 30_000)
+
+  test('nach dem Aufheben läuft es wieder', async () => {
+    await db.query(`SELECT sync.sperre_aufheben('test')`)
+    const mock = mockStarten({ port })
+    try {
+      const { workerLauf } = await import('./worker')
+      const r = await workerLauf('manuell')
+      expect(r.status).not.toBe('gesperrt')
+      expect(r.ok).toBe(5)
+    } finally { mock.stop() }
+  }, 60_000)
+
+  /**
+   * Der schwerste Fall. Vorher lief hier genau das, was harte Regel 6
+   * verbietet: `holen()` fing den Anmeldefehler als gewöhnlichen Fehler ab,
+   * beim nächsten Posten war die Session immer noch nicht angemeldet, also
+   * wurde erneut angemeldet — bis zu zehnmal in Folge, stündlich wiederholt.
+   */
+  test('Anmeldefehler: genau EIN Versuch, niemals eine Schleife', async () => {
+    await frisch()
+    const mock = mockStarten({ port, sperreAb: 1, sperreArt: 'anmeldung' })
+    try {
+      const { workerLauf } = await import('./worker')
+      const r = await workerLauf('manuell')
+      expect(r.status).toBe('abgebrochen')
+      expect(mock.anmeldungen).toBe(1)          // <- darauf kommt es an
+    } finally { mock.stop() }
+
+    const { rows: [s] } = await db.query(
+      `SELECT art, aktiv, pausiert_bis > now() + interval '12 hours' AS lange
+         FROM mart.zugangssperre LIMIT 1`)
+    expect(s.art).toBe('anmeldung')
+    expect(s.aktiv).toBe(true)
+    // Deutlich länger als eine gewöhnliche Sperre: hier hilft kein Abwarten,
+    // sondern nur ein Mensch, der im Browser nachsieht.
+    expect(s.lange).toBe(true)
+  }, 30_000)
+
+  test('HTML-Abwehrseite statt Daten wird als Sperre erkannt', async () => {
+    await frisch()
+    const mock = mockStarten({ port, sperreAb: 1, sperreArt: 'challenge' })
+    try {
+      const { workerLauf } = await import('./worker')
+      expect((await workerLauf('manuell')).status).toBe('abgebrochen')
+      expect(mock.gesperrteAufrufe).toBe(1)
+    } finally { mock.stop() }
+    const { rows: [s] } = await db.query(`SELECT art FROM mart.zugangssperre LIMIT 1`)
+    expect(s.art).toBe('challenge')
+  }, 30_000)
+
+  test('ein Retry-After, das länger ist als die eigene Pause, gewinnt', async () => {
+    await frisch()
+    // Acht Stunden — mehr als die Basisdauer von sechs.
+    const mock = mockStarten({ port, sperreAb: 1, sperreArt: 429, retryAfter: 8 * 3600 })
+    try {
+      const { workerLauf } = await import('./worker')
+      await workerLauf('manuell')
+    } finally { mock.stop() }
+    const { rows: [s] } = await db.query(
+      `SELECT pausiert_bis > now() + interval '7 hours' AS beachtet FROM mart.zugangssperre LIMIT 1`)
+    expect(s.beachtet).toBe(true)
+  }, 30_000)
+})
+
+/**
  * Der Aufbau der Schemata — das, was Metabase zu sehen bekommt.
  *
  * Bis zum 26.07.2026 legte `core.partition_anlegen()` die Monatspartitionen

@@ -95,12 +95,35 @@ export type LaufErgebnis = {
   keineDaten: number
   fehler: number
   uebersprungen: number
-  status: 'ok' | 'teilweise' | 'fehlgeschlagen' | 'abgebrochen' | 'lauf_uebersprungen'
+  status: 'ok' | 'teilweise' | 'fehlgeschlagen' | 'abgebrochen' | 'lauf_uebersprungen' | 'gesperrt'
 }
 
 export async function workerLauf(
   ausloeser: 'zeitplan' | 'manuell' | 'backfill' = 'zeitplan',
 ): Promise<LaufErgebnis> {
+  /**
+   * Ruht der Zugang, wird gar nicht erst angefangen.
+   *
+   * Diese Prüfung steht bewusst VOR der Laufsperre und vor allem vor jedem
+   * Netzwerkkontakt: Der Sinn einer Sperre ist, LINA in Ruhe zu lassen. Ein
+   * Lauf, der sich erst anmeldet und dann feststellt, dass er pausieren soll,
+   * hätte die eine Anfrage schon geschickt, die er nicht schicken darf.
+   *
+   * Der Zustand liegt in der Datenbank, nicht im Prozess — sonst wäre er beim
+   * stündlichen Neustart wieder weg. Dieselbe Lektion wie beim Tagesbudget.
+   */
+  const ruht = await eine<{ art: string; pausiert_bis: Date; hinweis: string | null }>(
+    `SELECT art, pausiert_bis, hinweis FROM sync.sperre_aktiv()`)
+  if (ruht?.pausiert_bis) {
+    log.error('zugang gesperrt — es wird kein Kontakt zu LINA aufgenommen', {
+      art: ruht.art,
+      pausiertBis: ruht.pausiert_bis,
+      hinweis: ruht.hinweis,
+      freigeben: "erst im Browser prüfen, dann SELECT sync.sperre_aufheben('name');",
+    })
+    return { laufId: null, ok: 0, keineDaten: 0, fehler: 0, uebersprungen: 0, status: 'gesperrt' }
+  }
+
   const sperre = await sperreHolen()
   if (!sperre.frei) {
     // Kein Fehler, sondern der Normalfall bei einem stündlichen Zeitplan und
@@ -363,6 +386,46 @@ async function workerLaufIntern(
         // Betrieb, Zeitraum vor der Eroeffnung) ist sonst wieder Stille.
         await fortschritt(ep.key, von, null, res.dauerMs)
         continue
+      }
+
+      /**
+       * --- Zugang gesperrt: aufhören, nicht durchhalten -------------------
+       *
+       * Der Posten ist in Ordnung, der Zugang nicht. Deshalb wird er weder
+       * aufgegeben noch mit einem verbrauchten Versuch belastet — `versuche`
+       * geht zurück, sonst wäre er nach vier Sperren dauerhaft weg, ohne je
+       * an LINA gescheitert zu sein.
+       *
+       * Und der Lauf endet hier. Ohne das liefen bis zu ABBRUCH_NACH_FEHLERN
+       * weitere Anfragen gegen ein System, das gerade „nein" gesagt hat.
+       */
+      if (res.art === 'gesperrt') {
+        await query(
+          `UPDATE sync.warteschlange
+              SET in_arbeit_seit = NULL, versuche = greatest(0, versuche - 1),
+                  letzter_fehler = $1
+            WHERE posten_id = $2`, [res.fehler.slice(0, 2000), posten.posten_id])
+        aktuellerPosten = null
+        await protokoll(laufId, ep.key, posten, 'uebersprungen', res, client, res.fehler)
+
+        const bis = await eine<{ bis: Date }>(
+          `SELECT sync.sperre_setzen($1, $2, $3, $4, $5, $6, $7) AS bis`,
+          [res.sperrArt,
+           res.sperrArt === 'anmeldung' ? config.SPERRE_ANMELDUNG_STUNDEN : config.SPERRE_PAUSE_STUNDEN,
+           res.status, ep.key, res.fehler.slice(0, 2000), laufId,
+           res.wartenBis ?? null])
+
+        status = 'abgebrochen'
+        notiz = `Zugang gesperrt (${res.sperrArt}) — Pause bis ${bis?.bis?.toISOString() ?? '?'}`
+        log.error('ZUGANG GESPERRT — Lauf wird beendet', {
+          art: res.sperrArt,
+          status: res.status,
+          fehler: res.fehler,
+          pausiertBis: bis?.bis,
+          naechsteSchritte: 'im Browser prüfen, ob der Zugang noch geht. Danach: ' +
+                            "SELECT sync.sperre_aufheben('name');",
+        })
+        break
       }
 
       // --- Fehler -------------------------------------------------------

@@ -49,6 +49,41 @@ Deshalb reiht `--taeglich` die letzten `NACHZUEGLER_TAGE` (Voreinstellung 10) Ge
 
 **`ON CONFLICT DO NOTHING` ist hier genau richtig — und zwar aus demselben Grund, aus dem es in `historie_einreihen()` genau falsch war.** Der Eindeutigkeitsindex ist partiell (`WHERE erledigt_am IS NULL`) und blockiert nur noch *offene* Posten. Für den Backfill hieß das: alles Erledigte wird erneut geholt, ein teurer Fehler. Für das Nachlauffenster heißt dasselbe: derselbe Tag wird nicht doppelt eingereiht, solange er noch aussteht, aber sehr wohl erneut, wenn er fertig ist. Genau das soll er.
 
+## Wenn LINA dichtmacht
+
+Der einzige Fall, den man nicht abwarten kann, sondern bauen muss — und der teuerste, wenn er falsch behandelt wird. **Es gibt genau einen Zugang, und eine Kontosperre wäre nicht rückgängig zu machen.**
+
+Vier Signale gelten als Sperre:
+
+| Signal | `art` | Basispause |
+|---|---|---|
+| HTTP 429 | `http_429` | `SPERRE_PAUSE_STUNDEN` (6) |
+| HTTP 403 | `http_403` | 6 |
+| HTML-Abwehrseite statt JSON (`captcha`, `cloudflare`, `access denied`, …) | `challenge` | 6 |
+| die **Anmeldung** selbst schlägt fehl | `anmeldung` | `SPERRE_ANMELDUNG_STUNDEN` (24) |
+
+Ein `Retry-After`-Header gilt als **Untergrenze**. Die Pause verdoppelt sich je weiterer Sperre der letzten 24 Stunden, gedeckelt beim Sechzehnfachen: aus 6 werden 12, 24, 48, 96 — irgendwann soll ein Mensch hinsehen, das ist der Zweck.
+
+Was dann passiert:
+
+1. **Der Posten bleibt offen.** Er wird *nicht* als `aufgegeben` quittiert, und sein verbrauchter Versuch wird zurückgegeben. Mit dem Zeitraum ist nichts verkehrt, nur mit dem Zugang — ihn abzuschreiben wäre eine Falschaussage über die Daten.
+2. **Der Lauf endet sofort.** Nicht erst nach `ABBRUCH_NACH_FEHLERN`. Zehn weitere Anfragen gegen ein System, das gerade „nein" gesagt hat, sind genau das Gegenteil von dem, was man will.
+3. **Die Pause steht in `sync.zugangssperre`**, nicht im Prozess. Sonst wäre sie beim stündlichen Neustart wieder weg — dieselbe Lektion wie beim Tagesbudget.
+4. **Der nächste Lauf nimmt gar keinen Kontakt auf.** Die Prüfung steht vor der Laufsperre und vor jeder Anmeldung: auch ein Login ist Kontakt.
+
+**Beim Anmeldefehler wird in diesem Prozess kein zweites Mal angemeldet.** Bis zum 26.07.2026 tat der Code genau das — zehnmal in Folge, stündlich wiederholt, gegen ein sperrbares Konto. Siehe `fehlerkatalog.md`.
+
+Nachsehen und freigeben:
+
+```sql
+SELECT * FROM mart.zugangssperre;          -- Erwartung: leer
+SELECT sync.sperre_aufheben('eugene');     -- ERST nach Prüfung im Browser
+```
+
+Blind aufzuheben schickt den Importer sofort zurück in dieselbe Sperre. Erst im Browser anmelden und nachsehen, ob der Zugang wirklich wieder geht.
+
+Alle vier Fälle sind im Ende-zu-Ende-Test nachgestellt — die Attrappe kann auf Kommando sperren (`sperreAb`, `sperreArt`, `retryAfter`). Geprüft wird nicht nur, dass der Lauf endet, sondern **wie oft danach noch angeklopft wird**. Die richtige Antwort ist: kein einziges Mal.
+
 ## Was ein laufender Import von sich zeigt
 
 Erfolge gingen früher nach `debug`. Zwischen zwei Posten liegen 20 bis 40 Sekunden, ein Backfill war auf `info` also stundenlang vollkommen still und von einem Hänger nicht zu unterscheiden — am 26.07.2026 wurde deshalb ein intakter Lauf für tot gehalten und abgebrochen.

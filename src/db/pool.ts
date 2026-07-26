@@ -68,6 +68,20 @@ export type Werte = readonly unknown[]
 function istTransient(e: unknown): boolean {
   const s = String((e as Error)?.message ?? e)
   return /Connection terminated/i.test(s)
+      /**
+       * Die Meldung des SERVERS, wenn er die Verbindung abräumt:
+       * „terminating connection due to administrator command" (pg_terminate_backend),
+       * „... because of crash of another server process", „... due to
+       * idle-in-transaction timeout". Alle heissen dasselbe — die Verbindung
+       * ist weg, die Anweisung lief nicht zu Ende, ein Commit kann es nicht
+       * gegeben haben.
+       *
+       * Fehlte hier bis zum 26.07.2026 und fiel nur deshalb nicht auf, weil
+       * der erste Zugriff eines Laufs zufällig spät genug kam: der Pool hatte
+       * die tote Verbindung bis dahin schon selbst aussortiert. Sobald eine
+       * Abfrage weiter nach vorn rückte, schlug der Ausfalltest zu.
+       */
+      || /terminating connection/i.test(s)
       || /timeout exceeded when trying to connect/i.test(s)
       || /Client has encountered a connection error/i.test(s)
       || /connection is closed/i.test(s)

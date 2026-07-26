@@ -46,9 +46,49 @@ const Schema = z.object({
   LINA_PLATTFORM: z.string().default('Windows'),
 
   // --- Tempo -------------------------------------------------------------
-  /** Pause zwischen zwei Requests, zufällig aus diesem Bereich. */
-  TAKT_MIN_MS: z.coerce.number().int().min(0).default(20_000),
-  TAKT_MAX_MS: z.coerce.number().int().min(0).default(40_000),
+  /**
+   * Pause zwischen zwei Requests, zufällig aus diesem Bereich.
+   *
+   * Seit dem 26.07.2026 10–20 s statt 20–40 s. Zwei Messungen tragen das:
+   *
+   *   * Über 526 Aufrufe gemittelt antwortet LINA in 623 ms, gewartet wurde
+   *     30.228 ms — **98 % Leerlauf**. An der Zahl der Anfragen ist nichts zu
+   *     sparen, eine Antwort enthält bereits alle 141 Betriebe.
+   *   * Ein Backfill über 1.100 Posten dauerte damit knapp zehn Stunden. Ein
+   *     Testlauf bei 5–12 s über mehrere hundert Aufrufe blieb ohne jede
+   *     Reaktion von LINA — keine 429, keine Verzögerung, keine Abwehrseite.
+   *
+   * 10–20 s liegt zwischen beidem und in dem Bereich, den auch ein Mensch
+   * beim Durchklicken des Report Centers erzeugt.
+   *
+   * **Weiter zu senken ist keine Optimierung, sondern eine Wette.** Es gibt
+   * genau einen Zugang, und eine Sperre wäre nicht rückgängig zu machen. Für
+   * einen beaufsichtigten Backfill ist ein schnellerer Takt vertretbar — dann
+   * aber über Umgebungsvariablen für diesen einen Lauf, nicht hier.
+   */
+  TAKT_MIN_MS: z.coerce.number().int().min(0).default(10_000),
+  TAKT_MAX_MS: z.coerce.number().int().min(0).default(20_000),
+
+  /**
+   * Wie lange der Importer nach einer erkannten Sperre ruht (Stunden).
+   *
+   * Die Dauer verdoppelt sich je weiterer Sperre der letzten 24 Stunden,
+   * gedeckelt beim Sechzehnfachen — aus 6 werden 12, 24, 48, 96. Wer zweimal
+   * am Tag gesperrt wird, hat ein anderes Problem als wer einmal gesperrt
+   * wird, und irgendwann soll ein Mensch hinsehen. Schickt LINA einen
+   * `Retry-After`-Header, gilt der als Untergrenze.
+   */
+  SPERRE_PAUSE_STUNDEN: z.coerce.number().min(0.01).default(6),
+
+  /**
+   * Dasselbe, aber für den schwersten Fall: die Anmeldung selbst schlägt fehl.
+   *
+   * Deutlich länger, weil das ein gesperrtes Konto bedeuten kann und es genau
+   * einen Zugang gibt. Hier hilft kein Abwarten, sondern nur ein Mensch, der
+   * sich im Browser anmeldet und nachsieht — die lange Pause ist dafür da,
+   * dass bis dahin nichts weiter passiert.
+   */
+  SPERRE_ANMELDUNG_STUNDEN: z.coerce.number().min(0.01).default(24),
   /**
    * Zweite Bremse: harte Obergrenze pro Kalendertag (UTC).
    *
