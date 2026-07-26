@@ -37,6 +37,32 @@ Erwartung: leer. Und der Lader schreibt eine **`error`-Zeile mit Handlungsanweis
 einzige Zeile zugeordnet werden konnte — die Reihenfolge soll stimmen, aber ihr Bruch darf nicht
 mehr leise sein.
 
+### Die Warengruppen liefen zu früh — und wären einen Monat lang weg gewesen
+
+**Symptom.** `core.artikel_warengruppe_stand` war leer. `mart.artikelverkauf.warengruppe`
+überall `NULL`, `mart.deckungsbeitrag_warengruppe` ohne Gruppierung.
+
+**Ursache.** `articleApi:franchise` ordnet Warengruppen **nur Artikeln zu, die `core.artikel`
+schon kennt** — und der Katalog wird vom Artikelverkaufsbericht gefüllt. Der Posten lief am
+26.07.2026 um **10:21**, als `core.artikel` noch leer war: 0 von 9.132 Zuordnungen, Status `ok`.
+
+Die Priorität war korrekt gesetzt (`nachlauf`, nach den Tagesberichten) — nur half sie nicht: der
+Tagesbericht des Vortags war selbst leer, weil LINA die letzten Tage noch nicht gefüllt hatte. Die
+Artikel kamen erst Stunden später aus dem **historischen** Backfill, und der läuft mit Priorität 90.
+
+**Warum das teuer gewesen wäre.** `articleApi` ist eine **monatliche** Momentaufnahme. Der nächste
+Versuch wäre der 1. August gewesen — ein ganzer Monat ohne Sortimentsdimension, und rückwirkend
+gibt es dafür keine zweite Chance, weil LINA keine Warengruppenhistorie führt.
+
+**Heute.** Der Lader schreibt eine `error`-Zeile mit Handlungsanweisung, wenn keine einzige
+Zuordnung entsteht, und eine Warnung, wenn auffällig wenige entstehen. Nach dem erneuten
+Einreihen: **4.170 Zuordnungen**, 68,6 % des Artikelumsatzes haben eine Warengruppe. Die
+restlichen 31,4 % sind Artikel, die im heutigen Katalog nicht mehr stehen — dafür ist der
+Rückgriff in `core.artikel_warengruppe_zeitraum` da.
+
+> Eine Priorität sichert die Reihenfolge, nicht die Voraussetzung. „Läuft nach X" heißt nicht
+> „X hat etwas geliefert".
+
 ### Die Markenebene war vollständig gebaut — und wurde nie geladen
 
 **Symptom.** `SELECT * FROM mart.konzept_zuordnung` meldete für **alle 141 Betriebe**

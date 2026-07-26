@@ -542,6 +542,36 @@ export async function laden(k: Kontext): Promise<number> {
                gross_key = EXCLUDED.gross_key, mec_key = EXCLUDED.mec_key,
                detail_key = EXCLUDED.detail_key`, werte)
         })
+
+        /**
+         * Null Zuordnungen sind kein Normalfall, sondern ein Totalausfall.
+         *
+         * Zugeordnet wird nur, was `core.artikel` schon kennt — und der
+         * Katalog wird vom Artikelverkaufsbericht gefüllt. Läuft diese
+         * Momentaufnahme, bevor genug Artikel da sind, schreibt sie NICHTS
+         * und meldet trotzdem `ok`. Genau so passiert am 26.07.2026: der
+         * Posten lief um 10:21, `core.artikel` war leer, 0 von 9.132
+         * Zuordnungen — und weil es eine MONATLICHE Momentaufnahme ist,
+         * wäre der nächste Versuch erst im August gewesen.
+         *
+         * Ein ganzer Monat ohne Warengruppen heißt: mart.artikelverkauf
+         * ohne Sortimentsdimension und mart.deckungsbeitrag_warengruppe
+         * ohne Gruppierung.
+         */
+        if (zeilen.length > 0 && rows.length === 0) {
+          log.error(
+            'keine einzige Warengruppenzuordnung geschrieben — core.artikel ist (noch) leer. ' +
+            'Erst den Artikelverkaufsbericht laufen lassen, dann diesen Posten erneut einreihen. ' +
+            'Sonst fehlt die Sortimentsdimension bis zur nächsten Momentaufnahme im Folgemonat.',
+            { endpunkt: k.ep.key, monat: k.von, angeboten: zeilen.length, bekannteArtikel: akey.size })
+        } else if (rows.length < zeilen.length / 10) {
+          // articleApi kennt 9.132 Artikel, verkauft wird davon ein Bruchteil
+          // — wenige Treffer sind also normal. Sehr wenige nicht.
+          log.warn('auffällig wenige Warengruppenzuordnungen', {
+            endpunkt: k.ep.key, monat: k.von, zugeordnet: rows.length, angeboten: zeilen.length,
+          })
+        }
+
         geschrieben = rows.length
         break
       }
