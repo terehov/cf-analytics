@@ -294,6 +294,40 @@ lauf('Stammdaten-Momentaufnahmen', () => {
   })
 
   /**
+   * Die Stände werden über ZEITRÄUME aufgelöst, nicht über Monatsgleichheit.
+   *
+   * Der Verkauf liegt im Juni, die Momentaufnahmen im Juli — genau die
+   * Konstellation, in der ein `... AND stand.monat = date_trunc('month', tag)`
+   * still NULL liefert und wie "kein Ansatz hinterlegt" aussieht. Beide
+   * Auflösungen laufen hier gegen dieselbe Zeile und müssen sich
+   * unterschiedlich verhalten:
+   *
+   *   fixer_we    NICHT rückwirkend. Ein Preis von heute auf gestern
+   *               angewandt ergibt eine konkret falsche Zahl.
+   *   Warengruppe SEHR WOHL rückwirkend, aber als Annahme gekennzeichnet.
+   *               Sonst hätte die gesamte Historie keine Warengruppe.
+   */
+  test('Stände werden über Zeiträume aufgelöst, die Warengruppe rückwirkend', async () => {
+    const { rows } = await db.query(`
+      SELECT geschaeftstag, warengruppe, warengruppe_geschaetzt,
+             fixer_we, wareneinsatz_theoretisch
+        FROM mart.artikelverkauf`)
+    expect(rows.length).toBeGreaterThan(0)
+    const z = rows[0]
+
+    // Verkauf im Juni, Momentaufnahme im Juli — die Ausgangslage des Tests.
+    expect(String(z.geschaeftstag) < MONAT).toBe(true)
+
+    // Warengruppe da, aber ehrlich als Annahme markiert.
+    expect(z.warengruppe).not.toBeNull()
+    expect(z.warengruppe_geschaetzt).toBe(true)
+
+    // Der Ansatz kommt aus core.artikel_stand des Verkaufsmonats.
+    expect(Number(z.fixer_we)).toBeGreaterThan(0)
+    expect(Number(z.wareneinsatz_theoretisch)).toBeGreaterThan(0)
+  })
+
+  /**
    * Der Takt: eine Momentaufnahme je Monat, nicht je Tag.
    *
    * Die erste Fassung verliess sich auf `ON CONFLICT DO NOTHING`. Das ist
@@ -431,5 +465,51 @@ lauf('Sperre gegen parallele Worker', () => {
       expect(frei).toBe(true)
       await d.query('SELECT pg_advisory_unlock($1)', [SPERRE])
     } finally { await d.end() }
+  })
+})
+
+/**
+ * Der Aufbau der Schemata — das, was Metabase zu sehen bekommt.
+ *
+ * Bis zum 26.07.2026 legte `core.partition_anlegen()` die Monatspartitionen
+ * neben der Elterntabelle ab. In `core` standen daraufhin 84 Tabellen namens
+ * `artikelverkauf_tag_2023_07` und rundherum die fünf, um die es tatsächlich
+ * geht. In Postico ist das lästig, in Metabase unbenutzbar.
+ *
+ * Die Regel ist einfach genug, um sie zu prüfen, und sie geht bei der
+ * nächsten Änderung an partition_anlegen() lautlos kaputt — deshalb steht
+ * sie hier und nicht nur in einem Kommentar.
+ */
+lauf('Aufbau der Schemata', () => {
+  let db: Client
+  beforeAll(async () => { db = new Client({ connectionString: DB }); await db.connect() })
+  afterAll(async () => { await db.end() })
+
+  test('in core und raw steht keine einzige Partition', async () => {
+    const { rows } = await db.query(`
+      SELECT n.nspname || '.' || c.relname AS tabelle
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        JOIN pg_inherits i  ON i.inhrelid = c.oid
+       WHERE n.nspname <> 'part'`)
+    expect(rows.map(r => r.tabelle)).toEqual([])
+  })
+
+  test('die Elterntabellen bleiben, wo man sie sucht', async () => {
+    const { rows } = await db.query(`
+      SELECT count(*)::int AS n FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+       WHERE c.relkind = 'p'
+         AND (n.nspname, c.relname) IN (('core','artikelverkauf_tag'), ('raw','api_antwort'))`)
+    expect(rows[0].n).toBe(2)
+  })
+
+  test('Metabase findet die Beziehungen des Artikelverkaufs', async () => {
+    // Ohne Fremdschlüssel sind betrieb_key und artikel_key dort namenlose
+    // Zahlenspalten und kein Drill-Down funktioniert.
+    const { rows } = await db.query(`
+      SELECT count(*)::int AS n FROM pg_constraint
+       WHERE conrelid = 'core.artikelverkauf_tag'::regclass AND contype = 'f'`)
+    expect(rows[0].n).toBe(2)
   })
 })
