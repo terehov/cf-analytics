@@ -11,7 +11,7 @@
  */
 import { query, eine, pool } from './db/pool'
 import { log } from './lib/log'
-import { AKTIVE_ENDPUNKTE, istMomentaufnahme, einreihPrioritaet, PRIORITAET } from './lina/endpunkte'
+import { AKTIVE_ENDPUNKTE, istMomentaufnahme, einreihPrioritaet } from './lina/endpunkte'
 import { geschaeftstag } from './lib/time'
 
 function arg(name: string): string | undefined {
@@ -28,7 +28,7 @@ if (process.argv.includes('--taeglich')) {
     if (ep.schrittweite !== 'tag') continue
     const r = await query(
       `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet)
-       VALUES ($1, $2, $2, $3) ON CONFLICT DO NOTHING RETURNING posten_id`, [ep.key, gestern, PRIORITAET.laufend])
+       VALUES ($1, $2, $2, $3) ON CONFLICT DO NOTHING RETURNING posten_id`, [ep.key, gestern, einreihPrioritaet(ep.key)])
     n += r.length
   }
   // Kennzahlen laufen jahresweise und werden erneut geholt, weil die BWA
@@ -38,7 +38,7 @@ if (process.argv.includes('--taeglich')) {
     const r = await query(
       `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet)
        VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING RETURNING posten_id`,
-      [ep.key, `${jahr}-01-01`, `${jahr}-12-31`, PRIORITAET.laufend])
+      [ep.key, `${jahr}-01-01`, `${jahr}-12-31`, einreihPrioritaet(ep.key)])
     n += r.length
   }
   /**

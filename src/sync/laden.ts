@@ -14,6 +14,7 @@ import type { PoolClient } from 'pg'
 import { inTransaktion, mehrzeilig, inBloecken } from '../db/pool'
 import * as t from '../transform'
 import type { Endpunkt } from '../lina/endpunkte'
+import { log } from '../lib/log'
 
 type Kontext = {
   ep: Endpunkt
@@ -256,6 +257,32 @@ export async function laden(k: Kontext): Promise<number> {
             wert_prozent: relativ ? z.wert : null,
             abgerufen_am: abgerufenAm, raw_id: rawId,
           }))
+        /**
+         * Der Filter oben ist die Stelle, an der die BWA lautlos verschwindet.
+         *
+         * Wer keine `lina_betrieb_id` hat, fällt heraus — und wenn NIEMAND
+         * eine hat, fällt alles heraus. Genau das ist am 26.07.2026 passiert:
+         * 7.860 Zeilen weg, Posten meldet `ok`, `core.kennzahlen_monat` leer.
+         * Ein Fehler, den man nur bemerkt, wenn man ihn sucht.
+         *
+         * Ein Abbruch wäre hier falsch: der Posten käme in Wiedervorlage und
+         * liefe erneut gegen LINA, obwohl die Antwort in Ordnung ist. Die
+         * Ursache liegt in `core.betrieb`, nicht in den Daten. Also nicht
+         * scheitern, sondern laut sein — und sagen, was zu tun ist.
+         */
+        if (zeilen.length > 0 && rows.length === 0) {
+          log.error(
+            'keine einzige BWA-Zeile konnte einem Betrieb zugeordnet werden — ' +
+            'core.betrieb.lina_betrieb_id ist leer. Zuerst analyticsFilterOptions ' +
+            'laufen lassen, dann diesen Posten erneut einreihen. ' +
+            'Nachsehen: SELECT * FROM mart.betrieb_ohne_lina_id;',
+            { endpunkt: k.ep.key, jahr, verworfen: zeilen.length })
+        } else if (zeilen.length > rows.length) {
+          log.warn('BWA-Zeilen ohne zuordenbaren Betrieb verworfen', {
+            endpunkt: k.ep.key, jahr, verworfen: zeilen.length - rows.length, uebernommen: rows.length,
+          })
+        }
+
         // APPEND-ONLY: kein DO UPDATE. abgerufen_am ist Teil des Schlüssels,
         // damit die BWA-Historie über Nachbuchungen erhalten bleibt.
         await inBloecken(rows, 500, async b => {

@@ -12,14 +12,26 @@ import {
  * zuordnete. Beide Male lag es nur an der Einfügereihenfolge.
  */
 describe('Einreihreihenfolge', () => {
-  test('analyticsFilterOptions läuft vor den Tagesberichten', () => {
-    // Sonst findet keine Zeile aus getKennzahlen ihren Betrieb.
-    expect(einreihPrioritaet('analyticsFilterOptions')).toBeLessThan(PRIORITAET.laufend)
+  /**
+   * Die Kette Tagesbericht → analyticsFilterOptions → getKennzahlen.
+   *
+   * Ein Tagesbericht legt die Betriebe an (über `encId`),
+   * analyticsFilterOptions heftet ihnen die numerische LINA-ID an (über den
+   * Namen), und erst damit findet getKennzahlen seinen Betrieb.
+   */
+  test('erst die Betriebe, dann ihre LINA-ID, dann die BWA', () => {
+    expect(einreihPrioritaet('getUmsatzbericht'))
+      .toBeLessThan(einreihPrioritaet('analyticsFilterOptions'))
+    expect(einreihPrioritaet('analyticsFilterOptions'))
+      .toBeLessThan(einreihPrioritaet('getKennzahlen:absolut'))
+    expect(einreihPrioritaet('getKennzahlen:relativ'))
+      .toBe(einreihPrioritaet('getKennzahlen:absolut'))
   })
 
-  test('articleApi:franchise läuft nach den Tagesberichten', () => {
+  test('articleApi:franchise läuft nach dem Artikelverkaufsbericht', () => {
     // Es ordnet nur Artikeln zu, die der Verkaufsbericht schon angelegt hat.
-    expect(einreihPrioritaet('articleApi:franchise')).toBeGreaterThan(PRIORITAET.laufend)
+    expect(einreihPrioritaet('getArtikelverkaufsbericht'))
+      .toBeLessThan(einreihPrioritaet('articleApi:franchise'))
   })
 
   test('die Historie kommt immer zuletzt', () => {
@@ -28,16 +40,23 @@ describe('Einreihreihenfolge', () => {
     expect(PRIORITAET.nacharbeit).toBeGreaterThan(PRIORITAET.laufend)
   })
 
-  test('jede Momentaufnahme bekommt eine Priorität außerhalb der Tagesberichte', () => {
+  test('keine Momentaufnahme teilt sich die Stufe mit den Tagesberichten', () => {
     for (const ep of AKTIVE_ENDPUNKTE.filter(istMomentaufnahme)) {
-      expect(einreihPrioritaet(ep.key)).not.toBe(PRIORITAET.laufend)
+      expect(einreihPrioritaet(ep.key)).toBeGreaterThan(PRIORITAET.laufend)
     }
   })
 
-  test('die beiden abhängigen Endpunkte gibt es überhaupt', () => {
+  test('jeder Tagesbericht landet auf der Stufe der Tagesberichte', () => {
+    for (const ep of AKTIVE_ENDPUNKTE.filter(e => e.schrittweite === 'tag')) {
+      expect(einreihPrioritaet(ep.key)).toBe(PRIORITAET.laufend)
+    }
+  })
+
+  test('die abhängigen Endpunkte gibt es überhaupt', () => {
     // Ein Tippfehler im Schlüssel oben würde die Prüfungen sonst wertlos machen,
     // ohne dass ein Test rot wird.
     expect(endpunkt('analyticsFilterOptions').aktiv).toBe(true)
     expect(endpunkt('articleApi:franchise').aktiv).toBe(true)
+    expect(endpunkt('getKennzahlen:absolut').aktiv).toBe(true)
   })
 })

@@ -41,41 +41,54 @@ export const istMomentaufnahme = (e: Endpunkt) => e.schrittweite === 'momentaufn
  * In welcher Reihenfolge ein Endpunkt eingereiht wird — und warum das keine
  * Geschmacksfrage ist.
  *
- * Zwei Endpunkte hängen von anderen ab, und beide Abhängigkeiten scheitern
- * LEISE, wenn die Reihenfolge nicht stimmt:
+ * Es gibt eine echte Kette, und jedes ihrer Glieder reisst LEISE:
  *
- *   analyticsFilterOptions liefert die numerischen Betriebs-IDs. Ohne sie
- *   findet keine einzige Zeile aus getKennzahlen ihren Betrieb. Der Posten
- *   meldet trotzdem `ok`, und core.kennzahlen_monat bleibt leer. Am
- *   26.07.2026 sind so 7.860 BWA-Zeilen durchgefallen — die BWA trägt den
- *   Round Table, ein leiserer Totalausfall ist schwer vorstellbar.
+ *   1. Die Tagesberichte legen die Betriebe an. Ihr Schluessel ist LINAs
+ *      `encId`, und die kommt nur dort vor.
+ *   2. `analyticsFilterOptions` heftet den Betrieben ihre NUMERISCHE LINA-ID
+ *      an — verbunden ueber den Namen, weil `encId` in dieser Antwort fehlt.
+ *      Auf einer leeren Datenbank gibt es dafuer noch nichts zu tun.
+ *   3. `getKennzahlen` kennt Betriebe ausschliesslich ueber diese numerische
+ *      ID. Fehlt sie, findet keine einzige BWA-Zeile ihren Betrieb.
  *
- *   articleApi:franchise ordnet Warengruppen nur Artikeln zu, die
- *   core.artikel schon kennt; gefüllt wird der Katalog vom
- *   Artikelverkaufsbericht. Läuft die Momentaufnahme davor, ordnet sie in
- *   diesem Monat nichts zu — und rückwirkend gibt es keine zweite Chance.
+ * Reisst Glied 2 oder 3, meldet der Posten trotzdem `ok` und
+ * `core.kennzahlen_monat` bleibt leer. Am 26.07.2026 sind so 7.860 BWA-Zeilen
+ * durchgefallen — die BWA traegt den Round Table, ein leiserer Totalausfall
+ * ist schwer vorstellbar.
  *
- * Bis zum 26.07.2026 hing beides an der Einfügereihenfolge: gleiche
- * Priorität, dann entscheidet die posten_id. Auf einer frisch aufgesetzten
- * Datenbank ging das prompt schief, getKennzahlen lag auf Posten 9 und
- * analyticsFilterOptions auf 12. Eine Abhängigkeit gehört nicht in eine
- * Zufälligkeit.
+ * Daneben eine zweite, gleich stille Abhaengigkeit: `articleApi:franchise`
+ * ordnet Warengruppen nur Artikeln zu, die `core.artikel` schon kennt, und
+ * gefuellt wird der Katalog vom Artikelverkaufsbericht. Laeuft die
+ * Momentaufnahme davor, ordnet sie in diesem Monat nichts zu — und
+ * rueckwirkend gibt es keine zweite Chance, weil LINA keine
+ * Warengruppenhistorie fuehrt.
+ *
+ * Bis zum 26.07.2026 hing das alles an der Einfuegereihenfolge: gleiche
+ * Prioritaet, dann entscheidet die `posten_id`. Beim ersten Lauf gegen die
+ * frisch aufgesetzte Datenbank lag `getKennzahlen` prompt vor
+ * `analyticsFilterOptions`. Eine Abhaengigkeit gehoert nicht in eine
+ * Zufaelligkeit.
  */
 export const PRIORITAET = {
-  /** Vor allem anderen: liefert Schlüssel, die andere Endpunkte brauchen. */
-  vorlauf: 5,
-  /** Die Tagesberichte. */
+  /** Tagesberichte. Legen Betriebe und Artikel an. */
   laufend: 10,
-  /** Momentaufnahmen, die auf den Tagesberichten aufbauen. */
+  /** analyticsFilterOptions: braucht die Betriebe, liefert deren LINA-ID. */
+  bruecke: 12,
+  /** getKennzahlen: braucht die LINA-ID. */
+  bwa: 14,
+  /** Uebrige Momentaufnahmen. Brauchen den Artikelkatalog. */
   nachlauf: 20,
   /** Nacharbeit nach einem Fehler. */
   nacharbeit: 50,
-  /** Historie, rückwärts. */
+  /** Historie, rueckwaerts. */
   historie: 90,
 } as const
 
 export function einreihPrioritaet(key: string): number {
-  return key === 'analyticsFilterOptions' ? PRIORITAET.vorlauf : PRIORITAET.nachlauf
+  if (key === 'analyticsFilterOptions') return PRIORITAET.bruecke
+  if (key.startsWith('getKennzahlen')) return PRIORITAET.bwa
+  if (istMomentaufnahme(endpunkt(key))) return PRIORITAET.nachlauf
+  return PRIORITAET.laufend
 }
 
 export type Endpunkt = {
