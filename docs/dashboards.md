@@ -25,6 +25,7 @@ metabase/
   karten-fach.ts        Umsatz, Struktur, Personal, Ware, BWA, Datenqualität
   dashboards.ts         Welche Karte auf welchem Dashboard, in welcher Reihe
   uebernehmen.ts        Trägt alles nach Metabase ein
+  sichtbarkeit.ts       Setzt, welche Tabellen Metabase zeigt (siehe metabase-sichtbarkeit.md)
 ```
 
 Stand 26.07.2026: **98 Karten, 17 Dashboards, drei Sammlungen.**

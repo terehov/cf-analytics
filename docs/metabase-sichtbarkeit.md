@@ -1,12 +1,13 @@
 # Was Metabase zeigt — und was nicht
 
 Stand 26.07.2026. Von **111 Tabellen und Sichten** in der Datenbank sind in Metabase
-**41 sichtbar**, 28 auf „nur in Detailansichten" gestellt und 42 gar nicht erst
+**40 sichtbar**, 29 auf „nur in Detailansichten" gestellt und 42 gar nicht erst
 synchronisiert.
 
 Der Grundsatz dahinter steht in [`metabase.md`](metabase.md): *Metabase soll nur `mart`
-sehen müssen.* Nachgemessen — von den 98 Dashboard-Karten greift **keine einzige** auf eine
-`core`-Tabelle zu außer `core.betrieb`.
+sehen müssen.* Er gilt seit dem 26.07.2026 buchstäblich — im Datenbrowser stehen nur noch
+**`mart`, `manual` und `ampel`**. Von den 98 Dashboard-Karten greift **keine einzige** mehr
+auf `core` zu.
 
 ---
 
@@ -14,13 +15,9 @@ sehen müssen.* Nachgemessen — von den 98 Dashboard-Karten greift **keine einz
 
 | Stufe | Was das heißt | Anzahl |
 |---|---|---|
-| **Sichtbar** | In Suche, Abfrage-Editor und Datenbrowser | 41 |
+| **Sichtbar** | In Suche, Abfrage-Editor und Datenbrowser | 40 |
 | **Nur in Detailansichten** (`technical`) | Aus Suche und Editor verschwunden, über einen Fremdschlüssel weiterhin erreichbar. Metabase liest die Beziehungen weiter aus dem Katalog. | 29 |
 | **Nicht synchronisiert** | Metabase kennt sie nicht. Schema-Filter auf der Datenbank. | 42 |
-
-> **Stand:** `core.betrieb` ist als letzte `core`-Tabelle auf „nur in Detailansichten"
-> zu stellen — die Migration, die das ermöglicht, ist angewendet, die Umstellung in
-> Metabase steht noch aus (siehe unten).
 
 Der Unterschied zwischen Stufe 2 und 3 ist wichtig: `core` bleibt **synchronisiert**, weil
 die Fremdschlüssel von dort kommen. Metabase liest sie aus dem Katalog und bietet daraufhin
@@ -29,7 +26,7 @@ von selbst den Sprung vom Artikelverkauf zum Betrieb an. Ausgeblendet wird nur d
 
 ---
 
-## Sichtbar (41)
+## Sichtbar (40)
 
 ### `mart` — die Auswertungsschicht (29)
 
@@ -84,7 +81,7 @@ ohne dass jemand deployen muss.
 `regelwerk` (global vs. betriebsindividuell) · `regel` (Schwellen je Bereich) ·
 `beschriftung` (die Emoji-Zuordnung)
 
-### `core` — keine Ausnahme mehr (0)
+### `core` — nichts mehr (0)
 
 Anfangs blieb `core.betrieb` sichtbar, weil drei BWA-Karten direkt darauf jointen, um den
 Betriebsnamen an `mart.kennzahlen_aktuell` zu hängen. Das war nach dem Grundsatz keine
@@ -92,14 +89,14 @@ Ausnahme, sondern eine **Lücke in `mart`** — `kennzahlen_aktuell` war die ein
 `mart`-Sicht ohne Namen.
 
 Migration `0009_kennzahlen_namen.sql` schließt sie mit **`mart.bwa_kennzahl`**: dieselben
-Daten plus `betrieb`, `stadt`, `konzept` und `gebucht`. Seither greift **keine einzige** der
-98 Karten mehr auf `core` zu, und das ganze Schema kann versteckt werden.
+Daten plus `betrieb`, `stadt`, `konzept` und `gebucht`. Seither greift keine der 98 Karten
+mehr auf `core` zu, und das Schema ist vollständig versteckt.
 
 ---
 
-## Nur in Detailansichten (28) — das übrige `core`
+## Nur in Detailansichten (29) — ganz `core`
 
-Alle 28 sind in `mart` aufbereitet. **Wer sie direkt abfragt, stolpert über eine der stillen
+Alle 29 sind in `mart` aufbereitet. **Wer sie direkt abfragt, stolpert über eine der stillen
 Fallen** — genau die, die `mart` ausräumt:
 
 | Tabelle | In `mart` als | Die Falle beim Direktzugriff |
@@ -141,7 +138,23 @@ fachliche Bedeutung.
 
 ## Wieder ändern
 
-**Einzelne Tabelle:** Admin → Tabellenmetadaten → Schema wählen → Sichtbarkeit.
+**Der ganze Satz auf einmal** — die Regel steht in `metabase/sichtbarkeit.ts`:
+
+```bash
+bun run metabase/sichtbarkeit.ts     # startet auf :8898
+# dann http://localhost:8898/ öffnen und „Anwenden" klicken
+```
+
+Dort stehen zwei Mengen: `SICHTBAR` (`mart`, `manual`, `ampel`) und `VERSTECKT` (`core`).
+Ein zweiter Lauf ändert nichts, was schon stimmt, und meldet je Schema, wie viele Tabellen
+sichtbar bzw. versteckt sind. **Nach jeder Migration, die eine Tabelle ergänzt, einmal
+laufen lassen** — neue Tabellen sind in Metabase zunächst sichtbar.
+
+Der Umweg über einen eigenen Port hat denselben Grund wie bei den Dashboards: Metabases
+`connect-src 'self'` lässt kein Skript im Metabase-Tab von außen laden. Siehe
+[`dashboards.md`](dashboards.md).
+
+**Einzelne Tabelle von Hand:** Admin → Tabellenmetadaten → Schema wählen → Sichtbarkeit.
 
 **Ganzes Schema:** Admin → Datenbanken → *LINA* → Schemata. Achtung: eine Änderung dort
 löst einen Re-Sync aus. Tabellen, die aus dem Filter fallen, werden **deaktiviert, nicht
@@ -149,5 +162,5 @@ gelöscht** — ihre Metadaten und die Sichtbarkeitseinstellung bleiben erhalten
 wieder, sobald das Schema zurückkommt.
 
 **Nach einer neuen Migration:** Admin → Datenbanken → *LINA* → „Datenbank jetzt
-synchronisieren". Neue Tabellen sind zunächst **sichtbar** — wer eine in `core` ergänzt,
-muss sie hier von Hand wieder ausblenden.
+synchronisieren", danach `bun run metabase/sichtbarkeit.ts`. Neue Tabellen sind zunächst
+**sichtbar** — das Skript setzt sie auf den Stand, der in `SICHTBAR`/`VERSTECKT` steht.
