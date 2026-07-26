@@ -578,6 +578,40 @@ lauf('BWA-Sichten', () => {
     expect(rows[0].ampel_we_kueche).toBe('rot')
     expect(rows[0].gesamt).toBe('rot')
   })
+
+  /**
+   * Sicht und Funktion müssen dieselben Zahlen liefern.
+   *
+   * `mart.konzept_schnitt_monat` gibt es, weil Metabase tabellenwertige
+   * Funktionen im Abfrage-Editor nicht benutzen kann. Damit steht dieselbe
+   * Regel — Median statt Mittelwert, Umsatz als echte Summe — an zwei
+   * Stellen, und genau das ist der Grund für diesen Test: wer die eine
+   * ändert und die andere vergisst, bekommt zwei Wahrheiten über dieselbe
+   * Marke, ohne dass irgendetwas rot wird.
+   */
+  test('Markenschnitt: Sicht und Funktion sind sich einig', async () => {
+    const { rows } = await db.query(`
+      WITH monate AS (SELECT DISTINCT monat FROM mart.konzept_schnitt_monat)
+      SELECT count(*)::int AS verglichen,
+             count(*) FILTER (WHERE
+                  f.betriebe               IS DISTINCT FROM s.betriebe
+               OR f.umsatz_ist             IS DISTINCT FROM s.umsatz_ist
+               OR f.umsatz_pct             IS DISTINCT FROM s.umsatz_pct
+               OR f.personalkosten_ogf_pct IS DISTINCT FROM s.personalkosten_ogf_pct
+               OR f.we_bar_pct             IS DISTINCT FROM s.we_bar_pct
+               OR f.we_kueche_pct          IS DISTINCT FROM s.we_kueche_pct
+               OR f.ampeln_rot             IS DISTINCT FROM s.ampeln_rot
+               OR f.ampeln_orange          IS DISTINCT FROM s.ampeln_orange
+               OR f.ampeln_gruen           IS DISTINCT FROM s.ampeln_gruen
+               OR f.massnahme_faellig      IS DISTINCT FROM s.massnahme_faellig
+             )::int AS abweichungen
+        FROM monate m
+        CROSS JOIN LATERAL mart.konzept_schnitt(m.monat) f
+        FULL JOIN mart.konzept_schnitt_monat s
+               ON s.monat = m.monat AND s.konzept = f.konzept`)
+    expect(Number(rows[0].verglichen)).toBeGreaterThan(0)
+    expect(Number(rows[0].abweichungen)).toBe(0)
+  })
 })
 
 /**

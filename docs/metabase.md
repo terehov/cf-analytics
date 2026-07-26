@@ -45,6 +45,7 @@ stellen: Admin → Tabellenmetadaten → Schema `core` → Sichtbarkeit.
 | Frage | Sicht |
 |---|---|
 | Round Table, Ampeln, Maßnahmenbedarf | `mart.round_table_monat` — nach `monat` filtern |
+| Marken nebeneinander, Ampelverteilung | `mart.konzept_schnitt_monat` — nach `monat` filtern, Prozente sind Mediane |
 | Umsatzentwicklung je Betrieb oder Marke | `mart.umsatz_tag` |
 | Speisen gegen Getränke | `mart.umsatz_tag_sparte` |
 | Stoßzeiten, Tagesverlauf | `mart.umsatz_stunde`, `mart.umsatz_zeitzone` |
