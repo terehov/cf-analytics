@@ -221,6 +221,32 @@ tot. Bei zwölf Tagen Backfill ein täglicher Abbruch.
 Nachgewiesen durch einen Test, der dem laufenden Worker mitten im Betrieb die Verbindungen
 abschießt (`pg_terminate_backend`).
 
+### `numeric(6,2)` war für eine Quote zu schmal — und riss den Raw-Layer mit
+
+**Symptom.** 33 Posten `getPersonalkosten` scheiterten mit `numeric field overflow`.
+
+**Ursache.** Die Quotenspalten standen auf `numeric(6,2)`, fassen also höchstens 9.999,99. Das ist
+keine Reserve, sondern eine falsche Annahme über die Kennzahl: eine Quote ist Kosten durch Umsatz,
+und der Umsatz geht bei den Karteileichen im Bestand gegen null — **79 der 141 geführten Betriebe
+machen überhaupt keinen Umsatz** (`befunde-datenlage.md`). Der höchste erfolgreich gespeicherte
+Wert lag bereits bei **9.079,37**.
+
+**Warum das schlimmer ist, als es aussieht.** `laden()` schreibt Rohantwort und `core` in *einer*
+Transaktion. Scheitert die Transformation, rollt der Raw-Layer mit zurück — die Versicherung greift
+also ausgerechnet dann nicht, wenn man sie bräuchte. Der überzählige Wert ließ sich hinterher
+nicht einmal mehr nachsehen.
+
+Und der Posten geht in Wiedervorlage: nach `MAX_VERSUCHE` (4) wäre er `aufgegeben` gewesen — 33
+Tage Personalkosten dauerhaft weg, ohne Alarm, nur eine Lücke. Rechtzeitig aufgefallen, alle 33
+standen erst bei Versuch 1.
+
+**Heute.** `numeric(12,2)` für alle `pek_*`, `persoog_bwa` und `eff_*`, dazu für die
+betriebsindividuellen Schwellen aus derselben Antwort. Die 33 Posten wurden mit `versuche = 0`
+zurückgestellt: sie sind an uns gescheitert, nicht an LINA.
+
+> Der Raw-Layer ist die Versicherung — aber nur gegen Fehler, die *nach* dem Commit auffallen.
+> Gegen einen Constraint-Verstoß in derselben Transaktion schützt er nicht.
+
 ### Ein Anmeldefehler lief in einer Schleife — direkt gegen harte Regel 6
 
 **Der teuerste Fehler, den dieser Code machen konnte.** Gefunden am 26.07.2026 beim Bauen der
