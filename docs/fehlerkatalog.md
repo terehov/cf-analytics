@@ -37,6 +37,40 @@ Erwartung: leer. Und der Lader schreibt eine **`error`-Zeile mit Handlungsanweis
 einzige Zeile zugeordnet werden konnte — die Reihenfolge soll stimmen, aber ihr Bruch darf nicht
 mehr leise sein.
 
+### Die Markenebene war vollständig gebaut — und wurde nie geladen
+
+**Symptom.** `SELECT * FROM mart.konzept_zuordnung` meldete für **alle 141 Betriebe**
+„LINA kennt kein Konzept". Jeder Markenschnitt leer, und das Marken-Dashboard ist der Einstieg
+der ganzen Drill-Down-Kette.
+
+**Ursache.** `core.konzept` und `core.betrieb_konzept` gibt es seit der ersten Migration, dazu
+`mart.konzept_zuordnung`, `mart.konzept_schnitt()`, `mart.round_table_marke()` und ein eigener
+Abschnitt in `datenmodell.md` über die n:m-Modellierung. Nur: **kein einziger Ladepfad schrieb je
+in diese Tabellen.** Die Dimension war durchdacht, dokumentiert, mit Sichten versehen — und leer.
+
+Die Daten lagen dabei längst da. Beide Endpunkte werden seit dem ersten Tag geholt:
+
+| | liefert | Feld |
+|---|---|---|
+| `analyticsFilterOptions` | die 14 Marken | `gruppen[] = {id, name}` |
+| `getKennzahlen` | **wer dazugehört** | dreistufig: `groups[].key = 'group_4'` → `children[].key` |
+
+**Heute.** `transform.konzepte()` und `transform.betriebKonzepte()`, geladen aus genau diesen
+beiden Antworten. Verbunden wird über **Zahlen, nicht über Namen**: `group_4` trägt dieselbe `id`,
+die `analyticsFilterOptions` als 4 meldet — für alle 14 Gruppen gegengeprüft. Zeigt eine
+Zuordnung ins Leere, wird das als Warnung protokolliert statt still gefiltert; dieselbe Lehre wie
+bei der BWA-Brücke.
+
+**Nebenbei beantwortet:** `datenmodell.md` führte seit `0005` die offene Frage, ob die Zuordnung
+1:n oder wirklich n:m ist, samt Prüfabfrage „sobald Betriebe geladen sind". Die Messung an der
+echten Antwort: **131 Zuordnungen auf 131 Betriebe, keiner in mehreren Gruppen.** Die Annahme
+„faktisch 1:n" ist bestätigt. Die n:m-Tabelle bleibt trotzdem — sie kostet nichts, und eine
+1:n-Spalte, die einen echten Mehrfachfall nicht abbilden kann, kostet eine Migration unter
+Zeitdruck.
+
+> Eine Tabelle, die niemand füllt, sieht genauso aus wie eine, für die es keine Daten gibt.
+> Der Unterschied fällt erst auf, wenn jemand die Auswertung öffnet.
+
 ### Dieselbe Kette, zweiter Anlauf: die Reihenfolge war Zufall
 
 **Symptom.** Beim ersten Lauf gegen die frisch aufgesetzte Datenbank lag `getKennzahlen` auf

@@ -108,6 +108,66 @@ export type KennzahlZeile = {
  * derselbe Schlüssel doch zweimal auf, vervielfachten sich die Werte still,
  * und das fiele erst am fertigen Round Table auf.
  */
+/**
+ * Die Marken selbst, aus `analyticsFilterOptions.gruppen`.
+ *
+ * LINA nennt sie im Filter „Konzepte" und in der API `gruppen` — 14 Stück.
+ * Es muss also nichts aus Betriebsnamen geraten werden.
+ */
+export function konzepte(daten: any): { linaGruppenId: number; name: string }[] {
+  const raus = new Map<number, string>()
+  for (const g of daten?.gruppen ?? []) {
+    const id = Number(g?.id)
+    const name = String(g?.name ?? '').trim()
+    // `> 0`, nicht `isFinite`: Number(null) ist 0 und damit endlich — dieselbe
+    // Falle wie bei betriebeMitLinaId.
+    if (id > 0 && name) raus.set(id, name)
+  }
+  return [...raus].map(([linaGruppenId, name]) => ({ linaGruppenId, name }))
+}
+
+/**
+ * Welcher Betrieb zu welcher Marke gehört — aus `getKennzahlen`.
+ *
+ * Das ist der einzige Endpunkt, der die Zuordnung überhaupt hergibt: er
+ * liefert dreistufig Konzept → Betrieb → Kennzahl. `analyticsFilterOptions`
+ * kennt die Marken, aber nicht, wer dazugehört.
+ *
+ * Verbunden wird über Zahlen, nicht über Namen. Der Gruppenschlüssel heißt
+ * dort `group_4`, und die 4 ist dieselbe `id`, die `analyticsFilterOptions`
+ * meldet — am 26.07.2026 für alle 14 Gruppen gegengeprüft. Der Kindschlüssel
+ * ist die numerische LINA-Betriebs-ID, also `core.betrieb.lina_betrieb_id`.
+ *
+ * Nachgemessen an der echten Antwort: 131 Zuordnungen auf 131 Betriebe,
+ * **keiner in mehreren Gruppen**. Damit ist die seit `datenmodell.md`
+ * offene Frage beantwortet — die Zuordnung ist faktisch 1:n. Die n:m-Tabelle
+ * bleibt trotzdem: sie kostet nichts, und eine 1:n-Spalte, die einen echten
+ * Mehrfachfall nicht abbilden kann, kostet eine Migration unter Zeitdruck.
+ */
+export function betriebKonzepte(daten: any): { linaGruppenId: number; linaBetriebId: number }[] {
+  const raus: { linaGruppenId: number; linaBetriebId: number }[] = []
+  const gesehen = new Set<string>()
+
+  for (const gruppe of daten?.groups ?? []) {
+    // 'group_4' -> 4. Passt das Muster nicht, wird die Gruppe übersprungen
+    // statt geraten: eine falsche Markenzuordnung fährt in jeder Auswertung
+    // mit, ohne sich zu zeigen.
+    const treffer = /^group_(\d+)$/.exec(String(gruppe?.key ?? ''))
+    if (!treffer) continue
+    const linaGruppenId = Number(treffer[1])
+
+    for (const betrieb of gruppe.children ?? []) {
+      const linaBetriebId = Number(betrieb?.key)
+      if (!(linaBetriebId > 0)) continue
+      const schluessel = `${linaGruppenId}:${linaBetriebId}`
+      if (gesehen.has(schluessel)) continue
+      gesehen.add(schluessel)
+      raus.push({ linaGruppenId, linaBetriebId })
+    }
+  }
+  return raus
+}
+
 export function kennzahlen(daten: any, jahr: number): KennzahlZeile[] {
   const gesehen = new Set<string>()
   const raus: KennzahlZeile[] = []

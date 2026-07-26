@@ -291,7 +291,61 @@ export async function laden(k: Kontext): Promise<number> {
             `INSERT INTO core.kennzahlen_monat (${sp.join(',')}) VALUES ${platzhalter}
              ON CONFLICT DO NOTHING`, werte)
         })
-        geschrieben = rows.length
+        /**
+         * Die Markenzuordnung — nur aus diesem Endpunkt zu bekommen.
+         *
+         * `getKennzahlen` liefert dreistufig Konzept → Betrieb → Kennzahl und
+         * ist damit die einzige Stelle, an der steht, WER zu welcher Marke
+         * gehört. Ohne das bleibt jede Markenauswertung leer: 141 Betriebe
+         * unter „(nicht zugeordnet)", und das Marken-Dashboard ist der
+         * Einstieg der ganzen Drill-Down-Kette.
+         *
+         * Ersetzt statt ergänzt: LINA ist hier die Quelle der Wahrheit. Wird
+         * ein Betrieb umgehängt, soll das ankommen und nicht als zweite
+         * Zuordnung danebenstehen — sonst gilt er in mart.konzept_zuordnung
+         * als „mehrdeutig" und fällt aus jedem Markenschnitt heraus. Betriebe,
+         * die in dieser Antwort gar nicht vorkommen, bleiben unangetastet.
+         */
+        const bk = t.betriebKonzepte(k.daten)
+        if (bk.length) {
+          const r = await c.query(
+            `WITH v AS (
+               SELECT kn.konzept_key, b.betrieb_key
+                 FROM unnest($1::int[], $2::int[]) AS x(gruppen_id, betrieb_id)
+                 JOIN core.konzept kn ON kn.lina_gruppen_id = x.gruppen_id
+                 JOIN core.betrieb b  ON b.lina_betrieb_id  = x.betrieb_id
+             ), weg AS (
+               DELETE FROM core.betrieb_konzept alt
+                WHERE alt.betrieb_key IN (SELECT betrieb_key FROM v)
+                  AND NOT EXISTS (SELECT 1 FROM v
+                                   WHERE v.betrieb_key = alt.betrieb_key
+                                     AND v.konzept_key = alt.konzept_key)
+             )
+             INSERT INTO core.betrieb_konzept (betrieb_key, konzept_key)
+             SELECT betrieb_key, konzept_key FROM v
+             ON CONFLICT DO NOTHING`,
+            [bk.map(x => x.linaGruppenId), bk.map(x => x.linaBetriebId)])
+          geschrieben += r.rowCount ?? 0
+
+          // Zuordnungen, die ins Leere zeigen, sind kein Randfall, sondern der
+          // Vorbote einer leeren Markenauswertung — genau wie bei der
+          // BWA-Bruecke. Also laut sein statt still filtern.
+          const fehlt = await c.query(
+            `SELECT count(*)::int AS n
+               FROM unnest($1::int[], $2::int[]) AS x(gruppen_id, betrieb_id)
+              WHERE NOT EXISTS (SELECT 1 FROM core.konzept WHERE lina_gruppen_id = x.gruppen_id)
+                 OR NOT EXISTS (SELECT 1 FROM core.betrieb WHERE lina_betrieb_id = x.betrieb_id)`,
+            [bk.map(x => x.linaGruppenId), bk.map(x => x.linaBetriebId)])
+          const n = Number(fehlt.rows[0]?.n ?? 0)
+          if (n > 0) {
+            log.warn('Markenzuordnungen ohne Gegenstueck verworfen', {
+              endpunkt: k.ep.key, verworfen: n, von: bk.length,
+              hinweis: 'analyticsFilterOptions muss vor getKennzahlen laufen — siehe einreihPrioritaet()',
+            })
+          }
+        }
+
+        geschrieben += rows.length
         break
       }
 
@@ -403,6 +457,22 @@ export async function laden(k: Kontext): Promise<number> {
                 AND b.lina_betrieb_id IS DISTINCT FROM v.lina_id`,
             [mitId.map(b => b.linaId), mitId.map(b => b.name)])
           zugeordnet = r.rowCount ?? 0
+        }
+
+        /**
+         * Die Marken. LINA nennt sie im Filter „Konzepte", in der API
+         * `gruppen` — es muss nichts aus Betriebsnamen geraten werden.
+         *
+         * Die Zuordnung, WER zu welcher Marke gehört, kommt nicht von hier,
+         * sondern aus `getKennzahlen`. Dieser Endpunkt kennt nur die Liste.
+         */
+        const kz = t.konzepte(k.daten)
+        if (kz.length) {
+          await c.query(
+            `INSERT INTO core.konzept (lina_gruppen_id, name)
+             SELECT v.id, v.name FROM unnest($1::int[], $2::text[]) AS v(id, name)
+             ON CONFLICT (lina_gruppen_id) DO UPDATE SET name = EXCLUDED.name`,
+            [kz.map(x => x.linaGruppenId), kz.map(x => x.name)])
         }
 
         const fs = t.feinsparten(k.daten)

@@ -11,6 +11,7 @@ import {
   zeitzonenbericht, vordefinierteZeitzonen, artikelverkauf,
   warengruppeAusText, artikelWarengruppen, feinsparten, lieferanten,
   waren, einheiten, bestellungen, inventurtermine, betriebeMitLinaId,
+  konzepte, betriebKonzepte,
 } from './index'
 import { PersonalkostenSchema } from '../lina/schemas'
 
@@ -435,5 +436,76 @@ describe('Betriebs-IDs — die Brücke zur BWA', () => {
   test('verträgt eine Antwort ohne betriebe', () => {
     expect(betriebeMitLinaId({})).toEqual([])
     expect(betriebeMitLinaId(null)).toEqual([])
+  })
+})
+
+/**
+ * Die Markenebene — bis zum 26.07.2026 gar nicht geladen.
+ *
+ * Schema, Mart-Sichten und das Marken-Dashboard waren vollständig gebaut,
+ * aber kein Ladepfad füllte `core.konzept` oder `core.betrieb_konzept`.
+ * Ergebnis in der echten Datenbank: 141 Betriebe, 0 Konzepte, alles unter
+ * „(nicht zugeordnet)" — und das Marken-Dashboard ist der Einstieg der
+ * ganzen Drill-Down-Kette.
+ */
+describe('Markenebene', () => {
+  test('konzepte liest die Marken aus analyticsFilterOptions', () => {
+    expect(konzepte({ gruppen: [
+      { id: 1, name: 'Enchilada' }, { id: 4, name: 'Aposto' },
+    ] })).toEqual([
+      { linaGruppenId: 1, name: 'Enchilada' },
+      { linaGruppenId: 4, name: 'Aposto' },
+    ])
+  })
+
+  test('konzepte überspringt Sätze ohne ID oder Namen', () => {
+    // Number(null) ist 0 und damit endlich — dieselbe Falle wie bei den
+    // Betriebs-IDs, deshalb wird auf > 0 geprüft.
+    expect(konzepte({ gruppen: [
+      { id: null, name: 'ohne ID' }, { id: 0, name: 'Null' },
+      { id: 3, name: '  ' }, { id: 6, name: 'Sonstige' },
+    ] })).toEqual([{ linaGruppenId: 6, name: 'Sonstige' }])
+    expect(konzepte({})).toEqual([])
+    expect(konzepte(null)).toEqual([])
+  })
+
+  /**
+   * Verbunden wird über Zahlen, nicht über Namen: `group_4` trägt dieselbe
+   * `id`, die `analyticsFilterOptions` als 4 meldet. Am 26.07.2026 für alle
+   * 14 Gruppen gegen die echte Antwort geprüft.
+   */
+  test('betriebKonzepte löst den Gruppenschlüssel auf', () => {
+    expect(betriebKonzepte({ groups: [
+      { key: 'group_4', children: [{ key: '4210' }, { key: 4211 }] },
+      { key: 'group_1', children: [{ key: '17' }] },
+    ] })).toEqual([
+      { linaGruppenId: 4, linaBetriebId: 4210 },
+      { linaGruppenId: 4, linaBetriebId: 4211 },
+      { linaGruppenId: 1, linaBetriebId: 17 },
+    ])
+  })
+
+  test('betriebKonzepte rät nicht, wenn der Schlüssel anders aussieht', () => {
+    // Eine falsche Markenzuordnung fährt in jeder Auswertung mit, ohne sich
+    // zu zeigen. Lieber keine Zuordnung als eine geratene.
+    expect(betriebKonzepte({ groups: [
+      { key: 'gruppe_4', children: [{ key: '1' }] },
+      { key: 'group_x', children: [{ key: '2' }] },
+      { key: null, children: [{ key: '3' }] },
+    ] })).toEqual([])
+  })
+
+  test('betriebKonzepte überspringt Kinder ohne brauchbare ID und Dubletten', () => {
+    expect(betriebKonzepte({ groups: [
+      { key: 'group_2', children: [{ key: null }, { key: '0' }, { key: '9' }, { key: '9' }] },
+    ] })).toEqual([{ linaGruppenId: 2, linaBetriebId: 9 }])
+    expect(betriebKonzepte({})).toEqual([])
+    expect(betriebKonzepte(null)).toEqual([])
+  })
+
+  test('verträgt eine Gruppe ganz ohne Kinder', () => {
+    // Real: „Lehners" und „Burrito Company" haben 0 Kinder.
+    expect(betriebKonzepte({ groups: [{ key: 'group_3' }, { key: 'group_78', children: [] }] }))
+      .toEqual([])
   })
 })

@@ -44,7 +44,7 @@ Backfill so billig ist — acht Aufrufe je Kalendertag, nicht 8 × 141.
 | `getArtikelverkaufsbericht` | `/intranet/analytics/getArtikelverkaufsbericht` | Tag | `core.artikelverkauf_tag` **+ `core.artikel` + `core.artikel_stand`** |
 | `getPersonalkosten` | `/intranet/analytics/getPersonalkosten` | Tag | `core.personalkosten` **+ `core.schwellenwert_betrieb`** |
 | `getAktionsbericht` | `/intranet/analytics/getAktionsbericht` | Tag | — noch keine Transformation, nur `raw` |
-| `getKennzahlen:absolut` | `/intranet/analytics/getKennzahlen`, `mode=absolut` | **Jahr** | `core.kennzahlen_monat.wert_absolut` |
+| `getKennzahlen:absolut` | `/intranet/analytics/getKennzahlen`, `mode=absolut` | **Jahr** | `core.kennzahlen_monat.wert_absolut` **+ `core.betrieb_konzept`** |
 | `getKennzahlen:relativ` | derselbe, `mode=relativ` | **Jahr** | `core.kennzahlen_monat.wert_prozent` |
 
 **`getKennzahlen` ist zwei Aufrufe je Jahr, nicht je Tag.** Euro und Prozent kommen getrennt und
@@ -64,7 +64,7 @@ Monatsersten gesetzt, `--historie` überspringt sie.
 
 | Endpunkt | Pfad | landet in |
 |---|---|---|
-| `analyticsFilterOptions` | `/intranet/api/analyticsFilterOptions` | `core.feinsparte` **+ `core.betrieb.lina_betrieb_id`** |
+| `analyticsFilterOptions` | `/intranet/api/analyticsFilterOptions` | `core.feinsparte`, `core.konzept` **+ `core.betrieb.lina_betrieb_id`** |
 | `articleApi:franchise` | `/wawi/rezept/articleApi?franchise=1` | `core.warengruppe`, `core.artikel_warengruppe_stand` |
 | `wawi:units` | `/wawi/api/units` | `core.einheit` |
 | `wawi:suppliers` | `/wawi/api/suppliers` | `core.lieferant` — **Datenminimierung, siehe unten** |
@@ -136,6 +136,30 @@ Daraus folgt die Reihenfolge im Import: **erst ein Tagesbericht** (legt die Betr
 
 **Im eigenen Schema wird ausschließlich über `betrieb_key` gejoint.** `enc_id` und
 `lina_betrieb_id` sind Außengrenzen-Schlüssel und haben in einer Auswertung nichts verloren.
+
+### Marke — die Zuordnung steckt nur in `getKennzahlen`
+
+`analyticsFilterOptions.gruppen` kennt die 14 Marken (`{id, name}`), aber nicht, wer dazugehört.
+Das steht ausschließlich in `getKennzahlen`, das dreistufig ausliefert:
+
+```
+groups[].key = 'group_4'   ──▶  core.konzept.lina_gruppen_id = 4
+  └─ children[].key = 4210 ──▶  core.betrieb.lina_betrieb_id = 4210
+       └─ children[]         die eigentlichen Kennzahlen
+```
+
+**Verbunden wird über Zahlen, nicht über Namen.** Die 4 in `group_4` ist dieselbe `id`, die
+`analyticsFilterOptions` meldet — am 26.07.2026 für alle 14 Gruppen gegengeprüft. Passt das Muster
+`group_<zahl>` nicht, wird die Gruppe übersprungen statt geraten: eine falsche Markenzuordnung
+fährt in jeder Auswertung mit, ohne sich zu zeigen.
+
+Die Zuordnung wird bei jedem Lauf **ersetzt**, nicht ergänzt. LINA ist die Quelle; wird ein Betrieb
+umgehängt, soll das ankommen und nicht als zweite Zuordnung danebenstehen — sonst gilt er in
+`mart.konzept_zuordnung` als „mehrdeutig" und fällt aus jedem Markenschnitt heraus. Betriebe, die
+in der Antwort gar nicht vorkommen, bleiben unangetastet.
+
+Gemessen: **131 Zuordnungen auf 131 Betriebe, keiner in mehreren Gruppen.** Die verbleibenden 10
+der 141 sind die Einheiten ohne BWA-Zuordnung; sie erscheinen als „LINA kennt kein Konzept".
 
 > **Der Betriebsname ist NICHT eindeutig.** In `getKennzahlen` liefert die *Gruppe* die Marke, das
 > *Kind* nur die Stadt — unter der Gruppe „Enchilada" heißt der Betrieb schlicht „Karlsruhe". Der
