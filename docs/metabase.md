@@ -55,9 +55,95 @@ stellen: Admin → Tabellenmetadaten → Schema `core` → Sichtbarkeit.
 | Stimmen die Zahlen? | `mart.pruefung_uebersicht` |
 | Läuft der Import? | `mart.sync_status`, `mart.backfill_fortschritt` |
 | Fehlt einem Betrieb die BWA-Brücke? | `mart.betrieb_ohne_lina_id` — Erwartung: leer |
+| Ampeln über Bereiche hinweg zählen | `mart.ampel_bereich` — Langformat, eine Zeile je Bereich |
+| Umsatz kumuliert, Vorjahresvergleich | `mart.umsatz_ytd` |
+| Wer hat sich verschlechtert? | `mart.round_table_trend` |
+| Warum steht die Ampel auf rot? | `mart.ursachen_analyse` — nur so gut wie ihre Pflege |
+| Maßnahmen-Tracking | `mart.massnahme` |
+| Personalkosten und Effektivität je Bereich | `mart.personalkosten` |
+| Sind die Zahlen dieses Betriebs überhaupt beurteilbar? | `mart.datenstand` |
 
 Jede dieser Sichten trägt einen Tabellenkommentar; Metabase zeigt ihn als Beschreibung an.
 Dort steht auch, was man mit ihr **nicht** tun soll.
+
+## Die Dashboards
+
+Angelegt und gepflegt werden sie aus dem Repository, nicht in der Oberfläche — siehe
+`metabase/` und den Abschnitt weiter unten. Drei Sammlungen:
+
+### Drill-Down — hier fängt man an
+
+Eine Kette, in der jeder Klick eine Ebene tiefer führt und den Filter mitnimmt.
+
+| Ebene | Dashboard | Was man sieht | Klick führt zu |
+|---|---|---|---|
+| ① | **Marken** | Eine Zeile je Marke, alle Metriken, Ampeln gezählt | ② mit gesetzter Marke |
+| ② | **Filialen** | Alle Betriebe der Marke über sämtliche Metriken | ③ mit gesetztem Betrieb |
+| ③ | **Betrieb** | Das Betriebsblatt: Kennzahlen, Verlauf, Struktur, Personal, Ware, BWA, Maßnahmen, Datenstand | das jeweilige Fach-Dashboard |
+| ④ | **Zeiträume vergleichen** | Zwei frei wählbare Zeiträume nebeneinander | ③ |
+| ⑤ | **Standorte vergleichen** | Mehrere Betriebe über alle Metriken, Verlauf, Tagesprofil, Spartenmix | ③ |
+
+Auf ① sind die Prozentwerte **Mediane**, und die Ampeln werden **gezählt statt gemittelt** —
+der Mittelwert zweier Ampeln ist keine Ampel. Der Rückweg ist immer, den Filter oben zu
+löschen.
+
+### Round Table — die Excel-Ablösung
+
+`JULI_Round_Table_Ampelsystem.xlsx`, Blatt für Blatt:
+
+| Excel-Blatt | Dashboard |
+|---|---|
+| `00_Dashboard`, `Eingabe` | Round Table — Übersicht |
+| `Trend_2Monate`, `Ampelhistorie` | Round Table — Trend und Ampelhistorie |
+| `Ursachenanalyse`, `Massnahmen` | Round Table — Ursachen und Maßnahmen |
+| `Regeln` (die offene Schwellenfrage) | Round Table — Regelwerk-Vergleich |
+
+Zwei Dinge sind bewusst **anders** als im Excel:
+
+* Es gibt eine Kachel **„Ohne Urteil"**. Im Excel fiel ein Betrieb ohne BWA unsichtbar unter
+  den Tisch und sah aus wie ein Betrieb ohne Befund. Am 26.07.2026 waren das 72 von 141.
+* Das Blatt `Ampelhistorie` entfällt ersatzlos. Dort musste man zum Monatsabschluss „Werte
+  kopieren und als Werte einfügen"; im Postgres ist die Historie ohne Zutun da.
+
+Die bekannten Excel-Fehler (`#REF!`, der Zeilenversatz in `K6`) sind damit gegenstandslos.
+
+### Betrieb — die Fachberichte
+
+Umsatz-Entwicklung, Umsatz-Struktur, Personal, Warenwirtschaft, BWA — und
+**Datenqualität und Import**, die Seite, die man aufmacht, bevor man einer anderen glaubt.
+
+## Dashboards ändern
+
+Nicht in der Oberfläche, sondern im Repository:
+
+```text
+metabase/
+  gemeinsam.ts          Monats- und Zeitraum-Ausdrücke, die sich alle Karten teilen
+  karten-drilldown.ts   Ebenen ① bis ⑤
+  karten-round-table.ts die Excel-Ablösung
+  karten-fach.ts        Umsatz, Struktur, Personal, Ware, BWA, Datenqualität
+  dashboards.ts         Anordnung im 24-Spalten-Raster und das Klickverhalten
+  uebernehmen.ts        trägt alles nach Metabase ein
+```
+
+```bash
+bun run metabase/uebernehmen.ts     # startet auf :8899
+# dann http://localhost:8899/ im Browser öffnen und "Übernehmen" klicken
+```
+
+Ein zweiter Lauf legt **nichts doppelt an**: jede Karte trägt ihren Schlüssel als
+`[key:...]` in der Beschreibung, und danach wird zuerst gesucht. Wer eine Karte in der
+Oberfläche umbenennt, verliert sie deshalb nicht — wer sie dort *inhaltlich* ändert, dessen
+Änderung wird beim nächsten Lauf überschrieben.
+
+Der Umweg über `:8899` hat einen Grund: Metabase schickt `connect-src 'self'`, seine eigene
+Seite darf also nichts von außen holen. Der Server unter `:8899` liefert deshalb die Seite
+*und* reicht `/api/*` an Metabase weiter; die Anmeldung kommt vom Browser selbst, weil
+Cookies je Host und nicht je Port gelten. Es entsteht kein zusätzlicher Schlüssel.
+
+**Beim Umzug nach Hetzner:** `site-url` in Metabase auf die künftige Domain setzen (Admin →
+Allgemein). Sie bestimmt, wohin Drill-Down-Klicks und Links in Abo-Mails zeigen; steht sie
+falsch, führt jeder Klick ins Leere. Aktuell: `http://localhost:3000`.
 
 ## Was Metabase nicht kann, und was stattdessen da ist
 

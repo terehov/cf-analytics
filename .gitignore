@@ -17,3 +17,6 @@ PROMPT-*.md
 # Git-Historie bekommt man so etwas nur schwer wieder heraus.
 # Die Dateien bleiben lokal vorhanden.
 examples/
+
+# Playwright-MCP-Artefakte (Snapshots, Screenshots, Konsolenmitschnitte)
+.playwright-mcp/
