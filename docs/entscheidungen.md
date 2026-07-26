@@ -188,3 +188,32 @@ dokumentiert in `docs/dashboards.md`; der Lauf ist ohnehin nach jeder Änderung 
 **Warum trotzdem richtig.** Ein Freitextfeld beantwortet einen Tippfehler mit einem leeren
 Dashboard statt mit einer Fehlermeldung — und ein leeres Dashboard ist hier eine plausible,
 falsche Auskunft.
+
+---
+
+## Auswahllisten per eigenem Skript statt im Importer (26.07.2026)
+
+**Frage.** Die Filterlisten sind Momentaufnahmen. Niemand weiß im Voraus, wann ein Betrieb
+dazukommt — der Importer legt ihn stillschweigend an, sobald LINA ihn liefert. Wie bleibt die
+Liste aktuell?
+
+**Verworfen: in den Importer einbauen.** Der bräuchte dafür Metabase-Zugang. Zwei Systeme, die
+nichts voneinander wissen müssen, wären aneinander gebunden — und ein Metabase-Ausfall könnte
+einen Importlauf scheitern lassen. Dieselbe Trennung, die es zwischen `/health` und `/status`
+schon gibt: der Import liefert Daten, das Berichtswesen liest sie.
+
+**Verworfen: API-Schlüssel für Metabase anlegen.** Ein zusätzliches Geheimnis, das verwaltet,
+verteilt und irgendwann gedreht werden muss — für eine Aufgabe, die ein `UPDATE` erledigt. Die
+Listen stehen in Metabases eigener Datenbank, auf die ohnehin Zugriff besteht.
+
+**Gewählt: `metabase/auswahllisten.ts`, täglich per Cron.** Fasst ausschließlich die
+Auswahllisten an — keine Dashboards, kein Layout, kein Browser. Ohne `--setzen` zeigt es nur
+an und endet mit Rückgabewert 1, wenn es etwas zu tun gibt; damit ist es auch als reine
+Prüfung brauchbar.
+
+**Das eigentliche Problem war nicht das Aktualisieren, sondern das Bemerken.** Ein
+ausgefallener Cron-Auftrag lässt die Liste **still** veralten: das Dashboard sieht vollständig
+richtig aus, es fehlt nur ein Betrieb im Dropdown, und niemand vermisst, was er nicht sieht.
+Deshalb hinterlegt das Skript in `sync.merker`, mit wie vielen Betrieben es abgeglichen hat,
+und `/status` zählt nach. Ohne diese Rückmeldung wäre die Automatisierung eine Scheinlösung
+gewesen — sie hätte den Fehler nur seltener gemacht, nicht sichtbarer.

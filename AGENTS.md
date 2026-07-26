@@ -125,6 +125,18 @@ Die Dashboards werden nicht in der Oberfläche gepflegt, sondern hier definiert 
 `uebernehmen.ts` übertragen. Wer in Metabase klickt, verliert die Änderung beim nächsten
 Durchlauf. Aufbau, Begründung und die Regeln für Diagrammtypen: `docs/dashboards.md`.
 
+```
+uebernehmen.ts     Karten und Dashboards anlegen — der vollständige Lauf, braucht Browser
+sichtbarkeit.ts    welche Tabellen Metabase zeigt (docs/metabase-sichtbarkeit.md)
+auswahllisten.ts   hält die Filter „Betrieb"/„Marke" aktuell — täglich per Cron
+```
+
+**Beschreibungen richten sich an Fachbereichs-Mitarbeitende, nicht an Techniker.** Keine
+Tabellennamen, keine Excel-Zellbezüge, keine Begründung von Bauentscheidungen — die gehören
+als Kommentar in die `karten-*.ts`. Was vor einem Fehlschluss schützt, bleibt. Ebenso wenig
+gehören feste Messwerte hinein („am 26.07.2026 waren es 79 von 141"): sie veralten still.
+Regel und Beispiele in `docs/dashboards.md`.
+
 ### `src/` — Importer
 
 ```
@@ -143,7 +155,7 @@ sync/worker.ts         die Schleife
 sync/laden.ts          raw → core
 transform/index.ts     reine Transformationsfunktionen
 health.ts              /health und /status, hält den Container oben
-status.ts              Statusbericht fürs Monitoring — sieben Prüfungen
+status.ts              Statusbericht fürs Monitoring — acht Prüfungen
 sync.ts / einreihen.ts Einstiegspunkte
 ```
 

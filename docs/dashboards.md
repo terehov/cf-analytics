@@ -424,8 +424,53 @@ feste Werteliste am Dashboard hinterlegt.
 > Freitextfeld, gleichgültig was in `values_source_config` steht. Das wurde am 26.07.2026
 > erst mit der Feld-Variante versucht und im Browser als wirkungslos nachgewiesen.
 
-**Nach jedem neuen Betrieb einmal `bun run metabase/uebernehmen.ts` laufen lassen** — sonst
-fehlt er in der Auswahlliste.
+### Wie die Liste aktuell bleibt
+
+Man weiß nicht, wann ein Betrieb dazukommt — der Importer legt ihn stillschweigend an, sobald
+LINA ihn liefert. Deshalb wird die Liste **nicht von Hand** gepflegt, sondern abgeglichen:
+
+```bash
+bun run metabase/auswahllisten.ts            # zeigt nur, was sich ändern würde
+bun run metabase/auswahllisten.ts --setzen   # schreibt es
+```
+
+Das Skript fasst **ausschließlich die Auswahllisten** an. Es baut keine Dashboards, ändert
+kein Layout, braucht keinen Browser und keinen API-Schlüssel — es schreibt direkt in
+Metabases Datenbank, auf die ohnehin Zugriff besteht. Metabase zeigt die neuen Werte sofort,
+ein Neustart ist nicht nötig.
+
+**Als täglichen Cron-Auftrag einrichten:**
+
+```cron
+15 5 * * *  cd /pfad/zu/analytics && bun run metabase/auswahllisten.ts --setzen >> /var/log/auswahllisten.log 2>&1
+```
+
+Ohne `--setzen` endet der Lauf mit Rückgabewert 1, sobald es etwas zu tun gibt — brauchbar
+für einen Monitor, der nur prüfen und nicht ändern soll.
+
+> **Warum nicht im Importer:** Der bräuchte dafür Metabase-Zugang. Zwei Systeme, die nichts
+> voneinander wissen müssen, wären aneinander gebunden, und ein Metabase-Ausfall könnte einen
+> Importlauf scheitern lassen. Dieselbe Trennung wie bei `/health` und `/status`: der Import
+> liefert Daten, das Berichtswesen liest sie.
+
+### Und wenn der Cron-Auftrag ausfällt
+
+Dann veraltet die Liste **still** — das Dashboard sieht vollständig richtig aus, es fehlt nur
+ein Betrieb im Dropdown, und niemand vermisst, was er nicht sieht. Deshalb zählt `/status`
+nach:
+
+```json
+{ "name": "dashboard_filter", "stufe": "warnung",
+  "meldung": "3 Betrieb(e) fehlen in der Filterauswahl der Dashboards",
+  "naechster_schritt": "bun run metabase/auswahllisten.ts --setzen — läuft der tägliche Cron-Auftrag noch?" }
+```
+
+Das Skript hinterlegt dafür bei jedem Lauf in `sync.merker`, mit wie vielen Betrieben es
+abgeglichen hat; `/status` vergleicht das mit dem Bestand. Der Zeitstempel dort sagt
+zusätzlich, wann der Abgleich zuletzt lief.
+
+**Nach einem größeren Umbau** an Karten oder Layout weiterhin `bun run metabase/uebernehmen.ts` —
+das ist der vollständige Lauf und setzt die Listen nebenbei mit.
 
 ### Kein Filter ohne Wirkung
 

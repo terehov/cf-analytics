@@ -937,6 +937,47 @@ lauf('Zugangssperre', () => {
     await db.query(`DELETE FROM sync.zugangssperre`)
   })
 
+  /**
+   * Die Auswahllisten der Dashboard-Filter sind Momentaufnahmen. Veralten sie,
+   * fehlt ein Betrieb im Dropdown — und das Dashboard sieht dabei vollständig
+   * richtig aus. Genau deshalb muss /status es melden.
+   */
+  test('der Statusbericht meldet veraltete Auswahllisten', async () => {
+    const { statusErheben } = await import('../status')
+    const anzahl = await db.query(
+      `SELECT count(*)::int AS n FROM mart.betrieb WHERE betrieb IS NOT NULL AND betrieb <> ''`)
+    const betriebe = Number(anzahl.rows[0].n)
+
+    // Ohne Merker: noch nie abgeglichen. Kein Alarm, aber ein Hinweis —
+    // beim ersten Aufsetzen ist das der Normalzustand.
+    await db.query(`DELETE FROM sync.merker WHERE schluessel = 'metabase_auswahllisten'`)
+    const ohne = await statusErheben()
+    const o = ohne.pruefungen.find(x => x.name === 'dashboard_filter')!
+    expect(o.stufe).toBe('ok')
+    expect(o.naechster_schritt).toContain('auswahllisten')
+
+    // Stand deckt sich mit dem Bestand: alles in Ordnung.
+    await db.query(
+      `INSERT INTO sync.merker (schluessel, wert)
+       VALUES ('metabase_auswahllisten', jsonb_build_object('anzahl_betriebe', $1::int))`,
+      [betriebe])
+    const gleich = await statusErheben()
+    expect(gleich.pruefungen.find(x => x.name === 'dashboard_filter')!.stufe).toBe('ok')
+
+    // Der Fall, um den es geht: drei Betriebe sind dazugekommen, der
+    // Abgleich lief seither nicht.
+    await db.query(
+      `UPDATE sync.merker SET wert = jsonb_build_object('anzahl_betriebe', $1::int)
+        WHERE schluessel = 'metabase_auswahllisten'`, [betriebe - 3])
+    const veraltet = await statusErheben()
+    const v = veraltet.pruefungen.find(x => x.name === 'dashboard_filter')!
+    expect(v.stufe).toBe('warnung')
+    expect(v.meldung).toContain('3 Betrieb')
+    expect(v.naechster_schritt).toContain('--setzen')
+
+    await db.query(`DELETE FROM sync.merker WHERE schluessel = 'metabase_auswahllisten'`)
+  })
+
   /** Das Aufheben von Hand bleibt — als Abkürzung, nicht als Bedingung. */
   test('von Hand aufheben kürzt die Wartezeit ab', async () => {
     await frisch()

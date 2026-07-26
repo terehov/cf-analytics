@@ -106,3 +106,20 @@ wird.
 ## Phase 4
 
 Metabase: zweistufig (Übersicht über alle Marken → Drill-Down je Betrieb), rollenbasierte Rechte über Metabase-Sandboxing plus Postgres-RLS. Der Round-Table-Regelwerk-Schalter wird ein Dropdown mit `mart.regelwerk` als Werteliste.
+
+---
+
+## Cron-Auftrag für die Auswahllisten einrichten (beim Hetzner-Deploy)
+
+`metabase/auswahllisten.ts --setzen` muss täglich laufen, sonst veralten die Filterlisten
+„Betrieb" und „Marke" — ein neuer Betrieb fehlt dann im Dropdown, ohne dass es auffällt.
+
+```cron
+15 5 * * *  cd /pfad/zu/analytics && bun run metabase/auswahllisten.ts --setzen >> /var/log/auswahllisten.log 2>&1
+```
+
+Bis dahin **von Hand nach jedem größeren Import** einmal laufen lassen.
+
+`/status` meldet es als Warnung, wenn die Listen zurückfallen (Prüfung `dashboard_filter`) —
+der Cron-Auftrag ist also abgesichert, aber noch nicht eingerichtet. Zusammen mit den beiden
+anderen Punkten für den Umzug (`site-url` auf die echte Domain, siehe unten) zu erledigen.

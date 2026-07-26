@@ -213,6 +213,64 @@ export async function statusErheben(): Promise<Statusbericht> {
         werte: { spitze: bwa?.spitze ?? null, monateZurueck: monate },
       })
 
+  // --- 7. Kennen die Dashboard-Filter alle Betriebe? ----------------------
+  //
+  // Die Filter "Betrieb" und "Marke" in Metabase sind feste Wertelisten --
+  // technisch unvermeidbar, weil die Karten natives SQL sind (siehe
+  // docs/dashboards.md). Fest heisst: eine Momentaufnahme. Kommt ein Betrieb
+  // dazu, fehlt er in der Auswahl.
+  //
+  // Das ist die gefaehrlichste Sorte Fehler, die dieses System kennt: das
+  // Dashboard sieht vollstaendig richtig aus. Es fehlt nur ein Betrieb, und
+  // niemand vermisst, was er nicht sieht. Deshalb wird hier nachgezaehlt.
+  //
+  // Behoben mit: bun run metabase/auswahllisten.ts --setzen
+  const filterStand = await eine<{ betriebe: number }>(
+    `SELECT count(*)::int AS betriebe FROM mart.betrieb
+      WHERE betrieb IS NOT NULL AND betrieb <> ''`)
+  const betriebeGesamt = Number(filterStand?.betriebe ?? 0)
+
+  // Die Filterlisten stehen in Metabases eigener Datenbank. Sie liegt in
+  // derselben Postgres-Instanz, ist aber eine ANDERE Datenbank -- ein Join
+  // ist deshalb nicht moeglich, und ein zweiter Verbindungspool nur fuer
+  // diese Pruefung waere zu teuer. Stattdessen liest die Pruefung den Wert,
+  // den das Sync-Skript zuletzt hinterlassen hat.
+  const filterSync = await eine<{ stand: number | null; alter_stunden: number | null }>(
+    `SELECT (wert->>'anzahl_betriebe')::int AS stand,
+            round(EXTRACT(epoch FROM (now() - gesetzt_am)) / 3600, 1)::float AS alter_stunden
+       FROM sync.merker WHERE schluessel = 'metabase_auswahllisten'`)
+
+  if (filterSync?.stand === null || filterSync?.stand === undefined) {
+    p.push({
+      name: 'dashboard_filter',
+      stufe: 'ok',
+      meldung: 'Auswahllisten noch nie abgeglichen',
+      naechster_schritt:
+        'Einmal "bun run metabase/auswahllisten.ts --setzen" laufen lassen, danach taeglich per Cron.',
+      werte: { betriebe: betriebeGesamt, inFilter: null },
+    })
+  } else {
+    const stand = Number(filterSync.stand)
+    const fehlend = betriebeGesamt - stand
+    p.push(fehlend !== 0
+      ? {
+          name: 'dashboard_filter',
+          stufe: 'warnung',
+          meldung: fehlend > 0
+            ? `${fehlend} Betrieb(e) fehlen in der Filterauswahl der Dashboards`
+            : `Filterauswahl kennt ${-fehlend} Betrieb(e), die es nicht mehr gibt`,
+          naechster_schritt:
+            'bun run metabase/auswahllisten.ts --setzen — laeuft der taegliche Cron-Auftrag noch?',
+          werte: { betriebe: betriebeGesamt, inFilter: stand, alterStunden: filterSync.alter_stunden },
+        }
+      : {
+          name: 'dashboard_filter',
+          stufe: 'ok',
+          meldung: `Filterauswahl kennt alle ${betriebeGesamt} Betriebe`,
+          werte: { betriebe: betriebeGesamt, inFilter: stand, alterStunden: filterSync.alter_stunden },
+        })
+  }
+
   return {
     status: schlimmste(p.map(x => x.stufe)),
     geprueft_am: new Date().toISOString(),

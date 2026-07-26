@@ -723,3 +723,27 @@ zu lassen.
 Hälfte des Bestands. Jede Division durch eine Umsatzsumme braucht einen Schutz. Die übrigen
 drei Stellen im Kartenbestand waren bereits über `HAVING sum(...) > 0` bzw. `CASE WHEN > 0`
 abgesichert; nachgeprüft am 26.07.2026.
+
+---
+
+## JSONB doppelt kodiert — der Merker, der immer NULL war
+
+**Symptom.** `sync.merker.wert` enthielt `"{\"anzahl_betriebe\":141}"` statt
+`{"anzahl_betriebe": 141}`. `wert->>'anzahl_betriebe'` lieferte NULL.
+
+**Ursache.** `${JSON.stringify(objekt)}::jsonb` — der Treiber reicht den JSON-String als
+**String-Literal** weiter, und `::jsonb` macht daraus einen JSON-String statt eines Objekts.
+Syntaktisch gültiges JSONB, nur eine Ebene zu tief.
+
+**Warum das gefährlich ist.** Nichts schlägt fehl. Das `INSERT` läuft, der Wert steht da und
+sieht in `psql` fast richtig aus. Erst der Lesezugriff liefert NULL — und die Prüfung in
+`/status` hätte daraufhin **für immer** „noch nie abgeglichen" gemeldet, also genau die
+Beruhigung ausgegeben, gegen die sie gebaut wurde.
+
+**Lösung.** `jsonb_build_object('anzahl_betriebe', $1::int)` — die Struktur entsteht in
+Postgres, nicht im JavaScript.
+
+**Regel.** JSONB aus dem Code nie über `JSON.stringify` + Cast schreiben. Entweder
+`jsonb_build_object` oder den Wert als typisierte Spalte führen. Und: **jede Prüfung, die
+einen Wert liest, einmal gegen einen echten Datensatz gegenprüfen** — hier fiel es nur auf,
+weil der Merker nach dem Schreiben nochmals gelesen wurde.
