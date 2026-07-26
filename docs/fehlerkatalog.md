@@ -1,0 +1,356 @@
+# Fehlerkatalog
+
+Jeder Fehler, der in diesem Projekt gefunden wurde — Symptom, Ursache, und was ihn heute
+verhindert. Chronologie steht in `entscheidungen.md`; hier ist nach **Fehlerklasse** sortiert,
+weil sich die Klassen wiederholen und die Ursache das ist, was man wiedererkennen können muss.
+
+**Das durchgehende Muster: fast keiner dieser Fehler hat sich gemeldet.** Kein Stacktrace, keine
+Warnung, kein roter Test. Nur eine Zahl, die plausibel aussieht und falsch ist, oder eine Tabelle,
+die leer bleibt, während der Import „ok" meldet. Wer hier arbeitet, sollte diese Liste einmal
+gelesen haben, bevor er einer Zahl glaubt.
+
+> **Neuen Fehler gefunden? Er gehört hier hinein**, bevor der Fix committet wird. Ein Fehler,
+> der nur in einer Commit-Nachricht steht, ist für den nächsten Agenten nicht auffindbar —
+> genau deshalb gibt es diese Datei seit dem 26.07.2026 überhaupt.
+
+---
+
+## 1. Stille Datenverluste
+
+Die gefährlichste Klasse. Der Posten meldet `ok`, die Zieltabelle bleibt leer oder falsch.
+
+### Die BWA fand ihren Betrieb nicht — 7.860 Zeilen fielen durch
+
+**Symptom.** Erster echter Import: `core.kennzahlen_monat` blieb leer, obwohl beide
+`getKennzahlen`-Posten `status = 'ok'` meldeten.
+
+**Ursache.** `getKennzahlen` kennt Betriebe nur über eine **numerische** LINA-ID, alle anderen
+Endpunkte nur über `encId`. `core.betrieb.lina_betrieb_id` war bei allen 141 Betrieben `NULL` —
+`betriebeSichern()` schreibt nur `enc_id` und `name`, gefüllt hat das Feld niemand. Der Filter
+warf jede Zeile weg. Die Transformation selbst war einwandfrei: 7.860 Zeilen, 131 Betriebe,
+korrekte Werte.
+
+**Heute.** `analyticsFilterOptions` liefert die Brücke (`{id, name}` für alle 141, im selben
+ID-Raum wie `getKennzahlen` — 131 von 131 Schnittmenge nachgemessen). Der Lader füllt
+`lina_betrieb_id` beim Laden dieses Endpunkts. `mart.betrieb_ohne_lina_id` ist die Kontrollsicht,
+Erwartung: leer. Und der Lader schreibt eine **`error`-Zeile mit Handlungsanweisung**, wenn keine
+einzige Zeile zugeordnet werden konnte — die Reihenfolge soll stimmen, aber ihr Bruch darf nicht
+mehr leise sein.
+
+### Dieselbe Kette, zweiter Anlauf: die Reihenfolge war Zufall
+
+**Symptom.** Beim ersten Lauf gegen die frisch aufgesetzte Datenbank lag `getKennzahlen` auf
+Posten 9 und `analyticsFilterOptions` auf Posten 12 — die Brücke wäre wieder zu spät gekommen.
+
+**Ursache.** Alle Posten hatten dieselbe Priorität, danach entscheidet die `posten_id`, also die
+Einfügereihenfolge. Eine harte Abhängigkeit hing an einer Zufälligkeit.
+
+**Zwischenfehler beim Beheben.** Der erste Fix zog `analyticsFilterOptions` ganz nach vorn — und
+war damit auch falsch: auf einer leeren Datenbank gibt es noch keinen Betrieb, dem man eine ID
+anheften könnte. Ergebnis in Zeile eins des Laufs: 334 Feinsparten geschrieben, **null**
+Betriebszuordnungen. Die Kette ist dreistufig, nicht zweistufig.
+
+**Heute.** `einreihPrioritaet()` in `src/lina/endpunkte.ts`, fünf Tests halten sie fest:
+
+| Stufe | Endpunkt | braucht vorher |
+|---|---|---|
+| 10 | Tagesberichte | — legen die Betriebe an (`encId`) |
+| 12 | `analyticsFilterOptions` | die Betriebe; liefert deren numerische ID |
+| 14 | `getKennzahlen` | die numerische ID |
+| 20 | übrige Momentaufnahmen | `core.artikel` (für `articleApi:franchise`) |
+
+### Der Round Table gab Entwarnung, weil noch nichts gebucht war
+
+**Symptom.** September bis Dezember 2026 standen für alle 131 Betriebe auf **grün**.
+
+**Ursache.** `getKennzahlen` liefert immer das ganze Jahr, auch die Monate, die der Steuerberater
+noch nicht gebucht hat. Die kommen mit `0,00` zurück — **nicht** als `NULL`. Der Filter
+`wert_prozent IS NOT NULL` ließ sie durch, und weil sie die jüngsten sind, gewannen sie als
+„jüngster BWA-Stand". 0 % Personalkosten ist „niedriger ist besser" und damit grün.
+
+**Heute.** „Gebucht" heißt: irgendein Wert ist ungleich null.
+
+```sql
+HAVING count(*) FILTER (WHERE wert_absolut IS NOT NULL AND wert_absolut <> 0) > 0
+```
+
+### …und dieselben Monate standen trotzdem noch als Zeile da
+
+**Symptom.** `mart.round_table_monat` lieferte August bis Dezember 2026 — 141 Betriebe je Monat,
+ohne Umsatz, mit dem BWA-Stand vom Mai. Niemand sieht so einer Zeile an, dass sie in der Zukunft
+liegt.
+
+**Ursache.** Der Fix darüber verhinderte, dass diese Monate zum *Maßstab* werden, nicht dass sie
+überhaupt erscheinen. Die Monatsliste kam ungefiltert aus `core.kennzahlen_monat`.
+
+**Heute.** Die Monatsliste kommt aus POS-Umsatz und **gebuchten** BWA-Monaten. Bewusst kein
+Vergleich gegen `current_date`: das wäre eine zweite Wahrheit neben den Daten und in einer per
+`pg_dump` wiederhergestellten Datenbank sofort falsch — und genau dieser Weg ist für den Umzug
+nach Hetzner geplant.
+
+### `mart.kennzahlen_aktuell` warf alle Euro-Beträge weg
+
+**Symptom.** 7.860 Zeilen, davon 7.860 mit Prozentwert und **null** mit Euro-Betrag.
+`mart.pruefung_wareneinsatz` war damit still wirkungslos — sie rechnet mit Euro.
+
+**Ursache.** LINA liefert Euro und Prozent aus zwei Aufrufen (`mode=absolut`, `mode=relativ`), die
+als zwei Zeilen mit unterschiedlichem `abgerufen_am` ankommen, jede mit genau **einer** gefüllten
+Spalte. `DISTINCT ON (…) ORDER BY abgerufen_am DESC` nahm davon nur eine, nämlich die später
+geholte. `relativ` lief 35 Sekunden nach `absolut`.
+
+**Heute.** Je Spalte der jüngste nicht-leere Wert. Die Rohtabelle bleibt unangetastet, die
+Zeitreise über `abgerufen_am` also erhalten.
+
+### Der Wareneinsatzansatz wurde nie gefunden
+
+**Symptom.** `wareneinsatz_theoretisch` wäre für die allermeisten Monate `NULL` geblieben — und
+ein `NULL` sieht dort aus wie „kein Ansatz hinterlegt", nicht wie „falsch verknüpft".
+
+**Ursache.** `mart.deckungsbeitrag_warengruppe` suchte den Artikelstand mit
+`stand.monat = date_trunc('month', tag)`. Geschrieben wird der Stand aber **nur bei Änderung** —
+ein unveränderter Artikel braucht keine 60 identischen Zeilen.
+
+**Heute.** `core.artikel_stand_zeitraum` und `core.artikel_warengruppe_zeitraum` übersetzen die
+Punktfolge in Gültigkeitszeiträume. Der Join ist ein Bereichsvergleich und kann nicht mehr
+danebengehen. Begründung und Join-Muster: `datenmodell.md`, Entscheidung 8.
+
+### „Gestern" holen heißt Nullen holen
+
+**Symptom.** Die letzten vier Geschäftstage lieferten für alle 141 Betriebe glatt 0 €.
+
+**Ursache.** LINAs Konzernberichte füllen sich über rund fünf bis sechs Tage. Gemessen am
+26.07.2026: 22.–25.07. leer, 21.07. für 21 Betriebe, ab 17.07. stabil für 56. `--taeglich` holte
+genau einen Tag — gestern. Und weil der Posten danach als erledigt gilt und `historie_einreihen()`
+bewusst nichts Erledigtes noch einmal einreiht, wäre dieser Tag **für immer** auf null geblieben.
+In der Umsatzkurve ein dauerhafter Einbruch der letzten Woche, jeden Tag aufs Neue.
+
+**Heute.** Gleitendes Fenster über `NACHZUEGLER_TAGE` (10). Die Zieltabellen sind Upserts, der
+zweite Abruf korrigiert den ersten. Messreihe und Rechnung: `importer.md`.
+
+---
+
+## 2. Der partielle Eindeutigkeitsindex — drei Fehler, eine Wurzel
+
+```sql
+CREATE UNIQUE INDEX warteschlange_offen_uq
+    ON sync.warteschlange (endpunkt, coalesce(betrieb_enc_id,''), zeitraum_von, zeitraum_bis)
+ WHERE erledigt_am IS NULL;
+```
+
+**Das `WHERE` ist der Punkt: ein ERLEDIGTER Posten blockiert nichts.** Wer sich beim Einreihen auf
+`ON CONFLICT DO NOTHING` verlässt, reiht damit alles Erledigte erneut ein. Das hat dreimal
+zugeschlagen, jedes Mal mit anderem Vorzeichen:
+
+| Fall | Folge | Richtig ist |
+|---|---|---|
+| **Momentaufnahmen** liefen täglich statt monatlich | 7 Endpunkte × 30 Tage statt 7 Aufrufe im Monat | `WHERE NOT EXISTS` gegen **alle** Posten |
+| **`historie_einreihen()`** war nicht idempotent | beim Umzug nach Hetzner wären alle 1.650 bereits geholten Posten aus 2026 ein zweites Mal gegen LINA gelaufen | `WHERE NOT EXISTS` gegen **alle** Posten |
+| **Nachlauffenster** des täglichen Laufs | — | `ON CONFLICT DO NOTHING` ist hier **genau richtig** |
+
+Der dritte Fall sieht aus wie ein Widerspruch und ist keiner: Für das Nachlauffenster *soll* ein
+erledigter Tag erneut geholt werden, ein noch offener aber nicht doppelt eingereiht. Genau das
+leistet der partielle Index. Dieselbe Mechanik, entgegengesetzte Absicht — wer eine der beiden
+Stellen anfasst, muss wissen, welche der beiden Absichten dort gilt.
+
+Nachgemessen statt angenommen, beide Male: erste Einreihung 1, Wiederholung 0, **nach Erledigung
+1** — das letzte hätte 0 sein müssen. Fünf Tage einreihen, erledigen, erneut einreihen ergab
+**zehn** Posten statt fünf.
+
+Beide Regressionstests stehen im Ende-zu-Ende-Test, weil sich der Fehler **nur an einem bereits
+erledigten Posten** zeigt. Eine Prüfung gegen einen frischen Posten hätte ihn nie gefunden.
+
+---
+
+## 3. Der Lauf stirbt, statt weiterzumachen
+
+Voraussetzung für einen unbeaufsichtigten Backfill: ein einzelner Posten darf scheitern, der Lauf
+nicht.
+
+### Ein stummer Server legte den Worker still
+
+**Symptom.** `getUmsatzbericht:speisen` stand über zehn Minuten „in Arbeit", während der Posten
+davor 614 ms gebraucht hatte.
+
+**Ursache.** Vier ungeschützte `fetch`-Aufrufe. `fetch` wartet von sich aus **unbegrenzt**.
+Besonders übel im Zusammenspiel mit der Laufsperre: der hängende Lauf hält sie, jeder folgende
+wird abgewiesen, und `sync.haengende_posten_freigeben()` läuft nur beim **Start** eines Laufs —
+der nie zustande kommt. Der Importer wäre dauerhaft still, ohne dass es jemand merkt.
+
+**Heute.** `ANFRAGE_TIMEOUT_MS` (60 s) auf jedem Aufruf. Ein Abbruch ist ein wiederholbarer
+Fehler, der Posten kommt mit Wiedervorlage zurück.
+
+### Ein Verbindungsfehler beim Quittieren tötete den Lauf
+
+**Symptom.** Nach 16 erfolgreichen Posten: `Connection terminated due to connection timeout`, Lauf
+tot. Bei zwölf Tagen Backfill ein täglicher Abbruch.
+
+**Ursache.** Geschützt war nur `laden()`. Jeder andere Datenbankzugriff — die Statusschreibungen,
+`protokoll()`, sogar der Fehlerpfad selbst — konnte den ganzen Lauf beenden.
+
+**Heute.** Vier Ebenen, jede einzeln nachgewiesen:
+
+* `pool.ts` wiederholt **transiente** Verbindungsfehler dreimal (250/500 ms) — bewusst nur Fälle,
+  in denen die Anweisung den Server nie erreicht hat. Ein Constraint-Verstoß muss durchschlagen,
+  sonst wird aus einem klaren Fehler ein langsamer.
+* In `inTransaktion` wird nur das **Holen** der Verbindung wiederholt, nie der Transaktionsinhalt:
+  der könnte schon geschrieben haben, und ein zweiter Durchlauf machte daraus stille Dubletten.
+* Jeder Posten ist einzeln gekapselt; nach `ABBRUCH_NACH_FEHLERN` (10) stoppt der Lauf bewusst.
+* Auch `posten_holen` selbst darf scheitern, ohne den Lauf mitzunehmen.
+
+Nachgewiesen durch einen Test, der dem laufenden Worker mitten im Betrieb die Verbindungen
+abschießt (`pg_terminate_backend`).
+
+### Ein `error`-Ereignis ohne Zuhörer ist in Node ein Absturz
+
+**Ursache.** `pg.Pool` gibt `error` aus, wenn eine gerade **unbenutzte** Verbindung wegbricht —
+Netzhänger, Datenbankneustart, ein `pg_terminate_backend` vom Administrator. Ohne Zuhörer beendet
+das den Prozess, und zwar an einer Stelle, die mit dem gerade bearbeiteten Posten nichts zu tun hat.
+
+**Heute.** Zuhörer auf dem Pool **und** auf der eigenen Verbindung der Laufsperre.
+
+### Ein abgestürzter Lauf wurde als `ok` verbucht
+
+**Ursache.** Die Zeile, die den Status auf `teilweise` hochstuft, wird beim Werfen übersprungen,
+und das `finally` schrieb den Anfangswert weg. In `mart.sync_status` stand ein Lauf mit
+`status = 'ok'` und `aufgaben_fehler = 1`, obwohl er an einem Datenbankfehler gestorben war.
+
+**Heute.** `fehlgeschlagen` mit Grund.
+
+### `workerLauf` war nur einmal je Prozess aufrufbar
+
+**Ursache.** `pool.end()` stand im `finally` des Workers. Der zweite Aufruf lief gegen einen
+geschlossenen Pool.
+
+**Heute.** Der Pool gehört dem Prozess, nicht dem Lauf — `pool.end()` steht in `sync.ts`.
+
+---
+
+## 4. Werkzeugfallen
+
+Fehler, die nicht in der Fachlichkeit liegen, sondern im Verhalten von Bun, Postgres oder
+JavaScript. Alle haben echte Zeit gekostet.
+
+### Bun expandiert `$` in der `.env` — auch in einfachen Anführungszeichen
+
+**Symptom.** `Login 200, Probe 401`. Drei Fehlanmeldungen, bei genau einem Zugang, der sich sperren
+lässt.
+
+**Ursache.** Das Passwort enthält `$` und `#`. Bun expandiert `$name` **auch in einfachen
+Anführungszeichen** und behandelt `#` als Kommentaranfang. Aus 25 Zeichen wurden stillschweigend
+9, und LINA meldete völlig zu Recht „Benutzername oder Passwort ist falsch!".
+
+Empirisch für alle vier Schreibweisen gemessen:
+
+| Schreibweise | ankommende Länge |
+|---|---|
+| unquotiert | 8 |
+| quotiert | 16 |
+| unquotiert, `\$` maskiert | 17 |
+| **quotiert UND `\$` maskiert** | **25 — richtig** |
+
+**Heute.** `konfigZumLoggen()` meldet die **Länge** des Passworts (nie den Wert). Eine Länge, die
+nicht zum tatsächlichen Passwort passt, zeigt das Problem sofort.
+
+### `Number(null)` ist `0` und damit endlich
+
+**Symptom.** Ein Satz ohne ID wäre als „Betrieb 0" durchgerutscht und hätte den Namen eines echten
+Betriebs beansprucht. Gefunden vom eigenen Test.
+
+**Heute.** Geprüft wird auf `> 0`, nicht auf `Number.isFinite`. LINAs Betriebs-IDs beginnen bei 1
+(beobachtet: 1 bis 5891).
+
+### `ON CONFLICT DO UPDATE cannot affect row a second time`
+
+**Ursache.** `wawi:inventory` lieferte 11 Zeilen für 4 Tage — mehrere Einträge je Kalendertag.
+Postgres verbietet, dieselbe Zeile in **einer** Anweisung zweimal zu treffen.
+
+**Heute.** Die Transformation dedupliziert je Tag („bearbeitbar, wenn irgendeiner es ist").
+
+### Enum-Cast in einer `VALUES`-Liste
+
+**Ursache.** In einem `VALUES` ohne explizite Typen hält Postgres die Parameter für `text` und
+findet den Enum-Typ nicht.
+
+**Heute.** `unnest($1::text[], $2::int[], …)` mit typisierten Arrays. Dasselbe Muster löst
+nebenbei die Blockaufteilung.
+
+### `pg` parst `DATE` in Ortszeit
+
+**Ursache.** Ohne Eingriff baut `pg` aus `DATE` ein `Date`-Objekt in **Ortszeit**. Läuft der
+Container westlich von UTC, kippt der Geschäftstag um einen Tag zurück.
+
+**Heute.** Der Parser für OID 1082 ist in `src/db/pool.ts` abgeschaltet — `DATE` kommt als
+`'YYYY-MM-DD'`-Text.
+
+### Ein Test, der zu prüfen schien und nichts prüfte
+
+**Ursache.** Die Datenminimierungs-Prüfung suchte heikle Feldnamen als **Teilzeichenkette**.
+`"tel"` steckt in `"mindestbestellwert"` — der Test war grün, weil er falsch fragte.
+
+**Heute.** Verglichen werden JSON-Schlüsselmengen, nicht Teilzeichenketten.
+
+---
+
+## 5. Im Betrieb selbst verursacht
+
+### Die Produktivdatenbank wurde durch einen Testlauf geleert
+
+**Was passiert ist.** `TEST_DATABASE_URL` zeigte auf `lina`. Der Ende-zu-Ende-Test macht
+`TRUNCATE` über `core`, `raw` und `sync` — ein einziger Lauf kostete die Daten des ersten echten
+LINA-Imports.
+
+**Heute.** Zwei Notbremsen in `src/sync/e2e.test.ts`:
+
+1. `TEST_DATABASE_URL` darf nicht gleich `DATABASE_URL` sein.
+2. Die wichtigere: geprüft wird, wohin der Worker **tatsächlich** schreibt. `bun test` teilt die
+   Modulregistrierung über Testdateien hinweg, `config` wird **einmal** geladen und friert die
+   Umgebung der zuerst gelaufenen Datei ein. Im Gesamtlauf ist das die `.env` — dann trunkiert der
+   Test die Testdatenbank, während der Worker in die Produktivdatenbank schreibt. Der Namensvergleich
+   aus (1) greift dabei nicht, weil die URLs ja verschieden sind.
+
+### Die Laufsperre verklemmte den Pool
+
+**Ursache.** Die Advisory-Sperre lag auf einer **gepoolten** Verbindung. `pool.end()` wartet auf
+ausgecheckte Verbindungen — der Testlauf lief in sein 60-Sekunden-Zeitlimit.
+
+**Heute.** Eine eigene `pg.Client`-Verbindung, nicht aus dem Pool.
+
+### Ein gesunder Lauf sah aus wie ein hängender
+
+**Symptom.** Ein völlig intakter Lauf wurde für tot gehalten und abgebrochen. Dass er die ganze
+Zeit gearbeitet hatte, zeigte erst ein Neustart mit `LOG_LEVEL=debug`.
+
+**Ursache.** Erfolge gingen nach `debug`, und zwischen zwei Posten liegen 20 bis 40 Sekunden. Auf
+`info` war ein Backfill stundenlang vollkommen still.
+
+**Heute.** Eine Fortschrittszeile mit Position, offener Schlange und geschätzter Restdauer.
+`FORTSCHRITT_ALLE`: am Terminal jede, im Container jede fünfzigste. Details in `importer.md`.
+
+> Ein Betriebszustand, den man nur durch Neustart feststellen kann, ist keiner.
+
+### `core` war mit 84 Partitionen zugestellt
+
+**Symptom.** 110 Tabellen in `core`, davon 84 namens `artikelverkauf_tag_2023_07`. In Postico
+lästig, in Metabase unbenutzbar.
+
+**Ursache.** Postgres legt Partitionskinder standardmäßig neben die Elterntabelle.
+
+**Heute.** Alle Kinder liegen im Schema `part`, die Elterntabellen bleiben in `core` und `raw`.
+Drei Tests halten das fest, weil es bei der nächsten Änderung an `partition_anlegen()` lautlos
+kaputtginge.
+
+---
+
+## Was diese Liste über das Projekt sagt
+
+Drei Muster, die sich durchziehen:
+
+1. **Der partielle Index hat dreimal zugeschlagen.** Nicht weil er falsch wäre, sondern weil
+   „blockiert Duplikate" und „blockiert *offene* Duplikate" beim Lesen gleich aussehen.
+2. **Ein Kommentar ist kein Beweis.** Zweimal behauptete ein Kommentar das Gegenteil dessen, was
+   der Code tat — beide Male hat erst eine Messung es aufgedeckt. Deshalb steht in diesem Projekt
+   an vielen Stellen „nachgemessen am …" statt „sollte".
+3. **Die Attrappe kann nicht alles.** Vier der schwersten Fehler (BWA-Brücke, ungebuchte Monate,
+   Euro/Prozent, die leeren letzten Tage) brauchen genau die Konstellation, die nur echte Daten
+   liefern. Nach jeder Schemaänderung gehört ein Blick in `mart.pruefung_uebersicht` und
+   `mart.betrieb_ohne_lina_id` dazu.

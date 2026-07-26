@@ -2,6 +2,10 @@
 
 Bun/TypeScript, läuft als Dokploy-Application im Container. Der Container bleibt über `health.ts` oben; die Läufe stößt ein Schedule Job per `docker exec` an (`bun run sync`) — jeder Lauf ist damit ein frisch startender Prozess.
 
+Was hier an Fallstricken steckt und schon einmal zugeschlagen hat, steht gesammelt in
+`fehlerkatalog.md` — besonders die Abschnitte zum partiellen Eindeutigkeitsindex und dazu,
+warum ein Lauf früher an jedem Verbindungsfehler starb.
+
 ## Eine Schlange, kein Modus-Unterschied
 
 Es gibt **keinen** getrennten Backfill- und Sync-Modus. Beides sind Einträge in `sync.warteschlange`, die ein einzelner Worker konstant und langsam abarbeitet:

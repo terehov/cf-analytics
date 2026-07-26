@@ -13,6 +13,8 @@ mart    Sichten für Metabase — hier fängt jede Frage an
 ```
 
 Welche Schemata Metabase synchronisieren soll und warum: `metabase.md`.
+Woher die Daten kommen und ueber welche Schluessel die Tabellen zusammenfinden: `datenherkunft.md`.
+Welche Fehler beim Bauen dieses Modells gemacht wurden: `fehlerkatalog.md`.
 
 ## Die acht Entscheidungen
 

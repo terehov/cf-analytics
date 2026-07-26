@@ -21,6 +21,7 @@ Diese Datei ist der Einstieg. Die inhaltliche Wahrheit steht in `docs/`.
 5. **Prozentwerte sind immer Prozentzahlen** (`23.64`), nie Brüche (`0.2364`). Das Excel macht es andersherum — das ist die häufigste Fehlerquelle.
 6. **Anmeldefehler werden nie in einer Schleife wiederholt.** Falsche Zugangsdaten mehrfach zu senden ist der schnellste Weg zu einer Kontosperre — und es gibt nur diesen einen Zugang.
 7. **Die Browserkennung bleibt stimmig.** Wer `LINA_USER_AGENT` ändert, ändert damit auch die Client-Hints (die Version wird daraus gelesen). Eine Chrome-Kennung ohne `sec-ch-ua`/`sec-fetch-*` gibt es bei keinem echten Browser und fällt mehr auf als gar keine Kennung. Begründung in `docs/importer.md`.
+8. **Jeder Befund landet in `docs/`, bevor der Commit steht.** Eine Erkenntnis, die nur in einer Commit-Nachricht oder einem Code-Kommentar existiert, ist für den nächsten Agenten nicht auffindbar. Welche Datei wofür zuständig ist, steht unten unter *Dokumentationspflicht*.
 
 ### Namenskonvention
 
@@ -38,6 +39,8 @@ Kommentare sind deutsch, damit sie in Postico lesbar sind.
 
 | Datei | Inhalt | Wann lesen |
 |---|---|---|
+| **`datenherkunft.md`** | **Der Einstieg.** Woher jede Zahl kommt, welche Endpunkte aktiv sind, und vor allem: **wie die Tabellen zusammenfinden** — `encId` gegen numerische LINA-ID, `artnr` gegen `id`, Stände über Zeiträume. Dazu, was die Zahlen *nicht* sagen. | Bevor du irgendetwas joinst oder eine Zahl deutest |
+| **`fehlerkatalog.md`** | **Jeder Fehler, den dieses Projekt gemacht hat** — Symptom, Ursache, was ihn heute verhindert. Fast keiner davon hat sich gemeldet: kein Stacktrace, nur eine plausibel aussehende falsche Zahl. | Einmal ganz, bevor du einer Zahl glaubst. Und immer, wenn etwas komisch aussieht |
 | **`lina-api-inventar.md`** | Alle LINA-Endpunkte: Parameter, Antwortstrukturen, Auth, Zeitverhalten. Ergebnis der Exploration. | Immer, wenn du einen Endpunkt anfasst |
 | **`lina-api-inventar-1b.md`** | Nachtrag: das **zweite** Report Center auf Betriebsebene (72 Berichte), WAWI, Dienstplan, Finance | Wenn du über die sieben Konzern-Berichte hinaus willst |
 | **`lina-api-inventar-1c.md`** | **Im Browser verifiziert (25.07.2026).** Konzeptzuordnung ist 1:n, Personalberichte sind gesperrt, WAWI ist JSON, Sortimentshierarchie gefunden. Überschreibt 1a und 1b, wo es abweicht. | Bevor du einen Endpunkt aktivierst |
@@ -45,7 +48,9 @@ Kommentare sind deutsch, damit sie in Postico lesbar sind.
 | **`kennzahlen-mapping.md`** / `.csv` | Excel-Kennzahl → LINA-Endpunkt/Feld → offene Fragen. Die eigentliche Zieldefinition. | Wenn du eine Kennzahl baust oder prüfst |
 | **`architektur.md`** | Warum Hetzner + Dokploy + vanilla Postgres. Verworfene Alternativen mit Begründung. | Vor Infrastrukturänderungen |
 | **`datenmodell.md`** | Schema-Entscheidungen und ihre Begründung | Vor Schemaänderungen |
-| **`metabase.md`** | Welche Schemata Metabase sehen soll, wo man anfängt, welche Fallen `mart` ausräumt | Bevor du eine Auswertung baust oder eine `mart`-Sicht änderst |
+| **`befunde-datenlage.md`** | Was in den **echten** Daten steckt und jede Zahl anders lesbar macht: nur 62 der 141 Betriebe machen Umsatz, 70 % kommen aus dem stärksten Fünftel, Personalquoten bis 1132 %. | Bevor du einen Mittelwert bildest oder eine Zahl weitergibst |
+| **`metabase.md`** | Welche Schemata Metabase sehen soll, wo man anfängt, welche Fallen `mart` ausräumt, und die Regeln für neue `mart`-Sichten | Bevor du eine Auswertung baust oder eine `mart`-Sicht änderst |
+| **`dashboards.md`** | Was in Metabase steht, warum es so aussieht, und warum Dashboards aus `metabase/` erzeugt und nicht in der Oberfläche gepflegt werden | Bevor du ein Dashboard oder eine Karte anfasst |
 | **`importer.md`** | Aufbau des Importers: Warteschlange, Drosselung, Session, Transformationen | Vor Arbeit an `src/` |
 | **`backfill.md`** | Strategie und Rechnung für die Historie | Wenn du Zeiträume einreihst |
 | **`entscheidungen.md`** | Entscheidungsprotokoll, chronologisch, inklusive der revidierten | Wenn du dich fragst „warum eigentlich so" |
@@ -53,6 +58,39 @@ Kommentare sind deutsch, damit sie in Postico lesbar sind.
 | **`datensicherung.md`** | Welche Rohdaten wir sichern sollten, solange LINA erreichbar ist — nach Wert und Kosten sortiert | Wenn du über neue Endpunkte oder Backfill-Tiefe entscheidest |
 | **`offene-punkte.md`** | Was ungeklärt ist und wer es klären muss | Bevor du etwas als fertig meldest |
 | **`payloads/`** | Echte, anonymisierte LINA-Antworten aus der Exploration | Als Referenz; identisch mit den Test-Fixtures |
+
+### Dokumentationspflicht
+
+**Ein Befund, der nur in einer Commit-Nachricht steht, ist verloren.** Am 26.07.2026 nachgesehen:
+von den zwanzig Fehlern, die dieses Projekt gefunden hatte, stand **kein einziger** in `docs/`. Das
+Wissen lag in Commit-Nachrichten und Code-Kommentaren — für den nächsten Agenten praktisch
+unauffindbar, und genau die Fehler hätten sich damit wiederholt.
+
+Deshalb gehört zu jeder Arbeit die passende Zeile in `docs/`. Nicht hinterher, sondern im selben
+Commit.
+
+| Du hast … | … dann schreibst du in |
+|---|---|
+| einen Fehler gefunden oder behoben | `fehlerkatalog.md` — Symptom, Ursache, was ihn künftig verhindert |
+| einen Endpunkt aktiviert, ein Feld anders gedeutet, einen Schlüssel entdeckt | `datenherkunft.md`, bei API-Details zusätzlich `lina-api-inventar*.md` |
+| eine Annahme widerlegt | `lina-api-korrekturen.md` — und die alte Aussage dort **durchstreichen**, nicht löschen |
+| dich zwischen zwei Wegen entschieden | `entscheidungen.md`, mit Begründung. Revidierte Entscheidungen bleiben stehen, durchgestrichen |
+| am Schema gearbeitet | `datenmodell.md` |
+| am Importer gearbeitet | `importer.md` |
+| eine `mart`-Sicht gebaut oder geändert | `metabase.md` |
+| etwas gemessen, das andere Zahlen einordnet | dorthin, wo die Zahl gelesen wird — meist `metabase.md` oder `datenherkunft.md` |
+| etwas gefunden, das jemand anderes klären muss | `offene-punkte.md` |
+
+Vier Gewohnheiten, die diese Dateien brauchbar halten:
+
+* **„Nachgemessen am …" statt „sollte".** Zweimal in diesem Projekt behauptete ein Kommentar das
+  Gegenteil dessen, was der Code tat. Beide Male hat erst eine Messung es aufgedeckt. Schreib die
+  Zahl hin und das Datum.
+* **Falsches nicht löschen, durchstreichen.** Wer nicht sieht, dass eine Annahme einmal galt,
+  stellt sie neu auf.
+* **Die Begründung ist wichtiger als die Regel.** „Warum" überlebt eine Refaktorierung, „was"
+  nicht.
+* **Kommentare und `docs/` sind deutsch**, damit sie in Postico neben den Daten lesbar sind.
 
 ### `examples/` — die Quelle der Anforderung
 
@@ -75,6 +113,12 @@ Handgeschriebenes SQL, nummeriert, wird der Reihe nach angewendet. Bewusst handg
 Migration hinzufügen: neue Datei `NNNN_name.sql`, aufsteigend. **Bereits angewendete Dateien nie ändern** — der Stand steht in `public.schema_migration`.
 
 Am 26.07.2026 sind die vorherigen zehn Dateien zu diesen sechs zusammengefasst worden, weil sich der Stand nur noch durch Nachspielen der Historie lesen ließ: `0005` korrigierte eine Aussage aus `0000`, `0007` einen Entwurfsfehler aus `0000`, `0009` einen aus `0003`. Die Begründungen sind dabei erhalten geblieben — sie stehen jetzt an der Stelle, die sie erklären.
+
+### `metabase/` — Dashboards als Code
+
+Die Dashboards werden nicht in der Oberfläche gepflegt, sondern hier definiert und per
+`uebernehmen.ts` übertragen. Wer in Metabase klickt, verliert die Änderung beim nächsten
+Durchlauf. Aufbau, Begründung und die Regeln für Diagrammtypen: `docs/dashboards.md`.
 
 ### `src/` — Importer
 
