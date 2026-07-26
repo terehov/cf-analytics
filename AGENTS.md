@@ -128,7 +128,8 @@ Durchlauf. Aufbau, Begründung und die Regeln für Diagrammtypen: `docs/dashboar
 ```
 uebernehmen.ts     Karten und Dashboards anlegen — der vollständige Lauf, braucht Browser
 sichtbarkeit.ts    welche Tabellen Metabase zeigt (docs/metabase-sichtbarkeit.md)
-auswahllisten.ts   hält die Filter „Betrieb"/„Marke" aktuell — täglich per Cron
+auswahllisten.ts   Filterlisten von Hand abgleichen — läuft sonst als Nachlauf im Sync
+karten-import.ts   die technische Seite: läuft der Import, woran hängt es
 ```
 
 **Beschreibungen richten sich an Fachbereichs-Mitarbeitende, nicht an Techniker.** Keine

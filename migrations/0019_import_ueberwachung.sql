@@ -330,3 +330,62 @@ COMMENT ON VIEW mart.import_betrieb IS
 aufgegeben > 0 heisst, dass ein Posten nach mehreren Versuchen aufgegeben wurde -- das ist die
 Spalte, die eine echte Luecke anzeigt. keine_daten dagegen ist Normalzustand fuer Betriebe, die
 einen Bericht nicht fuehren.';
+
+
+-- ---------------------------------------------------------------------
+-- 8./9. Sperre und Strukturaenderungen -- damit auch diese beiden Karten
+--       aus mart lesen
+--
+-- Nachgetragen, weil die ersten Fassungen der Karten direkt auf
+-- sync.zugangssperre und sync.schema_abweichung zugriffen. Das laeuft
+-- zwar (natives SQL fragt die Sichtbarkeit nicht), verstoesst aber gegen
+-- den Grundsatz aus docs/metabase.md: "Wer ausserhalb von mart joinen
+-- muss, hat eine Luecke in mart gefunden."
+--
+-- Hier ist die Luecke echt: sync.* ist gar nicht nach Metabase
+-- synchronisiert. Eine Karte darauf ist eine Karte, die niemand in der
+-- Oberflaeche nachbauen oder pruefen kann.
+-- ---------------------------------------------------------------------
+CREATE VIEW mart.import_sperre AS
+SELECT sperre_id,
+       art,
+       erkannt_am,
+       pausiert_bis,
+       round(EXTRACT(epoch FROM (pausiert_bis - now())) / 3600, 1) AS stunden_noch,
+       http_status,
+       endpunkt,
+       hinweis,
+       lauf_id,
+       aufgehoben_am,
+       aufgehoben_von,
+       (aufgehoben_am IS NULL AND pausiert_bis > now())            AS aktiv
+  FROM sync.zugangssperre
+ ORDER BY erkannt_am DESC;
+
+COMMENT ON VIEW mart.import_sperre IS
+'Zugangssperren, juengste zuerst. aktiv = true heisst, dass der Import gerade ruht.
+
+Sperren laufen von selbst ab -- der Importer kommt ohne Zutun zurueck. Die Ausnahme ist
+art = ''anmeldung'': die muss jemand ansehen, weil es nur einen Zugang gibt und wiederholte
+Anmeldeversuche zur Kontosperre fuehren.
+
+Der Hinweis ist LINAs eigene Meldung, keine Vermutung von uns.';
+
+
+CREATE VIEW mart.import_strukturaenderung AS
+SELECT abweichung_id,
+       endpunkt,
+       erkannt_am,
+       erwartet,
+       tatsaechlich,
+       quittiert_am,
+       (quittiert_am IS NULL) AS offen
+  FROM sync.schema_abweichung
+ ORDER BY erkannt_am DESC;
+
+COMMENT ON VIEW mart.import_strukturaenderung IS
+'Wenn LINA das Format einer Antwort aendert, steht es hier. Erwartung: leer.
+
+Eine offene Zeile heisst, dass ein Bericht anders aussieht als erwartet -- dann stimmen die
+Daten dieses Berichts moeglicherweise nicht mehr, ohne dass irgendetwas fehlgeschlagen waere.
+Genau diese Sorte Fehler meldet sich sonst nicht.';

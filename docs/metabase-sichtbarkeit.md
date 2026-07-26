@@ -1,7 +1,7 @@
 # Was Metabase zeigt — und was nicht
 
-Stand 26.07.2026. Von **111 Tabellen und Sichten** in der Datenbank sind in Metabase
-**40 sichtbar**, 29 auf „nur in Detailansichten" gestellt und 42 gar nicht erst
+Stand 26.07.2026. Von den Tabellen und Sichten der Datenbank sind in Metabase
+**56 sichtbar**, 31 auf „nur in Detailansichten" gestellt und 42 gar nicht erst
 synchronisiert.
 
 Der Grundsatz dahinter steht in [`metabase.md`](metabase.md): *Metabase soll nur `mart`
@@ -15,8 +15,8 @@ auf `core` zu.
 
 | Stufe | Was das heißt | Anzahl |
 |---|---|---|
-| **Sichtbar** | In Suche, Abfrage-Editor und Datenbrowser | 40 |
-| **Nur in Detailansichten** (`technical`) | Aus Suche und Editor verschwunden, über einen Fremdschlüssel weiterhin erreichbar. Metabase liest die Beziehungen weiter aus dem Katalog. | 29 |
+| **Sichtbar** | In Suche, Abfrage-Editor und Datenbrowser | 56 |
+| **Nur in Detailansichten** (`technical`) | Aus Suche und Editor verschwunden, über einen Fremdschlüssel weiterhin erreichbar. Metabase liest die Beziehungen weiter aus dem Katalog. | 31 |
 | **Nicht synchronisiert** | Metabase kennt sie nicht. Schema-Filter auf der Datenbank. | 42 |
 
 Der Unterschied zwischen Stufe 2 und 3 ist wichtig: `core` bleibt **synchronisiert**, weil
@@ -28,7 +28,7 @@ von selbst den Sprung vom Artikelverkauf zum Betrieb an. Ausgeblendet wird nur d
 
 ## Sichtbar (40)
 
-### `mart` — die Auswertungsschicht (29)
+### `mart` — die Auswertungsschicht (45)
 
 Dafür ist sie da. Jede Sicht ist so geschnitten, dass eine naive Summe ein richtiges
 Ergebnis liefert, und bringt die Namen schon mit.
@@ -57,6 +57,15 @@ Ergebnis liefert, und bringt die Namen schon mit.
 | `pruefung_umsatz`, `pruefung_bon`, `pruefung_wareneinsatz`, `pruefung_uebersicht` | Gegenrechnungen gegen LINAs Aggregate |
 | `sync_status`, `backfill_fortschritt` | Läuft der Import? |
 | `regelwerk` | Auswahlliste für den Regelwerk-Dropdown |
+| `import_gesamt` | **Importüberwachung.** Eine Zeile: Fortschritt, Tempo, Restzeit, Sperre |
+| `import_naechste` | Die offene Warteschlange in Abarbeitungsreihenfolge |
+| `import_fehler` | Fehlermuster der letzten 24 Stunden, gruppiert |
+| `import_bericht` | Je Bericht: Fortschritt, Aktualität, Gesundheit |
+| `import_betrieb` | Je Betrieb: was fehlt, wie weit reichen die Daten |
+| `import_lauf` | Die Importläufe mit Durchsatz |
+| `import_puls` | Posten je Stunde, letzte drei Tage |
+| `import_sperre` | Zugangssperren — aktive zuerst |
+| `import_strukturaenderung` | Wenn LINA das Antwortformat ändert. Erwartung: leer |
 
 ### `manual` — was von Hand gepflegt wird (8)
 

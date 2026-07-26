@@ -89,16 +89,15 @@ SELECT posten_gesamt        AS "Posten gesamt",
       'Nur belegt, wenn der Import gesperrt ist. Der Hinweis ist LINAs eigene Meldung, keine Vermutung von uns. Sperren laufen von selbst ab.',
     anzeige: 'table',
     sql: `
-SELECT art                        AS "Art",
-       erkannt_am                 AS "erkannt am",
-       pausiert_bis               AS "Pause bis",
-       round(EXTRACT(epoch FROM (pausiert_bis - now())) / 3600, 1) AS "Stunden noch",
-       http_status                AS "HTTP",
-       endpunkt                   AS "Endpunkt",
-       hinweis                    AS "Hinweis"
-  FROM sync.zugangssperre
- WHERE aufgehoben_am IS NULL AND pausiert_bis > now()
- ORDER BY erkannt_am DESC`,
+SELECT art            AS "Art",
+       erkannt_am     AS "erkannt am",
+       pausiert_bis   AS "Pause bis",
+       stunden_noch   AS "Stunden noch",
+       http_status    AS "HTTP",
+       endpunkt       AS "Endpunkt",
+       hinweis        AS "Hinweis"
+  FROM mart.import_sperre
+ WHERE aktiv`,
   },
 
   // ===================================================================
@@ -151,9 +150,8 @@ SELECT endpunkt      AS "Bericht",
        erkannt_am    AS "erkannt am",
        erwartet      AS "erwartet",
        tatsaechlich  AS "tatsächlich"
-  FROM sync.schema_abweichung
- WHERE quittiert_am IS NULL
- ORDER BY erkannt_am DESC`,
+  FROM mart.import_strukturaenderung
+ WHERE offen`,
   },
 
   // ===================================================================

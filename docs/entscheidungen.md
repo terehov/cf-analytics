@@ -250,3 +250,40 @@ nie am Berichtswesen.
 **Das Skript `metabase/auswahllisten.ts` bleibt** — für den Blick zwischendurch und für eine
 frische Metabase-Instanz. Es ruft dieselbe Funktion auf; zwei Umsetzungen desselben Abgleichs
 wären zwei Gelegenheiten, dass eine davon still etwas anderes tut.
+
+---
+
+## Eine eigene Seite für die Importüberwachung (26.07.2026)
+
+**Anlass.** „Ich möchte schnell feststellen, wenn etwas scheitert, und woran es liegt."
+
+**Warum nicht in „Datenqualität und Import".** Die Seite gab es schon, aber sie beantwortet
+eine andere Frage. Sie fragt **fachlich**: welchen Betrieben fehlen Daten, stimmen die Zahlen
+gegen LINAs Aggregate, wer ist beurteilbar. Die neue fragt **technisch**: läuft der Abruf, wie
+weit ist er, woran hängt er. Beides auf einer Seite hätte geheißen, dass niemand mehr weiß,
+welche Frage er gerade stellt.
+
+**Deshalb eine eigene Sammlung „Technik".** Sie richtet sich ausdrücklich nicht an den
+Fachbereich, und dort dürfen Endpunktnamen und technische Begriffe stehen — sie sind die Sache
+selbst, nicht ihre Verpackung. Das ist die bewusste Ausnahme von der Sprachregel, die für alle
+übrigen Dashboards gilt.
+
+**Was die Seite kann, was vorher fehlte:**
+
+- **Restzeit.** Aus dem Durchsatz der letzten Stunde hochgerechnet. Bewusst kurz gefenstert:
+  das Tempo hängt an `TAKT_*` und am Tagesbudget, ein Mittel über Tage würde jede Pause als
+  dauerhafte Langsamkeit lesen. Läuft nichts, steht dort „—" statt einer erfundenen Zahl.
+- **Was als Nächstes drankommt** — die Warteschlange in genau der Sortierung, die der Worker
+  benutzt. Damit ist das abgelesen und nicht geraten.
+- **Fehlermuster statt Fehlerliste.** Zeitstempel und lange Zahlen werden im Text ersetzt,
+  damit dieselbe Ursache eine Zeile ergibt und nicht hundert. Bei 141 Betrieben erzeugt ein
+  einziger struktureller Fehler sonst eine unlesbare Liste.
+- **„Tage alt" je Bericht** — die Spalte, an der ein hängender Bericht auffällt.
+
+**Beim ersten Aufruf sofort zwei echte Befunde:** eine aktive Zugangssperre (LINA lehnte die
+Anmeldung ab) und 33 `numeric field overflow` bei `getPersonalkosten`. Beides war vorher nur
+über eine Handabfrage sichtbar.
+
+**Eine Falle beim Bauen.** `tage_alt` stand für `getKennzahlen` bei **−158**: der Endpunkt wird
+je Kalenderjahr geholt, `zeitraum_bis` ist deshalb der 31.12. Eine negative Alterszahl sieht
+aus wie ein Fehler und ist keiner — mit `least(geladen_bis, current_date)` gedeckelt.

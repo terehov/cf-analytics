@@ -487,3 +487,71 @@ zählt ganz**, und genau das steht auch im Kopftext der Seite.
 
 Die Prüfung lässt sich wiederholen: Karten-Variablen (auch die aus `gemeinsam.ts` geerbten)
 gegen die Filterliste des Dashboards halten; was übrig bleibt, ist tot.
+
+---
+
+## Import — Überwachung (Sammlung „Technik")
+
+Die technische Seite. Sie beantwortet keine fachliche Frage, sondern die davor: **läuft der
+Datenimport, und wenn nicht, woran liegt es.** Deshalb stehen hier Endpunktnamen und
+technische Begriffe — sie sind die Sache selbst, nicht ihre Verpackung.
+
+Aufbau in der Reihenfolge, in der man nachfragt:
+
+| Abschnitt | Beantwortet | Wichtigste Karte |
+|---|---|---|
+| **Läuft es?** | Zugang frei? Wie weit? Wie schnell? Wann fertig? | Vier Kacheln: Zugang · Fortschritt · Tempo · Restzeit |
+| **Woran hängt es?** | Sperre, Fehlermuster, Strukturänderungen, letzte Läufe | „Warum der Zugang ruht" — ist die belegt, erübrigt sich alles Weitere |
+| **Was läuft gerade?** | Puls, Antwortzeiten, die offene Warteschlange | „Was als Nächstes drankommt" in echter Abarbeitungsreihenfolge |
+| **Wie vollständig?** | Je Bericht und je Betrieb | „Tage alt" — daran erkennt man einen hängenden Bericht |
+
+### Drei Dinge, die man wissen muss, um die Seite richtig zu lesen
+
+**„keine Daten" ist kein Fehler.** LINA antwortet mit HTTP 500 und leerem Body, wenn ein
+Betrieb für einen Bericht nichts hat — ein geschlossenes Haus, ein Bericht, den dieser Betrieb
+nicht führt. Bei 141 Betrieben ist das ständig der Fall. Nur was unter „Fehler" steht, ist
+einer.
+
+**„wartet" heißt nicht kaputt.** Der laufende Betrieb (Priorität ≤ 10) geht immer vor der
+Historie (≥ 90). Historienposten können deshalb tagelang unberührt bleiben, während alles
+richtig funktioniert.
+
+**„abgebrochen" bei einem Lauf ist der Normalfall.** Ein Lauf mit Zeitfrist endet per SIGTERM;
+der nächste macht dort weiter, wo dieser aufhörte. Der Zustand liegt in der Datenbank, nicht im
+Prozess.
+
+### Die Restzeit ist eine Größenordnung
+
+Sie wird aus dem Durchsatz der **letzten Stunde** hochgerechnet — bewusst kurz gefenstert, weil
+das Tempo an `TAKT_*` und am Tagesbudget hängt und ein Mittel über Tage jede Pause als
+dauerhafte Langsamkeit lesen würde. Läuft gerade nichts, steht dort „—" statt einer erfundenen
+Zahl.
+
+### Die Sichten dahinter
+
+Alle in `mart`, angelegt in `migrations/0019_import_ueberwachung.sql`:
+
+| Sicht | Beantwortet |
+|---|---|
+| `import_gesamt` | Eine Zeile: Fortschritt, Tempo, Restzeit, Reichweite, Sperre |
+| `import_naechste` | Die offene Warteschlange in Abarbeitungsreihenfolge |
+| `import_fehler` | Fehlermuster der letzten 24 h, gruppiert |
+| `import_bericht` | Je Bericht: Fortschritt, Aktualität, Gesundheit |
+| `import_betrieb` | Je Betrieb: was fehlt, wie weit reichen die Daten |
+| `import_lauf` | Die Läufe mit Durchsatz je Minute |
+| `import_puls` | Posten je Stunde, letzte drei Tage |
+| `import_sperre` | Zugangssperren, aktive zuerst |
+| `import_strukturaenderung` | Wenn LINA das Antwortformat ändert |
+
+> Die letzten beiden waren zuerst Karten direkt auf `sync.zugangssperre` und
+> `sync.schema_abweichung`. Das läuft — natives SQL fragt die Sichtbarkeit nicht — verstößt
+> aber gegen den Grundsatz aus `metabase.md`. `sync` ist gar nicht nach Metabase
+> synchronisiert; eine Karte darauf ist eine, die niemand in der Oberfläche nachbauen oder
+> prüfen kann. Deshalb nachträglich zwei `mart`-Sichten.
+
+### Verhältnis zu „Datenqualität und Import"
+
+Die ältere Seite bleibt. Sie fragt **fachlich**: welchen Betrieben fehlen Daten, stimmen die
+Zahlen gegen LINAs eigene Aggregate, wer ist überhaupt beurteilbar. Diese hier fragt
+**technisch**: läuft der Abruf. Wer eine fehlende Zahl sucht, fängt hier an und geht dann
+dorthin.
