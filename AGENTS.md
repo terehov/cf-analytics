@@ -50,6 +50,7 @@ Kommentare sind deutsch, damit sie in Postico lesbar sind.
 | **`datenmodell.md`** | Schema-Entscheidungen und ihre Begründung | Vor Schemaänderungen |
 | **`befunde-datenlage.md`** | Was in den **echten** Daten steckt und jede Zahl anders lesbar macht: nur 62 der 141 Betriebe machen Umsatz, die zehn stärksten tragen über ein Drittel, Personalquoten bis 1132 %. Dazu: LINA liefert in den geholten Endpunkten keine Betriebsadressen. | Bevor du einen Mittelwert bildest oder eine Zahl weitergibst |
 | **`metabase.md`** | Welche Schemata Metabase sehen soll, wo man anfängt, welche Fallen `mart` ausräumt, und die Regeln für neue `mart`-Sichten | Bevor du eine Auswertung baust oder eine `mart`-Sicht änderst |
+| **`metabase-sichtbarkeit.md`** | Welche der 111 Tabellen Metabase zeigt (41), welche nur in Detailansichten (28) und welche gar nicht (42) — je mit Begründung und der Falle, in die ein Direktzugriff läuft | Wenn eine Tabelle in Metabase fehlt oder nach einer Migration auftaucht |
 | **`dashboards.md`** | Was in Metabase steht, warum es so aussieht, und warum Dashboards aus `metabase/` erzeugt und nicht in der Oberfläche gepflegt werden | Bevor du ein Dashboard oder eine Karte anfasst |
 | **`importer.md`** | Aufbau des Importers: Warteschlange, Drosselung, Session, Transformationen | Vor Arbeit an `src/` |
 | **`backfill.md`** | Strategie und Rechnung für die Historie | Wenn du Zeiträume einreihst |

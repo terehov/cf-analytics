@@ -159,8 +159,8 @@ SELECT count(*) FILTER (WHERE u.umsatz > 0)::text || ' von ' || count(*)::text
       'Was wäre rechnerisch zu holen, wenn jeder Betrieb über dem Median seine Personalkostenquote nur auf den Median senkte? Kein Ziel und keine Prognose — eine Größenordnung, die sagt, wo sich Arbeit lohnt. Betriebe ohne Umsatz sind ausgeschlossen, sonst dominiert der Unsinn die Liste.',
     anzeige: 'table',
     parameter: [P_MONAT, P_MARKE],
-    sql: `${MONAT_CTE}
-WITH basis AS (
+    sql: `${MONAT_CTE},
+basis AS (
     SELECT r.betrieb, r.konzept, r.umsatz_ist, r.personalkosten_ogf_pct
       FROM mart.round_table_monat r
       CROSS JOIN gewaehlt g
@@ -198,8 +198,8 @@ SELECT b.betrieb                                                   AS "Betrieb",
       'Wie weit vergleichbare Betriebe auseinanderliegen. Eine enge Verteilung heißt, die Quote ist strukturell bedingt; eine breite heißt, sie ist beeinflussbar — und dann lohnt die Frage, was die unteren anders machen. Die Klassenbreite ist bewusst grob: bei mehr als etwa sieben Klassen verwischen benachbarte ohnehin.',
     anzeige: 'bar',
     parameter: [P_MONAT, P_MARKE],
-    sql: `${MONAT_CTE}
-WITH klassen AS (
+    sql: `${MONAT_CTE},
+klassen AS (
     SELECT CASE
              WHEN r.personalkosten_ogf_pct < 26 THEN '1 — unter 26 %'
              WHEN r.personalkosten_ogf_pct < 29 THEN '2 — 26 bis 29 %'
@@ -378,8 +378,8 @@ SELECT betrieb                                                        AS "Betrie
       'Jede Marke in jeder Metrik, als Median, mit dem Abstand zum Gesamtmedian. So sieht man, ob eine Marke durchgehend schwächer ist oder nur in einer Disziplin — und ob ein auffälliger Betrieb Ausreißer ist oder Symptom seiner Marke. Vorsicht beim Vorzeichen: bei Umsatz ist mehr besser, bei den Quoten weniger.',
     anzeige: 'table',
     parameter: [P_MONAT],
-    sql: `${MONAT_CTE}
-WITH werte AS (
+    sql: `${MONAT_CTE},
+werte AS (
     SELECT a.konzept, a.bereich_name, a.reihenfolge, a.wert
       FROM mart.ampel_bereich a
       CROSS JOIN gewaehlt g
