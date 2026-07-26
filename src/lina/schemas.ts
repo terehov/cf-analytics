@@ -146,6 +146,147 @@ export const BetriebsReportSchema = z.object({
   table: z.array(z.record(z.string(), z.unknown())),
 })
 
+// --- Stammdaten-Momentaufnahmen ----------------------------------------
+//
+// Alle Felder am 25.07.2026 an den echten Antworten abgelesen, nicht geraten.
+// Tolerant wie oben: unbekannte Felder sind erlaubt, fehlende Pflichtfelder
+// nicht. Die Zahlenfelder sind durchweg nachsichtig, weil LINA in denselben
+// Feldern mal Zahl und mal String liefert — das hat bei pekThreshold schon
+// einmal einen Fehlalarm je Posten erzeugt.
+
+/** Zahl ODER Zahl-als-String. LINA nimmt es damit nicht genau. */
+const zahlOderText = z.union([z.number(), z.string()]).nullable().optional()
+
+/**
+ * `/wawi/rezept/articleApi?franchise=1`
+ * Die Sätze liegen unter `articles`, nicht auf oberster Ebene.
+ * `mec`/`detailcat`/`grosscat` sind Strings der Form "Weine (2900)".
+ */
+export const ArticleApiSchema = z.object({
+  articles: z.array(z.object({
+    id: z.number(),
+    name: z.string(),
+    artnr: zahlOderText,
+    mec: z.string().nullable().optional(),
+    detailcat: z.string().nullable().optional(),
+    grosscat: z.string().nullable().optional(),
+    encId: z.string().optional(),
+  })),
+})
+
+/** `/intranet/api/analyticsFilterOptions` */
+export const FilterOptionenSchema = z.object({
+  gruppen: z.array(z.object({ id: z.number(), name: z.string() })).optional(),
+  betriebe: z.array(z.object({ id: z.number(), name: z.string() })).optional(),
+  hauptsparten: z.array(z.object({
+    posId: z.number(), number: zahlOderText, name: z.string(),
+  })).optional(),
+  feinsparten: z.array(z.object({
+    id: z.number(), number: zahlOderText, name: z.string(),
+  })),
+  verkaufsstellen: z.array(z.object({ number: zahlOderText, name: z.string() })).optional(),
+})
+
+/**
+ * `/wawi/api/items?archive=0`
+ * `prices` ist ein OBJEKT, dessen Schlüssel die Preis-ID ist — kein Array.
+ */
+export const WawiPreisSchema = z.object({
+  id: z.number(),
+  active: zahlOderText,
+  ware_id: z.number().nullable().optional(),
+  unit_id: z.number().nullable().optional(),
+  seller_id: z.number().nullable().optional(),
+  seller_sku: z.string().nullable().optional(),
+  ordertype: z.string().nullable().optional(),
+  updated: zahlOderText,
+  qty: zahlOderText,
+  bulk_qty: zahlOderText,
+  price: zahlOderText,
+  base_unit_mult: zahlOderText,
+})
+
+export const WawiItemsSchema = z.array(z.object({
+  id: z.number(),
+  name: z.string(),
+  number: z.string().nullable().optional(),
+  aktiv: z.boolean().nullable().optional(),
+  groupId: z.number().nullable().optional(),
+  groupName: z.string().nullable().optional(),
+  price: zahlOderText,
+  supplierId: z.number().nullable().optional(),
+  unitId: z.number().nullable().optional(),
+  unitName: z.string().nullable().optional(),
+  ve: zahlOderText,
+  ve_unit: z.string().nullable().optional(),
+  /**
+   * Objekt ODER leeres Array — PHPs `json_encode` macht aus einem leeren
+   * Array `[]` und erst aus einem gefüllten assoziativen Array `{}`.
+   *
+   * Am 25.07.2026 nachgemessen: 594 Waren mit Objekt, 304 mit `[]`, und
+   * **kein einziger** Array-Fall war nicht leer. Ohne diesen Zweig hätte
+   * jede Momentaufnahme eine Schemaabweichung gemeldet.
+   */
+  prices: z.union([
+    z.record(z.string(), WawiPreisSchema),
+    z.array(z.never()),
+  ]).nullable().optional(),
+}))
+
+/**
+ * `/wawi/api/suppliers`
+ * Geprüft werden nur die Felder, die wir auch speichern — der Rest der
+ * 28 Felder (ustid, hrb, kreditor, gegenkonto*, tel, email, Anschrift) ist
+ * bewusst nicht Teil des Schemas. Was nicht im Schema steht, wird auch nicht
+ * aus Versehen weitergereicht.
+ */
+export const WawiSuppliersSchema = z.array(z.object({
+  ID: z.number(),
+  name: z.string().nullable().optional(),
+  aktiv: zahlOderText,
+  min_order_value: zahlOderText,
+  dow: z.string().nullable().optional(),
+}))
+
+/** `/wawi/api/units` */
+export const WawiUnitsSchema = z.array(z.object({
+  ID: z.number(),
+  name: z.string(),
+  abk: z.string().nullable().optional(),
+  parent: zahlOderText,
+  factor: zahlOderText,
+  baseUnit: z.boolean().nullable().optional(),
+}))
+
+/** `/wawi/api/orders` — Zeitfelder sind Unix-Sekunden. */
+export const WawiOrdersSchema = z.array(z.object({
+  bestellid: z.number(),
+  lieferant: z.number().nullable().optional(),
+  created: zahlOderText,
+  bestellt_am: zahlOderText,
+  liefertermin: zahlOderText,
+  geliefert: zahlOderText,
+  status: zahlOderText,
+  articleCount: zahlOderText,
+  articleSum: zahlOderText,
+  posten: z.array(z.object({
+    ware: z.number().nullable().optional(),
+    unit_id: z.number().nullable().optional(),
+    menge: zahlOderText,
+    wareName: z.string().nullable().optional(),
+    unitPrice: zahlOderText,
+  })).nullable().optional(),
+}))
+
+/** `/wawi/inventory/inventory` — Hüllenformat, Sätze unter `data`. */
+export const WawiInventorySchema = z.object({
+  success: z.boolean().optional(),
+  data: z.array(z.object({
+    date: zahlOderText,
+    isEditable: z.boolean().nullable().optional(),
+  })),
+})
+
 export const SCHEMATA: Record<string, z.ZodTypeAny> = {
   'getUmsatzbericht':                 UmsatzberichtSchema,
   'getUmsatzbericht:speisen':         UmsatzberichtSchema,
@@ -157,6 +298,14 @@ export const SCHEMATA: Record<string, z.ZodTypeAny> = {
   'getVordefinierteZeitzonenBericht': VordefinierteZeitzonenSchema,
   'getArtikelverkaufsbericht':        ArtikelverkaufSchema,
   'getAktionsbericht':                AktionsberichtSchema,
+
+  'articleApi:franchise':             ArticleApiSchema,
+  'analyticsFilterOptions':           FilterOptionenSchema,
+  'wawi:items':                       WawiItemsSchema,
+  'wawi:suppliers':                   WawiSuppliersSchema,
+  'wawi:units':                       WawiUnitsSchema,
+  'wawi:orders':                      WawiOrdersSchema,
+  'wawi:inventory':                   WawiInventorySchema,
 }
 
 export function schemaFuer(key: string): z.ZodTypeAny | null {

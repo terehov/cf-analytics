@@ -1,0 +1,103 @@
+[
+ {
+  "id": 1,
+  "aktiv": true,
+  "name": "Ware A",
+  "number": "100001",
+  "groupId": 1,
+  "groupName": "Gruppe 1",
+  "price": 5.2,
+  "supplierId": 1,
+  "unitId": 1,
+  "unitName": "Liter",
+  "ve": 1,
+  "ve_unit": "Liter",
+  "inStock": 0,
+  "soll": 0,
+  "missing": 0,
+  "addSupps": [],
+  "prices": {
+   "249": {
+    "id": 249,
+    "active": 1,
+    "ware_id": 1,
+    "unit_id": 1,
+    "seller_id": 1,
+    "seller_sku": "SKU-A1",
+    "ordertype": "single",
+    "updated": 1361833200,
+    "qty": 1,
+    "bulk_qty": 6,
+    "price": 5.2,
+    "base_unit_mult": 1
+   },
+   "250": {
+    "id": 250,
+    "active": 1,
+    "ware_id": 1,
+    "unit_id": 2,
+    "seller_id": 2,
+    "seller_sku": "SKU-A2",
+    "ordertype": "bulk",
+    "updated": 1700000000,
+    "qty": 12,
+    "bulk_qty": 1,
+    "price": 58.8,
+    "base_unit_mult": 12
+   }
+  }
+ },
+ {
+  "id": 2,
+  "aktiv": true,
+  "name": "Ware B ohne Preise",
+  "number": "100002",
+  "groupId": 1,
+  "groupName": "Gruppe 1",
+  "price": 0,
+  "supplierId": 0,
+  "unitId": 3,
+  "unitName": "Stück",
+  "ve": 1,
+  "ve_unit": "Stück",
+  "inStock": 0,
+  "soll": 0,
+  "missing": 0,
+  "addSupps": [],
+  "prices": []
+ },
+ {
+  "id": 3,
+  "aktiv": false,
+  "name": "Ware C archiviert",
+  "number": "100003",
+  "groupId": 2,
+  "groupName": "Gruppe 2",
+  "price": 12.5,
+  "supplierId": 2,
+  "unitId": 1,
+  "unitName": "Liter",
+  "ve": 6,
+  "ve_unit": "Liter",
+  "inStock": 3,
+  "soll": 10,
+  "missing": 7,
+  "addSupps": [],
+  "prices": {
+   "251": {
+    "id": 251,
+    "active": 0,
+    "ware_id": 3,
+    "unit_id": 1,
+    "seller_id": 2,
+    "seller_sku": "SKU-C1",
+    "ordertype": "single",
+    "updated": 0,
+    "qty": 6,
+    "bulk_qty": 1,
+    "price": 12.5,
+    "base_unit_mult": 6
+   }
+  }
+ }
+]

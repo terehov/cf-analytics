@@ -1,0 +1,26 @@
+[
+ {
+  "ID": 1,
+  "name": "Liter",
+  "abk": "l",
+  "parent": 0,
+  "factor": 0,
+  "baseUnit": true
+ },
+ {
+  "ID": 2,
+  "name": "Kiste",
+  "abk": "Ki",
+  "parent": 1,
+  "factor": 12,
+  "baseUnit": false
+ },
+ {
+  "ID": 3,
+  "name": "Stück",
+  "abk": "St",
+  "parent": 0,
+  "factor": 0,
+  "baseUnit": true
+ }
+]

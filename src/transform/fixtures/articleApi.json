@@ -1,0 +1,68 @@
+{
+ "_endpoint": "/wawi/rezept/articleApi?franchise=1&showAdditionalMecCodes=0",
+ "_note": "anonymisiert, 5 von 9132 Artikeln (25.07.2026). Verknuepfung ueber artnr, NICHT id — gemessen: artnr trifft die Artikelnummern des Verkaufsberichts, id keine einzige. grosscat 7 Werte, mec 329, detailcat 278. Der Name kann Klammern und Schraegstriche enthalten, deshalb wird die LETZTE Klammergruppe als ID gelesen.",
+ "articles": [
+  {
+   "id": 19324,
+   "active": false,
+   "name": "Artikel A",
+   "artnr": 300213,
+   "mec": "Warengruppe A (2900)",
+   "detailcat": "Detail A (3000)",
+   "grosscat": "Getränke (2)",
+   "group_ids": [
+    5
+   ],
+   "encId": "ENC_A"
+  },
+  {
+   "id": 20011,
+   "active": true,
+   "name": "Artikel B",
+   "artnr": 450003,
+   "mec": "Warengruppe B (13400)",
+   "detailcat": "Detail B (13400)",
+   "grosscat": "Speisen (1)",
+   "group_ids": [
+    1
+   ],
+   "encId": "ENC_B"
+  },
+  {
+   "id": 20012,
+   "active": true,
+   "name": "Artikel C",
+   "artnr": 9990006,
+   "mec": "Warengruppe C (99952)",
+   "detailcat": "Detail C (26500)",
+   "grosscat": "Sonstiges / Divers (5)",
+   "group_ids": [],
+   "encId": "ENC_C"
+  },
+  {
+   "id": 20013,
+   "active": true,
+   "name": "Artikel D ohne Zuordnung",
+   "artnr": 4070029,
+   "mec": null,
+   "detailcat": "",
+   "grosscat": null,
+   "group_ids": [],
+   "encId": "ENC_D"
+  },
+  {
+   "id": 20014,
+   "active": true,
+   "name": "Artikel E mit artnr als Text",
+   "artnr": "1340064",
+   "mec": "Warengruppe A (2900)",
+   "detailcat": "Detail A (3000)",
+   "grosscat": "Getränke (2)",
+   "group_ids": [],
+   "encId": "ENC_E"
+  }
+ ],
+ "multistoreCount": 0,
+ "partners": [],
+ "a360isMaster": true
+}

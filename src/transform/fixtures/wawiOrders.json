@@ -1,0 +1,57 @@
+[
+ {
+  "bestellid": 42,
+  "lieferant": 1,
+  "created": 1474881875,
+  "bestellt_am": 1474881875,
+  "send_method": 1,
+  "liefertermin": 1339711200,
+  "geliefert": 0,
+  "status": 25,
+  "abgeschlossen": "",
+  "bereich": 0,
+  "besteller": 0,
+  "articleCount": 2,
+  "articleSum": 165.15,
+  "ware": "[]",
+  "posten": [
+   {
+    "bestellschein": 42,
+    "ware": 1,
+    "unit_id": 1,
+    "menge": 5,
+    "wareName": "Ware A",
+    "artNr": "",
+    "unitPrice": 5.2,
+    "sellerId": 1
+   },
+   {
+    "bestellschein": 42,
+    "ware": 3,
+    "unit_id": 1,
+    "menge": 2,
+    "wareName": "Ware C archiviert",
+    "artNr": "",
+    "unitPrice": null,
+    "sellerId": 2
+   }
+  ]
+ },
+ {
+  "bestellid": 43,
+  "lieferant": 2,
+  "created": 1500000000,
+  "bestellt_am": 0,
+  "send_method": 1,
+  "liefertermin": 0,
+  "geliefert": 1,
+  "status": 30,
+  "abgeschlossen": "",
+  "bereich": 0,
+  "besteller": 0,
+  "articleCount": 0,
+  "articleSum": 0,
+  "ware": "[]",
+  "posten": []
+ }
+]

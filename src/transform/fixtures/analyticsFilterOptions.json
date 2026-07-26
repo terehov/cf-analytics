@@ -1,28 +1,141 @@
 {
-  "_endpoint": "GET /intranet/api/analyticsFilterOptions",
-  "_note": "Dimensionstabellen fuer Phase 2. WICHTIG: der Query-Parameter 'hauptsparten' erwartet posId, NICHT number (verifiziert).",
-  "gruppen": [
-    {"id":1,"name":"Enchilada"},{"id":2,"name":"Besitos"},{"id":3,"name":"Lehners"},{"id":4,"name":"Aposto"},
-    {"id":6,"name":"Sonstige Enchilada Gruppe"},{"id":10,"name":"Deutsche Konzepte"},{"id":19,"name":"Enchi-…"}
-  ],
-  "_gruppenCount": 14,
-  "hauptsparten": [
-    {"posId":10001,"number":1,"name":"Speisen"},
-    {"posId":10002,"number":2,"name":"Getränke"},
-    {"posId":10003,"number":3,"name":"Gutscheine"},
-    {"posId":10004,"number":5,"name":"Sonstiges / Divers"},
-    {"posId":10006,"number":6,"name":"Strassenverkauf_Getränke"},
-    {"posId":10007,"number":7,"name":"Strassenverkauf_Speisen"},
-    {"posId":92,"number":54,"name":"Pfand"},
-    {"posId":94,"number":56,"name":"Trinkgeld"},
-    {"posId":95,"number":57,"name":"Gutschein"},
-    {"posId":10008,"number":58,"name":"Lieferkosten"}
-  ],
-  "verkaufsstellen": [
-    {"number":0,"name":"Gesamtbetrieb"},{"number":1,"name":"Ausser Haus"},{"number":2,"name":"AmadeusGO"},
-    {"number":51,"name":"Cocktail Casino"},{"number":52,"name":"Delivery"},{"number":53,"name":"To Go Lehners"},
-    {"number":56,"name":"To Go Aktionspreis"}
-  ],
-  "_betriebeCount": 141,
-  "_feinspartenCount": 334
+ "_endpoint": "GET /intranet/api/analyticsFilterOptions",
+ "_note": "Dimensionstabellen fuer Phase 2. WICHTIG: der Query-Parameter 'hauptsparten' erwartet posId, NICHT number (verifiziert). Feinsparten am 25.07.2026 ergaenzt (334 echte, hier 4 anonymisierte). Feinsparten sind {id, number, name} wie hauptsparten {posId, number, name} — der Filterschluessel duerfte id sein, ist aber UNGEPRUEFT.",
+ "gruppen": [
+  {
+   "id": 1,
+   "name": "Enchilada"
+  },
+  {
+   "id": 2,
+   "name": "Besitos"
+  },
+  {
+   "id": 3,
+   "name": "Lehners"
+  },
+  {
+   "id": 4,
+   "name": "Aposto"
+  },
+  {
+   "id": 6,
+   "name": "Sonstige Enchilada Gruppe"
+  },
+  {
+   "id": 10,
+   "name": "Deutsche Konzepte"
+  },
+  {
+   "id": 19,
+   "name": "Enchi-…"
+  }
+ ],
+ "_gruppenCount": 14,
+ "hauptsparten": [
+  {
+   "posId": 10001,
+   "number": 1,
+   "name": "Speisen"
+  },
+  {
+   "posId": 10002,
+   "number": 2,
+   "name": "Getränke"
+  },
+  {
+   "posId": 10003,
+   "number": 3,
+   "name": "Gutscheine"
+  },
+  {
+   "posId": 10004,
+   "number": 5,
+   "name": "Sonstiges / Divers"
+  },
+  {
+   "posId": 10006,
+   "number": 6,
+   "name": "Strassenverkauf_Getränke"
+  },
+  {
+   "posId": 10007,
+   "number": 7,
+   "name": "Strassenverkauf_Speisen"
+  },
+  {
+   "posId": 92,
+   "number": 54,
+   "name": "Pfand"
+  },
+  {
+   "posId": 94,
+   "number": 56,
+   "name": "Trinkgeld"
+  },
+  {
+   "posId": 95,
+   "number": 57,
+   "name": "Gutschein"
+  },
+  {
+   "posId": 10008,
+   "number": 58,
+   "name": "Lieferkosten"
+  }
+ ],
+ "verkaufsstellen": [
+  {
+   "number": 0,
+   "name": "Gesamtbetrieb"
+  },
+  {
+   "number": 1,
+   "name": "Ausser Haus"
+  },
+  {
+   "number": 2,
+   "name": "AmadeusGO"
+  },
+  {
+   "number": 51,
+   "name": "Cocktail Casino"
+  },
+  {
+   "number": 52,
+   "name": "Delivery"
+  },
+  {
+   "number": 53,
+   "name": "To Go Lehners"
+  },
+  {
+   "number": 56,
+   "name": "To Go Aktionspreis"
+  }
+ ],
+ "_betriebeCount": 141,
+ "_feinspartenCount": 334,
+ "feinsparten": [
+  {
+   "id": 0,
+   "number": 0,
+   "name": "Keine Zuordnung"
+  },
+  {
+   "id": 1194,
+   "number": 1000,
+   "name": "Feinsparte A"
+  },
+  {
+   "id": 1195,
+   "number": 1500,
+   "name": "Feinsparte B"
+  },
+  {
+   "id": 1196,
+   "number": 2000,
+   "name": "Feinsparte C"
+  }
+ ]
 }

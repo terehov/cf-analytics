@@ -72,6 +72,38 @@ export function zuLinaDatum(wert: string | Date, style: 'padded' | 'short' = 'pa
 }
 
 /**
+ * LINAs Unix-Sekunden -> Zeitpunkt.
+ *
+ * Ein Epoch-Wert ist absolut und braucht keine Zeitzone; die Umrechnung ist
+ * deshalb trivial — aber sie gehört trotzdem hierher und nicht verstreut in
+ * die Transformationen. LINA liefert Epochs in `prices[].updated`, in den
+ * Bestellzeiten und in den Inventurterminen, und jede Stelle, die das selbst
+ * rechnet, ist eine Stelle, an der jemand versehentlich Millisekunden annimmt.
+ *
+ * Null, undefined, 0 und Unfug ergeben null — LINA benutzt 0 als „nie".
+ */
+export function ausLinaEpoch(sekunden: unknown): Date | null {
+  const n = Number(sekunden)
+  if (!Number.isFinite(n) || n <= 0) return null
+  return new Date(n * 1000)
+}
+
+/**
+ * LINAs Unix-Sekunden -> ISO-Datum im Geschäftskalender.
+ *
+ * Für Termine, die als Tag gemeint sind (Inventurstichtage, Lieferdaten).
+ * Bewusst über die Berliner Wanduhr: 1486551600 ist der 08.02.2017 in Berlin,
+ * in UTC aber noch der 07.02. Wer hier UTC nimmt, verschiebt jeden Termin,
+ * der vor 01:00 bzw. 02:00 Ortszeit liegt, um einen Tag nach hinten.
+ */
+export function linaEpochAlsDatum(sekunden: unknown): string | null {
+  const d = ausLinaEpoch(sekunden)
+  if (!d) return null
+  const { y, m, d: tag } = wanduhr(d)
+  return `${y}-${String(m).padStart(2, '0')}-${String(tag).padStart(2, '0')}`
+}
+
+/**
  * Prüft LINAs from/to-Epoch gegen den erwarteten Geschäftszeitraum.
  *
  * Verifiziert am 25.07.2026: from=1780264800 entspricht 2026-06-01 00:00

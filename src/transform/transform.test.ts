@@ -9,6 +9,8 @@ import { expect, test, describe } from 'bun:test'
 import {
   umsatzbericht, personalkosten, kennzahlen,
   zeitzonenbericht, vordefinierteZeitzonen, artikelverkauf,
+  warengruppeAusText, artikelWarengruppen, feinsparten, lieferanten,
+  waren, einheiten, bestellungen, inventurtermine,
 } from './index'
 import { PersonalkostenSchema } from '../lina/schemas'
 
@@ -94,41 +96,6 @@ describe('personalkosten', () => {
     expect(PersonalkostenSchema.safeParse(bau(['29', 35, '50'])).success).toBe(true)
   })
 
-  /**
-   * Der erste echte Lauf am 25.07.2026 zeigte: LINA liefert die Schwellen mal
-   * als String, mal als Zahl — je Betrieb unterschiedlich. Die Exploration sah
-   * nur Strings, weil sie nur 2 von 141 Betrieben umfasste; der Schemawächter
-   * schlug deshalb sofort an.
-   *
-   * Beides muss dasselbe ergeben, sonst hängt der Ampelwert davon ab, in
-   * welchem Format LINA gerade antwortet.
-   */
-  test('mischt LINA Strings und Zahlen, kommt dasselbe heraus', () => {
-    const s = (d: unknown) => personalkosten(d, '2026-06-01', '2026-06-30').schwellen[0]
-    const erwartet = { gruen: 29, orange: 35, rot: 50 }
-    expect(s({ stores: [{ encId: 'a', pekThreshold: ['29', '35', '50'] }] })).toMatchObject(erwartet)
-    expect(s({ stores: [{ encId: 'a', pekThreshold: [29, 35, 50] }] })).toMatchObject(erwartet)
-    expect(s({ stores: [{ encId: 'a', pekThreshold: ['29', 35, '50'] }] })).toMatchObject(erwartet)
-  })
-
-  /**
-   * Passend dazu das Schema in src/lina/schemas.ts: Es muss beide Formen
-   * durchlassen, sonst meldet JEDER Backfill-Posten eine Abweichung und die
-   * eine echte geht im Rauschen unter.
-   */
-  test('das Schema akzeptiert Schwellen als String UND als Zahl', () => {
-    const bau = (t: unknown[]) => ({
-      timeframe: '2026-06', stores: [{
-        name: 'Test', encId: 'a',
-        effService: 0, effBar: 0, effKueche: 0, effGesamt: 0,
-        pekService: 0, pekBar: 0, pekKueche: 0, pekGesamt: 0,
-        pekThreshold: t, thresholds: { '-1': t }, persoogBwa: 0,
-      }],
-    })
-    expect(PersonalkostenSchema.safeParse(bau(['29', '35', '50'])).success).toBe(true)
-    expect(PersonalkostenSchema.safeParse(bau([29, 35, 50])).success).toBe(true)
-    expect(PersonalkostenSchema.safeParse(bau(['29', 35, '50'])).success).toBe(true)
-  })
 })
 
 describe('kennzahlen', () => {
@@ -240,5 +207,201 @@ describe('Robustheit', () => {
     ]) {
       expect(fn).not.toThrow()
     }
+  })
+})
+
+// =======================================================================
+// Stammdaten-Momentaufnahmen
+// =======================================================================
+
+describe('Warengruppen aus articleApi', () => {
+  const daten = fixture('articleApi')
+
+  test('trennt Name und LINA-ID aus "Weine (2900)"', () => {
+    expect(warengruppeAusText('Warengruppe A (2900)')).toEqual({ linaId: 2900, name: 'Warengruppe A' })
+  })
+
+  test('nimmt die LETZTE Klammergruppe — Namen dürfen Klammern enthalten', () => {
+    expect(warengruppeAusText('Aktion (Sommer) (26500)'))
+      .toEqual({ linaId: 26500, name: 'Aktion (Sommer)' })
+  })
+
+  test('verträgt Namen mit Schrägstrich', () => {
+    // "Sonstiges / Divers" ist EIN Kategoriename, keine zwei — am 25.07.2026
+    // gemessen: 7 Grosskategorien, nicht 8.
+    expect(warengruppeAusText('Sonstiges / Divers (5)'))
+      .toEqual({ linaId: 5, name: 'Sonstiges / Divers' })
+  })
+
+  test('gibt null statt zu werfen, wenn nichts da ist', () => {
+    for (const v of [null, undefined, '', '   ', 42]) expect(warengruppeAusText(v)).toBeNull()
+  })
+
+  test('ohne Klammer bleibt der Name erhalten, ID 0', () => {
+    expect(warengruppeAusText('Ohne Nummer')).toEqual({ linaId: 0, name: 'Ohne Nummer' })
+  })
+
+  /**
+   * Der teuerste denkbare Fehler in diesem Endpunkt: über `id` statt `artnr`
+   * zu verknüpfen. Am 25.07.2026 gemessen — artnr trifft die Artikelnummern
+   * des Verkaufsberichts, id trifft keine einzige (19324 vs. 300213).
+   */
+  test('verknüpft über artnr, nicht über id', () => {
+    const r = artikelWarengruppen(daten)
+    const nummern = r.map(a => a.artikelnummer)
+    expect(nummern).toContain(300213)   // artnr des ersten Satzes
+    expect(nummern).not.toContain(19324) // dessen id
+  })
+
+  test('liest artnr auch, wenn LINA sie als String schickt', () => {
+    expect(artikelWarengruppen(daten).map(a => a.artikelnummer)).toContain(1340064)
+  })
+
+  test('Artikel ohne Zuordnung fallen nicht raus, sind aber leer', () => {
+    const ohne = artikelWarengruppen(daten).find(a => a.artikelnummer === 4070029)!
+    expect(ohne).toBeDefined()
+    expect(ohne.gross).toBeNull()
+    expect(ohne.mec).toBeNull()
+    expect(ohne.detail).toBeNull()
+  })
+})
+
+describe('Feinsparten', () => {
+  test('liest id, number und name', () => {
+    const f = feinsparten(fixture('analyticsFilterOptions'))
+    expect(f.length).toBeGreaterThan(0)
+    expect(f.find(x => x.linaId === 1194)).toEqual({ linaId: 1194, nummer: 1000, name: 'Feinsparte A' })
+  })
+})
+
+describe('Lieferanten — Datenminimierung', () => {
+  const daten = fixture('wawiSuppliers')
+
+  test('liefert genau fünf Felder', () => {
+    const l = lieferanten(daten)
+    expect(Object.keys(l[0]).sort())
+      .toEqual(['aktiv', 'liefertage', 'linaId', 'mindestbestellwert', 'name'])
+  })
+
+  /**
+   * Der eigentliche Test. Die Fixture enthält die heiklen Felder ABSICHTLICH
+   * mit Platzhaltern — Steuer-, Bank- und Kontaktdaten von 540
+   * Geschäftspartnern, die in keiner geplanten Auswertung vorkommen.
+   * Ein `...rest` in der Transformation hätte hier genau den gegenteiligen
+   * Effekt, deshalb wird es hier festgenagelt.
+   */
+  test('reicht Steuer-, Bank- und Kontaktdaten NICHT durch', () => {
+    const rohFelder = new Set(Object.keys(daten[0]))
+    const ergebnisFelder = new Set(lieferanten(daten).flatMap(l => Object.keys(l)))
+    for (const feld of ['ustid', 'hrb', 'kreditor', 'gegenkonto', 'gegenkonto7', 'gegenkonto0',
+                        'tel', 'Fax', 'email', 'strasse', 'plz', 'ort', 'hnr', 'kdnr',
+                        'partner', 'netz', 're_def', 'id_general', 'api', 'einzelp',
+                        'global_discount_kontos', 'dh_supplier_id']) {
+      expect(rohFelder).toContain(feld)          // in der Antwort vorhanden …
+      expect(ergebnisFelder).not.toContain(feld) // … und im Ergebnis nicht
+    }
+    // Auf Feldnamen prüfen, nicht auf Teilketten: "tel" steckt sonst in
+    // "mindestbestellwert" und der Test wird zum Fehlalarm.
+    expect(JSON.stringify(lieferanten(daten))).not.toContain('XXXX')
+  })
+
+  test('ein Lieferant ohne Namen wird zu null, nicht zu Leerstring', () => {
+    expect(lieferanten(daten).find(l => l.linaId === 31)!.name).toBeNull()
+  })
+})
+
+describe('Waren und Einkaufspreise', () => {
+  const daten = fixture('wawiItems')
+
+  test('trennt Waren und Preise — eine Ware kann mehrere Lieferantenpreise haben', () => {
+    const { waren: w, preise } = waren(daten)
+    expect(w).toHaveLength(3)
+    expect(preise.filter(p => p.wareLinaId === 1)).toHaveLength(2)
+  })
+
+  /**
+   * PHPs json_encode macht aus einem leeren Array `[]` und erst aus einem
+   * gefüllten assoziativen Array `{}`. Am 25.07.2026: 594 Waren mit Objekt,
+   * 304 mit `[]`, kein einziger gefüllter Array-Fall. Ohne diesen Zweig
+   * meldete jede Momentaufnahme eine Schemaabweichung.
+   */
+  test('verträgt prices als Objekt UND als leeres Array', () => {
+    const { preise } = waren(daten)
+    expect(preise.filter(p => p.wareLinaId === 2)).toHaveLength(0)  // prices: []
+    expect(preise.filter(p => p.wareLinaId === 1).length).toBeGreaterThan(0) // prices: {}
+  })
+
+  test('rechnet updated aus Unix-Sekunden um, 0 heißt "nie"', () => {
+    const { preise } = waren(daten)
+    const p = preise.find(x => x.linaPreisId === 249)!
+    expect(p.geaendertAm).toBeInstanceOf(Date)
+    expect(p.geaendertAm!.toISOString()).toBe('2013-02-25T23:00:00.000Z')
+    expect(preise.find(x => x.linaPreisId === 251)!.geaendertAm).toBeNull()
+  })
+
+  test('behält die Umrechnung auf die Basiseinheit', () => {
+    // Ohne base_unit_mult sind Preise verschiedener Gebindegrößen nicht
+    // vergleichbar: 5,20 je Liter gegen 58,80 je 12er-Kiste.
+    const p = waren(daten).preise.find(x => x.linaPreisId === 250)!
+    expect(p.basisFaktor).toBe(12)
+    expect(p.menge).toBe(12)
+    expect(p.preis).toBe(58.8)
+  })
+})
+
+describe('Einheiten, Bestellungen, Inventur', () => {
+  test('Einheiten mit Faktor und Basiskennzeichen', () => {
+    const e = einheiten(fixture('wawiUnits'))
+    expect(e).toHaveLength(3)
+    expect(e.find(x => x.linaId === 2)).toMatchObject({ name: 'Kiste', faktor: 12, istBasis: false })
+    expect(e.find(x => x.linaId === 1)!.istBasis).toBe(true)
+  })
+
+  test('Bestellungen inklusive Positionen', () => {
+    const b = bestellungen(fixture('wawiOrders'))
+    expect(b).toHaveLength(2)
+    expect(b[0].posten).toHaveLength(2)
+    expect(b[0].summe).toBe(165.15)
+    expect(b[0].geliefert).toBe(false)
+    expect(b[1].bestelltAm).toBeNull()   // 0 heißt "nie"
+  })
+
+  /**
+   * Inventurtermine sind als TAG gemeint. 1486551600 ist in Berlin der
+   * 08.02.2017, in UTC aber noch der 07.02. Wer hier UTC nimmt, verschiebt
+   * jeden Termin vor 01:00 Ortszeit um einen Tag.
+   */
+  test('Inventurtermine über die Berliner Wanduhr, nicht über UTC', () => {
+    const i = inventurtermine(fixture('wawiInventory'))
+    expect(i).toHaveLength(2)
+    expect(i[0]).toEqual({ datum: '2017-02-08', bearbeitbar: true })
+  })
+
+  /**
+   * LINA liefert denselben Stichtag mehrfach: am 25.07.2026 waren es 11 Sätze
+   * auf nur 4 verschiedene Tage — teils zu unterschiedlichen Uhrzeiten
+   * desselben Tages, teils mit widersprüchlichem isEditable.
+   *
+   * Ohne Zusammenfassung scheitert der INSERT mit „ON CONFLICT DO UPDATE
+   * command cannot affect row a second time". Genau daran ist der erste
+   * Ladeversuch gescheitert — die Testsuite hätte es nicht gefunden, der
+   * Lauf gegen die echten Daten schon.
+   */
+  test('fasst mehrfach gelieferte Stichtage je Tag zusammen', () => {
+    const roh = {
+      data: [
+        { date: 1486551600, isEditable: true },   // 08.02.2017
+        { date: 1486551600, isEditable: false },  // derselbe Tag, widersprüchlich
+        { date: 1486551600, isEditable: false },
+        { date: 1429166941, isEditable: false },  // 16.04.2015, zwei Uhrzeiten
+        { date: 1429135200, isEditable: false },
+      ],
+    }
+    const i = inventurtermine(roh)
+    expect(i).toHaveLength(2)
+    // „bearbeitbar, wenn irgendeiner es sagt" — ein Stichtag, an dem noch
+    // gebucht werden kann, ist offen.
+    expect(i.find(x => x.datum === '2017-02-08')!.bearbeitbar).toBe(true)
+    expect(i.find(x => x.datum === '2015-04-16')!.bearbeitbar).toBe(false)
   })
 })
