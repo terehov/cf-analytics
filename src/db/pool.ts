@@ -18,6 +18,7 @@
  */
 import pg from 'pg'
 import { config } from '../config'
+import { log } from '../lib/log'
 
 // DATE als 'YYYY-MM-DD' statt Date-Objekt.
 pg.types.setTypeParser(1082, (v: string) => v)
@@ -32,10 +33,80 @@ export const pool = new pg.Pool({
   connectionTimeoutMillis: 10_000,
 })
 
+/**
+ * Fehler auf LEERLAUFENDEN Verbindungen abfangen.
+ *
+ * `pg.Pool` gibt ein `error`-Ereignis aus, wenn eine gerade unbenutzte
+ * Verbindung wegbricht — Netzhänger, Neustart der Datenbank, ein
+ * `pg_terminate_backend` vom Administrator. Ohne Zuhörer ist ein
+ * `error`-Ereignis in Node ein **Prozessabsturz**, und zwar an einer Stelle,
+ * die mit dem gerade bearbeiteten Posten nichts zu tun hat.
+ *
+ * Genau dieser Fall trat beim Ausfalltest am 26.07.2026 auf. Der Pool ersetzt
+ * die Verbindung von selbst; hier reicht es, den Vorfall festzuhalten, statt
+ * daran zu sterben.
+ */
+pool.on('error', (e) => {
+  log.warn('Verbindung im Leerlauf weggebrochen — der Pool ersetzt sie',
+    { fehler: String(e?.message ?? e).slice(0, 200) })
+})
+
 export type Werte = readonly unknown[]
 
+/**
+ * Fehler, bei denen die Anweisung den Server nachweislich NICHT erreicht hat.
+ *
+ * Nur solche dürfen wiederholt werden. Ein Constraint-Verstoß oder ein
+ * Tippfehler im SQL muss durchschlagen — wer den wiederholt, verschleiert ihn
+ * nur und macht aus einem klaren Fehler drei langsame.
+ *
+ * Die Liste stammt aus dem, was am 26.07.2026 tatsächlich passiert ist:
+ * mitten in einem Lauf mit 16 erfolgreichen Posten kam ein
+ * „Connection terminated due to connection timeout", und der ganze Lauf starb
+ * daran. Bei einem Backfill über zwölf Tage wäre das ein täglicher Abbruch.
+ */
+function istTransient(e: unknown): boolean {
+  const s = String((e as Error)?.message ?? e)
+  return /Connection terminated/i.test(s)
+      || /timeout exceeded when trying to connect/i.test(s)
+      || /Client has encountered a connection error/i.test(s)
+      || /connection is closed/i.test(s)
+      || /ECONNREFUSED|ECONNRESET|ETIMEDOUT|EPIPE/i.test(s)
+}
+
+const schlaf = (ms: number) => new Promise(r => setTimeout(r, ms))
+
+/**
+ * Führt eine Abfrage aus und wiederholt sie bei transienten
+ * Verbindungsfehlern — dreimal, mit wachsender Pause.
+ *
+ * Sicher, weil nur Fälle wiederholt werden, in denen die Verbindung gar nicht
+ * erst zustande kam: die Anweisung hat den Server nie gesehen, es kann also
+ * nichts doppelt ausgeführt werden.
+ */
+async function mitWiederholung<T>(fn: () => Promise<T>, was: string): Promise<T> {
+  let letzter: unknown
+  for (let versuch = 1; versuch <= 3; versuch++) {
+    try {
+      return await fn()
+    } catch (e) {
+      if (!istTransient(e)) throw e
+      letzter = e
+      if (versuch < 3) {
+        const pause = 250 * 2 ** (versuch - 1)   // 250 ms, 500 ms
+        log.warn('Datenbank kurz nicht erreichbar — wiederhole', {
+          versuch, pause, was, fehler: String((e as Error)?.message ?? e).slice(0, 200),
+        })
+        await schlaf(pause)
+      }
+    }
+  }
+  throw letzter
+}
+
 export async function query<T = any>(text: string, werte: Werte = []): Promise<T[]> {
-  const r = await pool.query(text, werte as unknown[])
+  const r = await mitWiederholung(
+    () => pool.query(text, werte as unknown[]), text.trim().slice(0, 60))
   return r.rows as T[]
 }
 
@@ -51,7 +122,10 @@ export async function eine<T = any>(text: string, werte: Werte = []): Promise<T 
  * außerhalb der Transaktion.
  */
 export async function inTransaktion<T>(fn: (c: pg.PoolClient) => Promise<T>): Promise<T> {
-  const client = await pool.connect()
+  // Nur das HOLEN der Verbindung wird wiederholt, nie der Transaktionsinhalt.
+  // Der könnte bereits geschrieben haben, bevor er scheiterte — ein zweiter
+  // Durchlauf machte daraus stillschweigend doppelte Daten.
+  const client = await mitWiederholung(() => pool.connect(), 'pool.connect')
   try {
     await client.query('BEGIN')
     const r = await fn(client)

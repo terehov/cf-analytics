@@ -60,6 +60,20 @@ const SPERRE = 8_142_026
  */
 async function sperreHolen(): Promise<{ frei: boolean; freigeben: () => Promise<void> }> {
   const verbindung = new pg.Client({ connectionString: config.DATABASE_URL })
+  /**
+   * Auch diese Verbindung kann wegbrechen — und ein `pg.Client` ohne
+   * Fehler-Zuhörer reißt in Node den ganzen Prozess mit. Beim Ausfalltest am
+   * 26.07.2026 war das der letzte verbliebene Stacktrace.
+   *
+   * Bricht sie weg, ist die Sperre weg: Postgres gibt Advisory-Sperren beim
+   * Verbindungsende frei. Ein paralleler Lauf wäre damit möglich, ist aber
+   * unwahrscheinlich (der Zeitplan startet stündlich) und deutlich harmloser
+   * als ein Absturz mitten im Schreiben. Deshalb Warnung statt Abbruch.
+   */
+  verbindung.on('error', (e) => {
+    log.warn('Verbindung der Laufsperre weggebrochen — die Sperre gilt nicht mehr',
+      { fehler: String(e?.message ?? e).slice(0, 200) })
+  })
   await verbindung.connect()
   try {
     const r = await verbindung.query('SELECT pg_try_advisory_lock($1) AS ok', [SPERRE])
@@ -214,11 +228,38 @@ async function workerLaufIntern(
         break
       }
 
-      const posten = await eine<any>(`SELECT * FROM sync.posten_holen($1)`, [laufId])
+      /**
+       * Schon das Holen des nächsten Postens kann scheitern, wenn die
+       * Datenbank kurz weg ist. Das darf den Lauf nicht beenden — `query()`
+       * wiederholt transiente Fehler bereits, und was danach noch übrig
+       * bleibt, zählt hier als Fehler in Folge. Nach ABBRUCH_NACH_FEHLERN
+       * bricht der Wächter oben ab; das ist dann auch richtig, denn ohne
+       * Datenbank kann der Worker nichts Sinnvolles tun.
+       */
+      let posten: any
+      try {
+        posten = await eine<any>(`SELECT * FROM sync.posten_holen($1)`, [laufId])
+      } catch (e) {
+        fehlerInFolge++
+        log.error('posten_holen fehlgeschlagen', { fehlerInFolge, fehler: String(e).slice(0, 300) })
+        await schlaf(5_000)
+        continue
+      }
       if (!posten?.posten_id) { notiz ??= 'Schlange leer'; break }
       // Merken, damit ein Signal die Reservierung wieder lösen kann.
       aktuellerPosten = String(posten.posten_id)
 
+      /**
+       * Ab hier ist alles gekapselt. Vorher war nur `laden()` geschützt, und
+       * jeder andere Datenbankzugriff — die Statusschreibungen, `protokoll()`,
+       * sogar der Fehlerpfad selbst — konnte den ganzen Lauf beenden. Am
+       * 26.07.2026 ist genau das passiert: nach 16 erfolgreichen Posten kam
+       * ein Verbindungsfehler, und der Lauf war tot. Bei einem Backfill über
+       * Tage wäre das ein täglicher Abbruch.
+       *
+       * Ein einzelner Posten darf scheitern. Der Lauf nicht.
+       */
+      try {
       const ep = endpunkt(posten.endpunkt)
       // postgres.js gibt date als Date zurueck - hier einmal normalisieren.
       const von = alsIsoDatum(posten.zeitraum_von)
@@ -303,6 +344,35 @@ async function workerLaufIntern(
         log.warn('wiedervorlage', { endpunkt: ep.key, von, versuche: posten.versuche, fehler: res.fehler })
       }
       await protokoll(laufId, ep.key, posten, aufgeben ? 'uebersprungen' : 'fehler', res, client, res.fehler)
+      } catch (e) {
+        /**
+         * Das Netz unter dem Netz: hierher kommt alles, was die Zweige oben
+         * nicht selbst abgefangen haben — ein Datenbankfehler beim Quittieren,
+         * ein unerwarteter Zustand, ein Fehler im Fehlerpfad.
+         *
+         * Die Reservierung wird freigegeben, damit der Posten nicht bis zur
+         * Stundengrenze von `haengende_posten_freigeben()` blockiert bleibt.
+         * Auch das kann scheitern, wenn die Datenbank weg ist — dann greift
+         * eben die Stundengrenze. Deshalb best effort und kein weiterer Wurf:
+         * ein zweiter Fehler an dieser Stelle würde genau den Abbruch
+         * auslösen, den dieser Block verhindern soll.
+         */
+        fehler++; fehlerInFolge++
+        log.error('posten abgebrochen', {
+          endpunkt: posten.endpunkt, postenId: posten.posten_id,
+          fehlerInFolge, fehler: String(e).slice(0, 300),
+        })
+        await query(
+          `UPDATE sync.warteschlange
+              SET in_arbeit_seit = NULL, letzter_fehler = $1,
+                  faellig_ab = now() + $2::interval
+            WHERE posten_id = $3`,
+          [String(e).slice(0, 2000), wiedervorlage(posten.versuche ?? 1), posten.posten_id],
+        ).catch(() => log.error('konnte den Posten nicht freigeben — greift erst die Stundengrenze',
+                                { postenId: posten.posten_id }))
+      } finally {
+        aktuellerPosten = null
+      }
     }
 
     if (fehler > 0 && status === 'ok') status = 'teilweise'

@@ -329,6 +329,62 @@ lauf('Stammdaten-Momentaufnahmen', () => {
 })
 
 /**
+ * Ein Datenbankausfall mitten im Lauf darf den Lauf nicht töten.
+ *
+ * Am 26.07.2026 starb ein Lauf nach 16 erfolgreichen Posten an einem
+ * „Connection terminated due to connection timeout". Für einen Backfill über
+ * 23.000 Posten und rund zwölf Tage wäre das ein täglicher Abbruch — und der
+ * Grund, warum der Import nicht unbeaufsichtigt laufen konnte.
+ */
+lauf('Robustheit gegen Datenbankausfälle', () => {
+  let mock: ReturnType<typeof mockStarten>
+  let db: Client
+
+  beforeAll(async () => {
+    const { config } = await import('../config')
+    mock = mockStarten({ port: Number(new URL(config.LINA_BASE_URL).port) })
+    db = new Client({ connectionString: DB })
+    await db.connect()
+    await db.query(`TRUNCATE sync.warteschlange, sync.aufgabe, sync.lauf RESTART IDENTITY CASCADE`)
+    for (let i = 1; i <= 5; i++) {
+      await db.query(
+        `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet)
+         VALUES ('getUmsatzbericht', $1::date, $1::date, 10)`,
+        [`2026-06-0${i}`])
+    }
+  })
+
+  afterAll(async () => { mock.stop(); await db.end() })
+
+  test('ein Lauf übersteht abgerissene Verbindungen und arbeitet alles ab', async () => {
+    const { pool } = await import('../db/pool')
+    const { workerLauf } = await import('./worker')
+
+    // Pool aufwärmen, damit ueberhaupt Verbindungen zum Abreissen da sind …
+    await pool.query('SELECT 1')
+    // … und sie dann abschiessen. Genau das Ereignis von damals: die
+    // zwischengespeicherten Verbindungen sind tot, der naechste Zugriff
+    // laeuft ins Leere und muss sich selbst erholen.
+    // Die eigene Verbindung bleibt verschont, sonst prueft der Test nichts mehr.
+    await db.query(
+      `SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+        WHERE datname = current_database() AND pid <> pg_backend_pid()`)
+
+    const r = await workerLauf('manuell')
+
+    expect(r.status).not.toBe('fehlgeschlagen')
+    const { rows: [{ n: offen }] } = await db.query(
+      `SELECT count(*)::int AS n FROM sync.warteschlange WHERE erledigt_am IS NULL`)
+    expect(offen).toBe(0)
+    // Kein Posten darf reserviert zurueckbleiben — sonst haengt er bis zur
+    // Stundengrenze von haengende_posten_freigeben().
+    const { rows: [{ n: haengend }] } = await db.query(
+      `SELECT count(*)::int AS n FROM sync.warteschlange WHERE in_arbeit_seit IS NOT NULL`)
+    expect(haengend).toBe(0)
+  }, 60_000)
+})
+
+/**
  * Die Sperre gegen parallele Worker.
  *
  * Seit das Arbeitsfenster entfallen ist (25.07.2026), läuft ein Backfill-Lauf
