@@ -544,29 +544,35 @@ lauf('BWA-Sichten', () => {
   })
 
   /**
-   * Ein ungebuchter Monat darf nicht der Maßstab werden.
+   * Ein Monat aus lauter Nullen existiert nicht.
    *
-   * LINA liefert das ganze Jahr, ungebuchte Monate als 0,00 statt NULL. Als
-   * jüngster „Stand" gewonnen, ergäben sie 0 % Personalkosten — und das ist
-   * „niedriger ist besser", also grün. Gemessen: September bis Dezember 2026
-   * standen für alle 131 Betriebe auf grün.
+   * LINA liefert immer das ganze Jahr, auch Monate, die es noch gar nicht
+   * gab — als 0,00, nicht als NULL. Stünden sie im Round Table, wäre der
+   * Dezember eine vollwertige Zeile mit dem BWA-Stand vom Mai und ohne
+   * Umsatz. Niemand sieht der Zeile an, dass sie in der Zukunft liegt.
    */
-  test('ein Monat aus lauter Nullen gilt nicht als gebucht', async () => {
+  test('ein Monat aus lauter Nullen erscheint gar nicht erst', async () => {
     const { rows } = await db.query(
-      `SELECT monat, bwa_monat, personalkosten_ogf_pct
-         FROM mart.round_table_basis
-        WHERE betrieb = 'Prüfbetrieb BWA' AND monat = '2026-12-01'`)
+      `SELECT monat FROM mart.round_table_basis WHERE monat = '2026-12-01'`)
+    expect(rows).toEqual([])
+  })
+
+  /**
+   * Und im Monat, den es gibt, gilt der jüngste WIRKLICH gebuchte Stand.
+   *
+   * Ohne die Prüfung auf „irgendein Wert ungleich null" hätte der Dezember
+   * als jüngster Stand gewonnen. 0 % Personalkosten ist „niedriger ist
+   * besser" und damit grün — gemessen: September bis Dezember 2026 standen
+   * für alle 131 Betriebe auf grün.
+   */
+  test('es gilt der jüngste wirklich gebuchte Stand, nicht der jüngste überhaupt', async () => {
+    const { rows } = await db.query(
+      `SELECT bwa_monat, personalkosten_ogf_pct, ampel_personal, ampel_we_kueche, gesamt
+         FROM mart.round_table_monat
+        WHERE betrieb = 'Prüfbetrieb BWA' AND monat = '2026-06-01'`)
     expect(rows).toHaveLength(1)
     expect(String(rows[0].bwa_monat)).toBe('2026-05-01')
     expect(Number(rows[0].personalkosten_ogf_pct)).toBeCloseTo(24.79, 2)
-  })
-
-  test('und produziert deshalb auch keine erfundene Ampel', async () => {
-    const { rows } = await db.query(
-      `SELECT ampel_personal, ampel_we_kueche, gesamt
-         FROM mart.round_table_monat
-        WHERE betrieb = 'Prüfbetrieb BWA' AND monat = '2026-12-01'`)
-    expect(rows).toHaveLength(1)
     // Mai-Werte, nicht Dezember-Nullen: 24,79 % ist grün, 31,08 % ist rot.
     expect(rows[0].ampel_personal).toBe('gruen')
     expect(rows[0].ampel_we_kueche).toBe('rot')

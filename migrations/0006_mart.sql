@@ -303,19 +303,7 @@ Ausschlusskandidat. Begruendung an core.artikel_warengruppe_zeitraum.';
 -- Sowohl die Metabase-Sicht als auch die Funktionen weiter unten setzen
 -- darauf auf - die Zahlen stehen damit an genau einer Stelle.
 CREATE VIEW mart.round_table_basis AS
-WITH monate AS (
-    SELECT DISTINCT date_trunc('month', geschaeftstag)::date AS monat FROM core.umsatzbericht_tag
-    UNION
-    SELECT DISTINCT monat FROM core.kennzahlen_monat
-),
-umsatz AS (
-    SELECT betrieb_key,
-           date_trunc('month', geschaeftstag)::date AS monat,
-           sum(umsatz_netto) AS umsatz
-      FROM core.umsatzbericht_tag
-     WHERE hauptsparte_key IS NULL AND verkaufsstelle_key IS NULL
-     GROUP BY 1, 2
-),
+WITH
 -- Nur GEBUCHTE Monate zaehlen, und "gebucht" heisst: irgendein Wert ist
 -- ungleich null.
 --
@@ -337,6 +325,33 @@ bwa AS (
       FROM mart.kennzahlen_aktuell
      GROUP BY 1, 2
     HAVING count(*) FILTER (WHERE wert_absolut IS NOT NULL AND wert_absolut <> 0) > 0
+),
+/*
+ * Welche Monate es ueberhaupt gibt.
+ *
+ * Bewusst aus den GEBUCHTEN BWA-Monaten abgeleitet und nicht aus
+ * core.kennzahlen_monat: getKennzahlen liefert immer das ganze Jahr, auch
+ * die Monate, die es noch gar nicht gab. Ohne diese Einschraenkung stuenden
+ * hier August bis Dezember 2026 als vollwertige Zeilen -- ohne Umsatz, mit
+ * dem BWA-Stand vom Mai, und niemand sieht der Zeile an, dass sie in der
+ * Zukunft liegt.
+ *
+ * Kein Vergleich gegen current_date: das waere eine zweite Wahrheit neben
+ * den Daten und in einer wiederhergestellten Datenbank sofort falsch. Ein
+ * Monat existiert, wenn es fuer ihn POS-Umsatz oder eine gebuchte BWA gibt.
+ */
+monate AS (
+    SELECT DISTINCT date_trunc('month', geschaeftstag)::date AS monat FROM core.umsatzbericht_tag
+    UNION
+    SELECT DISTINCT monat FROM bwa
+),
+umsatz AS (
+    SELECT betrieb_key,
+           date_trunc('month', geschaeftstag)::date AS monat,
+           sum(umsatz_netto) AS umsatz
+      FROM core.umsatzbericht_tag
+     WHERE hauptsparte_key IS NULL AND verkaufsstelle_key IS NULL
+     GROUP BY 1, 2
 )
 SELECT b.betrieb_key,
        b.name         AS betrieb,

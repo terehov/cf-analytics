@@ -91,6 +91,42 @@ Der Vollständigkeit halber, falls doch jemand direkt auf `core` geht:
   `DISTINCT ON` bekommt man jede Nachbuchung als eigene Zeile. Fertig:
   `mart.kennzahlen_aktuell`.
 
+## Wer eine `mart`-Sicht ergänzt
+
+Vier Regeln, und alle vier haben einen konkreten Fehler als Anlass.
+
+**1. Auf `mart.round_table_basis` aufsetzen, nicht die BWA-Logik neu ableiten.**
+Die Sicht liefert eine Zeile je aktivem Betrieb und Monat mit allen Rohgrößen — Umsatz,
+Vorjahr, Veränderung, die drei BWA-Quoten, Bewertung, OM-Score — und dazu `bwa_monat`, aus
+welchem Monat die BWA-Werte stammen. `mart.round_table_monat` und `mart.round_table()`
+setzen bereits darauf auf; alles Weitere (Ampeln im Langformat, Trend, YTD) gehört ebenfalls
+dorthin. Sonst liegt dieselbe Regel an fünf Stellen und zerfällt bei der ersten Korrektur.
+
+**2. „Gebucht" heißt: irgendein Wert ungleich null.**
+`getKennzahlen` liefert immer das ganze Jahr, ungebuchte Monate als `0,00` — nicht als
+`NULL`. Wer `mart.kennzahlen_aktuell` direkt joint und nur auf `IS NOT NULL` filtert, holt
+sich diese Monate zurück, und weil sie die jüngsten sind, gewinnen sie. 0 % Personalkosten
+ist „niedriger ist besser" und damit grün. Gemessen am 26.07.2026: September bis Dezember
+standen für alle 131 Betriebe auf grün. Die Bedingung lautet:
+
+```sql
+HAVING count(*) FILTER (WHERE wert_absolut IS NOT NULL AND wert_absolut <> 0) > 0
+```
+
+**3. Keine Zukunftsmonate herausfiltern — sie entstehen gar nicht mehr.**
+Aus demselben Grund enthielt `mart.round_table_monat` Zeilen für August bis Dezember 2026.
+Seit dem 26.07.2026 leitet die Sicht ihre Monatsliste aus POS-Umsatz und *gebuchten*
+BWA-Monaten ab. Ein `WHERE monat <= current_date` im Dashboard ist damit überflüssig — und
+wäre in einer wiederhergestellten Datenbank ohnehin sofort falsch.
+
+**4. `mart.kennzahlen_aktuell` führt Euro und Prozent zusammen.**
+Beide Spalten sind gefüllt. Bis zum 26.07.2026 war das nicht so: die Sicht behielt per
+`DISTINCT ON` nur die später geholte der beiden Zeilen und warf die andere Wertspalte weg.
+Wer gegen den alten Stand gebaut hat, rechnet jetzt mit anderen Zahlen.
+
+Neue Sichten kommen in eine **neue** Migrationsdatei. `0001` bis `0006` sind angewendet und
+werden nicht mehr geändert; der Stand steht in `public.schema_migration`.
+
 ## Tempo
 
 `mart.artikelverkauf` liegt bei rund 20 Millionen Zeilen im Jahr. Die Tabelle darunter ist
