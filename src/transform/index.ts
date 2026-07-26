@@ -461,3 +461,32 @@ export function inventurtermine(daten: any): { datum: string; bearbeitbar: boole
   }
   return [...jeTag].map(([datum, bearbeitbar]) => ({ datum, bearbeitbar }))
 }
+
+/**
+ * Betriebe mit ihrer LINA-ID aus analyticsFilterOptions.
+ *
+ * Die fehlende Bruecke zwischen zwei Welten: Der Umsatzbericht kennt Betriebe
+ * nur ueber `encId`, `getKennzahlen` nur ueber eine numerische ID. Ohne eine
+ * Verbindung findet keine einzige BWA-Zeile ihren Betrieb -- am 26.07.2026
+ * fielen so alle 7.860 Kennzahlenzeilen still durch den Filter, waehrend der
+ * Posten `ok` meldete.
+ *
+ * `analyticsFilterOptions.betriebe` liefert {id, name} fuer alle 141 Betriebe
+ * und benutzt DENSELBEN ID-Raum wie getKennzahlen (nachgemessen: 131 von 131
+ * Schnittmenge; die 10 fehlenden sind die Einheiten ohne BWA-Zuordnung).
+ *
+ * Verbunden wird ueber den NAMEN, weil es nichts Besseres gibt: encId kommt in
+ * dieser Antwort nicht vor. Nachgemessen sind die Namen auf beiden Seiten
+ * eindeutig (141 von 141) und treffen vollstaendig. Sollte LINA je zwei
+ * Betriebe gleich benennen, faellt das in mart.betrieb_ohne_lina_id auf, statt
+ * still den falschen zu treffen.
+ */
+export function betriebeMitLinaId(daten: any): { linaId: number; name: string }[] {
+  return (daten?.betriebe ?? [])
+    .map((b: any) => ({ linaId: Number(b?.id), name: String(b?.name ?? '') }))
+    // `> 0`, nicht `Number.isFinite`: Number(null) ist 0 und damit endlich —
+    // ein Satz ohne ID rutschte sonst als Betrieb 0 durch und beanspruchte
+    // einen Namen, der einem echten Betrieb gehört. LINAs Betriebs-IDs
+    // beginnen bei 1 (beobachtet: 1 bis 5891).
+    .filter((b: any) => Number.isFinite(b.linaId) && b.linaId > 0 && b.name !== '')
+}

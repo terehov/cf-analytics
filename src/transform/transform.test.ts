@@ -10,7 +10,7 @@ import {
   umsatzbericht, personalkosten, kennzahlen,
   zeitzonenbericht, vordefinierteZeitzonen, artikelverkauf,
   warengruppeAusText, artikelWarengruppen, feinsparten, lieferanten,
-  waren, einheiten, bestellungen, inventurtermine,
+  waren, einheiten, bestellungen, inventurtermine, betriebeMitLinaId,
 } from './index'
 import { PersonalkostenSchema } from '../lina/schemas'
 
@@ -403,5 +403,37 @@ describe('Einheiten, Bestellungen, Inventur', () => {
     // gebucht werden kann, ist offen.
     expect(i.find(x => x.datum === '2017-02-08')!.bearbeitbar).toBe(true)
     expect(i.find(x => x.datum === '2015-04-16')!.bearbeitbar).toBe(false)
+  })
+})
+
+describe('Betriebs-IDs — die Brücke zur BWA', () => {
+  /**
+   * Am 26.07.2026 fielen alle 7.860 Kennzahlenzeilen still durch den Filter,
+   * weil core.betrieb.lina_betrieb_id nirgends gefüllt wurde. Der Posten
+   * meldete `ok`, core.kennzahlen_monat blieb leer — und die BWA ist die
+   * Grundlage des Round Table.
+   */
+  test('liest id und name aus analyticsFilterOptions.betriebe', () => {
+    const r = betriebeMitLinaId({
+      betriebe: [
+        { id: 4469, name: 'A Testladen Concept Family' },
+        { id: 1, name: 'Enchilada Bayreuth GmbH' },
+      ],
+    })
+    expect(r).toEqual([
+      { linaId: 4469, name: 'A Testladen Concept Family' },
+      { linaId: 1, name: 'Enchilada Bayreuth GmbH' },
+    ])
+  })
+
+  test('überspringt Sätze ohne brauchbare ID oder ohne Namen', () => {
+    expect(betriebeMitLinaId({ betriebe: [
+      { id: null, name: 'ohne ID' }, { id: 5, name: '' }, { id: 7, name: 'gut' },
+    ] })).toEqual([{ linaId: 7, name: 'gut' }])
+  })
+
+  test('verträgt eine Antwort ohne betriebe', () => {
+    expect(betriebeMitLinaId({})).toEqual([])
+    expect(betriebeMitLinaId(null)).toEqual([])
   })
 })

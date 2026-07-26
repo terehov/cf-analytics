@@ -341,6 +341,36 @@ export async function laden(k: Kontext): Promise<number> {
       // beisammen. Das ist besser, als einen Posten scheitern zu lassen und
       // ihn 20 Minuten später erneut gegen LINA zu holen.
       case 'analyticsFilterOptions': {
+        /**
+         * Zuerst die Betriebs-IDs — das ist der wichtigere Teil dieses
+         * Endpunkts, auch wenn er nicht so aussieht.
+         *
+         * `getKennzahlen` kennt Betriebe nur über eine numerische LINA-ID,
+         * der Umsatzbericht nur über `encId`. Ohne Brücke findet keine
+         * einzige BWA-Zeile ihren Betrieb: Am 26.07.2026 fielen so alle
+         * 7.860 Kennzahlenzeilen still durch den Filter, während der Posten
+         * `ok` meldete und `core.kennzahlen_monat` leer blieb. Die BWA ist
+         * die Grundlage des Round Table — ein leiserer Totalausfall ist
+         * schwer vorstellbar.
+         *
+         * Verbunden wird über den Namen, weil `encId` in dieser Antwort
+         * nicht vorkommt. Nachgemessen: Namen beidseitig eindeutig (141 von
+         * 141) und vollständig treffend, gleicher ID-Raum wie getKennzahlen
+         * (131 von 131 Schnittmenge).
+         */
+        const mitId = t.betriebeMitLinaId(k.daten)
+        let zugeordnet = 0
+        if (mitId.length) {
+          const r = await c.query(
+            `UPDATE core.betrieb b
+                SET lina_betrieb_id = v.lina_id, zuletzt_am = now()
+               FROM unnest($1::int[], $2::text[]) AS v(lina_id, name)
+              WHERE b.name = v.name
+                AND b.lina_betrieb_id IS DISTINCT FROM v.lina_id`,
+            [mitId.map(b => b.linaId), mitId.map(b => b.name)])
+          zugeordnet = r.rowCount ?? 0
+        }
+
         const fs = t.feinsparten(k.daten)
         await inBloecken(fs, 500, async b => {
           const { platzhalter, werte } = mehrzeilig(
@@ -351,7 +381,7 @@ export async function laden(k: Kontext): Promise<number> {
              ON CONFLICT (lina_id) DO UPDATE SET
                nummer = EXCLUDED.nummer, name = EXCLUDED.name`, werte)
         })
-        geschrieben = fs.length
+        geschrieben = fs.length + zugeordnet
         break
       }
 

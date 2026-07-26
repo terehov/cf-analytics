@@ -306,6 +306,15 @@ async function workerLaufIntern(
     }
 
     if (fehler > 0 && status === 'ok') status = 'teilweise'
+  } catch (e) {
+    // Ohne diesen Zweig wird ein abgestürzter Lauf als 'ok' verbucht: die
+    // Zeile oben wird übersprungen, `status` steht noch auf seinem Anfangswert,
+    // und das `finally` schreibt ihn so weg. Am 26.07.2026 stand deshalb in
+    // mart.sync_status ein Lauf mit status 'ok' und aufgaben_fehler 1, obwohl
+    // er an einem Datenbankfehler gestorben war.
+    status = 'fehlgeschlagen'
+    notiz = `Lauf abgebrochen: ${String(e).slice(0, 500)}`
+    throw e
   } finally {
     // Handler wieder abmelden: workerLauf kann mehrfach im selben Prozess
     // laufen (Tests), und hängengebliebene Listener wären ein Leck.
