@@ -107,15 +107,36 @@ Round-Table-Frage hinterlegen, dann ist das Umschalten ein Klick in der Oberflae
 
 
 -- Aktueller BWA-Stand je Betrieb/Monat/Kennzahl
+--
+-- Die beiden Spalten werden GETRENNT aufgeloest, und das ist der ganze Witz
+-- dieser Sicht. LINA liefert Euro und Prozent aus zwei Aufrufen
+-- (mode=absolut, mode=relativ), die als zwei Zeilen mit unterschiedlichem
+-- abgerufen_am ankommen -- jede mit genau einem gefuellten Wert.
+--
+-- Ein DISTINCT ON ueber abgerufen_am DESC nimmt davon nur EINE, naemlich die
+-- spaeter geholte, und wirft die andere Spalte weg. Nachgemessen am
+-- 26.07.2026 im ersten echten Lauf: 7.860 Zeilen, davon 7.860 mit Prozent und
+-- NULL mit Euro, weil relativ 35 Sekunden nach absolut lief. Damit war
+-- mart.pruefung_wareneinsatz still wirkungslos -- die Sicht braucht Euro.
+--
+-- Deshalb je Spalte der juengste NICHT-LEERE Wert. Die Zeitreise bleibt
+-- erhalten: die Rohtabelle ist unangetastet und weiterhin append-only.
 CREATE VIEW mart.kennzahlen_aktuell AS
-SELECT DISTINCT ON (betrieb_key, monat, kennzahl)
-       betrieb_key, monat, kennzahl, wert_absolut, wert_prozent, abgerufen_am
+SELECT betrieb_key, monat, kennzahl,
+       ((array_agg(wert_absolut ORDER BY abgerufen_am DESC)
+         FILTER (WHERE wert_absolut IS NOT NULL))[1])::numeric(14,2) AS wert_absolut,
+       ((array_agg(wert_prozent ORDER BY abgerufen_am DESC)
+         FILTER (WHERE wert_prozent IS NOT NULL))[1])::numeric(8,2)  AS wert_prozent,
+       max(abgerufen_am)                                             AS abgerufen_am
   FROM core.kennzahlen_monat
- ORDER BY betrieb_key, monat, kennzahl, abgerufen_am DESC;
+ GROUP BY betrieb_key, monat, kennzahl;
 
 COMMENT ON VIEW mart.kennzahlen_aktuell IS
-'Juengster bekannter BWA-Stand. Fuer "was wussten wir am Stichtag X" stattdessen direkt
-core.kennzahlen_monat mit abgerufen_am <= X abfragen.';
+'Juengster bekannter BWA-Stand, je Wertspalte getrennt aufgeloest -- Euro und Prozent kommen
+aus zwei getrennten LINA-Aufrufen und wuerden sich sonst gegenseitig verdraengen.
+abgerufen_am ist der juengste der beiden Abrufe.
+Fuer "was wussten wir am Stichtag X" stattdessen direkt core.kennzahlen_monat mit
+abgerufen_am <= X abfragen.';
 
 
 -- =====================================================================
@@ -295,14 +316,27 @@ umsatz AS (
      WHERE hauptsparte_key IS NULL AND verkaufsstelle_key IS NULL
      GROUP BY 1, 2
 ),
+-- Nur GEBUCHTE Monate zaehlen, und "gebucht" heisst: irgendein Wert ist
+-- ungleich null.
+--
+-- getKennzahlen liefert immer das ganze Jahr, auch die Monate, die der
+-- Steuerberater noch nicht gebucht hat -- die kommen mit 0,00 zurueck, nicht
+-- als NULL. Ein Filter auf `wert_prozent IS NOT NULL` laesst sie also
+-- durch, und weil sie die juengsten sind, gewinnen sie.
+--
+-- Die Folge waere eine erfundene Ampel: 0,00 % Personalkosten ist "niedriger
+-- ist besser" und damit gruen. Am 26.07.2026 im ersten echten Lauf gemessen --
+-- September bis Dezember 2026 standen fuer alle 131 Betriebe auf gruen, mit
+-- bwa_monat = Dezember und Nullen in jeder Spalte. Ein Round Table, der
+-- Entwarnung gibt, weil noch nichts gebucht ist, ist schlimmer als gar keiner.
 bwa AS (
     SELECT betrieb_key, monat,
            max(wert_prozent) FILTER (WHERE kennzahl = 'Personalkosten ohne GF') AS personalkosten_ogf_pct,
            max(wert_prozent) FILTER (WHERE kennzahl = 'WE Bar')                 AS we_bar_pct,
            max(wert_prozent) FILTER (WHERE kennzahl = 'WE Küche')               AS we_kueche_pct
       FROM mart.kennzahlen_aktuell
-     WHERE wert_prozent IS NOT NULL
      GROUP BY 1, 2
+    HAVING count(*) FILTER (WHERE wert_absolut IS NOT NULL AND wert_absolut <> 0) > 0
 )
 SELECT b.betrieb_key,
        b.name         AS betrieb,
@@ -802,12 +836,16 @@ WITH theoretisch AS (
      GROUP BY 1, 2
 ),
 bwa AS (
+    -- Dieselbe Bedingung wie in mart.round_table_basis: ein Monat, in dem
+    -- alles null ist, ist nicht gebucht, sondern leer. Ohne sie stuende hier
+    -- fuer jeden noch nicht gebuchten Monat eine Luecke in voller Hoehe des
+    -- theoretischen Wareneinsatzes.
     SELECT betrieb_key, monat,
            sum(wert_absolut) FILTER (WHERE kennzahl IN ('WE Bar', 'WE Küche')) AS we_bwa,
            max(wert_absolut) FILTER (WHERE kennzahl = 'Umsatz')                AS umsatz_bwa
       FROM mart.kennzahlen_aktuell
-     WHERE wert_absolut IS NOT NULL
      GROUP BY 1, 2
+    HAVING count(*) FILTER (WHERE wert_absolut IS NOT NULL AND wert_absolut <> 0) > 0
 )
 SELECT b.name                                          AS betrieb,
        t.monat,

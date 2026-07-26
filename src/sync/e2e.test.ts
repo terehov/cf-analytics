@@ -469,6 +469,112 @@ lauf('Sperre gegen parallele Worker', () => {
 })
 
 /**
+ * Die beiden Fallen der BWA-Sichten.
+ *
+ * Beide sind am 26.07.2026 im ersten echten Lauf aufgefallen und beide waren
+ * in den Fixtures unsichtbar — sie brauchen genau die Konstellation, die LINA
+ * mit echten Daten liefert. Deshalb wird sie hier von Hand hergestellt.
+ */
+lauf('BWA-Sichten', () => {
+  let db: Client
+  const B = 'ENCID_BWA_PRUEFUNG'
+
+  /** Euro und Prozent kommen aus zwei Aufrufen, 35 s auseinander. */
+  const bwa = async (monat: string, werte: [string, number, number][], versatzSek: number) => {
+    for (const [modus, spalte] of [['absolut', 'wert_absolut'], ['relativ', 'wert_prozent']] as const) {
+      for (const [kennzahl, abs, pct] of werte) {
+        await db.query(
+          `INSERT INTO core.kennzahlen_monat (betrieb_key, monat, kennzahl, ${spalte}, abgerufen_am)
+           SELECT betrieb_key, $2::date, $3, $4, now() + ($5 || ' seconds')::interval
+             FROM core.betrieb WHERE enc_id = $1`,
+          [B, monat, kennzahl, modus === 'absolut' ? abs : pct,
+           versatzSek + (modus === 'relativ' ? 35 : 0)])
+      }
+    }
+  }
+
+  beforeAll(async () => {
+    db = new Client({ connectionString: DB })
+    await db.connect()
+    await db.query(`DELETE FROM core.kennzahlen_monat
+                     WHERE betrieb_key IN (SELECT betrieb_key FROM core.betrieb WHERE enc_id = $1)`, [B])
+    await db.query(`DELETE FROM core.betrieb WHERE enc_id = $1`, [B])
+    await db.query(
+      `INSERT INTO core.betrieb (enc_id, lina_betrieb_id, name, aktiv, hat_bwa)
+       VALUES ($1, 999999, 'Prüfbetrieb BWA', true, true)`, [B])
+
+    // Mai ist gebucht.
+    await bwa('2026-05-01', [
+      ['Umsatz',                 92030.31, 100.00],
+      ['Personalkosten ohne GF', 22812.56,  24.79],
+      ['WE Bar',                 11994.34,  23.64],
+      ['WE Küche',               12755.92,  31.08],
+    ], 0)
+    // Dezember liefert LINA mit, ist aber nicht gebucht: alles 0,00 — nicht NULL.
+    await bwa('2026-12-01', [
+      ['Umsatz',                 0, 0],
+      ['Personalkosten ohne GF', 0, 0],
+      ['WE Bar',                 0, 0],
+      ['WE Küche',               0, 0],
+    ], 100)
+  })
+
+  afterAll(async () => {
+    await db.query(`DELETE FROM core.kennzahlen_monat
+                     WHERE betrieb_key IN (SELECT betrieb_key FROM core.betrieb WHERE enc_id = $1)`, [B])
+    await db.query(`DELETE FROM core.betrieb WHERE enc_id = $1`, [B])
+    await db.end()
+  })
+
+  /**
+   * Euro und Prozent dürfen sich nicht gegenseitig verdrängen.
+   *
+   * `DISTINCT ON (…) ORDER BY abgerufen_am DESC` behielt nur die später
+   * geholte Zeile. Gemessen: 7.860 Zeilen mit Prozent, NULL mit Euro —
+   * und damit war mart.pruefung_wareneinsatz still wirkungslos.
+   */
+  test('kennzahlen_aktuell führt Euro und Prozent zusammen', async () => {
+    const { rows } = await db.query(
+      `SELECT wert_absolut, wert_prozent FROM mart.kennzahlen_aktuell k
+         JOIN core.betrieb b USING (betrieb_key)
+        WHERE b.enc_id = $1 AND k.monat = '2026-05-01' AND k.kennzahl = 'WE Bar'`, [B])
+    expect(rows).toHaveLength(1)
+    expect(Number(rows[0].wert_absolut)).toBeCloseTo(11994.34, 2)
+    expect(Number(rows[0].wert_prozent)).toBeCloseTo(23.64, 2)
+  })
+
+  /**
+   * Ein ungebuchter Monat darf nicht der Maßstab werden.
+   *
+   * LINA liefert das ganze Jahr, ungebuchte Monate als 0,00 statt NULL. Als
+   * jüngster „Stand" gewonnen, ergäben sie 0 % Personalkosten — und das ist
+   * „niedriger ist besser", also grün. Gemessen: September bis Dezember 2026
+   * standen für alle 131 Betriebe auf grün.
+   */
+  test('ein Monat aus lauter Nullen gilt nicht als gebucht', async () => {
+    const { rows } = await db.query(
+      `SELECT monat, bwa_monat, personalkosten_ogf_pct
+         FROM mart.round_table_basis
+        WHERE betrieb = 'Prüfbetrieb BWA' AND monat = '2026-12-01'`)
+    expect(rows).toHaveLength(1)
+    expect(String(rows[0].bwa_monat)).toBe('2026-05-01')
+    expect(Number(rows[0].personalkosten_ogf_pct)).toBeCloseTo(24.79, 2)
+  })
+
+  test('und produziert deshalb auch keine erfundene Ampel', async () => {
+    const { rows } = await db.query(
+      `SELECT ampel_personal, ampel_we_kueche, gesamt
+         FROM mart.round_table_monat
+        WHERE betrieb = 'Prüfbetrieb BWA' AND monat = '2026-12-01'`)
+    expect(rows).toHaveLength(1)
+    // Mai-Werte, nicht Dezember-Nullen: 24,79 % ist grün, 31,08 % ist rot.
+    expect(rows[0].ampel_personal).toBe('gruen')
+    expect(rows[0].ampel_we_kueche).toBe('rot')
+    expect(rows[0].gesamt).toBe('rot')
+  })
+})
+
+/**
  * Der Aufbau der Schemata — das, was Metabase zu sehen bekommt.
  *
  * Bis zum 26.07.2026 legte `core.partition_anlegen()` die Monatspartitionen
