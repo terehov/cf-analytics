@@ -747,3 +747,57 @@ Postgres, nicht im JavaScript.
 `jsonb_build_object` oder den Wert als typisierte Spalte führen. Und: **jede Prüfung, die
 einen Wert liest, einmal gegen einen echten Datensatz gegenprüfen** — hier fiel es nur auf,
 weil der Merker nach dem Schreiben nochmals gelesen wurde.
+
+---
+
+## Nachtrag zum Überlauf der Personalquoten: die Warnung stand im falschen Fenster
+
+**Anlass.** Das neue Import-Dashboard zeigte am 26.07.2026 „33 × numeric field overflow bei
+`getPersonalkosten`". Nachgegangen — und der Befund ist ein doppelter.
+
+**Der Überlauf selbst war bereits behoben.** Migration `0010` hat die Quotenspalten von
+`numeric(6,2)` auf `numeric(12,2)` geweitet, `0012` den Beleg dazu korrigiert. Zeitlich
+nachgemessen:
+
+| | |
+|---|---|
+| letzter Überlauf-Fehler | 26.07.2026 **16:46** |
+| Migration 0010 angewendet | 26.07.2026 **17:22** |
+
+36 Minuten nach dem letzten Fehler. Seither keiner mehr. Von den 33 betroffenen Tagen sind
+**32 inzwischen geladen**, der 33. (15.07.2026) steht mit 0 Versuchen in der Warteschlange und
+kommt beim nächsten Lauf. Nichts ist verloren gegangen.
+
+**Bestätigt: 20 Zeilen tragen heute Werte, die die alte Spalte abgewiesen hätte**, Höchstwert
+316.576,50 % — Enchilada Würzburg am 15.06.2026 bei **6,05 € Tagesumsatz**. Genau der Fall, den
+`0010` vorhergesagt hatte.
+
+**Der eigentliche Befund war der zweite.** `0012` hat die Warnung über die Größenordnung als
+Kommentar an `core.personalkosten` geschrieben — mit der ausdrücklichen Begründung, dass
+Metabase Tabellenkommentare als Beschreibung anzeigt und wer dort mittelt, die Warnung sehen
+soll.
+
+Nur ist `core` seit demselben Tag **vollständig ausgeblendet**. Sichtbar in Metabase ist
+`mart.personalkosten`, und deren Kommentar erklärte sorgfältig, dass man nicht über Zeiträume
+summieren darf — sagte aber nichts über die Größenordnung. Die Warnung existierte, sie stand
+nur dort, wo sie niemand liest.
+
+**Wie groß der Unterschied ist**, über alle Tageswerte mit Umsatz gemessen:
+
+| Rechenweg | Ergebnis |
+|---|---|
+| Mittelwert ungefiltert | **610,7 %** |
+| Median | **383,4 %** |
+| Mittelwert bei `pek_gesamt <= 200` | **113,0 %** |
+
+Bemerkenswert: **selbst der Median ist unbrauchbar.** Der übliche Rat „nimm den Median statt
+des Mittelwerts" reicht hier nicht, weil über die Hälfte der geführten Betriebe keinen
+nennenswerten Umsatz macht — der mittlere Wert liegt dann selbst schon im Unsinn. Es braucht
+zusätzlich einen Umsatzfilter.
+
+**Behoben** mit `0020_mart_personalkosten_warnung.sql`: die Warnung steht jetzt am Kommentar
+der Sicht, die Metabase tatsächlich zeigt, samt der drei Zahlen oben.
+
+**Regel.** Ein Kommentar, der eine Falle erklärt, gehört an das Objekt, das der Lesende
+**sieht** — nicht an das, aus dem die Daten stammen. Nach jeder Änderung an der Sichtbarkeit
+prüfen, ob eine Warnung dadurch unsichtbar geworden ist.
