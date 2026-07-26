@@ -129,6 +129,14 @@ async function artikelSichern(c: PoolClient, stamm: t.ArtikelStamm[]) {
 
 export async function laden(k: Kontext): Promise<number> {
   return inTransaktion(async c => {
+    // Partitionen bei Bedarf — kein Wartungsjob, den man vergessen kann.
+    // Der Raw-Layer ist nach ABRUFZEITPUNKT partitioniert, also nach heute;
+    // `current_date + 1` deckt den Fall ab, dass der Monat zwischen diesem
+    // Aufruf und dem INSERT umspringt.
+    await c.query(
+      `SELECT core.partition_anlegen('raw.api_antwort', d)
+         FROM unnest(ARRAY[current_date, current_date + 1]) AS d`)
+
     const roh = await c.query(
       `INSERT INTO raw.api_antwort
          (endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis, parameter,
@@ -140,7 +148,6 @@ export async function laden(k: Kontext): Promise<number> {
     const rawId = String(roh.rows[0].id)
     const abgerufenAm = roh.rows[0].abgerufen_am
 
-    // Partition bei Bedarf — kein Wartungsjob, den man vergessen kann.
     await c.query(`SELECT core.partition_anlegen('core.artikelverkauf_tag', $1::date)`, [k.von])
 
     const keys = await betriebeSichern(c, t.betriebeAus(k.daten))
