@@ -16,6 +16,15 @@
 | `einreihen --historie` erneut aufgerufen | reiht **nur echte Lücken** ein, nichts doppelt |
 | Datenbank per `pg_dump` umgezogen | die Warteschlange zieht mit — der Importer am Zielort macht exakt dort weiter |
 | Ein Posten erneut geholt | Upsert bzw. append-only, keine Dubletten |
+| Ein Tag war beim Abruf noch leer | der tägliche Lauf holt ihn im Nachlauffenster erneut, siehe unten |
+
+## Die letzten Tage sind noch nicht da
+
+**LINAs Konzernberichte füllen sich über rund fünf bis sechs Tage.** Am 26.07.2026 gemessen: der 22. bis 25.07. lieferten für alle 141 Betriebe glatt null, der 21.07. für 21 Betriebe, ab dem 17.07. stabil für 56. Zahlen, keine Vermutung — die Messreihe steht in `importer.md`.
+
+Für den Backfill ist das harmlos, er läuft ohnehin rückwärts in die fertige Vergangenheit. Für den täglichen Lauf war es ein stiller Datenverlust: „gestern" holen heißt Nullen holen, und der Posten gilt danach als erledigt. Deshalb reiht `--taeglich` seit dem 26.07.2026 die letzten `NACHZUEGLER_TAGE` (Voreinstellung 10) Tage ein statt nur einen.
+
+**Praktische Folge für den Umzug nach Hetzner:** die jüngsten Tage vor dem `pg_dump` können auf null stehen. Sie korrigieren sich von selbst, sobald der tägliche Lauf am Zielort ein paar Mal gelaufen ist — nichts zu tun, aber gut zu wissen, bevor man sich über eine Delle in der Umsatzkurve wundert.
 
 **Damit ist der geplante Ablauf gedeckt:** lokal das laufende Jahr holen, Dump nach Hetzner, dort `--historie --von 2018-01-01` — es werden nur die noch fehlenden Zeiträume eingereiht.
 

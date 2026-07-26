@@ -21,6 +21,30 @@ Aktuelle Daten können damit nie hinter dem Backfill verhungern, und es gibt nur
 
 Die Reihenfolge steht in `einreihPrioritaet()` in `src/lina/endpunkte.ts` und wird dort getestet. Zusätzlich schreibt der Lader es als `error` mit Handlungsanweisung, wenn keine einzige BWA-Zeile zugeordnet werden konnte — die Reihenfolge soll stimmen, aber ihr Bruch darf nicht mehr leise sein.
 
+## Der tägliche Lauf holt ein Fenster, nicht einen Tag
+
+**LINAs Konzernberichte füllen sich über mehrere Tage.** Am 26.07.2026 gegen die echte Instanz gemessen:
+
+| Geschäftstag | Betriebe mit Umsatz | Netto |
+|---|---|---|
+| 25.07. | 0 | 0 € |
+| 24.07. | 0 | 0 € |
+| 23.07. | 0 | 0 € |
+| 22.07. | 0 | 0 € |
+| 21.07. | 21 | 13.268 € |
+| 20.07. | 51 | 236.999 € |
+| 19.07. | 55 | 351.168 € |
+| 18.07. | 56 | 557.031 € |
+| 17.07. | 56 | 399.054 € |
+
+Ab dem 17.07. steht die Zahl der Betriebe stabil bei 56 — davor läuft sie hoch. Die Anlaufzeit beträgt also rund fünf bis sechs Tage.
+
+„Gestern" zu holen liefert damit verlässlich Nullen. Und weil der Posten danach als erledigt gilt und `historie_einreihen()` bewusst nichts Erledigtes noch einmal einreiht, bliebe dieser Tag **für immer** auf null. Zahlen dieser Sorte sind schlimmer als fehlende: eine Lücke sieht man, eine Null nicht.
+
+Deshalb reiht `--taeglich` die letzten `NACHZUEGLER_TAGE` (Voreinstellung 10) Geschäftstage ein. Die Zieltabellen sind Upserts, ein zweiter Abruf korrigiert den ersten also einfach. Kosten: 8 Endpunkte × 10 Tage = 80 Aufrufe am Tag, bei einem Tagesbudget von 3.000.
+
+**`ON CONFLICT DO NOTHING` ist hier genau richtig — und zwar aus demselben Grund, aus dem es in `historie_einreihen()` genau falsch war.** Der Eindeutigkeitsindex ist partiell (`WHERE erledigt_am IS NULL`) und blockiert nur noch *offene* Posten. Für den Backfill hieß das: alles Erledigte wird erneut geholt, ein teurer Fehler. Für das Nachlauffenster heißt dasselbe: derselbe Tag wird nicht doppelt eingereiht, solange er noch aussteht, aber sehr wohl erneut, wenn er fertig ist. Genau das soll er.
+
 ## Was ein laufender Import von sich zeigt
 
 Erfolge gingen früher nach `debug`. Zwischen zwei Posten liegen 20 bis 40 Sekunden, ein Backfill war auf `info` also stundenlang vollkommen still und von einem Hänger nicht zu unterscheiden — am 26.07.2026 wurde deshalb ein intakter Lauf für tot gehalten und abgebrochen.

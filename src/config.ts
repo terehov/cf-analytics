@@ -108,6 +108,33 @@ const Schema = z.object({
   /** Obergrenze je Lauf. 0 = unbegrenzt, dann läuft der Worker bis zum Fensterende. */
   MAX_POSTEN_PRO_LAUF: z.coerce.number().int().min(0).default(0),
 
+  /**
+   * Wie viele Tage rückwärts der tägliche Lauf nachholt.
+   *
+   * LINAs Konzernberichte füllen sich über mehrere Tage. Am 26.07.2026 gegen
+   * die echte Instanz gemessen:
+   *
+   *     25.07.   0 von 141 Betrieben mit Umsatz          0 €
+   *     24.07.   0                                       0 €
+   *     23.07.   0                                       0 €
+   *     22.07.   0                                       0 €
+   *     21.07.  21                                  13.268 €
+   *     20.07.  51                                 236.999 €
+   *     19.07.  55                                 351.168 €
+   *
+   * „Gestern" zu holen liefert also verlässlich Nullen — und weil der Posten
+   * danach als erledigt gilt und `historie_einreihen()` bewusst nichts
+   * Erledigtes noch einmal einreiht, bliebe dieser Tag für immer auf null.
+   * Eine Lücke, die wie ein Umsatz von null aussieht.
+   *
+   * Deshalb holt der tägliche Lauf ein gleitendes Fenster. Die Zieltabellen
+   * sind Upserts, ein zweiter Abruf korrigiert den ersten also einfach. Zehn
+   * Tage sind reichlich über der beobachteten Anlaufzeit und kosten 8
+   * Endpunkte × 10 Tage = 80 Aufrufe am Tag — bei einem Tagesbudget von 3.000
+   * fällt das nicht ins Gewicht.
+   */
+  NACHZUEGLER_TAGE: z.coerce.number().int().min(1).default(10),
+
   PORT: z.coerce.number().int().default(3000),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 
