@@ -109,6 +109,13 @@ Ein Pflichtparameter ohne Vorgabe lässt jede Karte beim ersten Öffnen scheiter
 
 **Die Bedingung ist der wichtigere Teil.** Beim Bauen der Sperrbehandlung kam heraus, dass der Importer auf eine Sperre bisher mit dem Gegenteil des Richtigen reagierte: Posten als `aufgegeben` abschreiben, zehnmal nachfassen, stündlich wiederholen — und im schlimmsten Fall zehn Anmeldeversuche in Folge gegen ein sperrbares Konto, also genau das, was harte Regel 6 verbietet. Jetzt ist eine Sperre eine eigene Ergebnisart, der Lauf endet sofort, der Posten bleibt unangetastet, und die Pause steht in `sync.zugangssperre` — in der Datenbank, weil sie sonst den stündlichen Neustart nicht überlebt.
 
+### Eine Sperre wartet nicht auf einen Menschen — aber sie meldet sich
+*Eugene:* „Falls es in die Sperre kommt, soll es nicht auf eine Freigabe warten, sondern einfach im Zeitintervall von einem Tag neu versuchen oder vielleicht zwei Tagen. Und dann wär's doch sinnvoll, wenn es zu wiederholten Problemen beim Import führt, dass wir benachrichtigt werden über ein Health Endpoint."
+
+**Beides richtig, und zusammen ergibt es erst Sinn.** Die Sperre lief technisch schon immer ab; sechs Stunden Grundpause waren aber eher Wiedervorlage als Ruhepause, und die Verdopplung bis zum Sechzehnfachen hätte daraus über vier Tage gemacht, ohne dass man das der Zahl ansieht. Jetzt ein Tag, höchstens vier. Das Aufheben von Hand bleibt als **Abkürzung**, nicht als Bedingung.
+
+Damit verschiebt sich aber die Frage: wenn niemand mehr eingreifen *muss*, merkt auch niemand mehr, dass etwas ist. Deshalb `/status` — bewusst **getrennt** von `/health`. `/health` ist der Container-Health-Check und darf nur rot werden, wenn ein Neustart hilft; bei einer Zugangssperre hilft er nicht, sondern dreht den Container im Kreis, während LINA gerade nichts von uns hören will. `/status` gibt 503, wenn ein Mensch hinsehen sollte, und niemand startet daraufhin etwas neu. Warnungen bleiben bei 200: Dinge, die man wissen sollte, wecken niemanden nachts.
+
 ### Befunde gehören in `docs/`, nicht in die Commit-Nachricht
 *Eugene:* „Ich möchte sichergehen, dass alle Explorationen, alle Erkenntnisse, alle Entscheidungen, alle Probleme innerhalb des docs-Ordners stehen und aus `AGENTS.md` verlinkt sind." — Auslöser war der Befund, dass **kein einziger** der gefundenen Fehler in `docs/` stand: das Wissen lag ausschließlich in Commit-Nachrichten und Code-Kommentaren, für den nächsten Agenten praktisch unauffindbar. Daraus `fehlerkatalog.md` und `datenherkunft.md` sowie die Dokumentationspflicht als harte Regel in `AGENTS.md`.
 

@@ -72,23 +72,41 @@ const Schema = z.object({
   /**
    * Wie lange der Importer nach einer erkannten Sperre ruht (Stunden).
    *
+   * **Die Sperre läuft von selbst ab.** Danach versucht es der Importer ohne
+   * Zutun erneut — niemand muss etwas freigeben. Ein Tag ist lang genug, dass
+   * eine Tagesbegrenzung bei LINA sicher zurückgesetzt ist, und kurz genug,
+   * dass der Rückstand aufholbar bleibt.
+   *
    * Die Dauer verdoppelt sich je weiterer Sperre der letzten 24 Stunden,
-   * gedeckelt beim Sechzehnfachen — aus 6 werden 12, 24, 48, 96. Wer zweimal
-   * am Tag gesperrt wird, hat ein anderes Problem als wer einmal gesperrt
-   * wird, und irgendwann soll ein Mensch hinsehen. Schickt LINA einen
-   * `Retry-After`-Header, gilt der als Untergrenze.
+   * höchstens zweimal: 24 → 48 → 96 Stunden. Wer dreimal am Tag gesperrt
+   * wird, hat ein anderes Problem als wer einmal gesperrt wird; dann soll ein
+   * Mensch hinsehen, und dafür gibt es `/status`.
+   *
+   * Schickt LINA einen `Retry-After`-Header, gilt der als Untergrenze.
    */
-  SPERRE_PAUSE_STUNDEN: z.coerce.number().min(0.01).default(6),
+  SPERRE_PAUSE_STUNDEN: z.coerce.number().min(0.01).default(24),
 
   /**
    * Dasselbe, aber für den schwersten Fall: die Anmeldung selbst schlägt fehl.
    *
-   * Deutlich länger, weil das ein gesperrtes Konto bedeuten kann und es genau
-   * einen Zugang gibt. Hier hilft kein Abwarten, sondern nur ein Mensch, der
-   * sich im Browser anmeldet und nachsieht — die lange Pause ist dafür da,
-   * dass bis dahin nichts weiter passiert.
+   * Doppelt so lang, weil das ein gesperrtes Konto bedeuten kann und es genau
+   * einen Zugang gibt. Auch hier läuft die Sperre von selbst ab — sinnvoll ist
+   * trotzdem, dass sich vorher ein Mensch im Browser anmeldet und nachsieht.
+   * Die lange Pause ist dafür da, dass bis dahin nichts weiter passiert.
    */
-  SPERRE_ANMELDUNG_STUNDEN: z.coerce.number().min(0.01).default(24),
+  SPERRE_ANMELDUNG_STUNDEN: z.coerce.number().min(0.01).default(48),
+
+  /**
+   * Ab wann `/status` einen Stillstand meldet (Stunden ohne erledigten Posten,
+   * obwohl fällige Arbeit in der Schlange liegt).
+   *
+   * Der Zeitplan läuft stündlich, ein Lauf schafft also normalerweise etwas.
+   * Drei Stunden ohne jeden Fortschritt bei vorhandener Arbeit heißt: es
+   * klemmt. Ruht der Zugang gerade, zählt das NICHT als Stillstand — dafür
+   * gibt es eine eigene Meldung, und zwei Alarme für eine Ursache sind einer
+   * zu viel.
+   */
+  STATUS_STILLSTAND_STUNDEN: z.coerce.number().min(0.1).default(3),
   /**
    * Zweite Bremse: harte Obergrenze pro Kalendertag (UTC).
    *

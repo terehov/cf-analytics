@@ -62,7 +62,9 @@ Vier Signale gelten als Sperre:
 | HTML-Abwehrseite statt JSON (`captcha`, `cloudflare`, `access denied`, …) | `challenge` | 6 |
 | die **Anmeldung** selbst schlägt fehl | `anmeldung` | `SPERRE_ANMELDUNG_STUNDEN` (24) |
 
-Ein `Retry-After`-Header gilt als **Untergrenze**. Die Pause verdoppelt sich je weiterer Sperre der letzten 24 Stunden, gedeckelt beim Sechzehnfachen: aus 6 werden 12, 24, 48, 96 — irgendwann soll ein Mensch hinsehen, das ist der Zweck.
+**Die Sperre läuft von selbst ab.** Niemand muss etwas freigeben — nach einem Tag versucht es der Importer erneut. Ein Tag ist lang genug, dass eine Tagesbegrenzung bei LINA sicher zurückgesetzt ist, und kurz genug, dass der Rückstand aufholbar bleibt.
+
+Ein `Retry-After`-Header gilt als **Untergrenze**. Die Pause verdoppelt sich je weiterer Sperre der letzten 24 Stunden, höchstens zweimal: 24 → 48 → 96 Stunden. Wer dreimal am Tag gesperrt wird, hat ein anderes Problem als wer einmal gesperrt wird — dann soll ein Mensch hinsehen, und dafür gibt es `/status`.
 
 Was dann passiert:
 
@@ -73,14 +75,45 @@ Was dann passiert:
 
 **Beim Anmeldefehler wird in diesem Prozess kein zweites Mal angemeldet.** Bis zum 26.07.2026 tat der Code genau das — zehnmal in Folge, stündlich wiederholt, gegen ein sperrbares Konto. Siehe `fehlerkatalog.md`.
 
-Nachsehen und freigeben:
+Nachsehen und — wenn man nicht warten will — abkürzen:
 
 ```sql
 SELECT * FROM mart.zugangssperre;          -- Erwartung: leer
-SELECT sync.sperre_aufheben('eugene');     -- ERST nach Prüfung im Browser
+SELECT sync.sperre_aufheben('eugene');     -- Abkürzung, nicht Bedingung
 ```
 
-Blind aufzuheben schickt den Importer sofort zurück in dieselbe Sperre. Erst im Browser anmelden und nachsehen, ob der Zugang wirklich wieder geht.
+Das Aufheben ist **nicht nötig**. Wer es trotzdem tut, sollte sich vorher im Browser angemeldet und nachgesehen haben: blind aufzuheben schickt den Importer sofort zurück in dieselbe Sperre — und verlängert sie, weil die Verdopplung greift.
+
+## Wann jemand hinsehen muss: `/status`
+
+Der Container läuft über `health.ts` und beantwortet zwei **verschiedene** Fragen an zwei Endpunkten. Sie zu vermischen wäre gefährlich:
+
+| Endpunkt | Frage | Wer fragt | 503 wann |
+|---|---|---|---|
+| `/health` | Lebt der Container, ist die Datenbank da? | Docker/Dokploy-Health-Check | **nur** wenn die Datenbank weg ist |
+| `/status` | Läuft der Import, wie er soll? | Monitoring (Uptime Kuma, Better Stack, Dokploy-Benachrichtigung) | wenn ein Mensch hinsehen sollte |
+
+**`/health` darf nur rot werden, wenn ein Neustart hilft.** Bei einer Zugangssperre hilft er nicht — er macht es schlimmer: Dokploy drehte den Container im Kreis, während LINA ohnehin gerade nichts von uns hören will.
+
+`/status` prüft sechs Dinge und sagt zu jedem, was daraus folgt:
+
+| Prüfung | Stufe | wann |
+|---|---|---|
+| `zugang` | Warnung / **Störung** | Sperre aktiv. Störung nur beim Anmeldefall — der kann ein gesperrtes Konto bedeuten |
+| `fortschritt` | **Störung** | seit `STATUS_STILLSTAND_STUNDEN` (3) kein Posten erledigt, obwohl fällige Arbeit da ist |
+| `laeufe` | **Störung** | die letzten drei Läufe sind fehlgeschlagen |
+| `aufgegebene_posten` | Warnung | in 24 h wurde ein Zeitraum endgültig aufgegeben — der fehlt dauerhaft |
+| `schema` | Warnung | LINA liefert etwas anderes als erwartet |
+| `bwa_bruecke` | Warnung | aktive Betriebe ohne LINA-ID — sie tauchen in keiner BWA-Auswertung auf |
+
+`warnung` bleibt bei **HTTP 200**: Dinge, die man wissen sollte, wecken niemanden nachts. Nur `stoerung` gibt 503.
+
+Zwei Entwurfsentscheidungen, die den Alarm brauchbar halten:
+
+* **Ruht der Zugang, meldet `fortschritt` keinen Stillstand.** Zwei Alarme für dieselbe Ursache sind einer zu viel.
+* **Jede Prüfung liefert `naechster_schritt` mit.** Ein Alarm ohne Handlungsanweisung kostet nur Zeit — meist steht dort direkt das SQL, das man als Nächstes braucht.
+
+Einrichten: einen HTTP-Monitor auf `https://<host>/status` legen, Intervall 5–15 Minuten. Er schlägt bei 503 an. Der Rumpf ist JSON und lässt sich in die Benachrichtigung übernehmen.
 
 Alle vier Fälle sind im Ende-zu-Ende-Test nachgestellt — die Attrappe kann auf Kommando sperren (`sperreAb`, `sperreArt`, `retryAfter`). Geprüft wird nicht nur, dass der Lauf endet, sondern **wie oft danach noch angeklopft wird**. Die richtige Antwort ist: kein einziges Mal.
 

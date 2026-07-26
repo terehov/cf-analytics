@@ -142,7 +142,8 @@ lina/mock.ts           LINA-Attrappe für die Tests — bildet auch den
 sync/worker.ts         die Schleife
 sync/laden.ts          raw → core
 transform/index.ts     reine Transformationsfunktionen
-health.ts              Health-Endpunkt, hält den Container oben
+health.ts              /health und /status, hält den Container oben
+status.ts              Statusbericht fürs Monitoring — sechs Prüfungen
 sync.ts / einreihen.ts Einstiegspunkte
 ```
 
@@ -158,6 +159,8 @@ bun run einreihen --taeglich                 # gestrigen Geschäftstag einreihen
 bun run einreihen --historie --von 2018-01-01 --bis 2026-07-24
 bun run sync                                 # einen Lauf abarbeiten
 bun run health                               # Health-Endpunkt (Container-CMD)
+curl localhost:3000/health                     # lebt der Container?
+curl localhost:3000/status                     # muss jemand hinsehen? (503 = ja)
 bun run typecheck
 ```
 

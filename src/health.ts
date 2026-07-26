@@ -14,6 +14,7 @@
  */
 import { config } from './config'
 import { eine } from './db/pool'
+import { statusErheben } from './status'
 
 type Zustand = {
   status: 'ok' | 'veraltet' | 'unbekannt' | 'db_nicht_erreichbar'
@@ -52,7 +53,9 @@ async function erheben(): Promise<Zustand> {
 Bun.serve({
   port: config.PORT,
   async fetch(req) {
-    if (new URL(req.url).pathname === '/health') {
+    const pfad = new URL(req.url).pathname
+
+    if (pfad === '/health') {
       try {
         // 200 auch bei "veraltet": ein verpasster Sync ist kein Grund, den
         // Container neu zu starten — das würde das Problem nicht lösen.
@@ -61,6 +64,31 @@ Bun.serve({
         return Response.json({ status: 'db_nicht_erreichbar', fehler: String(e) }, { status: 503 })
       }
     }
+
+    /**
+     * Der Endpunkt fürs Monitoring — die Frage „muss jemand hinsehen?".
+     *
+     * Bewusst NICHT `/health`. Der ist der Container-Health-Check und darf nur
+     * rot werden, wenn ein Neustart hilft. Bei einer Zugangssperre hilft er
+     * nicht, er macht es schlimmer: Dokploy drehte den Container im Kreis,
+     * während LINA ohnehin gerade nichts von uns hören will.
+     *
+     * Hier dagegen ist 503 richtig — ein Uptime-Monitor schlägt an, ein Mensch
+     * sieht nach, und niemand startet etwas neu. `warnung` bleibt bei 200:
+     * Dinge, die man wissen sollte, wecken niemanden nachts.
+     */
+    if (pfad === '/status') {
+      try {
+        const bericht = await statusErheben()
+        return Response.json(bericht, { status: bericht.status === 'stoerung' ? 503 : 200 })
+      } catch (e) {
+        return Response.json(
+          { status: 'stoerung', pruefungen: [{ name: 'datenbank', stufe: 'stoerung',
+            meldung: 'Datenbank nicht erreichbar', werte: { fehler: String(e).slice(0, 300) } }] },
+          { status: 503 })
+      }
+    }
+
     return new Response('cf-analytics importer', { status: 200 })
   },
 })

@@ -668,15 +668,73 @@ lauf('Zugangssperre', () => {
     } finally { mock.stop() }
   }, 30_000)
 
-  test('nach dem Aufheben läuft es wieder', async () => {
-    await db.query(`SELECT sync.sperre_aufheben('test')`)
+  /**
+   * Die Sperre ist kein Endzustand, auf den jemand reagieren MUSS.
+   *
+   * Eugene: „soll es nicht auf eine Freigabe warten, sondern einfach im
+   * Zeitintervall von einem Tag neu versuchen". Genau das wird hier geprüft:
+   * eine abgelaufene Sperre lässt den Importer von selbst weiterarbeiten,
+   * ohne dass jemand etwas aufhebt.
+   */
+  test('eine abgelaufene Sperre gibt den Weg von selbst frei', async () => {
+    await db.query(`UPDATE sync.zugangssperre SET pausiert_bis = now() - interval '1 minute'
+                     WHERE aufgehoben_am IS NULL`)
     const mock = mockStarten({ port })
+    try {
+      const { workerLauf } = await import('./worker')
+      const r = await workerLauf('zeitplan')
+      expect(r.status).not.toBe('gesperrt')
+      expect(mock.anmeldungen).toBe(1)
+    } finally { mock.stop() }
+  }, 60_000)
+
+  test('der Statusbericht meldet die Sperre, solange sie läuft', async () => {
+    await db.query(`DELETE FROM sync.zugangssperre`)
+    const { statusErheben } = await import('../status')
+
+    const vorher = await statusErheben()
+    expect(vorher.pruefungen.find(x => x.name === 'zugang')!.stufe).toBe('ok')
+
+    // Eine gewöhnliche Sperre: wissenswert, aber niemand muss nachts raus.
+    await db.query(`SELECT sync.sperre_setzen('http_429', 24, 429, 'probe', 'Test')`)
+    const gesperrt = await statusErheben()
+    const z = gesperrt.pruefungen.find(x => x.name === 'zugang')!
+    expect(z.stufe).toBe('warnung')
+    expect(z.meldung).toContain('ruht')
+    expect(z.naechster_schritt).toContain('läuft von selbst ab')
+    // Kein zweiter Alarm für dieselbe Ursache: der Stillstand ist erklärt.
+    expect(gesperrt.pruefungen.find(x => x.name === 'fortschritt')!.stufe).toBe('ok')
+
+    // Der Anmeldefall wiegt schwerer — es gibt genau einen Zugang.
+    await db.query(`DELETE FROM sync.zugangssperre`)
+    await db.query(`SELECT sync.sperre_setzen('anmeldung', 48, NULL, 'probe', 'Test')`)
+    const schwer = await statusErheben()
+    expect(schwer.pruefungen.find(x => x.name === 'zugang')!.stufe).toBe('stoerung')
+    expect(schwer.status).toBe('stoerung')
+
+    await db.query(`DELETE FROM sync.zugangssperre`)
+  })
+
+  /** Das Aufheben von Hand bleibt — als Abkürzung, nicht als Bedingung. */
+  test('von Hand aufheben kürzt die Wartezeit ab', async () => {
+    await frisch()
+    await db.query(`SELECT sync.sperre_setzen('http_403', 24, 403, 'probe', 'Test')`)
+
+    const gesperrt = mockStarten({ port })
+    try {
+      const { workerLauf } = await import('./worker')
+      expect((await workerLauf('zeitplan')).status).toBe('gesperrt')
+    } finally { gesperrt.stop() }
+
+    await db.query(`SELECT sync.sperre_aufheben('test')`)
+
+    const frei = mockStarten({ port })
     try {
       const { workerLauf } = await import('./worker')
       const r = await workerLauf('manuell')
       expect(r.status).not.toBe('gesperrt')
       expect(r.ok).toBe(5)
-    } finally { mock.stop() }
+    } finally { frei.stop() }
   }, 60_000)
 
   /**
