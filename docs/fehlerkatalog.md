@@ -228,8 +228,16 @@ abschießt (`pg_terminate_backend`).
 **Ursache.** Die Quotenspalten standen auf `numeric(6,2)`, fassen also höchstens 9.999,99. Das ist
 keine Reserve, sondern eine falsche Annahme über die Kennzahl: eine Quote ist Kosten durch Umsatz,
 und der Umsatz geht bei den Karteileichen im Bestand gegen null — **79 der 141 geführten Betriebe
-machen überhaupt keinen Umsatz** (`befunde-datenlage.md`). Der höchste erfolgreich gespeicherte
-Wert lag bereits bei **9.079,37**.
+machen überhaupt keinen Umsatz** (`befunde-datenlage.md`).
+
+**Und beinahe wäre die Begründung selbst ein Zirkelschluss geworden.** Als Beleg stand zuerst
+„höchster Wert 9.079,37" in der Migration — das war aber der höchste Wert der *überlebenden*
+Zeilen, also genau der Auswahl, die nicht am Überlauf gescheitert war. Nachdem die reparierten
+Posten durchgelaufen waren, lag der tatsächliche Höchstwert bei **316.576,50 %**: Enchilada
+Würzburg am 15.06.2026 bei **6,05 € Umsatz**. Das 35-Fache der alten Spaltengrenze.
+
+> Wer aus den Daten argumentiert, die den Fehler überlebt haben, misst den Fehler nicht — er
+> misst seinen Filter.
 
 **Warum das schlimmer ist, als es aussieht.** `laden()` schreibt Rohantwort und `core` in *einer*
 Transaktion. Scheitert die Transformation, rollt der Raw-Layer mit zurück — die Versicherung greift
