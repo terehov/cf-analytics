@@ -232,13 +232,46 @@ async function workerLaufIntern(
    * Takt — sonst zeigt sie eine Zahl an, die mit der Wirklichkeit nichts zu
    * tun hat, sobald LINA langsamer antwortet.
    */
-  const laufBeginn = Date.now()
   const dauerLesbar = (ms: number) => {
     const min = Math.round(ms / 60_000)
-    return min < 60 ? `${min} min` : `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')} min`
+    if (min < 60) return `${min} min`
+    const h = Math.floor(min / 60)
+    if (h < 48) return `${h} h ${String(min % 60).padStart(2, '0')} min`
+    return `${Math.floor(h / 24)} d ${String(h % 24).padStart(2, '0')} h`
   }
+
+  /**
+   * Ab wann die Restdauer ueberhaupt etwas aussagt — und wovon sie begrenzt ist.
+   *
+   * ZWEI FEHLER STECKTEN IN DER ERSTEN FASSUNG, beide am 26.07.2026 im echten
+   * Lauf aufgefallen, weil die Anzeige von 14 h auf 104 h kletterte:
+   *
+   * 1. Sie mass ab Laufbeginn geteilt durch die Zahl der Posten. Beim ERSTEN
+   *    Posten sind das Anmeldung plus ein Abruf und KEINE EINZIGE Taktpause —
+   *    die liegt zwischen den Posten. 2,3 s statt 16 s je Posten, also eine um
+   *    das Siebenfache zu optimistische Zahl, die dann langsam auf die
+   *    Wahrheit zulief. Es sah aus, als wuerde die Arbeit mehr statt weniger.
+   *    Jetzt zaehlt die Zeit erst ab dem Ende des ersten Postens, und vorher
+   *    wird gar keine Schaetzung gezeigt.
+   *
+   * 2. Sie ignorierte das TAGESBUDGET. 23.500 Posten im gemessenen Takt sind
+   *    gut vier Tage Rechenzeit — aber bei 3.000 Aufrufen am Tag dauert es
+   *    knapp acht. Fuer einen Backfill ueber acht Jahre ist die Bremse der
+   *    bindende Faktor, nicht das Tempo. Es gilt also der GROESSERE der
+   *    beiden Werte.
+   */
+  let erstesEnde: number | null = null
+  const restschaetzung = (offen: number, n: number): string | null => {
+    if (erstesEnde === null || n < 2) return null
+    const jePosten = (Date.now() - erstesEnde) / (n - 1)
+    const nachTempo = offen * jePosten
+    const nachBudget = (offen / config.TAGESBUDGET) * 86_400_000
+    return dauerLesbar(Math.max(nachTempo, nachBudget))
+  }
+
   const fortschritt = async (endpunkt: string, von: string, zeilen: number | null, dauerMs?: number) => {
     const n = ok + keineDaten + fehler
+    if (erstesEnde === null) erstesEnde = Date.now()
     if (config.FORTSCHRITT_ALLE === 0 || n % config.FORTSCHRITT_ALLE !== 0) return
     const r = await eine<{ offen: number }>(
       `SELECT count(*)::int AS offen FROM sync.warteschlange WHERE erledigt_am IS NULL`)
@@ -247,7 +280,7 @@ async function workerLaufIntern(
     log.info('fortschritt', {
       endpunkt, von, zeilen, dauerMs,
       imLauf: n, offen,
-      rest: offen ? dauerLesbar(offen * ((Date.now() - laufBeginn) / n)) : null,
+      rest: offen ? restschaetzung(offen, n) : null,
     })
   }
 
