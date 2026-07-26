@@ -394,6 +394,25 @@ Zeit gearbeitet hatte, zeigte erst ein Neustart mit `LOG_LEVEL=debug`.
 
 > Ein Betriebszustand, den man nur durch Neustart feststellen kann, ist keiner.
 
+### Das Tagesbudget hat nie gebremst
+
+**Symptom.** Keins — und das ist der Punkt. `TAGESBUDGET` ist als Notfallnetz gedacht, für den
+Fall, dass ein Fehler das Tempo aushebelt. Es hat nie ausgelöst, weil es nie auslösen *konnte*.
+
+**Ursache.** Der Zähler `heuteVerbraucht` lag im Arbeitsspeicher des Prozesses. Jeder Lauf ist
+aber ein frisch startender Prozess (`docker exec … bun run sync`, stündlich per Zeitplan) — der
+Zähler begann also stündlich wieder bei null. Bei 20–40 s Takt fiel das nicht auf: der Takt selbst
+hält bei rund 2.880 Aufrufen am Tag, die Grenze von 3.000 wurde ohnehin nie erreicht. Die Bremse
+war wirkungslos, solange sie nicht gebraucht wurde.
+
+**Aufgefallen** beim Senken des Takts auf 5–12 s für den Backfill. Genau dann ist das Budget die
+einzige Grenze, die überhaupt noch bliebe — und genau dann hätte es versagt.
+
+**Heute.** `LinaClient.budgetLaden()` zählt beim Laufstart die heutigen Zeilen aus
+`sync.aufgabe`. Damit gilt das Budget laufübergreifend und übersteht einen Neustart.
+
+> Ein Sicherheitsnetz, das nie ausgelöst hat, ist nicht bewiesen — es ist ungeprüft.
+
 ### `core` war mit 84 Partitionen zugestellt
 
 **Symptom.** 110 Tabellen in `core`, davon 84 namens `artikelverkauf_tag_2023_07`. In Postico

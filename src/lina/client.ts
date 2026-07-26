@@ -14,6 +14,7 @@
 import { config } from '../config'
 import { stundeInGeschaeftszeitzone } from '../lib/time'
 import { log } from '../lib/log'
+import { eine } from '../db/pool'
 import { LinaSession, sessionAbgelaufen, AnmeldungFehlgeschlagen } from './auth'
 import { schemaFuer } from './schemas'
 import type { Endpunkt } from './endpunkte'
@@ -54,6 +55,34 @@ export class LinaClient {
   private budgetTagWechseln() {
     const tag = new Date().toISOString().slice(0, 10)
     if (tag !== this.heute) { this.heute = tag; this.heuteVerbraucht = 0 }
+  }
+
+  /**
+   * Das Tagesbudget aus der Datenbank holen, statt bei null anzufangen.
+   *
+   * `heuteVerbraucht` lag nur im Arbeitsspeicher — und jeder Lauf ist ein
+   * frisch startender Prozess (`docker exec … bun run sync`, stündlich). Der
+   * Zähler begann also stündlich wieder bei null, und `TAGESBUDGET` hat in
+   * Produktion nie gegriffen. Ausgerechnet die Bremse, die als Notfallnetz
+   * gegen einen Fehler im Tempo gedacht war, war die einzige ohne Wirkung.
+   *
+   * Bei 20–40 s Takt fiel das nicht auf: der Takt selbst hielt bei rund 2.880
+   * Aufrufen am Tag, das Budget wurde nie erreicht. Sobald jemand den Takt
+   * senkt — und genau dafür ist er einstellbar — ist es die einzige Grenze,
+   * die noch bliebe.
+   *
+   * Gezählt wird über `sync.aufgabe`, weil dort jeder tatsächliche Aufruf
+   * steht, laufübergreifend und neustartfest. Bewusst großzügig gezählt:
+   * lieber einen übersprungenen Posten zu viel als einen Aufruf zu wenig.
+   */
+  async budgetLaden() {
+    this.budgetTagWechseln()
+    const r = await eine<{ n: number }>(
+      `SELECT count(*)::int AS n FROM sync.aufgabe WHERE beendet_am >= date_trunc('day', now())`)
+    this.heuteVerbraucht = Number(r?.n ?? 0)
+    log.info('tagesbudget', {
+      heuteVerbraucht: this.heuteVerbraucht, uebrig: this.budgetUebrig, grenze: config.TAGESBUDGET,
+    })
   }
 
   /** Zufällige Pause im konfigurierten Takt — kein fester Rhythmus. */

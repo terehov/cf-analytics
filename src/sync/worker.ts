@@ -135,6 +135,9 @@ async function workerLaufIntern(
   ausloeser: 'zeitplan' | 'manuell' | 'backfill',
 ): Promise<LaufErgebnis> {
   const client = new LinaClient()
+  // Das Tagesbudget gilt über Läufe hinweg, nicht je Prozess — sonst wäre es
+  // beim stündlichen Zeitplan wirkungslos. Begründung in client.ts.
+  await client.budgetLaden()
 
   const frei = await eine<{ n: number }>(`SELECT sync.haengende_posten_freigeben() AS n`)
   if (frei && Number(frei.n) > 0) log.warn('hängende Posten freigegeben', { anzahl: Number(frei.n) })

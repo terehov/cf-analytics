@@ -97,14 +97,19 @@ Die Drosselung ist keine Höflichkeit, sondern das, was die Integration am Leben
 | Variable | Vorgabe | Wirkung |
 |---|---|---|
 | `TAKT_MIN_MS` / `TAKT_MAX_MS` | 20.000 / 40.000 | zufällige Pause je Request, kein fester Rhythmus |
-| `TAGESBUDGET` | 2.000 | harte Obergrenze je Kalendertag |
-| `FENSTER_VON_STUNDE` / `_BIS_` | 7 / 23 | Arbeitsfenster in Berliner Zeit |
+| `TAGESBUDGET` | 3.000 | harte Obergrenze je Kalendertag (UTC), **laufübergreifend** |
+| `FENSTER_VON_STUNDE` / `_BIS_` | 0 / 24 | durchgehend — das Arbeitsfenster ist entfallen, siehe `entscheidungen.md` |
+| `ANFRAGE_TIMEOUT_MS` | 60.000 | Zeitlimit je Anfrage; ohne das hängt ein stummer Server den Worker auf |
 | `MAX_VERSUCHE` | 4 | danach wird ein Posten aufgegeben |
 | `ABBRUCH_NACH_FEHLERN` | 10 | Fehler in Folge → Lauf stoppt |
 
-**Tagsüber, nicht nachts.** Ein einzelner Client um drei Uhr früh ist im Log ein Ausreißer; dieselben Anfragen im Tagesverkehr von 141 Betrieben fallen nicht auf. Zusätzlich laufen LINAs eigene Importe (BWA vom Steuerberater) vermutlich nachts.
+**Nicht nachts abschalten.** Die frühere Begründung war, ein Client um drei Uhr früh sei im Log ein Ausreißer. Das stimmt — aber ein Gerät, das jeden Abend schlagartig verstummt und morgens wieder anspringt, ist eine deutlichere Kante als ein gleichmäßiges Rinnsal. Was das Tempo begrenzt, sind `TAKT_*` und `TAGESBUDGET`, nicht die Uhrzeit.
 
-Die tatsächlich gewartete Zeit steht je Aufruf in `sync.aufgabe.wartezeit_ms` — die Drosselung ist damit im Nachhinein prüfbar, nicht nur behauptet.
+**Das Budget zählt über Läufe hinweg.** `LinaClient.budgetLaden()` holt beim Laufstart die heutigen Zeilen aus `sync.aufgabe`. Bis zum 26.07.2026 lag der Zähler nur im Arbeitsspeicher — und weil jeder Lauf ein frisch startender Prozess ist, begann er stündlich wieder bei null. Die Bremse war wirkungslos, was nur deshalb nicht auffiel, weil der Takt sie ohnehin nie erreichen ließ.
+
+Die tatsächlich gewartete Zeit steht je Aufruf in `sync.aufgabe.wartezeit_ms` — die Drosselung ist damit im Nachhinein prüfbar, nicht nur behauptet. Nachgemessen am 26.07.2026 über 526 Aufrufe: **623 ms Antwortzeit gegen 30.228 ms Warten, also 98 % Leerlauf.** Der Engpass ist ausschließlich die selbst gesetzte Pause; an der Zahl der Anfragen lässt sich nichts sparen, weil eine Antwort bereits alle 141 Betriebe enthält.
+
+**Den Takt zu senken ist eine bewusste Entscheidung, keine Optimierung.** Es gibt genau einen Zugang, und eine Sperre wäre nicht rückgängig zu machen. Für einen beaufsichtigten Backfill ist ein schnellerer Takt vertretbar — dann aber über Umgebungsvariablen für diesen einen Lauf, nicht als neue Vorgabe in `src/config.ts`.
 
 Wiedervorlage nach Fehlern: exponentiell mit Jitter, gedeckelt bei sechs Stunden. Nie im festen Takt nachfassen.
 
