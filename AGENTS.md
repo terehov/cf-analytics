@@ -48,7 +48,7 @@ Kommentare sind deutsch, damit sie in Postico lesbar sind.
 | **`kennzahlen-mapping.md`** / `.csv` | Excel-Kennzahl → LINA-Endpunkt/Feld → offene Fragen. Die eigentliche Zieldefinition. | Wenn du eine Kennzahl baust oder prüfst |
 | **`architektur.md`** | Warum Hetzner + Dokploy + vanilla Postgres. Verworfene Alternativen mit Begründung. | Vor Infrastrukturänderungen |
 | **`datenmodell.md`** | Schema-Entscheidungen und ihre Begründung | Vor Schemaänderungen |
-| **`befunde-datenlage.md`** | Was in den **echten** Daten steckt und jede Zahl anders lesbar macht: nur 62 der 141 Betriebe machen Umsatz, 70 % kommen aus dem stärksten Fünftel, Personalquoten bis 1132 %. | Bevor du einen Mittelwert bildest oder eine Zahl weitergibst |
+| **`befunde-datenlage.md`** | Was in den **echten** Daten steckt und jede Zahl anders lesbar macht: nur 62 der 141 Betriebe machen Umsatz, die zehn stärksten tragen über ein Drittel, Personalquoten bis 1132 %. Dazu: LINA liefert in den geholten Endpunkten keine Betriebsadressen. | Bevor du einen Mittelwert bildest oder eine Zahl weitergibst |
 | **`metabase.md`** | Welche Schemata Metabase sehen soll, wo man anfängt, welche Fallen `mart` ausräumt, und die Regeln für neue `mart`-Sichten | Bevor du eine Auswertung baust oder eine `mart`-Sicht änderst |
 | **`dashboards.md`** | Was in Metabase steht, warum es so aussieht, und warum Dashboards aus `metabase/` erzeugt und nicht in der Oberfläche gepflegt werden | Bevor du ein Dashboard oder eine Karte anfasst |
 | **`importer.md`** | Aufbau des Importers: Warteschlange, Drosselung, Session, Transformationen | Vor Arbeit an `src/` |
@@ -78,6 +78,8 @@ Commit.
 | am Schema gearbeitet | `datenmodell.md` |
 | am Importer gearbeitet | `importer.md` |
 | eine `mart`-Sicht gebaut oder geändert | `metabase.md` |
+| eine Dashboard-Karte gebaut oder eine Visualisierung gewählt | `dashboards.md` — und **warum diese Darstellung**, nicht nur welche |
+| in den echten Daten etwas gefunden, das andere Zahlen relativiert | `befunde-datenlage.md`, mit Datum und der Abfrage, mit der du es gemessen hast |
 | etwas gemessen, das andere Zahlen einordnet | dorthin, wo die Zahl gelesen wird — meist `metabase.md` oder `datenherkunft.md` |
 | etwas gefunden, das jemand anderes klären muss | `offene-punkte.md` |
 

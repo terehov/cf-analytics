@@ -89,6 +89,20 @@ Margenbetrachtung, die sich nicht nachholen lässt.
 `manual.*` — Online-Bewertungen (YEXT, eigener Sync), OM-Einschätzung, Ursachen, Maßnahmen, und
 die Auflösung mehrdeutiger Markenzuordnungen.
 
+**Dazu Adressen und Koordinaten der Betriebe.** Am 26.07.2026 wurden alle 489 archivierten
+API-Antworten rekursiv nach Adress- und Geofeldern durchsucht — kein einziger Treffer für
+Betriebe. `analyticsFilterOptions` liefert `{id, name}`, die Berichtsendpunkte
+`{name, encId}` plus Kennzahlen. `core.betrieb.stadt` existiert im Schema und bleibt bei
+allen 141 Betrieben `NULL`.
+
+Bemerkenswert: **für Lieferanten liefert LINA sehr wohl Adressen** (`wawi:suppliers` mit
+`strasse`, `plz`, `ort`). Das Konzept ist also da, es wird für Betriebe nur nicht geführt.
+
+Deshalb `manual.betrieb_standort` (Migration `0008`) mit ausgewiesener `herkunft`. **Nicht
+aus dem Betriebsnamen ableiten** — „Aposto Aalen GmbH" trägt die Stadt, „Alter Kranen GmbH"
+nicht, und fünf Betriebe heißen nach derselben Stadt, ohne dieselbe zu sein. Ein Betrieb an
+der falschen Stelle auf einer Karte wird nicht hinterfragt, ein fehlender schon.
+
 ---
 
 ## Die Schlüssel

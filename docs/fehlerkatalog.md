@@ -129,6 +129,27 @@ zweite Abruf korrigiert den ersten. Messreihe und Rechnung: `importer.md`.
 
 ---
 
+### Ein Rückfallmonat für alle Karten zeigte leere EBIT-Zahlen
+
+**Symptom.** Die EBIT-Karte blieb leer, während die Karten daneben Zahlen zeigten. Kein
+Fehler, keine Meldung — nur „No results".
+
+**Ursache.** Alle Karten fielen ohne gesetzten Filter auf denselben Monat zurück: den
+jüngsten mit einem Round-Table-Urteil, also Juli. Der Round Table trägt aber den jüngsten
+*gebuchten* BWA-Monat in spätere Berichtsmonate nach (`bwa_monat`) und hat deshalb für Juli
+ein Urteil, obwohl der Steuerberater den Juli noch nicht gebucht hat. Eine EBIT-Karte kann
+das nicht — sie zeigt den Monat selbst, und der endet im Juni.
+
+**Warum das gefährlich ist.** Eine leere Karte neben gefüllten liest sich als **„kein
+EBIT"**, nicht als „noch nicht gebucht". Der Unterschied entscheidet, ob jemand beim
+Steuerberater nachfragt oder eine Zahl für bare Münze nimmt.
+
+**Heute.** Vier getrennte Rückfälle in `metabase/gemeinsam.ts`, je nach Datenreihe:
+`MONAT_CTE` (Round Table), `MONAT_CTE_UMSATZ`, `MONAT_CTE_BWA` (nur gebuchte Monate),
+`MONAT_CTE_WECHSEL`. Jede Karte nimmt den, der zu ihrer Quelle passt.
+
+---
+
 ## 2. Der partielle Eindeutigkeitsindex — drei Fehler, eine Wurzel
 
 ```sql
@@ -250,6 +271,51 @@ Empirisch für alle vier Schreibweisen gemessen:
 
 **Heute.** `konfigZumLoggen()` meldet die **Länge** des Passworts (nie den Wert). Eine Länge, die
 nicht zum tatsächlichen Passwort passt, zeigt das Problem sofort.
+
+### Komma-Join bindet schwächer als `LEFT JOIN`
+
+**Symptom.** `ERROR: invalid reference to FROM-clause entry for table "r"` in sechs
+Dashboard-Karten gleichzeitig, nachdem eine gemeinsame CTE ergänzt wurde.
+
+**Ursache.** Bei
+
+```sql
+FROM mart.round_table_monat r, gewaehlt g
+LEFT JOIN ampel.beschriftung a ON a.status = r.gesamt
+```
+
+gehört das `LEFT JOIN` zu `gewaehlt`, nicht zur ganzen Liste davor — `r` ist in der
+`ON`-Klausel unsichtbar. Der Komma-Join bindet schwächer als jeder explizite Join.
+
+**Heute.** Alle Karten benutzen `CROSS JOIN gewaehlt g`; das bindet gleich stark. Der Fehler
+ist laut, nicht still — er kostet trotzdem Zeit, weil die Meldung auf die falsche Stelle
+zeigt.
+
+### `percentile_cont` liefert `double precision`
+
+**Symptom.** `ERROR: function round(double precision, integer) does not exist`.
+
+**Ursache.** Postgres kennt `round(numeric, int)`, aber nicht `round(double, int)`.
+`percentile_cont` gibt `double precision` zurück — anders als `avg` über `numeric`.
+
+**Heute.** Vor jedem `round()` ein `::numeric`. Betrifft jeden Median in `mart`.
+
+### Metabase nimmt überlappende Kacheln klaglos an
+
+**Symptom.** Im Browser überlagerten sich Dashboard-Kacheln, Texte waren abgeschnitten. Die
+API hatte jede einzelne Anfrage mit `200` quittiert.
+
+**Ursache.** Von Hand gepflegte `y`-Koordinaten. Sie halten genau bis zur ersten
+Höhenänderung weiter oben; danach schiebt sich alles darunter ineinander. Metabase prüft das
+nicht.
+
+**Warum das schlimmer ist als es aussieht.** Der Fehler erscheint als Darstellungsproblem,
+nicht als falsche Definition — man sucht ihn im CSS statt in den Zahlen.
+
+**Heute.** `metabase/layout.ts` rechnet die Positionen aus Reihen; `dashboards.ts` enthält
+keine Koordinaten mehr. `uebernehmen.ts` bricht ab, wenn zwei Kacheln überlappen, eine über
+das Raster hinausragt oder unter ihr Mindestmaß fällt. Die Prüfung fand beim ersten Lauf
+sofort eine echte Überlappung.
 
 ### `Number(null)` ist `0` und damit endlich
 

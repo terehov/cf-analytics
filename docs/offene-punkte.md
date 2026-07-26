@@ -47,6 +47,37 @@ Sieben Endpunkte laufen jetzt monatlich als Momentaufnahme (`schrittweite: 'mome
 
 **Fehler im bestehenden Excel.** `Eingabe!K6` referenziert `J7` statt `J6` — die Personal-Ampel ist im JULI-Report um eine Zeile verschoben. Dazu mehrere `#REF!` und `#NAME?` (`_xludf.TEXTJOIN`, LibreOffice-Inkompatibilität). Falls der Juli-Report so kommuniziert wurde, lohnt ein Blick.
 
+**Standorte für die Karte — der Weg ist offen.** Gewünscht ist eine Deutschlandkarte mit
+allen Betrieben, eingefärbt nach der Gesamtampel, anklickbar bis ins Betriebsblatt. Die
+Struktur steht (`manual.betrieb_standort`, `mart.standort`, Migration `0008`), die
+Koordinaten fehlen.
+
+Am 26.07.2026 gemessen: `getStoreData` **hat** Adresse und Geokoordinaten — aber nur für den
+Betrieb, in dem die Session steht (die Konzernzentrale). Neun Parametervarianten wirken
+nicht, `storeList` kennt zwei Betriebe und keine Geofelder. Details in
+`befunde-datenlage.md`, Befund 8.
+→ **Drei mögliche Wege, in dieser Reihenfolge:**
+1. **Standortliste bei Concept Family anfragen.** Der einzige Weg ohne LINA-Zustandsänderung.
+   Sie führen sie mit Sicherheit — Franchiseverträge, Website, Google Business.
+2. **Klären, ob sich der aktive Betrieb lesend umschalten lässt.** Dann liefert
+   `getStoreData` je Betrieb Adresse, Koordinaten, Sitzplätze und Fläche — Letzteres wäre
+   zugleich die Bezugsgröße für „Umsatz je Sitzplatz". Ein Session-Wechsel verändert
+   LINA-Zustand und ist durch Regel 1 in `AGENTS.md` **nicht ohne Freigabe erlaubt.**
+3. **Geokodieren**, sobald Adressen aus 1 oder 2 vorliegen.
+
+Ausdrücklich **nicht** aus dem Betriebsnamen ableiten — „Alter Kranen GmbH" trägt keine
+Stadt, und fünf Betriebe heißen nach derselben Stadt, ohne dieselbe zu sein. Wie viele
+fehlen, sagt `mart.standort_fehlend`.
+
+**79 von 141 Betrieben melden dauerhaft 0 € Umsatz.** Sie liefern über 200 Tage lang
+Umsatzberichte, alle leer — Beteiligungsgesellschaften, geschlossene Häuser, Testeinträge.
+`core.betrieb.aktiv` steht bei allen 141 auf `true` und trägt die Unterscheidung nicht.
+Folge: jeder Mittelwert über „alle Betriebe" ist um mehr als die Hälfte verdünnt, und
+`Enchilada Bremen` steht mit 1109 % Personalquote bei 0 € Umsatz als rote Ampel im Round
+Table. → **Frage an Concept Family:** Welche dieser Betriebe sind dauerhaft stillzulegen?
+Arbeitsliste: Karte *Betriebe ohne laufendes Geschäft* auf Dashboard ⑥, bzw.
+`mart.standort_fehlend` und `mart.datenstand`.
+
 **Backfill-Tiefe unbekannt.** Wie weit LINA zurückreicht, ist nicht gemessen. Ein paar lesende Aufrufe klären es.
 
 **`Stornotyp`-Ausprägungen** bleiben unverifiziert, weil kein Betrieb Stornodaten liefert. Struktur ist dokumentiert, Bericht deaktiviert.
@@ -59,6 +90,12 @@ Sieben Endpunkte laufen jetzt monatlich als Momentaufnahme (`schrittweite: 'mome
 ## Sicherheitsbefund (an Concept Family melden)
 
 `GET /einstellungen/api/getStoreData` liefert die Stammdaten des aktiven Betriebs — darunter **`db_name`, `db_user`, `db_pass` im Klartext**, dazu IBAN, BIC und Steuernummer. Die Werte wurden bewusst nicht ausgelesen oder gespeichert. Der Endpunkt ist trotzdem als Stammdatenquelle interessant (Adresse, Öffnungszeiten, Geokoordinaten) — dann aber mit strikter Feld-Whitelist.
+
+**Er ist inzwischen der kritische Pfad für die Standortkarte** (siehe „Fachlich"): ohne ihn
+gibt es keine belastbaren Koordinaten, und geraten wird ausdrücklich nicht. Die Meldung an
+Concept Family und die Erschließung gehören deshalb zusammen — wer den Befund meldet, kann
+im selben Zug fragen, ob ein bereinigter Endpunkt oder eine Standortliste bereitgestellt
+wird.
 
 ## Betrieb
 

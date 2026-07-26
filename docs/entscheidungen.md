@@ -79,6 +79,31 @@ Beide Momentaufnahmen laufen nur vorwärts. Ohne Rückgriff hätte die gesamte H
 ### Der tägliche Lauf holt ein Fenster, nicht einen Tag
 LINAs Konzernberichte füllen sich über fünf bis sechs Tage — nachgemessen, Reihe in `importer.md`. „Gestern" zu holen schrieb Nullen fest, und zwar dauerhaft, weil der Posten danach als erledigt gilt. Jetzt zehn Tage rückwärts. Die Zieltabellen sind Upserts; 80 zusätzliche Aufrufe am Tag gegen ein Budget von 3.000.
 
+### Dashboards werden aus dem Repository erzeugt, nicht in der Oberfläche geklickt
+Eine zusammengeklickte Auswertung hat keine Historie, keine Begründung und keinen zweiten Ort, an dem sie überlebt — dasselbe Argument wie beim Schema. Die Definitionen liegen in `metabase/`, `uebernehmen.ts` trägt sie ein. Wiedererkannt wird über `[key:...]` in der Beschreibung, nicht über den Namen: einen Namen darf jemand in der Oberfläche ändern, ohne dass eine Kopie entsteht.
+**Preis:** Wer eine Karte in Metabase *inhaltlich* ändert, verliert die Änderung beim nächsten Lauf. Das ist gewollt.
+
+### Der Übernehmer ist ein Proxy, kein API-Schlüssel
+Metabase schickt `connect-src 'self'`; seine eigene Seite darf die Kartendefinitionen nicht von außen holen. Statt einen API-Schlüssel anzulegen — ein zusätzliches Geheimnis, das jemand später wieder aufräumen müsste — liefert ein lokaler Server unter `:8899` die Seite *und* reicht `/api/*` weiter. Die Anmeldung kommt vom Browser selbst, weil **Cookies je Host und nicht je Port gelten**. Nichts wird gespeichert.
+
+### Das Kachel-Layout wird gerechnet, nicht gepflegt
+Auslöser waren überlagerte Kacheln und abgeschnittene Texte im Browser. Von Hand gepflegte `y`-Werte halten bis zur ersten Höhenänderung weiter oben; Metabase nimmt Überlappungen klaglos an, und der Fehler erscheint als Darstellungs-, nicht als Definitionsproblem. In `dashboards.ts` steht seither nur noch, **was nebeneinander gehört**; `layout.ts` rechnet Position und Größe, `uebernehmen.ts` bricht bei Überlappung ab.
+
+### Keine zwei Y-Achsen, gekappte Balken, Median statt Mittelwert
+Drei Darstellungsentscheidungen mit je einem konkreten Anlass. **Zwei Y-Achsen** (Euro links, Prozent rechts) lassen sich beliebig gegeneinander verschieben und erfinden eine Beziehung, die nicht in den Daten steht — aufgeteilt in zwei Karten. **69 Betriebe** auf einer Balkenachse ergeben übereinanderliegende Namen — gekappt auf Top 20, vollständige Reihe als Tabelle daneben, nicht statt ihrer. **Mittelwerte** verziehen sich an einem einzigen Ausreißer; bei einer Personalquote von 1132 % bei 0 € Umsatz ist das kein Randfall, sondern der Normalzustand dieser Daten.
+
+### Vier Rückfallmonate statt einem
+Ein Pflichtparameter ohne Vorgabe lässt jede Karte beim ersten Öffnen scheitern, ein fester Vorgabemonat veraltet. Der Rückfall muss aber **je Datenreihe verschieden** sein: der Round Table hat für Juli ein Urteil (er trägt den letzten gebuchten BWA-Monat nach), EBIT endet im Juni. Ein gemeinsamer Rückfall erzeugte eine leere EBIT-Karte neben gefüllten — und die liest sich als „kein EBIT", nicht als „noch nicht gebucht".
+
+### Die Standortkarte wartet auf Koordinaten, statt sie zu erfinden
+*Eugene:* „Sollte es nicht möglich sein, Geodaten zu bekommen oder die Position eindeutig zu bestimmen, bitte nicht raten und nicht implementieren." — Danach, auf den Hinweis, `getStoreData` führe Geokoordinaten: „Dann lies sie dort aus und ignoriere die Datenbankzugangsdaten."
+**Gemessen am 26.07.2026:** Der Endpunkt führt sie tatsächlich (`geo_lat_ort`, `geo_long_ort`, dazu Straße, PLZ, Stadt, Fläche, Sitzplätze) — aber ausschließlich für den Betrieb, in dem die Session steht, und das ist die Konzernzentrale in Gräfelfing. Neun Parametervarianten (`storeId`, `store`, `id`, `encId`, `laden`, je mit `enc_id` und numerischer ID) liefern alle dieselbe Antwort. `storeList` in `/common/api/account` kennt zwei Betriebe und keine Geofelder.
+**Folge:** Die Struktur ist gebaut (`manual.betrieb_standort` mit ausgewiesener `herkunft`, `mart.standort`, `mart.standort_fehlend`), gefüllt wird sie erst, wenn Koordinaten aus einer belastbaren Quelle vorliegen. Der einzige verbliebene LINA-Weg wäre ein Wechsel des aktiven Betriebs — der verändert Zustand und ist durch Regel 1 ausgeschlossen. Begründung fürs Warten statt Raten: **ein Betrieb an der falschen Stelle auf einer Karte wird nicht hinterfragt, ein fehlender schon.**
+
+### Standorte werden nicht aus Betriebsnamen geraten
+*Eugene:* „Sollte es nicht möglich sein, Geodaten zu bekommen oder die Position eindeutig zu bestimmen, bitte nicht raten und nicht implementieren." — Die Suche über alle 489 archivierten API-Antworten ergab: LINA liefert für Betriebe keine Adresse, für **Lieferanten** dagegen schon. Die Ableitung aus dem Namen wäre teilweise möglich („Aposto Aalen"), aber nicht vollständig („Alter Kranen GmbH") und nicht eindeutig (fünf Betriebe heißen nach derselben Stadt).
+**Folge:** `manual.betrieb_standort` mit ausgewiesener `herkunft` und `genauigkeit`, gefüllt von Hand oder aus einer Liste von Concept Family. Die Karte zeigt genau die Betriebe, die darin stehen. Begründung: **ein Betrieb an der falschen Stelle wird nicht hinterfragt, ein fehlender schon.**
+
 ### Befunde gehören in `docs/`, nicht in die Commit-Nachricht
 *Eugene:* „Ich möchte sichergehen, dass alle Explorationen, alle Erkenntnisse, alle Entscheidungen, alle Probleme innerhalb des docs-Ordners stehen und aus `AGENTS.md` verlinkt sind." — Auslöser war der Befund, dass **kein einziger** der gefundenen Fehler in `docs/` stand: das Wissen lag ausschließlich in Commit-Nachrichten und Code-Kommentaren, für den nächsten Agenten praktisch unauffindbar. Daraus `fehlerkatalog.md` und `datenherkunft.md` sowie die Dokumentationspflicht als harte Regel in `AGENTS.md`.
 
