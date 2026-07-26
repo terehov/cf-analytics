@@ -8,11 +8,32 @@ Es gibt **keinen** getrennten Backfill- und Sync-Modus. Beides sind Einträge in
 
 | Priorität | Bedeutung |
 |---|---|
-| 10 | laufende Daten (gestern), täglich eingereiht |
+| 10 | Tagesberichte (gestern), täglich eingereiht — legen Betriebe und Artikel an |
+| 12 | `analyticsFilterOptions` — braucht die Betriebe, liefert deren LINA-ID |
+| 14 | `getKennzahlen` — braucht die LINA-ID |
+| 20 | übrige Momentaufnahmen — brauchen den Artikelkatalog |
 | 50 | Nacharbeit nach Fehlern |
 | 90 | Historie, rückwärts |
 
 Aktuelle Daten können damit nie hinter dem Backfill verhungern, und es gibt nur einen Codepfad statt zweier, die auseinanderlaufen.
+
+**12 und 14 sind keine Feinheit, sondern eine echte Kette.** Ein Tagesbericht legt die Betriebe an — ihr Schlüssel ist LINAs `encId`, und die kommt nur dort vor. `analyticsFilterOptions` heftet ihnen die *numerische* LINA-ID an, verbunden über den Namen, weil `encId` in dieser Antwort fehlt. Und `getKennzahlen` kennt Betriebe ausschließlich über diese Zahl. Reißt die Kette, meldet der Posten trotzdem `ok` und `core.kennzahlen_monat` bleibt leer — am 26.07.2026 sind so 7.860 BWA-Zeilen durchgefallen. Genauso still hängt `articleApi:franchise` am Artikelverkaufsbericht: es ordnet Warengruppen nur Artikeln zu, die `core.artikel` schon kennt.
+
+Die Reihenfolge steht in `einreihPrioritaet()` in `src/lina/endpunkte.ts` und wird dort getestet. Zusätzlich schreibt der Lader es als `error` mit Handlungsanweisung, wenn keine einzige BWA-Zeile zugeordnet werden konnte — die Reihenfolge soll stimmen, aber ihr Bruch darf nicht mehr leise sein.
+
+## Was ein laufender Import von sich zeigt
+
+Erfolge gingen früher nach `debug`. Zwischen zwei Posten liegen 20 bis 40 Sekunden, ein Backfill war auf `info` also stundenlang vollkommen still und von einem Hänger nicht zu unterscheiden — am 26.07.2026 wurde deshalb ein intakter Lauf für tot gehalten und abgebrochen.
+
+Es gibt jetzt eine Fortschrittszeile mit Endpunkt, Zeitraum, Zeilen, Position im Lauf, offener Schlange und geschätzter Restdauer. `FORTSCHRITT_ALLE` steuert die Häufigkeit; die Voreinstellung unterscheidet lokal von Produktion, ohne dass jemand etwas setzen muss:
+
+| Umgebung | Voreinstellung | Wirkung |
+|---|---|---|
+| Terminal (TTY) | 1 | jede Zeile — da will jemand zusehen |
+| Container | 50 | etwa alle 25 Minuten ein Lebenszeichen |
+| `FORTSCHRITT_ALLE=0` | — | aus |
+
+Die Restdauer kommt aus dem **tatsächlich gemessenen** Tempo dieses Laufs, nicht aus dem eingestellten Takt. Sie schwankt deshalb am Anfang und wird nach ein paar Dutzend Posten belastbar — dafür bleibt sie ehrlich, wenn LINA langsamer antwortet als gedacht.
 
 `sync.posten_holen()` reserviert mit `FOR UPDATE SKIP LOCKED` — aktuell läuft nur ein Worker, aber die Sperre kostet nichts und erspart einen späteren Umbau. `sync.haengende_posten_freigeben()` räumt Reservierungen auf, die ein Absturz hinterlassen hat.
 
