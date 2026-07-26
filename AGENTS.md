@@ -40,6 +40,7 @@ Kommentare sind deutsch, damit sie in Postico lesbar sind.
 |---|---|---|
 | **`lina-api-inventar.md`** | Alle LINA-Endpunkte: Parameter, Antwortstrukturen, Auth, Zeitverhalten. Ergebnis der Exploration. | Immer, wenn du einen Endpunkt anfasst |
 | **`lina-api-inventar-1b.md`** | Nachtrag: das **zweite** Report Center auf Betriebsebene (72 Berichte), WAWI, Dienstplan, Finance | Wenn du über die sieben Konzern-Berichte hinaus willst |
+| **`lina-api-inventar-1c.md`** | **Im Browser verifiziert (25.07.2026).** Konzeptzuordnung ist 1:n, Personalberichte sind gesperrt, WAWI ist JSON, Sortimentshierarchie gefunden. Überschreibt 1a und 1b, wo es abweicht. | Bevor du einen Endpunkt aktivierst |
 | **`lina-api-korrekturen.md`** | **Wichtig.** Drei widerlegte Annahmen und ein gelöster Blocker. Überschreibt die beiden Dateien darüber, wo es abweicht. | Vor jeder Arbeit an Kennzahlen oder Betriebs-Reports |
 | **`kennzahlen-mapping.md`** / `.csv` | Excel-Kennzahl → LINA-Endpunkt/Feld → offene Fragen. Die eigentliche Zieldefinition. | Wenn du eine Kennzahl baust oder prüfst |
 | **`architektur.md`** | Warum Hetzner + Dokploy + vanilla Postgres. Verworfene Alternativen mit Begründung. | Vor Infrastrukturänderungen |
@@ -70,6 +71,7 @@ Handgeschriebenes SQL, nummeriert, wird der Reihe nach angewendet. Bewusst handg
 | `0005_konzept_korrektur.sql` | Korrigiert die n:m-Aussage aus `0000` und hält den Prüfstand fest |
 | `0006_pruefung.sql` | Gegenrechnung: LINAs Aggregate gegen eigene Neuberechnung |
 | `0007_artikel_historie.sql` | `core.artikel_stand` — Artikelstand je Monat statt Momentaufnahme |
+| `0008_stammdaten.sql` | Stammdaten-Momentaufnahmen: Warengruppen, Feinsparten, Waren, **Einkaufspreise**, Lieferanten, Einheiten |
 | `pruefung.sql` | Verifikation gegen den Bayreuth-Fall aus dem Excel |
 
 Migration hinzufügen: neue Datei `NNNN_name.sql`, aufsteigend. **Bereits angewendete Dateien nie ändern** — der Stand steht in `public.schema_migration`.
@@ -102,7 +104,7 @@ sync.ts / einreihen.ts Einstiegspunkte
 ```bash
 bun install
 bun run migrate                              # Schema anwenden (idempotent)
-bun test                                     # 48 Tests
+bun test                                     # 88 Tests (E2E einzeln, siehe Kasten unten)
 bun run einreihen --taeglich                 # gestrigen Geschäftstag einreihen
 bun run einreihen --historie --von 2018-01-01 --bis 2026-07-24
 bun run sync                                 # einen Lauf abarbeiten
@@ -111,16 +113,6 @@ bun run typecheck
 ```
 
 Für den Ende-zu-Ende-Test zusätzlich `TEST_DATABASE_URL` setzen — ohne die Variable wird er übersprungen.
-
-> **Der Ende-zu-Ende-Test löscht Daten.** Sein `beforeAll` macht `TRUNCATE` über `core`, `raw` und `sync`. Er gehört deshalb auf eine **eigene** Datenbank und wird **einzeln** gestartet:
->
-> ```bash
-> createdb lina_test
-> DATABASE_URL=postgresql://postgres@localhost/lina_test bun run migrate
-> TEST_DATABASE_URL=postgresql://postgres@localhost/lina_test bun test src/sync/e2e.test.ts
-> ```
->
-> **Nicht im Gesamtlauf `bun test`.** `bun test` teilt die Modulregistrierung über Testdateien hinweg: `config` wird einmal geladen und friert die Umgebung der zuerst gelaufenen Datei ein — also die `.env`. Der Worker schriebe dann in die **echte** Datenbank, während der Test gegen die Testdatenbank prüft. Beide Fälle brechen seit dem 25.07.2026 mit einer klaren Meldung ab, statt still Daten zu vernichten.
 
 ---
 

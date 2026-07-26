@@ -16,6 +16,31 @@ Aktuelle Daten können damit nie hinter dem Backfill verhungern, und es gibt nur
 
 `sync.posten_holen()` reserviert mit `FOR UPDATE SKIP LOCKED` — aktuell läuft nur ein Worker, aber die Sperre kostet nichts und erspart einen späteren Umbau. `sync.haengende_posten_freigeben()` räumt Reservierungen auf, die ein Absturz hinterlassen hat.
 
+## Momentaufnahmen — die dritte Sorte Posten
+
+Berichte und Momentaufnahmen sind fachlich verschiedene Dinge, und der Unterschied ist nicht kosmetisch:
+
+| | Bericht | Momentaufnahme |
+|---|---|---|
+| Zeitbezug | ein Tag/Monat/Jahr, abgeschlossener Fakt | nur „jetzt" |
+| Wiederholung | liefert in fünf Jahren dasselbe | LINA **überschreibt**, alter Stand ist weg |
+| Einreihung | täglich bzw. jährlich | monatlich, auf den Monatsersten |
+| Backfill | ja | **nein** — rückwärts existiert nichts |
+
+Betroffen sind die sieben Stammdaten-Endpunkte (`schrittweite: 'momentaufnahme'`, `ebene: 'stamm'`): `articleApi:franchise`, `analyticsFilterOptions`, `wawi:items`, `wawi:suppliers`, `wawi:units`, `wawi:orders`, `wawi:inventory`. Zusammen kosten sie sieben Anfragen im Monat.
+
+**Warum das überhaupt gebaut wurde:** Eine Verkaufsmenge ohne den Einkaufspreis und die Warengruppe, die *damals* galten, ist eine Zahl ohne Bedeutung. `prices[].updated` verrät nur, wann zuletzt geändert wurde — nicht, was vorher galt. **Was heute nicht gesichert wird, ist rückwirkend nicht nachholbar.** Genau derselbe Fehler steckte bis `0007` im eigenen Schema, wo `core.artikel` den `fixer_we` überschrieb.
+
+`--historie` überspringt diese Endpunkte ausdrücklich und protokolliert das. Ein Backfill über sie würde hundertmal denselben heutigen Stand holen und die Historie trotzdem nicht herstellen.
+
+Drei Eigenheiten, die beim Bau Zeit gekostet haben und deshalb im Code festgenagelt sind:
+
+- **`artnr`, nicht `id`.** `articleApi` liefert beides; nur `artnr` trifft die Artikelnummern des Verkaufsberichts. Gemessen: 3 von 3 gegen 0 von 3, verschiedene Zahlenräume (`id 19324` vs. `artnr 300213`).
+- **`prices` ist mal Objekt, mal leeres Array.** PHPs `json_encode` macht aus einem leeren Array `[]` und erst aus einem gefüllten assoziativen Array `{}`. 594 Waren mit Objekt, 304 mit `[]`, kein einziger gefüllter Array-Fall. Ohne diesen Zweig meldete jede Momentaufnahme eine Schemaabweichung.
+- **Inventurtermine kommen mehrfach je Tag** — 11 Sätze auf 4 Tage, teils mit widersprüchlichem `isEditable`. Ohne Zusammenfassung scheitert der `INSERT` an „ON CONFLICT DO UPDATE command cannot affect row a second time". Zusammengefasst wird als „bearbeitbar, wenn irgendeiner es sagt".
+
+**Lieferanten unterliegen der Datenminimierung.** Die Antwort hat 28 Felder, darunter `ustid`, `hrb`, `kreditor`, `gegenkonto*`, `tel`, `email` und die Anschrift von 540 Geschäftspartnern. Gespeichert werden fünf: ID, Name, aktiv, Mindestbestellwert, Liefertage. Durchgesetzt wird das in `transform.lieferanten()` — namentliches Auslesen, **kein Spread**; ein `...rest` hätte hier den gegenteiligen Effekt. Ein Test in `transform.test.ts` und einer im Ende-zu-Ende-Test nageln es fest, letzterer sogar auf Ebene der Tabellenspalten.
+
 ## Drosselung
 
 Die Drosselung ist keine Höflichkeit, sondern das, was die Integration am Leben hält: kein offizieller Zugang, keine dokumentierten Limits, **keine Rate-Limit-Header** (in Phase 1 geprüft — es gibt schlicht keine).

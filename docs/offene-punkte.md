@@ -12,20 +12,36 @@ Damit ist der Ablauf gegen die Attrappe grün, **gegen das echte LINA aber noch 
 
 ## Rohdaten, die noch zu holen sind
 
-Vollständige Liste mit Bewertung in `docs/datensicherung.md`. Die drei dringendsten, weil billig und unersetzlich:
+Am 25.07.2026 im Browser geprüft — Einzelheiten in `docs/lina-api-inventar-1c.md`.
 
-**`/wawi/rezept/recipe` — Rezepturen. Nie geprüft.** Ein einziger lesender Aufruf klärt, ob dort JSON liegt. Wenn ja, ist das der größte Einzelgewinn im ganzen Projekt: damit lässt sich der Wareneinsatz für jeden historischen Zeitraum neu rechnen, statt `fixer_we` glauben zu müssen.
+**Erledigt und entschieden:**
+- Konzeptzuordnung ist **1:n**, verifiziert: 131 Betriebe, 0 in mehr als einer Gruppe.
+- Berichte **107, 118, 23, 8, 7, 9, 24 sind gesperrt** — HTTP 500 auch auf Betriebsebene, während 97 und 114 für denselben Betrieb JSON liefern. `getReport:107` wieder auf `aktiv: false`.
+- **Rezepturen gibt es nicht als JSON.** Nur HTML je Artikel, ~12 GB für alle. Nicht verfolgen.
 
-**WAWI-Einkaufspreise.** Verkaufspreise haben wir, Einkaufspreise nicht. Ohne sie ist die Frage „wie hat sich unsere Marge über die Jahre entwickelt" nicht beantwortbar — egal wie viele Umsatzdaten wir sammeln.
+**Noch zu bauen — hoher Wert, minimale Kosten:**
+- `wawi/rezept/articleApi?franchise=1` — **Sortimentshierarchie je Artikel** (8 Groß-, 329 MEC-, 278 Detailkategorien für 9.132 Artikel). Ein Aufruf. Ohne sie bleibt der Artikelverkaufsbericht eine Liste von Nummern.
+- `wawi/api/items` + `suppliers` + `units` — **Einkaufspreise je Lieferant**. `prices[].updated` zeigt nur die letzte Änderung, es gibt **keine Historie**. Monatliche Momentaufnahmen ab jetzt; rückwirkend nicht nachholbar. Das ist die Voraussetzung für jede Margenbetrachtung über die Zeit.
+- 334 Feinsparten aus `analyticsFilterOptions` als Dimension.
 
-**334 Feinsparten aus `analyticsFilterOptions`.** Wir speichern nur Haupt­sparten und Verkaufsstellen. Ein Aufruf, und ohne sie ist jede Sortimentsanalyse dauerhaft auf grobem Niveau.
+**Für Concept Family zu klären:**
+- Rechte für Bericht **107 (Gearbeitete Stunden)** und **118 (Wareneinsatz und Deckungsbeitrag)**. Ohne sie sind LINAs Effektivitäten nicht nachrechenbar und die Mitarbeiterstunden nicht zugänglich.
+- Wie sich der **Betriebskontext für WAWI und Dienstplan** umschalten lässt — sonst bleiben Einkaufspreise, Bestellungen und Dienstpläne auf die Zentrale beschränkt.
 
-**Bericht 107 „Gearbeitete Stunden"** ist seit heute aktiv, aber die Antwortstruktur ist unbekannt und der 500er aus Phase 1b nie auf Betriebsebene gegengeprüft. Bleibt es auch mit `storeId` bei 500, ist es ein Rechteproblem → `aktiv: false` setzen und hier vermerken, **nicht** wiederholen lassen.
+## Stammdaten-Momentaufnahmen (seit 26.07.2026 im Betrieb)
+
+Sieben Endpunkte laufen jetzt monatlich als Momentaufnahme (`schrittweite: 'momentaufnahme'`, kein Backfill). Details in `migrations/0008_stammdaten.sql` und `src/lina/endpunkte.ts`. Drei Punkte bleiben offen:
+
+**Der WAWI-Betriebskontext lässt sich nicht umschalten.** Die Waren-, Lieferanten- und Bestelldaten hängen am aktuell gewählten Betrieb; im Zentral-Kontext kommen 898 Waren, 540 Lieferanten und nur 4 Bestellungen zurück. `storeId` wird von diesen Endpunkten **nicht ausgewertet**. Die gesicherten Einkaufspreise sind damit vorerst die der Zentrale, nicht die der einzelnen Betriebe.
+→ **Frage an Concept Family bzw. LINA:** Wie schaltet man den Betriebskontext für WAWI um? Ohne das bleibt die Margenbetrachtung auf die Zentrale beschränkt. Das ist eine Rechte- und Kontextfrage, kein Umsetzungsfehler — es wurde bewusst nicht versucht, sie zu umgehen.
+
+**Der Filterschlüssel der Feinsparten ist ungeprüft.** Feinsparten kommen als `{id, number, name}`, Hauptsparten als `{posId, number, name}`. Bei Hauptsparten erwartet LINA nachweislich `posId` und nicht `number` — mit `number` kommt kommentarlos 0 €. Nach derselben Logik wäre es bei Feinsparten `id`. **Gemessen ist das nicht.** Wir speichern die 334 Feinsparten nur als Dimension und filtern noch nicht danach. Wer sie als Filter benutzt, prüft es vorher gegen eine bekannte Summe, sonst sieht das Ergebnis plausibel aus und ist still falsch.
+
+**Wie oft die Momentaufnahme wirklich laufen sollte, ist eine fachliche Frage.** Monatlich ist gesetzt, weil es billig ist (sieben Anfragen). Ändern sich Einkaufspreise häufiger und will man das sehen, muss der Takt hoch — rückwirkend ist nichts nachholbar, weil LINA keine Preishistorie führt.
 
 ## Fachlich
 
-**Ist die Konzeptzuordnung wirklich 1:n?** Erwartung ja — ein Aposto ist ein Aposto. Die frühere Notiz „Karlsruhe hängt in fünf Konzepten" beruhte darauf, dass in `getKennzahlen` die Gruppe die Marke liefert und das Kind nur die Stadt; der *Name* erscheint fünfmal, die *Schlüssel* sind höchstwahrscheinlich fünf verschiedene. Offen bleibt der Fall *Eat Tasty*, der laut Eugene mehrere Marken hatte.
-→ Prüfung, sobald Betriebe geladen sind: `SELECT anzahl_konzepte, count(*) FROM mart.konzept_zuordnung GROUP BY 1;` — nur die Zeile `1` bedeutet 1:n. Alles darüber ist die Arbeitsliste für `manual.betrieb_hauptkonzept`.
+**Konzeptzuordnung: erledigt.** Am 25.07.2026 direkt gegen `getKennzahlen` gemessen — 131 Betriebe, **0 in mehr als einer Gruppe**. Karlsruhe sind fünf eigenständige Betriebe mit fünf Schlüsseln und markenhaltigen Namen („Enchilada Karlsruhe GmbH", „Aposto Karlsruhe GmbH", …). Es ist 1:n. `manual.betrieb_hauptkonzept` bleibt damit voraussichtlich leer.
 
 **Umsatzabweichung Bayreuth und Freiburg.** Karlsruhe stimmt exakt zwischen API und Excel (136.612,46 € vs. 136.612,47 €), Bayreuth (52.712,58 vs. 69.886,44) und Freiburg (125.926,89 vs. 142.090,80) nicht. Vermutlich wurden diese Zeilen manuell aus einer anderen Quelle oder Periode gepflegt. **Vor dem ersten Round Table aus der neuen Datenbank klären**, sonst diskutiert jemand über Zahlen, die aus zwei Welten stammen.
 
