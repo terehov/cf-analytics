@@ -190,6 +190,41 @@ async function workerLaufIntern(
     ).catch(() => {})
   }
 
+  /**
+   * Ein gesunder Lauf muss von außen als gesund erkennbar sein.
+   *
+   * Vorher ging jeder Erfolg nach `debug`, und zwischen zwei Posten liegen
+   * 20–40 Sekunden — auf `info` war ein laufender Backfill also stundenlang
+   * vollkommen still und von einem Hänger nicht zu unterscheiden. Am
+   * 26.07.2026 wurde deshalb ein völlig intakter Lauf für tot gehalten und
+   * abgebrochen; erst ein Neustart mit LOG_LEVEL=debug zeigte, dass er die
+   * ganze Zeit gearbeitet hatte.
+   *
+   * Wie oft eine Zeile kommt, steuert FORTSCHRITT_ALLE: lokal jede, im
+   * Container jede fünfzigste. Die Restdauer ist bewusst aus dem TATSÄCHLICH
+   * gemessenen Tempo dieses Laufs gerechnet und nicht aus dem eingestellten
+   * Takt — sonst zeigt sie eine Zahl an, die mit der Wirklichkeit nichts zu
+   * tun hat, sobald LINA langsamer antwortet.
+   */
+  const laufBeginn = Date.now()
+  const dauerLesbar = (ms: number) => {
+    const min = Math.round(ms / 60_000)
+    return min < 60 ? `${min} min` : `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')} min`
+  }
+  const fortschritt = async (endpunkt: string, von: string, zeilen: number | null, dauerMs?: number) => {
+    const n = ok + keineDaten + fehler
+    if (config.FORTSCHRITT_ALLE === 0 || n % config.FORTSCHRITT_ALLE !== 0) return
+    const r = await eine<{ offen: number }>(
+      `SELECT count(*)::int AS offen FROM sync.warteschlange WHERE erledigt_am IS NULL`)
+      .catch(() => null)
+    const offen = r ? Number(r.offen) : null
+    log.info('fortschritt', {
+      endpunkt, von, zeilen, dauerMs,
+      imLauf: n, offen,
+      rest: offen ? dauerLesbar(offen * ((Date.now() - laufBeginn) / n)) : null,
+    })
+  }
+
   const behandler = new Map<string, () => void>()
   for (const signal of ENDESIGNALE) {
     const fn = () => {
@@ -309,6 +344,7 @@ async function workerLaufIntern(
             WHERE posten_id = $1`, [posten.posten_id])
         await protokoll(laufId, ep.key, posten, 'ok', res, client, null, zeilen)
         log.debug('geladen', { endpunkt: ep.key, von, zeilen, dauerMs: res.dauerMs })
+        await fortschritt(ep.key, von, zeilen, res.dauerMs)
         continue
       }
 
@@ -320,6 +356,9 @@ async function workerLaufIntern(
               SET erledigt_am = now(), in_arbeit_seit = NULL, ergebnis = 'keine_daten'
             WHERE posten_id = $1`, [posten.posten_id])
         await protokoll(laufId, ep.key, posten, 'keine_daten', res, client)
+        // Auch hier eine Zeile: eine lange Strecke ohne Daten (geschlossener
+        // Betrieb, Zeitraum vor der Eroeffnung) ist sonst wieder Stille.
+        await fortschritt(ep.key, von, null, res.dauerMs)
         continue
       }
 

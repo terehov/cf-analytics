@@ -110,6 +110,26 @@ const Schema = z.object({
 
   PORT: z.coerce.number().int().default(3000),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+
+  /**
+   * Wie oft eine Fortschrittszeile geschrieben wird — jeder n-te Posten.
+   *
+   * Der Anlass: ein gesunder Lauf war auf `info` vollkommen still. Erfolge
+   * gingen nach `debug`, und zwischen zwei Posten liegen 20–40 Sekunden. Am
+   * 26.07.2026 hat genau das wie ein Hänger ausgesehen, war aber keiner —
+   * nachweisbar erst, nachdem der Lauf mit LOG_LEVEL=debug neu gestartet
+   * wurde. Ein Betriebszustand, den man nur durch Neustart feststellen kann,
+   * ist keiner.
+   *
+   * Die Voreinstellung unterscheidet lokal von Produktion, ohne dass jemand
+   * etwas setzen muss: hängt an stdout ein Terminal, will da jemand zusehen —
+   * dann jede Zeile. Im Container (Dokploy, kein TTY) alle 50 Posten, also
+   * etwa alle 25 Minuten. Das ist Lebenszeichen genug und flutet kein Log.
+   *
+   * 0 schaltet die Zeilen ganz ab.
+   */
+  FORTSCHRITT_ALLE: z.coerce.number().int().min(0)
+    .default(process.stdout.isTTY ? 1 : 50),
 })
 
 function laden() {
@@ -156,5 +176,8 @@ export function konfigZumLoggen(c: Config = config) {
       : `${c.FENSTER_VON_STUNDE}–${c.FENSTER_BIS_STUNDE} Uhr`,
     hashverfahren: c.LINA_PASSWORD_HASH,
     maxVersuche: c.MAX_VERSUCHE,
+    fortschritt: c.FORTSCHRITT_ALLE === 0
+      ? 'aus'
+      : c.FORTSCHRITT_ALLE === 1 ? 'jeder Posten' : `jeder ${c.FORTSCHRITT_ALLE}. Posten`,
   }
 }
