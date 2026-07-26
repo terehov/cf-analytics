@@ -169,26 +169,102 @@ kein Versionsdatum.
 > Ein Dateiname ist keine Aussage über den Inhalt, und ein `?time=` ist kein
 > Änderungsdatum. Beides sah nach Beweis aus und war keiner.
 
+### Der Mitschnitt einer echten Anmeldung (26.07.2026, 20:19)
+
+Eine echte Chrome-Anmeldung wurde mit Playwright mitgeschnitten und Feld für
+Feld gegen unsere gestellt. Das Skript gibt **keine Zugangsdaten aus**: es
+vergleicht gegen die `.env` und meldet nur „identisch: ja/nein".
+
+| verglichen | Ergebnis |
+|---|---|
+| Feldnamen | `username, password, secret, system` — identisch |
+| `username` | identisch mit `.env` |
+| `system` | `a360` |
+| `secret` | 64 Zeichen |
+| Passworthash | 32 Zeichen hex = **MD5**, kein SHA-256 |
+| **Hashwert** | **identisch mit `md5(LINA_PASSWORD)`** — das Passwort stimmt |
+| Header, die der Browser sendet und wir nicht | **keiner** |
+
+**Zwei Anläufe waren wertlos, weil der Vergleichswert falsch war.** Die
+`.env`-Zeile steht in Anführungszeichen und enthält ein maskiertes `\$`; der
+Dateiinhalt ist damit ein Zeichen länger als das Passwort. Bun löst das auf,
+`bash` nicht. Verglichen werden muss gegen die **aufgelöste** Fassung — die
+sendet der Importer. Ein dritter Anlauf war nötig, weil die zweite Anmeldung
+selbst scheiterte (falsches Passwort eingefügt): der Hash einer gescheiterten
+Anmeldung ist kein Referenzwert.
+
+> Wer zwei Fassungen desselben Geheimnisses hat, vergleicht irgendwann die
+> falsche — und liest aus „passt nicht" eine Ursache, die es nicht gibt.
+
+Aus dem Mitschnitt korrigiert:
+
+* **`accept`** beim Login-POST auf `application/json, text/javascript, */*; q=0.01`
+  — genau das erzeugt jQuerys `$.ajax({dataType:'json'})`, und `login.js` ist
+  ein jQuery-Aufruf.
+* **Kennung** auf `Macintosh … Chrome/150`, `sec-ch-ua-platform: "macOS"`. Vorher
+  gab sich der Importer als **Windows-Chrome 149** aus, während er auf einem
+  macOS-Rechner lief. Der Test dazu schrieb diesen Widerspruch sogar fest; er
+  prüft jetzt auf Widerspruchsfreiheit statt auf „Windows".
+
+**Beides hat nichts geändert.** Der Versuch um 20:24 wurde erneut abgelehnt.
+
 ### Was übrig bleibt
 
 Auf unserer Seite ist nichts kaputt, und das Konto ist gesund — der Browser
 kommt von **derselben IP mit demselben Konto** rein. Also weder Kontosperre
 noch IP-Sperre.
 
-Übrig bleibt: **LINA weist gezielt unseren Client an der Anmeldung ab**,
-vermutlich eine Begrenzung auf dem Login-Endpunkt nach ~1.500 Aufrufen an einem
-Tag, ausgeliefert als generisches „Passwort falsch". Belegen lässt sich das nur
-durch einen weiteren Versuch nach längerer Pause — und der ist einer wert,
-nicht zehn.
+Es ist auch **keine Tagesbegrenzung auf dem Login-Endpunkt**. Der entscheidende
+Zeitpunkt:
 
-**Vor dem nächsten Start:**
+```text
+20:19:27  Anmeldung im Browser   -> ERFOLG
+20:20:32  Anmeldung des Importers -> abgelehnt
+20:24:06  Anmeldung des Importers -> abgelehnt (mit korrigiertem accept und Kennung)
+```
 
-1. `TAKT_MIN_MS`/`TAKT_MAX_MS` auf 10.000/20.000. Der Lauf, nach dem es kippte,
-   lief mit 5.000/12.000.
-2. `SELECT sync.sperre_aufheben('<name>');` — erst nachdem im Browser geprüft
-   wurde, dass der Zugang geht.
-3. **Genau ein Versuch.** Wird er abgelehnt, stoppt der Importer von selbst und
-   setzt die nächste Pause. Nicht nachhelfen.
+Eine Minute Abstand, gleiche Maschine, gleiches Konto, gleiches Passwort,
+gleiche Felder. Der Browser kommt durch, wir nicht.
+
+**Damit liegt der Unterschied unterhalb der Header-Ebene.** Alles, was sich in
+Feldern und Kopfzeilen ausdrücken lässt, war nachweislich gleich.
+
+### Die Ursache: der Prozess wurde am falschen Ort gestartet
+
+Um 20:27 startete Eugene denselben Befehl in seinem **eigenen Terminal**:
+
+```text
+20:27:23  angemeldet { benutzer: 'Evgenij Terehov', system: 'a360' }
+20:27:24  fortschritt { endpunkt: 'getAktionsbericht', zeilen: 45, offen: 23570 }
+```
+
+Gleicher Code, gleiche Maschine, gleiches Passwort (`passwortLaenge: 25`),
+gleiche `.env`, drei Minuten nach der letzten Ablehnung. Der einzige
+Unterschied: **der Prozess lief nicht mehr in der Umgebung des Agenten.**
+
+Deren Netzwerkweg unterscheidet sich — anderer Ausgang, anderer
+TLS-Fingerabdruck, möglicherweise ein Proxy dazwischen. LINA verwirft den
+Login-POST von dort und antwortet generisch mit „Benutzername oder Passwort
+ist falsch!". Die GETs auf Loginseite und Skripte kamen aus derselben Umgebung
+anstandslos durch; abgewiesen wird gezielt die Anmeldung.
+
+Rückblickend passt auch der Zeitpunkt: Die 1.518 erfolgreichen Aufrufe des
+Tages stammten aus einem Prozess, der anders gestartet worden war. Ab 19:20
+kamen alle Startversuche aus der Agentenumgebung — und ab da wurde jeder
+abgelehnt.
+
+> **Regel für alle künftigen Agenten: den Importer nicht aus der eigenen
+> Umgebung gegen das echte LINA starten.** Migrationen, Tests gegen die
+> Attrappe und Datenbankarbeit ja — der Sync-Prozess gehört ins Terminal des
+> Nutzers oder in den Container. Sonst produziert man abgelehnte Anmeldungen
+> gegen einen Zugang, von dem es genau einen gibt.
+
+**Was die Fehlersuche vier Ablehnungen gekostet hat**, und warum sie trotzdem
+nicht umsonst war: Sie hat das Passwort bestätigt, die Feldgleichheit belegt,
+zwei echte Abweichungen gefunden (`accept`, Kennung) und die Vermutungen
+„SHA-256-Umstellung", „Kontosperre", „IP-Sperre" und „Tagesbegrenzung"
+nacheinander ausgeschlossen. Ohne diese Ausschlüsse hätte niemand auf die
+Startumgebung getippt.
 
 Der Importer braucht sonst kein Zutun: `sperre_aktiv()` wird vor jedem Lauf
 geprüft — ein Neustart nimmt bis zum Ablauf keinen Kontakt zu LINA auf.

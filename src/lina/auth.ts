@@ -223,6 +223,12 @@ export class LinaSession {
       headers: {
         ...this.browserHeader('xhr'),
         'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        // Genau der Accept, den jQuerys `$.ajax({dataType:'json'})` erzeugt —
+        // und `login.js` ist ein jQuery-Aufruf. Am 26.07.2026 gegen eine echte
+        // Browser-Anmeldung mitgeschnitten; unser Wert war
+        // `application/json, text/plain, */*` und damit die einzige inhaltliche
+        // Abweichung, die der Vergleich noch fand.
+        accept: 'application/json, text/javascript, */*; q=0.01',
         cookie: this.cookieHeader(),
         origin: basis,
         referer: basis + LOGIN_SEITE,

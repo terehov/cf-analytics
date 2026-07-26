@@ -40,10 +40,10 @@ const Schema = z.object({
    * still, eine ein Jahr alte Version ist auffälliger als gar keine Angabe.
    */
   LINA_USER_AGENT: z.string().default(
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
-    '(KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36'),
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
+    '(KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36'),
   /** Passend zur Kennung. Ändert sich nur, wenn LINA_USER_AGENT wechselt. */
-  LINA_PLATTFORM: z.string().default('Windows'),
+  LINA_PLATTFORM: z.string().default('macOS'),
 
   // --- Tempo -------------------------------------------------------------
   /**

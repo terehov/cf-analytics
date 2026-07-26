@@ -87,7 +87,17 @@ describe('Anmeldung', () => {
     expect(mock.anmeldungen).toBe(1)
   })
 
-  test('gibt sich konsistent als Windows-Chrome aus', async () => {
+  /**
+   * Nicht auf eine bestimmte Plattform festnageln, sondern auf die
+   * WIDERSPRUCHSFREIHEIT — darum geht es hier.
+   *
+   * Die erste Fassung prüfte fest auf „Windows NT 10.0". Das war zugleich der
+   * Fehler, den sie hätte finden sollen: Der Importer gab sich als
+   * Windows-Chrome 149 aus, lief dabei auf einem macOS-Rechner, und der
+   * Vergleich mit einer echten Anmeldung am 26.07.2026 zeigte Chrome 150 auf
+   * macOS. Ein Test, der genau die falsche Angabe festschreibt, schützt nichts.
+   */
+  test('Kennung, Plattform und Client-Hints widersprechen sich nicht', async () => {
     const s = sitzung()
     await s.anmelden()
     const h = mock.letzteHeader
@@ -95,9 +105,20 @@ describe('Anmeldung', () => {
     // Kennung und Client-Hints müssen dieselbe Version nennen — ein Chrome,
     // dessen sec-ch-ua einer anderen Version widerspricht, gibt es nicht.
     const version = auth.chromeHauptversion(h['user-agent'] ?? '')
-    expect(h['user-agent']).toContain('Windows NT 10.0; Win64; x64')
     expect(h['sec-ch-ua']).toContain(`"Google Chrome";v="${version}"`)
-    expect(h['sec-ch-ua-platform']).toBe('"Windows"')
+
+    // Und dieselbe Plattform. `sec-ch-ua-platform: "macOS"` neben einem
+    // „Windows NT"-Agenten ist die Sorte Widerspruch, auf die jede
+    // Bot-Erkennung als Erstes sieht.
+    const plattform = (h['sec-ch-ua-platform'] ?? '').replace(/"/g, '')
+    const kennung = h['user-agent'] ?? ''
+    const passt: Record<string, RegExp> = {
+      macOS: /Macintosh; Intel Mac OS X/,
+      Windows: /Windows NT/,
+      Linux: /X11; Linux/,
+    }
+    expect(Object.keys(passt)).toContain(plattform)
+    expect(kennung).toMatch(passt[plattform]!)
     expect(h['sec-ch-ua-mobile']).toBe('?0')
     // Chrome schickt auf jedem Aufruf Fetch-Metadaten mit; ohne sie passt das
     // Gesamtbild nicht.
