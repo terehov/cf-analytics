@@ -15,8 +15,12 @@ sehen müssen.* Nachgemessen — von den 98 Dashboard-Karten greift **keine einz
 | Stufe | Was das heißt | Anzahl |
 |---|---|---|
 | **Sichtbar** | In Suche, Abfrage-Editor und Datenbrowser | 41 |
-| **Nur in Detailansichten** (`technical`) | Aus Suche und Editor verschwunden, über einen Fremdschlüssel weiterhin erreichbar. Metabase liest die Beziehungen weiter aus dem Katalog. | 28 |
+| **Nur in Detailansichten** (`technical`) | Aus Suche und Editor verschwunden, über einen Fremdschlüssel weiterhin erreichbar. Metabase liest die Beziehungen weiter aus dem Katalog. | 29 |
 | **Nicht synchronisiert** | Metabase kennt sie nicht. Schema-Filter auf der Datenbank. | 42 |
+
+> **Stand:** `core.betrieb` ist als letzte `core`-Tabelle auf „nur in Detailansichten"
+> zu stellen — die Migration, die das ermöglicht, ist angewendet, die Umstellung in
+> Metabase steht noch aus (siehe unten).
 
 Der Unterschied zwischen Stufe 2 und 3 ist wichtig: `core` bleibt **synchronisiert**, weil
 die Fremdschlüssel von dort kommen. Metabase liest sie aus dem Katalog und bietet daraufhin
@@ -80,11 +84,16 @@ ohne dass jemand deployen muss.
 `regelwerk` (global vs. betriebsindividuell) · `regel` (Schwellen je Bereich) ·
 `beschriftung` (die Emoji-Zuordnung)
 
-### `core` — genau eine Ausnahme (1)
+### `core` — keine Ausnahme mehr (0)
 
-**`core.betrieb`** bleibt sichtbar, weil die BWA-Karten direkt darauf joinen: `getKennzahlen`
-kennt Betriebe nur über `lina_betrieb_id`, alle anderen Endpunkte nur über `enc_id`. Die
-Brücke liegt in dieser Tabelle.
+Anfangs blieb `core.betrieb` sichtbar, weil drei BWA-Karten direkt darauf jointen, um den
+Betriebsnamen an `mart.kennzahlen_aktuell` zu hängen. Das war nach dem Grundsatz keine
+Ausnahme, sondern eine **Lücke in `mart`** — `kennzahlen_aktuell` war die einzige
+`mart`-Sicht ohne Namen.
+
+Migration `0009_kennzahlen_namen.sql` schließt sie mit **`mart.bwa_kennzahl`**: dieselben
+Daten plus `betrieb`, `stadt`, `konzept` und `gebucht`. Seither greift **keine einzige** der
+98 Karten mehr auf `core` zu, und das ganze Schema kann versteckt werden.
 
 ---
 
@@ -111,6 +120,7 @@ Fallen** — genau die, die `mart` ausräumt:
 | `bwa_buchungsstand` | `datenstand` | Sagt allein nicht, ob ein Monat gebucht **oder** leer ist |
 | `schwellenwert_betrieb` | `round_table_vergleich()` | Betriebsindividuelle Schwellen; ohne Regelwerk-Kontext irreführend |
 | `bestellung`, `bestellposten`, `inventurtermin` | — | Noch nicht ausgewertet, Struktur steht |
+| `betrieb` | `mart.betrieb`, `mart.bwa_kennzahl`, jede `mart`-Sicht | Trägt die BWA-Brücke `lina_betrieb_id`; in `mart` überall schon aufgelöst |
 
 ---
 

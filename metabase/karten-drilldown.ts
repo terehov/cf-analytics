@@ -487,10 +487,9 @@ SELECT k.monat AS "Monat",
        round(sum(k.wert_absolut) FILTER (WHERE k.kennzahl IN ('WE Bar','WE Küche')))   AS "Wareneinsatz",
        round(sum(k.wert_absolut) FILTER (WHERE k.kennzahl = 'Personalkosten ohne GF')) AS "Personalkosten",
        round(sum(k.wert_absolut) FILTER (WHERE k.kennzahl = 'EBIT'))                   AS "EBIT"
-  FROM mart.kennzahlen_aktuell k
-  JOIN core.betrieb b ON b.betrieb_key = k.betrieb_key
+  FROM mart.bwa_kennzahl k
  WHERE 1 = 1
-   [[AND b.name = {{betrieb}}]]
+   [[AND k.betrieb = {{betrieb}}]]
  GROUP BY k.monat
 HAVING count(*) FILTER (WHERE k.wert_absolut IS NOT NULL AND k.wert_absolut <> 0) > 0
  ORDER BY k.monat`,

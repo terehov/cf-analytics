@@ -608,10 +608,9 @@ SELECT k.monat AS "Monat",
        round(sum(k.wert_absolut) FILTER (WHERE k.kennzahl IN ('WE Bar','WE Küche')))   AS "Wareneinsatz",
        round(sum(k.wert_absolut) FILTER (WHERE k.kennzahl = 'Personalkosten ohne GF')) AS "Personalkosten",
        round(sum(k.wert_absolut) FILTER (WHERE k.kennzahl = 'EBIT'))                   AS "EBIT"
-  FROM mart.kennzahlen_aktuell k
-  JOIN core.betrieb b ON b.betrieb_key = k.betrieb_key
+  FROM mart.bwa_kennzahl k
  WHERE 1 = 1
-   [[AND b.name = {{betrieb}}]]
+   [[AND k.betrieb = {{betrieb}}]]
  GROUP BY k.monat
 HAVING count(*) FILTER (WHERE k.wert_absolut IS NOT NULL AND k.wert_absolut <> 0) > 0
  ORDER BY k.monat`,
@@ -627,20 +626,19 @@ HAVING count(*) FILTER (WHERE k.wert_absolut IS NOT NULL AND k.wert_absolut <> 0
     anzeige: 'row',
     parameter: [MONAT],
     sql: `${MONAT_CTE_BWA}
-SELECT b.name                        AS "Betrieb",
+SELECT k.betrieb                     AS "Betrieb",
        round(k.wert_absolut)         AS "EBIT",
        round(u.wert_absolut)         AS "Umsatz",
        CASE WHEN u.wert_absolut > 0
             THEN round(100 * k.wert_absolut / u.wert_absolut, 1)
        END                           AS "EBIT-Marge %"
-  FROM mart.kennzahlen_aktuell k
+  FROM mart.bwa_kennzahl k
   CROSS JOIN gewaehlt g
-  JOIN core.betrieb b ON b.betrieb_key = k.betrieb_key
   LEFT JOIN mart.kennzahlen_aktuell u
          ON u.betrieb_key = k.betrieb_key AND u.monat = k.monat AND u.kennzahl = 'Umsatz'
  WHERE k.kennzahl = 'EBIT'
    AND k.monat = g.monat
-   AND k.wert_absolut IS NOT NULL AND k.wert_absolut <> 0
+   AND k.gebucht
  ORDER BY k.wert_absolut DESC`,
     visualisierung: {
       'graph.dimensions': ['Betrieb'],
