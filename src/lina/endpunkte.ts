@@ -13,8 +13,29 @@
  */
 import { zuLinaDatum } from '../lib/time'
 
-export type Ebene = 'konzern' | 'betrieb'
-export type Schrittweite = 'tag' | 'monat' | 'jahr'
+export type Ebene = 'konzern' | 'betrieb' | 'stamm'
+export type Schrittweite = 'tag' | 'monat' | 'jahr' | 'momentaufnahme'
+
+/**
+ * Momentaufnahmen sind etwas grundsätzlich anderes als Berichte.
+ *
+ * Ein Bericht für den 14.06.2023 liefert heute dasselbe wie in fünf Jahren —
+ * der Tag ist ein abgeschlossener Fakt. Stammdaten dagegen **überschreibt**
+ * LINA: Einkaufspreise, Warengruppen und Lieferantenzuordnungen kennen keine
+ * Historie. `prices[].updated` verrät nur, wann zuletzt geändert wurde, nicht
+ * was vorher galt.
+ *
+ * Daraus folgen drei Regeln, die im Code an mehreren Stellen auftauchen:
+ *   * `parameter()` bekommt **keine** Datumsangaben — es gibt nur „jetzt".
+ *   * Eingereiht wird **monatlich** zum Monatsersten, nicht täglich.
+ *   * **Kein Backfill.** `--historie` überspringt sie; rückwärts existieren
+ *     diese Daten nicht und sind auch nicht nachholbar.
+ *
+ * `sync.warteschlange` verlangt `zeitraum_von`/`zeitraum_bis` als NOT NULL.
+ * Beide stehen deshalb auf dem Monatsersten — damit greift der vorhandene
+ * Eindeutigkeitsindex und dieselbe Momentaufnahme wird nicht zweimal geholt.
+ */
+export const istMomentaufnahme = (e: Endpunkt) => e.schrittweite === 'momentaufnahme'
 
 export type Endpunkt = {
   /** Schlüssel in der Warteschlange und in raw.api_antwort. */
@@ -163,17 +184,17 @@ export const ENDPUNKTE: Endpunkt[] = [
     pfad: '/finanzen/analytics/getReport',
     schrittweite: 'monat',
     zweck: 'Gearbeitete Stunden je Betrieb — die Rohdaten hinter LINAs Effektivitäten',
-    aktiv: true,
+    aktiv: false,
     hinweis:
-      'Der einzige Weg an die Mitarbeiterstunden, ohne personenbezogene Stundenzettel zu scrapen. '
-    + 'getPersonalkosten liefert nur fertige Effektivitäten; ohne diesen Bericht ist keine davon nachrechenbar. '
-    + 'ACHTUNG: In Phase 1b antwortete 107 mit HTTP 500 und leerem Body — aber auf KONZERNEBENE, und '
-    + '"CONCEPT FAMILY Franchise AG" ist eine Holding ohne eigene POS-Daten. Genau dieser Fehlschluss ist '
-    + 'uns bei der BWA schon einmal passiert. Auf Betriebsebene mit storeId ist der Bericht ungetestet. '
-    + 'Bleibt es auch dort bei 500, ist es ein Rechteproblem — dann in docs/offene-punkte.md vermerken und '
-    + 'aktiv auf false setzen, NICHT in eine Wiederholungsschleife laufen lassen. '
-    + 'Die Antwortstruktur ist unbekannt; bis zur ersten echten Antwort landet der Bericht nur in '
-    + 'raw.api_antwort (default-Zweig in sync/laden.ts). Das ist Absicht, nicht Nachlässigkeit.',
+      'AM 25.07.2026 IM BROWSER VERIFIZIERT: nicht verfügbar. Der Bericht antwortet mit HTTP 500 und '
+    + 'leerem Body — auf BETRIEBSEBENE mit storeId, für den umsatzstärksten Betrieb, und für drei '
+    + 'verschiedene Zeiträume (Mai 2026, März 2026, Gesamtjahr 2025). Meine Holding-Hypothese war also '
+    + 'falsch. Dass es kein Datenproblem ist, zeigt der Gegentest: Bericht 97 (Tagesabschluss) und 114 '
+    + '(Kost-Sach-Bezug) liefern für denselben Betrieb und dieselben Parameter sauberes JSON. '
+    + 'Dasselbe Bild bei 7, 8, 9, 23, 24 und 118 — die gesamte Personal- und Wareneinsatzgruppe ist für '
+    + 'diesen Account gesperrt oder nicht lizenziert. '
+    + 'NICHT auf true stellen, ohne dass jemand die Rechte bei LINA geklärt hat: aktiviert kostet der '
+    + 'Bericht rund 8.500 Anfragen Backfill für garantiert leere Antworten.',
     parameter: (von, bis) => ({
       report: '107', von: zuLinaDatum(von, 'short'), bis: zuLinaDatum(bis, 'short'),
       reltime: 'custom', interval: '8',
@@ -186,8 +207,9 @@ export const ENDPUNKTE: Endpunkt[] = [
     schrittweite: 'monat',
     zweck: 'Personalkostenschätzung je Betrieb',
     aktiv: false,
-    hinweis: 'Geschwister von 107. Erst aktivieren, wenn 107 auf Betriebsebene Daten liefert — '
-           + 'sonst verdoppelt sich der Aufwand für dieselbe Erkenntnis.',
+    hinweis: 'Wie 107 am 25.07.2026 verifiziert: HTTP 500 auf Betriebsebene. Gilt für die ganze Gruppe '
+           + '7 (Wareneinsätze), 8 (Personalkosten Jahr), 9 (Urlaubsverteilung), 23, 24 (Personalrechner), '
+           + '107 und 118 (Wareneinsatz und Deckungsbeitrag). Erst nach Rechteklärung anfassen.',
     parameter: (von, bis) => ({
       report: '23', von: zuLinaDatum(von, 'short'), bis: zuLinaDatum(bis, 'short'),
       reltime: 'custom', interval: '8',
@@ -205,6 +227,99 @@ export const ENDPUNKTE: Endpunkt[] = [
       report: '97', von: zuLinaDatum(von, 'short'), bis: zuLinaDatum(bis, 'short'),
       reltime: 'custom', interval: '8',
     }),
+  },
+
+  // --- Stammdaten: Momentaufnahmen ohne Zeitraum -------------------------
+  //
+  // Alle am 25.07.2026 live gegen die angemeldete Sitzung verifiziert:
+  // Pfad, Antwortstruktur und Satzzahl stehen unten je Eintrag. Zusammen
+  // kosten sie sieben Anfragen im Monat.
+  {
+    key: 'articleApi:franchise',
+    ebene: 'stamm',
+    pfad: '/wawi/rezept/articleApi',
+    schrittweite: 'momentaufnahme',
+    zweck: 'Sortimentshierarchie je Artikel: grosscat / mec / detailcat',
+    aktiv: true,
+    hinweis:
+      'Verknüpfung zum Artikelverkaufsbericht ist artnr, NICHT id — am 25.07.2026 gemessen: '
+    + 'artnr trifft die Artikelnummern des Verkaufsberichts, id trifft keine einzige '
+    + '(id 19324 vs. artnr 300213, verschiedene Zahlenräume). '
+    + 'Antwort ist ein Objekt, die Sätze liegen unter "articles" (9.132 Sätze, 3,2 MB). '
+    + 'Ohne franchise=1 kommen nur die 1.428 Artikel des aktuellen Betriebs.',
+    parameter: () => ({ franchise: '1', showAdditionalMecCodes: '0' }),
+  },
+  {
+    key: 'analyticsFilterOptions',
+    ebene: 'stamm',
+    pfad: '/intranet/api/analyticsFilterOptions',
+    schrittweite: 'momentaufnahme',
+    zweck: 'Dimensionen: 334 Feinsparten, Hauptsparten, Verkaufsstellen, Gruppen, Betriebe',
+    aktiv: true,
+    hinweis:
+      'Feinsparten sind {id, number, name} — analog zu hauptsparten {posId, number, name}. '
+    + 'Bei Hauptsparten erwartet LINA als Filter posId und nicht number; nach derselben Logik '
+    + 'wäre es bei Feinsparten id. UNGEPRÜFT — wir speichern die Dimension nur, filtern noch '
+    + 'nicht danach. Wer das als Filter benutzt, prüft es vorher.',
+    parameter: () => ({}),
+  },
+  {
+    key: 'wawi:items',
+    ebene: 'stamm',
+    pfad: '/wawi/api/items',
+    schrittweite: 'momentaufnahme',
+    zweck: 'Waren mit Einkaufspreisen je Lieferant — rückwirkend NICHT nachholbar',
+    aktiv: true,
+    hinweis:
+      '898 Sätze, 482 kB, Array auf oberster Ebene. prices ist ein OBJEKT, dessen Schlüssel '
+    + 'die Preis-ID ist, kein Array. 299 der 898 Waren haben mehr als einen Lieferantenpreis. '
+    + 'LINA kennt keine Preishistorie: was hier nicht monatlich gesichert wird, ist weg.',
+    parameter: () => ({ archive: '0' }),
+  },
+  {
+    key: 'wawi:suppliers',
+    ebene: 'stamm',
+    pfad: '/wawi/api/suppliers',
+    schrittweite: 'momentaufnahme',
+    zweck: 'Lieferantenstamm — nur Name, Mindestbestellwert und Liefertage',
+    aktiv: true,
+    hinweis:
+      'DATENMINIMIERUNG: Die Antwort enthält 28 Felder, darunter ustid, hrb, kreditor, '
+    + 'gegenkonto*, tel, email, strasse, plz. Davon wird NICHTS gespeichert — die '
+    + 'Transformation hat eine explizite Whitelist. 540 Sätze.',
+    parameter: () => ({}),
+  },
+  {
+    key: 'wawi:units',
+    ebene: 'stamm',
+    pfad: '/wawi/api/units',
+    schrittweite: 'momentaufnahme',
+    zweck: 'Einheiten mit Umrechnungsfaktoren — ohne sie sind Mengen nicht vergleichbar',
+    aktiv: true,
+    hinweis: '32 Sätze: ID, name, abk, parent, factor, baseUnit.',
+    parameter: () => ({}),
+  },
+  {
+    key: 'wawi:orders',
+    ebene: 'stamm',
+    pfad: '/wawi/api/orders',
+    schrittweite: 'momentaufnahme',
+    zweck: 'Bestellungen mit Positionen',
+    aktiv: true,
+    hinweis:
+      'Im Zentral-Kontext nur 4 Sätze. Zeitfelder (created, bestellt_am, liefertermin) sind '
+    + 'Unix-Sekunden. posten ist ein verschachteltes Array.',
+    parameter: () => ({}),
+  },
+  {
+    key: 'wawi:inventory',
+    ebene: 'stamm',
+    pfad: '/wawi/inventory/inventory',
+    schrittweite: 'momentaufnahme',
+    zweck: 'Inventurstichtage',
+    aktiv: true,
+    hinweis: 'Hüllenformat {success, data, message, errorNum} — die 11 Sätze liegen unter data.',
+    parameter: () => ({}),
   },
 ]
 

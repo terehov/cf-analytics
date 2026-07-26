@@ -11,7 +11,7 @@
  */
 import { query, eine, pool } from './db/pool'
 import { log } from './lib/log'
-import { AKTIVE_ENDPUNKTE } from './lina/endpunkte'
+import { AKTIVE_ENDPUNKTE, istMomentaufnahme } from './lina/endpunkte'
 import { geschaeftstag } from './lib/time'
 
 function arg(name: string): string | undefined {
@@ -40,7 +40,22 @@ if (process.argv.includes('--taeglich')) {
       [ep.key, `${jahr}-01-01`, `${jahr}-12-31`])
     n += r.length
   }
-  log.info('täglich eingereiht', { geschaeftstag: gestern, posten: n })
+  // Stammdaten-Momentaufnahmen: einmal je Kalendermonat, auf den Monatsersten
+  // gesetzt. Der Eindeutigkeitsindex der Warteschlange sorgt dafür, dass der
+  // tägliche Lauf sie ab dem zweiten Tag des Monats stillschweigend überspringt
+  // — deshalb genügt es, sie hier mitlaufen zu lassen, ohne eigenen Zeitplan.
+  const monatsErster = `${gestern.slice(0, 7)}-01`
+  let m = 0
+  for (const ep of AKTIVE_ENDPUNKTE.filter(istMomentaufnahme)) {
+    const r = await query(
+      `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet)
+       VALUES ($1, $2, $2, 10) ON CONFLICT DO NOTHING RETURNING posten_id`,
+      [ep.key, monatsErster])
+    m += r.length
+  }
+  if (m > 0) log.info('momentaufnahmen eingereiht', { monat: monatsErster, posten: m })
+
+  log.info('täglich eingereiht', { geschaeftstag: gestern, posten: n + m })
 }
 
 if (process.argv.includes('--historie')) {
@@ -48,6 +63,13 @@ if (process.argv.includes('--historie')) {
   const bis = arg('bis') ?? geschaeftstag(new Date(Date.now() - 24 * 3600 * 1000))
   let gesamt = 0
   for (const ep of AKTIVE_ENDPUNKTE) {
+    // Momentaufnahmen haben keine Vergangenheit. LINA überschreibt Stammdaten,
+    // ein Aufruf liefert immer den heutigen Stand — 100 Backfill-Posten dafür
+    // würden 100-mal dasselbe holen und die Historie trotzdem nicht herstellen.
+    if (istMomentaufnahme(ep)) {
+      log.info('historie übersprungen — Momentaufnahme ohne Vergangenheit', { endpunkt: ep.key })
+      continue
+    }
     const r = await eine<{ n: number }>(
       `SELECT sync.historie_einreihen($1, $2::date, $3::date, $4) AS n`,
       [ep.key, von, bis, ep.schrittweite])
