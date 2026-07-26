@@ -211,21 +211,29 @@ Ein bewusster Unterschied zwischen den beiden Sichten:
 aufgebaut: Betriebe in den Zeilen, Aktionen in den Spalten.
 
 ```json
-{"timeframe":"25.07.2026", "brutto":false,
+{"timeframe":"21.07.2026", "brutto":false,
  "aktionen":[{"id":8,"name":"Mexican Summer","dateFrom":1780264800,"dateTo":1785448800}],
- "rows":[{"name":"…","encId":"…","cells":{"4":null,"6":null,"8":128.40}}]}
+ "rows":[{"name":"…","encId":"…","cells":{"4":null,"12":{"revenue":798.15,"percent":8.73}}}]}
 ```
 
 Der **Schlüssel einer Zelle ist die `id` aus `aktionen`** — ohne die Liste im Kopf der Antwort
 ist `cells` unlesbar. Deshalb wird die Dimension bei jedem Posten mitgeschrieben, auch wenn
-keine einzige Zelle gefüllt ist.
+keine einzige Zelle gefüllt ist. Die Liste ändert sich dabei: Aktion 12 kam erst später dazu.
 
-Zwei Punkte, die man leicht falsch macht:
+Drei Punkte, die man leicht falsch macht:
 
-- **Leere Zellen werden verworfen.** Am 25.07.2026 waren *alle* 423 Zellen (141 Betriebe ×
-  3 Aktionen) `null`. Wer sie mitschreibt, sammelt 87.000 Zeilen Nichts im Jahr. Der Preis
-  ist derselbe wie beim Artikelverkauf: eine fehlende Zeile heißt „keine Aktion an diesem
-  Tag" **und** „Tag nicht geholt". Welcher Fall vorliegt, beantwortet `sync.warteschlange`.
+- **Der Wert einer Zelle ist ein Objekt, keine Zahl.** Das wurde hier schon einmal falsch
+  angenommen — gebaut gegen den einzigen Tag im Bestand, an dem alle 423 Zellen auf `null`
+  standen. Aus einer leeren Antwort lässt sich die Struktur der gefüllten nicht ablesen.
+  `Number({…})` ist `NaN`, also hätte die Transformation für jeden gefüllten Tag null Zeilen
+  geschrieben und dabei `ok` gemeldet. Siehe `fehlerkatalog.md`.
+- **`percent` wird übernommen, nicht nachgerechnet.** Es ist der Anteil am **Netto-Tagesumsatz**
+  des Betriebs; über alle 946 gefüllten Zellen gegen `core.umsatzbericht_tag` geprüft:
+  0 Abweichungen. Für den Monatsanteil rechnet `mart.aktionsumsatz_monat` selbst — den gibt
+  LINA nicht her.
+- **Leere Zellen werden verworfen.** Über 27 Tage gemessen: 15.510 Zellen, davon 946 gefüllt.
+  Der Preis ist derselbe wie beim Artikelverkauf: eine fehlende Zeile heißt „keine Aktion an
+  diesem Tag" **und** „Tag nicht geholt". Welcher Fall vorliegt, beantwortet `sync.warteschlange`.
 - **Netto oder brutto entscheidet `brutto` in der Antwort**, nicht unser Anfrageparameter.
   Wir fragen zwar immer mit `brutto=0`, aber wer sich auf die eigene Anfrage verlässt statt
   auf die Antwort, beschriftet irgendwann Bruttowerte als netto — und das sieht man einer

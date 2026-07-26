@@ -110,14 +110,48 @@ ist eine rechtliche Frage — ich bin kein Jurist und kann sie nicht beurteilen.
 
 ---
 
-## Offen
+## Gelöst — die Anmeldung funktioniert
 
-Die Anmeldung scheitert weiterhin (`Login 200, Probe 401`). Die Antwort auf
-den Login-POST — 69 Bytes JSON mit einem `status`-Feld — wird derzeit nicht
-ausgewertet; dort steht mit hoher Wahrscheinlichkeit die Ursache. Nächste
-Schritte in `PROMPT-login-fix.md`.
+Der `status`-Wert der Login-Antwort wird ausgewertet, MD5-Hex ist bestätigt,
+`system=a360` ebenfalls. Am 26.07.2026 liefen darüber **1.518 Aufrufe** ohne
+einen einzigen Anmeldefehler.
 
-Eine naheliegende Hypothese, die noch zu prüfen ist: LINAs `hex_md5` stammt
-aus der Paul-Johnston-Bibliothek, die je nach Version vor dem Hashen nach
-UTF-8 kodiert oder die Zeichencodes roh nimmt. Node kodiert immer UTF-8. Bei
-Sonderzeichen im Passwort ergeben sich daraus zwei verschiedene Hashes.
+## Ereignis 26.07.2026, 19:20 UTC — LINA lehnt die Anmeldung ab
+
+Nach einem Worker-Neustart antwortete `dologin` mit
+`{"status":"ERROR","message":"Benutzername oder Passwort ist falsch!"}`.
+Fünf Minuten zuvor lief derselbe Zugang mit gültiger Sitzung noch einwandfrei.
+
+**Was der Importer daraufhin tat — und das ist der Punkt:** genau einen
+Versuch, dann Ende. `sync.zugangssperre` steht bis zum **30.07.2026**, der
+Lauf brach sofort ab, kein Posten wurde angefasst, kein zweiter Anmeldeversuch.
+Harte Regel 6 hat gehalten.
+
+**Was vorher anders war.** Das Anfragetempo war für eine Nachladeaktion von
+20–40 s auf 5–12 s gesenkt worden. Die Aufrufe je Stunde:
+
+```text
+10–16 Uhr   75 … 143 je Stunde
+17 Uhr      279
+18 Uhr      321
+19:20       Anmeldung abgelehnt
+```
+
+Das ist ein zeitlicher Zusammenhang, kein bewiesener ursächlicher — LINA
+schickt keinen Grund mit. Aber es ist die einzige Änderung im Verhalten, und
+eine Abwehrmaßnahme, die sich als „Passwort falsch" ausgibt statt als 429,
+passt zum Bild.
+
+**Was jetzt zu tun ist — in dieser Reihenfolge:**
+
+1. **Im Browser anmelden.** Geht es dort, war es eine Drosselung und kein
+   gesperrtes Konto. Geht es dort nicht, bitte **nicht** weiterprobieren —
+   es gibt genau einen Zugang.
+2. Danach, und nur danach: `SELECT sync.sperre_aufheben('<name>');`
+3. Vor dem nächsten Start sicherstellen, dass `TAKT_MIN_MS`/`TAKT_MAX_MS` auf
+   der Voreinstellung 10.000/20.000 stehen. Der abgestürzte Lauf lief mit
+   5.000/12.000.
+
+Der Importer selbst braucht kein Zutun: Die Sperre läuft von allein ab, und
+`sperre_aktiv()` wird vor jedem Lauf geprüft — ein Neustart des Containers
+nimmt bis dahin keinen Kontakt zu LINA auf.

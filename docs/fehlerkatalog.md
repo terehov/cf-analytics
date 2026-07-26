@@ -83,6 +83,39 @@ noch in der Warteschlange — sie laufen jetzt gegen einen Ladepfad, der sie auc
 > „Der Raw-Layer hat es ja" ist eine Versicherung, keine Auswertung. Ein Endpunkt ohne
 > `case` bleibt still, bis jemand die Tabellen zählt.
 
+### …und die Transformation dafür war aus einer leeren Antwort geraten
+
+**Symptom.** Beim Nachtransformieren aus `raw`: `cannot cast jsonb object to type numeric`.
+
+**Ursache.** Die Transformation nahm an, eine Zelle sei eine Zahl. Sie ist ein Objekt:
+
+```json
+"cells": {"12": {"revenue": 798.15, "percent": 8.73}}
+```
+
+Gebaut war sie gegen die **einzige** Antwort, die zu dem Zeitpunkt im Bestand lag — den
+25.07.2026, an dem alle 423 Zellen auf `null` standen. **Aus einer leeren Antwort lässt sich
+die Struktur der gefüllten nicht ablesen.** `Number({…})` ist `NaN`, die Transformation hätte
+also jede Zelle verworfen: null Zeilen für jeden gefüllten Tag, Status `ok`. Genau der
+Ausfall, den der `case` beheben sollte, eine Ebene tiefer und mit einem grünen Test daneben.
+
+**Die Strukturprüfung hatte recht.** `sync.schema_abweichung` bekam 26 Einträge, geschrieben
+in derselben Viertelstunde — das Schema stand auf `z.number()`. Der Mechanismus hat den
+Irrtum sofort gemeldet; angesehen hat sie in dem Moment niemand. Gefunden wurde er stattdessen
+durch einen Postgres-Fehler beim Nachziehen.
+
+**Nebenbei gewonnen.** LINA liefert den Anteil am Netto-**Tages**umsatz gleich mit. Über alle
+946 gefüllten Zellen gegen `core.umsatzbericht_tag` geprüft: **0 Abweichungen**. Gespeichert
+wird LINAs Wert, nicht der nachgerechnete — dieselbe Regel wie bei `durchschnittsbon` und
+`kennzahlen_monat.wert_prozent`.
+
+**Heute.** Migration `0017`, `anteil_pct` in `core.aktionsumsatz_tag`, das Schema kennt die
+Objektform, und die Fixture trägt beide Formen. Aus `raw` nachgezogen: **946 Zeilen, 60.021 €
+Aktionsumsatz über 27 Tage** — ohne einen einzigen LINA-Aufruf.
+
+> Eine leere Antwort ist kein Muster. Wer die Struktur aus dem Fall ohne Daten ableitet,
+> beschreibt die Verpackung und nicht den Inhalt.
+
 ### Eine Tabelle mit Kommentar, mit Zweck — und ohne einen einzigen Schreiber
 
 **Symptom.** `core.bwa_buchungsstand`: 0 Zeilen. `grep -r bwa_buchungsstand src/` ohne Treffer.
