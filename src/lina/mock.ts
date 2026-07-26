@@ -145,9 +145,31 @@ export function mockStarten(opt: MockOptionen = {}) {
         '/intranet/analytics/getVordefinierteZeitzonenBericht': 'getVordefinierteZeitzonenBericht',
         '/intranet/analytics/getArtikelverkaufsbericht': 'getArtikelverkaufsbericht',
         '/intranet/analytics/getAktionsbericht': 'getAktionsbericht',
+
+        // Stammdaten-Momentaufnahmen. Die Fixtures sind anonymisiert, bilden
+        // aber die Eigenheiten des Originals nach — insbesondere prices als
+        // Objekt UND als leeres Array, und Inventurtermine, die denselben Tag
+        // mehrfach nennen.
+        '/wawi/rezept/articleApi': 'articleApi',
+        '/intranet/api/analyticsFilterOptions': 'analyticsFilterOptions',
+        '/wawi/api/items': 'wawiItems',
+        '/wawi/api/suppliers': 'wawiSuppliers',
+        '/wawi/api/units': 'wawiUnits',
+        '/wawi/api/orders': 'wawiOrders',
+        '/wawi/inventory/inventory': 'wawiInventory',
       }
       const name = map[pfad]
       if (!name) return new Response('nicht gefunden', { status: 404 })
+
+      // Momentaufnahmen dürfen KEINE Datumsparameter bekommen. Die Attrappe
+      // lehnt das ab, statt es zu schlucken: LINA kennt hier keinen Zeitraum,
+      // und ein Backfill über diese Endpunkte wäre ein teurer Denkfehler.
+      if (pfad.startsWith('/wawi/') || pfad === '/intranet/api/analyticsFilterOptions') {
+        if (url.searchParams.has('von') || url.searchParams.has('bis')
+            || url.searchParams.has('reltime')) {
+          return new Response('Momentaufnahmen kennen keinen Zeitraum', { status: 400 })
+        }
+      }
 
       zaehler[name] = (zaehler[name] ?? 0) + 1
 

@@ -180,6 +180,121 @@ lauf('Ende-zu-Ende', () => {
 })
 
 /**
+ * Stammdaten-Momentaufnahmen durch die ganze Kette.
+ *
+ * Eigener Durchlauf, weil sie sich grundsätzlich anders verhalten als
+ * Berichte: kein Zeitraum, monatlich statt täglich, kein Backfill.
+ */
+lauf('Stammdaten-Momentaufnahmen', () => {
+  let mock: ReturnType<typeof mockStarten>
+  let db: Client
+  const MONAT = '2026-07-01'
+
+  beforeAll(async () => {
+    // Auf DEMSELBEN Port wie der erste Durchlauf: `config` wird beim ersten
+    // Import eingefroren, `config.LINA_BASE_URL` zeigt also weiterhin auf den
+    // Port von oben. Eine Umgebungsvariable hier hilft nicht mehr — das ist
+    // dieselbe Falle, die im Kopf dieser Datei beschrieben ist.
+    const { config } = await import('../config')
+    mock = mockStarten({ port: Number(new URL(config.LINA_BASE_URL).port) })
+    db = new Client({ connectionString: DB })
+    await db.connect()
+    await db.query(`TRUNCATE core.artikel_warengruppe_stand, core.warengruppe, core.feinsparte,
+                       core.einkaufspreis_stand, core.ware_stand, core.ware,
+                       core.bestellposten, core.bestellung, core.lieferant, core.einheit,
+                       core.inventurtermin RESTART IDENTITY CASCADE`)
+    // Ein Artikel, damit articleApi etwas zum Verknuepfen hat.
+    await db.query(`INSERT INTO core.artikel (artikelnummer, name) VALUES (300213, 'Artikel A')
+                    ON CONFLICT (artikelnummer) DO NOTHING`)
+    await db.query(
+      `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet) VALUES
+         ('analyticsFilterOptions',  $1,$1, 10),
+         ('wawi:units',              $1,$1, 10),
+         ('wawi:suppliers',          $1,$1, 10),
+         ('wawi:items',              $1,$1, 10),
+         ('wawi:orders',             $1,$1, 10),
+         ('wawi:inventory',          $1,$1, 10),
+         ('articleApi:franchise',    $1,$1, 10)
+       ON CONFLICT DO NOTHING`, [MONAT])
+
+    const { workerLauf } = await import('./worker')
+    await workerLauf('manuell')
+  })
+
+  afterAll(async () => { mock.stop(); await db.end() })
+
+  test('alle sieben Momentaufnahmen laufen fehlerfrei durch', async () => {
+    const { rows: [{ n }] } = await db.query(
+      `SELECT count(*)::int AS n FROM sync.aufgabe WHERE status = 'fehler'`)
+    expect(n).toBe(0)
+  })
+
+  test('Warengruppen landen dreistufig getrennt', async () => {
+    const { rows } = await db.query(
+      `SELECT ebene::text AS ebene, count(*)::int AS n FROM core.warengruppe GROUP BY 1 ORDER BY 1`)
+    expect(rows.map(r => r.ebene).sort()).toEqual(['detail', 'gross', 'mec'])
+  })
+
+  /** Der teuerste denkbare Fehler: ueber id statt artnr verknuepfen. */
+  test('die Zuordnung haengt an der Artikelnummer, nicht an articleApi.id', async () => {
+    const { rows } = await db.query(
+      `SELECT a.artikelnummer::bigint AS nr, g.name AS gross
+         FROM core.artikel_warengruppe_stand s
+         JOIN core.artikel a ON a.artikel_key = s.artikel_key
+         LEFT JOIN core.warengruppe g ON g.warengruppe_key = s.gross_key`)
+    const nummern = rows.map(r => Number(r.nr))
+    // artnr des ersten Fixture-Satzes …
+    expect(nummern).toContain(300213)
+    expect(rows.find(r => Number(r.nr) === 300213)!.gross).toBe('Getränke')
+    // … und dessen id darf NIRGENDS als Artikelnummer auftauchen.
+    expect(nummern).not.toContain(19324)
+    // Zugeordnet wird nur, was core.artikel kennt — articleApi hat 9.132
+    // Artikel, verkauft wird davon ein Bruchteil.
+    const { rows: [{ n: bekannt }] } = await db.query(
+      `SELECT count(*)::int AS n FROM core.artikel`)
+    expect(rows.length).toBeLessThanOrEqual(Number(bekannt))
+  })
+
+  /**
+   * Datenminimierung, in der Datenbank nachgewiesen: core.lieferant darf
+   * ueberhaupt keine Spalte fuer Steuer-, Bank- oder Kontaktdaten haben.
+   */
+  test('core.lieferant hat keine Spalte fuer heikle Felder', async () => {
+    const { rows } = await db.query(
+      `SELECT column_name FROM information_schema.columns
+        WHERE table_schema = 'core' AND table_name = 'lieferant'`)
+    const spalten = rows.map(r => r.column_name)
+    for (const heikel of ['ustid', 'hrb', 'kreditor', 'gegenkonto', 'tel', 'email',
+                          'strasse', 'plz', 'ort', 'kdnr', 'fax']) {
+      expect(spalten).not.toContain(heikel)
+    }
+    expect(spalten).toContain('name')
+  })
+
+  test('Einkaufspreise je Ware und Lieferant, mit Umrechnung auf die Basiseinheit', async () => {
+    const { rows: [{ n }] } = await db.query(
+      `SELECT count(*)::int AS n FROM core.einkaufspreis_stand WHERE monat = $1`, [MONAT])
+    expect(n).toBeGreaterThan(0)
+    // Ware 1 hat zwei Lieferantenpreise -- deshalb eine eigene Tabelle.
+    const { rows: [{ n: mehrfach }] } = await db.query(`
+      SELECT count(*)::int AS n FROM (
+        SELECT ware_key FROM core.einkaufspreis_stand GROUP BY 1 HAVING count(*) > 1) x`)
+    expect(mehrfach).toBeGreaterThan(0)
+  })
+
+  test('Inventurtermine sind je Tag eindeutig', async () => {
+    const { rows: [{ n, tage }] } = await db.query(
+      `SELECT count(*)::int AS n, count(DISTINCT datum)::int AS tage FROM core.inventurtermin`)
+    expect(n).toBe(tage)
+  })
+
+  test('die neuen Mart-Sichten sind abfragbar', async () => {
+    await db.query(`SELECT * FROM mart.preisentwicklung_ware LIMIT 1`)
+    await db.query(`SELECT * FROM mart.deckungsbeitrag_warengruppe LIMIT 1`)
+  })
+})
+
+/**
  * Die Sperre gegen parallele Worker.
  *
  * Seit das Arbeitsfenster entfallen ist (25.07.2026), läuft ein Backfill-Lauf

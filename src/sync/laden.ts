@@ -89,6 +89,20 @@ async function artikelStandFortschreiben(
     [zeilen.map(z => z.artikel_key), zeilen.map(z => z.name), zeilen.map(z => z.fixer_we), monat])
 }
 
+/**
+ * lina_id -> Primärschlüssel für die Stammdatentabellen.
+ *
+ * Einheiten, Lieferanten und Waren kommen als getrennte Posten und in
+ * beliebiger Reihenfolge an. Wer noch nicht da ist, fehlt in der Map, und der
+ * Verweis bleibt null — die Fremdschlüssel sind bewusst nullable. Besser ein
+ * Satz ohne Verweis als ein gescheiterter Posten, der 20 Minuten später
+ * erneut gegen LINA läuft.
+ */
+async function schluesselMap(c: PoolClient, tabelle: string, keySpalte: string) {
+  const r = await c.query(`SELECT ${keySpalte} AS k, lina_id FROM ${tabelle}`)
+  return new Map<number, number>(r.rows.map(z => [Number(z.lina_id), Number(z.k)]))
+}
+
 async function artikelSichern(c: PoolClient, stamm: t.ArtikelStamm[]) {
   const map = new Map<number, number>()
   if (stamm.length === 0) return map
@@ -311,6 +325,240 @@ export async function laden(k: Kontext): Promise<number> {
                raw_id = EXCLUDED.raw_id, geladen_am = now()`, werte)
         })
         geschrieben = rows.length
+        break
+      }
+
+      // --- Stammdaten-Momentaufnahmen -----------------------------------
+      //
+      // `k.von` ist bei diesen Endpunkten der Monatserste (siehe
+      // istMomentaufnahme in endpunkte.ts) und damit der Monat, für den die
+      // *_stand-Tabellen fortgeschrieben werden.
+      //
+      // Die Fremdschlüssel zwischen den Stammdaten sind absichtlich NULLABLE:
+      // Einheiten, Lieferanten und Waren kommen als getrennte Posten und in
+      // beliebiger Reihenfolge an. Wer zuerst da ist, wird ohne Verweis
+      // gespeichert; die nächste Momentaufnahme im Folgemonat hat dann alles
+      // beisammen. Das ist besser, als einen Posten scheitern zu lassen und
+      // ihn 20 Minuten später erneut gegen LINA zu holen.
+      case 'analyticsFilterOptions': {
+        const fs = t.feinsparten(k.daten)
+        await inBloecken(fs, 500, async b => {
+          const { platzhalter, werte } = mehrzeilig(
+            ['lina_id', 'nummer', 'name'],
+            b.map(f => ({ lina_id: f.linaId, nummer: f.nummer, name: f.name })))
+          await c.query(
+            `INSERT INTO core.feinsparte (lina_id, nummer, name) VALUES ${platzhalter}
+             ON CONFLICT (lina_id) DO UPDATE SET
+               nummer = EXCLUDED.nummer, name = EXCLUDED.name`, werte)
+        })
+        geschrieben = fs.length
+        break
+      }
+
+      case 'articleApi:franchise': {
+        const zeilen = t.artikelWarengruppen(k.daten)
+
+        // 1. Die drei Warengruppenebenen als Dimension.
+        const gruppen = new Map<string, { ebene: string; linaId: number; name: string }>()
+        for (const a of zeilen) {
+          for (const [ebene, g] of [['gross', a.gross], ['mec', a.mec], ['detail', a.detail]] as const) {
+            if (g) gruppen.set(`${ebene}:${g.linaId}`, { ebene, linaId: g.linaId, name: g.name })
+          }
+        }
+        // unnest mit typisierten Arrays statt einer VALUES-Liste: in einem
+        // VALUES ohne explizite Typen hält Postgres die Parameter für text
+        // und findet den Enum-Typ nicht. Dasselbe Muster wie bei
+        // artikelStandFortschreiben.
+        await inBloecken([...gruppen.values()], 500, async b => {
+          await c.query(
+            `INSERT INTO core.warengruppe (ebene, lina_id, name)
+             SELECT v.ebene::core.warengruppe_ebene, v.lina_id, v.name
+               FROM unnest($1::text[], $2::int[], $3::text[]) AS v(ebene, lina_id, name)
+             ON CONFLICT (ebene, lina_id) DO UPDATE SET
+               name = EXCLUDED.name, zuletzt_am = now()`,
+            [b.map(g => g.ebene), b.map(g => g.linaId), b.map(g => g.name)])
+        })
+        const gr = await c.query(`SELECT warengruppe_key, ebene::text AS ebene, lina_id FROM core.warengruppe`)
+        const gkey = new Map(gr.rows.map(r => [`${r.ebene}:${r.lina_id}`, Number(r.warengruppe_key)]))
+
+        // 2. Zuordnung je Artikel — nur für Artikel, die wir schon kennen.
+        //    core.artikel wird vom Verkaufsbericht gefüllt; articleApi kennt
+        //    9.132 Artikel, verkauft wird davon ein Bruchteil. Wer nie
+        //    verkauft wurde, braucht auch keine Warengruppenhistorie.
+        const nummern = zeilen.map(a => a.artikelnummer)
+        const ar = await c.query(
+          `SELECT artikel_key, artikelnummer FROM core.artikel WHERE artikelnummer = ANY($1)`, [nummern])
+        const akey = new Map(ar.rows.map(r => [Number(r.artikelnummer), Number(r.artikel_key)]))
+
+        const sp = ['artikel_key', 'monat', 'gross_key', 'mec_key', 'detail_key'] as const
+        const rows = zeilen
+          .filter(a => akey.has(a.artikelnummer))
+          .map(a => ({
+            artikel_key: akey.get(a.artikelnummer)!,
+            monat: k.von,
+            gross_key: a.gross ? gkey.get(`gross:${a.gross.linaId}`) ?? null : null,
+            mec_key: a.mec ? gkey.get(`mec:${a.mec.linaId}`) ?? null : null,
+            detail_key: a.detail ? gkey.get(`detail:${a.detail.linaId}`) ?? null : null,
+          }))
+        await inBloecken(rows, 500, async b => {
+          const { platzhalter, werte } = mehrzeilig(sp, b)
+          await c.query(
+            `INSERT INTO core.artikel_warengruppe_stand (${sp.join(',')}) VALUES ${platzhalter}
+             ON CONFLICT (artikel_key, monat) DO UPDATE SET
+               gross_key = EXCLUDED.gross_key, mec_key = EXCLUDED.mec_key,
+               detail_key = EXCLUDED.detail_key`, werte)
+        })
+        geschrieben = rows.length
+        break
+      }
+
+      case 'wawi:units': {
+        const e = t.einheiten(k.daten)
+        await inBloecken(e, 500, async b => {
+          const { platzhalter, werte } = mehrzeilig(
+            ['lina_id', 'name', 'abkuerzung', 'parent_lina_id', 'faktor', 'ist_basis'],
+            b.map(x => ({ lina_id: x.linaId, name: x.name, abkuerzung: x.abkuerzung,
+                          parent_lina_id: x.parentLinaId, faktor: x.faktor, ist_basis: x.istBasis })))
+          await c.query(
+            `INSERT INTO core.einheit (lina_id, name, abkuerzung, parent_lina_id, faktor, ist_basis)
+             VALUES ${platzhalter}
+             ON CONFLICT (lina_id) DO UPDATE SET
+               name = EXCLUDED.name, abkuerzung = EXCLUDED.abkuerzung,
+               parent_lina_id = EXCLUDED.parent_lina_id, faktor = EXCLUDED.faktor,
+               ist_basis = EXCLUDED.ist_basis, zuletzt_am = now()`, werte)
+        })
+        geschrieben = e.length
+        break
+      }
+
+      case 'wawi:suppliers': {
+        // Die Transformation hat die Whitelist — hier kommen nur noch die
+        // fünf erlaubten Felder an. Siehe Kopf von migrations/0008.
+        const l = t.lieferanten(k.daten)
+        await inBloecken(l, 500, async b => {
+          const { platzhalter, werte } = mehrzeilig(
+            ['lina_id', 'name', 'aktiv', 'mindestbestellwert', 'liefertage'],
+            b.map(x => ({ lina_id: x.linaId, name: x.name, aktiv: x.aktiv,
+                          mindestbestellwert: x.mindestbestellwert, liefertage: x.liefertage })))
+          await c.query(
+            `INSERT INTO core.lieferant (lina_id, name, aktiv, mindestbestellwert, liefertage)
+             VALUES ${platzhalter}
+             ON CONFLICT (lina_id) DO UPDATE SET
+               name = EXCLUDED.name, aktiv = EXCLUDED.aktiv,
+               mindestbestellwert = EXCLUDED.mindestbestellwert,
+               liefertage = EXCLUDED.liefertage, zuletzt_am = now()`, werte)
+        })
+        geschrieben = l.length
+        break
+      }
+
+      case 'wawi:items': {
+        const { waren: w, preise } = t.waren(k.daten)
+        const ekey = await schluesselMap(c, 'core.einheit', 'einheit_key')
+        const lkey = await schluesselMap(c, 'core.lieferant', 'lieferant_key')
+
+        await inBloecken(w, 500, async b => {
+          const { platzhalter, werte } = mehrzeilig(
+            ['lina_id', 'name', 'nummer', 'gruppe_lina_id', 'gruppe_name', 'einheit_key'],
+            b.map(x => ({ lina_id: x.linaId, name: x.name, nummer: x.nummer,
+                          gruppe_lina_id: x.gruppeLinaId, gruppe_name: x.gruppeName,
+                          einheit_key: x.einheitLinaId ? ekey.get(x.einheitLinaId) ?? null : null })))
+          await c.query(
+            `INSERT INTO core.ware (lina_id, name, nummer, gruppe_lina_id, gruppe_name, einheit_key)
+             VALUES ${platzhalter}
+             ON CONFLICT (lina_id) DO UPDATE SET
+               name = EXCLUDED.name, nummer = EXCLUDED.nummer,
+               gruppe_lina_id = EXCLUDED.gruppe_lina_id, gruppe_name = EXCLUDED.gruppe_name,
+               einheit_key = EXCLUDED.einheit_key, zuletzt_am = now()`, werte)
+        })
+        const wkey = await schluesselMap(c, 'core.ware', 'ware_key')
+
+        const sw = ['ware_key','monat','name','gruppe_name','einheit_key',
+                    'hauptlieferant_key','listenpreis','gebinde','gebinde_einheit'] as const
+        const wsRows = w.filter(x => wkey.has(x.linaId)).map(x => ({
+          ware_key: wkey.get(x.linaId)!, monat: k.von, name: x.name,
+          gruppe_name: x.gruppeName,
+          einheit_key: x.einheitLinaId ? ekey.get(x.einheitLinaId) ?? null : null,
+          hauptlieferant_key: x.hauptlieferantLinaId ? lkey.get(x.hauptlieferantLinaId) ?? null : null,
+          listenpreis: x.listenpreis, gebinde: x.gebinde, gebinde_einheit: x.gebindeEinheit,
+        }))
+        await inBloecken(wsRows, 500, async b => {
+          const { platzhalter, werte } = mehrzeilig(sw, b)
+          await c.query(
+            `INSERT INTO core.ware_stand (${sw.join(',')}) VALUES ${platzhalter}
+             ON CONFLICT (ware_key, monat) DO NOTHING`, werte)
+        })
+
+        const sp = ['ware_key','monat','lina_preis_id','lieferant_key','einheit_key',
+                    'lieferanten_artnr','bestellart','preis','menge','gebinde_menge',
+                    'basis_faktor','aktiv','geaendert_am'] as const
+        const pRows = preise.filter(p => wkey.has(p.wareLinaId)).map(p => ({
+          ware_key: wkey.get(p.wareLinaId)!, monat: k.von, lina_preis_id: p.linaPreisId,
+          lieferant_key: p.lieferantLinaId ? lkey.get(p.lieferantLinaId) ?? null : null,
+          einheit_key: p.einheitLinaId ? ekey.get(p.einheitLinaId) ?? null : null,
+          lieferanten_artnr: p.lieferantenArtnr, bestellart: p.bestellart,
+          preis: p.preis, menge: p.menge, gebinde_menge: p.gebindeMenge,
+          basis_faktor: p.basisFaktor, aktiv: p.aktiv, geaendert_am: p.geaendertAm,
+        }))
+        // APPEND-ONLY: DO NOTHING statt DO UPDATE. Eine einmal festgehaltene
+        // Momentaufnahme wird nicht nachträglich verändert — sonst wäre die
+        // Preisreihe genau das, was LINA auch schon nicht hat.
+        await inBloecken(pRows, 500, async b => {
+          const { platzhalter, werte } = mehrzeilig(sp, b)
+          await c.query(
+            `INSERT INTO core.einkaufspreis_stand (${sp.join(',')}) VALUES ${platzhalter}
+             ON CONFLICT (ware_key, monat, lina_preis_id) DO NOTHING`, werte)
+        })
+        geschrieben = w.length + pRows.length
+        break
+      }
+
+      case 'wawi:orders': {
+        const b = t.bestellungen(k.daten)
+        const lkey = await schluesselMap(c, 'core.lieferant', 'lieferant_key')
+        const ekey = await schluesselMap(c, 'core.einheit', 'einheit_key')
+        for (const best of b) {
+          const r = await c.query(
+            `INSERT INTO core.bestellung
+               (lina_id, lieferant_key, erstellt_am, bestellt_am, liefertermin,
+                geliefert, status, posten_anzahl, summe)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+             ON CONFLICT (lina_id) DO UPDATE SET
+               lieferant_key = EXCLUDED.lieferant_key, geliefert = EXCLUDED.geliefert,
+               status = EXCLUDED.status, posten_anzahl = EXCLUDED.posten_anzahl,
+               summe = EXCLUDED.summe, zuletzt_am = now()
+             RETURNING bestellung_key`,
+            [best.linaId, best.lieferantLinaId ? lkey.get(best.lieferantLinaId) ?? null : null,
+             best.erstelltAm, best.bestelltAm, best.liefertermin,
+             best.geliefert, best.status, best.postenAnzahl, best.summe])
+          const bkey = Number(r.rows[0].bestellung_key)
+          if (best.posten.length === 0) continue
+          const sp = ['bestellung_key','ware_lina_id','einheit_key','ware_name','menge','einzelpreis'] as const
+          const { platzhalter, werte } = mehrzeilig(sp, best.posten.map(p => ({
+            bestellung_key: bkey, ware_lina_id: p.wareLinaId,
+            einheit_key: p.einheitLinaId ? ekey.get(p.einheitLinaId) ?? null : null,
+            ware_name: p.wareName, menge: p.menge, einzelpreis: p.einzelpreis,
+          })))
+          await c.query(
+            `INSERT INTO core.bestellposten (${sp.join(',')}) VALUES ${platzhalter}
+             ON CONFLICT (bestellung_key, ware_lina_id) DO UPDATE SET
+               menge = EXCLUDED.menge, einzelpreis = EXCLUDED.einzelpreis`, werte)
+        }
+        geschrieben = b.length
+        break
+      }
+
+      case 'wawi:inventory': {
+        const i = t.inventurtermine(k.daten)
+        await inBloecken(i, 500, async b => {
+          const { platzhalter, werte } = mehrzeilig(
+            ['datum', 'bearbeitbar'], b.map(x => ({ datum: x.datum, bearbeitbar: x.bearbeitbar })))
+          await c.query(
+            `INSERT INTO core.inventurtermin (datum, bearbeitbar) VALUES ${platzhalter}
+             ON CONFLICT (datum) DO UPDATE SET
+               bearbeitbar = EXCLUDED.bearbeitbar, zuletzt_am = now()`, werte)
+        })
+        geschrieben = i.length
         break
       }
 
