@@ -317,7 +317,12 @@ async function workerLaufIntern(
       laufId, status, ok, keineDaten, fehler, uebersprungen,
       budgetVerbraucht: client.budgetVerbraucht, notiz,
     })
-    await pool.end()
+    // Der Pool wird hier BEWUSST nicht geschlossen. Er gehört dem Prozess,
+    // nicht diesem Lauf: `pool.end()` an dieser Stelle machte workerLauf zu
+    // einer Funktion, die man pro Prozess genau einmal aufrufen kann — jeder
+    // zweite Aufruf scheiterte mit „Cannot use a pool after calling end".
+    // Aufgefallen ist das erst, als der Ende-zu-Ende-Test einen zweiten
+    // Durchlauf für die Stammdaten bekam. Geschlossen wird in src/sync.ts.
   }
 
   return { laufId, ok, keineDaten, fehler, uebersprungen, status }
