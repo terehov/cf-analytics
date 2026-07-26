@@ -1,17 +1,20 @@
 # Datenmodell
 
-Sechs Schemata statt eines großen `public`. In Postico sieht man damit sofort, ob man auf Rohdaten, abgeleitete Daten oder Handgepflegtes schaut, und Metabase-Berechtigungen lassen sich später pro Schema vergeben.
+Sieben Schemata statt eines großen `public`. In Postico sieht man damit sofort, ob man auf Rohdaten, abgeleitete Daten oder Handgepflegtes schaut, und Metabase bekommt nur die vier zu sehen, die etwas bedeuten.
 
 ```
-raw     unveränderte API-Antworten, append-only
+raw     unveränderte API-Antworten, append-only          nicht in Metabase
+part    ausschließlich Partitionskinder                  nicht in Metabase
 core    Stammdaten und Bewegungsdaten, benannt nach den LINA-Berichten
 manual  OM-Einschätzung, Ursachen, Maßnahmen, YEXT-Bewertungen
 ampel   Regelwerke
-sync    Betriebszustand des Importers
-mart    Sichten für Metabase
+sync    Betriebszustand des Importers                    nicht in Metabase
+mart    Sichten für Metabase — hier fängt jede Frage an
 ```
 
-## Die sieben Entscheidungen
+Welche Schemata Metabase synchronisieren soll und warum: `metabase.md`.
+
+## Die acht Entscheidungen
 
 **1. `raw.api_antwort` speichert die komplette Antwort als JSONB, append-only.**
 LINAs API ist undokumentiert und unversioniert. Ändert sich eine Struktur oder war eine Semantik falsch verstanden — was in Phase 1 dreimal passiert ist — muss rückwirkend neu transformiert werden können, ohne 141 Betriebe × Jahre neu zu ziehen. Kostet wenig: die Konzern-Endpunkte packen alle 141 Betriebe in *eine* Antwort. `payload_hash` erkennt unveränderte Antworten und macht BWA-Nachbuchungen sichtbar.
@@ -38,9 +41,16 @@ Umschalten ist ein Funktionsargument, kein Deploy. In Metabase wird daraus ein D
 **7. `sync` ist bewusst flach und in Postico lesbar.**
 Der gesamte Zustand des Importers liegt in der Datenbank, nicht im Container — ein Absturz kostet damit nichts, und „warum fehlen Betrieb 47 die Junidaten?" beantwortet ein `SELECT`.
 
+**8. Stände werden über Zeiträume aufgelöst, nicht über Monatsgleichheit.**
+Die `*_stand`-Tabellen bekommen nur bei einer **Änderung** eine Zeile — ein unveränderter Artikel braucht keine 60 identischen Einträge. Wer daraufhin `stand.monat = date_trunc('month', tag)` schreibt, bekommt für die meisten Monate `NULL` und merkt es nicht: ein theoretischer Wareneinsatz von `NULL` sieht aus wie „kein Ansatz hinterlegt", nicht wie „falsch verknüpft". Genau dieser Fehler steckte in der ersten Fassung von `mart.deckungsbeitrag_warengruppe`. `core.artikel_stand_zeitraum` und `core.artikel_warengruppe_zeitraum` übersetzen die Punktfolge einmal in Gültigkeitszeiträume; danach ist der Join ein Bereichsvergleich und kann nicht mehr danebengehen.
+
+Ein bewusster Unterschied zwischen den beiden: die **Warengruppe** gilt rückwirkend bis `-infinity`, der **Wareneinsatzansatz** nicht. Die Warengruppenmomentaufnahme läuft nur vorwärts, LINA führt keine Historie — ohne Rückgriff hätte die gesamte Vergangenheit gar keine Warengruppe. Eine Einordnung ändert sich selten, und die älteste bekannte ist die beste verfügbare Schätzung; `mart.artikelverkauf.warengruppe_geschaetzt` weist aus, wo geschätzt wurde. Ein Preis dagegen ist eine konkrete Zahl, und ein Preis von heute auf 2023 angewandt ist eine konkret falsche.
+
 ## Partitionierung
 
 `core.artikelverkauf_tag` (~20 Mio. Zeilen/Jahr) und `raw.api_antwort` sind monatlich partitioniert, BRIN auf der Zeitachse. `core.partition_anlegen()` legt fehlende Partitionen an — der Importer ruft das vor dem Schreiben auf, damit es keinen Wartungsjob gibt, den man vergessen kann.
+
+**Die Kinder liegen im Schema `part`, nicht neben der Elterntabelle.** Postgres legt sie standardmäßig daneben; bei monatlicher Partitionierung über acht Jahre stehen dann rund hundert Tabellen namens `artikelverkauf_tag_2023_07` in `core` und die fünf, um die es geht, gehen darin unter. Am 26.07.2026 waren es 84 von 110 Tabellen. In Postico ist das lästig, in Metabase unbenutzbar. Ein Test in `src/sync/e2e.test.ts` hält die Regel fest, weil sie bei der nächsten Änderung an `partition_anlegen()` lautlos kaputtginge.
 
 **BRIN braucht `autosummarize = on`.** Ohne das bleiben frisch angehängte Blöcke bis zum nächsten VACUUM unsummiert — also genau die Zeilen, die eine Round-Table-Auswertung am häufigsten liest. Bei append-only-Tabellen ist das der Normalfall.
 **Und:** Storage-Parameter lassen sich **nicht** auf dem partitionierten Index setzen (`This operation is not supported for partitioned indexes`), nur je Kindindex. Deshalb legt `partition_anlegen()` den BRIN gleich richtig an.

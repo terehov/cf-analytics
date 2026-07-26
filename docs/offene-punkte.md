@@ -30,7 +30,7 @@ Am 25.07.2026 im Browser geprüft — Einzelheiten in `docs/lina-api-inventar-1c
 
 ## Stammdaten-Momentaufnahmen (seit 26.07.2026 im Betrieb)
 
-Sieben Endpunkte laufen jetzt monatlich als Momentaufnahme (`schrittweite: 'momentaufnahme'`, kein Backfill). Details in `migrations/0008_stammdaten.sql` und `src/lina/endpunkte.ts`. Drei Punkte bleiben offen:
+Sieben Endpunkte laufen jetzt monatlich als Momentaufnahme (`schrittweite: 'momentaufnahme'`, kein Backfill). Details in `migrations/0002_stammdaten.sql` und `src/lina/endpunkte.ts`. Drei Punkte bleiben offen:
 
 **Der WAWI-Betriebskontext lässt sich nicht umschalten.** Die Waren-, Lieferanten- und Bestelldaten hängen am aktuell gewählten Betrieb; im Zentral-Kontext kommen 898 Waren, 540 Lieferanten und nur 4 Bestellungen zurück. `storeId` wird von diesen Endpunkten **nicht ausgewertet**. Die gesicherten Einkaufspreise sind damit vorerst die der Zentrale, nicht die der einzelnen Betriebe.
 → **Frage an Concept Family bzw. LINA:** Wie schaltet man den Betriebskontext für WAWI um? Ohne das bleibt die Margenbetrachtung auf die Zentrale beschränkt. Das ist eine Rechte- und Kontextfrage, kein Umsetzungsfehler — es wurde bewusst nicht versucht, sie zu umgehen.

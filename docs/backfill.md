@@ -19,7 +19,7 @@
 
 **Damit ist der geplante Ablauf gedeckt:** lokal das laufende Jahr holen, Dump nach Hetzner, dort `--historie --von 2018-01-01` — es werden nur die noch fehlenden Zeiträume eingereiht.
 
-Bis zum 26.07.2026 galt das **nicht**: `historie_einreihen()` benutzte `ON CONFLICT DO NOTHING` und hing damit am Eindeutigkeitsindex, der **partiell** ist (`WHERE erledigt_am IS NULL`). Erledigte Posten blockierten nichts — nachgemessen: fünf Tage einreihen, erledigen, erneut einreihen ergab **zehn** Posten statt fünf. Genau beim Umzug auf den Server wäre das aufgeschlagen und hätte das ganze lokal geholte Jahr ein zweites Mal gegen LINA laufen lassen. Korrigiert in `migrations/0009_wiederaufnahme.sql`.
+Bis zum 26.07.2026 galt das **nicht**: `historie_einreihen()` benutzte `ON CONFLICT DO NOTHING` und hing damit am Eindeutigkeitsindex, der **partiell** ist (`WHERE erledigt_am IS NULL`). Erledigte Posten blockierten nichts — nachgemessen: fünf Tage einreihen, erledigen, erneut einreihen ergab **zehn** Posten statt fünf. Genau beim Umzug auf den Server wäre das aufgeschlagen und hätte das ganze lokal geholte Jahr ein zweites Mal gegen LINA laufen lassen. Korrigiert in `migrations/0005_sync.sql`, `sync.historie_einreihen()`.
 
 Fortschritt ansehen:
 
@@ -68,7 +68,7 @@ Den Backfill **nach dem ersten erfolgreichen Lauf** starten, nicht davor — ers
 bun run einreihen --historie --von 2018-01-01 --bis 2026-07-24
 ```
 
-Reiht rückwärts ein, der jüngste Zeitraum zuerst. Fortschritt: `SELECT * FROM mart.warteschlange_stand;`
+Reiht rückwärts ein, der jüngste Zeitraum zuerst. Fortschritt: `SELECT * FROM mart.backfill_fortschritt;`
 
 ## Noch zu messen
 

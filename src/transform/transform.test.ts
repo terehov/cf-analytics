@@ -128,7 +128,7 @@ describe('kennzahlen', () => {
   test('dedupliziert Betriebe, die in mehreren Konzepten hängen', () => {
     // Künstlich doppelte Gruppe: prüft die Schutzfunktion, nicht einen
     // beobachteten Fall. Ob LINA denselben Betriebsschlüssel je in zwei
-    // Gruppen liefert, ist offen — siehe migrations/0005_konzept_korrektur.sql.
+    // Gruppen liefert, ist offen — siehe den Kommentar an core.betrieb_konzept in migrations/0002_stammdaten.sql.
     const doppelt = { groups: [ daten.groups[0], daten.groups[0] ] }
     expect(kennzahlen(doppelt, 2026)).toHaveLength(kennzahlen(daten, 2026).length)
   })

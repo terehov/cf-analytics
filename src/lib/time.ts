@@ -1,7 +1,7 @@
 /**
  * Zeitbehandlung an der LINA-Grenze.
  *
- * Zusammen mit core.business_tz() in der Datenbank die einzigen zwei Stellen,
+ * Zusammen mit core.geschaefts_zeitzone() in der Datenbank die einzigen zwei Stellen,
  * an denen 'Europe/Berlin' steht. Container und Datenbank laufen in UTC — die
  * Umgebungszeitzone ist bewusst nicht tragend.
  *

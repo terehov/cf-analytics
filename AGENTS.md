@@ -26,7 +26,7 @@ Diese Datei ist der Einstieg. Die inhaltliche Wahrheit steht in `docs/`.
 
 **Fachbegriffe kommen aus LINA und bleiben deutsch:** Betrieb, Konzept, Umsatz, Wareneinsatz, BWA, Ampel, Hauptsparte, Verkaufsstelle, Geschäftstag. Wo LINA einen Bericht so nennt, heißt die Tabelle auch so (`getUmsatzbericht` → `core.umsatzbericht_tag`). Damit ist die Zuordnung ohne Übersetzungsschritt lesbar — und genau da entstehen sonst Fehler.
 
-**Englisch bleiben nur die Schichtnamen:** `raw`, `core`, `manual`, `ampel`, `sync`, `mart`. Das sind Architekturbegriffe, keine LINA-Begriffe.
+**Englisch bleiben nur die Schichtnamen:** `raw`, `part`, `core`, `manual`, `ampel`, `sync`, `mart`. Das sind Architekturbegriffe, keine LINA-Begriffe.
 
 Kommentare sind deutsch, damit sie in Postico lesbar sind.
 
@@ -45,6 +45,7 @@ Kommentare sind deutsch, damit sie in Postico lesbar sind.
 | **`kennzahlen-mapping.md`** / `.csv` | Excel-Kennzahl → LINA-Endpunkt/Feld → offene Fragen. Die eigentliche Zieldefinition. | Wenn du eine Kennzahl baust oder prüfst |
 | **`architektur.md`** | Warum Hetzner + Dokploy + vanilla Postgres. Verworfene Alternativen mit Begründung. | Vor Infrastrukturänderungen |
 | **`datenmodell.md`** | Schema-Entscheidungen und ihre Begründung | Vor Schemaänderungen |
+| **`metabase.md`** | Welche Schemata Metabase sehen soll, wo man anfängt, welche Fallen `mart` ausräumt | Bevor du eine Auswertung baust oder eine `mart`-Sicht änderst |
 | **`importer.md`** | Aufbau des Importers: Warteschlange, Drosselung, Session, Transformationen | Vor Arbeit an `src/` |
 | **`backfill.md`** | Strategie und Rechnung für die Historie | Wenn du Zeiträume einreihst |
 | **`entscheidungen.md`** | Entscheidungsprotokoll, chronologisch, inklusive der revidierten | Wenn du dich fragst „warum eigentlich so" |
@@ -63,18 +64,17 @@ Handgeschriebenes SQL, nummeriert, wird der Reihe nach angewendet. Bewusst handg
 
 | Datei | Inhalt |
 |---|---|
-| `0000_schema.sql` | Schemata, Tabellen, Kommentare, Seed-Daten |
-| `0001_logik.sql` | Partitionen, Ampel-Funktionen, Mart-Sichten, `mart.round_table()` |
-| `0002_zeit.sql` | Geschäftstag, Zeitzonenumrechnung, LINA-Epoch-Wächter |
-| `0003_warteschlange.sql` | Arbeitsschlange des Importers |
-| `0004_konzept.sql` | Markenebene: Hauptkonzept, Markenschnitt, Round Table mit doppeltem Maßstab |
-| `0005_konzept_korrektur.sql` | Korrigiert die n:m-Aussage aus `0000` und hält den Prüfstand fest |
-| `0006_pruefung.sql` | Gegenrechnung: LINAs Aggregate gegen eigene Neuberechnung |
-| `0007_artikel_historie.sql` | `core.artikel_stand` — Artikelstand je Monat statt Momentaufnahme |
-| `0008_stammdaten.sql` | Stammdaten-Momentaufnahmen: Warengruppen, Feinsparten, Waren, **Einkaufspreise**, Lieferanten, Einheiten |
-| `pruefung.sql` | Verifikation gegen den Bayreuth-Fall aus dem Excel |
+| `0001_grundlage.sql` | Schemata, Zeitbehandlung, Partitionsverwaltung |
+| `0002_stammdaten.sql` | Dimensionen und ihre monatliche Historie (`*_stand`, `*_zeitraum`) |
+| `0003_bewegungsdaten.sql` | `raw.api_antwort` und die Faktentabellen |
+| `0004_bewertung.sql` | `manual`, Ampel-Regelwerk, Seed |
+| `0005_sync.sql` | Betriebszustand und Arbeitsschlange des Importers |
+| `0006_mart.sql` | Alle Sichten und Funktionen für Metabase |
+| `pruefung.sql` | Verifikation gegen den Bayreuth-Fall aus dem Excel (kein Migrationsschritt) |
 
 Migration hinzufügen: neue Datei `NNNN_name.sql`, aufsteigend. **Bereits angewendete Dateien nie ändern** — der Stand steht in `public.schema_migration`.
+
+Am 26.07.2026 sind die vorherigen zehn Dateien zu diesen sechs zusammengefasst worden, weil sich der Stand nur noch durch Nachspielen der Historie lesen ließ: `0005` korrigierte eine Aussage aus `0000`, `0007` einen Entwurfsfehler aus `0000`, `0009` einen aus `0003`. Die Begründungen sind dabei erhalten geblieben — sie stehen jetzt an der Stelle, die sie erklären.
 
 ### `src/` — Importer
 
@@ -141,7 +141,8 @@ Alles in Postico, keine Log-Wühlerei nötig:
 
 ```sql
 SELECT * FROM mart.sync_status LIMIT 5;              -- letzte Läufe
-SELECT * FROM mart.warteschlange_stand;             -- Backfill-Fortschritt je Endpunkt
+SELECT * FROM mart.backfill_fortschritt;             -- Fortschritt je Endpunkt
+SELECT * FROM mart.betrieb_ohne_lina_id;             -- Betriebe ohne Brücke zur BWA (Erwartung: leer)
 SELECT * FROM sync.aufgabe ORDER BY aufgabe_id DESC LIMIT 50;
 SELECT * FROM sync.schema_abweichung WHERE quittiert_am IS NULL;
 SELECT * FROM sync.warteschlange WHERE letzter_fehler IS NOT NULL;
@@ -172,7 +173,7 @@ SELECT * FROM mart.round_table_marke(DATE '2026-06-01');
 SELECT * FROM mart.konzept_zuordnung WHERE hauptkonzept IS NULL;
 ```
 
-**Der Betriebsname ist NICHT eindeutig.** In `getKennzahlen` liefert die Gruppe die Marke, das Kind nur die Stadt — fünf Betriebe heißen „Karlsruhe". Immer über `enc_id` joinen, nie über den Namen. Ob dahinter fünf Betriebe stehen (erwartet) oder ein Betrieb in fünf Marken, klärt: `SELECT anzahl_konzepte, count(*) FROM mart.konzept_zuordnung GROUP BY 1;` — Details in `migrations/0005_konzept_korrektur.sql`.
+**Der Betriebsname ist NICHT eindeutig.** In `getKennzahlen` liefert die Gruppe die Marke, das Kind nur die Stadt — fünf Betriebe heißen „Karlsruhe". Immer über `enc_id` joinen, nie über den Namen. Ob dahinter fünf Betriebe stehen (erwartet) oder ein Betrieb in fünf Marken, klärt: `SELECT anzahl_konzepte, count(*) FROM mart.konzept_zuordnung GROUP BY 1;` — Details am Kommentar von `core.betrieb_konzept` in `migrations/0002_stammdaten.sql`.
 
 ---
 
