@@ -40,16 +40,35 @@ if (process.argv.includes('--taeglich')) {
       [ep.key, `${jahr}-01-01`, `${jahr}-12-31`])
     n += r.length
   }
-  // Stammdaten-Momentaufnahmen: einmal je Kalendermonat, auf den Monatsersten
-  // gesetzt. Der Eindeutigkeitsindex der Warteschlange sorgt dafür, dass der
-  // tägliche Lauf sie ab dem zweiten Tag des Monats stillschweigend überspringt
-  // — deshalb genügt es, sie hier mitlaufen zu lassen, ohne eigenen Zeitplan.
+  /**
+   * Stammdaten-Momentaufnahmen laufen hier mit, brauchen also keinen eigenen
+   * Zeitplan — aber sie dürfen NICHT täglich ziehen. Eine je Kalendermonat,
+   * auf den Monatsersten gesetzt.
+   *
+   * `ON CONFLICT DO NOTHING` allein reicht dafür NICHT, auch wenn es so
+   * aussieht: Der Eindeutigkeitsindex der Warteschlange ist partiell
+   * (`WHERE erledigt_am IS NULL`). Ein ERLEDIGTER Posten blockiert also
+   * nichts — der tägliche Lauf hätte am Folgetag munter denselben
+   * Monatsersten neu eingereiht und die „monatliche" Momentaufnahme wäre in
+   * Wahrheit täglich gelaufen: 7 Endpunkte × 30 Tage statt 7 Aufrufe.
+   *
+   * Die erste Fassung dieses Codes hat genau das getan und im Kommentar das
+   * Gegenteil behauptet. Nachgemessen am 26.07.2026, nicht angenommen.
+   *
+   * Deshalb ausdrücklich gegen ALLE Posten desselben Zeitraums geprüft,
+   * erledigte eingeschlossen. Für eine Momentaufnahme ist das die richtige
+   * Aussage: je Zeitraum genau eine, ein für alle Mal.
+   */
   const monatsErster = `${gestern.slice(0, 7)}-01`
   let m = 0
   for (const ep of AKTIVE_ENDPUNKTE.filter(istMomentaufnahme)) {
     const r = await query(
       `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet)
-       VALUES ($1, $2, $2, 10) ON CONFLICT DO NOTHING RETURNING posten_id`,
+       SELECT $1, $2::date, $2::date, 10
+        WHERE NOT EXISTS (
+              SELECT 1 FROM sync.warteschlange
+               WHERE endpunkt = $1 AND zeitraum_von = $2::date)
+       RETURNING posten_id`,
       [ep.key, monatsErster])
     m += r.length
   }

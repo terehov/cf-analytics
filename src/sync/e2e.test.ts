@@ -292,6 +292,40 @@ lauf('Stammdaten-Momentaufnahmen', () => {
     await db.query(`SELECT * FROM mart.preisentwicklung_ware LIMIT 1`)
     await db.query(`SELECT * FROM mart.deckungsbeitrag_warengruppe LIMIT 1`)
   })
+
+  /**
+   * Der Takt: eine Momentaufnahme je Monat, nicht je Tag.
+   *
+   * Die erste Fassung verliess sich auf `ON CONFLICT DO NOTHING`. Das ist
+   * falsch, weil der Eindeutigkeitsindex der Warteschlange PARTIELL ist
+   * (`WHERE erledigt_am IS NULL`): ein erledigter Posten blockiert nichts.
+   * Der taegliche Lauf haette am Folgetag denselben Monatsersten neu
+   * eingereiht — 7 Endpunkte × 30 Tage statt 7 Aufrufe im Monat.
+   *
+   * Der Fehler zeigt sich NUR an einem bereits erledigten Posten. Genau
+   * deshalb steht er hier.
+   */
+  test('eine Momentaufnahme wird je Monat nur einmal eingereiht — auch nach Erledigung', async () => {
+    const einreihen = (monat: string) => db.query(
+      `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet)
+       SELECT $1, $2::date, $2::date, 10
+        WHERE NOT EXISTS (
+              SELECT 1 FROM sync.warteschlange
+               WHERE endpunkt = $1 AND zeitraum_von = $2::date)
+       RETURNING posten_id`, ['probe:takt', monat])
+
+    await db.query(`DELETE FROM sync.warteschlange WHERE endpunkt = 'probe:takt'`)
+    try {
+      expect((await einreihen('2026-07-01')).rowCount).toBe(1)   // erster Tag
+      expect((await einreihen('2026-07-01')).rowCount).toBe(0)   // noch offen
+      await db.query(`UPDATE sync.warteschlange SET erledigt_am = now()
+                       WHERE endpunkt = 'probe:takt'`)
+      expect((await einreihen('2026-07-01')).rowCount).toBe(0)   // <- hier war der Fehler
+      expect((await einreihen('2026-08-01')).rowCount).toBe(1)   // neuer Monat, neue Aufnahme
+    } finally {
+      await db.query(`DELETE FROM sync.warteschlange WHERE endpunkt = 'probe:takt'`)
+    }
+  })
 })
 
 /**
