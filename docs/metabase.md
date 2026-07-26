@@ -107,10 +107,51 @@ Zwei Dinge sind bewusst **anders** als im Excel:
 
 Die bekannten Excel-Fehler (`#REF!`, der Zeilenversatz in `K6`) sind damit gegenstandslos.
 
+Dazu zwei Seiten, die im Excel keine Entsprechung haben, weil es für 22 Betriebe einer
+Marke gebaut war:
+
+| Ebene | Dashboard | Die Frage dahinter |
+|---|---|---|
+| ⑥ | **Portfolio und Potenzial** | Wo steckt der Umsatz, wovon hängt die Gruppe ab, was kostet der Abstand zum Mittelfeld |
+| ⑦ | **Muster im Geschäft** | Wochenrhythmus, Stabilität, und ob Umsatzveränderung von Gästen oder vom Bon kommt |
+
 ### Betrieb — die Fachberichte
 
 Umsatz-Entwicklung, Umsatz-Struktur, Personal, Warenwirtschaft, BWA — und
 **Datenqualität und Import**, die Seite, die man aufmacht, bevor man einer anderen glaubt.
+
+## Drei Zahlen, die man vor der ersten Auswertung kennen sollte
+
+Am 26.07.2026 nachgemessen. Sie ändern, wie jede andere Zahl zu lesen ist.
+
+**Nur 62 der 141 geführten Betriebe machen überhaupt Umsatz.** Die übrigen 79 liefern
+206 Tage lang Umsatzberichte über 0 €. Das ist *keine* Datenlücke — die Berichte kommen an
+und sind leer. Beteiligungsgesellschaften, geschlossene Häuser, Testeinträge. Jeder
+Mittelwert über „alle Betriebe" ist damit um mehr als die Hälfte verdünnt; die Arbeitsliste
+steht auf ⑥ unter „Karteileichen".
+
+**70 % des Umsatzes kommen aus dem stärksten Fünftel.** Ein Prozentpunkt bei einem großen
+Haus wiegt mehr als eine ganze Sanierung im langen Schwanz. Das gehört in jede Priorisierung.
+
+**Die Personalquote reicht von 0 % bis 1132 %.** Der Extremwert ist „Enchilada Bremen" —
+1109 % bei 0 € Umsatz, also eine Division durch fast nichts. Deshalb rechnen alle
+Markenschnitte hier mit **Medianen**, nie mit Mittelwerten.
+
+## Wenn eine Visualisierung nicht passt
+
+Die Regeln, nach denen die Diagrammtypen hier gewählt sind — sie haben alle einen Anlass:
+
+* **Keine zwei Y-Achsen.** Euro und Prozent in einem Bild lassen sich beliebig
+  gegeneinander verschieben und erfinden eine Beziehung, die in den Daten nicht steht.
+  „Umsatz je Monat" und „Veränderung zum Vorjahr" sind deshalb zwei Karten.
+* **Balkendiagramme sind gekappt.** 69 Betriebe nebeneinander ergeben einen Balkenwald mit
+  überlappenden Namen. Diagramme zeigen die Top 20, die vollständige Reihe steht in einer
+  Tabelle daneben — nicht statt ihrer.
+* **Lange Namen laufen waagerecht** (`row` statt `bar`). Betriebsnamen wie „Alte Post Aachen
+  Gaststättenbetriebs GmbH" sind senkrecht nicht lesbar.
+* **Ab etwa sieben Klassen eine Tabelle.** Benachbarte Farbklassen verwischen, und 69 Zeilen
+  liest man ohnehin, statt sie zu überfliegen.
+* **Ampeln werden gezählt, nicht gemittelt.** Der Mittelwert zweier Ampeln ist keine Ampel.
 
 ## Dashboards ändern
 

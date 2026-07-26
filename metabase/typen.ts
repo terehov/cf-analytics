@@ -51,6 +51,11 @@ export type Klick = {
   uebergabe: Record<string, string>
 }
 
+/**
+ * Eine fertig ausgelegte Kachel. Wird von layout.ts GERECHNET, nicht von
+ * Hand geschrieben — von Hand gepflegte y-Werte halten nur bis zur ersten
+ * Hoehenaenderung weiter oben.
+ */
 export type Kachel = {
   karte: string
   x: number
@@ -63,12 +68,35 @@ export type Kachel = {
   klick?: Klick[]
 }
 
+/** Ein Element innerhalb einer Reihe. Entweder Karte oder Text. */
+export type Teil = {
+  karte?: string
+  text?: string
+  /** Rastereinheiten. Fehlt sie, teilt sich der Platz gleichmaessig auf. */
+  breite?: number
+  /** Nur setzen, wenn mehr als das Mindestmass noetig ist. */
+  hoehe?: number
+  klick?: Klick[]
+}
+
+/**
+ * Eine waagerechte Gruppe. Alle Teile stehen nebeneinander, die naechste
+ * Reihe faengt genau darunter an. Das ist das einzige, was in
+ * dashboards.ts von Hand gepflegt wird.
+ */
+export type Reihe = {
+  teile: Teil[]
+  /** Untergrenze fuer die ganze Reihe; sonst gilt das Maximum der Teile. */
+  hoehe?: number
+}
+
 export type Dashboard = {
   schluessel: string
   name: string
   beschreibung: string
   sammlung: string
-  kacheln: Kachel[]
+  /** Waagerechte Gruppen von oben nach unten. layout.ts rechnet daraus x/y. */
+  reihen: Reihe[]
   /** Dashboard-weite Filter. Werden auf alle Karten verdrahtet, die einen
    *  gleichnamigen Parameter haben. */
   filter?: Parameter[]

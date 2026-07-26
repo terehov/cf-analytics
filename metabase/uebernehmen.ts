@@ -25,14 +25,24 @@
 import { karten as kartenRoundTable } from './karten-round-table'
 import { karten as kartenFach } from './karten-fach'
 import { karten as kartenDrilldown } from './karten-drilldown'
+import { karten as kartenPortfolio } from './karten-portfolio'
 import { dashboards } from './dashboards'
-import type { Karte } from './typen'
+import { auslegen, MINDESTHOEHE } from './layout'
+import type { Karte, Kachel } from './typen'
 
 const DB_ID = 2
 const PORT = 8899
 const METABASE = 'http://localhost:3000'
 
-const alleKarten: Karte[] = [...kartenDrilldown, ...kartenRoundTable, ...kartenFach]
+const alleKarten: Karte[] = [
+  ...kartenDrilldown, ...kartenPortfolio, ...kartenRoundTable, ...kartenFach,
+]
+
+// Reihen in Kacheln umrechnen — EINMAL, damit Pruefung und Ausgabe
+// dieselben Zahlen sehen.
+const typVon = (s: string) => alleKarten.find(k => k.schluessel === s)?.anzeige
+const layoutVon = new Map<string, Kachel[]>(
+  dashboards.map(d => [d.schluessel, auslegen(d.reihen, typVon)]))
 
 // --- Plausibilitaet, bevor irgendetwas angelegt wird -------------------
 const gesehen = new Set<string>()
@@ -41,9 +51,57 @@ for (const k of alleKarten) {
   gesehen.add(k.schluessel)
 }
 for (const d of dashboards) {
-  for (const kachel of d.kacheln) {
-    if (!kachel.text && !gesehen.has(kachel.karte)) {
-      throw new Error(`Dashboard ${d.schluessel} verweist auf unbekannte Karte: ${kachel.karte}`)
+  for (const r of d.reihen) {
+    for (const teil of r.teile) {
+      if (teil.text === undefined && !gesehen.has(teil.karte!)) {
+        throw new Error(`Dashboard ${d.schluessel} verweist auf unbekannte Karte: ${teil.karte}`)
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------
+// Layoutpruefung.
+//
+// Metabase nimmt ueberlappende Kacheln klaglos entgegen und schiebt sie
+// beim Rendern uebereinander — der Fehler faellt erst im Browser auf, und
+// dort sieht er aus wie ein Darstellungsproblem statt wie eine falsche
+// Zahl in der Definition. Deshalb hier, wo er noch billig ist.
+//
+// Ebenso die Mindesthoehen: eine Tabelle auf vier Rastereinheiten zeigt
+// Kopfzeile und zwei Datenzeilen, den Rest schneidet sie ab.
+// ---------------------------------------------------------------------
+for (const d of dashboards) {
+  const belegt = layoutVon.get(d.schluessel)!.map(k => ({
+    name: k.text !== undefined ? 'Text' : k.karte,
+    x: k.x, y: k.y, b: k.breite, h: k.hoehe,
+  }))
+
+  for (const k of belegt) {
+    if (k.x + k.b > 24) {
+      throw new Error(`${d.schluessel}: Kachel ${k.name} ragt aus dem Raster (x=${k.x} + breite=${k.b} > 24)`)
+    }
+  }
+
+  for (let i = 0; i < belegt.length; i++) {
+    for (let j = i + 1; j < belegt.length; j++) {
+      const a = belegt[i]!, b = belegt[j]!
+      if (a.x < b.x + b.b && b.x < a.x + a.b && a.y < b.y + b.h && b.y < a.y + a.h) {
+        throw new Error(
+          `${d.schluessel}: ${a.name} und ${b.name} ueberlappen sich ` +
+          `(${a.x},${a.y} ${a.b}x${a.h} gegen ${b.x},${b.y} ${b.b}x${b.h})`)
+      }
+    }
+  }
+
+  for (const k of layoutVon.get(d.schluessel)!) {
+    if (k.text !== undefined) continue
+    const typ = typVon(k.karte) ?? 'bar'
+    const noetig = MINDESTHOEHE[typ] ?? 8
+    if (k.hoehe < noetig) {
+      throw new Error(
+        `${d.schluessel}: Kachel ${k.karte} ist zu niedrig (hoehe=${k.hoehe}, ` +
+        `noetig fuer ${typ}: ${noetig})`)
     }
   }
 }
@@ -121,7 +179,7 @@ const definitionen = {
       type: p.type,
       sectionId: p.type.startsWith('date') ? 'date' : 'string',
     })),
-    kacheln: d.kacheln,
+    kacheln: layoutVon.get(d.schluessel)!,
   })),
   sammlungen: [
     {
@@ -227,7 +285,8 @@ async function uebernehmen() {
     }
     p.collection_id = sammlungId[
       k.schluessel.startsWith('rt_') ? 'Round Table'
-      : (k.schluessel.startsWith('dd_') || k.schluessel.startsWith('vg_')) ? 'Drill-Down'
+      : (k.schluessel.startsWith('dd_') || k.schluessel.startsWith('vg_')
+         || k.schluessel.startsWith('pf_')) ? 'Drill-Down'
       : 'Betrieb'];
 
     const da = nachSchluessel[k.schluessel];

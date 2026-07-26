@@ -94,17 +94,13 @@ SELECT geschaeftstag       AS "Geschäftstag",
     schluessel: 'um_verlauf_monat',
     name: 'Umsatz je Monat mit Vorjahr',
     beschreibung:
-      'Monatsumsatz gegen den gleichen Monat des Vorjahres. Solange der Historien-Backfill läuft, ist die Vorjahresreihe leer — das ist fehlende Vergangenheit, kein Nullumsatz.',
-    anzeige: 'combo',
+      'Monatsumsatz gegen den gleichen Monat des Vorjahres, beides in Euro auf EINER Achse. Die prozentuale Veränderung steht bewusst in einer eigenen Karte daneben — zwei Y-Achsen in einem Bild erfinden eine Beziehung, die in den Daten nicht steht. Solange der Historien-Backfill läuft, ist die Vorjahresreihe leer; das ist fehlende Vergangenheit, kein Nullumsatz.',
+    anzeige: 'bar',
     parameter: [BETRIEB],
     sql: `
-SELECT monat                     AS "Monat",
-       sum(umsatz_monat)         AS "Umsatz",
-       sum(umsatz_monat_vj)      AS "Umsatz Vorjahr",
-       CASE WHEN sum(umsatz_monat_vj) > 0
-            THEN round((sum(umsatz_monat) - sum(umsatz_monat_vj))
-                       / sum(umsatz_monat_vj) * 100, 1)
-       END                       AS "Veränderung %"
+SELECT monat                AS "Monat",
+       sum(umsatz_monat)    AS "Umsatz",
+       sum(umsatz_monat_vj) AS "Umsatz Vorjahr"
   FROM mart.umsatz_ytd
  WHERE 1 = 1
    [[AND betrieb = {{betrieb}}]]
@@ -112,12 +108,41 @@ SELECT monat                     AS "Monat",
  ORDER BY monat`,
     visualisierung: {
       'graph.dimensions': ['Monat'],
-      'graph.metrics': ['Umsatz', 'Umsatz Vorjahr', 'Veränderung %'],
-      series_settings: {
-        Umsatz: { display: 'bar' },
-        'Umsatz Vorjahr': { display: 'bar' },
-        'Veränderung %': { display: 'line', axis: 'right' },
-      },
+      'graph.metrics': ['Umsatz', 'Umsatz Vorjahr'],
+      'graph.y_axis.title_text': 'Umsatz netto (€)',
+      'graph.x_axis.title_text': '',
+    },
+  },
+  {
+    // Die zweite Haelfte der zerlegten Kombi-Karte. Als divergierende Balken
+    // um die Nulllinie, weil die Frage hier eine Polaritaet ist: ueber oder
+    // unter Vorjahr. Eine Linie wuerde eine Entwicklung suggerieren, wo
+    // jeder Monat einen eigenen Vergleich hat.
+    schluessel: 'um_verlauf_delta',
+    name: 'Veränderung zum Vorjahr',
+    beschreibung:
+      'Prozentuale Abweichung zum gleichen Monat des Vorjahres. Balken über der Nulllinie sind Wachstum, darunter Rückgang. Bewusst getrennt vom Euro-Diagramm nebenan: Euro und Prozent auf zwei Achsen desselben Bildes lassen sich beliebig gegeneinander verschieben.',
+    anzeige: 'bar',
+    parameter: [BETRIEB],
+    sql: `
+SELECT monat AS "Monat",
+       CASE WHEN sum(umsatz_monat_vj) > 0
+            THEN round((sum(umsatz_monat) - sum(umsatz_monat_vj))
+                       / sum(umsatz_monat_vj) * 100, 1)
+       END   AS "Veränderung %"
+  FROM mart.umsatz_ytd
+ WHERE 1 = 1
+   [[AND betrieb = {{betrieb}}]]
+ GROUP BY monat
+HAVING sum(umsatz_monat_vj) > 0
+ ORDER BY monat`,
+    visualisierung: {
+      'graph.dimensions': ['Monat'],
+      'graph.metrics': ['Veränderung %'],
+      'graph.y_axis.title_text': 'Δ zum Vorjahr (%)',
+      'graph.goal_value': 0,
+      'graph.show_goal': true,
+      'graph.goal_label': 'Vorjahresniveau',
     },
   },
   {
@@ -343,8 +368,8 @@ SELECT uz.betrieb                                                  AS "Betrieb",
     schluessel: 'pe_quote_betrieb',
     name: 'Personalkostenquote je Betrieb',
     beschreibung:
-      'Personalkosten ohne Geschäftsführung in Prozent des Umsatzes, mit der Round-Table-Ampel (grün bis 28 %, orange bis 32 %). Das ist die Größe, auf der die Ampel Personal beruht.',
-    anzeige: 'bar',
+      'Die 20 Betriebe mit der höchsten Personalkostenquote ohne Geschäftsführung — die Liste, an der man arbeitet. Bewusst gekappt: alle 69 Betriebe nebeneinander ergeben einen Balkenwald, in dem die Namen übereinanderliegen und niemand mehr etwas abliest. Die vollständige Reihe steht in der Tabelle darunter.',
+    anzeige: 'row',
     parameter: [MONAT],
     sql: `${MONAT_CTE}
 SELECT r.betrieb                AS "Betrieb",
@@ -353,14 +378,40 @@ SELECT r.betrieb                AS "Betrieb",
   CROSS JOIN gewaehlt g
  WHERE r.monat = g.monat
    AND r.personalkosten_ogf_pct IS NOT NULL
- ORDER BY r.personalkosten_ogf_pct DESC`,
+ ORDER BY r.personalkosten_ogf_pct DESC
+ LIMIT 20`,
     visualisierung: {
       'graph.dimensions': ['Betrieb'],
       'graph.metrics': ['Personal o. GF %'],
       'graph.goal_value': 28,
       'graph.show_goal': true,
-      'graph.goal_label': 'Grün-Schwelle 28 %',
+      'graph.goal_label': 'Grün bis 28 %',
+      'graph.x_axis.title_text': 'Personalkosten ohne GF (%)',
     },
+  },
+  {
+    // Die vollstaendige Reihe, die das gekappte Diagramm oben nicht zeigt.
+    // Eine Tabelle, weil ab etwa sieben Klassen jede Farbskala verwischt und
+    // 69 Zeilen ohnehin gelesen und nicht ueberflogen werden.
+    schluessel: 'pe_quote_tabelle',
+    name: 'Personalkostenquote — alle Betriebe',
+    beschreibung:
+      'Die vollständige Reihe zum gekappten Diagramm darüber, mit Ampel und Abstand zur 28-%-Schwelle. Positive Werte in „Δ Schwelle" sind die Überschreitung in Prozentpunkten.',
+    anzeige: 'table',
+    parameter: [MONAT],
+    sql: `${MONAT_CTE}
+SELECT r.betrieb                            AS "Betrieb",
+       r.konzept                            AS "Marke",
+       coalesce(ap.emoji, '⚪')              AS "●",
+       r.personalkosten_ogf_pct             AS "Personal o. GF %",
+       round(r.personalkosten_ogf_pct - 28, 1) AS "Δ Schwelle",
+       r.bwa_monat                          AS "BWA-Stand"
+  FROM mart.round_table_monat r
+  CROSS JOIN gewaehlt g
+  LEFT JOIN ampel.beschriftung ap ON ap.status = r.ampel_personal
+ WHERE r.monat = g.monat
+   AND r.personalkosten_ogf_pct IS NOT NULL
+ ORDER BY r.personalkosten_ogf_pct DESC`,
   },
   {
     schluessel: 'pe_bereich',
@@ -573,7 +624,7 @@ HAVING count(*) FILTER (WHERE k.wert_absolut IS NOT NULL AND k.wert_absolut <> 0
     schluessel: 'bwa_ebit',
     name: 'EBIT je Betrieb',
     beschreibung: 'Rendite aus der BWA. In „Umsetzung Berichte" als „Rendite" geführt, Status live 0,2 — die Datenbasis ist da.',
-    anzeige: 'bar',
+    anzeige: 'row',
     parameter: [MONAT],
     sql: `${MONAT_CTE_BWA}
 SELECT b.name                        AS "Betrieb",
@@ -594,6 +645,10 @@ SELECT b.name                        AS "Betrieb",
     visualisierung: {
       'graph.dimensions': ['Betrieb'],
       'graph.metrics': ['EBIT'],
+      'graph.x_axis.title_text': 'EBIT (€)',
+      'graph.goal_value': 0,
+      'graph.show_goal': true,
+      'graph.goal_label': 'Break-even',
     },
   },
   {

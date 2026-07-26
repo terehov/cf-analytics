@@ -164,8 +164,8 @@ SELECT r.betrieb                                            AS "Betrieb",
     schluessel: 'dd_filialen_rangliste',
     name: 'Filialen nach Personalkostenquote',
     beschreibung:
-      'Die Metrik mit den meisten roten Ampeln, als Rangliste. Die 28-%-Linie ist die Grün-Schwelle des Round Table. Klick auf einen Balken öffnet das Betriebsblatt.',
-    anzeige: 'bar',
+      'Die 20 Betriebe mit der höchsten Personalkostenquote — die Metrik mit den meisten roten Ampeln. Waagerechte Balken, weil Betriebsnamen lang sind und senkrecht übereinanderliegen würden. Klick auf einen Balken öffnet das Betriebsblatt; die vollständige Reihe steht in der Tabelle oben.',
+    anzeige: 'row',
     parameter: [P_MONAT, P_MARKE],
     sql: `${MONAT_CTE}
 SELECT r.betrieb                AS "Betrieb",
@@ -175,13 +175,15 @@ SELECT r.betrieb                AS "Betrieb",
  WHERE r.monat = g.monat
    AND r.personalkosten_ogf_pct IS NOT NULL
    [[AND r.konzept = {{marke}}]]
- ORDER BY r.personalkosten_ogf_pct DESC`,
+ ORDER BY r.personalkosten_ogf_pct DESC
+ LIMIT 20`,
     visualisierung: {
       'graph.dimensions': ['Betrieb'],
       'graph.metrics': ['Personal o. GF %'],
       'graph.goal_value': 28,
       'graph.show_goal': true,
       'graph.goal_label': 'Grün bis 28 %',
+      'graph.x_axis.title_text': 'Personalkosten ohne GF (%)',
     },
   },
   {
@@ -749,8 +751,8 @@ SELECT lpad(s.stunde::text, 2, '0') || ':00'                       AS "Stunde",
     schluessel: 'vg_ort_sparte',
     name: 'Standorte — Speisen- und Getränkeanteil',
     beschreibung:
-      'Der Getränkeanteil je Betrieb. Er ist der Hebel für den Wareneinsatz Bar und erklärt oft, warum zwei Betriebe derselben Marke unterschiedliche Quoten haben.',
-    anzeige: 'bar',
+      'Speisen- und Getränkeumsatz je Betrieb, die 25 umsatzstärksten. Der Getränkeanteil ist der Hebel für den Wareneinsatz Bar und erklärt oft, warum zwei Betriebe derselben Marke unterschiedliche Quoten haben. Für einen echten Vergleich oben zwei bis vier Betriebe wählen — ohne Filter ist das eine Übersicht, kein Vergleich.',
+    anzeige: 'row',
     parameter: [P_MONAT, P_BETRIEB, P_MARKE],
     sql: `${MONAT_CTE_UMSATZ}
 SELECT sp.betrieb                                                     AS "Betrieb",
@@ -763,11 +765,13 @@ SELECT sp.betrieb                                                     AS "Betrie
    [[AND sp.betrieb = {{betrieb}}]]
    [[AND sp.konzept = {{marke}}]]
  GROUP BY sp.betrieb
- ORDER BY sum(sp.umsatz_netto) DESC`,
+ ORDER BY sum(sp.umsatz_netto) DESC
+ LIMIT 25`,
     visualisierung: {
       'graph.dimensions': ['Betrieb'],
       'graph.metrics': ['Speisen', 'Getränke'],
       'stackable.stack_type': 'stacked',
+      'graph.x_axis.title_text': 'Umsatz netto (€)',
     },
   },
 ]
