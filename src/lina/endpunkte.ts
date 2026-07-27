@@ -97,6 +97,23 @@ export type Endpunkt = {
   ebene: Ebene
   pfad: string
   schrittweite: Schrittweite
+  /**
+   * Schrittweite für den BACKFILL, falls sie von der täglichen abweicht.
+   *
+   * Warum es diese zweite Angabe überhaupt gibt: Für den laufenden Betrieb
+   * ist Tagesauflösung richtig — man will sehen, wie ein einzelner Tag lief.
+   * Für acht Jahre Historie ist sie es nicht zwingend. Wenn ein Endpunkt
+   * über einen Monat dieselbe Aussage in EINER Antwort liefert, sind 30
+   * Aufrufe dafür verschwendet, und zwar teuer: jeder kostet Wartezeit,
+   * Tagesbudget und Aufmerksamkeit bei LINA.
+   *
+   * Am 27.07.2026 nachgemessen — `getPersonalkosten` braucht im Schnitt
+   * **22,3 Sekunden** je Antwort und war damit für 38 % der gesamten
+   * Restlaufzeit verantwortlich, bei 17 % der Aufrufe.
+   *
+   * Fehlt die Angabe, gilt `schrittweite` auch für die Historie.
+   */
+  historieSchrittweite?: Schrittweite
   /** Baut die Query-Parameter für einen Zeitraum. */
   parameter: (von: string, bis: string, extra?: Record<string, string>) => Record<string, string>
   /** Kurzbeschreibung fürs Log und die Doku. */
@@ -104,6 +121,10 @@ export type Endpunkt = {
   aktiv: boolean
   hinweis?: string
 }
+
+/** Welche Schrittweite der Backfill für einen Endpunkt benutzt. */
+export const historieSchrittweite = (e: Endpunkt): Schrittweite =>
+  e.historieSchrittweite ?? e.schrittweite
 
 /** Konzern-Ebene: DD.MM.YYYY mit führender Null. */
 const konzernZeitraum = (von: string, bis: string) => ({
@@ -154,6 +175,29 @@ export const ENDPUNKTE: Endpunkt[] = [
     ebene: 'konzern',
     pfad: '/intranet/analytics/getPersonalkosten',
     schrittweite: 'tag',
+    /**
+     * Der Backfill holt Monate, nicht Tage. Zwei Messungen tragen das:
+     *
+     *   * `persoog_bwa` — die Kennzahl, die den Round Table trägt — ist an
+     *     JEDEM Tag eines Monats identisch. Nachgesehen für Betrieb 45,
+     *     23.06. bis 30.06.2026: acht Tage, acht Mal 42,51. Es ist ein
+     *     BWA-Monatswert, den LINA über den Monat auswalzt. 30 Abrufe
+     *     liefern dieselbe Zahl 30 Mal.
+     *   * Der Endpunkt ist mit Abstand der teuerste: 22,3 s je Antwort
+     *     gegenüber 0,5 bis 1,0 s bei vier der fünf anderen.
+     *
+     * Was dabei verloren geht, ist ehrlich zu benennen: `pek_*` und `eff_*`
+     * (Personaleffektivität) schwanken sehr wohl täglich und speisen
+     * `mart.personalkosten`. Für die Historie ist das vertretbar — ein
+     * Tagesprofil der Personaleffektivität aus 2019 wertet niemand aus, und
+     * der Round Table rechnet ohnehin monatlich. Der laufende Betrieb bleibt
+     * über `schrittweite: 'tag'` unverändert tagesgenau.
+     *
+     * Der Primärschlüssel von core.personalkosten ist
+     * (betrieb_key, zeitraum_von, zeitraum_bis) — Monats- und Tageszeilen
+     * stehen sich also nicht im Weg, sondern nebeneinander.
+     */
+    historieSchrittweite: 'monat',
     zweck: 'Personalkostenquoten, Effektivitäten, betriebsindividuelle Ampelschwellen',
     aktiv: true,
     parameter: (von, bis) => ({ report: 'intranet-personalkosten', ...konzernZeitraum(von, bis) }),

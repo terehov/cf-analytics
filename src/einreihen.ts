@@ -15,7 +15,7 @@
 import { query, eine, pool } from './db/pool'
 import { config } from './config'
 import { log } from './lib/log'
-import { AKTIVE_ENDPUNKTE, istMomentaufnahme, einreihPrioritaet } from './lina/endpunkte'
+import { AKTIVE_ENDPUNKTE, istMomentaufnahme, einreihPrioritaet, historieSchrittweite } from './lina/endpunkte'
 import { geschaeftstag } from './lib/time'
 
 function arg(name: string): string | undefined {
@@ -124,10 +124,13 @@ if (process.argv.includes('--historie')) {
       log.info('historie übersprungen — Momentaufnahme ohne Vergangenheit', { endpunkt: ep.key })
       continue
     }
+    // Die Historie darf gröber laufen als der Tagesbetrieb — siehe
+    // `historieSchrittweite` im Berichtsregister.
+    const schritt = historieSchrittweite(ep)
     const r = await eine<{ n: number }>(
       `SELECT sync.historie_einreihen($1, $2::date, $3::date, $4) AS n`,
-      [ep.key, von, bis, ep.schrittweite])
-    log.info('historie eingereiht', { endpunkt: ep.key, schrittweite: ep.schrittweite, posten: Number(r!.n) })
+      [ep.key, von, bis, schritt])
+    log.info('historie eingereiht', { endpunkt: ep.key, schrittweite: schritt, posten: Number(r!.n) })
     gesamt += Number(r!.n)
   }
   log.info('historie gesamt', { von, bis, posten: gesamt })
