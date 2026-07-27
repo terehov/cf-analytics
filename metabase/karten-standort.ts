@@ -20,10 +20,12 @@
 // =====================================================================
 
 import type { Karte } from './typen'
-import { MONAT_CTE, P_MONAT, P_MARKE } from './gemeinsam'
+import { MONAT_CTE, P_MONAT, P_MARKE, P_BETRIEB, P_AMPEL } from './gemeinsam'
 
 const MONAT = P_MONAT
 const MARKE = P_MARKE
+const BETRIEB = P_BETRIEB
+const AMPEL = P_AMPEL
 
 /**
  * Die Farbe des Punkts: INTENSITAET, nicht Gesamtampel.
@@ -281,6 +283,61 @@ SELECT coalesce(s.konzept, '(nicht zugeordnet)') AS "Marke",
       'stackable.stack_type': 'stack',
       'graph.y_axis.title_text': 'Standorte',
       'graph.x_axis.title_text': '',
+    },
+  },
+
+  {
+    // Dieselbe Karte, klein und mitwandernd.
+    //
+    // Sie steht oben auf den Seiten, auf denen man ARBEITET -- Round Table,
+    // Filialen, Betrieb -- und nicht auf einer eigenen. Der Zweck ist die
+    // raeumliche Einordnung im Vorbeigehen: wer die Marke einschraenkt,
+    // sieht deren Haeuser; wer einen Betrieb waehlt, sieht diesen einen.
+    //
+    // Deshalb kennt sie alle drei Filter. Der Betriebsfilter ist der
+    // Grund, warum das nicht dieselbe Karte wie `so_karte` sein kann: dort
+    // gibt es ihn nicht, und ein Filter, den nur eine von mehreren Karten
+    // liest, faellt in der Filterpruefung als "taub" durch.
+    schluessel: 'so_karte_klein',
+    name: 'Wo liegt das',
+    beschreibung:
+      'Dieselben Standorte wie auf der Standortkarte, nur kompakt. Folgt den Filtern '
+      + 'der Seite: ohne Auswahl alle Häuser, mit Marke deren Häuser, mit Betrieb dieser eine.\n\n'
+      + '🟥 eskalieren · 🔴 handeln · 🟠 nachforschen · 🟢 ok · ⚪ keine Bewertung. '
+      + 'Nur Standorte mit hinterlegter Adresse.',
+    anzeige: 'map',
+    parameter: [MONAT, MARKE, BETRIEB, AMPEL],
+    sql: `${MONAT_CTE}
+SELECT ${INTENSITAET_EMOJI} || ' ' || s.betrieb AS "Standort",
+       s.konzept                        AS "Marke",
+       s.breitengrad::float             AS "Breitengrad",
+       s.laengengrad::float             AS "Längengrad",${INTENSITAET_TEXT} AS "Handlungsbedarf",
+       round(s.umsatz)                  AS "Umsatz",
+       s.ort                            AS "Ort",
+       s.betrieb                        AS "Betrieb"
+  FROM mart.standort s
+  CROSS JOIN gewaehlt g
+ WHERE s.monat = g.monat
+   AND s.breitengrad IS NOT NULL
+   [[AND s.konzept = {{marke}}]]
+   [[AND s.betrieb = {{betrieb}}]]
+   -- 'ohne' steht fuer NULL; das laesst sich nicht als Gleichheit
+   -- schreiben, deshalb der Umweg ueber coalesce.
+   [[AND coalesce(s.ampel, 'ohne') = {{ampel}}]]
+ ORDER BY${NACH_DRUCK},
+          s.betrieb`,
+    visualisierung: {
+      'map.type': 'pin',
+      'map.latitude_column': 'Breitengrad',
+      'map.longitude_column': 'Längengrad',
+      'map.pin_type': 'markers',
+      'map.metric_column': 'Umsatz',
+      'map.tooltip_column': 'Standort',
+      column_settings: {
+        '["name","Umsatz"]': {
+          number_style: 'currency', currency: 'EUR', currency_style: 'symbol', decimals: 0,
+        },
+      },
     },
   },
 

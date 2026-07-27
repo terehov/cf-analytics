@@ -942,3 +942,45 @@ Entscheidung hinschreiben.
 
 **Regel.** Ein Filter am Dashboard ist ein Versprechen. Wird es nur von der Hälfte der Karten
 eingelöst, ist das kein halber Erfolg, sondern eine falsche Auskunft.
+
+## Die Punktkarte kann nicht nach Ampel färben — nachgemessen, nicht vermutet
+
+**Symptom.** Gemeldet am 27.07.2026: „Die Marker sind alle blau, da sollten ja die Ampeln hin."
+
+**Was gemessen wurde.** Metabase v0.63.1.6 kennt für `map.type: pin` genau drei
+Ausprägungen von `map.pin_type` — abgelesen am Auswahlfeld der Oberfläche:
+`tiles`, `markers`, `grid`. Keine davon nimmt eine Farbdimension entgegen.
+
+- **`markers`** zeichnet jeden Punkt als `<img src="app/assets/img/pin.png">` — eine
+  statische PNG-Datei. 48 Marker, 48-mal dasselbe Bild. Es gibt nichts einzufärben.
+- **`tiles`** rendert serverseitig. Die ausgelieferten Kacheln wurden Pixel für Pixel
+  ausgezählt: **zwei Farben**, weiß für den Rand und `rgb(76,157,230)` für alle Punkte.
+  Ebenfalls keine Dimension.
+- **`grid`** verdichtet zu Flächen und verliert den einzelnen Standort.
+
+**Nebenbefund.** `map.metric_column` stand auf der Karte gesetzt, wirkte aber nie: das Feld
+ist ausgeblendet, solange `pin_type` nicht `heat` oder `grid` ist. Eine Einstellung, die
+gespeichert wird und nichts tut — dieselbe Sorte Falle wie `table.column_formatting` auf
+Zahlkacheln und `parameterMapping` mit `source: null`.
+
+**Regel.** Bei Metabase-Visualisierungseinstellungen gilt: gespeichert heißt nicht gewirkt.
+Was nicht im Browser nachgemessen ist, ist nicht belegt. Die drei bisher gefundenen Fälle
+haben alle klaglos angenommen und stillschweigend ignoriert.
+
+## 37 Betriebe mit Umsatz fehlen auf der Karte
+
+**Symptom.** Gemeldet am 27.07.2026: „Lehners in Karlsruhe fehlt. Aposto, Enchilada und
+Wilma Wunder sind da."
+
+**Ursache.** Kein Kartenfehler. `manual.betrieb_standort` hat 48 Zeilen, alle mit
+Koordinaten — sie stammen aus dem Yext-Abgleich. Wer keinen Yext-Eintrag hat, hat auch
+keine Adresse, und Lehners Karlsruhe ist so ein Fall.
+
+**Warum das mehr ist als eine Lücke.** Von den 93 Betrieben ohne Koordinaten machen **37
+Umsatz**. Die Marke „Deutsche Konzepte" ist praktisch vollständig unsichtbar, obwohl sie die
+umsatzstärksten Häuser der Gruppe stellt — Wirtshaus am Schlossplatz (61 Mio. €), Alter
+Kranen (23 Mio. €), Lehners Heilbronn (22 Mio. €), Lehners Karlsruhe (22 Mio. €).
+
+**Warum das gefährlich ist.** Die Karte zeigt 48 Punkte und sieht vollständig aus. Wer die
+räumliche Verteilung der Gruppe daraus abliest, liest die Verteilung der Yext-Kunden ab.
+Deshalb steht die Liste `mart.standort_fehlend` unter der Karte und nicht in einem Anhang.

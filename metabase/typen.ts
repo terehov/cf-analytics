@@ -78,6 +78,15 @@ export type Klick = {
    * ungefiltert, und man haelt alle Betriebe fuer die neun roten.
    */
   fest?: boolean
+  /**
+   * Filter, die unveraendert vom QUELL-Dashboard mitwandern.
+   *
+   * Wird nicht von Hand gepflegt, sondern in uebernehmen.ts gerechnet:
+   * jeder Filter, den beide Seiten unter demselben Namen kennen. Wer oben
+   * einen Monat einstellt, erwartet ihn nach dem Klick wieder — und nicht
+   * eine Liste, die nach der gefilterten aussieht und es nicht ist.
+   */
+  durchreichen?: string[]
 }
 
 /**

@@ -85,7 +85,15 @@ export const dashboards: Dashboard[] = [
     filter: [F_MONAT, F_MARKE, F_AMPEL],
     reihen: [
       { teile: [{ text: '# ② Filialen\n\nKlick auf den Betriebsnamen öffnet die Detailseite. ⚪ heißt **keine Daten**, nicht „in Ordnung“.\n\nVon ① kommend ist der Markenfilter gesetzt — leeren zeigt wieder alle.' }] },
-      { teile: [{ karte: 'dd_filialen_tabelle', hoehe: 12, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      // Karte neben der Tabelle: die Marke, die man oben gewaehlt hat, hat
+      // hier eine Ausdehnung. Schmaler als auf der Kartenseite, weil die
+      // Tabelle die Hauptsache bleibt.
+      { teile: [
+        { karte: 'so_karte_klein', breite: 9, hoehe: 12,
+          klick: [{ ziel: 'dd_betrieb', uebergabe: { betrieb: 'Betrieb' } }] },
+        { karte: 'dd_filialen_tabelle', breite: 15, hoehe: 12,
+          klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] },
+      ] },
       { teile: [
         { karte: 'dd_filialen_metrikvergleich', breite: 10 },
         { karte: 'dd_filialen_rangliste', breite: 14, hoehe: 11,
@@ -105,15 +113,24 @@ export const dashboards: Dashboard[] = [
     sammlung: 'Drill-Down',
     filter: [F_MONAT, F_BETRIEB],
     reihen: [
-      { teile: [{ text: '# ③ Betrieb\n\n> **Zuerst „Datenstand“ unten ansehen** — ohne zu wissen, wie aktuell die Zahlen sind, bleibt jeder Schluss eine Vermutung.\n\nJedes Diagramm führt per Klick in die Detailauswertung.' }] },
+      { teile: [{ text: '# ③ Betrieb\n\nJedes Diagramm führt per Klick in die Detailauswertung.' }] },
+      // Die vier Kennzahlkacheln bleiben in einer eigenen Reihe: eine Reihe
+      // ist so hoch wie ihr hoechstes Element, und neben der Karte waeren
+      // die Zahlen auf zwoelf Einheiten auseinandergezogen.
       { teile: [
         { karte: 'dd_betrieb_umsatz_kachel' },
         { karte: 'dd_betrieb_ytd_kachel' },
         { karte: 'dd_betrieb_gaeste_kachel' },
         { karte: 'dd_betrieb_bon_kachel' },
       ] },
-      { teile: [{ text: '## Die sechs Kennzahlen des Round Table\n\nJeweils mit Vormonat, Veränderung und Ampelwechsel.' }] },
-      { teile: [{ karte: 'dd_betrieb_kopf' }] },
+      { teile: [{ text: '## Die sechs Kennzahlen des Round Table\n\nJeweils mit Vormonat, Veränderung und Ampelwechsel. Die Karte daneben zeigt, wo dieser Betrieb liegt.' }] },
+      // Karte neben den sechs Kennzahlen: bei gewaehltem Betrieb steht dort
+      // genau ein Punkt. Man sieht damit im Vorbeigehen, ueber welches Haus
+      // man gerade liest -- und ob es allein steht oder Nachbarn hat.
+      { teile: [
+        { karte: 'dd_betrieb_kopf', breite: 16, hoehe: 12 },
+        { karte: 'so_karte_klein', breite: 8, hoehe: 12 },
+      ] },
       { teile: [
         { karte: 'dd_betrieb_verlauf', breite: 14,
           klick: [{ ziel: 'db_umsatz', uebergabe: { betrieb: 'Betrieb' } }] },
@@ -146,7 +163,7 @@ export const dashboards: Dashboard[] = [
     sammlung: 'Drill-Down',
     filter: [F_VON_A, F_BIS_A, F_VON_B, F_BIS_B, F_MARKE],
     reihen: [
-      { teile: [{ text: '# ④ Zeiträume vergleichen\n\n**Zeitraum A** gegen **Zeitraum B**. Voreingestellt: laufender Monat gegen denselben Ausschnitt des Vormonats.\n\n> Auf die Tage-Spalten achten — unterschiedlich lange Zeiträume sind erlaubt, stecken aber in der Differenz.' }] },
+      { teile: [{ text: '# ④ Zeiträume vergleichen\n\n**Zeitraum A** gegen **Zeitraum B**. Voreingestellt: laufender Monat gegen denselben Ausschnitt des Vormonats.\n\nUnterschiedlich lange Zeiträume sind erlaubt — die Differenz enthält sie dann mit.' }] },
       { teile: [{ karte: 'vg_zeit_summe' }] },
       { teile: [{ karte: 'vg_zeit_verlauf' }] },
       { teile: [{ text: '## Je Betrieb\n\nEin Klick auf den Betriebsnamen öffnet das Betriebsblatt.' }] },
@@ -187,7 +204,7 @@ export const dashboards: Dashboard[] = [
     reihen: [
       { teile: [{ text: '# ⑥ Portfolio und Potenzial\n\nDie Ampeln beantworten die Frage „wer ist rot". Diese Seite stellt die Fragen davor: Wo steckt der Umsatz, wovon hängt die Gruppe ab, wie weit liegen vergleichbare Häuser auseinander — und was kostet dieser Abstand.' }] },
 
-      { teile: [{ text: '## Wo steckt der Umsatz\n\n> Ein Teil der geführten Betriebe macht gar keinen Umsatz — siehe Kachel unten. Das verzerrt jeden Anteil auf dieser Seite.' }] },
+      { teile: [{ text: '## Wo steckt der Umsatz\n\nEin Teil der geführten Betriebe macht gar keinen Umsatz. Das verzerrt jeden Anteil auf dieser Seite.' }] },
       { teile: [{ karte: 'pf_kachel_aktiv' }] },
       { teile: [
         { karte: 'pf_konzentration_kurve', breite: 10 },
@@ -238,7 +255,13 @@ export const dashboards: Dashboard[] = [
     sammlung: 'Round Table',
     filter: [F_MONAT, F_MARKE],
     reihen: [
-      { teile: [{ text: '# Round Table\n\n🟢 passt · 🟠 im Auge behalten · 🔴 sofort handeln · ⚪ nicht bewertbar (meist fehlt die BWA).\n\nEin Klick auf eine Kachel zeigt die Betriebe dahinter.' }] },
+      { teile: [{ text: '# Round Table\n\n🟢 passt · 🟠 im Auge behalten · 🔴 sofort handeln · ⚪ nicht bewertbar (meist fehlt die BWA).\n\nEin Klick auf eine Kachel zeigt die Betriebe dahinter. Filter oben wandern beim Klick mit.' }] },
+      // Die Karte steht ganz oben: sie beantwortet keine Frage, sondern
+      // gibt den Zahlen darunter einen Ort. Schraenkt man die Marke ein,
+      // bleiben deren Haeuser stehen -- die raeumliche Einordnung passiert
+      // dadurch im Vorbeigehen und kostet keinen Seitenwechsel.
+      { teile: [{ karte: 'so_karte_klein', hoehe: 12,
+        klick: [{ ziel: 'dd_betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       // Jede Zaehlkachel fuehrt auf die Liste der Betriebe, die sie zaehlt.
       // Der Wert wird fest mitgegeben -- "9 rote Betriebe" muss zu genau
       // diesen neun fuehren, nicht zu allen.
@@ -402,7 +425,7 @@ export const dashboards: Dashboard[] = [
     sammlung: 'Betrieb',
     filter: [F_BETRIEB, F_ZEITRAUM],
     reihen: [
-      { teile: [{ text: '# Warenwirtschaft\n\n> **Zeitraum wählen** — ohne Eingrenzung dauert es lange.\n\nSpalte „Abdeckung“ zuerst lesen: sie sagt, für welchen Anteil des Umsatzes Rezepturen hinterlegt sind. Der Deckungsbeitrag liegt nur monatsweise vor.' }] },
+      { teile: [{ text: '# Warenwirtschaft\n\n„Abdeckung“ ist der Anteil des Umsatzes, für den Rezepturen hinterlegt sind — bei niedriger Abdeckung sagt der Deckungsbeitrag wenig. Er liegt nur monatsweise vor.\n\nOhne Zeitraum dauert der Aufbau lange.' }] },
       { teile: [
         { karte: 'wa_renner', hoehe: 12 },
         { karte: 'wa_penner', hoehe: 12 },
@@ -438,7 +461,7 @@ export const dashboards: Dashboard[] = [
       'Kommen die Daten an, stimmen die Zahlen, und für welche Betriebe reicht die Datenlage für ein Urteil? Die Seite, die man aufschlägt, bevor man den anderen glaubt.',
     sammlung: 'Betrieb',
     reihen: [
-      { teile: [{ text: '# Datenqualität\n\nIn der Reihenfolge des Nachfragens: **kommen die Daten an** → **stimmen die Zahlen** → **wem fehlt was**.\n\n> Ein Betrieb ohne Daten sieht überall aus wie einer, bei dem alles stimmt.' }] },
+      { teile: [{ text: '# Datenqualität\n\nEin Betrieb ohne Daten sieht auf allen anderen Seiten aus wie einer, bei dem alles stimmt. Hier steht, bei wem das der Fall ist.' }] },
       { teile: [
         { karte: 'dq_befund', breite: 10 },
         { karte: 'dq_backfill_balken', breite: 14 },

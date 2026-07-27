@@ -212,6 +212,55 @@ if (filterFehler.length > 0) {
 }
 
 // ---------------------------------------------------------------------
+// Filterdurchreichung.
+//
+// Wer oben "Juni 2026" und "Aposto" einstellt und dann auf eine Ampel
+// klickt, erwartet die Einschraenkung im Zieldashboard wieder. Bisher
+// blieb sie auf jeder Ebene zurueck: alle 43 Drill-Downs verloren den
+// Monat, die Round-Table-Kacheln zusaetzlich die Marke. Man landete auf
+// einer Liste, die nach der gefilterten aussah und es nicht war --
+// schlimmer als ein toter Klick.
+//
+// Von Hand ist das nicht zu halten. Deshalb gilt hier die Regel: jeder
+// Filter, den QUELLE und ZIEL unter demselben Namen kennen, wird
+// mitgegeben, sofern die Kachel ihn nicht schon selbst belegt. Ein
+// ausdrueckliches `uebergabe` gewinnt immer -- die Betriebstabelle gibt
+// ihre Zeile weiter und nicht den Filter von oben.
+//
+// Ausgenommen ist nur, was fachlich nicht passt: der Bewertungsfilter
+// gehoert nicht auf das Betriebsblatt (dort ist der Betrieb schon
+// gewaehlt), und eine Kachel, die auf einen FESTEN Wert klickt, darf
+// diesen einen Filter nicht von oben ueberschrieben bekommen.
+// ---------------------------------------------------------------------
+const NICHT_DURCHREICHEN: Record<string, string[]> = {
+  // Ziel-Dashboard -> Filter, die dort nicht von oben kommen sollen
+  dd_betrieb: ['marke', 'ampel'],  // ein Betrieb hat genau eine Marke und eine Ampel
+  db_umsatz: ['marke'], db_struktur: ['marke'], db_personal: ['marke'],
+  db_ware: ['marke'], db_bwa: ['marke'],
+}
+
+for (const d of dashboards) {
+  const quellFilter = (d.filter ?? []).map(f => f.name)
+  if (quellFilter.length === 0) continue
+  for (const r of d.reihen) {
+    for (const teil of r.teile) {
+      for (const k of teil.klick ?? []) {
+        const ziel = dashboards.find(x => x.schluessel === k.ziel)
+        if (!ziel) continue
+        const zielFilter = new Set((ziel.filter ?? []).map(f => f.name))
+        const gesperrt = new Set(NICHT_DURCHREICHEN[k.ziel] ?? [])
+        for (const slug of quellFilter) {
+          if (!zielFilter.has(slug)) continue        // Ziel kennt ihn nicht
+          if (slug in k.uebergabe) continue          // Kachel belegt ihn selbst
+          if (gesperrt.has(slug)) continue           // fachlich nicht sinnvoll
+          ;(k.durchreichen ??= []).push(slug)
+        }
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------
 // Klickpruefung: fuehrt jeder Drill-Down irgendwohin, wo der uebergebene
 // Wert auch ankommt?
 //
@@ -536,7 +585,7 @@ async function uebernehmen() {
   // parameterMapping bildet einen Parameter des ZIELS auf eine Spalte der
   // QUELLE ab; ohne diese Abbildung oeffnet der Klick das Zieldashboard
   // ungefiltert, was schlimmer ist als kein Klick.
-  function klickVerhalten(k, zielDashboard) {
+  function klickVerhalten(k, zielDashboard, quellDashboard) {
     // FESTER WERT -> eigene URL.
     //
     // Eine Zaehlkachel hat keine Spalte, aus der sich etwas mitgeben
@@ -550,8 +599,15 @@ async function uebernehmen() {
     // dem Filter in der Abfragezeichenfolge -- genau das, was die
     // Oberflaeche selbst erzeugt, wenn man "Benutzerdefinierte URL" waehlt.
     if (k.fest) {
+      // Fester Wert -> Ziel-URL. Die durchgereichten Filter kommen als
+      // Platzhalter dazu: Metabase ersetzt {{slug}} in einem linkTemplate
+      // durch den aktuellen Wert des gleichnamigen Dashboard-Filters. So
+      // behaelt "9 rote Betriebe" beim Klick auch Monat und Marke.
       const paare = Object.entries(k.uebergabe)
         .map(([slug, wert]) => encodeURIComponent(slug) + '=' + encodeURIComponent(wert));
+      for (const slug of (k.durchreichen || [])) {
+        paare.push(encodeURIComponent(slug) + '={{' + slug + '}}');
+      }
       return {
         type: 'link',
         linkType: 'url',
@@ -559,14 +615,28 @@ async function uebernehmen() {
       };
     }
 
+    const zielDef = def.dashboards.find(x => x.schluessel === k.ziel);
+    const quellDef = def.dashboards.find(x => x.schluessel === quellDashboard);
     const parameterMapping = {};
     for (const [zielSlug, quellSpalte] of Object.entries(k.uebergabe)) {
-      const zielDef = def.dashboards.find(x => x.schluessel === k.ziel);
       const zp = (zielDef.parameter || []).find(p => p.slug === zielSlug);
       if (!zp) { log('  Klickziel ' + k.ziel + ' hat keinen Filter ' + zielSlug, 'fehler'); continue; }
       parameterMapping[zp.id] = {
         id: zp.id,
         source: {type: 'column', id: quellSpalte, name: quellSpalte},
+        target: {type: 'parameter', id: zp.id},
+      };
+    }
+    // Durchgereichte Filter: Quelle ist nicht eine Spalte der Karte,
+    // sondern der gleichnamige Filter des Quell-Dashboards. Metabase
+    // unterscheidet das ueber source.type -- 'parameter' statt 'column'.
+    for (const slug of (k.durchreichen || [])) {
+      const zp = (zielDef.parameter || []).find(p => p.slug === slug);
+      const qp = (quellDef.parameter || []).find(p => p.slug === slug);
+      if (!zp || !qp) continue;
+      parameterMapping[zp.id] = {
+        id: zp.id,
+        source: {type: 'parameter', id: qp.id, name: qp.name},
         target: {type: 'parameter', id: zp.id},
       };
     }
@@ -619,10 +689,10 @@ async function uebernehmen() {
             const schluessel = JSON.stringify(['name', k.spalte]);
             vis.column_settings[schluessel] = {
               ...(vis.column_settings[schluessel] || {}),
-              click_behavior: klickVerhalten(k, ziel),
+              click_behavior: klickVerhalten(k, ziel, d.schluessel),
             };
           } else {
-            vis.click_behavior = klickVerhalten(k, ziel);
+            vis.click_behavior = klickVerhalten(k, ziel, d.schluessel);
           }
         }
         // Spaltenformate der Karte beibehalten, Klickverhalten ergaenzen.
