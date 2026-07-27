@@ -340,6 +340,23 @@ for (const d of dashboards) {
   }
 }
 
+/**
+ * Welchen Typ die KARTE fuer einen Parameter melden darf.
+ *
+ * Metabase prueft beim Ausfuehren einer einzelnen Karte streng gegen den
+ * Typ des template-tags. Eine SQL-Variable ist dort `date`, und dagegen
+ * sind nur `category`, `date` und `date/single` zulaessig -- alles
+ * feinere (`date/month-year`, `date/range`, `date/all-options`) laesst
+ * Metabase zwar speichern, quittiert es beim Aufruf aber mit 500.
+ *
+ * Feldfilter (`dimension`) sind davon nicht betroffen: sie haengen an
+ * einer echten Spalte, nicht an einer Variablen.
+ */
+function kartenParameterTyp(typ: string): string {
+  if (!typ.startsWith('date')) return typ
+  return typ === 'date' || typ === 'date/single' ? typ : 'date/single'
+}
+
 function templateTags(karte: Karte) {
   const tags: Record<string, unknown> = {}
   const namen = new Set<string>()
@@ -360,11 +377,28 @@ function templateTags(karte: Karte) {
         default: null,
       }
     } else {
+      // Ein Datumsparameter hat ZWEI Typangaben, und sie muessen
+      // zusammenpassen: `type` sagt, was fuer eine Variable es ist (date),
+      // `widget-type` sagt, welches Bedienfeld dazu gehoert
+      // (date/month-year, date/single ...).
+      //
+      // Ohne `widget-type` nimmt Metabase 'date' an. Auf einem Dashboard
+      // faellt das nicht auf -- dort gleicht es die beiden Seiten ab. Ruft
+      // man dieselbe Karte aber ALLEIN auf, was jeder Klick auf einen
+      // Balken tut, prueft Metabase streng und antwortet mit 500:
+      //   "Invalid parameter value type :date/month-year for parameter
+      //    monat with widget type :date"
+      // Im Browser steht dann "We're experiencing server issues" -- eine
+      // Meldung, die nach einem kaputten Server aussieht und keinen
+      // Hinweis auf die eigentliche Ursache gibt.
+      // Gemeldet am 27.07.2026 fuer die Balken des Round Table.
+      const istDatum = p?.type?.startsWith('date') ?? false
       tags[name] = {
         id: `tag-${karte.schluessel}-${name}`,
         name,
         'display-name': p?.['display-name'] ?? name,
-        type: p?.type?.startsWith('date') ? 'date' : 'text',
+        type: istDatum ? 'date' : 'text',
+        ...(istDatum && p!.type !== 'date' ? { 'widget-type': p!.type } : {}),
         required: p?.required ?? false,
         default: p?.default ?? null,
       }
@@ -392,7 +426,26 @@ const definitionen = {
         id: p.id,
         name: p.name,
         slug: p.name,
-        type: p.type,
+        // Der Typ der KARTE ist nicht der Typ des Dashboardfilters.
+        //
+        // Eine Variable im nativen SQL ist fuer Metabase vom Typ `date`,
+        // und dagegen prueft es beim Ausfuehren streng. Erlaubt sind nur
+        // :category, :date und :date/single -- nachgemessen, indem alle
+        // vier Varianten gegen dieselbe Karte geschickt wurden:
+        // date/single, date und category liefern 6 Zeilen,
+        // date/month-year antwortet mit 500.
+        //
+        // Auf dem Dashboard faellt das nie auf, weil dort abgeglichen
+        // wird. Ruft man die Karte ALLEIN auf -- und genau das tut jeder
+        // Klick auf einen Balken --, scheitert sie mit "We're experiencing
+        // server issues". Betroffen waren 50 der 120 Karten.
+        //
+        // Das Bedienfeld leidet nicht darunter: welches Feld angezeigt
+        // wird, entscheidet `widget-type` am template-tag, und das bleibt
+        // date/month-year. Gemeldet am 27.07.2026.
+        type: karte.template_tag_dimension?.[p.name]
+          ? p.type                        // Feldfilter: haengt an einer Spalte, darf alles
+          : kartenParameterTyp(p.type),   // Variable: nur was Metabase durchlaesst
         target: karte.template_tag_dimension?.[p.name]
           ? ['dimension', ['template-tag', p.name]]
           : ['variable', ['template-tag', p.name]],

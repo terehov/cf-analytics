@@ -984,3 +984,46 @@ Kranen (23 Mio. €), Lehners Heilbronn (22 Mio. €), Lehners Karlsruhe (22 Mio
 **Warum das gefährlich ist.** Die Karte zeigt 48 Punkte und sieht vollständig aus. Wer die
 räumliche Verteilung der Gruppe daraus abliest, liest die Verteilung der Yext-Kunden ab.
 Deshalb steht die Liste `mart.standort_fehlend` unter der Karte und nicht in einem Anhang.
+
+## Klick auf einen Balken führte zu „We're experiencing server issues"
+
+**Symptom.** Gemeldet am 27.07.2026: ein Klick auf die Balken des Round Table landete auf
+`/question/46-ampeln-nach-bereich?monat=2026-05&marke=Enchilada` und zeigte dort statt eines
+Diagramms die Meldung „We're experiencing server issues. Try refreshing the page after waiting
+a minute or two."
+
+**Warum die Meldung in die Irre führt.** Sie liest sich wie ein überlasteter Server und legt
+nahe, es später nochmal zu versuchen. Der Server war in Ordnung; dieselbe Karte lief auf dem
+Dashboard einwandfrei. Was tatsächlich zurückkam, stand nur im Netzwerkprotokoll:
+
+> `Invalid parameter value type :date/month-year for parameter "monat" with widget type :date.
+> Parameter value must be one of: :category, :date, :date/single`
+
+**Ursache.** Eine Variable in nativem SQL ist für Metabase vom Typ `date` — feiner geht es
+nicht. Die Karte meldete ihren Parameter aber als `date/month-year`, weil dort derselbe Typ
+stand wie beim Dashboardfilter.
+
+Auf einem **Dashboard** fällt das nie auf: dort gleicht Metabase Filter und Karte ab. Wird die
+Karte **allein** ausgeführt — und genau das tut jeder Klick auf einen Balken —, prüft Metabase
+streng und lehnt ab.
+
+**Nachgemessen**, indem alle vier Varianten gegen dieselbe Karte geschickt wurden:
+
+| Typ im Aufruf | Antwort |
+|---|---|
+| `date/single` | 202, 6 Zeilen |
+| `date` | 202, 6 Zeilen |
+| `category` | 202, 6 Zeilen |
+| `date/month-year` | **500** |
+
+**Behoben.** `kartenParameterTyp()` in `uebernehmen.ts` bildet Datumstypen auf das ab, was
+Metabase durchlässt. Feldfilter (`dimension`) sind ausgenommen — sie hängen an einer echten
+Spalte statt an einer Variablen und vertragen `date/range`; auch das nachgemessen (202, 50
+Zeilen). Das Bedienfeld bleibt unverändert, weil dafür `widget-type` am template-tag zuständig
+ist und dort weiterhin `date/month-year` steht.
+
+**Betroffen waren 50 der 120 Karten** — praktisch jede mit Monatsfilter. Der Fehler war die
+ganze Zeit da und fiel nur nicht auf, weil Karten fast immer über ein Dashboard geöffnet werden.
+
+**Regel.** Was auf dem Dashboard läuft, muss auch allein laufen. Jeder Drill-Down auf eine
+Diagrammfläche öffnet die Karte einzeln, und dieser Weg wird beim Bauen nie getestet.

@@ -71,6 +71,31 @@ const INTENSITAET_EMOJI = `
          ELSE                          '⚪'
        END`
 
+/**
+ * Der Kartenausschnitt.
+ *
+ * Ohne diese drei Angaben waehlt Metabase den Ausschnitt selbst und trifft
+ * daneben: nachgemessen am 27.07.2026 lagen 2 der 48 Marker ausserhalb des
+ * sichtbaren Bereichs. Man sieht 46 Punkte, die Karte sieht vollstaendig
+ * aus, und die beiden fehlenden faellt niemandem auf.
+ *
+ * Die Werte sind aus den Daten gerechnet, nicht geschaetzt -- Mitte der
+ * Umschliessenden aller Standorte in manual.betrieb_standort:
+ *   Breite  47,72 bis 53,08  ->  Mitte 50,40
+ *   Laenge   6,78 bis 13,74  ->  Mitte 10,26
+ * Zoom 6 zeigt Deutschland ganz; nachgemessen liegen damit 48 von 48
+ * Markern im Bild.
+ *
+ * Sie muessen nachgezogen werden, wenn Standorte ausserhalb dieses
+ * Rahmens dazukommen -- ein Betrieb in Hamburg oder Wien verschiebt die
+ * Mitte. Die Pruefung dafuer steht in `bun run metabase/kartenausschnitt.ts`.
+ */
+const AUSSCHNITT = {
+  'map.center_latitude': 50.4018,
+  'map.center_longitude': 10.2562,
+  'map.zoom': 6,
+}
+
 /** Sortierung nach Handlungsdruck, in mehreren Karten gebraucht. */
 const NACH_DRUCK = `
           CASE s.intensitaet
@@ -104,15 +129,27 @@ export const karten: Karte[] = [
       + 'ganz unten.',
     anzeige: 'map',
     parameter: [MONAT, MARKE],
-    // WARUM DIE AMPEL IM TEXT STEHT UND NICHT IN DER PUNKTFARBE:
-    // Metabases Punktkarte faerbt nach einer ZAHL, nicht nach einer
-    // Kategorie -- `map.pin_type: markers` zeichnet alle Punkte gleich.
-    // Im Browser nachgemessen: 45 Marker, eine einzige Farbe.
+    // WARUM DIE AMPEL IM TEXT STEHT UND NICHT IN DER PUNKTFARBE.
+    //
+    // Nachgemessen am 27.07.2026 in Metabase v0.63.1.6, nachdem gemeldet
+    // wurde "die Marker sind alle blau": Die Punktkarte kennt genau drei
+    // Ausprägungen, und KEINE davon nimmt eine Farbdimension entgegen.
+    //   markers  zeichnet jeden Punkt als <img src="pin.png"> -- eine
+    //            statische Bilddatei, 48-mal dieselbe.
+    //   tiles    rendert serverseitig; die Kacheln wurden Pixel fuer Pixel
+    //            ausgezaehlt und enthalten zwei Farben, weiss und
+    //            rgb(76,157,230). Ebenfalls keine Dimension.
+    //   grid     verdichtet zu Flaechen und verliert den Standort.
     //
     // Statt die Ampel stillschweigend zu verlieren, steht sie als Emoji
     // VORNE in jeder Spalte, die im Tooltip auftaucht. Damit ist sie beim
-    // Antippen sofort sichtbar -- und in der Tabelle darunter, die
-    // dieselben Standorte nach Handlungsdruck sortiert, ohnehin.
+    // Antippen sichtbar -- und in der Tabelle darunter, die dieselben
+    // Standorte nach Handlungsdruck sortiert, ohnehin.
+    //
+    // Nicht uebernommen wurde `map.metric_column`: die Einstellung stand
+    // gesetzt, wirkte aber nie. Sie ist ausgeblendet, solange pin_type
+    // nicht heat oder grid ist -- gespeichert heisst bei Metabase nicht
+    // gewirkt. Siehe docs/fehlerkatalog.md.
     sql: `${MONAT_CTE}
 SELECT ${INTENSITAET_EMOJI} || ' ' || s.betrieb AS "Standort",
        s.konzept                        AS "Marke",
@@ -147,12 +184,11 @@ SELECT ${INTENSITAET_EMOJI} || ' ' || s.betrieb AS "Standort",
  ORDER BY${NACH_DRUCK},
           s.betrieb`,
     visualisierung: {
+      ...AUSSCHNITT,
       'map.type': 'pin',
       'map.latitude_column': 'Breitengrad',
       'map.longitude_column': 'Längengrad',
       'map.pin_type': 'markers',
-      // Was im Tooltip steht, wenn man einen Punkt antippt.
-      'map.metric_column': 'Umsatz',
       // Titel der Sprechblase: enthaelt bereits das Ampel-Emoji.
       'map.tooltip_column': 'Standort',
       column_settings: {
@@ -327,11 +363,11 @@ SELECT ${INTENSITAET_EMOJI} || ' ' || s.betrieb AS "Standort",
  ORDER BY${NACH_DRUCK},
           s.betrieb`,
     visualisierung: {
+      ...AUSSCHNITT,
       'map.type': 'pin',
       'map.latitude_column': 'Breitengrad',
       'map.longitude_column': 'Längengrad',
       'map.pin_type': 'markers',
-      'map.metric_column': 'Umsatz',
       'map.tooltip_column': 'Standort',
       column_settings: {
         '["name","Umsatz"]': {
