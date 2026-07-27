@@ -39,8 +39,10 @@ const SCHREIBEN = process.argv.includes('--schreiben')
 const VON_HAND: Record<string, number | null> = {
   // "Alte" gegen "Alter Papierfabrik" -- Tippfehler in LINA.
   A_15: 18,
-  // Yext kennt einen Standort, den LINA nicht als Betrieb fuehrt.
-  E_33: null,
+  // Der Laden heisst bei Yext nach der Marke ("Enchilada Koeln"), in LINA
+  // nach der Betreibergesellschaft ("COYACAN GmbH"). Kein Zeichen gemeinsam,
+  // keine Heuristik der Welt findet das -- Eugene wusste es.
+  E_33: 32,
 }
 
 /** Eine CSV-Zeile in Felder zerlegen, RFC-4180-Anfuehrungszeichen beachtet. */
