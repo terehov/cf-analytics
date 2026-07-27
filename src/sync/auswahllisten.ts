@@ -80,6 +80,48 @@ const VORGABE_MONAT = `
      AND gesamt IS NOT NULL`
 
 /**
+ * Derselbe Wert für Seiten, die an der BWA hängen — und der ist ein anderer.
+ *
+ * Der Round Table trägt den jüngsten gebuchten BWA-Monat in spätere
+ * Berichtsmonate nach; er hat für Juli ein Urteil, obwohl der Steuerberater
+ * den Juli noch nicht gebucht hat. Eine EBIT-Karte kann das nicht, sie zeigt
+ * den Monat selbst.
+ *
+ * Der erste Wurf setzte überall denselben Monat und machte damit genau den
+ * Fehler, vor dem der Kommentar an MONAT_CTE_BWA warnt: „EBIT je Betrieb" war
+ * leer, obwohl 23 Betriebe gebuchte Juni-Zahlen haben — und das neben einer
+ * Verlaufskarte, die bis Juni Zahlen zeigte. Gemeldet am 27.07.2026.
+ */
+const VORGABE_MONAT_BWA = `
+  SELECT to_char(max(monat), 'YYYY-MM') AS w
+    FROM mart.kennzahlen_aktuell
+   WHERE wert_absolut IS NOT NULL AND wert_absolut <> 0`
+
+/**
+ * Welche Dashboards die BWA-Vorgabe brauchen, erkannt an ihren Karten.
+ *
+ * Nicht am Namen: eine gepflegte Namensliste wäre beim nächsten Umbau still
+ * veraltet, und der Fehler sähe aus wie fehlende Daten. Stattdessen die Frage,
+ * ob ALLE Monatskarten der Seite den BWA-Rückfall benutzen — erkennbar am
+ * Verweis auf `kennzahlen_aktuell` mit `wert_absolut <> 0`.
+ */
+const BWA_DASHBOARDS = `
+  SELECT d.id
+    FROM report_dashboard d
+   WHERE d.archived = false
+     AND EXISTS (
+           SELECT 1 FROM report_dashboardcard dc
+             JOIN report_card c ON c.id = dc.card_id
+            WHERE dc.dashboard_id = d.id
+              AND c.dataset_query::text LIKE '%{{monat}}%')
+     AND NOT EXISTS (
+           SELECT 1 FROM report_dashboardcard dc
+             JOIN report_card c ON c.id = dc.card_id
+            WHERE dc.dashboard_id = d.id
+              AND c.dataset_query::text LIKE '%{{monat}}%'
+              AND c.dataset_query::text NOT LIKE '%wert_absolut <> 0%')`
+
+/**
  * Die Adresse von Metabases eigener Datenbank.
  *
  * Standardmäßig aus DATABASE_URL abgeleitet: dieselbe Postgres-Instanz,
@@ -127,8 +169,8 @@ export async function auswahllistenAbgleichen(): Promise<Abgleich> {
     // Der voreingestellte Monat, im Format, das der Filter erwartet
     // (YYYY-MM). Gibt es noch kein Urteil, bleibt er leer — dann ist ein
     // leerer Filter ehrlicher als ein erfundener Monat.
-    const monatZeilen = await query<{ w: string | null }>(VORGABE_MONAT)
-    const vorgabeMonat = monatZeilen[0]?.w ?? null
+    const vorgabeMonat = (await query<{ w: string | null }>(VORGABE_MONAT))[0]?.w ?? null
+    const vorgabeMonatBwa = (await query<{ w: string | null }>(VORGABE_MONAT_BWA))[0]?.w ?? null
 
     // Kurze Zeitgrenzen: läuft Metabase nicht, soll das hier nicht hängen.
     meta = new Pool({
@@ -142,6 +184,11 @@ export async function auswahllistenAbgleichen(): Promise<Abgleich> {
       `SELECT id, name, parameters::text AS parameters
          FROM report_dashboard
         WHERE archived = false AND parameters IS NOT NULL`)
+
+    // Welche Seiten hängen ausschließlich an der BWA? Die bekommen den
+    // letzten gebuchten Monat statt des letzten bewerteten.
+    const bwaIds = new Set(
+      (await meta.query<{ id: number }>(BWA_DASHBOARDS)).rows.map(r => r.id))
 
     let geaendert = 0
     const neuGesamt = new Set<string>()
@@ -157,8 +204,9 @@ export async function auswahllistenAbgleichen(): Promise<Abgleich> {
         // Nur dieser eine Slug und nur dieser eine Typ — ein Zeitraumfilter
         // (date/all-options) hat andere Vorgaben und bleibt unberührt.
         if (String(p.slug ?? '') === 'monat' && p.type === 'date/month-year') {
-          if (vorgabeMonat && p.default !== vorgabeMonat) {
-            p.default = vorgabeMonat
+          const wert = bwaIds.has(d.id) ? vorgabeMonatBwa : vorgabeMonat
+          if (wert && p.default !== wert) {
+            p.default = wert
             dirty = true
           }
           continue

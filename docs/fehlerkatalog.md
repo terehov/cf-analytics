@@ -1114,3 +1114,41 @@ und niemand konnte sehen, welcher Monat da beantwortet wird.
 Dashboard-ID 1 — deshalb heißt der Round Table `/dashboard/2-round-table` und nicht `1-`. Die
 Nummer ist Metabases Datenbank-ID, kein Titel; sie wird nie neu vergeben und lässt sich ohne
 Neuaufsetzen der Metabase-Datenbank nicht ändern.
+
+## Eine Vorgabe für alle Seiten leerte die EBIT-Karte
+
+**Symptom.** Gemeldet am 27.07.2026: „Warum ist EBIT je Betrieb auf dem BWA-Dashboard leer?"
+Die URL zeigte es: `/dashboard/10-bwa-kennzahlen-und-buchungsstand?betrieb=Aposto+Augsburg&monat=2026-07`.
+
+**Ursache — selbst verursacht, eine Stunde zuvor.** Der neu eingeführte Vorgabemonat setzte
+überall denselben Wert: den jüngsten Monat mit einem Round-Table-Urteil, also Juli 2026. Für
+Juli hat der Steuerberater aber **noch nichts gebucht** — 0 von 131 EBIT-Zeilen.
+
+Der Kommentar an `MONAT_CTE_BWA` beschreibt genau diesen Fall, seit dem 26.07.2026:
+
+> *„Wer hier den Round-Table-Rückfall nimmt, landet auf Juli und bekommt eine leere Karte …
+> Eine leere Karte neben gefüllten liest sich als ‚kein EBIT', nicht als ‚noch nicht gebucht',
+> und das ist der teurere der beiden Irrtümer."*
+
+Der Rückfall im SQL war richtig; die Dashboard-Vorgabe hat ihn überschrieben. Und der Irrtum
+trat genau so ein wie vorhergesagt — die Verlaufskarte darüber zeigte Zahlen bis Juni, die
+EBIT-Karte darunter blieb leer.
+
+**Behoben mit zwei Vorgaben:**
+
+| Seiten | Vorgabe | Wert am 27.07.2026 |
+|---|---|---|
+| alle übrigen | jüngster Monat mit Urteil | 2026-07 |
+| BWA | jüngster **gebuchter** Monat | 2026-06 |
+
+**Welche Seite welche bekommt, wird abgeleitet, nicht gepflegt.** Kriterium: benutzen *alle*
+Monatskarten der Seite den BWA-Rückfall (erkennbar an `kennzahlen_aktuell` mit
+`wert_absolut <> 0`)? Eine Namensliste wäre beim nächsten Umbau still veraltet, und der Fehler
+sähe wieder aus wie fehlende Daten. Nachgemessen trifft es genau ein Dashboard.
+
+Bewusst streng — nur wenn *alle* Karten daran hängen. Eine gemischte Seite bekommt die
+Standardvorgabe: eine einzelne leere BWA-Karte ist der kleinere Schaden als eine ganze Seite,
+die einen Monat zu weit zurückliegt.
+
+**Regel.** Ein Vorgabewert ist eine Behauptung darüber, welcher Ausschnitt sinnvoll ist. Wo
+verschiedene Datenquellen verschieden weit reichen, gibt es diese eine Antwort nicht.

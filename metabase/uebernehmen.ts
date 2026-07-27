@@ -30,7 +30,7 @@ import { karten as kartenImport } from './karten-import'
 import { karten as kartenStandort } from './karten-standort'
 import { dashboards } from './dashboards'
 import { auslegen, MINDESTHOEHE } from './layout'
-import type { Karte, Kachel } from './typen'
+import type { Karte, Kachel, Dashboard } from './typen'
 
 const DB_ID = 2
 const PORT = 8899
@@ -439,6 +439,33 @@ function kartenParameterTyp(typ: string): string {
   return typ === 'date' || typ === 'date/single' ? typ : 'date/single'
 }
 
+/**
+ * Haengen die Monatskarten dieses Dashboards an der BWA?
+ *
+ * Erkannt am Rueckfall aus MONAT_CTE_BWA -- der ist eindeutig genug, um
+ * ihn im SQL wiederzufinden, und aendert sich nur zusammen mit dem
+ * Baustein selbst. Eine gepflegte Liste von Dashboardnamen waere beim
+ * naechsten Umbau still veraltet.
+ *
+ * Bewusst STRENG: nur wenn ALLE Monatskarten der Seite an der BWA haengen.
+ * Eine gemischte Seite bekommt die Standardvorgabe, weil dort die Mehrheit
+ * der Karten sonst leer bliebe -- und eine einzelne leere BWA-Karte ist
+ * der kleinere Schaden als eine ganze leere Seite.
+ */
+function bwaDashboard(d: Dashboard): boolean {
+  const karten: Karte[] = []
+  for (const r of d.reihen) {
+    for (const t of r.teile) {
+      if (!t.karte) continue
+      const k = alleKarten.find(x => x.schluessel === t.karte)
+      if (k && /\{\{\s*monat\s*\}\}/.test(k.sql)) karten.push(k)
+    }
+  }
+  if (karten.length === 0) return false
+  return karten.every(k =>
+    k.sql.includes('mart.kennzahlen_aktuell') && k.sql.includes('wert_absolut <> 0'))
+}
+
 function templateTags(karte: Karte) {
   const tags: Record<string, unknown> = {}
   const namen = new Set<string>()
@@ -537,6 +564,16 @@ const definitionen = {
   dashboards: dashboards.map(d => ({
     schluessel: d.schluessel,
     sammlung: d.sammlung,
+    // Haengen die Karten dieser Seite an der BWA? Dann braucht ihr
+    // Monatsfilter den letzten GEBUCHTEN Monat als Vorgabe, nicht den
+    // letzten bewerteten -- der Steuerberater hinkt ein bis zwei Monate
+    // hinterher.
+    //
+    // Abgeleitet aus dem SQL statt von Hand gepflegt: eine Liste von
+    // Dashboardnamen waere beim naechsten Umbau still veraltet, und der
+    // Fehler saehe aus wie fehlende Daten. Erkennungsmerkmal ist der
+    // Rueckfall aus MONAT_CTE_BWA.
+    bwa_monat: bwaDashboard(d),
     payload: {
       name: d.name,
       description: `${d.beschreibung}\n\n[key:${d.schluessel}]`,
@@ -723,18 +760,36 @@ async function uebernehmen() {
   // Scheitert das, bleibt vorgabeMonat leer und die Filter stehen wie
   // bisher ohne Vorgabe da -- die Dashboards rechnen dann weiter mit dem
   // Rueckfall aus MONAT_CTE. Schlechter als vorher wird es dadurch nicht.
-  let vorgabeMonat = null;
-  try {
-    const a = await mb('/dataset', 'POST', {
-      type: 'native',
-      database: def.db_id,
-      native: {query:
-        "SELECT to_char(max(monat), 'YYYY-MM') FROM mart.round_table_monat " +
-        "WHERE monat <= date_trunc('month', current_date)::date AND gesamt IS NOT NULL"},
-    });
-    vorgabeMonat = (a.data?.rows || [])[0]?.[0] ?? null;
-    log('Voreingestellter Monat: ' + (vorgabeMonat ?? '(keiner — kein bewerteter Monat)'));
-  } catch (e) { log('Vorgabemonat nicht ermittelbar: ' + e.message, 'fehler'); }
+  // ZWEI Vorgabemonate, und das ist kein Schoenheitsfehler.
+  //
+  // Der Round Table traegt den juengsten GEBUCHTEN BWA-Monat in spaetere
+  // Berichtsmonate nach -- er hat fuer Juli ein Urteil, obwohl der
+  // Steuerberater den Juli noch nicht gebucht hat. Eine EBIT-Karte kann
+  // das nicht: sie zeigt den Monat selbst, und fuer Juli gibt es ihn
+  // nicht.
+  //
+  // Der erste Wurf setzte ueberall denselben Monat und machte damit genau
+  // den Fehler, vor dem der Kommentar an MONAT_CTE_BWA warnt: die Karte
+  // "EBIT je Betrieb" war leer, obwohl 23 Betriebe gebuchte Juni-Zahlen
+  // haben. Gemeldet am 27.07.2026.
+  //
+  // Die Vorgabe muss deshalb zu dem Rueckfall passen, den die Karten der
+  // Seite benutzen -- sonst widerspricht sie ihm.
+  const vorgabe = {};
+  for (const [name, sql] of [
+    ['standard', "SELECT to_char(max(monat), 'YYYY-MM') FROM mart.round_table_monat " +
+                 "WHERE monat <= date_trunc('month', current_date)::date AND gesamt IS NOT NULL"],
+    ['bwa',      "SELECT to_char(max(monat), 'YYYY-MM') FROM mart.kennzahlen_aktuell " +
+                 "WHERE wert_absolut IS NOT NULL AND wert_absolut <> 0"],
+  ]) {
+    try {
+      const a = await mb('/dataset', 'POST', {
+        type: 'native', database: def.db_id, native: {query: sql}});
+      vorgabe[name] = (a.data?.rows || [])[0]?.[0] ?? null;
+    } catch (e) { log('Vorgabemonat ' + name + ' nicht ermittelbar: ' + e.message, 'fehler'); }
+  }
+  log('Voreingestellter Monat: ' + (vorgabe.standard ?? '(keiner)') +
+      ', bei der BWA ' + (vorgabe.bwa ?? '(keiner)'));
 
   // Klickverhalten einer Kachel in Metabases Struktur uebersetzen.
   // parameterMapping bildet einen Parameter des ZIELS auf eine Spalte der
@@ -892,9 +947,9 @@ async function uebernehmen() {
         // src/sync/auswahllisten.ts nach JEDEM Import neu; hier steht er,
         // damit eine frisch eingerichtete Metabase nicht bis zum ersten
         // Sync-Lauf ohne Vorgabe dasteht.
-        if (p.slug === 'monat' && p.type === 'date/month-year' && vorgabeMonat) {
-          parameter.push({...p, default: vorgabeMonat});
-          continue;
+        if (p.slug === 'monat' && p.type === 'date/month-year') {
+          const wert = d.bwa_monat ? vorgabe.bwa : vorgabe.standard;
+          if (wert) { parameter.push({...p, default: wert}); continue; }
         }
         // Feste Liste: Werte stehen in der Definition, nicht in der
         // Datenbank -- etwa die Bewertung, deren 'ohne' fuer NULL steht.
