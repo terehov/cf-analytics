@@ -35,6 +35,8 @@ export const MINDESTHOEHE: Record<Anzeige, number> = {
   pie: 8,
   scatter: 9,  // Punktwolke braucht Hoehe, sonst wird sie ein Strich
   table: 9,    // Kopfzeile + ~6 Datenzeilen, darunter lohnt keine Tabelle
+  map: 12,     // Deutschland ist hoeher als breit -- flacher wird die Karte
+               // zum Streifen, in dem Nord und Sued uebereinanderliegen
 }
 
 /**

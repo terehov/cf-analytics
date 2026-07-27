@@ -6,6 +6,9 @@
 
 export type Anzeige =
   | 'table' | 'scalar' | 'bar' | 'row' | 'line' | 'combo' | 'pie' | 'area'
+  /** Punktkarte. Braucht map.type = 'pin' und die beiden Koordinatenspalten
+   *  in map.latitude_column / map.longitude_column. */
+  | 'map'
 
 export type Parameter = {
   id: string

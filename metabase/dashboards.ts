@@ -490,4 +490,31 @@ export const dashboards: Dashboard[] = [
       { teile: [{ karte: 'im_betrieb', hoehe: 12 }] },
     ],
   },
+
+  // ===================================================================
+  // Die Karte. Eigene Seite statt Kachel auf "① Marken": eine Karte
+  // braucht Hoehe, und darunter gehoert die Liste, die sagt, wer FEHLT --
+  // sonst haelt man 45 Punkte fuer alle 141 Betriebe.
+  // ===================================================================
+  {
+    schluessel: 'so_karte_db',
+    name: '⑧ Standortkarte',
+    beschreibung:
+      'Alle Standorte mit hinterlegten Koordinaten auf einer Karte, eingefärbt nach der Gesamtampel des gewählten Monats. Ein Klick auf einen Punkt öffnet die Detailseite des Betriebs.',
+    sammlung: 'Drill-Down',
+    filter: [F_MONAT, F_MARKE],
+    reihen: [
+      { teile: [{ text: '# ⑧ Standortkarte\n\nEin Punkt je Standort, gefärbt nach der Gesamtampel des gewählten Monats. Ein Klick führt auf die Detailseite des Betriebs.\n\n> **Die Karte zeigt einen Ausschnitt, nicht das Ganze.** Nur für einen Teil der Betriebe sind Adressen hinterlegt — wer fehlt, steht ganz unten. Ein leerer Fleck auf der Karte heißt also nicht, dass dort kein Betrieb ist.\n\n**Die Ampel steht im Namen jedes Punkts** (🔴 🟠 🟢 ⚪), nicht in seiner Farbe: Metabase färbt Kartenpunkte nur nach Zahlen, nicht nach Kategorien. Antippen zeigt Bewertung, Umsatz und Handlungsbedarf — die Tabelle weiter unten listet dieselben Standorte nach Handlungsdruck sortiert.\n\n⚪ sind Betriebe ohne Bewertung, meist weil die Zahlen vom Steuerberater fehlen. Sie stehen bewusst mit auf der Karte: eine fehlende Bewertung ist eine Aussage, kein Grund zum Ausblenden.' }] },
+      { teile: [{ karte: 'so_karte', hoehe: 16,
+        klick: [{ ziel: 'dd_betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      { teile: [{ text: '## Wie sich die Standorte verteilen' }] },
+      { teile: [{ karte: 'so_verteilung', hoehe: 9 }] },
+      { teile: [{ text: '## Dieselben Standorte als Liste\n\nSortiert nach Handlungsdruck. Die Spalte „Genauigkeit" sagt, wie genau der Punkt sitzt — „adresse" ist hausgenau, „ort" nur stadtgenau.' }] },
+      { teile: [{ karte: 'so_tabelle', hoehe: 12,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      { teile: [{ text: '## Wer fehlt auf der Karte\n\nFür diese Betriebe ist keine Adresse hinterlegt. **Die mit Umsatz stehen oben** — bei denen lohnt das Nachtragen zuerst.' }] },
+      { teile: [{ karte: 'so_fehlend', hoehe: 12,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+    ],
+  },
 ]

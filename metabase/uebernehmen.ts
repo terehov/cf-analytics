@@ -27,6 +27,7 @@ import { karten as kartenFach } from './karten-fach'
 import { karten as kartenDrilldown } from './karten-drilldown'
 import { karten as kartenPortfolio } from './karten-portfolio'
 import { karten as kartenImport } from './karten-import'
+import { karten as kartenStandort } from './karten-standort'
 import { dashboards } from './dashboards'
 import { auslegen, MINDESTHOEHE } from './layout'
 import type { Karte, Kachel } from './typen'
@@ -36,7 +37,7 @@ const PORT = 8899
 const METABASE = 'http://localhost:3000'
 
 const alleKarten: Karte[] = [
-  ...kartenDrilldown, ...kartenPortfolio, ...kartenRoundTable, ...kartenFach, ...kartenImport,
+  ...kartenDrilldown, ...kartenPortfolio, ...kartenRoundTable, ...kartenFach, ...kartenImport, ...kartenStandort,
 ]
 
 // Reihen in Kacheln umrechnen — EINMAL, damit Pruefung und Ausgabe
@@ -152,6 +153,12 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
   wa_we_pruefung:         { zeitraum: 'Vergleich je Monat gegen die BWA, nicht je Tag.' },
 
   // --- Strukturell ohne die Dimension --------------------------------------
+  so_fehlend: {
+    monat: 'Wer gar keine Koordinaten hat, fehlt in JEDEM Monat — die Liste ist '
+         + 'zeitlos und wuerde durch einen Monatsfilter nur scheinbar kleiner.',
+    marke: 'Bewusst ueber alle Marken: die Liste ist eine Arbeitsvorlage zum '
+         + 'Nachtragen der Adressen, und die soll vollstaendig bleiben.',
+  },
   wa_preise: {
     betrieb: 'Einkaufspreise gelten je Lieferant fuer die Gruppe, nicht je Betrieb — '
            + 'mart.preisentwicklung_ware hat gar keine Betriebsspalte.',
