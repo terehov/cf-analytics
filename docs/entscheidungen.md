@@ -51,6 +51,13 @@ Bun ist bei Nixpacks der schwache Punkt, und der Service läuft unbeaufsichtigt 
 ### ~~Arbeitsfenster 7–23 Uhr~~ → entfernt, durchgehend
 *Eugene:* „Wir brauchen das Zeitfenster gar nicht. Lass es einfach konstant in dem Tempo ganz ruhig weiterlaufen." — **Überzeugend, und es dreht die eigene Begründung von oben weiter.** Wenn schon „tagsüber fällt es weniger auf", dann gilt erst recht: ein Gerät, das jeden Abend schlagartig verstummt und morgens wieder anspringt, ist eine Kante im Log. Ein gleichmäßiges Rinnsal rund um die Uhr ist keine. Was das Tempo begrenzt, sind `TAKT_*` und `TAGESBUDGET`, nicht die Uhrzeit. Das Budget stieg dabei von 2.000 auf 3.000 — es soll das Notfallnetz sein, nicht die Alltagsbremse.
 
+### Tagesbudget 3.000 → 6.000, weil der Takt halbiert wurde
+Der Satz oben — *Notfallnetz, nicht Alltagsbremse* — galt für den Takt 20–40 s: im Mittel 30 s, also ~2.880 Aufrufe am Tag, knapp unter der Grenze von 3.000. Am 26.07.2026 wurde der Takt auf 10–20 s halbiert, **das Budget aber nicht mitgezogen.** Damit wurde stillschweigend genau das, was es nicht sein sollte.
+
+Lauf 10 hat es vorgeführt: 3.802 Posten in 16,9 Stunden, dann `Tagesbudget aufgebraucht` — um 13:21 Uhr, mitten am Tag. Gemessen 16,0 s je Posten, hochgerechnet ~5.400 Aufrufe in 24 Stunden. 6.000 liegt darüber, mit demselben schmalen Abstand wie vorher.
+
+**Das ändert die Last je Zeiteinheit nicht.** Was LINA sieht, regeln `TAKT_MIN_MS`/`TAKT_MAX_MS`; die bleiben bei 10–20 s. Das Budget entscheidet nur, wann der Tag vorzeitig endet. Die Lehre ist die Kopplung: wer den Takt ändert, muss das Budget nachziehen — sonst schlägt die Bremse zu, die nie bremsen sollte.
+
 ### Ein Worker, abgesichert per Advisory-Sperre
 `FOR UPDATE SKIP LOCKED` verhindert doppelte Posten, aber nicht doppeltes Tempo — und das Tagesbudget zählt jeder Prozess für sich im Speicher. Seit dem Wegfall des Arbeitsfensters läuft ein Backfill viele Stunden, der stündliche Zeitplan würde also Lauf um Lauf danebenstarten. Zehn Worker wären zehnfaches Tempo gegen einen Zugang ohne Limits. Die Sperre liegt auf einer **eigenen** Verbindung, nicht auf einer gepoolten: sonst wartet `pool.end()` auf sie.
 

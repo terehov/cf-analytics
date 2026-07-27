@@ -132,16 +132,28 @@ const Schema = z.object({
   /**
    * Zweite Bremse: harte Obergrenze pro Kalendertag (UTC).
    *
-   * Bewusst ÜBER dem, was der Takt zulässt: 20–40 s ergeben im Mittel 30 s,
-   * also ~2.880 Aufrufe in 24 Stunden. Mit 3.000 bremst der Takt, nicht das
-   * Budget — sonst stünde der Importer täglich ab dem Erreichen der Grenze
-   * still, und genau diese Lücke sollte mit dem Wegfall des Arbeitsfensters
-   * verschwinden (25.07.2026).
+   * Bewusst ÜBER dem, was der Takt zulässt — sonst stünde der Importer täglich
+   * ab dem Erreichen der Grenze still, und genau diese Lücke sollte mit dem
+   * Wegfall des Arbeitsfensters verschwinden (25.07.2026).
    *
    * Das Budget bleibt damit, was es sein soll: ein Notfallnetz gegen einen
    * Fehler, der das Tempo aushebelt — keine Alltagsbremse.
+   *
+   * 3.000 war zum Takt 20–40 s gerechnet (im Mittel 30 s, also ~2.880 Aufrufe
+   * in 24 Stunden). Am 26.07.2026 wurde der Takt auf 10–20 s halbiert, das
+   * Budget aber nicht mitgezogen — womit aus dem Notfallnetz still die
+   * Alltagsbremse wurde. Lauf 10 hat es vorgeführt: 3.802 Posten in 16,9
+   * Stunden, dann `Tagesbudget aufgebraucht` um 13:21 Uhr mitten am Tag.
+   *
+   * Gemessen sind das 16,0 s je Posten, also ~5.400 Aufrufe in 24 Stunden.
+   * 6.000 liegt darüber, mit demselben schmalen Abstand wie vorher.
+   *
+   * Wichtig: Das ändert NICHT die Last je Zeiteinheit. Was LINA sieht, regeln
+   * TAKT_MIN_MS/TAKT_MAX_MS — die bleiben unangetastet. Das Budget entscheidet
+   * nur, wann der Tag vorzeitig endet. Wer den Takt wieder ändert, muss diesen
+   * Wert nachziehen; sonst wiederholt sich derselbe Fehler.
    */
-  TAGESBUDGET: z.coerce.number().int().min(1).default(3_000),
+  TAGESBUDGET: z.coerce.number().int().min(1).default(6_000),
   /**
    * Arbeitsfenster in Ortszeit. **Voreinstellung 0–24: durchgehend.**
    *
@@ -210,7 +222,7 @@ const Schema = z.object({
    * Deshalb holt der tägliche Lauf ein gleitendes Fenster. Die Zieltabellen
    * sind Upserts, ein zweiter Abruf korrigiert den ersten also einfach. Zehn
    * Tage sind reichlich über der beobachteten Anlaufzeit und kosten 8
-   * Endpunkte × 10 Tage = 80 Aufrufe am Tag — bei einem Tagesbudget von 3.000
+   * Endpunkte × 10 Tage = 80 Aufrufe am Tag — bei einem Tagesbudget von 6.000
    * fällt das nicht ins Gewicht.
    */
   NACHZUEGLER_TAGE: z.coerce.number().int().min(1).default(10),

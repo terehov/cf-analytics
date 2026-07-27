@@ -168,7 +168,27 @@ export async function laden(k: Kontext): Promise<number> {
         const spalten = ['betrieb_key','geschaeftstag','hauptsparte_key','verkaufsstelle_key',
                          'umsatz_netto','umsatz_brutto','rechnungen','gaeste',
                          'durchschnittsbon','umsatz_pro_gast','raw_id'] as const
-        const zeilen = t.umsatzbericht(k.daten, k.von, posId)
+        const roh = t.umsatzbericht(k.daten, k.von, posId)
+
+        // Anzahlen, die keine sein können (siehe transform/index.ts,
+        // `anzahl`). Sie wurden auf null gesetzt — hier bekommen sie einen
+        // Platz, an dem jemand sie wiederfindet. Der Posten gilt trotzdem
+        // als erledigt: der Umsatz des Tages ist in Ordnung.
+        const verworfen = roh.flatMap(z => (z.verworfen ?? []).map(v => ({ ...v, encId: z.encId })))
+        if (verworfen.length) {
+          log.warn('unplausible Anzahl verworfen', {
+            endpunkt: k.ep.key, tag: k.von, anzahl: verworfen.length,
+            beispiel: verworfen[0],
+          })
+          await c.query(
+            `INSERT INTO sync.schema_abweichung (endpunkt, erwartet, tatsaechlich)
+             VALUES ($1, $2, $3)`,
+            [k.ep.key,
+             JSON.stringify({ hinweis: 'bills/guests sind Anzahlen im int4-Bereich' }),
+             JSON.stringify({ geschaeftstag: k.von, raw_id: rawId, verworfen })])
+        }
+
+        const zeilen = roh
           .filter(z => bk(z.encId))
           .map(z => ({
             betrieb_key: bk(z.encId)!, geschaeftstag: z.geschaeftstag,

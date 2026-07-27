@@ -45,7 +45,7 @@ Ab dem 17.07. steht die Zahl der Betriebe stabil bei 56 — davor läuft sie hoc
 
 „Gestern" zu holen liefert damit verlässlich Nullen. Und weil der Posten danach als erledigt gilt und `historie_einreihen()` bewusst nichts Erledigtes noch einmal einreiht, bliebe dieser Tag **für immer** auf null. Zahlen dieser Sorte sind schlimmer als fehlende: eine Lücke sieht man, eine Null nicht.
 
-Deshalb reiht `--taeglich` die letzten `NACHZUEGLER_TAGE` (Voreinstellung 10) Geschäftstage ein. Die Zieltabellen sind Upserts, ein zweiter Abruf korrigiert den ersten also einfach. Kosten: 8 Endpunkte × 10 Tage = 80 Aufrufe am Tag, bei einem Tagesbudget von 3.000.
+Deshalb reiht `--taeglich` die letzten `NACHZUEGLER_TAGE` (Voreinstellung 10) Geschäftstage ein. Die Zieltabellen sind Upserts, ein zweiter Abruf korrigiert den ersten also einfach. Kosten: 8 Endpunkte × 10 Tage = 80 Aufrufe am Tag, bei einem Tagesbudget von 6.000.
 
 **`ON CONFLICT DO NOTHING` ist hier genau richtig — und zwar aus demselben Grund, aus dem es in `historie_einreihen()` genau falsch war.** Der Eindeutigkeitsindex ist partiell (`WHERE erledigt_am IS NULL`) und blockiert nur noch *offene* Posten. Für den Backfill hieß das: alles Erledigte wird erneut geholt, ein teurer Fehler. Für das Nachlauffenster heißt dasselbe: derselbe Tag wird nicht doppelt eingereiht, solange er noch aussteht, aber sehr wohl erneut, wenn er fertig ist. Genau das soll er.
 
@@ -167,7 +167,7 @@ Die Drosselung ist keine Höflichkeit, sondern das, was die Integration am Leben
 | Variable | Vorgabe | Wirkung |
 |---|---|---|
 | `TAKT_MIN_MS` / `TAKT_MAX_MS` | 20.000 / 40.000 | zufällige Pause je Request, kein fester Rhythmus |
-| `TAGESBUDGET` | 3.000 | harte Obergrenze je Kalendertag (UTC), **laufübergreifend** |
+| `TAGESBUDGET` | 6.000 | harte Obergrenze je Kalendertag (UTC), **laufübergreifend** |
 | `FENSTER_VON_STUNDE` / `_BIS_` | 0 / 24 | durchgehend — das Arbeitsfenster ist entfallen, siehe `entscheidungen.md` |
 | `ANFRAGE_TIMEOUT_MS` | 60.000 | Zeitlimit je Anfrage; ohne das hängt ein stummer Server den Worker auf |
 | `MAX_VERSUCHE` | 4 | danach wird ein Posten aufgegeben |

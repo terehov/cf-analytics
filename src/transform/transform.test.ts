@@ -40,6 +40,54 @@ describe('umsatzbericht', () => {
     expect(umsatzbericht(daten, '2026-06-15')[0].hauptspartePosId).toBeNull()
     expect(umsatzbericht(daten, '2026-06-15', 10001)[0].hauptspartePosId).toBe(10001)
   })
+
+  /**
+   * Der Befund vom 27.07.2026: vier Tage im Oktober 2018 brachen den Import
+   * ab, weil LINA in `bills`/`guests` Werte zwischen 3,0 und 3,9 Milliarden
+   * lieferte — im Muster einer ID, nicht einer Anzahl.
+   *
+   * Wichtig ist hier BEIDES: der Wert darf nicht durchrutschen (sonst
+   * verdirbt er jeden Durchschnitt), und der Umsatz desselben Betriebs muss
+   * erhalten bleiben (sonst kostet ein kaputtes Feld den ganzen Tag).
+   */
+  test('eine Anzahl jenseits von int4 wird verworfen, nicht gespeichert', () => {
+    const kaputt = { stores: [{
+      encId: 'abc', name: 'Test',
+      umsatzNetto: 1234.5, umsatzBrutto: 1469.06,
+      bills: 3010725105, guests: 42, avgTicket: 30.1, avgGuest: 29.4,
+    }] }
+    const [zeile] = umsatzbericht(kaputt, '2018-10-10')
+
+    expect(zeile!.rechnungen).toBeNull()
+    expect(zeile!.verworfen).toEqual([{ feld: 'bills', wert: 3010725105 }])
+
+    // Der Rest der Zeile ist unberührt — nur das eine Feld fehlt.
+    expect(zeile!.gaeste).toBe(42)
+    expect(zeile!.umsatzNetto).toBe(1234.5)
+  })
+
+  test('gültige Anzahlen bis an die int4-Grenze bleiben erhalten', () => {
+    const grenze = { stores: [{ encId: 'a', bills: 2147483647, guests: 0 }] }
+    const [zeile] = umsatzbericht(grenze, '2026-06-15')
+    expect(zeile!.rechnungen).toBe(2147483647)
+    expect(zeile!.gaeste).toBe(0)
+    expect(zeile!.verworfen).toBeUndefined()
+  })
+
+  test('Nachkommastellen und negative Werte sind ebenfalls keine Anzahl', () => {
+    const krumm = { stores: [{ encId: 'a', bills: 12.5, guests: -3 }] }
+    const [zeile] = umsatzbericht(krumm, '2026-06-15')
+    expect(zeile!.rechnungen).toBeNull()
+    expect(zeile!.gaeste).toBeNull()
+    expect(zeile!.verworfen).toHaveLength(2)
+  })
+
+  test('fehlende Anzahlen erzeugen keinen Befund', () => {
+    const leer = { stores: [{ encId: 'a', umsatzNetto: 100 }] }
+    const [zeile] = umsatzbericht(leer, '2026-06-15')
+    expect(zeile!.rechnungen).toBeNull()
+    expect(zeile!.verworfen).toBeUndefined()
+  })
 })
 
 describe('personalkosten', () => {

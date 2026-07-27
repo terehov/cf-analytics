@@ -27,7 +27,7 @@
 -- Eine einzige Zeile. Alles, was man in drei Sekunden wissen will, bevor
 -- man ueberhaupt hinsieht, ob irgendwo etwas rot ist.
 -- ---------------------------------------------------------------------
-CREATE VIEW mart.import_gesamt AS
+CREATE OR REPLACE VIEW mart.import_gesamt AS
 WITH w AS (
     SELECT count(*)                                            AS posten,
            count(*) FILTER (WHERE erledigt_am IS NOT NULL)      AS erledigt,
@@ -91,7 +91,7 @@ Groessenordnung, keine Zusage -- sie aendert sich mit dem Tagesbudget und mit LI
 -- Faelligkeit). Damit ist "was kommt als Naechstes" nicht geraten,
 -- sondern abgelesen.
 -- ---------------------------------------------------------------------
-CREATE VIEW mart.import_naechste AS
+CREATE OR REPLACE VIEW mart.import_naechste AS
 SELECT w.posten_id,
        row_number() OVER (ORDER BY w.prioritaet, w.faellig_ab, w.posten_id) AS position,
        w.endpunkt,
@@ -129,7 +129,7 @@ etwas kaputt ist.';
 -- was man wissen will, ist "welcher Fehler, wie oft, seit wann, welcher
 -- Endpunkt".
 -- ---------------------------------------------------------------------
-CREATE VIEW mart.import_fehler AS
+CREATE OR REPLACE VIEW mart.import_fehler AS
 SELECT a.endpunkt,
        coalesce(a.http_status, 0)                      AS http_status,
        -- Fehlertexte enthalten oft Zeitstempel oder IDs. Fuer die
@@ -165,7 +165,7 @@ Bericht, den dieser Betrieb nicht fuehrt.';
 -- haengt, seit wann kam nichts mehr, und wie viele Betriebe sind
 -- betroffen.
 -- ---------------------------------------------------------------------
-CREATE VIEW mart.import_bericht AS
+CREATE OR REPLACE VIEW mart.import_bericht AS
 WITH warte AS (
     SELECT endpunkt,
            count(*)                                        AS posten,
@@ -243,7 +243,7 @@ deshalb koennen Historienposten laenger unberuehrt bleiben.';
 -- ---------------------------------------------------------------------
 -- 5. Die Laeufe -- was ist beim letzten Mal passiert?
 -- ---------------------------------------------------------------------
-CREATE VIEW mart.import_lauf AS
+CREATE OR REPLACE VIEW mart.import_lauf AS
 SELECT l.lauf_id,
        l.gestartet_am,
        l.beendet_am,
@@ -278,7 +278,7 @@ Der Zustand liegt in der Datenbank, nicht im Prozess.';
 -- Eine Luecke ist eine Pause; ein Absacken ohne Fehler ist meistens das
 -- Tagesbudget.
 -- ---------------------------------------------------------------------
-CREATE VIEW mart.import_puls AS
+CREATE OR REPLACE VIEW mart.import_puls AS
 SELECT date_trunc('hour', beendet_am)                       AS stunde,
        count(*) FILTER (WHERE status = 'ok')                AS geladen,
        count(*) FILTER (WHERE status = 'keine_daten')       AS keine_daten,
@@ -305,7 +305,7 @@ Zutun, hat LINA gebremst.';
 -- Die Umkehrung von import_bericht: nicht "welcher Bericht haengt",
 -- sondern "welcher Betrieb hat Luecken".
 -- ---------------------------------------------------------------------
-CREATE VIEW mart.import_betrieb AS
+CREATE OR REPLACE VIEW mart.import_betrieb AS
 SELECT b.betrieb_key,
        b.name                                              AS betrieb,
        b.enc_id,
@@ -346,7 +346,7 @@ einen Bericht nicht fuehren.';
 -- synchronisiert. Eine Karte darauf ist eine Karte, die niemand in der
 -- Oberflaeche nachbauen oder pruefen kann.
 -- ---------------------------------------------------------------------
-CREATE VIEW mart.import_sperre AS
+CREATE OR REPLACE VIEW mart.import_sperre AS
 SELECT sperre_id,
        art,
        erkannt_am,
@@ -372,7 +372,7 @@ Anmeldeversuche zur Kontosperre fuehren.
 Der Hinweis ist LINAs eigene Meldung, keine Vermutung von uns.';
 
 
-CREATE VIEW mart.import_strukturaenderung AS
+CREATE OR REPLACE VIEW mart.import_strukturaenderung AS
 SELECT abweichung_id,
        endpunkt,
        erkannt_am,

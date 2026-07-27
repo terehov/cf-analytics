@@ -15,6 +15,37 @@ import { geschaeftstagFuerStunde, ausLinaEpoch, linaEpochAlsDatum } from '../lib
 const z = (v: unknown): number | null =>
   v === null || v === undefined || Number.isNaN(Number(v)) ? null : Number(v)
 
+/** Obergrenze von int4 — die Breite der Anzahl-Spalten in core. */
+const INT4_MAX = 2_147_483_647
+
+/**
+ * Anzahlen (Rechnungen, Gäste). Alles, was keine Anzahl sein KANN, wird zu
+ * null — nicht zu einer Zahl, die zufällig in die Spalte passt.
+ *
+ * Anlass, 27.07.2026: Vier Tage im Oktober 2018 brachen den Import ab mit
+ * `value "3010725105" is out of range for type integer`. Die vier Werte
+ * lagen alle zwischen 3,0 und 3,9 Milliarden — also im oberen Bereich von
+ * uint32 und damit im Muster einer ID, nicht einer Anzahl. Ein Betrieb hat
+ * an einem Tag keine drei Milliarden Gäste.
+ *
+ * Die naheliegende Reparatur wäre gewesen, die Spalten auf bigint zu
+ * verbreitern. Das wäre falsch: Der Wert passte danach zwar, würde aber als
+ * Gästezahl gelten und jeden Durchschnitt in mart über den Haufen werfen —
+ * still, und rückwirkend nicht mehr erkennbar. Ein zu schmaler Datentyp war
+ * hier nicht das Problem, sondern der einzige Grund, warum es überhaupt
+ * aufgefallen ist.
+ *
+ * Deshalb: unplausibel → null, und der verworfene Wert wandert in
+ * `verworfen`, damit er in sync.schema_abweichung landet statt zu
+ * verschwinden. Der Umsatz des Tages bleibt erhalten; nur die Anzahl fehlt.
+ */
+const anzahl = (v: unknown): { wert: number | null; verworfen: number | null } => {
+  const n = z(v)
+  if (n === null) return { wert: null, verworfen: null }
+  if (!Number.isInteger(n) || n < 0 || n > INT4_MAX) return { wert: null, verworfen: n }
+  return { wert: n, verworfen: null }
+}
+
 export type UmsatzZeile = {
   encId: string
   geschaeftstag: string
@@ -25,22 +56,36 @@ export type UmsatzZeile = {
   gaeste: number | null
   durchschnittsbon: number | null
   umsatzProGast: number | null
+  /**
+   * Werte, die als Anzahl unmöglich sind und deshalb NICHT übernommen
+   * wurden. Leer im Normalfall; sonst Futter für sync.schema_abweichung.
+   */
+  verworfen?: { feld: string; wert: number }[]
 }
 
 export function umsatzbericht(
   daten: any, geschaeftstag: string, hauptspartePosId: number | null = null,
 ): UmsatzZeile[] {
-  return (daten?.stores ?? []).map((s: any) => ({
-    encId: s.encId,
-    geschaeftstag,
-    hauptspartePosId,
-    umsatzNetto: z(s.umsatzNetto),
-    umsatzBrutto: z(s.umsatzBrutto),
-    rechnungen: z(s.bills),
-    gaeste: z(s.guests),
-    durchschnittsbon: z(s.avgTicket),
-    umsatzProGast: z(s.avgGuest),
-  }))
+  return (daten?.stores ?? []).map((s: any) => {
+    const rechnungen = anzahl(s.bills)
+    const gaeste = anzahl(s.guests)
+    const verworfen: { feld: string; wert: number }[] = []
+    if (rechnungen.verworfen !== null) verworfen.push({ feld: 'bills', wert: rechnungen.verworfen })
+    if (gaeste.verworfen !== null) verworfen.push({ feld: 'guests', wert: gaeste.verworfen })
+
+    return {
+      encId: s.encId,
+      geschaeftstag,
+      hauptspartePosId,
+      umsatzNetto: z(s.umsatzNetto),
+      umsatzBrutto: z(s.umsatzBrutto),
+      rechnungen: rechnungen.wert,
+      gaeste: gaeste.wert,
+      durchschnittsbon: z(s.avgTicket),
+      umsatzProGast: z(s.avgGuest),
+      ...(verworfen.length ? { verworfen } : {}),
+    }
+  })
 }
 
 export type PersonalkostenZeile = {

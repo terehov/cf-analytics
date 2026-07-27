@@ -801,3 +801,83 @@ der Sicht, die Metabase tatsächlich zeigt, samt der drei Zahlen oben.
 **Regel.** Ein Kommentar, der eine Falle erklärt, gehört an das Objekt, das der Lesende
 **sieht** — nicht an das, aus dem die Daten stammen. Nach jeder Änderung an der Sichtbarkeit
 prüfen, ob eine Warnung dadurch unsichtbar geworden ist.
+
+---
+
+## Der Backfill lief endpunktweise — ein Abbruch hätte alles wertlos gemacht
+
+**27.07.2026.** Frage von Eugene: „Wie weit ist er schon gekommen?" Die Antwort war
+unangenehm:
+
+| Endpunkt | erledigt | reicht zurück bis |
+|---|---|---|
+| `getUmsatzbericht` | 3.123 | **2018** — fertig |
+| `getUmsatzbericht:speisen` | 969 | 2023-12 |
+| sechs weitere | je ~205 | **nur 2026** |
+
+Ein Endpunkt war acht Jahre weit, sechs andere kamen über das laufende Jahr nicht hinaus.
+
+**Ursache.** `sync.posten_holen()` sortierte `ORDER BY prioritaet, faellig_ab, posten_id`.
+Innerhalb einer Priorität entschied damit die **Einreihungsreihenfolge** — und eingereiht
+wurde endpunktweise. Der erste Endpunkt lief komplett durch, bevor der zweite anfing.
+
+**Warum das ein Risiko war und nicht nur unschön.** Es gibt genau einen Zugang, und eine
+Sperre wäre nicht rückgängig zu machen. Bei einem Abbruch — Sperre, Vertragsende,
+Abschaltung — wäre der Bestand ein vollständiger Endpunkt neben sieben leeren gewesen.
+Damit lässt sich **kein einziger Monatsbericht rechnen**: der Round Table braucht Umsatz
+UND Personal UND Ware. Acht Jahre Umsatzdaten ohne Personaldaten sind für den Zweck des
+Projekts genau so wertlos wie gar keine Daten.
+
+**Behoben** mit `0021_historie_datumsweise.sql`: `ORDER BY prioritaet, zeitraum_von DESC,
+endpunkt, posten_id`. Alle Endpunkte arbeiten denselben Tag ab, bevor einer den nächsten
+anfängt. `faellig_ab` bleibt als Filter für die Wiedervorlage, fällt aber als Sortierschlüssel
+weg. Der Index wurde mitgezogen — sonst hätte Postgres die gesamte offene Warteschlange
+sortiert.
+
+Die Menge der Aufrufe ändert sich dadurch **nicht**. Nur ihre Reihenfolge.
+
+**Sichtbar gemacht** in `mart.historie_stand`: je Endpunkt, wie weit er zurückreicht und wie
+viele Tage er hinter dem tiefsten liegt. Ohne diese Sicht war die Schieflage nur mit einer
+von Hand geschriebenen Abfrage zu sehen — und deshalb wochenlang niemandem aufgefallen.
+
+**Regel.** Bei einem Backfill, der Wochen läuft und jederzeit enden kann, ist die Reihenfolge
+eine fachliche Entscheidung, keine technische. Frage dabei immer: *Was ist da, wenn es morgen
+aufhört?* Tiefe verlieren ist verschmerzbar, Breite verlieren nicht.
+
+---
+
+## Drei Milliarden Gäste — und beinahe ein `bigint`, das sie geschluckt hätte
+
+**27.07.2026.** Vier Tage im Oktober 2018 scheiterten reproduzierbar:
+
+```
+2018-10-10   value "3010725105" is out of range for type integer
+2018-10-12   value "3303587892" ...
+2018-10-13   value "3875603054" ...
+2018-10-14   value "3648014052" ...
+```
+
+**Die erste Diagnose war falsch, und zwar auf die gefährliche Art.** Sie lautete: die Werte
+liegen knapp über 2^31, sehen nach IDs aus, die Spalte ist zu schmal — dieselbe Klasse wie
+`numeric(6,2)` bei den Personalkosten, also eine Migration auf `bigint`.
+
+Nachgesehen: die Werte landen in `rechnungen` und `gaeste`, gespeist aus LINAs `bills` und
+`guests`. Das sind **Anzahlen**. Ein Betrieb hat an einem Tag keine drei Milliarden Gäste.
+
+Die Werte liegen alle zwischen 3,0 und 3,9 Milliarden — im oberen Bereich von uint32, also im
+Muster einer ID. Was LINA dort schickt, ist keine Anzahl, sondern Datenmüll.
+
+**Warum `bigint` der schlechteste denkbare Fix gewesen wäre.** Der Wert hätte danach gepasst,
+wäre als Gästezahl in `core.umsatzbericht_tag` gelandet und hätte jeden Durchschnitt in `mart`
+über den Haufen geworfen — still, und rückwirkend kaum noch erkennbar. Die zu schmale Spalte
+war nicht das Problem. Sie war der einzige Grund, warum es überhaupt aufgefallen ist.
+
+**Behoben** im Transform: `anzahl()` nimmt nur ganze Zahlen von 0 bis 2.147.483.647. Alles
+andere wird `null`, der verworfene Wert wandert nach `sync.schema_abweichung`. Der Umsatz des
+Tages bleibt erhalten — ein kaputtes Feld kostet nicht den ganzen Tag.
+
+**Regel.** Ein Datentyp-Überlauf ist eine Frage, keine Antwort. Sie lautet nicht „wie mache ich
+die Spalte breiter", sondern **„kann dieser Wert überhaupt das sein, was die Spalte behauptet?"**
+Bei `numeric(6,2)` und den Personalkosten war die Antwort ja — 316.576 % sind bei 6,05 €
+Tagesumsatz rechnerisch korrekt. Hier ist sie nein. Dieselbe Fehlermeldung, entgegengesetzte
+Reparatur.
