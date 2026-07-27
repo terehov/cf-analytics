@@ -105,6 +105,7 @@ SELECT round(100.0 * r / n)                AS "Betriebe (%)",
     beschreibung:
       'Betriebe, die täglich Umsatzberichte liefern — aber durchgehend 0 €. Das ist keine Datenlücke: die Berichte kommen an, sie sind leer. Dahinter stehen Beteiligungsgesellschaften, geschlossene oder noch nicht eröffnete Häuser und Testeinträge. Solche Betriebe verzerren jeden Durchschnitt und erzeugen unsinnige Quoten — etwa über 1000 % Personalkosten bei 0 € Umsatz. Diese Liste ist die Vorlage, um sie auf inaktiv zu setzen.',
     anzeige: 'table',
+    parameter: [P_MARKE],
     sql: `
 SELECT d.betrieb                       AS "Betrieb",
        d.konzept                       AS "Marke",
@@ -125,6 +126,7 @@ SELECT d.betrieb                       AS "Betrieb",
           FROM mart.round_table_monat x WHERE x.betrieb_key = d.betrieb_key
   ) r ON true
  WHERE coalesce(u.umsatz, 0) = 0
+   [[AND d.konzept = {{marke}}]]
  ORDER BY r.personalkosten_ogf_pct DESC NULLS LAST, d.betrieb`,
   },
 
@@ -137,6 +139,7 @@ SELECT d.betrieb                       AS "Betrieb",
     beschreibung:
       'Wie viele der geführten Betriebe machen überhaupt Umsatz. Der Rest liefert täglich Berichte über 0 € und verzerrt jeden Durchschnitt.',
     anzeige: 'scalar',
+    parameter: [P_MARKE],
     sql: `
 SELECT count(*) FILTER (WHERE u.umsatz > 0)::text || ' von ' || count(*)::text
          AS "Betriebe mit Umsatz"
@@ -144,7 +147,9 @@ SELECT count(*) FILTER (WHERE u.umsatz > 0)::text || ' von ' || count(*)::text
   LEFT JOIN LATERAL (
         SELECT sum(umsatz_netto) AS umsatz
           FROM mart.umsatz_tag t WHERE t.betrieb_key = d.betrieb_key
-  ) u ON true`,
+  ) u ON true
+ WHERE 1 = 1
+   [[AND d.konzept = {{marke}}]]`,
   },
 
   // ===================================================================
@@ -269,6 +274,7 @@ SELECT trim(to_char(t.geschaeftstag, 'TMDay'))  AS "Wochentag",
     beschreibung:
       'Derselbe Wochenrhythmus je Marke, jeweils in Prozent der eigenen Woche — dadurch vergleichbar, egal wie groß die Marke ist. Ein Mittagskonzept und eine Abendgastronomie zeigen hier sichtbar verschiedene Kurven und brauchen verschiedene Maßnahmen.',
     anzeige: 'line',
+    parameter: [P_MARKE],
     sql: `
 WITH je_tag AS (
     SELECT coalesce(konzept, '(nicht zugeordnet)') AS konzept,
@@ -276,6 +282,8 @@ WITH je_tag AS (
            trim(to_char(geschaeftstag, 'TMDay'))   AS tag,
            sum(umsatz_netto)                       AS umsatz
       FROM mart.umsatz_tag
+     WHERE 1 = 1
+       [[AND konzept = {{marke}}]]
      GROUP BY 1, 2, 3
 )
 -- nullif: Marken, deren Betriebe durchgehend 0 EUR melden, haben eine
@@ -381,13 +389,14 @@ SELECT betrieb                                                        AS "Betrie
     beschreibung:
       'Jede Marke in jeder Kennzahl, jeweils der mittlere Betrieb, mit dem Abstand zum Gesamtmittelfeld. So wird sichtbar, ob eine Marke durchgehend schwächer ist oder nur in einer Disziplin — und ob ein auffälliger Betrieb ein Einzelfall ist oder typisch für seine Marke. Achtung beim Vorzeichen: beim Umsatz ist mehr besser, bei den Quoten weniger.',
     anzeige: 'table',
-    parameter: [P_MONAT],
+    parameter: [P_MONAT, P_MARKE],
     sql: `${MONAT_CTE},
 werte AS (
     SELECT a.konzept, a.bereich_name, a.reihenfolge, a.wert
       FROM mart.ampel_bereich a
       CROSS JOIN gewaehlt g
      WHERE a.monat = g.monat AND a.wert IS NOT NULL
+       [[AND a.konzept = {{marke}}]]
 ),
 je_marke AS (
     SELECT konzept, bereich_name, reihenfolge,
@@ -416,11 +425,14 @@ SELECT m.bereich_name                       AS "Metrik",
     beschreibung:
       'Wie sich der Gesamtumsatz Monat für Monat auf die Marken verteilt. Zeigt Verschiebungen zwischen den Marken, die man dem einzelnen Betrieb nicht ansieht.',
     anzeige: 'bar',
+    parameter: [P_MARKE],
     sql: `
 SELECT monat                                   AS "Monat",
        coalesce(konzept, '(nicht zugeordnet)') AS "Marke",
        round(sum(umsatz_netto))                AS "Umsatz"
   FROM mart.umsatz_tag
+ WHERE 1 = 1
+   [[AND konzept = {{marke}}]]
  GROUP BY monat, konzept
  ORDER BY monat`,
     visualisierung: {

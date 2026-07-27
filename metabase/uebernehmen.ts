@@ -62,6 +62,177 @@ for (const d of dashboards) {
 }
 
 // ---------------------------------------------------------------------
+// Filterpruefung.
+//
+// Am 27.07.2026 gemeldet: "Der Markenfilter im Round Table tut nichts."
+// Nachgemessen: 10 von 11 Karten dieser Seite lasen ihn nicht. Der Filter
+// stand oben, liess sich bedienen, und zehn Kacheln blieben stehen.
+//
+// Das ist die gefaehrlichste Sorte Fehler, die dieses System kennt --
+// gefaehrlicher als eine Fehlermeldung: Wer "Enchilada" waehlt und eine
+// Zahl abliest, haelt sie fuer die Zahl dieser Marke. Sie ist die Zahl
+// aller Betriebe. Nichts daran sieht falsch aus.
+//
+// Zwei Richtungen, beide sind Fehler:
+//   TOT   Kein einziges Kartenfeld liest den Filter -> er tut gar nichts.
+//   TAUB  Nur ein Teil der Karten liest ihn -> die Seite antwortet
+//         halb. Das ist schlimmer als tot, weil es funktioniert aussieht.
+//
+// Ausnahmen gehoeren dokumentiert, nicht stillschweigend geduldet:
+// FILTER_AUSNAHME nennt Karte und Grund.
+// ---------------------------------------------------------------------
+
+/**
+ * Karten, die einen Filter ihres Dashboards bewusst NICHT lesen.
+ * Jeder Eintrag braucht einen fachlichen Grund.
+ */
+const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
+  // --- Zeitreihen: der Monatsfilter waehlt einen Stichmonat, und genau den
+  // --- darf eine Verlaufskurve nicht haben. Sonst bleibt ein Punkt uebrig.
+  dd_marken_verlauf:      { monat: 'Verlauf ueber alle Monate — ein Stichmonat ergaebe einen Punkt.' },
+  pf_marken_umsatzanteil: { monat: 'Verlauf ueber alle Monate.' },
+  dd_betrieb_verlauf:     { monat: 'Verlauf ueber alle Monate.' },
+  dd_betrieb_ampelverlauf:{ monat: 'Verlauf ueber alle Monate.' },
+  dd_betrieb_sparte:      { monat: 'Verlauf ueber alle Monate.' },
+  vg_ort_umsatz:          { monat: 'Verlauf ueber alle Monate.' },
+  rt_historie:            { monat: 'Die Ampelhistorie IST der Verlauf ueber alle Monate.' },
+  rt_historie_bereich:    { monat: 'Historie je Bereich ueber alle Monate.' },
+  rt_ursachen_verlauf:    { monat: 'Ursachen im Zeitverlauf — ueber alle Monate.',
+                            marke: 'mart.ursachen_analyse ist ueber alle Betriebe verdichtet '
+                                 + 'und fuehrt keine Marke.' },
+  um_verlauf_tag:         { monat: 'Tagesverlauf; eingegrenzt wird ueber den Zeitraumfilter.' },
+  um_verlauf_monat:       { monat: 'Monatsverlauf mit Vorjahr — ueber alle Monate.',
+                            zeitraum: 'Aggregiert je Monat, nicht je Tag.' },
+  um_verlauf_delta:       { monat: 'Monatsverlauf — ueber alle Monate.',
+                            zeitraum: 'Aggregiert je Monat, nicht je Tag.' },
+  pe_verlauf:             { monat: 'Quotenverlauf ueber alle Monate.' },
+  bwa_kennzahlen:         { monat: 'BWA-Verlauf ueber alle gebuchten Monate.' },
+  im_puls:                { monat: 'Puls der letzten drei Tage, fest gefenstert.' },
+
+  // --- Kacheln des laufenden Monats: bewusst "jetzt", nicht "gewaehlter Monat".
+  um_kachel_monat:  { monat: 'Kachel zeigt ausdruecklich den LAUFENDEN Monat.',
+                      zeitraum: 'ebenso.' },
+  um_kachel_gaeste: { monat: 'Kachel zeigt ausdruecklich den LAUFENDEN Monat.',
+                      zeitraum: 'ebenso.' },
+  um_kachel_bon:    { monat: 'Kachel zeigt ausdruecklich den LAUFENDEN Monat.',
+                      zeitraum: 'ebenso.' },
+  pf_kachel_aktiv:  { monat: 'Zaehlt Betriebe mit Umsatz ueber die GESAMTE Historie — '
+                           + 'ein Monatsfilter wuerde die Aussage veraendern.' },
+
+  // --- Bestandsaufnahmen ueber die ganze Historie ---------------------------
+  pf_konzentration:       { monat: 'Umsatzkonzentration ueber die gesamte Historie.' },
+  pf_konzentration_kurve: { monat: 'ebenso.' },
+  pf_karteileichen:       { monat: 'Betriebe OHNE jeden Umsatz — ueber die gesamte Historie, '
+                                 + 'sonst zaehlte ein einzelner leerer Monat mit.' },
+  pf_wochentag_marke:     { betrieb: 'Vergleicht MARKEN, nicht Betriebe.' },
+  pf_gaeste_bon:          { betrieb: 'Vergleicht Betriebe untereinander — ein Betriebsfilter '
+                                   + 'liesse genau einen Punkt uebrig.' },
+  pf_stabilitaet:         { betrieb: 'Rangliste ueber alle Betriebe.' },
+  um_wochentag:           { monat: 'Wochenrhythmus ueber die gesamte Historie.',
+                            zeitraum: 'ebenso.' },
+  um_bon_gast:            { monat: 'Monatsverlauf von Bon und Umsatz je Gast — ueber alle Monate.',
+                            zeitraum: 'Aggregiert je Monat, nicht je Tag.' },
+  um_rangliste:           { zeitraum: 'Rangliste zum Stichmonat, nicht zum Tageszeitraum.' },
+  st_sparte:              { monat: 'Verlauf ueber alle Monate.' },
+  st_verkaufsstelle:      { monat: 'Verlauf ueber alle Monate.' },
+  st_stunde:              { monat: 'Tagesprofil ueber die gesamte Historie.' },
+  st_zeitzone:            { monat: 'Tagesprofil ueber die gesamte Historie.' },
+  pe_bereich:             { monat: 'Alle Zeitraeume je Betrieb, absichtlich ungefiltert.' },
+  pe_effektivitaet:       { monat: 'Alle Zeitraeume je Betrieb, absichtlich ungefiltert.' },
+  vg_ort_profil:          { monat: 'Tagesprofil ueber die gesamte Historie.' },
+  dd_betrieb_zeitzone:    { monat: 'Tagesprofil ueber die gesamte Historie.' },
+  dd_betrieb_stunde:      { monat: 'Tagesprofil ueber die gesamte Historie.' },
+  dd_betrieb_personal:    { monat: 'Alle Zeitraeume dieses Betriebs.' },
+  dd_betrieb_bwa:         { monat: 'BWA-Verlauf ueber alle gebuchten Monate.' },
+  dd_betrieb_massnahmen:  { monat: 'Offene Massnahmen unabhaengig vom Stichmonat.' },
+  dd_betrieb_datenstand:  { monat: 'Datenstand ist der Stand JETZT, kein Monatswert.' },
+  bwa_buchungsstand:      { monat: 'Buchungsstand ist der Stand JETZT, kein Monatswert.' },
+  rt_massnahmen_offen:    { monat: 'Offene Massnahmen unabhaengig vom Stichmonat.' },
+  rt_massnahmen_status:   { monat: 'Verteilung ueber alle Massnahmen.' },
+  wa_we_pruefung:         { zeitraum: 'Vergleich je Monat gegen die BWA, nicht je Tag.' },
+
+  // --- Strukturell ohne die Dimension --------------------------------------
+  wa_preise: {
+    betrieb: 'Einkaufspreise gelten je Lieferant fuer die Gruppe, nicht je Betrieb — '
+           + 'mart.preisentwicklung_ware hat gar keine Betriebsspalte.',
+    zeitraum: 'Preise liegen nur je Monat vor; ein Tageszeitraum waere irrefuehrend.',
+  },
+  dq_backfill: { betrieb: 'Importfortschritt je Endpunkt, nicht je Betrieb.' },
+  im_bericht:  { betrieb: 'Importzustand je Bericht, nicht je Betrieb.' },
+}
+
+/** Welche Variablen eine Karte tatsaechlich liest — inklusive der aus den
+ *  gemeinsamen CTE-Bausteinen geerbten. Genau die wurden bei der ersten
+ *  Pruefung uebersehen, weshalb `monat` faelschlich ueberall als tot galt. */
+function variablenVon(karte: Karte): Set<string> {
+  const v = new Set<string>()
+  for (const m of karte.sql.matchAll(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g)) v.add(m[1]!)
+  return v
+}
+
+const filterFehler: string[] = []
+for (const d of dashboards) {
+  const karten = d.reihen.flatMap(r => r.teile)
+    .filter(t => t.text === undefined)
+    .map(t => alleKarten.find(k => k.schluessel === t.karte)!)
+  if (karten.length === 0) continue
+
+  for (const f of d.filter ?? []) {
+    const slug = f.name
+    const liest = karten.filter(k => variablenVon(k).has(slug))
+    const taub = karten.filter(k => !variablenVon(k).has(slug)
+                                 && !FILTER_AUSNAHME[k.schluessel]?.[slug])
+
+    if (liest.length === 0) {
+      filterFehler.push(
+        `${d.schluessel}: Filter "${slug}" ist TOT — keine der ${karten.length} Karten liest ihn.`)
+    } else if (taub.length > 0) {
+      filterFehler.push(
+        `${d.schluessel}: Filter "${slug}" wirkt nur auf ${liest.length} von ${karten.length} Karten. ` +
+        `Ohne Wirkung: ${taub.map(k => k.schluessel).join(', ')}. ` +
+        `Entweder Klausel ergaenzen oder in FILTER_AUSNAHME begruenden.`)
+    }
+  }
+}
+if (filterFehler.length > 0) {
+  throw new Error('Filter ohne Wirkung:\n  ' + filterFehler.join('\n  '))
+}
+
+// ---------------------------------------------------------------------
+// Klickpruefung: fuehrt jeder Drill-Down irgendwohin, wo der uebergebene
+// Wert auch ankommt?
+//
+// Ein Klick, dessen Ziel den Parameter nicht kennt, oeffnet das
+// Zieldashboard UNGEFILTERT. Man landet auf "③ Betrieb" und sieht
+// irgendeinen Betrieb -- meist den zuletzt gewaehlten. Das ist schlimmer
+// als ein toter Klick, weil man die falsche Zeile fuer die richtige haelt.
+// ---------------------------------------------------------------------
+const klickFehler: string[] = []
+for (const d of dashboards) {
+  for (const r of d.reihen) {
+    for (const teil of r.teile) {
+      for (const k of teil.klick ?? []) {
+        const ziel = dashboards.find(x => x.schluessel === k.ziel)
+        if (!ziel) {
+          klickFehler.push(`${d.schluessel}/${teil.karte}: Klickziel "${k.ziel}" gibt es nicht.`)
+          continue
+        }
+        for (const slug of Object.keys(k.uebergabe)) {
+          if (!(ziel.filter ?? []).some(f => f.name === slug)) {
+            klickFehler.push(
+              `${d.schluessel}/${teil.karte}: uebergibt "${slug}" an ${k.ziel}, ` +
+              `aber dort gibt es diesen Filter nicht — der Klick landet ungefiltert.`)
+          }
+        }
+      }
+    }
+  }
+}
+if (klickFehler.length > 0) {
+  throw new Error('Drill-Down ohne Wirkung:\n  ' + klickFehler.join('\n  '))
+}
+
+// ---------------------------------------------------------------------
 // Layoutpruefung.
 //
 // Metabase nimmt ueberlappende Kacheln klaglos entgegen und schiebt sie

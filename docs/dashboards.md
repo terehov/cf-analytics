@@ -485,8 +485,31 @@ Aufgelöst, indem der Deckungsbeitrag denselben Zeitraum verwendet. Da diese Aus
 Monat vorliegt, nimmt sie alle Monate, die der gewählte Zeitraum berührt — **ein halber Monat
 zählt ganz**, und genau das steht auch im Kopftext der Seite.
 
-Die Prüfung lässt sich wiederholen: Karten-Variablen (auch die aus `gemeinsam.ts` geerbten)
-gegen die Filterliste des Dashboards halten; was übrig bleibt, ist tot.
+Seit dem 27.07.2026 wird das **erzwungen**, nicht mehr geprüft: `uebernehmen.ts` scheitert,
+bevor irgendetwas angelegt wird, wenn ein Filter nicht von allen Karten seines Dashboards
+gelesen wird. Zwei Stufen, beide sind Fehler:
+
+- **tot** — keine einzige Karte liest ihn
+- **taub** — nur ein Teil liest ihn. Schlimmer als tot, weil die Seite halb antwortet und
+  dadurch funktionierend aussieht
+
+Genauso für den Drill-Down: Führt ein Klick zu einem Dashboard, das den übergebenen Parameter
+nicht kennt, landet man dort **ungefiltert** — und hält den zuletzt gewählten Betrieb für den
+angeklickten. Auch das lässt den Lauf scheitern.
+
+**Ausnahmen gehören begründet.** `FILTER_AUSNAHME` in `uebernehmen.ts` nennt je Karte und
+Filter den fachlichen Grund. Die häufigsten:
+
+| Fall | Grund |
+|---|---|
+| Verlaufskurven (`*_verlauf`, `rt_historie`) | Ein Stichmonat ließe einen einzigen Punkt übrig |
+| Kacheln „laufender Monat" | Zeigen ausdrücklich *jetzt*, nicht den gewählten Monat |
+| `pf_karteileichen`, `pf_kachel_aktiv` | Betriebe ohne **jeden** Umsatz — über die gesamte Historie |
+| `wa_preise` | Einkaufspreise gelten je Lieferant für die Gruppe; die Sicht hat gar keine Betriebsspalte |
+| Tagesprofile (`*_stunde`, `*_zeitzone`) | Muster über die gesamte Historie, nicht über einen Monat |
+
+Wer eine Karte ergänzt, die einen Filter ignoriert, muss diese Entscheidung hinschreiben —
+sonst läuft das Provisionieren nicht durch.
 
 ---
 

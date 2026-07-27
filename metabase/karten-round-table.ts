@@ -25,7 +25,7 @@ import { MONAT_CTE, MONAT_CTE_WECHSEL, P_MONAT, P_MARKE } from './gemeinsam'
 // value" scheitern. MONAT_CTE faellt stattdessen auf den juengsten Monat
 // mit einem Urteil zurueck. Siehe gemeinsam.ts.
 const MONAT = { monat: P_MONAT }
-const KONZEPT = { konzept: P_MARKE }
+const KONZEPT = { marke: P_MARKE }
 
 export const karten: Karte[] = [
   // -------------------------------------------------------------------
@@ -37,13 +37,14 @@ export const karten: Karte[] = [
     beschreibung:
       'Betriebe mit mindestens einer roten Ampel im gewählten Monat.',
     anzeige: 'scalar',
-    parameter: [MONAT.monat],
+    parameter: [MONAT.monat, KONZEPT.marke],
     sql: `${MONAT_CTE}
 SELECT count(*) AS "Rote Betriebe"
   FROM mart.round_table_monat r
   CROSS JOIN gewaehlt g
  WHERE r.gesamt = 'rot'
-   AND r.monat = g.monat`,
+   AND r.monat = g.monat
+   [[AND r.konzept = {{marke}}]]`,
     visualisierung: {
       'scalar.field': 'Rote Betriebe',
       column_settings: {
@@ -56,26 +57,28 @@ SELECT count(*) AS "Rote Betriebe"
     name: 'Orange Betriebe',
     beschreibung: 'Betriebe ohne rote, aber mit mindestens einer orangen Ampel.',
     anzeige: 'scalar',
-    parameter: [MONAT.monat],
+    parameter: [MONAT.monat, KONZEPT.marke],
     sql: `${MONAT_CTE}
 SELECT count(*) AS "Orange Betriebe"
   FROM mart.round_table_monat r
   CROSS JOIN gewaehlt g
  WHERE r.gesamt = 'orange'
-   AND r.monat = g.monat`,
+   AND r.monat = g.monat
+   [[AND r.konzept = {{marke}}]]`,
   },
   {
     schluessel: 'rt_kachel_gruen',
     name: 'Grüne Betriebe',
     beschreibung: 'Betriebe, bei denen alle bewerteten Ampeln grün sind.',
     anzeige: 'scalar',
-    parameter: [MONAT.monat],
+    parameter: [MONAT.monat, KONZEPT.marke],
     sql: `${MONAT_CTE}
 SELECT count(*) AS "Grüne Betriebe"
   FROM mart.round_table_monat r
   CROSS JOIN gewaehlt g
  WHERE r.gesamt = 'gruen'
-   AND r.monat = g.monat`,
+   AND r.monat = g.monat
+   [[AND r.konzept = {{marke}}]]`,
   },
   {
     // Diese Kachel hat im Excel kein Pendant, und genau das war das Problem:
@@ -85,13 +88,14 @@ SELECT count(*) AS "Grüne Betriebe"
     beschreibung:
       'Betriebe, für die im gewählten Monat keine einzige Ampel berechnet werden konnte — meist weil die Zahlen vom Steuerberater noch fehlen. Diese Betriebe sind nicht unauffällig, sie sind unbeurteilt.',
     anzeige: 'scalar',
-    parameter: [MONAT.monat],
+    parameter: [MONAT.monat, KONZEPT.marke],
     sql: `${MONAT_CTE}
 SELECT count(*) AS "Ohne Urteil"
   FROM mart.round_table_monat r
   CROSS JOIN gewaehlt g
  WHERE r.gesamt IS NULL
-   AND r.monat = g.monat`,
+   AND r.monat = g.monat
+   [[AND r.konzept = {{marke}}]]`,
   },
   {
     schluessel: 'rt_kachel_massnahmen',
@@ -99,13 +103,14 @@ SELECT count(*) AS "Ohne Urteil"
     beschreibung:
       'Maßnahmen im Status Offen, In Arbeit, Eskalieren oder Wartet auf Rückmeldung.',
     anzeige: 'scalar',
-    parameter: [MONAT.monat],
+    parameter: [MONAT.monat, KONZEPT.marke],
     sql: `${MONAT_CTE}
 SELECT count(*) AS "Offene Maßnahmen"
   FROM mart.massnahme m
   CROSS JOIN gewaehlt g
  WHERE m.ist_offen
-   AND m.monat <= g.monat`,
+   AND m.monat <= g.monat
+   [[AND m.konzept = {{marke}}]]`,
   },
   {
     schluessel: 'rt_kachel_bewertung',
@@ -113,13 +118,14 @@ SELECT count(*) AS "Offene Maßnahmen"
     beschreibung:
       'Durchschnitt der Online-Bewertungen im gewählten Monat. Zeigt „– nicht erfasst", solange keine Bewertungen eingespielt sind.',
     anzeige: 'scalar',
-    parameter: [MONAT.monat],
+    parameter: [MONAT.monat, KONZEPT.marke],
     sql: `${MONAT_CTE}
 SELECT coalesce(to_char(round(avg(r.online_bewertung), 2), 'FM0.00'), '– nicht erfasst')
          AS "Ø Online-Bewertung"
   FROM mart.round_table_monat r
   CROSS JOIN gewaehlt g
- WHERE r.monat = g.monat`,
+ WHERE r.monat = g.monat
+   [[AND r.konzept = {{marke}}]]`,
   },
 
   // -------------------------------------------------------------------
@@ -134,7 +140,7 @@ SELECT coalesce(to_char(round(avg(r.online_bewertung), 2), 'FM0.00'), '– nicht
     beschreibung:
       'Wie viele Betriebe je Bereich auf rot, orange oder grün stehen — und für wie viele die Daten fehlen. Zeigt, woran die roten Ampeln insgesamt hängen.',
     anzeige: 'bar',
-    parameter: [MONAT.monat],
+    parameter: [MONAT.monat, KONZEPT.marke],
     sql: `${MONAT_CTE}
 SELECT a.bereich_name                                   AS "Bereich",
        count(*) FILTER (WHERE a.ampel = 'rot')        AS "Rot",
@@ -144,6 +150,7 @@ SELECT a.bereich_name                                   AS "Bereich",
   FROM mart.ampel_bereich a
   CROSS JOIN gewaehlt g
  WHERE a.monat = g.monat
+   [[AND a.konzept = {{marke}}]]
  GROUP BY a.bereich_name, a.reihenfolge
  ORDER BY a.reihenfolge`,
     visualisierung: {
@@ -167,7 +174,7 @@ SELECT a.bereich_name                                   AS "Bereich",
     beschreibung:
       'Wie dringend gehandelt werden muss: Sofort eskalieren (2 oder mehr rote Ampeln), Sofort handeln (eine rote), Nachforschung (2 oder mehr orange), Beobachten beziehungsweise in Ordnung.',
     anzeige: 'row',
-    parameter: [MONAT.monat],
+    parameter: [MONAT.monat, KONZEPT.marke],
     sql: `${MONAT_CTE}
 SELECT r.intensitaet AS "Intensität",
        count(*)      AS "Betriebe"
@@ -175,6 +182,7 @@ SELECT r.intensitaet AS "Intensität",
   CROSS JOIN gewaehlt g
  WHERE r.monat = g.monat
    AND r.intensitaet IS NOT NULL
+   [[AND r.konzept = {{marke}}]]
  GROUP BY r.intensitaet
  ORDER BY CASE r.intensitaet
             WHEN 'Sofort eskalieren' THEN 1
@@ -201,7 +209,7 @@ SELECT r.intensitaet AS "Intensität",
     beschreibung:
       'Eine Zeile je Betrieb mit allem, was für den Round Table zählt: Umsatz mit Vorjahr und Jahressumme, Personal- und Wareneinsatzquoten, Bewertung, Vor-Ort-Score, alle sechs Ampeln, Gesamturteil und Priorität. Sortiert nach Handlungsdruck — oben steht, was zuerst besprochen gehört.',
     anzeige: 'table',
-    parameter: [MONAT.monat, KONZEPT.konzept],
+    parameter: [MONAT.monat, KONZEPT.marke],
     sql: `${MONAT_CTE}
 SELECT r.betrieb                                            AS "Betrieb",
        r.stadt                                              AS "Stadt",
@@ -248,7 +256,7 @@ SELECT r.betrieb                                            AS "Betrieb",
            AND a.ursache IS NOT NULL
   ) u ON true
  WHERE r.monat = g.monat
-   [[AND r.konzept = {{konzept}}]]
+   [[AND r.konzept = {{marke}}]]
  ORDER BY CASE r.gesamt WHEN 'rot' THEN 1 WHEN 'orange' THEN 2 WHEN 'gruen' THEN 3 ELSE 4 END,
           CASE r.intensitaet
             WHEN 'Sofort eskalieren' THEN 1 WHEN 'Sofort handeln' THEN 2
@@ -327,6 +335,7 @@ SELECT betrieb            AS "Betrieb",
     beschreibung:
       'Wie sich die Gesamtampel über die Monate verteilt hat. Die Historie schreibt sich von selbst fort.',
     anzeige: 'bar',
+    parameter: [KONZEPT.marke],
     sql: `
 SELECT monat                                        AS "Monat",
        count(*) FILTER (WHERE gesamt = 'rot')       AS "Rot",
@@ -334,6 +343,8 @@ SELECT monat                                        AS "Monat",
        count(*) FILTER (WHERE gesamt = 'gruen')     AS "Grün",
        count(*) FILTER (WHERE gesamt IS NULL)       AS "Kein Urteil"
   FROM mart.round_table_monat
+ WHERE 1 = 1
+   [[AND konzept = {{marke}}]]
  GROUP BY monat
  ORDER BY monat`,
     visualisierung: {
@@ -354,11 +365,14 @@ SELECT monat                                        AS "Monat",
     name: 'Ampelhistorie je Bereich',
     beschreibung: 'Wie viele rote Ampeln je Bereich über die Monate zusammenkamen — zeigt, ob ein Problem neu ist oder mitläuft.',
     anzeige: 'line',
+    parameter: [KONZEPT.marke],
     sql: `
 SELECT monat                                  AS "Monat",
        bereich_name                           AS "Bereich",
        count(*) FILTER (WHERE ampel = 'rot')  AS "Rote Ampeln"
   FROM mart.ampel_bereich
+ WHERE 1 = 1
+   [[AND konzept = {{marke}}]]
  GROUP BY monat, bereich_name, reihenfolge
  ORDER BY monat, reihenfolge`,
     visualisierung: {
@@ -415,6 +429,7 @@ SELECT monat    AS "Monat",
     beschreibung:
       'Alle Maßnahmen, die noch nicht erledigt sind. Überfällige zuerst.',
     anzeige: 'table',
+    parameter: [KONZEPT.marke],
     sql: `
 SELECT CASE WHEN ueberfaellig THEN '⚠ überfällig' ELSE '' END AS "!",
        betrieb          AS "Betrieb",
@@ -431,6 +446,7 @@ SELECT CASE WHEN ueberfaellig THEN '⚠ überfällig' ELSE '' END AS "!",
        notizen          AS "Notizen"
   FROM mart.massnahme
  WHERE ist_offen
+   [[AND konzept = {{marke}}]]
  ORDER BY ueberfaellig DESC,
           CASE prioritaet WHEN 'Hoch' THEN 1 WHEN 'Mittel' THEN 2 ELSE 3 END,
           faellig_am NULLS LAST`,
@@ -440,10 +456,13 @@ SELECT CASE WHEN ueberfaellig THEN '⚠ überfällig' ELSE '' END AS "!",
     name: 'Maßnahmen nach Status',
     beschreibung: 'Wie sich alle Maßnahmen auf die Status verteilen.',
     anzeige: 'row',
+    parameter: [KONZEPT.marke],
     sql: `
 SELECT status   AS "Status",
        count(*) AS "Maßnahmen"
   FROM mart.massnahme
+ WHERE 1 = 1
+   [[AND konzept = {{marke}}]]
  GROUP BY status
  ORDER BY count(*) DESC`,
     visualisierung: {
@@ -465,7 +484,7 @@ SELECT status   AS "Status",
     beschreibung:
       'Eine Zeile je Marke: Umsatzsumme, mittlere Quoten und Ampelverteilung. Die Prozentwerte sind Mediane, also der mittlere Betrieb der Marke — ein einzelner Ausreißer verzieht so nicht das Bild der ganzen Marke.',
     anzeige: 'table',
-    parameter: [MONAT.monat],
+    parameter: [MONAT.monat, KONZEPT.marke],
     sql: `${MONAT_CTE}
 SELECT konzept                AS "Marke",
        betriebe               AS "Betriebe",
@@ -479,6 +498,8 @@ SELECT konzept                AS "Marke",
        ampeln_gruen           AS "Grün",
        massnahme_faellig      AS "Maßnahme fällig"
   FROM gewaehlt g, LATERAL mart.konzept_schnitt(g.monat)
+ WHERE 1 = 1
+   [[AND konzept = {{marke}}]]
  ORDER BY umsatz_ist DESC NULLS LAST`,
   },
   {
@@ -487,7 +508,7 @@ SELECT konzept                AS "Marke",
     beschreibung:
       'Je Kennzahl der Abstand zum Mittelfeld aller Betriebe und zum Mittelfeld der eigenen Marke. So ist unterscheidbar, ob ein einzelner Betrieb schwächelt oder seine ganze Marke — im zweiten Fall läuft eine Maßnahme beim einzelnen Betrieb ins Leere. Achtung beim Vorzeichen: beim Umsatz ist mehr besser, bei den Quoten weniger.',
     anzeige: 'table',
-    parameter: [MONAT.monat],
+    parameter: [MONAT.monat, KONZEPT.marke],
     sql: `${MONAT_CTE}
 SELECT betrieb                AS "Betrieb",
        konzept                AS "Marke",
@@ -504,6 +525,7 @@ SELECT betrieb                AS "Betrieb",
        prioritaet             AS "Priorität"
   FROM gewaehlt g, LATERAL mart.round_table_marke(g.monat)
  WHERE gesamt IS NOT NULL
+   [[AND konzept = {{marke}}]]
  ORDER BY konzept, betrieb`,
   },
   {

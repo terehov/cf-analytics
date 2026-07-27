@@ -32,10 +32,12 @@ export const karten: Karte[] = [
     name: 'Umsatz laufender Monat',
     beschreibung: 'Netto-Umsatz aller Betriebe im laufenden Monat, bis zum letzten verfügbaren Geschäftstag.',
     anzeige: 'scalar',
+    parameter: [BETRIEB],
     sql: `
 SELECT sum(umsatz_netto) AS "Umsatz"
   FROM mart.umsatz_tag
- WHERE monat = date_trunc('month', current_date)::date`,
+ WHERE monat = date_trunc('month', current_date)::date
+   [[AND betrieb = {{betrieb}}]]`,
     visualisierung: {
       column_settings: {
         '["name","Umsatz"]': { number_style: 'currency', currency: 'EUR', currency_style: 'symbol', decimals: 0 },
@@ -47,10 +49,12 @@ SELECT sum(umsatz_netto) AS "Umsatz"
     name: 'Gäste laufender Monat',
     beschreibung: 'Summe der Gäste aller Betriebe im laufenden Monat.',
     anzeige: 'scalar',
+    parameter: [BETRIEB],
     sql: `
 SELECT sum(gaeste) AS "Gäste"
   FROM mart.umsatz_tag
- WHERE monat = date_trunc('month', current_date)::date`,
+ WHERE monat = date_trunc('month', current_date)::date
+   [[AND betrieb = {{betrieb}}]]`,
   },
   {
     schluessel: 'um_kachel_bon',
@@ -58,10 +62,12 @@ SELECT sum(gaeste) AS "Gäste"
     beschreibung:
       'Umsatz je Rechnung im laufenden Monat. Gerechnet als Gesamtumsatz geteilt durch Gesamtzahl der Rechnungen, damit umsatzstarke Tage stärker zählen als schwache.',
     anzeige: 'scalar',
+    parameter: [BETRIEB],
     sql: `
 SELECT round(sum(umsatz_netto) / nullif(sum(rechnungen), 0), 2) AS "Ø Bon"
   FROM mart.umsatz_tag
- WHERE monat = date_trunc('month', current_date)::date`,
+ WHERE monat = date_trunc('month', current_date)::date
+   [[AND betrieb = {{betrieb}}]]`,
     visualisierung: {
       column_settings: {
         '["name","Ø Bon"]': { number_style: 'currency', currency: 'EUR', currency_style: 'symbol', decimals: 2 },
@@ -150,7 +156,7 @@ HAVING sum(umsatz_monat_vj) > 0
     name: 'Betriebe nach Umsatz',
     beschreibung: 'Rangliste der Betriebe im gewählten Monat, mit Durchschnittsbon und Umsatz je Gast. Die letzten Zeilen sind die interessanten.',
     anzeige: 'table',
-    parameter: [MONAT],
+    parameter: [MONAT, BETRIEB],
     sql: `${MONAT_CTE_UMSATZ}
 SELECT y.betrieb          AS "Betrieb",
        y.konzept          AS "Marke",
@@ -166,6 +172,7 @@ SELECT y.betrieb          AS "Betrieb",
   FROM mart.umsatz_ytd y
   CROSS JOIN gewaehlt g
  WHERE y.monat = g.monat
+   [[AND y.betrieb = {{betrieb}}]]
  ORDER BY y.umsatz_monat DESC NULLS LAST`,
     visualisierung: {
       column_settings: {
@@ -260,7 +267,7 @@ SELECT monat              AS "Monat",
     name: 'Spartenanteil je Betrieb',
     beschreibung: 'Wie sich der Umsatz je Betrieb auf Speisen und Getränke verteilt. Der Getränkeanteil ist der größte Hebel für den Wareneinsatz an der Bar.',
     anzeige: 'table',
-    parameter: [MONAT],
+    parameter: [MONAT, BETRIEB],
     sql: `${MONAT_CTE_UMSATZ}
 SELECT sp.betrieb                                                          AS "Betrieb",
        sum(sp.umsatz_netto) FILTER (WHERE sp.hauptsparte = 'Speisen')      AS "Speisen",
@@ -272,6 +279,7 @@ SELECT sp.betrieb                                                          AS "B
   CROSS JOIN gewaehlt g
  WHERE sp.hauptsparte IN ('Speisen','Getränke')
    AND sp.monat = g.monat
+   [[AND sp.betrieb = {{betrieb}}]]
  GROUP BY sp.betrieb
  ORDER BY sum(sp.umsatz_netto) DESC`,
   },
@@ -342,7 +350,7 @@ SELECT zeitzone           AS "Zeitzone",
     name: 'Zeitzonen je Betrieb',
     beschreibung: 'Welcher Betrieb wovon lebt. Ein Mittagsgeschäft und eine Abendgastronomie brauchen verschiedene Maßnahmen.',
     anzeige: 'table',
-    parameter: [MONAT],
+    parameter: [MONAT, BETRIEB],
     sql: `${MONAT_CTE_UMSATZ}
 SELECT uz.betrieb                                                  AS "Betrieb",
        round(sum(uz.umsatz_netto))                                 AS "Umsatz",
@@ -357,6 +365,7 @@ SELECT uz.betrieb                                                  AS "Betrieb",
   FROM mart.umsatz_zeitzone uz
   CROSS JOIN gewaehlt g
  WHERE uz.monat = g.monat
+   [[AND uz.betrieb = {{betrieb}}]]
  GROUP BY uz.betrieb
  ORDER BY sum(uz.umsatz_netto) DESC`,
   },
@@ -370,7 +379,7 @@ SELECT uz.betrieb                                                  AS "Betrieb",
     beschreibung:
       'Die 20 Betriebe mit der höchsten Personalkostenquote ohne Geschäftsführung. Auf 20 begrenzt, damit die Namen lesbar bleiben — die vollständige Liste steht in der Tabelle darunter.',
     anzeige: 'row',
-    parameter: [MONAT],
+    parameter: [MONAT, BETRIEB],
     sql: `${MONAT_CTE}
 SELECT r.betrieb                AS "Betrieb",
        r.personalkosten_ogf_pct AS "Personal o. GF %"
@@ -378,6 +387,7 @@ SELECT r.betrieb                AS "Betrieb",
   CROSS JOIN gewaehlt g
  WHERE r.monat = g.monat
    AND r.personalkosten_ogf_pct IS NOT NULL
+   [[AND r.betrieb = {{betrieb}}]]
  ORDER BY r.personalkosten_ogf_pct DESC
  LIMIT 20`,
     visualisierung: {
@@ -398,7 +408,7 @@ SELECT r.betrieb                AS "Betrieb",
     beschreibung:
       'Alle Betriebe mit Ampel und Abstand zur 28-%-Schwelle. Ein positiver Wert in „Δ Schwelle" heißt: um so viele Prozentpunkte liegt der Betrieb über der Grenze.',
     anzeige: 'table',
-    parameter: [MONAT],
+    parameter: [MONAT, BETRIEB],
     sql: `${MONAT_CTE}
 SELECT r.betrieb                            AS "Betrieb",
        r.konzept                            AS "Marke",
@@ -411,6 +421,7 @@ SELECT r.betrieb                            AS "Betrieb",
   LEFT JOIN ampel.beschriftung ap ON ap.status = r.ampel_personal
  WHERE r.monat = g.monat
    AND r.personalkosten_ogf_pct IS NOT NULL
+   [[AND r.betrieb = {{betrieb}}]]
  ORDER BY r.personalkosten_ogf_pct DESC`,
   },
   {
@@ -567,6 +578,7 @@ SELECT d.warengruppe              AS "Warengruppe",
     beschreibung:
       'Was laut Rezeptur verbraucht werden müsste, gegen das, was tatsächlich eingekauft wurde. Eine Lücke ist normal und genau die interessante Zahl: in ihr stecken Schwund, Bruch, Portionsgrößen, Personalverzehr und Lagerbewegung. Unter 90 % Abdeckung ist der Vergleich nicht belastbar.',
     anzeige: 'table',
+    parameter: [BETRIEB],
     sql: `
 SELECT betrieb            AS "Betrieb",
        monat              AS "Monat",
@@ -577,6 +589,8 @@ SELECT betrieb            AS "Betrieb",
        we_bwa_pct         AS "BWA %",
        abdeckung_pct      AS "Abdeckung %"
   FROM mart.pruefung_wareneinsatz
+ WHERE 1 = 1
+   [[AND betrieb = {{betrieb}}]]
  ORDER BY abdeckung_pct DESC NULLS LAST, abs(luecke) DESC NULLS LAST`,
   },
   {
@@ -633,7 +647,7 @@ HAVING count(*) FILTER (WHERE k.wert_absolut IS NOT NULL AND k.wert_absolut <> 0
     name: 'EBIT je Betrieb',
     beschreibung: 'Die Rendite je Betrieb aus den Zahlen des Steuerberaters.',
     anzeige: 'row',
-    parameter: [MONAT],
+    parameter: [MONAT, BETRIEB],
     sql: `${MONAT_CTE_BWA}
 SELECT k.betrieb                     AS "Betrieb",
        round(k.wert_absolut)         AS "EBIT",
@@ -648,6 +662,7 @@ SELECT k.betrieb                     AS "Betrieb",
  WHERE k.kennzahl = 'EBIT'
    AND k.monat = g.monat
    AND k.gebucht
+   [[AND k.betrieb = {{betrieb}}]]
  ORDER BY k.wert_absolut DESC`,
     visualisierung: {
       'graph.dimensions': ['Betrieb'],
@@ -664,6 +679,7 @@ SELECT k.betrieb                     AS "Betrieb",
     beschreibung:
       'Bis wann ist je Betrieb gebucht? Die Zahlen kommen vom Steuerberater und liegen üblicherweise ein bis zwei Monate zurück; vier Monate Verzug sind eine Nachfrage wert. Betriebe, die dem Steuerberater nicht zugeordnet sind, erscheinen hier gar nicht.',
     anzeige: 'table',
+    parameter: [BETRIEB],
     sql: `
 SELECT betrieb            AS "Betrieb",
        bwa_monat          AS "Gebucht bis",
@@ -672,6 +688,8 @@ SELECT betrieb            AS "Betrieb",
        letzter_tag        AS "Umsatz bis",
        befund             AS "Befund"
   FROM mart.datenstand
+ WHERE 1 = 1
+   [[AND betrieb = {{betrieb}}]]
  ORDER BY bwa_verzug_monate DESC NULLS FIRST, betrieb`,
   },
 

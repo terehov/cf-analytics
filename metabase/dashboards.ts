@@ -26,10 +26,6 @@ const F_MARKE: Parameter = {
   id: 'd-marke', name: 'marke', 'display-name': 'Marke', type: 'string/=',
   werteliste: ['mart', 'konzept_zuordnung', 'hauptkonzept'],
 }
-const F_KONZEPT: Parameter = {
-  id: 'd-konzept', name: 'konzept', 'display-name': 'Marke', type: 'string/=',
-  werteliste: ['mart', 'konzept_zuordnung', 'hauptkonzept'],
-}
 const F_BETRIEB: Parameter = {
   id: 'd-betrieb', name: 'betrieb', 'display-name': 'Betrieb', type: 'string/=',
   werteliste: ['mart', 'betrieb', 'betrieb'],
@@ -191,11 +187,11 @@ export const dashboards: Dashboard[] = [
       ] },
 
       { teile: [{ text: '## Was wäre zu holen\n\nDie Spalte „€ bis Median" ist **kein Ziel und keine Prognose**, sondern eine Größenordnung: was der Abstand zum Mittelfeld in Euro bedeutet. Sortiert nach eben diesem Betrag — oben stehen die Betriebe, bei denen sich Arbeit am meisten lohnt.' }] },
-      { teile: [{ karte: 'pf_potenzial', hoehe: 11 }] },
+      { teile: [{ karte: 'pf_potenzial', hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ karte: 'pf_streuung' }] },
 
       { teile: [{ text: '## Betriebe ohne laufendes Geschäft\n\n> Betriebe ohne Umsatz verzerren **jeden** Durchschnitt und erzeugen unsinnige Quoten: über 1000 % Personalkosten bei 0 € Umsatz melden eine Katastrophe, wo gar kein Betrieb läuft. Diese Liste ist die Vorlage, um solche Einträge auf inaktiv zu setzen.' }] },
-      { teile: [{ karte: 'pf_karteileichen' }] },
+      { teile: [{ karte: 'pf_karteileichen', klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
     ],
   },
 
@@ -216,10 +212,10 @@ export const dashboards: Dashboard[] = [
       ] },
 
       { teile: [{ text: '## Gäste oder Bon?\n\nEine Umsatzveränderung hat zwei mögliche Ursachen, und sie führen zu **verschiedenen Maßnahmen**: mehr oder weniger Gäste ist ein Marketing- und Standortthema, ein veränderter Bon ein Karten-, Preis- und Verkaufsthema.' }] },
-      { teile: [{ karte: 'pf_gaeste_bon', hoehe: 12 }] },
+      { teile: [{ karte: 'pf_gaeste_bon', hoehe: 12, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
 
       { teile: [{ text: '## Wie planbar läuft ein Betrieb\n\nWie stark der Tagesumsatz im Verhältnis zum eigenen Durchschnitt schwankt — dadurch sind große und kleine Häuser vergleichbar. Ein hoher Wert heißt Abhängigkeit von Wochenenden, Veranstaltungen oder Wetter und macht die Personalplanung teuer.' }] },
-      { teile: [{ karte: 'pf_stabilitaet', hoehe: 11 }] },
+      { teile: [{ karte: 'pf_stabilitaet', hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
     ],
   },
 
@@ -232,7 +228,7 @@ export const dashboards: Dashboard[] = [
     beschreibung:
       'Die Übersicht für den monatlichen Round Table: oben die Zähler, darunter woran es liegt, unten die vollständige Betriebstabelle.',
     sammlung: 'Round Table',
-    filter: [F_MONAT, F_KONZEPT],
+    filter: [F_MONAT, F_MARKE],
     reihen: [
       { teile: [{ text: '# Round Table\n\nDie Ampeln: 🟢 passt · 🟠 im Auge behalten · 🔴 sofort handeln.\n\n**„Ohne Urteil"** sind Betriebe, für die sich keine Ampel berechnen ließ — meist fehlen die Zahlen vom Steuerberater. Sie stehen bewusst als eigene Gruppe da, damit sie nicht mit unauffälligen Betrieben verwechselt werden.' }] },
       { teile: [
@@ -248,10 +244,13 @@ export const dashboards: Dashboard[] = [
         { karte: 'rt_intensitaet', breite: 10 },
       ] },
       { teile: [{ text: '## Die Betriebe\n\nSortiert nach Handlungsdruck: rot vor orange vor grün, innerhalb dessen nach Dringlichkeit.' }] },
-      { teile: [{ karte: 'rt_tabelle', hoehe: 14 }] },
+      { teile: [{ karte: 'rt_tabelle', hoehe: 14,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ text: '## Marken\n\nDie erste Frage vor jeder Maßnahme: schwächelt dieser eine Betrieb oder seine ganze Marke? Die Prozentwerte zeigen jeweils den mittleren Betrieb der Marke.' }] },
-      { teile: [{ karte: 'rt_marke' }] },
-      { teile: [{ karte: 'rt_marke_abweichung', hoehe: 11 }] },
+      { teile: [{ karte: 'rt_marke',
+        klick: [{ ziel: 'dd_filialen', spalte: 'Marke', uebergabe: { marke: 'Marke' } }] }] },
+      { teile: [{ karte: 'rt_marke_abweichung', hoehe: 11,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
     ],
   },
 
@@ -269,9 +268,9 @@ export const dashboards: Dashboard[] = [
         { karte: 'rt_historie_bereich' },
       ] },
       { teile: [{ text: '## Wer hat die Farbe gewechselt\n\nDie Liste, mit der ein Round Table anfangen sollte. Verschlechterungen zuerst.' }] },
-      { teile: [{ karte: 'rt_ampelwechsel', hoehe: 11 }] },
+      { teile: [{ karte: 'rt_ampelwechsel', hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ text: '## Die letzten drei Monate je Betrieb und Bereich\n\n↗ besser oder gleich, ↘ schlechter. Dabei gilt je Bereich die richtige Richtung: bei Personal- und Wareneinsatzquoten ist ein kleinerer Wert der bessere.' }] },
-      { teile: [{ karte: 'rt_trend_tabelle', hoehe: 12 }] },
+      { teile: [{ karte: 'rt_trend_tabelle', hoehe: 12, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
     ],
   },
 
@@ -289,7 +288,7 @@ export const dashboards: Dashboard[] = [
       { teile: [{ text: '## Maßnahmen' }] },
       { teile: [
         { karte: 'rt_massnahmen_status', breite: 8 },
-        { karte: 'rt_massnahmen_offen', breite: 16 },
+        { karte: 'rt_massnahmen_offen', breite: 16, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] },
       ] },
     ],
   },
@@ -303,7 +302,7 @@ export const dashboards: Dashboard[] = [
     filter: [F_MONAT],
     reihen: [
       { teile: [{ text: '# Welche Schwellen gelten?\n\nDer Round Table misst alle Betriebe an denselben Grenzen: **28 % grün, 32 % orange**. LINA führt je Betrieb eigene Grenzen (29/35, 30/34 …), die Standortgröße und Konzept berücksichtigen — dafür aber die Vergleichbarkeit untereinander kosten.\n\nDie Tabelle zeigt **nur die Betriebe, bei denen die Wahl tatsächlich zu einem anderen Urteil führt.** Bei allen übrigen erübrigt sich die Diskussion.' }] },
-      { teile: [{ karte: 'rt_regelwerk_vergleich', hoehe: 13 }] },
+      { teile: [{ karte: 'rt_regelwerk_vergleich', hoehe: 13, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
     ],
   },
 
@@ -335,7 +334,7 @@ export const dashboards: Dashboard[] = [
         { karte: 'um_wochentag', breite: 10 },
       ] },
       { teile: [{ text: '## Rangliste\n\nDie letzten Zeilen sind die interessanten.' }] },
-      { teile: [{ karte: 'um_rangliste', hoehe: 12 }] },
+      { teile: [{ karte: 'um_rangliste', hoehe: 12, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
     ],
   },
 
@@ -352,13 +351,13 @@ export const dashboards: Dashboard[] = [
         { karte: 'st_sparte', breite: 14 },
         { karte: 'st_verkaufsstelle', breite: 10 },
       ] },
-      { teile: [{ karte: 'st_sparte_anteil', hoehe: 11 }] },
+      { teile: [{ karte: 'st_sparte_anteil', hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ text: '## Tageszeit\n\nDer Geschäftstag läuft von 08:00 bis 07:59 des Folgetags. Die Nachtstunden gehören deshalb ans **Ende** des Tages, nicht an den Anfang.' }] },
       { teile: [
         { karte: 'st_stunde', breite: 14 },
         { karte: 'st_zeitzone', breite: 10 },
       ] },
-      { teile: [{ karte: 'st_zeitzone_betrieb', hoehe: 11 }] },
+      { teile: [{ karte: 'st_zeitzone_betrieb', hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
     ],
   },
 
@@ -371,8 +370,8 @@ export const dashboards: Dashboard[] = [
     filter: [F_MONAT, F_BETRIEB],
     reihen: [
       { teile: [{ text: '# Personal\n\nZwei verschiedene Kennzahlen, die im LINA-Bericht beide „Effektivität" heißen und deshalb hier getrennt stehen:\n\n- **Quote** — Personalkosten in Prozent vom Umsatz. Sagt, was das Personal kostet.\n- **Umsatz je Personalstunde** — in Euro. Sagt, was eine Arbeitsstunde einbringt.\n\nDie Ampel im Round Table beruht auf den **Personalkosten ohne Geschäftsführung** aus den Zahlen des Steuerberaters.' }] },
-      { teile: [{ karte: 'pe_quote_betrieb', hoehe: 11 }] },
-      { teile: [{ karte: 'pe_quote_tabelle', hoehe: 11 }] },
+      { teile: [{ karte: 'pe_quote_betrieb', hoehe: 11, klick: [{ ziel: 'dd_betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      { teile: [{ karte: 'pe_quote_tabelle', hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ karte: 'pe_verlauf' }] },
       { teile: [{ karte: 'pe_bereich', hoehe: 11 }] },
       { teile: [{ karte: 'pe_effektivitaet', hoehe: 11 }] },
@@ -410,9 +409,9 @@ export const dashboards: Dashboard[] = [
     reihen: [
       { teile: [{ text: '# Betriebswirtschaftliche Auswertung (BWA)\n\n> **Diese Zahlen hinken hinterher.** Sie kommen vom Steuerberater und liegen üblicherweise ein bis zwei Monate zurück. Ein Monat, in dem alle Werte auf null stehen, ist **noch nicht gebucht** — er bedeutet nicht „kein Umsatz". Deshalb werden hier nur gebuchte Monate gezeigt.' }] },
       { teile: [{ karte: 'bwa_kennzahlen', hoehe: 9 }] },
-      { teile: [{ karte: 'bwa_ebit', hoehe: 11 }] },
+      { teile: [{ karte: 'bwa_ebit', hoehe: 11, klick: [{ ziel: 'dd_betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ text: '## Buchungsstand\n\nZwei Monate Verzug sind normal, vier eine Nachfrage beim Steuerberater wert.' }] },
-      { teile: [{ karte: 'bwa_buchungsstand', hoehe: 12 }] },
+      { teile: [{ karte: 'bwa_buchungsstand', hoehe: 12, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
     ],
   },
 

@@ -881,3 +881,64 @@ die Spalte breiter", sondern **„kann dieser Wert überhaupt das sein, was die 
 Bei `numeric(6,2)` und den Personalkosten war die Antwort ja — 316.576 % sind bei 6,05 €
 Tagesumsatz rechnerisch korrekt. Hier ist sie nein. Dieselbe Fehlermeldung, entgegengesetzte
 Reparatur.
+
+---
+
+## Filter, die oben stehen und nichts tun
+
+**Symptom, vom Nutzer gemeldet (27.07.2026).** „Der Drill-Down vom Round Table funktioniert
+nicht. Ebenso scheint der Markenfilter dort nicht zu funktionieren."
+
+**Befund, weit größer als die Meldung.** Nachgemessen über alle 18 Dashboards:
+
+| | |
+|---|---|
+| Dashboards mit Drill-Down | **5 von 18** — die gesamte Round-Table-Sammlung und alle Fachseiten hatten keinen |
+| Filter, die nur teilweise wirkten | **21 Fälle** |
+| Schlimmster Fall | *Round Table — Übersicht*, Markenfilter: **10 von 11 Karten** lasen ihn nicht |
+
+**Warum das die gefährlichste Fehlerklasse dieses Systems ist.** Ein Filter, der nichts tut,
+meldet sich nicht. Er steht oben, lässt sich bedienen, die Seite lädt neu — und zeigt dieselben
+Zahlen. Wer „Aposto" wählt und **9 rote Betriebe** abliest, hält das für die Zahl dieser Marke.
+Tatsächlich stand dort vorher **70** — die Zahl aller 141 Betriebe. Nichts daran sieht falsch
+aus.
+
+Gegenprobe nach der Reparatur, gegen die Datenbank gehalten:
+
+| | rot | ohne Urteil | Betriebe |
+|---|---|---|---|
+| alle Marken | 70 | 64 | 141 |
+| nur Aposto | **9** | **2** | **11** |
+
+**Zwei Ursachen.**
+
+1. **Namensspaltung.** Das Round-Table-Dashboard führte den Filter als `konzept`, die Karten
+   lasen `marke`. Zwei Namen für dieselbe Sache — der Filter fand nie einen Abnehmer.
+   Vereinheitlicht auf `marke`.
+2. **Nie vollständig verdrahtet.** Bei den übrigen Karten fehlte schlicht die
+   `[[AND … = {{…}}]]`-Klausel. Sie liefen korrekt, nur eben ungefiltert.
+
+**Behoben:** 30 SQL-Klauseln ergänzt, 15 Drill-Down-Klicks gesetzt (Round Table, Trend,
+Ursachen, Regelwerk, Umsatz, Struktur, Personal, BWA, Portfolio, Muster).
+
+### Die eigentliche Lehre: zwei Prüfungen im Provisionieren
+
+Beide Fehler waren **statisch erkennbar** — es hätte nie ein Nutzer melden müssen. Deshalb
+scheitert `uebernehmen.ts` jetzt, bevor irgendetwas angelegt wird:
+
+**Filterprüfung.** Für jedes Dashboard: liest jede Karte jeden Filter?
+- *tot* — keine einzige Karte liest ihn
+- *taub* — nur ein Teil liest ihn. **Das ist schlimmer als tot**, weil die Seite halb antwortet
+  und dadurch funktionierend aussieht.
+
+**Klickprüfung.** Führt jeder Drill-Down zu einem Dashboard, das den übergebenen Parameter
+kennt? Ein Klick auf ein Ziel ohne passenden Filter öffnet die Seite **ungefiltert** — man
+landet auf ③ Betrieb und sieht irgendeinen Betrieb, meist den zuletzt gewählten.
+
+**Ausnahmen werden begründet, nicht geduldet.** `FILTER_AUSNAHME` in `uebernehmen.ts` nennt je
+Karte und Filter den fachlichen Grund — etwa: eine Verlaufskurve darf keinen Stichmonat haben,
+sonst bleibt ein Punkt übrig. Wer eine Karte ergänzt, die einen Filter ignoriert, muss diese
+Entscheidung hinschreiben.
+
+**Regel.** Ein Filter am Dashboard ist ein Versprechen. Wird es nur von der Hälfte der Karten
+eingelöst, ist das kein halber Erfolg, sondern eine falsche Auskunft.
