@@ -245,3 +245,69 @@ Vor jeder Zahl, die das Haus verlässt:
 3. **Median statt Mittelwert**, solange Betriebe ohne Umsatz in der Grundgesamtheit stehen.
 4. **Leer heißt nicht null.** Eine leere Karte kann „nicht importiert", „nicht gebucht" oder
    „nicht erfasst" heißen — drei verschiedene Dinge mit drei verschiedenen Adressaten.
+
+---
+
+## Warum 43 von 44 Standorten rot sind — und warum das kein Datenfehler ist
+
+**27.07.2026.** Auf der Standortkarte (Juni 2026) stand fast alles auf Rot. Naheliegender
+Verdacht: ein Importfehler wie bei `numeric(6,2)`. Nachgeprüft — es ist keiner.
+
+**Welche Kennzahl treibt das?** Von 48 Standorten im Juni:
+
+| Teilampel | rot |
+|---|---|
+| Personal | **38** |
+| Umsatz ggü. Vorjahr | 17 |
+| Wareneinsatz Küche | 7 |
+| Wareneinsatz Bar | 1 |
+| Online-Bewertung | 0 (keine Daten) |
+| OM-Score | 0 (keine Daten) |
+
+**Sind die Personalzahlen echt?** LINA liefert die Personalquote auf zwei unabhängigen Wegen:
+`getPersonalkosten.persoogBwa` als fertigen Prozentwert, und `getKennzahlen` als zwei
+Absolutbeträge, aus denen man selbst teilen kann. Beide verglichen:
+
+| Betrieb | aus `getKennzahlen` | aus `getPersonalkosten` |
+|---|---|---|
+| Gastronomie am Markt Mainz | 38,1 % | 38,1 % |
+| Wilma Wunder Dresden | 35,3 % | 35,3 % |
+| Wilma Wunder Köln | 44,2 % | 44,2 % |
+| Ratskeller Augsburg | 47,5 % | 47,6 % |
+
+Sie stimmen überein. Abweichungen von ein bis zwei Punkten erklären sich durch den
+BWA-Versatz — `getKennzahlen` rechnet auf den Kalendermonat, `persoogBwa` auf den gebuchten
+BWA-Monat. **Die Zahl ist richtig.**
+
+**Die Schwelle passt nicht zur Zahl.** Verteilung über die 41 bewerteten Standorte:
+
+| Schwelle grün / orange | grün | orange | rot |
+|---|---|---|---|
+| **28 / 32** (aus dem Excel-Blatt „Regeln") | 2 | 2 | **37** |
+| 32 / 38 | 4 | 17 | 20 |
+| 35 / 42 | 12 | 18 | 11 |
+
+Median der tatsächlichen Werte: **37,7 %**, Spanne 22,5 % bis 48,9 %.
+
+LINA pflegt eigene Schwellen je Betrieb (`core.schwellenwert_betrieb`, Median 27 grün /
+35 orange). Auch damit bleiben 28 von 48 rot — die betriebsindividuellen Schwellen sind
+nicht die Lösung, nur eine mildere Fassung desselben Problems.
+
+**Der Konflikt war bekannt.** `docs/kennzahlen-mapping.md` Zeile K hält seit Phase 1 fest:
+*„LINA liefert betriebsindividuelle Schwellen (z. B. 29/35, 30/34). Entscheidung nötig."*
+Die Entscheidung steht bis heute aus, und ihr Fehlen ist genau das, was man auf der Karte
+sieht.
+
+**Was daraus folgt — und was nicht.** Es folgt NICHT, dass die Schwelle hochgesetzt werden
+soll, damit die Karte grüner aussieht. Möglicherweise hat die Gruppe wirklich ein
+Personalkostenproblem; 37,7 % im Median ist in der Systemgastronomie kein guter Wert, und
+eine Ampel hat nicht die Aufgabe, hübsch auszusehen.
+
+Es folgt aber: **eine Ampel, bei der 43 von 44 rot leuchten, kann nicht mehr steuern.** Sie
+beantwortet die Frage „wo zuerst hinsehen?" nicht. Wer alles gleich schlimm anzeigt, zeigt
+nichts an.
+
+**Regel.** Wenn eine Ampel fast einfarbig ist, sind zwei Dinge zu trennen: *stimmt die Zahl*
+(hier ja) und *stimmt der Maßstab* (hier nein). Nur die erste Frage ist eine technische. Die
+zweite gehört dem Fachbereich, und sie darf nicht dadurch beantwortet werden, dass jemand
+still eine Konstante ändert.
