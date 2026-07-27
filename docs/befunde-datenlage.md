@@ -298,6 +298,23 @@ nicht die Lösung, nur eine mildere Fassung desselben Problems.
 Die Entscheidung steht bis heute aus, und ihr Fehlen ist genau das, was man auf der Karte
 sieht.
 
+**Das Excel berichtete genauso.** Nachgeschlagen in `JULI_Round_Table_Ampelsystem.xlsx`,
+Blatt `Eingabe`, 22 Betriebe:
+
+| | Excel Juli | unser Juni |
+|---|---|---|
+| Ampel Personal rot | 16 von 18 mit Daten | 38 von 48 |
+| Gesamtstatus rot | **20 von 22** | 43 von 48 |
+| grün | 1 | 0 |
+
+Die dort eingetragenen Personalquoten: 34,2 · 35,9 · 36,0 · 43,9 · 40,6 · 34,7 · 38,6 · 45,0 ·
+38,3 · 35,6 · 34,2 · 43,4 · 36,4 · 39,1 · 35,1 %. Grün waren genau zwei Häuser (24,8 % und
+26,9 %).
+
+**Damit ist die Frage beantwortet: unsere Umsetzung ist dem Original treu.** Die rote Wand ist
+kein Artefakt der Migration nach Postgres. Sie sah im Excel genauso aus, Monat für Monat, und
+der Fachbereich hat damit gearbeitet.
+
 **Was daraus folgt — und was nicht.** Es folgt NICHT, dass die Schwelle hochgesetzt werden
 soll, damit die Karte grüner aussieht. Möglicherweise hat die Gruppe wirklich ein
 Personalkostenproblem; 37,7 % im Median ist in der Systemgastronomie kein guter Wert, und
@@ -307,7 +324,24 @@ Es folgt aber: **eine Ampel, bei der 43 von 44 rot leuchten, kann nicht mehr ste
 beantwortet die Frage „wo zuerst hinsehen?" nicht. Wer alles gleich schlimm anzeigt, zeigt
 nichts an.
 
-**Regel.** Wenn eine Ampel fast einfarbig ist, sind zwei Dinge zu trennen: *stimmt die Zahl*
-(hier ja) und *stimmt der Maßstab* (hier nein). Nur die erste Frage ist eine technische. Die
-zweite gehört dem Fachbereich, und sie darf nicht dadurch beantwortet werden, dass jemand
-still eine Konstante ändert.
+**Wie das Excel damit umging — und das ist die eigentliche Lehre.** Es hat nicht gemittelt.
+Das Blatt `00_Dashboard` zeigt nebeneinander:
+
+* **Gesamtstatus** (ein Rot färbt alles rot) — die grobe Sortierung
+* **Intensität** (`Sofort eskalieren` / `Sofort handeln` / `Nachforschung` / `Beobachten/OK`)
+  — die feine. Sie zählt, statt zu verodern, und trennt die rote Wand in 11 Eskalationen
+  gegen 9 Handlungsfälle.
+* **alle sechs Einzelampeln** in derselben Zeile
+* einen Block „**Rot-Treiber nach Bereich**": je Bereich ein `COUNTIF(…,"🔴 Rot")`
+
+Der Gesamtstatus war also nie als alleinige Anzeige gedacht. Er war die Überschrift, und
+daneben stand immer, *warum*.
+
+**Regel.** Wenn eine Ampel fast einfarbig ist, sind drei Dinge zu trennen: *stimmt die Zahl*
+(hier ja), *entspricht es der Quelle* (hier ja, das Excel zeigte dasselbe) und *ist der Maßstab
+noch der richtige* (offen). Nur die ersten beiden sind technische Fragen. Die dritte gehört dem
+Fachbereich und darf nicht dadurch beantwortet werden, dass jemand still eine Konstante ändert.
+
+Und: Bevor man eine Anzeige „verbessert", nachsehen, wie das abgelöste System berichtet hat.
+Das Excel hatte den Rot-Treiber-Block bereits — die Antwort auf „warum ist alles rot" lag die
+ganze Zeit in `examples/`.
