@@ -890,6 +890,31 @@ async function uebernehmen() {
     } catch (e) { log('Dashboard ' + d.payload.name + ' — FEHLER: ' + e.message, 'fehler'); }
   }
 
+  // --- Verwaiste Dashboards aufraeumen -------------------------------
+  //
+  // Ein Dashboard, das aus dashboards.ts entfernt wurde, blieb bisher in
+  // Metabase stehen. Aufgefallen am 27.07.2026 beim Zusammenlegen von
+  // "① Marken" in den Round Table: die alte Seite war weiterhin da, mit
+  // denselben Karten, und niemand haette gemerkt, dass sie nicht mehr
+  // gepflegt wird.
+  //
+  // Erkannt werden sie am [key:...] in der Beschreibung -- das setzt nur
+  // dieses Skript. Von Hand angelegte Dashboards tragen keinen und bleiben
+  // deshalb unangetastet.
+  //
+  // ARCHIVIERT, NICHT GELOESCHT: Archivieren ist in Metabase umkehrbar,
+  // Loeschen nicht. Wer sich vertut, holt die Seite im Papierkorb zurueck.
+  try {
+    const gewollt = new Set(def.dashboards.map(d => d.schluessel));
+    const alle = await mb('/search?models=dashboard&archived=false&limit=1000');
+    for (const d of (alle.data || [])) {
+      const m = (d.description || '').match(/\[key:([a-z0-9_]+)\]/);
+      if (!m || gewollt.has(m[1])) continue;
+      await mb('/dashboard/' + d.id, 'PUT', {archived: true});
+      log('Dashboard ' + d.name + ' — archiviert (nicht mehr in dashboards.ts)', 'neu');
+    }
+  } catch (e) { log('Aufraeumen fehlgeschlagen: ' + e.message, 'fehler'); }
+
   log('\nFertig.');
 }
 
