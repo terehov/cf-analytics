@@ -156,6 +156,33 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
     ampel: 'Zaehlt Ampeln JE BEREICH (Umsatz, Personal, WE Bar ...). Ein Filter auf '
          + 'die Gesamtampel waere zirkulaer: die Karte soll ja zeigen, woraus sich '
          + 'das Gesamturteil zusammensetzt.',
+    bereich: 'Die Karte VERGLEICHT die sechs Bereiche. Ein Filter darauf liesse genau '
+           + 'einen Balken uebrig -- also dasselbe Diagramm in gross, und das ist das '
+           + 'Gegenteil dessen, was ein Klick darauf leisten soll.',
+    intensitaet: 'Zaehlt Einzelampeln je Bereich; der Handlungsbedarf ist eine Aussage '
+               + 'ueber den ganzen Betrieb und wuerde die Balken beschneiden, ohne dass '
+               + 'die Achse noch dazu passt.',
+  },
+
+  // --- Der Bereich beschreibt eine EINZELAMPEL. Karten, die den Betrieb als
+  // --- Ganzes zeigen, haben keine Bereichsspalte, an der er greifen koennte.
+  dd_filialen_tabelle: {
+    bereich: 'Eine Zeile je BETRIEB mit allen sechs Ampeln nebeneinander. Ein '
+           + 'Bereichsfilter haette hier keine Spalte -- er wirkt auf der Liste '
+           + 'darunter, die je Betrieb UND Bereich eine Zeile fuehrt.',
+  },
+  dd_filialen_rangliste: {
+    bereich: 'Zeigt ausschliesslich die Personalkostenquote; ein Bereichsfilter waere '
+           + 'entweder wirkungslos (Personal) oder wuerde die Karte leeren.',
+  },
+  dd_filialen_streuung: {
+    bereich: 'Umsatz gegen Personalquote -- zwei fest gewaehlte Bereiche. Ein dritter '
+           + 'liesse sich nicht auftragen.',
+  },
+  so_karte_klein: {
+    bereich: 'Ein Punkt je Standort, gefaerbt nach Handlungsbedarf ueber alle Bereiche. '
+           + 'Ein einzelner Bereich waere keine andere Karte, sondern eine andere Farbe -- '
+           + 'und die kann Metabases Punktkarte ohnehin nicht.',
   },
 
   // --- Strukturell ohne die Dimension --------------------------------------

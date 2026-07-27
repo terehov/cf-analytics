@@ -100,6 +100,37 @@ export const P_AMPEL: Parameter = {
   required: false,
 }
 
+/**
+ * Der Bereich einer Einzelampel: Umsatz, Personal, WE Bar, WE Kueche,
+ * Online-Bewertung, OM vor Ort.
+ *
+ * Zusammen mit P_AMPEL beschreibt er genau EIN Segment eines gestapelten
+ * Balkens. "Personal / rot" ist eine Aussage ueber 19 Betriebe, und wer
+ * den Balken anklickt, will diese 19 sehen -- nicht dasselbe Diagramm
+ * noch einmal in gross.
+ */
+export const P_BEREICH: Parameter = {
+  id: 'bereich-param',
+  name: 'bereich',
+  'display-name': 'Bereich',
+  type: 'text',
+  required: false,
+}
+
+/**
+ * Der Handlungsbedarf: "Sofort eskalieren", "Sofort handeln",
+ * "Nachforschung", "Beobachten/OK". Anders als die Gesamtampel zaehlt er
+ * die roten Bereiche, statt sie nur zu odern -- deshalb trennt er die 43
+ * roten Betriebe in 19 zum Eskalieren und 24 zum Handeln.
+ */
+export const P_INTENSITAET: Parameter = {
+  id: 'intensitaet-param',
+  name: 'intensitaet',
+  'display-name': 'Handlungsbedarf',
+  type: 'text',
+  required: false,
+}
+
 export const P_BETRIEB: Parameter = {
   id: 'betrieb-param',
   name: 'betrieb',

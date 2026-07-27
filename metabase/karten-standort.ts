@@ -20,12 +20,13 @@
 // =====================================================================
 
 import type { Karte } from './typen'
-import { MONAT_CTE, P_MONAT, P_MARKE, P_BETRIEB, P_AMPEL } from './gemeinsam'
+import { MONAT_CTE, P_MONAT, P_MARKE, P_BETRIEB, P_AMPEL, P_INTENSITAET } from './gemeinsam'
 
 const MONAT = P_MONAT
 const MARKE = P_MARKE
 const BETRIEB = P_BETRIEB
 const AMPEL = P_AMPEL
+const INTENSITAET = P_INTENSITAET
 
 /**
  * Die Farbe des Punkts: INTENSITAET, nicht Gesamtampel.
@@ -230,7 +231,11 @@ mit_ampel AS (
        [[AND s.konzept = {{marke}}]]
 )
 SELECT b.bereich AS "Bereich",
-       count(*) FILTER (WHERE b.ampel = 'rot') AS "Standorte mit roter Ampel"
+       count(*) FILTER (WHERE b.ampel = 'rot') AS "Standorte mit roter Ampel",
+       -- Fuer den Klick: diese Karte zaehlt ausschliesslich rote, der Wert
+       -- ist also immer derselbe. Er steht trotzdem als Spalte da, weil
+       -- Metabase nur Spalten uebergeben kann, keine festen Werte.
+       'rot'::text AS "Ampelwert"
   FROM mit_ampel m
   CROSS JOIN LATERAL (VALUES
         ('Personal',         m.ampel_personal,  1),
@@ -342,7 +347,7 @@ SELECT coalesce(s.konzept, '(nicht zugeordnet)') AS "Marke",
       + '🟥 eskalieren · 🔴 handeln · 🟠 nachforschen · 🟢 ok · ⚪ keine Bewertung. '
       + 'Nur Standorte mit hinterlegter Adresse.',
     anzeige: 'map',
-    parameter: [MONAT, MARKE, BETRIEB, AMPEL],
+    parameter: [MONAT, MARKE, BETRIEB, AMPEL, INTENSITAET],
     sql: `${MONAT_CTE}
 SELECT ${INTENSITAET_EMOJI} || ' ' || s.betrieb AS "Standort",
        s.konzept                        AS "Marke",
@@ -360,6 +365,7 @@ SELECT ${INTENSITAET_EMOJI} || ' ' || s.betrieb AS "Standort",
    -- 'ohne' steht fuer NULL; das laesst sich nicht als Gleichheit
    -- schreiben, deshalb der Umweg ueber coalesce.
    [[AND coalesce(s.ampel, 'ohne') = {{ampel}}]]
+   [[AND s.intensitaet = {{intensitaet}}]]
  ORDER BY${NACH_DRUCK},
           s.betrieb`,
     visualisierung: {

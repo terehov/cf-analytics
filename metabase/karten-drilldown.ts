@@ -17,7 +17,7 @@
 // =====================================================================
 
 import type { Karte } from './typen'
-import { MONAT_CTE, MONAT_CTE_UMSATZ, ZEITRAUM_CTE, P_MONAT, P_MARKE, P_BETRIEB, P_AMPEL } from './gemeinsam'
+import { MONAT_CTE, MONAT_CTE_UMSATZ, ZEITRAUM_CTE, P_MONAT, P_MARKE, P_BETRIEB, P_AMPEL, P_BEREICH, P_INTENSITAET } from './gemeinsam'
 
 export const karten: Karte[] = [
   // ===================================================================
@@ -113,7 +113,7 @@ SELECT monat                        AS "Monat",
     beschreibung:
       'Alle Betriebe der gewählten Marke über sämtliche Kennzahlen, jede mit ihrer Ampel. Sortiert nach Handlungsdruck. Ein Klick auf eine Zeile öffnet die Detailseite des Betriebs.',
     anzeige: 'table',
-    parameter: [P_MONAT, P_MARKE, P_AMPEL],
+    parameter: [P_MONAT, P_MARKE, P_AMPEL, P_INTENSITAET],
     sql: `${MONAT_CTE}
 SELECT r.betrieb                                            AS "Betrieb",
        r.konzept                                            AS "Marke",
@@ -149,6 +149,7 @@ SELECT r.betrieb                                            AS "Betrieb",
    -- 'ohne' steht fuer "keine Ampel berechenbar" (NULL). Ohne diesen Fall
    -- fuehrte die Kachel "Ohne Urteil" auf eine leere Liste.
    [[AND coalesce(r.gesamt, 'ohne') = {{ampel}}]]
+   [[AND r.intensitaet = {{intensitaet}}]]
  ORDER BY CASE r.gesamt WHEN 'rot' THEN 1 WHEN 'orange' THEN 2 WHEN 'gruen' THEN 3 ELSE 4 END,
           CASE r.intensitaet WHEN 'Sofort eskalieren' THEN 1 WHEN 'Sofort handeln' THEN 2
                              WHEN 'Nachforschung' THEN 3 ELSE 4 END,
@@ -164,12 +165,70 @@ SELECT r.betrieb                                            AS "Betrieb",
     },
   },
   {
+    // Das Ziel jedes Klicks auf ein Balkensegment.
+    //
+    // Ein gestapelter Balken traegt ZWEI Angaben: die Achse sagt den
+    // Bereich (Personal), die Farbe die Ampel (rot). Zusammen sind das
+    // 19 Betriebe -- und genau die will sehen, wer darauf klickt.
+    //
+    // Deshalb eine eigene Karte statt der grossen Filialtabelle: die
+    // filtert auf die GESAMTAMPEL. "Personal rot" und "gesamt rot" sind
+    // aber verschiedene Mengen, denn die Gesamtampel ist ein Oder ueber
+    // alle sechs Bereiche. Wer das verwechselt, landet bei 43 statt 19
+    // Betrieben und haelt die Liste fuer die des Balkens.
+    //
+    // mart.ampel_bereich hat eine Zeile je Betrieb UND Bereich -- also
+    // genau die Koernung, die ein Balkensegment meint.
+    schluessel: 'dd_filialen_bereich',
+    name: 'Betriebe hinter dem Balken',
+    beschreibung:
+      'Die Betriebe eines einzelnen Balkensegments — etwa alle mit grüner Umsatzampel. '
+      + 'Ohne Auswahl stehen hier alle Bereiche untereinander.\n\n'
+      + 'Nicht zu verwechseln mit der Gesamtampel: „Personal rot" ist etwas anderes als '
+      + '„insgesamt rot", weil die Gesamtampel ein Oder über alle sechs Bereiche ist.',
+    anzeige: 'table',
+    parameter: [P_MONAT, P_MARKE, P_AMPEL, P_BEREICH, P_INTENSITAET],
+    sql: `${MONAT_CTE}
+SELECT a.bereich_name        AS "Bereich",
+       coalesce(a.emoji, '⚪') AS "●",
+       a.betrieb             AS "Betrieb",
+       a.konzept             AS "Marke",
+       a.stadt               AS "Stadt",
+       a.wert                AS "Wert",
+       a.ampel_text          AS "Bewertung",
+       a.gesamt              AS "Gesamtampel",
+       a.intensitaet         AS "Handlungsbedarf",
+       a.ursache             AS "Ursache",
+       a.massnahme           AS "Maßnahme"
+  FROM mart.ampel_bereich a
+  CROSS JOIN gewaehlt g
+ WHERE a.monat = g.monat
+   [[AND a.konzept = {{marke}}]]
+   [[AND a.bereich_name = {{bereich}}]]
+   -- 'ohne' steht fuer NULL: fuer diesen Bereich liess sich keine Ampel
+   -- rechnen. Das ist eine Aussage und kein Grund zum Ausblenden -- bei
+   -- Online-Bewertung und OM ist es derzeit sogar der Normalfall.
+   [[AND coalesce(a.ampel, 'ohne') = {{ampel}}]]
+   [[AND a.intensitaet = {{intensitaet}}]]
+ ORDER BY a.reihenfolge,
+          CASE a.ampel WHEN 'rot' THEN 1 WHEN 'orange' THEN 2
+                       WHEN 'gruen' THEN 3 ELSE 4 END,
+          a.wert DESC NULLS LAST,
+          a.betrieb`,
+    visualisierung: {
+      column_settings: {
+        '["name","Wert"]': { decimals: 1 },
+      },
+    },
+  },
+
+  {
     schluessel: 'dd_filialen_rangliste',
     name: 'Filialen nach Personalkostenquote',
     beschreibung:
       'Die 20 Betriebe mit der höchsten Personalkostenquote — die Kennzahl mit den meisten roten Ampeln. Ein Klick auf einen Balken öffnet die Detailseite des Betriebs; die vollständige Liste steht in der Tabelle oben.',
     anzeige: 'row',
-    parameter: [P_MONAT, P_MARKE, P_AMPEL],
+    parameter: [P_MONAT, P_MARKE, P_AMPEL, P_INTENSITAET],
     sql: `${MONAT_CTE}
 SELECT r.betrieb                AS "Betrieb",
        r.personalkosten_ogf_pct AS "Personal o. GF %"
@@ -179,6 +238,7 @@ SELECT r.betrieb                AS "Betrieb",
    AND r.personalkosten_ogf_pct IS NOT NULL
    [[AND r.konzept = {{marke}}]]
    [[AND coalesce(r.gesamt, 'ohne') = {{ampel}}]]
+   [[AND r.intensitaet = {{intensitaet}}]]
  ORDER BY r.personalkosten_ogf_pct DESC
  LIMIT 20`,
     visualisierung: {
@@ -196,7 +256,7 @@ SELECT r.betrieb                AS "Betrieb",
     beschreibung:
       'Jeder Punkt ist ein Betrieb. Rechts unten steht der Wunschfall: viel Umsatz bei niedriger Personalkostenquote. Links oben stehen die Betriebe, bei denen beides nicht stimmt.',
     anzeige: 'scatter',
-    parameter: [P_MONAT, P_MARKE, P_AMPEL],
+    parameter: [P_MONAT, P_MARKE, P_AMPEL, P_INTENSITAET],
     sql: `${MONAT_CTE}
 SELECT r.umsatz_ist             AS "Umsatz",
        r.personalkosten_ogf_pct AS "Personal o. GF %",
@@ -207,7 +267,8 @@ SELECT r.umsatz_ist             AS "Umsatz",
    AND r.personalkosten_ogf_pct IS NOT NULL
    AND r.umsatz_ist > 0
    [[AND r.konzept = {{marke}}]]
-   [[AND coalesce(r.gesamt, 'ohne') = {{ampel}}]]`,
+   [[AND coalesce(r.gesamt, 'ohne') = {{ampel}}]]
+   [[AND r.intensitaet = {{intensitaet}}]]`,
     visualisierung: {
       'graph.dimensions': ['Umsatz'],
       'graph.metrics': ['Personal o. GF %'],
@@ -220,21 +281,24 @@ SELECT r.umsatz_ist             AS "Umsatz",
       'Dieselben Betriebe, aber nach Bereich sortiert statt nach Betrieb. So wird sichtbar, welche Kennzahl in dieser Marke durchgehend klemmt und welche nur bei einzelnen Häusern.',
     anzeige: 'bar',
     parameter: [P_MONAT, P_MARKE],
+    // Langform statt Breitform, damit der Klick auf ein Segment beide
+    // Angaben mitgeben kann: Bereich UND Bewertung. Steht die Ampel im
+    // Spaltennamen, laesst sie sich nicht uebergeben -- siehe rt_treiber.
     sql: `${MONAT_CTE}
-SELECT a.bereich_name                             AS "Bereich",
-       count(*) FILTER (WHERE a.ampel = 'rot')    AS "Rot",
-       count(*) FILTER (WHERE a.ampel = 'orange') AS "Orange",
-       count(*) FILTER (WHERE a.ampel = 'gruen')  AS "Grün",
-       count(*) FILTER (WHERE a.ampel IS NULL)    AS "Keine Daten"
+SELECT a.bereich_name                       AS "Bereich",
+       coalesce(b.bezeichnung, 'Keine Daten') AS "Bewertung",
+       count(*)                             AS "Betriebe",
+       coalesce(a.ampel, 'ohne')            AS "Ampelwert"
   FROM mart.ampel_bereich a
   CROSS JOIN gewaehlt g
+  LEFT JOIN ampel.beschriftung b ON b.status = a.ampel
  WHERE a.monat = g.monat
    [[AND a.konzept = {{marke}}]]
- GROUP BY a.bereich_name, a.reihenfolge
+ GROUP BY a.bereich_name, a.reihenfolge, b.bezeichnung, a.ampel
  ORDER BY a.reihenfolge`,
     visualisierung: {
-      'graph.dimensions': ['Bereich'],
-      'graph.metrics': ['Rot', 'Orange', 'Grün', 'Keine Daten'],
+      'graph.dimensions': ['Bereich', 'Bewertung'],
+      'graph.metrics': ['Betriebe'],
       'stackable.stack_type': 'stacked',
       'graph.show_values': true,
       series_settings: {

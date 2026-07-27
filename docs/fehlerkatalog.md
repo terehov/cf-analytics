@@ -1027,3 +1027,54 @@ ganze Zeit da und fiel nur nicht auf, weil Karten fast immer über ein Dashboard
 
 **Regel.** Was auf dem Dashboard läuft, muss auch allein laufen. Jeder Drill-Down auf eine
 Diagrammfläche öffnet die Karte einzeln, und dieser Weg wird beim Bauen nie getestet.
+
+## Ein Klick auf ein Balkensegment kann die Farbe nur mitgeben, wenn sie ein Wert ist
+
+**Symptom.** Gemeldet am 27.07.2026: „Wenn ich bei Ampeln nach Bereich auf Umsatz grün klicke,
+möchte ich alle Filialen sehen, in denen der Umsatz grün ist — nicht die Balken nochmals in groß."
+
+**Erster Versuch, und warum er zur Hälfte scheiterte.** Der Klick gab den Bereich mit
+(`bereich=Umsatz`), die Farbe blieb leer (`ampel=`). Man landete auf allen 22 Umsatzzeilen
+statt auf den 4 grünen — und die Liste begann mit den roten.
+
+**Ursache: die Form der Abfrage.** Die Karte stand in der **Breitform**:
+
+```sql
+SELECT bereich_name AS "Bereich",
+       count(*) FILTER (WHERE ampel = 'rot')   AS "Rot",
+       count(*) FILTER (WHERE ampel = 'gruen') AS "Grün", ...
+```
+
+Damit ist die Ampel ein **Spaltenname**, kein Wert. Metabase kann beim Klick nur den Inhalt
+einer Spalte weitergeben, nicht ihren Namen — die Farbe des angeklickten Segments ist für die
+Übergabe schlicht nicht vorhanden. Nachgeprüft an der gespeicherten `result_metadata`: die
+Karte kennt die Spalten `Bereich, Rot, Orange, Grün, Keine Daten`, und keine davon enthält
+„grün" als Wert.
+
+**Behoben durch die Langform** — eine Zeile je Bereich UND Ampel:
+
+```sql
+SELECT bereich_name              AS "Bereich",
+       coalesce(b.bezeichnung, 'Keine Daten') AS "Bewertung",
+       count(*)                  AS "Betriebe",
+       coalesce(a.ampel, 'ohne') AS "Ampelwert"   -- technischer Wert für den Klick
+```
+
+Das Diagramm sieht unverändert aus (`graph.dimensions: ['Bereich', 'Bewertung']` stapelt
+genauso), aber jetzt trägt jede Zeile beide Angaben. Der Klick gibt `bereich=Umsatz` **und**
+`ampel=gruen` weiter.
+
+**Zwei Spalten für dasselbe, mit Absicht.** „Bewertung" trägt die lesbare Beschriftung für die
+Legende, „Ampelwert" den technischen Wert (`rot`, `gruen`, `ohne`) für den Filter. Die
+Zielseite filtert auf `gruen`, nicht auf `🟢 Grün`.
+
+**Betroffen und umgestellt:** `rt_treiber`, `dd_filialen_metrikvergleich`, `rt_historie`.
+
+**Die Zielkarte fehlte ganz.** Ein Balkensegment meint eine EINZELAMPEL, die große
+Filialtabelle filtert aber auf die GESAMTAMPEL — und das sind verschiedene Mengen, weil die
+Gesamtampel ein Oder über alle sechs Bereiche ist. Wer das verwechselt, landet bei 43 statt 19
+Betrieben. Deshalb `dd_filialen_bereich` auf `mart.ampel_bereich`, die je Betrieb und Bereich
+eine Zeile führt — genau die Körnung eines Segments.
+
+**Regel.** Was ein Klick weitergeben soll, muss als **Wert** in einer Spalte stehen. Eine
+Kennzahl, die zur Spaltenüberschrift geworden ist, lässt sich nicht mehr filtern.

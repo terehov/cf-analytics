@@ -38,6 +38,18 @@ const F_AMPEL: Parameter = {
   // steht fuer NULL -- das liefert keine Spalte.
   festeWerte: ['rot', 'orange', 'gruen', 'ohne'],
 }
+// Der Bereich einer Einzelampel. Zusammen mit der Bewertung beschreibt er
+// genau ein Segment eines gestapelten Balkens -- "Personal / rot".
+const F_BEREICH: Parameter = {
+  id: 'd-bereich', name: 'bereich', 'display-name': 'Bereich', type: 'string/=',
+  festeWerte: ['Umsatz', 'Personal', 'WE Bar', 'WE Küche', 'Online-Bewertung', 'OM vor Ort'],
+}
+// Der Handlungsbedarf. Trennt die roten Betriebe danach, WIE VIELE
+// Bereiche rot sind -- eine rote Ampel heisst handeln, zwei eskalieren.
+const F_INTENSITAET: Parameter = {
+  id: 'd-intensitaet', name: 'intensitaet', 'display-name': 'Handlungsbedarf', type: 'string/=',
+  festeWerte: ['Sofort eskalieren', 'Sofort handeln', 'Nachforschung', 'Beobachten/OK'],
+}
 const F_ZEITRAUM: Parameter = {
   id: 'd-zeitraum', name: 'zeitraum', 'display-name': 'Zeitraum', type: 'date/all-options',
 }
@@ -82,7 +94,7 @@ export const dashboards: Dashboard[] = [
     beschreibung:
       'Alle Betriebe — oder nur die einer Marke, wenn man von Ebene ① kommt — über sämtliche Kennzahlen mit Ampeln. Ein Klick auf den Betriebsnamen öffnet die Detailseite.',
     sammlung: 'Drill-Down',
-    filter: [F_MONAT, F_MARKE, F_AMPEL],
+    filter: [F_MONAT, F_MARKE, F_AMPEL, F_BEREICH, F_INTENSITAET],
     reihen: [
       { teile: [{ text: '# ② Filialen\n\nKlick auf den Betriebsnamen öffnet die Detailseite. ⚪ heißt **keine Daten**, nicht „in Ordnung“.\n\nVon ① kommend ist der Markenfilter gesetzt — leeren zeigt wieder alle.' }] },
       // Karte neben der Tabelle: die Marke, die man oben gewaehlt hat, hat
@@ -95,10 +107,17 @@ export const dashboards: Dashboard[] = [
           klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] },
       ] },
       { teile: [
-        { karte: 'dd_filialen_metrikvergleich', breite: 10 },
+        // Klick auf ein Segment fuehrt auf die Liste darunter. Zwei
+        // Angaben wandern mit: der Bereich von der Achse, die Bewertung
+        // aus der Farbe des Segments.
+        { karte: 'dd_filialen_metrikvergleich', breite: 10,
+          klick: [{ ziel: 'dd_filialen', uebergabe: { bereich: 'Bereich', ampel: 'Ampelwert' } }] },
         { karte: 'dd_filialen_rangliste', breite: 14, hoehe: 11,
           klick: [{ ziel: 'dd_betrieb', uebergabe: { betrieb: 'Betrieb' } }] },
       ] },
+      { teile: [{ text: '## Betriebe hinter einem Balken\n\nEin Klick auf ein Balkensegment füllt diese Liste. Ohne Auswahl stehen alle Bereiche untereinander.' }] },
+      { teile: [{ karte: 'dd_filialen_bereich', hoehe: 12,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ text: '## Umsatz gegen Personalkosten\n\nRechts unten steht, was man sich wünscht: viel Umsatz bei niedriger Quote. Links oben die Betriebe, bei denen beides nicht stimmt.' }] },
       { teile: [{ karte: 'dd_filialen_streuung', hoehe: 10,
         klick: [{ ziel: 'dd_betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
@@ -279,8 +298,13 @@ export const dashboards: Dashboard[] = [
         { karte: 'rt_kachel_bewertung' },
       ] },
       { teile: [
-        { karte: 'rt_treiber', breite: 14 },
-        { karte: 'rt_intensitaet', breite: 10 },
+        // "Personal / rot" ist eine Aussage ueber 19 Betriebe. Der Klick
+        // fuehrt auf ② Filialen, wo die Liste dieser 19 steht -- nicht auf
+        // dasselbe Diagramm in gross.
+        { karte: 'rt_treiber', breite: 14,
+          klick: [{ ziel: 'dd_filialen', uebergabe: { bereich: 'Bereich', ampel: 'Ampelwert' } }] },
+        { karte: 'rt_intensitaet', breite: 10,
+          klick: [{ ziel: 'dd_filialen', uebergabe: { intensitaet: 'Intensität' } }] },
       ] },
       { teile: [{ text: '## Die Betriebe\n\nSortiert nach Handlungsdruck: rot vor orange vor grün, innerhalb dessen nach Dringlichkeit.' }] },
       { teile: [{ karte: 'rt_tabelle', hoehe: 14,
@@ -303,7 +327,10 @@ export const dashboards: Dashboard[] = [
     reihen: [
       { teile: [{ text: '# Trend und Historie\n\nWie sich die Ampeln über die Monate entwickelt haben. Die Historie schreibt sich von selbst fort und muss nicht gepflegt werden.' }] },
       { teile: [
-        { karte: 'rt_historie' },
+        // Ein Segment heisst "die roten Betriebe im Maerz". Beides wandert
+        // mit: der Monat von der Achse, die Bewertung aus der Farbe.
+        { karte: 'rt_historie',
+          klick: [{ ziel: 'dd_filialen', uebergabe: { monat: 'Monat', ampel: 'Ampelwert' } }] },
         { karte: 'rt_historie_bereich' },
       ] },
       { teile: [{ text: '## Wer hat die Farbe gewechselt\n\nDie Liste, mit der ein Round Table anfangen sollte. Verschlechterungen zuerst.' }] },
@@ -547,7 +574,11 @@ export const dashboards: Dashboard[] = [
       { teile: [
         { karte: 'so_karte', breite: 15, hoehe: 16,
           klick: [{ ziel: 'dd_betrieb', uebergabe: { betrieb: 'Betrieb' } }] },
-        { karte: 'so_rot_treiber', breite: 9, hoehe: 16 },
+        // Der Balken zaehlt nur ROTE, deshalb genuegt der Bereich aus der
+        // Achse -- die Bewertung ist bei dieser Karte immer dieselbe und
+        // wird auf der Zielseite von Hand gesetzt, falls noetig.
+        { karte: 'so_rot_treiber', breite: 9, hoehe: 16,
+          klick: [{ ziel: 'dd_filialen', uebergabe: { bereich: 'Bereich', ampel: 'Ampelwert' } }] },
       ] },
       { teile: [{ text: '## Wie sich die Standorte verteilen' }] },
       { teile: [{ karte: 'so_verteilung', hoehe: 9, klick: [{ ziel: 'dd_filialen', uebergabe: { marke: 'Marke' } }] }] },

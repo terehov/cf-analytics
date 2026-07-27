@@ -150,21 +150,34 @@ SELECT coalesce(to_char(round(avg(r.online_bewertung), 2), 'FM0.00'), '– nicht
       'Wie viele Betriebe je Bereich auf rot, orange oder grün stehen — und für wie viele die Daten fehlen. Zeigt, woran die roten Ampeln insgesamt hängen.',
     anzeige: 'bar',
     parameter: [MONAT.monat, KONZEPT.marke],
+    // LANGFORM, und das ist kein Schoenheitsentscheid.
+    //
+    // Zuerst stand hier die Breitform: eine Spalte je Ampel, gezaehlt mit
+    // FILTER. Das ergibt dasselbe Bild, aber der Klick darauf kann nur den
+    // Bereich weitergeben -- die Farbe steckt im SPALTENNAMEN, und einen
+    // Spaltennamen kann Metabase nicht als Filterwert uebergeben.
+    // Nachgemessen am 27.07.2026: der Klick landete mit `ampel=` leer auf
+    // ② Filialen und zeigte alle 22 Umsatzzeilen statt der 4 gruenen.
+    //
+    // In der Langform ist die Ampel ein WERT in der Spalte "Bewertung" --
+    // damit hat der Klick beide Angaben, die ein Segment ausmacht.
     sql: `${MONAT_CTE}
-SELECT a.bereich_name                                   AS "Bereich",
-       count(*) FILTER (WHERE a.ampel = 'rot')        AS "Rot",
-       count(*) FILTER (WHERE a.ampel = 'orange')     AS "Orange",
-       count(*) FILTER (WHERE a.ampel = 'gruen')      AS "Grün",
-       count(*) FILTER (WHERE a.ampel IS NULL)        AS "Keine Daten"
+SELECT a.bereich_name                       AS "Bereich",
+       coalesce(b.bezeichnung, 'Keine Daten') AS "Bewertung",
+       count(*)                             AS "Betriebe",
+       -- Der technische Wert fuer den Klick. Die Zielseite filtert auf
+       -- 'rot', nicht auf '🔴 Rot' -- die Beschriftung ist zum Lesen da.
+       coalesce(a.ampel, 'ohne')            AS "Ampelwert"
   FROM mart.ampel_bereich a
   CROSS JOIN gewaehlt g
+  LEFT JOIN ampel.beschriftung b ON b.status = a.ampel
  WHERE a.monat = g.monat
    [[AND a.konzept = {{marke}}]]
- GROUP BY a.bereich_name, a.reihenfolge
+ GROUP BY a.bereich_name, a.reihenfolge, b.bezeichnung, a.ampel
  ORDER BY a.reihenfolge`,
     visualisierung: {
-      'graph.dimensions': ['Bereich'],
-      'graph.metrics': ['Rot', 'Orange', 'Grün', 'Keine Daten'],
+      'graph.dimensions': ['Bereich', 'Bewertung'],
+      'graph.metrics': ['Betriebe'],
       'stackable.stack_type': 'stacked',
       'graph.x_axis.title_text': 'Bereich',
       'graph.y_axis.title_text': 'Betriebe',
@@ -345,20 +358,23 @@ SELECT betrieb            AS "Betrieb",
       'Wie sich die Gesamtampel über die Monate verteilt hat. Die Historie schreibt sich von selbst fort.',
     anzeige: 'bar',
     parameter: [KONZEPT.marke],
+    // Langform: die Ampel als WERT, damit ein Klick auf ein Segment sie
+    // mitgeben kann. In der Breitform steckte sie im Spaltennamen und ging
+    // beim Klick verloren -- man landete auf allen Betrieben des Monats.
     sql: `
-SELECT monat                                        AS "Monat",
-       count(*) FILTER (WHERE gesamt = 'rot')       AS "Rot",
-       count(*) FILTER (WHERE gesamt = 'orange')    AS "Orange",
-       count(*) FILTER (WHERE gesamt = 'gruen')     AS "Grün",
-       count(*) FILTER (WHERE gesamt IS NULL)       AS "Kein Urteil"
-  FROM mart.round_table_monat
+SELECT r.monat                               AS "Monat",
+       coalesce(b.bezeichnung, 'Kein Urteil') AS "Bewertung",
+       count(*)                              AS "Betriebe",
+       coalesce(r.gesamt, 'ohne')            AS "Ampelwert"
+  FROM mart.round_table_monat r
+  LEFT JOIN ampel.beschriftung b ON b.status = r.gesamt
  WHERE 1 = 1
-   [[AND konzept = {{marke}}]]
- GROUP BY monat
- ORDER BY monat`,
+   [[AND r.konzept = {{marke}}]]
+ GROUP BY r.monat, b.bezeichnung, r.gesamt
+ ORDER BY r.monat`,
     visualisierung: {
-      'graph.dimensions': ['Monat'],
-      'graph.metrics': ['Rot', 'Orange', 'Grün', 'Kein Urteil'],
+      'graph.dimensions': ['Monat', 'Bewertung'],
+      'graph.metrics': ['Betriebe'],
       'stackable.stack_type': 'stacked',
       'graph.y_axis.title_text': 'Betriebe',
       series_settings: {
