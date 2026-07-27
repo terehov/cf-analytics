@@ -29,6 +29,12 @@ export type Parameter = {
    * einer Feld-ID.
    */
   werteliste?: [string, string, string]
+  /**
+   * Feste Auswahlliste. Fuer Filter, deren Werte nicht in einer Spalte
+   * stehen -- die Bewertung etwa kennt genau vier Auspraegungen, und
+   * 'ohne' steht darin fuer NULL, was keine Spalte hergibt.
+   */
+  festeWerte?: string[]
 }
 
 export type Karte = {

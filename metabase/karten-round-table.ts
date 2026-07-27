@@ -33,57 +33,57 @@ export const karten: Karte[] = [
   // -------------------------------------------------------------------
   {
     schluessel: 'rt_kachel_rot',
-    name: 'Rote Betriebe',
+    name: 'Rot',
     beschreibung:
       'Betriebe mit mindestens einer roten Ampel im gewählten Monat.',
     anzeige: 'scalar',
     parameter: [MONAT.monat, KONZEPT.marke],
     sql: `${MONAT_CTE}
-SELECT '🔴 ' || count(*) AS "Rote Betriebe"
+SELECT '🔴 ' || count(*) AS "Rot"
   FROM mart.round_table_monat r
   CROSS JOIN gewaehlt g
  WHERE r.gesamt = 'rot'
    AND r.monat = g.monat
    [[AND r.konzept = {{marke}}]]`,
     visualisierung: {
-      'scalar.field': 'Rote Betriebe',
+      'scalar.field': 'Rot',
       column_settings: {
-        '["name","Rote Betriebe"]': { view_as: null },
+        '["name","Rot"]': { view_as: null },
       },
     },
   },
   {
     schluessel: 'rt_kachel_orange',
-    name: 'Orange Betriebe',
+    name: 'Orange',
     beschreibung: 'Betriebe ohne rote, aber mit mindestens einer orangen Ampel.',
     anzeige: 'scalar',
     parameter: [MONAT.monat, KONZEPT.marke],
     sql: `${MONAT_CTE}
-SELECT '🟠 ' || count(*) AS "Orange Betriebe"
+SELECT '🟠 ' || count(*) AS "Orange"
   FROM mart.round_table_monat r
   CROSS JOIN gewaehlt g
  WHERE r.gesamt = 'orange'
    AND r.monat = g.monat
    [[AND r.konzept = {{marke}}]]`,
     visualisierung: {
-      'scalar.field': 'Orange Betriebe',
+      'scalar.field': 'Orange',
     },
   },
   {
     schluessel: 'rt_kachel_gruen',
-    name: 'Grüne Betriebe',
+    name: 'Grün',
     beschreibung: 'Betriebe, bei denen alle bewerteten Ampeln grün sind.',
     anzeige: 'scalar',
     parameter: [MONAT.monat, KONZEPT.marke],
     sql: `${MONAT_CTE}
-SELECT '🟢 ' || count(*) AS "Grüne Betriebe"
+SELECT '🟢 ' || count(*) AS "Grün"
   FROM mart.round_table_monat r
   CROSS JOIN gewaehlt g
  WHERE r.gesamt = 'gruen'
    AND r.monat = g.monat
    [[AND r.konzept = {{marke}}]]`,
     visualisierung: {
-      'scalar.field': 'Grüne Betriebe',
+      'scalar.field': 'Grün',
     },
   },
   {

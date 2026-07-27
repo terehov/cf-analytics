@@ -34,6 +34,9 @@ const F_BETRIEB: Parameter = {
 // diese vier, und "ohne" steht fuer NULL -- das liefert keine Spalte.
 const F_AMPEL: Parameter = {
   id: 'd-ampel', name: 'ampel', 'display-name': 'Bewertung', type: 'string/=',
+  // Feste Liste statt Datenquelle: es gibt genau diese vier, und 'ohne'
+  // steht fuer NULL -- das liefert keine Spalte.
+  festeWerte: ['rot', 'orange', 'gruen', 'ohne'],
 }
 const F_ZEITRAUM: Parameter = {
   id: 'd-zeitraum', name: 'zeitraum', 'display-name': 'Zeitraum', type: 'date/all-options',
@@ -59,7 +62,7 @@ export const dashboards: Dashboard[] = [
     sammlung: 'Drill-Down',
     filter: [F_MONAT],
     reihen: [
-      { teile: [{ text: '# ① Marken\n\nDer Einstieg in die Kette **Marke → Filiale → Betrieb**. Ein Klick auf einen Markennamen führt eine Ebene tiefer.\n\nDie Prozentwerte zeigen jeweils den **mittleren Betrieb** einer Marke, nicht den rechnerischen Durchschnitt. Ein einzelner Ausreißer — etwa ein geschlossenes Haus mit über 1000 % Personalquote — verzieht damit nicht das Bild der ganzen Marke.' }] },
+      { teile: [{ text: '# ① Marken\n\n**Marke → Filiale → Betrieb.** Ein Klick auf den Markennamen führt eine Ebene tiefer.\n\nProzentwerte sind Mediane — der mittlere Betrieb, damit ein Ausreißer die Marke nicht verzieht.' }] },
       { teile: [{ karte: 'dd_marken_tabelle', klick: [{ ziel: 'dd_filialen', spalte: 'Marke', uebergabe: { marke: 'Marke' } }] }] },
       { teile: [
         { karte: 'dd_marken_ampeln', klick: [{ ziel: 'dd_filialen', uebergabe: { marke: 'Marke' } }] },
@@ -81,7 +84,7 @@ export const dashboards: Dashboard[] = [
     sammlung: 'Drill-Down',
     filter: [F_MONAT, F_MARKE, F_AMPEL],
     reihen: [
-      { teile: [{ text: '# ② Filialen\n\nAlle Betriebe über sämtliche Kennzahlen. Kommt man von ① Marken, ist der Marken-Filter oben bereits gesetzt — **wird er geleert, erscheinen wieder alle Betriebe**.\n\nEin Klick auf einen Betriebsnamen öffnet die Detailseite. Ein weißer Punkt ⚪ heißt **keine Daten**, nicht „in Ordnung".' }] },
+      { teile: [{ text: '# ② Filialen\n\nKlick auf den Betriebsnamen öffnet die Detailseite. ⚪ heißt **keine Daten**, nicht „in Ordnung“.\n\nVon ① kommend ist der Markenfilter gesetzt — leeren zeigt wieder alle.' }] },
       { teile: [{ karte: 'dd_filialen_tabelle', hoehe: 12, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [
         { karte: 'dd_filialen_metrikvergleich', breite: 10 },
@@ -102,7 +105,7 @@ export const dashboards: Dashboard[] = [
     sammlung: 'Drill-Down',
     filter: [F_MONAT, F_BETRIEB],
     reihen: [
-      { teile: [{ text: '# ③ Betrieb\n\nAlles zu einem Betrieb auf einer Seite. **Bitte zuerst unten auf „Datenstand" sehen** — ohne zu wissen, wie aktuell die Zahlen sind, bleibt jeder Schluss von hier oben eine Vermutung.\n\nJedes Diagramm führt per Klick in die passende Detailauswertung, der Betrieb ist dort bereits ausgewählt.' }] },
+      { teile: [{ text: '# ③ Betrieb\n\n> **Zuerst „Datenstand“ unten ansehen** — ohne zu wissen, wie aktuell die Zahlen sind, bleibt jeder Schluss eine Vermutung.\n\nJedes Diagramm führt per Klick in die Detailauswertung.' }] },
       { teile: [
         { karte: 'dd_betrieb_umsatz_kachel' },
         { karte: 'dd_betrieb_ytd_kachel' },
@@ -143,7 +146,7 @@ export const dashboards: Dashboard[] = [
     sammlung: 'Drill-Down',
     filter: [F_VON_A, F_BIS_A, F_VON_B, F_BIS_B, F_MARKE],
     reihen: [
-      { teile: [{ text: '# ④ Zeiträume vergleichen\n\nOben vier Datumsfelder: **Zeitraum A** gegen **Zeitraum B**. Ohne Eingabe steht der laufende Monat bis heute gegen denselben Ausschnitt des Vormonats — ein voller Monat gegen einen halben wäre kein fairer Vergleich.\n\n> **Bitte auf die Tage-Spalten achten.** Zeiträume unterschiedlicher Länge lassen sich vergleichen, aber dann steckt in der Differenz auch die unterschiedliche Anzahl Tage.' }] },
+      { teile: [{ text: '# ④ Zeiträume vergleichen\n\n**Zeitraum A** gegen **Zeitraum B**. Voreingestellt: laufender Monat gegen denselben Ausschnitt des Vormonats.\n\n> Auf die Tage-Spalten achten — unterschiedlich lange Zeiträume sind erlaubt, stecken aber in der Differenz.' }] },
       { teile: [{ karte: 'vg_zeit_summe' }] },
       { teile: [{ karte: 'vg_zeit_verlauf' }] },
       { teile: [{ text: '## Je Betrieb\n\nEin Klick auf den Betriebsnamen öffnet das Betriebsblatt.' }] },
@@ -184,18 +187,18 @@ export const dashboards: Dashboard[] = [
     reihen: [
       { teile: [{ text: '# ⑥ Portfolio und Potenzial\n\nDie Ampeln beantworten die Frage „wer ist rot". Diese Seite stellt die Fragen davor: Wo steckt der Umsatz, wovon hängt die Gruppe ab, wie weit liegen vergleichbare Häuser auseinander — und was kostet dieser Abstand.' }] },
 
-      { teile: [{ text: '## Wo steckt der Umsatz\n\nJe stärker sich der Umsatz auf wenige Häuser konzentriert, desto schwerer wiegt dort eine Störung — und desto weniger bringt ein Prozentpunkt Verbesserung bei einem kleinen Haus.\n\n> **Wichtig für alle Anteile auf dieser Seite:** Ein großer Teil der geführten Betriebe macht gar keinen Umsatz und liefert täglich Berichte über 0 €. Wie viele es aktuell sind, steht in der Kachel weiter unten.' }] },
+      { teile: [{ text: '## Wo steckt der Umsatz\n\n> Ein Teil der geführten Betriebe macht gar keinen Umsatz — siehe Kachel unten. Das verzerrt jeden Anteil auf dieser Seite.' }] },
       { teile: [{ karte: 'pf_kachel_aktiv' }] },
       { teile: [
         { karte: 'pf_konzentration_kurve', breite: 10 },
         { karte: 'pf_konzentration', breite: 14, hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] },
       ] },
 
-      { teile: [{ text: '## Was wäre zu holen\n\nDie Spalte „€ bis Median" ist **kein Ziel und keine Prognose**, sondern eine Größenordnung: was der Abstand zum Mittelfeld in Euro bedeutet. Sortiert nach eben diesem Betrag — oben stehen die Betriebe, bei denen sich Arbeit am meisten lohnt.' }] },
+      { teile: [{ text: '## Was wäre zu holen\n\n„€ bis Median“ ist **kein Ziel**, sondern eine Größenordnung: was der Abstand zum Mittelfeld in Euro bedeutet.' }] },
       { teile: [{ karte: 'pf_potenzial', hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ karte: 'pf_streuung' }] },
 
-      { teile: [{ text: '## Betriebe ohne laufendes Geschäft\n\n> Betriebe ohne Umsatz verzerren **jeden** Durchschnitt und erzeugen unsinnige Quoten: über 1000 % Personalkosten bei 0 € Umsatz melden eine Katastrophe, wo gar kein Betrieb läuft. Diese Liste ist die Vorlage, um solche Einträge auf inaktiv zu setzen.' }] },
+      { teile: [{ text: '## Betriebe ohne laufendes Geschäft\n\n> Betriebe ohne Umsatz verzerren **jeden** Durchschnitt — über 1000 % Personalkosten bei 0 € melden eine Katastrophe, wo kein Betrieb läuft. Vorlage zum Stilllegen.' }] },
       { teile: [{ karte: 'pf_karteileichen', klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
     ],
   },
@@ -219,7 +222,7 @@ export const dashboards: Dashboard[] = [
       { teile: [{ text: '## Gäste oder Bon?\n\nEine Umsatzveränderung hat zwei mögliche Ursachen, und sie führen zu **verschiedenen Maßnahmen**: mehr oder weniger Gäste ist ein Marketing- und Standortthema, ein veränderter Bon ein Karten-, Preis- und Verkaufsthema.' }] },
       { teile: [{ karte: 'pf_gaeste_bon', hoehe: 12, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
 
-      { teile: [{ text: '## Wie planbar läuft ein Betrieb\n\nWie stark der Tagesumsatz im Verhältnis zum eigenen Durchschnitt schwankt — dadurch sind große und kleine Häuser vergleichbar. Ein hoher Wert heißt Abhängigkeit von Wochenenden, Veranstaltungen oder Wetter und macht die Personalplanung teuer.' }] },
+      { teile: [{ text: '## Wie planbar läuft ein Betrieb\n\nSchwankung im Verhältnis zum eigenen Durchschnitt — dadurch sind große und kleine Häuser vergleichbar. Hoher Wert = abhängig von Wochenenden und Wetter.' }] },
       { teile: [{ karte: 'pf_stabilitaet', hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
     ],
   },
@@ -235,7 +238,7 @@ export const dashboards: Dashboard[] = [
     sammlung: 'Round Table',
     filter: [F_MONAT, F_MARKE],
     reihen: [
-      { teile: [{ text: '# Round Table\n\nDie Ampeln: 🟢 passt · 🟠 im Auge behalten · 🔴 sofort handeln.\n\n**„Ohne Urteil"** sind Betriebe, für die sich keine Ampel berechnen ließ — meist fehlen die Zahlen vom Steuerberater. Sie stehen bewusst als eigene Gruppe da, damit sie nicht mit unauffälligen Betrieben verwechselt werden.' }] },
+      { teile: [{ text: '# Round Table\n\n🟢 passt · 🟠 im Auge behalten · 🔴 sofort handeln · ⚪ nicht bewertbar (meist fehlt die BWA).\n\nEin Klick auf eine Kachel zeigt die Betriebe dahinter.' }] },
       // Jede Zaehlkachel fuehrt auf die Liste der Betriebe, die sie zaehlt.
       // Der Wert wird fest mitgegeben -- "9 rote Betriebe" muss zu genau
       // diesen neun fuehren, nicht zu allen.
@@ -249,7 +252,7 @@ export const dashboards: Dashboard[] = [
         { karte: 'rt_kachel_ohne_urteil',
           klick: [{ ziel: 'dd_filialen', uebergabe: { ampel: 'ohne' }, fest: true }] },
         { karte: 'rt_kachel_massnahmen',
-          klick: [{ ziel: 'db_rt_ursachen', uebergabe: {} }] },
+          klick: [{ ziel: 'db_rt_ursachen', uebergabe: {}, fest: true }] },
         { karte: 'rt_kachel_bewertung' },
       ] },
       { teile: [
@@ -314,7 +317,7 @@ export const dashboards: Dashboard[] = [
     sammlung: 'Round Table',
     filter: [F_MONAT],
     reihen: [
-      { teile: [{ text: '# Welche Schwellen gelten?\n\nDer Round Table misst alle Betriebe an denselben Grenzen: **28 % grün, 32 % orange**. LINA führt je Betrieb eigene Grenzen (29/35, 30/34 …), die Standortgröße und Konzept berücksichtigen — dafür aber die Vergleichbarkeit untereinander kosten.\n\nDie Tabelle zeigt **nur die Betriebe, bei denen die Wahl tatsächlich zu einem anderen Urteil führt.** Bei allen übrigen erübrigt sich die Diskussion.' }] },
+      { teile: [{ text: '# Welche Schwellen gelten?\n\nRound Table: **28 / 32 %** für alle. LINA: eigene Grenzen je Betrieb.\n\nUnten nur die Betriebe, bei denen das zu **unterschiedlichen Urteilen** führt.' }] },
       { teile: [{ karte: 'rt_regelwerk_vergleich', hoehe: 13, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
     ],
   },
@@ -382,7 +385,7 @@ export const dashboards: Dashboard[] = [
     sammlung: 'Betrieb',
     filter: [F_MONAT, F_BETRIEB],
     reihen: [
-      { teile: [{ text: '# Personal\n\nZwei verschiedene Kennzahlen, die im LINA-Bericht beide „Effektivität" heißen und deshalb hier getrennt stehen:\n\n- **Quote** — Personalkosten in Prozent vom Umsatz. Sagt, was das Personal kostet.\n- **Umsatz je Personalstunde** — in Euro. Sagt, was eine Arbeitsstunde einbringt.\n\nDie Ampel im Round Table beruht auf den **Personalkosten ohne Geschäftsführung** aus den Zahlen des Steuerberaters.' }] },
+      { teile: [{ text: '# Personal\n\n**Quote** = Personalkosten in % vom Umsatz (was es kostet). **Umsatz je Personalstunde** = in Euro (was es einbringt).\n\nIm LINA-Bericht heißen beide „Effektivität“ — deshalb stehen sie getrennt.' }] },
       { teile: [{ karte: 'pe_quote_betrieb', hoehe: 11, klick: [{ ziel: 'dd_betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ karte: 'pe_quote_tabelle', hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ karte: 'pe_verlauf' }] },
@@ -399,13 +402,13 @@ export const dashboards: Dashboard[] = [
     sammlung: 'Betrieb',
     filter: [F_BETRIEB, F_ZEITRAUM],
     reihen: [
-      { teile: [{ text: '# Warenwirtschaft\n\n> **Bitte zuerst einen Zeitraum wählen.** Ohne Eingrenzung wertet die Seite die gesamte Historie aus und braucht entsprechend lange.\n\n> **Die Spalte „Abdeckung" zuerst lesen.** Sie sagt, für welchen Anteil des Umsatzes überhaupt Rezepturen hinterlegt sind. Steht dort 60 %, fällt der ausgewiesene Deckungsbeitrag zu günstig aus — man sieht es der Zahl selbst nicht an.\n\nDer Deckungsbeitrag liegt nur monatsweise vor: ein Zeitraum, der mitten im Monat beginnt, zählt den ganzen Monat mit.' }] },
+      { teile: [{ text: '# Warenwirtschaft\n\n> **Zeitraum wählen** — ohne Eingrenzung dauert es lange.\n\nSpalte „Abdeckung“ zuerst lesen: sie sagt, für welchen Anteil des Umsatzes Rezepturen hinterlegt sind. Der Deckungsbeitrag liegt nur monatsweise vor.' }] },
       { teile: [
         { karte: 'wa_renner', hoehe: 12 },
         { karte: 'wa_penner', hoehe: 12 },
       ] },
       { teile: [{ karte: 'wa_db_warengruppe', hoehe: 11 }] },
-      { teile: [{ text: '## Rechnerischer Wareneinsatz gegen tatsächlichen\n\nEine Lücke ist hier der **Normalfall** und genau die interessante Zahl: in ihr stecken Schwund, Bruch, Portionsgrößen, Personalverzehr und Lagerbewegung. Ein positiver Wert heißt, es wurde mehr eingekauft, als nach Rezeptur verbraucht wurde.' }] },
+      { teile: [{ text: '## Rechnerischer Wareneinsatz gegen tatsächlichen\n\nEine Lücke ist der **Normalfall** und die eigentliche Kennzahl: darin stecken Schwund, Bruch, Portionsgrößen und Personalverzehr.' }] },
       { teile: [{ karte: 'wa_we_pruefung', hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ text: '## Einkaufspreise\n\nDie Reihe beginnt mit der ersten Erfassung. Für die Zeit davor gibt es keine Preise, weil sie nirgends gespeichert wurden.' }] },
       { teile: [{ karte: 'wa_preise', hoehe: 11 }] },
@@ -420,7 +423,7 @@ export const dashboards: Dashboard[] = [
     sammlung: 'Betrieb',
     filter: [F_MONAT, F_BETRIEB],
     reihen: [
-      { teile: [{ text: '# Betriebswirtschaftliche Auswertung (BWA)\n\n> **Diese Zahlen hinken hinterher.** Sie kommen vom Steuerberater und liegen üblicherweise ein bis zwei Monate zurück. Ein Monat, in dem alle Werte auf null stehen, ist **noch nicht gebucht** — er bedeutet nicht „kein Umsatz". Deshalb werden hier nur gebuchte Monate gezeigt.' }] },
+      { teile: [{ text: '# Betriebswirtschaftliche Auswertung (BWA)\n\n> Zahlen vom Steuerberater, üblicherweise **ein bis zwei Monate zurück**. Ein Monat auf null ist **nicht gebucht** — nicht umsatzlos. Gezeigt werden nur gebuchte Monate.' }] },
       { teile: [{ karte: 'bwa_kennzahlen', hoehe: 9 }] },
       { teile: [{ karte: 'bwa_ebit', hoehe: 11, klick: [{ ziel: 'dd_betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ text: '## Buchungsstand\n\nZwei Monate Verzug sind normal, vier eine Nachfrage beim Steuerberater wert.' }] },
@@ -435,7 +438,7 @@ export const dashboards: Dashboard[] = [
       'Kommen die Daten an, stimmen die Zahlen, und für welche Betriebe reicht die Datenlage für ein Urteil? Die Seite, die man aufschlägt, bevor man den anderen glaubt.',
     sammlung: 'Betrieb',
     reihen: [
-      { teile: [{ text: '# Datenqualität\n\nDie Seite ist in der Reihenfolge aufgebaut, in der man nachfragt: **kommen die Daten an** → **stimmen die Zahlen** → **wem fehlt was**.\n\nEin Betrieb, dessen Daten fehlen, sieht auf jeder anderen Seite genauso aus wie einer, bei dem alles in Ordnung ist. Genau davor schützt diese Seite.' }] },
+      { teile: [{ text: '# Datenqualität\n\nIn der Reihenfolge des Nachfragens: **kommen die Daten an** → **stimmen die Zahlen** → **wem fehlt was**.\n\n> Ein Betrieb ohne Daten sieht überall aus wie einer, bei dem alles stimmt.' }] },
       { teile: [
         { karte: 'dq_befund', breite: 10 },
         { karte: 'dq_backfill_balken', breite: 14 },
@@ -472,7 +475,7 @@ export const dashboards: Dashboard[] = [
       'Läuft der Datenimport, wie weit ist er, was macht er als Nächstes — und wenn etwas scheitert, woran es liegt. Die technische Seite; für die fachliche Sicht auf Lücken siehe „Datenqualität".',
     sammlung: 'Technik',
     reihen: [
-      { teile: [{ text: '# Import — Überwachung\n\nOben der Zustand in vier Zahlen, darunter die Ursachen, dann was gerade läuft, unten die Vollständigkeit.\n\n> **„keine Daten" ist kein Fehler.** LINA antwortet mit HTTP 500 und leerem Body, wenn ein Betrieb für einen Bericht nichts hat — ein geschlossenes Haus oder ein Bericht, den dieser Betrieb nicht führt. Nur was unter „Fehler" steht, ist einer.' }] },
+      { teile: [{ text: '# Import — Überwachung\n\n> **„keine Daten“ ist kein Fehler** — LINA meldet das, wenn ein Betrieb einen Bericht nicht führt. Nur was unter „Fehler“ steht, ist einer.' }] },
       { teile: [
         { karte: 'im_ampel' },
         { karte: 'im_prozent' },
@@ -481,7 +484,7 @@ export const dashboards: Dashboard[] = [
       ] },
       { teile: [{ karte: 'im_kopf' }] },
 
-      { teile: [{ text: '## Woran hängt es?\n\n**Zuerst hierher sehen, wenn Zahlen fehlen.** Ruht der Zugang, steht alles andere still — dann ist keine weitere Suche nötig.\n\nSperren laufen von selbst ab; der Importer kommt ohne Zutun zurück. Ein Anmeldefehler ist die Ausnahme: den muss jemand ansehen, weil es nur diesen einen Zugang gibt.' }] },
+      { teile: [{ text: '## Woran hängt es?\n\n**Ruht der Zugang, steht alles still** — dann erübrigt sich die weitere Suche. Sperren laufen von selbst ab; nur ein Anmeldefehler braucht einen Menschen.' }] },
       { teile: [{ karte: 'im_sperre' }] },
       { teile: [{ karte: 'im_fehler', hoehe: 9 }] },
       { teile: [{ karte: 'im_schema' }] },
@@ -494,7 +497,7 @@ export const dashboards: Dashboard[] = [
       ] },
       { teile: [{ karte: 'im_naechste', hoehe: 12 }] },
 
-      { teile: [{ text: '## Wie vollständig ist es?\n\n**„Tage alt"** ist die Spalte, an der ein hängender Bericht auffällt: bei täglichen Berichten sind ein bis zwei Tage normal.\n\n**„wartet"** heißt nicht kaputt. Der laufende Betrieb hat Vorrang vor der Historie, deshalb können Historienposten länger unberührt bleiben.' }] },
+      { teile: [{ text: '## Wie vollständig ist es?\n\n**„Tage alt“** zeigt einen hängenden Bericht — ein bis zwei Tage sind normal. **„wartet“** heißt nicht kaputt: laufender Betrieb geht vor Historie.' }] },
       { teile: [{ karte: 'im_bericht', hoehe: 11 }] },
       { teile: [
         { karte: 'im_bericht_balken', breite: 12 },
@@ -517,9 +520,12 @@ export const dashboards: Dashboard[] = [
     sammlung: 'Drill-Down',
     filter: [F_MONAT, F_MARKE],
     reihen: [
-      { teile: [{ text: '# ⑧ Standortkarte\n\nEin Punkt je Standort, gefärbt nach der Gesamtampel des gewählten Monats. Ein Klick führt auf die Detailseite des Betriebs.\n\n> **Die Karte zeigt einen Ausschnitt, nicht das Ganze.** Nur für einen Teil der Betriebe sind Adressen hinterlegt — wer fehlt, steht ganz unten. Ein leerer Fleck auf der Karte heißt also nicht, dass dort kein Betrieb ist.\n\n**Die Ampel steht im Namen jedes Punkts** (🔴 🟠 🟢 ⚪), nicht in seiner Farbe: Metabase färbt Kartenpunkte nur nach Zahlen, nicht nach Kategorien. Antippen zeigt Bewertung, Umsatz und Handlungsbedarf — die Tabelle weiter unten listet dieselben Standorte nach Handlungsdruck sortiert.\n\n⚪ sind Betriebe ohne Bewertung, meist weil die Zahlen vom Steuerberater fehlen. Sie stehen bewusst mit auf der Karte: eine fehlende Bewertung ist eine Aussage, kein Grund zum Ausblenden.' }] },
-      { teile: [{ karte: 'so_karte', hoehe: 16,
-        klick: [{ ziel: 'dd_betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      { teile: [{ text: '# ⑧ Standortkarte\n\n🟥 eskalieren · 🔴 handeln · 🟠 nachforschen · 🟢 ok · ⚪ keine Bewertung. Klick öffnet den Betrieb, Antippen zeigt die sechs Einzelampeln.\n\nNur Standorte mit hinterlegter Adresse — die fehlenden stehen unten.' }] },
+      { teile: [
+        { karte: 'so_karte', breite: 15, hoehe: 16,
+          klick: [{ ziel: 'dd_betrieb', uebergabe: { betrieb: 'Betrieb' } }] },
+        { karte: 'so_rot_treiber', breite: 9, hoehe: 16 },
+      ] },
       { teile: [{ text: '## Wie sich die Standorte verteilen' }] },
       { teile: [{ karte: 'so_verteilung', hoehe: 9, klick: [{ ziel: 'dd_filialen', uebergabe: { marke: 'Marke' } }] }] },
       { teile: [{ text: '## Dieselben Standorte als Liste\n\nSortiert nach Handlungsdruck. Die Spalte „Genauigkeit" sagt, wie genau der Punkt sitzt — „adresse" ist hausgenau, „ort" nur stadtgenau.' }] },

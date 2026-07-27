@@ -367,6 +367,7 @@ const definitionen = {
       // Feld-ID aufgeloest, weil die IDs je Metabase-Installation andere
       // sind und hier nicht fest stehen duerfen.
       ...(p.werteliste ? { werteliste: p.werteliste } : {}),
+      ...(p.festeWerte ? { festeWerte: p.festeWerte } : {}),
     })),
     kacheln: layoutVon.get(d.schluessel)!,
   })),
@@ -536,18 +537,38 @@ async function uebernehmen() {
   // QUELLE ab; ohne diese Abbildung oeffnet der Klick das Zieldashboard
   // ungefiltert, was schlimmer ist als kein Klick.
   function klickVerhalten(k, zielDashboard) {
+    // FESTER WERT -> eigene URL.
+    //
+    // Eine Zaehlkachel hat keine Spalte, aus der sich etwas mitgeben
+    // liesse -- sie weiss aber, was sie zaehlt. Der erste Versuch setzte
+    // dafuer parameterMapping mit source: null und einem value-Feld. Das
+    // speichert Metabase klaglos und IGNORIERT es dann: die Kachel war im
+    // Browser gar nicht anklickbar, gemeldet am 27.07.2026.
+    //
+    // Metabase erwartet in parameterMapping.source immer eine echte
+    // Spalte. Fuer feste Werte ist der vorgesehene Weg eine Ziel-URL mit
+    // dem Filter in der Abfragezeichenfolge -- genau das, was die
+    // Oberflaeche selbst erzeugt, wenn man "Benutzerdefinierte URL" waehlt.
+    if (k.fest) {
+      const paare = Object.entries(k.uebergabe)
+        .map(([slug, wert]) => encodeURIComponent(slug) + '=' + encodeURIComponent(wert));
+      return {
+        type: 'link',
+        linkType: 'url',
+        linkTemplate: '/dashboard/' + zielDashboard + (paare.length ? '?' + paare.join('&') : ''),
+      };
+    }
+
     const parameterMapping = {};
     for (const [zielSlug, quellSpalte] of Object.entries(k.uebergabe)) {
       const zielDef = def.dashboards.find(x => x.schluessel === k.ziel);
       const zp = (zielDef.parameter || []).find(p => p.slug === zielSlug);
       if (!zp) { log('  Klickziel ' + k.ziel + ' hat keinen Filter ' + zielSlug, 'fehler'); continue; }
-      parameterMapping[zp.id] = k.fest
-        // Fester Wert: die Kachel hat keine Spalte, aus der sich etwas
-        // mitgeben liesse -- sie weiss aber, was sie zaehlt.
-        ? { id: zp.id, source: null, target: {type: 'parameter', id: zp.id}, value: quellSpalte }
-        : { id: zp.id,
-            source: {type: 'column', id: quellSpalte, name: quellSpalte},
-            target: {type: 'parameter', id: zp.id} };
+      parameterMapping[zp.id] = {
+        id: zp.id,
+        source: {type: 'column', id: quellSpalte, name: quellSpalte},
+        target: {type: 'parameter', id: zp.id},
+      };
     }
     return {type: 'link', linkType: 'dashboard', targetId: zielDashboard, parameterMapping};
   }
@@ -632,6 +653,18 @@ async function uebernehmen() {
       // Freitextfeld, egal was in values_source_config steht.
       const parameter = [];
       for (const p of d.parameter) {
+        // Feste Liste: Werte stehen in der Definition, nicht in der
+        // Datenbank -- etwa die Bewertung, deren 'ohne' fuer NULL steht.
+        if (p.festeWerte) {
+          const {festeWerte, werteliste: _w, ...rest} = p;
+          parameter.push({
+            ...rest,
+            values_query_type: 'list',
+            values_source_type: 'static-list',
+            values_source_config: {values: festeWerte},
+          });
+          continue;
+        }
         if (!p.werteliste) { parameter.push(p); continue; }
         const {werteliste, ...rest} = p;
         const werte = await werteHolen(werteliste);

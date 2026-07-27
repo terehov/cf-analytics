@@ -26,36 +26,80 @@ const MONAT = P_MONAT
 const MARKE = P_MARKE
 
 /**
- * Die Ampel als lesbarer Text.
+ * Die Farbe des Punkts: INTENSITAET, nicht Gesamtampel.
  *
- * Bewusst mit Emoji davor: Metabases Punktkarte faerbt nach einer ZAHL,
- * nicht nach einer Kategorie -- alle Punkte sind gleich gross und gleich
- * gefaerbt (im Browser nachgemessen: 45 Marker, eine Farbe). Das Emoji ist
- * damit der einzige Weg, die Bewertung am Punkt selbst zu zeigen.
+ * Warum nicht die Ampel: `gesamt` ist ein logisches ODER ueber sechs
+ * Kennzahlen -- eine einzige rote genuegt. Im Juni 2026 sind damit 43 von
+ * 48 Standorten rot, und eine Karte, auf der fast alles dieselbe Farbe
+ * hat, traegt keine Information.
+ *
+ * `intensitaet` ZAEHLT stattdessen und trennt die 43 in 19 "Sofort
+ * eskalieren" und 24 "Sofort handeln". Das ist der Unterschied, auf den es
+ * ankommt.
+ *
+ * NICHT GEMITTELT, und zwar mit Absicht. Das abgeloeste Excel
+ * (examples/JULI_Round_Table_Ampelsystem.xlsx, Blatt 00_Dashboard) hat
+ * ebenfalls gezaehlt statt gemittelt. Zwei der sechs Kennzahlen --
+ * Online-Bewertung und OM-Score -- haben bei uns ueberhaupt keine Daten
+ * (nachgemessen Juni 2026: beide 0 rote). Ein Mittelwert waere
+ * stillschweigend einer ueber vier statt sechs und wuerde sich
+ * verschieben, sobald die Bewertungen dazukommen -- ohne dass sich an der
+ * Lage etwas geaendert haette.
+ *
+ * Die Reihenfolge ist Handlungsdruck, damit die Legende oben mit dem
+ * beginnt, was brennt.
  */
-const AMPEL_TEXT = `
-       CASE s.ampel
-         WHEN 'rot'    THEN '🔴 Sofort handeln'
-         WHEN 'orange' THEN '🟠 Im Auge behalten'
-         WHEN 'gruen'  THEN '🟢 Passt'
-         ELSE               '⚪ Keine Bewertung'
+const INTENSITAET_TEXT = `
+       CASE s.intensitaet
+         WHEN 'Sofort eskalieren' THEN '1 — Sofort eskalieren'
+         WHEN 'Sofort handeln'    THEN '2 — Sofort handeln'
+         WHEN 'Nachforschung'     THEN '3 — Nachforschung'
+         WHEN 'Beobachten/OK'     THEN '4 — Beobachten/OK'
+         ELSE                          '5 — Keine Bewertung'
        END`
+
+/** Das Emoji zur Intensitaet -- steht im Punktnamen, weil Metabases
+ *  Punktkarte nach Zahlen faerbt und nicht nach Kategorien. */
+const INTENSITAET_EMOJI = `
+       CASE s.intensitaet
+         WHEN 'Sofort eskalieren' THEN '🟥'
+         WHEN 'Sofort handeln'    THEN '🔴'
+         WHEN 'Nachforschung'     THEN '🟠'
+         WHEN 'Beobachten/OK'     THEN '🟢'
+         ELSE                          '⚪'
+       END`
+
+/** Sortierung nach Handlungsdruck, in mehreren Karten gebraucht. */
+const NACH_DRUCK = `
+          CASE s.intensitaet
+            WHEN 'Sofort eskalieren' THEN 1
+            WHEN 'Sofort handeln'    THEN 2
+            WHEN 'Nachforschung'     THEN 3
+            WHEN 'Beobachten/OK'     THEN 4
+            ELSE                          5 END`
 
 export const karten: Karte[] = [
   {
     schluessel: 'so_karte',
     name: 'Standorte auf der Karte',
     beschreibung:
-      'Ein Punkt je Standort. Ein Klick auf einen Punkt öffnet die Detailseite des Betriebs.\n\n'
-      + '**Die Ampel steht im Namen des Punkts** (🔴 🟠 🟢 ⚪), nicht in seiner Farbe — '
-      + 'Metabase färbt Kartenpunkte nur nach Zahlen, nicht nach Kategorien. Antippen zeigt '
-      + 'Bewertung, Umsatz und Handlungsbedarf; die Tabelle darunter listet dieselben '
-      + 'Standorte nach Handlungsdruck sortiert.\n\n'
-      + '⚪ sind Betriebe ohne Bewertung — meist fehlen die Zahlen vom Steuerberater. Sie '
-      + 'stehen bewusst mit auf der Karte: eine fehlende Bewertung ist eine Aussage, kein '
-      + 'Grund zum Ausblenden.\n\n'
-      + 'Achtung: Zu sehen sind nur Standorte mit hinterlegten Koordinaten. Welche fehlen, '
-      + 'zeigt „Standorte ohne Koordinaten" ganz unten.',
+      'Ein Punkt je Standort, eingefärbt nach **Handlungsbedarf**. Ein Klick öffnet die '
+      + 'Detailseite des Betriebs.\n\n'
+      + '🟥 Sofort eskalieren (2+ Kennzahlen rot) · 🔴 Sofort handeln (1 rot) · '
+      + '🟠 Nachforschung (2+ orange) · 🟢 Beobachten/OK · ⚪ keine Bewertung möglich\n\n'
+      + '**Warum nicht nach der Gesamtampel?** Die ist ein Oder über sechs Kennzahlen — eine '
+      + 'einzige rote genügt. Im Juni 2026 wären damit 43 von 48 Standorten rot, und eine '
+      + 'Karte, auf der fast alles gleich aussieht, sagt nichts. Der Handlungsbedarf zählt '
+      + 'stattdessen und trennt diese 43 in 19 zum Eskalieren und 24 zum Handeln.\n\n'
+      + '**Die hohe Rot-Quote ist kein Datenfehler.** Die Personalquote liegt real bei '
+      + '35–45 % gegen eine Schwelle von 28/32 %, die im Excel-Blatt „Regeln" ausdrücklich '
+      + 'als „Default, bei Bedarf Werte anpassen" steht — anders als der Wareneinsatz, der '
+      + 'dort „Fix nach Vorgabe" heißt. Einordnung in `docs/befunde-datenlage.md`.\n\n'
+      + 'Antippen zeigt die sechs Einzelampeln — ohne sie sieht man nur, **dass** es rot ist, '
+      + 'nicht **woran** es liegt. Die Grafik daneben beantwortet dieselbe Frage für alle '
+      + 'Standorte auf einmal.\n\n'
+      + 'Zu sehen sind nur Standorte mit hinterlegten Koordinaten; welche fehlen, steht '
+      + 'ganz unten.',
     anzeige: 'map',
     parameter: [MONAT, MARKE],
     // WARUM DIE AMPEL IM TEXT STEHT UND NICHT IN DER PUNKTFARBE:
@@ -68,21 +112,37 @@ export const karten: Karte[] = [
     // Antippen sofort sichtbar -- und in der Tabelle darunter, die
     // dieselben Standorte nach Handlungsdruck sortiert, ohnehin.
     sql: `${MONAT_CTE}
-SELECT coalesce(s.ampel_emoji, '⚪') || ' ' || s.betrieb AS "Standort",
+SELECT ${INTENSITAET_EMOJI} || ' ' || s.betrieb AS "Standort",
        s.konzept                        AS "Marke",
        s.breitengrad::float             AS "Breitengrad",
-       s.laengengrad::float             AS "Längengrad",${AMPEL_TEXT} AS "Bewertung",
+       s.laengengrad::float             AS "Längengrad",${INTENSITAET_TEXT} AS "Handlungsbedarf",
        round(s.umsatz)                  AS "Umsatz",
-       s.intensitaet                    AS "Handlungsbedarf",
+       -- Die sechs Einzelampeln. Ohne sie sieht man auf der Karte 43-mal
+       -- dieselbe Farbe und weiss nicht, WORAN es liegt. '–' heisst
+       -- "nicht bewertbar", nicht "in Ordnung" -- bei Bewertung und OM ist
+       -- das derzeit der Normalfall, weil dafuer noch keine Daten kommen.
+       coalesce(au.emoji, '–')  AS "Umsatz ●",
+       coalesce(ap.emoji, '–')  AS "Personal ●",
+       coalesce(ab.emoji, '–')  AS "WE Bar ●",
+       coalesce(ak.emoji, '–')  AS "WE Küche ●",
+       coalesce(aw.emoji, '–')  AS "Bewertung ●",
+       coalesce(ao.emoji, '–')  AS "OM vor Ort ●",
        s.ort                            AS "Ort",
        s.betrieb                        AS "Betrieb"
   FROM mart.standort s
   CROSS JOIN gewaehlt g
+  LEFT JOIN mart.round_table_monat r
+         ON r.betrieb_key = s.betrieb_key AND r.monat = s.monat
+  LEFT JOIN ampel.beschriftung au ON au.status = r.ampel_umsatz
+  LEFT JOIN ampel.beschriftung ap ON ap.status = r.ampel_personal
+  LEFT JOIN ampel.beschriftung ab ON ab.status = r.ampel_we_bar
+  LEFT JOIN ampel.beschriftung ak ON ak.status = r.ampel_we_kueche
+  LEFT JOIN ampel.beschriftung aw ON aw.status = r.ampel_bewertung
+  LEFT JOIN ampel.beschriftung ao ON ao.status = r.ampel_om
  WHERE s.monat = g.monat
    AND s.breitengrad IS NOT NULL
    [[AND s.konzept = {{marke}}]]
- ORDER BY CASE s.ampel WHEN 'rot' THEN 1 WHEN 'orange' THEN 2
-                       WHEN 'gruen' THEN 3 ELSE 4 END,
+ ORDER BY${NACH_DRUCK},
           s.betrieb`,
     visualisierung: {
       'map.type': 'pin',
@@ -98,6 +158,57 @@ SELECT coalesce(s.ampel_emoji, '⚪') || ' ' || s.betrieb AS "Standort",
           number_style: 'currency', currency: 'EUR', currency_style: 'symbol', decimals: 0,
         },
       },
+    },
+  },
+
+  {
+    // Das Excel hatte genau diesen Block (00_Dashboard, Zeilen 9-11). Er
+    // beantwortet die Frage, die die Karte aufwirft: dort sieht man, DASS
+    // fast alles rot ist -- hier, WORAN es liegt.
+    schluessel: 'so_rot_treiber',
+    name: 'Rot-Treiber nach Bereich',
+    beschreibung:
+      'Je Kennzahl die Anzahl der Standorte mit roter Ampel. Beantwortet die Frage, die '
+      + 'die Karte aufwirft: dort sieht man, dass fast alles rot ist — hier, woran es liegt.\n\n'
+      + 'Im Juni 2026 trägt **Personal** den Befund fast allein (38 von 48 Standorten), '
+      + 'gefolgt von Umsatz (17). Wareneinsatz Küche (7) und Bar (1) fallen kaum ins Gewicht.\n\n'
+      + '**Bewertung und OM vor Ort stehen auf 0** — nicht weil dort alles in Ordnung wäre, '
+      + 'sondern weil dafür noch keine Daten geliefert werden. Genau deshalb wird hier '
+      + 'gezählt und nicht gemittelt: ein Schnitt wäre stillschweigend einer über vier '
+      + 'statt sechs Kennzahlen.',
+    anzeige: 'row',
+    parameter: [MONAT, MARKE],
+    sql: `${MONAT_CTE},
+-- Einmal lesen, dann die sechs Ampelspalten in Zeilen kippen. Die
+-- Alternative waeren sechs UNION-Zweige, die alle dieselbe Verknuepfung
+-- wiederholen -- gleiches Ergebnis, sechsfache Pflege.
+mit_ampel AS (
+    SELECT r.*
+      FROM mart.round_table_monat r
+      JOIN mart.standort s ON s.betrieb_key = r.betrieb_key AND s.monat = r.monat
+      CROSS JOIN gewaehlt g
+     WHERE r.monat = g.monat
+       AND s.breitengrad IS NOT NULL
+       [[AND s.konzept = {{marke}}]]
+)
+SELECT b.bereich AS "Bereich",
+       count(*) FILTER (WHERE b.ampel = 'rot') AS "Standorte mit roter Ampel"
+  FROM mit_ampel m
+  CROSS JOIN LATERAL (VALUES
+        ('Personal',         m.ampel_personal,  1),
+        ('Umsatz',           m.ampel_umsatz,    2),
+        ('WE Küche',         m.ampel_we_kueche, 3),
+        ('WE Bar',           m.ampel_we_bar,    4),
+        ('Online-Bewertung', m.ampel_bewertung, 5),
+        ('OM vor Ort',       m.ampel_om,        6)
+       ) AS b(bereich, ampel, sortier)
+ GROUP BY b.bereich, b.sortier
+ ORDER BY b.sortier`,
+    visualisierung: {
+      'graph.dimensions': ['Bereich'],
+      'graph.metrics': ['Standorte mit roter Ampel'],
+      'graph.x_axis.title_text': 'Standorte mit roter Ampel',
+      'graph.y_axis.title_text': '',
     },
   },
 
