@@ -52,6 +52,34 @@ const LISTEN: Record<string, string> = {
 }
 
 /**
+ * Der Monat, der beim Öffnen eines Dashboards voreingestellt ist.
+ *
+ * WARUM DAS HIER STEHT UND NICHT FEST IM DASHBOARD
+ *
+ * Ein Dashboard ohne Vorgabe zeigt trotzdem Zahlen — MONAT_CTE fällt auf den
+ * jüngsten Monat mit einem Urteil zurück. Das ist richtig gerechnet, aber es
+ * ist unsichtbar: der Filter steht leer, und niemand weiß, welcher Monat da
+ * eigentlich beantwortet wird. Gemeldet am 27.07.2026.
+ *
+ * Der naheliegende Weg wäre Metabases relative Vorgabe `thismonth` gewesen.
+ * Nachgemessen und verworfen: bei einer SQL-Variablen kommt das Wort
+ * unverändert an, und `'thismonth'::date` scheitert — im Browser meldeten
+ * daraufhin ALLE Kacheln „There was a problem displaying this chart".
+ * Metabase speichert den Wert klaglos; gewirkt hat er nie. Relative Vorgaben
+ * funktionieren nur bei Feldfiltern, die an einer echten Spalte hängen.
+ *
+ * Bleibt der feste Wert — und der veraltet am ersten Tag des nächsten Monats
+ * stillschweigend. Deshalb wird er hier bei jedem Sync-Lauf neu gesetzt, aus
+ * denselben Daten, die auch die Karten lesen. Was von selbst aktuell bleibt,
+ * kann nicht vergessen werden.
+ */
+const VORGABE_MONAT = `
+  SELECT to_char(max(monat), 'YYYY-MM') AS w
+    FROM mart.round_table_monat
+   WHERE monat <= date_trunc('month', current_date)::date
+     AND gesamt IS NOT NULL`
+
+/**
  * Die Adresse von Metabases eigener Datenbank.
  *
  * Standardmäßig aus DATABASE_URL abgeleitet: dieselbe Postgres-Instanz,
@@ -96,6 +124,12 @@ export async function auswahllistenAbgleichen(): Promise<Abgleich> {
       soll[slug] = zeilen.map(z => String(z.w))
     }
 
+    // Der voreingestellte Monat, im Format, das der Filter erwartet
+    // (YYYY-MM). Gibt es noch kein Urteil, bleibt er leer — dann ist ein
+    // leerer Filter ehrlicher als ein erfundener Monat.
+    const monatZeilen = await query<{ w: string | null }>(VORGABE_MONAT)
+    const vorgabeMonat = monatZeilen[0]?.w ?? null
+
     // Kurze Zeitgrenzen: läuft Metabase nicht, soll das hier nicht hängen.
     meta = new Pool({
       connectionString: url,
@@ -119,6 +153,17 @@ export async function auswahllistenAbgleichen(): Promise<Abgleich> {
 
       let dirty = false
       for (const p of parameter) {
+        // Der Monatsfilter: Vorgabe auf den jüngsten bewerteten Monat.
+        // Nur dieser eine Slug und nur dieser eine Typ — ein Zeitraumfilter
+        // (date/all-options) hat andere Vorgaben und bleibt unberührt.
+        if (String(p.slug ?? '') === 'monat' && p.type === 'date/month-year') {
+          if (vorgabeMonat && p.default !== vorgabeMonat) {
+            p.default = vorgabeMonat
+            dirty = true
+          }
+          continue
+        }
+
         const neueWerte = soll[String(p.slug ?? '')]
         // Nur anfassen, was schon als feste Liste eingerichtet ist. Ein
         // Datumsfilter oder ein bewusst freies Feld bleibt unberührt.

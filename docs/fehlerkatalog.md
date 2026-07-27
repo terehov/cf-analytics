@@ -1078,3 +1078,39 @@ eine Zeile führt — genau die Körnung eines Segments.
 
 **Regel.** Was ein Klick weitergeben soll, muss als **Wert** in einer Spalte stehen. Eine
 Kennzahl, die zur Spaltenüberschrift geworden ist, lässt sich nicht mehr filtern.
+
+## Relative Datumsvorgaben wirken bei SQL-Variablen nicht
+
+**Anlass.** Gewünscht am 27.07.2026: „standardmäßig soll der letzte Monat ausgewählt sein".
+
+**Der naheliegende Weg — und warum er falsch ist.** Metabase kennt relative Vorgaben wie
+`thismonth` oder `past1months`. Gesetzt, gespeichert, Status 200. Im Browser meldeten daraufhin
+**alle 15 Kacheln** „There was a problem displaying this chart".
+
+Nachgemessen an einer einzelnen Karte:
+
+| Wert im Aufruf | Antwort |
+|---|---|
+| `2026-07` | 202, 16 Zeilen |
+| `thismonth` | **500** — `Text 'thismonth' could not be parsed, unparsed text found at index 1` |
+
+Der Grund ist derselbe wie beim Parametertyp weiter oben: Eine Variable in nativem SQL bekommt
+den Wert **unverändert** eingesetzt, und `'thismonth'::date` ist kein gültiges Datum. Relative
+Vorgaben funktionieren nur bei Feldfiltern, die an einer echten Spalte hängen und deren Klausel
+Metabase selbst baut.
+
+**Gelöst über einen berechneten festen Wert.** Der voreingestellte Monat wird beim
+Provisionieren aus `mart.round_table_monat` gelesen — der jüngste Monat mit einem Urteil — und
+als `default` eingetragen. Ein fester Wert veraltet am Monatsersten, deshalb setzt
+`src/sync/auswahllisten.ts` ihn nach **jedem Import** neu. Was von selbst aktuell bleibt, kann
+nicht vergessen werden.
+
+**Warum überhaupt eine Vorgabe.** Ohne sie zeigte das Dashboard trotzdem Zahlen: `MONAT_CTE`
+fällt auf denselben Monat zurück. Richtig gerechnet, aber unsichtbar — der Filter stand leer,
+und niemand konnte sehen, welcher Monat da beantwortet wird.
+
+**Nebenbei aufgeräumt.** Metabases mitgeliefertes Beispiel-Dashboard „E-commerce Insights"
+(Sammlung „Examples", erfundene Verkaufszahlen) wird jetzt mitarchiviert. Es belegt die
+Dashboard-ID 1 — deshalb heißt der Round Table `/dashboard/2-round-table` und nicht `1-`. Die
+Nummer ist Metabases Datenbank-ID, kein Titel; sie wird nie neu vergeben und lässt sich ohne
+Neuaufsetzen der Metabase-Datenbank nicht ändern.

@@ -716,6 +716,26 @@ async function uebernehmen() {
     return werte;
   }
 
+  // Den voreingestellten Monat holen: den juengsten, fuer den ueberhaupt
+  // ein Urteil vorliegt. Ueber Metabases eigene Abfrageschnittstelle, damit
+  // die Seite keine zweite Datenbankverbindung braucht.
+  //
+  // Scheitert das, bleibt vorgabeMonat leer und die Filter stehen wie
+  // bisher ohne Vorgabe da -- die Dashboards rechnen dann weiter mit dem
+  // Rueckfall aus MONAT_CTE. Schlechter als vorher wird es dadurch nicht.
+  let vorgabeMonat = null;
+  try {
+    const a = await mb('/dataset', 'POST', {
+      type: 'native',
+      database: def.db_id,
+      native: {query:
+        "SELECT to_char(max(monat), 'YYYY-MM') FROM mart.round_table_monat " +
+        "WHERE monat <= date_trunc('month', current_date)::date AND gesamt IS NOT NULL"},
+    });
+    vorgabeMonat = (a.data?.rows || [])[0]?.[0] ?? null;
+    log('Voreingestellter Monat: ' + (vorgabeMonat ?? '(keiner — kein bewerteter Monat)'));
+  } catch (e) { log('Vorgabemonat nicht ermittelbar: ' + e.message, 'fehler'); }
+
   // Klickverhalten einer Kachel in Metabases Struktur uebersetzen.
   // parameterMapping bildet einen Parameter des ZIELS auf eine Spalte der
   // QUELLE ab; ohne diese Abbildung oeffnet der Klick das Zieldashboard
@@ -858,6 +878,24 @@ async function uebernehmen() {
       // Freitextfeld, egal was in values_source_config steht.
       const parameter = [];
       for (const p of d.parameter) {
+        // Der Monatsfilter bekommt den juengsten bewerteten Monat als
+        // Vorgabe. Ohne sie steht der Filter leer, und man sieht nicht,
+        // welchen Monat man gerade liest -- gerechnet wird trotzdem einer,
+        // weil MONAT_CTE zurueckfaellt.
+        //
+        // Ein RELATIVER Wert waere haltbarer gewesen, funktioniert aber
+        // nicht: bei einer SQL-Variablen kommt 'thismonth' unveraendert an
+        // und 'thismonth'::date scheitert. Nachgemessen am 27.07.2026 --
+        // alle Kacheln meldeten daraufhin einen Fehler.
+        //
+        // Der feste Wert veraltet am Monatsersten. Dagegen setzt ihn
+        // src/sync/auswahllisten.ts nach JEDEM Import neu; hier steht er,
+        // damit eine frisch eingerichtete Metabase nicht bis zum ersten
+        // Sync-Lauf ohne Vorgabe dasteht.
+        if (p.slug === 'monat' && p.type === 'date/month-year' && vorgabeMonat) {
+          parameter.push({...p, default: vorgabeMonat});
+          continue;
+        }
         // Feste Liste: Werte stehen in der Definition, nicht in der
         // Datenbank -- etwa die Bewertung, deren 'ohne' fuer NULL steht.
         if (p.festeWerte) {
@@ -912,6 +950,18 @@ async function uebernehmen() {
       if (!m || gewollt.has(m[1])) continue;
       await mb('/dashboard/' + d.id, 'PUT', {archived: true});
       log('Dashboard ' + d.name + ' — archiviert (nicht mehr in dashboards.ts)', 'neu');
+    }
+
+    // Metabases mitgeliefertes Beispiel. Es steht in der Sammlung
+    // "Examples" und zeigt erfundene Verkaufszahlen -- neben echten
+    // Dashboards ist das eine Verwechslungsgefahr, und zwar eine, die
+    // niemand vermutet, weil es aussieht wie eine unserer Seiten.
+    for (const d of (alle.data || [])) {
+      const istBeispiel = /^E-commerce Insights$/.test(d.name || '')
+        && /sample data|hypothetical/i.test(d.description || '');
+      if (!istBeispiel) continue;
+      await mb('/dashboard/' + d.id, 'PUT', {archived: true});
+      log('Beispiel-Dashboard "' + d.name + '" archiviert (Metabase-Demodaten)', 'neu');
     }
   } catch (e) { log('Aufraeumen fehlgeschlagen: ' + e.message, 'fehler'); }
 
