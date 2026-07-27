@@ -43,6 +43,17 @@ const VON_HAND: Record<string, number | null> = {
   // nach der Betreibergesellschaft ("COYACAN GmbH"). Kein Zeichen gemeinsam,
   // keine Heuristik der Welt findet das -- Eugene wusste es.
   E_33: 32,
+
+  // Zwei Standorte in einer Stadt. Der Namensabgleich scheitert hier
+  // zwangslaeufig: "Wilma Wunder Mainz am Markt" und "Gastronomie am Markt
+  // Mainz GmbH" teilen nur "am Markt", und danach zu suchen waere die Sorte
+  // Regel, die naechstes Jahr das Falsche trifft. Entschieden ueber die
+  // Adresse, bestaetigt von Eugene am 27.07.2026:
+  W_05: 65,   // Markt 11, 55116 Mainz
+  A_14: 19,   // Mohrenstrasse 3, 42289 Wuppertal -- "Im Gaskessel"
+  // Ballplatz 2, 55116 Mainz. Zwei Betriebe tragen "Ballplatz Mainz" im
+  // Namen; genommen ist der ohne das Praefix "KUZ -" (105).
+  W_01: 123,
 }
 
 /** Eine CSV-Zeile in Felder zerlegen, RFC-4180-Anfuehrungszeichen beachtet. */
