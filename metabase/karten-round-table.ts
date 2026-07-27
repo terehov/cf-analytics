@@ -39,7 +39,7 @@ export const karten: Karte[] = [
     anzeige: 'scalar',
     parameter: [MONAT.monat, KONZEPT.marke],
     sql: `${MONAT_CTE}
-SELECT count(*) AS "Rote Betriebe"
+SELECT '🔴 ' || count(*) AS "Rote Betriebe"
   FROM mart.round_table_monat r
   CROSS JOIN gewaehlt g
  WHERE r.gesamt = 'rot'
@@ -59,12 +59,15 @@ SELECT count(*) AS "Rote Betriebe"
     anzeige: 'scalar',
     parameter: [MONAT.monat, KONZEPT.marke],
     sql: `${MONAT_CTE}
-SELECT count(*) AS "Orange Betriebe"
+SELECT '🟠 ' || count(*) AS "Orange Betriebe"
   FROM mart.round_table_monat r
   CROSS JOIN gewaehlt g
  WHERE r.gesamt = 'orange'
    AND r.monat = g.monat
    [[AND r.konzept = {{marke}}]]`,
+    visualisierung: {
+      'scalar.field': 'Orange Betriebe',
+    },
   },
   {
     schluessel: 'rt_kachel_gruen',
@@ -73,12 +76,15 @@ SELECT count(*) AS "Orange Betriebe"
     anzeige: 'scalar',
     parameter: [MONAT.monat, KONZEPT.marke],
     sql: `${MONAT_CTE}
-SELECT count(*) AS "Grüne Betriebe"
+SELECT '🟢 ' || count(*) AS "Grüne Betriebe"
   FROM mart.round_table_monat r
   CROSS JOIN gewaehlt g
  WHERE r.gesamt = 'gruen'
    AND r.monat = g.monat
    [[AND r.konzept = {{marke}}]]`,
+    visualisierung: {
+      'scalar.field': 'Grüne Betriebe',
+    },
   },
   {
     // Diese Kachel hat im Excel kein Pendant, und genau das war das Problem:
@@ -90,12 +96,15 @@ SELECT count(*) AS "Grüne Betriebe"
     anzeige: 'scalar',
     parameter: [MONAT.monat, KONZEPT.marke],
     sql: `${MONAT_CTE}
-SELECT count(*) AS "Ohne Urteil"
+SELECT '⚪ ' || count(*) AS "Ohne Urteil"
   FROM mart.round_table_monat r
   CROSS JOIN gewaehlt g
  WHERE r.gesamt IS NULL
    AND r.monat = g.monat
    [[AND r.konzept = {{marke}}]]`,
+    visualisierung: {
+      'scalar.field': 'Ohne Urteil',
+    },
   },
   {
     schluessel: 'rt_kachel_massnahmen',

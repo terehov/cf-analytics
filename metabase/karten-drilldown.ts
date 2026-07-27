@@ -17,7 +17,7 @@
 // =====================================================================
 
 import type { Karte } from './typen'
-import { MONAT_CTE, MONAT_CTE_UMSATZ, ZEITRAUM_CTE, P_MONAT, P_MARKE, P_BETRIEB } from './gemeinsam'
+import { MONAT_CTE, MONAT_CTE_UMSATZ, ZEITRAUM_CTE, P_MONAT, P_MARKE, P_BETRIEB, P_AMPEL } from './gemeinsam'
 
 export const karten: Karte[] = [
   // ===================================================================
@@ -113,7 +113,7 @@ SELECT monat                        AS "Monat",
     beschreibung:
       'Alle Betriebe der gewählten Marke über sämtliche Kennzahlen, jede mit ihrer Ampel. Sortiert nach Handlungsdruck. Ein Klick auf eine Zeile öffnet die Detailseite des Betriebs.',
     anzeige: 'table',
-    parameter: [P_MONAT, P_MARKE],
+    parameter: [P_MONAT, P_MARKE, P_AMPEL],
     sql: `${MONAT_CTE}
 SELECT r.betrieb                                            AS "Betrieb",
        r.konzept                                            AS "Marke",
@@ -146,6 +146,9 @@ SELECT r.betrieb                                            AS "Betrieb",
   LEFT JOIN ampel.beschriftung ag ON ag.status = r.gesamt
  WHERE r.monat = g.monat
    [[AND r.konzept = {{marke}}]]
+   -- 'ohne' steht fuer "keine Ampel berechenbar" (NULL). Ohne diesen Fall
+   -- fuehrte die Kachel "Ohne Urteil" auf eine leere Liste.
+   [[AND coalesce(r.gesamt, 'ohne') = {{ampel}}]]
  ORDER BY CASE r.gesamt WHEN 'rot' THEN 1 WHEN 'orange' THEN 2 WHEN 'gruen' THEN 3 ELSE 4 END,
           CASE r.intensitaet WHEN 'Sofort eskalieren' THEN 1 WHEN 'Sofort handeln' THEN 2
                              WHEN 'Nachforschung' THEN 3 ELSE 4 END,
@@ -166,7 +169,7 @@ SELECT r.betrieb                                            AS "Betrieb",
     beschreibung:
       'Die 20 Betriebe mit der höchsten Personalkostenquote — die Kennzahl mit den meisten roten Ampeln. Ein Klick auf einen Balken öffnet die Detailseite des Betriebs; die vollständige Liste steht in der Tabelle oben.',
     anzeige: 'row',
-    parameter: [P_MONAT, P_MARKE],
+    parameter: [P_MONAT, P_MARKE, P_AMPEL],
     sql: `${MONAT_CTE}
 SELECT r.betrieb                AS "Betrieb",
        r.personalkosten_ogf_pct AS "Personal o. GF %"
@@ -175,6 +178,7 @@ SELECT r.betrieb                AS "Betrieb",
  WHERE r.monat = g.monat
    AND r.personalkosten_ogf_pct IS NOT NULL
    [[AND r.konzept = {{marke}}]]
+   [[AND coalesce(r.gesamt, 'ohne') = {{ampel}}]]
  ORDER BY r.personalkosten_ogf_pct DESC
  LIMIT 20`,
     visualisierung: {
@@ -192,7 +196,7 @@ SELECT r.betrieb                AS "Betrieb",
     beschreibung:
       'Jeder Punkt ist ein Betrieb. Rechts unten steht der Wunschfall: viel Umsatz bei niedriger Personalkostenquote. Links oben stehen die Betriebe, bei denen beides nicht stimmt.',
     anzeige: 'scatter',
-    parameter: [P_MONAT, P_MARKE],
+    parameter: [P_MONAT, P_MARKE, P_AMPEL],
     sql: `${MONAT_CTE}
 SELECT r.umsatz_ist             AS "Umsatz",
        r.personalkosten_ogf_pct AS "Personal o. GF %",
@@ -202,7 +206,8 @@ SELECT r.umsatz_ist             AS "Umsatz",
  WHERE r.monat = g.monat
    AND r.personalkosten_ogf_pct IS NOT NULL
    AND r.umsatz_ist > 0
-   [[AND r.konzept = {{marke}}]]`,
+   [[AND r.konzept = {{marke}}]]
+   [[AND coalesce(r.gesamt, 'ohne') = {{ampel}}]]`,
     visualisierung: {
       'graph.dimensions': ['Umsatz'],
       'graph.metrics': ['Personal o. GF %'],

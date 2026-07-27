@@ -86,6 +86,20 @@ export const P_MARKE: Parameter = {
   required: false,
 }
 
+/**
+ * Filter auf die Gesamtampel. Traegt die technischen Werte 'rot' /
+ * 'orange' / 'gruen' / 'ohne', nicht die Beschriftung -- die Kacheln der
+ * Round-Table-Uebersicht uebergeben sie beim Klick, damit "9 rote
+ * Betriebe" zur Liste eben dieser neun fuehrt.
+ */
+export const P_AMPEL: Parameter = {
+  id: 'ampel-param',
+  name: 'ampel',
+  'display-name': 'Bewertung',
+  type: 'text',
+  required: false,
+}
+
 export const P_BETRIEB: Parameter = {
   id: 'betrieb-param',
   name: 'betrieb',

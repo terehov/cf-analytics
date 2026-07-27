@@ -63,6 +63,15 @@ export type Klick = {
   spalte?: string
   /** { ziel-parameter-slug: quell-spaltenname } */
   uebergabe: Record<string, string>
+  /**
+   * `uebergabe` enthaelt FESTE WERTE statt Spaltennamen.
+   *
+   * Fuer Zaehlkacheln: "9 rote Betriebe" hat keine Spalte "Betrieb", aus
+   * der man etwas mitgeben koennte -- die Kachel weiss aber, dass sie rote
+   * zaehlt. Ohne diese Angabe oeffnete der Klick die Zielliste
+   * ungefiltert, und man haelt alle Betriebe fuer die neun roten.
+   */
+  fest?: boolean
 }
 
 /**

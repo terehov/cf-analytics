@@ -30,6 +30,11 @@ const F_BETRIEB: Parameter = {
   id: 'd-betrieb', name: 'betrieb', 'display-name': 'Betrieb', type: 'string/=',
   werteliste: ['mart', 'betrieb', 'betrieb'],
 }
+// Bewertung als Auswahlliste. Feste Werte statt Datenquelle: es gibt genau
+// diese vier, und "ohne" steht fuer NULL -- das liefert keine Spalte.
+const F_AMPEL: Parameter = {
+  id: 'd-ampel', name: 'ampel', 'display-name': 'Bewertung', type: 'string/=',
+}
 const F_ZEITRAUM: Parameter = {
   id: 'd-zeitraum', name: 'zeitraum', 'display-name': 'Zeitraum', type: 'date/all-options',
 }
@@ -62,8 +67,8 @@ export const dashboards: Dashboard[] = [
       ] },
       { teile: [{ text: '## Marken nebeneinander\n\nJede Marke in jeder Kennzahl, mit dem Abstand zum Mittelfeld aller Betriebe. So wird sichtbar, ob eine Marke durchgehend schwächer ist oder nur in einer Disziplin.' }] },
       { teile: [
-        { karte: 'pf_marken_matrix' },
-        { karte: 'pf_marken_umsatzanteil' },
+        { karte: 'pf_marken_matrix', klick: [{ ziel: 'dd_filialen', spalte: 'Marke', uebergabe: { marke: 'Marke' } }] },
+        { karte: 'pf_marken_umsatzanteil', klick: [{ ziel: 'dd_filialen', uebergabe: { marke: 'Marke' } }] },
       ] },
     ],
   },
@@ -74,7 +79,7 @@ export const dashboards: Dashboard[] = [
     beschreibung:
       'Alle Betriebe — oder nur die einer Marke, wenn man von Ebene ① kommt — über sämtliche Kennzahlen mit Ampeln. Ein Klick auf den Betriebsnamen öffnet die Detailseite.',
     sammlung: 'Drill-Down',
-    filter: [F_MONAT, F_MARKE],
+    filter: [F_MONAT, F_MARKE, F_AMPEL],
     reihen: [
       { teile: [{ text: '# ② Filialen\n\nAlle Betriebe über sämtliche Kennzahlen. Kommt man von ① Marken, ist der Marken-Filter oben bereits gesetzt — **wird er geleert, erscheinen wieder alle Betriebe**.\n\nEin Klick auf einen Betriebsnamen öffnet die Detailseite. Ein weißer Punkt ⚪ heißt **keine Daten**, nicht „in Ordnung".' }] },
       { teile: [{ karte: 'dd_filialen_tabelle', hoehe: 12, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
@@ -183,7 +188,7 @@ export const dashboards: Dashboard[] = [
       { teile: [{ karte: 'pf_kachel_aktiv' }] },
       { teile: [
         { karte: 'pf_konzentration_kurve', breite: 10 },
-        { karte: 'pf_konzentration', breite: 14, hoehe: 11 },
+        { karte: 'pf_konzentration', breite: 14, hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] },
       ] },
 
       { teile: [{ text: '## Was wäre zu holen\n\nDie Spalte „€ bis Median" ist **kein Ziel und keine Prognose**, sondern eine Größenordnung: was der Abstand zum Mittelfeld in Euro bedeutet. Sortiert nach eben diesem Betrag — oben stehen die Betriebe, bei denen sich Arbeit am meisten lohnt.' }] },
@@ -231,12 +236,20 @@ export const dashboards: Dashboard[] = [
     filter: [F_MONAT, F_MARKE],
     reihen: [
       { teile: [{ text: '# Round Table\n\nDie Ampeln: 🟢 passt · 🟠 im Auge behalten · 🔴 sofort handeln.\n\n**„Ohne Urteil"** sind Betriebe, für die sich keine Ampel berechnen ließ — meist fehlen die Zahlen vom Steuerberater. Sie stehen bewusst als eigene Gruppe da, damit sie nicht mit unauffälligen Betrieben verwechselt werden.' }] },
+      // Jede Zaehlkachel fuehrt auf die Liste der Betriebe, die sie zaehlt.
+      // Der Wert wird fest mitgegeben -- "9 rote Betriebe" muss zu genau
+      // diesen neun fuehren, nicht zu allen.
       { teile: [
-        { karte: 'rt_kachel_rot' },
-        { karte: 'rt_kachel_orange' },
-        { karte: 'rt_kachel_gruen' },
-        { karte: 'rt_kachel_ohne_urteil' },
-        { karte: 'rt_kachel_massnahmen' },
+        { karte: 'rt_kachel_rot',
+          klick: [{ ziel: 'dd_filialen', uebergabe: { ampel: 'rot' }, fest: true }] },
+        { karte: 'rt_kachel_orange',
+          klick: [{ ziel: 'dd_filialen', uebergabe: { ampel: 'orange' }, fest: true }] },
+        { karte: 'rt_kachel_gruen',
+          klick: [{ ziel: 'dd_filialen', uebergabe: { ampel: 'gruen' }, fest: true }] },
+        { karte: 'rt_kachel_ohne_urteil',
+          klick: [{ ziel: 'dd_filialen', uebergabe: { ampel: 'ohne' }, fest: true }] },
+        { karte: 'rt_kachel_massnahmen',
+          klick: [{ ziel: 'db_rt_ursachen', uebergabe: {} }] },
         { karte: 'rt_kachel_bewertung' },
       ] },
       { teile: [
@@ -373,8 +386,8 @@ export const dashboards: Dashboard[] = [
       { teile: [{ karte: 'pe_quote_betrieb', hoehe: 11, klick: [{ ziel: 'dd_betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ karte: 'pe_quote_tabelle', hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ karte: 'pe_verlauf' }] },
-      { teile: [{ karte: 'pe_bereich', hoehe: 11 }] },
-      { teile: [{ karte: 'pe_effektivitaet', hoehe: 11 }] },
+      { teile: [{ karte: 'pe_bereich', hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      { teile: [{ karte: 'pe_effektivitaet', hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
     ],
   },
 
@@ -393,7 +406,7 @@ export const dashboards: Dashboard[] = [
       ] },
       { teile: [{ karte: 'wa_db_warengruppe', hoehe: 11 }] },
       { teile: [{ text: '## Rechnerischer Wareneinsatz gegen tatsächlichen\n\nEine Lücke ist hier der **Normalfall** und genau die interessante Zahl: in ihr stecken Schwund, Bruch, Portionsgrößen, Personalverzehr und Lagerbewegung. Ein positiver Wert heißt, es wurde mehr eingekauft, als nach Rezeptur verbraucht wurde.' }] },
-      { teile: [{ karte: 'wa_we_pruefung', hoehe: 11 }] },
+      { teile: [{ karte: 'wa_we_pruefung', hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ text: '## Einkaufspreise\n\nDie Reihe beginnt mit der ersten Erfassung. Für die Zeit davor gibt es keine Preise, weil sie nirgends gespeichert wurden.' }] },
       { teile: [{ karte: 'wa_preise', hoehe: 11 }] },
     ],
@@ -433,10 +446,10 @@ export const dashboards: Dashboard[] = [
       { teile: [{ text: '## Stimmen die Zahlen?\n\n„Auffällig" ist eine **Arbeitsliste, kein Alarm**. Beim Wareneinsatz zählt die Spalte die Fälle, in denen zu wenige Rezepturen hinterlegt sind — nicht die inhaltlichen Abweichungen.' }] },
       { teile: [
         { karte: 'dq_pruefung', breite: 10 },
-        { karte: 'dq_umsatz_abweichung', breite: 14 },
+        { karte: 'dq_umsatz_abweichung', breite: 14, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] },
       ] },
       { teile: [{ text: '## Wem fehlt was?\n\nDie folgenden Tabellen sind Arbeitslisten. **Die Liste der Betriebe ohne Zuordnung zum Steuerberater sollte leer sein.**' }] },
-      { teile: [{ karte: 'dq_datenstand', hoehe: 12 }] },
+      { teile: [{ karte: 'dq_datenstand', hoehe: 12, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [
         { karte: 'dq_ohne_bruecke' },
         { karte: 'dq_konzept' },
@@ -487,7 +500,7 @@ export const dashboards: Dashboard[] = [
         { karte: 'im_bericht_balken', breite: 12 },
         { karte: 'im_reichweite', breite: 12 },
       ] },
-      { teile: [{ karte: 'im_betrieb', hoehe: 12 }] },
+      { teile: [{ karte: 'im_betrieb', hoehe: 12, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
     ],
   },
 
@@ -508,7 +521,7 @@ export const dashboards: Dashboard[] = [
       { teile: [{ karte: 'so_karte', hoehe: 16,
         klick: [{ ziel: 'dd_betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ text: '## Wie sich die Standorte verteilen' }] },
-      { teile: [{ karte: 'so_verteilung', hoehe: 9 }] },
+      { teile: [{ karte: 'so_verteilung', hoehe: 9, klick: [{ ziel: 'dd_filialen', uebergabe: { marke: 'Marke' } }] }] },
       { teile: [{ text: '## Dieselben Standorte als Liste\n\nSortiert nach Handlungsdruck. Die Spalte „Genauigkeit" sagt, wie genau der Punkt sitzt — „adresse" ist hausgenau, „ort" nur stadtgenau.' }] },
       { teile: [{ karte: 'so_tabelle', hoehe: 12,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },

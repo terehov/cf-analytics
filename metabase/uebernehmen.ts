@@ -152,6 +152,12 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
   rt_massnahmen_status:   { monat: 'Verteilung ueber alle Massnahmen.' },
   wa_we_pruefung:         { zeitraum: 'Vergleich je Monat gegen die BWA, nicht je Tag.' },
 
+  dd_filialen_metrikvergleich: {
+    ampel: 'Zaehlt Ampeln JE BEREICH (Umsatz, Personal, WE Bar ...). Ein Filter auf '
+         + 'die Gesamtampel waere zirkulaer: die Karte soll ja zeigen, woraus sich '
+         + 'das Gesamturteil zusammensetzt.',
+  },
+
   // --- Strukturell ohne die Dimension --------------------------------------
   so_fehlend: {
     monat: 'Wer gar keine Koordinaten hat, fehlt in JEDEM Monat — die Liste ist '
@@ -535,11 +541,13 @@ async function uebernehmen() {
       const zielDef = def.dashboards.find(x => x.schluessel === k.ziel);
       const zp = (zielDef.parameter || []).find(p => p.slug === zielSlug);
       if (!zp) { log('  Klickziel ' + k.ziel + ' hat keinen Filter ' + zielSlug, 'fehler'); continue; }
-      parameterMapping[zp.id] = {
-        id: zp.id,
-        source: {type: 'column', id: quellSpalte, name: quellSpalte},
-        target: {type: 'parameter', id: zp.id},
-      };
+      parameterMapping[zp.id] = k.fest
+        // Fester Wert: die Kachel hat keine Spalte, aus der sich etwas
+        // mitgeben liesse -- sie weiss aber, was sie zaehlt.
+        ? { id: zp.id, source: null, target: {type: 'parameter', id: zp.id}, value: quellSpalte }
+        : { id: zp.id,
+            source: {type: 'column', id: quellSpalte, name: quellSpalte},
+            target: {type: 'parameter', id: zp.id} };
     }
     return {type: 'link', linkType: 'dashboard', targetId: zielDashboard, parameterMapping};
   }
