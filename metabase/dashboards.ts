@@ -66,27 +66,12 @@ export const dashboards: Dashboard[] = [
   // ===================================================================
   // DIE DRILL-DOWN-KETTE — Marke → Filiale → Betrieb
   // ===================================================================
-  {
-    schluessel: 'dd_marken',
-    name: '① Marken',
-    beschreibung:
-      'Der Einstieg. Eine Zeile je Marke mit allen Kennzahlen und der Ampelverteilung. Ein Klick auf den Markennamen öffnet die Filialen dieser Marke.',
-    sammlung: 'Drill-Down',
-    filter: [F_MONAT],
-    reihen: [
-      { teile: [{ text: '# ① Marken\n\n**Marke → Filiale → Betrieb.** Ein Klick auf den Markennamen führt eine Ebene tiefer.\n\nProzentwerte sind Mediane — der mittlere Betrieb, damit ein Ausreißer die Marke nicht verzieht.' }] },
-      { teile: [{ karte: 'dd_marken_tabelle', klick: [{ ziel: 'dd_filialen', spalte: 'Marke', uebergabe: { marke: 'Marke' } }] }] },
-      { teile: [
-        { karte: 'dd_marken_ampeln', klick: [{ ziel: 'dd_filialen', uebergabe: { marke: 'Marke' } }] },
-        { karte: 'dd_marken_verlauf' },
-      ] },
-      { teile: [{ text: '## Marken nebeneinander\n\nJede Marke in jeder Kennzahl, mit dem Abstand zum Mittelfeld aller Betriebe. So wird sichtbar, ob eine Marke durchgehend schwächer ist oder nur in einer Disziplin.' }] },
-      { teile: [
-        { karte: 'pf_marken_matrix', klick: [{ ziel: 'dd_filialen', spalte: 'Marke', uebergabe: { marke: 'Marke' } }] },
-        { karte: 'pf_marken_umsatzanteil', klick: [{ ziel: 'dd_filialen', uebergabe: { marke: 'Marke' } }] },
-      ] },
-    ],
-  },
+  // Das Dashboard "① Marken" gab es bis zum 27.07.2026 als eigene Seite.
+  // Es ist aufgegangen im Round Table, der jetzt die Einstiegsebene ① ist:
+  // vom Round Table kam man zwar auf die Filialen, aber die Markenebene
+  // dazwischen fehlte, und eine eigene Seite dafuer war ein Umweg fuer
+  // etwas, das in dieselbe Frage gehoert.
+  // sichtbarkeit.ts raeumt die verwaiste Seite in Metabase auf.
 
   {
     schluessel: 'dd_filialen',
@@ -268,13 +253,13 @@ export const dashboards: Dashboard[] = [
   // ===================================================================
   {
     schluessel: 'db_round_table',
-    name: 'Round Table — Übersicht',
+    name: '① Round Table',
     beschreibung:
-      'Die Übersicht für den monatlichen Round Table: oben die Zähler, darunter woran es liegt, unten die vollständige Betriebstabelle.',
+      'Der Einstieg: oben die Zähler, darunter woran es liegt, dann die Betriebstabelle und die Marken. Ein Klick führt jeweils eine Ebene tiefer.',
     sammlung: 'Round Table',
     filter: [F_MONAT, F_MARKE],
     reihen: [
-      { teile: [{ text: '# Round Table\n\n🟢 passt · 🟠 im Auge behalten · 🔴 sofort handeln · ⚪ nicht bewertbar (meist fehlt die BWA).\n\nEin Klick auf eine Kachel zeigt die Betriebe dahinter. Filter oben wandern beim Klick mit.' }] },
+      { teile: [{ text: '# ① Round Table\n\n🟢 passt · 🟠 im Auge behalten · 🔴 sofort handeln · ⚪ nicht bewertbar (meist fehlt die BWA).\n\n**Round Table → Filiale → Betrieb.** Ein Klick führt eine Ebene tiefer, die Filter oben wandern mit.' }] },
       // Die Karte steht ganz oben: sie beantwortet keine Frage, sondern
       // gibt den Zahlen darunter einen Ort. Schraenkt man die Marke ein,
       // bleiben deren Haeuser stehen -- die raeumliche Einordnung passiert
@@ -309,9 +294,33 @@ export const dashboards: Dashboard[] = [
       { teile: [{ text: '## Die Betriebe\n\nSortiert nach Handlungsdruck: rot vor orange vor grün, innerhalb dessen nach Dringlichkeit.' }] },
       { teile: [{ karte: 'rt_tabelle', hoehe: 14,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
-      { teile: [{ text: '## Marken\n\nDie erste Frage vor jeder Maßnahme: schwächelt dieser eine Betrieb oder seine ganze Marke? Die Prozentwerte zeigen jeweils den mittleren Betrieb der Marke.' }] },
-      { teile: [{ karte: 'rt_marke',
+      // ---------------------------------------------------------------
+      // Die Markenebene. Sie stand bis zum 27.07.2026 auf einer eigenen
+      // Seite "① Marken", was einen Umweg bedeutete: vom Round Table kam
+      // man auf die Filialen, aber die Marke dazwischen fehlte.
+      //
+      // Jetzt ist der Round Table die Einstiegsebene, und die Marken
+      // stehen hier -- zwischen der Betriebstabelle und dem Ausblick.
+      // Sortiert wie der Rest der Seite: erst das Urteil, dann die
+      // Kennzahlen, dann der Verlauf.
+      // ---------------------------------------------------------------
+      { teile: [{ text: '## Marken\n\nDie erste Frage vor jeder Maßnahme: schwächelt dieser eine Betrieb oder seine ganze Marke? Die Prozentwerte zeigen jeweils den mittleren Betrieb der Marke — ein Ausreißer verzieht so nicht das Bild.' }] },
+      { teile: [{ karte: 'dd_marken_tabelle', hoehe: 11,
         klick: [{ ziel: 'dd_filialen', spalte: 'Marke', uebergabe: { marke: 'Marke' } }] }] },
+      { teile: [
+        { karte: 'dd_marken_ampeln',
+          klick: [{ ziel: 'dd_filialen', uebergabe: { marke: 'Marke' } }] },
+        { karte: 'rt_marke',
+          klick: [{ ziel: 'dd_filialen', spalte: 'Marke', uebergabe: { marke: 'Marke' } }] },
+      ] },
+      { teile: [{ text: '### Marken nebeneinander\n\nJede Marke in jeder Kennzahl, mit dem Abstand zum Mittelfeld aller Betriebe. Zeigt, ob eine Marke durchgehend schwächer ist oder nur in einer Disziplin.' }] },
+      { teile: [
+        { karte: 'pf_marken_matrix',
+          klick: [{ ziel: 'dd_filialen', spalte: 'Marke', uebergabe: { marke: 'Marke' } }] },
+        { karte: 'pf_marken_umsatzanteil',
+          klick: [{ ziel: 'dd_filialen', uebergabe: { marke: 'Marke' } }] },
+      ] },
+      { teile: [{ karte: 'dd_marken_verlauf' }] },
       { teile: [{ karte: 'rt_marke_abweichung', hoehe: 11,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
     ],
@@ -410,9 +419,13 @@ export const dashboards: Dashboard[] = [
     beschreibung:
       'Woher der Umsatz kommt: nach Speisen und Getränken, nach Verkaufsstelle und nach Tageszeit.',
     sammlung: 'Betrieb',
-    filter: [F_MONAT, F_BETRIEB],
+    // Monat UND Zeitraum, und das ist kein Versehen: die beiden Tabellen
+    // unten zeigen einen Stichmonat je Betrieb, die Diagramme darueber
+    // einen Verlauf. Der Zeitraum grenzt ein, welche Tage einfliessen --
+    // ein Quartal, ein Halbjahr, "letzte 3 Monate".
+    filter: [F_MONAT, F_BETRIEB, F_ZEITRAUM],
     reihen: [
-      { teile: [{ text: '# Struktur des Umsatzes\n\n> Bisher werden nur die Sparten **Speisen** und **Getränke** geliefert. Ihre Summe ist deshalb kleiner als der Gesamtumsatz — es fehlt nichts in der Rechnung, sondern in den gelieferten Daten.' }] },
+      { teile: [{ text: '# Struktur des Umsatzes\n\nBisher werden nur die Sparten **Speisen** und **Getränke** geliefert. Ihre Summe ist deshalb kleiner als der Gesamtumsatz — es fehlt nichts in der Rechnung, sondern in den gelieferten Daten.\n\nOhne Zeitraum zählt die gesamte Historie.' }] },
       { teile: [
         { karte: 'st_sparte', breite: 14 },
         { karte: 'st_verkaufsstelle', breite: 10 },

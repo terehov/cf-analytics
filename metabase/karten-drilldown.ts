@@ -17,7 +17,7 @@
 // =====================================================================
 
 import type { Karte } from './typen'
-import { MONAT_CTE, MONAT_CTE_UMSATZ, ZEITRAUM_CTE, P_MONAT, P_MARKE, P_BETRIEB, P_AMPEL, P_BEREICH, P_INTENSITAET } from './gemeinsam'
+import { MONAT_CTE, MONAT_CTE_UMSATZ, ZEITRAUM_CTE, P_MONAT, P_MARKE, P_BETRIEB, P_AMPEL, P_BEREICH, P_INTENSITAET, P_ZEITRAUM } from './gemeinsam'
 
 export const karten: Karte[] = [
   // ===================================================================
@@ -400,21 +400,66 @@ SELECT sum(y.umsatz_ytd) AS "Umsatz YTD"
   {
     schluessel: 'dd_betrieb_verlauf',
     name: 'Betrieb — Umsatz je Tag',
-    beschreibung: 'Tagesumsatz des gewählten Betriebs über die geladene Historie.',
+    beschreibung:
+      'Tagesumsatz des gewählten Betriebs. Die kräftige Linie ist das **Mittel der letzten '
+      + 'sieben Tage** — sie nimmt den Wochenrhythmus heraus, damit die Entwicklung sichtbar '
+      + 'wird. Die blasse Linie dahinter sind die einzelnen Tage.\n\n'
+      + 'Ohne gesetzten Zeitraum werden die letzten 90 Tage gezeigt.',
     anzeige: 'line',
-    parameter: [P_BETRIEB],
+    parameter: [P_BETRIEB, P_ZEITRAUM],
+    // WARUM GEGLAETTET WIRD.
+    //
+    // Gemeldet am 27.07.2026: "die gelben Linien schiessen nur so hin und
+    // her". Nachgemessen: die Karte zeichnete 3.124 Tage seit 2018 in eine
+    // Kachel von rund 500 Pixeln -- sechs Punkte je Pixel. Dazu der
+    // Wochenrhythmus, der bei Aposto Augsburg zwischen 0 und 18.852 EUR
+    // springt. Was dabei entsteht, ist ein gefuelltes Band, kein Verlauf.
+    //
+    // Zwei Aenderungen, beide noetig:
+    //   1. Der Zeitraumfilter greift jetzt (vorher gab es hier gar keinen)
+    //      und zeigt ohne Angabe die letzten 90 Tage.
+    //   2. Ein gleitendes Mittel ueber sieben Tage nimmt den
+    //      Wochenrhythmus heraus. Genau sieben, damit jeder Wochentag
+    //      einmal vorkommt -- bei fuenf oder zehn bliebe ein Rest davon
+    //      stehen und saehe aus wie ein Trend.
+    //
+    // Die Rohwerte bleiben als zweite Reihe sichtbar. Wer einen einzelnen
+    // Ausreissertag sucht, findet ihn weiterhin; die geglaettete Linie
+    // beantwortet nur die andere Frage.
     sql: `
-SELECT geschaeftstag     AS "Geschäftstag",
-       sum(umsatz_netto) AS "Umsatz",
-       sum(gaeste)       AS "Gäste"
-  FROM mart.umsatz_tag
- WHERE 1 = 1
-   [[AND betrieb = {{betrieb}}]]
- GROUP BY geschaeftstag
+WITH tage AS (
+    SELECT geschaeftstag,
+           sum(umsatz_netto) AS umsatz
+      FROM mart.umsatz_tag
+     WHERE 1 = 1
+       [[AND betrieb = {{betrieb}}]]
+       [[AND {{zeitraum}}]]
+     GROUP BY geschaeftstag
+)
+SELECT geschaeftstag AS "Geschäftstag",
+       round(avg(umsatz) OVER (ORDER BY geschaeftstag
+                               ROWS BETWEEN 6 PRECEDING AND CURRENT ROW)) AS "Mittel 7 Tage",
+       round(umsatz)                                                      AS "Einzelne Tage"
+  FROM tage
+ -- Ohne gesetzten Zeitraum die letzten 90 Tage: 3.124 Punkte sind in
+ -- einer Dashboardkachel nicht darstellbar, und die Frage "wie lief der
+ -- Betrieb zuletzt" braucht sie auch nicht.
+ WHERE geschaeftstag >= coalesce(
+         [[ (SELECT min(geschaeftstag) FROM tage WHERE {{zeitraum}}), ]]
+         (SELECT max(geschaeftstag) - 89 FROM tage))
  ORDER BY geschaeftstag`,
+    template_tag_dimension: { zeitraum: ['mart', 'umsatz_tag', 'geschaeftstag'] },
     visualisierung: {
       'graph.dimensions': ['Geschäftstag'],
-      'graph.metrics': ['Umsatz'],
+      'graph.metrics': ['Mittel 7 Tage', 'Einzelne Tage'],
+      'graph.y_axis.title_text': 'Umsatz netto',
+      'graph.x_axis.title_text': '',
+      series_settings: {
+        'Mittel 7 Tage': { color: '#509EE3', 'line.width': 3 },
+        // Die Rohtage treten bewusst zurueck: sie sind der Beleg, nicht
+        // die Aussage.
+        'Einzelne Tage': { color: '#C7CFD4', 'line.width': 1, 'line.style': 'dotted' },
+      },
     },
   },
   {

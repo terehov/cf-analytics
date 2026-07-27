@@ -90,7 +90,8 @@ for (const d of dashboards) {
 const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
   // --- Zeitreihen: der Monatsfilter waehlt einen Stichmonat, und genau den
   // --- darf eine Verlaufskurve nicht haben. Sonst bleibt ein Punkt uebrig.
-  dd_marken_verlauf:      { monat: 'Verlauf ueber alle Monate — ein Stichmonat ergaebe einen Punkt.' },
+  // dd_marken_verlauf steht weiter unten bei den Markenkarten -- ein
+  // zweiter Eintrag hier wuerde ihn ueberschreiben, nicht ergaenzen.
   pf_marken_umsatzanteil: { monat: 'Verlauf ueber alle Monate.' },
   dd_betrieb_verlauf:     { monat: 'Verlauf ueber alle Monate.' },
   dd_betrieb_ampelverlauf:{ monat: 'Verlauf ueber alle Monate.' },
@@ -164,6 +165,23 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
                + 'die Achse noch dazu passt.',
   },
 
+  // --- Die Markenkarten VERGLEICHEN Marken. Ein Markenfilter liesse genau
+  // --- eine Zeile uebrig -- also dieselbe Karte ohne den Vergleich, der
+  // --- ihr Zweck ist. Sie sind seit dem 27.07.2026 Teil des Round Table,
+  // --- der einen Markenfilter fuehrt; deshalb steht das erst jetzt hier.
+  dd_marken_tabelle: {
+    marke: 'Eine Zeile JE MARKE -- der Filter liesse genau eine uebrig. Wer eine '
+         + 'einzelne Marke sehen will, klickt sie an und landet auf ihren Filialen.',
+  },
+  dd_marken_ampeln: {
+    marke: 'Vergleicht die Ampelverteilung ZWISCHEN den Marken; mit Filter bliebe '
+         + 'ein Balken stehen.',
+  },
+  dd_marken_verlauf: {
+    marke: 'Zeigt alle Marken als Linien nebeneinander -- der Vergleich ist der Zweck.',
+    monat: 'Verlauf ueber alle Monate — ein Stichmonat ergaebe einen Punkt.',
+  },
+
   // --- Der Bereich beschreibt eine EINZELAMPEL. Karten, die den Betrieb als
   // --- Ganzes zeigen, haben keine Bereichsspalte, an der er greifen koennte.
   dd_filialen_tabelle: {
@@ -185,6 +203,19 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
            + 'und die kann Metabases Punktkarte ohnehin nicht.',
   },
 
+  // --- Stichmonat statt Zeitraum. Diese beiden Tabellen zeigen eine Zeile
+  // --- JE BETRIEB fuer EINEN Monat -- das ist ihr Zweck, sie sollen
+  // --- Betriebe vergleichbar machen. Ein Zeitraum daneben waere
+  // --- widerspruechlich: welcher Monat stuende dann in der Zeile?
+  st_sparte_anteil: {
+    zeitraum: 'Eine Zeile je Betrieb fuer den Stichmonat. Der Zeitraum wirkt auf die '
+            + 'Diagramme darueber, die einen Verlauf zeigen -- hier waere er die '
+            + 'Frage "welcher Monat steht in der Zeile", auf die es keine Antwort gibt.',
+  },
+  st_zeitzone_betrieb: {
+    zeitraum: 'Ebenso: Stichmonat je Betrieb, damit die Prozentwerte vergleichbar sind.',
+  },
+
   // --- Strukturell ohne die Dimension --------------------------------------
   so_fehlend: {
     monat: 'Wer gar keine Koordinaten hat, fehlt in JEDEM Monat — die Liste ist '
@@ -199,6 +230,30 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
   },
   dq_backfill: { betrieb: 'Importfortschritt je Endpunkt, nicht je Betrieb.' },
   im_bericht:  { betrieb: 'Importzustand je Bericht, nicht je Betrieb.' },
+}
+
+// Doppelte Schluessel in FILTER_AUSNAHME sind in JavaScript erlaubt: der
+// spaetere gewinnt, der fruehere verschwindet lautlos. Genau das passierte
+// am 27.07.2026, als dd_marken_verlauf einen zweiten Eintrag bekam -- die
+// Monatsbegruendung war weg, ohne dass irgendetwas gemeldet haette.
+//
+// Der Quelltext ist die einzige Stelle, an der man das noch sehen kann;
+// im ausgewerteten Objekt ist der Verlust bereits eingetreten.
+{
+  const quelle = await Bun.file(import.meta.path).text()
+  const block = quelle.slice(quelle.indexOf('const FILTER_AUSNAHME'))
+  const bisEnde = block.slice(0, block.indexOf('\n}\n'))
+  const gesehen = new Set<string>()
+  const doppelt: string[] = []
+  for (const t of bisEnde.matchAll(/^  ([a-z_][a-z0-9_]*):\s*\{/gm)) {
+    if (gesehen.has(t[1]!)) doppelt.push(t[1]!)
+    gesehen.add(t[1]!)
+  }
+  if (doppelt.length > 0) {
+    throw new Error(
+      'FILTER_AUSNAHME hat doppelte Eintraege: ' + doppelt.join(', ') +
+      '\n  Der spaetere ueberschreibt den frueheren stillschweigend. Zusammenfassen.')
+  }
 }
 
 /** Welche Variablen eine Karte tatsaechlich liest — inklusive der aus den

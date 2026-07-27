@@ -246,7 +246,7 @@ SELECT monat                                                    AS "Monat",
     beschreibung:
       'Umsatz nach Speisen und Getränken. Achtung: bisher werden nur diese beiden Sparten geliefert, ihre Summe ist deshalb kleiner als der Gesamtumsatz.',
     anzeige: 'bar',
-    parameter: [BETRIEB],
+    parameter: [BETRIEB, ZEITRAUM],
     sql: `
 SELECT monat              AS "Monat",
        hauptsparte        AS "Sparte",
@@ -254,8 +254,10 @@ SELECT monat              AS "Monat",
   FROM mart.umsatz_tag_sparte
  WHERE hauptsparte IS NOT NULL
    [[AND betrieb = {{betrieb}}]]
+   [[AND {{zeitraum}}]]
  GROUP BY monat, hauptsparte
  ORDER BY monat, hauptsparte`,
+    template_tag_dimension: { zeitraum: ['mart', 'umsatz_tag_sparte', 'geschaeftstag'] },
     visualisierung: {
       'graph.dimensions': ['Monat', 'Sparte'],
       'graph.metrics': ['Umsatz'],
@@ -288,15 +290,17 @@ SELECT sp.betrieb                                                          AS "B
     name: 'Umsatz je Verkaufsstelle',
     beschreibung: 'Umsatz nach Verkaufsstelle: Außer Haus, Delivery, To Go und die übrigen.',
     anzeige: 'bar',
-    parameter: [BETRIEB],
+    parameter: [BETRIEB, ZEITRAUM],
     sql: `
 SELECT verkaufsstelle     AS "Verkaufsstelle",
        sum(umsatz_netto)  AS "Umsatz"
   FROM mart.umsatz_tag_sparte
  WHERE verkaufsstelle IS NOT NULL
    [[AND betrieb = {{betrieb}}]]
+   [[AND {{zeitraum}}]]
  GROUP BY verkaufsstelle
  ORDER BY sum(umsatz_netto) DESC`,
+    template_tag_dimension: { zeitraum: ['mart', 'umsatz_tag_sparte', 'geschaeftstag'] },
     visualisierung: {
       'graph.dimensions': ['Verkaufsstelle'],
       'graph.metrics': ['Umsatz'],
@@ -310,15 +314,17 @@ SELECT verkaufsstelle     AS "Verkaufsstelle",
     beschreibung:
       'Umsatz je Stunde über alle Tage. Der Geschäftstag beginnt um 08:00 und endet um 07:59 des Folgetags — die Nachtstunden stehen deshalb am Ende und nicht am Anfang.',
     anzeige: 'bar',
-    parameter: [BETRIEB],
+    parameter: [BETRIEB, ZEITRAUM],
     sql: `
 SELECT lpad(stunde::text, 2, '0') || ':00' AS "Stunde",
        sum(umsatz_netto)                   AS "Umsatz"
   FROM mart.umsatz_stunde
  WHERE 1 = 1
    [[AND betrieb = {{betrieb}}]]
+   [[AND {{zeitraum}}]]
  GROUP BY stunde
  ORDER BY ((stunde + 16) % 24)`,
+    template_tag_dimension: { zeitraum: ['mart', 'umsatz_stunde', 'geschaeftstag'] },
     visualisierung: {
       'graph.dimensions': ['Stunde'],
       'graph.metrics': ['Umsatz'],
@@ -331,15 +337,17 @@ SELECT lpad(stunde::text, 2, '0') || ':00' AS "Stunde",
     beschreibung:
       'Umsatz nach Tageszeit: Frühstück, Mittagszeit, Nachmittag, Happy Hour, Abendessen und Late Night. „Late Night" läuft über Mitternacht hinaus.',
     anzeige: 'bar',
-    parameter: [BETRIEB],
+    parameter: [BETRIEB, ZEITRAUM],
     sql: `
 SELECT zeitzone           AS "Zeitzone",
        sum(umsatz_netto)  AS "Umsatz"
   FROM mart.umsatz_zeitzone
  WHERE 1 = 1
    [[AND betrieb = {{betrieb}}]]
+   [[AND {{zeitraum}}]]
  GROUP BY zeitzone, minute_von
  ORDER BY minute_von`,
+    template_tag_dimension: { zeitraum: ['mart', 'umsatz_zeitzone', 'geschaeftstag'] },
     visualisierung: {
       'graph.dimensions': ['Zeitzone'],
       'graph.metrics': ['Umsatz'],
