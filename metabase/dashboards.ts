@@ -54,6 +54,28 @@ const F_ZEITRAUM: Parameter = {
   id: 'd-zeitraum', name: 'zeitraum', 'display-name': 'Zeitraum', type: 'date/all-options',
 }
 
+/**
+ * Derselbe Filter, aber mit Vorgabe -- fuer die Warenwirtschaft.
+ *
+ * mart.artikelverkauf hat 14 Millionen Zeilen ueber dreieinhalb Jahre; ein
+ * blosses count(*) darauf braucht 20 Sekunden. Ohne Eingrenzung baute die
+ * Seite deshalb praktisch nicht auf, und wer ueber den Drill-Down dorthin
+ * kam, sah eine haengende Seite statt Zahlen. Gemeldet am 28.07.2026.
+ *
+ * `past3months` ist ein RELATIVER Wert und veraltet deshalb nie. Das geht
+ * hier, weil `zeitraum` ein Feldfilter ist: Metabase baut die Klausel
+ * selbst und rechnet den Ausdruck aus. Bei einer SQL-Variablen -- wie beim
+ * Monatsfilter -- kaeme das Wort unveraendert an und scheiterte.
+ * Nachgemessen: 50 Zeilen in 2 Sekunden statt 20+.
+ *
+ * Es ist eine VORGABE, keine Grenze. Wer weiter zurueck will, stellt den
+ * Filter um.
+ */
+const F_ZEITRAUM_QUARTAL: Parameter = {
+  id: 'd-zeitraum', name: 'zeitraum', 'display-name': 'Zeitraum', type: 'date/all-options',
+  default: 'past3months',
+}
+
 // Vier einzelne Datumsfelder fuer den Zeitraumvergleich. Bewusst nicht
 // zwei Bereichsfilter: Metabase kann einen Bereichsfilter nur EINEM
 // Zeitraum zuordnen, hier brauchen beide Seiten ihren eigenen.
@@ -463,9 +485,12 @@ export const dashboards: Dashboard[] = [
     beschreibung:
       'Was gut und was kaum läuft, Deckungsbeitrag je Warengruppe, rechnerischer gegen tatsächlichen Wareneinsatz und die Entwicklung der Einkaufspreise.',
     sammlung: 'Betrieb',
-    filter: [F_BETRIEB, F_ZEITRAUM],
+    // Die Marke gehoert hierher, seit der Drill-Down vom Round Table
+    // hierher fuehrt: wer aus "Enchilada" kommt, will die Verbraeuche von
+    // Enchilada sehen und nicht die aller 141 Betriebe.
+    filter: [F_BETRIEB, F_MARKE, F_ZEITRAUM_QUARTAL],
     reihen: [
-      { teile: [{ text: '# Warenwirtschaft\n\n„Abdeckung“ ist der Anteil des Umsatzes, für den Rezepturen hinterlegt sind — bei niedriger Abdeckung sagt der Deckungsbeitrag wenig. Er liegt nur monatsweise vor.\n\nOhne Zeitraum dauert der Aufbau lange.' }] },
+      { teile: [{ text: '# Warenwirtschaft\n\n„Abdeckung“ ist der Anteil des Umsatzes, für den Rezepturen hinterlegt sind — bei niedriger Abdeckung sagt der Deckungsbeitrag wenig. Er liegt nur monatsweise vor.\n\nVoreingestellt sind die letzten drei Monate; ein größerer Zeitraum dauert entsprechend länger.' }] },
       { teile: [
         { karte: 'wa_renner', hoehe: 12 },
         { karte: 'wa_penner', hoehe: 12 },

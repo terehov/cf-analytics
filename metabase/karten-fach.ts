@@ -16,12 +16,13 @@
 // =====================================================================
 
 import type { Karte } from './typen'
-import { MONAT_CTE, MONAT_CTE_UMSATZ, MONAT_CTE_BWA, P_MONAT, P_BETRIEB, P_ZEITRAUM } from './gemeinsam'
+import { MONAT_CTE, MONAT_CTE_UMSATZ, MONAT_CTE_BWA, P_MONAT, P_BETRIEB, P_ZEITRAUM, P_MARKE } from './gemeinsam'
 
 // Der Monat ist bewusst kein Pflichtfeld — siehe gemeinsam.ts.
 const ZEITRAUM = P_ZEITRAUM
 const MONAT = P_MONAT
 const BETRIEB = P_BETRIEB
+const MARKE = P_MARKE
 
 export const karten: Karte[] = [
   // ===================================================================
@@ -509,7 +510,7 @@ SELECT monat                                                     AS "Monat",
     beschreibung:
       'Die 50 meistverkauften Artikel im gewählten Zeitraum. Bitte zuerst einen Zeitraum wählen — ohne Eingrenzung wertet die Karte die gesamte Historie aus und braucht entsprechend lange.',
     anzeige: 'table',
-    parameter: [ZEITRAUM, BETRIEB],
+    parameter: [ZEITRAUM, BETRIEB, MARKE],
     sql: `
 SELECT artikel                        AS "Artikel",
        warengruppe                    AS "Warengruppe",
@@ -522,6 +523,7 @@ SELECT artikel                        AS "Artikel",
  WHERE 1 = 1
    [[AND {{zeitraum}}]]
    [[AND betrieb = {{betrieb}}]]
+   [[AND konzept = {{marke}}]]
  GROUP BY artikel, warengruppe
  ORDER BY sum(menge) DESC
  LIMIT 50`,
@@ -533,7 +535,7 @@ SELECT artikel                        AS "Artikel",
     beschreibung:
       'Artikel, die verkauft wurden, aber kaum — Kandidaten zum Streichen. Artikel ohne einen einzigen Verkauf tauchen hier nicht auf, weil der Verkaufsbericht sie nicht kennt.',
     anzeige: 'table',
-    parameter: [ZEITRAUM, BETRIEB],
+    parameter: [ZEITRAUM, BETRIEB, MARKE],
     sql: `
 SELECT artikel            AS "Artikel",
        warengruppe        AS "Warengruppe",
@@ -544,6 +546,7 @@ SELECT artikel            AS "Artikel",
  WHERE 1 = 1
    [[AND {{zeitraum}}]]
    [[AND betrieb = {{betrieb}}]]
+   [[AND konzept = {{marke}}]]
  GROUP BY artikel, warengruppe
 HAVING sum(menge) > 0
  ORDER BY sum(menge) ASC
@@ -556,7 +559,7 @@ HAVING sum(menge) > 0
     beschreibung:
       'Deckungsbeitrag je Warengruppe. Bitte zuerst die Spalte „Abdeckung" lesen: sie sagt, für welchen Anteil des Umsatzes überhaupt Rezepturen hinterlegt sind. Steht dort 60 %, ist der ausgewiesene Deckungsbeitrag zu günstig — man sieht es der Zahl selbst nicht an.',
     anzeige: 'table',
-    parameter: [ZEITRAUM, BETRIEB],
+    parameter: [ZEITRAUM, BETRIEB, MARKE],
     // Diese Auswertung liegt je Monat vor, der Zeitraumfilter arbeitet auf
     // Tagen. Deshalb werden alle Monate genommen, die der gewaehlte
     // Zeitraum beruehrt -- ein halber Monat zaehlt ganz. Die Alternative
@@ -576,6 +579,7 @@ SELECT d.warengruppe              AS "Warengruppe",
    [[ AND d.monat IN (SELECT DISTINCT monat FROM mart.artikelverkauf
                        WHERE {{zeitraum}}) ]]
    [[ AND d.betrieb = {{betrieb}} ]]
+   [[ AND d.konzept = {{marke}} ]]
  GROUP BY d.warengruppe
  ORDER BY sum(d.umsatz_netto_pos) DESC NULLS LAST`,
     template_tag_dimension: { zeitraum: ['mart', 'artikelverkauf', 'geschaeftstag'] },
@@ -586,20 +590,27 @@ SELECT d.warengruppe              AS "Warengruppe",
     beschreibung:
       'Was laut Rezeptur verbraucht werden müsste, gegen das, was tatsächlich eingekauft wurde. Eine Lücke ist normal und genau die interessante Zahl: in ihr stecken Schwund, Bruch, Portionsgrößen, Personalverzehr und Lagerbewegung. Unter 90 % Abdeckung ist der Vergleich nicht belastbar.',
     anzeige: 'table',
-    parameter: [BETRIEB],
+    parameter: [BETRIEB, MARKE],
+    // mart.pruefung_wareneinsatz fuehrt keine Marke -- sie kommt ueber
+    // mart.konzept_zuordnung dazu, dieselbe Quelle, aus der auch die
+    // Auswahlliste des Markenfilters stammt. Ein LEFT JOIN, damit ein
+    // Betrieb ohne Konzeptzuordnung nicht aus der Liste faellt: die
+    // Pruefung soll gerade die Luecken zeigen, nicht sie verstecken.
     sql: `
-SELECT betrieb            AS "Betrieb",
-       monat              AS "Monat",
-       we_theoretisch     AS "WE theoretisch",
-       we_bwa             AS "WE laut BWA",
-       luecke             AS "Lücke",
-       we_theoretisch_pct AS "theoretisch %",
-       we_bwa_pct         AS "BWA %",
-       abdeckung_pct      AS "Abdeckung %"
-  FROM mart.pruefung_wareneinsatz
+SELECT p.betrieb            AS "Betrieb",
+       p.monat              AS "Monat",
+       p.we_theoretisch     AS "WE theoretisch",
+       p.we_bwa             AS "WE laut BWA",
+       p.luecke             AS "Lücke",
+       p.we_theoretisch_pct AS "theoretisch %",
+       p.we_bwa_pct         AS "BWA %",
+       p.abdeckung_pct      AS "Abdeckung %"
+  FROM mart.pruefung_wareneinsatz p
+  LEFT JOIN mart.konzept_zuordnung kz ON kz.betrieb = p.betrieb
  WHERE 1 = 1
-   [[AND betrieb = {{betrieb}}]]
- ORDER BY abdeckung_pct DESC NULLS LAST, abs(luecke) DESC NULLS LAST`,
+   [[AND p.betrieb = {{betrieb}}]]
+   [[AND kz.hauptkonzept = {{marke}}]]
+ ORDER BY p.abdeckung_pct DESC NULLS LAST, abs(p.luecke) DESC NULLS LAST`,
   },
   {
     schluessel: 'wa_preise',

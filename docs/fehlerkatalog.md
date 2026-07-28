@@ -1152,3 +1152,43 @@ die einen Monat zu weit zurückliegt.
 
 **Regel.** Ein Vorgabewert ist eine Behauptung darüber, welcher Ausschnitt sinnvoll ist. Wo
 verschiedene Datenquellen verschieden weit reichen, gibt es diese eine Antwort nicht.
+
+## Eine Ausnahme, die das Filtern verhinderte
+
+**Symptom.** Gemeldet am 28.07.2026: „Wenn ich auf dem Round Table nach einer Marke filtere,
+wird der Markenbereich nicht gefiltert."
+
+**Ursache — falsch herum gedacht.** Beim Verschieben der Markenkarten in den Round Table hatte
+ich sie als Filterausnahme eingetragen, mit der Begründung: *„Eine Zeile JE MARKE — der Filter
+ließe genau eine übrig."* Das stimmt, ist aber kein Argument gegen den Filter, sondern seine
+Funktion. Wer Enchilada wählt, will Enchilada sehen.
+
+Behoben durch Zurücknehmen der Ausnahme und `[[AND konzept = {{marke}}]]` in den drei Karten.
+
+**Regel.** Eine Ausnahme braucht einen Grund, warum der Filter *nicht wirken kann* — keine
+fehlende Spalte, keine Kreisbezüge. „Es bliebe wenig übrig" ist der Zweck des Filterns.
+
+## Die Warenwirtschaft lud ohne Eingrenzung 14 Millionen Zeilen
+
+**Symptom.** Gemeldet am 28.07.2026: „Wenn ich mich per Drill-Down bis zur Warenwirtschaft
+durchklicke, werden keine Filter übernommen, sodass sie nicht lädt."
+
+**Nachgemessen.** `mart.artikelverkauf` hat **14.024.161 Zeilen** über dreieinhalb Jahre; ein
+bloßes `count(*)` darauf braucht **20 Sekunden**. Die Seite hatte keinen Vorgabezeitraum und
+keinen Markenfilter — wer über den Drill-Down dorthin kam, sah eine hängende Seite.
+
+**Zwei Änderungen:**
+
+1. **Markenfilter ergänzt.** Vier der fünf Karten lesen ihn jetzt; `mart.artikelverkauf` und
+   `mart.deckungsbeitrag_warengruppe` führen `konzept` direkt, `mart.pruefung_wareneinsatz`
+   bekommt es über `mart.konzept_zuordnung` — dieselbe Quelle, aus der die Auswahlliste stammt.
+   `wa_preise` bleibt ausgenommen: der Einkauf läuft über die Gruppe, nicht je Konzept.
+
+2. **Vorgabezeitraum „letzte 3 Monate".** Nachgemessen: 50 Zeilen in **2 Sekunden** statt 20+.
+
+**Warum hier ein relativer Wert geht und beim Monat nicht.** `zeitraum` ist ein **Feldfilter** —
+er hängt an `mart.artikelverkauf.geschaeftstag`, und Metabase baut die WHERE-Klausel selbst,
+inklusive Auflösung von `past3months`. Der Monatsfilter ist dagegen eine SQL-Variable; dort käme
+das Wort unverändert an und `'past3months'::date` scheiterte. Beide Fälle nachgemessen.
+
+**Es ist eine Vorgabe, keine Grenze.** Wer weiter zurück will, stellt den Filter um.

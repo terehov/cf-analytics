@@ -29,7 +29,7 @@ export const karten: Karte[] = [
     beschreibung:
       'Eine Zeile je Marke mit allen sechs Kennzahlen und der Ampelverteilung. Ein Klick auf eine Zeile öffnet die Filialen dieser Marke. Die Prozentwerte sind Mediane, also der mittlere Betrieb der Marke — ein einzelner Ausreißer verzieht so nicht das Bild der ganzen Marke.',
     anzeige: 'table',
-    parameter: [P_MONAT],
+    parameter: [P_MONAT, P_MARKE],
     sql: `${MONAT_CTE}
 SELECT r.konzept                                                          AS "Marke",
        count(*)::int                                                      AS "Betriebe",
@@ -47,6 +47,7 @@ SELECT r.konzept                                                          AS "Ma
   FROM mart.round_table_monat r
   CROSS JOIN gewaehlt g
  WHERE r.monat = g.monat
+   [[AND r.konzept = {{marke}}]]
  GROUP BY r.konzept
  ORDER BY count(*) FILTER (WHERE r.gesamt = 'rot') DESC, sum(r.umsatz_ist) DESC NULLS LAST`,
     visualisierung: {
@@ -63,7 +64,7 @@ SELECT r.konzept                                                          AS "Ma
     name: 'Ampeln je Marke',
     beschreibung: 'Wie sich die Gesamtampel innerhalb jeder Marke verteilt. Ein Klick auf einen Balken öffnet die Filialen dieser Marke.',
     anzeige: 'bar',
-    parameter: [P_MONAT],
+    parameter: [P_MONAT, P_MARKE],
     sql: `${MONAT_CTE}
 SELECT r.konzept                                       AS "Marke",
        count(*) FILTER (WHERE r.gesamt = 'rot')        AS "Rot",
@@ -73,6 +74,7 @@ SELECT r.konzept                                       AS "Marke",
   FROM mart.round_table_monat r
   CROSS JOIN gewaehlt g
  WHERE r.monat = g.monat
+   [[AND r.konzept = {{marke}}]]
  GROUP BY r.konzept
  ORDER BY count(*) FILTER (WHERE r.gesamt = 'rot') DESC`,
     visualisierung: {
@@ -91,11 +93,14 @@ SELECT r.konzept                                       AS "Marke",
     name: 'Umsatz je Marke im Verlauf',
     beschreibung: 'Monatsumsatz je Marke über die geladene Historie.',
     anzeige: 'line',
+    parameter: [P_MARKE],
     sql: `
 SELECT monat                        AS "Monat",
        coalesce(konzept, '(nicht zugeordnet)') AS "Marke",
        sum(umsatz_monat)            AS "Umsatz"
   FROM mart.umsatz_ytd
+ WHERE 1 = 1
+   [[AND konzept = {{marke}}]]
  GROUP BY monat, konzept
  ORDER BY monat`,
     visualisierung: {

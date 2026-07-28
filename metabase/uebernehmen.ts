@@ -165,20 +165,12 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
                + 'die Achse noch dazu passt.',
   },
 
-  // --- Die Markenkarten VERGLEICHEN Marken. Ein Markenfilter liesse genau
-  // --- eine Zeile uebrig -- also dieselbe Karte ohne den Vergleich, der
-  // --- ihr Zweck ist. Sie sind seit dem 27.07.2026 Teil des Round Table,
-  // --- der einen Markenfilter fuehrt; deshalb steht das erst jetzt hier.
-  dd_marken_tabelle: {
-    marke: 'Eine Zeile JE MARKE -- der Filter liesse genau eine uebrig. Wer eine '
-         + 'einzelne Marke sehen will, klickt sie an und landet auf ihren Filialen.',
-  },
-  dd_marken_ampeln: {
-    marke: 'Vergleicht die Ampelverteilung ZWISCHEN den Marken; mit Filter bliebe '
-         + 'ein Balken stehen.',
-  },
+  // --- Die Markenkarten lesen den Markenfilter. Am 27.07.2026 standen sie
+  // --- hier kurzzeitig als Ausnahme, mit der Begruendung, ein Filter liesse
+  // --- "nur eine Zeile uebrig". Das war falsch herum gedacht: genau das ist
+  // --- beim Filtern erwuenscht. Wer Enchilada waehlt, will Enchilada sehen.
+  // --- Gemeldet am 28.07.2026, sofort zurueckgenommen.
   dd_marken_verlauf: {
-    marke: 'Zeigt alle Marken als Linien nebeneinander -- der Vergleich ist der Zweck.',
     monat: 'Verlauf ueber alle Monate — ein Stichmonat ergaebe einen Punkt.',
   },
 
@@ -226,6 +218,8 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
   wa_preise: {
     betrieb: 'Einkaufspreise gelten je Lieferant fuer die Gruppe, nicht je Betrieb — '
            + 'mart.preisentwicklung_ware hat gar keine Betriebsspalte.',
+    marke: 'Aus demselben Grund auch keine Marke: der Einkauf laeuft ueber die Gruppe, '
+         + 'nicht je Konzept. Ein Markenfilter haette hier nichts zu greifen.',
     zeitraum: 'Preise liegen nur je Monat vor; ein Tageszeitraum waere irrefuehrend.',
   },
   dq_backfill: { betrieb: 'Importfortschritt je Endpunkt, nicht je Betrieb.' },
@@ -584,6 +578,10 @@ const definitionen = {
       slug: p.name,
       type: p.type,
       sectionId: p.type.startsWith('date') ? 'date' : 'string',
+      // Vorgabewert, wo einer in der Definition steht -- etwa die letzten
+      // drei Monate in der Warenwirtschaft, die ohne Eingrenzung 14
+      // Millionen Zeilen laden wuerde.
+      ...(p.default !== undefined ? { default: p.default } : {}),
       // Auswahlliste statt Freitext. Das Feld wird erst in der Seite zur
       // Feld-ID aufgeloest, weil die IDs je Metabase-Installation andere
       // sind und hier nicht fest stehen duerfen.
