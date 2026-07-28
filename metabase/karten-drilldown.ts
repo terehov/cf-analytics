@@ -319,11 +319,31 @@ SELECT a.bereich_name                       AS "Bereich",
   {
     schluessel: 'dd_betrieb_kopf',
     name: 'Betrieb — Kennzahlen des Monats',
-    beschreibung: 'Alle sechs Kennzahlen des gewählten Betriebs mit Ampel, Wert und Veränderung zum Vormonat.',
+    beschreibung:
+      'Alle sechs Kennzahlen mit Ampel, Wert und Veränderung zum Vormonat.\n\n'
+      + 'Ohne gewählten Betrieb stehen hier **alle** Betriebe untereinander, nach '
+      + 'Handlungsdruck sortiert — die Spalte „Betrieb" sagt jeweils, um welchen es geht.',
     anzeige: 'table',
-    parameter: [P_MONAT, P_BETRIEB],
+    parameter: [P_MONAT, P_BETRIEB, P_MARKE],
+    // DIE BETRIEBSSPALTE IST NICHT SCHMUECKEND.
+    //
+    // Die Karte ist fuer EINEN Betrieb gedacht -- sechs Zeilen, je eine
+    // Kennzahl. Ohne Betriebsfilter liefert dieselbe Abfrage aber 846
+    // Zeilen: 141 Betriebe mal sechs Bereiche, unaggregiert und ohne
+    // Kennung. Man sieht dann sechsmal "Umsatz" untereinander mit
+    // verschiedenen Werten und haelt es fuer die Kennzahlen eines Hauses.
+    // Gemeldet am 28.07.2026.
+    //
+    // Die Spalte "Betrieb" beantwortet genau diese Frage. Bei gewaehltem
+    // Betrieb steht in allen sechs Zeilen dasselbe -- redundant, aber
+    // harmlos; die Alternative waere eine zweite fast gleiche Karte.
+    //
+    // Die Sortierung nach Handlungsdruck ist der zweite Teil: ohne sie
+    // stuenden 846 Zeilen in beliebiger Reihenfolge da. So stehen die
+    // Betriebe oben, bei denen etwas zu tun ist.
     sql: `${MONAT_CTE}
-SELECT t.bereich_name                    AS "Bereich",
+SELECT t.betrieb                         AS "Betrieb",
+       t.bereich_name                    AS "Bereich",
        coalesce(be.emoji, '⚪')           AS "●",
        t.wert                            AS "Aktuell",
        t.wert_vormonat                   AS "Vormonat",
@@ -336,9 +356,14 @@ SELECT t.bereich_name                    AS "Bereich",
   LEFT JOIN ampel.beschriftung be ON be.status = t.ampel
   LEFT JOIN mart.ampel_bereich ab ON ab.betrieb_key = t.betrieb_key
                                  AND ab.monat = t.monat AND ab.bereich = t.bereich
+  LEFT JOIN mart.konzept_zuordnung kz ON kz.betrieb_key = t.betrieb_key
  WHERE t.monat = g.monat
    [[AND t.betrieb = {{betrieb}}]]
- ORDER BY t.reihenfolge`,
+   [[AND kz.hauptkonzept = {{marke}}]]
+ ORDER BY CASE ab.gesamt WHEN 'rot' THEN 1 WHEN 'orange' THEN 2
+                         WHEN 'gruen' THEN 3 ELSE 4 END,
+          t.betrieb,
+          t.reihenfolge`,
   },
   {
     schluessel: 'dd_betrieb_umsatz_kachel',
@@ -471,17 +496,32 @@ SELECT geschaeftstag AS "Geschäftstag",
     schluessel: 'dd_betrieb_ampelverlauf',
     name: 'Betrieb — Ampelverlauf je Bereich',
     beschreibung:
-      'Wie sich die Kennzahlen dieses Betriebs über die Monate entwickelt haben. Wo die Linie abbricht, fehlen die Daten — das ist eine Lücke, kein Nullwert.',
+      'Wie sich die Quoten über die Monate entwickelt haben. Wo die Linie abbricht, fehlen '
+      + 'die Daten — das ist eine Lücke, kein Nullwert.\n\n'
+      + 'Ohne gewählten Betrieb ist es der **mittlere Betrieb** je Monat, nicht die Summe: '
+      + 'ein Median über Quoten, damit die Linie eine Quote bleibt.',
     anzeige: 'line',
     parameter: [P_BETRIEB],
+    // AGGREGIERT, weil sonst 91 Betriebe uebereinanderliegen.
+    //
+    // Ohne Betriebsfilter lieferte die Karte 10.746 Punkte aus 91
+    // Betrieben -- fuer dieselbe Monat/Bereich-Kombination also viele
+    // Werte, die Metabase zu einem unlesbaren Knaeuel verbindet. Nichts
+    // daran sagt, dass mehrere Haeuser drinstecken.
+    //
+    // Der Median statt der Summe, weil es PROZENTWERTE sind: die Summe
+    // zweier Personalquoten ist keine Personalquote. Bei einem gewaehlten
+    // Betrieb aendert der Median nichts -- ein Wert je Gruppe bleibt er
+    // selbst.
     sql: `
 SELECT monat        AS "Monat",
        bereich_name AS "Bereich",
-       wert         AS "Wert"
+       round(percentile_cont(0.5) WITHIN GROUP (ORDER BY wert)::numeric, 1) AS "Wert"
   FROM mart.ampel_bereich
  WHERE wert IS NOT NULL
    AND bereich IN ('personal','we_bar','we_kueche')
    [[AND betrieb = {{betrieb}}]]
+ GROUP BY monat, bereich_name, reihenfolge
  ORDER BY monat, reihenfolge`,
     visualisierung: {
       'graph.dimensions': ['Monat', 'Bereich'],
@@ -556,7 +596,8 @@ SELECT lpad(stunde::text, 2, '0') || ':00' AS "Stunde",
     anzeige: 'table',
     parameter: [P_BETRIEB],
     sql: `
-SELECT zeitraum_von AS "Von",
+SELECT betrieb      AS "Betrieb",
+       zeitraum_von AS "Von",
        zeitraum_bis AS "Bis",
        pek_gesamt   AS "Personal %",
        pek_service  AS "Service %",
@@ -625,6 +666,7 @@ HAVING count(*) FILTER (WHERE k.wert_absolut IS NOT NULL AND k.wert_absolut <> 0
     parameter: [P_BETRIEB],
     sql: `
 SELECT CASE WHEN ueberfaellig THEN '⚠' ELSE '' END AS "!",
+       betrieb        AS "Betrieb",
        monat          AS "Monat",
        bereich        AS "Bereich",
        ursache        AS "Ursache",
@@ -647,7 +689,8 @@ SELECT CASE WHEN ueberfaellig THEN '⚠' ELSE '' END AS "!",
     anzeige: 'table',
     parameter: [P_BETRIEB],
     sql: `
-SELECT befund              AS "Befund",
+SELECT betrieb             AS "Betrieb",
+       befund              AS "Befund",
        erster_tag          AS "Umsatz ab",
        letzter_tag         AS "Umsatz bis",
        umsatz_alter_tage   AS "Alter (Tage)",

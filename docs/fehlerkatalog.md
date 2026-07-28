@@ -1192,3 +1192,38 @@ inklusive Auflösung von `past3months`. Der Monatsfilter ist dagegen eine SQL-Va
 das Wort unverändert an und `'past3months'::date` scheiterte. Beide Fälle nachgemessen.
 
 **Es ist eine Vorgabe, keine Grenze.** Wer weiter zurück will, stellt den Filter um.
+
+## Ohne Betriebsfilter stapelten sechs Karten anonyme Zeilen
+
+**Symptom.** Gemeldet am 28.07.2026: „Wenn ich den Betriebs-Filter entferne, weiß ich nicht,
+welche Betriebe gemeint sind in ‚Betrieb — Kennzahlen des Monats'."
+
+**Nachgemessen — es war schlimmer als eine fehlende Beschriftung.** Die Karte ist für EINEN
+Betrieb gedacht: sechs Zeilen, je eine Kennzahl. Ohne Filter liefert dieselbe Abfrage **846
+Zeilen** — 141 Betriebe mal sechs Bereiche, unaggregiert und ohne jede Kennung. Man sah
+sechsmal „Umsatz" untereinander mit verschiedenen Werten und hielt es für die Kennzahlen eines
+Hauses.
+
+**Sechs Karten auf ③ Betrieb hatten dieselbe Schwäche**, gefunden über eine Prüfung: liest die
+Karte den Betriebsfilter, gibt sie ihn aber weder als Spalte aus noch aggregiert sie über
+alle Betriebe?
+
+| Karte | Behoben durch |
+|---|---|
+| `dd_betrieb_kopf` | Spalte „Betrieb" + Sortierung nach Handlungsdruck |
+| `dd_betrieb_personal` | Spalte „Betrieb" |
+| `dd_betrieb_massnahmen` | Spalte „Betrieb" |
+| `dd_betrieb_datenstand` | Spalte „Betrieb" |
+| `dd_betrieb_ampelverlauf` | Median je Monat und Bereich |
+| `dd_betrieb_verlauf` | war bereits summiert — in Ordnung |
+
+**Warum beim Ampelverlauf ein Median und keine Spalte.** Es ist ein Liniendiagramm; eine
+Betriebsspalte ergäbe 91 Linien. Ohne Filter lagen dort 10.746 Punkte übereinander, die
+Metabase zu einem unlesbaren Knäuel verband. Der Median statt der Summe, weil es
+**Prozentwerte** sind: die Summe zweier Personalquoten ist keine Personalquote. Bei einem
+gewählten Betrieb ändert der Median nichts — ein Wert je Gruppe bleibt er selbst; nachgemessen
+an Aposto Augsburg (32,64 → 32,6).
+
+**Regel.** Eine Karte, die für eine Einheit gedacht ist, muss auch ohne Filter lesbar bleiben —
+entweder sagt sie, von wem jede Zeile stammt, oder sie fasst ehrlich zusammen. Was sie nicht
+darf: mehrere Einheiten so stapeln, dass es wie eine aussieht.
