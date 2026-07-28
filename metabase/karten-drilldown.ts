@@ -474,9 +474,20 @@ SELECT geschaeftstag AS "Geschäftstag",
  -- Ohne gesetzten Zeitraum die letzten 90 Tage: 3.124 Punkte sind in
  -- einer Dashboardkachel nicht darstellbar, und die Frage "wie lief der
  -- Betrieb zuletzt" braucht sie auch nicht.
- WHERE geschaeftstag >= coalesce(
-         [[ (SELECT min(geschaeftstag) FROM tage WHERE {{zeitraum}}), ]]
-         (SELECT max(geschaeftstag) - 89 FROM tage))
+ --
+ -- Die Eingrenzung steht NUR in der CTE oben. Ein zweites {{zeitraum}}
+ -- stand hier bis zum 28.07.2026 in einer Unterabfrage ueber "tage" --
+ -- Metabase baut daraus aber "umsatz_tag.geschaeftstag", und diese
+ -- Tabelle ist an der Stelle nicht mehr in Reichweite. Ergebnis:
+ -- "missing FROM-clause entry for table umsatz_tag", sobald jemand
+ -- wirklich einen Zeitraum setzte. Ohne gesetzten Filter fiel der
+ -- optionale Block weg, und der Fehler blieb unsichtbar.
+ --
+ -- Jetzt greift der 90-Tage-Rueckfall nur noch, wenn die CTE mehr als
+ -- 90 Tage hergibt. Bei gesetztem Zeitraum hat sie ohnehin schon
+ -- gefiltert; ist der laenger als 90 Tage, war er ausdruecklich gewollt.
+ WHERE geschaeftstag >= (SELECT max(geschaeftstag) - 89 FROM tage)
+    OR (SELECT max(geschaeftstag) - min(geschaeftstag) FROM tage) <= 90
  ORDER BY geschaeftstag`,
     template_tag_dimension: { zeitraum: ['mart', 'umsatz_tag', 'geschaeftstag'] },
     visualisierung: {
@@ -501,7 +512,7 @@ SELECT geschaeftstag AS "Geschäftstag",
       + 'Ohne gewählten Betrieb ist es der **mittlere Betrieb** je Monat, nicht die Summe: '
       + 'ein Median über Quoten, damit die Linie eine Quote bleibt.',
     anzeige: 'line',
-    parameter: [P_BETRIEB],
+    parameter: [P_BETRIEB, P_ZEITRAUM],
     // AGGREGIERT, weil sonst 91 Betriebe uebereinanderliegen.
     //
     // Ohne Betriebsfilter lieferte die Karte 10.746 Punkte aus 91
@@ -521,8 +532,10 @@ SELECT monat        AS "Monat",
  WHERE wert IS NOT NULL
    AND bereich IN ('personal','we_bar','we_kueche')
    [[AND betrieb = {{betrieb}}]]
+   [[AND {{zeitraum}}]]
  GROUP BY monat, bereich_name, reihenfolge
  ORDER BY monat, reihenfolge`,
+    template_tag_dimension: { zeitraum: ['mart', 'ampel_bereich', 'monat'] },
     visualisierung: {
       'graph.dimensions': ['Monat', 'Bereich'],
       'graph.metrics': ['Wert'],
@@ -532,9 +545,9 @@ SELECT monat        AS "Monat",
   {
     schluessel: 'dd_betrieb_sparte',
     name: 'Betrieb — Speisen und Getränke',
-    beschreibung: 'Spartenumsatz des gewählten Betriebs im Zeitverlauf.',
+    beschreibung: 'Spartenumsatz des gewählten Betriebs im gewählten Zeitraum.',
     anzeige: 'bar',
-    parameter: [P_BETRIEB],
+    parameter: [P_BETRIEB, P_ZEITRAUM],
     sql: `
 SELECT monat             AS "Monat",
        hauptsparte       AS "Sparte",
@@ -542,8 +555,10 @@ SELECT monat             AS "Monat",
   FROM mart.umsatz_tag_sparte
  WHERE hauptsparte IS NOT NULL
    [[AND betrieb = {{betrieb}}]]
+   [[AND {{zeitraum}}]]
  GROUP BY monat, hauptsparte
  ORDER BY monat`,
+    template_tag_dimension: { zeitraum: ['mart', 'umsatz_tag_sparte', 'geschaeftstag'] },
     visualisierung: {
       'graph.dimensions': ['Monat', 'Sparte'],
       'graph.metrics': ['Umsatz'],
@@ -553,17 +568,19 @@ SELECT monat             AS "Monat",
   {
     schluessel: 'dd_betrieb_zeitzone',
     name: 'Betrieb — Zeitzonen',
-    beschreibung: 'Wovon dieser Betrieb lebt: Frühstück, Mittag, Happy Hour, Abend und Late Night im Vergleich.',
+    beschreibung: 'Wovon dieser Betrieb lebt: Frühstück, Mittag, Happy Hour, Abend und Late Night im gewählten Zeitraum.',
     anzeige: 'bar',
-    parameter: [P_BETRIEB],
+    parameter: [P_BETRIEB, P_ZEITRAUM],
     sql: `
 SELECT zeitzone          AS "Zeitzone",
        sum(umsatz_netto) AS "Umsatz"
   FROM mart.umsatz_zeitzone
  WHERE 1 = 1
    [[AND betrieb = {{betrieb}}]]
+   [[AND {{zeitraum}}]]
  GROUP BY zeitzone, minute_von
  ORDER BY minute_von`,
+    template_tag_dimension: { zeitraum: ['mart', 'umsatz_zeitzone', 'geschaeftstag'] },
     visualisierung: {
       'graph.dimensions': ['Zeitzone'],
       'graph.metrics': ['Umsatz'],
@@ -573,17 +590,19 @@ SELECT zeitzone          AS "Zeitzone",
     schluessel: 'dd_betrieb_stunde',
     name: 'Betrieb — Tagesverlauf',
     beschreibung:
-      'Umsatz je Stunde. Der Geschäftstag beginnt um 08:00 — die Nachtstunden stehen deshalb am Ende und nicht am Anfang.',
+      'Umsatz je Stunde im gewählten Zeitraum. Der Geschäftstag beginnt um 08:00 — die Nachtstunden stehen deshalb am Ende und nicht am Anfang.',
     anzeige: 'bar',
-    parameter: [P_BETRIEB],
+    parameter: [P_BETRIEB, P_ZEITRAUM],
     sql: `
 SELECT lpad(stunde::text, 2, '0') || ':00' AS "Stunde",
        sum(umsatz_netto)                   AS "Umsatz"
   FROM mart.umsatz_stunde
  WHERE 1 = 1
    [[AND betrieb = {{betrieb}}]]
+   [[AND {{zeitraum}}]]
  GROUP BY stunde
  ORDER BY ((stunde + 16) % 24)`,
+    template_tag_dimension: { zeitraum: ['mart', 'umsatz_stunde', 'geschaeftstag'] },
     visualisierung: {
       'graph.dimensions': ['Stunde'],
       'graph.metrics': ['Umsatz'],
@@ -592,26 +611,41 @@ SELECT lpad(stunde::text, 2, '0') || ':00' AS "Stunde",
   {
     schluessel: 'dd_betrieb_personal',
     name: 'Betrieb — Personal je Bereich',
-    beschreibung: 'Personalkostenquoten und Umsatz je Personalstunde für Service, Bar und Küche.',
+    beschreibung:
+      'Personalkostenquoten und Umsatz je Personalstunde für Service, Bar und Küche.\n\n'
+      + 'Die Prozentspalten sind Anteile am Umsatz, „€/Std“ ist der Umsatz je '
+      + 'geleisteter Personalstunde. „o. GF %“ ist die Personalquote ohne '
+      + 'Geschäftsführung aus den Zahlen des Steuerberaters.',
     anzeige: 'table',
-    parameter: [P_BETRIEB],
+    parameter: [P_BETRIEB, P_ZEITRAUM],
     sql: `
+-- Ein Zeitraum in EINER Spalte statt "Von" und "Bis" nebeneinander: die
+-- beiden kosteten zusammen 208 Pixel und waren der Ueberstand, der die
+-- Tabelle auch ueber die volle Breite noch scrollen liess. Im Browser
+-- nachgemessen am 28.07.2026.
 SELECT betrieb      AS "Betrieb",
-       zeitraum_von AS "Von",
-       zeitraum_bis AS "Bis",
+       to_char(zeitraum_von, 'DD.MM.') || '–' || to_char(zeitraum_bis, 'DD.MM.YY')
+                    AS "Zeitraum",
+       -- Quoten in Prozent, Effektivitaet in Euro je Personalstunde. Die
+       -- Einheit steht in der Ueberschrift der Quotenspalten, damit die
+       -- vier Effektivitaetsspalten ohne "Eff."-Vorsatz auskommen -- der
+       -- war viermal 30 Pixel fuer eine Information, die aus der Reihung
+       -- hervorgeht.
        pek_gesamt   AS "Personal %",
        pek_service  AS "Service %",
        pek_bar      AS "Bar %",
        pek_kueche   AS "Küche %",
-       eff_gesamt   AS "Effektivität",
-       eff_service  AS "Eff. Service",
-       eff_bar      AS "Eff. Bar",
-       eff_kueche   AS "Eff. Küche",
-       persoog_bwa  AS "o. GF % (BWA)"
+       eff_gesamt   AS "€/Std",
+       eff_service  AS "€/Std Service",
+       eff_bar      AS "€/Std Bar",
+       eff_kueche   AS "€/Std Küche",
+       persoog_bwa  AS "o. GF %"
   FROM mart.personalkosten
  WHERE 1 = 1
    [[AND betrieb = {{betrieb}}]]
+   [[AND {{zeitraum}}]]
  ORDER BY zeitraum_von DESC`,
+    template_tag_dimension: { zeitraum: ['mart', 'personalkosten', 'zeitraum_von'] },
   },
   {
     schluessel: 'dd_betrieb_artikel',
@@ -640,19 +674,29 @@ SELECT av.artikel                 AS "Artikel",
     name: 'Betrieb — BWA im Verlauf',
     beschreibung: 'Umsatz, Wareneinsatz, Personalkosten und Ergebnis aus den Zahlen des Steuerberaters. Es werden nur gebuchte Monate gezeigt.',
     anzeige: 'line',
-    parameter: [P_BETRIEB],
+    parameter: [P_BETRIEB, P_ZEITRAUM],
     sql: `
-SELECT k.monat AS "Monat",
-       round(sum(k.wert_absolut) FILTER (WHERE k.kennzahl = 'Umsatz'))                 AS "Umsatz",
-       round(sum(k.wert_absolut) FILTER (WHERE k.kennzahl IN ('WE Bar','WE Küche')))   AS "Wareneinsatz",
-       round(sum(k.wert_absolut) FILTER (WHERE k.kennzahl = 'Personalkosten ohne GF')) AS "Personalkosten",
-       round(sum(k.wert_absolut) FILTER (WHERE k.kennzahl = 'EBIT'))                   AS "EBIT"
-  FROM mart.bwa_kennzahl k
+-- OHNE Tabellenalias, und das ist Absicht.
+--
+-- Metabase baut die Klausel eines Feldfilters aus dem TABELLENNAMEN:
+-- "bwa_kennzahl.monat BETWEEN ...". Stand hier ein Alias (FROM
+-- mart.bwa_kennzahl k), war der Name an dieser Stelle nicht mehr
+-- gueltig, und Postgres antwortete mit "invalid reference to
+-- FROM-clause entry for table bwa_kennzahl". Gemessen am 28.07.2026,
+-- als die Karte den Zeitraumfilter bekam.
+SELECT monat AS "Monat",
+       round(sum(wert_absolut) FILTER (WHERE kennzahl = 'Umsatz'))                 AS "Umsatz",
+       round(sum(wert_absolut) FILTER (WHERE kennzahl IN ('WE Bar','WE Küche')))   AS "Wareneinsatz",
+       round(sum(wert_absolut) FILTER (WHERE kennzahl = 'Personalkosten ohne GF')) AS "Personalkosten",
+       round(sum(wert_absolut) FILTER (WHERE kennzahl = 'EBIT'))                   AS "EBIT"
+  FROM mart.bwa_kennzahl
  WHERE 1 = 1
-   [[AND k.betrieb = {{betrieb}}]]
- GROUP BY k.monat
-HAVING count(*) FILTER (WHERE k.wert_absolut IS NOT NULL AND k.wert_absolut <> 0) > 0
- ORDER BY k.monat`,
+   [[AND betrieb = {{betrieb}}]]
+   [[AND {{zeitraum}}]]
+ GROUP BY monat
+HAVING count(*) FILTER (WHERE wert_absolut IS NOT NULL AND wert_absolut <> 0) > 0
+ ORDER BY monat`,
+    template_tag_dimension: { zeitraum: ['mart', 'bwa_kennzahl', 'monat'] },
     visualisierung: {
       'graph.dimensions': ['Monat'],
       'graph.metrics': ['Umsatz', 'Wareneinsatz', 'Personalkosten', 'EBIT'],
@@ -685,20 +729,28 @@ SELECT CASE WHEN ueberfaellig THEN '⚠' ELSE '' END AS "!",
     schluessel: 'dd_betrieb_datenstand',
     name: 'Betrieb — Datenstand',
     beschreibung:
-      'Woher die Zahlen dieser Seite stammen und wie aktuell sie sind. Der erste Blick, bevor man aus den Zahlen darüber etwas schließt.',
+      'Woher die Zahlen dieser Seite stammen und wie aktuell sie sind. Der erste Blick, '
+      + 'bevor man aus den Zahlen darüber etwas schließt.\n\n'
+      + '„Alter“ ist der Abstand des letzten Umsatztages zu heute in Tagen, '
+      + '„Verzug“ der Rückstand der BWA in Monaten.',
     anzeige: 'table',
     parameter: [P_BETRIEB],
     sql: `
-SELECT betrieb             AS "Betrieb",
-       befund              AS "Befund",
-       erster_tag          AS "Umsatz ab",
-       letzter_tag         AS "Umsatz bis",
-       umsatz_alter_tage   AS "Alter (Tage)",
-       bwa_monat           AS "BWA gebucht bis",
-       bwa_verzug_monate   AS "BWA Verzug (Monate)",
-       artikeltage         AS "Artikeltage",
-       letzter_personaltag AS "Personal bis",
-       bwa_bruecke         AS "BWA-Brücke"
+-- Kurze Ueberschriften, weil bei dieser Tabelle die UEBERSCHRIFT die
+-- Spalte breit macht und nicht der Wert: "BWA Verzug (Monate)" belegte
+-- 166 Pixel fuer eine einstellige Zahl. Im Browser nachgemessen am
+-- 28.07.2026 -- zusammen mit "Alter (Tage)" war das der Ueberstand, der
+-- die Tabelle auch ueber die volle Breite noch scrollen liess.
+SELECT betrieb                  AS "Betrieb",
+       befund                   AS "Befund",
+       erster_tag               AS "Umsatz ab",
+       letzter_tag              AS "Umsatz bis",
+       umsatz_alter_tage        AS "Alter",
+       bwa_monat                AS "BWA bis",
+       bwa_verzug_monate        AS "Verzug",
+       artikeltage              AS "Artikeltage",
+       letzter_personaltag      AS "Personal bis",
+       bwa_bruecke              AS "BWA-Brücke"
   FROM mart.datenstand
  WHERE 1 = 1
    [[AND betrieb = {{betrieb}}]]`,
@@ -867,7 +919,7 @@ SELECT a.bereich_name                        AS "Metrik",
     name: 'Standorte — Umsatzverlauf nebeneinander',
     beschreibung: 'Monatsumsatz der gewählten Betriebe auf einer Achse.',
     anzeige: 'line',
-    parameter: [P_BETRIEB, P_MARKE],
+    parameter: [P_BETRIEB, P_MARKE, P_ZEITRAUM],
     sql: `
 SELECT monat        AS "Monat",
        betrieb      AS "Betrieb",
@@ -876,7 +928,9 @@ SELECT monat        AS "Monat",
  WHERE umsatz_monat > 0
    [[AND betrieb = {{betrieb}}]]
    [[AND konzept = {{marke}}]]
+   [[AND {{zeitraum}}]]
  ORDER BY monat`,
+    template_tag_dimension: { zeitraum: ['mart', 'umsatz_ytd', 'monat'] },
     visualisierung: {
       'graph.dimensions': ['Monat', 'Betrieb'],
       'graph.metrics': ['Umsatz'],
@@ -888,21 +942,38 @@ SELECT monat        AS "Monat",
     beschreibung:
       'Der Tagesverlauf der gewählten Betriebe, jeweils als Anteil am eigenen Tagesumsatz. In Prozent, damit ein großes und ein kleines Haus vergleichbar bleiben.',
     anzeige: 'line',
-    parameter: [P_BETRIEB, P_MARKE],
+    parameter: [P_BETRIEB, P_MARKE, P_ZEITRAUM],
+    // Der Nenner MUSS im selben Zeitraum stehen wie der Zaehler.
+    //
+    // Bis zum 28.07.2026 holte eine LATERAL-Unterabfrage den Tagesumsatz
+    // ueber die GESAMTE Historie. Mit einem Zeitraumfilter waere das
+    // stillschweigend falsch geworden: der Zaehler haette sich auf drei
+    // Monate verkleinert, der Nenner nicht, und die Anteile haetten sich
+    // statt auf 100 % auf einen Bruchteil summiert -- ohne Fehlermeldung,
+    // nur mit flacheren Kurven. Ein Feldfilter laesst sich in eine
+    // Unterabfrage nicht einsetzen, deshalb rechnet jetzt ein Fenster
+    // ueber genau die Zeilen, die der Filter uebrig laesst.
     sql: `
-SELECT lpad(s.stunde::text, 2, '0') || ':00'                       AS "Stunde",
-       s.betrieb                                                   AS "Betrieb",
-       round(100 * sum(s.umsatz_netto) / nullif(t.gesamt, 0), 2)    AS "Anteil %"
-  FROM mart.umsatz_stunde s
-  JOIN LATERAL (
-        SELECT sum(x.umsatz_netto) AS gesamt
-          FROM mart.umsatz_stunde x WHERE x.betrieb_key = s.betrieb_key
-  ) t ON true
- WHERE 1 = 1
-   [[AND s.betrieb = {{betrieb}}]]
-   [[AND s.konzept = {{marke}}]]
- GROUP BY s.stunde, s.betrieb, t.gesamt
- ORDER BY ((s.stunde + 16) % 24)`,
+SELECT "Stunde", "Betrieb",
+       round(100 * stunde_umsatz / nullif(gesamt, 0), 2) AS "Anteil %"
+  FROM (
+    -- Ohne Tabellenalias: Metabase baut die Klausel eines Feldfilters aus
+    -- dem TABELLENNAMEN ("umsatz_stunde.geschaeftstag BETWEEN ..."), und
+    -- mit einem Alias ist der Name dort nicht mehr gueltig.
+    SELECT lpad(stunde::text, 2, '0') || ':00' AS "Stunde",
+           betrieb                             AS "Betrieb",
+           ((stunde + 16) % 24)                AS sortierung,
+           sum(umsatz_netto)                   AS stunde_umsatz,
+           sum(sum(umsatz_netto)) OVER (PARTITION BY betrieb) AS gesamt
+      FROM mart.umsatz_stunde
+     WHERE 1 = 1
+       [[AND betrieb = {{betrieb}}]]
+       [[AND konzept = {{marke}}]]
+       [[AND {{zeitraum}}]]
+     GROUP BY stunde, betrieb
+  ) x
+ ORDER BY sortierung`,
+    template_tag_dimension: { zeitraum: ['mart', 'umsatz_stunde', 'geschaeftstag'] },
     visualisierung: {
       'graph.dimensions': ['Stunde', 'Betrieb'],
       'graph.metrics': ['Anteil %'],

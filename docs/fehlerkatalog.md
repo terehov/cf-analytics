@@ -1227,3 +1227,112 @@ an Aposto Augsburg (32,64 → 32,6).
 **Regel.** Eine Karte, die für eine Einheit gedacht ist, muss auch ohne Filter lesbar bleiben —
 entweder sagt sie, von wem jede Zeile stammt, oder sie fasst ehrlich zusammen. Was sie nicht
 darf: mehrere Einheiten so stapeln, dass es wie eine aussieht.
+
+## Tabellen scrollten waagerecht, und die erste Prüfung dagegen mass nichts
+
+**Symptom.** Gemeldet am 28.07.2026: „Viele Tabellen sind zu eng und brauchen viel
+horizontales Scrollen." Genannt wurde „Betrieb — Kennzahlen des Monats" auf ③ Betrieb: neun
+Spalten auf sechzehn Rastereinheiten, daneben die Standortkarte.
+
+**Warum das mehr ist als ein Schönheitsfehler.** Wer scrollen muss, um die dritte Spalte zu
+sehen, vergleicht sie nicht mehr mit der ersten — und Vergleichen ist der Zweck einer Tabelle.
+Auf ② Filialen standen zwanzig Spalten auf fünfzehn Einheiten; sechs Ampeln lagen außerhalb
+des Bildes.
+
+**Drei Fehlversuche, bis die Messung stimmte.** Der Reihe nach, weil jeder etwas anderes
+falsch machte:
+
+| Ansatz | Warum er scheiterte |
+|---|---|
+| `LIMIT 0`, Spalten aus `Object.keys(zeile[0])` | Bei null Zeilen gibt es keine erste Zeile — überall NULL Spalten gemessen und **„alle Tabellen haben genug Breite"** gemeldet, während vier zu schmal waren |
+| Spalten **zählen** | „Datenstand" hat zehn Spalten und braucht 368 Zeichen, „Maßnahmen" hat elf und braucht 83. Was scrollt, ist die Summe der Inhalte |
+| Zeichen linear in Pixel | Metabase gibt jeder Spalte eine **Mindestbreite** von rund 70 Pixeln. Tabellen mit vielen kurzen Spalten wurden dadurch unterschätzt und gingen durch |
+
+Die vierte Fassung rechnet in Pixeln mit Mindestbreite je Spalte, Aufschlag je Zeichen und
+Obergrenze — alle drei Werte am gerenderten Ergebnis abgelesen, nicht hergeleitet.
+
+**Eine Prüfung, die durchgeht, weil sie nichts gemessen hat, ist schlimmer als gar keine.**
+Sie meldet Entwarnung. Deshalb wirft `tabellenbreite.ts` jetzt, wenn eine Karte null Spalten
+oder der Lauf null Kacheln meldet.
+
+**Ein Messfehler sah aus wie ein Kartenfehler.** Der `pg`-Treiber macht aus einem `date` ein
+JavaScript-`Date`; `String()` daraus ist `2022-09-07T00:00:00.000Z` — 62 Zeichen für einen Tag,
+den Metabase als `2022-09-07` zeigt. Ein `::date` im SQL sah dadurch wirkungslos aus, obwohl es
+genau richtig war. Erst ein `setTypeParser`, der Datumswerte als Text liefert, mass das, was
+im Browser steht.
+
+**Zwei Hebel, in dieser Reihenfolge:** erst die breitesten Spalten schmaler machen — ein
+Zeitstempel mit Mikrosekunden, wo ein Datum genügt, kostet 50 Pixel ohne Aussage —, dann die
+Kachel breiter legen. Umgesetzt: `dd_betrieb_kopf`, `dd_filialen_tabelle`, `rt_marke`,
+`rt_massnahmen_offen`, `dq_konzept`, `pf_konzentration`, `pf_marken_matrix`,
+`dq_umsatz_abweichung`, `dq_pruefung`, `wa_renner`/`wa_penner` und
+`dd_betrieb_artikel`/`dd_betrieb_bwa` auf volle Breite; Standortkarte auf ③ und ② jeweils
+neben eine Karte gerückt, die keine waagerechte Ausdehnung braucht. Bei `dq_konzept` half
+keine Breite: `string_agg` schrieb **131 Betriebsnamen und 3.693 Zeichen in EINE Zelle** —
+gekürzt auf Anzahl plus Stichprobe.
+
+## „Zeitraum" fehlte, also hörten die Verläufe auf gar keine Zeit
+
+**Symptom.** Gemeldet am 28.07.2026: „Wenn ich bei Betrieb oben einen Monat auswähle, erwarte
+ich, dass die Karten im Bereich Struktur auch nur die ausgewählte Periode anzeigen."
+
+**Die Ursache war eine falsche Antwort auf eine richtige Beobachtung — meine.** ③ Betrieb
+führte nur einen **Monatsfilter**. Der wählt einen Stichmonat, und den kann ein Verlauf nicht
+lesen: es bliebe ein Punkt übrig. Genau deshalb standen „Speisen und Getränke", Zeitzonen und
+Tagesverlauf in `FILTER_AUSNAHME`, begründet mit „über die gesamte Historie". Fachlich
+vertretbar, praktisch falsch: wer oben einen Monat einstellt, erwartet darunter nicht
+dreieinhalb Jahre.
+
+**Die Lösung ist nicht, dem Verlauf einen Stichmonat aufzuzwingen, sondern der Seite einen
+Zeitraum zu geben, den ein Verlauf lesen kann.** ③ Betrieb, Personal, BWA und ⑤ Standorte
+vergleichen führen jetzt beide: **Monat** für die Ampeln und Stichmonatstabellen, **Zeitraum**
+für die Verläufe darunter. Der Unterschied steht im Kopftext der Seite.
+
+Nachgemessen an der Zeitzonen-Karte von Aposto Augsburg: **9,6 Mio. €** ohne Zeitraum,
+**1,06 Mio. €** für den 1.1.–30.6.2026 — und dieser Wert stimmt auf den Euro mit der
+YTD-Kachel derselben Seite überein.
+
+**Wo ein Zeitraum wirklich nicht passt, steht es begründet in `FILTER_AUSNAHME`** — bei
+Kennzahlkacheln eines Monats, bei „bis wann hat der Steuerberater gebucht" (eine Frage an die
+Gegenwart) und bei offenen Maßnahmen (eine fällige Maßnahme aus dem März verschwindet nicht
+dadurch, dass man auf den Juni schaut).
+
+## Ein Feldfilter auf eine Tabelle mit Alias scheitert erst, wenn jemand ihn setzt
+
+**Symptom.** Nach dem Einbau des Zeitraumfilters zeigten „Betrieb — Umsatz je Tag" und
+„Betrieb — BWA im Verlauf" auf dem Dashboard *There was a problem displaying this chart* —
+während beide Karten einzeln aufgerufen tadellos liefen.
+
+**Ursache.** Metabase baut die Klausel eines Feldfilters aus dem **Tabellennamen**:
+
+```
+bwa_kennzahl.monat BETWEEN … AND …
+```
+
+Steht die Tabelle im SQL unter einem Alias (`FROM mart.bwa_kennzahl k`), ist dieser Name an
+der Stelle nicht mehr gültig:
+
+```
+ERROR: invalid reference to FROM-clause entry for table "bwa_kennzahl"
+  Hint: Perhaps you meant to reference the table alias "k".
+```
+
+**Warum es so spät auffällt.** Ohne gesetzten Wert fällt der optionale Block `[[…]]` weg und
+die Abfrage läuft. Der Fehler erscheint erst, wenn jemand den Filter **wirklich benutzt** —
+also genau dann, wenn niemand mehr mit einem Einbaufehler rechnet.
+
+**Vier Karten an einem Nachmittag.** Zwei fielen im Browser auf; die anderen beiden fand eine
+Regel: *hat eine Karte einen Feldfilter auf eine Tabelle, die im SQL einen Alias trägt?* Sie
+steht jetzt als Prüfung in `uebernehmen.ts` und bricht das Übernehmen ab — geprüft, indem ein
+Alias absichtlich wieder eingesetzt wurde.
+
+**Derselbe Fehler in einer Unterabfrage.** `dd_betrieb_verlauf` referenzierte `{{zeitraum}}`
+ein zweites Mal in einer Unterabfrage über die CTE `tage`, wo `umsatz_tag` nicht mehr in
+Reichweite ist. Die Eingrenzung steht jetzt nur noch in der CTE.
+
+**Und ein Fehler, der ohne Fehlermeldung ausgegangen wäre.** `vg_ort_profil` rechnet Anteile
+am Tagesumsatz. Der Nenner kam aus einer LATERAL-Unterabfrage über die **gesamte** Historie.
+Hätte man dort nur den Filter ergänzt, wäre der Zähler auf drei Monate geschrumpft und der
+Nenner nicht: die Anteile hätten sich statt auf 100 % auf **5,55 %** summiert — flachere
+Kurven, keine Fehlermeldung. Nachgemessen, bevor es passieren konnte; der Nenner rechnet
+jetzt als Fenster über genau die Zeilen, die der Filter übrig lässt.

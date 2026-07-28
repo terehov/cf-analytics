@@ -146,9 +146,23 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
   dd_betrieb_stunde:      { monat: 'Tagesprofil ueber die gesamte Historie.' },
   dd_betrieb_personal:    { monat: 'Alle Zeitraeume dieses Betriebs.' },
   dd_betrieb_bwa:         { monat: 'BWA-Verlauf ueber alle gebuchten Monate.' },
-  dd_betrieb_massnahmen:  { monat: 'Offene Massnahmen unabhaengig vom Stichmonat.' },
-  dd_betrieb_datenstand:  { monat: 'Datenstand ist der Stand JETZT, kein Monatswert.' },
-  bwa_buchungsstand:      { monat: 'Buchungsstand ist der Stand JETZT, kein Monatswert.' },
+  dd_betrieb_massnahmen: {
+    monat: 'Offene Massnahmen unabhaengig vom Stichmonat.',
+    zeitraum: 'Offene Massnahmen sind offen, unabhaengig vom betrachteten Zeitraum. '
+            + 'Eine faellige Massnahme aus dem Maerz verschwindet nicht dadurch, '
+            + 'dass man auf den Juni schaut.',
+  },
+  dd_betrieb_datenstand: {
+    monat: 'Datenstand ist der Stand JETZT, kein Monatswert.',
+    zeitraum: 'Ebenso: "bis wann sind Umsaetze da" ist keine Frage an einen '
+            + 'Zeitraum, sondern an die Gegenwart.',
+  },
+  bwa_buchungsstand: {
+    monat: 'Buchungsstand ist der Stand JETZT, kein Monatswert.',
+    zeitraum: 'Ebenso: bis wann der Steuerberater gebucht hat, ist eine Frage an '
+            + 'die Gegenwart. Ein Zeitraum wuerde sie nicht einschraenken, sondern '
+            + 'die Antwort verfaelschen.',
+  },
   rt_massnahmen_offen:    { monat: 'Offene Massnahmen unabhaengig vom Stichmonat.' },
   rt_massnahmen_status:   { monat: 'Verteilung ueber alle Massnahmen.' },
   wa_we_pruefung:         { zeitraum: 'Vergleich je Monat gegen die BWA, nicht je Tag.' },
@@ -193,6 +207,8 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
     bereich: 'Ein Punkt je Standort, gefaerbt nach Handlungsbedarf ueber alle Bereiche. '
            + 'Ein einzelner Bereich waere keine andere Karte, sondern eine andere Farbe -- '
            + 'und die kann Metabases Punktkarte ohnehin nicht.',
+    zeitraum: 'Standorte liegen, wo sie liegen. Die Faerbung folgt dem Monatsfilter, '
+            + 'die Koordinaten keinem Zeitfilter.',
   },
 
   // --- Stichmonat statt Zeitraum. Diese beiden Tabellen zeigen eine Zeile
@@ -224,6 +240,67 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
   },
   dq_backfill: { betrieb: 'Importfortschritt je Endpunkt, nicht je Betrieb.' },
   im_bericht:  { betrieb: 'Importzustand je Bericht, nicht je Betrieb.' },
+
+  // --- Personal und BWA: Stichmonat gegen Zeitraum --------------------------
+  // Beide Seiten fuehren seit dem 28.07.2026 einen Zeitraumfilter, damit
+  // die Verlaeufe und Zeitraumtabellen ueberhaupt auf die Zeit hoeren --
+  // vorher zeigten sie die gesamte Historie, waehrend oben ein Monat
+  // eingestellt war. Die Karten hier VERGLEICHEN Betriebe fuer EINEN
+  // Monat; ein Zeitraum daneben liesse offen, welcher Monat in der Zeile
+  // steht.
+  pe_quote_betrieb: {
+    zeitraum: 'Rangliste aller Betriebe zum Stichmonat. Ueber ein Quartal waere '
+            + 'unklar, welcher Monat den Rang bestimmt.',
+  },
+  vg_ort_metriken: {
+    zeitraum: 'Vergleicht Betriebe ueber alle Kennzahlen zum Stichmonat -- die '
+            + 'Ampeln gibt es je Monat einmal. Der Zeitraum wirkt auf den '
+            + 'Umsatzverlauf und das Tagesprofil darunter.',
+  },
+  vg_ort_sparte: {
+    zeitraum: 'Speisen gegen Getraenke je Betrieb fuer EINEN Monat. Ueber ein '
+            + 'Quartal waeren es Summen, und die Zeile sagte nicht, aus welchem '
+            + 'Monat sie stammt.',
+  },
+  pe_quote_tabelle: {
+    zeitraum: 'Eine Zeile je Betrieb zum Stichmonat -- dafuer ist der Monatsfilter da.',
+  },
+  bwa_ebit: {
+    zeitraum: 'EBIT je Betrieb fuer EINEN gebuchten Monat. Ueber mehrere Monate '
+            + 'waere der Balken eine Summe und die Marge daneben keine Marge mehr.',
+  },
+
+  // --- ③ Betrieb: Stichmonat gegen Zeitraum ---------------------------------
+  // Die Seite fuehrt seit dem 28.07.2026 BEIDE Zeitfilter. Der Monat gilt
+  // den Ampeln und Kennzahlen, der Zeitraum den Verlaeufen darunter --
+  // vorher hoerten die Strukturdiagramme auf gar keinen von beiden und
+  // zeigten dreieinhalb Jahre, waehrend oben ein Monat eingestellt war.
+  //
+  // Was hier steht, sind die Karten, fuer die ein ZEITRAUM keinen Sinn
+  // ergibt, weil sie einen Stichmonat zeigen. Das ist kein Versehen und
+  // keine Bequemlichkeit: "Umsatz im Juni" mit einem Zeitraum von drei
+  // Monaten daneben waere die Frage, welcher Monat in der Zahl steht -- und
+  // darauf gibt es keine Antwort, die man ablesen koennte.
+  dd_betrieb_umsatz_kachel: {
+    zeitraum: 'Kennzahl EINES Monats. Ein Zeitraum daneben liesse offen, welcher '
+            + 'Monat in der Zahl steht.',
+  },
+  dd_betrieb_ytd_kachel: {
+    zeitraum: 'Aufgelaufener Wert seit Jahresbeginn -- der Anfang steht fest, '
+            + 'ein Zeitraum wuerde ihn verschieben und die Zahl waere kein YTD mehr.',
+  },
+  dd_betrieb_gaeste_kachel: { zeitraum: 'Kennzahl EINES Monats, wie die Umsatzkachel.' },
+  dd_betrieb_bon_kachel:    { zeitraum: 'Kennzahl EINES Monats, wie die Umsatzkachel.' },
+  dd_betrieb_kopf: {
+    zeitraum: 'Die sechs Ampeln gibt es je Monat einmal. Genau dafuer ist der '
+            + 'Monatsfilter da; ein Zeitraum ergaebe sechs Zeilen je Monat '
+            + 'uebereinander, ohne dass die Zeile sagt, aus welchem.',
+  },
+  dd_betrieb_artikel: {
+    zeitraum: 'Die 30 meistverkauften Artikel EINES Monats. Ueber ein Quartal '
+            + 'waere es eine andere Rangliste -- richtig, aber nicht die, die '
+            + 'neben den Ampeln desselben Monats steht.',
+  },
 }
 
 // Doppelte Schluessel in FILTER_AUSNAHME sind in JavaScript erlaubt: der
@@ -247,6 +324,46 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
     throw new Error(
       'FILTER_AUSNAHME hat doppelte Eintraege: ' + doppelt.join(', ') +
       '\n  Der spaetere ueberschreibt den frueheren stillschweigend. Zusammenfassen.')
+  }
+}
+
+// ---------------------------------------------------------------------
+// Feldfilter vertragen keinen Tabellenalias.
+//
+// Metabase baut die Klausel eines Feldfilters aus dem TABELLENNAMEN:
+// aus {{zeitraum}} auf mart.bwa_kennzahl.monat wird
+//   bwa_kennzahl.monat BETWEEN ... AND ...
+// Steht die Tabelle im SQL unter einem Alias (FROM mart.bwa_kennzahl k),
+// ist dieser Name an der Stelle nicht mehr gueltig, und Postgres
+// antwortet mit "invalid reference to FROM-clause entry".
+//
+// Das faellt nicht beim Anlegen auf und nicht beim Oeffnen der Karte,
+// sondern erst, wenn jemand den Filter WIRKLICH setzt -- ohne Wert faellt
+// der optionale Block [[...]] weg und die Abfrage laeuft. Genau so
+// passierte es am 28.07.2026 gleich viermal an einem Nachmittag.
+// ---------------------------------------------------------------------
+{
+  const aliasFehler: string[] = []
+  for (const k of alleKarten) {
+    for (const [tag, ziel] of Object.entries(k.template_tag_dimension ?? {})) {
+      const [schema, tabelle] = ziel
+      // Ein Wort nach dem Tabellennamen, das kein SQL-Schluesselwort ist,
+      // ist ein Alias.
+      const re = new RegExp(
+        `(?:FROM|JOIN)\\s+${schema}\\.${tabelle}\\s+(?!ON\\b|WHERE\\b|GROUP\\b|ORDER\\b|` +
+        `HAVING\\b|LIMIT\\b|CROSS\\b|LEFT\\b|RIGHT\\b|INNER\\b|FULL\\b|JOIN\\b|UNION\\b)` +
+        `([a-z][a-z0-9_]*)`, 'i')
+      const treffer = k.sql.match(re)
+      if (treffer) {
+        aliasFehler.push(
+          `${k.schluessel}: Feldfilter {{${tag}}} zeigt auf ${schema}.${tabelle}, ` +
+          `aber die Tabelle steht im SQL unter dem Alias "${treffer[1]}". ` +
+          `Alias entfernen — sonst scheitert die Karte, sobald der Filter gesetzt wird.`)
+      }
+    }
+  }
+  if (aliasFehler.length > 0) {
+    throw new Error('Feldfilter auf Tabelle mit Alias:\n  ' + aliasFehler.join('\n  '))
   }
 }
 

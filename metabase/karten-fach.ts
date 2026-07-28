@@ -439,22 +439,24 @@ SELECT r.betrieb                            AS "Betrieb",
     beschreibung:
       'Personalkostenquoten für Service, Bar und Küche nebeneinander. Alle Werte in Prozent vom Umsatz, nicht in Euro.',
     anzeige: 'table',
-    parameter: [BETRIEB],
+    parameter: [BETRIEB, ZEITRAUM],
     sql: `
-SELECT betrieb        AS "Betrieb",
-       zeitraum_von   AS "Von",
-       zeitraum_bis   AS "Bis",
-       pek_gesamt     AS "Personal gesamt %",
-       pek_service    AS "Service %",
-       pek_bar        AS "Bar %",
-       pek_kueche     AS "Küche %",
-       persoog_bwa    AS "o. GF % (BWA)",
-       ampel_global   AS "Ampel global",
-       ampel_lina     AS "Ampel LINA"
+SELECT betrieb            AS "Betrieb",
+       zeitraum_von::date AS "Von",
+       zeitraum_bis::date AS "Bis",
+       pek_gesamt         AS "Personal gesamt %",
+       pek_service        AS "Service %",
+       pek_bar            AS "Bar %",
+       pek_kueche         AS "Küche %",
+       persoog_bwa        AS "o. GF % (BWA)",
+       ampel_global       AS "Ampel global",
+       ampel_lina         AS "Ampel LINA"
   FROM mart.personalkosten
  WHERE 1 = 1
    [[AND betrieb = {{betrieb}}]]
+   [[AND {{zeitraum}}]]
  ORDER BY zeitraum_von DESC, betrieb`,
+    template_tag_dimension: { zeitraum: ['mart', 'personalkosten', 'zeitraum_von'] },
   },
   {
     schluessel: 'pe_effektivitaet',
@@ -462,26 +464,28 @@ SELECT betrieb        AS "Betrieb",
     beschreibung:
       'Umsatz je geleisteter Personalstunde in Euro, gesamt und je Bereich. Sagt, was eine Arbeitsstunde einbringt — anders als die Quote, die sagt, was sie kostet.',
     anzeige: 'table',
-    parameter: [BETRIEB],
+    parameter: [BETRIEB, ZEITRAUM],
     sql: `
-SELECT betrieb        AS "Betrieb",
-       zeitraum_von   AS "Von",
-       zeitraum_bis   AS "Bis",
-       eff_gesamt     AS "Effektivität gesamt",
-       eff_service    AS "Service",
-       eff_bar        AS "Bar",
-       eff_kueche     AS "Küche"
+SELECT betrieb            AS "Betrieb",
+       zeitraum_von::date AS "Von",
+       zeitraum_bis::date AS "Bis",
+       eff_gesamt         AS "Effektivität gesamt",
+       eff_service        AS "Service",
+       eff_bar            AS "Bar",
+       eff_kueche         AS "Küche"
   FROM mart.personalkosten
  WHERE 1 = 1
    [[AND betrieb = {{betrieb}}]]
+   [[AND {{zeitraum}}]]
  ORDER BY zeitraum_von DESC, betrieb`,
+    template_tag_dimension: { zeitraum: ['mart', 'personalkosten', 'zeitraum_von'] },
   },
   {
     schluessel: 'pe_verlauf',
     name: 'Personalkostenquote im Verlauf',
     beschreibung: 'Die Personalkostenquote über die Monate, aus den Zahlen des Steuerberaters. Die Linie bei 28 % ist die Grenze, ab der die Ampel im Round Table auf Grün steht.',
     anzeige: 'line',
-    parameter: [BETRIEB],
+    parameter: [BETRIEB, ZEITRAUM],
     sql: `
 SELECT monat                                                     AS "Monat",
        round(avg(personalkosten_ogf_pct), 2)                     AS "Ø Personal o. GF %",
@@ -490,8 +494,10 @@ SELECT monat                                                     AS "Monat",
   FROM mart.round_table_monat
  WHERE personalkosten_ogf_pct IS NOT NULL
    [[AND betrieb = {{betrieb}}]]
+   [[AND {{zeitraum}}]]
  GROUP BY monat
  ORDER BY monat`,
+    template_tag_dimension: { zeitraum: ['mart', 'round_table_monat', 'monat'] },
     visualisierung: {
       'graph.dimensions': ['Monat'],
       'graph.metrics': ['Ø Personal o. GF %', 'Median'],
@@ -643,19 +649,25 @@ SELECT ware                  AS "Ware",
     beschreibung:
       'Umsatz, Wareneinsatz, Personalkosten und Ergebnis aus den Zahlen des Steuerberaters. Es werden nur gebuchte Monate gezeigt: ein Monat, in dem alles auf null steht, ist noch nicht gebucht — nicht umsatzlos.',
     anzeige: 'line',
-    parameter: [BETRIEB],
+    parameter: [BETRIEB, ZEITRAUM],
     sql: `
-SELECT k.monat AS "Monat",
-       round(sum(k.wert_absolut) FILTER (WHERE k.kennzahl = 'Umsatz'))                 AS "Umsatz",
-       round(sum(k.wert_absolut) FILTER (WHERE k.kennzahl IN ('WE Bar','WE Küche')))   AS "Wareneinsatz",
-       round(sum(k.wert_absolut) FILTER (WHERE k.kennzahl = 'Personalkosten ohne GF')) AS "Personalkosten",
-       round(sum(k.wert_absolut) FILTER (WHERE k.kennzahl = 'EBIT'))                   AS "EBIT"
-  FROM mart.bwa_kennzahl k
+-- OHNE Tabellenalias: Metabase baut die Klausel eines Feldfilters aus
+-- dem TABELLENNAMEN ("bwa_kennzahl.monat BETWEEN ..."). Mit einem Alias
+-- ist der Name an dieser Stelle nicht mehr gueltig, und Postgres
+-- antwortet mit "invalid reference to FROM-clause entry".
+SELECT monat AS "Monat",
+       round(sum(wert_absolut) FILTER (WHERE kennzahl = 'Umsatz'))                 AS "Umsatz",
+       round(sum(wert_absolut) FILTER (WHERE kennzahl IN ('WE Bar','WE Küche')))   AS "Wareneinsatz",
+       round(sum(wert_absolut) FILTER (WHERE kennzahl = 'Personalkosten ohne GF')) AS "Personalkosten",
+       round(sum(wert_absolut) FILTER (WHERE kennzahl = 'EBIT'))                   AS "EBIT"
+  FROM mart.bwa_kennzahl
  WHERE 1 = 1
-   [[AND k.betrieb = {{betrieb}}]]
- GROUP BY k.monat
-HAVING count(*) FILTER (WHERE k.wert_absolut IS NOT NULL AND k.wert_absolut <> 0) > 0
- ORDER BY k.monat`,
+   [[AND betrieb = {{betrieb}}]]
+   [[AND {{zeitraum}}]]
+ GROUP BY monat
+HAVING count(*) FILTER (WHERE wert_absolut IS NOT NULL AND wert_absolut <> 0) > 0
+ ORDER BY monat`,
+    template_tag_dimension: { zeitraum: ['mart', 'bwa_kennzahl', 'monat'] },
     visualisierung: {
       'graph.dimensions': ['Monat'],
       'graph.metrics': ['Umsatz', 'Wareneinsatz', 'Personalkosten', 'EBIT'],
@@ -741,9 +753,12 @@ SELECT endpunkt          AS "Endpunkt",
        geladen           AS "Geladen",
        keine_daten       AS "Keine Daten",
        aufgegeben        AS "Aufgegeben",
-       aeltester_geladen AS "Ältester geladen",
-       juengster_geladen AS "Jüngster geladen",
-       aeltester_offener AS "Ältester offener"
+       -- "Ältester geladen" und Geschwister kosteten je 134 Pixel fuer
+       -- ein Datum von zehn Zeichen. Was geladen und was offen ist, sagt
+       -- die Gruppierung; die Ueberschrift muss es nicht wiederholen.
+       aeltester_geladen AS "Geladen ab",
+       juengster_geladen AS "Geladen bis",
+       aeltester_offener AS "Offen ab"
   FROM mart.backfill_fortschritt
  ORDER BY prozent, endpunkt`,
   },
@@ -767,21 +782,29 @@ SELECT endpunkt AS "Endpunkt",
   {
     schluessel: 'dq_sync',
     name: 'Letzte Datenabrufe',
-    beschreibung: 'Die letzten Datenabrufe, der jüngste zuerst. Erste Anlaufstelle, wenn irgendwo Zahlen fehlen.',
+    beschreibung:
+      'Die letzten Datenabrufe, der jüngste zuerst. Erste Anlaufstelle, wenn irgendwo '
+      + 'Zahlen fehlen.\n\n'
+      + '„Schema“ zählt offene Schema-Abweichungen des Laufs, „Pausiert“ die '
+      + 'pausierten Kombinationen aus Endpunkt und Betrieb.',
     anzeige: 'table',
     sql: `
-SELECT lauf_id                 AS "Lauf",
-       gestartet_am            AS "Gestartet",
-       beendet_am              AS "Beendet",
-       status                  AS "Status",
-       ausloeser               AS "Auslöser",
-       aufgaben_gesamt         AS "Aufgaben",
-       aufgaben_ok             AS "OK",
-       aufgaben_fehler         AS "Fehler",
-       aufgaben_uebersprungen  AS "Übersprungen",
-       dauer_s                 AS "Dauer (s)",
-       offene_abweichungen     AS "Schema-Abweichungen",
-       pausierte_kombinationen AS "Pausiert"
+-- Zeitstempel auf Sekunden gekuerzt: die Mikrosekunden und die
+-- Zeitzone machten aus jeder der beiden Zeitspalten 29 Zeichen und
+-- damit 238 Pixel. Zusammen war das ein Drittel der Tabellenbreite fuer
+-- eine Genauigkeit, die bei einem Importlauf niemand braucht.
+SELECT lauf_id                                     AS "Lauf",
+       to_char(gestartet_am, 'DD.MM. HH24:MI:SS')  AS "Gestartet",
+       to_char(beendet_am,   'DD.MM. HH24:MI:SS')  AS "Beendet",
+       status                                      AS "Status",
+       ausloeser                                   AS "Auslöser",
+       aufgaben_gesamt                             AS "Aufgaben",
+       aufgaben_ok                                 AS "OK",
+       aufgaben_fehler                             AS "Fehler",
+       aufgaben_uebersprungen                      AS "Übersprungen",
+       dauer_s                                     AS "Dauer (s)",
+       offene_abweichungen                         AS "Schema",
+       pausierte_kombinationen                     AS "Pausiert"
   FROM mart.sync_status
  LIMIT 25`,
   },
@@ -789,20 +812,32 @@ SELECT lauf_id                 AS "Lauf",
     schluessel: 'dq_datenstand',
     name: 'Datenstand je Betrieb',
     beschreibung:
-      'Für welche Betriebe liegen überhaupt genug Daten für ein Urteil vor? Ohne diese Liste sieht ein Betrieb, dessen Daten fehlen, genauso aus wie einer, bei dem alles in Ordnung ist.',
+      'Für welche Betriebe liegen überhaupt genug Daten für ein Urteil vor? Ohne diese '
+      + 'Liste sieht ein Betrieb, dessen Daten fehlen, genauso aus wie einer, bei dem '
+      + 'alles in Ordnung ist.\n\n'
+      + '„Tage“ ist die Zahl der Tage mit Umsatz, „Alter“ der Abstand des letzten '
+      + 'Umsatztages zu heute in Tagen, „Verzug“ der Rückstand der BWA in Monaten.',
     anzeige: 'table',
     sql: `
-SELECT betrieb           AS "Betrieb",
-       befund            AS "Befund",
-       erster_tag        AS "Umsatz ab",
-       letzter_tag       AS "Umsatz bis",
-       umsatztage        AS "Umsatztage",
-       umsatz_alter_tage AS "Umsatz Alter (Tage)",
-       bwa_monat         AS "BWA gebucht bis",
-       bwa_verzug_monate AS "BWA Verzug",
-       artikeltage       AS "Artikeltage",
-       letzter_personaltag AS "Personal bis",
-       konzept           AS "Marke"
+-- Kurze Ueberschriften: bei dieser Tabelle macht die UEBERSCHRIFT die
+-- Spalte breit, nicht der Wert. "Umsatz Alter (Tage)" belegte 158 Pixel
+-- fuer eine einstellige Zahl. Was die Kuerzel bedeuten, steht in der
+-- Beschreibung der Karte.
+SELECT betrieb             AS "Betrieb",
+       befund              AS "Befund",
+       erster_tag          AS "Umsatz ab",
+       letzter_tag         AS "Umsatz bis",
+       umsatztage          AS "Tage",
+       umsatz_alter_tage   AS "Alter",
+       bwa_monat           AS "BWA bis",
+       bwa_verzug_monate   AS "Verzug",
+       artikeltage         AS "Artikeltage",
+       letzter_personaltag AS "Personal bis"
+       -- Ohne Markenspalte: sie belegte 192 Pixel und stand fast immer
+       -- schon im Betriebsnamen ("Aposto Augsburg"). Zusammen mit der
+       -- Betriebsspalte war das die Haelfte der Tabelle fuer eine
+       -- Angabe, die hier niemand sucht -- die Frage dieser Karte ist
+       -- "reichen die Daten fuer ein Urteil", nicht "welche Marke".
   FROM mart.datenstand
  ORDER BY CASE befund
             WHEN 'kein Umsatz geladen' THEN 1
@@ -835,11 +870,15 @@ SELECT befund   AS "Befund",
       'Diese Liste sollte leer sein. Jede Zeile ist ein Betrieb, der in keiner Kennzahlenauswertung auftaucht, weil er den Zahlen des Steuerberaters nicht zugeordnet werden kann — stillschweigend, ohne Fehlermeldung.',
     anzeige: 'table',
     sql: `
-SELECT betrieb    AS "Betrieb",
-       stadt      AS "Stadt",
-       aktiv      AS "Aktiv",
-       hat_bwa    AS "Hat BWA",
-       zuletzt_am AS "Zuletzt gesehen"
+SELECT betrieb            AS "Betrieb",
+       stadt              AS "Stadt",
+       aktiv              AS "Aktiv",
+       hat_bwa            AS "Hat BWA",
+       -- Als Datum, nicht als Zeitstempel: '2026-07-26 00:00:00.000000
+       -- +00:00' ist 62 Zeichen breit und sagt keine Sekunde mehr aus
+       -- als '2026-07-26'. Vier solcher Spalten schieben eine Tabelle
+       -- ueber den Rand, und dann scrollt man an den Zahlen vorbei.
+       zuletzt_am::date   AS "Zuletzt gesehen"
   FROM mart.betrieb_ohne_lina_id`,
   },
   {
@@ -849,9 +888,18 @@ SELECT betrieb    AS "Betrieb",
       'Woher die Marke je Betrieb stammt. Zeilen mit „mehrdeutig — Entscheidung fehlt" sind zu klären: solange das offen ist, laufen diese Betriebe in allen Markenauswertungen unter „(nicht zugeordnet)".',
     anzeige: 'table',
     sql: `
-SELECT herkunft        AS "Herkunft",
-       count(*)        AS "Betriebe",
-       string_agg(betrieb, ', ' ORDER BY betrieb) AS "welche"
+-- Die Namen standen bis zum 28.07.2026 vollstaendig in einer Spalte:
+-- string_agg ueber alle Betriebe einer Herkunft, bei "aus LINA
+-- eindeutig" waren das 131 Namen und 3693 Zeichen in EINER Zelle. Keine
+-- Kachelbreite macht das lesbar -- man sah den Anfang und scrollte ins
+-- Nichts. Und die 131 eindeutigen sind ohnehin nicht die Frage.
+--
+-- Interessant ist die Gegenrichtung: WER ist offen? Deshalb je Herkunft
+-- nur noch die Zahl, dazu bis zu fuenf Namen als Stichprobe.
+SELECT herkunft AS "Herkunft",
+       count(*) AS "Betriebe",
+       left(string_agg(betrieb, ', ' ORDER BY betrieb), 120)
+         || CASE WHEN count(*) > 5 THEN ' …' ELSE '' END AS "Beispiele"
   FROM mart.konzept_zuordnung
  GROUP BY herkunft
  ORDER BY count(*) DESC`,
@@ -863,9 +911,9 @@ SELECT herkunft        AS "Herkunft",
       'Der Tagesumsatz, aus den einzelnen Artikelverkäufen neu zusammengezählt und gegen den gemeldeten Umsatz gehalten. Abweichungen bis 0,5 % sind Rundung und unbedenklich; darüber lohnt ein Blick. Erwartung: keine auffälligen Zeilen.',
     anzeige: 'table',
     sql: `
-SELECT betrieb       AS "Betrieb",
-       geschaeftstag AS "Geschäftstag",
-       lina_netto    AS "LINA netto",
+SELECT betrieb             AS "Betrieb",
+       geschaeftstag::date AS "Geschäftstag",
+       lina_netto          AS "LINA netto",
        artikel_netto AS "aus Artikeln",
        differenz     AS "Differenz",
        differenz_pct AS "Differenz %"

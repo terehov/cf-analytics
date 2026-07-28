@@ -76,6 +76,24 @@ const F_ZEITRAUM_QUARTAL: Parameter = {
   default: 'past3months',
 }
 
+/**
+ * Zeitraum fuer die Betriebsseite -- gleiche Vorgabe, eigener Zweck.
+ *
+ * Auf ③ Betrieb stehen ein Monatsfilter (fuer die Ampeln) und ein
+ * Zeitraumfilter (fuer die Verlaeufe) nebeneinander. Ohne Vorgabe zeigten
+ * "wovon dieser Betrieb lebt", Zeitzonen und Tagesverlauf dreieinhalb
+ * Jahre am Stueck -- der Monat oben blieb wirkungslos, weil ein Verlauf
+ * keinen Stichmonat lesen kann.
+ *
+ * Drei Monate, weil ein Tagesprofil daraus schon einen Rhythmus zeigt und
+ * ein einzelner Monat zu sehr an Feiertagen und Wetter haengt. Eine
+ * VORGABE, keine Grenze: wer weiter zurueck will, stellt sie um.
+ */
+const F_ZEITRAUM_DREI_MONATE: Parameter = {
+  id: 'd-zeitraum', name: 'zeitraum', 'display-name': 'Zeitraum', type: 'date/all-options',
+  default: 'past3months',
+}
+
 // Vier einzelne Datumsfelder fuer den Zeitraumvergleich. Bewusst nicht
 // zwei Bereichsfilter: Metabase kann einen Bereichsfilter nur EINEM
 // Zeitraum zuordnen, hier brauchen beide Seiten ihren eigenen.
@@ -104,22 +122,28 @@ export const dashboards: Dashboard[] = [
     filter: [F_MONAT, F_MARKE, F_AMPEL, F_BEREICH, F_INTENSITAET],
     reihen: [
       { teile: [{ text: '# ② Filialen\n\nKlick auf den Betriebsnamen öffnet die Detailseite. ⚪ heißt **keine Daten**, nicht „in Ordnung“.\n\nVon ① kommend ist der Markenfilter gesetzt — leeren zeigt wieder alle.' }] },
-      // Karte neben der Tabelle: die Marke, die man oben gewaehlt hat, hat
-      // hier eine Ausdehnung. Schmaler als auf der Kartenseite, weil die
-      // Tabelle die Hauptsache bleibt.
+      // Die Tabelle ueber die volle Breite. Zwanzig Spalten -- Betrieb,
+      // Marke, Stadt und je Bereich Wert und Ampel -- passen auf fuenfzehn
+      // Einheiten nicht; bis zum 28.07.2026 stand die Standortkarte
+      // daneben, und man scrollte an sechs Ampeln vorbei. Bei einer
+      // Tabelle, die Betriebe VERGLEICHBAR machen soll, ist das der
+      // teuerste Platz im Layout.
+      { teile: [
+        { karte: 'dd_filialen_tabelle', hoehe: 12,
+          klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] },
+      ] },
+      // Die Standortkarte rueckt neben den Metrikvergleich: beide zeigen
+      // die Verteilung ueber die gewaehlte Menge, nur einmal raeumlich und
+      // einmal nach Bereich. Klick auf ein Segment fuehrt auf die Liste
+      // darunter -- Bereich von der Achse, Bewertung aus der Farbe.
       { teile: [
         { karte: 'so_karte_klein', breite: 9, hoehe: 12,
           klick: [{ ziel: 'dd_betrieb', uebergabe: { betrieb: 'Betrieb' } }] },
-        { karte: 'dd_filialen_tabelle', breite: 15, hoehe: 12,
-          klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] },
+        { karte: 'dd_filialen_metrikvergleich', breite: 15, hoehe: 12,
+          klick: [{ ziel: 'dd_filialen', uebergabe: { bereich: 'Bereich', ampel: 'Ampelwert' } }] },
       ] },
       { teile: [
-        // Klick auf ein Segment fuehrt auf die Liste darunter. Zwei
-        // Angaben wandern mit: der Bereich von der Achse, die Bewertung
-        // aus der Farbe des Segments.
-        { karte: 'dd_filialen_metrikvergleich', breite: 10,
-          klick: [{ ziel: 'dd_filialen', uebergabe: { bereich: 'Bereich', ampel: 'Ampelwert' } }] },
-        { karte: 'dd_filialen_rangliste', breite: 14, hoehe: 11,
+        { karte: 'dd_filialen_rangliste', hoehe: 11,
           klick: [{ ziel: 'dd_betrieb', uebergabe: { betrieb: 'Betrieb' } }] },
       ] },
       { teile: [{ text: '## Betriebe hinter einem Balken\n\nEin Klick auf ein Balkensegment füllt diese Liste. Ohne Auswahl stehen alle Bereiche untereinander.' }] },
@@ -137,9 +161,23 @@ export const dashboards: Dashboard[] = [
     beschreibung:
       'Alle Kennzahlen eines Betriebs an einer Stelle. Jede Kachel führt per Klick in die passende Detailauswertung. Oben den Betrieb auswählen oder von Ebene ② hierherkommen.',
     sammlung: 'Drill-Down',
-    filter: [F_MONAT, F_BETRIEB],
+    // Monat UND Zeitraum, und das ist kein Widerspruch, sondern der Grund,
+    // warum die Strukturdiagramme lange gar nicht auf die Zeit hoerten.
+    //
+    // Der Monatsfilter waehlt einen STICHMONAT -- richtig fuer die sechs
+    // Ampeln, die es je Monat einmal gibt. Ein Verlauf kann ihn nicht
+    // lesen: bliebe ein Punkt uebrig, waere die Kurve weg. Genau deshalb
+    // standen "wovon dieser Betrieb lebt", Zeitzonen und Tagesverlauf in
+    // FILTER_AUSNAHME -- mit der Begruendung "ueber die gesamte Historie".
+    //
+    // Das war die falsche Antwort auf die richtige Beobachtung. Wer oben
+    // einen Monat einstellt, erwartet nicht dreieinhalb Jahre darunter.
+    // Gemeldet am 28.07.2026. Die Loesung ist nicht, dem Verlauf einen
+    // Stichmonat aufzuzwingen, sondern der Seite einen ZEITRAUM zu geben,
+    // den ein Verlauf lesen kann.
+    filter: [F_MONAT, F_ZEITRAUM_DREI_MONATE, F_BETRIEB],
     reihen: [
-      { teile: [{ text: '# ③ Betrieb\n\nJedes Diagramm führt per Klick in die Detailauswertung.' }] },
+      { teile: [{ text: '# ③ Betrieb\n\nJedes Diagramm führt per Klick in die Detailauswertung.\n\n**Monat** gilt für die Ampeln und Kennzahlen, **Zeitraum** für die Verläufe darunter.' }] },
       // Die vier Kennzahlkacheln bleiben in einer eigenen Reihe: eine Reihe
       // ist so hoch wie ihr hoechstes Element, und neben der Karte waeren
       // die Zahlen auf zwoelf Einheiten auseinandergezogen.
@@ -149,18 +187,27 @@ export const dashboards: Dashboard[] = [
         { karte: 'dd_betrieb_gaeste_kachel' },
         { karte: 'dd_betrieb_bon_kachel' },
       ] },
-      { teile: [{ text: '## Die sechs Kennzahlen des Round Table\n\nJeweils mit Vormonat, Veränderung und Ampelwechsel. Die Karte daneben zeigt, wo dieser Betrieb liegt.' }] },
-      // Karte neben den sechs Kennzahlen: bei gewaehltem Betrieb steht dort
-      // genau ein Punkt. Man sieht damit im Vorbeigehen, ueber welches Haus
-      // man gerade liest -- und ob es allein steht oder Nachbarn hat.
+      { teile: [{ text: '## Die sechs Kennzahlen des Round Table\n\nJeweils mit Vormonat, Veränderung und Ampelwechsel.' }] },
+      // Die Kennzahlentabelle ueber die volle Breite. Sie stand bis zum
+      // 28.07.2026 auf sechzehn Einheiten mit der Standortkarte daneben --
+      // und brauchte damit waagerechtes Scrollen, um von "Aktuell" bis
+      // "Ursache" zu kommen. Wer scrollen muss, um die dritte Spalte zu
+      // sehen, vergleicht sie nicht mehr mit der ersten; genau dafuer ist
+      // eine Tabelle aber da.
+      // Hoehe 9, nicht 12: bei gewaehltem Betrieb sind es genau sechs
+      // Zeilen, und der Rest stand leer. Ohne Betriebsfilter scrollt die
+      // Tabelle -- das ist der seltenere Fall und der richtige Ort dafuer.
+      { teile: [{ karte: 'dd_betrieb_kopf', hoehe: 9 }] },
+      // Die Standortkarte steht jetzt neben dem Ampelverlauf. Beide
+      // beantworten dieselbe Frage -- wo steht dieses Haus, und wie steht
+      // es da -- und beide brauchen keine waagerechte Ausdehnung.
       { teile: [
-        { karte: 'dd_betrieb_kopf', breite: 16, hoehe: 12 },
+        { karte: 'dd_betrieb_ampelverlauf', breite: 16, hoehe: 12 },
         { karte: 'so_karte_klein', breite: 8, hoehe: 12 },
       ] },
       { teile: [
-        { karte: 'dd_betrieb_verlauf', breite: 14,
+        { karte: 'dd_betrieb_verlauf',
           klick: [{ ziel: 'db_umsatz', uebergabe: { betrieb: 'Betrieb' } }] },
-        { karte: 'dd_betrieb_ampelverlauf', breite: 10 },
       ] },
       { teile: [{ text: '## Struktur — wovon dieser Betrieb lebt' }] },
       { teile: [
@@ -171,10 +218,13 @@ export const dashboards: Dashboard[] = [
       { teile: [{ text: '## Personal, Ware, BWA' }] },
       { teile: [{ karte: 'dd_betrieb_personal',
         klick: [{ ziel: 'db_personal', uebergabe: { betrieb: 'Betrieb' } }] }] },
-      { teile: [
-        { karte: 'dd_betrieb_artikel', klick: [{ ziel: 'db_ware', uebergabe: { betrieb: 'Betrieb' } }] },
-        { karte: 'dd_betrieb_bwa', klick: [{ ziel: 'db_bwa', uebergabe: { betrieb: 'Betrieb' } }] },
-      ] },
+      // Artikeltabelle und BWA-Verlauf untereinander: sechs Spalten mit
+      // Artikel- und Warengruppennamen passen auf eine halbe Breite nicht,
+      // und der Artikelname steht ganz links.
+      { teile: [{ karte: 'dd_betrieb_artikel', hoehe: 11,
+        klick: [{ ziel: 'db_ware', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      { teile: [{ karte: 'dd_betrieb_bwa',
+        klick: [{ ziel: 'db_bwa', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ text: '## Maßnahmen und Datenstand' }] },
       { teile: [{ karte: 'dd_betrieb_massnahmen' }] },
       { teile: [{ karte: 'dd_betrieb_datenstand' }] },
@@ -204,7 +254,11 @@ export const dashboards: Dashboard[] = [
     beschreibung:
       'Mehrere Betriebe nebeneinander über alle Kennzahlen, im Umsatzverlauf, im Tagesverlauf und in der Aufteilung zwischen Speisen und Getränken. Oben die Betriebe auswählen.',
     sammlung: 'Drill-Down',
-    filter: [F_MONAT, F_BETRIEB, F_MARKE],
+    // Der Monat gilt der Kennzahlentabelle, der Zeitraum dem Umsatzverlauf
+    // und dem Tagesprofil darunter. Ohne ihn verglich das Tagesprofil
+    // dreieinhalb Jahre, waehrend die Tabelle darueber einen Monat zeigte
+    // -- zwei Aussagen ueber verschiedene Zeitraeume auf einer Seite.
+    filter: [F_MONAT, F_ZEITRAUM_DREI_MONATE, F_BETRIEB, F_MARKE],
     reihen: [
       { teile: [{ text: '# ⑤ Standorte vergleichen\n\nOben Betrieb oder Marke auswählen. Ohne Auswahl stehen hier alle — für einen aussagekräftigen Vergleich zwei bis vier Betriebe wählen.\n\nDer Tagesverlauf zeigt **Prozent vom eigenen Tagesumsatz**. Sonst vergleicht man nur die Größe der Häuser und nicht ihr Muster.' }] },
       { teile: [{ karte: 'vg_ort_metriken', hoehe: 11,
@@ -232,9 +286,10 @@ export const dashboards: Dashboard[] = [
 
       { teile: [{ text: '## Wo steckt der Umsatz\n\nEin Teil der geführten Betriebe macht gar keinen Umsatz. Das verzerrt jeden Anteil auf dieser Seite.' }] },
       { teile: [{ karte: 'pf_kachel_aktiv' }] },
+      { teile: [{ karte: 'pf_konzentration_kurve', breite: 10 }] },
       { teile: [
-        { karte: 'pf_konzentration_kurve', breite: 10 },
-        { karte: 'pf_konzentration', breite: 14, hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] },
+        { karte: 'pf_konzentration', hoehe: 11,
+          klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] },
       ] },
 
       { teile: [{ text: '## Was wäre zu holen\n\n„€ bis Median“ ist **kein Ziel**, sondern eine Größenordnung: was der Abstand zum Mittelfeld in Euro bedeutet.' }] },
@@ -329,16 +384,24 @@ export const dashboards: Dashboard[] = [
       { teile: [{ text: '## Marken\n\nDie erste Frage vor jeder Maßnahme: schwächelt dieser eine Betrieb oder seine ganze Marke? Die Prozentwerte zeigen jeweils den mittleren Betrieb der Marke — ein Ausreißer verzieht so nicht das Bild.' }] },
       { teile: [{ karte: 'dd_marken_tabelle', hoehe: 11,
         klick: [{ ziel: 'dd_filialen', spalte: 'Marke', uebergabe: { marke: 'Marke' } }] }] },
+      // Die Markentabelle stand bis zum 28.07.2026 auf zwoelf Einheiten
+      // neben dem Ampeldiagramm. Elf Spalten, davon vier Medianwerte mit
+      // langer Ueberschrift, gehen darauf nicht auf -- ueber die volle
+      // Breite steht jede Marke in einer lesbaren Zeile.
       { teile: [
         { karte: 'dd_marken_ampeln',
           klick: [{ ziel: 'dd_filialen', uebergabe: { marke: 'Marke' } }] },
-        { karte: 'rt_marke',
+      ] },
+      { teile: [
+        { karte: 'rt_marke', hoehe: 10,
           klick: [{ ziel: 'dd_filialen', spalte: 'Marke', uebergabe: { marke: 'Marke' } }] },
       ] },
       { teile: [{ text: '### Marken nebeneinander\n\nJede Marke in jeder Kennzahl, mit dem Abstand zum Mittelfeld aller Betriebe. Zeigt, ob eine Marke durchgehend schwächer ist oder nur in einer Disziplin.' }] },
       { teile: [
-        { karte: 'pf_marken_matrix',
+        { karte: 'pf_marken_matrix', hoehe: 10,
           klick: [{ ziel: 'dd_filialen', spalte: 'Marke', uebergabe: { marke: 'Marke' } }] },
+      ] },
+      { teile: [
         { karte: 'pf_marken_umsatzanteil',
           klick: [{ ziel: 'dd_filialen', uebergabe: { marke: 'Marke' } }] },
       ] },
@@ -383,9 +446,13 @@ export const dashboards: Dashboard[] = [
       { teile: [{ karte: 'rt_ursachen', hoehe: 11 }] },
       { teile: [{ karte: 'rt_ursachen_verlauf' }] },
       { teile: [{ text: '## Maßnahmen' }] },
+      { teile: [{ karte: 'rt_massnahmen_status', breite: 8 }] },
+      // Dreizehn Spalten -- von "Verantwortlich" bis "Notizen" -- auf
+      // sechzehn Einheiten hiessen scrollen, um zu sehen, wer bis wann
+      // was tut. Genau das ist der Zweck der Tabelle, also volle Breite.
       { teile: [
-        { karte: 'rt_massnahmen_status', breite: 8 },
-        { karte: 'rt_massnahmen_offen', breite: 16, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] },
+        { karte: 'rt_massnahmen_offen', hoehe: 11,
+          klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] },
       ] },
     ],
   },
@@ -468,7 +535,11 @@ export const dashboards: Dashboard[] = [
     beschreibung:
       'Personalkostenquoten und Umsatz je Personalstunde, gesamt und getrennt nach Service, Bar und Küche.',
     sammlung: 'Betrieb',
-    filter: [F_MONAT, F_BETRIEB],
+    // Wie auf ③ Betrieb: der Monat gilt dem Stichmonat-Vergleich, der
+    // Zeitraum den Verlaeufen und den Zeitraumtabellen darunter. Ohne ihn
+    // zeigten pe_verlauf, pe_bereich und pe_effektivitaet die gesamte
+    // Historie, waehrend oben ein Monat eingestellt war.
+    filter: [F_MONAT, F_ZEITRAUM_DREI_MONATE, F_BETRIEB],
     reihen: [
       { teile: [{ text: '# Personal\n\n**Quote** = Personalkosten in % vom Umsatz (was es kostet). **Umsatz je Personalstunde** = in Euro (was es einbringt).\n\nIm LINA-Bericht heißen beide „Effektivität“ — deshalb stehen sie getrennt.' }] },
       { teile: [{ karte: 'pe_quote_betrieb', hoehe: 11, klick: [{ ziel: 'dd_betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
@@ -491,10 +562,13 @@ export const dashboards: Dashboard[] = [
     filter: [F_BETRIEB, F_MARKE, F_ZEITRAUM_QUARTAL],
     reihen: [
       { teile: [{ text: '# Warenwirtschaft\n\n„Abdeckung“ ist der Anteil des Umsatzes, für den Rezepturen hinterlegt sind — bei niedriger Abdeckung sagt der Deckungsbeitrag wenig. Er liegt nur monatsweise vor.\n\nVoreingestellt sind die letzten drei Monate; ein größerer Zeitraum dauert entsprechend länger.' }] },
-      { teile: [
-        { karte: 'wa_renner', hoehe: 12 },
-        { karte: 'wa_penner', hoehe: 12 },
-      ] },
+      // Untereinander statt nebeneinander: sieben Spalten mit Artikel- und
+      // Warengruppennamen brauchen auf zwoelf Einheiten waagerechtes
+      // Scrollen, und der Artikelname steht ganz links. Beide Listen
+      // beantworten ohnehin nacheinander gestellte Fragen -- was laeuft,
+      // und was nicht -- und nicht dieselbe im Vergleich.
+      { teile: [{ karte: 'wa_renner', hoehe: 12 }] },
+      { teile: [{ karte: 'wa_penner', hoehe: 12 }] },
       { teile: [{ karte: 'wa_db_warengruppe', hoehe: 11 }] },
       { teile: [{ text: '## Rechnerischer Wareneinsatz gegen tatsächlichen\n\nEine Lücke ist der **Normalfall** und die eigentliche Kennzahl: darin stecken Schwund, Bruch, Portionsgrößen und Personalverzehr.' }] },
       { teile: [{ karte: 'wa_we_pruefung', hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
@@ -509,7 +583,12 @@ export const dashboards: Dashboard[] = [
     beschreibung:
       'Umsatz, Wareneinsatz, Personalkosten und Ergebnis aus den Zahlen des Steuerberaters — und bis wann diese Zahlen überhaupt vorliegen.',
     sammlung: 'Betrieb',
-    filter: [F_MONAT, F_BETRIEB],
+    // Ohne Vorgabe: die BWA reicht nur so weit, wie der Steuerberater
+    // gebucht hat, und das sind je nach Betrieb ein bis vier Monate
+    // zurueck. Drei Monate als Vorgabe wuerden bei manchen Betrieben eine
+    // leere Kurve zeigen -- und "nicht gebucht" liest sich als "kein
+    // Umsatz". Wer eingrenzen will, stellt den Filter selbst.
+    filter: [F_MONAT, F_ZEITRAUM, F_BETRIEB],
     reihen: [
       { teile: [{ text: '# Betriebswirtschaftliche Auswertung (BWA)\n\n> Zahlen vom Steuerberater, üblicherweise **ein bis zwei Monate zurück**. Ein Monat auf null ist **nicht gebucht** — nicht umsatzlos. Gezeigt werden nur gebuchte Monate.' }] },
       { teile: [{ karte: 'bwa_kennzahlen', hoehe: 9 }] },
@@ -535,16 +614,17 @@ export const dashboards: Dashboard[] = [
       { teile: [{ karte: 'dq_backfill', hoehe: 11 }] },
       { teile: [{ karte: 'dq_sync' }] },
       { teile: [{ text: '## Stimmen die Zahlen?\n\n„Auffällig" ist eine **Arbeitsliste, kein Alarm**. Beim Wareneinsatz zählt die Spalte die Fälle, in denen zu wenige Rezepturen hinterlegt sind — nicht die inhaltlichen Abweichungen.' }] },
+      { teile: [{ karte: 'dq_pruefung', hoehe: 9 }] },
       { teile: [
-        { karte: 'dq_pruefung', breite: 10 },
-        { karte: 'dq_umsatz_abweichung', breite: 14, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] },
+        { karte: 'dq_umsatz_abweichung', hoehe: 11,
+          klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] },
       ] },
       { teile: [{ text: '## Wem fehlt was?\n\nDie folgenden Tabellen sind Arbeitslisten. **Die Liste der Betriebe ohne Zuordnung zum Steuerberater sollte leer sein.**' }] },
       { teile: [{ karte: 'dq_datenstand', hoehe: 12, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
-      { teile: [
-        { karte: 'dq_ohne_bruecke' },
-        { karte: 'dq_konzept' },
-      ] },
+      { teile: [{ karte: 'dq_ohne_bruecke' }] },
+      // Volle Breite: die Spalte mit den Beispielnamen ist der Zweck der
+      // Karte, und auf zwoelf Einheiten sah man davon drei Namen.
+      { teile: [{ karte: 'dq_konzept' }] },
     ],
   },
 
