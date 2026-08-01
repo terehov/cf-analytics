@@ -243,6 +243,41 @@ describe('artikelverkauf', () => {
     expect(zeilen[0].verkaufspreis).toBeNull()
     expect(zeilen[0].menge).toBe(128)
   })
+
+  /**
+   * Der echte Fall vom 14.10.2022: eine Zelle von 12.821 trug
+   * `menge = 2147483649` (2^31+1) bei Umsatz und Preis null. Der ganze
+   * Tagesposten brach daran ab mit „numeric field overflow".
+   */
+  test('verwirft unmögliche Mengen, statt an ihnen zu scheitern', () => {
+    const kaputt = {
+      ...daten,
+      rows: daten.rows.map((r: any, i: number) =>
+        i === 0 ? { ...r, counts: { ...r.counts, 8826: 2147483649 } } : r),
+    }
+    const { zeilen } = artikelverkauf(kaputt, '2026-06-15')
+    const z = zeilen.find(x => x.artikelnummer === 8826)!
+    expect(z.menge).toBeNull()
+    expect(z.verworfen).toEqual([{ feld: 'counts.8826', wert: 2147483649 }])
+  })
+
+  test('behält den Rest des Tages, wenn eine Menge unmöglich ist', () => {
+    const { zeilen: sauber } = artikelverkauf(daten, '2026-06-15')
+    const kaputt = {
+      ...daten,
+      rows: daten.rows.map((r: any, i: number) =>
+        i === 0 ? { ...r, counts: { ...r.counts, 8826: 2147483649 } } : r),
+    }
+    const { zeilen } = artikelverkauf(kaputt, '2026-06-15')
+    // Eine kaputte Zelle darf nicht die guten mitnehmen.
+    expect(zeilen.length).toBe(sauber.length + 1)
+    expect(zeilen.find(x => x.artikelnummer === 450003)!.menge).toBe(128)
+  })
+
+  test('lässt plausible Mengen unangetastet und meldet nichts', () => {
+    const { zeilen } = artikelverkauf(daten, '2026-06-15')
+    expect(zeilen.every(z => z.verworfen === undefined)).toBe(true)
+  })
 })
 
 describe('Aktionsbericht', () => {

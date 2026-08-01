@@ -125,8 +125,11 @@ CREATE VIEW mart.kennzahlen_aktuell AS
 SELECT betrieb_key, monat, kennzahl,
        ((array_agg(wert_absolut ORDER BY abgerufen_am DESC)
          FILTER (WHERE wert_absolut IS NOT NULL))[1])::numeric(14,2) AS wert_absolut,
+       -- numeric(14,2) wie die Spalte selbst, siehe 0024. Ein engerer Cast
+       -- hier wuerde den Ueberlauf nur vom Schreiben ins Lesen verschieben:
+       -- der Import liefe durch, und das Dashboard zeigte den Fehler.
        ((array_agg(wert_prozent ORDER BY abgerufen_am DESC)
-         FILTER (WHERE wert_prozent IS NOT NULL))[1])::numeric(8,2)  AS wert_prozent,
+         FILTER (WHERE wert_prozent IS NOT NULL))[1])::numeric(14,2) AS wert_prozent,
        max(abgerufen_am)                                             AS abgerufen_am
   FROM core.kennzahlen_monat
  GROUP BY betrieb_key, monat, kennzahl;

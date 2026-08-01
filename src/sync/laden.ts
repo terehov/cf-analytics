@@ -519,6 +519,25 @@ export async function laden(k: Kontext): Promise<number> {
 
       case 'getArtikelverkaufsbericht': {
         const { stamm, zeilen } = t.artikelverkauf(k.daten, k.von)
+
+        // Mengen, die keine sein können (siehe transform/index.ts, `menge`).
+        // Wie beim Umsatzbericht: der Wert ist null, der Tag zählt trotzdem
+        // als erledigt — eine kaputte Zelle wirft 12.820 gute nicht weg.
+        const verworfeneMengen = zeilen.flatMap(
+          z => (z.verworfen ?? []).map(v => ({ ...v, encId: z.encId, artikelnummer: z.artikelnummer })))
+        if (verworfeneMengen.length) {
+          log.warn('unplausible Verkaufsmenge verworfen', {
+            endpunkt: k.ep.key, tag: k.von, anzahl: verworfeneMengen.length,
+            beispiel: verworfeneMengen[0],
+          })
+          await c.query(
+            `INSERT INTO sync.schema_abweichung (endpunkt, erwartet, tatsaechlich)
+             VALUES ($1, $2, $3)`,
+            [k.ep.key,
+             JSON.stringify({ hinweis: 'counts sind Verkaufsmengen unter 10^9' }),
+             JSON.stringify({ geschaeftstag: k.von, raw_id: rawId, verworfen: verworfeneMengen })])
+        }
+
         const amap = await artikelSichern(c, stamm)
         await artikelStandFortschreiben(c, stamm, k.von, amap)
         const sp = ['betrieb_key','geschaeftstag','artikel_key','menge',

@@ -276,10 +276,44 @@ export function vordefinierteZeitzonen(daten: any, geschaeftstag: string): ZoneZ
   return raus
 }
 
+/**
+ * Obergrenze für eine Verkaufsmenge — die Breite von `menge numeric(12,3)`
+ * in core.artikelverkauf_tag.
+ */
+const MENGE_MAX = 1e9
+
+/**
+ * Verkaufsmengen. Gleiche Haltung wie bei `anzahl`: was keine Menge sein
+ * KANN, wird null statt einer Zahl, die zufällig in die Spalte passt.
+ *
+ * Anlass, 01.08.2026: Der 14.10.2022 brach den Import ab mit `numeric field
+ * overflow`. Eine einzige Zeile von 12.821 trug `menge = 2147483649` —
+ * 2^31 + 1, also genau einen Schritt über der Grenze von int4 und damit im
+ * Muster eines Überlaufs, nicht eines Verkaufs. Dieselbe Zeile hatte netto,
+ * brutto und Preis auf null: zwei Milliarden Artikel, für die niemand
+ * etwas bezahlt hat.
+ *
+ * Verbreitern wäre hier falsch — aus demselben Grund wie bei `anzahl`. Der
+ * Wert passte danach, würde aber als verkaufte Menge gelten und jede
+ * Artikelstatistik still verderben. Der zu schmale Typ ist nicht das
+ * Problem, sondern der Grund, warum es auffiel.
+ *
+ * Der Rest des Tages bleibt erhalten: 12.820 gute Zeilen wegen einer
+ * kaputten zu verwerfen, wäre der teurere Fehler.
+ */
+const menge = (v: unknown): { wert: number | null; verworfen: number | null } => {
+  const n = z(v)
+  if (n === null) return { wert: null, verworfen: null }
+  if (!Number.isFinite(n) || n < 0 || n >= MENGE_MAX) return { wert: null, verworfen: n }
+  return { wert: n, verworfen: null }
+}
+
 export type ArtikelStamm = { artikelnummer: number; name: string; fixerWe: number | null }
 export type ArtikelverkaufZeile = {
   encId: string; geschaeftstag: string; artikelnummer: number
   menge: number | null; umsatzNetto: number | null; umsatzBrutto: number | null; verkaufspreis: number | null
+  /** Mengen, die unmöglich sind — Futter für sync.schema_abweichung. */
+  verworfen?: { feld: string; wert: number }[]
 }
 
 /**
@@ -298,17 +332,21 @@ export function artikelverkauf(daten: any, geschaeftstag: string): {
   const zeilen: ArtikelverkaufZeile[] = []
   for (const r of daten?.rows ?? []) {
     const counts = r.counts ?? {}
-    for (const [nr, menge] of Object.entries(counts)) {
-      const m = z(menge)
-      if (m === null || m === 0) continue
+    for (const [nr, roh] of Object.entries(counts)) {
+      const m = menge(roh)
+      // Kein Verkauf und nichts zu melden — die häufigste Zelle überhaupt.
+      if (m.wert === 0 || (m.wert === null && m.verworfen === null)) continue
       zeilen.push({
         encId: r.encId,
         geschaeftstag,
         artikelnummer: Number(nr),
-        menge: m,
+        menge: m.wert,
         umsatzNetto: z(r.netto?.[nr]),
         umsatzBrutto: z(r.brutto?.[nr]),
         verkaufspreis: z(r.prices?.[nr]),
+        ...(m.verworfen !== null
+          ? { verworfen: [{ feld: `counts.${nr}`, wert: m.verworfen }] }
+          : {}),
       })
     }
   }
