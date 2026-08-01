@@ -1,17 +1,29 @@
 // =====================================================================
-// Passt jede Tabelle in ihre Kachel?
+// Passt der Inhalt jeder Kachel in ihre Breite?
 //
-// Der Anlass: gemeldet am 28.07.2026 -- "viele Tabellen sind zu eng und
-// brauchen viel horizontales Scrollen". Nachgemessen war das kein
-// Schoenheitsfehler: "Betrieb — Kennzahlen des Monats" fuehrte neun
-// Spalten auf sechzehn Rastereinheiten, die Filialtabelle zwanzig auf
-// fuenfzehn. Wer scrollen muss, um die dritte Spalte zu sehen, vergleicht
-// die erste nicht mehr mit ihr -- und genau dafuer ist eine Tabelle da.
+// Zwei Pruefungen, beide gegen denselben Fehler: die Kachel ist zu
+// schmal fuer das, was drinsteht, und Metabase meldet das nicht, sondern
+// laesst still etwas weg.
 //
-// Warum ein eigenes Skript und keine Pruefung in uebernehmen.ts: die
-// Spaltenzahl steht nicht im Quelltext. Ein SELECT * mit sechs
-// coalesce-Ausdruecken sieht nach sechs Spalten aus und liefert neun,
-// sobald eine CTE dazukommt. Die einzige ehrliche Quelle ist die
+//   TABELLEN  Zu viele Spalten -> waagerechtes Scrollen. Gemeldet am
+//             28.07.2026: "Betrieb — Kennzahlen des Monats" fuehrte neun
+//             Spalten auf sechzehn Rastereinheiten, die Filialtabelle
+//             zwanzig auf fuenfzehn. Wer scrollen muss, um die dritte
+//             Spalte zu sehen, vergleicht die erste nicht mehr mit ihr --
+//             und genau dafuer ist eine Tabelle da.
+//
+//   DIAGRAMME Zu viele Kategorien -> Metabase laesst die Achsen-
+//             beschriftung WEG. Gemeldet am 28.07.2026: "Beim 'Betrieb -
+//             Tagesverlauf' sieht man keine Stunden auf der x Skala."
+//             Nachgemessen: 24 Balken auf acht Einheiten sind 14 Pixel
+//             je Balken, eine Uhrzeit braucht rund 40. Uebrig blieb der
+//             Achsentitel "Stunde" ueber unbeschrifteten Balken -- man
+//             sieht ein Muster und kann es keiner Tageszeit zuordnen.
+//
+// Warum ein eigenes Skript und keine Pruefung in uebernehmen.ts: weder
+// Spalten- noch Kategorienzahl stehen im Quelltext. Ein SELECT * mit
+// sechs coalesce-Ausdruecken sieht nach sechs Spalten aus und liefert
+// neun, sobald eine CTE dazukommt. Die einzige ehrliche Quelle ist die
 // Datenbank, und die soll das Provisionieren nicht brauchen.
 //
 //   bun run metabase/tabellenbreite.ts
@@ -139,15 +151,81 @@ for (const t of (await db.query('SELECT oid, typname FROM pg_type')).rows) {
   typName.set(Number(t.oid), String(t.typname))
 }
 
+type Diagramm = {
+  dashboard: string
+  karte: string
+  achse: string
+  kategorien: number
+  breite: number
+  noetig: number
+}
+
+/**
+ * Platz je waagerechter Achsenbeschriftung.
+ *
+ * "08:00" sind fuenf Zeichen und braucht mit Abstand rund 40 Pixel.
+ * Darunter laesst Metabase die Beschriftung weg -- ohne Hinweis, ohne
+ * Fehlermeldung, einfach ohne Text unter den Balken.
+ */
+const PX_JE_BESCHRIFTUNG = 40
+
+/**
+ * Diagramme, bei denen die einzelne Achsenbeschriftung nicht gebraucht
+ * wird. Jeder Eintrag braucht einen Grund -- sonst ist das hier die
+ * Stelle, an der ein echter Befund verschwindet.
+ */
+const ACHSE_EGAL: Record<string, string> = {
+  pf_konzentration_kurve:
+    'Lorenzkurve. Die Achse ist ein Prozentkontinuum von 0 bis 100 -- die Aussage '
+    + 'steckt in der KRUEMMUNG, nicht in einzelnen Punkten. Wer wissen will, welcher '
+    + 'Betrieb wo steht, liest die Tabelle daneben.',
+}
+
 const befunde: Befund[] = []
+const diagramme: Diagramm[] = []
 let geprueft = 0
+let geprueftDiagramme = 0
 let geschaetzt = 0
 
 for (const d of dashboards) {
   for (const kachel of auslegen(d.reihen, typVon)) {
     if (!kachel.karte) continue
     const k = alleKarten.find(x => x.schluessel === kachel.karte)
-    if (!k || k.anzeige !== 'table') continue
+    if (!k) continue
+
+    // ---- Diagramme: passen die Achsenbeschriftungen nebeneinander? ----
+    if (['bar', 'line', 'combo', 'area'].includes(k.anzeige)) {
+      const achse = ((k.visualisierung?.['graph.dimensions'] as string[]) ?? [])[0]
+      if (!achse) continue
+      if (ACHSE_EGAL[k.schluessel]) continue
+
+      // Zeitachsen sind nicht gemeint. Bei 103 Monaten setzt Metabase
+      // jede fuenfte Beschriftung, und die Linie bleibt lesbar -- eine
+      // ausgelassene Jahreszahl kostet nichts. Bei "08:00" oder
+      // "Happy Hour" ist jede ausgelassene Beschriftung ein Balken, den
+      // man nicht mehr zuordnen kann.
+      if (/monat|tag|datum|jahr|woche/i.test(achse)) continue
+
+      let anzahl: number
+      try {
+        const r = await db.query(
+          `SELECT count(*)::int AS n FROM (SELECT DISTINCT "${achse}" FROM (${ausfuehrbar(k.sql)}) t) u`)
+        anzahl = r.rows[0].n
+      } catch { continue }
+
+      geprueftDiagramme++
+      const px = kachel.breite * PX_JE_EINHEIT
+      if (anzahl > 6 && px / anzahl < PX_JE_BESCHRIFTUNG) {
+        diagramme.push({
+          dashboard: d.schluessel, karte: k.schluessel, achse, kategorien: anzahl,
+          breite: kachel.breite,
+          noetig: Math.min(24, Math.ceil(anzahl * PX_JE_BESCHRIFTUNG / PX_JE_EINHEIT)),
+        })
+      }
+      continue
+    }
+
+    if (k.anzeige !== 'table') continue
 
     // Echte Zeilen, nicht LIMIT 0: die Breite steckt in den Werten. 200
     // reichen -- der laengste Betriebsname taucht darin auf, und ein
@@ -211,11 +289,9 @@ if (geprueft === 0) throw new Error('Keine einzige Tabellenkachel gemessen — S
 
 console.log(`${geprueft} Tabellenkacheln geprueft`
   + (geschaetzt > 0 ? `, davon ${geschaetzt} aus dem Spaltentyp geschaetzt (zu langsam fuer Zeilen)` : '')
-  + '.\n')
+  + `, dazu ${geprueftDiagramme} Diagramme mit kategorialer Achse.\n`)
 
-if (befunde.length === 0) {
-  console.log('Alle Tabellen haben genug Breite. Nichts zu tun.')
-} else {
+if (befunde.length > 0) {
   console.log(`${befunde.length} Tabelle(n) zu schmal:\n`)
   for (const b of befunde.sort((x, y) => (y.noetig - y.breite) - (x.noetig - x.breite))) {
     console.log(`  ${b.dashboard} / ${b.karte}`)
@@ -226,6 +302,25 @@ if (befunde.length === 0) {
   console.log('\nZwei Hebel, in dieser Reihenfolge:')
   console.log('  1. Die breitesten Spalten schmaler machen -- ein Zeitstempel,')
   console.log('     wo ein Datum genuegt, kostet 50 Zeichen ohne Aussage.')
-  console.log('  2. Die Kachel breiter legen (dashboards.ts).')
+  console.log('  2. Die Kachel breiter legen (dashboards.ts).\n')
+}
+
+if (diagramme.length > 0) {
+  console.log(`${diagramme.length} Diagramm(e) ohne lesbare Achsenbeschriftung:\n`)
+  for (const g of diagramme.sort((x, y) => (y.noetig - y.breite) - (x.noetig - x.breite))) {
+    const px = (g.breite * PX_JE_EINHEIT / g.kategorien).toFixed(1)
+    console.log(`  ${g.dashboard} / ${g.karte}`)
+    console.log(`      Achse "${g.achse}": ${g.kategorien} Kategorien auf ${g.breite} Einheiten `
+      + `= ${px}px je Kategorie (noetig ${PX_JE_BESCHRIFTUNG})`)
+    console.log(`      Kachel ${g.breite}, noetig ${g.noetig}`)
+  }
+  console.log('\nMetabase laesst die Beschriftung dann WEG, ohne es zu melden.')
+  console.log('Kachel breiter legen -- oder, wenn 24 Einheiten nicht reichen,')
+  console.log('die Kategorien zusammenfassen.\n')
+}
+
+if (befunde.length === 0 && diagramme.length === 0) {
+  console.log('Alles passt in seine Kachel. Nichts zu tun.')
+} else {
   process.exit(1)
 }

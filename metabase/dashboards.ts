@@ -210,9 +210,21 @@ export const dashboards: Dashboard[] = [
           klick: [{ ziel: 'db_umsatz', uebergabe: { betrieb: 'Betrieb' } }] },
       ] },
       { teile: [{ text: '## Struktur — wovon dieser Betrieb lebt' }] },
+      // Zwei Diagramme nebeneinander, der Tagesverlauf allein darunter.
+      //
+      // Zu dritt bekam jedes acht Rastereinheiten. Fuer "Speisen und
+      // Getraenke" (zwei Kategorien) und die Zeitzonen (fuenf) reicht
+      // das; der Tagesverlauf hat VIERUNDZWANZIG Balken und damit rund
+      // 14 Pixel je Balken. Eine Beschriftung wie "08:00" braucht 40 --
+      // Metabase liess deshalb ALLE Stunden weg, gemeldet am 28.07.2026.
+      // Uebrig blieb der Achsentitel "Stunde" ueber unbeschrifteten
+      // Balken, was schlimmer ist als gar keine Achse: man sieht ein
+      // Muster und kann es keiner Tageszeit zuordnen.
       { teile: [
         { karte: 'dd_betrieb_sparte', klick: [{ ziel: 'db_struktur', uebergabe: { betrieb: 'Betrieb' } }] },
         { karte: 'dd_betrieb_zeitzone', klick: [{ ziel: 'db_struktur', uebergabe: { betrieb: 'Betrieb' } }] },
+      ] },
+      { teile: [
         { karte: 'dd_betrieb_stunde', klick: [{ ziel: 'db_struktur', uebergabe: { betrieb: 'Betrieb' } }] },
       ] },
       { teile: [{ text: '## Personal, Ware, BWA' }] },
@@ -263,10 +275,13 @@ export const dashboards: Dashboard[] = [
       { teile: [{ text: '# ⑤ Standorte vergleichen\n\nOben Betrieb oder Marke auswählen. Ohne Auswahl stehen hier alle — für einen aussagekräftigen Vergleich zwei bis vier Betriebe wählen.\n\nDer Tagesverlauf zeigt **Prozent vom eigenen Tagesumsatz**. Sonst vergleicht man nur die Größe der Häuser und nicht ihr Muster.' }] },
       { teile: [{ karte: 'vg_ort_metriken', hoehe: 11,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
-      { teile: [
-        { karte: 'vg_ort_umsatz' },
-        { karte: 'vg_ort_profil' },
-      ] },
+      { teile: [{ karte: 'vg_ort_umsatz' }] },
+      // Der Tagesverlauf allein auf voller Breite: vierundzwanzig Stunden
+      // auf zwoelf Einheiten sind 22 Pixel je Balken, und eine
+      // Beschriftung wie "08:00" braucht rund 40. Metabase laesst sie
+      // dann samt und sonders weg -- man sieht ein Muster und kann es
+      // keiner Tageszeit zuordnen.
+      { teile: [{ karte: 'vg_ort_profil' }] },
       { teile: [{ karte: 'vg_ort_sparte', hoehe: 11 }] },
     ],
   },
@@ -521,10 +536,13 @@ export const dashboards: Dashboard[] = [
       ] },
       { teile: [{ karte: 'st_sparte_anteil', hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ text: '## Tageszeit\n\nDer Geschäftstag läuft von 08:00 bis 07:59 des Folgetags. Die Nachtstunden gehören deshalb ans **Ende** des Tages, nicht an den Anfang.' }] },
+      // Der Stundenverlauf allein auf voller Breite -- vierundzwanzig
+      // Balken auf vierzehn Einheiten liessen Metabase alle Uhrzeiten
+      // weglassen. Die Zeitzonen (fuenf Kategorien) darunter.
       { teile: [
-        { karte: 'st_stunde', breite: 14 },
-        { karte: 'st_zeitzone', breite: 10 },
+        { karte: 'st_stunde' },
       ] },
+      { teile: [{ karte: 'st_zeitzone' }] },
       { teile: [{ karte: 'st_zeitzone_betrieb', hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
     ],
   },
@@ -606,10 +624,11 @@ export const dashboards: Dashboard[] = [
     sammlung: 'Betrieb',
     reihen: [
       { teile: [{ text: '# Datenqualität\n\nEin Betrieb ohne Daten sieht auf allen anderen Seiten aus wie einer, bei dem alles stimmt. Hier steht, bei wem das der Fall ist.' }] },
-      { teile: [
-        { karte: 'dq_befund', breite: 10 },
-        { karte: 'dq_backfill_balken', breite: 14 },
-      ] },
+      { teile: [{ karte: 'dq_befund', breite: 10 }] },
+      // Volle Breite: siebzehn Endpunktnamen auf vierzehn Einheiten sind
+      // 36 Pixel je Balken, und ein Name wie "getPersonalkosten" braucht
+      // mehr. Metabase laesst die Beschriftung dann weg.
+      { teile: [{ karte: 'dq_backfill_balken' }] },
       { teile: [{ text: '## Kommen die Daten an?' }] },
       { teile: [{ karte: 'dq_backfill', hoehe: 11 }] },
       { teile: [{ karte: 'dq_sync' }] },
@@ -659,10 +678,11 @@ export const dashboards: Dashboard[] = [
       { teile: [{ karte: 'im_laeufe', hoehe: 11 }] },
 
       { teile: [{ text: '## Was läuft gerade?\n\nDer Puls zeigt, ob überhaupt etwas passiert. Eine Lücke ist eine Pause — Sperre, Tagesbudget oder kein laufender Prozess.' }] },
-      { teile: [
-        { karte: 'im_puls', breite: 14 },
-        { karte: 'im_wartezeit', breite: 10 },
-      ] },
+      // Beide Stundenachsen untereinander statt nebeneinander: neunzehn
+      // Stunden auf zehn Einheiten sind 23 Pixel je Balken, zu wenig fuer
+      // eine Uhrzeit. Metabase laesst die Beschriftung dann ganz weg.
+      { teile: [{ karte: 'im_puls' }] },
+      { teile: [{ karte: 'im_wartezeit' }] },
       { teile: [{ karte: 'im_naechste', hoehe: 12 }] },
 
       { teile: [{ text: '## Wie vollständig ist es?\n\n**„Tage alt“** zeigt einen hängenden Bericht — ein bis zwei Tage sind normal. **„wartet“** heißt nicht kaputt: laufender Betrieb geht vor Historie.' }] },

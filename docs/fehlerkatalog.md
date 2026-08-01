@@ -1336,3 +1336,78 @@ Hätte man dort nur den Filter ergänzt, wäre der Zähler auf drei Monate gesch
 Nenner nicht: die Anteile hätten sich statt auf 100 % auf **5,55 %** summiert — flachere
 Kurven, keine Fehlermeldung. Nachgemessen, bevor es passieren konnte; der Nenner rechnet
 jetzt als Fenster über genau die Zeilen, die der Filter übrig lässt.
+
+## Metabase lässt Achsenbeschriftungen weg, ohne es zu sagen
+
+**Symptom.** Gemeldet am 28.07.2026: „Beim ‚Betrieb — Tagesverlauf' sieht man keine Stunden auf
+der x-Skala."
+
+**Nachgemessen im Browser.** Das Diagramm enthielt **acht** Textelemente: den Achsentitel
+„Stunde", sieben Werte der y-Achse — und **keine einzige Uhrzeit**. Die Kachel war 345 Pixel
+breit, das Diagramm hat vierundzwanzig Balken; das sind rund 14 Pixel je Balken, und eine
+Beschriftung wie „08:00" braucht mit Abstand etwa 40. Metabase lässt sie dann weg. Ohne
+Hinweis, ohne Fehlermeldung, einfach ohne Text unter den Balken.
+
+**Das ist schlimmer als eine fehlende Achse**, denn der Achsentitel bleibt stehen. Man sieht
+ein Muster, liest darüber „Stunde" und kann keinen einzigen Balken einer Tageszeit zuordnen.
+
+**Der Unterschied zur Zeitachse ist wesentlich.** Bei 103 Monaten auf einer Linie setzt
+Metabase jede fünfte Beschriftung, und die Kurve bleibt lesbar — eine ausgelassene Jahreszahl
+kostet nichts. Bei einer **kategorialen** Achse ist jede ausgelassene Beschriftung ein Balken,
+den man nicht mehr zuordnen kann. Die Prüfung unterscheidet deshalb nach Achsentyp.
+
+**Vier Diagramme betroffen**, drei davon gefunden, bevor jemand sie meldete:
+
+| Diagramm | vorher | jetzt |
+|---|---|---|
+| `dd_betrieb_stunde` | 24 Stunden auf 8 Einheiten (14 px) | volle Breite (44 px) |
+| `vg_ort_profil` | 24 Stunden auf 12 Einheiten (22 px) | volle Breite |
+| `st_stunde` | 24 Stunden auf 14 Einheiten (26 px) | volle Breite |
+| `im_wartezeit` | 19 Stunden auf 10 Einheiten (23 px) | volle Breite |
+| `dq_backfill_balken` | 17 Endpunkte auf 14 Einheiten (36 px) | volle Breite |
+
+Nachgemessen nach der Änderung: **24 von 24 Uhrzeiten** stehen an der Achse, in der Reihenfolge
+des Geschäftstags von 08:00 bis 07:00.
+
+**Die Prüfung steht jetzt in `tabellenbreite.ts`** neben der Spaltenbreite — dasselbe Muster:
+die Kachel ist zu schmal für ihren Inhalt, und Metabase löst das, indem es still etwas
+weglässt. Ausnahmen brauchen einen Grund; die Lorenzkurve auf dem Portfolio-Dashboard hat
+einen (ihre Aussage steckt in der Krümmung, nicht in einzelnen Punkten).
+
+## „Personal %" zeigte Werte über 1.000, und es waren tatsächlich Prozent
+
+**Symptom.** Gemeldet am 28.07.2026 zur Tabelle „Betrieb — Personal je Bereich": „einzeltage
+sind nicht so aussagekräftig und warum wird da ein zeitraum angezeigt, wenn es nur ein tag
+ist?" Im Screenshot standen unter „Personal %" die Werte 777, 908, 1.262 — daneben in
+derselben Zeile „o. GF %" mit 32,6.
+
+**Beides zutreffend, und dahinter lag ein größerer Fehler.**
+
+`mart.personalkosten` führt **ausschließlich Tageszeilen** — 233.778 Stück, alle mit
+`zeitraum_bis = zeitraum_von`. Die Karte zeigte sie roh: 91 Zeilen für einen Betrieb, jede
+mit einer „Von–Bis"-Spanne über genau einen Tag. Die Spanne war meine Änderung vom selben
+Vormittag; ich hatte zwei Datumsspalten zu einer zusammengefasst, ohne zu prüfen, was die
+Zeilen eigentlich sind.
+
+**Der eigentliche Fehler stand seit Monaten im Kommentar der Sicht.** Diese Quoten haben den
+**Umsatz im Nenner**, und der geht bei einem Tag ohne Geschäft gegen null:
+
+> Gemessen am 26.07.2026: `pek_gesamt` bis 316.576,50 Prozent — Enchilada Würzburg am
+> 15.06.2026 bei 6,05 EUR Tagesumsatz. Das ist keine Anomalie in den Daten, sondern die
+> Bauart der Kennzahl.
+>
+> Für Auswertungen deshalb: den **Median** nehmen **und** Betriebe ohne Umsatz ausschließen.
+
+Die Karte tat weder das eine noch das andere. Über alle Tageswerte liegt der Median bei
+383 Prozent; in der Tabelle standen solche Zahlen unter der Überschrift „Personal %" neben
+einem BWA-Wert von 32,6. **Wer die vergleicht, vergleicht Unvergleichbares** — und nichts an
+der Darstellung sagte, dass man das nicht darf.
+
+**Jetzt eine Zeile je Monat**, mit dem belastbaren BWA-Wert zuerst, dem Median der plausiblen
+Tageswerte dahinter und der Zahl dieser Tage daneben. Bei Aposto Augsburg sind das 7 bis 11
+von 30 — und diese Ehrlichkeit gehört in die Tabelle: steht dort eine kleine Zahl, ist der
+Median wenig wert.
+
+**Regel.** Wo eine Sicht in ihrem Kommentar vorschreibt, wie ihre Werte zu lesen sind, ist das
+keine Empfehlung. `PLAUSIBEL` und `MEDIAN` stehen deshalb als gemeinsame Bausteine in
+`karten-drilldown.ts` — damit keine Karte nur die Hälfte der Vorschrift befolgt.
