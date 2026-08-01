@@ -1411,3 +1411,71 @@ Median wenig wert.
 **Regel.** Wo eine Sicht in ihrem Kommentar vorschreibt, wie ihre Werte zu lesen sind, ist das
 keine Empfehlung. `PLAUSIBEL` und `MEDIAN` stehen deshalb als gemeinsame Bausteine in
 `karten-drilldown.ts` — damit keine Karte nur die Hälfte der Vorschrift befolgt.
+
+## Ein Zeitfilter in einer Unterabfrage sieht aus wie ein Zeitfilter und wirkt nicht
+
+**Symptom.** Gemeldet am 01.08.2026, nach dem abgeschlossenen Lina-Import: „Metabase ist auf
+einzelnen Dashboards langsam." Verdacht des Melders war die Datenmenge — die Historie reicht
+weiter zurück, als irgendjemand abfragt.
+
+**Nachgemessen, und zuerst gegen den Verdacht.** Der Round Table (Dashboard 2), auf den die
+Meldung verwies, war **nicht** betroffen: alle 17 Karten zusammen 3,9 s mit Markenfilter,
+5,3 s ohne — und Metabase lädt sie parallel. Betroffen war die Seite **Warenwirtschaft**, mit
+ihrer eigenen Voreinstellung „letzte 3 Monate":
+
+| Karte | vorher | nachher |
+|---|---|---|
+| `wa_db_warengruppe` | **>120 s (Abbruch)** | 2,0 s |
+| `wa_we_pruefung` | **63,2 s** | 0,2 s |
+| `pf_karteileichen` | 23,9 s | unverändert |
+| `wa_renner` | 7,0 s | 2,4 s |
+
+**Ursache 1 — der Filter, der nur innen wirkt.** In `wa_db_warengruppe` stand:
+
+```sql
+FROM mart.deckungsbeitrag_warengruppe d
+WHERE d.monat IN (SELECT DISTINCT monat FROM mart.artikelverkauf WHERE {{zeitraum}})
+```
+
+Das ist rechnerisch richtig und liefert die richtigen Zahlen — deshalb ist es nie aufgefallen.
+Nur wirkt der Zeitraum ausschließlich in der **inneren** Abfrage. Die äußere Sicht aggregiert
+vorher die gesamte Historie und filtert erst danach: **111 Partitionsscans** auf
+`core.artikelverkauf_tag` statt der drei gebrauchten. Genau die Falle, vor der der Kommentar
+an `mart.artikelverkauf` seit jeher warnt („in Metabase immer nach `geschaeftstag` filtern,
+dann greift das Partition Pruning").
+
+Behoben, indem der Zeitraum direkt auf `geschaeftstag` liegt und die Aggregation je
+Warengruppe in der Karte passiert. Gegengeprüft über alle 194 Warengruppen: Menge, Umsatz und
+Abdeckung stimmen auf die Stelle überein.
+
+**Ursache 2 — ein Aggregat, das gar nicht filtern kann.** `wa_we_pruefung` war noch langsamer
+und hat **keinen Zeitraumfilter**: `mart.pruefung_wareneinsatz` stellt Monate absichtlich
+nebeneinander. Pruning ist dort grundsätzlich unerreichbar — die Sicht las bei jedem Aufruf
+alle 27,5 Mio. Zeilen.
+
+Dagegen hilft kein Filter, sondern nur, das Ergebnis **einmal** zu rechnen:
+`mart.deckungsbeitrag_warengruppe` ist seit Migration `0027` materialisiert, und
+`pruefung_wareneinsatz` summiert seit `0028` darauf auf statt auf die Rohsicht. Das gesuchte
+Aggregat (Betrieb × Monat) ist eine Stufe gröber als das materialisierte
+(Betrieb × Monat × Warengruppe), lässt sich also exakt daraus ableiten. Gegengeprüft über alle
+**5.068 Zeilen: null Abweichungen.**
+
+**Eine Falle dabei, die fast durchgerutscht wäre.** `abdeckung_pct` ist ein **Prozentwert** und
+damit nicht wieder aufsummierbar — aus Prozenten lässt sich der zugrunde liegende Betrag nicht
+zurückrechnen. Deshalb führt die materialisierte Sicht `umsatz_mit_we` als eigene Summenspalte.
+Dass die Werte im aktuellen Bestand zufällig nur `NULL` oder `100` sind (139.823 zu 34.129,
+kein einziger Teilwert), hätte die Rückrechnung heute funktionieren lassen und beim ersten
+teilweise hinterlegten Monat still falsche Zahlen ergeben.
+
+**Zwei Regeln.**
+
+1. **Ein Zeitfilter muss auf der partitionierten Spalte liegen.** Steht er in einer
+   Unterabfrage, ist er Dekoration. Ob er wirkt, sagt nicht das Ergebnis, sondern
+   `EXPLAIN` — die Zahl der Partitionsscans.
+2. **Wo kein Zeitfilter möglich ist, hilft nur Materialisieren.** Eine Aggregation über
+   Millionen Zeilen, die sich einmal je Import ändert, gehört nicht in jeden Kartenaufruf.
+   Der Preis ist ein Stand statt Echtzeit — deshalb `mart.deckungsbeitrag_stand`, damit
+   „wie alt ist das?" beantwortbar bleibt.
+
+**Offen geblieben.** `pf_karteileichen` (23,9 s) auf der Portfolio-Seite ist unverändert. Sie
+lag außerhalb dessen, was hier beauftragt war.

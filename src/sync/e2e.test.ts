@@ -967,6 +967,43 @@ lauf('Zugangssperre', () => {
   }, 30_000)
 
   /**
+   * Dieselbe Zusicherung für den zweiten Nachlauf: der Refresh von
+   * mart.deckungsbeitrag_warengruppe (Migration 0027) hängt genauso am
+   * Sync-Lauf wie der Listenabgleich darüber — und darf ihn genauso wenig
+   * scheitern lassen. Ein misslungener Refresh bedeutet veraltete
+   * Auswertungen, nicht verlorene Daten.
+   *
+   * Geprüft wird zusätzlich, dass die Zeitgrenze zurückgenommen wird. Bliebe
+   * sie an der Verbindung hängen, erbte sie der nächste Nutzer aus dem Pool
+   * und ein langer Import bräche nach 15 Minuten ab — mit einem Fehler, dessen
+   * Ursache nirgends sichtbar wäre.
+   */
+  test('ein misslungener Refresh lässt den Sync-Lauf unberührt', async () => {
+    const { deckungsbeitragAuffrischen, deckungsbeitragNachlauf } =
+      await import('./deckungsbeitrag')
+    const { query } = await import('../db/pool')
+
+    // Die Sicht wegnehmen, auf die der Refresh zielt — damit scheitert er
+    // garantiert, ohne dass an der Datenbank sonst etwas fehlt.
+    await query(`ALTER MATERIALIZED VIEW mart.deckungsbeitrag_warengruppe
+                 RENAME TO deckungsbeitrag_warengruppe_test`)
+    try {
+      const r = await deckungsbeitragAuffrischen()
+      expect(r.status).toBe('fehler')
+
+      // Und der Nachlauf, wie sync.ts ihn aufruft: protokolliert, wirft nicht.
+      await deckungsbeitragNachlauf()
+
+      // Die Zeitgrenze darf nicht an der Verbindung hängengeblieben sein.
+      const [t] = await query<{ statement_timeout: string }>(`SHOW statement_timeout`)
+      expect(t.statement_timeout).toBe('0')
+    } finally {
+      await query(`ALTER MATERIALIZED VIEW mart.deckungsbeitrag_warengruppe_test
+                   RENAME TO deckungsbeitrag_warengruppe`)
+    }
+  }, 30_000)
+
+  /**
    * Die Auswahllisten der Dashboard-Filter sind Momentaufnahmen. Veralten sie,
    * fehlt ein Betrieb im Dropdown — und das Dashboard sieht dabei vollständig
    * richtig aus. Genau deshalb muss /status es melden.

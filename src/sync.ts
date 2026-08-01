@@ -10,6 +10,7 @@ import { log } from './lib/log'
 import { pool } from './db/pool'
 import { workerLauf } from './sync/worker'
 import { auswahllistenNachlauf } from './sync/auswahllisten'
+import { deckungsbeitragNachlauf } from './sync/deckungsbeitrag'
 
 const ausloeser = process.argv.includes('--backfill') ? 'backfill'
                 : process.argv.includes('--manuell')  ? 'manuell'
@@ -29,6 +30,13 @@ try {
   // angehängt, damit ein neuer Betrieb ohne Zutun im Filter auftaucht,
   // statt auf einen eigenen Zeitplan zu warten, den jemand einrichten muss.
   await auswahllistenNachlauf()
+
+  // Zweiter Nachlauf, gleiche Regeln: mart.deckungsbeitrag_warengruppe ist
+  // seit Migration 0027 materialisiert und muss aufgefrischt werden, sobald
+  // neue Artikelverkäufe da sind. Wirft nie, siehe Kopf von
+  // sync/deckungsbeitrag.ts. Steht NACH den Auswahllisten, weil der Refresh
+  // der längere von beiden ist — die Filterlisten sollen nicht darauf warten.
+  await deckungsbeitragNachlauf()
 
   await pool.end().catch(() => {})
   // Exitcode 1 nur bei Abbruch - 'teilweise' ist normal (einzelne Betriebe ohne Daten).

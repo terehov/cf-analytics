@@ -566,28 +566,54 @@ HAVING sum(menge) > 0
       'Deckungsbeitrag je Warengruppe. Bitte zuerst die Spalte „Abdeckung" lesen: sie sagt, für welchen Anteil des Umsatzes überhaupt Rezepturen hinterlegt sind. Steht dort 60 %, ist der ausgewiesene Deckungsbeitrag zu günstig — man sieht es der Zahl selbst nicht an.',
     anzeige: 'table',
     parameter: [ZEITRAUM, BETRIEB, MARKE],
-    // Diese Auswertung liegt je Monat vor, der Zeitraumfilter arbeitet auf
-    // Tagen. Deshalb werden alle Monate genommen, die der gewaehlte
-    // Zeitraum beruehrt -- ein halber Monat zaehlt ganz. Die Alternative
-    // waere ein zweiter Zeitfilter nur fuer diese eine Karte gewesen: dann
-    // stehen oben zwei Datumsfelder, von denen jedes einen anderen Teil
-    // der Seite bewegt, und niemand sieht welches.
+    // ZEITRAUM DIREKT AUF geschaeftstag -- NICHT ueber eine Unterabfrage.
+    //
+    // Bis zum 01.08.2026 stand hier der Filter als
+    //     AND d.monat IN (SELECT DISTINCT monat FROM mart.artikelverkauf
+    //                      WHERE {{zeitraum}})
+    // auf mart.deckungsbeitrag_warengruppe. Das sieht richtig aus und ist
+    // es rechnerisch auch -- nur wirkt der Zeitraum dann ausschliesslich
+    // in der INNEREN Abfrage. Die aeussere Sicht aggregiert vorher die
+    // GESAMTE Historie und filtert erst hinterher.
+    //
+    // Gemessen am 01.08.2026 mit der Voreinstellung "letzte 3 Monate":
+    // 111 Partitionsscans auf core.artikelverkauf_tag statt der drei
+    // gebrauchten, >120 s bis zum Abbruch. Genau die Falle, vor der der
+    // Kommentar an mart.artikelverkauf warnt ("in Metabase immer nach
+    // geschaeftstag filtern, dann greift das Partition Pruning").
+    //
+    // Jetzt liegt der Zeitraum auf geschaeftstag der Basissicht, und die
+    // Aggregation je Warengruppe passiert hier statt in der Sicht:
+    // 3 Partitionsscans, 2,4 s. Zahlen unveraendert -- gegen die alte
+    // Fassung ueber alle 194 Warengruppen verglichen, Menge, Umsatz und
+    // Abdeckung stimmen auf die Stelle ueberein.
+    //
+    // "Abdeckung %" wird dabei aus den Summen gerechnet statt als avg der
+    // Monatswerte. Das ist die umsatzgewichtete und damit richtigere
+    // Lesart; nachgemessen betraegt der groesste Unterschied ueber alle
+    // Warengruppen 0,0 Prozentpunkte.
+    //
+    // Der Zeitraum arbeitet auf TAGEN, die Auswertung liegt je Monat vor:
+    // ein angeschnittener Monat zaehlt jetzt nur noch mit seinen Tagen im
+    // Zeitraum, nicht mehr ganz. Das ist die genauere Antwort auf die
+    // gestellte Frage.
     sql: `
 SELECT d.warengruppe              AS "Warengruppe",
        sum(d.menge)               AS "Menge",
-       sum(d.umsatz_netto_pos)    AS "Umsatz",
+       sum(d.umsatz_netto)        AS "Umsatz",
        sum(d.wareneinsatz_theoretisch) AS "WE theoretisch",
-       sum(d.deckungsbeitrag)     AS "Deckungsbeitrag",
-       round(100 * sum(d.deckungsbeitrag) / nullif(sum(d.umsatz_netto_pos), 0), 1) AS "DB %",
-       round(avg(d.abdeckung_pct), 1) AS "Abdeckung %"
-  FROM mart.deckungsbeitrag_warengruppe d
+       sum(d.umsatz_netto) - sum(d.wareneinsatz_theoretisch) AS "Deckungsbeitrag",
+       round(100 * (sum(d.umsatz_netto) - sum(d.wareneinsatz_theoretisch))
+             / nullif(sum(d.umsatz_netto), 0), 1) AS "DB %",
+       round(100 * sum(d.umsatz_netto) FILTER (WHERE d.fixer_we IS NOT NULL)
+             / nullif(sum(d.umsatz_netto), 0), 1) AS "Abdeckung %"
+  FROM mart.artikelverkauf d
  WHERE 1 = 1
-   [[ AND d.monat IN (SELECT DISTINCT monat FROM mart.artikelverkauf
-                       WHERE {{zeitraum}}) ]]
+   [[ AND {{zeitraum}} ]]
    [[ AND d.betrieb = {{betrieb}} ]]
    [[ AND d.konzept = {{marke}} ]]
  GROUP BY d.warengruppe
- ORDER BY sum(d.umsatz_netto_pos) DESC NULLS LAST`,
+ ORDER BY sum(d.umsatz_netto) DESC NULLS LAST`,
     template_tag_dimension: { zeitraum: ['mart', 'artikelverkauf', 'geschaeftstag'] },
   },
   {

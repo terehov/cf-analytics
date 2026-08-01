@@ -294,3 +294,56 @@ Anmeldung ab) und 33 `numeric field overflow` bei `getPersonalkosten`. Beides wa
 **Eine Falle beim Bauen.** `tage_alt` stand für `getKennzahlen` bei **−158**: der Endpunkt wird
 je Kalenderjahr geholt, `zeitraum_bis` ist deshalb der 31.12. Eine negative Alterszahl sieht
 aus wie ein Fehler und ist keiner — mit `least(geladen_bis, current_date)` gedeckelt.
+
+---
+
+## Eine materialisierte Sicht in `mart`, und nur eine (01.08.2026)
+
+**Anlass.** Nach dem abgeschlossenen Lina-Import gemeldet: einzelne Dashboards sind langsam.
+Der Verdacht des Melders war die Tiefe der Historie — relevant seien nur die letzten zwei
+Jahre. Nachgemessen betraf es die Seite *Warenwirtschaft*, nicht den Round Table, auf den die
+Meldung verwies. Hergang und Messwerte in `fehlerkatalog.md`.
+
+**Warum die naheliegende Lösung nicht die richtige war.** Alte Jahre aus Metabase
+auszublenden hätte die schlimmste Karte nicht gerettet: `wa_we_pruefung` liest ohnehin alles,
+weil `mart.pruefung_wareneinsatz` Monate absichtlich nebeneinanderstellt und deshalb gar
+keinen Zeitfilter haben kann. Bei zwei statt achteinhalb Jahren wäre sie proportional
+langsam geblieben — rund 15 statt 62 Sekunden. Der Fehler war strukturell, nicht die
+Datenmenge. Eine Zwei-Jahres-Grenze bleibt als Ergänzung sinnvoll und ist bewusst **nicht**
+Teil dieser Änderung.
+
+**Entscheidung.** `mart.deckungsbeitrag_warengruppe` wird materialisiert (Migration `0027`) —
+als bislang einziges der 34 `mart`-Objekte. Sie verdichtet 27,5 Mio. Zeilen auf rund 174.000,
+und dieses Ergebnis ändert sich genau einmal je Importlauf.
+
+**Warum das die Ausnahme bleibt und nicht der neue Normalfall.** Reine Sichten sind hier
+richtig: sie können nicht veralten, und `mart` ist genau dafür da, Fallen auszuräumen statt
+neue aufzustellen. Eine materialisierte Sicht kehrt das um — sie kann still alt werden. Das
+lohnt nur, wo drei Dinge zusammenkommen, und hier kommen sie zusammen:
+
+1. Das Aggregat ist um Größenordnungen kleiner als seine Grundlage (174.000 zu 27,5 Mio.).
+2. Es ändert sich nur beim Import, nicht laufend.
+3. Es gibt einen Leser, der **nicht** filtern kann und deshalb nie prunen wird.
+
+Fehlt Punkt 3, ist ein richtig gesetzter Zeitfilter die bessere Antwort — er kostet nichts
+und veraltet nie. Genau so ist `wa_db_warengruppe` behoben worden und liest die
+materialisierte Sicht bewusst *nicht*: dort ist der taggenaue Filter auf `geschaeftstag`
+sowohl schneller als auch genauer, weil ein angeschnittener Monat sonst ganz zählte.
+
+**Wodurch der Preis gedeckelt ist.** Dieselbe Konstruktion wie beim Listenabgleich darüber,
+mit denselben zwei Zusicherungen und einem Test dafür:
+
+1. **Der Refresh kann einen Sync-Lauf niemals scheitern lassen** (`src/sync/deckungsbeitrag.ts`
+   fängt alles und wirft nie). Ein misslungener Refresh heißt veraltete Auswertung, nicht
+   verlorene Daten.
+2. **Er läuft nach dem Import, nie davor** — vorher würde er den alten Stand neu schreiben.
+
+Dazu eine dritte, die aus der eigenen Verbindung folgt: die Zeitgrenze von 15 Minuten wird im
+`finally` zurückgenommen. Bliebe sie an der Verbindung hängen, erbte sie der nächste Nutzer
+aus dem Pool, und ein langer Import bräche nach 15 Minuten ab — ohne dass jemand den
+Zusammenhang sähe. Auch das ist getestet.
+
+**Und die Frage, die eine materialisierte Sicht immer aufwirft:** „Wie alt sind diese Zahlen?"
+beantwortet `mart.deckungsbeitrag_stand`. Ohne sie wäre die einzige ehrliche Antwort ein
+Achselzucken — und eine veraltete Zahl, die aussieht wie eine frische, ist genau die Sorte
+Fehler, die sich laut `fehlerkatalog.md` nie von selbst meldet.

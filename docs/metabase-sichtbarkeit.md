@@ -46,7 +46,8 @@ Ergebnis liefert, und bringt die Namen schon mit.
 | `umsatz_stunde`, `umsatz_zeitzone` | Tagesverlauf und vordefinierte Zeitzonen |
 | `umsatz_ytd` | Monats- und Jahresumsatz mit Vorjahr — Spalten G/H/I des Excels |
 | `artikelverkauf` | Artikelverkäufe mit dem Wareneinsatzansatz **des jeweiligen Tages** |
-| `deckungsbeitrag_warengruppe` | DB je Warengruppe, mit Abdeckungsgrad |
+| `deckungsbeitrag_warengruppe` | DB je Warengruppe, mit Abdeckungsgrad. **Materialisiert** (seit 01.08.2026) — Stand in `deckungsbeitrag_stand` |
+| `deckungsbeitrag_stand` | Wie alt die Zahlen der materialisierten Sicht sind |
 | `preisentwicklung_ware` | Einkaufspreise mit Vormonatsvergleich |
 | `personalkosten` | Quoten und Effektivitäten, gesamt und je Bereich |
 | `kennzahlen_aktuell` | Jüngster BWA-Stand, Euro und Prozent getrennt aufgelöst |

@@ -255,18 +255,57 @@ Beide Spalten sind gefüllt. Bis zum 26.07.2026 war das nicht so: die Sicht behi
 `DISTINCT ON` nur die später geholte der beiden Zeilen und warf die andere Wertspalte weg.
 Wer gegen den alten Stand gebaut hat, rechnet jetzt mit anderen Zahlen.
 
+**5. Ein Zeitfilter muss auf der Spalte liegen, die partitioniert ist — nicht in einer
+Unterabfrage.** Am 01.08.2026 stand in der Karte „Deckungsbeitrag je Warengruppe":
+
+```sql
+WHERE d.monat IN (SELECT DISTINCT monat FROM mart.artikelverkauf WHERE {{zeitraum}})
+```
+
+Rechnerisch richtig, und trotzdem der Grund für einen Abbruch nach zwei Minuten: der Zeitraum
+wirkt nur in der **inneren** Abfrage. Die äußere Sicht aggregiert vorher die gesamte Historie
+und filtert erst danach — 111 Partitionsscans statt der drei gebrauchten. Wer einen Zeitraum
+setzt, muss ihn auf `geschaeftstag` der Basissicht legen. Ausführlich in `fehlerkatalog.md`.
+
 Neue Sichten kommen in eine **neue** Migrationsdatei. `0001` bis `0006` sind angewendet und
 werden nicht mehr geändert; der Stand steht in `public.schema_migration`.
 
 ## Tempo
 
-`mart.artikelverkauf` liegt bei rund 20 Millionen Zeilen im Jahr. Die Tabelle darunter ist
-monatlich partitioniert — **wer nach `geschaeftstag` filtert, liest nur die betroffenen
-Monate.** Ohne Zeitfilter wird die ganze Historie gelesen. Beim Anlegen einer Frage auf
-dieser Sicht also zuerst den Zeitraum setzen, dann gruppieren.
+`mart.artikelverkauf` liegt bei rund 20 Millionen Zeilen im Jahr — Stand 01.08.2026 sind es
+**27,5 Millionen Zeilen in 108 Monatspartitionen ab Januar 2018, 3,8 GB.** Die Tabelle
+darunter ist monatlich partitioniert — **wer nach `geschaeftstag` filtert, liest nur die
+betroffenen Monate.** Ohne Zeitfilter wird die ganze Historie gelesen. Beim Anlegen einer
+Frage auf dieser Sicht also zuerst den Zeitraum setzen, dann gruppieren.
 
 Für alles andere ist die Datenmenge unkritisch: der Umsatzbericht sind ~150.000 Zeilen im
 Jahr, die BWA ~8.000.
+
+### Die eine materialisierte Sicht
+
+`mart.deckungsbeitrag_warengruppe` ist seit dem 01.08.2026 **materialisiert** — als bislang
+einziges der `mart`-Objekte. Sie aggregiert die 27,5 Millionen Zeilen auf rund 174.000, und
+das Ergebnis ändert sich genau einmal je Importlauf; als reine Sicht wurde es bei jedem
+Kartenaufruf neu gerechnet.
+
+Zwei Dinge folgen daraus:
+
+* **Die Zahlen sind so alt wie der letzte Refresh.** Der läuft im Nachlauf jedes Sync-Laufs
+  (`src/sync/deckungsbeitrag.ts`). Wie alt genau, steht in `mart.deckungsbeitrag_stand` —
+  diese Frage soll beantwortbar sein, ohne jemanden zu fragen.
+* **Wer auf ein großes Aggregat aus `artikelverkauf` stößt, das keinen Zeitfilter haben
+  kann, setzt darauf auf statt auf die Rohsicht.** `mart.pruefung_wareneinsatz` ist der
+  Fall: die Karte dazu hat bewusst keinen Zeitraumfilter, kann also nie prunen. Über die
+  materialisierte Sicht fällt sie von 61,7 s auf 0,04 s bei identischem Ergebnis.
+
+Von Hand auffrischen:
+
+```sql
+REFRESH MATERIALIZED VIEW CONCURRENTLY mart.deckungsbeitrag_warengruppe;
+```
+
+`CONCURRENTLY`, damit niemand währenddessen vor einem sperrenden Dashboard sitzt. Der dafür
+nötige eindeutige Index liegt in Migration `0027`. Ein Refresh dauert rund 145 Sekunden.
 
 ## Berechtigungen
 
