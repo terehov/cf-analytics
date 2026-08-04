@@ -616,54 +616,229 @@ SELECT d.warengruppe              AS "Warengruppe",
  ORDER BY sum(d.umsatz_netto) DESC NULLS LAST`,
     template_tag_dimension: { zeitraum: ['mart', 'artikelverkauf', 'geschaeftstag'] },
   },
+  // ENTFALLEN AM 01.08.2026 (Migration 0029): die Karte
+  // 'wa_we_pruefung' -- "Rechnerischer gegen tatsächlichen
+  // Wareneinsatz". Ihre Quelle mart.pruefung_wareneinsatz ist
+  // stillgelegt.
+  //
+  // Zwei Gruende, beide unabhaengig voneinander ausreichend:
+  //
+  //   1. fixer_we stammt aus LINAs Warenwirtschaft, und die enthaelt
+  //      Demodaten. Der Sollwert war nicht verantwortbar.
+  //   2. Die Karte zeigte fuer 2.590 von 5.364 Betriebsmonaten eine
+  //      Luecke in voller Hoehe des BWA-Wareneinsatzes -- daneben
+  //      "Abdeckung 100 %". Der Waechter, der genau das haette melden
+  //      sollen, prueft auf IS NOT NULL, und fixer_we ist nie NULL,
+  //      sondern 0. Er hat nie ausgeloest.
+  //
+  // Wer die Karte vermisst: sie kommt in Stufe 2.4 auf Basis der
+  // FoodNotify-Zutatenkosten zurueck, dann mit Bar/Kueche-Split.
+  // Siehe docs/plan-foodnotify.md.
+  // Die Karte 'wa_preise' hiess bis zum 01.08.2026 "Einkaufspreise im
+  // Verlauf" und las mart.preisentwicklung_ware -- LINAs Warenwirtschaft,
+  // also Demodaten (AGENTS.md Regel 5). Sie zeigte 1.111 Zeilen
+  // erfundener Einkaufspreise als echte an, ohne jede Kennzeichnung.
+  //
+  // Ihre eigene Beschreibung war im Rueckblick der Hinweis: "Die Reihe
+  // beginnt mit der ersten Erfassung -- fuer die Zeit davor gibt es keine
+  // Preise, weil sie nirgends gespeichert wurden." Genau umgekehrt: bei
+  // FoodNotify entsteht die Historie aus den Bestellungen selbst und
+  // reicht bei Aposto bis Oktober 2021 zurueck.
+  //
+  // Seit dem 02.08.2026 (Stufe 1.7, Migration 0035) steht sie wieder --
+  // auf core.bestellposition, mit echten Belegpreisen.
   {
-    schluessel: 'wa_we_pruefung',
-    name: 'Rechnerischer gegen tatsächlichen Wareneinsatz',
+    schluessel: 'wa_ladestand',
+    name: 'Wie vollständig sind die Einkaufsdaten?',
     beschreibung:
-      'Was laut Rezeptur verbraucht werden müsste, gegen das, was tatsächlich eingekauft wurde. Eine Lücke ist normal und genau die interessante Zahl: in ihr stecken Schwund, Bruch, Portionsgrößen, Personalverzehr und Lagerbewegung. Unter 90 % Abdeckung ist der Vergleich nicht belastbar.',
+      'ZUERST LESEN. „Positionen %" misst nur die Tiefe der BEREITS GELADENEN Bestellungen — fehlende Bestellungen sieht die Spalte nicht. Ob die Bestell-Liste einer Marke vollständig ist, sagt „Seiten offen": solange dort etwas steht, fehlen ganze Bestellungen, egal was die Prozentspalte behauptet. Die Seiten laufen je Kostenstelle chronologisch AUFSTEIGEND — bei unfertigen Marken fehlen also gerade die JÜNGSTEN Monate.',
     anzeige: 'table',
-    parameter: [BETRIEB, MARKE],
-    // mart.pruefung_wareneinsatz fuehrt keine Marke -- sie kommt ueber
-    // mart.konzept_zuordnung dazu, dieselbe Quelle, aus der auch die
-    // Auswahlliste des Markenfilters stammt. Ein LEFT JOIN, damit ein
-    // Betrieb ohne Konzeptzuordnung nicht aus der Liste faellt: die
-    // Pruefung soll gerade die Luecken zeigen, nicht sie verstecken.
+    parameter: [MARKE],
+    // Der Vorgaenger dieser Beschreibung versprach das Gegenteil ("erst
+    // bei 100 % ist er vollstaendig") und behauptete, es werde rueckwaerts
+    // geladen. Beides falsch, und die Karte war ausgerechnet als
+    // Vertrauensanker deklariert: Enchilada stand mit "1 Bestellung /
+    // 100,0 %" da, waehrend 600 Listen-Seiten offen waren.
     sql: `
-SELECT p.betrieb            AS "Betrieb",
-       p.monat              AS "Monat",
-       p.we_theoretisch     AS "WE theoretisch",
-       p.we_bwa             AS "WE laut BWA",
-       p.luecke             AS "Lücke",
-       p.we_theoretisch_pct AS "theoretisch %",
-       p.we_bwa_pct         AS "BWA %",
-       p.abdeckung_pct      AS "Abdeckung %"
-  FROM mart.pruefung_wareneinsatz p
-  LEFT JOIN mart.konzept_zuordnung kz ON kz.betrieb = p.betrieb
+SELECT monat                AS "Monat",
+       marke                AS "Marke",
+       bestellungen         AS "Bestellungen",
+       mit_positionen       AS "davon mit Positionen",
+       positionen_pct       AS "Positionen %",
+       seiten_offen         AS "Seiten offen",
+       CASE WHEN liste_vollstaendig THEN '✓' ELSE '… lädt' END AS "Liste vollständig?"
+  FROM mart.einkauf_ladestand
  WHERE 1 = 1
-   [[AND p.betrieb = {{betrieb}}]]
-   [[AND kz.hauptkonzept = {{marke}}]]
- ORDER BY p.abdeckung_pct DESC NULLS LAST, abs(p.luecke) DESC NULLS LAST`,
+   [[AND marke = {{marke}}]]
+ ORDER BY monat DESC, marke`,
   },
   {
     schluessel: 'wa_preise',
     name: 'Einkaufspreise im Verlauf',
     beschreibung:
-      'Einkaufspreis je Ware und Lieferant mit Vergleich zum Vormonat. Die Reihe beginnt mit der ersten Erfassung — für die Zeit davor gibt es keine Preise, weil sie nirgends gespeichert wurden.',
+      'Was ein bestelltes Gebinde gekostet hat — ein Karton, ein Sack, eine Kiste. Gezeigt wird der Median: eine einzelne Fehlbuchung würde den Durchschnitt verzerren. Die Spalte „je Einheit" (€/kg, €/l) steht daneben, ist aber oft leer: FoodNotify pflegt die Angabe, wie viel in einem Gebinde steckt, für dieselbe Ware widersprüchlich — sie erscheint nur, wo sie belegbar war. Die Werte stammen aus echten Bestellungen, nicht aus einem Katalog. Bitte vorher „Wie vollständig sind die Einkaufsdaten?" ansehen.',
     anzeige: 'table',
+    parameter: [MARKE],
+    // Der FÜHRENDE Preis ist der je Gebinde (Migration 0041). Der Preis
+    // je Einheit hing an FoodNotifys `unitQuantity`, und die schwankt für
+    // dieselbe Ware zwischen 0,00035 und 50 — die Karte zeigte deshalb
+    // 48.400 EUR/kg für Kaffee.
     sql: `
-SELECT ware                  AS "Ware",
-       lieferant             AS "Lieferant",
-       monat                 AS "Monat",
-       preis                 AS "Preis",
-       preis_vormonat        AS "Vormonat",
-       round(preis - preis_vormonat, 2) AS "Δ",
-       CASE WHEN preis_vormonat > 0
-            THEN round((preis - preis_vormonat) / preis_vormonat * 100, 1)
-       END                   AS "Δ %",
-       preis_je_basiseinheit AS "je Basiseinheit",
-       basiseinheit          AS "Einheit"
-  FROM mart.preisentwicklung_ware
- ORDER BY abs(coalesce(preis - preis_vormonat, 0)) DESC, ware`,
+SELECT ware                     AS "Ware",
+       marke                    AS "Marke",
+       monat                    AS "Monat",
+       bestellungen             AS "Bestellungen",
+       gebinde                  AS "Gebinde",
+       ausgaben                 AS "Ausgaben",
+       preis_je_gebinde         AS "Preis je Gebinde",
+       preis_min                AS "günstigster",
+       preis_max                AS "teuerster",
+       einheit                  AS "Einheit",
+       preis_je_einheit_median  AS "je Einheit"
+  FROM mart.einkaufspreis_monat
+ WHERE 1 = 1
+   [[AND marke = {{marke}}]]
+ ORDER BY monat DESC, ausgaben DESC
+ LIMIT 500`,
+  },
+  {
+    schluessel: 'wa_preis_veraenderung',
+    name: 'Was ist teurer geworden?',
+    beschreibung:
+      'Veränderung des Gebindepreises gegenüber dem VORMONAT, absteigend nach Größe des Sprungs. Waren, deren letzter Einkauf länger als einen Monat her ist, erscheinen hier nicht: ein Halbjahressprung als Monatsveränderung auszuweisen wäre eine erfundene Zahl.',
+    anzeige: 'table',
+    parameter: [MARKE],
+    sql: `
+SELECT ware              AS "Ware",
+       marke             AS "Marke",
+       monat             AS "Monat",
+       vormonat_preis    AS "Gebindepreis Vormonat",
+       preis             AS "Gebindepreis",
+       veraenderung_pct  AS "Veränderung %",
+       bestellungen      AS "Bestellungen"
+  FROM mart.einkaufspreis_veraenderung
+ WHERE veraenderung_pct IS NOT NULL
+   -- Ohne diesen Filter fuehrten +3,2-Millionen-%-Zeilen die Liste an:
+   -- Einheitenwechsel und Buchungsfehler, keine Teuerung. "verdaechtig"
+   -- kennzeichnet Spruenge ueber +/-100 % und die ungeklaerte Einheit
+   -- baseUnit (Migration 0039); solche Zeilen gehoeren in die
+   -- Einkaufspruefung, nicht in eine Preisliste.
+   AND NOT verdaechtig
+   AND bestellungen >= 2
+   [[AND marke = {{marke}}]]
+ ORDER BY abs(veraenderung_pct) DESC, ausgaben DESC
+ LIMIT 200`,
+  },
+  {
+    schluessel: 'wa_einkauf_pruefung',
+    name: 'Auffällige Einkaufspositionen',
+    beschreibung:
+      'Positionen, die in der Preisliste fehlen oder dort auffallen — mit dem üblichen Preis derselben Ware zum Vergleich. Meist echte Falschbuchungen im Quellsystem (1.002.250 € für eine Packung Falthandtücher ist keine Preiserhöhung). Diese Liste existiert, damit die Lücke sichtbar ist, statt still zu sein.',
+    anzeige: 'table',
+    parameter: [BETRIEB, MARKE],
+    sql: `
+SELECT bestelldatum       AS "Bestelldatum",
+       marke              AS "Marke",
+       coalesce(betrieb, '— nicht zugeordnet —') AS "Betrieb",
+       ware               AS "Ware",
+       menge              AS "Menge",
+       summe_preis        AS "Summe",
+       preis_je_gebinde   AS "Preis je Gebinde",
+       ueblich            AS "üblich",
+       grund              AS "Grund",
+       bestellnummer      AS "Bestellung"
+  FROM mart.einkauf_pruefung
+ WHERE 1 = 1
+   [[AND betrieb = {{betrieb}}]]
+   [[AND marke = {{marke}}]]
+ ORDER BY bestelldatum DESC NULLS LAST
+ LIMIT 300`,
+  },
+  {
+    schluessel: 'wa_einkauf_betrieb',
+    name: 'Einkaufsvolumen je Betrieb',
+    beschreibung:
+      'Was jeder Betrieb je Monat eingekauft hat, getrennt nach Bar und Küche. Es erscheinen nur Betriebe, deren FoodNotify-Kostenstelle einem LINA-Betrieb zugeordnet ist — eine Summe ohne Betrieb ließe sich mit nichts vergleichen.',
+    anzeige: 'table',
+    parameter: [BETRIEB, MARKE],
+    sql: `
+SELECT betrieb        AS "Betrieb",
+       marke          AS "Marke",
+       bereich        AS "Bereich",
+       monat          AS "Monat",
+       bestellungen   AS "Bestellungen",
+       positionen     AS "Positionen",
+       einkauf_netto  AS "Einkauf netto",
+       lieferanten    AS "Lieferanten"
+  FROM mart.einkauf_betrieb_monat
+ WHERE 1 = 1
+   [[AND betrieb = {{betrieb}}]]
+   [[AND marke = {{marke}}]]
+ ORDER BY monat DESC, einkauf_netto DESC
+ LIMIT 500`,
+  },
+
+  {
+    // Das Dashboard hiess von Anfang an "Einkauf — Preise, Lieferanten,
+    // Volumen", zeigte aber keinen einzigen Lieferanten. Je MARKE, nicht
+    // je Konzern: FoodNotify fuehrt denselben Lieferanten je Mandant als
+    // eigenen Datensatz (4x Distra), eine naive Konzernsumme zaehlte ihn
+    // vierfach getrennt und keinmal ganz.
+    schluessel: 'wa_lieferant_volumen',
+    name: 'Lieferanten nach Einkaufsvolumen',
+    beschreibung:
+      'Einkaufsvolumen je Lieferant in den letzten zwölf Monaten. Ohne Markenfilter stehen gleichnamige Lieferanten mehrfach da — je Marke ein Vertrag, das ist FoodNotifys Sicht und die des Einkäufers. Für Marken mit offenen Bestellseiten (siehe Ladestand) ist das Volumen unvollständig.',
+    anzeige: 'row',
+    parameter: [MARKE, BETRIEB],
+    sql: `
+SELECT lieferant || ' — ' || marke  AS "Lieferant",
+       round(sum(summe_preis))      AS "Einkauf (12 Monate)"
+  FROM mart.einkauf_position
+ WHERE lieferant IS NOT NULL
+   AND monat >= (date_trunc('month', current_date) - interval '12 months')::date
+   [[AND marke = {{marke}}]]
+   [[AND betrieb = {{betrieb}}]]
+ GROUP BY lieferant, marke
+ ORDER BY sum(summe_preis) DESC
+ LIMIT 25`,
+    visualisierung: {
+      'graph.dimensions': ['Lieferant'],
+      'graph.metrics': ['Einkauf (12 Monate)'],
+      'graph.x_axis.title_text': 'Einkauf netto (€), letzte 12 Monate',
+    },
+  },
+  {
+    // Beschaffungsrisiko je Betrieb: haengt ein Haus an EINEM Lieferanten,
+    // ist jede Preisverhandlung und jeder Lieferausfall ein Betriebsrisiko.
+    schluessel: 'wa_lieferant_konzentration',
+    name: 'Lieferantenkonzentration je Betrieb',
+    beschreibung:
+      'Je Betrieb: Einkaufsvolumen der letzten zwölf Monate, Zahl der Lieferanten und der Anteil des größten. Ein Anteil über 60 % heißt: dieses Haus hat faktisch einen Monopol-Lieferanten. Nur Betriebe mit zugeordneter FoodNotify-Kostenstelle; unfertig geladene Marken sind untertrieben.',
+    anzeige: 'table',
+    parameter: [MARKE, BETRIEB],
+    sql: `
+WITH je AS (
+    SELECT betrieb, lieferant, sum(summe_preis) AS einkauf
+      FROM mart.einkauf_position
+     WHERE lieferant IS NOT NULL AND betrieb IS NOT NULL
+       AND monat >= (date_trunc('month', current_date) - interval '12 months')::date
+       [[AND marke = {{marke}}]]
+       [[AND betrieb = {{betrieb}}]]
+     GROUP BY betrieb, lieferant
+), top1 AS (
+    SELECT DISTINCT ON (betrieb) betrieb, lieferant, einkauf
+      FROM je
+     ORDER BY betrieb, einkauf DESC
+)
+SELECT je.betrieb                                       AS "Betrieb",
+       round(sum(je.einkauf))                           AS "Einkauf (12 M.)",
+       count(*)                                         AS "Lieferanten",
+       max(t.lieferant)                                 AS "größter Lieferant",
+       round(100 * max(t.einkauf) / nullif(sum(je.einkauf), 0), 1) AS "Anteil größter %"
+  FROM je
+  JOIN top1 t ON t.betrieb = je.betrieb
+ GROUP BY je.betrieb
+ ORDER BY round(100 * max(t.einkauf) / nullif(sum(je.einkauf), 0), 1) DESC NULLS LAST`,
   },
 
   // ===================================================================

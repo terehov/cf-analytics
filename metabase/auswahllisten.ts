@@ -48,8 +48,16 @@ if (!setzen) {
   }
   soll.konzept = soll.marke!
 
-  const d = await meta.query<{ name: string; parameters: string }>(
-    `SELECT name, parameters::text AS parameters
+  // Dieselbe Dashboard-Ausnahme wie im Nachlauf: das Einkauf-Dashboard
+  // filtert auf FoodNotify-Mandanten, nicht auf Hauptkonzepte. Ohne diese
+  // Sonderliste meldete die Pruefung dort dauerhaft einen Drift, den es
+  // nicht gibt.
+  const sollEinkaufMarke: string[] = (await daten.query(
+    `SELECT DISTINCT marke AS w FROM mart.einkauf_ladestand
+      WHERE marke IS NOT NULL ORDER BY 1`)).rows.map((z: { w: string }) => String(z.w))
+
+  const d = await meta.query<{ name: string; parameters: string; description: string | null }>(
+    `SELECT name, parameters::text AS parameters, description
        FROM report_dashboard WHERE archived = false AND parameters IS NOT NULL`)
 
   let offen = 0
@@ -57,8 +65,11 @@ if (!setzen) {
     let ps: Record<string, unknown>[]
     try { ps = JSON.parse(row.parameters) } catch { continue }
     if (!Array.isArray(ps)) continue
+    const istEinkauf = (row.description ?? '').includes('[key:db_einkauf]')
     for (const p of ps) {
-      const neueWerte = soll[String(p.slug ?? '')]
+      const neueWerte = istEinkauf && String(p.slug ?? '') === 'marke'
+        ? sollEinkaufMarke
+        : soll[String(p.slug ?? '')]
       if (!neueWerte || p.values_source_type !== 'static-list') continue
       const alt = ((p.values_source_config ?? {}) as { values?: string[] }).values ?? []
       const neu = neueWerte.filter(w => !alt.includes(w))

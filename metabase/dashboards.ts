@@ -588,10 +588,59 @@ export const dashboards: Dashboard[] = [
       { teile: [{ karte: 'wa_renner', hoehe: 12 }] },
       { teile: [{ karte: 'wa_penner', hoehe: 12 }] },
       { teile: [{ karte: 'wa_db_warengruppe', hoehe: 11 }] },
-      { teile: [{ text: '## Rechnerischer Wareneinsatz gegen tatsächlichen\n\nEine Lücke ist der **Normalfall** und die eigentliche Kennzahl: darin stecken Schwund, Bruch, Portionsgrößen und Personalverzehr.' }] },
-      { teile: [{ karte: 'wa_we_pruefung', hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
-      { teile: [{ text: '## Einkaufspreise\n\nDie Reihe beginnt mit der ersten Erfassung. Für die Zeit davor gibt es keine Preise, weil sie nirgends gespeichert wurden.' }] },
-      { teile: [{ karte: 'wa_preise', hoehe: 11 }] },
+      // Der Abschnitt "Rechnerischer Wareneinsatz gegen tatsächlichen"
+      // ist am 01.08.2026 entfallen (Migration 0029). Er stand auf
+      // mart.pruefung_wareneinsatz, und die rechnete auf fixer_we aus
+      // LINAs Warenwirtschaft -- Demodaten. Schlimmer: die Karte wies
+      // fuer knapp die Haelfte aller Betriebsmonate eine Luecke in
+      // voller Hoehe des BWA-Wareneinsatzes aus und meldete daneben
+      // "Abdeckung 100 %". Kommt in Stufe 2.4 auf FoodNotify-Basis
+      // zurueck, siehe docs/plan-foodnotify.md.
+      // Der Abschnitt "Einkaufspreise" ist am 01.08.2026 entfallen
+      // (Migration 0030), weil er Demodaten als echte Einkaufspreise
+      // zeigte. Seit dem 02.08.2026 steht er wieder -- aber als EIGENES
+      // Dashboard "Einkauf" (db_einkauf, gleich unten), nicht hier.
+      //
+      // Warum getrennt: dieses Dashboard filtert ueber einen
+      // Feldfilter auf mart.artikelverkauf.geschaeftstag. Die
+      // Einkaufskarten stehen auf ganz anderen Sichten, kennen diese
+      // Spalte nicht und wuerden den gemeinsamen Zeitraumfilter still
+      // ignorieren -- ein gesetzter Filter, der nichts tut, ist
+      // schlimmer als keiner (siehe docs/fehlerkatalog.md).
+    ],
+  },
+
+  {
+    schluessel: 'db_einkauf',
+    name: 'Einkauf — Preise, Lieferanten, Volumen',
+    beschreibung:
+      'Was der Wareneinkauf tatsächlich gekostet hat: Preise je Ware im Zeitverlauf, was teurer geworden ist, und wie viel jeder Betrieb einkauft. Aus den echten Bestellungen bei FoodNotify — keine Katalogpreise.',
+    sammlung: 'Betrieb',
+    // Kein Zeitraumfilter: die Einkaufssichten aggregieren bereits auf
+    // Monate, und ein Feldfilter braeuchte je Karte eine andere Tabelle.
+    // Gefiltert wird ueber Marke und Betrieb. Die Marke ist hier der
+    // FOODNOTIFY-MANDANT (vier Werte), nicht das Round-Table-Konzept —
+    // acht der zwoelf Konzern-Marken lieferten grundsaetzlich leere
+    // Karten, siehe F_MARKE_EINKAUF.
+    filter: [F_BETRIEB, F_MARKE_EINKAUF],
+    reihen: [
+      { teile: [{ text: '# Einkauf\n\n**Die Daten werden noch geladen** — je Kostenstelle chronologisch aufsteigend: bei unfertigen Marken fehlen gerade die **jüngsten** Monate. Ein Monat mit wenigen Positionen ist meist noch nicht fertig, nicht etwa ein Einbruch. Die erste Karte sagt, welche Marken vollständig sind.\n\nAlle Preise sind **je Gebinde** — was ein bestellter Karton, Sack oder Eimer gekostet hat. Der Preis je Kilo oder Liter steht als Zusatzspalte daneben, bleibt aber oft leer: FoodNotify pflegt die Angabe, wie viel in einem Gebinde steckt, für dieselbe Ware widersprüchlich. Was auffällt oder fehlt, steht in der letzten Karte.' }] },
+      // Der Ladestand steht GANZ OBEN, nicht unten als Fussnote: solange
+      // der Backfill laeuft, ist er die Voraussetzung fuer jede Aussage
+      // ueber einen Zeitraum.
+      { teile: [{ karte: 'wa_ladestand', hoehe: 9 }] },
+      { teile: [{ karte: 'wa_preis_veraenderung', hoehe: 12 }] },
+      { teile: [{ karte: 'wa_preise', hoehe: 12 }] },
+      // Die Lieferanten — der Titel der Seite versprach sie von Anfang
+      // an, gezeigt hat sie bisher keine Karte.
+      { teile: [{ text: '## Lieferanten\n\nJe **Marke**, nicht je Konzern: FoodNotify führt denselben Lieferanten je Mandant als eigenen Vertrag. Ein Anteil über 60 % beim größten Lieferanten heißt: dieses Haus hat faktisch einen Monopol-Lieferanten.' }] },
+      { teile: [{ karte: 'wa_lieferant_volumen', hoehe: 11 }] },
+      { teile: [{ karte: 'wa_lieferant_konzentration', hoehe: 11,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      { teile: [{ karte: 'wa_einkauf_betrieb', hoehe: 11 }] },
+      // Die Pruefliste ganz unten, aber sichtbar: eine ausgeschlossene
+      // Position, die nirgends auftaucht, ist eine stille Kuerzung.
+      { teile: [{ karte: 'wa_einkauf_pruefung', hoehe: 10 }] },
     ],
   },
 

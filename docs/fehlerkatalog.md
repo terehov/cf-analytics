@@ -1721,3 +1721,98 @@ eine Budgetgrenze ist eine gewollte Entscheidung und kein Zwischenfall.
    einzeln gesetztes `FN_TAKT_MIN_MS` muss gegen den *geerbten* Höchstwert
    geprüft werden, sonst entsteht still eine Spanne, die es nicht gibt.
 
+## 4,44e-16 ist keine Menge — und riss eine ganze Bestellung mit (03.08.2026)
+
+**Symptom.** Vier `fn:bestellpositionen`-Posten hingen mit bis zu **neun** Versuchen im
+Backoff, HTTP-Status 200, Fehlertext `error: numeric field overflow`. Die Antwort war in
+Ordnung, das Schreiben nicht.
+
+**Ursache.** FoodNotify bildet `adjustedQuantity` offenbar als Differenz zweier
+Fließkommazahlen. Kommt glatt null heraus, steht in der Antwort nicht `0`, sondern der Rest
+der Rundung: `4.4408920985006262e-16`. In JavaScript ist dieser Wert **truthy** — er rutschte
+durch die `menge &&`-Prüfung des Stückpreises. Danach: `156,44 / 4,44e-16 = 3,5 · 10^17`.
+`numeric(14,6)` trägt acht Vorkommastellen, Postgres bricht ab.
+
+Und es fiel nicht die Position um, sondern die **ganze Bestellung samt Kopf** — Laden ist
+eine Transaktion. Eine einzelne Zahl aus dem Rundungsrauschen kostete vier vollständige
+Bestellungen.
+
+Ein zweiter Weg in denselben Überlauf lag daneben: aus derselben Menge wurde
+`menge × Gebinde × Inhalt` gerechnet, und war das Ergebnis knapp über null, galt es als
+Gesamtmenge — dann wäre auch `preis_je_einheit` explodiert.
+
+**Behebung.** Beträge unter `1e-6` gelten beim Lesen der Menge als null (`nullFalls0`);
+darunter liegt keine Bestellmenge, die jemand aufgibt, und so weit rundet die Datei ohnehin.
+Zweite Verteidigungslinie ist `jeEinheit()`: ein Quotient, der nicht in `numeric(14,6)`
+passt, wird **nicht geschrieben**. Eine fehlende Zahl ist besser als ein abgebrochener
+Import, und die Position steht mit ihrer Menge weiterhin da.
+
+**Regeln.**
+
+1. **`x &&` prüft nicht auf „ungleich null", sondern auf „truthy".** Jede Zahl aus einer
+   fremden Fließkommarechnung kann numerisch null sein und trotzdem durchkommen. Wer damit
+   dividiert, braucht eine Schranke, keine Wahrheitsprüfung.
+2. **Ein Ausreißer darf nur seine eigene Zeile kosten.** Steht das Laden in einer
+   Transaktion, nimmt ein Spaltenüberlauf alles mit, was daneben stand. Was nicht in die
+   Spalte passt, gehört vorher abgefangen — im Transformer, nicht in Postgres.
+3. **Die Spaltenbreite ist eine Zusicherung, die der Transformer einhalten muss.**
+   `numeric(14,6)` heißt „unter 10^8". Wer das nur in der Migration weiß und nicht im Code,
+   erfährt es beim ersten echten Beleg.
+
+## Eine Zeile, die in sich stimmt und trotzdem falsch ist (03.08.2026)
+
+**Symptom.** Die Karte „Einkaufspreise im Verlauf" zeigte **48.400 €/kg
+für Kaffee**. Nicht als Ausreißer weit unten, sondern ganz oben, wo man
+zuerst hinsieht.
+
+**Erste Ursache, behoben.** `totalUnitQuantity` entspricht normalerweise
+`menge × packagingQuantity × unitQuantity` — an 310.032 von 310.761
+Positionen bestätigt. Bei 2.116 von 20.750 Waren weicht es ab. Die
+Transformation rechnet die Menge seither selbst und verweigert den Preis,
+wo beides sich widerspricht.
+
+**Zweite Ursache, die schwerere.** Das reichte nicht. FoodNotify liefert
+für dieselbe Ware *beide* Felder falsch — und dann ist die Zeile **in sich
+stimmig**:
+
+```
+packagingQuantity 50, unitQuantity 0,007    →  0,35 kg  →     38 €/kg
+packagingQuantity  1, unitQuantity 0,00035  →  0,00035 kg → 48.400 €/kg
+```
+
+`1 × 1 × 0,00035 = 0,00035`. Die Rechnung geht auf. Für sich betrachtet
+ist keine der beiden Zeilen widerlegbar — erst **nebeneinander**: dieselbe
+Ware, derselbe Lieferant, Faktor 1.275 im Preis.
+
+**Warum auch das nicht reichte.** Der Vergleich muss über den *Namen*
+laufen, nicht über die Warennummer: derselbe Kaffee trägt acht
+verschiedene `ware_key`, und innerhalb einer Nummer ist der Fehler
+konsistent — alle elf Zeilen bei 48.400 €/kg, der Median genauso hoch,
+nichts fällt auf. Und selbst dann bleibt ein Rest: „Entcoffeiniert" gegen
+„Ent**k**offeiniert" sind zwei Namen, und in der kleineren Gruppe ist der
+Fehler durchgängig.
+
+**Die Lösung war, die Kennzahl zu wechseln.** Der Preis **je Gebinde**
+braucht nur `sumPrice` und `adjustedQuantity` — beide sauber. Median
+14,36 € über 310.496 Positionen, dreizehn Werte über 1.000 €. Der Preis je
+Kilo hängt an einer Stammdatenangabe, die der Lieferant pflegt und
+niemand prüft; der Gebindepreis hängt an dem, was auf der Rechnung steht.
+
+**Regeln.**
+
+1. **Eine Zeile, die in sich stimmt, kann trotzdem falsch sein.** Wo alle
+   Felder zueinander passen, aber gegen ihresgleichen nicht, hilft keine
+   Zeilenprüfung — nur der Vergleich mit der Verteilung.
+2. **Die Prüfung gehört dorthin, wo der Vergleich möglich ist.** Beim
+   Laden einer einzelnen Position ist die Verteilung noch nicht bekannt.
+   Deshalb Nachlauf (`src/sync/einkaufspreis.ts`), nicht Ladepfad.
+3. **Wenn eine Kennzahl an einem unzuverlässigen Feld hängt, wechsle die
+   Kennzahl — nicht den Filter.** Man kann lange an Schwellen feilen. Die
+   bessere Frage ist, ob es eine Zahl gibt, die dasselbe beantwortet und
+   weniger fremde Annahmen braucht. „Was kostet ein Karton?" ist ohnehin
+   die Frage, die im Einkauf gestellt wird.
+4. **Was ausgeschlossen wird, muss sichtbar bleiben.**
+   `mart.einkauf_pruefung` zeigt jede verworfene Position mit Grund und
+   dem üblichen Preis daneben. Eine stille Kürzung liest sich wie
+   Vollständigkeit.
+

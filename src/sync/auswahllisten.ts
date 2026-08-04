@@ -52,6 +52,24 @@ const LISTEN: Record<string, string> = {
 }
 
 /**
+ * Ausnahmen je Dashboard: gleicher Slug, andere Grundgesamtheit.
+ *
+ * Das Einkauf-Dashboard filtert auf die FoodNotify-Mandanten — Marke im
+ * Sinne der Warenwirtschaft, nicht das Round-Table-Hauptkonzept. Acht der
+ * zwölf Konzern-Marken haben dort grundsätzlich keine Daten; eine
+ * Auswahlliste, deren Mehrheit leere Karten liefert, ist eine Falle, die
+ * wie fehlende Daten aussieht. Erkannt wird die Seite am [key:...] in der
+ * Beschreibung — dasselbe Kennzeichen, über das der Provisionierer seine
+ * Dashboards wiederfindet.
+ */
+export const LISTEN_JE_DASHBOARD: Record<string, Record<string, string>> = {
+  db_einkauf: {
+    marke: `SELECT DISTINCT marke AS w FROM mart.einkauf_ladestand
+             WHERE marke IS NOT NULL ORDER BY 1`,
+  },
+}
+
+/**
  * Der Monat, der beim Öffnen eines Dashboards voreingestellt ist.
  *
  * WARUM DAS HIER STEHT UND NICHT FEST IM DASHBOARD
@@ -165,6 +183,15 @@ export async function auswahllistenAbgleichen(): Promise<Abgleich> {
       const zeilen = await query<{ w: string }>(sql)
       soll[slug] = zeilen.map(z => String(z.w))
     }
+    // Die Dashboard-Ausnahmen gleich mit — je Dashboard-Schlüssel und Slug.
+    const sollJeDashboard: Record<string, Record<string, string[]>> = {}
+    for (const [schluessel, listen] of Object.entries(LISTEN_JE_DASHBOARD)) {
+      sollJeDashboard[schluessel] = {}
+      for (const [slug, sql] of Object.entries(listen)) {
+        const zeilen = await query<{ w: string }>(sql)
+        sollJeDashboard[schluessel]![slug] = zeilen.map(z => String(z.w))
+      }
+    }
 
     // Der voreingestellte Monat, im Format, das der Filter erwartet
     // (YYYY-MM). Gibt es noch kein Urteil, bleibt er leer — dann ist ein
@@ -180,8 +207,8 @@ export async function auswahllistenAbgleichen(): Promise<Abgleich> {
       statement_timeout: 15_000,
     })
 
-    const dashboards = await meta.query<{ id: number; name: string; parameters: string }>(
-      `SELECT id, name, parameters::text AS parameters
+    const dashboards = await meta.query<{ id: number; name: string; parameters: string; description: string | null }>(
+      `SELECT id, name, parameters::text AS parameters, description
          FROM report_dashboard
         WHERE archived = false AND parameters IS NOT NULL`)
 
@@ -212,7 +239,11 @@ export async function auswahllistenAbgleichen(): Promise<Abgleich> {
           continue
         }
 
-        const neueWerte = soll[String(p.slug ?? '')]
+        // Dashboard-Ausnahme vor der globalen Liste — das Einkauf-Dashboard
+        // führt unter demselben Slug eine andere Grundgesamtheit.
+        const dKey = (d.description ?? '').match(/\[key:([a-z0-9_]+)\]/)?.[1]
+        const neueWerte = (dKey ? sollJeDashboard[dKey]?.[String(p.slug ?? '')] : undefined)
+          ?? soll[String(p.slug ?? '')]
         // Nur anfassen, was schon als feste Liste eingerichtet ist. Ein
         // Datumsfilter oder ein bewusst freies Feld bleibt unberührt.
         if (!neueWerte || p.values_source_type !== 'static-list') continue

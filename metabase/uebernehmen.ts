@@ -165,7 +165,6 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
   },
   rt_massnahmen_offen:    { monat: 'Offene Massnahmen unabhaengig vom Stichmonat.' },
   rt_massnahmen_status:   { monat: 'Verteilung ueber alle Massnahmen.' },
-  wa_we_pruefung:         { zeitraum: 'Vergleich je Monat gegen die BWA, nicht je Tag.' },
 
   dd_filialen_metrikvergleich: {
     ampel: 'Zaehlt Ampeln JE BEREICH (Umsatz, Personal, WE Bar ...). Ein Filter auf '
@@ -231,15 +230,9 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
     marke: 'Bewusst ueber alle Marken: die Liste ist eine Arbeitsvorlage zum '
          + 'Nachtragen der Adressen, und die soll vollstaendig bleiben.',
   },
-  wa_preise: {
-    betrieb: 'Einkaufspreise gelten je Lieferant fuer die Gruppe, nicht je Betrieb — '
-           + 'mart.preisentwicklung_ware hat gar keine Betriebsspalte.',
-    marke: 'Aus demselben Grund auch keine Marke: der Einkauf laeuft ueber die Gruppe, '
-         + 'nicht je Konzept. Ein Markenfilter haette hier nichts zu greifen.',
-    zeitraum: 'Preise liegen nur je Monat vor; ein Tageszeitraum waere irrefuehrend.',
-  },
-  dq_backfill: { betrieb: 'Importfortschritt je Endpunkt, nicht je Betrieb.' },
-  im_bericht:  { betrieb: 'Importzustand je Bericht, nicht je Betrieb.' },
+  // Die frueheren Eintraege fuer dq_backfill und im_bericht (betrieb) sind
+  // gestrichen: ihre Dashboards fuehren gar keine Filter, die Ausnahmen
+  // liefen ins Leere und suggerierten eine Pruefung, die nie stattfand.
 
   // --- Personal und BWA: Stichmonat gegen Zeitraum --------------------------
   // Beide Seiten fuehren seit dem 28.07.2026 einen Zeitraumfilter, damit
@@ -301,6 +294,16 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
             + 'waere es eine andere Rangliste -- richtig, aber nicht die, die '
             + 'neben den Ampeln desselben Monats steht.',
   },
+
+  // --- Einkauf: die drei Sichten kennen keinen Betrieb ----------------------
+  // FoodNotify verhandelt Preise je MARKE, nicht je Haus. mart.einkauf_ladestand,
+  // mart.einkaufspreis_monat und mart.einkaufspreis_veraenderung fuehren
+  // deshalb `marke` und keine Betriebsspalte -- ein Betriebsfilter haette
+  // hier nichts, worauf er zeigen koennte.
+  wa_ladestand:           { betrieb: 'Ladestand je Marke; die Sicht fuehrt keinen Betrieb.' },
+  wa_preise:              { betrieb: 'Einkaufspreise gelten je Marke, nicht je Haus.' },
+  wa_preis_veraenderung:  { betrieb: 'ebenso -- Preisentwicklung je Marke.' },
+
 }
 
 // Doppelte Schluessel in FILTER_AUSNAHME sind in JavaScript erlaubt: der

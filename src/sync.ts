@@ -11,6 +11,7 @@ import { pool } from './db/pool'
 import { workerLauf } from './sync/worker'
 import { auswahllistenNachlauf } from './sync/auswahllisten'
 import { deckungsbeitragNachlauf } from './sync/deckungsbeitrag'
+import { einkaufspreisNachlauf } from './sync/einkaufspreis'
 
 const ausloeser = process.argv.includes('--backfill') ? 'backfill'
                 : process.argv.includes('--manuell')  ? 'manuell'
@@ -37,6 +38,15 @@ try {
   // sync/deckungsbeitrag.ts. Steht NACH den Auswahllisten, weil der Refresh
   // der längere von beiden ist — die Filterlisten sollen nicht darauf warten.
   await deckungsbeitragNachlauf()
+
+  /**
+   * Dritter Nachlauf: die Einkaufspreise gegen die Verteilung derselben
+   * Ware prüfen. Steht NACH dem Import, weil die Vergleichszeilen beim
+   * Laden einer einzelnen Position noch fehlen — eine Fehlbuchung ist in
+   * sich stimmig und nur neben ihresgleichen widerlegbar.
+   * Wirft nie, siehe Kopf von sync/einkaufspreis.ts.
+   */
+  await einkaufspreisNachlauf()
 
   await pool.end().catch(() => {})
   // Exitcode 1 nur bei Abbruch - 'teilweise' ist normal (einzelne Betriebe ohne Daten).
