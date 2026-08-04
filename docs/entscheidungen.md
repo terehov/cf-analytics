@@ -613,3 +613,33 @@ zum Rechnen. Eine gelöschte Bewertung verschwindet bei Yext sofort aus dem
 Durchschnitt, unsere Kopie bliebe stehen — wer aus dieser Tabelle einen Schnitt
 rechnet, bekommt eine andere Zahl als der Round Table, und zwar die falsche.
 
+## Das FoodNotify-Tagesbudget geht auf 90.000, für die Dauer des Backfills (03.08.2026)
+
+**Was war.** `FN_TAGESBUDGET=40000`. Bei einem Takt von 800–1500 ms sind rechnerisch
+rund **75.000** Aufrufe am Tag überhaupt möglich, gemessen waren es 49.700 (Lauf 65:
+46.853 Posten in 22,6 Stunden). Das Budget endete den Tag also **vor** dem Takt — am
+03.08.2026 bei 40.003 Aufrufen. Der Lauf danach hatte 1.778 FoodNotify-Posten in der
+Schlange, konnte keinen davon anfassen und schob sie auf den Folgetag.
+
+**Was offen war.** 1.778 Bestellseiten. Jede Seite bringt 25 Bestellungen, und jede
+Bestellung zieht Kopf und Positionen nach — also rund **90.000 Aufrufe**, bis der
+Backfill durch ist. Bei 40.000 am Tag wären das zweieinhalb Tage, in denen jeden Abend
+alles liegen bleibt und am nächsten Morgen wieder anläuft.
+
+**Die Entscheidung.** 90.000. Das liegt über der physischen Obergrenze des Takts —
+während des Backfills bremst also der **Takt**, nicht das Budget. Das ist der Punkt:
+was FoodNotify sieht, regeln `FN_TAKT_MIN_MS`/`FN_TAKT_MAX_MS`, und die bleiben
+unangetastet. Die Last je Zeiteinheit ändert sich nicht, nur die Uhrzeit, zu der der
+Tag endet.
+
+**Warum das Budget trotzdem stehen bleibt.** Es ist kein Tagesplan mehr, sondern ein
+Netz gegen einen kaputten Takt — ein versehentliches `FN_TAKT_MIN_MS=0` liefe sonst
+ungebremst gegen einen fremden Dienst. Ein Netz, das nie greift, ist besser als keins.
+
+**Was danach gilt.** Zurück auf 40.000, sobald der Bestell-Backfill durch ist. Im
+Alltag sind es ein paar hundert Aufrufe täglich, und dann ist ein enges Netz das
+richtige. Der Wert steht mit dieser Begründung in der `.env`, nicht nur hier.
+
+**Unterschied zu LINA.** Dort bleibt es bei 10.500 — LINA ist ein Report Center mit
+genau einem Zugang, FoodNotify ein bezahlter REST-Dienst mit dokumentierten Endpunkten.
+Zwei Anbieter, zwei Verträge, zwei Risiken; seit dem 02.08.2026 auch zwei Budgets.

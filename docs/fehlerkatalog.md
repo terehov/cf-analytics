@@ -1948,3 +1948,47 @@ niemand prüft; der Gebindepreis hängt an dem, was auf der Rechnung steht.
    dem üblichen Preis daneben. Eine stille Kürzung liest sich wie
    Vollständigkeit.
 
+## 320 Bestellungen mit Kopf und ohne eine einzige Position (03.08.2026)
+
+**Symptom.** Ab 21:00 UTC stieg der Anteil HTTP 500 bei `fn:bestellpositionen` von 0 auf
+30 %, im Log lief „posten aufgegeben" im Minutentakt. Nach vier Versuchen gibt der Worker
+einen Posten endgültig auf — 266 Stück, und in `core.bestellung` stehen jetzt **320 von
+28.047 Bestellungen (1,1 %) mit Kopf, aber ohne eine einzige Position**.
+
+**Ursache — und die falsche Fährte zuerst.** Der Anstieg sah nach Überlastung aus: er kam
+plötzlich, mitten in einem Backfill, der seit Stunden lief. Die naheliegende Reaktion wäre
+gewesen, den Takt zu drosseln. Nachgemessen ist es das Gegenteil einer Lastfrage:
+
+| in 6 Stunden gemessen | |
+|---|---|
+| Bestellungen, die nach einem 500 doch noch geladen wurden | **0** |
+| Bestellungen, die bei allen vier Versuchen 500 lieferten | **271** |
+| Bestellungen ohne einen einzigen 500 | 3.821 |
+
+Ein 500 ist hier **bestellungsbezogen und deterministisch**. Bestimmte Bestellungen bringen
+FoodNotifys `/change`-Endpunkt zu Fall, gleich wie langsam man fragt. Der Sprung um 21:00
+war kein Lastsignal, sondern eine Zeitregion der Historie mit vielen solcher Bestellungen —
+der Backfill läuft rückwärts durch die Jahre, und 2023 und 2025 sind besonders betroffen
+(74 und 88 Fälle, fast alle bei Enchilada).
+
+**Was daraus folgt.** Zwei Dinge, die sich widersprechen könnten und es nicht tun:
+
+1. Der Takt darf schneller werden — das Fehlerbild sagt nichts über Belastbarkeit.
+2. Die 266 Bestellungen sind **endgültig weg**, und zwar leise: `core.bestellung` trägt
+   Nummer, Datum, Lieferant und Summe, nur die Positionen fehlen. Eine Auswertung über
+   Warenpreise sieht 27.727 Bestellungen und merkt nicht, dass 320 fehlen.
+
+**Offen.** Ein erneuter Versuch kostet vier Aufrufe je Bestellung und liefert nach heutigem
+Stand nichts — deshalb bleiben sie aufgegeben. Was fehlt, ist eine **Prüfsicht**, die
+Bestellungen ohne Positionen sichtbar macht, statt sie nur im Log zu haben. Ohne die ist es
+genau der Fehler, vor dem dieser Katalog oben warnt: eine Zahl, die plausibel aussieht und
+unvollständig ist.
+
+**Regeln.**
+
+1. **Bevor man wegen einer Fehlerhäufung drosselt, prüft man, ob der Fehler wiederholbar
+   ist.** „Klappt beim zweiten Versuch" und „klappt nie" sehen in einer Fehlerquote gleich
+   aus und bedeuten das Gegenteil. Eine Quote je Zeit misst Last, eine Quote je *Objekt*
+   misst Daten.
+2. **Ein aufgegebener Posten ist ein Datenverlust und gehört nicht nur ins Log.** Der Lauf
+   meldet danach weiterhin „ok" — die Lücke steht in einer Tabelle, die niemand ansieht.
