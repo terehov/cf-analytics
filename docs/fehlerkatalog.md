@@ -1641,6 +1641,35 @@ Bereits eingereihte Posten wurden mit umgestellt.
    Erfolg. Nach dem Start eines Backfills gehört geprüft, ob die Felder
    gefüllt sind, die den Zweck tragen — nicht nur, ob Zeilen entstehen.
 
+## `tsconfig.json` prüfte ein ganzes Verzeichnis nie (02.08.2026)
+
+**Symptom.** `bun run typecheck` meldete „grün", während in
+`metabase/karten-fach.ts` eine doppelte Klammer stand — ein Syntaxfehler,
+der die Datei unlesbar machte. Erst ein Test, der die Datei importierte,
+brachte ihn ans Licht.
+
+**Ursache.** `"include": ["src"]`. Das Verzeichnis `metabase/` mit 220
+Kartendefinitionen und der gesamten Dashboard-Provisionierung lag außerhalb
+und wurde nie geprüft. Dabei kamen zwei echte Typfehler zum Vorschein, die
+seit Längerem dort standen (`'scatter'` fehlte im Typ `Anzeige`, obwohl die
+Anzeige benutzt wird).
+
+**Behebung.** `"include": ["src", "metabase"]`, `Anzeige` um `'scatter'`
+ergänzt. Zusätzlich `metabase/karten.test.ts`: jede Kartenabfrage läuft
+einmal per `EXPLAIN` gegen die Datenbank — einmal ohne Filter und einmal
+**mit** gesetztem Filter, denn der optionale Block `[[...]]` fällt ohne
+Wert weg und verbirgt genau die Fehler, die den Benutzer treffen.
+
+**Regeln.**
+
+1. **Ein grüner Typcheck sagt nur etwas über das, was er ansieht.** Bei
+   jeder Prüfung gehört die Frage dazu, welchen Teil des Projekts sie
+   überhaupt erfasst. `include`/`exclude` sind Teil des Prüfergebnisses,
+   nicht Konfigurationsdetail.
+2. **Was der Benutzer erst durch Klicken auslöst, muss der Test auslösen.**
+   Ein optionaler Filterblock ist im Ruhezustand unsichtbar; geprüft
+   werden muss der gesetzte Zustand.
+
 ## Ein Importer ohne Arbeit sieht aus wie einer, der fertig ist (02.08.2026)
 
 **Symptom.** Der Importer lief stündlich, fehlerfrei, ohne eine einzige
