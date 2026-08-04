@@ -186,7 +186,19 @@ eingespielt — dann erst klären, was, statt darüberzubügeln.
 
 ---
 
-## Schritt 4 — Dump einspielen
+## Schritt 4 — Dump einspielen ✅ erledigt (04.08.2026)
+
+Ergebnis des Laufs:
+
+| Prüfung | Ergebnis |
+| --- | --- |
+| `pg_restore` | Exitcode 0, **119 min**, 0 Fehler, 0 Warnungen |
+| Zeilenzahlen (12 Tabellen) | **identisch** zur Quelle |
+| Migrationsstand | `0045_mart_inventur_und_beleg.sql` |
+| Materialisierte Sichten | alle drei gefüllt, kein `REFRESH` nötig |
+| `ANALYZE` | durch (24 s) |
+| Indizes / FK / Funktionen | 589 / 276 / 24 |
+| Stichprobe | 141 Betriebe, jüngster Umsatztag 2026-08-03 |
 
 ```bash
 cd ~/umzug
@@ -269,19 +281,23 @@ In Dokploy eine Anwendung aus diesem Git-Repository anlegen, Build-Typ
 
 ### 5b — Umgebungsvariablen setzen
 
+Alle als **Runtime**-Variablen, keine als Build-Time: das Dockerfile kennt kein
+einziges `ARG`, und `src/config.ts:366` liest `process.env` erst beim
+Prozessstart. Build-Time-Werte landen zudem im Image — dort haben Passwörter
+nichts verloren.
+
 Vollständige Liste in `.env.example`. Diese Werte ändern sich gegenüber lokal:
 
 | Variable | Wert auf Hetzner |
-|---|---|
-| `DATABASE_URL` | interne Dokploy-Adresse der Postgres-DB, **nicht** der öffentliche Port |
-| `METABASE_URL` | öffentliche Cloudron-URL der Metabase-Instanz |
+| --- | --- |
+| `DATABASE_URL` | interne Dokploy-Adresse, DB-Name **`analytics`** (nicht `lina`), **nicht** der öffentliche Port |
 | `TZ` | `UTC` — bewusst, siehe Dockerfile-Kopf |
-| `FN_TAGESBUDGET` | bewusst setzen; lokal steht ein Testwert |
+| `FN_TAGESBUDGET` | bewusst setzen; lokal steht mit 140000 ein Backfill-Testwert |
 | `LOG_LEVEL` | `info` |
 
 Aus der lokalen `.env` übernehmen (Zugangsdaten, nicht ins Repo):
 
-```
+```text
 LINA_USER LINA_PASSWORD LINA_PASSWORD_HASH LINA_SYSTEM LINA_BASE_URL
 FN_BASE_URL
 FN_APOSTO_USER FN_APOSTO_PASSWORD
@@ -289,11 +305,32 @@ FN_ENCHILADA_USER FN_ENCHILADA_PASSWORD
 FN_WILMA_WUNDER_USER FN_WILMA_WUNDER_PASSWORD
 FN_DEUTSCHE_KONZEPTE_USER FN_DEUTSCHE_KONZEPTE_PASSWORD
 YEXT_API_KEY
-METABASE_USER METABASE_PASSWORD
 TAKT_MIN_MS TAKT_MAX_MS FN_TAKT_MIN_MS FN_TAKT_MAX_MS
 TAGESBUDGET MAX_POSTEN_PRO_LAUF MAX_VERSUCHE ABBRUCH_NACH_FEHLERN
 ANFRAGE_TIMEOUT_MS FENSTER_VON_STUNDE FENSTER_BIS_STUNDE PORT
 ```
+
+> **`METABASE_URL` / `METABASE_USER` / `METABASE_PASSWORD` gehören NICHT in
+> Dokploy.** Sie werden nur von `metabase/uebernehmen.ts` und
+> `metabase/beziehungen.ts` gelesen, und das Dockerfile kopiert `metabase/`
+> gar nicht ins Image. Diese Skripte laufen lokal.
+
+---
+
+> **`METABASE_DB_URL` — neuer Sonderfall seit dem Umzug.**
+> `src/sync/auswahllisten.ts:150` leitet die Adresse von Metabases *eigener*
+> Datenbank aus `DATABASE_URL` ab und ersetzt den DB-Namen durch
+> `lina_metabase`. Das setzt voraus, dass Metabase auf derselben Postgres-Instanz
+> liegt — lokal war das so, auf Cloudron nicht mehr.
+>
+> Folge ohne Gegenmaßnahme: der Nachlauf meldet `uebersprungen`, der Sync läuft
+> normal weiter, aber die Filter-Auswahllisten werden nicht mehr gepflegt. Ein
+> neuer Betrieb taucht dann nicht von selbst im Dashboard-Filter auf.
+>
+> Entweder bewusst so lassen, oder `METABASE_DB_URL` auf die Cloudron-eigene
+> Metabase-Datenbank setzen, falls diese erreichbar ist.
+
+---
 
 > **SSL:** `src/db/pool.ts` setzt keine SSL-Option und reicht die
 > `connectionString` durch. Der Server verlangt derzeit kein TLS (gemessen in
@@ -339,11 +376,13 @@ acht Tage stillstehen lassen, ohne dass es auffiel.
 ### 6a — Datenbankverbindung eintragen
 
 In der Metabase-Oberfläche unter *Admin → Databases* die Hetzner-Postgres
-eintragen. Danach die vergebene ID feststellen:
+eintragen — mit SSH-Tunnel, siehe Schritt 7. Danach die vergebene ID
+feststellen: sie steht am Ende der URL des Eintrags
+(`/admin/databases/<ID>`).
 
-```
-Admin → Databases → auf den Eintrag klicken → die URL endet auf /admin/databases/<ID>
-```
+**Ergebnis am 04.08.2026: ID = 2** — dieselbe wie lokal. Schritt 6b entfiel
+damit, aber geprüft werden muss es trotzdem: eine abweichende ID bleibt
+unbemerkt, bis alle Dashboards leer sind.
 
 ### 6b — DB_ID im Repo anpassen
 
