@@ -31,10 +31,13 @@ import { karten as kartenStandort } from './karten-standort'
 import { dashboards } from './dashboards'
 import { auslegen, MINDESTHOEHE } from './layout'
 import type { Karte, Kachel, Dashboard } from './typen'
+import { config } from '../src/config'
 
 const DB_ID = 2
 const PORT = 8899
-const METABASE = 'http://localhost:3000'
+// Aus der Konfiguration, damit derselbe Befehl auch gegen eine andere
+// Metabase-Instanz laeuft (Server, Testumgebung).
+const METABASE = config.METABASE_URL
 
 const alleKarten: Karte[] = [
   ...kartenDrilldown, ...kartenPortfolio, ...kartenRoundTable, ...kartenFach, ...kartenImport, ...kartenStandort,
@@ -1150,6 +1153,106 @@ document.getElementById('los').onclick = async () => {
 // =====================================================================
 // Server: Seite, Definitionen, und alles unter /api an Metabase weiter.
 // =====================================================================
+// =====================================================================
+// Direkter Weg: selbst anmelden und dieselbe Logik hier ausführen.
+//
+// Der Proxy unten existiert, weil Metabase eine strenge
+// Content-Security-Policy schickt — seine eigene Seite darf keine
+// Anfragen nach aussen stellen, also lief das Skript IM Browser und
+// benutzte das Sitzungs-Cookie des angemeldeten Menschen. Damit brauchte
+// jede Uebernahme jemanden, der einen Browser oeffnet.
+//
+// Metabase hat aber einen API-Login. Mit einem eigenen Konto
+// (METABASE_USER/_PASSWORD) laeuft die Uebernahme ohne Browser und
+// spaeter auch auf dem Server.
+//
+// WARUM DERSELBE CODE UND KEINE ZWEITE FASSUNG: die 391 Zeilen in SEITE
+// sind die einzige Wahrheit darueber, wie Karten und Dashboards angelegt
+// werden. Eine zweite Fassung waere ab dem ersten Tag eine Kopie, die
+// hinterherhinkt. Stattdessen wird die Funktion `uebernehmen()` aus der
+// Seite herausgeschnitten und hier mit serverseitigem `mb`, `log` und
+// `def` ausgefuehrt.
+// =====================================================================
+async function direktUebernehmen(user: string, passwort: string): Promise<number> {
+  const anmeldung = await fetch(`${METABASE}/api/session`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: user, password: passwort }),
+  })
+  if (!anmeldung.ok) {
+    const text = await anmeldung.text()
+    console.error(`Anmeldung an Metabase gescheitert (${anmeldung.status}): ${text.slice(0, 300)}`)
+    console.error('  Passwortlänge:', passwort.length, '— Benutzer:', user)
+    return 1
+  }
+  const { id: sitzung } = await anmeldung.json() as { id: string }
+
+  /** Ein Aufruf gegen Metabase, mit der eigenen Sitzung. */
+  const mb = async (pfad: string, methode = 'GET', koerper?: unknown) => {
+    const r = await fetch(METABASE + '/api' + pfad, {
+      method: methode,
+      headers: { 'Content-Type': 'application/json', 'X-Metabase-Session': sitzung },
+      body: koerper ? JSON.stringify(koerper) : undefined,
+    })
+    const text = await r.text()
+    if (!r.ok) throw new Error(`${methode} ${pfad} → ${r.status} ${text.slice(0, 400)}`)
+    return text ? JSON.parse(text) : null
+  }
+
+  let fehler = 0
+  const log = (t: string, k = '') => {
+    if (k === 'fehler') fehler++
+    console.log(t)
+  }
+
+  /**
+   * Die Funktion aus der Seite holen. Sie steht dort zwischen
+   * `async function uebernehmen()` und dem Klick-Handler; alles davor
+   * (der Browser-`log`, der Browser-`mb`) wird hier durch die Fassungen
+   * oben ersetzt.
+   */
+  const anfang = SEITE.indexOf('async function uebernehmen()')
+  const ende = SEITE.indexOf("document.getElementById('los').onclick")
+  if (anfang < 0 || ende < 0) {
+    console.error('uebernehmen() nicht in der Seite gefunden — wurde SEITE umgebaut?')
+    return 1
+  }
+  /**
+   * Eine Zeile muss weichen: `const def = await (await
+   * fetch('/definitionen.json')).json()` holt die Definitionen im
+   * Browser über den Proxy. Hier kommen sie direkt als Parameter — die
+   * Zeile würde eine relative URL anfragen, die es ohne Server nicht
+   * gibt. Bewusst eine gezielte Ersetzung und kein Umbau der Seite:
+   * schlägt sie fehl, bricht der Lauf sichtbar ab, statt still eine
+   * andere Definition zu verwenden.
+   */
+  const quelle = SEITE.slice(anfang, ende).replace(
+    /const def = await \(await fetch\('\/definitionen\.json'\)\)\.json\(\);?/,
+    '/* def kommt als Parameter */')
+
+  const laufen = new Function('mb', 'log', 'def', `
+    ${quelle}
+    return uebernehmen()
+  `) as (mb: unknown, log: unknown, def: unknown) => Promise<void>
+
+  try {
+    await laufen(mb, log, definitionen)
+  } catch (e) {
+    console.error('ABBRUCH:', e instanceof Error ? e.message : String(e))
+    return 1
+  }
+  return fehler > 0 ? 1 : 0
+}
+
+// Zugangsdaten da? Dann direkt. Sonst der Proxy wie bisher — wer nichts
+// konfiguriert hat, verliert nichts.
+if (config.METABASE_USER && config.METABASE_PASSWORD) {
+  console.log(`Übernahme direkt gegen ${METABASE} als ${config.METABASE_USER}`)
+  console.log(`  ${definitionen.karten.length} Karten, ${definitionen.dashboards.length} Dashboards`)
+  const code = await direktUebernehmen(config.METABASE_USER, config.METABASE_PASSWORD)
+  process.exit(code)
+}
+
 const server = Bun.serve({
   port: PORT,
   hostname: 'localhost',

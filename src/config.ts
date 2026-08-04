@@ -100,6 +100,34 @@ const Schema = z.object({
    */
   YEXT_API_VERSION: z.string().regex(/^\d{8}$/).default('20240401'),
 
+  // --- Metabase ------------------------------------------------------------
+  /**
+   * Eigener Benutzer für die Dashboard-Provisionierung.
+   *
+   * Bis zum 03.08.2026 lief `metabase/uebernehmen.ts` nur über einen
+   * Proxy im Browser: Metabase schickt eine strenge
+   * `Content-Security-Policy`, seine eigene Seite darf also keine
+   * Anfragen nach außen stellen — und das Skript benutzte deshalb das
+   * Sitzungs-Cookie des angemeldeten Menschen. Damit brauchte jede
+   * Übernahme jemanden, der einen Browser öffnet.
+   *
+   * Metabase hat aber einen API-Login (`POST /api/session`). Mit einem
+   * eigenen Konto läuft die Übernahme ohne Browser und später auch auf
+   * dem Server.
+   *
+   * ALLE DREI OPTIONAL, und das mit Absicht: fehlen sie, fällt das
+   * Skript auf den Browser-Proxy zurück. Wer nichts konfiguriert, verliert
+   * nichts.
+   *
+   * WARUM EIN EIGENES KONTO statt des persönlichen: In Metabases
+   * Änderungsverlauf ist dann erkennbar, was vom Importer stammt und was
+   * von Hand — und das Passwort eines Menschen steht in keiner Datei.
+   * Braucht Admin-Rechte, weil Karten und Dashboards geschrieben werden.
+   */
+  METABASE_URL: z.string().default('http://localhost:3000'),
+  METABASE_USER: z.string().optional(),
+  METABASE_PASSWORD: z.string().optional(),
+
   // --- Tempo -------------------------------------------------------------
   /**
    * Pause zwischen zwei Requests, zufällig aus diesem Bereich.
@@ -369,6 +397,14 @@ function laden() {
         `FN_${m.env}_USER und FN_${m.env}_PASSWORD müssen beide gesetzt sein oder beide fehlen — ` +
         `gesetzt ist nur ${user ? 'der Benutzer' : 'das Passwort'}`)
     }
+  }
+  // Dasselbe für Metabase, aus demselben Grund: ein halbes Paar sieht aus
+  // wie „nicht konfiguriert" und fiele erst auf, wenn die Übernahme
+  // stillschweigend wieder den Browser verlangt.
+  if (Boolean(r.data.METABASE_USER) !== Boolean(r.data.METABASE_PASSWORD)) {
+    throw new Error(
+      'METABASE_USER und METABASE_PASSWORD müssen beide gesetzt sein oder beide fehlen — ' +
+      `gesetzt ist nur ${r.data.METABASE_USER ? 'der Benutzer' : 'das Passwort'}`)
   }
   return r.data
 }
