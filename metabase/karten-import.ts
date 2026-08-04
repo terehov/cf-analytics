@@ -300,4 +300,32 @@ SELECT endpunkt                                    AS "Bericht",
       'graph.x_axis.title_text': 'Tage zurück',
     },
   },
+  {
+    schluessel: 'im_foodnotify',
+    name: 'FoodNotify — Stand je Endpunkt',
+    beschreibung:
+      'Der Einkaufs-Import (fn:*) neben dem LINA-Import — er war auf dieser Seite vorher unsichtbar, obwohl über tausend Posten offen standen. Besonderheit bei fn:bestellungen: die Posten sind Seiten je Kostenstelle, chronologisch aufsteigend abgearbeitet — solange der Backfill läuft, fehlen die JÜNGSTEN Monate zuerst, und die Einkaufszahlen der letzten Monate sind noch unvollständig.',
+    anzeige: 'table',
+    sql: `
+-- Dieselbe Sicht wie "Je Bericht", auf fn:* gefiltert. Eine eigene
+-- Karte statt einer Zeile zwischen zwanzig get*-Endpunkten, weil der
+-- FoodNotify-Backfill eine eigene Erklaerung braucht -- ohne sie
+-- liest sich "1.673 offen" wie ein Fehler und nicht wie ein Plan.
+SELECT endpunkt            AS "Endpunkt",
+       zustand             AS "Zustand",
+       prozent             AS "%",
+       offen               AS "offen",
+       geladen             AS "geladen",
+       keine_daten         AS "keine Daten",
+       aufgegeben          AS "aufgegeben",
+       reicht_zurueck_bis  AS "Daten ab",
+       geladen_bis         AS "Daten bis",
+       fehler_24h          AS "Fehler 24h"
+  FROM mart.import_bericht
+ WHERE endpunkt LIKE 'fn:%'
+ ORDER BY offen DESC, endpunkt`,
+    visualisierung: {
+      column_settings: { '["name","%"]': { suffix: ' %' } },
+    },
+  },
 ]

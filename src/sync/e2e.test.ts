@@ -8,9 +8,17 @@
  *
  * Übersprungen, wenn keine TEST_DATABASE_URL gesetzt ist.
  */
-import { expect, test, describe, beforeAll, afterAll } from 'bun:test'
+import { expect, test, describe, beforeAll, beforeEach, afterAll } from 'bun:test'
 import { Client } from 'pg'
 import { mockStarten } from '../lina/mock'
+import { fnMockStarten } from '../foodnotify/mock'
+
+/**
+ * Die FoodNotify-Attrappe lebt auf Dateiebene: ihre URL muss VOR dem ersten
+ * config-Import in der Umgebung stehen (config friert beim Laden ein), und
+ * die FoodNotify-Suite weiter unten braucht denselben Server.
+ */
+let fnMock: ReturnType<typeof fnMockStarten>
 
 const DB = process.env.TEST_DATABASE_URL
 
@@ -48,6 +56,18 @@ lauf('Ende-zu-Ende', () => {
     process.env.FENSTER_VON_STUNDE = '0'
     process.env.FENSTER_BIS_STUNDE = '24'
     process.env.LOG_LEVEL ??= 'error'
+    /**
+     * FoodNotify-Attrappe: zwei Marken, zwei Verhalten. Aposto meldet sich
+     * an, „Enchilada" läuft auf den 2FA-Benutzer — der Fall, der abbrechen
+     * muss, ohne die anderen mitzureißen. `leerAb` lässt die Bestellseite
+     * ab dem zweiten Aufruf leer antworten (Leere-200er-Regel).
+     */
+    fnMock = fnMockStarten({ leerAb: { '/api/10483/shop-order/paginate': 4 } })
+    process.env.FN_BASE_URL = fnMock.url
+    process.env.FN_APOSTO_USER = 'test@aposto.eu'
+    process.env.FN_APOSTO_PASSWORD = 'geheim'
+    process.env.FN_ENCHILADA_USER = 'zfa@aposto.eu'
+    process.env.FN_ENCHILADA_PASSWORD = 'geheim'
     /**
      * Zweite Notbremse, und die wichtigere.
      *
@@ -893,9 +913,18 @@ lauf('Zugangssperre', () => {
    * wäre er dauerhaft weg, ohne je an LINA gescheitert zu sein.
    */
   test('der Posten wird weder aufgegeben noch mit einem Versuch belastet', async () => {
+    // Den Posten holen, den der Worker ANGEFASST hat -- nicht den mit der
+    // kleinsten posten_id. Bei gleicher Prioritaet nimmt der Worker nicht
+    // den zuerst eingereihten, und der Test stand deshalb dauerhaft auf
+    // rot: er las Posten 1, bearbeitet wurde Posten 5. Die Reihenfolge ist
+    // Sache des Workers; der Test soll die Zusicherung pruefen, nicht die
+    // Reihenfolge mitraten.
     const { rows: [p] } = await db.query(
       `SELECT ergebnis, erledigt_am, in_arbeit_seit, versuche, letzter_fehler
-         FROM sync.warteschlange ORDER BY posten_id LIMIT 1`)
+         FROM sync.warteschlange
+        WHERE letzter_fehler IS NOT NULL
+        ORDER BY posten_id LIMIT 1`)
+    expect(p).toBeDefined()
     expect(p.ergebnis).toBeNull()
     expect(p.erledigt_am).toBeNull()
     expect(p.in_arbeit_seit).toBeNull()
@@ -1190,5 +1219,315 @@ lauf('Aufbau der Schemata', () => {
       SELECT count(*)::int AS n FROM pg_constraint
        WHERE conrelid = 'core.artikelverkauf_tag'::regclass AND contype = 'f'`)
     expect(rows[0].n).toBe(2)
+  })
+})
+
+/**
+ * FoodNotify Ende-zu-Ende: Warteschlange → FnClient → raw, mit Mandanten.
+ *
+ * Läuft gegen die FoodNotify-Attrappe aus dem Kopf der Datei (deren URL in
+ * config.FN_BASE_URL eingefroren ist) und beweist die vier Zusicherungen
+ * von Stufe 1.4:
+ *   1. Ein fn:-Posten wird mit den Zugangsdaten seiner Marke geholt und
+ *      landet im Raw-Layer, das Protokoll trägt Mandant und Parameter.
+ *   2. Eine leere 200er-Antwort, wo früher Daten kamen, erzeugt eine
+ *      schema_abweichung — der Wilma-Wunder-Fehler bleibt nicht lautlos.
+ *   3. 2FA bricht die Anmeldung ab, ohne einen zweiten Versuch.
+ *   4. Eine gesperrte Marke vertagt nur die eigenen Posten; der Lauf und
+ *      die anderen Mandanten laufen weiter, es entsteht KEINE globale Sperre.
+ */
+lauf('FoodNotify Ende-zu-Ende', () => {
+  let db: Client
+  let aposto: number
+  let enchilada: number
+
+  beforeAll(async () => {
+    db = new Client({ connectionString: DB })
+    await db.connect()
+    await db.query(`DELETE FROM sync.zugangssperre`)
+    await db.query(`TRUNCATE sync.warteschlange, sync.aufgabe, sync.lauf, sync.schema_abweichung
+                    RESTART IDENTITY CASCADE`)
+    const { rows } = await db.query(`SELECT marke_key, schluessel FROM core.marke`)
+    aposto = Number(rows.find(r => r.schluessel === 'aposto')!.marke_key)
+    enchilada = Number(rows.find(r => r.schluessel === 'enchilada')!.marke_key)
+  })
+
+  afterAll(async () => { await db.end() })
+
+  test('der Durchstich: vier A1-Posten, der Rest steuert sich selbst bis in die Positionen', async () => {
+    await db.query(`TRUNCATE core.bestellposition, core.bestellung, core.ware,
+                       core.lieferant, core.kostenstelle RESTART IDENTITY CASCADE`)
+    // Genau das, was `bun run einreihen --foodnotify` einreiht — die vier
+    // Organisationsposten. Alles Weitere entsteht beim Laden.
+    await db.query(
+      `INSERT INTO sync.warteschlange
+         (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter) VALUES
+         ('fn:profil',         current_date, current_date, 5, $1, '{}'),
+         ('fn:betriebe',       current_date, current_date, 5, $1, '{}'),
+         ('fn:kostenstellen',  current_date, current_date, 5, $1, '{}'),
+         ('fn:pos_standorte',  current_date, current_date, 6, $1, '{}')`,
+      [aposto])
+
+    const { workerLauf } = await import('./worker')
+    const r = await workerLauf('manuell')
+    expect(r.status).toBe('ok')
+    // 4 A1 + 4 Bestellseiten (Küche 3, Bar leer 1) + je Bestellung Kopf und
+    // Positionen (4 × 2) = 16 Posten, alle in EINEM Lauf.
+    expect(r.ok).toBe(16)
+    // Genau eine Anmeldung für alles — die Session wird gehalten.
+    expect(fnMock.anmeldungen).toBe(1)
+
+    // Jede Antwort im Raw-Layer trägt quelle='foodnotify' — der
+    // Spalten-Default ist 'lina' und griff anfangs stillschweigend.
+    const { rows: [rawQuelle] } = await db.query(
+      `SELECT count(*)::int AS n,
+              count(*) FILTER (WHERE quelle = 'foodnotify')::int AS fn
+         FROM raw.api_antwort WHERE endpunkt LIKE 'fn:%'`)
+    expect(rawQuelle.n).toBe(16)
+    expect(rawQuelle.fn).toBe(rawQuelle.n)
+
+    // Kostenstellen: Art abgeleitet, Kassenanbindung nachgetragen.
+    const { rows: ks } = await db.query(
+      `SELECT name, art, connection_id, kassensystem FROM core.kostenstelle ORDER BY kostenstelle_id`)
+    expect(ks).toHaveLength(2)
+    expect(ks[0]).toMatchObject({ name: 'Küche Aposto Gera ', art: 'kueche',
+                                  connection_id: 1907, kassensystem: 'amadeus' })
+    expect(ks[1]).toMatchObject({ name: 'Bar Aposto Gera ', art: 'bar',
+                                  connection_id: null, kassensystem: null })
+
+    // DIE RÜCKWÄRTS-REIHENFOLGE: Seite 1 ist der Einstieg, danach kommen
+    // die Seiten von hinten — 3 (neueste Bestellungen) vor 2. Belegt über
+    // die Abarbeitungsreihenfolge im Aufgabenprotokoll.
+    const { rows: seitenfolge } = await db.query(
+      `SELECT parameter->>'seite' AS seite FROM sync.aufgabe
+        WHERE endpunkt = 'fn:bestellungen' AND parameter->>'erpId' = '10483'
+        ORDER BY aufgabe_id`)
+    expect(seitenfolge.map(z => z.seite)).toEqual(['1', '3', '2'])
+
+    // Bestellungen: Kopf-Daten aus fn:bestellung, Lieferant angelegt.
+    const { rows: best } = await db.query(
+      `SELECT b.fn_id, b.bestellnummer, b.status, b.summe, b.beleg_nummer,
+              b.geliefert_am::text AS geliefert_am, l.name AS lieferant
+         FROM core.bestellung b LEFT JOIN core.lieferant l USING (lieferant_key)
+        ORDER BY b.fn_id`)
+    expect(best).toHaveLength(4)
+    expect(best[0]).toMatchObject({
+      fn_id: 'b1', bestellnummer: 'A-100', status: 'delivered',
+      beleg_nummer: 'RE-2021-4711', geliefert_am: '2021-10-17', lieferant: 'Distra Aposto',
+    })
+    expect(Number(best[0].summe)).toBe(214.5)
+
+    // Positionen: echte Belegpreise, die Abweichungsflagge, die Ware verknüpft.
+    const { rows: pos } = await db.query(
+      `SELECT p.name, p.menge, p.einzelpreis, p.preis_abweichend, p.ersetzt, w.fn_id AS ware
+         FROM core.bestellposition p LEFT JOIN core.ware w USING (ware_key) ORDER BY p.fn_id`)
+    expect(pos).toHaveLength(5)
+    expect(pos[1]).toMatchObject({ name: 'Zwiebeln Rot Sack 10Kg', preis_abweichend: true, ware: '15790513' })
+    expect(Number(pos[1].einzelpreis)).toBe(12)
+    expect(pos[2]).toMatchObject({ name: 'Auberginen Kg', ersetzt: true })
+
+    // Die leere Bar-Seite ist ein LEGITIMER Leerfall: ok, 0 Zeilen, KEINE
+    // Abweichung — sie hat ja nie Daten geliefert.
+    const { rows: [bar] } = await db.query(
+      `SELECT status, zeilen FROM sync.aufgabe
+        WHERE endpunkt = 'fn:bestellungen' AND parameter->>'erpId' = '10484'`)
+    expect(bar.status).toBe('ok')
+    expect(Number(bar.zeilen)).toBe(0)
+    const { rows: abw } = await db.query(`SELECT 1 FROM sync.schema_abweichung`)
+    expect(abw).toHaveLength(0)
+
+    // Detail-Posten tragen das BESTELLDATUM als Zeitraum — der Fortschritt
+    // zeigt, in welchem Jahr der Backfill steckt.
+    const { rows: [detail] } = await db.query(
+      `SELECT zeitraum_von::text AS von FROM sync.warteschlange
+        WHERE endpunkt = 'fn:bestellung' AND parameter->>'orderId' = 'b1'`)
+    expect(detail.von).toBe('2021-10-15')
+
+    // Und nichts blieb liegen.
+    const { rows: [offen] } = await db.query(
+      `SELECT count(*)::int AS n FROM sync.warteschlange
+        WHERE erledigt_am IS NULL AND marke_key IS NOT NULL`)
+    expect(Number(offen.n)).toBe(0)
+  })
+
+  test('ein zweiter Durchstich reiht nichts erneut ein — NOT EXISTS gegen alle Posten', async () => {
+    await db.query(
+      `INSERT INTO sync.warteschlange
+         (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter)
+       SELECT 'fn:kostenstellen', current_date, current_date, 5, $1, '{}'::jsonb`,
+      [aposto])
+    const { workerLauf } = await import('./worker')
+    const r = await workerLauf('manuell')
+    expect(r.status).toBe('ok')
+    // Nur der eine Kostenstellen-Posten lief; die Bestellseiten von eben
+    // wurden NICHT erneut eingereiht.
+    expect(r.ok).toBe(1)
+    const { rows: [seiten] } = await db.query(
+      `SELECT count(*)::int AS n FROM sync.warteschlange WHERE endpunkt = 'fn:bestellungen'`)
+    expect(Number(seiten.n)).toBe(4)
+  })
+
+  test('eine leere 200er-Antwort nach früheren Daten wird zur schema_abweichung', async () => {
+    // Dieselbe Kombination noch einmal — die Attrappe antwortet jetzt leer.
+    await db.query(
+      `INSERT INTO sync.warteschlange
+         (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter) VALUES
+         ('fn:bestellungen', current_date, current_date, 90, $1, '{"erpId":"10483","seite":"1"}')`,
+      [aposto])
+    const { workerLauf } = await import('./worker')
+    const r = await workerLauf('manuell')
+    expect(r.status).toBe('ok')
+
+    const { rows } = await db.query(
+      `SELECT tatsaechlich FROM sync.schema_abweichung WHERE endpunkt = 'fn:bestellungen'`)
+    expect(rows).toHaveLength(1)
+    expect(JSON.stringify(rows[0].tatsaechlich)).toContain('0 Zeilen')
+  })
+
+  test('2FA bricht die Anmeldung ab — kein zweiter Versuch', async () => {
+    const { FnSession, FnAnmeldungFehlgeschlagen } = await import('../foodnotify/auth')
+    const vorher = fnMock.anmeldungen
+    const s = new FnSession({ schluessel: 'enchilada', user: 'zfa@aposto.eu', password: 'geheim' })
+    expect(s.anmelden()).rejects.toThrow(FnAnmeldungFehlgeschlagen)
+    await s.anmelden().catch((e: Error) => {
+      expect(e.message).toContain('2FA')
+      expect(e.message).toContain('Subuser')
+    })
+    // Zwei bewusste Aufrufe im Test — aber die Session selbst hat nie
+    // nachgefasst und ist nicht angemeldet.
+    expect(fnMock.anmeldungen).toBe(vorher + 2)
+    expect(s.istAngemeldet).toBe(false)
+  })
+
+  test('eine gesperrte Marke vertagt nur die eigenen Posten — der Lauf läuft weiter', async () => {
+    // Enchilada läuft auf den 2FA-Benutzer: die Anmeldung scheitert. Daneben
+    // ein Aposto-Posten, der durchkommen muss.
+    await db.query(
+      `INSERT INTO sync.warteschlange
+         (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter) VALUES
+         ('fn:kostenstellen', current_date - 1, current_date - 1, 5, $1, '{}'),
+         ('fn:profil',        current_date - 1, current_date - 1, 6, $2, '{}')`,
+      [enchilada, aposto])
+
+    const { workerLauf } = await import('./worker')
+    const r = await workerLauf('manuell')
+
+    // Kein Abbruch: der Aposto-Posten ist erledigt.
+    expect(r.status).toBe('ok')
+    const { rows: [apostoPosten] } = await db.query(
+      `SELECT ergebnis FROM sync.warteschlange WHERE endpunkt = 'fn:profil' AND marke_key = $1`,
+      [aposto])
+    expect(apostoPosten.ergebnis).toBe('ok')
+
+    // Der Enchilada-Posten ist weder aufgegeben noch verbraucht — nur vertagt,
+    // um die Anmeldesperre-Frist (48 h), nicht bis zum nächsten Stundenlauf.
+    const { rows: [vertagt] } = await db.query(
+      `SELECT ergebnis, versuche, faellig_ab > now() + interval '24 hours' AS weit_genug
+         FROM sync.warteschlange WHERE marke_key = $1`, [enchilada])
+    expect(vertagt.ergebnis).toBeNull()
+    expect(Number(vertagt.versuche)).toBe(0)
+    expect(vertagt.weit_genug).toBe(true)
+
+    // Und vor allem: KEINE globale Sperre — LINA und die anderen Marken
+    // wären sonst mitgerissen.
+    const { rows: sperren } = await db.query(`SELECT * FROM sync.zugangssperre`)
+    expect(sperren).toHaveLength(0)
+  })
+})
+
+/**
+ * Takt und Tagesbudget gelten JE ANBIETER (seit 02.08.2026).
+ *
+ * LINA und FoodNotify sind zwei Firmen mit zwei Verträgen. Vorher zählten
+ * beide Clients dieselbe Zahl — ALLE Zeilen aus `sync.aufgabe` — und der
+ * Worker brach ab, sobald EINES der Budgets leer war. Ein FoodNotify-
+ * Backfill mit 36.000 Posten hätte damit LINAs Tagesdaten an einer Grenze
+ * scheitern lassen, die gar nicht für sie gilt.
+ */
+lauf('Getrennte Anbietergrenzen', () => {
+  let db: Client
+  let aposto: number
+
+  beforeAll(async () => {
+    db = new Client({ connectionString: DB })
+    await db.connect()
+    const { rows } = await db.query(`SELECT marke_key, schluessel FROM core.marke`)
+    aposto = Number(rows.find(r => r.schluessel === 'aposto')!.marke_key)
+  })
+  afterAll(async () => { await db.end() })
+
+  beforeEach(async () => {
+    await db.query(`DELETE FROM sync.zugangssperre`)
+    await db.query(`TRUNCATE sync.warteschlange, sync.aufgabe, sync.lauf RESTART IDENTITY CASCADE`)
+  })
+
+  test('das FoodNotify-Budget zählt NUR fn:-Aufrufe', async () => {
+    /**
+     * 50 erledigte LINA-Aufgaben von heute. Vorher hätten sie das
+     * FoodNotify-Budget zu 50 belastet; jetzt lässt der Zähler sie außen vor.
+     */
+    const { rows: [l1] } = await db.query(
+      `INSERT INTO sync.lauf (ausloeser) VALUES ('manuell') RETURNING lauf_id`)
+    for (let i = 0; i < 50; i++) {
+      await db.query(
+        `INSERT INTO sync.aufgabe (lauf_id, endpunkt, status, beendet_am, zeilen)
+         VALUES ($1, 'getUmsatzbericht', 'ok', now(), 1)`, [l1.lauf_id])
+    }
+    const { FnClient } = await import('../foodnotify/client')
+    const { config } = await import('../config')
+    const c = new FnClient()
+    await c.budgetLaden()
+    expect(c.budgetUebrig).toBe(config.TAGESBUDGET)
+  })
+
+  test('das LINA-Budget zählt NUR LINA-Aufrufe', async () => {
+    const { rows: [l2] } = await db.query(
+      `INSERT INTO sync.lauf (ausloeser) VALUES ('manuell') RETURNING lauf_id`)
+    for (let i = 0; i < 50; i++) {
+      await db.query(
+        `INSERT INTO sync.aufgabe (lauf_id, endpunkt, status, beendet_am, zeilen, marke_key)
+         VALUES ($1, 'fn:bestellungen', 'ok', now(), 1, $2)`, [l2.lauf_id, aposto])
+    }
+    const { LinaClient } = await import('../lina/client')
+    const { config } = await import('../config')
+    const c = new LinaClient()
+    await c.budgetLaden()
+    expect(c.budgetUebrig).toBe(config.TAGESBUDGET)
+  })
+
+  test('ein erschöpftes FoodNotify-Budget lässt LINAs Budget unberührt', async () => {
+    /**
+     * Die Trennung an ihrer schärfsten Stelle: das FoodNotify-Budget wird
+     * VOLLSTÄNDIG aufgebraucht, und LINAs Zähler darf davon nichts
+     * mitbekommen.
+     *
+     * Vorher lasen beide Clients dieselbe Abfrage über ALLE Zeilen in
+     * `sync.aufgabe` — hier wäre auch LINA auf 0 gefallen, und der Worker
+     * hätte den ganzen Lauf beendet. Genau das ist der Fall, den ein
+     * FoodNotify-Backfill mit 36.000 Posten täglich ausgelöst hätte.
+     *
+     * Geprüft wird an den Clients statt am Worker: die Budgetgrenze ist
+     * eine Eigenschaft des Zählers, und ein vollständiger Workerlauf
+     * bräuchte beide Attrappen — die gehören anderen Suiten in dieser
+     * Datei und werden dort gestartet und gestoppt.
+     */
+    const { config } = await import('../config')
+    const { rows: [l] } = await db.query(
+      `INSERT INTO sync.lauf (ausloeser) VALUES ('manuell') RETURNING lauf_id`)
+    await db.query(
+      `INSERT INTO sync.aufgabe (lauf_id, endpunkt, status, beendet_am, zeilen, marke_key)
+       SELECT $1, 'fn:profil', 'ok', now(), 1, $2 FROM generate_series(1, $3)`,
+      [l.lauf_id, aposto, config.TAGESBUDGET])
+
+    const { FnClient } = await import('../foodnotify/client')
+    const { LinaClient } = await import('../lina/client')
+    const fn = new FnClient()
+    const lina = new LinaClient()
+    await fn.budgetLaden()
+    await lina.budgetLaden()
+
+    expect(fn.budgetUebrig).toBe(0)
+    // Der Punkt, um den es geht.
+    expect(lina.budgetUebrig).toBe(config.TAGESBUDGET)
   })
 })

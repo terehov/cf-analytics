@@ -1546,3 +1546,134 @@ ungeklärt.
    die nicht diskriminiert. Wer so etwas notiert, hat den Fehler schon gesehen und
    muss ihn nur noch als solchen lesen.
 
+## Ein Spalten-Default beschriftet fremde Daten mit dem falschen Absender (02.08.2026)
+
+**Symptom.** In `raw.api_antwort` standen 232 FoodNotify-Antworten mit
+`quelle = 'lina'`. Wer nach Quelle filterte, sah: FoodNotify liefert nichts —
+dabei lief der Backfill seit Stunden fehlerfrei.
+
+**Ursache.** Die Spalte hat `DEFAULT 'lina'`, gesetzt zu einer Zeit, als es nur
+eine Quelle gab. Das Insert in `fnLaden` zählte die Spalte nicht auf — der
+Default griff stillschweigend und beschriftete jede FoodNotify-Antwort als LINA.
+
+**Behebung.** Insert nennt `quelle` jetzt explizit (`'foodnotify'`); die
+Bestandszeilen wurden am Präfix `fn:` erkannt und umetikettiert — eine Reparatur
+der eigenen Metadaten, die Payloads blieben unangetastet. Der e2e-Test prüft
+seither, dass jede `fn:`-Zeile `quelle = 'foodnotify'` trägt.
+
+**Regel.** Ein `DEFAULT`, der einen konkreten Absender benennt, ist eine
+Falle für jede spätere zweite Quelle. Defaults dürfen Unwissen ausdrücken
+(`NULL`, `now()`), aber keine Herkunft behaupten. Beim Anschluss einer neuen
+Quelle gehört jede Spalte mit Default auf die Prüfliste: Wer setzt sie — ich
+oder die Tabelle?
+
+## Eine Priorität, die eine Warteschlange in zwei Hälften teilt (02.08.2026)
+
+**Symptom.** Nach Stunden Backfill standen 17.077 Bestellungen in
+`core.bestellung` — und **null Positionen**. Kein Lieferant, keine Summe,
+kein einziger Preis. Die Abrufe liefen fehlerfrei durch, der Fortschritt
+sah gesund aus.
+
+**Ursache.** `sync.posten_holen` sortiert primär nach `prioritaet`. Die
+Bestellseiten hatten 90, die Detailabrufe (Kopf und Positionen) 91. Das
+heißt nicht „etwas später", sondern **danach** — alle ~30.000 Seiten aller
+vier Marken hätten abgearbeitet sein müssen, bevor die erste Bestellung im
+Detail geholt worden wäre. Die Liste liefert nur Nummer und Datum; der
+gesamte Zweck der Anbindung — Einkaufspreise — steckt im Detail.
+
+**Behebung.** Details auf 89, also **vor** weitere Seiten. Eine Seite bringt
+25 Bestellungen, die vollständig geladen werden, dann folgt die nächste.
+Bereits eingereihte Posten wurden mit umgestellt.
+
+**Regeln.**
+
+1. **Eine Priorität ist keine Reihenfolge, sondern eine Sperre.** Solange
+   ein Posten niedrigerer Zahl offen ist, kommt kein höherer dran. Wer
+   zwei Sorten Posten in dieselbe Schlange legt, entscheidet damit nicht
+   „erst A, dann B", sondern „B **nie**, solange A nachwächst" — und
+   selbsterzeugende Ketten wachsen nach.
+2. **Ein fehlerfreier Fortschritt ist kein vollständiger Fortschritt.**
+   17.077 Zeilen ohne Inhalt zählen in jeder Fortschrittsanzeige als
+   Erfolg. Nach dem Start eines Backfills gehört geprüft, ob die Felder
+   gefüllt sind, die den Zweck tragen — nicht nur, ob Zeilen entstehen.
+
+## Die Attrappe bildete ein plausibleres Schema nach als die echte API (02.08.2026)
+
+**Symptom.** 13.027 Bestellpositionen in `core.bestellposition`, alle mit
+Namen, Menge in der Rohantwort, Summe — und **ausnahmslos
+`einzelpreis = NULL`**. Damit war die Sicht `mart.einkaufspreis_monat`,
+also der ganze Zweck der FoodNotify-Anbindung, ohne Inhalt.
+
+**Ursache.** Die Transformation las die Menge aus `amount`. Dieses Feld ist
+in FoodNotifys echten Antworten **immer 0** — die tatsächliche Menge steht
+in `adjustedQuantity` (an 13.126 Positionen ohne eine einzige Ausnahme
+gemessen). Der Stückpreis ist Summe je Menge; die Division durch 0 wurde
+sauber abgefangen und lieferte `NULL`. Nichts fiel um, es fehlte nur alles.
+
+**Warum kein Test das fand.** Die Attrappe in `mock.ts` füllte `amount`,
+weil das Feld im API-Inventar so notiert war. Sie bildete damit ein
+Schema nach, das plausibler ist als das echte — und prüfte gegen die
+eigene Annahme statt gegen das fremde System. Alle Tests waren grün,
+während im Bestand jeder Preis fehlte.
+
+Gleiches Muster beim zweiten Feld: `isSubstituted` ist in allen 13.155
+Positionen `null`. Was tatsächlich unterscheidet, ist `status`
+(`'not arrived'`).
+
+**Behebung.** `adjustedQuantity` mit `amount` als Rückfall; `ersetzt` aus
+`status`. Die Attrappe trägt jetzt `amount: 0`, so wie das Original.
+**Die 13.254 bestehenden Positionen wurden aus `raw.api_antwort` neu
+gerechnet** — ohne einen einzigen erneuten Abruf bei FoodNotify. Genau
+dafür ist der Raw-Layer da (AGENTS.md Regel 4).
+
+**Regeln.**
+
+1. **Eine Attrappe, die man aus der Dokumentation baut, prüft die
+   Dokumentation.** Fixtures gehören aus einer echten Antwort abgeleitet —
+   notfalls aus `raw.api_antwort`, das genau dafür jede Antwort aufbewahrt.
+2. **Ein Feld, das es gibt, ist kein Feld, das gefüllt ist.** `amount`
+   existiert in jeder Antwort und ist überall 0. Vor dem Verlassen auf ein
+   Feld gehört ein `count(*) FILTER (WHERE feld > 0)` gegen den Rohbestand.
+3. **Eine sauber abgefangene Division durch 0 verbirgt den Fehler, statt
+   ihn zu melden.** `NULL` ist hier kein Schutz, sondern eine stille
+   Niederlage: die Zeile entsteht, die Zahl fehlt, niemand merkt es. Wo
+   ein Wert IMMER berechenbar sein muss, gehört das geprüft — nicht
+   umgangen.
+
+## Eine Grenze, die für zwei Anbieter gleichzeitig gilt (02.08.2026)
+
+**Lage.** Der Importer spricht mit zwei Firmen: LINA und FoodNotify. Beide
+Clients lasen dieselbe Drosselung (`TAKT_MIN_MS`/`TAKT_MAX_MS`) und —
+schwerwiegender — dasselbe `TAGESBUDGET`, gezählt über **alle** Zeilen in
+`sync.aufgabe`, gleich von welchem Anbieter.
+
+**Was daraus folgte.** Ein FoodNotify-Backfill mit 36.000 Posten hätte das
+gemeinsame Budget aufgebraucht und LINAs Tagesdaten mit gedeckelt. Im
+Worker stand zudem `if (budgetLina === 0 || budgetFn === 0) break` — ein
+erschöpftes Budget beendete den **ganzen** Lauf, auch für den Anbieter,
+dessen Grenze unberührt war.
+
+Das ist kein Fehler, den man an einer falschen Zahl erkennt: beide Grenzen
+waren korrekt eingehalten. Falsch war, dass sie überhaupt eine gemeinsame
+Grenze waren.
+
+**Behebung.** `FN_TAKT_MIN_MS` / `FN_TAKT_MAX_MS` / `FN_TAGESBUDGET`, ohne
+Angabe auf die LINA-Werte zurückfallend. Die Zähler filtern jetzt auf
+`endpunkt LIKE 'fn:%'` beziehungsweise `NOT LIKE`. Der Worker bricht erst
+ab, wenn **beide** Budgets leer sind; Posten des erschöpften Anbieters
+werden zurückgelegt und auf den Folgetag vertagt — ohne Fehlereintrag, denn
+eine Budgetgrenze ist eine gewollte Entscheidung und kein Zwischenfall.
+
+**Regeln.**
+
+1. **Eine Ratenbegrenzung gehört dem Gegenüber, nicht dem eigenen
+   Prozess.** Wer zwei Fremdsysteme anspricht, braucht zwei Zähler. Eine
+   geteilte Grenze bedeutet, dass ein Anbieter den Zugang zu einem anderen
+   verbrauchen kann.
+2. **Ein Standardwert darf nie riskanter sein als der Rückfall.** Wer
+   `FN_*` nicht setzt, bekommt LINAs vorsichtige Werte — nicht den
+   schnelleren Takt, nur weil FoodNotify ihn verträgt.
+3. **Bei zusammengesetzten Grenzen auf den EFFEKTIVEN Werten prüfen.** Ein
+   einzeln gesetztes `FN_TAKT_MIN_MS` muss gegen den *geerbten* Höchstwert
+   geprüft werden, sonst entsteht still eine Spanne, die es nicht gibt.
+

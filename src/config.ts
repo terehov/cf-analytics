@@ -45,6 +45,31 @@ const Schema = z.object({
   /** Passend zur Kennung. Ändert sich nur, wenn LINA_USER_AGENT wechselt. */
   LINA_PLATTFORM: z.string().default('macOS'),
 
+  // --- FoodNotify ----------------------------------------------------------
+  /**
+   * Vier Marken, vier Mandanten, vier Konten. Jeder Zugang sieht nur die
+   * Betriebe seiner Marke (geprüft 01.08.2026: das Aposto-Konto zeigt 14
+   * Betriebe und kennt keinen Markenwechsel).
+   *
+   * Die Variablennamen tragen den Markenschlüssel aus `core.marke.schluessel`
+   * — `aposto` → `FN_APOSTO_USER`. Wer hier eine Marke ergänzt, ergänzt sie
+   * zuerst dort.
+   *
+   * Alle optional: wer nur Aposto durchsticht, setzt nur Aposto. Was NICHT
+   * geht, ist ein halbes Paar — Benutzer ohne Passwort oder umgekehrt bricht
+   * den Start ab (geprüft in `laden()`), denn ein halbes Paar ist immer ein
+   * Versehen und fiele sonst erst mitten im Backfill auf.
+   */
+  FN_BASE_URL: z.string().default('https://my.foodnotify.com'),
+  FN_APOSTO_USER: z.string().optional(),
+  FN_APOSTO_PASSWORD: z.string().optional(),
+  FN_ENCHILADA_USER: z.string().optional(),
+  FN_ENCHILADA_PASSWORD: z.string().optional(),
+  FN_DEUTSCHE_KONZEPTE_USER: z.string().optional(),
+  FN_DEUTSCHE_KONZEPTE_PASSWORD: z.string().optional(),
+  FN_WILMA_WUNDER_USER: z.string().optional(),
+  FN_WILMA_WUNDER_PASSWORD: z.string().optional(),
+
   // --- Tempo -------------------------------------------------------------
   /**
    * Pause zwischen zwei Requests, zufällig aus diesem Bereich.
@@ -68,6 +93,34 @@ const Schema = z.object({
    */
   TAKT_MIN_MS: z.coerce.number().int().min(0).default(10_000),
   TAKT_MAX_MS: z.coerce.number().int().min(0).default(20_000),
+
+  /**
+   * Takt und Budget für FoodNotify — GETRENNT von LINA.
+   *
+   * Zwei verschiedene Anbieter, zwei verschiedene Verträge, zwei
+   * verschiedene Risiken. Eine Drosselung gegenüber LINA soll FoodNotify
+   * nicht ausbremsen und umgekehrt; ein Backfill bei FoodNotify darf nicht
+   * das Budget verbrauchen, das für LINAs Tagesdaten gedacht ist.
+   *
+   * Bis zum 02.08.2026 teilten sich beide `TAGESBUDGET`: der Zähler las
+   * ALLE Zeilen aus `sync.aufgabe`, gleich von welchem Anbieter. Ein
+   * FoodNotify-Backfill mit 36.000 Posten hätte damit rechnerisch LINAs
+   * Tagesdaten verhungern lassen — die Priorität rettet sie, das Budget
+   * hätte sie trotzdem gedeckelt.
+   *
+   * WARUM DIE WERTE ANDERS SEIN DÜRFEN. LINAs 10–20 s sind Tarnung: ein
+   * einzelner Client, der schneller klickt als ein Mensch, fällt in einem
+   * Report Center auf, und es gibt genau einen Zugang. FoodNotify ist ein
+   * bezahlter REST-Dienst mit dokumentierten Endpunkten und ~58 ms
+   * Antwortzeit — dort ist ein zügigerer Takt kein Risiko, sondern
+   * bestimmungsgemäße Nutzung.
+   *
+   * Ohne gesetzte Variable gelten die LINA-Werte. Das ist Absicht: wer
+   * nichts konfiguriert, bekommt das vorsichtigere Verhalten.
+   */
+  FN_TAKT_MIN_MS: z.coerce.number().int().min(0).optional(),
+  FN_TAKT_MAX_MS: z.coerce.number().int().min(0).optional(),
+  FN_TAGESBUDGET: z.coerce.number().int().min(1).optional(),
 
   /**
    * Wie lange der Importer nach einer erkannten Sperre ruht (Stunden).
@@ -260,10 +313,78 @@ function laden() {
   if (r.data.TAKT_MIN_MS > r.data.TAKT_MAX_MS) {
     throw new Error('TAKT_MIN_MS darf nicht größer als TAKT_MAX_MS sein')
   }
+  // Dieselbe Prüfung für FoodNotify — auf den EFFEKTIVEN Werten, damit
+  // ein einzeln gesetztes FN_TAKT_MIN_MS gegen LINAs Höchstwert geprüft
+  // wird und nicht stillschweigend gegen sich selbst.
+  const fnMin = r.data.FN_TAKT_MIN_MS ?? r.data.TAKT_MIN_MS
+  const fnMax = r.data.FN_TAKT_MAX_MS ?? r.data.TAKT_MAX_MS
+  if (fnMin > fnMax) {
+    throw new Error(
+      `FN_TAKT_MIN_MS (${fnMin} ms) darf nicht größer als FN_TAKT_MAX_MS (${fnMax} ms) sein`)
+  }
   if (r.data.FENSTER_VON_STUNDE >= r.data.FENSTER_BIS_STUNDE) {
     throw new Error('FENSTER_VON_STUNDE muss vor FENSTER_BIS_STUNDE liegen')
   }
+  /**
+   * Halbe FoodNotify-Paare sind immer ein Versehen — ein vertipptes
+   * `FN_APOSTO_PASSWORT` statt `_PASSWORD` sähe sonst aus wie „Marke nicht
+   * konfiguriert" und fiele erst auf, wenn der Backfill die Marke still
+   * überspringt.
+   */
+  for (const m of FN_MARKEN) {
+    const user = r.data[`FN_${m.env}_USER` as keyof typeof r.data]
+    const pass = r.data[`FN_${m.env}_PASSWORD` as keyof typeof r.data]
+    if (Boolean(user) !== Boolean(pass)) {
+      throw new Error(
+        `FN_${m.env}_USER und FN_${m.env}_PASSWORD müssen beide gesetzt sein oder beide fehlen — ` +
+        `gesetzt ist nur ${user ? 'der Benutzer' : 'das Passwort'}`)
+    }
+  }
   return r.data
+}
+
+/**
+ * Die vier Marken, für die es Zugangsdaten geben kann. `schluessel` muss
+ * `core.marke.schluessel` entsprechen — der Wert wandert als Mandant in
+ * `sync.warteschlange.marke_key` und zurück.
+ */
+const FN_MARKEN = [
+  { schluessel: 'aposto',            env: 'APOSTO' },
+  { schluessel: 'enchilada',         env: 'ENCHILADA' },
+  { schluessel: 'deutsche_konzepte', env: 'DEUTSCHE_KONZEPTE' },
+  { schluessel: 'wilma_wunder',      env: 'WILMA_WUNDER' },
+] as const
+
+export type FnZugang = { schluessel: string; user: string; password: string }
+
+/**
+ * Die Marken, für die Zugangsdaten vorliegen. Marken ohne Eintrag werden
+ * beim Einreihen übersprungen — sichtbar geloggt, nicht still.
+ */
+/**
+ * Die tatsächlich geltenden FoodNotify-Grenzen.
+ *
+ * Eine Stelle, an der der Rückfall auf die LINA-Werte steht — sonst
+ * driften Client, Startprotokoll und Prüfung auseinander, und jede Seite
+ * behauptet ein anderes Tempo.
+ */
+export function fnGrenzen(c: Config = config) {
+  return {
+    taktMin: c.FN_TAKT_MIN_MS ?? c.TAKT_MIN_MS,
+    taktMax: c.FN_TAKT_MAX_MS ?? c.TAKT_MAX_MS,
+    tagesbudget: c.FN_TAGESBUDGET ?? c.TAGESBUDGET,
+    /** Sind eigene Werte gesetzt, oder gelten LINAs? */
+    eigen: c.FN_TAKT_MIN_MS !== undefined || c.FN_TAKT_MAX_MS !== undefined
+        || c.FN_TAGESBUDGET !== undefined,
+  }
+}
+
+export function fnZugaenge(c: Config = config): FnZugang[] {
+  return FN_MARKEN.flatMap(m => {
+    const user = c[`FN_${m.env}_USER` as keyof Config] as string | undefined
+    const password = c[`FN_${m.env}_PASSWORD` as keyof Config] as string | undefined
+    return user && password ? [{ schluessel: m.schluessel, user, password }] : []
+  })
 }
 
 export type Config = z.infer<typeof Schema>
@@ -288,8 +409,13 @@ export function konfigZumLoggen(c: Config = config) {
      */
     passwortLaenge: c.LINA_PASSWORD.length,
     system: c.LINA_SYSTEM,
-    takt: `${c.TAKT_MIN_MS}–${c.TAKT_MAX_MS} ms`,
-    tagesbudget: c.TAGESBUDGET,
+    // „lina"-Präfix, seit Takt und Budget je Anbieter gelten: ohne den
+    // Zusatz läse man die Zahl als Tempo des ganzen Importers.
+    linaTakt: `${c.TAKT_MIN_MS}–${c.TAKT_MAX_MS} ms`,
+    linaTagesbudget: c.TAGESBUDGET,
+    fnTakt: `${fnGrenzen(c).taktMin}–${fnGrenzen(c).taktMax} ms`
+      + (fnGrenzen(c).eigen ? '' : ' (von LINA geerbt)'),
+    fnTagesbudget: fnGrenzen(c).tagesbudget,
     fenster: c.FENSTER_VON_STUNDE === 0 && c.FENSTER_BIS_STUNDE === 24
       ? 'durchgehend'
       : `${c.FENSTER_VON_STUNDE}–${c.FENSTER_BIS_STUNDE} Uhr`,
@@ -298,5 +424,14 @@ export function konfigZumLoggen(c: Config = config) {
     fortschritt: c.FORTSCHRITT_ALLE === 0
       ? 'aus'
       : c.FORTSCHRITT_ALLE === 1 ? 'jeder Posten' : `jeder ${c.FORTSCHRITT_ALLE}. Posten`,
+    /**
+     * Je konfigurierter FoodNotify-Marke Benutzer und Passwortlänge — die
+     * LÄNGE aus demselben Grund wie bei LINA oben: eine falsche Zahl zeigt
+     * sofort, dass Bun das Passwort beim Einlesen der `.env` verstümmelt hat
+     * (`$` expandiert, `#` beginnt Kommentar).
+     */
+    foodnotify: fnZugaenge(c).length === 0
+      ? 'keine Marke konfiguriert'
+      : fnZugaenge(c).map(z => `${z.schluessel}: ${z.user} (Passwortlänge ${z.password.length})`),
   }
 }

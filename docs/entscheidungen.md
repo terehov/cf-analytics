@@ -399,6 +399,65 @@ kein Verlust — die Zahlen waren ohnehin keine.
 
 ---
 
+## Kein Support-Kontakt bei FoodNotify — es geht auch ohne (01.08.2026)
+
+Vorgabe Eugene. Der Plan sah in Stufe 0.2 ein Ticket mit drei Punkten vor.
+Geprüft, was daran wirklich hing — und das Ergebnis ist: nichts, was den Bau
+aufhält.
+
+**Die POS-Zuordnung** war der einzige Punkt, der als Blocker galt. Sie ist am
+selben Tag selbst gefunden worden (`docs/foodnotify-0-1-nummernraum.md`): über
+die `connectionId` aus `/api/pos/locations`, nicht über eine Account-ID. Der
+Support wäre der bequemere, nicht der einzige Weg gewesen.
+
+**Der Verkaufsfehler** (`column t0.root_recipe_id does not exist`, 100 % der
+Stichproben) blockiert FoodNotifys eigene Abrechnung von Verkauf gegen
+Rezeptur. Er blockiert **nicht uns**, denn wir brauchen diese Abrechnung nicht:
+
+```
+core.artikelverkauf_tag.menge  ×  Σ zutat.cost  =  Soll-Wareneinsatz
+        (LINA, funktioniert)      (FoodNotify, gepflegt)
+```
+
+Die Verkaufsmengen kommen aus LINA — derselbe Amadeus-Datenstrom, nur in der
+funktionierenden Fassung. Die Zutatenkosten stehen fertig gerechnet am Rezept
+(`zutat.cost`, Euro je Portion). Die Multiplikation ist unsere, und sie umgeht
+genau die Kette, die bei FoodNotify bricht.
+
+**Belegt statt behauptet:** Aposto Gera, Juni 2026, 40 der 146 zugeordneten
+Rezepte ergeben 2.902,58 € Soll-Wareneinsatz auf 14.660,83 € Umsatz = **19,8 %**.
+Plausibel (üblich 25–33 %, hier fehlen noch zwei Drittel der Rezepte,
+überwiegend Speisen). FoodNotifys eigene Kostenanalyse weist für dieselbe Marke
+**−2667 %** aus.
+
+**Daraus folgt mehr als nur „kein Ticket".** B2 (Verkäufe) und B3
+(Kostenanalyse) sind gestrichen, nicht zurückgestellt:
+
+* **B2** wäre dieselbe Zahl ein zweites Mal, in der kaputten Fassung.
+* **B3** war als Vergleichsgröße gedacht. Eine Vergleichsgröße muss selbst
+  belastbar sein; diese ist es in keiner der vier Marken. Sie taugt weder als
+  Wahrheit noch als Prüfstein.
+
+Stufe 4 schrumpft damit auf die Inventuren, und die hingen nie am Fehler.
+
+**Die Anmeldung braucht ebenfalls keine Rückfrage.** Gemessen: kein JWT im
+`localStorage`, `/api/profile` antwortet trotzdem mit 200 — die Sitzung hängt an
+einem HttpOnly-Cookie. Dasselbe Muster wie bei LINA, `src/lina/auth.ts` trägt
+konzeptionell schon. Ob 2FA greift, zeigt der erste Anmeldeversuch; darauf zu
+bauen, bevor es auftritt, wäre Spekulation.
+
+**Was wir uns damit einhandeln.** Zwei Dinge bleiben ungeklärt und sollen es
+bewusst bleiben:
+
+1. **Der Fehler bleibt bestehen.** Wer in FoodNotifys Oberfläche auf die
+   Kostenanalyse sieht, sieht weiterhin Phantasiewerte — ohne Warnung. Das ist
+   jetzt ein Thema für die Fachseite, nicht für den Importer.
+2. **Die geteilten Administratorkonten bleiben.** Ein lesender Subuser wäre
+   sauberer und ließe sich in der Oberfläche selbst anlegen. Kein Blocker,
+   aber auch nicht erledigt.
+
+---
+
 ## LINAs Warenwirtschaft wird gelöscht, nicht umgebaut (01.08.2026)
 
 Migration `0030` legt die FoodNotify-Tabellen an und räumt dabei acht Tabellen

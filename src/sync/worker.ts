@@ -13,10 +13,13 @@
  */
 import pg from 'pg'
 import { query, eine, pool } from '../db/pool'
-import { config } from '../config'
+import { config, fnGrenzen } from '../config'
 import { log } from '../lib/log'
 import { LinaClient, strukturPruefen } from '../lina/client'
 import { endpunkt } from '../lina/endpunkte'
+import { FnClient } from '../foodnotify/client'
+import { fnEndpunkt } from '../foodnotify/endpunkte'
+import { fnLaden } from '../foodnotify/laden'
 import { laden } from './laden'
 import { alsIsoDatum } from '../lib/time'
 
@@ -161,6 +164,19 @@ async function workerLaufIntern(
   // Das Tagesbudget gilt über Läufe hinweg, nicht je Prozess — sonst wäre es
   // beim stündlichen Zeitplan wirkungslos. Begründung in client.ts.
   await client.budgetLaden()
+
+  /**
+   * Der zweite Quellclient: FoodNotify, ein Client für alle vier Mandanten.
+   * Eigener Takt (anderes Zielsystem), aber dasselbe Tagesbudget aus
+   * derselben Zählung — der eine Worker bleibt die eine Bremse.
+   */
+  const fnClient = new FnClient()
+  await fnClient.budgetLaden()
+  /** marke_key → schluessel, für die Zugangswahl je Posten. Vier Zeilen. */
+  const marken = new Map<number, string>(
+    (await query<{ marke_key: number; schluessel: string }>(
+      `SELECT marke_key, schluessel FROM core.marke`))
+      .map(m => [Number(m.marke_key), m.schluessel]))
 
   const frei = await eine<{ n: number }>(`SELECT sync.haengende_posten_freigeben() AS n`)
   if (frei && Number(frei.n) > 0) log.warn('hängende Posten freigegeben', { anzahl: Number(frei.n) })
@@ -311,7 +327,22 @@ async function workerLaufIntern(
         break
       }
       if (!client.imFenster()) { notiz = 'Arbeitsfenster beendet'; break }
-      if (client.budgetUebrig === 0) { notiz = 'Tagesbudget aufgebraucht'; break }
+      /**
+       * Die Budgets sind JE ANBIETER getrennt (seit 02.08.2026), also
+       * bricht der Lauf erst ab, wenn BEIDE erschöpft sind.
+       *
+       * Vorher stand hier `||`: ein aufgebrauchtes FoodNotify-Budget
+       * beendete den Lauf, und LINAs Tagesdaten blieben liegen, obwohl
+       * ihr eigenes Budget unberührt war. Ein Anbieter an seiner Grenze
+       * darf den anderen nicht anhalten.
+       *
+       * Ist nur eines leer, laufen die Posten des anderen weiter — die
+       * Posten des erschöpften werden unten übersprungen und bleiben
+       * offen für den nächsten Lauf.
+       */
+      if (client.budgetUebrig === 0 && fnClient.budgetUebrig === 0) {
+        notiz = 'Tagesbudget beider Anbieter aufgebraucht'; break
+      }
       if (config.MAX_POSTEN_PRO_LAUF > 0 && ok + keineDaten + fehler >= config.MAX_POSTEN_PRO_LAUF) {
         notiz = 'Postenobergrenze je Lauf erreicht'; break
       }
@@ -354,35 +385,82 @@ async function workerLaufIntern(
        * Ein einzelner Posten darf scheitern. Der Lauf nicht.
        */
       try {
-      const ep = endpunkt(posten.endpunkt)
       // postgres.js gibt date als Date zurueck - hier einmal normalisieren.
       const von = alsIsoDatum(posten.zeitraum_von)
       const bis = alsIsoDatum(posten.zeitraum_bis)
       const extra = (posten.parameter ?? {}) as Record<string, string>
-      const parameter = ep.parameter(von, bis, extra)
-      if (posten.betrieb_enc_id) parameter.storeId = posten.betrieb_enc_id
 
-      const res = await client.holen(ep, parameter)
+      /**
+       * Welches Quellsystem? marke_key entscheidet (NULL = LINA, Migration
+       * 0031). Alles danach — Erfolgs-, Sperr- und Fehlerpfad — ist für
+       * beide gleich; nur Abruf und Laden unterscheiden sich.
+       */
+      const quelle = posten.marke_key != null
+        ? { art: 'fn' as const, ep: fnEndpunkt(posten.endpunkt),
+            markeKey: Number(posten.marke_key),
+            marke: marken.get(Number(posten.marke_key)) ?? `unbekannt_${posten.marke_key}` }
+        : { art: 'lina' as const, ep: endpunkt(posten.endpunkt) }
+      const epKey = quelle.ep.key
+      const quellClient = quelle.art === 'fn' ? fnClient : client
+
+      /**
+       * Ist das Budget DIESES Anbieters erschöpft, wird der Posten
+       * zurückgelegt — der andere Anbieter arbeitet weiter.
+       *
+       * Zurücklegen und nicht als Fehler zählen: das Budget ist eine
+       * gewollte Grenze, kein Zwischenfall. `faellig_ab` auf morgen früh,
+       * damit derselbe Posten nicht sofort wieder gezogen wird und der
+       * Lauf sich in einer Schleife dreht.
+       */
+      if (quellClient.budgetUebrig === 0) {
+        await query(
+          `UPDATE sync.warteschlange
+              SET in_arbeit_seit = NULL, versuche = greatest(0, versuche - 1),
+                  faellig_ab = date_trunc('day', now()) + interval '1 day'
+            WHERE posten_id = $1`, [posten.posten_id])
+        uebersprungen++
+        continue
+      }
+
+      let parameter: Record<string, string> = extra
+      let res
+      if (quelle.art === 'fn') {
+        res = await fnClient.holen(quelle.ep, quelle.marke, extra)
+      } else {
+        parameter = quelle.ep.parameter(von, bis, extra)
+        if (posten.betrieb_enc_id) parameter.storeId = posten.betrieb_enc_id
+        res = await client.holen(quelle.ep, parameter)
+      }
 
       // --- Erfolg -------------------------------------------------------
       if (res.art === 'ok') {
-        const pruefung = strukturPruefen(ep.key, res.daten)
-        if (!pruefung.ok) {
-          // Nicht verwerfen: Raw behält die Daten, aber es muss auffallen.
-          await query(
-            `INSERT INTO sync.schema_abweichung (endpunkt, erwartet, tatsaechlich)
-             VALUES ($1, $2, $3)`,
-            [ep.key, JSON.stringify(pruefung.erwartet), JSON.stringify(pruefung.tatsaechlich)])
-          log.warn('schema weicht ab', { endpunkt: ep.key, von })
+        if (quelle.art === 'lina') {
+          // Die zod-Schemas gibt es nur für LINA. FoodNotifys Gegenstück ist
+          // die Leere-200er-Prüfung in fnLaden — dort, weil sie die
+          // Aufgabenhistorie braucht, nicht nur die Antwort.
+          const pruefung = strukturPruefen(epKey, res.daten)
+          if (!pruefung.ok) {
+            // Nicht verwerfen: Raw behält die Daten, aber es muss auffallen.
+            await query(
+              `INSERT INTO sync.schema_abweichung (endpunkt, erwartet, tatsaechlich)
+               VALUES ($1, $2, $3)`,
+              [epKey, JSON.stringify(pruefung.erwartet), JSON.stringify(pruefung.tatsaechlich)])
+            log.warn('schema weicht ab', { endpunkt: epKey, von })
+          }
         }
 
         let zeilen = 0
         try {
-          zeilen = await laden({
-            ep, von, bis, parameter, daten: res.daten,
-            httpStatus: res.status, bytes: res.bytes, hash: res.hash,
-            laufId, betriebEncId: posten.betrieb_enc_id ?? null,
-          })
+          zeilen = quelle.art === 'fn'
+            ? await fnLaden({
+                ep: quelle.ep, markeKey: quelle.markeKey, von, bis, parameter: extra,
+                daten: res.daten, httpStatus: res.status, bytes: res.bytes, hash: res.hash, laufId,
+              })
+            : await laden({
+                ep: quelle.ep, von, bis, parameter, daten: res.daten,
+                httpStatus: res.status, bytes: res.bytes, hash: res.hash,
+                laufId, betriebEncId: posten.betrieb_enc_id ?? null,
+              })
         } catch (e) {
           fehler++; fehlerInFolge++
           await query(
@@ -391,8 +469,8 @@ async function workerLaufIntern(
                     faellig_ab = now() + $2::interval
               WHERE posten_id = $3`,
             [String(e).slice(0, 2000), wiedervorlage(posten.versuche), posten.posten_id])
-          await protokoll(laufId, ep.key, posten, 'fehler', res, client, String(e))
-          log.error('laden fehlgeschlagen', { endpunkt: ep.key, von, fehler: String(e) })
+          await protokoll(laufId, epKey, posten, 'fehler', res, quellClient, String(e))
+          log.error('laden fehlgeschlagen', { endpunkt: epKey, von, fehler: String(e) })
           continue
         }
 
@@ -401,9 +479,9 @@ async function workerLaufIntern(
           `UPDATE sync.warteschlange
               SET erledigt_am = now(), in_arbeit_seit = NULL, ergebnis = 'ok', letzter_fehler = NULL
             WHERE posten_id = $1`, [posten.posten_id])
-        await protokoll(laufId, ep.key, posten, 'ok', res, client, null, zeilen)
-        log.debug('geladen', { endpunkt: ep.key, von, zeilen, dauerMs: res.dauerMs })
-        await fortschritt(ep.key, von, zeilen, res.dauerMs)
+        await protokoll(laufId, epKey, posten, 'ok', res, quellClient, null, zeilen)
+        log.debug('geladen', { endpunkt: epKey, von, zeilen, dauerMs: res.dauerMs })
+        await fortschritt(epKey, von, zeilen, res.dauerMs)
         continue
       }
 
@@ -414,10 +492,10 @@ async function workerLaufIntern(
           `UPDATE sync.warteschlange
               SET erledigt_am = now(), in_arbeit_seit = NULL, ergebnis = 'keine_daten'
             WHERE posten_id = $1`, [posten.posten_id])
-        await protokoll(laufId, ep.key, posten, 'keine_daten', res, client)
+        await protokoll(laufId, epKey, posten, 'keine_daten', res, quellClient)
         // Auch hier eine Zeile: eine lange Strecke ohne Daten (geschlossener
         // Betrieb, Zeitraum vor der Eroeffnung) ist sonst wieder Stille.
-        await fortschritt(ep.key, von, null, res.dauerMs)
+        await fortschritt(epKey, von, null, res.dauerMs)
         continue
       }
 
@@ -432,6 +510,42 @@ async function workerLaufIntern(
        * Und der Lauf endet hier. Ohne das liefen bis zu ABBRUCH_NACH_FEHLERN
        * weitere Anfragen gegen ein System, das gerade „nein" gesagt hat.
        */
+      /**
+       * --- FoodNotify gesperrt: nur die Marke ruht, der Lauf läuft weiter --
+       *
+       * Der globale Sperrpfad darunter legt den GANZEN Importer still — für
+       * LINA richtig (es gibt nur den einen Zugang), für FoodNotify falsch:
+       * ein falsches Passwort bei Aposto darf weder LINA noch die anderen
+       * drei Marken anhalten.
+       *
+       * Stattdessen werden alle offenen Posten der Marke vertagt. Die Frist
+       * ist dieselbe wie bei der globalen Sperre (48 h bei Anmeldefehlern,
+       * 24 h sonst, Retry-After gewinnt) — Regel 7 bleibt gewahrt: der
+       * nächste Anmeldeversuch kommt frühestens nach der Frist, nicht beim
+       * nächsten Stundenlauf. Im laufenden Prozess verhindert zusätzlich
+       * die Sperre je Marke im FnClient jeden weiteren Versuch.
+       */
+      if (res.art === 'gesperrt' && quelle.art === 'fn') {
+        const stunden = res.sperrArt === 'anmeldung'
+          ? config.SPERRE_ANMELDUNG_STUNDEN : config.SPERRE_PAUSE_STUNDEN
+        const bisWann = res.wartenBis ?? new Date(Date.now() + stunden * 3_600_000)
+        await query(
+          `UPDATE sync.warteschlange
+              SET in_arbeit_seit = NULL,
+                  faellig_ab = greatest(faellig_ab, $1::timestamptz),
+                  letzter_fehler = CASE WHEN posten_id = $3 THEN $2 ELSE letzter_fehler END,
+                  versuche = CASE WHEN posten_id = $3 THEN greatest(0, versuche - 1) ELSE versuche END
+            WHERE marke_key = $4 AND erledigt_am IS NULL`,
+          [bisWann, res.fehler.slice(0, 2000), posten.posten_id, quelle.markeKey])
+        await protokoll(laufId, epKey, posten, 'uebersprungen', res, quellClient, res.fehler)
+        log.error('foodnotify-marke gesperrt — ihre posten sind vertagt, der lauf läuft weiter', {
+          marke: quelle.marke, art: res.sperrArt, status: res.status,
+          fehler: res.fehler, vertagtBis: bisWann,
+        })
+        // Kein fehlerInFolge++: der Posten ist in Ordnung, der Zugang nicht.
+        continue
+      }
+
       if (res.art === 'gesperrt') {
         await query(
           `UPDATE sync.warteschlange
@@ -439,13 +553,13 @@ async function workerLaufIntern(
                   letzter_fehler = $1
             WHERE posten_id = $2`, [res.fehler.slice(0, 2000), posten.posten_id])
         aktuellerPosten = null
-        await protokoll(laufId, ep.key, posten, 'uebersprungen', res, client, res.fehler)
+        await protokoll(laufId, epKey, posten, 'uebersprungen', res, quellClient, res.fehler)
 
         const bis = await eine<{ bis: Date }>(
           `SELECT sync.sperre_setzen($1, $2, $3, $4, $5, $6, $7) AS bis`,
           [res.sperrArt,
            res.sperrArt === 'anmeldung' ? config.SPERRE_ANMELDUNG_STUNDEN : config.SPERRE_PAUSE_STUNDEN,
-           res.status, ep.key, res.fehler.slice(0, 2000), laufId,
+           res.status, epKey, res.fehler.slice(0, 2000), laufId,
            res.wartenBis ?? null])
 
         status = 'abgebrochen'
@@ -471,7 +585,7 @@ async function workerLaufIntern(
               SET erledigt_am = now(), in_arbeit_seit = NULL, ergebnis = 'aufgegeben',
                   letzter_fehler = $1
             WHERE posten_id = $2`, [res.fehler.slice(0, 2000), posten.posten_id])
-        log.error('posten aufgegeben', { endpunkt: ep.key, von, versuche: posten.versuche, fehler: res.fehler })
+        log.error('posten aufgegeben', { endpunkt: epKey, von, versuche: posten.versuche, fehler: res.fehler })
       } else {
         await query(
           `UPDATE sync.warteschlange
@@ -479,9 +593,9 @@ async function workerLaufIntern(
                   faellig_ab = now() + $2::interval
             WHERE posten_id = $3`,
           [res.fehler.slice(0, 2000), wiedervorlage(posten.versuche), posten.posten_id])
-        log.warn('wiedervorlage', { endpunkt: ep.key, von, versuche: posten.versuche, fehler: res.fehler })
+        log.warn('wiedervorlage', { endpunkt: epKey, von, versuche: posten.versuche, fehler: res.fehler })
       }
-      await protokoll(laufId, ep.key, posten, aufgeben ? 'uebersprungen' : 'fehler', res, client, res.fehler)
+      await protokoll(laufId, epKey, posten, aufgeben ? 'uebersprungen' : 'fehler', res, quellClient, res.fehler)
       } catch (e) {
         /**
          * Das Netz unter dem Netz: hierher kommt alles, was die Zweige oben
@@ -548,15 +662,19 @@ async function workerLaufIntern(
 async function protokoll(
   laufId: string, endpunktKey: string, posten: any,
   status: 'ok' | 'keine_daten' | 'fehler' | 'uebersprungen',
-  res: { status?: number | null; dauerMs: number }, client: LinaClient,
+  // Nur die Wartezeit wird gebraucht — so passt jeder Quellclient.
+  res: { status?: number | null; dauerMs: number }, client: { letzteWartezeitMs: number },
   fehler: string | null = null, zeilen: number | null = null,
 ) {
   await query(
     `INSERT INTO sync.aufgabe
        (lauf_id, endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis, versuch,
-        status, http_status, zeilen, dauer_ms, wartezeit_ms, fehler)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+        status, http_status, zeilen, dauer_ms, wartezeit_ms, fehler, marke_key, parameter)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
     [laufId, endpunktKey, posten.betrieb_enc_id ?? null, posten.zeitraum_von,
      posten.zeitraum_bis, posten.versuche, status, res.status ?? null, zeilen,
-     res.dauerMs, client.letzteWartezeitMs, fehler])
+     res.dauerMs, client.letzteWartezeitMs, fehler,
+     // Mandant und Parameter (Migration 0032): die Kombination, über die die
+     // Leere-200er-Prüfung "kam hier früher etwas?" beantwortet.
+     posten.marke_key ?? null, JSON.stringify(posten.parameter ?? {})])
 }

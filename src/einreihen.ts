@@ -133,4 +133,55 @@ if (process.argv.includes('--historie')) {
   log.info('historie gesamt', { von, bis, posten: gesamt })
 }
 
+/**
+ *   bun run einreihen --foodnotify
+ *       Reiht je konfigurierter Marke (FN_*_USER/_PASSWORD gesetzt) die vier
+ *       Organisationsposten ein (A1: Profil, Betriebe, Kostenstellen,
+ *       POS-Standorte). ALLES WEITERE STEUERT SICH SELBST: die Kostenstellen
+ *       reihen die erste Bestellseite je erpId ein, jede Seite ihre Köpfe,
+ *       Positionen und die Folgeseite (src/foodnotify/laden.ts).
+ *
+ *       Idempotent über NOT EXISTS gegen ALLE Posten — ein zweiter Aufruf
+ *       reiht nichts erneut ein, was schon lief. Wer die Momentaufnahmen
+ *       bewusst aktualisieren will (neue Kostenstelle, neue Kasse), löscht
+ *       die alten fn:-Posten oder wartet auf den späteren Abgleichslauf.
+ */
+if (process.argv.includes('--foodnotify')) {
+  const { fnZugaenge } = await import('./config')
+  const zugaenge = fnZugaenge()
+  if (zugaenge.length === 0) {
+    log.error('keine FoodNotify-Marke konfiguriert — FN_*_USER/_PASSWORD setzen (.env.example)')
+  }
+  const heute = geschaeftstag(new Date())
+  let gesamt = 0
+  for (const z of zugaenge) {
+    const marke = await eine<{ marke_key: number }>(
+      `SELECT marke_key FROM core.marke WHERE schluessel = $1`, [z.schluessel])
+    if (!marke) {
+      log.error('marke fehlt in core.marke — Migration 0030 angewendet?', { marke: z.schluessel })
+      continue
+    }
+    let n = 0
+    const { fnEndpunkt } = await import('./foodnotify/endpunkte')
+    for (const ep of ['fn:profil', 'fn:betriebe', 'fn:kostenstellen', 'fn:pos_standorte']) {
+      const r = await query(
+        `INSERT INTO sync.warteschlange
+           (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter)
+         SELECT $1, $2::date, $2::date, $4, $3, '{}'::jsonb
+          WHERE NOT EXISTS (
+                SELECT 1 FROM sync.warteschlange w
+                 WHERE w.endpunkt = $1 AND w.marke_key = $3 AND w.parameter = '{}'::jsonb)
+         RETURNING posten_id`,
+        [ep, heute, marke.marke_key, fnEndpunkt(ep).prioritaet])
+      n += r.length
+    }
+    log.info('foodnotify eingereiht', { marke: z.schluessel, posten: n })
+    gesamt += n
+  }
+  log.info('foodnotify gesamt', {
+    marken: zugaenge.map(z => z.schluessel), posten: gesamt,
+    hinweis: 'der Bestellungs-Backfill folgt von selbst aus fn:kostenstellen',
+  })
+}
+
 await pool.end()

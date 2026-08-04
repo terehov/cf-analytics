@@ -115,11 +115,18 @@ export class LinaClient {
    * Gezählt wird über `sync.aufgabe`, weil dort jeder tatsächliche Aufruf
    * steht, laufübergreifend und neustartfest. Bewusst großzügig gezählt:
    * lieber einen übersprungenen Posten zu viel als einen Aufruf zu wenig.
+   *
+   * NUR LINA-AUFRUFE (`endpunkt NOT LIKE 'fn:%'`, seit 02.08.2026). Vorher
+   * zählte diese Abfrage alle Zeilen, FoodNotify eingeschlossen — ein
+   * Backfill dort mit 36.000 Posten hätte LINAs Tagesdaten am eigenen
+   * Budget scheitern lassen. Zwei Anbieter, zwei Töpfe: eine Grenze soll
+   * das System schützen, gegen das sie gilt, und kein anderes.
    */
   async budgetLaden() {
     this.budgetTagWechseln()
     const r = await eine<{ n: number }>(
-      `SELECT count(*)::int AS n FROM sync.aufgabe WHERE beendet_am >= date_trunc('day', now())`)
+      `SELECT count(*)::int AS n FROM sync.aufgabe
+        WHERE beendet_am >= date_trunc('day', now()) AND endpunkt NOT LIKE 'fn:%'`)
     this.heuteVerbraucht = Number(r?.n ?? 0)
     log.info('tagesbudget', {
       heuteVerbraucht: this.heuteVerbraucht, uebrig: this.budgetUebrig, grenze: config.TAGESBUDGET,
