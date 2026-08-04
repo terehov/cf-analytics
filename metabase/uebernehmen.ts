@@ -614,6 +614,30 @@ for (const d of dashboards) {
               `aber dort gibt es diesen Filter nicht — der Klick landet ungefiltert.`)
           }
         }
+        // Die QUELLSEITE der Uebergabe ist ein Spaltenname der Karte.
+        // Metabase prueft ihn nicht: ein parameterMapping auf eine
+        // Spalte, die es nicht gibt, wird gespeichert und uebergibt dann
+        // schlicht NICHTS — das Ziel oeffnet mit leerem Filter. Genau so
+        // verloren am 04.08.2026 alle sechs Fach-Klicks auf ③ Betrieb
+        // ihren Betrieb. Wer den Dashboard-Filter meint, laesst die
+        // uebergabe leer und ueberlaesst es der Durchreichung oben.
+        if (!k.fest) {
+          const karte = alleKarten.find(x => x.schluessel === teil.karte)
+          const spalten = [
+            ...Object.values(k.uebergabe).map(s => [s, 'uebergabe'] as const),
+            ...(k.spalte ? [[k.spalte, 'klickbare Spalte'] as const] : []),
+          ]
+          for (const [spalte, rolle] of spalten) {
+            const muster = new RegExp(
+              `AS\\s+"${spalte.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`, 'i')
+            if (karte && !muster.test(karte.sql)) {
+              klickFehler.push(
+                `${d.schluessel}/${teil.karte}: ${rolle} liest Spalte "${spalte}", ` +
+                `aber die Karte gibt sie nicht aus (kein AS "${spalte}" in der SQL) — ` +
+                `der Klick uebergibt einen leeren Wert.`)
+            }
+          }
+        }
       }
     }
   }

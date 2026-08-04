@@ -259,8 +259,15 @@ export const dashboards: Dashboard[] = [
         { karte: 'so_karte_klein', breite: 8, hoehe: 12 },
       ] },
       { teile: [
+        // Leere uebergabe mit Absicht: diese Karten geben KEINE Spalte
+        // "Betrieb" aus (der Betrieb ist hier schon der Dashboard-Filter).
+        // Eine Spalten-Uebergabe auf eine fehlende Spalte speichert
+        // Metabase klaglos und uebergibt dann NICHTS -- der Klick landete
+        // auf dem Fach-Dashboard mit leerem Betriebsfilter, gemeldet am
+        // 04.08.2026. Ohne eigene Belegung reicht uebernehmen.ts den
+        // gleichnamigen Dashboard-Filter durch, und genau der ist gemeint.
         { karte: 'dd_betrieb_verlauf',
-          klick: [{ ziel: 'db_umsatz', uebergabe: { betrieb: 'Betrieb' } }] },
+          klick: [{ ziel: 'db_umsatz', uebergabe: {} }] },
       ] },
       ] },
       { name: 'Gäste & Bewertungen', reihen: [
@@ -302,11 +309,11 @@ export const dashboards: Dashboard[] = [
       // Balken, was schlimmer ist als gar keine Achse: man sieht ein
       // Muster und kann es keiner Tageszeit zuordnen.
       { teile: [
-        { karte: 'dd_betrieb_sparte', klick: [{ ziel: 'db_struktur', uebergabe: { betrieb: 'Betrieb' } }] },
-        { karte: 'dd_betrieb_zeitzone', klick: [{ ziel: 'db_struktur', uebergabe: { betrieb: 'Betrieb' } }] },
+        { karte: 'dd_betrieb_sparte', klick: [{ ziel: 'db_struktur', uebergabe: {} }] },
+        { karte: 'dd_betrieb_zeitzone', klick: [{ ziel: 'db_struktur', uebergabe: {} }] },
       ] },
       { teile: [
-        { karte: 'dd_betrieb_stunde', klick: [{ ziel: 'db_struktur', uebergabe: { betrieb: 'Betrieb' } }] },
+        { karte: 'dd_betrieb_stunde', klick: [{ ziel: 'db_struktur', uebergabe: {} }] },
       ] },
       ] },
       { name: 'Personal · Ware · BWA', reihen: [
@@ -317,9 +324,9 @@ export const dashboards: Dashboard[] = [
       // Artikel- und Warengruppennamen passen auf eine halbe Breite nicht,
       // und der Artikelname steht ganz links.
       { teile: [{ karte: 'dd_betrieb_artikel', hoehe: 11,
-        klick: [{ ziel: 'db_ware', uebergabe: { betrieb: 'Betrieb' } }] }] },
+        klick: [{ ziel: 'db_ware', uebergabe: {} }] }] },
       { teile: [{ karte: 'dd_betrieb_bwa',
-        klick: [{ ziel: 'db_bwa', uebergabe: { betrieb: 'Betrieb' } }] }] },
+        klick: [{ ziel: 'db_bwa', uebergabe: {} }] }] },
       ] },
       { name: 'Maßnahmen & Datenstand', reihen: [
       { teile: [{ text: '## Maßnahmen und Datenstand' }] },
