@@ -1446,6 +1446,74 @@ lauf('FoodNotify Ende-zu-Ende', () => {
     const { rows: sperren } = await db.query(`SELECT * FROM sync.zugangssperre`)
     expect(sperren).toHaveLength(0)
   })
+
+  /**
+   * B1 · Inventuren (plan-foodnotify.md Stufe 4). Anders als bei
+   * Bestellungen bündelt EIN fn:inventuren-Posten ALLE Kostenstellen der
+   * Marke (erpIds[]) — die Kostenstelle steckt in jeder Zeile der Antwort,
+   * nicht im Posten-Parameter. Positionen folgen automatisch, wie bei
+   * Bestellungen Kopf und Positionen aus der Liste folgen.
+   */
+  test('Inventuren: ein Aufruf für alle Kostenstellen, Positionen folgen automatisch', async () => {
+    await db.query(
+      `INSERT INTO sync.warteschlange
+         (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter)
+       VALUES ('fn:inventuren', current_date, current_date, 95, $1, $2::jsonb)`,
+      [aposto, JSON.stringify({ erpIds: '10483,10484', seite: '1' })])
+
+    const { workerLauf } = await import('./worker')
+    const r = await workerLauf('manuell')
+    expect(r.status).toBe('ok')
+    // Seite 1 + Seite 2 (rückwärts eingereiht) + je eine Positionen-Zeile
+    // für inv-1 und inv-2 = 4 Posten, alle in diesem einen Lauf.
+    expect(r.ok).toBe(4)
+
+    const { rows: inventuren } = await db.query(
+      `SELECT i.fn_uuid, i.name, i.art, i.status, i.anzahl_positionen, k.erp_id
+         FROM core.inventur i JOIN core.kostenstelle k USING (kostenstelle_key)
+        WHERE k.marke_key = $1
+        ORDER BY i.fn_uuid`, [aposto])
+    expect(inventuren).toHaveLength(2)
+    // DER STATUS KOMMT ALS OBJEKT — dieselbe Form wie shopOrderStatus (0043),
+    // hier von Anfang an über alsBezeichnung gelesen statt über String().
+    expect(inventuren[0]).toMatchObject({
+      fn_uuid: 'inv-1', name: 'Kücheninventur Juli', art: 'full', status: 'signed',
+      anzahl_positionen: 2, erp_id: 10483,
+    })
+    expect(inventuren[1]).toMatchObject({
+      fn_uuid: 'inv-2', name: 'Barinventur August', art: 'full', status: 'counting',
+      anzahl_positionen: 1, erp_id: 10484,
+    })
+    expect(inventuren.some(i => String(i.status).includes('[object'))).toBe(false)
+
+    // Die Positionen: Sollbestand, gezählte Menge, Preis je Basiseinheit —
+    // und shopArticleId zeigt auf core.ware mit quelle='lieferant', NICHT
+    // auf core.artikel (plan-foodnotify.md, Warnung um Zeile 146).
+    const { rows: positionen } = await db.query(
+      `SELECT p.name, p.soll_menge, p.gezaehlt_menge, p.preis_je_basiseinheit,
+              w.fn_id AS ware, w.quelle
+         FROM core.inventurposition p
+         JOIN core.inventur i USING (inventur_key)
+         JOIN core.kostenstelle k USING (kostenstelle_key)
+         LEFT JOIN core.ware w USING (ware_key)
+        WHERE k.marke_key = $1
+        ORDER BY i.fn_uuid, p.name`, [aposto])
+    expect(positionen).toHaveLength(3)
+    const orangensaft = positionen.find(p => p.name.startsWith('Granini'))!
+    expect(orangensaft).toMatchObject({ ware: 'L-9001', quelle: 'lieferant' })
+    expect(Number(orangensaft.soll_menge)).toBeCloseTo(29612.59, 2)
+    expect(Number(orangensaft.gezaehlt_menge)).toBe(6000)
+    // Ohne shopArticleId bleibt die Ware NULL statt erfunden.
+    const zwiebeln = positionen.find(p => p.name.startsWith('Zwiebeln'))!
+    expect(zwiebeln.ware).toBeNull()
+
+    // Nichts blieb für Aposto liegen (Enchilada steht nach dem vorigen Test
+    // bewusst noch vertagt — das ist kein Leck dieses Tests).
+    const { rows: [offen] } = await db.query(
+      `SELECT count(*)::int AS n FROM sync.warteschlange
+        WHERE erledigt_am IS NULL AND marke_key = $1`, [aposto])
+    expect(Number(offen.n)).toBe(0)
+  })
 })
 
 /**

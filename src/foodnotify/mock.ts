@@ -248,6 +248,61 @@ export function fnMockStarten(opt: FnMockOptionen = {}) {
         case '/api/999/shop-order/paginate':
           // Fremde erpId: FoodNotify meldet das mit 200 und isError=true.
           return json({ errors: ['object not found'], code: 404, isError: true, payload: null })
+
+        /**
+         * B1 · Inventuren — EIN Aufruf für BEIDE Aposto-Gera-Kostenstellen
+         * zugleich (erpIds[]=10483&erpIds[]=10484), nicht einer je
+         * Kostenstelle. Zwei Seiten, damit derselbe Test wie bei
+         * Bestellungen möglich ist: Seite 1 reiht Seite 2 rückwärts ein.
+         *
+         * DIE HÜLLE IST HIER NICHT GEMESSEN, NUR ABGELEITET: /api/erp/* nutzt
+         * sonst {code,errors,isError,payload}, und genau an DIESEM Endpunkt
+         * (Wilma Wunder, 275 Inventuren) ist die Exploration einmal auf eine
+         * geschachtelte payload→data-Form hereingefallen (Inventar §1, §8b).
+         * Diese Attrappe bildet payload→{data,pagination} nach — die
+         * plausibelste Lesart, keine Messung. src/foodnotify/endpunkte.ts
+         * trägt denselben Vorbehalt im `hinweis`-Feld.
+         */
+        case '/api/erp/stocktakings': {
+          const seite = Number(url.searchParams.get('page') ?? 1)
+          const seiten: Record<number, unknown[]> = {
+            1: [
+              { id: 'inv-1', erpId: 10483, name: 'Kücheninventur Juli', type: 'full',
+                createdAt: '2026-07-01T08:00:00+00:00', timeModified: '2026-07-01T10:00:00+00:00',
+                status: { name: 'signed' }, totalNumberOfItems: 2, note: null },
+            ],
+            2: [
+              { id: 'inv-2', erpId: 10484, name: 'Barinventur August', type: 'full',
+                createdAt: '2026-08-01T08:00:00+00:00', timeModified: null,
+                status: { name: 'counting' }, totalNumberOfItems: 1, note: 'Nachzählung offen' },
+            ],
+          }
+          return json({ errors: [], code: 200, isError: false, payload: {
+            data: seiten[seite] ?? [],
+            pagination: { currentPage: seite, totalPages: 2, totalItems: 2 },
+          } })
+        }
+        case '/api/erp/stocktakings/inv-1/items':
+          // Wie im Inventar §4 belegt: Sollbestand, gezählte Menge, Preis je
+          // Basiseinheit. Eine Position ohne shopArticleId (item-2) prüft den
+          // Rückfall auf ware_key = NULL.
+          return json({ errors: [], code: 200, isError: false, payload: [
+            { id: 'item-1', name: 'Granini Orangensaft Mw 6X1,00',
+              shopArticleId: 'L-9001', shopName: 'HFS Getränke', baseUnit: 'ml',
+              theoreticalStockLevelInBaseUnits: 29612.59, countedAmountInBaseUnits: 6000,
+              reviewAmountInBaseUnits: 6000, pricePerBaseUnit: 0.0025533 },
+            { id: 'item-2', name: 'Zwiebeln Rot Sack 10Kg',
+              shopArticleId: null, shopName: null, baseUnit: 'kg',
+              theoreticalStockLevelInBaseUnits: 12, countedAmountInBaseUnits: 10.5,
+              reviewAmountInBaseUnits: null, pricePerBaseUnit: 2.4 },
+          ] })
+        case '/api/erp/stocktakings/inv-2/items':
+          return json({ errors: [], code: 200, isError: false, payload: [
+            { id: 'item-3', name: 'Prosecco Spumante Zardetto 0,75L',
+              shopArticleId: 'L-9002', shopName: 'Distra Aposto', baseUnit: 'l',
+              theoreticalStockLevelInBaseUnits: 8.25, countedAmountInBaseUnits: 6,
+              reviewAmountInBaseUnits: null, pricePerBaseUnit: 8.9 },
+          ] })
       }
       return json({ message: 'not found' }, { status: 404 })
     },

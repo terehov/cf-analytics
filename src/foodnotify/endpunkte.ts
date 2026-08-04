@@ -113,6 +113,41 @@ export const FN_ENDPUNKTE: FnEndpunkt[] = [
     hinweis: 'shopOrderMappingProduct.concreteProduct.id ist die Ware — dieselbe '
       + 'Nummer wie zutat.artikelId. Echte Belegpreise, keine Katalogpreise.',
   },
+
+  // --- B1 · Inventuren — lohnend fast nur bei Wilma Wunder (275) --------
+  {
+    key: 'fn:inventuren',
+    zweck: 'Inventurköpfe ALLER Kostenstellen einer Marke in einem Aufruf, seitenweise',
+    prioritaet: 95,
+    pfad: p => {
+      // erpIds[] ist ein ARRAY-Parameter — anders als fn:bestellungen läuft
+      // dieser Endpunkt nicht je Kostenstelle, sondern EINMAL je Marke für
+      // alle Kostenstellen zusammen (plan-foodnotify.md §4 B1). Die Liste
+      // steht als kommagetrennter String im Posten (src/einreihen.ts baut
+      // sie aus core.kostenstelle), hier nur wieder aufgeteilt.
+      const erpIds = pflicht(p, 'erpIds').split(',').filter(Boolean)
+      if (erpIds.length === 0) throw new Error('fn:inventuren: erpIds im Posten ist leer')
+      const seite = pflicht(p, 'seite')
+      const q = new URLSearchParams({ page: seite, order_by: 'timeCreated', order_direction: 'ASC' })
+      for (const id of erpIds) q.append('erpIds[]', id)
+      return `/api/erp/stocktakings?${q}`
+    },
+    hinweis: 'ACHTUNG PAGINATION: bei Wilma Wunder blieben beim ersten Auspacken 275 '
+      + 'Inventuren unsichtbar — HTTP 200, leeres Ergebnis, keine Ausnahme (Inventar §1, '
+      + 'plan-foodnotify.md Zeile 319). Die Hülle ist nach dem Pfadmuster /api/erp/* '
+      + 'vermutlich {code,errors,isError,payload:{data,pagination}} — das ist aus dem '
+      + 'Muster der übrigen /api/erp/*-Endpunkte abgeleitet, am echten stocktakings-Pfad '
+      + 'selbst aber NICHT gemessen. Der erste echte Abruf gehört von Hand geprüft, bevor '
+      + 'man den Zeilen traut (docs/foodnotify-api-inventar.md).',
+  },
+  {
+    key: 'fn:inventurpositionen',
+    zweck: 'Zählung einer Inventur — Sollbestand, gezählte Menge, Preis je Basiseinheit',
+    prioritaet: 94,
+    pfad: p => `/api/erp/stocktakings/${pflicht(p, 'uuid')}/items`,
+    hinweis: 'shopArticleId zeigt auf core.ware (quelle=lieferant), NICHT auf core.artikel — '
+      + 'dieselbe Art Lieferanten-Artikelnummer wie zutat.artikelId (plan-foodnotify.md Zeile 146).',
+  },
 ]
 
 const register = new Map(FN_ENDPUNKTE.map(e => [e.key, e]))

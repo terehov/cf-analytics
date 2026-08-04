@@ -187,11 +187,12 @@ sync.ts / einreihen.ts Einstiegspunkte
 ```bash
 bun install
 bun run migrate                              # Schema anwenden (idempotent)
-bun test                                     # 88 Tests (E2E einzeln, siehe Kasten unten)
+bun test                                     # nachgemessen am 04.08.2026: 455 pass, 120 skip ohne TEST_DATABASE_URL
 bun run sync                                 # nachfüllen UND abarbeiten
 bun run einreihen --taeglich                 # nur nachfüllen (sync macht das selbst)
 bun run einreihen --historie --von 2018-01-01 --bis 2026-07-24
 bun run einreihen --foodnotify               # FoodNotify-Backfill starten
+bun run einreihen --foodnotify-inventuren    # Inventur-Backfill starten (B1, lohnend fast nur bei Wilma Wunder)
 bun run health                               # Health-Endpunkt (Container-CMD)
 curl localhost:3000/health                     # lebt der Container?
 curl localhost:3000/status                     # muss jemand hinsehen? (503 = ja)

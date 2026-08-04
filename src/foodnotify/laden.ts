@@ -24,6 +24,7 @@ import { inTransaktion, eine } from '../db/pool'
 import { log } from '../lib/log'
 import { auspacken, istLeer } from './huelle'
 import * as t from './transform'
+import * as inv from './inventur'
 import type { FnEndpunkt } from './endpunkte'
 
 type FnKontext = {
@@ -289,6 +290,94 @@ export async function fnLaden(k: FnKontext): Promise<number> {
              p.gesamtMenge, p.einzelpreis, p.preisJeEinheit, p.mengeUnstimmig,
              p.lieferantenNr, p.summePreis, p.neuerPreis,
              p.preisAbweichend, p.ersetzt])
+        }
+        return positionen.length
+      }
+
+      /**
+       * B1 · Inventuren (plan-foodnotify.md Stufe 4) — lohnend fast nur bei
+       * Wilma Wunder (275 Stück). Anders als bei Bestellungen bündelt EIN
+       * Aufruf ALLE Kostenstellen der Marke (erpIds[]); die Kostenstelle
+       * wird deshalb je ZEILE aufgelöst, nicht aus dem Posten-Parameter.
+       */
+      case 'fn:inventuren': {
+        const seite = inv.inventurListe(k.daten)
+        for (const iv of seite.inventuren) {
+          const ksKey = await kostenstelleKey(c, k.markeKey, iv.erpId)
+          await c.query(
+            `INSERT INTO core.inventur
+               (kostenstelle_key, fn_uuid, name, art, status, anzahl_positionen, notiz,
+                erstellt_am, geaendert_am)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+             ON CONFLICT (kostenstelle_key, fn_uuid) DO UPDATE SET
+               name = EXCLUDED.name,
+               art = EXCLUDED.art,
+               status = EXCLUDED.status,
+               anzahl_positionen = EXCLUDED.anzahl_positionen,
+               notiz = EXCLUDED.notiz,
+               geaendert_am = EXCLUDED.geaendert_am,
+               zuletzt_am = now()`,
+            [ksKey, iv.fnUuid, iv.name, iv.art, iv.status, iv.anzahlPositionen, iv.notiz,
+             iv.erstelltAm, iv.geaendertAm])
+
+          // Die Positionen folgen automatisch — Zeitraum ist das Anlagedatum
+          // der Inventur, wie bei Bestellungen das Bestelldatum.
+          const tag = (iv.erstelltAm ?? k.von).slice(0, 10)
+          await folgepostenEinreihen(c, k.markeKey, 'fn:inventurpositionen',
+            { uuid: iv.fnUuid }, tag, 94)
+        }
+
+        /**
+         * Wie bei fn:bestellungen: Seite 1 reiht alle übrigen Seiten auf
+         * einmal ein, RÜCKWÄRTS (neueste zuerst). erpIds wird auf jeder
+         * Folgeseite mitgeführt — endpunkte.ts baut den Pfad rein aus dem
+         * Posten-Parameter, ohne Datenbankzugriff.
+         */
+        if (seite.aktuelleSeite === 1) {
+          const erpIds = k.parameter.erpIds ?? ''
+          for (let n = seite.gesamtSeiten; n >= 2; n--) {
+            await folgepostenEinreihen(c, k.markeKey, 'fn:inventuren',
+              { erpIds, seite: String(n) }, k.von, 95)
+          }
+        }
+        return seite.inventuren.length
+      }
+
+      case 'fn:inventurpositionen': {
+        const positionen = inv.inventurpositionen(k.daten)
+        const uuid = k.parameter.uuid
+        if (!uuid) throw new Error('fn:inventurpositionen ohne uuid im Posten')
+
+        const kopf = await c.query(
+          `SELECT i.inventur_key FROM core.inventur i
+             JOIN core.kostenstelle ks USING (kostenstelle_key)
+            WHERE ks.marke_key = $1 AND i.fn_uuid = $2`,
+          [k.markeKey, uuid])
+        if (kopf.rows.length === 0) {
+          // Positionen ohne Kopf gibt es nicht: der Kopf kommt aus derselben
+          // Liste, die diesen Posten eingereiht hat (wie bei Bestellungen).
+          throw new Error(`Inventur ${uuid} (marke_key ${k.markeKey}) nicht in core.inventur`)
+        }
+        const inventurKey = Number(kopf.rows[0].inventur_key)
+
+        // Ersetzen statt upsert — die Antwort ist der VOLLSTÄNDIGE Stand
+        // der Zählung (wie core.bestellposition).
+        await c.query(`DELETE FROM core.inventurposition WHERE inventur_key = $1`, [inventurKey])
+        for (const p of positionen) {
+          // shopArticleId ist eine LIEFERANTEN-Artikelnummer — quelle
+          // 'lieferant', wie core.bestellposition.lieferanten_nr. NICHT
+          // 'concrete_product': plan-foodnotify.md warnt ausdrücklich davor,
+          // diesen Schlüssel mit core.artikel zu verwechseln.
+          const ware = p.lieferantenNr
+            ? await wareKey(c, k.markeKey, 'lieferant', p.lieferantenNr, p.name)
+            : null
+          await c.query(
+            `INSERT INTO core.inventurposition
+               (inventur_key, fn_id, ware_key, name, shop_name, basis_einheit,
+                soll_menge, gezaehlt_menge, nachzaehlung_menge, preis_je_basiseinheit)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+            [inventurKey, p.fnId, ware, p.name, p.shopName, p.basisEinheit,
+             p.sollMenge, p.gezaehlteMenge, p.nachzaehlungMenge, p.preisJeBasiseinheit])
         }
         return positionen.length
       }

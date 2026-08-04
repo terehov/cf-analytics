@@ -18,7 +18,12 @@
  *   bun run einreihen --foodnotify
  *       Startet den FoodNotify-Backfill. Einmalig.
  *
- * Die beiden Backfills bleiben ausdrücklich Handarbeit: sie stellen
+ *   bun run einreihen --foodnotify-inventuren
+ *       Startet den Inventur-Backfill (B1, Stufe 4). Eigener Schalter,
+ *       nicht Teil von --foodnotify: lohnend fast nur bei Wilma Wunder
+ *       (275 Stück), bei den anderen drei Marken kaum. Einmalig.
+ *
+ * Die drei Backfills bleiben ausdrücklich Handarbeit: sie stellen
  * Zehntausende Posten ein, und das soll eine Entscheidung sein, kein
  * Nebeneffekt eines Neustarts.
  */
@@ -115,6 +120,76 @@ if (process.argv.includes('--foodnotify')) {
   log.info('foodnotify gesamt', {
     marken: zugaenge.map(z => z.schluessel), posten: gesamt,
     hinweis: 'der Bestellungs-Backfill folgt von selbst aus fn:kostenstellen',
+  })
+}
+
+/**
+ *   bun run einreihen --foodnotify-inventuren
+ *       Reiht je konfigurierter Marke EINEN fn:inventuren-Posten (Seite 1)
+ *       ein — mit den erpIds ALLER aktuell in core.kostenstelle bekannten
+ *       Kostenstellen dieser Marke. erpIds[] ist ein Array-Parameter, der
+ *       alle Kostenstellen in einem Aufruf bündelt (anders als
+ *       fn:bestellungen, das je Kostenstelle läuft, plan-foodnotify.md §4
+ *       B1). ALLES WEITERE STEUERT SICH SELBST: weitere Seiten und die
+ *       Positionen je Inventur folgen aus dem Laden (src/foodnotify/laden.ts).
+ *
+ *       EIGENER SCHALTER, nicht Teil von --foodnotify: Inventuren lohnen
+ *       praktisch nur bei Wilma Wunder (275 Stück, docs/plan-foodnotify.md
+ *       Stufe 4) — bei Aposto und Deutsche Konzepte gibt es sie kaum (19
+ *       bzw. 9, davon 5 storniert). Wer sie für alle vier Marken trotzdem
+ *       holen will, kann es — es soll aber eine bewusste Entscheidung
+ *       bleiben, kein Nebeneffekt des A1-Durchstichs.
+ *
+ *       Setzt core.kostenstelle voraus (aus --foodnotify bzw. dem
+ *       laufenden Abgleich) — ohne Kostenstellen bliebe die erpIds-Liste
+ *       leer.
+ *
+ *       Idempotent: ein zweiter Aufruf reiht keinen zweiten Seite-1-Posten
+ *       ein. Das heißt auch: kommen später neue Kostenstellen dazu, nimmt
+ *       ein erneuter Aufruf sie NICHT automatisch mit — dafür den alten
+ *       fn:inventuren-Posten der Marke von Hand löschen.
+ */
+if (process.argv.includes('--foodnotify-inventuren')) {
+  const { fnZugaenge } = await import('./config')
+  const { fnEndpunkt } = await import('./foodnotify/endpunkte')
+  const zugaenge = fnZugaenge()
+  if (zugaenge.length === 0) {
+    log.error('keine FoodNotify-Marke konfiguriert — FN_*_USER/_PASSWORD setzen (.env.example)')
+  }
+  const heute = geschaeftstag(new Date())
+  let gesamt = 0
+  for (const z of zugaenge) {
+    const marke = await eine<{ marke_key: number }>(
+      `SELECT marke_key FROM core.marke WHERE schluessel = $1`, [z.schluessel])
+    if (!marke) {
+      log.error('marke fehlt in core.marke — Migration 0030 angewendet?', { marke: z.schluessel })
+      continue
+    }
+    const kostenstellen = await query<{ erp_id: number }>(
+      `SELECT erp_id FROM core.kostenstelle WHERE marke_key = $1 AND erp_id IS NOT NULL`,
+      [marke.marke_key])
+    if (kostenstellen.length === 0) {
+      log.warn('keine Kostenstellen für diese Marke — erst --foodnotify laufen lassen', { marke: z.schluessel })
+      continue
+    }
+    const erpIds = kostenstellen.map(r => String(r.erp_id)).join(',')
+    const r = await query(
+      `INSERT INTO sync.warteschlange
+         (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter)
+       SELECT 'fn:inventuren', $1::date, $1::date, $3, $2, $4::jsonb
+        WHERE NOT EXISTS (
+              SELECT 1 FROM sync.warteschlange w
+               WHERE w.endpunkt = 'fn:inventuren' AND w.marke_key = $2
+                 AND w.parameter->>'seite' = '1')
+       RETURNING posten_id`,
+      [heute, marke.marke_key, fnEndpunkt('fn:inventuren').prioritaet,
+       JSON.stringify({ erpIds, seite: '1' })])
+    log.info('inventuren eingereiht', { marke: z.schluessel, kostenstellen: kostenstellen.length, posten: r.length })
+    gesamt += r.length
+  }
+  log.info('foodnotify-inventuren gesamt', {
+    marken: zugaenge.map(z => z.schluessel), posten: gesamt,
+    hinweis: 'weitere Seiten und Positionen folgen von selbst aus fn:inventuren',
   })
 }
 

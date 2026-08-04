@@ -45,4 +45,26 @@ describe('Pfadbau', () => {
     expect(fnEndpunkt('fn:bestellpositionen').pfad({ erpId: '10483', orderId: '777' }, null))
       .toBe('/api/10483/shop-order/777/change?order_by=name')
   })
+
+  test('fn:inventuren bündelt mehrere erpIds als Array-Parameter', () => {
+    const p = fnEndpunkt('fn:inventuren').pfad({ erpIds: '10483,10484', seite: '2' }, null)
+    expect(p.startsWith('/api/erp/stocktakings?')).toBe(true)
+    expect(p).toContain('page=2')
+    // URLSearchParams kodiert die eckigen Klammern — das ist Absicht (Symfony-Backend).
+    expect(p).toContain('erpIds%5B%5D=10483')
+    expect(p).toContain('erpIds%5B%5D=10484')
+  })
+
+  test('fn:inventuren ohne erpIds im Posten wirft', () => {
+    expect(() => fnEndpunkt('fn:inventuren').pfad({ seite: '1' }, null)).toThrow('"erpIds"')
+  })
+
+  test('fn:inventuren mit leerer erpIds-Liste wirft ebenfalls', () => {
+    expect(() => fnEndpunkt('fn:inventuren').pfad({ erpIds: '', seite: '1' }, null)).toThrow('erpIds')
+  })
+
+  test('fn:inventurpositionen baut den items-Pfad aus der uuid', () => {
+    expect(fnEndpunkt('fn:inventurpositionen').pfad({ uuid: 'inv-1' }, null))
+      .toBe('/api/erp/stocktakings/inv-1/items')
+  })
 })
