@@ -275,28 +275,115 @@ async function workerLaufIntern(
    *    knapp acht. Fuer einen Backfill ueber acht Jahre ist die Bremse der
    *    bindende Faktor, nicht das Tempo. Es gilt also der GROESSERE der
    *    beiden Werte.
+   *
+   * ZWEI WEITERE am 03.08.2026, aus demselben Muster: die Anzeige stand eine
+   * Viertelstunde lang bei „4 h 06 min", dann endete der Lauf schlagartig mit
+   * „Schlange leer". Beides stimmte — sie beschrieben nur nicht dasselbe.
+   *
+   * 3. `offen` zaehlte ALLE unerledigten Posten, auch die VERTAGTEN.
+   *    `posten_holen` nimmt nur, was `faellig_ab <= now()` erfuellt (Migration
+   *    0021). An dem Abend lagen 1.778 FoodNotify-Posten auf morgen frueh —
+   *    dieser Lauf konnte sie per Definition nicht anfassen, die Schaetzung
+   *    rechnete sie trotzdem mit. Sie beantwortete „wie lange braucht die
+   *    Warteschlange" und nicht „wie lange laeuft DIESER Lauf noch".
+   *
+   * 4. Sie rechnete FoodNotify-Posten gegen LINAs Tagesbudget. Seit dem
+   *    02.08.2026 hat jeder Anbieter sein eigenes (10.500 gegen 40.000) — die
+   *    „4 h 06 min" waren exakt 1.795 / 10.500 × 24 h, eine Zahl ueber zwei
+   *    Systeme, von denen keins so arbeitet. Jetzt gilt je Anbieter sein
+   *    eigenes Budget, und es gewinnt der langsamere von beiden: sie teilen
+   *    sich EINE Schleife, also wartet der eine, solange der andere bremst.
+   *
+   * 5. Und derselbe Fehler noch einmal, eine Ebene tiefer: EIN gemitteltes
+   *    Tempo fuer beide Anbieter. Direkt nach dem Fix oben stand da wieder
+   *    „4 h 05 min" — diesmal aus dem Tempo-Term, weil die ersten 50 Posten
+   *    LINA waren (8 s je Posten, die Personalkosten allein 20 s) und diese
+   *    Zahl auf eine Schlange angewandt wurde, die zu 98 % aus FoodNotify
+   *    besteht. Dort sind es 1,2 s. Ein Sechstel der Wahrheit, mit derselben
+   *    Selbstsicherheit vorgetragen.
+   *
+   *    Gemessen wird deshalb je Anbieter, und geschaetzt wird als Summe:
+   *    LINA-Posten mal LINA-Tempo plus FoodNotify-Posten mal dessen Tempo.
+   *
+   *    UND WER NOCH NICHT DRANKAM, ERBT NICHTS. Der erste Anlauf lieh dem
+   *    ungemessenen Anbieter das Tempo des anderen — „eine geliehene Zahl
+   *    ist besser als keine". Das war falsch, und der naechste Lauf hat es
+   *    sofort vorgefuehrt: elf Minuten lang standen wieder „4 h 06 min" da,
+   *    weil FoodNotify (1.794 der 1.809 faelligen Posten) noch keinen
+   *    einzigen Posten gemessen hatte und LINAs 8 s erbte. Eine geliehene
+   *    Zahl ist eben KEINE Messung, und wo der ungemessene Anbieter die
+   *    Schlange stellt, ist sie nur eine Erfindung mit Nachkommastelle.
+   *    Hat ein Anbieter faellige Arbeit, aber keine eigene Messung, gibt es
+   *    gar keine Schaetzung — dieselbe Entscheidung wie oben unter 1.
+   *
+   * Was vertagt ist, verschwindet damit aus der Schaetzung — aber nicht aus
+   * dem Log: `vertagt` steht daneben. Die Zahl ist richtig, sie ist nur keine
+   * Restlaufzeit. Sonst sieht ein Lauf, der 1.778 Posten auf morgen schiebt,
+   * aus wie einer, der fertig ist.
+   *
+   * WAS DIE ZAHL NICHT KANN, UND ABSICHTLICH NICHT KANN: sie gilt fuer die
+   * Schlange, WIE SIE JETZT IST. Beim FoodNotify-Backfill reiht jede geholte
+   * Bestellseite ~25 Bestellungen mit je zwei Folgeposten nach — 1.724 offene
+   * Seiten sind also nicht 1.724, sondern eher 88.000 Aufrufe. „59 min" ist
+   * fuer den Inhalt der Schlange richtig und fuer den Backfill zu wenig.
+   *
+   * Das bleibt so. Die Folgeposten vorherzusagen hiesse, die Bestellungen je
+   * Seite zu schaetzen und gegen bereits geladene abzuziehen — eine Modell-
+   * annahme in einer Fortschrittsanzeige, also wieder eine erfundene Zahl,
+   * nur mit mehr Rechenschritten davor. Wer den Gesamtumfang wissen will,
+   * liest die offenen Seiten; wer wissen will, wann die Schlange leer ist,
+   * liest diese Zahl.
    */
-  let erstesEnde: number | null = null
-  const restschaetzung = (offen: number, n: number): string | null => {
-    if (erstesEnde === null || n < 2) return null
-    const jePosten = (Date.now() - erstesEnde) / (n - 1)
-    const nachTempo = offen * jePosten
-    const nachBudget = (offen / config.TAGESBUDGET) * 86_400_000
+  const fnBudget = fnGrenzen().tagesbudget
+  /**
+   * Je Anbieter: wie viele Posten gemessen wurden und wie lange sie zusammen
+   * gedauert haben. Gezaehlt wird der ABSTAND zwischen zwei Posten, nicht die
+   * Antwortzeit — die Taktpause gehoert zur Dauer, sie ist der groessere Teil.
+   * Der erste Posten hat keinen Vorgaenger und bleibt deshalb aussen vor.
+   */
+  const tempo = { lina: { n: 0, ms: 0 }, fn: { n: 0, ms: 0 } }
+  let letztesEnde: number | null = null
+  const jePosten = (art: 'lina' | 'fn'): number | null =>
+    tempo[art].n > 0 ? tempo[art].ms / tempo[art].n : null
+  const restschaetzung = (faellig: { lina: number; fn: number }): string | null => {
+    const jeLina = jePosten('lina'), jeFn = jePosten('fn')
+    // Arbeit ohne Messung: keine Zahl. Sie waere sonst die des anderen.
+    if (faellig.lina > 0 && jeLina === null) return null
+    if (faellig.fn > 0 && jeFn === null) return null
+    const nachTempo = faellig.lina * (jeLina ?? 0) + faellig.fn * (jeFn ?? 0)
+    const nachBudget = 86_400_000 * Math.max(
+      faellig.lina / config.TAGESBUDGET,
+      faellig.fn / fnBudget)
     return dauerLesbar(Math.max(nachTempo, nachBudget))
   }
 
   const fortschritt = async (endpunkt: string, von: string, zeilen: number | null, dauerMs?: number) => {
     const n = ok + keineDaten + fehler
-    if (erstesEnde === null) erstesEnde = Date.now()
+    const jetzt = Date.now()
+    if (letztesEnde !== null) {
+      const art = endpunkt.startsWith('fn:') ? 'fn' : 'lina'
+      tempo[art].n++
+      tempo[art].ms += jetzt - letztesEnde
+    }
+    letztesEnde = jetzt
     if (config.FORTSCHRITT_ALLE === 0 || n % config.FORTSCHRITT_ALLE !== 0) return
-    const r = await eine<{ offen: number }>(
-      `SELECT count(*)::int AS offen FROM sync.warteschlange WHERE erledigt_am IS NULL`)
+    /**
+     * `marke_key IS NULL` heisst LINA (Migration 0031) — dieselbe Weiche wie
+     * unten in der Schleife. Der Faelligkeitsfilter spiegelt `posten_holen`.
+     */
+    const r = await eine<{ lina: number; fn: number; vertagt: number }>(
+      `SELECT count(*) FILTER (WHERE marke_key IS NULL     AND faellig_ab <= now())::int AS lina,
+              count(*) FILTER (WHERE marke_key IS NOT NULL AND faellig_ab <= now())::int AS fn,
+              count(*) FILTER (WHERE faellig_ab > now())::int AS vertagt
+         FROM sync.warteschlange WHERE erledigt_am IS NULL`)
       .catch(() => null)
-    const offen = r ? Number(r.offen) : null
+    const faellig = r ? { lina: Number(r.lina), fn: Number(r.fn) } : null
     log.info('fortschritt', {
       endpunkt, von, zeilen, dauerMs,
-      imLauf: n, offen,
-      rest: offen ? restschaetzung(offen, n) : null,
+      imLauf: n,
+      offen: faellig ? faellig.lina + faellig.fn : null,
+      vertagt: r ? Number(r.vertagt) : null,
+      rest: faellig && faellig.lina + faellig.fn > 0 ? restschaetzung(faellig) : null,
     })
   }
 
@@ -370,7 +457,23 @@ async function workerLaufIntern(
         await schlaf(5_000)
         continue
       }
-      if (!posten?.posten_id) { notiz ??= 'Schlange leer'; break }
+      /**
+       * „Schlange leer" hiess bis zum 03.08.2026 auch dann so, wenn 1.778
+       * Posten offen und nur vertagt waren. Der Lauf endete korrekt, die
+       * Meldung log — nichts war leer, es war nur nichts faellig. Wer den
+       * Unterschied nicht sieht, sucht am naechsten Tag nach verlorenen Daten.
+       */
+      if (!posten?.posten_id) {
+        const w = await eine<{ vertagt: number; naechste: Date | null }>(
+          `SELECT count(*)::int AS vertagt, min(faellig_ab) AS naechste
+             FROM sync.warteschlange
+            WHERE erledigt_am IS NULL AND faellig_ab > now()`).catch(() => null)
+        const vertagt = w ? Number(w.vertagt) : 0
+        notiz ??= vertagt > 0
+          ? `nichts faellig — ${vertagt} Posten vertagt bis ${w?.naechste?.toISOString() ?? '?'}`
+          : 'Schlange leer'
+        break
+      }
       // Merken, damit ein Signal die Reservierung wieder lösen kann.
       aktuellerPosten = String(posten.posten_id)
 
@@ -525,6 +628,48 @@ async function workerLaufIntern(
        * nächsten Stundenlauf. Im laufenden Prozess verhindert zusätzlich
        * die Sperre je Marke im FnClient jeden weiteren Versuch.
        */
+      /**
+       * --- 403 sperrt eine RESSOURCE, nicht ein KONTO ---------------------
+       *
+       * Am 03.08.2026 gemessen: Kostenstelle 11805 antwortet dem
+       * Enchilada-Zugang mit 403, dieselbe Anmeldung holt 10059 und 10064
+       * unmittelbar danach fehlerfrei. FoodNotify betreibt in einem Mandanten
+       * auch Betriebe, die uns nicht gehoeren — 403 heisst dort „diese
+       * Kostenstelle nicht", nicht „dieser Zugang nicht".
+       *
+       * Behandelt wurde es trotzdem wie eine Kontosperre: 584 offene Posten
+       * der Marke lagen 24 Stunden still wegen EINER Kostenstelle. Das ist
+       * der teuerste Fehler dieser Art — ein einzelner fehlender Anspruch
+       * legt einen ganzen Backfill lahm.
+       *
+       * Jetzt ruht nur der Posten. 24 Stunden statt Aufgeben, weil ein
+       * Anspruch nachgetragen werden kann und ein Aufruf am Tag nichts
+       * kostet. `fehlerInFolge++` ist die Gegenprobe: sagt der Zugang
+       * WIRKLICH ueberall nein, stoppt der Lauf nach ABBRUCH_NACH_FEHLERN —
+       * dann liegt es am Konto und nicht an einer Kostenstelle.
+       *
+       * 429 bleibt marken-weit: „zu schnell" gilt fuer den Zugang, nicht
+       * fuer die Ressource.
+       */
+      if (res.art === 'gesperrt' && res.sperrArt === 'http_403' && quelle.art === 'fn') {
+        const bisWann = res.wartenBis
+          ?? new Date(Date.now() + config.SPERRE_PAUSE_STUNDEN * 3_600_000)
+        await query(
+          `UPDATE sync.warteschlange
+              SET in_arbeit_seit = NULL, versuche = greatest(0, versuche - 1),
+                  letzter_fehler = $2, faellig_ab = $1::timestamptz
+            WHERE posten_id = $3`,
+          [bisWann, res.fehler.slice(0, 2000), posten.posten_id])
+        await protokoll(laufId, epKey, posten, 'uebersprungen', res, quellClient, res.fehler)
+        uebersprungen++
+        fehlerInFolge++
+        log.warn('foodnotify 403 auf einer ressource — nur dieser posten ruht', {
+          marke: quelle.marke, endpunkt: epKey, parameter: posten.parameter,
+          fehlerInFolge, vertagtBis: bisWann,
+        })
+        continue
+      }
+
       if (res.art === 'gesperrt' && quelle.art === 'fn') {
         const stunden = res.sperrArt === 'anmeldung'
           ? config.SPERRE_ANMELDUNG_STUNDEN : config.SPERRE_PAUSE_STUNDEN

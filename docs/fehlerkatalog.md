@@ -1757,6 +1757,73 @@ eine Budgetgrenze ist eine gewollte Entscheidung und kein Zwischenfall.
    einzeln gesetztes `FN_TAKT_MIN_MS` muss gegen den *geerbten* Höchstwert
    geprüft werden, sonst entsteht still eine Spanne, die es nicht gibt.
 
+## Eine Restlaufzeit, die Arbeit mitzählt, die dieser Lauf nicht anfassen kann (03.08.2026)
+
+**Symptom.** Ein Lauf meldete eine Viertelstunde lang „rest: 4 h 06 min", die Zahl bewegte
+sich kaum — und dann endete er schlagartig nach elf Minuten mit `status: 'ok'`, `ok: 82`,
+`notiz: 'Schlange leer'`. Beides stimmte. Nur beschrieben sie nicht dasselbe.
+
+**Ursache — zwei Fehler übereinander.**
+
+1. `offen` zählte **alle** unerledigten Posten. `sync.posten_holen()` nimmt aber nur, was
+   `faellig_ab <= now()` erfüllt (Migration 0021). An dem Abend lagen 1.778
+   FoodNotify-Posten auf den Folgetag vertagt, weil deren Tagesbudget schon **vor** dem
+   Start erschöpft war (40.003 von 40.000). Dieser Lauf konnte sie per Definition nicht
+   anfassen — die Schätzung rechnete sie trotzdem mit.
+2. Die Budgetgrenze war `config.TAGESBUDGET`, also **LINAs**. Seit dem 02.08.2026 hat jeder
+   Anbieter sein eigenes (10.500 gegen 40.000). Die „4 h 06 min" waren exakt
+   `1.795 / 10.500 × 24 h`: FoodNotify-Posten, geteilt durch LINAs Tagesbudget. Eine Zahl
+   über zwei Systeme, von denen keines so arbeitet.
+
+Weil der Budget-Term den Tempo-Term überstieg, hing die Anzeige allein an einer Zahl, die
+sich je Posten um eins verringerte — daher die Unbeweglichkeit. Real zu tun hatte der Lauf
+82 LINA-Posten; nach elf Minuten war er fertig.
+
+**Und derselbe Fehler noch einmal, eine Ebene tiefer.** Nach dem Fix stand da wieder
+„4 h 05 min" — diesmal aus dem **Tempo**-Term. Der maß **ein** gemitteltes Tempo für beide
+Anbieter: die ersten 50 Posten des Laufs waren LINA (8 s je Posten, die Personalkosten
+allein 20 s), und diese Zahl wurde auf eine Schlange angewandt, die zu 98 % aus FoodNotify
+bestand — dort sind es 1,2 s. Ein Sechstel der Wahrheit, mit derselben Selbstsicherheit
+vorgetragen. Dass die Zahl beide Male fast gleich herauskam, ist Zufall und war das
+Verwirrendste daran.
+
+**Und ein drittes Mal, im Fix selbst.** Die erste Fassung des getrennten Tempos lieh einem
+Anbieter ohne eigene Messung das Tempo des anderen — „eine geliehene Zahl ist besser als
+keine". Der nächste Lauf führte es sofort vor: wieder elf Minuten „4 h 06 min", weil
+FoodNotify **1.794 der 1.809 fälligen Posten** stellte und noch keinen einzigen gemessen
+hatte. Eine geliehene Zahl ist eben keine Messung. Hat ein Anbieter fällige Arbeit, aber
+keine eigene Messung, gibt es jetzt **gar keine** Schätzung — dieselbe Entscheidung, die
+schon für den allerersten Posten galt.
+
+**Behebung.** `fortschritt` zählt jetzt getrennt nach Anbieter und **nur Fälliges**
+(`marke_key IS NULL` = LINA, wie in der Schleife). Der Budget-Term nimmt je Anbieter seine
+eigene Grenze und den langsameren von beiden — sie teilen sich eine Schleife. Der
+Tempo-Term misst ebenfalls je Anbieter und rechnet als Summe: LINA-Posten mal LINA-Tempo
+plus FoodNotify-Posten mal dessen Tempo. Was vertagt ist, steht als eigenes Feld `vertagt` daneben: die
+Zahl ist richtig, sie ist nur keine Restlaufzeit.
+
+Dazu heißt „Schlange leer" nur noch dann so, wenn die Schlange leer ist. Liegt Arbeit
+vertagt herum, sagt die Notiz das mit Anzahl und Datum.
+
+**Regeln.**
+
+1. **Eine Fortschrittsanzeige muss dieselbe Auswahl treffen wie der Arbeiter.** Wer
+   `faellig_ab` beim Holen filtert und beim Zählen nicht, zählt Arbeit, die es für diesen
+   Lauf nicht gibt. Der Filter gehört an beide Stellen oder an keine.
+2. **Getrennte Grenzen brauchen getrennte Rechnungen.** Als LINA und FoodNotify sich ein
+   Budget teilten, war eine Zahl richtig. Seit sie es nicht mehr tun, ist dieselbe Zahl
+   eine Vermischung — und sie fällt nicht auf, weil sie plausibel aussieht. Das gilt für
+   jede Grenze, die sich getrennt hat: Budget **und** Takt. Wer nur die eine nachzieht,
+   hat den Fehler halb behoben und merkt es an einer Zahl, die sich kaum bewegt hat.
+3. **Eine geliehene Zahl ist keine Messung.** Ein Rückfall auf einen fremden Messwert ist
+   dort vertretbar, wo er eine Kleinigkeit überbrückt — nicht dort, wo der ungemessene Teil
+   die Mehrheit stellt. Dann ist er eine Erfindung mit Nachkommastelle. Lieber kein Wert:
+   ein fehlendes Feld liest sich als „weiß ich noch nicht", eine falsche Zahl nicht.
+4. **Ein Lauf, der nichts Fälliges findet, ist nicht fertig.** „Leer" und „nichts fällig"
+   sehen im Log gleich aus und bedeuten das Gegenteil: einmal ist die Arbeit getan, einmal
+   liegt sie noch da. Wer den Unterschied nicht schreibt, sucht am nächsten Tag nach
+   verlorenen Daten.
+
 ## 4,44e-16 ist keine Menge — und riss eine ganze Bestellung mit (03.08.2026)
 
 **Symptom.** Vier `fn:bestellpositionen`-Posten hingen mit bis zu **neun** Versuchen im
@@ -1794,6 +1861,35 @@ Import, und die Position steht mit ihrer Menge weiterhin da.
 3. **Die Spaltenbreite ist eine Zusicherung, die der Transformer einhalten muss.**
    `numeric(14,6)` heißt „unter 10^8". Wer das nur in der Migration weiß und nicht im Code,
    erfährt es beim ersten echten Beleg.
+
+## Ein 403 auf einer Kostenstelle legte eine ganze Marke still (03.08.2026)
+
+**Symptom.** 584 offene FoodNotify-Posten der Marke Enchilada lagen 24 Stunden auf
+Wiedervorlage. Auslöser: **zwei** Aufrufe mit HTTP 403.
+
+**Ursache.** Der Client stuft 403 wie 429 als Sperre ein, und der Worker vertagt bei einer
+Sperre **alle** offenen Posten der Marke. Das ist für 429 richtig („zu schnell" gilt für den
+Zugang) und für 403 falsch: nachgemessen am 03.08.2026 antwortet Kostenstelle 11805 dem
+Enchilada-Zugang mit 403, während **dieselbe Anmeldung** 10059 und 10064 unmittelbar danach
+fehlerfrei liefert. FoodNotify betreibt in einem Mandanten auch Betriebe, die uns nicht
+gehören — 403 heißt dort „diese Kostenstelle nicht", nicht „dieser Zugang nicht".
+
+Ein einzelner fehlender Anspruch hielt damit einen ganzen Backfill an.
+
+**Behebung.** Ein 403 vertagt nur noch **seinen** Posten (24 h, nicht aufgeben: ein Anspruch
+kann nachgetragen werden, und ein Aufruf am Tag kostet nichts). Die Marke arbeitet weiter.
+Die Gegenprobe ist `fehlerInFolge++`: sagt der Zugang wirklich überall nein, stoppt der Lauf
+nach `ABBRUCH_NACH_FEHLERN` — dann liegt es am Konto und nicht an einer Kostenstelle.
+429 und Anmeldefehler bleiben marken-weit.
+
+**Regeln.**
+
+1. **403 und 429 sind verschiedene Antworten.** „Du darfst das nicht" gilt für eine
+   Ressource, „du bist zu schnell" für den Zugang. Wer beide gleich behandelt, macht aus
+   einer fehlenden Berechtigung einen Betriebsausfall.
+2. **Bevor eine Sperre auf viele Posten wirkt, muss die Gegenprobe im Code stehen.** Ob der
+   Zugang oder die Ressource gemeint ist, entscheidet der nächste Aufruf auf eine andere
+   Ressource — nicht die Vermutung beim Schreiben der Fehlerbehandlung.
 
 ## Eine Zeile, die in sich stimmt und trotzdem falsch ist (03.08.2026)
 
