@@ -12,6 +12,7 @@ import { workerLauf } from './sync/worker'
 import { nachfuellen } from './sync/nachfuellen'
 import { auswahllistenNachlauf } from './sync/auswahllisten'
 import { deckungsbeitragNachlauf } from './sync/deckungsbeitrag'
+import { roundTableNachlauf } from './sync/round_table'
 import { einkaufspreisNachlauf } from './sync/einkaufspreis'
 import { yextNachlauf } from './yext/nachlauf'
 
@@ -54,6 +55,12 @@ try {
   // sync/deckungsbeitrag.ts. Steht NACH den Auswahllisten, weil der Refresh
   // der längere von beiden ist — die Filterlisten sollen nicht darauf warten.
   await deckungsbeitragNachlauf()
+
+  // Gleiche Regeln: mart.round_table_monat und mart.round_table_trend sind
+  // seit Migration 0039 materialisiert. Steht direkt nach dem Import-Ende,
+  // damit die Urteile auf ①–③ nie älter sind als der letzte Lauf.
+  // Wirft nie, siehe Kopf von sync/round_table.ts.
+  await roundTableNachlauf()
 
   /**
    * Dritter Nachlauf: die Einkaufspreise gegen die Verteilung derselben
