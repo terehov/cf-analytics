@@ -1641,6 +1641,42 @@ Bereits eingereihte Posten wurden mit umgestellt.
    Erfolg. Nach dem Start eines Backfills gehört geprüft, ob die Felder
    gefüllt sind, die den Zweck tragen — nicht nur, ob Zeilen entstehen.
 
+## Ein Importer ohne Arbeit sieht aus wie einer, der fertig ist (02.08.2026)
+
+**Symptom.** Der Importer lief stündlich, fehlerfrei, ohne eine einzige
+Fehlermeldung. LINAs Umsatzdaten endeten trotzdem am 25.07. — acht Tage
+Rückstand, während im Log alles grün war.
+
+**Ursache.** Einreihen und Abarbeiten waren zwei getrennte Zeitpläne:
+`einreihen --taeglich` füllte die Warteschlange, `sync` leerte sie. Der
+erste lief seit dem 01.08. nicht mehr. Der zweite lief weiter, fand nichts
+zu tun und meldete genau das, was er immer meldet, wenn er fertig ist.
+
+**Aufgefallen ist es nur, weil jemand fragte**, ob auch LINA weiterläuft.
+Kein Wächter hätte angeschlagen: die Anzahl der Fehler war null, die
+Laufzeit normal, die Warteschlange leer — leer ist im Erfolgsfall genau
+das, was man sehen will.
+
+**Behebung.** `sync` füllt die Warteschlange jetzt zu Beginn jedes Laufs
+selbst (`src/sync/nachfuellen.ts`). Ein Zeitplan statt zweier, ein
+Ausfallpunkt statt zweier. Das Nachfüllen wirft nie — ein Fehler dabei darf
+das Abarbeiten nicht verhindern.
+
+**Regeln.**
+
+1. **Zwei Zeitpläne, die voneinander abhängen, sind ein Ausfall, der sich
+   als Erfolg meldet.** Wo der eine den anderen mit Arbeit versorgt,
+   gehören sie in denselben Prozess. Wer sie trennt, braucht einen
+   Wächter auf *Datenaktualität* — nicht auf Fehlerfreiheit.
+2. **„Nichts zu tun" und „nichts bekommen" sehen im Log identisch aus.**
+   Eine leere Warteschlange ist erst dann ein gutes Zeichen, wenn jemand
+   nachweislich versucht hat, sie zu füllen.
+3. **Was bei jedem Lauf passiert, muss idempotent sein — und zwar gegen
+   ERLEDIGTE Posten.** Der partielle Eindeutigkeitsindex greift nur bei
+   offenen. Momentaufnahmen prüfen deshalb ausdrücklich gegen alle Posten
+   des Zeitraums; Nachzügler-Tage sollen umgekehrt gerade nachwachsen.
+   Beide Fälle haben je einen Test, der genau das festhält.
+
 ## Die Attrappe bildete ein plausibleres Schema nach als die echte API (02.08.2026)
 
 **Symptom.** 13.027 Bestellpositionen in `core.bestellposition`, alle mit

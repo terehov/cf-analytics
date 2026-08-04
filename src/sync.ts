@@ -9,6 +9,7 @@ import { config, konfigZumLoggen } from './config'
 import { log } from './lib/log'
 import { pool } from './db/pool'
 import { workerLauf } from './sync/worker'
+import { nachfuellen } from './sync/nachfuellen'
 import { auswahllistenNachlauf } from './sync/auswahllisten'
 import { deckungsbeitragNachlauf } from './sync/deckungsbeitrag'
 import { einkaufspreisNachlauf } from './sync/einkaufspreis'
@@ -23,6 +24,20 @@ log.info('start', konfigZumLoggen())
 // geschlossen und nicht in workerLauf. Sonst liesse sich der Worker pro
 // Prozess nur genau einmal aufrufen.
 try {
+  /**
+   * VORLAUF: die Warteschlange selbst nachfüllen.
+   *
+   * Bis zum 02.08.2026 war das ein zweiter Schedule Job
+   * (`einreihen --taeglich`). Fiel er aus, lief dieser hier trotzdem,
+   * meldete „ok" und tat nichts — LINA stand acht Tage still, während
+   * der Importer fehlerfrei durchlief. Ein Importer ohne Arbeit sieht
+   * genauso aus wie einer, der fertig ist.
+   *
+   * Jetzt ein Zeitplan, ein Ausfallpunkt. `nachfuellen` wirft nie: ein
+   * Fehler beim Füllen darf das Leeren nicht verhindern.
+   */
+  await nachfuellen()
+
   const r = await workerLauf(ausloeser as any)
 
   // Nachlauf: die Auswahllisten der Metabase-Filter aktuell halten. Steht

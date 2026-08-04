@@ -188,9 +188,10 @@ sync.ts / einreihen.ts Einstiegspunkte
 bun install
 bun run migrate                              # Schema anwenden (idempotent)
 bun test                                     # 88 Tests (E2E einzeln, siehe Kasten unten)
-bun run einreihen --taeglich                 # gestrigen Geschäftstag einreihen
+bun run sync                                 # nachfüllen UND abarbeiten
+bun run einreihen --taeglich                 # nur nachfüllen (sync macht das selbst)
 bun run einreihen --historie --von 2018-01-01 --bis 2026-07-24
-bun run sync                                 # einen Lauf abarbeiten
+bun run einreihen --foodnotify               # FoodNotify-Backfill starten
 bun run health                               # Health-Endpunkt (Container-CMD)
 curl localhost:3000/health                     # lebt der Container?
 curl localhost:3000/status                     # muss jemand hinsehen? (503 = ja)
@@ -207,12 +208,24 @@ Für den Ende-zu-Ende-Test zusätzlich `TEST_DATABASE_URL` setzen — ohne die V
 
 Dokploys Schedule Jobs führen Kommandos per `docker exec` in einem **laufenden** Container aus; sie starten keinen neuen. Deshalb hält `health.ts` den Container oben, und der Job ruft `bun run sync` als eigenen Prozess auf. Jeder Lauf startet damit frisch, und man bekommt pro Lauf einen Log-Eintrag samt manueller Auslösung.
 
-Zwei Schedule Jobs:
+**Ein** Schedule Job:
 
 ```
-täglich  06:30   bun run einreihen --taeglich
 stündlich       bun run sync
 ```
+
+`sync` füllt die Warteschlange zu Beginn jedes Laufs selbst (`src/sync/nachfuellen.ts`):
+LINAs Nachzügler-Fenster, Jahresberichte, monatliche Momentaufnahmen und FoodNotifys
+jeweils letzte Bestellseite je Kostenstelle.
+
+Bis zum 02.08.2026 war das Nachfüllen ein zweiter Job. Fiel er aus, lief `sync`
+munter weiter, meldete „ok" und tat nichts — LINA stand acht Tage still, während
+der Importer fehlerfrei durchlief. **Ein Importer ohne Arbeit sieht genauso aus wie
+einer, der fertig ist.** Ein Zeitplan, ein Ausfallpunkt.
+
+Die beiden **Backfills** (`--historie`, `--foodnotify`) bleiben ausdrücklich
+Handarbeit: sie stellen Zehntausende Posten ein, und das soll eine Entscheidung
+sein, kein Nebeneffekt eines Neustarts.
 
 Der Sync läuft **tagsüber** (Fenster 7–23 Uhr, konfigurierbar). Das ist Absicht: ein einzelner Client um drei Uhr früh ist im Log ein Ausreißer, dieselben Anfragen im Tagesverkehr von 141 Betrieben fallen nicht auf.
 
