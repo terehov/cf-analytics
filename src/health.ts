@@ -25,8 +25,14 @@ type Zustand = {
 }
 
 async function erheben(): Promise<Zustand> {
+  // ORDER BY steht bewusst auf `lauf_id DESC` OHNE Alias-Bezug: hiesse die
+  // Ausgabespalte ebenfalls `lauf_id`, löste Postgres den ORDER BY gegen den
+  // TEXT auf und sortierte alphabetisch — 9 vor 71. Genau das war bis zum
+  // 04.08.2026 der Fall und liess /health monatelang einen falschen „letzten
+  // Lauf" melden (und damit ein falsches `veraltet`).
   const lauf = await eine<any>(
-    `SELECT lauf_id::text AS lauf_id, status, beendet_am FROM sync.lauf ORDER BY lauf_id DESC LIMIT 1`)
+    `SELECT lauf_id::text AS lauf_id_text, status, beendet_am
+       FROM sync.lauf ORDER BY lauf_id DESC LIMIT 1`)
   const abw = await eine<any>(
     `SELECT count(*)::int AS n FROM sync.schema_abweichung WHERE quittiert_am IS NULL`)
   const pausiert = await eine<any>(
@@ -42,7 +48,7 @@ async function erheben(): Promise<Zustand> {
   return {
     status: !lauf ? 'unbekannt' : veraltet ? 'veraltet' : 'ok',
     letzterLauf: lauf
-      ? { laufId: lauf.lauf_id, status: lauf.status, beendetAm: lauf.beendet_am?.toISOString?.() ?? null }
+      ? { laufId: lauf.lauf_id_text, status: lauf.status, beendetAm: lauf.beendet_am?.toISOString?.() ?? null }
       : null,
     offeneAbweichungen: abw?.n ?? 0,
     pausierteKombinationen: pausiert?.n ?? 0,
