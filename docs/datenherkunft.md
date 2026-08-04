@@ -314,7 +314,13 @@ von 131 Betrieben gebucht, für Mai 59.
 holt sie sich als „jüngsten Stand" zurück — und 0 % Personalkosten ist grün.
 
 **Der POS-Artikelumsatz ist NICHT das BWA-Umsatzkonto.** Die beiden weichen systematisch ab. Wer
-sie vergleicht, liest vorher den Kommentar an `mart.pruefung_wareneinsatz`.
+sie vergleicht, liest vorher den Kommentar an `mart.deckungsbeitrag_warengruppe`.
+
+**Und `fixer_we` ist dafür ein Musterfall:** LINA liefert dort `0.0000` statt `NULL`, weshalb
+ein Filter auf `IS NOT NULL` in `mart.pruefung_wareneinsatz` jahrelang 100 % Abdeckung
+behauptete, wo 48 % der Betriebsmonate gar keinen Ansatz hatten. Die Sicht ist seit Migration
+`0029` stillgelegt — siehe `fehlerkatalog.md`. Es ist derselbe Fehler wie zwei Absätze weiter
+oben bei den Personalkosten, nur an anderer Stelle.
 
 ---
 

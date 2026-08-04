@@ -347,3 +347,55 @@ Zusammenhang sähe. Auch das ist getestet.
 beantwortet `mart.deckungsbeitrag_stand`. Ohne sie wäre die einzige ehrliche Antwort ein
 Achselzucken — und eine veraltete Zahl, die aussieht wie eine frische, ist genau die Sorte
 Fehler, die sich laut `fehlerkatalog.md` nie von selbst meldet.
+
+---
+
+## Eine Prüfsicht, die nicht prüfen kann, wird stillgelegt statt repariert (01.08.2026)
+
+`mart.pruefung_wareneinsatz` ist mit Migration `0029` gelöscht — als `DROP VIEW`,
+nicht auskommentiert. Zwei Gründe, jeder für sich ausreichend.
+
+**Erstens, die Herkunft.** Der Sollwert stammt aus `core.artikel.fixer_we`, und
+das gilt als „Ergebnis der LINA-Rezepturkalkulation". Seit der Vorgabe vom
+27.07.2026 steht fest: LINAs Warenwirtschaft enthält Demodaten, die Rezepturen
+werden in FoodNotify gepflegt. Damit ist unklar, was `fixer_we` überhaupt ist.
+Eine Prüfsicht, deren Sollwert niemand verantworten kann, prüft nichts.
+
+**Zweitens, und schwerer: sie hat nie ausgelöst.** Ihr eigener Wächter
+`abdeckung_pct` filterte auf `fixer_we IS NOT NULL`, doch LINA liefert `0.0000`
+statt `NULL` — in 591.464 Zeilen kein einziges `NULL`. Der Wert stand deshalb
+ausnahmslos auf 100, während 48 % aller Betriebsmonate gar keinen Ansatz hatten
+und ihre Lücke in voller Höhe des BWA-Wareneinsatzes ausgewiesen wurde. Details
+im `fehlerkatalog.md`.
+
+**Warum nicht einfach reparieren.** Der Filter ist eine Zeile
+(`fixer_we > 0`). Dann meldete die Sicht korrekt, dass sie für die Hälfte aller
+Betriebsmonate nichts sagen kann — und lieferte für die andere Hälfte Zahlen,
+deren Herkunft weiterhin ungeklärt ist. **Eine Prüfsicht, die zur Hälfte
+schweigt und zur anderen Hälfte unbelegte Werte liefert, ist schlechter als
+keine: sie sieht aus wie eine Antwort.**
+
+Deshalb `DROP` statt auskommentieren. Eine Sicht, die noch antwortet, wird
+benutzt — von Metabase, von einem Kollegen in Postico, von einem späteren Agent,
+der den Kommentar nicht liest. Die Metabase-Karte `wa_we_pruefung` und der
+Abschnitt auf der Warenwirtschaftsseite sind mit entfernt.
+
+**Was mitgenommen wurde, ohne stillgelegt zu werden.** `abdeckung_pct` in
+`mart.deckungsbeitrag_warengruppe` hatte denselben Defekt, ist dort aber nicht
+tragend — die Sicht dient der Umsatzgliederung. Sie ist auf `fixer_we > 0`
+korrigiert und zeigt jetzt 79 % Durchschnitt statt 100. Nicht stilllegen, aber
+auch nicht mit einer Kennzahl weiterlaufen lassen, die falsche Sicherheit
+ausstrahlt.
+
+**Was an die Stelle tritt.** Stufe 2.4 aus `docs/plan-foodnotify.md`: der
+theoretische Wareneinsatz aus FoodNotifys Zutatenkosten, verknüpft über die am
+01.08.2026 gefundene POS-Brücke (`pos_artikel.plu = core.artikel.artikelnummer`,
+belegt in `docs/foodnotify-0-1-nummernraum.md`). Dann mit dem Bar/Küche-Split,
+den die alte Sicht nie bilden konnte, weil die Hauptsparte am Umsatzbericht
+hängt und nicht am Artikel.
+
+**Bis dahin gilt:** keine Entscheidung auf dieser Rechnung aufbauen. Das ist
+kein Verlust — die Zahlen waren ohnehin keine.
+
+---
+

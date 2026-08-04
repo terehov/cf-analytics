@@ -1479,3 +1479,70 @@ teilweise hinterlegten Monat still falsche Zahlen ergeben.
 
 **Offen geblieben.** `pf_karteileichen` (23,9 s) auf der Portfolio-Seite ist unverändert. Sie
 lag außerhalb dessen, was hier beauftragt war.
+
+---
+
+## Ein Filter auf `IS NOT NULL`, wo die Quelle `0` liefert (01.08.2026)
+
+**Der Wächter, der nie ausgelöst hat.**
+
+`mart.pruefung_wareneinsatz` trug seit `0006` eine ausdrückliche Warnung in ihrem
+Kommentar: *„abdeckung_pct sagt, welcher Anteil des Artikelumsatzes überhaupt einen
+hinterlegten Ansatz hat. UNTER ETWA 90 PROZENT IST DER VERGLEICH NICHT
+AUSSAGEKRÄFTIG."* Die Übersichtssicht zählte die Fälle darunter als Arbeitsliste.
+
+Gemessen am 01.08.2026: **5.068 Zeilen, davon 0 unter 90 %, Durchschnitt 100,0.**
+
+Kein einziger Fall — über Jahre. Der Grund stand in der Aggregation:
+
+```sql
+sum(umsatz_netto) FILTER (WHERE fixer_we IS NOT NULL)
+```
+
+**`fixer_we` ist nie `NULL`.** LINA liefert `0.0000`. In `core.artikel_stand`:
+591.464 Zeilen, davon **0 mit `NULL`**, 574.254 mit dem Wert `0` (97,1 %), nur
+17.210 positiv. Der Filter griff also nie, `umsatz_mit_we` war identisch mit
+`umsatz_netto_pos`, und `abdeckung_pct` stand per Konstruktion auf 100.
+
+**Was das anrichtete.** 2.590 der 5.364 Betrieb-Monat-Kombinationen (48 %) haben
+einen theoretischen Wareneinsatz von exakt null. Die Sicht wies deren Lücke in
+voller Höhe des BWA-Wareneinsatzes aus — und meldete daneben 100 % Abdeckung:
+
+```
+BS Bier & Speisen Gastro GmbH   2023-05   Lücke 235.900,27 €   Abdeckung 100 %
+Wirtshaus am Schlossplatz GmbH  2023-12   Lücke 197.452,41 €   Abdeckung 100 %
+```
+
+Das sind keine Schwundwerte. Das ist ein **fehlender Ansatz, der als Schwund
+gelesen wird** — genau der Fehler, vor dem der Kommentar warnte. Unbemerkt, weil
+der Wächter selbst defekt war.
+
+**Der Befund lag schon im Katalog, ungedeutet.** Der Eintrag darüber notiert, die
+Werte seien „zufällig nur `NULL` oder `100`, kein einziger Teilwert". Das war kein
+Zufall, sondern die Signatur des Fehlers — eine Verteilung ohne Zwischenwerte
+entsteht nicht durch Daten, sondern durch eine Bedingung, die immer oder nie
+greift. Die Beobachtung war da; sie wurde als Kuriosität abgelegt statt als Frage.
+
+**Behoben in `0029`:** `FILTER (WHERE fixer_we > 0)`. Seither meldet
+`mart.deckungsbeitrag_warengruppe` bei 173.952 Zeilen **25.608 unter 90 %** und
+109.565 ganz ohne Ansatz, Durchschnitt 79,0 %. `mart.pruefung_wareneinsatz` ist
+im selben Zug stillgelegt (Stufe 0.3 aus `docs/plan-foodnotify.md`) — reparieren
+allein hätte sie nur ehrlich schweigen lassen, die Herkunft von `fixer_we` bleibt
+ungeklärt.
+
+**Drei Regeln.**
+
+1. **`IS NOT NULL` ist keine Prüfung auf „vorhanden".** Fremdsysteme liefern
+   Abwesenheit als `0`, `''`, `'-'` oder `1970-01-01`. Wer auf `NULL` filtert,
+   muss belegen, dass die Quelle `NULL` überhaupt schreibt — sonst prüft er nichts.
+   Ein `count(*) FILTER (WHERE x IS NULL)` gegen die Rohtabelle kostet Sekunden.
+2. **Ein Wächter, der immer grün zeigt, ist schlimmer als keiner.** Er erzeugt
+   Vertrauen statt Aufmerksamkeit. **Jede Warnschwelle braucht einen Testfall, der
+   sie auslöst** — sonst ist unbewiesen, dass sie überhaupt auslösen kann.
+   Der Test in `e2e.test.ts` prüft deshalb die Ursache, nicht das Symptom:
+   solange `fixer_we` nie `NULL` ist, darf keine Sicht auf `IS NOT NULL` filtern.
+3. **Eine Verteilung ohne Zwischenwerte ist ein Befund, keine Kuriosität.** Nur
+   `NULL` und `100`, nie `73` — das ist kein Datenmuster, sondern eine Bedingung,
+   die nicht diskriminiert. Wer so etwas notiert, hat den Fehler schon gesehen und
+   muss ihn nur noch als solchen lesen.
+

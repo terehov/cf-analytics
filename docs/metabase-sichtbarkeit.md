@@ -55,7 +55,7 @@ Ergebnis liefert, und bringt die Namen schon mit.
 | `betrieb_ohne_lina_id` | Arbeitsliste — **Erwartung: leer** |
 | `datenstand` | Je Betrieb: bis wann Umsatz, bis wann BWA. Vor jeder Auswertung |
 | `standort`, `standort_fehlend` | Grundlage der Karte, derzeit leer (siehe unten) |
-| `pruefung_umsatz`, `pruefung_bon`, `pruefung_wareneinsatz`, `pruefung_uebersicht` | Gegenrechnungen gegen LINAs Aggregate |
+| `pruefung_umsatz`, `pruefung_bon`, `pruefung_uebersicht` | Gegenrechnungen gegen LINAs Aggregate. `pruefung_wareneinsatz` ist seit `0029` stillgelegt |
 | `sync_status`, `backfill_fortschritt` | Läuft der Import? |
 | `regelwerk` | Auswahlliste für den Regelwerk-Dropdown |
 | `import_gesamt` | **Importüberwachung.** Eine Zeile: Fortschritt, Tempo, Restzeit, Sperre |

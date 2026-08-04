@@ -294,9 +294,11 @@ Zwei Dinge folgen daraus:
   (`src/sync/deckungsbeitrag.ts`). Wie alt genau, steht in `mart.deckungsbeitrag_stand` —
   diese Frage soll beantwortbar sein, ohne jemanden zu fragen.
 * **Wer auf ein großes Aggregat aus `artikelverkauf` stößt, das keinen Zeitfilter haben
-  kann, setzt darauf auf statt auf die Rohsicht.** `mart.pruefung_wareneinsatz` ist der
-  Fall: die Karte dazu hat bewusst keinen Zeitraumfilter, kann also nie prunen. Über die
-  materialisierte Sicht fällt sie von 61,7 s auf 0,04 s bei identischem Ergebnis.
+  kann, setzt darauf auf statt auf die Rohsicht.** Der Musterfall war
+  `mart.pruefung_wareneinsatz`: keine Zeitraumfilterung möglich, also nie Pruning — über
+  die materialisierte Sicht fiel sie von 61,7 s auf 0,04 s bei identischem Ergebnis.
+  (Die Sicht selbst ist seit Migration `0029` stillgelegt, aus fachlichen Gründen; das
+  Muster gilt unverändert.)
 
 Von Hand auffrischen:
 

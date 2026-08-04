@@ -158,9 +158,36 @@ lauf('Ende-zu-Ende', () => {
     // Umsatzbericht und Artikelbericht stammen aus verschiedenen Beispielen und
     // widersprechen sich zwangsläufig. Geprüft wird, dass die Sichten laufen —
     // ein Tippfehler im SQL fällt sonst erst in Postico auf.
+    // Seit Migration 0029 zwei statt drei Zeilen: die Wareneinsatzpruefung
+    // ist stillgelegt. Sie hat nie ausgeloest, weil ihr Filter auf
+    // IS NOT NULL prueft und fixer_we nie NULL ist, sondern 0.
     const { rows } = await db.query(`SELECT * FROM mart.pruefung_uebersicht`)
-    expect(rows).toHaveLength(3)
-    await db.query(`SELECT * FROM mart.pruefung_wareneinsatz LIMIT 1`)
+    expect(rows).toHaveLength(2)
+  })
+
+  /**
+   * Der Waechter, der 0029 ausgeloest hat.
+   *
+   * `abdeckung_pct` filterte auf `fixer_we IS NOT NULL`. LINA liefert
+   * aber 0.0000 statt NULL — gemessen an core.artikel_stand: 591.464
+   * Zeilen, davon 0 mit NULL. Der Filter griff nie, die Spalte stand
+   * ausnahmslos auf 100, und 2.590 von 5.364 Betriebsmonaten wiesen
+   * eine Luecke in voller Hoehe des BWA-Wareneinsatzes aus, ohne dass
+   * es jemandem auffiel.
+   *
+   * Geprueft wird die Ursache, nicht das Symptom: solange fixer_we
+   * niemals NULL ist, darf kein Filter auf IS NOT NULL eine Abdeckung
+   * behaupten.
+   */
+  test('fixer_we ist nie NULL — Abdeckung darf nicht auf IS NOT NULL filtern', async () => {
+    const { rows: [{ ist_null }] } = await db.query(`
+      SELECT count(*) FILTER (WHERE fixer_we IS NULL)::int AS ist_null
+        FROM core.artikel_stand`)
+    expect(ist_null).toBe(0)
+
+    const { rows: [{ def }] } = await db.query(
+      `SELECT pg_get_viewdef('mart.deckungsbeitrag_warengruppe'::regclass, true) AS def`)
+    expect(def).not.toContain('fixer_we IS NOT NULL')
   })
 
   test('die Drosselung ist im Nachhinein prüfbar', async () => {
