@@ -944,6 +944,43 @@ SELECT je.betrieb                                       AS "Betrieb",
  GROUP BY je.betrieb
  ORDER BY round(100 * max(t.einkauf) / nullif(sum(je.einkauf), 0), 1) DESC NULLS LAST`,
   },
+  {
+    // NUR BEI WILMA WUNDER BELASTBAR: siehe migrations/0044_inventur.sql
+    // und 0045_mart_inventur_und_beleg.sql. Die anderen drei Marken haben
+    // zu wenige (Aposto, davon storniert bei Deutsche Konzepte fast alle),
+    // um daraus eine Schwundaussage abzuleiten -- die Karte zeigt sie
+    // trotzdem, mit demselben Vorbehalt wie in der Beschreibung.
+    schluessel: 'wa_inventur_schwund',
+    name: 'Bewerteter Schwund aus Inventuren',
+    beschreibung:
+      'Sollbestand gegen tatsächlich gezählten Bestand aus echten Inventuren, in Euro '
+      + 'bewertet. NUR BEI WILMA WUNDER BELASTBAR: nur dort gibt es genug Zählungen für eine '
+      + 'Aussage — bei den anderen drei Marken sind es zu wenige, teils überwiegend '
+      + 'storniert, um daraus einen Schwundwert abzuleiten. Stornierte Inventuren zählen '
+      + 'nicht mit, noch nicht signierte ebenfalls nicht — „davon signiert" zeigt, wie '
+      + 'tragfähig die Zahl je Betrieb ist. Bleibt die Liste leer, sind noch keine Inventuren '
+      + 'geladen.',
+    anzeige: 'table',
+    parameter: [MARKE, BETRIEB],
+    sql: `
+SELECT betrieb                    AS "Betrieb",
+       marke                      AS "Marke",
+       sum(inventuren)            AS "Inventuren",
+       sum(inventuren_signiert)   AS "davon signiert",
+       round(sum(soll_eur), 2)     AS "Soll (bewertet)",
+       round(sum(gezaehlt_eur), 2) AS "Gezählt (bewertet)",
+       round(sum(schwund_eur), 2)  AS "Schwund €",
+       CASE WHEN sum(soll_eur) > 0
+            THEN round(100 * sum(schwund_eur) / sum(soll_eur), 2)
+       END                        AS "Schwund %"
+  FROM mart.inventur_schwund
+ WHERE 1 = 1
+   [[AND marke = {{marke}}]]
+   [[AND betrieb = {{betrieb}}]]
+ GROUP BY betrieb, marke
+HAVING sum(inventuren_signiert) > 0
+ ORDER BY sum(schwund_eur) DESC NULLS LAST`,
+  },
 
   // ===================================================================
   // BWA

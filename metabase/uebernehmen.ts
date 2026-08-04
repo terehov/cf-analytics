@@ -338,6 +338,31 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
             + 'neben den Ampeln desselben Monats steht.',
   },
 
+  // --- Belege und Inventuren: eigene Zeitlogik statt Stichmonat -------------
+  // Eine Belegliste ist kein Monatswert wie die sechs Ampeln -- sie liest
+  // bereits den Zeitraumfilter ueber einen Feldfilter auf bestelldatum. Ein
+  // zusaetzlicher Stichmonat waere ein zweiter, widersprechender Zeitfilter
+  // auf derselben Liste.
+  dd_betrieb_bestellungen: {
+    monat: 'Belegliste mit eigenem Zeitraumfilter (Feldfilter auf bestelldatum). '
+         + 'Ein zusaetzlicher Stichmonat waere ein zweiter, widersprechender '
+         + 'Zeitfilter auf derselben Liste.',
+  },
+  // Inventuren sind seltene Ereignisse -- bei Wilma Wunder rund 275 ueber
+  // mehrere Jahre, bei den anderen drei Marken einstellig (core.inventur,
+  // Migration 0044). Ein Drei-Monats-Fenster liesse die Liste fast immer
+  // leer erscheinen und saehe aus wie "keine Inventuren", wo in Wahrheit nur
+  // keine im Fenster liegen. Die Karte zeigt deshalb bewusst ALLE Inventuren
+  // des Betriebs, neueste zuerst -- wie dd_betrieb_massnahmen es fuer offene
+  // Massnahmen schon tut.
+  dd_betrieb_inventur: {
+    monat: 'Zeigt alle Inventuren des Betriebs, nicht die eines Stichmonats -- '
+         + 'bei seltenen Zaehlungen liesse ein Monat die Liste fast immer leer '
+         + 'erscheinen.',
+    zeitraum: 'ebenso -- ein Drei-Monats-Fenster traefe die meisten Inventuren '
+             + 'gar nicht.',
+  },
+
   // --- Einkauf: die drei Sichten kennen keinen Betrieb ----------------------
   // FoodNotify verhandelt Preise je MARKE, nicht je Haus. mart.einkauf_ladestand,
   // mart.einkaufspreis_monat und mart.einkaufspreis_veraenderung fuehren

@@ -328,6 +328,21 @@ export const dashboards: Dashboard[] = [
       { teile: [{ karte: 'dd_betrieb_bwa',
         klick: [{ ziel: 'db_bwa', uebergabe: {} }] }] },
       ] },
+      // EIGENER REITER statt Anhaengsel an "Personal · Ware · BWA": die
+      // Karten dort sind verdichtete Kennzahlen (Quoten, Rangfolgen,
+      // Zeitreihen); Belegliste und Inventurliste sind Rohlisten wie
+      // "Maßnahmen & Datenstand" nebenan -- selbe Kategorie, eigenes
+      // Fachthema. Ein Anhaengsel haette die Ware-Reihe auf sechs Karten
+      // gestreckt und die beiden neuen Listen unter dem Artikelverkauf
+      // begraben, obwohl "Bestellungen" und "Ware" fachlich verschiedene
+      // Fragen sind (was wurde verkauft, gegen was wurde eingekauft).
+      { name: 'Einkauf & Inventur', reihen: [
+      { teile: [{ text: '## Einkauf und Inventur\n\nBelege und Zählungen dieses Betriebs. Storno- und Signierkennzeichen stehen jeweils in einer eigenen Spalte, nicht als stille Kürzung.' }] },
+      { teile: [{ karte: 'dd_betrieb_bestellungen', hoehe: 11,
+        klick: [{ ziel: 'db_einkauf', uebergabe: {} }] }] },
+      { teile: [{ karte: 'dd_betrieb_inventur', hoehe: 11,
+        klick: [{ ziel: 'db_einkauf', uebergabe: {} }] }] },
+      ] },
       { name: 'Maßnahmen & Datenstand', reihen: [
       { teile: [{ text: '## Maßnahmen und Datenstand' }] },
       { teile: [{ karte: 'dd_betrieb_massnahmen' }] },
@@ -784,6 +799,15 @@ export const dashboards: Dashboard[] = [
       // Die Pruefliste ganz unten, aber sichtbar: eine ausgeschlossene
       // Position, die nirgends auftaucht, ist eine stille Kuerzung.
       { teile: [{ karte: 'wa_einkauf_pruefung', hoehe: 10 }] },
+      // Eigener Abschnitt statt Einreihung neben den Preiskarten: der
+      // Vorbehalt (nur Wilma Wunder belastbar) braucht eine eigene
+      // Textkachel, sonst liest jemand die Rangliste als flaechige
+      // Marken-Aussage -- genau der Fehlschluss, vor dem die
+      // Kartenbeschreibung schon warnt, aber eine Ueberschrift auf der
+      // Seite selbst sieht niemand ueber.
+      { teile: [{ text: '## Inventur und Schwund\n\n**Nur bei Wilma Wunder belastbar** — nur dort gibt es genug echte Inventuren für eine Aussage. Bei den anderen drei Marken sind es zu wenige, um daraus einen Schwundwert für die ganze Marke abzuleiten. Stornierte und noch nicht signierte Zählungen zählen nicht mit.' }] },
+      { teile: [{ karte: 'wa_inventur_schwund', hoehe: 11,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
     ],
   },
 

@@ -823,6 +823,76 @@ SELECT d.betrieb                  AS "Betrieb",
  WHERE 1 = 1
    [[AND d.betrieb = {{betrieb}}]]`,
   },
+  {
+    schluessel: 'dd_betrieb_bestellungen',
+    name: 'Betrieb — Bestellungen',
+    beschreibung:
+      'Die Bestellungen dieses Betriebs, neueste zuerst — Datum, Lieferant, Anzahl '
+      + 'Positionen und Summe. Stornierte Bestellungen bleiben in der Liste stehen, sind aber '
+      + 'als solche markiert: sie wurden zurückgenommen und zählen in keiner anderen '
+      + 'Auswertung mehr mit.',
+    anzeige: 'table',
+    parameter: [P_BETRIEB, P_ZEITRAUM],
+    // OHNE ALIAS: {{zeitraum}} ist ein Feldfilter auf mart.einkauf_beleg.
+    // Metabase baut daraus "einkauf_beleg.bestelldatum BETWEEN ...", und
+    // unter einem Alias waere dieser Name nicht mehr gueltig -- derselbe
+    // Fehler wie bei dd_betrieb_bwa (siehe Kommentar dort).
+    sql: `
+SELECT bestelldatum                                   AS "Datum",
+       lieferdatum                                     AS "Lieferdatum",
+       lieferant                                        AS "Lieferant",
+       positionen                                       AS "Positionen",
+       summe                                             AS "Summe",
+       CASE WHEN storniert THEN 'storniert' ELSE '' END AS "Storno",
+       beleg_nummer                                      AS "Beleg-Nr."
+  FROM mart.einkauf_beleg
+ WHERE 1 = 1
+   [[AND betrieb = {{betrieb}}]]
+   [[AND {{zeitraum}}]]
+ ORDER BY bestelldatum DESC
+ LIMIT 500`,
+    template_tag_dimension: { zeitraum: ['mart', 'einkauf_beleg', 'bestelldatum'] },
+    visualisierung: {
+      column_settings: {
+        '["name","Summe"]': { number_style: 'currency', currency: 'EUR', currency_style: 'symbol', decimals: 2 },
+      },
+    },
+  },
+  {
+    schluessel: 'dd_betrieb_inventur',
+    name: 'Betrieb — Inventuren',
+    beschreibung:
+      'Inventuren dieses Betriebs mit bewertetem Soll- und Zählbestand sowie dem daraus '
+      + 'errechneten Schwund in Euro. Eine noch nicht signierte Zählung ist als solche '
+      + 'gekennzeichnet — ihr Wert ist ein Zwischenstand, kein Ergebnis. Bleibt die Liste '
+      + 'leer, heißt das „noch keine Inventuren erfasst": die Zählungen werden von Hand '
+      + 'nachgetragen, nicht laufend importiert. Eine belastbare Schwundaussage liefert das '
+      + 'derzeit praktisch nur bei Wilma Wunder — bei den übrigen Marken gibt es zu wenige '
+      + 'Zählungen dafür.',
+    anzeige: 'table',
+    parameter: [P_BETRIEB],
+    sql: `
+SELECT datum                                              AS "Datum",
+       art                                                 AS "Art",
+       CASE WHEN storniert THEN 'storniert'
+            WHEN signiert  THEN 'signiert'
+            ELSE '… nicht signiert' END                    AS "Status",
+       positionen_geladen                                  AS "Positionen",
+       soll_bewertet                                        AS "Soll (bewertet)",
+       gezaehlt_bewertet                                    AS "Gezählt (bewertet)",
+       schwund_eur                                          AS "Schwund €"
+  FROM mart.inventur
+ WHERE 1 = 1
+   [[AND betrieb = {{betrieb}}]]
+ ORDER BY datum DESC NULLS LAST`,
+    visualisierung: {
+      column_settings: {
+        '["name","Soll (bewertet)"]': { number_style: 'currency', currency: 'EUR', currency_style: 'symbol', decimals: 2 },
+        '["name","Gezählt (bewertet)"]': { number_style: 'currency', currency: 'EUR', currency_style: 'symbol', decimals: 2 },
+        '["name","Schwund €"]': { number_style: 'currency', currency: 'EUR', currency_style: 'symbol', decimals: 2 },
+      },
+    },
+  },
 
   // ===================================================================
   // Zeitraumvergleich
