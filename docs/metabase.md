@@ -51,7 +51,9 @@ stellen: Admin → Tabellenmetadaten → Schema `core` → Sichtbarkeit.
 | Stoßzeiten, Tagesverlauf | `mart.umsatz_stunde`, `mart.umsatz_zeitzone` |
 | Artikel, Renner und Penner, Deckungsbeitrag | `mart.artikelverkauf` |
 | Sortiment nach Warengruppe | `mart.deckungsbeitrag_warengruppe` |
-| Einkaufspreise über die Zeit | `mart.preisentwicklung_ware` |
+| Einkaufspreise über die Zeit, echte Belegpreise | `mart.einkaufspreis_monat` — löst das stillgelegte `preisentwicklung_ware` ab |
+| Konkrete Bestellungen je Betrieb, inklusive Stornos | `mart.einkauf_beleg` — eine Zeile je Bestellung, `storniert` kennzeichnet statt auszublenden |
+| Inventuren und bewerteter Schwund | `mart.inventur` (je Inventur), `mart.inventur_schwund` (je Betrieb und Monat) — belastbar praktisch nur bei Wilma Wunder, siehe Migration `0044`/`0045`. Aktuell leer: der Backfill ist eine bewusste manuelle Entscheidung |
 | Was bringen die Marketingaktionen? | `mart.aktionsumsatz_monat` — mit Anteil am Gesamtumsatz |
 | Welche Aktionen gibt es, laufen sie noch? | `mart.aktion` — hinterlegte gegen tatsächliche Laufzeit |
 | BWA-Kennzahlen, jüngster Stand | `mart.kennzahlen_aktuell` |
@@ -83,7 +85,7 @@ Eine Kette, in der jeder Klick eine Ebene tiefer führt und den Filter mitnimmt.
 |---|---|---|---|
 | ① | **Marken** | Eine Zeile je Marke, alle Metriken, Ampeln gezählt | ② mit gesetzter Marke |
 | ② | **Filialen** | Alle Betriebe der Marke über sämtliche Metriken | ③ mit gesetztem Betrieb |
-| ③ | **Betrieb** | Das Betriebsblatt: Kennzahlen, Verlauf, Struktur, Personal, Ware, BWA, Maßnahmen, Datenstand | das jeweilige Fach-Dashboard |
+| ③ | **Betrieb** | Das Betriebsblatt: Kennzahlen, Verlauf, Struktur, Personal, Ware, BWA, Einkauf & Inventur, Maßnahmen, Datenstand | das jeweilige Fach-Dashboard |
 | ④ | **Zeiträume vergleichen** | Zwei frei wählbare Zeiträume nebeneinander | ③ |
 | ⑤ | **Standorte vergleichen** | Mehrere Betriebe über alle Metriken, Verlauf, Tagesprofil, Spartenmix | ③ |
 

@@ -72,7 +72,7 @@ Rückweg ist immer, den Filter oben zu löschen.
 |---|---|---|---|
 | ① | Marken | Eine Zeile je Marke, alle Metriken, Ampeln gezählt | ② mit gesetzter Marke |
 | ② | Filialen | Alle Betriebe der Marke über sämtliche Metriken | ③ mit gesetztem Betrieb |
-| ③ | Betrieb | Das Betriebsblatt: Kennzahlen, Verlauf, Struktur, Personal, Ware, BWA, Maßnahmen, Datenstand | das jeweilige Fach-Dashboard |
+| ③ | Betrieb | Das Betriebsblatt: Kennzahlen, Verlauf, Struktur, Personal, Ware, BWA, Einkauf & Inventur, Maßnahmen, Datenstand | das jeweilige Fach-Dashboard |
 | ④ | Zeiträume vergleichen | Zwei frei wählbare Zeiträume nebeneinander | ③ |
 | ⑤ | Standorte vergleichen | Mehrere Betriebe über alle Metriken, Verlauf, Tagesprofil, Spartenmix | ③ |
 | ⑥ | Portfolio und Potenzial | Konzentration, Streuung, was der Abstand zum Median kostet | — |
@@ -341,6 +341,47 @@ welches Haus es geht, und das Emoji trägt die Ampelfarbe auch dann, wenn zwei M
 
 Wer echte Logos will, braucht eine eigene Kartenanwendung außerhalb von Metabase. Das wäre
 ein eigenes Vorhaben; der Nutzen gegenüber Emoji-plus-Markenname ist überschaubar.
+
+---
+
+## Belege und Inventur
+
+Zwei Auswertungen, die auf denselben Daten aufbauen wie die Warenwirtschaft, aber eine
+andere Frage beantworten: nicht „was kostet die Ware im Schnitt", sondern „was ist an einem
+konkreten Beleg passiert" und „was hat die Zählung ergeben".
+
+**Ein eigener Reiter statt einer weiteren Zeile auf „Personal · Ware · BWA".** Die Karten
+dort sind verdichtete Kennzahlen — Quoten, Ranglisten, Zeitreihen. Belegliste und
+Inventurliste sind Rohlisten, dieselbe Kategorie wie „Maßnahmen & Datenstand" nebenan, nur
+ein eigenes Fachthema: „was wurde verkauft" gegen „was wurde eingekauft und gezählt". Ein
+Anhängsel hätte die Warenreihe auf sechs Karten gestreckt und die beiden neuen Listen unter
+dem Artikelverkauf begraben.
+
+**Stornos stehen in der Liste, nicht daneben.** Eine stornierte Bestellung verschwindet
+nicht aus der Belegliste — sie bekommt eine eigene Spalte „Storno". Wer eine Bestellung
+sucht, die vor Wochen aufgegeben und dann storniert wurde, muss sie finden können, nicht nur
+ihre Abwesenheit erraten. Dieselbe Logik gilt für eine noch nicht signierte Inventur: sie
+bleibt sichtbar und gekennzeichnet, zählt aber nicht in den bewerteten Euro-Summen mit.
+
+**Die Inventurkarten sind heute leer, und das ist kein Fehler.** Die Rohtabellen stehen seit
+Migration `0044`, der Abruf der Zählungen ist eine bewusste, manuelle Entscheidung
+(`bun run einreihen --foodnotify-inventuren`) und läuft erst später. Die Kartenbeschreibung
+sagt das ausdrücklich, damit eine leere Liste nicht als „keine Inventuren gemacht" gelesen
+wird.
+
+**Eine flächige Schwundaussage über alle Marken gibt es nicht, und die Karte verschweigt das
+nicht.** Gemessen an den geladenen Inventurköpfen (Migration `0044`) kommen von den echten
+Zählungen praktisch alle bei Wilma Wunder vor; bei den anderen drei Marken ist die Fallzahl
+zu klein, um daraus einen Schwundwert für die ganze Marke abzuleiten. Der Vorbehalt steht
+deshalb doppelt: als Textkachel über der Karte auf „Einkauf" und als Satz in der
+Kartenbeschreibung selbst — eine Überschrift auf der Seite sieht man leichter über als einen
+Kartentext.
+
+**Schwund wird je Betrieb und Monat verdichtet, nicht je Inventur.** Dieselbe Körnung wie
+das Einkaufsvolumen und die Personalkosten, damit sich Schwund neben diesen beiden in
+denselben Zeitraster einordnet. Nur signierte, nicht stornierte Inventuren gehen in die
+bewerteten Euro-Summen ein — eine laufende Zählung ist kein Ergebnis, eine stornierte kein
+Beleg.
 
 ---
 

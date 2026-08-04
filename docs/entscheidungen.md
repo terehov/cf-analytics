@@ -643,3 +643,41 @@ richtige. Der Wert steht mit dieser Begründung in der `.env`, nicht nur hier.
 **Unterschied zu LINA.** Dort bleibt es bei 10.500 — LINA ist ein Report Center mit
 genau einem Zugang, FoodNotify ein bezahlter REST-Dienst mit dokumentierten Endpunkten.
 Zwei Anbieter, zwei Verträge, zwei Risiken; seit dem 02.08.2026 auch zwei Budgets.
+
+## Inventuren bleiben ein reiner Backfill — kein laufender Abgleich in nachfuellen.ts (04.08.2026)
+
+**Die Frage.** `src/sync/nachfuellen.ts` zieht für Bestellungen stündlich die
+jeweils NEUESTE Seite je Kostenstelle nach (`foodnotifyNachfuellen()`), weil neue
+Bestellungen sonst für immer unentdeckt blieben — der Backfill kennt nur die
+Seiten, die es beim Start gab. Sollen Inventuren dasselbe bekommen?
+
+**Dagegen entschieden.** Bestellungen sind das Gegenteil von Inventuren: 11.578
+Stück bei Aposto allein, täglich neue, und wirtschaftlich sofort relevant
+(Einkaufspreise). Inventuren sind laut `docs/foodnotify-api-inventar.md` §8b
+eine „Runde Monatsinventuren" — bei Wilma Wunder 275 über zwei Jahre, das sind
+grob 10–15 im Monat, bei den anderen drei Marken einstellig bis niedrig
+zweistellig **insgesamt**. Eine stündliche Abfrage würde 24-mal am Tag prüfen,
+ob sich etwas geändert hat, das sich im Schnitt alle zwei bis drei Tage ändert —
+und nur bei Wilma Wunder überhaupt in einer Menge, die eine Schwundrechnung
+trägt (275 Stück, 154 signiert; bei Aposto und Deutsche Konzepte ist die
+inventurgestützte Schwundrechnung laut Plan ohnehin nicht möglich).
+
+**Dazu kommt die technische Form.** `fn:inventuren` bündelt ALLE Kostenstellen
+einer Marke in einem Aufruf (`erpIds[]`) — anders als bei Bestellungen ließe
+sich „die letzte Seite je Kostenstelle" hier nicht direkt übertragen, das
+Nachziehen bräuchte eine eigene Logik (letzte Seite je MARKE, nicht je
+Kostenstelle), keine Wiederverwendung der bestehenden Funktion.
+
+**Die Entscheidung.** Inventuren bleiben ausschließlich ein manueller Backfill
+(`bun run einreihen --foodnotify-inventuren`, analog `--foodnotify` für die
+Organisationsposten und `--historie` für LINA). Kein Eintrag in
+`nachfuellen.ts`. Wer neue Inventuren sehen will, ruft den Backfill erneut —
+das idempotente `NOT EXISTS` verhindert dabei keine neuen Seiten, sondern nur
+einen zweiten Seite-1-Posten je Marke (siehe der Hinweis in `src/einreihen.ts`
+zum Nachziehen neuer Kostenstellen).
+
+**Was das revidieren würde.** Zeigt sich nach dem ersten echten Backfill, dass
+Wilma Wunder tatsächlich laufend neue Inventuren anlegt und die Zahl regelmäßig
+gebraucht wird (nicht nur einmalig für eine Schwundanalyse), lohnt sich ein
+eigener „letzte Seite je Marke"-Zweig in `foodnotifyNachfuellen()` — dann mit
+gemessenen Zahlen statt der hier getroffenen Vorabschätzung.

@@ -534,9 +534,27 @@ Rund 100 weitere Zuordnungen von Hand.
 
 ### Stufe 4 — Inventuren, wenn jemand danach fragt
 
-Nur noch **Inventuren** (B1). Sie hingen nie am Verkaufsfehler: gezählte
+~~Nur noch **Inventuren** (B1). Sie hingen nie am Verkaufsfehler: gezählte
 Menge, Sollbestand und Preis je Basiseinheit stehen unabhängig davon in
-`/api/erp/stocktakings/{uuid}/items`.
+`/api/erp/stocktakings/{uuid}/items`.~~
+
+**✅ gebaut 04.08.2026, Start ausstehend** — Eugene hat gefragt. Migration
+`0044`: `core.inventur` + `core.inventurposition` (Schema wie unten in §5
+skizziert, `art`/`status` bewusst ohne CHECK — siehe Migrationskommentar).
+Register `fn:inventuren` (bündelt ALLE Kostenstellen einer Marke in einem
+Aufruf, `erpIds[]`) und `fn:inventurpositionen`, `src/foodnotify/inventur.ts`
+(reine Transformation, eigene Datei wegen einer parallel laufenden Session
+auf `transform.ts`), `src/foodnotify/laden.ts` (zwei neue Fälle, dieselbe
+Rückwärts-Seiten-Strategie wie bei Bestellungen). Eigener Schalter
+`bun run einreihen --foodnotify-inventuren` (B1 ist **kein** Teil des
+laufenden Abgleichs in `nachfuellen.ts` — Begründung in
+`docs/entscheidungen.md`, „Inventuren bleiben ein reiner Backfill").
+
+**Eine Falle, die noch aussteht:** die Antworthülle von
+`/api/erp/stocktakings` ist NICHT gemessen, nur aus dem Pfadmuster
+`/api/erp/*` abgeleitet (Inventar §1). Der erste echte Abruf sollte von
+Hand geprüft werden, bevor jemand den geladenen Zeilen traut — siehe den
+`hinweis` an `fn:inventuren` in `src/foodnotify/endpunkte.ts`.
 
 Lohnend ist das allein bei **Wilma Wunder** (275 Stück, 154 signiert). Bei
 den anderen drei Marken gibt es praktisch keine — Aposto 19, Deutsche

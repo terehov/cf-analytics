@@ -2053,3 +2053,44 @@ unvollständig ist.
    misst Daten.
 2. **Ein aufgegebener Posten ist ein Datenverlust und gehört nicht nur ins Log.** Der Lauf
    meldet danach weiterhin „ok" — die Lücke steht in einer Tabelle, die niemand ansieht.
+
+## Von Grund auf migriert bricht die Kette — obwohl der laufende Server sauber ist (04.08.2026)
+
+**Symptom.** Bei der Arbeit an Migration `0044` sollte der Ende-zu-Ende-Test einmal gegen
+eine wirklich frische Datenbank laufen, nicht gegen den laufenden Entwicklungsserver.
+`createdb` plus `bun run migrate` bricht ab:
+
+```
+error: column p.gebinde does not exist
+Migration 0039_betriebsstatus_und_plausibilitaet.sql fehlgeschlagen
+```
+
+**Ursache.** `migrations/0039_betriebsstatus_und_plausibilitaet.sql` liest eine Spalte
+`gebinde`, die erst `migrations/0041_einkaufspreis_gebinde.sql` einführt — numerisch
+SPÄTER, aber der Migrations-Runner wendet Dateien in alphabetischer Namensreihenfolge an
+(`db/migrate.ts`, dieselbe Regel, die AGENTS.md schon für die `0009`-Kollision
+dokumentiert). Auf einer leeren Datenbank angewendet, sieht `0039` also eine Spalte, die es
+in dieser Reihenfolge noch nicht gibt.
+
+Der laufende Entwicklungsserver (`lina`) ist davon **nicht betroffen** — dort wurden beide
+Dateien seinerzeit in der Reihenfolge angewendet, in der sie tatsächlich entstanden sind
+(vermutlich nicht die heutige alphabetische), und `public.schema_migration` merkt sich nur
+„angewendet ja/nein" je Dateiname, nicht die Reihenfolge. Der Fehler zeigt sich ausschließlich
+beim **Nachspielen der ganzen Historie auf einer leeren Datenbank** — also genau bei einem
+Restore, einem neuen Dokploy-Deployment oder einer neuen CI-Datenbank.
+
+**Wie diese Migration trotzdem verifiziert wurde.** Nicht durch Reparatur der alten Kette
+(„Bereits angewendete Dateien nie ändern", AGENTS.md) — stattdessen ein `pg_dump
+--schema-only` vom laufenden `lina`-Server in eine Wegwerf-Datenbank, `schema_migration`
+kopiert, `bun run migrate` meldet „aktuell", der Ende-zu-Ende-Test läuft grün. Das prüft die
+NEUE Migration `0044` gegen den echten Zielzustand, umgeht aber bewusst das eigentliche
+Problem.
+
+**Was offen bleibt.** Ein `dropdb && createdb && bun run migrate` — der Weg, den ein echter
+Restore oder ein frischer Server nehmen würde — funktioniert heute nicht. Das betrifft direkt
+den Punkt „Restore testen, nicht nur das Backup" in `docs/offene-punkte.md`. Reparieren
+hieße entweder die betroffenen Dateien inhaltlich zusammenlegen (wie am 26.07.2026 schon
+einmal für zehn ältere Migrationen gemacht) oder eine der beiden 0039-Dateien so
+umzunummerieren, dass die alphabetische und die tatsächliche Abhängigkeitsreihenfolge wieder
+übereinstimmen — beides nur mit Blick auf `public.schema_migration` der echten Datenbank,
+nicht blind.

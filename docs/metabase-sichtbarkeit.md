@@ -50,7 +50,9 @@ Ergebnis liefert, und bringt die Namen schon mit.
 | `artikelverkauf` | Artikelverkäufe mit dem Wareneinsatzansatz **des jeweiligen Tages** |
 | `deckungsbeitrag_warengruppe` | DB je Warengruppe, mit Abdeckungsgrad. **Materialisiert** (seit 01.08.2026) — Stand in `deckungsbeitrag_stand` |
 | `deckungsbeitrag_stand` | Wie alt die Zahlen der materialisierten Sicht sind |
-| `preisentwicklung_ware` | Einkaufspreise mit Vormonatsvergleich |
+| `preisentwicklung_ware` | Einkaufspreise mit Vormonatsvergleich — abgelöst durch `einkaufspreis_monat` (echte Belegpreise aus FoodNotify) |
+| `einkauf_position`, `einkauf_beleg`, `einkauf_betrieb_monat`, `einkauf_ladestand` | Belegpositionen, Belegköpfe je Bestellung (inkl. Storno-Kennzeichen), Einkaufsvolumen je Betrieb, Ladefortschritt |
+| `inventur`, `inventur_schwund` | Inventurköpfe mit bewertetem Bestand, Schwund je Betrieb und Monat. Belastbar praktisch nur bei Wilma Wunder (Migration `0044`); **derzeit leer**, der Backfill ist eine bewusste manuelle Entscheidung |
 | `personalkosten` | Quoten und Effektivitäten, gesamt und je Bereich |
 | `kennzahlen_aktuell` | Jüngster BWA-Stand, Euro und Prozent getrennt aufgelöst |
 | `betrieb`, `konzept_zuordnung` | Betriebsübersicht und Markenzuordnung |
@@ -129,7 +131,8 @@ Fallen** — genau die, die `mart` ausräumt:
 | `bwa_buchungsstand` | `bwa_rueckstand`, `datenstand` | Rohe Höchststände ohne Vergleichsmaßstab; „keine Zeile" und `NULL` bedeuten Verschiedenes |
 | `aktion`, `aktionsumsatz_tag` | `aktion`, `aktionsumsatz`, `aktionsumsatz_monat` | Fehlende Zeile heißt „kein Umsatz" **oder** „Tag nicht geholt"; der Anteil am Gesamtumsatz fehlt |
 | `schwellenwert_betrieb` | `round_table_vergleich()` | Betriebsindividuelle Schwellen; ohne Regelwerk-Kontext irreführend |
-| `bestellung`, `bestellposten`, `inventurtermin` | — | Noch nicht ausgewertet, Struktur steht |
+| `bestellung`, `bestellposition` | `einkauf_position`, `einkauf_beleg`, `einkauf_betrieb_monat` | Storno steht als Text im Rohstatus (`[object Object]`-Falle behoben in Migration `0043`) — die Sichten lösen ihn in `storniert` auf |
+| `inventur`, `inventurposition` | `mart.inventur`, `mart.inventur_schwund` | Soll- und Zählmenge roh, ohne Bewertung — die Sichten multiplizieren mit `preis_je_basiseinheit`. **Derzeit leer** (Migration `0044`), Backfill ist manuelle Entscheidung |
 | `betrieb` | `mart.betrieb`, `mart.bwa_kennzahl`, jede `mart`-Sicht | Trägt die BWA-Brücke `lina_betrieb_id`; in `mart` überall schon aufgelöst |
 
 ---

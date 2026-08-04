@@ -100,6 +100,12 @@ wird.
 ## Betrieb
 
 - **Restore testen**, nicht nur das Backup. Dokploys Testfunktion prüft nur den Upload.
+  **Konkreter Befund dazu (04.08.2026):** `dropdb && createdb && bun run migrate` schlägt
+  auf einer wirklich leeren Datenbank fehl — `0039_betriebsstatus_und_plausibilitaet.sql`
+  liest eine Spalte, die erst `0041_einkaufspreis_gebinde.sql` anlegt. Der laufende Server
+  ist nicht betroffen (andere historische Anwendungsreihenfolge), aber ein Restore oder ein
+  neues Dokploy-Deployment würde genau diesen Weg nehmen. Einzelheiten und mögliche Wege in
+  `docs/fehlerkatalog.md`, „Von Grund auf migriert bricht die Kette".
 - ~~**Plausibilitätsprüfung** muss „Betrieb hat nie BWA" von „Monat noch nicht gebucht" unterscheiden (`core.bwa_buchungsstand`).~~ **Erledigt am 26.07.2026.** Der Ladepfad schreibt den Stand, `mart.bwa_rueckstand` wertet ihn aus, `/status` prüft die Spitze statt der Nachzügler. Drei Zustände statt zwei — siehe `datenherkunft.md`.
 - **Postgres nicht ins Internet exponieren** — Postico über SSH-Tunnel.
 
@@ -156,3 +162,24 @@ anderen beiden fielen mit Migration 0030 ohnehin weg.
 **Bis dahin gilt:** Wer an `sync/` arbeitet, lässt `e2e.test.ts` **einzeln**
 gegen eine frische Datenbank laufen. Ein grüner Gesamtlauf ohne
 `TEST_DATABASE_URL` sagt über diesen Teil nichts aus.
+
+---
+
+## `datenherkunft.md`, `importer.md` und `datenmodell.md` sind noch LINA-lastig (gefunden 04.08.2026)
+
+Beim Dokumentieren der Inventuren (Migration `0044`) aufgefallen: Alle drei zentralen
+Dokumente beschreiben weiterhin fast ausschließlich LINA. `datenherkunft.md` listet in der
+Momentaufnahmen-Tabelle sogar noch `wawi:items`, `wawi:orders`, `wawi:suppliers`,
+`wawi:inventory` als „aktiv geholt" — diese Endpunkte und ihre Zieltabellen sind seit
+Migration `0030` (01.08.2026) gelöscht, weil es LINA-Demodaten waren (AGENTS.md Regel 5).
+Der komplette FoodNotify-Importer (`src/foodnotify/`, zehn Migrationen, `0030`–`0044`)
+kommt in keiner der drei Dateien als eigenes Kapitel vor — nur `docs/plan-foodnotify.md`
+und die Kommentare in `src/foodnotify/*.ts` selbst sind aktuell.
+
+Diese Aufgabe hat gezielt nur das ergänzt, was zu den Inventuren gehört (siehe die neuen
+Abschnitte „FoodNotify: Inventuren" in allen drei Dateien) — die veraltete WAWI-Zeile in
+`datenherkunft.md` unangetastet gelassen, um nicht in einer Migrationsaufgabe fremde
+Abschnitte umzuschreiben. **Wer als Nächstes an FoodNotify arbeitet:** ein eigener Durchgang,
+der Stufe 1–3 (Bestellungen, Rezepturen, POS-Zuordnung, Einkauf) in diesen drei Dateien
+nachträgt und die WAWI-Zeile entfernt, wäre die Dokumentationsschuld los, die dieser Fund
+aufgedeckt hat.

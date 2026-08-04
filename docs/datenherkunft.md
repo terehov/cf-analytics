@@ -374,6 +374,57 @@ Klartext sowie IBAN, BIC und Steuernummer. **Wird nicht gelesen und nicht gespei
 
 ---
 
+## FoodNotify: Inventuren
+
+Diese Datei ist bisher LINA-lastig geschrieben — der ganze FoodNotify-Importer
+(`src/foodnotify/`, seit Migration `0030`) fehlt hier noch als eigenes
+Kapitel. Der vollständige Ablauf steht bislang nur in
+`docs/plan-foodnotify.md`. Dieser Abschnitt deckt nur die **Inventuren**
+(B1, Stufe 4, Migration `0044`) ab, den zuletzt gebauten Teil.
+
+```
+FoodNotify (my.foodnotify.com)  →  raw.api_antwort  →  core.inventur(position)
+   /api/erp/stocktakings            (quelle='foodnotify')   je Kostenstelle
+   /api/erp/stocktakings/{uuid}/items
+```
+
+**Woher:** `GET /api/erp/stocktakings?erpIds[]=…` (ein Aufruf für alle
+Kostenstellen einer Marke), `GET /api/erp/stocktakings/{uuid}/items` für die
+Zählung je Inventur. Landet in `core.inventur` (Kopf) und
+`core.inventurposition` (Sollbestand, gezählte Menge, Preis je
+Basiseinheit).
+
+**Was die Zahl kann:** `(soll_menge - gezaehlt_menge) * preis_je_basiseinheit`
+je Position ist der bewertbare Schwund — anders als der theoretische
+Wareneinsatz aus Rezepturen (`docs/entscheidungen.md`, „0.2") eine direkt
+gezählte, keine gerechnete Größe.
+
+**Was die Zahl NICHT sagt — die Abdeckung ist extrem ungleich.** Gemessen
+27.07.–01.08.2026 (`docs/foodnotify-api-inventar.md` §8b):
+
+| Marke | Inventuren | davon signiert |
+|---|---|---|
+| **Wilma Wunder** | **275** | **154** |
+| Enchilada | ~70 | ungeprüft |
+| Aposto | 19 | 14 |
+| Deutsche Konzepte | 9 | 5 **storniert** |
+
+**Eine inventurgestützte Schwundrechnung ist praktisch nur bei Wilma Wunder
+belastbar.** Bei Aposto und Deutsche Konzepte ist die Stückzahl zu klein für
+eine Auswertung, und bei Deutsche Konzepte ist über die Hälfte der wenigen
+Inventuren storniert — `status = 'canceled'` zählt fachlich nicht als
+Zählung und gehört vor jeder Summierung herausgefiltert (dieselbe Lehre wie
+bei den Bestellstornos, `0043`).
+
+**Und eine offene Prüfung:** die Hülle von `/api/erp/stocktakings` ist nicht
+gemessen, nur aus dem Pfadmuster `/api/erp/*` abgeleitet — siehe den
+`hinweis` an `fn:inventuren` in `src/foodnotify/endpunkte.ts` und
+`docs/importer.md`. Vor jeder Aussage aus den ersten echten Zahlen prüfen,
+ob die Zeilenzahl plausibel ist (siehe `mart.backfill_fortschritt` und
+`sync.schema_abweichung`).
+
+---
+
 ## Wo man nachsieht, ob die Herkunft noch stimmt
 
 ```sql

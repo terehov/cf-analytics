@@ -336,3 +336,22 @@ Der Ende-zu-Ende-Test braucht `TEST_DATABASE_URL`; ohne die Variable wird er üb
 
 1. **`Intl.DateTimeFormat` mit `de-DE`** liefert bei reiner Stundenausgabe `"22 Uhr"`. `Number()` darauf ist `NaN`, damit war das Arbeitsfenster dauerhaft geschlossen und der Importer wäre nie gelaufen. Jetzt `formatToParts` mit `en-GB` — und ein eigener Test dafür.
 2. **`date`-Spalten kommen als `Date`-Objekt zurück**, nicht als String. Alles, was ein ISO-Datum erwartet, lief in eine Ausnahme, bevor der erste Request rausging. Jetzt `alsIsoDatum()` am Übergang — und in `src/db/pool.ts` ist der DATE-Parser abgeschaltet, damit `pg` daraus gar nicht erst ein Date in Ortszeit baut (das kann den Tag verschieben).
+
+## FoodNotify: Inventuren (`src/foodnotify/inventur.ts`, Stufe 4)
+
+Diese Datei ist bisher LINA-lastig geschrieben; der ganze FoodNotify-Importer (`src/foodnotify/`, seit `0030`) fehlt hier noch als eigenes Kapitel — der vollständige Ablauf steht bislang nur in `docs/plan-foodnotify.md` §6 und in den Kommentaren von `src/foodnotify/laden.ts` selbst. Dieser Abschnitt deckt nur die **Inventuren** (B1) ab, den zuletzt gebauten Teil.
+
+**Zwei neue Endpunkte** in `src/foodnotify/endpunkte.ts`:
+
+| Endpunkt | Pfad | Besonderheit |
+|---|---|---|
+| `fn:inventuren` | `GET /api/erp/stocktakings?erpIds[]=…&page=N` | bündelt **alle** Kostenstellen einer Marke in einem Aufruf — anders als `fn:bestellungen`, das je Kostenstelle läuft |
+| `fn:inventurpositionen` | `GET /api/erp/stocktakings/{uuid}/items` | `shopArticleId` zeigt auf `core.ware`, nicht auf `core.artikel` |
+
+**Der Ablauf steuert sich wie bei Bestellungen selbst**, nur mit einer anderen Wurzel: `bun run einreihen --foodnotify-inventuren` reiht je Marke **einen** `fn:inventuren`-Posten (Seite 1) mit den `erpIds` aller aktuell bekannten Kostenstellen ein. Das Laden der ersten Seite (`src/foodnotify/laden.ts`) reiht dann selbstständig die übrigen Seiten ein (rückwärts, wie bei Bestellungen — neueste zuerst) und je gefundener Inventur einen `fn:inventurpositionen`-Posten. Ein Aufruf genügt, der Rest läuft von selbst.
+
+**Bewusst kein eigener Schalter in `fn:kostenstellen`** — anders als `fn:bestellungen` wird `fn:inventuren` NICHT automatisch angestoßen, wenn die Kostenstellen einer Marke geladen werden. Grund: Inventuren lohnen praktisch nur bei Wilma Wunder (plan-foodnotify.md Stufe 4), ein automatischer Anstoß für alle vier Marken wäre unnötige Last ohne Gegenwert bei drei von vieren.
+
+**Und kein Eintrag im laufenden Abgleich** (`src/sync/nachfuellen.ts`) — anders als Bestellungen, wo stündlich die jeweils letzte Seite je Kostenstelle nachgezogen wird. Begründung mit Zahlen: `docs/entscheidungen.md`, „Inventuren bleiben ein reiner Backfill".
+
+**Die Antworthülle ist nicht gemessen, nur abgeleitet.** `/api/erp/stocktakings` folgt dem Pfadmuster `/api/erp/*`, für das drei andere Endpunkte die `{code,errors,isError,payload}`-Hülle bestätigt haben — aber der stocktakings-Pfad selbst wurde nie gegen das echte FoodNotify abgefragt (harte Regel, `AGENTS.md`). Mock und Tests bilden die plausibelste Form nach (`payload.data` + `payload.pagination`, dieselbe Schachtelung, an der die Exploration bei Wilma Wunder einmal gescheitert ist — `docs/foodnotify-api-inventar.md` §1). Der erste echte Abruf gehört von Hand geprüft, bevor jemand den geladenen Zeilen traut.

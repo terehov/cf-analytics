@@ -95,6 +95,19 @@ Die Mehrdeutigen verschwinden nicht, sie laufen als `(nicht zugeordnet)` mit. `m
 
 Vorsicht beim Vorzeichen: bei Umsatz ist mehr besser, bei Personal- und Wareneinsatzquoten weniger. Ein positiver Abweichungswert ist also nicht automatisch ein guter.
 
+## FoodNotify: Inventuren (`0044`, 04.08.2026)
+
+`core.inventur` und `core.inventurposition` — der letzte Baustein aus `docs/plan-foodnotify.md` (B1, Stufe 4). Schlüssel und Modellierung folgen bewusst `core.bestellung`/`core.bestellposition` (`0030`), nicht einem neuen Muster:
+
+- **Hängt an `core.kostenstelle`, nicht direkt an `core.marke`.** Wie bei Bestellungen ergibt sich die Marke über `kostenstelle.marke_key` — eine zusätzliche Mandantenspalte auf `core.inventur` wäre eine redundante zweite Wahrheit.
+- **`fn_uuid` ist `text`, nicht `uuid`.** FoodNotify liefert hier laut Inventar UUIDv7, trotzdem der konservativere Typ: derselbe Grundsatz wie bei `core.zutat.ware_fn_id` — ein einzelner Wert außerhalb des erwarteten Formats soll keine Transaktion abbrechen. Die Eindeutigkeit trägt der `UNIQUE`-Index, nicht der Spaltentyp.
+- **`art` und `status` ohne `CHECK`-Constraint.** Das Vokabular (`signed | counting | canceled`) steht nur im Inventar, nicht an einer echten Antwort gemessen — der Endpunkt wurde nie gegen das echte FoodNotify abgefragt (harte Regel: nie gegen das echte FoodNotify laufen, siehe `AGENTS.md`). Ein `CHECK`, der ein fünftes Wort nicht kennt, ließe die ganze Transaktion scheitern; das ist genau der Fehler, den `core.bestellung.status` schon einmal (`0043`) mit einem zu engen *Parser* gemacht hat, hier vorsorglich auch im Schema vermieden.
+- **`core.inventurposition.ware_key` zeigt über `shopArticleId` auf `core.ware` mit `quelle = 'lieferant'`.** Die Falle steht wörtlich in `docs/plan-foodnotify.md` (Zeile 146): `shopArticleId` ist eine Lieferanten-Artikelnummer, keine FoodNotify-eigene Warennummer, und erst recht keine `core.artikel.artikelnummer`. Derselbe Nummernraum wie `core.zutat.ware_fn_id` und `core.bestellposition.lieferanten_nr` — deshalb dieselbe `quelle`-Markierung (`0042`) statt eines neuen Felds.
+- **Ersetzen statt Upsert bei den Positionen.** Wie `core.bestellposition`: die Antwort ist der vollständige Stand der Zählung, `DELETE`+`INSERT` je Inventur in einer Transaktion verhindert einen halb sichtbaren Zwischenstand.
+- **Kein Eintrag in `sync/nachfuellen.ts`.** Anders als Bestellungen bleibt der Import ein reiner, manueller Backfill (`bun run einreihen --foodnotify-inventuren`) — Begründung mit Zahlen in `docs/entscheidungen.md`.
+
+Unverifiziert bleibt die Antworthülle von `/api/erp/stocktakings` selbst — abgeleitet aus dem Pfadmuster `/api/erp/*`, nie am echten Endpunkt gemessen (`docs/foodnotify-api-inventar.md` §1). Der erste echte Abruf gehört von Hand geprüft.
+
 ## Verifikation
 
 `migrations/pruefung.sql` rechnet `mart.round_table()` gegen die Zeile „Enchilada Bayreuth" aus `JULI_Round_Table_Ampelsystem.xlsx` nach. Alle zehn Werte stimmen:
