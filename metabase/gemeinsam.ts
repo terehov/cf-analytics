@@ -12,25 +12,36 @@ import type { Parameter } from './typen'
 // Vorgabemonat veraltet ab dem naechsten Monatswechsel.
 //
 // Deshalb dieser Ausdruck: gesetzt gewinnt der Parameter, ungesetzt der
-// juengste Monat, fuer den ueberhaupt ein Urteil vorliegt. Die eckigen
-// Klammern sind Metabases optionaler Block — steht kein Wert an, faellt
-// der ganze Abschnitt weg und coalesce bleibt mit einem Argument stehen,
-// was gueltiges SQL ist.
+// juengste ABGESCHLOSSENE Monat mit Urteil. Die eckigen Klammern sind
+// Metabases optionaler Block — steht kein Wert an, faellt der ganze
+// Abschnitt weg und coalesce bleibt mit einem Argument stehen, was
+// gueltiges SQL ist.
+//
+// `monat <` und nicht `<=`, und das ist der ganze Punkt: der Round Table
+// fuehrt auch fuer den laufenden Monat Urteile (BWA-Nachtrag), am
+// 03.08.2026 fiel der Rueckfall deshalb auf einen drei Tage alten August
+// — alle Seiten oeffneten mit -92 % Umsatz und 58 roten Ampeln. Zwei
+// Tage gegen einen vollen Vorjahresmonat sind kein Urteil. Wer den
+// laufenden Monat sehen will, waehlt ihn ausdruecklich im Filter.
 // ---------------------------------------------------------------------
 export const MONAT_CTE = `
 WITH gewaehlt AS (
     SELECT coalesce([[ {{monat}}::date, ]]
                     (SELECT max(monat) FROM mart.round_table_monat
-                      WHERE monat <= date_trunc('month', current_date)::date
+                      WHERE monat < date_trunc('month', current_date)::date
                         AND gesamt IS NOT NULL),
                     date_trunc('month', current_date)::date) AS monat
 )`
 
-/** Dasselbe fuer Karten, deren Datenreihe nicht am Round Table haengt. */
+/** Dasselbe fuer Karten, deren Datenreihe nicht am Round Table haengt.
+ *  Auch hier der juengste ABGESCHLOSSENE Monat — mart.umsatz_ytd hat schon
+ *  am Monatsersten eine Zeile fuer den neuen Monat, und ein Zwei-Tage-Monat
+ *  gegen den Vorjahres-Vollmonat liest sich als Einbruch. */
 export const MONAT_CTE_UMSATZ = `
 WITH gewaehlt AS (
     SELECT coalesce([[ {{monat}}::date, ]]
-                    (SELECT max(monat) FROM mart.umsatz_ytd),
+                    (SELECT max(monat) FROM mart.umsatz_ytd
+                      WHERE monat < date_trunc('month', current_date)::date),
                     date_trunc('month', current_date)::date) AS monat
 )`
 
@@ -59,14 +70,17 @@ WITH gewaehlt AS (
 /**
  * Fuer Karten, die einen Vormonatsvergleich brauchen (Ampelwechsel).
  * Im ersten Monat der Historie gibt es keinen Wechsel, im letzten oft
- * noch keinen vollstaendigen — deshalb der juengste Monat, in dem
- * ueberhaupt ein Wechsel steht.
+ * noch keinen vollstaendigen — deshalb der juengste ABGESCHLOSSENE Monat,
+ * in dem ueberhaupt ein Wechsel steht. Ohne die Obergrenze fiel der
+ * Rueckfall auf den laufenden Teilmonat und meldete 25 erfundene
+ * "verschlechtert" aus zwei Tagen Umsatz.
  */
 export const MONAT_CTE_WECHSEL = `
 WITH gewaehlt AS (
     SELECT coalesce([[ {{monat}}::date, ]]
                     (SELECT max(monat) FROM mart.round_table_trend
-                      WHERE ampelwechsel IN ('verbessert','verschlechtert')),
+                      WHERE monat < date_trunc('month', current_date)::date
+                        AND ampelwechsel IN ('verbessert','verschlechtert')),
                     date_trunc('month', current_date)::date) AS monat
 )`
 

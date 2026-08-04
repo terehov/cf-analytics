@@ -94,7 +94,7 @@ export const LISTEN_JE_DASHBOARD: Record<string, Record<string, string>> = {
 const VORGABE_MONAT = `
   SELECT to_char(max(monat), 'YYYY-MM') AS w
     FROM mart.round_table_monat
-   WHERE monat <= date_trunc('month', current_date)::date
+   WHERE monat < date_trunc('month', current_date)::date
      AND gesamt IS NOT NULL`
 
 /**
