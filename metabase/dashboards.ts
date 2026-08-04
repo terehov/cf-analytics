@@ -666,6 +666,59 @@ export const dashboards: Dashboard[] = [
   },
 
   {
+    schluessel: 'db_bewertung',
+    name: 'Online-Bewertungen — was Gäste sagen',
+    beschreibung:
+      'Die einzige der sechs Round-Table-Kennzahlen, die nicht aus unseren eigenen Systemen '
+      + 'kommt. Stand, Bewegung und die Betriebe, bei denen die neuen Bewertungen schlechter '
+      + 'ausfallen als ihr eigener Ruf.',
+    sammlung: 'Betrieb',
+    // Kein Betriebsfilter im Kopf: dieses Dashboard ist die Uebersicht
+    // ueber alle. Wer einen einzelnen Betrieb sucht, klickt ihn an und
+    // landet auf ③ Betrieb, wo der Verlauf noch einmal steht.
+    filter: [F_MONAT, F_MARKE],
+    // Drei Reiter entlang der drei Fragen: Wie stehen wir da? Wo kippt
+    // es gerade? Und kann ich den Zahlen trauen?
+    tabs: [
+      { name: 'Stand', reihen: [
+      { teile: [{ text: '# Online-Bewertungen\n\nQuelle ist Yext, geladen einmal täglich. **Stand** = Schnitt über alle Bewertungen bis Monatsende, das was ein Gast auf Google sieht — daran hängt die Ampel (grün ab 4,40, orange ab 4,00). **Ø neu** = wie die Bewertungen ausfielen, die in diesem Monat kamen; die Kurve darunter glättet das über sechs Monate zur **Tendenz**.\n\nGerechnet wird auf Google: Facebook führt Bewertungen ohne Sternewertung, ein Schnitt über alle Portale mischt zwei Skalen.' }] },
+      { teile: [
+        { karte: 'bw_kachel_schnitt' },
+        { karte: 'bw_kachel_monatswert' },
+        { karte: 'bw_kachel_neue' },
+      ] },
+      { teile: [{ karte: 'bw_verlauf', hoehe: 10 }] },
+      { teile: [{ karte: 'bw_marke', hoehe: 10,
+        klick: [{ ziel: 'dd_filialen', uebergabe: { marke: 'Marke' } }] }] },
+      { teile: [{ text: '## Alle Betriebe\n\nSchlechteste zuerst. Jede Spaltenüberschrift sortiert — für die Bestenliste einmal auf **Stand** klicken. Nur operative Betriebe.' }] },
+      { teile: [{ karte: 'bw_rangliste', hoehe: 12,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      ] },
+      { name: 'Frühwarnung', reihen: [
+      // Zwei Fruehwarnungen mit verschiedener Mechanik: bw_bewegung
+      // vergleicht den Monatsschnitt mit dem eigenen Ruf (Mittelwert),
+      // bw_anteil_schlecht zaehlt die 1-2-Sterne-Faelle (Anteil). Der
+      // Anteil schlaegt frueher aus: drei wuetende Bewertungen bewegen
+      // einen 4,4er-Schnitt kaum, den Schlecht-Anteil sehr wohl.
+      { teile: [{ text: '## Frühwarnung — wo es gerade kippt\n\nBei mehreren tausend Bewertungen bewegt ein schlechter Monat den **Stand** nur um Hundertstel. Die Ampel bleibt grün, während sich vor Ort etwas ändert. Zwei Sichten auf denselben Verdacht: oben der Monatsschnitt gegen den eigenen Ruf, unten der **Anteil der 1–2-Sterne-Bewertungen** der letzten 90 Tage gegen die zwölf Monate davor — das schärfere Signal.' }] },
+      { teile: [{ karte: 'bw_bewegung', hoehe: 11,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      { teile: [{ karte: 'bw_anteil_schlecht', hoehe: 11,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      ] },
+      { name: 'Portale & Abdeckung', reihen: [
+      { teile: [{ text: '## Wenn jemand fragt, warum Google\n\nDie Portalwahl entscheidet bei manchen Betrieben über die Ampelfarbe. Gespeichert ist beides, umgestellt wird in einer Funktion — nicht durch einen neuen Import. Die zweite Tabelle zeigt jedes Portal einzeln: TripAdvisor bewertet strukturell strenger, ein Portal-Mix wäre deshalb keine Note, sondern ein Zufall der Gewichte.' }] },
+      { teile: [{ karte: 'bw_portale', hoehe: 11 }] },
+      { teile: [{ karte: 'bw_portalvergleich', hoehe: 9 }] },
+      { teile: [{ text: '## Wem fehlen Bewertungen?\n\nOperative Betriebe ohne Yext-Zuordnung — ihre Ampel bleibt grau, egal was die Gäste sagen. Diese Liste sollte leer werden.' }] },
+      { teile: [{ karte: 'bw_fehlend', hoehe: 9,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      { teile: [{ karte: 'bw_ladestand', hoehe: 9 }] },
+      ] },
+    ],
+  },
+
+  {
     schluessel: 'db_datenqualitaet',
     name: 'Datenqualität und Import',
     beschreibung:

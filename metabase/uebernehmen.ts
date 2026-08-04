@@ -28,6 +28,8 @@ import { karten as kartenDrilldown } from './karten-drilldown'
 import { karten as kartenPortfolio } from './karten-portfolio'
 import { karten as kartenImport } from './karten-import'
 import { karten as kartenStandort } from './karten-standort'
+import { karten as kartenBewertung } from './karten-bewertung'
+import { karten as kartenAktionen } from './karten-aktionen'
 import { dashboards } from './dashboards'
 import { auslegen, MINDESTHOEHE } from './layout'
 import type { Karte, Kachel, Dashboard } from './typen'
@@ -41,6 +43,7 @@ const METABASE = config.METABASE_URL
 
 const alleKarten: Karte[] = [
   ...kartenDrilldown, ...kartenPortfolio, ...kartenRoundTable, ...kartenFach, ...kartenImport, ...kartenStandort,
+  ...kartenBewertung, ...kartenAktionen,
 ]
 
 // Reihen in Kacheln umrechnen — EINMAL, damit Pruefung und Ausgabe
@@ -113,6 +116,18 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
   pe_verlauf:             { monat: 'Quotenverlauf ueber alle Monate.' },
   bwa_kennzahlen:         { monat: 'BWA-Verlauf ueber alle gebuchten Monate.' },
   im_puls:                { monat: 'Puls der letzten drei Tage, fest gefenstert.' },
+
+  // --- Aktionen: feste Fenster statt Stichmonat -----------------------------
+  ak_uebersicht:          { monat: 'Festes 12-Monats-Fenster einschliesslich des laufenden Monats — '
+                                 + 'die Frage ist "welche Aktionen laufen", nicht "welche liefen im Juni".',
+                            zeitraum: 'ebenso — die Sicht aggregiert je Monat.' },
+  ak_verlauf:             { monat: 'Verlauf ueber 24 Monate, damit die Jahresaktionen ganz im Bild sind.',
+                            zeitraum: 'ebenso.' },
+  ak_betrieb:             { zeitraum: 'Stichmonat je Betrieb — dafuer ist der Monatsfilter da.' },
+  ak_steckbrief:          { monat: 'Stammdaten je Aktion ueber die gesamte Historie — "nie Umsatz gesehen" '
+                                 + 'verschwaende unter jedem Zeitfilter.',
+                            zeitraum: 'ebenso.',
+                            betrieb: 'Der Steckbrief beschreibt die AKTION, nicht einen Betrieb.' },
 
   // --- Kacheln des laufenden Monats: bewusst "jetzt", nicht "gewaehlter Monat".
   um_kachel_monat:  { monat: 'Kachel zeigt ausdruecklich den LAUFENDEN Monat.',
@@ -307,6 +322,59 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
   wa_preise:              { betrieb: 'Einkaufspreise gelten je Marke, nicht je Haus.' },
   wa_preis_veraenderung:  { betrieb: 'ebenso -- Preisentwicklung je Marke.' },
 
+  // --- Bewertungen ---------------------------------------------------------
+  bw_verlauf: {
+    monat: 'Verlauf ueber alle Monate -- ein Stichmonat liesse genau einen Punkt uebrig.',
+    zeitraum: 'Aggregiert je Monat, nicht je Tag.',
+  },
+  bw_marke: {
+    marke: 'Die Karte VERGLEICHT die Marken. Ein Markenfilter liesse einen '
+         + 'einzigen Balken stehen, und ein Balken ist kein Vergleich.',
+  },
+  bw_ladestand: {
+    monat: 'Technische Karte: was der Importer zuletzt geholt hat, ueber den '
+         + 'gesamten geladenen Zeitraum. Ein Monatsfilter beantwortete die '
+         + 'Frage "fehlen Daten?" gerade nicht mehr.',
+    marke: 'ebenso -- der Ladestand haengt am Importer, nicht an der Marke.',
+  },
+  bw_fehlend: {
+    monat: 'Fehlende Zuordnung ist ein ZUSTAND, kein Monatswert.',
+    marke: 'Bewusst ueber alle Marken: die Liste ist eine Arbeitsvorlage zum '
+         + 'Nachtragen, und die soll vollstaendig bleiben — wie so_fehlend.',
+  },
+  bw_anteil_schlecht: {
+    monat: 'Festes Fenster: 90 Tage gegen die zwoelf Monate davor. Ein '
+         + 'Stichmonat zerstoerte genau den Vergleich, der die Karte ist.',
+  },
+  bw_portalvergleich: {
+    monat: 'Festes 12-Monats-Fenster — der Portal-Bias ist strukturell, '
+         + 'nicht monatlich.',
+  },
+  // Die Bewertungs-Rangliste auf ② Filialen liest Monat und Marke, aber
+  // NICHT die drei Round-Table-Filter. Sie sortiert nach der Bewertung;
+  // wer zusaetzlich auf "gesamt rot" filtert, bekaeme "die
+  // bestbewerteten unter den roten Betrieben" -- eine Liste, die
+  // aussieht wie eine Bestenliste und keine ist. Die Bewertungsampel
+  // steht in der Zeile und ordnet an Ort und Stelle ein.
+  bw_rangliste: {
+    ampel:        'Rangliste nach BEWERTUNG, nicht nach der Gesamtampel.',
+    bereich:      'Der Bereich ist hier fest: es geht um die Bewertung.',
+    intensitaet:  'Eskalationsstufe des Round Table; sagt ueber die Bewertung nichts.',
+  },
+
+  // Die Wortlaut-Liste liest Betrieb, Marke und die Note -- aber weder
+  // Stichmonat noch Zeitraum. Geschriebene Rueckmeldungen sind selten:
+  // Enchilada Bremen bekam im Mai 2026 eine einzige Bewertung, und die
+  // ohne Text. Ein Drei-Monats-Fenster laesst dort eine Zeile uebrig und
+  // sieht aus, als fehlten die Daten. Stattdessen feste 24 Monate,
+  // neueste zuerst.
+  bw_einzel: {
+    monat: 'Festes Fenster von 24 Monaten, neueste zuerst -- ein Stichmonat laesst '
+         + 'bei kleinen Haeusern keine lesbare Zahl an Rueckmeldungen uebrig.',
+    zeitraum: 'ebenso.',
+  },
+  // Die Verlaufskurve: der Monatsfilter waehlt einen Stichmonat, und der
+  // liesse von einer Kurve genau einen Punkt uebrig.
 }
 
 // Doppelte Schluessel in FILTER_AUSNAHME sind in JavaScript erlaubt: der
