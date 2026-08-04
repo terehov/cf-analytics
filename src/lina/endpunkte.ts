@@ -317,17 +317,38 @@ export const ENDPUNKTE: Endpunkt[] = [
     + 'nicht danach. Wer das als Filter benutzt, prüft es vorher.',
     parameter: () => ({}),
   },
+  // -------------------------------------------------------------------
+  // LINAs Warenwirtschaft — ABGESTELLT am 01.08.2026 (Migration 0030)
+  //
+  // Die Werte dort sind Demodaten (Vorgabe Eugene, 27.07.2026; AGENTS.md
+  // Regel 5). Waren, Lieferanten, Bestellungen und Einheiten kommen seit
+  // Migration 0030 aus FoodNotify.
+  //
+  // Die Zahlen, die es hätten verraten können: 540 Lieferanten und 898
+  // Waren — aber nur 4 Bestellungen mit 18 Positionen und 11
+  // Inventurtermine. Das ist kein spärlich genutztes Modul, das ist ein
+  // leeres.
+  //
+  // aktiv: false statt gelöscht, damit der Befund und die Antwortstruktur
+  // dokumentiert bleiben — beides war Arbeit, und wer später fragt "haben
+  // wir das mal geprüft?", findet hier die Antwort. Die zugehörigen
+  // Tabellen (core.ware, lieferant, bestellung, bestellposten,
+  // einkaufspreis_stand, einheit, ware_stand) sind in 0030 gelöscht; der
+  // Ladecode in sync/laden.ts ist mit entfernt. Wer einen dieser
+  // Endpunkte wieder einschaltet, muss beides neu bauen.
+  // -------------------------------------------------------------------
   {
     key: 'wawi:items',
     ebene: 'stamm',
     pfad: '/wawi/api/items',
     schrittweite: 'momentaufnahme',
-    zweck: 'Waren mit Einkaufspreisen je Lieferant — rückwirkend NICHT nachholbar',
-    aktiv: true,
+    zweck: 'Waren mit Einkaufspreisen je Lieferant — DEMODATEN, abgestellt',
+    aktiv: false,
     hinweis:
       '898 Sätze, 482 kB, Array auf oberster Ebene. prices ist ein OBJEKT, dessen Schlüssel '
     + 'die Preis-ID ist, kein Array. 299 der 898 Waren haben mehr als einen Lieferantenpreis. '
-    + 'LINA kennt keine Preishistorie: was hier nicht monatlich gesichert wird, ist weg.',
+    + 'ABGESTELLT 01.08.2026: Demodaten. Echte Einkaufspreise kommen aus FoodNotifys '
+    + 'Bestellungen (core.bestellposition) — und zwar als Belegpreise, nicht als Katalogpreise.',
     parameter: () => ({ archive: '0' }),
   },
   {
@@ -335,12 +356,13 @@ export const ENDPUNKTE: Endpunkt[] = [
     ebene: 'stamm',
     pfad: '/wawi/api/suppliers',
     schrittweite: 'momentaufnahme',
-    zweck: 'Lieferantenstamm — nur Name, Mindestbestellwert und Liefertage',
-    aktiv: true,
+    zweck: 'Lieferantenstamm — DEMODATEN, abgestellt',
+    aktiv: false,
     hinweis:
       'DATENMINIMIERUNG: Die Antwort enthält 28 Felder, darunter ustid, hrb, kreditor, '
-    + 'gegenkonto*, tel, email, strasse, plz. Davon wird NICHTS gespeichert — die '
-    + 'Transformation hat eine explizite Whitelist. 540 Sätze.',
+    + 'gegenkonto*, tel, email, strasse, plz. Davon wurde NICHTS gespeichert — die '
+    + 'Transformation hatte eine explizite Whitelist. 540 Sätze. '
+    + 'ABGESTELLT 01.08.2026: Demodaten.',
     parameter: () => ({}),
   },
   {
@@ -348,9 +370,11 @@ export const ENDPUNKTE: Endpunkt[] = [
     ebene: 'stamm',
     pfad: '/wawi/api/units',
     schrittweite: 'momentaufnahme',
-    zweck: 'Einheiten mit Umrechnungsfaktoren — ohne sie sind Mengen nicht vergleichbar',
-    aktiv: true,
-    hinweis: '32 Sätze: ID, name, abk, parent, factor, baseUnit.',
+    zweck: 'Einheiten mit Umrechnungsfaktoren — abgestellt',
+    aktiv: false,
+    hinweis: '32 Sätze: ID, name, abk, parent, factor, baseUnit. '
+    + 'ABGESTELLT 01.08.2026: FoodNotify liefert eigene Einheiten je Ware. Ein gemeinsamer '
+    + 'Einheitenschlüssel über zwei Systeme wäre eine Übersetzung, die niemand pflegt.',
     parameter: () => ({}),
   },
   {
@@ -358,11 +382,13 @@ export const ENDPUNKTE: Endpunkt[] = [
     ebene: 'stamm',
     pfad: '/wawi/api/orders',
     schrittweite: 'momentaufnahme',
-    zweck: 'Bestellungen mit Positionen',
-    aktiv: true,
+    zweck: 'Bestellungen mit Positionen — DEMODATEN, abgestellt',
+    aktiv: false,
     hinweis:
       'Im Zentral-Kontext nur 4 Sätze. Zeitfelder (created, bestellt_am, liefertermin) sind '
-    + 'Unix-Sekunden. posten ist ein verschachteltes Array.',
+    + 'Unix-Sekunden. posten ist ein verschachteltes Array. '
+    + 'ABGESTELLT 01.08.2026: vier Bestellungen waren der Hinweis, den wir zu lange als '
+    + '"hängt am Zentral-Kontext" gedeutet haben. Aposto allein hat in FoodNotify 11.578.',
     parameter: () => ({}),
   },
   {
@@ -370,9 +396,10 @@ export const ENDPUNKTE: Endpunkt[] = [
     ebene: 'stamm',
     pfad: '/wawi/inventory/inventory',
     schrittweite: 'momentaufnahme',
-    zweck: 'Inventurstichtage',
-    aktiv: true,
-    hinweis: 'Hüllenformat {success, data, message, errorNum} — die 11 Sätze liegen unter data.',
+    zweck: 'Inventurstichtage — DEMODATEN, abgestellt',
+    aktiv: false,
+    hinweis: 'Hüllenformat {success, data, message, errorNum} — die 11 Sätze liegen unter data. '
+    + 'ABGESTELLT 01.08.2026: Demodaten. Echte Inventuren stehen in FoodNotify (Wilma Wunder 275).',
     parameter: () => ({}),
   },
 ]

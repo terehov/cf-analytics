@@ -18,17 +18,28 @@ Diese Datei ist der Einstieg. Die inhaltliche Wahrheit steht in `docs/`.
 2. **Zugangsdaten kommen aus Umgebungsvariablen** und werden nie geloggt, nie persistiert, nie committet.
 3. **Das Anfragetempo ist Teil der Anforderung, keine Höflichkeit.** Es gibt keinen offiziellen Zugang und keine dokumentierten Limits — die Drosselung ist das, was die Integration am Leben hält. Werte in `src/config.ts` nur mit Begründung erhöhen.
 4. **Der Raw-Layer ist die Versicherung.** `raw.api_antwort` ist append-only. Niemals `UPDATE` oder `DELETE`. Alles in `core` darf jederzeit daraus neu aufgebaut werden.
-5. **Prozentwerte sind immer Prozentzahlen** (`23.64`), nie Brüche (`0.2364`). Das Excel macht es andersherum — das ist die häufigste Fehlerquelle.
-6. **Anmeldefehler werden nie in einer Schleife wiederholt.** Falsche Zugangsdaten mehrfach zu senden ist der schnellste Weg zu einer Kontosperre — und es gibt nur diesen einen Zugang.
-6a. **Den Sync-Prozess nicht aus der Agentenumgebung gegen das echte LINA starten.** Am 26.07.2026 wurden vier Anmeldungen abgelehnt, obwohl Passwort, Felder und Header nachweislich stimmten — derselbe Befehl im Terminal des Nutzers meldete sich beim ersten Versuch an. Der Netzwerkweg der Agentenumgebung wird von LINA an der Anmeldung abgewiesen, mit der irreführenden Meldung „Benutzername oder Passwort ist falsch!". Migrationen, Tests gegen die Attrappe und Datenbankarbeit sind davon nicht betroffen. Wer den Import starten will: **den Nutzer bitten** (`bun run sync`) oder den Container. Hergang in `docs/protokoll-anmeldeverfahren.md`.
-7. **Die Browserkennung bleibt stimmig.** Wer `LINA_USER_AGENT` ändert, ändert damit auch die Client-Hints (die Version wird daraus gelesen). Eine Chrome-Kennung ohne `sec-ch-ua`/`sec-fetch-*` gibt es bei keinem echten Browser und fällt mehr auf als gar keine Kennung. Begründung in `docs/importer.md`.
-8. **Jeder Befund landet in `docs/`, bevor der Commit steht.** Eine Erkenntnis, die nur in einer Commit-Nachricht oder einem Code-Kommentar existiert, ist für den nächsten Agenten nicht auffindbar. Welche Datei wofür zuständig ist, steht unten unter *Dokumentationspflicht*.
+5. **LINAs Warenwirtschaft und Einkauf sind Demodaten.** Nicht importieren, nicht auswerten, nicht darauf verweisen. Waren, Lieferanten, Bestellungen und Inventuren kommen aus **FoodNotify** (`docs/plan-foodnotify.md`). Betrifft auch `core.artikel.fixer_we`: dessen Herkunft ist ungeklärt, `mart.pruefung_wareneinsatz` ist deshalb seit Migration `0029` stillgelegt (Begründung in `docs/entscheidungen.md`). Der theoretische Wareneinsatz in `mart.deckungsbeitrag_warengruppe` steht weiter auf `fixer_we` — als Umsatzgliederung brauchbar, **als Margenaussage nicht**. Auf `abdeckung_pct` sehen, bevor jemand daraus etwas ableitet.
+6. **Prozentwerte sind immer Prozentzahlen** (`23.64`), nie Brüche (`0.2364`). Das Excel macht es andersherum — das ist die häufigste Fehlerquelle.
+7. **Anmeldefehler werden nie in einer Schleife wiederholt.** Falsche Zugangsdaten mehrfach zu senden ist der schnellste Weg zu einer Kontosperre — und es gibt nur diesen einen Zugang.
+7a. **Den Sync-Prozess nicht aus der Agentenumgebung gegen das echte LINA starten.** Am 26.07.2026 wurden vier Anmeldungen abgelehnt, obwohl Passwort, Felder und Header nachweislich stimmten — derselbe Befehl im Terminal des Nutzers meldete sich beim ersten Versuch an. Der Netzwerkweg der Agentenumgebung wird von LINA an der Anmeldung abgewiesen, mit der irreführenden Meldung „Benutzername oder Passwort ist falsch!". Migrationen, Tests gegen die Attrappe und Datenbankarbeit sind davon nicht betroffen. Wer den Import starten will: **den Nutzer bitten** (`bun run sync`) oder den Container. Hergang in `docs/protokoll-anmeldeverfahren.md`.
+8. **Die Browserkennung bleibt stimmig.** Wer `LINA_USER_AGENT` ändert, ändert damit auch die Client-Hints (die Version wird daraus gelesen). Eine Chrome-Kennung ohne `sec-ch-ua`/`sec-fetch-*` gibt es bei keinem echten Browser und fällt mehr auf als gar keine Kennung. Begründung in `docs/importer.md`.
+9. **Jeder Befund landet in `docs/`, bevor der Commit steht.** Eine Erkenntnis, die nur in einer Commit-Nachricht oder einem Code-Kommentar existiert, ist für den nächsten Agenten nicht auffindbar. Welche Datei wofür zuständig ist, steht unten unter *Dokumentationspflicht*.
 
 ### Namenskonvention
 
 **Fachbegriffe kommen aus LINA und bleiben deutsch:** Betrieb, Konzept, Umsatz, Wareneinsatz, BWA, Ampel, Hauptsparte, Verkaufsstelle, Geschäftstag. Wo LINA einen Bericht so nennt, heißt die Tabelle auch so (`getUmsatzbericht` → `core.umsatzbericht_tag`). Damit ist die Zuordnung ohne Übersetzungsschritt lesbar — und genau da entstehen sonst Fehler.
 
 **Englisch bleiben nur die Schichtnamen:** `raw`, `part`, `core`, `manual`, `ampel`, `sync`, `mart`. Das sind Architekturbegriffe, keine LINA-Begriffe.
+
+**Drei Begriffe, die nicht vermischt werden dürfen** (seit Migration `0030`). Beide Quellsysteme sagen „Artikel" und meinen Verschiedenes:
+
+| Tabelle | System | Bedeutung |
+| --- | --- | --- |
+| `core.artikel` | LINA | was **verkauft** wird — die Position auf dem Bon |
+| `core.rezept` | FoodNotify | woraus ein verkaufter Artikel **besteht** |
+| `core.ware` | FoodNotify | was **eingekauft** wird — Rohware, Zutat |
+
+LINAs Tabellen heißen nach LINA-**Berichten** (`umsatzbericht_tag`), FoodNotifys nach **Fachbegriffen** (`rezept`, `ware`, `bestellung`). Deshalb kollidieren sie nicht.
 
 Kommentare sind deutsch, damit sie in Postico lesbar sind.
 
@@ -57,6 +68,8 @@ Kommentare sind deutsch, damit sie in Postico lesbar sind.
 | **`backfill.md`** | Strategie und Rechnung für die Historie | Wenn du Zeiträume einreihst |
 | **`entscheidungen.md`** | Entscheidungsprotokoll, chronologisch, inklusive der revidierten | Wenn du dich fragst „warum eigentlich so" |
 | **`protokoll-anmeldeverfahren.md`** | Wie LINAs Anmeldung funktioniert, was das sicherheitstechnisch bedeutet, und was daraus folgt | Bevor du an `auth.ts` arbeitest oder jemand nach dem Passwortumgang fragt |
+| **`plan-foodnotify.md`** | **Der Plan für FoodNotify**: was geholt wird, wie es mit LINA verzahnt wird, in welcher Reihenfolge | Zuerst, wenn du an FoodNotify baust |
+| **`foodnotify-api-inventar.md`** | FoodNotify: 126 API-Pfade, vier Marken im Vergleich, der defekte Verkaufs-Import | Bevor du einen FoodNotify-Endpunkt anfasst |
 | **`datensicherung.md`** | Welche Rohdaten wir sichern sollten, solange LINA erreichbar ist — nach Wert und Kosten sortiert | Wenn du über neue Endpunkte oder Backfill-Tiefe entscheidest |
 | **`offene-punkte.md`** | Was ungeklärt ist und wer es klären muss | Bevor du etwas als fertig meldest |
 | **`payloads/`** | Echte, anonymisierte LINA-Antworten aus der Exploration | Als Referenz; identisch mit den Test-Fixtures |
@@ -112,7 +125,11 @@ Handgeschriebenes SQL, nummeriert, wird der Reihe nach angewendet. Bewusst handg
 | `0004_bewertung.sql` | `manual`, Ampel-Regelwerk, Seed |
 | `0005_sync.sql` | Betriebszustand und Arbeitsschlange des Importers |
 | `0006_mart.sql` | Alle Sichten und Funktionen für Metabase |
+| `0029_pruefung_wareneinsatz_stilllegen.sql` | Prüfsicht gelöscht, `abdeckung_pct` repariert — sie stand immer auf 100 % |
+| `0030_foodnotify.sql` | **FoodNotify**: Marke, Kostenstelle, POS-Zuordnung, Rezept, Zutat, Ware, Einkauf. Räumt LINAs WAWI-Tabellen ab |
 | `pruefung.sql` | Verifikation gegen den Bayreuth-Fall aus dem Excel (kein Migrationsschritt) |
+
+Die Tabelle nennt die tragenden Migrationen, nicht jede einzelne. Der verbindliche Stand steht in `public.schema_migration`.
 
 Migration hinzufügen: neue Datei `NNNN_name.sql`, aufsteigend. **Bereits angewendete Dateien nie ändern** — der Stand steht in `public.schema_migration`.
 

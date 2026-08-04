@@ -399,3 +399,54 @@ kein Verlust — die Zahlen waren ohnehin keine.
 
 ---
 
+## LINAs Warenwirtschaft wird gelöscht, nicht umgebaut (01.08.2026)
+
+Migration `0030` legt die FoodNotify-Tabellen an und räumt dabei acht Tabellen
+aus `0002`/`0003` ab: `core.ware`, `ware_stand`, `lieferant`, `bestellung`,
+`bestellposten`, `einkaufspreis_stand`, `einheit`, `inventurtermin`.
+
+**Warum überhaupt.** Sie halten LINAs Warenwirtschaft, und die ist laut Vorgabe
+vom 27.07.2026 Demodaten. Vorgefunden: 898 Waren, 540 Lieferanten — aber **vier
+Bestellungen mit 18 Positionen**. Ein Verhältnis, das die Antwort schon enthielt.
+
+**Mit echter Wirkung.** `mart.preisentwicklung_ware` las diese Tabellen und
+lieferte 1.111 Zeilen. Die Metabase-Karte „Einkaufspreise im Verlauf" zeigte
+diese erfundenen Preise als echte an — ohne Kennzeichnung. Ihre eigene
+Beschreibung war im Rückblick der Hinweis: *„Die Reihe beginnt mit der ersten
+Erfassung — für die Zeit davor gibt es keine Preise, weil sie nirgends
+gespeichert wurden."* Bei FoodNotify ist es genau umgekehrt: die Historie
+entsteht aus den Bestellungen selbst und reicht bei Aposto bis Oktober 2021.
+
+Das ist innerhalb eines Tages der zweite Fall derselben Sorte, nach
+`mart.pruefung_wareneinsatz` in `0029`: **eine Zahl, die aussieht wie eine
+Antwort.** Beide Karten sind entfernt.
+
+**Warum löschen statt umbauen.** Die alten Strukturen tragen LINAs Begriffe und
+LINAs Annahmen: `lina_id` als Schlüssel, `listenpreis` (Katalog- statt
+Belegpreis), `liefertage`, `mindestbestellwert`. Es fehlen Marke, Kostenstelle
+und Belegnummer — die drei Achsen, um die es bei FoodNotify geht. Ein Umbau wäre
+ein Zwitter, dem man in einem Jahr nicht mehr ansieht, welche Spalte woher
+stammt. Und `UPDATE`-Migrationen auf Tabellen, deren Inhalt ohnehin wertlos ist,
+sind Arbeit ohne Ertrag.
+
+**Was bleibt, und warum.** `raw.api_antwort` ist append-only und behält alle
+geholten Antworten (Regel 4) — es ist nichts unwiederbringlich weg. Die
+Transformationsfunktionen in `src/transform/index.ts` bleiben samt Tests stehen:
+sie sind rein, beschreiben LINAs Antwortstruktur und haben Arbeit gekostet.
+**Gelöscht wird die Datenhaltung, nicht das Wissen, wie man die Antwort liest.**
+
+**Was abgestellt statt gelöscht wird.** Die fünf `wawi:`-Endpunkte in
+`src/lina/endpunkte.ts` stehen auf `aktiv: false`, mit Befund und
+Antwortstruktur im Kommentar. Wer später fragt „haben wir das mal geprüft?",
+findet dort die Antwort statt einer Lücke. Die fünf Ladefälle in
+`src/sync/laden.ts` sind entfernt — ohne Zieltabelle wären sie ein Laufzeitfehler
+mit Ansage.
+
+**Nicht angefasst:** `manual.betrieb_fremd_id`. Ihr Primärschlüssel
+`(betrieb_key, system)` lässt nur **eine** Fremd-ID je Betrieb und System zu,
+ein LINA-Betrieb hat aber **zwei** FoodNotify-Kostenstellen (Bar und Küche). Die
+Zuordnung sitzt deshalb als `betrieb_key` an `core.kostenstelle` — n:1 statt
+1:1. Die bestehende Tabelle bleibt für YEXT unverändert.
+
+---
+

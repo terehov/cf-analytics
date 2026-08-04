@@ -723,155 +723,23 @@ export async function laden(k: Kontext): Promise<number> {
         break
       }
 
-      case 'wawi:units': {
-        const e = t.einheiten(k.daten)
-        await inBloecken(e, 500, async b => {
-          const { platzhalter, werte } = mehrzeilig(
-            ['lina_id', 'name', 'abkuerzung', 'parent_lina_id', 'faktor', 'ist_basis'],
-            b.map(x => ({ lina_id: x.linaId, name: x.name, abkuerzung: x.abkuerzung,
-                          parent_lina_id: x.parentLinaId, faktor: x.faktor, ist_basis: x.istBasis })))
-          await c.query(
-            `INSERT INTO core.einheit (lina_id, name, abkuerzung, parent_lina_id, faktor, ist_basis)
-             VALUES ${platzhalter}
-             ON CONFLICT (lina_id) DO UPDATE SET
-               name = EXCLUDED.name, abkuerzung = EXCLUDED.abkuerzung,
-               parent_lina_id = EXCLUDED.parent_lina_id, faktor = EXCLUDED.faktor,
-               ist_basis = EXCLUDED.ist_basis, zuletzt_am = now()`, werte)
-        })
-        geschrieben = e.length
-        break
-      }
-
-      case 'wawi:suppliers': {
-        // Die Transformation hat die Whitelist — hier kommen nur noch die
-        // fünf erlaubten Felder an. Siehe Kopf von migrations/0008.
-        const l = t.lieferanten(k.daten)
-        await inBloecken(l, 500, async b => {
-          const { platzhalter, werte } = mehrzeilig(
-            ['lina_id', 'name', 'aktiv', 'mindestbestellwert', 'liefertage'],
-            b.map(x => ({ lina_id: x.linaId, name: x.name, aktiv: x.aktiv,
-                          mindestbestellwert: x.mindestbestellwert, liefertage: x.liefertage })))
-          await c.query(
-            `INSERT INTO core.lieferant (lina_id, name, aktiv, mindestbestellwert, liefertage)
-             VALUES ${platzhalter}
-             ON CONFLICT (lina_id) DO UPDATE SET
-               name = EXCLUDED.name, aktiv = EXCLUDED.aktiv,
-               mindestbestellwert = EXCLUDED.mindestbestellwert,
-               liefertage = EXCLUDED.liefertage, zuletzt_am = now()`, werte)
-        })
-        geschrieben = l.length
-        break
-      }
-
-      case 'wawi:items': {
-        const { waren: w, preise } = t.waren(k.daten)
-        const ekey = await schluesselMap(c, 'core.einheit', 'einheit_key')
-        const lkey = await schluesselMap(c, 'core.lieferant', 'lieferant_key')
-
-        await inBloecken(w, 500, async b => {
-          const { platzhalter, werte } = mehrzeilig(
-            ['lina_id', 'name', 'nummer', 'gruppe_lina_id', 'gruppe_name', 'einheit_key'],
-            b.map(x => ({ lina_id: x.linaId, name: x.name, nummer: x.nummer,
-                          gruppe_lina_id: x.gruppeLinaId, gruppe_name: x.gruppeName,
-                          einheit_key: x.einheitLinaId ? ekey.get(x.einheitLinaId) ?? null : null })))
-          await c.query(
-            `INSERT INTO core.ware (lina_id, name, nummer, gruppe_lina_id, gruppe_name, einheit_key)
-             VALUES ${platzhalter}
-             ON CONFLICT (lina_id) DO UPDATE SET
-               name = EXCLUDED.name, nummer = EXCLUDED.nummer,
-               gruppe_lina_id = EXCLUDED.gruppe_lina_id, gruppe_name = EXCLUDED.gruppe_name,
-               einheit_key = EXCLUDED.einheit_key, zuletzt_am = now()`, werte)
-        })
-        const wkey = await schluesselMap(c, 'core.ware', 'ware_key')
-
-        const sw = ['ware_key','monat','name','gruppe_name','einheit_key',
-                    'hauptlieferant_key','listenpreis','gebinde','gebinde_einheit'] as const
-        const wsRows = w.filter(x => wkey.has(x.linaId)).map(x => ({
-          ware_key: wkey.get(x.linaId)!, monat: k.von, name: x.name,
-          gruppe_name: x.gruppeName,
-          einheit_key: x.einheitLinaId ? ekey.get(x.einheitLinaId) ?? null : null,
-          hauptlieferant_key: x.hauptlieferantLinaId ? lkey.get(x.hauptlieferantLinaId) ?? null : null,
-          listenpreis: x.listenpreis, gebinde: x.gebinde, gebinde_einheit: x.gebindeEinheit,
-        }))
-        await inBloecken(wsRows, 500, async b => {
-          const { platzhalter, werte } = mehrzeilig(sw, b)
-          await c.query(
-            `INSERT INTO core.ware_stand (${sw.join(',')}) VALUES ${platzhalter}
-             ON CONFLICT (ware_key, monat) DO NOTHING`, werte)
-        })
-
-        const sp = ['ware_key','monat','lina_preis_id','lieferant_key','einheit_key',
-                    'lieferanten_artnr','bestellart','preis','menge','gebinde_menge',
-                    'basis_faktor','aktiv','geaendert_am'] as const
-        const pRows = preise.filter(p => wkey.has(p.wareLinaId)).map(p => ({
-          ware_key: wkey.get(p.wareLinaId)!, monat: k.von, lina_preis_id: p.linaPreisId,
-          lieferant_key: p.lieferantLinaId ? lkey.get(p.lieferantLinaId) ?? null : null,
-          einheit_key: p.einheitLinaId ? ekey.get(p.einheitLinaId) ?? null : null,
-          lieferanten_artnr: p.lieferantenArtnr, bestellart: p.bestellart,
-          preis: p.preis, menge: p.menge, gebinde_menge: p.gebindeMenge,
-          basis_faktor: p.basisFaktor, aktiv: p.aktiv, geaendert_am: p.geaendertAm,
-        }))
-        // APPEND-ONLY: DO NOTHING statt DO UPDATE. Eine einmal festgehaltene
-        // Momentaufnahme wird nicht nachträglich verändert — sonst wäre die
-        // Preisreihe genau das, was LINA auch schon nicht hat.
-        await inBloecken(pRows, 500, async b => {
-          const { platzhalter, werte } = mehrzeilig(sp, b)
-          await c.query(
-            `INSERT INTO core.einkaufspreis_stand (${sp.join(',')}) VALUES ${platzhalter}
-             ON CONFLICT (ware_key, monat, lina_preis_id) DO NOTHING`, werte)
-        })
-        geschrieben = w.length + pRows.length
-        break
-      }
-
-      case 'wawi:orders': {
-        const b = t.bestellungen(k.daten)
-        const lkey = await schluesselMap(c, 'core.lieferant', 'lieferant_key')
-        const ekey = await schluesselMap(c, 'core.einheit', 'einheit_key')
-        for (const best of b) {
-          const r = await c.query(
-            `INSERT INTO core.bestellung
-               (lina_id, lieferant_key, erstellt_am, bestellt_am, liefertermin,
-                geliefert, status, posten_anzahl, summe)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-             ON CONFLICT (lina_id) DO UPDATE SET
-               lieferant_key = EXCLUDED.lieferant_key, geliefert = EXCLUDED.geliefert,
-               status = EXCLUDED.status, posten_anzahl = EXCLUDED.posten_anzahl,
-               summe = EXCLUDED.summe, zuletzt_am = now()
-             RETURNING bestellung_key`,
-            [best.linaId, best.lieferantLinaId ? lkey.get(best.lieferantLinaId) ?? null : null,
-             best.erstelltAm, best.bestelltAm, best.liefertermin,
-             best.geliefert, best.status, best.postenAnzahl, best.summe])
-          const bkey = Number(r.rows[0].bestellung_key)
-          if (best.posten.length === 0) continue
-          const sp = ['bestellung_key','ware_lina_id','einheit_key','ware_name','menge','einzelpreis'] as const
-          const { platzhalter, werte } = mehrzeilig(sp, best.posten.map(p => ({
-            bestellung_key: bkey, ware_lina_id: p.wareLinaId,
-            einheit_key: p.einheitLinaId ? ekey.get(p.einheitLinaId) ?? null : null,
-            ware_name: p.wareName, menge: p.menge, einzelpreis: p.einzelpreis,
-          })))
-          await c.query(
-            `INSERT INTO core.bestellposten (${sp.join(',')}) VALUES ${platzhalter}
-             ON CONFLICT (bestellung_key, ware_lina_id) DO UPDATE SET
-               menge = EXCLUDED.menge, einzelpreis = EXCLUDED.einzelpreis`, werte)
-        }
-        geschrieben = b.length
-        break
-      }
-
-      case 'wawi:inventory': {
-        const i = t.inventurtermine(k.daten)
-        await inBloecken(i, 500, async b => {
-          const { platzhalter, werte } = mehrzeilig(
-            ['datum', 'bearbeitbar'], b.map(x => ({ datum: x.datum, bearbeitbar: x.bearbeitbar })))
-          await c.query(
-            `INSERT INTO core.inventurtermin (datum, bearbeitbar) VALUES ${platzhalter}
-             ON CONFLICT (datum) DO UPDATE SET
-               bearbeitbar = EXCLUDED.bearbeitbar, zuletzt_am = now()`, werte)
-        })
-        geschrieben = i.length
-        break
-      }
+      // ENTFALLEN AM 01.08.2026 (Migration 0030): die fünf Ladefälle
+      // 'wawi:units', 'wawi:suppliers', 'wawi:items', 'wawi:orders' und
+      // 'wawi:inventory'.
+      //
+      // LINAs Warenwirtschaft enthält Demodaten (AGENTS.md, Regel 5). Die
+      // Zieltabellen — core.einheit, lieferant, ware, ware_stand,
+      // einkaufspreis_stand, bestellung, bestellposten, inventurtermin —
+      // sind in Migration 0030 gelöscht; die Endpunkte stehen in
+      // lina/endpunkte.ts auf aktiv: false.
+      //
+      // Waren, Lieferanten, Bestellungen und Preise kommen seither aus
+      // FoodNotify (core.ware, core.bestellung, core.bestellposition) —
+      // und dort als BELEGPREISE mit Datum, nicht als Katalogpreise ohne
+      // Historie. Siehe docs/plan-foodnotify.md.
+      //
+      // Der Raw-Layer behält die bereits geholten Antworten: raw.api_antwort
+      // ist append-only, es ist nichts verloren.
 
       default:
         // Noch keine Transformation — der Raw-Layer hat die Daten trotzdem.

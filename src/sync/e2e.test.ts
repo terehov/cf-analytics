@@ -226,21 +226,16 @@ lauf('Stammdaten-Momentaufnahmen', () => {
     mock = mockStarten({ port: Number(new URL(config.LINA_BASE_URL).port) })
     db = new Client({ connectionString: DB })
     await db.connect()
-    await db.query(`TRUNCATE core.artikel_warengruppe_stand, core.warengruppe, core.feinsparte,
-                       core.einkaufspreis_stand, core.ware_stand, core.ware,
-                       core.bestellposten, core.bestellung, core.lieferant, core.einheit,
-                       core.inventurtermin RESTART IDENTITY CASCADE`)
+    // Die WAWI-Tabellen sind seit Migration 0030 gelöscht (Demodaten,
+    // AGENTS.md Regel 5) — hier bleibt nur die Sortimentshierarchie.
+    await db.query(`TRUNCATE core.artikel_warengruppe_stand, core.warengruppe, core.feinsparte
+                    RESTART IDENTITY CASCADE`)
     // Ein Artikel, damit articleApi etwas zum Verknuepfen hat.
     await db.query(`INSERT INTO core.artikel (artikelnummer, name) VALUES (300213, 'Artikel A')
                     ON CONFLICT (artikelnummer) DO NOTHING`)
     await db.query(
       `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet) VALUES
          ('analyticsFilterOptions',  $1,$1, 10),
-         ('wawi:units',              $1,$1, 10),
-         ('wawi:suppliers',          $1,$1, 10),
-         ('wawi:items',              $1,$1, 10),
-         ('wawi:orders',             $1,$1, 10),
-         ('wawi:inventory',          $1,$1, 10),
          ('articleApi:franchise',    $1,$1, 10)
        ON CONFLICT DO NOTHING`, [MONAT])
 
@@ -285,6 +280,10 @@ lauf('Stammdaten-Momentaufnahmen', () => {
   /**
    * Datenminimierung, in der Datenbank nachgewiesen: core.lieferant darf
    * ueberhaupt keine Spalte fuer Steuer-, Bank- oder Kontaktdaten haben.
+   *
+   * Die Tabelle ist seit Migration 0030 eine andere (FoodNotify statt LINA),
+   * die Regel ist dieselbe. Genau deshalb steht der Test hier weiter: er
+   * prueft eine Zusicherung, nicht eine Implementierung.
    */
   test('core.lieferant hat keine Spalte fuer heikle Felder', async () => {
     const { rows } = await db.query(
@@ -298,26 +297,29 @@ lauf('Stammdaten-Momentaufnahmen', () => {
     expect(spalten).toContain('name')
   })
 
-  test('Einkaufspreise je Ware und Lieferant, mit Umrechnung auf die Basiseinheit', async () => {
-    const { rows: [{ n }] } = await db.query(
-      `SELECT count(*)::int AS n FROM core.einkaufspreis_stand WHERE monat = $1`, [MONAT])
-    expect(n).toBeGreaterThan(0)
-    // Ware 1 hat zwei Lieferantenpreise -- deshalb eine eigene Tabelle.
-    const { rows: [{ n: mehrfach }] } = await db.query(`
-      SELECT count(*)::int AS n FROM (
-        SELECT ware_key FROM core.einkaufspreis_stand GROUP BY 1 HAVING count(*) > 1) x`)
-    expect(mehrfach).toBeGreaterThan(0)
-  })
-
-  test('Inventurtermine sind je Tag eindeutig', async () => {
-    const { rows: [{ n, tage }] } = await db.query(
-      `SELECT count(*)::int AS n, count(DISTINCT datum)::int AS tage FROM core.inventurtermin`)
-    expect(n).toBe(tage)
-  })
-
-  test('die neuen Mart-Sichten sind abfragbar', async () => {
-    await db.query(`SELECT * FROM mart.preisentwicklung_ware LIMIT 1`)
+  /**
+   * Die Tests zu Einkaufspreisen, Inventurterminen und
+   * mart.preisentwicklung_ware sind am 01.08.2026 entfallen (Migration
+   * 0030): sie prueften LINAs Warenwirtschaft, und die ist Demodaten.
+   *
+   * Ihre Nachfolger gehoeren zu Stufe 1.5 und 1.7 und pruefen dann
+   * core.bestellposition — echte Belegpreise mit Datum.
+   */
+  test('die Mart-Sichten sind abfragbar', async () => {
     await db.query(`SELECT * FROM mart.deckungsbeitrag_warengruppe LIMIT 1`)
+  })
+
+  /**
+   * Migration 0030 legt die vier Mandanten an. Ohne sie haengt jede
+   * FoodNotify-Tabelle an einem Fremdschluessel ins Leere — und der
+   * Schluessel traegt zugleich den Namen der Umgebungsvariablen
+   * (aposto -> FN_APOSTO_USER), ist also nicht frei umbenennbar.
+   */
+  test('die vier FoodNotify-Marken stehen bereit', async () => {
+    const { rows } = await db.query(
+      `SELECT schluessel FROM core.marke ORDER BY schluessel`)
+    expect(rows.map(r => r.schluessel)).toEqual(
+      ['aposto', 'deutsche_konzepte', 'enchilada', 'wilma_wunder'])
   })
 
   /**
