@@ -149,6 +149,62 @@ fachliche Bedeutung.
 
 ---
 
+## Beziehungen — das Entlanghangeln in `mart` (03.08.2026)
+
+Sichtbarkeit ist die eine Hälfte, Beziehungen die andere. Metabases eigentliche Stärke
+ist der Sprung von einer Zahl zum Betrieb und von dort weiter — angeboten wird er aber
+nur, wo Metabase eine **Beziehung** kennt, und die liest es als Fremdschlüssel aus dem
+Katalog.
+
+**`mart` hatte keine.** Das Schema besteht zu 100 % aus Sichten (50 Views, 0 Tabellen),
+und Postgres kennt keine Fremdschlüssel auf Sichten — alle 40 FKs der Datenbank liegen in
+`core` und `manual`. Die 34 Schlüsselfelder in `mart` standen deshalb **ohne jeden
+semantischen Typ** da: kein PK, kein FK. Die Sprünge, die Metabase anbot, gingen
+ausschließlich innerhalb von `core`, also genau dort, wo niemand arbeiten soll.
+
+Das war der eigentliche Grund für den Eindruck, in `mart` fehle die Funktionalität — nicht
+die Sichtbarkeit von `core`. Beides sichtbar zu machen hätte das Entlanghangeln *auch nicht*
+hergestellt, weil `mart` und `core` für Metabase unverbunden sind.
+
+**Metabase nimmt FK-Metadaten auch ohne Constraint an.** Die API unterscheidet nicht
+zwischen Tabelle und Sicht. `metabase/beziehungen.ts` setzt drei Ebenen — alle drei nötig:
+
+| Ebene | Was | Ohne sie |
+|---|---|---|
+| 1 | Ziel als Entity Key (`mart.betrieb.betrieb_key`) | kein Sprungziel |
+| 2 | Quelle als Foreign Key (`mart.umsatz_tag.betrieb_key`) | kein Sprung |
+| 3 | Anzeige auf den Namen umhängen | Spalte heißt „Betrieb Key → Betrieb Key" und zeigt Zahlen |
+
+Verdrahtet sind **64 Felder** entlang zweier Achsen: `betrieb_key` (30 Sichten) und
+`aktion_key` (3). Ergebnis: ein Aufriss über `mart.round_table_basis` gruppiert nach
+Betrieb liefert „Alte Post Aachen" statt `3`.
+
+**Bewusst nicht verdrahtet:** `artikel_key`, `bestellung_key`, `bestellposition_key`. Ein
+Fremdschlüssel braucht ein Ziel, und `mart.artikel` bzw. `mart.bestellung` gibt es nicht —
+die Schlüssel kommen je genau einmal vor. Das wäre eine Migration, keine Metadatenfrage.
+Ebenso offen: `mart.einkauf_position` führt `lieferant` und `ware` nur als **Text**, ohne
+Schlüsselspalte — dort ist ein Sprung nicht verdrahtbar, sondern muss erst in der Sicht
+angelegt werden.
+
+```bash
+bun run metabase/beziehungen.ts            # zeigt nur an
+bun run metabase/beziehungen.ts --setzen   # schreibt
+```
+
+Läuft ohne Browser über den Importer-Zugang (`METABASE_USER`/`_PASSWORD`), dasselbe Muster
+wie `uebernehmen.ts`. Ein zweiter Lauf meldet „0 zu setzen".
+
+> **Fallstrick beim Abgleich:** `/database/:id/metadata` liefert das Feld `dimensions`
+> **nicht** mit — nur `/field/:id` tut das. Wer den Ist-Zustand aus dem Katalog liest, hält
+> jede bestehende Anzeigeverknüpfung für fehlend und schreibt bei jedem Lauf dieselben
+> 30 Änderungen. `beziehungen.ts` fragt Ebene 3 deshalb je Feld einzeln ab.
+
+**Nach jeder Migration, die eine `mart`-Sicht ergänzt, einmal laufen lassen** — neue
+Sichten kommen ohne semantische Typen aus dem Katalog, genau wie neue Tabellen ohne
+Sichtbarkeitseinstellung.
+
+---
+
 ## Wieder ändern
 
 **Der ganze Satz auf einmal** — die Regel steht in `metabase/sichtbarkeit.ts`:
