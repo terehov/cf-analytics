@@ -328,4 +328,47 @@ SELECT endpunkt            AS "Endpunkt",
       column_settings: { '["name","%"]': { suffix: ' %' } },
     },
   },
+  {
+    schluessel: 'im_yext',
+    name: 'Bewertungsimport — letzter Lauf',
+    beschreibung:
+      'Der Yext-Abruf der Online-Bewertungen läuft getrennt vom LINA-Import, einmal täglich. „Std her" sollte unter etwa 28 Stunden liegen — täglicher Lauf plus Puffer. Steht dort mehr, ist der Bewertungsimport hängen geblieben, und die Bewertungsseiten altern stillschweigend weiter.',
+    anzeige: 'table',
+    sql: `
+-- Zwei Quellen, weil keine allein die Frage beantwortet: sync.merker
+-- weiss, WANN der letzte Yext-Lauf lief und ob er Fehler hatte;
+-- mart.bewertung_ladestand weiss, WAS danach in der Datenbank liegt.
+-- LEFT JOIN statt CROSS JOIN: fehlt der Merker (noch nie gelaufen),
+-- sollen die Ladestandzeilen trotzdem erscheinen -- mit leerem Lauf.
+WITH lauf AS (
+  SELECT (wert ->> 'beendet_am')::timestamptz AS beendet_am,
+         (wert ->> 'fehler')::int             AS fehler
+    FROM sync.merker
+   WHERE schluessel = 'yext_letzter_lauf'
+)
+SELECT s.quelle                                  AS "Quelle",
+       s.publisher                               AS "Publisher",
+       s.betriebe                                AS "Betriebe",
+       s.bewertungen_aktuell                     AS "Bewertungen",
+       s.schnitt_aktuell                         AS "Ø Sterne",
+       s.von                                     AS "von",
+       s.bis                                     AS "bis",
+       to_char(l.beendet_am, 'DD.MM. HH24:MI')   AS "letzter Lauf",
+       round(extract(epoch FROM now() - l.beendet_am) / 3600, 1)
+                                                 AS "Std her",
+       l.fehler                                  AS "Fehler"
+  FROM mart.bewertung_ladestand s
+  LEFT JOIN lauf l ON true
+ ORDER BY s.publisher`,
+  },
+
+  // ===================================================================
+  // 5. Datenqualitaet -- Karten fuer "Datenqualitaet und Import"
+  //
+  // Diese dq_*-Karten liegen NICHT auf der Importseite, sondern auf
+  // db_datenqualitaet. Sie stehen trotzdem in dieser Datei: sie lesen
+  // dieselben Quellen wie die Importkarten und sind mit ihnen im
+  // Review vom 03.08.2026 zusammen entstanden.
+  // ===================================================================
+  {
 ]

@@ -93,6 +93,18 @@ ohne Zweck zu speichern wollen wir vermeiden.
 Sollte später eine Textauswertung gewünscht sein, käme das als eigener Antrag mit eigener
 datenschutzrechtlicher Prüfung — nicht durch die Hintertür dieses Zugangs.
 
+> **Nachtrag 03.08.2026 — dieser Antrag ist gestellt und entschieden.** Die Texte werden
+> seitdem gespeichert (`core.bewertung`), damit die roten Ampeln des Round Table eine
+> Ursache bekommen: eine Zahl sagt, *dass* ein Haus abrutscht, erst der Text sagt *woran*.
+> Gespeichert werden Note, Datum, Portal, Text, **Autorenname** und der Link zur Quelle;
+> `authorEmail` und die Antworten des Betriebs (`comments`) bleiben ausgeschlossen.
+>
+> Der Autorenname war zunächst ebenfalls ausgenommen und kam am selben Tag dazu: die
+> Namen stehen bei Google, TripAdvisor und OpenTable öffentlich neben der Bewertung, und
+> wer auf eine Kritik antworten will, muss wissen an wen. Begründung in
+> `entscheidungen.md`, Umsetzung in `migrations/0037_bewertung_einzeln.sql` und
+> `0038_bewertung_autor.sql`.
+
 ---
 
 ## 4. Zielstruktur bei uns
@@ -217,3 +229,73 @@ Qualitätsproblem einhergeht oder nicht.
 Wir bitten um einen **lesenden API-Zugang zu Reviews und Entities** für 141 Standorte, um
 die monatliche Durchschnittsbewertung automatisiert in unser internes Berichtswesen zu
 übernehmen — dort ersetzt sie eine bislang von Hand gepflegte Zahl.
+
+---
+
+## 10. Nachtrag 03.08.2026 — was der Zugang tatsächlich kann
+
+Der API-Schlüssel liegt vor und wurde gegen das Produktivkonto gemessen. Damit sind fünf der
+sechs Fragen aus Abschnitt 8 beantwortet, teils anders als erhofft. Der Abschnitt oben bleibt
+unverändert stehen — er ist die gestellte Anfrage, das hier ist der Befund.
+
+| Frage | Befund |
+|---|---|
+| 1 Developer Console | offen — der Schlüssel kam auf anderem Weg |
+| 2 eigenes Konto? | **Nein.** Alle 115 Entitäten liegen unter `accountId 1559219539920412896`, dem Konto der Family & Friends Marketing. `accountId=me` funktioniert. |
+| 3 Reviews im Vertrag? | **Ja.** 225.725 Bewertungen lesbar. |
+| 4 Aggregierter Endpunkt? | **Kein eigener** (`/reviewsAggregate` → 404) — aber die Bewertungsliste liefert `count` und `averageRating` im Kopf. Zusammen mit `maxPublisherDate` ist das genau die gesuchte Aggregation. |
+| 5 Publisher-Skalen? | **Bestätigtes Problem.** FACEBOOK führt Einträge ohne `rating`. Konsequenz: die Kennzahl läuft auf `GOOGLEMYBUSINESS`, gespeichert wird zusätzlich `ALLE`. |
+| 6 Sandbox? | nicht geprüft — nicht nötig, der Zugriff ist ausschließlich lesend |
+
+### Die wichtigste Antwort ist die auf Frage 2
+
+**Die Bitte aus Abschnitt 1 ist nicht umgesetzt.** Der Zugang ist *nicht* technisch auf die
+Concept-Family-Standorte begrenzt. Sichtbar sind neben unseren 65 Restaurant-Entitäten auch
+43 Standorte fremder Kunden:
+
+| Ordner | Standorte |
+|---|---|
+| my Indigo | 16 |
+| Pommes Freunde | 10 |
+| Gimme Gelato | 9 |
+| Glorious Bastards / Soulkitchen Gruppe | 6 |
+| Soulkitchen Einzelkonzepte | 2 |
+
+Dazu sechs Markensätze (`entityType: brand`) und die Zentrale in Gräfelfing.
+
+Getrennt wird ausschließlich über den Ordnerbaum unter „Family & Friends Marketing GmbH".
+Ein Ordnername ist eine Beschriftung, keine Grenze — er kann sich ändern, ohne dass jemand
+es uns sagt. **Der Importer filtert deshalb über `manual.betrieb_fremd_id` und lädt
+ausschließlich zugeordnete Betriebe.** Das ist die Stelle, an der aus einer organisatorischen
+Zusage eine technische Eigenschaft wird.
+
+Die Anfrage nach einer technischen Begrenzung bleibt damit offen und sinnvoll. Sie ist jetzt
+allerdings kein Blocker mehr, sondern eine zweite Sicherung.
+
+### Wie die 141 Betriebe und die Yext-Entitäten zueinander stehen
+
+Von den 141 Zeilen in `core.betrieb` sind viele keine Restaurants: Holdings
+(`… Beteiligungs GmbH`, `… Management GmbH`), Testeinträge und stillgelegte Häuser
+(`GESCHLOSSEN …`). Yext führt 65 Restaurant-Entitäten in unseren Ordnern; 60 davon sind
+zugeordnet.
+
+Fünf haben in `core.betrieb` kein zweifelsfreies Gegenstück und stehen in
+`src/yext_zuordnen.ts` ausdrücklich als offen (`null`), damit der Namensabgleich sie nicht
+doch noch irgendwo hinsortiert:
+
+| Entität | Yext-Name | Vermutung |
+|---|---|---|
+| `B_04` | Besitos Würzburg | kein Besitos Würzburg in LINA |
+| `EK_06` | Carls Brauhaus, Stuttgart | evtl. [138] Wirtshaus am Schlossplatz GmbH |
+| `EK_11` | Riegele Wirtshaus, Augsburg | kein plausibler Betrieb gefunden |
+| `EK_14` | Würzburger Hofbräukeller | evtl. [122] WHK Gastronomie GmbH |
+| `L_03` | Lehners Wirtshaus Pforzheim | evtl. [21] B+L Pforzheim GmbH |
+
+### Was gespeichert wird — Abschnitt 3 und 4 im Ist-Zustand
+
+Enger als beantragt. Der Importer holt **keine** Einzelbewertungen: er fragt je Betrieb,
+Monatsende und Portal nach `count` und `averageRating` und speichert genau diese zwei Zahlen
+in `core.bewertung_stand`. `authorName`, `content` und `comments` werden nicht ausgewertet,
+nicht gespeichert und nicht einmal durchgereicht — die Felder aus Abschnitt 3
+(`entityId`, `rating`, `publisherId`, `publisherDate`, `status`) werden serverseitig von
+Yext aggregiert, nicht bei uns.

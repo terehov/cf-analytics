@@ -89,6 +89,38 @@ Margenbetrachtung, die sich nicht nachholen lässt.
 `manual.*` — Online-Bewertungen (YEXT, eigener Sync), OM-Einschätzung, Ursachen, Maßnahmen, und
 die Auflösung mehrdeutiger Markenzuordnungen.
 
+#### Online-Bewertungen aus Yext — seit 03.08.2026 automatisch
+
+```
+Yext Management API v2  →  core.bewertung_stand  →  mart.bewertung_verlauf  →  Metabase
+   /reviews (count +        kumuliert je Betrieb,     Stand + Monatswert
+   averageRating je         Monatsende und Portal
+   Stichtag)                                       →  manual.online_bewertung  →  Round Table
+```
+
+| | |
+|---|---|
+| Importer | `bun run yext` (täglich, 3 Monate) · `bun run yext --voll` (25 Monate) |
+| Zuordnung | `manual.betrieb_fremd_id` (`system = 'yext'`), gepflegt über `bun run yext:zuordnen` |
+| Abdeckung | 60 von 65 unserer Yext-Entitäten; 5 ohne LINA-Gegenstück, in `VON_HAND` als offen vermerkt |
+| Kennzahl | kumulierter Google-Schnitt bis Monatsende → `manual.online_bewertung.bewertung` |
+| `anzahl` | Bewertungen **im** Monat (Differenz zum Vormonat), NULL wenn der Vormonat fehlt |
+
+**Der Zugang ist nicht auf uns begrenzt.** Alle 115 Entitäten des Kontos liegen unter einer
+`accountId`; 43 davon sind Standorte fremder Kunden der Family & Friends Marketing (Gimme
+Gelato, Pommes Freunde, my Indigo, Soulkitchen). Gefiltert wird über
+`manual.betrieb_fremd_id`, nie über Namen oder Ordner. Prüfen mit `bun run yext:pruefen`.
+
+**Zwei Schichten, zwei Zwecke.** Die *Kennzahl* kommt aus `core.bewertung_stand`: Anzahl
+und Durchschnitt je Monatsende, Yexts eigenes Aggregat, keine Einzeldaten. Zum *Lesen*
+kommt seit dem 03.08.2026 `core.bewertung` dazu — einzelne Bewertungen mit Note, Text,
+Autorenname und Link zur Quelle (`mart.bewertung_einzel`), weil eine Zahl zwar sagt, dass
+ein Haus abrutscht, aber nicht woran.
+
+Aus `core.bewertung` wird **nicht gerechnet**: eine gelöschte Bewertung verschwindet bei
+Yext sofort aus dem Durchschnitt, unsere Kopie bliebe stehen. Wer daraus einen Schnitt
+bildet, bekommt eine andere Zahl als der Round Table — und die falsche.
+
 **Dazu Adressen und Koordinaten der Betriebe.** Am 26.07.2026 wurden alle 489 archivierten
 API-Antworten rekursiv nach Adress- und Geofeldern durchsucht — kein einziger Treffer für
 Betriebe. `analyticsFilterOptions` liefert `{id, name}`, die Berichtsendpunkte

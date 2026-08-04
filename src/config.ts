@@ -70,6 +70,36 @@ const Schema = z.object({
   FN_WILMA_WUNDER_USER: z.string().optional(),
   FN_WILMA_WUNDER_PASSWORD: z.string().optional(),
 
+  // --- Yext ----------------------------------------------------------------
+  /**
+   * Lesender Zugang zu Bewertungen und Entitäten (Management API v2).
+   *
+   * Optional, und zwar dauerhaft: der Importer läuft ohne Yext vollständig
+   * weiter, die Online-Bewertung ist dann eben die von Hand gepflegte Zahl.
+   * Ein fehlender Schlüssel ist deshalb kein Startfehler.
+   *
+   * WAS DIESER SCHLÜSSEL NICHT ENTSCHEIDET: welche Standorte uns gehören. Das
+   * Konto gehört der Family & Friends Marketing und enthält auch fremde
+   * Kunden (docs/yext-anbindung.md §1). Maßgeblich ist
+   * `manual.betrieb_fremd_id` mit `system = 'yext'`; alles andere, was die API
+   * liefert, wird verworfen.
+   */
+  YEXT_API_KEY: z.string().optional(),
+  /** 'me' = das Konto des Schlüssels. Eine echte ID nur als Unterkonto einer Agentur. */
+  YEXT_ACCOUNT_ID: z.string().default('me'),
+  /**
+   * Rechenzentrum. Ein Schlüssel der US-Instanz ist an der EU-Instanz
+   * ungültig und umgekehrt — bei einem 401 ist das der erste Verdacht,
+   * nicht der Schlüssel.
+   */
+  YEXT_BASE_URL: z.string().default('https://api.yext.com'),
+  /**
+   * Pflichtparameter `v` der Management API. Festes Datum in der
+   * Vergangenheit: Yext hält alte Versionen stabil, damit sich die
+   * Antwortform nicht unter uns weg ändert.
+   */
+  YEXT_API_VERSION: z.string().regex(/^\d{8}$/).default('20240401'),
+
   // --- Tempo -------------------------------------------------------------
   /**
    * Pause zwischen zwei Requests, zufällig aus diesem Bereich.

@@ -13,6 +13,7 @@ import { nachfuellen } from './sync/nachfuellen'
 import { auswahllistenNachlauf } from './sync/auswahllisten'
 import { deckungsbeitragNachlauf } from './sync/deckungsbeitrag'
 import { einkaufspreisNachlauf } from './sync/einkaufspreis'
+import { yextNachlauf } from './yext/nachlauf'
 
 const ausloeser = process.argv.includes('--backfill') ? 'backfill'
                 : process.argv.includes('--manuell')  ? 'manuell'
@@ -62,6 +63,14 @@ try {
    * Wirft nie, siehe Kopf von sync/einkaufspreis.ts.
    */
   await einkaufspreisNachlauf()
+
+  // Vierter Nachlauf: die Online-Bewertungen aus Yext. Anders als die beiden
+  // darüber hängt er nicht am Importergebnis, sondern an der Uhr — er läuft
+  // höchstens einmal am Tag und prüft das selbst. Hier angehängt aus demselben
+  // Grund wie nebenan, und aus einem eigenen: ein zweiter Zeitplan hat am
+  // 02.08.2026 LINA acht Tage stillstehen lassen, ohne dass es auffiel.
+  // Wirft nie, siehe Kopf von yext/nachlauf.ts.
+  await yextNachlauf()
 
   await pool.end().catch(() => {})
   // Exitcode 1 nur bei Abbruch - 'teilweise' ist normal (einzelne Betriebe ohne Daten).

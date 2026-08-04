@@ -7,6 +7,9 @@
     "health": "bun run src/health.ts",
     "sync": "bun run src/sync.ts",
     "einreihen": "bun run src/einreihen.ts",
+    "yext": "bun run src/yext.ts",
+    "yext:pruefen": "bun run src/yext_pruefen.ts",
+    "yext:zuordnen": "bun run src/yext_zuordnen.ts",
     "migrate": "bun run src/db/migrate.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit"

@@ -509,3 +509,107 @@ Zuordnung sitzt deshalb als `betrieb_key` an `core.kostenstelle` — n:1 statt
 
 ---
 
+### Yext: Portalwahl erst in der Sicht, nicht im Importer
+*03.08.2026, mit Schlüssel gegen das Produktivkonto gemessen.*
+
+Die API kennt **keinen** Aggregat-Endpunkt (`/reviewsAggregate` → 404). Dafür
+liefert die normale Bewertungsliste `count` und `averageRating` im Kopf mit;
+zusammen mit `maxPublisherDate` ist das ein vollständiges Aggregat je Stichtag
+für **einen** Aufruf. Der Importer holt deshalb Stände, nicht Bewertungen —
+und rührt personenbezogene Felder nie an.
+
+**Facebook rechnet nicht mit.** Bei Enchilada Hamm: 2.001 Bewertungen gesamt
+(Schnitt 4,30), davon 1.639 bei Google (4,32), 164 OpenTable, 119 Facebook —
+und Facebook führt Einträge *ohne* `rating`, weil es mit „empfohlen / nicht
+empfohlen" arbeitet. Das ist Frage 5 aus `yext-anbindung.md`, empirisch
+beantwortet: ein Mittelwert über alle Portale mischt zwei Skalen.
+
+Die Ampel steht bei 4,40 zu 4,00, die Portalwahl verschiebt den Wert also über
+die Schwelle hinweg. Gespeichert wird deshalb **je Portal** (`ALLE` und
+`GOOGLEMYBUSINESS`), entschieden wird erst in
+`manual.online_bewertung_aus_yext()`. Läge die Entscheidung im Importer, würde
+ein Meinungswechsel 3.000 Aufrufe kosten; so kostet er ein `UPDATE`.
+
+### Yext: kumulierter Stand als Kennzahl, Monatswert daneben
+Die Zahl, die bisher von Hand in den Round Table getippt wurde, ist die, die
+ein Gast auf Google sieht — der Schnitt über **alle** Bewertungen. Der Schnitt
+der Bewertungen *eines* Monats ist etwas anderes: Enchilada Hamm hatte im Juli
+2026 neun Stück, ein Ausrutscher bewegt das um eine halbe Note. Eine Ampel
+darauf wäre Rauschen mit Farbe.
+
+`core.bewertung_stand` hält deshalb den kumulierten Stand je Monatsende. Der
+Monatswert geht nicht verloren — er ist die Differenz zweier Stände und steht
+in `mart.bewertung_verlauf` als Frühwarnung neben dem Stand. Ein Aufruf je
+Betrieb und Monat liefert beides.
+
+**Fehlt der Vormonat, bleiben die Monatsspalten NULL.** Eine Lücke in der Reihe
+würde sonst zwei Monate zu einem verschmelzen und als besonders starker Monat
+gelesen. Deshalb lädt der Backfill 25 statt 24 Monate: der älteste Monat hat
+keinen Vorgänger und trägt nur den Anker.
+
+### Yext bekommt keinen Wartetakt, sondern Serialität
+*Eugene:* „da es eine API ist, kannst du die requests ohne zu warten der Reihe
+nach abfeuern, nur nicht parallel."
+
+LINAs 10–20 Sekunden sind Tarnung — ein Mensch am Report Center, ein einziger
+Zugang, eine Sperre wäre nicht rückgängig zu machen. Yext ist eine
+dokumentierte, bezahlte API mit ausgeschriebenem Limit von 5.000 Aufrufen je
+Stunde. Dort ist eine künstliche Pause keine Vorsicht, sondern verschenkte
+Zeit.
+
+Gemessen: 453 ms je Aufruf, also ~2,2/s bei strikt serieller Abarbeitung. Der
+Backfill über 25 Monate sind rund 3.000 Aufrufe in gut 20 Minuten — unter dem
+Stundenlimit, solange **ein** Lauf arbeitet. Genau deshalb ist Serialität die
+Bremse und Parallelität ausgeschlossen: sie würde diese Rechnung zerstören.
+Reagiert wird nur auf ein echtes Bremssignal (429/5xx, `Retry-After` als
+Untergrenze).
+
+### Yext: der Zugang ist nicht auf uns begrenzt — der Import muss es sein
+Alle 115 Entitäten des Kontos liegen unter **einer** `accountId`. Die
+wichtigste Bitte aus `yext-anbindung.md` §1 ist damit nicht erfüllt: der
+Schlüssel sieht auch Gimme Gelato, Pommes Freunde, my Indigo und die
+Soulkitchen Gruppe — 43 Standorte fremder Kunden der Family & Friends
+Marketing. Getrennt wird nur der Ordnerbaum, und ein Ordnername ist eine
+Beschriftung, keine Grenze.
+
+**Maßgeblich bleibt `manual.betrieb_fremd_id`.** Der Importer lädt
+ausschließlich zugeordnete Betriebe. Der Ordnerfilter in
+`src/yext_zuordnen.ts` engt nur ein, wer überhaupt zur Zuordnung vorgeschlagen
+wird — er entscheidet nichts.
+
+### Yext: einzelne Bewertungen doch — mit Text, ohne Namen
+*03.08.2026. Revidiert ausdrücklich `yext-anbindung.md` §3.*
+
+Dort stand, Bewertungstexte würden **nicht** gespeichert, und eine Textauswertung
+käme „als eigener Antrag mit eigener datenschutzrechtlicher Prüfung — nicht
+durch die Hintertür dieses Zugangs".
+
+*Eugene:* „Ich möchte hier die einzelnen besten und schlechtesten Bewertungen
+lesen können." Das ist dieser Antrag, und er ist berechtigt: eine Zahl sagt,
+**dass** ein Haus abrutscht. Erst der Text sagt, **woran** — Service, Wartezeit,
+Küche. Ohne ihn ist die Kennzahl eine Ampel ohne Ursache, und die roten Betriebe
+im Round Table wären eine Liste ohne Handlungsanweisung.
+
+**Was gespeichert wird:** Note, Datum, Portal, Text, Autorenname, Link zur Quelle.
+**Was nicht:** `authorEmail` und die Antworten des Betriebs (`comments`). Der Typ
+`YextBewertung` in `src/yext/client.ts` führt diese Felder gar nicht erst; was
+nicht im Typ steht, landet auch nicht versehentlich in einem `INSERT`.
+
+> **Der Autorenname kam erst im zweiten Anlauf dazu.** Migration 0037 hat ihn
+> ausdrücklich weggelassen — er sei das einzige Feld, das eindeutig eine Person
+> benennt, und zum Lesen brauche ihn niemand.
+> *Eugene, am selben Tag:* „Lad die Autoren der Bewertungen mit. Beim Abgeben der
+> Bewertung haben sie der Verarbeitung zugestimmt."
+> Das trägt, und es ist mehr als eine Formalie: der Name steht bei Google,
+> TripAdvisor und OpenTable öffentlich neben dem Text, sichtbar für jeden — wir
+> speichern nichts, was dort nicht ohnehin steht. Dazu kommt der praktische Teil:
+> wer auf eine Kritik antworten will, muss wissen an wen, und dieselbe Person, die
+> dreimal in einem Monat einen Stern vergibt, ist etwas anderes als drei
+> enttäuschte Gäste. Ohne Namen sieht beides gleich aus.
+> Nachgezogen in `migrations/0038_bewertung_autor.sql`.
+
+**Die Kennzahl bleibt beim Aggregat.** `core.bewertung` ist zum Lesen da, nicht
+zum Rechnen. Eine gelöschte Bewertung verschwindet bei Yext sofort aus dem
+Durchschnitt, unsere Kopie bliebe stehen — wer aus dieser Tabelle einen Schnitt
+rechnet, bekommt eine andere Zahl als der Round Table, und zwar die falsche.
+

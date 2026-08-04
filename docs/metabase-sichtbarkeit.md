@@ -39,6 +39,8 @@ Ergebnis liefert, und bringt die Namen schon mit.
 | `round_table_basis` | Dieselben Zahlen ohne Ampel — die Grundlage, auf der alles Weitere aufsetzt |
 | `round_table_trend` | Drei-Monats-Blick je Betrieb und Bereich, ersetzt `Trend_2Monate` |
 | `ampel_bereich` | Die sechs Ampeln im Langformat — für alles, was über Bereiche hinweg zählt |
+| `bewertung_verlauf` | **Online-Bewertungen je Betrieb und Monat** (Yext). Kumulierter Stand für die Ampel, Monatswert als Frühwarnung — die beiden Spalten dürfen nicht verwechselt werden |
+| `bewertung_ladestand` | Abdeckung und letzter Lauf des Yext-Importers. Erste Anlaufstelle, wenn eine Bewertungsampel grau bleibt |
 | `ursachen_analyse` | Ursache × Bereich, ersetzt das Blatt `Ursachenanalyse` |
 | `massnahme` | Maßnahmen mit Betriebsname und Fälligkeit |
 | `umsatz_tag` | Tagesumsatz gesamt — **darf man bedenkenlos summieren** |
