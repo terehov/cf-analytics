@@ -1757,6 +1757,38 @@ eine Budgetgrenze ist eine gewollte Entscheidung und kein Zwischenfall.
    einzeln gesetztes `FN_TAKT_MIN_MS` muss gegen den *geerbten* Höchstwert
    geprüft werden, sonst entsteht still eine Spanne, die es nicht gibt.
 
+## Ein Test, der bei Misserfolg die Umgebung kaputt hinterlässt (02.08.2026)
+
+**Symptom.** Nach einem fehlgeschlagenen Testlauf scheiterte plötzlich
+**jede** Suite gegen die Testdatenbank mit `relation "sync.warteschlange"
+does not exist` — auch die, die zuvor grün waren.
+
+**Ursache.** Ein Test prüfte, dass ein Fehler beim Nachfüllen den Lauf
+nicht abbricht. Er erzeugte den Fehler über
+`ALTER TABLE sync.warteschlange RENAME TO warteschlange_weg` und benannte
+im `finally` zurück. Schlug eine Zusicherung davor fehl, brach der Test ab
+— und je nach Ablauf blieb die Tabelle umbenannt zurück. Ab da war die
+Datenbank für alle folgenden Läufe unbrauchbar, und die Fehlermeldungen
+zeigten auf Stellen, die nichts damit zu tun hatten.
+
+**Behebung.** Der Fehler wird jetzt über eine `CHECK`-Bedingung erzeugt,
+die jedes INSERT zurückweist. Selbst wenn das Aufräumen misslingt, bleibt
+nur eine Regel zurück statt einer fehlenden Tabelle — reparierbar, ohne
+dass man erst herausfinden muss, welcher Test wann was umbenannt hat.
+
+**Regeln.**
+
+1. **Ein Test darf keine Struktur verändern, deren Wiederherstellung er
+   selbst garantieren muss.** `finally` läuft nicht, wenn der Prozess
+   stirbt. Was die Umgebung für andere Tests zerstören kann, gehört in
+   eine Transaktion mit `ROLLBACK` oder in eine Form, deren Rückstand
+   harmlos ist.
+2. **Fehlermeldungen nach einem beschädigten Testlauf zeigen auf die
+   Symptome, nicht auf die Ursache.** Wenn plötzlich viele Suiten
+   scheitern, die nichts gemeinsam haben außer der Datenbank, ist die
+   erste Frage nicht „was ist am Code kaputt", sondern „was hat der letzte
+   Lauf hinterlassen".
+
 ## Eine Restlaufzeit, die Arbeit mitzählt, die dieser Lauf nicht anfassen kann (03.08.2026)
 
 **Symptom.** Ein Lauf meldete eine Viertelstunde lang „rest: 4 h 06 min", die Zahl bewegte

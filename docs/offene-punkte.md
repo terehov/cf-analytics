@@ -115,3 +115,44 @@ Nicht nötig geworden. Der Abgleich hängt jetzt als Nachlauf am Sync-Lauf (`src
 passiert damit von selbst, sobald der Importer läuft — kein eigener Zeitplan, nichts
 einzurichten. Begründung in `docs/entscheidungen.md`, Beschreibung in `docs/dashboards.md`.
 
+
+---
+
+## Die Testsuite ist nicht isoliert (gefunden 01.08.2026)
+
+**Symptom.** `src/sync/e2e.test.ts` allein gegen eine Datenbank: 47 von 47 grün.
+Dieselbe Datenbank, aber `bun test` über alle sechs Dateien: **23 Fehlschläge**,
+fast alle in der Suite „Zugangssperre".
+
+**Nachgewiesen unabhängig von den Änderungen vom 01.08.2026** — mit
+zurückgestashten Änderungen und frischer Datenbank treten dieselben 23 auf.
+
+**Ursache, soweit erkennbar.** Die Testdateien teilen sich Datenbank *und*
+Mock-Port (`config.LINA_BASE_URL`) und laufen nebenläufig. Eine gesetzte
+`sync.zugangssperre` aus einer Datei legt Läufe in einer anderen still — genau
+das, wovor der `afterAll`-Kommentar in der Sperr-Suite warnt („Nicht liegen
+lassen: eine aktive Sperre würde jeden weiteren Lauf stilllegen — auch die
+anderer Testdateien"). Der Hinweis ist da, die Isolation nicht.
+
+**Warum es nicht auffiel.** Ohne `TEST_DATABASE_URL` werden alle
+datenbankgebundenen Tests übersprungen — im Normallauf sind es 61 von 159. Grün
+heißt hier „nicht ausgeführt", nicht „geprüft".
+
+**Was es kostet.** Der teuerste Teil der Suite ist praktisch nie gelaufen. Beim
+Aufräumen am 01.08.2026 fanden sich drei Tests, die schon vorher rot waren,
+darunter einer mit einem echten Denkfehler: Er las
+`sync.warteschlange ORDER BY posten_id LIMIT 1` und nahm an, der Worker greife
+den zuerst eingereihten Posten — tatsächlich griff er Posten 5. Behoben; die
+anderen beiden fielen mit Migration 0030 ohnehin weg.
+
+**Was zu tun wäre** (nicht Teil von Stufe 1.1):
+
+1. Je Testdatei eine eigene Datenbank oder ein `--concurrency 1`, damit der
+   geteilte Zustand nicht mehr zwischen Dateien wandert.
+2. Je Testdatei einen eigenen Mock-Port.
+3. Danach die Suite einmal vollständig grün sehen — vorher ist unbekannt, wie
+   viele der 23 echte Befunde sind und wie viele reine Kollisionen.
+
+**Bis dahin gilt:** Wer an `sync/` arbeitet, lässt `e2e.test.ts` **einzeln**
+gegen eine frische Datenbank laufen. Ein grüner Gesamtlauf ohne
+`TEST_DATABASE_URL` sagt über diesen Teil nichts aus.
