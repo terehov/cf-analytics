@@ -191,7 +191,10 @@ let geprueftDiagramme = 0
 let geschaetzt = 0
 
 for (const d of dashboards) {
-  for (const kachel of auslegen(d.reihen, typVon)) {
+  // Reiter oder Reihen — fuer die Breitenpruefung ist egal, WO eine Kachel
+  // liegt, nur WIE BREIT sie ist. Deshalb alle Reiter nacheinander.
+  const reihen = d.tabs ? d.tabs.flatMap(t => t.reihen) : (d.reihen ?? [])
+  for (const kachel of auslegen(reihen, typVon)) {
     if (!kachel.karte) continue
     const k = alleKarten.find(x => x.schluessel === kachel.karte)
     if (!k) continue

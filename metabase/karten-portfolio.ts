@@ -19,7 +19,7 @@
 // =====================================================================
 
 import type { Karte } from './typen'
-import { MONAT_CTE, MONAT_CTE_UMSATZ, P_MONAT, P_MARKE, P_BETRIEB } from './gemeinsam'
+import { MONAT_CTE, P_MONAT, P_MARKE, P_BETRIEB, WOCHENTAGE } from './gemeinsam'
 
 export const karten: Karte[] = [
   // ===================================================================
@@ -30,20 +30,31 @@ export const karten: Karte[] = [
     // Prozent des Umsatzes. Das ist die Zahl, die entscheidet, wie viel
     // ein Prozentpunkt Verbesserung bei einem kleinen Haus ueberhaupt
     // wert ist -- und wie weh ein Ausfall oben tut.
+    //
+    // Seit dem Review vom 03.08.2026 rollierende 12 Monate statt der
+    // gesamten Historie: ueber 8,5 Jahre gerechnet stand auf Rang 8 ein
+    // seit Januar geschlossenes Haus. Die Frage der Karte ist "wovon
+    // haengt die Gruppe HEUTE ab", nicht "wer hat je am meisten
+    // umgesetzt". Geschlossene Haeuser bleiben absichtlich drin, solange
+    // sie im Fenster Umsatz hatten -- ihr Anteil war real, und ihn
+    // wegzulassen wuerde die kumulierten Prozente schoenen. Die Spalte
+    // "Letzter Umsatztag" macht sie stattdessen kenntlich.
     schluessel: 'pf_konzentration',
-    name: 'Umsatzkonzentration',
+    name: 'Umsatzkonzentration (12 Monate)',
     beschreibung:
-      'Wie stark hängt der Gesamtumsatz an wenigen Häusern? Die Betriebe nach Umsatz sortiert, dazu der aufsummierte Anteil. Je mehr Umsatz auf die ersten Zeilen entfällt, desto schwerer wiegt dort eine Störung — und desto weniger bringt eine Verbesserung ganz unten.',
+      'Wie stark hängt der Gesamtumsatz an wenigen Häusern? Die Betriebe nach Umsatz der letzten zwölf Monate sortiert, dazu der aufsummierte Anteil. Je mehr Umsatz auf die ersten Zeilen entfällt, desto schwerer wiegt dort eine Störung — und desto weniger bringt eine Verbesserung ganz unten. Ein „Letzter Umsatztag" weit in der Vergangenheit heißt: dieses Haus meldet nicht mehr, sein Anteil im Fenster ist Auslauf.',
     anzeige: 'table',
     parameter: [P_MARKE],
     sql: `
 WITH je_betrieb AS (
-    SELECT betrieb, konzept, sum(umsatz_netto) AS umsatz
-      FROM mart.umsatz_tag
-     WHERE 1 = 1
-       [[AND konzept = {{marke}}]]
-     GROUP BY betrieb, konzept
-    HAVING sum(umsatz_netto) > 0
+    SELECT t.betrieb, t.konzept, s.letzter_umsatztag,
+           sum(t.umsatz_netto) AS umsatz
+      FROM mart.umsatz_tag t
+      JOIN mart.betrieb_status s ON s.betrieb_key = t.betrieb_key
+     WHERE t.geschaeftstag >= current_date - interval '12 months'
+       [[AND t.konzept = {{marke}}]]
+     GROUP BY t.betrieb, t.konzept, s.letzter_umsatztag
+    HAVING sum(t.umsatz_netto) > 0
 )
 SELECT row_number() OVER (ORDER BY umsatz DESC)                          AS "Rang",
        betrieb                                                           AS "Betrieb",
@@ -51,7 +62,8 @@ SELECT row_number() OVER (ORDER BY umsatz DESC)                          AS "Ran
        round(umsatz)                                                     AS "Umsatz",
        round(100 * umsatz / sum(umsatz) OVER (), 2)                      AS "Anteil %",
        round(100 * sum(umsatz) OVER (ORDER BY umsatz DESC)
-             / sum(umsatz) OVER (), 1)                                   AS "kumuliert %"
+             / sum(umsatz) OVER (), 1)                                   AS "kumuliert %",
+       letzter_umsatztag                                                 AS "Letzter Umsatztag"
   FROM je_betrieb
  ORDER BY umsatz DESC`,
     visualisierung: {
@@ -61,17 +73,20 @@ SELECT row_number() OVER (ORDER BY umsatz DESC)                          AS "Ran
     },
   },
   {
+    // Dasselbe 12-Monats-Fenster wie in der Tabelle daneben. Zwei Karten,
+    // die "denselben Zusammenhang" zeigen, aber ueber verschiedene
+    // Zeitraeume rechnen, widersprechen sich in den Zahlen.
     schluessel: 'pf_konzentration_kurve',
-    name: 'Konzentrationskurve',
+    name: 'Konzentrationskurve (12 Monate)',
     beschreibung:
-      'Derselbe Zusammenhang als Kurve: wie viel Prozent des Umsatzes die stärksten Betriebe tragen. Je steiler die Kurve links ansteigt, desto abhängiger ist die Gruppe von wenigen Häusern. Eine gerade Linie würde heißen, alle Betriebe tragen gleich viel bei.',
+      'Derselbe Zusammenhang als Kurve, ebenfalls über die letzten zwölf Monate: wie viel Prozent des Umsatzes die stärksten Betriebe tragen. Je steiler die Kurve links ansteigt, desto abhängiger ist die Gruppe von wenigen Häusern. Eine gerade Linie würde heißen, alle Betriebe tragen gleich viel bei.',
     anzeige: 'line',
     parameter: [P_MARKE],
     sql: `
 WITH je_betrieb AS (
     SELECT betrieb, sum(umsatz_netto) AS umsatz
       FROM mart.umsatz_tag
-     WHERE 1 = 1
+     WHERE geschaeftstag >= current_date - interval '12 months'
        [[AND konzept = {{marke}}]]
      GROUP BY betrieb
     HAVING sum(umsatz_netto) > 0
@@ -109,6 +124,7 @@ SELECT round(100.0 * r / n)                AS "Betriebe (%)",
     sql: `
 SELECT d.betrieb                       AS "Betrieb",
        d.konzept                       AS "Marke",
+       s.status                        AS "Status",
        d.aktiv                         AS "Als aktiv geführt",
        coalesce(u.umsatz, 0)           AS "Umsatz gesamt",
        d.umsatztage                    AS "Tage mit Bericht",
@@ -117,6 +133,11 @@ SELECT d.betrieb                       AS "Betrieb",
        r.personalkosten_ogf_pct        AS "Personal % (unsinnig)",
        d.befund                        AS "Befund"
   FROM mart.datenstand d
+  -- Der abgeleitete Status aus mart.betrieb_status sagt, WARUM ein Haus
+  -- ohne Umsatz gefuehrt wird: verwaltend, geschlossen, ohne_geschaeft
+  -- oder test. Das unterscheidet die Vorlage zum Stilllegen von der
+  -- Beteiligungsgesellschaft, die nie Umsatz melden wird.
+  LEFT JOIN mart.betrieb_status s ON s.betrieb_key = d.betrieb_key
   LEFT JOIN LATERAL (
         SELECT sum(umsatz_netto) AS umsatz
           FROM mart.umsatz_tag t WHERE t.betrieb_key = d.betrieb_key
@@ -131,25 +152,76 @@ SELECT d.betrieb                       AS "Betrieb",
   },
 
   {
-    // Diese Kachel ist der Grund, warum die Karteileichen-Liste weiter
-    // unten ueberhaupt ein eigenes Thema ist: 79 von 141 klingt nach
-    // einem Randfall, 56 Prozent nicht mehr.
-    schluessel: 'pf_kachel_aktiv',
-    name: 'Betriebe mit Umsatz',
+    // Anlass aus dem Review vom 03.08.2026: Rang 8 der Umsatzkonzentration
+    // war ein seit Januar geschlossenes Haus -- niemand hatte eine Liste,
+    // WELCHE Haeuser aufgehoert haben zu melden und was das kostet.
+    // Park Cafe Muenchen: letzter Umsatztag 12.01.2026, davor 3,1 Mio im
+    // Jahr. Die Karteileichen-Liste daneben zeigt Betriebe OHNE JEDEN
+    // Umsatz; diese hier zeigt die, die einmal liefen und verstummt sind.
+    //
+    // Test- und Verwaltungsgesellschaften sind ausgenommen: eine
+    // Franchise-AG ohne Umsatz seit 2021 ist kein Ausfall, sondern ihr
+    // Normalzustand.
+    schluessel: 'pf_stillgelegt',
+    name: 'Betriebe ohne Umsatz seit 90 Tagen',
     beschreibung:
-      'Wie viele der geführten Betriebe machen überhaupt Umsatz. Der Rest liefert täglich Berichte über 0 € und verzerrt jeden Durchschnitt.',
+      'Betriebe, die einmal Umsatz gemeldet haben und seit über 90 Tagen keinen mehr — mit dem letzten Umsatztag und dem Volumen der zwölf Monate davor. Sortiert nach diesem Volumen: die teuersten Ausfälle stehen oben. Test- und Verwaltungsgesellschaften sind ausgenommen; Betriebe, die nie Umsatz gemeldet haben, stehen in der Liste darüber.',
+    anzeige: 'table',
+    parameter: [P_MARKE],
+    sql: `
+SELECT s.betrieb                            AS "Betrieb",
+       s.konzept                            AS "Marke",
+       s.status                             AS "Status",
+       s.letzter_umsatztag                  AS "Letzter Umsatztag",
+       (current_date - s.letzter_umsatztag) AS "Tage ohne Umsatz",
+       round(v.umsatz)                      AS "Umsatz 12 Monate davor"
+  FROM mart.betrieb_status s
+  -- Das Volumen der zwoelf Monate VOR dem letzten Umsatztag, nicht vor
+  -- heute: bei einem 2023 geschlossenen Haus laege das Kalenderjahr vor
+  -- heute komplett nach der Schliessung und ergaebe 0 -- der Ausfall
+  -- saehe kostenlos aus. Direkt auf core.umsatzbericht_tag, weil
+  -- mart.umsatz_tag je nach Sicht bereits gefiltert sein kann; die
+  -- NULL-Schluessel waehlen die Gesamtzeile je Tag (wie in
+  -- mart.betrieb_status selbst), sonst zaehlten Sparten doppelt.
+  LEFT JOIN LATERAL (
+        SELECT sum(u.umsatz_netto) AS umsatz
+          FROM core.umsatzbericht_tag u
+         WHERE u.betrieb_key = s.betrieb_key
+           AND u.hauptsparte_key IS NULL AND u.verkaufsstelle_key IS NULL
+           AND u.geschaeftstag >  s.letzter_umsatztag - interval '12 months'
+           AND u.geschaeftstag <= s.letzter_umsatztag
+  ) v ON true
+ WHERE s.letzter_umsatztag < current_date - 90
+   AND s.status NOT IN ('test', 'verwaltend')
+   [[AND s.konzept = {{marke}}]]
+ ORDER BY v.umsatz DESC NULLS LAST`,
+    visualisierung: {
+      column_settings: {
+        '["name","Umsatz 12 Monate davor"]': { number_style: 'currency', currency: 'EUR', currency_style: 'symbol', decimals: 0 },
+      },
+    },
+  },
+
+  {
+    // Diese Kachel ist der Grund, warum die Karteileichen-Liste weiter
+    // unten ueberhaupt ein eigenes Thema ist -- und sie hat selbst eine
+    // Korrektur hinter sich: "79 von 141" zaehlte jeden Betrieb, der
+    // IRGENDWANN in 8,5 Jahren Umsatz hatte, auch die 2022 geschlossenen.
+    // Mit Umsatz in den letzten 12 Monaten sind es 62 (Stand 03.08.2026).
+    // Die Kachel sagt jetzt genau das, was sie zaehlt.
+    schluessel: 'pf_kachel_aktiv',
+    name: 'Betriebe mit Umsatz (12 Monate)',
+    beschreibung:
+      'Wie viele der geführten Betriebe hatten in den letzten zwölf Monaten Umsatz. Der Rest ist geschlossen, verwaltend oder liefert leere Berichte — und verzerrt jeden Durchschnitt, in den er hineingerät.',
     anzeige: 'scalar',
     parameter: [P_MARKE],
     sql: `
-SELECT count(*) FILTER (WHERE u.umsatz > 0)::text || ' von ' || count(*)::text
-         AS "Betriebe mit Umsatz"
-  FROM mart.datenstand d
-  LEFT JOIN LATERAL (
-        SELECT sum(umsatz_netto) AS umsatz
-          FROM mart.umsatz_tag t WHERE t.betrieb_key = d.betrieb_key
-  ) u ON true
+SELECT count(*) FILTER (WHERE letzter_umsatztag >= current_date - interval '12 months')::text
+         || ' von ' || count(*)::text
+         AS "Betriebe mit Umsatz in den letzten 12 Monaten"
+  FROM mart.betrieb_status
  WHERE 1 = 1
-   [[AND d.konzept = {{marke}}]]`,
+   [[AND konzept = {{marke}}]]`,
   },
 
   // ===================================================================
@@ -161,7 +233,7 @@ SELECT count(*) FILTER (WHERE u.umsatz > 0)::text || ' von ' || count(*)::text
     schluessel: 'pf_potenzial',
     name: 'Potenzial bis zum Mittelfeld',
     beschreibung:
-      'Was wäre rechnerisch zu holen, wenn jeder überdurchschnittliche Betrieb seine Personalkostenquote auf das Mittelfeld senken würde? Das ist kein Ziel und keine Prognose, sondern eine Größenordnung: sie zeigt, wo sich Arbeit am meisten lohnt. Betriebe ohne Umsatz sind ausgenommen.',
+      'Was wäre rechnerisch zu holen, wenn jeder überdurchschnittliche Betrieb seine Personalkostenquote auf das Mittelfeld senken würde? Das ist kein Ziel und keine Prognose, sondern eine Größenordnung: sie zeigt, wo sich Arbeit am meisten lohnt. Nur operative Betriebe — geschlossene, verwaltende und Testbetriebe sind ausgenommen.',
     anzeige: 'table',
     parameter: [P_MONAT, P_MARKE],
     sql: `${MONAT_CTE},
@@ -171,7 +243,11 @@ basis AS (
       CROSS JOIN gewaehlt g
      WHERE r.monat = g.monat
        AND r.personalkosten_ogf_pct IS NOT NULL
-       AND r.umsatz_ist > 0
+       -- operativ = Umsatz im Monat UND weder Test noch Verwaltung. Das
+       -- ersetzt das fruehere umsatz_ist > 0 und ist strenger: "€ bis
+       -- Median" auf Basis geschlossener oder verwaltender Haeuser ist
+       -- keine Groessenordnung, sondern Rauschen (Review 03.08.2026).
+       AND r.operativ
        [[AND r.konzept = {{marke}}]]
 ),
 mitte AS (
@@ -200,7 +276,7 @@ SELECT b.betrieb                                                   AS "Betrieb",
     schluessel: 'pf_streuung',
     name: 'Streuung der Personalquote',
     beschreibung:
-      'Wie weit vergleichbare Betriebe auseinanderliegen. Liegen alle eng beieinander, ist die Quote durch das Geschäft vorgegeben und kaum zu ändern. Streuen sie weit, ist sie beeinflussbar — dann lohnt die Frage, was die günstigen Häuser anders machen.',
+      'Wie weit vergleichbare Betriebe auseinanderliegen. Liegen alle eng beieinander, ist die Quote durch das Geschäft vorgegeben und kaum zu ändern. Streuen sie weit, ist sie beeinflussbar — dann lohnt die Frage, was die günstigen Häuser anders machen. Nur operative Betriebe.',
     anzeige: 'bar',
     parameter: [P_MONAT, P_MARKE],
     sql: `${MONAT_CTE},
@@ -217,7 +293,10 @@ klassen AS (
       CROSS JOIN gewaehlt g
      WHERE r.monat = g.monat
        AND r.personalkosten_ogf_pct IS NOT NULL
-       AND r.umsatz_ist > 0
+       -- Wie beim Potenzial: nur operative Betriebe. Eine Quote aus einem
+       -- geschlossenen Haus verbreitert die Verteilung, ohne dass es ein
+       -- Haus gaebe, an dem man etwas aendern koennte.
+       AND r.operativ
        [[AND r.konzept = {{marke}}]]
 )
 SELECT klasse   AS "Personalkostenquote",
@@ -237,17 +316,24 @@ SELECT klasse   AS "Personalkostenquote",
   // Muster im Geschaeft
   // ===================================================================
   {
-    // Nachgemessen: Samstag traegt im Schnitt 546.000 Euro, Montag
-    // 207.000. Wer Oeffnungszeiten oder Dienstplaene diskutiert, faengt
-    // bei diesem Verhaeltnis an.
+    // Nachgemessen am 03.08.2026 ueber die letzten 12 Monate: Samstag
+    // traegt im Schnitt 558.000 Euro, Montag 212.000. Wer Oeffnungszeiten
+    // oder Dienstplaene diskutiert, faengt bei diesem Verhaeltnis an.
+    //
+    // 12 Monate statt der gesamten Historie: ueber 8,5 Jahre inklusive
+    // Corona-Schliessungen gemittelt sagt der Wochenrhythmus nichts ueber
+    // heute. Nulltage (umsatz_netto = 0) fliegen aus dem Schnitt -- ein
+    // Ruhetag ist kein Umsatz von 0, sondern kein Geschaeftstag. Die
+    // Spalte "Tage" zeigt, auf wie vielen Tagen der Schnitt steht.
     schluessel: 'pf_wochentag',
-    name: 'Umsatz nach Wochentag',
+    name: 'Umsatz nach Wochentag (12 Monate)',
     beschreibung:
-      'Der durchschnittliche Tagesumsatz je Wochentag. Das Verhältnis zwischen starken und schwachen Tagen ist die Grundlage für jede Diskussion über Öffnungszeiten, Dienstpläne und Ruhetage.',
+      'Der durchschnittliche Tagesumsatz je Wochentag über die letzten zwölf Monate; Tage ohne Umsatz (Ruhetage, Schließungen) zählen nicht in den Schnitt. Das Verhältnis zwischen starken und schwachen Tagen ist die Grundlage für jede Diskussion über Öffnungszeiten, Dienstpläne und Ruhetage.',
     anzeige: 'bar',
     parameter: [P_BETRIEB, P_MARKE],
     sql: `
-SELECT trim(to_char(t.geschaeftstag, 'TMDay'))  AS "Wochentag",
+SELECT ${WOCHENTAGE}[extract(isodow FROM t.geschaeftstag)::int]  AS "Wochentag",
+       count(*)                                 AS "Tage",
        round(avg(t.umsatz))                     AS "Ø Umsatz",
        round(avg(t.gaeste))                     AS "Ø Gäste"
   FROM (
@@ -255,13 +341,14 @@ SELECT trim(to_char(t.geschaeftstag, 'TMDay'))  AS "Wochentag",
                sum(umsatz_netto) AS umsatz,
                sum(gaeste)       AS gaeste
           FROM mart.umsatz_tag
-         WHERE 1 = 1
+         WHERE umsatz_netto <> 0
+           AND geschaeftstag >= current_date - interval '12 months'
            [[AND betrieb = {{betrieb}}]]
            [[AND konzept = {{marke}}]]
          GROUP BY geschaeftstag
        ) t
- GROUP BY trim(to_char(t.geschaeftstag, 'TMDay')), to_char(t.geschaeftstag, 'ID')
- ORDER BY to_char(t.geschaeftstag, 'ID')`,
+ GROUP BY extract(isodow FROM t.geschaeftstag)
+ ORDER BY extract(isodow FROM t.geschaeftstag)`,
     visualisierung: {
       'graph.dimensions': ['Wochentag'],
       'graph.metrics': ['Ø Umsatz'],
@@ -269,27 +356,31 @@ SELECT trim(to_char(t.geschaeftstag, 'TMDay'))  AS "Wochentag",
     },
   },
   {
+    // Dasselbe 12-Monats-Fenster wie die Karte daneben -- ein Profil aus
+    // 8,5 Jahren beschreibt keine Marke von heute. Die Nulltage-Klausel
+    // aendert an den Wochensummen nichts (0 addiert sich nicht), haelt
+    // aber reine Melde-Karteileichen aus der Gruppierung.
     schluessel: 'pf_wochentag_marke',
-    name: 'Wochenprofil je Marke',
+    name: 'Wochenprofil je Marke (12 Monate)',
     beschreibung:
-      'Derselbe Wochenrhythmus je Marke, jeweils in Prozent der eigenen Woche — dadurch vergleichbar, egal wie groß die Marke ist. Ein Mittagskonzept und eine Abendgastronomie zeigen hier sichtbar verschiedene Kurven und brauchen verschiedene Maßnahmen.',
+      'Derselbe Wochenrhythmus je Marke über die letzten zwölf Monate, jeweils in Prozent der eigenen Woche — dadurch vergleichbar, egal wie groß die Marke ist. Ein Mittagskonzept und eine Abendgastronomie zeigen hier sichtbar verschiedene Kurven und brauchen verschiedene Maßnahmen.',
     anzeige: 'line',
     parameter: [P_MARKE],
     sql: `
 WITH je_tag AS (
     SELECT coalesce(konzept, '(nicht zugeordnet)') AS konzept,
-           to_char(geschaeftstag, 'ID')            AS tag_nr,
-           trim(to_char(geschaeftstag, 'TMDay'))   AS tag,
+           extract(isodow FROM geschaeftstag)::int AS tag_nr,
            sum(umsatz_netto)                       AS umsatz
       FROM mart.umsatz_tag
-     WHERE 1 = 1
+     WHERE umsatz_netto <> 0
+       AND geschaeftstag >= current_date - interval '12 months'
        [[AND konzept = {{marke}}]]
-     GROUP BY 1, 2, 3
+     GROUP BY 1, 2
 )
 -- nullif: Marken, deren Betriebe durchgehend 0 EUR melden, haben eine
 -- Wochensumme von 0 und wuerden die Division sprengen. Sie erscheinen
 -- dann ohne Linie statt die ganze Karte scheitern zu lassen.
-SELECT tag      AS "Wochentag",
+SELECT ${WOCHENTAGE}[tag_nr] AS "Wochentag",
        konzept  AS "Marke",
        round(100 * umsatz / nullif(sum(umsatz) OVER (PARTITION BY konzept), 0), 1)
                 AS "Anteil an der Woche (%)"
@@ -305,28 +396,38 @@ SELECT tag      AS "Wochentag",
     // Stabilitaet ist im Excel gar nicht vorgekommen, ist aber die
     // Kennzahl, die einen strukturell schwachen Betrieb von einem
     // unterscheidet, der nur einen schlechten Monat hatte.
+    //
+    // Review 03.08.2026: Die Rangliste fuehrte "A Testladen Concept
+    // Family" an (117 % Schwankung, 1.935 EUR Gesamtumsatz) -- ein
+    // Testeintrag, kein Betrieb. Deshalb nur noch operative Betriebe
+    // (mart.betrieb_status). Und nur die letzten 12 Monate: eine
+    // Schwankung, die Corona-Schliessungen von 2020 einrechnet, sagt
+    // nichts ueber die Planbarkeit von heute.
     schluessel: 'pf_stabilitaet',
-    name: 'Wie stabil läuft ein Betrieb',
+    name: 'Wie stabil läuft ein Betrieb (12 Monate)',
     beschreibung:
-      'Wie stark der Tagesumsatz schwankt, gemessen im Verhältnis zum eigenen Durchschnitt. Ein niedriger Wert heißt planbares Geschäft; ein hoher heißt Abhängigkeit von Wochenenden, Veranstaltungen oder Wetter — und macht die Personalplanung teuer. Der Bezug auf den eigenen Durchschnitt macht große und kleine Häuser vergleichbar.',
+      'Wie stark der Tagesumsatz der letzten zwölf Monate schwankt, gemessen im Verhältnis zum eigenen Durchschnitt. Ein niedriger Wert heißt planbares Geschäft; ein hoher heißt Abhängigkeit von Wochenenden, Veranstaltungen oder Wetter — und macht die Personalplanung teuer. Der Bezug auf den eigenen Durchschnitt macht große und kleine Häuser vergleichbar. Nur operative Betriebe mit mindestens 30 Umsatztagen.',
     anzeige: 'table',
     parameter: [P_MARKE],
     sql: `
-SELECT betrieb                                              AS "Betrieb",
-       konzept                                              AS "Marke",
+SELECT t.betrieb                                            AS "Betrieb",
+       t.konzept                                            AS "Marke",
        count(*)                                             AS "Tage",
-       round(avg(umsatz_netto))                             AS "Ø Tagesumsatz",
-       round(stddev_samp(umsatz_netto))                     AS "Streuung",
-       round(100 * stddev_samp(umsatz_netto)
-             / nullif(avg(umsatz_netto), 0), 1)             AS "Schwankung %",
-       round(min(umsatz_netto))                             AS "Schwächster Tag",
-       round(max(umsatz_netto))                             AS "Stärkster Tag"
-  FROM mart.umsatz_tag
- WHERE umsatz_netto > 0
-   [[AND konzept = {{marke}}]]
- GROUP BY betrieb, konzept
+       round(avg(t.umsatz_netto))                           AS "Ø Tagesumsatz",
+       round(stddev_samp(t.umsatz_netto))                   AS "Streuung",
+       round(100 * stddev_samp(t.umsatz_netto)
+             / nullif(avg(t.umsatz_netto), 0), 1)           AS "Schwankung %",
+       round(min(t.umsatz_netto))                           AS "Schwächster Tag",
+       round(max(t.umsatz_netto))                           AS "Stärkster Tag"
+  FROM mart.umsatz_tag t
+  JOIN mart.betrieb_status s ON s.betrieb_key = t.betrieb_key
+ WHERE t.umsatz_netto > 0
+   AND t.geschaeftstag >= current_date - interval '12 months'
+   AND s.status = 'operativ'
+   [[AND t.konzept = {{marke}}]]
+ GROUP BY t.betrieb, t.konzept
 HAVING count(*) >= 30
- ORDER BY 100 * stddev_samp(umsatz_netto) / nullif(avg(umsatz_netto), 0) DESC`,
+ ORDER BY 100 * stddev_samp(t.umsatz_netto) / nullif(avg(t.umsatz_netto), 0) DESC`,
     visualisierung: {
       column_settings: {
         '["name","Ø Tagesumsatz"]': { number_style: 'currency', currency: 'EUR', currency_style: 'symbol', decimals: 0 },

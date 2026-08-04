@@ -16,7 +16,7 @@
 // =====================================================================
 
 import type { Karte } from './typen'
-import { MONAT_CTE, MONAT_CTE_UMSATZ, MONAT_CTE_BWA, P_MONAT, P_BETRIEB, P_ZEITRAUM, P_MARKE } from './gemeinsam'
+import { MONAT_CTE, MONAT_CTE_UMSATZ, MONAT_CTE_BWA, P_MONAT, P_BETRIEB, P_ZEITRAUM, P_MARKE, WOCHENTAGE } from './gemeinsam'
 
 // Der Monat ist bewusst kein Pflichtfeld — siehe gemeinsam.ts.
 const ZEITRAUM = P_ZEITRAUM
@@ -103,16 +103,21 @@ SELECT geschaeftstag       AS "Geschäftstag",
     beschreibung:
       'Monatsumsatz gegen den gleichen Monat des Vorjahres, beides in Euro. Fehlt die Vorjahreslinie, sind die alten Daten noch nicht eingelesen — das heißt nicht, dass damals kein Umsatz war.',
     anzeige: 'bar',
-    parameter: [BETRIEB],
+    parameter: [BETRIEB, ZEITRAUM],
+    // Der laufende Monat bleibt draussen: zwei geladene Tage neben einem
+    // vollen Vorjahresmonat lesen sich als Einbruch, und genau so einer
+    // stand hier am 03.08.2026 als letzter Balken.
     sql: `
 SELECT monat                AS "Monat",
        sum(umsatz_monat)    AS "Umsatz",
        sum(umsatz_monat_vj) AS "Umsatz Vorjahr"
   FROM mart.umsatz_ytd
- WHERE 1 = 1
+ WHERE monat < date_trunc('month', current_date)::date
    [[AND betrieb = {{betrieb}}]]
+   [[AND {{zeitraum}}]]
  GROUP BY monat
  ORDER BY monat`,
+    template_tag_dimension: { zeitraum: ['mart', 'umsatz_ytd', 'monat'] },
     visualisierung: {
       'graph.dimensions': ['Monat'],
       'graph.metrics': ['Umsatz', 'Umsatz Vorjahr'],
@@ -130,7 +135,10 @@ SELECT monat                AS "Monat",
     beschreibung:
       'Veränderung zum gleichen Monat des Vorjahres in Prozent. Balken über der Nulllinie sind Wachstum, darunter Rückgang.',
     anzeige: 'bar',
-    parameter: [BETRIEB],
+    parameter: [BETRIEB, ZEITRAUM],
+    // Wie beim Monatsverlauf: der angebrochene Monat gehoert nicht in den
+    // Vorjahresvergleich — das HAVING unten fing ihn nicht, weil das
+    // VORJAHR voll da ist. Der letzte Balken zeigte -91,6 %.
     sql: `
 SELECT monat AS "Monat",
        CASE WHEN sum(umsatz_monat_vj) > 0
@@ -138,11 +146,13 @@ SELECT monat AS "Monat",
                        / sum(umsatz_monat_vj) * 100, 1)
        END   AS "Veränderung %"
   FROM mart.umsatz_ytd
- WHERE 1 = 1
+ WHERE monat < date_trunc('month', current_date)::date
    [[AND betrieb = {{betrieb}}]]
+   [[AND {{zeitraum}}]]
  GROUP BY monat
 HAVING sum(umsatz_monat_vj) > 0
  ORDER BY monat`,
+    template_tag_dimension: { zeitraum: ['mart', 'umsatz_ytd', 'monat'] },
     visualisierung: {
       'graph.dimensions': ['Monat'],
       'graph.metrics': ['Veränderung %'],
@@ -188,23 +198,31 @@ SELECT y.betrieb          AS "Betrieb",
   {
     schluessel: 'um_wochentag',
     name: 'Umsatz nach Wochentag',
-    beschreibung: 'Durchschnittlicher Tagesumsatz je Wochentag — die Grundlage für jede Frage nach Öffnungszeiten und Ruhetagen.',
+    beschreibung:
+      'Durchschnittlicher Tagesumsatz je Wochentag — die Grundlage für jede Frage nach Öffnungszeiten und Ruhetagen. Gezählt werden nur Tage MIT Umsatz; die Spalte „Tage" zeigt, wie viele das je Wochentag waren — ein Ruhetag fällt also nicht als 0 in den Schnitt, sondern als fehlender Tag auf.',
     anzeige: 'bar',
-    parameter: [BETRIEB],
+    parameter: [BETRIEB, ZEITRAUM],
+    // Zwei Fehler in einem SQL behoben (03.08.2026): TMDay haengt an der
+    // Server-Locale und lieferte "Monday"; und avg() ueber das volle
+    // 141x3136-Gitter mittelte Nulltage mit — fuer ein Haus, das im Mai
+    // eroeffnet hat, hiess das Ø Montag 74 EUR statt 3.677 EUR.
     sql: `
-SELECT to_char(geschaeftstag, 'ID')                       AS sortier,
-       trim(to_char(geschaeftstag, 'TMDay'))              AS "Wochentag",
-       round(avg(tagesumsatz), 2)                         AS "Ø Umsatz",
-       round(avg(gaeste), 0)                              AS "Ø Gäste"
+SELECT extract(isodow FROM geschaeftstag)::int                    AS sortier,
+       ${WOCHENTAGE}[extract(isodow FROM geschaeftstag)::int]     AS "Wochentag",
+       round(avg(tagesumsatz), 2)                                 AS "Ø Umsatz",
+       round(avg(gaeste), 0)                                      AS "Ø Gäste",
+       count(*)                                                   AS "Tage"
   FROM (
         SELECT geschaeftstag, sum(umsatz_netto) AS tagesumsatz, sum(gaeste) AS gaeste
           FROM mart.umsatz_tag
-         WHERE 1 = 1
+         WHERE umsatz_netto <> 0
            [[AND betrieb = {{betrieb}}]]
+           [[AND {{zeitraum}}]]
          GROUP BY geschaeftstag
        ) t
  GROUP BY 1, 2
  ORDER BY 1`,
+    template_tag_dimension: { zeitraum: ['mart', 'umsatz_tag', 'geschaeftstag'] },
     visualisierung: {
       'graph.dimensions': ['Wochentag'],
       'graph.metrics': ['Ø Umsatz'],
@@ -213,6 +231,7 @@ SELECT to_char(geschaeftstag, 'ID')                       AS sortier,
         { name: 'Wochentag', enabled: true },
         { name: 'Ø Umsatz', enabled: true },
         { name: 'Ø Gäste', enabled: true },
+        { name: 'Tage', enabled: true },
       ],
     },
   },
@@ -222,16 +241,25 @@ SELECT to_char(geschaeftstag, 'ID')                       AS sortier,
     beschreibung:
       'Durchschnittsbon und Umsatz je Gast im Verlauf. Die beiden laufen selten parallel: steigt der Bon, während der Umsatz je Gast fällt, sitzen größere Gruppen am Tisch — mehr Umsatz je Rechnung, aber nicht je Person.',
     anzeige: 'line',
-    parameter: [BETRIEB],
+    parameter: [BETRIEB, ZEITRAUM],
+    // "Ø je Gast" rechnet nur ueber Monate mit belastbarer Gaestezaehlung
+    // (umsatz_pro_gast ist in mart.umsatz_ytd NULL, wenn weniger als 80 %
+    // der Umsatztage eine Gaestezahl tragen). Ohne den Filter teilte die
+    // Karte den Monatsumsatz durch die Gaeste weniger Tage — bis 390 EUR
+    // je Gast bei einem realen Schnitt um 36.
     sql: `
 SELECT monat                                                    AS "Monat",
        round(sum(umsatz_monat) / nullif(sum(rechnungen), 0), 2) AS "Ø Bon",
-       round(sum(umsatz_monat) / nullif(sum(gaeste), 0), 2)     AS "Ø je Gast"
+       round(sum(umsatz_monat) FILTER (WHERE umsatz_pro_gast IS NOT NULL)
+             / nullif(sum(gaeste) FILTER (WHERE umsatz_pro_gast IS NOT NULL), 0), 2)
+                                                                AS "Ø je Gast"
   FROM mart.umsatz_ytd
  WHERE 1 = 1
    [[AND betrieb = {{betrieb}}]]
+   [[AND {{zeitraum}}]]
  GROUP BY monat
  ORDER BY monat`,
+    template_tag_dimension: { zeitraum: ['mart', 'umsatz_ytd', 'monat'] },
     visualisierung: {
       'graph.dimensions': ['Monat'],
       'graph.metrics': ['Ø Bon', 'Ø je Gast'],
@@ -286,27 +314,13 @@ SELECT sp.betrieb                                                          AS "B
  GROUP BY sp.betrieb
  ORDER BY sum(sp.umsatz_netto) DESC`,
   },
-  {
-    schluessel: 'st_verkaufsstelle',
-    name: 'Umsatz je Verkaufsstelle',
-    beschreibung: 'Umsatz nach Verkaufsstelle: Außer Haus, Delivery, To Go und die übrigen.',
-    anzeige: 'bar',
-    parameter: [BETRIEB, ZEITRAUM],
-    sql: `
-SELECT verkaufsstelle     AS "Verkaufsstelle",
-       sum(umsatz_netto)  AS "Umsatz"
-  FROM mart.umsatz_tag_sparte
- WHERE verkaufsstelle IS NOT NULL
-   [[AND betrieb = {{betrieb}}]]
-   [[AND {{zeitraum}}]]
- GROUP BY verkaufsstelle
- ORDER BY sum(umsatz_netto) DESC`,
-    template_tag_dimension: { zeitraum: ['mart', 'umsatz_tag_sparte', 'geschaeftstag'] },
-    visualisierung: {
-      'graph.dimensions': ['Verkaufsstelle'],
-      'graph.metrics': ['Umsatz'],
-    },
-  },
+  // ENTFALLEN AM 03.08.2026: die Karte 'st_verkaufsstelle' ("Umsatz je
+  // Verkaufsstelle"). LINA liefert die Dimension schlicht nicht —
+  // verkaufsstelle ist in allen 884.352 Zeilen von mart.umsatz_tag_sparte
+  // NULL, die Karte konnte nie eine Zeile zeigen. Ein dauerhaft leeres
+  // Diagramm neben gefuellten liest sich als "kein Ausser-Haus-Geschaeft",
+  // nicht als "Daten fehlen" — und das ist der teurere Irrtum. Kommt
+  // wieder, falls der Abruf die Verkaufsstellen eines Tages liefert.
   {
     // Die Tagesgrenze ist hier der ganze Trick: der Geschaeftstag laeuft
     // 08:00 bis 07:59, die Stunden 0 bis 7 gehoeren also ans Ende.
@@ -331,6 +345,43 @@ SELECT lpad(stunde::text, 2, '0') || ':00' AS "Stunde",
       'graph.metrics': ['Umsatz'],
       'graph.x_axis.title_text': 'Stunde des Geschäftstags (08:00 → 07:59)',
     },
+  },
+  {
+    // Das Dienstplan-Werkzeug: Wochentag und Stunde in EINER Matrix.
+    // Stundenverlauf und Wochentagsbalken existierten je fuer sich; die
+    // Frage "brauche ich Samstagmittag mehr Leute als Dienstagabend?"
+    // beantwortet erst die Kreuzung. Bewusst eine Tabelle mit sieben
+    // Spalten statt einer Pivot-Konfiguration: die Tabelle rendert
+    // ueberall gleich, und sieben Wochentage sind keine dynamische
+    // Dimension, die eine Pivot rechtfertigt.
+    schluessel: 'st_wochenprofil',
+    name: 'Wochenprofil — Stunde × Wochentag',
+    beschreibung:
+      'Durchschnittlicher Stundenumsatz je Wochentag, Zeilen in Geschäftstagsreihenfolge (08:00 bis 07:59). Ohne Betriebsfilter das Konzernprofil; mit Betrieb das Werkzeug für den Dienstplan. Der Schnitt läuft über alle Tage des Zeitraums — Ruhetage drücken ihn, das ist hier Absicht: geplant wird die Woche, wie sie ist.',
+    anzeige: 'table',
+    parameter: [BETRIEB, ZEITRAUM],
+    sql: `
+SELECT lpad(stunde::text, 2, '0') || ':00'                        AS "Stunde",
+       round(avg(umsatz) FILTER (WHERE dow = 1))                  AS "Mo",
+       round(avg(umsatz) FILTER (WHERE dow = 2))                  AS "Di",
+       round(avg(umsatz) FILTER (WHERE dow = 3))                  AS "Mi",
+       round(avg(umsatz) FILTER (WHERE dow = 4))                  AS "Do",
+       round(avg(umsatz) FILTER (WHERE dow = 5))                  AS "Fr",
+       round(avg(umsatz) FILTER (WHERE dow = 6))                  AS "Sa",
+       round(avg(umsatz) FILTER (WHERE dow = 7))                  AS "So"
+  FROM (
+        SELECT geschaeftstag, stunde,
+               extract(isodow FROM geschaeftstag)::int AS dow,
+               sum(umsatz_netto)                       AS umsatz
+          FROM mart.umsatz_stunde
+         WHERE 1 = 1
+           [[AND betrieb = {{betrieb}}]]
+           [[AND {{zeitraum}}]]
+         GROUP BY geschaeftstag, stunde
+       ) t
+ GROUP BY stunde
+ ORDER BY ((stunde + 16) % 24)`,
+    template_tag_dimension: { zeitraum: ['mart', 'umsatz_stunde', 'geschaeftstag'] },
   },
   {
     schluessel: 'st_zeitzone',
@@ -363,8 +414,12 @@ SELECT zeitzone           AS "Zeitzone",
     sql: `${MONAT_CTE_UMSATZ}
 SELECT uz.betrieb                                                  AS "Betrieb",
        round(sum(uz.umsatz_netto))                                 AS "Umsatz",
+       round(100 * sum(uz.umsatz_netto) FILTER (WHERE uz.zeitzone = 'Frühstück')
+             / nullif(sum(uz.umsatz_netto), 0), 1)                 AS "Frühstück %",
        round(100 * sum(uz.umsatz_netto) FILTER (WHERE uz.zeitzone = 'Mittagszeit')
              / nullif(sum(uz.umsatz_netto), 0), 1)                 AS "Mittag %",
+       round(100 * sum(uz.umsatz_netto) FILTER (WHERE uz.zeitzone = 'Nachmittag')
+             / nullif(sum(uz.umsatz_netto), 0), 1)                 AS "Nachmittag %",
        round(100 * sum(uz.umsatz_netto) FILTER (WHERE uz.zeitzone = 'Happy Hour')
              / nullif(sum(uz.umsatz_netto), 0), 1)                 AS "Happy Hour %",
        round(100 * sum(uz.umsatz_netto) FILTER (WHERE uz.zeitzone = 'Abendessen')
@@ -396,6 +451,10 @@ SELECT r.betrieb                AS "Betrieb",
   CROSS JOIN gewaehlt g
  WHERE r.monat = g.monat
    AND r.personalkosten_ogf_pct IS NOT NULL
+   -- Nur operative Betriebe: die Top-4 waren geschlossene Haeuser mit bis
+   -- zu 4,5 Jahre alten, fortgeschriebenen Quoten. Ein ausdruecklich
+   -- gewaehlter Betrieb bleibt trotzdem sichtbar.
+   AND (r.operativ [[ OR r.betrieb = {{betrieb}} ]])
    [[AND r.betrieb = {{betrieb}}]]
  ORDER BY r.personalkosten_ogf_pct DESC
  LIMIT 20`,
@@ -424,12 +483,14 @@ SELECT r.betrieb                            AS "Betrieb",
        coalesce(ap.emoji, '⚪')              AS "●",
        r.personalkosten_ogf_pct             AS "Personal o. GF %",
        round(r.personalkosten_ogf_pct - 28, 1) AS "Δ Schwelle",
-       r.bwa_monat                          AS "BWA-Stand"
+       r.bwa_monat                          AS "BWA-Stand",
+       r.bwa_alter_monate                   AS "BWA-Alter (Monate)"
   FROM mart.round_table_monat r
   CROSS JOIN gewaehlt g
   LEFT JOIN ampel.beschriftung ap ON ap.status = r.ampel_personal
  WHERE r.monat = g.monat
    AND r.personalkosten_ogf_pct IS NOT NULL
+   AND (r.operativ [[ OR r.betrieb = {{betrieb}} ]])
    [[AND r.betrieb = {{betrieb}}]]
  ORDER BY r.personalkosten_ogf_pct DESC`,
   },
@@ -452,7 +513,7 @@ SELECT betrieb            AS "Betrieb",
        ampel_global       AS "Ampel global",
        ampel_lina         AS "Ampel LINA"
   FROM mart.personalkosten
- WHERE 1 = 1
+ WHERE (pek_gesamt <> 0 OR eff_gesamt <> 0)
    [[AND betrieb = {{betrieb}}]]
    [[AND {{zeitraum}}]]
  ORDER BY zeitraum_von DESC, betrieb`,
@@ -474,7 +535,7 @@ SELECT betrieb            AS "Betrieb",
        eff_bar            AS "Bar",
        eff_kueche         AS "Küche"
   FROM mart.personalkosten
- WHERE 1 = 1
+ WHERE (pek_gesamt <> 0 OR eff_gesamt <> 0)
    [[AND betrieb = {{betrieb}}]]
    [[AND {{zeitraum}}]]
  ORDER BY zeitraum_von DESC, betrieb`,
@@ -493,6 +554,12 @@ SELECT monat                                                     AS "Monat",
              (ORDER BY personalkosten_ogf_pct)::numeric, 2)      AS "Median"
   FROM mart.round_table_monat
  WHERE personalkosten_ogf_pct IS NOT NULL
+   -- Nur Monate, in denen die Quote WIRKLICH gebucht ist: der Nachtrag
+   -- kopierte den letzten gebuchten Monat in die Folgemonate, und die
+   -- Linie endete mit einem kuenstlichen Plateau, das Stabilitaet
+   -- suggerierte, wo schlicht noch nichts gebucht war.
+   AND bwa_alter_monate = 0
+   AND operativ
    [[AND betrieb = {{betrieb}}]]
    [[AND {{zeitraum}}]]
  GROUP BY monat
@@ -512,11 +579,16 @@ SELECT monat                                                     AS "Monat",
   // ===================================================================
   {
     schluessel: 'wa_renner',
-    name: 'Meistverkaufte Artikel',
+    name: 'Umsatzstärkste Artikel',
     beschreibung:
-      'Die 50 meistverkauften Artikel im gewählten Zeitraum. Bitte zuerst einen Zeitraum wählen — ohne Eingrenzung wertet die Karte die gesamte Historie aus und braucht entsprechend lange.',
+      'Die 50 umsatzstärksten Artikel im gewählten Zeitraum. Sortiert nach Umsatz, nicht nach Stückzahl — nach Menge führten technische Zähl-PLUs wie „Fax" mit 91.000 Buchungen ohne einen Euro. „DB %" gilt nur für den Umsatzanteil MIT hinterlegtem Wareneinsatz (Spalte „WE hinterlegt %") und ist eine Umsatzgliederung, keine Margenaussage. Bitte zuerst einen Zeitraum wählen — ohne Eingrenzung wertet die Karte die gesamte Historie aus.',
     anzeige: 'table',
     parameter: [ZEITRAUM, BETRIEB, MARKE],
+    // Nach dem nullif(fixer_we,0)-Fix (Migration 0039) ist deckungsbeitrag
+    // NULL, wo kein WE-Ansatz hinterlegt ist. "DB %" bezieht sich deshalb
+    // auf den ABGEDECKTEN Umsatz — vorher stand dort glatt 100 % fuer
+    // drei Viertel der Artikel, eine Margenaussage aus dem Wert, der laut
+    // Projektregel keine tragen darf.
     sql: `
 SELECT artikel                        AS "Artikel",
        warengruppe                    AS "Warengruppe",
@@ -524,14 +596,18 @@ SELECT artikel                        AS "Artikel",
        sum(umsatz_netto)              AS "Umsatz",
        round(avg(verkaufspreis), 2)   AS "Ø Preis",
        sum(deckungsbeitrag)           AS "Deckungsbeitrag",
-       round(100 * sum(deckungsbeitrag) / nullif(sum(umsatz_netto), 0), 1) AS "DB %"
+       round(100 * sum(deckungsbeitrag)
+             / nullif(sum(umsatz_netto) FILTER (WHERE fixer_we IS NOT NULL), 0), 1) AS "DB %",
+       round(100 * sum(umsatz_netto) FILTER (WHERE fixer_we IS NOT NULL)
+             / nullif(sum(umsatz_netto), 0), 1)                                     AS "WE hinterlegt %"
   FROM mart.artikelverkauf
- WHERE 1 = 1
+ WHERE umsatz_netto IS NOT NULL
    [[AND {{zeitraum}}]]
    [[AND betrieb = {{betrieb}}]]
    [[AND konzept = {{marke}}]]
  GROUP BY artikel, warengruppe
- ORDER BY sum(menge) DESC
+HAVING sum(umsatz_netto) > 0
+ ORDER BY sum(umsatz_netto) DESC
  LIMIT 50`,
     template_tag_dimension: { zeitraum: ['mart', 'artikelverkauf', 'geschaeftstag'] },
   },
@@ -597,23 +673,36 @@ HAVING sum(menge) > 0
     // ein angeschnittener Monat zaehlt jetzt nur noch mit seinen Tagen im
     // Zeitraum, nicht mehr ganz. Das ist die genauere Antwort auf die
     // gestellte Frage.
+    // OHNE ALIAS, und das ist Pflicht, keine Vorliebe: {{zeitraum}} ist ein
+    // Feldfilter auf mart.artikelverkauf. Metabase setzt dafuer
+    // "artikelverkauf.geschaeftstag" ein -- unter einem Alias ist dieser
+    // Name nicht mehr in Reichweite, und die Karte scheitert genau dann,
+    // wenn jemand den Filter setzt (docs/fehlerkatalog.md).
     sql: `
-SELECT d.warengruppe              AS "Warengruppe",
-       sum(d.menge)               AS "Menge",
-       sum(d.umsatz_netto)        AS "Umsatz",
-       sum(d.wareneinsatz_theoretisch) AS "WE theoretisch",
-       sum(d.umsatz_netto) - sum(d.wareneinsatz_theoretisch) AS "Deckungsbeitrag",
-       round(100 * (sum(d.umsatz_netto) - sum(d.wareneinsatz_theoretisch))
-             / nullif(sum(d.umsatz_netto), 0), 1) AS "DB %",
-       round(100 * sum(d.umsatz_netto) FILTER (WHERE d.fixer_we IS NOT NULL)
-             / nullif(sum(d.umsatz_netto), 0), 1) AS "Abdeckung %"
-  FROM mart.artikelverkauf d
+SELECT mart.artikelverkauf.warengruppe                  AS "Warengruppe",
+       sum(mart.artikelverkauf.menge)                   AS "Menge",
+       sum(mart.artikelverkauf.umsatz_netto)            AS "Umsatz",
+       sum(mart.artikelverkauf.wareneinsatz_theoretisch) AS "WE theoretisch",
+       sum(mart.artikelverkauf.umsatz_netto) FILTER (WHERE mart.artikelverkauf.fixer_we IS NOT NULL)
+         - sum(mart.artikelverkauf.wareneinsatz_theoretisch)
+                                                        AS "Deckungsbeitrag",
+       -- DB % auf dem ABGEDECKTEN Umsatz: seit nullif(fixer_we,0)
+       -- (Migration 0039) ist der Wareneinsatz NULL, wo kein Ansatz
+       -- hinterlegt ist. Den vollen Umsatz in den Nenner zu nehmen
+       -- hiesse, fehlende Ansaetze als 100-%-Marge zu verkaufen.
+       round(100 * (sum(mart.artikelverkauf.umsatz_netto) FILTER (WHERE mart.artikelverkauf.fixer_we IS NOT NULL)
+                    - sum(mart.artikelverkauf.wareneinsatz_theoretisch))
+             / nullif(sum(mart.artikelverkauf.umsatz_netto) FILTER (WHERE mart.artikelverkauf.fixer_we IS NOT NULL), 0), 1)
+                                                        AS "DB %",
+       round(100 * sum(mart.artikelverkauf.umsatz_netto) FILTER (WHERE mart.artikelverkauf.fixer_we IS NOT NULL)
+             / nullif(sum(mart.artikelverkauf.umsatz_netto), 0), 1) AS "Abdeckung %"
+  FROM mart.artikelverkauf
  WHERE 1 = 1
    [[ AND {{zeitraum}} ]]
-   [[ AND d.betrieb = {{betrieb}} ]]
-   [[ AND d.konzept = {{marke}} ]]
- GROUP BY d.warengruppe
- ORDER BY sum(d.umsatz_netto) DESC NULLS LAST`,
+   [[ AND mart.artikelverkauf.betrieb = {{betrieb}} ]]
+   [[ AND mart.artikelverkauf.konzept = {{marke}} ]]
+ GROUP BY mart.artikelverkauf.warengruppe
+ ORDER BY sum(mart.artikelverkauf.umsatz_netto) DESC NULLS LAST`,
     template_tag_dimension: { zeitraum: ['mart', 'artikelverkauf', 'geschaeftstag'] },
   },
   // ENTFALLEN AM 01.08.2026 (Migration 0029): die Karte
@@ -848,7 +937,7 @@ SELECT je.betrieb                                       AS "Betrieb",
     schluessel: 'bwa_kennzahlen',
     name: 'BWA-Kennzahlen je Monat',
     beschreibung:
-      'Umsatz, Wareneinsatz, Personalkosten und Ergebnis aus den Zahlen des Steuerberaters. Es werden nur gebuchte Monate gezeigt: ein Monat, in dem alles auf null steht, ist noch nicht gebucht — nicht umsatzlos.',
+      'Umsatz, Wareneinsatz, Personalkosten und Ergebnis aus den Zahlen des Steuerberaters. Es werden nur gebuchte Monate gezeigt — und ohne Betriebsfilter nur Monate, in denen die MEISTEN Betriebe schon gebucht haben: im jüngsten Monat buchen erst die Schnellbucher, und deren Teilsumme läse sich als Umsatzeinbruch von −43 %.',
     anzeige: 'line',
     parameter: [BETRIEB, ZEITRAUM],
     sql: `
@@ -856,17 +945,33 @@ SELECT je.betrieb                                       AS "Betrieb",
 -- dem TABELLENNAMEN ("bwa_kennzahl.monat BETWEEN ..."). Mit einem Alias
 -- ist der Name an dieser Stelle nicht mehr gueltig, und Postgres
 -- antwortet mit "invalid reference to FROM-clause entry".
-SELECT monat AS "Monat",
-       round(sum(wert_absolut) FILTER (WHERE kennzahl = 'Umsatz'))                 AS "Umsatz",
-       round(sum(wert_absolut) FILTER (WHERE kennzahl IN ('WE Bar','WE Küche')))   AS "Wareneinsatz",
-       round(sum(wert_absolut) FILTER (WHERE kennzahl = 'Personalkosten ohne GF')) AS "Personalkosten",
-       round(sum(wert_absolut) FILTER (WHERE kennzahl = 'EBIT'))                   AS "EBIT"
-  FROM mart.bwa_kennzahl
- WHERE 1 = 1
-   [[AND betrieb = {{betrieb}}]]
-   [[AND {{zeitraum}}]]
- GROUP BY monat
-HAVING count(*) FILTER (WHERE wert_absolut IS NOT NULL AND wert_absolut <> 0) > 0
+--
+-- Der zweite WITH-Schritt schneidet Monate ab, in denen erst ein Bruchteil
+-- der Betriebe gebucht hat: Juni 2026 stand mit 37 von 61 Buchern als
+-- -43-%-Absturz in der Kurve. Mit Betriebsfilter greift der Schnitt nie
+-- (1 von 1 ist immer 100 %).
+WITH je_monat AS (
+    SELECT monat,
+           round(sum(wert_absolut) FILTER (WHERE kennzahl = 'Umsatz'))                 AS umsatz,
+           round(sum(wert_absolut) FILTER (WHERE kennzahl IN ('WE Bar','WE Küche')))   AS wareneinsatz,
+           round(sum(wert_absolut) FILTER (WHERE kennzahl = 'Personalkosten ohne GF')) AS personalkosten,
+           round(sum(wert_absolut) FILTER (WHERE kennzahl = 'EBIT'))                   AS ebit,
+           count(DISTINCT betrieb_key) FILTER (WHERE gebucht)                          AS betriebe
+      FROM mart.bwa_kennzahl
+     WHERE 1 = 1
+       [[AND betrieb = {{betrieb}}]]
+       [[AND {{zeitraum}}]]
+     GROUP BY monat
+    HAVING count(*) FILTER (WHERE wert_absolut IS NOT NULL AND wert_absolut <> 0) > 0
+)
+SELECT monat          AS "Monat",
+       umsatz         AS "Umsatz",
+       wareneinsatz   AS "Wareneinsatz",
+       personalkosten AS "Personalkosten",
+       ebit           AS "EBIT",
+       betriebe       AS "Betriebe gebucht"
+  FROM (SELECT je_monat.*, lag(betriebe) OVER (ORDER BY monat) AS betriebe_vormonat FROM je_monat) x
+ WHERE betriebe_vormonat IS NULL OR betriebe >= 0.6 * betriebe_vormonat
  ORDER BY monat`,
     template_tag_dimension: { zeitraum: ['mart', 'bwa_kennzahl', 'monat'] },
     visualisierung: {
@@ -875,9 +980,54 @@ HAVING count(*) FILTER (WHERE wert_absolut IS NOT NULL AND wert_absolut <> 0) > 
     },
   },
   {
+    // Der Weg vom Umsatz zum Ergebnis als Wasserfall — die BWA-Frage
+    // schlechthin, bisher nur als vier getrennte Linien lesbar. Der
+    // Restposten "Uebrige Kosten" ist gerechnet (EBIT minus der drei
+    // benannten Bloecke), damit der Wasserfall exakt beim EBIT landet.
+    schluessel: 'bwa_wasserfall',
+    name: 'Vom Umsatz zum EBIT',
+    beschreibung:
+      'Umsatz minus Wareneinsatz, Personal und übrige Kosten — der Wasserfall endet beim EBIT des gewählten Monats. „Übrige Kosten" ist der Rest zwischen den benannten Blöcken und dem Ergebnis (Miete, Energie, GF-Gehälter, Abschreibungen). Ohne Betriebsfilter über alle Betriebe, deren Monat gebucht ist.',
+    anzeige: 'waterfall',
+    parameter: [MONAT, BETRIEB],
+    sql: `${MONAT_CTE_BWA}
+, w AS (
+    SELECT sum(k.wert_absolut) FILTER (WHERE k.kennzahl = 'Umsatz')                 AS umsatz,
+           sum(k.wert_absolut) FILTER (WHERE k.kennzahl = 'WE Bar')                 AS we_bar,
+           sum(k.wert_absolut) FILTER (WHERE k.kennzahl = 'WE Küche')               AS we_kueche,
+           sum(k.wert_absolut) FILTER (WHERE k.kennzahl = 'Personalkosten ohne GF') AS personal,
+           sum(k.wert_absolut) FILTER (WHERE k.kennzahl = 'EBIT')                   AS ebit
+      FROM mart.bwa_kennzahl k
+     CROSS JOIN gewaehlt g
+     WHERE k.monat = g.monat
+       AND k.gebucht
+       [[AND k.betrieb = {{betrieb}}]]
+)
+SELECT p."Posten", p."Betrag"
+  FROM w,
+       LATERAL (VALUES
+         (1, 'Umsatz',             round(w.umsatz)),
+         (2, 'WE Bar',             round(-coalesce(w.we_bar, 0))),
+         (3, 'WE Küche',           round(-coalesce(w.we_kueche, 0))),
+         (4, 'Personal o. GF',     round(-coalesce(w.personal, 0))),
+         (5, 'Übrige Kosten',      round(coalesce(w.ebit, 0) - (coalesce(w.umsatz, 0)
+                                        - coalesce(w.we_bar, 0) - coalesce(w.we_kueche, 0)
+                                        - coalesce(w.personal, 0))))
+       ) p(ord, "Posten", "Betrag")
+ WHERE w.umsatz IS NOT NULL
+ ORDER BY p.ord`,
+    visualisierung: {
+      'graph.dimensions': ['Posten'],
+      'graph.metrics': ['Betrag'],
+      'waterfall.show_total': true,
+      'waterfall.total_label': 'EBIT',
+    },
+  },
+  {
     schluessel: 'bwa_ebit',
     name: 'EBIT je Betrieb',
-    beschreibung: 'Die Rendite je Betrieb aus den Zahlen des Steuerberaters.',
+    beschreibung:
+      'Die Rendite je Betrieb aus den Zahlen des Steuerberaters. Ohne Betriebsfilter erscheinen nur die Betriebe, deren gewählter Monat schon gebucht ist — am Monatsanfang sind das erst die Schnellbucher, die Liste ist dann kürzer als die Flotte.',
     anzeige: 'row',
     parameter: [MONAT, BETRIEB],
     sql: `${MONAT_CTE_BWA}
@@ -912,17 +1062,23 @@ SELECT k.betrieb                     AS "Betrieb",
       'Bis wann ist je Betrieb gebucht? Die Zahlen kommen vom Steuerberater und liegen üblicherweise ein bis zwei Monate zurück; vier Monate Verzug sind eine Nachfrage wert. Betriebe, die dem Steuerberater nicht zugeordnet sind, erscheinen hier gar nicht.',
     anzeige: 'table',
     parameter: [BETRIEB],
+    // Nur Betriebe, die es noch zu buchen GIBT: 36 Zeilen "keine BWA
+    // gebucht" — Testlaeden, Verwaltungs-GmbHs, Geschlossene — standen
+    // ganz oben und begruben darunter die eigentliche Arbeitsliste.
+    // NULLS LAST statt FIRST: wer nie gebucht hat, ist ein eigenes Thema
+    // und steht am Ende, nicht vor dem groessten echten Verzug.
     sql: `
-SELECT betrieb            AS "Betrieb",
-       bwa_monat          AS "Gebucht bis",
-       bwa_verzug_monate  AS "Verzug (Monate)",
-       bwa_bruecke        AS "BWA-Brücke da?",
-       letzter_tag        AS "Umsatz bis",
-       befund             AS "Befund"
-  FROM mart.datenstand
- WHERE 1 = 1
-   [[AND betrieb = {{betrieb}}]]
- ORDER BY bwa_verzug_monate DESC NULLS FIRST, betrieb`,
+SELECT d.betrieb            AS "Betrieb",
+       d.bwa_monat          AS "Gebucht bis",
+       d.bwa_verzug_monate  AS "Verzug (Monate)",
+       d.bwa_bruecke        AS "BWA-Brücke da?",
+       d.letzter_tag        AS "Umsatz bis",
+       d.befund             AS "Befund"
+  FROM mart.datenstand d
+  JOIN mart.betrieb_status s ON s.betrieb_key = d.betrieb_key
+ WHERE s.status NOT IN ('test', 'verwaltend', 'geschlossen')
+   [[AND d.betrieb = {{betrieb}}]]
+ ORDER BY d.bwa_verzug_monate DESC NULLS LAST, d.betrieb`,
   },
 
   // ===================================================================

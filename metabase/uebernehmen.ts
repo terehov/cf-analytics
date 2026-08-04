@@ -32,7 +32,7 @@ import { karten as kartenBewertung } from './karten-bewertung'
 import { karten as kartenAktionen } from './karten-aktionen'
 import { dashboards } from './dashboards'
 import { auslegen, MINDESTHOEHE } from './layout'
-import type { Karte, Kachel, Dashboard } from './typen'
+import type { Karte, Kachel, Dashboard, Reihe } from './typen'
 import { config } from '../src/config'
 
 const DB_ID = 2
@@ -49,8 +49,30 @@ const alleKarten: Karte[] = [
 // Reihen in Kacheln umrechnen — EINMAL, damit Pruefung und Ausgabe
 // dieselben Zahlen sehen.
 const typVon = (s: string) => alleKarten.find(k => k.schluessel === s)?.anzeige
+
+/** Alle Reihen eines Dashboards, ueber die Reiter hinweg. Fuer jede
+ *  Pruefung, der egal ist, WO eine Karte liegt — Filter, Klicks, Schluessel. */
+function reihenVon(d: Dashboard): Reihe[] {
+  return d.tabs ? d.tabs.flatMap(t => t.reihen) : (d.reihen ?? [])
+}
+
+/** Kacheln eines Dashboards. Bei Reitern wird jeder Reiter fuer sich
+ *  ausgelegt (y beginnt je Reiter bei 0) und traegt seinen Index. */
+function kachelnVon(d: Dashboard): Kachel[] {
+  if (d.tabs) {
+    if (d.reihen) {
+      throw new Error(`Dashboard ${d.schluessel} hat reihen UND tabs — eines von beiden.`)
+    }
+    if (d.tabs.length < 2) {
+      throw new Error(`Dashboard ${d.schluessel}: ein einzelner Reiter ist keiner — reihen verwenden.`)
+    }
+    return d.tabs.flatMap((t, i) => auslegen(t.reihen, typVon).map(k => ({ ...k, tab: i })))
+  }
+  return auslegen(d.reihen ?? [], typVon)
+}
+
 const layoutVon = new Map<string, Kachel[]>(
-  dashboards.map(d => [d.schluessel, auslegen(d.reihen, typVon)]))
+  dashboards.map(d => [d.schluessel, kachelnVon(d)]))
 
 // --- Plausibilitaet, bevor irgendetwas angelegt wird -------------------
 const gesehen = new Set<string>()
@@ -59,7 +81,7 @@ for (const k of alleKarten) {
   gesehen.add(k.schluessel)
 }
 for (const d of dashboards) {
-  for (const r of d.reihen) {
+  for (const r of reihenVon(d)) {
     for (const teil of r.teile) {
       if (teil.text === undefined && !gesehen.has(teil.karte!)) {
         throw new Error(`Dashboard ${d.schluessel} verweist auf unbekannte Karte: ${teil.karte}`)
@@ -108,14 +130,15 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
   rt_ursachen_verlauf:    { monat: 'Ursachen im Zeitverlauf — ueber alle Monate.',
                             marke: 'mart.ursachen_analyse ist ueber alle Betriebe verdichtet '
                                  + 'und fuehrt keine Marke.' },
+  rt_ursachen:            { marke: 'Dieselbe Verdichtung wie der Verlauf darunter — '
+                                 + 'mart.ursachen_analyse fuehrt keine Marke.' },
   um_verlauf_tag:         { monat: 'Tagesverlauf; eingegrenzt wird ueber den Zeitraumfilter.' },
-  um_verlauf_monat:       { monat: 'Monatsverlauf mit Vorjahr — ueber alle Monate.',
-                            zeitraum: 'Aggregiert je Monat, nicht je Tag.' },
-  um_verlauf_delta:       { monat: 'Monatsverlauf — ueber alle Monate.',
-                            zeitraum: 'Aggregiert je Monat, nicht je Tag.' },
+  um_verlauf_monat:       { monat: 'Monatsverlauf mit Vorjahr — den Zeitraum liest er als Feldfilter.' },
+  um_verlauf_delta:       { monat: 'Monatsverlauf — den Zeitraum liest er als Feldfilter.' },
   pe_verlauf:             { monat: 'Quotenverlauf ueber alle Monate.' },
   bwa_kennzahlen:         { monat: 'BWA-Verlauf ueber alle gebuchten Monate.' },
-  im_puls:                { monat: 'Puls der letzten drei Tage, fest gefenstert.' },
+  bwa_wasserfall:         { zeitraum: 'EIN Monat, EIN Wasserfall — dafuer ist der Monatsfilter da. '
+                                    + 'Ueber einen Zeitraum waeren die Bloecke Summen ohne Aussage.' },
 
   // --- Aktionen: feste Fenster statt Stichmonat -----------------------------
   ak_uebersicht:          { monat: 'Festes 12-Monats-Fenster einschliesslich des laufenden Monats — '
@@ -144,17 +167,19 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
   pf_konzentration_kurve: { monat: 'ebenso.' },
   pf_karteileichen:       { monat: 'Betriebe OHNE jeden Umsatz — ueber die gesamte Historie, '
                                  + 'sonst zaehlte ein einzelner leerer Monat mit.' },
+  pf_stillgelegt:         { monat: 'Der letzte Umsatztag ist ein ZUSTAND, kein Monatswert — '
+                                 + 'still ist still, egal welchen Monat man betrachtet.' },
   pf_wochentag_marke:     { betrieb: 'Vergleicht MARKEN, nicht Betriebe.' },
   pf_gaeste_bon:          { betrieb: 'Vergleicht Betriebe untereinander — ein Betriebsfilter '
                                    + 'liesse genau einen Punkt uebrig.' },
   pf_stabilitaet:         { betrieb: 'Rangliste ueber alle Betriebe.' },
-  um_wochentag:           { monat: 'Wochenrhythmus ueber die gesamte Historie.',
-                            zeitraum: 'ebenso.' },
-  um_bon_gast:            { monat: 'Monatsverlauf von Bon und Umsatz je Gast — ueber alle Monate.',
-                            zeitraum: 'Aggregiert je Monat, nicht je Tag.' },
+  um_wochentag:           { monat: 'Wochenrhythmus ueber den ZEITRAUM, nicht einen Stichmonat — '
+                                 + 'ein einzelner Monat hat je Wochentag nur vier Tage.' },
+  um_bon_gast:            { monat: 'Monatsverlauf von Bon und Umsatz je Gast — den Zeitraum liest er als Feldfilter.' },
   um_rangliste:           { zeitraum: 'Rangliste zum Stichmonat, nicht zum Tageszeitraum.' },
   st_sparte:              { monat: 'Verlauf ueber alle Monate.' },
-  st_verkaufsstelle:      { monat: 'Verlauf ueber alle Monate.' },
+  st_wochenprofil:        { monat: 'Wochenprofil ueber den Zeitraum — ein Stichmonat hat je '
+                                 + 'Wochentag nur vier Tage, das Muster braucht mehr.' },
   st_stunde:              { monat: 'Tagesprofil ueber die gesamte Historie.' },
   st_zeitzone:            { monat: 'Tagesprofil ueber die gesamte Historie.' },
   pe_bereich:             { monat: 'Alle Zeitraeume je Betrieb, absichtlich ungefiltert.' },
@@ -450,9 +475,32 @@ function variablenVon(karte: Karte): Set<string> {
   return v
 }
 
+/**
+ * Filter, die auf einem Dashboard AUSDRUECKLICH nur eine Karte betreffen.
+ *
+ * Der Regelfall ist der andere: ein Filter im Kopf soll alles darunter
+ * bewegen, und wenn er das bei der Haelfte nicht tut, ist das ein Fehler
+ * — die Pruefung darunter faengt genau das.
+ *
+ * Es gibt aber Filter, die von vornherein nur zu EINER Karte gehoeren.
+ * "Sterne" auf ③ Betrieb ist so einer: er grenzt die Rueckmeldungen auf
+ * eine Note ein, und dass daraufhin der Monatsumsatz gleich bleibt, ist
+ * kein Versehen, sondern selbstverstaendlich. Siebzehn Einzelausnahmen
+ * dafuer einzutragen wuerde die Ausnahmeliste unlesbar machen und den
+ * eigentlichen Grund verstecken.
+ *
+ * Der Eintrag hier ist deshalb enger als eine Ausnahme, nicht weiter: er
+ * nennt die EINE Karte, die den Filter lesen MUSS. Liest sie ihn nicht,
+ * schlaegt die Pruefung weiterhin zu.
+ */
+const FILTER_NUR_FUER: Record<string, Record<string, string>> = {
+  // dashboard: { filter: karte }
+  dd_betrieb: { note: 'bw_einzel' },
+}
+
 const filterFehler: string[] = []
 for (const d of dashboards) {
-  const karten = d.reihen.flatMap(r => r.teile)
+  const karten = reihenVon(d).flatMap(r => r.teile)
     .filter(t => t.text === undefined)
     .map(t => alleKarten.find(k => k.schluessel === t.karte)!)
   if (karten.length === 0) continue
@@ -460,6 +508,19 @@ for (const d of dashboards) {
   for (const f of d.filter ?? []) {
     const slug = f.name
     const liest = karten.filter(k => variablenVon(k).has(slug))
+
+    // Filter, die ausdruecklich zu genau einer Karte gehoeren: geprueft
+    // wird dann NUR, ob diese eine Karte ihn auch wirklich liest.
+    const nurFuer = FILTER_NUR_FUER[d.schluessel]?.[slug]
+    if (nurFuer) {
+      if (!liest.some(k => k.schluessel === nurFuer)) {
+        filterFehler.push(
+          `${d.schluessel}: Filter "${slug}" ist fuer Karte "${nurFuer}" erklaert, ` +
+          `aber die liest ihn nicht.`)
+      }
+      continue
+    }
+
     const taub = karten.filter(k => !variablenVon(k).has(slug)
                                  && !FILTER_AUSNAHME[k.schluessel]?.[slug])
 
@@ -509,7 +570,7 @@ const NICHT_DURCHREICHEN: Record<string, string[]> = {
 for (const d of dashboards) {
   const quellFilter = (d.filter ?? []).map(f => f.name)
   if (quellFilter.length === 0) continue
-  for (const r of d.reihen) {
+  for (const r of reihenVon(d)) {
     for (const teil of r.teile) {
       for (const k of teil.klick ?? []) {
         const ziel = dashboards.find(x => x.schluessel === k.ziel)
@@ -538,7 +599,7 @@ for (const d of dashboards) {
 // ---------------------------------------------------------------------
 const klickFehler: string[] = []
 for (const d of dashboards) {
-  for (const r of d.reihen) {
+  for (const r of reihenVon(d)) {
     for (const teil of r.teile) {
       for (const k of teil.klick ?? []) {
         const ziel = dashboards.find(x => x.schluessel === k.ziel)
@@ -575,7 +636,7 @@ if (klickFehler.length > 0) {
 for (const d of dashboards) {
   const belegt = layoutVon.get(d.schluessel)!.map(k => ({
     name: k.text !== undefined ? 'Text' : k.karte,
-    x: k.x, y: k.y, b: k.breite, h: k.hoehe,
+    x: k.x, y: k.y, b: k.breite, h: k.hoehe, tab: k.tab,
   }))
 
   for (const k of belegt) {
@@ -587,6 +648,8 @@ for (const d of dashboards) {
   for (let i = 0; i < belegt.length; i++) {
     for (let j = i + 1; j < belegt.length; j++) {
       const a = belegt[i]!, b = belegt[j]!
+      // Jeder Reiter hat seine eigene Flaeche — y beginnt dort wieder bei 0.
+      if (a.tab !== b.tab) continue
       if (a.x < b.x + b.b && b.x < a.x + a.b && a.y < b.y + b.h && b.y < a.y + a.h) {
         throw new Error(
           `${d.schluessel}: ${a.name} und ${b.name} ueberlappen sich ` +
@@ -639,7 +702,7 @@ function kartenParameterTyp(typ: string): string {
  */
 function bwaDashboard(d: Dashboard): boolean {
   const karten: Karte[] = []
-  for (const r of d.reihen) {
+  for (const r of reihenVon(d)) {
     for (const t of r.teile) {
       if (!t.karte) continue
       const k = alleKarten.find(x => x.schluessel === t.karte)
@@ -780,6 +843,9 @@ const definitionen = {
       ...(p.festeWerte ? { festeWerte: p.festeWerte } : {}),
     })),
     kacheln: layoutVon.get(d.schluessel)!,
+    // Reiternamen in Reihenfolge. Die Kacheln tragen den Index (`tab`);
+    // die Seite uebersetzt beides in Metabases tabs/dashboard_tab_id.
+    tabs: d.tabs?.map(t => t.name) ?? null,
   })),
   sammlungen: [
     {
@@ -966,8 +1032,11 @@ async function uebernehmen() {
   // Seite benutzen -- sonst widerspricht sie ihm.
   const vorgabe = {};
   for (const [name, sql] of [
+    // Der juengste ABGESCHLOSSENE Monat — nicht der laufende Teilmonat.
+    // Begruendung am MONAT_CTE in gemeinsam.ts; src/sync/auswahllisten.ts
+    // setzt denselben Wert nach jedem Import.
     ['standard', "SELECT to_char(max(monat), 'YYYY-MM') FROM mart.round_table_monat " +
-                 "WHERE monat <= date_trunc('month', current_date)::date AND gesamt IS NOT NULL"],
+                 "WHERE monat < date_trunc('month', current_date)::date AND gesamt IS NOT NULL"],
     ['bwa',      "SELECT to_char(max(monat), 'YYYY-MM') FROM mart.kennzahlen_aktuell " +
                  "WHERE wert_absolut IS NOT NULL AND wert_absolut <> 0"],
   ]) {
@@ -1048,6 +1117,13 @@ async function uebernehmen() {
       // Kacheln. Jede Karte, die einen gleichnamigen Parameter hat, wird
       // an den Dashboard-Filter verdrahtet — sonst bliebe der Filter oben
       // stehen und täte nichts.
+      // Reiter: negative IDs, die Metabase beim Anlegen durch echte ersetzt.
+      // Kacheln verweisen ueber dashboard_tab_id auf dieselben negativen IDs.
+      // Ohne Reiter wird tabs: [] geschickt — das raeumt auch Reiter ab, die
+      // ein frueherer Stand angelegt hat.
+      const tabs = (d.tabs || []).map((name, i) => ({id: -(i + 1), name}));
+      const tabId = (kachel) =>
+        kachel.tab !== undefined && kachel.tab !== null ? -(kachel.tab + 1) : undefined;
       const dashcards = [];
       let lauf = -1;
       for (const kachel of d.kacheln) {
@@ -1056,6 +1132,7 @@ async function uebernehmen() {
           dashcards.push({
             id: lauf, card_id: null, row: kachel.y, col: kachel.x,
             size_x: kachel.breite, size_y: kachel.hoehe,
+            ...(tabId(kachel) !== undefined ? {dashboard_tab_id: tabId(kachel)} : {}),
             visualization_settings: {virtual_card: {name: null, display: 'text',
               visualization_settings: {}, dataset_query: {}, archived: false},
               text: kachel.text, 'text.align_vertical': 'middle'},
@@ -1107,6 +1184,7 @@ async function uebernehmen() {
         dashcards.push({
           id: lauf, card_id: cid, row: kachel.y, col: kachel.x,
           size_x: kachel.breite, size_y: kachel.hoehe,
+          ...(tabId(kachel) !== undefined ? {dashboard_tab_id: tabId(kachel)} : {}),
           parameter_mappings: mappings, visualization_settings: vis,
         });
       }
@@ -1167,8 +1245,9 @@ async function uebernehmen() {
         });
       }
 
-      await mb('/dashboard/' + id, 'PUT', {parameters: parameter, dashcards});
-      log('  ' + dashcards.length + ' Kacheln gesetzt', 'ok');
+      await mb('/dashboard/' + id, 'PUT', {parameters: parameter, dashcards, tabs});
+      log('  ' + dashcards.length + ' Kacheln gesetzt'
+          + (tabs.length ? ' (' + tabs.length + ' Reiter)' : ''), 'ok');
     } catch (e) { log('Dashboard ' + d.payload.name + ' — FEHLER: ' + e.message, 'fehler'); }
   }
 

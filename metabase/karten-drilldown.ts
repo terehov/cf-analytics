@@ -168,6 +168,10 @@ SELECT r.betrieb                                            AS "Betrieb",
   LEFT JOIN ampel.beschriftung am ON am.status = r.ampel_om
   LEFT JOIN ampel.beschriftung ag ON ag.status = r.gesamt
  WHERE r.monat = g.monat
+   -- Nur operative Betriebe: geschlossene, verwaltende und Test-Betriebe
+   -- stellten ein Drittel der roten Ampeln und begruben die eigentliche
+   -- Arbeitsliste. Die Zaehlkacheln auf ① zaehlen dieselbe Menge.
+   AND r.operativ
    [[AND r.konzept = {{marke}}]]
    -- 'ohne' steht fuer "keine Ampel berechenbar" (NULL). Ohne diesen Fall
    -- fuehrte die Kachel "Ohne Urteil" auf eine leere Liste.
@@ -226,6 +230,7 @@ SELECT a.bereich_name        AS "Bereich",
   FROM mart.ampel_bereich a
   CROSS JOIN gewaehlt g
  WHERE a.monat = g.monat
+   AND a.operativ
    [[AND a.konzept = {{marke}}]]
    [[AND a.bereich_name = {{bereich}}]]
    -- 'ohne' steht fuer NULL: fuer diesen Bereich liess sich keine Ampel
@@ -259,6 +264,7 @@ SELECT r.betrieb                AS "Betrieb",
   CROSS JOIN gewaehlt g
  WHERE r.monat = g.monat
    AND r.personalkosten_ogf_pct IS NOT NULL
+   AND r.operativ
    [[AND r.konzept = {{marke}}]]
    [[AND coalesce(r.gesamt, 'ohne') = {{ampel}}]]
    [[AND r.intensitaet = {{intensitaet}}]]
@@ -288,7 +294,7 @@ SELECT r.umsatz_ist             AS "Umsatz",
   CROSS JOIN gewaehlt g
  WHERE r.monat = g.monat
    AND r.personalkosten_ogf_pct IS NOT NULL
-   AND r.umsatz_ist > 0
+   AND r.operativ
    [[AND r.konzept = {{marke}}]]
    [[AND coalesce(r.gesamt, 'ohne') = {{ampel}}]]
    [[AND r.intensitaet = {{intensitaet}}]]`,
@@ -316,6 +322,7 @@ SELECT a.bereich_name                       AS "Bereich",
   CROSS JOIN gewaehlt g
   LEFT JOIN ampel.beschriftung b ON b.status = a.ampel
  WHERE a.monat = g.monat
+   AND a.operativ
    [[AND a.konzept = {{marke}}]]
  GROUP BY a.bereich_name, a.reihenfolge, b.bezeichnung, a.ampel
  ORDER BY a.reihenfolge`,
@@ -376,6 +383,10 @@ SELECT t.betrieb                         AS "Betrieb",
                                  AND ab.monat = t.monat AND ab.bereich = t.bereich
   LEFT JOIN mart.konzept_zuordnung kz ON kz.betrieb_key = t.betrieb_key
  WHERE t.monat = g.monat
+   -- Ohne Betriebsfilter nur operative Betriebe -- die 846-Zeilen-Sicht
+   -- soll die Flotte zeigen, nicht die Karteileichen. Ein ausdruecklich
+   -- gewaehlter Betrieb bleibt sichtbar, auch wenn er geschlossen ist.
+   AND (t.operativ [[ OR t.betrieb = {{betrieb}} ]])
    [[AND t.betrieb = {{betrieb}}]]
    [[AND kz.hauptkonzept = {{marke}}]]
  ORDER BY CASE ab.gesamt WHEN 'rot' THEN 1 WHEN 'orange' THEN 2
@@ -452,7 +463,8 @@ SELECT sum(y.umsatz_ytd) AS "Umsatz YTD"
       'Tagesumsatz des gewählten Betriebs. Die kräftige Linie ist das **Mittel der letzten '
       + 'sieben Tage** — sie nimmt den Wochenrhythmus heraus, damit die Entwicklung sichtbar '
       + 'wird. Die blasse Linie dahinter sind die einzelnen Tage.\n\n'
-      + 'Ohne gesetzten Zeitraum werden die letzten 90 Tage gezeigt.',
+      + 'Ohne gesetzten Zeitraum werden die letzten 90 Tage gezeigt; ein selbst '
+      + 'gewählter Zeitraum wird bis zu einem Jahr vollständig gezeichnet.',
     anzeige: 'line',
     parameter: [P_BETRIEB, P_ZEITRAUM],
     // WARUM GEGLAETTET WIRD.
@@ -501,11 +513,14 @@ SELECT geschaeftstag AS "Geschäftstag",
  -- wirklich einen Zeitraum setzte. Ohne gesetzten Filter fiel der
  -- optionale Block weg, und der Fehler blieb unsichtbar.
  --
- -- Jetzt greift der 90-Tage-Rueckfall nur noch, wenn die CTE mehr als
- -- 90 Tage hergibt. Bei gesetztem Zeitraum hat sie ohnehin schon
- -- gefiltert; ist der laenger als 90 Tage, war er ausdruecklich gewollt.
+ -- Der 90-Tage-Rueckfall gilt dem KEIN-FILTER-Fall (gesamte Historie,
+ -- 3.100+ Punkte). Bis zum 03.08.2026 kappte er auch ausdruecklich
+ -- gesetzte Zeitraeume: wer sechs Monate einstellte, sah kommentarlos
+ -- die letzten 90 Tage davon -- und die Karte sah aus, als haette sie
+ -- den Filter befolgt. Die Grenze liegt jetzt bei einem Jahr: alles
+ -- darunter war eine bewusste Wahl und wird vollstaendig gezeichnet.
  WHERE geschaeftstag >= (SELECT max(geschaeftstag) - 89 FROM tage)
-    OR (SELECT max(geschaeftstag) - min(geschaeftstag) FROM tage) <= 90
+    OR (SELECT max(geschaeftstag) - min(geschaeftstag) FROM tage) <= 366
  ORDER BY geschaeftstag`,
     template_tag_dimension: { zeitraum: ['mart', 'umsatz_tag', 'geschaeftstag'] },
     visualisierung: {
@@ -685,24 +700,39 @@ SELECT betrieb                   AS "Betrieb",
   },
   {
     schluessel: 'dd_betrieb_artikel',
-    name: 'Betrieb — Meistverkaufte Artikel',
+    name: 'Betrieb — Umsatzstärkste Artikel',
     beschreibung:
-      'Die 30 meistverkauften Artikel dieses Betriebs im gewählten Monat, mit Deckungsbeitrag. Bleibt leer, solange die Artikeldaten noch eingelesen werden.',
+      'Die 30 umsatzstärksten Artikel dieses Betriebs im gewählten Monat. „DB %" gilt nur für den Umsatzanteil mit hinterlegtem Wareneinsatz („WE hinterlegt %") und ist eine Umsatzgliederung, keine Margenaussage. Bleibt leer, solange die Artikeldaten noch eingelesen werden.',
     anzeige: 'table',
     parameter: [P_MONAT, P_BETRIEB],
+    // ZWEI Korrekturen vom 03.08.2026:
+    //   1. Der Filter liegt auf geschaeftstag statt auf der abgeleiteten
+    //      monat-Spalte -- nur so greift das Partition Pruning von
+    //      core.artikelverkauf_tag (1 statt 108 Partitionen; dieselbe
+    //      Regel, die Commit 3597eb1 fuer die Warengruppen durchsetzte).
+    //   2. "DB %" rechnet auf dem ABGEDECKTEN Umsatz: seit nullif(fixer_we)
+    //      zeigte die alte Formel sonst wieder 100 % fuer Artikel ohne
+    //      WE-Ansatz -- eine Margenaussage aus fixer_we, die die
+    //      Projektregel ausdruecklich verbietet.
     sql: `${MONAT_CTE_UMSATZ}
 SELECT av.artikel                 AS "Artikel",
        av.warengruppe             AS "Warengruppe",
        sum(av.menge)              AS "Menge",
        sum(av.umsatz_netto)       AS "Umsatz",
        sum(av.deckungsbeitrag)    AS "Deckungsbeitrag",
-       round(100 * sum(av.deckungsbeitrag) / nullif(sum(av.umsatz_netto), 0), 1) AS "DB %"
+       round(100 * sum(av.deckungsbeitrag)
+             / nullif(sum(av.umsatz_netto) FILTER (WHERE av.fixer_we IS NOT NULL), 0), 1) AS "DB %",
+       round(100 * sum(av.umsatz_netto) FILTER (WHERE av.fixer_we IS NOT NULL)
+             / nullif(sum(av.umsatz_netto), 0), 1)                                        AS "WE hinterlegt %"
   FROM mart.artikelverkauf av
   CROSS JOIN gewaehlt g
- WHERE av.monat = g.monat
+ WHERE av.geschaeftstag >= g.monat
+   AND av.geschaeftstag < (g.monat + interval '1 month')::date
+   AND av.umsatz_netto IS NOT NULL
    [[AND av.betrieb = {{betrieb}}]]
  GROUP BY av.artikel, av.warengruppe
- ORDER BY sum(av.menge) DESC
+HAVING sum(av.umsatz_netto) > 0
+ ORDER BY sum(av.umsatz_netto) DESC
  LIMIT 30`,
   },
   {
@@ -777,34 +807,37 @@ SELECT CASE WHEN ueberfaellig THEN '⚠' ELSE '' END AS "!",
 -- 166 Pixel fuer eine einstellige Zahl. Im Browser nachgemessen am
 -- 28.07.2026 -- zusammen mit "Alter (Tage)" war das der Ueberstand, der
 -- die Tabelle auch ueber die volle Breite noch scrollen liess.
-SELECT betrieb                  AS "Betrieb",
-       befund                   AS "Befund",
-       erster_tag               AS "Umsatz ab",
-       letzter_tag              AS "Umsatz bis",
-       umsatz_alter_tage        AS "Alter",
-       bwa_monat                AS "BWA bis",
-       bwa_verzug_monate        AS "Verzug",
-       artikeltage              AS "Artikeltage",
-       letzter_personaltag      AS "Personal bis",
-       bwa_bruecke              AS "BWA-Brücke"
-  FROM mart.datenstand
+SELECT d.betrieb                  AS "Betrieb",
+       s.status                   AS "Status",
+       d.befund                   AS "Befund",
+       d.erster_tag               AS "Umsatz ab",
+       d.letzter_tag              AS "Umsatz bis",
+       d.umsatz_alter_tage        AS "Alter",
+       d.bwa_monat                AS "BWA bis",
+       d.bwa_verzug_monate        AS "Verzug",
+       d.artikeltage              AS "Artikeltage",
+       d.letzter_personaltag      AS "Personal bis",
+       d.bwa_bruecke              AS "BWA-Brücke"
+  FROM mart.datenstand d
+  LEFT JOIN mart.betrieb_status s ON s.betrieb_key = d.betrieb_key
  WHERE 1 = 1
-   [[AND betrieb = {{betrieb}}]]`,
+   [[AND d.betrieb = {{betrieb}}]]`,
   },
 
   // ===================================================================
   // Zeitraumvergleich
   //
-  // Zwei frei waehlbare Zeitraeume nebeneinander. Vorbelegt mit
-  // "laufender Monat bis heute" gegen "derselbe Ausschnitt des Vormonats"
-  // — ein Vergleich ganzer Monate waere schief, solange der laufende noch
-  // nicht zu Ende ist.
+  // Zwei frei waehlbare Zeitraeume nebeneinander. Vorbelegt mit den
+  // letzten sieben abgeschlossenen Tagen gegen DASSELBE Fenster vier
+  // Wochen frueher — wochentagstreu, Montag gegen Montag. Der alte
+  // Default ("laufender Monat gegen Vormonat") verglich am Monatsdritten
+  // Sa/So/Mo mit Mi/Do/Fr, und der Wochentagsmix dominierte das Delta.
   // ===================================================================
   {
     schluessel: 'vg_zeit_betrieb',
     name: 'Zeitraumvergleich je Betrieb',
     beschreibung:
-      'Zwei frei wählbare Zeiträume nebeneinander. Voreingestellt ist der laufende Monat bis heute gegen denselben Ausschnitt des Vormonats — ein ganzer Monat gegen einen halben wäre kein fairer Vergleich. Die Tage-Spalten zeigen, ob beide Zeiträume gleich lang sind.',
+      'Zwei frei wählbare Zeiträume nebeneinander. Voreingestellt: die letzten sieben abgeschlossenen Tage gegen dasselbe Fenster vier Wochen früher — Montag gegen Montag, Samstag gegen Samstag. „Tage" zählt nur Tage MIT Umsatz: fehlt dem jüngsten Zeitraum ein Tag, sind die Daten noch nicht nachgeliefert.',
     anzeige: 'table',
     parameter: [
       { id: 'von-a-param', name: 'von_a', 'display-name': 'Zeitraum A von', type: 'date/single' },
@@ -825,8 +858,10 @@ SELECT u.betrieb                                                        AS "Betr
                             - sum(u.umsatz_netto) FILTER (WHERE u.geschaeftstag BETWEEN z.b_von AND z.b_bis))
                        / sum(u.umsatz_netto) FILTER (WHERE u.geschaeftstag BETWEEN z.b_von AND z.b_bis), 1)
        END                                                              AS "Δ %",
-       count(*) FILTER (WHERE u.geschaeftstag BETWEEN z.a_von AND z.a_bis) AS "Tage A",
-       count(*) FILTER (WHERE u.geschaeftstag BETWEEN z.b_von AND z.b_bis) AS "Tage B",
+       count(*) FILTER (WHERE u.geschaeftstag BETWEEN z.a_von AND z.a_bis
+                          AND u.umsatz_netto > 0) AS "Tage A",
+       count(*) FILTER (WHERE u.geschaeftstag BETWEEN z.b_von AND z.b_bis
+                          AND u.umsatz_netto > 0) AS "Tage B",
        sum(u.gaeste) FILTER (WHERE u.geschaeftstag BETWEEN z.a_von AND z.a_bis) AS "Gäste A",
        sum(u.gaeste) FILTER (WHERE u.geschaeftstag BETWEEN z.b_von AND z.b_bis) AS "Gäste B",
        round(sum(u.umsatz_netto) FILTER (WHERE u.geschaeftstag BETWEEN z.a_von AND z.a_bis)
@@ -852,7 +887,8 @@ HAVING sum(u.umsatz_netto) > 0
   {
     schluessel: 'vg_zeit_summe',
     name: 'Zeitraumvergleich gesamt',
-    beschreibung: 'Beide Zeiträume als Summe über alle Betriebe. Die Tageszahl steht daneben, weil unterschiedlich lange Zeiträume sonst falsche Schlüsse nahelegen.',
+    beschreibung:
+      'Beide Zeiträume als Summe über alle Betriebe. „Tage mit Daten" neben den Kalendertagen zeigt, ob der jüngste Zeitraum schon vollständig geliefert ist — LINA füllt die letzten Tage nach. „Betriebe" zählt nur Häuser mit Umsatz im Zeitraum.',
     anzeige: 'table',
     parameter: [
       { id: 'von-a-param', name: 'von_a', 'display-name': 'Zeitraum A von', type: 'date/single' },
@@ -866,12 +902,13 @@ SELECT s.zeitraum                                       AS "Zeitraum",
        s.von                                            AS "Von",
        s.bis                                            AS "Bis",
        (s.bis - s.von + 1)                              AS "Kalendertage",
+       count(DISTINCT u.geschaeftstag) FILTER (WHERE u.umsatz_netto > 0) AS "Tage mit Daten",
        round(sum(u.umsatz_netto), 0)                    AS "Umsatz",
        sum(u.gaeste)                                    AS "Gäste",
        sum(u.rechnungen)                                AS "Rechnungen",
        round(sum(u.umsatz_netto) / nullif(sum(u.rechnungen), 0), 2) AS "Ø Bon",
        round(sum(u.umsatz_netto) / nullif(sum(u.gaeste), 0), 2)     AS "Ø je Gast",
-       count(DISTINCT u.betrieb)                        AS "Betriebe"
+       count(DISTINCT u.betrieb) FILTER (WHERE u.umsatz_netto > 0)  AS "Betriebe"
   FROM z
   CROSS JOIN LATERAL (VALUES ('A — Zeitraum A', z.a_von, z.a_bis),
                              ('B — Zeitraum B', z.b_von, z.b_bis)) AS s(zeitraum, von, bis)
@@ -926,7 +963,19 @@ SELECT (u.geschaeftstag - s.von + 1)   AS "Tag im Zeitraum",
       'Die gewählten Betriebe nebeneinander, eine Zeile je Kennzahl. Ohne Auswahl stehen hier alle bewerteten Betriebe — oben im Filter die auswählen, die verglichen werden sollen.',
     anzeige: 'table',
     parameter: [P_MONAT, P_BETRIEB, P_MARKE],
+    // Der Median wird EINMAL je Bereich gerechnet, nicht je Zeile: die
+    // LATERAL-Fassung rechnete ihn fuer jede der ~800 Zeilen neu und
+    // brauchte 8 Sekunden. Er laeuft absichtlich ueber ALLE operativen
+    // Betriebe, unabhaengig vom Betriebs-/Markenfilter — "Δ zum Median
+    // aller" verspricht genau das.
     sql: `${MONAT_CTE}
+, med AS (
+    SELECT x.bereich,
+           percentile_cont(0.5) WITHIN GROUP (ORDER BY x.wert)::numeric AS median
+      FROM mart.ampel_bereich x, gewaehlt g
+     WHERE x.monat = g.monat AND x.wert IS NOT NULL AND x.operativ
+     GROUP BY x.bereich
+)
 SELECT a.bereich_name                        AS "Metrik",
        a.betrieb                             AS "Betrieb",
        a.wert                                AS "Wert",
@@ -939,13 +988,10 @@ SELECT a.bereich_name                        AS "Metrik",
   LEFT JOIN ampel.beschriftung be ON be.status = a.ampel
   LEFT JOIN mart.round_table_trend t ON t.betrieb_key = a.betrieb_key
                                     AND t.monat = a.monat AND t.bereich = a.bereich
-  LEFT JOIN LATERAL (
-        SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY x.wert)::numeric AS median
-          FROM mart.ampel_bereich x
-         WHERE x.monat = a.monat AND x.bereich = a.bereich AND x.wert IS NOT NULL
-  ) med ON true
+  LEFT JOIN med ON med.bereich = a.bereich
  WHERE a.monat = g.monat
    AND a.wert IS NOT NULL
+   AND (a.operativ [[ OR a.betrieb = {{betrieb}} ]])
    [[AND a.betrieb = {{betrieb}}]]
    [[AND a.konzept = {{marke}}]]
  ORDER BY a.reihenfolge, a.betrieb`,

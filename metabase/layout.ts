@@ -37,6 +37,9 @@ export const MINDESTHOEHE: Record<Anzeige, number> = {
   table: 9,    // Kopfzeile + ~6 Datenzeilen, darunter lohnt keine Tabelle
   map: 12,     // Deutschland ist hoeher als breit -- flacher wird die Karte
                // zum Streifen, in dem Nord und Sued uebereinanderliegen
+  pivot: 10,   // Kopfzeile + Spaltenkoepfe + genug Zeilen, dass ein Muster
+               // erkennbar wird — eine Pivot auf sechs Einheiten ist ein Brett
+  waterfall: 8,
 }
 
 /**

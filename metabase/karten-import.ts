@@ -123,20 +123,37 @@ SELECT endpunkt      AS "Bericht",
     schluessel: 'im_laeufe',
     name: 'Die letzten Läufe',
     beschreibung:
-      '„abgebrochen" mit einer Notiz über SIGTERM ist der Normalfall bei einem Lauf mit Zeitfrist — der nächste macht dort weiter, wo dieser aufhörte. Der Zustand liegt in der Datenbank, nicht im Prozess.',
+      '„abgebrochen" mit einer Notiz über SIGTERM ist der Normalfall bei einem Lauf mit Zeitfrist — der nächste macht dort weiter, wo dieser aufhörte. Der Zustand liegt in der Datenbank, nicht im Prozess. „verwaist" heißt: der Prozess ist ohne Abmeldung verschwunden (Absturz, SIGKILL) — die Zeile ist Protokollrest, kein laufender Import.',
     anzeige: 'table',
     sql: `
-SELECT lauf_id                AS "Lauf",
-       gestartet_am           AS "gestartet",
-       dauer                  AS "Dauer",
-       ausloeser              AS "Auslöser",
-       status                 AS "Status",
-       aufgaben_gesamt        AS "Posten",
-       aufgaben_ok            AS "ok",
-       aufgaben_fehler        AS "Fehler",
-       posten_pro_minute      AS "Posten/Min",
-       notiz                  AS "Notiz"
-  FROM mart.import_lauf
+-- 'verwaist' vergibt die Karte selbst, nicht die Sicht: die kann nur
+-- sehen, dass niemand den Lauf beendet hat, und zeigt 'laeuft'. Am
+-- 03.08.2026 standen so drei "laufende" Laeufe nebeneinander, von
+-- denen zwei laengst tot waren. Woran man den Toten erkennt: ein
+-- SPAETER gestarteter Lauf ist schon fertig (der Importer laeuft
+-- einzeln, zwei echte Laeufe zugleich gibt es nicht), oder der Start
+-- liegt ueber sechs Stunden zurueck -- so lange laeuft keiner.
+SELECT l.lauf_id              AS "Lauf",
+       l.gestartet_am         AS "gestartet",
+       l.dauer                AS "Dauer",
+       l.ausloeser            AS "Auslöser",
+       CASE WHEN l.status = 'laeuft'
+             AND l.beendet_am IS NULL
+             AND (EXISTS (SELECT 1
+                            FROM mart.import_lauf s
+                           WHERE s.gestartet_am > l.gestartet_am
+                             AND s.beendet_am IS NOT NULL)
+                  OR l.gestartet_am < now() - interval '6 hours')
+            THEN 'verwaist'
+            ELSE l.status
+       END                    AS "Status",
+       l.aufgaben_gesamt      AS "Posten",
+       l.aufgaben_ok          AS "ok",
+       l.aufgaben_fehler      AS "Fehler",
+       l.posten_pro_minute    AS "Posten/Min",
+       l.notiz                AS "Notiz"
+  FROM mart.import_lauf l
+ ORDER BY l.gestartet_am DESC
  LIMIT 25`,
   },
   {
@@ -199,19 +216,33 @@ SELECT stunde         AS "Stunde",
     schluessel: 'im_naechste',
     name: 'Was als Nächstes drankommt',
     beschreibung:
-      'Die offene Warteschlange in genau der Reihenfolge, in der sie abgearbeitet wird. Zeile 1 ist der nächste Posten. „laufend" geht immer vor „Historie" — deshalb kann die Historie stillstehen, ohne dass etwas kaputt ist.',
+      'Die offene Warteschlange in genau der Reihenfolge, in der sie abgearbeitet wird. Zeile 1 ist der nächste Posten. „laufend" geht immer vor „Historie" — deshalb kann die Historie stillstehen, ohne dass etwas kaputt ist. FoodNotify-Posten (fn:*) hängen an keiner LINA-Betriebsnummer — bei ihnen steht die Kostenstelle bzw. Bestellung aus den Auftragsparametern.',
     anzeige: 'table',
     sql: `
-SELECT position           AS "#",
-       endpunkt           AS "Bericht",
-       betrieb            AS "Betrieb",
-       zeitraum_von       AS "von",
-       zeitraum_bis       AS "bis",
-       art                AS "Art",
-       faellig_ab         AS "fällig ab",
-       versuche           AS "Versuche",
-       laeuft_gerade      AS "läuft gerade"
-  FROM mart.import_naechste
+-- FoodNotify-Posten (fn:*) fuehren keinen Betrieb -- die Spalte der
+-- Sicht bleibt dort leer, und fuenfzig leere Zellen lesen sich wie
+-- ein Datenfehler. Was den Posten tatsaechlich benennt, steht in den
+-- Parametern der Warteschlange: Kostenstelle (erpId), Bestellung
+-- (orderId), Seite. Daraus wird hier eine lesbare Bezeichnung gebaut;
+-- LINA-Posten zeigen unveraendert den Betrieb.
+SELECT n.position           AS "#",
+       n.endpunkt           AS "Bericht",
+       coalesce(
+         n.betrieb,
+         nullif(concat_ws(', ',
+           'Kostenstelle ' || (w.parameter ->> 'erpId'),
+           'Bestellung '   || (w.parameter ->> 'orderId'),
+           'Seite '        || (w.parameter ->> 'seite')), ''),
+         n.endpunkt)        AS "Betrieb",
+       n.zeitraum_von       AS "von",
+       n.zeitraum_bis       AS "bis",
+       n.art                AS "Art",
+       n.faellig_ab         AS "fällig ab",
+       n.versuche           AS "Versuche",
+       n.laeuft_gerade      AS "läuft gerade"
+  FROM mart.import_naechste n
+  LEFT JOIN sync.warteschlange w USING (posten_id)
+ ORDER BY n.position
  LIMIT 50`,
   },
 
@@ -273,8 +304,11 @@ SELECT betrieb              AS "Betrieb",
        offen                AS "offen",
        keine_daten          AS "keine Daten",
        aufgegeben           AS "aufgegeben",
-       reicht_zurueck_bis   AS "Daten ab",
-       geladen_bis          AS "Daten bis",
+       -- "Daten ab"/"Daten bis" standen hier als durchgehend leere
+       -- Spalten: die Sicht fuellt sie fuer keinen einzigen Betrieb
+       -- (0 von 141 am 03.08.2026). Eine leere Datumsspalte liest
+       -- sich als Datenluecke des Betriebs, nicht als Luecke der
+       -- Sicht -- weg damit, bis die Sicht sie wirklich liefert.
        berichte_pausiert    AS "Berichte pausiert"
   FROM mart.import_betrieb
  LIMIT 200`,
@@ -371,4 +405,94 @@ SELECT s.quelle                                  AS "Quelle",
   // Review vom 03.08.2026 zusammen entstanden.
   // ===================================================================
   {
+    schluessel: 'dq_lochtage',
+    name: 'Tage mit Datenloch',
+    beschreibung:
+      'Tage der letzten 120 Tage, an denen deutlich weniger Betriebe Umsatz melden als im 28-Tage-Schnitt davor. Die jüngsten etwa sechs Tage füllt LINA von selbst nach — dort ist eine Zeile normal. Ältere Zeilen sind echte Löcher: diese Tage fehlen in jeder Auswertung und gehören neu eingereiht. Anlassfall: der 22.07.2026 mit 0 von ~54 erwarteten Betrieben.',
+    anzeige: 'table',
+    sql: `
+SELECT geschaeftstag        AS "Geschäftstag",
+       wochentag            AS "Wochentag",
+       betriebe_mit_umsatz  AS "Betriebe mit Umsatz",
+       betriebe_erwartet    AS "erwartet",
+       umsatz               AS "Umsatz",
+       befund               AS "Befund"
+  FROM mart.umsatz_lochtag
+ ORDER BY geschaeftstag DESC`,
+    visualisierung: {
+      column_settings: {
+        '["name","Umsatz"]': { number_style: 'currency', currency: 'EUR', currency_style: 'symbol', decimals: 0 },
+      },
+    },
+  },
+  {
+    schluessel: 'dq_gaeste',
+    name: 'Gästezahlen — wem sie fehlen',
+    beschreibung:
+      'Betriebe, die in den letzten zwölf Monaten an weniger als 80 % ihrer Umsatztage Gästezahlen melden. Für diese Betriebe gibt es kein „Umsatz je Gast" — auf den Kennzahlseiten fehlen sie stillschweigend. Die umsatzstärksten stehen oben: dort lohnt es zuerst, die Gästezählung an der Kasse zu klären.',
+    anzeige: 'table',
+    sql: `
+SELECT betrieb           AS "Betrieb",
+       status            AS "Status",
+       umsatztage        AS "Umsatztage",
+       tage_mit_gaesten  AS "Tage mit Gästen",
+       abdeckung_pct     AS "Abdeckung %",
+       umsatz_12m        AS "Umsatz 12M"
+  FROM mart.gaeste_abdeckung
+ WHERE abdeckung_pct < 80
+ ORDER BY umsatz_12m DESC NULLS LAST`,
+    visualisierung: {
+      column_settings: {
+        '["name","Umsatz 12M"]': { number_style: 'currency', currency: 'EUR', currency_style: 'symbol', decimals: 0 },
+      },
+    },
+  },
+  {
+    schluessel: 'dq_zuordnung_offen',
+    name: 'FoodNotify-Restaurants ohne Betrieb',
+    beschreibung:
+      'Erwartung: leer. Jede Zeile ist ein FoodNotify-Restaurant, dessen Bestellungen in keiner Betriebsauswertung ankommen, weil die Zuordnung zum Betrieb fehlt — stillschweigend, ohne Fehlermeldung. „Vorschlag" ist der ähnlichste Betriebsname samt Ähnlichkeitsmaß: bestätigen oder verwerfen, eingetragen wird in manual.betrieb_zuordnung.',
+    anzeige: 'table',
+    sql: `
+SELECT fn_name        AS "Restaurant (FoodNotify)",
+       marke          AS "Marke",
+       grund          AS "Grund",
+       vorschlag_name AS "Vorschlag",
+       trgm           AS "Ähnlichkeit",
+       kostenstellen  AS "Kostenstellen",
+       bestellungen   AS "Bestellungen"
+  FROM manual.betrieb_zuordnung_offen
+ ORDER BY bestellungen DESC NULLS LAST`,
+  },
+  {
+    schluessel: 'dq_unplausibel',
+    name: 'Unplausible BWA-Quoten',
+    beschreibung:
+      'BWA-Prozentwerte jenseits von ±150 % vom Umsatz — als Quote unmöglich, meist ein Buchungs- oder Übertragungsfehler beim Steuerberater. Seit dem 03.08.2026 tragen diese Werte KEINE Ampel mehr; diese Liste ist die Arbeitsliste, mit der man beim Steuerberater anruft. Gezeigt: aktive Betriebe, jüngste 24 Monate, größte Ausreißer zuerst.',
+    anzeige: 'table',
+    sql: `
+-- DISTINCT ON: die Sicht fuehrt je Abruf eine Zeile, derselbe Fall
+-- steht daher mehrfach darin (107 Zeilen, 62 eindeutige Faelle am
+-- 03.08.2026). Interessant ist nur der juengste Stand je Fall.
+-- wert_absolut/umsatz_absolut fuellt die Sicht derzeit nie (0 von
+-- 875 Zeilen) -- als Spalten waeren sie leere Versprechen, siehe
+-- die Begruendung bei "Je Betrieb".
+SELECT betrieb      AS "Betrieb",
+       monat        AS "Monat",
+       kennzahl     AS "Kennzahl",
+       wert_prozent AS "Wert"
+  FROM (
+    SELECT DISTINCT ON (betrieb_key, monat, kennzahl)
+           betrieb, monat, kennzahl, wert_prozent
+      FROM mart.bwa_prozent_unplausibel
+     WHERE aktiv
+       AND monat >= date_trunc('month', current_date) - interval '24 months'
+     ORDER BY betrieb_key, monat, kennzahl, abgerufen_am DESC NULLS LAST
+  ) juengster_stand
+ ORDER BY abs(wert_prozent) DESC
+ LIMIT 200`,
+    visualisierung: {
+      column_settings: { '["name","Wert"]': { suffix: ' %' } },
+    },
+  },
 ]

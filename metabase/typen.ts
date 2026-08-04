@@ -6,9 +6,17 @@
 
 export type Anzeige =
   | 'table' | 'scalar' | 'bar' | 'row' | 'line' | 'combo' | 'pie' | 'area'
+  /** Punktwolke — zwei Kennzahlen gegeneinander, ein Punkt je Betrieb. */
+  | 'scatter'
   /** Punktkarte. Braucht map.type = 'pin' und die beiden Koordinatenspalten
    *  in map.latitude_column / map.longitude_column. */
   | 'map'
+  /** Pivot-Tabelle — z. B. Wochentag × Stunde. Braucht pivot_table.column_split
+   *  in der Visualisierung; Metabase hat keine Heatmap, eine Pivot mit
+   *  Farbskala ist das naechstliegende Werkzeug. */
+  | 'pivot'
+  /** Wasserfall — vom Umsatz ueber die Kostenbloecke zum Ergebnis. */
+  | 'waterfall'
 
 export type Parameter = {
   id: string
@@ -104,6 +112,9 @@ export type Kachel = {
   text?: string
   /** Ein oder mehrere Klickziele. */
   klick?: Klick[]
+  /** Index des Reiters (0-basiert), auf dem die Kachel liegt.
+   *  Fehlt bei Dashboards ohne Reiter. */
+  tab?: number
 }
 
 /** Ein Element innerhalb einer Reihe. Entweder Karte oder Text. */
@@ -128,13 +139,31 @@ export type Reihe = {
   hoehe?: number
 }
 
+/**
+ * Ein Reiter innerhalb eines Dashboards.
+ *
+ * Fuer Seiten, die sonst zu langen Rollbahnen wuerden — ③ Betrieb hatte
+ * zwanzig Reihen untereinander, und wer die BWA suchte, scrollte an den
+ * Bewertungen vorbei. Jeder Reiter traegt seine eigenen Reihen; die Filter
+ * im Kopf gelten fuer alle Reiter gemeinsam (das macht Metabase so, und es
+ * ist hier auch richtig: der Monat soll nicht je Reiter ein anderer sein).
+ */
+export type Tab = {
+  name: string
+  reihen: Reihe[]
+}
+
 export type Dashboard = {
   schluessel: string
   name: string
   beschreibung: string
   sammlung: string
-  /** Waagerechte Gruppen von oben nach unten. layout.ts rechnet daraus x/y. */
-  reihen: Reihe[]
+  /** Waagerechte Gruppen von oben nach unten. layout.ts rechnet daraus x/y.
+   *  Entweder `reihen` ODER `tabs` — nicht beides. */
+  reihen?: Reihe[]
+  /** Reiter statt einer einzigen Rollbahn. Drill-Downs von aussen landen
+   *  immer auf dem ERSTEN Reiter — dorthin gehoert, was der Klick meinte. */
+  tabs?: Tab[]
   /** Dashboard-weite Filter. Werden auf alle Karten verdrahtet, die einen
    *  gleichnamigen Parameter haben. */
   filter?: Parameter[]

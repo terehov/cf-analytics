@@ -50,6 +50,15 @@ const F_INTENSITAET: Parameter = {
   id: 'd-intensitaet', name: 'intensitaet', 'display-name': 'Handlungsbedarf', type: 'string/=',
   festeWerte: ['Sofort eskalieren', 'Sofort handeln', 'Nachforschung', 'Beobachten/OK'],
 }
+/**
+ * Die Note einer einzelnen Bewertung. Ersetzt die frueheren zwei Karten
+ * "beste" und "schlechteste": wer die Kritik sehen will, stellt 1 oder 2
+ * ein, statt eine zweite Tabelle mit umgedrehtem ORDER BY zu lesen.
+ */
+const F_NOTE: Parameter = {
+  id: 'd-note', name: 'note', 'display-name': 'Sterne', type: 'text',
+  festeWerte: ['1', '2', '3', '4', '5'],
+}
 const F_ZEITRAUM: Parameter = {
   id: 'd-zeitraum', name: 'zeitraum', 'display-name': 'Zeitraum', type: 'date/all-options',
 }
@@ -92,6 +101,36 @@ const F_ZEITRAUM_QUARTAL: Parameter = {
 const F_ZEITRAUM_DREI_MONATE: Parameter = {
   id: 'd-zeitraum', name: 'zeitraum', 'display-name': 'Zeitraum', type: 'date/all-options',
   default: 'past3months',
+}
+
+/**
+ * Zeitraum fuer die Umsatzentwicklung — zwoelf Monate als Vorgabe.
+ *
+ * Ohne Vorgabe zeichnete um_verlauf_tag beim Oeffnen 3.136 Tagespunkte
+ * seit 2018 in eine Kachel. Zwoelf Monate, nicht drei: die Seite fragt
+ * nach ENTWICKLUNG, und dafuer braucht es mindestens einen Jahreszyklus —
+ * sonst sieht jede Saisonkurve wie ein Trend aus. Eine VORGABE, keine
+ * Grenze.
+ */
+const F_ZEITRAUM_JAHR: Parameter = {
+  id: 'd-zeitraum', name: 'zeitraum', 'display-name': 'Zeitraum', type: 'date/all-options',
+  default: 'past12months',
+}
+
+/**
+ * Der Markenfilter des EINKAUFS — gleicher Slug, andere Grundgesamtheit.
+ *
+ * Die Einkaufssichten fuehren die FoodNotify-Mandanten (vier Marken),
+ * nicht die zwoelf Round-Table-Hauptkonzepte. Acht der zwoelf lieferten
+ * grundsaetzlich leere Karten, und sechs Betriebe waren nur unter der
+ * falschen Marke auffindbar. Die Liste kommt deshalb aus
+ * mart.einkauf_ladestand; src/sync/auswahllisten.ts kennt dieselbe
+ * Ausnahme (LISTEN_JE_DASHBOARD), damit der Nachlauf sie nicht
+ * ueberschreibt.
+ */
+const F_MARKE_EINKAUF: Parameter = {
+  id: 'd-marke', name: 'marke', 'display-name': 'Marke', type: 'string/=',
+  werteliste: ['mart', 'einkauf_ladestand', 'marke'],
 }
 
 // Vier einzelne Datumsfelder fuer den Zeitraumvergleich. Bewusst nicht
@@ -146,6 +185,15 @@ export const dashboards: Dashboard[] = [
         { karte: 'dd_filialen_rangliste', hoehe: 11,
           klick: [{ ziel: 'dd_betrieb', uebergabe: { betrieb: 'Betrieb' } }] },
       ] },
+      // EINE sortierbare Liste, nicht zwei nebeneinander. Die erste
+      // Fassung hatte "beste" und "schlechteste" als getrennte Karten;
+      // verworfen am 03.08.2026, weil beide aus demselben Topf schoepfen
+      // und sich nur in der Sortierrichtung unterscheiden. Metabase
+      // sortiert eine Tabelle auf Klick — die zweite Karte war nur eine
+      // vorweggenommene Kopfbewegung.
+      { teile: [{ text: '## Online-Bewertungen\n\nSchlechteste zuerst — auf jede Spaltenüberschrift klicken dreht die Reihenfolge. Der **Stand** ist der Schnitt über alle Bewertungen, das was ein Gast auf Google sieht; **Ø neu** sind die des laufenden Monats.' }] },
+      { teile: [{ karte: 'bw_rangliste', hoehe: 12,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ text: '## Betriebe hinter einem Balken\n\nEin Klick auf ein Balkensegment füllt diese Liste. Ohne Auswahl stehen alle Bereiche untereinander.' }] },
       { teile: [{ karte: 'dd_filialen_bereich', hoehe: 12,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
@@ -175,9 +223,14 @@ export const dashboards: Dashboard[] = [
     // Gemeldet am 28.07.2026. Die Loesung ist nicht, dem Verlauf einen
     // Stichmonat aufzuzwingen, sondern der Seite einen ZEITRAUM zu geben,
     // den ein Verlauf lesen kann.
-    filter: [F_MONAT, F_ZEITRAUM_DREI_MONATE, F_BETRIEB],
-    reihen: [
-      { teile: [{ text: '# ③ Betrieb\n\nJedes Diagramm führt per Klick in die Detailauswertung.\n\n**Monat** gilt für die Ampeln und Kennzahlen, **Zeitraum** für die Verläufe darunter.' }] },
+    filter: [F_MONAT, F_ZEITRAUM_DREI_MONATE, F_BETRIEB, F_NOTE],
+    // REITER statt einer Rollbahn: die Seite hatte zwanzig Reihen
+    // untereinander, und wer die BWA suchte, scrollte an den Bewertungen
+    // vorbei. Die Filter oben gelten fuer alle Reiter; Drill-Downs von
+    // aussen landen auf "Ueberblick" — dort steht, was der Klick meinte.
+    tabs: [
+      { name: 'Überblick', reihen: [
+      { teile: [{ text: '# ③ Betrieb\n\nJedes Diagramm führt per Klick in die Detailauswertung, die Reiter oben gliedern die Seite.\n\n**Monat** gilt für die Ampeln und Kennzahlen, **Zeitraum** für die Verläufe.' }] },
       // Die vier Kennzahlkacheln bleiben in einer eigenen Reihe: eine Reihe
       // ist so hoch wie ihr hoechstes Element, und neben der Karte waeren
       // die Zahlen auf zwoelf Einheiten auseinandergezogen.
@@ -209,6 +262,34 @@ export const dashboards: Dashboard[] = [
         { karte: 'dd_betrieb_verlauf',
           klick: [{ ziel: 'db_umsatz', uebergabe: { betrieb: 'Betrieb' } }] },
       ] },
+      ] },
+      { name: 'Gäste & Bewertungen', reihen: [
+      // Die Gaeste-Sicht. Zwei Linien, die man nicht verwechseln darf:
+      // der Stand traegt alle Bewertungen und bewegt sich kaum, der
+      // Monatswert schwankt und laeuft ihm voraus. Genau deshalb stehen
+      // sie in EINEM Diagramm -- getrennt saehe der Monatswert nach einem
+      // instabilen Betrieb aus, statt nach einer Fruehwarnung.
+      { teile: [{ text: '## Was Gäste sagen\n\n**Stand** = Schnitt über alle Bewertungen, das was auf Google steht und woran die Ampel hängt. Er bewegt sich träge, weil tausende Stimmen darin stecken.\n\n**Tendenz** = gleitender Schnitt der neuen Bewertungen über sechs Monate. Sie läuft dem Stand voraus: fällt sie darunter, sinkt der Stand irgendwann nach. Die Balken zählen die neuen Bewertungen — eine Tendenz aus drei Stimmen ist keine.' }] },
+      { teile: [{ karte: 'bw_verlauf', hoehe: 9 }] },
+      // Der Wortlaut direkt unter der Kurve. Die Kurve sagt, DASS es
+      // kippt; diese beiden sagen, woran es liegt -- und das ist der
+      // ganze Grund, warum die Einzelbewertungen ueberhaupt geladen
+      // werden (migrations/0037_bewertung_einzeln.sql).
+      { teile: [{ text: '### Im Wortlaut\n\nAlle Rückmeldungen mit Text, neueste zuerst. Über **Sterne** im Kopf auf eine Note eingrenzen — 1 und 2 sind die Liste, mit der man arbeitet. Jede Spaltenüberschrift sortiert. **Quelle** führt zum Original beim Portal.' }] },
+      // EINE Liste, volle Breite, neueste zuerst. Zwei Karten (beste /
+      // schlechteste) standen hier bis zum 03.08.2026 und sind
+      // verworfen: sie schoepfen aus demselben Topf und unterscheiden
+      // sich nur in der Sortierrichtung, die Metabase auf Klick ohnehin
+      // liefert. Was fehlte, war ein Filter fuer die Note -- der steht
+      // jetzt oben im Dashboardkopf.
+      //
+      // Volle Breite, weil hier gelesen wird: auf zwoelf Einheiten
+      // bleiben dem Text 240 Pixel, und Metabase schneidet dann mitten
+      // im Satz ab. Ein halber Satz ist kein halbes Argument, sondern
+      // keins.
+      { teile: [{ karte: 'bw_einzel', hoehe: 14 }] },
+      ] },
+      { name: 'Struktur', reihen: [
       { teile: [{ text: '## Struktur — wovon dieser Betrieb lebt' }] },
       // Zwei Diagramme nebeneinander, der Tagesverlauf allein darunter.
       //
@@ -227,6 +308,8 @@ export const dashboards: Dashboard[] = [
       { teile: [
         { karte: 'dd_betrieb_stunde', klick: [{ ziel: 'db_struktur', uebergabe: { betrieb: 'Betrieb' } }] },
       ] },
+      ] },
+      { name: 'Personal · Ware · BWA', reihen: [
       { teile: [{ text: '## Personal, Ware, BWA' }] },
       { teile: [{ karte: 'dd_betrieb_personal',
         klick: [{ ziel: 'db_personal', uebergabe: { betrieb: 'Betrieb' } }] }] },
@@ -237,9 +320,12 @@ export const dashboards: Dashboard[] = [
         klick: [{ ziel: 'db_ware', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ karte: 'dd_betrieb_bwa',
         klick: [{ ziel: 'db_bwa', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      ] },
+      { name: 'Maßnahmen & Datenstand', reihen: [
       { teile: [{ text: '## Maßnahmen und Datenstand' }] },
       { teile: [{ karte: 'dd_betrieb_massnahmen' }] },
       { teile: [{ karte: 'dd_betrieb_datenstand' }] },
+      ] },
     ],
   },
 
@@ -251,7 +337,7 @@ export const dashboards: Dashboard[] = [
     sammlung: 'Drill-Down',
     filter: [F_VON_A, F_BIS_A, F_VON_B, F_BIS_B, F_MARKE],
     reihen: [
-      { teile: [{ text: '# ④ Zeiträume vergleichen\n\n**Zeitraum A** gegen **Zeitraum B**. Voreingestellt: laufender Monat gegen denselben Ausschnitt des Vormonats.\n\nUnterschiedlich lange Zeiträume sind erlaubt — die Differenz enthält sie dann mit.' }] },
+      { teile: [{ text: '# ④ Zeiträume vergleichen\n\n**Zeitraum A** gegen **Zeitraum B**. Voreingestellt: die letzten sieben abgeschlossenen Tage gegen dasselbe Fenster **vier Wochen früher** — Montag gegen Montag, sonst vergleicht man nur den Wochentagsmix.\n\nDie jüngsten Tage liefert LINA nach; fehlt in „Tage mit Daten" etwas, ist Zeitraum A noch unvollständig. Unterschiedlich lange Zeiträume sind erlaubt — die Differenz enthält sie dann mit.' }] },
       { teile: [{ karte: 'vg_zeit_summe' }] },
       { teile: [{ karte: 'vg_zeit_verlauf' }] },
       { teile: [{ text: '## Je Betrieb\n\nEin Klick auf den Betriebsnamen öffnet das Betriebsblatt.' }] },
@@ -311,7 +397,8 @@ export const dashboards: Dashboard[] = [
       { teile: [{ karte: 'pf_potenzial', hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ karte: 'pf_streuung' }] },
 
-      { teile: [{ text: '## Betriebe ohne laufendes Geschäft\n\n> Betriebe ohne Umsatz verzerren **jeden** Durchschnitt — über 1000 % Personalkosten bei 0 € melden eine Katastrophe, wo kein Betrieb läuft. Vorlage zum Stilllegen.' }] },
+      { teile: [{ text: '## Betriebe ohne laufendes Geschäft\n\n> Betriebe ohne Umsatz verzerren **jeden** Durchschnitt. Seit dem 03.08.2026 fliegen sie deshalb aus Ampeln, Ranglisten und Marken-Medianen — hier stehen sie gesammelt: erst die still gewordenen (mit dem Umsatz, der wegfiel), dann die, die nie Umsatz hatten.' }] },
+      { teile: [{ karte: 'pf_stillgelegt', hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ karte: 'pf_karteileichen', klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
     ],
   },
@@ -350,8 +437,13 @@ export const dashboards: Dashboard[] = [
       'Der Einstieg: oben die Zähler, darunter woran es liegt, dann die Betriebstabelle und die Marken. Ein Klick führt jeweils eine Ebene tiefer.',
     sammlung: 'Round Table',
     filter: [F_MONAT, F_MARKE],
-    reihen: [
-      { teile: [{ text: '# ① Round Table\n\n🟢 passt · 🟠 im Auge behalten · 🔴 sofort handeln · ⚪ nicht bewertbar (meist fehlt die BWA).\n\n**Round Table → Filiale → Betrieb.** Ein Klick führt eine Ebene tiefer, die Filter oben wandern mit.' }] },
+    // Zwei Reiter: "Lage" ist der Einstieg (Karte, Zaehler, Betriebe),
+    // "Marken" die Frage dahinter — schwaechelt das Haus oder seine Marke?
+    // Vorher stand beides untereinander, und die Markenebene begann erst
+    // nach vierzehn Reihen Scrollen.
+    tabs: [
+      { name: 'Lage', reihen: [
+      { teile: [{ text: '# ① Round Table\n\n🟢 passt · 🟠 im Auge behalten · 🔴 sofort handeln · ⚪ nicht bewertbar (meist fehlt die BWA).\n\n**Round Table → Filiale → Betrieb.** Ein Klick führt eine Ebene tiefer, die Filter oben wandern mit. Gezählt werden nur **operative** Betriebe — geschlossene, verwaltende und Testbetriebe stehen in der eigenen Kachel und in ⑥ Portfolio.' }] },
       // Die Karte steht ganz oben: sie beantwortet keine Frage, sondern
       // gibt den Zahlen darunter einen Ort. Schraenkt man die Marke ein,
       // bleiben deren Haeuser stehen -- die raeumliche Einordnung passiert
@@ -370,6 +462,12 @@ export const dashboards: Dashboard[] = [
           klick: [{ ziel: 'dd_filialen', uebergabe: { ampel: 'gruen' }, fest: true }] },
         { karte: 'rt_kachel_ohne_urteil',
           klick: [{ ziel: 'dd_filialen', uebergabe: { ampel: 'ohne' }, fest: true }] },
+        // Die Herausgenommenen duerfen nicht stumm verschwinden: wer die
+        // Zaehler mit der Betriebsliste abgleicht, muss sehen, wohin die
+        // uebrigen Haeuser gefallen sind.
+        { karte: 'rt_kachel_nicht_operativ' },
+      ] },
+      { teile: [
         { karte: 'rt_kachel_massnahmen',
           klick: [{ ziel: 'db_rt_ursachen', uebergabe: {}, fest: true }] },
         { karte: 'rt_kachel_bewertung' },
@@ -386,17 +484,18 @@ export const dashboards: Dashboard[] = [
       { teile: [{ text: '## Die Betriebe\n\nSortiert nach Handlungsdruck: rot vor orange vor grün, innerhalb dessen nach Dringlichkeit.' }] },
       { teile: [{ karte: 'rt_tabelle', hoehe: 14,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      ] },
       // ---------------------------------------------------------------
       // Die Markenebene. Sie stand bis zum 27.07.2026 auf einer eigenen
-      // Seite "① Marken", was einen Umweg bedeutete: vom Round Table kam
-      // man auf die Filialen, aber die Marke dazwischen fehlte.
-      //
-      // Jetzt ist der Round Table die Einstiegsebene, und die Marken
-      // stehen hier -- zwischen der Betriebstabelle und dem Ausblick.
-      // Sortiert wie der Rest der Seite: erst das Urteil, dann die
-      // Kennzahlen, dann der Verlauf.
+      // Seite "① Marken", dann bis zum 03.08.2026 UNTER der
+      // Betriebstabelle — nach vierzehn Reihen Scrollen. Jetzt ein
+      // eigener Reiter: dieselbe Seite, dieselben Filter, eine Frage.
+      // Die Mediane rechnen seit Migration 0039 nur ueber OPERATIVE
+      // Betriebe — vorher bestand "Besitos" aus einer Verwaltungs-GmbH
+      // und einem Testladen, beide rot.
       // ---------------------------------------------------------------
-      { teile: [{ text: '## Marken\n\nDie erste Frage vor jeder Maßnahme: schwächelt dieser eine Betrieb oder seine ganze Marke? Die Prozentwerte zeigen jeweils den mittleren Betrieb der Marke — ein Ausreißer verzieht so nicht das Bild.' }] },
+      { name: 'Marken', reihen: [
+      { teile: [{ text: '## Marken\n\nDie erste Frage vor jeder Maßnahme: schwächelt dieser eine Betrieb oder seine ganze Marke? Die Prozentwerte zeigen jeweils den mittleren **operativen** Betrieb der Marke — ein Ausreißer verzieht so nicht das Bild.' }] },
       { teile: [{ karte: 'dd_marken_tabelle', hoehe: 11,
         klick: [{ ziel: 'dd_filialen', spalte: 'Marke', uebergabe: { marke: 'Marke' } }] }] },
       // Die Markentabelle stand bis zum 28.07.2026 auf zwoelf Einheiten
@@ -423,6 +522,7 @@ export const dashboards: Dashboard[] = [
       { teile: [{ karte: 'dd_marken_verlauf' }] },
       { teile: [{ karte: 'rt_marke_abweichung', hoehe: 11,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      ] },
     ],
   },
 
@@ -432,9 +532,15 @@ export const dashboards: Dashboard[] = [
     beschreibung:
       'Wie sich die Ampeln über die Monate entwickelt haben. Die Vormonate und die Historie stehen automatisch zur Verfügung.',
     sammlung: 'Round Table',
-    filter: [F_MONAT],
+    filter: [F_MONAT, F_MARKE],
     reihen: [
-      { teile: [{ text: '# Trend und Historie\n\nWie sich die Ampeln über die Monate entwickelt haben. Die Historie schreibt sich von selbst fort und muss nicht gepflegt werden.' }] },
+      { teile: [{ text: '# Trend und Historie\n\nWie sich die Ampeln über die Monate entwickelt haben. Die Historie schreibt sich von selbst fort und muss nicht gepflegt werden. Gezeigt werden die letzten 24 Monate, nur operative Betriebe.' }] },
+      // Der Gesamtwechsel ZUERST: "welcher Betrieb ist als Ganzes
+      // gekippt" ist die Eroeffnungsfrage jedes Round Table — bisher
+      // zeigte die Seite nur Wechsel einzelner Bereiche.
+      { teile: [{ text: '## Wessen Gesamturteil ist gekippt\n\nVerschlechterungen zuerst. Das ist die Liste, mit der ein Round Table anfängt.' }] },
+      { teile: [{ karte: 'rt_gesamtwechsel', hoehe: 10,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [
         // Ein Segment heisst "die roten Betriebe im Maerz". Beides wandert
         // mit: der Monat von der Achse, die Bewertung aus der Farbe.
@@ -442,7 +548,7 @@ export const dashboards: Dashboard[] = [
           klick: [{ ziel: 'dd_filialen', uebergabe: { monat: 'Monat', ampel: 'Ampelwert' } }] },
         { karte: 'rt_historie_bereich' },
       ] },
-      { teile: [{ text: '## Wer hat die Farbe gewechselt\n\nDie Liste, mit der ein Round Table anfangen sollte. Verschlechterungen zuerst.' }] },
+      { teile: [{ text: '## Wer hat die Farbe gewechselt — je Bereich\n\nWechsel einzelner Ampeln, Verschlechterungen zuerst. Feiner als das Gesamturteil oben: ein Haus kann insgesamt grün bleiben, während die Personalampel kippt.' }] },
       { teile: [{ karte: 'rt_ampelwechsel', hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ text: '## Die letzten drei Monate je Betrieb und Bereich\n\n↗ besser oder gleich, ↘ schlechter. Dabei gilt je Bereich die richtige Richtung: bei Personal- und Wareneinsatzquoten ist ein kleinerer Wert der bessere.' }] },
       { teile: [{ karte: 'rt_trend_tabelle', hoehe: 12, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
@@ -455,7 +561,11 @@ export const dashboards: Dashboard[] = [
     beschreibung:
       'Ursachen hinter den Ampeln und die daraus abgeleiteten Maßnahmen. Beides wird von Hand erfasst — bleiben die Tabellen leer, heißt das „nichts eingetragen", nicht „keine Probleme".',
     sammlung: 'Round Table',
-    filter: [F_MONAT],
+    // Der Markenfilter kam am 03.08.2026: die Massnahmen-Kachel auf ①
+    // zaehlt MIT Marke und klickt hierher — ohne den Filter landete
+    // "5 offene Massnahmen (Enchilada)" auf einer Liste ALLER Marken,
+    // die aussah wie die gefilterte (docs/fehlerkatalog.md).
+    filter: [F_MONAT, F_MARKE],
     reihen: [
       { teile: [{ text: '# Ursachen und Maßnahmen\n\n> **Diese Seite ist so gut wie ihre Pflege.** Ursachen und Maßnahmen kommen nicht aus LINA, sondern werden von Hand erfasst. Eine leere Tabelle heißt hier **„nichts eingetragen"**, nicht „keine Probleme".' }] },
       { teile: [{ karte: 'rt_ursachen', hoehe: 11 }] },
@@ -490,13 +600,14 @@ export const dashboards: Dashboard[] = [
   // ===================================================================
   {
     schluessel: 'db_umsatz',
-    name: 'Umsatz — Entwicklung',
+    name: 'Umsatz — Entwicklung und Aktionen',
     beschreibung:
-      'Umsatzentwicklung, Durchschnittsbon und Umsatz je Gast.',
+      'Umsatzentwicklung, Durchschnittsbon und Umsatz je Gast — und im zweiten Reiter die Marketingaktionen.',
     sammlung: 'Betrieb',
-    filter: [F_MONAT, F_BETRIEB, F_ZEITRAUM],
-    reihen: [
-      { teile: [{ text: '# Umsatz\n\nAlle Werte sind Nettowerte, also ohne Mehrwertsteuer. Durchschnittsbon und Umsatz je Gast werden unverändert aus LINA übernommen.' }] },
+    filter: [F_MONAT, F_BETRIEB, F_ZEITRAUM_JAHR],
+    tabs: [
+      { name: 'Entwicklung', reihen: [
+      { teile: [{ text: '# Umsatz\n\nAlle Werte sind Nettowerte, also ohne Mehrwertsteuer. Durchschnittsbon und Umsatz je Gast werden unverändert aus LINA übernommen; „Ø je Gast" erscheint nur für Monate, in denen mindestens 80 % der Umsatztage eine Gästezahl tragen — sonst wäre die Zahl erfunden.\n\nVoreingestellt sind die letzten zwölf Monate.' }] },
       { teile: [
         { karte: 'um_kachel_monat' },
         { karte: 'um_kachel_gaeste' },
@@ -514,6 +625,24 @@ export const dashboards: Dashboard[] = [
       ] },
       { teile: [{ text: '## Rangliste\n\nDie letzten Zeilen sind die interessanten.' }] },
       { teile: [{ karte: 'um_rangliste', hoehe: 12, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      ] },
+      // ---------------------------------------------------------------
+      // Aktionen. mart.aktionsumsatz_monat lag seit Wochen fertig
+      // aggregiert da — 4,6 Mio EUR "Feinsparten 2025", Happy-Hour-
+      // Auswertungen — und keine einzige Karte las es. Ein eigener
+      // Reiter statt eines eigenen Dashboards: Aktionsumsatz IST Umsatz,
+      // und die Filter oben (Monat, Betrieb) gelten mit.
+      // ---------------------------------------------------------------
+      { name: 'Aktionen', reihen: [
+      { teile: [{ text: '## Aktionen\n\nNur **34 der Betriebe** erfassen Aktionen — 19 davon Enchilada, 14 Wilma Wunder. Das ist keine Konzernsicht: Wer hier fehlt, fährt vielleicht dieselbe Aktion und bucht sie nur nicht. Alle Werte netto; der laufende Monat ist unvollständig.' }] },
+      { teile: [{ karte: 'ak_uebersicht', hoehe: 10 }] },
+      { teile: [{ karte: 'ak_verlauf', hoehe: 9 }] },
+      { teile: [{ text: '### Wer hängt woran\n\nDer gewählte Monat, sortiert nach **Anteil am eigenen Umsatz**: 40 % Aktionsanteil sind eine andere Nachricht als 4.000 € — dieses Haus hat eine Frage zu beantworten, wenn die Aktion endet.' }] },
+      { teile: [{ karte: 'ak_betrieb', hoehe: 12,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      { teile: [{ text: '### Geplant und tatsächlich\n\n„—" heißt unbefristet. Der Steckbrief zeigt, was das Umsatzbild nicht zeigt: Aktionen, die **nie Umsatz sahen**, und unbefristete, die **seit Jahren still weiterlaufen**.' }] },
+      { teile: [{ karte: 'ak_steckbrief', hoehe: 10 }] },
+      ] },
     ],
   },
 
@@ -521,18 +650,23 @@ export const dashboards: Dashboard[] = [
     schluessel: 'db_struktur',
     name: 'Umsatz — Struktur',
     beschreibung:
-      'Woher der Umsatz kommt: nach Speisen und Getränken, nach Verkaufsstelle und nach Tageszeit.',
+      'Woher der Umsatz kommt: nach Speisen und Getränken, nach Tageszeit und im Wochenprofil.',
     sammlung: 'Betrieb',
     // Monat UND Zeitraum, und das ist kein Versehen: die beiden Tabellen
     // unten zeigen einen Stichmonat je Betrieb, die Diagramme darueber
     // einen Verlauf. Der Zeitraum grenzt ein, welche Tage einfliessen --
-    // ein Quartal, ein Halbjahr, "letzte 3 Monate".
-    filter: [F_MONAT, F_BETRIEB, F_ZEITRAUM],
+    // Vorgabe drei Monate, damit das Tagesprofil einen Rhythmus zeigt
+    // statt 8,5 Jahre inklusive Corona zu mitteln.
+    //
+    // "Umsatz je Verkaufsstelle" ist am 03.08.2026 entfallen: LINA
+    // liefert die Dimension nicht (in allen 884.352 Zeilen NULL), die
+    // Karte war seit je leer und las sich als "kein Ausser-Haus-
+    // Geschaeft".
+    filter: [F_MONAT, F_BETRIEB, F_ZEITRAUM_DREI_MONATE],
     reihen: [
-      { teile: [{ text: '# Struktur des Umsatzes\n\nBisher werden nur die Sparten **Speisen** und **Getränke** geliefert. Ihre Summe ist deshalb kleiner als der Gesamtumsatz — es fehlt nichts in der Rechnung, sondern in den gelieferten Daten.\n\nOhne Zeitraum zählt die gesamte Historie.' }] },
+      { teile: [{ text: '# Struktur des Umsatzes\n\nBisher werden nur die Sparten **Speisen** und **Getränke** geliefert. Ihre Summe ist deshalb kleiner als der Gesamtumsatz — es fehlt nichts in der Rechnung, sondern in den gelieferten Daten.\n\nVoreingestellt sind die letzten drei Monate.' }] },
       { teile: [
-        { karte: 'st_sparte', breite: 14 },
-        { karte: 'st_verkaufsstelle', breite: 10 },
+        { karte: 'st_sparte' },
       ] },
       { teile: [{ karte: 'st_sparte_anteil', hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ text: '## Tageszeit\n\nDer Geschäftstag läuft von 08:00 bis 07:59 des Folgetags. Die Nachtstunden gehören deshalb ans **Ende** des Tages, nicht an den Anfang.' }] },
@@ -542,6 +676,8 @@ export const dashboards: Dashboard[] = [
       { teile: [
         { karte: 'st_stunde' },
       ] },
+      { teile: [{ text: '## Wochenprofil\n\nStunde × Wochentag — das Werkzeug für den Dienstplan. Mit gewähltem Betrieb: Wo liegen DIESE Spitzen? Ohne: das Konzernmuster.' }] },
+      { teile: [{ karte: 'st_wochenprofil', hoehe: 13 }] },
       { teile: [{ karte: 'st_zeitzone' }] },
       { teile: [{ karte: 'st_zeitzone_betrieb', hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
     ],
@@ -570,9 +706,9 @@ export const dashboards: Dashboard[] = [
 
   {
     schluessel: 'db_ware',
-    name: 'Warenwirtschaft — Artikel, Deckungsbeitrag, Preise',
+    name: 'Warenwirtschaft — Artikel und Deckungsbeitrag',
     beschreibung:
-      'Was gut und was kaum läuft, Deckungsbeitrag je Warengruppe, rechnerischer gegen tatsächlichen Wareneinsatz und die Entwicklung der Einkaufspreise.',
+      'Was gut und was kaum läuft, und der Deckungsbeitrag je Warengruppe — als Umsatzgliederung, nicht als Margenaussage. Die echten Einkaufspreise stehen auf dem Einkaufs-Dashboard.',
     sammlung: 'Betrieb',
     // Die Marke gehoert hierher, seit der Drill-Down vom Round Table
     // hierher fuehrt: wer aus "Enchilada" kommt, will die Verbraeuche von
@@ -659,6 +795,11 @@ export const dashboards: Dashboard[] = [
     reihen: [
       { teile: [{ text: '# Betriebswirtschaftliche Auswertung (BWA)\n\n> Zahlen vom Steuerberater, üblicherweise **ein bis zwei Monate zurück**. Ein Monat auf null ist **nicht gebucht** — nicht umsatzlos. Gezeigt werden nur gebuchte Monate.' }] },
       { teile: [{ karte: 'bwa_kennzahlen', hoehe: 9 }] },
+      // Der Wasserfall daneben waere zu schmal: "Uebrige Kosten" braucht
+      // eine lesbare Beschriftung, und die Bloecke sollen proportional
+      // erkennbar sein.
+      { teile: [{ text: '## Vom Umsatz zum Ergebnis\n\nDie vier Blöcke zwischen Umsatz und EBIT. „Übrige Kosten" ist der Rest — Miete, Energie, GF-Gehälter, Abschreibungen. Mit gewähltem Betrieb wird daraus die Ergebnisrechnung dieses Hauses.' }] },
+      { teile: [{ karte: 'bwa_wasserfall', hoehe: 10 }] },
       { teile: [{ karte: 'bwa_ebit', hoehe: 11, klick: [{ ziel: 'dd_betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ text: '## Buchungsstand\n\nZwei Monate Verzug sind normal, vier eine Nachfrage beim Steuerberater wert.' }] },
       { teile: [{ karte: 'bwa_buchungsstand', hoehe: 12, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
@@ -736,6 +877,12 @@ export const dashboards: Dashboard[] = [
       { teile: [{ karte: 'dq_sync' }] },
       { teile: [{ text: '## Stimmen die Zahlen?\n\n„Auffällig" ist eine **Arbeitsliste, kein Alarm**. Beim Wareneinsatz zählt die Spalte die Fälle, in denen zu wenige Rezepturen hinterlegt sind — nicht die inhaltlichen Abweichungen.' }] },
       { teile: [{ karte: 'dq_pruefung', hoehe: 9 }] },
+      // Der Anlassfall: am 22.07.2026 hatte kein einziger der 141
+      // Betriebe Umsatz — ein ganztaegiges Importloch, zwoelf Tage alt,
+      // und keine Karte meldete es. Jeder Verlauf zeigte einen
+      // erfundenen Absturz auf null.
+      { teile: [{ karte: 'dq_lochtage', hoehe: 9 }] },
+      { teile: [{ karte: 'dq_unplausibel', hoehe: 10 }] },
       { teile: [
         { karte: 'dq_umsatz_abweichung', hoehe: 11,
           klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] },
@@ -743,6 +890,8 @@ export const dashboards: Dashboard[] = [
       { teile: [{ text: '## Wem fehlt was?\n\nDie folgenden Tabellen sind Arbeitslisten. **Die Liste der Betriebe ohne Zuordnung zum Steuerberater sollte leer sein.**' }] },
       { teile: [{ karte: 'dq_datenstand', hoehe: 12, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ karte: 'dq_ohne_bruecke' }] },
+      { teile: [{ karte: 'dq_zuordnung_offen', hoehe: 9 }] },
+      { teile: [{ karte: 'dq_gaeste', hoehe: 10 }] },
       // Volle Breite: die Spalte mit den Beispielnamen ist der Zweck der
       // Karte, und auf zwoelf Einheiten sah man davon drei Namen.
       { teile: [{ karte: 'dq_konzept' }] },
@@ -787,8 +936,10 @@ export const dashboards: Dashboard[] = [
       { teile: [{ karte: 'im_wartezeit' }] },
       { teile: [{ karte: 'im_naechste', hoehe: 12 }] },
 
-      { teile: [{ text: '## Wie vollständig ist es?\n\n**„Tage alt“** zeigt einen hängenden Bericht — ein bis zwei Tage sind normal. **„wartet“** heißt nicht kaputt: laufender Betrieb geht vor Historie.' }] },
+      { teile: [{ text: '## Wie vollständig ist es?\n\n**„Tage alt“** zeigt einen hängenden Bericht — ein bis zwei Tage sind normal. **„wartet“** heißt nicht kaputt: laufender Betrieb geht vor Historie.\n\nDaneben die beiden anderen Quellen: **FoodNotify** (Bestellseiten je Kostenstelle, chronologisch aufsteigend) und **Yext** (Bewertungen, einmal täglich — älter als ~28 Stunden ist eine Nachfrage wert).' }] },
       { teile: [{ karte: 'im_bericht', hoehe: 11 }] },
+      { teile: [{ karte: 'im_foodnotify', hoehe: 9 }] },
+      { teile: [{ karte: 'im_yext', hoehe: 9 }] },
       { teile: [
         { karte: 'im_bericht_balken', breite: 12 },
         { karte: 'im_reichweite', breite: 12 },
@@ -806,7 +957,7 @@ export const dashboards: Dashboard[] = [
     schluessel: 'so_karte_db',
     name: '⑧ Standortkarte',
     beschreibung:
-      'Alle Standorte mit hinterlegten Koordinaten auf einer Karte, eingefärbt nach der Gesamtampel des gewählten Monats. Ein Klick auf einen Punkt öffnet die Detailseite des Betriebs.',
+      'Alle Standorte mit hinterlegten Koordinaten auf einer Karte, eingefärbt nach dem Handlungsbedarf des gewählten Monats. Ein Klick auf einen Punkt öffnet die Detailseite des Betriebs.',
     sammlung: 'Drill-Down',
     filter: [F_MONAT, F_MARKE],
     reihen: [

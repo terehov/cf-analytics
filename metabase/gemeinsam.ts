@@ -178,14 +178,36 @@ export const P_BIS_B: Parameter = {
 }
 
 /**
- * Zwei Zeitraeume mit Vorgabe: A ist der laufende Monat bis heute, B
- * derselbe Ausschnitt des Vormonats. Damit zeigt das Dashboard beim
- * Oeffnen bereits einen sinnvollen Vergleich, statt leer zu bleiben.
+ * Zwei Zeitraeume mit Vorgabe: A sind die letzten sieben abgeschlossenen
+ * Tage, B ist DASSELBE Fenster vier Wochen frueher.
+ *
+ * Bis zum 03.08.2026 stand hier "laufender Monat gegen denselben
+ * Ausschnitt des Vormonats". Am Monatsdritten hiess das: Sa/So/Mo gegen
+ * Mi/Do/Fr — bei einem Samstag/Montag-Verhaeltnis von 2,5:1 im
+ * Tagesumsatz war der Wochentagsmix der dominante Treiber des Deltas,
+ * nicht das Geschaeft. Dazu fehlte der letzte Tag von A noch komplett
+ * (LINA fuellt 5–6 Tage nach).
+ *
+ * 28 Tage zurueck heisst: Montag gegen Montag, Samstag gegen Samstag.
+ * a_bis = gestern, weil der heutige Geschaeftstag noch laeuft. Die
+ * juengsten Tage sind trotzdem systematisch etwas zu niedrig — das sagt
+ * die Textkachel auf ④ dazu.
  */
 export const ZEITRAUM_CTE = `
 WITH z AS (
-    SELECT coalesce([[ {{von_a}}::date, ]] date_trunc('month', current_date)::date)      AS a_von,
-           coalesce([[ {{bis_a}}::date, ]] current_date)                                  AS a_bis,
-           coalesce([[ {{von_b}}::date, ]] (date_trunc('month', current_date) - interval '1 month')::date) AS b_von,
-           coalesce([[ {{bis_b}}::date, ]] (current_date - interval '1 month')::date)     AS b_bis
+    SELECT coalesce([[ {{von_a}}::date, ]] (current_date - 7))                            AS a_von,
+           coalesce([[ {{bis_a}}::date, ]] (current_date - 1))                            AS a_bis,
+           coalesce([[ {{von_b}}::date, ]] (current_date - 35))                           AS b_von,
+           coalesce([[ {{bis_b}}::date, ]] (current_date - 29))                           AS b_bis
 )`
+
+/**
+ * Deutsche Wochentagsnamen, unabhaengig von der Server-Locale.
+ *
+ * to_char(..., 'TMDay') haengt an lc_time, und die stand auf Englisch —
+ * "Monday" mitten in deutschen Dashboards. Verwendung:
+ *   ${WOCHENTAGE}[extract(isodow FROM geschaeftstag)::int]
+ * isodow ist 1 = Montag ... 7 = Sonntag, passend zur Reihenfolge hier.
+ */
+export const WOCHENTAGE =
+  `(ARRAY['Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'])`
