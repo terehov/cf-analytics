@@ -39,6 +39,8 @@ Diese Datei ist der Einstieg. Die inhaltliche Wahrheit steht in `docs/`.
 | `core.rezept` | FoodNotify | woraus ein verkaufter Artikel **besteht** |
 | `core.ware` | FoodNotify | was **eingekauft** wird — Rohware, Zutat |
 
+Verbunden werden sie über `core.pos_artikel`: `plu = core.artikel.artikelnummer`. **Dieser Join gilt nur, wo `core.kostenstelle.kassensystem = 'amadeus'`** — bei anderen Kassensystemen ist `plu` ein fremder Nummernkreis und trifft still falsche Artikel. Begründung und Messwerte in `docs/foodnotify-0-1-nummernraum.md`.
+
 LINAs Tabellen heißen nach LINA-**Berichten** (`umsatzbericht_tag`), FoodNotifys nach **Fachbegriffen** (`rezept`, `ware`, `bestellung`). Deshalb kollidieren sie nicht.
 
 Kommentare sind deutsch, damit sie in Postico lesbar sind.

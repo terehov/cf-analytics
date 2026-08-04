@@ -1567,6 +1567,50 @@ Falle für jede spätere zweite Quelle. Defaults dürfen Unwissen ausdrücken
 Quelle gehört jede Spalte mit Default auf die Prüfliste: Wer setzt sie — ich
 oder die Tabelle?
 
+## Namensvergleich: die beste Ähnlichkeit ist nicht der richtige Betrieb (02.08.2026)
+
+**Aufgabe.** 79 FoodNotify-Restaurants auf 141 LINA-Betriebe abbilden. Es gibt
+keinen gemeinsamen Schlüssel, nur Namen. Ohne die Brücke ist keine gemeinsame
+Kennzahl möglich: Wareneinsatz kommt von FoodNotify, Umsatz von LINA.
+
+**Drei Fallen, alle gemessen — keine hypothetisch.**
+
+1. **Trigramm allein ordnet falsch zu.** `Enchilada Halle` ist nach reiner
+   Trigramm-Ähnlichkeit dem **falschen** Betrieb `Enchilada Hamm` ähnlicher
+   (0,63) als dem richtigen (0,53). Behoben durch doppelt gewichtete
+   Wortüberschneidung: gemeinsame ganze Wörter wiegen bei Ortsnamen schwerer
+   als gemeinsame Buchstabenfolgen.
+
+2. **Der beste Name ist ein schon vergebener Betrieb.** `Aposto Wuppertal II`
+   passt namentlich am besten auf `Aposto Wuppertal GmbH` — belegt durch
+   `Aposto Wuppertal`. Daneben steht der Zweitstandort `Alter Papierfabrik`.
+   Kein Ähnlichkeitsmaß bemerkt das, denn es vergleicht **Paare, nicht die
+   Gesamtverteilung**. Wer den schwächeren Treffer auf einen belegten Betrieb
+   hat, wird deshalb `unsicher`.
+
+3. **Zwei Normalisierungsfehler, die still danebengreifen.**
+   * Rechtsformen *stapeln* sich: `Alte Post Aachen Gaststättenbetriebs GmbH`
+     trägt zwei. Ein einzelner Durchlauf entfernt nur `GmbH` — der **aktive**
+     Betrieb verlor dadurch 0,4 zu 0,8 gegen `GESCHLOSSEN Alte Post Aachen
+     GmbH`, also gegen die stillgelegte Gesellschaft.
+   * `translate()` faltet `ü` auf **ein** Zeichen: aus `Münster` wird
+     `munster`, aus LINAs `Muenster` bleibt `muenster` — die beiden treffen
+     sich nicht. Umlaute müssen **zweistellig** gefaltet werden (ae, oe, ue).
+
+**Regeln.**
+
+1. **Eine falsche Zuordnung ist schlimmer als gar keine.** Sie rechnet den
+   Wareneinsatz eines Betriebs gegen den Umsatz eines anderen, und niemand
+   sieht es der Kennzahl an. Ein NULL-Wert meldet sich; eine stille
+   Fehlzuordnung nicht. Deshalb: der Automat **schlägt vor**, der Mensch
+   entscheidet, und `unsicher` bleibt sichtbar offen statt geraten.
+2. **„Kein Gegenstück" und „noch nicht angeschaut" brauchen verschiedene
+   Felder.** `NULL` kann beides heißen — und dieser Unterschied entscheidet,
+   ob eine Lücke eine Aufgabe ist oder ein Ergebnis.
+3. **Trefferquoten sind kein Qualitätsmaß.** Eine Quote steigt auch, wenn man
+   falscher wird. Getestet werden deshalb die benannten Fallen
+   (`src/foodnotify/zuordnung.test.ts`), nicht die Prozentzahl.
+
 ## Eine Priorität, die eine Warteschlange in zwei Hälften teilt (02.08.2026)
 
 **Symptom.** Nach Stunden Backfill standen 17.077 Bestellungen in
