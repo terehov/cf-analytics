@@ -1007,10 +1007,18 @@ lauf('Zugangssperre', () => {
     const { auswahllistenAbgleichen, auswahllistenNachlauf } =
       await import('./auswahllisten')
 
-    const vorher = process.env.METABASE_DB_URL
+    // Seit dem Umzug nach Hetzner läuft der Abgleich über Metabases HTTP-API
+    // statt über dessen Datenbank — die Zusicherung ist dieselbe geblieben,
+    // nur die Adresse, an der garantiert nichts antwortet, ist eine andere.
+    const vorher = {
+      url: process.env.METABASE_URL,
+      user: process.env.METABASE_USER,
+      pass: process.env.METABASE_PASSWORD,
+    }
     try {
-      // Adresse, an der garantiert nichts antwortet.
-      process.env.METABASE_DB_URL = 'postgresql://postgres@127.0.0.1:9/nirgendwo'
+      process.env.METABASE_URL = 'http://127.0.0.1:9'
+      process.env.METABASE_USER = 'niemand'
+      process.env.METABASE_PASSWORD = 'nichts'
 
       const r = await auswahllistenAbgleichen()
       expect(r.status).toBe('fehler')
@@ -1019,8 +1027,11 @@ lauf('Zugangssperre', () => {
       // Und der Nachlauf, wie sync.ts ihn aufruft: protokolliert, wirft nicht.
       await auswahllistenNachlauf()
     } finally {
-      if (vorher === undefined) delete process.env.METABASE_DB_URL
-      else process.env.METABASE_DB_URL = vorher
+      for (const [k, v] of Object.entries(
+        { METABASE_URL: vorher.url, METABASE_USER: vorher.user, METABASE_PASSWORD: vorher.pass })) {
+        if (v === undefined) delete process.env[k]
+        else process.env[k] = v
+      }
     }
   }, 30_000)
 

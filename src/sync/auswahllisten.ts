@@ -30,8 +30,22 @@
  *
  *   2. Es läuft NACH dem Import, nicht davor. Die Daten sind wichtiger, und
  *      der Abgleich braucht den frischen Bestand.
+ *
+ * ÜBER DIE API, NICHT ÜBER METABASES DATENBANK (seit 04.08.2026)
+ *
+ * Bis zum Umzug nach Hetzner lag Metabase auf derselben Postgres-Instanz wie
+ * die Fachdaten, und dieser Abgleich schrieb direkt in `report_dashboard`.
+ * Seit Metabase auf Cloudron läuft, ist seine Datenbank von hier aus nicht
+ * mehr erreichbar — und war es auch vorher nur durch einen Zufall der
+ * Aufstellung.
+ *
+ * Jetzt derselbe Abgleich über die HTTP-API, mit demselben Zugang, den
+ * `metabase/uebernehmen.ts` und `metabase/beziehungen.ts` schon benutzen
+ * (METABASE_USER/_PASSWORD). Zwei Vorteile über die Erreichbarkeit hinaus:
+ * die API pflegt Metabases Cache mit, ein direktes UPDATE nicht — Filter
+ * standen nach einem DB-Schreibzugriff bis zum nächsten Neuladen veraltet da.
+ * Und `parameters` ist ein reguläres Feld der Dashboard-API, kein Interna.
  */
-import { Pool } from 'pg'
 import { config } from '../config'
 import { log } from '../lib/log'
 import { query } from '../db/pool'
@@ -123,40 +137,68 @@ const VORGABE_MONAT_BWA = `
  * ob ALLE Monatskarten der Seite den BWA-Rückfall benutzen — erkennbar am
  * Verweis auf `kennzahlen_aktuell` mit `wert_absolut <> 0`.
  */
-const BWA_DASHBOARDS = `
-  SELECT d.id
-    FROM report_dashboard d
-   WHERE d.archived = false
-     AND EXISTS (
-           SELECT 1 FROM report_dashboardcard dc
-             JOIN report_card c ON c.id = dc.card_id
-            WHERE dc.dashboard_id = d.id
-              AND c.dataset_query::text LIKE '%{{monat}}%')
-     AND NOT EXISTS (
-           SELECT 1 FROM report_dashboardcard dc
-             JOIN report_card c ON c.id = dc.card_id
-            WHERE dc.dashboard_id = d.id
-              AND c.dataset_query::text LIKE '%{{monat}}%'
-              AND c.dataset_query::text NOT LIKE '%wert_absolut <> 0%')`
+/** Ein angemeldeter Zugriff auf Metabases API. */
+type MetabaseZugriff = (pfad: string, methode?: string, koerper?: unknown) => Promise<any>
 
 /**
- * Die Adresse von Metabases eigener Datenbank.
+ * Meldet sich an und liefert eine Aufruffunktion — oder null.
  *
- * Standardmäßig aus DATABASE_URL abgeleitet: dieselbe Postgres-Instanz,
- * Datenbank `lina_metabase`. Das ist der Aufbau, in dem das hier läuft, und
- * spart eine Umgebungsvariable, die beim Deployen vergessen werden könnte.
- * METABASE_DB_URL überschreibt es, falls Metabase doch woanders liegt.
+ * Null ist der Normalfall auf einer Installation ohne Importer-Zugang: dann
+ * wird der Abgleich übersprungen, nicht als Fehler gemeldet. Dasselbe Muster
+ * wie in `metabase/uebernehmen.ts`.
+ *
+ * Die Zeitgrenzen sind kurz gehalten: läuft Metabase nicht, soll ein
+ * Sync-Nachlauf nicht daran hängen (Regel 1).
  */
-function metabaseUrl(): string | null {
-  const gesetzt = process.env.METABASE_DB_URL
-  if (gesetzt) return gesetzt
-  try {
-    const u = new URL(config.DATABASE_URL)
-    u.pathname = '/lina_metabase'
-    return u.toString()
-  } catch {
-    return null
+async function anmelden(): Promise<MetabaseZugriff | null> {
+  // Aus der Umgebung statt aus `config`: die dortigen Werte werden beim Import
+  // eingefroren, und der e2e-Test setzt sie danach, um ein totes Metabase zu
+  // stellen. `config` bleibt der Rückfall und damit die Quelle der Vorgaben.
+  const basis = process.env.METABASE_URL ?? config.METABASE_URL
+  const nutzer = process.env.METABASE_USER ?? config.METABASE_USER
+  const passwort = process.env.METABASE_PASSWORD ?? config.METABASE_PASSWORD
+  if (!basis || !nutzer || !passwort) return null
+
+  const anmeldung = await fetch(`${basis}/api/session`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: nutzer, password: passwort }),
+    signal: AbortSignal.timeout(15_000),
+  })
+  if (!anmeldung.ok) {
+    throw new Error(`Anmeldung an Metabase gescheitert (${anmeldung.status}): `
+      + (await anmeldung.text()).slice(0, 200))
   }
+  const { id: sitzung } = await anmeldung.json() as { id: string }
+
+  return async (pfad, methode = 'GET', koerper) => {
+    const r = await fetch(`${basis}/api${pfad}`, {
+      method: methode,
+      headers: { 'Content-Type': 'application/json', 'X-Metabase-Session': sitzung },
+      body: koerper ? JSON.stringify(koerper) : undefined,
+      signal: AbortSignal.timeout(30_000),
+    })
+    const text = await r.text()
+    if (!r.ok) throw new Error(`${methode} ${pfad} → ${r.status} ${text.slice(0, 200)}`)
+    return text ? JSON.parse(text) : null
+  }
+}
+
+/**
+ * Hängt das Dashboard ausschließlich an der BWA?
+ *
+ * Ersetzt die frühere SQL-Abfrage BWA_DASHBOARDS über `report_dashboardcard`.
+ * Die Regel ist unverändert: es gibt Karten mit {{monat}}, und ALLE davon
+ * filtern auf `wert_absolut <> 0`. Dann ist der letzte gebuchte Monat die
+ * richtige Vorgabe, nicht der letzte bewertete.
+ *
+ * `dashcards` liefert die API mit `GET /api/dashboard/:id` gleich mit.
+ */
+function nurBwa(dashcards: any[]): boolean {
+  const mitMonat = dashcards
+    .map(dc => JSON.stringify(dc?.card?.dataset_query ?? {}))
+    .filter(q => q.includes('{{monat}}'))
+  return mitMonat.length > 0 && mitMonat.every(q => q.includes('wert_absolut <> 0'))
 }
 
 export type Abgleich = {
@@ -170,13 +212,15 @@ export type Abgleich = {
  * Gleicht die Auswahllisten ab. Wirft nie — siehe Regel 1 oben.
  */
 export async function auswahllistenAbgleichen(): Promise<Abgleich> {
-  const url = metabaseUrl()
-  if (!url) {
-    return { status: 'uebersprungen', geaendert: 0, neu: [], meldung: 'keine Metabase-Datenbank ermittelbar' }
-  }
-
-  let meta: Pool | null = null
   try {
+    const mb = await anmelden()
+    if (!mb) {
+      return {
+        status: 'uebersprungen', geaendert: 0, neu: [],
+        meldung: 'METABASE_URL/_USER/_PASSWORD nicht gesetzt',
+      }
+    }
+
     // Sollwerte aus der Fachdatenbank — über den bestehenden Pool.
     const soll: Record<string, string[]> = {}
     for (const [slug, sql] of Object.entries(LISTEN)) {
@@ -199,31 +243,24 @@ export async function auswahllistenAbgleichen(): Promise<Abgleich> {
     const vorgabeMonat = (await query<{ w: string | null }>(VORGABE_MONAT))[0]?.w ?? null
     const vorgabeMonatBwa = (await query<{ w: string | null }>(VORGABE_MONAT_BWA))[0]?.w ?? null
 
-    // Kurze Zeitgrenzen: läuft Metabase nicht, soll das hier nicht hängen.
-    meta = new Pool({
-      connectionString: url,
-      max: 1,
-      connectionTimeoutMillis: 5_000,
-      statement_timeout: 15_000,
-    })
-
-    const dashboards = await meta.query<{ id: number; name: string; parameters: string; description: string | null }>(
-      `SELECT id, name, parameters::text AS parameters, description
-         FROM report_dashboard
-        WHERE archived = false AND parameters IS NOT NULL`)
-
-    // Welche Seiten hängen ausschließlich an der BWA? Die bekommen den
-    // letzten gebuchten Monat statt des letzten bewerteten.
-    const bwaIds = new Set(
-      (await meta.query<{ id: number }>(BWA_DASHBOARDS)).rows.map(r => r.id))
+    // Die Liste zuerst — sie trägt weder Parameter noch Karten, nur Eckdaten.
+    const liste = (await mb('/dashboard') as any[])
+      .filter(d => !d.archived)
 
     let geaendert = 0
     const neuGesamt = new Set<string>()
 
-    for (const d of dashboards.rows) {
-      let parameter: Record<string, unknown>[]
-      try { parameter = JSON.parse(d.parameters) } catch { continue }
-      if (!Array.isArray(parameter)) continue
+    for (const kopf of liste) {
+      // Erst der Einzelabruf liefert `parameters` und `dashcards`. Ein Aufruf
+      // je Dashboard statt einer JOIN-Abfrage — bei rund 20 Seiten vertretbar,
+      // und es läuft im Nachlauf, nicht im Importpfad.
+      const d = await mb(`/dashboard/${kopf.id}`)
+      const parameter = d?.parameters
+      if (!Array.isArray(parameter) || parameter.length === 0) continue
+
+      // Hängt die Seite ausschließlich an der BWA? Dann der letzte gebuchte
+      // Monat statt des letzten bewerteten.
+      const istBwa = nurBwa(d.dashcards ?? [])
 
       let dirty = false
       for (const p of parameter) {
@@ -231,7 +268,7 @@ export async function auswahllistenAbgleichen(): Promise<Abgleich> {
         // Nur dieser eine Slug und nur dieser eine Typ — ein Zeitraumfilter
         // (date/all-options) hat andere Vorgaben und bleibt unberührt.
         if (String(p.slug ?? '') === 'monat' && p.type === 'date/month-year') {
-          const wert = bwaIds.has(d.id) ? vorgabeMonatBwa : vorgabeMonat
+          const wert = istBwa ? vorgabeMonatBwa : vorgabeMonat
           if (wert && p.default !== wert) {
             p.default = wert
             dirty = true
@@ -258,8 +295,10 @@ export async function auswahllistenAbgleichen(): Promise<Abgleich> {
       }
 
       if (dirty) {
-        await meta.query(`UPDATE report_dashboard SET parameters = $1 WHERE id = $2`,
-          [JSON.stringify(parameter), d.id])
+        // Nur `parameters` schicken: die Dashboard-API nimmt Teiländerungen
+        // entgegen, und alles andere mitzusenden hiesse, den gelesenen Stand
+        // ungeprüft zurückzuschreiben.
+        await mb(`/dashboard/${d.id}`, 'PUT', { parameters: parameter })
         geaendert++
       }
     }
@@ -280,8 +319,6 @@ export async function auswahllistenAbgleichen(): Promise<Abgleich> {
   } catch (e) {
     // Regel 1: nie werfen. Metabase ist für den Import ohne Bedeutung.
     return { status: 'fehler', geaendert: 0, neu: [], meldung: String(e) }
-  } finally {
-    if (meta) await meta.end().catch(() => {})
   }
 }
 
