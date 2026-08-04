@@ -20,3 +20,11 @@ examples/
 
 # Playwright-MCP-Artefakte (Snapshots, Screenshots, Konsolenmitschnitte)
 .playwright-mcp/
+
+# Belege einer einzelnen Sichtpruefung im Wurzelverzeichnis: Screenshots von
+# Metabase-Seiten und ausgekippte Accessibility-Snapshots. Sie zeigen, dass eine
+# Karte an EINEM Tag richtig aussah - die Begruendung, warum sie so aussieht,
+# steht in docs/. Dieselbe Ueberlegung wie bei examples/, nur kleiner.
+*.jpeg
+*.png
+*-snapshot.yml
