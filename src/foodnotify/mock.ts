@@ -109,14 +109,22 @@ export function fnMockStarten(opt: FnMockOptionen = {}) {
           // Drei Seiten, chronologisch aufsteigend: vorne die alten
           // Bestellungen, hinten die neueste — der e2e-Test beweist damit,
           // dass der Backfill die LETZTEN Seiten zuerst abarbeitet (3 vor 2).
+          // Die Liste traegt denselben Status wie der Kopf, in derselben
+          // Objektform — hier fehlte er ganz, obwohl `bestellliste()` ihn
+          // liest und schreibt. Ein Feld, das die Attrappe nicht kennt,
+          // kann kein Test pruefen.
           const seite = Number(url.searchParams.get('page') ?? 1)
           const seiten: Record<number, unknown[]> = {
             1: [
-              { id: 'b1', orderNumber: 'A-100', timeCreated: '2021-10-15T09:00:00+00:00' },
-              { id: 'b2', orderNumber: 'A-101', timeCreated: '2021-10-16T09:00:00+00:00' },
+              { id: 'b1', orderNumber: 'A-100', timeCreated: '2021-10-15T09:00:00+00:00',
+                shopOrderStatus: { name: 'imported' } },
+              { id: 'b2', orderNumber: 'A-101', timeCreated: '2021-10-16T09:00:00+00:00',
+                shopOrderStatus: { name: 'canceled' } },
             ],
-            2: [{ id: 'b3', orderNumber: 'A-102', timeCreated: '2024-05-01T09:00:00+00:00' }],
-            3: [{ id: 'b4', orderNumber: 'A-103', timeCreated: '2026-07-30T09:00:00+00:00' }],
+            2: [{ id: 'b3', orderNumber: 'A-102', timeCreated: '2024-05-01T09:00:00+00:00',
+                  shopOrderStatus: { name: 'imported' } }],
+            3: [{ id: 'b4', orderNumber: 'A-103', timeCreated: '2026-07-30T09:00:00+00:00',
+                  shopOrderStatus: { name: 'pending' } }],
           }
           return json({
             order_by: 'timeCreated', order_direction: 'ASC',
@@ -133,10 +141,24 @@ export function fnMockStarten(opt: FnMockOptionen = {}) {
             current_page: 1, current_page_size: 25, page_count: 0, total_count: 0,
             currency: 'EUR', data: [],
           })
+        /**
+         * DER STATUS IST EIN OBJEKT: `{"name": "imported"}`.
+         *
+         * Hier stand bis zum 04.08.2026 `shopOrderStatus: 'delivered'` —
+         * eine flache Zeichenkette und ein Wort, das FoodNotify gar nicht
+         * kennt. Das Vokabular ist `imported | pending | canceled |
+         * accepted | finished` (gemessen an 44.271 Bestellkoepfen im
+         * Rohbestand). Weil die Attrappe eine Zeichenkette lieferte, war
+         * `String(status)` hier harmlos und im Echtbestand
+         * `[object Object]` — in jeder Zeile, ueber alle vier Marken.
+         *
+         * b2 ist deshalb STORNIERT: der Fall, um den es fachlich geht,
+         * muss durch die ganze Kette laufen, nicht nur durch den Parser.
+         */
         case '/api/10483/shop-order/b1':
           // Kopf wie im Inventar §4: Lieferant, Liefertermin, Rechnung dran.
           return json({ data: {
-            id: 'b1', orderNumber: 'A-100', shopOrderStatus: 'delivered',
+            id: 'b1', orderNumber: 'A-100', shopOrderStatus: { name: 'imported' },
             timeCreated: '2021-10-15T09:00:00+00:00', comment: null,
             markedShop: { shopId: 6316, name: 'Distra Aposto' },
             markedShopOrder: { total: 214.5, deliveryDate: { timestamp: 1634428800 }, orderId: 'b1' },
@@ -144,7 +166,7 @@ export function fnMockStarten(opt: FnMockOptionen = {}) {
           } })
         case '/api/10483/shop-order/b2':
           return json({ data: {
-            id: 'b2', orderNumber: 'A-101', shopOrderStatus: 'ordered',
+            id: 'b2', orderNumber: 'A-101', shopOrderStatus: { name: 'canceled' },
             timeCreated: '2021-10-16T09:00:00+00:00', comment: 'Eilbestellung',
             markedShop: { shopId: 6316, name: 'Distra Aposto' },
             markedShopOrder: { total: 68.4, deliveryDate: null, orderId: 'b2' },
@@ -179,7 +201,7 @@ export function fnMockStarten(opt: FnMockOptionen = {}) {
           ] })
         case '/api/10483/shop-order/b3':
           return json({ data: {
-            id: 'b3', orderNumber: 'A-102', shopOrderStatus: 'delivered',
+            id: 'b3', orderNumber: 'A-102', shopOrderStatus: { name: 'imported' },
             timeCreated: '2024-05-01T09:00:00+00:00', comment: null,
             markedShop: { shopId: 6316, name: 'Distra Aposto' },
             markedShopOrder: { total: 31.2, deliveryDate: null, orderId: 'b3' },
@@ -187,7 +209,7 @@ export function fnMockStarten(opt: FnMockOptionen = {}) {
           } })
         case '/api/10483/shop-order/b4':
           return json({ data: {
-            id: 'b4', orderNumber: 'A-103', shopOrderStatus: 'ordered',
+            id: 'b4', orderNumber: 'A-103', shopOrderStatus: { name: 'pending' },
             timeCreated: '2026-07-30T09:00:00+00:00', comment: null,
             markedShop: { shopId: 6316, name: 'Distra Aposto' },
             markedShopOrder: { total: 45.9, deliveryDate: null, orderId: 'b4' },

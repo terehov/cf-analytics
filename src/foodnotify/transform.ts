@@ -24,6 +24,31 @@ const alsZahl = (x: unknown): number | null => {
 const alsText = (x: unknown): string | null =>
   x === null || x === undefined ? null : String(x)
 
+/**
+ * EIN STATUS IST EIN OBJEKT, KEINE ZEICHENKETTE.
+ *
+ * `shopOrderStatus` kommt als `{"name": "canceled"}`. Die erste Fassung
+ * las ihn mit `alsText`, und `String({name:'canceled'})` ergibt
+ * `[object Object]` — in ALLEN 44.271 Bestellungen, seit dem ersten Lauf.
+ * Gemessen am 04.08.2026 im Rohbestand: 26.703 imported, 15.893 pending,
+ * 1.561 canceled, 41 accepted, 15 finished. Nichts davon war in `core`
+ * zu sehen; die 1.561 Stornos (2,49 Mio EUR) zaehlten im Einkaufsvolumen
+ * mit wie jede andere Bestellung.
+ *
+ * Lautlos war es aus demselben Grund wie beim `amount`-Fehler weiter
+ * unten: die Attrappe bildete das Feld als Zeichenkette nach, weil es im
+ * Inventar so notiert war. Der Test war gruen, der Bestand falsch.
+ * `mock.ts` traegt jetzt die echte Form.
+ *
+ * Ein Objekt OHNE `name` ergibt `null`, nicht `[object Object]`: eine
+ * fehlende Angabe faellt beim Nachzaehlen auf, eine erfundene nicht.
+ * Zeichenketten bleiben erlaubt — sollte FoodNotify je flach liefern.
+ */
+const alsBezeichnung = (x: unknown): string | null => {
+  const o = alsObjekt(x)
+  return o ? alsText(o.name) : alsText(x)
+}
+
 /** ISO-Zeitstempel oder Unix-Sekunden — FoodNotify liefert beides. */
 const alsZeit = (x: unknown): string | null => {
   if (x === null || x === undefined || x === '') return null
@@ -130,7 +155,7 @@ export function bestellliste(daten: unknown): Bestellliste {
       fnId,
       bestellnummer: alsText(o.orderNumber),
       bestelltAm: alsZeit(o.timeCreated),
-      status: alsText(o.shopOrderStatus),
+      status: alsBezeichnung(o.shopOrderStatus),
     }]
   })
   return {
@@ -163,7 +188,7 @@ export function bestellkopf(daten: unknown): Bestellkopf {
   const lieferantId = alsText(laden?.shopId ?? laden?.id)
   return {
     bestellnummer: alsText(o.orderNumber),
-    status: alsText(o.shopOrderStatus),
+    status: alsBezeichnung(o.shopOrderStatus),
     bestelltAm: alsZeit(o.timeCreated),
     geliefertAm: alsDatum(shopOrder?.deliveryDate),
     summe: alsZahl(shopOrder?.total),

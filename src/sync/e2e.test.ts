@@ -1312,10 +1312,23 @@ lauf('FoodNotify Ende-zu-Ende', () => {
         ORDER BY b.fn_id`)
     expect(best).toHaveLength(4)
     expect(best[0]).toMatchObject({
-      fn_id: 'b1', bestellnummer: 'A-100', status: 'delivered',
+      fn_id: 'b1', bestellnummer: 'A-100', status: 'imported',
       beleg_nummer: 'RE-2021-4711', geliefert_am: '2021-10-17', lieferant: 'Distra Aposto',
     })
     expect(Number(best[0].summe)).toBe(214.5)
+
+    /**
+     * DER STATUS KOMMT ALS OBJEKT AN UND ALS WORT IN core.
+     *
+     * Bis zum 04.08.2026 stand hier in JEDER Zeile `[object Object]`,
+     * ueber alle vier Marken und 44.271 Bestellungen — und damit zaehlten
+     * 1.561 Stornos (2,49 Mio EUR) im Einkaufsvolumen mit. Die Zusicherung
+     * gilt der ganzen Spalte, nicht nur b2: ein zweites Feld mit derselben
+     * Form soll hier auffallen und nicht erst im Bestand.
+     */
+    expect(best.map(b => b.status))
+      .toEqual(['imported', 'canceled', 'imported', 'pending'])
+    expect(best.filter(b => String(b.status).includes('[object'))).toEqual([])
 
     // Positionen: echte Belegpreise, die Abweichungsflagge, die Ware verknüpft.
     const { rows: pos } = await db.query(

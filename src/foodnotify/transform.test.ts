@@ -59,15 +59,21 @@ describe('bestellliste (paginate)', () => {
   test('Seitenzähler und Bestellungen aus der flachen Hülle', () => {
     const s = bestellliste({
       order_by: 'timeCreated', current_page: 3, page_count: 464, total_count: 11578,
-      data: [{ id: 'b1', orderNumber: 'A-100', timeCreated: '2021-10-15T09:00:00+00:00' }],
+      data: [{ id: 'b1', orderNumber: 'A-100', timeCreated: '2021-10-15T09:00:00+00:00',
+               shopOrderStatus: { name: 'imported' } }],
     })
     expect(s.aktuelleSeite).toBe(3)
     expect(s.gesamtSeiten).toBe(464)
     expect(s.gesamt).toBe(11578)
     expect(s.bestellungen[0]).toEqual({
       fnId: 'b1', bestellnummer: 'A-100',
-      bestelltAm: '2021-10-15T09:00:00.000Z', status: null,
+      bestelltAm: '2021-10-15T09:00:00.000Z', status: 'imported',
     })
+  })
+  test('Storno wird als storno erkannt, nicht als [object Object]', () => {
+    const s = bestellliste({ current_page: 1, page_count: 1, total_count: 1, data: [
+      { id: 'b9', orderNumber: 'A-9', shopOrderStatus: { name: 'canceled' } }] })
+    expect(s.bestellungen[0].status).toBe('canceled')
   })
   test('leere Seite: null Bestellungen, eine Seite', () => {
     const s = bestellliste({ current_page: 1, page_count: 0, total_count: 0, data: [] })
@@ -78,7 +84,7 @@ describe('bestellliste (paginate)', () => {
 describe('bestellkopf (/{orderId})', () => {
   test('Lieferant, Liefertermin als Unix-Sekunden, Beleg aus der Rechnung', () => {
     const k = bestellkopf({ data: {
-      id: 'b1', orderNumber: 'A-100', shopOrderStatus: 'delivered',
+      id: 'b1', orderNumber: 'A-100', shopOrderStatus: { name: 'imported' },
       timeCreated: '2021-10-15T09:00:00+00:00', comment: null,
       markedShop: { shopId: 6316, name: 'Distra Aposto' },
       markedShopOrder: { total: 214.5, deliveryDate: { timestamp: 1634428800 } },
@@ -95,6 +101,31 @@ describe('bestellkopf (/{orderId})', () => {
     expect(k.belegNummer).toBeNull()
     expect(k.geliefertAm).toBeNull()
     expect(k.lieferant).toBeNull()
+  })
+
+  /**
+   * Der Status ist ein Objekt — `String()` darauf ergab `[object Object]`
+   * in allen 44.271 Bestellungen und versteckte 1.561 Stornos im
+   * Einkaufsvolumen. Alle fuenf gemessenen Werte, plus die beiden
+   * Randfaelle, in denen NICHTS besser ist als eine erfundene Angabe.
+   */
+  describe('shopOrderStatus ist ein Objekt', () => {
+    const status = (x: unknown) => bestellkopf({ data: { id: 'b', shopOrderStatus: x } }).status
+
+    test.each(['imported', 'pending', 'canceled', 'accepted', 'finished'])(
+      '%s wird aus {name} gelesen', wert => {
+        expect(status({ name: wert })).toBe(wert)
+      })
+
+    test('nie [object Object] — auch nicht bei unbekannter Form', () => {
+      expect(status({ id: 7 })).toBeNull()
+      expect(status({ name: null })).toBeNull()
+      expect(status(undefined)).toBeNull()
+    })
+
+    test('eine flache Zeichenkette bleibt erlaubt', () => {
+      expect(status('canceled')).toBe('canceled')
+    })
   })
 })
 

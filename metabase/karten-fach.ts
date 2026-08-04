@@ -755,7 +755,14 @@ SELECT monat                AS "Monat",
        mit_positionen       AS "davon mit Positionen",
        positionen_pct       AS "Positionen %",
        seiten_offen         AS "Seiten offen",
-       CASE WHEN liste_vollstaendig THEN '✓' ELSE '… lädt' END AS "Liste vollständig?"
+       CASE WHEN liste_vollstaendig THEN '✓' ELSE '… lädt' END AS "Liste vollständig?",
+       -- Die drei Spalten sagen, was NICHT im Einkaufsvolumen steht bzw.
+       -- dort fraglich steht. status_unbekannt ist der Waechter: > 0
+       -- heisst, ein Status kommt nicht durch den Importer — genau der
+       -- Fehler, der bis zum 04.08.2026 in allen 44.271 Zeilen stand.
+       nullif(storniert, 0)        AS "storniert (raus)",
+       nullif(pending, 0)          AS "pending (ungeklärt)",
+       nullif(status_unbekannt, 0) AS "Status unbekannt"
   FROM mart.einkauf_ladestand
  WHERE 1 = 1
    [[AND marke = {{marke}}]]
@@ -847,18 +854,22 @@ SELECT bestelldatum       AS "Bestelldatum",
     schluessel: 'wa_einkauf_betrieb',
     name: 'Einkaufsvolumen je Betrieb',
     beschreibung:
-      'Was jeder Betrieb je Monat eingekauft hat, getrennt nach Bar und Küche. Es erscheinen nur Betriebe, deren FoodNotify-Kostenstelle einem LINA-Betrieb zugeordnet ist — eine Summe ohne Betrieb ließe sich mit nichts vergleichen.',
+      'Was jeder Betrieb je Monat eingekauft hat, getrennt nach Bar und Küche. Es erscheinen nur Betriebe, deren FoodNotify-Kostenstelle einem LINA-Betrieb zugeordnet ist — eine Summe ohne Betrieb ließe sich mit nichts vergleichen. „Einkauf netto" ist OHNE stornierte Bestellungen; was storniert wurde, steht in der letzten Spalte daneben statt still zu verschwinden.',
     anzeige: 'table',
     parameter: [BETRIEB, MARKE],
+    // Bis zum 04.08.2026 zaehlten hier 1.561 Stornos ueber 2,49 Mio EUR
+    // mit: der Importer schrieb den Status als `[object Object]`, also
+    // konnte keine Sicht ihn erkennen (Migration 0043).
     sql: `
-SELECT betrieb        AS "Betrieb",
-       marke          AS "Marke",
-       bereich        AS "Bereich",
-       monat          AS "Monat",
-       bestellungen   AS "Bestellungen",
-       positionen     AS "Positionen",
-       einkauf_netto  AS "Einkauf netto",
-       lieferanten    AS "Lieferanten"
+SELECT betrieb                AS "Betrieb",
+       marke                  AS "Marke",
+       bereich                AS "Bereich",
+       monat                  AS "Monat",
+       bestellungen           AS "Bestellungen",
+       positionen             AS "Positionen",
+       einkauf_netto          AS "Einkauf netto",
+       lieferanten            AS "Lieferanten",
+       nullif(storniert_netto, 0) AS "davon storniert (nicht enthalten)"
   FROM mart.einkauf_betrieb_monat
  WHERE 1 = 1
    [[AND betrieb = {{betrieb}}]]
@@ -884,6 +895,9 @@ SELECT lieferant || ' — ' || marke  AS "Lieferant",
        round(sum(summe_preis))      AS "Einkauf (12 Monate)"
   FROM mart.einkauf_position
  WHERE lieferant IS NOT NULL
+   -- Stornos raus: mart.einkauf_position ist die Beweissicht und traegt sie
+   -- absichtlich mit (Migration 0043). Wer summiert, filtert selbst.
+   AND NOT storniert
    AND monat >= (date_trunc('month', current_date) - interval '12 months')::date
    [[AND marke = {{marke}}]]
    [[AND betrieb = {{betrieb}}]]
@@ -910,6 +924,7 @@ WITH je AS (
     SELECT betrieb, lieferant, sum(summe_preis) AS einkauf
       FROM mart.einkauf_position
      WHERE lieferant IS NOT NULL AND betrieb IS NOT NULL
+       AND NOT storniert
        AND monat >= (date_trunc('month', current_date) - interval '12 months')::date
        [[AND marke = {{marke}}]]
        [[AND betrieb = {{betrieb}}]]
