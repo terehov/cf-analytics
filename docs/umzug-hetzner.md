@@ -274,6 +274,29 @@ psql "$ZIEL" -c "REFRESH MATERIALIZED VIEW mart.deckungsbeitrag_warengruppe;"
 Das `Dockerfile` ist bereits auf diesen Betrieb ausgelegt: Container bleibt über
 `src/health.ts` oben, Läufe kommen per Schedule Job als `docker exec`.
 
+> **Migrationen laufen seit 05.08.2026 automatisch bei jedem Containerstart.**
+> `CMD` ist jetzt `bun run start` (`package.json`) — das ist
+> `bun run src/db/migrate.ts && bun run src/health.ts`. `migrate.ts` ist
+> idempotent (überspringt bereits angewendete Dateien anhand von
+> `public.schema_migration`) und bricht mit Exit 1 ab, wenn eine Migration
+> fehlschlägt — dann startet der Container gar nicht erst, statt unbemerkt
+> gegen ein halb migriertes Schema zu laufen.
+>
+> **Widerspricht das nicht Schritt 4 ("Migrationen nicht neu abspielen")?**
+> Nein, das war eine andere Situation: eine LEERE Zielbank scheitert an 0039
+> (verweist auf eine Spalte, die erst 0041 anlegt, siehe
+> `docs/fehlerkatalog.md`) — deshalb lief der Umzug über den Dump und nicht
+> über `bun run migrate` auf einer leeren Bank. Auf einer bereits befüllten
+> Bank wie nach diesem Umzug übersprüngt `migrate.ts` alles bis 0045 ohnehin
+> und wendet nur an, was NEU dazukommt — genau der Normalfall bei jedem
+> künftigen Deployment.
+>
+> Ausgelöst wurde die Änderung dadurch, dass drei neue Migrationen (0043–0045,
+> Storno-Erkennung und Inventuren) erst von Hand nachgetragen werden mussten,
+> weil weder Containerstart noch `bun run sync` sie einspielten — ein
+> Deployment mit neuem Code lief damit still auf altem Schema weiter, bis
+> jemand es bemerkte.
+
 ### 5a — Anwendung anlegen
 
 In Dokploy eine Anwendung aus diesem Git-Repository anlegen, Build-Typ
@@ -446,6 +469,23 @@ Artikeldetail — dort ging zuletzt der `betrieb`-Filter verloren).
       der Umzug ist der natürliche Moment, ihn zu schließen.
 - [ ] Lokale Postgres.app-Instanz erst abschalten, wenn Hetzner mehrere Tage
       stabil läuft
+- [ ] **Optional: Inventur-Backfill starten**, wenn eine Schwundaussage
+      gewünscht ist. Läuft NICHT automatisch — bewusste Entscheidung, siehe
+      `docs/entscheidungen.md` ("Inventuren bleiben ein reiner Backfill").
+      Setzt voraus, dass `core.kostenstelle` bereits gefüllt ist (aus dem
+      gelaufenen `--foodnotify`-Bestellungs-Backfill), was nach diesem Umzug
+      der Fall ist. Aus dem Dokploy-Container:
+      ```bash
+      docker exec <container> bun run einreihen --foodnotify-inventuren
+      ```
+      Reiht je Marke einen Seite-1-Posten ein; Folgeseiten und die Positionen
+      je Inventur (`fn:inventurpositionen`) reihen sich beim Laden automatisch
+      nach — kein zweiter Befehl nötig. Lohnt fachlich fast nur bei
+      **Wilma Wunder** (275 Inventuren, 154 signiert); bei Aposto (19) und
+      Deutsche Konzepte (9, davon 5 storniert) bleibt die Fallzahl zu klein für
+      eine belastbare Schwundaussage. Danach `mart.inventur_schwund` und die
+      Karte „Bewerteter Schwund aus Inventuren" auf dem Einkaufs-Dashboard
+      prüfen — bis dahin bleiben sie leer, das ist kein Fehler.
 
 ## Rückweg
 

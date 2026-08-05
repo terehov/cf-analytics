@@ -11,6 +11,7 @@
     "yext:pruefen": "bun run src/yext_pruefen.ts",
     "yext:zuordnen": "bun run src/yext_zuordnen.ts",
     "migrate": "bun run src/db/migrate.ts",
+    "start": "bun run src/db/migrate.ts && bun run src/health.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
   },
