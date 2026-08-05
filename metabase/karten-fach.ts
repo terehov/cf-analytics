@@ -441,7 +441,10 @@ SELECT uz.betrieb                                                  AS "Betrieb",
     schluessel: 'pe_quote_betrieb',
     name: 'Personalkostenquote je Betrieb',
     beschreibung:
-      'Die 20 Betriebe mit der höchsten Personalkostenquote ohne Geschäftsführung. Auf 20 begrenzt, damit die Namen lesbar bleiben — die vollständige Liste steht in der Tabelle darunter.',
+      'Die 20 Betriebe mit der höchsten Personalkostenquote ohne Geschäftsführung — die Größe aus '
+      + 'der BWA des Steuerberaters, an der die Ampel „Personal" hängt (nicht die operativen '
+      + 'Bereichsquoten aus dem Kassensystem weiter unten). Auf 20 begrenzt, damit die Namen lesbar '
+      + 'bleiben — die vollständige Liste steht in der Tabelle darunter.',
     anzeige: 'row',
     parameter: [MONAT, BETRIEB],
     sql: `${MONAT_CTE}
@@ -474,7 +477,10 @@ SELECT r.betrieb                AS "Betrieb",
     schluessel: 'pe_quote_tabelle',
     name: 'Personalkostenquote — alle Betriebe',
     beschreibung:
-      'Alle Betriebe mit Ampel und Abstand zur 28-%-Schwelle. Ein positiver Wert in „Δ Schwelle" heißt: um so viele Prozentpunkte liegt der Betrieb über der Grenze.',
+      'Alle Betriebe mit Ampel und Abstand zur 28-%-Schwelle, gerechnet auf den Personalkosten ohne '
+      + 'Geschäftsführung aus der BWA. Ein positiver Wert in „Δ Schwelle" heißt: um so viele '
+      + 'Prozentpunkte liegt der Betrieb über der Grenze. „BWA-Alter" sagt, wie alt die zugrunde '
+      + 'liegende Buchung ist — bei mehreren Monaten ist das Urteil entsprechend alt.',
     anzeige: 'table',
     parameter: [MONAT, BETRIEB],
     sql: `${MONAT_CTE}
@@ -498,18 +504,28 @@ SELECT r.betrieb                            AS "Betrieb",
     schluessel: 'pe_bereich',
     name: 'Personalkosten je Bereich',
     beschreibung:
-      'Personalkostenquoten für Service, Bar und Küche nebeneinander. Alle Werte in Prozent vom Umsatz, nicht in Euro.',
+      'Personalkostenquoten für Service, Bar und Küche nebeneinander, in Prozent vom Umsatz. '
+      + '„Personal gesamt (operativ)" ist die Summe dieser drei Bereiche aus dem Kassensystem — '
+      + 'ohne Geschäftsführung und ohne Verwaltung. Die Spalte daneben, „Personal o. GF % '
+      + '(BWA · Ampel)", ist eine '
+      + 'ANDERE Größe: sie kommt aus der BWA des Steuerberaters, und nur an ihr hängt die Ampel im '
+      + 'Round Table. Dass beide abweichen, ist normal — die eine ist der laufende Betrieb, die '
+      + 'andere das gebuchte Ergebnis.',
     anzeige: 'table',
     parameter: [BETRIEB, ZEITRAUM],
     sql: `
 SELECT betrieb            AS "Betrieb",
        zeitraum_von::date AS "Von",
        zeitraum_bis::date AS "Bis",
-       pek_gesamt         AS "Personal gesamt %",
+       -- Die Spaltennamen tragen die Herkunft, weil die Tabelle sonst zwei
+       -- verschiedene Groessen wie zwei Fassungen derselben aussehen laesst:
+       -- pek_* ist die Kasse (Service+Bar+Kueche, ohne GF und Verwaltung),
+       -- persoog_bwa der Steuerberater -- und nur letztere traegt die Ampel.
+       pek_gesamt         AS "Personal gesamt % (operativ)",
        pek_service        AS "Service %",
        pek_bar            AS "Bar %",
        pek_kueche         AS "Küche %",
-       persoog_bwa        AS "o. GF % (BWA)",
+       persoog_bwa        AS "Personal o. GF % (BWA · Ampel)",
        ampel_global       AS "Ampel global",
        ampel_lina         AS "Ampel LINA"
   FROM mart.personalkosten

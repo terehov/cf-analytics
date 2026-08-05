@@ -645,10 +645,14 @@ SELECT lpad(stunde::text, 2, '0') || ':00' AS "Stunde",
     schluessel: 'dd_betrieb_personal',
     name: 'Betrieb — Personal je Bereich',
     beschreibung:
-      'Eine Zeile je Monat. Die belastbare Zahl ist **„o. GF % (BWA)“** — die '
+      'Eine Zeile je Monat. Die belastbare Zahl ist **„Personal o. GF % (BWA · Ampel)“** — die '
       + 'Personalquote ohne Geschäftsführung aus den Zahlen des Steuerberaters; auf ihr '
       + 'beruht auch die Ampel im Round Table.\n\n'
-      + 'Die Spalten mit „(Med.)“ sind der **Median der Tageswerte** und nur ein '
+      + 'Die Spalten mit „(Med.)“ sind eine **andere Größe**: die operativen Kosten der '
+      + 'Bereiche Service, Bar und Küche aus dem Kassensystem — ohne Geschäftsführung und '
+      + 'ohne Verwaltung. Sie zeigen, **wo** es klemmt, tragen aber keine Ampel, und ihre '
+      + 'Summe ergibt nicht die BWA-Quote nebenan.\n\n'
+      + 'Sie sind zudem der **Median der Tageswerte** und nur ein '
       + 'Anhaltspunkt: die Tagesquote hat den Tagesumsatz im Nenner, und der schwankt '
       + 'stärker als die Personalkosten. „Tage“ sagt, wie viele Tage des Monats '
       + 'überhaupt eine plausible Quote ergaben — steht dort eine kleine Zahl, ist der '
@@ -682,7 +686,7 @@ SELECT lpad(stunde::text, 2, '0') || ':00' AS "Stunde",
     sql: `
 SELECT betrieb                   AS "Betrieb",
        to_char(monat, 'MM.YYYY') AS "Monat",
-       round(max(persoog_bwa), 1) AS "o. GF % (BWA)",
+       round(max(persoog_bwa), 1) AS "Personal o. GF % (BWA · Ampel)",
        count(*) FILTER (WHERE ${PLAUSIBEL})           AS "Tage",
        ${MEDIAN('pek_gesamt')}                        AS "Personal % (Med.)",
        ${MEDIAN('pek_service')}                       AS "Service % (Med.)",

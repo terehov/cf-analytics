@@ -717,7 +717,13 @@ export const dashboards: Dashboard[] = [
     // Historie, waehrend oben ein Monat eingestellt war.
     filter: [F_MONAT, F_ZEITRAUM_DREI_MONATE, F_BETRIEB],
     reihen: [
-      { teile: [{ text: '# Personal\n\n**Quote** = Personalkosten in % vom Umsatz (was es kostet). **Umsatz je Personalstunde** = in Euro (was es einbringt).\n\nIm LINA-Bericht heißen beide „Effektivität“ — deshalb stehen sie getrennt.' }] },
+      // ZWEI PERSONALKOSTENGROESSEN, EINE SEITE. Der Text darunter ist der
+      // wichtigste auf diesem Dashboard: pe_bereich stellt "Personal
+      // gesamt %" (operativ, aus der Kasse) und "o. GF %" (vom
+      // Steuerberater) NEBENEINANDER in eine Tabelle. Ohne Erklaerung liest
+      // man das als dieselbe Zahl in zwei Fassungen -- und wundert sich
+      // ueber die Abweichung, statt sie zu deuten. Gefragt am 04.08.2026.
+      { teile: [{ text: '# Personal\n\n**Zwei verschiedene Personalkosten-Größen stehen auf dieser Seite. Sie sind nicht ineinander umrechenbar:**\n\n**„Personal o. GF %" — die Ampel-Größe.** Personalkosten **ohne Geschäftsführung**, aus der **BWA des Steuerberaters**, in % vom Umsatz. Nur an dieser Zahl hängt die Ampel „Personal" im Round Table (grün bis 28 %). Sie ist die verbindliche Zahl aus dem Round-Table-Regelwerk.\n\n**„Personal gesamt %" — die operative Größe.** Die Kosten der drei Bereiche **Service, Bar und Küche** aus dem Kassensystem, ebenfalls in % vom Umsatz. GF-Gehälter, Verwaltung und alles außerhalb dieser drei Bereiche stecken **nicht** darin. Sie sagt, **wo** es klemmt — nicht, ob die Ampel kippt.\n\nDass beide voneinander abweichen, ist der Normalfall: die eine ist gebuchte BWA, die andere der laufende Betrieb.\n\n**Quote** = in % vom Umsatz (was Personal kostet). **Umsatz je Personalstunde** = in Euro (was eine Arbeitsstunde einbringt). Im LINA-Bericht heißen beide „Effektivität" — deshalb stehen sie getrennt.\n\nQuoten haben den Umsatz im Nenner: an umsatzschwachen Tagen werden sie beliebig groß. Deshalb wird hier mit dem **Median** gerechnet und ohne Betriebe ohne laufendes Geschäft.' }] },
       { teile: [{ karte: 'pe_quote_betrieb', hoehe: 11, klick: [{ ziel: 'dd_betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ karte: 'pe_quote_tabelle', hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ karte: 'pe_verlauf' }] },

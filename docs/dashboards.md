@@ -385,6 +385,38 @@ Beleg.
 
 ---
 
+## Zwei Personalkosten-Größen auf einer Seite
+
+**Gefragt am 04.08.2026:** „Die Personalkosten, welche du anzeigst — sind das Kosten gesamt,
+Kosten ohne GF oder nur die operativen Kosten aus den Bereichen (Bar, Küche, Service)?" Die
+Frage war berechtigt, denn auf dem Personal-Dashboard standen **beide** Größen, ohne dass
+irgendwo stand, dass es zwei sind.
+
+| Größe | Herkunft | Was drin ist | Wozu |
+|---|---|---|---|
+| `persoog_bwa` → „Personal o. GF % (BWA · Ampel)" | LINA-Feld `persoogBwa`, aus der **BWA** | Personalkosten **ohne Geschäftsführung**, fertig in % vom Umsatz | **Trägt die Ampel** „Personal" im Round Table (grün bis 28 %); ist Spalte `Eingabe!J` des Excel |
+| `pek_gesamt` → „Personal gesamt % (operativ)" | LINA-Bericht „Personalkosten/Effektivität pro Bereich", aus der **Kasse** | Nur **Service + Bar + Küche**; ohne GF, ohne Verwaltung | Sagt, **wo** es klemmt — trägt keine Ampel |
+
+**Sie sind nicht ineinander umrechenbar, und eine Abweichung ist der Normalfall** — die eine
+ist gebuchtes Ergebnis vom Steuerberater, die andere der laufende Betrieb aus dem
+Kassensystem. `pek_service`, `pek_bar` und `pek_kueche` sind die Aufteilung der zweiten,
+nicht der ersten.
+
+Der Kartentext von `pe_bereich` stellte beide bis dahin wortlos nebeneinander in eine
+Tabelle — das liest sich zwangsläufig als dieselbe Zahl in zwei Fassungen. Behoben an vier
+Stellen, weil jede für sich gelesen wird: in der Einleitung des Personal-Dashboards, in den
+Beschreibungen von `pe_quote_betrieb`, `pe_quote_tabelle` und `pe_bereich`, in
+`dd_betrieb_personal` auf ③ Betrieb — und in den **Spaltentiteln selbst**. Der Spaltentitel
+ist die einzige Erklärung, die mitwandert, wenn jemand die Tabelle exportiert oder einen
+Screenshot verschickt.
+
+**Die `eff_*`-Spalten sind eine dritte Größe** und heißen im LINA-Bericht ebenfalls
+„Effektivität": Umsatz je geleisteter Personalstunde in **Euro**, keine Quote. Deshalb stehen
+sie in einer eigenen Karte und nicht neben den Prozentwerten — zwei Achsen in einem Diagramm
+wären hier der sichere Weg zur Fehldeutung.
+
+---
+
 ## Fallen beim Bauen einer neuen Karte
 
 **Komma-Join bindet schwächer als `LEFT JOIN`.** Bei
