@@ -140,6 +140,14 @@ if (process.argv.includes('--foodnotify')) {
  *       holen will, kann es — es soll aber eine bewusste Entscheidung
  *       bleiben, kein Nebeneffekt des A1-Durchstichs.
  *
+ *       SEIT 05.08.2026 BRAUCHT MAN DIESEN SCHALTER NICHT MEHR ZWINGEND:
+ *       `sync/nachfuellen.ts` zieht die jeweils letzte Inventurseite je
+ *       Marke bei jedem Lauf selbst nach (inventurenNachfuellen). Solange
+ *       noch nie Inventuren geholt wurden, IST die letzte Seite die erste
+ *       — der laufende Abgleich stößt damit dieselbe Kette an wie dieser
+ *       Schalter. Er bleibt für den Fall, dass man den Durchstich sofort
+ *       und ohne auf den nächsten Sync-Lauf zu warten haben will.
+ *
  *       Setzt core.kostenstelle voraus (aus --foodnotify bzw. dem
  *       laufenden Abgleich) — ohne Kostenstellen bliebe die erpIds-Liste
  *       leer.

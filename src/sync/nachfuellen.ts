@@ -216,9 +216,91 @@ export async function foodnotifyNachfuellen(): Promise<number> {
          JSON.stringify({ erpId: String(s.erp_id), seite: String(s.letzte_seite) })])
       n += r.length
     }
+
+    n += await inventurenNachfuellen(marke.marke_key, heute)
   }
 
   return n
+}
+
+/**
+ * Die jeweils letzte Inventurseite einer Marke.
+ *
+ * WARUM JE MARKE UND NICHT JE KOSTENSTELLE: `fn:inventuren` bündelt alle
+ * Kostenstellen in EINEM Aufruf (`erpIds[]`, siehe endpunkte.ts) — es gibt
+ * hier also gar keine Seitenzahl je Kostenstelle, sondern nur eine je
+ * Marke. Das ist der Grund, warum sich `foodnotifyNachfuellen()` oben nicht
+ * einfach wiederverwenden ließ.
+ *
+ * WARUM DIE LETZTE SEITE: dieselbe Mechanik wie bei den Bestellungen. Die
+ * Abfrage sortiert aufsteigend nach `timeCreated`, neue Inventuren landen
+ * deshalb am Ende. Wer nur Seite 1 nachzöge, bekäme für immer dieselben
+ * ältesten Zählungen.
+ *
+ * DIE SEITENZAHL STEHT WOANDERS ALS BEI DEN BESTELLUNGEN. `/api/erp/*`
+ * liefert die erp-Hülle `{code, errors, isError, payload: {data,
+ * pagination}}`, die Seitenzahl also unter `payload.pagination.totalPages`
+ * — nicht unter dem flachen `page_count`, das `/api/{erpId}/*` verwendet
+ * (huelle.ts unterscheidet beide Formen). Ein Griff an die falsche Stelle
+ * liefert hier NULL und keinen Fehler: der Abgleich liefe dann still ins
+ * Leere, genau wie das erste Auspacken bei Wilma Wunder 275 Inventuren
+ * übersah.
+ *
+ * `coalesce(…, 1)`: solange keine Antwort mit Seitenangabe vorliegt, ist
+ * Seite 1 die richtige Wahl — sie ist bei einer einseitigen Liste zugleich
+ * die letzte, und bei noch nie geholten Marken der Einstieg.
+ *
+ * DIE MARKE STEHT IM PARAMETER-JSON, nicht in einer eigenen Spalte:
+ * `raw.api_antwort` hat kein `marke_key` (die Tabelle stammt aus der
+ * LINA-Zeit, wo es nur einen Mandanten gab). Der Worker legt sie als
+ * `parameter->>'markeKey'` ab.
+ *
+ * Priorität 20 wie bei den Bestellungen: vor dem Backfill (94/95), hinter
+ * LINAs Tagesdaten (10).
+ */
+export async function inventurenNachfuellen(
+  markeKey: number, heute: string,
+): Promise<number> {
+  const stand = await eine<{ letzte_seite: number; erp_ids: string | null }>(
+    `SELECT coalesce((
+              SELECT (s.payload->'payload'->'pagination'->>'totalPages')::int
+                FROM raw.api_antwort s
+               WHERE s.endpunkt = 'fn:inventuren'
+                 -- Die Spalte casten, NICHT den Parameter: $1 wird unten
+                 -- als integer gegen k.marke_key verwendet, und Postgres
+                 -- legt den Typ eines Parameters für die ganze Abfrage
+                 -- fest. Ein $1::text hier hiesse "integer = text" dort.
+                 AND (s.parameter->>'markeKey')::int = $1
+                 AND s.payload->'payload'->'pagination'->>'totalPages' IS NOT NULL
+               ORDER BY s.abgerufen_am DESC
+               LIMIT 1), 1) AS letzte_seite,
+            (SELECT string_agg(k.erp_id::text, ',' ORDER BY k.erp_id)
+               FROM core.kostenstelle k
+              WHERE k.marke_key = $1 AND k.erp_id IS NOT NULL) AS erp_ids`,
+    [markeKey])
+
+  // Ohne Kostenstellen gäbe es keine erpIds — der Pfadbau würfe beim
+  // Abarbeiten. Dann ist der Bestellungs-Backfill dieser Marke ohnehin
+  // noch nicht gelaufen.
+  if (!stand?.erp_ids) return 0
+
+  const parameter = JSON.stringify({
+    erpIds: stand.erp_ids,
+    seite: String(Math.max(1, stand.letzte_seite)),
+  })
+
+  const r = await query(
+    `INSERT INTO sync.warteschlange
+       (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter)
+     SELECT 'fn:inventuren', $1::date, $1::date, 20, $2, $3::jsonb
+      WHERE NOT EXISTS (
+            SELECT 1 FROM sync.warteschlange w
+             WHERE w.endpunkt = 'fn:inventuren' AND w.marke_key = $2
+               AND w.parameter = $3::jsonb AND w.erledigt_am IS NULL)
+     RETURNING posten_id`,
+    [heute, markeKey, parameter])
+
+  return r.length
 }
 
 /**

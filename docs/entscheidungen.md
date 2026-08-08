@@ -668,16 +668,54 @@ sich „die letzte Seite je Kostenstelle" hier nicht direkt übertragen, das
 Nachziehen bräuchte eine eigene Logik (letzte Seite je MARKE, nicht je
 Kostenstelle), keine Wiederverwendung der bestehenden Funktion.
 
-**Die Entscheidung.** Inventuren bleiben ausschließlich ein manueller Backfill
+~~**Die Entscheidung.** Inventuren bleiben ausschließlich ein manueller Backfill
 (`bun run einreihen --foodnotify-inventuren`, analog `--foodnotify` für die
 Organisationsposten und `--historie` für LINA). Kein Eintrag in
 `nachfuellen.ts`. Wer neue Inventuren sehen will, ruft den Backfill erneut —
 das idempotente `NOT EXISTS` verhindert dabei keine neuen Seiten, sondern nur
 einen zweiten Seite-1-Posten je Marke (siehe der Hinweis in `src/einreihen.ts`
-zum Nachziehen neuer Kostenstellen).
+zum Nachziehen neuer Kostenstellen).~~ **Revidiert am 05.08.2026, siehe unten.**
 
 **Was das revidieren würde.** Zeigt sich nach dem ersten echten Backfill, dass
 Wilma Wunder tatsächlich laufend neue Inventuren anlegt und die Zahl regelmäßig
 gebraucht wird (nicht nur einmalig für eine Schwundanalyse), lohnt sich ein
 eigener „letzte Seite je Marke"-Zweig in `foodnotifyNachfuellen()` — dann mit
 gemessenen Zahlen statt der hier getroffenen Vorabschätzung.
+
+## Inventuren laufen doch im Sync mit — Anforderung Eugene (05.08.2026)
+
+**Revidiert die Entscheidung darüber.** Eugene: „ich möchte, dass die
+Inventuren auch automatisch gezogen und dargestellt werden. sprich wir
+brauchen einen backfill und sync". Damit ist die Bedingung eingetreten, die
+der Absatz „Was das revidieren würde" selbst benannt hatte — die Zahl wird
+laufend gebraucht, nicht einmalig für eine Schwundanalyse.
+
+**Umgesetzt** als `inventurenNachfuellen()` in `src/sync/nachfuellen.ts`,
+aufgerufen je Marke aus `foodnotifyNachfuellen()`. Drei Dinge, die dabei
+anders sind als bei den Bestellungen:
+
+- **Je Marke, nicht je Kostenstelle.** `fn:inventuren` bündelt alle
+  Kostenstellen in einem Aufruf (`erpIds[]`), es gibt also gar keine
+  Seitenzahl je Kostenstelle. Genau deshalb ließ sich die bestehende
+  Funktion nicht wiederverwenden — die eigene Logik, die der alte Eintrag
+  als Aufwand veranschlagt hatte.
+- **Die Seitenzahl steht woanders.** `/api/erp/*` liefert die erp-Hülle mit
+  `payload.pagination.totalPages`; die Bestellungen nutzen das flache
+  `page_count` aus `/api/{erpId}/*`. Ein Griff an die falsche Stelle liefert
+  NULL statt eines Fehlers — der Abgleich liefe still ins Leere, derselbe
+  lautlose Fehlertyp, der bei Wilma Wunder schon einmal 275 Inventuren
+  übersah.
+- **Die Marke steht im Parameter-JSON.** `raw.api_antwort` hat keine
+  `marke_key`-Spalte (die Tabelle stammt aus der LINA-Zeit mit einem
+  Mandanten); der Worker legt sie als `parameter->>'markeKey'` ab.
+
+**Der Backfill-Schalter bleibt** — er ist jetzt aber nur noch die Abkürzung,
+wenn man den Durchstich sofort will, statt auf den nächsten Sync-Lauf zu
+warten. Solange nie Inventuren geholt wurden, IST die letzte Seite die
+erste: der laufende Abgleich stößt dieselbe Kette an (Seite 1 reiht alle
+Folgeseiten ein, jede geladene Seite reiht ihre Positionen nach).
+
+**Was weiterhin gilt:** Belastbar ist die Schwundrechnung praktisch nur bei
+Wilma Wunder. Der laufende Abgleich holt jetzt alle vier Marken — das kostet
+vier Aufrufe je Sync-Lauf, was gegenüber den Bestellungen (ein Aufruf je
+Kostenstelle, also 152) nicht ins Gewicht fällt.

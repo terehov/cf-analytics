@@ -246,3 +246,138 @@ lauf('nachfuellen — FoodNotifys laufender Abgleich', () => {
     expect(await offen('fn:bestellungen')).toBe(0)
   })
 })
+
+/**
+ * Inventuren im laufenden Abgleich (seit 05.08.2026, Anforderung Eugene —
+ * docs/entscheidungen.md).
+ *
+ * Drei Dinge sind hier anders als bei den Bestellungen, und genau die
+ * werden geprüft: EIN Posten je MARKE statt je Kostenstelle, die
+ * Seitenzahl aus `payload.pagination.totalPages` statt aus dem flachen
+ * `page_count`, und ein sinnvoller Einstieg, solange noch nie etwas
+ * geholt wurde.
+ */
+lauf('nachfuellen — Inventuren', () => {
+  beforeAll(async () => {
+    process.env.DATABASE_URL = DB!
+    process.env.FN_APOSTO_USER = 'test@aposto.eu'
+    process.env.FN_APOSTO_PASSWORD = 'geheim'
+    db = new Client({ connectionString: DB })
+    await db.connect()
+  })
+  afterAll(async () => { await db?.end() })
+
+  /**
+   * Zwei Kostenstellen derselben Marke — der Fall, an dem sich zeigt, ob
+   * je Marke oder je Kostenstelle eingereiht wird.
+   */
+  const lageAufbauen = async (): Promise<number> => {
+    await db.query('TRUNCATE sync.warteschlange')
+    await db.query('DELETE FROM core.kostenstelle')
+    await db.query(`DELETE FROM raw.api_antwort WHERE endpunkt = 'fn:inventuren'`)
+
+    const { rows: [m] } = await db.query(`
+      INSERT INTO core.marke (schluessel, name) VALUES ('aposto','Aposto')
+      ON CONFLICT (schluessel) DO UPDATE SET name = excluded.name RETURNING marke_key`)
+    await db.query(
+      `INSERT INTO core.kostenstelle
+         (marke_key, kostenstelle_id, restaurant_id, erp_id, name, restaurant_name, art)
+       VALUES ($1, 8001, 6001, 10483, 'Küche Test', 'Testbetrieb', 'kueche'),
+              ($1, 8002, 6001, 10484, 'Bar Test',   'Testbetrieb', 'bar')`,
+      [m.marke_key])
+    await db.query(`SELECT core.partition_anlegen('raw.api_antwort', current_date)`)
+    return m.marke_key
+  }
+
+  /** Eine Inventurantwort in der erp-Hülle ablegen, wie raw sie speichert. */
+  const antwortAblegen = async (markeKey: number, seiten: number, hash: string) => {
+    await db.query(
+      `INSERT INTO raw.api_antwort
+         (quelle, endpunkt, parameter, http_status, payload, payload_hash, payload_bytes)
+       VALUES ('foodnotify', 'fn:inventuren', $1::jsonb, 200, $2::jsonb, $3, 1)`,
+      [JSON.stringify({ erpIds: '10483,10484', seite: '1', markeKey }),
+       // Die erp-Hülle: payload.pagination.totalPages — NICHT page_count.
+       JSON.stringify({ payload: { pagination: { currentPage: 1, totalPages: seiten,
+                                                 totalItems: seiten * 25 }, data: [] } }),
+       hash])
+  }
+
+  test('EIN Posten je Marke, nicht einer je Kostenstelle', async () => {
+    /**
+     * Der Kern des Unterschieds: `fn:inventuren` bündelt alle
+     * Kostenstellen über `erpIds[]`. Zwei Kostenstellen dürfen deshalb
+     * nur EINEN Posten ergeben — mit beiden erpIds darin.
+     */
+    const markeKey = await lageAufbauen()
+    const { foodnotifyNachfuellen } = await import('./nachfuellen')
+    await foodnotifyNachfuellen()
+
+    const { rows } = await db.query(`
+      SELECT parameter->>'erpIds' AS erp_ids, parameter->>'seite' AS seite, prioritaet
+        FROM sync.warteschlange
+       WHERE endpunkt = 'fn:inventuren' AND erledigt_am IS NULL`)
+    expect(rows).toHaveLength(1)
+    expect(rows[0].erp_ids).toBe('10483,10484')
+    expect(rows[0].prioritaet).toBe(20)
+    expect(markeKey).toBeGreaterThan(0)
+  })
+
+  test('ohne bisherige Antwort ist Seite 1 der Einstieg', async () => {
+    /**
+     * Solange nie Inventuren geholt wurden, IST die letzte Seite die
+     * erste. Das ist der Grund, warum der laufende Abgleich denselben
+     * Durchstich anstößt wie der Backfill-Schalter: Seite 1 reiht beim
+     * Laden alle Folgeseiten ein.
+     */
+    await lageAufbauen()
+    const { foodnotifyNachfuellen } = await import('./nachfuellen')
+    await foodnotifyNachfuellen()
+
+    const { rows } = await db.query(`
+      SELECT parameter->>'seite' AS seite FROM sync.warteschlange
+       WHERE endpunkt = 'fn:inventuren' AND erledigt_am IS NULL`)
+    expect(rows.map(r => r.seite)).toEqual(['1'])
+  })
+
+  test('die Seitenzahl kommt aus pagination.totalPages, nicht aus page_count', async () => {
+    /**
+     * Die Falle mit dem stillen Fehlschlag: `/api/erp/*` liefert die
+     * erp-Hülle, `/api/{erpId}/*` die flache. Griffe der Code an die
+     * falsche Stelle, käme NULL statt eines Fehlers — der Abgleich bliebe
+     * für immer auf Seite 1 und holte nie die neuesten Zählungen.
+     */
+    const markeKey = await lageAufbauen()
+    await antwortAblegen(markeKey, 12, 'inv-a')
+
+    const { foodnotifyNachfuellen } = await import('./nachfuellen')
+    await foodnotifyNachfuellen()
+
+    const { rows } = await db.query(`
+      SELECT parameter->>'seite' AS seite FROM sync.warteschlange
+       WHERE endpunkt = 'fn:inventuren' AND erledigt_am IS NULL`)
+    expect(rows.map(r => r.seite)).toEqual(['12'])
+  })
+
+  test('solange ein Posten offen ist, kommt kein zweiter dazu', async () => {
+    await lageAufbauen()
+    const { foodnotifyNachfuellen } = await import('./nachfuellen')
+    await foodnotifyNachfuellen()
+    const vorher = await offen('fn:inventuren')
+    await foodnotifyNachfuellen()
+    expect(await offen('fn:inventuren')).toBe(vorher)
+  })
+
+  test('eine Marke ohne Kostenstellen wird übersprungen', async () => {
+    /**
+     * Ohne erpIds würfe der Pfadbau beim Abarbeiten („erpIds im Posten
+     * ist leer"). Dann ist der Bestellungs-Backfill dieser Marke ohnehin
+     * noch nicht gelaufen — ein Posten wäre nur Arbeit, die scheitert.
+     */
+    await lageAufbauen()
+    await db.query('DELETE FROM core.kostenstelle')
+    await db.query('TRUNCATE sync.warteschlange')
+    const { foodnotifyNachfuellen } = await import('./nachfuellen')
+    await foodnotifyNachfuellen()
+    expect(await offen('fn:inventuren')).toBe(0)
+  })
+})
