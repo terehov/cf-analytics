@@ -183,3 +183,36 @@ Abschnitte umzuschreiben. **Wer als Nächstes an FoodNotify arbeitet:** ein eige
 der Stufe 1–3 (Bestellungen, Rezepturen, POS-Zuordnung, Einkauf) in diesen drei Dateien
 nachträgt und die WAWI-Zeile entfernt, wäre die Dokumentationsschuld los, die dieser Fund
 aufgedeckt hat.
+
+---
+
+## Die Ursache des `numeric field overflow` ist nicht messbar (gefunden 10.08.2026)
+
+Im ersten echten Inventurlauf (Lauf 79, 09.08.2026) scheiterten neun Posten an
+`numeric field overflow`, vier Inventuren von Wilma Wunder blieben ungeladen.
+Migration `0046` verbreiterte daraufhin die Mengenspalten, `0047` den Preis.
+
+**Die auslösende Zahl kennt niemand.** `fnLaden` schreibt `raw.api_antwort` und
+`core.inventurposition` in **einer** Transaktion (`inTransaktion`). Scheitert das
+core-INSERT, rollt der raw-INSERT mit zurück — von genau den Antworten, die den
+Fehler ausgelöst haben, existiert deshalb keine Rohantwort. Nachgemessen an den
+79.750 erfolgreich geladenen Positionen passte alles längst in die alten Spalten:
+
+| Feld | max. Vorkommastellen | alte Spalte |
+|---|---|---|
+| `theoreticalStockLevelInBaseUnits` | 10 | `numeric(16,4)` → 12 möglich |
+| `countedAmountInBaseUnits` | 8 | `numeric(16,4)` → 12 möglich |
+| `reviewAmountInBaseUnits` | 8 | `numeric(16,4)` → 12 möglich |
+| `pricePerBaseUnit` | 2 | `numeric(14,6)` → **nur 8 möglich** |
+
+Der Preis war die mit Abstand engste Spalte und ist damit der wahrscheinlichste
+Kandidat — bewiesen ist es nicht.
+
+**Was den Fund abschließen würde:** Die vier Posten stehen bei zwei bis drei
+Versuchen (Grenze `MAX_VERSUCHE` = 4) und laufen nach dem Deployment von `0047`
+von selbst nach. Bleiben sie danach als Fehler stehen, ist die Ursache eine
+andere — und dann lohnt es, den Raw-Schreibvorgang aus der gemeinsamen
+Transaktion zu lösen (eigene Transaktion oder `SAVEPOINT`), damit eine Antwort,
+die core sprengt, wenigstens im Raw-Layer landet. Genau dafür ist er da
+(AGENTS.md Regel 4: „Der Raw-Layer ist die Versicherung"), und aktuell greift
+diese Versicherung im Fehlerfall nicht.
