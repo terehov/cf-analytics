@@ -17,7 +17,7 @@
 // =====================================================================
 
 import type { Karte } from './typen'
-import { MONAT_CTE, MONAT_CTE_UMSATZ, ZEITRAUM_CTE, P_MONAT, P_MARKE, P_BETRIEB, P_AMPEL, P_BEREICH, P_INTENSITAET, P_ZEITRAUM, P_INVENTUR } from './gemeinsam'
+import { MONAT_CTE, MONAT_CTE_UMSATZ, ZEITRAUM_CTE, P_MONAT, P_MARKE, P_BETRIEB, P_AMPEL, P_BEREICH, P_INTENSITAET, P_ZEITRAUM, P_INVENTUR, P_BESTELLUNG } from './gemeinsam'
 
 // ---------------------------------------------------------------------
 // Personalquoten sind nur mit Filter und Median zu gebrauchen.
@@ -834,7 +834,9 @@ SELECT d.betrieb                  AS "Betrieb",
       'Die Bestellungen dieses Betriebs, neueste zuerst — Datum, Lieferant, Anzahl '
       + 'Positionen und Summe. Stornierte Bestellungen bleiben in der Liste stehen, sind aber '
       + 'als solche markiert: sie wurden zurückgenommen und zählen in keiner anderen '
-      + 'Auswertung mehr mit.',
+      + 'Auswertung mehr mit.\n\n'
+      + 'Ein Klick auf **„ansehen →"** öffnet den einzelnen Beleg: jede bestellte Ware mit '
+      + 'Menge, Gebinde, Einzelpreis und Summe.',
     anzeige: 'table',
     parameter: [P_BETRIEB, P_ZEITRAUM],
     // OHNE ALIAS: {{zeitraum}} ist ein Feldfilter auf mart.einkauf_beleg.
@@ -848,7 +850,11 @@ SELECT bestelldatum                                   AS "Datum",
        positionen                                       AS "Positionen",
        summe                                             AS "Summe",
        CASE WHEN storniert THEN 'storniert' ELSE '' END AS "Storno",
-       beleg_nummer                                      AS "Beleg-Nr."
+       beleg_nummer                                      AS "Beleg-Nr.",
+       -- Klickziel zum Beleg. Wie bei den Inventuren: eine Textspalte, kein
+       -- Schluessel zum Lesen -- der steht daneben und bleibt ausgeblendet.
+       'ansehen →'                                       AS "Beleg",
+       bestellung_key::text                              AS "bestellung_key"
   FROM mart.einkauf_beleg
  WHERE 1 = 1
    [[AND betrieb = {{betrieb}}]]
@@ -857,6 +863,13 @@ SELECT bestelldatum                                   AS "Datum",
  LIMIT 500`,
     template_tag_dimension: { zeitraum: ['mart', 'einkauf_beleg', 'bestelldatum'] },
     visualisierung: {
+      'table.columns': [
+        { name: 'Datum', enabled: true }, { name: 'Lieferdatum', enabled: true },
+        { name: 'Lieferant', enabled: true }, { name: 'Positionen', enabled: true },
+        { name: 'Summe', enabled: true }, { name: 'Storno', enabled: true },
+        { name: 'Beleg-Nr.', enabled: true }, { name: 'Beleg', enabled: true },
+        { name: 'bestellung_key', enabled: false },
+      ],
       column_settings: {
         '["name","Summe"]': { number_style: 'currency', currency: 'EUR', currency_style: 'symbol', decimals: 2 },
       },
@@ -916,6 +929,89 @@ SELECT datum                                              AS "Datum",
         '["name","Soll (bewertet)"]': { number_style: 'currency', currency: 'EUR', currency_style: 'symbol', decimals: 2 },
         '["name","Gezählt (bewertet)"]': { number_style: 'currency', currency: 'EUR', currency_style: 'symbol', decimals: 2 },
         '["name","Schwund €"]': { number_style: 'currency', currency: 'EUR', currency_style: 'symbol', decimals: 2 },
+      },
+    },
+  },
+
+  // ===================================================================
+  // Der einzelne Beleg — was genau bestellt wurde
+  //
+  // Gegenstueck zur Zaehlung unten, angefragt am 10.08.2026. Die
+  // Belegliste sagt "132,74 EUR bei CHEFS CULINAR"; diese beiden Karten
+  // sagen, was dafuer im Karton war.
+  // ===================================================================
+  {
+    schluessel: 'dd_beleg_kopf',
+    name: 'Beleg — Überblick',
+    beschreibung:
+      'Wer wann bei wem bestellt hat, mit Liefertermin und Summe. Ein stornierter Beleg '
+      + 'steht hier mit dem Vermerk „storniert" — er wurde zurückgenommen und zählt in keiner '
+      + 'Auswertung mit.',
+    anzeige: 'table',
+    parameter: [P_BESTELLUNG],
+    sql: `
+SELECT betrieb                     AS "Betrieb",
+       marke                       AS "Marke",
+       bereich                     AS "Bereich",
+       lieferant                   AS "Lieferant",
+       bestelldatum                AS "Bestellt am",
+       lieferdatum                 AS "Geliefert am",
+       beleg_nummer                AS "Beleg-Nr.",
+       bestellnummer               AS "Bestell-Nr.",
+       CASE WHEN storniert THEN 'storniert' ELSE bestellstatus END AS "Status",
+       positionen                  AS "Positionen",
+       summe                       AS "Summe"
+  FROM mart.einkauf_beleg
+ WHERE 1 = 1
+   [[AND bestellung_key::text = {{bestellung}}]]
+ ORDER BY bestelldatum DESC
+ LIMIT 50`,
+    visualisierung: {
+      column_settings: {
+        '["name","Summe"]': { number_style: 'currency', currency: 'EUR', currency_style: 'symbol', decimals: 2 },
+      },
+    },
+  },
+  {
+    schluessel: 'dd_beleg_positionen',
+    name: 'Beleg — jede bestellte Ware',
+    beschreibung:
+      'Jede Position dieses Belegs: Ware, Menge, Gebinde, Einzelpreis und Summe.\n\n'
+      + '„Gebinde" ist die Verpackungseinheit — bestellt wird in Kartons oder Kisten, der '
+      + 'Einzelpreis gilt je Gebinde. „Gesamtmenge" rechnet beides zusammen.\n\n'
+      + 'Ein **⚠** in „Preis" heißt, dass der berechnete Preis vom hinterlegten abweicht. '
+      + '**„nicht angekommen"** heißt, diese Position ist nicht eingetroffen — bei einer noch '
+      + 'offenen Bestellung steht es auf allen Zeilen und bedeutet schlicht „noch nicht '
+      + 'geliefert", bei einer abgeschlossenen ist es ein Fehlartikel.',
+    anzeige: 'table',
+    parameter: [P_BESTELLUNG],
+    // Sortiert nach dem Positionswert: der teuerste Posten zuerst. Wer
+    // einen Beleg oeffnet, prueft ihn meist von oben nach unten.
+    sql: `
+SELECT ware                        AS "Ware",
+       positionsname               AS "Wie bestellt",
+       menge                       AS "Menge",
+       gebinde_menge               AS "Gebinde",
+       gesamt_menge                AS "Gesamtmenge",
+       einheit                     AS "Einheit",
+       einzelpreis                 AS "Einzelpreis",
+       summe_preis                 AS "Summe",
+       CASE WHEN preis_abweichend THEN '⚠' ELSE '' END AS "Preis",
+       -- NICHT "ersetzt" beschriften, auch wenn die Spalte so heisst:
+       -- isSubstituted ist in allen Positionen null, gemessen wird der
+       -- Status "not arrived" (src/foodnotify/transform.ts). Die Spalte
+       -- sagt also "nicht angekommen", nicht "anderes geliefert" --
+       -- bei einer offenen Bestellung steht sie auf jeder Zeile.
+       CASE WHEN ersetzt THEN 'nicht angekommen' ELSE '' END AS "Hinweis"
+  FROM mart.einkauf_position
+ WHERE 1 = 1
+   [[AND bestellung_key::text = {{bestellung}}]]
+ ORDER BY summe_preis DESC NULLS LAST, ware
+ LIMIT 2000`,
+    visualisierung: {
+      column_settings: {
+        '["name","Einzelpreis"]': { number_style: 'currency', currency: 'EUR', currency_style: 'symbol', decimals: 4 },
+        '["name","Summe"]': { number_style: 'currency', currency: 'EUR', currency_style: 'symbol', decimals: 2 },
       },
     },
   },

@@ -37,6 +37,11 @@ const F_BETRIEB: Parameter = {
 const F_INVENTUR: Parameter = {
   id: 'd-inventur', name: 'inventur', 'display-name': 'Zählung', type: 'string/=',
 }
+// Der einzelne Beleg -- ebenfalls ohne Werteliste: 50.072 Schluesselzahlen
+// waeren keine Auswahl, sondern eine Zumutung. Angesteuert wird geklickt.
+const F_BESTELLUNG: Parameter = {
+  id: 'd-bestellung', name: 'bestellung', 'display-name': 'Beleg', type: 'string/=',
+}
 // Bewertung als Auswahlliste. Feste Werte statt Datenquelle: es gibt genau
 // diese vier, und "ohne" steht fuer NULL -- das liefert keine Spalte.
 const F_AMPEL: Parameter = {
@@ -345,8 +350,12 @@ export const dashboards: Dashboard[] = [
       // Fragen sind (was wurde verkauft, gegen was wurde eingekauft).
       { name: 'Einkauf & Inventur', reihen: [
       { teile: [{ text: '## Einkauf und Inventur\n\nBelege und Zählungen dieses Betriebs. Storno- und Signierkennzeichen stehen jeweils in einer eigenen Spalte, nicht als stille Kürzung.' }] },
+      // Klick auf "ansehen →" oeffnet den Beleg; die uebrigen Spalten
+      // bleiben unangetastet, damit ein Klick auf eine Zahl nicht
+      // wegnavigiert -- dieselbe Regel wie bei der Inventurliste darunter.
       { teile: [{ karte: 'dd_betrieb_bestellungen', hoehe: 11,
-        klick: [{ ziel: 'db_einkauf', uebergabe: {} }] }] },
+        klick: [{ ziel: 'dd_beleg', spalte: 'Beleg',
+                  uebergabe: { bestellung: 'bestellung_key' } }] }] },
       // Klick auf "ansehen →" oeffnet die Zaehlung; die uebrigen Spalten
       // bleiben unangetastet, damit ein Klick auf eine Zahl nicht
       // wegnavigiert. Der Schluessel kommt aus der ausgeblendeten Spalte
@@ -360,6 +369,22 @@ export const dashboards: Dashboard[] = [
       { teile: [{ karte: 'dd_betrieb_massnahmen' }] },
       { teile: [{ karte: 'dd_betrieb_datenstand' }] },
       ] },
+    ],
+  },
+
+  // Der einzelne Beleg. Eigenes Dashboard aus demselben Grund wie die
+  // Zaehlung darunter: es beantwortet eine Frage zu EINEM Vorgang.
+  {
+    schluessel: 'dd_beleg',
+    name: 'Beleg — was bestellt wurde',
+    beschreibung:
+      'Ein einzelner Bestellbeleg im Detail: jede bestellte Ware mit Menge, Gebinde, Einzelpreis und Summe. Erreichbar über „ansehen →" in der Bestellliste auf dem Betriebsblatt.',
+    sammlung: 'Drill-Down',
+    filter: [F_BESTELLUNG],
+    reihen: [
+      { teile: [{ text: '# Der einzelne Beleg\n\nWas in diesem Karton war — nach Positionswert sortiert, der teuerste Posten zuerst.\n\n**Gebinde** ist die Verpackungseinheit: bestellt wird in Kartons oder Kisten, der Einzelpreis gilt je Gebinde.\n\nEin **⚠** in „Preis" heißt, der berechnete Preis weicht vom hinterlegten ab. **„nicht angekommen"** heißt, die Position ist nicht eingetroffen — bei einer noch offenen Bestellung (Status „pending") steht das auf allen Zeilen und heißt schlicht „noch nicht geliefert".' }] },
+      { teile: [{ karte: 'dd_beleg_kopf', hoehe: 9 }] },
+      { teile: [{ karte: 'dd_beleg_positionen', hoehe: 16 }] },
     ],
   },
 

@@ -379,6 +379,20 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
     zeitraum: 'ebenso.',
   },
 
+  // --- Der einzelne Beleg: gefiltert wird ueber DIE BESTELLUNG --------------
+  // Dieselbe Begruendung wie bei der Zaehlung: ein Beleg gehoert zu genau
+  // einem Betrieb und genau einem Tag, beides bringt der Schluessel mit.
+  dd_beleg_kopf: {
+    betrieb: 'Der Beleg bringt seinen Betrieb mit -- ausgewaehlt wird ueber ihn.',
+    monat: 'ebenso: ein Beleg hat genau ein Bestelldatum.',
+    zeitraum: 'ebenso.',
+  },
+  dd_beleg_positionen: {
+    betrieb: 'Der Beleg bringt seinen Betrieb mit -- ausgewaehlt wird ueber ihn.',
+    monat: 'ebenso: ein Beleg hat genau ein Bestelldatum.',
+    zeitraum: 'ebenso.',
+  },
+
   // --- Einkauf: die drei Sichten kennen keinen Betrieb ----------------------
   // FoodNotify verhandelt Preise je MARKE, nicht je Haus. mart.einkauf_ladestand,
   // mart.einkaufspreis_monat und mart.einkaufspreis_veraenderung fuehren

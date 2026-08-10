@@ -180,6 +180,22 @@ export const P_INVENTUR: Parameter = {
   required: false,
 }
 
+/**
+ * Ein einzelner Bestellbeleg, angesteuert ueber seinen Schluessel.
+ *
+ * Wie bei der Inventur der SCHLUESSEL und nicht Belegnummer + Datum: ein
+ * Betrieb bestellt am selben Tag mehrfach beim selben Lieferanten (gemessen:
+ * am 26.07.2026 zweimal bei CHEFS CULINAR), und `beleg_nummer` ist NULL,
+ * solange FoodNotify keine Rechnung angehaengt hat.
+ */
+export const P_BESTELLUNG: Parameter = {
+  id: 'bestellung-param',
+  name: 'bestellung',
+  'display-name': 'Beleg',
+  type: 'text',
+  required: false,
+}
+
 // Zwei Zeitraeume fuer den Vergleich. Bewusst Textparameter mit
 // Datumsangabe statt Feldfilter: ein Feldfilter kann nur EINEN Zeitraum
 // einschraenken, hier brauchen beide Seiten ihren eigenen.

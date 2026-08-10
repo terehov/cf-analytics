@@ -383,6 +383,27 @@ denselben Zeitraster einordnet. Nur signierte, nicht stornierte Inventuren gehen
 bewerteten Euro-Summen ein — eine laufende Zählung ist kein Ergebnis, eine stornierte kein
 Beleg.
 
+### Der einzelne Beleg (angefragt 10.08.2026)
+
+Dasselbe Muster wie bei der Zählung unten: Ein Klick auf „ansehen →" in der Bestellliste
+öffnet `dd_beleg` — Kopfdaten plus jede bestellte Ware mit Menge, Gebinde, Einzelpreis und
+Summe, nach Positionswert sortiert. Eine eigene mart-Sicht brauchte es nicht:
+`mart.einkauf_position` führt die Positionsebene bereits, inklusive `bestellung_key`.
+
+**Angesteuert wird über den Bestellschlüssel, nicht über Belegnummer + Datum.** Gemessen am
+10.08.2026: in **9.795** Fällen bestellt derselbe Betrieb am selben Tag mehrfach beim selben
+Lieferanten, und **50.063 von 50.072** Belegen haben gar keine Belegnummer — FoodNotify füllt
+sie erst, wenn eine Rechnung angehängt ist. Beides zusammen macht jede andere Ansteuerung
+mehrdeutig.
+
+**„nicht angekommen" heißt nicht „ersetzt".** Die Spalte in `core.bestellposition` heißt
+`ersetzt`, misst aber `status = 'not arrived'` — `isSubstituted` ist in allen Positionen
+`null` (siehe den Kommentar in `src/foodnotify/transform.ts`). Bei einer noch offenen
+Bestellung (Status `pending`) steht der Vermerk deshalb auf **jeder** Zeile und heißt schlicht
+„noch nicht geliefert"; nur bei einer abgeschlossenen Bestellung ist er ein Fehlartikel. Der
+erste Entwurf der Karte beschriftete die Spalte mit „ersetzt" — beim Live-Test fielen 13 von
+14 Zeilen eines Belegs auf, was die Fehldeutung aufdeckte.
+
 ### Die einzelne Zählung (angefragt 10.08.2026)
 
 Die Kopfzeile sagt, **dass** ein Betrieb 5.500 € Schwund hat; sie sagt nicht, **woran**. Ein
