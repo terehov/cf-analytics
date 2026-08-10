@@ -29,6 +29,7 @@ import { karten as kartenPortfolio } from './karten-portfolio'
 import { karten as kartenImport } from './karten-import'
 import { karten as kartenStandort } from './karten-standort'
 import { karten as kartenBewertung } from './karten-bewertung'
+import { karten as kartenYext } from './karten-yext'
 import { karten as kartenAktionen } from './karten-aktionen'
 import { dashboards } from './dashboards'
 import { auslegen, MINDESTHOEHE } from './layout'
@@ -43,7 +44,7 @@ const METABASE = config.METABASE_URL
 
 const alleKarten: Karte[] = [
   ...kartenDrilldown, ...kartenPortfolio, ...kartenRoundTable, ...kartenFach, ...kartenImport, ...kartenStandort,
-  ...kartenBewertung, ...kartenAktionen,
+  ...kartenBewertung, ...kartenAktionen, ...kartenYext,
 ]
 
 // Reihen in Kacheln umrechnen — EINMAL, damit Pruefung und Ausgabe
@@ -455,6 +456,64 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
   },
   // Die Verlaufskurve: der Monatsfilter waehlt einen Stichmonat, und der
   // liesse von einer Kurve genau einen Punkt uebrig.
+
+  // --- Yext Analytics: Themen, Antworten, Sichtbarkeit ---------------------
+  // Dieselbe Mechanik wie bei den Bewertungskarten darueber, ein Grund
+  // kommt hinzu: die Themen gibt es erst seit April 2026. Ein Stichmonat
+  // auf einer Verlaufskurve liesse dort nicht nur einen Punkt uebrig, er
+  // liesse bei jedem aelteren Monat GAR NICHTS uebrig -- und eine leere
+  // Karte liest sich als "keine Probleme".
+  yx_themen_verlauf: {
+    monat: 'Verlauf ueber alle Monate -- ein Stichmonat liesse einen Punkt uebrig.',
+    note:  'Die Themennote IST die Aussage der Karte; auf eine Sternezahl gefiltert '
+         + 'bliebe eine Tautologie stehen.',
+  },
+  yx_antwort_verlauf: {
+    monat: 'Verlauf ueber alle Monate.',
+  },
+  yx_note_verteilung: {
+    monat: 'Die Verteilung ueber die Monate IST die Karte.',
+  },
+  yx_sicht_trichter: {
+    monat: 'Verlauf ueber alle Monate.',
+  },
+  yx_themen_unbekannt: {
+    monat: 'Waechterkarte: ein unbekanntes Label soll auffallen, egal wann es auftauchte. '
+         + 'Mit Monatsfilter waere es genau in den Monaten unsichtbar, die niemand ansieht.',
+  },
+  yx_themen_stand: {
+    monat: 'Sagt, AB WANN es Themen gibt -- ein Monatsfilter beantwortete genau diese '
+         + 'Frage nicht mehr.',
+    marke: 'Der Erhebungszeitraum haengt an Yext, nicht an der Marke.',
+  },
+  yx_datenstand: {
+    monat: 'Technische Karte: bis wann Yext welche Zahl als vollstaendig meldet. '
+         + 'Ein Monatsfilter waere hier sinnlos -- wie bei bw_ladestand.',
+    marke: 'Der Datenstand haengt am Importer, nicht an der Marke.',
+  },
+  // Auf ② Filialen liest das Themenprofil Monat und Marke, aber nicht die
+  // drei Round-Table-Filter -- aus demselben Grund wie bw_rangliste: es
+  // ordnet nach der Themennote, und wer zusaetzlich auf "gesamt rot"
+  // filtert, bekaeme "die themenstaerksten unter den roten Betrieben".
+  yx_themen_betrieb: {
+    ampel:        'Profil nach THEMEN, nicht nach der Gesamtampel.',
+    bereich:      'Der Bereich ist hier fest: es geht um die Bewertung.',
+    intensitaet:  'Eskalationsstufe des Round Table; sagt ueber die Themen nichts.',
+    note:         'Die Karte zeigt Durchschnittsnoten je Thema; ein Filter auf eine '
+                + 'einzelne Sternezahl liesse leere Spalten stehen.',
+    zeitraum:     'Stichmonat je Betrieb -- dafuer ist der Monatsfilter da.',
+  },
+  yx_themen: {
+    note:     'Die Karte zeigt Durchschnittsnoten je Thema; auf eine Sternezahl '
+            + 'gefiltert waere jede Note gleich der gefilterten.',
+    zeitraum: 'Stichmonat -- dafuer ist der Monatsfilter da.',
+  },
+  yx_antwort_rangliste: {
+    note:     'Antwortverhalten haengt nicht an der Sternezahl der Bewertung; die '
+            + 'Spalte "Offen 1-2★" traegt den Bezug bereits in sich.',
+    zeitraum: 'Stichmonat -- dafuer ist der Monatsfilter da.',
+  },
+
 }
 
 // Doppelte Schluessel in FILTER_AUSNAHME sind in JavaScript erlaubt: der

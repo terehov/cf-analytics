@@ -27,6 +27,7 @@ import { karten as kartenPortfolio } from './karten-portfolio'
 import { karten as kartenImport } from './karten-import'
 import { karten as kartenStandort } from './karten-standort'
 import { karten as kartenBewertung } from './karten-bewertung'
+import { karten as kartenYext } from './karten-yext'
 import { karten as kartenAktionen } from './karten-aktionen'
 import type { Karte } from './typen'
 
@@ -36,7 +37,7 @@ const lauf = DB ? describe : describe.skip
 const alleKarten: Karte[] = [
   ...kartenRoundTable, ...kartenFach, ...kartenDrilldown,
   ...kartenPortfolio, ...kartenImport, ...kartenStandort, ...kartenBewertung,
-  ...kartenAktionen,
+  ...kartenAktionen, ...kartenYext,
 ]
 
 let db: Client

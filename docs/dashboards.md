@@ -256,6 +256,87 @@ Aktuell `http://localhost:3000`. **Beim Umzug nach Hetzner auf die künftige Dom
 
 ---
 
+## Bewertungsthemen: woran es liegt (angefragt 10.08.2026)
+
+> „Wir importieren von Yext aktuell nur die Bewertung. Allerdings interessiert uns die
+> Klusterung, was denn genau die Themen sind."
+
+Bis dahin sagte der Round Table, **dass** ein Haus abrutscht, und daneben standen die
+Bewertungstexte, damit ein Mensch das **woran** selbst liest. Yext klassifiziert diese Texte
+aber bereits selbst. Migration 0050 holt das Ergebnis herein, `metabase/karten-yext.ts` zeigt
+es. Der vollständige Befund zur API steht in [`yext-analytics-inventar.md`](yext-analytics-inventar.md).
+
+### Fünf Themen, und die Note ist die Aussage
+
+Küche · Service & Personal · Wartezeit · Bestellung · Sauberkeit. Jedes trägt die
+Durchschnittsnote **der Bewertungen, die es ansprechen** — „Bestellung 2,14" heißt: wer über
+die Bestellung schrieb, vergab im Schnitt 2,14 Sterne. Über alle operativen Betriebe im Juli
+2026 trugen Küche (4,35) und Service (4,12) die Note, Bestellung (2,14) und Wartezeit (3,15)
+zogen sie herunter.
+
+**Nicht Yexts Sentiment.** Yext liefert zu jedem Stichwort einen Stimmungswert; für unsere
+Daten steht er bei 4.362 von 5.119 Stichworten auf exakt 0 — darunter *essen*, *bedienung*,
+*personal*. Dieselben Themen trennt die Note von 2,50 bis 4,35. Die Note ist das bessere
+Sentiment, und deshalb rechnet jede Karte auf ihr.
+
+### Drei Eigenschaften, die auf den Seiten stehen und nicht in einer Fußnote
+
+**Die Themen beginnen im April 2026.** Davor stehen vier von Hand vergebene Alt-Labels („5",
+„5 Sterne AR") mit je einer Nennung, dann elf leere Monate. `mart.bewertung_thema_start`
+rechnet deshalb den Beginn der **lückenlosen** Reihe aus, nicht `min(monat)` — sonst meldete
+die Seite „Vorjahresvergleich möglich", während der Vergleich gegen eine einzige handvergebene
+Marke liefe. Die Karte *Seit wann es Themen gibt* sagt es auf der Seite.
+
+**Eine Bewertung trägt mehrere Themen.** Die Anteile ergeben zusammen über 100 % — das ist
+richtig. Deshalb rechnet `mart.bewertung_thema.anteil` gegen die echte Bewertungszahl aus
+`core.bewertung_antwort` und nicht gegen die Themensumme, und deshalb steht auf diesen Seiten
+**kein Kreisdiagramm**: ein Tortenstück behauptet einen Anteil an einem Ganzen, das es hier
+nicht gibt.
+
+**Der Schwachpunkt ist der Abstand, nicht die kleinste Note.** Ein Haus mit lauter Vieren hat
+kein Wartezeitproblem, nur weil die Wartezeit bei 3,9 steht. Gezeigt wird deshalb der Abstand
+zum eigenen Schnitt des Hauses.
+
+### Was daneben lag und mitgenommen wurde
+
+Dieselbe API liefert zwei Blöcke, nach denen niemand gefragt hatte:
+
+**Antwortverhalten** (Reiter *Antworten*). Wer auf Bewertungen antwortet und wie schnell. Das
+war nirgends sichtbar: einzelne Häuser antworten gar nicht, während der Konzernschnitt bei 91 %
+liegt. Wo nicht geantwortet wurde, bleibt die Reaktionszeit **leer und nicht null** — Yext
+liefert dort 0, und 0 Stunden hätte genau die Häuser ohne Antwort an die Spitze der Bestenliste
+gesetzt.
+
+**Sichtbarkeit** (Reiter *Sichtbarkeit*). Impressionen, Suchen, Profilaufrufe, Klicks — und
+der von Yext gelieferte **Median vergleichbarer Betriebe**. Faktor unter 1 heißt: dieses Haus
+wird seltener gesehen als vergleichbare. Der Median ist **nicht addierbar**; über alle Häuser
+summiert ergäbe er eine Zahl, die nach Faktor 9 aussieht und nichts bedeutet. Deshalb nur je
+Betrieb und nur, wo Yext überhaupt einen Vergleich führt.
+
+### Zwei Wächter, weil zwei Annahmen fest verdrahtet sind
+
+*Unbekannte Themen* listet Labels, die Yext liefert und die die Fünf-Spalten-Tabelle nicht
+kennt — sie **soll leer sein**. Die vier historischen Handvergaben sind ausgenommen: ein
+Wächter, der immer piept, wird abgeschaltet.
+
+*Wie frisch die Yext-Zahlen sind* zeigt je Kennzahl, bis wann Yext sie als vollständig meldet.
+Nötig, weil der Bericht für angefangene Zeiträume Zahlen liefert, die vollständig **aussehen**:
+Bewertungen sind bis gestern vollständig, Impressionen bis zu einer Woche älter.
+
+### Wo die aggregierten Werte stehen
+
+| Seite | was dort steht |
+|---|---|
+| ① Round Table, *Lage* | Kacheln **Schwächstes Thema** und **Antwortquote**, beide führen auf das Bewertungs-Dashboard |
+| ② Filialen | *Woran es bei wem liegt* — die Note je Thema unter der Bewertungs-Rangliste |
+| ③ Betrieb, *Gäste & Bewertungen* | Themenprofil und Verlauf des Hauses, dazu sein Antwortverhalten |
+| Online-Bewertungen | drei neue Reiter: *Themen*, *Antworten*, *Sichtbarkeit* |
+
+Die Kachel auf ① ist der eigentliche Punkt: „4,23" sagt niemandem, was zu tun ist,
+„Bestellung · 2,14" schon.
+
+---
+
 ## Die Karte
 
 Gewünscht ist eine Deutschlandkarte auf der Markenübersicht: alle Standorte, eingefärbt nach

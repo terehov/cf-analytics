@@ -206,6 +206,13 @@ export const dashboards: Dashboard[] = [
       { teile: [{ text: '## Online-Bewertungen\n\nSchlechteste zuerst — auf jede Spaltenüberschrift klicken dreht die Reihenfolge. Der **Stand** ist der Schnitt über alle Bewertungen, das was ein Gast auf Google sieht; **Ø neu** sind die des laufenden Monats.' }] },
       { teile: [{ karte: 'bw_rangliste', hoehe: 12,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      // Das Themenprofil direkt unter der Bewertungs-Rangliste: die
+      // Rangliste sortiert die Haeuser, diese Tabelle sagt zu jedem, WOBEI
+      // es haengt. Beide lesen denselben Monat und dieselbe Marke, also
+      // stehen sie untereinander und nicht auf getrennten Seiten.
+      { teile: [{ text: '### Woran es bei wem liegt\n\nDie Note je Thema, schwächstes Haus zuerst. **Schwachpunkt** ist das Thema mit dem größten Abstand nach unten zum eigenen Schnitt des Hauses. Erst ab April 2026 — Yext klassifiziert nicht rückwirkend.' }] },
+      { teile: [{ karte: 'yx_themen_betrieb', hoehe: 12,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ text: '## Betriebe hinter einem Balken\n\nEin Klick auf ein Balkensegment füllt diese Liste. Ohne Auswahl stehen alle Bereiche untereinander.' }] },
       { teile: [{ karte: 'dd_filialen_bereich', hoehe: 12,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
@@ -290,6 +297,18 @@ export const dashboards: Dashboard[] = [
       // instabilen Betrieb aus, statt nach einer Fruehwarnung.
       { teile: [{ text: '## Was Gäste sagen\n\n**Stand** = Schnitt über alle Bewertungen, das was auf Google steht und woran die Ampel hängt. Er bewegt sich träge, weil tausende Stimmen darin stecken.\n\n**Tendenz** = gleitender Schnitt der neuen Bewertungen über sechs Monate. Sie läuft dem Stand voraus: fällt sie darunter, sinkt der Stand irgendwann nach. Die Balken zählen die neuen Bewertungen — eine Tendenz aus drei Stimmen ist keine.' }] },
       { teile: [{ karte: 'bw_verlauf', hoehe: 9 }] },
+      // Die Themen ZWISCHEN Kurve und Wortlaut, und zwar genau hier: die
+      // Kurve sagt, dass es kippt, der Wortlaut sagt es in Saetzen, und
+      // dazwischen fehlte bisher die Zwischenstufe -- welches Thema es
+      // ist. Wer sie hat, muss nicht mehr vierzig Rueckmeldungen lesen,
+      // um zu merken, dass es an der Wartezeit liegt.
+      { teile: [{ text: '### Woran es liegt\n\nYexts Klusterung der Bewertungstexte dieses Betriebs. Die Note ist die der Bewertungen, die das Thema ansprechen; eine Bewertung kann mehrere Themen tragen. Erst ab April 2026 verfügbar.' }] },
+      { teile: [
+        { karte: 'yx_themen', breite: 11, hoehe: 9 },
+        { karte: 'yx_themen_verlauf', breite: 13, hoehe: 9 },
+      ] },
+      { teile: [{ text: '### Antwortverhalten\n\nWie dieses Haus auf seine Bewertungen reagiert — Quote, Reaktionszeit und was offen liegt.' }] },
+      { teile: [{ karte: 'yx_antwort_rangliste', hoehe: 9 }] },
       // Der Wortlaut direkt unter der Kurve. Die Kurve sagt, DASS es
       // kippt; diese beiden sagen, woran es liegt -- und das ist der
       // ganze Grund, warum die Einzelbewertungen ueberhaupt geladen
@@ -544,10 +563,20 @@ export const dashboards: Dashboard[] = [
         // uebrigen Haeuser gefallen sind.
         { karte: 'rt_kachel_nicht_operativ' },
       ] },
+      // Neben der Bewertungskachel steht jetzt, WORAN sie haengt. Die Note
+      // allein ist auf dieser Ebene eine Zahl ohne Griff -- "4,23" sagt
+      // niemandem, was zu tun ist. "Bestellung · 2,14" schon, und ein Klick
+      // fuehrt auf den Themenreiter, wo die Haeuser dahinter stehen.
+      // Die Antwortquote daneben, weil sie das einzige auf dieser Seite
+      // ist, das sich ohne Gast beeinflussen laesst.
       { teile: [
         { karte: 'rt_kachel_massnahmen',
           klick: [{ ziel: 'db_rt_ursachen', uebergabe: {}, fest: true }] },
         { karte: 'rt_kachel_bewertung' },
+        { karte: 'yx_kachel_schwaechstes_thema',
+          klick: [{ ziel: 'db_bewertung', uebergabe: {}, fest: true }] },
+        { karte: 'yx_kachel_antwortquote',
+          klick: [{ ziel: 'db_bewertung', uebergabe: {}, fest: true }] },
       ] },
       { teile: [
         // "Personal / rot" ist eine Aussage ueber 19 Betriebe. Der Klick
@@ -904,7 +933,8 @@ export const dashboards: Dashboard[] = [
     beschreibung:
       'Die einzige der sechs Round-Table-Kennzahlen, die nicht aus unseren eigenen Systemen '
       + 'kommt. Stand, Bewegung und die Betriebe, bei denen die neuen Bewertungen schlechter '
-      + 'ausfallen als ihr eigener Ruf.',
+      + 'ausfallen als ihr eigener Ruf. Der Reiter **Themen** sagt, woran es liegt — '
+      + 'Küche, Service, Wartezeit, Bestellung, Sauberkeit.',
     sammlung: 'Betrieb',
     // Kein Betriebsfilter im Kopf: dieses Dashboard ist die Uebersicht
     // ueber alle. Wer einen einzelnen Betrieb sucht, klickt ihn an und
@@ -927,6 +957,32 @@ export const dashboards: Dashboard[] = [
       { teile: [{ karte: 'bw_rangliste', hoehe: 12,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       ] },
+      // Der Reiter, der die Frage von 10.08.2026 beantwortet: die Note
+      // sagt DASS ein Haus abrutscht, die Themen sagen WORAN. Er steht
+      // direkt hinter "Stand", weil das die Reihenfolge ist, in der
+      // gefragt wird -- nicht hinter den technischen Reitern.
+      { name: 'Themen', reihen: [
+      { teile: [{ text: '# Woran es liegt\n\nYext klassifiziert die Bewertungstexte selbst. Fünf Themen, jedes mit der Durchschnittsnote **der Bewertungen, die es ansprechen** — „Bestellung 2,1“ heißt: wer über die Bestellung schrieb, vergab im Schnitt 2,1 Sterne.\n\nZwei Dinge, die man wissen muss: die Klusterung beginnt **im April 2026**, ein Vorjahresvergleich ist also noch nicht möglich. Und eine Bewertung kann **mehrere Themen** tragen — die Anteile ergeben zusammen mehr als 100 %, und das ist richtig.' }] },
+      { teile: [
+        { karte: 'yx_kachel_schwaechstes_thema' },
+        { karte: 'yx_kachel_anteil_schlecht' },
+        { karte: 'yx_kachel_offen' },
+      ] },
+      { teile: [{ karte: 'yx_themen', hoehe: 9 }] },
+      { teile: [{ text: '## Im Verlauf\n\nEin Thema, das kippt, ist hier sichtbar, lange bevor der Bewertungsstand darauf reagiert. Der Anstieg im April 2026 ist der Beginn der Erhebung, kein Ereignis.' }] },
+      { teile: [{ karte: 'yx_themen_verlauf', hoehe: 9 }] },
+      { teile: [{ text: '## Themenprofil je Betrieb\n\nJede Spaltenüberschrift sortiert. **Schwachpunkt** ist das Thema, das am weitesten unter dem eigenen Schnitt des Hauses liegt — nicht das mit der kleinsten Note: ein Haus mit lauter Vieren hat kein Wartezeitproblem, nur weil die Wartezeit bei 3,9 steht.' }] },
+      { teile: [{ karte: 'yx_themen_betrieb', hoehe: 12,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      { teile: [{ text: '## Wo ein Thema am weitesten abfällt\n\nDie Arbeitsliste: nicht „welches Haus ist schlecht“, sondern „welches Haus ist **wobei** schlecht“. Erst ab drei Nennungen — darunter wäre der Abstand die Meinung eines einzelnen Gastes.' }] },
+      { teile: [{ karte: 'yx_themen_ausreisser', hoehe: 11,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      { teile: [{ text: '## Datengrundlage\n\nLinks der Zeitraum, den die Klusterung abdeckt. Rechts eine Liste, die **leer sein sollte**: Themen, die Yext liefert und die die Tabelle oben nicht kennt. Steht dort etwas, hat jemand im Yext-Konto ein Label ergänzt.' }] },
+      { teile: [
+        { karte: 'yx_themen_stand', breite: 11, hoehe: 9 },
+        { karte: 'yx_themen_unbekannt', breite: 13, hoehe: 9 },
+      ] },
+      ] },
       { name: 'Frühwarnung', reihen: [
       // Zwei Fruehwarnungen mit verschiedener Mechanik: bw_bewegung
       // vergleicht den Monatsschnitt mit dem eigenen Ruf (Mittelwert),
@@ -938,6 +994,38 @@ export const dashboards: Dashboard[] = [
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ karte: 'bw_anteil_schlecht', hoehe: 11,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      ] },
+      // Antwortverhalten und Sichtbarkeit kommen aus derselben Yext-API
+      // wie die Themen, beantworten aber andere Fragen: was TUN wir mit
+      // dem, was Gaeste sagen -- und finden sie uns ueberhaupt.
+      { name: 'Antworten', reihen: [
+      { teile: [{ text: '# Was wir damit tun\n\nWer auf Bewertungen antwortet und wie schnell. Bis heute war das nirgends sichtbar: einzelne Häuser antworten **gar nicht**, während andere über 90 % erreichen — im Konzernschnitt verschwindet der Unterschied.\n\nDie Reaktionszeit zählt ab der Bewertung. Wo nicht geantwortet wurde, bleibt sie leer und steht **nicht** auf null — sonst stünden genau die Häuser ohne Antwort an der Spitze der Bestenliste.' }] },
+      { teile: [
+        { karte: 'yx_kachel_antwortquote' },
+        { karte: 'yx_kachel_offen' },
+      ] },
+      { teile: [{ karte: 'yx_antwort_rangliste', hoehe: 12,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      { teile: [{ karte: 'yx_antwort_verlauf', hoehe: 9 }] },
+      { teile: [{ text: '## Notenverteilung\n\nDer **Anteil der 1–2-Sterne-Bewertungen** ist die robustere Ampel: bei mehreren tausend Altbewertungen bewegt ein schlechter Monat den Stand um Hundertstel, diesen Anteil sofort.' }] },
+      { teile: [{ karte: 'yx_note_verteilung', hoehe: 9 }] },
+      { teile: [{ karte: 'yx_note_rangliste', hoehe: 11,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      ] },
+      { name: 'Sichtbarkeit', reihen: [
+      { teile: [{ text: '# Findet man uns?\n\nEine von den Bewertungen **unabhängige** Datenquelle: wie oft die Einträge eines Betriebs in den Portalen ausgespielt werden, wie oft danach gesucht und geklickt wird — und wie gepflegt die Einträge sind.\n\n**Diese Zahlen hinken.** Bewertungen sind bis gestern vollständig, die Sichtbarkeitszahlen bis zu einer Woche älter; der laufende Monat ist hier immer ein Teilmonat. Die Tabelle ganz unten sagt, wie alt jede Zahl ist.' }] },
+      { teile: [
+        { karte: 'yx_sicht_kachel_impressionen' },
+        { karte: 'yx_sicht_kachel_genauigkeit' },
+      ] },
+      { teile: [{ karte: 'yx_sicht_trichter', hoehe: 9 }] },
+      { teile: [{ text: '## Gegen vergleichbare Betriebe\n\nYext liefert zu jedem Haus den Median vergleichbarer Betriebe. **Faktor** unter 1 heißt: dieses Haus wird seltener gesehen als vergleichbare. Häuser ohne Vergleichsgruppe fehlen in der Liste — bei Yext ist das eine Leerstelle, kein guter Wert.' }] },
+      { teile: [{ karte: 'yx_sicht_benchmark', hoehe: 11,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      { teile: [{ text: '## Pflegezustand\n\nEine Arbeitsliste fürs Marketing. **Genauigkeit** ist der Anteil der Portaleinträge, die mit unseren Stammdaten übereinstimmen — unter 90 % heißt, dass Gäste dort Öffnungszeiten oder Nummern finden, die nicht stimmen.' }] },
+      { teile: [{ karte: 'yx_sicht_pflege', hoehe: 11,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      { teile: [{ karte: 'yx_datenstand', hoehe: 9 }] },
       ] },
       { name: 'Portale & Abdeckung', reihen: [
       { teile: [{ text: '## Wenn jemand fragt, warum Google\n\nDie Portalwahl entscheidet bei manchen Betrieben über die Ampelfarbe. Gespeichert ist beides, umgestellt wird in einer Funktion — nicht durch einen neuen Import. Die zweite Tabelle zeigt jedes Portal einzeln: TripAdvisor bewertet strukturell strenger, ein Portal-Mix wäre deshalb keine Note, sondern ein Zufall der Gewichte.' }] },

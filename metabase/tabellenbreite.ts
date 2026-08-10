@@ -39,6 +39,7 @@ import { karten as kartenPortfolio } from './karten-portfolio'
 import { karten as kartenImport } from './karten-import'
 import { karten as kartenStandort } from './karten-standort'
 import { karten as kartenBewertung } from './karten-bewertung'
+import { karten as kartenYext } from './karten-yext'
 import { karten as kartenAktionen } from './karten-aktionen'
 import { dashboards } from './dashboards'
 import { auslegen } from './layout'
@@ -47,7 +48,7 @@ import { Client } from 'pg'
 const alleKarten = [
   ...kartenDrilldown, ...kartenPortfolio, ...kartenRoundTable,
   ...kartenFach, ...kartenImport, ...kartenStandort, ...kartenBewertung,
-  ...kartenAktionen,
+  ...kartenAktionen, ...kartenYext,
 ]
 const typVon = (s: string) => alleKarten.find(k => k.schluessel === s)?.anzeige
 

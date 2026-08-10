@@ -6,6 +6,7 @@
  *     bun run yext --monate=12      eigenes Fenster
  *     bun run yext --trocken        nur zeigen, nichts schreiben
  *     bun run yext --ohne-texte     nur die Kennzahl, keine Einzelbewertungen
+ *     bun run yext --ohne-analytics ohne Themen, Antwortverhalten, Sichtbarkeit
  *     bun run yext --portal=ALLE    andere Kennzahlbasis eintragen
  *
  * WARUM DER TAEGLICHE LAUF NUR DREI MONATE HOLT. Ein Stand ist kumuliert;
@@ -27,6 +28,7 @@ import { config } from './config'
 import { log } from './lib/log'
 import { yextKonfiguriert } from './yext/client'
 import { staendeLaden, bewertungenLaden, kennzahlFuellen, laufMerken, monate, pool } from './yext/laden'
+import { analyticsLaden } from './yext/analytics'
 
 const arg = (name: string) => process.argv.find(a => a.startsWith(`--${name}=`))?.split('=')[1]
 const hat = (name: string) => process.argv.includes(`--${name}`)
@@ -68,6 +70,19 @@ try {
     })
     erg.aufrufe += t.aufrufe
     erg.fehler.push(...t.fehler)
+  }
+
+  // Analytics ZULETZT, aus demselben Grund, aus dem die Texte nach den
+  // Staenden kommen: die Ampel ist die Arbeit, die Themen sind die
+  // Begruendung dazu. Bricht es hier ab, steht der Round Table trotzdem.
+  //
+  // IMMER 25 MONATE, unabhaengig von --monate. Ein Analytics-Bericht
+  // kostet einen Aufruf, egal wie viele Monate er umspannt -- ein
+  // kleineres Fenster spart hier nichts und liesse nur Luecken in den
+  // Sichtbarkeitsreihen zurueck, die niemand nachtraeglich fuellt.
+  if (!hat('ohne-analytics')) {
+    const a = await analyticsLaden({ monateAnzahl: Math.max(monateAnzahl, 25), trocken })
+    erg.aufrufe += a.aufrufe
   }
 
   const dauer = Math.round((Date.now() - t0) / 1000)

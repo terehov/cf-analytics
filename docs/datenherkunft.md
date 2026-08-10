@@ -121,6 +121,51 @@ Aus `core.bewertung` wird **nicht gerechnet**: eine gelöschte Bewertung verschw
 Yext sofort aus dem Durchschnitt, unsere Kopie bliebe stehen. Wer daraus einen Schnitt
 bildet, bekommt eine andere Zahl als der Round Table — und die falsche.
 
+#### Yext Analytics — seit 10.08.2026, ein zweiter Weg zu denselben Bewertungen
+
+```
+POST /v2/accounts/me/analytics/reports  →  core.bewertung_thema      →  mart.bewertung_thema
+                                        →  core.bewertung_antwort    →  mart.bewertung_antwort
+                                        →  core.bewertung_note       →  mart.bewertung_note
+                                        →  core.betrieb_sichtbarkeit →  mart.betrieb_sichtbarkeit
+GET  /v2/accounts/me/analytics/catalog  →  core.yext_datenstand
+```
+
+Ein **anderer Endpunkt als oben**, und der Unterschied ist die Körnung: `/reviews` liefert
+Bewertungen und wir rechnen, `/analytics/reports` liefert das fertige Aggregat und wir
+speichern. Ein einziger Aufruf bringt alle 60 Betriebe über alle Monate — der komplette
+Block kostet **sieben Aufrufe**, gegen rund 3.300 für den Backfill der Stände.
+
+| | |
+|---|---|
+| Rhythmus | im täglichen `bun run yext`, abschaltbar mit `--ohne-analytics` |
+| Fenster | immer 25 Monate — ein Bericht kostet einen Aufruf, unabhängig vom Zeitraum |
+| Themen | fünf, **erst ab April 2026**; davor vier handvergebene Alt-Labels |
+| Grenzen der API | höchstens 10 Metriken und 10 Dimensionen je Bericht, davon eine Zeit- und eine Ortsdimension; kein `limit`, kein `sortBy` |
+
+Auch hier gilt: **wir können diese Zahlen nicht nachrechnen** — derselbe Satz und derselbe
+Grund wie bei `core.bewertung_stand`.
+
+Drei Eigenheiten, die im Code an ihrer Stelle stehen und hier zusammengefasst sind:
+
+- **Die Antwortnamen sind nicht die Metriknamen.** `NEW_REVIEWS` kommt als „Reviews" zurück,
+  `LISTINGS_ACCURACY` als `LISTINGS_ACCURACY`, `GOOGLE_LISTINGS_IMPRESSIONS` als
+  `LISTINGS_IMPRESSIONS`. `ANTWORTNAME` in `src/yext/client.ts` hält die Abbildung und
+  **wirft**, wenn eine angefragte Metrik nicht unter dem erwarteten Namen ankommt — sonst
+  hätte eine Umbenennung bei Yext lautlos NULL-Spalten erzeugt.
+- **`LISTINGS_IMPRESSIONS` steht nicht im Katalog, wird aber angenommen** — und liefert nur
+  Google (1.302.862 statt 1.968.357 im Juni 2026). Der Importer fragt deshalb ausdrücklich
+  `TOTAL_LISTINGS_IMPRESSIONS`. Ebenso zwei Namen, die dasselbe zu heißen scheinen:
+  `POWERLISTINGS_LIVE` ist der Bestand, `LISTINGS_LIVE` sind die Neuzugänge.
+- **Nicht jede Zahl ist gleich frisch.** Bewertungs- und Antwortmetriken sind bis gestern
+  vollständig, Sichtbarkeitsmetriken bis zu einer Woche älter, die Google-Suchbegriffe standen
+  am 10.08.2026 seit dem 30.06. still. `core.yext_datenstand` hält das je Metrik fest, weil
+  der Bericht für angefangene Zeiträume Zahlen liefert, die vollständig aussehen.
+
+Nicht geholt werden `KEYWORD_SENTIMENT` (85 % Nullen), `REVIEW_TOPICS` (ungefilterte
+n-Gramme) und `REVIEW_CONTENT` (die Texte haben wir bereits, begründet und begrenzt).
+Vollständiger Befund: [`yext-analytics-inventar.md`](yext-analytics-inventar.md).
+
 **Dazu Adressen und Koordinaten der Betriebe.** Am 26.07.2026 wurden alle 489 archivierten
 API-Antworten rekursiv nach Adress- und Geofeldern durchsucht — kein einziger Treffer für
 Betriebe. `analyticsFilterOptions` liefert `{id, name}`, die Berichtsendpunkte

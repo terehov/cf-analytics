@@ -65,7 +65,9 @@ export function yextKonfiguriert(): boolean {
  * oder die Instanz nicht stimmt — beides Faelle fuer einen Menschen, nicht
  * fuer eine Schleife.
  */
-export async function yextHolen<T>(pfad: string, params: Record<string, string> = {}): Promise<T> {
+export async function yextHolen<T>(
+  pfad: string, params: Record<string, string> = {}, koerper?: unknown,
+): Promise<T> {
   const key = config.YEXT_API_KEY
   if (!key) throw new YextFehler('YEXT_API_KEY ist nicht gesetzt', 0, true)
 
@@ -83,10 +85,15 @@ export async function yextHolen<T>(pfad: string, params: Record<string, string> 
       let antwort: Response
       try {
         antwort = await fetch(url, {
+          // Der Analytics-Bericht ist ein POST, obwohl er nur liest --
+          // die Abfrage passt nicht in eine URL. Kein Schreibzugriff.
+          method: koerper === undefined ? 'GET' : 'POST',
           headers: {
             accept: 'application/json',
+            ...(koerper === undefined ? {} : { 'content-type': 'application/json' }),
             ...(w === 'bearer' ? { authorization: `Bearer ${key}` } : {}),
           },
+          body: koerper === undefined ? undefined : JSON.stringify(koerper),
           signal: AbortSignal.timeout(config.ANFRAGE_TIMEOUT_MS),
         })
       } catch (e) {
@@ -222,6 +229,138 @@ export async function bewertungen(
     status: 'LIVE',
     ...(abDatum ? { minPublisherDate: abDatum } : {}),
   }, 100)
+}
+
+// =====================================================================
+// Analytics — POST /analytics/reports
+//
+// EIN AUFRUF LIEFERT ALLE BETRIEBE UEBER ALLE MONATE. Das ist der ganze
+// Unterschied zu den Staenden oben: dort ist ein Aufruf eine Zahl fuer
+// einen Betrieb, einen Monat und ein Portal (3.300 Aufrufe fuer den
+// Backfill), hier sind es 790 Zeilen in einem Aufruf. Deshalb wird hier
+// nicht gestueckelt und nicht inkrementell geladen -- es lohnt nicht.
+//
+// Grenzen der API, gemessen am 10.08.2026: hoechstens 10 Metriken und 10
+// Dimensionen je Bericht, davon nur EINE Zeit- und EINE Ortsdimension.
+// Kein limit, kein offset, keine Sortierung -- die Antwort kommt ganz.
+// =====================================================================
+
+/**
+ * Wie die Metrik in der ANTWORT heisst.
+ *
+ * Yext gibt Spalten unter Anzeigenamen zurueck, nicht unter den
+ * Metriknamen der Anfrage -- und zwar uneinheitlich: NEW_REVIEWS wird zu
+ * "Reviews", LISTINGS_ACCURACY bleibt LISTINGS_ACCURACY, und
+ * GOOGLE_LISTINGS_IMPRESSIONS kommt als "LISTINGS_IMPRESSIONS" zurueck.
+ *
+ * Diese Tabelle ist deshalb kein Komfort, sondern die Stelle, an der ein
+ * stiller Fehler laut wird: `berichtZeilen` wirft, wenn eine angefragte
+ * Metrik nicht unter dem erwarteten Namen ankommt. Ohne das haette eine
+ * Umbenennung bei Yext lautlos NULL-Spalten erzeugt.
+ */
+const ANTWORTNAME: Record<string, string> = {
+  NEW_REVIEWS:                                  'Reviews',
+  AVERAGE_RATING:                               'Average Rating',
+  RESPONSE_RATE:                                'Response Rate',
+  RESPONSE_COUNT:                               'Response Count',
+  REVIEW_RESPONSE_TIME_REVIEW_TIMESTAMP_BASED:  'REVIEW_RESPONSE_TIME_REVIEW_TIMESTAMP_BASED',
+  TOTAL_LISTINGS_IMPRESSIONS:                   'Total Listings Impressions',
+  GOOGLE_LISTINGS_IMPRESSIONS:                  'LISTINGS_IMPRESSIONS',
+  GOOGLE_LISTINGS_IMPRESSIONS_BENCHMARK_MEDIAN: 'GOOGLE_LISTINGS_IMPRESSIONS_BENCHMARK_MEDIAN',
+  SEARCHES:                                     'Searches',
+  PROFILE_VIEWS:                                'Profile Views',
+  CLICK_COUNT:                                  'CLICK_COUNT',
+  LISTINGS_ACCURACY:                            'LISTINGS_ACCURACY',
+  // Zwei Metriken, die dasselbe zu heissen scheinen und Verschiedenes
+  // zaehlen: POWERLISTINGS_LIVE ist der BESTAND ("Active Listings Live",
+  // 5.291 im Konto), LISTINGS_LIVE sind die NEUZUGAENGE des Zeitraums
+  // ("New Listings Live", 114). Fuer den Pflegezustand zaehlt der Bestand.
+  POWERLISTINGS_LIVE:                           'Active Listings Live',
+  LISTINGS_LIVE:                                'New Listings Live',
+  UNAVAILABLE_REASON_COUNT:                     'UNAVAILABLE_REASON_COUNT',
+  PUBLISHER_SUGGESTIONS:                        'Publisher Suggestions',
+}
+
+export type BerichtFilter = {
+  entityIds?: string[]
+  startDate?: string
+  endDate?: string
+  publishers?: string[]
+  reviewLabels?: string[]
+  ratings?: number[]
+  awaitingResponse?: boolean
+}
+
+export type BerichtZeile = Record<string, string | number | null>
+
+/**
+ * Ein Analytics-Bericht. Gibt die Zeilen zurueck, wie Yext sie liefert --
+ * Dimensionen unter ihrem eigenen Namen, Metriken unter ANTWORTNAME.
+ *
+ * `zahl()` und `text()` unten holen die Werte heraus, damit keine Karte
+ * und kein Loader die Anzeigenamen kennen muss.
+ */
+export async function bericht(
+  metriken: string[], dimensionen: string[], filter: BerichtFilter = {},
+): Promise<BerichtZeile[]> {
+  if (metriken.length > 10 || dimensionen.length > 10) {
+    throw new YextFehler(
+      `Yext nimmt hoechstens 10 Metriken und 10 Dimensionen je Bericht `
+      + `(hier ${metriken.length} und ${dimensionen.length})`, 0, true)
+  }
+  const unbekannt = metriken.filter(m => !(m in ANTWORTNAME))
+  if (unbekannt.length) {
+    throw new YextFehler(
+      `Fuer diese Metriken ist kein Antwortname hinterlegt: ${unbekannt.join(', ')}. `
+      + `Ergaenze ANTWORTNAME in src/yext/client.ts`, 0, true)
+  }
+
+  const r = await yextHolen<{ data?: BerichtZeile[] }>(
+    '/analytics/reports', {}, { metrics: metriken, dimensions: dimensionen, filters: filter })
+  const zeilen = r.data ?? []
+
+  // Der Selbsttest: kam jede angefragte Metrik unter dem erwarteten Namen
+  // an? Eine leere Antwort ist erlaubt (Betrieb ohne Daten im Zeitraum),
+  // eine gefuellte mit fehlender Spalte nicht.
+  if (zeilen.length) {
+    const da = new Set(zeilen.flatMap(z => Object.keys(z)))
+    const fehlt = metriken.filter(m => !da.has(ANTWORTNAME[m]!))
+    if (fehlt.length) {
+      throw new YextFehler(
+        `Yext hat ${fehlt.map(m => `${m} (erwartet als "${ANTWORTNAME[m]}")`).join(', ')} `
+        + `nicht geliefert. Tatsaechliche Spalten: ${[...da].join(', ')}. `
+        + `ANTWORTNAME in src/yext/client.ts anpassen.`, 0, true)
+    }
+  }
+  return zeilen
+}
+
+/** Der Wert einer Metrik aus einer Berichtszeile. */
+export const zahl = (z: BerichtZeile, metrik: string): number | null => {
+  const v = z[ANTWORTNAME[metrik] ?? metrik]
+  return typeof v === 'number' ? v : null
+}
+
+/** Der Wert einer Dimension aus einer Berichtszeile. */
+export const text = (z: BerichtZeile, dimension: string): string | null => {
+  const v = z[dimension]
+  return v == null ? null : String(v)
+}
+
+/**
+ * Bis wann Yext welche Metrik als vollstaendig meldet.
+ *
+ * Der Endpunkt, der die ganze Sondierung erst brauchbar gemacht hat: ohne
+ * ihn liefert der Bericht fuer angefangene Zeitraeume Zahlen, die
+ * vollstaendig aussehen. Am 10.08.2026 waren die Bewertungsmetriken bis
+ * zum 09.08. vollstaendig, die Google-Suchbegriffe nur bis zum 30.06.
+ */
+export async function datenstand(): Promise<{ metrik: string; bis: string }[]> {
+  const r = await yextHolen<{ metrics?: { id?: string; completedDate?: string }[] }>(
+    '/analytics/catalog')
+  return (r.metrics ?? [])
+    .filter(m => m.id && m.completedDate)
+    .map(m => ({ metrik: m.id!, bis: m.completedDate! }))
 }
 
 export async function bewertungsstand(
