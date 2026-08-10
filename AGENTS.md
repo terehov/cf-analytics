@@ -222,8 +222,13 @@ Dokploys Schedule Jobs führen Kommandos per `docker exec` in einem **laufenden*
 **Ein** Schedule Job:
 
 ```
-stündlich       bun run sync
+täglich 05:02   bun run sync
 ```
+
+> **Nachgemessen am 10.08.2026**, weil hier „stündlich" stand: `mart.sync_status` führt die
+> Läufe 76 bis 80 an fünf aufeinanderfolgenden Tagen, jeweils um 05:02, `lauf_id` lückenlos.
+> Bei stündlichem Lauf wären es rund 24 IDs je Tag. Wer das Intervall ändert, ändert damit
+> auch die Yext-Fälligkeit (20 Stunden) — bei einem Lauf pro Tag greift sie faktisch immer.
 
 `sync` füllt die Warteschlange zu Beginn jedes Laufs selbst (`src/sync/nachfuellen.ts`):
 LINAs Nachzügler-Fenster, Jahresberichte, monatliche Momentaufnahmen und FoodNotifys

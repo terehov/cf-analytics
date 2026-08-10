@@ -2133,3 +2133,53 @@ ohne und einmal mit gesetzten Filtern, und fasst Metabase nicht an.
 („dann im Browser klicken"), wird als ungefährlich gelesen. Fällt der Zwischenschritt später
 weg, ist die veraltete Zeile in der Dokumentation nicht nur ungenau — sie ist eine
 Einladung.
+
+## Ein Importer, der die Hälfte des Imports nicht kennt (10.08.2026)
+
+**Symptom.** Keins. Der Sync-Lauf meldete „ok", die Bewertungen waren tagesaktuell, der
+Container lief. Aufgefallen ist es nur, weil jemand fragte, ob der Sync die neuen
+Yext-Auswertungen synchron hält.
+
+Nachgemessen auf der Produktivdatenbank:
+
+| Tabelle | Zeilen |
+|---|---|
+| `core.bewertung` | 174.115 |
+| `core.bewertung_stand` | 2.819 |
+| `core.bewertung_thema` | **0** |
+| `core.bewertung_antwort` | **0** |
+| `core.bewertung_note` | **0** |
+
+**Ursache.** Migration `0050` brachte den Analytics-Import (Themen, Antwortverhalten,
+Notenverteilung, Sichtbarkeit). `analyticsLaden` wurde in `src/yext.ts` eingehängt — dem
+Befehl von Hand — und nirgends sonst. `src/yext/nachlauf.ts`, das der Sync ausführt, kannte
+die Funktion nicht. Es gab damit keinen Pfad, auf dem diese vier Auswertungen jemals von
+selbst geladen worden wären.
+
+**Warum es niemandem auffiel.** Die Karten dazu waren gerade erst provisioniert; eine leere
+Karte kurz nach dem Bau liest sich als „läuft noch an". Und der Zeitstempel des Yext-Laufs
+war frisch — der Nachlauf lief ja, er lud nur die Hälfte.
+
+**Der teurere Fall wäre der gewesen, der beinahe eintrat.** Hätte jemand `bun run yext`
+einmal von Hand ausgeführt, stünden dort Zahlen — und sie wären dort stehen geblieben,
+während die Bewertungen daneben weiterliefen. **Ein eingefrorener Wert sieht aus wie ein
+gepflegter.** Eine leere Tabelle stellt wenigstens eine Frage.
+
+**Was ihn künftig verhindert.** Drei Dinge, weil eines zu wenig ist:
+
+1. `analyticsLaden` hängt jetzt am Nachlauf — in eigenem `try` und nach `laufMerken`, damit
+   ein Fehler dort nicht die rund 400 bereits erfolgreichen Stand-Aufrufe entwertet.
+2. `src/yext/nachlauf.test.ts` prüft **statisch**, dass jede exportierte `*Laden`- oder
+   `*Fuellen`-Funktion aus `laden.ts` und `analytics.ts` im Nachlauf vorkommt — und dass der
+   Nachlauf selbst in `sync.ts` aufgerufen wird. Gegen den Stand vor der Reparatur
+   ausprobiert: der Test wäre rot gewesen und hätte `analyticsLaden` beim Namen genannt.
+3. `/status` hat eine Prüfung `yext` bekommt. Vorher meldete sie zu Yext **gar nichts** — ein
+   abgelaufener Schlüssel oder eine geänderte Antwortstruktur hätte sich nur durch eine
+   Bewertungsampel gezeigt, die sich nicht mehr bewegt. Die bewegt sich ohnehin träge.
+
+**Die allgemeine Lehre — es ist dieselbe wie am 02.08.2026, eine Ebene tiefer.** Damals war
+es ein zweiter Zeitplan, der ausfiel und LINA acht Tage stillstehen ließ. Diesmal ein
+zweiter *Einstiegspunkt*: ein Importer mit einem Weg für Menschen und einem für die
+Automatik, und neue Arbeit landete nur auf dem ersten. **Ein Importer ohne Arbeit sieht
+genauso aus wie einer, der fertig ist** — und ein Importer, der nur die Hälfte seiner Arbeit
+kennt, ebenfalls.

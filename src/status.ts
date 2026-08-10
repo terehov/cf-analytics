@@ -271,6 +271,88 @@ export async function statusErheben(): Promise<Statusbericht> {
         })
   }
 
+  // --- Yext: laeuft der Nachlauf, und kommen die Analytics mit? -----------
+  //
+  // Bis zum 10.08.2026 gab es hier gar nichts. Yext konnte still stehen — ein
+  // abgelaufener Schluessel, eine geaenderte Antwortstruktur, ein Konto ohne
+  // Rechte — und der einzige Hinweis waere eine Bewertungsampel gewesen, die
+  // sich nicht mehr bewegt. Das faellt niemandem auf, weil sie sich ohnehin
+  // traege bewegt.
+  //
+  // ZWEI SIGNALE, WEIL ES ZWEI AUSFALLARTEN GIBT:
+  //
+  //   1. Der Nachlauf haengt   -> der Merker veraltet. Faelligkeit sind 20 h,
+  //      48 h Toleranz decken einen ausgefallenen Sync-Lauf ab, ohne bei jeder
+  //      Verzoegerung Alarm zu schlagen.
+  //   2. Die Analytics fehlen  -> der Merker ist frisch, aber die drei
+  //      Tabellen sind leer. Genau dieser Zustand bestand am 10.08.2026: der
+  //      Nachlauf lief taeglich sauber, `analyticsLaden` hing an keinem
+  //      automatischen Pfad. Ein frischer Zeitstempel neben leeren Tabellen
+  //      ist der irrefuehrendste Zustand von beiden.
+  // Die Schluesselpruefung steht VOR der Abfrage: ohne Yext gibt es nichts zu
+  // messen, und eine Instanz ohne Schluessel soll dafuer auch keine Zaehlung
+  // ueber drei Tabellen fahren.
+  if (!config.YEXT_API_KEY) {
+    // Kein Schluessel ist kein Fehler: Yext ist optional. Aber es soll
+    // dastehen, damit niemand leere Bewertungskarten fuer einen Defekt haelt.
+    p.push({
+      name: 'yext', stufe: 'ok',
+      meldung: 'Yext nicht eingerichtet (kein Schlüssel) — Bewertungskarten bleiben leer',
+    })
+  } else {
+    const yext = await eine<{
+      alter_stunden: number | null; themen: number; antworten: number; noten: number
+    }>(
+      `SELECT round(EXTRACT(epoch FROM (now() - (m.wert->>'beendet_am')::timestamptz)) / 3600, 1)
+                AS alter_stunden,
+              (SELECT count(*) FROM core.bewertung_thema)   AS themen,
+              (SELECT count(*) FROM core.bewertung_antwort) AS antworten,
+              (SELECT count(*) FROM core.bewertung_note)    AS noten
+         FROM (SELECT 1) x
+         LEFT JOIN sync.merker m ON m.schluessel = 'yext_letzter_lauf'`)
+
+    const leer = Number(yext?.themen) === 0
+              && Number(yext?.antworten) === 0
+              && Number(yext?.noten) === 0
+
+    if (yext?.alter_stunden == null) {
+      p.push({
+        name: 'yext', stufe: 'warnung',
+        meldung: 'Yext-Nachlauf ist noch nie gelaufen',
+        naechster_schritt:
+          'Einmal "bun run yext" im Container laufen lassen; danach fährt der Sync ihn selbst mit.',
+      })
+    } else if (yext.alter_stunden > 48) {
+      p.push({
+        name: 'yext', stufe: 'warnung',
+        meldung: `Yext-Nachlauf seit ${yext.alter_stunden} h nicht gelaufen`,
+        naechster_schritt: 'Läuft der Sync noch? Der Nachlauf hängt an ihm — siehe Prüfung "laeufe".',
+        werte: { alterStunden: yext.alter_stunden },
+      })
+    } else if (leer) {
+      // Der irrefuehrendste der drei Zustaende: frischer Zeitstempel neben
+      // leeren Tabellen. Genau so stand es am 10.08.2026 da, und genau
+      // deshalb gibt es diese Pruefung.
+      p.push({
+        name: 'yext', stufe: 'warnung',
+        meldung: 'Yext läuft, aber die Analytics-Tabellen sind leer (Themen, Antwortverhalten, Noten)',
+        naechster_schritt:
+          'Erwartet nur vor dem ersten Lauf mit dieser Version. Bleibt es dabei, hat analyticsLaden '
+          + 'gemeldet — im Log nach "yext-analytics fehlgeschlagen" suchen.',
+        werte: { alterStunden: yext.alter_stunden, themen: 0, antworten: 0, noten: 0 },
+      })
+    } else {
+      p.push({
+        name: 'yext', stufe: 'ok',
+        meldung: `Yext aktuell (vor ${yext.alter_stunden} h), Analytics gefüllt`,
+        werte: {
+          alterStunden: yext.alter_stunden, themen: Number(yext.themen),
+          antworten: Number(yext.antworten), noten: Number(yext.noten),
+        },
+      })
+    }
+  }
+
   return {
     status: schlimmste(p.map(x => x.stufe)),
     geprueft_am: new Date().toISOString(),

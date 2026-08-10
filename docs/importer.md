@@ -84,6 +84,41 @@ SELECT sync.sperre_aufheben('eugene');     -- Abkürzung, nicht Bedingung
 
 Das Aufheben ist **nicht nötig**. Wer es trotzdem tut, sollte sich vorher im Browser angemeldet und nachgesehen haben: blind aufzuheben schickt den Importer sofort zurück in dieselbe Sperre — und verlängert sie, weil die Verdopplung greift.
 
+## Was ein Sync-Lauf synchron hält — vollständig aufgezählt
+
+Nachgeprüft am 10.08.2026, weil die Frage gestellt wurde. **Ein** Zeitplan (`bun run sync`)
+löst alles hier aus:
+
+| Quelle | Was nachgezogen wird | Wie oft | Wo |
+|---|---|---|---|
+| **LINA** | jeder aktive Endpunkt mit Schrittweite *Tag*, über das Nachzügler-Fenster | jeder Lauf | `linaNachfuellen` |
+| **LINA** | Jahresberichte des laufenden Jahres (BWA wird rückwirkend gebucht) | jeder Lauf | dito |
+| **LINA** | Stammdaten-Momentaufnahmen | einmal je Kalendermonat | dito |
+| **FoodNotify** | Betriebe, Kostenstellen, POS-Standorte | einmal je Kalendermonat | `foodnotifyNachfuellen` |
+| **FoodNotify** | letzte Bestellseite je Kostenstelle → Köpfe und Positionen | jeder Lauf | dito |
+| **FoodNotify** | letzte Inventurseite je Marke → Zählungen und Positionen | jeder Lauf | `inventurenNachfuellen` |
+| **Yext** | Stände je Betrieb/Monat/Portal, Kennzahl, einzelne Bewertungen | alle 20 h | `yextNachlauf` |
+| **Yext** | Themen, Antwortverhalten, Notenverteilung, Sichtbarkeit | alle 20 h | dito, seit 10.08.2026 |
+| *abgeleitet* | Auswahllisten, Deckungsbeitrag, Round Table, Einkaufspreis-Prüfung | jeder Lauf | Nachläufe in `sync.ts` |
+
+**LINA ist vollständig per Bauart, nicht per Pflege.** `linaNachfuellen` läuft über
+`AKTIVE_ENDPUNKTE` und gruppiert nach Schrittweite — wer einen Endpunkt auf `aktiv: true`
+stellt, bekommt das Nachziehen geschenkt. Es gibt hier keine zweite Liste, die man vergessen
+könnte.
+
+**FoodNotify und Yext sind es nicht.** Dort steht jeder Abruf einzeln im Quelltext, und
+genau daraus ist am 10.08.2026 ein Fehler entstanden (`fehlerkatalog.md`: „Ein Importer, der
+die Hälfte des Imports nicht kennt"). Für Yext hält das jetzt ein Test fest
+(`src/yext/nachlauf.test.ts`): jede exportierte `*Laden`- oder `*Fuellen`-Funktion muss im
+Nachlauf vorkommen, sonst schlägt er fehl.
+
+### Was der Sync ausdrücklich NICHT tut
+
+Die beiden **Backfills** — `einreihen --historie` und `einreihen --foodnotify` — bleiben
+Handarbeit. Das ist keine Lücke, sondern eine Entscheidung: sie stellen Zehntausende Posten
+ein, und das soll eine Entscheidung sein, kein Nebeneffekt eines Neustarts. Der laufende
+Abgleich holt das jeweils neue Ende der Liste; der Backfill holt ihren Anfang.
+
 ## Wann jemand hinsehen muss: `/status`
 
 Der Container läuft über `health.ts` und beantwortet zwei **verschiedene** Fragen an zwei Endpunkten. Sie zu vermischen wäre gefährlich:
@@ -95,7 +130,7 @@ Der Container läuft über `health.ts` und beantwortet zwei **verschiedene** Fra
 
 **`/health` darf nur rot werden, wenn ein Neustart hilft.** Bei einer Zugangssperre hilft er nicht — er macht es schlimmer: Dokploy drehte den Container im Kreis, während LINA ohnehin gerade nichts von uns hören will.
 
-`/status` prüft sieben Dinge und sagt zu jedem, was daraus folgt:
+`/status` prüft neun Dinge und sagt zu jedem, was daraus folgt:
 
 | Prüfung | Stufe | wann |
 |---|---|---|
@@ -106,6 +141,8 @@ Der Container läuft über `health.ts` und beantwortet zwei **verschiedene** Fra
 | `schema` | Warnung | LINA liefert etwas anderes als erwartet |
 | `bwa_bruecke` | Warnung | aktive Betriebe ohne LINA-ID — sie tauchen in keiner BWA-Auswertung auf |
 | `bwa_fortschritt` | Warnung | die **Spitze** steht mehr als `STATUS_BWA_RUECKSTAND_MONATE` (3) Monate zurück — Verdacht auf fehlende BWA-Rechte, denn dann liefert `getKennzahlen` kommentarlos Nullen |
+| `dashboard_filter` | Warnung | die Auswahllisten der Metabase-Filter kennen nicht mehr alle Betriebe — ein fehlender Betrieb im Dropdown fällt sonst niemandem auf |
+| `yext` | Warnung | der Yext-Nachlauf hängt (> 48 h), oder er läuft und die **Analytics-Tabellen sind leer** |
 
 `warnung` bleibt bei **HTTP 200**: Dinge, die man wissen sollte, wecken niemanden nachts. Nur `stoerung` gibt 503.
 

@@ -29,14 +29,42 @@
  * Was geholt wird, sind drei Monate (der laufende, der Vormonat und einer als
  * Reserve). Aeltere Staende sind kumuliert und aendern sich nicht mehr — dafuer
  * gibt es `bun run yext --voll`, das die ganze Reihe geradezieht.
+ *
+ * DAZU DIE ANALYTICS-BERICHTE (seit 10.08.2026)
+ *
+ * Themen, Antwortverhalten, Notenverteilung und Sichtbarkeit kamen mit
+ * Migration `0050` dazu — geladen aber nur von `bun run yext`, dem Befehl von
+ * Hand. Kein automatischer Lauf ruehrte sie an. Nachgemessen am 10.08.2026 auf
+ * der Produktivdatenbank: `core.bewertung_thema`, `core.bewertung_antwort` und
+ * `core.bewertung_note` standen auf **null Zeilen**, waehrend `core.bewertung`
+ * 174.115 Zeilen fuehrte und taeglich wuchs.
+ *
+ * Das ist exakt die Falle aus dem Absatz oben, nur eine Ebene tiefer: die
+ * Karten haetten nach einem einmaligen Handlauf Zahlen gezeigt und diese Zahlen
+ * behalten, waehrend die Bewertungen daneben weiterliefen. Ein eingefrorener
+ * Wert sieht aus wie ein gepflegter.
  */
 import { log } from '../lib/log'
 import { query } from '../db/pool'
 import { yextKonfiguriert } from './client'
 import { staendeLaden, bewertungenLaden, kennzahlFuellen, laufMerken } from './laden'
+import { analyticsLaden } from './analytics'
 
 /** Drei Monate: der laufende, der Vormonat (Portale liefern verzoegert), einer Reserve. */
 const MONATE = 3
+
+/**
+ * Fuer die Analytics dagegen das volle Fenster, und das ist kein Widerspruch.
+ *
+ * Die Staende kosten einen Aufruf JE BETRIEB UND MONAT — drei Monate sind dort
+ * rund 400 Aufrufe, 25 Monate waeren 3.300. Die Analytics-Berichte sind
+ * Aggregate ueber alle Betriebe und Monate zugleich: **sechs Aufrufe, ganz
+ * gleich wie lang das Fenster ist** (siehe Kopf von analytics.ts). Ein kurzes
+ * Fenster spart hier also nichts und wuerde die Historie nie vollstaendig
+ * machen — Yext liefert Themen und Stimmung erst ab April 2026, und diese
+ * Reihe soll ganz dastehen.
+ */
+const ANALYTICS_MONATE = 25
 
 /** Nach so vielen Stunden ist ein neuer Lauf faellig. 20 statt 24, damit er */
 /** nicht taeglich eine Stunde spaeter rutscht und irgendwann ganz ausfaellt. */
@@ -81,6 +109,32 @@ export async function yextNachlauf(): Promise<void> {
       betriebe: erg.betriebe, aufrufe: erg.aufrufe,
       kennzahlZeilen: kennzahl, fehler: erg.fehler.length,
     })
+
+    /**
+     * Die Analytics-Berichte — in EIGENEM try und NACH laufMerken.
+     *
+     * Beides hat denselben Grund: analytics.ts faengt einen Fehler
+     * ausdruecklich NICHT je Betrieb ab, weil dort alle Betriebe in einem
+     * Aufruf stecken — es gibt kein Teilergebnis, entweder der Bericht kommt
+     * oder nicht. Ohne eigenes try risse ein solcher Fehler den Merker mit,
+     * und der naechste Lauf holte die rund 400 Stand-Aufrufe noch einmal, die
+     * gerade erfolgreich waren.
+     *
+     * Umgekehrt darf ein Fehler hier auch nicht folgenlos bleiben: er wird
+     * geloggt, und `/status` sieht ihn an den leeren Tabellen (Pruefung
+     * "yext" in src/status.ts). Der naechste Nachlauf versucht es in 20
+     * Stunden erneut — bei sechs Aufrufen ist das billig.
+     */
+    try {
+      const a = await analyticsLaden({ monateAnzahl: ANALYTICS_MONATE })
+      log.info('yext-analytics fertig', {
+        aufrufe: a.aufrufe, themen: a.themen, antworten: a.antworten,
+        noten: a.noten, sichtbarkeit: a.sichtbarkeit,
+      })
+    } catch (e) {
+      log.warn('yext-analytics fehlgeschlagen — Staende und Texte stehen bereits',
+        { fehler: String((e as Error).message ?? e).slice(0, 300) })
+    }
   } catch (e) {
     // Regel 1. Ein Standort ohne Antwort, ein abgelaufener Schluessel, ein
     // Netzhaenger — nichts davon darf den Import mitnehmen.
