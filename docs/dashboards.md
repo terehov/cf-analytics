@@ -383,6 +383,37 @@ denselben Zeitraster einordnet. Nur signierte, nicht stornierte Inventuren gehen
 bewerteten Euro-Summen ein — eine laufende Zählung ist kein Ergebnis, eine stornierte kein
 Beleg.
 
+### Die einzelne Zählung (angefragt 10.08.2026)
+
+Die Kopfzeile sagt, **dass** ein Betrieb 5.500 € Schwund hat; sie sagt nicht, **woran**. Ein
+Klick auf „ansehen →" in der Inventurliste öffnet deshalb `dd_inventur` — Kopfdaten plus
+jede gezählte Ware mit Soll- und Ist-Menge, Preis je Einheit und Differenz.
+
+**Angesteuert wird über den Inventurschlüssel, nicht über Betrieb + Datum.** An einem Tag
+zählen Bar und Küche getrennt (zwei Kostenstellen, zwei Inventuren) — beide tragen denselben
+Betrieb und dasselbe Datum. Ein Klick müsste sonst raten, welche der beiden gemeint war. Die
+Schlüsselspalte steht in der Liste, ist aber ausgeblendet: Metabase reicht auch verborgene
+Spalten an das Klickziel weiter.
+
+**Nur die Spalte „ansehen →" ist klickbar**, nicht die ganze Zeile. Sonst navigiert ein
+versehentlicher Klick auf eine Zahl weg — dieselbe Regel wie bei allen Tabellen hier.
+
+**Die Detailsicht filtert bewusst NICHTS weg.** `mart.inventur` und `mart.inventur_schwund`
+nehmen unplausible Positionen aus den Euro-Summen (Migration `0046`); `mart.inventurposition`
+lässt sie stehen und kennzeichnet sie mit **⚠**. Wer eine einzelne Zählung öffnet, sucht
+gerade die Ausreißer — eine Detailansicht, die die auffälligen Zeilen versteckt, beantwortet
+die Frage nicht, wegen der man sie geöffnet hat. Die Kopfkarte nennt daneben, wie viele
+Positionen ausgenommen wurden.
+
+**Sortiert nach dem Geldwert der Differenz, absteigend.** Wer eine Zählung öffnet, sucht die
+Zeile, die den Schwund trägt — nicht die alphabetisch erste Ware. `abs()` um die Differenz,
+weil auch ein Überbestand ein Befund ist: positiv heißt „es fehlt", negativ heißt „mehr da
+als gebucht", meist ein Buchungsfehler.
+
+**Die Einheit gehört zur Menge.** Dieselbe Ware führt bei FoodNotify Positionen in `g` und in
+`mpce` nebeneinander (siehe `0046`). Eine Menge ohne ihre Einheit ist hier keine Aussage,
+sondern eine Falle — deshalb steht `Einheit` als eigene Spalte direkt neben den Mengen.
+
 ---
 
 ## Zwei Personalkosten-Größen auf einer Seite

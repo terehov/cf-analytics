@@ -161,6 +161,25 @@ export const P_ZEITRAUM: Parameter = {
   required: false,
 }
 
+/**
+ * Eine einzelne Inventur, angesteuert ueber ihren Schluessel.
+ *
+ * Bewusst der SCHLUESSEL und nicht Betrieb+Datum: an einem Tag zaehlen Bar
+ * und Kueche getrennt (zwei Kostenstellen, zwei Inventuren), und beide
+ * traegen denselben Betrieb und dasselbe Datum. Ein Klick muesste sonst
+ * raten, welche der beiden gemeint war.
+ *
+ * `type: 'text'` trotz Zahlenwert — wie alle Parameter hier: Metabase
+ * reicht Klickwerte als Zeichenkette durch, die Karte castet selbst.
+ */
+export const P_INVENTUR: Parameter = {
+  id: 'inventur-param',
+  name: 'inventur',
+  'display-name': 'Inventur',
+  type: 'text',
+  required: false,
+}
+
 // Zwei Zeitraeume fuer den Vergleich. Bewusst Textparameter mit
 // Datumsangabe statt Feldfilter: ein Feldfilter kann nur EINEN Zeitraum
 // einschraenken, hier brauchen beide Seiten ihren eigenen.

@@ -17,7 +17,7 @@
 // =====================================================================
 
 import type { Karte } from './typen'
-import { MONAT_CTE, MONAT_CTE_UMSATZ, ZEITRAUM_CTE, P_MONAT, P_MARKE, P_BETRIEB, P_AMPEL, P_BEREICH, P_INTENSITAET, P_ZEITRAUM } from './gemeinsam'
+import { MONAT_CTE, MONAT_CTE_UMSATZ, ZEITRAUM_CTE, P_MONAT, P_MARKE, P_BETRIEB, P_AMPEL, P_BEREICH, P_INTENSITAET, P_ZEITRAUM, P_INVENTUR } from './gemeinsam'
 
 // ---------------------------------------------------------------------
 // Personalquoten sind nur mit Filter und Median zu gebrauchen.
@@ -872,9 +872,17 @@ SELECT bestelldatum                                   AS "Datum",
       + 'leer, heißt das „noch keine Inventuren erfasst": die Zählungen werden von Hand '
       + 'nachgetragen, nicht laufend importiert. Eine belastbare Schwundaussage liefert das '
       + 'derzeit praktisch nur bei Wilma Wunder — bei den übrigen Marken gibt es zu wenige '
-      + 'Zählungen dafür.',
+      + 'Zählungen dafür.\n\n'
+      + 'Ein Klick auf **„ansehen →"** öffnet die einzelne Zählung: jede gezählte Ware mit '
+      + 'Soll- und Ist-Menge, Preis und Differenz. „davon unplausibel" zählt Positionen, '
+      + 'deren Wert für einen Warenbestand unmöglich ist — sie sind aus den Euro-Summen '
+      + 'dieser Zeile herausgerechnet, in der Detailansicht aber sichtbar.',
     anzeige: 'table',
     parameter: [P_BETRIEB],
+    // Die Spalte "Zählung" traegt den Inventurschluessel und ist das
+    // Klickziel zur Detailansicht (dd_inventur). Sie steht als TEXT da:
+    // eine Zahl liesse Metabase rechtsbuendig als Kennzahl erscheinen, und
+    // ein Schluessel ist keine Groesse, die man summiert.
     sql: `
 SELECT datum                                              AS "Datum",
        art                                                 AS "Art",
@@ -884,16 +892,133 @@ SELECT datum                                              AS "Datum",
        positionen_geladen                                  AS "Positionen",
        soll_bewertet                                        AS "Soll (bewertet)",
        gezaehlt_bewertet                                    AS "Gezählt (bewertet)",
-       schwund_eur                                          AS "Schwund €"
+       schwund_eur                                          AS "Schwund €",
+       nullif(positionen_unplausibel, 0)                    AS "davon unplausibel",
+       'ansehen →'                                          AS "Zählung",
+       inventur_key::text                                   AS "inventur_key"
   FROM mart.inventur
  WHERE 1 = 1
    [[AND betrieb = {{betrieb}}]]
  ORDER BY datum DESC NULLS LAST`,
     visualisierung: {
+      // Der Schluessel wird gebraucht (er ist die Quelle des Klicks), aber
+      // niemand will ihn lesen -- Metabase gibt ihn ueber die Klickabbildung
+      // trotzdem weiter, auch wenn die Spalte ausgeblendet ist.
+      'table.columns': [
+        { name: 'Datum', enabled: true }, { name: 'Art', enabled: true },
+        { name: 'Status', enabled: true }, { name: 'Positionen', enabled: true },
+        { name: 'Soll (bewertet)', enabled: true }, { name: 'Gezählt (bewertet)', enabled: true },
+        { name: 'Schwund €', enabled: true }, { name: 'davon unplausibel', enabled: true },
+        { name: 'Zählung', enabled: true },
+        { name: 'inventur_key', enabled: false },
+      ],
       column_settings: {
         '["name","Soll (bewertet)"]': { number_style: 'currency', currency: 'EUR', currency_style: 'symbol', decimals: 2 },
         '["name","Gezählt (bewertet)"]': { number_style: 'currency', currency: 'EUR', currency_style: 'symbol', decimals: 2 },
         '["name","Schwund €"]': { number_style: 'currency', currency: 'EUR', currency_style: 'symbol', decimals: 2 },
+      },
+    },
+  },
+
+  // ===================================================================
+  // Die einzelne Zaehlung — was genau gezaehlt wurde
+  //
+  // Angefragt am 10.08.2026: "wenn man die Inventuren im Card anklickt die
+  // detailierte Inventur sehen, was genau gezaehlt wurde und alle Infos
+  // dazu". Die Kopfzeile sagt DASS 5.500 EUR fehlen; diese beiden Karten
+  // sagen WORAN.
+  // ===================================================================
+  {
+    schluessel: 'dd_inventur_kopf',
+    name: 'Zählung — Überblick',
+    beschreibung:
+      'Wann, wo und von welcher Art diese Zählung war, mit den bewerteten Summen. '
+      + '„Positionen unplausibel" sind Zeilen, deren Wert für einen Warenbestand unmöglich '
+      + 'ist — sie zählen in den Summen hier nicht mit, stehen in der Liste darunter aber '
+      + 'sichtbar.',
+    anzeige: 'table',
+    parameter: [P_INVENTUR],
+    sql: `
+SELECT betrieb                     AS "Betrieb",
+       marke                       AS "Marke",
+       bereich                     AS "Bereich",
+       datum                       AS "Datum",
+       name                        AS "Bezeichnung",
+       art                         AS "Art",
+       CASE WHEN storniert THEN 'storniert'
+            WHEN signiert  THEN 'signiert'
+            ELSE '… nicht signiert' END AS "Status",
+       positionen_geladen          AS "Positionen",
+       positionen_unplausibel      AS "davon unplausibel",
+       soll_bewertet                AS "Soll (bewertet)",
+       gezaehlt_bewertet            AS "Gezählt (bewertet)",
+       schwund_eur                  AS "Schwund €"
+  FROM mart.inventur
+ WHERE 1 = 1
+   -- Der Schluessel wird als TEXT verglichen, nicht per ::int gecastet:
+   -- Metabase reicht Klickwerte als Zeichenkette durch, und ein Cast wirft
+   -- bei allem, was keine Zahl ist, einen Datenbankfehler statt einer
+   -- leeren Liste. Ein leeres Ergebnis ist die ehrlichere Antwort auf einen
+   -- unsinnigen Filterwert.
+   [[AND inventur_key::text = {{inventur}}]]
+ ORDER BY datum DESC NULLS LAST
+ LIMIT 50`,
+    visualisierung: {
+      column_settings: {
+        '["name","Soll (bewertet)"]': { number_style: 'currency', currency: 'EUR', currency_style: 'symbol', decimals: 2 },
+        '["name","Gezählt (bewertet)"]': { number_style: 'currency', currency: 'EUR', currency_style: 'symbol', decimals: 2 },
+        '["name","Schwund €"]': { number_style: 'currency', currency: 'EUR', currency_style: 'symbol', decimals: 2 },
+      },
+    },
+  },
+  {
+    schluessel: 'dd_inventur_positionen',
+    name: 'Zählung — jede gezählte Ware',
+    beschreibung:
+      'Jede Position dieser Zählung: Sollbestand laut System, tatsächlich gezählte Menge, '
+      + 'Preis je Einheit und die Differenz in Menge und Euro.\n\n'
+      + '**Differenz = Soll minus Gezählt.** Ein positiver Wert heißt, es fehlt etwas; ein '
+      + 'negativer heißt, es ist mehr da als gebucht — meist ein Buchungsfehler, kein Fund.\n\n'
+      + 'Die **Einheit** gehört zur Menge: dieselbe Ware wird je nach Erfassung in Gramm oder '
+      + 'in Gebinden geführt. Zeilen mit **⚠** tragen einen Wert, den ein Warenbestand nicht '
+      + 'haben kann — sie bleiben hier stehen, damit man sie findet, zählen aber in keiner '
+      + 'Summe mit.',
+    anzeige: 'table',
+    parameter: [P_INVENTUR],
+    // Sortiert nach dem GELDWERT der Differenz, absteigend: wer eine
+    // Zaehlung oeffnet, sucht die Zeile, die den Schwund traegt -- nicht
+    // die alphabetisch erste Ware. NULLS LAST, damit ungezaehlte
+    // Positionen (kein Ist-Wert) nicht die Spitze belegen.
+    sql: `
+SELECT ware                        AS "Ware",
+       lieferant                   AS "Lieferant",
+       basis_einheit               AS "Einheit",
+       soll_menge                  AS "Soll (Menge)",
+       gezaehlt_menge              AS "Gezählt (Menge)",
+       nachzaehlung_menge          AS "Nachzählung",
+       preis_je_basiseinheit       AS "Preis je Einheit",
+       soll_eur                    AS "Soll €",
+       gezaehlt_eur                AS "Gezählt €",
+       differenz_menge             AS "Differenz (Menge)",
+       differenz_eur               AS "Differenz €",
+       differenz_pct               AS "Differenz %",
+       CASE WHEN unplausibel THEN '⚠' ELSE '' END AS "!"
+  FROM mart.inventurposition
+ WHERE 1 = 1
+   -- Der Schluessel wird als TEXT verglichen, nicht per ::int gecastet:
+   -- Metabase reicht Klickwerte als Zeichenkette durch, und ein Cast wirft
+   -- bei allem, was keine Zahl ist, einen Datenbankfehler statt einer
+   -- leeren Liste. Ein leeres Ergebnis ist die ehrlichere Antwort auf einen
+   -- unsinnigen Filterwert.
+   [[AND inventur_key::text = {{inventur}}]]
+ ORDER BY abs(differenz_eur) DESC NULLS LAST, ware
+ LIMIT 2000`,
+    visualisierung: {
+      column_settings: {
+        '["name","Soll €"]': { number_style: 'currency', currency: 'EUR', currency_style: 'symbol', decimals: 2 },
+        '["name","Gezählt €"]': { number_style: 'currency', currency: 'EUR', currency_style: 'symbol', decimals: 2 },
+        '["name","Differenz €"]': { number_style: 'currency', currency: 'EUR', currency_style: 'symbol', decimals: 2 },
+        '["name","Preis je Einheit"]': { number_style: 'currency', currency: 'EUR', currency_style: 'symbol', decimals: 4 },
       },
     },
   },

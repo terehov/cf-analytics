@@ -363,6 +363,22 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
              + 'gar nicht.',
   },
 
+  // --- Die einzelne Zaehlung: gefiltert wird ueber DIE INVENTUR -------------
+  // Beide Karten haengen an einem Inventurschluessel, der den Betrieb, den
+  // Monat und den Zeitraum bereits mitbringt -- eine Zaehlung gehoert zu genau
+  // einem Haus und genau einem Tag. Ein zusaetzlicher Betriebsfilter koennte
+  // die gewaehlte Zaehlung nur noch wegfiltern.
+  dd_inventur_kopf: {
+    betrieb: 'Die Zaehlung bringt ihren Betrieb mit -- ausgewaehlt wird ueber sie.',
+    monat: 'ebenso: eine Zaehlung hat genau ein Datum.',
+    zeitraum: 'ebenso.',
+  },
+  dd_inventur_positionen: {
+    betrieb: 'Die Zaehlung bringt ihren Betrieb mit -- ausgewaehlt wird ueber sie.',
+    monat: 'ebenso: eine Zaehlung hat genau ein Datum.',
+    zeitraum: 'ebenso.',
+  },
+
   // --- Einkauf: die drei Sichten kennen keinen Betrieb ----------------------
   // FoodNotify verhandelt Preise je MARKE, nicht je Haus. mart.einkauf_ladestand,
   // mart.einkaufspreis_monat und mart.einkaufspreis_veraenderung fuehren

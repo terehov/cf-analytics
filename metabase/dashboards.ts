@@ -30,6 +30,13 @@ const F_BETRIEB: Parameter = {
   id: 'd-betrieb', name: 'betrieb', 'display-name': 'Betrieb', type: 'string/=',
   werteliste: ['mart', 'betrieb', 'betrieb'],
 }
+// Die einzelne Zaehlung. OHNE Werteliste: der Filter wird geklickt, nicht
+// von Hand gesetzt -- eine Auswahlliste mit 355 Schluesselzahlen waere
+// niemandem eine Hilfe. Wer die Seite ohne Wert oeffnet, sieht die
+// letzten Zaehlungen.
+const F_INVENTUR: Parameter = {
+  id: 'd-inventur', name: 'inventur', 'display-name': 'Zählung', type: 'string/=',
+}
 // Bewertung als Auswahlliste. Feste Werte statt Datenquelle: es gibt genau
 // diese vier, und "ohne" steht fuer NULL -- das liefert keine Spalte.
 const F_AMPEL: Parameter = {
@@ -340,14 +347,37 @@ export const dashboards: Dashboard[] = [
       { teile: [{ text: '## Einkauf und Inventur\n\nBelege und Zählungen dieses Betriebs. Storno- und Signierkennzeichen stehen jeweils in einer eigenen Spalte, nicht als stille Kürzung.' }] },
       { teile: [{ karte: 'dd_betrieb_bestellungen', hoehe: 11,
         klick: [{ ziel: 'db_einkauf', uebergabe: {} }] }] },
+      // Klick auf "ansehen →" oeffnet die Zaehlung; die uebrigen Spalten
+      // bleiben unangetastet, damit ein Klick auf eine Zahl nicht
+      // wegnavigiert. Der Schluessel kommt aus der ausgeblendeten Spalte
+      // inventur_key -- Metabase reicht auch verborgene Spalten weiter.
       { teile: [{ karte: 'dd_betrieb_inventur', hoehe: 11,
-        klick: [{ ziel: 'db_einkauf', uebergabe: {} }] }] },
+        klick: [{ ziel: 'dd_inventur', spalte: 'Zählung',
+                  uebergabe: { inventur: 'inventur_key' } }] }] },
       ] },
       { name: 'Maßnahmen & Datenstand', reihen: [
       { teile: [{ text: '## Maßnahmen und Datenstand' }] },
       { teile: [{ karte: 'dd_betrieb_massnahmen' }] },
       { teile: [{ karte: 'dd_betrieb_datenstand' }] },
       ] },
+    ],
+  },
+
+  // Die einzelne Zaehlung. Eigenes Dashboard und kein Reiter auf ③:
+  // es beantwortet eine Frage zu EINEM Vorgang, nicht zu einem Betrieb --
+  // dieselbe Stellung wie ③ zu ②. Ohne gewaehlte Inventur zeigt es die
+  // letzten Zaehlungen, damit die Seite auch direkt aufgerufen etwas sagt.
+  {
+    schluessel: 'dd_inventur',
+    name: 'Zählung — was gezählt wurde',
+    beschreibung:
+      'Eine einzelne Inventur im Detail: jede gezählte Ware mit Soll- und Ist-Menge, Preis und Differenz. Erreichbar über „ansehen →" in der Inventurliste auf dem Betriebsblatt.',
+    sammlung: 'Drill-Down',
+    filter: [F_INVENTUR],
+    reihen: [
+      { teile: [{ text: '# Die einzelne Zählung\n\n**Differenz = Soll minus Gezählt.** Positiv heißt, es fehlt etwas; negativ heißt, es ist mehr da als gebucht — meist ein Buchungsfehler.\n\nDie Liste steht nach dem **Geldwert der Differenz** sortiert: oben die Position, die den Schwund trägt. Zeilen mit **⚠** tragen einen Wert, den ein Warenbestand nicht haben kann; sie bleiben sichtbar, zählen aber in keiner Summe mit.' }] },
+      { teile: [{ karte: 'dd_inventur_kopf', hoehe: 9 }] },
+      { teile: [{ karte: 'dd_inventur_positionen', hoehe: 16 }] },
     ],
   },
 

@@ -53,7 +53,7 @@ stellen: Admin → Tabellenmetadaten → Schema `core` → Sichtbarkeit.
 | Sortiment nach Warengruppe | `mart.deckungsbeitrag_warengruppe` |
 | Einkaufspreise über die Zeit, echte Belegpreise | `mart.einkaufspreis_monat` — löst das stillgelegte `preisentwicklung_ware` ab |
 | Konkrete Bestellungen je Betrieb, inklusive Stornos | `mart.einkauf_beleg` — eine Zeile je Bestellung, `storniert` kennzeichnet statt auszublenden |
-| Inventuren und bewerteter Schwund | `mart.inventur` (je Inventur), `mart.inventur_schwund` (je Betrieb und Monat) — belastbar praktisch nur bei Wilma Wunder, siehe Migration `0044`/`0045`. Aktuell leer: der Backfill ist eine bewusste manuelle Entscheidung |
+| Inventuren und bewerteter Schwund | `mart.inventur` (je Inventur), `mart.inventur_schwund` (je Betrieb und Monat), `mart.inventurposition` (je gezählte Ware) — belastbar praktisch nur bei Wilma Wunder, siehe Migration `0044`–`0048`. Gefüllt seit dem 09.08.2026 (358 Zählungen, 81.190 Positionen) |
 | Was bringen die Marketingaktionen? | `mart.aktionsumsatz_monat` — mit Anteil am Gesamtumsatz |
 | Welche Aktionen gibt es, laufen sie noch? | `mart.aktion` — hinterlegte gegen tatsächliche Laufzeit |
 | BWA-Kennzahlen, jüngster Stand | `mart.kennzahlen_aktuell` |
