@@ -719,3 +719,97 @@ Folgeseiten ein, jede geladene Seite reiht ihre Positionen nach).
 Wilma Wunder. Der laufende Abgleich holt jetzt alle vier Marken — das kostet
 vier Aufrufe je Sync-Lauf, was gegenüber den Bestellungen (ein Aufruf je
 Kostenstelle, also 152) nicht ins Gewicht fällt.
+
+## Vergleichsgruppen: zwei Dashboards, kein Umschalter, kein zweiter Filter (10.08.2026)
+
+**Anlass.** Angefragt: „ein Dashboard, bei dem man einen Betrieb gegen den Durchschnitt der
+Marke vergleicht, und eins, bei dem man einen Betrieb gegen andere Betriebe in der gleichen
+Stadt vergleicht … um festzustellen, ob bei allen der Umsatz eingebrochen ist oder nur bei
+einem."
+
+### Zwei Seiten, nicht eine mit Umschalter
+
+Marke und Stadt fangen **verschiedene Störquellen** ab: die Marke, was am Konzept liegt
+(gleiche Karte, gleiche Preise, über ganz Deutschland verteilt); die Stadt, was am Standort
+liegt (gleiches Wetter, gleiche Feiertage, gleiche Kaufkraft, verschiedene Konzepte).
+
+Ein Umschalter hätte Platz gespart und die eigentliche Aussage unmöglich gemacht: **fällt
+ein Haus gegen beide Gruppen ab, liegt es am Haus.** Dafür müssen beide gleichzeitig
+sichtbar sein — in zwei Reitern desselben Dashboards wäre es dasselbe Problem.
+
+### Die Vergleichsgruppe wird aus dem Betrieb abgeleitet, nicht eingestellt
+
+Beide Seiten tragen nur **Monat** und **Betrieb** als Filter. Ein zweiter Filter „Marke"
+bzw. „Stadt" wäre naheliegend und falsch: zwei Filter, die dieselbe Menge einschränken,
+können einander widersprechen („Betrieb = Aposto Mainz" und „Marke = Enchilada"), und
+Metabase antwortet darauf mit einer **leeren Seite ohne Fehlermeldung**. Das ist genau die
+Falle, wegen der die Textfilter am 26.07.2026 überhaupt Auswahllisten bekommen haben — ein
+leeres Dashboard ist von einem Betrieb ohne Geschäft nicht zu unterscheiden.
+
+### Kein Zeitraumfilter, sondern ein Fenster am Monatsfilter
+
+Die Verlaufskarten lesen **zwei verschiedene Tabellen** — das Haus aus `mart.umsatz_ytd`,
+die Gruppe aus `mart.konzept_schnitt_monat` bzw. `mart.stadt_schnitt_monat`. Ein
+Metabase-Feldfilter baut seine Klausel aus dem *Tabellennamen* und hätte deshalb nur einen
+der beiden Äste eingeschränkt: die Linien wären still verschieden lang geworden, ohne
+Fehlermeldung. Stattdessen ein festes Fenster von 24 Monaten, das am Monatsfilter hängt —
+zwei Jahre, weil ein Vorjahresvergleich mindestens einen vollen Saisonzyklus braucht.
+
+### Die Richtung gehört in die Sicht, nicht in den Kopf des Lesers
+
+Bei Umsatz und Bewertung ist mehr besser, bei Personal und Wareneinsatz weniger. Eine Spalte
+„Abweichung: +3,2" ist ohne diese Angabe zweideutig — und zwar auf die gefährliche Art, weil
+sie entschieden aussieht. `mart.marke_vergleich` und `mart.stadt_vergleich` tragen deshalb
+eine Spalte `vergleich` mit *besser* / *schlechter* / *gleich*, abgeleitet aus
+`ampel.regel.richtung` des Standardregelwerks. Die Karten beschriften sie nur noch.
+
+Dieselbe Überlegung wie bei `mart.konzept_schnitt_monat` (Migration `0013`): eine
+Rechenvorschrift, die in mehreren Karten nachgebaut wird, zerfällt bei der ersten Korrektur.
+
+### Die Stadt kommt aus `manual.betrieb_standort`, nicht aus `core.betrieb.stadt`
+
+`core.betrieb.stadt` ist bei allen 141 Betrieben NULL und wird trotzdem durch ein Dutzend
+`mart`-Sichten durchgereicht. Eine Stadtauswertung darauf hätte **eine** Gruppe namens NULL
+mit allen Betrieben darin ergeben — kein Fehler, kein leeres Ergebnis, nur eine falsche
+Zahl. Deshalb tragen die beiden verlockendsten dieser Spalten seit Migration `0049` einen
+Spaltenkommentar, den Metabase im Datenmodell anzeigt.
+
+**Verworfen: die Stadt aus dem Betriebsnamen ableiten.** Dieselbe Begründung wie bei der
+Karte in `0008` — „Alter Kranen GmbH" trägt keine Stadt, und fünf Betriebe heißen nach
+derselben Stadt, ohne dieselbe zu sein. Eine falsche Vergleichsgruppe ist schlimmer als eine
+fehlende: sie wird nicht hinterfragt.
+
+### Ohne Auswahl zeigen Tabellen alles, Diagramme die Gruppen
+
+Zwei SQL-Muster, bewusst unterschiedlich: `WHERE 1 = 1 [[AND betrieb = {{betrieb}}]]` liefert
+ohne Auswahl alle Zeilen (Tabellen), `WHERE false [[OR betrieb = {{betrieb}}]]` keine
+(Diagramme). 49 Linien übereinander sind keine Kurve; die Diagramme zeigen ohne Auswahl
+deshalb die Gruppen selbst. Damit ist **jede** der zehn Karten in beiden Zuständen eine
+Aussage, und keine muss mit „bitte oben etwas auswählen" leer bleiben.
+
+### Nachtrag am selben Tag: die kurze Fassung gehört aufs Betriebsblatt
+
+Rückfrage nach dem Bau von ⑨ und ⑩: „oder vielleicht sogar das bestehende
+Betriebs-Dashboard um diese zwei Sachen erweitern … alles auf einem Dashboard". Richtig —
+die Frage „liegt es an diesem Haus?" stellt sich beim Lesen des Betriebsblatts, nicht auf
+einer Seite, zu der man erst navigieren muss. Zwei Karten mehr auf ③ Betrieb, direkt unter
+den sechs Kennzahlen: beide Maßstäbe nebeneinander in einer Tabelle, und ein Verlauf mit
+Haus, Marke und Stadt in einem Bild.
+
+**⑨ und ⑩ bleiben trotzdem.** Sie zeigen die Nachbarhäuser **einzeln** — vier Zeilen für
+Karlsruhe, achtzehn für Enchilada, dazu Verläufe je Haus. Das passt nicht auf ein
+Betriebsblatt, das schon sechs Reiter hat. Die Aufteilung ist damit die übliche dieses
+Projekts: die verdichtete Aussage dort, wo die Frage entsteht, die Auflösung einen Klick
+weiter. Neu ist, dass die beiden Seiten seit diesem Nachtrag überhaupt angeklickt erreichbar
+sind — über die Spalten „Marke (Median)" und „Stadt (Median)".
+
+**Verworfen: die vier Spalten an `dd_betrieb_kopf` anhängen.** Das wäre die kompakteste
+Lösung gewesen und die schlechteste: dreizehn Spalten erzwingen waagerechtes Scrollen, und
+genau daran ist diese Tabelle am 28.07.2026 schon einmal gescheitert. Zwei Karten
+untereinander in derselben Zeilenreihenfolge lesen sich besser als eine, die man schieben
+muss.
+
+**Verworfen: Δ-Spalten auf ③.** Auf dem Betriebsblatt stehen Median und Rang, aber kein
+Abstand. Der Rang trägt die Aussage ohne Zweideutigkeit — „16 von 17" heißt schlecht,
+gleichgültig ob bei der Kennzahl mehr oder weniger besser ist. Ein „+5,8" heißt das nicht.
+Wer den Abstand in Zahlen braucht, ist einen Klick entfernt.

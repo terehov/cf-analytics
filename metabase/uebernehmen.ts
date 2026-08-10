@@ -31,6 +31,7 @@ import { karten as kartenStandort } from './karten-standort'
 import { karten as kartenBewertung } from './karten-bewertung'
 import { karten as kartenYext } from './karten-yext'
 import { karten as kartenAktionen } from './karten-aktionen'
+import { karten as kartenVergleich } from './karten-vergleich'
 import { dashboards } from './dashboards'
 import { auslegen, MINDESTHOEHE } from './layout'
 import type { Karte, Kachel, Dashboard, Reihe } from './typen'
@@ -44,7 +45,7 @@ const METABASE = config.METABASE_URL
 
 const alleKarten: Karte[] = [
   ...kartenDrilldown, ...kartenPortfolio, ...kartenRoundTable, ...kartenFach, ...kartenImport, ...kartenStandort,
-  ...kartenBewertung, ...kartenAktionen, ...kartenYext,
+  ...kartenBewertung, ...kartenAktionen, ...kartenYext, ...kartenVergleich,
 ]
 
 // Reihen in Kacheln umrechnen — EINMAL, damit Pruefung und Ausgabe
@@ -514,6 +515,25 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
     zeitraum: 'Stichmonat -- dafuer ist der Monatsfilter da.',
   },
 
+  // --- Vergleichsgruppen ---------------------------------------------------
+  // Eine fehlende Ortsangabe ist kein Monatswert, sondern ein Zustand der
+  // Stammdaten. Mit Monatsfilter waere die Liste im Juni eine andere als
+  // im Juli, obwohl sich nichts geaendert hat -- und die Frage "wer fehlt
+  // im Stadtvergleich" haette je Monat eine andere Antwort.
+  vs_fehlend: { monat: 'Fehlende Ortsangabe ist ein Zustand der Stammdaten, kein Monatswert.' },
+
+  // Die beiden Vergleichskarten auf ③ Betrieb. Dort gibt es neben dem
+  // Monat auch einen Zeitraumfilter -- den koennen sie nicht lesen.
+  dd_betrieb_vergleich: {
+    zeitraum: 'Die sechs Kennzahlen gibt es je Monat einmal, wie bei dd_betrieb_kopf '
+            + 'darueber. Ein Zeitraum ergaebe sechs Zeilen je Monat uebereinander.',
+  },
+  dd_betrieb_vergleich_verlauf: {
+    zeitraum: 'Liest DREI Tabellen (Haus, Marke, Stadt). Ein Feldfilter baut seine '
+            + 'Klausel aus dem Tabellennamen und koennte nur einen der drei Aeste '
+            + 'einschraenken -- die Linien waeren still verschieden lang. Das Fenster '
+            + 'sind feste 24 Monate am Monatsfilter.',
+  },
 }
 
 // Doppelte Schluessel in FILTER_AUSNAHME sind in JavaScript erlaubt: der

@@ -270,6 +270,39 @@ export const dashboards: Dashboard[] = [
       // Zeilen, und der Rest stand leer. Ohne Betriebsfilter scrollt die
       // Tabelle -- das ist der seltenere Fall und der richtige Ort dafuer.
       { teile: [{ karte: 'dd_betrieb_kopf', hoehe: 9 }] },
+      // ZWEI MASSSTAEBE DIREKT UNTER DEN KENNZAHLEN (angefragt 10.08.2026).
+      //
+      // Die Tabelle darueber beantwortet "wie hat es sich entwickelt"
+      // (Vormonat, Trend, Ampelwechsel), diese "wie steht es gegen die
+      // anderen". Dieselbe Zeilenreihenfolge, damit man von oben nach
+      // unten lesen kann, ohne die Kennzahl zu suchen.
+      //
+      // Bewusst NICHT in dd_betrieb_kopf hineingezogen: die Karte hat
+      // schon neun Spalten, vier weitere ergaeben dreizehn und damit
+      // waagerechtes Scrollen -- derselbe Fehler, der am 28.07.2026 zur
+      // vollen Breite gefuehrt hat.
+      { teile: [{ text: '## Liegt es an diesem Haus?\n\nDieselben Kennzahlen gegen zwei Maßstäbe: die **eigene Marke** (gleiches Konzept, ganz Deutschland — fängt ab, was am Konzept liegt) und die **eigene Stadt** (gleiches Wetter, gleiche Feiertage, andere Konzepte — fängt ab, was am Standort liegt).\n\n**Der Rang ist die Aussage**, nicht der Abstand: „16 von 17" ist eindeutig, „+5,8" nicht — bei Personal und Wareneinsatz ist weniger besser.\n\nDie vier Vergleichsspalten sind **anklickbar**: die beiden Marken-Spalten öffnen alle Häuser der Marke, die beiden Stadt-Spalten alle Häuser am Ort — jeweils mit Betrieb und Monat von hier.' }] },
+      // VIER klickbare Spalten, nicht zwei: die ganze Marken-Haelfte der
+      // Zeile fuehrt zu ⑨, die ganze Stadt-Haelfte zu ⑩. Wer eine rote
+      // Zahl sieht, greift nach IHR -- meist nach dem Rang, denn der
+      // traegt die Aussage -- und nicht nach der Spalte daneben, die
+      // zufaellig verlinkt ist. Zwei Klickflaechen je Thema statt einer.
+      //
+      // Die uebrigen Spalten (Kennzahl, ●, Wert) bleiben stumm, und das
+      // ist Absicht: sie beschreiben das HAUS, nicht eine Vergleichs-
+      // gruppe, und haetten deshalb kein eindeutiges Ziel. Ein Klick, der
+      // raet, ist schlechter als keiner.
+      //
+      // Der Monat wandert von selbst mit (beide Ziele kennen den Filter
+      // unter demselben Namen); der Betrieb kommt aus der Zeile.
+      { teile: [{ karte: 'dd_betrieb_vergleich', hoehe: 9,
+        klick: [
+          { ziel: 'vg_marke', spalte: 'Marke (Median)', uebergabe: { betrieb: 'Betrieb' } },
+          { ziel: 'vg_marke', spalte: 'Rang Marke',     uebergabe: { betrieb: 'Betrieb' } },
+          { ziel: 'vg_stadt', spalte: 'Stadt (Median)', uebergabe: { betrieb: 'Betrieb' } },
+          { ziel: 'vg_stadt', spalte: 'Rang Stadt',     uebergabe: { betrieb: 'Betrieb' } },
+        ] }] },
+      { teile: [{ karte: 'dd_betrieb_vergleich_verlauf' }] },
       // Die Standortkarte steht jetzt neben dem Ampelverlauf. Beide
       // beantworten dieselbe Frage -- wo steht dieses Haus, und wie steht
       // es da -- und beide brauchen keine waagerechte Ausdehnung.
@@ -465,6 +498,82 @@ export const dashboards: Dashboard[] = [
       // keiner Tageszeit zuordnen.
       { teile: [{ karte: 'vg_ort_profil' }] },
       { teile: [{ karte: 'vg_ort_sparte', hoehe: 11 }] },
+    ],
+  },
+
+  // ===================================================================
+  // VERGLEICHSGRUPPEN — der Massstab, gegen den ein Betrieb gelesen wird
+  //
+  // Gefragt am 10.08.2026: "ob bei allen der Umsatz eingebrochen ist oder
+  // nur bei einem". Ein Rueckgang von zwoelf Prozent heisst etwas
+  // voellig anderes, je nachdem ob die Nachbarhaeuser dasselbe zeigen
+  // oder ob das Haus allein dasteht.
+  //
+  // Zwei Seiten statt einer mit Umschalter, weil sie verschiedene
+  // Stoerquellen abfangen: die Marke, was am Konzept liegt (gleiche
+  // Karte, gleiche Preise, ganz Deutschland); die Stadt, was am Standort
+  // liegt (gleiches Wetter, gleiche Feiertage, gleiche Kaufkraft,
+  // verschiedene Konzepte). Erst beide nebeneinander erlauben die dritte
+  // Aussage -- faellt ein Haus gegen BEIDE ab, liegt es am Haus.
+  //
+  // KEIN zweiter Filter fuer Marke oder Stadt. Die Vergleichsgruppe wird
+  // aus dem gewaehlten Betrieb abgeleitet. Zwei Filter, die dieselbe
+  // Menge einschraenken, koennen einander widersprechen ("Betrieb =
+  // Aposto Mainz" und "Marke = Enchilada"), und das Ergebnis ist eine
+  // leere Seite ohne Fehlermeldung -- nicht zu unterscheiden von einem
+  // Betrieb ohne Geschaeft. Genau die Falle, wegen der die Textfilter
+  // ueberhaupt Auswahllisten bekommen haben.
+  //
+  // Ebenso KEIN Zeitraumfilter. Die Verlaufskarten lesen zwei
+  // verschiedene Tabellen (Haus und Gruppe), und ein Metabase-Feldfilter
+  // baut seine Klausel aus dem TABELLENNAMEN -- er wuerde nur einen der
+  // beiden Aeste einschraenken und die Linien still verschieden lang
+  // machen. Stattdessen ein festes 24-Monats-Fenster, das am
+  // Monatsfilter haengt.
+  // ===================================================================
+  {
+    schluessel: 'vg_marke',
+    name: '⑨ Betrieb gegen Marke',
+    beschreibung:
+      'Ein Betrieb gegen den Schnitt seiner eigenen Marke: bricht der Umsatz nur hier ein oder in der ganzen Marke? Oben den Betrieb wählen — die Marke ergibt sich daraus.',
+    sammlung: 'Drill-Down',
+    filter: [F_MONAT, F_BETRIEB],
+    reihen: [
+      { teile: [{ text: '# ⑨ Betrieb gegen Marke\n\nDie Frage vor jeder Maßnahme: **schwächelt dieses Haus oder seine ganze Marke?** Läuft die Marke mit nach unten, liegt es am Konzept, an der Saison oder am Markt — und eine Maßnahme im einzelnen Haus geht daneben.\n\nOben den **Betrieb** wählen; die Marke ergibt sich daraus. Ohne Auswahl steht hier die Gesamtübersicht: welche Häuser am weitesten unter ihrer eigenen Marke liegen.\n\nDer Markenwert ist immer der **mittlere Betrieb** der Marke, nicht der Mittelwert — ein einzelner Ausreißer soll den Maßstab nicht verziehen. Häuser ohne laufenden Umsatz zählen darin nicht mit.' }] },
+      { teile: [{ karte: 'vm_kopf', hoehe: 11,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      { teile: [{ karte: 'vm_verlauf' }] },
+      { teile: [{ text: '## Alle sechs Kennzahlen gegen die Marke\n\n„Stellung" sagt **besser** oder **schlechter**, nicht höher oder niedriger: bei Personal und Wareneinsatz ist weniger besser.' }] },
+      { teile: [{ karte: 'vm_kennzahlen', hoehe: 11,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      { teile: [{ text: '## Die anderen Häuser der Marke\n\nEin ◀ markiert den oben gewählten Betrieb. Stehen die Nachbarn derselben Marke ebenso im Minus, ist der Befund keiner über dieses Haus.' }] },
+      { teile: [{ karte: 'vm_haeuser', hoehe: 12,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+    ],
+  },
+
+  {
+    schluessel: 'vg_stadt',
+    name: '⑩ Betrieb gegen die Stadt',
+    beschreibung:
+      'Ein Betrieb gegen die anderen Häuser der Gruppe am selben Ort — verschiedene Marken, gleiches Einzugsgebiet. Trennt, was am Standort liegt, von dem, was am Haus liegt.',
+    sammlung: 'Drill-Down',
+    filter: [F_MONAT, F_BETRIEB],
+    reihen: [
+      { teile: [{ text: '# ⑩ Betrieb gegen die Stadt\n\nIn Karlsruhe stehen vier Häuser der Gruppe: Aposto, Enchilada, Lehners und Wilma Wunder. Wetter, Baustellen, Feiertagslage und Kaufkraft treffen sie **gleichzeitig** — eine Marke über ganz Deutschland dagegen nicht. Deshalb ist die Stadt der zweite Maßstab neben der Marke.\n\nOben den **Betrieb** wählen; die Stadt ergibt sich daraus. Ohne Auswahl stehen in den Diagrammen die Städte selbst.\n\n> **Die Veränderung ist vergleichbar, die absoluten Quoten nur bedingt.** Die Häuser gehören verschiedenen Marken mit verschiedenen Karten, Preisen und Personalstrukturen. Ein Wareneinsatz von 24 % ist zwischen einem mexikanischen und einem bürgerlichen Konzept keine gemeinsame Messlatte — die Veränderung gegenüber dem Vorjahr trägt dagegen jedes Haus in seiner eigenen Einheit.' }] },
+      { teile: [{ karte: 'vs_kopf', hoehe: 10,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      { teile: [{ text: '## Alle oder nur einer?\n\nDie Karte, wegen der es diese Seite gibt.' }] },
+      { teile: [{ karte: 'vs_umsatz_pct', hoehe: 10 }] },
+      { teile: [{ karte: 'vs_verlauf' }] },
+      { teile: [{ text: '## Die Häuser der Stadt im Einzelnen' }] },
+      { teile: [{ karte: 'vs_haeuser', hoehe: 12,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      { teile: [{ karte: 'vs_kennzahlen', hoehe: 12,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      { teile: [{ text: '## Wer im Vergleich fehlt\n\nDie Ortsangaben werden von Hand gepflegt — das Kassensystem liefert für Betriebe keine Adresse. Jedes Haus in dieser Liste fehlt in seiner Stadt, **ohne dass es dort auffiele**. Bleibt die Seite oben leer, steht der gewählte Betrieb hier.' }] },
+      { teile: [{ karte: 'vs_fehlend', hoehe: 10,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
     ],
   },
 

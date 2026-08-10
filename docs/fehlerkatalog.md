@@ -2094,3 +2094,42 @@ einmal für zehn ältere Migrationen gemacht) oder eine der beiden 0039-Dateien 
 umzunummerieren, dass die alphabetische und die tatsächliche Abhängigkeitsreihenfolge wieder
 übereinstimmen — beides nur mit Blick auf `public.schema_migration` der echten Datenbank,
 nicht blind.
+
+## Ein Befehl, der laut Dokumentation nur einen Server startet, schrieb sofort nach Produktion (10.08.2026)
+
+**Symptom.** Ein Agent rief `bun run metabase/uebernehmen.ts` auf, um die neu gebauten
+Kartendefinitionen prüfen zu lassen — die Prüfungen (Überlappung, Mindesthöhe, tote und
+taube Filter, Klickziele) laufen ganz am Anfang und werfen, bevor irgendetwas angelegt wird.
+Erwartet wurde nach `docs/dashboards.md` ein Server auf `:8899` und ein Browserschritt.
+Stattdessen meldete die erste Zeile:
+
+```text
+Übernahme direkt gegen https://cf-analytics.brainfood.technology als importer@brain.food
+```
+
+Der Lauf schrieb rund vierzig Karten in die Produktivinstanz, bevor er abgebrochen wurde.
+
+**Ursache.** `uebernehmen.ts` hat seit einer späteren Änderung zwei Betriebsarten: sind
+`METABASE_USER` und `METABASE_PASSWORD` gesetzt, meldet sich das Skript selbst an und
+überträgt ohne Browser; nur ohne diese Variablen startet es den Server auf `:8899`. In
+`.env` sind beide gesetzt. `docs/dashboards.md`, `docs/metabase.md` und `AGENTS.md`
+beschrieben ausschließlich den älteren Weg.
+
+**Warum es folgenlos blieb — und warum das kein Verdienst ist.** Die Übertragung ist
+idempotent (jede Karte wird über ihren `[key:...]` gefunden und überschrieben), und die
+vierzig betroffenen Karten hatten sich nicht geändert: sie wurden mit ihrer eigenen
+Definition überschrieben. Ein abgebrochener Lauf hinterlässt deshalb keinen kaputten Stand,
+sondern einen unvollständigen — der nächste vollständige Lauf stellt ihn her. Wäre in
+derselben Änderung eine bestehende Karte umgebaut worden, stünde die Produktivinstanz jetzt
+halb auf dem alten und halb auf dem neuen Stand.
+
+**Was ihn künftig verhindert.** Die Warnung steht jetzt an beiden Stellen, an denen der
+Befehl dokumentiert ist (`docs/dashboards.md`, `docs/metabase.md`), und `AGENTS.md` nennt
+`uebernehmen.ts` nicht mehr „braucht Browser". Wer nur die Definitionen prüfen will, nimmt
+`bun test metabase/karten.test.ts` — der lässt Postgres über jede Karte urteilen, einmal
+ohne und einmal mit gesetzten Filtern, und fasst Metabase nicht an.
+
+**Die allgemeine Lehre.** Ein Befehl, dessen Dokumentation einen Zwischenschritt verspricht
+(„dann im Browser klicken"), wird als ungefährlich gelesen. Fällt der Zwischenschritt später
+weg, ist die veraltete Zeile in der Dokumentation nicht nur ungenau — sie ist eine
+Einladung.

@@ -129,6 +129,7 @@ Handgeschriebenes SQL, nummeriert, wird der Reihe nach angewendet. Bewusst handg
 | `0006_mart.sql` | Alle Sichten und Funktionen für Metabase |
 | `0029_pruefung_wareneinsatz_stilllegen.sql` | Prüfsicht gelöscht, `abdeckung_pct` repariert — sie stand immer auf 100 % |
 | `0030_foodnotify.sql` | **FoodNotify**: Marke, Kostenstelle, POS-Zuordnung, Rezept, Zutat, Ware, Einkauf. Räumt LINAs WAWI-Tabellen ab |
+| `0049_vergleichsgruppen.sql` | Betrieb gegen Marke und gegen Stadt. Die **einzige belastbare Stadtangabe** ist `mart.nachbarschaft.ort` aus `manual.betrieb_standort` — `core.betrieb.stadt` ist bei allen 141 NULL |
 | `pruefung.sql` | Verifikation gegen den Bayreuth-Fall aus dem Excel (kein Migrationsschritt) |
 
 Die Tabelle nennt die tragenden Migrationen, nicht jede einzelne. Der verbindliche Stand steht in `public.schema_migration`.
@@ -146,11 +147,20 @@ Die Dashboards werden nicht in der Oberfläche gepflegt, sondern hier definiert 
 Durchlauf. Aufbau, Begründung und die Regeln für Diagrammtypen: `docs/dashboards.md`.
 
 ```
-uebernehmen.ts     Karten und Dashboards anlegen — der vollständige Lauf, braucht Browser
+uebernehmen.ts     Karten und Dashboards anlegen — der vollständige Lauf
 sichtbarkeit.ts    welche Tabellen Metabase zeigt (docs/metabase-sichtbarkeit.md)
 auswahllisten.ts   Filterlisten von Hand abgleichen — läuft sonst als Nachlauf im Sync
 karten-import.ts   die technische Seite: läuft der Import, woran hängt es
+karten-vergleich.ts  Betrieb gegen Marke, Betrieb gegen Stadt — die kurze
+                     Fassung auf ③ Betrieb, die lange auf ⑨ und ⑩
 ```
+
+⚠️ **`uebernehmen.ts` ist kein Trockenlauf.** Mit `METABASE_USER`/`METABASE_PASSWORD` in der
+Umgebung — so steht es in `.env` — meldet sich das Skript selbst an und schreibt **sofort**
+gegen `METABASE_URL`, die Produktivinstanz. Kein Browser, keine Rückfrage. Ohne die beiden
+Variablen fällt es auf den älteren Weg zurück (Server auf `:8899`, im Browser „Übernehmen"
+klicken). Wer nur die Definitionen prüfen will: `bun test metabase/karten.test.ts` — der
+fasst Metabase nicht an. Hergang in `docs/fehlerkatalog.md` (10.08.2026).
 
 **Beschreibungen richten sich an Fachbereichs-Mitarbeitende, nicht an Techniker.** Keine
 Tabellennamen, keine Excel-Zellbezüge, keine Begründung von Bauentscheidungen — die gehören
@@ -272,6 +282,24 @@ SELECT * FROM mart.round_table_marke(DATE '2026-06-01');
 -- Arbeitsliste: wem fehlt noch die Marke?
 SELECT * FROM mart.konzept_zuordnung WHERE hauptkonzept IS NULL;
 ```
+
+Vergleichsgruppen — schwächelt das Haus oder alle:
+
+```sql
+-- gegen die eigene Marke (Median der operativen Häuser, mit Rang)
+SELECT * FROM mart.marke_vergleich WHERE betrieb = 'Enchilada Karlsruhe GmbH';
+-- gegen die Nachbarhäuser am selben Ort
+SELECT * FROM mart.stadt_vergleich WHERE ort = 'Karlsruhe' AND bereich = 'umsatz';
+-- Städte mit mehr als einem laufenden Haus
+SELECT * FROM mart.stadt_schnitt_monat WHERE monat = DATE '2026-06-01';
+-- Arbeitsliste: wem fehlt die Ortsangabe? (Erwartung: kein operativer dabei)
+SELECT * FROM mart.nachbarschaft_fehlend WHERE status = 'operativ';
+```
+
+**Die Stadt steht NICHT in `core.betrieb.stadt`** — die Spalte ist bei allen 141 Betrieben
+NULL und wird trotzdem durch ein Dutzend `mart`-Sichten durchgereicht. Wer danach gruppiert,
+bekommt eine Gruppe mit allen Betrieben darin, ohne Fehlermeldung. Die gepflegte Stadt kommt
+aus `manual.betrieb_standort` und ist über `mart.nachbarschaft` zu lesen.
 
 **Der Betriebsname ist NICHT eindeutig.** In `getKennzahlen` liefert die Gruppe die Marke, das Kind nur die Stadt — fünf Betriebe heißen „Karlsruhe". Immer über `enc_id` joinen, nie über den Namen. Ob dahinter fünf Betriebe stehen (erwartet) oder ein Betrieb in fünf Marken, klärt: `SELECT anzahl_konzepte, count(*) FROM mart.konzept_zuordnung GROUP BY 1;` — Details am Kommentar von `core.betrieb_konzept` in `migrations/0002_stammdaten.sql`.
 

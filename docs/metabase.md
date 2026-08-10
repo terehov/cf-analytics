@@ -68,9 +68,23 @@ stellen: Admin → Tabellenmetadaten → Schema `core` → Sichtbarkeit.
 | Maßnahmen-Tracking | `mart.massnahme` |
 | Personalkosten und Effektivität je Bereich | `mart.personalkosten` |
 | Sind die Zahlen dieses Betriebs überhaupt beurteilbar? | `mart.datenstand` |
+| Schwächelt das Haus oder seine ganze Marke? | `mart.marke_vergleich` — je Monat, Betrieb und Kennzahl mit Markenmedian, Abstand und Rang |
+| Liegt es am Haus oder am Standort? | `mart.stadt_vergleich` — dasselbe, aber gegen die Nachbarhäuser am Ort |
+| Wer steht mit wem in einer Stadt? | `mart.nachbarschaft` — die einzige belastbare Stadtangabe |
+| Die Stadt als eine Zeile | `mart.stadt_schnitt_monat` — Gegenstück zu `konzept_schnitt_monat`, nur Orte mit mehr als einem laufenden Haus |
+| Wer fehlt im Stadtvergleich? | `mart.nachbarschaft_fehlend` — Erwartung: für Betriebe mit Umsatz leer |
 
 Jede dieser Sichten trägt einen Tabellenkommentar; Metabase zeigt ihn als Beschreibung an.
 Dort steht auch, was man mit ihr **nicht** tun soll.
+
+> **Die Spalte `stadt` ist überall NULL.** Sie läuft durch `mart.umsatz_ytd`,
+> `mart.round_table_monat`, `mart.ampel_bereich` und ein Dutzend weiterer Sichten, kommt aus
+> `core.betrieb.stadt` und ist dort bei **allen 141** Betrieben leer — LINA liefert für
+> Betriebe keine Adresse (nachgemessen 26.07.2026, erneut 10.08.2026). Wer danach gruppiert,
+> bekommt keine Fehlermeldung, sondern **eine** Gruppe mit allen Betrieben darin. Die
+> gepflegte Stadt steht in `mart.nachbarschaft.ort`, gespeist aus `manual.betrieb_standort`.
+> Seit Migration `0049` tragen die beiden verlockendsten dieser Spalten einen
+> Spaltenkommentar, der das sagt.
 
 ## Die Dashboards
 
@@ -174,14 +188,21 @@ metabase/
 ```
 
 ```bash
-bun run metabase/uebernehmen.ts     # startet auf :8899
-# dann http://localhost:8899/ im Browser öffnen und "Übernehmen" klicken
+bun run metabase/uebernehmen.ts
 ```
+
+> ⚠️ **Das ist kein Trockenlauf.** Mit `METABASE_USER` und `METABASE_PASSWORD` in der
+> Umgebung — so steht es in `.env` — meldet sich das Skript selbst an und schreibt sofort
+> gegen `METABASE_URL`, die Produktivinstanz. Ohne die beiden Variablen fällt es auf den
+> älteren Weg zurück und startet einen Server auf `:8899`, den man im Browser öffnet und wo
+> man „Übernehmen" klickt. Wer nur die Definitionen prüfen will, nimmt
+> `bun test metabase/karten.test.ts` — der fasst Metabase nicht an.
 
 Ein zweiter Lauf legt **nichts doppelt an**: jede Karte trägt ihren Schlüssel als
 `[key:...]` in der Beschreibung, und danach wird zuerst gesucht. Wer eine Karte in der
 Oberfläche umbenennt, verliert sie deshalb nicht — wer sie dort *inhaltlich* ändert, dessen
-Änderung wird beim nächsten Lauf überschrieben.
+Änderung wird beim nächsten Lauf überschrieben. Aus derselben Idempotenz folgt, dass ein
+abgebrochener Lauf nichts kaputt macht: der nächste stellt alles wieder her.
 
 Der Umweg über `:8899` hat einen Grund: Metabase schickt `connect-src 'self'`, seine eigene
 Seite darf also nichts von außen holen. Der Server unter `:8899` liefert deshalb die Seite

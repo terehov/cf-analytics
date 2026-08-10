@@ -33,9 +33,25 @@ Stand 26.07.2026: **98 Karten, 17 Dashboards, drei Sammlungen.**
 ### Übernehmen
 
 ```bash
-bun run metabase/uebernehmen.ts     # startet einen Server auf :8899
-# dann http://localhost:8899/ im Browser öffnen und „Übernehmen" klicken
+bun run metabase/uebernehmen.ts
 ```
+
+> ⚠️ **Der Befehl prüft nicht, er überträgt.** Sind `METABASE_USER` und `METABASE_PASSWORD`
+> gesetzt — und das sind sie in `.env` —, meldet sich das Skript selbst an und schreibt
+> **sofort** gegen `METABASE_URL`, also gegen die Produktivinstanz. Kein Browser, keine
+> Rückfrage, kein Trockenlauf. Nur **ohne** diese beiden Variablen fällt es auf den älteren
+> Weg zurück: ein Server auf `:8899`, den man im Browser öffnet und wo man „Übernehmen"
+> klickt.
+>
+> Wer nur wissen will, ob die Definitionen in sich stimmen, braucht den Befehl nicht: die
+> Prüfungen (Überlappung, Mindesthöhe, tote und taube Filter, Klickziele) laufen ganz am
+> Anfang und werfen, bevor irgendetwas angelegt wird — aber sie laufen im selben Prozess,
+> der danach überträgt. Für einen reinen Test gibt es `bun test metabase/karten.test.ts`;
+> der fasst Metabase nicht an.
+>
+> Am 10.08.2026 hat ein Agent den Befehl in der Annahme aufgerufen, er prüfe nur, und ihn
+> nach vierzig Karten abgebrochen. Folgenlos, weil die Übertragung idempotent ist und die
+> betroffenen Karten sich nicht geändert hatten — aber die Annahme kam aus dieser Datei.
 
 Ein zweiter Lauf legt **nichts doppelt an**. Jede Karte und jedes Dashboard trägt seinen
 Schlüssel als `[key:...]` am Ende der Beschreibung; danach wird zuerst gesucht. Wer eine
@@ -72,11 +88,14 @@ Rückweg ist immer, den Filter oben zu löschen.
 |---|---|---|---|
 | ① | Marken | Eine Zeile je Marke, alle Metriken, Ampeln gezählt | ② mit gesetzter Marke |
 | ② | Filialen | Alle Betriebe der Marke über sämtliche Metriken | ③ mit gesetztem Betrieb |
-| ③ | Betrieb | Das Betriebsblatt: Kennzahlen, Verlauf, Struktur, Personal, Ware, BWA, Einkauf & Inventur, Maßnahmen, Datenstand | das jeweilige Fach-Dashboard |
+| ③ | Betrieb | Das Betriebsblatt: Kennzahlen **samt Vergleich gegen Marke und Stadt**, Verlauf, Struktur, Personal, Ware, BWA, Einkauf & Inventur, Maßnahmen, Datenstand | das jeweilige Fach-Dashboard, ⑨ und ⑩ |
 | ④ | Zeiträume vergleichen | Zwei frei wählbare Zeiträume nebeneinander | ③ |
 | ⑤ | Standorte vergleichen | Mehrere Betriebe über alle Metriken, Verlauf, Tagesprofil, Spartenmix | ③ |
 | ⑥ | Portfolio und Potenzial | Konzentration, Streuung, was der Abstand zum Median kostet | — |
 | ⑦ | Muster im Geschäft | Wochenrhythmus, Stabilität, Gäste gegen Bon | — |
+| ⑧ | Standortkarte | Alle Standorte mit Koordinate, eingefärbt nach Handlungsbedarf | ③ |
+| ⑨ | Betrieb gegen Marke | Ein Haus gegen den Schnitt seiner eigenen Marke | ③ |
+| ⑩ | Betrieb gegen die Stadt | Ein Haus gegen die Nachbarhäuser am selben Ort | ③ |
 
 ### Round Table — die Excel-Ablösung
 
@@ -334,6 +353,174 @@ Bewertungen sind bis gestern vollständig, Impressionen bis zu einer Woche älte
 
 Die Kachel auf ① ist der eigentliche Punkt: „4,23" sagt niemandem, was zu tun ist,
 „Bestellung · 2,14" schon.
+
+---
+
+## Vergleichsgruppen: gegen die Marke, gegen die Stadt (angefragt 10.08.2026)
+
+> „Angenommen, wir möchten Enchilada Karlsruhe gegen Aposto und Wilma Wunder vergleichen, um
+> festzustellen, ob bei allen der Umsatz eingebrochen ist oder nur bei einem."
+
+Das ist die Frage nach dem **Maßstab**. Ein Umsatzrückgang von zwölf Prozent heißt etwas
+völlig anderes, je nachdem ob die Nachbarhäuser dasselbe zeigen oder ob das Haus allein
+dasteht. Ohne Maßstab führt jede Zahl im Round Table zu derselben Rückfrage, und die wurde
+bisher von Hand beantwortet.
+
+### Die kurze Fassung steht auf ③ Betrieb, die lange auf ⑨ und ⑩
+
+**Nachgereicht am 10.08.2026:** „das bestehende Betriebs-Dashboard um diese zwei Sachen
+erweitern … alles auf einem Dashboard". Berechtigt — die Frage „liegt es an diesem Haus?"
+stellt sich beim Lesen des Betriebsblatts, nicht auf einer Extraseite, zu der man erst
+navigieren muss.
+
+Auf ③ stehen deshalb direkt unter den sechs Kennzahlen zwei Karten:
+
+| Karte | Zeigt |
+|---|---|
+| `dd_betrieb_vergleich` | dieselben sechs Kennzahlen, je mit Markenmedian **und** Stadtmedian samt Rang |
+| `dd_betrieb_vergleich_verlauf` | Umsatzveränderung über 24 Monate: Haus, Marke und Stadt in **einem** Bild |
+
+Das liest sich von oben nach unten: `dd_betrieb_kopf` beantwortet *wie hat es sich
+entwickelt* (Vormonat, Trend, Ampelwechsel), die Karte darunter *wie steht es gegen die
+anderen* — in derselben Zeilenreihenfolge, damit man die Kennzahl nicht suchen muss.
+
+**Warum nicht einfach vier Spalten an `dd_betrieb_kopf` anhängen.** Die Karte führt bereits
+neun Spalten. Vier weitere ergäben dreizehn und damit waagerechtes Scrollen — genau der
+Fehler, der am 28.07.2026 dazu geführt hat, dass diese Tabelle die volle Breite bekam: wer
+scrollen muss, um die dritte Spalte zu sehen, vergleicht sie nicht mehr mit der ersten.
+
+**Der Rang trägt die Aussage, nicht der Abstand.** Auf ③ ist der Platz knapp, deshalb stehen
+dort Median und Rang, aber keine Δ-Spalten. Das ist kein Verlust: „16 von 17" ist eindeutig,
+ein „+5,8" wäre es nicht — bei Personal und Wareneinsatz ist weniger besser. Wer den Abstand
+in Zahlen will, klickt auf einen Vergleichswert und landet auf ⑨ bzw. ⑩.
+
+**Damit sind ⑨ und ⑩ erstmals angeklickt erreichbar.** ④ bis ⑦ hängen bis heute an keinem
+Klick — man findet sie nur über die Sammlung.
+
+Klickbar sind **vier** Spalten, nicht zwei: die ganze Marken-Hälfte der Zeile führt zu ⑨,
+die ganze Stadt-Hälfte zu ⑩.
+
+| Spalte | führt zu |
+|---|---|
+| `Marke (Median)`, `Rang Marke` | ⑨ Betrieb gegen Marke |
+| `Stadt (Median)`, `Rang Stadt` | ⑩ Betrieb gegen die Stadt |
+
+Zwei Klickflächen je Thema, weil die Hand nach der **roten Zahl** greift — und das ist meist
+der Rang, denn der trägt die Aussage. Eine einzelne verlinkte Spalte daneben wäre ein Klick,
+den man erst suchen muss.
+
+`Kennzahl`, `●` und `Wert` bleiben bewusst stumm: sie beschreiben das **Haus**, nicht eine
+Vergleichsgruppe, und hätten deshalb kein eindeutiges Ziel. Ein Klick, der zwischen Marke
+und Stadt raten müsste, ist schlechter als keiner.
+
+Der **Betrieb** kommt aus der angeklickten Zeile, der **Monat** wandert von selbst mit —
+beide Zielseiten kennen den Filter unter demselben Namen. `zeitraum` und `Sterne` bleiben
+zurück, weil ⑨ und ⑩ sie gar nicht führen.
+
+Ein Beispiel, warum beide Ebenen bleiben — Enchilada Karlsruhe im Juli:
+
+| Kennzahl | Wert | Marke | Rang Marke | Stadt | Rang Stadt |
+|---|---|---|---|---|---|
+| Umsatz | +21,2 % | −1,1 % | 2 von 18 | +7,4 % | 1 von 4 |
+| Personal | 45,0 % | 39,2 % | 16 von 17 | 42,5 % | 3 von 4 |
+| WE Küche | 37,4 % | 24,9 % | **17 von 17** | 33,9 % | **4 von 4** |
+
+Der Umsatz ist nicht das Problem — das Haus ist das beste seiner Stadt und das zweitbeste
+seiner Marke. Der Wareneinsatz Küche ist es: **letzter gegen beide Maßstäbe.** Diese
+Diagnose steht jetzt auf dem Betriebsblatt selbst; ⑨ und ⑩ sagen anschließend, gegen *wen*
+genau.
+
+### Warum zwei Seiten und nicht eine mit Umschalter
+
+Die beiden Gruppen fangen **verschiedene Störquellen** ab:
+
+| Gruppe | gleich | verschieden | fängt ab, was … |
+|---|---|---|---|
+| **Marke** | Konzept, Karte, Preise, Zielgruppe | Standort, Einzugsgebiet, Wetter | … am Konzept liegt |
+| **Stadt** | Einzugsgebiet, Wetter, Feiertage, Kaufkraft | Konzept, Karte, Preise | … am Standort liegt |
+
+Erst wer beide nebeneinander liest, kann die dritte Aussage treffen: **fällt ein Haus
+gegenüber seiner Marke *und* gegenüber seiner Stadt ab, liegt es am Haus.** Eine einzelne
+Seite mit Umschalter hätte genau diesen Vergleich unmöglich gemacht — man sieht immer nur
+eine der beiden Antworten.
+
+### Die Vergleichsgruppe wird abgeleitet, nicht eingestellt
+
+Beide Seiten haben **nur zwei Filter: Monat und Betrieb.** Marke und Stadt ergeben sich aus
+dem gewählten Betrieb.
+
+Die naheliegende Alternative — ein zweiter Filter „Marke" bzw. „Stadt" daneben — ist die
+schlechtere: zwei Filter, die dieselbe Menge einschränken, können einander widersprechen
+(„Betrieb = Aposto Mainz" und „Marke = Enchilada"), und das Ergebnis ist eine **leere Seite
+ohne Fehlermeldung**. Nicht zu unterscheiden von einem Betrieb ohne Geschäft — dieselbe
+Falle, wegen der die Textfilter überhaupt Auswahllisten bekommen haben.
+
+Auch **keinen Zeitraumfilter**, und das ist kein Vergessen: die Verlaufskarten lesen zwei
+verschiedene Tabellen (das Haus und seine Gruppe), und ein Metabase-Feldfilter baut seine
+Klausel aus dem *Tabellennamen*. Er würde nur einen der beiden Äste einschränken und die
+Linien still verschieden lang machen. Stattdessen ein festes **24-Monats-Fenster, das am
+Monatsfilter hängt** — zwei Jahre, weil ein Jahresvergleich mindestens einen vollen
+Saisonzyklus braucht.
+
+### Ohne Auswahl zeigt jede Karte etwas anderes — mit Absicht
+
+Ein Muster, das sich durch alle zehn Karten zieht:
+
+| SQL | ohne Auswahl | benutzt in |
+|---|---|---|
+| `WHERE 1 = 1 [[AND betrieb = {{betrieb}}]]` | **alle** Zeilen | Tabellen |
+| `WHERE false [[OR betrieb = {{betrieb}}]]` | **keine** Zeile | Diagrammen |
+
+Tabellen stehen ohne Auswahl vollständig da und sind dann eine brauchbare Gesamtübersicht
+(„wer liegt am weitesten unter seiner eigenen Marke"). Diagramme können das nicht — 49
+Linien übereinander sind keine Kurve. Sie zeigen ohne Auswahl deshalb die **Gruppen selbst**
+(die Marken bzw. die Städte) und mit Auswahl die einzelnen Häuser.
+
+### Was in den Sichten steht und nicht in den Karten
+
+**Die Richtung.** Bei Umsatz und Bewertung ist mehr besser, bei Personal und Wareneinsatz
+weniger. Eine Spalte „Abweichung: +3,2" ist ohne diese Angabe zweideutig — und zwar auf die
+gefährliche Art, weil sie entschieden aussieht. Jede Zeile trägt deshalb eine Spalte
+**„Stellung"** mit *besser* / *schlechter* / *gleich*, abgeleitet aus dem Standardregelwerk.
+Angezeigt wird `▲ besser` — Zeichen **und** Wort, weil das Zeichen allein bei einer
+Personalquote wieder als „höher" lesbar wäre und auch in einem CSV-Export funktionieren muss.
+
+**Der Rang steht nie ohne die Gruppengröße** — „3 von 14", nicht „3". Platz drei ist unter
+vierzehn gut und unter dreien der letzte.
+
+**Der Maßstab zählt nur operative Häuser.** Ein stillgelegtes Haus steht mit −100 % Umsatz
+in den Daten; zwei davon in einer kleinen Marke, und jeder laufende Betrieb sieht
+überdurchschnittlich aus. Der **betrachtete** Betrieb darf trotzdem still sein — sonst öffnet
+sich die Seite für ihn leer, und leer liest sich als „keine Daten" statt als „stillgelegt".
+
+**Median, nicht Mittelwert** — dieselbe Begründung wie überall hier: die Personalquote hat
+den Umsatz im Nenner und erreicht gemessen bis 316.576 %.
+
+### Auf ⑩ steht eine Warnung, die auf ⑨ fehlt
+
+Die Häuser einer Stadt gehören **verschiedenen Marken**. In Karlsruhe stehen Aposto,
+Enchilada, Lehners und Wilma Wunder nebeneinander — vier Konzepte mit verschiedenen Karten,
+Preisen und Personalstrukturen. Ein Wareneinsatz von 24 % ist zwischen einem mexikanischen
+und einem bürgerlichen Konzept **keine gemeinsame Messlatte**.
+
+Belastbar ist dort die **Veränderung gegenüber dem Vorjahr**: die trägt jedes Haus in seiner
+eigenen Einheit, und Wetter, Baustellen und Feiertage treffen alle gleichzeitig. Deshalb
+steht auf ⑩ die Umsatzveränderung ganz oben (als Balken je Haus, die Karte, wegen der es die
+Seite gibt) und die absoluten Quoten darunter — auf ⑨ ist die Reihenfolge dieselbe, aber der
+Vorbehalt entfällt.
+
+### Die Lücke steht auf der Seite, nicht daneben
+
+Der Stadtvergleich ist nur so vollständig wie die von Hand gepflegte Standortliste. Am
+10.08.2026 haben **60 von 141** Betrieben eine Ortsangabe, darunter **49 von 56** im letzten
+bewerteten Monat operativen — sieben laufende Häuser fehlen also in ihrer Stadt, **ohne dass
+es dort auffiele**. Genau deshalb steht unten auf ⑩ die Karte „Wer im Stadtvergleich fehlt",
+und die Kopfzeile sagt bei einem Betrieb ohne Ortsangabe ausdrücklich „(keine Stadt
+hinterlegt)" statt leer zu bleiben.
+
+Zehn Städte haben mindestens zwei laufende Häuser; Karlsruhe mit vieren ist die größte
+Gruppe. Für alle anderen Betriebe ist ⑩ eine leere Seite — das ist keine Datenlücke, sondern
+die Lage.
 
 ---
 

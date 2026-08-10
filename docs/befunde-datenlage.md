@@ -209,6 +209,37 @@ ausgewiesener `herkunft` entgegen, `mart.standort` verbindet sie mit der Ampel, 
 Karte zeigt genau die Betriebe, die darin stehen. Gefüllt wird sie **nicht durch Raten aus
 Betriebsnamen** — siehe [`dashboards.md`](dashboards.md), Abschnitt *Die Karte*.
 
+### Nachtrag 10.08.2026: die Standortliste ist inzwischen zu zwei Dritteln gefüllt
+
+`core.betrieb.stadt` ist unverändert bei **0 von 141** Betrieben gefüllt. `manual.betrieb_standort`
+dagegen ist gepflegt worden — nachgemessen am 10.08.2026:
+
+| Größe | Zahl |
+|---|---|
+| Betriebe mit Ortsangabe **und** Koordinate | 60 von 141 |
+| davon im letzten bewerteten Monat operativ | 49 von 56 |
+| operative Betriebe **ohne** Ortsangabe | 7 |
+| Städte mit mindestens zwei laufenden Häusern | 10 |
+
+Damit ist ein Vergleich innerhalb einer Stadt erstmals möglich. Die zehn Gruppen:
+
+| Stadt | laufende Häuser | Marken |
+|---|---|---|
+| Karlsruhe | 4 | Aposto, Enchilada, Deutsche Konzepte, Wilma Wunder |
+| Mainz | 4 | Aposto, Deutsche Konzepte, Wilma Wunder |
+| Aalen, Augsburg, Düsseldorf, Freudenstadt, Heilbronn, Köln, Nürnberg, Würzburg | je 2 | je 2 |
+
+In Karlsruhe steht zusätzlich ein fünftes geführtes Haus (Wirtshaus Im Jagdgrund) ohne
+laufenden Umsatz. **Deshalb führen die Sichten beide Zahlen getrennt:**
+`mart.nachbarschaft.haeuser_am_ort` zählt geführte Häuser, `mart.stadt_schnitt_monat.haeuser`
+die im Monat operativen. Wer beide verwechselt, zählt ein stillgelegtes Haus mit −100 %
+Umsatz in einen Stadtdurchschnitt.
+
+**Die sieben fehlenden sind der wunde Punkt.** Ein Betrieb ohne Ortsangabe fehlt in seiner
+Stadt, und **dort fällt es nicht auf** — die Stadt sieht dann einfach so aus, als stünde er
+nicht darin. Arbeitsliste: `mart.nachbarschaft_fehlend`, sichtbar am Fuß des Dashboards
+⑩ Betrieb gegen die Stadt.
+
 ---
 
 ## 9. Der Wochenrhythmus ist ausgeprägt

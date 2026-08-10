@@ -69,6 +69,36 @@ Ausdrücklich **nicht** aus dem Betriebsnamen ableiten — „Alter Kranen GmbH"
 Stadt, und fünf Betriebe heißen nach derselben Stadt, ohne dieselbe zu sein. Wie viele
 fehlen, sagt `mart.standort_fehlend`.
 
+**Stand 10.08.2026: 60 von 141 sind gepflegt** — Weg 1 hat also teilweise funktioniert. Damit
+steht die Karte, und seit demselben Tag hängt noch etwas daran: das Dashboard
+*⑩ Betrieb gegen die Stadt* vergleicht ein Haus mit den Nachbarhäusern am selben Ort.
+
+**Sieben laufende Betriebe fehlen noch, und dort wiegt es schwerer als auf der Karte.** Auf
+einer Karte fällt ein fehlender Punkt auf. In einem Stadtvergleich fällt ein fehlendes Haus
+**nicht** auf — die Stadt sieht dann einfach so aus, als stünde es nicht darin, und der
+Vergleich gibt sich als vollständig aus. Wer diese sieben nachträgt, macht mehr als eine
+Karte hübscher.
+
+Es sind ausgerechnet große Häuser (Monatsumsatz im zuletzt bewerteten Monat, 10.08.2026):
+
+| Betrieb | Marke | Umsatz |
+|---|---|---|
+| Wirtshaus am Schlossplatz GmbH | Deutsche Konzepte | 745.460 € |
+| WHK Gastronomie GmbH | Deutsche Konzepte | 428.451 € |
+| Wirtshaus Lautenschlager GmbH | Deutsche Konzepte | 359.055 € |
+| BS Bier & Speisen Gastro GmbH | Deutsche Konzepte | 246.500 € |
+| SCHAFFERONE GmbH | Kooperationspartner | 191.530 € |
+| Gastronomie Wilsdruffer Straße GmbH | Enchilada | 146.188 € |
+| B+L Pforzheim GmbH | Deutsche Konzepte | 95.351 € |
+
+**Das umsatzstärkste Haus der ganzen Gruppe steht nicht in seiner Stadt.** Fünf der sieben
+gehören zu „Deutsche Konzepte" — dort lohnt eine Sammelanfrage mehr als sieben Einzelfälle.
+„Gastronomie Wilsdruffer Straße" ist zudem ein Enchilada in Dresden, wo bereits zwei Häuser
+gepflegt sind; diese eine Zeile vervollständigt sofort eine bestehende Vergleichsgruppe.
+
+→ Arbeitsliste mit Umsatz und Zustand: `SELECT * FROM mart.nachbarschaft_fehlend WHERE status = 'operativ';`
+oder die unterste Karte auf ⑩.
+
 **79 von 141 Betrieben melden dauerhaft 0 € Umsatz.** Sie liefern über 200 Tage lang
 Umsatzberichte, alle leer — Beteiligungsgesellschaften, geschlossene Häuser, Testeinträge.
 `core.betrieb.aktiv` steht bei allen 141 auf `true` und trägt die Unterscheidung nicht.
