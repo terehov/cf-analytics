@@ -2261,3 +2261,103 @@ und sie zerstören jede Summe.
 **Was ihn verhindert.** Bei jeder Gästeauswertung `gaeste BETWEEN 1 AND 10000` filtern und
 den Ausschluss benennen. Ein Median hätte den Fehler nie gezeigt — deshalb bei
 Gästekennzahlen **immer auch die Summe gegenrechnen**.
+
+---
+
+## 11.08.2026 — fünf Fallen aus dem Bau des Ladenakte-Imports
+
+Vier davon hat erst das Testen gezeigt, eine hat mich beim Arbeiten selbst erwischt.
+
+### `bun run migrate` liest `DATABASE_URL` — auch wenn `TEST_DATABASE_URL` davorsteht
+
+**Symptom.** `TEST_DATABASE_URL=postgresql://…/lina_test bun run migrate` meldete
+„apply 0053, apply 0054". Angewendet wurden sie auf **`lina`**, die Produktivdatenbank.
+
+**Ursache.** Der Migrationsrunner liest `config.DATABASE_URL`. `TEST_DATABASE_URL` kennt
+nur die e2e-Testdatei. Eine Umgebungsvariable davorzuschreiben, die niemand liest, sieht
+aus wie eine Absicherung und ist keine.
+
+**Folgen hier: keine.** Beide Migrationen legen nur an. Der Bestand war unverändert
+(1.327.233 Umsatzzeilen, 141 Betriebe), die neuen Tabellen leer, `payload_text` überall
+NULL. Es war genau das, was der Deploy ohnehin getan hätte — aber es war nicht die Absicht,
+und bei einer Migration mit `UPDATE` oder `DROP` wäre es teuer geworden.
+
+**Was ihn verhindert.** Wer eine Migration gegen eine andere Datenbank fahren will, setzt
+`DATABASE_URL` — nichts anderes wirkt:
+
+```bash
+DATABASE_URL=postgresql://postgres@localhost/lina_test bun run migrate
+```
+
+Und vorher hinsehen, wohin es geht: `psql -tAd <db> -c "select current_database()"`.
+
+### Eine leere Testdatenbank ist nicht dasselbe wie ein Schema-Klon
+
+**Symptom.** `createdb lina_test && bun run migrate` bricht ab. Danach: sechs e2e-Tests
+scheitern, obwohl der Code stimmt.
+
+**Ursache, zwei Schichten.** Erstens lassen sich die Migrationen auf einer leeren Datenbank
+nicht abspielen (bekannt seit `0039`). Der Ausweg ist ein Schema-Klon:
+
+```bash
+dropdb --if-exists lina_test && createdb lina_test
+pg_dump --schema-only --no-owner --no-privileges lina | psql -q -d lina_test -v ON_ERROR_STOP=1
+```
+
+Zweitens — und das ist die eigentliche Falle — bringt `--schema-only` die **Seed-Zeilen der
+Migrationen nicht mit**. `core.marke` hat in der Produktivdatenbank vier Zeilen und im Klon
+null; dasselbe gilt für `core.belegart` und `manual.belegarchiv_soll`. Tests, die auf
+Stammdaten aufsetzen, scheitern dann an der Umgebung und sehen aus wie Codefehler.
+
+**Was ihn verhindert.** Ein Test, der Stammdaten braucht, **legt sie selbst an**, statt sie
+in der Datenbank vorauszusetzen — so macht es die Ladenakte-Suite mit `core.belegart`.
+Und wer sechs rote Tests sieht, prüft zuerst gegen den unveränderten Stand
+(`git stash`), bevor er den eigenen Code verdächtigt.
+
+### Die zweite Attrappe in derselben Testdatei redet ins Leere
+
+**Symptom.** Vier Ladenakte-Tests liefen einzeln grün und meldeten im Dateilauf drei Fehler.
+
+**Ursache.** `config` wird beim **ersten** Import eingefroren; im Dateilauf ist das die
+Attrappe der ersten Suite. Eine spätere Suite startet ihre eigene auf einem anderen Port,
+der Client zeigt aber weiter auf den alten. Alle Aufrufe laufen ins Leere — und weil sie
+als gewöhnliche Postenfehler ankommen, sieht es nach einem kaputten Lader aus.
+
+**Was ihn verhindert.** Jede Suite, die eine eigene Attrappe startet, zieht die Basis-URL
+ausdrücklich nach:
+
+```ts
+;(config as { LINA_BASE_URL: string }).LINA_BASE_URL = mock.url
+```
+
+Dieselbe Wurzel wie die bekannte `-t`-Falle weiter oben: **eine eingefrorene Konfiguration
+und mehrere Testdateien in einem Prozess.**
+
+### LINA schreibt „nicht zugeordnet" auf zwei Arten in dasselbe Feld
+
+**Symptom.** `kreditor_konto IS NOT NULL` zählte 61 von 61 Belegen — obwohl nur 20 ein
+Kreditorenkonto haben.
+
+**Ursache.** `kreditor_account` kommt **im selben Ordner gemischt** als leere Zeichenkette
+und als Zahl `0`: 33-mal Text, 28-mal Zahl. Dasselbe bei `seller_id`, `cost_account`,
+`cost_account7` und `cost_account0`. Wer nur auf `null` prüft, speichert `""` und `"0"` als
+Werte.
+
+**Warum das teuer wäre.** `"0"` ist ein Konto, das es nicht gibt. Jede Gruppierung nach
+Kreditor bekäme einen erfundenen Sammelposten, der bei 394.552 Eingangsrechnungen der
+grösste von allen wäre — und völlig plausibel aussähe.
+
+**Was ihn verhindert.** `kontoZuNull()` in `src/ladenakte/laden.ts`: leer, `-` und `0`
+werden NULL. Der e2e-Test prüft die Zahl (20), nicht bloss „nicht leer".
+
+### Ein Tausenderpunkt zu viel, und die Zahl ist um Faktor 1000 daneben
+
+**Symptom.** Im eigenen Test aufgefallen, bevor etwas lief: `deutscheZahl('1.234.56')`
+lieferte `123456`.
+
+**Ursache.** Das erste Muster war `^-?[\d.]+(,\d+)?$` — es akzeptiert beliebig viele Punkte
+und wirft sie beim Umwandeln weg. Aus einer verstümmelten Zahl wird so eine plausible.
+
+**Was ihn verhindert.** Tausenderpunkte müssen echte Dreiergruppen sein:
+`^-?(\d{1,3}(\.\d{3})*|\d+)(,\d+)?$`. Was nicht passt, wird **NULL statt geraten** — und
+NULL fällt in einer Geldspalte auf, eine falsche Zahl nicht.
