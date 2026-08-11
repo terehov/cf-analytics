@@ -359,12 +359,16 @@ CREATE TABLE core.bwa_position (
     betrieb_key   integer      NOT NULL REFERENCES core.betrieb(betrieb_key),
     monat         date         NOT NULL,
     zeile         text         NOT NULL,
+    zeile_id      text         NOT NULL,
     zeile_nr      smallint,
     betrag        numeric(14,2),
     abgerufen_am  timestamptz  NOT NULL,
     raw_id        bigint,
     geladen_am    timestamptz  NOT NULL DEFAULT now(),
     PRIMARY KEY (betrieb_key, monat, zeile),
+    -- Zweiter Schluessel auf derselben Zeile. Nicht redundant: er ist der
+    -- BELASTBARE, waehrend der PK der LESBARE ist. Begruendung am Spaltenkommentar.
+    CONSTRAINT bwa_position_zeile_id_uq UNIQUE (betrieb_key, monat, zeile_id),
     CONSTRAINT bwa_position_monatserster CHECK (monat = date_trunc('month', monat)::date)
 );
 
@@ -390,11 +394,25 @@ Beschriftung und waeren damit nicht schluesselbar.';
 
 COMMENT ON COLUMN core.bwa_position.zeile IS
 'Die Beschriftung WOERTLICH wie geliefert, einschliesslich Abschneidung ("Freiwillige soz.
-Auf", "Abschluss-/Pruefungsk"). SIE IST DER EINZIGE SCHLUESSEL — das Longterm-HTML liefert
-keine Zeilen-ID. Nicht normalisiert, nicht aufgefuellt, nicht repariert: die Auffuellung
-waere eine Vermutung, und eine geaenderte Abschneidelaenge bei LINA erzeugte dann still
-eine zweite Kennzahl. Die Deutung steht in manual.bwa_zeile, die Arbeitsliste in
-mart.bwa_zeile_ungepflegt.';
+Auf", "Abschluss-/Pruefungsk"). Nicht normalisiert, nicht aufgefuellt, nicht repariert: die
+Auffuellung waere eine Vermutung. Sie ist der PRIMAERSCHLUESSEL, weil sie lesbar ist und
+weil manual.bwa_zeile die Deutung daran haengt — aber sie ist NICHT der verlaessliche
+Schluessel. Der ist zeile_id. Die Arbeitsliste steht in mart.bwa_zeile_ungepflegt.';
+COMMENT ON COLUMN core.bwa_position.zeile_id IS
+'Die stabile Nummer der BWA-Zeile, 82 bis 162. HIER STAND ZUERST, DAS LONGTERM-HTML LIEFERE
+KEINE ZEILEN-ID — das war falsch, und die Berichtigung ist der Grund fuer diese Spalte.
+Jede Datenzeile traegt in ihrem Diagramm-Link ein /img/<nr>/, und das ist die Nummer.
+Am 11.08.2026 an zwei sehr verschiedenen Betrieben gemessen — Schlager Cafe Duesseldorf mit
+20 Monatsspalten und voller Buchung, CONCEPT FAMILY Franchise AG mit 80 Spalten und keinem
+einzigen Wert: beide Male dieselben 77 Nummern in derselben Reihenfolge. Dieselben 77 fuehrt
+das Stammdatenblatt in der Spalte ID der Plan-BWA.
+WARUM DAS ZAEHLT: Plan und Ist kommen aus ZWEI VERSCHIEDENEN Seiten. Ein Join ueber die
+Beschriftung setzt voraus, dass LINA denselben abgeschnittenen Text an beiden Stellen gleich
+rendert. Am 11.08.2026 tat es das (77 von 77 gemessen) — aber es ist eine Zusicherung, die
+niemand gegeben hat, und ein nicht getroffener Join meldet keinen Fehler, sondern liefert
+eine leere Zeile. mart.bwa_plan_ist joint deshalb ueber zeile_id.
+Die Nummer trennt ausserdem Daten von Layout: die 26 Gliederungsleerzeilen der 103 tragen
+keine Nummer und werden gar nicht erst geschrieben.';
 COMMENT ON COLUMN core.bwa_position.zeile_nr IS
 'Position in der gerenderten Tabelle, 1 bis 103. NUR Anzeigereihenfolge und Driftmelder,
 NIE Schluessel: Zeilen werden ueber die Beschriftung getroffen, nie ueber den Index
@@ -425,13 +443,16 @@ CREATE TABLE core.bwa_plan (
     betrieb_key   integer      NOT NULL REFERENCES core.betrieb(betrieb_key),
     monat         date         NOT NULL,
     zeile         text         NOT NULL,
-    zeile_id      text,
+    -- NOT NULL, seit die Nummer auch auf der Ist-Seite steht: mart.bwa_plan_ist
+    -- joint darueber, und ein NULL hier hiesse "diese Planzeile findet ihr Ist nie".
+    zeile_id      text         NOT NULL,
     zeile_nr      smallint,
     betrag        numeric(14,2),
     abgerufen_am  timestamptz  NOT NULL,
     raw_id        bigint,
     geladen_am    timestamptz  NOT NULL DEFAULT now(),
     PRIMARY KEY (betrieb_key, monat, zeile),
+    CONSTRAINT bwa_plan_zeile_id_uq UNIQUE (betrieb_key, monat, zeile_id),
     CONSTRAINT bwa_plan_monatserster CHECK (monat = date_trunc('month', monat)::date)
 );
 
@@ -718,7 +739,15 @@ SELECT coalesce(i.betrieb_key, pl.betrieb_key) AS betrieb_key,
   FULL OUTER JOIN core.bwa_plan pl
     ON  pl.betrieb_key = i.betrieb_key
     AND pl.monat       = i.monat
-    AND pl.zeile       = i.zeile
+    /*
+     * ueber die NUMMER, nicht ueber den Text. Plan und Ist stammen aus zwei
+     * verschiedenen Seiten; ein Textjoin verlaesst sich darauf, dass LINA
+     * dieselbe Abschneidung zweimal gleich rendert. Am 11.08.2026 traf das zu
+     * (77 von 77), aber ein danebengehender Join liefert hier keine
+     * Fehlermeldung, sondern eine leere Plan-Spalte neben einem gefuellten Ist
+     * — und das liest sich wie "kein Budget gepflegt".
+     */
+    AND pl.zeile_id    = i.zeile_id
   JOIN core.betrieb b ON b.betrieb_key = coalesce(i.betrieb_key, pl.betrieb_key)
   LEFT JOIN manual.bwa_zeile z        ON z.zeile        = coalesce(i.zeile, pl.zeile)
   LEFT JOIN mart.konzept_zuordnung kz ON kz.betrieb_key = coalesce(i.betrieb_key, pl.betrieb_key)
