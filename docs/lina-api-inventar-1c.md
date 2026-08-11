@@ -183,7 +183,11 @@ geplanten wie an die geleisteten Stunden kommen wir derzeit nicht.**
 
 **Streichen:** 107, 118, 23, 8, 7, 9, 24 — gesperrt, nicht bloß leer.
 
-**Nicht verfolgen:** Rezepturen über HTML (≈12 GB), Stundenzettel (personenbezogen, HTML).
+**Nicht verfolgen:** Rezepturen über HTML (≈12 GB).
+
+**Zurückgestellt, nicht ausgeschlossen:** Stundenzettel (HTML, kein JSON — Aufwandsfrage). Der
+frühere Zusatzgrund „personenbezogen" ist seit dem 11.08.2026 keiner mehr, siehe
+`entscheidungen.md`.
 
 **Fragen an Concept Family bzw. LINA:**
 

@@ -813,3 +813,86 @@ muss.
 Abstand. Der Rang trägt die Aussage ohne Zweideutigkeit — „16 von 17" heißt schlecht,
 gleichgültig ob bei der Kennzahl mehr oder weniger besser ist. Ein „+5,8" heißt das nicht.
 Wer den Abstand in Zahlen braucht, ist einen Klick entfernt.
+
+---
+
+## Personenbezogene Daten: die Sperre fällt (11.08.2026)
+
+*Entschieden von Eugene, ausgelöst durch die Round-Table-Map des Managements.*
+
+**Die Regel ist aufgehoben.** Personenbezug ist ab sofort **kein Grund mehr**, eine Quelle
+nicht zu holen. Der Maßstab ist jetzt einer: **dient das Feld einer Kennzahl aus der
+Round-Table-Map?** Wenn ja, wird es geholt.
+
+### Woher die Regel kam — und warum sie fiel
+
+Sie stand an sieben Stellen, aber sie war **nie eine Vorgabe des Fachbereichs**. Sie ist in
+Phase 1 im Projekt selbst entstanden, als es noch keinen definierten Auswertungszweck gab:
+`datensicherung.md` Klasse D, `yext-anbindung.md` §3, die Lieferanten-Whitelist in
+Migration `0002`, der Kommentar an `mart.pruefung_bon` in `0006`, zwei Stellen im
+API-Inventar und die ausgeschlossene `USER_NAME`-Dimension im Yext-Analytics-Inventar. Die
+Begründung war überall dieselbe: *„für die Kennzahl nicht nötig"*.
+
+**Genau diese Begründung ist mit der Round-Table-Map hinfällig geworden.** Sie definiert den
+Zweck, den es vorher nicht gab, und mehrere ihrer Kennzahlen sind ohne Personenbezug nicht
+rechenbar:
+
+| Kapitel der Map | Kennzahl | braucht |
+|---|---|---|
+| 5.1 | Bons mit Aktion, Ø Bon mit vs. ohne Aktion, Gäste mit Aktion | Bonebene aus dem Kassenjournal |
+| 4.2 | Kurswirkung: Kursabschluss ↔ Durchschnittsbon, Zusatzverkäufe | Zuordnung **je Mitarbeiter**, sonst nur ein schwacher Betriebsvergleich |
+| 2.1 / 2.3 / 7.2 | PK je Umsatzstunde, Stunden je Zeitzone, Plan vs. Ist | Arbeitszeiten je Person und Schicht |
+| 7.2 / 11.1 | Wartezeiten | Bon-Zeitstempel |
+| 3.1 | Antwortverhalten je Bearbeiter | Yext-`USER_NAME` |
+
+Die frühere Fassung hat das eine Mal ausdrücklich offengelassen: *„Falls doch: erst Zweck
+definieren, dann holen."* Der Zweck ist jetzt definiert. Das ist keine Kehrtwende, sondern
+der vorgesehene Ausgang.
+
+**Ein Vorlauf gab es schon.** Am 03.08.2026 fiel derselbe Grundsatz bereits für die
+Bewertungstexte und den Autorennamen (`core.bewertung`, Migrationen `0037`/`0038`) — mit
+derselben Begründung: eine Zahl sagt *dass*, erst der Text sagt *woran*. Diese Entscheidung
+zieht die Linie nur konsequent zu Ende, statt sie Fall für Fall neu zu verhandeln.
+
+### Was ausgeschlossen bleibt — und aus welchem anderen Grund
+
+Zwei Dinge bleiben draußen, und **keines davon wegen Personenbezugs**:
+
+1. **Zugangsdaten.** `db_name`, `db_user`, `db_pass` aus `getStoreData`, dazu IBAN, BIC und
+   Steuernummer. Das fällt unter Regel 2 in `AGENTS.md` — Zugangsdaten werden nicht
+   gespeichert, egal von wem. Unverändert gültig.
+2. **Steuer- und Bankdaten der Lieferanten** (`ustid`, `hrb`, `kreditor`, `gegenkonto*`).
+   Sie beantworten keine Kennzahl. Die Whitelist in `src/transform/index.ts` und die beiden
+   Tests bleiben deshalb stehen — aber als *fachliche* Entscheidung, die eine Kennzahl
+   jederzeit umstoßen kann, nicht als Grundsatz.
+
+### Was sich dadurch **nicht** ändert
+
+Die Aufhebung betrifft ausschließlich die Frage *welche Felder*. Alle übrigen harten Regeln
+gelten unverändert: in LINA wird nur gelesen (1), Zugangsdaten kommen aus Umgebungsvariablen
+(2), die Drosselung bleibt (3), der Raw-Layer bleibt append-only (4).
+
+**Und die Daten sind damit noch nicht da.** Wer diesen Abschnitt liest und annimmt, die
+Bonebene liege jetzt vor, irrt. Drei Hindernisse standen neben dem Personenbezug und stehen
+noch:
+
+- **Rechte.** Berichte 107, 118, 23, 8, 7, 9, 24 liefern HTTP 500. Mitarbeiter-Stammdaten
+  stehen auf `access: false`. Das klärt Concept Family, nicht der Importer.
+- **Format.** Kassenjournal und Stundenzettel sind vermutlich HTML, nicht JSON. Ungemessen.
+- **Kosten.** Betriebs-Reports kosten 141 Aufrufe je Zeitraum statt einem. Bericht 107 über
+  fünf Jahre sind rund 8.500 Anfragen — bei der geltenden Drosselung eine Planungsgröße.
+
+Nächster Schritt ist deshalb **messen, nicht bauen**: je ein lesender Aufruf auf
+`/finanzen/report/kassenjournal` und auf Bericht 107 in Betriebskontext, um Format, Umfang
+und Rechtelage zu kennen. Vorher lässt sich der Aufwand für Kapitel 2, 4.2, 5.1 und 7.2 der
+Map nicht seriös schätzen.
+
+### Wo die Regel überall stand
+
+Aktualisiert wurden `datensicherung.md` (Klasse D), `datenherkunft.md` (zwei Stellen),
+`yext-anbindung.md` §3, `lina-api-inventar-1b.md`, `lina-api-inventar-1c.md` und
+`yext-analytics-inventar.md`. **Die Kommentare in den Migrationen `0002`, `0006`, `0036` und
+`0037` bleiben unangetastet** — sie sind angewandte Migrationen und dokumentieren, was zum
+damaligen Zeitpunkt galt. Wer sie liest, findet den Widerspruch über diesen Abschnitt
+aufgelöst; sie nachträglich umzuschreiben würde die Historie verfälschen und wäre bei
+`0002` und `0006` auch wirkungslos, weil dort nur Quelltextkommentare stehen.

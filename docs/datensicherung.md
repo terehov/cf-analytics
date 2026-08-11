@@ -56,13 +56,20 @@ Betriebs-Reports: **eine Anfrage je Betrieb und Zeitraum**, also ×141.
 
 ---
 
-## Klasse D — bewusst nicht verfolgen
+## Klasse D — technisch teuer, fachlich gewollt
 
-| Quelle | Warum nicht |
+> **Umgestellt am 11.08.2026.** Diese Klasse hieß „bewusst nicht verfolgen", und der
+> Hauptgrund war Personenbezug. Der ist als Ausschlussgrund entfallen — Begründung und
+> Umfang in [`entscheidungen.md`](entscheidungen.md), Abschnitt *Personenbezogene Daten:
+> die Sperre fällt*. Was bleibt, sind **technische** Gründe: HTML statt JSON, Datenmenge,
+> fehlende Rechte. Die sind unverändert real und entscheiden über die Reihenfolge.
+
+| Quelle | Was jetzt dagegen spricht |
 |---|---|
-| **Stundenzettel** je Mitarbeiter | Nur HTML, editierbares Formular. Personenbezogen, fragil, und man tippt auf einer Eingabemaske herum. Die aggregierten Berichte (107, 23, 8) beantworten dieselben Fragen ohne Personenbezug. |
-| **Kassenjournal / Bon-Rohdaten** | Ungeprüft, vermutlich HTML. Um Größenordnungen umfangreicher als alles andere, und personenbezogen (Kellner, Zeitstempel). Für Ops-Analysen bringt die Bonebene wenig, was Artikel- plus Stundenebene nicht schon hergeben. Falls doch: erst Zweck definieren, dann Datenminimierung, dann holen. |
-| Mitarbeiter-Stammdaten | `access: false` für den genutzten Account. |
+| **Stundenzettel** je Mitarbeiter | Nur HTML, editierbares Formular, kein JSON. DOM-Scraping je Mitarbeiter × Monat ist aufwendig und fragil, und man tippt auf einer Eingabemaske herum (Regel 1: in LINA wird nur gelesen). **Erst 107 auf Betriebsebene testen** — liefert der Bericht Stunden je Bereich und Tag, ist der Stundenzettel nur noch für Lohnniveau und Krankenstand nötig. |
+| **Kassenjournal / Bon-Rohdaten** | Ungeprüft, vermutlich HTML. Um Größenordnungen umfangreicher als alles andere. **Fachlich jetzt gewollt**: die Bonebene ist die einzige Quelle für „Bons mit Aktion", „Ø Bon mit vs. ohne Aktion", Zusatzverkäufe und Wartezeiten aus Bon-Zeitstempeln. Nächster Schritt ist ein einzelner lesender Aufruf auf `/finanzen/report/kassenjournal`, um Format und Größe zu messen. |
+| Mitarbeiter-Stammdaten | `access: false` für den genutzten Account — eine **Rechtefrage**, kein Verzicht. Gehört auf die Liste für Concept Family. |
+| Kellnerbezogene Berichte (58, 59, Umsatz je Kellner) | Betriebs-Reports, also 141 Aufrufe je Zeitraum. Fachlich die Basis für Zusatzverkauf je Mitarbeiter und damit für die Kurswirkung aus Kapitel 4.2 der Round-Table-Map. |
 
 ---
 

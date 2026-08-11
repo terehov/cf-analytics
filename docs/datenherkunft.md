@@ -67,7 +67,7 @@ Monatsersten gesetzt, `--historie` überspringt sie.
 | `analyticsFilterOptions` | `/intranet/api/analyticsFilterOptions` | `core.feinsparte`, `core.konzept` **+ `core.betrieb.lina_betrieb_id`** |
 | `articleApi:franchise` | `/wawi/rezept/articleApi?franchise=1` | `core.warengruppe`, `core.artikel_warengruppe_stand` |
 | `wawi:units` | `/wawi/api/units` | `core.einheit` |
-| `wawi:suppliers` | `/wawi/api/suppliers` | `core.lieferant` — **Datenminimierung, siehe unten** |
+| `wawi:suppliers` | `/wawi/api/suppliers` | `core.lieferant` — **Feld-Whitelist, siehe unten** |
 | `wawi:items` | `/wawi/api/items?archive=0` | `core.ware`, `core.ware_stand`, `core.einkaufspreis_stand` |
 | `wawi:orders` | `/wawi/api/orders` | `core.bestellung`, `core.bestellposten` |
 | `wawi:inventory` | `/wawi/inventory/inventory` | `core.inventurtermin` |
@@ -80,8 +80,8 @@ Margenbetrachtung, die sich nicht nachholen lässt.
 | | Warum |
 |---|---|
 | Betriebs-Reports (`getReport:*`, 72 Stück) | im Register als `aktiv: false`. Kosten 141 Aufrufe je Zeitraum statt einem. |
-| Kassenjournal | ungeprüft, vermutlich HTML statt JSON, um Größenordnungen umfangreicher und **personenbezogen** (Kellner, Zeitstempel). |
-| Personalberichte | im Browser verifiziert gesperrt. |
+| Kassenjournal | ungeprüft, vermutlich HTML statt JSON, um Größenordnungen umfangreicher. **Fachlich seit 11.08.2026 gewollt** — der Personenbezug ist kein Ausschlussgrund mehr, siehe `entscheidungen.md`. Offen ist nur noch Format und Menge; das klärt ein lesender Aufruf. |
+| Personalberichte | im Browser verifiziert gesperrt. **Rechtefrage**, kein Verzicht — steht in `offene-punkte.md` bei Concept Family. |
 | Storno | wird bei Concept Family offenbar nicht genutzt. Begründung in `entscheidungen.md`. |
 
 ### Was aus LINA gar nicht kommt
@@ -401,21 +401,30 @@ oben bei den Personalkosten, nur an anderer Stelle.
 
 ---
 
-## Datenminimierung bei Lieferanten
+## Die Lieferanten-Whitelist — was sie ist und was sie nicht ist
 
 `/wawi/api/suppliers` liefert 28 Felder für 540 Geschäftspartner. Übernommen werden **fünf**:
 `lina_id`, `name`, `aktiv`, `mindestbestellwert`, `liefertage`.
 
-Bewusst **nicht** gespeichert: `ustid`, `hrb`, `kreditor`, `gegenkonto*`, `tel`, `Fax`, `email`,
+Nicht gespeichert: `ustid`, `hrb`, `kreditor`, `gegenkonto*`, `tel`, `Fax`, `email`,
 `ort`, `strasse`, `hnr`, `plz`, `kdnr`, `partner`, `netz`, `re_def`, `id_general`, `api`,
-`einzelp`, `dh_supplier_id`. Steuer-, Bank- und Kontaktdaten, für jede geplante Auswertung ohne
-Nutzen — und ein Datenbestand, den man nicht hat, kann auch nicht abfließen.
+`einzelp`, `dh_supplier_id`.
+
+**Der Grund ist seit dem 11.08.2026 ein anderer als früher.** Diese Whitelist hieß einmal
+„Datenminimierung" und stand für den Grundsatz, personenbezogene Daten gar nicht erst zu holen.
+Der Grundsatz ist aufgehoben (siehe `entscheidungen.md`, *Personenbezogene Daten: die Sperre
+fällt*). Geblieben ist ein schlichterer Maßstab: **Steuer- und Bankdaten von Geschäftspartnern
+beantworten keine der Kennzahlen aus der Round-Table-Map.** Sie bleiben deshalb draußen — nicht
+aus Prinzip, sondern mangels Zweck. Braucht eine Kennzahl eines dieser Felder, wird die Whitelist
+erweitert; das ist ab jetzt eine fachliche Entscheidung, keine grundsätzliche.
 
 Die Transformation hat eine **explizite Whitelist**, und ein Test weist die Abwesenheit dieser
-Spalten in der Datenbank nach. Wer hier eine Spalte ergänzt, begründet das im Ticket.
+Spalten in der Datenbank nach. Wer eine Spalte ergänzt, ergänzt beides.
 
-Dasselbe gilt für `getStoreData`: die Antwort enthält `db_name`, `db_user` und `db_pass` im
-Klartext sowie IBAN, BIC und Steuernummer. **Wird nicht gelesen und nicht gespeichert.**
+**Anders liegt der Fall bei `getStoreData`:** die Antwort enthält `db_name`, `db_user` und
+`db_pass` im Klartext sowie IBAN, BIC und Steuernummer. Das sind **Zugangsdaten**, keine
+Analysedaten — sie fallen unter Regel 2 in `AGENTS.md` und bleiben ausgeschlossen. Diese
+Ausnahme hat mit der aufgehobenen Regel nichts zu tun und gilt unverändert weiter.
 
 ---
 

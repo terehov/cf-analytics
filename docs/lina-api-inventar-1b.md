@@ -117,7 +117,15 @@ Interessant: `umsatz` und `eff` im Dienstplan-Objekt → LINA hinterlegt bereits
 **Wichtige Einschränkung:** Für den genutzten Account gilt „Keine Berechtigung für diesen Dienstplan vorhanden". Die API antwortet trotzdem mit 200 — die Rechteprüfung passiert im Frontend bzw. liefert leere Daten.
 
 **Der Stundenzettel ist ein Problem.** Er ist eine serverseitig gerenderte, **editierbare** Seite je Mitarbeiter und Monat (Spalten: Datum, h gesamt, Zuschlagsstufen, Kost, TD von/bis, Von/Bis, Pause, Tage, Bereich; dazu Stammdaten Anstellungsverhältnis, Wochenstunden, Stunden/Tag). Es gibt **keine JSON-API**.
-→ Für „Lohnniveau, Krankenstand, MA-Kosten pro Stunde" ist DOM-Scraping je Mitarbeiter × Monat **die falsche Antwort** (Aufwand, Fragilität, und man tippt auf einem Eingabeformular herum). **Der bessere Weg sind die aggregierten Betriebs-Berichte:** `107 Gearbeitete Stunden`, `23 Personalkostenschätzung`, `8 Personalkosten (Jahr)`, `9 Urlaubsverteilung` — alle über `getReport` als JSON. Personenbezogene Einzeldaten brauchen wir für das Reporting ohnehin nicht (Datenminimierung).
+→ Für „Lohnniveau, Krankenstand, MA-Kosten pro Stunde" ist DOM-Scraping je Mitarbeiter × Monat **der teurere Weg** (Aufwand, Fragilität, und man tippt auf einem Eingabeformular herum — Regel 1). **Zuerst zu prüfen sind deshalb die aggregierten Betriebs-Berichte:** `107 Gearbeitete Stunden`, `23 Personalkostenschätzung`, `8 Personalkosten (Jahr)`, `9 Urlaubsverteilung` — alle über `getReport` als JSON.
+
+> **Nachtrag 11.08.2026.** Hier stand: „Personenbezogene Einzeldaten brauchen wir für das
+> Reporting ohnehin nicht (Datenminimierung)." Der Satz gilt nicht mehr — der Personenbezug
+> ist als Ausschlussgrund aufgehoben (`entscheidungen.md`). Und die Aussage war fachlich zu
+> kurz gesprungen: Kapitel 2.3 und 7.2 der Round-Table-Map verlangen Personalstunden **je
+> Zeitzone**, Kapitel 4.2 die Kurswirkung **je Mitarbeiter**. Ob 107 das je Schicht hergibt,
+> ist bis heute ungemessen. Reicht der aggregierte Bericht nicht, ist der Stundenzettel der
+> Weg — dann als bewusste Aufwandsentscheidung, nicht als Grundsatzfrage.
 
 ---
 

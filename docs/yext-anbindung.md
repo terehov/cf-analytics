@@ -86,12 +86,16 @@ Zuordnung zu unseren 141 Betrieben herzustellen (siehe Abschnitt 6).
 
 ### Was wir bewusst nicht verarbeiten
 
-`authorName`, `authorEmail` und der Bewertungstext (`content`, `comments`) werden **nicht
-gespeichert**. Für eine Monatskennzahl sind sie nicht nötig, und personenbezogene Daten
-ohne Zweck zu speichern wollen wir vermeiden.
+> **Überholt seit 03.08. und endgültig seit 11.08.2026.** Der Absatz bleibt stehen, weil die
+> beiden Nachträge darunter sonst ins Leere zeigen — als Regel gilt er nicht mehr. Maßgeblich
+> ist `entscheidungen.md`, Abschnitt *Personenbezogene Daten: die Sperre fällt*.
 
-Sollte später eine Textauswertung gewünscht sein, käme das als eigener Antrag mit eigener
-datenschutzrechtlicher Prüfung — nicht durch die Hintertür dieses Zugangs.
+~~`authorName`, `authorEmail` und der Bewertungstext (`content`, `comments`) werden **nicht
+gespeichert**. Für eine Monatskennzahl sind sie nicht nötig, und personenbezogene Daten
+ohne Zweck zu speichern wollen wir vermeiden.~~
+
+~~Sollte später eine Textauswertung gewünscht sein, käme das als eigener Antrag mit eigener
+datenschutzrechtlicher Prüfung — nicht durch die Hintertür dieses Zugangs.~~
 
 > **Nachtrag 03.08.2026 — dieser Antrag ist gestellt und entschieden.** Die Texte werden
 > seitdem gespeichert (`core.bewertung`), damit die roten Ampeln des Round Table eine

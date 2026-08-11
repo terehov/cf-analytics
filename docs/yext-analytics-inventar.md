@@ -325,9 +325,16 @@ schneller als ein Schnitt über zehntausende Altbewertungen.
 ### C — nicht bauen
 
 `KEYWORD_SENTIMENT` (85 % Nullen) · `REVIEW_TOPICS` roh · `REVIEW_TRENDS` (HTTP 500) ·
-`STATE` (leer) · `REVIEW_CONTENT` als Dimension · `USER_NAME` (Yext-Bearbeiter, personenbezogen) ·
+`STATE` (leer) · `REVIEW_CONTENT` als Dimension ·
 `CONVERSION_*` (im Konto nicht konfiguriert, alles 0) · `FB_PAGE_*` (16 Metriken, alle 0 — Facebook
 ist nicht angebunden) · Apple- und Instagram-Metriken (dreistellige Werte, kein Steuerungsnutzen)
+
+**`USER_NAME` (Yext-Bearbeiter) steht seit dem 11.08.2026 nicht mehr auf dieser Liste.** Der
+Ausschluss beruhte allein auf dem Personenbezug, und der zählt nicht mehr
+(`entscheidungen.md`). Ob die Dimension gebaut wird, ist jetzt eine fachliche Frage: sie zeigt,
+**wer** auf Bewertungen antwortet, und ist damit die einzige Spur zum Antwortverhalten je
+Person statt je Betrieb. Achtung bei der Auswertung — im Konto liegen auch die Bearbeiter der
+43 Fremdkunden der Family & Friends Marketing (§13).
 
 ---
 

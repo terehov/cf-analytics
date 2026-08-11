@@ -1,0 +1,772 @@
+<!doctype html>
+<html lang="de" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<title>Round-Table-Map: Datenlage, Lücken und offene Rechte</title>
+
+<style>
+  :root {
+    --ground:      #F6F8F7;
+    --surface:     #FFFFFF;
+    --surface-alt: #EFF3F1;
+    --ink:         #16211F;
+    --ink-muted:   #57645F;
+    --ink-faint:   #7C8783;
+    --rule:        #D9E0DC;
+    --rule-soft:   #E7ECE9;
+    --accent:      #0F5C55;
+    --accent-soft: #E2EFEC;
+    --ok:          #2E6B3E;
+    --ok-bg:       #E3F0E5;
+    --warn:        #855307;
+    --warn-bg:     #F6EBD6;
+    --miss:        #93362B;
+    --miss-bg:     #F6E4E1;
+    --intern:      #37536E;
+    --intern-bg:   #E3EAF1;
+    --shadow:      0 1px 2px rgba(22, 33, 31, .05), 0 8px 24px -16px rgba(22, 33, 31, .25);
+
+    --display: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', 'URW Palladio L', Georgia, serif;
+    --body: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, 'SF Mono', SFMono-Regular, 'Cascadia Mono', Menlo, Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #111614;
+      --surface:     #191F1D;
+      --surface-alt: #1F2724;
+      --ink:         #E7EDEA;
+      --ink-muted:   #9BA8A3;
+      --ink-faint:   #7C8985;
+      --rule:        #2B3532;
+      --rule-soft:   #232B29;
+      --accent:      #6DC3B6;
+      --accent-soft: #1C302D;
+      --ok:          #79C089;
+      --ok-bg:       #1B2A1F;
+      --warn:        #D9A855;
+      --warn-bg:     #2C2415;
+      --miss:        #E28C7B;
+      --miss-bg:     #2E1E1B;
+      --intern:      #86ABC9;
+      --intern-bg:   #1A242D;
+      --shadow:      0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -16px rgba(0, 0, 0, .8);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:      #111614;
+    --surface:     #191F1D;
+    --surface-alt: #1F2724;
+    --ink:         #E7EDEA;
+    --ink-muted:   #9BA8A3;
+    --ink-faint:   #7C8985;
+    --rule:        #2B3532;
+    --rule-soft:   #232B29;
+    --accent:      #6DC3B6;
+    --accent-soft: #1C302D;
+    --ok:          #79C089;
+    --ok-bg:       #1B2A1F;
+    --warn:        #D9A855;
+    --warn-bg:     #2C2415;
+    --miss:        #E28C7B;
+    --miss-bg:     #2E1E1B;
+    --intern:      #86ABC9;
+    --intern-bg:   #1A242D;
+    --shadow:      0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -16px rgba(0, 0, 0, .8);
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .sheet {
+    max-width: 54rem;
+    margin: 0 auto;
+    padding: 3.5rem 1.5rem 6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 3.25rem;
+  }
+
+  /* ---------- Kopf ---------- */
+
+  .kopf { display: flex; flex-direction: column; gap: 1rem; }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: .72rem;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-size: clamp(2rem, 5vw, 2.9rem);
+    line-height: 1.12;
+    font-weight: 600;
+    letter-spacing: -.01em;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  .untertitel {
+    font-size: 1.1rem;
+    color: var(--ink-muted);
+    max-width: 40rem;
+    text-wrap: pretty;
+  }
+
+  .stand {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 1.75rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--rule);
+    font-family: var(--mono);
+    font-size: .76rem;
+    color: var(--ink-faint);
+  }
+  .stand b { color: var(--ink-muted); font-weight: 500; }
+
+  /* ---------- Abschnitte ---------- */
+
+  section { display: flex; flex-direction: column; gap: 1.25rem; }
+
+  h2 {
+    font-family: var(--display);
+    font-size: 1.6rem;
+    font-weight: 600;
+    line-height: 1.2;
+    margin: 0;
+    text-wrap: balance;
+    display: flex;
+    align-items: baseline;
+    gap: .7rem;
+  }
+  h2 .nr {
+    font-family: var(--mono);
+    font-size: .8rem;
+    font-weight: 400;
+    color: var(--accent);
+    letter-spacing: .08em;
+  }
+
+  h3 {
+    font-family: var(--body);
+    font-size: .82rem;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    margin: 0;
+  }
+
+  p { margin: 0; max-width: 42rem; text-wrap: pretty; }
+  .lead { font-size: 1.05rem; }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+
+  strong { font-weight: 600; }
+  .zahl { font-variant-numeric: tabular-nums; }
+
+  /* ---------- Kennzahlenband ---------- */
+
+  .band {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .band > div {
+    background: var(--surface);
+    padding: 1rem 1.1rem;
+    display: flex;
+    flex-direction: column;
+    gap: .2rem;
+  }
+  .band .wert {
+    font-family: var(--display);
+    font-size: 1.65rem;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  .band .etikett {
+    font-size: .78rem;
+    color: var(--ink-muted);
+    line-height: 1.35;
+  }
+
+  /* ---------- Register ---------- */
+
+  .register { display: flex; flex-direction: column; gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 3px; overflow: hidden; }
+
+  .posten {
+    background: var(--surface);
+    padding: 1.05rem 1.2rem;
+    display: grid;
+    grid-template-columns: 8.5rem 1fr;
+    gap: .35rem 1.25rem;
+    align-items: start;
+  }
+  .posten .titel { font-weight: 600; grid-column: 2; }
+  .posten .text { grid-column: 2; color: var(--ink-muted); font-size: .93rem; }
+  .posten .text b { color: var(--ink); font-weight: 600; }
+
+  .chip {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    justify-self: start;
+    font-family: var(--mono);
+    font-size: .66rem;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    padding: .3rem .5rem;
+    border-radius: 2px;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+  .chip.ok     { background: var(--ok-bg);     color: var(--ok); }
+  .chip.warn   { background: var(--warn-bg);   color: var(--warn); }
+  .chip.miss   { background: var(--miss-bg);   color: var(--miss); }
+  .chip.intern { background: var(--intern-bg); color: var(--intern); }
+
+  @media (max-width: 34rem) {
+    .posten { grid-template-columns: 1fr; }
+    .chip { grid-row: auto; grid-column: 1; }
+    .posten .titel, .posten .text { grid-column: 1; }
+  }
+
+  /* ---------- Legende ---------- */
+
+  .legende {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem .9rem;
+    font-size: .82rem;
+    color: var(--ink-muted);
+    align-items: center;
+  }
+  .legende span.chip { grid-column: auto; grid-row: auto; }
+
+  /* ---------- Anfrageliste ---------- */
+
+  .anfragen { display: flex; flex-direction: column; gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 3px; overflow: hidden; counter-reset: anfrage; }
+
+  .anfrage {
+    background: var(--surface);
+    padding: 1.15rem 1.25rem;
+    display: grid;
+    grid-template-columns: 2rem 1fr;
+    gap: .3rem .9rem;
+  }
+  .anfrage::before {
+    counter-increment: anfrage;
+    content: counter(anfrage, decimal-leading-zero);
+    grid-column: 1;
+    grid-row: 1 / span 3;
+    font-family: var(--mono);
+    font-size: .8rem;
+    color: var(--accent);
+    padding-top: .18rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .anfrage > * { grid-column: 2; }
+  .anfrage .was { font-weight: 600; }
+  .anfrage .warum { font-size: .93rem; color: var(--ink-muted); }
+  .anfrage .frei {
+    font-size: .82rem;
+    color: var(--ink-faint);
+    font-family: var(--mono);
+    padding-top: .15rem;
+  }
+  .anfrage .frei b { color: var(--accent); font-weight: 500; }
+
+  /* ---------- Feldkasten ---------- */
+
+  .kasten {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--accent);
+    border-radius: 3px;
+    padding: 1.25rem 1.4rem;
+    display: flex;
+    flex-direction: column;
+    gap: .75rem;
+    box-shadow: var(--shadow);
+  }
+  .kasten h4 {
+    margin: 0;
+    font-family: var(--display);
+    font-size: 1.15rem;
+    font-weight: 600;
+  }
+  .kasten .status {
+    font-family: var(--mono);
+    font-size: .7rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  ul.felder { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: .45rem; }
+  ul.felder li {
+    padding-left: 1.1rem;
+    position: relative;
+    font-size: .95rem;
+    color: var(--ink-muted);
+  }
+  ul.felder li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: .62em;
+    width: .4rem;
+    height: 1px;
+    background: var(--accent);
+  }
+  ul.felder li b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- Tabelle ---------- */
+
+  .tabellenrahmen { overflow-x: auto; border: 1px solid var(--rule); border-radius: 3px; }
+  table { border-collapse: collapse; width: 100%; font-size: .9rem; background: var(--surface); }
+  th, td { text-align: left; padding: .65rem .9rem; border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
+  thead th {
+    font-family: var(--mono);
+    font-size: .68rem;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    background: var(--surface-alt);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* ---------- Merksatz ---------- */
+
+  .merksatz {
+    background: var(--accent-soft);
+    border-radius: 3px;
+    padding: 1.15rem 1.35rem;
+    font-family: var(--display);
+    font-size: 1.12rem;
+    line-height: 1.45;
+    color: var(--ink);
+    max-width: none;
+    text-wrap: pretty;
+  }
+
+  .fuss {
+    border-top: 1px solid var(--rule);
+    padding-top: 1.5rem;
+    font-size: .85rem;
+    color: var(--ink-faint);
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+  }
+</style>
+
+<div class="sheet">
+
+  <header class="kopf">
+    <div class="eyebrow">Concept Family &middot; Analytics</div>
+    <h1>Round-Table-Map: Datenlage, Lücken und offene Rechte</h1>
+    <p class="untertitel">Abgleich der Management-Anforderung gegen den tatsächlichen Datenbestand. Was heute rechenbar ist, was fehlt, und welche Freigaben wir brauchen, um den Rest zu liefern.</p>
+    <div class="stand">
+      <span><b>Stand</b> 11.08.2026</span>
+      <span><b>Grundlage</b> Produktivdatenbank, gemessen</span>
+      <span><b>Quellen</b> LINA &middot; FoodNotify &middot; Yext</span>
+    </div>
+  </header>
+
+  <section>
+    <h2><span class="nr">01</span> Kurzfassung</h2>
+    <p class="lead">Rund <strong>60 % der Anforderung ist heute rechenbar</strong> — mit einer Historie zurück bis Januar 2018, also einschließlich aller Vorjahresvergleiche. Der Rest verteilt sich auf drei Ursachen, die getrennt behandelt werden müssen, weil sie an verschiedenen Stellen entschieden werden.</p>
+
+    <div class="band">
+      <div><span class="wert">62</span><span class="etikett">Betriebe mit laufendem Umsatz (von 141 geführten)</span></div>
+      <div><span class="wert">2018</span><span class="etikett">Historie vollständig ab 01.01.</span></div>
+      <div><span class="wert">27,7&nbsp;Mio.</span><span class="etikett">Artikelverkaufszeilen</span></div>
+      <div><span class="wert">173.823</span><span class="etikett">Einzelbewertungen mit Text</span></div>
+    </div>
+
+    <p>Die drei Ursachen: <strong>fehlende Rechte in LINA</strong> (lösbar durch Freigabe), <strong>nicht angebundene Systeme</strong> (Bounti, OpenTable, Marktdaten) und <strong>fehlende Stammdatenpflege</strong> (Soll-Wareneinsatz, Aktionsstamm, Betriebsstammdaten). Die dritte ist die unangenehmste, weil keine Schnittstelle sie löst.</p>
+
+    <div class="merksatz">Der teuerste Einzelbefund ist nicht ein fehlendes System, sondern eine Stammdatenlücke: Der Soll-Wareneinsatz je Artikel ist für <strong>5 % des verkauften Sortiments</strong> hinterlegt. Kapitel 6.2 der Map — der gewichtete optimale Wareneinsatz — ist damit heute nicht lieferbar.</div>
+  </section>
+
+  <section>
+    <h2><span class="nr">02</span> Was vorliegt</h2>
+    <p>Alle Zahlen am 11.08.2026 direkt im Datenbestand gemessen, nicht geschätzt.</p>
+
+    <div class="tabellenrahmen">
+      <table>
+        <thead>
+          <tr><th>Datenbereich</th><th>Umfang</th><th>Deckt in der Map ab</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Umsatz, Gäste, Bons, Ø Bon je Betrieb und Tag</td><td class="num">1,33 Mio. Zeilen<br>ab 01.01.2018</td><td>1.1, 6.1, 8.2, 9.2</td></tr>
+          <tr><td>Speisen- / Getränke-Trennung</td><td class="num">26,95 Mio. € / 20,02 Mio. €<br>(2026 bis 07.08.)</td><td>1.2, 6.1</td></tr>
+          <tr><td>Artikelverkauf je Betrieb, Tag und Artikel</td><td class="num">27,70 Mio. Zeilen<br>8.683 Artikel in 2026</td><td>10.1, 6.3 (Absatzteil)</td></tr>
+          <tr><td>Zeitzonen und Stundenwerte</td><td class="num">2,65 Mio. Zeilen<br>6 Zonen</td><td>1.3 (nur Umsatz)</td></tr>
+          <tr><td>Personalkennzahlen je Bereich (Service, Bar, Küche)</td><td class="num">442.599 Zeilen<br>Quoten und Effektivitäten</td><td>2.1, 2.2 (teilweise)</td></tr>
+          <tr><td>BWA: Umsatz, WE Bar, WE Küche, Personalkosten ohne GF, EBIT</td><td class="num">353.700 Zeilen<br>monatlich je Betrieb</td><td>1.2, 6.1, 9.2 (Rendite)</td></tr>
+          <tr><td>Online-Bewertungen aus Yext</td><td class="num">173.823 Einzelbewertungen<br>60 Betriebe</td><td>3.1, 3.3</td></tr>
+          <tr><td>Aktionsumsätze je Betrieb, Tag und Aktion</td><td class="num">34.642 Zeilen<br>12 Aktionen</td><td>5.1 (nur Umsatzteil)</td></tr>
+          <tr><td>Einkaufspreise und Bestellungen (FoodNotify)</td><td class="num">4 Marken<br>seit 2022</td><td>6.3 (Einkaufspreisveränderung)</td></tr>
+          <tr><td>Ampel-, Score- und Maßnahmenlogik</td><td>als Regelwerk hinterlegt, nicht als Programmcode</td><td>8.3, 8.4, 11.2</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>Damit sind unter anderem lieferbar: Umsatzentwicklung gegen Vorjahr und Vormonat, Wareneinsatzquoten Bar und Küche, Rendite je Betrieb, Renner-Penner nach Absatz und Umsatz, Betriebs-Ranking, Bewertungsentwicklung, Ampel- und Score-Logik sowie der Maßnahmenkatalog.</p>
+  </section>
+
+  <section>
+    <h2><span class="nr">03</span> Was nicht vorliegt</h2>
+
+    <div class="legende">
+      <span class="chip warn">Rechte fehlen</span>
+      <span class="chip miss">nicht angebunden</span>
+      <span class="chip intern">Pflege / Festlegung</span>
+      <span>&mdash; drei verschiedene Adressaten, drei verschiedene Wege.</span>
+    </div>
+
+    <h3>Personal und Arbeitszeit</h3>
+    <div class="register">
+      <div class="posten">
+        <span class="chip warn">Rechte fehlen</span>
+        <span class="titel">Gearbeitete Stunden</span>
+        <span class="text">LINA liefert Personalkosten nur als <b>Quote</b>, keine einzige Arbeitsstunde und keinen Euro-Betrag je Bereich. Damit fehlen: Personalkosten je Umsatzstunde, Umsatz je Arbeitsstunde, Gäste je Arbeitsstunde, Personalstunden je Zeitzone, Plan gegen Ist an Aktionstagen. Betrifft die Kapitel <b>2.1, 2.3 und 7.2 vollständig</b>.</span>
+      </div>
+      <div class="posten">
+        <span class="chip warn">Rechte fehlen</span>
+        <span class="titel">Dienstplan</span>
+        <span class="text">Die Dienstplan-Schnittstelle antwortet, meldet aber „Keine Berechtigung für diesen Dienstplan". Ohne sie gibt es keinen Plan-Ist-Vergleich. LINA hinterlegt dort bereits Umsatz- und Effektivitätsziele je Dienstplan — das wäre zugleich die Grundlage für datengestützte Dienstplanung.</span>
+      </div>
+      <div class="posten">
+        <span class="chip intern">Pflege / Festlegung</span>
+        <span class="titel">Gesamtpersonalkosten inklusive GF</span>
+        <span class="text">Die BWA liefert fünf Kennzahlen, darunter <b>Personalkosten ohne GF</b>. Der Gesamtwert und damit der GF-Anteil (Kapitel 2.2) ist nicht darunter und muss als zusätzliche Position aufgenommen werden. Offen ist außerdem, ob „ohne GF" die Lohnnebenkosten bereits enthält.</span>
+      </div>
+      <div class="posten">
+        <span class="chip intern">Pflege / Festlegung</span>
+        <span class="titel">Bereichsschnitt</span>
+        <span class="text">LINA kennt drei Bereiche: Service, Bar, Küche. Die Map nennt zusätzlich Runner, Host, Reinigung und weitere operative Kostenstellen. Ob diese in LINA angelegt werden können, ist zu klären.</span>
+      </div>
+    </div>
+
+    <h3>Bonebene und Gäste</h3>
+    <div class="register">
+      <div class="posten">
+        <span class="chip warn">Rechte fehlen</span>
+        <span class="titel">Kassenjournal / Bon-Rohdaten</span>
+        <span class="text">Ohne Einzelbons nicht rechenbar: <b>Bons mit Aktion</b>, <b>Ø Bon mit gegen ohne Aktion</b>, <b>Gästezahl mit Aktion</b> (Kapitel 5.1), Zusatzverkäufe (4.2, 7.1) und Wartezeiten aus Bon-Zeitstempeln (7.2, 11.1). Format und Umfang sind ungeprüft — ein einzelner lesender Aufruf klärt beides.</span>
+      </div>
+      <div class="posten">
+        <span class="chip intern">Pflege / Festlegung</span>
+        <span class="titel">Gästezählung ist lückenhaft</span>
+        <span class="text">Von 62 laufenden Betrieben zählen <b>43 durchgängig</b> Gäste, <b>17 lückenhaft</b>, <b>2 nie</b>. Jede Kennzahl „je Gast" hat damit einen um bis zu 30 % gelöcherten Nenner. Das ist Kassenkonfiguration im Betrieb, keine Schnittstellenfrage — sollte aber vor dem ersten Report bereinigt sein, sonst wird die Lücke als Rückgang gelesen.</span>
+      </div>
+      <div class="posten">
+        <span class="chip miss">nicht angebunden</span>
+        <span class="titel">Gäste je Zeitzone</span>
+        <span class="text">Die Zeitzonenberichte liefern <b>ausschließlich Umsatz</b> — keine Gäste, keine Bons, keinen Speisen-/Getränke-Anteil, keine Personalstunden. Von sechs Auswertungspunkten unter Kapitel 1.3 ist damit einer abgedeckt. Reservierungsdaten (siehe 05) schließen einen Teil dieser Lücke.</span>
+      </div>
+    </div>
+
+    <h3>Wareneinsatz und Artikel</h3>
+    <div class="register">
+      <div class="posten">
+        <span class="chip intern">Pflege / Festlegung</span>
+        <span class="titel">Soll-Wareneinsatz je Artikel</span>
+        <span class="text">Kapitel 6.2 verlangt den gewichteten optimalen Wareneinsatz nach tatsächlichem Verkaufsmix. Dafür braucht jeder Artikel einen Soll-Ansatz. Gemessen: <b>457 von 8.683 verkauften Artikeln</b> haben einen — <b>5,3 %</b>. Bei den übrigen steht in LINA eine Null, die wie ein gepflegter Wert aussieht. <b>Ohne Nachpflege ist 6.2 nicht lieferbar</b>, und mit ihm fallen der Deckungsbeitrag je Artikel und die Renner-Penner-Matrix nach DB (10.2).</span>
+      </div>
+      <div class="posten">
+        <span class="chip warn">Rechte fehlen</span>
+        <span class="titel">Wareneinsatz und Deckungsbeitrag (LINA-Bericht 118)</span>
+        <span class="text">Dem Namen nach genau die Margenrechnung auf LINAs eigener Logik — gesperrt. Wäre der zweite Weg zu 6.2, unabhängig von der Artikelpflege.</span>
+      </div>
+      <div class="posten">
+        <span class="chip warn">Rechte fehlen</span>
+        <span class="titel">Betriebskontext für Einkauf und Dienstplan</span>
+        <span class="text">Waren-, Lieferanten- und Bestelldaten hängen am aktuell gewählten Betrieb. Im Zentral-Kontext kommen die Daten der Zentrale zurück, nicht die der Häuser. Solange das so ist, bleibt jede Margenbetrachtung aus LINA auf die Zentrale beschränkt.</span>
+      </div>
+    </div>
+
+    <h3>Aktionen</h3>
+    <div class="register">
+      <div class="posten">
+        <span class="chip intern">Pflege / Festlegung</span>
+        <span class="titel">Der Aktionsstamm trägt die Auswertung nicht</span>
+        <span class="text">In LINA stehen 12 Einträge — darunter <b>„Test"</b>, <b>„Feinsparten 2025"</b>, <b>„Auswertung Frühstück"</b> und <b>„Dessert"</b>. Von den sieben in der Map genannten Aktionen existieren <b>zwei</b>: Sarti und Mexican Summer. <b>Cocktail Casino, Taco Day, Gambas Day und „20 Tage 20 €" kommen nicht vor.</b> Echte Kampagnen, Zeitfensterauswertungen und Testeinträge stehen gleichberechtigt nebeneinander.</span>
+      </div>
+      <div class="posten">
+        <span class="chip intern">Pflege / Festlegung</span>
+        <span class="titel">Teilnehmende Betriebe und Aktionsartikel</span>
+        <span class="text">Welche Häuser an einer Aktion teilnehmen, steht in keinem System — der Vergleich „Teilnehmer gegen Nicht-Teilnehmer" ist damit Handarbeit. Und ohne die Zuordnung <b>welche Artikel zur Aktion gehören</b> gibt es keine Stückzahl, keinen Deckungsbeitrag je Aktion und keine Kannibalisierungsrechnung (10.3). Die Verkaufsdaten selbst sind mit 27,7 Mio. Zeilen reichlich vorhanden — es fehlt nur die Zuordnung.</span>
+      </div>
+    </div>
+
+    <h3>Gästezufriedenheit</h3>
+    <div class="register">
+      <div class="posten">
+        <span class="chip miss">nicht angebunden</span>
+        <span class="titel">Themencluster: 5 statt 11</span>
+        <span class="text">Yext klassifiziert nach fünf eigenen, englischen Labels: Food, Service and Staff, Speed of Service, Order, Restaurant Cleanliness. <b>Sieben der elf gewünschten Cluster fehlen</b> — Preis-Leistung, Getränke, Atmosphäre, Reservierung/Empfang, Musik/Lautstärke, Aktion positiv/negativ, Wiederbesuchsabsicht. Zudem erst ab April 2026, damit kein Themen-Vorjahresvergleich vor April 2027, und nur Bewertungen <b>mit Text</b> bekommen ein Thema.<br><br><b>Empfehlung:</b> die elf Cluster selbst auf den 173.823 gespeicherten Bewertungstexten bilden — rückwirkend über die gesamte Historie und in unserer Hand. Der Durchschnitt bleibt Yexts Zahl, damit der Round Table nicht von der Quelle abweicht.</span>
+      </div>
+    </div>
+
+    <h3>Umfeld und Vergleichsmaßstab</h3>
+    <div class="register">
+      <div class="posten">
+        <span class="chip miss">nicht angebunden</span>
+        <span class="titel">Marktvergleich</span>
+        <span class="text">Für „Umsatz gegen Gesamtmarkt Gastronomie" (1.1, 9.2, 20 % des Betriebs-Scores) existiert keine Quelle. Vorschlag: <b>Destatis-Umsatzindex Gastgewerbe</b> — monatlich und maschinenlesbar — statt der quartalsweisen DEHOGA-PDF. Zu entscheiden ist, ob real oder nominal verglichen wird; unsere Umsätze sind nominal.</span>
+      </div>
+      <div class="posten">
+        <span class="chip miss">nicht angebunden</span>
+        <span class="titel">Feiertage, Ferien, Events, Wetter</span>
+        <span class="text">Kapitel 7.1 verlangt einen echten Vergleichstag: gleicher Wochentag, ähnliche Saison, keine Feiertage oder Ferien, ähnliche Wetterlage. Feiertage und Ferien sind offene Daten und schnell ergänzt, <b>lokale Events bleiben Handpflege</b>. Für Wetter gibt es in LINA einen Wetteranalyse-Bericht — vor einer externen Anbindung zuerst prüfen.</span>
+      </div>
+      <div class="posten">
+        <span class="chip intern">Pflege / Festlegung</span>
+        <span class="titel">Betriebsstammdaten</span>
+        <span class="text">Es gibt <b>kein Eröffnungs- und kein Schließungsdatum</b>. „Bestehende Fläche gegen neue Betriebe" (1.1) ist damit nicht abgrenzbar. Ebenfalls offen: Fläche und Sitzplätze (Voraussetzung für Umsatz je Sitzplatz), sowie <b>79 von 141 Betrieben, die dauerhaft 0 € melden</b> — Beteiligungsgesellschaften, geschlossene Häuser, Testeinträge. Sie verwässern jeden Durchschnitt und gehören stillgelegt.<br><br>Von <b>7 laufenden Betrieben fehlt der Standort</b>, darunter das umsatzstärkste Haus der Gruppe. In einer Stadtauswertung fällt ein fehlendes Haus nicht auf — die Stadt sieht dann einfach so aus, als stünde es nicht darin.</span>
+      </div>
+      <div class="posten">
+        <span class="chip intern">Pflege / Festlegung</span>
+        <span class="titel">Plan- und Zielwerte</span>
+        <span class="text">„Umsatz gegen Plan" (8.2) hat keine Datenbasis — eine Budgetierungsebene existiert in LINA nicht. Ziel-Rendite und Zielkorridor Personalkosten sind fachlich nie festgelegt worden. Beides sind Entscheidungen, keine Datenlücken.</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="nr">04</span> Was wir an Rechten und Freigaben brauchen</h2>
+    <p>In dieser Reihenfolge — oben steht, was am meisten freischaltet. Die Punkte 1 bis 6 gehen an LINA beziehungsweise Concept Family, Punkt 7 an die Buchhaltung.</p>
+
+    <div class="anfragen">
+      <div class="anfrage">
+        <span class="was">Bericht 107 „Gearbeitete Stunden" auf Betriebsebene</span>
+        <span class="warum">Antwortet derzeit mit einem Serverfehler. Bitte zusätzlich klären, ob der Bericht Stunden <strong>je Schicht und Bereich</strong> ausweist oder nur je Tag — davon hängt ab, ob Kapitel 2.3 überhaupt erfüllbar ist.</span>
+        <span class="frei"><b>schaltet frei:</b> 2.1 · 2.3 · 7.2 · Personalteil des Scores</span>
+      </div>
+      <div class="anfrage">
+        <span class="was">Dienstplan-Schnittstelle freigeben</span>
+        <span class="warum">Meldet „Keine Berechtigung für diesen Dienstplan". Liefert Soll-Stunden und die dort bereits hinterlegten Umsatz- und Effektivitätsziele.</span>
+        <span class="frei"><b>schaltet frei:</b> 7.2 Plan gegen Ist · datengestützte Dienstplanung</span>
+      </div>
+      <div class="anfrage">
+        <span class="was">Kassenjournal — Freigabe und Formatauskunft</span>
+        <span class="warum">Wir brauchen zunächst nur die Erlaubnis für <strong>einen einzigen lesenden Aufruf</strong>, um Format und Datenmenge zu messen. Erst danach lässt sich der Aufwand seriös schätzen.</span>
+        <span class="frei"><b>schaltet frei:</b> 5.1 Bon- und Gästekennzahlen · Zusatzverkäufe · Wartezeiten</span>
+      </div>
+      <div class="anfrage">
+        <span class="was">Bericht 118 „Wareneinsatz und Deckungsbeitrag"</span>
+        <span class="warum">Zweiter, von der Artikelpflege unabhängiger Weg zum gewichteten Wareneinsatz. Gleiches gilt für die Berichte 23, 8 und 9 (Personalkostenschätzung, Personalkosten Jahr, Urlaubsverteilung).</span>
+        <span class="frei"><b>schaltet frei:</b> 6.2 · 6.3 · 10.2</span>
+      </div>
+      <div class="anfrage">
+        <span class="was">Betriebskontext für Einkauf und Dienstplan umschalten</span>
+        <span class="warum">Wie wird der aktive Betrieb <strong>lesend</strong> gewechselt? Ohne das bleiben Einkaufspreise, Bestellungen und Dienstpläne auf die Zentrale beschränkt. Derselbe Mechanismus würde zugleich Adresse, Sitzplätze und Fläche je Haus liefern.</span>
+        <span class="frei"><b>schaltet frei:</b> Margenbetrachtung je Betrieb · Umsatz je Sitzplatz · Standortkarte</span>
+      </div>
+      <div class="anfrage">
+        <span class="was">Mitarbeiter-Stammdaten</span>
+        <span class="warum">Der genutzte Zugang hat keinen Zugriff. Nötig für die Verbindung zwischen Schulungsstand, Schicht und Verkaufsverhalten (Kapitel 4.2).</span>
+        <span class="frei"><b>schaltet frei:</b> 4.2 Kurswirkung auf Personenebene</span>
+      </div>
+      <div class="anfrage">
+        <span class="was">Gesamtpersonalkosten inklusive GF als BWA-Position</span>
+        <span class="warum">Geht an den Steuerberater, nicht an LINA. Zusammen damit die Frage, ob „Personalkosten ohne GF" die Lohnnebenkosten enthält.</span>
+        <span class="frei"><b>schaltet frei:</b> 2.2 vollständig</span>
+      </div>
+    </div>
+
+    <div class="kasten">
+      <span class="status">Nebenbefund &mdash; bitte weiterreichen</span>
+      <h4>Ein LINA-Endpunkt gibt Zugangsdaten im Klartext heraus</h4>
+      <p>Die Stammdatenabfrage eines Betriebs liefert unter anderem <strong>Datenbankname, Datenbankbenutzer und Datenbankpasswort im Klartext</strong> sowie IBAN, BIC und Steuernummer. Wir haben diese Felder bewusst weder ausgelesen noch gespeichert. Der Befund gehört an LINA gemeldet — sinnvollerweise im selben Zug wie die Rechtefragen oben, weil derselbe Endpunkt für die Standortdaten interessant wäre.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="nr">05</span> Neue Anbindungen</h2>
+
+    <div class="kasten">
+      <span class="status">bereits angefragt</span>
+      <h4>Bounti — Schulungsstand</h4>
+      <p>Damit Kapitel 4.1 und 4.2 funktionieren, brauchen wir aus Bounti fünf Dinge. Besonders wichtig ist der dritte Punkt: <strong>welchem Bereich ein Mitarbeitender zugeordnet ist, weiß sonst kein System</strong> — weder LINA noch FoodNotify.</p>
+      <ul class="felder">
+        <li><b>Mitarbeiterstamm</b> — angelegt, aktiv, Eintrittsdatum</li>
+        <li><b>Betriebszuordnung</b> — mit einem stabilen Schlüssel; über Namen lässt sich das nicht zuverlässig verbinden</li>
+        <li><b>Bereich</b> — Service, Bar, Küche, Betriebsleitung</li>
+        <li><b>Kurskatalog</b> — mit Pflichtkennzeichen und Frist; ohne Fristfeld sind „offene" und „überfällige" Kurse nicht unterscheidbar</li>
+        <li><b>Kursstatus je Mitarbeitendem</b> — inklusive Abschlussdatum, nicht nur Status</li>
+      </ul>
+      <p>Zur technischen Form: Schnittstelle, regelmäßiger Export oder Datei ist gleichermaßen möglich — wir brauchen nur zu wissen, was Bounti anbietet.</p>
+    </div>
+
+    <div class="kasten">
+      <span class="status">neu vorgeschlagen</span>
+      <h4>OpenTable — Reservierung, Auslastung, Wartezeit</h4>
+      <p>OpenTable schließt gleich mehrere Lücken, die aus LINA nicht zu schließen sind, und liefert als einzige Quelle einen <strong>Frühindikator</strong>: Der Reservierungsvorlauf zeigt die Entwicklung, bevor sie im Umsatz steht.</p>
+      <ul class="felder">
+        <li><b>Reservierungen und Gäste je Betrieb, Tag und Zeitfenster</b> — schließt „Gäste je Zeitzone" aus Kapitel 1.3</li>
+        <li><b>Walk-in gegen reserviert</b> — trennt Frequenz aus Marketing von Laufkundschaft</li>
+        <li><b>No-Show- und Stornoquote</b></li>
+        <li><b>Vorlaufzeit der Buchung</b> — der Frühindikator</li>
+        <li><b>Sitzdauer am Tisch</b> — Kapazitätsrechnung, in der Map als Verweildauer geführt</li>
+        <li><b>Wartelisten und Wartezeiten</b> — bisher nur indirekt über das Bewertungsthema „Speed of Service" greifbar (7.2, 11.1)</li>
+        <li><b>Kapazität und Auslastung</b> — Tische und Plätze je Zeitfenster</li>
+      </ul>
+      <p><strong>Zwei Hinweise vorab.</strong> Bewertungen brauchen wir aus OpenTable <em>nicht</em> — die 24.259 OpenTable-Bewertungen liegen bereits über Yext vor, ein zweiter Weg würde nur doppelt zählen. Und: LINA führt bereits eine Reservierungs-Schnittstelle, die wir noch nicht abgerufen haben. <strong>Die sollte zuerst gemessen werden</strong> — deckt sie einen Teil der Liste ab, verkleinert das den Umfang der OpenTable-Anbindung.</p>
+    </div>
+
+    <div class="kasten">
+      <span class="status">klein, aber ohne Quelle</span>
+      <h4>Marktdaten und Kalender</h4>
+      <ul class="felder">
+        <li><b>Destatis-Umsatzindex Gastgewerbe</b> — monatlich, maschinenlesbar. Entscheidung nötig: realer oder nominaler Vergleich.</li>
+        <li><b>Feiertage und Schulferien je Bundesland</b> — offene Daten, schnell ergänzt.</li>
+        <li><b>Wetter</b> — zuerst LINAs eigenen Wetteranalyse-Bericht prüfen, bevor extern angebunden wird.</li>
+        <li><b>Lokale Events</b> — keine automatisierbare Quelle. Das ist genau der Fall, für den die Map ein manuelles Freifeld im Report vorsieht.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="nr">06</span> Was auch mit allen Freigaben nicht geht</h2>
+    <p>Vier Punkte, die aus Gründen offen bleiben, die keine Schnittstelle löst. Besser jetzt geklärt als im ersten Round Table.</p>
+
+    <div class="register">
+      <div class="posten">
+        <span class="chip intern">Taktfrage</span>
+        <span class="titel">Rendite hinkt strukturell ein bis zwei Monate nach</span>
+        <span class="text">Stand heute liegt EBIT für Mai bei <b>63 Betrieben</b> vor, für Juni bei <b>41</b>, für Juli bei <b>keinem</b>. Der Buchungsstand ist je Betrieb verschieden. Ein monatlicher Aufsichtsratsreport mit Rendite kann deshalb immer nur den letzten <b>gebuchten</b> Monat zeigen, nie den Vormonat.</span>
+      </div>
+      <div class="posten">
+        <span class="chip intern">Zeitfrage</span>
+        <span class="titel">Themen-Vorjahresvergleich erst ab April 2027</span>
+        <span class="text">Yext klassifiziert Bewertungstexte erst seit April 2026. Eine eigene Klassifikation über die gespeicherten Texte würde das rückwirkend lösen — mit Yexts Labels nicht.</span>
+      </div>
+      <div class="posten">
+        <span class="chip intern">Definitionsfrage</span>
+        <span class="titel">Reklamationen</span>
+        <span class="text">Kein System erfasst sie. Stornos werden in der Gruppe offenbar nicht genutzt. Solange keine Erfassung existiert, bleibt der Punkt aus Kapitel 4.2 offen — oder er wird über negative Bewertungen ersetzt, dann aber ausdrücklich als Näherung.</span>
+      </div>
+      <div class="posten">
+        <span class="chip intern">Definitionsfrage</span>
+        <span class="titel">Zusatzverkäufe</span>
+        <span class="text">Der Begriff ist nicht definiert. Als Artikel je Bon braucht er die Bonebene, als Artikel je Gast geht er schon heute. Bevor gerechnet wird, sollte festgelegt sein, was gemeint ist.</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="nr">07</span> Vorgeschlagene Reihenfolge</h2>
+    <div class="tabellenrahmen">
+      <table>
+        <thead>
+          <tr><th>Schritt</th><th>Was</th><th>Warum zuerst</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="num">1</td><td>Rechteanfragen 1 bis 6 stellen</td><td>Längste Vorlaufzeit, hängt nicht an uns. Alles Weitere kann parallel laufen.</td></tr>
+          <tr><td class="num">2</td><td>Je einen lesenden Testaufruf: Kassenjournal, Bericht 107, Reservierungen, Wetterbericht</td><td>Vier Aufrufe entscheiden über den Aufwand für vier Kapitel der Map. Ohne sie ist jede Schätzung geraten.</td></tr>
+          <tr><td class="num">3</td><td>Aktionsstamm bereinigen und Aktionsartikel zuordnen</td><td>Reine Pflege, kein Programmieraufwand — und schaltet Kapitel 5 und 10.3 frei.</td></tr>
+          <tr><td class="num">4</td><td>Entscheidung zum Soll-Wareneinsatz</td><td>Die größte Einzellücke. Bis hier entschieden ist, sollte 6.2 nicht als lieferbar zugesagt werden.</td></tr>
+          <tr><td class="num">5</td><td>Betriebsstammdaten nachziehen: Eröffnung, Sitzplätze, 7 fehlende Standorte, Stilllegungen</td><td>Bereinigt gleichzeitig die Durchschnitte in jeder anderen Auswertung.</td></tr>
+          <tr><td class="num">6</td><td>Eigene Themenklassifikation auf den vorhandenen Bewertungstexten</td><td>Liefert alle elf gewünschten Cluster rückwirkend, ohne externe Abhängigkeit.</td></tr>
+          <tr><td class="num">7</td><td>Marktindex, Feiertage, Ferien ergänzen</td><td>Klein, aber Voraussetzung für Kapitel 1.1 und 7.1.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="fuss">
+    <p>Alle Mengenangaben wurden am 11.08.2026 im Produktivdatenbestand gemessen, nicht geschätzt. Wo etwas ungeprüft ist, steht es ausdrücklich dabei.</p>
+    <p>Rückfragen zu einzelnen Positionen lassen sich jeweils mit einer Abfrage beantworten — es muss nichts nachgeschätzt werden.</p>
+  </div>
+
+</div>
+<style>
+  /* ---------------------------------------------------------------
+     Druckfassung. Wird nur fuer die PDF-Ausgabe angehaengt; die
+     Bildschirmfassung (Artifact) bleibt unveraendert.
+
+     html statt body fuer die Groesse: die Seite rechnet durchgaengig
+     in rem, und rem haengt an html. Ueber body eingestellt wuerde
+     nur der Fliesstext schrumpfen, jeder Abstand bliebe stehen.
+     --------------------------------------------------------------- */
+
+  @page {
+    size: A4;
+    margin: 16mm 15mm 18mm;
+  }
+
+  @media print {
+    html { font-size: 10.5pt; }
+
+    /* Ohne das druckt Chrome jede Flaeche weiss - und damit waeren
+       die Statusetiketten farblos, also bedeutungslos. */
+    *, *::before, *::after {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+
+    .sheet {
+      max-width: none;
+      padding: 0;
+      gap: 2.4rem;
+    }
+
+    h1 { font-size: 2.2rem; }
+
+    /* Eine Ueberschrift am Seitenfuss ohne ihren Inhalt ist der
+       haeufigste Umbruchfehler in solchen Dokumenten. */
+    h2, h3 { break-after: avoid-page; }
+    .kopf  { break-after: avoid-page; }
+
+    /* Registerzeilen, Anfragen und Kaesten tragen je einen
+       abgeschlossenen Gedanken - die werden nicht zerrissen. */
+    .posten,
+    .anfrage,
+    .kasten,
+    .merksatz,
+    .band > div,
+    tr { break-inside: avoid; }
+
+    /* Bei mehrseitigen Tabellen den Kopf mitnehmen. */
+    thead { display: table-header-group; }
+
+    /* Am Bildschirm scrollen breite Tabellen seitlich; auf Papier
+       gibt es kein Scrollen, also umbrechen lassen. */
+    .tabellenrahmen { overflow-x: visible; }
+    td.num { white-space: normal; }
+
+    section { break-inside: auto; }
+
+    a { text-decoration: none; }
+  }
+</style>
+</body>
+</html>
