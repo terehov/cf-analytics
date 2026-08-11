@@ -2183,3 +2183,81 @@ zweiter *Einstiegspunkt*: ein Importer mit einem Weg für Menschen und einem fü
 Automatik, und neue Arbeit landete nur auf dem ersten. **Ein Importer ohne Arbeit sieht
 genauso aus wie einer, der fertig ist** — und ein Importer, der nur die Hälfte seiner Arbeit
 kennt, ebenfalls.
+
+---
+
+## 11.08.2026 — drei Fallen, die beim Nachmessen der Round-Table-Lücken auffielen
+
+Alle drei haben eines gemeinsam: sie melden sich nicht. Es gibt keinen Stacktrace, nur eine
+Zahl, die plausibel aussieht.
+
+### `sum(umsatz_netto)` auf `core.umsatzbericht_tag` zählt doppelt
+
+**Symptom.** Zurückgerechnete Arbeitsstunden waren rund doppelt so hoch wie plausibel; der
+daraus abgeleitete Stundenlohn lag bei 10,93 € — unter dem Mindestlohn. Die Zahl sah nur
+*etwas* zu niedrig aus, nicht offensichtlich falsch.
+
+**Ursache.** Die Tabelle führt je Betrieb und Tag **drei** Zeilen: die Gesamtzeile
+(`hauptsparte_key IS NULL`) und je eine für Speisen und Getränke. Ein `sum()` über die
+Tabelle addiert den Tag zu sich selbst.
+
+```sql
+SELECT CASE WHEN hauptsparte_key IS NULL THEN 'GESAMT' ELSE 'Sparte' END, count(*), sum(umsatz_netto)
+  FROM core.umsatzbericht_tag WHERE geschaeftstag >= DATE '2026-01-01' GROUP BY 1;
+-- GESAMT  30456  66.950.204
+-- Sparte  60771  46.971.209   <- addiert sich mit dazu
+```
+
+**Was ihn verhindert.** `mart.umsatz_tag` filtert `hauptsparte_key IS NULL AND
+verkaufsstelle_key IS NULL` und ist dafür da. **Für Umsatzsummen immer die `mart`-Sicht
+nehmen, nie die `core`-Tabelle.** Nach der Korrektur lag der implizite Stundenlohn bei
+21,12 € im Median.
+
+**Verschärfend:** Speisen + Getränke ergeben *nicht* den Gesamtumsatz — 2026 fehlen 29,8 %,
+weil 4.088 Artikel keiner Warengruppe zugeordnet sind. Beide Fallen zusammen können sich
+gegenseitig verdecken.
+
+### `core.personalkosten.pek_*` ist auf Tagesebene keine Quote
+
+**Symptom.** `pek_gesamt` erreicht Werte bis 717 — als Prozentsatz sinnlos, aber die
+Spalte heißt wie eine Quote und die zugehörigen Schwellen (29/35/50) sind Prozentwerte.
+
+**Ursache.** Wir fragen `getPersonalkosten` je Tag ab. LINA bildet den Zähler
+(Personalkosten) offenbar **seit Monatsanfang kumuliert**, den Nenner aber aus dem
+angefragten Tag. Damit wächst der Wert linear mit dem Monatstag:
+
+| Monatstag | Median `pek_gesamt` | Median `eff_gesamt` |
+|---:|---:|---:|
+| 1 | 43,8 | 55,7 |
+| 15 | 422,8 | 52,3 |
+| 31 | 717,6 | 60,1 |
+
+`eff_*` bleibt flach — das ist die Kontrolle, die zeigt, dass nicht der ganze Abruf kaputt
+ist, sondern genau dieses Feld.
+
+**Was ihn verhindert.** Für die Personalquote **`persoog_bwa`** nehmen: er stimmt mit dem
+BWA-Prozentwert exakt überein (Median-Abweichung 0,000 pp). `pek_*` je Tag nur benutzen, wer
+die Kumulation ausdrücklich mitrechnet — `pek(d)/100 × Umsatz(d)` ergibt die aufgelaufenen
+Personalkosten des Monats, mit rund 15 % Streuung gegen die BWA. `eff_*` ist von alldem
+nicht betroffen und trägt die Stundenrechnung.
+
+### Vierzehn Gästezahlen sind keine Gästezahlen
+
+**Symptom.** „Umsatz je Gast" und jede Bewertungsquote lagen konzernweit um Größenordnungen
+daneben, während die Mediane je Betrieb stimmten.
+
+**Ursache.** Einzelne Zeilen tragen im Feld `gaeste` einen Betrag statt einer Anzahl:
+
+```sql
+SELECT b.name, u.geschaeftstag, u.gaeste, round(u.umsatz_netto), u.rechnungen
+  FROM mart.umsatz_tag u JOIN core.betrieb b USING (betrieb_key)
+ WHERE u.geschaeftstag >= DATE '2026-01-01' AND u.gaeste > 100000;
+-- Aposto Aalen, 27.07.2026: 46.126.263 Gaeste bei 331 Rechnungen
+```
+
+Vierzehn Zeilen 2026, sieben Betriebe. Es sind zu wenige, um in einer Zählung aufzufallen,
+und sie zerstören jede Summe.
+
+**Was ihn verhindert.** Bei jeder Gästeauswertung `gaeste BETWEEN 1 AND 10000` filtern und
+den Ausschluss benennen. Ein Median hätte den Fehler nie gezeigt — deshalb bei
+Gästekennzahlen **immer auch die Summe gegenrechnen**.

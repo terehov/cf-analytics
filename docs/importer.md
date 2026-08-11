@@ -394,3 +394,26 @@ Diese Datei ist bisher LINA-lastig geschrieben; der ganze FoodNotify-Importer (`
 **Und kein Eintrag im laufenden Abgleich** (`src/sync/nachfuellen.ts`) — anders als Bestellungen, wo stündlich die jeweils letzte Seite je Kostenstelle nachgezogen wird. Begründung mit Zahlen: `docs/entscheidungen.md`, „Inventuren bleiben ein reiner Backfill".
 
 **Die Antworthülle ist nicht gemessen, nur abgeleitet.** `/api/erp/stocktakings` folgt dem Pfadmuster `/api/erp/*`, für das drei andere Endpunkte die `{code,errors,isError,payload}`-Hülle bestätigt haben — aber der stocktakings-Pfad selbst wurde nie gegen das echte FoodNotify abgefragt (harte Regel, `AGENTS.md`). Mock und Tests bilden die plausibelste Form nach (`payload.data` + `payload.pagination`, dieselbe Schachtelung, an der die Exploration bei Wilma Wunder einmal gescheitert ist — `docs/foodnotify-api-inventar.md` §1). Der erste echte Abruf gehört von Hand geprüft, bevor jemand den geladenen Zeilen traut.
+
+---
+
+## `src/messen.ts` — Einzelmessungen ohne Warteschlange (11.08.2026)
+
+`bun run messen <d1..d6>` stellt **einen** lesenden Aufruf gegen LINA und druckt Status,
+Form, Größe und die ersten Zeichen der Antwort. Kein Schreibvorgang — weder in LINA
+(Regel 1) noch in `raw.api_antwort`: `LinaClient.holen()` holt und gibt zurück, das Ablegen
+macht `sync/laden.ts`, und das läuft hier nicht.
+
+**Warum ein eigener Einstiegspunkt und kein Eintrag in `ENDPUNKTE`.** Was in `ENDPUNKTE`
+steht, reiht `nachfuellen()` automatisch ein. Eine einmalige Messung soll genau das nicht
+auslösen. Der Endpunkt wird deshalb ad hoc im Skript gebaut und ist `aktiv: false`.
+
+**Was übernommen wird:** Drosselung, Tagesbudget, Arbeitsfenster und die
+Anmelde-Notbremse aus Regel 7 — es ist derselbe `LinaClient` wie im Sync. Ein gescheiterter
+Anmeldeversuch beendet den Lauf, statt ihn zu wiederholen.
+
+**Warum die Deutung im Code steht und nicht in der Ausgabe entsteht.** Jede Messung führt
+eine Liste „Antwort → Schlussfolgerung", die **vor** dem Aufruf feststeht und danach erneut
+gedruckt wird. Wer den Schluss erst nach dem Ergebnis formuliert, findet immer einen.
+
+Läuft nach Regel 7a **nur im Terminal des Nutzers**, nicht aus der Agentenumgebung.

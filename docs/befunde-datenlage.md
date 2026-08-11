@@ -376,3 +376,357 @@ Fachbereich und darf nicht dadurch beantwortet werden, dass jemand still eine Ko
 Und: Bevor man eine Anzeige „verbessert", nachsehen, wie das abgelöste System berichtet hat.
 Das Excel hatte den Rot-Treiber-Block bereits — die Antwort auf „warum ist alles rot" lag die
 ganze Zeit in `examples/`.
+
+---
+
+# Nachgemessen am 11.08.2026: was für die Round-Table-Map wirklich fehlt
+
+**Anlass.** Für die Round-Table-Map stand eine Liste von Punkten im Raum, die an Concept
+Family gehen sollten. Diese Messreihe hat jeden davon in der Produktivdatenbank nachgerechnet,
+bevor er weitergegeben wurde. Ergebnis: **ein großer Teil war keine Lücke, sondern eine
+ungeprüfte Annahme.** Die Befunde unten stehen in der Reihenfolge ihrer Wirkung; der Stand
+für den Fachbereich ist `docs/datenlage-round-table.html`.
+
+## 1. Der Soll-Wareneinsatz: 5,3 % der Artikel sind 31,3 % des Umsatzes
+
+Die bisher zitierte Zahl — *457 von 8.683 verkauften Artikeln haben einen `fixer_we`* — ist
+richtig und **misst das Falsche**. Sie ist ein Artikelanteil. Für Kapitel 6.2 zählt der
+Umsatzanteil, denn gewichtet wird nach Verkaufsmix.
+
+```sql
+WITH v AS (
+  SELECT a.artikel_key, a.fixer_we, sum(av.umsatz_netto) AS umsatz
+    FROM core.artikelverkauf_tag av JOIN core.artikel a USING (artikel_key)
+   WHERE av.geschaeftstag >= DATE '2026-01-01' GROUP BY 1,2)
+SELECT round(100.0*count(*) FILTER (WHERE fixer_we>0)/count(*),1)                    AS artikelanteil,
+       round(100.0*sum(umsatz) FILTER (WHERE fixer_we>0)/sum(umsatz),1)              AS umsatzanteil
+  FROM v;
+-- 5.3 | 31.3
+```
+
+**Der Unterschied ist Faktor sechs.** Gepflegt ist offenbar, was verkauft wird.
+
+Und der Konzernwert verdeckt, dass die Pflege **je Marke fast alles oder fast nichts** ist:
+
+| Marke | Umsatz 2026 | Umsatzanteil mit Soll-WE |
+|---|---:|---:|
+| Enchilada | 14,43 Mio. € | **84,4 %** |
+| Aposto | 10,89 Mio. € | **67,0 %** |
+| Wilma Wunder | 17,13 Mio. € | 6,7 % |
+| Schlager Cafe | 0,57 Mio. € | 5,5 % |
+| Deutsche Konzepte | 23,06 Mio. € | 1,8 % |
+| Besitos | 0,17 Mio. € | 0,1 % |
+
+Je Betrieb: **15 Betriebe über 80 %, 13 zwischen 50 und 80 %.** Diese 28 tragen
+24,58 Mio. € = **36,5 % des Artikelumsatzes 2026**.
+
+**Was daraus folgt:** Kapitel 6.2 ist **für Enchilada und Aposto heute lieferbar**, nicht
+„nicht lieferbar". Der Satz „ohne Nachpflege ist 6.2 nicht lieferbar" war eine
+Konzernaussage über eine Größe, die es nicht als Konzernwert gibt. Die Nachpflege ist eine
+Aufgabe für **Deutsche Konzepte und Wilma Wunder**, und für Wilma Wunder gibt es dafür einen
+zweiten Weg (siehe Befund 8).
+
+**Nebenbefund, gleiche Abfrage:** 4.088 Artikel mit 19,9 Mio. € Umsatz (29,6 %) haben
+**überhaupt keine Warengruppe**. Fast alles davon Deutsche Konzepte (78,2 % ihres Umsatzes)
+und Besitos (99,9 %). Deshalb summieren sich Speisen (26,95 Mio.) und Getränke (20,02 Mio.)
+2026 auf 46,97 Mio. — der Gesamtumsatz ist 66,95 Mio. **Die Sparten-Trennung deckt 70 % des
+Umsatzes ab, nicht 100 %.** Wer Speisen und Getränke addiert und das für den Umsatz hält,
+verliert ein knappes Drittel.
+
+## 2. Die Arbeitsstunden liegen vor — sie heißen nur nicht so
+
+Das Dokument sagte: *„LINA liefert Personalkosten nur als Quote, keine einzige
+Arbeitsstunde."* **Das ist widerlegt.**
+
+`core.personalkosten.eff_*` ist **Umsatz je Arbeitsstunde** — also genau eine der beiden
+Kennzahlen aus Kapitel 2.1, täglich, für 141 Betriebe, seit 01.01.2018 (442.599 Zeilen).
+Aus ihr fallen die Stunden durch Division heraus. Die Zuordnung, welcher Umsatz zu welchem
+Bereich gehört, ist **nicht geraten, sondern nachgerechnet** — sie schließt als Identität:
+
+```
+Stunden_Service = Umsatz_gesamt    / eff_service
+Stunden_Bar     = Umsatz_Getränke  / eff_bar
+Stunden_Küche   = Umsatz_Speisen   / eff_kueche
+                                                  Summe = Umsatz_gesamt / eff_gesamt
+```
+
+Über 16.110 Betriebstage mit vollständiger Spartenaufteilung: **Median des Verhältnisses
+0,99995**, exakt auf 0,5 % bei 73 % der Tage. Beispiel Enchilada Augsburg, 03.06.2026:
+26,0 + 19,5 + 27,6 = 73,1 Stunden gegen 73,1 aus `eff_gesamt`.
+
+**Gegenprobe gegen die BWA** — die entscheidende, weil sie eine unabhängige Quelle benutzt:
+
+```sql
+-- BWA-Personalkosten (EUR) geteilt durch die zurueckgerechneten Stunden
+-- = impliziter Stundenlohn. 838 Betriebsmonate, 53 Betriebe, ab 2025.
+```
+
+| | €/Stunde |
+|---|---:|
+| p10 | 18,37 |
+| Median | **21,12** |
+| p90 | 25,21 |
+| im Band 14–32 €/h | **97,7 %** |
+
+Ein voll belasteter Stundensatz von 21 € ist für die Systemgastronomie plausibel. Dazu
+**86 Stunden je Öffnungstag im Median** (p10 53, p90 165) bei 4.139 € Tagesumsatz.
+
+**Was daraus folgt:** Kapitel 2.1 (Personalkosten je Umsatzstunde, Umsatz je Arbeitsstunde)
+und „Gäste je Arbeitsstunde" sind **ohne Bericht 107 rechenbar**. Offen bleiben nur
+Personalstunden je *Zeitzone* (die Stunden liegen je Tag vor, nicht je Stunde) und der
+Plan-Ist-Vergleich, der Soll-Stunden braucht.
+
+⚠️ **Die Abdeckung ist echt, nicht wie `fixer_we` mit Nullen getarnt.** 48 der 62 Betriebe
+mit Umsatz haben an ≥95 % ihrer Umsatztage einen Wert, konzernweit rund 87 % der Umsatztage.
+Zehn Betriebe haben gar keinen.
+
+## 3. `pek_*` ist auf Tagesebene KEINE Quote
+
+Beim Prüfen von Befund 2 aufgefallen und in [`fehlerkatalog.md`](fehlerkatalog.md)
+ausführlich: `pek_service/bar/kueche/gesamt` wächst innerhalb eines Monats linear mit dem
+Monatstag, während `eff_*` flach bleibt.
+
+| Monatstag | Median `pek_gesamt` | Median `eff_gesamt` |
+|---:|---:|---:|
+| 1 | 43,8 | 55,7 |
+| 15 | 422,8 | 52,3 |
+| 31 | 717,6 | 60,1 |
+
+Der Zähler ist **seit Monatsanfang kumuliert**, der Nenner ist der Tagesumsatz. Als Prozent
+gelesen ist der Wert ab dem zweiten Tag des Monats falsch. Verlässlich ist allein
+`persoog_bwa`: er stimmt mit dem BWA-Prozentwert exakt überein (Median-Abweichung 0,000 pp,
+76,5 % der Fälle unter 0,15 pp).
+
+## 4. Eigene Zeitfenster gehen — auf vollen Stunden
+
+`core.zeitzonenbericht_stunde`: **10.618.992 Zeilen, Stunden 0–23 vollständig besetzt,
+31.12.2017 bis 07.08.2026, alle 141 Betriebe.** Damit ist jedes Zeitfenster frei
+schneidbar. `mart.umsatz_zeitfenster` (Migration `0052`) trifft die Stundensumme auf
+**100,00 % von 30.597 Betriebstagen exakt**, inklusive Late Night über Mitternacht.
+
+**Die Grenze:** LINAs eigene Zonen brechen bei 11:30 und 17:30, und das ist aus
+Stundenwerten nicht nachbaubar. Mittagszeit 11:30–14:00 gegen eigenen Schnitt 11–14 ergibt
+**+8,4 %**, gegen 12–14 **−8,4 %**; in Stunde 17 allein liegen 9,7 % des Tagesumsatzes.
+Eigene Fenster und LINA-Zonen dürfen deshalb nicht gegeneinander gehalten werden.
+
+„LINA kennt nur 6 feste Zonen" ist damit kein Mangel mehr. Was bleibt, ist eine
+**fachliche Festlegung**: welche sieben Fenster die Map meint — auf vollen Stunden.
+
+## 5. Der Aktionsstamm, sortiert
+
+Alle zwölf Einträge mit ihren tatsächlichen Umsatzdaten. **Drei sind Kampagnen.**
+
+| Eintrag | Betriebe | Tage | Umsatz | Einordnung |
+|---|---:|---:|---:|---|
+| Feinsparten 2025 | 12 | 365 | 10.375.393 € | Sortimentsauswertung, volles Jahr |
+| Enchilada Happy Hour 22:30–23:00 | 19 | 365 | 836.337 € | Zeitfenster, täglich |
+| Sekt alkoholfrei | 14 | 1.906 | 778.290 € | Dauersortiment seit 2020 |
+| Auswertung HH Enchi ab 22:30 | 19 | 196 | 432.198 € | Zeitfenster, Dublette der Zeile 2 |
+| Auswertung Frühstück | 13 | 34 | 392.469 € | Zeitfensterauswertung |
+| Sarti Aktion | 13 | 1.655 | 216.766 € | läuft seit 28.05.2018 — Dauersortiment |
+| **Sommermärchen 2025** | 10 | 89 | 70.847 € | **Kampagne** |
+| Dessert | 13 | 35 | 48.856 € | Sortimentsauswertung |
+| Test | 1 | 4 | 47.500 € | **Testeintrag mit echtem Umsatz** |
+| **Mexican Summer** | 18 | 59 | 32.958 € | **Kampagne** |
+| **Sonnenhut Aktion 2026** | 14 | 7 | 26.781 € | **Kampagne** |
+| Happy Hour Enchilada KG3 | 0 | 0 | — | leer, stillzulegen |
+
+Der Eintrag *Test* trägt 47.500 € an vier Tagen in einem Betrieb (Median 10.808 €/Tag) —
+mehr als zwei der drei echten Kampagnen. Wer über „Aktionen" summiert, ohne zu trennen,
+zählt ihn mit.
+
+## 6. Aktionsartikel lassen sich NICHT aus den Verkaufsdaten erschließen
+
+Versucht, und zwar mit Prüfmöglichkeit: LINA liefert den Aktionsumsatz je Betrieb und Tag,
+also ist jede Kandidatenliste gegen eine bekannte Summe messbar. Methode: Artikel, die im
+Aktionsfenster in teilnehmenden Betrieben neu auftauchen oder deren Tagesabsatz mehr als das
+Dreifache des Zeitraums ±4 Wochen erreicht.
+
+| Aktion | Kandidatenumsatz | LINA-Aktionsumsatz | Treffer |
+|---|---:|---:|---:|
+| Mexican Summer | 34.135 € | 32.958 € | 104 % |
+| Sommermärchen 2025 | 253.512 € | 70.847 € | **358 %** |
+| Sonnenhut Aktion 2026 | 16.470 € | 26.781 € | **61 %** |
+
+**Die Spanne −39 % bis +258 % macht die Zuordnung unbrauchbar.** Das Verfahren findet
+zwar Richtiges — bei *Sonnenhut* steht „Aperol Sommerhut" mit Lift 8,2 in der Liste —, kann
+es aber nicht von zufälligen Ausschlägen trennen: darüber stehen „Speisenpauschale_"
+(10.385 €) und „Raummiete" (3.336 €), also Bankettgeschäft. Dazu bestehen die „neu im
+Fenster"-Artikel überwiegend aus Bonzusätzen ohne Umsatz („o. Brot", „extra Heiß").
+
+**Was daraus folgt:** Die Zuordnung bleibt bei Concept Family. Aber die Kandidatenlisten
+liegen vor und verkürzen die Arbeit auf Bestätigen statt Suchen. Eine **geratene Zuordnung
+wird nicht übernommen** — sie führe in jede Deckungsbeitrags- und
+Kannibalisierungsrechnung ein, ohne sich je wieder zu melden.
+
+## 7. Die Historie ist vollständig — die Grundgesamtheit nicht
+
+Fehlende **Kalendertage** zwischen 01.01.2018 und 07.08.2026: Umsatz 3, Zeitzonen 2,
+Artikelverkauf 3 — und das sind ausschließlich die letzten Sync-Tage (04.–06.08.2026, dazu
+22.07.2026 beim Artikelverkauf). **Es gibt keine Löcher in der Historie.**
+
+Was es gibt, ist Wachstum der Gruppe:
+
+| Jahr | Betriebe mit Umsatz | mit Vorjahresvergleich |
+|---|---:|---:|
+| 2018 | 36 | — |
+| 2020 | 55 | 48 |
+| 2023 | 66 | 61 |
+| 2026 | 61 | **59** |
+
+„Historie vollständig ab 01.01.2018" stimmt für die Datenkette. Ein Konzern-Vorjahresvergleich
+2018 gegen 2026 stellt aber 36 Häuser gegen 62. **Für 59 Betriebe ist der
+Vorjahresvergleich sauber**, und nur so gehört er gerechnet.
+
+## 8. FoodNotify und LINA sind komplementär, nicht redundant
+
+Der zweite Weg zum Soll-Wareneinsatz führt über FoodNotify-Rezepturen. Sein Deckel steht
+fest: der PLU-Join gilt nur bei `core.kostenstelle.kassensystem = 'amadeus'`
+(`docs/foodnotify-0-1-nummernraum.md`). Gemessen: **42 Kostenstellen in 21 Betrieben, die
+33,9 % des Umsatzes 2026 tragen.**
+
+**Davon gehören 31 zu Wilma Wunder** — der Marke, deren `fixer_we`-Abdeckung bei 6,7 %
+liegt. Die beiden Wege überlappen sich also kaum, sie ergänzen sich:
+
+| Weg | Marken | Umsatzanteil 2026 |
+|---|---|---:|
+| LINA `fixer_we` | Enchilada + Aposto | 37,5 % |
+| FoodNotify-Rezepturen | Wilma Wunder | 25,4 % |
+| **zusammen** | | **≈ 63 %** |
+
+Offen bleibt danach im Wesentlichen **Deutsche Konzepte (34,3 %)** — die Marke ohne
+Soll-WE, ohne Warengruppen und mit vier der neun fehlenden Standorte.
+
+## 9. Bewertungstexte: 112.598, nicht 173.823
+
+`core.bewertung` hat 173.823 Zeilen, aber **nur 112.598 tragen einen Text** (64,8 %);
+106.539 haben mindestens 20 Zeichen. Die im Dokument genannte Zahl „173.823 Einzelbewertungen
+mit Text" war der Gesamtbestand.
+
+**Machbarkeitsprobe eigener Themenklassifikation**, 300 zufällige Bewertungen ab 2024,
+von Hand gegen die elf Cluster der Map gelesen. Alle elf kommen vor; die sieben, die Yext
+nicht kennt, sind gut belegt:
+
+| Cluster | Treffer in 300 |
+|---|---:|
+| Atmosphäre / Ambiente | 95 |
+| Getränke | 72 |
+| Wiederbesuchsabsicht | 65 |
+| Preis-Leistung | 37 |
+| Reservierung / Empfang | 22 |
+| Musik / Lautstärke | 14 |
+| Aktion (positiv/negativ) | 14 |
+| *Sauberkeit (kennt Yext)* | *6* |
+
+Zum Vergleich: Yext hat seit April 2026 insgesamt **5.640 Themennennungen** vergeben, über
+alle fünf Labels und alle 60 Betriebe. Dem stehen 106.539 auswertbare Texte gegenüber.
+
+**Vier Grenzfälle, die ein Klassifikator abkönnen muss:**
+
+* **Mehrsprachigkeit.** Rund 8 % englisch, dazu Italienisch, Französisch, Spanisch,
+  Niederländisch, Norwegisch, Russisch (99 kyrillisch), Japanisch (33 CJK).
+* **Sterne widersprechen dem Text.** 10,9 % der Fünf-Sterne-Bewertungen enthalten ein
+  Negativwort („Service leider so gut wie nicht da" bei 5,0). Die Note taugt **nicht** als
+  Sentiment-Etikett je Cluster; das muss aus dem Text kommen.
+* **Fremde Objekte.** Einzelne Texte bewerten etwas anderes als den Betrieb (ein Hotelbad).
+* **Dubletten.** 173 Texte kommen mehrfach vor (353 Zeilen, 0,36 %), 142 davon über
+  mehrere Publisher.
+
+**Nebenbefund mit eigener Wirkung:** rund 7 % der Texte **nennen Mitarbeitende beim Namen**
+(„Lina", „Umut", „Tim", „Selin"). Damit ist ein Teil von Kapitel 4.2 — Wirkung auf
+Personenebene — aus vorhandenen Daten greifbar, ohne Bounti. Der Notendurchschnitt bleibt
+unverändert Yexts Zahl.
+
+## 10. Kleinere Korrekturen an bisher genannten Zahlen
+
+| Bisher | Gemessen 11.08.2026 |
+|---|---|
+| „17 Betriebe zählen lückenhaft, 2 nie" | **16 lückenhaft, 2 nie** (43 durchgängig) |
+| „7 operative Betriebe ohne Standort" | **9 Betriebe mit Umsatz 2026** ohne Standort |
+| „173.823 Einzelbewertungen mit Text" | 173.823 gesamt, **112.598 mit Text** |
+| „5,3 % des Sortiments" | richtig, aber **31,3 % des Umsatzes** |
+
+**Die Lücken in der Gästezählung sind meist kein Defekt, sondern ein Rollout.** Enchilada
+Nürnberg zählt Januar bis Juni an 0 von 182 Tagen, im Juli an 27 von 29. Dasselbe Muster bei
+den meisten der 16: sie stehen bei 13–14 %, also rund einem von sieben Monaten. **Wer das
+als Rückgang liest, liest eine Einführung.**
+
+Die neun Betriebe ohne Standort, nach Umsatz 2026 (`mart.kalender_fehlend`):
+
+| Betrieb | Umsatz 2026 |
+|---|---:|
+| Wirtshaus am Schlossplatz GmbH | 5.528.220 € |
+| Wirtshaus Lautenschlager GmbH | 2.510.525 € |
+| WHK Gastronomie GmbH | 2.089.719 € |
+| BS Bier & Speisen Gastro GmbH | 1.836.054 € |
+| Gastronomie Wilsdruffer Straße GmbH | 1.025.991 € |
+| SCHAFFERONE GmbH | 853.678 € |
+| B+L Pforzheim GmbH | 650.443 € |
+| GSF Gastro GmbH | 182.115 € |
+| A Testladen Concept Family | 230 € |
+
+Der erste ist **das umsatzstärkste Haus der Gruppe.** Er fehlt in jeder Stadt-, Feiertags-
+und Vergleichstagsauswertung, und dort fällt es nicht auf.
+
+## 11. Bewertungsquote und BWA-Takt
+
+**Bewertungsquote** (Kapitel 3), nur die 39 Betriebe mit verlässlicher Gästezählung und ohne
+die 14 Ausreißerzeilen: **27,9 Bewertungen je 10.000 Gäste im Median** (p10 16,4, p90 55,9),
+Gruppenwert 31,4. Also rund **eine Bewertung je 320 Gäste**.
+
+**BWA-Takt.** Stand 04.08.2026 gebuchte EBIT-Werte: April 65 Betriebe, Mai 63, Juni 41,
+Juli 0. Der **Buchungsverzug ist noch nicht messbar**: `core.kennzahlen_monat` führt erst
+Momentaufnahmen vom 26.07. bis 04.08.2026, also acht Tage. In diesen acht Tagen stieg Juni
+von 23 auf 41 Betriebe. Wer den Verzug aus `min(abgerufen_am)` rechnet, misst den Beginn
+unseres Imports, nicht die Arbeit der Buchhaltung. **Nach drei Monaten Momentaufnahmen ist
+die Frage beantwortbar** — sie braucht keine Anfrage, nur Zeit.
+
+## 12. Rendite: eine Definition, und sie ist LINAs
+
+`wert_prozent` zu EBIT entspricht exakt `EBIT_absolut / Umsatz_absolut` — bei **100 % von
+6.289 Betriebsmonaten** innerhalb von 0,05 pp, Median-Abweichung 0,003 pp. `Umsatz` steht
+dabei durchgehend auf 100,0 %, alle Prozentwerte sind also „in % vom Umsatz".
+
+Der geplante Abgleich gegen die „Betriebsergebnis-Rendite" des Wilma-Wunder-Reports
+**konnte nicht durchgeführt werden: dieser Report liegt nicht im Repository.** In
+`examples/` findet sich das Wort „Betriebsergebnis" nicht. Offen bleibt damit genau eine
+Frage, und sie ist fachlich: **Ist Concept Familys Betriebsergebnis derselbe Zähler wie
+LINAs EBIT?** Alles andere daran ist geklärt.
+
+## 13. Standort und Yext fehlen bei denselben neun Betrieben
+
+Zwei getrennt geführte Arbeitslisten sind dieselbe Liste:
+
+```sql
+-- operative Betriebe ohne Yext-Zuordnung
+SELECT b.name FROM core.betrieb b
+  JOIN mart.umsatz_tag t ON t.betrieb_key = b.betrieb_key AND t.geschaeftstag >= DATE '2026-01-01'
+  LEFT JOIN manual.betrieb_fremd_id f ON f.betrieb_key = b.betrieb_key AND f.system = 'yext'
+ WHERE f.betrieb_key IS NULL GROUP BY 1 HAVING sum(t.umsatz_netto) > 0;
+```
+
+liefert **exakt dieselben neun Betriebe** wie `mart.kalender_fehlend`. Beide Tabellen —
+`manual.betrieb_standort` und `manual.betrieb_fremd_id` — führen dieselben 60 Betriebe.
+
+**Was daraus folgt:** ein Arbeitsgang schließt beide Lücken. Und die Betriebe fehlen
+gleichzeitig in der Standortkarte, im Stadtvergleich, in der Feiertagsrechnung, im
+Vergleichstag **und** in jeder Bewertungsauswertung — angeführt vom umsatzstärksten Haus der
+Gruppe.
+
+## 14. `mart.betrieb_status` beantwortet die Stilllegungsfrage bereits
+
+Die Frage „welche der Betriebe ohne Umsatz sind Beteiligung, insolvent, Test oder nie
+eröffnet" ist nicht offen — die Sicht gibt es:
+
+| Status | Betriebe |
+|---|---:|
+| operativ | 57 |
+| geschlossen | 39 |
+| ohne Geschäft | 18 |
+| verwaltend | 17 |
+| inaktiv | 6 |
+| Test | 4 |
+
+**57 von 141 sind operativ.** Die bisher zitierten „79 ohne Umsatz" beruhten auf einem
+anderen Schnitt (jemals Umsatz gegen Umsatz im letzten bewerteten Monat). Beide Zahlen sind
+richtig und beantworten verschiedene Fragen — beim Weitergeben gehört der Nenner dazu.

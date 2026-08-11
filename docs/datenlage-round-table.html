@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 <body>
-<title>Round-Table-Map: Datenlage, Lücken und offene Rechte</title>
+<title>Round-Table-Map: Datenlage und offene Punkte</title>
 
 <style>
   :root {
@@ -388,34 +388,32 @@
 
   <header class="kopf">
     <div class="eyebrow">Concept Family &middot; Analytics</div>
-    <h1>Round-Table-Map: Datenlage, Lücken und offene Rechte</h1>
-    <p class="untertitel">Abgleich der Management-Anforderung gegen den tatsächlichen Datenbestand. Was heute rechenbar ist, was fehlt, und welche Freigaben wir brauchen, um den Rest zu liefern.</p>
+    <h1>Round-Table-Map: Datenlage und offene Punkte</h1>
+    <p class="untertitel">Was für die Kennzahlen der Map heute rechenbar ist, was noch fehlt, und wer es klären muss. Jede Zahl in diesem Dokument stammt aus einer Abfrage auf den Produktivbestand.</p>
     <div class="stand">
       <span><b>Stand</b> 11.08.2026</span>
       <span><b>Grundlage</b> Produktivdatenbank, gemessen</span>
-      <span><b>Quellen</b> LINA &middot; FoodNotify &middot; Yext</span>
+      <span><b>Quellen</b> LINA &middot; FoodNotify &middot; Yext &middot; Eurostat</span>
     </div>
   </header>
 
   <section>
     <h2><span class="nr">01</span> Kurzfassung</h2>
-    <p class="lead">Rund <strong>60 % der Anforderung ist heute rechenbar</strong> — mit einer Historie zurück bis Januar 2018, also einschließlich aller Vorjahresvergleiche. Der Rest verteilt sich auf drei Ursachen, die getrennt behandelt werden müssen, weil sie an verschiedenen Stellen entschieden werden.</p>
+    <p class="lead">Der Datenbestand trägt mehr, als er auf den ersten Blick hergibt — an mehreren Stellen liegt eine Kennzahl unter einem Feldnamen, der nicht nach ihr klingt. Was offen bleibt, verteilt sich auf vier Adressaten, und keiner davon ist eine Schnittstelle, die noch gebaut werden müsste.</p>
 
     <div class="band">
-      <div><span class="wert">62</span><span class="etikett">Betriebe mit laufendem Umsatz (von 141 geführten)</span></div>
-      <div><span class="wert">2018</span><span class="etikett">Historie vollständig ab 01.01.</span></div>
-      <div><span class="wert">27,7&nbsp;Mio.</span><span class="etikett">Artikelverkaufszeilen</span></div>
-      <div><span class="wert">173.823</span><span class="etikett">Einzelbewertungen mit Text</span></div>
+      <div><span class="wert">31,3&nbsp;%</span><span class="etikett">des Umsatzes haben einen hinterlegten Soll-Wareneinsatz</span></div>
+      <div><span class="wert">21,12&nbsp;€</span><span class="etikett">impliziter Stundenlohn aus den rechenbaren Arbeitsstunden</span></div>
+      <div><span class="wert">2018</span><span class="etikett">Historie lückenlos ab 01.01., alle 141 Betriebe</span></div>
+      <div><span class="wert">6</span><span class="etikett">Messaufrufe entscheiden den Rest — je einer, keine Schleife</span></div>
     </div>
 
-    <p>Die drei Ursachen: <strong>fehlende Rechte in LINA</strong> (lösbar durch Freigabe), <strong>nicht angebundene Systeme</strong> (Bounti, OpenTable, Marktdaten) und <strong>fehlende Stammdatenpflege</strong> (Soll-Wareneinsatz, Aktionsstamm, Betriebsstammdaten). Die dritte ist die unangenehmste, weil keine Schnittstelle sie löst.</p>
-
-    <div class="merksatz">Der teuerste Einzelbefund ist nicht ein fehlendes System, sondern eine Stammdatenlücke: Der Soll-Wareneinsatz je Artikel ist für <strong>5 % des verkauften Sortiments</strong> hinterlegt. Kapitel 6.2 der Map — der gewichtete optimale Wareneinsatz — ist damit heute nicht lieferbar.</div>
+    <div class="merksatz">Vier Adressaten: <strong>Rechte in LINA</strong> und eine Frage an den Steuerberater, <strong>zwei fremde Systeme</strong> (Bounti, OpenTable), <strong>Stammdatenpflege</strong>, die nur Concept Family leisten kann, und <strong>fachliche Festlegungen</strong>, die nie getroffen wurden. Die dritte und die vierte sind die unangenehmen — dafür löst keine Schnittstelle etwas.</div>
   </section>
 
   <section>
     <h2><span class="nr">02</span> Was vorliegt</h2>
-    <p>Alle Zahlen am 11.08.2026 direkt im Datenbestand gemessen, nicht geschätzt.</p>
+    <p>Alle Mengenangaben am 11.08.2026 im Produktivbestand gemessen.</p>
 
     <div class="tabellenrahmen">
       <table>
@@ -423,182 +421,116 @@
           <tr><th>Datenbereich</th><th>Umfang</th><th>Deckt in der Map ab</th></tr>
         </thead>
         <tbody>
-          <tr><td>Umsatz, Gäste, Bons, Ø Bon je Betrieb und Tag</td><td class="num">1,33 Mio. Zeilen<br>ab 01.01.2018</td><td>1.1, 6.1, 8.2, 9.2</td></tr>
-          <tr><td>Speisen- / Getränke-Trennung</td><td class="num">26,95 Mio. € / 20,02 Mio. €<br>(2026 bis 07.08.)</td><td>1.2, 6.1</td></tr>
-          <tr><td>Artikelverkauf je Betrieb, Tag und Artikel</td><td class="num">27,70 Mio. Zeilen<br>8.683 Artikel in 2026</td><td>10.1, 6.3 (Absatzteil)</td></tr>
-          <tr><td>Zeitzonen und Stundenwerte</td><td class="num">2,65 Mio. Zeilen<br>6 Zonen</td><td>1.3 (nur Umsatz)</td></tr>
-          <tr><td>Personalkennzahlen je Bereich (Service, Bar, Küche)</td><td class="num">442.599 Zeilen<br>Quoten und Effektivitäten</td><td>2.1, 2.2 (teilweise)</td></tr>
-          <tr><td>BWA: Umsatz, WE Bar, WE Küche, Personalkosten ohne GF, EBIT</td><td class="num">353.700 Zeilen<br>monatlich je Betrieb</td><td>1.2, 6.1, 9.2 (Rendite)</td></tr>
-          <tr><td>Online-Bewertungen aus Yext</td><td class="num">173.823 Einzelbewertungen<br>60 Betriebe</td><td>3.1, 3.3</td></tr>
-          <tr><td>Aktionsumsätze je Betrieb, Tag und Aktion</td><td class="num">34.642 Zeilen<br>12 Aktionen</td><td>5.1 (nur Umsatzteil)</td></tr>
-          <tr><td>Einkaufspreise und Bestellungen (FoodNotify)</td><td class="num">4 Marken<br>seit 2022</td><td>6.3 (Einkaufspreisveränderung)</td></tr>
-          <tr><td>Ampel-, Score- und Maßnahmenlogik</td><td>als Regelwerk hinterlegt, nicht als Programmcode</td><td>8.3, 8.4, 11.2</td></tr>
+          <tr><td>Umsatz, Gäste, Bons, Ø Bon je Betrieb und Tag</td><td class="num">lückenlos<br>ab 01.01.2018</td><td>1.1, 6.1, 8.2, 9.2</td></tr>
+          <tr><td>Arbeitsstunden und Umsatz je Arbeitsstunde, je Bereich</td><td class="num">442.599 Zeilen<br>48 von 62 Betrieben ≥ 95 % der Tage</td><td><b>2.1, 2.2</b></td></tr>
+          <tr><td>Artikelverkauf je Betrieb, Tag und Artikel</td><td class="num">27,70 Mio. Zeilen</td><td>10.1, 6.3</td></tr>
+          <tr><td>Soll-Wareneinsatz — Enchilada und Aposto</td><td class="num">84,4 % / 67,0 %<br>des Markenumsatzes</td><td><b>6.2, 10.2</b> für diese Marken</td></tr>
+          <tr><td>Umsatz je Stunde und je frei geschnittenem Zeitfenster</td><td class="num">10,62 Mio. Zeilen<br>24 Stunden, ab 2018</td><td>1.3 (Umsatzteil)</td></tr>
+          <tr><td>Speisen- / Getränke-Trennung</td><td class="num">46,97 von 66,95 Mio. €<br>= <b>70 % des Umsatzes</b></td><td>1.2, 6.1</td></tr>
+          <tr><td>BWA: Umsatz, WE Bar, WE Küche, Personalkosten ohne GF, EBIT</td><td class="num">monatlich je Betrieb<br>Rendite = EBIT ÷ Umsatz</td><td>1.2, 6.1, 9.2</td></tr>
+          <tr><td>Feiertage, Schulferien, Vergleichstag</td><td class="num">1.718 Einträge<br>10 Bundesländer, 2018–2027</td><td><b>7.1</b> ohne Events und Wetter</td></tr>
+          <tr><td>Marktindex Gastronomie, nominal und real</td><td class="num">101 Monate<br>ab 01/2018</td><td><b>1.1, 9.2</b></td></tr>
+          <tr><td>Online-Bewertungen aus Yext</td><td class="num">173.823 gesamt<br><b>112.598 mit Text</b>, 60 Betriebe</td><td>3.1, 3.3</td></tr>
+          <tr><td>Aktionsumsätze je Betrieb, Tag und Aktion</td><td class="num">34.642 Zeilen<br>3 echte Kampagnen</td><td>5.1 (Umsatzteil)</td></tr>
+          <tr><td>Einkaufspreise und Bestellungen (FoodNotify)</td><td class="num">634.175 Positionen<br>4 Marken, seit 2022</td><td>6.3</td></tr>
+          <tr><td>Ampel-, Score- und Maßnahmenlogik</td><td>als Regelwerk hinterlegt</td><td>8.3, 8.4, 11.2</td></tr>
         </tbody>
       </table>
     </div>
 
-    <p>Damit sind unter anderem lieferbar: Umsatzentwicklung gegen Vorjahr und Vormonat, Wareneinsatzquoten Bar und Küche, Rendite je Betrieb, Renner-Penner nach Absatz und Umsatz, Betriebs-Ranking, Bewertungsentwicklung, Ampel- und Score-Logik sowie der Maßnahmenkatalog.</p>
+    <p>Damit sind unter anderem lieferbar: Umsatzentwicklung gegen Vorjahr, Vormonat und Markt, Wareneinsatzquoten Bar und Küche, Rendite je Betrieb, Personalkosten je Umsatzstunde, Renner-Penner nach Absatz und Umsatz, Betriebs- und Markenvergleich, Bewertungsentwicklung sowie Ampel- und Score-Logik.</p>
   </section>
 
   <section>
-    <h2><span class="nr">03</span> Was nicht vorliegt</h2>
+    <h2><span class="nr">03</span> Sechs Punkte, die man den Daten nicht ansieht</h2>
+    <p>Jeder davon ändert, wie eine Zahl der Map zu lesen ist — und in vier Fällen, ob sie überhaupt als lieferbar gilt. Mit der Messung dabei, damit nachprüfbar bleibt, worauf die Aussage beruht.</p>
+
+    <div class="register">
+      <div class="posten">
+        <span class="chip ok">gemessen</span>
+        <span class="titel">Der Soll-Wareneinsatz ist eine Frage je Marke, nicht je Konzern</span>
+        <span class="text">Hinterlegt ist er für <b>457 von 8.683 verkauften Artikeln</b> — 5,3 %. Diese Zahl ist ein Artikelanteil und misst das Falsche: Kapitel 6.2 gewichtet nach Verkaufsmix. Nach Umsatz gerechnet sind es <b>31,3 %</b>, also <b>Faktor sechs</b>. Gepflegt ist offenbar, was verkauft wird.<br><br>Der Konzernwert verdeckt außerdem, dass es je Marke fast alles oder fast nichts ist: <b>Enchilada 84,4 %, Aposto 67,0 %</b> — Wilma Wunder 6,7 %, Deutsche Konzepte 1,8 %. <b>28 der 62 laufenden Betriebe liegen über 50 %</b> und tragen 36,5 % des Artikelumsatzes. Für Enchilada und Aposto ist der gewichtete optimale Wareneinsatz heute rechenbar.</span>
+      </div>
+      <div class="posten">
+        <span class="chip ok">gemessen</span>
+        <span class="titel">Die Arbeitsstunden liegen vor — unter einem anderen Namen</span>
+        <span class="text">LINA weist Personalkosten als Quote aus und keine Stunden. Aber das Feld <b>„Effektivität" ist Umsatz je Arbeitsstunde</b> — täglich, für 141 Betriebe, seit 01.01.2018. Damit ist eine der beiden Kennzahlen aus Kapitel 2.1 direkt da, und die Stunden fallen durch Division heraus.<br><br>Die Zuordnung, welcher Umsatz zu welchem Bereich gehört, ist nicht angenommen, sondern schließt als Identität: Service + Bar + Küche trafen die Gesamtstunden über <b>16.110 Betriebstage</b> mit einem Median von 0,99995. Gegenprobe gegen die BWA: <b>21,12 € Stundenlohn im Median</b>, 97,7 % aller Betriebsmonate im plausiblen Band von 14 bis 32 €.<br><br><b>Kapitel 2.1 ist damit lieferbar.</b> Offen bleiben Personalstunden je <em>Zeitzone</em> und die Soll-Stunden für den Plan-Ist-Vergleich aus 7.2 — die stecken im gesperrten Dienstplan.</span>
+      </div>
+      <div class="posten">
+        <span class="chip ok">gemessen</span>
+        <span class="titel">Zeitfenster sind frei schneidbar</span>
+        <span class="text">LINAs Zonenbericht kennt sechs feste Zonen. Der <b>Stundenbericht</b> daneben ist vollständig: 10,6 Mio. Zeilen, alle 24 Stunden besetzt, lückenlos seit Ende 2017, alle 141 Betriebe. Damit ist jedes Fenster frei schneidbar; die Summe der eigenen Fenster trifft den Tag auf <b>100,00 % von 30.597 Betriebstagen</b> exakt, Late Night über Mitternacht eingeschlossen.<br><br><b>Eine echte Grenze:</b> LINAs Zonen brechen bei 11:30 und 17:30, und in Stunde 17 allein liegen 9,7 % des Tagesumsatzes. Eigene Fenster müssen auf <b>vollen Stunden</b> definiert werden und dürfen nicht gegen LINAs Zonen gehalten werden.</span>
+      </div>
+      <div class="posten">
+        <span class="chip ok">gebaut</span>
+        <span class="titel">Feiertage, Ferien und Marktindex sind offene Daten</span>
+        <span class="text">In der Datenbank stehen <b>1.127 Feiertage und 591 Ferienzeiträume</b> für zehn Bundesländer, 2018 bis 2027, das Bundesland je Betrieb über die gepflegte PLZ aufgelöst. Darauf rechnet der <b>Vergleichstag aus Kapitel 7.1</b>: jeder Tag gegen den Durchschnitt der letzten vier gleichen Wochentage, Feiertage und Ruhetage ausgenommen, mit Ausweis der Ferienlage. Offen bleiben nur Events und Wetter.<br><br>Für „Umsatz gegen Gesamtmarkt" liegt der <b>Umsatzindex Gastronomie</b> vor, monatlich, <b>101 Monate ab 2018</b>, nominal und real. Erste Rechnung: Herbst 2025 lag die Gruppe <b>1,6 bis 2,7 Prozentpunkte unter</b> dem Markt, seit Januar 2026 <b>0,5 bis 2,7 darüber</b>.</span>
+      </div>
+      <div class="posten">
+        <span class="chip ok">gemessen</span>
+        <span class="titel">Von zwölf Aktionen sind drei Kampagnen</span>
+        <span class="text">Im Aktionsstamm stehen zwölf Einträge nebeneinander: <b>drei echte Kampagnen</b> (Sommermärchen 2025, Mexican Summer, Sonnenhut 2026), fünf Zeitfenster- oder Sortimentsauswertungen, zwei Dauersortimente, einer leer und einer ein Testeintrag.<br><br>Der Eintrag <b>„Test" trägt 47.500 €</b> an vier Tagen — mehr als zwei der drei echten Kampagnen. Wer über „Aktionen" summiert, ohne zu trennen, zählt ihn mit. Die Bereinigungsliste liegt fertig vor.</span>
+      </div>
+      <div class="posten">
+        <span class="chip ok">gemessen</span>
+        <span class="titel">Die Historie ist lückenlos — die Grundgesamtheit wächst</span>
+        <span class="text">Zwischen 01.01.2018 und 07.08.2026 fehlt <b>kein einziger Kalendertag</b> außer den letzten dreien, die der Sync noch nicht geholt hat.<br><br>Aber: 2018 machten <b>36</b> Häuser Umsatz, 2026 sind es 62. Ein Konzern-Vorjahresvergleich 2018 gegen 2026 stellt also 36 Häuser gegen 62. <b>Für 59 Betriebe ist der Vorjahresvergleich sauber</b> — so und nicht über „alle" gehört er gerechnet.</span>
+      </div>
+    </div>
+
+    <div class="kasten">
+      <span class="status">drei Fallen in den Rohdaten</span>
+      <h4>Zahlen, die plausibel aussehen und falsch sind</h4>
+      <ul class="felder">
+        <li><b>Umsatzsummen zählen doppelt</b>, wer die Rohtabelle nimmt: sie führt je Tag eine Gesamtzeile <em>und</em> je eine für Speisen und Getränke. Der Fehler halbiert jede daraus abgeleitete Stundenrechnung, ohne sich zu melden.</li>
+        <li><b>Speisen plus Getränke sind nicht der Umsatz.</b> 2026 fehlen 29,8 %, weil 4.088 Artikel keiner Warengruppe zugeordnet sind — fast alles davon Deutsche Konzepte und Besitos.</li>
+        <li><b>Vierzehn Gästezahlen sind Beträge</b>, keine Anzahlen — 46 Millionen Gäste an einem Tag mit 331 Rechnungen. Zu wenige, um in einer Zählung aufzufallen, genug, um jede Summe „je Gast" zu zerstören.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="nr">04</span> Was offen bleibt</h2>
 
     <div class="legende">
-      <span class="chip warn">Rechte fehlen</span>
-      <span class="chip miss">nicht angebunden</span>
-      <span class="chip intern">Pflege / Festlegung</span>
-      <span>&mdash; drei verschiedene Adressaten, drei verschiedene Wege.</span>
+      <span class="chip warn">Rechte</span>
+      <span class="chip miss">fremdes System</span>
+      <span class="chip intern">Pflege</span>
+      <span class="chip intern">Festlegung</span>
+      <span>&mdash; vier Adressaten, vier verschiedene Wege.</span>
     </div>
 
-    <h3>Personal und Arbeitszeit</h3>
+    <h3>Rechte und Freigaben</h3>
     <div class="register">
       <div class="posten">
-        <span class="chip warn">Rechte fehlen</span>
-        <span class="titel">Gearbeitete Stunden</span>
-        <span class="text">LINA liefert Personalkosten nur als <b>Quote</b>, keine einzige Arbeitsstunde und keinen Euro-Betrag je Bereich. Damit fehlen: Personalkosten je Umsatzstunde, Umsatz je Arbeitsstunde, Gäste je Arbeitsstunde, Personalstunden je Zeitzone, Plan gegen Ist an Aktionstagen. Betrifft die Kapitel <b>2.1, 2.3 und 7.2 vollständig</b>.</span>
+        <span class="chip warn">Rechte</span>
+        <span class="titel">Kassenjournal — Bonebene</span>
+        <span class="text">Ohne Einzelbons nicht rechenbar: Bons mit Aktion, Ø Bon mit gegen ohne Aktion, Gästezahl mit Aktion (5.1) und Wartezeiten aus Bon-Zeitstempeln (7.2, 11.1). <b>Ob es überhaupt eine Rechtefrage ist, ist ungeprüft</b> — der erste Messaufruf unten entscheidet es.</span>
       </div>
       <div class="posten">
-        <span class="chip warn">Rechte fehlen</span>
-        <span class="titel">Dienstplan</span>
-        <span class="text">Die Dienstplan-Schnittstelle antwortet, meldet aber „Keine Berechtigung für diesen Dienstplan". Ohne sie gibt es keinen Plan-Ist-Vergleich. LINA hinterlegt dort bereits Umsatz- und Effektivitätsziele je Dienstplan — das wäre zugleich die Grundlage für datengestützte Dienstplanung.</span>
+        <span class="chip warn">Rechte</span>
+        <span class="titel">Dienstplan — die Soll-Seite</span>
+        <span class="text">Die Schnittstelle antwortet, meldet aber „Keine Berechtigung für diesen Dienstplan". Die <b>Ist</b>-Stunden haben wir; was fehlt, sind die <b>Soll</b>-Stunden und die dort hinterlegten Umsatz- und Effektivitätsziele. Damit fehlt der Plan-Ist-Vergleich aus 7.2.<br><br>Im Management-Bericht führt LINA sichtbar die Spalten <b>Plan</b> und <b>Stundenbudget</b>. Sie stehen bei den meisten Betrieben auf 0,00. Ob sie befüllbar sind, gehört in dieselbe Anfrage — es wäre zugleich die Datenbasis für „Umsatz gegen Plan" (8.2).</span>
       </div>
       <div class="posten">
-        <span class="chip intern">Pflege / Festlegung</span>
+        <span class="chip warn">Rechte</span>
+        <span class="titel">Betriebskontext für Einkauf und Stammdaten</span>
+        <span class="text">Waren-, Lieferanten- und Bestelldaten hängen am aktuell gewählten Betrieb; im Zentral-Kontext kommen die Daten der Zentrale zurück, nicht die der Häuser. Derselbe Mechanismus lieferte <b>Adresse, Sitzplätze und Fläche je Haus</b> — und damit „Umsatz je Sitzplatz" und die fehlenden Standorte in einem Zug.<br><br>Gefragt ist ausdrücklich ein <b>lesender</b> Weg, den aktiven Betrieb zu wechseln.</span>
+      </div>
+      <div class="posten">
+        <span class="chip warn">Rechte</span>
+        <span class="titel">Mitarbeiter-Stammdaten</span>
+        <span class="text">Der genutzte Zugang hat keinen Zugriff. Nötig für die Verbindung zwischen Schulungsstand, Schicht und Verkaufsverhalten (Kapitel 4.2).<br><br><b>Teilweise entschärft:</b> rund 7 % der Bewertungstexte nennen Mitarbeitende beim Namen. Ein Teil der Wirkungsmessung ist damit auch ohne Stammdaten greifbar.</span>
+      </div>
+      <div class="posten">
+        <span class="chip warn">Rechte</span>
         <span class="titel">Gesamtpersonalkosten inklusive GF</span>
-        <span class="text">Die BWA liefert fünf Kennzahlen, darunter <b>Personalkosten ohne GF</b>. Der Gesamtwert und damit der GF-Anteil (Kapitel 2.2) ist nicht darunter und muss als zusätzliche Position aufgenommen werden. Offen ist außerdem, ob „ohne GF" die Lohnnebenkosten bereits enthält.</span>
+        <span class="text">Geht an den <b>Steuerberater</b>, nicht an LINA. Die BWA führt „Personalkosten ohne GF"; Gesamtwert und GF-Anteil (2.2) fehlen als Position. Dazu die Frage, ob „ohne GF" die Lohnnebenkosten enthält — sie geht auch in den oben genannten Stundenlohn ein.</span>
       </div>
       <div class="posten">
-        <span class="chip intern">Pflege / Festlegung</span>
-        <span class="titel">Bereichsschnitt</span>
-        <span class="text">LINA kennt drei Bereiche: Service, Bar, Küche. Die Map nennt zusätzlich Runner, Host, Reinigung und weitere operative Kostenstellen. Ob diese in LINA angelegt werden können, ist zu klären.</span>
-      </div>
-    </div>
-
-    <h3>Bonebene und Gäste</h3>
-    <div class="register">
-      <div class="posten">
-        <span class="chip warn">Rechte fehlen</span>
-        <span class="titel">Kassenjournal / Bon-Rohdaten</span>
-        <span class="text">Ohne Einzelbons nicht rechenbar: <b>Bons mit Aktion</b>, <b>Ø Bon mit gegen ohne Aktion</b>, <b>Gästezahl mit Aktion</b> (Kapitel 5.1), Zusatzverkäufe (4.2, 7.1) und Wartezeiten aus Bon-Zeitstempeln (7.2, 11.1). Format und Umfang sind ungeprüft — ein einzelner lesender Aufruf klärt beides.</span>
-      </div>
-      <div class="posten">
-        <span class="chip intern">Pflege / Festlegung</span>
-        <span class="titel">Gästezählung ist lückenhaft</span>
-        <span class="text">Von 62 laufenden Betrieben zählen <b>43 durchgängig</b> Gäste, <b>17 lückenhaft</b>, <b>2 nie</b>. Jede Kennzahl „je Gast" hat damit einen um bis zu 30 % gelöcherten Nenner. Das ist Kassenkonfiguration im Betrieb, keine Schnittstellenfrage — sollte aber vor dem ersten Report bereinigt sein, sonst wird die Lücke als Rückgang gelesen.</span>
-      </div>
-      <div class="posten">
-        <span class="chip miss">nicht angebunden</span>
-        <span class="titel">Gäste je Zeitzone</span>
-        <span class="text">Die Zeitzonenberichte liefern <b>ausschließlich Umsatz</b> — keine Gäste, keine Bons, keinen Speisen-/Getränke-Anteil, keine Personalstunden. Von sechs Auswertungspunkten unter Kapitel 1.3 ist damit einer abgedeckt. Reservierungsdaten (siehe 05) schließen einen Teil dieser Lücke.</span>
-      </div>
-    </div>
-
-    <h3>Wareneinsatz und Artikel</h3>
-    <div class="register">
-      <div class="posten">
-        <span class="chip intern">Pflege / Festlegung</span>
-        <span class="titel">Soll-Wareneinsatz je Artikel</span>
-        <span class="text">Kapitel 6.2 verlangt den gewichteten optimalen Wareneinsatz nach tatsächlichem Verkaufsmix. Dafür braucht jeder Artikel einen Soll-Ansatz. Gemessen: <b>457 von 8.683 verkauften Artikeln</b> haben einen — <b>5,3 %</b>. Bei den übrigen steht in LINA eine Null, die wie ein gepflegter Wert aussieht. <b>Ohne Nachpflege ist 6.2 nicht lieferbar</b>, und mit ihm fallen der Deckungsbeitrag je Artikel und die Renner-Penner-Matrix nach DB (10.2).</span>
-      </div>
-      <div class="posten">
-        <span class="chip warn">Rechte fehlen</span>
-        <span class="titel">Wareneinsatz und Deckungsbeitrag (LINA-Bericht 118)</span>
-        <span class="text">Dem Namen nach genau die Margenrechnung auf LINAs eigener Logik — gesperrt. Wäre der zweite Weg zu 6.2, unabhängig von der Artikelpflege.</span>
-      </div>
-      <div class="posten">
-        <span class="chip warn">Rechte fehlen</span>
-        <span class="titel">Betriebskontext für Einkauf und Dienstplan</span>
-        <span class="text">Waren-, Lieferanten- und Bestelldaten hängen am aktuell gewählten Betrieb. Im Zentral-Kontext kommen die Daten der Zentrale zurück, nicht die der Häuser. Solange das so ist, bleibt jede Margenbetrachtung aus LINA auf die Zentrale beschränkt.</span>
-      </div>
-    </div>
-
-    <h3>Aktionen</h3>
-    <div class="register">
-      <div class="posten">
-        <span class="chip intern">Pflege / Festlegung</span>
-        <span class="titel">Der Aktionsstamm trägt die Auswertung nicht</span>
-        <span class="text">In LINA stehen 12 Einträge — darunter <b>„Test"</b>, <b>„Feinsparten 2025"</b>, <b>„Auswertung Frühstück"</b> und <b>„Dessert"</b>. Von den sieben in der Map genannten Aktionen existieren <b>zwei</b>: Sarti und Mexican Summer. <b>Cocktail Casino, Taco Day, Gambas Day und „20 Tage 20 €" kommen nicht vor.</b> Echte Kampagnen, Zeitfensterauswertungen und Testeinträge stehen gleichberechtigt nebeneinander.</span>
-      </div>
-      <div class="posten">
-        <span class="chip intern">Pflege / Festlegung</span>
-        <span class="titel">Teilnehmende Betriebe und Aktionsartikel</span>
-        <span class="text">Welche Häuser an einer Aktion teilnehmen, steht in keinem System — der Vergleich „Teilnehmer gegen Nicht-Teilnehmer" ist damit Handarbeit. Und ohne die Zuordnung <b>welche Artikel zur Aktion gehören</b> gibt es keine Stückzahl, keinen Deckungsbeitrag je Aktion und keine Kannibalisierungsrechnung (10.3). Die Verkaufsdaten selbst sind mit 27,7 Mio. Zeilen reichlich vorhanden — es fehlt nur die Zuordnung.</span>
-      </div>
-    </div>
-
-    <h3>Gästezufriedenheit</h3>
-    <div class="register">
-      <div class="posten">
-        <span class="chip miss">nicht angebunden</span>
-        <span class="titel">Themencluster: 5 statt 11</span>
-        <span class="text">Yext klassifiziert nach fünf eigenen, englischen Labels: Food, Service and Staff, Speed of Service, Order, Restaurant Cleanliness. <b>Sieben der elf gewünschten Cluster fehlen</b> — Preis-Leistung, Getränke, Atmosphäre, Reservierung/Empfang, Musik/Lautstärke, Aktion positiv/negativ, Wiederbesuchsabsicht. Zudem erst ab April 2026, damit kein Themen-Vorjahresvergleich vor April 2027, und nur Bewertungen <b>mit Text</b> bekommen ein Thema.<br><br><b>Empfehlung:</b> die elf Cluster selbst auf den 173.823 gespeicherten Bewertungstexten bilden — rückwirkend über die gesamte Historie und in unserer Hand. Der Durchschnitt bleibt Yexts Zahl, damit der Round Table nicht von der Quelle abweicht.</span>
-      </div>
-    </div>
-
-    <h3>Umfeld und Vergleichsmaßstab</h3>
-    <div class="register">
-      <div class="posten">
-        <span class="chip miss">nicht angebunden</span>
-        <span class="titel">Marktvergleich</span>
-        <span class="text">Für „Umsatz gegen Gesamtmarkt Gastronomie" (1.1, 9.2, 20 % des Betriebs-Scores) existiert keine Quelle. Vorschlag: <b>Destatis-Umsatzindex Gastgewerbe</b> — monatlich und maschinenlesbar — statt der quartalsweisen DEHOGA-PDF. Zu entscheiden ist, ob real oder nominal verglichen wird; unsere Umsätze sind nominal.</span>
-      </div>
-      <div class="posten">
-        <span class="chip miss">nicht angebunden</span>
-        <span class="titel">Feiertage, Ferien, Events, Wetter</span>
-        <span class="text">Kapitel 7.1 verlangt einen echten Vergleichstag: gleicher Wochentag, ähnliche Saison, keine Feiertage oder Ferien, ähnliche Wetterlage. Feiertage und Ferien sind offene Daten und schnell ergänzt, <b>lokale Events bleiben Handpflege</b>. Für Wetter gibt es in LINA einen Wetteranalyse-Bericht — vor einer externen Anbindung zuerst prüfen.</span>
-      </div>
-      <div class="posten">
-        <span class="chip intern">Pflege / Festlegung</span>
-        <span class="titel">Betriebsstammdaten</span>
-        <span class="text">Es gibt <b>kein Eröffnungs- und kein Schließungsdatum</b>. „Bestehende Fläche gegen neue Betriebe" (1.1) ist damit nicht abgrenzbar. Ebenfalls offen: Fläche und Sitzplätze (Voraussetzung für Umsatz je Sitzplatz), sowie <b>79 von 141 Betrieben, die dauerhaft 0 € melden</b> — Beteiligungsgesellschaften, geschlossene Häuser, Testeinträge. Sie verwässern jeden Durchschnitt und gehören stillgelegt.<br><br>Von <b>7 laufenden Betrieben fehlt der Standort</b>, darunter das umsatzstärkste Haus der Gruppe. In einer Stadtauswertung fällt ein fehlendes Haus nicht auf — die Stadt sieht dann einfach so aus, als stünde es nicht darin.</span>
-      </div>
-      <div class="posten">
-        <span class="chip intern">Pflege / Festlegung</span>
-        <span class="titel">Plan- und Zielwerte</span>
-        <span class="text">„Umsatz gegen Plan" (8.2) hat keine Datenbasis — eine Budgetierungsebene existiert in LINA nicht. Ziel-Rendite und Zielkorridor Personalkosten sind fachlich nie festgelegt worden. Beides sind Entscheidungen, keine Datenlücken.</span>
-      </div>
-    </div>
-  </section>
-
-  <section>
-    <h2><span class="nr">04</span> Was wir an Rechten und Freigaben brauchen</h2>
-    <p>In dieser Reihenfolge — oben steht, was am meisten freischaltet. Die Punkte 1 bis 6 gehen an LINA beziehungsweise Concept Family, Punkt 7 an die Buchhaltung.</p>
-
-    <div class="anfragen">
-      <div class="anfrage">
-        <span class="was">Bericht 107 „Gearbeitete Stunden" auf Betriebsebene</span>
-        <span class="warum">Antwortet derzeit mit einem Serverfehler. Bitte zusätzlich klären, ob der Bericht Stunden <strong>je Schicht und Bereich</strong> ausweist oder nur je Tag — davon hängt ab, ob Kapitel 2.3 überhaupt erfüllbar ist.</span>
-        <span class="frei"><b>schaltet frei:</b> 2.1 · 2.3 · 7.2 · Personalteil des Scores</span>
-      </div>
-      <div class="anfrage">
-        <span class="was">Dienstplan-Schnittstelle freigeben</span>
-        <span class="warum">Meldet „Keine Berechtigung für diesen Dienstplan". Liefert Soll-Stunden und die dort bereits hinterlegten Umsatz- und Effektivitätsziele.</span>
-        <span class="frei"><b>schaltet frei:</b> 7.2 Plan gegen Ist · datengestützte Dienstplanung</span>
-      </div>
-      <div class="anfrage">
-        <span class="was">Kassenjournal — Freigabe und Formatauskunft</span>
-        <span class="warum">Wir brauchen zunächst nur die Erlaubnis für <strong>einen einzigen lesenden Aufruf</strong>, um Format und Datenmenge zu messen. Erst danach lässt sich der Aufwand seriös schätzen.</span>
-        <span class="frei"><b>schaltet frei:</b> 5.1 Bon- und Gästekennzahlen · Zusatzverkäufe · Wartezeiten</span>
-      </div>
-      <div class="anfrage">
-        <span class="was">Bericht 118 „Wareneinsatz und Deckungsbeitrag"</span>
-        <span class="warum">Zweiter, von der Artikelpflege unabhängiger Weg zum gewichteten Wareneinsatz. Gleiches gilt für die Berichte 23, 8 und 9 (Personalkostenschätzung, Personalkosten Jahr, Urlaubsverteilung).</span>
-        <span class="frei"><b>schaltet frei:</b> 6.2 · 6.3 · 10.2</span>
-      </div>
-      <div class="anfrage">
-        <span class="was">Betriebskontext für Einkauf und Dienstplan umschalten</span>
-        <span class="warum">Wie wird der aktive Betrieb <strong>lesend</strong> gewechselt? Ohne das bleiben Einkaufspreise, Bestellungen und Dienstpläne auf die Zentrale beschränkt. Derselbe Mechanismus würde zugleich Adresse, Sitzplätze und Fläche je Haus liefern.</span>
-        <span class="frei"><b>schaltet frei:</b> Margenbetrachtung je Betrieb · Umsatz je Sitzplatz · Standortkarte</span>
-      </div>
-      <div class="anfrage">
-        <span class="was">Mitarbeiter-Stammdaten</span>
-        <span class="warum">Der genutzte Zugang hat keinen Zugriff. Nötig für die Verbindung zwischen Schulungsstand, Schicht und Verkaufsverhalten (Kapitel 4.2).</span>
-        <span class="frei"><b>schaltet frei:</b> 4.2 Kurswirkung auf Personenebene</span>
-      </div>
-      <div class="anfrage">
-        <span class="was">Gesamtpersonalkosten inklusive GF als BWA-Position</span>
-        <span class="warum">Geht an den Steuerberater, nicht an LINA. Zusammen damit die Frage, ob „Personalkosten ohne GF" die Lohnnebenkosten enthält.</span>
-        <span class="frei"><b>schaltet frei:</b> 2.2 vollständig</span>
+        <span class="chip warn">Rechte</span>
+        <span class="titel">Bericht 118 „Wareneinsatz und Deckungsbeitrag"</span>
+        <span class="text">Dem Namen nach die Margenrechnung auf LINAs eigener Logik — gesperrt. Ein zweiter, von der Artikelpflege unabhängiger Weg zu Kapitel 6.2. Er erschlösse vor allem <b>Deutsche Konzepte</b>, wo weder Soll-Wareneinsatz noch Warengruppen gepflegt sind. Gleiches gilt für die Berichte 23, 8 und 9.</span>
       </div>
     </div>
 
@@ -607,96 +539,158 @@
       <h4>Ein LINA-Endpunkt gibt Zugangsdaten im Klartext heraus</h4>
       <p>Die Stammdatenabfrage eines Betriebs liefert unter anderem <strong>Datenbankname, Datenbankbenutzer und Datenbankpasswort im Klartext</strong> sowie IBAN, BIC und Steuernummer. Wir haben diese Felder bewusst weder ausgelesen noch gespeichert. Der Befund gehört an LINA gemeldet — sinnvollerweise im selben Zug wie die Rechtefragen oben, weil derselbe Endpunkt für die Standortdaten interessant wäre.</p>
     </div>
-  </section>
 
-  <section>
-    <h2><span class="nr">05</span> Neue Anbindungen</h2>
-
-    <div class="kasten">
-      <span class="status">bereits angefragt</span>
-      <h4>Bounti — Schulungsstand</h4>
-      <p>Damit Kapitel 4.1 und 4.2 funktionieren, brauchen wir aus Bounti fünf Dinge. Besonders wichtig ist der dritte Punkt: <strong>welchem Bereich ein Mitarbeitender zugeordnet ist, weiß sonst kein System</strong> — weder LINA noch FoodNotify.</p>
-      <ul class="felder">
-        <li><b>Mitarbeiterstamm</b> — angelegt, aktiv, Eintrittsdatum</li>
-        <li><b>Betriebszuordnung</b> — mit einem stabilen Schlüssel; über Namen lässt sich das nicht zuverlässig verbinden</li>
-        <li><b>Bereich</b> — Service, Bar, Küche, Betriebsleitung</li>
-        <li><b>Kurskatalog</b> — mit Pflichtkennzeichen und Frist; ohne Fristfeld sind „offene" und „überfällige" Kurse nicht unterscheidbar</li>
-        <li><b>Kursstatus je Mitarbeitendem</b> — inklusive Abschlussdatum, nicht nur Status</li>
-      </ul>
-      <p>Zur technischen Form: Schnittstelle, regelmäßiger Export oder Datei ist gleichermaßen möglich — wir brauchen nur zu wissen, was Bounti anbietet.</p>
+    <h3>Fremde Systeme</h3>
+    <div class="register">
+      <div class="posten">
+        <span class="chip miss">fremdes System</span>
+        <span class="titel">Bounti — Schulungsstand</span>
+        <span class="text">Für 4.1 und 4.2 brauchen wir fünf Dinge: <b>Mitarbeiterstamm</b> (angelegt, aktiv, Eintritt), <b>Betriebszuordnung</b> mit stabilem Schlüssel, <b>Bereich</b> (Service, Bar, Küche, Betriebsleitung), <b>Kurskatalog</b> mit Pflichtkennzeichen und Frist, <b>Kursstatus je Mitarbeitendem</b> mit Abschlussdatum.<br><br>Der dritte Punkt ist der wichtigste: <b>welchem Bereich ein Mitarbeitender zugeordnet ist, weiß sonst kein System.</b> Über Namen lässt sich das nicht zuverlässig verbinden, und ohne Fristfeld sind „offene" und „überfällige" Kurse nicht unterscheidbar. Schnittstelle, Export oder Datei ist gleichermaßen möglich — wir müssen nur wissen, was Bounti anbietet.</span>
+      </div>
+      <div class="posten">
+        <span class="chip miss">fremdes System</span>
+        <span class="titel">OpenTable — Reservierung, Auslastung, Wartezeit</span>
+        <span class="text">Die einzige Quelle mit einem <b>Frühindikator</b>: der Reservierungsvorlauf zeigt die Entwicklung, bevor sie im Umsatz steht. Dazu Gäste je Zeitfenster (schließt „Gäste je Zeitzone" aus 1.3), Walk-in gegen reserviert, No-Show- und Stornoquote, Sitzdauer, Wartelisten und Wartezeiten, Kapazität und Auslastung.<br><br>Bewertungen brauchen wir <em>nicht</em> — die 22.855 OpenTable-Bewertungen liegen bereits über Yext vor, ein zweiter Weg würde nur doppelt zählen. Und: <b>LINAs eigene Reservierungs-Schnittstelle ist noch ungemessen</b>; der dritte Messaufruf unten entscheidet, wie groß die Anbindung werden muss.</span>
+      </div>
     </div>
 
-    <div class="kasten">
-      <span class="status">neu vorgeschlagen</span>
-      <h4>OpenTable — Reservierung, Auslastung, Wartezeit</h4>
-      <p>OpenTable schließt gleich mehrere Lücken, die aus LINA nicht zu schließen sind, und liefert als einzige Quelle einen <strong>Frühindikator</strong>: Der Reservierungsvorlauf zeigt die Entwicklung, bevor sie im Umsatz steht.</p>
-      <ul class="felder">
-        <li><b>Reservierungen und Gäste je Betrieb, Tag und Zeitfenster</b> — schließt „Gäste je Zeitzone" aus Kapitel 1.3</li>
-        <li><b>Walk-in gegen reserviert</b> — trennt Frequenz aus Marketing von Laufkundschaft</li>
-        <li><b>No-Show- und Stornoquote</b></li>
-        <li><b>Vorlaufzeit der Buchung</b> — der Frühindikator</li>
-        <li><b>Sitzdauer am Tisch</b> — Kapazitätsrechnung, in der Map als Verweildauer geführt</li>
-        <li><b>Wartelisten und Wartezeiten</b> — bisher nur indirekt über das Bewertungsthema „Speed of Service" greifbar (7.2, 11.1)</li>
-        <li><b>Kapazität und Auslastung</b> — Tische und Plätze je Zeitfenster</li>
-      </ul>
-      <p><strong>Zwei Hinweise vorab.</strong> Bewertungen brauchen wir aus OpenTable <em>nicht</em> — die 24.259 OpenTable-Bewertungen liegen bereits über Yext vor, ein zweiter Weg würde nur doppelt zählen. Und: LINA führt bereits eine Reservierungs-Schnittstelle, die wir noch nicht abgerufen haben. <strong>Die sollte zuerst gemessen werden</strong> — deckt sie einen Teil der Liste ab, verkleinert das den Umfang der OpenTable-Anbindung.</p>
+    <h3>Pflege, die nur Concept Family leisten kann</h3>
+    <div class="register">
+      <div class="posten">
+        <span class="chip intern">Pflege</span>
+        <span class="titel">Soll-Wareneinsatz und Warengruppen — zwei Marken</span>
+        <span class="text">Nachzupflegen ist nicht „das Sortiment", sondern <b>Deutsche Konzepte (1,8 %) und Wilma Wunder (6,7 %)</b>. Für Wilma Wunder gibt es einen zweiten Weg: 31 ihrer Kostenstellen laufen auf Amadeus, also greift die Verknüpfung mit den FoodNotify-Rezepturen. Zusammen mit Enchilada und Aposto wären das rund <b>63 % des Umsatzes</b>.<br><br>Bei Deutsche Konzepte fehlen zusätzlich die <b>Warengruppen</b>: 78 % ihres Umsatzes hat keine. Das trifft nicht nur 6.2, sondern jede Auswertung nach Speisen und Getränken.</span>
+      </div>
+      <div class="posten">
+        <span class="chip intern">Pflege</span>
+        <span class="titel">Aktionsstamm bereinigen, Aktionsartikel zuordnen</span>
+        <span class="text">Die <b>Bereinigungsliste liegt vor</b>: drei Kampagnen behalten, einen Testeintrag und einen leeren stilllegen, sieben in Zeitfenster- und Sortimentsauswertungen umbenennen.<br><br>Bei den <b>Aktionsartikeln</b> haben wir versucht, die Zuordnung aus den Verkaufsdaten zu erschließen, und sagen ausdrücklich, dass es nicht trägt. Weil LINA den Aktionsumsatz je Tag liefert, war die Probe messbar: unsere Kandidatenlisten trafen ihn zu 104 %, 358 % und 61 %. <b>Eine Spanne von −39 bis +258 % ist als Grundlage unbrauchbar.</b> Kandidatenlisten je Kampagne liegen bei — sie verkürzen die Arbeit auf Bestätigen statt Suchen. Geraten wird nichts: eine falsche Zuordnung meldet sich nie wieder, sie fährt in jeder Deckungsbeitrags- und Kannibalisierungsrechnung mit.</span>
+      </div>
+      <div class="posten">
+        <span class="chip intern">Pflege</span>
+        <span class="titel">Neun Betriebe ohne Standort — und ohne Yext</span>
+        <span class="text">Von den Betrieben mit Umsatz 2026 fehlt bei <b>neun</b> die Standortangabe — darunter <b>das umsatzstärkste Haus der Gruppe</b> (5,53 Mio. €), dazu Wirtshaus Lautenschlager, WHK Gastronomie, BS Bier &amp; Speisen, Gastronomie Wilsdruffer Straße, SCHAFFERONE, B+L Pforzheim, GSF Gastro und ein Testeintrag.<br><br>Sie fehlen damit in jeder Stadt-, Feiertags- und Vergleichstagsauswertung, und <b>dort fällt es nicht auf</b> — die Stadt sieht dann einfach so aus, als stünde das Haus nicht darin. <b>Es ist dieselbe Liste, die auch bei Yext fehlt</b>: exakt diese neun haben weder einen gepflegten Standort noch eine Yext-Zuordnung. Ein Arbeitsgang schließt beide Lücken.</span>
+      </div>
+      <div class="posten">
+        <span class="chip intern">Pflege</span>
+        <span class="titel">84 Betriebe ohne laufendes Geschäft stilllegen</span>
+        <span class="text">Von 141 geführten Betrieben sind <b>57 operativ</b> — also mit Umsatz im letzten bewerteten Monat. (Über das ganze Jahr 2026 gerechnet sind es 62; beide Zahlen sind richtig und beantworten verschiedene Fragen, deshalb steht der Nenner überall dabei.) Die übrigen liefern Umsatzberichte über 0 € und verwässern jeden Durchschnitt und jede Zählung — jede Aussage über „alle Betriebe" hat einen Nenner, der zu 60 % aus Zeilen besteht, die kein Geschäft beschreiben.<br><br>Die Klassifikation liegt fertig vor: <b>39 geschlossen, 18 ohne Geschäft, 17 verwaltend, 6 inaktiv, 4 Test.</b> Zu entscheiden ist nur, welche davon stillgelegt werden.</span>
+      </div>
+      <div class="posten">
+        <span class="chip intern">Pflege</span>
+        <span class="titel">Gästezählung — ein Rollout, kein Defekt</span>
+        <span class="text">Von 62 laufenden Betrieben zählen <b>43 durchgängig, 16 lückenhaft, 2 nie</b>. Jede Kennzahl „je Gast" hat damit einen gelöcherten Nenner.<br><br>Beim Nachsehen zeigt sich: die 16 sind meist kein Defekt, sondern eine <b>Einführung</b>. Enchilada Nürnberg zählt Januar bis Juni an 0 von 182 Tagen, im Juli an 27 von 29. <b>Das gehört vor dem ersten Report bereinigt oder erklärt</b> — sonst liest der Round Table eine Einführung als Rückgang.</span>
+      </div>
+      <div class="posten">
+        <span class="chip intern">Pflege</span>
+        <span class="titel">Eröffnungsdatum, Fläche, Sitzplätze</span>
+        <span class="text">Es gibt <b>kein Eröffnungs- und kein Schließungsdatum</b>; „bestehende Fläche gegen neue Betriebe" (1.1) ist damit nicht abgrenzbar. Fläche und Sitzplätze fehlen ebenfalls — sie sind die Bezugsgröße für „Umsatz je Sitzplatz" und liegen in LINA hinter demselben Betriebskontext wie die Adressen.</span>
+      </div>
     </div>
 
-    <div class="kasten">
-      <span class="status">klein, aber ohne Quelle</span>
-      <h4>Marktdaten und Kalender</h4>
-      <ul class="felder">
-        <li><b>Destatis-Umsatzindex Gastgewerbe</b> — monatlich, maschinenlesbar. Entscheidung nötig: realer oder nominaler Vergleich.</li>
-        <li><b>Feiertage und Schulferien je Bundesland</b> — offene Daten, schnell ergänzt.</li>
-        <li><b>Wetter</b> — zuerst LINAs eigenen Wetteranalyse-Bericht prüfen, bevor extern angebunden wird.</li>
-        <li><b>Lokale Events</b> — keine automatisierbare Quelle. Das ist genau der Fall, für den die Map ein manuelles Freifeld im Report vorsieht.</li>
-      </ul>
+    <h3>Fachliche Festlegungen</h3>
+    <div class="register">
+      <div class="posten">
+        <span class="chip intern">Festlegung</span>
+        <span class="titel">Ziel-Rendite, Zielkorridor Personalkosten, Umsatzplan</span>
+        <span class="text">Nie festgelegt worden. Das sind Entscheidungen, keine Datenlücken.<br><br>Dazu gehört eine ältere, unbeantwortete Frage: die <b>Ampelschwelle für Personalkosten</b>. Bei 28/32 aus dem Excel-Blatt „Regeln" stehen fast alle Häuser auf Rot — im Excel war das genauso, Monat für Monat. Eine Ampel, bei der alles rot leuchtet, beantwortet „wo zuerst hinsehen" nicht mehr.</span>
+      </div>
+      <div class="posten">
+        <span class="chip intern">Festlegung</span>
+        <span class="titel">Die sieben Zeitfenster</span>
+        <span class="text">Frei schneidbar, solange die Grenzen auf <b>vollen Stunden</b> liegen. Unser Vorschlag steht als Stammdatum in der Datenbank: Frühstück 8–11, Mittag 11–14, Nachmittag 14–17, Early Dinner 17–19, Abendessen 19–21, Aktionszeit 21–22, Late Night 22–1.<br><br>Zu bestätigen oder zu ändern — eine Zeile Pflege, keine Programmänderung.</span>
+      </div>
+      <div class="posten">
+        <span class="chip intern">Festlegung</span>
+        <span class="titel">Marktvergleich: real oder nominal</span>
+        <span class="text">Unsere Umsätze sind nominal. Gegen die reale Marktreihe gehalten, misst man die Inflation mit und nennt sie Wachstum: Mai 2026 gegen Mai 2018 ist <b>nominal +19,4 %, real −20,2 %</b>. Beide Reihen liegen vor, der Vergleich läuft vorerst nominal.</span>
+      </div>
+      <div class="posten">
+        <span class="chip intern">Festlegung</span>
+        <span class="titel">Zusatzverkäufe und Reklamationen definieren</span>
+        <span class="text">Beide Begriffe sind nicht definiert. Statt sie offen zu lassen, drei gemessene Vorschläge — jeweils ausdrücklich als <b>Näherung</b>:<br><br><b>Artikel je Gast</b> — Median 3,69 (43 Betriebe mit verlässlicher Zählung). <b>Getränke je Speise</b> — Median 1,64, streut stärker und braucht keine Gästezahl, aber nur für 46 Betriebe (Warengruppen fehlen). <b>Reklamationen</b> — Stornos kommen in den Daten nicht vor; als Ersatz Bewertungen mit ein oder zwei Sternen: 8,7 % der Bewertungen 2026, mit eigener Themenklassifikation einem Cluster zuweisbar.</span>
+      </div>
+      <div class="posten">
+        <span class="chip intern">Festlegung</span>
+        <span class="titel">Ist „Betriebsergebnis" dasselbe wie EBIT?</span>
+        <span class="text">Unsere Rendite ist <b>EBIT ÷ Umsatz</b> aus der BWA — geprüft gegen LINAs eigenen Prozentwert über <b>6.289 Betriebsmonate</b>, Abweichung 0,003 Prozentpunkte. Es gibt also genau eine Definition, und sie ist LINAs.<br><br>Ob Concept Familys „Betriebsergebnis-Rendite" denselben Zähler benutzt, konnte nicht geprüft werden: der entsprechende Report liegt uns nicht vor. Eine Frage, eine Antwort.</span>
+      </div>
+      <div class="posten">
+        <span class="chip intern">Festlegung</span>
+        <span class="titel">Eigene Themencluster statt Yexts fünf</span>
+        <span class="text">Yext klassifiziert nach fünf englischen Labels — Food, Service and Staff, Speed of Service, Order, Restaurant Cleanliness —, erst seit April 2026 und nur bei Bewertungen mit Text. Insgesamt sind das <b>5.640 Themennennungen</b>. Dem stehen <b>106.539 auswertbare Bewertungstexte</b> gegenüber. <b>Sieben der elf gewünschten Cluster fehlen</b> bei Yext ganz.<br><br>Machbarkeit geprüft an 300 zufälligen Bewertungen: <b>alle elf Cluster kommen vor</b>, auch die sieben fehlenden — Atmosphäre 95 Treffer, Getränke 72, Wiederbesuchsabsicht 65, Preis-Leistung 37, Reservierung 22, Musik/Lautstärke 14, Aktion 14. Zu beachten: rund 8 % der Texte sind nicht deutsch, und <b>10,9 % der Fünf-Sterne-Bewertungen enthalten ein Negativwort</b> — die Note taugt nicht als Etikett je Cluster.<br><br>Zu entscheiden ist nur, ob wir es tun. <b>Der Notendurchschnitt bleibt in jedem Fall Yexts Zahl</b>, damit der Round Table nicht von der Quelle abweicht.</span>
+      </div>
     </div>
-  </section>
 
-  <section>
-    <h2><span class="nr">06</span> Was auch mit allen Freigaben nicht geht</h2>
-    <p>Vier Punkte, die aus Gründen offen bleiben, die keine Schnittstelle löst. Besser jetzt geklärt als im ersten Round Table.</p>
-
+    <h3>Bleibt offen, und das ist in Ordnung</h3>
     <div class="register">
       <div class="posten">
         <span class="chip intern">Taktfrage</span>
-        <span class="titel">Rendite hinkt strukturell ein bis zwei Monate nach</span>
-        <span class="text">Stand heute liegt EBIT für Mai bei <b>63 Betrieben</b> vor, für Juni bei <b>41</b>, für Juli bei <b>keinem</b>. Der Buchungsstand ist je Betrieb verschieden. Ein monatlicher Aufsichtsratsreport mit Rendite kann deshalb immer nur den letzten <b>gebuchten</b> Monat zeigen, nie den Vormonat.</span>
+        <span class="titel">Rendite hinkt strukturell nach</span>
+        <span class="text">Stand 04.08.2026 liegt EBIT für April bei <b>65</b> Betrieben vor, für Mai bei <b>63</b>, für Juni bei <b>41</b>, für Juli bei <b>keinem</b>. Der Buchungsstand ist je Betrieb verschieden. Ein monatlicher Aufsichtsratsreport mit Rendite kann deshalb immer nur den letzten <b>gebuchten</b> Monat zeigen, nie den Vormonat.<br><br>Wie schnell gebucht wird, ist <b>noch nicht messbar</b>: unsere Monatsstände reichen erst acht Tage zurück. In diesen acht Tagen stieg Juni von 23 auf 41 Betriebe. In drei Monaten ist die Frage beantwortbar — sie braucht keine Anfrage, nur Zeit.</span>
       </div>
       <div class="posten">
-        <span class="chip intern">Zeitfrage</span>
-        <span class="titel">Themen-Vorjahresvergleich erst ab April 2027</span>
-        <span class="text">Yext klassifiziert Bewertungstexte erst seit April 2026. Eine eigene Klassifikation über die gespeicherten Texte würde das rückwirkend lösen — mit Yexts Labels nicht.</span>
-      </div>
-      <div class="posten">
-        <span class="chip intern">Definitionsfrage</span>
-        <span class="titel">Reklamationen</span>
-        <span class="text">Kein System erfasst sie. Stornos werden in der Gruppe offenbar nicht genutzt. Solange keine Erfassung existiert, bleibt der Punkt aus Kapitel 4.2 offen — oder er wird über negative Bewertungen ersetzt, dann aber ausdrücklich als Näherung.</span>
-      </div>
-      <div class="posten">
-        <span class="chip intern">Definitionsfrage</span>
-        <span class="titel">Zusatzverkäufe</span>
-        <span class="text">Der Begriff ist nicht definiert. Als Artikel je Bon braucht er die Bonebene, als Artikel je Gast geht er schon heute. Bevor gerechnet wird, sollte festgelegt sein, was gemeint ist.</span>
+        <span class="chip intern">keine Quelle</span>
+        <span class="titel">Lokale Events</span>
+        <span class="text">Stadtfest, Heimspiel, Baustelle, Konzert. Keine automatisierbare Quelle, und genau dafür sieht die Map ein <b>manuelles Freifeld</b> im Report vor. Feiertage und Ferien sind abgedeckt, über das Wetter entscheidet der vierte Messaufruf.</span>
       </div>
     </div>
   </section>
 
   <section>
-    <h2><span class="nr">07</span> Vorgeschlagene Reihenfolge</h2>
+    <h2><span class="nr">05</span> Sechs Messaufrufe, die den Rest entscheiden</h2>
+    <p>Jeder ist <strong>ein einziger lesender Aufruf</strong>. Sie sind vorbereitet und laufen mit <span style="font-family:var(--mono);font-size:.9em">bun run messen d1</span> bis <span style="font-family:var(--mono);font-size:.9em">d6</span>. Jeder sagt <em>vorher</em>, welche Antwort welchen Schluss erlaubt — wer den Schluss erst nach dem Ergebnis formuliert, findet immer einen.</p>
+
+    <div class="anfragen">
+      <div class="anfrage">
+        <span class="was">Kassenjournal — Rechtefrage oder Aufwandsfrage?</span>
+        <span class="warum">Der einzige Punkt der Rechteliste, bei dem wir nicht wissen, ob es überhaupt einer ist. <strong>403</strong> heißt Rechtefrage und bleibt auf der Liste. <strong>200 mit Daten</strong> heißt Aufwandsfrage und fällt von der Liste.</span>
+        <span class="frei"><b>entscheidet:</b> 5.1 · Zusatzverkäufe · Wartezeiten</span>
+      </div>
+      <div class="anfrage">
+        <span class="was">Bericht 107 „Gearbeitete Stunden" auf Betriebsebene</span>
+        <span class="warum">Auf Konzernebene antwortet er mit einem Serverfehler. Antwortet er je Betrieb, liefert er die <strong>Schichtebene</strong> — davon hängt Kapitel 2.3 ab. Antwortet er nicht, bleibt es bei den zurückgerechneten Stunden, und die tragen.</span>
+        <span class="frei"><b>entscheidet:</b> 2.3 · ob 2.1 noch genauer geht</span>
+      </div>
+      <div class="anfrage">
+        <span class="was">LINAs Reservierungs-Schnittstelle</span>
+        <span class="warum">Liefert sie Gäste je Betrieb und Zeitfenster, schließt sie „Gäste je Zeitzone" aus 1.3 — und die OpenTable-Anbindung schrumpft auf No-Show, Vorlaufzeit, Sitzdauer und Warteliste.</span>
+        <span class="frei"><b>entscheidet:</b> Umfang der OpenTable-Anbindung</span>
+      </div>
+      <div class="anfrage">
+        <span class="was">LINAs Wetteranalyse</span>
+        <span class="warum">Wetter je Betrieb und Tag ist der letzte offene Punkt am Vergleichstag. Kommt nur <em>eine</em> Wetterlage für die ganze Gruppe, ist es unbrauchbar — die Betriebe liegen von Dresden bis Freiburg.</span>
+        <span class="frei"><b>entscheidet:</b> 7.1 vollständig oder externe Wetterquelle</span>
+      </div>
+      <div class="anfrage">
+        <span class="was">Hauptsparten-Filter im Zeitzonenbericht</span>
+        <span class="warum">Greift er, liefern <strong>zwei Aufrufe am Tag</strong> den Speisen- und Getränkeanteil je Zeitfenster — eine der sechs Lücken in 1.3. Gegenprobe ohne Filter ist Pflicht, sonst hält man einen ignorierten Filter für einen wirkungslosen.</span>
+        <span class="frei"><b>entscheidet:</b> Spartenanteil je Zeitfenster</span>
+      </div>
+      <div class="anfrage">
+        <span class="was">Yext-Analytics je Bearbeiter</span>
+        <span class="warum">Gibt es die Dimension im gebuchten Paket, wird Antwortverhalten je Bearbeiter messbar — ein Teil von 3.1 auf Personenebene, ohne Bounti.</span>
+        <span class="frei"><b>entscheidet:</b> 3.1 auf Personenebene</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="nr">06</span> Vorgeschlagene Reihenfolge</h2>
     <div class="tabellenrahmen">
       <table>
         <thead>
           <tr><th>Schritt</th><th>Was</th><th>Warum zuerst</th></tr>
         </thead>
         <tbody>
-          <tr><td class="num">1</td><td>Rechteanfragen 1 bis 6 stellen</td><td>Längste Vorlaufzeit, hängt nicht an uns. Alles Weitere kann parallel laufen.</td></tr>
-          <tr><td class="num">2</td><td>Je einen lesenden Testaufruf: Kassenjournal, Bericht 107, Reservierungen, Wetterbericht</td><td>Vier Aufrufe entscheiden über den Aufwand für vier Kapitel der Map. Ohne sie ist jede Schätzung geraten.</td></tr>
-          <tr><td class="num">3</td><td>Aktionsstamm bereinigen und Aktionsartikel zuordnen</td><td>Reine Pflege, kein Programmieraufwand — und schaltet Kapitel 5 und 10.3 frei.</td></tr>
-          <tr><td class="num">4</td><td>Entscheidung zum Soll-Wareneinsatz</td><td>Die größte Einzellücke. Bis hier entschieden ist, sollte 6.2 nicht als lieferbar zugesagt werden.</td></tr>
-          <tr><td class="num">5</td><td>Betriebsstammdaten nachziehen: Eröffnung, Sitzplätze, 7 fehlende Standorte, Stilllegungen</td><td>Bereinigt gleichzeitig die Durchschnitte in jeder anderen Auswertung.</td></tr>
-          <tr><td class="num">6</td><td>Eigene Themenklassifikation auf den vorhandenen Bewertungstexten</td><td>Liefert alle elf gewünschten Cluster rückwirkend, ohne externe Abhängigkeit.</td></tr>
-          <tr><td class="num">7</td><td>Marktindex, Feiertage, Ferien ergänzen</td><td>Klein, aber Voraussetzung für Kapitel 1.1 und 7.1.</td></tr>
+          <tr><td class="num">1</td><td>Die sechs Messaufrufe starten</td><td>Sechs Aufrufe, eine Viertelstunde. Sie entscheiden, welche der Rechteanfragen überhaupt gestellt werden muss.</td></tr>
+          <tr><td class="num">2</td><td>Rechteanfragen stellen — was nach Schritt 1 übrig ist</td><td>Längste Vorlaufzeit, hängt nicht an uns. Alles Weitere läuft parallel.</td></tr>
+          <tr><td class="num">3</td><td>Neun Standorte nachtragen, Aktionsstamm bestätigen, Betriebe ohne Geschäft stilllegen</td><td>Reine Pflege, die Listen liegen fertig vor. Bereinigt gleichzeitig die Durchschnitte in jeder anderen Auswertung.</td></tr>
+          <tr><td class="num">4</td><td>Gästezählung: Rollout in den 16 Betrieben abschließen</td><td>Muss vor dem ersten Report stehen, sonst wird eine Einführung als Rückgang gelesen.</td></tr>
+          <tr><td class="num">5</td><td>Zielwerte festlegen: Rendite, Personalkostenkorridor, Umsatzplan, Ampelschwellen</td><td>Ohne sie zeigt die Ampel weiter fast überall Rot und steuert damit nichts.</td></tr>
+          <tr><td class="num">6</td><td>Soll-Wareneinsatz: FoodNotify-Rezepturen für Wilma Wunder starten, Deutsche Konzepte nachpflegen</td><td>Hebt Kapitel 6.2 von 37 % auf rund 63 % des Umsatzes. Der FoodNotify-Weg ist gebaut und muss nur gestartet werden.</td></tr>
+          <tr><td class="num">7</td><td>Bounti und OpenTable anfragen</td><td>Die einzigen beiden Systeme, die wirklich fehlen.</td></tr>
+          <tr><td class="num">8</td><td>Eigene Themenklassifikation auf den 106.539 Texten</td><td>Liefert alle elf Cluster rückwirkend über die ganze Historie, ohne externe Abhängigkeit.</td></tr>
         </tbody>
       </table>
     </div>
@@ -708,6 +702,7 @@
   </div>
 
 </div>
+
 <style>
   /* ---------------------------------------------------------------
      Druckfassung. Wird nur fuer die PDF-Ausgabe angehaengt; die

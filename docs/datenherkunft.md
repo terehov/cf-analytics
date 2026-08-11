@@ -491,3 +491,76 @@ SELECT * FROM mart.backfill_fortschritt;     -- welcher Zeitraum ist je Endpunkt
 Die Prüfsichten kosten **keinen einzigen zusätzlichen LINA-Aufruf** — sie rechnen aus Daten, die
 ohnehin da sind. Grundsatz: nichts korrigieren, nur sichtbar machen. Wer automatisch „korrigiert",
 verschiebt den Fehler nur dorthin, wo ihn keiner sucht.
+
+---
+
+## Nachtrag 11.08.2026 — drei Felder anders gedeutet, vier neue `manual`-Quellen
+
+### `core.personalkosten`: was die acht Zahlenspalten wirklich sind
+
+| Spalte | Bedeutung | verlässlich? |
+|---|---|---|
+| `eff_service` | Gesamtumsatz ÷ Servicestunden | ✅ täglich |
+| `eff_bar` | **Getränke**umsatz ÷ Barstunden | ✅ täglich |
+| `eff_kueche` | **Speisen**umsatz ÷ Küchenstunden | ✅ täglich |
+| `eff_gesamt` | Gesamtumsatz ÷ Summe aller drei | ✅ täglich |
+| `pek_*` | Personalkosten **seit Monatsanfang** ÷ Umsatz **des Tages** | ❌ als Quote unbrauchbar |
+| `persoog_bwa` | Personalkostenquote ohne GF aus der BWA | ✅ monatlich konstant |
+
+**Die Bereichszuordnung ist nachgerechnet, nicht angenommen** — welcher Umsatz im Zähler
+steht, unterscheidet sich je Bereich, und nur diese Kombination schließt als Identität
+(Median 0,99995 über 16.110 Betriebstage). Wer für alle drei den Gesamtumsatz einsetzt,
+bekommt Stunden, die sich zu 153 % der Gesamtstunden addieren, ohne dass etwas auffällt.
+
+Arbeitsstunden entstehen also so:
+
+```sql
+-- Stunden je Betrieb und Tag. mart.umsatz_tag, NICHT core.umsatzbericht_tag (siehe unten).
+SELECT u.betrieb_key, u.geschaeftstag, u.umsatz_netto / p.eff_gesamt AS stunden
+  FROM mart.umsatz_tag u
+  JOIN core.personalkosten p ON p.betrieb_key = u.betrieb_key AND p.zeitraum_von = u.geschaeftstag
+ WHERE p.eff_gesamt > 0;
+```
+
+Abdeckung: 48 der 62 Betriebe mit Umsatz haben an ≥95 % ihrer Umsatztage einen Wert,
+konzernweit rund 87 %. Zehn Betriebe haben gar keinen. **Das ist echte Abdeckung, nicht wie
+`fixer_we` mit Nullen getarnt** — geprüft.
+
+### `core.umsatzbericht_tag` hat drei Zeilen je Tag, nicht eine
+
+Je Betrieb und Geschäftstag stehen dort: die **Gesamtzeile** (`hauptsparte_key IS NULL`) und
+je eine Zeile für Speisen und Getränke. Ein `sum(umsatz_netto)` über die Tabelle addiert den
+Tag zu sich selbst.
+
+**Für Umsatzsummen immer `mart.umsatz_tag`** — die Sicht filtert `hauptsparte_key IS NULL AND
+verkaufsstelle_key IS NULL` und ist genau dafür da.
+
+Und: **Speisen + Getränke ergeben nicht den Gesamtumsatz.** 2026 fehlen 29,8 %, weil 4.088
+Artikel keiner Warengruppe zugeordnet sind — fast alles davon Deutsche Konzepte (78,2 % ihres
+Umsatzes) und Besitos (99,9 %).
+
+### `core.zeitzonenbericht_stunde` ist vollständiger als der Zonenbericht
+
+10.618.992 Zeilen, **alle 24 Stunden besetzt**, 31.12.2017 bis 07.08.2026, alle 141 Betriebe.
+Daraus lässt sich jedes Zeitfenster frei schneiden (`mart.umsatz_zeitfenster`, Migration
+`0052`); die Summe trifft den Tag auf 100,00 % von 30.597 Betriebstagen exakt.
+
+**Nicht gegen `core.zeitzonenbericht_zone` rechnen:** LINAs Zonen brechen bei 11:30 und
+17:30. Eigener Schnitt 11–14 liegt 8,4 % über LINAs Mittagszeit, 12–14 liegt 8,4 % darunter.
+
+### Vier neue Quellen im `manual`-Schema (Migrationen 0051 / 0052)
+
+| Tabelle | Herkunft | Stand |
+|---|---|---|
+| `manual.plz_bundesland` | `api.zippopotam.us`, 44 PLZ einzeln aufgelöst, Koordinaten als Gegenprobe | 11.08.2026 |
+| `manual.feiertag` | `feiertage-api.de` (2018–2019), `openholidaysapi.org` (ab 2020) | 11.08.2026 |
+| `manual.schulferien` | `openholidaysapi.org`, 2017–2027 | 11.08.2026 |
+| `manual.marktindex` | Eurostat `sts_setu_m`, NACE I56, Quelldaten Destatis | 11.08.2026 |
+
+**Warum zwei Feiertagsquellen:** `openholidaysapi.org` reicht bei den gesetzlichen Feiertagen
+nicht vor 2020 zurück, unsere Historie beginnt 2018. Die Spalte `quelle` hält den Bruch je
+Zeile fest.
+
+**Warum nicht Genesis:** Der Destatis-REST-Dienst verlangt seit dem Wegfall des Gastzugangs
+eine Registrierung und liefert ohne Anmeldung HTML statt Daten (geprüft 11.08.2026). Eurostat
+verteilt dieselbe Reihe offen. Begründung in [`entscheidungen.md`](entscheidungen.md).

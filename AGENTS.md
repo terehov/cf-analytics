@@ -58,6 +58,7 @@ Kommentare sind deutsch, damit sie in Postico lesbar sind.
 | **`lina-api-inventar.md`** | Alle LINA-Endpunkte: Parameter, Antwortstrukturen, Auth, Zeitverhalten. Ergebnis der Exploration. | Immer, wenn du einen Endpunkt anfasst |
 | **`lina-api-inventar-1b.md`** | Nachtrag: das **zweite** Report Center auf Betriebsebene (72 Berichte), WAWI, Dienstplan, Finance | Wenn du über die sieben Konzern-Berichte hinaus willst |
 | **`lina-api-inventar-1c.md`** | **Im Browser verifiziert (25.07.2026).** Konzeptzuordnung ist 1:n, Personalberichte sind gesperrt, WAWI ist JSON, Sortimentshierarchie gefunden. Überschreibt 1a und 1b, wo es abweicht. | Bevor du einen Endpunkt aktivierst |
+| **`lina-api-inventar-ladenakte.md`** | **Im Browser erhoben (11.08.2026).** Die Ladenakte: Belegarchiv (≈ 500.000 Dokumente mit Lieferant, Kreditor, Sachkonto, MwSt-Split), **BWA-Longterm seit 2009 mit 77 Zeilen** inkl. Miete/Energie/Franchisegebühr/EBITDA, Stammdaten (Sitzplätze, Fläche, Plan-BWA, Tagesbudget), Verträge mit Fristen. Enthält zwei Warnungen: **Löschen geschieht per GET**, und der Lohn-Zweig führt Ausweisdokumente und Krankmeldungen. | Bevor du Belege, BWA-Historie oder Kapazitätsdaten anfasst |
 | **`lina-api-korrekturen.md`** | **Wichtig.** Drei widerlegte Annahmen und ein gelöster Blocker. Überschreibt die beiden Dateien darüber, wo es abweicht. | Vor jeder Arbeit an Kennzahlen oder Betriebs-Reports |
 | **`kennzahlen-mapping.md`** / `.csv` | Excel-Kennzahl → LINA-Endpunkt/Feld → offene Fragen. Die eigentliche Zieldefinition. | Wenn du eine Kennzahl baust oder prüfst |
 | **`architektur.md`** | Warum Hetzner + Dokploy + vanilla Postgres. Verworfene Alternativen mit Begründung. | Vor Infrastrukturänderungen |
@@ -74,6 +75,7 @@ Kommentare sind deutsch, damit sie in Postico lesbar sind.
 | **`foodnotify-api-inventar.md`** | FoodNotify: 126 API-Pfade, vier Marken im Vergleich, der defekte Verkaufs-Import | Bevor du einen FoodNotify-Endpunkt anfasst |
 | **`datensicherung.md`** | Welche Rohdaten wir sichern sollten, solange LINA erreichbar ist — nach Wert und Kosten sortiert | Wenn du über neue Endpunkte oder Backfill-Tiefe entscheidest |
 | **`offene-punkte.md`** | Was ungeklärt ist und wer es klären muss | Bevor du etwas als fertig meldest |
+| **`datenlage-round-table.html`** / `.pdf` | Was der Round-Table-Map noch fehlt — nach der Messreihe vom 11.08.2026 nur noch Rechte, Bounti/OpenTable, Stammdatenpflege und fachliche Festlegungen | Bevor du einen Punkt als „fehlt" weitergibst |
 | **`payloads/`** | Echte, anonymisierte LINA-Antworten aus der Exploration | Als Referenz; identisch mit den Test-Fixtures |
 
 ### Dokumentationspflicht
@@ -207,6 +209,8 @@ bun run health                               # Health-Endpunkt (Container-CMD)
 curl localhost:3000/health                     # lebt der Container?
 curl localhost:3000/status                     # muss jemand hinsehen? (503 = ja)
 bun run typecheck
+bun run messen                               # LESENDE Einzelmessungen gegen LINA, d1-d6
+                                             # (nur im Terminal des Nutzers, Regel 7a)
 ```
 
 Für den Ende-zu-Ende-Test zusätzlich `TEST_DATABASE_URL` setzen — ohne die Variable wird er übersprungen.

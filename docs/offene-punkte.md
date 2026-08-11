@@ -246,3 +246,86 @@ Transaktion zu lösen (eigene Transaktion oder `SAVEPOINT`), damit eine Antwort,
 die core sprengt, wenigstens im Raw-Layer landet. Genau dafür ist er da
 (AGENTS.md Regel 4: „Der Raw-Layer ist die Versicherung"), und aktuell greift
 diese Versicherung im Fehlerfall nicht.
+
+---
+
+## Round-Table-Map: was nach der Messreihe vom 11.08.2026 übrig ist
+
+Die Fassung für den Fachbereich steht in `docs/datenlage-round-table.html` (und als PDF
+daneben). Hier nur, wer was klären muss. **Sieben Punkte, die zunächst als offen galten, sind
+es nicht** — sie haben sich durch Nachmessen und Bauen erledigt, nicht durch Freigaben; siehe
+[`befunde-datenlage.md`](befunde-datenlage.md).
+
+### Zuerst: sechs Messaufrufe, die Eugene starten muss
+
+`bun run messen d1` bis `d6`. Je ein lesender Aufruf, nicht aus der Agentenumgebung
+(Regel 7a). Sie entscheiden, **welche der Rechteanfragen überhaupt gestellt werden muss** —
+solange sie nicht gelaufen sind, ist jede Aufwandsschätzung geraten.
+
+| | entscheidet |
+|---|---|
+| `d1` Kassenjournal | Rechtefrage (403) oder Aufwandsfrage (200)? Der einzige Punkt der Rechteliste, bei dem wir nicht wissen, ob es einer ist |
+| `d2` Bericht 107 je Betrieb | ob Kapitel 2.3 (Schichtebene) erfüllbar ist. 2.1 hängt nicht mehr daran |
+| `d3` Reservierungs-Schnittstelle | wie groß die OpenTable-Anbindung werden muss |
+| `d4` Wetteranalyse | ob `mart.vergleichstag` vollständig wird oder eine externe Wetterquelle braucht |
+| `d5` Hauptsparten-Filter | ob der Speisen-/Getränke-Anteil je Zeitfenster für zwei Aufrufe am Tag zu haben ist |
+| `d6` Yext `USER_NAME` | ob 3.1 auf Personenebene geht, ohne Bounti |
+
+### An LINA beziehungsweise Concept Family (Rechte)
+
+* **Dienstplan freigeben** — die Ist-Stunden haben wir selbst, es fehlen die **Soll**-Stunden
+  für 7.2. Dabei gleich fragen, ob die Spalten **Plan** und **Stundenbudget** im
+  Management-Bericht befüllbar sind: sie stehen bei fast allen Betrieben auf 0,00 und wären
+  die Datenbasis für „Umsatz gegen Plan" (8.2).
+* **Betriebskontext lesend umschalten** — erschließt Einkaufspreise je Haus, Adressen,
+  Sitzplätze und Fläche in einem Zug.
+* **Mitarbeiter-Stammdaten** — für 4.2 auf Personenebene.
+* **Bericht 118** — von kritisch auf nützlich gerutscht, erschlösse vor allem Deutsche Konzepte.
+
+### An den Steuerberater
+
+* **Gesamtpersonalkosten inklusive GF** als BWA-Position, und ob „Personalkosten ohne GF" die
+  Lohnnebenkosten enthält. Letzteres geht auch in unseren zurückgerechneten Stundenlohn ein.
+
+### An Concept Family (Pflege — Listen liegen fertig vor)
+
+* **Neun Betriebe ohne Standort *und* ohne Yext-Zuordnung** (`mart.kalender_fehlend`) —
+  es ist dieselbe Liste, angeführt vom umsatzstärksten Haus der Gruppe. Ein Arbeitsgang.
+* **Aktionsstamm bereinigen** — drei Kampagnen behalten, ein Testeintrag mit 47.500 € und
+  ein leerer stillzulegen, sieben umzubenennen.
+* **Aktionsartikel bestätigen** — Kandidatenlisten liegen bei, ausgewiesen als **unsicher**.
+  Nicht automatisch übernehmen: die Probe gegen LINAs bekannten Aktionsumsatz traf zu 104 %,
+  358 % und 61 %.
+* **Soll-Wareneinsatz für Deutsche Konzepte und Wilma Wunder** — Enchilada (84,4 %) und
+  Aposto (67,0 %) sind gepflegt. Bei Deutsche Konzepte fehlen zusätzlich die Warengruppen
+  (78,2 % ohne).
+* **Gästezählung in 16 Betrieben** — meist kein Defekt, sondern ein laufender Rollout. Muss
+  vor dem ersten Report erklärt sein, sonst wird eine Einführung als Rückgang gelesen.
+* **84 Betriebe ohne laufendes Geschäft** (`mart.betrieb_status`) — 39 geschlossen, 18 ohne
+  Geschäft, 17 verwaltend, 6 inaktiv, 4 Test.
+* **Eröffnungs- und Schließungsdatum, Fläche, Sitzplätze** — fehlen ganz.
+
+### Fachliche Festlegungen
+
+* **Ziel-Rendite, Zielkorridor Personalkosten, Umsatzplan** — nie festgelegt.
+* **Ampelschwelle Personalkosten** — steht seit Phase 1 offen. Bei 28/32 leuchtet fast alles
+  rot; im Excel war das genauso. Eine Ampel, bei der alles rot ist, steuert nicht mehr.
+* **Marktvergleich real oder nominal** — dreht das Vorzeichen. Läuft vorerst nominal.
+* **Die sieben Zeitfenster** — Vorschlag steht in `manual.zeitfenster`, auf vollen Stunden.
+* **„Zusatzverkäufe" und „Reklamationen" definieren** — drei gemessene Vorschläge liegen vor.
+* **Ist „Betriebsergebnis" derselbe Zähler wie EBIT?** Unsere Rendite ist geprüft
+  (EBIT ÷ Umsatz, 6.289 Betriebsmonate, Abweichung 0,003 pp). Der Wilma-Wunder-Report, gegen
+  den verglichen werden sollte, **liegt nicht im Repository**.
+
+### Nicht offen, nur noch nicht dran
+
+* **FoodNotify Stufe 2 und der Inventur-Import** sind gebaut und ungestartet. Sie konnten
+  nicht aus der Agentenumgebung gestartet werden (`bun run sync` arbeitet LINA und FoodNotify
+  in einem Prozess ab, Regel 7a). Obergrenze gemessen: 42 Amadeus-Kostenstellen in 21
+  Betrieben mit 33,9 % des Umsatzes, **davon 31 bei Wilma Wunder** — genau der Marke mit
+  6,7 % `fixer_we`. Start: `bun run einreihen --foodnotify`, dann
+  `--foodnotify-inventuren`, dann `bun run sync`.
+* **BWA-Buchungsverzug** — noch nicht messbar, `core.kennzahlen_monat` führt erst acht Tage
+  Momentaufnahmen. Braucht keine Anfrage, nur drei Monate Zeit.
+* **Lokale Events** — keine automatisierbare Quelle; dafür sieht die Map ein manuelles
+  Freifeld vor. Feiertage und Ferien sind seit Migration `0051` erledigt.

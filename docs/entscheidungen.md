@@ -896,3 +896,108 @@ Aktualisiert wurden `datensicherung.md` (Klasse D), `datenherkunft.md` (zwei Ste
 damaligen Zeitpunkt galt. Wer sie liest, findet den Widerspruch über diesen Abschnitt
 aufgelöst; sie nachträglich umzuschreiben würde die Historie verfälschen und wäre bei
 `0002` und `0006` auch wirkungslos, weil dort nur Quelltextkommentare stehen.
+
+---
+
+## 11.08.2026 — Entscheidungen aus dem Nachmessen der Round-Table-Lücken
+
+Anlass: Für die Round-Table-Map standen Punkte als offene Anfragen im Raum, die nie
+gemessen worden waren. Messreihe und Zahlen in
+[`befunde-datenlage.md`](befunde-datenlage.md).
+
+### Marktindex kommt von Eurostat, nicht von Genesis
+
+*Vorgabe war Destatis Genesis, Tabelle 45213.* Der Genesis-REST-Dienst verlangt seit dem
+Wegfall des Gastzugangs eine Registrierung; ein Aufruf ohne Anmeldung liefert eine
+HTML-Seite statt Daten (geprüft 11.08.2026, `logincheck` und `find` beide HTML).
+
+**Entschieden: Eurostat `sts_setu_m`, NACE I56 (Gastronomie), Deutschland, monatlich,
+kalenderbereinigt.** Quelldaten sind die des Statistischen Bundesamtes — Eurostat ist der
+Verteilweg, nicht eine zweite Messung. 101 Monate ab 2018-01, offen abrufbar, tagesaktuell
+gepflegt.
+
+**Beide Reihen werden geführt** (`index_nominal` und `index_real`), weil die Entscheidung
+real gegen nominal noch aussteht und sie das Vorzeichen dreht. Der Vergleichsmaßstab in
+`mart.markt_vergleich.delta_pp` ist **nominal**, weil unsere Umsätze nominal sind.
+
+Wenn Concept Family später einen Genesis-Zugang stellt: `manual.marktindex` bleibt, nur die
+Spalte `quelle` ändert sich. Die Sicht darüber merkt nichts davon.
+
+### Bundesland über die PLZ, nicht über den Ortsnamen
+
+`manual.betrieb_standort` führt für 60 Betriebe eine gepflegte PLZ. Die 44 verschiedenen PLZ
+sind einzeln gegen `api.zippopotam.us` aufgelöst worden, das je PLZ Ort, Bundesland **und**
+Koordinaten liefert — die Koordinaten dienten als Gegenprobe gegen die bereits gepflegten.
+
+**Nicht über den Ortsnamen**, aus demselben Grund wie in Migration `0008`: fünf Betriebe
+heißen nach derselben Stadt, und „Alter Kranen GmbH" trägt gar keinen Ort im Namen.
+
+Feiertage stammen aus **zwei** Quellen: `openholidaysapi.org` reicht bei den gesetzlichen
+Feiertagen nicht vor 2020 zurück, unsere Umsatzhistorie beginnt 2018. Für 2018/2019 kommen
+sie von `feiertage-api.de`. Die Spalte `quelle` hält den Bruch je Zeile fest — wer ihn nicht
+sieht, hält zwei Jahre ohne Feiertage für zwei Jahre ohne Feiertagswirkung.
+
+### Eigene Zeitfenster ersetzen LINAs Zonen nicht, sie stehen daneben
+
+LINAs Zonen brechen bei 11:30 und 17:30. Aus Stundenwerten ist das nicht nachbaubar, und der
+Fehler ist nicht klein: Mittagszeit 11:30–14:00 gegen 11–14 sind +8,4 %, gegen 12–14 −8,4 %.
+
+**Entschieden: `mart.umsatz_zeitfenster` als eigene Sicht, `core.zeitzonenbericht_zone`
+bleibt unangetastet.** Die Fenstergrenzen stehen in `manual.zeitfenster` als Stammdaten und
+nicht als `CASE` in einer Sicht — sie sind eine fachliche Festlegung, die sich ändern wird.
+Die sieben eingetragenen Fenster sind ausdrücklich ein **Vorschlag**, kein Befund.
+
+### Aktionsartikel werden NICHT aus den Verkaufsdaten geraten
+
+Der Versuch war messbar, weil LINA den Aktionsumsatz je Betrieb und Tag liefert. Gegen diese
+bekannte Summe trafen die Kandidatenlisten auf 104 %, 358 % und 61 %.
+
+**Entschieden: keine automatische Zuordnung.** Eine Spanne von −39 % bis +258 % ist als
+Grundlage für Deckungsbeitrag je Aktion und Kannibalisierungsrechnung unbrauchbar, und eine
+falsche Zuordnung meldet sich nie wieder — sie fährt in jeder Folgeauswertung mit.
+
+Die Kandidatenlisten werden trotzdem übergeben: sie verkürzen Concept Familys Arbeit auf
+Bestätigen statt Suchen. Ausgewiesen als **unsicher**, nicht als Ergebnis.
+
+### Bericht 107 ist für Kapitel 2.1 nicht mehr nötig
+
+`core.personalkosten.eff_*` ist Umsatz je Arbeitsstunde; die Stunden fallen durch Division
+heraus, und die Bereichszuordnung schließt als Identität (Median 0,99995 über 16.110
+Betriebstage). Gegenprobe gegen die BWA: impliziter Stundenlohn 21,12 € im Median, 97,7 %
+der 838 Betriebsmonate im Band 14–32 €/h.
+
+**Entschieden: Kapitel 2.1 wird auf `eff_*` gebaut**, nicht auf eine Freigabe gewartet.
+Bericht 107 bleibt als Messaufruf (`bun run messen d2`) auf der Liste — er würde die
+Rückrechnung ersetzen und zusätzlich Schichtebene liefern, aber er blockiert nichts mehr.
+
+### Messaufrufe bekommen einen eigenen Befehl statt einer Anleitung
+
+Sechs Fragen im Dokument waren mit je einem lesenden Aufruf entscheidbar, aber niemand hatte
+sie gestellt. Der Grund war Reibung: `AGENTS.md` Regel 7a verbietet den Sync aus der
+Agentenumgebung, und eine Anleitung in Prosa wird nicht ausgeführt.
+
+**Entschieden: `bun run messen <id>`** (`src/messen.ts`). Ein Request, keine Schreibvorgänge
+— weder in LINA noch in die eigene Datenbank —, dieselbe Drosselung und dieselbe
+Anmelde-Notbremse wie im Sync. Jede Messung nennt **vor** dem Aufruf, welche Antwort welche
+Schlussfolgerung erlaubt; wer den Schluss erst nach dem Ergebnis formuliert, findet immer
+einen.
+
+Die Endpunkte stehen bewusst **nicht** in `ENDPUNKTE` — was dort steht, reiht der Sync
+automatisch ein, und genau das soll bei einer einmaligen Messung nicht passieren.
+
+### FoodNotify Stufe 2 und der Inventur-Import bleiben Handarbeit des Nutzers
+
+Beide sind gebaut und ungestartet. Sie **konnten in dieser Sitzung nicht gestartet werden**:
+`bun run sync` füllt die Warteschlange für beide Quellsysteme und arbeitet sie in einem
+Prozess ab — der LINA-Anteil würde eine Anmeldung aus der Agentenumgebung auslösen, also
+genau das, was Regel 7a verbietet und Regel 7 als teuersten möglichen Fehler benennt.
+
+**Entschieden: nicht gestartet, stattdessen die Obergrenze gemessen.** Der PLU-Join gilt nur
+bei `kassensystem = 'amadeus'` — 42 Kostenstellen in 21 Betrieben mit 33,9 % des Umsatzes
+2026, davon 31 bei Wilma Wunder. Das ist genau die Marke, deren `fixer_we`-Abdeckung bei
+6,7 % liegt: die beiden Wege zum Soll-Wareneinsatz überschneiden sich kaum, sie ergänzen
+sich auf zusammen rund 63 % des Umsatzes.
+
+Wer es startet, braucht zwei Läufe im eigenen Terminal:
+`bun run einreihen --foodnotify` und `bun run einreihen --foodnotify-inventuren`, danach
+`bun run sync`.

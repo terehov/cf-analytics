@@ -337,3 +337,34 @@ nötige eindeutige Index liegt in Migration `0027`. Ein Refresh dauert rund 145 
 `manual` ist das einzige Schema, in das geschrieben wird — Maßnahmen, OM-Einschätzungen,
 Ursachen. Metabase kann das nicht; v1 läuft über CSV-Upload, später über eine kleine
 Eingabemaske. Der Metabase-Datenbankbenutzer braucht deshalb nur Lesezugriff.
+
+---
+
+## Kalender, Marktindex, Vergleichstag, Zeitfenster (Migrationen 0051 und 0052, 11.08.2026)
+
+Vier Sichten für vier Kennzahlenbereiche der Round-Table-Map, die als „nicht angebunden"
+galten. Alle vier waren offene Daten oder vorhandene Rohdaten, keine Anfragen.
+
+| Sicht | Beantwortet | Falle |
+|---|---|---|
+| `mart.betrieb_kalender` | Feiertag und Schulferien **im Bundesland des Betriebs**, je Tag | Nur Betriebe mit gepflegter PLZ — am 11.08.2026 sind das 60 von 141 |
+| `mart.vergleichstag` | Kapitel 7.1: jeder Tag gegen die letzten vier gleichen Wochentage ohne Feiertag | Rechnet je Zeile vier Nachbartage nach — **immer auf Betrieb oder Zeitraum filtern** |
+| `mart.markt_vergleich` | Kapitel 1.1 / 9.2: eigenes Wachstum gegen den Gastronomiemarkt | `delta_pp` vergleicht gegen die **nominale** Reihe. Real steht daneben und dreht das Vorzeichen |
+| `mart.umsatz_zeitfenster` | Umsatz je selbst geschnittenem Zeitfenster, ab 2018 | **Nicht** gegen `core.zeitzonenbericht_zone` halten: LINAs Zonen brechen auf halben Stunden |
+
+Dazu zwei Arbeitslisten mit derselben Aufgabe wie `mart.nachbarschaft_fehlend` — eine
+unvollständige Auswertung, die sich als vollständig ausgibt, ist schlimmer als keine:
+
+* **`mart.kalender_fehlend`** — Betriebe mit Umsatz im laufenden Jahr, für die kein
+  Bundesland ableitbar ist. Am 11.08.2026 neun, angeführt vom umsatzstärksten Haus der Gruppe.
+* **`mart.zeitfenster_pruefung`** — Stunden, die in keinem oder in mehreren Fenstern liegen.
+  Erwartung: leer. Eine Fensterdefinition mit Loch summiert sich plausibel falsch.
+
+**Warum real und nominal beide geführt werden.** Die Entscheidung steht aus, und sie dreht
+das Ergebnis um: Mai 2026 gegen Mai 2018 ist nominal +19,4 %, real −20,2 %. Unsere Umsätze sind
+nominal; wer sie gegen die reale Reihe hält, misst die Inflation mit und nennt sie Wachstum.
+
+**Warum `ferien_abweichung` in `mart.vergleichstag` steht und nicht bereinigt wird.** Ein
+Samstag in den Sommerferien gegen vier Samstage in der Schulzeit ist ein schlechter
+Vergleich. Ob er verworfen wird, entscheidet der Fachbereich — wer stillschweigend
+bereinigt, verliert genau die Fälle, in denen die Ferien die Erklärung sind.

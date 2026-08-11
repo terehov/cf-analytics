@@ -13,7 +13,8 @@
     "migrate": "bun run src/db/migrate.ts",
     "start": "bun run src/db/migrate.ts && bun run src/health.ts",
     "test": "bun test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "messen": "bun run src/messen.ts"
   },
   "dependencies": {
     "pg": "^8.22.0",

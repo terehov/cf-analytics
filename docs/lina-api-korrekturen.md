@@ -166,3 +166,98 @@ Das ist für den Parallelwelt-Ansatz eine wichtige Information: Ein Teil der Sta
 | Führendes Vorsystem (Amadeus 360 / anderes) | 🟡 **neu** — Zugang dorthin prüfen? |
 
 Damit ist Phase 1 aus meiner Sicht abgeschlossen und Phase 2 nicht mehr blockiert.
+
+---
+
+## KORREKTUR 4 — LINA liefert **doch** Arbeitsstunden (11.08.2026)
+
+~~„LINA liefert Personalkosten nur als Quote, keine einzige Arbeitsstunde und keinen
+Euro-Betrag je Bereich. Damit fehlen: Personalkosten je Umsatzstunde, Umsatz je
+Arbeitsstunde, Gäste je Arbeitsstunde. Betrifft die Kapitel 2.1, 2.3 und 7.2
+**vollständig**."~~ — so stand es bis zum 11.08.2026 in `datenlage-round-table.html`, und es
+war der Grund, Bericht 107 als Blocker zu führen.
+
+**Widerlegt.** `getPersonalkosten.eff*` ist **Umsatz je Arbeitsstunde**. Der Beleg steht
+schon im archivierten Payload (`docs/payloads/getPersonalkosten.json`): `effService` 199,28
+neben `pekService` 9,44 % ergibt 18,81 € Stundensatz — eine plausible Zahl, und zwar nur
+dann, wenn `eff` €/Stunde ist.
+
+**Die Bereichszuordnung ist nicht geraten, sie schließt als Identität:**
+
+```
+Stunden_Service = Umsatz_gesamt    / effService
+Stunden_Bar     = Umsatz_Getränke  / effBar
+Stunden_Küche   = Umsatz_Speisen   / effKueche
+                                        Summe  =  Umsatz_gesamt / effGesamt
+```
+
+Über **16.110 Betriebstage** mit vollständiger Spartenaufteilung: Median des Verhältnisses
+**0,99995**. Beispiel Enchilada Augsburg, 03.06.2026: 26,0 + 19,5 + 27,6 = 73,1 gegen 73,1.
+
+**Unabhängige Gegenprobe** (BWA-Personalkosten ÷ zurückgerechnete Stunden): Median
+**21,12 €/h**, 97,7 % von 838 Betriebsmonaten im Band 14–32 €/h. Rechnung und Zahlen in
+[`befunde-datenlage.md`](befunde-datenlage.md), Befund 2.
+
+**Was daraus folgt:** Kapitel 2.1 hängt **nicht** an Bericht 107. Der Bericht bleibt
+interessant — er brächte die Schichtebene für 2.3 —, aber er blockiert nichts. Der Messaufruf
+dafür ist `bun run messen d2`.
+
+**Was weiter gilt:** Personalstunden je *Zeitzone* gibt es nicht (die Stunden liegen je Tag
+vor), und die **Soll**-Stunden für den Plan-Ist-Vergleich aus 7.2 stecken im Dienstplan, der
+gesperrt ist.
+
+### Nachtrag zur selben Antwort: `pek*` ist auf Tagesebene keine Quote
+
+Beim Prüfen aufgefallen. Wer `getPersonalkosten` **je Tag** abruft, bekommt in `pek*` einen
+Zähler, der **seit Monatsanfang kumuliert** ist, über einem Nenner aus dem angefragten Tag.
+Der Wert wächst dadurch linear mit dem Monatstag (Median `pekGesamt`: Tag 1 = 43,8,
+Tag 31 = 717,6), während `eff*` flach bleibt.
+
+Für den Monatsabruf — so wie der archivierte Payload entstanden ist — stimmt `pek*`. Für
+Tagesabrufe **nicht**. Verlässlich ist `persoogBwa`: identisch mit dem BWA-Prozentwert
+(Median-Abweichung 0,000 pp). Hergang in [`fehlerkatalog.md`](fehlerkatalog.md).
+
+---
+
+## KORREKTUR 5 — Die Ladenakte trägt, was wir für unerreichbar hielten (11.08.2026)
+
+Erhoben in der angemeldeten Browser-Sitzung des Nutzers, nur lesend. Vollständige
+Aufnahme in [`lina-api-inventar-ladenakte.md`](lina-api-inventar-ladenakte.md).
+Drei Aussagen aus früheren Dokumenten sind damit überholt.
+
+**a) „Rendite ist in den Buchhaltungsdaten ohne Definition, der Wilma-Wunder-Report
+fehlt im Repo" (Posten A11, 11.08.2026 vormittags).**
+Überholt. `/finanzen/bwa/longterm?module=franchise&laden=<hash>` liefert je Betrieb
+**77 BWA-Zeilen über 207 Monate (06/2009–08/2026)** in *einer* Antwort — darunter
+`Erg.v Zins/Tax(EBIT)`, `Ergeb v Steuer (EBT)`, `Vorläufiges Ergebnis` und
+`zur Info: EBITDA`, dazu Mietaufwand, Mietnebenkosten, Energiekosten,
+Abschreibungen und Franchisegebühr. Für Enchilada Karlsruhe tragen die Spalten ab
+01/2012 Werte. Unser Bestand kennt keinen dieser Kostenblöcke.
+
+**b) „Bounti ist nicht angebunden" (Lückenanalyse 10.08.2026).**
+Überholt. Das Stammdatenblatt jedes Betriebs führt eine Tabelle vergebener
+**API-Keys mit Scopes**. Eingetragen sind „Sell & Pick" und **„Bounti"** (Scope
+*Personalstammdaten und Kosten*), Ebene Franchise, auf feste IPs gebunden.
+LINA hat also eine **offizielle Third-Party-API**, und Concept Family nutzt sie
+bereits. Das ist zugleich der mögliche Ausweg aus Regel 7a: ein eigener Schlüssel
+mit lesenden Scopes, gebunden auf die Hetzner-IP, ersetzt Anmeldung und Scraping.
+Zu klären mit LINA und Tobias Lindemann — keine technische Frage.
+
+**c) Regel 5 gilt weiter — aber nicht für das Belegarchiv.**
+Gegenprobe bestätigt die Regel für das Buy-Modul: `/wawi/inventory/inventory`
+liefert für Betrieb 62 elf Inventurstichtage, der **jüngste vom 08.02.2017**.
+Der Bericht *Inventurstände* in der Ladenakte ist ebenso leer.
+
+Das **Belegarchiv ist davon nicht berührt.** Dort liegen echte, OCR-erschlossene
+Eingangsrechnungen mit Lieferant, Kreditorenkonto, Sachkonto, MwSt-Aufteilung und
+DATEV-GUID — gemessen **308.387 Stück** in 99 Betrieben. Wer Regel 5 („LINAs
+Warenwirtschaft und Einkauf sind Demodaten") auf das Belegarchiv anwendet, wirft
+die beste Wareneinsatzquelle des Projekts weg. Insbesondere trägt jede Rechnung
+`zuordnungFibu` ∈ {Bar, Küche, sonstiges} — der **Wareneinsatz-Split am Beleg
+selbst**, unabhängig von FoodNotify-PLU (~34 %) und `fixer_we` (~63 %).
+
+**Und eine Warnung, die keine Korrektur ist, aber dringender:** Auf der
+Verträge-Seite ist das Löschen ein **gewöhnlicher GET-Link**
+(`…/vertragid/<id>/delete/1`). Ein Crawler, der Links folgt, löscht Verträge.
+Jeder Zugriff auf die Ladenakte läuft über eine Positivliste zusammengesetzter
+URLs — niemals über Linkverfolgung.

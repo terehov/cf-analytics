@@ -122,3 +122,32 @@ Unverifiziert bleibt die Antworthülle von `/api/erp/stocktakings` selbst — ab
 | Bewertung / OM | 4,00 · orange / 3 · orange | 🟠 / 🟠 |
 | Gesamt / Intensität | rot / Sofort eskalieren | 🔴 / Sofort eskalieren |
 | Maßnahme / Priorität | Ja / Hoch | Ja / Hoch |
+
+---
+
+## Kalender, Marktindex und Zeitfenster (Migrationen 0051 / 0052, 11.08.2026)
+
+Fünf Tabellen im `manual`-Schema. Alle fünf tragen **Referenzdaten von außen**, keine
+importierten Bewegungsdaten — deshalb `manual` und nicht `core`: der Sync fasst sie nicht an,
+und ein Backfill kann sie nicht überschreiben.
+
+| Tabelle | Schlüssel | Warum so |
+|---|---|---|
+| `manual.plz_bundesland` | `plz` | Die Zuordnung hängt an der PLZ, nicht am Betrieb. Zieht ein Betrieb um, folgt das Bundesland von selbst |
+| `manual.feiertag` | `(kuerzel, datum, name)` | Der Name gehört in den Schlüssel: an einem Datum können in einem Land zwei Feiertage zusammenfallen |
+| `manual.schulferien` | `(kuerzel, von, name)` | Als **Zeitraum** geführt, wie die Quelle es liefert — ein Zeitraum lässt sich nicht versehentlich halb laden |
+| `manual.marktindex` | `monat` | Zwei Reihen nebeneinander (`index_nominal`, `index_real`), plus `stand`: die Reihe wird rückwirkend revidiert |
+| `manual.zeitfenster` | `name` | Stammdaten, kein `CASE` in einer Sicht. Eine Fenstergrenze zu ändern ist Pflege, keine Migration |
+
+**Warum `manual.plz_bundesland` und keine Spalte an `manual.betrieb_standort`.** Eine Spalte
+am Betrieb müsste bei jedem neuen Standort erneut gefüllt werden und wäre bei zwei Betrieben
+in derselben Stadt zweimal gepflegt — mit der Möglichkeit, dass sie sich widersprechen.
+
+**Warum `stand` in `manual.marktindex` Pflicht ist.** Statistikreihen werden nachträglich
+revidiert. Ohne Abrufdatum ist nicht nachvollziehbar, gegen welche Fassung ein alter Report
+gerechnet hat, und ein Zahlenunterschied sieht dann aus wie ein Fehler.
+
+**Warum `manual.zeitfenster.stunde_bis` ausschließlich ist.** 11 bis 14 sind die Stunden 11,
+12, 13. Läuft `stunde_bis <= stunde_von`, geht das Fenster über Mitternacht (22 bis 1 =
+Stunden 22, 23, 0) — der Geschäftstag endet um 07:59, Late Night gehört noch dazu.
+`mart.zeitfenster_pruefung` findet Löcher und Überlappungen in der Definition; Erwartung leer.
