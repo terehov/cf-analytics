@@ -36,8 +36,30 @@ const LOGIN_SEITE = '/login'
 const LOGIN_ZIEL = '/common/index/dologin'
 const PROBE = '/common/api/account'
 
-/** Erkennt an der Antwort, ob die Session abgelaufen ist. */
-export function sessionAbgelaufen(res: Response, koerper: string): boolean {
+/**
+ * Erkennt an der Antwort, ob die Session abgelaufen ist.
+ *
+ * `form` ist die erwartete Antwortform des Endpunkts (Vorgabe `json`, so
+ * verhalten sich alle Endpunkte von vor dem 11.08.2026).
+ *
+ * WARUM DIE HTML-HEURISTIK BEI HTML-ENDPUNKTEN ENGER SEIN MUSS. Die Zeile
+ * unten sagt sinngemäß „HTML mit einem Passwortfeld ist die Loginseite". Für
+ * Endpunkte, die JSON liefern sollen, stimmt das: kommt dort HTML mit einem
+ * Passwortfeld an, ist man ausgeloggt. Für Endpunkte, die absichtlich HTML
+ * liefern, stimmt es nicht — das Stammdatenblatt der Ladenakte trägt Formulare,
+ * und ein einzelnes `name="password"` irgendwo auf der Seite würde eine
+ * Neuanmeldung samt Wiederholung auslösen. Bei einem Zugang, den es genau
+ * einmal gibt und der sich sperren lässt (harte Regel 7), ist eine grundlos
+ * ausgelöste Anmeldung kein Schönheitsfehler.
+ *
+ * Deshalb für HTML-Endpunkte die Signatur der Loginseite selbst statt eines
+ * beliebigen Passwortfelds: sie postet auf `/common/index/dologin` und trägt
+ * `window.secret`. Beides steht auf keiner Fachseite. Status und Weiterleitung
+ * bleiben für beide Formen die verlässlichen Signale und werden zuerst geprüft.
+ */
+export function sessionAbgelaufen(
+  res: Response, koerper: string, form: 'json' | 'html' = 'json',
+): boolean {
   if (res.status === 401 || res.status === 403) return true
   // LINA leitet auf die Loginseite um, statt einen Statuscode zu setzen.
   if (res.status >= 300 && res.status < 400) {
@@ -45,7 +67,9 @@ export function sessionAbgelaufen(res: Response, koerper: string): boolean {
   }
   if (res.redirected && new URL(res.url).pathname.startsWith('/login')) return true
   const ct = res.headers.get('content-type') ?? ''
-  if (ct.includes('text/html') && /login-username|name="password"/i.test(koerper)) return true
+  if (!ct.includes('text/html')) return false
+  if (form === 'html') return /dologin|window\.secret/i.test(koerper)
+  if (/login-username|name="password"/i.test(koerper)) return true
   return false
 }
 

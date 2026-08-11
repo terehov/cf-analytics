@@ -598,7 +598,8 @@ Offen bliebe danach **Deutsche Konzepte (34,3 %)** — die Marke ohne Soll-WE, o
 Warengruppen und mit vier der neun fehlenden Standorte.
 
 **Nachtrag 11.08.2026, nachmittags: es gibt einen dritten Weg.** Die Ladenakte-Erhebung
-(KORREKTUR 5) hat im Belegarchiv **308.387 Eingangsrechnungen** gefunden, OCR-erschlossen,
+(KORREKTUR 5) hat im Belegarchiv **394.552 Eingangsrechnungen** gefunden (Vollzählung über
+alle 131 Betriebe; die zuerst genannten 308.387 stammten aus 99 gezählten), OCR-erschlossen,
 jede mit `zuordnungFibu` ∈ {Bar, Küche, sonstiges} — der **Wareneinsatz-Split an der
 Rechnung selbst**, unabhängig von Artikelpflege und PLU-Nummernraum. Er deckt damit auch
 Deutsche Konzepte ab.

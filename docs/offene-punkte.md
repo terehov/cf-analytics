@@ -273,11 +273,25 @@ solange sie nicht gelaufen sind, ist jede Aufwandsschätzung geraten.
 
 ### An LINA beziehungsweise Concept Family (Rechte)
 
-* **Eigener API-Schlüssel — die wichtigste Anfrage.** LINA hat eine offizielle
-  Drittanbieter-Schnittstelle mit Schlüsseln und Scopes; Sell & Pick und Bounti nutzen sie
-  bereits. Ein eigener Schlüssel mit **lesenden** Scopes, gebunden auf die Hetzner-IP,
-  ersetzt Anmeldung und Scraping — und damit das ganze Problem hinter Regel 7a. Adressat:
-  LINA und Tobias Lindemann. Siehe KORREKTUR 5.
+* ~~**Eigener API-Schlüssel bei LINA anfragen**~~ — **entschieden am 11.08.2026: wird nicht
+  angefragt.** Eugene will LINA aus politischen Gründen nicht ansprechen. Die Sache ist
+  damit erledigt, nicht offen, und gehört nicht wieder auf die Liste.
+
+  Der Vollständigkeit halber, weil die Erhebung es zutage gefördert hat: es gäbe die
+  Schnittstelle. „Sell & Pick" trägt die Scopes *Artikelstammdaten schreiben*,
+  *Journaldaten Kasse lesen*, *Personalstammdaten und Kosten lesen* und *BWAs und SuSas
+  lesen* — technisch also genau das, wofür wir HTML parsen. **Die Konsequenz ist trotzdem
+  keine Anfrage, sondern HTML-Parsing**, und der Parser ist entsprechend gebaut: über
+  stabile Zeilennummern statt über Beschriftungen, mit harten Strukturprüfungen, die laut
+  scheitern statt still Falsches zu schreiben (siehe `entscheidungen.md`). Regel 7a bleibt
+  damit ebenfalls in Kraft — der Lauf gehört ins Terminal des Nutzers oder in den Container.
+* **Zwei LINA-API-Schlüssel gehören rotiert** (Sell & Pick, Bounti). Sie stehen im Klartext
+  im Stammdatenblatt jedes Betriebs und waren dadurch kurzzeitig in einer Fixture-Datei
+  dieses Repositories; die Datei wurde vor dem Commit geschwärzt, die Werte sind nirgends
+  persistiert. **Das ist Selbstbedienung, keine Anfrage:** in der Ladenakte unter Stammdaten
+  gibt es je Schlüssel „Löschen" und darunter das Formular zum Neuanlegen. Wer rotiert, muss
+  vorher wissen, wo die alten Schlüssel im Einsatz sind — Sell & Pick und Bounti laufen
+  produktiv, ein Austausch ohne Absprache mit denen legt die Anbindung lahm.
 * **Dienstplan freigeben** — Bedarf ist deutlich kleiner geworden: die Ist-Stunden haben wir,
   die **Soll**-Stunden je Tag und Bereich stehen im Tagesbudget der Ladenakte. Der Dienstplan
   bringt nur noch die **Schicht- und Personenzuordnung** für 2.3.
@@ -336,8 +350,13 @@ Aus der Ladenakte-Erhebung, [`lina-api-inventar-ladenakte.md`](lina-api-inventar
   getrennt, Delivery-Anteil und fünf Ergebniszeilen. Günstigste Quelle im ganzen Projekt.
 * **Stammdatenblatt holen** — Sitzplätze, Tische, Fläche je Bereich; Gesellschafter; Plan-BWA
   (77 × 12); **Tagesbudget mit Plan-Stunden je Tag und Bereich** (366 Zeilen/Jahr).
-* **Belegmetadaten abziehen** — ~2.300 Listenaufrufe, rund zwei Stunden, 455.968 Belege in
-  99 gezählten Betrieben. Kein PDF nötig; `zuordnungFibu` ist der WE-Split an der Rechnung.
+* **Belegmetadaten abziehen** — **mindestens 593.314 Belege** — alle 131 Betriebe gezählt (109 mit Daten,
+  22 leer), aber nur acht der vierzehn Belegarten, also eine Untergrenze, davon 394.552 Eingangsrechnungen. 621 der 1.048 (Betrieb, Belegart)-Paare sind
+  nicht leer, daraus **3.366 Listenseiten** bei 200 Zeilen je Seite. Laufzeit hängt am Takt:
+  bei den 4–6 s der laufenden `.env` rund **4,7 Stunden**, bei 1,5–4 s rund 2,6. Ob `length`
+  über 200 hinaus geht, ist **ungemessen** — bei 1.000 wären es 1.099 Seiten.
+  Kein PDF nötig; `zuordnungFibu` ist der WE-Split an der Rechnung.
+  Einzelwerte je Betrieb: [`ladenakte-bestand.csv`](ladenakte-bestand.csv).
 * **Harte Sperre gegen Linkverfolgung einbauen** — im Ladenakte-Baum ist *Löschen ein GET*.
   `delete`, `edit`, `upload`, `add`, `set` als Pfadsegmente verbieten, Positivliste statt
   Crawler. Das gehört in den Code, nicht in einen Kommentar.

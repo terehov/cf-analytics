@@ -210,7 +210,8 @@ export class FnClient {
       // beim Laden (src/foodnotify/laden.ts).
       const bytes = new TextEncoder().encode(text).length
       const hash = Bun.SHA256.hash(text, 'hex')
-      return { art: 'ok', daten, status: res.status, bytes, hash, dauerMs }
+      // FoodNotify liefert ausschliesslich JSON — die Form ist hier fest.
+      return { art: 'ok', daten, form: 'json', status: res.status, bytes, hash, dauerMs }
 
     } catch (e) {
       this.letzterRequest = Date.now()

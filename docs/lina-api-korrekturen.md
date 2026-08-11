@@ -250,11 +250,19 @@ Der Bericht *Inventurstände* in der Ladenakte ist ebenso leer.
 
 Das **Belegarchiv ist davon nicht berührt.** Dort liegen echte, OCR-erschlossene
 Eingangsrechnungen mit Lieferant, Kreditorenkonto, Sachkonto, MwSt-Aufteilung und
-DATEV-GUID — gemessen **308.387 Stück** in 99 Betrieben. Wer Regel 5 („LINAs
+DATEV-GUID — gemessen **394.552 Stück** über alle 131 Betriebe (Gesamtbestand
+des Archivs: mindestens 593.314 Dokumente in acht der vierzehn Belegarten). Wer Regel 5 („LINAs
 Warenwirtschaft und Einkauf sind Demodaten") auf das Belegarchiv anwendet, wirft
 die beste Wareneinsatzquelle des Projekts weg. Insbesondere trägt jede Rechnung
 `zuordnungFibu` ∈ {Bar, Küche, sonstiges} — der **Wareneinsatz-Split am Beleg
-selbst**, unabhängig von FoodNotify-PLU (~34 %) und `fixer_we` (~63 %).
+selbst**, unabhängig von Artikelpflege und PLU-Nummernraum.
+
+> **Korrektur an dieser Stelle (nachgetragen).** Hier stand zuerst „FoodNotify-PLU
+> (~34 %) und `fixer_we` (~63 %)". Das war eine falsche Zuordnung. Richtig nach der
+> Messung in [`befunde-datenlage.md`](befunde-datenlage.md): **`fixer_we` deckt 31,3 %**
+> des Umsatzes, die **Amadeus/FoodNotify-Obergrenze liegt bei 33,9 %**, und die **63 %**
+> sind erst die *Summe beider Wege auf Markenebene* — sie gehören nicht zu `fixer_we`
+> allein.
 
 **Und eine Warnung, die keine Korrektur ist, aber dringender:** Auf der
 Verträge-Seite ist das Löschen ein **gewöhnlicher GET-Link**

@@ -1001,3 +1001,150 @@ sich auf zusammen rund 63 % des Umsatzes.
 Wer es startet, braucht zwei Läufe im eigenen Terminal:
 `bun run einreihen --foodnotify` und `bun run einreihen --foodnotify-inventuren`, danach
 `bun run sync`.
+
+---
+
+## 11.08.2026, abends — Entscheidungen für den Ladenakte-Import
+
+Grundlage sind die Messungen in [`ladenakte-messungen.md`](ladenakte-messungen.md). Jede
+dieser Entscheidungen hat eine Messung hinter sich; keine ist aus Plausibilität getroffen.
+
+### Es wird nicht geblättert — ein Aufruf holt einen ganzen Ordner
+
+Der Plan sah 3.366 Seitenaufrufe zu je 200 Zeilen vor. Die Messung zeigt: die Belegliste
+kennt **keine Seitengrenze**. `length=10000` liefert alle 8.384 Eingangsrechnungen von
+Enchilada Karlsruhe in einer Antwort — 8,22 MB in 11,9 s, aufsteigend nach ID.
+
+**Entschieden: ein Aufruf je (Betrieb, Belegart).** 621 nicht-leere Paare statt 3.366
+Seiten, Laufzeit von rund 4,9 auf **1,3 Stunden**.
+
+Der eigentliche Gewinn ist aber nicht die Zeit, sondern was wegfällt. Blättern über Stunden
+heisst: während des Laufs lädt jemand einen Beleg hoch, das Seitenraster verschiebt sich um
+eine Position, und der Abzug bekommt eine **Lücke** — nicht bloss eine Dublette. Genau das
+liesse sich hinterher nicht einmal bemerken. Ein Ordner in einem Aufruf ist entweder ganz
+da oder gar nicht, und `recordsTotal` sagt, welches von beidem.
+
+**Preis:** bis zu 12,4 MB je Antwort (Aposto Mainz, 12.639 Kassenbelege) und rund 582 MB
+Rohdaten insgesamt. `ANFRAGE_TIMEOUT_MS` steht auf 60.000 und trägt die geschätzten 18 s
+im schlechtesten Fall. Beides ist bezahlbar; die Lücke wäre es nicht.
+
+**Bedingung:** der Lader prüft `data.length === recordsTotal` und scheitert laut bei
+Abweichung. Ohne diese Prüfung sieht eine gekürzte Antwort aus wie ein kleiner Ordner.
+
+### BWA-Zeilen werden über ihre Nummer verbunden, nie über die Beschriftung
+
+Im Longterm-HTML trägt jede Datenzeile im Diagramm-Link eine Nummer (`/img/82/` = Erlöse
+Getränke). Gemessen an zwei sehr verschiedenen Betrieben: **77 Datenzeilen, Nummern 82–162,
+eindeutig, identisch.** Und dieselben 77 Nummern führt die Plan-BWA im Stammdatenblatt in
+einer eigenen Spalte.
+
+**Entschieden: `bwa_zeile_id` ist der Schlüssel.** Plan und Ist joinen darüber.
+
+Die Alternative wäre der Vergleich der Beschriftungen gewesen, und der wäre brüchig: sie
+sind teils abgeschnitten („Freiwillige soz. Auf", „Abschluss-/Pruefungsk"), tragen Umlaute
+und ändern sich mit jeder Textpflege in LINA. Ein Join über Text hätte funktioniert, bis
+ihn jemand still kaputtmacht — und das wäre nicht aufgefallen, weil ein nicht getroffener
+Join keine Fehlermeldung ist, sondern eine leere Zeile.
+
+Die Nummer trennt zusätzlich Daten von Layout: die 26 Zeilen ohne Nummer sind
+Gliederungslücken. Kein Ratespiel, welche Zeile eine Summe ist.
+
+### Ein eigener Parser statt einer neuen Abhängigkeit
+
+Das Merkblatt hielt einen Regex-Parser für „nicht seriös baubar" und schlug `HTMLRewriter`
+oder `linkedom` vor. Das echte HTML widerlegt die Annahme: die Tabelle ist serverseitig
+gerendert, flach, ohne Verschachtelung in den Zellen ausser einem `<a>`.
+
+**Entschieden: ein kleiner eigener Parser, keine neue Abhängigkeit.** Das Projekt hängt
+heute an `pg`, `tslog` und `zod` — eine Parse-Bibliothek für zwei Tabellenformen wäre
+teurer als der Parser selbst.
+
+**Was ihn trägt, ist nicht die Regex, sondern die Prüfung dahinter:** genau 77 Zeilen mit
+Nummer, alle Nummern eindeutig, jede Datenzeile so viele Zellen wie die Kopfzeile Monate
+hat. Ändert LINA das Markup, schlägt eine dieser Prüfungen fehl und der Posten scheitert
+laut. Ein Parser ohne diese Prüfungen wäre tatsächlich unseriös — mit ihnen ist er
+belastbarer als eine Bibliothek, die alles klaglos irgendwie liest.
+
+### Die Antwortform steht im Register, nicht im Content-Type
+
+LINA deklariert `/intranet/ladenakte/baum/...` als `text/html` und liefert sauberes JSON.
+Wer am Header entscheidet, parst dort das Falsche.
+
+**Entschieden: `Endpunkt.form: 'json' | 'html'`, Vorgabe `json`.** Die Form ist eine
+Eigenschaft des Endpunkts und aus der Messung bekannt — also gehört sie dorthin, wo alles
+andere über den Endpunkt steht.
+
+**Nicht** mitentschieden wurde ein Dokument-Header: die HTML-liefernden Ladenakte-Seiten
+werden von LINAs eigener Oberfläche ebenfalls per XHR nachgeladen. Ein Navigations-Header
+wäre hier die unstimmige Variante und würde Regel 8 verletzen, nicht erfüllen.
+
+### Zwei Notbremsen werden für HTML enger gefasst — und nur für HTML
+
+`sessionAbgelaufen()` hielt bisher jede HTML-Antwort mit `name="password"` für die
+Loginseite. Das Stammdatenblatt trägt Formulare. Die Folge wäre eine grundlos ausgelöste
+Neuanmeldung gewesen — bei einem Zugang, den es genau einmal gibt und der sich sperren
+lässt (Regel 7), der teuerste denkbare Fehlalarm. Für `form: 'html'` gilt jetzt die
+Signatur der Loginseite selbst (`dologin`, `window.secret`), die auf keiner Fachseite steht.
+
+`nachAbwehrseiteAussehend()` sucht unter anderem „Zugriff verweigert". In einer deutschen
+Fachanwendung ist das gewöhnlicher Seitentext, und ein Treffer beendet nicht den Posten,
+sondern den **ganzen Lauf**. Für `form: 'html'` bleiben nur Zeichenketten, die kein
+Fachtext enthält: `captcha`, `cloudflare`, `attention required`, `too many requests`.
+
+**Für JSON ändert sich nichts.** Beide Verschärfungen gelten ausschliesslich für Endpunkte,
+die ausdrücklich als HTML deklariert sind — die bestehenden Endpunkte verhalten sich
+unverändert.
+
+### Das Stammdatenblatt wird nicht roh abgelegt
+
+Tabelle 5 des Stammdatenblatts führt die vergebenen **API-Schlüssel im Klartext**, mit
+IP-Bindung und Scopes. `raw.api_antwort` ist append-only (Regel 4) — was dort landet, ist
+nicht mehr zu entfernen, ohne die Versicherung des Projekts anzufassen.
+
+**Entschieden: von dieser einen Quelle wird die Schlüsseltabelle vor dem Ablegen entfernt.**
+Der Parser liest ausserdem über eine **Positivliste** genau drei Kopfzeilen (Kapazität,
+Plan-BWA, Tagesbudget) — nicht über eine Ausschlussliste. Eine Ausschlussliste vergisst man
+bei der nächsten neuen Tabelle; eine Positivliste übersieht sie höchstens.
+
+Beim Anlegen des Test-Fixtures ist genau dieser Fehler passiert und vor dem Commit
+korrigiert worden: die Schlüssel lagen im Klartext in `ladenakte_stammdaten.html`. Die
+Datei ist jetzt geschwärzt, die Struktur vollständig erhalten. Die beiden Schlüssel gehören
+trotzdem rotiert — vermerkt in [`offene-punkte.md`](offene-punkte.md).
+
+### LINA wird nicht angefragt — HTML-Parsen ist die Antwort, nicht der Notbehelf
+
+Die Erhebung hat eine offizielle Drittanbieter-Schnittstelle zutage gefördert, mit Scopes,
+die genau passen (`BWAs und SuSas lesen`, `Journaldaten Kasse lesen`). Der technisch
+sauberste Weg wäre ein eigener Schlüssel gewesen: keine Anmeldung, kein Scraping, kein
+Regel-7a-Problem.
+
+**Entschieden am 11.08.2026 von Eugene: LINA wird aus politischen Gründen nicht
+kontaktiert.** Das ist keine offene Frage und keine Aufgabe, die noch jemand erledigen
+müsste — es ist eine Festlegung.
+
+Für den Bau heisst das zweierlei. Erstens: **HTML-Parsen ist der gewählte Weg**, nicht die
+Zwischenlösung, bis etwas Besseres kommt. Der Parser wird entsprechend gebaut — über
+stabile Zeilennummern statt Beschriftungen, mit Strukturprüfungen, die laut scheitern.
+Wer ihn später anfasst, soll ihn als dauerhafte Einrichtung behandeln.
+
+Zweitens: **Regel 7a bleibt dauerhaft.** Die Anmeldung aus der Agentenumgebung wird
+abgewiesen, und daran wird sich nichts ändern, weil niemand LINA darum bitten wird. Das ist
+keine vorübergehende Unbequemlichkeit, sondern die Betriebsform.
+
+**Praktisch heisst das aber nicht, dass jemand etwas startet.** Der Container fährt einen
+Zeitplan (`bun run sync`), und `nachfuellen()` läuft darin als Vorlauf. Wer neue Arbeit
+dorthin einhängt, hängt sie in etwas ein, das ohnehin läuft — deshalb bekommt der
+Ladenakte-Import **kein** `einreihen`-Handkommando, sondern ein `ladenakteNachfuellen()`
+neben `linaNachfuellen()` und `foodnotifyNachfuellen()`.
+
+Das ist zugleich die Lehre vom 02.08.2026: ein zweiter Zeitplan (`einreihen --taeglich`)
+fiel aus, der erste meldete weiter „ok", und LINA stand acht Tage still, ohne dass es
+auffiel. Ein Importer ohne Arbeit sieht aus wie einer, der fertig ist. **Ein Zeitplan, ein
+Ausfallpunkt** — und einmalige Massenaktionen als Handbefehl sind genau das, was diese
+Regel vermeiden will, sobald die Aktion sich wiederholen kann.
+
+Dieselbe Festlegung gilt für alle benachbarten Versuchungen: gesperrte Berichte
+freischalten lassen, Rechte erweitern, den Bericht 107 doch noch erbitten. Wo eine Lücke
+nur mit LINAs Mitwirkung zu schliessen wäre, wird sie **gemessen und dokumentiert**, nicht
+eskaliert. Nicht betroffen ist Selbstbedienung in der Oberfläche — einen API-Schlüssel im
+Stammdatenblatt selbst zu löschen und neu anzulegen ist kein Kontakt.

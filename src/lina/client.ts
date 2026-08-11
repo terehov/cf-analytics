@@ -20,7 +20,13 @@ import { schemaFuer } from './schemas'
 import type { Endpunkt } from './endpunkte'
 
 export type Ergebnis =
-  | { art: 'ok'; daten: unknown; status: number; bytes: number; hash: string; dauerMs: number }
+  /**
+   * `form` sagt, was in `daten` steht: bei `json` das geparste Objekt, bei
+   * `html` der unveränderte Rohtext als `string`. Der Diskriminator steht hier,
+   * damit der Lader nicht raten muss — `typeof daten === 'string'` wäre
+   * mehrdeutig, sobald ein JSON-Endpunkt einmal einen Skalar liefert.
+   */
+  | { art: 'ok'; daten: unknown; form: 'json' | 'html'; status: number; bytes: number; hash: string; dauerMs: number }
   /**
    * Kein Fehler, sondern ein Normalzustand: LINA antwortet mit HTTP 500 und
    * leerem Body, wenn ein Betrieb für diesen Bericht keine Daten hat.
@@ -65,9 +71,26 @@ function retryAfter(header: string | null): Date | null {
  * lahm. Ein abgelaufener Session-Redirect ist KEINE Sperre — den behandelt
  * `sessionAbgelaufen()` und meldet sich einmal neu an.
  */
-function nachAbwehrseiteAussehend(text: string): boolean {
+function nachAbwehrseiteAussehend(text: string, form: 'json' | 'html' = 'json'): boolean {
+  const anfang = text.slice(0, 2000)
+  /**
+   * Bei HTML-Endpunkten fallen die deutschsprachigen und die generischen
+   * englischen Stichwörter weg.
+   *
+   * Grund: „Zugriff verweigert" und „access denied" sind in einer deutschen
+   * Fachanwendung gewöhnlicher Seitentext — eine Rechteverwaltung, eine
+   * Fehlermeldung neben einem gesperrten Feld, ein Hinweis im Belegarchiv.
+   * Bei JSON kommen sie praktisch nur von einer Abwehrseite, bei HTML sind
+   * sie ein Alltagswort. Ein Fehlalarm hier beendet nicht den Posten, sondern
+   * den ganzen Lauf — die teuerste mögliche Fehlklassifikation.
+   *
+   * Was bleibt, sind Zeichenketten, die kein Fachtext enthält. Der echte
+   * Abwehrfall verliert dadurch wenig: 403 und 429 werden vorher am Status
+   * erkannt, und Cloudflare nennt sich in seinen Seiten selbst beim Namen.
+   */
+  if (form === 'html') return /captcha|cloudflare|attention required|too many requests/i.test(anfang)
   return /captcha|cloudflare|attention required|access denied|zugriff verweigert|too many requests/i
-    .test(text.slice(0, 2000))
+    .test(anfang)
 }
 
 export class LinaClient {
@@ -183,13 +206,14 @@ export class LinaClient {
       }
     }
 
+    const form = ep.form ?? 'json'
     const start = Date.now()
     try {
       let res = await this.request(ep, parameter)
       let text = await res.text()
 
       // Session abgelaufen: genau einmal neu anmelden und wiederholen.
-      if (sessionAbgelaufen(res, text)) {
+      if (sessionAbgelaufen(res, text, form)) {
         log.info('session abgelaufen, melde neu an', { endpunkt: ep.key })
         await this.session.anmelden()
         res = await this.request(ep, parameter)
@@ -222,7 +246,7 @@ export class LinaClient {
           fehler: `HTTP ${res.status}${res.headers.get('retry-after') ? ` (Retry-After: ${res.headers.get('retry-after')})` : ''}`,
         }
       }
-      if (nachAbwehrseiteAussehend(text)) {
+      if (nachAbwehrseiteAussehend(text, form)) {
         return {
           art: 'gesperrt', sperrArt: 'challenge', status: res.status, dauerMs,
           wartenBis: retryAfter(res.headers.get('retry-after')),
@@ -239,19 +263,25 @@ export class LinaClient {
       }
 
       let daten: unknown
-      try {
-        daten = JSON.parse(text)
-      } catch {
-        return {
-          art: 'fehler', status: res.status, dauerMs,
-          fehler: `Antwort ist kein JSON (${text.length} Bytes, beginnt mit "${text.slice(0, 40)}")`,
-          wiederholbar: false,
+      if (form === 'html') {
+        // Rohtext durchreichen. Geprüft wird nicht das HTML, sondern das
+        // Ergebnis des Parsers — HTML gegen ein Schema zu halten sagt nichts.
+        daten = text
+      } else {
+        try {
+          daten = JSON.parse(text)
+        } catch {
+          return {
+            art: 'fehler', status: res.status, dauerMs,
+            fehler: `Antwort ist kein JSON (${text.length} Bytes, beginnt mit "${text.slice(0, 40)}")`,
+            wiederholbar: false,
+          }
         }
       }
 
       const bytes = new TextEncoder().encode(text).length
       const hash = Bun.SHA256.hash(text, 'hex')
-      return { art: 'ok', daten, status: res.status, bytes, hash, dauerMs }
+      return { art: 'ok', daten, form, status: res.status, bytes, hash, dauerMs }
 
     } catch (e) {
       this.letzterRequest = Date.now()

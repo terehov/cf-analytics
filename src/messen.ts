@@ -37,10 +37,99 @@ type Messung = {
   frage: string
   /** Was der Aufruf tut — in einem Satz, ohne Fachjargon. */
   aufruf: string
-  pfad: string
-  parameter: Record<string, string>
+  /** Einschrittige Messung: ein Pfad, ein Parametersatz, ein Request. */
+  pfad?: string
+  parameter?: Record<string, string>
+  /**
+   * Mehrschrittige Messung. Manche Fragen lassen sich mit einem Aufruf nicht
+   * beantworten — ob eine Seitengroesse trägt, sieht man erst im Vergleich
+   * mehrerer Seitengroessen, und wie lange ein Token gilt, erst nach dem
+   * Warten. Solche Messungen bringen ihren Ablauf selbst mit und geben ihren
+   * Bericht als Text zurueck.
+   *
+   * Sie benutzen denselben gedrosselten `LinaClient` wie alles andere. Ein
+   * eigenes `fetch` daneben wuerde Takt, Tagesbudget und Anmelde-Notbremse
+   * gleichzeitig umgehen.
+   */
+  lauf?: (client: LinaClient) => Promise<string>
   /** Antwort -> Schlussfolgerung. Vor dem Aufruf festgelegt. */
   deutung: [string, string][]
+}
+
+/** Ad-hoc-Endpunkt fuer eine Messung. Absichtlich nicht in ENDPUNKTE. */
+const adhoc = (
+  key: string, pfad: string, form: 'json' | 'html' = 'json',
+): Endpunkt => ({
+  key: `messen:${key}`,
+  ebene: 'konzern',
+  pfad,
+  schrittweite: 'tag',
+  parameter: () => ({}),
+  zweck: `Messung ${key}`,
+  aktiv: false,
+  form,
+})
+
+const schlaf = (ms: number) => new Promise(r => setTimeout(r, ms))
+
+/**
+ * Enchilada Karlsruhe. Am 11.08.2026 mit 8.383 Eingangsrechnungen gemessen —
+ * genug fuer mehrere Seiten, klein genug, um niemanden zu belasten.
+ */
+const MESS_BETRIEB = 15
+
+/**
+ * Holt einen `storeId`-Token fuer das Belegarchiv eines Betriebs.
+ *
+ * Zwei Aufrufe: der Baumknoten nennt die Ordner samt Link, die Ordnerseite
+ * traegt den Token im eingebetteten `getFilesUrl`. Der Token ist je Anfrage
+ * neu gesalzen und gilt fuer alle Belegarten desselben Betriebs.
+ */
+async function belegarchivToken(
+  client: LinaClient, betriebId: number,
+): Promise<{ token: string; schritte: string[] }> {
+  const schritte: string[] = []
+
+  const baum = await client.holen(
+    adhoc('la_baum', '/intranet/ladenakte/baum/admin/1', 'json'),
+    { id: `belegarchiv_${betriebId}` })
+  if (baum.art !== 'ok') throw new Error(`Baumknoten: ${baum.art} — ${'fehler' in baum ? baum.fehler : ''}`)
+  const ordner = baum.daten as Array<{ text: string; a_attr: Record<string, string> }>
+  schritte.push(`Baumknoten: ${ordner.length} Ordner`)
+
+  const eingang = ordner.find(o => /Eingangsrechnungen/.test(o.text))
+  if (!eingang) throw new Error('Ordner "Eingangsrechnungen und Avise" nicht gefunden')
+
+  const link = new URL(eingang.a_attr['data-link'], 'https://x')
+  const seite = await client.holen(
+    adhoc('la_ordner', link.pathname, 'html'),
+    Object.fromEntries(link.searchParams))
+  if (seite.art !== 'ok') throw new Error(`Ordnerseite: ${seite.art} — ${'fehler' in seite ? seite.fehler : ''}`)
+
+  const treffer = String(seite.daten).match(/getFilesUrl = '([^']+)'/)
+  if (!treffer) throw new Error('getFilesUrl nicht in der Ordnerseite gefunden')
+  const token = new URL(treffer[1], 'https://x').searchParams.get('storeId')
+  if (!token) throw new Error('storeId fehlt in getFilesUrl')
+  schritte.push(`Token geholt (${token.length} Zeichen)`)
+
+  return { token, schritte }
+}
+
+/** Eine Seite der Belegliste. Gibt IDs und Gesamtzahl zurueck. */
+async function belegSeite(
+  client: LinaClient, token: string,
+  opt: { typeId?: string; start?: number; length?: number; spalte?: number; richtung?: string },
+): Promise<{ ids: number[]; total: number; geliefert: number }> {
+  const r = await client.holen(adhoc('la_liste', '/intranet/ladenakte/beleglist', 'json'), {
+    admin: '1', storeId: token, typeId: opt.typeId ?? '1', draw: '1',
+    start: String(opt.start ?? 0), length: String(opt.length ?? 200),
+    'order[0][column]': String(opt.spalte ?? 0),
+    'order[0][dir]': opt.richtung ?? 'asc',
+  })
+  if (r.art !== 'ok') throw new Error(`Belegliste: ${r.art} — ${'fehler' in r ? r.fehler : ''}`)
+  const j = r.daten as { data?: Array<{ id: number }>; recordsTotal?: number }
+  const zeilen = j.data ?? []
+  return { ids: zeilen.map(z => z.id), total: j.recordsTotal ?? -1, geliefert: zeilen.length }
 }
 
 /** Ein Zeitraum, der garantiert Daten hat: eine ruhige Woche im Juni 2026. */
@@ -151,6 +240,134 @@ const MESSUNGEN: Messung[] = [
        + 'Schreibweise prüfen, nicht raten.'],
     ],
   },
+
+  // ---------------------------------------------------------------------
+  // d7-d9: die drei offenen Punkte des Belegarchiv-Abzugs.
+  //
+  // Sie stehen hier, weil der Abzug ohne sie nicht dimensionierbar ist. Am
+  // 11.08.2026 lief die Browser-Sitzung ab, bevor sie gemessen werden konnten
+  // — dokumentiert in docs/lina-api-inventar-ladenakte.md, Abschnitt 10.
+  // Solange sie offen sind, arbeitet der Lader mit den vorsichtigen Annahmen
+  // 200 Zeilen je Seite, aufsteigend nach ID, Token je Betrieb neu.
+  // ---------------------------------------------------------------------
+  {
+    id: 'd7',
+    frage: 'Belegliste: wie viele Zeilen liefert eine Seite höchstens?',
+    aufruf: 'Dieselbe Seite viermal abrufen, mit length 200, 500, 1000 und 2000.',
+    deutung: [
+      ['Alle vier liefern, was sie sollen',
+       'Der Abzug läuft mit length=1000. Statt 3.366 Seitenaufrufen sind es 1.099 — '
+       + 'aus fast fünf Stunden werden anderthalb. Wert in den Lader übernehmen.'],
+      ['Ab einem Wert wird gedeckelt (z. B. immer 1000)',
+       'Die Deckelung IST die Obergrenze. Mit genau diesem Wert rechnen, nicht mit dem '
+       + 'angefragten — sonst hält der Lader eine gekürzte Seite für eine vollständige '
+       + 'und überspringt still den Rest.'],
+      ['Grosse Werte scheitern oder laufen in die Zeitüberschreitung',
+       'Bei 200 bleiben. Die 3.366 Seiten sind kein Problem, nur Zeit.'],
+    ],
+    lauf: async (client) => {
+      const { token, schritte } = await belegarchivToken(client, MESS_BETRIEB)
+      const zeilen = [...schritte]
+      for (const length of [200, 500, 1000, 2000]) {
+        try {
+          const s = await belegSeite(client, token, { length })
+          const gedeckelt = s.geliefert < length && s.geliefert < s.total
+          zeilen.push(
+            `length=${String(length).padStart(4)}  ->  geliefert ${String(s.geliefert).padStart(4)}`
+            + `  (Bestand ${s.total})${gedeckelt ? '   << GEDECKELT' : ''}`)
+        } catch (e) {
+          zeilen.push(`length=${String(length).padStart(4)}  ->  FEHLER: ${(e as Error).message}`)
+        }
+      }
+      return zeilen.join('\n')
+    },
+  },
+  {
+    id: 'd8',
+    frage: 'Blättern: liefert aufsteigend nach ID lückenlose, überschneidungsfreie Seiten?',
+    aufruf: 'Seite 1 und Seite 2 aufsteigend nach ID holen und die IDs vergleichen; '
+          + 'dieselbe Seite 1 zusätzlich absteigend nach Hochladedatum.',
+    deutung: [
+      ['Aufsteigend: Seite 2 überschneidet Seite 1 nicht, IDs steigen durchgehend',
+       'So wird geblättert. Neue Belege landen am Ende und verschieben nichts — '
+       + 'der Abzug ist dann auch über Stunden vollständig.'],
+      ['Aufsteigend funktioniert nicht, absteigend schon',
+       'Dann bleibt nur absteigend. ACHTUNG: jeder während des Laufs hochgeladene Beleg '
+       + 'schiebt das Seitenraster um eine Position weiter — das erzeugt LÜCKEN, nicht nur '
+       + 'Dubletten. Dann muss der Lader die gesehenen IDs mitführen und am Ende gegen '
+       + 'recordsTotal prüfen, statt sich auf das Raster zu verlassen.'],
+      ['Die Sortierspalte wird ignoriert (beide Reihenfolgen gleich)',
+       'Die Reihenfolge ist serverseitig fest. Dann gilt dieselbe Vorsicht wie oben: '
+       + 'IDs mitführen, Vollständigkeit am Schluss zählen.'],
+    ],
+    lauf: async (client) => {
+      const { token, schritte } = await belegarchivToken(client, MESS_BETRIEB)
+      const zeilen = [...schritte]
+
+      const a1 = await belegSeite(client, token, { start: 0, length: 200, spalte: 0, richtung: 'asc' })
+      const a2 = await belegSeite(client, token, { start: 200, length: 200, spalte: 0, richtung: 'asc' })
+      const d1 = await belegSeite(client, token, { start: 0, length: 200, spalte: 6, richtung: 'desc' })
+
+      const schnitt = a1.ids.filter(i => a2.ids.includes(i))
+      const steigend = a1.ids.every((v, i, arr) => i === 0 || arr[i - 1] <= v)
+      const luecke = a2.ids.length > 0 && a1.ids.length > 0
+        ? Math.min(...a2.ids) > Math.max(...a1.ids) : false
+
+      zeilen.push(
+        `Bestand laut recordsTotal: ${a1.total}`,
+        '',
+        `aufsteigend (Spalte 0)  Seite 1: ${a1.geliefert} Zeilen, ID ${a1.ids[0]} .. ${a1.ids[a1.ids.length - 1]}`,
+        `aufsteigend (Spalte 0)  Seite 2: ${a2.geliefert} Zeilen, ID ${a2.ids[0]} .. ${a2.ids[a2.ids.length - 1]}`,
+        `absteigend  (Spalte 6)  Seite 1: ${d1.geliefert} Zeilen, ID ${d1.ids[0]} .. ${d1.ids[d1.ids.length - 1]}`,
+        '',
+        `IDs auf Seite 1 aufsteigend sortiert: ${steigend ? 'ja' : 'NEIN'}`,
+        `Ueberschneidung Seite 1 / Seite 2:    ${schnitt.length} IDs${schnitt.length ? '   << PROBLEM' : ''}`,
+        `Seite 2 beginnt hinter Seite 1:       ${luecke ? 'ja' : 'NEIN   << PROBLEM'}`,
+        `Reihenfolge asc und desc verschieden: ${a1.ids[0] !== d1.ids[0] ? 'ja' : 'NEIN — Sortierung wird ignoriert'}`,
+      )
+      return zeilen.join('\n')
+    },
+  },
+  {
+    id: 'd9',
+    frage: 'Wie lange gilt ein storeId-Token?',
+    aufruf: 'Einen Token holen und ihn nach 0, 1, 3 und 6 Minuten erneut verwenden. '
+          + 'Dauert rund sieben Minuten.',
+    deutung: [
+      ['Alle vier Versuche liefern Daten',
+       'Der Token überlebt einen Betrieb mühelos. Ein Token je Betrieb reicht, der Lader '
+       + 'holt ihn einmal und blättert damit durch alle Belegarten. Günstigster Fall.'],
+      ['Er fällt nach einigen Minuten aus',
+       'Die gemessene Zeit ist die Obergrenze. Der Lader erneuert den Token nach der '
+       + 'HÄLFTE davon — und zusätzlich immer dann, wenn eine Seite leer zurückkommt, '
+       + 'obwohl recordsTotal mehr verspricht. Auf die Zeit allein darf er sich nicht verlassen.'],
+      ['Schon der Versuch nach einer Minute scheitert',
+       'Der Token ist an die einzelne Anfrage gebunden. Dann kostet jede Seite zwei '
+       + 'Aufrufe statt einem — der Abzug verdoppelt sich auf rund 6.700 Aufrufe. '
+       + 'Das ist ärgerlich, aber machbar; es muss nur vorher bekannt sein.'],
+    ],
+    lauf: async (client) => {
+      const { token, schritte } = await belegarchivToken(client, MESS_BETRIEB)
+      const zeilen = [...schritte]
+      const start = Date.now()
+      const pausen = [0, 60, 120, 180]   // kumuliert 0, 1, 3, 6 Minuten
+      for (const p of pausen) {
+        if (p > 0) {
+          zeilen.push(`... ${p} s warten`)
+          await schlaf(p * 1000)
+        }
+        const alter = Math.round((Date.now() - start) / 1000)
+        try {
+          const s = await belegSeite(client, token, { length: 1 })
+          zeilen.push(`nach ${String(alter).padStart(3)} s: ${s.geliefert} Zeile(n), Bestand ${s.total}  -> Token gilt`)
+        } catch (e) {
+          zeilen.push(`nach ${String(alter).padStart(3)} s: FEHLER -> Token abgelaufen: ${(e as Error).message}`)
+          break
+        }
+      }
+      return zeilen.join('\n')
+    },
+  },
 ]
 
 /**
@@ -191,14 +408,16 @@ Einmalige LESENDE Messaufrufe gegen LINA.
 
   bun run messen <id> [--roh]
 
-Jeder Aufruf ist EIN Request. Der Client drosselt, führt das Tagesbudget und
-bricht nach EINEM gescheiterten Anmeldeversuch ab (AGENTS.md Regel 7).
+d1-d5 sind je EIN Request. d7-d9 brauchen mehrere und sagen das dazu.
+Der Client drosselt, führt das Tagesbudget und bricht nach EINEM gescheiterten
+Anmeldeversuch ab (AGENTS.md Regel 7).
 Geschrieben wird nirgends — weder in LINA noch in die eigene Datenbank.
 `)
   for (const m of MESSUNGEN) {
     console.log(`${m.id}  ${m.frage}`)
     console.log(`    ${m.aufruf}`)
-    console.log(`    GET ${m.pfad}`)
+    if (m.pfad) console.log(`    GET ${m.pfad}`)
+    else console.log(`    mehrere Aufrufe`)
     for (const [antwort, schluss] of m.deutung) {
       console.log(`      ${antwort}`)
       console.log(`        -> ${schluss.replace(/\s+/g, ' ')}`)
@@ -228,6 +447,30 @@ if (!messung) {
   process.exit(1)
 }
 
+console.log(`\n${messung.id}  ${messung.frage}`)
+
+const client = new LinaClient()
+
+// Mehrschrittige Messung: sie bringt ihren Ablauf selbst mit.
+if (messung.lauf) {
+  console.log(`${messung.aufruf}\n`)
+  try {
+    console.log(await messung.lauf(client))
+  } catch (e) {
+    console.log(`Abgebrochen: ${(e as Error).message}`)
+  }
+  console.log(`\nDeutung:`)
+  for (const [antwort, schluss] of messung.deutung) {
+    console.log(`  ${antwort}\n    -> ${schluss.replace(/\s+/g, ' ')}`)
+  }
+  process.exit(0)
+}
+
+if (!messung.pfad || !messung.parameter) {
+  console.error(`Messung ${messung.id} hat weder Pfad noch eigenen Ablauf.`)
+  process.exit(1)
+}
+
 // Ad-hoc-Endpunkt: absichtlich nicht in ENDPUNKTE aufgenommen. Was dort steht,
 // reiht der Sync automatisch ein — und genau das soll hier nicht passieren.
 const ep: Endpunkt = {
@@ -235,16 +478,14 @@ const ep: Endpunkt = {
   ebene: 'konzern',
   pfad: messung.pfad,
   schrittweite: 'tag',
-  parameter: () => messung.parameter,
+  parameter: () => messung.parameter ?? {},
   zweck: messung.frage,
   aktiv: false,
 }
 
-console.log(`\n${messung.id}  ${messung.frage}`)
 console.log(`GET ${messung.pfad}`)
 console.log(`Parameter: ${JSON.stringify(messung.parameter)}\n`)
 
-const client = new LinaClient()
 const r = await client.holen(ep, messung.parameter)
 
 console.log(`Ergebnis: ${r.art}`)

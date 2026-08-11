@@ -103,6 +103,23 @@ export type Endpunkt = {
   zweck: string
   aktiv: boolean
   hinweis?: string
+  /**
+   * Welche Form die Antwort hat. Vorgabe `json` — so verhalten sich alle
+   * Endpunkte, die es vor dem 11.08.2026 gab.
+   *
+   * WARUM DAS INS REGISTER GEHÖRT UND NICHT AN DEN CONTENT-TYPE. LINA setzt
+   * den Header nicht verlässlich: `/intranet/ladenakte/baum/...` liefert
+   * sauberes JSON und deklariert es als `text/html`. Wer am Header entscheidet,
+   * parst dort das Falsche. Die Form ist eine Eigenschaft des Endpunkts, und
+   * bekannt ist sie aus der Messung — also steht sie hier.
+   *
+   * `html` heißt nur: der Rohtext wird unverändert durchgereicht statt durch
+   * `JSON.parse` geschickt. Es heißt NICHT, dass ein Dokument-Header gesendet
+   * wird — die HTML-liefernden Ladenakte-Endpunkte werden von LINAs eigener
+   * Oberfläche ebenfalls per XHR nachgeladen (am 11.08.2026 im Browser so
+   * gemessen). Ein Navigations-Header wäre hier die unstimmige Variante.
+   */
+  form?: 'json' | 'html'
 }
 
 /** Konzern-Ebene: DD.MM.YYYY mit führender Null. */

@@ -134,9 +134,40 @@ und das vorläufige Ergebnis stehen je Betrieb und Monat seit 2012 zur
 Verfügung. Ebenso Miete, Energie und Franchisegebühr — drei Kostenblöcke, die
 in unserem Bestand bisher überhaupt nicht vorkommen.
 
-**Aufwand:** eine Anfrage je Betrieb für die gesamte Historie. Das ist die mit
-Abstand günstigste Datenquelle im ganzen Projekt — günstiger noch als
-`getKennzahlen` mit zwei Aufrufen je Jahr.
+### 3.1 Reichweite je Betrieb (10 Betriebe gemessen)
+
+Die Spaltenzahl ist **nicht fest** — die Tabelle beginnt bei der Eröffnung des
+Betriebs und endet beim zuletzt gebuchten Monat:
+
+| Betrieb | Spalten | Werte von | bis | Monate mit Wert | MB |
+|---|---|---|---|---|---|
+| Ratskeller Augsburg | 224 | 01/12 | 06/26 | 170 | 1,21 |
+| Enchilada Bayreuth | 212 | 01/12 | 06/26 | 174 | 1,15 |
+| Park Cafe München | 212 | 01/12 | **12/25** | 162 | 1,16 |
+| INSOLVENT Enchilada Pforzheim | 212 | 01/13 | 12/24 | 138 | 1,14 |
+| GESCHLOSSEN Enchilada München | 212 | 01/12 | 12/15 | 48 | 1,12 |
+| Enchilada Karlsruhe | 207 | 01/12 | 05/26 | 172 | 1,13 |
+| Aposto Augsburg | 140 | 06/15 | 06/26 | 133 | 0,78 |
+| Wilma Wunder Köln | 109 | 10/19 | 06/26 | 80 | 0,61 |
+| Schlager Cafe Düsseldorf | 20 | 01/25 | 03/26 | 15 | 0,14 |
+| CONCEPT FAMILY Franchise AG | 80 | — | — | **0** | 0,44 |
+
+Drei Beobachtungen, die für den Importer zählen:
+
+1. **Geschlossene und insolvente Häuser tragen ihre volle Historie.** München
+   endet sauber 12/15, Pforzheim 12/24. Für Zeitreihen ist das ein Gewinn.
+2. **Der Endmonat ist der BWA-Rückstand.** Park Cafe München endet 12/25 —
+   für 2026 ist dort nichts gebucht, während andere bis 06/26 laufen. Das
+   deckt sich mit `mart.bwa_rueckstand` und ist eine kostenlose Gegenprobe.
+3. **Die Franchisegebergesellschaft hat 80 Spalten und keinen einzigen Wert.**
+   Wer aus „Tabelle vorhanden" auf „Daten vorhanden" schließt, importiert
+   Nullen. Die Prüfung muss auf *Werte* gehen, nicht auf *Struktur* — genau der
+   Silent-Failure-Typ, vor dem `lina-api-inventar.md` bei `getKennzahlen` warnt.
+
+**Aufwand:** eine Anfrage je Betrieb für die gesamte Historie, 0,1–1,2 MB.
+Für alle 131 Betriebe rund **120 MB in 131 Anfragen**. Das ist die mit Abstand
+günstigste Datenquelle im ganzen Projekt — günstiger noch als `getKennzahlen`
+mit zwei Aufrufen je Jahr, und sie reicht sechs Jahre weiter zurück.
 
 **Fallstrick:** die Antwort ist HTML, keine JSON-Schnittstelle. Die Tabelle ist
 serverseitig gerendert (keine PrimeVue-Virtualisierung), das Parsen ist damit
@@ -314,40 +345,77 @@ Sachkonto, MwSt-Aufteilung und DATEV-GUID. Für Auswertungen heißt das: **die
 Metadaten allein sind auswertbar, ohne eine einzige PDF-Datei zu laden.**
 
 Besonders `zuordnungFibu` (Bar / Küche / sonstiges): das ist der
-**Wareneinsatz-Split an der Rechnung selbst**. Der offene Posten C1 — der
-FoodNotify-PLU-Weg deckt nur ~34 % des Umsatzes, mit `fixer_we` ~63 % — ist
-damit über eine dritte, unabhängige Quelle angreifbar.
+**Wareneinsatz-Split an der Rechnung selbst**, unabhängig von Artikelpflege und
+PLU-Nummernraum. Der offene Posten C1 ist damit über eine dritte, unabhängige
+Quelle angreifbar — und diese dritte deckt auch **Deutsche Konzepte** ab, die
+Marke ohne Soll-Wareneinsatz, bei der die beiden anderen Wege dünn sind.
 
-### 7.4 Mengengerüst (gemessen, nicht geschätzt)
+Zur Einordnung der Deckung, gemessen in [`befunde-datenlage.md`](befunde-datenlage.md):
+`fixer_we` deckt **31,3 %** des Umsatzes, die Amadeus/FoodNotify-Obergrenze liegt
+bei **33,9 %**; die oft zitierten **63 %** sind erst die *Summe beider Wege auf
+Markenebene* und gehören nicht zu einem der beiden allein.
 
-99 der 131 Betriebe gezählt (Zählung auf Wunsch des Nutzers abgebrochen, um in
-der Ladenakte zu bleiben). **82 tragen Dokumente, 17 sind leer** — überwiegend
-geschlossene und noch nicht eröffnete Häuser.
+### 7.4 Mengengerüst — vollzählig gemessen, nicht hochgerechnet
 
-| Belegart | Anzahl |
-|---|---|
-| Eingangsrechnungen und Avise | **308.387** |
-| Kassenbelege | 107.882 |
-| Ausgangsrechnungen | 16.466 |
-| Kontoauszüge / Saldenbestätigungen | 11.771 |
-| Inventur und Bruchlisten | 5.617 |
-| Susa | 3.307 |
-| BWA | 2.475 |
-| Lieferscheine | 63 |
-| **Summe (99 Betriebe)** | **455.968** |
+**Alle 131 Betriebe gezählt, 0 Fehler. 109 tragen Dokumente, 22 sind leer.**
+Die leeren sind Testläden (`A Testladen Concept Family`, `Tobi Enchi Testladen
+Zwei`), Neueröffnungen (`Wilma Wunder Bochum`, `Aposto Wuppertal – Alte
+Papierfabrik`) und Ghost-Kitchen-Hüllen (`EatTasty Speisekarte`).
+
+| Belegart | `typeId` | Anzahl |
+|---|---|---|
+| Eingangsrechnungen und Avise | 1 | **394.552** |
+| Kassenbelege | 5 | 149.748 |
+| Ausgangsrechnungen | 2 | 20.755 |
+| Kontoauszüge / Saldenbestätigungen | 3977 | 13.494 |
+| Inventur und Bruchlisten | 3 | 7.279 |
+| Susa | 3975 | 4.049 |
+| BWA | 3974 | 2.895 |
+| Lieferscheine | 3970 | 542 |
+| **Summe über alle 131 Betriebe** | | **593.314** |
+
+> **Diese Zahl ist eine Untergrenze, keine Gesamtzahl.** Gezählt wurden **acht der
+> vierzehn** Belegarten. Nicht gezählt sind: sonstige Dokumente (16), sonstige
+> Auswertungen (3968), USt-Voranmeldungen (3969), Mahnungen (3971), Steuerunterlagen
+> (3972) und OPOS-Listen (3976). Der Abzug holt alle vierzehn — der tatsächliche
+> Bestand liegt also über 593.314. Wer die Zahl weitergibt, sagt „mindestens" dazu.
+
+Die Einzelwerte je Betrieb stehen in [`ladenakte-bestand.csv`](ladenakte-bestand.csv)
+— 131 Zeilen, Schlüssel ist `lina_betrieb_id` (= `core.betrieb.lina_betrieb_id`).
+Damit lässt sich der Abzug betriebsweise planen und hinterher gegenprüfen.
 
 Je Konzept: Deutsche Konzepte 163.946 (16 Betriebe), Enchilada 133.607 (22),
-Aposto 82.834 (11), Enchi-Gruppe geschlossene 42.413 (34),
-Franchisegebergesellschaften 26.739 (14), Besitos 6.429 (2).
+Wilma Wunder 110.703 (14), Aposto 82.834 (11), Enchi-Gruppe geschlossene 42.413
+(34), Franchisegebergesellschaften 27.609 (17), Sonstige Enchilada Gruppe 10.947
+(9), Ghost Kitchen 6.435 (3), Besitos 6.429 (2), Kooperationspartner 4.662 (2),
+Schlager Cafe 3.729 (1).
 
-Einzelwerte zum Kalibrieren: Wilma Wunder Köln 17.351, Park Cafe München 15.705,
-CF Franchise AG 13.473, Aposto Augsburg 7.674, Enchilada Augsburg 6.332,
-Schlager Cafe Düsseldorf 3.729. Geschlossene Häuser und Neueröffnungen: 0.
+Die zehn größten Einzelbestände: Aposto Mainz 19.835, Wilma Wunder Dresden
+18.574, Wilma Wunder Köln 17.352, Alter Kranen 15.888, Park Cafe München 15.705,
+Wirtshaus Lautenschlager 14.669, Wilma Wunder Stuttgart 14.388, Wilma Wunder
+Karlsruhe 13.852, CONCEPT FAMILY Franchise AG 13.473, Aposto Bamberg 13.309.
 
-**Hochrechnung auf alle 131 Betriebe: rund 500.000 bis 550.000 Dokumente.**
+Bemerkenswert: **die 34 geschlossenen und insolventen Häuser tragen zusammen
+42.413 Belege.** Deren Historie ist vollständig erhalten — für Zeitreihen ein
+Gewinn, für Betriebsvergleiche eine Falle.
 
-Der Ordner **Lieferscheine ist praktisch leer (63 Stück konzernweit)** — die
-Hoffnung, darüber an Liefermengen zu kommen, trägt nicht.
+Der Ordner **Lieferscheine ist praktisch leer (542 Stück konzernweit, bei
+394.552 Eingangsrechnungen)** — die Hoffnung, darüber an Liefermengen zu
+kommen, trägt nicht.
+
+### 7.5 Die Struktur ist konzernweit identisch
+
+Alle 131 Betriebe wurden nicht nur gezählt, sondern auch strukturell geprüft
+(Rubrikenliste und Ordnerliste je Betrieb einzeln abgefragt):
+
+* **Eine einzige Rubrik-Kombination** — alle 131 haben dieselben 9 Rubriken.
+* **Eine einzige Ordner-Kombination** — alle 131 haben dieselben 14 `typeId`.
+* Keine unbekannte Rubrik, kein unbekannter Ordnertyp, kein Fehlschlag.
+
+Das ist die Zusage, die ein Importer braucht: **das Schema ist uniform.** Kein
+Sonderfall je Marke, kein abweichender Ordner bei geschlossenen Häusern. Wer
+einen Betrieb korrekt liest, liest alle korrekt. Unterschiede gibt es nur in
+der Befüllung, nie in der Struktur.
 
 ---
 
@@ -413,5 +481,24 @@ Freigabe gibt. Technisch ist es eine Zeile Positivliste.
 | `/finanzen/stb/export` (Datenexport Steuerberater) | Könnte den Belegabzug als **Sammelexport** überflüssig machen. Nicht aufgerufen. |
 | `datevformat`-Buchungsstapel | Strukturierte Buchungen statt PDFs. Format ungeprüft. |
 | `lineItems` je Rechnung | Nur die Anzahl ist im Listensatz. Der Positionsabruf wurde nicht gefunden — er wäre der **Artikelwareneinsatz aus der Rechnung**. |
-| Zensus Betriebe 100–131 | Auf Wunsch abgebrochen; 32 Betriebe ungezählt. |
+| BWA-Reichweite der übrigen 121 Betriebe | 10 gemessen (Abschnitt 3.1). Der Rest folgt beim Import — die Prüfung muss auf *Werte* gehen, nicht auf Struktur. |
 | Offizieller API-Key | Der sanktionierte Weg an Regel 7a vorbei. Frage an LINA / Tobias Lindemann. |
+
+---
+
+## 11. Erhebungsumfang
+
+Damit der nächste Agent weiß, was belegt ist und was nicht:
+
+| geprüft | Umfang |
+|---|---|
+| Betriebe im Baum | **131 / 131** |
+| Belegzählung über 8 Belegarten | **131 / 131**, 0 Fehler |
+| Rubrikenliste je Betrieb | **131 / 131** — eine einzige Kombination |
+| Ordnerliste je Betrieb | **131 / 131** — eine einzige Kombination |
+| Alle 9 Rubriken inhaltlich geöffnet | 1 Betrieb (Enchilada Karlsruhe), Belegarchiv zusätzlich bei GSF Gastro |
+| BWA-Longterm Reichweite | 10 Betriebe |
+| Zentrales Belegarchiv (`/finanzen/document/…`) | 1 Mandant (62) |
+
+Nicht angefasst: Formularinhalte, Foren-Beiträge, `stb/export`, `datevformat`,
+und **keine einzige Belegdatei heruntergeladen**.
