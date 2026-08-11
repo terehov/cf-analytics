@@ -594,8 +594,19 @@ liegt. Die beiden Wege überlappen sich also kaum, sie ergänzen sich:
 | FoodNotify-Rezepturen | Wilma Wunder | 25,4 % |
 | **zusammen** | | **≈ 63 %** |
 
-Offen bleibt danach im Wesentlichen **Deutsche Konzepte (34,3 %)** — die Marke ohne
-Soll-WE, ohne Warengruppen und mit vier der neun fehlenden Standorte.
+Offen bliebe danach **Deutsche Konzepte (34,3 %)** — die Marke ohne Soll-WE, ohne
+Warengruppen und mit vier der neun fehlenden Standorte.
+
+**Nachtrag 11.08.2026, nachmittags: es gibt einen dritten Weg.** Die Ladenakte-Erhebung
+(KORREKTUR 5) hat im Belegarchiv **308.387 Eingangsrechnungen** gefunden, OCR-erschlossen,
+jede mit `zuordnungFibu` ∈ {Bar, Küche, sonstiges} — der **Wareneinsatz-Split an der
+Rechnung selbst**, unabhängig von Artikelpflege und PLU-Nummernraum. Er deckt damit auch
+Deutsche Konzepte ab.
+
+⚠️ **Zahlendreher in KORREKTUR 5 beachten:** dort steht „FoodNotify-PLU (~34 %) und
+`fixer_we` (~63 %)". Richtig ist nach der Messung oben: **`fixer_we` = 31,3 %** des
+Umsatzes, **Amadeus/FoodNotify-Obergrenze = 33,9 %**, und die **63 %** sind erst die
+Summe beider Wege auf Markenebene. Die 63 % gehören nicht zu `fixer_we` allein.
 
 ## 9. Bewertungstexte: 112.598, nicht 173.823
 
@@ -687,11 +698,22 @@ die Frage beantwortbar** — sie braucht keine Anfrage, nur Zeit.
 6.289 Betriebsmonaten** innerhalb von 0,05 pp, Median-Abweichung 0,003 pp. `Umsatz` steht
 dabei durchgehend auf 100,0 %, alle Prozentwerte sind also „in % vom Umsatz".
 
-Der geplante Abgleich gegen die „Betriebsergebnis-Rendite" des Wilma-Wunder-Reports
-**konnte nicht durchgeführt werden: dieser Report liegt nicht im Repository.** In
-`examples/` findet sich das Wort „Betriebsergebnis" nicht. Offen bleibt damit genau eine
-Frage, und sie ist fachlich: **Ist Concept Familys Betriebsergebnis derselbe Zähler wie
-LINAs EBIT?** Alles andere daran ist geklärt.
+~~Der geplante Abgleich gegen die „Betriebsergebnis-Rendite" des Wilma-Wunder-Reports
+konnte nicht durchgeführt werden: dieser Report liegt nicht im Repository. Offen bleibt
+damit genau eine Frage, und sie ist fachlich: Ist Concept Familys Betriebsergebnis
+derselbe Zähler wie LINAs EBIT?~~
+
+**Überholt am selben Tag** durch die Ladenakte-Erhebung, siehe
+[`lina-api-korrekturen.md`](lina-api-korrekturen.md) KORREKTUR 5 und
+[`lina-api-inventar-ladenakte.md`](lina-api-inventar-ladenakte.md). Die Langfrist-BWA
+(`/finanzen/bwa/longterm`) führt **fünf Ergebniszeilen nebeneinander**: Operatives
+Betriebsergebnis, Betriebsergebnis, EBIT, EBT und EBITDA — je Betrieb und Monat seit 2009,
+in **einer** Anfrage.
+
+Die Frage ist damit keine Datenfrage mehr, sondern eine Auswahl: **welche der fünf Zeilen
+ist „die Rendite" des Round Table?** Für einen Betriebsvergleich spricht viel für das
+operative Betriebsergebnis — Zinsen und Steuern sagen nichts über die Führung eines Hauses.
+Das entscheidet der Fachbereich.
 
 ## 13. Standort und Yext fehlen bei denselben neun Betrieben
 

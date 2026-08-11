@@ -389,31 +389,31 @@
   <header class="kopf">
     <div class="eyebrow">Concept Family &middot; Analytics</div>
     <h1>Round-Table-Map: Datenlage und offene Punkte</h1>
-    <p class="untertitel">Was für die Kennzahlen der Map heute rechenbar ist, was noch fehlt, und wer es klären muss. Jede Zahl in diesem Dokument stammt aus einer Abfrage auf den Produktivbestand.</p>
+    <p class="untertitel">Was für die Kennzahlen der Map heute rechenbar ist, was in LINA liegt und noch geholt werden muss, und was wirklich fehlt. Jede Zahl in diesem Dokument stammt aus einer Messung.</p>
     <div class="stand">
       <span><b>Stand</b> 11.08.2026</span>
-      <span><b>Grundlage</b> Produktivdatenbank, gemessen</span>
+      <span><b>Grundlage</b> Produktivdatenbank und LINA, gemessen</span>
       <span><b>Quellen</b> LINA &middot; FoodNotify &middot; Yext &middot; Eurostat</span>
     </div>
   </header>
 
   <section>
     <h2><span class="nr">01</span> Kurzfassung</h2>
-    <p class="lead">Der Datenbestand trägt mehr, als er auf den ersten Blick hergibt — an mehreren Stellen liegt eine Kennzahl unter einem Feldnamen, der nicht nach ihr klingt. Was offen bleibt, verteilt sich auf vier Adressaten, und keiner davon ist eine Schnittstelle, die noch gebaut werden müsste.</p>
+    <p class="lead">Der Datenbestand trägt mehr, als er auf den ersten Blick hergibt — an mehreren Stellen liegt eine Kennzahl unter einem Feldnamen, der nicht nach ihr klingt. Und in LINA liegt deutlich mehr, als wir bisher abrufen. Was danach wirklich fehlt, verteilt sich auf vier Adressaten.</p>
 
     <div class="band">
       <div><span class="wert">31,3&nbsp;%</span><span class="etikett">des Umsatzes haben einen hinterlegten Soll-Wareneinsatz</span></div>
       <div><span class="wert">21,12&nbsp;€</span><span class="etikett">impliziter Stundenlohn aus den rechenbaren Arbeitsstunden</span></div>
-      <div><span class="wert">2018</span><span class="etikett">Historie lückenlos ab 01.01., alle 141 Betriebe</span></div>
+      <div><span class="wert">77</span><span class="etikett">BWA-Zeilen je Betrieb liegen bereit — wir nutzen bisher 5</span></div>
       <div><span class="wert">6</span><span class="etikett">Messaufrufe entscheiden den Rest — je einer, keine Schleife</span></div>
     </div>
 
-    <div class="merksatz">Vier Adressaten: <strong>Rechte in LINA</strong> und eine Frage an den Steuerberater, <strong>zwei fremde Systeme</strong> (Bounti, OpenTable), <strong>Stammdatenpflege</strong>, die nur Concept Family leisten kann, und <strong>fachliche Festlegungen</strong>, die nie getroffen wurden. Die dritte und die vierte sind die unangenehmen — dafür löst keine Schnittstelle etwas.</div>
+    <div class="merksatz">Was übrig bleibt, geht an vier Adressaten: <strong>Rechte in LINA</strong> und eine Frage an den Steuerberater, <strong>ein fremdes System</strong> (OpenTable), <strong>Stammdatenpflege</strong>, die nur Concept Family leisten kann, und <strong>fachliche Festlegungen</strong>, die nie getroffen wurden. Die dritte und die vierte sind die unangenehmen — dafür löst keine Schnittstelle etwas.</div>
   </section>
 
   <section>
     <h2><span class="nr">02</span> Was vorliegt</h2>
-    <p>Alle Mengenangaben am 11.08.2026 im Produktivbestand gemessen.</p>
+    <p>In unserer Datenbank, am 11.08.2026 gemessen.</p>
 
     <div class="tabellenrahmen">
       <table>
@@ -454,7 +454,7 @@
       <div class="posten">
         <span class="chip ok">gemessen</span>
         <span class="titel">Die Arbeitsstunden liegen vor — unter einem anderen Namen</span>
-        <span class="text">LINA weist Personalkosten als Quote aus und keine Stunden. Aber das Feld <b>„Effektivität" ist Umsatz je Arbeitsstunde</b> — täglich, für 141 Betriebe, seit 01.01.2018. Damit ist eine der beiden Kennzahlen aus Kapitel 2.1 direkt da, und die Stunden fallen durch Division heraus.<br><br>Die Zuordnung, welcher Umsatz zu welchem Bereich gehört, ist nicht angenommen, sondern schließt als Identität: Service + Bar + Küche trafen die Gesamtstunden über <b>16.110 Betriebstage</b> mit einem Median von 0,99995. Gegenprobe gegen die BWA: <b>21,12 € Stundenlohn im Median</b>, 97,7 % aller Betriebsmonate im plausiblen Band von 14 bis 32 €.<br><br><b>Kapitel 2.1 ist damit lieferbar.</b> Offen bleiben Personalstunden je <em>Zeitzone</em> und die Soll-Stunden für den Plan-Ist-Vergleich aus 7.2 — die stecken im gesperrten Dienstplan.</span>
+        <span class="text">LINA weist Personalkosten als Quote aus und keine Stunden. Aber das Feld <b>„Effektivität" ist Umsatz je Arbeitsstunde</b> — täglich, für 141 Betriebe, seit 01.01.2018. Damit ist eine der beiden Kennzahlen aus Kapitel 2.1 direkt da, und die Stunden fallen durch Division heraus.<br><br>Die Zuordnung, welcher Umsatz zu welchem Bereich gehört, ist nicht angenommen, sondern schließt als Identität: Service + Bar + Küche trafen die Gesamtstunden über <b>16.110 Betriebstage</b> mit einem Median von 0,99995. Gegenprobe gegen die BWA: <b>21,12 € Stundenlohn im Median</b>, 97,7 % aller Betriebsmonate im plausiblen Band von 14 bis 32 €.<br><br><b>Kapitel 2.1 ist damit lieferbar.</b> Offen bleiben Personalstunden je <em>Zeitzone</em>.</span>
       </div>
       <div class="posten">
         <span class="chip ok">gemessen</span>
@@ -490,7 +490,50 @@
   </section>
 
   <section>
-    <h2><span class="nr">04</span> Was offen bleibt</h2>
+    <h2><span class="nr">04</span> Was in LINA liegt und noch nicht geholt ist</h2>
+    <p>Am 11.08.2026 in der angemeldeten Sitzung erhoben, ausschließlich lesend. Die <strong>Ladenakte</strong> ist keine weitere Berichtsseite, sondern das Dokumentenarchiv des Konzerns — und nichts davon ist über die sieben Berichte erreichbar, aus denen wir bisher importieren. <strong>Keiner dieser Punkte ist eine Anfrage an Concept Family.</strong> Es ist Arbeit auf unserer Seite.</p>
+
+    <div class="register">
+      <div class="posten">
+        <span class="chip ok">erreichbar</span>
+        <span class="titel">Die BWA hat 77 Zeilen, nicht fünf</span>
+        <span class="text">Wir importieren fünf Kennzahlen. Die Langfristauswertung liefert <b>in einer einzigen Anfrage je Betrieb 77 gefüllte Zeilen über 207 Monatsspalten</b> — 06/2009 bis 08/2026. Darunter Kostenblöcke, die in unserem Bestand überhaupt nicht vorkommen: <b>Mietaufwand, Mietnebenkosten, Energiekosten, Abschreibungen, Franchisegebühr</b>, dazu Krankheit und Urlaub getrennt vom Personalaufwand, Bruch und Skonto im Wareneinsatz und der <b>Delivery-Anteil</b> am Erlös.<br><br>Auf der Ergebnisseite stehen <b>Operatives Betriebsergebnis, Betriebsergebnis, EBIT, EBT und EBITDA</b> nebeneinander. Für Enchilada Karlsruhe sind die Spalten ab 01/2012 gefüllt.<br><br>Das ist die mit Abstand günstigste Quelle im Projekt — <b>ein Aufruf je Betrieb für die ganze Historie</b>.</span>
+      </div>
+      <div class="posten">
+        <span class="chip ok">erreichbar</span>
+        <span class="titel">Sitzplätze, Tische und Fläche je Bereich</span>
+        <span class="text">Das Stammdatenblatt jedes Betriebs führt eine Kapazitätstabelle: <b>Bereich, Plätze, Tische, Fläche in qm</b>. Für Enchilada Karlsruhe: 632 Plätze auf 339 qm, davon Biergarten 250, Theke 32.<br><br>Damit sind <b>Umsatz je Sitzplatz und Umsatz je Quadratmeter</b> rechenbar. Beides stand auf der Wunschliste und galt als nicht verfügbar.</span>
+      </div>
+      <div class="posten">
+        <span class="chip ok">erreichbar</span>
+        <span class="titel">Plan-BWA und Tagesbudget — die Soll-Seite existiert</span>
+        <span class="text">Je Betrieb liegt eine <b>Plan-BWA über 77 Zeilen × 12 Monate</b> auf derselben Zeilenstruktur wie die Ist-BWA. Daneben ein <b>Tagesbudget mit 366 Zeilen je Jahr</b>: Datum, Umsatz netto, <b>Plan-Stunden für Service, Bar und Küche</b>.<br><br>Das schließt zwei Punkte auf einmal: „Umsatz gegen Plan" (8.2) hat eine Datenbasis, und der <b>Plan-Ist-Vergleich der Personalstunden aus 7.2</b> braucht den gesperrten Dienstplan nicht mehr — die Ist-Stunden haben wir bereits, die Soll-Stunden stehen hier.</span>
+      </div>
+      <div class="posten">
+        <span class="chip ok">erreichbar</span>
+        <span class="titel">Ein drittes, unabhängiges Fundament für den Wareneinsatz</span>
+        <span class="text">Das Belegarchiv trägt in 99 gezählten Betrieben <b>455.968 Dokumente</b>, darunter <b>308.387 Eingangsrechnungen</b>. Sie sind per Texterkennung erschlossen und tragen Lieferant, Kreditorenkonto, Sachkonto, MwSt-Aufteilung und DATEV-Kennung — <b>die Metadaten allein sind auswertbar, ohne eine einzige PDF-Datei zu laden</b>.<br><br>Entscheidend: jede Rechnung trägt eine Zuordnung <b>Bar / Küche / sonstiges</b>. Das ist der Wareneinsatz-Split <b>an der Rechnung selbst</b> — unabhängig von der Artikelpflege und von FoodNotify, und er deckt auch die Marken ab, bei denen beide Wege dünn sind.<br><br>Der reine Metadaten-Abzug sind rund 2.300 Aufrufe, also etwa <b>zwei Stunden</b>. Der Abzug der Dateien wäre ein eigenes Vorhaben — rund 100 GB und elf Tage — und ist eine Frage der Datensicherung, nicht der Auswertung.</span>
+      </div>
+      <div class="posten">
+        <span class="chip ok">erreichbar</span>
+        <span class="titel">Verträge mit Fristen</span>
+        <span class="text">Je Betrieb rund hundert Verträge mit <b>Vertragsdatum, Vertragsende und Kündigungsfrist</b> (Enchilada Karlsruhe 92, GSF Gastro 108). Maschinell auswertbar als Fristenkalender — Mietvertragslaufzeiten und Auslaufrisiken.<br><br>Nicht Teil der Map, aber die Art von Information, nach der im Round Table gefragt wird, sobald sie einmal sichtbar war.</span>
+      </div>
+    </div>
+
+    <div class="kasten">
+      <span class="status">was das kostet</span>
+      <h4>Drei Dinge, die den Abzug schwerer machen als einen Berichtsabruf</h4>
+      <ul class="felder">
+        <li><b>Es ist HTML, keine Schnittstelle.</b> Die Tabellen werden serverseitig gerendert; das Auslesen ist stabil, bleibt aber Textauswertung und braucht eine Strukturprüfung, die Zeilen über ihre Beschriftung trifft und nie über die Position.</li>
+        <li><b>Die Zugriffstoken sind je Anfrage neu.</b> Sie lassen sich nicht speichern; der Verzeichnisbaum muss vor jedem Lauf frisch gegangen werden.</li>
+        <li><b>Das gehört nicht in den täglichen Lauf.</b> Andere Frequenz, andere Fehlerbehandlung — und beim Dokumentenabzug auch eine andere Rechtsgrundlage.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="nr">05</span> Was offen bleibt</h2>
 
     <div class="legende">
       <span class="chip warn">Rechte</span>
@@ -504,18 +547,18 @@
     <div class="register">
       <div class="posten">
         <span class="chip warn">Rechte</span>
+        <span class="titel">Ein eigener API-Schlüssel — die Frage, die alle anderen kleiner macht</span>
+        <span class="text">LINA führt eine <b>offizielle Schnittstelle für Drittanbieter mit vergebenen Schlüsseln und Rechteumfängen</b>, und Concept Family nutzt sie bereits: eingetragen sind <b>Sell &amp; Pick</b> und <b>Bounti</b>, jeweils auf Franchise-Ebene und auf eine feste IP gebunden.<br><br>Damit gibt es einen <b>sanktionierten Weg</b>, der unseren heutigen Zugang ersetzen könnte — ein eigener Schlüssel mit ausschließlich lesenden Rechten, gebunden auf unsere Server-IP. Das wäre stabiler, schneller und unstrittig. <b>Das ist keine technische Frage</b>, sondern eine an LINA und den dortigen Administrator.</span>
+      </div>
+      <div class="posten">
+        <span class="chip warn">Rechte</span>
         <span class="titel">Kassenjournal — Bonebene</span>
         <span class="text">Ohne Einzelbons nicht rechenbar: Bons mit Aktion, Ø Bon mit gegen ohne Aktion, Gästezahl mit Aktion (5.1) und Wartezeiten aus Bon-Zeitstempeln (7.2, 11.1). <b>Ob es überhaupt eine Rechtefrage ist, ist ungeprüft</b> — der erste Messaufruf unten entscheidet es.</span>
       </div>
       <div class="posten">
         <span class="chip warn">Rechte</span>
-        <span class="titel">Dienstplan — die Soll-Seite</span>
-        <span class="text">Die Schnittstelle antwortet, meldet aber „Keine Berechtigung für diesen Dienstplan". Die <b>Ist</b>-Stunden haben wir; was fehlt, sind die <b>Soll</b>-Stunden und die dort hinterlegten Umsatz- und Effektivitätsziele. Damit fehlt der Plan-Ist-Vergleich aus 7.2.<br><br>Im Management-Bericht führt LINA sichtbar die Spalten <b>Plan</b> und <b>Stundenbudget</b>. Sie stehen bei den meisten Betrieben auf 0,00. Ob sie befüllbar sind, gehört in dieselbe Anfrage — es wäre zugleich die Datenbasis für „Umsatz gegen Plan" (8.2).</span>
-      </div>
-      <div class="posten">
-        <span class="chip warn">Rechte</span>
-        <span class="titel">Betriebskontext für Einkauf und Stammdaten</span>
-        <span class="text">Waren-, Lieferanten- und Bestelldaten hängen am aktuell gewählten Betrieb; im Zentral-Kontext kommen die Daten der Zentrale zurück, nicht die der Häuser. Derselbe Mechanismus lieferte <b>Adresse, Sitzplätze und Fläche je Haus</b> — und damit „Umsatz je Sitzplatz" und die fehlenden Standorte in einem Zug.<br><br>Gefragt ist ausdrücklich ein <b>lesender</b> Weg, den aktiven Betrieb zu wechseln.</span>
+        <span class="titel">Dienstplan — nur noch für die Schichtzuordnung</span>
+        <span class="text">Die Schnittstelle antwortet, meldet aber „Keine Berechtigung für diesen Dienstplan". Der Bedarf ist inzwischen <b>deutlich kleiner</b>: die Ist-Stunden haben wir, die Soll-Stunden je Tag und Bereich stehen im Tagesbudget.<br><br>Was der Dienstplan zusätzlich brächte, ist die <b>Zuordnung zur einzelnen Schicht und Person</b> — Voraussetzung für Kapitel 2.3. Für den reinen Plan-Ist-Vergleich wird er nicht mehr gebraucht.</span>
       </div>
       <div class="posten">
         <span class="chip warn">Rechte</span>
@@ -525,32 +568,35 @@
       <div class="posten">
         <span class="chip warn">Rechte</span>
         <span class="titel">Gesamtpersonalkosten inklusive GF</span>
-        <span class="text">Geht an den <b>Steuerberater</b>, nicht an LINA. Die BWA führt „Personalkosten ohne GF"; Gesamtwert und GF-Anteil (2.2) fehlen als Position. Dazu die Frage, ob „ohne GF" die Lohnnebenkosten enthält — sie geht auch in den oben genannten Stundenlohn ein.</span>
+        <span class="text">Geht an den <b>Steuerberater</b>, nicht an LINA. Zu klären ist, ob „Personalkosten ohne GF" die Lohnnebenkosten enthält — das geht auch in den oben genannten Stundenlohn ein.<br><br>Der GF-Anteil selbst (2.2) ist keine Lücke mehr: die Langfrist-BWA führt <b>Geschäftsführung als eigene Zeile</b>.</span>
       </div>
       <div class="posten">
         <span class="chip warn">Rechte</span>
         <span class="titel">Bericht 118 „Wareneinsatz und Deckungsbeitrag"</span>
-        <span class="text">Dem Namen nach die Margenrechnung auf LINAs eigener Logik — gesperrt. Ein zweiter, von der Artikelpflege unabhängiger Weg zu Kapitel 6.2. Er erschlösse vor allem <b>Deutsche Konzepte</b>, wo weder Soll-Wareneinsatz noch Warengruppen gepflegt sind. Gleiches gilt für die Berichte 23, 8 und 9.</span>
+        <span class="text">Dem Namen nach die Margenrechnung auf LINAs eigener Logik — gesperrt. Er ist inzwischen <b>der vierte Weg zum selben Ziel</b> und damit der am wenigsten dringende: Artikelpflege, FoodNotify-Rezepturen und der Beleg-Split decken die Frage bereits ab. Gleiches gilt für die Berichte 23, 8 und 9.</span>
       </div>
     </div>
 
     <div class="kasten">
-      <span class="status">Nebenbefund &mdash; bitte weiterreichen</span>
-      <h4>Ein LINA-Endpunkt gibt Zugangsdaten im Klartext heraus</h4>
-      <p>Die Stammdatenabfrage eines Betriebs liefert unter anderem <strong>Datenbankname, Datenbankbenutzer und Datenbankpasswort im Klartext</strong> sowie IBAN, BIC und Steuernummer. Wir haben diese Felder bewusst weder ausgelesen noch gespeichert. Der Befund gehört an LINA gemeldet — sinnvollerweise im selben Zug wie die Rechtefragen oben, weil derselbe Endpunkt für die Standortdaten interessant wäre.</p>
+      <span class="status">Nebenbefunde &mdash; bitte an LINA weiterreichen</span>
+      <h4>Zwei Dinge, die im selben Zug gemeldet gehören</h4>
+      <ul class="felder">
+        <li><b>Zugangsdaten im Klartext.</b> Die Stammdatenabfrage eines Betriebs liefert unter anderem Datenbankname, Datenbankbenutzer und Datenbankpasswort im Klartext sowie IBAN, BIC und Steuernummer. Wir haben diese Felder bewusst weder ausgelesen noch gespeichert.</li>
+        <li><b>Löschen geschieht per Aufruf, nicht per Formular.</b> Auf der Vertragsseite ist das Löschen eines Vertrags ein gewöhnlicher Link. Wer dort mit einem Werkzeug arbeitet, das Links folgt — oder ein Browser, der Seiten vorlädt —, <b>löscht damit Verträge</b>. Wir arbeiten deshalb ausschließlich mit fest zusammengesetzten Adressen. Für andere Nutzer bleibt das ein Risiko.</li>
+      </ul>
     </div>
 
     <h3>Fremde Systeme</h3>
     <div class="register">
       <div class="posten">
         <span class="chip miss">fremdes System</span>
-        <span class="titel">Bounti — Schulungsstand</span>
-        <span class="text">Für 4.1 und 4.2 brauchen wir fünf Dinge: <b>Mitarbeiterstamm</b> (angelegt, aktiv, Eintritt), <b>Betriebszuordnung</b> mit stabilem Schlüssel, <b>Bereich</b> (Service, Bar, Küche, Betriebsleitung), <b>Kurskatalog</b> mit Pflichtkennzeichen und Frist, <b>Kursstatus je Mitarbeitendem</b> mit Abschlussdatum.<br><br>Der dritte Punkt ist der wichtigste: <b>welchem Bereich ein Mitarbeitender zugeordnet ist, weiß sonst kein System.</b> Über Namen lässt sich das nicht zuverlässig verbinden, und ohne Fristfeld sind „offene" und „überfällige" Kurse nicht unterscheidbar. Schnittstelle, Export oder Datei ist gleichermaßen möglich — wir müssen nur wissen, was Bounti anbietet.</span>
+        <span class="titel">Bounti — der Weg führt womöglich über LINA</span>
+        <span class="text">Für Kapitel 4.1 und 4.2 brauchen wir <b>Mitarbeiterstamm, Betriebszuordnung mit stabilem Schlüssel, Bereich, Kurskatalog mit Pflichtkennzeichen und Frist, Kursstatus je Mitarbeitendem</b>. Der Bereich ist der wichtigste Punkt: <b>welchem Bereich ein Mitarbeitender zugeordnet ist, weiß sonst kein System.</b><br><br>Neu ist der Weg dorthin: <b>Bounti hat bereits einen LINA-Schlüssel</b> mit dem Rechteumfang <em>Personalstammdaten und Kosten</em>. Die Verbindung besteht also, und die Frage lautet nicht mehr „was kann Bounti liefern", sondern <b>„fließen die Daten schon nach LINA, und dürfen wir sie dort lesen"</b>. Das ist womöglich eine Anfrage weniger.</span>
       </div>
       <div class="posten">
         <span class="chip miss">fremdes System</span>
         <span class="titel">OpenTable — Reservierung, Auslastung, Wartezeit</span>
-        <span class="text">Die einzige Quelle mit einem <b>Frühindikator</b>: der Reservierungsvorlauf zeigt die Entwicklung, bevor sie im Umsatz steht. Dazu Gäste je Zeitfenster (schließt „Gäste je Zeitzone" aus 1.3), Walk-in gegen reserviert, No-Show- und Stornoquote, Sitzdauer, Wartelisten und Wartezeiten, Kapazität und Auslastung.<br><br>Bewertungen brauchen wir <em>nicht</em> — die 22.855 OpenTable-Bewertungen liegen bereits über Yext vor, ein zweiter Weg würde nur doppelt zählen. Und: <b>LINAs eigene Reservierungs-Schnittstelle ist noch ungemessen</b>; der dritte Messaufruf unten entscheidet, wie groß die Anbindung werden muss.</span>
+        <span class="text">Die einzige Quelle mit einem <b>Frühindikator</b>: der Reservierungsvorlauf zeigt die Entwicklung, bevor sie im Umsatz steht. Dazu Gäste je Zeitfenster (schließt „Gäste je Zeitzone" aus 1.3), Walk-in gegen reserviert, No-Show- und Stornoquote, Sitzdauer, Wartelisten und Wartezeiten, Kapazität und Auslastung.<br><br>Bewertungen brauchen wir <em>nicht</em> — die 22.855 OpenTable-Bewertungen liegen bereits über Yext vor. Und: <b>LINAs eigene Reservierungs-Schnittstelle ist noch ungemessen</b>; der dritte Messaufruf unten entscheidet, wie groß die Anbindung werden muss.</span>
       </div>
     </div>
 
@@ -559,7 +605,7 @@
       <div class="posten">
         <span class="chip intern">Pflege</span>
         <span class="titel">Soll-Wareneinsatz und Warengruppen — zwei Marken</span>
-        <span class="text">Nachzupflegen ist nicht „das Sortiment", sondern <b>Deutsche Konzepte (1,8 %) und Wilma Wunder (6,7 %)</b>. Für Wilma Wunder gibt es einen zweiten Weg: 31 ihrer Kostenstellen laufen auf Amadeus, also greift die Verknüpfung mit den FoodNotify-Rezepturen. Zusammen mit Enchilada und Aposto wären das rund <b>63 % des Umsatzes</b>.<br><br>Bei Deutsche Konzepte fehlen zusätzlich die <b>Warengruppen</b>: 78 % ihres Umsatzes hat keine. Das trifft nicht nur 6.2, sondern jede Auswertung nach Speisen und Getränken.</span>
+        <span class="text">Nachzupflegen ist nicht „das Sortiment", sondern <b>Deutsche Konzepte (1,8 %) und Wilma Wunder (6,7 %)</b>. Für Wilma Wunder gibt es einen zweiten Weg: 31 ihrer Kostenstellen laufen auf Amadeus, also greift die Verknüpfung mit den FoodNotify-Rezepturen. Zusammen mit Enchilada und Aposto wären das rund <b>63 % des Umsatzes</b>; der Beleg-Split aus dem Archiv deckt den Rest ab.<br><br>Bei Deutsche Konzepte fehlen zusätzlich die <b>Warengruppen</b>: 78 % ihres Umsatzes hat keine. Das trifft nicht nur 6.2, sondern jede Auswertung nach Speisen und Getränken — und dafür gibt es keinen Ersatzweg.</span>
       </div>
       <div class="posten">
         <span class="chip intern">Pflege</span>
@@ -574,7 +620,7 @@
       <div class="posten">
         <span class="chip intern">Pflege</span>
         <span class="titel">84 Betriebe ohne laufendes Geschäft stilllegen</span>
-        <span class="text">Von 141 geführten Betrieben sind <b>57 operativ</b> — also mit Umsatz im letzten bewerteten Monat. (Über das ganze Jahr 2026 gerechnet sind es 62; beide Zahlen sind richtig und beantworten verschiedene Fragen, deshalb steht der Nenner überall dabei.) Die übrigen liefern Umsatzberichte über 0 € und verwässern jeden Durchschnitt und jede Zählung — jede Aussage über „alle Betriebe" hat einen Nenner, der zu 60 % aus Zeilen besteht, die kein Geschäft beschreiben.<br><br>Die Klassifikation liegt fertig vor: <b>39 geschlossen, 18 ohne Geschäft, 17 verwaltend, 6 inaktiv, 4 Test.</b> Zu entscheiden ist nur, welche davon stillgelegt werden.</span>
+        <span class="text">Von 141 geführten Betrieben sind <b>57 operativ</b> — also mit Umsatz im letzten bewerteten Monat. (Über das ganze Jahr 2026 gerechnet sind es 62; beide Zahlen sind richtig und beantworten verschiedene Fragen, deshalb steht der Nenner überall dabei.) Die übrigen liefern Umsatzberichte über 0 € und verwässern jeden Durchschnitt und jede Zählung.<br><br>Die Klassifikation liegt fertig vor: <b>39 geschlossen, 18 ohne Geschäft, 17 verwaltend, 6 inaktiv, 4 Test.</b> Zu entscheiden ist nur, welche davon stillgelegt werden.</span>
       </div>
       <div class="posten">
         <span class="chip intern">Pflege</span>
@@ -583,8 +629,8 @@
       </div>
       <div class="posten">
         <span class="chip intern">Pflege</span>
-        <span class="titel">Eröffnungsdatum, Fläche, Sitzplätze</span>
-        <span class="text">Es gibt <b>kein Eröffnungs- und kein Schließungsdatum</b>; „bestehende Fläche gegen neue Betriebe" (1.1) ist damit nicht abgrenzbar. Fläche und Sitzplätze fehlen ebenfalls — sie sind die Bezugsgröße für „Umsatz je Sitzplatz" und liegen in LINA hinter demselben Betriebskontext wie die Adressen.</span>
+        <span class="titel">Eröffnungs- und Schließungsdatum</span>
+        <span class="text">Es gibt <b>kein Eröffnungs- und kein Schließungsdatum</b>; „bestehende Fläche gegen neue Betriebe" (1.1) ist damit nicht abgrenzbar. Fläche und Sitzplätze sind es dagegen nicht mehr — sie stehen im Stammdatenblatt (siehe Abschnitt 04). Zu klären bleibt, ob die Kapazitätstabelle bei <b>allen</b> Betrieben gepflegt ist oder nur bei den geprüften.</span>
       </div>
     </div>
 
@@ -593,7 +639,12 @@
       <div class="posten">
         <span class="chip intern">Festlegung</span>
         <span class="titel">Ziel-Rendite, Zielkorridor Personalkosten, Umsatzplan</span>
-        <span class="text">Nie festgelegt worden. Das sind Entscheidungen, keine Datenlücken.<br><br>Dazu gehört eine ältere, unbeantwortete Frage: die <b>Ampelschwelle für Personalkosten</b>. Bei 28/32 aus dem Excel-Blatt „Regeln" stehen fast alle Häuser auf Rot — im Excel war das genauso, Monat für Monat. Eine Ampel, bei der alles rot leuchtet, beantwortet „wo zuerst hinsehen" nicht mehr.</span>
+        <span class="text">Für den Umsatzplan gibt es inzwischen eine Datenbasis: <b>Plan-BWA und Tagesbudget sind in LINA gepflegt</b>. Zu klären ist, ob sie fortgeschrieben werden und ob der Round Table sie als verbindlichen Zielwert nimmt — oder ob daneben eine eigene Zielsetzung tritt.<br><br>Ziel-Rendite und Zielkorridor Personalkosten sind dagegen nie festgelegt worden. Dazu gehört eine ältere, unbeantwortete Frage: die <b>Ampelschwelle für Personalkosten</b>. Bei 28/32 aus dem Excel-Blatt „Regeln" stehen fast alle Häuser auf Rot — im Excel war das genauso, Monat für Monat. Eine Ampel, bei der alles rot leuchtet, beantwortet „wo zuerst hinsehen" nicht mehr.</span>
+      </div>
+      <div class="posten">
+        <span class="chip intern">Festlegung</span>
+        <span class="titel">Welches Ergebnis ist „die Rendite"?</span>
+        <span class="text">Unsere heutige Rendite ist <b>EBIT ÷ Umsatz</b> — geprüft gegen LINAs eigenen Prozentwert über <b>6.289 Betriebsmonate</b>, Abweichung 0,003 Prozentpunkte.<br><br>Die Langfrist-BWA führt allerdings <b>fünf Ergebniszeilen nebeneinander</b>: Operatives Betriebsergebnis, Betriebsergebnis, EBIT, EBT und EBITDA. Die Frage ist damit nicht mehr, ob wir an die Zahlen kommen, sondern <b>welche davon der Round Table meint</b>. Für einen Betriebsvergleich spricht viel für das operative Betriebsergebnis, weil Zinsen und Steuern nichts über die Führung eines Hauses sagen — das ist eine fachliche Entscheidung.</span>
       </div>
       <div class="posten">
         <span class="chip intern">Festlegung</span>
@@ -612,13 +663,13 @@
       </div>
       <div class="posten">
         <span class="chip intern">Festlegung</span>
-        <span class="titel">Ist „Betriebsergebnis" dasselbe wie EBIT?</span>
-        <span class="text">Unsere Rendite ist <b>EBIT ÷ Umsatz</b> aus der BWA — geprüft gegen LINAs eigenen Prozentwert über <b>6.289 Betriebsmonate</b>, Abweichung 0,003 Prozentpunkte. Es gibt also genau eine Definition, und sie ist LINAs.<br><br>Ob Concept Familys „Betriebsergebnis-Rendite" denselben Zähler benutzt, konnte nicht geprüft werden: der entsprechende Report liegt uns nicht vor. Eine Frage, eine Antwort.</span>
+        <span class="titel">Eigene Themencluster statt Yexts fünf</span>
+        <span class="text">Yext klassifiziert nach fünf englischen Labels — Food, Service and Staff, Speed of Service, Order, Restaurant Cleanliness —, erst seit April 2026 und nur bei Bewertungen mit Text. Insgesamt sind das <b>5.640 Themennennungen</b>. Dem stehen <b>106.539 auswertbare Bewertungstexte</b> gegenüber. <b>Sieben der elf gewünschten Cluster fehlen</b> bei Yext ganz.<br><br>Machbarkeit geprüft an 300 zufälligen Bewertungen: <b>alle elf Cluster kommen vor</b>, auch die sieben fehlenden — Atmosphäre 95 Treffer, Getränke 72, Wiederbesuchsabsicht 65, Preis-Leistung 37, Reservierung 22, Musik/Lautstärke 14, Aktion 14. Zu beachten: rund 8 % der Texte sind nicht deutsch, und <b>10,9 % der Fünf-Sterne-Bewertungen enthalten ein Negativwort</b> — die Note taugt nicht als Etikett je Cluster.<br><br>Zu entscheiden ist nur, ob wir es tun. <b>Der Notendurchschnitt bleibt in jedem Fall Yexts Zahl</b>, damit der Round Table nicht von der Quelle abweicht.</span>
       </div>
       <div class="posten">
         <span class="chip intern">Festlegung</span>
-        <span class="titel">Eigene Themencluster statt Yexts fünf</span>
-        <span class="text">Yext klassifiziert nach fünf englischen Labels — Food, Service and Staff, Speed of Service, Order, Restaurant Cleanliness —, erst seit April 2026 und nur bei Bewertungen mit Text. Insgesamt sind das <b>5.640 Themennennungen</b>. Dem stehen <b>106.539 auswertbare Bewertungstexte</b> gegenüber. <b>Sieben der elf gewünschten Cluster fehlen</b> bei Yext ganz.<br><br>Machbarkeit geprüft an 300 zufälligen Bewertungen: <b>alle elf Cluster kommen vor</b>, auch die sieben fehlenden — Atmosphäre 95 Treffer, Getränke 72, Wiederbesuchsabsicht 65, Preis-Leistung 37, Reservierung 22, Musik/Lautstärke 14, Aktion 14. Zu beachten: rund 8 % der Texte sind nicht deutsch, und <b>10,9 % der Fünf-Sterne-Bewertungen enthalten ein Negativwort</b> — die Note taugt nicht als Etikett je Cluster.<br><br>Zu entscheiden ist nur, ob wir es tun. <b>Der Notendurchschnitt bleibt in jedem Fall Yexts Zahl</b>, damit der Round Table nicht von der Quelle abweicht.</span>
+        <span class="titel">Wie tief geht der Dokumentenabzug?</span>
+        <span class="text">Die Belegmetadaten (Lieferant, Konto, Betrag, MwSt) sind für die Auswertung das Wertvolle und in etwa zwei Stunden geholt. Der Abzug der <b>Dateien</b> ist ein anderes Vorhaben: rund 100 GB, gut elf Tage, und eine Frage von Zweck, Aufbewahrungsfrist und Löschkonzept.<br><br>Wichtig dabei: das Archiv enthält neben Rechnungen auch einen <b>Personalzweig mit Ausweisdokumenten, Geburtsurkunden, Krankmeldungen und Pfändungen</b>. Für keine Umsatzauswertung ist davon etwas erforderlich. Unser Vorschlag ist, diesen Zweig <b>vom Abzug auszunehmen</b>, bis es dafür einen benannten Zweck und eine Freigabe gibt.</span>
       </div>
     </div>
 
@@ -627,7 +678,7 @@
       <div class="posten">
         <span class="chip intern">Taktfrage</span>
         <span class="titel">Rendite hinkt strukturell nach</span>
-        <span class="text">Stand 04.08.2026 liegt EBIT für April bei <b>65</b> Betrieben vor, für Mai bei <b>63</b>, für Juni bei <b>41</b>, für Juli bei <b>keinem</b>. Der Buchungsstand ist je Betrieb verschieden. Ein monatlicher Aufsichtsratsreport mit Rendite kann deshalb immer nur den letzten <b>gebuchten</b> Monat zeigen, nie den Vormonat.<br><br>Wie schnell gebucht wird, ist <b>noch nicht messbar</b>: unsere Monatsstände reichen erst acht Tage zurück. In diesen acht Tagen stieg Juni von 23 auf 41 Betriebe. In drei Monaten ist die Frage beantwortbar — sie braucht keine Anfrage, nur Zeit.</span>
+        <span class="text">Stand 04.08.2026 liegt EBIT für April bei <b>65</b> Betrieben vor, für Mai bei <b>63</b>, für Juni bei <b>41</b>, für Juli bei <b>keinem</b>. Der Buchungsstand ist je Betrieb verschieden. Ein monatlicher Aufsichtsratsreport mit Rendite kann deshalb immer nur den letzten <b>gebuchten</b> Monat zeigen, nie den Vormonat. Die Langfrist-BWA bestätigt das: auch dort enden die gefüllten Spalten im Mai.<br><br>Wie schnell gebucht wird, ist <b>noch nicht messbar</b>: unsere Monatsstände reichen erst acht Tage zurück. In diesen acht Tagen stieg Juni von 23 auf 41 Betriebe. In drei Monaten ist die Frage beantwortbar — sie braucht keine Anfrage, nur Zeit.</span>
       </div>
       <div class="posten">
         <span class="chip intern">keine Quelle</span>
@@ -638,7 +689,7 @@
   </section>
 
   <section>
-    <h2><span class="nr">05</span> Sechs Messaufrufe, die den Rest entscheiden</h2>
+    <h2><span class="nr">06</span> Sechs Messaufrufe, die den Rest entscheiden</h2>
     <p>Jeder ist <strong>ein einziger lesender Aufruf</strong>. Sie sind vorbereitet und laufen mit <span style="font-family:var(--mono);font-size:.9em">bun run messen d1</span> bis <span style="font-family:var(--mono);font-size:.9em">d6</span>. Jeder sagt <em>vorher</em>, welche Antwort welchen Schluss erlaubt — wer den Schluss erst nach dem Ergebnis formuliert, findet immer einen.</p>
 
     <div class="anfragen">
@@ -676,7 +727,7 @@
   </section>
 
   <section>
-    <h2><span class="nr">06</span> Vorgeschlagene Reihenfolge</h2>
+    <h2><span class="nr">07</span> Vorgeschlagene Reihenfolge</h2>
     <div class="tabellenrahmen">
       <table>
         <thead>
@@ -684,20 +735,22 @@
         </thead>
         <tbody>
           <tr><td class="num">1</td><td>Die sechs Messaufrufe starten</td><td>Sechs Aufrufe, eine Viertelstunde. Sie entscheiden, welche der Rechteanfragen überhaupt gestellt werden muss.</td></tr>
-          <tr><td class="num">2</td><td>Rechteanfragen stellen — was nach Schritt 1 übrig ist</td><td>Längste Vorlaufzeit, hängt nicht an uns. Alles Weitere läuft parallel.</td></tr>
-          <tr><td class="num">3</td><td>Neun Standorte nachtragen, Aktionsstamm bestätigen, Betriebe ohne Geschäft stilllegen</td><td>Reine Pflege, die Listen liegen fertig vor. Bereinigt gleichzeitig die Durchschnitte in jeder anderen Auswertung.</td></tr>
-          <tr><td class="num">4</td><td>Gästezählung: Rollout in den 16 Betrieben abschließen</td><td>Muss vor dem ersten Report stehen, sonst wird eine Einführung als Rückgang gelesen.</td></tr>
-          <tr><td class="num">5</td><td>Zielwerte festlegen: Rendite, Personalkostenkorridor, Umsatzplan, Ampelschwellen</td><td>Ohne sie zeigt die Ampel weiter fast überall Rot und steuert damit nichts.</td></tr>
-          <tr><td class="num">6</td><td>Soll-Wareneinsatz: FoodNotify-Rezepturen für Wilma Wunder starten, Deutsche Konzepte nachpflegen</td><td>Hebt Kapitel 6.2 von 37 % auf rund 63 % des Umsatzes. Der FoodNotify-Weg ist gebaut und muss nur gestartet werden.</td></tr>
-          <tr><td class="num">7</td><td>Bounti und OpenTable anfragen</td><td>Die einzigen beiden Systeme, die wirklich fehlen.</td></tr>
-          <tr><td class="num">8</td><td>Eigene Themenklassifikation auf den 106.539 Texten</td><td>Liefert alle elf Cluster rückwirkend über die ganze Historie, ohne externe Abhängigkeit.</td></tr>
+          <tr><td class="num">2</td><td>Eigenen API-Schlüssel anfragen</td><td>Längste Vorlaufzeit und größte Wirkung: er würde den heutigen Zugang ersetzen und die übrigen Rechtefragen vereinfachen.</td></tr>
+          <tr><td class="num">3</td><td>Langfrist-BWA, Stammdaten und Tagesbudget holen</td><td>Ein Aufruf je Betrieb für 77 Zeilen über 17 Jahre. Bringt Miete, Energie, Franchisegebühr, Sitzplätze, Fläche und die gesamte Plan-Seite auf einmal.</td></tr>
+          <tr><td class="num">4</td><td>Neun Standorte nachtragen, Aktionsstamm bestätigen, Betriebe ohne Geschäft stilllegen</td><td>Reine Pflege, die Listen liegen fertig vor. Bereinigt gleichzeitig die Durchschnitte in jeder anderen Auswertung.</td></tr>
+          <tr><td class="num">5</td><td>Gästezählung: Rollout in den 16 Betrieben abschließen</td><td>Muss vor dem ersten Report stehen, sonst wird eine Einführung als Rückgang gelesen.</td></tr>
+          <tr><td class="num">6</td><td>Zielwerte festlegen: Rendite-Definition, Personalkostenkorridor, Ampelschwellen</td><td>Ohne sie zeigt die Ampel weiter fast überall Rot und steuert damit nichts.</td></tr>
+          <tr><td class="num">7</td><td>Belegmetadaten abziehen</td><td>Rund zwei Stunden Laufzeit für den Wareneinsatz-Split an der Rechnung — die dritte und breiteste Quelle für Kapitel 6.2.</td></tr>
+          <tr><td class="num">8</td><td>Soll-Wareneinsatz: FoodNotify-Rezepturen für Wilma Wunder, Warengruppen bei Deutsche Konzepte</td><td>Der FoodNotify-Weg ist gebaut und muss nur gestartet werden. Die Warengruppen bleiben Handarbeit ohne Ersatzweg.</td></tr>
+          <tr><td class="num">9</td><td>Bounti klären, OpenTable anfragen</td><td>Bei Bounti zuerst prüfen, ob die Daten über den bestehenden LINA-Schlüssel schon fließen.</td></tr>
+          <tr><td class="num">10</td><td>Eigene Themenklassifikation auf den 106.539 Texten</td><td>Liefert alle elf Cluster rückwirkend über die ganze Historie, ohne externe Abhängigkeit.</td></tr>
         </tbody>
       </table>
     </div>
   </section>
 
   <div class="fuss">
-    <p>Alle Mengenangaben wurden am 11.08.2026 im Produktivdatenbestand gemessen, nicht geschätzt. Wo etwas ungeprüft ist, steht es ausdrücklich dabei.</p>
+    <p>Die Mengenangaben aus der Datenbank wurden am 11.08.2026 im Produktivbestand gemessen; die Angaben zu Ladenakte, BWA-Langfrist und Belegarchiv am selben Tag lesend in LINA erhoben. Wo etwas ungeprüft ist, steht es ausdrücklich dabei.</p>
     <p>Rückfragen zu einzelnen Positionen lassen sich jeweils mit einer Abfrage beantworten — es muss nichts nachgeschätzt werden.</p>
   </div>
 

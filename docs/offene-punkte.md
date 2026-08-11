@@ -273,14 +273,22 @@ solange sie nicht gelaufen sind, ist jede Aufwandsschätzung geraten.
 
 ### An LINA beziehungsweise Concept Family (Rechte)
 
-* **Dienstplan freigeben** — die Ist-Stunden haben wir selbst, es fehlen die **Soll**-Stunden
-  für 7.2. Dabei gleich fragen, ob die Spalten **Plan** und **Stundenbudget** im
-  Management-Bericht befüllbar sind: sie stehen bei fast allen Betrieben auf 0,00 und wären
-  die Datenbasis für „Umsatz gegen Plan" (8.2).
-* **Betriebskontext lesend umschalten** — erschließt Einkaufspreise je Haus, Adressen,
-  Sitzplätze und Fläche in einem Zug.
+* **Eigener API-Schlüssel — die wichtigste Anfrage.** LINA hat eine offizielle
+  Drittanbieter-Schnittstelle mit Schlüsseln und Scopes; Sell & Pick und Bounti nutzen sie
+  bereits. Ein eigener Schlüssel mit **lesenden** Scopes, gebunden auf die Hetzner-IP,
+  ersetzt Anmeldung und Scraping — und damit das ganze Problem hinter Regel 7a. Adressat:
+  LINA und Tobias Lindemann. Siehe KORREKTUR 5.
+* **Dienstplan freigeben** — Bedarf ist deutlich kleiner geworden: die Ist-Stunden haben wir,
+  die **Soll**-Stunden je Tag und Bereich stehen im Tagesbudget der Ladenakte. Der Dienstplan
+  bringt nur noch die **Schicht- und Personenzuordnung** für 2.3.
 * **Mitarbeiter-Stammdaten** — für 4.2 auf Personenebene.
-* **Bericht 118** — von kritisch auf nützlich gerutscht, erschlösse vor allem Deutsche Konzepte.
+* **Bericht 118** — inzwischen der *vierte* Weg zum Wareneinsatz und damit der am wenigsten
+  dringende.
+
+~~**Betriebskontext lesend umschalten**~~ — weitgehend erledigt: die Ladenakte adressiert
+Betriebe über einen Laden-Hash ohne Mandantenwechsel, und Sitzplätze, Fläche und
+Gesellschafter stehen im Stammdatenblatt. Offen bleibt davon nur, ob **Einkaufspreise je
+Haus** anders zu holen sind — was durch das Belegarchiv ohnehin an Bedeutung verliert.
 
 ### An den Steuerberater
 
@@ -303,7 +311,9 @@ solange sie nicht gelaufen sind, ist jede Aufwandsschätzung geraten.
   vor dem ersten Report erklärt sein, sonst wird eine Einführung als Rückgang gelesen.
 * **84 Betriebe ohne laufendes Geschäft** (`mart.betrieb_status`) — 39 geschlossen, 18 ohne
   Geschäft, 17 verwaltend, 6 inaktiv, 4 Test.
-* **Eröffnungs- und Schließungsdatum, Fläche, Sitzplätze** — fehlen ganz.
+* **Eröffnungs- und Schließungsdatum** — fehlen ganz. ~~Fläche, Sitzplätze~~ stehen im
+  Stammdatenblatt der Ladenakte (Karlsruhe: 632 Plätze, 339 qm). Zu prüfen bleibt, ob die
+  Kapazitätstabelle bei **allen** Betrieben gepflegt ist oder nur bei den zwei gemessenen.
 
 ### Fachliche Festlegungen
 
@@ -316,6 +326,23 @@ solange sie nicht gelaufen sind, ist jede Aufwandsschätzung geraten.
 * **Ist „Betriebsergebnis" derselbe Zähler wie EBIT?** Unsere Rendite ist geprüft
   (EBIT ÷ Umsatz, 6.289 Betriebsmonate, Abweichung 0,003 pp). Der Wilma-Wunder-Report, gegen
   den verglichen werden sollte, **liegt nicht im Repository**.
+
+### Neu auf unserer Seite (keine Anfrage, Arbeit)
+
+Aus der Ladenakte-Erhebung, [`lina-api-inventar-ladenakte.md`](lina-api-inventar-ladenakte.md):
+
+* **Langfrist-BWA holen** — 77 Zeilen über 207 Monatsspalten, ein Aufruf je Betrieb. Bringt
+  Miete, Mietnebenkosten, Energie, Abschreibungen, Franchisegebühr, Krankheit/Urlaub
+  getrennt, Delivery-Anteil und fünf Ergebniszeilen. Günstigste Quelle im ganzen Projekt.
+* **Stammdatenblatt holen** — Sitzplätze, Tische, Fläche je Bereich; Gesellschafter; Plan-BWA
+  (77 × 12); **Tagesbudget mit Plan-Stunden je Tag und Bereich** (366 Zeilen/Jahr).
+* **Belegmetadaten abziehen** — ~2.300 Listenaufrufe, rund zwei Stunden, 455.968 Belege in
+  99 gezählten Betrieben. Kein PDF nötig; `zuordnungFibu` ist der WE-Split an der Rechnung.
+* **Harte Sperre gegen Linkverfolgung einbauen** — im Ladenakte-Baum ist *Löschen ein GET*.
+  `delete`, `edit`, `upload`, `add`, `set` als Pfadsegmente verbieten, Positivliste statt
+  Crawler. Das gehört in den Code, nicht in einen Kommentar.
+* **Lohn-Zweig vom Abzug ausnehmen**, bis Zweck und Freigabe benannt sind — dort liegen
+  Ausweisdokumente, Geburtsurkunden, Krankmeldungen und Pfändungen.
 
 ### Nicht offen, nur noch nicht dran
 
