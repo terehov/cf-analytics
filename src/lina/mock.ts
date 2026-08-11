@@ -24,7 +24,13 @@
  */
 import { createHash } from 'node:crypto'
 
+import { readFileSync } from 'node:fs'
+
 const fixture = (name: string) => require(`../transform/fixtures/${name}.json`)
+/** HTML-Fixtures: echte Antworten, nicht nachgebaut. Synchron gelesen, weil die
+ *  Attrappe innerhalb eines Request-Handlers ohne await auskommen muss. */
+const fixtureText = (datei: string) =>
+  readFileSync(new URL(`../transform/fixtures/${datei}`, import.meta.url), 'utf8')
 
 const md5 = (s: string) => createHash('md5').update(s).digest('hex')
 
@@ -165,6 +171,68 @@ export function mockStarten(opt: MockOptionen = {}) {
             { status: 200, headers: { 'content-type': 'text/html', ...kopf } })
         }
         return new Response('', { status: opt.sperreArt ?? 429, headers: kopf })
+      }
+
+      /**
+       * Ladenakte. Bildet das GEMESSENE Verhalten nach, nicht ein sauberes API:
+       * der Baum liefert JSON mit Content-Type text/html, die Token sind je
+       * Aufruf verschieden, und die Ordnerseite traegt den Token nur im
+       * eingebetteten getFilesUrl.
+       */
+      if (pfad === '/intranet/ladenakte/baum/admin/1') {
+        zaehler['la_baum'] = (zaehler['la_baum'] ?? 0) + 1
+        const id = url.searchParams.get('id') ?? ''
+        const salz = `${Math.random().toString(16).slice(2)}${'0'.repeat(40)}`.slice(0, 86)
+        if (id.startsWith('belegarchiv_')) {
+          return new Response(JSON.stringify([{
+            text: 'Eingangsrechnungen und Avise',
+            a_attr: { 'data-link': `/intranet/ladenakte/showBelegarchivFolder?storeId=${salz}&typeId=1&admin=1` },
+          }]), { headers: { 'content-type': 'text/html' } })
+        }
+        if (id.startsWith('bwa_')) {
+          return new Response(JSON.stringify({ children: [{
+            text: 'Longterm',
+            a_attr: { 'data-link': `/finanzen/bwa/longterm?module=franchise&laden=${salz.slice(0, 84)}` },
+          }] }), { headers: { 'content-type': 'text/html' } })
+        }
+        if (id.startsWith('laden_')) {
+          return new Response(JSON.stringify({ children: [{
+            text: 'Stammdaten',
+            a_attr: { 'data-link': `/intranet/ladenakte/ladenstamm/laden/${'a'.repeat(40)}/admin/1/` },
+          }] }), { headers: { 'content-type': 'text/html' } })
+        }
+        return new Response('unbekannter Baumknoten', { status: 404 })
+      }
+
+      if (pfad === '/intranet/ladenakte/showBelegarchivFolder') {
+        zaehler['la_ordnerseite'] = (zaehler['la_ordnerseite'] ?? 0) + 1
+        const tok = url.searchParams.get('storeId') ?? ''
+        // Der Token fuer die Belegliste ist ein ANDERER als der der Ordnerseite.
+        return new Response(
+          `<div>Belegarchiv</div><script>var getFilesUrl = `
+          + `'/intranet/ladenakte/beleglist?admin=1&storeId=L${tok.slice(1)}&typeId=1';</script>`,
+          { headers: { 'content-type': 'text/html' } })
+      }
+
+      if (pfad === '/intranet/ladenakte/beleglist') {
+        zaehler['la_belegliste'] = (zaehler['la_belegliste'] ?? 0) + 1
+        if (!url.searchParams.get('storeId')) {
+          return new Response('storeId fehlt', { status: 400 })
+        }
+        return Response.json(fixture('ladenakte_beleglist'))
+      }
+
+      if (pfad === '/finanzen/bwa/longterm') {
+        zaehler['la_bwa'] = (zaehler['la_bwa'] ?? 0) + 1
+        if (!url.searchParams.get('laden')) return new Response('laden fehlt', { status: 400 })
+        return new Response(fixtureText('bwa_longterm_klein.html'),
+          { headers: { 'content-type': 'text/html' } })
+      }
+
+      if (/^\/intranet\/ladenakte\/ladenstamm\//.test(pfad)) {
+        zaehler['la_stammdaten'] = (zaehler['la_stammdaten'] ?? 0) + 1
+        return new Response(fixtureText('ladenakte_stammdaten.html'),
+          { headers: { 'content-type': 'text/html' } })
       }
 
       const map: Record<string, string> = {

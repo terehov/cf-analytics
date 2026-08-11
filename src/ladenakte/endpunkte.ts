@@ -16,22 +16,17 @@
 import type { Endpunkt } from '../lina/endpunkte'
 
 /**
- * Pfadsegmente, die dieser Importer NIEMALS aufruft.
+ * ERLAUBTE PFADE — eine Positivliste.
  *
  * ⚠ AUF DER VERTRAEGE-SEITE IST LOESCHEN EIN GEWOEHNLICHER GET-LINK:
- * `…/vertraege/laden/<hash>/vertragid/<id>/delete/1`. Kein Formular, kein
- * POST, keine Rueckfrage. Ein Crawler, der Links folgt, oder ein Prefetch im
- * Browser loescht damit Vertraege — bei Enchilada Karlsruhe waeren das 92,
- * bei GSF Gastro 108, darunter notarielle Urkunden.
+ * `…/vertraege/laden/<hash>/vertragid/<id>/delete/1`. Kein Formular, kein POST,
+ * keine Rueckfrage. Ein Crawler, der Links folgt, loescht damit Vertraege — bei
+ * GSF Gastro 108 Stueck, darunter notarielle Urkunden. Deshalb folgt dieser
+ * Importer nirgends einem Link; er ruft nur zusammengesetzte Pfade auf, und
+ * `pfadPruefen()` laeuft vor jedem einzelnen.
  *
- * Deshalb: keine Linkverfolgung, nirgends. Es werden ausschliesslich URLs
- * aufgerufen, die hier zusammengesetzt werden, und `pfadPruefen()` laeuft vor
- * jedem einzelnen davon. Die Sperre steht im Code und nicht in einem
- * Kommentar, weil ein Kommentar niemanden aufhaelt.
- */
-/**
- * ERLAUBTE PFADE — eine Positivliste, und der Grund dafuer ist ein gescheiterter
- * Versuch mit dem Gegenteil.
+ * Der Grund fuer die Positivliste ist ein gescheiterter Versuch mit dem
+ * Gegenteil.
  *
  * Zuerst stand hier eine Sperrliste verbotener Segmente. Sie liess sich nicht
  * dicht bekommen: `vertragEdit` ist ein Schreibpfad, aber als ganzes Segment
@@ -147,6 +142,7 @@ export const LADENAKTE_ENDPUNKTE: Endpunkt[] = [
     form: 'json',
     zweck: 'Belegmetadaten eines Ordners je Betrieb — ein Aufruf holt den ganzen Ordner',
     aktiv: false,
+    braucht: 'beleg_token',
     hinweis:
       'DataTables-Huelle {data, recordsTotal, recordsFiltered}. Braucht einen storeId-Token; '
       + 'den holt LinaClient selbst, weil er je Anfrage neu gesalzen ist und deshalb nicht '
@@ -168,6 +164,7 @@ export const LADENAKTE_ENDPUNKTE: Endpunkt[] = [
     form: 'html',
     zweck: '77 BWA-Zeilen x bis zu 224 Monatsspalten je Betrieb, zurueck bis 06/2009',
     aktiv: false,
+    braucht: 'bwa_hash',
     hinweis:
       'HTML, 0,1 bis 1,2 MB. Der laden=-Parameter ist je Anfrage neu gesalzen und kommt aus '
       + 'dem Baumknoten bwa_<id>; LinaClient holt ihn selbst. Der Franchisegeber liefert '
@@ -183,6 +180,7 @@ export const LADENAKTE_ENDPUNKTE: Endpunkt[] = [
     form: 'html',
     zweck: 'Kapazitaet je Bereich, Plan-BWA und Tagesbudget mit Plan-Stunden',
     aktiv: false,
+    braucht: 'stamm_pfad',
     hinweis:
       'HTML, rund 310 KB, sieben Tabellen. Der Pfad traegt einen Laden-Hash und wird '
       + 'deshalb zur Laufzeit zusammengesetzt. ACHTUNG: eine der sieben Tabellen fuehrt die '

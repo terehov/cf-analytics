@@ -1623,3 +1623,169 @@ lauf('Getrennte Anbietergrenzen', () => {
     expect(lina.budgetUebrig).toBe(config.TAGESBUDGET)
   })
 })
+
+/**
+ * Ladenakte: Belegarchiv, BWA-Historie und Stammdatenblatt durch die ganze
+ * Kette — Warteschlange, Tokenaufloesung, Parser, core.
+ *
+ * Eigene Suite mit eigenem TRUNCATE-Umfang. Sie prueft nie `status = 'ok'`,
+ * sondern immer die Zieltabelle: fast jeder Ausfall dieses Projekts hat „ok"
+ * gemeldet und nichts geschrieben.
+ */
+lauf('e2e Ladenakte', () => {
+  let mock: ReturnType<typeof mockStarten>
+  let db: Client
+
+  beforeAll(async () => {
+    mock = mockStarten()
+    process.env.LINA_BASE_URL = mock.url
+    process.env.LINA_USER = 'testuser'
+    process.env.LINA_PASSWORD = 'geheim'
+    process.env.DATABASE_URL = DB!
+    process.env.TAKT_MIN_MS = '0'
+    process.env.TAKT_MAX_MS = '0'
+    process.env.FENSTER_VON_STUNDE = '0'
+    process.env.FENSTER_BIS_STUNDE = '24'
+    process.env.LOG_LEVEL ??= 'error'
+    const { config } = await import('../config')
+    if (config.DATABASE_URL !== DB) {
+      throw new Error(`Der Worker wuerde nach "${config.DATABASE_URL}" schreiben, geprueft `
+        + `wird "${DB}". Diesen Test einzeln starten: bun test src/sync/e2e.test.ts`)
+    }
+    /**
+     * `config` wird beim ERSTEN Import eingefroren — im Dateilauf ist das die
+     * Attrappe der ersten Suite. Eine spaetere Suite, die ihre eigene startet,
+     * bekommt einen anderen Port, waehrend der Client weiter auf den alten
+     * zeigt: alle Aufrufe laufen ins Leere, und der Test meldet drei Fehler
+     * statt eines Hinweises. Deshalb hier ausdruecklich nachziehen.
+     */
+    ;(config as { LINA_BASE_URL: string }).LINA_BASE_URL = mock.url
+    db = new Client({ connectionString: DB! })
+    await db.connect()
+    await db.query(`TRUNCATE sync.warteschlange, sync.aufgabe, sync.lauf, raw.api_antwort,
+                       core.buchungsbeleg, core.belegarchiv_bestand, core.bwa_position,
+                       core.bwa_plan, core.betrieb_kapazitaet, core.tagesbudget,
+                       core.betrieb RESTART IDENTITY CASCADE`)
+    // Ein Betrieb mit numerischer LINA-ID — ohne die findet kein Posten sein Ziel.
+    await db.query(
+      `INSERT INTO core.betrieb (enc_id, name, lina_betrieb_id) VALUES ('enc-15','Enchilada Karlsruhe GmbH',15)`)
+
+    /**
+     * Die Belegarten selbst setzen, statt sich auf die Testdatenbank zu
+     * verlassen: sie entsteht als Schema-Klon (`pg_dump --schema-only`), und
+     * der bringt die Seed-Zeilen der Migration nicht mit. Ohne sie greift der
+     * Fremdschluessel von core.belegarchiv_bestand.
+     */
+    const { FIBU_BELEGARTEN } = await import('../ladenakte/endpunkte')
+    for (const [i, b] of FIBU_BELEGARTEN.entries()) {
+      await db.query(
+        `INSERT INTO core.belegart (typ_id, name, zweig, hat_soll, reihenfolge)
+         VALUES ($1,$2,'fibu',true,$3) ON CONFLICT (typ_id) DO NOTHING`,
+        [b.typId, b.name, i])
+    }
+  })
+
+  afterAll(async () => { mock.stop(); await db.end() })
+
+  test('holt Belege, BWA und Stammdaten und schreibt sie nach core', async () => {
+    const { workerLauf } = await import('./worker')
+    const { cacheLeeren } = await import('../ladenakte/token')
+    cacheLeeren()
+
+    await db.query(`
+      INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, parameter) VALUES
+        ('la:belegliste',   current_date, current_date, 95, '{"linaBetriebId":"15","typeId":"1"}'),
+        ('la:bwa_longterm', current_date, current_date, 95, '{"linaBetriebId":"15"}'),
+        ('la:stammdaten',   current_date, current_date, 95, '{"linaBetriebId":"15"}')`)
+
+    const r = await workerLauf('manuell')
+    expect(r.fehler).toBe(0)
+    expect(r.ok).toBe(3)
+
+    const zahl = async (sql: string) =>
+      Number((await db.query(sql)).rows[0].n)
+
+    // Belege: 61 echte Eingangsrechnungen der Schlager Cafe Beteiligungs AG.
+    expect(await zahl(`SELECT count(*)::int AS n FROM core.buchungsbeleg`)).toBe(61)
+    expect(await zahl(`SELECT records_total AS n FROM core.belegarchiv_bestand`)).toBe(61)
+
+    /**
+     * Die Felder, wegen derer das Ganze gebaut wurde — und zwar mit den
+     * Luecken, die das Original hat: 27 der 61 Rechnungen tragen einen
+     * Lieferanten, 20 ein Kreditorenkonto. Genau diese Mischung soll geprueft
+     * werden. Ein Fixture, in dem alle Felder gefuellt waeren, pruefte die
+     * Attrappe statt LINA.
+     */
+    expect(await zahl(
+      `SELECT count(*)::int AS n FROM core.buchungsbeleg WHERE verkaeufer_name IS NOT NULL`)).toBe(27)
+    expect(await zahl(
+      `SELECT count(*)::int AS n FROM core.buchungsbeleg WHERE kreditor_konto IS NOT NULL`)).toBe(20)
+    expect(await zahl(
+      `SELECT count(*)::int AS n FROM core.buchungsbeleg WHERE datev_guid IS NOT NULL`)).toBe(58)
+
+    // Der Wareneinsatz-Split an der Rechnung: Bar (1) und sonstiges (0).
+    expect(await zahl(
+      `SELECT count(DISTINCT zuordnung_fibu)::int AS n FROM core.buchungsbeleg`)).toBe(2)
+    expect(await zahl(
+      `SELECT count(*)::int AS n FROM core.buchungsbeleg WHERE zuordnung_fibu = 1`)).toBe(26)
+
+    // Steueraufteilung lang: 78 Zeilen ueber die Saetze 0, 7 und 19.
+    expect(await zahl(`SELECT count(*)::int AS n FROM core.buchungsbeleg_steuer`)).toBe(78)
+    expect(await zahl(
+      `SELECT count(DISTINCT satz)::int AS n FROM core.buchungsbeleg_steuer`)).toBe(3)
+
+    /**
+     * Leere Betraege sind NULL, nicht 0 — der Unterschied zwischen
+     * "steht nicht drin" und "ist null Euro".
+     */
+    expect(await zahl(
+      `SELECT count(*)::int AS n FROM core.buchungsbeleg WHERE netto IS NOT NULL AND netto <> 0`)).toBe(29)
+
+    // BWA: 77 Zeilen x 20 Monate aus dem Fixture.
+    expect(await zahl(`SELECT count(DISTINCT zeile_id)::int AS n FROM core.bwa_position`)).toBe(77)
+    expect(await zahl(`SELECT count(DISTINCT monat)::int AS n FROM core.bwa_position`)).toBe(20)
+    // Und tatsaechlich Betraege, nicht nur Zeilen.
+    expect(await zahl(
+      `SELECT count(*)::int AS n FROM core.bwa_position WHERE betrag IS NOT NULL AND betrag <> 0`))
+      .toBe(847)
+
+    // Stammdaten
+    expect(await zahl(`SELECT count(*)::int AS n FROM core.betrieb_kapazitaet`)).toBe(5)
+    expect(await zahl(
+      `SELECT plaetze AS n FROM core.betrieb_kapazitaet WHERE ist_gesamt`)).toBe(632)
+    expect(await zahl(`SELECT count(*)::int AS n FROM core.tagesbudget`)).toBe(365)
+    expect(await zahl(`SELECT count(DISTINCT zeile_id)::int AS n FROM core.bwa_plan`)).toBe(77)
+
+    // Plan und Ist finden ueber die Zeilennummer zusammen.
+    expect(await zahl(
+      `SELECT count(*)::int AS n FROM mart.bwa_plan_ist
+        WHERE betrag_ist IS NOT NULL AND betrag_plan IS NOT NULL`)).toBeGreaterThan(0)
+  })
+
+  test('das Roh-HTML des Stammdatenblatts traegt keine API-Schluessel', async () => {
+    const { rows } = await db.query(
+      `SELECT payload_text FROM raw.api_antwort WHERE endpunkt = 'la:stammdaten'`)
+    expect(rows.length).toBe(1)
+    expect(rows[0].payload_text).not.toMatch(/API - Key/)
+    expect(rows[0].payload_text).toMatch(/vor der Rohablage entfernt/)
+    // Die Nutzdaten sind trotzdem noch da.
+    expect(rows[0].payload_text).toMatch(/Tagesbudget|Stunden Service/)
+  })
+
+  test('HTML landet in payload_text, JSON in payload — nie beides', async () => {
+    const { rows } = await db.query(
+      `SELECT endpunkt, (payload IS NOT NULL) AS hat_json, (payload_text IS NOT NULL) AS hat_text
+         FROM raw.api_antwort WHERE endpunkt LIKE 'la:%' ORDER BY endpunkt`)
+    expect(rows).toEqual([
+      { endpunkt: 'la:belegliste',   hat_json: true,  hat_text: false },
+      { endpunkt: 'la:bwa_longterm', hat_json: false, hat_text: true },
+      { endpunkt: 'la:stammdaten',   hat_json: false, hat_text: true },
+    ])
+  })
+
+  test('der Token wird je Betrieb einmal geholt, nicht je Ordner', async () => {
+    // Baum + Ordnerseite fuer die Belegliste, Baum fuer BWA, Baum fuer Stammdaten.
+    expect(mock.zaehler['la_ordnerseite']).toBe(1)
+    expect(mock.zaehler['la_baum']).toBe(3)
+  })
+})

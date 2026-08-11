@@ -138,7 +138,7 @@ lauf('nachfuellen — was nicht nachwachsen darf', () => {
         ADD CONSTRAINT test_nichts_geht CHECK (endpunkt = '__unmoeglich__') NOT VALID`)
     try {
       const stand = await nachfuellen()
-      expect(stand).toEqual({ lina: 0, foodnotify: 0 })
+      expect(stand).toEqual({ lina: 0, foodnotify: 0, ladenakte: 0 })
       // Und die Warteschlange ist unverändert leer geblieben.
       expect(await offen(AKTIVE_ENDPUNKTE[0]!.key)).toBe(0)
     } finally {

@@ -375,3 +375,29 @@ Aus der Ladenakte-Erhebung, [`lina-api-inventar-ladenakte.md`](lina-api-inventar
   Momentaufnahmen. Braucht keine Anfrage, nur drei Monate Zeit.
 * **Lokale Events** — keine automatisierbare Quelle; dafür sieht die Map ein manuelles
   Freifeld vor. Feiertage und Ferien sind seit Migration `0051` erledigt.
+
+### Ladenakte-Import — was nach dem ersten Lauf zu prüfen ist
+
+Der Lader steht und ist gegen echte Fixtures geprüft. Offen bleibt, was sich erst am
+laufenden Bestand zeigt:
+
+* **`sachkonto` ist in allen bisher gesehenen Antworten leer.** `cost_account`,
+  `cost_account7` und `cost_account0` waren in fünf geprüften Betrieben durchgängig `0`.
+  Entweder pflegt Concept Family sie nicht, oder sie stehen woanders. Solange das so ist,
+  bleibt `mart.sachkonto_monat` leer — und die Kostenkontenauswertung, die eines der
+  Argumente für den ganzen Abzug war, trägt nicht. **Nach dem ersten Lauf messen:**
+  `SELECT count(*) FROM core.buchungsbeleg WHERE sachkonto IS NOT NULL`.
+* **Der Lieferant ist nur teilweise erschlossen.** Im Fixture 27 von 61. Was die
+  Lieferantenkonzentration aussagt, hängt davon ab, wie hoch die Quote im Gesamtbestand
+  ist. Vor der ersten Auswertung zählen, nicht schätzen.
+* **Ein Fixture aus einem grossen, vollständig erschlossenen Ordner fehlt.** Die vorhandenen
+  Fixtures sind klein (61 Belege) und stammen von einer Beteiligungsgesellschaft. Ob ein
+  Ordner mit 12.000 Zeilen dieselbe Struktur liefert, ist gemessen (Feldliste identisch),
+  aber nicht als Test abgesichert.
+* **Die Token-Obergrenze ist unbekannt.** Gemessen sind 172 s Gültigkeit, angesetzt sind 90 s.
+  `bun run messen d9` misst die Obergrenze über sieben Minuten. Bis dahin gilt: der Client
+  holt bei unbrauchbarer Antwort einmal neu, das trägt auch ohne die Messung.
+* **Sechs Belegarten wurden nie gezählt** (16, 3968, 3969, 3971, 3972, 3976). Der Abzug holt
+  sie, aber `manual.belegarchiv_soll` führt für sie 0 — sie werden deshalb **nicht
+  eingereiht**. Nach dem ersten Lauf einmal von Hand zählen und den Sollbestand ergänzen,
+  sonst fehlen sie dauerhaft.

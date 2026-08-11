@@ -18,6 +18,7 @@ import { eine } from '../db/pool'
 import { LinaSession, sessionAbgelaufen, AnmeldungFehlgeschlagen } from './auth'
 import { schemaFuer } from './schemas'
 import type { Endpunkt } from './endpunkte'
+import { belegToken, bwaHash, stammPfad } from '../ladenakte/token'
 
 export type Ergebnis =
   /**
@@ -209,14 +210,29 @@ export class LinaClient {
     const form = ep.form ?? 'json'
     const start = Date.now()
     try {
-      let res = await this.request(ep, parameter)
+      /**
+       * Gesalzene Zugriffsmerkmale auflösen, falls der Endpunkt welche braucht.
+       *
+       * Das kostet ein bis zwei zusätzliche Aufrufe, die durch dieselbe
+       * Drosselung und dasselbe Tagesbudget laufen wie alles andere — sie gehen
+       * über `this.holen()`. Ein eigener Posten wäre falsch: der Wert überlebt
+       * den Weg durch die Warteschlange nicht.
+       */
+      let pfad = ep.pfad
+      if (ep.braucht) {
+        const aufgeloest = await this.aufloesen(ep, parameter)
+        parameter = aufgeloest.parameter
+        pfad = aufgeloest.pfad
+      }
+
+      let res = await this.request(ep, parameter, pfad)
       let text = await res.text()
 
       // Session abgelaufen: genau einmal neu anmelden und wiederholen.
       if (sessionAbgelaufen(res, text, form)) {
         log.info('session abgelaufen, melde neu an', { endpunkt: ep.key })
         await this.session.anmelden()
-        res = await this.request(ep, parameter)
+        res = await this.request(ep, parameter, pfad)
         text = await res.text()
       }
 
@@ -300,10 +316,37 @@ export class LinaClient {
     }
   }
 
-  private request(ep: Endpunkt, parameter: Record<string, string>) {
-    const url = `${config.LINA_BASE_URL}${ep.pfad}?${new URLSearchParams(parameter)}`
+  /**
+   * Gesalzene Zugriffsmerkmale beschaffen. Gibt Parameter und Pfad zurück,
+   * weil das Stammdatenblatt seinen Wert im PFAD trägt und nicht in der Query.
+   *
+   * Nur der Betrieb kommt von aussen (`linaBetriebId`); alles andere holt
+   * `token.ts` und merkt es sich für die Dauer eines Betriebs.
+   */
+  private async aufloesen(ep: Endpunkt, parameter: Record<string, string>):
+    Promise<{ parameter: Record<string, string>; pfad: string }> {
+    const id = parameter.linaBetriebId
+    if (!id) throw new Error(`${ep.key}: linaBetriebId fehlt im Posten — ohne Betrieb kein Token`)
+
+    // Der Ordnungsschlüssel gehört in den Posten, nicht in die Anfrage.
+    const { linaBetriebId: _weg, ...rest } = parameter
+
+    if (ep.braucht === 'beleg_token') {
+      return { parameter: { ...rest, storeId: await belegToken(this, id) }, pfad: ep.pfad }
+    }
+    if (ep.braucht === 'bwa_hash') {
+      return { parameter: { ...rest, laden: await bwaHash(this, id) }, pfad: ep.pfad }
+    }
+    if (ep.braucht === 'stamm_pfad') {
+      return { parameter: rest, pfad: await stammPfad(this, id) }
+    }
+    throw new Error(`${ep.key}: unbekanntes braucht "${ep.braucht}"`)
+  }
+
+  private request(ep: Endpunkt, parameter: Record<string, string>, pfad = ep.pfad) {
+    const url = `${config.LINA_BASE_URL}${pfad}?${new URLSearchParams(parameter)}`
     return fetch(url, {
-      headers: this.session.header({ referer: `${config.LINA_BASE_URL}${ep.pfad.split('/').slice(0, 3).join('/')}` }),
+      headers: this.session.header({ referer: `${config.LINA_BASE_URL}${pfad.split('/').slice(0, 3).join('/')}` }),
       redirect: 'manual',
       // Ohne Zeitlimit wartet fetch unbegrenzt und hängt den ganzen Worker auf.
       // Begründung ausführlich bei ANFRAGE_TIMEOUT_MS in src/config.ts.

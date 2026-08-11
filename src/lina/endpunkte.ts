@@ -11,6 +11,7 @@
  *   Betrieb  /finanzen/analytics/...  ein Betrieb je Antwort (storeId),
  *                                     Datum als 1.6.2026  (ohne führende Null)
  */
+import { LADENAKTE_ENDPUNKTE } from '../ladenakte/endpunkte'
 import { zuLinaDatum } from '../lib/time'
 
 export type Ebene = 'konzern' | 'betrieb' | 'stamm'
@@ -120,6 +121,17 @@ export type Endpunkt = {
    * gemessen). Ein Navigations-Header wäre hier die unstimmige Variante.
    */
   form?: 'json' | 'html'
+  /**
+   * Was vor dem Aufruf aufgelöst werden muss.
+   *
+   * Die Ladenakte vergibt je Anfrage neue, gesalzene Zugriffsmerkmale. Sie
+   * können nicht im Warteschlangenposten stehen — nach dem ersten Lauf wären
+   * alle Posten wertlos. `LinaClient` löst sie kurz vor dem Aufruf auf, über
+   * denselben gedrosselten Weg, so wie er bei abgelaufener Sitzung neu anmeldet.
+   *
+   * Der Betrieb kommt dafür als `linaBetriebId` in den Zusatzparametern.
+   */
+  braucht?: 'beleg_token' | 'bwa_hash' | 'stamm_pfad'
 }
 
 /** Konzern-Ebene: DD.MM.YYYY mit führender Null. */
@@ -423,8 +435,18 @@ export const ENDPUNKTE: Endpunkt[] = [
 
 export const AKTIVE_ENDPUNKTE = ENDPUNKTE.filter(e => e.aktiv)
 
+/**
+ * Die Ladenakte-Endpunkte stehen in `src/ladenakte/endpunkte.ts`, werden hier
+ * aber mitgesucht — sonst findet der Worker seine Posten nicht.
+ *
+ * Sie stehen NICHT in `ENDPUNKTE`: dort speist jeder Eintrag mit `aktiv: true`
+ * das automatische Nachfuellen, und auf Betriebsebene waeren das 131 Posten je
+ * Zeitraum. Eingereiht wird ausschliesslich von `ladenakteNachfuellen()`,
+ * gezielt und nur fuer das, was fehlt.
+ */
 export function endpunkt(key: string): Endpunkt {
   const e = ENDPUNKTE.find(x => x.key === key)
+    ?? LADENAKTE_ENDPUNKTE.find(x => x.key === key)
   if (!e) throw new Error(`Unbekannter Endpunkt: ${key}`)
   return e
 }

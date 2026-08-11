@@ -26,7 +26,7 @@ import { log } from '../lib/log'
 import { AKTIVE_ENDPUNKTE, istMomentaufnahme, einreihPrioritaet } from '../lina/endpunkte'
 import { geschaeftstag } from '../lib/time'
 
-export type NachfuellStand = { lina: number; foodnotify: number }
+export type NachfuellStand = { lina: number; foodnotify: number; ladenakte: number }
 
 /**
  * LINA: die letzten NACHZUEGLER_TAGE Geschäftstage, die Jahresberichte
@@ -308,8 +308,93 @@ export async function inventurenNachfuellen(
  * Lauf nicht verhindern: die Warteschlange enthält in aller Regel noch
  * Arbeit, und die soll getan werden. Gemeldet wird er trotzdem.
  */
+/**
+ * Ladenakte nachfuellen — Belegarchiv, BWA-Historie, Stammdatenblatt.
+ *
+ * EINGEREIHT WIRD NUR, WAS FEHLT. Grundlage ist `manual.belegarchiv_soll`:
+ * die Vollzaehlung vom 11.08.2026, 1.048 Paare aus Betrieb und Belegart, davon
+ * 621 nicht leer. Die 427 leeren werden gar nicht erst aufgerufen.
+ *
+ * Der Lauf ist damit selbstheilend und selbstbegrenzend: was einmal geholt ist,
+ * steht in `core.belegarchiv_bestand` und wird nicht erneut eingereiht. Faellt
+ * ein Posten aus, kommt er beim naechsten Lauf wieder.
+ *
+ * KEIN HANDBEFEHL. Der Erstabzug sind rund 1.400 Aufrufe und laeuft ueber
+ * mehrere Sync-Laeufe von selbst durch — kein `einreihen --ladenakte`, das
+ * jemand ausloesen muesste und dessen Ausfall niemandem auffiele. Genau daran
+ * stand LINA am 02.08.2026 acht Tage still.
+ *
+ * `WHERE NOT EXISTS` statt `ON CONFLICT DO NOTHING`: der Eindeutigkeitsindex
+ * auf der Warteschlange ist partiell (`WHERE erledigt_am IS NULL`), ein
+ * Konflikt-Insert reiht also alles Erledigte erneut ein.
+ */
+export async function ladenakteNachfuellen(heute: string): Promise<number> {
+  let n = 0
+
+  // 1. Belegordner: je Betrieb und Belegart einer, aber nur wo Belege liegen
+  //    und noch nichts abgerufen wurde.
+  const belege = await query<{ lina_betrieb_id: number; typ_id: string }>(
+    `SELECT s.lina_betrieb_id, s.typ_id
+       FROM manual.belegarchiv_soll s
+       JOIN core.betrieb b ON b.lina_betrieb_id = s.lina_betrieb_id
+      WHERE s.soll_anzahl > 0
+        AND NOT EXISTS (SELECT 1 FROM core.belegarchiv_bestand v
+                         WHERE v.betrieb_key = b.betrieb_key AND v.typ_id = s.typ_id)
+      ORDER BY s.lina_betrieb_id, s.typ_id`)
+
+  for (const z of belege) {
+    n += await einreihenWennNeu('la:belegliste', heute, PRIORITAET_LADENAKTE,
+      { linaBetriebId: String(z.lina_betrieb_id), typeId: z.typ_id })
+  }
+
+  // 2. BWA-Historie und Stammdatenblatt: je Betrieb einer, hoechstens einmal
+  //    im Kalendermonat. Beides sind Momentaufnahmen, die LINA ueberschreibt.
+  const betriebe = await query<{ lina_betrieb_id: number }>(
+    `SELECT b.lina_betrieb_id
+       FROM core.betrieb b
+      WHERE b.lina_betrieb_id IS NOT NULL
+      ORDER BY b.lina_betrieb_id`)
+
+  for (const key of ['la:bwa_longterm', 'la:stammdaten'] as const) {
+    for (const z of betriebe) {
+      const schonDiesenMonat = await eine<{ da: boolean }>(
+        `SELECT EXISTS (
+                  SELECT 1 FROM sync.aufgabe
+                   WHERE endpunkt = $1
+                     AND parameter->>'linaBetriebId' = $2
+                     AND status = 'ok'
+                     AND beendet_am >= date_trunc('month', current_date)) AS da`,
+        [key, String(z.lina_betrieb_id)])
+      if (schonDiesenMonat?.da) continue
+      n += await einreihenWennNeu(key, heute, PRIORITAET_LADENAKTE,
+        { linaBetriebId: String(z.lina_betrieb_id) })
+    }
+  }
+
+  return n
+}
+
+/**
+ * Hinter der Historie (90), vor der Nacharbeit. Die Ladenakte ist wertvoll,
+ * aber nichts davon ist tagesaktuell — die Tagesdaten haben Vorrang.
+ */
+const PRIORITAET_LADENAKTE = 95
+
+async function einreihenWennNeu(
+  endpunkt: string, heute: string, prioritaet: number, parameter: Record<string, string>,
+): Promise<number> {
+  const r = await query<{ posten_id: number }>(
+    `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, parameter)
+     SELECT $1, $2::date, $2::date, $3, $4::jsonb
+      WHERE NOT EXISTS (SELECT 1 FROM sync.warteschlange w
+                         WHERE w.endpunkt = $1 AND w.parameter = $4::jsonb)
+     RETURNING posten_id`,
+    [endpunkt, heute, prioritaet, JSON.stringify(parameter)])
+  return r.length
+}
+
 export async function nachfuellen(): Promise<NachfuellStand> {
-  const stand: NachfuellStand = { lina: 0, foodnotify: 0 }
+  const stand: NachfuellStand = { lina: 0, foodnotify: 0, ladenakte: 0 }
 
   try {
     stand.lina = await linaNachfuellen()
@@ -323,7 +408,13 @@ export async function nachfuellen(): Promise<NachfuellStand> {
     log.error('nachfüllen foodnotify gescheitert — der Lauf geht weiter', { fehler: String(e) })
   }
 
-  if (stand.lina > 0 || stand.foodnotify > 0) {
+  try {
+    stand.ladenakte = await ladenakteNachfuellen(geschaeftstag(new Date()))
+  } catch (e) {
+    log.error('nachfüllen ladenakte gescheitert — der Lauf geht weiter', { fehler: String(e) })
+  }
+
+  if (stand.lina > 0 || stand.foodnotify > 0 || stand.ladenakte > 0) {
     log.info('nachgefüllt', stand)
   }
   return stand

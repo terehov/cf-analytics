@@ -15,6 +15,8 @@ import { inTransaktion, mehrzeilig, inBloecken } from '../db/pool'
 import * as t from '../transform'
 import type { Endpunkt } from '../lina/endpunkte'
 import { log } from '../lib/log'
+import { laLaden } from '../ladenakte/laden'
+import { istLadenakte } from '../ladenakte/endpunkte'
 
 type Kontext = {
   ep: Endpunkt
@@ -129,6 +131,19 @@ async function artikelSichern(c: PoolClient, stamm: t.ArtikelStamm[]) {
 }
 
 export async function laden(k: Kontext): Promise<number> {
+  /**
+   * Die Ladenakte hat ihren eigenen Lader: sie schreibt HTML nach
+   * `payload_text`, kennt keine Betriebsliste in der Antwort und bereinigt das
+   * Stammdatenblatt vor der Rohablage. Das alles in den grossen switch unten
+   * zu ziehen, haette beide Seiten unleserlich gemacht.
+   */
+  if (istLadenakte(k.ep.key)) {
+    return laLaden({
+      ep: k.ep, parameter: k.parameter, daten: k.daten, httpStatus: k.httpStatus,
+      bytes: k.bytes, hash: k.hash, laufId: k.laufId,
+    })
+  }
+
   return inTransaktion(async c => {
     // Partitionen bei Bedarf — kein Wartungsjob, den man vergessen kann.
     // Der Raw-Layer ist nach ABRUFZEITPUNKT partitioniert, also nach heute;
