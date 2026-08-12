@@ -676,3 +676,95 @@ An der Arbeit ändert das nichts, an der Dringlichkeit schon. Reihenfolge nach V
 
 Ausserdem offen und unverändert: „Carls Brauhaus" hat keine Zeile in `core.betrieb`, und
 acht der 13 GFGH-Zeilen tragen keinen aufgelösten Dachnamen.
+
+---
+
+## Erledigt 12.08.2026: der `numeric field overflow` ist gefunden — es war die Menge
+
+Der Punkt weiter oben („Die Ursache des `numeric field overflow` ist nicht messbar") ist
+abgeschlossen. Er hat **zwei falsche Erklärungen** überlebt, und beide entstanden aus
+demselben Grund: gemessen wurde auf der falschen Datenbank. Sobald der Zugang zur
+Serverbank stand (Tunnel, siehe `deployment-hetzner-stand` im Gedächtnis), war es eine
+Abfrage.
+
+**Es ist nicht der Preis.** Der grösste entstehende Preis je Einheit liegt bei 46.200 gegen
+eine Spaltengrenze von 100.000.000 — Faktor 2.165 Luft.
+
+**Es sind genau zwei Zeilen, und die Packungsgrösse wird quadriert:**
+
+| Ware | menge | gebinde_menge | inhalt_soll | gesamt_neu |
+|---|---|---|---|---|
+| Knusperschnitzel Homestyle | 4 | 432.000 | 432.000 | **746.496.000.000** |
+| Kalbsschnitzel roh paniert | 2 | 198.000 | 198.000 | 78.408.000.000 |
+
+Dieselbe Ware wird zweierlei gebucht: die meisten Häuser tragen die Packungsgrösse in
+`gesamt_menge` und lassen `gebinde_menge` auf 1 — daraus wird der Modus `inhalt_soll` =
+432.000. Diese Zeile trägt sie in `gebinde_menge`. `menge × gebinde_menge × inhalt_soll`
+multipliziert sie dann mit sich selbst. `gesamt_menge numeric(14,4)` fasst zehn
+Vorkommastellen.
+
+Eine Zeile brachte drei Läufe lang den ganzen Nachlauf zu Fall — **samt
+`core.preis_ausreisser_markieren()`, das danach gar nicht mehr lief.** Auf der Serverbank
+ist die Ausreisserprüfung also seit Lauf 83 nicht mehr durchgelaufen.
+
+**Migration 0060** prüft, ob das Ergebnis in die Spalte passt. Verworfene Korrekturen
+gelten als unentscheidbar (`menge_unstimmig = true`, `preis_je_einheit = NULL`), nicht als
+unverändert. Gegen die Serverbank nachgerechnet: **79.768 Korrekturen werden geschrieben,
+2 verworfen.**
+
+**Der `catch` wirft die Beweise nicht mehr weg.** `src/sync/einkaufspreis.ts` protokolliert
+jetzt `code`, `where`, `detail`, `table` und `column`. Zwei Läufe lang wurde geraten, weil
+aus einem Postgres-Fehler vier Wörter geworden waren.
+
+### Was offen bleibt: 412 unplausible Korrekturen ohne Überlauf
+
+Von 79.770 Korrekturen ändern **414 die Menge um mehr als das Tausendfache oder weniger als
+ein Tausendstel**; zwei davon sprengen die Spalte und sind jetzt gefangen, **412 werden
+weiterhin geschrieben**. Grösster Faktor ausserhalb der Absturzzeilen: 60.000.
+
+**Bewusst keine Faktorgrenze gezogen.** 0040 beschreibt selbst, dass FoodNotify die
+Gebindeangabe derselben Ware zwischen 0,00035 und 50 meldet — Faktor 142.857, und eine
+solche Korrektur wäre nach eigener Beschreibung richtig. Eine Grenze bei 1000 verwürfe
+Richtiges mit dem Falschen; das ist derselbe Fehler, der in 0056 schon 37.339 EUR Ersparnis
+erfunden hat. Zu klären ist, woran sich eine falsche von einer grossen richtigen Korrektur
+unterscheiden lässt — die Antwort liegt vermutlich nicht im Faktor, sondern darin, welches
+Feld die Packungsgrösse trägt. Der naheliegende Test (`gebinde_menge = inhalt_soll`) taugt
+nicht: er trifft 19.568 Zeilen, von denen 19.547 einwandfrei sind.
+
+---
+
+## Erledigt 12.08.2026: sieben Minuten Nachfüllen, bevor der Lauf beginnt
+
+Lauf 85 brauchte von `start` bis `nachgefüllt` **7:06**, Lauf 84 zwei Stunden zuvor noch
+2:47 — bei identischem Ergebnis. Im Nachfüllen gibt es kein Netzwerk.
+
+`einreihenJeMonat` fragte vor jedem Einreihen mit `date_trunc('month', w.zeitraum_von) = …`,
+ob es den Posten schon gibt. Das rechnet auf der Spalte und ist nicht indexfähig; die
+vorhandenen Indexe sind ausserdem **partiell** (`erledigt_am IS NULL` bzw. `IS NOT NULL`)
+und für eine Abfrage, die beides umfasst, unbenutzbar. Gemessen auf der Serverbank:
+
+```
+Parallel Seq Scan on warteschlange   27 ms
+Rows Removed by Filter: 56073 x 3    ->  168.218 Zeilen je Prüfung
+```
+
+Bei 420 s Nachfüllzeit rund 15.500 Prüfungen, um 237 Posten einzureihen. **Und es wuchs
+quadratisch**: die Tabelle hat 168.218 Zeilen, davon 17 offen — der Rest ist Historie, die
+jede künftige Prüfung mitschleppt.
+
+Behoben in **0059** (nicht-partieller Index auf `endpunkt, zeitraum_von`) plus dem
+Bereichsprädikat in `nachfuellen.ts`. **Beides ist nötig** — mit dem Prädikat allein blieb
+es beim Seq Scan. Nachgemessen an 130.407 Zeilen:
+
+| | vorher | nachher |
+|---|---|---|
+| Plan | Parallel Seq Scan | Bitmap Index Scan |
+| gelesene Zeilen | 168.000 | 212 |
+| Buffer | 3.415 | 75 |
+| Zeit | 27 ms | **0,65 ms** |
+
+Faktor 41. Aus sieben Minuten werden rund zehn Sekunden.
+
+**Beim Einspielen:** `CREATE INDEX` ohne `CONCURRENTLY` sperrt Schreibzugriffe auf
+`sync.warteschlange`, solange er baut — nicht während eines laufenden Syncs einspielen.
+`CONCURRENTLY` geht nicht, weil `migrate.ts` jede Migration in eine Transaktion fasst.

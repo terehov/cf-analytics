@@ -52,7 +52,30 @@ export async function einkaufspreisNachlauf(): Promise<void> {
       })
     }
   } catch (e) {
-    log.error('einkaufspreis-nachlauf gescheitert — der Import bleibt gültig',
-      { fehler: String(e).slice(0, 300) })
+    /**
+     * ALLES MITLOGGEN, WAS POSTGRES MITSCHICKT.
+     *
+     * Hier stand `String(e).slice(0, 300)`. Aus einem Postgres-Fehler wurden
+     * damit vier Wörter — `error: numeric field overflow` — und weggeworfen
+     * war genau das, was die Frage beantwortet: `where` nennt die PL/pgSQL-
+     * Zeile und damit, WELCHE der beiden Funktionen und welche Anweisung es
+     * war, `table` und `column` die Zielspalte.
+     *
+     * Die Läufe 83, 84 und 85 sind daran gescheitert, und zwischendurch stand
+     * zweimal eine falsche Ursache in docs/offene-punkte.md — geraten, weil
+     * nichts zu lesen war. Der Fehler lag nicht beim Preis, sondern bei der
+     * Menge (Migration 0060).
+     */
+    const p = e as { code?: string; where?: string; detail?: string;
+                     table?: string; column?: string; constraint?: string }
+    log.error('einkaufspreis-nachlauf gescheitert — der Import bleibt gültig', {
+      fehler: String(e).slice(0, 300),
+      code: p?.code,
+      wo: p?.where?.slice(0, 400),
+      detail: p?.detail?.slice(0, 300),
+      tabelle: p?.table,
+      spalte: p?.column,
+      constraint: p?.constraint,
+    })
   }
 }

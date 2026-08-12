@@ -473,7 +473,17 @@ async function einreihenJeMonat(
       WHERE NOT EXISTS (
             SELECT 1 FROM sync.warteschlange w
              WHERE w.endpunkt = $1 AND w.parameter = $4::jsonb
-               AND date_trunc('month', w.zeitraum_von) = date_trunc('month', $2::date))
+               -- ALS BEREICH UND NICHT ALS date_trunc AUF DER SPALTE.
+               -- Fachlich dasselbe, aber date_trunc(spalte) ist nicht
+               -- indexfaehig: gemessen am 12.08.2026 ein Parallel Seq Scan
+               -- ueber alle 168.218 Zeilen, 27 ms je Pruefung. Das
+               -- Nachfuellen brauchte dadurch sieben Minuten, in denen es
+               -- 237 Posten einreihte — und wurde mit jedem Lauf langsamer,
+               -- weil die Tabelle nur waechst (17 offen, der Rest Historie).
+               -- Der Index dazu steht in Migration 0059.
+               AND w.zeitraum_von >= date_trunc('month', $2::date)::date
+               AND w.zeitraum_von <  (date_trunc('month', $2::date)
+                                       + interval '1 month')::date)
      RETURNING posten_id`,
     [endpunkt, monatsErster, prioritaet, JSON.stringify(parameter)])
   return r.length
