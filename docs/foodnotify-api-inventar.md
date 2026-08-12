@@ -418,33 +418,6 @@ berechtigt nur zum Einbetten von Ansichten, nicht zum Datenabruf. Was
 inhaltlich zählt, liegt ohnehin in den Cost-Analysis-Endpunkten aus §2 — die
 sind FoodNotifys eigenes API und liefern JSON.
 
----
-
-## 7b. „Lab" — B.E.A.M., ein eigenes Produkt
-
-Der Menüpunkt *Lab* führt nach `beam.foodnotify.com` — **eine separate Plattform
-mit eigenem Login**, derzeit Beta und kostenlos.
-
-Was sie tut: Rechnungen, Lieferscheine und Produktkataloge per OCR und KI
-einlesen (Lieferant, Artikel, Preise, Einheiten, MwSt.), Produkte mit
-Nährwerten, Allergenen, Verpackung und Bildern anreichern, Dubletten über
-EAN → Artikelnummer → Fuzzy zusammenführen, GoBD-konform archivieren und nach
-FoodNotify exportieren.
-
-**Für unsere Fragestellung ein Detail von Gewicht:** Die Produktdatenbank führt
-laut Beschreibung einen **Preisverlauf je Lieferant**. Genau das, was weder
-LINAs WAWI noch FoodNotifys `prices` vorhalten — dort steht jeweils nur der
-aktuelle Stand, und in `docs/datensicherung.md` ist deshalb notiert, dass die
-Preisentwicklung rückwirkend nicht nachholbar ist.
-
-Zwei Einschränkungen: Es ist ein Onboarding-Werkzeug — die Historie entsteht
-erst, wenn man Belege einspeist, nicht rückwirkend aus euren Altdaten. Und es
-ist ein weiterer Zugang, ein weiteres Beta-Produkt, eine weitere Abhängigkeit.
-
-Ohne Anmeldung dort ist kein API zu inventarisieren. **Wenn ihr den Einkauf
-ernsthaft auswerten wollt, ist ein Blick darauf trotzdem lohnend** — dann aber
-als eigene Entscheidung, nicht als Nebenprodukt dieses Imports.
-
 ## 8. Menu Creator
 
 ```

@@ -266,11 +266,6 @@ interessant, aber nicht als Import: Er liefert bei Aposto echte Zahlen und
 kann einmalig zur Gegenprobe dienen, wenn unsere Deckungsbeitragsrechnung
 steht. Als laufender Posten in der Warteschlange hat er nichts verloren.
 
-### Nicht holen
-
-Menu Creator, Marketplace, Catering, Stock-Transfer (vorerst), Tableau,
-B.E.A.M. — sowie alles, was Personenbezug trägt.
-
 ---
 
 ## 5. Datenmodell
