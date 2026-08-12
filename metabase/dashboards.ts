@@ -415,6 +415,12 @@ export const dashboards: Dashboard[] = [
       { teile: [{ karte: 'dd_betrieb_inventur', hoehe: 11,
         klick: [{ ziel: 'dd_inventur', spalte: 'Zählung',
                   uebergabe: { inventur: 'inventur_key' } }] }] },
+      // Der Fremdeinkauf dieses Hauses. Nur die Kachel, nicht die ganze
+      // Auswertung: das Betriebsblatt soll die Frage STELLEN, beantwortet
+      // wird sie auf der eigenen Seite. Der Betriebsfilter wandert beim
+      // Klick mit, weil beide Seiten ihn unter demselben Namen kennen.
+      { teile: [{ karte: 'fe_kachel_verweis', breite: 8,
+        klick: [{ ziel: 'db_fremdeinkauf', uebergabe: {}, fest: true }] }] },
       ] },
       { name: 'Maßnahmen & Datenstand', reihen: [
       { teile: [{ text: '## Maßnahmen und Datenstand' }] },
@@ -1007,6 +1013,64 @@ export const dashboards: Dashboard[] = [
       { teile: [{ text: '## Inventur und Schwund\n\n**Nur bei Wilma Wunder belastbar** — nur dort gibt es genug echte Inventuren für eine Aussage. Bei den anderen drei Marken sind es zu wenige, um daraus einen Schwundwert für die ganze Marke abzuleiten. Stornierte und noch nicht signierte Zählungen zählen nicht mit.' }] },
       { teile: [{ karte: 'wa_inventur_schwund', hoehe: 11,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      // Der Verweis ans Ende, nicht nach oben: diese Seite beantwortet
+      // "was hat der Einkauf gekostet", die andere "durfte dort ueberhaupt
+      // gekauft werden". Zwei Fragen, und die zweite stellt man, nachdem
+      // man die erste gesehen hat. Die Kachel traegt bewusst KEINEN
+      // Markenfilter — hier oben steht der FoodNotify-Mandant, drueben das
+      // Konzept, siehe Kopf von fe_kachel_verweis.
+      { teile: [{ text: '## Durfte dort eingekauft werden?\n\nDie Frage nach dem **Lieferanten** statt nach dem Preis: Wareneinkauf bei Firmen, die weder auf der Konzernfreigabe stehen noch der hinterlegte GFGH ihres Hauses sind. Grundlage ist das **Belegarchiv** — die Rechnungen selbst, nicht die Bestellungen. Das ist der Unterschied, auf den es hier ankommt: wer bei einem nicht freigegebenen Lieferanten kauft, bestellt ihn nicht über FoodNotify.' }] },
+      { teile: [{ karte: 'fe_kachel_verweis', breite: 8,
+        klick: [{ ziel: 'db_fremdeinkauf', uebergabe: {}, fest: true }] }] },
+    ],
+  },
+
+  // ---------------------------------------------------------------------
+  // Fremdeinkauf. Eigene Seite und kein Reiter auf db_einkauf, weil die
+  // Datenbasis eine andere ist: db_einkauf steht auf FoodNotify-
+  // Bestellungen, diese Seite auf dem Belegarchiv. Dieselbe Seite mit zwei
+  // Quellen haette bei jeder Zahl die Frage aufgeworfen, welche gemeint
+  // ist — und die falsche Antwort waere gewesen, sie zu addieren.
+  // ---------------------------------------------------------------------
+  {
+    schluessel: 'db_fremdeinkauf',
+    name: 'Fremdeinkauf — wer liefert, obwohl er nicht darf',
+    beschreibung:
+      'Wareneinkauf bei nicht freigegebenen Lieferanten, je Betrieb und Lieferant, aus dem Belegarchiv und aus FoodNotify getrennt. Dazu der Preisvergleich zwischen den Häusern — die Auswertung, die „GFGH Q2 2026.xlsx" von den Betrieben erfragen wollte und zu 8,7 % zurückbekam.',
+    sammlung: 'Betrieb',
+    // Das Konzept, nicht der FoodNotify-Mandant: mart.fremdeinkauf und
+    // mart.einkaufspreis_betrieb tragen beide konzept aus
+    // mart.konzept_zuordnung.
+    filter: [F_BETRIEB, F_MARKE],
+    reihen: [
+      { teile: [{ text: '# Fremdeinkauf\n\n**Drei Dinge vorweg, sonst liest man die Zahlen falsch.**\n\n**Die Quelle steht in jeder Tabelle und wird nie summiert.** Dieselbe Rechnung steht in FoodNotify *und* im Belegarchiv. Wer über die Spalte „Quelle" summiert, zählt sie doppelt. Die Kacheln und Diagramme zeigen deshalb ausschließlich das **Belegarchiv** — dort ist Fremdeinkauf überhaupt erst sichtbar, denn wer bei einem nicht freigegebenen Lieferanten kauft, bestellt ihn nicht über das Bestellsystem des Konzerns.\n\n**Es zählt nur Wareneinkauf.** Das Belegarchiv führt alle Eingangsrechnungen — Strom, Leasing, Finanzamt, Kartengebühren, Rechnungen zwischen Konzerngesellschaften. Das ist herausgerechnet und steht weiter unten nachprüfbar daneben.\n\n**Die Liste ist eine Arbeitsliste, kein Urteil.** Wer nicht auf der Freigabeliste steht, erscheint hier — auch die Brauerei mit Liefervertrag und der Winzer. Sie gehören in `manual.lieferant_freigabe` eingetragen; dann verschwinden sie. Die Liste schrumpft, während man sie abarbeitet.' }] },
+      { teile: [
+        { karte: 'fe_summe' },
+        { karte: 'fe_ungeklaert' },
+        { karte: 'fe_betriebe_betroffen' },
+      ] },
+      { teile: [{ text: '## Bei wem\n\nNach Volumen sortiert: oben lohnt die Entscheidung am meisten. Die Tabelle darunter zeigt beide Quellen getrennt und nennt den Grund — „steht nicht auf der Liste" heißt, noch niemand hat entschieden; „ausdrücklich gesperrt" heißt, jemand hat entschieden.' }] },
+      { teile: [{ karte: 'fe_lieferant', hoehe: 11 }] },
+      { teile: [{ karte: 'fe_lieferant_tabelle', hoehe: 12 }] },
+      { teile: [{ text: '## In welchem Haus\n\nDer **Anteil** ist die aussagekräftigere Spalte: ein großes Haus mit 5 % hat ein kleineres Problem als ein kleines mit 50 %. Steht in der letzten Spalte ein GFGH, ist dessen Belieferung freigegeben und hier nicht mitgezählt.' }] },
+      { teile: [{ karte: 'fe_betrieb', hoehe: 12,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      // Beide Richtungen des Ausschlusses stehen auf der Seite. Eine
+      // herausgerechnete Menge dieser Groesse (44 Mio ungeklaert, 29,8 Mio
+      // aussortiert) unsichtbar zu lassen, waere eine stille Kuerzung --
+      // und die Zahl oben saehe nach einem Ergebnis aus statt nach einer
+      // Untergrenze.
+      { teile: [{ text: '## Was nicht mitgezählt wurde\n\nBeide Richtungen, damit die Zahl oben prüfbar ist. **Oben fehlt, was noch niemand eingeordnet hat** — das ist die Arbeitsliste, und solange sie groß ist, ist der Fremdeinkauf oben eine Untergrenze. **Unten fehlt, was kein Wareneinkauf ist** — das ist beabsichtigt.' }] },
+      { teile: [{ karte: 'fe_arbeitsliste', hoehe: 12 }] },
+      { teile: [{ karte: 'fe_kein_wareneinkauf', hoehe: 10 }] },
+      { teile: [{ text: '## Stand der Freigabeliste\n\nKonzernweit, deshalb ohne Betriebsfilter. „Trifft nichts" heißt: der Eintrag steht in der Liste, aber unter diesem Namen wurde nie eingekauft — meist ein Schreibweisenproblem, kein leerer Lieferant.' }] },
+      { teile: [{ karte: 'fe_freigabestand', hoehe: 12 }] },
+      { teile: [{ text: '## Preisvergleich zwischen den Häusern\n\nDie eigentliche Excel-Frage: was zahlt *dieses* Haus, und wie stehen die anderen da. Aus **FoodNotify**, nicht aus dem Belegarchiv — nur dort stehen einzelne Artikel.\n\n**Belastbar ist das im einstelligen bis niedrig zweistelligen Prozentbereich.** Dreistellige Abweichungen sind meist Mengenartefakte: die Häuser buchen dieselbe Ware verschieden. Vier Sperren fangen das ab, die letzte stumpf bei Faktor 3. Wer eine große Abweichung weitergibt, prüft sie vorher am Beleg.\n\n**Mehrkosten sind eine Obergrenze, keine Einsparzusage.** Der Median ist ein erreichter Preis, kein zugesagter.' }] },
+      { teile: [{ karte: 'ep_abweichung', hoehe: 12,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      { teile: [{ karte: 'ep_betrieb', hoehe: 12,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      { teile: [{ karte: 'ep_nicht_vergleichbar', hoehe: 9 }] },
     ],
   },
 

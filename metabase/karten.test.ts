@@ -30,6 +30,7 @@ import { karten as kartenBewertung } from './karten-bewertung'
 import { karten as kartenYext } from './karten-yext'
 import { karten as kartenAktionen } from './karten-aktionen'
 import { karten as kartenVergleich } from './karten-vergleich'
+import { karten as kartenFremdeinkauf } from './karten-fremdeinkauf'
 import type { Karte } from './typen'
 
 const DB = process.env.DATABASE_URL
@@ -38,7 +39,7 @@ const lauf = DB ? describe : describe.skip
 const alleKarten: Karte[] = [
   ...kartenRoundTable, ...kartenFach, ...kartenDrilldown,
   ...kartenPortfolio, ...kartenImport, ...kartenStandort, ...kartenBewertung,
-  ...kartenAktionen, ...kartenVergleich, ...kartenYext,
+  ...kartenAktionen, ...kartenVergleich, ...kartenFremdeinkauf, ...kartenYext,
 ]
 
 let db: Client

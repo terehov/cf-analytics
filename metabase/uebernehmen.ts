@@ -32,6 +32,7 @@ import { karten as kartenBewertung } from './karten-bewertung'
 import { karten as kartenYext } from './karten-yext'
 import { karten as kartenAktionen } from './karten-aktionen'
 import { karten as kartenVergleich } from './karten-vergleich'
+import { karten as kartenFremdeinkauf } from './karten-fremdeinkauf'
 import { dashboards } from './dashboards'
 import { auslegen, MINDESTHOEHE } from './layout'
 import type { Karte, Kachel, Dashboard, Reihe } from './typen'
@@ -45,7 +46,7 @@ const METABASE = config.METABASE_URL
 
 const alleKarten: Karte[] = [
   ...kartenDrilldown, ...kartenPortfolio, ...kartenRoundTable, ...kartenFach, ...kartenImport, ...kartenStandort,
-  ...kartenBewertung, ...kartenAktionen, ...kartenYext, ...kartenVergleich,
+  ...kartenBewertung, ...kartenAktionen, ...kartenYext, ...kartenVergleich, ...kartenFremdeinkauf,
 ]
 
 // Reihen in Kacheln umrechnen — EINMAL, damit Pruefung und Ausgabe

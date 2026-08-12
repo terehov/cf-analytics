@@ -149,6 +149,32 @@ Marke gebaut war:
 Umsatz-Entwicklung, Umsatz-Struktur, Personal, Warenwirtschaft, BWA — und
 **Datenqualität und Import**, die Seite, die man aufmacht, bevor man einer anderen glaubt.
 
+Dazu **Fremdeinkauf — wer liefert, obwohl er nicht darf** (`db_fremdeinkauf`, seit
+12.08.2026). Eigene Seite und kein Reiter auf *Einkauf*, weil die Datenbasis eine andere
+ist: *Einkauf* steht auf FoodNotify-Bestellungen, der Fremdeinkauf auf dem **Belegarchiv**.
+Genau darin liegt der Punkt — wer bei einem nicht freigegebenen Lieferanten kauft,
+bestellt ihn nicht über das Bestellsystem des Konzerns. Verlinkt ist sie von *Einkauf* und
+vom Reiter *Einkauf & Inventur* des Betriebsblatts, jeweils über die Kachel
+`fe_kachel_verweis`.
+
+Drei Regeln gelten dort für jede Karte, und jede hat einen Anlass
+(`docs/befunde-datenlage.md`, 12.08.2026):
+
+* **Nie über `quelle` summieren.** Dieselbe Rechnung steht in FoodNotify *und* im
+  Belegarchiv. Tabellen tragen die Spalte und gruppieren danach; Kacheln und Diagramme
+  legen die Quelle fest, weil sie keine Spalte dafür haben.
+* **Immer `wareneinkauf IS TRUE`.** Das Belegarchiv führt alle Eingangsrechnungen. Ohne den
+  Filter zählen Strom, Leasing, Finanzamt und Kartengebühren als Fremdeinkauf — gemessen
+  29,8 von 126,6 Mio EUR.
+* **`wareneinkauf IS NULL` ist kein Befund, sondern die Arbeitsliste** und steht auf einer
+  eigenen Karte. 44 Mio EUR auf 8.292 Namen unsichtbar zu lassen, wäre eine stille Kürzung
+  — und die Zahl oben sähe nach einem Ergebnis aus statt nach einer Untergrenze.
+
+Die Kachel `fe_kachel_verweis` trägt bewusst **keinen** Markenfilter: `db_einkauf` filtert
+nach dem FoodNotify-Mandanten, `db_fremdeinkauf` nach dem Round-Table-Konzept. Beide Filter
+heissen `marke`, und verdrahtet wird nach Namen — eine Karte mit `marke` stünde auf
+*Einkauf* dauerhaft leer, ohne Fehlermeldung.
+
 ## Drei Zahlen, die man vor der ersten Auswertung kennen sollte
 
 Am 26.07.2026 nachgemessen. Sie ändern, wie jede andere Zahl zu lesen ist.
@@ -192,6 +218,7 @@ metabase/
   karten-drilldown.ts   Ebenen ① bis ⑤
   karten-round-table.ts die Excel-Ablösung
   karten-fach.ts        Umsatz, Struktur, Personal, Ware, BWA, Datenqualität
+  karten-fremdeinkauf.ts Fremdeinkauf und Preisvergleich zwischen den Häusern
   dashboards.ts         Anordnung im 24-Spalten-Raster und das Klickverhalten
   uebernehmen.ts        trägt alles nach Metabase ein
 ```
