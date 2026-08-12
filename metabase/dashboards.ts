@@ -235,7 +235,7 @@ export const dashboards: Dashboard[] = [
       // und sich nur in der Sortierrichtung unterscheiden. Metabase
       // sortiert eine Tabelle auf Klick — die zweite Karte war nur eine
       // vorweggenommene Kopfbewegung.
-      { teile: [{ text: '## Online-Bewertungen\n\nSchlechteste zuerst — auf jede Spaltenüberschrift klicken dreht die Reihenfolge. Der **Stand** ist der Schnitt über alle Bewertungen, das was ein Gast auf Google sieht; **Ø neu** sind die des laufenden Monats.' }] },
+      { teile: [{ text: '## Online-Bewertungen\n\nSchlechteste zuerst — auf jede Spaltenüberschrift klicken dreht die Reihenfolge. Der **Stand** ist der Schnitt über alle Bewertungen, das was ein Gast auf Google sieht; **Ø neu** sind die des oben gewählten Monats — ohne Auswahl der jüngste abgeschlossene.' }] },
       { teile: [{ karte: 'bw_rangliste', hoehe: 12,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       // Das Themenprofil direkt unter der Bewertungs-Rangliste: die
@@ -523,7 +523,7 @@ export const dashboards: Dashboard[] = [
     schluessel: 'vg_zeit',
     name: '④ Zeiträume vergleichen',
     beschreibung:
-      'Zwei frei wählbare Zeiträume nebeneinander, je Betrieb und in Summe. Voreingestellt ist der laufende Monat bis heute gegen denselben Ausschnitt des Vormonats.',
+      'Zwei frei wählbare Zeiträume nebeneinander, je Betrieb und in Summe. Voreingestellt: die letzten sieben abgeschlossenen Tage gegen dasselbe Fenster vier Wochen früher — Montag gegen Montag.',
     sammlung: 'Drill-Down',
     filter: [F_VON_A, F_BIS_A, F_VON_B, F_BIS_B, F_MARKE],
     reihen: [
@@ -551,14 +551,19 @@ export const dashboards: Dashboard[] = [
       { teile: [{ text: '# ⑤ Standorte vergleichen\n\nOben Betrieb oder Marke auswählen. Ohne Auswahl stehen hier alle — für einen aussagekräftigen Vergleich zwei bis vier Betriebe wählen.\n\nDer Tagesverlauf zeigt **Prozent vom eigenen Tagesumsatz**. Sonst vergleicht man nur die Größe der Betriebe und nicht ihr Muster.' }] },
       { teile: [{ karte: 'vg_ort_metriken', hoehe: 11,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
-      { teile: [{ karte: 'vg_ort_umsatz' }] },
+      // Klick auf eine Linie oeffnet das Betriebsblatt — die Karten
+      // tragen den Betrieb als Datenreihe, die Uebergabe liest ihn daraus.
+      { teile: [{ karte: 'vg_ort_umsatz',
+        klick: [{ ziel: 'dd_betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       // Der Tagesverlauf allein auf voller Breite: vierundzwanzig Stunden
       // auf zwoelf Einheiten sind 22 Pixel je Balken, und eine
       // Beschriftung wie "08:00" braucht rund 40. Metabase laesst sie
       // dann samt und sonders weg -- man sieht ein Muster und kann es
       // keiner Tageszeit zuordnen.
-      { teile: [{ karte: 'vg_ort_profil' }] },
-      { teile: [{ karte: 'vg_ort_sparte', hoehe: 11 }] },
+      { teile: [{ karte: 'vg_ort_profil',
+        klick: [{ ziel: 'dd_betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      { teile: [{ karte: 'vg_ort_sparte', hoehe: 11,
+        klick: [{ ziel: 'dd_betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
     ],
   },
 
@@ -625,7 +630,10 @@ export const dashboards: Dashboard[] = [
       { teile: [{ karte: 'vs_kopf', hoehe: 10,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ text: '## Alle oder nur einer?\n\nDie Karte, wegen der es diese Seite gibt.' }] },
-      { teile: [{ karte: 'vs_umsatz_pct', hoehe: 10 }] },
+      // Der Balken eines Betriebs fuehrt auf sein Betriebsblatt — wer
+      // den Ausreisser sieht, will ihn ansehen, nicht nur benennen.
+      { teile: [{ karte: 'vs_umsatz_pct', hoehe: 10,
+        klick: [{ ziel: 'dd_betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ karte: 'vs_verlauf' }] },
       { teile: [{ text: '## Die Betriebe der Stadt im Einzelnen' }] },
       { teile: [{ karte: 'vs_betriebe', hoehe: 12,
@@ -929,7 +937,7 @@ export const dashboards: Dashboard[] = [
       // und die Filter oben (Monat, Betrieb) gelten mit.
       // ---------------------------------------------------------------
       { name: 'Aktionen', reihen: [
-      { teile: [{ text: '## Aktionen\n\nNur **34 der Betriebe** erfassen Aktionen — 19 davon Enchilada, 14 Wilma Wunder. Das ist keine Konzernsicht: Wer hier fehlt, fährt vielleicht dieselbe Aktion und bucht sie nur nicht. Alle Werte netto; der laufende Monat ist unvollständig.' }] },
+      { teile: [{ text: '## Aktionen\n\nNur **34 der Betriebe** erfassen Aktionen — 19 Enchilada, 14 Wilma Wunder, eine Deutsche Konzepte. Das ist keine Konzernsicht: Wer hier fehlt, fährt vielleicht dieselbe Aktion und bucht sie nur nicht. Alle Werte netto; der laufende Monat ist unvollständig.' }] },
       { teile: [{ karte: 'ak_uebersicht', hoehe: 10 }] },
       { teile: [{ karte: 'ak_verlauf', hoehe: 9 }] },
       { teile: [{ text: '### Wer hängt woran\n\nDer gewählte Monat, sortiert nach **Anteil am eigenen Umsatz**: 40 % Aktionsanteil sind eine andere Nachricht als 4.000 € — dieser Betrieb hat eine Frage zu beantworten, wenn die Aktion endet.' }] },
@@ -1292,7 +1300,10 @@ export const dashboards: Dashboard[] = [
     filter: [F_MONAT, F_ZEITRAUM, F_BETRIEB],
     reihen: [
       { teile: [{ text: '# Betriebswirtschaftliche Auswertung (BWA)\n\n> Zahlen vom Steuerberater, üblicherweise **ein bis zwei Monate zurück**. Ein Monat auf null ist **nicht gebucht** — nicht umsatzlos. Gezeigt werden nur gebuchte Monate.' }] },
-      { teile: [{ karte: 'bwa_kennzahlen', hoehe: 9 }] },
+      // Klick auf einen Monat setzt den Monatsfilter: Wasserfall und
+      // EBIT-Rangliste unten springen auf genau diesen Monat um.
+      { teile: [{ karte: 'bwa_kennzahlen', hoehe: 9,
+        klick: [{ ziel: 'db_bwa', uebergabe: { monat: 'Monat' } }] }] },
       // Der Wasserfall daneben waere zu schmal: "Uebrige Kosten" braucht
       // eine lesbare Beschriftung, und die Bloecke sollen proportional
       // erkennbar sein.
@@ -1327,7 +1338,9 @@ export const dashboards: Dashboard[] = [
         { karte: 'bw_kachel_monatswert' },
         { karte: 'bw_kachel_neue' },
       ] },
-      { teile: [{ karte: 'bw_verlauf', hoehe: 10 }] },
+      // Klick auf einen Monat setzt den Monatsfilter der Seite.
+      { teile: [{ karte: 'bw_verlauf', hoehe: 10,
+        klick: [{ ziel: 'db_bewertung', uebergabe: { monat: 'Monat' } }] }] },
       { teile: [{ karte: 'bw_marke', hoehe: 10,
         klick: [{ ziel: 'dd_filialen', uebergabe: { marke: 'Marke' } }] }] },
       { teile: [{ text: '## Alle Betriebe\n\nSchlechteste zuerst. Jede Spaltenüberschrift sortiert — für die Bestenliste einmal auf **Stand** klicken. Nur operative Betriebe.' }] },
@@ -1439,7 +1452,12 @@ export const dashboards: Dashboard[] = [
       // und keine Karte meldete es. Jeder Verlauf zeigte einen
       // erfundenen Absturz auf null.
       { teile: [{ karte: 'dq_lochtage', hoehe: 9 }] },
-      { teile: [{ karte: 'dq_unplausibel', hoehe: 10 }] },
+      // Der Klick oeffnet das Betriebsblatt IM MONAT DER ZEILE — der
+      // unplausible Wert steht in einem bestimmten Monat, nicht im
+      // aktuellen.
+      { teile: [{ karte: 'dq_unplausibel', hoehe: 10,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb',
+                  uebergabe: { betrieb: 'Betrieb', monat: 'Monat' } }] }] },
       { teile: [
         { karte: 'dq_umsatz_abweichung', hoehe: 11,
           klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] },
@@ -1448,7 +1466,8 @@ export const dashboards: Dashboard[] = [
       { teile: [{ karte: 'dq_datenstand', hoehe: 12, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ karte: 'dq_ohne_bruecke' }] },
       { teile: [{ karte: 'dq_zuordnung_offen', hoehe: 9 }] },
-      { teile: [{ karte: 'dq_gaeste', hoehe: 10 }] },
+      { teile: [{ karte: 'dq_gaeste', hoehe: 10,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       // Volle Breite: die Spalte mit den Beispielnamen ist der Zweck der
       // Karte, und auf zwoelf Einheiten sah man davon drei Namen.
       { teile: [{ karte: 'dq_konzept' }] },
@@ -1518,7 +1537,7 @@ export const dashboards: Dashboard[] = [
     sammlung: 'Drill-Down',
     filter: [F_MONAT, F_MARKE],
     reihen: [
-      { teile: [{ text: '# ⑧ Standortkarte\n\n🟥 eskalieren · 🔴 handeln · 🟠 nachforschen · 🟢 ok · ⚪ keine Bewertung. Klick öffnet den Betrieb, Antippen zeigt die sechs Einzelampeln.\n\nNur Standorte mit hinterlegter Adresse — die fehlenden stehen unten.' }] },
+      { teile: [{ text: '# ⑧ Standortkarte\n\n🟥 eskalieren · 🔴 handeln · 🟠 nachforschen · 🟢 ok · ⚪ keine Bewertung · ⚫ nicht operativ. Klick öffnet den Betrieb, Antippen zeigt die sechs Einzelampeln.\n\nNur Standorte mit hinterlegter Adresse — die fehlenden stehen unten.' }] },
       { teile: [
         { karte: 'so_karte', breite: 15, hoehe: 16,
           klick: [{ ziel: 'dd_betrieb', uebergabe: { betrieb: 'Betrieb' } }] },

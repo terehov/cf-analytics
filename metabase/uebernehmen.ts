@@ -173,8 +173,10 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
   pf_stillgelegt:         { monat: 'Der letzte Umsatztag ist ein ZUSTAND, kein Monatswert — '
                                  + 'still ist still, egal welchen Monat man betrachtet.' },
   pf_wochentag_marke:     { betrieb: 'Vergleicht MARKEN, nicht Betriebe.' },
-  pf_gaeste_bon:          { betrieb: 'Vergleicht Betriebe untereinander — ein Betriebsfilter '
-                                   + 'liesse genau einen Punkt uebrig.' },
+  // pf_gaeste_bon stand hier mit der Begruendung "liesse genau einen
+  // Punkt uebrig" — die Karte ist aber eine Tabelle Betrieb x Monat, und
+  // mit Betriebsfilter bleibt die Monatsreihe DIESES Betriebs uebrig.
+  // Seit dem 12.08.2026 liest sie den Filter.
   pf_stabilitaet:         { betrieb: 'Rangliste ueber alle Betriebe.' },
   um_wochentag:           { monat: 'Wochenrhythmus ueber den ZEITRAUM, nicht einen Stichmonat — '
                                  + 'ein einzelner Monat hat je Wochentag nur vier Tage.' },
@@ -438,8 +440,10 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
          + 'verdrahtet stuende hier dauerhaft eine leere Kachel ohne Fehlermeldung.',
     ware: 'Verweiskachel auf eine andere Seite; sie zeigt eine Summe, keinen Artikel.',
   },
-  fe_betriebe_betroffen:  { betrieb: 'ZAEHLT die betroffenen Betriebe. Mit gesetztem Betrieb '
-                                   + 'waere das Ergebnis 0 oder 1 -- eine Zahl, die nichts sagt.' },
+  // fe_betriebe_betroffen stand hier mit "0 oder 1 -- eine Zahl, die
+  // nichts sagt". Verworfen am 12.08.2026: neben drei gefilterten
+  // Nachbarkacheln las sich die ungefilterte 48 als Aussage ueber den
+  // gewaehlten Betrieb — 1 oder 0 sagt dagegen genau das Richtige.
   fe_freigabestand:       { betrieb: 'Die Freigabeliste gilt konzernweit; sie kennt keinen Betrieb.',
                             marke: 'ebenso -- ein Dachlieferant gehoert keiner Marke.' },
   fe_pflegestand:         { betrieb: 'Zaehlt den Stand der drei Pflegetabellen. Die gelten '

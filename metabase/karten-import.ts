@@ -429,17 +429,21 @@ SELECT geschaeftstag        AS "Geschäftstag",
     schluessel: 'dq_gaeste',
     name: 'Gästezahlen — wem sie fehlen',
     beschreibung:
-      'Betriebe, die in den letzten zwölf Monaten an weniger als 80 % ihrer Umsatztage Gästezahlen melden. Für diese Betriebe gibt es kein „Umsatz je Gast" — auf den Kennzahlseiten fehlen sie stillschweigend. Die umsatzstärksten stehen oben: dort lohnt es zuerst, die Gästezählung an der Kasse zu klären.',
+      'Operative Betriebe, die in den letzten zwölf Monaten an weniger als 80 % ihrer Umsatztage Gästezahlen melden. Für diese Betriebe gibt es kein „Umsatz je Gast" — auf den Kennzahlseiten fehlen sie stillschweigend. Die umsatzstärksten stehen oben: dort lohnt es zuerst, die Gästezählung an der Kasse zu klären.',
     anzeige: 'table',
+    // Nur operative: die Liste ruft dazu auf, die Gaestezaehlung an der
+    // Kasse zu klaeren — bei geschlossenen und Testbetrieben gibt es
+    // keine Kasse mehr, an der jemand etwas klaeren koennte. Die
+    // Statusspalte ist damit konstant und entfaellt.
     sql: `
 SELECT betrieb           AS "Betrieb",
-       status            AS "Status",
        umsatztage        AS "Umsatztage",
        tage_mit_gaesten  AS "Tage mit Gästen",
        abdeckung_pct     AS "Abdeckung %",
        umsatz_12m        AS "Umsatz 12M"
   FROM mart.gaeste_abdeckung
  WHERE abdeckung_pct < 80
+   AND status = 'operativ'
  ORDER BY umsatz_12m DESC NULLS LAST`,
     visualisierung: {
       column_settings: {

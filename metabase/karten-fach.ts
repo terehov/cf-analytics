@@ -113,7 +113,7 @@ SELECT geschaeftstag       AS "Geschäftstag",
     schluessel: 'um_verlauf_monat',
     name: 'Umsatz je Monat mit Vorjahr',
     beschreibung:
-      'Monatsumsatz gegen den gleichen Monat des Vorjahres, beides in Euro. Fehlt die Vorjahreslinie, sind die alten Daten noch nicht eingelesen — das heißt nicht, dass damals kein Umsatz war.',
+      'Monatsumsatz gegen den gleichen Monat des Vorjahres, beides in Euro. Ein Klick auf einen Monat stellt den Monatsfilter der Seite um. Fehlt der Vorjahresbalken, sind die alten Daten noch nicht eingelesen — das heißt nicht, dass damals kein Umsatz war.',
     anzeige: 'bar',
     parameter: [BETRIEB, ZEITRAUM],
     // Der laufende Monat bleibt draussen: zwei geladene Tage neben einem
@@ -587,7 +587,11 @@ SELECT monat                                                     AS "Monat",
    -- Linie endete mit einem kuenstlichen Plateau, das Stabilitaet
    -- suggerierte, wo schlicht noch nichts gebucht war.
    AND bwa_alter_monate = 0
-   AND operativ
+   -- Ein ausdruecklich gewaehlter Betrieb bleibt sichtbar, auch wenn er
+   -- nicht mehr operativ ist — dasselbe Muster wie pe_quote_betrieb;
+   -- vorher zeigte der Verlauf fuer geschlossene Betriebe kommentarlos
+   -- eine leere Kurve neben gefuellten Nachbarkarten.
+   AND (operativ [[ OR betrieb = {{betrieb}} ]])
    [[AND betrieb = {{betrieb}}]]
    [[AND {{zeitraum}}]]
  GROUP BY monat
@@ -622,7 +626,11 @@ SELECT artikel                        AS "Artikel",
        warengruppe                    AS "Warengruppe",
        sum(menge)                     AS "Menge",
        sum(umsatz_netto)              AS "Umsatz",
-       round(avg(verkaufspreis), 2)   AS "Ø Preis",
+       -- Netto und mengengewichtet, wie alle Werte der Zeile. Vorher
+       -- stand hier avg(verkaufspreis): BRUTTO (Faktor exakt 1,19 zum
+       -- Netto daneben) und ungewichtet — neben einer Netto-Umsatzspalte
+       -- las sich das als Rechenfehler.
+       round(sum(umsatz_netto) / nullif(sum(menge), 0), 2) AS "Ø Preis netto",
        sum(deckungsbeitrag)           AS "Deckungsbeitrag",
        round(100 * sum(deckungsbeitrag)
              / nullif(sum(umsatz_netto) FILTER (WHERE fixer_we IS NOT NULL), 0), 1) AS "DB %",
@@ -659,7 +667,10 @@ SELECT artikel            AS "Artikel",
    [[AND konzept = {{marke}}]]
  GROUP BY artikel, warengruppe
 HAVING sum(menge) > 0
- ORDER BY sum(menge) ASC
+ -- Umsatz und Name als Nachsortierung: im Vorgabezeitraum teilen sich
+ -- 386 Artikel die Menge 1, und ohne festen Zweitschluessel wechselte
+ -- die gezeigte Auswahl der 50 mit jedem Neuladen.
+ ORDER BY sum(menge) ASC, sum(umsatz_netto) ASC, artikel
  LIMIT 50`,
     template_tag_dimension: { zeitraum: ['mart', 'artikelverkauf', 'geschaeftstag'] },
   },
@@ -1424,8 +1435,11 @@ SELECT herkunft AS "Herkunft",
     schluessel: 'dq_umsatz_abweichung',
     name: 'Artikelsumme gegen gemeldeten Umsatz',
     beschreibung:
-      'Der Tagesumsatz, aus den einzelnen Artikelverkäufen neu zusammengezählt und gegen den gemeldeten Umsatz gehalten. Abweichungen bis 0,5 % sind Rundung und unbedenklich; darüber lohnt ein Blick. Erwartung: keine auffälligen Zeilen.',
+      'Der Tagesumsatz, aus den einzelnen Artikelverkäufen neu zusammengezählt und gegen den gemeldeten Umsatz gehalten. Letzte zwölf Monate — was älter ist, korrigiert niemand mehr. Abweichungen bis 0,5 % sind Rundung und unbedenklich; darüber lohnt ein Blick. Erwartung: keine auffälligen Zeilen.',
     anzeige: 'table',
+    // Ohne das Fenster stammten 175 der 200 gezeigten Zeilen aus den
+    // Jahren vor 2026 — eine Arbeitsliste, deren Arbeit verjaehrt ist,
+    // verdraengte die aktuellen Faelle unter LIMIT 200.
     sql: `
 SELECT betrieb             AS "Betrieb",
        geschaeftstag::date AS "Geschäftstag",
@@ -1435,6 +1449,7 @@ SELECT betrieb             AS "Betrieb",
        differenz_pct AS "Differenz %"
   FROM mart.pruefung_umsatz
  WHERE auffaellig
+   AND geschaeftstag >= current_date - interval '12 months'
  ORDER BY abs(differenz_pct) DESC
  LIMIT 200`,
   },

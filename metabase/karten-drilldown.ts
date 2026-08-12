@@ -65,6 +65,10 @@ SELECT r.konzept                                                          AS "Ma
   FROM mart.round_table_monat r
   CROSS JOIN gewaehlt g
  WHERE r.monat = g.monat
+   -- Nur operative: der Reiter-Text verspricht "den mittleren OPERATIVEN
+   -- Betrieb der Marke". Ohne den Filter zaehlten im Juli 2026 siebzehn
+   -- rote Gesamtampeln geschlossener und verwaltender Betriebe mit.
+   AND r.operativ
    [[AND r.konzept = {{marke}}]]
  GROUP BY r.konzept
  ORDER BY count(*) FILTER (WHERE r.gesamt = 'rot') DESC, sum(r.umsatz_ist) DESC NULLS LAST`,
@@ -92,6 +96,8 @@ SELECT r.konzept                                       AS "Marke",
   FROM mart.round_table_monat r
   CROSS JOIN gewaehlt g
  WHERE r.monat = g.monat
+   -- Nur operative, wie die Markentabelle darueber.
+   AND r.operativ
    [[AND r.konzept = {{marke}}]]
  GROUP BY r.konzept
  ORDER BY count(*) FILTER (WHERE r.gesamt = 'rot') DESC`,
@@ -109,15 +115,18 @@ SELECT r.konzept                                       AS "Marke",
   {
     schluessel: 'dd_marken_verlauf',
     name: 'Umsatz je Marke im Verlauf',
-    beschreibung: 'Monatsumsatz je Marke über die geladene Historie.',
+    beschreibung: 'Monatsumsatz je Marke über die geladene Historie. Der laufende Monat fehlt bewusst — angebrochen sähe jede Marke nach Absturz aus.',
     anzeige: 'line',
     parameter: [P_MARKE],
+    // Ohne die Obergrenze stand am 12.08. der halbe August (1,45 Mio)
+    // neben dem vollen Juli (9,84 Mio) — jede Linie stuerzte am rechten
+    // Rand ab, und das bei jedem Monatswechsel aufs Neue.
     sql: `
 SELECT monat                        AS "Monat",
        coalesce(konzept, '(nicht zugeordnet)') AS "Marke",
        sum(umsatz_monat)            AS "Umsatz"
   FROM mart.umsatz_ytd
- WHERE 1 = 1
+ WHERE monat < date_trunc('month', current_date)::date
    [[AND konzept = {{marke}}]]
  GROUP BY monat, konzept
  ORDER BY monat`,

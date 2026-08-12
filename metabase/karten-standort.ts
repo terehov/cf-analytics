@@ -341,7 +341,14 @@ SELECT coalesce(s.ampel_emoji, '⚪')     AS "●",
    -- nachgetragener roter Ampel gehoeren nicht hinein (Review 03.08.2026).
    AND r.operativ
    [[AND s.konzept = {{marke}}]]
- ORDER BY CASE s.ampel WHEN 'rot' THEN 1 WHEN 'orange' THEN 2
+ -- Erst der Handlungsbedarf, dann die Ampel: die Beschreibung verspricht
+ -- "sortiert nach Handlungsdruck", und der steht in s.intensitaet — ein
+ -- Rot mit zwei roten Bereichen ("Sofort eskalieren") gehoert ueber ein
+ -- Rot mit einem ("Sofort handeln"). Vorher galten beide gleich.
+ ORDER BY CASE s.intensitaet WHEN 'Sofort eskalieren' THEN 1
+                             WHEN 'Sofort handeln'    THEN 2
+                             WHEN 'Nachforschung'     THEN 3 ELSE 4 END,
+          CASE s.ampel WHEN 'rot' THEN 1 WHEN 'orange' THEN 2
                        WHEN 'gruen' THEN 3 ELSE 4 END,
           s.umsatz DESC NULLS LAST`,
     visualisierung: {

@@ -187,7 +187,7 @@ SELECT ${THEMA_DEUTSCH}                                                     AS "
     visualisierung: {
       'graph.dimensions': ['Thema'],
       'graph.metrics': ['Ø Note', 'Nennungen'],
-      'graph.series_settings': { Nennungen: { display: 'line', axis: 'right' } },
+      series_settings: { Nennungen: { display: 'line', axis: 'right' } },
       'graph.x_axis.title_text': 'Thema',
       'graph.y_axis.title_text': 'Ø Note',
     },
@@ -398,7 +398,7 @@ SELECT monat                                                          AS "Monat"
     visualisierung: {
       'graph.dimensions': ['Monat'],
       'graph.metrics': ['Antwortquote %', 'Reaktion (Std.)'],
-      'graph.series_settings': { 'Reaktion (Std.)': { axis: 'right' } },
+      series_settings: { 'Reaktion (Std.)': { axis: 'right' } },
     },
   },
 
@@ -433,7 +433,7 @@ SELECT monat                                            AS "Monat",
       'graph.dimensions': ['Monat'],
       'graph.metrics': ['1–2 Sterne', '3 Sterne', '4–5 Sterne', 'Anteil 1–2★ %'],
       'stackable.stack_type': 'stacked',
-      'graph.series_settings': {
+      series_settings: {
         'Anteil 1–2★ %': { display: 'line', axis: 'right' },
         '1–2 Sterne': { color: '#ED6E6E' },
         '4–5 Sterne': { color: '#84BB4C' },
@@ -526,7 +526,7 @@ SELECT monat                            AS "Monat",
     visualisierung: {
       'graph.dimensions': ['Monat'],
       'graph.metrics': ['Impressionen', 'Suchen', 'Profilaufrufe', 'Klicks'],
-      'graph.series_settings': {
+      series_settings: {
         Suchen: { axis: 'right' }, Profilaufrufe: { axis: 'right' }, Klicks: { axis: 'right' },
       },
     },

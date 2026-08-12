@@ -438,24 +438,56 @@ HAVING count(*) >= 30
     schluessel: 'pf_gaeste_bon',
     name: 'Kommen mehr Gäste oder geben sie mehr aus?',
     beschreibung:
-      'Woher eine Umsatzveränderung kommt: von mehr Gästen oder von höherem Umsatz je Gast. Die Unterscheidung entscheidet über die Maßnahme — mehr Gäste sind ein Marketing- und Standortthema, ein höherer Bon ein Karten-, Preis- und Verkaufsthema.',
+      'Woher eine Umsatzveränderung kommt: von mehr Gästen oder von höherem Umsatz je Gast. Die Unterscheidung entscheidet über die Maßnahme — mehr Gäste sind ein Marketing- und Standortthema, ein höherer Bon ein Karten-, Preis- und Verkaufsthema. Letzte zwölf abgeschlossene Monate, nur operative Betriebe. „Ø je Gast" rechnet nur über Tage, die auch eine Gästezahl tragen, und bleibt leer, wenn das weniger als 80 % der Umsatztage sind — wie auf der Umsatzseite.',
     anzeige: 'table',
-    parameter: [P_MARKE],
+    /*
+     * VIER KORREKTUREN am 12.08.2026, jede fuer einen gemessenen Fehler:
+     *
+     * 1. "Ø je Gast" teilte den Umsatz ALLER Tage durch die Gaeste der
+     *    GEZAEHLTEN Tage. Wilma Wunder Viernheim 06/2026: 2.962 EUR je
+     *    Gast, weil an 30 Umsatztagen nur ein einziger eine Gaestezahl
+     *    trug. Zaehler und Nenner kommen jetzt aus denselben Tagen, und
+     *    unter 80 % Abdeckung bleibt die Spalte leer (dieselbe Regel,
+     *    die db_umsatz im Kopftext zusagt).
+     *
+     * 2. lag() verglich ueber Luecken hinweg: fehlte ein Monat, stand
+     *    "Vormonat" fuer einen Sprung von zwei oder mehr. Jetzt zaehlt
+     *    ein Delta nur gegen den unmittelbaren Vormonat.
+     *
+     * 3. Ohne Statusfilter standen Testlaeden und geschlossene Betriebe
+     *    in der Liste ("A Testladen Concept Family", 2024/2025).
+     *
+     * 4. Ohne Zeitfenster rechnete die Karte seit 2018 inklusive
+     *    Corona-Monaten — als einzige der Seite.
+     */
+    parameter: [P_BETRIEB, P_MARKE],
     sql: `
 WITH je_monat AS (
-    SELECT betrieb, konzept, monat,
-           sum(umsatz_netto) AS umsatz,
-           sum(gaeste)       AS gaeste
-      FROM mart.umsatz_tag
-     WHERE 1 = 1
-       [[AND konzept = {{marke}}]]
-     GROUP BY betrieb, konzept, monat
-    HAVING sum(gaeste) > 0
+    SELECT u.betrieb, u.konzept, u.monat,
+           sum(u.umsatz_netto) AS umsatz,
+           sum(u.gaeste)       AS gaeste,
+           sum(u.umsatz_netto) FILTER (WHERE u.gaeste > 0) AS umsatz_gezaehlt,
+           count(*) FILTER (WHERE u.gaeste > 0)::numeric
+             / nullif(count(*) FILTER (WHERE u.umsatz_netto > 0), 0) AS abdeckung
+      FROM mart.umsatz_tag u
+      JOIN mart.betrieb_status st USING (betrieb_key)
+     WHERE st.status = 'operativ'
+       AND u.monat >= (date_trunc('month', current_date) - interval '13 months')::date
+       AND u.monat <  date_trunc('month', current_date)::date
+       [[AND u.konzept = {{marke}}]]
+       [[AND u.betrieb = {{betrieb}}]]
+     GROUP BY u.betrieb, u.konzept, u.monat
+    HAVING sum(u.gaeste) > 0
 ),
 mit_vormonat AS (
     SELECT j.*,
+           lag(monat)  OVER w AS monat_vor,
            lag(umsatz) OVER w AS umsatz_vor,
-           lag(gaeste) OVER w AS gaeste_vor
+           lag(gaeste) OVER w AS gaeste_vor,
+           CASE WHEN abdeckung >= 0.8
+                THEN umsatz_gezaehlt / nullif(gaeste, 0) END AS je_gast,
+           lag(CASE WHEN abdeckung >= 0.8
+                    THEN umsatz_gezaehlt / nullif(gaeste, 0) END) OVER w AS je_gast_vor
       FROM je_monat j
     WINDOW w AS (PARTITION BY betrieb ORDER BY monat)
 )
@@ -465,19 +497,21 @@ SELECT betrieb                                                        AS "Betrie
        round(100 * (umsatz - umsatz_vor) / nullif(umsatz_vor, 0), 1)  AS "Umsatz Δ %",
        gaeste                                                         AS "Gäste",
        round(100 * (gaeste - gaeste_vor) / nullif(gaeste_vor, 0), 1)  AS "Gäste Δ %",
-       round(umsatz / gaeste, 2)                                      AS "Ø je Gast",
-       round(100 * ((umsatz / gaeste) - (umsatz_vor / nullif(gaeste_vor, 0)))
-             / nullif(umsatz_vor / nullif(gaeste_vor, 0), 0), 1)      AS "Ø je Gast Δ %",
+       round(je_gast, 2)                                              AS "Ø je Gast",
+       round(100 * (je_gast - je_gast_vor)
+             / nullif(je_gast_vor, 0), 1)                             AS "Ø je Gast Δ %",
        CASE
-         WHEN umsatz_vor IS NULL                                     THEN NULL
-         WHEN gaeste > gaeste_vor AND umsatz / gaeste > umsatz_vor / nullif(gaeste_vor, 0)
-              THEN 'beides gestiegen'
+         WHEN je_gast IS NULL OR je_gast_vor IS NULL                  THEN NULL
+         WHEN gaeste > gaeste_vor AND je_gast > je_gast_vor           THEN 'beides gestiegen'
          WHEN gaeste > gaeste_vor                                     THEN 'mehr Gäste'
-         WHEN umsatz / gaeste > umsatz_vor / nullif(gaeste_vor, 0)    THEN 'höherer Bon'
+         WHEN je_gast > je_gast_vor                                   THEN 'höherer Bon'
+         WHEN gaeste = gaeste_vor AND je_gast = je_gast_vor           THEN 'unverändert'
          ELSE                                                              'beides gefallen'
        END                                                            AS "Treiber"
   FROM mit_vormonat
  WHERE umsatz_vor IS NOT NULL
+   AND monat_vor = (monat - interval '1 month')::date
+   AND monat >= (date_trunc('month', current_date) - interval '12 months')::date
  ORDER BY monat DESC, umsatz DESC`,
   },
 
@@ -493,10 +527,13 @@ SELECT betrieb                                                        AS "Betrie
     parameter: [P_MONAT, P_MARKE],
     sql: `${MONAT_CTE},
 werte AS (
+    -- Nur operative Betriebe: ohne den Filter zogen im Juli 2026 die
+    -- Werte von 61 nicht operativen Zeilen die Marken-Mediane schief.
     SELECT a.konzept, a.bereich_name, a.reihenfolge, a.wert
       FROM mart.ampel_bereich a
       CROSS JOIN gewaehlt g
      WHERE a.monat = g.monat AND a.wert IS NOT NULL
+       AND a.operativ
        [[AND a.konzept = {{marke}}]]
 ),
 je_marke AS (
@@ -532,7 +569,10 @@ SELECT monat                                   AS "Monat",
        coalesce(konzept, '(nicht zugeordnet)') AS "Marke",
        round(sum(umsatz_netto))                AS "Umsatz"
   FROM mart.umsatz_tag
- WHERE 1 = 1
+ -- Ohne den laufenden Monat: angebrochen verschiebt er die Anteile im
+ -- juengsten Balken — die normalized-Darstellung versteckt, dass ihm
+ -- Tage fehlen.
+ WHERE monat < date_trunc('month', current_date)::date
    [[AND konzept = {{marke}}]]
  GROUP BY monat, konzept
  ORDER BY monat`,

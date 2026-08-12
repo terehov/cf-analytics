@@ -532,7 +532,7 @@ SELECT betrieb                        AS "Betrieb",
     schluessel: 'ep_nicht_vergleichbar',
     name: 'Warum eine Ware nicht verglichen wird',
     beschreibung:
-      'Die vier Sperren, jede mit ihrer Menge. Sie stehen hier, weil eine ausgeschlossene Ware, die nirgends auftaucht, eine stille Kürzung wäre. „zu wenige Betriebe" ist der Normalfall und harmlos. „Gebinde uneinheitlich" und „Menge widersprüchlich" heißen, dass die Betriebe dieselbe Ware verschieden buchen — das ist ein Datenpflegethema, kein Preisthema. „Spreizung über Faktor 3" fängt, was die anderen drei durchlassen.',
+      'Die vier Sperren, jede mit ihrer Menge — und daneben „vergleichbar" als Gegenprobe, damit sichtbar ist, wie viel vom Einkauf der Vergleich überhaupt trägt. Die Sperren stehen hier, weil eine ausgeschlossene Ware, die nirgends auftaucht, eine stille Kürzung wäre. „zu wenige Betriebe" ist der Normalfall und harmlos. „Gebinde uneinheitlich" und „Menge widersprüchlich" heißen, dass die Betriebe dieselbe Ware verschieden buchen — das ist ein Datenpflegethema, kein Preisthema. „Spreizung über Faktor 3" fängt, was die anderen drei durchlassen.',
     anzeige: 'table',
     parameter: [MARKE],
     /*
@@ -666,7 +666,7 @@ SELECT round(coalesce(sum(netto), 0)) AS "Netto (12 Monate)"
     schluessel: 'fd_verlauf',
     name: 'Verlauf je Monat',
     beschreibung:
-      'Die Summe der Kachel, auf zwölf Monatsbalken verteilt. Der jüngste Balken kann noch wachsen: das Belegarchiv füllt nach, ein dünner aktueller Monat ist Ladestand, kein Rückgang.',
+      'Die Summe der Kachel, je Monat — zwölf abgeschlossene und der laufende, wie das Fenster der Kachel selbst. Der jüngste Balken kann noch wachsen: das Belegarchiv füllt nach, ein dünner aktueller Monat ist Ladestand, kein Rückgang.',
     anzeige: 'bar',
     parameter: [ZUSTAND, LIEFERANT, BETRIEB, MARKE],
     sql: `

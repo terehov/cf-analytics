@@ -174,6 +174,9 @@ SELECT coalesce(to_char(round(avg(r.online_bewertung), 2), 'FM0.00'), '– nicht
   FROM mart.round_table_monat r
   CROSS JOIN gewaehlt g
  WHERE r.monat = g.monat
+   -- Nur operative, wie alle Nachbarkacheln der Reihe: im Juli 2026
+   -- flossen sonst elf bewertete nicht operative Betriebe in den Schnitt.
+   AND r.operativ
    [[AND r.konzept = {{marke}}]]`,
   },
 
