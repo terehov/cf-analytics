@@ -793,7 +793,8 @@ fange die Folgeschäden ohnehin ab. Nachgemessen fängt seine Faktor-20-Prüfung
 — 42 Prozent**. Die übrigen **239** kämen durch beide Netze und fütterten den
 Preisvergleich. Die Behauptung war also nur zu zwei Fünfteln richtig.
 
-**Stand jetzt** (0060, gegen die Serverbank gerechnet):
+**Stand jetzt** (0060 für die Spalte, **0061** für den Faktor; gegen die Serverbank
+gerechnet):
 
 | | Korrekturen |
 |---|---|
@@ -802,6 +803,17 @@ Preisvergleich. Die Behauptung war also nur zu zwei Fünfteln richtig.
 | unentscheidbar wegen Faktor | 412 |
 
 Kosten: 414 von 876.341 Positionen verlieren ihren Preis je Einheit, 0,05 Prozent.
+
+**Und noch ein Nachtrag, derselbe Fehler zum zweiten Mal an einem Tag.** Die Faktorschranke
+stand zuerst als Änderung IN 0060 — die aber seit 14:17 auf der Serverbank in
+`schema_migration` steht. Der Runner hätte sie übersprungen: lokal grün, auf dem Server nie
+angekommen. Genau das war am Vormittag schon mit 0056 passiert und hatte 0057 nötig
+gemacht; beim zweiten Mal lautete die Ausrede „0060 steht ja nur lokal", und sie stimmte
+nicht. Die Schranke ist deshalb **0061**.
+
+**Regel, jetzt zweimal gelernt:** vor jeder Änderung an einer Migration
+`SELECT filename FROM public.schema_migration` — auf der Bank, die es betrifft, nicht auf
+der lokalen. Die beiden sind hier verschieden.
 
 **Was wirklich offen bleibt** ist nicht mehr die Frage, ob die 412 durchrutschen, sondern
 die dahinter: woran liesse sich eine falsche von einer grossen richtigen Korrektur
