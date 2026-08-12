@@ -1006,7 +1006,9 @@ ihn nicht mehr nehmen. Die Zahl wächst mit jedem Lauf.
 
 **Regel daraus: `NULL` heisst „geprüft und verworfen", `NOT NULL` heisst nicht „geprüft und
 bestanden".** Das Urteil steht in `menge_unstimmig`, nicht in der Anwesenheit des Wertes.
-`mart.einkaufspreis_betrieb` filtert seit heute auf beides. Kosten: 255 Zeilen weniger,
+`mart.einkaufspreis_betrieb` filtert seit **Migration 0057** auf beides — nicht als
+Korrektur in 0056, weil die auf dem Server bereits angewendet war und der Runner sie
+überspringt. Kosten: 255 Zeilen weniger,
 erfundene Ersparnis 17.512 → 17.453 EUR. Darunter acht Positionen „Idee Entkoffeiniert
 50 Pouches A 7G" zu 42.350 EUR je Kilogramm — dieselbe Ware, deretwegen 0042 gebaut wurde,
 auf einem zweiten Weg zurück in der Auswertung.
@@ -1031,3 +1033,81 @@ nicht diese Sicht.
 
 Die einzige Zeile dieser Ware, die ein Befund geworden wäre — Speyer mit 48,40 gegen einen
 Median von 24.224 — ist von allen drei Sperren gleichzeitig geblockt.
+
+---
+
+## Der Belegarchiv-Zweig, zum ersten Mal an echten Daten (gemessen 12.08.2026)
+
+Der Erstlauf ist durch: **593.353 Belege** stehen in `core.buchungsbeleg`, gegen ein Soll
+von 593.314 — vollständig. Damit lief `mart.fremdeinkauf` zum ersten Mal mit beiden
+Zweigen. **Der Belegarchiv-Zweig trägt noch nicht.** Vier Mängel, gemessen auf der
+Serverbank über den SSH-Tunnel, rein lesend.
+
+| Grösse | Zeilen | Anteil |
+|---|---|---|
+| Belege gesamt | 593.353 | |
+| davon Rechnungen (`typ_id = '1'`) | 394.575 | 100 % |
+| mit Lieferantennamen | 124.310 | **31,5 %** |
+| mit Betrag ≠ 0 | 111.272 | 28,2 % |
+| **mit beidem — die nutzbare Menge** | **103.846** | **26,3 %** |
+
+### 1. Der Betrag fehlt bei 71,8 Prozent, und das ist grösstenteils kein Fehler
+
+283.303 Rechnungen tragen `netto = 0`. Davon haben **269.514 auch kein Rohfeld** —
+LINAs Belegliste (Weg A) liefert für sie schlicht keinen Betrag. Das ist eine Grenze der
+Quelle, nicht der Verarbeitung, und über Weg A nicht zu heilen.
+
+**3.219 sind dagegen ein echter Parserfehler:** `netto_split_roh` enthält Werte, `netto`
+steht auf 0. Beispiele: `3,50/0,00/783,46`, `-10,50/1.014,61/0,00`, `0,00/983,77/0,00`.
+Diese Belege sind rückholbar.
+
+### 2. Achtundachtzig Zeilen sind Faktor 10⁸ zu gross
+
+Die Summe des Zweigs meldete **14.024.387.689.386 EUR**. Vierzehn Billionen sind kein
+Befund, sondern ein Rechenfehler in 88 Zeilen:
+
+| `netto_split_roh` | gespeichert | richtig |
+|---|---|---|
+| `7.847,11/0,00/7.847,11` | 784.712.000.000 | 7.847,12 |
+| `5.541,71/0,00/5.541,71` | 554.172.000.000 | 5.541,72 |
+
+Das Muster ist konstant: **Cent × 10⁶**. Grenzt man auf `abs(netto) <= 100.000` ein,
+bleiben **114.036.715 EUR** — eine plausible Grössenordnung und rund das 2,7-fache des
+FoodNotify-Zweigs (42,3 Mio.).
+
+### 3. Die Kreditor-Zuordnung kennt die Schreibweisen des Belegarchivs nicht
+
+Das ist der teuerste Mangel, weil er wie ein Befund aussieht. `manual.kreditor_gruppe`
+wurde aus FoodNotify-Namen gebaut. Das Belegarchiv schreibt anders — und **freigegebene
+Lieferanten landen dadurch im Fremdeinkauf**:
+
+| normierter Name | Netto | eingeordnet als |
+|---|---|---|
+| `distra handels gmbh` | 19.141.334 | *nicht freigegeben* |
+| `chefs culinar wir leben foodservice` | 5.593.503 | *nicht freigegeben* |
+| `chefs culinar sued gmbh und co kg tel 08291` | 3.670.576 | *nicht freigegeben* |
+| `layer chemie gmbh` | 1.091.133 | *nicht freigegeben* |
+| `Chefs Culinar` | 866.030 | freigegeben ✓ |
+
+Daher die **8.164 „nicht freigegebenen Lieferanten"** aus der ersten Auswertung: es sind
+8.395 normierte Schreibweisen, und getroffen wird fast keine. Die Zahl ist ein
+Zuordnungsproblem, kein Einkaufsproblem.
+
+### 4. Das Belegarchiv enthält alle Rechnungen, nicht nur Wareneinkauf
+
+Unter den grössten „Lieferanten" stehen `visa` (1.285.805), `pay one` (1.260.471),
+`concept family franchise ag` (7.499.249) und `family und friends marketing gmbh`
+(2.224.204). Zahlungsdienstleister, Konzerninnenumsatz, Marketing. Ohne Abgrenzung auf
+Wareneinkauf zählt jede Versicherungsrechnung als Fremdeinkauf. `manual.sachkonto` und
+`manual.kreditor_gruppe` aus 0053 sind dafür da und noch nicht bestückt.
+
+### Was daraus folgt
+
+Die Reihenfolge ist nicht beliebig: **erst 3, dann 4, dann 2, dann 1.** Die Zuordnung ist
+der grösste Hebel — sie verwandelt 8.164 Verdachtsfälle in eine Liste, die ein Mensch
+abarbeiten kann. Die Abgrenzung auf Wareneinkauf entfernt die Zahlungsdienstleister. Erst
+danach lohnt der Zahlenfehler, und der Nullbetrag ist zu zwei Dritteln gar nicht heilbar.
+
+**Bis dahin gilt für jede Auswertung des Zweigs:** `abs(netto) <= 100000` filtern und die
+Einordnung nicht als Ergebnis lesen. Und weiterhin nie über `quelle` summieren — jetzt, wo
+beide Zweige Daten führen, steht dieselbe Rechnung erstmals wirklich doppelt da.

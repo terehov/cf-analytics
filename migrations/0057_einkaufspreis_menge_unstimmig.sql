@@ -1,85 +1,56 @@
--- =====================================================================
--- 0056 Einkaufspreis im Betriebsvergleich — die Excel, gefuellt
---
--- ANLASS (12.08.2026): die Erhebung "GFGH Q2 2026.xlsx" wollte je Betrieb
--- und Produkt einen Preis und daneben Durchschnitt, Hoechst- und
--- Tiefstpreis. Zurueck kamen 607 von 6.952 Zellen (8,7 Prozent). Die
--- Zahlen, nach denen gefragt wurde, stehen laengst in FoodNotify — nur
--- ohne die Achse, die die Frage stellt.
---
--- WAS ES SCHON GAB UND WARUM ES NICHT REICHT:
---   mart.einkaufspreis_monat (0041) gruppiert nach Ware, Marke, Einheit
---   und Monat. Kein Betrieb, kein Lieferant. Sie beantwortet "was kostet
---   diese Ware im Konzern", nicht "was zahlt DIESES Haus, und wie stehen
---   die anderen da". Genau das ist die Excel-Frage.
---
---   Diese Migration ergaenzt deshalb NUR die fehlende Achse. Basis,
---   Preisformel und Ausreisserbremse sind woertlich aus
---   mart.einkaufspreis_monat uebernommen — eine zweite, leicht andere
---   Preisdefinition waere der sichere Weg zu zwei Zahlen fuer dieselbe
---   Frage. Wer die Formel dort aendert, aendert sie hier mit.
---
--- ---------------------------------------------------------------------
--- WELCHER PREIS VERGLICHEN WIRD — UND WARUM NICHT DER GEBINDEPREIS
---
--- Nicht einzelpreis: nachgemessen am 12.08.2026 ueber bar-Positionen der
--- letzten zwoelf Monate traegt er Werte von 0,00 und bis zu MINUS 16,16
--- (Gutschriften und Korrekturen), und "H-Milch 3,5% 1L" streut von 0,00
--- bis 10,68. Eine Spanne, die groesstenteils aus Buchungsartefakten
--- besteht, ist als Preisvergleich wertlos.
---
--- ABER AUCH NICHT DER GEBINDEPREIS, und das ist der Unterschied zu
--- mart.einkaufspreis_monat (0041). Dort wird ueber EINE Ware ueber die
--- Zeit verglichen; da ist summe_preis/menge richtig, weil derselbe
--- Besteller dieselbe Gebindeeinheit bucht. Hier wird ueber BETRIEBE
--- verglichen, und dort bucht das eine Haus einen Karton als menge=1,
--- das andere sechs Flaschen als menge=6. Dieselbe Ware, dasselbe Geld,
--- Faktor 6 im Gebindepreis.
---
--- Die erste Fassung dieser Sicht rechnete mit dem Gebindepreis, und die
--- Trefferliste bestand aus genau diesem Artefakt: "Elka Orangensaft"
--- 67,02 gegen 11,17 (Faktor 6,00), "Grana Padano" 147,90 gegen 14,79
--- (Faktor 10,00), dazu ein Dutzend Zeilen mit exakt 500,0 Prozent
--- Abweichung. Saubere Vielfache sind der Fingerabdruck dieses Fehlers,
--- und die Faktor-20-Bremse aus 0041 faengt Faktor 6 nicht.
---
--- Verglichen wird deshalb summe_preis / gesamt_menge, der Preis je
--- BASISEINHEIT (Liter, Kilogramm, Stueck). Er normalisiert die
--- Verpackung weg. Nachgemessen ueber 979 Waren mit mindestens vier
--- Betrieben: der Median der Spanne ist bei beiden 1,03, aber ueber
--- Faktor 3 hinaus streuen 119 Waren beim Gebindepreis und nur 67 beim
--- Preis je Basiseinheit. Am Rand — dort, wo die Befunde entstehen — ist
--- die Basiseinheit messbar der bessere Massstab.
---
--- DER GEBINDEPREIS STEHT TROTZDEM DANEBEN, weil ein Einkaeufer in
--- Kartonpreisen denkt und nicht in Cent je Milliliter. Er ist zum Lesen
--- da, nicht zum Rechnen.
---
--- OFFEN UND GEMESSEN: gesamt_menge ist NICHT durchgaengig
--- menge * gebinde_menge — das stimmt nur in 162.519 von 633.652
--- Positionen (26 Prozent). Woher die Abweichung kommt, ist ungeklaert;
--- gefuellt ist die Spalte praktisch immer (2 Ausreisser). Solange das so
--- ist, traegt gebinde_uneinheitlich die Warnung je Zeile.
--- ---------------------------------------------------------------------
+/**
+ * 0057 — mart.einkaufspreis_betrieb prueft gegen menge_unstimmig, nicht gegen NULL
+ *
+ * WARUM DAS EINE EIGENE MIGRATION IST UND NICHT EINE KORREKTUR IN 0056
+ *
+ * 0056 ist am 12.08.2026 um 11:06 auf der Serverbank angewendet worden und
+ * steht dort in public.schema_migration. Der Runner ueberspringt jede Datei,
+ * deren Name dort steht — eine nachtraegliche Aenderung an 0056 waere lokal
+ * gruen gewesen und haette den Server nie erreicht. Eine angewendete Migration
+ * ist unveraenderlich; Korrekturen bekommen eine neue Nummer.
+ *
+ * WAS KORRIGIERT WIRD
+ *
+ * 0056 filterte auf `preis_je_einheit IS NOT NULL` und der Kommentar behauptete,
+ * damit blieben die als unstimmig markierten Positionen draussen. Gemessen am
+ * 12.08.2026: 561 Positionen tragen menge_unstimmig UND einen Preis, nach einem
+ * weiteren Nachlauf 613. Der Entzug haelt nicht, weil der Nachlauf
+ * core.gebinde_vereinheitlichen() VOR core.preis_ausreisser_markieren() aufruft
+ * (src/sync/einkaufspreis.ts:37-40): der erste schreibt preis_je_einheit neu,
+ * ohne markierte Zeilen auszunehmen (0040:77-82), der zweite fasst sie danach
+ * nicht mehr an, denn er filtert "AND NOT p.menge_unstimmig" (0040:135).
+ *
+ * NULL heisst "geprueft und verworfen". NOT NULL heisst NICHT "geprueft und
+ * bestanden". Das Urteil steht in menge_unstimmig.
+ *
+ * Kosten der Korrektur: 255 Zeilen weniger, erfundene Ersparnis 17.512 ->
+ * 17.453 EUR. Darunter acht Positionen "Idee Entkoffeiniert 50 Pouches A 7G" zu
+ * 42.350 EUR je Kilogramm — dieselbe Ware, deretwegen 0042 gebaut wurde, auf
+ * einem zweiten Weg zurueck in der Auswertung.
+ *
+ * Nur die Sicht wird ersetzt. Tabellen, Seeds und Sperren aus 0056 bleiben.
+ */
 
-
--- ---------------------------------------------------------------------
--- Preis je Ware, Gebinde, Betrieb, Lieferant und Monat — mit Vergleich
---
--- MONAT IST EINE ACHSE UND KEIN ZIERAT. Der Bestand reicht bis 2020; ein
--- Vergleich ueber die ganze Historie stellt einen Preis von 2021 neben
--- einen von 2026 und nennt die Differenz "Abweichung". Wer ein Quartal
--- auswerten will, filtert auf die Monate — so wie die Excel es fuer
--- Q2 2026 wollte.
--- ---------------------------------------------------------------------
 CREATE OR REPLACE VIEW mart.einkaufspreis_betrieb AS
 WITH basis AS (
   /*
    * DIE PREISGROESSE KOMMT AUS core.bestellposition UND WIRD HIER NICHT
    * NEU GERECHNET. Migration 0042 hat preis_je_einheit genau dafuer
-   * gebaut und setzt sie auf NULL, wo die Gesamtmenge nicht belastbar
+   * gebaut und entzieht sie dort, wo die Gesamtmenge nicht belastbar
    * ist (menge_unstimmig) — "FoodNotify meldet die Gebindegroesse
    * derselben Ware uneinheitlich".
+   *
+   * ES REICHT ABER NICHT, AUF preis_je_einheit IS NOT NULL ZU PRUEFEN.
+   * Beide Bedingungen stehen hier, weil das Entziehen nicht haelt:
+   * core.gebinde_vereinheitlichen() laeuft im Nachlauf VOR
+   * core.preis_ausreisser_markieren() (sync/einkaufspreis.ts:37-40) und
+   * schreibt preis_je_einheit neu, ohne bereits markierte Zeilen
+   * auszunehmen (0040:77-82). Der Markierer fasst sie danach nicht mehr
+   * an, denn er filtert "AND NOT p.menge_unstimmig" (0040:135). So
+   * entsteht die Kombination markiert UND Preis vorhanden — gemessen am
+   * 12.08.2026: 561 Positionen, nach einem weiteren Nachlauf 613.
+   * NULL heisst also "geprueft und verworfen", NOT NULL heisst nicht
+   * "geprueft und bestanden". Das Urteil steht in menge_unstimmig.
    *
    * Die erste Fassung dieser Sicht rechnete summe_preis/gesamt_menge
    * selbst und umging damit die Pruefung: 5.946 als unstimmig markierte
@@ -114,6 +85,7 @@ WITH basis AS (
      AND bp.menge             > 0
      AND bp.summe_preis       > 0
      AND bp.preis_je_einheit IS NOT NULL
+     AND NOT bp.menge_unstimmig
      AND b.status IS DISTINCT FROM 'canceled'
      AND k.betrieb_key IS NOT NULL
 ), je_betrieb AS (
@@ -274,11 +246,26 @@ und mehrkosten deshalb nur, wo vergleichbar gilt; wer die Rohspalten selbst verr
 umgeht die Sperren.
 
 DIE PREISGROESSE IST core.bestellposition.preis_je_einheit AUS 0042 und wird hier NICHT
-nachgerechnet. Sie ist NULL, wo FoodNotify die Gebindegroesse derselben Ware uneinheitlich
-meldet (menge_unstimmig), und genau diese Positionen bleiben draussen. Eine frueher hier
-selbst gerechnete Fassung umging die Pruefung und brachte "Idee Entkoffeiniert" mit
-48.400 EUR je Kilogramm zurueck — den Wert, dessentwegen 0042 gebaut wurde. Kosten der
-Pruefung: 5.398 von 621.614 Positionen, 99,1 Prozent bleiben.
+nachgerechnet. Eine frueher hier selbst gerechnete Fassung umging die Pruefung und brachte
+"Idee Entkoffeiniert" mit 48.400 EUR je Kilogramm zurueck — den Wert, dessentwegen 0042
+gebaut wurde.
+
+GEPRUEFT WIRD GEGEN menge_unstimmig, NICHT GEGEN NULL. Der entzogene Preis kommt wieder:
+der Nachlauf ruft core.gebinde_vereinheitlichen() VOR core.preis_ausreisser_markieren()
+auf, der erste schreibt preis_je_einheit ohne Ruecksicht auf die Markierung neu, der zweite
+fasst markierte Zeilen nicht mehr an. Gemessen am 12.08.2026 tragen 561 markierte
+Positionen wieder einen Preis. Deshalb stehen beide Bedingungen im WHERE. Kosten der
+Pruefung: 5.398 von 621.614 Positionen ueber NULL, 561 weitere ueber die Markierung —
+99,0 Prozent bleiben.
+
+WAS AUCH DANACH DRINBLEIBT, UND WARUM ES TROTZDEM NICHT LUEGT: ein Preis, der in ALLEN
+Haeusern gleich falsch ist, ueberlebt beide Pruefungen. "Idee Entkoffeiniert 50 Pouches
+A 7G" steht im Februar 2026 in drei Haeusern bei 48.400 EUR je Kilogramm — 0040 markiert
+nichts, weil der Median derselben Ware genauso hoch liegt und ihn nichts widerlegt. In
+dieser Sicht ist die Zeile dann abweichung_pct = 0,0 und mehrkosten = 0: die Spalte preis
+ist Unsinn, der Befund ist keiner. Die Sicht prueft ABWEICHUNGEN, nicht absolute
+Plausibilitaet — wo alle gleich falsch buchen, gibt es keine Referenz, die widerspricht.
+Wer absolute Preise lesen will, nimmt nicht diese Sicht.
 DER GEBINDEPREIS STEHT DANEBEN, weil ein Einkaeufer in Kartonpreisen denkt. Er ist zum
 Lesen da, nicht zum Rechnen — verglichen wird die Basiseinheit.
 
