@@ -368,6 +368,11 @@ Haus** anders zu holen sind — was durch das Belegarchiv ohnehin an Bedeutung v
   vor dem ersten Report erklärt sein, sonst wird eine Einführung als Rückgang gelesen.
 * **84 Betriebe ohne laufendes Geschäft** (`mart.betrieb_status`) — 39 geschlossen, 18 ohne
   Geschäft, 17 verwaltend, 6 inaktiv, 4 Test.
+* **Getränkefachgroßhändler je Betrieb: 13 von 141 gepflegt, ein Erhebungsname ohne Betrieb**
+  („Carls Brauhaus"). Die Erhebung „GFGH Q2 2026.xlsx" kam mit 8,7 % gefüllten Preiszellen
+  zurück; nachgefordert wird sie nicht, abgeleitet wird aus den Rechnungen. Arbeitslisten und
+  die Fragen, die dabei übrig bleiben, stehen im Abschnitt „Die GFGH-Erhebung kam leer
+  zurück" am Ende dieser Datei.
 * **Eröffnungs- und Schließungsdatum** — fehlen ganz. ~~Fläche, Sitzplätze~~ stehen im
   Stammdatenblatt der Ladenakte (Karlsruhe: 632 Plätze, 339 qm). Zu prüfen bleibt, ob die
   Kapazitätstabelle bei **allen** Betrieben gepflegt ist oder nur bei den zwei gemessenen.
@@ -485,3 +490,130 @@ SELECT (parameter->>'linaBetriebId')::int AS betrieb,
  WHERE endpunkt = 'la:bwa_longterm'
  ORDER BY payload_bytes DESC;
 ```
+
+---
+
+## Die GFGH-Erhebung kam leer zurück — was das offen lässt (12.08.2026)
+
+Nachgemessen am 12.08.2026 an „GFGH Q2 2026.xlsx": 88 Betriebsspalten, 79 Produktzeilen,
+**607 von 6.952 Preiszellen gefüllt (8,7 %)**, ein GFGH-Name in 14 von 88 Spalten, 44 Spalten
+ganz ohne Angabe. Entschieden ist, nicht nachzufordern, sondern aus den Rechnungen abzuleiten
+(Migration `0055_lieferantenfreigabe.sql`; Begründung in [`entscheidungen.md`](entscheidungen.md),
+Aufbau in [`datenmodell.md`](datenmodell.md), Messwerte in
+[`befunde-datenlage.md`](befunde-datenlage.md)). Hier steht nur, was dabei für andere übrig
+bleibt.
+
+### An Concept Family
+
+* **„Carls Brauhaus" gibt es unter diesem Namen nicht in `core.betrieb`.** Es ist der einzige
+  der 14 Erhebungseinträge, der nicht geladen werden konnte (Erhebung nennt „Dinkelacker ja/
+  GLH nein"). Entweder fehlt der Betrieb in LINA, oder die Erhebung fragt jemanden ab, der
+  nicht zum Bestand gehört — das gehört geklärt, nicht geraten. **Es waren zwei Fälle; seit dem
+  12.08.2026 ist es einer**: „Wilma Wunder Markt Mainz" ist vom Nutzer als „Gastronomie am
+  Markt Mainz GmbH" bestätigt, die Zeile steht jetzt in der Saat und nicht mehr als
+  auskommentierter Vorschlag daneben.
+* **Drei Häuser bestellen über FoodNotify, existieren aber nicht in `core.betrieb`** — Riegele
+  Wirtshaus (samt Produktionsküche), Zum Augustiner Rosenheim, Enchilada Darmstadt.
+* **Zwei Häuser bestellen gegen ihren eigenen Status.** „Aposto Wuppertal II" bestellt bis
+  02.08.2026; der plausible Betrieb 18 („Aposto Wuppertal – Alter Papierfabrik") steht auf
+  `ohne_geschaeft`. „Aposto Aachen – Alte Post" zeigt auf die Betriebe 3 und 71, beide
+  `geschlossen` — dazu passt der letzte Beleg vom 28.08.2024. Eines von beiden ist falsch,
+  der Status oder die Bestellung.
+
+### Auf unserer Seite: 25 Kostenstellen ohne Betrieb
+
+Nachgemessen am 12.08.2026: **25 von 152 Kostenstellen (16,4 %) haben keinen `betrieb_key`**,
+18 davon mit Bestellungen. `mart.fremdeinkauf` filtert auf `betrieb_key IS NOT NULL` und
+verliert dadurch **1.127.133 €** über die ganze Historie (3,1 % des Bestellvolumens), 313.770 €
+davon aus den letzten 12 Monaten. Es sind fast durchweg echte Häuser (7 Häuser, 1.095.156 €)
+und nur zu einem Rest Testbetriebe (4 Häuser, 31.977 €).
+
+Für die GFGH-Frage kostet das genau dort am meisten, wo sie gestellt wird: **GLH Getränke
+Logistik Heilbronn liegt mit 84.336 € auf nicht zugeordneten gegen 89.442 € auf zugeordneten
+Kostenstellen** — knapp die Hälfte des GLH-Volumens fällt aus der Sicht heraus. Drei Lieferanten
+sind darin überhaupt nicht sichtbar (abels fruechtewelt 145.391 €, intergast deutschland 307 €,
+„test 1" 3 €).
+
+Es fehlen dabei **immer ganze Häuser, nie einzelne Bar- oder Küchen-Kostenstellen** eines sonst
+zugeordneten Betriebs (für alle 15 betroffenen `restaurant_name` gilt: null zugeordnete
+Kostenstellen). Zwei davon sind reine Zuordnungslücke und sofort behebbar: **„Lehners
+Karlsruhe" (107) und „Lehners Wirtshaus Rastatt GmbH" (108) existieren, sind `operativ` und
+haben null Kostenstellen.** Sie zählen deshalb zugleich fälschlich als „nie FoodNotify" — auf
+die Zahlen im nächsten Abschnitt wirkt sich das nicht aus, weil ihre letzten Bestellungen von
+2023 und 2022 stammen.
+
+### Der blinde Fleck ist kleiner und schlimmer als „51 von 141"
+
+Die 51 ist richtig gezählt, der Nenner führt in die Irre: in den 141 stecken 39 geschlossene,
+18 ohne Geschäft, 17 verwaltende, 6 inaktive und 4 Testbetriebe. **Operativ sind 57, davon
+haben 43 FoodNotify-Daten der letzten 12 Monate und 14 nicht** (nachgemessen 12.08.2026).
+Diese 14 sind 24,6 % der operativen Häuser, tragen aber **30,0 % des operativen Umsatzes
+(33.530.901 € von 111.868.092 €)**, und zehn von ihnen sind „Deutsche Konzepte". Der blinde
+Fleck ist damit fast eine ganze Marke und kein Streuverlust — für diese Häuser ist das
+Belegarchiv nicht die zweite Quelle, sondern die einzige.
+
+### Arbeitsliste: die nicht eingeordneten Lieferanten
+
+`mart.lieferant_freigabe_stand` führt am 12.08.2026 **112 Dachnamen ohne Einordnung, zusammen
+6.330.827 €** über die ganze Historie; 69 davon haben seit 08/2025 noch eine Bestellung. In
+`mart.fremdeinkauf` sind es für die letzten 12 Monate **71 Lieferanten, 33 Betriebe,
+1.116.877 € — 8,3 % des Volumens** (die Arbeitsliste zählt zwei weniger, weil GLH und WIGEM
+dort als GFGH stehen und nur bei Häusern ohne hinterlegten GFGH als „nicht eingeordnet"
+gelten). Der Betrag sinkt mit jeder nachgetragenen Freigabe: am Vormittag desselben Tages
+waren es noch 1.175.609 €.
+
+| Lieferant (Dachname) | Netto gesamt | Betriebe | letzter Beleg |
+|---|---|---|---|
+| transgourmet de | 2.654.937 € | 27 | 09.01.2025 |
+| FFD Frisch Fruchtig Delp | 621.398 € | 41 | 24.07.2026 |
+| getraenke keller | 488.072 € | 2 | 02.08.2026 |
+| fruchthof nagel | 426.926 € | 4 | 20.03.2026 |
+| trinkkontor | 302.816 € | 3 | 03.08.2026 |
+| brauhaus pforzheim | 229.625 € | 2 | 03.08.2026 |
+| Splendid Drinks | 161.398 € | 2 | 30.07.2026 |
+| lisa mai getraenke gmbh und co kg | 151.690 € | 1 | 02.08.2026 |
+
+**Der größte Posten ist vermutlich kein Posten mehr.** Transgourmet steht mit 2,65 Mio. € an
+der Spitze, der letzte Beleg ist vom **09.01.2025** — 27 Betriebe, dann nichts mehr. Entweder
+abgelöst oder in einen anderen Namen gewandert; das gehört geprüft, bevor jemand die Liste von
+oben abarbeitet und die halbe Zeit in einen erledigten Fall steckt.
+
+### Vier der acht offenen GFGH stehen schon in FoodNotify
+
+Der Kommentar in `0055` sagt, die acht Häuser mit `dach_name IS NULL` hätten „einen Haendler
+genannt, der in FoodNotify nicht vorkommt". Nachgemessen am 12.08.2026 stimmt das für vier
+nicht — sie sind ohne das Belegarchiv auflösbar, mit je einer Zeile in
+`manual.kreditor_gruppe` und einem `dach_name`:
+
+| Betrieb | Erhebung nennt | in FoodNotify als | Netto | letzter Monat |
+|---|---|---|---|---|
+| Aposto Aalen | Getränke Keller | `getraenke keller` | 355.230 € | 08/2026 |
+| Wilma Wunder Dresden | Hubauer Getränkefachgrosshandel | `hubauer getraenke gmbh` | 83.237 € | 08/2026 |
+| Wilma Wunder Recklinghausen | Getränke Weidlich | `getraenke weidlich` | 7.138 € | 07/2026 |
+| Enchilada Kempten | Allgäuer Getränkeservice & C+C Oberallgäu | `c c oberallgaeu lang steudler gmbh` | 1.608 € | 02/2024 |
+
+Nebenbefund: **Enchilada Aalen kauft ebenfalls bei Getränke Keller** (132.842 €), hat aber
+keinen Erhebungseintrag — die Erhebung erfasst weniger, als die Rechnungen zeigen.
+
+Ein Fall ist ausdrücklich **nicht** aufzulösen: Enchilada Nürnberg nennt „Trinkkartell/Tucher",
+`trinkkartell` steht in FoodNotify — aber bei **Wilma Wunder Nürnberg** (8.618 €). Gleiche
+Stadt, anderes Haus. Hermann Wecken, Getränke Staude und Getränke Express kommen gar nicht vor;
+diese drei brauchen das Belegarchiv.
+
+### Zwei Wartestände
+
+* **Das Belegarchiv ist noch leer.** `core.buchungsbeleg`: **0 Zeilen** am 12.08.2026. Alles
+  oben ist FoodNotify allein — die zweite Hälfte der Ableitung existiert als Sicht, aber nicht
+  als Bestand. Der Abzug muss nicht freigeschaltet werden: `aktiv:false` an den
+  Ladenakte-Endpunkten ist **keine Sperre** (`AKTIVE_ENDPUNKTE` filtert nur `ENDPUNKTE`;
+  eingereiht wird von `ladenakteNachfuellen()` in `src/sync/nachfuellen.ts`, das den Flag nicht
+  liest). Er startet beim nächsten Sync-Lauf von selbst; siehe oben „Belegmetadaten abziehen".
+* **Weg B entscheidet über die eigentliche Frage der Erhebung.** Die Excel war im Kern eine
+  *Preis*erhebung, artikelgenau. Weg A des Belegarchivs liefert Belegkopf, Lieferant, Sachkonto
+  und Nettobetrag — **keinen Artikel, keinen Einzelpreis**. Weg B
+  (`/finanzen/document/filelistByBelegart`) hätte ihn, wurde am 11.08.2026 wegen 131
+  Mandantenwechseln verworfen. Die Wiedervorlage steht ausformuliert in
+  [`entscheidungen.md`](entscheidungen.md) („Offen: Weg B des Belegarchivs liegt durch die
+  gescheiterte Erhebung wieder auf dem Tisch"). Offen bleibt hier nur, **wer und wann** — es ist
+  eine Entscheidung über Regel 1 (Zustandsänderung in LINA), nicht über Laufzeit, und solange
+  sie aussteht, gibt es auf die Preisfrage überhaupt keine Antwort.

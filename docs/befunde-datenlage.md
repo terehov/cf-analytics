@@ -609,6 +609,11 @@ Deutsche Konzepte ab.
 Umsatzes, **Amadeus/FoodNotify-Obergrenze = 33,9 %**, und die **63 %** sind erst die
 Summe beider Wege auf Markenebene. Die 63 % gehören nicht zu `fixer_we` allein.
 
+**Nachtrag 12.08.2026: „komplementär" gilt für Rezepturen, nicht für Einkaufsvolumen.** Als
+Quelle für den *Fremdeinkauf* ist FoodNotify nicht die eine Hälfte eines Paars, sondern die
+schwächere Quelle — und zwar bauartbedingt. Siehe den Block *Nachgemessen am 12.08.2026*
+weiter unten, Befund 4.
+
 ## 9. Bewertungstexte: 112.598, nicht 173.823
 
 `core.bewertung` hat 173.823 Zeilen, aber **nur 112.598 tragen einen Text** (64,8 %);
@@ -753,3 +758,193 @@ eröffnet" ist nicht offen — die Sicht gibt es:
 **57 von 141 sind operativ.** Die bisher zitierten „79 ohne Umsatz" beruhten auf einem
 anderen Schnitt (jemals Umsatz gegen Umsatz im letzten bewerteten Monat). Beide Zahlen sind
 richtig und beantworten verschiedene Fragen — beim Weitergeben gehört der Nenner dazu.
+
+---
+
+# Nachgemessen am 12.08.2026: der Fremdeinkauf — und warum FoodNotify ihn nicht sieht
+
+**Anlass.** Die Erhebung *GFGH Q2 2026.xlsx* (Getränkefachgroßhandel je Betrieb, 79
+Produktpreise) kam fast leer zurück. Entschieden wurde, die fehlenden Angaben **nicht
+nachzufordern, sondern aus den Rechnungen abzuleiten** — Migration `0055`, Begründung in
+[`entscheidungen.md`](entscheidungen.md), Tabellenaufbau in
+[`datenmodell.md`](datenmodell.md). Diese Messreihe prüft, was die neuen Sichten
+`mart.fremdeinkauf` und `mart.lieferant_freigabe_stand` tatsächlich hergeben. Alle Zahlen
+unten sind am 12.08.2026 auf `localhost/lina` gemessen.
+
+## 1. Der Rücklauf trägt 8,7 % der gefragten Preise
+
+Ausgezählt in der Rücklaufdatei: **88 Betriebsspalten × 79 Produktzeilen = 6.952 Preiszellen,
+davon 607 gefüllt (8,7 %).** **44 Spalten sind ganz ohne Angabe**, und den Namen des eigenen
+Getränkefachgroßhändlers nennen **14 von 88** Häusern.
+
+Das ist keine dünne Datenlage, das ist keine. Eine Preiserhebung, die neun von zehn Feldern
+leer zurückbekommt, trägt keinen Betriebsvergleich — auch nicht für die 8,7 %, denn welche
+Häuser antworten, ist nicht zufällig.
+
+**Was daraus folgt:** Jede Aussage über Getränkepreise stammt ab hier aus Rechnungsdaten. Was
+die tragen und was nicht, steht in den Befunden 4 und 5 — und der Preis dafür ist, dass der
+Weg über die Belege **keine Artikel und keine Einzelpreise** liefert (Weg A der Erhebung vom
+11.08.2026, siehe [`lina-api-korrekturen.md`](lina-api-korrekturen.md)). Die Erhebung war im
+Kern eine *Preis*erhebung; genau das kann der Ersatzweg heute nicht.
+
+## 2. Distra ist ein Lieferant, nicht vier
+
+In FoodNotify steht derselbe Großhändler unter vier Schreibweisen — `distra gmbh`,
+`distra aposto`, `distra deutsche`, `distra enchilada coyacan`. Zusammengeführt über
+`manual.kreditor_gruppe`:
+
+```sql
+SELECT count(DISTINCT betrieb_key) AS betriebe, round(sum(netto)) AS netto
+  FROM mart.fremdeinkauf WHERE quelle='foodnotify' AND lieferant='Distra';
+-- 56 | 21.666.348
+```
+
+**21,67 Mio. € über 56 Betriebe, gesamte Historie** — vorher vier Zeilen, von denen keine
+groß genug aussah, um die Frage nach Konditionen zu stellen. Sechs Dachnamen fassen heute
+mehrere Schreibweisen zusammen (Distra vier, FFD, GLH, Pentz, Splendid Drinks, WIGEM je
+zwei).
+
+⚠️ **Über alle Kostenstellen gerechnet sind es 22.475.163 €.** Die Differenz von 808.815 €
+fehlt in der Sicht, weil sie auf Kostenstellen ohne Betrieb liegt — Befund 5. Wer Distra
+gegenüber verhandelt, sollte die größere Zahl kennen.
+
+## 3. Drei Zustände, und die Verdachtsliste ist heute leer
+
+Die Sicht unterscheidet *freigegeben* / *nicht freigegeben* / *nicht eingeordnet*; warum
+Abwesenheit einer Freigabe nicht „nicht freigegeben" heißen darf, steht in
+[`entscheidungen.md`](entscheidungen.md). Gemessen wurde hier nur, was heute herauskommt:
+
+| Einordnung, `quelle='foodnotify'`, ab 01.08.2025 | Netto | Betriebe | Lieferanten |
+|---|---:|---:|---:|
+| freigegeben | 12.303.849 € | 51 | 7 |
+| nicht eingeordnet | 1.116.877 € | 33 | **71** |
+| nicht freigegeben | **0 €** | 0 | 0 |
+
+**`einordnung = 'nicht freigegeben'` trifft 0 von 9.078 Zeilen — über die gesamte Historie.**
+Der Zustand feuert nur, wenn ein Haus einen aufgelösten GFGH hat *und* bei einem anderen
+kauft, der irgendwo als GFGH gepflegt ist. Gepflegt sind 13 Zeilen in
+`manual.gfgh_betrieb`, davon **5 mit Namen** — also zwei Firmen, WIGEM und GLH. **47 der 51
+Betriebe mit Einkaufsvolumen der letzten 12 Monate haben keinen aufgelösten GFGH**, und für
+sie kann der Befund gar nicht auslösen. Wer die Verdachtsliste heute öffnet und sie leer
+findet, hat *nichts gemessen*, nicht *nichts gefunden*.
+
+Was die zwei gepflegten Firmen zeigen, ist trotzdem der Fall, um den es geht:
+
+| Lieferant | Häuser | Netto | Einordnung |
+|---|---:|---:|---|
+| WIGEM Getränke | 3 mit WIGEM als hinterlegtem GFGH | 487.425 € | freigegeben |
+| WIGEM Getränke | 1 ohne GFGH-Eintrag | 171.434 € | nicht eingeordnet |
+| GLH Getränke Logistik Heilbronn | 1 mit GLH als hinterlegtem GFGH | 56.584 € | freigegeben |
+| GLH Getränke Logistik Heilbronn | 3 ohne GFGH-Eintrag | 175.843 € | nicht eingeordnet |
+
+Vier Häuser kaufen bei GLH, **eines** hat GLH hinterlegt. Die anderen drei stehen nicht
+deshalb auf „nicht eingeordnet", weil an ihrem Einkauf nichts wäre, sondern weil niemand
+ihren GFGH eingetragen hat. **Die Arbeitsliste ist die Pflege, nicht der Einkauf.**
+
+Nach Volumen führt sie `mart.lieferant_freigabe_stand` an — größter Posten
+**Transgourmet mit 2.654.937 € über 27 Betriebe, letzter Beleg aber 09.01.2025**, also
+vermutlich abgelöst. Die Spalte `fn_letzter_beleg` gehört deshalb neben jedes Volumen: ein
+großer Posten ohne frischen Beleg ist Vergangenheit, kein Handlungsbedarf.
+
+## 4. FoodNotify ist für den Fremdeinkauf strukturell blind
+
+Das ist der Befund, der alle Zahlen dieses Blocks relativiert. **Wer am System vorbei
+bestellt, erzeugt in FoodNotify keine Zeile.** Fremdeinkauf ist definitionsgemäß der Einkauf,
+der die vorgesehenen Wege verlässt — die Quelle unterschätzt ihn also **genau dort, wo er am
+größten ist**, und zwar bauartbedingt, nicht wegen einer Lücke im Import. Kein Nachladen
+behebt das.
+
+Die Reichweite dazu:
+
+```sql
+WITH fn AS (SELECT k.betrieb_key FROM core.bestellung b JOIN core.kostenstelle k USING (kostenstelle_key)
+             WHERE b.status IS DISTINCT FROM 'canceled' AND b.bestellt_am >= date '2025-08-01'
+               AND k.betrieb_key IS NOT NULL GROUP BY 1),
+     u AS (SELECT betrieb_key, sum(umsatz_netto) AS umsatz FROM core.umsatzbericht_tag
+            WHERE geschaeftstag >= date '2025-08-01'
+              AND hauptsparte_key IS NULL AND verkaufsstelle_key IS NULL GROUP BY 1)
+SELECT CASE WHEN f.betrieb_key IS NOT NULL THEN 'mit FoodNotify' ELSE 'ohne FoodNotify' END AS gruppe,
+       count(*) AS betriebe, round(sum(u.umsatz)) AS umsatz_12m,
+       round(100.0*sum(u.umsatz)/sum(sum(u.umsatz)) OVER (),1) AS pct
+  FROM mart.betrieb_status s
+  LEFT JOIN fn f ON f.betrieb_key = s.betrieb_key
+  LEFT JOIN u ON u.betrieb_key = s.betrieb_key
+ WHERE s.status='operativ' GROUP BY 1;
+```
+
+| Operative Betriebe | Betriebe | Umsatz 12 M | Anteil |
+|---|---:|---:|---:|
+| mit FoodNotify | 43 (75,4 %) | 78.337.191 € | 70,0 % |
+| **ohne FoodNotify** | **14 (24,6 %)** | **33.530.901 €** | **30,0 %** |
+
+**Der blinde Fleck ist ein Viertel der Häuser, aber 30 % des Umsatzes** — er trifft die
+großen. Und er ist keine Streuung: **zehn der 14 sind Deutsche Konzepte**, dazu zwei
+Enchilada, ein Schlager Cafe, ein Kooperationspartner. Es fehlt fast eine ganze Marke —
+dieselbe, die schon bei `fixer_we` (Befund 1 vom 11.08.) und bei den Warengruppen fehlt.
+
+**Der Nenner „51 von 141" ist irreführend** und sollte so nicht weitergegeben werden. Richtig
+ist: **62** Betriebe haben jemals über FoodNotify bestellt, **51** in den letzten 12 Monaten,
+und die einzige Zahl, die etwas besagt, ist **43 von 57 operativen**. In den 141 stecken 39
+geschlossene, 18 ohne Geschäft, 17 verwaltende, 6 inaktive und 4 Testbetriebe (Befund 14 vom
+11.08.).
+
+**Was daraus folgt:** Aus FoodNotify allein darf **kein Fremdeinkaufsanteil** berichtet
+werden — weder je Konzern noch je Marke. Zulässig ist die Aussage „bei diesen Lieferanten,
+in diesen Häusern, mindestens dieses Volumen". Die Gegenprobe kann nur das Belegarchiv
+liefern, weil dort jede *gebuchte* Rechnung steht, unabhängig vom Bestellweg.
+
+⚠️ **Diese Gegenprobe fehlt heute noch.** `core.buchungsbeleg` steht am 12.08.2026 auf
+**0 Zeilen**; `quelle='belegarchiv'` liefert also keine einzige Zeile. Erwartet werden laut
+`manual.belegarchiv_soll` **1.048 Betrieb/Belegart-Paare, 621 davon nicht leer, 593.314
+Belege — darunter 394.552 Eingangsrechnungen.** Der Abzug startet beim nächsten Sync-Lauf von
+selbst. Bis dahin ist jede Fremdeinkaufszahl eine Untergrenze aus der schwächeren Quelle.
+
+## 5. 25 Kostenstellen ohne Betrieb — 1,13 Mio. €, und zwei Sichten mit verschiedenen Summen
+
+```sql
+SELECT count(*) FILTER (WHERE betrieb_key IS NULL) AS ohne, count(*) AS gesamt
+  FROM core.kostenstelle;                                            -- 25 | 152
+```
+
+**25 von 152 Kostenstellen (16,4 %) haben keinen `betrieb_key`**, 18 davon tragen
+Bestellungen: **951 Bestellungen über 1.127.133 €** (3,1 % des Bestellvolumens; in den
+letzten 12 Monaten 313.770 €). Weil `mart.fremdeinkauf` auf `betrieb_key IS NOT NULL`
+filtert, fällt das **vollständig aus der Sicht**.
+
+Betroffen sind **echte Häuser, keine Testeinträge**: 1.095.156 € entfallen auf sieben
+laufende oder ehemals laufende Betriebe, nur 31.977 € auf vier Testbetriebe. Und es fehlen
+**immer ganze Häuser, nie einzelne Bar- oder Küchenkostenstellen** eines sonst zugeordneten
+Betriebs — für alle 15 betroffenen Restaurantnamen gilt: keine einzige ihrer Kostenstellen
+ist zugeordnet. Beim Gegenprüfen gegen `core.betrieb` zerfällt das in drei verschiedene
+Fehler:
+
+| Fall | Beispiele | Was fehlt |
+|---|---|---|
+| Zuordnungslücke | Lehners Karlsruhe (107), Lehners Wirtshaus Rastatt (108) | Betrieb existiert und ist operativ, hat aber **null** Kostenstellen |
+| Betrieb fehlt ganz | Riegele Wirtshaus, Zum Augustiner Rosenheim, Enchilada Darmstadt | keine Zeile in `core.betrieb` |
+| Status widerspricht dem Einkauf | Aposto Wuppertal II bestellt bis 02.08.2026 | plausibler Betrieb 18 steht auf `ohne_geschaeft` |
+
+Für den GFGH-Befund heißt das konkret: **GLH hat 84.336 € auf nicht zugeordneten gegen
+89.442 € auf zugeordneten Kostenstellen** — knapp die Hälfte des GLH-Volumens fällt aus
+`mart.fremdeinkauf` heraus. Drei Lieferanten sind darin **komplett unsichtbar**, weil kein
+einziger ihrer Euros auf einer zugeordneten Kostenstelle liegt (abels fruechtewelt
+145.391 €, intergast deutschland 307 €, „test 1" 3 €).
+
+⚠️ **Dieselbe Migration nennt für denselben Bestand zwei Summen.**
+`mart.lieferant_freigabe_stand` filtert nicht auf `betrieb_key IS NOT NULL`,
+`mart.fremdeinkauf` schon:
+
+```sql
+SELECT round(sum(fn_netto)) FROM mart.lieferant_freigabe_stand;                      -- 35.894.104
+SELECT round(sum(netto))    FROM mart.fremdeinkauf WHERE quelle='foodnotify';        -- 34.766.971
+```
+
+Die Differenz ist exakt die 1.127.133 € von oben. **Beide Zahlen sind richtig und
+beantworten verschiedene Fragen** — die Arbeitsliste soll das Volumen eines Lieferanten
+vollständig zeigen, die Betriebssicht nur, was einem Haus zurechenbar ist. Steht das nicht
+daneben, sieht es wie ein Rechenfehler aus. Ein Nebeneffekt derselben Bauart:
+`fn_betriebe = 0` bei vollem `fn_netto` ist kein Defekt, sondern genau dieser Fall —
+`count(DISTINCT betrieb_key)` überspringt NULL.
+
+Die Arbeitsliste zum Schließen der Lücke gehört an Concept Family; sie steht in
+[`offene-punkte.md`](offene-punkte.md).

@@ -1148,3 +1148,163 @@ freischalten lassen, Rechte erweitern, den Bericht 107 doch noch erbitten. Wo ei
 nur mit LINAs Mitwirkung zu schliessen wäre, wird sie **gemessen und dokumentiert**, nicht
 eskaliert. Nicht betroffen ist Selbstbedienung in der Oberfläche — einen API-Schlüssel im
 Stammdatenblatt selbst zu löschen und neu anzulegen ist kein Kontakt.
+
+---
+
+## 12.08.2026 — Entscheidungen aus der Lieferantenfreigabe
+
+**Anlass.** Die Erhebung „GFGH Q2 2026.xlsx" (Getränkefachgroßhandel je Betrieb, 79
+Produktpreise) kam fast leer zurück. Nachgemessen am 12.08.2026: 88 Betriebsspalten, davon
+**44 ganz ohne jede Angabe**; ein GFGH-Name bei 14 von 88; **607 von 6.952 Preiszellen
+gefüllt, also 8,7 %**. *Eugene:* nicht nachfordern, sondern aus den Rechnungen ableiten.
+Daraus Migration `0055`. Tabellen und Sichten stehen in [`datenmodell.md`](datenmodell.md),
+die Messreihe in [`befunde-datenlage.md`](befunde-datenlage.md), die Nacharbeiten in
+[`offene-punkte.md`](offene-punkte.md).
+
+### Drei Zustände statt zwei — eine fehlende Zeile ist kein Urteil
+
+Die tragende Entscheidung dieser Arbeit. Was in `manual.lieferant_freigabe` **nicht** steht,
+heißt „nicht eingeordnet" und niemals „nicht freigegeben".
+
+| Zustand | Woran erkennbar | Was er aussagt |
+|---|---|---|
+| freigegeben | Zeile mit `freigegeben = true` | Einkauf dort ist gewollt |
+| gesperrt | Zeile mit `freigegeben = false` bzw. GFGH-Befund | Fremdeinkauf — ein Befund |
+| nicht eingeordnet | keine Zeile | niemand hat hingesehen — **kein** Urteil |
+
+**Verworfene Alternative: ein Standardwert.** Ein `DEFAULT false` oder ein
+`COALESCE(…, false)` in der Sicht wäre eine Zeile Code gewesen und hätte die Auswertung
+sofort vollständig aussehen lassen. Nachgemessen am 12.08.2026 hätte er allein in den
+letzten zwölf Monaten **71 Firmen mit 1.175.609 EUR** (8,8 % des FoodNotify-Volumens) zu
+Fremdeinkauf erklärt — darunter Brauereien mit Liefervertrag (Dinkelacker Stuttgart,
+Höpfner Karlsruhe, Auerbräu Rosenheim) und rund ein Dutzend Winzer. Zum Vergleich die
+eingeordnete Seite: 12.245.117 EUR über 51 Betriebe bei 7 Lieferanten.
+
+**Warum das mehr ist als eine saubere Modellierung.** Eine Verdachtsliste, auf der ein
+Dutzend offensichtlicher Vertragspartner steht, wird beim ersten Lesen als kaputt eingestuft
+— und danach werden auch die echten Befunde darin nicht mehr gelesen. Der Standardwert
+hätte den Aufwand nicht gespart, sondern nur unsichtbar gemacht: Statt einer Arbeitsliste
+mit 71 offenen Zeilen gäbe es 71 stille Falschaussagen. Dasselbe Muster wie bei
+`core.bwa_buchungsstand` am 26.07.2026 („hat geliefert / nie gebucht / nie geprüft"), nur
+diesmal von Anfang an mit drei Zuständen statt als Korrektur hinterher.
+
+**Was der dritte Zustand kostet, ehrlich benannt.** Die Sicht beantwortet heute nicht „wo
+kaufen wir am Vertrag vorbei", sondern „hier ist noch nichts entschieden". Nachgemessen am
+12.08.2026 trägt **keine einzige der 9.078 Zeilen** in `mart.fremdeinkauf` über die gesamte
+Historie die Einordnung „nicht freigegeben" — die Verdachtsliste ist am Tag des Commits
+leer. Das ist die Kehrseite derselben Entscheidung und kein Fehler in ihr: Die Zahl der
+offenen Zeilen ist die Fortschrittsanzeige, sie schrumpft, während jemand die Liste
+abarbeitet. Größter offener Posten ist Transgourmet mit 2,65 Mio. EUR — letzter Beleg
+Januar 2025, vermutlich abgelöst, also genau die Art Zeile, die ein Standardwert als Befund
+ausgegeben hätte.
+
+### Der Getränkefachgroßhandel hängt am Betrieb, nicht am Konzern
+
+Bei Food, Nonfood und Kaffee/Tee gibt es Konzernlieferanten, und eine Freigabe gilt für alle
+Häuser. Beim GFGH ist es je Betrieb ein anderer, weil Getränkelogistik regional ist. Deshalb
+zwei Tabellen: `manual.lieferant_freigabe` konzernweit je Warengruppe,
+`manual.gfgh_betrieb` je `betrieb_key`.
+
+**Verworfen: eine Tabelle mit einer zusätzlichen Warengruppe `'getraenke'`.** Das wäre die
+kompaktere Lösung gewesen und die falsche — eine konzernweite Getränkefreigabe ist eine
+Aussage, die es nicht gibt. Sie hätte den GFGH eines einzelnen Hauses für alle 141
+freigegeben und damit genau den Befund gelöscht, den die Erhebung finden sollte.
+`CHECK warengruppe IN ('food','nonfood','kaffee_tee','sonstiges')` sperrt das. **Warum ein
+CHECK und kein Kommentar:** Ein Kommentar hält niemanden auf, der in zwei Jahren „schnell
+noch die Getränke" nachträgt; ein CHECK schon, und zwar laut und beim `INSERT`.
+
+`gebunden` und `verraeumt` sind aus demselben Grund wie oben **dreiwertig** — `NULL` heißt
+„nicht beantwortet" und ist bei 44 der 88 Spalten der Fall, nicht „nein".
+
+### Der Betrieb wird über seinen Namen aufgelöst, nicht über eine getippte Schlüsselzahl
+
+Eine von Hand in die Saat geschriebene `betrieb_key`-Zahl lädt auch dann klaglos, wenn sie
+auf das falsche Haus zeigt — der Fehler ist nicht sichtbar, weil das Ergebnis plausibel
+bleibt. Ein Name ist gegen `core.betrieb` prüfbar. Deshalb steht in den `VALUES` der Name.
+
+**Nachgemessen am 12.08.2026: die Absicherung, auf die sich die Saat beruft, gibt es nicht.**
+Der Kommentar in `0055` verspricht, ein nicht mehr existierender Name „liefert NULL und
+bricht am NOT NULL des Primaerschluessels laut ab". Tatsächlich steht dort ein
+`JOIN core.betrieb b ON b.name = v.betrieb`, und ein INNER JOIN lässt die Zeile still
+fallen: 14 VALUES-Zeilen mit einem absichtlich falschen Namen ergeben 13 Treffer, keinen
+Fehler, keine Meldung. **Die Entscheidung bleibt richtig, ihre Umsetzung trägt sie nicht** —
+bei einer Umbenennung fehlt der GFGH lautlos, und `mart.fremdeinkauf` ordnet dessen Getränke
+dauerhaft als „nicht eingeordnet" ein, also in den Zustand, der wie Arbeit aussieht und
+keine ist.
+
+**Behoben am 12.08.2026, noch vor dem Commit.** `0055` war zu diesem Zeitpunkt zwar auf
+`localhost/lina` angewendet, aber nirgends committet — deshalb wurde die Datei selbst
+korrigiert statt eine Folgemigration nachzuschieben: `LEFT JOIN core.betrieb`, damit ein
+unbekannter Name `NULL` liefert und am `NOT NULL` des Primärschlüssels tatsächlich
+abbricht. Der Kommentar beschreibt jetzt, was der Code tut. Die lokale Datenbank wurde dafür
+zurückgebaut und die Migration neu abgespielt; auf Hetzner läuft sie ohnehin erstmalig.
+
+Der Fall ist trotzdem hier festgehalten, weil die *Fehlerart* wiederkommt: eine Begründung,
+die eine technische Absicherung behauptet, die niemand nachgemessen hat. Aufgefallen ist sie
+nur, weil ein Prüflauf die Behauptung gegen die Datenbank gehalten hat.
+
+### Zusammengeführt wird nur, wo es eine Firma ist — und der Schlüssel wird gerechnet
+
+Die vier FoodNotify-Mandanten führen Distra als vier getrennte Lieferanten. Zusammengeführt
+ist es **einer**: 22.475.163 EUR über 56 Betriebe. Ohne die Zusammenführung steht der
+größte Lieferant des Konzerns viermal klein in der Liste statt einmal groß.
+
+**Die Grenze ist die Firma, nicht die Namensähnlichkeit.** „Trinkkontor" und „Trinkkartell"
+bleiben getrennt. Ein ähnlicher Name ist kein Beleg für dieselbe Firma, und eine falsche
+Zusammenführung meldet sich nie wieder — sie fährt in jeder Folgeauswertung mit. Dieselbe
+Begründung wie bei den Aktionsartikeln am 11.08.2026.
+
+**Verworfen: den normalisierten Schlüssel von Hand in die Saat schreiben.** Er kommt aus
+`core.kreditor_name_norm()`, wie überall sonst auch. Ein getippter Schlüssel ist im Moment
+des Tippens richtig und nach der ersten Änderung der Normalisierungsfunktion still falsch —
+die 18 Zeilen in `manual.kreditor_gruppe` träfen dann ins Leere, ohne dass eine Zeile fehlt.
+
+### FoodNotify und Belegarchiv stehen nebeneinander, sie werden nicht addiert
+
+`mart.fremdeinkauf` trägt eine Spalte `quelle` (`'foodnotify' | 'belegarchiv'`) statt einer
+gemeinsamen Summe. Grund: Dieselbe Rechnung steht in **beiden** Quellen, wenn sie über
+FoodNotify bestellt und in LINA gebucht wurde. `fn_netto + beleg_netto` wäre eine plausible,
+doppelt gezählte Zahl — und die sieht man ihr nicht an.
+
+**Warum das festgelegt wird, bevor es etwas zu addieren gibt.** `core.buchungsbeleg` hat am
+12.08.2026 **0 Zeilen**; der Ladenakte-Abzug (1.048 Paare, 621 davon nicht leer, 593.314
+Belege in acht Ordnern) reiht sich beim nächsten Sync-Lauf von selbst ein. Genau deshalb
+jetzt: Sobald beide Spalten gefüllt sind, sieht ihre Summe richtig aus und niemand rechnet
+nach. Eine Trennung, die erst nach dem ersten falschen Bericht eingezogen wird, kommt zu
+spät.
+
+**Warum es überhaupt zwei Quellen gibt.** FoodNotify deckt nicht den Konzern ab: 14 der 57
+operativen Betriebe haben keine FoodNotify-Daten der letzten zwölf Monate, und diese 14
+tragen 30,0 % des operativen Umsatzes — zehn davon sind „Deutsche Konzepte". Der blinde
+Fleck ist damit fast eine ganze Marke und kein Streuverlust; Zahlen und Gegenproben in
+[`befunde-datenlage.md`](befunde-datenlage.md). Das Belegarchiv ist die einzige Quelle, die
+diese Häuser überhaupt erreicht.
+
+### Offen: Weg B des Belegarchivs liegt durch die gescheiterte Erhebung wieder auf dem Tisch
+
+**Der Stand.** Am 11.08.2026 ist Weg A gewählt worden (`beleglist` je Betrieb und Belegart,
+ohne Mandantenwechsel). Weg B (`/finanzen/document/filelistByBelegart`) liefert dieselben
+Belege mit mehr Feldern — darunter `lineItems`, also die **Rechnungspositionen** — ist aber
+an den im Kopf gewählten Mandanten gebunden: 131 Betriebe hießen 131 Mandantenwechsel.
+Verworfen, und für den Bulk-Lauf zu Recht (`lina-api-inventar-ladenakte.md` §7.2).
+
+**Warum die Ablehnung neu zu prüfen ist.** Die Excel war im Kern eine **Preiserhebung** —
+79 Produkte, Preis je Betrieb, artikelgenau. Diese Frage beantwortet Weg A nicht: Er liefert
+Belegkopf, Lieferant, Sachkonto und Nettobetrag, aber keinen Artikel und keinen Einzelpreis.
+Am 11.08. war Weg B der teurere von zwei Wegen zum selben Ziel. Seit dem Rücklauf von 8,7 %
+ist er der einzige bekannte Weg zu einem Ziel, das sonst gar nicht erreicht wird — die
+Alternative „den Fachbereich fragen" ist gemessen gescheitert. Das ändert die Rechnung, ohne
+dass jemand die Entscheidung geändert hätte.
+
+**Was unverändert dagegen steht, und es ist nicht der Aufwand.** Ein Wechsel des aktiven
+Mandanten verändert Zustand in LINA. Genau das galt am 26.07.2026 bei der Standortkarte als
+durch Regel 1 ausgeschlossen (Abschnitt „Die Standortkarte wartet auf Koordinaten"). Wer Weg
+B will, muss diese Auslegung **ausdrücklich** ändern — und nicht stillschweigend, weil die
+Zahlen diesmal wertvoller erscheinen. Erschwerend: Der Aufwand lässt sich nicht vorab
+messen, ohne den Zustandswechsel schon einmal zu machen; ein rein lesender Messaufruf im
+Sinne von `bun run messen` gibt es hier nicht.
+
+**Nicht entschieden.** Dieser Abschnitt legt nichts fest. Er hält fest, dass die Ablehnung
+vom 11.08.2026 unter einer Annahme getroffen wurde, die seit dem 12.08.2026 nicht mehr gilt,
+und dass die Wiedervorlage eine Entscheidung über Regel 1 ist, keine über Laufzeit. Der
+Punkt steht in [`offene-punkte.md`](offene-punkte.md).

@@ -53,6 +53,8 @@ stellen: Admin → Tabellenmetadaten → Schema `core` → Sichtbarkeit.
 | Sortiment nach Warengruppe | `mart.deckungsbeitrag_warengruppe` |
 | Einkaufspreise über die Zeit, echte Belegpreise | `mart.einkaufspreis_monat` — löst das stillgelegte `preisentwicklung_ware` ab |
 | Konkrete Bestellungen je Betrieb, inklusive Stornos | `mart.einkauf_beleg` — eine Zeile je Bestellung, `storniert` kennzeichnet statt auszublenden |
+| Ist dieser Lieferant überhaupt eingeordnet? | `mart.lieferant_freigabe_stand` — die Arbeitsliste, hier fängt man an; Sortierung nach `fn_netto` selbst setzen |
+| Fremdeinkauf: Volumen je Betrieb, Monat und Lieferant | `mart.fremdeinkauf` — **immer auf genau eine `quelle` filtern**, sonst Doppelzählung |
 | Inventuren und bewerteter Schwund | `mart.inventur` (je Inventur), `mart.inventur_schwund` (je Betrieb und Monat), `mart.inventurposition` (je gezählte Ware) — belastbar praktisch nur bei Wilma Wunder, siehe Migration `0044`–`0048`. Gefüllt seit dem 09.08.2026 (358 Zählungen, 81.190 Positionen) |
 | Was bringen die Marketingaktionen? | `mart.aktionsumsatz_monat` — mit Anteil am Gesamtumsatz |
 | Welche Aktionen gibt es, laufen sie noch? | `mart.aktion` — hinterlegte gegen tatsächliche Laufzeit |
@@ -290,8 +292,11 @@ wirkt nur in der **inneren** Abfrage. Die äußere Sicht aggregiert vorher die g
 und filtert erst danach — 111 Partitionsscans statt der drei gebrauchten. Wer einen Zeitraum
 setzt, muss ihn auf `geschaeftstag` der Basissicht legen. Ausführlich in `fehlerkatalog.md`.
 
-Neue Sichten kommen in eine **neue** Migrationsdatei. `0001` bis `0006` sind angewendet und
-werden nicht mehr geändert; der Stand steht in `public.schema_migration`.
+Neue Sichten kommen in eine **neue** Migrationsdatei. ~~`0001` bis `0006` sind angewendet und
+werden nicht mehr geändert;~~ der Stand steht in `public.schema_migration`.
+(Nachgemessen am 12.08.2026: angewendet sind **58 Dateien bis einschließlich
+`0055_lieferantenfreigabe.sql`**. Die Regel gilt unverändert, nur die Nummern sind
+weitergelaufen — angewendet heißt eingefroren, gleich welche Nummer.)
 
 ## Tempo
 
@@ -368,3 +373,66 @@ nominal; wer sie gegen die reale Reihe hält, misst die Inflation mit und nennt 
 Samstag in den Sommerferien gegen vier Samstage in der Schulzeit ist ein schlechter
 Vergleich. Ob er verworfen wird, entscheidet der Fachbereich — wer stillschweigend
 bereinigt, verliert genau die Fälle, in denen die Ferien die Erklärung sind.
+
+---
+
+## Lieferantenfreigabe und Fremdeinkauf (Migration 0055, 12.08.2026)
+
+Die Erhebung „GFGH Q2 2026.xlsx" kam fast leer zurück — nachgemessen am 12.08.2026: **607 von
+6.952 Preiszellen gefüllt (8,7 %)**, bei 44 der 88 Betriebsspalten stand überhaupt nichts. Statt
+nachzufordern wird der Fremdeinkauf aus den Rechnungen abgeleitet; die beiden Sichten sind das
+Ergebnis. Warum es drei Zustände sind und nicht zwei, und warum der Getränkefachgroßhändler je
+Betrieb gepflegt wird und nicht konzernweit, steht in `entscheidungen.md`; die Tabellen dahinter
+stehen in `datenmodell.md`.
+
+| Sicht | Beantwortet | Falle |
+|---|---|---|
+| `mart.lieferant_freigabe_stand` | Eine Zeile je Lieferanten-Dachname: eingeordnet oder nicht, Volumen beider Quellen nebeneinander, letzter Beleg | Kennt weder `betrieb_status` noch `operativ` und hat kein `ORDER BY` |
+| `mart.fremdeinkauf` | Volumen je Betrieb, Monat und Lieferant, mit der Einordnung daneben | Die Spalte `quelle` darf nicht weggruppiert werden |
+
+**Angefangen wird mit `mart.lieferant_freigabe_stand`, nicht mit `mart.fremdeinkauf`.** Die
+Volumensicht ist nur so gut wie die Pflegeliste dahinter: solange ein Lieferant nicht eingeordnet
+ist, landet sein Umsatz in der Restgruppe, und die Restgruppe ist heute die Mehrheit —
+nachgemessen am 12.08.2026 sind **112 von 119 Dachnamen** „nicht eingeordnet". Die Arbeitsliste
+sagt, wie belastbar eine Fremdeinkauf-Karte gerade wäre. Erst abarbeiten, dann auswerten.
+
+### Zwei Sätze, die vor jeder Karte stehen
+
+**Die Spalte `quelle` darf nicht weggruppiert werden.** `foodnotify` und `belegarchiv` zeigen
+dieselbe Rechnung, sobald sie über FoodNotify bestellt und in LINA gebucht wurde; addiert ergibt
+das den doppelten Einkauf. Jede Karte filtert deshalb auf **genau eine** Quelle. Dieselbe Regel
+in der Arbeitsliste: `fn_netto` und `beleg_netto` stehen nebeneinander, damit ihr Abstand sichtbar
+wird, und werden nie summiert. Heute ist die Falle unsichtbar — nachgemessen am 12.08.2026 hat
+`quelle = 'belegarchiv'` **0 Zeilen**, weil `core.buchungsbeleg` noch leer ist. Sie schlägt mit
+dem ersten Belegarchiv-Abzug zu, und der startet beim nächsten Sync-Lauf von selbst. Wer bis dahin
+ohne Quellenfilter baut, merkt den Bruch nicht an einem Fehler, sondern an einer Zahl, die sich
+über Nacht verdoppelt.
+
+**„nicht eingeordnet" ist kein Fremdeinkauf, sondern die Arbeitsliste.** Der Wert heißt: über
+diesen Lieferanten hat noch niemand entschieden. Nachgemessen am 12.08.2026 in
+`mart.fremdeinkauf`: 6.517.388 EUR über die ganze Historie, in den letzten zwölf Monaten
+1.116.877 EUR bei 33 Betrieben und 71 Lieferanten. Darin stehen Brauereien mit Liefervertrag —
+Dinkelacker Stuttgart, Höpfner Karlsruhe, Auerbräu Rosenheim — und rund ein Dutzend Winzer. Eine
+Karte, die diese Gruppe „Fremdeinkauf" nennt, meldet über hundert Firmen als Befund und ist am
+Tag nach der ersten Pflegerunde eine andere Karte. Fremdeinkauf ist allein
+`einordnung = 'nicht freigegeben'`.
+
+### Fallen dieser beiden Sichten
+
+| Falle | Nachgemessen am 12.08.2026 | Was man tut |
+|---|---|---|
+| `einordnung = 'nicht freigegeben'` heißt im Tabellenkommentar „die Verdachtsliste" | **0 von 9.078** Zeilen tragen den Wert, über die gesamte Historie | Eine Karte darauf ist heute dauerhaft leer und sieht aus wie „kein Befund". Der Verdacht kommt vorerst aus der Arbeitsliste |
+| `mart.lieferant_freigabe_stand` hat kein `ORDER BY`, obwohl ihr Kommentar „absteigend lesen" sagt | — | Sortierung in der Karte selbst setzen, nach `fn_netto` |
+| Dieselbe Sicht trägt weder `betrieb_status` noch `operativ` und zählt geschlossene und verwaltende Häuser mit | 3.385.426 EUR = **9,7 %** des Volumens stammen aus nicht operativen Häusern | Alles, was auf laufende Häuser zielt, aus `mart.fremdeinkauf` bauen — die trägt beide Spalten |
+| Die beiden Sichten nennen für denselben Bestand verschiedene Summen: die Arbeitsliste zählt Kostenstellen ohne Betrieb mit, `mart.fremdeinkauf` filtert sie weg | `sum(fn_netto)` **35.894.104 EUR** gegen **34.766.971 EUR**, Differenz 1.127.133 EUR aus 25 Kostenstellen ohne `betrieb_key` | Beide Zahlen sind für ihre Frage richtig. Nicht nebeneinander auf ein Dashboard, ohne den Unterschied dazuzuschreiben |
+| `gfgh_des_betriebs` verspricht den Getränkefachgroßhändler des Hauses | in **9.078 von 9.078** Zeilen NULL | In der Tabellenmetadaten-Ansicht ausblenden, bis sie trägt |
+| `warengruppe` bleibt in den Fremdeinkaufzeilen NULL | — | Ein Filter `warengruppe = 'getraenke'` verliert genau die Getränke-Fremdeinkaufzeilen. Stattdessen über `lieferant` filtern |
+
+**`quelle = 'foodnotify'` ist keine Vollerhebung, und der Nenner „141" führt in die Irre.**
+Nachgemessen am 12.08.2026: FoodNotify-Bestellungen der letzten zwölf Monate gibt es für 51
+Betriebe. Von den 141 geführten sind aber nur **57 operativ** — der Rest ist geschlossen,
+verwaltend, ohne Geschäft, inaktiv oder Test. Von den 57 haben **43** FoodNotify und **14 nicht**,
+und diese 14 stehen für **30,0 % des operativen Umsatzes** (33.530.901 EUR von 111,9 Mio EUR);
+zehn davon sind „Deutsche Konzepte". Der blinde Fleck ist also fast eine ganze Marke und kein
+Streuverlust: eine Lieferantenkonzentration aus FoodNotify ist die Konzentration der 43. Die
+Aufschlüsselung nach Status und Umsatz steht in `befunde-datenlage.md`.
