@@ -28,3 +28,9 @@ examples/
 *.jpeg
 *.png
 *-snapshot.yml
+
+# Druckausgaben. Die Quelle ist die HTML-Datei daneben, das PDF nur ihr Abzug -
+# knapp 1 MB je Stueck, weil die Schrift eingebettet wird, und bei jeder
+# Neuerzeugung ein anderer Binaerklumpen. Wer es braucht, erzeugt es neu.
+# Die Dateien bleiben lokal vorhanden.
+*.pdf
