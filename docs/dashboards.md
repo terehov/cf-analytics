@@ -97,6 +97,11 @@ Rückweg ist immer, den Filter oben zu löschen.
 | ⑨ | Betrieb gegen Marke | Ein Haus gegen den Schnitt seiner eigenen Marke | ③ |
 | ⑩ | Betrieb gegen die Stadt | Ein Haus gegen die Nachbarhäuser am selben Ort | ③ |
 
+Dazu drei Detailseiten ohne Nummer, die man nicht ansteuert, sondern in die man klickt:
+**Beleg** (`dd_beleg`, aus der Bestellliste), **Zählung** (`dd_inventur`, aus der
+Inventurliste) und **Sperre** (`dd_sperre`, aus „Warum eine Ware nicht verglichen wird" —
+zeigt die Waren und Häuser hinter einer der vier Sperren des Preisvergleichs).
+
 ### Round Table — die Excel-Ablösung
 
 `JULI_Round_Table_Ampelsystem.xlsx`, Blatt für Blatt:

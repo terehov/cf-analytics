@@ -132,6 +132,22 @@ export const P_BEREICH: Parameter = {
 }
 
 /**
+ * Welche der vier Sperren eine Ware vom Preisvergleich ausschliesst.
+ *
+ * Traegt die Beschriftung selbst und keinen technischen Schluessel: sie
+ * steht seit 0063 so in mart.einkaufspreis_betrieb.sperre, und die
+ * Zaehlkarte gibt beim Klick genau diesen Wert weiter. Ein zweiter
+ * Schluessel daneben waere eine zweite Liste zum Auseinanderlaufen.
+ */
+export const P_SPERRE: Parameter = {
+  id: 'sperre-param',
+  name: 'sperre',
+  'display-name': 'Sperre',
+  type: 'text',
+  required: false,
+}
+
+/**
  * Der Handlungsbedarf: "Sofort eskalieren", "Sofort handeln",
  * "Nachforschung", "Beobachten/OK". Anders als die Gesamtampel zaehlt er
  * die roten Bereiche, statt sie nur zu odern -- deshalb trennt er die 43

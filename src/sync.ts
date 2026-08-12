@@ -14,6 +14,7 @@ import { auswahllistenNachlauf } from './sync/auswahllisten'
 import { deckungsbeitragNachlauf } from './sync/deckungsbeitrag'
 import { roundTableNachlauf } from './sync/round_table'
 import { einkaufspreisNachlauf } from './sync/einkaufspreis'
+import { einkaufSichtenNachlauf } from './sync/einkauf_sichten'
 import { yextNachlauf } from './yext/nachlauf'
 
 const ausloeser = process.argv.includes('--backfill') ? 'backfill'
@@ -70,6 +71,16 @@ try {
    * Wirft nie, siehe Kopf von sync/einkaufspreis.ts.
    */
   await einkaufspreisNachlauf()
+
+  /**
+   * Und direkt danach die Einkaufssichten auffrischen — in dieser
+   * Reihenfolge, nicht davor: der Nachlauf darüber schreibt
+   * preis_je_einheit und menge_unstimmig neu, und beides steckt in
+   * mart.einkaufspreis_betrieb_basis. Andersherum zeigten die Karten bis
+   * zum nächsten Lauf den Stand vor der Korrektur.
+   * Wirft nie, siehe Kopf von sync/einkauf_sichten.ts.
+   */
+  await einkaufSichtenNachlauf()
 
   // Vierter Nachlauf: die Online-Bewertungen aus Yext. Anders als die beiden
   // darüber hängt er nicht am Importergebnis, sondern an der Uhr — er läuft

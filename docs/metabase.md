@@ -602,3 +602,54 @@ und wird dadurch nur wichtiger: **immer auf `vergleichbar = true` filtern.**
 Nachgemessen am 12.08.2026: negative `mehrkosten` von −55.282 auf −17.512 EUR gefallen.
 Rest-Einschränkung: dicht unter der Dreifach-Grenze stehen weiter glatte Faktoren (150,0 und
 200,0 Prozent). Belastbar ist der einstellige bis niedrig zweistellige Bereich.
+
+---
+
+## Materialisierte Einkaufssichten und der Drill-Down in eine Sperre (Migration 0063, 12.08.2026)
+
+**Was sich für Kartenbauer ändert: nichts an den Namen.**
+`mart.fremdeinkauf`, `mart.lieferant_freigabe_stand`, `mart.einkaufspreis_monat` und
+`mart.einkaufspreis_betrieb` heissen weiter so, tragen dieselben Spalten in derselben
+Reihenfolge und liefern dieselben Zeilen. Sie stehen jetzt nur auf drei
+materialisierten Sichten statt direkt auf `core`:
+
+| materialisiert | trägt | wird gelesen von |
+|---|---|---|
+| `mart.einkauf_kreditor_monat` | Volumen je Quelle, Betrieb, Monat, Dachlieferant | `fremdeinkauf`, `lieferant_freigabe_stand` |
+| `mart.einkaufspreis_monat_basis` | Preis je Ware und Monat | `einkaufspreis_monat` → `einkaufspreis_veraenderung` |
+| `mart.einkaufspreis_betrieb_basis` | Preis je Ware, Haus und Monat | `einkaufspreis_betrieb` |
+
+Aufgefrischt in `src/sync/einkauf_sichten.ts`, `CONCURRENTLY`, direkt nach
+`einkaufspreisNachlauf()` — in dieser Reihenfolge, weil dort
+`core.gebinde_vereinheitlichen()` die Preise korrigiert.
+
+**Warum die Einordnung NICHT mitmaterialisiert ist.** Freigabe, GFGH und
+Lieferantenart kommen aus `manual.*` und werden bei jedem Kartenaufruf frisch
+gejoint. Wer im Einkauf einen Lieferanten in `manual.lieferant_art` einträgt,
+sieht das Ergebnis sofort und nicht nach dem nächsten Sync. Das ist die
+Trennlinie: **materialisiert wird, was aus der Quelle kommt; live bleibt, was
+jemand pflegt.**
+
+**Drei Regeln, wenn jemand diese Sichten ändert:**
+
+1. Die *Logik* steht in der Sicht — dort ändern, wirkt sofort.
+2. Die *Aggregation* steht in der materialisierten Sicht — dort ändern heisst
+   `DROP MATERIALIZED VIEW ... CASCADE` und alles darüber neu anlegen. `CREATE OR
+   REPLACE` gibt es für materialisierte Sichten nicht.
+3. Eine neue Spalte in der Basis erscheint **nicht** von selbst oben. Die Sicht
+   darüber zählt ihre Spalten auf; `CREATE OR REPLACE VIEW` darf nur anhängen.
+
+**Neu in `mart.einkaufspreis_betrieb`: `sperre` und `gebinde_typisch`.**
+`sperre` nennt, welche der vier Sperren greift („zu wenige Häuser (unter 3)",
+„Gebinde uneinheitlich", „Menge widersprüchlich", „Spreizung über Faktor 3") oder
+„vergleichbar". Reisst ein Fall mehrere, steht die erste da. Die Spalte ersetzt
+den CASE, der bisher in der Zählkarte stand — zwei Kopien derselben
+Fallunterscheidung waren zwei Kopien zum Auseinanderlaufen.
+
+**Der Drill-Down.** „Warum eine Ware nicht verglichen wird" ist ab jetzt eine Tür:
+ein Klick auf die Spalte **Sperre** öffnet `dd_sperre` mit den Waren
+(`sp_waren`) und den einzelnen Häusern (`sp_positionen`) hinter dieser einen
+Zahl. Nur die Spalte ist klickbar, nicht die Zeile — sonst navigiert ein Klick auf
+„Betroffener Einkauf" weg, während man nur lesen wollte. Der Warenfilter auf
+`dd_sperre` bringt einen von 300 Zeilen auf eine Ware herunter; dann steht
+nebeneinander, was jedes Haus für dieselbe Sache gebucht hat.

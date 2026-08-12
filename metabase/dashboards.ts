@@ -56,6 +56,15 @@ const F_BEREICH: Parameter = {
   id: 'd-bereich', name: 'bereich', 'display-name': 'Bereich', type: 'string/=',
   festeWerte: ['Umsatz', 'Personal', 'WE Bar', 'WE Küche', 'Online-Bewertung', 'OM vor Ort'],
 }
+// Welche der vier Sperren eine Ware vom Preisvergleich ausschliesst.
+// Feste Liste statt Datenquelle: es gibt genau diese fuenf Werte, sie
+// stehen so in mart.einkaufspreis_betrieb.sperre (0063), und eine
+// Auswahlliste aus der Spalte laedt 200.000 Zeilen fuer fuenf Antworten.
+const F_SPERRE: Parameter = {
+  id: 'd-sperre', name: 'sperre', 'display-name': 'Sperre', type: 'string/=',
+  festeWerte: ['zu wenige Häuser (unter 3)', 'Gebinde uneinheitlich',
+               'Menge widersprüchlich', 'Spreizung über Faktor 3', 'vergleichbar'],
+}
 // Der Handlungsbedarf. Trennt die roten Betriebe danach, WIE VIELE
 // Bereiche rot sind -- eine rote Ampel heisst handeln, zwei eskalieren.
 const F_INTENSITAET: Parameter = {
@@ -994,10 +1003,11 @@ export const dashboards: Dashboard[] = [
     // Karten, siehe F_MARKE_EINKAUF.
     filter: [F_BETRIEB, F_MARKE_EINKAUF, F_WARE],
     reihen: [
-      { teile: [{ text: '# Einkauf\n\n**Die Daten werden noch geladen** — je Kostenstelle chronologisch aufsteigend: bei unfertigen Marken fehlen gerade die **jüngsten** Monate. Ein Monat mit wenigen Positionen ist meist noch nicht fertig, nicht etwa ein Einbruch. Die erste Karte sagt, welche Marken vollständig sind.\n\nAlle Preise sind **je Gebinde** — was ein bestellter Karton, Sack oder Eimer gekostet hat. Der Preis je Kilo oder Liter steht als Zusatzspalte daneben, bleibt aber oft leer: FoodNotify pflegt die Angabe, wie viel in einem Gebinde steckt, für dieselbe Ware widersprüchlich. Was auffällt oder fehlt, steht in der letzten Karte.\n\n**Ein Sprung auf genau das Doppelte ist fast nie eine Teuerung.** Dieselbe Ware wird im selben Monat mit verschiedenen Gebindegrößen gebucht — Grana Padano 8,82 € bei Größe 1 und 17,64 € bei Größe 2 —, und der Monatsmedian kippt zwischen beiden. Solche Zeilen sind seit Migration 0062 aus „Was ist teurer geworden?" heraus; die Spalte „Gebindegröße" in der Preistabelle zeigt, worauf sich ein Preis bezieht.' }] },
-      // Der Ladestand steht GANZ OBEN, nicht unten als Fussnote: solange
-      // der Backfill laeuft, ist er die Voraussetzung fuer jede Aussage
-      // ueber einen Zeitraum.
+      { teile: [{ text: '# Einkauf\n\nGrundlage sind **echte Bestellungen bei FoodNotify**, keine Katalogpreise — und damit nur der Teil des Einkaufs, der über das Bestellsystem läuft. Was daran vorbeigeht, steht ganz unten unter „Durfte dort eingekauft werden?".\n\nAlle Preise sind **je Gebinde** — was ein bestellter Karton, Sack oder Eimer gekostet hat. Der Preis je Kilo oder Liter steht als Zusatzspalte daneben, bleibt aber oft leer: FoodNotify pflegt die Angabe, wie viel in einem Gebinde steckt, für dieselbe Ware widersprüchlich. Was auffällt oder fehlt, steht in der letzten Karte.\n\n**Ein Sprung auf genau das Doppelte ist fast nie eine Teuerung.** Dieselbe Ware wird im selben Monat mit verschiedenen Gebindegrößen gebucht — Grana Padano 8,82 € bei Größe 1 und 17,64 € bei Größe 2 —, und der Monatsmedian kippt zwischen beiden. Solche Zeilen sind seit Migration 0062 aus „Was ist teurer geworden?" heraus; die Spalte „Gebindegröße" in der Preistabelle zeigt, worauf sich ein Preis bezieht.\n\n**Wie belastbar ein Zeitraum ist, sagt die Karte direkt darunter.** Sie zählt je Marke und Monat, wie viele Bestellungen mit Positionen geladen sind. Ein dünner Monat ist dort Ladestand und kein Einbruch: geladen wird je Kostenstelle chronologisch aufsteigend, bei einer Marke mit offenen Bestellseiten fehlen also die **jüngsten** Monate zuerst.' }] },
+      // Der Ladestand steht GANZ OBEN, nicht unten als Fussnote: er ist
+      // die Voraussetzung fuer jede Aussage ueber einen Zeitraum. Das galt
+      // waehrend des Backfills und gilt danach weiter -- eine Marke kann
+      // jederzeit wieder offene Bestellseiten haben.
       { teile: [{ karte: 'wa_ladestand', hoehe: 9 }] },
       { teile: [{ karte: 'wa_preis_veraenderung', hoehe: 12 }] },
       // Erst das Bild, dann die Zahlen: ein Preissprung faellt in der Linie
@@ -1082,7 +1092,38 @@ export const dashboards: Dashboard[] = [
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ karte: 'ep_betrieb', hoehe: 12,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
-      { teile: [{ karte: 'ep_nicht_vergleichbar', hoehe: 9 }] },
+      // Die Zaehlkarte ist ab hier eine Tuer: ein Klick auf die Spalte
+      // "Sperre" oeffnet die Waren und Haeuser hinter dieser einen Zahl.
+      // Nur diese Spalte, nicht die ganze Zeile — sonst navigiert ein
+      // Klick auf "Betroffener Einkauf" weg, waehrend man nur lesen wollte.
+      { teile: [{ karte: 'ep_nicht_vergleichbar', hoehe: 9,
+        klick: [{ ziel: 'dd_sperre', spalte: 'Sperre',
+                  uebergabe: { sperre: 'Sperre' } }] }] },
+    ],
+  },
+
+  /*
+   * Der Drill-Down in eine Sperre. Eigenes Dashboard und kein Reiter,
+   * dieselbe Stellung wie dd_beleg zu ③: es beantwortet eine Frage zu
+   * EINEM Ausschluss, nicht zum Einkauf insgesamt.
+   *
+   * Ohne gewaehlte Sperre zeigt es alle Zeilen — auch die vergleichbaren.
+   * Das ist Absicht: wer die Seite direkt aufruft, soll etwas sehen und
+   * nicht raten muessen, welcher Filter fehlt.
+   */
+  {
+    schluessel: 'dd_sperre',
+    name: 'Warum diese Ware nicht verglichen wird',
+    beschreibung:
+      'Die Waren und Häuser hinter einer der vier Sperren des Preisvergleichs. Erreichbar über einen Klick auf die Spalte „Sperre" in „Warum eine Ware nicht verglichen wird".',
+    sammlung: 'Drill-Down',
+    filter: [F_SPERRE, F_MARKE, F_WARE],
+    reihen: [
+      { teile: [{ text: '# Hinter der Sperre\n\n**Eine Sperre ist kein Fehler, sondern ein Verzicht.** Sie sagt: für diese Ware in diesem Monat gibt es keinen belastbaren Vergleich zwischen den Häusern — nicht, dass etwas falsch eingekauft wurde.\n\n**„zu wenige Häuser"** ist der Normalfall und harmlos: unter drei Häusern ist der „Median" nur der andere Betrieb.\n\n**„Gebinde uneinheitlich"** und **„Menge widersprüchlich"** sind Datenpflege, kein Preisthema — die Häuser buchen dieselbe Lieferung verschieden. Der Fingerabdruck steht in der Tabelle: gleicher Gebindepreis, weit auseinanderlaufender Preis je Einheit.\n\n**„Spreizung über Faktor 3"** ist die stumpfe Bremse hinter den drei feinen. Bei gleicher Ware, Einheit und Monat gibt es keinen Einkauf, der das Dreifache kostet; es gibt eine anders gebuchte Menge.' }] },
+      { teile: [{ karte: 'sp_waren', hoehe: 12 }] },
+      { teile: [{ text: '## Die einzelnen Häuser\n\nDieselben Zeilen, eine Stufe feiner. Über den **Warenfilter** oben kommt man von 300 Zeilen auf eine Ware herunter — dann steht nebeneinander, was jedes Haus für dieselbe Sache gebucht hat.' }] },
+      { teile: [{ karte: 'sp_positionen', hoehe: 14,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
     ],
   },
 

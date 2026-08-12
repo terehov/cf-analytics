@@ -821,3 +821,41 @@ unterscheiden, **ohne eine Zahl zu raten**? Die Antwort liegt vermutlich darin, 
 Feld die Packungsgrösse trägt — der naheliegende Test (`gebinde_menge = inhalt_soll`) ist
 aber widerlegt: 19.568 Treffer bei 21 tatsächlichen Fehlern. Bis das geklärt ist, ist die
 Faktorgrenze eine Notlösung, die bewusst zu viel verwirft.
+
+---
+
+## Nach dem Deployment von 0063 zu prüfen (offen seit 12.08.2026)
+
+**Reihenfolge, sonst scheitert es.** Erst pushen, damit der Container 0063 einspielt —
+`mart.einkaufspreis_betrieb.sperre` und `gebinde_typisch` gibt es vorher nicht. Dann
+`POST /api/database/2/sync_schema`, dann `bun run metabase/uebernehmen.ts`. Wer
+provisioniert, bevor die Migration steht, bricht mit „Feld nicht gefunden" ab — und die
+neuen Karten `sp_waren`/`sp_positionen` stünden angelegt, aber leer.
+
+**Was gegengeprüft werden muss:** der Belegarchiv-Zweig von `mart.fremdeinkauf` ist lokal
+nicht prüfbar (die lokale Datenbank führt 0 Buchungsbelege). Die Gegenprobe sind die vier
+Summen der letzten zwölf Monate, gemessen vor dem Umbau:
+
+| Quelle | Einordnung | netto |
+|---|---|---|
+| belegarchiv | freigegeben | 19.979.323 |
+| belegarchiv | nicht freigegeben | 7.930.024 |
+| foodnotify | freigegeben | 14.502.396 |
+| foodnotify | nicht freigegeben | 300.750 |
+
+Weichen sie ab, liegt es am Umbau und nicht an neuen Daten — der Sync lädt zwar weiter,
+aber nicht in dieser Grössenordnung.
+
+**Der erste Refresh läuft ohne Netz.** `REFRESH ... CONCURRENTLY` braucht eine gefüllte
+Sicht; gefüllt wird sie beim `CREATE` in der Migration, also im Containerstart. Dauert das
+zu lange, bricht der Start ab und der Container läuft nicht an. Lokal kostet der Aufbau
+6,9 s bei 634.175 Positionen und 0 Belegen; auf der Produktionsdatenbank kommen 394.575
+Belege dazu. Falls der Start hängt: `sync.merker` unter `einkauf_sichten_refresh` zeigt
+die Dauer des letzten regulären Refreshs.
+
+**Eine verwaiste Abfrage steht noch auf der Produktionsdatenbank** (PID 36368, seit
+14:03 UTC, `psql`, `WITH zeile AS (...)` über `core.bestellposition`). Sie stammt aus der
+Diagnose am Vormittag: der Client wurde beendet, der Server rechnet weiter. Ein Abbruch
+per `pg_cancel_backend(36368)` wurde von der Freigabe der Agentenumgebung abgelehnt und
+muss von Hand kommen. Sie schadet nichts ausser Rechenzeit, aber sie hat an den gemessenen
+Ladezeiten mitgewirkt.

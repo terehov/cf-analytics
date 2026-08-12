@@ -1232,3 +1232,70 @@ belastbar ist.
 
 **Regel für die Karte:** zuerst auf `Soll je Gezählt` sehen. Weit über 1 heisst, der
 Prozentwert daneben ist wertlos.
+
+---
+
+## Die Einkaufsseiten waren nicht langsam, sie waren blockiert (gemessen 12.08.2026)
+
+Gemeldet vom Fachbereich: „die meisten Karten laden hier viel zu lange"
+(Dashboard 26, Fremdeinkauf). Nachgesehen auf der Produktionsdatenbank, während
+die Seite offen war:
+
+```sql
+SELECT count(*) FILTER (WHERE state='active') AS aktiv,
+       max(now()-query_start) FILTER (WHERE state='active') AS aelteste
+  FROM pg_stat_activity WHERE pid <> pg_backend_pid();
+-- 17 aktiv, älteste 1h57min
+```
+
+Siebzehn gleichzeitige Abfragen, die Karten **einer** Seite, die ältesten neun
+Minuten alt und noch nicht fertig.
+
+**Die Ursache ist Bauart, nicht Last.** `mart.fremdeinkauf` war eine Sicht. Jede
+ihrer zwölf Karten las damit 394.575 Buchungsbelege und 66.926 Bestellungen von
+vorn, normierte dabei jeden Kreditorennamen über zwei `regexp_replace` in
+`core.kreditor_name_norm` und aggregierte das Ergebnis. Zwölf Karten sind zwölf
+vollständige Durchläufe derselben Rechnung, gleichzeitig gestartet, um dieselben
+Kerne konkurrierend. `mart.einkaufspreis_monat` und `mart.einkaufspreis_betrieb`
+machen dasselbe mit 876.611 Bestellpositionen, je zwei `percentile_cont` und
+einem `mode()` obendrauf.
+
+**Gemessen lokal (634.175 Positionen, leere Maschine, vorher/nachher):**
+
+| Sicht | vorher | nachher | Faktor |
+|---|---|---|---|
+| `mart.einkaufspreis_betrieb` | 1.697 ms | 8,9 ms | 190 |
+| `mart.einkaufspreis_monat` | 1.218 ms | 10,7 ms | 114 |
+| `mart.fremdeinkauf` (**ohne** Belegarchiv) | 133 ms | 3,9 ms | 34 |
+| `mart.lieferant_freigabe_stand` | 387 ms | 30,8 ms | 12 |
+| `mart.einkaufspreis_veraenderung` | 1.438 ms | 74 ms | 19 |
+
+Die lokale Datenbank führt **keine** Buchungsbelege — auf der
+Produktionsdatenbank liegt der Faktor bei `fremdeinkauf` deutlich höher, weil
+dort die 394.575 Belege den Aufwand tragen. **Dort gemessen, auf leerem Server:
+60,4 Sekunden für die Summenabfrage EINER Kachel.** Zwölf davon gleichzeitig sind
+die gemeldeten Minuten; nach dem Umbau zahlt diese Minute der Refresh, einmal je
+Sync-Lauf, statt jede Karte bei jedem Aufruf. Refresh-Kosten lokal: 6,9 s für alle
+drei materialisierten Sichten zusammen, einmal je Sync-Lauf.
+
+**Die Trennlinie läuft an der Pflegearbeit entlang, nicht am Rechenaufwand.**
+`manual.lieferant_art` und `manual.lieferant_freigabe` sind die Arbeitsliste des
+Einkaufs: wer dort einträgt, muss das Ergebnis sofort sehen. In der
+Materialisierung liegt deshalb nur, was aus LINA und FoodNotify kommt; jede
+Einordnung wird bei jedem Kartenaufruf frisch dazugejoint — die Pflegetabellen
+haben 5 bis 85 Zeilen, das kostet nichts.
+
+**Gegenprobe vor dem Commit:** alle fünf Sichten liefern nach Migration 0063
+zeichengleiche Ergebnisse wie davor (CSV-Vergleich über 452.940 Zeilen, `diff`
+ohne Ausgabe). Der Belegarchiv-Zweig von `mart.fremdeinkauf` ist lokal nicht
+prüfbar und wurde deshalb **read-only auf der Produktionsdatenbank** gegengeprüft: die neue
+Bauart als eine Abfrage geschrieben, gegen die laufende Sicht gehalten, beide im
+selben Lauf. Vier Zeilen, vier gleiche Zahlen — 19.979.323 / 7.930.024 /
+14.502.623 / 300.750 €.
+
+**Nebenbefund:** die älteste der siebzehn Abfragen lief seit 1h57min und war eine
+verwaiste `psql`-Sitzung aus der Diagnose vom selben Vormittag — der Client war
+weg, der Server rechnete weiter. Ein `pkill` auf den Client beendet die Abfrage
+nicht; sie stirbt erst, wenn Postgres beim Senden merkt, dass niemand mehr
+zuhört. **Regel:** eine lange Abfrage nicht wegkillen, sondern mit
+`pg_cancel_backend(pid)` abbrechen.

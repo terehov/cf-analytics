@@ -29,11 +29,25 @@
 // Konzerns. Das Belegarchiv sieht die Rechnung trotzdem.
 // =====================================================================
 
-import type { Karte } from './typen'
-import { P_BETRIEB, P_MARKE } from './gemeinsam'
+import type { Karte, Parameter } from './typen'
+import { P_BETRIEB, P_MARKE, P_SPERRE } from './gemeinsam'
 
 const BETRIEB = P_BETRIEB
 const MARKE = P_MARKE
+const SPERRE = P_SPERRE
+
+/**
+ * Die einzelne Ware — nur fuer den Drill-Down in die Sperren, damit man
+ * nach dem Klick von 300 Zeilen auf eine Ware herunterkommt. Gleiche
+ * Bauart wie in karten-fach.ts: MIT Werteliste, denn
+ * "Blumenk.i.backt10,2G Tk Veg7Kg" tippt niemand fehlerfrei, und ein
+ * Tippfehler ergibt in Metabase keine Fehlermeldung, sondern eine leere
+ * Karte.
+ */
+const WARE: Parameter = {
+  id: 'ware-param', name: 'ware', 'display-name': 'Ware', type: 'string/=',
+  werteliste: ['mart', 'einkaufspreis_monat', 'ware'],
+}
 
 /**
  * Zwoelf Monate zurueck. Als Textbaustein und nicht als CTE, weil diese
@@ -371,13 +385,15 @@ SELECT betrieb                        AS "Betrieb",
       'Die vier Sperren, jede mit ihrer Menge. Sie stehen hier, weil eine ausgeschlossene Ware, die nirgends auftaucht, eine stille Kürzung wäre. „zu wenige Häuser" ist der Normalfall und harmlos. „Gebinde uneinheitlich" und „Menge widersprüchlich" heißen, dass die Häuser dieselbe Ware verschieden buchen — das ist ein Datenpflegethema, kein Preisthema. „Spreizung über Faktor 3" fängt, was die anderen drei durchlassen.',
     anzeige: 'table',
     parameter: [MARKE],
+    /*
+     * Die Fallunterscheidung stand bis 0063 hier als CASE. Sie steht jetzt
+     * als Spalte in der Sicht, weil der Drill-Down darunter dieselbe
+     * Einteilung braucht — zwei Kopien einer Fallunterscheidung sind zwei
+     * Kopien zum Auseinanderlaufen. Die Zahlen sind dieselben: gleiche
+     * Reihenfolge der Zweige, gleiche Schwellen.
+     */
     sql: `
-SELECT CASE WHEN betriebe_operativ < 3   THEN 'zu wenige Häuser (unter 3)'
-            WHEN gebinde_uneinheitlich   THEN 'Gebinde uneinheitlich'
-            WHEN menge_widerspruechlich  THEN 'Menge widersprüchlich'
-            WHEN spreizung_zu_gross      THEN 'Spreizung über Faktor 3'
-            ELSE 'vergleichbar'
-       END                     AS "Sperre",
+SELECT sperre                  AS "Sperre",
        count(*)                AS "Zeilen",
        count(DISTINCT ware)    AS "Waren",
        round(sum(ausgaben))    AS "Betroffener Einkauf"
@@ -385,7 +401,81 @@ SELECT CASE WHEN betriebe_operativ < 3   THEN 'zu wenige Häuser (unter 3)'
  WHERE operativ
    AND ${ZWOELF_MONATE}
    [[AND konzept = {{marke}}]]
- GROUP BY 1
+ GROUP BY sperre
  ORDER BY 4 DESC NULLS LAST`,
+  },
+
+  // -------------------------------------------------------------------
+  // Der Drill-Down in eine Sperre. Zwei Karten, weil die Frage nach dem
+  // Klick zwei Stufen hat: WELCHE Waren stecken dahinter, und was steht
+  // in den einzelnen Haeusern.
+  //
+  // Beide filtern auf operativ und zwoelf Monate wie die Zaehlkarte
+  // darueber — sonst zaehlt die Uebersicht 4.000 Zeilen und die Liste
+  // zeigt 6.000, und niemand findet den Grund.
+  // -------------------------------------------------------------------
+  {
+    schluessel: 'sp_waren',
+    name: 'Waren hinter dieser Sperre',
+    beschreibung:
+      'Je Ware, Einheit und Monat: warum der Vergleich gesperrt ist und wie weit die Häuser auseinanderliegen. Der Faktor ist der schlechteste durch den besten Preis je Basiseinheit — ab 3 greift die stumpfe Sperre. Die beiden Gebindepreis-Spalten daneben sind die Gegenprobe: laufen sie zusammen, während die Basiseinheit spreizt, ist es eine Mengenbuchung und kein Preisunterschied.',
+    anzeige: 'table',
+    parameter: [SPERRE, MARKE, WARE],
+    sql: `
+SELECT monat                              AS "Monat",
+       ware                               AS "Ware",
+       einheit                            AS "Einheit",
+       max(sperre)                        AS "Sperre",
+       max(betriebe_operativ)             AS "Häuser operativ",
+       max(betriebe_gesamt)               AS "Häuser gesamt",
+       count(DISTINCT gebinde_typisch)    AS "Gebindegrößen",
+       round(max(konzern_bester), 4)      AS "Bester je Einheit",
+       round(max(konzern_schlechtester), 4) AS "Schlechtester je Einheit",
+       round(max(konzern_schlechtester)
+             / nullif(max(konzern_bester), 0), 1) AS "Faktor",
+       round(min(preis_je_gebinde), 2)    AS "Gebindepreis min",
+       round(max(preis_je_gebinde), 2)    AS "Gebindepreis max",
+       round(sum(ausgaben))               AS "Einkauf"
+  FROM mart.einkaufspreis_betrieb
+ WHERE operativ
+   AND ${ZWOELF_MONATE}
+   [[AND sperre = {{sperre}}]]
+   [[AND konzept = {{marke}}]]
+   [[AND ware = {{ware}}]]
+ GROUP BY monat, ware, einheit
+ ORDER BY sum(ausgaben) DESC NULLS LAST
+ LIMIT 300`,
+  },
+
+  {
+    schluessel: 'sp_positionen',
+    name: 'Die einzelnen Häuser',
+    beschreibung:
+      'Eine Zeile je Haus, Ware und Monat — die Positionen, aus denen die Sperre entstanden ist. „Gebinde typisch" ist die häufigste Gebindegröße dieses Hauses in diesem Monat; stehen dort verschiedene Zahlen, buchen die Häuser dieselbe Lieferung verschieden, und das ist der häufigste Grund für eine Sperre. Nach Ware und Preis sortiert, damit die Ausreißer nebeneinander stehen.',
+    anzeige: 'table',
+    parameter: [SPERRE, MARKE, WARE],
+    sql: `
+SELECT monat                        AS "Monat",
+       ware                         AS "Ware",
+       einheit                      AS "Einheit",
+       betrieb                      AS "Betrieb",
+       konzept                      AS "Marke",
+       gebinde_typisch              AS "Gebinde typisch",
+       bestellungen                 AS "Bestellungen",
+       gebinde                      AS "Gebinde",
+       round(menge, 2)              AS "Menge",
+       round(preis, 4)              AS "Preis je Einheit",
+       round(preis_je_gebinde, 2)   AS "Preis je Gebinde",
+       round(ausgaben)              AS "Ausgaben",
+       lieferanten                  AS "Lieferant",
+       sperre                       AS "Sperre"
+  FROM mart.einkaufspreis_betrieb
+ WHERE operativ
+   AND ${ZWOELF_MONATE}
+   [[AND sperre = {{sperre}}]]
+   [[AND konzept = {{marke}}]]
+   [[AND ware = {{ware}}]]
+ ORDER BY ware, monat DESC, preis DESC
+ LIMIT 500`,
   },
 ]
