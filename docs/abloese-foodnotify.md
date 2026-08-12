@@ -31,7 +31,7 @@ wiegen die folgenden Mängel schwer: es gibt keine Ausweichquelle.
 
 ## 1. Kernfunktionen des Produkts sind nachweislich defekt
 
-Das unterscheidet FoodNotify von LINA: nicht nur die API ist unbequem, das
+Nicht nur die API ist unbequem, das
 **Produkt selbst rechnet falsch** — sichtbar für jeden Nutzer der Oberfläche:
 
 - **Die Verkaufsverarbeitung ist kaputt.** Jeder geprüfte Verkaufsdatensatz
@@ -43,12 +43,7 @@ Das unterscheidet FoodNotify von LINA: nicht nur die API ist unbequem, das
 - **Die Kostenanalyse zeigt Phantasiewerte ohne Warnung:** Aposto
   −10.036.635 € Ist-Wareneinsatz bei 762.455 € Umsatz (**−2667 %**); in keiner
   der vier Marken belastbar. Selbst die plausibelste Marke (Deutsche Konzepte,
-  5,36 %) liegt Faktor fünf unter branchenüblichen Quoten.
-- **Preishistorie gibt es nur im separaten Beta-Produkt B.E.A.M.** (eigener
-  Login, eigene Datenhaltung, Historie erst ab Einspeisung — nicht rückwirkend).
-  Im Hauptprodukt führt der Warenstamm nur den jeweils aktuellen Preis.
-- **Das Analytics-Modul ist eine Tableau-Einbettung** ohne Daten-API (JWT mit
-  Scope `tableau:views:embed`, 9 Minuten gültig).
+  5,36 %) liegt Faktor fünf unter branchenüblichen Quoten.$
 
 Q: foodnotify-api-inventar.md §2/§7/§8, entscheidungen.md „Kein Support-Kontakt"
 
