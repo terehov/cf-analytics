@@ -401,9 +401,49 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
   // mart.einkaufspreis_monat und mart.einkaufspreis_veraenderung fuehren
   // deshalb `marke` und keine Betriebsspalte -- ein Betriebsfilter haette
   // hier nichts, worauf er zeigen koennte.
-  wa_ladestand:           { betrieb: 'Ladestand je Marke; die Sicht fuehrt keinen Betrieb.' },
+  // --- Einkauf --------------------------------------------------------------
+  // Der WARE-Filter (0062) ist von Natur aus auf die beiden Preiskarten
+  // beschraenkt: er waehlt EINEN Artikel, und die uebrigen Karten dieser Seite
+  // verdichten ueber alle Artikel -- je Lieferant, je Betrieb, je Marke. Sie
+  // koennten ihn zwar lesen, wuerden dann aber etwas anderes zeigen, als ihr
+  // Titel verspricht ("Lieferanten nach Einkaufsvolumen" mit einem einzigen
+  // Artikel darin ist keine Lieferantenrangliste mehr).
+  wa_ladestand: {
+    betrieb: 'Ladestand je Marke; die Sicht fuehrt keinen Betrieb.',
+    ware: 'Zaehlt geladene BESTELLUNGEN, nicht Artikel -- eine Ware einzugrenzen '
+        + 'wuerde den Ladestand kleiner aussehen lassen, als er ist.',
+  },
   wa_preise:              { betrieb: 'Einkaufspreise gelten je Marke, nicht je Haus.' },
-  wa_preis_veraenderung:  { betrieb: 'ebenso -- Preisentwicklung je Marke.' },
+  wa_preis_veraenderung:  { betrieb: 'ebenso -- Preisentwicklung je Marke.',
+                            ware: 'Die Karte IST die Rangliste der groessten Spruenge ueber alle '
+                                + 'Artikel. Mit einer gewaehlten Ware bleibt eine Zeile uebrig, '
+                                + 'und die steht daneben schon im Verlauf.' },
+  wa_preis_verlauf:       { betrieb: 'Einkaufspreise gelten je Marke, nicht je Haus -- '
+                                   + 'mart.einkaufspreis_monat fuehrt keinen Betrieb.' },
+  wa_lieferant_volumen:   { ware: 'Rangliste der Lieferanten ueber ihr gesamtes Sortiment.' },
+  wa_lieferant_konzentration: { ware: 'Beschaffungsrisiko je Haus ueber alle Artikel -- der '
+                                    + 'Anteil des groessten Lieferanten an EINER Ware sagt nichts.' },
+  wa_einkauf_betrieb:     { ware: 'Einkaufsvolumen je Betrieb und Monat, ueber alle Artikel.' },
+  wa_einkauf_pruefung:    { ware: 'Pruefliste ueber alle auffaelligen Positionen; wer sie nach '
+                                + 'einer Ware filtert, sieht nicht mehr, was sonst auffiel.' },
+  wa_inventur_schwund:    { ware: 'Inventuren zaehlen Bestaende, keine Bestellartikel.' },
+
+  // --- Fremdeinkauf (0055/0058) ---------------------------------------------
+  fe_kachel_verweis: {
+    monat: 'Festes 12-Monats-Fenster -- die Kachel fragt "wie viel laeuft am Konzern '
+         + 'vorbei", nicht "wie viel im Juni".',
+    zeitraum: 'ebenso.',
+    marke: 'BEWUSST ohne Markenfilter. db_einkauf filtert nach dem FoodNotify-Mandanten, '
+         + 'mart.fremdeinkauf fuehrt das Round-Table-Konzept. Beide Filter heissen marke; '
+         + 'verdrahtet stuende hier dauerhaft eine leere Kachel ohne Fehlermeldung.',
+    ware: 'Verweiskachel auf eine andere Seite; sie zeigt eine Summe, keinen Artikel.',
+  },
+  fe_betriebe_betroffen:  { betrieb: 'ZAEHLT die betroffenen Betriebe. Mit gesetztem Betrieb '
+                                   + 'waere das Ergebnis 0 oder 1 -- eine Zahl, die nichts sagt.' },
+  fe_freigabestand:       { betrieb: 'Die Freigabeliste gilt konzernweit; sie kennt keinen Betrieb.',
+                            marke: 'ebenso -- ein Dachlieferant gehoert keiner Marke.' },
+  ep_nicht_vergleichbar:  { betrieb: 'Zaehlt, WARUM Waren aus dem Preisvergleich fallen. Die '
+                                   + 'Sperren gelten konzernweit je Ware, nicht je Haus.' },
 
   // --- Bewertungen ---------------------------------------------------------
   bw_verlauf: {
