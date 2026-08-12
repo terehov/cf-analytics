@@ -859,3 +859,32 @@ Diagnose am Vormittag: der Client wurde beendet, der Server rechnet weiter. Ein 
 per `pg_cancel_backend(36368)` wurde von der Freigabe der Agentenumgebung abgelehnt und
 muss von Hand kommen. Sie schadet nichts ausser Rechenzeit, aber sie hat an den gemessenen
 Ladezeiten mitgewirkt.
+
+## Neun Objekte haben ihre Kommentare verloren (gefunden 12.08.2026)
+
+Beim Umbenennen fiel auf, dass `COMMENT ON`-Texte verschwinden, wenn eine Sicht per
+`DROP ... CASCADE` neu gebaut wird — die abhängigen Sichten entstehen ohne sie. Für die
+Objekte, die davon am 12.08. betroffen waren, holt Migration `0066` die Texte zurück.
+Ohne Kommentar sind aber noch:
+
+| Objekt | zuletzt beschrieben in |
+|---|---|
+| `mart.standort` | Sicht besteht, Text weg |
+| `mart.ampel_bereich` | " |
+| `mart.round_table_trend` | " |
+| `mart.konzept_schnitt_monat` | " |
+| `mart.ursachen_analyse` | " |
+| `mart.einkaufspreis_veraenderung` | " |
+| `core.lieferant.liefertage` | Spalte |
+| `core.ware_stand.listenpreis` | Spalte |
+| `core.buchungsbeleg.sachkonto_` | Spalte |
+
+**Warum das mehr ist als Kosmetik:** in Metabase steht an diesen Objekten weiter die
+Beschreibung vom letzten Sync — eine Konserve, die niemand mehr über die Datenbank
+erreicht. Ist der Text seither fachlich falsch geworden, liest ihn trotzdem jeder, der
+auf das Info-Zeichen klickt. `uebernehmen.ts` zieht nur nach, wo ein Kommentar *steht*;
+ein fehlender überschreibt nichts.
+
+**Reihenfolge beim Aufräumen:** den Text aus der Migration holen, in der er zuletzt
+stand, gegen den heutigen Stand der Sicht lesen (er kann veraltet sein), und in einer
+neuen Migration setzen. Nicht blind zurückkopieren.
