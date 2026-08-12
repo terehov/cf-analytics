@@ -1111,3 +1111,48 @@ danach lohnt der Zahlenfehler, und der Nullbetrag ist zu zwei Dritteln gar nicht
 **Bis dahin gilt für jede Auswertung des Zweigs:** `abs(netto) <= 100000` filtern und die
 Einordnung nicht als Ergebnis lesen. Und weiterhin nie über `quelle` summieren — jetzt, wo
 beide Zweige Daten führen, steht dieselbe Rechnung erstmals wirklich doppelt da.
+
+### Was Migration 0058 daraus macht (gemessen 12.08.2026, Produktivbank)
+
+Die drei Mängel oben sind behoben, soweit sie zu beheben sind. Gemessen wurde, indem die
+Seeds schreibgeschützt gegen den Produktivbestand durchgespielt wurden — 0058 selbst ist
+zum Zeitpunkt der Messung dort noch nicht angewendet.
+
+**Die Abgrenzung trägt sofort.** Vom plausiblen Belegarchiv-Volumen (126,6 Mio EUR bei der
+neuen Grenze von 1 Mio je Beleg):
+
+| Art | Lieferanten | Netto | Anteil |
+|---|---|---|---|
+| **wareneinkauf** | 34 | **52.353.623** | 41,4 % |
+| *nicht eingeordnet* | 8.292 | 44.062.259 | 34,8 % |
+| konzern | 13 | 14.380.916 | 11,4 % |
+| zahlungsdienst | 7 | 5.382.182 | 4,3 % |
+| energie | 5 | 2.580.684 | 2,0 % |
+| handwerk_bau | 7 | 2.510.987 | 2,0 % |
+| bank_leasing | 8 | 2.449.787 | 1,9 % |
+| marketing_plattform | 3 | 1.110.648 | 0,9 % |
+| behoerde | 3 | 784.505 | 0,6 % |
+| dienstleistung | 3 | 562.647 | 0,4 % |
+| miete | 1 | 425.951 | 0,3 % |
+
+**Fast ein Viertel des Volumens (29,8 Mio EUR) ist gar kein Wareneinkauf** und hätte ohne
+diese Abgrenzung als Fremdeinkauf gezählt — allein 14,4 Mio Konzerninnenumsatz und 5,4 Mio
+Kartengebühren.
+
+**Der Befund, der übrig bleibt**, auf den eingeordneten Wareneinkauf gerechnet:
+
+| | Lieferanten | Betriebe | Netto |
+|---|---|---|---|
+| freigegeben (Konzernfreigabe) | 5 | 70 | 34.900.401 |
+| **nicht freigegeben** | **29** | **83** | **17.453.222** |
+
+Aus 8.164 Verdachtsfällen und 14 Billionen sind **29 Lieferanten und 17,5 Mio EUR**
+geworden. Der GFGH je Betrieb ist hier noch nicht gegengerechnet — die Sicht tut das, also
+liegt die echte Zahl darunter.
+
+**Was offen bleibt: 44 Mio EUR auf 8.292 uneingeordneten Namen.** Das ist die Arbeitsliste,
+und sie ist nach Volumen sortiert abzuarbeiten. Die 34 eingeordneten Warenlieferanten
+decken bereits 41 Prozent; die Namen darunter werden schnell klein und OCR-verrauscht
+("comis9 shemalessignal iduna gruppe"). Bewusst nicht zugeordnet bleibt `cf`
+(245.551 EUR, 13 Betriebe): das kann CF Gastro sein oder Concept Family, Wareneinkauf oder
+Konzerninnenumsatz — und das entscheidet kein Präfix.

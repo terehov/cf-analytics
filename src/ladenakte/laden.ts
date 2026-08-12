@@ -71,6 +71,32 @@ const kontoZuNull = (v: unknown): string | null => {
 }
 
 /**
+ * Obergrenze für einen Belegbetrag. Alles darüber ist `null`, nicht die Zahl.
+ *
+ * LINA liefert in `nettoBetrag` gelegentlich Cent mal 10^6. Nachgesehen in
+ * `raw.api_antwort` am 12.08.2026: das Rohfeld enthält selbst
+ * `"117982000000,00"`, wo die Steueraufteilung daneben `0,00/0,00/1.267,47`
+ * sagt. `deutscheZahl` hat also korrekt gelesen, was ankam — der Fehler sitzt
+ * in der Quelle, und dorthin reicht niemand von uns.
+ *
+ * DIE ZAHL WIRD NICHT KORRIGIERT, sondern verworfen. Durch 10^8 zu teilen
+ * hiesse, einen Betrag zu erfinden: netto und Steuersumme stimmen auch dort
+ * nicht überein, wo beide plausibel aussehen. Dieselbe Regel wie eine Zeile
+ * tiefer — aus „unbekannt" darf kein Wert werden.
+ *
+ * 1 Mio EUR ist bewusst grosszügig: gemessen über 111.187 Rechnungen mit
+ * Betrag liegt das 99. Perzentil bei 6.292 EUR, die grösste glaubhafte bei
+ * 99.232 EUR. Getroffen werden 124 Belege, 105 davon über 100 Mio.
+ * Migration 0058 hat die bereits geladenen auf NULL gesetzt.
+ */
+const BELEG_OBERGRENZE = 1_000_000
+
+const belegBetrag = (roh: unknown): number | null => {
+  const n = deutscheZahl(String(roh ?? ''))
+  return n !== null && Math.abs(n) >= BELEG_OBERGRENZE ? null : n
+}
+
+/**
  * `zusatz` entsteht durch LÖSCHEN der bekannten Felder, nicht durch Aufzählen
  * der unbekannten. Damit ist jedes Feld, das LINA künftig hinzufügt, sofort in
  * der Datenbank statt still verloren — und `mart.buchungsbeleg_zusatzfelder`
@@ -194,6 +220,19 @@ async function belegeSchreiben(
 
   if (zeilen.length === 0) return 0
 
+  // Kein stiller Verlust: was belegBetrag verwirft, steht im Log. Sonst sieht
+  // ein Lauf mit lauter unlesbaren Betraegen genauso aus wie ein sauberer.
+  const verworfen = zeilen.filter(z =>
+    deutscheZahl(String(z.nettoBetrag ?? '')) !== null &&
+    belegBetrag(z.nettoBetrag) === null).length
+  if (verworfen > 0) {
+    log.warn('unglaubhafte Belegbetraege verworfen', {
+      betrieb_key: bk, typ_id: typId, anzahl: verworfen,
+      grenze: BELEG_OBERGRENZE,
+      hinweis: 'LINA liefert nettoBetrag teils als Cent mal 10^6, siehe 0058',
+    })
+  }
+
   const spalten = [
     'betrieb_key', 'lina_betrieb_id', 'typ_id', 'lina_id', 'encrypted_id',
     'beleg_datum', 'leistungs_datum', 're_nummer', 'netto', 'netto_split_roh',
@@ -216,7 +255,8 @@ async function belegeSchreiben(
       leistungs_datum: ausDatum(z.leistungsDatum),
       re_nummer: leerZuNull(z.reNumber),
       // Bei unlesbarem Betrag NULL, nicht 0 — sonst wird aus „unbekannt" ein Wert.
-      netto: deutscheZahl(String(z.nettoBetrag ?? '')),
+      // Das gilt auch für lesbare, aber unglaubhafte Zahlen, siehe belegBetrag.
+      netto: belegBetrag(z.nettoBetrag),
       netto_split_roh: leerZuNull(z.nettoBetragTax),
       belegart_roh: z.belegart == null ? null : String(z.belegart),
       belegart_name: leerZuNull(z.belegartName),
