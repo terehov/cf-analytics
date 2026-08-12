@@ -1415,16 +1415,25 @@ export const dashboards: Dashboard[] = [
     tabs: [
       { name: 'Stand', reihen: [
       { teile: [{ text: '# Online-Bewertungen\n\nQuelle ist Yext, geladen einmal täglich. **Stand** = Schnitt über alle Bewertungen bis Monatsende, das was ein Gast auf Google sieht — daran hängt die Ampel (grün ab 4,40, orange ab 4,00). **Ø neu** = wie die Bewertungen ausfielen, die in diesem Monat kamen; die Kurve darunter glättet das über sechs Monate zur **Tendenz**.\n\nGerechnet wird auf Google: Facebook führt Bewertungen ohne Sternewertung, ein Schnitt über alle Portale mischt zwei Skalen.' }] },
+      // Das schwaechste Thema mit in der Kachelreihe (angefragt
+      // 13.08.2026): der Stand-Reiter beantwortete nur "wie stehen wir
+      // da" — die naechste Frage "woran liegt es" musste man auf dem
+      // Themen-Reiter suchen, und wer sie nicht suchte, sah sie nie.
       { teile: [
         { karte: 'bw_kachel_schnitt' },
         { karte: 'bw_kachel_monatswert' },
         { karte: 'bw_kachel_neue' },
+        { karte: 'yx_kachel_schwaechstes_thema' },
       ] },
       // Klick auf einen Monat setzt den Monatsfilter der Seite.
       { teile: [{ karte: 'bw_verlauf', hoehe: 10,
         klick: [{ ziel: 'db_bewertung', uebergabe: { monat: 'Monat' } }] }] },
       { teile: [{ karte: 'bw_marke', hoehe: 10,
         klick: [{ ziel: 'dd_filialen', uebergabe: { marke: 'Marke' } }] }] },
+      // Die Themen-Klusterung auch HIER, nicht nur auf dem eigenen
+      // Reiter: dieselbe Karte, zweite Platzierung (wie yx_kachel_offen).
+      { teile: [{ text: '## Woran es liegt — die Themen\n\nYexts Klusterung der Bewertungstexte im gewählten Monat: die **Note je Thema** als Balken, die Nennungen als Linie. „Bestellung 2,1" heißt: wer über die Bestellung schrieb, vergab im Schnitt 2,1 Sterne. Erst ab April 2026. Verlauf, Themenprofil je Betrieb und Ausreißer stehen auf dem Reiter **Themen**.' }] },
+      { teile: [{ karte: 'yx_themen', hoehe: 9 }] },
       { teile: [{ text: '## Alle Betriebe\n\nSchlechteste zuerst. Jede Spaltenüberschrift sortiert — für die Bestenliste einmal auf **Stand** klicken. Nur operative Betriebe.' }] },
       { teile: [{ karte: 'bw_rangliste', hoehe: 12,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
