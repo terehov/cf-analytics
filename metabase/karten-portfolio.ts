@@ -7,7 +7,7 @@
 // einem knappen Dutzend Marken geht das nicht mehr, und genau diese
 // Fragen stellt hier bisher niemand:
 //
-//   * Wo steckt der Umsatz, und wie abhaengig sind wir von wenigen Haeusern?
+//   * Wo steckt der Umsatz, und wie abhaengig sind wir von wenigen Betrieben?
 //   * Welche Betriebe sind ueberhaupt beurteilbar, und welche sind
 //     Karteileichen, die jede Auswertung verzerren?
 //   * Wie weit streuen vergleichbare Betriebe auseinander — und was waere
@@ -28,21 +28,21 @@ export const karten: Karte[] = [
   {
     // Nachgemessen am 26.07.2026: 20 Prozent der Betriebe machen 70
     // Prozent des Umsatzes. Das ist die Zahl, die entscheidet, wie viel
-    // ein Prozentpunkt Verbesserung bei einem kleinen Haus ueberhaupt
+    // ein Prozentpunkt Verbesserung bei einem kleinen Betrieb ueberhaupt
     // wert ist -- und wie weh ein Ausfall oben tut.
     //
     // Seit dem Review vom 03.08.2026 rollierende 12 Monate statt der
     // gesamten Historie: ueber 8,5 Jahre gerechnet stand auf Rang 8 ein
-    // seit Januar geschlossenes Haus. Die Frage der Karte ist "wovon
+    // seit Januar geschlossener Betrieb. Die Frage der Karte ist "wovon
     // haengt die Gruppe HEUTE ab", nicht "wer hat je am meisten
-    // umgesetzt". Geschlossene Haeuser bleiben absichtlich drin, solange
+    // umgesetzt". Geschlossene Betriebe bleiben absichtlich drin, solange
     // sie im Fenster Umsatz hatten -- ihr Anteil war real, und ihn
     // wegzulassen wuerde die kumulierten Prozente schoenen. Die Spalte
     // "Letzter Umsatztag" macht sie stattdessen kenntlich.
     schluessel: 'pf_konzentration',
     name: 'Umsatzkonzentration (12 Monate)',
     beschreibung:
-      'Wie stark hängt der Gesamtumsatz an wenigen Häusern? Die Betriebe nach Umsatz der letzten zwölf Monate sortiert, dazu der aufsummierte Anteil. Je mehr Umsatz auf die ersten Zeilen entfällt, desto schwerer wiegt dort eine Störung — und desto weniger bringt eine Verbesserung ganz unten. Ein „Letzter Umsatztag" weit in der Vergangenheit heißt: dieses Haus meldet nicht mehr, sein Anteil im Fenster ist Auslauf.',
+      'Wie stark hängt der Gesamtumsatz an wenigen Betrieben? Die Betriebe nach Umsatz der letzten zwölf Monate sortiert, dazu der aufsummierte Anteil. Je mehr Umsatz auf die ersten Zeilen entfällt, desto schwerer wiegt dort eine Störung — und desto weniger bringt eine Verbesserung ganz unten. Ein „Letzter Umsatztag" weit in der Vergangenheit heißt: dieser Betrieb meldet nicht mehr, sein Anteil im Fenster ist Auslauf.',
     anzeige: 'table',
     parameter: [P_MARKE],
     sql: `
@@ -79,7 +79,7 @@ SELECT row_number() OVER (ORDER BY umsatz DESC)                          AS "Ran
     schluessel: 'pf_konzentration_kurve',
     name: 'Konzentrationskurve (12 Monate)',
     beschreibung:
-      'Derselbe Zusammenhang als Kurve, ebenfalls über die letzten zwölf Monate: wie viel Prozent des Umsatzes die stärksten Betriebe tragen. Je steiler die Kurve links ansteigt, desto abhängiger ist die Gruppe von wenigen Häusern. Eine gerade Linie würde heißen, alle Betriebe tragen gleich viel bei.',
+      'Derselbe Zusammenhang als Kurve, ebenfalls über die letzten zwölf Monate: wie viel Prozent des Umsatzes die stärksten Betriebe tragen. Je steiler die Kurve links ansteigt, desto abhängiger ist die Gruppe von wenigen Betrieben. Eine gerade Linie würde heißen, alle Betriebe tragen gleich viel bei.',
     anzeige: 'line',
     parameter: [P_MARKE],
     sql: `
@@ -118,7 +118,7 @@ SELECT round(100.0 * r / n)                AS "Betriebe (%)",
     schluessel: 'pf_karteileichen',
     name: 'Betriebe ohne laufendes Geschäft',
     beschreibung:
-      'Betriebe, die täglich Umsatzberichte liefern — aber durchgehend 0 €. Das ist keine Datenlücke: die Berichte kommen an, sie sind leer. Dahinter stehen Beteiligungsgesellschaften, geschlossene oder noch nicht eröffnete Häuser und Testeinträge. Solche Betriebe verzerren jeden Durchschnitt und erzeugen unsinnige Quoten — etwa über 1000 % Personalkosten bei 0 € Umsatz. Diese Liste ist die Vorlage, um sie auf inaktiv zu setzen.',
+      'Betriebe, die täglich Umsatzberichte liefern — aber durchgehend 0 €. Das ist keine Datenlücke: die Berichte kommen an, sie sind leer. Dahinter stehen Beteiligungsgesellschaften, geschlossene oder noch nicht eröffnete Betriebe und Testeinträge. Solche Betriebe verzerren jeden Durchschnitt und erzeugen unsinnige Quoten — etwa über 1000 % Personalkosten bei 0 € Umsatz. Diese Liste ist die Vorlage, um sie auf inaktiv zu setzen.',
     anzeige: 'table',
     parameter: [P_MARKE],
     sql: `
@@ -133,7 +133,7 @@ SELECT d.betrieb                       AS "Betrieb",
        r.personalkosten_ogf_pct        AS "Personal % (unsinnig)",
        d.befund                        AS "Befund"
   FROM mart.datenstand d
-  -- Der abgeleitete Status aus mart.betrieb_status sagt, WARUM ein Haus
+  -- Der abgeleitete Status aus mart.betrieb_status sagt, WARUM ein Betrieb
   -- ohne Umsatz gefuehrt wird: verwaltend, geschlossen, ohne_geschaeft
   -- oder test. Das unterscheidet die Vorlage zum Stilllegen von der
   -- Beteiligungsgesellschaft, die nie Umsatz melden wird.
@@ -153,8 +153,8 @@ SELECT d.betrieb                       AS "Betrieb",
 
   {
     // Anlass aus dem Review vom 03.08.2026: Rang 8 der Umsatzkonzentration
-    // war ein seit Januar geschlossenes Haus -- niemand hatte eine Liste,
-    // WELCHE Haeuser aufgehoert haben zu melden und was das kostet.
+    // war ein seit Januar geschlossener Betrieb -- niemand hatte eine Liste,
+    // WELCHE Betriebe aufgehoert haben zu melden und was das kostet.
     // Park Cafe Muenchen: letzter Umsatztag 12.01.2026, davor 3,1 Mio im
     // Jahr. Die Karteileichen-Liste daneben zeigt Betriebe OHNE JEDEN
     // Umsatz; diese hier zeigt die, die einmal liefen und verstummt sind.
@@ -177,7 +177,7 @@ SELECT s.betrieb                            AS "Betrieb",
        round(v.umsatz)                      AS "Umsatz 12 Monate davor"
   FROM mart.betrieb_status s
   -- Das Volumen der zwoelf Monate VOR dem letzten Umsatztag, nicht vor
-  -- heute: bei einem 2023 geschlossenen Haus laege das Kalenderjahr vor
+  -- heute: bei einem 2023 geschlossenen Betrieb laege das Kalenderjahr vor
   -- heute komplett nach der Schliessung und ergaebe 0 -- der Ausfall
   -- saehe kostenlos aus. Direkt auf core.umsatzbericht_tag, weil
   -- mart.umsatz_tag je nach Sicht bereits gefiltert sein kann; die
@@ -245,7 +245,7 @@ basis AS (
        AND r.personalkosten_ogf_pct IS NOT NULL
        -- operativ = Umsatz im Monat UND weder Test noch Verwaltung. Das
        -- ersetzt das fruehere umsatz_ist > 0 und ist strenger: "€ bis
-       -- Median" auf Basis geschlossener oder verwaltender Haeuser ist
+       -- Median" auf Basis geschlossener oder verwaltender Betriebe ist
        -- keine Groessenordnung, sondern Rauschen (Review 03.08.2026).
        AND r.operativ
        [[AND r.konzept = {{marke}}]]
@@ -276,7 +276,7 @@ SELECT b.betrieb                                                   AS "Betrieb",
     schluessel: 'pf_streuung',
     name: 'Streuung der Personalquote',
     beschreibung:
-      'Wie weit vergleichbare Betriebe auseinanderliegen. Liegen alle eng beieinander, ist die Quote durch das Geschäft vorgegeben und kaum zu ändern. Streuen sie weit, ist sie beeinflussbar — dann lohnt die Frage, was die günstigen Häuser anders machen. Nur operative Betriebe.',
+      'Wie weit vergleichbare Betriebe auseinanderliegen. Liegen alle eng beieinander, ist die Quote durch das Geschäft vorgegeben und kaum zu ändern. Streuen sie weit, ist sie beeinflussbar — dann lohnt die Frage, was die günstigen Betriebe anders machen. Nur operative Betriebe.',
     anzeige: 'bar',
     parameter: [P_MONAT, P_MARKE],
     sql: `${MONAT_CTE},
@@ -294,8 +294,8 @@ klassen AS (
      WHERE r.monat = g.monat
        AND r.personalkosten_ogf_pct IS NOT NULL
        -- Wie beim Potenzial: nur operative Betriebe. Eine Quote aus einem
-       -- geschlossenen Haus verbreitert die Verteilung, ohne dass es ein
-       -- Haus gaebe, an dem man etwas aendern koennte.
+       -- geschlossenen Betrieb verbreitert die Verteilung, ohne dass es ein
+       -- Betrieb gaebe, an dem man etwas aendern koennte.
        AND r.operativ
        [[AND r.konzept = {{marke}}]]
 )
@@ -406,7 +406,7 @@ SELECT ${WOCHENTAGE}[tag_nr] AS "Wochentag",
     schluessel: 'pf_stabilitaet',
     name: 'Wie stabil läuft ein Betrieb (12 Monate)',
     beschreibung:
-      'Wie stark der Tagesumsatz der letzten zwölf Monate schwankt, gemessen im Verhältnis zum eigenen Durchschnitt. Ein niedriger Wert heißt planbares Geschäft; ein hoher heißt Abhängigkeit von Wochenenden, Veranstaltungen oder Wetter — und macht die Personalplanung teuer. Der Bezug auf den eigenen Durchschnitt macht große und kleine Häuser vergleichbar. Nur operative Betriebe mit mindestens 30 Umsatztagen.',
+      'Wie stark der Tagesumsatz der letzten zwölf Monate schwankt, gemessen im Verhältnis zum eigenen Durchschnitt. Ein niedriger Wert heißt planbares Geschäft; ein hoher heißt Abhängigkeit von Wochenenden, Veranstaltungen oder Wetter — und macht die Personalplanung teuer. Der Bezug auf den eigenen Durchschnitt macht große und kleine Betriebe vergleichbar. Nur operative Betriebe mit mindestens 30 Umsatztagen.',
     anzeige: 'table',
     parameter: [P_MARKE],
     sql: `

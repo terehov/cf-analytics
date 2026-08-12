@@ -307,7 +307,7 @@ SELECT r.umsatz_ist             AS "Umsatz",
     schluessel: 'dd_filialen_metrikvergleich',
     name: 'Alle Kennzahlen nebeneinander',
     beschreibung:
-      'Dieselben Betriebe, aber nach Bereich sortiert statt nach Betrieb. So wird sichtbar, welche Kennzahl in dieser Marke durchgehend klemmt und welche nur bei einzelnen Häusern.',
+      'Dieselben Betriebe, aber nach Bereich sortiert statt nach Betrieb. So wird sichtbar, welche Kennzahl in dieser Marke durchgehend klemmt und welche nur bei einzelnen Betrieben.',
     anzeige: 'bar',
     parameter: [P_MONAT, P_MARKE],
     // Langform statt Breitform, damit der Klick auf ein Segment beide
@@ -356,7 +356,7 @@ SELECT a.bereich_name                       AS "Bereich",
     // Kennzahl. Ohne Betriebsfilter liefert dieselbe Abfrage aber 846
     // Zeilen: 141 Betriebe mal sechs Bereiche, unaggregiert und ohne
     // Kennung. Man sieht dann sechsmal "Umsatz" untereinander mit
-    // verschiedenen Werten und haelt es fuer die Kennzahlen eines Hauses.
+    // verschiedenen Werten und haelt es fuer die Kennzahlen eines Betriebs.
     // Gemeldet am 28.07.2026.
     //
     // Die Spalte "Betrieb" beantwortet genau diese Frage. Bei gewaehltem
@@ -551,7 +551,7 @@ SELECT geschaeftstag AS "Geschäftstag",
     // Ohne Betriebsfilter lieferte die Karte 10.746 Punkte aus 91
     // Betrieben -- fuer dieselbe Monat/Bereich-Kombination also viele
     // Werte, die Metabase zu einem unlesbaren Knaeuel verbindet. Nichts
-    // daran sagt, dass mehrere Haeuser drinstecken.
+    // daran sagt, dass mehrere Betriebe drinstecken.
     //
     // Der Median statt der Summe, weil es PROZENTWERTE sind: die Summe
     // zweier Personalquoten ist keine Personalquote. Bei einem gewaehlten
@@ -1183,7 +1183,7 @@ HAVING sum(u.umsatz_netto) > 0
     schluessel: 'vg_zeit_summe',
     name: 'Zeitraumvergleich gesamt',
     beschreibung:
-      'Beide Zeiträume als Summe über alle Betriebe. „Tage mit Daten" neben den Kalendertagen zeigt, ob der jüngste Zeitraum schon vollständig geliefert ist — LINA füllt die letzten Tage nach. „Betriebe" zählt nur Häuser mit Umsatz im Zeitraum.',
+      'Beide Zeiträume als Summe über alle Betriebe. „Tage mit Daten" neben den Kalendertagen zeigt, ob der jüngste Zeitraum schon vollständig geliefert ist — LINA füllt die letzten Tage nach. „Betriebe" zählt nur Betriebe mit Umsatz im Zeitraum.',
     anzeige: 'table',
     parameter: [
       { id: 'von-a-param', name: 'von_a', 'display-name': 'Zeitraum A von', type: 'date/single' },
@@ -1317,7 +1317,7 @@ SELECT monat        AS "Monat",
     schluessel: 'vg_ort_profil',
     name: 'Standorte — Umsatzprofil über den Tag',
     beschreibung:
-      'Der Tagesverlauf der gewählten Betriebe, jeweils als Anteil am eigenen Tagesumsatz. In Prozent, damit ein großes und ein kleines Haus vergleichbar bleiben.',
+      'Der Tagesverlauf der gewählten Betriebe, jeweils als Anteil am eigenen Tagesumsatz. In Prozent, damit ein großes und ein kleiner Betrieb vergleichbar bleiben.',
     anzeige: 'line',
     parameter: [P_BETRIEB, P_MARKE, P_ZEITRAUM],
     // Der Nenner MUSS im selben Zeitraum stehen wie der Zaehler.
@@ -1360,7 +1360,7 @@ SELECT "Stunde", "Betrieb",
     schluessel: 'vg_ort_sparte',
     name: 'Standorte — Speisen- und Getränkeanteil',
     beschreibung:
-      'Speisen- und Getränkeumsatz der 25 umsatzstärksten Betriebe. Der Getränkeanteil ist der größte Hebel für den Wareneinsatz an der Bar und erklärt oft, warum zwei Häuser derselben Marke verschiedene Quoten haben. Für einen echten Vergleich oben zwei bis vier Betriebe auswählen.',
+      'Speisen- und Getränkeumsatz der 25 umsatzstärksten Betriebe. Der Getränkeanteil ist der größte Hebel für den Wareneinsatz an der Bar und erklärt oft, warum zwei Betriebe derselben Marke verschiedene Quoten haben. Für einen echten Vergleich oben zwei bis vier Betriebe auswählen.',
     anzeige: 'row',
     parameter: [P_MONAT, P_BETRIEB, P_MARKE],
     sql: `${MONAT_CTE_UMSATZ}

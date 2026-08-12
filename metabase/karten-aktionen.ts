@@ -9,7 +9,7 @@
 // DER VORBEHALT, DER UEBER ALLEM STEHT: nur 34 Betriebe erfassen
 // ueberhaupt Aktionen, 19 davon Enchilada, 14 Wilma Wunder, einer
 // Deutsche Konzepte. Das ist KEINE Konzernsicht. Jede Zahl auf diesen
-// Karten ist eine Aussage ueber die mitmachenden Haeuser — und ein
+// Karten ist eine Aussage ueber die mitmachenden Betriebe — und ein
 // Betrieb, der hier fehlt, faehrt vielleicht dieselbe Aktion und tippt
 // sie nur nicht ein. Der Satz steht deshalb in jeder Beschreibung, nicht
 // nur einmal im Dashboardkopf: Karten werden einzeln kopiert und
@@ -49,9 +49,9 @@ export const karten: Karte[] = [
       'Jede Aktion mit Umsatz in den letzten zwölf Monaten: wie viele Betriebe sie fahren, '
       + 'was sie einspielt und welchen Anteil sie am Umsatz der teilnehmenden Betriebe hat. '
       + '**Ø Anteil** ist der ungewichtete Schnitt über die Betriebsmonate — wie stark die '
-      + 'Aktion das Geschäft eines mitmachenden Hauses prägt, nicht ihr Anteil an der Summe.\n\n'
+      + 'Aktion das Geschäft eines mitmachenden Betriebs prägt, nicht ihr Anteil an der Summe.\n\n'
       + '**Nur 34 Betriebe (überwiegend Enchilada) erfassen Aktionen** — die Zahlen '
-      + 'beschreiben diese Häuser, nicht die Gruppe.',
+      + 'beschreiben diese Betriebe, nicht die Gruppe.',
     anzeige: 'table',
     parameter: [MARKE, BETRIEB],
     // Zwoelf Monate EINSCHLIESSLICH des laufenden. Der laufende Monat ist
@@ -61,7 +61,7 @@ export const karten: Karte[] = [
     // Tage alt ist. "Letzter Monat" sagt dazu, wie frisch die Zahl ist.
     //
     // Der Anteil UNGEWICHTET als avg(anteil_pct): gewichtet nach Umsatz
-    // bestimmten die grossen Haeuser den Schnitt, und die Frage "wie
+    // bestimmten die grossen Betriebe den Schnitt, und die Frage "wie
     // stark haengt ein teilnehmender Betrieb an der Aktion" bekaeme die
     // Antwort auf eine andere Frage. Feinsparten 2025 steht so bei rund
     // 43 % — die Zahl aus dem Review.
@@ -97,7 +97,7 @@ SELECT a.aktion                       AS "Aktion",
       + 'Man sieht, wann eine Aktion anläuft, trägt und ausläuft — der letzte Punkt ist der '
       + 'laufende, noch unvollständige Monat.\n\n'
       + '**Nur 34 Betriebe (überwiegend Enchilada) erfassen Aktionen** — die Kurven '
-      + 'beschreiben diese Häuser, nicht die Gruppe.',
+      + 'beschreiben diese Betriebe, nicht die Gruppe.',
     anzeige: 'line',
     parameter: [MARKE, BETRIEB],
     // Kein Monatsfilter: ein Verlauf beantwortet "seit wann und wie
@@ -139,7 +139,7 @@ SELECT a.monat              AS "Monat",
     anzeige: 'table',
     parameter: [MONAT, MARKE, BETRIEB],
     // Nach Anteil sortiert, nicht nach Umsatz: 4.000 € Happy Hour in
-    // einem grossen Haus sind Beiwerk, 2 % sind es auch — aber ein Haus,
+    // einem grossen Betrieb sind Beiwerk, 2 % sind es auch — aber ein Betrieb,
     // dessen Monat zu 40 % an einer Aktion haengt, hat eine andere Frage
     // zu beantworten, wenn die Aktion endet.
     sql: `${MONAT_CTE}

@@ -15,7 +15,7 @@
 //           Bewegt sich viel staerker -- Enchilada Hamm hatte im Juli
 //           2026 neun Stueck. Als Ampel waere das Rauschen mit Farbe, als
 //           Fruehwarnung ist es das Interessantere: der Stand von 3.700
-//           Bewertungen faellt nicht, wenn ein Haus kippt. Der Monatswert
+//           Bewertungen faellt nicht, wenn ein Betrieb kippt. Der Monatswert
 //           schon.
 //
 // WOHER DIE AMPEL KOMMT. Nicht aus einer Schwelle in diesen Karten,
@@ -31,7 +31,7 @@
 // die Wahl ausmacht -- gespeichert ist beides.
 //
 // OPERATIV. Seit dem Review vom 03.08.2026 (Migration 0039) standen
-// geschlossene und verwaltende Haeuser in Fruehwarnung und Rangliste --
+// geschlossene und verwaltende Betriebe in Fruehwarnung und Rangliste --
 // "GESCHLOSSEN Enchilada Dresden" als Handlungsempfehlung. Kacheln,
 // Ranglisten und Marken-Schnitte filtern deshalb auf operative Betriebe:
 // wo mart.round_table_monat schon am Tisch sitzt, ueber dessen
@@ -187,7 +187,7 @@ export const karten: Karte[] = [
       + 'Der **Stand** ist der Schnitt über alle Bewertungen bis Monatsende — das, was ein Gast sieht.',
     anzeige: 'scalar',
     parameter: [MONAT, MARKE, BETRIEB],
-    // Nur operative Betriebe (heutiger Status): geschlossene Haeuser
+    // Nur operative Betriebe (heutiger Status): geschlossene Betriebe
     // sammeln weiter Bewertungen, aber ihr Schnitt ist keine Aussage
     // ueber die Flotte, die heute am Tisch besprochen wird.
     sql: `${MONAT_CTE}
@@ -267,7 +267,7 @@ SELECT coalesce(to_char(
     //
     // r.operativ (monatsgenau, Migration 0039) statt LEFT-JOIN-Toleranz:
     // "GESCHLOSSEN Enchilada Dresden" stand hier als schlechtester
-    // Betrieb der Gruppe. Ein Haus, das im gewaehlten Monat Umsatz hatte
+    // Betrieb der Gruppe. Ein Betrieb, der im gewaehlten Monat Umsatz hatte
     // und heute zu ist, bleibt in seiner Historie drin -- die damalige
     // Flotte soll die damalige bleiben.
     sql: `${MONAT_CTE}
@@ -301,7 +301,7 @@ SELECT v.betrieb                                  AS "Betrieb",
   //
   // Die einzige Karte, die etwas zeigt, das der Round Table NICHT zeigen
   // kann. Bei 3.700 Bewertungen bewegt ein schlechter Monat den Stand um
-  // Hundertstel -- die Ampel bleibt gruen, waehrend das Haus kippt.
+  // Hundertstel -- die Ampel bleibt gruen, waehrend der Betrieb kippt.
   // Deshalb der Abstand zwischen Monatswert und Stand.
   // -------------------------------------------------------------------
   {
@@ -336,7 +336,7 @@ SELECT v.betrieb                                  AS "Betrieb",
    -- einen schlechten Abend hatte.
    AND v.anzahl_monat >= 3
    AND v.schnitt_monat < v.schnitt_stand
-   -- Nur operative Haeuser (monatsgenau): eine Fruehwarnung fuer einen
+   -- Nur operative Betriebe (monatsgenau): eine Fruehwarnung fuer einen
    -- geschlossenen Betrieb ist keine -- dort kippt nichts mehr.
    AND r.operativ
    [[AND v.konzept = {{marke}}]]
@@ -358,9 +358,9 @@ SELECT v.betrieb                                  AS "Betrieb",
     parameter: [MARKE],
     /**
      * WARUM 90 TAGE ROLLIEREND UND KEIN MONATSFILTER. Ein Kalendermonat
-     * hat fuer viele Haeuser zu wenige Bewertungen (Enchilada Hamm: neun
+     * hat fuer viele Betriebe zu wenige Bewertungen (Enchilada Hamm: neun
      * im Juli 2026) -- die Quote eines Monats waere Wuerfeln. 90 Tage
-     * heben auch kleine Haeuser ueber die Zehnerschwelle, und eine
+     * heben auch kleine Betriebe ueber die Zehnerschwelle, und eine
      * Fruehwarnung fragt ohnehin "was passiert GERADE", nicht "was war
      * im gewaehlten Berichtsmonat".
      *
@@ -372,7 +372,7 @@ SELECT v.betrieb                                  AS "Betrieb",
      *
      * Das Vergleichsfenster sind die zwoelf Monate VOR dem 90-Tage-
      * Fenster -- der eigene Normalzustand, nicht der Gruppenschnitt: ein
-     * Haus mit chronisch 20 % soll nicht jede Woche als "neu kippend"
+     * Betrieb mit chronisch 20 % soll nicht jede Woche als "neu kippend"
      * gemeldet werden, eines, das von 5 auf 15 springt, sehr wohl.
      */
     sql: `
@@ -432,7 +432,7 @@ SELECT bs.betrieb                                                    AS "Betrieb
      *
      * Sechs Monate, gewichtet mit der Anzahl -- nicht Mittel der Mittel,
      * sonst zaehlt ein Monat mit einer Bewertung so schwer wie einer mit
-     * vierzig. Das ist lang genug, dass auch ein kleines Haus auf eine
+     * vierzig. Das ist lang genug, dass auch ein kleiner Betrieb auf eine
      * belastbare Zahl kommt, und kurz genug, dass eine echte
      * Verschlechterung binnen eines halben Jahres sichtbar wird.
      *
@@ -501,7 +501,7 @@ WINDOW w AS (ORDER BY monat ROWS BETWEEN 5 PRECEDING AND CURRENT ROW)
     anzeige: 'bar',
     parameter: [MONAT],
     // Nur operative Betriebe: vor dem 03.08.2026 zogen geschlossene
-    // Haeuser den Markenschnitt -- eine Marke sah schlecht aus wegen
+    // Betriebe den Markenschnitt -- eine Marke sah schlecht aus wegen
     // Bewertungen an Standorten, die es nicht mehr gibt.
     sql: `${MONAT_CTE}
 SELECT coalesce(v.konzept, '(ohne Marke)') AS "Marke",
@@ -642,7 +642,7 @@ SELECT quelle              AS "Quelle",
   // Was Gaeste geschrieben haben — auf ③ Betrieb
   //
   // Die Karte, wegen derer core.bewertung ueberhaupt existiert. Eine
-  // Zahl sagt, DASS ein Haus abrutscht; erst der Text sagt, woran es
+  // Zahl sagt, DASS ein Betrieb abrutscht; erst der Text sagt, woran es
   // liegt (migrations/0037_bewertung_einzeln.sql).
   //
   // Die Spalte "Gast" traegt den Namen, unter dem die Bewertung

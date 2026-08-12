@@ -19,8 +19,8 @@
 // mart.round_table_monat.operativ (Migration 0039) heisst: Umsatz im
 // Monat, und weder Test- noch Verwaltungsgesellschaft. Im Juli 2026 sind
 // 11 von 60 Standorten nicht operativ -- geschlossene, inaktive und
-// umsatzlose Haeuser, die trotzdem eine (nachgetragene) rote Ampel trugen.
-// Ein GESCHLOSSEN-Haus darf nicht als "Sofort eskalieren" gluehen: auf
+// umsatzlose Betriebe, die trotzdem eine (nachgetragene) rote Ampel trugen.
+// Ein GESCHLOSSEN-Betrieb darf nicht als "Sofort eskalieren" gluehen: auf
 // den Karten erscheint es neutral (schwarzer Punkt, "Nicht operativ"),
 // aus Listen und Zaehlungen faellt es heraus.
 //
@@ -64,10 +64,10 @@ const INTENSITAET = P_INTENSITAET
  * Die Reihenfolge ist Handlungsdruck, damit die Legende oben mit dem
  * beginnt, was brennt.
  *
- * NICHT OPERATIV schlaegt alles: ein Haus ohne Umsatz im Monat (oder eine
+ * NICHT OPERATIV schlaegt alles: ein Betrieb ohne Umsatz im Monat (oder eine
  * Verwaltungs-/Testgesellschaft) traegt zwar oft noch eine nachgetragene
  * Intensitaet aus alten BWA-Werten, aber die ist kein Handlungsdruck --
- * niemand eskaliert ein geschlossenes Haus. Es bleibt als neutraler
+ * niemand eskaliert einen geschlossenen Betrieb. Es bleibt als neutraler
  * Punkt sichtbar, damit die Karte nicht heimlich schrumpft.
  *
  * Die Fragmente setzen die Aliase `s` (mart.standort) UND `r`
@@ -88,7 +88,7 @@ const INTENSITAET_TEXT = `
 /** Das Emoji zur Intensitaet -- steht im Punktnamen, weil Metabases
  *  Punktkarte nach Zahlen faerbt und nicht nach Kategorien.
  *  ⚫ = nicht operativ (bewusst dunkler als ⚪ "keine Bewertung": das eine
- *  Haus laeuft nicht, dem anderen fehlt nur die BWA). */
+ *  Betrieb laeuft nicht, dem anderen fehlt nur die BWA). */
 const INTENSITAET_EMOJI = `
        CASE
          WHEN NOT r.operativ THEN '⚫'
@@ -127,7 +127,7 @@ const AUSSCHNITT = {
 }
 
 /** Sortierung nach Handlungsdruck, in mehreren Karten gebraucht.
- *  Nicht operative Haeuser ganz ans Ende -- sie sind kein Druck. */
+ *  Nicht operative Betriebe ganz ans Ende -- sie sind kein Druck. */
 const NACH_DRUCK = `
           CASE
             WHEN NOT r.operativ THEN 6
@@ -149,7 +149,7 @@ export const karten: Karte[] = [
       + '🟥 Sofort eskalieren (2+ Kennzahlen rot) · 🔴 Sofort handeln (1 rot) · '
       + '🟠 Nachforschung (2+ orange) · 🟢 Beobachten/OK · ⚪ keine Bewertung möglich · '
       + '⚫ nicht operativ (kein Umsatz im Monat — geschlossen, inaktiv oder verwaltend)\n\n'
-      + '**Nicht operative Häuser glühen hier absichtlich nicht rot.** Ein geschlossenes Haus '
+      + '**Nicht operative Betriebe glühen hier absichtlich nicht rot.** Ein geschlossener Betrieb '
       + 'trägt oft noch eine nachgetragene Ampel aus alten BWA-Werten; das ist kein '
       + 'Handlungsbedarf. Es bleibt als schwarzer Punkt sichtbar, damit die Karte nicht '
       + 'heimlich schrumpft — die Spalte „Status" im Tooltip sagt, warum.\n\n'
@@ -254,7 +254,7 @@ SELECT ${INTENSITAET_EMOJI} || ' ' || s.betrieb AS "Standort",
       + 'Frage, die die Karte aufwirft: dort sieht man, dass fast alles rot ist — hier, '
       + 'woran es liegt. Typisch trägt **Personal** den Befund fast allein, gefolgt vom '
       + 'Umsatz; die Wareneinsätze fallen kaum ins Gewicht.\n\n'
-      + 'Nicht operative Häuser (geschlossen, inaktiv, ohne Umsatz im Monat) zählen nicht '
+      + 'Nicht operative Betriebe (geschlossen, inaktiv, ohne Umsatz im Monat) zählen nicht '
       + 'mit — ihre nachgetragenen roten Ampeln sind kein Befund, an dem jemand arbeiten '
       + 'könnte.\n\n'
       + '**Ein niedriger Balken heißt nicht Entwarnung**: OM vor Ort liefert noch gar keine '
@@ -274,8 +274,8 @@ mit_ampel AS (
       CROSS JOIN gewaehlt g
      WHERE r.monat = g.monat
        AND s.breitengrad IS NOT NULL
-       -- Nur operative Haeuser. Ohne diese Zeile zaehlen geschlossene
-       -- Haeuser mit nachgetragenen Ampeln mit: nachgemessen Juli 2026
+       -- Nur operative Betriebe. Ohne diese Zeile zaehlen geschlossene
+       -- Betriebe mit nachgetragenen Ampeln mit: nachgemessen Juli 2026
        -- stuende Personal auf 46 statt 42, Umsatz auf 25 statt 21.
        AND r.operativ
        [[AND s.konzept = {{marke}}]]
@@ -311,7 +311,7 @@ SELECT b.bereich AS "Bereich",
     beschreibung:
       'Dieselben Standorte als Liste, sortiert nach Handlungsdruck. Ein Klick auf den '
       + 'Betriebsnamen öffnet die Detailseite.\n\n'
-      + '**Nur operative Häuser** — geschlossene, inaktive und umsatzlose stehen nicht in '
+      + '**Nur operative Betriebe** — geschlossene, inaktive und umsatzlose stehen nicht in '
       + 'einer Arbeitsliste. Auf der Karte darüber bleiben sie als schwarze Punkte sichtbar.',
     anzeige: 'table',
     parameter: [MONAT, MARKE],
@@ -337,7 +337,7 @@ SELECT coalesce(s.ampel_emoji, '⚪')     AS "●",
        ON r.betrieb_key = s.betrieb_key AND r.monat = s.monat
  WHERE s.monat = g.monat
    AND s.breitengrad IS NOT NULL
-   -- Eine Liste, nach der gearbeitet wird: geschlossene Haeuser mit
+   -- Eine Liste, nach der gearbeitet wird: geschlossene Betriebe mit
    -- nachgetragener roter Ampel gehoeren nicht hinein (Review 03.08.2026).
    AND r.operativ
    [[AND s.konzept = {{marke}}]]
@@ -362,9 +362,9 @@ SELECT coalesce(s.ampel_emoji, '⚪')     AS "●",
     beschreibung:
       'Wie sich die Standorte mit Koordinaten auf die Marken verteilen, aufgeteilt nach '
       + '**Handlungsbedarf** — denselben Kategorien wie die Punktfarben der Karte. Zeigt auf '
-      + 'einen Blick, welche Marke wie viele Häuser im Feuer hat.\n\n'
+      + 'einen Blick, welche Marke wie viele Betriebe im Feuer hat.\n\n'
       + '„Nicht operativ" steht als eigenes Segment dabei: geschlossene und umsatzlose '
-      + 'Häuser zählen nicht als Handlungsbedarf, sollen aber auch nicht stillschweigend '
+      + 'Betriebe zählen nicht als Handlungsbedarf, sollen aber auch nicht stillschweigend '
       + 'aus der Summe verschwinden.',
     anzeige: 'bar',
     parameter: [MONAT, MARKE],
@@ -410,7 +410,7 @@ SELECT coalesce(s.konzept, '(nicht zugeordnet)') AS "Marke",
     // Sie steht oben auf den Seiten, auf denen man ARBEITET -- Round Table,
     // Filialen, Betrieb -- und nicht auf einer eigenen. Der Zweck ist die
     // raeumliche Einordnung im Vorbeigehen: wer die Marke einschraenkt,
-    // sieht deren Haeuser; wer einen Betrieb waehlt, sieht diesen einen.
+    // sieht deren Betriebe; wer einen Betrieb waehlt, sieht diesen einen.
     //
     // Deshalb kennt sie alle drei Filter. Der Betriebsfilter ist der
     // Grund, warum das nicht dieselbe Karte wie `so_karte` sein kann: dort
@@ -420,7 +420,7 @@ SELECT coalesce(s.konzept, '(nicht zugeordnet)') AS "Marke",
     name: 'Wo liegt das',
     beschreibung:
       'Dieselben Standorte wie auf der Standortkarte, nur kompakt. Folgt den Filtern '
-      + 'der Seite: ohne Auswahl alle Häuser, mit Marke deren Häuser, mit Betrieb dieser eine.\n\n'
+      + 'der Seite: ohne Auswahl alle Betriebe, mit Marke deren Betriebe, mit Betrieb dieser eine.\n\n'
       + '🟥 eskalieren · 🔴 handeln · 🟠 nachforschen · 🟢 ok · ⚪ keine Bewertung · '
       + '⚫ nicht operativ. Nur Standorte mit hinterlegter Adresse.',
     anzeige: 'map',
@@ -441,14 +441,14 @@ SELECT ${INTENSITAET_EMOJI} || ' ' || s.betrieb AS "Standort",
        ON r.betrieb_key = s.betrieb_key AND r.monat = s.monat
  WHERE s.monat = g.monat
    AND s.breitengrad IS NOT NULL
-   -- KEIN pauschales "AND r.operativ": nicht operative Haeuser bleiben
+   -- KEIN pauschales "AND r.operativ": nicht operative Betriebe bleiben
    -- als schwarze Punkte stehen, und ein per Betriebsfilter GEWAEHLTES
-   -- Haus muss sichtbar bleiben, auch wenn es geschlossen ist.
+   -- Betrieb muss sichtbar bleiben, auch wenn es geschlossen ist.
    [[AND s.konzept = {{marke}}]]
    [[AND s.betrieb = {{betrieb}}]]
    -- 'ohne' steht fuer NULL; das laesst sich nicht als Gleichheit
    -- schreiben, deshalb der Umweg ueber coalesce. Sobald nach Bewertung
-   -- oder Handlungsbedarf GEFILTERT wird, fliegen nicht operative Haeuser
+   -- oder Handlungsbedarf GEFILTERT wird, fliegen nicht operative Betriebe
    -- heraus: wer "rot" oder "Sofort eskalieren" waehlt, sucht Arbeit,
    -- keine Karteileichen mit nachgetragener Ampel.
    [[AND coalesce(s.ampel, 'ohne') = {{ampel}} AND r.operativ]]
@@ -478,7 +478,7 @@ SELECT ${INTENSITAET_EMOJI} || ' ' || s.betrieb AS "Standort",
       + 'die Karte zeigt also einen Ausschnitt, nicht das Ganze. Diese Liste ist die '
       + 'Arbeitsvorlage, um die Adressen nachzutragen; wie viele es sind, zeigt sie selbst.\n\n'
       + 'Geschlossene, verwaltende und Test-Gesellschaften stehen absichtlich nicht darin: '
-      + 'eine Adresse für ein Haus nachzutragen, das nie wieder auf der Karte gebraucht '
+      + 'eine Adresse für einen Betrieb nachzutragen, der nie wieder auf der Karte gebraucht '
       + 'wird, ist verlorene Arbeit.',
     anzeige: 'table',
     // Keine feste Anzahl mehr im Text: "96 von 141" stimmte am 27.07.2026

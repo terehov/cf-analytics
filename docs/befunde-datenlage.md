@@ -1317,3 +1317,53 @@ Einkaufspositionen" (4.973 ms, `mart.einkauf_pruefung`) — beide lesen wieder
 21.338 Warennamen. Alle übrigen acht Karten liegen zwischen 128 und 2.234 ms.
 **Migration 0064** zieht die beiden nach; lokal 965 ms → 2,4 ms und
 (Produktionsdatenbank) 3,0 s → wenige ms, Refresh-Kosten 0,9 s.
+
+---
+
+## Die 7,93 Mio € „Fremdeinkauf" messen zum größten Teil eine leere Liste (12.08.2026)
+
+Gemeldet vom Fachbereich: „hört sich viel zu viel an." Nachgemessen — die Zahl
+ist richtig gerechnet, aber sie beantwortet eine andere Frage, als ihre
+Überschrift stellte.
+
+**Kein einziger Euro ist ein entschiedener Fall.** Alle 26 Lieferanten hinter der
+Summe tragen den Grund `steht nicht auf der liste`. `ausdruecklich gesperrt`:
+null.
+
+**Die drei Listen, aus denen die Einordnung kommt, sind fast leer:**
+
+| Liste | Einträge | Bezugsgröße |
+|---|---|---|
+| `manual.lieferant_freigabe` | **5** (CF Gastro, Chefs Culinar, Distra, J.J. Darboven, Layer-Chemie) | 32 Lieferanten mit Wareneinkauf |
+| `manual.gfgh_betrieb` | **13** | 57 operative Betriebe |
+| `manual.gfgh_haendler` | **2** | — |
+
+**6,92 der 7,93 Mio € entfallen auf 48 Betriebe, für die kein GFGH hinterlegt
+ist.** Für diese Betriebe zählt jede Getränkelieferung als Fremdeinkauf, weil
+niemand eingetragen hat, wer ihr Getränkefachgroßhändler ist.
+
+**Und die Namen sagen dasselbe.** Nach Volumen:
+
+| Lieferant | netto | Betriebe | was es ist |
+|---|---|---|---|
+| gastro mis gmbh | 1.887.870 | **53 von 57** | konzernweiter Lieferant, offensichtlich vertraglich |
+| Riegele, Dinkelacker, EGU, Würzburger Hofbräu, Brauhaus Pforzheim, Höpfner, Radeberger | zusammen ~3,3 Mio | 1–14 | regionale Brauereien |
+| GLH, Trinkkontor, W-GEM, Weidlich, Bierhalter, WIGEM | zusammen ~1,1 Mio | 1–11 | Getränkefachgroßhändler |
+| Metzger Schneider, Landmetzgerei Ichtl | 524.250 | 2 | Fleisch, regional |
+| FFD, Fruchthof Nagel, Manss | 660.558 | 1–17 | Obst und Gemüse |
+
+Das ist der Lieferantenstamm eines Gastronomiebetriebs, nicht ein Befund.
+
+**Was daraus folgt.** Die Kachel heißt jetzt „Einkauf ohne Freigabe", die Seite
+„Einkauf außerhalb der Freigabeliste", und der Befund steht in einer eigenen
+Kachel: `grund IN ('ausdruecklich gesperrt', 'fremder getraenkehaendler')` — nur
+dort hat jemand entschieden. Eine neue Karte „Woran die Zahl oben hängt" zeigt den
+Stand der drei Listen. **Die Zahl selbst bleibt unverändert**: eine Freigabe
+erfindet man nicht, indem man die Auswertung anders rechnet. Sie wird kleiner,
+wenn der Einkauf die Listen pflegt — und genau das soll sie.
+
+**Sachkonto hilft dabei nicht.** Naheliegend wäre, statt der Lieferantennamen die
+Buchungskonten zu nehmen. Gemessen: von 71.780 Eingangsrechnungen der letzten
+zwölf Monate tragen **1.816** ein Sachkonto (2,5 %), verteilt auf 32
+verschiedene. `kreditor_konto` steht bei 37.818. Als Grundlage für eine
+Abgrenzung reicht beides nicht.

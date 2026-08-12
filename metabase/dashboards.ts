@@ -62,7 +62,7 @@ const F_BEREICH: Parameter = {
 // Auswahlliste aus der Spalte laedt 200.000 Zeilen fuer fuenf Antworten.
 const F_SPERRE: Parameter = {
   id: 'd-sperre', name: 'sperre', 'display-name': 'Sperre', type: 'string/=',
-  festeWerte: ['zu wenige Häuser (unter 3)', 'Gebinde uneinheitlich',
+  festeWerte: ['zu wenige Betriebe (unter 3)', 'Gebinde uneinheitlich',
                'Menge widersprüchlich', 'Spreizung über Faktor 3', 'vergleichbar'],
 }
 // Der Handlungsbedarf. Trennt die roten Betriebe danach, WIE VIELE
@@ -223,10 +223,10 @@ export const dashboards: Dashboard[] = [
       { teile: [{ karte: 'bw_rangliste', hoehe: 12,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       // Das Themenprofil direkt unter der Bewertungs-Rangliste: die
-      // Rangliste sortiert die Haeuser, diese Tabelle sagt zu jedem, WOBEI
+      // Rangliste sortiert die Betriebe, diese Tabelle sagt zu jedem, WOBEI
       // es haengt. Beide lesen denselben Monat und dieselbe Marke, also
       // stehen sie untereinander und nicht auf getrennten Seiten.
-      { teile: [{ text: '### Woran es bei wem liegt\n\nDie Note je Thema, schwächstes Haus zuerst. **Schwachpunkt** ist das Thema mit dem größten Abstand nach unten zum eigenen Schnitt des Hauses. Erst ab April 2026 — Yext klassifiziert nicht rückwirkend.' }] },
+      { teile: [{ text: '### Woran es bei wem liegt\n\nDie Note je Thema, schwächster Betrieb zuerst. **Schwachpunkt** ist das Thema mit dem größten Abstand nach unten zum eigenen Schnitt des Betriebs. Erst ab April 2026 — Yext klassifiziert nicht rückwirkend.' }] },
       { teile: [{ karte: 'yx_themen_betrieb', hoehe: 12,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ text: '## Betriebe hinter einem Balken\n\nEin Klick auf ein Balkensegment füllt diese Liste. Ohne Auswahl stehen alle Bereiche untereinander.' }] },
@@ -297,7 +297,7 @@ export const dashboards: Dashboard[] = [
       // schon neun Spalten, vier weitere ergaeben dreizehn und damit
       // waagerechtes Scrollen -- derselbe Fehler, der am 28.07.2026 zur
       // vollen Breite gefuehrt hat.
-      { teile: [{ text: '## Liegt es an diesem Haus?\n\nDieselben Kennzahlen gegen zwei Maßstäbe: die **eigene Marke** (gleiches Konzept, ganz Deutschland — fängt ab, was am Konzept liegt) und die **eigene Stadt** (gleiches Wetter, gleiche Feiertage, andere Konzepte — fängt ab, was am Standort liegt).\n\n**Der Rang ist die Aussage**, nicht der Abstand: „16 von 17" ist eindeutig, „+5,8" nicht — bei Personal und Wareneinsatz ist weniger besser.\n\nDie vier Vergleichsspalten sind **anklickbar**: die beiden Marken-Spalten öffnen alle Häuser der Marke, die beiden Stadt-Spalten alle Häuser am Ort — jeweils mit Betrieb und Monat von hier.' }] },
+      { teile: [{ text: '## Liegt es an diesem Betrieb?\n\nDieselben Kennzahlen gegen zwei Maßstäbe: die **eigene Marke** (gleiches Konzept, ganz Deutschland — fängt ab, was am Konzept liegt) und die **eigene Stadt** (gleiches Wetter, gleiche Feiertage, andere Konzepte — fängt ab, was am Standort liegt).\n\n**Der Rang ist die Aussage**, nicht der Abstand: „16 von 17" ist eindeutig, „+5,8" nicht — bei Personal und Wareneinsatz ist weniger besser.\n\nDie vier Vergleichsspalten sind **anklickbar**: die beiden Marken-Spalten öffnen alle Betriebe der Marke, die beiden Stadt-Spalten alle Betriebe am Ort — jeweils mit Betrieb und Monat von hier.' }] },
       // VIER klickbare Spalten, nicht zwei: die ganze Marken-Haelfte der
       // Zeile fuehrt zu ⑨, die ganze Stadt-Haelfte zu ⑩. Wer eine rote
       // Zahl sieht, greift nach IHR -- meist nach dem Rang, denn der
@@ -320,7 +320,7 @@ export const dashboards: Dashboard[] = [
         ] }] },
       { teile: [{ karte: 'dd_betrieb_vergleich_verlauf' }] },
       // Die Standortkarte steht jetzt neben dem Ampelverlauf. Beide
-      // beantworten dieselbe Frage -- wo steht dieses Haus, und wie steht
+      // beantworten dieselbe Frage -- wo steht dieser Betrieb, und wie steht
       // es da -- und beide brauchen keine waagerechte Ausdehnung.
       { teile: [
         { karte: 'dd_betrieb_ampelverlauf', breite: 16, hoehe: 12 },
@@ -356,7 +356,7 @@ export const dashboards: Dashboard[] = [
         { karte: 'yx_themen', breite: 11, hoehe: 9 },
         { karte: 'yx_themen_verlauf', breite: 13, hoehe: 9 },
       ] },
-      { teile: [{ text: '### Antwortverhalten\n\nWie dieses Haus auf seine Bewertungen reagiert — Quote, Reaktionszeit und was offen liegt.' }] },
+      { teile: [{ text: '### Antwortverhalten\n\nWie dieser Betrieb auf seine Bewertungen reagiert — Quote, Reaktionszeit und was offen liegt.' }] },
       { teile: [{ karte: 'yx_antwort_rangliste', hoehe: 9 }] },
       // Der Wortlaut direkt unter der Kurve. Die Kurve sagt, DASS es
       // kippt; diese beiden sagen, woran es liegt -- und das ist der
@@ -431,7 +431,7 @@ export const dashboards: Dashboard[] = [
       { teile: [{ karte: 'dd_betrieb_inventur', hoehe: 11,
         klick: [{ ziel: 'dd_inventur', spalte: 'Zählung',
                   uebergabe: { inventur: 'inventur_key' } }] }] },
-      // Der Fremdeinkauf dieses Hauses. Nur die Kachel, nicht die ganze
+      // Der Fremdeinkauf dieses Betriebs. Nur die Kachel, nicht die ganze
       // Auswertung: das Betriebsblatt soll die Frage STELLEN, beantwortet
       // wird sie auf der eigenen Seite. Der Betriebsfilter wandert beim
       // Klick mit, weil beide Seiten ihn unter demselben Namen kennen.
@@ -509,7 +509,7 @@ export const dashboards: Dashboard[] = [
     // -- zwei Aussagen ueber verschiedene Zeitraeume auf einer Seite.
     filter: [F_MONAT, F_ZEITRAUM_DREI_MONATE, F_BETRIEB, F_MARKE],
     reihen: [
-      { teile: [{ text: '# ⑤ Standorte vergleichen\n\nOben Betrieb oder Marke auswählen. Ohne Auswahl stehen hier alle — für einen aussagekräftigen Vergleich zwei bis vier Betriebe wählen.\n\nDer Tagesverlauf zeigt **Prozent vom eigenen Tagesumsatz**. Sonst vergleicht man nur die Größe der Häuser und nicht ihr Muster.' }] },
+      { teile: [{ text: '# ⑤ Standorte vergleichen\n\nOben Betrieb oder Marke auswählen. Ohne Auswahl stehen hier alle — für einen aussagekräftigen Vergleich zwei bis vier Betriebe wählen.\n\nDer Tagesverlauf zeigt **Prozent vom eigenen Tagesumsatz**. Sonst vergleicht man nur die Größe der Betriebe und nicht ihr Muster.' }] },
       { teile: [{ karte: 'vg_ort_metriken', hoehe: 11,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ karte: 'vg_ort_umsatz' }] },
@@ -529,14 +529,14 @@ export const dashboards: Dashboard[] = [
   // Gefragt am 10.08.2026: "ob bei allen der Umsatz eingebrochen ist oder
   // nur bei einem". Ein Rueckgang von zwoelf Prozent heisst etwas
   // voellig anderes, je nachdem ob die Nachbarhaeuser dasselbe zeigen
-  // oder ob das Haus allein dasteht.
+  // oder ob der Betrieb allein dasteht.
   //
   // Zwei Seiten statt einer mit Umschalter, weil sie verschiedene
   // Stoerquellen abfangen: die Marke, was am Konzept liegt (gleiche
   // Karte, gleiche Preise, ganz Deutschland); die Stadt, was am Standort
   // liegt (gleiches Wetter, gleiche Feiertage, gleiche Kaufkraft,
   // verschiedene Konzepte). Erst beide nebeneinander erlauben die dritte
-  // Aussage -- faellt ein Haus gegen BEIDE ab, liegt es am Haus.
+  // Aussage -- faellt ein Betrieb gegen BEIDE ab, liegt es am Betrieb.
   //
   // KEIN zweiter Filter fuer Marke oder Stadt. Die Vergleichsgruppe wird
   // aus dem gewaehlten Betrieb abgeleitet. Zwei Filter, die dieselbe
@@ -547,7 +547,7 @@ export const dashboards: Dashboard[] = [
   // ueberhaupt Auswahllisten bekommen haben.
   //
   // Ebenso KEIN Zeitraumfilter. Die Verlaufskarten lesen zwei
-  // verschiedene Tabellen (Haus und Gruppe), und ein Metabase-Feldfilter
+  // verschiedene Tabellen (Betrieb und Gruppe), und ein Metabase-Feldfilter
   // baut seine Klausel aus dem TABELLENNAMEN -- er wuerde nur einen der
   // beiden Aeste einschraenken und die Linien still verschieden lang
   // machen. Stattdessen ein festes 24-Monats-Fenster, das am
@@ -561,14 +561,14 @@ export const dashboards: Dashboard[] = [
     sammlung: 'Drill-Down',
     filter: [F_MONAT, F_BETRIEB],
     reihen: [
-      { teile: [{ text: '# ⑨ Betrieb gegen Marke\n\nDie Frage vor jeder Maßnahme: **schwächelt dieses Haus oder seine ganze Marke?** Läuft die Marke mit nach unten, liegt es am Konzept, an der Saison oder am Markt — und eine Maßnahme im einzelnen Haus geht daneben.\n\nOben den **Betrieb** wählen; die Marke ergibt sich daraus. Ohne Auswahl steht hier die Gesamtübersicht: welche Häuser am weitesten unter ihrer eigenen Marke liegen.\n\nDer Markenwert ist immer der **mittlere Betrieb** der Marke, nicht der Mittelwert — ein einzelner Ausreißer soll den Maßstab nicht verziehen. Häuser ohne laufenden Umsatz zählen darin nicht mit.' }] },
+      { teile: [{ text: '# ⑨ Betrieb gegen Marke\n\nDie Frage vor jeder Maßnahme: **schwächelt dieser Betrieb oder seine ganze Marke?** Läuft die Marke mit nach unten, liegt es am Konzept, an der Saison oder am Markt — und eine Maßnahme im einzelnen Betrieb geht daneben.\n\nOben den **Betrieb** wählen; die Marke ergibt sich daraus. Ohne Auswahl steht hier die Gesamtübersicht: welche Betriebe am weitesten unter ihrer eigenen Marke liegen.\n\nDer Markenwert ist immer der **mittlere Betrieb** der Marke, nicht der Mittelwert — ein einzelner Ausreißer soll den Maßstab nicht verziehen. Betriebe ohne laufenden Umsatz zählen darin nicht mit.' }] },
       { teile: [{ karte: 'vm_kopf', hoehe: 11,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ karte: 'vm_verlauf' }] },
       { teile: [{ text: '## Alle sechs Kennzahlen gegen die Marke\n\n„Stellung" sagt **besser** oder **schlechter**, nicht höher oder niedriger: bei Personal und Wareneinsatz ist weniger besser.' }] },
       { teile: [{ karte: 'vm_kennzahlen', hoehe: 11,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
-      { teile: [{ text: '## Die anderen Häuser der Marke\n\nEin ◀ markiert den oben gewählten Betrieb. Stehen die Nachbarn derselben Marke ebenso im Minus, ist der Befund keiner über dieses Haus.' }] },
+      { teile: [{ text: '## Die anderen Betriebe der Marke\n\nEin ◀ markiert den oben gewählten Betrieb. Stehen die Nachbarn derselben Marke ebenso im Minus, ist der Befund keiner über diesen Betrieb.' }] },
       { teile: [{ karte: 'vm_haeuser', hoehe: 12,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
     ],
@@ -578,22 +578,22 @@ export const dashboards: Dashboard[] = [
     schluessel: 'vg_stadt',
     name: '⑩ Betrieb gegen die Stadt',
     beschreibung:
-      'Ein Betrieb gegen die anderen Häuser der Gruppe am selben Ort — verschiedene Marken, gleiches Einzugsgebiet. Trennt, was am Standort liegt, von dem, was am Haus liegt.',
+      'Ein Betrieb gegen die anderen Betriebe der Gruppe am selben Ort — verschiedene Marken, gleiches Einzugsgebiet. Trennt, was am Standort liegt, von dem, was am Betrieb liegt.',
     sammlung: 'Drill-Down',
     filter: [F_MONAT, F_BETRIEB],
     reihen: [
-      { teile: [{ text: '# ⑩ Betrieb gegen die Stadt\n\nIn Karlsruhe stehen vier Häuser der Gruppe: Aposto, Enchilada, Lehners und Wilma Wunder. Wetter, Baustellen, Feiertagslage und Kaufkraft treffen sie **gleichzeitig** — eine Marke über ganz Deutschland dagegen nicht. Deshalb ist die Stadt der zweite Maßstab neben der Marke.\n\nOben den **Betrieb** wählen; die Stadt ergibt sich daraus. Ohne Auswahl stehen in den Diagrammen die Städte selbst.\n\n> **Die Veränderung ist vergleichbar, die absoluten Quoten nur bedingt.** Die Häuser gehören verschiedenen Marken mit verschiedenen Karten, Preisen und Personalstrukturen. Ein Wareneinsatz von 24 % ist zwischen einem mexikanischen und einem bürgerlichen Konzept keine gemeinsame Messlatte — die Veränderung gegenüber dem Vorjahr trägt dagegen jedes Haus in seiner eigenen Einheit.' }] },
+      { teile: [{ text: '# ⑩ Betrieb gegen die Stadt\n\nIn Karlsruhe stehen vier Betriebe der Gruppe: Aposto, Enchilada, Lehners und Wilma Wunder. Wetter, Baustellen, Feiertagslage und Kaufkraft treffen sie **gleichzeitig** — eine Marke über ganz Deutschland dagegen nicht. Deshalb ist die Stadt der zweite Maßstab neben der Marke.\n\nOben den **Betrieb** wählen; die Stadt ergibt sich daraus. Ohne Auswahl stehen in den Diagrammen die Städte selbst.\n\n> **Die Veränderung ist vergleichbar, die absoluten Quoten nur bedingt.** Die Betriebe gehören verschiedenen Marken mit verschiedenen Karten, Preisen und Personalstrukturen. Ein Wareneinsatz von 24 % ist zwischen einem mexikanischen und einem bürgerlichen Konzept keine gemeinsame Messlatte — die Veränderung gegenüber dem Vorjahr trägt dagegen jeder Betrieb in seiner eigenen Einheit.' }] },
       { teile: [{ karte: 'vs_kopf', hoehe: 10,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ text: '## Alle oder nur einer?\n\nDie Karte, wegen der es diese Seite gibt.' }] },
       { teile: [{ karte: 'vs_umsatz_pct', hoehe: 10 }] },
       { teile: [{ karte: 'vs_verlauf' }] },
-      { teile: [{ text: '## Die Häuser der Stadt im Einzelnen' }] },
+      { teile: [{ text: '## Die Betriebe der Stadt im Einzelnen' }] },
       { teile: [{ karte: 'vs_haeuser', hoehe: 12,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ karte: 'vs_kennzahlen', hoehe: 12,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
-      { teile: [{ text: '## Wer im Vergleich fehlt\n\nDie Ortsangaben werden von Hand gepflegt — das Kassensystem liefert für Betriebe keine Adresse. Jedes Haus in dieser Liste fehlt in seiner Stadt, **ohne dass es dort auffiele**. Bleibt die Seite oben leer, steht der gewählte Betrieb hier.' }] },
+      { teile: [{ text: '## Wer im Vergleich fehlt\n\nDie Ortsangaben werden von Hand gepflegt — das Kassensystem liefert für Betriebe keine Adresse. Jeder Betrieb in dieser Liste fehlt in seiner Stadt, **ohne dass es dort auffiele**. Bleibt die Seite oben leer, steht der gewählte Betrieb hier.' }] },
       { teile: [{ karte: 'vs_fehlend', hoehe: 10,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
     ],
@@ -606,11 +606,11 @@ export const dashboards: Dashboard[] = [
     schluessel: 'pf_portfolio',
     name: '⑥ Portfolio und Potenzial',
     beschreibung:
-      'Wo steckt der Umsatz, wie abhängig ist die Gruppe von wenigen Häusern, wie weit liegen vergleichbare Betriebe auseinander — und was wäre rechnerisch zu holen. Fragen, die man bei einer Handvoll Betriebe im Kopf beantwortet, bei über hundert nicht mehr.',
+      'Wo steckt der Umsatz, wie abhängig ist die Gruppe von wenigen Betrieben, wie weit liegen vergleichbare Betriebe auseinander — und was wäre rechnerisch zu holen. Fragen, die man bei einer Handvoll Betriebe im Kopf beantwortet, bei über hundert nicht mehr.',
     sammlung: 'Drill-Down',
     filter: [F_MONAT, F_MARKE],
     reihen: [
-      { teile: [{ text: '# ⑥ Portfolio und Potenzial\n\nDie Ampeln beantworten die Frage „wer ist rot". Diese Seite stellt die Fragen davor: Wo steckt der Umsatz, wovon hängt die Gruppe ab, wie weit liegen vergleichbare Häuser auseinander — und was kostet dieser Abstand.' }] },
+      { teile: [{ text: '# ⑥ Portfolio und Potenzial\n\nDie Ampeln beantworten die Frage „wer ist rot". Diese Seite stellt die Fragen davor: Wo steckt der Umsatz, wovon hängt die Gruppe ab, wie weit liegen vergleichbare Betriebe auseinander — und was kostet dieser Abstand.' }] },
 
       { teile: [{ text: '## Wo steckt der Umsatz\n\nEin Teil der geführten Betriebe macht gar keinen Umsatz. Das verzerrt jeden Anteil auf dieser Seite.' }] },
       { teile: [{ karte: 'pf_kachel_aktiv' }] },
@@ -649,7 +649,7 @@ export const dashboards: Dashboard[] = [
       { teile: [{ text: '## Gäste oder Bon?\n\nEine Umsatzveränderung hat zwei mögliche Ursachen, und sie führen zu **verschiedenen Maßnahmen**: mehr oder weniger Gäste ist ein Marketing- und Standortthema, ein veränderter Bon ein Karten-, Preis- und Verkaufsthema.' }] },
       { teile: [{ karte: 'pf_gaeste_bon', hoehe: 12, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
 
-      { teile: [{ text: '## Wie planbar läuft ein Betrieb\n\nSchwankung im Verhältnis zum eigenen Durchschnitt — dadurch sind große und kleine Häuser vergleichbar. Hoher Wert = abhängig von Wochenenden und Wetter.' }] },
+      { teile: [{ text: '## Wie planbar läuft ein Betrieb\n\nSchwankung im Verhältnis zum eigenen Durchschnitt — dadurch sind große und kleine Betriebe vergleichbar. Hoher Wert = abhängig von Wochenenden und Wetter.' }] },
       { teile: [{ karte: 'pf_stabilitaet', hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
     ],
   },
@@ -665,7 +665,7 @@ export const dashboards: Dashboard[] = [
     sammlung: 'Round Table',
     filter: [F_MONAT, F_MARKE],
     // Zwei Reiter: "Lage" ist der Einstieg (Karte, Zaehler, Betriebe),
-    // "Marken" die Frage dahinter — schwaechelt das Haus oder seine Marke?
+    // "Marken" die Frage dahinter — schwaechelt der Betrieb oder seine Marke?
     // Vorher stand beides untereinander, und die Markenebene begann erst
     // nach vierzehn Reihen Scrollen.
     tabs: [
@@ -673,7 +673,7 @@ export const dashboards: Dashboard[] = [
       { teile: [{ text: '# ① Round Table\n\n🟢 passt · 🟠 im Auge behalten · 🔴 sofort handeln · ⚪ nicht bewertbar (meist fehlt die BWA).\n\n**Round Table → Filiale → Betrieb.** Ein Klick führt eine Ebene tiefer, die Filter oben wandern mit. Gezählt werden nur **operative** Betriebe — geschlossene, verwaltende und Testbetriebe stehen in der eigenen Kachel und in ⑥ Portfolio.' }] },
       // Die Karte steht ganz oben: sie beantwortet keine Frage, sondern
       // gibt den Zahlen darunter einen Ort. Schraenkt man die Marke ein,
-      // bleiben deren Haeuser stehen -- die raeumliche Einordnung passiert
+      // bleiben deren Betriebe stehen -- die raeumliche Einordnung passiert
       // dadurch im Vorbeigehen und kostet keinen Seitenwechsel.
       { teile: [{ karte: 'so_karte_klein', hoehe: 12,
         klick: [{ ziel: 'dd_betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
@@ -691,13 +691,13 @@ export const dashboards: Dashboard[] = [
           klick: [{ ziel: 'dd_filialen', uebergabe: { ampel: 'ohne' }, fest: true }] },
         // Die Herausgenommenen duerfen nicht stumm verschwinden: wer die
         // Zaehler mit der Betriebsliste abgleicht, muss sehen, wohin die
-        // uebrigen Haeuser gefallen sind.
+        // uebrigen Betriebe gefallen sind.
         { karte: 'rt_kachel_nicht_operativ' },
       ] },
       // Neben der Bewertungskachel steht jetzt, WORAN sie haengt. Die Note
       // allein ist auf dieser Ebene eine Zahl ohne Griff -- "4,23" sagt
       // niemandem, was zu tun ist. "Bestellung · 2,14" schon, und ein Klick
-      // fuehrt auf den Themenreiter, wo die Haeuser dahinter stehen.
+      // fuehrt auf den Themenreiter, wo die Betriebe dahinter stehen.
       // Die Antwortquote daneben, weil sie das einzige auf dieser Seite
       // ist, das sich ohne Gast beeinflussen laesst.
       { teile: [
@@ -785,7 +785,7 @@ export const dashboards: Dashboard[] = [
           klick: [{ ziel: 'dd_filialen', uebergabe: { monat: 'Monat', ampel: 'Ampelwert' } }] },
         { karte: 'rt_historie_bereich' },
       ] },
-      { teile: [{ text: '## Wer hat die Farbe gewechselt — je Bereich\n\nWechsel einzelner Ampeln, Verschlechterungen zuerst. Feiner als das Gesamturteil oben: ein Haus kann insgesamt grün bleiben, während die Personalampel kippt.' }] },
+      { teile: [{ text: '## Wer hat die Farbe gewechselt — je Bereich\n\nWechsel einzelner Ampeln, Verschlechterungen zuerst. Feiner als das Gesamturteil oben: ein Betrieb kann insgesamt grün bleiben, während die Personalampel kippt.' }] },
       { teile: [{ karte: 'rt_ampelwechsel', hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ text: '## Die letzten drei Monate je Betrieb und Bereich\n\n↗ besser oder gleich, ↘ schlechter. Dabei gilt je Bereich die richtige Richtung: bei Personal- und Wareneinsatzquoten ist ein kleinerer Wert der bessere.' }] },
       { teile: [{ karte: 'rt_trend_tabelle', hoehe: 12, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
@@ -874,7 +874,7 @@ export const dashboards: Dashboard[] = [
       { teile: [{ text: '## Aktionen\n\nNur **34 der Betriebe** erfassen Aktionen — 19 davon Enchilada, 14 Wilma Wunder. Das ist keine Konzernsicht: Wer hier fehlt, fährt vielleicht dieselbe Aktion und bucht sie nur nicht. Alle Werte netto; der laufende Monat ist unvollständig.' }] },
       { teile: [{ karte: 'ak_uebersicht', hoehe: 10 }] },
       { teile: [{ karte: 'ak_verlauf', hoehe: 9 }] },
-      { teile: [{ text: '### Wer hängt woran\n\nDer gewählte Monat, sortiert nach **Anteil am eigenen Umsatz**: 40 % Aktionsanteil sind eine andere Nachricht als 4.000 € — dieses Haus hat eine Frage zu beantworten, wenn die Aktion endet.' }] },
+      { teile: [{ text: '### Wer hängt woran\n\nDer gewählte Monat, sortiert nach **Anteil am eigenen Umsatz**: 40 % Aktionsanteil sind eine andere Nachricht als 4.000 € — dieser Betrieb hat eine Frage zu beantworten, wenn die Aktion endet.' }] },
       { teile: [{ karte: 'ak_betrieb', hoehe: 12,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ text: '### Geplant und tatsächlich\n\n„—" heißt unbefristet. Der Steckbrief zeigt, was das Umsatzbild nicht zeigt: Aktionen, die **nie Umsatz sahen**, und unbefristete, die **seit Jahren still weiterlaufen**.' }] },
@@ -1018,7 +1018,7 @@ export const dashboards: Dashboard[] = [
       { teile: [{ karte: 'wa_preise', hoehe: 12 }] },
       // Die Lieferanten — der Titel der Seite versprach sie von Anfang
       // an, gezeigt hat sie bisher keine Karte.
-      { teile: [{ text: '## Lieferanten\n\nJe **Marke**, nicht je Konzern: FoodNotify führt denselben Lieferanten je Mandant als eigenen Vertrag. Ein Anteil über 60 % beim größten Lieferanten heißt: dieses Haus hat faktisch einen Monopol-Lieferanten.' }] },
+      { teile: [{ text: '## Lieferanten\n\nJe **Marke**, nicht je Konzern: FoodNotify führt denselben Lieferanten je Mandant als eigenen Vertrag. Ein Anteil über 60 % beim größten Lieferanten heißt: dieser Betrieb hat faktisch einen Monopol-Lieferanten.' }] },
       { teile: [{ karte: 'wa_lieferant_volumen', hoehe: 11 }] },
       { teile: [{ karte: 'wa_lieferant_konzentration', hoehe: 11,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
@@ -1041,7 +1041,7 @@ export const dashboards: Dashboard[] = [
       // man die erste gesehen hat. Die Kachel traegt bewusst KEINEN
       // Markenfilter — hier oben steht der FoodNotify-Mandant, drueben das
       // Konzept, siehe Kopf von fe_kachel_verweis.
-      { teile: [{ text: '## Durfte dort eingekauft werden?\n\nDie Frage nach dem **Lieferanten** statt nach dem Preis: Wareneinkauf bei Firmen, die weder auf der Konzernfreigabe stehen noch der hinterlegte GFGH ihres Hauses sind. Grundlage ist das **Belegarchiv** — die Rechnungen selbst, nicht die Bestellungen. Das ist der Unterschied, auf den es hier ankommt: wer bei einem nicht freigegebenen Lieferanten kauft, bestellt ihn nicht über FoodNotify.' }] },
+      { teile: [{ text: '## Durfte dort eingekauft werden?\n\nDie Frage nach dem **Lieferanten** statt nach dem Preis: Wareneinkauf bei Firmen, die weder auf der Konzernfreigabe stehen noch der hinterlegte GFGH ihres Betriebs sind. Grundlage ist das **Belegarchiv** — die Rechnungen selbst, nicht die Bestellungen. Das ist der Unterschied, auf den es hier ankommt: wer bei einem nicht freigegebenen Lieferanten kauft, bestellt ihn nicht über FoodNotify.' }] },
       { teile: [{ karte: 'fe_kachel_verweis', breite: 8,
         klick: [{ ziel: 'db_fremdeinkauf', uebergabe: {}, fest: true }] }] },
     ],
@@ -1055,26 +1055,39 @@ export const dashboards: Dashboard[] = [
   // ist — und die falsche Antwort waere gewesen, sie zu addieren.
   // ---------------------------------------------------------------------
   {
+    /*
+     * DER TITEL HIESS "wer liefert, obwohl er nicht darf" UND WAR DAMIT
+     * EINE BEHAUPTUNG, DIE DIE DATEN NICHT TRAGEN.
+     *
+     * Gemessen am 12.08.2026: von 7,93 Mio EUR "nicht freigegeben" trug
+     * KEIN EINZIGER Euro den Grund "ausdruecklich gesperrt". 6,92 Mio
+     * entfielen auf 48 Betriebe ohne hinterlegten GFGH, und die
+     * Freigabeliste hatte fuenf Eintraege. Die Seite zaehlte also
+     * ueberwiegend, was niemand je eingetragen hat — unter einer
+     * Ueberschrift, die nach Verstoss klang.
+     */
     schluessel: 'db_fremdeinkauf',
-    name: 'Fremdeinkauf — wer liefert, obwohl er nicht darf',
+    name: 'Fremdeinkauf — Einkauf außerhalb der Freigabeliste',
     beschreibung:
-      'Wareneinkauf bei nicht freigegebenen Lieferanten, je Betrieb und Lieferant, aus dem Belegarchiv und aus FoodNotify getrennt. Dazu der Preisvergleich zwischen den Häusern — die Auswertung, die „GFGH Q2 2026.xlsx" von den Betrieben erfragen wollte und zu 8,7 % zurückbekam.',
+      'Wareneinkauf bei Lieferanten ohne Freigabe, je Betrieb und Lieferant, aus dem Belegarchiv und aus FoodNotify getrennt. Solange die Freigabeliste dünn ist, misst die Seite vor allem den Pflegestand — der bestätigte Teil steht in einer eigenen Kachel. Dazu der Preisvergleich zwischen den Betrieben, die Auswertung, die „GFGH Q2 2026.xlsx" von den Betrieben erfragen wollte und zu 8,7 % zurückbekam.',
     sammlung: 'Betrieb',
     // Das Konzept, nicht der FoodNotify-Mandant: mart.fremdeinkauf und
     // mart.einkaufspreis_betrieb tragen beide konzept aus
     // mart.konzept_zuordnung.
     filter: [F_BETRIEB, F_MARKE],
     reihen: [
-      { teile: [{ text: '# Fremdeinkauf\n\n**Drei Dinge vorweg, sonst liest man die Zahlen falsch.**\n\n**Die Quelle steht in jeder Tabelle und wird nie summiert.** Dieselbe Rechnung steht in FoodNotify *und* im Belegarchiv. Wer über die Spalte „Quelle" summiert, zählt sie doppelt. Die Kacheln und Diagramme zeigen deshalb ausschließlich das **Belegarchiv** — dort ist Fremdeinkauf überhaupt erst sichtbar, denn wer bei einem nicht freigegebenen Lieferanten kauft, bestellt ihn nicht über das Bestellsystem des Konzerns.\n\n**Es zählt nur Wareneinkauf.** Das Belegarchiv führt alle Eingangsrechnungen — Strom, Leasing, Finanzamt, Kartengebühren, Rechnungen zwischen Konzerngesellschaften. Das ist herausgerechnet und steht weiter unten nachprüfbar daneben.\n\n**Die Liste ist eine Arbeitsliste, kein Urteil.** Wer nicht auf der Freigabeliste steht, erscheint hier — auch die Brauerei mit Liefervertrag und der Winzer. Sie gehören in `manual.lieferant_freigabe` eingetragen; dann verschwinden sie. Die Liste schrumpft, während man sie abarbeitet.' }] },
+      { teile: [{ text: '# Fremdeinkauf\n\n**Die große Zahl links ist noch kein Verstoß.** Sie zählt jeden Wareneinkauf bei einem Lieferanten, der nicht auf der Freigabeliste steht — und die hat heute fünf Einträge. Nachgemessen am 12.08.2026: von 7,93 Mio € trug **kein einziger Euro** den Grund „ausdrücklich gesperrt", und 6,92 Mio entfielen auf 48 Betriebe, für die überhaupt kein GFGH hinterlegt ist. Dahinter stehen regionale Brauereien, Getränkefachgroßhändler, Metzger und Obsthändler. Was davon **entschieden** ist, steht in der Kachel „Bestätigter Fremdeinkauf"; woran der Rest hängt, in „Woran die Zahl oben hängt".\n\n**Die Quelle steht in jeder Tabelle und wird nie summiert.** Dieselbe Rechnung steht in FoodNotify *und* im Belegarchiv. Wer über die Spalte „Quelle" summiert, zählt sie doppelt. Kacheln und Diagramme zeigen deshalb ausschließlich das **Belegarchiv** — dort ist Fremdeinkauf überhaupt erst sichtbar, denn wer außerhalb der Freigabe kauft, bestellt nicht über das Bestellsystem des Konzerns.\n\n**Es zählt nur Wareneinkauf.** Das Belegarchiv führt alle Eingangsrechnungen — Strom, Leasing, Finanzamt, Kartengebühren, Rechnungen zwischen Konzerngesellschaften. Das ist herausgerechnet und steht weiter unten nachprüfbar daneben.\n\n**Die Seite ist eine Arbeitsliste.** Wer berechtigt liefert, gehört in `manual.lieferant_freigabe`, und der Getränkelieferant eines Betriebs in `manual.gfgh_betrieb`; dann verschwinden sie hier. Die Zahl schrumpft, während man die Liste abarbeitet — genau das ist ihr Zweck.' }] },
       { teile: [
         { karte: 'fe_summe' },
+        { karte: 'fe_bestaetigt' },
         { karte: 'fe_ungeklaert' },
         { karte: 'fe_betriebe_betroffen' },
       ] },
+      { teile: [{ karte: 'fe_pflegestand', hoehe: 8 }] },
       { teile: [{ text: '## Bei wem\n\nNach Volumen sortiert: oben lohnt die Entscheidung am meisten. Die Tabelle darunter zeigt beide Quellen getrennt und nennt den Grund — „steht nicht auf der Liste" heißt, noch niemand hat entschieden; „ausdrücklich gesperrt" heißt, jemand hat entschieden.' }] },
       { teile: [{ karte: 'fe_lieferant', hoehe: 11 }] },
       { teile: [{ karte: 'fe_lieferant_tabelle', hoehe: 12 }] },
-      { teile: [{ text: '## In welchem Haus\n\nDer **Anteil** ist die aussagekräftigere Spalte: ein großes Haus mit 5 % hat ein kleineres Problem als ein kleines mit 50 %. Steht in der letzten Spalte ein GFGH, ist dessen Belieferung freigegeben und hier nicht mitgezählt.' }] },
+      { teile: [{ text: '## In welchem Betrieb\n\nDer **Anteil** ist die aussagekräftigere Spalte: ein großer Betrieb mit 5 % hat ein kleineres Problem als ein kleiner mit 50 %. Steht in der letzten Spalte ein GFGH, ist dessen Belieferung freigegeben und hier nicht mitgezählt.' }] },
       { teile: [{ karte: 'fe_betrieb', hoehe: 12,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       // Beide Richtungen des Ausschlusses stehen auf der Seite. Eine
@@ -1087,13 +1100,13 @@ export const dashboards: Dashboard[] = [
       { teile: [{ karte: 'fe_kein_wareneinkauf', hoehe: 10 }] },
       { teile: [{ text: '## Stand der Freigabeliste\n\nKonzernweit, deshalb ohne Betriebsfilter. „Trifft nichts" heißt: der Eintrag steht in der Liste, aber unter diesem Namen wurde nie eingekauft — meist ein Schreibweisenproblem, kein leerer Lieferant.' }] },
       { teile: [{ karte: 'fe_freigabestand', hoehe: 12 }] },
-      { teile: [{ text: '## Preisvergleich zwischen den Häusern\n\nDie eigentliche Excel-Frage: was zahlt *dieses* Haus, und wie stehen die anderen da. Aus **FoodNotify**, nicht aus dem Belegarchiv — nur dort stehen einzelne Artikel.\n\n**Belastbar ist das im einstelligen bis niedrig zweistelligen Prozentbereich.** Dreistellige Abweichungen sind meist Mengenartefakte: die Häuser buchen dieselbe Ware verschieden. Vier Sperren fangen das ab, die letzte stumpf bei Faktor 3. Wer eine große Abweichung weitergibt, prüft sie vorher am Beleg.\n\n**Mehrkosten sind eine Obergrenze, keine Einsparzusage.** Der Median ist ein erreichter Preis, kein zugesagter.' }] },
+      { teile: [{ text: '## Preisvergleich zwischen den Betrieben\n\nDie eigentliche Excel-Frage: was zahlt *dieser* Betrieb, und wie stehen die anderen da. Aus **FoodNotify**, nicht aus dem Belegarchiv — nur dort stehen einzelne Artikel.\n\n**Belastbar ist das im einstelligen bis niedrig zweistelligen Prozentbereich.** Dreistellige Abweichungen sind meist Mengenartefakte: die Betriebe buchen dieselbe Ware verschieden. Vier Sperren fangen das ab, die letzte stumpf bei Faktor 3. Wer eine große Abweichung weitergibt, prüft sie vorher am Beleg.\n\n**Mehrkosten sind eine Obergrenze, keine Einsparzusage.** Der Median ist ein erreichter Preis, kein zugesagter.' }] },
       { teile: [{ karte: 'ep_abweichung', hoehe: 12,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ karte: 'ep_betrieb', hoehe: 12,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       // Die Zaehlkarte ist ab hier eine Tuer: ein Klick auf die Spalte
-      // "Sperre" oeffnet die Waren und Haeuser hinter dieser einen Zahl.
+      // "Sperre" oeffnet die Waren und Betriebe hinter dieser einen Zahl.
       // Nur diese Spalte, nicht die ganze Zeile — sonst navigiert ein
       // Klick auf "Betroffener Einkauf" weg, waehrend man nur lesen wollte.
       { teile: [{ karte: 'ep_nicht_vergleichbar', hoehe: 9,
@@ -1115,13 +1128,13 @@ export const dashboards: Dashboard[] = [
     schluessel: 'dd_sperre',
     name: 'Warum diese Ware nicht verglichen wird',
     beschreibung:
-      'Die Waren und Häuser hinter einer der vier Sperren des Preisvergleichs. Erreichbar über einen Klick auf die Spalte „Sperre" in „Warum eine Ware nicht verglichen wird".',
+      'Die Waren und Betriebe hinter einer der vier Sperren des Preisvergleichs. Erreichbar über einen Klick auf die Spalte „Sperre" in „Warum eine Ware nicht verglichen wird".',
     sammlung: 'Drill-Down',
     filter: [F_SPERRE, F_MARKE, F_WARE],
     reihen: [
-      { teile: [{ text: '# Hinter der Sperre\n\n**Eine Sperre ist kein Fehler, sondern ein Verzicht.** Sie sagt: für diese Ware in diesem Monat gibt es keinen belastbaren Vergleich zwischen den Häusern — nicht, dass etwas falsch eingekauft wurde.\n\n**„zu wenige Häuser"** ist der Normalfall und harmlos: unter drei Häusern ist der „Median" nur der andere Betrieb.\n\n**„Gebinde uneinheitlich"** und **„Menge widersprüchlich"** sind Datenpflege, kein Preisthema — die Häuser buchen dieselbe Lieferung verschieden. Der Fingerabdruck steht in der Tabelle: gleicher Gebindepreis, weit auseinanderlaufender Preis je Einheit.\n\n**„Spreizung über Faktor 3"** ist die stumpfe Bremse hinter den drei feinen. Bei gleicher Ware, Einheit und Monat gibt es keinen Einkauf, der das Dreifache kostet; es gibt eine anders gebuchte Menge.' }] },
+      { teile: [{ text: '# Hinter der Sperre\n\n**Eine Sperre ist kein Fehler, sondern ein Verzicht.** Sie sagt: für diese Ware in diesem Monat gibt es keinen belastbaren Vergleich zwischen den Betrieben — nicht, dass etwas falsch eingekauft wurde.\n\n**„zu wenige Betriebe"** ist der Normalfall und harmlos: unter drei Betrieben ist der „Median" nur der andere Betrieb.\n\n**„Gebinde uneinheitlich"** und **„Menge widersprüchlich"** sind Datenpflege, kein Preisthema — die Betriebe buchen dieselbe Lieferung verschieden. Der Fingerabdruck steht in der Tabelle: gleicher Gebindepreis, weit auseinanderlaufender Preis je Einheit.\n\n**„Spreizung über Faktor 3"** ist die stumpfe Bremse hinter den drei feinen. Bei gleicher Ware, Einheit und Monat gibt es keinen Einkauf, der das Dreifache kostet; es gibt eine anders gebuchte Menge.' }] },
       { teile: [{ karte: 'sp_waren', hoehe: 12 }] },
-      { teile: [{ text: '## Die einzelnen Häuser\n\nDieselben Zeilen, eine Stufe feiner. Über den **Warenfilter** oben kommt man von 300 Zeilen auf eine Ware herunter — dann steht nebeneinander, was jedes Haus für dieselbe Sache gebucht hat.' }] },
+      { teile: [{ text: '## Die einzelnen Betriebe\n\nDieselben Zeilen, eine Stufe feiner. Über den **Warenfilter** oben kommt man von 300 Zeilen auf eine Ware herunter — dann steht nebeneinander, was jeder Betrieb für dieselbe Sache gebucht hat.' }] },
       { teile: [{ karte: 'sp_positionen', hoehe: 14,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
     ],
@@ -1145,7 +1158,7 @@ export const dashboards: Dashboard[] = [
       // Der Wasserfall daneben waere zu schmal: "Uebrige Kosten" braucht
       // eine lesbare Beschriftung, und die Bloecke sollen proportional
       // erkennbar sein.
-      { teile: [{ text: '## Vom Umsatz zum Ergebnis\n\nDie vier Blöcke zwischen Umsatz und EBIT. „Übrige Kosten" ist der Rest — Miete, Energie, GF-Gehälter, Abschreibungen. Mit gewähltem Betrieb wird daraus die Ergebnisrechnung dieses Hauses.' }] },
+      { teile: [{ text: '## Vom Umsatz zum Ergebnis\n\nDie vier Blöcke zwischen Umsatz und EBIT. „Übrige Kosten" ist der Rest — Miete, Energie, GF-Gehälter, Abschreibungen. Mit gewähltem Betrieb wird daraus die Ergebnisrechnung dieses Betriebs.' }] },
       { teile: [{ karte: 'bwa_wasserfall', hoehe: 10 }] },
       { teile: [{ karte: 'bwa_ebit', hoehe: 11, klick: [{ ziel: 'dd_betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ text: '## Buchungsstand\n\nZwei Monate Verzug sind normal, vier eine Nachfrage beim Steuerberater wert.' }] },
@@ -1184,7 +1197,7 @@ export const dashboards: Dashboard[] = [
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       ] },
       // Der Reiter, der die Frage von 10.08.2026 beantwortet: die Note
-      // sagt DASS ein Haus abrutscht, die Themen sagen WORAN. Er steht
+      // sagt DASS ein Betrieb abrutscht, die Themen sagen WORAN. Er steht
       // direkt hinter "Stand", weil das die Reihenfolge ist, in der
       // gefragt wird -- nicht hinter den technischen Reitern.
       { name: 'Themen', reihen: [
@@ -1197,10 +1210,10 @@ export const dashboards: Dashboard[] = [
       { teile: [{ karte: 'yx_themen', hoehe: 9 }] },
       { teile: [{ text: '## Im Verlauf\n\nEin Thema, das kippt, ist hier sichtbar, lange bevor der Bewertungsstand darauf reagiert. Der Anstieg im April 2026 ist der Beginn der Erhebung, kein Ereignis.' }] },
       { teile: [{ karte: 'yx_themen_verlauf', hoehe: 9 }] },
-      { teile: [{ text: '## Themenprofil je Betrieb\n\nJede Spaltenüberschrift sortiert. **Schwachpunkt** ist das Thema, das am weitesten unter dem eigenen Schnitt des Hauses liegt — nicht das mit der kleinsten Note: ein Haus mit lauter Vieren hat kein Wartezeitproblem, nur weil die Wartezeit bei 3,9 steht.' }] },
+      { teile: [{ text: '## Themenprofil je Betrieb\n\nJede Spaltenüberschrift sortiert. **Schwachpunkt** ist das Thema, das am weitesten unter dem eigenen Schnitt des Betriebs liegt — nicht das mit der kleinsten Note: ein Betrieb mit lauter Vieren hat kein Wartezeitproblem, nur weil die Wartezeit bei 3,9 steht.' }] },
       { teile: [{ karte: 'yx_themen_betrieb', hoehe: 12,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
-      { teile: [{ text: '## Wo ein Thema am weitesten abfällt\n\nDie Arbeitsliste: nicht „welches Haus ist schlecht“, sondern „welches Haus ist **wobei** schlecht“. Erst ab drei Nennungen — darunter wäre der Abstand die Meinung eines einzelnen Gastes.' }] },
+      { teile: [{ text: '## Wo ein Thema am weitesten abfällt\n\nDie Arbeitsliste: nicht „welcher Betrieb ist schlecht“, sondern „welcher Betrieb ist **wobei** schlecht“. Erst ab drei Nennungen — darunter wäre der Abstand die Meinung eines einzelnen Gastes.' }] },
       { teile: [{ karte: 'yx_themen_ausreisser', hoehe: 11,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ text: '## Datengrundlage\n\nLinks der Zeitraum, den die Klusterung abdeckt. Rechts eine Liste, die **leer sein sollte**: Themen, die Yext liefert und die die Tabelle oben nicht kennt. Steht dort etwas, hat jemand im Yext-Konto ein Label ergänzt.' }] },
@@ -1225,7 +1238,7 @@ export const dashboards: Dashboard[] = [
       // wie die Themen, beantworten aber andere Fragen: was TUN wir mit
       // dem, was Gaeste sagen -- und finden sie uns ueberhaupt.
       { name: 'Antworten', reihen: [
-      { teile: [{ text: '# Was wir damit tun\n\nWer auf Bewertungen antwortet und wie schnell. Bis heute war das nirgends sichtbar: einzelne Häuser antworten **gar nicht**, während andere über 90 % erreichen — im Konzernschnitt verschwindet der Unterschied.\n\nDie Reaktionszeit zählt ab der Bewertung. Wo nicht geantwortet wurde, bleibt sie leer und steht **nicht** auf null — sonst stünden genau die Häuser ohne Antwort an der Spitze der Bestenliste.' }] },
+      { teile: [{ text: '# Was wir damit tun\n\nWer auf Bewertungen antwortet und wie schnell. Bis heute war das nirgends sichtbar: einzelne Betriebe antworten **gar nicht**, während andere über 90 % erreichen — im Konzernschnitt verschwindet der Unterschied.\n\nDie Reaktionszeit zählt ab der Bewertung. Wo nicht geantwortet wurde, bleibt sie leer und steht **nicht** auf null — sonst stünden genau die Betriebe ohne Antwort an der Spitze der Bestenliste.' }] },
       { teile: [
         { karte: 'yx_kachel_antwortquote' },
         { karte: 'yx_kachel_offen' },
@@ -1245,7 +1258,7 @@ export const dashboards: Dashboard[] = [
         { karte: 'yx_sicht_kachel_genauigkeit' },
       ] },
       { teile: [{ karte: 'yx_sicht_trichter', hoehe: 9 }] },
-      { teile: [{ text: '## Gegen vergleichbare Betriebe\n\nYext liefert zu jedem Haus den Median vergleichbarer Betriebe. **Faktor** unter 1 heißt: dieses Haus wird seltener gesehen als vergleichbare. Häuser ohne Vergleichsgruppe fehlen in der Liste — bei Yext ist das eine Leerstelle, kein guter Wert.' }] },
+      { teile: [{ text: '## Gegen vergleichbare Betriebe\n\nYext liefert zu jedem Betrieb den Median vergleichbarer Betriebe. **Faktor** unter 1 heißt: dieser Betrieb wird seltener gesehen als vergleichbare. Betriebe ohne Vergleichsgruppe fehlen in der Liste — bei Yext ist das eine Leerstelle, kein guter Wert.' }] },
       { teile: [{ karte: 'yx_sicht_benchmark', hoehe: 11,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ text: '## Pflegezustand\n\nEine Arbeitsliste fürs Marketing. **Genauigkeit** ist der Anteil der Portaleinträge, die mit unseren Stammdaten übereinstimmen — unter 90 % heißt, dass Gäste dort Öffnungszeiten oder Nummern finden, die nicht stimmen.' }] },

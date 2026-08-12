@@ -36,7 +36,7 @@ export const karten: Karte[] = [
   // stellten geschlossene, verwaltende und Testbetriebe ein Drittel der
   // roten Ampeln — "GESCHLOSSEN - Aposto Frankfurt: Sofort eskalieren"
   // ist keine Handlungsempfehlung, sondern Rauschen. Historische Monate
-  // geschlossener Haeuser bleiben operativ, die Historie bleibt also
+  // geschlossener Betriebe bleiben operativ, die Historie bleibt also
   // ehrlich. Damit die Herausgenommenen nicht stumm verschwinden, zaehlt
   // die Kachel rt_kachel_nicht_operativ sie ausdruecklich.
   // -------------------------------------------------------------------
@@ -127,7 +127,7 @@ SELECT '⚪ ' || count(*) AS "Ohne Urteil"
     schluessel: 'rt_kachel_nicht_operativ',
     name: 'Nicht operativ',
     beschreibung:
-      'Betriebe, die im gewählten Monat nicht operativ sind: geschlossen, verwaltend, Testbetrieb oder ohne Umsatz. Sie fallen bewusst aus allen Ampelzählern heraus — eine rote Ampel eines geschlossenen Hauses ist keine Handlungsaufforderung. Details in ⑥ Portfolio.',
+      'Betriebe, die im gewählten Monat nicht operativ sind: geschlossen, verwaltend, Testbetrieb oder ohne Umsatz. Sie fallen bewusst aus allen Ampelzählern heraus — eine rote Ampel eines geschlossenen Betriebs ist keine Handlungsaufforderung. Details in ⑥ Portfolio.',
     anzeige: 'scalar',
     parameter: [MONAT.monat, KONZEPT.marke],
     sql: `${MONAT_CTE}
@@ -453,7 +453,7 @@ SELECT betrieb            AS "Betrieb",
     // "ist das neu oder laeuft das mit" nicht. Der laufende Monat bleibt
     // draussen, ein Zwei-Tage-Monat liest sich als Einbruch.
     //
-    // operativ je MONAT: geschlossene Haeuser behalten ihre operativen
+    // operativ je MONAT: geschlossene Betriebe behalten ihre operativen
     // Monate, die Balken frueherer Monate schrumpfen also nicht
     // nachtraeglich.
     sql: `
@@ -619,7 +619,7 @@ SELECT status   AS "Status",
     parameter: [MONAT.monat, KONZEPT.marke],
     // Seit Migration 0039 aus mart.konzept_schnitt_monat statt der
     // Funktion mart.konzept_schnitt: die Sicht enthaelt NUR operative
-    // Betriebe. Vorher drueckten geschlossene Haeuser mit 0 € Umsatz
+    // Betriebe. Vorher drueckten geschlossene Betriebe mit 0 € Umsatz
     // die Mediane und zaehlten als rote Ampeln der Marke.
     sql: `${MONAT_CTE}
 SELECT k.konzept                AS "Marke",
@@ -663,7 +663,7 @@ SELECT betrieb                AS "Betrieb",
   FROM gewaehlt g, LATERAL mart.round_table_marke(g.monat) rt
  WHERE rt.gesamt IS NOT NULL
    -- Nur operative Betriebe. Die Funktion fuehrt die Spalte nicht,
-   -- deshalb der Blick in den Mart: ein geschlossenes Haus mit -100 %
+   -- deshalb der Blick in den Mart: ein geschlossener Betrieb mit -100 %
    -- Umsatzabweichung ist kein Ausreisser, sondern Rauschen.
    AND EXISTS (SELECT 1 FROM mart.round_table_monat m
                 WHERE m.betrieb = rt.betrieb
@@ -691,7 +691,7 @@ SELECT betrieb                AS "Betrieb",
   FROM gewaehlt g, LATERAL mart.round_table_vergleich(g.monat) v
  WHERE v.weicht_ab
    -- Nur operative Betriebe — die Schwellendiskussion lohnt nur fuer
-   -- Haeuser, die noch wirtschaften. Die Funktion fuehrt die Spalte
+   -- Betriebe, die noch wirtschaften. Die Funktion fuehrt die Spalte
    -- nicht, deshalb der Blick in den Mart.
    AND EXISTS (SELECT 1 FROM mart.round_table_monat m
                 WHERE m.betrieb = v.betrieb

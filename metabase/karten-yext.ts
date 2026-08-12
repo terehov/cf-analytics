@@ -2,7 +2,7 @@
 // Yext Analytics — woran es liegt, wer geantwortet hat, wer uns findet
 //
 // Die Karten aus Migration 0050. Sie beantworten die Frage, die
-// karten-bewertung.ts offenlaesst: DASS ein Haus abrutscht, sagt die Note
+// karten-bewertung.ts offenlaesst: DASS ein Betrieb abrutscht, sagt die Note
 // dort -- WORAN es liegt, steht hier.
 //
 // DREI EIGENSCHAFTEN DER DATEN, DIE JEDE KARTE HIER BETREFFEN:
@@ -41,7 +41,7 @@ const ZEITRAUM = P_ZEITRAUM
 
 /**
  * Die fuenf Themen in der Reihenfolge, in der sie gelesen werden sollen:
- * erst was das Haus traegt, dann was es herunterzieht.
+ * erst was der Betrieb traegt, dann was es herunterzieht.
  *
  * Die Namen sind Yexts eigene, englisch und unuebersetzt -- eine
  * Uebersetzungstabelle waere eine zweite Wahrheit, die beim naechsten
@@ -84,7 +84,7 @@ export const karten: Karte[] = [
       + 'operativen Betriebe. Antwortet auf „woran liegt es“, bevor jemand die Einzelbewertungen liest.',
     anzeige: 'scalar',
     parameter: [MONAT, MARKE, BETRIEB],
-    // Mengengewichtet: ein Haus mit zwei Nennungen darf nicht so schwer
+    // Mengengewichtet: ein Betrieb mit zwei Nennungen darf nicht so schwer
     // waehlen wie eines mit achtzig. Die Reihenfolge entscheidet die
     // Note, nicht die Haeufigkeit -- gesucht ist das schlechteste Thema,
     // nicht das lauteste.
@@ -107,11 +107,11 @@ SELECT coalesce(
     name: 'Antwortquote',
     beschreibung:
       'Anteil der Bewertungen des Monats, die eine Antwort bekommen haben — über die gewählten '
-      + 'Betriebe. Einzelne Häuser antworten gar nicht; im Konzernschnitt fällt das nicht auf.',
+      + 'Betriebe. Einzelne Betriebe antworten gar nicht; im Konzernschnitt fällt das nicht auf.',
     anzeige: 'scalar',
     parameter: [MONAT, MARKE, BETRIEB],
     // Gewichtet ueber die Bewertungen, nicht als Mittel der Quoten: ein
-    // Haus mit drei Bewertungen und 0 Prozent zoege den Schnitt sonst
+    // Betrieb mit drei Bewertungen und 0 Prozent zoege den Schnitt sonst
     // genauso weit wie eines mit 200.
     sql: `${MONAT_CTE}
 SELECT coalesce(to_char(round(
@@ -225,7 +225,7 @@ SELECT monat                                                    AS "Monat",
     name: 'Themenprofil je Betrieb',
     beschreibung:
       'Für jeden Betrieb die Note je Thema — schwächstes Thema zuerst. Die Spalte **Schwachpunkt** '
-      + 'nennt das Thema, das am weitesten unter dem eigenen Schnitt des Hauses liegt. '
+      + 'nennt das Thema, das am weitesten unter dem eigenen Schnitt des Betriebs liegt. '
       + 'Ein Klick auf den Namen öffnet den Betrieb.',
     anzeige: 'table',
     parameter: [MONAT, MARKE, BETRIEB],
@@ -254,7 +254,7 @@ SELECT j.betrieb                                                       AS "Betri
        max(j.schnitt) FILTER (WHERE j.thema = 'Restaurant Cleanliness') AS "Sauberkeit",
        sum(j.anzahl)::integer                                          AS "Nennungen",
        -- Der Schwachpunkt ist der groesste ABSTAND nach unten, nicht die
-       -- kleinste Note: ein Haus mit lauter Vieren hat kein Problem mit
+       -- kleinste Note: ein Betrieb mit lauter Vieren hat kein Problem mit
        -- der Wartezeit, nur weil sie bei 3,9 liegt.
        (array_agg(${THEMA_DEUTSCH.replace(/t\.thema/g, 'j.thema')}
                   ORDER BY j.abstand NULLS LAST))[1]                   AS "Schwachpunkt"
@@ -267,8 +267,8 @@ SELECT j.betrieb                                                       AS "Betri
     name: 'Wo ein Thema am weitesten abfällt',
     beschreibung:
       'Die einzelnen Betrieb-und-Thema-Kombinationen mit dem größten Abstand nach unten zum '
-      + 'eigenen Schnitt des Hauses. Das ist die Arbeitsliste: nicht „welches Haus ist schlecht“, '
-      + 'sondern „welches Haus ist wobei schlecht“.',
+      + 'eigenen Schnitt des Betriebs. Das ist die Arbeitsliste: nicht „welcher Betrieb ist schlecht“, '
+      + 'sondern „welcher Betrieb ist wobei schlecht“.',
     anzeige: 'table',
     parameter: [MONAT, MARKE, BETRIEB],
     // Mindestens drei Nennungen: bei einer einzigen ist der "Abstand"
@@ -281,7 +281,7 @@ SELECT t.betrieb                       AS "Betrieb",
        t.schnitt                       AS "Ø Note",
        t.anzahl                        AS "Nennungen",
        t.anteil                        AS "Anteil %",
-       t.abstand                       AS "Abstand zum Haus"
+       t.abstand                       AS "Abstand zum Betrieb"
   FROM mart.bewertung_thema t
   CROSS JOIN gewaehlt g
  WHERE t.monat = g.monat AND t.operativ AND t.abstand IS NOT NULL
@@ -535,8 +535,8 @@ SELECT monat                            AS "Monat",
     schluessel: 'yx_sicht_benchmark',
     name: 'Sichtbarkeit gegen vergleichbare Betriebe',
     beschreibung:
-      'Yext liefert zu jedem Betrieb den Median vergleichbarer Häuser. **Faktor** unter 1 heißt: '
-      + 'dieses Haus wird seltener gesehen als vergleichbare. Betriebe ohne Vergleichsgruppe '
+      'Yext liefert zu jedem Betrieb den Median vergleichbarer Betriebe. **Faktor** unter 1 heißt: '
+      + 'dieser Betrieb wird seltener gesehen als vergleichbare. Betriebe ohne Vergleichsgruppe '
       + 'stehen nicht in der Liste — das ist eine Leerstelle bei Yext, kein guter Wert.',
     anzeige: 'table',
     parameter: [MONAT, MARKE, BETRIEB],

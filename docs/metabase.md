@@ -655,3 +655,26 @@ Zahl. Nur die Spalte ist klickbar, nicht die Zeile — sonst navigiert ein Klick
 „Betroffener Einkauf" weg, während man nur lesen wollte. Der Warenfilter auf
 `dd_sperre` bringt einen von 300 Zeilen auf eine Ware herunter; dann steht
 nebeneinander, was jedes Haus für dieselbe Sache gebucht hat.
+
+---
+
+## Betrieb, nicht Haus (12.08.2026)
+
+Vorgabe: durchgehend, über alle Dashboards und Charts, heißt es **Betrieb**.
+Ersetzt in allen Karten, Kopftexten und Spaltenüberschriften; „Ausser-Haus-Geschäft"
+bleibt als Fachbegriff stehen. Beim Ersetzen ziehen Artikel und Adjektive mit —
+„Haus" ist sächlich, „Betrieb" männlich.
+
+Ein Wert stand **in der Datenbank**: `mart.einkaufspreis_betrieb.sperre` trug seit
+0063 die Beschriftung `'zu wenige Häuser (unter 3)'`, und der Drill-Down filtert
+darauf. **Migration 0065** verschiebt die Fallunterscheidung deshalb aus der
+materialisierten Sicht in die Sicht darüber.
+
+**Die Regel dahinter, für den nächsten Fall:** in die materialisierte Sicht gehört,
+was *gerechnet* werden muss. **Beschriftungen gehören in die Sicht darüber.** Was
+jemand irgendwann umbenennt, darf nicht in einer Tabelle festliegen, die man nur
+mit `DROP ... CASCADE` ändern kann — sonst kostet ein Wort einen Neuaufbau über
+278.054 Zeilen.
+
+Die Migrationen 0055 bis 0064 bleiben unverändert: sie sind angewendet, und die
+Datei ist das Protokoll. Auch `docs/` wird nicht rückwirkend umgeschrieben.

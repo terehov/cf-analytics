@@ -216,7 +216,7 @@ SELECT y.betrieb          AS "Betrieb",
     parameter: [BETRIEB, ZEITRAUM],
     // Zwei Fehler in einem SQL behoben (03.08.2026): TMDay haengt an der
     // Server-Locale und lieferte "Monday"; und avg() ueber das volle
-    // 141x3136-Gitter mittelte Nulltage mit — fuer ein Haus, das im Mai
+    // 141x3136-Gitter mittelte Nulltage mit — fuer ein Betrieb, der im Mai
     // eroeffnet hat, hiess das Ø Montag 74 EUR statt 3.677 EUR.
     sql: `
 SELECT extract(isodow FROM geschaeftstag)::int                    AS sortier,
@@ -466,7 +466,7 @@ SELECT r.betrieb                AS "Betrieb",
   CROSS JOIN gewaehlt g
  WHERE r.monat = g.monat
    AND r.personalkosten_ogf_pct IS NOT NULL
-   -- Nur operative Betriebe: die Top-4 waren geschlossene Haeuser mit bis
+   -- Nur operative Betriebe: die Top-4 waren geschlossene Betriebe mit bis
    -- zu 4,5 Jahre alten, fortgeschriebenen Quoten. Ein ausdruecklich
    -- gewaehlter Betrieb bleibt trotzdem sichtbar.
    AND (r.operativ [[ OR r.betrieb = {{betrieb}} ]])
@@ -1003,12 +1003,12 @@ SELECT lieferant || ' — ' || marke  AS "Lieferant",
     },
   },
   {
-    // Beschaffungsrisiko je Betrieb: haengt ein Haus an EINEM Lieferanten,
+    // Beschaffungsrisiko je Betrieb: haengt ein Betrieb an EINEM Lieferanten,
     // ist jede Preisverhandlung und jeder Lieferausfall ein Betriebsrisiko.
     schluessel: 'wa_lieferant_konzentration',
     name: 'Lieferantenkonzentration je Betrieb',
     beschreibung:
-      'Je Betrieb: Einkaufsvolumen der letzten zwölf Monate, Zahl der Lieferanten und der Anteil des größten. Ein Anteil über 60 % heißt: dieses Haus hat faktisch einen Monopol-Lieferanten. Nur Betriebe mit zugeordneter FoodNotify-Kostenstelle; unfertig geladene Marken sind untertrieben.',
+      'Je Betrieb: Einkaufsvolumen der letzten zwölf Monate, Zahl der Lieferanten und der Anteil des größten. Ein Anteil über 60 % heißt: dieser Betrieb hat faktisch einen Monopol-Lieferanten. Nur Betriebe mit zugeordneter FoodNotify-Kostenstelle; unfertig geladene Marken sind untertrieben.',
     anzeige: 'table',
     parameter: [MARKE, BETRIEB],
     sql: `
@@ -1047,7 +1047,7 @@ SELECT je.betrieb                                       AS "Betrieb",
     beschreibung:
       'Sollbestand gegen tatsächlich gezählten Bestand, in Euro bewertet. '
       + 'ZUERST AUF „SOLL JE GEZÄHLT" SEHEN: liegt der Wert weit über 1, ist der Prozentwert '
-      + 'daneben wertlos. Der theoretische Bestand aus FoodNotify ist bei vielen Häusern '
+      + 'daneben wertlos. Der theoretische Bestand aus FoodNotify ist bei vielen Betrieben '
       + 'aufgebläht — gemessen 971.750 g Pizzateig gegen 138.000 g gezählt —, weil der '
       + 'Verbrauch nicht dagegen gebucht wird. Das ist kein Schwund, sondern fehlende '
       + 'Rezepturpflege, und diese Sicht kann es nicht heilen. '

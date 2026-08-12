@@ -62,13 +62,42 @@ export const karten: Karte[] = [
 
   // -------------------------------------------------------------------
   // Die drei Kacheln oben: wie gross ist es, wie viel ist ungeklaert,
-  // wie viele Haeuser betrifft es.
+  // wie viele Betriebe betrifft es.
   // -------------------------------------------------------------------
   {
+    /*
+     * DIESE KACHEL IST KEIN BEFUND, UND SIE HAT ES EINE ZEIT LANG SO
+     * AUSGESEHEN.
+     *
+     * Gemeldet am 12.08.2026: "7.930.024 hoert sich viel zu viel an."
+     * Nachgesehen — die Zahl stimmt, aber sie misst zum groessten Teil eine
+     * leere Pflegetabelle:
+     *
+     *   26 Lieferanten tragen die Summe, ALLE mit dem Grund "steht nicht
+     *   auf der Liste". Kein einziger ist gesperrt.
+     *
+     *   6,92 der 7,93 Mio EUR entfallen auf 48 Betriebe, fuer die
+     *   ueberhaupt kein GFGH hinterlegt ist. Von 57 operativen Betrieben
+     *   haben 13 einen Eintrag in manual.gfgh_betrieb.
+     *
+     *   Die Freigabeliste hat FUENF Eintraege: CF Gastro, Chefs Culinar,
+     *   Distra, J.J. Darboven, Layer-Chemie.
+     *
+     *   Der Rest sind der Reihe nach: ein konzernweiter Lieferant mit 53
+     *   von 57 Betrieben (1,89 Mio), regionale Brauereien und
+     *   Getraenkefachgrosshaendler (zusammen rund 4,3 Mio), dazu Metzger
+     *   und Obsthaendler. Also genau die Lieferanten, die ein
+     *   Gastronomiebetrieb hat — nur eben nicht eingetragen.
+     *
+     * Deshalb heisst die Kachel jetzt, was sie zaehlt, und der Befund
+     * steht in der Kachel daneben (fe_bestaetigt). Die Zahl bleibt
+     * unveraendert; niemand darf eine Freigabe erfinden, indem er die
+     * Auswertung anders rechnet.
+     */
     schluessel: 'fe_summe',
-    name: 'Fremdeinkauf, letzte 12 Monate',
+    name: 'Einkauf ohne Freigabe, 12 Monate',
     beschreibung:
-      'Wareneinkauf bei Lieferanten, die weder auf der Konzernfreigabe stehen noch der hinterlegte GFGH ihres Hauses sind — aus dem Belegarchiv, also aus den Rechnungen selbst. Nur operative Betriebe. Nicht enthalten: Strom, Leasing, Kartengebühren, Konzerninnenumsatz und alles andere, was kein Wareneinkauf ist. Ebenfalls nicht enthalten sind Lieferanten, die noch niemand eingeordnet hat — die stehen in der Arbeitsliste weiter unten.',
+      'Wareneinkauf bei Lieferanten, die weder auf der Konzernfreigabe stehen noch der hinterlegte GFGH ihres Betriebs sind — aus dem Belegarchiv, also aus den Rechnungen selbst. Nur operative Betriebe. NICHT als Verstoß lesen: gemessen am 12.08.2026 entfielen 6,92 von 7,93 Mio € auf 48 Betriebe, für die überhaupt kein GFGH hinterlegt ist, und die Freigabeliste hatte fünf Einträge. Die Zahl ist damit vor allem ein Pflegestand — der bestätigte Fremdeinkauf steht in der Kachel daneben. Nicht enthalten: Strom, Leasing, Kartengebühren, Konzerninnenumsatz und alles andere, was kein Wareneinkauf ist, sowie Lieferanten, die noch niemand eingeordnet hat.',
     anzeige: 'scalar',
     parameter: [BETRIEB, MARKE],
     sql: `
@@ -103,13 +132,13 @@ SELECT round(sum(netto)) AS "Ungeklärtes Volumen (12 Monate)"
 
   {
     schluessel: 'fe_betriebe_betroffen',
-    name: 'Betriebe mit Fremdeinkauf',
+    name: 'Betriebe ohne Freigabe des Lieferanten',
     beschreibung:
-      'Wie viele operative Betriebe in den letzten zwölf Monaten mindestens einmal bei einem nicht freigegebenen Lieferanten Ware gekauft haben.',
+      'Wie viele operative Betriebe in den letzten zwölf Monaten mindestens einmal bei einem Lieferanten ohne Freigabe eingekauft haben. Steht die Zahl nahe an der Gesamtzahl der Betriebe, ist es kein Verhalten einzelner Betriebe, sondern eine Lücke in der Freigabeliste.',
     anzeige: 'scalar',
     parameter: [MARKE],
     sql: `
-SELECT count(DISTINCT betrieb_key) AS "Betriebe mit Fremdeinkauf"
+SELECT count(DISTINCT betrieb_key) AS "Betriebe ohne Freigabe"
   FROM mart.fremdeinkauf
  WHERE quelle = 'belegarchiv'
    AND wareneinkauf IS TRUE
@@ -117,6 +146,82 @@ SELECT count(DISTINCT betrieb_key) AS "Betriebe mit Fremdeinkauf"
    AND operativ
    AND ${ZWOELF_MONATE}
    [[AND konzept = {{marke}}]]`,
+  },
+
+  {
+    /*
+     * DER EIGENTLICHE BEFUND, und er ist heute klein.
+     *
+     * Zwei Gruende gelten als Befund, weil jemand etwas ENTSCHIEDEN hat:
+     *
+     *   ausdruecklich gesperrt      — steht mit freigegeben = false in
+     *                                 manual.lieferant_freigabe.
+     *   fremder getraenkehaendler   — der Betrieb hat einen GFGH hinterlegt
+     *                                 und kauft bei einem anderen.
+     *
+     * Alles andere heisst "steht nicht auf der Liste" und ist eine
+     * Aussage ueber die Liste, nicht ueber den Einkauf. Solange die
+     * Freigabeliste fuenf Eintraege hat, ist diese Kachel die einzige,
+     * die man weitergeben kann.
+     */
+    schluessel: 'fe_bestaetigt',
+    name: 'Bestätigter Fremdeinkauf',
+    beschreibung:
+      'Der Teil, bei dem jemand tatsächlich entschieden hat: ausdrücklich gesperrte Lieferanten, und Betriebe mit hinterlegtem GFGH, die woanders kaufen. Nur das ist ein Befund. Die Kachel links zählt zusätzlich alle Lieferanten, über die noch nie jemand entschieden hat — das ist ein Pflegestand, kein Verstoß.',
+    anzeige: 'scalar',
+    parameter: [BETRIEB, MARKE],
+    sql: `
+SELECT round(coalesce(sum(netto), 0)) AS "Bestätigt (12 Monate)"
+  FROM mart.fremdeinkauf
+ WHERE quelle = 'belegarchiv'
+   AND wareneinkauf IS TRUE
+   AND grund IN ('ausdruecklich gesperrt', 'fremder getraenkehaendler')
+   AND operativ
+   AND ${ZWOELF_MONATE}
+   [[AND betrieb = {{betrieb}}]]
+   [[AND konzept = {{marke}}]]`,
+  },
+
+  {
+    /*
+     * Der Pflegestand als eigene Karte, nicht als Fussnote. Er ist die
+     * Erklaerung fuer die Groesse der Zahl oben, und ohne ihn liest sich
+     * jede Zeile dieser Seite als Vorwurf.
+     */
+    schluessel: 'fe_pflegestand',
+    name: 'Woran die Zahl oben hängt',
+    beschreibung:
+      'Der Stand der drei Listen, aus denen die Einordnung kommt. Jede Lücke hier vergrößert die Zahl oben, ohne dass im Einkauf irgendetwas passiert wäre. Umgekehrt: wer eine Zeile pflegt, verkleinert sie — deshalb ist die Auswertung eine Arbeitsliste und kein Bericht.',
+    anzeige: 'table',
+    sql: `
+WITH zeitraum AS (
+  SELECT * FROM mart.fremdeinkauf
+   WHERE quelle = 'belegarchiv' AND operativ AND ${ZWOELF_MONATE}
+), lieferanten AS (
+  SELECT lieferant,
+         bool_or(wareneinkauf IS TRUE)  AS ist_ware,
+         bool_or(wareneinkauf IS NULL)  AS unbekannt
+    FROM zeitraum GROUP BY lieferant
+)
+SELECT 'Lieferanten eingeordnet (Ware oder nicht)' AS "Grundlage",
+       (SELECT count(*) FROM lieferanten WHERE NOT unbekannt) AS "gepflegt",
+       (SELECT count(*) FROM lieferanten WHERE unbekannt)     AS "offen",
+       'manual.lieferant_art'                                 AS "Tabelle",
+       'Offene zählen gar nicht mit — die Zahl oben ist eine Untergrenze.' AS "Wirkung"
+UNION ALL
+SELECT 'Lieferanten mit Konzernfreigabe',
+       (SELECT count(*) FROM manual.lieferant_freigabe WHERE freigegeben),
+       (SELECT count(*) FROM lieferanten WHERE ist_ware)
+         - (SELECT count(*) FROM manual.lieferant_freigabe WHERE freigegeben),
+       'manual.lieferant_freigabe',
+       'Wer fehlt, zählt als nicht freigegeben — auch die Brauerei mit Vertrag.'
+UNION ALL
+SELECT 'Betriebe mit hinterlegtem GFGH',
+       (SELECT count(*) FROM manual.gfgh_betrieb),
+       (SELECT count(DISTINCT betrieb_key) FROM zeitraum)
+         - (SELECT count(*) FROM manual.gfgh_betrieb),
+       'manual.gfgh_betrieb',
+       'Ohne Eintrag zählt die Getränkelieferung des Betriebs als Fremdeinkauf.'`,
   },
 
   {
@@ -133,9 +238,9 @@ SELECT count(DISTINCT betrieb_key) AS "Betriebe mit Fremdeinkauf"
      * schon einmal geschuetzt hat.
      */
     schluessel: 'fe_kachel_verweis',
-    name: 'Fremdeinkauf, letzte 12 Monate',
+    name: 'Einkauf ohne Freigabe, 12 Monate',
     beschreibung:
-      'Wareneinkauf bei nicht freigegebenen Lieferanten, aus dem Belegarchiv. Klick öffnet die vollständige Auswertung mit Lieferanten, Betrieben und der Arbeitsliste.',
+      'Wareneinkauf bei Lieferanten ohne Freigabe, aus dem Belegarchiv. Überwiegend Lieferanten, über die noch nie jemand entschieden hat — kein Verstoß, sondern ein Pflegestand. Klick öffnet die vollständige Auswertung mit Lieferanten, Betrieben und der Arbeitsliste.',
     anzeige: 'scalar',
     parameter: [BETRIEB],
     sql: `
@@ -212,7 +317,7 @@ SELECT quelle                        AS "Quelle",
     schluessel: 'fe_betrieb',
     name: 'Fremdanteil je Betrieb',
     beschreibung:
-      'Je Betrieb: wie viel Wareneinkauf insgesamt, wie viel davon bei nicht freigegebenen Lieferanten, und der Anteil. Der Anteil ist die aussagekräftigere Spalte — ein großes Haus mit 5 % hat ein kleineres Problem als ein kleines mit 50 %. Quelle getrennt, weil dieselbe Rechnung sonst doppelt zählt.',
+      'Je Betrieb: wie viel Wareneinkauf insgesamt, wie viel davon bei nicht freigegebenen Lieferanten, und der Anteil. Der Anteil ist die aussagekräftigere Spalte — ein großer Betrieb mit 5 % hat ein kleineres Problem als ein kleiner mit 50 %. Quelle getrennt, weil dieselbe Rechnung sonst doppelt zählt.',
     anzeige: 'table',
     parameter: [BETRIEB, MARKE],
     sql: `
@@ -226,7 +331,7 @@ SELECT quelle                       AS "Quelle",
                                     AS "Lieferanten davon",
        round(100.0 * sum(netto) FILTER (WHERE einordnung = 'nicht freigegeben')
              / nullif(sum(netto), 0), 1) AS "Fremdanteil %",
-       max(gfgh_des_betriebs)       AS "GFGH des Hauses"
+       max(gfgh_des_betriebs)       AS "GFGH des Betriebs"
   FROM mart.fremdeinkauf
  WHERE wareneinkauf IS TRUE
    AND operativ
@@ -322,9 +427,9 @@ SELECT dach_name                        AS "Lieferant",
   // -------------------------------------------------------------------
   {
     schluessel: 'ep_abweichung',
-    name: 'Wo ein Haus mehr zahlt als der Konzern',
+    name: 'Wo ein Betrieb mehr zahlt als der Konzern',
     beschreibung:
-      'Je Ware, Einheit, Betrieb und Monat: der Preis je Basiseinheit gegen den Median der anderen Häuser. NUR vergleichbare Zeilen — drei operative Häuser mit derselben Ware im selben Monat, einheitliche Gebinde, keine widersprüchliche Menge, Spreizung unter Faktor 3. Belastbar ist das im einstelligen bis niedrig zweistelligen Prozentbereich; wer eine dreistellige Abweichung weitergibt, prüft sie vorher am Beleg. FoodNotify, nicht Belegarchiv — nur dort stehen Artikel.',
+      'Je Ware, Einheit, Betrieb und Monat: der Preis je Basiseinheit gegen den Median der anderen Betriebe. NUR vergleichbare Zeilen — drei operative Betriebe mit derselben Ware im selben Monat, einheitliche Gebinde, keine widersprüchliche Menge, Spreizung unter Faktor 3. Belastbar ist das im einstelligen bis niedrig zweistelligen Prozentbereich; wer eine dreistellige Abweichung weitergibt, prüft sie vorher am Beleg. FoodNotify, nicht Belegarchiv — nur dort stehen Artikel.',
     anzeige: 'table',
     parameter: [BETRIEB, MARKE],
     sql: `
@@ -340,7 +445,7 @@ SELECT betrieb                    AS "Betrieb",
        abweichung_pct             AS "Abweichung %",
        round(mehrkosten)          AS "Mehrkosten",
        round(preis_je_gebinde, 2) AS "Preis je Gebinde",
-       betriebe_operativ          AS "Häuser im Vergleich"
+       betriebe_operativ          AS "Betriebe im Vergleich"
   FROM mart.einkaufspreis_betrieb
  WHERE vergleichbar
    AND operativ
@@ -356,7 +461,7 @@ SELECT betrieb                    AS "Betrieb",
     schluessel: 'ep_betrieb',
     name: 'Mehrkosten je Betrieb',
     beschreibung:
-      'Was ein Haus in zwölf Monaten mehr gezahlt hat als der Konzernmedian, über alle vergleichbaren Waren summiert. Eine Obergrenze für das Verhandlungspotenzial, keine Einsparzusage: der Median ist ein erreichter Preis, kein zugesagter. Häuser mit negativer Summe kaufen günstiger ein als der Median — von denen lernt man.',
+      'Was ein Betrieb in zwölf Monaten mehr gezahlt hat als der Konzernmedian, über alle vergleichbaren Waren summiert. Eine Obergrenze für das Verhandlungspotenzial, keine Einsparzusage: der Median ist ein erreichter Preis, kein zugesagter. Betriebe mit negativer Summe kaufen günstiger ein als der Median — von denen lernt man.',
     anzeige: 'table',
     parameter: [BETRIEB, MARKE],
     sql: `
@@ -382,7 +487,7 @@ SELECT betrieb                        AS "Betrieb",
     schluessel: 'ep_nicht_vergleichbar',
     name: 'Warum eine Ware nicht verglichen wird',
     beschreibung:
-      'Die vier Sperren, jede mit ihrer Menge. Sie stehen hier, weil eine ausgeschlossene Ware, die nirgends auftaucht, eine stille Kürzung wäre. „zu wenige Häuser" ist der Normalfall und harmlos. „Gebinde uneinheitlich" und „Menge widersprüchlich" heißen, dass die Häuser dieselbe Ware verschieden buchen — das ist ein Datenpflegethema, kein Preisthema. „Spreizung über Faktor 3" fängt, was die anderen drei durchlassen.',
+      'Die vier Sperren, jede mit ihrer Menge. Sie stehen hier, weil eine ausgeschlossene Ware, die nirgends auftaucht, eine stille Kürzung wäre. „zu wenige Betriebe" ist der Normalfall und harmlos. „Gebinde uneinheitlich" und „Menge widersprüchlich" heißen, dass die Betriebe dieselbe Ware verschieden buchen — das ist ein Datenpflegethema, kein Preisthema. „Spreizung über Faktor 3" fängt, was die anderen drei durchlassen.',
     anzeige: 'table',
     parameter: [MARKE],
     /*
@@ -408,7 +513,7 @@ SELECT sperre                  AS "Sperre",
   // -------------------------------------------------------------------
   // Der Drill-Down in eine Sperre. Zwei Karten, weil die Frage nach dem
   // Klick zwei Stufen hat: WELCHE Waren stecken dahinter, und was steht
-  // in den einzelnen Haeusern.
+  // in den einzelnen Betrieben.
   //
   // Beide filtern auf operativ und zwoelf Monate wie die Zaehlkarte
   // darueber — sonst zaehlt die Uebersicht 4.000 Zeilen und die Liste
@@ -418,7 +523,7 @@ SELECT sperre                  AS "Sperre",
     schluessel: 'sp_waren',
     name: 'Waren hinter dieser Sperre',
     beschreibung:
-      'Je Ware, Einheit und Monat: warum der Vergleich gesperrt ist und wie weit die Häuser auseinanderliegen. Der Faktor ist der schlechteste durch den besten Preis je Basiseinheit — ab 3 greift die stumpfe Sperre. Die beiden Gebindepreis-Spalten daneben sind die Gegenprobe: laufen sie zusammen, während die Basiseinheit spreizt, ist es eine Mengenbuchung und kein Preisunterschied.',
+      'Je Ware, Einheit und Monat: warum der Vergleich gesperrt ist und wie weit die Betriebe auseinanderliegen. Der Faktor ist der schlechteste durch den besten Preis je Basiseinheit — ab 3 greift die stumpfe Sperre. Die beiden Gebindepreis-Spalten daneben sind die Gegenprobe: laufen sie zusammen, während die Basiseinheit spreizt, ist es eine Mengenbuchung und kein Preisunterschied.',
     anzeige: 'table',
     parameter: [SPERRE, MARKE, WARE],
     sql: `
@@ -426,8 +531,8 @@ SELECT monat                              AS "Monat",
        ware                               AS "Ware",
        einheit                            AS "Einheit",
        max(sperre)                        AS "Sperre",
-       max(betriebe_operativ)             AS "Häuser operativ",
-       max(betriebe_gesamt)               AS "Häuser gesamt",
+       max(betriebe_operativ)             AS "Betriebe operativ",
+       max(betriebe_gesamt)               AS "Betriebe gesamt",
        count(DISTINCT gebinde_typisch)    AS "Gebindegrößen",
        round(max(konzern_bester), 4)      AS "Bester je Einheit",
        round(max(konzern_schlechtester), 4) AS "Schlechtester je Einheit",
@@ -449,9 +554,9 @@ SELECT monat                              AS "Monat",
 
   {
     schluessel: 'sp_positionen',
-    name: 'Die einzelnen Häuser',
+    name: 'Die einzelnen Betriebe',
     beschreibung:
-      'Eine Zeile je Haus, Ware und Monat — die Positionen, aus denen die Sperre entstanden ist. „Gebinde typisch" ist die häufigste Gebindegröße dieses Hauses in diesem Monat; stehen dort verschiedene Zahlen, buchen die Häuser dieselbe Lieferung verschieden, und das ist der häufigste Grund für eine Sperre. Nach Ware und Preis sortiert, damit die Ausreißer nebeneinander stehen.',
+      'Eine Zeile je Betrieb, Ware und Monat — die Positionen, aus denen die Sperre entstanden ist. „Gebinde typisch" ist die häufigste Gebindegröße dieses Betriebs in diesem Monat; stehen dort verschiedene Zahlen, buchen die Betriebe dieselbe Lieferung verschieden, und das ist der häufigste Grund für eine Sperre. Nach Ware und Preis sortiert, damit die Ausreißer nebeneinander stehen.',
     anzeige: 'table',
     parameter: [SPERRE, MARKE, WARE],
     sql: `

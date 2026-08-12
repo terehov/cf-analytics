@@ -369,7 +369,7 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
   // --- Die einzelne Zaehlung: gefiltert wird ueber DIE INVENTUR -------------
   // Beide Karten haengen an einem Inventurschluessel, der den Betrieb, den
   // Monat und den Zeitraum bereits mitbringt -- eine Zaehlung gehoert zu genau
-  // einem Haus und genau einem Tag. Ein zusaetzlicher Betriebsfilter koennte
+  // einem Betrieb und genau einem Tag. Ein zusaetzlicher Betriebsfilter koennte
   // die gewaehlte Zaehlung nur noch wegfiltern.
   dd_inventur_kopf: {
     betrieb: 'Die Zaehlung bringt ihren Betrieb mit -- ausgewaehlt wird ueber sie.',
@@ -397,7 +397,7 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
   },
 
   // --- Einkauf: die drei Sichten kennen keinen Betrieb ----------------------
-  // FoodNotify verhandelt Preise je MARKE, nicht je Haus. mart.einkauf_ladestand,
+  // FoodNotify verhandelt Preise je MARKE, nicht je Betrieb. mart.einkauf_ladestand,
   // mart.einkaufspreis_monat und mart.einkaufspreis_veraenderung fuehren
   // deshalb `marke` und keine Betriebsspalte -- ein Betriebsfilter haette
   // hier nichts, worauf er zeigen koennte.
@@ -413,15 +413,15 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
     ware: 'Zaehlt geladene BESTELLUNGEN, nicht Artikel -- eine Ware einzugrenzen '
         + 'wuerde den Ladestand kleiner aussehen lassen, als er ist.',
   },
-  wa_preise:              { betrieb: 'Einkaufspreise gelten je Marke, nicht je Haus.' },
+  wa_preise:              { betrieb: 'Einkaufspreise gelten je Marke, nicht je Betrieb.' },
   wa_preis_veraenderung:  { betrieb: 'ebenso -- Preisentwicklung je Marke.',
                             ware: 'Die Karte IST die Rangliste der groessten Spruenge ueber alle '
                                 + 'Artikel. Mit einer gewaehlten Ware bleibt eine Zeile uebrig, '
                                 + 'und die steht daneben schon im Verlauf.' },
-  wa_preis_verlauf:       { betrieb: 'Einkaufspreise gelten je Marke, nicht je Haus -- '
+  wa_preis_verlauf:       { betrieb: 'Einkaufspreise gelten je Marke, nicht je Betrieb -- '
                                    + 'mart.einkaufspreis_monat fuehrt keinen Betrieb.' },
   wa_lieferant_volumen:   { ware: 'Rangliste der Lieferanten ueber ihr gesamtes Sortiment.' },
-  wa_lieferant_konzentration: { ware: 'Beschaffungsrisiko je Haus ueber alle Artikel -- der '
+  wa_lieferant_konzentration: { ware: 'Beschaffungsrisiko je Betrieb ueber alle Artikel -- der '
                                     + 'Anteil des groessten Lieferanten an EINER Ware sagt nichts.' },
   wa_einkauf_betrieb:     { ware: 'Einkaufsvolumen je Betrieb und Monat, ueber alle Artikel.' },
   wa_einkauf_pruefung:    { ware: 'Pruefliste ueber alle auffaelligen Positionen; wer sie nach '
@@ -442,8 +442,12 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
                                    + 'waere das Ergebnis 0 oder 1 -- eine Zahl, die nichts sagt.' },
   fe_freigabestand:       { betrieb: 'Die Freigabeliste gilt konzernweit; sie kennt keinen Betrieb.',
                             marke: 'ebenso -- ein Dachlieferant gehoert keiner Marke.' },
+  fe_pflegestand:         { betrieb: 'Zaehlt den Stand der drei Pflegetabellen. Die gelten '
+                                   + 'konzernweit -- ein Betriebsfilter machte aus "5 von 32 '
+                                   + 'eingeordnet" eine Zahl ueber nichts.',
+                            marke: 'ebenso.' },
   ep_nicht_vergleichbar:  { betrieb: 'Zaehlt, WARUM Waren aus dem Preisvergleich fallen. Die '
-                                   + 'Sperren gelten konzernweit je Ware, nicht je Haus.' },
+                                   + 'Sperren gelten konzernweit je Ware, nicht je Betrieb.' },
 
   // --- Bewertungen ---------------------------------------------------------
   bw_verlauf: {
@@ -493,7 +497,7 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
   // neueste zuerst.
   bw_einzel: {
     monat: 'Festes Fenster von 24 Monaten, neueste zuerst -- ein Stichmonat laesst '
-         + 'bei kleinen Haeusern keine lesbare Zahl an Rueckmeldungen uebrig.',
+         + 'bei kleinen Betrieben keine lesbare Zahl an Rueckmeldungen uebrig.',
     zeitraum: 'ebenso.',
   },
   // Die Verlaufskurve: der Monatsfilter waehlt einen Stichmonat, und der
@@ -570,7 +574,7 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
             + 'darueber. Ein Zeitraum ergaebe sechs Zeilen je Monat uebereinander.',
   },
   dd_betrieb_vergleich_verlauf: {
-    zeitraum: 'Liest DREI Tabellen (Haus, Marke, Stadt). Ein Feldfilter baut seine '
+    zeitraum: 'Liest DREI Tabellen (Betrieb, Marke, Stadt). Ein Feldfilter baut seine '
             + 'Klausel aus dem Tabellennamen und koennte nur einen der drei Aeste '
             + 'einschraenken -- die Linien waeren still verschieden lang. Das Fenster '
             + 'sind feste 24 Monate am Monatsfilter.',
