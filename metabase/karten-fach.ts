@@ -1069,9 +1069,10 @@ SELECT betrieb                    AS "Betrieb",
        CASE WHEN sum(soll_eur) > 0
             THEN round(100 * sum(schwund_eur) / sum(soll_eur), 2)
        END                        AS "Schwund %",
-       -- Der Kanarienvogel. Steht ABSICHTLICH neben dem Prozentwert und
-       -- nicht in einer Fussnote: liegt er weit über 1, ist die Zahl links
-       -- davon wertlos, und das muss man im selben Blick sehen.
+       -- Pruefgroesse: theoretischer Bestand geteilt durch gezaehlten.
+       -- Steht ABSICHTLICH neben dem Prozentwert und nicht in einer
+       -- Fussnote: liegt sie weit über 1, ist die Zahl links davon wertlos,
+       -- und das muss man im selben Blick sehen.
        CASE WHEN sum(gezaehlt_eur) > 0
             THEN round(sum(soll_eur) / sum(gezaehlt_eur), 2)
        END                        AS "Soll je Gezählt",

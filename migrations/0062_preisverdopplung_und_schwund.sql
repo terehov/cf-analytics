@@ -3,7 +3,7 @@
  *
  * ANLASS (12.08.2026): Durchsicht des Dashboards "Einkauf — Preise,
  * Lieferanten, Volumen" durch den Fachbereich. Drei Beobachtungen, alle drei
- * bestätigt und gegen die Serverbank nachgemessen.
+ * bestätigt und gegen die Produktionsdatenbank nachgemessen.
  *
  * ---------------------------------------------------------------------
  * 1. "VIELE PREISE VERDOPPELN SICH EXAKT" — GEBINDEWECHSEL, KEINE TEUERUNG
@@ -296,7 +296,7 @@ SELECT
                        AND NOT p.gezaehlt)                            AS positionen_ohne_zaehlung,
     round(sum(p.soll_menge * p.preis_je_basiseinheit)
         FILTER (WHERE p.zaehlt_mit AND NOT p.gezaehlt)::numeric, 2)   AS soll_eur_ohne_zaehlung,
-    -- Der Kanarienvogel fuer Punkt (c): Soll durch Gezaehlt. Ein Haus, das
+    -- Pruefgroesse fuer Punkt (c): Soll geteilt durch Gezaehlt. Ein Haus, das
     -- sechsmal so viel im Soll hat wie im Regal, hat kein Schwundproblem.
     CASE WHEN sum(p.gezaehlt_menge * p.preis_je_basiseinheit)
               FILTER (WHERE p.zaehlt_mit AND p.gezaehlt) > 0

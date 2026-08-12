@@ -1041,7 +1041,7 @@ Median von 24.224 — ist von allen drei Sperren gleichzeitig geblockt.
 Der Erstlauf ist durch: **593.353 Belege** stehen in `core.buchungsbeleg`, gegen ein Soll
 von 593.314 — vollständig. Damit lief `mart.fremdeinkauf` zum ersten Mal mit beiden
 Zweigen. **Der Belegarchiv-Zweig trägt noch nicht.** Vier Mängel, gemessen auf der
-Serverbank über den SSH-Tunnel, rein lesend.
+Produktionsdatenbank über den SSH-Tunnel, rein lesend.
 
 | Grösse | Zeilen | Anteil |
 |---|---|---|
@@ -1112,7 +1112,7 @@ danach lohnt der Zahlenfehler, und der Nullbetrag ist zu zwei Dritteln gar nicht
 Einordnung nicht als Ergebnis lesen. Und weiterhin nie über `quelle` summieren — jetzt, wo
 beide Zweige Daten führen, steht dieselbe Rechnung erstmals wirklich doppelt da.
 
-### Was Migration 0058 daraus macht (gemessen 12.08.2026, Produktivbank)
+### Was Migration 0058 daraus macht (gemessen 12.08.2026, Produktionsdatenbank)
 
 Die drei Mängel oben sind behoben, soweit sie zu beheben sind. Gemessen wurde, indem die
 Seeds schreibgeschützt gegen den Produktivbestand durchgespielt wurden — 0058 selbst ist
@@ -1216,7 +1216,7 @@ Drei Fehler übereinander:
 Die ersten beiden sind in **0062** behoben. Der dritte **bleibt** — er ist ein
 FoodNotify-Datenproblem: wird der Verbrauch nicht gegen den Bestand gebucht, wächst das Soll
 mit jeder Lieferung. Statt ihn zu verstecken, macht ihn die neue Spalte `soll_je_gezaehlt`
-sichtbar. Wirkung auf der Serverbank:
+sichtbar. Wirkung auf der Produktionsdatenbank:
 
 | Betrieb | alt | neu | Soll/Gezählt |
 |---|---|---|---|
@@ -1225,10 +1225,10 @@ sichtbar. Wirkung auf der Serverbank:
 | Aposto Gera | 97,2 % | 62,8 % | 2,69 |
 | Wilma Wunder Köln | 60,0 % | 28,8 % | 1,41 |
 
-**Recklinghausen ist der Beweis, dass die Korrektur greift:** ein Haus, das sauber zählt
+**Recklinghausen zeigt, dass die Korrektur greift:** ein Haus, das sauber zählt
 (Soll/Gezählt 0,96), hat gar keinen Schwund — die 87,9 % waren vollständig Tests und
-ungezählte Positionen. Bei allen anderen sagt der Kanarienvogel, dass die Zahl daneben
-weiterhin nicht belastbar ist.
+ungezählte Positionen. Bei allen anderen sagt `soll_je_gezaehlt`, dass die Zahl daneben weiterhin nicht
+belastbar ist.
 
 **Regel für die Karte:** zuerst auf `Soll je Gezählt` sehen. Weit über 1 heisst, der
 Prozentwert daneben ist wertlos.

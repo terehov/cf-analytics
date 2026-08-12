@@ -684,7 +684,7 @@ acht der 13 GFGH-Zeilen tragen keinen aufgelösten Dachnamen.
 Der Punkt weiter oben („Die Ursache des `numeric field overflow` ist nicht messbar") ist
 abgeschlossen. Er hat **zwei falsche Erklärungen** überlebt, und beide entstanden aus
 demselben Grund: gemessen wurde auf der falschen Datenbank. Sobald der Zugang zur
-Serverbank stand (Tunnel, siehe `deployment-hetzner-stand` im Gedächtnis), war es eine
+Produktionsdatenbank stand (Tunnel, siehe `deployment-hetzner-stand` im Gedächtnis), war es eine
 Abfrage.
 
 **Es ist nicht der Preis.** Der grösste entstehende Preis je Einheit liegt bei 46.200 gegen
@@ -704,12 +704,12 @@ multipliziert sie dann mit sich selbst. `gesamt_menge numeric(14,4)` fasst zehn
 Vorkommastellen.
 
 Eine Zeile brachte drei Läufe lang den ganzen Nachlauf zu Fall — **samt
-`core.preis_ausreisser_markieren()`, das danach gar nicht mehr lief.** Auf der Serverbank
+`core.preis_ausreisser_markieren()`, das danach gar nicht mehr lief.** Auf der Produktionsdatenbank
 ist die Ausreisserprüfung also seit Lauf 83 nicht mehr durchgelaufen.
 
 **Migration 0060** prüft, ob das Ergebnis in die Spalte passt. Verworfene Korrekturen
 gelten als unentscheidbar (`menge_unstimmig = true`, `preis_je_einheit = NULL`), nicht als
-unverändert. Gegen die Serverbank nachgerechnet: **79.768 Korrekturen werden geschrieben,
+unverändert. Gegen die Produktionsdatenbank nachgerechnet: **79.768 Korrekturen werden geschrieben,
 2 verworfen.**
 
 **Der `catch` wirft die Beweise nicht mehr weg.** `src/sync/einkaufspreis.ts` protokolliert
@@ -741,7 +741,7 @@ Lauf 85 brauchte von `start` bis `nachgefüllt` **7:06**, Lauf 84 zwei Stunden z
 `einreihenJeMonat` fragte vor jedem Einreihen mit `date_trunc('month', w.zeitraum_von) = …`,
 ob es den Posten schon gibt. Das rechnet auf der Spalte und ist nicht indexfähig; die
 vorhandenen Indexe sind ausserdem **partiell** (`erledigt_am IS NULL` bzw. `IS NOT NULL`)
-und für eine Abfrage, die beides umfasst, unbenutzbar. Gemessen auf der Serverbank:
+und für eine Abfrage, die beides umfasst, unbenutzbar. Gemessen auf der Produktionsdatenbank:
 
 ```
 Parallel Seq Scan on warteschlange   27 ms
@@ -793,7 +793,7 @@ fange die Folgeschäden ohnehin ab. Nachgemessen fängt seine Faktor-20-Prüfung
 — 42 Prozent**. Die übrigen **239** kämen durch beide Netze und fütterten den
 Preisvergleich. Die Behauptung war also nur zu zwei Fünfteln richtig.
 
-**Stand jetzt** (0060 für die Spalte, **0061** für den Faktor; gegen die Serverbank
+**Stand jetzt** (0060 für die Spalte, **0061** für den Faktor; gegen die Produktionsdatenbank
 gerechnet):
 
 | | Korrekturen |
@@ -805,14 +805,14 @@ gerechnet):
 Kosten: 414 von 876.341 Positionen verlieren ihren Preis je Einheit, 0,05 Prozent.
 
 **Und noch ein Nachtrag, derselbe Fehler zum zweiten Mal an einem Tag.** Die Faktorschranke
-stand zuerst als Änderung IN 0060 — die aber seit 14:17 auf der Serverbank in
+stand zuerst als Änderung IN 0060 — die aber seit 14:17 auf der Produktionsdatenbank in
 `schema_migration` steht. Der Runner hätte sie übersprungen: lokal grün, auf dem Server nie
 angekommen. Genau das war am Vormittag schon mit 0056 passiert und hatte 0057 nötig
 gemacht; beim zweiten Mal lautete die Ausrede „0060 steht ja nur lokal", und sie stimmte
 nicht. Die Schranke ist deshalb **0061**.
 
 **Regel, jetzt zweimal gelernt:** vor jeder Änderung an einer Migration
-`SELECT filename FROM public.schema_migration` — auf der Bank, die es betrifft, nicht auf
+`SELECT filename FROM public.schema_migration` — auf der Datenbank, die es betrifft, nicht auf
 der lokalen. Die beiden sind hier verschieden.
 
 **Was wirklich offen bleibt** ist nicht mehr die Frage, ob die 412 durchrutschen, sondern
