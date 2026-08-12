@@ -247,6 +247,49 @@ die core sprengt, wenigstens im Raw-Layer landet. Genau dafür ist er da
 (AGENTS.md Regel 4: „Der Raw-Layer ist die Versicherung"), und aktuell greift
 diese Versicherung im Fehlerfall nicht.
 
+### Nachtrag 12.08.2026: er ist wieder da, und diesmal an anderer Stelle
+
+Lauf 83 meldete `einkaufspreis-nachlauf gescheitert … numeric field overflow`
+(`src/sync/einkaufspreis.ts:55`). Das ist **nicht** dasselbe wie oben und hat mit
+dem Ladenakte-Import nichts zu tun — der Nachlauf rührt keine der neuen Tabellen
+an. Er ist damit vorbestehend und unabhängig, aber er ist neu genug hier, um ihn
+festzuhalten.
+
+Der Nachlauf setzt zwei Anweisungen ab; nur `core.gebinde_vereinheitlichen()`
+schreibt Zahlen (`migrations/0040_preis_ausreisser.sql:77-82`). Zwei Divisionen
+sind ungeschützt:
+
+```
+inhalt    = gesamt_menge / (menge * gebinde_menge)     -- 0040:56, nullif faengt nur die exakte Null
+preis_neu = summe_preis  / gesamt_neu                  -- 0040:79-80
+```
+
+`gesamt_neu` ist `round(menge * gebinde_menge * inhalt_soll, 4)` und damit
+mindestens **0,0001**. Eine Position über 10.000 EUR sprengt so die acht
+Vorkommastellen von `core.bestellposition.preis_je_einheit numeric(14,6)`. Lokal
+liegen drei Positionen ≥ 10.000 EUR, die grösste bei 124.500 EUR — geteilt durch
+0,0001 sind das 1,2 Milliarden.
+
+**Damit ist es diesmal messbar**, anders als beim Fund vom 10.08.: der Nachlauf
+liest vorhandene Zeilen, es gibt also keine verlorene Rohantwort. Die
+auslösende Zeile findet:
+
+```sql
+SELECT bestellposition_key, menge, gebinde_menge, summe_preis,
+       round(menge * gebinde_menge * inhalt_soll, 4) AS gesamt_neu
+  FROM core.bestellposition
+ WHERE round(menge * gebinde_menge * inhalt_soll, 4) > 0
+   AND summe_preis / round(menge * gebinde_menge * inhalt_soll, 4) >= 100000000
+ ORDER BY 5 ASC LIMIT 20;
+```
+
+Der Nachlauf ist bewusst so gebaut, dass sein Scheitern den Import nicht
+entwertet („der Import bleibt gültig", `einkaufspreis.ts:55`) — es eilt also
+nicht. Zu entscheiden ist, ob die Spalte breiter wird oder ob ein Ausreisser mit
+absurd kleiner Menge gar keinen Einheitspreis bekommen soll. Das Zweite ist
+vermutlich richtig: ein Preis je Einheit von 1,2 Milliarden ist keine Zahl,
+sondern ein Datenfehler, und ihn zu speichern hiesse, ihn zu glauben.
+
 ---
 
 ## Round-Table-Map: was nach der Messreihe vom 11.08.2026 übrig ist
@@ -401,3 +444,44 @@ laufenden Bestand zeigt:
   sie, aber `manual.belegarchiv_soll` führt für sie 0 — sie werden deshalb **nicht
   eingereiht**. Nach dem ersten Lauf einmal von Hand zählen und den Sollbestand ergänzen,
   sonst fehlen sie dauerhaft.
+
+### Nach dem ersten Lauf neu dazugekommen (12.08.2026)
+
+* **28 Betriebe lieferten 77 BWA-Zeilen und keinen einzigen Wert** — nichts wurde
+  geschrieben. Der Parser ist nicht die Ursache: hätte er eine Kopfzeile falsch gelesen,
+  wäre die Spaltenzahl gegenüber den Datenzeilen verstimmt und der Posten an der Prüfung in
+  `src/ladenakte/html.ts:197-201` gescheitert. Er ist es nicht, also hatten alle 77 Zeilen
+  ebenfalls exakt so viele Wertzellen wie die Kopfzeile Monate nennt.
+* **Die 680 Monatsspalten lösen sich auf, und zwar unangenehm sauber.** Von 01/1970 bis
+  08/2026 sind es inklusive **genau 680 Monate**. Auch jede andere beobachtete Zahl passt:
+  80 = ab 01/2020, 11 = ab 10/2025. Die Spaltenzahl ist also immer die Spanne vom
+  Betriebsstart bis heute — und `680` heisst schlicht **„LINA kennt kein Startdatum für
+  diesen Betrieb und hat die Unix-Epoche genommen"**. Das betrifft 13 Betriebe.
+  Zu klären: ob diese 13 wirklich keine BWA haben (Holding, nie eröffnet, geschlossen) oder
+  ob das fehlende Startdatum in LINA auch die BWA-Berechnung selbst lahmlegt. Das Zweite
+  wäre ein Pflegethema bei Concept Family, kein Fehler bei uns.
+* **Wie viele Belegordner der NUL-Fehler wirklich gekostet hat, ist unbekannt.** 14
+  Fehlerzeilen sind nicht 14 Ordner — die Wiedervorlage liegt bei 2,5 bis 7,5 Minuten und
+  der Lauf dauerte 2 h 14 min, derselbe Ordner kam also mehrfach dran. `src/sync/worker.ts:576`
+  loggt als einzige der drei Fehlerzeilen weder `postenId` noch `versuche`. **Kleine
+  Nacharbeit, die das dauerhaft löst:** diese Logzeile um `postenId` und `versuche`
+  ergänzen, so wie es die beiden anderen Fehlerwege tun.
+* **`zellenMitWert` zählt Nullen nicht mit.** Ein Betrieb, dessen BWA ausschliesslich echte
+  gebuchte Nullen enthält, gilt damit als „ohne Werte" und wird gar nicht geschrieben —
+  obwohl der Kopfkommentar von `src/ladenakte/laden.ts` die Unterscheidung zwischen „keine
+  Zeile", „NULL" und „0,00" ausdrücklich als tragend führt. Praktisch dürfte das niemanden
+  treffen (eine BWA aus 5.236 echten Nullen gibt es nicht), aber die Zählung widerspricht
+  der eigenen Regel. Beim nächsten Anfassen geradeziehen.
+
+**Die eine Abfrage, die das meiste davon entscheidet** — sie braucht die Datenbank des
+Containers, weil der Rohtext dieser Seiten nur dort liegt:
+
+```sql
+SELECT (parameter->>'linaBetriebId')::int AS betrieb,
+       (length(payload_text) - length(replace(payload_text, '</tr>', ''))) / 5 AS zeilen_im_html,
+       payload_text ~ '01/70'                                   AS faengt_bei_der_epoche_an,
+       payload_bytes
+  FROM raw.api_antwort
+ WHERE endpunkt = 'la:bwa_longterm'
+ ORDER BY payload_bytes DESC;
+```

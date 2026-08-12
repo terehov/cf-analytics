@@ -25,7 +25,7 @@
  */
 import { config, fnZugaenge, fnGrenzen } from '../config'
 import { log } from '../lib/log'
-import { ohneNullzeichen } from '../lib/text'
+import { ohneNullzeichen, jsonOhneNullzeichen } from '../lib/text'
 import { eine } from '../db/pool'
 import { FnSession, FnAnmeldungFehlgeschlagen, fnSessionAbgelaufen } from './auth'
 import { auspacken } from './huelle'
@@ -182,7 +182,7 @@ export class FnClient {
 
       let daten: unknown
       try {
-        daten = JSON.parse(text)
+        daten = jsonOhneNullzeichen(text, ep.key)
       } catch {
         return {
           art: 'fehler', status: res.status, dauerMs,

@@ -14,7 +14,7 @@
 import { config } from '../config'
 import { stundeInGeschaeftszeitzone } from '../lib/time'
 import { log } from '../lib/log'
-import { ohneNullzeichen } from '../lib/text'
+import { ohneNullzeichen, jsonOhneNullzeichen } from '../lib/text'
 import { eine } from '../db/pool'
 import { LinaSession, sessionAbgelaufen, AnmeldungFehlgeschlagen } from './auth'
 import { schemaFuer } from './schemas'
@@ -286,7 +286,10 @@ export class LinaClient {
         daten = text
       } else {
         try {
-          daten = JSON.parse(text)
+          // Nicht JSON.parse: die NUL, an denen der erste Ladenakte-Lauf
+          // gescheitert ist, stecken als Escape-Folge im Text und entstehen
+          // erst beim Parsen. Siehe src/lib/text.ts.
+          daten = jsonOhneNullzeichen(text, ep.key)
         } catch {
           return {
             art: 'fehler', status: res.status, dauerMs,

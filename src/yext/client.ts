@@ -21,6 +21,7 @@
  */
 import { config } from '../config'
 import { log } from '../lib/log'
+import { ohneNullzeichen, jsonOhneNullzeichen } from '../lib/text'
 
 export class YextFehler extends Error {
   constructor(msg: string, readonly status: number, readonly endgueltig: boolean) {
@@ -103,9 +104,21 @@ export async function yextHolen<T>(
         break
       }
 
-      const text = await antwort.text()
+      /**
+       * NUL raus, bevor irgendetwas davon in die Datenbank geht.
+       *
+       * Von hier gehen Gaestetexte ungefiltert nach `core.bewertung` und als
+       * jsonb nach `sync.merker`. Eine Google-Rezension ist der wahrschein-
+       * lichste NUL-Traeger im ganzen Projekt — Text, den Fremde tippen und
+       * durch fremde Systeme schicken. Ein einziges NUL laesst den
+       * Sammel-INSERT eines Betriebs scheitern, und der Lader meldet das nur
+       * als WARN. Siehe src/lib/text.ts zu den zwei Wegen.
+       */
+      const text = ohneNullzeichen(await antwort.text(), `yext${pfad}`)
       let json: Huelle<T> | null = null
-      try { json = JSON.parse(text) } catch { /* bei 5xx kann HTML kommen */ }
+      try {
+        json = jsonOhneNullzeichen(text, `yext${pfad}`) as Huelle<T>
+      } catch { /* bei 5xx kann HTML kommen */ }
 
       if (antwort.ok && json?.response !== undefined) {
         if (!weg) { weg = w; log.info('yext authentifiziert', { weg: w === 'query' ? 'api_key' : 'bearer' }) }

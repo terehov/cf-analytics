@@ -2374,27 +2374,46 @@ bleibt.
 **Symptom.** 14-mal `la:belegliste` mit `error: unsupported Unicode escape sequence`.
 Nicht ein Beleg dieser Ordner ist angekommen.
 
-**Ursache.** PostgreSQL nimmt U+0000 weder in `text` noch in `jsonb`; bei `jsonb` lautet die
-Meldung genau so. Irgendwo in diesen Ordnern trägt ein Beleg ein NUL im Namen oder in einem
-Textfeld. Weil `laLaden()` einen Ordner in **einer Transaktion** schreibt — erst
-`raw.api_antwort`, dann `core` —, reisst dieses eine Zeichen den ganzen Ordner mit. Bei den
-betroffenen Ordnern lagen zwischen einem und mehreren hundert Belegen.
+**Wie viele Ordner das sind, weiss niemand.** Vierzehn Fehlerzeilen sind nicht vierzehn
+Ordner: der Fehlerweg setzt `faellig_ab` auf 2,5 bis 7,5 Minuten, und der Lauf dauerte
+2 h 14 min — derselbe Ordner ist also mehrfach drangekommen. `src/sync/worker.ts:576`
+loggt als einzige der drei Fehlerzeilen weder `postenId` noch `versuche`, deshalb ist die
+Zahl aus dem Protokoll nicht zu gewinnen. Sie steht in der Warteschlange des Containers
+(Abschnitt 3 von `docs/ladenakte-lauf-pruefen.sql`). **Was hier zunaechst als „14 Ordner"
+formuliert war, ist eine Obergrenze und vermutlich deutlich zu hoch.**
+
+**Ursache.** PostgreSQL nimmt U+0000 weder in `text` noch in `jsonb`. Irgendwo in diesen
+Ordnern trägt ein Beleg ein NUL im Namen oder in einem Textfeld. Weil `laLaden()` einen
+Ordner in **einer Transaktion** schreibt — erst `raw.api_antwort`, dann `core` —, reisst
+dieses eine Zeichen den ganzen Ordner mit.
 
 **Warum es kein Ladenakte-Problem ist.** `raw.api_antwort.payload` ist `jsonb`, und dort
-landet **jede** JSON-Antwort dieses Projekts. LINA wie FoodNotify hatten dieselbe Falle;
-getreten hat sie bisher nur die Ladenakte, weil dort zum ersten Mal Dateinamen aus
-eingescannten Belegen durchlaufen.
+landet **jede** JSON-Antwort dieses Projekts. LINA, FoodNotify und Yext hatten dieselbe
+Falle; getreten hat sie bisher nur die Ladenakte, weil dort zum ersten Mal Dateinamen aus
+eingescannten Belegen durchlaufen. Der wahrscheinlichste NUL-Träger im ganzen Projekt ist
+aber ein anderer: Google-Rezensionen über `src/yext/client.ts` — Text, den Fremde tippen und
+durch fremde Systeme schicken.
 
-**Was ihn verhindert.** `ohneNullzeichen()` in `src/lib/text.ts`, eingehängt in beiden
-Clients direkt hinter `await res.text()` — an der Aussengrenze, nicht im Lader, weil jeder
-Lader dieselbe Falle hätte. Entfernt wird **ausschliesslich U+0000**: andere Steuerzeichen
-sind in PostgreSQL zulässig, und was hier mehr wegputzt als nötig, verfälscht Daten, die
-hinterher niemand mehr nachsehen kann (`raw` ist append-only, Regel 4). Und es wird
-geloggt — eine stille Bereinigung findet man ein halbes Jahr später in keiner Zahl wieder.
+**Was ihn verhindert — und was ihn im ersten Anlauf NICHT verhindert hat.** Es gibt zwei
+Wege, auf denen ein NUL in einer JSON-Antwort steckt, und sie verlangen verschiedene
+Gegenmittel. Der erste Anlauf hat nur den falschen der beiden behandelt; das steht als
+eigener Abschnitt weiter unten, weil es die lehrreichere Hälfte ist.
+
+Heute greifen beide, in `src/lib/text.ts`:
+
+| Weg | im Antworttext steht | PostgreSQL meldet | gefangen von |
+|---|---|---|---|
+| rohes Byte | `0x00` | `invalid byte sequence for encoding "UTF8": 0x00` | `ohneNullzeichen()` |
+| Escape-Folge | die sechs Zeichen `\u0000` | `unsupported Unicode escape sequence` | `jsonOhneNullzeichen()` |
+
+Entfernt wird **ausschliesslich U+0000**: andere Steuerzeichen sind in PostgreSQL zulässig,
+und was hier mehr wegputzt als nötig, verfälscht Daten, die hinterher niemand mehr nachsehen
+kann (`raw` ist append-only, Regel 4). Und es wird geloggt — eine stille Bereinigung findet
+man ein halbes Jahr später in keiner Zahl wieder.
 
 **Nachzuholen ist nichts von Hand.** Auf dem Fehlerweg in `src/sync/worker.ts` bleibt
-`erledigt_am` NULL und es greift keine Versuchsgrenze; die 14 Posten stehen mit
-Wiedervorlage in der Schlange und werden nach dem Deploy von selbst geholt.
+`erledigt_am` NULL und es greift keine Versuchsgrenze; die Posten stehen mit Wiedervorlage
+in der Schlange und werden nach dem Deploy von selbst geholt.
 
 ### Die Löschsperre stolperte über einen Hash, der zufällig `add` enthielt
 
@@ -2449,3 +2468,65 @@ fragt. Ob überhaupt gefragt wird, entscheidet weiterhin der Aufrufer — beim B
 sich wiederholen soll, ein stiller Totalausfall auf Zeit. Wer „schon mal dagewesen" prüft,
 wo „gerade offen" gemeint ist, baut eine Sperre, die erst nach dem ersten Erfolg zuschnappt
 — also dann, wenn niemand mehr hinsieht.
+
+
+### Nachtrag vom selben Tag: die Korrektur sass an der falschen Stelle
+
+**Symptom.** Keines. Typecheck grün, 586 Tests grün, committet. Erst eine adversarische
+Nachprüfung hat gezeigt, dass die Bereinigung den Fall aus dem Protokoll gar nicht berührt.
+
+**Ursache.** Zwei verschiedene Dinge heissen „ein NUL in der Antwort", und ich habe das
+falsche behandelt. `ohneNullzeichen()` prüfte den Rohtext auf ein echtes `0x00`. Der Rohtext
+enthielt aber keines: LINA liefert die sechs gewöhnlichen ASCII-Zeichen `\u0000`, und erst
+`JSON.parse` macht daraus ein U+0000. `JSON.stringify` schreibt es anschliessend wieder als
+Escape-Folge — genau die, die PostgreSQL ablehnt.
+
+Nachgemessen, in dieser Reihenfolge:
+
+```
+Rohtext enthaelt echtes NUL?      false     ← die Reinigung greift nicht
+nach JSON.parse echtes NUL?       true
+JSON.stringify erzeugt wieder:    {"name":"Rechnung\u0000.pdf"}
+```
+
+**Was der Beleg war, dass es nicht das rohe Byte sein KANN.** Ein rohes `0x00` im JSON-Rumpf
+lässt `JSON.parse` scheitern („Unterminated string"). Der Client fängt das ab und meldet
+„Antwort ist kein JSON" — der Lader bekommt die Daten nie zu sehen, und die Meldung im
+Protokoll wäre eine ganz andere gewesen. Die beobachtete Meldung konnte also nur aus der
+Escape-Folge kommen. Die zwei PostgreSQL-Meldungen auseinanderzuhalten war der ganze
+Schlüssel; sie stehen in der Tabelle weiter oben.
+
+**Was ihn verhindert.** `jsonOhneNullzeichen()` liest das JSON mit einem Reviver, der die
+Zeichenketten beim Parsen säubert. Wichtiger als die Funktion ist der Test:
+`src/lib/text.test.ts` prüft nicht „die Funktion tut etwas", sondern die Eigenschaft, auf die
+es ankommt — **nach der Reinigung enthält `JSON.stringify` des Ergebnisses kein `\u0000`
+mehr**. Gegengeprüft per Mutation: schaltet man die Reinigung aus, fallen vier Tests um.
+
+**Die eigentliche Lehre.** Der erste Anlauf war nicht falsch, weil ich zu wenig nachgedacht
+hätte, sondern weil er nirgends widerlegbar war: im ganzen Repository kam kein einziges NUL
+vor, also war jede Fassung grün — auch eine, die nichts tut. Ein Fix ohne Test, der ohne ihn
+rot wäre, ist eine Vermutung mit Commit-Nachricht. Und schlimmer als wirkungslos war er
+beinahe irreführend: die WARN-Zeile „NUL-Zeichen entfernt" wäre nie erschienen, und wer nach
+der Wirkung gesucht hätte, hätte Stille gefunden und daraus geschlossen, es habe keine NUL
+gegeben.
+
+### Und die Korrektur daneben zog einen neuen Fehler nach
+
+**Symptom.** Ebenfalls keines, ebenfalls erst in der Nachprüfung aufgefallen.
+
+**Ursache.** Die Lockerung an `einreihenWennNeu()` liess ab sofort jeden Posten wieder
+einreihen, der weder offen noch aufgegeben war. Der Monatstakt hing aber weiterhin an einer
+Prüfung auf `status = 'ok'`. Ein Posten, der mit `keine_daten` endet — bei LINA der
+dokumentierte Normalfall, HTTP 500 mit leerem Rumpf —, fiel damit durch beide Netze: er galt
+als „diesen Monat noch nicht geholt" und wurde in **jeder** Nacht neu eingereiht. 365 Aufrufe
+im Jahr statt zwölf, und in der Statistik sieht es aus wie eine monatliche Momentaufnahme.
+
+**Was ihn verhindert.** Der Wiederholtakt hängt jetzt am **Zeitraum** des Postens und nicht
+an seinem Ausgang (`einreihenJeMonat()`) — derselbe Bau, den die LINA-Momentaufnahmen seit
+dem 02.08.2026 verwenden. Ein Zeitraum kennt das Problem nicht, weil er nichts über den
+Ausgang weiss; er deckt nebenbei auch `aufgegeben` ab, das sonst dauerhaft gesperrt hätte.
+
+**Die allgemeine Lehre, und es ist dieselbe wie eine Ebene höher.** Ein Wiederholtakt, der an
+einem Ergebniswert hängt, kennt immer einen Ausgang, an den niemand gedacht hat. Erst war es
+„erledigt", dann `keine_daten`, beim nächsten Mal wäre es `aufgegeben` gewesen. Die Frage
+„wann ist das wieder fällig?" beantwortet ein Kalender, kein Statusfeld.

@@ -333,15 +333,30 @@ export async function inventurenNachfuellen(
 export async function ladenakteNachfuellen(heute: string): Promise<number> {
   let n = 0
 
-  // 1. Belegordner: je Betrieb und Belegart einer, aber nur wo Belege liegen
-  //    und noch nichts abgerufen wurde.
+  /*
+   * 1. Belegordner: je Betrieb und Belegart einer, aber nur wo Belege liegen
+   *    und noch nichts Brauchbares abgerufen wurde.
+   *
+   *    „NICHTS BRAUCHBARES" IST NICHT DASSELBE WIE „NICHTS". Der Bestandseintrag
+   *    entsteht in `laLaden()` VOR der Pruefung auf null Zeilen — eine einzige
+   *    Leerantwort wuerde einen Ordner sonst fuer immer als geholt festschreiben,
+   *    obwohl die Vollzaehlung vom 11.08.2026 dort Belege gesehen hat. Genau
+   *    dieser Widerspruch — Soll ueber null, gemessen null — ist der Grund, es
+   *    noch einmal zu versuchen, und nicht der Grund, es sein zu lassen.
+   *
+   *    Die Messung selbst bleibt stehen: `core.belegarchiv_bestand` traegt
+   *    `gemessen_am` im Schluessel und ist eine Zeitreihe. Haelt der Widerspruch
+   *    an, kostet er eine Anfrage je Nacht und steht in Abschnitt 5 von
+   *    `docs/ladenakte-lauf-pruefen.sql` — sichtbar statt still.
+   */
   const belege = await query<{ lina_betrieb_id: number; typ_id: string }>(
     `SELECT s.lina_betrieb_id, s.typ_id
        FROM manual.belegarchiv_soll s
        JOIN core.betrieb b ON b.lina_betrieb_id = s.lina_betrieb_id
       WHERE s.soll_anzahl > 0
         AND NOT EXISTS (SELECT 1 FROM core.belegarchiv_bestand v
-                         WHERE v.betrieb_key = b.betrieb_key AND v.typ_id = s.typ_id)
+                         WHERE v.betrieb_key = b.betrieb_key AND v.typ_id = s.typ_id
+                           AND v.records_total > 0)
       ORDER BY s.lina_betrieb_id, s.typ_id`)
 
   for (const z of belege) {
@@ -349,26 +364,36 @@ export async function ladenakteNachfuellen(heute: string): Promise<number> {
       { linaBetriebId: String(z.lina_betrieb_id), typeId: z.typ_id })
   }
 
-  // 2. BWA-Historie und Stammdatenblatt: je Betrieb einer, hoechstens einmal
-  //    im Kalendermonat. Beides sind Momentaufnahmen, die LINA ueberschreibt.
+  /*
+   * 2. BWA-Historie und Stammdatenblatt: je Betrieb einer im Kalendermonat.
+   *    Beides sind Momentaufnahmen, die LINA ueberschreibt.
+   *
+   *    DER MONATSTAKT HAENGT AM ZEITRAUM DES POSTENS, NICHT AN SEINEM ERGEBNIS
+   *    — so wie bei den LINA-Momentaufnahmen weiter oben, aus demselben Grund.
+   *
+   *    Die erste Fassung fragte `sync.aufgabe` nach `status = 'ok'`. Damit fiel
+   *    jeder Posten durchs Netz, der mit `keine_daten` endete: er galt als
+   *    „diesen Monat noch nicht geholt" und wurde in JEDER Nacht neu
+   *    eingereiht — 365 Aufrufe im Jahr statt zwoelf, und in der Statistik sah
+   *    es aus wie eine monatliche Momentaufnahme. Ein Zeitraum kennt dieses
+   *    Problem nicht, weil er nichts ueber den Ausgang weiss. Er deckt
+   *    ausserdem den Fall mit ab, dass ein Posten den ganzen Monat lang
+   *    scheitert: der naechste Monat bringt eine frische Zeile, auch wenn die
+   *    alte auf 'aufgegeben' steht.
+   *
+   *    Nebenbei entfaellt eine Abfrage je Betrieb und Endpunkt — 262 Rundreisen
+   *    zur Datenbank in jedem Lauf, nur um festzustellen, dass nichts zu tun ist.
+   */
   const betriebe = await query<{ lina_betrieb_id: number }>(
     `SELECT b.lina_betrieb_id
        FROM core.betrieb b
       WHERE b.lina_betrieb_id IS NOT NULL
       ORDER BY b.lina_betrieb_id`)
 
+  const monatsErster = `${heute.slice(0, 7)}-01`
   for (const key of ['la:bwa_longterm', 'la:stammdaten'] as const) {
     for (const z of betriebe) {
-      const schonDiesenMonat = await eine<{ da: boolean }>(
-        `SELECT EXISTS (
-                  SELECT 1 FROM sync.aufgabe
-                   WHERE endpunkt = $1
-                     AND parameter->>'linaBetriebId' = $2
-                     AND status = 'ok'
-                     AND beendet_am >= date_trunc('month', current_date)) AS da`,
-        [key, String(z.lina_betrieb_id)])
-      if (schonDiesenMonat?.da) continue
-      n += await einreihenWennNeu(key, heute, PRIORITAET_LADENAKTE,
+      n += await einreihenJeMonat(key, monatsErster, PRIORITAET_LADENAKTE,
         { linaBetriebId: String(z.lina_betrieb_id) })
     }
   }
@@ -383,32 +408,26 @@ export async function ladenakteNachfuellen(heute: string): Promise<number> {
 const PRIORITAET_LADENAKTE = 95
 
 /**
- * Einreihen, sofern nicht schon offen.
+ * Einreihen fuer den EINMALIGEN Abzug — das Belegarchiv.
  *
- * ⚠ „NICHT SCHON OFFEN" — NICHT „NOCH NIE DAGEWESEN". Der Unterschied ist am
- * 12.08.2026 aufgefallen und war ein stiller Totalausfall in Zeitlupe.
+ * Ob ein Ordner ueberhaupt angeboten wird, entscheidet der Aufrufer an
+ * `core.belegarchiv_bestand`. Diese Funktion verhindert nur, dass derselbe
+ * Ordner zweimal gleichzeitig in der Schlange steht.
  *
- * Vorher stand hier `NOT EXISTS (… endpunkt = $1 AND parameter = $4)` ohne
- * jeden Zustandsvergleich. Damit sperrte ein einziger erledigter Posten seinen
- * Platz fuer immer: BWA-Historie und Stammdatenblatt sind Momentaufnahmen, die
- * `ladenakteNachfuellen()` ausdruecklich einmal im Kalendermonat erneuern will
- * — die Pruefung `schonDiesenMonat` steht extra dafuer da. Sie haette ab
- * September brav „nicht diesen Monat geholt" gesagt, und das Einreihen waere
- * danach wortlos ins Leere gelaufen. Der Lauf haette weiter „ok" gemeldet, und
- * die BWA-Zahlen waeren auf dem Stand vom 12.08.2026 eingefroren, ohne dass
- * irgendeine Zeile irgendwo rot geworden waere.
+ * Zwei Zustaende sperren:
+ *   offen (erledigt_am IS NULL)  er kommt ohnehin dran
+ *   'aufgegeben'                 sonst waechst die Warteschlange jede Nacht um
+ *                                denselben kaputten Posten. Er steht in
+ *                                Abschnitt 3 von `docs/ladenakte-lauf-pruefen.sql`
+ *                                und will angesehen, nicht wiederholt werden.
  *
- * Drei Zustaende, drei Antworten:
- *   offen (erledigt_am IS NULL)  nicht noch einmal — er kommt ohnehin dran
- *   'aufgegeben'                 nicht noch einmal — sonst waechst die
- *                                Warteschlange jede Nacht um denselben
- *                                kaputten Posten. Er steht in Abschnitt 3 von
- *                                `docs/ladenakte-lauf-pruefen.sql` und will
- *                                angesehen, nicht wiederholt werden.
- *   'ok' / 'keine_daten'         wieder einreihen, wenn der Aufrufer fragt.
- *                                Ob ueberhaupt gefragt wird, entscheidet der
- *                                Aufrufer — beim Belegarchiv `core.belegarchiv_bestand`,
- *                                bei den Momentaufnahmen `schonDiesenMonat`.
+ * ⚠ FUER ETWAS, DAS SICH WIEDERHOLEN SOLL, IST DAS DIE FALSCHE FUNKTION —
+ * dafuer gibt es `einreihenJeMonat()` gleich darunter. Der Unterschied hat am
+ * 12.08.2026 zwei Fehler nacheinander gekostet: erst sperrte hier JEDE erledigte
+ * Zeile fuer immer, wodurch die Momentaufnahmen ab September wortlos ausgeblieben
+ * waeren; dann liess die Lockerung Posten mit 'keine_daten' jede Nacht durch.
+ * Beides sind Symptome derselben Verwechslung — ein Wiederholtakt gehoert an den
+ * Zeitraum, nicht an einen Ergebniswert.
  *
  * Der partielle Eindeutigkeitsindex (`warteschlange_offen_uq … WHERE erledigt_am
  * IS NULL`) traegt das mit: erledigte Zeilen stehen gar nicht erst darin.
@@ -424,6 +443,39 @@ async function einreihenWennNeu(
                            AND (w.erledigt_am IS NULL OR w.ergebnis = 'aufgegeben'))
      RETURNING posten_id`,
     [endpunkt, heute, prioritaet, JSON.stringify(parameter)])
+  return r.length
+}
+
+/**
+ * Einreihen fuer eine MONATLICHE Momentaufnahme — BWA-Historie, Stammdatenblatt.
+ *
+ * Ein Posten je Betrieb und Kalendermonat, und der Takt haengt ausschliesslich am
+ * Zeitraum: gibt es fuer diesen Monat schon eine Zeile — offen, erledigt,
+ * gescheitert, aufgegeben, gleich welche —, passiert nichts. Im naechsten Monat
+ * gibt es eine frische.
+ *
+ * Das ist derselbe Bau wie bei den LINA-Momentaufnahmen weiter oben, und aus
+ * demselben Grund: ein Wiederholtakt, der an einem Ergebniswert haengt, kennt
+ * immer einen Ausgang, an den niemand gedacht hat. Hier waren es 'keine_daten'
+ * und 'aufgegeben'.
+ *
+ * Verglichen wird ueber `date_trunc('month', …)` und nicht auf Gleichheit mit dem
+ * Monatsersten. Der erste Lauf am 12.08.2026 hat seine Posten noch mit dem
+ * Tagesdatum eingereiht; ohne diesen Vergleich bekaeme jeder der 131 Betriebe im
+ * August eine zweite Zeile — 262 Anfragen an LINA fuer Daten, die schon da sind.
+ */
+async function einreihenJeMonat(
+  endpunkt: string, monatsErster: string, prioritaet: number, parameter: Record<string, string>,
+): Promise<number> {
+  const r = await query<{ posten_id: number }>(
+    `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, parameter)
+     SELECT $1, $2::date, $2::date, $3, $4::jsonb
+      WHERE NOT EXISTS (
+            SELECT 1 FROM sync.warteschlange w
+             WHERE w.endpunkt = $1 AND w.parameter = $4::jsonb
+               AND date_trunc('month', w.zeitraum_von) = date_trunc('month', $2::date))
+     RETURNING posten_id`,
+    [endpunkt, monatsErster, prioritaet, JSON.stringify(parameter)])
   return r.length
 }
 

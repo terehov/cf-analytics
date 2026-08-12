@@ -1788,4 +1788,85 @@ lauf('e2e Ladenakte', () => {
     expect(mock.zaehler['la_ordnerseite']).toBe(1)
     expect(mock.zaehler['la_baum']).toBe(3)
   })
+
+  /**
+   * Der Wiederholtakt der Momentaufnahmen.
+   *
+   * Am 12.08.2026 ist dieser Takt zweimal hintereinander falsch gewesen — erst
+   * gar nicht (ein erledigter Posten sperrte fuer immer), dann zu oft (jeder
+   * Posten mit 'keine_daten' kam in JEDER Nacht wieder). Beide Male haette ein
+   * Test es gesehen, und beide Male gab es keinen. Deshalb wird hier nicht die
+   * Implementierung geprueft, sondern der Takt selbst: einmal im Monat, egal wie
+   * der Posten ausgegangen ist.
+   */
+  test('Momentaufnahmen kommen einmal im Monat — unabhaengig vom Ausgang', async () => {
+    const { ladenakteNachfuellen } = await import('./nachfuellen')
+    await db.query(`TRUNCATE sync.warteschlange RESTART IDENTITY`)
+
+    const posten = async (ep: string) => Number((await db.query(
+      `SELECT count(*)::int AS n FROM sync.warteschlange WHERE endpunkt = $1`, [ep])).rows[0].n)
+
+    await ladenakteNachfuellen('2026-08-12')
+    expect(await posten('la:bwa_longterm')).toBe(1)
+    expect(await posten('la:stammdaten')).toBe(1)
+
+    // Derselbe Monat, drei weitere Naechte: nichts Neues, obwohl der Posten noch offen ist.
+    for (const tag of ['2026-08-13', '2026-08-20', '2026-08-31']) await ladenakteNachfuellen(tag)
+    expect(await posten('la:bwa_longterm')).toBe(1)
+
+    /**
+     * Jetzt der Ausgang, an dem die zweite Fassung gescheitert waere.
+     * `keine_daten` ist bei LINA der dokumentierte Normalfall (HTTP 500 mit
+     * leerem Rumpf), und eine Pruefung auf `status = 'ok'` haette ihn als
+     * „diesen Monat noch nicht geholt" gelesen — jede Nacht neu.
+     */
+    await db.query(`UPDATE sync.warteschlange SET erledigt_am = now(), ergebnis = 'keine_daten'`)
+    await ladenakteNachfuellen('2026-08-31')
+    expect(await posten('la:bwa_longterm')).toBe(1)
+    expect(await posten('la:stammdaten')).toBe(1)
+
+    // Neuer Monat: eine frische Zeile je Endpunkt.
+    await ladenakteNachfuellen('2026-09-01')
+    expect(await posten('la:bwa_longterm')).toBe(2)
+    expect(await posten('la:stammdaten')).toBe(2)
+  })
+
+  test('ein aufgegebener Posten sperrt den naechsten Monat nicht', async () => {
+    const { ladenakteNachfuellen } = await import('./nachfuellen')
+    await db.query(`TRUNCATE sync.warteschlange RESTART IDENTITY`)
+
+    await ladenakteNachfuellen('2026-08-12')
+    await db.query(`UPDATE sync.warteschlange SET erledigt_am = now(), ergebnis = 'aufgegeben'`)
+
+    /**
+     * Genau der Fall der drei Stammdatenblaetter, die an der Loeschsperre
+     * gescheitert sind: vier Fehlversuche, dann 'aufgegeben'. Danach ist der
+     * Pfadfehler behoben — es muss wieder einer gebaut werden, sonst fehlen die
+     * drei Betriebe fuer immer, und der Lauf meldet dabei fehlerfrei.
+     */
+    await ladenakteNachfuellen('2026-09-01')
+    const { rows } = await db.query(
+      `SELECT count(*)::int AS n FROM sync.warteschlange
+        WHERE endpunkt = 'la:stammdaten' AND erledigt_am IS NULL`)
+    expect(Number(rows[0].n)).toBe(1)
+  })
+
+  /**
+   * Der erste Lauf hat seine Posten mit dem TAGESDATUM eingereiht, nicht mit dem
+   * Monatsersten. Verglichen wird deshalb ueber `date_trunc('month', …)` — sonst
+   * bekaeme im August jeder der 131 Betriebe eine zweite Zeile, und der naechste
+   * Lauf holte 262-mal Daten, die schon da sind.
+   */
+  test('ein Posten mit Tagesdatum blockiert denselben Monat', async () => {
+    const { ladenakteNachfuellen } = await import('./nachfuellen')
+    await db.query(`TRUNCATE sync.warteschlange RESTART IDENTITY`)
+    await db.query(
+      `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, parameter)
+       VALUES ('la:stammdaten','2026-08-11','2026-08-11',95,'{"linaBetriebId":"15"}')`)
+
+    await ladenakteNachfuellen('2026-08-12')
+    const { rows } = await db.query(
+      `SELECT count(*)::int AS n FROM sync.warteschlange WHERE endpunkt = 'la:stammdaten'`)
+    expect(Number(rows[0].n)).toBe(1)
+  })
 })
