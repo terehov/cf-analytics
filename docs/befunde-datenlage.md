@@ -1299,3 +1299,21 @@ weg, der Server rechnete weiter. Ein `pkill` auf den Client beendet die Abfrage
 nicht; sie stirbt erst, wenn Postgres beim Senden merkt, dass niemand mehr
 zuhört. **Regel:** eine lange Abfrage nicht wegkillen, sondern mit
 `pg_cancel_backend(pid)` abbrechen.
+
+### Nachgemessen an der fertigen Seite (12.08.2026, nach 0063)
+
+Alle Karten eines Dashboards gleichzeitig gestartet, wie es der Browser tut:
+
+| Dashboard | Karten | vorher | nachher |
+|---|---|---|---|
+| 26 Fremdeinkauf | 12 | über 9 min, nicht fertig | **2,7 s** |
+| 16 Einkauf | 10 | — | **5,8 s** |
+| 27 Sperren (neu) | 2 | — | 0,5 s |
+
+Auf 16 trugen zwei Karten diese 5,8 s praktisch allein: „Einkaufsvolumen je
+Betrieb" (5.789 ms, `mart.einkauf_betrieb_monat`) und „Auffällige
+Einkaufspositionen" (4.973 ms, `mart.einkauf_pruefung`) — beide lesen wieder
+876.611 Positionen von vorn, die zweite bildet dabei je Ware einen Median über
+21.338 Warennamen. Alle übrigen acht Karten liegen zwischen 128 und 2.234 ms.
+**Migration 0064** zieht die beiden nach; lokal 965 ms → 2,4 ms und
+(Produktionsdatenbank) 3,0 s → wenige ms, Refresh-Kosten 0,9 s.

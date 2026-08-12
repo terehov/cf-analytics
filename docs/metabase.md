@@ -618,6 +618,8 @@ materialisierten Sichten statt direkt auf `core`:
 | `mart.einkauf_kreditor_monat` | Volumen je Quelle, Betrieb, Monat, Dachlieferant | `fremdeinkauf`, `lieferant_freigabe_stand` |
 | `mart.einkaufspreis_monat_basis` | Preis je Ware und Monat | `einkaufspreis_monat` → `einkaufspreis_veraenderung` |
 | `mart.einkaufspreis_betrieb_basis` | Preis je Ware, Haus und Monat | `einkaufspreis_betrieb` |
+| `mart.einkauf_betrieb_monat_basis` (0064) | Einkaufsvolumen je Betrieb und Monat | `einkauf_betrieb_monat` |
+| `mart.einkauf_pruefung_basis` (0064) | auffällige Positionen mit Grund | `einkauf_pruefung` |
 
 Aufgefrischt in `src/sync/einkauf_sichten.ts`, `CONCURRENTLY`, direkt nach
 `einkaufspreisNachlauf()` — in dieser Reihenfolge, weil dort

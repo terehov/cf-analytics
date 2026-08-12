@@ -45,6 +45,10 @@ const REFRESHES = [
   `REFRESH MATERIALIZED VIEW CONCURRENTLY mart.einkauf_kreditor_monat`,
   `REFRESH MATERIALIZED VIEW CONCURRENTLY mart.einkaufspreis_monat_basis`,
   `REFRESH MATERIALIZED VIEW CONCURRENTLY mart.einkaufspreis_betrieb_basis`,
+  // Migration 0064, nachgezogen nach der Messung an der fertigen Seite:
+  // diese beiden trugen die restlichen 5,8 s von Dashboard 16 fast allein.
+  `REFRESH MATERIALIZED VIEW CONCURRENTLY mart.einkauf_betrieb_monat_basis`,
+  `REFRESH MATERIALIZED VIEW CONCURRENTLY mart.einkauf_pruefung_basis`,
 ]
 
 /** Notnagel gegen stille Blockaden, keine erwartete Laufzeit. */
