@@ -14,6 +14,7 @@
 import { config } from '../config'
 import { stundeInGeschaeftszeitzone } from '../lib/time'
 import { log } from '../lib/log'
+import { ohneNullzeichen } from '../lib/text'
 import { eine } from '../db/pool'
 import { LinaSession, sessionAbgelaufen, AnmeldungFehlgeschlagen } from './auth'
 import { schemaFuer } from './schemas'
@@ -226,14 +227,14 @@ export class LinaClient {
       }
 
       let res = await this.request(ep, parameter, pfad)
-      let text = await res.text()
+      let text = ohneNullzeichen(await res.text(), ep.key)
 
       // Session abgelaufen: genau einmal neu anmelden und wiederholen.
       if (sessionAbgelaufen(res, text, form)) {
         log.info('session abgelaufen, melde neu an', { endpunkt: ep.key })
         await this.session.anmelden()
         res = await this.request(ep, parameter, pfad)
-        text = await res.text()
+        text = ohneNullzeichen(await res.text(), ep.key)
       }
 
       this.letzterRequest = Date.now()

@@ -326,7 +326,9 @@ export async function inventurenNachfuellen(
  *
  * `WHERE NOT EXISTS` statt `ON CONFLICT DO NOTHING`: der Eindeutigkeitsindex
  * auf der Warteschlange ist partiell (`WHERE erledigt_am IS NULL`), ein
- * Konflikt-Insert reiht also alles Erledigte erneut ein.
+ * Konflikt-Insert reiht also alles Erledigte erneut ein. Welche Zustaende das
+ * NOT EXISTS sperrt und welche nicht, steht bei `einreihenWennNeu()` — daran
+ * haengt, ob die Momentaufnahmen je wieder aufgefrischt werden.
  */
 export async function ladenakteNachfuellen(heute: string): Promise<number> {
   let n = 0
@@ -380,6 +382,37 @@ export async function ladenakteNachfuellen(heute: string): Promise<number> {
  */
 const PRIORITAET_LADENAKTE = 95
 
+/**
+ * Einreihen, sofern nicht schon offen.
+ *
+ * ⚠ „NICHT SCHON OFFEN" — NICHT „NOCH NIE DAGEWESEN". Der Unterschied ist am
+ * 12.08.2026 aufgefallen und war ein stiller Totalausfall in Zeitlupe.
+ *
+ * Vorher stand hier `NOT EXISTS (… endpunkt = $1 AND parameter = $4)` ohne
+ * jeden Zustandsvergleich. Damit sperrte ein einziger erledigter Posten seinen
+ * Platz fuer immer: BWA-Historie und Stammdatenblatt sind Momentaufnahmen, die
+ * `ladenakteNachfuellen()` ausdruecklich einmal im Kalendermonat erneuern will
+ * — die Pruefung `schonDiesenMonat` steht extra dafuer da. Sie haette ab
+ * September brav „nicht diesen Monat geholt" gesagt, und das Einreihen waere
+ * danach wortlos ins Leere gelaufen. Der Lauf haette weiter „ok" gemeldet, und
+ * die BWA-Zahlen waeren auf dem Stand vom 12.08.2026 eingefroren, ohne dass
+ * irgendeine Zeile irgendwo rot geworden waere.
+ *
+ * Drei Zustaende, drei Antworten:
+ *   offen (erledigt_am IS NULL)  nicht noch einmal — er kommt ohnehin dran
+ *   'aufgegeben'                 nicht noch einmal — sonst waechst die
+ *                                Warteschlange jede Nacht um denselben
+ *                                kaputten Posten. Er steht in Abschnitt 3 von
+ *                                `docs/ladenakte-lauf-pruefen.sql` und will
+ *                                angesehen, nicht wiederholt werden.
+ *   'ok' / 'keine_daten'         wieder einreihen, wenn der Aufrufer fragt.
+ *                                Ob ueberhaupt gefragt wird, entscheidet der
+ *                                Aufrufer — beim Belegarchiv `core.belegarchiv_bestand`,
+ *                                bei den Momentaufnahmen `schonDiesenMonat`.
+ *
+ * Der partielle Eindeutigkeitsindex (`warteschlange_offen_uq … WHERE erledigt_am
+ * IS NULL`) traegt das mit: erledigte Zeilen stehen gar nicht erst darin.
+ */
 async function einreihenWennNeu(
   endpunkt: string, heute: string, prioritaet: number, parameter: Record<string, string>,
 ): Promise<number> {
@@ -387,7 +420,8 @@ async function einreihenWennNeu(
     `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, parameter)
      SELECT $1, $2::date, $2::date, $3, $4::jsonb
       WHERE NOT EXISTS (SELECT 1 FROM sync.warteschlange w
-                         WHERE w.endpunkt = $1 AND w.parameter = $4::jsonb)
+                         WHERE w.endpunkt = $1 AND w.parameter = $4::jsonb
+                           AND (w.erledigt_am IS NULL OR w.ergebnis = 'aufgegeben'))
      RETURNING posten_id`,
     [endpunkt, heute, prioritaet, JSON.stringify(parameter)])
   return r.length

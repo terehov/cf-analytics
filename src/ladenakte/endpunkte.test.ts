@@ -66,6 +66,44 @@ describe('Loeschsperre', () => {
       .toThrow(VerbotenerPfad)
   })
 
+  /**
+   * Der Unfall des ersten Laufs, 12.08.2026: drei von 131 Stammdatenblaettern
+   * wurden von dieser Sperre abgewiesen, weil ihr Laden-Hash die Zeichenfolge
+   * `add` enthielt. `add` besteht ausschliesslich aus Hexziffern, und verglichen
+   * wurde damals mit `includes()` statt auf Gleichheit. In einem 85-stelligen
+   * Hexstring tritt die Folge mit rund zwei Prozent Wahrscheinlichkeit auf — bei
+   * 131 Betrieben rechnerisch dreimal. Genau dreimal ist es passiert.
+   *
+   * Die echten Hashes stehen hier nicht (AGENTS.md Regel 2). Nachgebaut ist nur,
+   * worauf es ankommt.
+   */
+  test('ein Laden-Hash mit der Hexfolge "add" ist kein Schreibpfad', () => {
+    const hash = '0'.repeat(20) + 'add' + 'c0ffee'.repeat(10) + '00'
+    expect(hash).toMatch(/^[0-9a-f]{20,120}$/)
+    expect(() => pfadPruefen(`/intranet/ladenakte/ladenstamm/laden/${hash}/admin/1/`)).not.toThrow()
+  })
+
+  /**
+   * Dieselbe Falle fuer jedes kuenftige Verbotswort, das zufaellig aus Hexziffern
+   * besteht — `dead`, `beef`, `face` waeren die naechsten Kandidaten. Wer eines
+   * hinzufuegt, bekommt hier sofort einen roten Test statt in acht Monaten drei
+   * fehlende Betriebe.
+   */
+  test('geprueft wird das ganze Segment, nicht ein Stueck davon', () => {
+    const hexWoerter = VERBOTENE_SEGMENTE.filter(w => /^[0-9a-f]+$/.test(w))
+    expect(hexWoerter).toContain('add')
+    for (const wort of hexWoerter) {
+      const hash = 'ab'.repeat(15) + wort + 'cd'.repeat(15)
+      expect(() => pfadPruefen(`/intranet/ladenakte/ladenstamm/laden/${hash}/admin/1/`)).not.toThrow()
+    }
+  })
+
+  test('ein Segment, das GENAU ein Schreibwort ist, faellt weiterhin durch', () => {
+    for (const w of ['delete', 'edit', 'add', 'new', 'save']) {
+      expect(() => pfadPruefen(`/intranet/ladenakte/${w}`)).toThrow(VerbotenerPfad)
+    }
+  })
+
   test('alle tatsaechlich benutzten Pfade kommen durch die Sperre', () => {
     for (const ep of [...LADENAKTE_ENDPUNKTE, BAUM, ORDNERSEITE]) {
       expect(() => pfadPruefen(ep.pfad)).not.toThrow()

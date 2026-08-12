@@ -57,9 +57,25 @@ export const ERLAUBTE_PFADE: RegExp[] = [
 ]
 
 /**
- * Zweiter Guertel. Ein Pfad, der die Positivliste passiert und trotzdem eines
- * dieser Woerter traegt, ist ein Widerspruch — dann stimmt etwas an der
- * Positivliste nicht, und Scheitern ist die richtige Antwort.
+ * Zweiter Guertel. Ein Pfad, der die Positivliste passiert und trotzdem ein
+ * Segment traegt, das GENAU eines dieser Woerter IST, ist ein Widerspruch —
+ * dann stimmt etwas an der Positivliste nicht, und Scheitern ist die richtige
+ * Antwort.
+ *
+ * ⚠ VERGLICHEN WIRD AUF GLEICHHEIT, NICHT AUF ENTHALTENSEIN. Das ist der Kern
+ * dieser Liste, und er hat einen Preis gekostet.
+ *
+ * Bis zum 12.08.2026 stand hier `s.includes(v)`. Im ersten Lauf sind daran drei
+ * Stammdatenblaetter gescheitert: der Laden-Hash im Pfad ist Hex, und `add`
+ * besteht ausschliesslich aus Hexziffern. In einem 85-stelligen Hexstring
+ * taucht die Folge `add` mit rund zwei Prozent Wahrscheinlichkeit auf — bei 131
+ * Betrieben also in etwa drei Faellen. Genau drei sind eingetreten.
+ *
+ * Die Enthaltensein-Pruefung war ohnehin ein Ueberbleibsel aus der Zeit vor der
+ * Positivliste (siehe den Kommentar dort). Sie kann hier nichts mehr fangen,
+ * was die Positivliste durchlaesst: der einzige variable Teil eines erlaubten
+ * Pfades ist der Hex-Hash, und der kann kein Schreibsegment SEIN. Sie kann nur
+ * noch Unfaelle bauen — und hat es getan.
  */
 export const VERBOTENE_SEGMENTE = [
   'delete', 'edit', 'upload', 'add', 'save', 'set', 'remove', 'loeschen',
@@ -88,8 +104,8 @@ export function pfadPruefen(pfad: string): void {
   }
   for (const segment of ohneQuery.split('/')) {
     const s = segment.toLowerCase()
-    if (VERBOTENE_SEGMENTE.some(v => s.includes(v))) {
-      throw new VerbotenerPfad(pfad, `Segment "${segment}" sieht schreibend aus`)
+    if (VERBOTENE_SEGMENTE.includes(s)) {
+      throw new VerbotenerPfad(pfad, `Segment "${segment}" ist ein Schreibsegment`)
     }
   }
 }

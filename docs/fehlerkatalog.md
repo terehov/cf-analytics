@@ -2361,3 +2361,91 @@ und wirft sie beim Umwandeln weg. Aus einer verstümmelten Zahl wird so eine pla
 **Was ihn verhindert.** Tausenderpunkte müssen echte Dreiergruppen sein:
 `^-?(\d{1,3}(\.\d{3})*|\d+)(,\d+)?$`. Was nicht passt, wird **NULL statt geraten** — und
 NULL fällt in einer Geldspalte auf, eine falsche Zahl nicht.
+
+## 12.08.2026 — drei Fehler, die der erste Ladenakte-Lauf ans Licht brachte
+
+Der Erstlauf im Container (Lauf 83, 03:02–05:16 Uhr) meldete 1240 erledigte Posten und
+17 Fehler. Alle drei Ursachen lagen im eigenen Code. Zwei davon standen im Protokoll, die
+dritte nicht — sie hätte sich erst im September gezeigt, und dann als Zahl, die stehen
+bleibt.
+
+### Ein einziges NUL-Zeichen nimmt einen ganzen Belegordner mit
+
+**Symptom.** 14-mal `la:belegliste` mit `error: unsupported Unicode escape sequence`.
+Nicht ein Beleg dieser Ordner ist angekommen.
+
+**Ursache.** PostgreSQL nimmt U+0000 weder in `text` noch in `jsonb`; bei `jsonb` lautet die
+Meldung genau so. Irgendwo in diesen Ordnern trägt ein Beleg ein NUL im Namen oder in einem
+Textfeld. Weil `laLaden()` einen Ordner in **einer Transaktion** schreibt — erst
+`raw.api_antwort`, dann `core` —, reisst dieses eine Zeichen den ganzen Ordner mit. Bei den
+betroffenen Ordnern lagen zwischen einem und mehreren hundert Belegen.
+
+**Warum es kein Ladenakte-Problem ist.** `raw.api_antwort.payload` ist `jsonb`, und dort
+landet **jede** JSON-Antwort dieses Projekts. LINA wie FoodNotify hatten dieselbe Falle;
+getreten hat sie bisher nur die Ladenakte, weil dort zum ersten Mal Dateinamen aus
+eingescannten Belegen durchlaufen.
+
+**Was ihn verhindert.** `ohneNullzeichen()` in `src/lib/text.ts`, eingehängt in beiden
+Clients direkt hinter `await res.text()` — an der Aussengrenze, nicht im Lader, weil jeder
+Lader dieselbe Falle hätte. Entfernt wird **ausschliesslich U+0000**: andere Steuerzeichen
+sind in PostgreSQL zulässig, und was hier mehr wegputzt als nötig, verfälscht Daten, die
+hinterher niemand mehr nachsehen kann (`raw` ist append-only, Regel 4). Und es wird
+geloggt — eine stille Bereinigung findet man ein halbes Jahr später in keiner Zahl wieder.
+
+**Nachzuholen ist nichts von Hand.** Auf dem Fehlerweg in `src/sync/worker.ts` bleibt
+`erledigt_am` NULL und es greift keine Versuchsgrenze; die 14 Posten stehen mit
+Wiedervorlage in der Schlange und werden nach dem Deploy von selbst geholt.
+
+### Die Löschsperre stolperte über einen Hash, der zufällig `add` enthielt
+
+**Symptom.** Dreimal `la:stammdaten` mit
+`VerbotenerPfad: … Segment "<85 Hexzeichen, darin irgendwo add>" sieht schreibend aus`.
+Drei Betriebe ohne Stammdatenblatt.
+
+**Ursache.** `pfadPruefen()` verglich jedes Pfadsegment per `includes()` gegen
+`VERBOTENE_SEGMENTE`. Der Laden-Hash im Stammdatenpfad ist **Hex**, und `add` besteht
+ausschliesslich aus Hexziffern. In 85 Hexstellen taucht die Folge mit rund zwei Prozent
+Wahrscheinlichkeit auf — bei 131 Betrieben rechnerisch dreimal. Es waren exakt drei.
+
+**Die Ironie steht im selben File.** Der Kommentar über `ERLAUBTE_PFADE` begründet die
+Positivliste damit, dass sich eine Sperrliste nicht dicht bekommen lässt — und nennt als
+Beispiel `addgesell` gegen `addresse`. Die Sperrliste blieb trotzdem als zweiter Gürtel
+stehen, mit derselben Teilstring-Prüfung, und hat als Einzige noch Schaden angerichtet.
+
+**Was ihn verhindert.** Verglichen wird auf **Gleichheit des ganzen Segments**. Das
+verliert nichts: der einzige variable Teil eines erlaubten Pfades ist der Hex-Hash, und der
+kann kein Schreibsegment *sein*. Dazu ein Test, der jedes Verbotswort, das aus Hexziffern
+besteht, in einen Hash einbettet und durchlässt — wer künftig `dead`, `beef` oder `face`
+auf die Liste setzt, bekommt sofort einen roten Test statt in acht Monaten drei fehlende
+Betriebe.
+
+### Die Monatsauffrischung, die nie wiedergekommen wäre
+
+**Symptom.** Keines. Das ist der Punkt.
+
+**Ursache.** `einreihenWennNeu()` prüfte `NOT EXISTS (… endpunkt = $1 AND parameter = $4)`
+ohne jeden Zustandsvergleich. Ein einziger erledigter Posten sperrte damit seinen Platz für
+immer. BWA-Historie und Stammdatenblatt sind aber Momentaufnahmen, die
+`ladenakteNachfuellen()` ausdrücklich einmal im Kalendermonat erneuern will — die Prüfung
+`schonDiesenMonat` steht extra dafür da.
+
+**Was passiert wäre.** Ab September hätte `schonDiesenMonat` korrekt „diesen Monat noch
+nicht geholt" gesagt, und das Einreihen wäre wortlos ins Leere gelaufen. Der Lauf hätte
+weiter „ok" gemeldet, die Warteschlange wäre leer geblieben, kein Fehler, keine
+Schema-Abweichung — und die BWA-Zahlen wären auf dem Stand vom 12.08.2026 eingefroren.
+Genau die Sorte Ausfall, die dieses Projekt schon zweimal hatte: ein Lauf, der „ok" meldet
+und nichts tut.
+
+**Nachgespielt statt hergeleitet**, in `BEGIN … ROLLBACK` gegen die lokale Datenbank: alter
+Code 0 neu eingereihte Posten, korrigierter Code 1.
+
+**Was ihn verhindert.** Drei Zustände, drei Antworten — offen: nicht noch einmal, er kommt
+ohnehin dran. `aufgegeben`: nicht noch einmal, sonst wächst die Schlange jede Nacht um
+denselben kaputten Posten. `ok` und `keine_daten`: wieder einreihen, wenn der Aufrufer
+fragt. Ob überhaupt gefragt wird, entscheidet weiterhin der Aufrufer — beim Belegarchiv
+`core.belegarchiv_bestand`, bei den Momentaufnahmen `schonDiesenMonat`.
+
+**Die allgemeine Lehre.** Eine Existenzprüfung ohne Zustandsvergleich ist bei allem, was
+sich wiederholen soll, ein stiller Totalausfall auf Zeit. Wer „schon mal dagewesen" prüft,
+wo „gerade offen" gemeint ist, baut eine Sperre, die erst nach dem ersten Erfolg zuschnappt
+— also dann, wenn niemand mehr hinsieht.

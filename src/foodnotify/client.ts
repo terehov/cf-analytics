@@ -25,6 +25,7 @@
  */
 import { config, fnZugaenge, fnGrenzen } from '../config'
 import { log } from '../lib/log'
+import { ohneNullzeichen } from '../lib/text'
 import { eine } from '../db/pool'
 import { FnSession, FnAnmeldungFehlgeschlagen, fnSessionAbgelaufen } from './auth'
 import { auspacken } from './huelle'
@@ -156,7 +157,7 @@ export class FnClient {
         await session.anmelden()
         res = await this.request(pfad, session)
       }
-      const text = await res.text()
+      const text = ohneNullzeichen(await res.text(), ep.key)
 
       this.letzterRequest = Date.now()
       this.heuteVerbraucht++
