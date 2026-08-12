@@ -44,24 +44,46 @@
  * core.preis_ausreisser_markieren(), der danach gar nicht mehr läuft.
  *
  * ---------------------------------------------------------------------
- * DIE SCHRANKE IST DIE SPALTE, NICHT EIN GERATENER SCHWELLWERT
+ * ZWEI SCHRANKEN, UND SIE SIND VERSCHIEDENER ART
  *
- * Naheliegend wäre gewesen, Korrekturen ab einem bestimmten Faktor zu
- * verwerfen: 414 der 79.770 Korrekturen ändern die Menge um mehr als das
- * Tausendfache oder weniger als ein Tausendstel. Diese Grenze steht hier
- * BEWUSST NICHT, und der Grund steht in 0040 selbst: FoodNotify meldet die
- * Gebindeangabe derselben Ware zwischen 0,00035 und 50 — das ist Faktor
- * 142.857, und eine solche Korrektur wäre nach eigener Beschreibung richtig.
- * Wer hier 1000 hinschreibt, verwirft Richtiges mit dem Falschen. Es ist
- * derselbe Fehler, der in 0056 schon einmal 66 Zeilen um 90 Prozent
- * heruntergerechnet und 37.339 EUR Ersparnis erfunden hat.
+ * ERSTE SCHRANKE: DIE SPALTE. Passt das Ergebnis in numeric(14,4) bzw.
+ * numeric(14,6)? Das ist keine Ermessensfrage, sondern eine harte Grenze.
+ * Zwei Zeilen reissen sie, und sie sind es, die den Nachlauf zum Absturz
+ * bringen.
  *
- * Geprüft wird deshalb nur, was beweisbar ist: passt das Ergebnis in die
- * Spalte. Zwei Zeilen tut es nicht.
+ * ZWEITE SCHRANKE: DER FAKTOR, 0,001 bis 1000. 414 der 79.770 Korrekturen
+ * liegen ausserhalb — sie ändern die Menge um mehr als das Tausendfache oder
+ * weniger als ein Tausendstel, im Extremfall um das 432.000-fache.
  *
- * Auch der Mechanismus taugt nicht als Regel — `gebinde_menge = inhalt_soll`
- * trifft zwar beide Absturzzeilen, aber insgesamt 19.568, von denen 19.547
- * einwandfrei sind.
+ * DIESE ZWEITE SCHRANKE STAND HIER ZUERST NICHT, und die Begründung dafür war
+ * falsch. Sie lautete: 0040 beschreibt Gebindeangaben derselben Ware zwischen
+ * 0,00035 und 50, also Faktor 142.857 — wer bei 1000 abschneidet, verwirft
+ * Richtiges mit dem Falschen.
+ *
+ * Darin steckte eine Verwechslung. "Korrektur verwerfen" hiesse, den ALTEN
+ * Wert stehen zu lassen — und der stammt aus derselben widersprüchlichen
+ * Mengenangabe. Das wäre tatsächlich schlecht. "Als unentscheidbar markieren"
+ * heisst dagegen, GAR KEINEN Preis zu behalten. Bei dieser Aktion kostet eine
+ * zu eng gezogene Grenze Abdeckung, nicht Richtigkeit — und das ist genau die
+ * Regel des Hauses: aus unbekannt darf kein Wert werden.
+ *
+ * Die 1000 ist und bleibt geraten. Sie entscheidet aber nur, OB eine Zahl
+ * behalten wird, nicht WELCHE. Das ist der Unterschied zu 0056, wo ein
+ * geratener Schwellwert 66 Zeilen um 90 Prozent heruntergerechnet und
+ * 37.339 EUR Ersparnis erfunden hat — dort bestimmte er einen Wert.
+ *
+ * WARUM ES DIE ZWEITE SCHRANKE BRAUCHT. Naheliegend war die Annahme, der
+ * zweite Schritt des Nachlaufs, core.preis_ausreisser_markieren(), fange die
+ * Folgeschäden ohnehin ab. Nachgemessen auf der Serverbank fängt seine
+ * Faktor-20-Prüfung 173 der 412 nicht abstürzenden Fälle — 42 Prozent. Die
+ * übrigen 239 kämen durch beide Netze und fütterten den Preisvergleich.
+ *
+ * KOSTEN: 414 von 876.341 Positionen verlieren ihren Preis je Einheit,
+ * 0,05 Prozent.
+ *
+ * Der Mechanismus taugt übrigens nicht als Regel — `gebinde_menge =
+ * inhalt_soll` trifft zwar beide Absturzzeilen, aber insgesamt 19.568, von
+ * denen 19.547 einwandfrei sind.
  *
  * ---------------------------------------------------------------------
  * WAS MIT DEN VERWORFENEN ZEILEN PASSIERT
@@ -76,10 +98,12 @@
  * menge_unstimmig zählbar, und mart.einkaufspreis_betrieb filtert seit 0057
  * genau darauf.
  *
- * OFFEN BLEIBT, was mit den 412 übrigen unplausiblen Korrekturen ist — sie
- * überschreiten keine Spaltengrenze und werden weiterhin geschrieben. Ob sie
- * falsch sind, ist gemessen, aber nicht bewiesen; steht in
- * docs/offene-punkte.md.
+ * OFFEN BLEIBT DIE EIGENTLICHE FRAGE: woran liesse sich eine falsche von einer
+ * grossen richtigen Korrektur unterscheiden, ohne eine Zahl zu raten? Die
+ * Antwort liegt vermutlich nicht im Faktor, sondern darin, WELCHES Feld die
+ * Packungsgrösse trägt — nur ist der naheliegende Test dafür widerlegt (siehe
+ * oben, 19.568 Treffer bei 21 Fehlern). Bis dahin ist die Faktorgrenze eine
+ * Notlösung, die bewusst zu viel verwirft. Steht in docs/offene-punkte.md.
  */
 
 CREATE OR REPLACE FUNCTION core.gebinde_vereinheitlichen()
@@ -103,7 +127,7 @@ BEGIN
           FROM zeile GROUP BY ware, einheit
          HAVING count(*) >= 4 AND count(DISTINCT inhalt) > 1
     ), korrektur AS (
-        SELECT z.bestellposition_key,
+        SELECT z.bestellposition_key, z.gesamt_menge,
                round(z.menge * z.gebinde_menge * h.inhalt_soll, 4) AS gesamt_neu,
                z.summe_preis
           FROM zeile z JOIN haeufigster h
@@ -112,19 +136,26 @@ BEGIN
            AND abs(z.inhalt - h.inhalt_soll) > h.inhalt_soll * 0.01
     ), geprueft AS (
         /*
-         * PASST DAS ERGEBNIS UEBERHAUPT IN DIE SPALTEN?
+         * ZWEI SCHRANKEN, siehe Kopf.
          *
-         * gesamt_menge ist numeric(14,4) -> zehn Vorkommastellen,
-         * preis_je_einheit numeric(14,6) -> acht. Beides ist keine
-         * Ermessensgrenze, sondern eine harte. Wo sie reisst, ist die Zeile
-         * nicht "knapp daneben", sondern widerspruechlich: 4 x 432.000 x
-         * 432.000 entsteht, weil die Packungsgroesse mit sich selbst
-         * multipliziert wird.
+         * (1) Passt es in die Spalte? gesamt_menge ist numeric(14,4) -> zehn
+         *     Vorkommastellen, preis_je_einheit numeric(14,6) -> acht. Harte
+         *     Grenze, kein Ermessen. Wo sie reisst, ist die Zeile nicht knapp
+         *     daneben, sondern widerspruechlich: 4 x 432.000 x 432.000
+         *     entsteht, weil die Packungsgroesse mit sich selbst
+         *     multipliziert wird.
+         *
+         * (2) Ist die Korrektur ueberhaupt eine? Wer die Menge um mehr als
+         *     das Tausendfache aendert, korrigiert keine Gebindeangabe. Die
+         *     Grenze ist geraten, entscheidet aber nur ueber BEHALTEN oder
+         *     VERWERFEN, nie ueber einen Wert.
          */
         SELECT k.*,
                k.gesamt_neu < 10000000000
                AND (k.summe_preis <= 0 OR k.gesamt_neu <= 0
-                    OR round(k.summe_preis / k.gesamt_neu, 6) < 100000000) AS passt
+                    OR round(k.summe_preis / k.gesamt_neu, 6) < 100000000)
+               AND k.gesamt_menge > 0
+               AND k.gesamt_neu / k.gesamt_menge BETWEEN 0.001 AND 1000 AS passt
           FROM korrektur k
     )
     UPDATE core.bestellposition p
@@ -148,21 +179,27 @@ COMMENT ON FUNCTION core.gebinde_vereinheitlichen() IS
 FoodNotify meldet unitQuantity fuer dieselbe Ware zwischen 0,00035 und 50 --
 der Preis je Gebinde bleibt dabei stabil, also ist die Mengenangabe der Fehler.
 Gruppiert ueber Name und Einheit, weil dieselbe Ware acht Warennummern traegt.
-SEIT 0060 MIT UEBERLAUFSCHUTZ: wo das Ergebnis nicht in numeric(14,4) bzw.
-numeric(14,6) passt, wird es NICHT geschrieben; die Zeile bekommt stattdessen
-menge_unstimmig = true und preis_je_einheit = NULL. Zwei Zeilen haben den
-Nachlauf sonst drei Laeufe lang komplett zum Absturz gebracht -- samt
-core.preis_ausreisser_markieren(), das danach gar nicht mehr lief.';
+SEIT 0060 MIT ZWEI SCHRANKEN. Erstens die Spalte: passt das Ergebnis nicht in
+numeric(14,4) bzw. numeric(14,6), wird es nicht geschrieben -- zwei Zeilen haben
+den Nachlauf sonst drei Laeufe lang komplett zum Absturz gebracht, samt
+core.preis_ausreisser_markieren(), das danach gar nicht mehr lief. Zweitens der
+Faktor: wer die Menge um mehr als das Tausendfache verschiebt, korrigiert keine
+Gebindeangabe. In beiden Faellen bekommt die Zeile menge_unstimmig = true und
+preis_je_einheit = NULL -- unentscheidbar, nicht unveraendert. Kosten 414 von
+876.341 Positionen. Die Faktor-20-Pruefung des zweiten Schritts faengt davon nur
+173, deshalb reicht sie als alleiniger Schutz nicht.';
 
 
 -- ---------------------------------------------------------------------
--- Die beiden bekannten Zeilen sofort in Ordnung bringen
+-- Die bekannten Zeilen sofort in Ordnung bringen
 --
--- Ohne das laeuft der naechste Nachlauf zwar durch, die zwei Zeilen traegen
--- aber bis dahin ihren alten, aus derselben widerspruechlichen Menge
--- gerechneten Preis. Die Bedingung ist dieselbe wie oben, nur als
+-- Ohne das laeuft der naechste Nachlauf zwar durch, die Zeilen traegen aber
+-- bis dahin ihren alten, aus derselben widerspruechlichen Menge gerechneten
+-- Preis. Die Bedingung ist dieselbe wie in der Funktion, nur als
 -- eigenstaendige Anweisung -- sie trifft genau die Zeilen, deren Korrektur
--- die Spalte sprengen wuerde.
+-- entweder die Spalte sprengt oder die Menge um mehr als Faktor 1000
+-- verschiebt. Erwartung gegen die Serverbank: 414 Zeilen, davon 2 wegen der
+-- Spalte.
 -- ---------------------------------------------------------------------
 WITH zeile AS (
     SELECT p.bestellposition_key, w.name AS ware, p.einheit, p.menge,
@@ -174,18 +211,20 @@ WITH zeile AS (
     SELECT ware, einheit, mode() WITHIN GROUP (ORDER BY inhalt) AS inhalt_soll
       FROM zeile GROUP BY ware, einheit
      HAVING count(*) >= 4 AND count(DISTINCT inhalt) > 1
-), sprengt AS (
+), unentscheidbar AS (
     SELECT z.bestellposition_key
       FROM zeile z JOIN haeufigster h
         ON h.ware = z.ware AND h.einheit IS NOT DISTINCT FROM z.einheit
      WHERE h.inhalt_soll > 0
        AND abs(z.inhalt - h.inhalt_soll) > h.inhalt_soll * 0.01
-       AND round(z.menge * z.gebinde_menge * h.inhalt_soll, 4) >= 10000000000
+       AND (round(z.menge * z.gebinde_menge * h.inhalt_soll, 4) >= 10000000000
+            OR round(z.menge * z.gebinde_menge * h.inhalt_soll, 4)
+               / nullif(z.gesamt_menge, 0) NOT BETWEEN 0.001 AND 1000)
 )
 UPDATE core.bestellposition p
    SET menge_unstimmig = true, preis_je_einheit = NULL
-  FROM sprengt s
- WHERE p.bestellposition_key = s.bestellposition_key
+  FROM unentscheidbar u
+ WHERE p.bestellposition_key = u.bestellposition_key
    AND NOT p.menge_unstimmig;
 
 
@@ -195,6 +234,8 @@ INSERT INTO sync.merker (schluessel, wert) VALUES
         '"numeric field overflow" in den Laeufen 83-85: nicht der Preis (Faktor '
         '2.165 Luft), sondern die MENGE. Zwei Zeilen buchen die Packungsgroesse '
         'in gebinde_menge, waehrend der Modus derselben Ware sie in gesamt_menge '
-        'fuehrt -- 4 x 432.000 x 432.000 quadriert sie. Verworfene Korrekturen '
-        'gelten als unentscheidbar (menge_unstimmig), nicht als unveraendert.'::text))
+        'fuehrt -- 4 x 432.000 x 432.000 quadriert sie. Zweite Schranke: Faktor '
+        '0,001 bis 1000, weil die Ausreisserpruefung nur 173 der 412 uebrigen '
+        'faengt. Verworfene Korrekturen gelten als unentscheidbar '
+        '(menge_unstimmig), nicht als unveraendert -- 414 Positionen.'::text))
 ON CONFLICT (schluessel) DO UPDATE SET wert = excluded.wert;

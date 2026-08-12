@@ -768,3 +768,44 @@ Faktor 41. Aus sieben Minuten werden rund zehn Sekunden.
 **Beim Einspielen:** `CREATE INDEX` ohne `CONCURRENTLY` sperrt Schreibzugriffe auf
 `sync.warteschlange`, solange er baut — nicht während eines laufenden Syncs einspielen.
 `CONCURRENTLY` geht nicht, weil `migrate.ts` jede Migration in eine Transaktion fasst.
+
+### Nachtrag desselben Tages: die 412 sind doch gefangen, und meine Begründung war falsch
+
+Der Absatz darüber („Bewusst keine Faktorgrenze gezogen") ist revidiert. Er bleibt stehen,
+weil der Denkfehler darin lehrreich ist.
+
+**Der Fehler.** Ich hatte argumentiert, eine Faktorgrenze bei 1000 verwerfe Richtiges mit
+dem Falschen, weil 0040 selbst Gebindeangaben zwischen 0,00035 und 50 beschreibt — Faktor
+142.857. Darin steckte eine Verwechslung zweier verschiedener Aktionen:
+
+| Aktion | was übrig bleibt | was eine zu enge Grenze kostet |
+|---|---|---|
+| Korrektur **verwerfen** | der alte Wert — aus derselben widersprüchlichen Menge | Richtigkeit |
+| als **unentscheidbar** markieren | gar kein Preis | Abdeckung |
+
+Nur die erste Aktion ist gefährlich. Die zweite ist die Hausregel selbst: aus unbekannt
+darf kein Wert werden. Die 1000 bleibt geraten, entscheidet aber nur, **ob** eine Zahl
+behalten wird, nicht **welche** — und das ist der Unterschied zu 0056, wo ein geratener
+Schwellwert einen Wert bestimmte und 37.339 EUR Ersparnis erfand.
+
+**Die Messung, die den Ausschlag gab.** Ich hatte behauptet, `preis_ausreisser_markieren()`
+fange die Folgeschäden ohnehin ab. Nachgemessen fängt seine Faktor-20-Prüfung **173 der 412
+— 42 Prozent**. Die übrigen **239** kämen durch beide Netze und fütterten den
+Preisvergleich. Die Behauptung war also nur zu zwei Fünfteln richtig.
+
+**Stand jetzt** (0060, gegen die Serverbank gerechnet):
+
+| | Korrekturen |
+|---|---|
+| werden geschrieben | 79.356 |
+| unentscheidbar wegen Spaltengrenze | 2 |
+| unentscheidbar wegen Faktor | 412 |
+
+Kosten: 414 von 876.341 Positionen verlieren ihren Preis je Einheit, 0,05 Prozent.
+
+**Was wirklich offen bleibt** ist nicht mehr die Frage, ob die 412 durchrutschen, sondern
+die dahinter: woran liesse sich eine falsche von einer grossen richtigen Korrektur
+unterscheiden, **ohne eine Zahl zu raten**? Die Antwort liegt vermutlich darin, welches
+Feld die Packungsgrösse trägt — der naheliegende Test (`gebinde_menge = inhalt_soll`) ist
+aber widerlegt: 19.568 Treffer bei 21 tatsächlichen Fehlern. Bis das geklärt ist, ist die
+Faktorgrenze eine Notlösung, die bewusst zu viel verwirft.
