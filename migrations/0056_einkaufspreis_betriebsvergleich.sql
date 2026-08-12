@@ -77,9 +77,21 @@ WITH basis AS (
   /*
    * DIE PREISGROESSE KOMMT AUS core.bestellposition UND WIRD HIER NICHT
    * NEU GERECHNET. Migration 0042 hat preis_je_einheit genau dafuer
-   * gebaut und setzt sie auf NULL, wo die Gesamtmenge nicht belastbar
+   * gebaut und entzieht sie dort, wo die Gesamtmenge nicht belastbar
    * ist (menge_unstimmig) — "FoodNotify meldet die Gebindegroesse
    * derselben Ware uneinheitlich".
+   *
+   * ES REICHT ABER NICHT, AUF preis_je_einheit IS NOT NULL ZU PRUEFEN.
+   * Beide Bedingungen stehen hier, weil das Entziehen nicht haelt:
+   * core.gebinde_vereinheitlichen() laeuft im Nachlauf VOR
+   * core.preis_ausreisser_markieren() (sync/einkaufspreis.ts:37-40) und
+   * schreibt preis_je_einheit neu, ohne bereits markierte Zeilen
+   * auszunehmen (0040:77-82). Der Markierer fasst sie danach nicht mehr
+   * an, denn er filtert "AND NOT p.menge_unstimmig" (0040:135). So
+   * entsteht die Kombination markiert UND Preis vorhanden — gemessen am
+   * 12.08.2026: 561 Positionen, nach einem weiteren Nachlauf 613.
+   * NULL heisst also "geprueft und verworfen", NOT NULL heisst nicht
+   * "geprueft und bestanden". Das Urteil steht in menge_unstimmig.
    *
    * Die erste Fassung dieser Sicht rechnete summe_preis/gesamt_menge
    * selbst und umging damit die Pruefung: 5.946 als unstimmig markierte
@@ -114,6 +126,7 @@ WITH basis AS (
      AND bp.menge             > 0
      AND bp.summe_preis       > 0
      AND bp.preis_je_einheit IS NOT NULL
+     AND NOT bp.menge_unstimmig
      AND b.status IS DISTINCT FROM 'canceled'
      AND k.betrieb_key IS NOT NULL
 ), je_betrieb AS (
@@ -274,11 +287,26 @@ und mehrkosten deshalb nur, wo vergleichbar gilt; wer die Rohspalten selbst verr
 umgeht die Sperren.
 
 DIE PREISGROESSE IST core.bestellposition.preis_je_einheit AUS 0042 und wird hier NICHT
-nachgerechnet. Sie ist NULL, wo FoodNotify die Gebindegroesse derselben Ware uneinheitlich
-meldet (menge_unstimmig), und genau diese Positionen bleiben draussen. Eine frueher hier
-selbst gerechnete Fassung umging die Pruefung und brachte "Idee Entkoffeiniert" mit
-48.400 EUR je Kilogramm zurueck — den Wert, dessentwegen 0042 gebaut wurde. Kosten der
-Pruefung: 5.398 von 621.614 Positionen, 99,1 Prozent bleiben.
+nachgerechnet. Eine frueher hier selbst gerechnete Fassung umging die Pruefung und brachte
+"Idee Entkoffeiniert" mit 48.400 EUR je Kilogramm zurueck — den Wert, dessentwegen 0042
+gebaut wurde.
+
+GEPRUEFT WIRD GEGEN menge_unstimmig, NICHT GEGEN NULL. Der entzogene Preis kommt wieder:
+der Nachlauf ruft core.gebinde_vereinheitlichen() VOR core.preis_ausreisser_markieren()
+auf, der erste schreibt preis_je_einheit ohne Ruecksicht auf die Markierung neu, der zweite
+fasst markierte Zeilen nicht mehr an. Gemessen am 12.08.2026 tragen 561 markierte
+Positionen wieder einen Preis. Deshalb stehen beide Bedingungen im WHERE. Kosten der
+Pruefung: 5.398 von 621.614 Positionen ueber NULL, 561 weitere ueber die Markierung —
+99,0 Prozent bleiben.
+
+WAS AUCH DANACH DRINBLEIBT, UND WARUM ES TROTZDEM NICHT LUEGT: ein Preis, der in ALLEN
+Haeusern gleich falsch ist, ueberlebt beide Pruefungen. "Idee Entkoffeiniert 50 Pouches
+A 7G" steht im Februar 2026 in drei Haeusern bei 48.400 EUR je Kilogramm — 0040 markiert
+nichts, weil der Median derselben Ware genauso hoch liegt und ihn nichts widerlegt. In
+dieser Sicht ist die Zeile dann abweichung_pct = 0,0 und mehrkosten = 0: die Spalte preis
+ist Unsinn, der Befund ist keiner. Die Sicht prueft ABWEICHUNGEN, nicht absolute
+Plausibilitaet — wo alle gleich falsch buchen, gibt es keine Referenz, die widerspricht.
+Wer absolute Preise lesen will, nimmt nicht diese Sicht.
 DER GEBINDEPREIS STEHT DANEBEN, weil ein Einkaeufer in Kartonpreisen denkt. Er ist zum
 Lesen da, nicht zum Rechnen — verglichen wird die Basiseinheit.
 

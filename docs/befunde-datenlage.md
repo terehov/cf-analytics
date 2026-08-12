@@ -977,3 +977,57 @@ Speyer und Passau je 26, Düsseldorf 25.
 **Diese Liste enthält berechtigte Fälle** — Brauereien mit Liefervertrag und rund ein
 Dutzend Winzer. Sie gehören in `manual.lieferant_freigabe` eingetragen, nicht in einen
 dritten Zustand. Die Liste schrumpft, während sie abgearbeitet wird.
+
+---
+
+## Ein entzogener Preis kommt zurück: `menge_unstimmig` ohne NULL (gemessen 12.08.2026)
+
+Migration 0042 entzieht `core.bestellposition.preis_je_einheit` dort, wo die Gesamtmenge
+nicht belastbar ist, und setzt `menge_unstimmig`. Wer eine geprüfte Grösse will, prüft
+deshalb auf `preis_je_einheit IS NOT NULL` — so stand es bis heute auch in 0056.
+
+**Das reicht nicht.** Gemessen auf dem lokalen Bestand:
+
+| Bedingung | Positionen |
+|---|---|
+| `menge_unstimmig` gesetzt | 6.296 |
+| davon **mit** einem Preis je Einheit | **561** |
+| dieselbe Zahl nach einem weiteren Nachlauf | **613** |
+
+Die Ursache ist die Reihenfolge im Nachlauf (`src/sync/einkaufspreis.ts:37-40`):
+
+1. `core.gebinde_vereinheitlichen()` läuft zuerst und schreibt `preis_je_einheit` neu —
+   ohne bereits markierte Zeilen auszunehmen (`0040:77-82`).
+2. `core.preis_ausreisser_markieren()` läuft danach und fasst genau diese Zeilen nicht mehr
+   an, denn es filtert `AND NOT p.menge_unstimmig` (`0040:135`).
+
+Jeder Lauf gibt also einigen verworfenen Zeilen ihren Preis zurück, und der Markierer darf
+ihn nicht mehr nehmen. Die Zahl wächst mit jedem Lauf.
+
+**Regel daraus: `NULL` heisst „geprüft und verworfen", `NOT NULL` heisst nicht „geprüft und
+bestanden".** Das Urteil steht in `menge_unstimmig`, nicht in der Anwesenheit des Wertes.
+`mart.einkaufspreis_betrieb` filtert seit heute auf beides. Kosten: 255 Zeilen weniger,
+erfundene Ersparnis 17.512 → 17.453 EUR. Darunter acht Positionen „Idee Entkoffeiniert
+50 Pouches A 7G" zu 42.350 EUR je Kilogramm — dieselbe Ware, deretwegen 0042 gebaut wurde,
+auf einem zweiten Weg zurück in der Auswertung.
+
+**Ob `gebinde_vereinheitlichen()` die Markierung löschen dürfte**, wenn es die Menge
+korrigiert, ist eine Frage an den Eigentümer dieser Logik und hier bewusst nicht
+entschieden: die Funktion korrigiert `gesamt_menge` tatsächlich, ein danach gerechneter
+Preis kann also stimmen. Geändert wurde nur der Konsument.
+
+### Was auch danach drinbleibt, ohne zu lügen
+
+Ein Preis, der in **allen** Häusern gleich falsch ist, überlebt beide Prüfungen: 0040
+vergleicht gegen den Median derselben Ware, und wenn der genauso hoch liegt, widerspricht
+nichts. „Idee Entkoffeiniert" steht im Februar 2026 in drei Häusern bei 48.400 EUR je
+Kilogramm und ist `vergleichbar = true`.
+
+Ein falscher Befund entsteht daraus trotzdem nicht: alle drei zahlen dasselbe, also ist
+`abweichung_pct` = 0,0 und `mehrkosten` = 0. Die Spalte `preis` ist Unsinn, die Aussage der
+Sicht ist keine. **Die Sicht prüft Abweichungen, nicht absolute Plausibilität** — wo alle
+gleich falsch buchen, gibt es keine Referenz. Wer absolute Einkaufspreise lesen will, nimmt
+nicht diese Sicht.
+
+Die einzige Zeile dieser Ware, die ein Befund geworden wäre — Speyer mit 48,40 gegen einen
+Median von 24.224 — ist von allen drei Sperren gleichzeitig geblockt.

@@ -290,6 +290,42 @@ absurd kleiner Menge gar keinen Einheitspreis bekommen soll. Das Zweite ist
 vermutlich richtig: ein Preis je Einheit von 1,2 Milliarden ist keine Zahl,
 sondern ein Datenfehler, und ihn zu speichern hiesse, ihn zu glauben.
 
+### Widerruf 12.08.2026: die Erklärung oben ist nachgemessen falsch
+
+~~Eine Position über 10.000 EUR sprengt die acht Vorkommastellen.~~ Der Absatz
+darüber bleibt als Irrweg stehen, weil er zweimal geschrieben wurde und beim
+dritten Mal wieder plausibel klingen würde. Er ist es nicht.
+
+Lauf 84 meldete denselben Fehler erneut. Nachgemessen auf dem lokalen Bestand:
+
+| Grösse | grösster Wert | Grenze der Spalte | Abstand |
+|---|---|---|---|
+| `gesamt_neu` → `gesamt_menge numeric(14,4)` | 1.800.000 | 10.000.000.000 | Faktor 5.500 |
+| `summe_preis/gesamt_neu` → `preis_je_einheit numeric(14,6)` | 46.200 | 100.000.000 | **Faktor 2.165** |
+
+Kein einziger Satz kommt der Grenze nahe; beide Funktionen laufen hier fehlerfrei
+durch (`gebinde_vereinheitlichen()` 50.733 Zeilen, `preis_ausreisser_markieren()`
+8.297). Die Vermutung war eine Rechnung auf dem Papier, keine Messung.
+
+**Der Grund, warum sie sich nicht widerlegen liess: es ist nicht dieselbe
+Datenbank.** `sync.lauf` endet lokal bei Lauf **74**, die letzte Rohantwort
+stammt vom **08.08.2026 17:52**. Lauf 83 und 84 stehen hier nicht. Der Zeitplan
+schreibt gegen einen anderen Bestand als den, gegen den in dieser Umgebung
+gemessen wird — vgl. `DATABASE_URL` in [[deployment-hetzner-stand]].
+
+**Was daraus folgt, und zwar über diesen Fehler hinaus:** jede Zahl, die in
+dieser Umgebung gemessen wird, beschreibt den Stand vom 08.08.2026. Das gilt
+auch für die Fremdeinkaufs- und Preiszahlen aus 0055/0056. Die Logik ist davon
+unberührt, die Beträge sind es nicht.
+
+**Der eigentliche Mangel ist der `catch`.** `String(e).slice(0, 300)` macht aus
+einem Postgres-Fehler die vier Wörter `error: numeric field overflow` und wirft
+alles weg, was die Frage beantwortet hätte: `code`, `where` (die PL/pgSQL-Zeile,
+also welche der beiden Funktionen und welche Anweisung), `detail`, `table`,
+`column`. Zwei Läufe lang wurde deshalb geraten statt gelesen. Solange das so
+bleibt, ist der nächste Lauf wieder nur ein Gerücht — hier steht bewusst kein
+Fix, weil er ohne Zugriff auf den echten Bestand nicht prüfbar wäre.
+
 ---
 
 ## Round-Table-Map: was nach der Messreihe vom 11.08.2026 übrig ist
