@@ -1156,3 +1156,79 @@ decken bereits 41 Prozent; die Namen darunter werden schnell klein und OCR-verra
 ("comis9 shemalessignal iduna gruppe"). Bewusst nicht zugeordnet bleibt `cf`
 (245.551 EUR, 13 Betriebe): das kann CF Gastro sein oder Concept Family, Wareneinkauf oder
 Konzerninnenumsatz — und das entscheidet kein Präfix.
+
+---
+
+## Drei Befunde aus der Dashboard-Durchsicht (Fachbereich, 12.08.2026)
+
+Der Fachbereich hat das Dashboard „Einkauf — Preise, Lieferanten, Volumen" durchgesehen und
+drei Dinge gemeldet: viele Preise verdoppeln sich exakt, der Verlauf sagt wenig aus, der
+Schwund wirkt zu hoch. **Alle drei trafen zu, zwei waren schlimmer als gemeldet.**
+
+### 1. Die Verdopplungen sind Gebindewechsel
+
+**41 von 200 Zeilen** der Karte „Was ist teurer geworden?" standen auf exakt +100,0 %,
+**39 davon exakt auf dem Doppelten** des Vormonats. Weil die Karte nach Sprunggrösse
+sortiert, standen sie **alle ganz oben** — die ersten zehn Zeilen ausnahmslos.
+
+Ursache, an „Grana Padano Pdo Gehobelt 32% 500G" im **selben** Monat gemessen:
+
+| menge | gebinde_menge | Preis je Gebinde | Zeilen (Juni 2026) |
+|---|---|---|---|
+| 1 | 1 | 8,82 | 19 |
+| 1 | 2 | 17,64 | 5 |
+
+Zwei Buchungsstile nebeneinander; der Monatsmedian kippt zwischen ihnen. Dieselbe Krankheit,
+gegen die 0056 die Sperre `gebinde_uneinheitlich` hat — `einkaufspreis_monat` kannte sie nicht.
+
+**Zwei Fehler im Filter dazu.** `verdaechtig` prüfte auf Sprünge **über** ±100 %, exakt 100,0
+rutschte durch — also genau der häufigste Fall. Und schwerer: **die Prozentskala ist
+asymmetrisch.** Eine Verdopplung sind +100 %, eine Halbierung nur −50, ein Sturz auf ein
+Hundertstel −99. Nach unten konnte die Grenze **nie** greifen; „Karotten Standart (10 Kg)"
+stand mit 62,90 → 0,63 als unverdächtig in der Liste.
+
+Behoben in **0062**: `gebinde_typisch` (Modus) in `einkaufspreis_monat`, `verdaechtig` bei
+Gebindewechsel oder mehreren Gebindegrössen im Monat, und die Grenze rechnet als
+**Verhältnis** (Faktor 2 in beide Richtungen) statt in Prozent. Ergebnis: exakte
+Verdopplungen von 39 auf 0, Spanne der Karte jetzt +100,0 bis −50,0.
+
+### 2. „Im Verlauf" zeigte keinen Verlauf
+
+Schlimmer als gemeldet: die 500 Zeilen deckten **genau einen Monat** ab (August 2026) mit
+**441 verschiedenen Waren**. `ORDER BY monat DESC, ausgaben DESC LIMIT 500` schnitt ab,
+bevor ein zweiter Monat kam. Die Sicht darunter hat 9.887 Waren über 75 Monate.
+
+Behoben in der Karte: erst die Waren nach Volumen ranken, dann von den zwanzig grössten die
+ganze Historie zeigen. Dazu ein **Warenfilter mit Werteliste** (9.887 Namen der Sorte
+„Blumenk.i.backt10,2G Tk Veg7Kg" tippt niemand fehlerfrei) und eine neue Linienkarte
+`wa_preis_verlauf`.
+
+### 3. Der Schwund war nicht zu hoch, sondern unbrauchbar
+
+Drei Fehler übereinander:
+
+| | |
+|---|---|
+| **Testinventuren zählten mit** | 61 von 358 tragen „Test" im Namen; „Test Inventur" bei Aposto Gera steht auf `signed` mit 285 Positionen |
+| **Teilinventuren gegen Vollsortiment** | 155 Inventuren nennen einen Teilbereich („Inventur Bar Juni"); konzernweit tragen **27.395 von 67.219 Positionen (42,6 %)** ein Soll ohne jede Zählung |
+| **Der Sollbestand selbst ist aufgebläht** | 971.750 g Pizzateig gegen 138.000 g gezählt |
+
+Die ersten beiden sind in **0062** behoben. Der dritte **bleibt** — er ist ein
+FoodNotify-Datenproblem: wird der Verbrauch nicht gegen den Bestand gebucht, wächst das Soll
+mit jeder Lieferung. Statt ihn zu verstecken, macht ihn die neue Spalte `soll_je_gezaehlt`
+sichtbar. Wirkung auf der Serverbank:
+
+| Betrieb | alt | neu | Soll/Gezählt |
+|---|---|---|---|
+| Wilma Wunder Recklinghausen | 87,9 % | **−3,8 %** | **0,96** |
+| Wilma Wunder Karlsruhe | 99,7 % | 55,8 % | 2,26 |
+| Aposto Gera | 97,2 % | 62,8 % | 2,69 |
+| Wilma Wunder Köln | 60,0 % | 28,8 % | 1,41 |
+
+**Recklinghausen ist der Beweis, dass die Korrektur greift:** ein Haus, das sauber zählt
+(Soll/Gezählt 0,96), hat gar keinen Schwund — die 87,9 % waren vollständig Tests und
+ungezählte Positionen. Bei allen anderen sagt der Kanarienvogel, dass die Zahl daneben
+weiterhin nicht belastbar ist.
+
+**Regel für die Karte:** zuerst auf `Soll je Gezählt` sehen. Weit über 1 heisst, der
+Prozentwert daneben ist wertlos.

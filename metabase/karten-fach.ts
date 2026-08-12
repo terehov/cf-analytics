@@ -15,7 +15,7 @@
 //   Datenqualitaet und Import Betriebszustand
 // =====================================================================
 
-import type { Karte } from './typen'
+import type { Karte, Parameter } from './typen'
 import { MONAT_CTE, MONAT_CTE_UMSATZ, MONAT_CTE_BWA, P_MONAT, P_BETRIEB, P_ZEITRAUM, P_MARKE, WOCHENTAGE } from './gemeinsam'
 
 // Der Monat ist bewusst kein Pflichtfeld — siehe gemeinsam.ts.
@@ -23,6 +23,18 @@ const ZEITRAUM = P_ZEITRAUM
 const MONAT = P_MONAT
 const BETRIEB = P_BETRIEB
 const MARKE = P_MARKE
+
+/**
+ * Die einzelne Ware. Nur hier gebraucht, deshalb nicht in gemeinsam.ts.
+ *
+ * MIT Werteliste: es sind 9.887 Waren mit Namen wie
+ * "Blumenk.i.backt10,2G Tk Veg7Kg" — die tippt niemand fehlerfrei, und ein
+ * Tippfehler ergibt in Metabase kein Fehlerbild, sondern eine leere Karte.
+ */
+const WARE: Parameter = {
+  id: 'ware-param', name: 'ware', 'display-name': 'Ware', type: 'string/=',
+  werteliste: ['mart', 'einkaufspreis_monat', 'ware'],
+}
 
 export const karten: Karte[] = [
   // ===================================================================
@@ -790,34 +802,98 @@ SELECT monat                AS "Monat",
     beschreibung:
       'Was ein bestelltes Gebinde gekostet hat — ein Karton, ein Sack, eine Kiste. Gezeigt wird der Median: eine einzelne Fehlbuchung würde den Durchschnitt verzerren. Die Spalte „je Einheit" (€/kg, €/l) steht daneben, ist aber oft leer: FoodNotify pflegt die Angabe, wie viel in einem Gebinde steckt, für dieselbe Ware widersprüchlich — sie erscheint nur, wo sie belegbar war. Die Werte stammen aus echten Bestellungen, nicht aus einem Katalog. Bitte vorher „Wie vollständig sind die Einkaufsdaten?" ansehen.',
     anzeige: 'table',
-    parameter: [MARKE],
-    // Der FÜHRENDE Preis ist der je Gebinde (Migration 0041). Der Preis
-    // je Einheit hing an FoodNotifys `unitQuantity`, und die schwankt für
-    // dieselbe Ware zwischen 0,00035 und 50 — die Karte zeigte deshalb
-    // 48.400 EUR/kg für Kaffee.
+    parameter: [MARKE, WARE],
+    /*
+     * Der FÜHRENDE Preis ist der je Gebinde (Migration 0041). Der Preis
+     * je Einheit hing an FoodNotifys `unitQuantity`, und die schwankt für
+     * dieselbe Ware zwischen 0,00035 und 50 — die Karte zeigte deshalb
+     * 48.400 EUR/kg für Kaffee.
+     *
+     * DIE KARTE HIESS "IM VERLAUF" UND ZEIGTE KEINEN. Bis zum 12.08.2026
+     * stand hier `ORDER BY monat DESC, ausgaben DESC LIMIT 500`. Das
+     * schnitt ab, bevor ein zweiter Monat kam: gemessen deckten die 500
+     * Zeilen GENAU EINEN Monat ab, mit 441 verschiedenen Waren
+     * nebeneinander. Die Sicht darunter hat 9.887 Waren über 75 Monate.
+     *
+     * Jetzt umgekehrt: erst die Waren nach Volumen ranken, dann von den
+     * grössten deren ganze Historie zeigen. Mit gesetztem Warenfilter
+     * bleibt genau eine Ware übrig und man sieht ihre Reihe am Stück.
+     */
     sql: `
-SELECT ware                     AS "Ware",
-       marke                    AS "Marke",
-       monat                    AS "Monat",
-       bestellungen             AS "Bestellungen",
-       gebinde                  AS "Gebinde",
-       ausgaben                 AS "Ausgaben",
-       preis_je_gebinde         AS "Preis je Gebinde",
-       preis_min                AS "günstigster",
-       preis_max                AS "teuerster",
-       einheit                  AS "Einheit",
-       preis_je_einheit_median  AS "je Einheit"
-  FROM mart.einkaufspreis_monat
- WHERE 1 = 1
-   [[AND marke = {{marke}}]]
- ORDER BY monat DESC, ausgaben DESC
+WITH basis AS (
+  SELECT * FROM mart.einkaufspreis_monat
+   WHERE monat >= (date_trunc('month', current_date) - interval '24 months')::date
+     [[AND marke = {{marke}}]]
+     [[AND ware  = {{ware}}]]
+), rang AS (
+  SELECT ware, marke, sum(ausgaben) AS ausgaben_ware,
+         row_number() OVER (ORDER BY sum(ausgaben) DESC) AS rang
+    FROM basis GROUP BY ware, marke
+)
+SELECT b.ware                     AS "Ware",
+       b.marke                    AS "Marke",
+       b.monat                    AS "Monat",
+       b.bestellungen             AS "Bestellungen",
+       b.gebinde                  AS "Gebinde",
+       b.ausgaben                 AS "Ausgaben",
+       b.preis_je_gebinde         AS "Preis je Gebinde",
+       b.gebinde_typisch          AS "Gebindegrösse",
+       nullif(b.gebinde_varianten, 1) AS "verschiedene Gebinde",
+       b.preis_min                AS "günstigster",
+       b.preis_max                AS "teuerster",
+       b.einheit                  AS "Einheit",
+       b.preis_je_einheit_median  AS "je Einheit"
+  FROM basis b JOIN rang r USING (ware, marke)
+ WHERE r.rang <= 20
+ ORDER BY r.ausgaben_ware DESC, b.ware, b.monat DESC
  LIMIT 500`,
+  },
+
+  {
+    /*
+     * Die Preisreihe als Bild. Bewusst getrennt von der Tabelle darüber und
+     * bewusst eng: acht Waren sind das Meiste, was in einem Liniendiagramm
+     * noch unterscheidbar ist — bei 441 Linien sieht man nichts.
+     *
+     * OHNE WARENFILTER zeigt sie die acht umsatzstärksten. Das ist eine
+     * Auswahl und keine Aussage über den Konzern; wer eine bestimmte Ware
+     * sucht, setzt den Filter oben.
+     */
+    schluessel: 'wa_preis_verlauf',
+    name: 'Preisreihe einer Ware',
+    beschreibung:
+      'Der Gebindepreis über die Zeit, eine Linie je Ware. Ohne Warenfilter die acht umsatzstärksten der letzten zwei Jahre — das ist eine Auswahl, keine Konzernaussage. Ein Sprung auf genau das Doppelte oder die Hälfte ist fast immer ein Wechsel der Gebindegrösse und keine Teuerung; die Tabelle darüber zeigt in der Spalte „Gebindegrösse", ob sich etwas geändert hat.',
+    anzeige: 'line',
+    parameter: [MARKE, WARE],
+    sql: `
+WITH basis AS (
+  SELECT * FROM mart.einkaufspreis_monat
+   WHERE monat >= (date_trunc('month', current_date) - interval '24 months')::date
+     [[AND marke = {{marke}}]]
+     [[AND ware  = {{ware}}]]
+), rang AS (
+  SELECT ware, marke, sum(ausgaben) AS ausgaben_ware,
+         row_number() OVER (ORDER BY sum(ausgaben) DESC) AS rang
+    FROM basis GROUP BY ware, marke
+)
+SELECT b.monat            AS "Monat",
+       b.ware             AS "Ware",
+       b.preis_je_gebinde AS "Preis je Gebinde"
+  FROM basis b JOIN rang r USING (ware, marke)
+ WHERE r.rang <= 8
+ ORDER BY b.monat`,
+    visualisierung: {
+      'graph.dimensions': ['Monat', 'Ware'],
+      'graph.metrics': ['Preis je Gebinde'],
+      'graph.x_axis.title_text': 'Monat',
+      'graph.y_axis.title_text': 'Preis je Gebinde (€)',
+    },
   },
   {
     schluessel: 'wa_preis_veraenderung',
     name: 'Was ist teurer geworden?',
     beschreibung:
-      'Veränderung des Gebindepreises gegenüber dem VORMONAT, absteigend nach Größe des Sprungs. Waren, deren letzter Einkauf länger als einen Monat her ist, erscheinen hier nicht: ein Halbjahressprung als Monatsveränderung auszuweisen wäre eine erfundene Zahl.',
+      'Veränderung des Gebindepreises gegenüber dem VORMONAT, absteigend nach Größe des Sprungs. Waren, deren letzter Einkauf länger als einen Monat her ist, erscheinen hier nicht: ein Halbjahressprung als Monatsveränderung auszuweisen wäre eine erfundene Zahl. Seit Migration 0062 sind Gebindewechsel heraus: dieselbe Ware wird im selben Monat mit verschiedenen Gebindegrößen gebucht (Grana Padano 8,82 € bei Größe 1, 17,64 € bei Größe 2), und der Median kippte zwischen beiden — das ergab exakt +100 %. So kamen 41 von 200 Zeilen zustande, und weil nach Sprunggröße sortiert wird, standen sie alle ganz oben.',
     anzeige: 'table',
     parameter: [MARKE],
     sql: `
@@ -969,13 +1045,17 @@ SELECT je.betrieb                                       AS "Betrieb",
     schluessel: 'wa_inventur_schwund',
     name: 'Bewerteter Schwund aus Inventuren',
     beschreibung:
-      'Sollbestand gegen tatsächlich gezählten Bestand aus echten Inventuren, in Euro '
-      + 'bewertet. NUR BEI WILMA WUNDER BELASTBAR: nur dort gibt es genug Zählungen für eine '
-      + 'Aussage — bei den anderen drei Marken sind es zu wenige, teils überwiegend '
-      + 'storniert, um daraus einen Schwundwert abzuleiten. Stornierte Inventuren zählen '
-      + 'nicht mit, noch nicht signierte ebenfalls nicht — „davon signiert" zeigt, wie '
-      + 'tragfähig die Zahl je Betrieb ist. Bleibt die Liste leer, sind noch keine Inventuren '
-      + 'geladen.',
+      'Sollbestand gegen tatsächlich gezählten Bestand, in Euro bewertet. '
+      + 'ZUERST AUF „SOLL JE GEZÄHLT" SEHEN: liegt der Wert weit über 1, ist der Prozentwert '
+      + 'daneben wertlos. Der theoretische Bestand aus FoodNotify ist bei vielen Häusern '
+      + 'aufgebläht — gemessen 971.750 g Pizzateig gegen 138.000 g gezählt —, weil der '
+      + 'Verbrauch nicht dagegen gebucht wird. Das ist kein Schwund, sondern fehlende '
+      + 'Rezepturpflege, und diese Sicht kann es nicht heilen. '
+      + 'Testinventuren sind seit Migration 0062 draussen (61 von 358), und gerechnet wird '
+      + 'nur über Positionen, die tatsächlich gezählt wurden — wer nur die Bar zählt, dem '
+      + 'fehlt die Küche, und die zählte vorher als Schwund. Was so herausfiel, steht rechts '
+      + 'daneben statt zu verschwinden. Stornierte und nicht signierte Zählungen zählen nicht '
+      + 'mit. NUR BEI WILMA WUNDER überhaupt genug Fälle für eine Aussage.',
     anzeige: 'table',
     parameter: [MARKE, BETRIEB],
     sql: `
@@ -988,7 +1068,17 @@ SELECT betrieb                    AS "Betrieb",
        round(sum(schwund_eur), 2)  AS "Schwund €",
        CASE WHEN sum(soll_eur) > 0
             THEN round(100 * sum(schwund_eur) / sum(soll_eur), 2)
-       END                        AS "Schwund %"
+       END                        AS "Schwund %",
+       -- Der Kanarienvogel. Steht ABSICHTLICH neben dem Prozentwert und
+       -- nicht in einer Fussnote: liegt er weit über 1, ist die Zahl links
+       -- davon wertlos, und das muss man im selben Blick sehen.
+       CASE WHEN sum(gezaehlt_eur) > 0
+            THEN round(sum(soll_eur) / sum(gezaehlt_eur), 2)
+       END                        AS "Soll je Gezählt",
+       nullif(sum(positionen_ohne_zaehlung), 0) AS "Positionen ohne Zählung",
+       nullif(round(sum(soll_eur_ohne_zaehlung), 2), 0) AS "Soll ohne Zählung (raus)",
+       nullif(sum(inventuren_teilbereich), 0)   AS "davon Teilbereich",
+       nullif(sum(inventuren_test), 0)          AS "Tests (nicht gezählt)"
   FROM mart.inventur_schwund
  WHERE 1 = 1
    [[AND marke = {{marke}}]]

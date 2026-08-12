@@ -144,6 +144,13 @@ const F_MARKE_EINKAUF: Parameter = {
   id: 'd-marke', name: 'marke', 'display-name': 'Marke', type: 'string/=',
   werteliste: ['mart', 'einkauf_ladestand', 'marke'],
 }
+// Die einzelne Ware, fuer die Preisreihe. Mit Werteliste: 9.887 Namen der
+// Sorte "Blumenk.i.backt10,2G Tk Veg7Kg" tippt niemand fehlerfrei, und ein
+// Tippfehler ergibt eine leere Karte statt einer Fehlermeldung.
+const F_WARE: Parameter = {
+  id: 'd-ware', name: 'ware', 'display-name': 'Ware', type: 'string/=',
+  werteliste: ['mart', 'einkaufspreis_monat', 'ware'],
+}
 
 // Vier einzelne Datumsfelder fuer den Zeitraumvergleich. Bewusst nicht
 // zwei Bereichsfilter: Metabase kann einen Bereichsfilter nur EINEM
@@ -985,14 +992,19 @@ export const dashboards: Dashboard[] = [
     // FOODNOTIFY-MANDANT (vier Werte), nicht das Round-Table-Konzept —
     // acht der zwoelf Konzern-Marken lieferten grundsaetzlich leere
     // Karten, siehe F_MARKE_EINKAUF.
-    filter: [F_BETRIEB, F_MARKE_EINKAUF],
+    filter: [F_BETRIEB, F_MARKE_EINKAUF, F_WARE],
     reihen: [
-      { teile: [{ text: '# Einkauf\n\n**Die Daten werden noch geladen** — je Kostenstelle chronologisch aufsteigend: bei unfertigen Marken fehlen gerade die **jüngsten** Monate. Ein Monat mit wenigen Positionen ist meist noch nicht fertig, nicht etwa ein Einbruch. Die erste Karte sagt, welche Marken vollständig sind.\n\nAlle Preise sind **je Gebinde** — was ein bestellter Karton, Sack oder Eimer gekostet hat. Der Preis je Kilo oder Liter steht als Zusatzspalte daneben, bleibt aber oft leer: FoodNotify pflegt die Angabe, wie viel in einem Gebinde steckt, für dieselbe Ware widersprüchlich. Was auffällt oder fehlt, steht in der letzten Karte.' }] },
+      { teile: [{ text: '# Einkauf\n\n**Die Daten werden noch geladen** — je Kostenstelle chronologisch aufsteigend: bei unfertigen Marken fehlen gerade die **jüngsten** Monate. Ein Monat mit wenigen Positionen ist meist noch nicht fertig, nicht etwa ein Einbruch. Die erste Karte sagt, welche Marken vollständig sind.\n\nAlle Preise sind **je Gebinde** — was ein bestellter Karton, Sack oder Eimer gekostet hat. Der Preis je Kilo oder Liter steht als Zusatzspalte daneben, bleibt aber oft leer: FoodNotify pflegt die Angabe, wie viel in einem Gebinde steckt, für dieselbe Ware widersprüchlich. Was auffällt oder fehlt, steht in der letzten Karte.\n\n**Ein Sprung auf genau das Doppelte ist fast nie eine Teuerung.** Dieselbe Ware wird im selben Monat mit verschiedenen Gebindegrößen gebucht — Grana Padano 8,82 € bei Größe 1 und 17,64 € bei Größe 2 —, und der Monatsmedian kippt zwischen beiden. Solche Zeilen sind seit Migration 0062 aus „Was ist teurer geworden?" heraus; die Spalte „Gebindegröße" in der Preistabelle zeigt, worauf sich ein Preis bezieht.' }] },
       // Der Ladestand steht GANZ OBEN, nicht unten als Fussnote: solange
       // der Backfill laeuft, ist er die Voraussetzung fuer jede Aussage
       // ueber einen Zeitraum.
       { teile: [{ karte: 'wa_ladestand', hoehe: 9 }] },
       { teile: [{ karte: 'wa_preis_veraenderung', hoehe: 12 }] },
+      // Erst das Bild, dann die Zahlen: ein Preissprung faellt in der Linie
+      // auf, bevor man ihn in 500 Tabellenzeilen sucht. Beide haengen am
+      // Warenfilter oben — ohne ihn zeigen sie die umsatzstaerksten Waren,
+      // und das ist eine Auswahl und keine Konzernaussage.
+      { teile: [{ karte: 'wa_preis_verlauf', hoehe: 11 }] },
       { teile: [{ karte: 'wa_preise', hoehe: 12 }] },
       // Die Lieferanten — der Titel der Seite versprach sie von Anfang
       // an, gezeigt hat sie bisher keine Karte.
