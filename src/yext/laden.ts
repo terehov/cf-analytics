@@ -159,7 +159,7 @@ export async function staendeLaden(opt: {
  * Die einzelnen Bewertungen — zum LESEN, nicht zum Rechnen.
  *
  * Ausdrueckliche Abweichung von docs/yext-anbindung.md §3, entschieden am
- * 03.08.2026: eine Zahl sagt, DASS ein Haus abrutscht, erst der Text sagt
+ * 03.08.2026: eine Zahl sagt, DASS ein Betrieb abrutscht, erst der Text sagt
  * woran. Mit Autorenname (Migration 0038, am selben Tag nachgezogen: die
  * Namen stehen oeffentlich neben der Bewertung), ohne E-Mail-Adresse und
  * ohne die Antworten des Betriebs -- der Typ `YextBewertung` fuehrt diese

@@ -52,7 +52,7 @@ stellen: Admin → Tabellenmetadaten → Schema `core` → Sichtbarkeit.
 | Artikel, Renner und Penner, Deckungsbeitrag | `mart.artikelverkauf` |
 | Sortiment nach Warengruppe | `mart.deckungsbeitrag_warengruppe` |
 | Einkaufspreise über die Zeit, echte Belegpreise | `mart.einkaufspreis_monat` — löst das stillgelegte `preisentwicklung_ware` ab |
-| Zahlt **dieses Haus** mehr als die anderen für dieselbe Ware? | `mart.einkaufspreis_betrieb` — **nur mit `vergleichbar = true` lesen**, und auch dann mit den drei Sperren aus dem Abschnitt zu Migration `0056` |
+| Zahlt **dieser Betrieb** mehr als die anderen für dieselbe Ware? | `mart.einkaufspreis_betrieb` — **nur mit `vergleichbar = true` lesen**, und auch dann mit den drei Sperren aus dem Abschnitt zu Migration `0056` |
 | Konkrete Bestellungen je Betrieb, inklusive Stornos | `mart.einkauf_beleg` — eine Zeile je Bestellung, `storniert` kennzeichnet statt auszublenden |
 | Ist dieser Lieferant überhaupt eingeordnet? | `mart.lieferant_freigabe_stand` — die Arbeitsliste, hier fängt man an; Sortierung nach `fn_netto` selbst setzen |
 | Fremdeinkauf: Volumen je Betrieb, Monat und Lieferant | `mart.fremdeinkauf` — **immer auf genau eine `quelle` filtern**, sonst Doppelzählung |
@@ -71,10 +71,10 @@ stellen: Admin → Tabellenmetadaten → Schema `core` → Sichtbarkeit.
 | Maßnahmen-Tracking | `mart.massnahme` |
 | Personalkosten und Effektivität je Bereich | `mart.personalkosten` |
 | Sind die Zahlen dieses Betriebs überhaupt beurteilbar? | `mart.datenstand` |
-| Schwächelt das Haus oder seine ganze Marke? | `mart.marke_vergleich` — je Monat, Betrieb und Kennzahl mit Markenmedian, Abstand und Rang |
-| Liegt es am Haus oder am Standort? | `mart.stadt_vergleich` — dasselbe, aber gegen die Nachbarhäuser am Ort |
+| Schwächelt der Betrieb oder seine ganze Marke? | `mart.marke_vergleich` — je Monat, Betrieb und Kennzahl mit Markenmedian, Abstand und Rang |
+| Liegt es am Betrieb oder am Standort? | `mart.stadt_vergleich` — dasselbe, aber gegen die Nachbarbetriebe am Ort |
 | Wer steht mit wem in einer Stadt? | `mart.nachbarschaft` — die einzige belastbare Stadtangabe |
-| Die Stadt als eine Zeile | `mart.stadt_schnitt_monat` — Gegenstück zu `konzept_schnitt_monat`, nur Orte mit mehr als einem laufenden Haus |
+| Die Stadt als eine Zeile | `mart.stadt_schnitt_monat` — Gegenstück zu `konzept_schnitt_monat`, nur Orte mit mehr als einem laufenden Betrieb |
 | Wer fehlt im Stadtvergleich? | `mart.nachbarschaft_fehlend` — Erwartung: für Betriebe mit Umsatz leer |
 
 Jede dieser Sichten trägt einen Tabellenkommentar; Metabase zeigt ihn als Beschreibung an.
@@ -181,12 +181,12 @@ Am 26.07.2026 nachgemessen. Sie ändern, wie jede andere Zahl zu lesen ist.
 
 **Nur 62 der 141 geführten Betriebe machen überhaupt Umsatz.** Die übrigen 79 liefern
 206 Tage lang Umsatzberichte über 0 €. Das ist *keine* Datenlücke — die Berichte kommen an
-und sind leer. Beteiligungsgesellschaften, geschlossene Häuser, Testeinträge. Jeder
+und sind leer. Beteiligungsgesellschaften, geschlossene Betriebe, Testeinträge. Jeder
 Mittelwert über „alle Betriebe" ist damit um mehr als die Hälfte verdünnt; die Arbeitsliste
 steht auf ⑥ unter „Karteileichen".
 
 **70 % des Umsatzes kommen aus dem stärksten Fünftel.** Ein Prozentpunkt bei einem großen
-Haus wiegt mehr als eine ganze Sanierung im langen Schwanz. Das gehört in jede Priorisierung.
+Betrieb wiegt mehr als eine ganze Sanierung im langen Schwanz. Das gehört in jede Priorisierung.
 
 **Die Personalquote reicht von 0 % bis 1132 %.** Der Extremwert ist „Enchilada Bremen" —
 1109 % bei 0 € Umsatz, also eine Division durch fast nichts. Deshalb rechnen alle
@@ -218,7 +218,7 @@ metabase/
   karten-drilldown.ts   Ebenen ① bis ⑤
   karten-round-table.ts die Excel-Ablösung
   karten-fach.ts        Umsatz, Struktur, Personal, Ware, BWA, Datenqualität
-  karten-fremdeinkauf.ts Fremdeinkauf und Preisvergleich zwischen den Häusern
+  karten-fremdeinkauf.ts Fremdeinkauf und Preisvergleich zwischen den Betrieben
   dashboards.ts         Anordnung im 24-Spalten-Raster und das Klickverhalten
   uebernehmen.ts        trägt alles nach Metabase ein
 ```
@@ -397,7 +397,7 @@ Dazu zwei Arbeitslisten mit derselben Aufgabe wie `mart.nachbarschaft_fehlend` �
 unvollständige Auswertung, die sich als vollständig ausgibt, ist schlimmer als keine:
 
 * **`mart.kalender_fehlend`** — Betriebe mit Umsatz im laufenden Jahr, für die kein
-  Bundesland ableitbar ist. Am 11.08.2026 neun, angeführt vom umsatzstärksten Haus der Gruppe.
+  Bundesland ableitbar ist. Am 11.08.2026 neun, angeführt vom umsatzstärksten Betrieb der Gruppe.
 * **`mart.zeitfenster_pruefung`** — Stunden, die in keinem oder in mehreren Fenstern liegen.
   Erwartung: leer. Eine Fensterdefinition mit Loch summiert sich plausibel falsch.
 
@@ -459,9 +459,9 @@ Tag nach der ersten Pflegerunde eine andere Karte. Fremdeinkauf ist allein
 |---|---|---|
 | `einordnung = 'nicht freigegeben'` heißt im Tabellenkommentar „die Verdachtsliste" | **0 von 9.078** Zeilen tragen den Wert, über die gesamte Historie | Eine Karte darauf ist heute dauerhaft leer und sieht aus wie „kein Befund". Der Verdacht kommt vorerst aus der Arbeitsliste |
 | `mart.lieferant_freigabe_stand` hat kein `ORDER BY`, obwohl ihr Kommentar „absteigend lesen" sagt | — | Sortierung in der Karte selbst setzen, nach `fn_netto` |
-| Dieselbe Sicht trägt weder `betrieb_status` noch `operativ` und zählt geschlossene und verwaltende Häuser mit | 3.385.426 EUR = **9,7 %** des Volumens stammen aus nicht operativen Häusern | Alles, was auf laufende Häuser zielt, aus `mart.fremdeinkauf` bauen — die trägt beide Spalten |
+| Dieselbe Sicht trägt weder `betrieb_status` noch `operativ` und zählt geschlossene und verwaltende Betriebe mit | 3.385.426 EUR = **9,7 %** des Volumens stammen aus nicht operativen Betrieben | Alles, was auf laufende Betriebe zielt, aus `mart.fremdeinkauf` bauen — die trägt beide Spalten |
 | Die beiden Sichten nennen für denselben Bestand verschiedene Summen: die Arbeitsliste zählt Kostenstellen ohne Betrieb mit, `mart.fremdeinkauf` filtert sie weg | `sum(fn_netto)` **35.894.104 EUR** gegen **34.766.971 EUR**, Differenz 1.127.133 EUR aus 25 Kostenstellen ohne `betrieb_key` | Beide Zahlen sind für ihre Frage richtig. Nicht nebeneinander auf ein Dashboard, ohne den Unterschied dazuzuschreiben |
-| `gfgh_des_betriebs` verspricht den Getränkefachgroßhändler des Hauses | in **9.078 von 9.078** Zeilen NULL | In der Tabellenmetadaten-Ansicht ausblenden, bis sie trägt |
+| `gfgh_des_betriebs` verspricht den Getränkefachgroßhändler des Betriebs | in **9.078 von 9.078** Zeilen NULL | In der Tabellenmetadaten-Ansicht ausblenden, bis sie trägt |
 | `warengruppe` bleibt in den Fremdeinkaufzeilen NULL | — | Ein Filter `warengruppe = 'getraenke'` verliert genau die Getränke-Fremdeinkaufzeilen. Stattdessen über `lieferant` filtern |
 
 **`quelle = 'foodnotify'` ist keine Vollerhebung, und der Nenner „141" führt in die Irre.**
@@ -487,7 +487,7 @@ Eine Zeile je Ware, Gebinde, Betrieb, Lieferant, Monat **und Bereich** (`bar` / 
 Bereich steht nicht im Tabellenkommentar und ist der Grund für die erste der drei Sperren weiter
 unten. Nachgemessen am 12.08.2026 im Fenster `monat >= '2026-04-01'`: 35.587 Zeilen, 2.896 Waren,
 49 Betriebe, 4.512.053 EUR Ausgaben; über die ganze Historie 230.350 Zeilen. `betrieb_status`
-und `operativ` sind da, gefiltert wird nicht (Falle 12) — geschlossene Häuser behalten ihre Zeile
+und `operativ` sind da, gefiltert wird nicht (Falle 12) — geschlossene Betriebe behalten ihre Zeile
 und bekommen ihre Abweichung, bilden den Maßstab aber nicht mit.
 
 ### Welche der beiden Preissichten — und warum sie verschiedene Zahlen nennen
@@ -495,10 +495,10 @@ und bekommen ihre Abweichung, bilden den Maßstab aber nicht mit.
 | Frage | Sicht | Preisbasis |
 |---|---|---|
 | Was kostet diese Ware im Konzern, wie läuft der Preis über die Zeit? | `mart.einkaufspreis_monat` | Gebindepreis, `summe_preis / menge` |
-| Zahlt **dieses Haus** mehr als die anderen für dieselbe Ware? | `mart.einkaufspreis_betrieb` | Preis je Basiseinheit, `summe_preis / gesamt_menge` |
+| Zahlt **dieser Betrieb** mehr als die anderen für dieselbe Ware? | `mart.einkaufspreis_betrieb` | Preis je Basiseinheit, `summe_preis / gesamt_menge` |
 
 Über die Zeit ist der Gebindepreis richtig: derselbe Besteller bucht dieselbe Einheit. Über
-Betriebe hinweg nicht — das eine Haus bucht den Karton als `menge = 1`, das andere sechs Flaschen
+Betriebe hinweg nicht — der eine Betrieb bucht den Karton als `menge = 1`, der andere sechs Flaschen
 als `menge = 6`. Gleiche Ware, gleiches Geld, Faktor 6.
 
 **Die beiden Sichten nennen deshalb für dieselbe Ware verschiedene Preise, und das ist kein
@@ -515,16 +515,16 @@ Richtung hält nur im jungen `bar`-Bestand.
 ### Immer auf `vergleichbar` filtern
 
 **Ohne `WHERE vergleichbar` stehen Mengenartefakte als Preisbefunde da.** Die Spalte ist `false`,
-solange weniger als drei operative Häuser dieselbe Ware im selben Monat gekauft haben, oder
-solange die Häuser verschiedene Gebindegrößen buchen. Im Fenster ab April 2026 tragen 24.682 von
-35.587 Zeilen `true`: 7.944 fallen an der Drei-Häuser-Schwelle, 3.144 an `gebinde_uneinheitlich`,
+solange weniger als drei operative Betriebe dieselbe Ware im selben Monat gekauft haben, oder
+solange die Betriebe verschiedene Gebindegrößen buchen. Im Fenster ab April 2026 tragen 24.682 von
+35.587 Zeilen `true`: 7.944 fallen an der Drei-Betriebe-Schwelle, 3.144 an `gebinde_uneinheitlich`,
 42 an `einheit_verdaechtig`. In allen anderen Zeilen sind `abweichung_pct` und `mehrkosten` NULL,
 die Zeile selbst bleibt stehen.
 
 Zwei Nebenbedingungen:
 
 * **Auf `vergleichbar` filtern, nicht auf die Einzelkennzeichen.** `einheit_verdaechtig` ist
-  nicht `false`, sondern **NULL**, wo kein Haus operativ ist — 3.676 Zeilen der Sicht. Ein
+  nicht `false`, sondern **NULL**, wo kein Betrieb operativ ist — 3.676 Zeilen der Sicht. Ein
   `WHERE NOT einheit_verdaechtig` verliert sie still; `WHERE vergleichbar` nicht.
 * **`mehrkosten` über Betriebe *und* Waren summiert ist kein Einsparpotenzial.** Der Median
   verschiebt sich, sobald jemand günstiger einkauft. Steht so auch im Tabellenkommentar.
@@ -534,30 +534,30 @@ Zwei Nebenbedingungen:
 Drei gemessene Lücken, alle am 12.08.2026 im Fenster ab April 2026. Sie sind der Grund, warum
 eine Karte auf dieser Sicht heute noch eine eigene Sperre in der Abfrage braucht.
 
-**1. Der Maßstab zählt Zeilen, nicht Häuser.** `bereich` gehört zum Korn, `betriebe_operativ`
-zählt aber mit `count(*)` darüber. Ein Haus, das dieselbe Ware über `bar` **und** `kueche` bucht,
-geht zweimal ein. 1.525 Haus-Zellen sind so gespalten, 1.077 von 9.519 Gruppen zählen zu hoch,
-und **50 Gruppen erreichen die Drei-Häuser-Schwelle ausschließlich durch die Doppelzählung** —
+**1. Der Maßstab zählt Zeilen, nicht Betriebe.** `bereich` gehört zum Korn, `betriebe_operativ`
+zählt aber mit `count(*)` darüber. Ein Betrieb, der dieselbe Ware über `bar` **und** `kueche` bucht,
+geht zweimal ein. 1.525 Betrieb-Zellen sind so gespalten, 1.077 von 9.519 Gruppen zählen zu hoch,
+und **50 Gruppen erreichen die Drei-Betriebe-Schwelle ausschließlich durch die Doppelzählung** —
 162 Zeilen, davon **156 mit `vergleichbar = true`** und einer Abweichung, die es nach der
 dokumentierten Regel nicht geben dürfte. Gegenprobe in der Karte: `count(DISTINCT betrieb_key)`
 je Ware/Einheit/Monat.
 
 **2. `einheit_verdaechtig` prüft nur die teure Richtung.** Geprüft wird, ob
-`preis / konzern_median` ein glattes Vielfaches ≥ 2 ist; der Spiegelfall — das Haus zählt Liter
+`preis / konzern_median` ein glattes Vielfaches ≥ 2 ist; der Spiegelfall — der Betrieb zählt Liter
 statt Kartons, also `konzern_median / preis` ganzzahlig — wird nie angesehen. 79 Zeilen, **66
 davon `vergleichbar = true`**, Abweichungen bis **−90,0 %**, in Summe **−37.339 EUR erfundene
 „Ersparnis"**.
 
 **3. Bei zwei Mengen-Clustern greift die Heuristik gar nicht.** Liegt der Median zwischen den
 Clustern, ist kein Quotient ganzzahlig. „Captain Morgan Dark Rum 40% 1l Karton 12x1l": **jedes
-Haus zahlt exakt 147,84 EUR je Karton**, und die Sicht meldet für die einen +84,6 % und für die
+Betrieb zahlt exakt 147,84 EUR je Karton**, und die Sicht meldet für die einen +84,6 % und für die
 anderen −84,6 %, beide mit `vergleichbar = true` und `einheit_verdaechtig = false`. 78 solcher
 Gruppen, 643 Zeilen, davon 311 vergleichbar, geflaggt nur 34. Aus ihnen stammen **−45.045 EUR von
 −55.282 EUR (81 %)** aller negativen `mehrkosten` der Sicht.
 
-Was übrig bleibt, wenn man alle drei zusätzlich sperrt — Häuser distinct zählen, den Kehrfaktor
+Was übrig bleibt, wenn man alle drei zusätzlich sperrt — Betriebe distinct zählen, den Kehrfaktor
 mitprüfen, Gruppen mit ganzzahliger Spreizung verwerfen: 24.221 der 24.682 vergleichbaren Zeilen,
-und aus **+5.449 / −55.282 EUR** werden **+2.550 / −9.628 EUR**. Als Preisliste je Haus ist die
+und aus **+5.449 / −55.282 EUR** werden **+2.550 / −9.628 EUR**. Als Preisliste je Betrieb ist die
 Sicht heute brauchbar; als Einsparpotenzial-Karte erst nach dieser Korrektur.
 
 ### Fallen dieser Sicht
@@ -566,9 +566,9 @@ Sicht heute brauchbar; als Einsparpotenzial-Karte erst nach dieser Korrektur.
 |---|---|---|
 | Der Tabellenkommentar widerspricht der Sicht | Drei Stellen: „DIE PREISBASIS IST DER GEBINDEPREIS (summe_preis / menge)", „mehrkosten ist die Abweichung MAL der bezogenen Gebindezahl", „Median der Gebindepreise" | Gerechnet wird durchgehend auf der **Basiseinheit**. Der Kommentar ist falsch, nicht der Code — die Metabase-Beschreibung dieser Sicht nicht zitieren |
 | `preis` ist der Preis je Basiseinheit, nicht der Kartonpreis | Zum Lesen steht `preis_je_gebinde` daneben | Spalte in der Karte entsprechend beschriften. Ein Einkäufer, der „Preis" liest, denkt an den Karton |
-| `gesamt_menge` ist der Nenner und stimmt selten | `menge * gebinde_menge` trifft sie in 26 % der Positionen; **5.466** als `menge_unstimmig` markierte Positionen fließen ungeprüft in die Basis, obwohl `core.bestellposition.preis_je_einheit` (Migration `0042`) genau dafür gebaut wurde | Vor jedem Extremwert die Rohposition ansehen. „Idee Entkoffeiniert 50 Pouches A 7G" steht mit **48.400,00 EUR je kg** und `vergleichbar = true` (Februar 2026, drei Häuser) — `mart.einkaufspreis_monat` nennt für dieselbe Ware 16,94 EUR je Gebinde. Über die ganze Sicht: 330 Zeilen mit `preis > 1.000 EUR` je Basiseinheit, **91 davon vergleichbar**, 19 Waren |
+| `gesamt_menge` ist der Nenner und stimmt selten | `menge * gebinde_menge` trifft sie in 26 % der Positionen; **5.466** als `menge_unstimmig` markierte Positionen fließen ungeprüft in die Basis, obwohl `core.bestellposition.preis_je_einheit` (Migration `0042`) genau dafür gebaut wurde | Vor jedem Extremwert die Rohposition ansehen. „Idee Entkoffeiniert 50 Pouches A 7G" steht mit **48.400,00 EUR je kg** und `vergleichbar = true` (Februar 2026, drei Betriebe) — `mart.einkaufspreis_monat` nennt für dieselbe Ware 16,94 EUR je Gebinde. Über die ganze Sicht: 330 Zeilen mit `preis > 1.000 EUR` je Basiseinheit, **91 davon vergleichbar**, 19 Waren |
 | Gruppiert wird über den Lieferanten-**Klarnamen** (Falle 13) | 162 `lieferant_key` verteilen sich auf **132** Namen; „Layer-Chemie" und „FFD - Frisch Fruchtig Delp" je 5×, „CHEFS CULINAR", „Transgourmet DE", „CF Gastro", „J.J. Darboven" je 4× | Hier ist eine **falsche Zusammenführung** möglich — anders als beim Warennamen, wo der Tabellenkommentar zu Recht nur von Untererfassung spricht |
-| Untererfassung über den Warennamen | „…Karton 12x1l" und „…Karton 12X1L" sind zwei Waren mit je eigenem Betriebskreis | Erwartet und im Tabellenkommentar beschrieben. `betriebe_operativ = 1` heißt oft „andere Schreibweise", nicht „nur ein Haus kauft das" |
+| Untererfassung über den Warennamen | „…Karton 12x1l" und „…Karton 12X1L" sind zwei Waren mit je eigenem Betriebskreis | Erwartet und im Tabellenkommentar beschrieben. `betriebe_operativ = 1` heißt oft „andere Schreibweise", nicht „nur ein Betrieb kauft das" |
 | `mehrkosten` geht gegen `ausgaben` nicht auf | `preis` ist ein Median, `ausgaben` eine Summe: in **134 von 24.682** vergleichbaren Zeilen weicht `preis * menge` um mehr als 1 % von `ausgaben` ab | Nicht als „von X EUR Ausgaben sind Y EUR zu viel" lesen. Beide Zahlen sind für ihre Frage richtig |
 | Ohne Monatsfilter stellt die Sicht 2021 neben 2026 | Bestand reicht bis 2020 zurück | Immer auf Monate filtern, so wie die Excel es für Q2 2026 wollte |
 
@@ -584,9 +584,9 @@ FoodNotify keine Vollerhebung ist, steht im Abschnitt darüber.
 
 **`mart.fremdeinkauf` führt zwei Zustände, nicht drei.** Der Abschnitt oben beschreibt
 `nicht eingeordnet` als eigenen Zustand — den gibt es in der Sicht nicht mehr. Standard ist
-`nicht freigegeben`; wer nicht auf der Freigabeliste steht und nicht der GFGH seines Hauses
+`nicht freigegeben`; wer nicht auf der Freigabeliste steht und nicht der GFGH seines Betriebs
 ist, gilt als Fremdeinkauf. Die neue Spalte **`grund`** sagt warum: `konzernfreigabe`,
-`gfgh des hauses`, `ausdruecklich gesperrt`, `fremder getraenkehaendler` oder
+`gfgh des betriebs`, `ausdruecklich gesperrt`, `fremder getraenkehaendler` oder
 `steht nicht auf der liste`.
 
 Für Karten heisst das: auf `einordnung = 'nicht freigegeben'` filtern liefert die
@@ -617,7 +617,7 @@ materialisierten Sichten statt direkt auf `core`:
 |---|---|---|
 | `mart.einkauf_kreditor_monat` | Volumen je Quelle, Betrieb, Monat, Dachlieferant | `fremdeinkauf`, `lieferant_freigabe_stand` |
 | `mart.einkaufspreis_monat_basis` | Preis je Ware und Monat | `einkaufspreis_monat` → `einkaufspreis_veraenderung` |
-| `mart.einkaufspreis_betrieb_basis` | Preis je Ware, Haus und Monat | `einkaufspreis_betrieb` |
+| `mart.einkaufspreis_betrieb_basis` | Preis je Ware, Betrieb und Monat | `einkaufspreis_betrieb` |
 | `mart.einkauf_betrieb_monat_basis` (0064) | Einkaufsvolumen je Betrieb und Monat | `einkauf_betrieb_monat` |
 | `mart.einkauf_pruefung_basis` (0064) | auffällige Positionen mit Grund | `einkauf_pruefung` |
 
@@ -642,7 +642,7 @@ jemand pflegt.**
    darüber zählt ihre Spalten auf; `CREATE OR REPLACE VIEW` darf nur anhängen.
 
 **Neu in `mart.einkaufspreis_betrieb`: `sperre` und `gebinde_typisch`.**
-`sperre` nennt, welche der vier Sperren greift („zu wenige Häuser (unter 3)",
+`sperre` nennt, welche der vier Sperren greift („zu wenige Betriebe (unter 3)",
 „Gebinde uneinheitlich", „Menge widersprüchlich", „Spreizung über Faktor 3") oder
 „vergleichbar". Reisst ein Fall mehrere, steht die erste da. Die Spalte ersetzt
 den CASE, der bisher in der Zählkarte stand — zwei Kopien derselben
@@ -650,11 +650,11 @@ Fallunterscheidung waren zwei Kopien zum Auseinanderlaufen.
 
 **Der Drill-Down.** „Warum eine Ware nicht verglichen wird" ist ab jetzt eine Tür:
 ein Klick auf die Spalte **Sperre** öffnet `dd_sperre` mit den Waren
-(`sp_waren`) und den einzelnen Häusern (`sp_positionen`) hinter dieser einen
+(`sp_waren`) und den einzelnen Betrieben (`sp_positionen`) hinter dieser einen
 Zahl. Nur die Spalte ist klickbar, nicht die Zeile — sonst navigiert ein Klick auf
 „Betroffener Einkauf" weg, während man nur lesen wollte. Der Warenfilter auf
 `dd_sperre` bringt einen von 300 Zeilen auf eine Ware herunter; dann steht
-nebeneinander, was jedes Haus für dieselbe Sache gebucht hat.
+nebeneinander, was jeder Betrieb für dieselbe Sache gebucht hat.
 
 ---
 
@@ -662,13 +662,39 @@ nebeneinander, was jedes Haus für dieselbe Sache gebucht hat.
 
 Vorgabe: durchgehend, über alle Dashboards und Charts, heißt es **Betrieb**.
 Ersetzt in allen Karten, Kopftexten und Spaltenüberschriften; „Ausser-Haus-Geschäft"
-bleibt als Fachbegriff stehen. Beim Ersetzen ziehen Artikel und Adjektive mit —
-„Haus" ist sächlich, „Betrieb" männlich.
+bleibt als Fachbegriff stehen, ebenso Betriebsnamen wie „Lehners Wirtshaus" und
+„hausgenau" als Angabe zur Adressgenauigkeit. Beim Ersetzen ziehen Artikel und
+Adjektive mit — „Haus" ist sächlich, „Betrieb" männlich.
 
 Ein Wert stand **in der Datenbank**: `mart.einkaufspreis_betrieb.sperre` trug seit
 0063 die Beschriftung `'zu wenige Häuser (unter 3)'`, und der Drill-Down filtert
 darauf. **Migration 0065** verschiebt die Fallunterscheidung deshalb aus der
 materialisierten Sicht in die Sicht darüber.
+
+### Vier Wege, und der Kartentext ist nur einer
+
+Nachgemessen am Abend des 12.08.2026, nachdem das Wort trotz 0065 weiter auf den
+Dashboards stand:
+
+| Weg | Wo es sichtbar wird | Wo es geändert wird |
+|---|---|---|
+| Kartentext | Titel, Beschreibung, Textkacheln | `metabase/` — wirkt **erst nach** `bun run metabase/uebernehmen.ts` |
+| Datenwert | in der Zelle | in der Sicht darüber (0065: `sperre`; 0066: `mart.fremdeinkauf.grund`, `'gfgh des hauses'`) |
+| Spaltenname | Filterfeld, Abfrage-Editor, Datenreferenz — Metabase macht aus `haeuser_am_ort` von selbst „Haeuser Am Ort" | `ALTER VIEW … RENAME COLUMN` (0066), dazu die Karten, die die Spalte lesen |
+| `COMMENT ON` | Info-Fenster an Tabelle und Spalte | Migration, danach Sync |
+
+**Der teuerste Irrtum war der erste.** Die Kartentexte lagen seit dem Nachmittag
+umbenannt im Repo und waren committet — übernommen hatte sie niemand. In Metabase
+stand deshalb weiter „Alle Häuser der Marke". Ein Commit ändert dort nichts.
+
+**Ein fehlender Kommentar löscht in Metabase nichts.** 0065 hat
+`mart.einkaufspreis_betrieb_basis` mit `DROP … CASCADE` neu gebaut; die abhängigen
+Sichten entstanden dabei ohne ihre Kommentare (`mart.fremdeinkauf`,
+`mart.lieferant_freigabe_stand`, sechs Spalten von `mart.einkaufspreis_betrieb`).
+Metabase zeigte darauf weiter den Text vom letzten Sync — mit „Haus" darin, und von
+der Datenbank aus nicht mehr erreichbar: ein leerer Kommentar überschreibt nichts.
+0066 setzt die verlorenen Texte in der neuen Wortwahl zurück. **Wer eine Sicht mit
+CASCADE neu baut, schreibt ihre Kommentare in derselben Migration wieder hin.**
 
 **Die Regel dahinter, für den nächsten Fall:** in die materialisierte Sicht gehört,
 was *gerechnet* werden muss. **Beschriftungen gehören in die Sicht darüber.** Was
@@ -677,4 +703,6 @@ mit `DROP ... CASCADE` ändern kann — sonst kostet ein Wort einen Neuaufbau ü
 278.054 Zeilen.
 
 Die Migrationen 0055 bis 0064 bleiben unverändert: sie sind angewendet, und die
-Datei ist das Protokoll. Auch `docs/` wird nicht rückwirkend umgeschrieben.
+Datei ist das Protokoll. `docs/` dagegen ist Arbeitsmaterial und wurde am
+12.08.2026 durchgehend umgestellt — was hier stehen bleibt, steht beim nächsten
+Schreiben wieder in einer Karte.

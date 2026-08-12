@@ -134,7 +134,7 @@ async function antwortLaden(k: Karte, ids: string[], f: ReturnType<typeof fenste
     const stunden = zahl(z, 'REVIEW_RESPONSE_TIME_REVIEW_TIMESTAMP_BASED')
     // Wer NICHT geantwortet hat, hat keine Reaktionszeit -- Yext liefert
     // dafuer 0, und 0 Stunden liest sich als "sofort geantwortet". Genau
-    // die Haeuser, die gar nicht antworten, staenden damit an der Spitze
+    // die Betriebe, die gar nicht antworten, staenden damit an der Spitze
     // der Bestenliste (gemessen: 100 solcher Zeilen im ersten Lauf).
     r.stunden = r.antworten ? stunden : null
     // Kein offener Fall ist eine 0, keine Leerstelle. Yext liefert fuer
@@ -238,7 +238,7 @@ async function sichtbarkeitLaden(k: Karte, ids: string[], f: ReturnType<typeof f
       b: s.betrieb, m: s.monat,
       ges: ganz(zahl(z, 'TOTAL_LISTINGS_IMPRESSIONS')),
       goo: ganz(zahl(z, 'GOOGLE_LISTINGS_IMPRESSIONS')),
-      // 0 heisst hier "Yext fuehrt fuer dieses Haus keinen Vergleich",
+      // 0 heisst hier "Yext fuehrt fuer diesen Betrieb keinen Vergleich",
       // nicht "der Vergleich liegt bei null". Als 0 gespeichert waere
       // jeder Betrieb ohne Vergleichsgruppe unendlich gut.
       ben: med && med > 0 ? Math.round(med) : null,

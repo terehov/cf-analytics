@@ -72,8 +72,7 @@ LINA-Weg ~63 %. Deutsche Konzepte (34,3 %) erreicht keiner der beiden Wege.
 ### Keiner fühlt sich zuständig — Historie und Preis fallen durch
 
 Eine Einkaufspreis-Historie führt **keines** der beiden Systeme (LINA: nur
-aktueller Stand; FoodNotify: nur aktueller Stand, Historie im Beta-Produkt
-B.E.A.M.). Beide überschreiben Stammdaten. Alles Historische an diesem Projekt
+aktueller Stand; FoodNotify: nur aktueller Stand). Beide überschreiben Stammdaten. Alles Historische an diesem Projekt
 — `<ding>_stand`-Momentaufnahmen, append-only Raw-Layer — existiert, weil beide
 Quellen vergessen.
 

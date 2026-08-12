@@ -305,7 +305,7 @@ export const dashboards: Dashboard[] = [
       // zufaellig verlinkt ist. Zwei Klickflaechen je Thema statt einer.
       //
       // Die uebrigen Spalten (Kennzahl, ●, Wert) bleiben stumm, und das
-      // ist Absicht: sie beschreiben das HAUS, nicht eine Vergleichs-
+      // ist Absicht: sie beschreiben den BETRIEB, nicht eine Vergleichs-
       // gruppe, und haetten deshalb kein eindeutiges Ziel. Ein Klick, der
       // raet, ist schlechter als keiner.
       //
@@ -528,7 +528,7 @@ export const dashboards: Dashboard[] = [
   //
   // Gefragt am 10.08.2026: "ob bei allen der Umsatz eingebrochen ist oder
   // nur bei einem". Ein Rueckgang von zwoelf Prozent heisst etwas
-  // voellig anderes, je nachdem ob die Nachbarhaeuser dasselbe zeigen
+  // voellig anderes, je nachdem ob die Nachbarbetriebe dasselbe zeigen
   // oder ob der Betrieb allein dasteht.
   //
   // Zwei Seiten statt einer mit Umschalter, weil sie verschiedene
@@ -569,7 +569,7 @@ export const dashboards: Dashboard[] = [
       { teile: [{ karte: 'vm_kennzahlen', hoehe: 11,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ text: '## Die anderen Betriebe der Marke\n\nEin ◀ markiert den oben gewählten Betrieb. Stehen die Nachbarn derselben Marke ebenso im Minus, ist der Befund keiner über diesen Betrieb.' }] },
-      { teile: [{ karte: 'vm_haeuser', hoehe: 12,
+      { teile: [{ karte: 'vm_betriebe', hoehe: 12,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
     ],
   },
@@ -589,7 +589,7 @@ export const dashboards: Dashboard[] = [
       { teile: [{ karte: 'vs_umsatz_pct', hoehe: 10 }] },
       { teile: [{ karte: 'vs_verlauf' }] },
       { teile: [{ text: '## Die Betriebe der Stadt im Einzelnen' }] },
-      { teile: [{ karte: 'vs_haeuser', hoehe: 12,
+      { teile: [{ karte: 'vs_betriebe', hoehe: 12,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ karte: 'vs_kennzahlen', hoehe: 12,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },

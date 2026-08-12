@@ -115,7 +115,7 @@ Gelato, Pommes Freunde, my Indigo, Soulkitchen). Gefiltert wird über
 und Durchschnitt je Monatsende, Yexts eigenes Aggregat, keine Einzeldaten. Zum *Lesen*
 kommt seit dem 03.08.2026 `core.bewertung` dazu — einzelne Bewertungen mit Note, Text,
 Autorenname und Link zur Quelle (`mart.bewertung_einzel`), weil eine Zahl zwar sagt, dass
-ein Haus abrutscht, aber nicht woran.
+ein Betrieb abrutscht, aber nicht woran.
 
 Aus `core.bewertung` wird **nicht gerechnet**: eine gelöschte Bewertung verschwindet bei
 Yext sofort aus dem Durchschnitt, unsere Kopie bliebe stehen. Wer daraus einen Schnitt

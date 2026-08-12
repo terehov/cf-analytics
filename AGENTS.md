@@ -292,14 +292,14 @@ SELECT * FROM mart.round_table_marke(DATE '2026-06-01');
 SELECT * FROM mart.konzept_zuordnung WHERE hauptkonzept IS NULL;
 ```
 
-Vergleichsgruppen — schwächelt das Haus oder alle:
+Vergleichsgruppen — schwächelt der Betrieb oder alle:
 
 ```sql
--- gegen die eigene Marke (Median der operativen Häuser, mit Rang)
+-- gegen die eigene Marke (Median der operativen Betriebe, mit Rang)
 SELECT * FROM mart.marke_vergleich WHERE betrieb = 'Enchilada Karlsruhe GmbH';
--- gegen die Nachbarhäuser am selben Ort
+-- gegen die Nachbarbetriebe am selben Ort
 SELECT * FROM mart.stadt_vergleich WHERE ort = 'Karlsruhe' AND bereich = 'umsatz';
--- Städte mit mehr als einem laufenden Haus
+-- Städte mit mehr als einem laufenden Betrieb
 SELECT * FROM mart.stadt_schnitt_monat WHERE monat = DATE '2026-06-01';
 -- Arbeitsliste: wem fehlt die Ortsangabe? (Erwartung: kein operativer dabei)
 SELECT * FROM mart.nachbarschaft_fehlend WHERE status = 'operativ';

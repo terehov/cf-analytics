@@ -22,7 +22,7 @@ SELECT count(*) FILTER (WHERE u.umsatz > 0) AS mit_umsatz, count(*) AS gesamt
 
 Die übrigen **79 liefern über 200 Tage lang Umsatzberichte über 0 €**. Das ist ausdrücklich
 *keine* Datenlücke: die Berichte kommen an, sie sind leer. Dahinter stehen
-Beteiligungsgesellschaften (`Aposto Beteiligungs GmbH`), geschlossene Häuser
+Beteiligungsgesellschaften (`Aposto Beteiligungs GmbH`), geschlossene Betriebe
 (`INSOLVENT - Enchilada Pforzheim GmbH`), noch nicht eröffnete Standorte und Testeinträge
 (`A Testladen Concept Family`).
 
@@ -65,7 +65,7 @@ Beide Zahlen sind richtig und beantworten verschiedene Fragen:
 
 | Frage | Antwort |
 |---|---|
-| Wie viel machen die stärksten 20 % **der 62 aktiven Betriebe** (also 12 Häuser)? | **42,6 %** |
+| Wie viel machen die stärksten 20 % **der 62 aktiven Betriebe** (also 12 Betriebe)? | **42,6 %** |
 | Wie viel machen die stärksten 28 Betriebe, also 20 % **der 141 geführten**? | **70,4 %** |
 | Wie viel machen die **Top 10**? | **37,4 %** |
 
@@ -76,7 +76,7 @@ zählt Karteileichen in den Nenner und übertreibt dadurch die Konzentration.
 Dashboard ⑥ filtern auf `sum(umsatz_netto) > 0`. Der Dashboard-Text nennt die Bezugsgröße
 ausdrücklich, weil sonst die verlockendere Zahl zitiert wird.
 
-Auch mit dem ehrlichen Nenner gilt: **zehn Häuser tragen über ein Drittel.** Ein
+Auch mit dem ehrlichen Nenner gilt: **zehn Betriebe tragen über ein Drittel.** Ein
 Prozentpunkt dort wiegt mehr als eine ganze Sanierung im langen Schwanz — das gehört in
 jede Priorisierung.
 
@@ -219,20 +219,20 @@ dagegen ist gepflegt worden — nachgemessen am 10.08.2026:
 | Betriebe mit Ortsangabe **und** Koordinate | 60 von 141 |
 | davon im letzten bewerteten Monat operativ | 49 von 56 |
 | operative Betriebe **ohne** Ortsangabe | 7 |
-| Städte mit mindestens zwei laufenden Häusern | 10 |
+| Städte mit mindestens zwei laufenden Betrieben | 10 |
 
 Damit ist ein Vergleich innerhalb einer Stadt erstmals möglich. Die zehn Gruppen:
 
-| Stadt | laufende Häuser | Marken |
+| Stadt | laufende Betriebe | Marken |
 |---|---|---|
 | Karlsruhe | 4 | Aposto, Enchilada, Deutsche Konzepte, Wilma Wunder |
 | Mainz | 4 | Aposto, Deutsche Konzepte, Wilma Wunder |
 | Aalen, Augsburg, Düsseldorf, Freudenstadt, Heilbronn, Köln, Nürnberg, Würzburg | je 2 | je 2 |
 
-In Karlsruhe steht zusätzlich ein fünftes geführtes Haus (Wirtshaus Im Jagdgrund) ohne
+In Karlsruhe steht zusätzlich ein fünfter geführter Betrieb (Wirtshaus Im Jagdgrund) ohne
 laufenden Umsatz. **Deshalb führen die Sichten beide Zahlen getrennt:**
-`mart.nachbarschaft.haeuser_am_ort` zählt geführte Häuser, `mart.stadt_schnitt_monat.haeuser`
-die im Monat operativen. Wer beide verwechselt, zählt ein stillgelegtes Haus mit −100 %
+`mart.nachbarschaft.betriebe_am_ort` zählt geführte Betriebe, `mart.stadt_schnitt_monat.betriebe`
+die im Monat operativen. Wer beide verwechselt, zählt einen stillgelegten Betrieb mit −100 %
 Umsatz in einen Stadtdurchschnitt.
 
 **Die sieben fehlenden sind der wunde Punkt.** Ein Betrieb ohne Ortsangabe fehlt in seiner
@@ -267,7 +267,7 @@ Abhängigkeit von Wochenenden, Events oder Wetter — und macht Personalplanung 
 
 ## Was das für eine Auswertung bedeutet
 
-Vor jeder Zahl, die das Haus verlässt:
+Vor jeder Zahl, die den Betrieb verlässt:
 
 1. **`mart.datenstand` aufmachen.** Sie sagt je Betrieb, bis wann Umsatz geladen und bis wann
    die BWA gebucht ist. Ohne das ist jede Schlussfolgerung eine Vermutung.
@@ -339,7 +339,7 @@ Blatt `Eingabe`, 22 Betriebe:
 | grün | 1 | 0 |
 
 Die dort eingetragenen Personalquoten: 34,2 · 35,9 · 36,0 · 43,9 · 40,6 · 34,7 · 38,6 · 45,0 ·
-38,3 · 35,6 · 34,2 · 43,4 · 36,4 · 39,1 · 35,1 %. Grün waren genau zwei Häuser (24,8 % und
+38,3 · 35,6 · 34,2 · 43,4 · 36,4 · 39,1 · 35,1 %. Grün waren genau zwei Betriebe (24,8 % und
 26,9 %).
 
 **Damit ist die Frage beantwortet: unsere Umsetzung ist dem Original treu.** Die rote Wand ist
@@ -575,7 +575,7 @@ Was es gibt, ist Wachstum der Gruppe:
 | 2026 | 61 | **59** |
 
 „Historie vollständig ab 01.01.2018" stimmt für die Datenkette. Ein Konzern-Vorjahresvergleich
-2018 gegen 2026 stellt aber 36 Häuser gegen 62. **Für 59 Betriebe ist der
+2018 gegen 2026 stellt aber 36 Betriebe gegen 62. **Für 59 Betriebe ist der
 Vorjahresvergleich sauber**, und nur so gehört er gerechnet.
 
 ## 8. FoodNotify und LINA sind komplementär, nicht redundant
@@ -682,7 +682,7 @@ Die neun Betriebe ohne Standort, nach Umsatz 2026 (`mart.kalender_fehlend`):
 | GSF Gastro GmbH | 182.115 € |
 | A Testladen Concept Family | 230 € |
 
-Der erste ist **das umsatzstärkste Haus der Gruppe.** Er fehlt in jeder Stadt-, Feiertags-
+Der erste ist **das umsatzstärkste Betrieb der Gruppe.** Er fehlt in jeder Stadt-, Feiertags-
 und Vergleichstagsauswertung, und dort fällt es nicht auf.
 
 ## 11. Bewertungsquote und BWA-Takt
@@ -718,7 +718,7 @@ in **einer** Anfrage.
 
 Die Frage ist damit keine Datenfrage mehr, sondern eine Auswahl: **welche der fünf Zeilen
 ist „die Rendite" des Round Table?** Für einen Betriebsvergleich spricht viel für das
-operative Betriebsergebnis — Zinsen und Steuern sagen nichts über die Führung eines Hauses.
+operative Betriebsergebnis — Zinsen und Steuern sagen nichts über die Führung eines Betriebs.
 Das entscheidet der Fachbereich.
 
 ## 13. Standort und Yext fehlen bei denselben neun Betrieben
@@ -738,7 +738,7 @@ liefert **exakt dieselben neun Betriebe** wie `mart.kalender_fehlend`. Beide Tab
 
 **Was daraus folgt:** ein Arbeitsgang schließt beide Lücken. Und die Betriebe fehlen
 gleichzeitig in der Standortkarte, im Stadtvergleich, in der Feiertagsrechnung, im
-Vergleichstag **und** in jeder Bewertungsauswertung — angeführt vom umsatzstärksten Haus der
+Vergleichstag **und** in jeder Bewertungsauswertung — angeführt vom umsatzstärksten Betrieb der
 Gruppe.
 
 ## 14. `mart.betrieb_status` beantwortet die Stilllegungsfrage bereits
@@ -775,11 +775,11 @@ unten sind am 12.08.2026 auf `localhost/lina` gemessen.
 
 Ausgezählt in der Rücklaufdatei: **88 Betriebsspalten × 79 Produktzeilen = 6.952 Preiszellen,
 davon 607 gefüllt (8,7 %).** **44 Spalten sind ganz ohne Angabe**, und den Namen des eigenen
-Getränkefachgroßhändlers nennen **14 von 88** Häusern.
+Getränkefachgroßhändlers nennen **14 von 88** Betrieben.
 
 Das ist keine dünne Datenlage, das ist keine. Eine Preiserhebung, die neun von zehn Feldern
 leer zurückbekommt, trägt keinen Betriebsvergleich — auch nicht für die 8,7 %, denn welche
-Häuser antworten, ist nicht zufällig.
+Betriebe antworten, ist nicht zufällig.
 
 **Was daraus folgt:** Jede Aussage über Getränkepreise stammt ab hier aus Rechnungsdaten. Was
 die tragen und was nicht, steht in den Befunden 4 und 5 — und der Preis dafür ist, dass der
@@ -821,7 +821,7 @@ Abwesenheit einer Freigabe nicht „nicht freigegeben" heißen darf, steht in
 | nicht freigegeben | **0 €** | 0 | 0 |
 
 **`einordnung = 'nicht freigegeben'` trifft 0 von 9.078 Zeilen — über die gesamte Historie.**
-Der Zustand feuert nur, wenn ein Haus einen aufgelösten GFGH hat *und* bei einem anderen
+Der Zustand feuert nur, wenn ein Betrieb einen aufgelösten GFGH hat *und* bei einem anderen
 kauft, der irgendwo als GFGH gepflegt ist. Gepflegt sind 13 Zeilen in
 `manual.gfgh_betrieb`, davon **5 mit Namen** — also zwei Firmen, WIGEM und GLH. **47 der 51
 Betriebe mit Einkaufsvolumen der letzten 12 Monate haben keinen aufgelösten GFGH**, und für
@@ -830,14 +830,14 @@ findet, hat *nichts gemessen*, nicht *nichts gefunden*.
 
 Was die zwei gepflegten Firmen zeigen, ist trotzdem der Fall, um den es geht:
 
-| Lieferant | Häuser | Netto | Einordnung |
+| Lieferant | Betriebe | Netto | Einordnung |
 |---|---:|---:|---|
 | WIGEM Getränke | 3 mit WIGEM als hinterlegtem GFGH | 487.425 € | freigegeben |
 | WIGEM Getränke | 1 ohne GFGH-Eintrag | 171.434 € | nicht eingeordnet |
 | GLH Getränke Logistik Heilbronn | 1 mit GLH als hinterlegtem GFGH | 56.584 € | freigegeben |
 | GLH Getränke Logistik Heilbronn | 3 ohne GFGH-Eintrag | 175.843 € | nicht eingeordnet |
 
-Vier Häuser kaufen bei GLH, **eines** hat GLH hinterlegt. Die anderen drei stehen nicht
+Vier Betriebe kaufen bei GLH, **eines** hat GLH hinterlegt. Die anderen drei stehen nicht
 deshalb auf „nicht eingeordnet", weil an ihrem Einkauf nichts wäre, sondern weil niemand
 ihren GFGH eingetragen hat. **Die Arbeitsliste ist die Pflege, nicht der Einkauf.**
 
@@ -877,7 +877,7 @@ SELECT CASE WHEN f.betrieb_key IS NOT NULL THEN 'mit FoodNotify' ELSE 'ohne Food
 | mit FoodNotify | 43 (75,4 %) | 78.337.191 € | 70,0 % |
 | **ohne FoodNotify** | **14 (24,6 %)** | **33.530.901 €** | **30,0 %** |
 
-**Der blinde Fleck ist ein Viertel der Häuser, aber 30 % des Umsatzes** — er trifft die
+**Der blinde Fleck ist ein Viertel der Betriebe, aber 30 % des Umsatzes** — er trifft die
 großen. Und er ist keine Streuung: **zehn der 14 sind Deutsche Konzepte**, dazu zwei
 Enchilada, ein Schlager Cafe, ein Kooperationspartner. Es fehlt fast eine ganze Marke —
 dieselbe, die schon bei `fixer_we` (Befund 1 vom 11.08.) und bei den Warengruppen fehlt.
@@ -890,7 +890,7 @@ geschlossene, 18 ohne Geschäft, 17 verwaltende, 6 inaktive und 4 Testbetriebe (
 
 **Was daraus folgt:** Aus FoodNotify allein darf **kein Fremdeinkaufsanteil** berichtet
 werden — weder je Konzern noch je Marke. Zulässig ist die Aussage „bei diesen Lieferanten,
-in diesen Häusern, mindestens dieses Volumen". Die Gegenprobe kann nur das Belegarchiv
+in diesen Betrieben, mindestens dieses Volumen". Die Gegenprobe kann nur das Belegarchiv
 liefern, weil dort jede *gebuchte* Rechnung steht, unabhängig vom Bestellweg.
 
 ⚠️ **Diese Gegenprobe fehlt heute noch.** `core.buchungsbeleg` steht am 12.08.2026 auf
@@ -911,9 +911,9 @@ Bestellungen: **951 Bestellungen über 1.127.133 €** (3,1 % des Bestellvolumen
 letzten 12 Monaten 313.770 €). Weil `mart.fremdeinkauf` auf `betrieb_key IS NOT NULL`
 filtert, fällt das **vollständig aus der Sicht**.
 
-Betroffen sind **echte Häuser, keine Testeinträge**: 1.095.156 € entfallen auf sieben
+Betroffen sind **echte Betriebe, keine Testeinträge**: 1.095.156 € entfallen auf sieben
 laufende oder ehemals laufende Betriebe, nur 31.977 € auf vier Testbetriebe. Und es fehlen
-**immer ganze Häuser, nie einzelne Bar- oder Küchenkostenstellen** eines sonst zugeordneten
+**immer ganze Betriebe, nie einzelne Bar- oder Küchenkostenstellen** eines sonst zugeordneten
 Betriebs — für alle 15 betroffenen Restaurantnamen gilt: keine einzige ihrer Kostenstellen
 ist zugeordnet. Beim Gegenprüfen gegen `core.betrieb` zerfällt das in drei verschiedene
 Fehler:
@@ -941,7 +941,7 @@ SELECT round(sum(netto))    FROM mart.fremdeinkauf WHERE quelle='foodnotify';   
 
 Die Differenz ist exakt die 1.127.133 € von oben. **Beide Zahlen sind richtig und
 beantworten verschiedene Fragen** — die Arbeitsliste soll das Volumen eines Lieferanten
-vollständig zeigen, die Betriebssicht nur, was einem Haus zurechenbar ist. Steht das nicht
+vollständig zeigen, die Betriebssicht nur, was einem Betrieb zurechenbar ist. Steht das nicht
 daneben, sieht es wie ein Rechenfehler aus. Ein Nebeneffekt derselben Bauart:
 `fn_betriebe = 0` bei vollem `fn_netto` ist kein Defekt, sondern genau dieser Fall —
 `count(DISTINCT betrieb_key)` überspringt NULL.
@@ -959,7 +959,7 @@ nicht mehr:** `mart.fremdeinkauf` führt seit dem 12.08.2026 zwei Zustände mit 
 | Einordnung | Grund | Betriebe | Lieferanten | Netto EUR |
 |---|---|---|---|---|
 | freigegeben | Konzernfreigabe | 51 | 5 | 12.158.163 |
-| freigegeben | GFGH des Hauses | 4 | 2 | 145.686 |
+| freigegeben | GFGH des Betriebs | 4 | 2 | 145.686 |
 | **nicht freigegeben** | steht nicht auf der Liste | **33** | **71** | **1.116.877** |
 
 Grösste Posten: Trinkkontor 141.753 EUR (3 Betriebe), Getränke Keller 134.626 (2),
@@ -967,7 +967,7 @@ GLH Getränke Logistik Heilbronn 99.531 (3), Hubauer 82.484 (1), Würzburger Hof
 (1), FFD Frisch Fruchtig Delp 48.847 (8), Segafredo Zanetti 32.153 (7).
 
 **GLH ist der lehrreiche Fall.** Bei Wilma Wunder Stuttgart und Wirtshaus Lautenschlager ist
-GLH der hinterlegte GFGH und damit freigegeben; an drei weitere Häuser liefert dieselbe
+GLH der hinterlegte GFGH und damit freigegeben; an drei weitere Betriebe liefert dieselbe
 Firma ohne Hinterlegung. Derselbe Lieferant steht also in beiden Spalten — genau die
 Unterscheidung, die die GFGH-Erhebung treffen wollte.
 
@@ -1020,9 +1020,9 @@ Preis kann also stimmen. Geändert wurde nur der Konsument.
 
 ### Was auch danach drinbleibt, ohne zu lügen
 
-Ein Preis, der in **allen** Häusern gleich falsch ist, überlebt beide Prüfungen: 0040
+Ein Preis, der in **allen** Betrieben gleich falsch ist, überlebt beide Prüfungen: 0040
 vergleicht gegen den Median derselben Ware, und wenn der genauso hoch liegt, widerspricht
-nichts. „Idee Entkoffeiniert" steht im Februar 2026 in drei Häusern bei 48.400 EUR je
+nichts. „Idee Entkoffeiniert" steht im Februar 2026 in drei Betrieben bei 48.400 EUR je
 Kilogramm und ist `vergleichbar = true`.
 
 Ein falscher Befund entsteht daraus trotzdem nicht: alle drei zahlen dasselbe, also ist
@@ -1225,7 +1225,7 @@ sichtbar. Wirkung auf der Produktionsdatenbank:
 | Aposto Gera | 97,2 % | 62,8 % | 2,69 |
 | Wilma Wunder Köln | 60,0 % | 28,8 % | 1,41 |
 
-**Recklinghausen zeigt, dass die Korrektur greift:** ein Haus, das sauber zählt
+**Recklinghausen zeigt, dass die Korrektur greift:** ein Betrieb, der sauber zählt
 (Soll/Gezählt 0,96), hat gar keinen Schwund — die 87,9 % waren vollständig Tests und
 ungezählte Positionen. Bei allen anderen sagt `soll_je_gezaehlt`, dass die Zahl daneben weiterhin nicht
 belastbar ist.

@@ -9,7 +9,7 @@
  * Bruecke dorthin und die Herkunftsangabe fuer die Altdaten.
  *
  * WARUM DIE KENNZAHL WICHTIG IST: Sie ist die einzige im Round Table, die
- * nicht aus LINA kommt. Die fuenf anderen beschreiben Geld. Ein Haus kann
+ * nicht aus LINA kommt. Die fuenf anderen beschreiben Geld. Ein Betrieb kann
  * wirtschaftlich sauber dastehen und trotzdem verwahrlost sein -- das
  * sieht keine BWA. Im Juli-Excel widerspricht sie den Finanzampeln
  * regelmaessig: bei einem Board mit 20 von 22 roten Betrieben gab es eine

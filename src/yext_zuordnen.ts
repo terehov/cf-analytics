@@ -51,7 +51,7 @@ const UNSERE_ORDNER = new Set([
  * Zuordnungen, die ein Mensch entschieden hat.
  *
  * Hier steht alles, was der automatische Abgleich NICHT eindeutig
- * hinbekommt -- zwei Standorte in einer Stadt, abweichende Hausnamen,
+ * hinbekommt -- zwei Standorte in einer Stadt, abweichende Betriebsnamen,
  * Tippfehler. Bewusst als Liste im Code und nicht als Heuristik: eine
  * Regel, die diese Faelle trifft, traefe naechstes Jahr auch die falschen.
  *
@@ -80,7 +80,7 @@ const VON_HAND: Record<string, number | null> = {
 
   // --- 03.08.2026, nachdem die API 18 bis dahin unsichtbare Entitaeten
   // --- zeigte. Alle drei tragen in LINA einen Gesellschaftsnamen, der mit
-  // --- dem Hausnamen bei Yext kein Wort gemeinsam hat:
+  // --- dem Betriebsnamen bei Yext kein Wort gemeinsam hat:
   EK_04: 4,     // "Brauerei-Gasthof Alter Kranen" -> "Alter Kranen GmbH"
   L_01: 106,    // "Lehners Wirtshaus Heilbronn"   -> "Lehners HN Gaststaettenbetriebs GmbH" (HN = Heilbronn)
   L_02: 107,    // "Lehners Wirtshaus Karlsruhe"   -> "Lehners Karlsruhe"

@@ -71,15 +71,15 @@ fehlen, sagt `mart.standort_fehlend`.
 
 **Stand 10.08.2026: 60 von 141 sind gepflegt** — Weg 1 hat also teilweise funktioniert. Damit
 steht die Karte, und seit demselben Tag hängt noch etwas daran: das Dashboard
-*⑩ Betrieb gegen die Stadt* vergleicht ein Haus mit den Nachbarhäusern am selben Ort.
+*⑩ Betrieb gegen die Stadt* vergleicht einen Betrieb mit den Nachbarbetrieben am selben Ort.
 
 **Sieben laufende Betriebe fehlen noch, und dort wiegt es schwerer als auf der Karte.** Auf
-einer Karte fällt ein fehlender Punkt auf. In einem Stadtvergleich fällt ein fehlendes Haus
+einer Karte fällt ein fehlender Punkt auf. In einem Stadtvergleich fällt ein fehlender Betrieb
 **nicht** auf — die Stadt sieht dann einfach so aus, als stünde es nicht darin, und der
 Vergleich gibt sich als vollständig aus. Wer diese sieben nachträgt, macht mehr als eine
 Karte hübscher.
 
-Es sind ausgerechnet große Häuser (Monatsumsatz im zuletzt bewerteten Monat, 10.08.2026):
+Es sind ausgerechnet große Betriebe (Monatsumsatz im zuletzt bewerteten Monat, 10.08.2026):
 
 | Betrieb | Marke | Umsatz |
 |---|---|---|
@@ -91,16 +91,16 @@ Es sind ausgerechnet große Häuser (Monatsumsatz im zuletzt bewerteten Monat, 1
 | Gastronomie Wilsdruffer Straße GmbH | Enchilada | 146.188 € |
 | B+L Pforzheim GmbH | Deutsche Konzepte | 95.351 € |
 
-**Das umsatzstärkste Haus der ganzen Gruppe steht nicht in seiner Stadt.** Fünf der sieben
+**Das umsatzstärkste Betrieb der ganzen Gruppe steht nicht in seiner Stadt.** Fünf der sieben
 gehören zu „Deutsche Konzepte" — dort lohnt eine Sammelanfrage mehr als sieben Einzelfälle.
-„Gastronomie Wilsdruffer Straße" ist zudem ein Enchilada in Dresden, wo bereits zwei Häuser
+„Gastronomie Wilsdruffer Straße" ist zudem ein Enchilada in Dresden, wo bereits zwei Betriebe
 gepflegt sind; diese eine Zeile vervollständigt sofort eine bestehende Vergleichsgruppe.
 
 → Arbeitsliste mit Umsatz und Zustand: `SELECT * FROM mart.nachbarschaft_fehlend WHERE status = 'operativ';`
 oder die unterste Karte auf ⑩.
 
 **79 von 141 Betrieben melden dauerhaft 0 € Umsatz.** Sie liefern über 200 Tage lang
-Umsatzberichte, alle leer — Beteiligungsgesellschaften, geschlossene Häuser, Testeinträge.
+Umsatzberichte, alle leer — Beteiligungsgesellschaften, geschlossene Betriebe, Testeinträge.
 `core.betrieb.aktiv` steht bei allen 141 auf `true` und trägt die Unterscheidung nicht.
 Folge: jeder Mittelwert über „alle Betriebe" ist um mehr als die Hälfte verdünnt, und
 `Enchilada Bremen` steht mit 1109 % Personalquote bei 0 € Umsatz als rote Ampel im Round
@@ -381,7 +381,7 @@ solange sie nicht gelaufen sind, ist jede Aufwandsschätzung geraten.
 ~~**Betriebskontext lesend umschalten**~~ — weitgehend erledigt: die Ladenakte adressiert
 Betriebe über einen Laden-Hash ohne Mandantenwechsel, und Sitzplätze, Fläche und
 Gesellschafter stehen im Stammdatenblatt. Offen bleibt davon nur, ob **Einkaufspreise je
-Haus** anders zu holen sind — was durch das Belegarchiv ohnehin an Bedeutung verliert.
+Betrieb** anders zu holen sind — was durch das Belegarchiv ohnehin an Bedeutung verliert.
 
 ### An den Steuerberater
 
@@ -391,7 +391,7 @@ Haus** anders zu holen sind — was durch das Belegarchiv ohnehin an Bedeutung v
 ### An Concept Family (Pflege — Listen liegen fertig vor)
 
 * **Neun Betriebe ohne Standort *und* ohne Yext-Zuordnung** (`mart.kalender_fehlend`) —
-  es ist dieselbe Liste, angeführt vom umsatzstärksten Haus der Gruppe. Ein Arbeitsgang.
+  es ist dieselbe Liste, angeführt vom umsatzstärksten Betrieb der Gruppe. Ein Arbeitsgang.
 * **Aktionsstamm bereinigen** — drei Kampagnen behalten, ein Testeintrag mit 47.500 € und
   ein leerer stillzulegen, sieben umzubenennen.
 * **Aktionsartikel bestätigen** — Kandidatenlisten liegen bei, ausgewiesen als **unsicher**.
@@ -548,9 +548,9 @@ bleibt.
   12.08.2026 ist es einer**: „Wilma Wunder Markt Mainz" ist vom Nutzer als „Gastronomie am
   Markt Mainz GmbH" bestätigt, die Zeile steht jetzt in der Saat und nicht mehr als
   auskommentierter Vorschlag daneben.
-* **Drei Häuser bestellen über FoodNotify, existieren aber nicht in `core.betrieb`** — Riegele
+* **Drei Betriebe bestellen über FoodNotify, existieren aber nicht in `core.betrieb`** — Riegele
   Wirtshaus (samt Produktionsküche), Zum Augustiner Rosenheim, Enchilada Darmstadt.
-* **Zwei Häuser bestellen gegen ihren eigenen Status.** „Aposto Wuppertal II" bestellt bis
+* **Zwei Betriebe bestellen gegen ihren eigenen Status.** „Aposto Wuppertal II" bestellt bis
   02.08.2026; der plausible Betrieb 18 („Aposto Wuppertal – Alter Papierfabrik") steht auf
   `ohne_geschaeft`. „Aposto Aachen – Alte Post" zeigt auf die Betriebe 3 und 71, beide
   `geschlossen` — dazu passt der letzte Beleg vom 28.08.2024. Eines von beiden ist falsch,
@@ -561,8 +561,8 @@ bleibt.
 Nachgemessen am 12.08.2026: **25 von 152 Kostenstellen (16,4 %) haben keinen `betrieb_key`**,
 18 davon mit Bestellungen. `mart.fremdeinkauf` filtert auf `betrieb_key IS NOT NULL` und
 verliert dadurch **1.127.133 €** über die ganze Historie (3,1 % des Bestellvolumens), 313.770 €
-davon aus den letzten 12 Monaten. Es sind fast durchweg echte Häuser (7 Häuser, 1.095.156 €)
-und nur zu einem Rest Testbetriebe (4 Häuser, 31.977 €).
+davon aus den letzten 12 Monaten. Es sind fast durchweg echte Betriebe (7 Betriebe, 1.095.156 €)
+und nur zu einem Rest Testbetriebe (4 Betriebe, 31.977 €).
 
 Für die GFGH-Frage kostet das genau dort am meisten, wo sie gestellt wird: **GLH Getränke
 Logistik Heilbronn liegt mit 84.336 € auf nicht zugeordneten gegen 89.442 € auf zugeordneten
@@ -570,7 +570,7 @@ Kostenstellen** — knapp die Hälfte des GLH-Volumens fällt aus der Sicht hera
 sind darin überhaupt nicht sichtbar (abels fruechtewelt 145.391 €, intergast deutschland 307 €,
 „test 1" 3 €).
 
-Es fehlen dabei **immer ganze Häuser, nie einzelne Bar- oder Küchen-Kostenstellen** eines sonst
+Es fehlen dabei **immer ganze Betriebe, nie einzelne Bar- oder Küchen-Kostenstellen** eines sonst
 zugeordneten Betriebs (für alle 15 betroffenen `restaurant_name` gilt: null zugeordnete
 Kostenstellen). Zwei davon sind reine Zuordnungslücke und sofort behebbar: **„Lehners
 Karlsruhe" (107) und „Lehners Wirtshaus Rastatt GmbH" (108) existieren, sind `operativ` und
@@ -583,9 +583,9 @@ die Zahlen im nächsten Abschnitt wirkt sich das nicht aus, weil ihre letzten Be
 Die 51 ist richtig gezählt, der Nenner führt in die Irre: in den 141 stecken 39 geschlossene,
 18 ohne Geschäft, 17 verwaltende, 6 inaktive und 4 Testbetriebe. **Operativ sind 57, davon
 haben 43 FoodNotify-Daten der letzten 12 Monate und 14 nicht** (nachgemessen 12.08.2026).
-Diese 14 sind 24,6 % der operativen Häuser, tragen aber **30,0 % des operativen Umsatzes
+Diese 14 sind 24,6 % der operativen Betriebe, tragen aber **30,0 % des operativen Umsatzes
 (33.530.901 € von 111.868.092 €)**, und zehn von ihnen sind „Deutsche Konzepte". Der blinde
-Fleck ist damit fast eine ganze Marke und kein Streuverlust — für diese Häuser ist das
+Fleck ist damit fast eine ganze Marke und kein Streuverlust — für diese Betriebe ist das
 Belegarchiv nicht die zweite Quelle, sondern die einzige.
 
 ### Arbeitsliste: die nicht eingeordneten Lieferanten
@@ -594,7 +594,7 @@ Belegarchiv nicht die zweite Quelle, sondern die einzige.
 6.330.827 €** über die ganze Historie; 69 davon haben seit 08/2025 noch eine Bestellung. In
 `mart.fremdeinkauf` sind es für die letzten 12 Monate **71 Lieferanten, 33 Betriebe,
 1.116.877 € — 8,3 % des Volumens** (die Arbeitsliste zählt zwei weniger, weil GLH und WIGEM
-dort als GFGH stehen und nur bei Häusern ohne hinterlegten GFGH als „nicht eingeordnet"
+dort als GFGH stehen und nur bei Betrieben ohne hinterlegten GFGH als „nicht eingeordnet"
 gelten). Der Betrag sinkt mit jeder nachgetragenen Freigabe: am Vormittag desselben Tages
 waren es noch 1.175.609 €.
 
@@ -616,7 +616,7 @@ oben abarbeitet und die halbe Zeit in einen erledigten Fall steckt.
 
 ### Vier der acht offenen GFGH stehen schon in FoodNotify
 
-Der Kommentar in `0055` sagt, die acht Häuser mit `dach_name IS NULL` hätten „einen Haendler
+Der Kommentar in `0055` sagt, die acht Betriebe mit `dach_name IS NULL` hätten „einen Haendler
 genannt, der in FoodNotify nicht vorkommt". Nachgemessen am 12.08.2026 stimmt das für vier
 nicht — sie sind ohne das Belegarchiv auflösbar, mit je einer Zeile in
 `manual.kreditor_gruppe` und einem `dach_name`:
@@ -633,7 +633,7 @@ keinen Erhebungseintrag — die Erhebung erfasst weniger, als die Rechnungen zei
 
 Ein Fall ist ausdrücklich **nicht** aufzulösen: Enchilada Nürnberg nennt „Trinkkartell/Tucher",
 `trinkkartell` steht in FoodNotify — aber bei **Wilma Wunder Nürnberg** (8.618 €). Gleiche
-Stadt, anderes Haus. Hermann Wecken, Getränke Staude und Getränke Express kommen gar nicht vor;
+Stadt, anderer Betrieb. Hermann Wecken, Getränke Staude und Getränke Express kommen gar nicht vor;
 diese drei brauchen das Belegarchiv.
 
 ### Zwei Wartestände
@@ -667,9 +667,9 @@ Befundcharakter. Seit der Umstellung auf zwei Zustände (Begründung in
 An der Arbeit ändert das nichts, an der Dringlichkeit schon. Reihenfolge nach Volumen:
 
 1. **Trinkkontor** (141.753 EUR, 3 Betriebe) und **Getränke Keller** (134.626, 2) — beides
-   Getränkehändler. Entweder sie sind der GFGH dieser Häuser, dann gehören sie nach
+   Getränkehändler. Entweder sie sind der GFGH dieser Betriebe, dann gehören sie nach
    `manual.gfgh_betrieb`, oder sie sind es nicht, dann ist es ein Befund.
-2. **GLH** (99.531, 3 Betriebe **ohne** Hinterlegung) — bei zwei anderen Häusern ist GLH der
+2. **GLH** (99.531, 3 Betriebe **ohne** Hinterlegung) — bei zwei anderen Betrieben ist GLH der
    eingetragene GFGH. Hier ist die Frage konkret beantwortbar.
 3. **Segafredo Zanetti** (32.153, 7 Betriebe) — Kaffee gegen die Darboven-Freigabe.
 4. Brauereien und Winzer eintragen, damit sie aus der Liste verschwinden.
@@ -697,7 +697,7 @@ eine Spaltengrenze von 100.000.000 — Faktor 2.165 Luft.
 | Knusperschnitzel Homestyle | 4 | 432.000 | 432.000 | **746.496.000.000** |
 | Kalbsschnitzel roh paniert | 2 | 198.000 | 198.000 | 78.408.000.000 |
 
-Dieselbe Ware wird zweierlei gebucht: die meisten Häuser tragen die Packungsgrösse in
+Dieselbe Ware wird zweierlei gebucht: die meisten Betriebe tragen die Packungsgrösse in
 `gesamt_menge` und lassen `gebinde_menge` auf 1 — daraus wird der Modus `inhalt_soll` =
 432.000. Diese Zeile trägt sie in `gebinde_menge`. `menge × gebinde_menge × inhalt_soll`
 multipliziert sie dann mit sich selbst. `gesamt_menge numeric(14,4)` fasst zehn
@@ -783,7 +783,7 @@ dem Falschen, weil 0040 selbst Gebindeangaben zwischen 0,00035 und 50 beschreibt
 | Korrektur **verwerfen** | der alte Wert — aus derselben widersprüchlichen Menge | Richtigkeit |
 | als **unentscheidbar** markieren | gar kein Preis | Abdeckung |
 
-Nur die erste Aktion ist gefährlich. Die zweite ist die Hausregel selbst: aus unbekannt
+Nur die erste Aktion ist gefährlich. Die zweite ist die Projektregel selbst: aus unbekannt
 darf kein Wert werden. Die 1000 bleibt geraten, entscheidet aber nur, **ob** eine Zahl
 behalten wird, nicht **welche** — und das ist der Unterschied zu 0056, wo ein geratener
 Schwellwert einen Wert bestimmte und 37.339 EUR Ersparnis erfand.

@@ -978,7 +978,7 @@ keine Adresse, und Lehners Karlsruhe ist so ein Fall.
 
 **Warum das mehr ist als eine Lücke.** Von den 93 Betrieben ohne Koordinaten machen **37
 Umsatz**. Die Marke „Deutsche Konzepte" ist praktisch vollständig unsichtbar, obwohl sie die
-umsatzstärksten Häuser der Gruppe stellt — Wirtshaus am Schlossplatz (61 Mio. €), Alter
+umsatzstärksten Betriebe der Gruppe stellt — Wirtshaus am Schlossplatz (61 Mio. €), Alter
 Kranen (23 Mio. €), Lehners Heilbronn (22 Mio. €), Lehners Karlsruhe (22 Mio. €).
 
 **Warum das gefährlich ist.** Die Karte zeigt 48 Punkte und sieht vollständig aus. Wer die
@@ -1202,7 +1202,7 @@ welche Betriebe gemeint sind in ‚Betrieb — Kennzahlen des Monats'."
 Betrieb gedacht: sechs Zeilen, je eine Kennzahl. Ohne Filter liefert dieselbe Abfrage **846
 Zeilen** — 141 Betriebe mal sechs Bereiche, unaggregiert und ohne jede Kennung. Man sah
 sechsmal „Umsatz" untereinander mit verschiedenen Werten und hielt es für die Kennzahlen eines
-Hauses.
+Betriebs.
 
 **Sechs Karten auf ③ Betrieb hatten dieselbe Schwäche**, gefunden über eine Prüfung: liest die
 Karte den Betriebsfilter, gibt sie ihn aber weder als Spalte aus noch aggregiert sie über

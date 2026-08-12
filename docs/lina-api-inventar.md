@@ -278,7 +278,7 @@ gruppen (Marken):      Enchilada(1), Besitos(2), Lehners(3), Aposto(4), Sonstige
 hauptsparten (posId):  10001 Speisen | 10002 Getränke | 10003 Gutscheine | 10004 Sonstiges/Divers
                        10006 Strassenverkauf_Getränke | 10007 Strassenverkauf_Speisen
                        92 Pfand | 94 Trinkgeld | 95 Gutschein | 10008 Lieferkosten
-verkaufsstellen:       0 Gesamtbetrieb | 1 Ausser Haus | 2 AmadeusGO | 51 Cocktail Casino
+verkaufsstellen:       0 Gesamtbetrieb | 1 Ausser Betrieb | 2 AmadeusGO | 51 Cocktail Casino
                        52 Delivery | 53 To Go Lehners | 56 To Go Aktionspreis
 ```
 

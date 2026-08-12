@@ -3,7 +3,7 @@
 // seine Stadt.
 //
 // Beide Seiten beantworten dieselbe Frage mit verschiedenem Massstab:
-// LIEGT ES AM HAUS ODER AN ETWAS, DAS ALLE TRIFFT?
+// LIEGT ES AM BETRIEB ODER AN ETWAS, DAS ALLE TRIFFT?
 //
 //   Marke — gleiches Konzept, gleiche Karte, gleiche Preise, verteilt
 //           ueber ganz Deutschland. Faengt ab, was am Konzept liegt.
@@ -81,7 +81,7 @@ export const karten: Karte[] = [
   // Die beiden Karten hier sind die VERDICHTETE Fassung von ⑨ und ⑩:
   // beide Maßstaebe nebeneinander in einer Tabelle, statt auf zwei
   // Seiten. Sie ersetzen die Detailseiten nicht -- dort stehen die
-  // Nachbarhaeuser einzeln --, aber sie beantworten die Frage, wegen der
+  // Nachbarbetriebe einzeln --, aber sie beantworten die Frage, wegen der
   // man sie sonst aufgemacht haette, ohne das Betriebsblatt zu verlassen.
   //
   // WARUM NICHT IN dd_betrieb_kopf HINEIN: die Karte fuehrt bereits neun
@@ -105,9 +105,9 @@ SELECT m.betrieb                                  AS "Betrieb",
        coalesce(m.emoji, '⚪')                     AS "●",
        m.wert                                     AS "Wert",
        m.marke_median                             AS "Marke (Median)",
-       ${RANG('m.rang', 'm.marke_haeuser')}       AS "Rang Marke",
+       ${RANG('m.rang', 'm.marke_betriebe')}      AS "Rang Marke",
        s.ort_median                               AS "Stadt (Median)",
-       ${RANG('s.rang', 's.ort_haeuser')}         AS "Rang Stadt"
+       ${RANG('s.rang', 's.ort_betriebe')}        AS "Rang Stadt"
   FROM mart.marke_vergleich m
   CROSS JOIN gewaehlt g
   -- LEFT JOIN, nicht JOIN: sieben laufende Betriebe haben keine
@@ -204,7 +204,7 @@ SELECT v.betrieb                                  AS "Betrieb",
        v.marke_median                             AS "Marke % (Median)",
        v.abweichung                               AS "Δ zur Marke",
        ${VERGLEICH('v.vergleich')}                AS "Stellung",
-       ${RANG('v.rang', 'v.marke_haeuser')}       AS "Rang in der Marke",
+       ${RANG('v.rang', 'v.marke_betriebe')}      AS "Rang in der Marke",
        coalesce(be.emoji, '⚪')                    AS "Gesamtampel"
   FROM mart.marke_vergleich v
   CROSS JOIN gewaehlt g
@@ -241,7 +241,7 @@ SELECT v.bereich_name                             AS "Kennzahl",
        v.marke_median                             AS "Marke (Median)",
        v.abweichung                               AS "Δ",
        ${VERGLEICH('v.vergleich')}                AS "Stellung",
-       ${RANG('v.rang', 'v.marke_haeuser')}       AS "Rang in der Marke"
+       ${RANG('v.rang', 'v.marke_betriebe')}      AS "Rang in der Marke"
   FROM mart.marke_vergleich v
   CROSS JOIN gewaehlt g
  WHERE v.monat = g.monat
@@ -302,7 +302,7 @@ SELECT x."Monat", x."Reihe", x."Umsatz % ggü. Vorjahr"
     },
   },
   {
-    schluessel: 'vm_haeuser',
+    schluessel: 'vm_betriebe',
     name: 'Alle Betriebe der Marke',
     beschreibung:
       'Die Betriebe derselben Marke im gewählten Monat, der stärkste zuerst. Zeigt auf einen Blick, ob ein Rückgang die ganze Marke betrifft oder ein einzelner Betrieb. Ein ◀ markiert den oben gewählten Betrieb.\n\nBetriebe ohne laufenden Umsatz stehen nicht in der Liste — sie würden mit −100 % jede Zeile daneben verzerren.',
@@ -371,8 +371,8 @@ SELECT ${MARKIERUNG}                              AS "◀",
 SELECT r.betrieb                                              AS "Betrieb",
        coalesce(r.konzept, '(nicht zugeordnet)')              AS "Marke",
        coalesce(n.ort, '(keine Stadt hinterlegt)')            AS "Stadt",
-       coalesce(s.haeuser, 0)                                 AS "Betriebe mit Umsatz",
-       coalesce(n.haeuser_am_ort, 0)                          AS "davon geführt",
+       coalesce(s.betriebe, 0)                                AS "Betriebe mit Umsatz",
+       coalesce(n.betriebe_am_ort, 0)                         AS "davon geführt",
        s.marken_namen                                         AS "Marken am Ort",
        round(r.umsatz_ist, 0)                                 AS "Umsatz",
        r.umsatz_pct                                           AS "Umsatz % ggü. Vorjahr",
@@ -386,7 +386,7 @@ SELECT r.betrieb                                              AS "Betrieb",
  WHERE r.monat = g.monat
    AND (r.operativ [[ OR r.betrieb = {{betrieb}} ]])
    [[AND r.betrieb = {{betrieb}}]]
- ORDER BY coalesce(n.haeuser_am_ort, 0) DESC, n.ort NULLS LAST, r.umsatz_ist DESC NULLS LAST`,
+ ORDER BY coalesce(n.betriebe_am_ort, 0) DESC, n.ort NULLS LAST, r.umsatz_ist DESC NULLS LAST`,
     visualisierung: {
       column_settings: {
         '["name","Umsatz"]': { number_style: 'currency', currency: 'EUR', currency_style: 'symbol', decimals: 0 },
@@ -419,7 +419,7 @@ SELECT x."Betrieb", x."Umsatz % ggü. Vorjahr"
            AND r.operativ
            AND n.ort IN (SELECT ort FROM bezug)
         UNION ALL
-        SELECT s.ort || ' (' || s.haeuser::text || ' Betriebe)',
+        SELECT s.ort || ' (' || s.betriebe::text || ' Betriebe)',
                s.umsatz_pct
           FROM mart.stadt_schnitt_monat s
           CROSS JOIN gewaehlt g
@@ -435,7 +435,7 @@ SELECT x."Betrieb", x."Umsatz % ggü. Vorjahr"
     },
   },
   {
-    schluessel: 'vs_haeuser',
+    schluessel: 'vs_betriebe',
     name: 'Die Betriebe der Stadt nebeneinander',
     beschreibung:
       'Alle Betriebe am selben Ort mit ihren Kennzahlen. Ein ◀ markiert den oben gewählten Betrieb; ohne Auswahl stehen hier alle Städte mit mehr als einem Betrieb.\n\nDie **Veränderung** ist zwischen den Betrieben vergleichbar, die **absoluten Quoten** nur bedingt: die Betriebe gehören verschiedenen Marken mit verschiedenen Karten, Preisen und Personalstrukturen. Für den Vergleich innerhalb einer Marke ist die Seite „⑨ Betrieb gegen Marke“ da.',
@@ -462,7 +462,7 @@ SELECT ${MARKIERUNG}                              AS "◀",
   LEFT JOIN ampel.beschriftung be ON be.status     = r.gesamt
  WHERE r.monat = g.monat
    AND r.operativ
-   AND n.haeuser_am_ort > 1
+   AND n.betriebe_am_ort > 1
    AND n.ort IN (SELECT ort FROM bezug)
  ORDER BY n.ort, r.umsatz_ist DESC NULLS LAST`,
     visualisierung: {
@@ -534,17 +534,17 @@ SELECT v.bereich_name                             AS "Kennzahl",
        v.ort_median                               AS "Stadt (Median)",
        v.abweichung                               AS "Δ",
        ${VERGLEICH('v.vergleich')}                AS "Stellung",
-       ${RANG('v.rang', 'v.ort_haeuser')}         AS "Rang am Ort"
+       ${RANG('v.rang', 'v.ort_betriebe')}        AS "Rang am Ort"
   FROM mart.stadt_vergleich v
   CROSS JOIN gewaehlt g
  WHERE v.monat = g.monat
    AND v.wert IS NOT NULL
-   -- haeuser_am_ort und NICHT ort_haeuser: die Frage ist "gibt es an
+   -- betriebe_am_ort und NICHT ort_betriebe: die Frage ist "gibt es an
    -- diesem Ort ueberhaupt ein zweiter Betrieb", nicht "hat das zweite Betrieb
-   -- auch diese Kennzahl". Filterte man nach ort_haeuser, verschwaende
+   -- auch diese Kennzahl". Filterte man nach ort_betriebe, verschwaende
    -- genau die Zeile, deren Nachbar den Wert nicht erfasst hat -- und das
    -- liest sich als fehlende Kennzahl im eigenen Betrieb.
-   AND v.haeuser_am_ort > 1
+   AND v.betriebe_am_ort > 1
    AND (v.operativ [[ OR v.betrieb = {{betrieb}} ]])
    [[AND v.betrieb = {{betrieb}}]]
  ORDER BY v.ort, v.reihenfolge, v.abweichung NULLS LAST`,

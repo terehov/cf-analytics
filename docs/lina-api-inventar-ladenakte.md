@@ -42,7 +42,7 @@ GET /intranet/ladenakte/baum/admin/1?id=<knoten>
 Betriebe, die das Report Center kennt — enthalten sind auch geschlossene und
 insolvente Gesellschaften (34), Franchisegebergesellschaften (17) und
 Testläden. Für Auswertungen ist das eine Chance und eine Falle zugleich:
-Historie geschlossener Häuser wird hier greifbar, darf aber niemals
+Historie geschlossener Betriebe wird hier greifbar, darf aber niemals
 kommentarlos in eine Betriebsvergleichs-Kennzahl laufen.
 
 ### 1.1 Zwei Token-Arten — der Unterschied ist wichtig
@@ -154,7 +154,7 @@ Betriebs und endet beim zuletzt gebuchten Monat:
 
 Drei Beobachtungen, die für den Importer zählen:
 
-1. **Geschlossene und insolvente Häuser tragen ihre volle Historie.** München
+1. **Geschlossene und insolvente Betriebe tragen ihre volle Historie.** München
    endet sauber 12/15, Pforzheim 12/24. Für Zeitreihen ist das ein Gewinn.
 2. **Der Endmonat ist der BWA-Rückstand.** Park Cafe München endet 12/25 —
    für 2026 ist dort nichts gebucht, während andere bis 06/26 laufen. Das
@@ -395,7 +395,7 @@ Die zehn größten Einzelbestände: Aposto Mainz 19.835, Wilma Wunder Dresden
 Wirtshaus Lautenschlager 14.669, Wilma Wunder Stuttgart 14.388, Wilma Wunder
 Karlsruhe 13.852, CONCEPT FAMILY Franchise AG 13.473, Aposto Bamberg 13.309.
 
-Bemerkenswert: **die 34 geschlossenen und insolventen Häuser tragen zusammen
+Bemerkenswert: **die 34 geschlossenen und insolventen Betriebe tragen zusammen
 42.413 Belege.** Deren Historie ist vollständig erhalten — für Zeitreihen ein
 Gewinn, für Betriebsvergleiche eine Falle.
 
@@ -413,7 +413,7 @@ Alle 131 Betriebe wurden nicht nur gezählt, sondern auch strukturell geprüft
 * Keine unbekannte Rubrik, kein unbekannter Ordnertyp, kein Fehlschlag.
 
 Das ist die Zusage, die ein Importer braucht: **das Schema ist uniform.** Kein
-Sonderfall je Marke, kein abweichender Ordner bei geschlossenen Häusern. Wer
+Sonderfall je Marke, kein abweichender Ordner bei geschlossenen Betrieben. Wer
 einen Betrieb korrekt liest, liest alle korrekt. Unterschiede gibt es nur in
 der Befüllung, nie in der Struktur.
 

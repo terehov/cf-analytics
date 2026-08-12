@@ -586,7 +586,7 @@ durch die Hintertür dieses Zugangs".
 
 *Eugene:* „Ich möchte hier die einzelnen besten und schlechtesten Bewertungen
 lesen können." Das ist dieser Antrag, und er ist berechtigt: eine Zahl sagt,
-**dass** ein Haus abrutscht. Erst der Text sagt, **woran** — Service, Wartezeit,
+**dass** ein Betrieb abrutscht. Erst der Text sagt, **woran** — Service, Wartezeit,
 Küche. Ohne ihn ist die Kennzahl eine Ampel ohne Ursache, und die roten Betriebe
 im Round Table wären eine Liste ohne Handlungsanweisung.
 
@@ -734,7 +734,7 @@ Marke und Stadt fangen **verschiedene Störquellen** ab: die Marke, was am Konze
 liegt (gleiches Wetter, gleiche Feiertage, gleiche Kaufkraft, verschiedene Konzepte).
 
 Ein Umschalter hätte Platz gespart und die eigentliche Aussage unmöglich gemacht: **fällt
-ein Haus gegen beide Gruppen ab, liegt es am Haus.** Dafür müssen beide gleichzeitig
+ein Betrieb gegen beide Gruppen ab, liegt es am Betrieb.** Dafür müssen beide gleichzeitig
 sichtbar sein — in zwei Reitern desselben Dashboards wäre es dasselbe Problem.
 
 ### Die Vergleichsgruppe wird aus dem Betrieb abgeleitet, nicht eingestellt
@@ -748,7 +748,7 @@ leeres Dashboard ist von einem Betrieb ohne Geschäft nicht zu unterscheiden.
 
 ### Kein Zeitraumfilter, sondern ein Fenster am Monatsfilter
 
-Die Verlaufskarten lesen **zwei verschiedene Tabellen** — das Haus aus `mart.umsatz_ytd`,
+Die Verlaufskarten lesen **zwei verschiedene Tabellen** — der Betrieb aus `mart.umsatz_ytd`,
 die Gruppe aus `mart.konzept_schnitt_monat` bzw. `mart.stadt_schnitt_monat`. Ein
 Metabase-Feldfilter baut seine Klausel aus dem *Tabellennamen* und hätte deshalb nur einen
 der beiden Äste eingeschränkt: die Linien wären still verschieden lang geworden, ohne
@@ -791,13 +791,13 @@ Aussage, und keine muss mit „bitte oben etwas auswählen" leer bleiben.
 
 Rückfrage nach dem Bau von ⑨ und ⑩: „oder vielleicht sogar das bestehende
 Betriebs-Dashboard um diese zwei Sachen erweitern … alles auf einem Dashboard". Richtig —
-die Frage „liegt es an diesem Haus?" stellt sich beim Lesen des Betriebsblatts, nicht auf
+die Frage „liegt es an diesem Betrieb?" stellt sich beim Lesen des Betriebsblatts, nicht auf
 einer Seite, zu der man erst navigieren muss. Zwei Karten mehr auf ③ Betrieb, direkt unter
 den sechs Kennzahlen: beide Maßstäbe nebeneinander in einer Tabelle, und ein Verlauf mit
-Haus, Marke und Stadt in einem Bild.
+Betrieb, Marke und Stadt in einem Bild.
 
-**⑨ und ⑩ bleiben trotzdem.** Sie zeigen die Nachbarhäuser **einzeln** — vier Zeilen für
-Karlsruhe, achtzehn für Enchilada, dazu Verläufe je Haus. Das passt nicht auf ein
+**⑨ und ⑩ bleiben trotzdem.** Sie zeigen die Nachbarbetriebe **einzeln** — vier Zeilen für
+Karlsruhe, achtzehn für Enchilada, dazu Verläufe je Betrieb. Das passt nicht auf ein
 Betriebsblatt, das schon sechs Reiter hat. Die Aufteilung ist damit die übliche dieses
 Projekts: die verdichtete Aussage dort, wo die Frage entsteht, die Auflösung einen Klick
 weiter. Neu ist, dass die beiden Seiten seit diesem Nachtrag überhaupt angeklickt erreichbar
@@ -1201,13 +1201,13 @@ ausgegeben hätte.
 ### Der Getränkefachgroßhandel hängt am Betrieb, nicht am Konzern
 
 Bei Food, Nonfood und Kaffee/Tee gibt es Konzernlieferanten, und eine Freigabe gilt für alle
-Häuser. Beim GFGH ist es je Betrieb ein anderer, weil Getränkelogistik regional ist. Deshalb
+Betriebe. Beim GFGH ist es je Betrieb ein anderer, weil Getränkelogistik regional ist. Deshalb
 zwei Tabellen: `manual.lieferant_freigabe` konzernweit je Warengruppe,
 `manual.gfgh_betrieb` je `betrieb_key`.
 
 **Verworfen: eine Tabelle mit einer zusätzlichen Warengruppe `'getraenke'`.** Das wäre die
 kompaktere Lösung gewesen und die falsche — eine konzernweite Getränkefreigabe ist eine
-Aussage, die es nicht gibt. Sie hätte den GFGH eines einzelnen Hauses für alle 141
+Aussage, die es nicht gibt. Sie hätte den GFGH eines einzelnen Betriebs für alle 141
 freigegeben und damit genau den Befund gelöscht, den die Erhebung finden sollte.
 `CHECK warengruppe IN ('food','nonfood','kaffee_tee','sonstiges')` sperrt das. **Warum ein
 CHECK und kein Kommentar:** Ein Kommentar hält niemanden auf, der in zwei Jahren „schnell
@@ -1219,7 +1219,7 @@ noch die Getränke" nachträgt; ein CHECK schon, und zwar laut und beim `INSERT`
 ### Der Betrieb wird über seinen Namen aufgelöst, nicht über eine getippte Schlüsselzahl
 
 Eine von Hand in die Saat geschriebene `betrieb_key`-Zahl lädt auch dann klaglos, wenn sie
-auf das falsche Haus zeigt — der Fehler ist nicht sichtbar, weil das Ergebnis plausibel
+auf den falschen Betrieb zeigt — der Fehler ist nicht sichtbar, weil das Ergebnis plausibel
 bleibt. Ein Name ist gegen `core.betrieb` prüfbar. Deshalb steht in den `VALUES` der Name.
 
 **Nachgemessen am 12.08.2026: die Absicherung, auf die sich die Saat beruft, gibt es nicht.**
@@ -1278,7 +1278,7 @@ operativen Betriebe haben keine FoodNotify-Daten der letzten zwölf Monate, und 
 tragen 30,0 % des operativen Umsatzes — zehn davon sind „Deutsche Konzepte". Der blinde
 Fleck ist damit fast eine ganze Marke und kein Streuverlust; Zahlen und Gegenproben in
 [`befunde-datenlage.md`](befunde-datenlage.md). Das Belegarchiv ist die einzige Quelle, die
-diese Häuser überhaupt erreicht.
+diese Betriebe überhaupt erreicht.
 
 ### Offen: Weg B des Belegarchivs liegt durch die gescheiterte Erhebung wieder auf dem Tisch
 
@@ -1300,7 +1300,7 @@ dass jemand die Entscheidung geändert hätte.
 `0056` beantwortet die Preisfrage aus den FoodNotify-Bestellungen — nachgemessen auf
 `localhost/lina`: `mart.einkaufspreis_betrieb` trägt über die letzten zwölf Monate 3.974
 Waren mit Preis je Betrieb und Ware, für **43 der 57 operativen Betriebe**. Was bleibt, ist
-die andere Hälfte: die 14 operativen Häuser ohne FoodNotify und alles, was am Bestellsystem
+die andere Hälfte: die 14 operativen Betriebe ohne FoodNotify und alles, was am Bestellsystem
 vorbei gekauft wurde. Dafür ist Weg B weiterhin der einzige bekannte Weg. Die drei
 Entscheidungen hinter `0056` und ihre gemessenen Grenzen stehen am Ende dieses Blocks.
 
@@ -1320,7 +1320,7 @@ Punkt steht in [`offene-punkte.md`](offene-punkte.md).
 ### Dieselbe Erhebung, die andere Hälfte der Frage: Migration `0056`
 
 Die Excel wollte zweierlei — **wo** eingekauft wird (das beantwortet `mart.fremdeinkauf` aus
-`0055`, oben) und **was jedes Haus für ein Produkt zahlt**. Die zweite Hälfte beantwortet
+`0055`, oben) und **was jeder Betrieb für ein Produkt zahlt**. Die zweite Hälfte beantwortet
 `mart.einkaufspreis_betrieb` aus Migration `0056`, am 12.08.2026 auf `localhost/lina`
 angewendet. `mart.einkaufspreis_monat` (`0041`) konnte es nicht: Sie gruppiert nach Ware,
 Marke, Einheit und Monat — ohne Betrieb und ohne Lieferant, also ohne die Achse, um die die
@@ -1336,7 +1336,7 @@ unten, was die Messung von der Begründung übrig lässt. Bei der dritten ist da
 `summe_preis / menge` (Euro je Gebinde) wie in `0041`.
 
 **Begründung.** Über die Zeit hinweg bucht derselbe Besteller dasselbe Gebinde; über
-Betriebe hinweg nicht. Ein Haus bucht den Karton als `menge = 1`, das nächste sechs Flaschen
+Betriebe hinweg nicht. Ein Betrieb bucht den Karton als `menge = 1`, der nächste sechs Flaschen
 als `menge = 6` — dieselbe Ware, dasselbe Geld, Faktor 6 im Gebindepreis. Die erste Fassung
 der Sicht rechnete mit dem Gebindepreis, und ihre Trefferliste bestand aus genau diesem
 Artefakt: „Elka Orangensaft" 67,02 gegen 11,17, „Grana Padano" 147,90 gegen 14,79, dazu ein
@@ -1376,45 +1376,45 @@ der bezogenen Gebindezahl" und „Median der Gebindepreise" an
 zweimal im Widerspruch zum Kopf derselben Datei. Wer die Sicht in Metabase liest, sieht diese
 Texte im Datenmodell. Nicht behoben.
 
-### Der Maßstab ist der Median der Hauspreise, gebildet nur aus operativen Betrieben
+### Der Maßstab ist der Median der Betriebspreise, gebildet nur aus operativen Betrieben
 
 **Entscheidung.** Vergleichswert je Ware, Einheit und Monat ist der Median **der
-Betriebspreise** — jedes Haus zählt einmal, unabhängig davon, wie oft es bestellt hat. In
-diesen Median gehen nur Häuser mit `status = 'operativ'` ein.
+Betriebspreise** — jeder Betrieb zählt einmal, unabhängig davon, wie oft er bestellt hat. In
+diesen Median gehen nur Betriebe mit `status = 'operativ'` ein.
 
-**Verworfene Alternative: der Median über alle Positionen.** Dann bestimmt ein Haus mit 500
-Bestellungen den Wert, gegen den ein Haus mit fünf gemessen wird — „Konzern" hieße dann „der
+**Verworfene Alternative: der Median über alle Positionen.** Dann bestimmt ein Betrieb mit 500
+Bestellungen den Wert, gegen den ein Betrieb mit fünf gemessen wird — „Konzern" hieße dann „der
 größte Besteller". Nachgemessen am 12.08.2026 ist der Unterschied selten und dort, wo er
 auftritt, groß: In 155 von 9.276 Gruppen (1,7 Prozent) weichen beide Maßstäbe voneinander ab,
 bis zum Faktor 12,5. Die Entscheidung ändert für 98 von 100 Waren nichts und rettet die
 Fälle, in denen es zählt.
 
-**Verworfen: geschlossene Häuser aus der Sicht filtern.** Sie bilden den Maßstab nicht mit —
-ein geschlossenes Haus soll den Preis, an dem sich ein offenes messen lassen muss, nicht
+**Verworfen: geschlossene Betriebe aus der Sicht filtern.** Sie bilden den Maßstab nicht mit —
+ein geschlossener Betrieb soll den Preis, an dem sich ein offener messen lassen muss, nicht
 bestimmen. Ihre Zeilen bleiben aber stehen und bekommen ihre Abweichung gegen den operativen
 Maßstab (Falle 12: die Sicht filtert nicht, sie kennzeichnet). Nachgemessen im Fenster ab
-April 2026: 4.190 Zeilen aus sechs nicht operativen Häusern, 2.897 davon mit Abweichung,
+April 2026: 4.190 Zeilen aus sechs nicht operativen Betrieben, 2.897 davon mit Abweichung,
 keine einzige Zeile ohne `betrieb_status`.
 
 **Was die Umsetzung nicht hält — und das ist blockierend.** `je_betrieb` gruppiert zusätzlich
 nach `bereich` (`core.kostenstelle.art`, also Bar und Küche), und der Maßstab zählt darüber
-mit `count(*)`. Ein Haus, das dieselbe Ware über beide Bereiche bucht, geht **zweimal** in
-`betriebe_operativ` und zweimal in den Median ein — der Kommentar „So zählt jedes Haus
-einmal" ist wörtlich falsch. Nachgemessen: 12.577 doppelte Haus-Zellen über die ganze Sicht
+mit `count(*)`. Ein Betrieb, der dieselbe Ware über beide Bereiche bucht, geht **zweimal** in
+`betriebe_operativ` und zweimal in den Median ein — der Kommentar „So zählt jeder Betrieb
+einmal" ist wörtlich falsch. Nachgemessen: 12.577 doppelte Betrieb-Zellen über die ganze Sicht
 (12.522 durch `bereich`, 55 durch den Lieferanten), 1.525 im Fenster ab April; 1.077 von
-9.519 Gruppen zählen zu hoch, bis +8. **50 Gruppen erreichen die Drei-Häuser-Schwelle allein
+9.519 Gruppen zählen zu hoch, bis +8. **50 Gruppen erreichen die Drei-Betriebe-Schwelle allein
 durch die Doppelzählung**, und 156 Zeilen tragen deshalb `vergleichbar = true` samt
-`abweichung_pct`, obwohl real nur zwei Häuser beteiligt sind. Der Median selbst verschiebt
+`abweichung_pct`, obwohl real nur zwei Betriebe beteiligt sind. Der Median selbst verschiebt
 sich in 180 von 9.190 Gruppen, höchstens um 2,1936 EUR je Basiseinheit. Die Entscheidung
 bleibt richtig, der Code setzt sie nicht um: er bräuchte `count(DISTINCT betrieb_key)` und
-eine Zwischenaggregation je Haus vor dem Median.
+eine Zwischenaggregation je Betrieb vor dem Median.
 
 ### `einheit_verdaechtig`: eine Heuristik, die bewusst echte Fälle unterdrückt
 
-**Entscheidung.** Liegt der Quotient aus Hauspreis und Konzernmedian auf 0,001 genau auf
+**Entscheidung.** Liegt der Quotient aus Betriebspreis und Konzernmedian auf 0,001 genau auf
 einem ganzzahligen Vielfachen ab 2, gilt die Zeile als Mengenartefakt: `vergleichbar = false`,
 `abweichung_pct` und `mehrkosten` bleiben `NULL`. Anlass ist „Tequila Silver 1l Karton 6x1l"
-mit 11,5783 gegen 1,9297, Faktor 6,0000 — beide Häuser buchen dieselbe Gebindegröße, aber das
+mit 11,5783 gegen 1,9297, Faktor 6,0000 — beide Betriebe buchen dieselbe Gebindegröße, aber das
 eine zählt in `gesamt_menge` Kartons und das andere Liter. `gebinde_uneinheitlich` sieht das
 nicht, weil dort die Größe übereinstimmt.
 
@@ -1436,11 +1436,11 @@ befürchtete Verlust ist einstellig, der Tausch damit günstiger als angenommen.
 Lücken, beide gemessen, beide im selben Fenster:
 
 1. **Nur die teure Richtung.** Geprüft wird `preis / median`, nie `median / preis`. Der
-   spiegelbildliche Fall — dieses Haus zählt Liter, die anderen Kartons — läuft durch: 79
+   spiegelbildliche Fall — dieser Betrieb zählt Liter, die anderen Kartons — läuft durch: 79
    Zeilen mit auf 0,001 ganzzahligem Kehrfaktor, **66 davon `vergleichbar = true`**,
    Abweichungen bis **−90,0 Prozent**, in Summe **−37.339 EUR erfundene „Ersparnis"**.
 2. **Bimodale Gruppen sieht sie gar nicht.** Liegt der Median zwischen zwei Mengen-Clustern,
-   ist kein Quotient ganzzahlig. „Captain Morgan Dark Rum 40% 1l Karton 12x1l": jedes Haus
+   ist kein Quotient ganzzahlig. „Captain Morgan Dark Rum 40% 1l Karton 12x1l": jeder Betrieb
    zahlt exakt 147,84 EUR je Karton, die Sicht meldet für die einen **+84,6**, für die
    anderen **−84,6 Prozent**, alle `vergleichbar = true`, `einheit_verdaechtig = false` (der
    Median 6,6733 liegt zwischen 12,32 und 1,0267). Insgesamt 78 Gruppen mit auf 0,001
@@ -1454,7 +1454,7 @@ und der ganze `AND`-Ausdruck wird es mit. Ein `WHERE NOT einheit_verdaechtig` ve
 Zeilen still. `vergleichbar` und `gebinde_uneinheitlich` haben das Problem nicht.
 
 **Was daraus für den Leser folgt, bis das behoben ist.** Die teuren Ausreißer der Sicht
-tragen; die günstigen tragen nicht. „Dieses Haus kauft 85 Prozent günstiger" ist zu vier
+tragen; die günstigen tragen nicht. „Dieser Betrieb kauft 85 Prozent günstiger" ist zu vier
 Fünfteln Mengenartefakt. Eine Einsparliste aus `mehrkosten < 0` ist am 12.08.2026 keine
 Einsparliste.
 
@@ -1491,10 +1491,10 @@ nirgends committet:
 
 | Befund | Behebung |
 |---|---|
-| `bereich` im Korn zählte Häuser doppelt (50 Gruppen erreichten die Schwelle nur dadurch) | `bereich` und Lieferant aus dem `GROUP BY` entfernt, stehen als Anzeige daneben. Nachgemessen: 0 Gruppen zählen noch falsch |
+| `bereich` im Korn zählte Betriebe doppelt (50 Gruppen erreichten die Schwelle nur dadurch) | `bereich` und Lieferant aus dem `GROUP BY` entfernt, stehen als Anzeige daneben. Nachgemessen: 0 Gruppen zählen noch falsch |
 | `menge_unstimmig` umgangen, 48.400-EUR-Kaffee zurück | Die Sicht nimmt jetzt `core.bestellposition.preis_je_einheit` aus `0042` und rechnet sie nicht nach. Kosten: 5.398 von 621.614 Positionen |
 | `einheit_verdaechtig` prüfte nur die teure Richtung | Heuristik ersetzt durch `menge_widerspruechlich` — die Basiseinheit streut weiter als der Gebindepreis |
-| Bimodale Gruppen (Captain Morgan: überall 147,84 EUR, gemeldet ±84,6 %) | Vierte Sperre `spreizung_zu_gross`: mehr als Faktor 3 zwischen den Häusern ist eine Mengenbuchung, kein Preis. Kostet 96 von 17.748 Gruppen |
+| Bimodale Gruppen (Captain Morgan: überall 147,84 EUR, gemeldet ±84,6 %) | Vierte Sperre `spreizung_zu_gross`: mehr als Faktor 3 zwischen den Betrieben ist eine Mengenbuchung, kein Preis. Kostet 96 von 17.748 Gruppen |
 | Drei `COMMENT`s beschrieben den Gebindepreis, gerechnet wurde die Basiseinheit | Kommentare berichtigt |
 
 Wirkung, nachgemessen am 12.08.2026: die negativen `mehrkosten` — also die erfundene

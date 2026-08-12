@@ -2,7 +2,7 @@
 
 Gemessen am 10.08.2026 gegen das Produktivkonto (`accountId 1559219539920412896`), ausschließlich
 lesend. Anlass: wir importieren bisher nur die Note. Gesucht war die **Klusterung** — woran genau
-liegt es, wenn ein Haus abrutscht.
+liegt es, wenn ein Betrieb abrutscht.
 
 Kurzfassung: die Klusterung gibt es, sie heißt `REVIEW_LABELS`, sie hat fünf Themen und reicht nur
 bis April 2026 zurück. Die eigentliche Sentiment-Auswertung von Yext ist für unsere Daten
@@ -77,7 +77,7 @@ August liefert** — nur eben unvollständige, ohne jeden Hinweis darauf.
 **Konsequenz fürs Dashboard:** Bewertungs- und Antwortkennzahlen sind tagesaktuell, die
 Sichtbarkeitszahlen hinken bis zu einer Woche hinterher, und die Google-Suchbegriffe stehen sechs
 Wochen still. Eine Karte „Datenstand" gehört dazu, sonst erklärt irgendwann jemand einen
-Wochenendabfall zum Trend. Der Katalog ist ein Aufruf und liefert das frei Haus.
+Wochenendabfall zum Trend. Der Katalog ist ein Aufruf und liefert das frei Betrieb.
 
 ---
 
@@ -182,7 +182,7 @@ Danach war nicht gefragt, aber es ist der operativ schärfste Teil. Mai–10.08.
 | E_24 | Enchilada Münster | 21 % | 29 | 4,34 |
 | E_13 | Enchilada Hamm | 26 % | 27 | 4,30 |
 
-Andere Häuser liegen über 90 %; der Konzernschnitt im Juni war 0,91. Das ist heute in keinem
+Andere Betriebe liegen über 90 %; der Konzernschnitt im Juni war 0,91. Das ist heute in keinem
 Dashboard sichtbar, kostet nichts und ist sofort adressierbar.
 
 Die Reaktionszeit korreliert sichtbar mit der Note:
@@ -235,7 +235,7 @@ Yext liefert zu jedem Betrieb den **Median vergleichbarer Betriebe** (`_BENCHMAR
 | A_04 | Aposto Aschaffenburg | 6.774 | 7.978 | 0,85× |
 | A_02 | Aposto Aalen | 7.980 | 9.255 | 0,86× |
 
-Dass die sechs schwächsten (nach dem geschlossenen Haus) **allesamt Aposto** sind, ist ein Befund
+Dass die sechs schwächsten (nach dem geschlossenen Betrieb) **allesamt Aposto** sind, ist ein Befund
 für sich.
 
 **Vorsicht bei der Aggregation:** der Median ist nicht summierbar. Über alle 60 aufaddiert kommt
@@ -256,7 +256,7 @@ Konzern 0,95 im Juni, je Betrieb zwischen 0,85 und 1,00:
 | 0,90–0,93 | W_12 · W_13 · EK_10 · EK_09 · E_25 · E_32 · W_09 · W_11 · W_04 |
 
 Dazu im Juni: **328 Einträge mit `UNAVAILABLE_REASON_COUNT`**, 13 offene `SUGGESTION_COUNT`,
-14 `PUBLISHER_SUGGESTIONS`, 3.189 aktive Einträge über alle Betriebe (~53 je Haus). Duplikate:
+14 `PUBLISHER_SUGGESTIONS`, 3.189 aktive Einträge über alle Betriebe (~53 je Betrieb). Duplikate:
 null erkannt, null unterdrückt.
 
 Das ist eine Arbeitsliste für das Marketing, keine Kennzahl für den Round Table — aber es ist die
@@ -364,4 +364,4 @@ zu mehr Daten. Das Stundenlimit von 5.000 ist kein Thema.
    Vorjahresvergleich sofort statt in acht Monaten ermöglichen.
 
 3. **Welche Betriebe stehen im Benchmark-Vergleich auf Median 0** und warum (u. a. alle
-   Enchiladas)? Ohne Antwort ist der Vergleich nur für einen Teil der Häuser nutzbar.
+   Enchiladas)? Ohne Antwort ist der Vergleich nur für einen Teil der Betriebe nutzbar.

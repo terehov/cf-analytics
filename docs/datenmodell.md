@@ -223,7 +223,7 @@ ein **zulässiger Endzustand**, keine halbfertige Zeile.
 
 **Die eine harte Bindung: `betrieb_key REFERENCES core.betrieb`.** Die Saat schreibt keine
 Schlüsselzahl hinein, sondern löst den Betrieb über `core.betrieb.name` auf — eine falsche Zahl
-lädt klaglos und zeigt danach auf das falsche Haus. Nachgemessen am 12.08.2026: der `JOIN` in
+lädt klaglos und zeigt danach auf den falschen Betrieb. Nachgemessen am 12.08.2026: der `JOIN` in
 der Saat ist ein `INNER JOIN` und lässt einen unbekannten Namen ebenso still fallen (14
 `VALUES`-Zeilen mit einem absichtlich falschen Namen ergaben 13 Zeilen, keine Meldung). Die
 Absicherung, die der Migrationskommentar an dieser Stelle behauptet („bricht am `NOT NULL` des
@@ -241,7 +241,7 @@ steht trotzdem hier, weil sie eine Modellfrage entscheidet: welche Größe „de
 rechnet `summe_preis / menge` — den **Gebindepreis**. Dort wird eine Ware über die Zeit
 verglichen, und derselbe Besteller bucht dieselbe Gebindeeinheit; der Kartonpreis ist die Zahl,
 in der ein Einkäufer denkt. `mart.einkaufspreis_betrieb` rechnet `summe_preis / gesamt_menge` —
-den Preis je **Basiseinheit**. Hier wird über *Häuser* verglichen, und dort bucht das eine Haus
+den Preis je **Basiseinheit**. Hier wird über *Betriebe* verglichen, und dort bucht der eine Betrieb
 einen Karton als `menge = 1` und das andere sechs Flaschen als `menge = 6`: dieselbe Ware,
 dasselbe Geld, Faktor 6 im Gebindepreis. Die erste Fassung der Sicht rechnete mit dem Gebinde
 und meldete genau das als Befund („Grana Padano" 147,90 gegen 14,79, Faktor 10,00).
@@ -253,7 +253,7 @@ gegen 67 Basis — gemessen über `bar`-Positionen der letzten zwölf Monate). N
 ohne Zeitfilter): 2.182 Waren mit mindestens vier Betrieben, Median der Spanne 1,06 gegen 1,07,
 über Faktor 3 streuen **286 Waren beim Gebindepreis und 337 bei der Basiseinheit**. Nach dem
 eigenen Maßstab der Migration ist die Basiseinheit dort die *schlechtere* Wahl. Die
-Entscheidung bleibt richtig — über Häuser hinweg ist der Gebindepreis schlicht keine
+Entscheidung bleibt richtig — über Betriebe hinweg ist der Gebindepreis schlicht keine
 vergleichbare Größe —, aber nicht mit dieser Begründung.
 
 **Was das über `gesamt_menge` sagt: die Basiseinheit ist nicht die saubere Größe, nur eine
@@ -274,12 +274,12 @@ belastbar ist — „eine fehlende Zahl ist besser als eine erfundene". `0056` r
 ungeprüft und umgeht damit die einzige Stelle, an der die Prüfung steht. Folge: der
 48.400-EUR-Kaffee aus dem Kopf von `0042` steht wieder in einer Auswertung — `Idee
 Entkoffeiniert 50 Pouches A 7G` mit `preis` = 48.400,0000 EUR/kg, im Februar 2026 sogar mit
-`vergleichbar = true` und 0,0 Prozent Abweichung, weil alle drei beteiligten Häuser dasselbe
+`vergleichbar = true` und 0,0 Prozent Abweichung, weil alle drei beteiligten Betriebe dasselbe
 Artefakt tragen.
 
 **Und die Verpackung ist damit nicht wegnormalisiert, sondern nur verschoben.** Buchen einige
-Häuser die Gesamtmenge in Kartons und andere in Litern, spaltet sich der Preis je Basiseinheit
-in zwei Cluster. „Captain Morgan Dark Rum 40% 1l Karton 12x1l": **jedes Haus zahlt exakt 147,84
+Betriebe die Gesamtmenge in Kartons und andere in Litern, spaltet sich der Preis je Basiseinheit
+in zwei Cluster. „Captain Morgan Dark Rum 40% 1l Karton 12x1l": **jeder Betrieb zahlt exakt 147,84
 EUR je Gebinde**, die Sicht meldet +84,6 Prozent für die einen und −84,6 Prozent für die
 anderen, `vergleichbar = true`. Die Heuristik `einheit_verdaechtig` greift nicht, weil der
 Median (6,6733) zwischen den Clustern liegt und kein Quotient ganzzahlig wird. Nachgemessen am

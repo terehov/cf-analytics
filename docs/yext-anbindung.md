@@ -99,7 +99,7 @@ datenschutzrechtlicher Prüfung — nicht durch die Hintertür dieses Zugangs.~~
 
 > **Nachtrag 03.08.2026 — dieser Antrag ist gestellt und entschieden.** Die Texte werden
 > seitdem gespeichert (`core.bewertung`), damit die roten Ampeln des Round Table eine
-> Ursache bekommen: eine Zahl sagt, *dass* ein Haus abrutscht, erst der Text sagt *woran*.
+> Ursache bekommen: eine Zahl sagt, *dass* ein Betrieb abrutscht, erst der Text sagt *woran*.
 > Gespeichert werden Note, Datum, Portal, Text, **Autorenname** und der Link zur Quelle;
 > `authorEmail` und die Antworten des Betriebs (`comments`) bleiben ausgeschlossen.
 >
@@ -279,7 +279,7 @@ allerdings kein Blocker mehr, sondern eine zweite Sicherung.
 ### Wie die 141 Betriebe und die Yext-Entitäten zueinander stehen
 
 Von den 141 Zeilen in `core.betrieb` sind viele keine Restaurants: Holdings
-(`… Beteiligungs GmbH`, `… Management GmbH`), Testeinträge und stillgelegte Häuser
+(`… Beteiligungs GmbH`, `… Management GmbH`), Testeinträge und stillgelegte Betriebe
 (`GESCHLOSSEN …`). Yext führt 65 Restaurant-Entitäten in unseren Ordnern; 60 davon sind
 zugeordnet.
 

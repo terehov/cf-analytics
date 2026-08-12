@@ -94,13 +94,13 @@ Rückweg ist immer, den Filter oben zu löschen.
 | ⑥ | Portfolio und Potenzial | Konzentration, Streuung, was der Abstand zum Median kostet | — |
 | ⑦ | Muster im Geschäft | Wochenrhythmus, Stabilität, Gäste gegen Bon | — |
 | ⑧ | Standortkarte | Alle Standorte mit Koordinate, eingefärbt nach Handlungsbedarf | ③ |
-| ⑨ | Betrieb gegen Marke | Ein Haus gegen den Schnitt seiner eigenen Marke | ③ |
-| ⑩ | Betrieb gegen die Stadt | Ein Haus gegen die Nachbarhäuser am selben Ort | ③ |
+| ⑨ | Betrieb gegen Marke | Ein Betrieb gegen den Schnitt seiner eigenen Marke | ③ |
+| ⑩ | Betrieb gegen die Stadt | Ein Betrieb gegen die Nachbarbetriebe am selben Ort | ③ |
 
 Dazu drei Detailseiten ohne Nummer, die man nicht ansteuert, sondern in die man klickt:
 **Beleg** (`dd_beleg`, aus der Bestellliste), **Zählung** (`dd_inventur`, aus der
 Inventurliste) und **Sperre** (`dd_sperre`, aus „Warum eine Ware nicht verglichen wird" —
-zeigt die Waren und Häuser hinter einer der vier Sperren des Preisvergleichs).
+zeigt die Waren und Betriebe hinter einer der vier Sperren des Preisvergleichs).
 
 ### Round Table — die Excel-Ablösung
 
@@ -285,7 +285,7 @@ Aktuell `http://localhost:3000`. **Beim Umzug nach Hetzner auf die künftige Dom
 > „Wir importieren von Yext aktuell nur die Bewertung. Allerdings interessiert uns die
 > Klusterung, was denn genau die Themen sind."
 
-Bis dahin sagte der Round Table, **dass** ein Haus abrutscht, und daneben standen die
+Bis dahin sagte der Round Table, **dass** ein Betrieb abrutscht, und daneben standen die
 Bewertungstexte, damit ein Mensch das **woran** selbst liest. Yext klassifiziert diese Texte
 aber bereits selbst. Migration 0050 holt das Ergebnis herein, `metabase/karten-yext.ts` zeigt
 es. Der vollständige Befund zur API steht in [`yext-analytics-inventar.md`](yext-analytics-inventar.md).
@@ -317,23 +317,23 @@ richtig. Deshalb rechnet `mart.bewertung_thema.anteil` gegen die echte Bewertung
 **kein Kreisdiagramm**: ein Tortenstück behauptet einen Anteil an einem Ganzen, das es hier
 nicht gibt.
 
-**Der Schwachpunkt ist der Abstand, nicht die kleinste Note.** Ein Haus mit lauter Vieren hat
+**Der Schwachpunkt ist der Abstand, nicht die kleinste Note.** Ein Betrieb mit lauter Vieren hat
 kein Wartezeitproblem, nur weil die Wartezeit bei 3,9 steht. Gezeigt wird deshalb der Abstand
-zum eigenen Schnitt des Hauses.
+zum eigenen Schnitt des Betriebs.
 
 ### Was daneben lag und mitgenommen wurde
 
 Dieselbe API liefert zwei Blöcke, nach denen niemand gefragt hatte:
 
 **Antwortverhalten** (Reiter *Antworten*). Wer auf Bewertungen antwortet und wie schnell. Das
-war nirgends sichtbar: einzelne Häuser antworten gar nicht, während der Konzernschnitt bei 91 %
+war nirgends sichtbar: einzelne Betriebe antworten gar nicht, während der Konzernschnitt bei 91 %
 liegt. Wo nicht geantwortet wurde, bleibt die Reaktionszeit **leer und nicht null** — Yext
-liefert dort 0, und 0 Stunden hätte genau die Häuser ohne Antwort an die Spitze der Bestenliste
+liefert dort 0, und 0 Stunden hätte genau die Betriebe ohne Antwort an die Spitze der Bestenliste
 gesetzt.
 
 **Sichtbarkeit** (Reiter *Sichtbarkeit*). Impressionen, Suchen, Profilaufrufe, Klicks — und
-der von Yext gelieferte **Median vergleichbarer Betriebe**. Faktor unter 1 heißt: dieses Haus
-wird seltener gesehen als vergleichbare. Der Median ist **nicht addierbar**; über alle Häuser
+der von Yext gelieferte **Median vergleichbarer Betriebe**. Faktor unter 1 heißt: dieser Betrieb
+wird seltener gesehen als vergleichbare. Der Median ist **nicht addierbar**; über alle Betriebe
 summiert ergäbe er eine Zahl, die nach Faktor 9 aussieht und nichts bedeutet. Deshalb nur je
 Betrieb und nur, wo Yext überhaupt einen Vergleich führt.
 
@@ -353,7 +353,7 @@ Bewertungen sind bis gestern vollständig, Impressionen bis zu einer Woche älte
 |---|---|
 | ① Round Table, *Lage* | Kacheln **Schwächstes Thema** und **Antwortquote**, beide führen auf das Bewertungs-Dashboard |
 | ② Filialen | *Woran es bei wem liegt* — die Note je Thema unter der Bewertungs-Rangliste |
-| ③ Betrieb, *Gäste & Bewertungen* | Themenprofil und Verlauf des Hauses, dazu sein Antwortverhalten |
+| ③ Betrieb, *Gäste & Bewertungen* | Themenprofil und Verlauf des Betriebs, dazu sein Antwortverhalten |
 | Online-Bewertungen | drei neue Reiter: *Themen*, *Antworten*, *Sichtbarkeit* |
 
 Die Kachel auf ① ist der eigentliche Punkt: „4,23" sagt niemandem, was zu tun ist,
@@ -367,14 +367,14 @@ Die Kachel auf ① ist der eigentliche Punkt: „4,23" sagt niemandem, was zu tu
 > festzustellen, ob bei allen der Umsatz eingebrochen ist oder nur bei einem."
 
 Das ist die Frage nach dem **Maßstab**. Ein Umsatzrückgang von zwölf Prozent heißt etwas
-völlig anderes, je nachdem ob die Nachbarhäuser dasselbe zeigen oder ob das Haus allein
+völlig anderes, je nachdem ob die Nachbarbetriebe dasselbe zeigen oder ob der Betrieb allein
 dasteht. Ohne Maßstab führt jede Zahl im Round Table zu derselben Rückfrage, und die wurde
 bisher von Hand beantwortet.
 
 ### Die kurze Fassung steht auf ③ Betrieb, die lange auf ⑨ und ⑩
 
 **Nachgereicht am 10.08.2026:** „das bestehende Betriebs-Dashboard um diese zwei Sachen
-erweitern … alles auf einem Dashboard". Berechtigt — die Frage „liegt es an diesem Haus?"
+erweitern … alles auf einem Dashboard". Berechtigt — die Frage „liegt es an diesem Betrieb?"
 stellt sich beim Lesen des Betriebsblatts, nicht auf einer Extraseite, zu der man erst
 navigieren muss.
 
@@ -383,7 +383,7 @@ Auf ③ stehen deshalb direkt unter den sechs Kennzahlen zwei Karten:
 | Karte | Zeigt |
 |---|---|
 | `dd_betrieb_vergleich` | dieselben sechs Kennzahlen, je mit Markenmedian **und** Stadtmedian samt Rang |
-| `dd_betrieb_vergleich_verlauf` | Umsatzveränderung über 24 Monate: Haus, Marke und Stadt in **einem** Bild |
+| `dd_betrieb_vergleich_verlauf` | Umsatzveränderung über 24 Monate: Betrieb, Marke und Stadt in **einem** Bild |
 
 Das liest sich von oben nach unten: `dd_betrieb_kopf` beantwortet *wie hat es sich
 entwickelt* (Vormonat, Trend, Ampelwechsel), die Karte darunter *wie steht es gegen die
@@ -414,7 +414,7 @@ Zwei Klickflächen je Thema, weil die Hand nach der **roten Zahl** greift — un
 der Rang, denn der trägt die Aussage. Eine einzelne verlinkte Spalte daneben wäre ein Klick,
 den man erst suchen muss.
 
-`Kennzahl`, `●` und `Wert` bleiben bewusst stumm: sie beschreiben das **Haus**, nicht eine
+`Kennzahl`, `●` und `Wert` bleiben bewusst stumm: sie beschreiben den **Betrieb**, nicht eine
 Vergleichsgruppe, und hätten deshalb kein eindeutiges Ziel. Ein Klick, der zwischen Marke
 und Stadt raten müsste, ist schlechter als keiner.
 
@@ -430,7 +430,7 @@ Ein Beispiel, warum beide Ebenen bleiben — Enchilada Karlsruhe im Juli:
 | Personal | 45,0 % | 39,2 % | 16 von 17 | 42,5 % | 3 von 4 |
 | WE Küche | 37,4 % | 24,9 % | **17 von 17** | 33,9 % | **4 von 4** |
 
-Der Umsatz ist nicht das Problem — das Haus ist das beste seiner Stadt und das zweitbeste
+Der Umsatz ist nicht das Problem — der Betrieb ist der beste seiner Stadt und der zweitbeste
 seiner Marke. Der Wareneinsatz Küche ist es: **letzter gegen beide Maßstäbe.** Diese
 Diagnose steht jetzt auf dem Betriebsblatt selbst; ⑨ und ⑩ sagen anschließend, gegen *wen*
 genau.
@@ -444,8 +444,8 @@ Die beiden Gruppen fangen **verschiedene Störquellen** ab:
 | **Marke** | Konzept, Karte, Preise, Zielgruppe | Standort, Einzugsgebiet, Wetter | … am Konzept liegt |
 | **Stadt** | Einzugsgebiet, Wetter, Feiertage, Kaufkraft | Konzept, Karte, Preise | … am Standort liegt |
 
-Erst wer beide nebeneinander liest, kann die dritte Aussage treffen: **fällt ein Haus
-gegenüber seiner Marke *und* gegenüber seiner Stadt ab, liegt es am Haus.** Eine einzelne
+Erst wer beide nebeneinander liest, kann die dritte Aussage treffen: **fällt ein Betrieb
+gegenüber seiner Marke *und* gegenüber seiner Stadt ab, liegt es am Betrieb.** Eine einzelne
 Seite mit Umschalter hätte genau diesen Vergleich unmöglich gemacht — man sieht immer nur
 eine der beiden Antworten.
 
@@ -461,7 +461,7 @@ ohne Fehlermeldung**. Nicht zu unterscheiden von einem Betrieb ohne Geschäft �
 Falle, wegen der die Textfilter überhaupt Auswahllisten bekommen haben.
 
 Auch **keinen Zeitraumfilter**, und das ist kein Vergessen: die Verlaufskarten lesen zwei
-verschiedene Tabellen (das Haus und seine Gruppe), und ein Metabase-Feldfilter baut seine
+verschiedene Tabellen (der Betrieb und seine Gruppe), und ein Metabase-Feldfilter baut seine
 Klausel aus dem *Tabellennamen*. Er würde nur einen der beiden Äste einschränken und die
 Linien still verschieden lang machen. Stattdessen ein festes **24-Monats-Fenster, das am
 Monatsfilter hängt** — zwei Jahre, weil ein Jahresvergleich mindestens einen vollen
@@ -479,7 +479,7 @@ Ein Muster, das sich durch alle zehn Karten zieht:
 Tabellen stehen ohne Auswahl vollständig da und sind dann eine brauchbare Gesamtübersicht
 („wer liegt am weitesten unter seiner eigenen Marke"). Diagramme können das nicht — 49
 Linien übereinander sind keine Kurve. Sie zeigen ohne Auswahl deshalb die **Gruppen selbst**
-(die Marken bzw. die Städte) und mit Auswahl die einzelnen Häuser.
+(die Marken bzw. die Städte) und mit Auswahl die einzelnen Betriebe.
 
 ### Was in den Sichten steht und nicht in den Karten
 
@@ -493,7 +493,7 @@ Personalquote wieder als „höher" lesbar wäre und auch in einem CSV-Export fu
 **Der Rang steht nie ohne die Gruppengröße** — „3 von 14", nicht „3". Platz drei ist unter
 vierzehn gut und unter dreien der letzte.
 
-**Der Maßstab zählt nur operative Häuser.** Ein stillgelegtes Haus steht mit −100 % Umsatz
+**Der Maßstab zählt nur operative Betriebe.** Ein stillgelegter Betrieb steht mit −100 % Umsatz
 in den Daten; zwei davon in einer kleinen Marke, und jeder laufende Betrieb sieht
 überdurchschnittlich aus. Der **betrachtete** Betrieb darf trotzdem still sein — sonst öffnet
 sich die Seite für ihn leer, und leer liest sich als „keine Daten" statt als „stillgelegt".
@@ -503,14 +503,14 @@ den Umsatz im Nenner und erreicht gemessen bis 316.576 %.
 
 ### Auf ⑩ steht eine Warnung, die auf ⑨ fehlt
 
-Die Häuser einer Stadt gehören **verschiedenen Marken**. In Karlsruhe stehen Aposto,
+Die Betriebe einer Stadt gehören **verschiedenen Marken**. In Karlsruhe stehen Aposto,
 Enchilada, Lehners und Wilma Wunder nebeneinander — vier Konzepte mit verschiedenen Karten,
 Preisen und Personalstrukturen. Ein Wareneinsatz von 24 % ist zwischen einem mexikanischen
 und einem bürgerlichen Konzept **keine gemeinsame Messlatte**.
 
-Belastbar ist dort die **Veränderung gegenüber dem Vorjahr**: die trägt jedes Haus in seiner
+Belastbar ist dort die **Veränderung gegenüber dem Vorjahr**: die trägt jeder Betrieb in seiner
 eigenen Einheit, und Wetter, Baustellen und Feiertage treffen alle gleichzeitig. Deshalb
-steht auf ⑩ die Umsatzveränderung ganz oben (als Balken je Haus, die Karte, wegen der es die
+steht auf ⑩ die Umsatzveränderung ganz oben (als Balken je Betrieb, die Karte, wegen der es die
 Seite gibt) und die absoluten Quoten darunter — auf ⑨ ist die Reihenfolge dieselbe, aber der
 Vorbehalt entfällt.
 
@@ -518,12 +518,12 @@ Vorbehalt entfällt.
 
 Der Stadtvergleich ist nur so vollständig wie die von Hand gepflegte Standortliste. Am
 10.08.2026 haben **60 von 141** Betrieben eine Ortsangabe, darunter **49 von 56** im letzten
-bewerteten Monat operativen — sieben laufende Häuser fehlen also in ihrer Stadt, **ohne dass
+bewerteten Monat operativen — sieben laufende Betriebe fehlen also in ihrer Stadt, **ohne dass
 es dort auffiele**. Genau deshalb steht unten auf ⑩ die Karte „Wer im Stadtvergleich fehlt",
 und die Kopfzeile sagt bei einem Betrieb ohne Ortsangabe ausdrücklich „(keine Stadt
 hinterlegt)" statt leer zu bleiben.
 
-Zehn Städte haben mindestens zwei laufende Häuser; Karlsruhe mit vieren ist die größte
+Zehn Städte haben mindestens zwei laufende Betriebe; Karlsruhe mit vieren ist die größte
 Gruppe. Für alle anderen Betriebe ist ⑩ eine leere Seite — das ist keine Datenlücke, sondern
 die Lage.
 
@@ -533,7 +533,7 @@ die Lage.
 
 Gewünscht ist eine Deutschlandkarte auf der Markenübersicht: alle Standorte, eingefärbt nach
 der Round-Table-Gesamtampel, anklickbar bis ins Betriebsblatt, und beim Filtern auf eine
-Marke nur deren Häuser. Bei mehreren Marken in derselben Stadt ist die geografische
+Marke nur deren Betriebe. Bei mehreren Marken in derselben Stadt ist die geografische
 Verteilung sonst unsichtbar.
 
 **Die Struktur steht, die Koordinaten fehlen.** Am 26.07.2026 gemessen:
@@ -609,7 +609,7 @@ Punkt ist in der Kartenvisualisierung nicht vorgesehen (anders als bei Tabellens
 Was stattdessen geht und in `mart.standort.punkt` bereits vorbereitet ist: die Beschriftung
 trägt **Ampel-Emoji + Marke + Betriebsname** — `🔴 Enchilada — Enchilada Würzburg GmbH`. Bei
 eng beieinanderliegenden Betrieben macht die vorangestellte Marke auf einen Blick klar, um
-welches Haus es geht, und das Emoji trägt die Ampelfarbe auch dann, wenn zwei Marker
+welchen Betrieb es geht, und das Emoji trägt die Ampelfarbe auch dann, wenn zwei Marker
 überlappen.
 
 Wer echte Logos will, braucht eine eigene Kartenanwendung außerhalb von Metabase. Das wäre
@@ -929,7 +929,7 @@ Aufbau in der Reihenfolge, in der man nachfragt:
 ### Drei Dinge, die man wissen muss, um die Seite richtig zu lesen
 
 **„keine Daten" ist kein Fehler.** LINA antwortet mit HTTP 500 und leerem Body, wenn ein
-Betrieb für einen Bericht nichts hat — ein geschlossenes Haus, ein Bericht, den dieser Betrieb
+Betrieb für einen Bericht nichts hat — ein geschlossener Betrieb, ein Bericht, den dieser Betrieb
 nicht führt. Bei 141 Betrieben ist das ständig der Fall. Nur was unter „Fehler" steht, ist
 einer.
 
