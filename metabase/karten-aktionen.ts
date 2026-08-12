@@ -32,11 +32,12 @@
 // =====================================================================
 
 import type { Karte } from './typen'
-import { MONAT_CTE, P_MONAT, P_MARKE, P_BETRIEB } from './gemeinsam'
+import { MONAT_CTE, P_MONAT, P_MARKE, P_BETRIEB, P_AKTION } from './gemeinsam'
 
 const MONAT = P_MONAT
 const MARKE = P_MARKE
 const BETRIEB = P_BETRIEB
+const AKTION = P_AKTION
 
 export const karten: Karte[] = [
   // -------------------------------------------------------------------
@@ -214,5 +215,91 @@ SELECT a.aktion                                                  AS "Aktion",
                FROM mart.aktionsumsatz_monat
               GROUP BY aktion_key) u USING (aktion_key)
  ORDER BY a.erster_umsatztag DESC NULLS FIRST`,
+  },
+
+  // -------------------------------------------------------------------
+  // Der Aktions-Drill-Down (dd_aktion). Drei Karten fuer die Frage nach
+  // EINER Aktion: ihr Steckbrief, ihr Verlauf, ihre Betriebe. Ohne
+  // gewaehlte Aktion zeigen alle drei alles — wer direkt herkommt, soll
+  // etwas sehen und nicht raten, welcher Filter fehlt (wie dd_sperre).
+  // -------------------------------------------------------------------
+  {
+    schluessel: 'akd_steckbrief',
+    name: 'Steckbrief der Aktion',
+    beschreibung:
+      'Geplante Gültigkeit gegen tatsächliche Laufzeit dieser Aktion. „—" heißt unbefristet. Nur die 34 erfassenden Betriebe (überwiegend Enchilada) zählen mit.',
+    anzeige: 'table',
+    parameter: [AKTION],
+    sql: `
+SELECT a.aktion                                                  AS "Aktion",
+       coalesce(to_char(a.gueltig_von, 'DD.MM.YYYY'), '—')       AS "Geplant von",
+       coalesce(to_char(a.gueltig_bis, 'DD.MM.YYYY'), '—')       AS "Geplant bis",
+       coalesce(to_char(a.erster_umsatztag, 'DD.MM.YYYY'), '—')  AS "Erster Umsatz",
+       coalesce(to_char(a.letzter_umsatztag, 'DD.MM.YYYY'), '—') AS "Letzter Umsatz",
+       coalesce(u.betriebe, 0)                                   AS "Betriebe"
+  FROM mart.aktion a
+  LEFT JOIN (SELECT aktion_key, count(DISTINCT betrieb_key) AS betriebe
+               FROM mart.aktionsumsatz_monat
+              GROUP BY aktion_key) u USING (aktion_key)
+ WHERE 1 = 1
+   [[AND a.aktion = {{aktion}}]]
+ ORDER BY a.erster_umsatztag DESC NULLS FIRST
+ LIMIT 100`,
+  },
+
+  {
+    schluessel: 'akd_verlauf',
+    name: 'Aktion — Umsatz je Monat',
+    beschreibung:
+      'Der Monatsumsatz dieser Aktion über 24 Monate — wann sie anlief, trug und auslief. Der jüngste Balken ist der laufende, noch unvollständige Monat. Nur die 34 erfassenden Betriebe.',
+    anzeige: 'bar',
+    parameter: [AKTION, MARKE, BETRIEB],
+    sql: `
+SELECT a.monat              AS "Monat",
+       sum(a.umsatz_netto)  AS "Umsatz",
+       count(DISTINCT a.betrieb_key) AS "Betriebe"
+  FROM mart.aktionsumsatz_monat a
+ WHERE a.monat >= date_trunc('month', current_date)::date - interval '23 months'
+   [[AND a.aktion = {{aktion}}]]
+   [[AND a.konzept = {{marke}}]]
+   [[AND a.betrieb = {{betrieb}}]]
+ GROUP BY a.monat
+ ORDER BY a.monat`,
+    visualisierung: {
+      'graph.dimensions': ['Monat'],
+      'graph.metrics': ['Umsatz', 'Betriebe'],
+      series_settings: { Betriebe: { display: 'line', axis: 'right' } },
+      'graph.y_axis.title_text': 'Aktionsumsatz netto (€)',
+    },
+  },
+
+  {
+    schluessel: 'akd_betriebe',
+    name: 'Aktion — die Betriebe dahinter',
+    beschreibung:
+      'Wer die Aktion fährt, was sie ihm einspielt und wie stark sein Monat daran hängt — zwölf Monate. **Ø Anteil %** ist der Schnitt über die Betriebsmonate dieses Betriebs. Ein Klick auf den Namen öffnet das Betriebsblatt.',
+    anzeige: 'table',
+    parameter: [AKTION, MARKE, BETRIEB],
+    sql: `
+SELECT a.betrieb                     AS "Betrieb",
+       a.konzept                     AS "Marke",
+       round(sum(a.umsatz_netto))    AS "Umsatz",
+       round(avg(a.anteil_pct), 1)   AS "Ø Anteil %",
+       count(DISTINCT a.monat)       AS "Monate",
+       max(a.monat)                  AS "Letzter Monat"
+  FROM mart.aktionsumsatz_monat a
+ WHERE a.monat >= date_trunc('month', current_date)::date - interval '11 months'
+   [[AND a.aktion = {{aktion}}]]
+   [[AND a.konzept = {{marke}}]]
+   [[AND a.betrieb = {{betrieb}}]]
+ GROUP BY a.betrieb, a.konzept
+ ORDER BY avg(a.anteil_pct) DESC NULLS LAST
+ LIMIT 300`,
+    visualisierung: {
+      column_settings: {
+        '["name","Umsatz"]': { number_style: 'currency', currency: 'EUR', currency_style: 'symbol', decimals: 0 },
+        '["name","Ø Anteil %"]': { suffix: ' %' },
+      },
+    },
   },
 ]

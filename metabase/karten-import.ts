@@ -15,6 +15,7 @@
 // =====================================================================
 
 import type { Karte } from './typen'
+import { P_ENDPUNKT } from './gemeinsam'
 
 export const karten: Karte[] = [
   // ===================================================================
@@ -497,6 +498,42 @@ SELECT betrieb      AS "Betrieb",
  LIMIT 200`,
     visualisierung: {
       column_settings: { '["name","Wert"]': { suffix: ' %' } },
+    },
+  },
+
+  // -------------------------------------------------------------------
+  // Der Fehler-Drill-Down (dd_import_fehler) hinter den Fehlermustern.
+  //
+  // im_fehler fasst gleichartige Fehler der letzten 24 Stunden zusammen;
+  // hier stehen die EINZELNEN Aufrufe dahinter, mit rohem Fehlertext und
+  // sieben Tagen Rueckblick — genug, um "seit wann" zu beantworten, ohne
+  // sync.aufgabe unbegrenzt zu lesen.
+  // -------------------------------------------------------------------
+  {
+    schluessel: 'imf_faelle',
+    name: 'Die einzelnen Fehlerfälle',
+    beschreibung:
+      'Jeder fehlgeschlagene Aufruf der letzten sieben Tage, neueste zuerst — mit dem rohen Fehlertext, den das Muster oben normalisiert hat. „Versuch" über 1 heißt: der Import hat es selbst noch einmal probiert.',
+    anzeige: 'table',
+    parameter: [P_ENDPUNKT],
+    sql: `
+SELECT to_char(beendet_am, 'DD.MM. HH24:MI') AS "Zeit",
+       endpunkt                              AS "Bericht",
+       coalesce(http_status::text, '—')      AS "HTTP",
+       versuch                               AS "Versuch",
+       coalesce(zeitraum_von::text, '—')     AS "Zeitraum von",
+       coalesce(zeitraum_bis::text, '—')     AS "Zeitraum bis",
+       coalesce(fehler, 'ohne Meldung')      AS "Fehler"
+  FROM sync.aufgabe
+ WHERE status = 'fehler'
+   AND beendet_am >= now() - interval '7 days'
+   [[AND endpunkt = {{endpunkt}}]]
+ ORDER BY beendet_am DESC
+ LIMIT 300`,
+    visualisierung: {
+      column_settings: {
+        '["name","Fehler"]': { text_wrapping: true },
+      },
     },
   },
 ]

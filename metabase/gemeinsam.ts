@@ -178,6 +178,28 @@ export const P_ZEITRAUM: Parameter = {
 }
 
 /**
+ * Der einzelne Artikel, fuer den Artikel-Drill-Down. Ohne Werteliste:
+ * der Filter wird geklickt (aus Rennern, Pennern, Betriebsartikeln),
+ * nicht getippt — 10.000 Kassennamen sind keine Auswahl.
+ */
+export const P_ARTIKEL: Parameter = {
+  id: 'artikel-param', name: 'artikel', 'display-name': 'Artikel', type: 'text',
+  required: false,
+}
+
+/** Die einzelne Aktion, fuer den Aktions-Drill-Down. */
+export const P_AKTION: Parameter = {
+  id: 'aktion-param', name: 'aktion', 'display-name': 'Aktion', type: 'text',
+  required: false,
+}
+
+/** Der einzelne Import-Endpunkt, fuer den Fehler-Drill-Down. */
+export const P_ENDPUNKT: Parameter = {
+  id: 'endpunkt-param', name: 'endpunkt', 'display-name': 'Bericht', type: 'text',
+  required: false,
+}
+
+/**
  * Eine einzelne Inventur, angesteuert ueber ihren Schluessel.
  *
  * Bewusst der SCHLUESSEL und nicht Betrieb+Datum: an einem Tag zaehlen Bar

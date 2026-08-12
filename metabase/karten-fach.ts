@@ -16,7 +16,7 @@
 // =====================================================================
 
 import type { Karte, Parameter } from './typen'
-import { MONAT_CTE, MONAT_CTE_UMSATZ, MONAT_CTE_BWA, P_MONAT, P_BETRIEB, P_ZEITRAUM, P_MARKE, WOCHENTAGE } from './gemeinsam'
+import { MONAT_CTE, MONAT_CTE_UMSATZ, MONAT_CTE_BWA, P_MONAT, P_BETRIEB, P_ZEITRAUM, P_MARKE, P_ARTIKEL, WOCHENTAGE } from './gemeinsam'
 
 // Der Monat ist bewusst kein Pflichtfeld — siehe gemeinsam.ts.
 const ZEITRAUM = P_ZEITRAUM
@@ -744,6 +744,90 @@ SELECT mart.artikelverkauf.warengruppe                  AS "Warengruppe",
  ORDER BY sum(mart.artikelverkauf.umsatz_netto) DESC NULLS LAST`,
     template_tag_dimension: { zeitraum: ['mart', 'artikelverkauf', 'geschaeftstag'] },
   },
+
+  // ===================================================================
+  // Der Artikel-Drill-Down (dd_artikel). Drei Karten auf
+  // mart.artikel_monat (0068) — die Tagessicht braucht 7 Sekunden je
+  // Artikelfrage, die Monatssicht 26 Millisekunden. Feste Fenster statt
+  // Zeitraumfilter: die Monatssicht kennt keine Tage.
+  // ===================================================================
+  {
+    schluessel: 'ar_kopf',
+    name: 'Der Artikel in Zahlen',
+    beschreibung:
+      'Zwölf Monate in einer Zeile: Menge, Umsatz, Ø Preis netto und der Deckungsbeitrag. „DB %" rechnet nur gegen den Umsatzanteil mit hinterlegtem Wareneinsatz — „WE hinterlegt %" sagt, wie groß der ist. Ohne gewählten Artikel stehen hier die 50 umsatzstärksten.',
+    anzeige: 'table',
+    parameter: [P_ARTIKEL, P_BETRIEB, P_MARKE],
+    sql: `
+SELECT artikel                        AS "Artikel",
+       max(warengruppe)               AS "Warengruppe",
+       sum(menge)                     AS "Menge",
+       round(sum(umsatz_netto))       AS "Umsatz",
+       round(sum(umsatz_netto) / nullif(sum(menge), 0), 2) AS "Ø Preis netto",
+       round(sum(deckungsbeitrag))    AS "Deckungsbeitrag",
+       round(100 * sum(deckungsbeitrag) / nullif(sum(umsatz_mit_we), 0), 1) AS "DB %",
+       round(100 * sum(umsatz_mit_we) / nullif(sum(umsatz_netto), 0), 1)    AS "WE hinterlegt %",
+       count(DISTINCT betrieb_key)    AS "Betriebe"
+  FROM mart.artikel_monat
+ WHERE monat >= (date_trunc('month', current_date) - interval '12 months')::date
+   [[AND artikel = {{artikel}}]]
+   [[AND betrieb = {{betrieb}}]]
+   [[AND konzept = {{marke}}]]
+ GROUP BY artikel
+ ORDER BY sum(umsatz_netto) DESC NULLS LAST
+ LIMIT 50`,
+  },
+
+  {
+    schluessel: 'ar_verlauf',
+    name: 'Artikel — Umsatz und Menge je Monat',
+    beschreibung:
+      'Verkauf über 24 Monate: Umsatz als Balken, Menge als Linie auf der rechten Achse. Läuft ein Artikel aus oder nur der Preis nach oben, laufen die beiden auseinander. Ohne gewählten Artikel steht hier die Summe über alle.',
+    anzeige: 'combo',
+    parameter: [P_ARTIKEL, P_BETRIEB, P_MARKE],
+    sql: `
+SELECT monat                    AS "Monat",
+       round(sum(umsatz_netto)) AS "Umsatz",
+       sum(menge)               AS "Menge"
+  FROM mart.artikel_monat
+ WHERE monat >= (date_trunc('month', current_date) - interval '23 months')::date
+   [[AND artikel = {{artikel}}]]
+   [[AND betrieb = {{betrieb}}]]
+   [[AND konzept = {{marke}}]]
+ GROUP BY monat
+ ORDER BY monat`,
+    visualisierung: {
+      'graph.dimensions': ['Monat'],
+      'graph.metrics': ['Umsatz', 'Menge'],
+      series_settings: { Menge: { display: 'line', axis: 'right' } },
+      'graph.y_axis.title_text': 'Umsatz netto (€)',
+    },
+  },
+
+  {
+    schluessel: 'ar_betriebe',
+    name: 'Artikel — die Betriebe dahinter',
+    beschreibung:
+      'Wer den Artikel verkauft, wie viel und zu welchem Ø-Preis — zwölf Monate. Preisunterschiede zwischen Betrieben derselben Marke sind meist Aktionen oder Kartenpflege. Ein Klick auf den Betriebsnamen öffnet das Betriebsblatt.',
+    anzeige: 'table',
+    parameter: [P_ARTIKEL, P_BETRIEB, P_MARKE],
+    sql: `
+SELECT betrieb                        AS "Betrieb",
+       konzept                        AS "Marke",
+       sum(menge)                     AS "Menge",
+       round(sum(umsatz_netto))       AS "Umsatz",
+       round(sum(umsatz_netto) / nullif(sum(menge), 0), 2) AS "Ø Preis netto",
+       count(DISTINCT monat)          AS "Monate",
+       max(monat)                     AS "Letzter Monat"
+  FROM mart.artikel_monat
+ WHERE monat >= (date_trunc('month', current_date) - interval '12 months')::date
+   [[AND artikel = {{artikel}}]]
+   [[AND betrieb = {{betrieb}}]]
+   [[AND konzept = {{marke}}]]
+ GROUP BY betrieb, konzept
+ ORDER BY sum(umsatz_netto) DESC NULLS LAST
+ LIMIT 300`,
+  },
   // ENTFALLEN AM 01.08.2026 (Migration 0029): die Karte
   // 'wa_we_pruefung' -- "Rechnerischer gegen tatsächlichen
   // Wareneinsatz". Ihre Quelle mart.pruefung_wareneinsatz ist
@@ -932,9 +1016,11 @@ SELECT ware              AS "Ware",
     schluessel: 'wa_einkauf_pruefung',
     name: 'Auffällige Einkaufspositionen',
     beschreibung:
-      'Positionen, die in der Preisliste fehlen oder dort auffallen — mit dem üblichen Preis derselben Ware zum Vergleich. Meist echte Falschbuchungen im Quellsystem (1.002.250 € für eine Packung Falthandtücher ist keine Preiserhöhung). Diese Liste existiert, damit die Lücke sichtbar ist, statt still zu sein.',
+      'Positionen, die in der Preisliste fehlen oder dort auffallen — mit dem üblichen Preis derselben Ware zum Vergleich. Meist echte Falschbuchungen im Quellsystem (1.002.250 € für eine Packung Falthandtücher ist keine Preiserhöhung). Diese Liste existiert, damit die Lücke sichtbar ist, statt still zu sein. „ansehen →" öffnet den Beleg — beurteilen lässt sich eine Abweichung nur dort.',
     anzeige: 'table',
     parameter: [BETRIEB, MARKE],
+    // "ansehen →" + verdeckter Schluessel: dasselbe Muster wie die
+    // Bestellliste auf ③. bestellung_key steht seit 0067 in der Sicht.
     sql: `
 SELECT bestelldatum       AS "Bestelldatum",
        marke              AS "Marke",
@@ -945,13 +1031,26 @@ SELECT bestelldatum       AS "Bestelldatum",
        preis_je_gebinde   AS "Preis je Gebinde",
        ueblich            AS "üblich",
        grund              AS "Grund",
-       bestellnummer      AS "Bestellung"
+       bestellnummer      AS "Bestellung",
+       'ansehen →'        AS "Beleg",
+       bestellung_key::text AS "bestellung_key"
   FROM mart.einkauf_pruefung
  WHERE 1 = 1
    [[AND betrieb = {{betrieb}}]]
    [[AND marke = {{marke}}]]
  ORDER BY bestelldatum DESC NULLS LAST
  LIMIT 300`,
+    visualisierung: {
+      'table.columns': [
+        { name: 'Bestelldatum', enabled: true }, { name: 'Marke', enabled: true },
+        { name: 'Betrieb', enabled: true }, { name: 'Ware', enabled: true },
+        { name: 'Menge', enabled: true }, { name: 'Summe', enabled: true },
+        { name: 'Preis je Gebinde', enabled: true }, { name: 'üblich', enabled: true },
+        { name: 'Grund', enabled: true }, { name: 'Bestellung', enabled: true },
+        { name: 'Beleg', enabled: true },
+        { name: 'bestellung_key', enabled: false },
+      ],
+    },
   },
   {
     schluessel: 'wa_einkauf_betrieb',
@@ -990,26 +1089,44 @@ SELECT betrieb                AS "Betrieb",
     schluessel: 'wa_lieferant_volumen',
     name: 'Lieferanten nach Einkaufsvolumen',
     beschreibung:
-      'Einkaufsvolumen je Lieferant in den letzten zwölf Monaten. Ohne Markenfilter stehen gleichnamige Lieferanten mehrfach da — je Marke ein Vertrag, das ist FoodNotifys Sicht und die des Einkäufers. Für Marken mit offenen Bestellseiten (siehe Ladestand) ist das Volumen unvollständig.',
+      'Einkaufsvolumen je Lieferant in den letzten zwölf Monaten, gestapelt nach Marke — je Marke ein Vertrag, das ist FoodNotifys Sicht und die des Einkäufers. Für Marken mit offenen Bestellseiten (siehe Ladestand) ist das Volumen unvollständig.',
     anzeige: 'row',
     parameter: [MARKE, BETRIEB],
+    // Marke als eigene Dimension statt in den Namen konkateniert
+    // ("Distra — Aposto"): ein Balken je Lieferant, die Vertraege als
+    // Segmente. Vorher zerfiel derselbe Lieferant in bis zu vier
+    // Balken, und ein Klick haette nur die Wortkette uebergeben koennen.
     sql: `
-SELECT lieferant || ' — ' || marke  AS "Lieferant",
-       round(sum(summe_preis))      AS "Einkauf (12 Monate)"
-  FROM mart.einkauf_position
- WHERE lieferant IS NOT NULL
-   -- Stornos raus: mart.einkauf_position ist die Beweissicht und traegt sie
-   -- absichtlich mit (Migration 0043). Wer summiert, filtert selbst.
-   AND NOT storniert
-   AND monat >= (date_trunc('month', current_date) - interval '12 months')::date
-   [[AND marke = {{marke}}]]
-   [[AND betrieb = {{betrieb}}]]
- GROUP BY lieferant, marke
- ORDER BY sum(summe_preis) DESC
- LIMIT 25`,
+WITH top AS (
+    SELECT lieferant
+      FROM mart.einkauf_position
+     WHERE lieferant IS NOT NULL
+       AND NOT storniert
+       AND monat >= (date_trunc('month', current_date) - interval '12 months')::date
+       [[AND marke = {{marke}}]]
+       [[AND betrieb = {{betrieb}}]]
+     GROUP BY lieferant
+     ORDER BY sum(summe_preis) DESC
+     LIMIT 15
+)
+SELECT p.lieferant             AS "Lieferant",
+       p.marke                 AS "Marke",
+       round(sum(p.summe_preis)) AS "Einkauf (12 Monate)"
+  FROM mart.einkauf_position p
+  JOIN top USING (lieferant)
+ -- Stornos raus: mart.einkauf_position ist die Beweissicht und traegt sie
+ -- absichtlich mit (Migration 0043). Wer summiert, filtert selbst.
+ WHERE NOT p.storniert
+   AND p.monat >= (date_trunc('month', current_date) - interval '12 months')::date
+   [[AND p.marke = {{marke}}]]
+   [[AND p.betrieb = {{betrieb}}]]
+ GROUP BY p.lieferant, p.marke
+ ORDER BY sum(sum(p.summe_preis)) OVER (PARTITION BY p.lieferant) DESC NULLS LAST,
+          p.marke`,
     visualisierung: {
-      'graph.dimensions': ['Lieferant'],
+      'graph.dimensions': ['Lieferant', 'Marke'],
       'graph.metrics': ['Einkauf (12 Monate)'],
+      'stackable.stack_type': 'stacked',
       'graph.x_axis.title_text': 'Einkauf netto (€), letzte 12 Monate',
     },
   },
@@ -1120,6 +1237,13 @@ HAVING sum(inventuren_signiert) > 0
 -- der Betriebe gebucht hat: Juni 2026 stand mit 37 von 61 Buchern als
 -- -43-%-Absturz in der Kurve. Mit Betriebsfilter greift der Schnitt nie
 -- (1 von 1 ist immer 100 %).
+--
+-- Massstab ist das MAXIMUM der zurueckliegenden zwoelf Monate, nicht der
+-- Vormonat: gegen den Vormonat rutschte Juni 2026 mit 41 von 63 Buchern
+-- (65 %) unter der 60-%-Schwelle DURCH und stand doch als Einbruch in
+-- der Kurve. Gegen das eigene Jahresmaximum faellt ein Teilmonat sicher,
+-- waehrend alte Monate an ihrer eigenen Epoche gemessen werden — 2020
+-- hatte weniger Betriebe, und das war kein Teilmonat.
 WITH je_monat AS (
     SELECT monat,
            round(sum(wert_absolut) FILTER (WHERE kennzahl = 'Umsatz'))                 AS umsatz,
@@ -1140,13 +1264,21 @@ SELECT monat          AS "Monat",
        personalkosten AS "Personalkosten",
        ebit           AS "EBIT",
        betriebe       AS "Betriebe gebucht"
-  FROM (SELECT je_monat.*, lag(betriebe) OVER (ORDER BY monat) AS betriebe_vormonat FROM je_monat) x
- WHERE betriebe_vormonat IS NULL OR betriebe >= 0.6 * betriebe_vormonat
+  FROM (SELECT je_monat.*,
+               max(betriebe) OVER (ORDER BY monat
+                                   ROWS BETWEEN 11 PRECEDING AND CURRENT ROW)
+                 AS betriebe_massstab
+          FROM je_monat) x
+ WHERE betriebe >= 0.8 * betriebe_massstab
  ORDER BY monat`,
     template_tag_dimension: { zeitraum: ['mart', 'bwa_kennzahl', 'monat'] },
+    // EBIT auf der rechten Achse: +-1 Mio neben 11 Mio Umsatz war auf
+    // der gemeinsamen Skala ein Strich am Boden — ob ein Monat negativ
+    // war, sah man nicht.
     visualisierung: {
       'graph.dimensions': ['Monat'],
       'graph.metrics': ['Umsatz', 'Wareneinsatz', 'Personalkosten', 'EBIT'],
+      series_settings: { EBIT: { axis: 'right' } },
     },
   },
   {
@@ -1293,7 +1425,11 @@ SELECT endpunkt          AS "Endpunkt",
     schluessel: 'dq_backfill_balken',
     name: 'Fortschritt des Datenabrufs',
     beschreibung: 'Derselbe Fortschritt als Balken — auf einen Blick, was noch fehlt.',
-    anzeige: 'bar',
+    // row statt bar: siebzehn Namen wie "getPersonalkosten" passen
+    // waagerecht nicht unter senkrechte Balken — Metabase liess die
+    // Beschriftung komplett weg, und unbeschriftete Balken sind kein
+    // Fortschritt, sondern ein Muster ohne Aussage.
+    anzeige: 'row',
     sql: `
 SELECT endpunkt AS "Endpunkt",
        prozent  AS "Fertig %"

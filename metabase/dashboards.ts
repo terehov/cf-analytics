@@ -176,6 +176,22 @@ const F_ZUSTAND: Parameter = {
 const F_LIEFERANT: Parameter = {
   id: 'd-lieferant', name: 'lieferant', 'display-name': 'Lieferant', type: 'string/=',
 }
+// Der einzelne Artikel. OHNE Werteliste wie der Lieferant: wird aus
+// Rennern, Pennern und dem Betriebsblatt geklickt, und 10.000
+// Kassennamen sind keine Auswahl.
+const F_ARTIKEL: Parameter = {
+  id: 'd-artikel', name: 'artikel', 'display-name': 'Artikel', type: 'string/=',
+}
+// Die einzelne Aktion. MIT Werteliste: es sind wenige Dutzend Namen,
+// und "Feinsparten 2025" tippt man schneller falsch als richtig.
+const F_AKTION: Parameter = {
+  id: 'd-aktion', name: 'aktion', 'display-name': 'Aktion', type: 'string/=',
+  werteliste: ['mart', 'aktion', 'aktion'],
+}
+// Der einzelne Import-Endpunkt. Wird aus den Fehlermustern geklickt.
+const F_ENDPUNKT: Parameter = {
+  id: 'd-endpunkt', name: 'endpunkt', 'display-name': 'Bericht', type: 'string/=',
+}
 
 // Vier einzelne Datumsfelder fuer den Zeitraumvergleich. Bewusst nicht
 // zwei Bereichsfilter: Metabase kann einen Bereichsfilter nur EINEM
@@ -438,8 +454,13 @@ export const dashboards: Dashboard[] = [
       // Artikeltabelle und BWA-Verlauf untereinander: sechs Spalten mit
       // Artikel- und Warengruppennamen passen auf eine halbe Breite nicht,
       // und der Artikelname steht ganz links.
+      // Zwei Ziele: die Artikelspalte oeffnet den einzelnen Artikel,
+      // die uebrige Kachel weiter die Warenwirtschaft.
       { teile: [{ karte: 'dd_betrieb_artikel', hoehe: 11,
-        klick: [{ ziel: 'db_ware', uebergabe: {} }] }] },
+        klick: [
+          { ziel: 'db_ware', uebergabe: {} },
+          { ziel: 'dd_artikel', spalte: 'Artikel', uebergabe: { artikel: 'Artikel' } },
+        ] }] },
       { teile: [{ karte: 'dd_betrieb_bwa',
         klick: [{ ziel: 'db_bwa', uebergabe: {} }] }] },
       ] },
@@ -792,9 +813,11 @@ export const dashboards: Dashboard[] = [
       // neben dem Ampeldiagramm. Elf Spalten, davon vier Medianwerte mit
       // langer Ueberschrift, gehen darauf nicht auf -- ueber die volle
       // Breite steht jede Marke in einer lesbaren Zeile.
+      // Seit der Langform (0067-Runde) wandert auch die Ampel mit: das
+      // rote Segment von Enchilada oeffnet die roten Enchilada-Filialen.
       { teile: [
         { karte: 'dd_marken_ampeln',
-          klick: [{ ziel: 'dd_filialen', uebergabe: { marke: 'Marke' } }] },
+          klick: [{ ziel: 'dd_filialen', uebergabe: { marke: 'Marke', ampel: 'Ampelwert' } }] },
       ] },
       { teile: [
         { karte: 'rt_marke', hoehe: 10,
@@ -937,15 +960,43 @@ export const dashboards: Dashboard[] = [
       // und die Filter oben (Monat, Betrieb) gelten mit.
       // ---------------------------------------------------------------
       { name: 'Aktionen', reihen: [
-      { teile: [{ text: '## Aktionen\n\nNur **34 der Betriebe** erfassen Aktionen — 19 Enchilada, 14 Wilma Wunder, eine Deutsche Konzepte. Das ist keine Konzernsicht: Wer hier fehlt, fährt vielleicht dieselbe Aktion und bucht sie nur nicht. Alle Werte netto; der laufende Monat ist unvollständig.' }] },
-      { teile: [{ karte: 'ak_uebersicht', hoehe: 10 }] },
-      { teile: [{ karte: 'ak_verlauf', hoehe: 9 }] },
+      { teile: [{ text: '## Aktionen\n\nNur **34 der Betriebe** erfassen Aktionen — 19 Enchilada, 14 Wilma Wunder, eine Deutsche Konzepte. Das ist keine Konzernsicht: Wer hier fehlt, fährt vielleicht dieselbe Aktion und bucht sie nur nicht. Alle Werte netto; der laufende Monat ist unvollständig.\n\nEin Klick auf einen **Aktionsnamen** öffnet die Aktion im Detail.' }] },
+      { teile: [{ karte: 'ak_uebersicht', hoehe: 10,
+        klick: [{ ziel: 'dd_aktion', spalte: 'Aktion', uebergabe: { aktion: 'Aktion' } }] }] },
+      { teile: [{ karte: 'ak_verlauf', hoehe: 9,
+        klick: [{ ziel: 'dd_aktion', uebergabe: { aktion: 'Aktion' } }] }] },
       { teile: [{ text: '### Wer hängt woran\n\nDer gewählte Monat, sortiert nach **Anteil am eigenen Umsatz**: 40 % Aktionsanteil sind eine andere Nachricht als 4.000 € — dieser Betrieb hat eine Frage zu beantworten, wenn die Aktion endet.' }] },
       { teile: [{ karte: 'ak_betrieb', hoehe: 12,
-        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+        klick: [
+          { ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } },
+          { ziel: 'dd_aktion', spalte: 'Aktion', uebergabe: { aktion: 'Aktion' } },
+        ] }] },
       { teile: [{ text: '### Geplant und tatsächlich\n\n„—" heißt unbefristet. Der Steckbrief zeigt, was das Umsatzbild nicht zeigt: Aktionen, die **nie Umsatz sahen**, und unbefristete, die **seit Jahren still weiterlaufen**.' }] },
-      { teile: [{ karte: 'ak_steckbrief', hoehe: 10 }] },
+      { teile: [{ karte: 'ak_steckbrief', hoehe: 10,
+        klick: [{ ziel: 'dd_aktion', spalte: 'Aktion', uebergabe: { aktion: 'Aktion' } }] }] },
       ] },
+    ],
+  },
+
+  /*
+   * Die einzelne Aktion. Eigenes Dashboard, dieselbe Stellung wie
+   * dd_beleg zu ③: es beantwortet die Frage nach EINER Aktion, nicht
+   * nach dem Aktionsgeschaeft insgesamt. Ohne gewaehlte Aktion zeigt es
+   * alle — wer direkt herkommt, sieht etwas und muss nicht raten.
+   */
+  {
+    schluessel: 'dd_aktion',
+    name: 'Aktion — Verlauf und Betriebe',
+    beschreibung:
+      'Eine Aktion im Detail: Steckbrief, Monatsverlauf und die Betriebe, die sie fahren. Erreichbar über einen Klick auf einen Aktionsnamen im Aktionen-Reiter der Umsatzseite.',
+    sammlung: 'Drill-Down',
+    filter: [F_AKTION, F_MARKE, F_BETRIEB],
+    reihen: [
+      { teile: [{ text: '# Die einzelne Aktion\n\n**Nur 34 Betriebe erfassen Aktionen** (19 Enchilada, 14 Wilma Wunder, eine Deutsche Konzepte) — jede Zahl hier beschreibt die mitmachenden Betriebe, nicht die Gruppe.\n\nDer Verlauf zeigt, wann die Aktion anlief, trug und auslief; die Betriebsliste, wessen Monat an ihr hängt. **Ø Anteil %** über 40 heißt: dieser Betrieb hat eine Frage zu beantworten, wenn die Aktion endet.' }] },
+      { teile: [{ karte: 'akd_steckbrief', hoehe: 8 }] },
+      { teile: [{ karte: 'akd_verlauf', hoehe: 9 }] },
+      { teile: [{ karte: 'akd_betriebe', hoehe: 12,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
     ],
   },
 
@@ -1034,8 +1085,12 @@ export const dashboards: Dashboard[] = [
       // Scrollen, und der Artikelname steht ganz links. Beide Listen
       // beantworten ohnehin nacheinander gestellte Fragen -- was laeuft,
       // und was nicht -- und nicht dieselbe im Vergleich.
-      { teile: [{ karte: 'wa_renner', hoehe: 12 }] },
-      { teile: [{ karte: 'wa_penner', hoehe: 12 }] },
+      // Klick auf einen Artikelnamen oeffnet den Artikel im Detail —
+      // Verlauf und Betriebe, aus der schnellen Monatssicht (0068).
+      { teile: [{ karte: 'wa_renner', hoehe: 12,
+        klick: [{ ziel: 'dd_artikel', spalte: 'Artikel', uebergabe: { artikel: 'Artikel' } }] }] },
+      { teile: [{ karte: 'wa_penner', hoehe: 12,
+        klick: [{ ziel: 'dd_artikel', spalte: 'Artikel', uebergabe: { artikel: 'Artikel' } }] }] },
       { teile: [{ karte: 'wa_db_warengruppe', hoehe: 11 }] },
       // Der Abschnitt "Rechnerischer Wareneinsatz gegen tatsächlichen"
       // ist am 01.08.2026 entfallen (Migration 0029). Er stand auf
@@ -1056,6 +1111,29 @@ export const dashboards: Dashboard[] = [
       // Spalte nicht und wuerden den gemeinsamen Zeitraumfilter still
       // ignorieren -- ein gesetzter Filter, der nichts tut, ist
       // schlimmer als keiner (siehe docs/fehlerkatalog.md).
+    ],
+  },
+
+  /*
+   * Der einzelne Artikel. Eigenes Dashboard, dieselbe Stellung wie
+   * dd_beleg zu ③: die Frage nach EINEM Artikel, nicht nach der
+   * Warenwirtschaft insgesamt. Steht auf mart.artikel_monat (0068) —
+   * die Tagessicht braucht 7 Sekunden je Artikelfrage, die Monatssicht
+   * Millisekunden; deshalb feste Monatsfenster statt Zeitraumfilter.
+   */
+  {
+    schluessel: 'dd_artikel',
+    name: 'Artikel — Verlauf und Betriebe',
+    beschreibung:
+      'Ein Artikel im Detail: zwölf Monate in Zahlen, der Verlauf über 24 Monate und die Betriebe, die ihn verkaufen. Erreichbar über einen Klick auf einen Artikelnamen in den Rennern, Pennern oder auf dem Betriebsblatt.',
+    sammlung: 'Drill-Down',
+    filter: [F_ARTIKEL, F_BETRIEB, F_MARKE],
+    reihen: [
+      { teile: [{ text: '# Der einzelne Artikel\n\nMonatsraster statt Tagesfilter — feiner führt die schnelle Artikelsicht den Verkauf nicht, und für „läuft er noch, und wo" reicht der Monat.\n\n**Ø Preis netto** ist Umsatz durch Menge, nicht der Kartenpreis: Aktionen und Rabatte stecken darin. Laufen Umsatz und Menge im Verlauf auseinander, hat sich der Preis bewegt, nicht die Nachfrage.' }] },
+      { teile: [{ karte: 'ar_kopf', hoehe: 8 }] },
+      { teile: [{ karte: 'ar_verlauf', hoehe: 9 }] },
+      { teile: [{ karte: 'ar_betriebe', hoehe: 12,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
     ],
   },
 
@@ -1101,7 +1179,11 @@ export const dashboards: Dashboard[] = [
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       // Die Pruefliste ganz unten, aber sichtbar: eine ausgeschlossene
       // Position, die nirgends auftaucht, ist eine stille Kuerzung.
-      { teile: [{ karte: 'wa_einkauf_pruefung', hoehe: 10 }] },
+      // "ansehen →" oeffnet den Beleg — nur dort laesst sich beurteilen,
+      // ob 1.002.250 EUR eine Falschbuchung oder ein Karton Gold war.
+      { teile: [{ karte: 'wa_einkauf_pruefung', hoehe: 10,
+        klick: [{ ziel: 'dd_beleg', spalte: 'Beleg',
+                  uebergabe: { bestellung: 'bestellung_key' } }] }] },
       // Eigener Abschnitt statt Einreihung neben den Preiskarten: der
       // Vorbehalt (nur Wilma Wunder belastbar) braucht eine eigene
       // Textkachel, sonst liest jemand die Rangliste als flaechige
@@ -1353,10 +1435,14 @@ export const dashboards: Dashboard[] = [
       // gefragt wird -- nicht hinter den technischen Reitern.
       { name: 'Themen', reihen: [
       { teile: [{ text: '# Woran es liegt\n\nYext klassifiziert die Bewertungstexte selbst. Fünf Themen, jedes mit der Durchschnittsnote **der Bewertungen, die es ansprechen** — „Bestellung 2,1“ heißt: wer über die Bestellung schrieb, vergab im Schnitt 2,1 Sterne.\n\nZwei Dinge, die man wissen muss: die Klusterung beginnt **im April 2026**, ein Vorjahresvergleich ist also noch nicht möglich. Und eine Bewertung kann **mehrere Themen** tragen — die Anteile ergeben zusammen mehr als 100 %, und das ist richtig.' }] },
+      // Beide Zaehlkacheln fuehren auf den Kritiken-Drill-Down: die
+      // Betriebe mit offenen Faellen und der Wortlaut des Monats.
       { teile: [
         { karte: 'yx_kachel_schwaechstes_thema' },
-        { karte: 'yx_kachel_anteil_schlecht' },
-        { karte: 'yx_kachel_offen' },
+        { karte: 'yx_kachel_anteil_schlecht',
+          klick: [{ ziel: 'dd_kritiken', uebergabe: {}, fest: true }] },
+        { karte: 'yx_kachel_offen',
+          klick: [{ ziel: 'dd_kritiken', uebergabe: {}, fest: true }] },
       ] },
       { teile: [{ karte: 'yx_themen', hoehe: 9 }] },
       { teile: [{ text: '## Im Verlauf\n\nEin Thema, das kippt, ist hier sichtbar, lange bevor der Bewertungsstand darauf reagiert. Der Anstieg im April 2026 ist der Beginn der Erhebung, kein Ereignis.' }] },
@@ -1392,7 +1478,8 @@ export const dashboards: Dashboard[] = [
       { teile: [{ text: '# Was wir damit tun\n\nWer auf Bewertungen antwortet und wie schnell. Bis heute war das nirgends sichtbar: einzelne Betriebe antworten **gar nicht**, während andere über 90 % erreichen — im Konzernschnitt verschwindet der Unterschied.\n\nDie Reaktionszeit zählt ab der Bewertung. Wo nicht geantwortet wurde, bleibt sie leer und steht **nicht** auf null — sonst stünden genau die Betriebe ohne Antwort an der Spitze der Bestenliste.' }] },
       { teile: [
         { karte: 'yx_kachel_antwortquote' },
-        { karte: 'yx_kachel_offen' },
+        { karte: 'yx_kachel_offen',
+          klick: [{ ziel: 'dd_kritiken', uebergabe: {}, fest: true }] },
       ] },
       { teile: [{ karte: 'yx_antwort_rangliste', hoehe: 12,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
@@ -1426,6 +1513,32 @@ export const dashboards: Dashboard[] = [
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ karte: 'bw_ladestand', hoehe: 9 }] },
       ] },
+    ],
+  },
+
+  /*
+   * Der Kritiken-Drill-Down hinter "Offene 1-2-Sterne-Kritiken".
+   *
+   * Er zeigt ZWEI Stufen, weil Yext nur Zaehler je Betrieb liefert und
+   * keine Antwortmarkierung an der einzelnen Bewertung: oben die
+   * Betriebe mit ihren Offen-Zaehlern (deren Summe exakt die Kachel
+   * ist), darunter alle 1-2-Sterne-Texte des Monats als
+   * Arbeitsmaterial. Das ist ehrlicher als eine Liste, die "offen"
+   * verspricht und es nicht wissen kann.
+   */
+  {
+    schluessel: 'dd_kritiken',
+    name: 'Kritiken — offen und im Wortlaut',
+    beschreibung:
+      'Was hinter der Kachel „Offene 1–2-Sterne-Kritiken" steckt: je Betrieb die offenen Fälle, darunter alle schlechten Bewertungen des Monats im Wortlaut. Erreichbar über einen Klick auf die Kachel.',
+    sammlung: 'Drill-Down',
+    filter: [F_MONAT, F_MARKE, F_BETRIEB],
+    reihen: [
+      { teile: [{ text: '# Offene Kritiken\n\n**Oben die Zähler, unten der Wortlaut.** Yext meldet je Betrieb, wie viele 1–2-Sterne-Bewertungen ohne Antwort sind — aber nicht, welche. Die Betriebsliste trägt deshalb die Arbeit („wer muss antworten"), der Wortlaut darunter das Material: alle schlechten Bewertungen des Monats, auch die schon beantworteten. **Quelle → Original** führt zum Portal; dort steht, ob eine Antwort fehlt.' }] },
+      { teile: [{ karte: 'kr_betriebe', hoehe: 11,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      { teile: [{ karte: 'kr_wortlaut', hoehe: 14,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
     ],
   },
 
@@ -1500,7 +1613,11 @@ export const dashboards: Dashboard[] = [
 
       { teile: [{ text: '## Woran hängt es?\n\n**Ruht der Zugang, steht alles still** — dann erübrigt sich die weitere Suche. Sperren laufen von selbst ab; nur ein Anmeldefehler braucht einen Menschen.' }] },
       { teile: [{ karte: 'im_sperre' }] },
-      { teile: [{ karte: 'im_fehler', hoehe: 9 }] },
+      // Klick auf den Bericht oeffnet die einzelnen Fehlerfaelle mit
+      // rohem Fehlertext und sieben Tagen Rueckblick.
+      { teile: [{ karte: 'im_fehler', hoehe: 9,
+        klick: [{ ziel: 'dd_import_fehler', spalte: 'Bericht',
+                  uebergabe: { endpunkt: 'Bericht' } }] }] },
       { teile: [{ karte: 'im_schema' }] },
       { teile: [{ karte: 'im_laeufe', hoehe: 11 }] },
 
@@ -1521,6 +1638,25 @@ export const dashboards: Dashboard[] = [
         { karte: 'im_reichweite', breite: 12 },
       ] },
       { teile: [{ karte: 'im_betrieb', hoehe: 12, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+    ],
+  },
+
+  /*
+   * Die einzelnen Importfehler. Eigenes Dashboard hinter den
+   * Fehlermustern: das Muster sagt "42 mal derselbe Fehler", hier
+   * stehen die 42 Aufrufe mit rohem Text — das, was man beim
+   * Nachstellen wirklich braucht.
+   */
+  {
+    schluessel: 'dd_import_fehler',
+    name: 'Importfehler — die einzelnen Fälle',
+    beschreibung:
+      'Die fehlgeschlagenen Aufrufe hinter einem Fehlermuster, mit rohem Fehlertext und sieben Tagen Rückblick. Erreichbar über einen Klick auf die Spalte „Bericht" in den Fehlermustern.',
+    sammlung: 'Drill-Down',
+    filter: [F_ENDPUNKT],
+    reihen: [
+      { teile: [{ text: '# Die einzelnen Fehlerfälle\n\nDas Fehlermuster auf der Importseite normalisiert Zeitstempel und Zahlen, damit gleiche Ursachen eine Zeile ergeben — hier steht der **rohe Text** jedes Aufrufs. „Versuch" über 1 heißt: der Import hat selbst wiederholt. Ohne gewählten Bericht stehen hier alle Fehler der letzten sieben Tage.' }] },
+      { teile: [{ karte: 'imf_faelle', hoehe: 14 }] },
     ],
   },
 

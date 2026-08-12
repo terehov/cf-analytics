@@ -84,26 +84,35 @@ SELECT r.konzept                                                          AS "Ma
   {
     schluessel: 'dd_marken_ampeln',
     name: 'Ampeln je Marke',
-    beschreibung: 'Wie sich die Gesamtampel innerhalb jeder Marke verteilt. Ein Klick auf einen Balken öffnet die Filialen dieser Marke.',
+    beschreibung: 'Wie sich die Gesamtampel innerhalb jeder Marke verteilt. Ein Klick auf ein Segment öffnet genau diese Betriebe — die roten von Enchilada, nicht alle.',
     anzeige: 'bar',
     parameter: [P_MONAT, P_MARKE],
+    // LANGFORM statt einer Spalte je Ampel — dieselbe Lehre wie bei
+    // rt_treiber (27.07.2026): in der Breitform steckt die Farbe im
+    // SPALTENNAMEN, und einen Spaltennamen kann Metabase beim Klick
+    // nicht uebergeben. Der Klick auf das rote Segment von Enchilada
+    // landete deshalb auf ALLEN Enchilada-Filialen. In der Langform ist
+    // die Ampel ein Wert und wandert mit.
     sql: `${MONAT_CTE}
-SELECT r.konzept                                       AS "Marke",
-       count(*) FILTER (WHERE r.gesamt = 'rot')        AS "Rot",
-       count(*) FILTER (WHERE r.gesamt = 'orange')     AS "Orange",
-       count(*) FILTER (WHERE r.gesamt = 'gruen')      AS "Grün",
-       count(*) FILTER (WHERE r.gesamt IS NULL)        AS "Ohne Urteil"
+SELECT r.konzept                              AS "Marke",
+       coalesce(b.bezeichnung, 'Ohne Urteil') AS "Bewertung",
+       count(*)                               AS "Betriebe",
+       -- Der technische Wert fuer den Klick; die Beschriftung ist zum Lesen.
+       coalesce(r.gesamt, 'ohne')             AS "Ampelwert"
   FROM mart.round_table_monat r
   CROSS JOIN gewaehlt g
+  LEFT JOIN ampel.beschriftung b ON b.status = r.gesamt
  WHERE r.monat = g.monat
    -- Nur operative, wie die Markentabelle darueber.
    AND r.operativ
    [[AND r.konzept = {{marke}}]]
- GROUP BY r.konzept
- ORDER BY count(*) FILTER (WHERE r.gesamt = 'rot') DESC`,
+ GROUP BY r.konzept, b.bezeichnung, r.gesamt
+ ORDER BY sum(count(*)) FILTER (WHERE r.gesamt = 'rot')
+            OVER (PARTITION BY r.konzept) DESC NULLS LAST,
+          r.konzept`,
     visualisierung: {
-      'graph.dimensions': ['Marke'],
-      'graph.metrics': ['Rot', 'Orange', 'Grün', 'Ohne Urteil'],
+      'graph.dimensions': ['Marke', 'Bewertung'],
+      'graph.metrics': ['Betriebe'],
       'stackable.stack_type': 'stacked',
       'graph.show_values': true,
       series_settings: {
@@ -1272,6 +1281,13 @@ SELECT (u.geschaeftstag - s.von + 1)   AS "Tag im Zeitraum",
     // brauchte 8 Sekunden. Er laeuft absichtlich ueber ALLE operativen
     // Betriebe, unabhaengig vom Betriebs-/Markenfilter — "Δ zum Median
     // aller" verspricht genau das.
+    // betrieb ist seit der 0067-Runde ein FELDFILTER, kein Textparameter:
+    // nur so kann Metabase MEHRERE Betriebe annehmen — und "zwei bis vier
+    // Betriebe waehlen" ist der ganze Zweck der Seite. Deshalb steht
+    // mart.ampel_bereich hier OHNE Alias (Metabase baut die Klausel aus
+    // dem Tabellennamen, die Aliasfalle vom 28.07.2026), und der Tag
+    // erscheint zweimal: einmal als Filter, einmal im operativ-OR, damit
+    // ein ausdruecklich gewaehlter geschlossener Betrieb sichtbar bleibt.
     sql: `${MONAT_CTE}
 , med AS (
     SELECT x.bereich,
@@ -1280,25 +1296,27 @@ SELECT (u.geschaeftstag - s.von + 1)   AS "Tag im Zeitraum",
      WHERE x.monat = g.monat AND x.wert IS NOT NULL AND x.operativ
      GROUP BY x.bereich
 )
-SELECT a.bereich_name                        AS "Metrik",
-       a.betrieb                             AS "Betrieb",
-       a.wert                                AS "Wert",
+SELECT ampel_bereich.bereich_name            AS "Metrik",
+       ampel_bereich.betrieb                 AS "Betrieb",
+       ampel_bereich.wert                    AS "Wert",
        coalesce(be.emoji, '⚪')               AS "●",
        t.wert_vormonat                       AS "Vormonat",
        t.trend                               AS "Trend",
-       round(a.wert - med.median, 2)         AS "Δ zum Median aller"
-  FROM mart.ampel_bereich a
+       round(ampel_bereich.wert - med.median, 2) AS "Δ zum Median aller"
+  FROM mart.ampel_bereich
   CROSS JOIN gewaehlt g
-  LEFT JOIN ampel.beschriftung be ON be.status = a.ampel
-  LEFT JOIN mart.round_table_trend t ON t.betrieb_key = a.betrieb_key
-                                    AND t.monat = a.monat AND t.bereich = a.bereich
-  LEFT JOIN med ON med.bereich = a.bereich
- WHERE a.monat = g.monat
-   AND a.wert IS NOT NULL
-   AND (a.operativ [[ OR a.betrieb = {{betrieb}} ]])
-   [[AND a.betrieb = {{betrieb}}]]
-   [[AND a.konzept = {{marke}}]]
- ORDER BY a.reihenfolge, a.betrieb`,
+  LEFT JOIN ampel.beschriftung be ON be.status = ampel_bereich.ampel
+  LEFT JOIN mart.round_table_trend t ON t.betrieb_key = ampel_bereich.betrieb_key
+                                    AND t.monat = ampel_bereich.monat
+                                    AND t.bereich = ampel_bereich.bereich
+  LEFT JOIN med ON med.bereich = ampel_bereich.bereich
+ WHERE ampel_bereich.monat = g.monat
+   AND ampel_bereich.wert IS NOT NULL
+   AND (ampel_bereich.operativ [[ OR {{betrieb}} ]])
+   [[AND {{betrieb}}]]
+   [[AND ampel_bereich.konzept = {{marke}}]]
+ ORDER BY ampel_bereich.reihenfolge, ampel_bereich.betrieb`,
+    template_tag_dimension: { betrieb: ['mart', 'ampel_bereich', 'betrieb'] },
   },
   {
     schluessel: 'vg_ort_umsatz',
@@ -1306,17 +1324,21 @@ SELECT a.bereich_name                        AS "Metrik",
     beschreibung: 'Monatsumsatz der gewählten Betriebe auf einer Achse.',
     anzeige: 'line',
     parameter: [P_BETRIEB, P_MARKE, P_ZEITRAUM],
+    // betrieb als Feldfilter — Mehrfachauswahl, siehe vg_ort_metriken.
     sql: `
 SELECT monat        AS "Monat",
        betrieb      AS "Betrieb",
        umsatz_monat AS "Umsatz"
   FROM mart.umsatz_ytd
  WHERE umsatz_monat > 0
-   [[AND betrieb = {{betrieb}}]]
+   [[AND {{betrieb}}]]
    [[AND konzept = {{marke}}]]
    [[AND {{zeitraum}}]]
  ORDER BY monat`,
-    template_tag_dimension: { zeitraum: ['mart', 'umsatz_ytd', 'monat'] },
+    template_tag_dimension: {
+      zeitraum: ['mart', 'umsatz_ytd', 'monat'],
+      betrieb: ['mart', 'umsatz_ytd', 'betrieb'],
+    },
     visualisierung: {
       'graph.dimensions': ['Monat', 'Betrieb'],
       'graph.metrics': ['Umsatz'],
@@ -1353,13 +1375,16 @@ SELECT "Stunde", "Betrieb",
            sum(sum(umsatz_netto)) OVER (PARTITION BY betrieb) AS gesamt
       FROM mart.umsatz_stunde
      WHERE 1 = 1
-       [[AND betrieb = {{betrieb}}]]
+       [[AND {{betrieb}}]]
        [[AND konzept = {{marke}}]]
        [[AND {{zeitraum}}]]
      GROUP BY stunde, betrieb
   ) x
  ORDER BY sortierung`,
-    template_tag_dimension: { zeitraum: ['mart', 'umsatz_stunde', 'geschaeftstag'] },
+    template_tag_dimension: {
+      zeitraum: ['mart', 'umsatz_stunde', 'geschaeftstag'],
+      betrieb: ['mart', 'umsatz_stunde', 'betrieb'],
+    },
     visualisierung: {
       'graph.dimensions': ['Stunde', 'Betrieb'],
       'graph.metrics': ['Anteil %'],
@@ -1372,19 +1397,24 @@ SELECT "Stunde", "Betrieb",
       'Speisen- und Getränkeumsatz der 25 umsatzstärksten Betriebe. Der Getränkeanteil ist der größte Hebel für den Wareneinsatz an der Bar und erklärt oft, warum zwei Betriebe derselben Marke verschiedene Quoten haben. Für einen echten Vergleich oben zwei bis vier Betriebe auswählen.',
     anzeige: 'row',
     parameter: [P_MONAT, P_BETRIEB, P_MARKE],
+    // Ohne Alias (Aliasfalle) und betrieb als Feldfilter — Mehrfachauswahl,
+    // siehe vg_ort_metriken.
     sql: `${MONAT_CTE_UMSATZ}
-SELECT sp.betrieb                                                     AS "Betrieb",
-       round(sum(sp.umsatz_netto) FILTER (WHERE sp.hauptsparte = 'Speisen'), 0)  AS "Speisen",
-       round(sum(sp.umsatz_netto) FILTER (WHERE sp.hauptsparte = 'Getränke'), 0) AS "Getränke"
-  FROM mart.umsatz_tag_sparte sp
+SELECT umsatz_tag_sparte.betrieb                                      AS "Betrieb",
+       round(sum(umsatz_tag_sparte.umsatz_netto)
+             FILTER (WHERE umsatz_tag_sparte.hauptsparte = 'Speisen'), 0)  AS "Speisen",
+       round(sum(umsatz_tag_sparte.umsatz_netto)
+             FILTER (WHERE umsatz_tag_sparte.hauptsparte = 'Getränke'), 0) AS "Getränke"
+  FROM mart.umsatz_tag_sparte
   CROSS JOIN gewaehlt g
- WHERE sp.monat = g.monat
-   AND sp.hauptsparte IN ('Speisen','Getränke')
-   [[AND sp.betrieb = {{betrieb}}]]
-   [[AND sp.konzept = {{marke}}]]
- GROUP BY sp.betrieb
- ORDER BY sum(sp.umsatz_netto) DESC
+ WHERE umsatz_tag_sparte.monat = g.monat
+   AND umsatz_tag_sparte.hauptsparte IN ('Speisen','Getränke')
+   [[AND {{betrieb}}]]
+   [[AND umsatz_tag_sparte.konzept = {{marke}}]]
+ GROUP BY umsatz_tag_sparte.betrieb
+ ORDER BY sum(umsatz_tag_sparte.umsatz_netto) DESC
  LIMIT 25`,
+    template_tag_dimension: { betrieb: ['mart', 'umsatz_tag_sparte', 'betrieb'] },
     visualisierung: {
       'graph.dimensions': ['Betrieb'],
       'graph.metrics': ['Speisen', 'Getränke'],

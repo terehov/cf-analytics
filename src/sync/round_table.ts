@@ -34,11 +34,16 @@ import { pool, query } from '../db/pool'
 const REFRESHES = [
   `REFRESH MATERIALIZED VIEW CONCURRENTLY mart.round_table_monat`,
   `REFRESH MATERIALIZED VIEW CONCURRENTLY mart.round_table_trend`,
+  // Migration 0068: der Artikel-Drill-Down. LINA-Ware wie die beiden
+  // oben, deshalb hier und nicht in einkauf_sichten.ts (FoodNotify).
+  // Unabhaengig von den Round-Table-Sichten, liest nur artikelverkauf.
+  `REFRESH MATERIALIZED VIEW CONCURRENTLY mart.artikel_monat_basis`,
 ]
 
-/** Beide zusammen liegen bei Sekunden, nicht Minuten — die Grenze ist ein
- *  Notnagel gegen stille Blockaden, keine erwartete Laufzeit. */
-const ZEITGRENZE_MS = 5 * 60 * 1000
+/** Der Artikel-Refresh (0068) verdichtet 27,7 Mio Tageszeilen und liegt
+ *  allein bei rund zwei Minuten; die Grenze ist ein Notnagel gegen stille
+ *  Blockaden, keine erwartete Laufzeit. */
+const ZEITGRENZE_MS = 10 * 60 * 1000
 
 export type Auffrischung = {
   status: 'aufgefrischt' | 'fehler'

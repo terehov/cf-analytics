@@ -358,7 +358,7 @@ SELECT ${MARKIERUNG}                              AS "◀",
     schluessel: 'vs_kopf',
     name: 'Der Betrieb und seine Stadt',
     beschreibung:
-      'Wo der Betrieb steht, wie viele Betriebe der Gruppe dort sonst noch stehen und wie sich die Stadt insgesamt entwickelt hat. Steht hier „(keine Stadt hinterlegt)“, bleiben die Karten darunter leer — der Betrieb fehlt dann in der Standortliste, und wer noch fehlt, steht ganz unten auf dieser Seite.\n\n„Betriebe mit Umsatz“ sind die, die im gewählten Monat Geschäft gemacht haben; „geführt“ zählt auch stillgelegte mit.',
+      'Wo der Betrieb steht, wie viele Betriebe der Gruppe dort sonst noch stehen und wie sich die Stadt insgesamt entwickelt hat. Steht hier „(keine Stadt hinterlegt)“, bleiben die Karten darunter leer — der Betrieb fehlt dann in der Standortliste, und wer noch fehlt, steht ganz unten auf dieser Seite.\n\n„Betriebe am Ort“ zählt alle geführten, auch stillgelegte; „davon mit Umsatz“ die, die im gewählten Monat Geschäft gemacht haben.',
     anzeige: 'table',
     parameter: [P_MONAT, P_BETRIEB],
     // Bewusst OHNE den operativ-Filter und mit LEFT JOIN auf die
@@ -371,8 +371,11 @@ SELECT ${MARKIERUNG}                              AS "◀",
 SELECT r.betrieb                                              AS "Betrieb",
        coalesce(r.konzept, '(nicht zugeordnet)')              AS "Marke",
        coalesce(n.ort, '(keine Stadt hinterlegt)')            AS "Stadt",
-       coalesce(s.betriebe, 0)                                AS "Betriebe mit Umsatz",
-       coalesce(n.betriebe_am_ort, 0)                         AS "davon geführt",
+       -- Obermenge zuerst: "gefuehrt" zaehlt auch stillgelegte, "mit
+       -- Umsatz" ist die Teilmenge davon. Vorher stand es andersherum
+       -- ("davon gefuehrt") und behauptete die falsche Richtung.
+       coalesce(n.betriebe_am_ort, 0)                         AS "Betriebe am Ort",
+       coalesce(s.betriebe, 0)                                AS "davon mit Umsatz",
        s.marken_namen                                         AS "Marken am Ort",
        round(r.umsatz_ist, 0)                                 AS "Umsatz",
        r.umsatz_pct                                           AS "Umsatz % ggü. Vorjahr",

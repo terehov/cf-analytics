@@ -61,6 +61,15 @@ const SCHWELLE_GRUEN = `(SELECT ar.schwelle_gruen FROM ampel.regel ar
         WHERE ar.regelwerk_key = 'round_table_global' AND ar.bereich = 'bewertung')`
 
 /**
+ * Dieselbe Schwelle fuer die ZIELLINIE der Diagramme. Eine
+ * Visualisierungs-Einstellung kann kein SQL lesen — der Wert steht
+ * deshalb hier EINMAL als Zahl, mit der Pflicht, ampel.regel zu folgen,
+ * statt zweimal anonym in goal_value-Zeilen.
+ */
+const GRUEN_ZIEL = 4.4
+const GRUEN_ZIEL_TEXT = 'Grün ab 4,40'
+
+/**
  * Lesbare Portalnamen. Yext liefert Publisher-Codes; "TRIPADVISORREVIEWS"
  * in einer Tabellenspalte liest sich wie ein Fehler und kostet Breite.
  * Nur die vier grossen bekommen einen Namen -- GOLOCAL und UBEREATS (371
@@ -183,15 +192,22 @@ export const karten: Karte[] = [
     schluessel: 'bw_kachel_schnitt',
     name: 'Ø Bewertung',
     beschreibung:
-      'Durchschnittlicher Bewertungsstand über die gewählten Betriebe im gewählten Monat. '
-      + 'Der **Stand** ist der Schnitt über alle Bewertungen bis Monatsende — das, was ein Gast sieht.',
+      'Durchschnittlicher Bewertungsstand über die gewählten Betriebe im gewählten Monat, '
+      + 'gewichtet mit der Zahl der Bewertungen — also der Schnitt, den ein Gast über alle '
+      + 'Bewertungen der Gruppe sähe, nicht der Mittelwert der Betriebs-Schnitte.',
     anzeige: 'scalar',
     parameter: [MONAT, MARKE, BETRIEB],
     // Nur operative Betriebe (heutiger Status): geschlossene Betriebe
     // sammeln weiter Bewertungen, aber ihr Schnitt ist keine Aussage
     // ueber die Flotte, die heute am Tisch besprochen wird.
+    //
+    // GEWICHTET mit anzahl_stand: ungewichtet zog ein kleiner Betrieb
+    // mit 40 Bewertungen den Schnitt so stark wie einer mit 4.000 —
+    // die Nachbarkachel gewichtet ausdruecklich, und zwei Kacheln mit
+    // zwei Rechenwegen lasen sich als Widerspruch.
     sql: `${MONAT_CTE}
-SELECT coalesce(to_char(round(avg(v.schnitt_stand), 2), 'FM0.00'), '– keine Daten')
+SELECT coalesce(to_char(round(sum(v.schnitt_stand * v.anzahl_stand)
+                              / nullif(sum(v.anzahl_stand), 0), 2), 'FM0.00'), '– keine Daten')
          AS "Ø Bewertung"
   FROM mart.bewertung_verlauf v
   CROSS JOIN gewaehlt g
@@ -480,8 +496,8 @@ WINDOW w AS (ORDER BY monat ROWS BETWEEN 5 PRECEDING AND CURRENT ROW)
       'graph.y_axis.min': 3,
       'graph.y_axis.max': 5,
       'graph.show_goal': true,
-      'graph.goal_value': 4.4,
-      'graph.goal_label': 'Grün ab 4,40',
+      'graph.goal_value': GRUEN_ZIEL,
+      'graph.goal_label': GRUEN_ZIEL_TEXT,
       series_settings: {
         Stand: { display: 'line' },
         'Tendenz (6 Monate)': { display: 'line' },
@@ -523,8 +539,8 @@ SELECT coalesce(v.konzept, '(ohne Marke)') AS "Marke",
       'graph.y_axis.min': 3,
       'graph.y_axis.max': 5,
       'graph.show_goal': true,
-      'graph.goal_value': 4.4,
-      'graph.goal_label': 'Grün ab 4,40',
+      'graph.goal_value': GRUEN_ZIEL,
+      'graph.goal_label': GRUEN_ZIEL_TEXT,
     },
   },
 
@@ -564,6 +580,11 @@ SELECT v.betrieb                                        AS "Betrieb",
             THEN 'ja' ELSE '' END                       AS "Ampel kippt"
   FROM mart.bewertung_verlauf v
   CROSS JOIN gewaehlt g
+  -- Nur operative: die Frage "kippt die Ampel bei Portalwechsel" stellt
+  -- sich nur fuer Betriebe, die eine Ampel haben. Vorher standen 10 von
+  -- 60 Zeilen fuer geschlossene und Testbetriebe.
+  JOIN mart.betrieb_status bs
+    ON bs.betrieb_key = v.betrieb_key AND bs.status = 'operativ'
  WHERE v.monat = g.monat
    AND v.schnitt_stand IS NOT NULL
    [[AND v.konzept = {{marke}}]]
@@ -687,5 +708,80 @@ SELECT betrieb                    AS "Betrieb",
     parameter: [BETRIEB, MARKE, P_NOTE],
     sql: EINZEL_SQL,
     visualisierung: EINZEL_ANZEIGE,
+  },
+
+  // -------------------------------------------------------------------
+  // Der Kritiken-Drill-Down (dd_kritiken) hinter der Kachel "Offene
+  // 1-2-Sterne-Kritiken".
+  //
+  // WAS ER ZEIGEN KANN UND WAS NICHT: Yext liefert je Betrieb und Monat
+  // nur die ZAEHLER (offen, offen_schlecht) — welche einzelne Bewertung
+  // beantwortet ist, steht in keiner geladenen Tabelle. Die Seite zeigt
+  // deshalb ehrlich zwei Stufen: je Betrieb die Zaehler (deren Summe
+  // exakt die Kachel ist), und darunter ALLE 1-2-Sterne-Texte des
+  // Monats als Arbeitsmaterial — beantwortete einschliesslich.
+  // -------------------------------------------------------------------
+  {
+    schluessel: 'kr_betriebe',
+    name: 'Offene Kritiken je Betrieb',
+    beschreibung:
+      'Die Kachel, aufgeteilt auf Betriebe: 1–2-Sterne-Bewertungen des Monats ohne Antwort, daneben alles Offene und das Antwortverhalten. Die Summe der ersten Spalte ist exakt die Kachelzahl. Ein Klick auf den Namen öffnet das Betriebsblatt.',
+    anzeige: 'table',
+    parameter: [MONAT, MARKE, BETRIEB],
+    sql: `${MONAT_CTE}
+SELECT a.betrieb              AS "Betrieb",
+       a.konzept              AS "Marke",
+       a.offen_schlecht       AS "Offen 1–2★",
+       a.offen                AS "Offen gesamt",
+       a.bewertungen          AS "Bewertungen im Monat",
+       a.quote_prozent        AS "Antwortquote %",
+       a.reaktion_tage        AS "Reaktion (Tage)"
+  FROM mart.bewertung_antwort a
+  CROSS JOIN gewaehlt g
+ WHERE a.monat = g.monat AND a.operativ
+   AND (a.offen_schlecht > 0 OR a.offen > 0)
+   [[AND a.konzept = {{marke}}]]
+   [[AND a.betrieb = {{betrieb}}]]
+ ORDER BY a.offen_schlecht DESC NULLS LAST, a.offen DESC NULLS LAST`,
+    visualisierung: {
+      column_settings: {
+        '["name","Antwortquote %"]': { suffix: ' %' },
+      },
+    },
+  },
+
+  {
+    schluessel: 'kr_wortlaut',
+    name: '1–2 Sterne im Wortlaut',
+    beschreibung:
+      'Alle 1–2-Sterne-Bewertungen des gewählten Monats mit Text — auch die schon beantworteten: welche einzelne offen ist, führt Yext nur als Zähler (Tabelle oben). **Quelle** führt zum Original beim Portal, dort steht auch die Antwort. Ein Klick auf den Betrieb öffnet das Betriebsblatt.',
+    anzeige: 'table',
+    parameter: [MONAT, MARKE, BETRIEB],
+    sql: `${MONAT_CTE}
+SELECT e.datum                          AS "Datum",
+       e.betrieb                        AS "Betrieb",
+       repeat('★', e.rating::int)       AS "Sterne",
+       e.autor                          AS "Gast",
+       e.inhalt                         AS "Bewertung",
+       ${PORTAL_NAME('e.publisher')}    AS "Portal",
+       e.url                            AS "Quelle"
+  FROM mart.bewertung_einzel e
+  CROSS JOIN gewaehlt g
+ WHERE e.monat = g.monat
+   AND e.rating <= 2
+   [[AND e.konzept = {{marke}}]]
+   [[AND e.betrieb = {{betrieb}}]]
+ ORDER BY e.publiziert_am DESC
+ LIMIT 300`,
+    // Dieselbe Lese-Einrichtung wie bw_einzel: Umbruch und feste Breiten,
+    // damit der Text lesbar ist statt abgeschnitten. Eine Spalte mehr
+    // (Betrieb), deshalb eigene Breiten. Summe 1.020 px < 1.048.
+    visualisierung: {
+      'table.column_widths': [110, 150, 90, 130, 370, 90, 80],
+      column_settings: {
+        '["name","Bewertung"]': { text_wrapping: true },
+        '["name","Quelle"]': { view_as: 'link', link_text: 'Original' },
+      },
+    },
   },
 ]

@@ -154,6 +154,9 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
                                  + 'verschwaende unter jedem Zeitfilter.',
                             zeitraum: 'ebenso.',
                             betrieb: 'Der Steckbrief beschreibt die AKTION, nicht einen Betrieb.' },
+  akd_steckbrief:         { marke: 'Der Steckbrief beschreibt die AKTION — mart.aktion kennt '
+                                 + 'weder Marke noch Betrieb.',
+                            betrieb: 'ebenso.' },
 
   // --- Kacheln des laufenden Monats: bewusst "jetzt", nicht "gewaehlter Monat".
   um_kachel_monat:  { monat: 'Kachel zeigt ausdruecklich den LAUFENDEN Monat.',
