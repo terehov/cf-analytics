@@ -1290,11 +1290,16 @@ SELECT (u.geschaeftstag - s.von + 1)   AS "Tag im Zeitraum",
     // ein ausdruecklich gewaehlter geschlossener Betrieb sichtbar bleibt.
     sql: `${MONAT_CTE}
 , med AS (
-    SELECT x.bereich,
-           percentile_cont(0.5) WITHIN GROUP (ORDER BY x.wert)::numeric AS median
-      FROM mart.ampel_bereich x, gewaehlt g
-     WHERE x.monat = g.monat AND x.wert IS NOT NULL AND x.operativ
-     GROUP BY x.bereich
+    -- Ebenfalls ohne Alias: die Aliasfallen-Pruefung in uebernehmen.ts
+    -- kennt keine CTE-Grenzen und meldet JEDES aliasierte Vorkommen der
+    -- Feldfilter-Tabelle. Der Median bleibt bewusst ungefiltert — er
+    -- laeuft ueber ALLE operativen Betriebe, das verspricht die Spalte.
+    SELECT ampel_bereich.bereich,
+           percentile_cont(0.5) WITHIN GROUP (ORDER BY ampel_bereich.wert)::numeric AS median
+      FROM mart.ampel_bereich, gewaehlt g
+     WHERE ampel_bereich.monat = g.monat
+       AND ampel_bereich.wert IS NOT NULL AND ampel_bereich.operativ
+     GROUP BY ampel_bereich.bereich
 )
 SELECT ampel_bereich.bereich_name            AS "Metrik",
        ampel_bereich.betrieb                 AS "Betrieb",

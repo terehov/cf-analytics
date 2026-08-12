@@ -993,7 +993,7 @@ export const dashboards: Dashboard[] = [
     filter: [F_AKTION, F_MARKE, F_BETRIEB],
     reihen: [
       { teile: [{ text: '# Die einzelne Aktion\n\n**Nur 34 Betriebe erfassen Aktionen** (19 Enchilada, 14 Wilma Wunder, eine Deutsche Konzepte) — jede Zahl hier beschreibt die mitmachenden Betriebe, nicht die Gruppe.\n\nDer Verlauf zeigt, wann die Aktion anlief, trug und auslief; die Betriebsliste, wessen Monat an ihr hängt. **Ø Anteil %** über 40 heißt: dieser Betrieb hat eine Frage zu beantworten, wenn die Aktion endet.' }] },
-      { teile: [{ karte: 'akd_steckbrief', hoehe: 8 }] },
+      { teile: [{ karte: 'akd_steckbrief', hoehe: 9 }] },
       { teile: [{ karte: 'akd_verlauf', hoehe: 9 }] },
       { teile: [{ karte: 'akd_betriebe', hoehe: 12,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
@@ -1130,7 +1130,7 @@ export const dashboards: Dashboard[] = [
     filter: [F_ARTIKEL, F_BETRIEB, F_MARKE],
     reihen: [
       { teile: [{ text: '# Der einzelne Artikel\n\nMonatsraster statt Tagesfilter — feiner führt die schnelle Artikelsicht den Verkauf nicht, und für „läuft er noch, und wo" reicht der Monat.\n\n**Ø Preis netto** ist Umsatz durch Menge, nicht der Kartenpreis: Aktionen und Rabatte stecken darin. Laufen Umsatz und Menge im Verlauf auseinander, hat sich der Preis bewegt, nicht die Nachfrage.' }] },
-      { teile: [{ karte: 'ar_kopf', hoehe: 8 }] },
+      { teile: [{ karte: 'ar_kopf', hoehe: 9 }] },
       { teile: [{ karte: 'ar_verlauf', hoehe: 9 }] },
       { teile: [{ karte: 'ar_betriebe', hoehe: 12,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
