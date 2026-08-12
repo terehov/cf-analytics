@@ -1292,9 +1292,17 @@ Verworfen, und für den Bulk-Lauf zu Recht (`lina-api-inventar-ladenakte.md` §7
 79 Produkte, Preis je Betrieb, artikelgenau. Diese Frage beantwortet Weg A nicht: Er liefert
 Belegkopf, Lieferant, Sachkonto und Nettobetrag, aber keinen Artikel und keinen Einzelpreis.
 Am 11.08. war Weg B der teurere von zwei Wegen zum selben Ziel. Seit dem Rücklauf von 8,7 %
-ist er der einzige bekannte Weg zu einem Ziel, das sonst gar nicht erreicht wird — die
+~~ist er der einzige bekannte Weg zu einem Ziel, das sonst gar nicht erreicht wird~~ — die
 Alternative „den Fachbereich fragen" ist gemessen gescheitert. Das ändert die Rechnung, ohne
 dass jemand die Entscheidung geändert hätte.
+
+**Korrigiert am 12.08.2026, noch am selben Tag.** Weg B ist nicht der einzige Weg. Migration
+`0056` beantwortet die Preisfrage aus den FoodNotify-Bestellungen — nachgemessen auf
+`localhost/lina`: `mart.einkaufspreis_betrieb` trägt über die letzten zwölf Monate 3.974
+Waren mit Preis je Betrieb und Ware, für **43 der 57 operativen Betriebe**. Was bleibt, ist
+die andere Hälfte: die 14 operativen Häuser ohne FoodNotify und alles, was am Bestellsystem
+vorbei gekauft wurde. Dafür ist Weg B weiterhin der einzige bekannte Weg. Die drei
+Entscheidungen hinter `0056` und ihre gemessenen Grenzen stehen am Ende dieses Blocks.
 
 **Was unverändert dagegen steht, und es ist nicht der Aufwand.** Ein Wechsel des aktiven
 Mandanten verändert Zustand in LINA. Genau das galt am 26.07.2026 bei der Standortkarte als
@@ -1308,3 +1316,191 @@ Sinne von `bun run messen` gibt es hier nicht.
 vom 11.08.2026 unter einer Annahme getroffen wurde, die seit dem 12.08.2026 nicht mehr gilt,
 und dass die Wiedervorlage eine Entscheidung über Regel 1 ist, keine über Laufzeit. Der
 Punkt steht in [`offene-punkte.md`](offene-punkte.md).
+
+### Dieselbe Erhebung, die andere Hälfte der Frage: Migration `0056`
+
+Die Excel wollte zweierlei — **wo** eingekauft wird (das beantwortet `mart.fremdeinkauf` aus
+`0055`, oben) und **was jedes Haus für ein Produkt zahlt**. Die zweite Hälfte beantwortet
+`mart.einkaufspreis_betrieb` aus Migration `0056`, am 12.08.2026 auf `localhost/lina`
+angewendet. `mart.einkaufspreis_monat` (`0041`) konnte es nicht: Sie gruppiert nach Ware,
+Marke, Einheit und Monat — ohne Betrieb und ohne Lieferant, also ohne die Achse, um die die
+Erhebung überhaupt gefragt hat. Nachgemessen im Fenster ab April 2026: 35.587 Zeilen, 2.896
+Waren, 49 Betriebe, davon 24.682 Zeilen als `vergleichbar` gekennzeichnet.
+
+Drei Entscheidungen tragen die Sicht. Alle drei sind gemessen — und bei allen dreien steht
+unten, was die Messung von der Begründung übrig lässt. Bei der dritten ist das viel.
+
+### Verglichen wird der Preis je Basiseinheit, nicht der Gebindepreis
+
+**Entscheidung.** `summe_preis / gesamt_menge` (Euro je Liter, Kilo, Stück) statt
+`summe_preis / menge` (Euro je Gebinde) wie in `0041`.
+
+**Begründung.** Über die Zeit hinweg bucht derselbe Besteller dasselbe Gebinde; über
+Betriebe hinweg nicht. Ein Haus bucht den Karton als `menge = 1`, das nächste sechs Flaschen
+als `menge = 6` — dieselbe Ware, dasselbe Geld, Faktor 6 im Gebindepreis. Die erste Fassung
+der Sicht rechnete mit dem Gebindepreis, und ihre Trefferliste bestand aus genau diesem
+Artefakt: „Elka Orangensaft" 67,02 gegen 11,17, „Grana Padano" 147,90 gegen 14,79, dazu ein
+Dutzend Zeilen mit exakt 500,0 Prozent Abweichung.
+
+**Verworfene Alternative: der Gebindepreis, wie ihn `0041` benutzt.** Er ist nicht verworfen,
+sondern entmachtet — er steht als `preis_je_gebinde` daneben, weil ein Einkäufer in
+Kartonpreisen denkt und nicht in Cent je Milliliter. Zum Lesen, nicht zum Rechnen.
+
+**Was die Messung von der Begründung übrig lässt.** Der Migrationskopf beruft sich auf 979
+Waren mit mindestens vier Betrieben, Median der Spanne 1,03 bei beiden Preisen, über Faktor 3
+streuen 119 Waren beim Gebindepreis und nur 67 beim Preis je Basiseinheit. Nachgemessen am
+12.08.2026 über bar-Positionen der letzten zwölf Monate: 962 Waren, Median 1,02 gegen 1,02,
+über Faktor 3 **87 gegen 34**. Die Richtung hält, die Zahlen nicht. Über die Grundgesamtheit,
+die die Sicht tatsächlich liest (beide Bereiche, ganze Historie), **kehrt sich das Ergebnis
+um**: 2.182 Waren, Median 1,06 gegen 1,07, über Faktor 3 **286 beim Gebindepreis gegen 337
+bei der Basiseinheit**. Nach dem eigenen Maßstab der Entscheidung ist die Basiseinheit dort
+die schlechtere Wahl. Belegt ist sie im jungen bar-Bestand, nicht in dem Bestand, den die
+Sicht ausliefert.
+
+**Und sie umgeht eine Absicherung, die es schon gibt.** `0042` hat
+`core.bestellposition.preis_je_einheit` für genau diese Größe gebaut und trägt dort `NULL`
+ein, wo `gesamt_menge` nicht belastbar ist (`menge_unstimmig`) — der Fall „48.400 EUR/kg
+statt 48,40". `0041` liest diese Spalte, `0056` rechnet die Größe stattdessen neu und
+ungeprüft aus `summe_preis / gesamt_menge`. Nachgemessen: **5.466 als `menge_unstimmig`
+markierte Positionen** fließen in die Basis von 603.941 Positionen, und „Idee Entkoffeiniert
+50 Pouches A 7G" steht im Juli 2026 mit `preis = 48.400,0000` je kg und demselben Wert als
+`konzern_median` in der Sicht — der Ausreißer, der in `0042` der Anlass war. 455 von 9.509
+Ware/Einheit/Monat-Zellen liefern damit einen anderen Preis je Basiseinheit als
+`mart.einkaufspreis_monat.preis_je_einheit_median`, größte Differenz 47.432 EUR. Das sind die
+„zwei Wahrheiten für dieselbe Frage", die der Migrationskopf zu verhindern verspricht.
+
+**Der `COMMENT ON VIEW` beschreibt am 12.08.2026 eine andere Sicht als die gebaute:** „DIE
+PREISBASIS IST DER GEBINDEPREIS (summe_preis / menge)", „mehrkosten ist die Abweichung MAL
+der bezogenen Gebindezahl" und „Median der Gebindepreise" an
+`einkaufspreis_betrieb.preis` — dreimal das Gegenteil dessen, was der Code rechnet, und
+zweimal im Widerspruch zum Kopf derselben Datei. Wer die Sicht in Metabase liest, sieht diese
+Texte im Datenmodell. Nicht behoben.
+
+### Der Maßstab ist der Median der Hauspreise, gebildet nur aus operativen Betrieben
+
+**Entscheidung.** Vergleichswert je Ware, Einheit und Monat ist der Median **der
+Betriebspreise** — jedes Haus zählt einmal, unabhängig davon, wie oft es bestellt hat. In
+diesen Median gehen nur Häuser mit `status = 'operativ'` ein.
+
+**Verworfene Alternative: der Median über alle Positionen.** Dann bestimmt ein Haus mit 500
+Bestellungen den Wert, gegen den ein Haus mit fünf gemessen wird — „Konzern" hieße dann „der
+größte Besteller". Nachgemessen am 12.08.2026 ist der Unterschied selten und dort, wo er
+auftritt, groß: In 155 von 9.276 Gruppen (1,7 Prozent) weichen beide Maßstäbe voneinander ab,
+bis zum Faktor 12,5. Die Entscheidung ändert für 98 von 100 Waren nichts und rettet die
+Fälle, in denen es zählt.
+
+**Verworfen: geschlossene Häuser aus der Sicht filtern.** Sie bilden den Maßstab nicht mit —
+ein geschlossenes Haus soll den Preis, an dem sich ein offenes messen lassen muss, nicht
+bestimmen. Ihre Zeilen bleiben aber stehen und bekommen ihre Abweichung gegen den operativen
+Maßstab (Falle 12: die Sicht filtert nicht, sie kennzeichnet). Nachgemessen im Fenster ab
+April 2026: 4.190 Zeilen aus sechs nicht operativen Häusern, 2.897 davon mit Abweichung,
+keine einzige Zeile ohne `betrieb_status`.
+
+**Was die Umsetzung nicht hält — und das ist blockierend.** `je_betrieb` gruppiert zusätzlich
+nach `bereich` (`core.kostenstelle.art`, also Bar und Küche), und der Maßstab zählt darüber
+mit `count(*)`. Ein Haus, das dieselbe Ware über beide Bereiche bucht, geht **zweimal** in
+`betriebe_operativ` und zweimal in den Median ein — der Kommentar „So zählt jedes Haus
+einmal" ist wörtlich falsch. Nachgemessen: 12.577 doppelte Haus-Zellen über die ganze Sicht
+(12.522 durch `bereich`, 55 durch den Lieferanten), 1.525 im Fenster ab April; 1.077 von
+9.519 Gruppen zählen zu hoch, bis +8. **50 Gruppen erreichen die Drei-Häuser-Schwelle allein
+durch die Doppelzählung**, und 156 Zeilen tragen deshalb `vergleichbar = true` samt
+`abweichung_pct`, obwohl real nur zwei Häuser beteiligt sind. Der Median selbst verschiebt
+sich in 180 von 9.190 Gruppen, höchstens um 2,1936 EUR je Basiseinheit. Die Entscheidung
+bleibt richtig, der Code setzt sie nicht um: er bräuchte `count(DISTINCT betrieb_key)` und
+eine Zwischenaggregation je Haus vor dem Median.
+
+### `einheit_verdaechtig`: eine Heuristik, die bewusst echte Fälle unterdrückt
+
+**Entscheidung.** Liegt der Quotient aus Hauspreis und Konzernmedian auf 0,001 genau auf
+einem ganzzahligen Vielfachen ab 2, gilt die Zeile als Mengenartefakt: `vergleichbar = false`,
+`abweichung_pct` und `mehrkosten` bleiben `NULL`. Anlass ist „Tequila Silver 1l Karton 6x1l"
+mit 11,5783 gegen 1,9297, Faktor 6,0000 — beide Häuser buchen dieselbe Gebindegröße, aber das
+eine zählt in `gesamt_menge` Kartons und das andere Liter. `gebinde_uneinheitlich` sieht das
+nicht, weil dort die Größe übereinstimmt.
+
+**Der Preis ist bewusst in Kauf genommen.** Wer tatsächlich exakt das Doppelte zahlt, fällt
+heraus. Der Tausch: eine erfundene Meldung „500 Prozent zu teuer" verbrennt die ganze
+Auswertung, ein übersehener Fall nicht. Dieselbe Abwägung wie bei den Aktionsartikeln am
+11.08.2026 — lieber untererfassen als falsch zusammenführen.
+
+**Wie hoch der Preis wirklich ist, nachgemessen am 12.08.2026.** Im Fenster ab April 2026
+sind 42 Zeilen geflaggt. 16 tragen denselben Gebindepreis wie ihre Gruppe — dort steckt der
+Faktor ausschließlich in der Basiseinheit, also zweifelsfrei Artefakt. 16 weitere weichen bei
+Gebinde- **und** Basispreis um denselben Faktor ab, sind also ebenfalls Mengenbuchung. Es
+bleiben **zehn** Zeilen, in denen ein echter Preisunterschied stecken kann, sechs davon ein
+und dieselbe Ware (Grana Padano). Klarster Kandidat: „Tk Erdbeeren Cama. 2,5Kg", Betrieb 55 —
+halber Gebindepreis (11,05 gegen 22,10), doppelter kg-Preis, also die kleinere Packung. Der
+befürchtete Verlust ist einstellig, der Tausch damit günstiger als angenommen.
+
+**Das Problem ist nicht, was die Heuristik verwirft, sondern was sie nicht ansieht.** Zwei
+Lücken, beide gemessen, beide im selben Fenster:
+
+1. **Nur die teure Richtung.** Geprüft wird `preis / median`, nie `median / preis`. Der
+   spiegelbildliche Fall — dieses Haus zählt Liter, die anderen Kartons — läuft durch: 79
+   Zeilen mit auf 0,001 ganzzahligem Kehrfaktor, **66 davon `vergleichbar = true`**,
+   Abweichungen bis **−90,0 Prozent**, in Summe **−37.339 EUR erfundene „Ersparnis"**.
+2. **Bimodale Gruppen sieht sie gar nicht.** Liegt der Median zwischen zwei Mengen-Clustern,
+   ist kein Quotient ganzzahlig. „Captain Morgan Dark Rum 40% 1l Karton 12x1l": jedes Haus
+   zahlt exakt 147,84 EUR je Karton, die Sicht meldet für die einen **+84,6**, für die
+   anderen **−84,6 Prozent**, alle `vergleichbar = true`, `einheit_verdaechtig = false` (der
+   Median 6,6733 liegt zwischen 12,32 und 1,0267). Insgesamt 78 Gruppen mit auf 0,001
+   ganzzahliger Spreizung, 643 Zeilen, davon 311 vergleichbar und nur 34 geflaggt. Aus diesen
+   Gruppen stammen **−45.045 von −55.282 EUR, also 81 Prozent** aller negativen `mehrkosten`
+   der Sicht.
+
+Dazu eine Kleinigkeit mit derselben Wirkungsrichtung: `einheit_verdaechtig` ist in 3.676
+Zeilen der Sicht weder `true` noch `false`, sondern `NULL` — dort ist `konzern_median` `NULL`,
+und der ganze `AND`-Ausdruck wird es mit. Ein `WHERE NOT einheit_verdaechtig` verliert diese
+Zeilen still. `vergleichbar` und `gebinde_uneinheitlich` haben das Problem nicht.
+
+**Was daraus für den Leser folgt, bis das behoben ist.** Die teuren Ausreißer der Sicht
+tragen; die günstigen tragen nicht. „Dieses Haus kauft 85 Prozent günstiger" ist zu vier
+Fünfteln Mengenartefakt. Eine Einsparliste aus `mehrkosten < 0` ist am 12.08.2026 keine
+Einsparliste.
+
+
+---
+
+## 12.08.2026, nachmittags — zwei Korrekturen vor dem Commit
+
+Beide Abschnitte oben beschreiben Stände, die **vor** dem Commit noch geändert wurden. Der
+Text bleibt stehen, weil die Begründungen weiter gelten; hier steht, was daraus wurde.
+
+### Revidiert: drei Zustände wurden zwei
+
+Oben steht ausführlich, warum `mart.fremdeinkauf` drei Zustände führt und „nicht
+eingeordnet" der Standard ist. **Der Nutzer hat das am 12.08.2026 verworfen**, und die
+Begründung trägt: dass eine Brauerei mit Liefervertrag berechtigt ist, ist kein Grund für
+einen dritten Zustand, sondern ein Grund, sie in `manual.lieferant_freigabe` einzutragen.
+Dafür ist eine Freigabeliste da.
+
+Der Preis der alten Fassung war eine Auswertung, die vor 112 Klassifizierungen nichts
+anzeigt — eine leere Verdachtsliste, die wie „kein Fremdeinkauf" aussieht. Die neue liefert
+sofort: **1.116.877 EUR bei 71 Lieferanten und 33 Betrieben** in den letzten zwölf Monaten.
+
+Was der dritte Zustand wert war, steht jetzt in der Spalte `grund`: sie trennt
+`ausdruecklich gesperrt` von `steht nicht auf der liste` und nennt bei Getränken
+`fremder getraenkehaendler`. Für den Befund macht das keinen Unterschied, für die
+Arbeitsplanung schon.
+
+### Behoben: die fünf blockierenden Befunde an `0056`
+
+Der Prüflauf zu `0056` fand fünf blockierende Fehler. Alle wurden **vor dem Commit** in
+derselben Migration behoben, nicht in einer Folgemigration — `0056` war zu dem Zeitpunkt
+nirgends committet:
+
+| Befund | Behebung |
+|---|---|
+| `bereich` im Korn zählte Häuser doppelt (50 Gruppen erreichten die Schwelle nur dadurch) | `bereich` und Lieferant aus dem `GROUP BY` entfernt, stehen als Anzeige daneben. Nachgemessen: 0 Gruppen zählen noch falsch |
+| `menge_unstimmig` umgangen, 48.400-EUR-Kaffee zurück | Die Sicht nimmt jetzt `core.bestellposition.preis_je_einheit` aus `0042` und rechnet sie nicht nach. Kosten: 5.398 von 621.614 Positionen |
+| `einheit_verdaechtig` prüfte nur die teure Richtung | Heuristik ersetzt durch `menge_widerspruechlich` — die Basiseinheit streut weiter als der Gebindepreis |
+| Bimodale Gruppen (Captain Morgan: überall 147,84 EUR, gemeldet ±84,6 %) | Vierte Sperre `spreizung_zu_gross`: mehr als Faktor 3 zwischen den Häusern ist eine Mengenbuchung, kein Preis. Kostet 96 von 17.748 Gruppen |
+| Drei `COMMENT`s beschrieben den Gebindepreis, gerechnet wurde die Basiseinheit | Kommentare berichtigt |
+
+Wirkung, nachgemessen am 12.08.2026: die negativen `mehrkosten` — also die erfundene
+„Ersparnis" — sind von **−55.282 auf −17.512 EUR** gefallen.
+
+**Was bleibt:** dicht unter der Dreifach-Grenze stehen weiter Zeilen mit glatten Faktoren
+(150,0 und 200,0 Prozent). Belastbar ist die Sicht im einstelligen bis niedrig
+zweistelligen Bereich — dort, wo Einkaufsbefunde tatsächlich liegen. Dreistellige
+Abweichungen gehören vor der Weitergabe am Beleg geprüft.

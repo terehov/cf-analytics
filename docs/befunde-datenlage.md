@@ -948,3 +948,32 @@ daneben, sieht es wie ein Rechenfehler aus. Ein Nebeneffekt derselben Bauart:
 
 Die Arbeitsliste zum Schließen der Lücke gehört an Concept Family; sie steht in
 [`offene-punkte.md`](offene-punkte.md).
+
+
+## Nachtrag 12.08.2026: die Zahlen zum Fremdeinkauf gelten für zwei Zustände
+
+Der Block oben rechnet mit drei Zuständen und nennt die Verdachtsliste leer. **Das gilt
+nicht mehr:** `mart.fremdeinkauf` führt seit dem 12.08.2026 zwei Zustände mit dem Standard
+`nicht freigegeben`. Gemessen über die letzten zwölf Monate, Quelle FoodNotify:
+
+| Einordnung | Grund | Betriebe | Lieferanten | Netto EUR |
+|---|---|---|---|---|
+| freigegeben | Konzernfreigabe | 51 | 5 | 12.158.163 |
+| freigegeben | GFGH des Hauses | 4 | 2 | 145.686 |
+| **nicht freigegeben** | steht nicht auf der Liste | **33** | **71** | **1.116.877** |
+
+Grösste Posten: Trinkkontor 141.753 EUR (3 Betriebe), Getränke Keller 134.626 (2),
+GLH Getränke Logistik Heilbronn 99.531 (3), Hubauer 82.484 (1), Würzburger Hofbräu 64.310
+(1), FFD Frisch Fruchtig Delp 48.847 (8), Segafredo Zanetti 32.153 (7).
+
+**GLH ist der lehrreiche Fall.** Bei Wilma Wunder Stuttgart und Wirtshaus Lautenschlager ist
+GLH der hinterlegte GFGH und damit freigegeben; an drei weitere Häuser liefert dieselbe
+Firma ohne Hinterlegung. Derselbe Lieferant steht also in beiden Spalten — genau die
+Unterscheidung, die die GFGH-Erhebung treffen wollte.
+
+Betriebe mit dem höchsten Fremdanteil: B+L Pforzheim 54 Prozent, Wilma Wunder Köln 28,
+Speyer und Passau je 26, Düsseldorf 25.
+
+**Diese Liste enthält berechtigte Fälle** — Brauereien mit Liefervertrag und rund ein
+Dutzend Winzer. Sie gehören in `manual.lieferant_freigabe` eingetragen, nicht in einen
+dritten Zustand. Die Liste schrumpft, während sie abgearbeitet wird.

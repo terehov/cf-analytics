@@ -19,20 +19,29 @@
 -- ---------------------------------------------------------------------
 -- WAS DIESE MIGRATION NICHT TUT
 --
--- Sie klassifiziert keinen einzigen Lieferanten, den der Nutzer nicht
--- benannt hat. Gesetzt sind am 12.08.2026 fuenf konzernweite Freigaben
--- (Distra, Chefs Culinar, CF Gastro, Layer-Chemie, J.J. Darboven) und
--- 13 GFGH-Zeilen aus den ausgefuellten Excel-Spalten, davon 5 mit
--- aufgeloestem Dachnamen. Alles
--- andere bleibt NICHT EINGEORDNET und steht in mart.lieferant_freigabe_stand
--- nach Volumen sortiert zur Pflege.
+-- Sie FREIGIBT keinen einzigen Lieferanten, den der Nutzer nicht benannt
+-- hat. Gesetzt sind am 12.08.2026 fuenf konzernweite Freigaben (Distra,
+-- Chefs Culinar, CF Gastro, Layer-Chemie, J.J. Darboven) und 13
+-- GFGH-Zeilen aus den ausgefuellten Excel-Spalten, davon 5 mit
+-- aufgeloestem Dachnamen.
 --
--- Das ist die tragende Entscheidung dieser Migration, und sie hat einen
--- Grund: bei 119 Dachnamen in beiden Quellen wuerde ein Standardwert
--- "nicht freigegeben" auf einen Schlag 112 Firmen zu Fremdeinkauf erklaeren,
--- darunter Brauereien mit Liefervertrag und Winzer. Diese Liste wuerde
--- einmal herumgereicht, und danach glaubt ihr niemand mehr. Drei Zustaende
--- statt zwei ist der ganze Unterschied.
+-- ALLES ANDERE GILT ALS FREMDEINKAUF. Das sind bei 119 Dachnamen
+-- zunaechst 112 Firmen, und darunter sind berechtigte: Brauereien mit
+-- Liefervertrag und rund ein Dutzend Winzer. Das ist Absicht und nicht
+-- Schlamperei — eine Freigabeliste ist dafuer da, dass "nicht darauf"
+-- etwas bedeutet.
+--
+-- Hier stand zuerst ein dritter Zustand "nicht eingeordnet" als Standard,
+-- mit genau dem Argument, man duerfe die Brauereien nicht vorschnell
+-- verdaechtigen. Der Nutzer hat das am 12.08.2026 verworfen: dass eine
+-- Brauerei berechtigt ist, ist kein Grund fuer einen dritten Zustand,
+-- sondern ein Grund, sie einzutragen. Der Preis der alten Fassung war
+-- eine Auswertung, die vor 112 Klassifizierungen nichts anzeigt — eine
+-- leere Verdachtsliste, die wie "kein Fremdeinkauf" aussieht.
+--
+-- Die Arbeitsrichtung ist damit umgedreht: mart.lieferant_freigabe_stand
+-- nach Volumen absteigend durchgehen, jede berechtigte Firma eintragen,
+-- und die Verdachtsliste schrumpft, waehrend sie abgearbeitet wird.
 -- =====================================================================
 
 
@@ -67,11 +76,13 @@ keinem Quellsystem steht. Stand 12.08.2026 vom Nutzer benannt: Food ueber Distra
 Chefs Culinar und CF Gastro, Hygiene ueber Layer-Chemie, Kaffee und Tee ueber
 J.J. Darboven.
 
-DIE ABWESENHEIT EINER ZEILE HEISST "NICHT EINGEORDNET" UND NIEMALS "NICHT FREIGEGEBEN".
-Beide Sichten dieser Migration halten die drei Zustaende auseinander. Wer sie zu zweien
-zusammenzieht, erklaert 112 von 119 Firmen zu Fremdeinkauf, darunter Brauereien mit Liefervertrag
-(Dinkelacker in Stuttgart, Hoepfner in Karlsruhe, Auerbraeu in Rosenheim) und ein Dutzend
-Winzer. Die Arbeitsliste ist mart.lieferant_freigabe_stand, nach Volumen sortiert.
+DIE ABWESENHEIT EINER ZEILE HEISST "NICHT FREIGEGEBEN". mart.fremdeinkauf fuehrt jeden
+Lieferanten ohne Freigabezeile als Fremdeinkauf — am 12.08.2026 sind das 112 von 119
+Dachnamen, darunter berechtigte Faelle wie Brauereien mit Liefervertrag (Dinkelacker in
+Stuttgart, Hoepfner in Karlsruhe, Auerbraeu in Rosenheim) und ein Dutzend Winzer.
+DIESE FIRMEN GEHOEREN HIER EINGETRAGEN, nicht in einen dritten Zustand. Die Arbeitsliste
+dafuer ist mart.lieferant_freigabe_stand, nach Volumen sortiert; die Spalte grund in
+mart.fremdeinkauf trennt "ausdruecklich gesperrt" von "steht nicht auf der liste".
 
 GETRAENKE STEHEN HIER NICHT. Der Getraenkefachgrosshandel ist JE BETRIEB ein anderer und
 gehoert nach manual.gfgh_betrieb; konzernweit ist ein GFGH weder freigegeben noch
@@ -139,11 +150,13 @@ offen und ueber mart.lieferant_freigabe_stand aus den Rechnungen nachziehbar.
 WOFUER DAS DA IST: ein Getraenkehaendler ist konzernweit weder erlaubt noch verboten.
 Erst diese Zeile sagt, WER das Haus beliefern darf.
 
-EIN BEFUND BRAUCHT BEIDE SEITEN: hier einen aufgeloesten dach_name, und den liefernden
-Haendler in manual.gfgh_haendler. Fehlt eine davon, steht die Zeile als
-"nicht eingeordnet" da und nicht als Fremdeinkauf. Beispiel Aposto Aalen: das Haus nennt
-"Getraenke Keller", der Name ist aber nicht aufgeloest — solange das so bleibt, kann fuer
-Aalen kein Getraenke-Befund entstehen, gleich wer dorthin liefert.';
+EIN EINTRAG HIER IST EINE FREIGABE: der genannte Haendler darf dieses Haus beliefern und
+erscheint in mart.fremdeinkauf mit grund = ''gfgh des hauses''. Jeder andere Lieferant
+dieses Hauses gilt als Fremdeinkauf, solange er nicht konzernweit freigegeben ist.
+Bleibt dach_name NULL — bei acht der 13 Zeilen der Fall —, gibt dieses Haus fuer NIEMANDEN
+eine Getraenkefreigabe her. Beispiel Aposto Aalen: das Haus nennt "Getraenke Keller", der
+Name ist nicht aufgeloest, und deshalb steht auch Getraenke Keller dort als Fremdeinkauf.
+Das ist die richtige Anzeige — aufgeloest gehoert der Name trotzdem.';
 
 COMMENT ON COLUMN manual.gfgh_betrieb.dach_name IS
 'Unsere Deutung des Rohtexts, auf derselben Achse wie manual.lieferant_freigabe.dach_name.
@@ -564,23 +577,56 @@ SELECT z.quelle,
        coalesce(f.warengruppe,
                 CASE WHEN h.dach_name IS NOT NULL THEN 'getraenke' END)
                        AS warengruppe,
+       /*
+        * ZWEI ZUSTAENDE, UND DER STANDARD IST "NICHT FREIGEGEBEN".
+        *
+        * Hier standen zuerst drei Zustaende, mit "nicht eingeordnet" als
+        * Standard. Die Begruendung war, ein Standardwert wuerde 112 Firmen
+        * auf einen Schlag zu Fremdeinkauf erklaeren, darunter Brauereien
+        * mit Liefervertrag und Winzer.
+        *
+        * Der Nutzer hat das am 12.08.2026 verworfen, und zwar zu Recht:
+        * dass eine Brauerei mit Liefervertrag berechtigt ist, ist kein
+        * Grund fuer einen dritten Zustand, sondern ein Grund, sie in
+        * manual.lieferant_freigabe EINZUTRAGEN. Dafuer ist die Liste da.
+        *
+        * Der Preis der alten Fassung war, dass die Auswertung erst nach
+        * 112 Klassifizierungen etwas anzeigt — bis dahin eine leere
+        * Verdachtsliste, die wie "kein Fremdeinkauf" aussieht. So herum
+        * liefert sie sofort, und die Freigabeliste waechst, indem man die
+        * Befunde nach Volumen abarbeitet. Erst verdaechtigen, dann die
+        * berechtigten Ausnahmen eintragen.
+        *
+        * WAS DER DRITTE ZUSTAND WERT WAR, steht jetzt in der Spalte
+        * grund: sie unterscheidet "ausdruecklich gesperrt" von "steht
+        * nicht auf der Liste". Fuer den Befund macht das keinen
+        * Unterschied, fuer die Arbeitsplanung schon.
+        */
        CASE
          WHEN f.freigegeben IS TRUE
               AND (f.gilt_ab IS NULL OR z.monat >= date_trunc('month', f.gilt_ab)::date)
            THEN 'freigegeben'
-         WHEN f.freigegeben IS FALSE
-              AND (f.gilt_ab IS NULL OR z.monat >= date_trunc('month', f.gilt_ab)::date)
-           THEN 'nicht freigegeben'
          WHEN gb.dach_name IS NOT NULL
            THEN 'freigegeben'
-         -- Ein bekannter Getraenkehaendler liefert an ein Haus, das einen
-         -- ANDEREN GFGH hinterlegt hat. Das ist der Befund.
+         ELSE 'nicht freigegeben'
+       END             AS einordnung,
+       CASE
+         WHEN f.freigegeben IS TRUE
+              AND (f.gilt_ab IS NULL OR z.monat >= date_trunc('month', f.gilt_ab)::date)
+           THEN 'konzernfreigabe'
+         WHEN gb.dach_name IS NOT NULL
+           THEN 'gfgh des hauses'
+         WHEN f.freigegeben IS FALSE
+              AND (f.gilt_ab IS NULL OR z.monat >= date_trunc('month', f.gilt_ab)::date)
+           THEN 'ausdruecklich gesperrt'
          WHEN h.dach_name IS NOT NULL
               AND gb_haus.dach_name IS NOT NULL
               AND gb_haus.dach_name IS DISTINCT FROM z.dach_name
-           THEN 'nicht freigegeben'
-         ELSE 'nicht eingeordnet'
-       END             AS einordnung,
+           THEN 'fremder getraenkehaendler'
+         WHEN f.freigegeben IS TRUE AND z.monat < date_trunc('month', f.gilt_ab)::date
+           THEN 'freigabe galt damals noch nicht'
+         ELSE 'steht nicht auf der liste'
+       END             AS grund,
        -- Der hinterlegte GFGH des Hauses, IMMER wenn es einen gibt — nicht
        -- nur im Befundfall. Zuerst stand hier gb_fremd.dach_name; die Spalte
        -- war damit in 9.078 von 9.078 Zeilen NULL und log ueber ihren Namen.
@@ -611,16 +657,21 @@ COMMENT ON VIEW mart.fremdeinkauf IS
 die Grundlage fuer Fremdeinkauf, Lieferantenkonzentration und Volumen je Haus.
 Filtern auf einordnung = ''nicht freigegeben'' liefert die Verdachtsliste.
 
-DIESE VERDACHTSLISTE IST AM 12.08.2026 FAST LEER, und das ist eine Aussage ueber den
-Pflegestand und nicht ueber den Einkauf. Ein Befund entsteht nur, wo BEIDES gepflegt ist:
-der Lieferant steht in manual.gfgh_haendler UND das belieferte Haus hat einen anderen GFGH
-in manual.gfgh_betrieb. Gepflegt sind 5 Haendler und 13 Haeuser, davon 5 mit aufgeloestem
-Dachnamen. Wer aus einer kurzen Liste "kaum Fremdeinkauf" liest, liest sie falsch.
+ZWEI ZUSTAENDE, UND DER STANDARD IST "nicht freigegeben". Wer nicht auf der Freigabeliste
+steht und nicht der GFGH seines Hauses ist, gilt als Fremdeinkauf — dafuer ist eine
+Freigabeliste da. Am 12.08.2026 sind das die meisten: gesetzt sind fuenf konzernweite
+Freigaben und 13 GFGH-Zeilen gegen 119 Dachnamen.
 
-DREI ZUSTAENDE, NICHT ZWEI. "nicht eingeordnet" heisst, dass niemand ueber diesen
-Lieferanten entschieden hat — es ist die Arbeitsliste, nicht der Befund. Am 12.08.2026
-sind das die meisten: 112 von 119 Dachnamen. Gesetzt sind fuenf konzernweite Freigaben
-und 13 GFGH-Zeilen.
+DIE LISTE IST DESHALB ANFANGS LANG UND ENTHAELT BERECHTIGTE FAELLE — Brauereien mit
+Liefervertrag (Dinkelacker in Stuttgart, Hoepfner in Karlsruhe, Auerbraeu in Rosenheim)
+und rund ein Dutzend Winzer. Das ist kein Fehler der Sicht, sondern der Arbeitsauftrag:
+nach Volumen absteigend durchgehen und jede berechtigte Firma in
+manual.lieferant_freigabe eintragen. Die Liste schrumpft, waehrend sie abgearbeitet wird.
+
+DIE SPALTE grund SAGT, WARUM. Sie unterscheidet ''ausdruecklich gesperrt'' (jemand hat
+entschieden) von ''steht nicht auf der liste'' (noch niemand hat hingesehen) und nennt bei
+Getraenken ''fremder getraenkehaendler'', wenn ein bekannter GFGH an ein Haus mit anderem
+GFGH liefert. Fuer den Befund macht das keinen Unterschied, fuer die Arbeitsplanung schon.
 
 DIE SPALTE quelle DARF NICHT WEGGRUPPIERT WERDEN. ''foodnotify'' und ''belegarchiv''
 zeigen dieselbe Rechnung, wenn sie ueber FoodNotify bestellt und in LINA gebucht wurde.

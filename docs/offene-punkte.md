@@ -617,3 +617,26 @@ diese drei brauchen das Belegarchiv.
   gescheiterte Erhebung wieder auf dem Tisch"). Offen bleibt hier nur, **wer und wann** — es ist
   eine Entscheidung über Regel 1 (Zustandsänderung in LINA), nicht über Laufzeit, und solange
   sie aussteht, gibt es auf die Preisfrage überhaupt keine Antwort.
+
+
+---
+
+## Nachtrag 12.08.2026: die Arbeitsliste ist jetzt eine Verdachtsliste
+
+Der Block oben beschreibt die nicht eingeordneten Lieferanten als Pflegeaufgabe ohne
+Befundcharakter. Seit der Umstellung auf zwei Zustände (Begründung in
+[`entscheidungen.md`](entscheidungen.md)) **sind es Befunde**: 71 Lieferanten, 33 Betriebe,
+1.116.877 EUR in zwölf Monaten.
+
+An der Arbeit ändert das nichts, an der Dringlichkeit schon. Reihenfolge nach Volumen:
+
+1. **Trinkkontor** (141.753 EUR, 3 Betriebe) und **Getränke Keller** (134.626, 2) — beides
+   Getränkehändler. Entweder sie sind der GFGH dieser Häuser, dann gehören sie nach
+   `manual.gfgh_betrieb`, oder sie sind es nicht, dann ist es ein Befund.
+2. **GLH** (99.531, 3 Betriebe **ohne** Hinterlegung) — bei zwei anderen Häusern ist GLH der
+   eingetragene GFGH. Hier ist die Frage konkret beantwortbar.
+3. **Segafredo Zanetti** (32.153, 7 Betriebe) — Kaffee gegen die Darboven-Freigabe.
+4. Brauereien und Winzer eintragen, damit sie aus der Liste verschwinden.
+
+Ausserdem offen und unverändert: „Carls Brauhaus" hat keine Zeile in `core.betrieb`, und
+acht der 13 GFGH-Zeilen tragen keinen aufgelösten Dachnamen.

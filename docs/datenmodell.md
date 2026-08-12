@@ -230,3 +230,80 @@ Absicherung, die der Migrationskommentar an dieser Stelle behauptet („bricht a
 Primärschlüssels laut ab"), gibt es also nicht; bei einem abweichenden Betriebsnamen fehlt der
 GFGH lautlos, und `mart.fremdeinkauf` ordnet dessen Getränke dauerhaft als „nicht eingeordnet"
 ein.
+
+### Welcher Preis verglichen wird (Migration 0056, 12.08.2026)
+
+Dieselbe Erhebung, die `0055` ausgelöst hat, wollte je Betrieb und Produkt einen Preis. `0056`
+liefert ihn als `mart.einkaufspreis_betrieb` — **keine Schemaänderung, nur eine Sicht**. Sie
+steht trotzdem hier, weil sie eine Modellfrage entscheidet: welche Größe „der Preis" ist.
+
+**Zwei Sichten, zwei Preisbasen, und das ist Absicht.** `mart.einkaufspreis_monat` (`0041`)
+rechnet `summe_preis / menge` — den **Gebindepreis**. Dort wird eine Ware über die Zeit
+verglichen, und derselbe Besteller bucht dieselbe Gebindeeinheit; der Kartonpreis ist die Zahl,
+in der ein Einkäufer denkt. `mart.einkaufspreis_betrieb` rechnet `summe_preis / gesamt_menge` —
+den Preis je **Basiseinheit**. Hier wird über *Häuser* verglichen, und dort bucht das eine Haus
+einen Karton als `menge = 1` und das andere sechs Flaschen als `menge = 6`: dieselbe Ware,
+dasselbe Geld, Faktor 6 im Gebindepreis. Die erste Fassung der Sicht rechnete mit dem Gebinde
+und meldete genau das als Befund („Grana Padano" 147,90 gegen 14,79, Faktor 10,00).
+
+**Der Beleg für den Wechsel trägt nur im jungen `bar`-Bestand.** Der Migrationskopf begründet
+ihn damit, dass die Basiseinheit am Rand enger streut (979 Waren, über Faktor 3: 119 Gebinde
+gegen 67 Basis — gemessen über `bar`-Positionen der letzten zwölf Monate). Nachgemessen am
+12.08.2026 über die Grundgesamtheit, die die Sicht **tatsächlich** verwendet (alle Bereiche,
+ohne Zeitfilter): 2.182 Waren mit mindestens vier Betrieben, Median der Spanne 1,06 gegen 1,07,
+über Faktor 3 streuen **286 Waren beim Gebindepreis und 337 bei der Basiseinheit**. Nach dem
+eigenen Maßstab der Migration ist die Basiseinheit dort die *schlechtere* Wahl. Die
+Entscheidung bleibt richtig — über Häuser hinweg ist der Gebindepreis schlicht keine
+vergleichbare Größe —, aber nicht mit dieser Begründung.
+
+**Was das über `gesamt_menge` sagt: die Basiseinheit ist nicht die saubere Größe, nur eine
+andere schmutzige.** Alle Zahlen nachgemessen am 12.08.2026 auf `localhost/lina`:
+
+| gemessen | Zahl |
+|---|---|
+| Positionen, in denen `gesamt_menge = menge × gebinde_menge` gilt | 162.477 von 634.175 (**25,6 %**) |
+| Positionen in der Basis der Sicht | 603.941 |
+| davon als `menge_unstimmig` markiert (`0042`) | 5.466 |
+| davon ohne `preis_je_einheit` aus `0042` (dort bewusst `NULL`) | 4.985 |
+| davon mit abweichendem `preis_je_einheit` (> 0,005) | 7.346 |
+
+Woher die Abweichung kommt, ist ungeklärt; gefüllt ist die Spalte praktisch immer (4 Positionen
+mit `gesamt_menge = 0`, keine `NULL`). Genau dafür hat `0042` die Spalte
+`core.bestellposition.preis_je_einheit` gebaut und setzt dort `NULL`, wo die Gesamtmenge nicht
+belastbar ist — „eine fehlende Zahl ist besser als eine erfundene". `0056` rechnet sie neu und
+ungeprüft und umgeht damit die einzige Stelle, an der die Prüfung steht. Folge: der
+48.400-EUR-Kaffee aus dem Kopf von `0042` steht wieder in einer Auswertung — `Idee
+Entkoffeiniert 50 Pouches A 7G` mit `preis` = 48.400,0000 EUR/kg, im Februar 2026 sogar mit
+`vergleichbar = true` und 0,0 Prozent Abweichung, weil alle drei beteiligten Häuser dasselbe
+Artefakt tragen.
+
+**Und die Verpackung ist damit nicht wegnormalisiert, sondern nur verschoben.** Buchen einige
+Häuser die Gesamtmenge in Kartons und andere in Litern, spaltet sich der Preis je Basiseinheit
+in zwei Cluster. „Captain Morgan Dark Rum 40% 1l Karton 12x1l": **jedes Haus zahlt exakt 147,84
+EUR je Gebinde**, die Sicht meldet +84,6 Prozent für die einen und −84,6 Prozent für die
+anderen, `vergleichbar = true`. Die Heuristik `einheit_verdaechtig` greift nicht, weil der
+Median (6,6733) zwischen den Clustern liegt und kein Quotient ganzzahlig wird. Nachgemessen am
+12.08.2026 für Monate ab 2026-04: 78 Gruppen mit auf 0,001 ganzzahliger Spreizung, 643 Zeilen,
+davon **311 trotzdem vergleichbar**, geflaggt nur 34 — aus ihnen stammen **45.045 der 55.282
+EUR** negativer `mehrkosten` der ganzen Sicht (81 Prozent der gemeldeten „Ersparnis").
+
+Die Regel, die daraus folgt: **die belastbare Preisgröße liegt in `core` (`0042`), nicht in der
+Sicht.** Solange `mart.einkaufspreis_betrieb` `summe_preis / gesamt_menge` selbst bildet, gibt
+es für dieselbe Ware zwei Preise je Basiseinheit — den geprüften in `core.bestellposition` und
+den ungeprüften in der Sicht. Der nächste Eingriff dort ersetzt die eigene Formel durch
+`preis_je_einheit` und lässt die unstimmigen Positionen fallen, statt sie mitzurechnen.
+
+
+### Nachtrag 12.08.2026: zwei Änderungen vor dem Commit
+
+**`mart.fremdeinkauf`:** zwei Zustände statt drei, Standard `nicht freigegeben`. Die
+Unterscheidung, die der dritte Zustand trug, steht in der Spalte `grund`. Begründung in
+[`entscheidungen.md`](entscheidungen.md).
+
+**`mart.einkaufspreis_betrieb`:** die Sicht rechnet den Preis je Basiseinheit **nicht mehr
+selbst**, sondern nimmt `core.bestellposition.preis_je_einheit` aus `0042`. Der oben
+beschriebene Befund — 5.466 als `menge_unstimmig` markierte Positionen liefen mit, und der
+48.400-EUR-Kaffee war zurück — ist damit behoben. Die Regel dahinter ist allgemein und
+gehört hierher: **wer eine geprüfte Größe nachrechnet, verliert die Prüfung.** `0042` hat
+`preis_je_einheit` genau dafür gebaut und setzt sie auf NULL, wo die Gesamtmenge nicht
+belastbar ist; eine Sicht, die die Formel wiederholt, umgeht diesen NULL-Wert.

@@ -52,6 +52,7 @@ stellen: Admin → Tabellenmetadaten → Schema `core` → Sichtbarkeit.
 | Artikel, Renner und Penner, Deckungsbeitrag | `mart.artikelverkauf` |
 | Sortiment nach Warengruppe | `mart.deckungsbeitrag_warengruppe` |
 | Einkaufspreise über die Zeit, echte Belegpreise | `mart.einkaufspreis_monat` — löst das stillgelegte `preisentwicklung_ware` ab |
+| Zahlt **dieses Haus** mehr als die anderen für dieselbe Ware? | `mart.einkaufspreis_betrieb` — **nur mit `vergleichbar = true` lesen**, und auch dann mit den drei Sperren aus dem Abschnitt zu Migration `0056` |
 | Konkrete Bestellungen je Betrieb, inklusive Stornos | `mart.einkauf_beleg` — eine Zeile je Bestellung, `storniert` kennzeichnet statt auszublenden |
 | Ist dieser Lieferant überhaupt eingeordnet? | `mart.lieferant_freigabe_stand` — die Arbeitsliste, hier fängt man an; Sortierung nach `fn_netto` selbst setzen |
 | Fremdeinkauf: Volumen je Betrieb, Monat und Lieferant | `mart.fremdeinkauf` — **immer auf genau eine `quelle` filtern**, sonst Doppelzählung |
@@ -78,6 +79,12 @@ stellen: Admin → Tabellenmetadaten → Schema `core` → Sichtbarkeit.
 
 Jede dieser Sichten trägt einen Tabellenkommentar; Metabase zeigt ihn als Beschreibung an.
 Dort steht auch, was man mit ihr **nicht** tun soll.
+
+**Eine Ausnahme, gefunden am 12.08.2026:** der Tabellenkommentar von
+`mart.einkaufspreis_betrieb` (Migration `0056`) beschreibt an drei Stellen eine andere Sicht
+als die gebaute — Preisbasis, Bezugsgröße von `mehrkosten`, Bedeutung von `preis`. Wer die
+Metabase-Beschreibung dieser einen Sicht gegen die Zahl hält, bekommt einen Widerspruch. Was
+gilt, steht unten im Abschnitt zu `0056`.
 
 > **Die Spalte `stadt` ist überall NULL.** Sie läuft durch `mart.umsatz_ytd`,
 > `mart.round_table_monat`, `mart.ampel_bereich` und ein Dutzend weiterer Sichten, kommt aus
@@ -294,9 +301,11 @@ setzt, muss ihn auf `geschaeftstag` der Basissicht legen. Ausführlich in `fehle
 
 Neue Sichten kommen in eine **neue** Migrationsdatei. ~~`0001` bis `0006` sind angewendet und
 werden nicht mehr geändert;~~ der Stand steht in `public.schema_migration`.
-(Nachgemessen am 12.08.2026: angewendet sind **58 Dateien bis einschließlich
-`0055_lieferantenfreigabe.sql`**. Die Regel gilt unverändert, nur die Nummern sind
+(Nachgemessen am 12.08.2026: angewendet sind ~~**58 Dateien bis einschließlich
+`0055_lieferantenfreigabe.sql`**~~. Die Regel gilt unverändert, nur die Nummern sind
 weitergelaufen — angewendet heißt eingefroren, gleich welche Nummer.)
+Erneut nachgemessen am 12.08.2026, 12:29 Uhr: **59 Dateien bis einschließlich
+`0056_einkaufspreis_betriebsvergleich.sql`**.
 
 ## Tempo
 
@@ -436,3 +445,133 @@ und diese 14 stehen für **30,0 % des operativen Umsatzes** (33.530.901 EUR von 
 zehn davon sind „Deutsche Konzepte". Der blinde Fleck ist also fast eine ganze Marke und kein
 Streuverlust: eine Lieferantenkonzentration aus FoodNotify ist die Konzentration der 43. Die
 Aufschlüsselung nach Status und Umsatz steht in `befunde-datenlage.md`.
+
+---
+
+## Einkaufspreis im Betriebsvergleich (Migration 0056, 12.08.2026)
+
+Die andere Hälfte derselben Erhebung. „GFGH Q2 2026.xlsx" wollte je Betrieb und Produkt einen
+Preis und daneben Durchschnitt, Höchst- und Tiefstpreis; zurück kamen 8,7 %. Die Zahlen stehen
+längst in FoodNotify, nur ohne die Achse, nach der gefragt war: `mart.einkaufspreis_monat`
+(`0041`) gruppiert nach Ware, Marke, Einheit und Monat — **ohne Betrieb und ohne Lieferant**.
+`mart.einkaufspreis_betrieb` ergänzt genau diese Achse.
+
+Eine Zeile je Ware, Gebinde, Betrieb, Lieferant, Monat **und Bereich** (`bar` / `kueche`). Der
+Bereich steht nicht im Tabellenkommentar und ist der Grund für die erste der drei Sperren weiter
+unten. Nachgemessen am 12.08.2026 im Fenster `monat >= '2026-04-01'`: 35.587 Zeilen, 2.896 Waren,
+49 Betriebe, 4.512.053 EUR Ausgaben; über die ganze Historie 230.350 Zeilen. `betrieb_status`
+und `operativ` sind da, gefiltert wird nicht (Falle 12) — geschlossene Häuser behalten ihre Zeile
+und bekommen ihre Abweichung, bilden den Maßstab aber nicht mit.
+
+### Welche der beiden Preissichten — und warum sie verschiedene Zahlen nennen
+
+| Frage | Sicht | Preisbasis |
+|---|---|---|
+| Was kostet diese Ware im Konzern, wie läuft der Preis über die Zeit? | `mart.einkaufspreis_monat` | Gebindepreis, `summe_preis / menge` |
+| Zahlt **dieses Haus** mehr als die anderen für dieselbe Ware? | `mart.einkaufspreis_betrieb` | Preis je Basiseinheit, `summe_preis / gesamt_menge` |
+
+Über die Zeit ist der Gebindepreis richtig: derselbe Besteller bucht dieselbe Einheit. Über
+Betriebe hinweg nicht — das eine Haus bucht den Karton als `menge = 1`, das andere sechs Flaschen
+als `menge = 6`. Gleiche Ware, gleiches Geld, Faktor 6.
+
+**Die beiden Sichten nennen deshalb für dieselbe Ware verschiedene Preise, und das ist kein
+Fehler, sondern die Preisbasis.** Nachgemessen am 12.08.2026: von 7.742 eindeutigen
+Ware/Einheit/Monat-Zellen weichen **274 (3,5 %)** voneinander ab, im Extremfall um 47.432 EUR.
+Nicht nebeneinander auf ein Dashboard, ohne den Unterschied dazuzuschreiben.
+
+Und die Wahl ist schwächer belegt, als der Migrationskopf sagt. Er nennt 979 Waren, über Faktor 3
+streuen 119 beim Gebindepreis gegen 67 beim Basispreis. Nachgemessen über die Grundgesamtheit,
+die die Sicht tatsächlich verwendet (2.182 Waren mit mindestens vier Betrieben, ohne Zeitfilter):
+**286 gegen 337** — dort ist die Basiseinheit nach dem eigenen Maßstab die schlechtere Wahl. Die
+Richtung hält nur im jungen `bar`-Bestand.
+
+### Immer auf `vergleichbar` filtern
+
+**Ohne `WHERE vergleichbar` stehen Mengenartefakte als Preisbefunde da.** Die Spalte ist `false`,
+solange weniger als drei operative Häuser dieselbe Ware im selben Monat gekauft haben, oder
+solange die Häuser verschiedene Gebindegrößen buchen. Im Fenster ab April 2026 tragen 24.682 von
+35.587 Zeilen `true`: 7.944 fallen an der Drei-Häuser-Schwelle, 3.144 an `gebinde_uneinheitlich`,
+42 an `einheit_verdaechtig`. In allen anderen Zeilen sind `abweichung_pct` und `mehrkosten` NULL,
+die Zeile selbst bleibt stehen.
+
+Zwei Nebenbedingungen:
+
+* **Auf `vergleichbar` filtern, nicht auf die Einzelkennzeichen.** `einheit_verdaechtig` ist
+  nicht `false`, sondern **NULL**, wo kein Haus operativ ist — 3.676 Zeilen der Sicht. Ein
+  `WHERE NOT einheit_verdaechtig` verliert sie still; `WHERE vergleichbar` nicht.
+* **`mehrkosten` über Betriebe *und* Waren summiert ist kein Einsparpotenzial.** Der Median
+  verschiebt sich, sobald jemand günstiger einkauft. Steht so auch im Tabellenkommentar.
+
+### Was `vergleichbar = true` heute trotzdem durchlässt
+
+Drei gemessene Lücken, alle am 12.08.2026 im Fenster ab April 2026. Sie sind der Grund, warum
+eine Karte auf dieser Sicht heute noch eine eigene Sperre in der Abfrage braucht.
+
+**1. Der Maßstab zählt Zeilen, nicht Häuser.** `bereich` gehört zum Korn, `betriebe_operativ`
+zählt aber mit `count(*)` darüber. Ein Haus, das dieselbe Ware über `bar` **und** `kueche` bucht,
+geht zweimal ein. 1.525 Haus-Zellen sind so gespalten, 1.077 von 9.519 Gruppen zählen zu hoch,
+und **50 Gruppen erreichen die Drei-Häuser-Schwelle ausschließlich durch die Doppelzählung** —
+162 Zeilen, davon **156 mit `vergleichbar = true`** und einer Abweichung, die es nach der
+dokumentierten Regel nicht geben dürfte. Gegenprobe in der Karte: `count(DISTINCT betrieb_key)`
+je Ware/Einheit/Monat.
+
+**2. `einheit_verdaechtig` prüft nur die teure Richtung.** Geprüft wird, ob
+`preis / konzern_median` ein glattes Vielfaches ≥ 2 ist; der Spiegelfall — das Haus zählt Liter
+statt Kartons, also `konzern_median / preis` ganzzahlig — wird nie angesehen. 79 Zeilen, **66
+davon `vergleichbar = true`**, Abweichungen bis **−90,0 %**, in Summe **−37.339 EUR erfundene
+„Ersparnis"**.
+
+**3. Bei zwei Mengen-Clustern greift die Heuristik gar nicht.** Liegt der Median zwischen den
+Clustern, ist kein Quotient ganzzahlig. „Captain Morgan Dark Rum 40% 1l Karton 12x1l": **jedes
+Haus zahlt exakt 147,84 EUR je Karton**, und die Sicht meldet für die einen +84,6 % und für die
+anderen −84,6 %, beide mit `vergleichbar = true` und `einheit_verdaechtig = false`. 78 solcher
+Gruppen, 643 Zeilen, davon 311 vergleichbar, geflaggt nur 34. Aus ihnen stammen **−45.045 EUR von
+−55.282 EUR (81 %)** aller negativen `mehrkosten` der Sicht.
+
+Was übrig bleibt, wenn man alle drei zusätzlich sperrt — Häuser distinct zählen, den Kehrfaktor
+mitprüfen, Gruppen mit ganzzahliger Spreizung verwerfen: 24.221 der 24.682 vergleichbaren Zeilen,
+und aus **+5.449 / −55.282 EUR** werden **+2.550 / −9.628 EUR**. Als Preisliste je Haus ist die
+Sicht heute brauchbar; als Einsparpotenzial-Karte erst nach dieser Korrektur.
+
+### Fallen dieser Sicht
+
+| Falle | Nachgemessen am 12.08.2026 | Was man tut |
+|---|---|---|
+| Der Tabellenkommentar widerspricht der Sicht | Drei Stellen: „DIE PREISBASIS IST DER GEBINDEPREIS (summe_preis / menge)", „mehrkosten ist die Abweichung MAL der bezogenen Gebindezahl", „Median der Gebindepreise" | Gerechnet wird durchgehend auf der **Basiseinheit**. Der Kommentar ist falsch, nicht der Code — die Metabase-Beschreibung dieser Sicht nicht zitieren |
+| `preis` ist der Preis je Basiseinheit, nicht der Kartonpreis | Zum Lesen steht `preis_je_gebinde` daneben | Spalte in der Karte entsprechend beschriften. Ein Einkäufer, der „Preis" liest, denkt an den Karton |
+| `gesamt_menge` ist der Nenner und stimmt selten | `menge * gebinde_menge` trifft sie in 26 % der Positionen; **5.466** als `menge_unstimmig` markierte Positionen fließen ungeprüft in die Basis, obwohl `core.bestellposition.preis_je_einheit` (Migration `0042`) genau dafür gebaut wurde | Vor jedem Extremwert die Rohposition ansehen. „Idee Entkoffeiniert 50 Pouches A 7G" steht mit **48.400,00 EUR je kg** und `vergleichbar = true` (Februar 2026, drei Häuser) — `mart.einkaufspreis_monat` nennt für dieselbe Ware 16,94 EUR je Gebinde. Über die ganze Sicht: 330 Zeilen mit `preis > 1.000 EUR` je Basiseinheit, **91 davon vergleichbar**, 19 Waren |
+| Gruppiert wird über den Lieferanten-**Klarnamen** (Falle 13) | 162 `lieferant_key` verteilen sich auf **132** Namen; „Layer-Chemie" und „FFD - Frisch Fruchtig Delp" je 5×, „CHEFS CULINAR", „Transgourmet DE", „CF Gastro", „J.J. Darboven" je 4× | Hier ist eine **falsche Zusammenführung** möglich — anders als beim Warennamen, wo der Tabellenkommentar zu Recht nur von Untererfassung spricht |
+| Untererfassung über den Warennamen | „…Karton 12x1l" und „…Karton 12X1L" sind zwei Waren mit je eigenem Betriebskreis | Erwartet und im Tabellenkommentar beschrieben. `betriebe_operativ = 1` heißt oft „andere Schreibweise", nicht „nur ein Haus kauft das" |
+| `mehrkosten` geht gegen `ausgaben` nicht auf | `preis` ist ein Median, `ausgaben` eine Summe: in **134 von 24.682** vergleichbaren Zeilen weicht `preis * menge` um mehr als 1 % von `ausgaben` ab | Nicht als „von X EUR Ausgaben sind Y EUR zu viel" lesen. Beide Zahlen sind für ihre Frage richtig |
+| Ohne Monatsfilter stellt die Sicht 2021 neben 2026 | Bestand reicht bis 2020 zurück | Immer auf Monate filtern, so wie die Excel es für Q2 2026 wollte |
+
+**Nur FoodNotify.** Was am Bestellsystem vorbei gekauft wurde, hat hier keine Zeile. Für „zahle
+ich zu viel" ist das richtig — verhandelte Preise gibt es nur bei freigegebenen Lieferanten. Wer
+wissen will, **wo** überhaupt eingekauft wurde, nimmt `mart.fremdeinkauf` (`0055`); dass
+FoodNotify keine Vollerhebung ist, steht im Abschnitt darüber.
+
+
+---
+
+## Nachtrag 12.08.2026: beide Sichten haben sich vor dem Commit noch geändert
+
+**`mart.fremdeinkauf` führt zwei Zustände, nicht drei.** Der Abschnitt oben beschreibt
+`nicht eingeordnet` als eigenen Zustand — den gibt es in der Sicht nicht mehr. Standard ist
+`nicht freigegeben`; wer nicht auf der Freigabeliste steht und nicht der GFGH seines Hauses
+ist, gilt als Fremdeinkauf. Die neue Spalte **`grund`** sagt warum: `konzernfreigabe`,
+`gfgh des hauses`, `ausdruecklich gesperrt`, `fremder getraenkehaendler` oder
+`steht nicht auf der liste`.
+
+Für Karten heisst das: auf `einordnung = 'nicht freigegeben'` filtern liefert die
+Verdachtsliste (12 Monate: 1.116.877 EUR, 71 Lieferanten, 33 Betriebe). Wer die Arbeitsliste
+sehen will, filtert zusätzlich auf `grund = 'steht nicht auf der liste'`.
+
+**`mart.einkaufspreis_betrieb` hat jetzt vier Sperren statt drei**, und die im Abschnitt
+oben genannten Fallen sind behoben: die `bereich`-Doppelzählung, der umgangene
+`menge_unstimmig`-Schutz und die einseitige Heuristik. Neu sind `menge_widerspruechlich` und
+`spreizung_zu_gross`; `einheit_verdaechtig` gibt es nicht mehr. Die Regel bleibt dieselbe
+und wird dadurch nur wichtiger: **immer auf `vergleichbar = true` filtern.**
+
+Nachgemessen am 12.08.2026: negative `mehrkosten` von −55.282 auf −17.512 EUR gefallen.
+Rest-Einschränkung: dicht unter der Dreifach-Grenze stehen weiter glatte Faktoren (150,0 und
+200,0 Prozent). Belastbar ist der einstellige bis niedrig zweistellige Bereich.
