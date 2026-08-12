@@ -1491,6 +1491,70 @@ async function uebernehmen() {
     }
   } catch (e) { log('Aufraeumen fehlgeschlagen: ' + e.message, 'fehler'); }
 
+  // --- Beschreibungen aus COMMENT ON nachziehen ----------------------
+  //
+  // Metabase liest die Kommentare der Datenbank NUR, wenn es eine Tabelle
+  // oder ein Feld zum ersten Mal sieht. Aendert eine Migration den Text
+  // spaeter, bleibt in der Oberflaeche die alte Fassung stehen -- ein
+  // Sync raeumt das nicht ab, und ueber die Datenbank ist sie nicht mehr
+  // erreichbar.
+  //
+  // Aufgefallen am 12.08.2026: nach der Umbenennung Haus -> Betrieb
+  // standen die Spaltennamen sofort richtig da (die zieht der Sync), die
+  // Info-Fenster an den Tabellen dagegen trugen weiter "Haeuser" --
+  // sechs Wochen alter Text, den 0066 in der Datenbank laengst ersetzt
+  // hatte.
+  //
+  // Gelesen wird ueber /api/dataset, nicht ueber eine eigene
+  // Datenbankverbindung: dieses Skript soll genau die Bank sehen, an der
+  // Metabase haengt. Eine zweite Verbindung ueber DATABASE_URL zeigte
+  // hier auf die Entwicklungsbank und haette den falschen Stand
+  // uebertragen.
+  try {
+    // Kein Backtick in diesem Block: der ganze Seitentext ist selbst ein
+    // Template-Literal, ein zweites darin beendet es vorzeitig.
+    const KOMMENTARE = [
+      "SELECT n.nspname, c.relname, '' AS spalte, obj_description(c.oid,'pg_class') AS text",
+      "  FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace",
+      " WHERE c.relkind IN ('r','v','m','p')",
+      "   AND obj_description(c.oid,'pg_class') IS NOT NULL",
+      "UNION ALL",
+      "SELECT n.nspname, c.relname, a.attname, col_description(c.oid, a.attnum)",
+      "  FROM pg_class c",
+      "  JOIN pg_namespace n ON n.oid = c.relnamespace",
+      "  JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped",
+      " WHERE c.relkind IN ('r','v','m','p')",
+      "   AND col_description(c.oid, a.attnum) IS NOT NULL",
+    ].join('\n');
+
+    const antwort = await mb('/dataset', 'POST',
+      {database: def.db_id, type: 'native', native: {query: KOMMENTARE}});
+    if (antwort.status === 'failed') throw new Error(antwort.error);
+
+    const kommentar = {};
+    for (const [schema, tabelle, spalte, text] of antwort.data.rows) {
+      kommentar[schema + '.' + tabelle + '.' + spalte] = text;
+    }
+
+    const meta = await mb('/database/' + def.db_id + '/metadata');
+    let gesetzt = 0;
+    for (const t of (meta.tables || [])) {
+      const tk = kommentar[t.schema + '.' + t.name + '.'];
+      if (tk && tk !== t.description) {
+        await mb('/table/' + t.id, 'PUT', {description: tk});
+        gesetzt++;
+      }
+      for (const f of (t.fields || [])) {
+        const fk = kommentar[t.schema + '.' + t.name + '.' + f.name];
+        if (fk && fk !== f.description) {
+          await mb('/field/' + f.id, 'PUT', {description: fk});
+          gesetzt++;
+        }
+      }
+    }
+    log('  ' + gesetzt + ' Beschreibungen aus COMMENT ON nachgezogen', gesetzt ? 'neu' : 'ok');
+  } catch (e) { log('Beschreibungen nachziehen fehlgeschlagen: ' + e.message, 'fehler'); }
+
   log('\nFertig.');
 }
 

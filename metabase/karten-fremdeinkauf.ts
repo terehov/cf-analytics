@@ -58,6 +58,40 @@ const WARE: Parameter = {
 const ZWOELF_MONATE =
   `monat >= (date_trunc('month', current_date) - interval '12 months')::date`
 
+/**
+ * Der Zustand, den eine Kachel beim Klick mitgibt.
+ *
+ * Die drei Werte entsprechen EXAKT den drei Zaehlkacheln oben auf
+ * db_fremdeinkauf — sie duerfen sich ueberlappen ('bestätigt' ist eine
+ * Teilmenge von 'ohne Freigabe'), weil ein Filter immer nur EINEN Wert
+ * traegt und jeder Wert seine eigene Menge beschreibt. Wer die Kachel
+ * "7,9 Mio ohne Freigabe" klickt, muss auf dem Ziel dieselben 7,9 Mio
+ * wiederfinden — eine disjunkte Einteilung haette das verfehlt.
+ *
+ * Ungesetzt gilt 'ohne Freigabe': das ist die Zahl, um die es der Seite
+ * geht. Dieselbe coalesce-Bauart wie MONAT_CTE in gemeinsam.ts.
+ */
+const ZUSTAND_WAHL = `CASE coalesce([[ {{zustand}}, ]] 'ohne Freigabe')
+     WHEN 'bestätigt' THEN wareneinkauf IS TRUE
+                       AND grund IN ('ausdruecklich gesperrt', 'fremder getraenkehaendler')
+     WHEN 'ungeklärt' THEN wareneinkauf IS NULL
+     ELSE einordnung = 'nicht freigegeben' AND wareneinkauf IS TRUE
+   END`
+
+const ZUSTAND: Parameter = {
+  id: 'zustand-param', name: 'zustand', 'display-name': 'Zustand', type: 'string/=',
+  festeWerte: ['ohne Freigabe', 'bestätigt', 'ungeklärt'],
+}
+
+/**
+ * Der einzelne Lieferant (Dachname). OHNE Werteliste, wie F_INVENTUR und
+ * F_BESTELLUNG: der Filter wird geklickt, nicht getippt — eine
+ * Auswahlliste mit tausenden OCR-Namen waere keine Hilfe.
+ */
+const LIEFERANT: Parameter = {
+  id: 'lieferant-param', name: 'lieferant', 'display-name': 'Lieferant', type: 'string/=',
+}
+
 export const karten: Karte[] = [
 
   // -------------------------------------------------------------------
@@ -100,8 +134,10 @@ export const karten: Karte[] = [
       'Wareneinkauf bei Lieferanten, die weder auf der Konzernfreigabe stehen noch der hinterlegte GFGH ihres Betriebs sind — aus dem Belegarchiv, also aus den Rechnungen selbst. Nur operative Betriebe. NICHT als Verstoß lesen: gemessen am 12.08.2026 entfielen 6,92 von 7,93 Mio € auf 48 Betriebe, für die überhaupt kein GFGH hinterlegt ist, und die Freigabeliste hatte fünf Einträge. Die Zahl ist damit vor allem ein Pflegestand — der bestätigte Fremdeinkauf steht in der Kachel daneben. Nicht enthalten: Strom, Leasing, Kartengebühren, Konzerninnenumsatz und alles andere, was kein Wareneinkauf ist, sowie Lieferanten, die noch niemand eingeordnet hat.',
     anzeige: 'scalar',
     parameter: [BETRIEB, MARKE],
+    // coalesce: ein Betrieb ohne Fremdeinkauf zeigt 0, keine leere Kachel
+    // — leer liest sich als "kaputt", nicht als "nichts".
     sql: `
-SELECT round(sum(netto)) AS "Fremdeinkauf netto (12 Monate)"
+SELECT round(coalesce(sum(netto), 0)) AS "Fremdeinkauf netto (12 Monate)"
   FROM mart.fremdeinkauf
  WHERE quelle = 'belegarchiv'
    AND wareneinkauf IS TRUE
@@ -120,7 +156,7 @@ SELECT round(sum(netto)) AS "Fremdeinkauf netto (12 Monate)"
     anzeige: 'scalar',
     parameter: [BETRIEB, MARKE],
     sql: `
-SELECT round(sum(netto)) AS "Ungeklärtes Volumen (12 Monate)"
+SELECT round(coalesce(sum(netto), 0)) AS "Ungeklärtes Volumen (12 Monate)"
   FROM mart.fremdeinkauf
  WHERE quelle = 'belegarchiv'
    AND wareneinkauf IS NULL
@@ -136,7 +172,11 @@ SELECT round(sum(netto)) AS "Ungeklärtes Volumen (12 Monate)"
     beschreibung:
       'Wie viele operative Betriebe in den letzten zwölf Monaten mindestens einmal bei einem Lieferanten ohne Freigabe eingekauft haben. Steht die Zahl nahe an der Gesamtzahl der Betriebe, ist es kein Verhalten einzelner Betriebe, sondern eine Lücke in der Freigabeliste.',
     anzeige: 'scalar',
-    parameter: [MARKE],
+    // Auch der Betriebsfilter: mit gewaehltem Betrieb steht hier 1 oder 0.
+    // Vorher war die Kachel die einzige der Reihe, die nicht reagierte —
+    // sie zeigte 48 neben drei gefilterten Nachbarn, als waeren die 48
+    // eine Aussage ueber den gewaehlten Betrieb.
+    parameter: [BETRIEB, MARKE],
     sql: `
 SELECT count(DISTINCT betrieb_key) AS "Betriebe ohne Freigabe"
   FROM mart.fremdeinkauf
@@ -145,6 +185,7 @@ SELECT count(DISTINCT betrieb_key) AS "Betriebe ohne Freigabe"
    AND einordnung = 'nicht freigegeben'
    AND operativ
    AND ${ZWOELF_MONATE}
+   [[AND betrieb = {{betrieb}}]]
    [[AND konzept = {{marke}}]]`,
   },
 
@@ -244,7 +285,7 @@ SELECT 'Betriebe mit hinterlegtem GFGH',
     anzeige: 'scalar',
     parameter: [BETRIEB],
     sql: `
-SELECT round(sum(netto)) AS "Fremdeinkauf netto (12 Monate)"
+SELECT round(coalesce(sum(netto), 0)) AS "Fremdeinkauf netto (12 Monate)"
   FROM mart.fremdeinkauf
  WHERE quelle = 'belegarchiv'
    AND wareneinkauf IS TRUE
@@ -358,6 +399,10 @@ HAVING sum(netto) > 0
     sql: `
 SELECT quelle                      AS "Quelle",
        lieferant                   AS "Lieferant (normiert)",
+       -- Konstante Spalte fuer den Klick: der Drill-Down braucht neben dem
+       -- Lieferanten den Zustand, sonst zeigte er 'ohne Freigabe' und die
+       -- ungeklaerten Zeilen dieses Lieferanten blieben unsichtbar.
+       'ungeklärt'                 AS "Zustand",
        count(DISTINCT betrieb_key) AS "Betriebe",
        sum(belege)                 AS "Belege",
        round(sum(netto))           AS "Volumen netto",
@@ -581,6 +626,124 @@ SELECT monat                        AS "Monat",
    [[AND konzept = {{marke}}]]
    [[AND ware = {{ware}}]]
  ORDER BY ware, monat DESC, preis DESC
+ LIMIT 500`,
+  },
+
+  // -------------------------------------------------------------------
+  // Der Drill-Down in die Fremdeinkaufszahl selbst. Vier Karten fuer
+  // dd_fremdeinkauf, dieselbe Stellung wie sp_waren/sp_positionen zur
+  // Sperren-Zaehlkarte: sie zeigen, WAS hinter einer der Zaehlkacheln
+  // steckt — je Monat, je Betrieb, je Posten.
+  //
+  // Alle vier: quelle = 'belegarchiv' fest (Kacheln haben keine
+  // Quellspalte, Regel 1 oben), operativ, zwoelf Monate, und derselbe
+  // Zustand wie die angeklickte Kachel (ZUSTAND_WAHL).
+  //
+  // Feiner als Betrieb x Lieferant x Monat geht es hier nicht: das
+  // Belegarchiv fuehrt keine Positionen (Weg A der Erhebung, 0053),
+  // "belege" zaehlt die Rechnungen hinter einer Zeile.
+  // -------------------------------------------------------------------
+  {
+    schluessel: 'fd_summe',
+    name: 'Netto-Summe der Auswahl',
+    beschreibung:
+      'Dieselbe Rechnung wie die angeklickte Kachel — steht hier eine andere Zahl als dort, ist ein Filter im Spiel. Aus dem Belegarchiv, nur operative Betriebe, letzte zwölf Monate.',
+    anzeige: 'scalar',
+    parameter: [ZUSTAND, LIEFERANT, BETRIEB, MARKE],
+    sql: `
+SELECT round(coalesce(sum(netto), 0)) AS "Netto (12 Monate)"
+  FROM mart.fremdeinkauf
+ WHERE quelle = 'belegarchiv'
+   AND operativ
+   AND ${ZWOELF_MONATE}
+   AND ${ZUSTAND_WAHL}
+   [[AND lieferant = {{lieferant}}]]
+   [[AND betrieb = {{betrieb}}]]
+   [[AND konzept = {{marke}}]]`,
+  },
+
+  {
+    schluessel: 'fd_verlauf',
+    name: 'Verlauf je Monat',
+    beschreibung:
+      'Die Summe der Kachel, auf zwölf Monatsbalken verteilt. Der jüngste Balken kann noch wachsen: das Belegarchiv füllt nach, ein dünner aktueller Monat ist Ladestand, kein Rückgang.',
+    anzeige: 'bar',
+    parameter: [ZUSTAND, LIEFERANT, BETRIEB, MARKE],
+    sql: `
+SELECT monat             AS "Monat",
+       round(sum(netto)) AS "Netto"
+  FROM mart.fremdeinkauf
+ WHERE quelle = 'belegarchiv'
+   AND operativ
+   AND ${ZWOELF_MONATE}
+   AND ${ZUSTAND_WAHL}
+   [[AND lieferant = {{lieferant}}]]
+   [[AND betrieb = {{betrieb}}]]
+   [[AND konzept = {{marke}}]]
+ GROUP BY monat
+ ORDER BY monat`,
+    visualisierung: {
+      'graph.dimensions': ['Monat'],
+      'graph.metrics': ['Netto'],
+      'graph.y_axis.title_text': 'Netto (€)',
+    },
+  },
+
+  {
+    schluessel: 'fd_betriebe',
+    name: 'Die Betriebe dahinter',
+    beschreibung:
+      'Je Betrieb: bei wie vielen Lieferanten, wie viele Rechnungen, wie viel Geld. Das ist die Liste hinter der Kachel „Betriebe ohne Freigabe des Lieferanten". Ein Klick auf den Betriebsnamen öffnet das Betriebsblatt.',
+    anzeige: 'table',
+    parameter: [ZUSTAND, LIEFERANT, BETRIEB, MARKE],
+    sql: `
+SELECT betrieb                     AS "Betrieb",
+       konzept                     AS "Marke",
+       count(DISTINCT lieferant)   AS "Lieferanten",
+       sum(belege)                 AS "Belege",
+       round(sum(netto))           AS "Netto",
+       max(monat)                  AS "Letzter Monat"
+  FROM mart.fremdeinkauf
+ WHERE quelle = 'belegarchiv'
+   AND operativ
+   AND ${ZWOELF_MONATE}
+   AND ${ZUSTAND_WAHL}
+   [[AND lieferant = {{lieferant}}]]
+   [[AND betrieb = {{betrieb}}]]
+   [[AND konzept = {{marke}}]]
+ GROUP BY betrieb, konzept
+ ORDER BY sum(netto) DESC NULLS LAST
+ LIMIT 300`,
+  },
+
+  {
+    schluessel: 'fd_zeilen',
+    name: 'Die einzelnen Posten',
+    beschreibung:
+      'Eine Zeile je Betrieb, Lieferant und Monat — feiner führt das Belegarchiv den Einkauf nicht, es kennt keine Positionen. „Belege" zählt die Rechnungen hinter der Zeile. Klick auf den Lieferanten grenzt die Seite auf ihn ein, Klick auf den Betrieb öffnet das Betriebsblatt.',
+    anzeige: 'table',
+    parameter: [ZUSTAND, LIEFERANT, BETRIEB, MARKE],
+    sql: `
+SELECT monat                       AS "Monat",
+       betrieb                     AS "Betrieb",
+       konzept                     AS "Marke",
+       lieferant                   AS "Lieferant",
+       -- Anzeige-Ersetzung, solange die Sicht den alten Wortlaut fuehrt;
+       -- faellt weg, sobald der Sichtwert selbst umbenannt ist.
+       CASE WHEN grund = 'gfgh des hauses' THEN 'gfgh des betriebs'
+            ELSE grund END         AS "Grund",
+       coalesce(warengruppe, '—')  AS "Warengruppe",
+       belege                      AS "Belege",
+       round(netto)                AS "Netto"
+  FROM mart.fremdeinkauf
+ WHERE quelle = 'belegarchiv'
+   AND operativ
+   AND ${ZWOELF_MONATE}
+   AND ${ZUSTAND_WAHL}
+   [[AND lieferant = {{lieferant}}]]
+   [[AND betrieb = {{betrieb}}]]
+   [[AND konzept = {{marke}}]]
+ ORDER BY monat DESC, netto DESC NULLS LAST
  LIMIT 500`,
   },
 ]

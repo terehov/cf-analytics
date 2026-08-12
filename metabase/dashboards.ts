@@ -160,6 +160,22 @@ const F_WARE: Parameter = {
   id: 'd-ware', name: 'ware', 'display-name': 'Ware', type: 'string/=',
   werteliste: ['mart', 'einkaufspreis_monat', 'ware'],
 }
+// Welche der drei Fremdeinkaufs-Kacheln der Drill-Down gerade aufloest.
+// Die Werte entsprechen EXAKT den Zaehlkacheln auf db_fremdeinkauf und
+// duerfen sich ueberlappen ('bestätigt' ist Teilmenge von 'ohne
+// Freigabe') — ein Filter traegt immer nur EINEN Wert, und jeder Wert
+// muss die Zahl seiner Kachel exakt reproduzieren. Details am
+// ZUSTAND_WAHL-Baustein in karten-fremdeinkauf.ts.
+const F_ZUSTAND: Parameter = {
+  id: 'd-zustand', name: 'zustand', 'display-name': 'Zustand', type: 'string/=',
+  festeWerte: ['ohne Freigabe', 'bestätigt', 'ungeklärt'],
+}
+// Der einzelne Lieferant (Dachname). OHNE Werteliste, wie Beleg und
+// Zaehlung: der Filter wird geklickt, nicht getippt — eine Auswahlliste
+// aus tausenden OCR-Namen des Belegarchivs waere keine Hilfe.
+const F_LIEFERANT: Parameter = {
+  id: 'd-lieferant', name: 'lieferant', 'display-name': 'Lieferant', type: 'string/=',
+}
 
 // Vier einzelne Datumsfelder fuer den Zeitraumvergleich. Bewusst nicht
 // zwei Bereichsfilter: Metabase kann einen Bereichsfilter nur EINEM
@@ -269,11 +285,21 @@ export const dashboards: Dashboard[] = [
       // Die vier Kennzahlkacheln bleiben in einer eigenen Reihe: eine Reihe
       // ist so hoch wie ihr hoechstes Element, und neben der Karte waeren
       // die Zahlen auf zwoelf Einheiten auseinandergezogen.
+      // Jede der vier Kacheln fuehrt auf die Umsatzseite — die Seite
+      // verspricht im Kopf "jede Kachel fuehrt per Klick in die
+      // Detailauswertung", und diese vier waren die einzigen stummen.
+      // fest mit leerer uebergabe wie bei fe_kachel_verweis: Zaehlkacheln
+      // haben keine Spalte, Betrieb/Monat/Zeitraum wandern als
+      // gleichnamige Filter von selbst mit.
       { teile: [
-        { karte: 'dd_betrieb_umsatz_kachel' },
-        { karte: 'dd_betrieb_ytd_kachel' },
-        { karte: 'dd_betrieb_gaeste_kachel' },
-        { karte: 'dd_betrieb_bon_kachel' },
+        { karte: 'dd_betrieb_umsatz_kachel',
+          klick: [{ ziel: 'db_umsatz', uebergabe: {}, fest: true }] },
+        { karte: 'dd_betrieb_ytd_kachel',
+          klick: [{ ziel: 'db_umsatz', uebergabe: {}, fest: true }] },
+        { karte: 'dd_betrieb_gaeste_kachel',
+          klick: [{ ziel: 'db_umsatz', uebergabe: {}, fest: true }] },
+        { karte: 'dd_betrieb_bon_kachel',
+          klick: [{ ziel: 'db_umsatz', uebergabe: {}, fest: true }] },
       ] },
       { teile: [{ text: '## Die sechs Kennzahlen des Round Table\n\nJeweils mit Vormonat, Veränderung und Ampelwechsel.' }] },
       // Die Kennzahlentabelle ueber die volle Breite. Sie stand bis zum
@@ -285,7 +311,12 @@ export const dashboards: Dashboard[] = [
       // Hoehe 9, nicht 12: bei gewaehltem Betrieb sind es genau sechs
       // Zeilen, und der Rest stand leer. Ohne Betriebsfilter scrollt die
       // Tabelle -- das ist der seltenere Fall und der richtige Ort dafuer.
-      { teile: [{ karte: 'dd_betrieb_kopf', hoehe: 9 }] },
+      // Klick auf den Namen setzt den Betriebsfilter der Seite: ohne
+      // gewaehlten Betrieb zeigt die Tabelle alle Betriebe nach
+      // Handlungsdruck, und der Klick holt einen davon herauf. Bei
+      // gewaehltem Betrieb ist er wirkungslos, aber harmlos.
+      { teile: [{ karte: 'dd_betrieb_kopf', hoehe: 9,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       // ZWEI MASSSTAEBE DIREKT UNTER DEN KENNZAHLEN (angefragt 10.08.2026).
       //
       // Die Tabelle darueber beantwortet "wie hat es sich entwickelt"
@@ -324,7 +355,11 @@ export const dashboards: Dashboard[] = [
       // es da -- und beide brauchen keine waagerechte Ausdehnung.
       { teile: [
         { karte: 'dd_betrieb_ampelverlauf', breite: 16, hoehe: 12 },
-        { karte: 'so_karte_klein', breite: 8, hoehe: 12 },
+        // Ohne gewaehlten Betrieb zeigt die Karte alle Punkte; der Klick
+        // auf einen Pin setzt den Betriebsfilter — dasselbe Verhalten wie
+        // dieselbe Karte auf ② und ①.
+        { karte: 'so_karte_klein', breite: 8, hoehe: 12,
+          klick: [{ ziel: 'dd_betrieb', uebergabe: { betrieb: 'Betrieb' } }] },
       ] },
       { teile: [
         // Leere uebergabe mit Absicht: diese Karten geben KEINE Spalte
@@ -457,7 +492,10 @@ export const dashboards: Dashboard[] = [
     filter: [F_BESTELLUNG],
     reihen: [
       { teile: [{ text: '# Der einzelne Beleg\n\nWas in diesem Karton war — nach Positionswert sortiert, der teuerste Posten zuerst.\n\n**Gebinde** ist die Verpackungseinheit: bestellt wird in Kartons oder Kisten, der Einzelpreis gilt je Gebinde.\n\nEin **⚠** in „Preis" heißt, der berechnete Preis weicht vom hinterlegten ab. **„nicht angekommen"** heißt, die Position ist nicht eingetroffen — bei einer noch offenen Bestellung (Status „pending") steht das auf allen Zeilen und heißt schlicht „noch nicht geliefert".' }] },
-      { teile: [{ karte: 'dd_beleg_kopf', hoehe: 9 }] },
+      // Wer einen Beleg prueft, will als naechstes den Betrieb dahinter
+      // sehen — der Rueckweg nach ③, den es bisher nur als Browser-Zurueck gab.
+      { teile: [{ karte: 'dd_beleg_kopf', hoehe: 9,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ karte: 'dd_beleg_positionen', hoehe: 16 }] },
     ],
   },
@@ -475,7 +513,8 @@ export const dashboards: Dashboard[] = [
     filter: [F_INVENTUR],
     reihen: [
       { teile: [{ text: '# Die einzelne Zählung\n\n**Differenz = Soll minus Gezählt.** Positiv heißt, es fehlt etwas; negativ heißt, es ist mehr da als gebucht — meist ein Buchungsfehler.\n\nDie Liste steht nach dem **Geldwert der Differenz** sortiert: oben die Position, die den Schwund trägt. Zeilen mit **⚠** tragen einen Wert, den ein Warenbestand nicht haben kann; sie bleiben sichtbar, zählen aber in keiner Summe mit.' }] },
-      { teile: [{ karte: 'dd_inventur_kopf', hoehe: 9 }] },
+      { teile: [{ karte: 'dd_inventur_kopf', hoehe: 9,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ karte: 'dd_inventur_positionen', hoehe: 16 }] },
     ],
   },
@@ -691,8 +730,11 @@ export const dashboards: Dashboard[] = [
           klick: [{ ziel: 'dd_filialen', uebergabe: { ampel: 'ohne' }, fest: true }] },
         // Die Herausgenommenen duerfen nicht stumm verschwinden: wer die
         // Zaehler mit der Betriebsliste abgleicht, muss sehen, wohin die
-        // uebrigen Betriebe gefallen sind.
-        { karte: 'rt_kachel_nicht_operativ' },
+        // uebrigen Betriebe gefallen sind. Der Klick loest das Versprechen
+        // der eigenen Kachelbeschreibung ein ("Details in ⑥ Portfolio") —
+        // dort stehen die Stillgelegten und Karteileichen gesammelt.
+        { karte: 'rt_kachel_nicht_operativ',
+          klick: [{ ziel: 'pf_portfolio', uebergabe: {}, fest: true }] },
       ] },
       // Neben der Bewertungskachel steht jetzt, WORAN sie haengt. Die Note
       // allein ist auf dieser Ebene eine Zahl ohne Griff -- "4,23" sagt
@@ -703,7 +745,10 @@ export const dashboards: Dashboard[] = [
       { teile: [
         { karte: 'rt_kachel_massnahmen',
           klick: [{ ziel: 'db_rt_ursachen', uebergabe: {}, fest: true }] },
-        { karte: 'rt_kachel_bewertung' },
+        // Dasselbe Muster wie die beiden Nachbarn: die Ø-Note fuehrt auf
+        // die Bewertungsseite, wo Stand, Verlauf und Rangliste stehen.
+        { karte: 'rt_kachel_bewertung',
+          klick: [{ ziel: 'db_bewertung', uebergabe: {}, fest: true }] },
         { karte: 'yx_kachel_schwaechstes_thema',
           klick: [{ ziel: 'db_bewertung', uebergabe: {}, fest: true }] },
         { karte: 'yx_kachel_antwortquote',
@@ -756,7 +801,10 @@ export const dashboards: Dashboard[] = [
         { karte: 'pf_marken_umsatzanteil',
           klick: [{ ziel: 'dd_filialen', uebergabe: { marke: 'Marke' } }] },
       ] },
-      { teile: [{ karte: 'dd_marken_verlauf' }] },
+      // Wie alle Geschwister des Reiters: die Linie einer Marke fuehrt
+      // auf deren Filialliste.
+      { teile: [{ karte: 'dd_marken_verlauf',
+        klick: [{ ziel: 'dd_filialen', uebergabe: { marke: 'Marke' } }] }] },
       { teile: [{ karte: 'rt_marke_abweichung', hoehe: 11,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       ] },
@@ -783,7 +831,12 @@ export const dashboards: Dashboard[] = [
         // mit: der Monat von der Achse, die Bewertung aus der Farbe.
         { karte: 'rt_historie',
           klick: [{ ziel: 'dd_filialen', uebergabe: { monat: 'Monat', ampel: 'Ampelwert' } }] },
-        { karte: 'rt_historie_bereich' },
+        // Ein Punkt heisst "6 rote WE-Kueche-Ampeln im Maerz". Monat und
+        // Bereich wandern mit; die Ampel 'rot' kann nicht zusaetzlich fest
+        // mitgegeben werden (fest gilt fuer die ganze uebergabe) — auf ②
+        // sortiert die Bereichsliste rot aber ohnehin nach oben.
+        { karte: 'rt_historie_bereich',
+          klick: [{ ziel: 'dd_filialen', uebergabe: { monat: 'Monat', bereich: 'Bereich' } }] },
       ] },
       { teile: [{ text: '## Wer hat die Farbe gewechselt — je Bereich\n\nWechsel einzelner Ampeln, Verschlechterungen zuerst. Feiner als das Gesamturteil oben: ein Betrieb kann insgesamt grün bleiben, während die Personalampel kippt.' }] },
       { teile: [{ karte: 'rt_ampelwechsel', hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
@@ -852,9 +905,14 @@ export const dashboards: Dashboard[] = [
       ] },
       { teile: [{ karte: 'um_verlauf_tag', hoehe: 9 }] },
       { teile: [{ text: '## Gegen Vorjahr\n\nEuro und Prozent stehen absichtlich in **zwei getrennten Diagrammen**: übereinandergelegt lassen sich die beiden Maßstäbe so wählen, dass ein Zusammenhang entsteht, den die Zahlen gar nicht hergeben.' }] },
+      // Klick auf einen Monat setzt den Monatsfilter der Seite: die
+      // Kacheln oben springen auf genau diesen Monat um. Wer im Verlauf
+      // einen Einbruch sieht, muss ihn nicht von Hand nachstellen.
       { teile: [
-        { karte: 'um_verlauf_monat' },
-        { karte: 'um_verlauf_delta' },
+        { karte: 'um_verlauf_monat',
+          klick: [{ ziel: 'db_umsatz', uebergabe: { monat: 'Monat' } }] },
+        { karte: 'um_verlauf_delta',
+          klick: [{ ziel: 'db_umsatz', uebergabe: { monat: 'Monat' } }] },
       ] },
       { teile: [
         { karte: 'um_bon_gast', breite: 14 },
@@ -902,8 +960,11 @@ export const dashboards: Dashboard[] = [
     filter: [F_MONAT, F_BETRIEB, F_ZEITRAUM_DREI_MONATE],
     reihen: [
       { teile: [{ text: '# Struktur des Umsatzes\n\nBisher werden nur die Sparten **Speisen** und **Getränke** geliefert. Ihre Summe ist deshalb kleiner als der Gesamtumsatz — es fehlt nichts in der Rechnung, sondern in den gelieferten Daten.\n\nVoreingestellt sind die letzten drei Monate.' }] },
+      // Klick auf einen Monat setzt den Monatsfilter der Seite — die
+      // beiden Stichmonat-Tabellen unten springen mit.
       { teile: [
-        { karte: 'st_sparte' },
+        { karte: 'st_sparte',
+          klick: [{ ziel: 'db_struktur', uebergabe: { monat: 'Monat' } }] },
       ] },
       { teile: [{ karte: 'st_sparte_anteil', hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ text: '## Tageszeit\n\nDer Geschäftstag läuft von 08:00 bis 07:59 des Folgetags. Die Nachtstunden gehören deshalb ans **Ende** des Tages, nicht an den Anfang.' }] },
@@ -941,7 +1002,8 @@ export const dashboards: Dashboard[] = [
       { teile: [{ text: '# Personal\n\n**Zwei verschiedene Personalkosten-Größen stehen auf dieser Seite. Sie sind nicht ineinander umrechenbar:**\n\n**„Personal o. GF %" — die Ampel-Größe.** Personalkosten **ohne Geschäftsführung**, aus der **BWA des Steuerberaters**, in % vom Umsatz. Nur an dieser Zahl hängt die Ampel „Personal" im Round Table (grün bis 28 %). Sie ist die verbindliche Zahl aus dem Round-Table-Regelwerk.\n\n**„Personal gesamt %" — die operative Größe.** Die Kosten der drei Bereiche **Service, Bar und Küche** aus dem Kassensystem, ebenfalls in % vom Umsatz. GF-Gehälter, Verwaltung und alles außerhalb dieser drei Bereiche stecken **nicht** darin. Sie sagt, **wo** es klemmt — nicht, ob die Ampel kippt.\n\nDass beide voneinander abweichen, ist der Normalfall: die eine ist gebuchte BWA, die andere der laufende Betrieb.\n\n**Quote** = in % vom Umsatz (was Personal kostet). **Umsatz je Personalstunde** = in Euro (was eine Arbeitsstunde einbringt). Im LINA-Bericht heißen beide „Effektivität" — deshalb stehen sie getrennt.\n\nQuoten haben den Umsatz im Nenner: an umsatzschwachen Tagen werden sie beliebig groß. Deshalb wird hier mit dem **Median** gerechnet und ohne Betriebe ohne laufendes Geschäft.' }] },
       { teile: [{ karte: 'pe_quote_betrieb', hoehe: 11, klick: [{ ziel: 'dd_betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ karte: 'pe_quote_tabelle', hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
-      { teile: [{ karte: 'pe_verlauf' }] },
+      { teile: [{ karte: 'pe_verlauf',
+        klick: [{ ziel: 'db_personal', uebergabe: { monat: 'Monat' } }] }] },
       { teile: [{ karte: 'pe_bereich', hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ karte: 'pe_effektivitaet', hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
     ],
@@ -1009,20 +1071,26 @@ export const dashboards: Dashboard[] = [
       // waehrend des Backfills und gilt danach weiter -- eine Marke kann
       // jederzeit wieder offene Bestellseiten haben.
       { teile: [{ karte: 'wa_ladestand', hoehe: 9 }] },
-      { teile: [{ karte: 'wa_preis_veraenderung', hoehe: 12 }] },
+      // Klick auf die Ware setzt den Warenfilter DIESER Seite: Verlauf
+      // und Preistabelle darunter springen auf genau diese Ware um —
+      // dasselbe Selbstziel-Muster wie die Balkensegmente auf ②.
+      { teile: [{ karte: 'wa_preis_veraenderung', hoehe: 12,
+        klick: [{ ziel: 'db_einkauf', spalte: 'Ware', uebergabe: { ware: 'Ware' } }] }] },
       // Erst das Bild, dann die Zahlen: ein Preissprung faellt in der Linie
       // auf, bevor man ihn in 500 Tabellenzeilen sucht. Beide haengen am
       // Warenfilter oben — ohne ihn zeigen sie die umsatzstaerksten Waren,
       // und das ist eine Auswahl und keine Konzernaussage.
       { teile: [{ karte: 'wa_preis_verlauf', hoehe: 11 }] },
-      { teile: [{ karte: 'wa_preise', hoehe: 12 }] },
+      { teile: [{ karte: 'wa_preise', hoehe: 12,
+        klick: [{ ziel: 'db_einkauf', spalte: 'Ware', uebergabe: { ware: 'Ware' } }] }] },
       // Die Lieferanten — der Titel der Seite versprach sie von Anfang
       // an, gezeigt hat sie bisher keine Karte.
       { teile: [{ text: '## Lieferanten\n\nJe **Marke**, nicht je Konzern: FoodNotify führt denselben Lieferanten je Mandant als eigenen Vertrag. Ein Anteil über 60 % beim größten Lieferanten heißt: dieser Betrieb hat faktisch einen Monopol-Lieferanten.' }] },
       { teile: [{ karte: 'wa_lieferant_volumen', hoehe: 11 }] },
       { teile: [{ karte: 'wa_lieferant_konzentration', hoehe: 11,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
-      { teile: [{ karte: 'wa_einkauf_betrieb', hoehe: 11 }] },
+      { teile: [{ karte: 'wa_einkauf_betrieb', hoehe: 11,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       // Die Pruefliste ganz unten, aber sichtbar: eine ausgeschlossene
       // Position, die nirgends auftaucht, ist eine stille Kuerzung.
       { teile: [{ karte: 'wa_einkauf_pruefung', hoehe: 10 }] },
@@ -1077,32 +1145,62 @@ export const dashboards: Dashboard[] = [
     filter: [F_BETRIEB, F_MARKE],
     reihen: [
       { teile: [{ text: '# Fremdeinkauf\n\n**Die große Zahl links ist noch kein Verstoß.** Sie zählt jeden Wareneinkauf bei einem Lieferanten, der nicht auf der Freigabeliste steht — und die hat heute fünf Einträge. Nachgemessen am 12.08.2026: von 7,93 Mio € trug **kein einziger Euro** den Grund „ausdrücklich gesperrt", und 6,92 Mio entfielen auf 48 Betriebe, für die überhaupt kein GFGH hinterlegt ist. Dahinter stehen regionale Brauereien, Getränkefachgroßhändler, Metzger und Obsthändler. Was davon **entschieden** ist, steht in der Kachel „Bestätigter Fremdeinkauf"; woran der Rest hängt, in „Woran die Zahl oben hängt".\n\n**Die Quelle steht in jeder Tabelle und wird nie summiert.** Dieselbe Rechnung steht in FoodNotify *und* im Belegarchiv. Wer über die Spalte „Quelle" summiert, zählt sie doppelt. Kacheln und Diagramme zeigen deshalb ausschließlich das **Belegarchiv** — dort ist Fremdeinkauf überhaupt erst sichtbar, denn wer außerhalb der Freigabe kauft, bestellt nicht über das Bestellsystem des Konzerns.\n\n**Es zählt nur Wareneinkauf.** Das Belegarchiv führt alle Eingangsrechnungen — Strom, Leasing, Finanzamt, Kartengebühren, Rechnungen zwischen Konzerngesellschaften. Das ist herausgerechnet und steht weiter unten nachprüfbar daneben.\n\n**Die Seite ist eine Arbeitsliste.** Wer berechtigt liefert, gehört in `manual.lieferant_freigabe`, und der Getränkelieferant eines Betriebs in `manual.gfgh_betrieb`; dann verschwinden sie hier. Die Zahl schrumpft, während man die Liste abarbeitet — genau das ist ihr Zweck.' }] },
+      // Jede Zaehlkachel fuehrt auf dd_fremdeinkauf und gibt FEST den
+      // Zustand mit, den sie zaehlt — dieselbe Bauart wie "9 rote
+      // Betriebe" auf ①. Ohne den festen Wert oeffnete der Klick auf
+      // "ungeklärt" eine Liste, die 'ohne Freigabe' zeigt, und man
+      // hielte die falschen Zeilen fuer die gezaehlten.
       { teile: [
-        { karte: 'fe_summe' },
-        { karte: 'fe_bestaetigt' },
-        { karte: 'fe_ungeklaert' },
-        { karte: 'fe_betriebe_betroffen' },
+        { karte: 'fe_summe',
+          klick: [{ ziel: 'dd_fremdeinkauf', uebergabe: { zustand: 'ohne Freigabe' }, fest: true }] },
+        { karte: 'fe_bestaetigt',
+          klick: [{ ziel: 'dd_fremdeinkauf', uebergabe: { zustand: 'bestätigt' }, fest: true }] },
+        { karte: 'fe_ungeklaert',
+          klick: [{ ziel: 'dd_fremdeinkauf', uebergabe: { zustand: 'ungeklärt' }, fest: true }] },
+        { karte: 'fe_betriebe_betroffen',
+          klick: [{ ziel: 'dd_fremdeinkauf', uebergabe: { zustand: 'ohne Freigabe' }, fest: true }] },
       ] },
-      { teile: [{ karte: 'fe_pflegestand', hoehe: 8 }] },
-      { teile: [{ text: '## Bei wem\n\nNach Volumen sortiert: oben lohnt die Entscheidung am meisten. Die Tabelle darunter zeigt beide Quellen getrennt und nennt den Grund — „steht nicht auf der Liste" heißt, noch niemand hat entschieden; „ausdrücklich gesperrt" heißt, jemand hat entschieden.' }] },
-      { teile: [{ karte: 'fe_lieferant', hoehe: 11 }] },
-      { teile: [{ karte: 'fe_lieferant_tabelle', hoehe: 12 }] },
+      { teile: [{ karte: 'fe_pflegestand', hoehe: 9 }] },
+      { teile: [{ text: '## Bei wem\n\nNach Volumen sortiert: oben lohnt die Entscheidung am meisten. Ein Klick auf einen Lieferanten öffnet dessen Betriebe und Monate. Die Tabelle darunter zeigt beide Quellen getrennt und nennt den Grund — „steht nicht auf der Liste" heißt, noch niemand hat entschieden; „ausdrücklich gesperrt" heißt, jemand hat entschieden.' }] },
+      { teile: [{ karte: 'fe_lieferant', hoehe: 11,
+        klick: [{ ziel: 'dd_fremdeinkauf', uebergabe: { lieferant: 'Lieferant' } }] }] },
+      { teile: [{ karte: 'fe_lieferant_tabelle', hoehe: 12,
+        klick: [{ ziel: 'dd_fremdeinkauf', spalte: 'Lieferant',
+                  uebergabe: { lieferant: 'Lieferant' } }] }] },
       { teile: [{ text: '## In welchem Betrieb\n\nDer **Anteil** ist die aussagekräftigere Spalte: ein großer Betrieb mit 5 % hat ein kleineres Problem als ein kleiner mit 50 %. Steht in der letzten Spalte ein GFGH, ist dessen Belieferung freigegeben und hier nicht mitgezählt.' }] },
+      // Zwei Klickspalten mit verschiedenen Zielen: der Name fuehrt zum
+      // Betriebsblatt, die Fremdeinkaufs-Summe zu den Posten dahinter.
       { teile: [{ karte: 'fe_betrieb', hoehe: 12,
-        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+        klick: [
+          { ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } },
+          { ziel: 'dd_fremdeinkauf', spalte: 'davon nicht freigegeben',
+            uebergabe: { betrieb: 'Betrieb' } },
+        ] }] },
       // Beide Richtungen des Ausschlusses stehen auf der Seite. Eine
       // herausgerechnete Menge dieser Groesse (44 Mio ungeklaert, 29,8 Mio
       // aussortiert) unsichtbar zu lassen, waere eine stille Kuerzung --
       // und die Zahl oben saehe nach einem Ergebnis aus statt nach einer
       // Untergrenze.
       { teile: [{ text: '## Was nicht mitgezählt wurde\n\nBeide Richtungen, damit die Zahl oben prüfbar ist. **Oben fehlt, was noch niemand eingeordnet hat** — das ist die Arbeitsliste, und solange sie groß ist, ist der Fremdeinkauf oben eine Untergrenze. **Unten fehlt, was kein Wareneinkauf ist** — das ist beabsichtigt.' }] },
-      { teile: [{ karte: 'fe_arbeitsliste', hoehe: 12 }] },
+      // Der Klick traegt neben dem Lieferanten den Zustand aus der
+      // konstanten Spalte mit: ohne ihn oeffnete der Drill-Down 'ohne
+      // Freigabe' und zeigte fuer einen ungeklaerten Lieferanten nichts.
+      { teile: [{ karte: 'fe_arbeitsliste', hoehe: 12,
+        klick: [{ ziel: 'dd_fremdeinkauf', spalte: 'Lieferant (normiert)',
+                  uebergabe: { lieferant: 'Lieferant (normiert)', zustand: 'Zustand' } }] }] },
       { teile: [{ karte: 'fe_kein_wareneinkauf', hoehe: 10 }] },
       { teile: [{ text: '## Stand der Freigabeliste\n\nKonzernweit, deshalb ohne Betriebsfilter. „Trifft nichts" heißt: der Eintrag steht in der Liste, aber unter diesem Namen wurde nie eingekauft — meist ein Schreibweisenproblem, kein leerer Lieferant.' }] },
       { teile: [{ karte: 'fe_freigabestand', hoehe: 12 }] },
       { teile: [{ text: '## Preisvergleich zwischen den Betrieben\n\nDie eigentliche Excel-Frage: was zahlt *dieser* Betrieb, und wie stehen die anderen da. Aus **FoodNotify**, nicht aus dem Belegarchiv — nur dort stehen einzelne Artikel.\n\n**Belastbar ist das im einstelligen bis niedrig zweistelligen Prozentbereich.** Dreistellige Abweichungen sind meist Mengenartefakte: die Betriebe buchen dieselbe Ware verschieden. Vier Sperren fangen das ab, die letzte stumpf bei Faktor 3. Wer eine große Abweichung weitergibt, prüft sie vorher am Beleg.\n\n**Mehrkosten sind eine Obergrenze, keine Einsparzusage.** Der Median ist ein erreichter Preis, kein zugesagter.' }] },
+      // Zweite Klickspalte: die Ware fuehrt in den Sperren-Drill-Down,
+      // der ohne gewaehlte Sperre ALLE Zeilen dieser Ware zeigt — dort
+      // steht nebeneinander, was jeder Betrieb dafuer gebucht hat. Genau
+      // die Gegenprobe, zu der die Beschreibung vor dem Weitergeben rät.
       { teile: [{ karte: 'ep_abweichung', hoehe: 12,
-        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+        klick: [
+          { ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } },
+          { ziel: 'dd_sperre', spalte: 'Ware', uebergabe: { ware: 'Ware' } },
+        ] }] },
       { teile: [{ karte: 'ep_betrieb', hoehe: 12,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       // Die Zaehlkarte ist ab hier eine Tuer: ein Klick auf die Spalte
@@ -1133,10 +1231,50 @@ export const dashboards: Dashboard[] = [
     filter: [F_SPERRE, F_MARKE, F_WARE],
     reihen: [
       { teile: [{ text: '# Hinter der Sperre\n\n**Eine Sperre ist kein Fehler, sondern ein Verzicht.** Sie sagt: für diese Ware in diesem Monat gibt es keinen belastbaren Vergleich zwischen den Betrieben — nicht, dass etwas falsch eingekauft wurde.\n\n**„zu wenige Betriebe"** ist der Normalfall und harmlos: unter drei Betrieben ist der „Median" nur der andere Betrieb.\n\n**„Gebinde uneinheitlich"** und **„Menge widersprüchlich"** sind Datenpflege, kein Preisthema — die Betriebe buchen dieselbe Lieferung verschieden. Der Fingerabdruck steht in der Tabelle: gleicher Gebindepreis, weit auseinanderlaufender Preis je Einheit.\n\n**„Spreizung über Faktor 3"** ist die stumpfe Bremse hinter den drei feinen. Bei gleicher Ware, Einheit und Monat gibt es keinen Einkauf, der das Dreifache kostet; es gibt eine anders gebuchte Menge.' }] },
-      { teile: [{ karte: 'sp_waren', hoehe: 12 }] },
+      // Klick auf die Ware setzt den Warenfilter der eigenen Seite: die
+      // Betriebsliste darunter springt von 300 Zeilen auf diese Ware um.
+      { teile: [{ karte: 'sp_waren', hoehe: 12,
+        klick: [{ ziel: 'dd_sperre', spalte: 'Ware', uebergabe: { ware: 'Ware' } }] }] },
       { teile: [{ text: '## Die einzelnen Betriebe\n\nDieselben Zeilen, eine Stufe feiner. Über den **Warenfilter** oben kommt man von 300 Zeilen auf eine Ware herunter — dann steht nebeneinander, was jeder Betrieb für dieselbe Sache gebucht hat.' }] },
       { teile: [{ karte: 'sp_positionen', hoehe: 14,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+    ],
+  },
+
+  /*
+   * Der Drill-Down in die Fremdeinkaufszahl. Eigenes Dashboard, dieselbe
+   * Stellung wie dd_sperre zum Preisvergleich: es beantwortet die Frage
+   * nach EINER Kachel — welche Monate, Betriebe und Posten stecken in
+   * dieser Zahl —, nicht die nach dem Fremdeinkauf insgesamt.
+   *
+   * Der Zustandsfilter oben sagt, WELCHE Kachel gerade aufgeloest wird;
+   * die Klicks der Kacheln setzen ihn fest. Ohne Wert gilt 'ohne
+   * Freigabe' — die Zahl, um die es der Seite geht. Wer direkt herkommt,
+   * sieht also etwas und muss nicht raten, welcher Filter fehlt.
+   */
+  {
+    schluessel: 'dd_fremdeinkauf',
+    name: 'Fremdeinkauf — die Posten hinter der Zahl',
+    beschreibung:
+      'Was eine der Zählkacheln auf der Fremdeinkauf-Seite zählt: dieselbe Summe je Monat, je Betrieb und als einzelne Posten. Erreichbar über einen Klick auf eine Kachel, einen Lieferanten oder eine Betriebszeile.',
+    sammlung: 'Drill-Down',
+    filter: [F_ZUSTAND, F_LIEFERANT, F_BETRIEB, F_MARKE],
+    reihen: [
+      { teile: [{ text: '# Hinter der Fremdeinkaufszahl\n\n**Zustand** oben sagt, welche Kachel diese Seite gerade auflöst: „ohne Freigabe" ist die große Zahl, „bestätigt" der entschiedene Teil davon, „ungeklärt" die Arbeitsliste. Die Kachelsumme steht links zur Kontrolle — weicht sie ab, ist ein Filter im Spiel.\n\nAlles aus dem **Belegarchiv** (nur dort ist Fremdeinkauf sichtbar), nur operative Betriebe, letzte zwölf Monate. Feiner als Betrieb × Lieferant × Monat geht es nicht: das Belegarchiv kennt keine Positionen, und wer am System vorbei kauft, hinterlässt in FoodNotify keine Artikel.' }] },
+      { teile: [
+        { karte: 'fd_summe', breite: 7 },
+        { karte: 'fd_verlauf', breite: 17, hoehe: 8 },
+      ] },
+      { teile: [{ karte: 'fd_betriebe', hoehe: 11,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      // Zwei Klickspalten: der Betrieb fuehrt zum Betriebsblatt, der
+      // Lieferant grenzt DIESE Seite auf ihn ein (Selbstziel, wie die
+      // Balkensegmente auf ② die Liste darunter fuellen).
+      { teile: [{ karte: 'fd_zeilen', hoehe: 13,
+        klick: [
+          { ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } },
+          { ziel: 'dd_fremdeinkauf', spalte: 'Lieferant', uebergabe: { lieferant: 'Lieferant' } },
+        ] }] },
     ],
   },
 

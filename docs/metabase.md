@@ -681,7 +681,7 @@ Dashboards stand:
 | Kartentext | Titel, Beschreibung, Textkacheln | `metabase/` — wirkt **erst nach** `bun run metabase/uebernehmen.ts` |
 | Datenwert | in der Zelle | in der Sicht darüber (0065: `sperre`; 0066: `mart.fremdeinkauf.grund`, `'gfgh des hauses'`) |
 | Spaltenname | Filterfeld, Abfrage-Editor, Datenreferenz — Metabase macht aus `haeuser_am_ort` von selbst „Haeuser Am Ort" | `ALTER VIEW … RENAME COLUMN` (0066), dazu die Karten, die die Spalte lesen |
-| `COMMENT ON` | Info-Fenster an Tabelle und Spalte | Migration, danach Sync |
+| `COMMENT ON` | Info-Fenster an Tabelle und Spalte | Migration, danach `uebernehmen.ts` |
 
 **Der teuerste Irrtum war der erste.** Die Kartentexte lagen seit dem Nachmittag
 umbenannt im Repo und waren committet — übernommen hatte sie niemand. In Metabase
@@ -695,6 +695,15 @@ Metabase zeigte darauf weiter den Text vom letzten Sync — mit „Haus" darin, 
 der Datenbank aus nicht mehr erreichbar: ein leerer Kommentar überschreibt nichts.
 0066 setzt die verlorenen Texte in der neuen Wortwahl zurück. **Wer eine Sicht mit
 CASCADE neu baut, schreibt ihre Kommentare in derselben Migration wieder hin.**
+
+**Und der Sync holt geänderte Kommentare nicht nach.** Metabase liest `COMMENT ON`
+nur, wenn es eine Tabelle oder ein Feld zum ersten Mal sieht; ein `sync_schema`
+zieht Spaltennamen nach, Beschreibungen nicht. `metabase/uebernehmen.ts` hat deshalb
+seit dem 12.08.2026 einen letzten Schritt: es liest die Kommentare über
+`/api/dataset` aus derselben Bank, an der Metabase hängt, und schreibt jede
+abweichende Beschreibung an Tabelle und Feld zurück (beim ersten Lauf 38 Stück).
+Nach einer Migration, die Kommentare ändert, gehört `uebernehmen.ts` also genauso
+dazu wie nach einer Kartenänderung.
 
 **Die Regel dahinter, für den nächsten Fall:** in die materialisierte Sicht gehört,
 was *gerechnet* werden muss. **Beschriftungen gehören in die Sicht darüber.** Was
