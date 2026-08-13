@@ -21,17 +21,30 @@
 -- core.belegarchiv_bestand, stehen also fuer immer auf "nie gezaehlt" und
 -- damit fuer immer in der 36-h-Zeile.
 --
--- Am 13.08.2026 waehrend Lauf 89 gemessen: 1.645 von 1.974 Paaren
--- gezaehlt, ausnahmslos Status 'ok', kein einziges 'keine_daten'. Die
--- ausstehenden 329 Paare gehoeren aber zu den 23 noch nicht gezaehlten
--- Betrieben — und darunter sind genau die, die die Vollzaehlung vom
--- 11.08.2026 nicht kannte: drei geschlossene, sechs ohne Geschaeft, einer
--- Test, alle mit null Belegen. Diese Migration kommt der Messung also
--- absichtlich zuvor; die Zeile entsteht, bevor sie zum ersten Mal rot
--- wird, nicht danach.
+-- MITTEN IM LAUF 89 GEMESSEN (1.645 von 1.974): kein einziges
+-- 'keine_daten'. Erwartet wurden bis zu zehn Betriebe ohne Belegarchiv —
+-- die, die die Vollzaehlung vom 11.08.2026 nicht kannte (drei
+-- geschlossene, sechs ohne Geschaeft, einer Test).
+--
+-- NACH DEM FERTIGEN LAUF 89 (18:02, 1.974 von 1.974) IST DAS WIDERLEGT:
+-- alle 141 Betriebe wurden gezaehlt, alle 1.974 Aufgaben endeten mit
+-- 'ok', und die 36-h-Zeile steht bei 0. Auch die zehn Unbekannten haben
+-- ein Belegarchiv. Es gibt heute KEINEN Betrieb, der in diese Zeile
+-- faellt.
+--
+-- DIESE MIGRATION BLEIBT TROTZDEM, UND ZWAR VORBEUGEND. Der Zweig
+-- existiert im Code (KeinBelegarchiv in src/ladenakte/token.ts) und ist
+-- erreichbar: ein neu eroeffneter Betrieb, oder einer, dessen Ladenakte
+-- noch nicht eingerichtet ist, laeuft genau hier hinein — und seine
+-- vierzehn Paare stuenden dann fuer immer in der 36-h-Zeile. Das ist
+-- dieselbe Bauform, die 0069 fuer die Ordner geloest hat, eine Ebene
+-- hoeher. Der Unterschied zu 0069: dort war der Schaden gemessen, hier
+-- ist er nur moeglich. Das gehoert dazugesagt, statt eine Dringlichkeit
+-- zu behaupten, die die Messung nicht hergibt.
 --
 -- Die Paare bekommen einen eigenen Zustand und eine eigene Zeile in der
--- Pruefuebersicht. Erwartung dort ist NICHT null, sondern KONSTANT.
+-- Pruefuebersicht. Erwartung dort ist NICHT null, sondern KONSTANT —
+-- heute konstant BEI null.
 --
 -- WARUM DIE AUSKLAMMERUNG EIN ZEITFENSTER HAT (7 Tage). Sie stuetzt sich
 -- auf einen Befund, und ein Befund veraltet. Ohne Fenster wuerde ein
@@ -340,12 +353,15 @@ Quelle ohne Zulauf ist ein Fehler und kein Normalzustand, und der Lauf hat sie z
 als "ok" gemeldet (AGENTS.md Regel 10). Was sie beim Anlegen zeigten:
 
   Belegarchiv: Ordner ohne den faelligen Abzug       0 von 1.974
-  Belegarchiv: seit ueber 36 h nicht gezaehlt      329 von 1.974 (mitten in Lauf 89 —
-                                                   genau die noch nicht gezaehlten)
-  Belegarchiv: Betrieb ohne Belegarchiv              0 von 1.974 (Lauf 89 hatte die
-                                                   fraglichen 23 Betriebe noch nicht
-                                                   erreicht; erwartet werden bis zu
-                                                   zehn Betriebe, also 140 Paare)
+  Belegarchiv: seit ueber 36 h nicht gezaehlt        0 von 1.974 (nach dem FERTIGEN
+                                                   Lauf 89; mitten im Lauf waren es 329,
+                                                   naemlich genau die noch offenen)
+  Belegarchiv: Betrieb ohne Belegarchiv              0 von 1.974 — und nach dem fertigen
+                                                   Lauf 89 ist das keine Zwischenzahl
+                                                   mehr, sondern der Befund: alle 141
+                                                   Betriebe haben ein Belegarchiv, alle
+                                                   1.974 Zaehlungen endeten mit ok. Die
+                                                   Zeile ist vorbeugend, nicht heilend
   Inventur: Zaehlung abgeschnitten                   0 von 358 (vor 0069: 9, mit 936
                                                    fehlenden Positionen)
   Bestellung: Kopf ohne eine einzige Position       47 von 66.966 (vor 0070: 322)

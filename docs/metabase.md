@@ -803,10 +803,17 @@ Verlust wie eine, die dauerhaft grün steht, nur langsamer.
 
 Neu ist der Zustand **`kein belegarchiv`** und die Spalte **`zaehlung_status`**.
 
-Die Ladenakte kennt Betriebe, deren Baumknoten keinen einzigen Ordner führt (drei
-geschlossene, sechs ohne Geschäft, einer Test — gemessen 13.08.2026). Für sie wirft
-`belegToken()` ein `KeinBelegarchiv`, der Client macht `keine_daten` daraus. Sie bekommen
-damit nie eine Zeile in `core.belegarchiv_bestand` und standen für immer auf „nie gezaehlt".
+`belegToken()` wirft ein `KeinBelegarchiv`, wenn der Baumknoten eines Betriebs keinen
+einzigen Ordner führt; der Client macht `keine_daten` daraus. Solche Betriebe bekommen nie
+eine Zeile in `core.belegarchiv_bestand` und stünden damit für immer auf „nie gezaehlt" — und
+für immer in der 36-h-Prüfzeile.
+
+**Nachgemessen nach dem fertigen Lauf 89 am 13.08.2026: es gibt heute keinen solchen
+Betrieb.** Alle 1.974 Zählungen über alle 141 Betriebe endeten mit `ok`, auch die zehn, die
+die Vollzählung vom 11.08.2026 nicht kannte. Der Zustand ist also **vorbeugend** und nicht
+heilend: er greift für einen neu eröffneten Betrieb oder einen, dessen Ladenakte noch nicht
+eingerichtet ist. Das gehört dazugesagt, damit niemand aus einer 0 in dieser Zeile schließt,
+die Sicht sei kaputt.
 
 `zaehlung_status` ist der Ausgang der jüngsten `la:belegzahl`-Aufgabe **je Betrieb** — nicht
 je Ordner, weil das fehlende Belegarchiv eine Eigenschaft des Betriebs ist — und **nur aus

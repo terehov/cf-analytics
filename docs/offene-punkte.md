@@ -996,9 +996,11 @@ Migration. Was danach am nächsten Nachtlauf nachzumessen ist — lesend über d
 SELECT * FROM mart.pruefung_uebersicht
  WHERE pruefung LIKE 'Belegarchiv%';
 
--- 2. Wie viele Betriebe haben wirklich kein Belegarchiv? Erwartung: bis zu zehn
---    Betriebe, also bis zu 140 Paare. Ab dann ist die Zahl KONSTANT, und jede
---    Änderung ist ein Befund.
+-- 2. Wie viele Betriebe haben kein Belegarchiv? ERWARTUNG: null — nach dem
+--    fertigen Lauf 89 am 13.08.2026 haben alle 141 Betriebe eines, alle 1.974
+--    Zaehlungen endeten mit ok. Die Zeile ist vorbeugend. Steht hier jemals
+--    etwas, ist es ein neuer oder ein noch nicht eingerichteter Betrieb — und
+--    genau dann soll er hier stehen und nicht in der 36-h-Zeile.
 SELECT betrieb, count(*) FROM mart.belegarchiv_zulauf
  WHERE zustand = 'kein belegarchiv' GROUP BY 1 ORDER BY 1;
 

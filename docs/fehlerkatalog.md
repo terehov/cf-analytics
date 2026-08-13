@@ -2748,12 +2748,24 @@ nichts da, kein Retry. Richtig so. Nur bekommen sie damit **nie** eine Zeile in
 `core.belegarchiv_bestand`, standen also für immer auf „nie gezaehlt" und für immer in der
 Prüfzeile.
 
-**Gemessen.** Am 13.08.2026 während Lauf 89: 1.645 von 1.974 Paaren gezählt, ausnahmslos
-Status `ok`, **kein einziges `keine_daten`**. Die ausstehenden 329 Paare gehören aber zu den
-23 noch nicht gezählten Betrieben — und darunter sind genau die zehn, die die Vollzählung vom
-11.08.2026 nicht kannte (drei geschlossene, sechs ohne Geschäft, einer Test, alle mit null
-Belegen). Diese Migration kommt der Messung also absichtlich zuvor: die Zeile entsteht,
-bevor sie zum ersten Mal rot wird, nicht danach.
+**Gemessen — und die erste Messung war zu früh.** Mitten in Lauf 89 (1.645 von 1.974 Paaren)
+war kein einziges `keine_daten` dabei. ~~Die ausstehenden 329 Paare gehören zu den 23 noch
+nicht gezählten Betrieben — und darunter sind genau die zehn, die die Vollzählung vom
+11.08.2026 nicht kannte (drei geschlossene, sechs ohne Geschäft, einer Test). Dort werden sie
+auftauchen.~~
+
+**Nach dem fertigen Lauf 89 (18:02) ist das widerlegt:** 1.974 von 1.974 Zählungen, alle 141
+Betriebe, **alle mit Status `ok`** — und die 36-h-Zeile steht bei 0. Auch die zehn
+Unbekannten haben ein Belegarchiv. Es gibt heute **keinen** Betrieb, der in diese Zeile
+fällt.
+
+**Die Reparatur bleibt trotzdem, aber sie ist vorbeugend und nicht heilend.** Der Zweig
+existiert im Code und ist erreichbar: ein neu eröffneter Betrieb, oder einer, dessen Ladenakte
+noch nicht eingerichtet ist, läuft genau hier hinein, und seine vierzehn Paare stünden dann
+für immer in der 36-h-Zeile. Das ist dieselbe Bauform, die 0069 für die Ordner gelöst hat,
+eine Ebene höher. Der Unterschied zu 0069 gehört dazugesagt: **dort war der Schaden gemessen,
+hier ist er nur möglich.** Wer diesen Eintrag später liest, soll daraus keine Dringlichkeit
+ableiten, die die Messung nicht hergibt.
 
 **Was ihn verhindert.** Migration `0071`. `mart.belegarchiv_zulauf` bekommt den Zustand
 `kein belegarchiv` und die Spalte `zaehlung_status`; die 36-h-Zeile klammert ihn aus und
