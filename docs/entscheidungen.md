@@ -1720,3 +1720,52 @@ hält `src/config.test.ts` den Vorgabewert auf 3 fest, und die Kommentare an bei
 verweisen aufeinander. Wer die Grenze ändern will, bekommt einen roten Test, und der nennt
 die Sicht, die mitzuändern ist. Das ist keine Kopplung, aber es ist der Unterschied zwischen
 „auseinandergelaufen" und „gemeinsam geändert".
+
+## 13.08.2026 (Phase 2.6): Der Nachholauf ist kein Befehl
+
+Der Nachtrag sah für die 21.737 eingefrorenen Bestellungen einen einmaligen Nachholauf vor —
+„neben dem Nachtlauf, wie die Phase-1-Backfills", also einen Handbefehl. `--historie` und
+`--foodnotify` sind ausdrücklich so gebaut, mit guter Begründung: sie stellen Zehntausende
+Posten ein, und das soll eine Entscheidung sein.
+
+**Entschieden: kein Befehl. Der Nachholauf ist eine Obergrenze im normalen Lauf.**
+
+**Warum.** Die Entscheidung vom 13.08.2026 („kein Befehl auf dem Server") ist die stärkere,
+und der Unterschied zu den Historien-Backfills ist real: `--historie` ist eine **Entscheidung**
+(wie weit zurück wollen wir überhaupt?), dieser Nachholauf ist ein **Befund** (Daten, die
+falsch sind und richtig werden müssen). Ein Befund, dessen Reparatur ein Mensch anstoßen muss,
+ist eine Verabredung — und die beiden teuersten Ausfälle dieses Projekts, der 02.08. und der
+12.08.2026, waren ausgefallene Verabredungen.
+
+**Wie es ohne Befehl terminiert.** `BESTELLDETAIL_JE_LAUF` (11.000) begrenzt jeden Lauf, und
+`ORDER BY bestellt_am DESC` sorgt dafür, dass zuerst das rollierende Fenster bedient wird.
+Der Altbestand arbeitet sich über zwei Nächte ab, danach fällt der Verbrauch von selbst auf
+das Fenster zurück — 5.962 statt 22.000 Aufrufe. Es muss nichts abgeschaltet werden, und es
+gibt keinen Zustand „Nachholauf läuft noch", den jemand im Kopf behalten müsste.
+`mart.bestelldetail_stand.nie_aufgefrischt` zeigt den Rest.
+
+### Der Wiederholtakt hängt an der Bestellung, nicht an der Warteschlange
+
+`bestelldetailsAuffrischen()` hätte auch über `folgepostenEinreihen()` mit einem dritten
+Sperrmodus laufen können („erledigt, aber älter als 20 Stunden").
+
+**Entschieden: `core.bestellung.detail_geholt_am`.**
+
+**Warum.** Die Warteschlange ist ein Arbeitsvorrat, keine Datenhaltung — sie beantwortet
+„was ist zu tun", nicht „wie frisch ist diese Bestellung". Genau diese Verwechslung steckt
+hinter drei Befunden dieses Plans: die Einreihbedingung des Belegarchivs war die eines
+einmaligen Abzugs (12.08.), die Folgeseiten-Sperre der Inventuren ebenso (N1), und die
+Detailposten auch. **Ein Wiederholtakt gehört an eine Tatsache über die Sache, nicht an einen
+Zustand der Schlange.** Nebenbei ist die Spalte sichtbar: wer eine Bestellung ansieht, sieht
+ihren Stand.
+
+### `imported` gilt als nicht final — bis es jemand gemessen hat
+
+47.340 der 66.966 Bestellungen stehen auf `imported`. Ob dieser Status endgültig ist, weiß
+niemand; zu FoodNotify gibt es keinen Kontakt.
+
+**Entschieden: konservativ als nicht final behandeln.** Sie kosten damit einmal je zwei
+Aufrufe im Nachholauf. Der Vergleich vorher gegen nachher beantwortet die Frage dann selbst —
+und erst danach lässt sich entscheiden, ob der lange Schwanz jenseits der 45 Tage einen
+Wochentakt braucht oder Ruhe hat. Eine Annahme, die sich für 43.474 Aufrufe messen lässt,
+soll nicht geraten werden.

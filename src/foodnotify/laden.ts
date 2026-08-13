@@ -223,8 +223,9 @@ export async function fnLaden(k: FnKontext): Promise<number> {
         await c.query(
           `INSERT INTO core.bestellung
              (kostenstelle_key, fn_id, bestellnummer, lieferant_key, bestellt_am,
-              geliefert_am, status, summe, beleg_nummer, beleg_datum, kommentar)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+              geliefert_am, status, summe, beleg_nummer, beleg_datum, kommentar,
+              detail_geholt_am)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now())
            ON CONFLICT (kostenstelle_key, fn_id) DO UPDATE SET
              bestellnummer = coalesce(EXCLUDED.bestellnummer, core.bestellung.bestellnummer),
              lieferant_key = coalesce(EXCLUDED.lieferant_key, core.bestellung.lieferant_key),
@@ -234,7 +235,12 @@ export async function fnLaden(k: FnKontext): Promise<number> {
              summe         = EXCLUDED.summe,
              beleg_nummer  = EXCLUDED.beleg_nummer,
              beleg_datum   = EXCLUDED.beleg_datum,
-             kommentar     = EXCLUDED.kommentar`,
+             kommentar     = EXCLUDED.kommentar,
+             -- Der Stempel des Auffrischens (0072). Er steht NUR hier, weil nur
+             -- dieser Endpunkt Liefermenge, Lieferdatum und Preisstand bringt —
+             -- der Listen-Upsert bei fn:bestellungen frischt allein den Status
+             -- auf und darf deshalb nicht so tun, als sei das Detail geholt.
+             detail_geholt_am = now()`,
           [ksKey, orderId, kopf.bestellnummer, lieferantKey, kopf.bestelltAm,
            kopf.geliefertAm, kopf.status, kopf.summe, kopf.belegNummer,
            kopf.belegDatum, kopf.kommentar])

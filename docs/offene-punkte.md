@@ -1034,3 +1034,35 @@ bringt keine aufgefrischten Sichten mit) und zweimal die Budgetgrenzen, die `con
 echten `.env` einfriert statt aus dem Test. Beides sind Artefakte der Testumgebung, keine
 Befunde. `bun test` ohne `TEST_DATABASE_URL` ist grün (683 pass, 157 skip, 0 fail,
 nachgemessen am 13.08.2026), die 407 Kartentests ebenso.
+
+## Nach dem Deployment von `0072` zu prüfen (offen seit 13.08.2026)
+
+```sql
+-- 1. Faellt der Nachholauf? Diese Zahl MUSS jede Nacht kleiner werden, bis
+--    nur noch der Bestand jenseits des 45-Tage-Fensters uebrig ist.
+--    Erwartung: nach zwei Naechten nahe 0.
+SELECT * FROM mart.bestelldetail_stand;
+
+-- 2. Die Pruefzeile. Erwartung: 0 nach JEDEM Nachtlauf. Beim Anlegen stand
+--    sie auf 2.981 von 2.981 — dem ganzen Fenster.
+SELECT * FROM mart.pruefung_uebersicht
+ WHERE pruefung = 'Bestellung: Details im Fenster aelter als 48 h';
+
+-- 3. Wurde wirklich mehrfach geholt? Vorher: 66.966 Aufgaben, 66.966
+--    verschiedene orderId, 0 mehrfach.
+SELECT count(*) AS aufgaben,
+       count(DISTINCT parameter->>'orderId') AS verschiedene,
+       count(*) - count(DISTINCT parameter->>'orderId') AS mehrfach
+  FROM sync.aufgabe WHERE endpunkt = 'fn:bestellung' AND status = 'ok';
+
+-- 4. Das Budget. FN_TAGESBUDGET ist 140.000; erwartet werden in der
+--    Aufholphase rund 22.000 je Nacht, danach rund 6.000.
+SELECT count(*) FROM sync.aufgabe
+ WHERE endpunkt LIKE 'fn:%' AND beendet_am > current_date;
+```
+
+**Und die eigentliche Messung, für die der Nachholauf zugleich das Werkzeug ist:** ändern
+sich alte Bestellungen überhaupt noch? Vor dem Lauf steht die Statusverteilung fest
+(`imported` 47.340, `pending` 16.203, `canceled` 3.350, `accepted` 61, `finished` 12); danach
+sagt der Vergleich, ob `imported` als final gelten darf und ob der lange Schwanz jenseits von
+45 Tagen einen Wochentakt braucht. Solange das offen ist, gilt `imported` als **nicht** final.

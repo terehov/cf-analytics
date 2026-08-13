@@ -325,6 +325,55 @@ const Schema = z.object({
    * kann die Budgets nicht sprengen.
    */
   MAX_WIEDERBELEBUNGEN: z.coerce.number().int().min(0).default(3),
+
+  /**
+   * Das rollierende Fenster für das Auffrischen der Bestelldetails (Tage).
+   *
+   * DER BEFUND DAHINTER. Am 13.08.2026 in Produktion gemessen: von 66.966
+   * Bestellungen wurde JEDE GENAU EINMAL im Detail geholt, keine einzige je
+   * erneut (66.966 Aufgaben, 66.966 verschiedene `orderId`, 0 mehrfach).
+   * Liefermenge, Lieferdatum, Belegnummer und alle Preisstände standen damit
+   * auf dem Stand des ersten Abrufs — in den Einkaufssichten also
+   * Bestellmengen, wo Liefermengen stehen sollten.
+   *
+   * 45 Tage, weil eine Bestellung so lange nach dem Bestelldatum noch
+   * geliefert, korrigiert und abgerechnet wird. Gemessen sind das 2.981
+   * nicht-finale Bestellungen und damit 5.962 Aufrufe je Nacht — 4,3 % des
+   * FoodNotify-Tagesbudgets von 140.000, bei heute rund 200 verbrauchten.
+   */
+  BESTELLDETAIL_FENSTER_TAGE: z.coerce.number().int().min(1).default(45),
+
+  /**
+   * Wie weit zurück der eingefrorene Altbestand nachgeholt wird (Monate).
+   *
+   * Entscheidung 5 (Eugene, 13.08.2026): zwölf Monate, nicht der ganze
+   * Bestand. Gemessen sind das 21.737 nicht-finale Bestellungen → 43.474
+   * Aufrufe; der ganze nicht-finale Bestand wären 63.616 → 127.232 und damit
+   * fast das gesamte Tagesbudget über drei Nächte.
+   */
+  BESTELLDETAIL_NACHHOLTIEFE_MONATE: z.coerce.number().int().min(1).default(12),
+
+  /**
+   * Obergrenze je Lauf und Marke — und zugleich der ganze „Nachholauf".
+   *
+   * ER IST KEIN BEFEHL. Der Nachtrag sah ihn als Handbefehl neben dem
+   * Nachtlauf vor, wie die Phase-1-Backfills. Die Entscheidung vom
+   * 13.08.2026 gilt aber weiter und ist stärker: kein Befehl auf dem Server.
+   * Eine Reparatur, die ein Mensch anstoßen muss, ist eine Verabredung — sie
+   * fällt irgendwann aus, und ihr Ausfall sieht aus wie Ruhe.
+   *
+   * Stattdessen nimmt der normale Lauf höchstens so viele Bestellungen,
+   * JÜNGSTE ZUERST. Damit ist das rollierende Fenster (2.981) immer zuerst
+   * bedient, und der Rest arbeitet sich über die folgenden Nächte ab. Danach
+   * fällt der Verbrauch von selbst auf das Fenster zurück — nichts muss
+   * abgeschaltet werden.
+   *
+   * 11.000 sind 22.000 Aufrufe, 15,7 % des Tagesbudgets, bei gemessenem Takt
+   * von 200–500 ms rund zwei Stunden. Die 21.737 des Nachholaufs sind damit
+   * nach zwei Nächten durch — die Zahl aus Entscheidung 5.
+   */
+  BESTELLDETAIL_JE_LAUF: z.coerce.number().int().min(0).default(11_000),
+
   /** Ab so vielen Fehlern in Folge pausiert der Worker den ganzen Lauf. */
   ABBRUCH_NACH_FEHLERN: z.coerce.number().int().min(1).default(10),
 

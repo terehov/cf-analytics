@@ -662,3 +662,36 @@ Ordner jede Nacht neu, bis zu 12.668 Belege, ohne dass sich je etwas änderte.
 steht der Beleg schon auf der neuen `typ_id` und die Löschbedingung des alten trifft ihn
 nicht mehr; zieht der alte zuerst ab, löscht er ihn und der Abzug des neuen schreibt ihn
 wieder. Spätestens in der zweiten Nacht steht er richtig.
+
+## Bestelldetails altern nach (13.08.2026, Phase 2.6)
+
+`bestelldetailsAuffrischen()` in `src/sync/nachfuellen.ts` läuft je Marke bei jedem Lauf und
+reiht `fn:bestellung` und `fn:bestellpositionen` für nicht-finale Bestellungen neu ein.
+
+| Stellschraube (`src/config.ts`) | Vorgabe | Wofür |
+|---|---|---|
+| `BESTELLDETAIL_FENSTER_TAGE` | 45 | das rollierende Fenster — so lange wird eine Bestellung noch geliefert, korrigiert und abgerechnet |
+| `BESTELLDETAIL_NACHHOLTIEFE_MONATE` | 12 | wie weit der eingefrorene Altbestand nachgeholt wird (Entscheidung 5) |
+| `BESTELLDETAIL_JE_LAUF` | 11.000 | Obergrenze je Lauf und Marke — und der ganze „Nachholauf" |
+
+**Der Wiederholtakt hängt an `core.bestellung.detail_geholt_am`, nicht an der
+Warteschlange.** Das ist der Kern: die Alle-Posten-Sperre von `folgepostenEinreihen()` ist
+genau der Grund, warum bis zum 13.08.2026 keine Bestellung je erneut geholt wurde. Gesperrt
+wird hier deshalb nur gegen einen noch **offenen** Zwilling — damit derselbe Abruf nicht
+zweimal gleichzeitig läuft, mehr nicht.
+
+**Gestempelt wird nur von `fn:bestellung`.** Der Listen-Upsert bei `fn:bestellungen` frischt
+allein den Status auf und darf nicht so tun, als sei das Detail geholt — sonst sähe eine
+Bestellung, deren Status sich änderte, aus wie eine, deren Liefermenge frisch ist.
+
+**Jüngste zuerst.** `ORDER BY bestellt_am DESC` sorgt dafür, dass die Obergrenze zuerst das
+rollierende Fenster (gemessen 2.981 Bestellungen) und erst danach den Altbestand bedient.
+Dieselbe Entscheidung wie beim Bestell-Backfill am 02.08.2026: aktuelle Preise vor der
+Historie.
+
+**„Nicht final" heißt: Status weder `canceled` noch `finished`.** `imported` gilt
+ausdrücklich als nicht final, solange niemand gemessen hat, ob sich solche Bestellungen noch
+ändern — der Nachholauf beantwortet das selbst.
+
+**Priorität 30:** hinter LINAs Tagesdaten (10) und dem Stammdaten-Abgleich (20), klar vor dem
+Backfill (89/90).

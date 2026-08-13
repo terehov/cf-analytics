@@ -852,3 +852,25 @@ Der Sichtkommentar sagte bis dahin nicht, dass ein Abzug fehlerfrei laufen und t
 ändern konnte. Seit `verschwundeneEntfernen()` (im selben Deploy) löscht der Abzug, was LINA
 nicht mehr führt — „abzug fehlt" heißt damit wieder, was es sagt: eine Abweichung ist gemessen
 und es steht kein Posten dafür.
+
+## `mart.bestelldetail_stand` und die achte Prüfzeile (Migration `0072`, 13.08.2026)
+
+Bis dahin wurde jede der 66.966 Bestellungen genau einmal im Detail geholt und keine je
+erneut. Die Sicht zeigt je Marke, wie frisch die Details sind — über den nicht-finalen
+Bestand der letzten zwölf Monate, also genau über den Bestand, den das Auffrischen bearbeitet.
+
+| Spalte | Bedeutung |
+|---|---|
+| `nicht_final` | Status weder `canceled` noch `finished` |
+| `im_fenster` | davon aus den letzten 45 Tagen — die, die **jede** Nacht drankommen |
+| `nie_aufgefrischt` | `detail_geholt_am IS NULL`: der Rest des Nachholaufs. **Diese Zahl muss jede Nacht fallen.** Bleibt sie zwei Nächte gleich, reiht das Auffrischen nicht mehr ein |
+| `fenster_veraltet` | im Fenster und trotzdem älter als 48 h. **Erwartung 0** nach jedem Nachtlauf |
+
+**Die Prüfzeile zählt nur das Fenster, nicht den Altbestand.** Das ist eine bewusste
+Entscheidung: der Altbestand arbeitet sich über zwei Nächte ab und stünde sonst zweimal mit
+fünfstelligen Zahlen in der Übersicht. Eine Kachel, die beim Einschalten rot ist, sieht sich
+niemand mehr an — und dann ist auch der echte Ausfall unsichtbar. Wie weit der Nachholauf
+ist, steht in `nie_aufgefrischt`, wo es hingehört.
+
+**Beim Anlegen stand die Zeile auf 2.981 von 2.981** — dem ganzen Fenster, weil bis dahin
+keine Bestellung je erneut geholt wurde. Nach dem ersten Lauf mit 0072 muss sie 0 sein.

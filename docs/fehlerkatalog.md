@@ -2779,3 +2779,59 @@ und ein Befund veraltet. Ohne Fenster nähme ein einziges `keine_daten` aus dem 
 Betrieb für immer aus der Überwachung — und fiele die Zählung ganz aus, wäre ausgerechnet die
 Zeile still, die den Ausfall melden soll. Mit Fenster altert die Ausnahme heraus und der
 Betrieb fällt zurück in die 36-h-Zeile. **Eine Ausnahme darf ihren Beleg nicht überleben.**
+
+### Jede Bestellung wurde genau einmal im Detail geholt — und nie wieder
+
+**Symptom.** Keines. In den Einkaufssichten standen Bestellmengen, wo Liefermengen stehen
+sollten, und niemand konnte das an der Zahl sehen.
+
+**Ursache.** Dieselbe wie bei allen Befunden dieses Plans: die Detailposten
+(`fn:bestellung`, `fn:bestellpositionen`) entstehen aus der Bestellliste über
+`folgepostenEinreihen()` — mit der Sperre gegen ALLE Posten, also der Sperre eines
+**einmaligen** Abrufs. Für den Backfill war das richtig. Als laufender Abgleich ist es falsch,
+und niemand hat den Übergang bemerkt.
+
+**Gemessen am 13.08.2026 in Produktion:**
+
+```sql
+SELECT count(*), count(DISTINCT parameter->>'orderId')
+  FROM sync.aufgabe WHERE endpunkt = 'fn:bestellung' AND status = 'ok';
+-- 66.966 | 66.966   → mehrfach geholt: 0
+```
+
+**66.966 Bestellungen, 66.966 verschiedene `orderId`, null Wiederholungen.** 32.812 der
+Abrufe stammen vom 04.08.2026 und 6.942 vom 05.08. — das war der Backfill. Danach kam nur
+noch dazu, was neu war. Der Bestand: `imported` 47.340, `pending` 16.203, `canceled` 3.350,
+`accepted` 61, `finished` 12.
+
+**Was daran hing.** Liefermenge (`adjustedQuantity`), Lieferdatum, Belegnummer und alle
+Preisstände kommen aus dem Detail. Der Listen-Upsert frischt nur `status` auf — und auch das
+nur, solange die Bestellung auf der **letzten** Seite ihrer Kostenstelle steht. Der Transform
+liest `adjustedQuantity` längst korrekt (`transform.ts`); es fehlte allein der erneute Abruf.
+
+**Was ihn verhindert.** `bestelldetailsAuffrischen()` läuft bei jedem Sync-Lauf und reiht
+nicht-finale Bestellungen neu ein — an der Alle-Posten-Sperre vorbei, weil die genau das
+Problem ist. Der Wiederholtakt hängt stattdessen an
+`core.bestellung.detail_geholt_am`, also an einer gemessenen Eigenschaft der Bestellung und
+nicht an einem Zustand der Warteschlange. Das ist dieselbe Lehre wie am 12.08.2026: **ein
+Wiederholtakt gehört an eine Tatsache, nicht an einen Warteschlangenzustand.**
+
+**Der Nachholauf ist kein Befehl.** Der Nachtrag sah ihn als Handbefehl neben dem Nachtlauf
+vor, wie `--historie` und `--foodnotify`. Die Entscheidung vom 13.08.2026 gilt aber weiter
+und ist stärker: kein Befehl auf dem Server. Der Nachholauf ist deshalb nur eine
+**Obergrenze** (`BESTELLDETAIL_JE_LAUF`, 11.000) im normalen Lauf, **jüngste zuerst**. Damit
+ist das rollierende Fenster immer zuerst bedient, der Altbestand arbeitet sich über zwei
+Nächte ab, und der Verbrauch fällt danach von selbst auf das Fenster zurück — es muss nichts
+abgeschaltet werden.
+
+**Sichtbar, nicht nur getan.** `mart.bestelldetail_stand.nie_aufgefrischt` ist der Rest des
+Nachholaufs und muss jede Nacht fallen; `mart.pruefung_uebersicht` führt „Bestellung: Details
+im Fenster aelter als 48 h" mit der Erwartung 0. Ohne beides sähe ein stiller Ausfall des
+neuen Einreihens wieder genauso aus wie „nichts zu tun".
+
+**Was der Nachholauf nebenbei beantwortet.** Ob `imported` als final gelten darf, weiß
+niemand — zu FoodNotify gibt es keinen Kontakt. Bis dahin gilt es als **nicht** final
+(konservativ). Der Nachholauf holt diese Bestellungen einmal neu, und der Vergleich vorher
+gegen nachher sagt, ob sich alte Bestellungen überhaupt noch ändern. Erst danach lässt sich
+entscheiden, ob der lange Schwanz jenseits von 45 Tagen einen Wochentakt braucht oder Ruhe
+hat.

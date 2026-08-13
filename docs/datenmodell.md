@@ -412,3 +412,34 @@ nicht: `betrieb_enc_id` ist bei allen `la:`-Zeilen NULL, der Betrieb steckt im
 und weil `sync.aufgabe` seit 0069 um 1.834 Zeilen am Tag wächst, rund 670.000 im Jahr. Ein
 voller Index wäre hier deutlich größer als nötig. Es ist derselbe Grund wie bei
 `warteschlange_aufgegeben` in 0070.
+
+## Bestelldetails altern nach (Migration `0072`, 13.08.2026)
+
+### `core.bestellung.detail_geholt_am` — warum eine Spalte und keine Abfrage
+
+„Wann wurde diese Bestellung zuletzt im Detail geholt?" ließe sich aus `sync.aufgabe`
+beantworten. Das wäre aber je Nacht eine Gruppierung über 66.966 `orderId`-Parameter in einer
+Tabelle, die seit 0069 um 1.834 Zeilen am Tag wächst. Die Spalte beantwortet dieselbe Frage
+mit einem Indexzugriff — und sie steht dort, wo auch die Bestellung steht, also sieht sie
+jeder, der die Zeile ansieht.
+
+**`NULL` heißt „seit Einführung dieser Spalte nicht geholt", nicht „nie".** Alle 66.966
+vorhandenen Zeilen starten auf NULL, und genau das ist gewollt: sie **sind** der eingefrorene
+Altbestand, den der Nachholauf abarbeitet. Die Spalte braucht keinen Backfill, weil ihr
+Anfangswert die Wahrheit sagt.
+
+**Gestempelt wird nur von `fn:bestellung`**, nicht vom Listen-Upsert bei `fn:bestellungen` —
+der frischt allein den Status auf. Sonst sähe eine Bestellung, deren Status sich änderte, aus
+wie eine, deren Liefermenge frisch ist.
+
+### `bestellung_detail_faellig` — partiell auf die nicht-finalen
+
+```sql
+CREATE INDEX bestellung_detail_faellig
+    ON core.bestellung (bestellt_am DESC)
+ WHERE coalesce(status, '') NOT IN ('canceled', 'finished');
+```
+
+`canceled` und `finished` sind 3.362 von 66.966, und um die geht es nie — sie ändern sich
+nicht mehr. Derselbe Grund wie bei `warteschlange_aufgegeben` (0070) und
+`aufgabe_belegzahl_betrieb` (0071).

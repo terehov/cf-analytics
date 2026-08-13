@@ -223,9 +223,111 @@ export async function foodnotifyNachfuellen(): Promise<number> {
 
     n += await inventurenNachfuellen(marke.marke_key, heute)
     n += await inventurpositionenNachziehen(marke.marke_key)
+    n += await bestelldetailsAuffrischen(marke.marke_key)
   }
 
   return n
+}
+
+/**
+ * Bestelldetails auffrischen — das rollierende Fenster UND der Nachholauf.
+ *
+ * DER BEFUND (13.08.2026, lesend in Produktion gemessen). Von 66.966
+ * Bestellungen wurde JEDE GENAU EINMAL im Detail geholt, keine einzige je
+ * erneut: `sync.aufgabe` zaehlt fuer `fn:bestellung` 66.966 Aufgaben und
+ * 66.966 verschiedene `orderId`, mehrfach geholt: null. Liefermenge
+ * (`adjustedQuantity`), Lieferdatum, Belegnummer und alle Preisstaende standen
+ * damit auf dem Stand des ERSTEN Abrufs — in den Einkaufssichten also
+ * laufend Bestellmengen, wo Liefermengen stehen sollten. Der Transform liest
+ * `adjustedQuantity` laengst korrekt; es fehlte nur der erneute Abruf.
+ *
+ * DIE URSACHE IST DIESELBE WIE ÜBERALL IN DIESEM PLAN. Die Detailposten
+ * entstehen aus der Bestellliste ueber `folgepostenEinreihen()` mit der Sperre
+ * gegen ALLE Posten — die Sperre eines EINMALIGEN Abrufs. Fuer den Backfill
+ * war das richtig, als laufender Abgleich ist es falsch. Diese Funktion reiht
+ * deshalb an der Sperre vorbei ein, und zwar bewusst: die Wiederholbarkeit
+ * steckt hier in `detail_geholt_am`, nicht in der Warteschlange.
+ *
+ * KEIN HANDBEFEHL, AUCH NICHT FUER DEN ALTBESTAND. Der Nachtrag sah den
+ * Nachholauf als zweiten, von Hand gestarteten Lauf vor — wie `--historie`
+ * und `--foodnotify`. Die Entscheidung vom 13.08.2026 gilt aber weiter und ist
+ * staerker: kein Befehl auf dem Server. Der Nachholauf ist deshalb nur eine
+ * OBERGRENZE (`BESTELLDETAIL_JE_LAUF`) im normalen Lauf. Weil JUENGSTE ZUERST
+ * genommen werden, ist das rollierende Fenster (gemessen 2.981 Bestellungen)
+ * immer zuerst bedient, und der Altbestand arbeitet sich ueber die folgenden
+ * Naechte ab. Danach faellt der Verbrauch von selbst auf das Fenster zurueck;
+ * es muss nichts abgeschaltet werden.
+ *
+ * WAS „NICHT FINAL" HEISST. Status weder `canceled` noch `finished`. Gemessen
+ * am 13.08.2026: imported 47.340, pending 16.203, canceled 3.350, accepted 61,
+ * finished 12. `imported` gilt ausdruecklich als NICHT final — konservativ,
+ * solange niemand gemessen hat, ob sich solche Bestellungen noch aendern.
+ * Genau das beantwortet der Nachholauf selbst, indem er sie einmal neu holt.
+ *
+ * SELBSTBEGRENZEND UND SICHTBAR. Wie weit der Nachholauf ist, steht in
+ * `mart.bestelldetail_stand.nie_aufgefrischt` — die Zahl MUSS jede Nacht
+ * fallen. Ob das Fenster bedient wird, steht als eigene Zeile in
+ * `mart.pruefung_uebersicht` (Erwartung 0). Ohne beides saehe ein stiller
+ * Ausfall dieser Funktion genauso aus wie „nichts zu tun".
+ */
+export async function bestelldetailsAuffrischen(markeKey: number): Promise<number> {
+  if (config.BESTELLDETAIL_JE_LAUF === 0) return 0
+
+  const r = await query<{ posten_id: number }>(
+    `WITH faellig AS (
+       SELECT b.fn_id, ks.erp_id,
+              coalesce(b.bestellt_am::date, current_date) AS tag
+         FROM core.bestellung b
+         JOIN core.kostenstelle ks USING (kostenstelle_key)
+        WHERE ks.marke_key = $1
+          AND ks.erp_id IS NOT NULL
+          AND coalesce(b.status, '') NOT IN ('canceled', 'finished')
+          -- Die Nachholtiefe aus Entscheidung 5. Aelteres bleibt liegen; das
+          -- ist eine Grenze und kein Rueckstand.
+          AND b.bestellt_am > now() - make_interval(months => $2::int)
+          AND (
+              -- der eingefrorene Altbestand: seit 0072 nicht aufgefrischt
+              b.detail_geholt_am IS NULL
+              -- oder das rollierende Fenster, hoechstens einmal am Tag.
+              -- 20 statt 24 Stunden aus demselben Grund wie bei der
+              -- Wiederbelebung: zwei Laeufe an aufeinanderfolgenden Tagen
+              -- liegen nie exakt 24 Stunden auseinander.
+           OR (b.bestellt_am > now() - make_interval(days => $3::int)
+               AND b.detail_geholt_am < now() - interval '20 hours'))
+        -- JUENGSTE ZUERST: damit deckt die Obergrenze immer erst das Fenster
+        -- und dann den Altbestand. Dieselbe Entscheidung wie beim
+        -- Bestell-Backfill am 02.08.2026 — aktuelle Preise vor der Historie.
+        ORDER BY b.bestellt_am DESC
+        LIMIT $4
+     ), posten AS (
+       SELECT ep AS endpunkt, f.tag,
+              jsonb_build_object('erpId', f.erp_id::text, 'orderId', f.fn_id) AS parameter
+         FROM faellig f
+         CROSS JOIN unnest(ARRAY['fn:bestellung', 'fn:bestellpositionen']) AS ep
+     )
+     INSERT INTO sync.warteschlange
+       (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter)
+     SELECT p.endpunkt, p.tag, p.tag, 30, $1, p.parameter
+       FROM posten p
+      -- NICHT die Alle-Posten-Sperre: die ist genau das Problem. Gesperrt
+      -- wird nur ein noch OFFENER Zwilling, damit derselbe Abruf nicht
+      -- zweimal gleichzeitig laeuft. Der Wiederholtakt haengt an
+      -- detail_geholt_am, also an einer gemessenen Eigenschaft der
+      -- Bestellung — nicht an einem Zustand der Warteschlange.
+      WHERE NOT EXISTS (
+            SELECT 1 FROM sync.warteschlange w
+             WHERE w.endpunkt = p.endpunkt AND w.marke_key = $1
+               AND w.parameter = p.parameter AND w.erledigt_am IS NULL)
+     RETURNING posten_id`,
+    [markeKey, config.BESTELLDETAIL_NACHHOLTIEFE_MONATE,
+     config.BESTELLDETAIL_FENSTER_TAGE, config.BESTELLDETAIL_JE_LAUF])
+
+  if (r.length > 0) {
+    log.info('bestelldetails aufgefrischt — posten eingereiht', {
+      markeKey, posten: r.length, bestellungen: Math.ceil(r.length / 2),
+    })
+  }
+  return r.length
 }
 
 /**

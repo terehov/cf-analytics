@@ -197,6 +197,13 @@ lauf('Ende-zu-Ende', () => {
       'Belegarchiv: Betrieb ohne Belegarchiv',
       'Belegarchiv: Ordner ohne den faelligen Abzug',
       'Belegarchiv: seit ueber 36 h nicht gezaehlt',
+      /**
+       * Seit 0072. Gezählt wird NUR das rollierende Fenster, nicht der
+       * Altbestand — der arbeitet sich über mehrere Nächte ab und stünde
+       * hier sonst zweimal mit fünfstelligen Zahlen. Wie weit er ist, sagt
+       * `mart.bestelldetail_stand.nie_aufgefrischt`.
+       */
+      'Bestellung: Details im Fenster aelter als 48 h',
       'Bestellung: Kopf ohne eine einzige Position',
       'Bon: avgTicket vs. Umsatz/Rechnungen',
       'Inventur: Zaehlung abgeschnitten',
@@ -1666,6 +1673,158 @@ lauf('FoodNotify Ende-zu-Ende', () => {
 
     // Selbstbegrenzend: ein dritter Zyklus wird gar nicht erst eingereiht.
     expect(await inventurpositionenNachziehen(aposto)).toBe(0)
+  })
+
+  /**
+   * ================================================================
+   * BESTELLDETAILS ALTERN NIE NACH — Befund 2.6 vom 13.08.2026
+   * ================================================================
+   *
+   * In Produktion gemessen: von 66.966 Bestellungen wurde JEDE GENAU EINMAL
+   * im Detail geholt, keine einzige je erneut (66.966 Aufgaben, 66.966
+   * verschiedene orderId, 0 mehrfach). Liefermenge, Lieferdatum, Belegnummer
+   * und alle Preisstände standen damit auf dem Stand des ersten Abrufs.
+   *
+   * Die Ursache ist dieselbe wie bei N1: die Detailposten entstehen über
+   * `folgepostenEinreihen()` mit der Sperre gegen ALLE Posten — die Sperre
+   * eines EINMALIGEN Abrufs. Genau deshalb prüft der Test nicht nur, DASS
+   * eingereiht wird, sondern dass es TROTZ des erledigten Zwillings
+   * geschieht.
+   */
+  describe('Bestelldetails auffrischen', () => {
+    const zahlDetail = async (endpunkt: string, orderId: string) => Number((await db.query(
+      `SELECT count(*)::int AS n FROM sync.warteschlange
+        WHERE endpunkt = $1 AND marke_key = $2 AND parameter->>'orderId' = $3`,
+      [endpunkt, aposto, orderId])).rows[0].n)
+
+    /**
+     * Die vier Bestellungen der Attrappe stammen aus 2021 und lägen damit
+     * außerhalb der Nachholtiefe von zwölf Monaten. Für den Test rücken sie
+     * auf heute — die Tiefe selbst prüft der Test darunter.
+     */
+    const heuteBestellt = () => db.query(
+      `UPDATE core.bestellung SET bestellt_am = now() - interval '2 days'`)
+
+    test('eine veraltete Bestellung wird erneut geholt — trotz erledigtem Zwilling', async () => {
+      const { bestelldetailsAuffrischen } = await import('./nachfuellen')
+
+      // Vorbedingung: der Erstabruf hat stattgefunden und liegt ERLEDIGT in
+      // der Schlange. Ohne ihn prüft der Test nicht das, worum es geht.
+      expect(await zahlDetail('fn:bestellung', 'b1')).toBe(1)
+      const { rows: [zwilling] } = await db.query(
+        `SELECT count(*)::int AS n FROM sync.warteschlange
+          WHERE endpunkt = 'fn:bestellung' AND marke_key = $1
+            AND parameter->>'orderId' = 'b1' AND erledigt_am IS NOT NULL`, [aposto])
+      expect(Number(zwilling.n)).toBe(1)
+
+      /**
+       * Und der Stempel steht: `fn:bestellung` setzt `detail_geholt_am`, der
+       * Listen-Upsert von `fn:bestellungen` ausdrücklich nicht — sonst sähe
+       * eine Bestellung, deren Status aufgefrischt wurde, aus wie eine, deren
+       * Liefermenge aufgefrischt wurde.
+       */
+      const { rows: [gestempelt] } = await db.query(
+        `SELECT count(*)::int AS n FROM core.bestellung WHERE detail_geholt_am IS NOT NULL`)
+      expect(Number(gestempelt.n)).toBe(4)
+
+      await heuteBestellt()
+
+      // Frisch geholt (unter 20 h): nichts zu tun.
+      expect(await bestelldetailsAuffrischen(aposto)).toBe(0)
+
+      // 21 Stunden später ist das Fenster wieder offen.
+      await db.query(`UPDATE core.bestellung SET detail_geholt_am = now() - interval '21 hours'`)
+      const eingereiht = await bestelldetailsAuffrischen(aposto)
+
+      /**
+       * DER KERN: 6 Posten = 3 nicht-finale Bestellungen mal zwei Endpunkte.
+       * b2 ist `canceled` und bleibt liegen. Mit der Alle-Posten-Sperre wären
+       * es 0 gewesen — jede dieser sechs Parameterkombinationen steht schon
+       * erledigt in der Schlange.
+       */
+      expect(eingereiht).toBe(6)
+      expect(await zahlDetail('fn:bestellung', 'b1')).toBe(2)
+      expect(await zahlDetail('fn:bestellpositionen', 'b1')).toBe(2)
+      // Der Storno wird NICHT erneut geholt — er ändert sich nicht mehr.
+      expect(await zahlDetail('fn:bestellung', 'b2')).toBe(1)
+
+      // Zweimal nachfüllen legt nichts doppelt an: der offene Zwilling sperrt.
+      expect(await bestelldetailsAuffrischen(aposto)).toBe(0)
+
+      /**
+       * Und nach dem Lauf ist der Stempel frisch — das ist die Bedingung,
+       * die morgen wieder greift. Ohne sie liefe das Auffrischen bei jedem
+       * Lauf, nicht einmal am Tag.
+       */
+      const { workerLauf } = await import('./worker')
+      await workerLauf('manuell')
+      const { rows: [frisch] } = await db.query(
+        `SELECT count(*)::int AS n FROM core.bestellung
+          WHERE detail_geholt_am > now() - interval '1 hour'`)
+      expect(Number(frisch.n)).toBe(3)
+      expect(await bestelldetailsAuffrischen(aposto)).toBe(0)
+    })
+
+    /**
+     * Die Grenze aus Entscheidung 5: zwölf Monate zurück, nicht der ganze
+     * Bestand. Das ist eine Grenze und kein Rückstand — sie darf nur nicht
+     * still sein, und dafür gibt es `mart.bestelldetail_stand`.
+     */
+    test('was älter ist als die Nachholtiefe, bleibt liegen', async () => {
+      const { bestelldetailsAuffrischen } = await import('./nachfuellen')
+      await db.query(
+        `UPDATE core.bestellung
+            SET bestellt_am = now() - interval '13 months',
+                detail_geholt_am = NULL`)
+      expect(await bestelldetailsAuffrischen(aposto)).toBe(0)
+
+      // Und die Sicht zeigt deshalb auch nichts mehr an — sie führt genau
+      // den Bestand, den das Auffrischen bearbeitet.
+      const { rows } = await db.query(
+        `SELECT nicht_final, nie_aufgefrischt FROM mart.bestelldetail_stand`)
+      expect(rows).toEqual([])
+    })
+
+    /**
+     * Die Prüfzeile. Ohne sie sähe ein stiller Ausfall des Auffrischens
+     * wieder genauso aus wie „nichts zu tun" — der Fehler, der diesem
+     * Projekt zweimal Tage gekostet hat.
+     */
+    test('die Prüfzeile zeigt das Fenster, nicht den Altbestand', async () => {
+      const { bestelldetailsAuffrischen } = await import('./nachfuellen')
+      const { workerLauf } = await import('./worker')
+      await db.query(
+        `UPDATE core.bestellung
+            SET bestellt_am = now() - interval '2 days', detail_geholt_am = NULL`)
+
+      const zeile = async () => (await db.query(
+        `SELECT geprueft, auffaellig FROM mart.pruefung_uebersicht
+          WHERE pruefung = 'Bestellung: Details im Fenster aelter als 48 h'`)).rows[0]
+
+      // Vorher: alle drei nicht-finalen sind überfällig — genau der Zustand,
+      // in dem Produktion beim Anlegen dieser Zeile stand.
+      const vorher = await zeile()
+      expect(Number(vorher.geprueft)).toBe(3)
+      expect(Number(vorher.auffaellig)).toBe(3)
+
+      await bestelldetailsAuffrischen(aposto)
+      await workerLauf('manuell')
+
+      /**
+       * Das Bestelldatum noch einmal setzen: der Abruf schreibt es aus der
+       * Antwort zurück, und die Fixtures der Attrappe stammen aus 2021 —
+       * die drei Bestellungen fielen sonst aus dem Fenster, und die Zeile
+       * stünde aus dem falschen Grund auf 0. In Produktion passiert das
+       * nicht: dort ist `bestellt_am` das, was FoodNotify sagt, und es
+       * wandert nicht.
+       */
+      await db.query(`UPDATE core.bestellung SET bestellt_am = now() - interval '2 days'`)
+
+      // Nachher: 0. Das ist die Erwartung nach jedem Nachtlauf.
+      const nachher = await zeile()
+      expect(Number(nachher.geprueft)).toBe(3)
+      expect(Number(nachher.auffaellig)).toBe(0)
+    })
   })
 })
 

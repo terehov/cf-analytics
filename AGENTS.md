@@ -139,6 +139,7 @@ Handgeschriebenes SQL, nummeriert, wird der Reihe nach angewendet. Bewusst handg
 | `0069_belegarchiv_zulauf.sql` | **Der Zulauf des Belegarchivs.** `core.belegart.inhalt_holen` und `core.belegarchiv_bestand.quelle`, dazu `mart.belegarchiv_zulauf` und `mart.inventur_abgeschnitten`. Der Torwächter ist ab hier die tägliche Zählung (`la:belegzahl`) und nicht mehr `manual.belegarchiv_soll` |
 | `0070_wiederbelebung.sql` | `sync.warteschlange.wiederbelebt` und `mart.posten_aufgegeben`. Der Lauf holt aufgegebene Posten hoechstens dreimal selbst zurueck und zieht unvollstaendige Inventurzaehlungen selbst nach — **kein Handbefehl** |
 | `0071_pruefsichten_hygiene.sql` | Die Pruefsichten sagen wieder, was sie meinen: die 36-h-Zeile klammert Betriebe ohne Belegarchiv aus und fuehrt sie als eigene Zeile (Erwartung **konstant**, nicht null), `mart.belegarchiv_zulauf` bekommt `zaehlung_status`. Eine Kachel, die nie auf null geht, liest niemand mehr |
+| `0072_bestelldetails_altern.sql` | **Bestelldetails altern nach.** `core.bestellung.detail_geholt_am` und `mart.bestelldetail_stand`. Bis dahin wurde jede der 66.966 Bestellungen **genau einmal** im Detail geholt und keine je erneut — Liefermengen und Preisstaende standen auf dem Stand des ersten Abrufs. Der Nachholauf ist kein Befehl, sondern eine Obergrenze im Nachtlauf |
 | `pruefung.sql` | Verifikation gegen den Bayreuth-Fall aus dem Excel (kein Migrationsschritt) |
 
 Die Tabelle nennt die tragenden Migrationen, nicht jede einzelne. Der verbindliche Stand steht in `public.schema_migration`.
