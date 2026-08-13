@@ -29,12 +29,12 @@ examples/
 *.png
 *-snapshot.yml
 
-# Der Belegkorpus: echte Rechnungen und Lieferscheine der Concept Family AG als
-# PDF, dazu die daraus gezogenen E-Rechnungs-XML und ein Manifest mit
-# Lieferant, Betrag und Kontierung. Beispieldaten fuer die PIM-Pipeline,
-# erzeugt von `bun run belege-herunterladen` - dieselbe Ueberlegung wie bei
-# examples/, nur dass es hier um Buchhaltungsbelege geht.
-korpus/
+# Die heruntergeladenen Belegdateien: echte Rechnungen und Lieferscheine der
+# Concept Family AG als PDF, dazu die daraus gezogenen E-Rechnungs-XML und ein
+# Manifest mit Lieferant, Betrag und Kontierung. Beispieldaten fuer die
+# PIM-Pipeline, erzeugt von `bun run belege-herunterladen` - dieselbe
+# Ueberlegung wie bei examples/, nur dass es hier um Buchhaltungsbelege geht.
+belege/
 
 # Druckausgaben. Die Quelle ist die HTML-Datei daneben, das PDF nur ihr Abzug -
 # knapp 1 MB je Stueck, weil die Schrift eingebettet wird, und bei jeder

@@ -420,7 +420,7 @@ Läuft nach Regel 7a **nur im Terminal des Nutzers**, nicht aus der Agentenumgeb
 
 ---
 
-## `src/korpus.ts` — Belegdateien als Beispieldaten für das PIM (13.08.2026)
+## `src/belege.ts` — Belegdateien als Beispieldaten für das PIM (13.08.2026)
 
 `bun run belege-herunterladen` zieht **Dateien** statt Zeilen: die PDFs aus LINAs
 Belegarchiv und die darin eingebetteten E-Rechnungs-XML. Zweck ist ein Testkorpus für
@@ -455,8 +455,18 @@ ist sortiert statt zufällig — derselbe Aufruf liefert morgen denselben Korpus
 als Testbestand wertlos. Gemessen am 13.08.2026: **1.585 Belege** (542 Lieferscheine,
 113 E-Rechnungs-Verdacht, 930 gestreute Eingangsrechnungen).
 
-**Vorschau vor Abzug.** Ohne `KORPUS_ZIEHEN=1` wird nur gerechnet: Zahl je Topf, Obergrenze,
-geschätzte Dauer. Fortsetzbar ist er ohnehin — was auf der Platte liegt, wird übersprungen.
+**Zwei Befehle, kein Schalter.** `bun run belege-vorschau` rechnet nur — Zahl je Topf,
+Obergrenze, geschätzte Dauer; `bun run belege-herunterladen` zieht. Zuerst entschied das
+eine Umgebungsvariable, was die falsche Bauform ist: sie steht nicht im Befehl, den man
+später im Verlauf wiederfindet, sie überlebt in der Shell den nächsten Aufruf, und wer sie
+einmal gesetzt hat, zieht beim nächsten Lauf unbeabsichtigt erneut. Ohne Flagge passiert
+jetzt das Harmlose. Fortsetzbar ist der Abzug ohnehin — was auf der Platte liegt, wird
+übersprungen.
+
+**Läuft nur lokal, nie auf dem Server.** Nichts startet es dort: der Container-CMD ist
+`health.ts`, der Dokploy-Job ruft `bun run sync`. Es wäre auch der falsche Ort — die
+Dateien sollen bei dem liegen, der die PIM-Pipeline baut, nicht im Container. Ablage ist
+`./belege`, gitignoriert wie `examples/`.
 
 Läuft nach Regel 7a **nur im Terminal des Nutzers**. Der Takt ist derselbe wie im Sync;
 für den beaufsichtigten Lauf lässt er sich über `TAKT_MIN_MS`/`TAKT_MAX_MS` senken, aber

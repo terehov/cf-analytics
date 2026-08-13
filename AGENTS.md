@@ -217,9 +217,10 @@ curl localhost:3000/status                     # muss jemand hinsehen? (503 = ja
 bun run typecheck
 bun run lina-fragen                          # LESENDE Einzelmessungen gegen LINA, d1-d6
                                              # (nur im Terminal des Nutzers, Regel 7a)
-bun run belege-herunterladen                 # Vorschau: welche Belegdateien ein Korpuslauf zöge
-KORPUS_ZIEHEN=1 bun run belege-herunterladen # zieht die PDFs und die eingebetteten E-Rechnungs-XML
-                                             # (nur im Terminal des Nutzers, Regel 7a)
+bun run belege-vorschau                      # rechnet nur: welche Belegdateien ein Abzug zöge
+bun run belege-herunterladen                 # zieht die PDFs und die eingebetteten E-Rechnungs-XML
+                                             # nach ./belege (nur lokal, Regel 7a — der Server
+                                             # startet das nicht und soll es nicht)
 ```
 
 Für den Ende-zu-Ende-Test zusätzlich `TEST_DATABASE_URL` setzen — ohne die Variable wird er übersprungen.

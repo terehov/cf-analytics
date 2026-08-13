@@ -15,7 +15,8 @@
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "lina-fragen": "bun run src/messen.ts",
-    "belege-herunterladen": "bun run src/korpus.ts"
+    "belege-vorschau": "bun run src/belege.ts",
+    "belege-herunterladen": "bun run src/belege.ts --ziehen"
   },
   "dependencies": {
     "pg": "^8.22.0",

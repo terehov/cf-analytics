@@ -9,7 +9,7 @@
  */
 import { describe, expect, test } from 'bun:test'
 import { deflateSync } from 'node:zlib'
-import { erechnungXml, dateiname, ablage, nurLesend, type Beleg } from './korpus'
+import { erechnungXml, dateiname, ablage, nurLesend, type Beleg } from './belege'
 import { pfadPruefen, VerbotenerPfad } from './ladenakte/endpunkte'
 
 /** Ein PDF-Gerüst mit einem Strom darin — mehr braucht der Sucher nicht. */
@@ -96,7 +96,7 @@ describe('Ablage', () => {
   })
 
   test('Ordner trennt nach Belegart und Betrieb', () => {
-    expect(ablage('/korpus', b)).toBe('/korpus/eingangsrechnungen_und_avise/62')
+    expect(ablage('/belege', b)).toBe('/belege/eingangsrechnungen_und_avise/62')
   })
 })
 

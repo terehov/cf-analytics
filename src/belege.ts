@@ -47,11 +47,11 @@
  * Voreinstellung (so steht es bei TAKT_MIN_MS in src/config.ts). Es gibt genau
  * einen Zugang, und eine Sperre wäre nicht rückgängig zu machen.
  *
- *   bun run belege-herunterladen                 # Vorschau: was würde geladen, wie lange dauert es
- *   KORPUS_ZIEHEN=1 bun run belege-herunterladen # zieht wirklich
+ *   bun run belege-vorschau              # rechnet nur: was käme, wie lange dauert es
+ *   bun run belege-herunterladen         # zieht die Dateien
  *
- *   KORPUS_ZIEL=/pfad/zum/korpus         # Ablage (Vorgabe: ./korpus, nicht im Git)
- *   KORPUS_MAX=2000                      # harte Obergrenze an Dateien für diesen Lauf
+ *   BELEGE_ZIEL=/pfad/zum/ordner         # Ablage (Vorgabe: ./belege, nicht im Git)
+ *   BELEGE_MAX=2000                      # harte Obergrenze an Dateien für diesen Lauf
  *   TAKT_MIN_MS=2000 TAKT_MAX_MS=5000    # beaufsichtigt schneller
  */
 import { inflateRawSync, inflateSync } from 'node:zlib'
@@ -325,7 +325,7 @@ export async function ziehen(belege: Beleg[], ziel: string, grenze: number): Pro
 
   try {
     for (const b of belege) {
-      if (geladen >= grenze) { log.info('korpus: Obergrenze erreicht', { grenze }); break }
+      if (geladen >= grenze) { log.info('belege: Obergrenze erreicht', { grenze }); break }
       if (ohneArchiv.has(b.lina_betrieb_id)) { uebersprungen++; continue }
 
       const ordner = ablage(ziel, b)
@@ -358,7 +358,7 @@ export async function ziehen(belege: Beleg[], ziel: string, grenze: number): Pro
        */
       if (!res.ok || bytes.length < 5 || Buffer.from(bytes.subarray(0, 5)).toString('latin1') !== '%PDF-') {
         fehler++
-        log.warn('korpus: keine PDF-Antwort', {
+        log.warn('belege: keine PDF-Antwort', {
           lina_id: b.lina_id, betrieb: b.lina_betrieb_id, status: res.status, bytes: bytes.length,
         })
         continue
@@ -377,14 +377,14 @@ export async function ziehen(belege: Beleg[], ziel: string, grenze: number): Pro
       }) + '\n')
 
       if (geladen % 25 === 0) {
-        log.info('korpus: Fortschritt', { geladen, uebersprungen, mitXml, fehler, von: belege.length })
+        log.info('belege: Fortschritt', { geladen, uebersprungen, mitXml, fehler, von: belege.length })
       }
     }
   } finally {
     await manifest.end()
   }
 
-  log.info('korpus: fertig', { geladen, uebersprungen, mitXml, fehler, ziel })
+  log.info('belege: fertig', { geladen, uebersprungen, mitXml, fehler, ziel })
   console.log(
     `\n${geladen} Dateien geladen, ${uebersprungen} übersprungen, ${fehler} ohne PDF-Antwort.\n`
     + `${mitXml} davon trugen eine eingebettete E-Rechnung (XML liegt daneben).\n`
@@ -393,9 +393,22 @@ export async function ziehen(belege: Beleg[], ziel: string, grenze: number): Pro
 
 // ---------------------------------------------------------------------------
 
+/**
+ * ZWEI BEFEHLE, KEIN SCHALTER.
+ *
+ * Vorher entschied `KORPUS_ZIEHEN=1` darüber, ob dieser Lauf 1.585 Dateien aus
+ * LINA holt oder nur rechnet. Eine Umgebungsvariable ist dafür die falsche
+ * Bauform: sie steht nicht im Befehl, den man später im Verlauf wiederfindet,
+ * sie überlebt in der Shell den nächsten Aufruf, und wer sie einmal gesetzt
+ * hat, zieht beim nächsten `bun run` unbeabsichtigt erneut.
+ *
+ * Jetzt sagt der Befehlsname, was passiert. Ohne Flagge passiert das
+ * Harmlose — wer sich vertippt, bekommt eine Vorschau und keinen Abzug.
+ */
 if (import.meta.main) {
-  const ziel = process.env.KORPUS_ZIEL ?? `${process.cwd()}/korpus`
-  const grenze = Number(process.env.KORPUS_MAX ?? 2000)
+  const ziehenGewollt = process.argv.includes('--ziehen')
+  const ziel = process.env.BELEGE_ZIEL ?? `${process.cwd()}/belege`
+  const grenze = Number(process.env.BELEGE_MAX ?? 2000)
 
   const belege = await ausProduktion(AUSWAHL)
   const jeTopf = new Map<string, number>()
@@ -405,14 +418,14 @@ if (import.meta.main) {
 
   console.log(`\nAuswahl aus der Produktion: ${belege.length} Belege`)
   for (const [topf, n] of [...jeTopf].sort()) console.log(`  ${topf.padEnd(20)} ${n}`)
-  console.log(`\nDieser Lauf zieht höchstens ${nimmt} (KORPUS_MAX=${grenze}).`)
+  console.log(`\nDieser Lauf zieht höchstens ${nimmt} (BELEGE_MAX=${grenze}).`)
   console.log(`Takt ${config.TAKT_MIN_MS / 1000}–${config.TAKT_MAX_MS / 1000} s`
     + ` → grob ${(sekunden / 3600).toFixed(1)} h, plus ein Tokenaufruf je Betrieb.`)
   console.log(`Ablage: ${ziel}`)
 
-  if (process.env.KORPUS_ZIEHEN !== '1') {
+  if (!ziehenGewollt) {
     console.log(`\nVorschau — es wurde nichts geladen.`
-      + `  Zum Ziehen:  KORPUS_ZIEHEN=1 bun run belege-herunterladen\n`)
+      + `  Zum Ziehen:  bun run belege-herunterladen\n`)
     process.exit(0)
   }
   await ziehen(belege, ziel, grenze)
