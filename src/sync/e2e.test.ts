@@ -206,6 +206,12 @@ lauf('Ende-zu-Ende', () => {
       'Bestellung: Details im Fenster aelter als 48 h',
       'Bestellung: Kopf ohne eine einzige Position',
       'Bon: avgTicket vs. Umsatz/Rechnungen',
+      /**
+       * Seit 0073. Testbetriebe und Kostenstellen ohne Bestellungen zählen
+       * NICHT mit — sonst stünde die Zeile dauerhaft rot, und sie soll eine
+       * Entscheidungsliste sein, keine Tapete.
+       */
+      'Einkauf: Kostenstelle ohne Betrieb, mit Bestellungen',
       'Inventur: Zaehlung abgeschnitten',
       'Umsatz: Artikelsumme vs. Umsatzbericht',
       // Seit 0070 ausdruecklich nur die ENDGUELTIGEN: ein aufgegebener Posten,

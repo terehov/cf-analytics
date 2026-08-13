@@ -103,14 +103,29 @@ export async function linaNachfuellen(): Promise<number> {
    */
   const monatsErster = `${gestern.slice(0, 7)}-01`
   for (const ep of AKTIVE_ENDPUNKTE.filter(istMomentaufnahme)) {
+    /**
+     * Der Zeitraum IST der Takt. Bei Monatstakt der Monatserste, bei
+     * Wochentakt der Montag derselben Woche — beides ein Datum, das sich
+     * innerhalb der Periode nicht ändert, und damit sperrt das NOT EXISTS
+     * genau eine Erhebung je Periode.
+     *
+     * `date_trunc('week', …)` liefert in Postgres den Montag (ISO), und zwar
+     * unabhängig von der Spracheinstellung. Gerechnet wird in SQL und nicht
+     * in JavaScript: `geschaeftstag()` liefert bereits das fachlich richtige
+     * Datum, und eine zweite Wochenlogik daneben wäre eine zweite Stelle,
+     * an der dieselbe Sache falsch stehen kann.
+     */
+    const periodenBeginn = ep.takt === 'woche'
+      ? `date_trunc('week', $2::date)::date`
+      : `$2::date`
     const r = await query(
       `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet)
-       SELECT $1, $2::date, $2::date, $3
+       SELECT $1, ${periodenBeginn}, ${periodenBeginn}, $3
         WHERE NOT EXISTS (
               SELECT 1 FROM sync.warteschlange
-               WHERE endpunkt = $1 AND zeitraum_von = $2::date)
+               WHERE endpunkt = $1 AND zeitraum_von = ${periodenBeginn})
        RETURNING posten_id`,
-      [ep.key, monatsErster, einreihPrioritaet(ep.key)])
+      [ep.key, ep.takt === 'woche' ? gestern : monatsErster, einreihPrioritaet(ep.key)])
     n += r.length
   }
 
@@ -149,14 +164,25 @@ export async function foodnotifyNachfuellen(): Promise<number> {
     if (!marke) continue
 
     /**
-     * Die Organisationsposten (A1) einmal je Kalendermonat auffrischen:
-     * neue Betriebe, neue Kostenstellen, neu angeschlossene Kassen. Sie
-     * sind Momentaufnahmen — täglich wäre Verschwendung, nie wäre blind.
+     * Die Organisationsposten (A1) auffrischen: neue Betriebe, neue
+     * Kostenstellen, neu angeschlossene Kassen.
      *
-     * Geprüft wird gegen ALLE Posten des Monats, erledigte eingeschlossen
-     * (siehe die Begründung bei den LINA-Momentaufnahmen oben).
+     * TÄGLICH SEIT DEM 13.08.2026, VORHER MONATLICH. Der Monatstakt war als
+     * „täglich wäre Verschwendung" begründet, und das war an den Aufrufen
+     * gemessen richtig und an der Wirkung falsch: eine neue Kostenstelle
+     * blieb bis zu vier Wochen ohne `betrieb_key`, und ihr Einkauf fiel so
+     * lange aus jeder betriebsbezogenen Sicht. Gemessen am 13.08.2026 lagen
+     * die Stammdaten 11 Tage zurück.
+     *
+     * Die Verschwendung ist zudem winzig: drei Endpunkte mal vier Marken
+     * sind 12 Aufrufe am Tag, gegen ein FoodNotify-Tagesbudget von 140.000
+     * bei rund 200 verbrauchten. Das ist der billigste Punkt dieses ganzen
+     * Plans.
+     *
+     * Der Takt hängt weiterhin am ZEITRAUM und nicht an einem Ergebniswert —
+     * gibt es für heute schon eine Zeile, passiert nichts, gleich wie sie
+     * ausgegangen ist. Dieselbe Lehre wie bei `einreihenJeMonat()`.
      */
-    const monatsErster = `${heute.slice(0, 7)}-01`
     const { fnEndpunkt } = await import('../foodnotify/endpunkte')
     for (const ep of ['fn:betriebe', 'fn:kostenstellen', 'fn:pos_standorte']) {
       const r = await query(
@@ -169,7 +195,7 @@ export async function foodnotifyNachfuellen(): Promise<number> {
                    AND w.parameter = '{}'::jsonb
                    AND w.zeitraum_von = $2::date)
          RETURNING posten_id`,
-        [ep, monatsErster, marke.marke_key, fnEndpunkt(ep).prioritaet])
+        [ep, heute, marke.marke_key, fnEndpunkt(ep).prioritaet])
       n += r.length
     }
 

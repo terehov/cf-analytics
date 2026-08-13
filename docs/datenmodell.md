@@ -443,3 +443,22 @@ CREATE INDEX bestellung_detail_faellig
 `canceled` und `finished` sind 3.362 von 66.966, und um die geht es nie — sie ändern sich
 nicht mehr. Derselbe Grund wie bei `warteschlange_aufgegeben` (0070) und
 `aufgabe_belegzahl_betrieb` (0071).
+
+## `core.name_norm()`: Apostrophe werden gelöscht (Migration `0073`, 13.08.2026)
+
+Die Funktion faltet Umlaute (`ü` → `ue`) und Akzente (`é` → `e`), damit LINA und FoodNotify
+denselben Namen gleich schreiben. Die Apostroph-Zeichen `´`, `` ` `` und `'` standen dabei mit
+je einem **Leerzeichen** als Ziel in `translate()`, das typografische `’` fehlte ganz.
+
+```
+vorher:  name_norm('Lehner´s Wirtshaus Rastatt GmbH') → 'lehner s wirtshaus rastatt'
+         name_norm('Lehners Wirtshaus Rastatt GmbH')  → 'lehners wirtshaus rastatt'
+nachher: beide → 'lehners wirtshaus rastatt'
+```
+
+`translate()` löscht jedes Quellzeichen ohne Zielzeichen — die fünf Apostroph-Varianten stehen
+deshalb am Ende der Quellzeichenkette und haben in der Zielkette keine Entsprechung mehr.
+
+**Gemessen über alle 79 Restaurants × 141 Betriebe:** 59 exakte Treffer vorher, 60 nachher,
+**0 verloren**, keine neue Kollision. Apostrophe tragen nur 6 der 79 Restaurantnamen und
+keiner der 141 Betriebsnamen. Genau ein Betrieb hing daran.

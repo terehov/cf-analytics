@@ -874,3 +874,19 @@ ist, steht in `nie_aufgefrischt`, wo es hingehört.
 
 **Beim Anlegen stand die Zeile auf 2.981 von 2.981** — dem ganzen Fenster, weil bis dahin
 keine Bestellung je erneut geholt wurde. Nach dem ersten Lauf mit 0072 muss sie 0 sein.
+
+## `mart.kostenstelle_ohne_betrieb` (Migration `0073`, 13.08.2026)
+
+Eine Zeile je Restaurant ohne `betrieb_key`, nach Bestellvolumen sortiert. Ihr Einkauf fällt
+aus **jeder** betriebsbezogenen Sicht heraus, ohne dass man es einer Zahl ansieht — die Summen
+stimmen, sie stehen nur nirgends.
+
+Das ist eine **Entscheidungsliste**, keine Fehlerliste. Die Spalte `grund` sagt, was zu tun
+ist: `unsicher` braucht einen Menschen (`manual.betrieb_zuordnung.entscheidung_key` setzen,
+der nächste Lauf trägt sie ein), `kein_treffer` ist eine Grenze der Quelle, `testbetrieb`
+bleibt so.
+
+**Die Prüfzeile zählt Testbetriebe und Kostenstellen ohne Bestellungen ausdrücklich nicht
+mit.** Wer sie mitzählte, bekäme eine Zeile, die nie auf null geht — und die liest dann
+niemand mehr. Dieselbe Überlegung wie bei „Betrieb ohne Belegarchiv" (0071) und
+„endgueltig aufgegeben" (0070).

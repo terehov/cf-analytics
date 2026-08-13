@@ -103,6 +103,22 @@ export type Endpunkt = {
   /** Kurzbeschreibung fürs Log und die Doku. */
   zweck: string
   aktiv: boolean
+  /**
+   * In welchem Takt eine Momentaufnahme wiederholt wird. Vorgabe `monat`.
+   *
+   * Momentaufnahmen haben keinen Zeitraum, den man nachholen könnte — es gibt
+   * nur „jetzt". Wie oft „jetzt" neu erhoben wird, ist deshalb eine
+   * Abwägung je Endpunkt und keine Eigenschaft der Gattung: bei den meisten
+   * ändert sich zwischen zwei Monaten nichts, bei
+   * `analyticsFilterOptions` hängt an der Aktualität, ob ein neuer Betrieb
+   * überhaupt Daten bekommt.
+   *
+   * Der Takt hängt am ZEITRAUM des Postens (Wochenanfang bzw. Monatserster)
+   * und nicht an einem Ergebniswert — dieselbe Lehre wie überall sonst hier:
+   * ein Wiederholtakt, der an einem Ausgang hängt, kennt immer einen, an den
+   * niemand gedacht hat.
+   */
+  takt?: 'monat' | 'woche'
   hinweis?: string
   /**
    * Welche Form die Antwort hat. Vorgabe `json` — so verhalten sich alle
@@ -337,6 +353,23 @@ export const ENDPUNKTE: Endpunkt[] = [
     ebene: 'stamm',
     pfad: '/intranet/api/analyticsFilterOptions',
     schrittweite: 'momentaufnahme',
+    /**
+     * WÖCHENTLICH statt monatlich (13.08.2026, Punkt 2.9 des Plans).
+     *
+     * Diese Antwort ist die EINZIGE Quelle für `core.betrieb.lina_betrieb_id`
+     * — die numerische ID, die über einen Namens-Join angeheftet wird. Und an
+     * dieser ID hängt alles Betriebsbezogene: die BWA über `getKennzahlen`,
+     * und seit Migration 0069 die tägliche Zählung des Belegarchivs.
+     *
+     * Ein neu eröffneter Betrieb wartete damit bis zu VIER WOCHEN auf seine
+     * erste Zählung. Das ist derselbe Fall, den 0069 für die Ordner gelöst
+     * hat — „neuer Betrieb fällt stumm heraus" —, nur eine Ebene höher.
+     *
+     * Kosten: drei zusätzliche Aufrufe im Monat, gegen ein LINA-Tagesbudget
+     * von 10.500 bei rund 82 verbrauchten. Die Frage war nie der Preis,
+     * sondern dass niemand hingesehen hat.
+     */
+    takt: 'woche',
     zweck: 'Dimensionen: 334 Feinsparten, Hauptsparten, Verkaufsstellen, Gruppen, Betriebe',
     aktiv: true,
     hinweis:

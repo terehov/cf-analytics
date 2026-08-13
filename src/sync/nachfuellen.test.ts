@@ -589,3 +589,69 @@ lauf('nachfuellen — Selbstreparatur', () => {
     expect(r2[0].zustand).toBe('wird erneut versucht')
   })
 })
+
+/**
+ * Der Takt der Momentaufnahmen — Punkt 2.9 des Plans.
+ *
+ * `analyticsFilterOptions` ist die EINZIGE Quelle für
+ * `core.betrieb.lina_betrieb_id`, und daran hängt alles Betriebsbezogene:
+ * die BWA über `getKennzahlen` und seit Migration 0069 die tägliche Zählung
+ * des Belegarchivs. Im Monatstakt wartete ein neu eröffneter Betrieb bis zu
+ * vier Wochen auf seine erste Zählung — derselbe Fall, den 0069 für die
+ * Ordner gelöst hat, eine Ebene höher.
+ */
+lauf('Takt der Momentaufnahmen', () => {
+  beforeAll(async () => {
+    process.env.DATABASE_URL = DB!
+    db = new Client({ connectionString: DB })
+    await db.connect()
+  })
+  afterAll(async () => { await db?.end() })
+  beforeEach(async () => { await db.query('TRUNCATE sync.warteschlange') })
+
+  const zeitraeume = async (endpunkt: string): Promise<string[]> => {
+    const { rows } = await db.query(
+      `SELECT zeitraum_von::text AS d FROM sync.warteschlange
+        WHERE endpunkt = $1 ORDER BY zeitraum_von`, [endpunkt])
+    return rows.map(r => r.d)
+  }
+
+  test('analyticsFilterOptions läuft wöchentlich, auf den Montag gesetzt', async () => {
+    const { linaNachfuellen } = await import('./nachfuellen')
+    const { endpunkt } = await import('../lina/endpunkte')
+    expect(endpunkt('analyticsFilterOptions').takt).toBe('woche')
+
+    await linaNachfuellen()
+    const [tag] = await zeitraeume('analyticsFilterOptions')
+    expect(tag).toBeDefined()
+
+    /**
+     * Der Zeitraum IST der Takt: ein Montag, nicht der Monatserste. Geprüft
+     * über die Datenbank statt über eine zweite Wochenrechnung in
+     * JavaScript — die wäre genau die zweite Stelle, an der dasselbe falsch
+     * stehen kann.
+     */
+    const { rows: [w] } = await db.query(
+      `SELECT extract(isodow FROM $1::date)::int AS wochentag,
+              ($1::date = date_trunc('week', $1::date)::date) AS ist_wochenanfang`, [tag])
+    expect(w.wochentag).toBe(1)
+    expect(w.ist_wochenanfang).toBe(true)
+
+    // Und zweimal nachfüllen legt in derselben Woche nichts Zweites an.
+    await linaNachfuellen()
+    expect(await zeitraeume('analyticsFilterOptions')).toEqual([tag!])
+  })
+
+  test('die übrigen Momentaufnahmen bleiben monatlich', async () => {
+    const { linaNachfuellen } = await import('./nachfuellen')
+    const { AKTIVE_ENDPUNKTE, istMomentaufnahme } = await import('../lina/endpunkte')
+    await linaNachfuellen()
+
+    for (const ep of AKTIVE_ENDPUNKTE.filter(istMomentaufnahme)) {
+      if (ep.takt === 'woche') continue
+      const [tag] = await zeitraeume(ep.key)
+      // Der Monatserste — der Takt hängt am Zeitraum, nicht am Ergebnis.
+      expect(tag?.slice(8)).toBe('01')
+    }
+  })
+})

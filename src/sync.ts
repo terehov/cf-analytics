@@ -15,6 +15,7 @@ import { deckungsbeitragNachlauf } from './sync/deckungsbeitrag'
 import { roundTableNachlauf } from './sync/round_table'
 import { einkaufspreisNachlauf } from './sync/einkaufspreis'
 import { einkaufSichtenNachlauf } from './sync/einkauf_sichten'
+import { zuordnungNachlauf } from './sync/zuordnung'
 import { yextNachlauf } from './yext/nachlauf'
 
 const ausloeser = process.argv.includes('--backfill') ? 'backfill'
@@ -42,6 +43,23 @@ try {
   await nachfuellen()
 
   const r = await workerLauf(ausloeser as any)
+
+  /**
+   * ERSTER Nachlauf, und er muss der erste sein: Kostenstelle → Betrieb.
+   *
+   * Alle folgenden Nachläufe rechnen auf `betrieb_key` — die Auswahllisten,
+   * der Deckungsbeitrag, der Round Table, die Einkaufssichten. Liefe die
+   * Zuordnung dahinter, zeigten sie bis zum nächsten Lauf den Stand von
+   * gestern; ein neu zugeordneter Betrieb wäre einen Tag lang in den Zahlen
+   * und nicht in den Sichten.
+   *
+   * Dieselbe Falle wie bei `yextNachlauf()`, der bis heute NACH dem
+   * Round-Table-Refresh läuft und deshalb zwei Betrieben eine veraltete Note
+   * in die Ampel schreibt (Punkt 5.3 des Plans).
+   *
+   * Wirft nie, siehe Kopf von sync/zuordnung.ts.
+   */
+  await zuordnungNachlauf()
 
   // Nachlauf: die Auswahllisten der Metabase-Filter aktuell halten. Steht
   // bewusst NACH dem Import und kann ihn nicht scheitern lassen — die

@@ -724,3 +724,29 @@ je Zusicherung) und zur Laufzeit, falls jemand am Test vorbei deployt.
 Eine doppelt gepflegte Liste ohne Abgleich wäre nur eine zweite Stelle, an der dasselbe falsch
 stehen kann — deshalb liest `waechter.test.ts` die Datei und vergleicht die `case`-Zeilen
 gegen die Menge.
+
+## Die Zuordnung Kostenstelle → Betrieb läuft endlich mit (13.08.2026, Phase 2.4)
+
+`manual.betrieb_vorschlaege_berechnen()` und `manual.betrieb_zuordnung_anwenden()` gibt es
+seit Migration `0034` — vollständig gebaut, kommentiert und getestet. **In Produktion wurden
+sie nie aufgerufen:** der einzige Aufrufer im ganzen Repo war `zuordnung.test.ts`.
+
+`zuordnungNachlauf()` (`src/sync/zuordnung.ts`) ruft jetzt beide bei jedem Lauf, in dieser
+Reihenfolge — `anwenden()` arbeitet auf dem, was `berechnen()` schreibt.
+
+**Er steht als ERSTER Nachlauf, direkt hinter dem Worker.** Alle anderen rechnen auf
+`betrieb_key`: Auswahllisten, Deckungsbeitrag, Round Table, Einkaufssichten. Liefe die
+Zuordnung dahinter, zeigten sie bis zum nächsten Lauf den Stand von gestern — genau die Falle,
+in der `yextNachlauf()` bis heute sitzt (Punkt 5.3 des Plans).
+
+**Warum bei jedem Lauf und nicht einmalig.** Ein einmaliger Aufruf hätte denselben Fehler wie
+`manual.belegarchiv_soll`: er wäre die Bedingung eines Erstabzugs, und jeder danach angelegte
+Betrieb fiele stumm heraus. Seit dem 13.08.2026 kommen die FoodNotify-Stammdaten täglich statt
+monatlich, also entstehen neue Kostenstellen auch täglich.
+
+**Er rät nicht.** „unsicher" und „kein_treffer" bleiben NULL. Die offenen Fälle stehen in
+`mart.kostenstelle_ohne_betrieb` und als eigene Prüfzeile — Begründung in `entscheidungen.md`.
+
+**Er meldet auch, wenn er nichts tut.** Die Logzeile führt `zugeordnet` **und**
+`offen_mit_bestellungen`. „0 zugeordnet" allein liest sich wie „nichts zu tun"; erst mit der
+zweiten Zahl steht da, ob wirklich nichts zu tun ist oder ob jemand entscheiden muss.

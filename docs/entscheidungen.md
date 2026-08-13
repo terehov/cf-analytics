@@ -1769,3 +1769,64 @@ Aufrufe im Nachholauf. Der Vergleich vorher gegen nachher beantwortet die Frage 
 und erst danach lässt sich entscheiden, ob der lange Schwanz jenseits der 45 Tage einen
 Wochentakt braucht oder Ruhe hat. Eine Annahme, die sich für 43.474 Aufrufe messen lässt,
 soll nicht geraten werden.
+
+## 13.08.2026 (Phase 2.4/2.8/2.9): Vier Entscheidungen zur Betriebszuordnung
+
+### Kein Lader-Case für `fn:betriebe` — die Messung hat den Auftrag widerlegt
+
+Der Nachtrag verlangte einen echten Lader-Case für `fn:betriebe`, weil dort die Restaurants
+lägen, die die 25 unzugeordneten Kostenstellen erklären. **Gemessen:** alle 78 Restaurants
+sind bereits in `core.kostenstelle`, mit identischen Namen, und die einzige zusätzliche
+Information ist eine für alle gleiche Zeitzone.
+
+**Entschieden: nicht bauen.** Eine Tabelle, die eine andere Spalte für Spalte doppelt, ist
+keine Datenhaltung, sondern eine zweite Stelle, an der dasselbe falsch stehen kann. Der Punkt
+steht durchgestrichen in `lina-api-korrekturen.md` — wer nicht sieht, dass eine Annahme einmal
+galt, stellt sie neu auf.
+
+### Apostrophe werden gelöscht, nicht zu Leerzeichen
+
+**Entschieden: löschen**, und alle fünf Varianten (`´ ` ' ’ ‘`) statt der bisherigen drei.
+
+**Warum nicht Leerzeichen.** „Lehner´s" und „Lehners" meinen dasselbe Haus; als „lehner s" und
+„lehners" treffen sie sich nie. Es ist derselbe Gedanke wie bei den Umlauten eine Zeile
+darüber — was zwei Systeme verschieden schreiben, aber gleich meinen, muss gleich aussehen.
+
+**Warum das messbar sicher ist.** Über alle 79 Restaurants × 141 Betriebe: 59 exakte Treffer
+vorher, 60 nachher, **0 verloren, keine neue Kollision**. Apostrophe tragen überhaupt nur 6
+der 79 Restaurantnamen und keiner der 141 Betriebsnamen. Ein Test hält die fünf Varianten
+fest und prüft mit dem Bindestrich gegen, dass die Zeichenliste nicht zu gierig wird.
+
+### Die sechs offenen Zuordnungen werden NICHT geraten
+
+`manual.betrieb_zuordnung_anwenden()` trägt nur exakte Treffer, bekannte Varianten und
+menschliche Entscheidungen ein. „unsicher" und „kein_treffer" bleiben NULL.
+
+**Entschieden: dabei bleibt es**, auch wenn zwei der offenen Fälle erhebliches Volumen tragen.
+Bei „Aposto Aachen - Alte Post" (458 Bestellungen) führt LINA eine aktive **und** eine
+geschlossene Gesellschaft desselben Namens; bei „Aposto Wuppertal II" (246) zwei Häuser, und
+welches das „II" meint, sagt kein Name. Ein Automat, der hier rät, ordnet sechsstellige
+Einkaufsbeträge lautlos dem falschen Betrieb zu — und lautlos falsch ist in diesem Projekt
+teurer als offen.
+
+**Sichtbar statt geraten:** `mart.kostenstelle_ohne_betrieb` und eine eigene Prüfzeile, die
+Testbetriebe und Kostenstellen ohne Bestellungen ausdrücklich **nicht** mitzählt. Eine Zeile,
+die nie auf null geht, wird nicht gelesen.
+
+### FoodNotify-Stammdaten täglich, `analyticsFilterOptions` wöchentlich
+
+Beide Takte hingen an „täglich wäre Verschwendung". An den Aufrufen gemessen stimmte das, an
+der Wirkung nicht.
+
+* **FoodNotify-Stammdaten: täglich.** Drei Endpunkte × vier Marken = 12 Aufrufe am Tag, gegen
+  140.000 Budget bei ~200 verbrauchten. Eine neue Kostenstelle blieb vorher bis zu vier Wochen
+  ohne `betrieb_key`.
+* **`analyticsFilterOptions`: wöchentlich** (+3 Aufrufe im Monat, LINA-Budget 10.500 bei 82).
+  Es ist die einzige Quelle für `core.betrieb.lina_betrieb_id`, und daran hängt die BWA **und**
+  seit 0069 die tägliche Belegarchiv-Zählung. Ein neu eröffneter Betrieb wartete bis zu vier
+  Wochen auf seine erste Zählung — derselbe Fall, den 0069 für die Ordner gelöst hat, eine
+  Ebene höher.
+
+Der Takt hängt in beiden Fällen weiter am **Zeitraum** (Kalendertag bzw. Montag der Woche) und
+nicht an einem Ergebniswert. Ein Wiederholtakt, der an einem Ausgang hängt, kennt immer einen,
+an den niemand gedacht hat.

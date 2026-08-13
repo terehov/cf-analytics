@@ -50,6 +50,36 @@ lauf('core.name_norm — Namen vergleichbar machen', () => {
     expect(await norm('Alte Post Aachen Gaststättenbetriebs GmbH')).toBe('alte post aachen')
     expect(await norm('GESCHLOSSEN Alte Post Aachen GmbH')).toBe('alte post aachen')
   })
+
+  /**
+   * DER APOSTROPH — derselbe Fehler wie bei den Umlauten, ein Zeichen weiter.
+   *
+   * Bis zum 13.08.2026 übersetzte `name_norm` die Zeichen ´ ` ' in
+   * LEERZEICHEN statt sie zu entfernen, und das typografische ’ kannte sie
+   * gar nicht. Aus „Lehner´s" wurde „lehner s" statt „lehners" — gegen LINAs
+   * „Lehners Wirtshaus Rastatt GmbH" ergab das 0.83 statt Gleichheit, also
+   * `unsicher` statt `exakt`, also keine Zuordnung.
+   *
+   * In Produktion gemessen: 59 exakte Treffer vorher, 60 nachher, 0 verloren,
+   * keine neue Kollision. Genau ein Betrieb hing daran.
+   */
+  test('Apostrophe verschwinden, statt zu Leerzeichen zu werden', async () => {
+    // Der gemessene Fall, Zeichen für Zeichen wie in den beiden Systemen.
+    expect(await norm('Lehner´s Wirtshaus Rastatt GmbH'))
+      .toBe(await norm('Lehners Wirtshaus Rastatt GmbH'))
+
+    // Alle fünf Varianten, die in freien Namensfeldern vorkommen — der
+    // typografische Apostroph ist der, den ein Mac von selbst einsetzt.
+    for (const zeichen of ['´', '`', "'", '’', '‘']) {
+      expect(await norm(`Lehner${zeichen}s Wirtshaus`)).toBe('lehners wirtshaus')
+    }
+
+    // Die Gegenprobe: ein Bindestrich ist KEIN Apostroph und trennt weiter.
+    // Ohne sie würde eine zu gierige Zeichenliste hier unbemerkt Wörter
+    // zusammenziehen.
+    expect(await norm('Aposto Wuppertal - Alter Papierfabrik'))
+      .toBe('aposto wuppertal - alter papierfabrik')
+  })
 })
 
 /**

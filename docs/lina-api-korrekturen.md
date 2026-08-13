@@ -269,3 +269,34 @@ Verträge-Seite ist das Löschen ein **gewöhnlicher GET-Link**
 (`…/vertragid/<id>/delete/1`). Ein Crawler, der Links folgt, löscht Verträge.
 Jeder Zugriff auf die Ladenakte läuft über eine Positivliste zusammengesetzter
 URLs — niemals über Linkverfolgung.
+
+## 13.08.2026 — `fn:betriebe` hält NICHT die fehlende Restaurantliste
+
+**Die Annahme** stand in `docs/plan-datenvollstaendigkeit-nachtrag.md` §2.8: *„Die
+Restaurantliste, die die 25 Kostenstellen ohne `betrieb_key` zuordnen könnte, liegt seit
+Wochen ungenutzt in `raw.api_antwort`."* Daraus folgte der Auftrag, `fn:betriebe` einen echten
+Lader-Case zu geben und danach die Zuordnungsfunktionen anzuschließen.
+
+~~`fn:betriebe` liefert Restaurants, die `core.kostenstelle` nicht kennt.~~ **Widerlegt am
+13.08.2026, lesend in Produktion gemessen:**
+
+| Messung | Ergebnis |
+|---|---|
+| Restaurants in `fn:betriebe` | 78 |
+| davon **ohne** Kostenstelle in `core` | **0** |
+| Namen, die von `core.kostenstelle.restaurant_name` abweichen | **0** |
+| verschiedene Zeitzonen | **1** (alle `Europe/Vienna`) |
+
+Ein Lader-Case für `fn:betriebe` schriebe also eine Tabelle, die `core.kostenstelle` Spalte
+für Spalte doppelt, plus eine konstante Zeitzone. **Er ist deshalb nicht gebaut worden** —
+das steht auch in `entscheidungen.md`, damit es niemand für Vergesslichkeit hält.
+
+**Was es stattdessen war.** Ein Apostroph in `core.name_norm()`: die Funktion übersetzte
+`´`, `` ` `` und `'` in Leerzeichen statt sie zu entfernen, und `’` kannte sie gar nicht. Aus
+`Lehner´s` wurde `lehner s` statt `lehners`. Gemessen über alle 79 Restaurants × 141 Betriebe:
+59 exakte Treffer vorher, 60 nachher, 0 verloren. Migration `0073`.
+
+**Und was bleibt.** Sechs Restaurants mit Bestellungen ohne Betrieb — die brauchen eine
+**Entscheidung**, keinen Automaten, und stehen dafür in `mart.kostenstelle_ohne_betrieb`.
+Bei „Aposto Wuppertal II" führt LINA zwei Gesellschaften gleichen Namens; welche gemeint ist,
+sagt kein Name. Wer hier raten lässt, ordnet 246 Bestellungen lautlos dem falschen Betrieb zu.
