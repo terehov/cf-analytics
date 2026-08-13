@@ -1,5 +1,15 @@
 # Nachtrag zum Plan Datenvollständigkeit — Befunde aus dem Review vom 13.08.2026
 
+> **Stand 13.08.2026 abends: alles hier ist umgesetzt** — Phase 1c
+> (`d948770`), 2.6 (`eca5a8a`), 2.5/2.7 (`def6a73`), 2.4/2.8/2.9 (`eb546e8`),
+> 2.1–2.3 (`b8475e6`). Zwei Punkte hat die Messung dabei widerlegt: §2.8
+> (`fn:betriebe` hält die fehlende Restaurantliste NICHT — es war ein
+> Apostroph in `core.name_norm()`) und die Begründungszahlen von 2.1/2.3
+> (beide Artefakte ihres eigenen Fensters). Und zwei Punkte sind bewusst
+> anders gebaut als hier beschrieben: die Nachholäufe in 2.6 und 2.2 sind
+> **keine Handbefehle** geworden, sondern Obergrenzen im Nachtlauf —
+> Begründung in `entscheidungen.md`.
+
 Ergänzt `docs/plan-datenvollstaendigkeit.md`, ersetzt ihn nicht. Anlass: ein
 unabhängiges Review der Phase-1-Implementierung (Zählkette, Paginierung,
 Wiederbelebung) plus zwei Kreuzproben — definierte Endpunkte gegen automatische

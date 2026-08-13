@@ -1,5 +1,13 @@
 # Plan: alles holen, alles aktuell halten
 
+> **Stand 13.08.2026 abends: Phase 1, 1c und 2 sind umgesetzt und committet,
+> aber NICHT deployt** — Produktion steht auf `0070`, die Migrationen `0071`
+> bis `0074` liegen bereit. Was seit dem Schreiben dieses Plans gemessen wurde
+> und ihm widerspricht, steht in `befunde-datenlage.md` (die beiden
+> Fenster-Artefakte zu 2.1/2.3) und `lina-api-korrekturen.md` (`fn:betriebe`
+> zu 2.8). Die Nachprüfungen nach dem Deploy stehen in `offene-punkte.md`.
+> Offen bleiben die Phasen 3 bis 6 und die vier Entscheidungen in Abschnitt 4.
+
 Stand 13.08.2026. Grundlage ist ein Audit vom selben Tag, das jede Aussage in
 der Produktionsdatenbank nachgemessen hat — nicht am Code, nicht an der lokalen
 Datenbank (die ist ein Torso, siehe `docs/backfill.md`).
