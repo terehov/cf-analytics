@@ -895,3 +895,34 @@ Sparten      8 × 10                                                +80
 Ein neuer Spartenendpunkt ist damit ein Registereintrag, eine `case`-Zeile, ein
 Schema-Eintrag und eine Zeile im Quellenregister — der Wächter
 (`waechter.test.ts`) lässt keinen davon weg.
+
+## Yext braucht keinen Befehl mehr (Migration `0078`, 14.08.2026)
+
+Drei Dinge hingen bis dahin an einem Menschen oder an der falschen Stelle:
+
+| | vorher | jetzt |
+|---|---|---|
+| Vollabgleich, 25 Monate | `bun run yext --voll`, zuletzt 03.08.2026 | im Nachlauf, alle 30 Tage |
+| Zuordnung Betrieb → Entität | `bun run yext:zuordnen --schreiben`, zuletzt 03.08.2026 | im selben Takt |
+| Reihenfolge | letzter Nachlauf, **hinter** dem Round Table | zweiter Nachlauf, **vor** allem Materialisierten |
+
+**Die Zuordnung läuft VOR den Ständen**, und das ist keine Kosmetik:
+`staendeLaden()` fragt Yext je *zugeordnetem* Betrieb. Ein Betrieb ohne Eintrag
+in `manual.betrieb_fremd_id` wird nicht geholt — kein Fehler, keine leere Zeile,
+gar nichts. Liefe die Zuordnung dahinter, bekäme ein neuer Betrieb seine erste
+Bewertung einen Monat später.
+
+**Monatlich und nicht täglich**, weil die Namensheuristik dabei entscheidet —
+und eine Entscheidung, die sich täglich neu fällt, ist keine. Der Takt hängt an
+einem Merker (`yext_letzte_zuordnung`, `yext_letzter_vollabgleich`) und nicht am
+Monatsersten: sonst machte der Ausfall eines einzigen Laufs den Ausfall eines
+ganzen Monats.
+
+**Aufrufe:** der Vollabgleich kostet rund 3.300 statt 400, einmal im Monat. Das
+Stundenlimit der Yext Management API liegt bei 5.000. Der Zuordnungsabgleich
+sind zwei Aufrufe (Entitäten und Ordner).
+
+`src/yext_zuordnen.ts` bleibt als **Vorschau** — es rechnet nichts mehr selbst,
+sondern ruft denselben Abgleich auf und druckt ihn lesbar aus. Wer eine neue
+Entität in `VON_HAND` einträgt, will vor dem Schreiben sehen, was daraus folgt;
+der nächtliche Lauf zeigt das nicht, er schreibt.

@@ -45,13 +45,52 @@
  * Wert sieht aus wie ein gepflegter.
  */
 import { log } from '../lib/log'
-import { query } from '../db/pool'
+import { query, eine } from '../db/pool'
+import { config } from '../config'
 import { yextKonfiguriert } from './client'
 import { staendeLaden, bewertungenLaden, kennzahlFuellen, laufMerken } from './laden'
 import { analyticsLaden } from './analytics'
+import { zuordnungAbgleichen } from './zuordnen'
+
+/**
+ * Ist eine monatliche Aufgabe faellig?
+ *
+ * DER TAKT HAENGT AN EINEM MERKER UND NICHT AM KALENDERTAG — anders als bei
+ * den Momentaufnahmen im Importer, wo der Zeitraum des Postens den Takt
+ * traegt. Hier gibt es keinen Posten: der Yext-Nachlauf haengt an der Uhr.
+ * Ein „am Monatsersten"-Takt haette den Ausfall genau eines Laufs zum
+ * Ausfall eines ganzen Monats gemacht.
+ */
+async function vollabgleichFaellig(schluessel: string): Promise<boolean> {
+  const r = await eine<{ faellig: boolean }>(
+    `SELECT coalesce((wert->>'am')::timestamptz < now() - ($2 || ' days')::interval, true)
+              AS faellig
+       FROM sync.merker WHERE schluessel = $1`,
+    [schluessel, config.YEXT_VOLLABGLEICH_TAGE])
+  // Keine Zeile = noch nie gelaufen = faellig.
+  return r === null || r.faellig === true
+}
+
+async function merkerSetzen(schluessel: string): Promise<void> {
+  await query(
+    `INSERT INTO sync.merker (schluessel, wert)
+     VALUES ($1, jsonb_build_object('am', now()))
+     ON CONFLICT (schluessel) DO UPDATE SET wert = excluded.wert, gesetzt_am = now()`,
+    [schluessel])
+}
 
 /** Drei Monate: der laufende, der Vormonat (Portale liefern verzoegert), einer Reserve. */
 const MONATE = 3
+
+/**
+ * Das volle Fenster fuer den Vollabgleich — dieselben 25 Monate wie
+ * `bun run yext --voll`.
+ *
+ * 25 statt 24 ist kein Vertippen: der aelteste geladene Monat hat keinen
+ * Vormonat und damit keinen Monatswert (`mart.bewertung_verlauf`). Ein Monat
+ * Vorlauf macht die berichteten 24 vollstaendig.
+ */
+const VOLL_MONATE = 25
 
 /**
  * Fuer die Analytics dagegen das volle Fenster, und das ist kein Widerspruch.
@@ -93,7 +132,68 @@ export async function yextNachlauf(): Promise<void> {
       return
     }
 
-    const erg = await staendeLaden({ monateAnzahl: MONATE })
+    /**
+     * ERST DIE ZUORDNUNG, DANN DIE STAENDE (seit 14.08.2026).
+     *
+     * `staendeLaden()` fragt Yext je ZUGEORDNETEM Betrieb. Ein Betrieb ohne
+     * Eintrag in `manual.betrieb_fremd_id` wird schlicht nicht geholt — kein
+     * Fehler, keine leere Zeile, gar nichts. Lief die Zuordnung dahinter,
+     * bekaeme ein neuer Betrieb seine erste Bewertung einen Monat spaeter.
+     *
+     * WARUM SIE UEBERHAUPT HIER STEHT. Bis heute war der Abgleich
+     * ausschliesslich ein Handbefehl (`bun run yext:zuordnen --schreiben`).
+     * Gemessen am 14.08.2026: **sieben operative Betriebe** hatten keine
+     * Yext-Zuordnung und fehlten damit in jeder Bewertungstabelle. Eine
+     * Reparatur, die ein Mensch anstossen muss, ist keine Reparatur, sondern
+     * eine Verabredung — dieselbe Lehre wie beim Belegarchiv am 12.08.2026.
+     *
+     * MONATLICH UND NICHT TAEGLICH: es kostet zwei Aufrufe (Entitaeten und
+     * Ordner), aber die Namensheuristik entscheidet dabei — und eine
+     * Entscheidung, die sich taeglich neu faellt, ist keine. Neue Betriebe
+     * entstehen ohnehin nicht taeglich.
+     *
+     * Eigenes `try`: ein Fehler hier darf die Staende nicht mitnehmen. Die
+     * Zuordnung von gestern ist besser als keine.
+     */
+    if (await vollabgleichFaellig('yext_letzte_zuordnung')) {
+      try {
+        const z = await zuordnungAbgleichen({ schreiben: true })
+        await merkerSetzen('yext_letzte_zuordnung')
+        log.info('yext-zuordnung abgeglichen', {
+          zugeordnet: z.zugeordnet, geschrieben: z.geschrieben, offen: z.offen,
+          offeneNamen: z.offene_namen.map(o => `${o.id} ${o.name}`),
+          sicht: 'mart.betrieb_ohne_yext',
+        })
+      } catch (e) {
+        log.warn('yext-zuordnung fehlgeschlagen — die Staende laufen trotzdem',
+          { fehler: String((e as Error).message ?? e).slice(0, 300) })
+      }
+    }
+
+    /**
+     * DAS FENSTER: drei Monate im Regelfall, 25 einmal im Monat.
+     *
+     * Ein Stand ist kumuliert — der Maerz aendert sich nicht mehr, wenn im
+     * August eine Bewertung dazukommt. GELOESCHTE Bewertungen aendern
+     * allerdings auch alte Staende, und dafuer war bisher `bun run yext
+     * --voll` da: ein Handbefehl, der zuletzt am 03.08.2026 lief. Alle
+     * Staende vor Mai 2026 trugen deshalb am 14.08.2026 denselben
+     * `geladen_am` — sie altern still.
+     *
+     * Der Vollabgleich kostet rund 3.300 Aufrufe statt 400. Das
+     * Stundenlimit der Management API liegt bei 5.000, und er laeuft einmal
+     * im Monat — die Rechnung geht auf, ohne die Drosselung anzufassen.
+     */
+    const vollFaellig = await vollabgleichFaellig('yext_letzter_vollabgleich')
+    const fenster = vollFaellig ? VOLL_MONATE : MONATE
+    if (vollFaellig) {
+      log.info('yext-vollabgleich faellig — 25 Monate statt 3', {
+        grund: 'geloeschte Bewertungen aendern auch alte Staende',
+      })
+    }
+
+    const erg = await staendeLaden({ monateAnzahl: fenster })
+    if (vollFaellig && erg.betriebe > 0) await merkerSetzen('yext_letzter_vollabgleich')
     const kennzahl = erg.betriebe > 0 ? await kennzahlFuellen() : 0
 
     // Die einzelnen Bewertungen hinterher und inkrementell: sie sind die

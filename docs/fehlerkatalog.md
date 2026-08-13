@@ -2977,3 +2977,69 @@ Jahre vor ihrem Upload, das sind nachgereichte Altbelege.
 
 **Und was verworfen wird, bleibt lesbar:** `mart.belegdatum_ausreisser`. Eine
 Bereinigung ohne eigene Anzeige wäre derselbe stille Zweig wie der Fehler davor.
+
+### `eintraege_live` war vier Monate leer — ein Wort daneben
+
+**Symptom.** `core.betrieb_sichtbarkeit.eintraege_live` stand in **allen 1.497
+Zeilen** auf NULL, während die neun übrigen Metriken derselben Antwort gefüllt
+waren (`impressionen_google` 1497, `klicks` 1497, `genauigkeit` 1497). Die
+Spalte hängt an 6 Kartenstellen und zeigte dort eine dauerhaft leere Spalte
+hinter einer grünen Statusampel.
+
+**Ursache.** Angefordert wird `POWERLISTINGS_LIVE`, gelesen wurde
+`LISTINGS_LIVE` (`src/yext/analytics.ts`). `zahl()` liefert für eine unbekannte
+Metrik `null` statt zu werfen — richtig so, denn Yext lässt Metriken für
+einzelne Betriebe weg. **Genau diese Nachsicht hat den Tippfehler getragen.**
+
+**Der Plan hatte hier die falsche Frage gestellt:** „erst prüfen, ob Yext das
+Feld überhaupt liefert — wenn nicht, gehört die Spalte aus der Karte". Yext
+liefert es. Die Spalte bleibt.
+
+**Was ihn verhindert.** Ein Test in `src/yext/nachlauf.test.ts` vergleicht, was
+`bericht(...)` **anfordert**, mit dem, was `zahl()`/`text()` **liest** — ein
+Name auf nur einer der beiden Seiten ist der Fehler. Gegengeprüft: mit
+`LISTINGS_LIVE` fällt er sofort mit genau diesem Namen aus.
+
+### Zwei Handbefehle, die zuletzt am 03.08.2026 liefen
+
+**Symptom.** Zwei Zustände, die man den Daten nicht ansieht:
+
+* Alle `core.bewertung_stand`-Zeilen vor Mai 2026 tragen denselben
+  `geladen_am` — den 03.08.2026. Der Bestand sieht vollständig aus (25 Monate,
+  2.819 Zeilen, 60 Betriebe) und altert still: **gelöschte** Bewertungen ändern
+  auch alte Stände, und die sieht das Drei-Monats-Fenster des täglichen Laufs
+  nie.
+* **Sieben operative Betriebe** haben keine Yext-Zuordnung: B+L Pforzheim,
+  BS Bier & Speisen, Gastronomie Wilsdruffer Straße, SCHAFFERONE,
+  WHK Gastronomie, Wirtshaus am Schlossplatz, Wirtshaus Lautenschlager. Sie
+  fehlen in jeder Bewertungstabelle — und zwar lautlos: `staendeLaden()` fragt
+  je zugeordnetem Betrieb, ein nicht zugeordneter erzeugt keine leere Zeile,
+  sondern gar keine.
+
+**Ursache.** Beides hing an `bun run yext --voll` bzw.
+`bun run yext:zuordnen --schreiben`. Dieselbe Signatur wie überall in diesem
+Projekt: **eine Reparatur, die ein Mensch anstoßen muss, ist keine Reparatur,
+sondern eine Verabredung.**
+
+**Was ihn verhindert.** Beides läuft seit dem 14.08.2026 im nächtlichen Lauf,
+alle `YEXT_VOLLABGLEICH_TAGE` (30). Der Takt hängt an einem Merker und nicht am
+Monatsersten — sonst machte der Ausfall eines einzigen Laufs den Ausfall eines
+ganzen Monats. Sichtbar in `mart.yext_abgleich` und `mart.betrieb_ohne_yext`,
+mit je einer Prüfzeile.
+
+### Die Bewertungsnote in der Ampel war einen Tag alt
+
+**Symptom.** Zwei Betriebe trugen im Round Table dauerhaft eine Bewertungsnote
+aus dem Vortag.
+
+**Ursache.** `yextNachlauf()` war der **letzte** Nachlauf in `src/sync.ts`,
+hinter `roundTableNachlauf()` — und `mart.round_table_monat` ist seit Migration
+`0039` materialisiert. Die Note kam an, nachdem die Sicht schon aufgefrischt war.
+
+**Die allgemeine Form:** ein Nachlauf, der hinter seinem eigenen Leser steht,
+ist einen Tag alt, ohne dass es jemandem auffällt. Dieselbe Falle wie bei
+`zuordnungNachlauf()`, die am 13.08.2026 dieselbe Antwort bekommen hat.
+
+**Was ihn verhindert.** `yextNachlauf()` steht jetzt als zweiter Nachlauf, vor
+allem Materialisierten. Ein Test in `src/yext/nachlauf.test.ts` vergleicht die
+beiden Positionen in `sync.ts`.

@@ -246,7 +246,22 @@ async function sichtbarkeitLaden(k: Karte, ids: string[], f: ReturnType<typeof f
       pro: ganz(zahl(z, 'PROFILE_VIEWS')),
       kli: ganz(zahl(z, 'CLICK_COUNT')),
       gen: zahl(z, 'LISTINGS_ACCURACY'),
-      liv: ganz(zahl(z, 'LISTINGS_LIVE')),
+      /*
+       * POWERLISTINGS_LIVE, nicht LISTINGS_LIVE — genau das stand hier bis
+       * zum 14.08.2026, und deshalb war `eintraege_live` in ALLEN 1.497
+       * Zeilen NULL, waehrend die neun uebrigen Metriken derselben Antwort
+       * gefuellt waren.
+       *
+       * Angefordert wurde die Metrik richtig (siehe die Liste oben);
+       * gelesen wurde sie unter einem Namen, den die Antwort nicht kennt.
+       * `zahl()` liefert dann null statt zu werfen — richtig so, denn Yext
+       * laesst Metriken fuer einzelne Betriebe weg. Genau diese Nachsicht
+       * hat den Tippfehler getragen.
+       *
+       * `mart.betrieb_sichtbarkeit` haengt an 6 Kartenstellen und zeigte
+       * dort eine dauerhaft leere Spalte hinter einer gruenen Statusampel.
+       */
+      liv: ganz(zahl(z, 'POWERLISTINGS_LIVE')),
       una: ganz(zahl(z, 'UNAVAILABLE_REASON_COUNT')),
       vor: ganz(zahl(z, 'PUBLISHER_SUGGESTIONS')),
     }]

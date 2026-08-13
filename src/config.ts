@@ -351,6 +351,30 @@ const Schema = z.object({
   SPERRE_AUFGEBEN_TAGE: z.coerce.number().int().min(1).default(14),
 
   /**
+   * Nach wie vielen Tagen der Yext-Nachlauf das volle Fenster holt statt der
+   * drei laufenden Monate — und die Zuordnung neu abgleicht.
+   *
+   * WAS DAMIT AUFHÖRT, HANDARBEIT ZU SEIN. Bis zum 14.08.2026 gab es dafür
+   * zwei Befehle: `bun run yext --voll` (25 Monate) und
+   * `bun run yext:zuordnen --schreiben`. Beide liefen zuletzt am 03.08.2026,
+   * und beides sah man den Daten nicht an: alle Stände vor Mai 2026 trugen
+   * denselben `geladen_am`, und sieben operative Betriebe hatten keine
+   * Yext-Zuordnung — sie fehlten in jeder Bewertungstabelle.
+   *
+   * WARUM ÜBERHAUPT EIN VOLLABGLEICH. Ein Stand ist kumuliert: der März
+   * ändert sich nicht mehr, wenn im August eine Bewertung dazukommt.
+   * **Gelöschte** Bewertungen ändern aber auch alte Stände, und die sieht das
+   * Drei-Monats-Fenster nie.
+   *
+   * DREISSIG TAGE, weil der Vollabgleich rund 3.300 Aufrufe kostet statt 400.
+   * Das Stundenlimit der Yext Management API liegt bei 5.000; einmal im Monat
+   * passt das, ohne die Drosselung anzufassen. Der Takt hängt an einem Merker
+   * und nicht am Monatsersten — sonst machte der Ausfall eines einzigen Laufs
+   * den Ausfall eines ganzen Monats.
+   */
+  YEXT_VOLLABGLEICH_TAGE: z.coerce.number().int().min(1).default(30),
+
+  /**
    * Das rollierende Fenster für das Auffrischen der Bestelldetails (Tage).
    *
    * DER BEFUND DAHINTER. Am 13.08.2026 in Produktion gemessen: von 66.966

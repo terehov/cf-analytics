@@ -62,6 +62,28 @@ try {
    */
   await zuordnungNachlauf()
 
+  /**
+   * ZWEITER Nachlauf, und seit dem 14.08.2026 VOR dem Round Table (Punkt 5.3).
+   *
+   * Er hing bis dahin ganz am Ende, hinter dem Round-Table-Refresh — und
+   * `mart.round_table_monat` ist seit Migration `0039` materialisiert. Zwei
+   * Betriebe trugen deshalb dauerhaft eine Bewertungsnote aus dem VORTAG in
+   * der Ampel: die Note kam an, die Sicht war schon aufgefrischt.
+   *
+   * Dieselbe Falle wie bei `zuordnungNachlauf()` darüber, und dieselbe
+   * Antwort: was eine materialisierte Sicht liest, muss vor ihrem Refresh
+   * geschrieben sein. Ein Nachlauf, der hinter seinem eigenen Leser steht,
+   * ist einen Tag alt, ohne dass es jemandem auffällt.
+   *
+   * Anders als die übrigen hängt er nicht am Importergebnis, sondern an der
+   * Uhr — er läuft höchstens einmal am Tag und prüft das selbst. Einmal im
+   * Monat zieht er dabei die ganze Reihe gerade (25 Monate) und gleicht die
+   * Zuordnung der Betriebe ab; beides war bis zum 14.08.2026 Handarbeit.
+   *
+   * Wirft nie, siehe Kopf von yext/nachlauf.ts.
+   */
+  await yextNachlauf()
+
   // Nachlauf: die Auswahllisten der Metabase-Filter aktuell halten. Steht
   // bewusst NACH dem Import und kann ihn nicht scheitern lassen — die
   // Funktion wirft nie, siehe Kopf von sync/auswahllisten.ts. Hier
@@ -100,14 +122,6 @@ try {
    * Wirft nie, siehe Kopf von sync/einkauf_sichten.ts.
    */
   await einkaufSichtenNachlauf()
-
-  // Vierter Nachlauf: die Online-Bewertungen aus Yext. Anders als die beiden
-  // darüber hängt er nicht am Importergebnis, sondern an der Uhr — er läuft
-  // höchstens einmal am Tag und prüft das selbst. Hier angehängt aus demselben
-  // Grund wie nebenan, und aus einem eigenen: ein zweiter Zeitplan hat am
-  // 02.08.2026 LINA acht Tage stillstehen lassen, ohne dass es auffiel.
-  // Wirft nie, siehe Kopf von yext/nachlauf.ts.
-  await yextNachlauf()
 
   /**
    * ZULETZT, UND ERST HIER: bekommt jede Quelle noch Zulauf?

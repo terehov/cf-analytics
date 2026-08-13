@@ -986,3 +986,21 @@ eine, die nie ausschlägt, wird nicht gelesen. Beides ist derselbe Fehler.
 **Die gemeinsame Regel:** was aus einer Summe herausgerechnet wird, bekommt eine
 eigene Spalte oder eine eigene Sicht. Eine Bereinigung ohne Anzeige ist derselbe
 stille Zweig wie der Fehler davor — und der Befund von übermorgen.
+
+## Zwei Yext-Sichten (Migration `0078`, 14.08.2026)
+
+* **`mart.betrieb_ohne_yext`** — Betriebe ohne Zuordnung. **Erwartung: keine
+  Zeile mit `status = 'operativ'` UND `macht_umsatz = true`.** Alles andere ist
+  in Ordnung: geschlossene Betriebe, Holdings und Testeinträge haben zu Recht
+  keine Yext-Entität, und sie mitzuzählen ergäbe eine Prüfzeile, die nie auf
+  null geht.
+* **`mart.yext_abgleich`** — wann die drei Yext-Aufgaben zuletzt liefen
+  (täglicher Lauf, Vollabgleich, Zuordnung). Sie beantwortet die Frage, die man
+  dem Bestand nicht ansieht: `core.bewertung_stand` sah am 14.08.2026
+  vollständig aus (25 Monate, 2.819 Zeilen), war aber seit dem 03.08. nicht mehr
+  nachgezogen worden.
+
+**Die Prüfzeile zu `eintraege_live`** ist die Gegenprobe zu einem Tippfehler mit
+vier Monaten Wirkung: die Spalte stand in allen 1.497 Zeilen auf NULL, weil
+`POWERLISTINGS_LIVE` angefordert und `LISTINGS_LIVE` gelesen wurde. Eine leere
+Spalte hinter einer grünen Ampel fällt sonst niemandem auf.

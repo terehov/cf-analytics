@@ -293,6 +293,21 @@ lauf('Ende-zu-Ende', () => {
        * Quelle liefert nichts" ist ein Befund, „wir fragen nicht mehr" ist
        * ein Baufehler.
        */
+      /**
+       * Drei seit 0078. Die erste zaehlt ausdruecklich nur operative
+       * Betriebe MIT Umsatz — geschlossene Betriebe, Holdings und
+       * Testeintraege haben zu Recht keine Yext-Entitaet, und sie
+       * mitzuzaehlen ergaebe eine Zeile, die nie auf null geht.
+       *
+       * Die dritte ist die Gegenprobe zu einem Tippfehler mit vier Monaten
+       * Wirkung: eintraege_live stand in allen 1.497 Zeilen auf NULL, weil
+       * POWERLISTINGS_LIVE angefordert und LISTINGS_LIVE gelesen wurde.
+       */
+      // ICU-Sortierung: Kleinbuchstabe vor Grossbuchstabe an derselben
+      // Stelle, "operativer" steht deshalb vor "Sichtbarkeitszeile".
+      'Yext: operativer Betrieb mit Umsatz, aber ohne Zuordnung',
+      'Yext: Sichtbarkeitszeile ohne eintraege_live',
+      'Yext: Vollabgleich aelter als 45 Tage',
       'Zulauf: Quelle ohne Zulauf in ihrer Kadenz',
       'Zulauf: Quelle wird nicht mehr abgefragt',
     ])

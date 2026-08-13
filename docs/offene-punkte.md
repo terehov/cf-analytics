@@ -1154,3 +1154,40 @@ SELECT lauf_id, status, notiz FROM sync.lauf ORDER BY lauf_id DESC LIMIT 3;
 SELECT beendet_am::date, count(*) FROM sync.aufgabe
  WHERE endpunkt = 'fn:profil' GROUP BY 1 ORDER BY 1 DESC LIMIT 5;
 ```
+
+## Nachprüfung nach dem Deploy von `0077` und `0078` (Phase 5)
+
+```sql
+-- 1. Hauptsparten. VORHER: 31,8 % nicht aufteilbar, 2 von 10 Sparten.
+--    ERWARTUNG: der Anteil faellt, sparten_mit_umsatz steigt.
+SELECT * FROM mart.hauptsparte_abdeckung LIMIT 6;
+
+-- 2. Belegdatum. VORHER: max(monat) = 2038-01 in vier Sichten.
+SELECT max(monat) FROM mart.buchungsbeleg_monat;
+SELECT count(*) FROM mart.belegdatum_ausreisser;   -- Erwartung: 13, konstant
+
+-- 3. Schwund. VORHER: Februar 2026 mit minus 2,97 Mio EUR aus EINER Zeile.
+SELECT monat, schwund_eur, positionen_unplausibel, wert_unplausibel
+  FROM mart.inventur_schwund ORDER BY schwund_eur LIMIT 5;
+
+-- 4. Yext: laeuft der Vollabgleich von selbst? ERWARTUNG nach dem ersten
+--    Lauf: drei Zeilen, alle mit tage_her < 1.
+SELECT * FROM mart.yext_abgleich;
+
+-- 5. Yext: eintraege_live. VORHER: 0 von 1.497 gefuellt.
+SELECT count(*) AS zeilen, count(eintraege_live) AS gefuellt
+  FROM core.betrieb_sichtbarkeit;
+
+-- 6. Yext: die sieben Betriebe. ERWARTUNG: unveraendert, bis jemand die drei
+--    Verdachtsfaelle in src/yext/zuordnen.ts (VON_HAND) entscheidet.
+SELECT betrieb, status, macht_umsatz FROM mart.betrieb_ohne_yext
+ WHERE status = 'operativ';
+```
+
+**Eine Entscheidung bleibt bei einem Menschen:** drei der sieben Betriebe ohne
+Yext-Zuordnung haben einen Verdachtsfall (`L_03` → B+L Pforzheim, `EK_14` → WHK
+Gastronomie, `EK_06` → Wirtshaus am Schlossplatz). Sie stehen in
+`src/yext/zuordnen.ts` als `null` — ausdrücklich offen. Wer sie bestätigt,
+trägt die `betrieb_key` ein; der nächste Lauf holt die Bewertungen dann von
+selbst. Geraten wird nicht: eine falsche Note im Round Table löst dieselbe
+Eskalationsstufe aus wie eine echte.

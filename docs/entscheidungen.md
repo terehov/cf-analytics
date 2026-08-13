@@ -1951,3 +1951,29 @@ DRY, würde aber die Aggregation über 82.126 Positionen verdoppeln — und
 Zusammengehalten werden die beiden Stellen durch den Ende-zu-Ende-Test, der
 beide Zahlen gegen dieselbe Lage prüft. Eine doppelte Konstante mit Test ist
 besser als eine einzelne mit doppeltem Plan.
+
+### Der Yext-Vollabgleich läuft monatlich, nicht täglich
+
+Täglich wären es 3.300 Aufrufe statt 400 — bei einem Stundenlimit von 5.000
+machbar, aber ohne Nutzen: ein Stand ist kumuliert, der März ändert sich nicht
+mehr. Was ihn doch ändert, sind **gelöschte** Bewertungen, und die tröpfeln über
+Wochen.
+
+**Der Takt hängt an einem Merker und nicht am Monatsersten.** Ein
+„am Ersten"-Takt hätte den Ausfall genau eines Laufs zum Ausfall eines ganzen
+Monats gemacht — dieselbe Überlegung wie bei den 20 Stunden des täglichen Laufs,
+die bewusst keine 24 sind.
+
+### Die sieben Betriebe ohne Yext-Zuordnung werden nicht geraten
+
+Für drei der sieben gibt es in `src/yext/zuordnen.ts` einen Verdacht, der
+ausdrücklich als `null` — also OFFEN — eingetragen ist: `L_03` „Lehners
+Wirtshaus Pforzheim" könnte B+L Pforzheim sein, `EK_14` „Würzburger
+Hofbräukeller" die WHK Gastronomie, `EK_06` „Carls Brauhaus" das Wirtshaus am
+Schlossplatz.
+
+**Ein Automat, der hier rät, hängt einem Betrieb die Bewertungen eines anderen
+an** — und eine falsche Note im Round Table löst dieselbe Eskalationsstufe aus
+wie eine echte. Dieselbe Entscheidung wie bei den Kostenstellen ohne Betrieb
+(`0073`): sichtbar machen, nicht raten. `mart.betrieb_ohne_yext` ist die
+Arbeitsliste, `VON_HAND` die Stelle, an der ein Mensch entscheidet.

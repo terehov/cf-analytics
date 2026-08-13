@@ -331,7 +331,14 @@ Normalzustand — der Lauf darf sie nicht als „ok" melden.**
 > **Quelle** behandelt (`beleg_datum` wird NULL, Rohwert in `beleg_datum_roh`),
 > nicht in den Sichten: alle vier filtern ohnehin auf `IS NOT NULL`, es musste
 > keine geändert werden. `mart.inventur_schwund` kennt jetzt das
-> `unplausibel`-Kennzeichen. 5.2 und 5.3 folgen mit `0078`.
+> `unplausibel`-Kennzeichen.
+>
+> **5.2 und 5.3 erledigt am 14.08.2026, Migration `0078`.** Vollabgleich und
+> Zuordnung laufen monatlich im Nachtlauf statt auf Zuruf; `yextNachlauf()`
+> steht vor dem Round-Table-Refresh. `eintraege_live` war kein fehlendes Feld,
+> sondern ein Tippfehler: angefordert wurde `POWERLISTINGS_LIVE`, gelesen
+> `LISTINGS_LIVE`. Die sieben Betriebe ohne Zuordnung stehen in
+> `mart.betrieb_ohne_yext` — sie werden **nicht** geraten.
 
 | # | Was |
 |---|---|
