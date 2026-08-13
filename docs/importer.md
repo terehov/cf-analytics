@@ -540,3 +540,14 @@ FoodNotify, Tagesbudget 140.000, verbraucht 155 bis 1.000:
 Danach fällt beides auf null zurück, weil die Bedingungen nicht mehr zutreffen. Kein
 Dauerverbrauch — und das ist nachprüfbar, nicht behauptet: `mart.posten_aufgegeben` zeigt,
 wie viele noch Leben haben.
+
+### Der Statusbericht sagt seit dem 13.08.2026 etwas anderes
+
+`src/status.ts` zählte unter `aufgegebene_posten` alles, was auf `aufgegeben` stand, und
+schrieb darüber „diese Zeiträume fehlen dauerhaft". Für Posten, die der Lauf noch bis zu
+dreimal zurückholt, ist der Satz schlicht falsch. Gezählt wird deshalb jetzt nur das
+**endgültige**; die übrigen erscheinen als Randnotiz („4 werden erneut versucht") und färben
+die Ampel nicht.
+
+Eine Warnung, die zu viel behauptet, wird genauso ignoriert wie eine, die nie ausschlägt —
+dieselbe Lehre wie bei der Wareneinsatz-Prüfung, die bis Migration `0029` immer grün zeigte.

@@ -127,23 +127,42 @@ export async function statusErheben(): Promise<Statusbericht> {
 
   // --- 4. Wurde etwas aufgegeben? -----------------------------------------
   //
-  // Ein aufgegebener Posten ist ein Zeitraum, den niemand mehr holt. Keine
-  // Störung — aber ohne diese Zeile fällt es nie auf, weil eine Lücke in den
-  // Daten aussieht wie ein Tag ohne Umsatz.
-  const aufgegeben = await eine<{ n: number }>(
-    `SELECT count(*)::int AS n FROM sync.warteschlange
-      WHERE ergebnis = 'aufgegeben' AND erledigt_am > now() - interval '24 hours'`)
-  p.push(Number(aufgegeben?.n ?? 0) > 0
+  /**
+   * Ein aufgegebener Posten ist ein Zeitraum, den niemand mehr holt. Keine
+   * Störung — aber ohne diese Zeile fällt es nie auf, weil eine Lücke in den
+   * Daten aussieht wie ein Tag ohne Umsatz.
+   *
+   * GEZÄHLT WIRD SEIT DEM 13.08.2026 NUR NOCH DAS ENDGÜLTIGE. Vorher stand
+   * hier „diese Zeiträume fehlen dauerhaft" über allem, was auf `aufgegeben`
+   * stand. Seit Migration 0070 holt der nächtliche Lauf jeden Posten bis zu
+   * MAX_WIEDERBELEBUNGEN mal zurück — für die ist der Satz schlicht falsch,
+   * und eine Warnung, die zu viel behauptet, wird genauso ignoriert wie eine,
+   * die nie ausschlägt.
+   */
+  const aufgegeben = await eine<{ endgueltig: number; offen: number }>(
+    `SELECT count(*) FILTER (WHERE wiederbelebt >= $1)::int AS endgueltig,
+            count(*) FILTER (WHERE wiederbelebt <  $1)::int AS offen
+       FROM sync.warteschlange WHERE ergebnis = 'aufgegeben'`,
+    [config.MAX_WIEDERBELEBUNGEN])
+  const endgueltig = Number(aufgegeben?.endgueltig ?? 0)
+  const nochOffen = Number(aufgegeben?.offen ?? 0)
+  p.push(endgueltig > 0
     ? {
         name: 'aufgegebene_posten',
         stufe: 'warnung',
-        meldung: `${aufgegeben!.n} Posten in 24 h aufgegeben — diese Zeiträume fehlen dauerhaft`,
+        meldung: `${endgueltig} Posten endgültig aufgegeben — diese Zeiträume fehlen dauerhaft`
+               + (nochOffen > 0 ? `, ${nochOffen} weitere werden noch erneut versucht` : ''),
         naechster_schritt:
-          "SELECT endpunkt, zeitraum_von, letzter_fehler FROM sync.warteschlange " +
-          "WHERE ergebnis = 'aufgegeben' ORDER BY erledigt_am DESC LIMIT 20;",
-        werte: { anzahl: aufgegeben!.n },
+          "SELECT * FROM mart.posten_aufgegeben WHERE zustand = 'endgueltig';",
+        werte: { endgueltig, wird_erneut_versucht: nochOffen },
       }
-    : { name: 'aufgegebene_posten', stufe: 'ok', meldung: 'nichts aufgegeben' })
+    : {
+        name: 'aufgegebene_posten', stufe: 'ok',
+        meldung: nochOffen > 0
+          ? `nichts endgültig aufgegeben (${nochOffen} werden erneut versucht)`
+          : 'nichts aufgegeben',
+        werte: { endgueltig: 0, wird_erneut_versucht: nochOffen },
+      })
 
   // --- 5. Hat sich LINAs Antwortstruktur geändert? ------------------------
   const abweichung = await eine<{ n: number }>(
