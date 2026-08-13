@@ -715,3 +715,61 @@ Die Migrationen 0055 bis 0064 bleiben unverändert: sie sind angewendet, und die
 Datei ist das Protokoll. `docs/` dagegen ist Arbeitsmaterial und wurde am
 12.08.2026 durchgehend umgestellt — was hier stehen bleibt, steht beim nächsten
 Schreiben wieder in einer Karte.
+
+---
+
+## Zwei Sichten für den Zulauf (Migration `0069`, 13.08.2026)
+
+Beide entstehen aus demselben Satz: **eine Quelle ohne Zulauf ist ein Fehler, kein
+Normalzustand.** Am 12. und 13.08.2026 stand das Belegarchiv still, während der Lauf 269 von
+269 Aufgaben als „ok" meldete. Ein Log-WARN hätte daran nichts geändert — niemand liest Logs.
+Deshalb stehen `differenz` und `zustand` jetzt dort, wo auch die Zahlen stehen.
+
+### `mart.belegarchiv_zulauf`
+
+Eine Zeile je Betrieb und Ordner, 1.834 insgesamt. Die Arbeitsliste steht in **einer** Spalte:
+
+| `zustand` | bedeutet |
+|---|---|
+| `vollstaendig` | LINAs Zählung und unser Bestand stimmen überein |
+| `abzug eingereiht` | Abweichung erkannt, der Abzug steht in der Schlange |
+| `abzug fehlt` | Abweichung erkannt, aber **kein** offener Posten — der Befund, auf den man sehen will |
+| `gezaehlt, nicht freigegeben` | dort liegen Belege, `core.belegart.inhalt_holen` ist false |
+| `nie gezaehlt` | noch keine Zählung |
+
+`differenz` rechnet Zählstand minus Bestand. **Negativ** heißt, wir halten mehr als LINA
+zählt — möglich, wenn dort ein Beleg gelöscht wurde. Auch das löst einen Abzug aus, weil die
+Bedingung auf ungleich prüft und nicht auf kleiner.
+
+Beide Zählspalten sind auf `integer` gecastet. `count(*)` ist `bigint`, und `bigint` kommt bei
+node-postgres als **Zeichenkette** an — in einem Test fällt das auf, in einer Metabase-Kachel
+wird daraus stillschweigend eine Textspalte, die sich nicht summieren lässt.
+
+### `mart.inventur_abgeschnitten`
+
+Erwartung: **leer**. Beim Anlegen standen hier neun Zeilen mit zusammen 936 fehlenden
+Positionen, alle bei `geladen = 800` — der Seitengrenze von
+`/api/erp/stocktakings/{uuid}/items`.
+
+`endet_auf_seitengrenze` trennt die beiden Ursachen: `true` heißt abgeschnittene Paginierung
+(ein Fehler bei uns), `false` heißt, dass FoodNotify im Kopf etwas anderes zählt als in den
+Zeilen (eine Eigenart der Quelle). Ohne diese Spalte sähe beides gleich aus, und die Sicht
+wäre nach der Reparatur nicht mehr von einem Datenfehler zu unterscheiden.
+
+### Vier neue Zeilen in `mart.pruefung_uebersicht`
+
+Die Übersicht ist die Gewohnheit, die es schon gibt („nach jedem größeren Backfill zuerst",
+AGENTS.md). **Ein Wächter, der eine eigene Gewohnheit braucht, entsteht nie** — deshalb
+kommen die neuen Befunde dorthin und nicht auf eine eigene Seite:
+
+* Belegarchiv: Ordner ohne den fälligen Abzug
+* Belegarchiv: seit über 36 h nicht gezählt
+* Inventur: Zählung abgeschnitten
+* Bestellung: Kopf ohne eine einzige Position
+* Warteschlange: aufgegebene Posten
+
+Die 36 Stunden sind bewusst großzügig: der Lauf ist täglich um 05:02, und ein einzelner
+ausgefallener Lauf soll die Zeile nicht sofort rot färben. Zwei ausgefallene schon.
+
+Keine dieser Sichten hängt bisher an einer Karte. Das ist Absicht — das Zulauf-Dashboard ist
+Phase 4 des Plans, und dieser Commit stellt nur die Zahlen bereit, gegen die es gebaut wird.

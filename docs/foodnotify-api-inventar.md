@@ -689,3 +689,38 @@ LINA-Befund.
 ein geteiltes Administratorkonto. Für einen Importer wäre ein eigener,
 lesender Subuser sauberer; `/api/subusers` und `/api/subuser-roles` zeigen, dass
 FoodNotify das unterstützt. Das würde auch die 2FA-Frage entschärfen.
+
+---
+
+## Korrektur 13.08.2026: die Hülle der Inventur-Endpunkte ist gemessen
+
+~~Die Hülle ist nach dem Pfadmuster `/api/erp/*` vermutlich
+`{code, errors, isError, payload: {data, pagination}}` — das ist aus dem Muster der übrigen
+`/api/erp/*`-Endpunkte abgeleitet, am echten `stocktakings`-Pfad selbst aber NICHT gemessen.~~
+
+**Widerlegt.** Am 13.08.2026 am Rohbestand in Produktion geprüft, über alle 358 Antworten:
+
+```sql
+SELECT jsonb_object_keys(payload) FROM raw.api_antwort WHERE endpunkt = 'fn:inventurpositionen';
+-- pagination, data   (358 von 358)
+```
+
+**Beide** stocktakings-Pfade antworten mit `{data, pagination}` auf der **obersten** Ebene —
+also mit der recipes-Form, nicht mit der erp-Form. Für `/api/erp/stocktakings` gilt dasselbe.
+
+Folgenlos geblieben ist das nur, weil `auspacken()` beide Formen erkennt (`istPayloadHuelle`
+und `istPaginationHuelle`). Die Attrappe bildete bis zum 13.08.2026 die falsche Form nach;
+sie ist jetzt auf die gemessene umgestellt.
+
+### `/api/erp/stocktakings/{uuid}/items` ist paginiert — `perPage` ist 800
+
+Die Angabe steht in jeder Antwort und wurde bis zum 13.08.2026 nicht gelesen:
+
+```json
+{"pagination": {"perPage": 800, "totalItems": 817, "totalPages": 2, "currentPage": 1}}
+```
+
+Der Pfad kennt seither `?page=`. `page_size` wird **bewusst nicht** gesetzt: 800 ist die
+Angabe des Servers über sich selbst, eine eigene Zahl wäre eine Annahme über fremdes
+Verhalten. Was das gekostet hat, steht in `docs/fehlerkatalog.md` — neun Inventuren, 936
+Positionen, lautlos.

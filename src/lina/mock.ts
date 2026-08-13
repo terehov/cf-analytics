@@ -214,12 +214,57 @@ export function mockStarten(opt: MockOptionen = {}) {
           { headers: { 'content-type': 'text/html' } })
       }
 
+      /**
+       * Belegliste UND Zaehlung — derselbe Pfad, unterschieden nur durch
+       * `length`. Genau so ist es auch bei LINA: `la:belegzahl` ruft mit
+       * length=1 auf, `la:belegliste` mit 100.000.
+       *
+       * DIE ATTRAPPE BEACHTET length SEIT DEM 13.08.2026. Vorher gab sie
+       * immer alle 61 Zeilen zurueck, gleich was angefragt war — damit haette
+       * eine Zaehlung im Test 61 Belege geliefert und der Unterschied
+       * zwischen beiden Endpunkten waere unpruefbar geblieben. `recordsTotal`
+       * bleibt dabei die VOLLE Zahl, denn genau das ist die Aussage, auf der
+       * der Zulaufabgleich beruht: wie viele es insgesamt sind, unabhaengig
+       * davon, wie viele geliefert wurden.
+       */
       if (pfad === '/intranet/ladenakte/beleglist') {
-        zaehler['la_belegliste'] = (zaehler['la_belegliste'] ?? 0) + 1
+        const laenge = Number(url.searchParams.get('length') ?? 0)
+        zaehler[laenge === 1 ? 'la_belegzahl' : 'la_belegliste'] =
+          (zaehler[laenge === 1 ? 'la_belegzahl' : 'la_belegliste'] ?? 0) + 1
         if (!url.searchParams.get('storeId')) {
           return new Response('storeId fehlt', { status: 400 })
         }
-        return Response.json(fixture('ladenakte_beleglist'))
+        const f = fixture('ladenakte_beleglist') as { data: Record<string, unknown>[] }
+        const start = Number(url.searchParams.get('start') ?? 0)
+
+        /**
+         * JEDER ORDNER HAT EIGENE BELEGE — sonst prueft der Test sich selbst.
+         *
+         * Der Upsert-Schluessel von core.buchungsbeleg ist (betrieb_key,
+         * lina_id), typ_id gehoert ausdruecklich NICHT dazu (Migration 0053,
+         * Falle 5): ein in einen anderen Ordner umgelegter Beleg soll nicht
+         * dupliziert werden. Lieferte die Attrappe fuer alle vierzehn typeId
+         * dieselben 61 lina_id, verschoebe jeder Abzug also nur die typ_id
+         * derselben 61 Zeilen — und der Zulaufabgleich saehe fuer dreizehn
+         * Ordner dauerhaft "null gehalten, 61 gezaehlt".
+         *
+         * Ordner 1 behaelt die echten 61 Eingangsrechnungen der Schlager Cafe
+         * Beteiligungs AG, an denen die Feldpruefungen haengen. Die uebrigen
+         * bekommen zwei Zeilen mit eigenen IDs — so wie in Wirklichkeit, wo
+         * die Erhebung vom 11.08.2026 pro Betrieb sehr unterschiedlich volle
+         * und 427 von 1.048 nachweislich leere Ordner gezaehlt hat.
+         */
+        const typ = url.searchParams.get('typeId') ?? '1'
+        const alle = typ === '1' ? f.data : f.data.slice(0, 2).map((z, i) => ({
+          ...z, id: `${typ}00${i}`, encryptedId: `enc-${typ}-${i}`,
+        }))
+
+        return Response.json({
+          ...f,
+          recordsTotal: alle.length,
+          recordsFiltered: alle.length,
+          data: laenge > 0 ? alle.slice(start, start + laenge) : alle,
+        })
       }
 
       if (pfad === '/finanzen/bwa/longterm') {

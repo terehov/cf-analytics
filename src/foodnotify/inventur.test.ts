@@ -86,8 +86,8 @@ describe('inventurpositionen (/{uuid}/items)', () => {
 
   test('Sollbestand, gezählte Menge, Nachzählung und Preis je Basiseinheit', () => {
     const p = inventurpositionen(antwort)
-    expect(p).toHaveLength(1)
-    expect(p[0]).toEqual({
+    expect(p.positionen).toHaveLength(1)
+    expect(p.positionen[0]).toEqual({
       fnId: '019fba58-000', name: 'Granini Orangensaft Mw 6X1,00',
       shopName: 'HFS Getränke', basisEinheit: 'ml',
       sollMenge: 29612.59, gezaehlteMenge: 6000, nachzaehlungMenge: 6000,
@@ -97,16 +97,54 @@ describe('inventurpositionen (/{uuid}/items)', () => {
 
   test('ohne shopArticleId bleibt lieferantenNr null — kein erfundener Schlüssel', () => {
     const ohne = huelle([{ ...(antwort.payload as any[])[0], shopArticleId: null }])
-    expect(inventurpositionen(ohne)[0]!.lieferantenNr).toBeNull()
+    expect(inventurpositionen(ohne).positionen[0]!.lieferantenNr).toBeNull()
   })
 
   test('eine Zeile ohne name ist keine Position', () => {
     const kaputt = huelle([{ id: 'x' }])
-    expect(inventurpositionen(kaputt)).toEqual([])
+    expect(inventurpositionen(kaputt).positionen).toEqual([])
   })
 
   test('reviewAmountInBaseUnits fehlt oft — dann null, nicht 0', () => {
     const ohneNachzaehlung = huelle([{ ...(antwort.payload as any[])[0], reviewAmountInBaseUnits: null }])
-    expect(inventurpositionen(ohneNachzaehlung)[0]!.nachzaehlungMenge).toBeNull()
+    expect(inventurpositionen(ohneNachzaehlung).positionen[0]!.nachzaehlungMenge).toBeNull()
+  })
+
+  /**
+   * DER 800er-ABSCHNITT — der Fehler, der bis zum 13.08.2026 lief.
+   *
+   * Die Hülle ist WÖRTLICH die aus Produktion: `{data, pagination}` OHNE
+   * payload-Umschlag, am Rohbestand aller 358 Antworten geprüft. Die
+   * Zahlen stammen aus der Inventur 019ca7da (02.2026): perPage 800,
+   * totalItems 817, totalPages 2 — und 800 geladene Positionen.
+   *
+   * Solange dieser Test steht, kann die Seitenangabe nicht noch einmal
+   * still verlorengehen: sie wurde von `auspacken()` immer korrekt
+   * gelesen, nur vom Rückgabewert weggeworfen.
+   */
+  test('die Seitenangabe kommt mit zurück — sonst endet eine Inventur lautlos bei 800', () => {
+    const echt = {
+      data: [{ id: 'p1', name: 'Kartoffel', shopArticleId: '1' }],
+      pagination: { perPage: 800, totalItems: 817, totalPages: 2, currentPage: 1 },
+    }
+    const p = inventurpositionen(echt)
+    expect(p.aktuelleSeite).toBe(1)
+    expect(p.gesamtSeiten).toBe(2)
+    expect(p.gesamt).toBe(817)
+    expect(p.positionen).toHaveLength(1)
+  })
+
+  test('Seite 2 meldet sich als Seite 2 — daran hängt, dass Seite 1 nicht gelöscht wird', () => {
+    const zweite = {
+      data: [{ id: 'p801', name: 'Zwiebel', shopArticleId: '2' }],
+      pagination: { perPage: 800, totalItems: 817, totalPages: 2, currentPage: 2 },
+    }
+    expect(inventurpositionen(zweite).aktuelleSeite).toBe(2)
+  })
+
+  test('ohne pagination ist es eine einzige Seite, nicht null Seiten', () => {
+    const p = inventurpositionen(antwort)
+    expect(p.aktuelleSeite).toBe(1)
+    expect(p.gesamtSeiten).toBe(1)
   })
 })

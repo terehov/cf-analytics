@@ -127,12 +127,30 @@ export type InventurpositionZeile = {
   lieferantenNr: string | null
 }
 
+export type InventurpositionSeite = {
+  aktuelleSeite: number
+  gesamtSeiten: number
+  gesamt: number | null
+  positionen: InventurpositionZeile[]
+}
+
 /**
  * /api/erp/stocktakings/{uuid}/items — die Zählung. Ein Element ohne
  * `name` ist keine Position, sondern ein kaputter Datensatz.
+ *
+ * GIBT SEIT DEM 13.08.2026 DIE SEITENANGABE MIT ZURÜCK, und das ist der
+ * eigentliche Punkt dieser Funktion. Vorher lieferte sie eine nackte Liste:
+ * `auspacken()` las die `pagination` korrekt aus, und der Rückgabewert warf
+ * sie weg. Damit war nirgends mehr ablesbar, dass es eine zweite Seite gibt —
+ * neun Inventuren endeten bei exakt 800 Positionen, ohne Fehler, ohne Log.
+ *
+ * Dieselbe Form wie `inventurListe()` gleich darüber, damit das Laden beide
+ * gleich behandeln kann: wer eine Seite bekommt, muss auch erfahren, die
+ * wievielte von wie vielen es war.
  */
-export function inventurpositionen(daten: unknown): InventurpositionZeile[] {
-  return alsListe(auspacken(daten).daten).flatMap(e => {
+export function inventurpositionen(daten: unknown): InventurpositionSeite {
+  const a = auspacken(daten)
+  const positionen = alsListe(a.daten).flatMap(e => {
     const o = alsObjekt(e); if (!o) return []
     const name = alsText(o.name)
     if (!name) return []
@@ -148,4 +166,10 @@ export function inventurpositionen(daten: unknown): InventurpositionZeile[] {
       lieferantenNr: alsText(o.shopArticleId),
     }]
   })
+  return {
+    aktuelleSeite: a.seiten?.aktuelleSeite ?? 1,
+    gesamtSeiten: a.seiten?.gesamtSeiten ?? 1,
+    gesamt: a.seiten?.gesamt ?? null,
+    positionen,
+  }
 }

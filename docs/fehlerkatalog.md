@@ -2530,3 +2530,116 @@ Ausgang weiss; er deckt nebenbei auch `aufgegeben` ab, das sonst dauerhaft gespe
 einem Ergebniswert hängt, kennt immer einen Ausgang, an den niemand gedacht hat. Erst war es
 „erledigt", dann `keine_daten`, beim nächsten Mal wäre es `aufgegeben` gewesen. Die Frage
 „wann ist das wieder fällig?" beantwortet ein Kalender, kein Statusfeld.
+
+---
+
+## 13.08.2026 — drei Quellen ohne Zulauf, und alle drei meldeten „ok"
+
+Gefunden beim Audit zu `docs/plan-datenvollstaendigkeit.md`, alle Zahlen in Produktion
+nachgemessen. Die drei Fehler haben nichts miteinander zu tun außer der Form: **keiner
+davon hat sich gemeldet.** Kein Stacktrace, kein Fehlerzähler, kein roter Lauf. Lauf 88
+meldete am 13.08. um 05:07 genau 269 von 269 Aufgaben erledigt, null Fehler — während
+zwei Quellen still standen und eine still abschnitt.
+
+### Das Belegarchiv fror ein, als der Abzug fertig war
+
+**Symptom.** `core.buchungsbeleg` bekam am 12. und 13.08.2026 **null** neue Belege. Die 28
+Tage davor lagen im Mittel bei 331 am Tag (Minimum 43, Maximum 702). Der Anteil des
+Belegarchivs in `mart.fremdeinkauf` — der Sicht an 18 Kartenstellen — fiel von stabil 76–82 %
+auf 52,3 % im August. Fehlende Fremdrechnungen sehen dort aus wie gesunkener Fremdeinkauf.
+
+**Ursache.** `ladenakteNachfuellen()` reihte `la:belegliste` nur für solche Paare aus Betrieb
+und Ordner ein, für die es **noch keinen** Bestandssatz mit `records_total > 0` gab. Das ist
+die Bedingung eines EINMALIGEN Abzugs, nicht die eines laufenden Abgleichs. Der Abzug lief am
+12.08. um 13:25 fertig — von da an lieferte die Bedingung 0 Zeilen. Nachgemessen: die Läufe
+85 bis 88 hatten je **null** `la:*`-Aufgaben, alle 621 Posten standen auf „ok".
+
+Torwächter war `manual.belegarchiv_soll`: 1.048 Zeilen, `gemessen_am` durchgehend
+2026-08-11, einmal von Hand aus `docs/ladenakte-bestand.csv` in Migration `0053` geschrieben
+und seither **von keinem Code fortgeschrieben**. Daraus folgten zwei weitere Lücken, die
+niemand als Lücke sah: 6 der 14 Belegarten hatten null Soll-Zeilen und konnten bauartbedingt
+nie geholt werden, und 10 Betriebe hatten überhaupt keine Soll-Zeile.
+
+**Was ihn verhindert.** Der Torwächter ist jetzt die **Messung** und keine Liste. Ein neuer
+Endpunkt `la:belegzahl` zählt täglich jeden Ordner mit `length=1` — eine Zeile statt bis zu
+8,2 MB —, und `laLaden()` reiht den vollen Abzug nach, sobald `records_total` von dem
+abweicht, was `core.buchungsbeleg` für dieses Paar hält. Die Menge entsteht als Kreuzprodukt
+aus `core.betrieb` und `core.belegart`, beide live gelesen: neue Betriebe und neue Ordner
+kommen von selbst dazu.
+
+Geprüft wird auf **ungleich**, nicht auf **gewachsen**. Das ist keine Vorsicht, sondern
+gemessen: für alle 621 abgezogenen Ordner stimmten `count(*)` und `records_total` am
+13.08.2026 auf den Beleg genau überein, kein einziger Ausreißer. Damit fängt dieselbe
+Bedingung auch den mittendrin abgebrochenen Abzug und den in LINA gelöschten Beleg.
+
+**Warum kein Delta-Fenster (`start=<bekannt>`).** Naheliegend und falsch: `start` ist eine
+Zeilennummer, keine Beleg-ID. Wird in der Mitte eines Ordners einer gelöscht und einer
+angehängt, bleibt `recordsTotal` gleich, das Fenster verschiebt sich, und der neue Beleg
+fehlt für immer. Die Gegenprobe dazu ist gemessen: `lina_id` läuft innerhalb eines Ordners
+nicht verlässlich mit der Uploadzeit (Korrelation im Mittel 0,991, aber acht Ordner unter
+0,9, kleinster Wert 0,779). Die Annahme trägt nicht.
+
+**Die allgemeine Lehre.** Ein Zustand, der „einmal fertig" bedeutet, darf nicht die Bedingung
+für „läuft weiter" sein. Der Unterschied fällt genau an dem Tag auf, an dem es fertig wird —
+und dann sieht Stillstand aus wie Erfolg.
+
+### Jede Inventur endete bei genau 800 Positionen
+
+**Symptom.** Keines. HTTP 200, kein Fehler, kein Log. Nur: keine der 358 Inventuren in
+Produktion hatte mehr als 800 Positionen, und das Maximum war **exakt** 800.
+
+**Ursache.** `/api/erp/stocktakings/{uuid}/items` ist paginiert und sagt es auch —
+`{perPage: 800, totalItems: 817, totalPages: 2}`. Der Pfadbau in
+`src/foodnotify/endpunkte.ts` kannte keinen `page`-Parameter, und beim Laden gab es keine
+Folgeseiten-Kette wie bei `fn:bestellungen`. `auspacken()` las die Seitenangabe die ganze
+Zeit korrekt aus; `inventurpositionen()` warf sie im Rückgabewert weg.
+
+**Was gefehlt hat.** Neun Inventuren, zusammen **936 Positionen**, vom 02.02. bis 03.08.2026.
+Betroffen waren die größten Inventuren, also die mit dem höchsten Warenwert —
+`mart.inventur_schwund` rechnete für sie einen zu kleinen Bestand. Der Kopf wusste es besser
+als die Zeilen: `core.inventur.anzahl_positionen` geht bis 1.426.
+
+**Was ihn verhindert.** Der Pfad trägt `page` als **Pflichtparameter** (kein stiller Rückfall
+auf 1 — das wäre der alte Zustand mit einem Parameter davor), `inventurpositionen()` gibt die
+Seitenangabe mit zurück, und Seite 1 reiht die Folgeseiten rückwärts ein, genauso gebaut wie
+bei `fn:bestellungen` und `fn:inventuren`. Dazu `mart.inventur_abgeschnitten` mit der
+Erwartung „leer".
+
+**Die Falle in der Reparatur, und sie wäre teurer gewesen als der Fehler.** Das Laden ersetzt
+die Zählung einer Inventur vollständig (`DELETE`, dann `INSERT`) — richtig, solange eine
+Antwort der ganze Stand ist. Sobald geblättert wird, ist sie das nicht mehr: ein `DELETE` je
+Seite ließe am Ende nur die LETZTE Seite stehen. Bei der 817er-Inventur wären das 17 statt
+817 Positionen, und es sähe aus wie eine sehr kleine Inventur. Gelöscht wird deshalb nur auf
+Seite 1, in derselben Transaktion, in der die Folgeseiten eingereiht werden.
+
+**Was die Attrappe nicht konnte.** Sie lieferte für `/items` eine nackte Liste ohne
+Seitenangabe. Eine Attrappe, die den Fehlerfall nicht herstellen kann, beweist nichts —
+`inv-1` hat jetzt zwei Seiten zu je einer Position.
+
+### 275 aufgegebene Posten, die niemand je wieder ansieht
+
+**Symptom.** 322 Bestellungen über **686.535,93 €** standen mit Kopf, aber ohne eine einzige
+Position in der Datenbank. Sie zählen in `mart.einkauf_beleg` voll mit und fehlen in jeder
+Positions- und Preissicht.
+
+**Ursache.** `ergebnis = 'aufgegeben'` setzt `erledigt_am`. Der Posten gilt damit als
+erledigt, und **kein Code sieht ihn je wieder an** — weder das Nachfüllen noch der Worker.
+Gemessen: 275 Posten, ausnahmslos `fn:bestellpositionen`, alle mit HTTP 500 nach vier
+Versuchen zwischen dem 02. und 04.08.2026, also im großen Backfill. 1.100 Versuche insgesamt,
+keine einzige Rohantwort gespeichert. Die restlichen 47 der 322 sind mit `ok` geladene,
+tatsächlich leere Bestellungen — das ist kein Fehler.
+
+**Was ihn verhindert.** `bun run einreihen --aufgegebene [--endpunkt …]` belebt aufgegebene
+Posten wieder (`versuche = 0`, `erledigt_am = NULL`), und
+`mart.pruefung_uebersicht` führt „Warteschlange: aufgegebene Posten" als eigene Zeile — sie
+standen vorher nur in `src/status.ts`, das niemand liest, wenn nichts weh tut.
+
+**Warum Wiedervorlage und nicht „Quellengrenze".** HTTP 500 ist eine Aussage über den Server,
+nicht über die Bestellung: derselbe Endpunkt hat für 66.000 andere Bestellungen geliefert,
+und die Fehler ballen sich auf zwei Tage schwerer Backfill-Last. Eine Quellengrenze sähe
+anders aus — 404 oder 403, gleichmäßig verteilt. Zu FoodNotify gibt es keinen Kontakt, die
+Frage lässt sich also nur durch einen erneuten Versuch beantworten.
+
+**Warum ein Handbefehl und kein automatischer Rücklauf.** Ohne Obergrenze wäre ein
+nächtlicher Rücklauf derselbe Bau wie der 403-Zweig in `src/sync/worker.ts`, der seit neun
+Tagen bei netto ±0 Versuchen steht. Die Obergrenze ist Phase 3.3 des Plans.

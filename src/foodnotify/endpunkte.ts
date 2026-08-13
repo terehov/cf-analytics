@@ -144,9 +144,34 @@ export const FN_ENDPUNKTE: FnEndpunkt[] = [
     key: 'fn:inventurpositionen',
     zweck: 'Zählung einer Inventur — Sollbestand, gezählte Menge, Preis je Basiseinheit',
     prioritaet: 94,
-    pfad: p => `/api/erp/stocktakings/${pflicht(p, 'uuid')}/items`,
+    /**
+     * DIESER ENDPUNKT IST PAGINIERT, UND ER SAGT ES AUCH.
+     *
+     * Bis zum 13.08.2026 fehlte hier der `page`-Parameter. Die Antwort trägt
+     * `{pagination: {perPage: 800, totalItems: 817, totalPages: 2}}` — geholt
+     * wurde immer nur Seite 1, also höchstens 800 Positionen. Der Fehler war
+     * lautlos: HTTP 200, kein Fehler, kein Log, nur eine Inventur, die genau
+     * bei 800 endet.
+     *
+     * In Produktion nachgemessen am 13.08.2026: keine der 358 Inventuren hat
+     * mehr als 800 Positionen, das Maximum ist exakt 800. Neun stossen an,
+     * ihnen fehlen zusammen 936 Positionen — und es sind die grössten, also
+     * die mit dem höchsten Warenwert. `mart.inventur_schwund` rechnete für
+     * sie einen zu kleinen Bestand.
+     *
+     * `page_size` wird BEWUSST NICHT gesetzt: 800 ist die Angabe des Servers
+     * über sich selbst. Eine eigene Zahl wäre eine Annahme über fremdes
+     * Verhalten — dieselbe Unterscheidung wie bei `page_count` in
+     * nachfuellen.ts. Geblättert wird nach `totalPages` aus der Antwort.
+     */
+    pfad: p => {
+      const q = new URLSearchParams({ page: pflicht(p, 'seite') })
+      return `/api/erp/stocktakings/${pflicht(p, 'uuid')}/items?${q}`
+    },
     hinweis: 'shopArticleId zeigt auf core.ware (quelle=lieferant), NICHT auf core.artikel — '
-      + 'dieselbe Art Lieferanten-Artikelnummer wie zutat.artikelId (plan-foodnotify.md Zeile 146).',
+      + 'dieselbe Art Lieferanten-Artikelnummer wie zutat.artikelId (plan-foodnotify.md Zeile 146). '
+      + 'PAGINIERT mit perPage 800; die Hülle ist {data, pagination} (die recipes-Form), '
+      + 'nicht die erp-Form {payload:{data,pagination}} — am Rohbestand geprüft, 358 von 358.',
   },
 ]
 

@@ -149,7 +149,65 @@ export const FIBU_BELEGARTEN: { typId: string; name: string }[] = [
  */
 export const SEITENGROESSE = 100_000
 
+/**
+ * Die Zaehlung holt EINE Zeile — gebraucht wird nur `recordsTotal` daneben.
+ *
+ * Nicht 0: DataTables deutet `length=0` je nach Fassung als "keine Begrenzung"
+ * und lieferte dann den ganzen Ordner, also genau das, was die Zaehlung
+ * vermeiden soll. Eine Zeile ist die kleinste Menge, die sicher eine Menge ist.
+ * Die gelieferte Zeile wird verworfen; geschrieben wird nur der Zaehlstand.
+ */
+export const ZAEHLGROESSE = 1
+
 export const LADENAKTE_ENDPUNKTE: Endpunkt[] = [
+  /**
+   * DIE ZAEHLUNG — der Grund, warum das Belegarchiv ueberhaupt Zulauf bekommt.
+   *
+   * Bis zum 13.08.2026 entschied `manual.belegarchiv_soll` darueber, welcher
+   * Ordner abgerufen wird: eine Handzaehlung vom 11.08.2026, die kein Code je
+   * fortgeschrieben hat. Der Abzug lief am 12.08. um 13:25 fertig — seither
+   * lieferte die Einreihbedingung null Zeilen, und `core.buchungsbeleg` bekam
+   * KEINEN Beleg mehr. Die Laeufe 85 bis 88 hatten je null `la:*`-Aufgaben und
+   * meldeten trotzdem "ok". Der Verlust lag bei rund 331 Belegen am Tag.
+   *
+   * WARUM EIN ZWEITER ENDPUNKT UND NICHT EINFACH TAEGLICH ALLES NEU HOLEN:
+   * ein voller Ordnerabzug ist bis zu 8,2 MB und dauerte im Erstabzug im
+   * Schnitt 3,0 s (Maximum 27,5 s) — 621 Ordner brauchten acht Stunden. Die
+   * Zaehlung kostet eine Zeile und beantwortet dieselbe Frage: hat sich
+   * `recordsTotal` gegenueber dem bewegt, was wir halten?
+   *
+   * WARUM NICHT NUR DAS DELTA HOLEN (start=<bekannt>&length=…): der Versatz
+   * waere eine Zeilennummer, keine Beleg-ID. Wird in der Mitte eines Ordners
+   * ein Beleg geloescht und ein neuer angehaengt, bleibt `recordsTotal`
+   * gleich, das Fenster verschiebt sich, und der neue Beleg fehlt fuer immer —
+   * lautlos. Gegenprobe am 13.08.2026: `lina_id` laeuft INNERHALB eines
+   * Ordners nicht verlaesslich mit der Uploadzeit (Korrelation im Mittel
+   * 0,991, aber acht Ordner unter 0,9, kleinster Wert 0,779). Die Annahme
+   * traegt also nicht. Ein voller Abzug bei jeder Abweichung traegt.
+   */
+  {
+    key: 'la:belegzahl',
+    ebene: 'betrieb',
+    pfad: '/intranet/ladenakte/beleglist',
+    schrittweite: 'momentaufnahme',
+    form: 'json',
+    zweck: 'Zaehlstand eines Ordners — eine Zeile, dazu recordsTotal',
+    aktiv: false,
+    braucht: 'beleg_token',
+    hinweis:
+      'Derselbe Pfad wie la:belegliste, nur mit length=1. Schreibt NUR eine Zeile nach '
+      + 'core.belegarchiv_bestand (quelle=zaehlung) und reiht la:belegliste nach, wenn der '
+      + 'Zaehlstand von dem abweicht, was core.buchungsbeleg fuer dieses Paar haelt. '
+      + 'Deshalb gilt hier die Vollstaendigkeitspruefung von la:belegliste NICHT: eine '
+      + 'Antwort mit einer Zeile bei recordsTotal 8.384 ist genau das Gewollte.',
+    parameter: (_von, _bis, extra = {}) => ({
+      admin: '1', draw: '1', start: '0',
+      length: String(ZAEHLGROESSE),
+      'order[0][column]': '0',
+      'order[0][dir]': 'asc',
+      ...extra,
+    }),
+  },
   {
     key: 'la:belegliste',
     ebene: 'betrieb',

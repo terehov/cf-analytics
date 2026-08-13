@@ -888,3 +888,74 @@ ein fehlender überschreibt nichts.
 **Reihenfolge beim Aufräumen:** den Text aus der Migration holen, in der er zuletzt
 stand, gegen den heutigen Stand der Sicht lesen (er kann veraltet sein), und in einer
 neuen Migration setzen. Nicht blind zurückkopieren.
+
+---
+
+## Nach dem Deployment von `0069` zu prüfen (offen seit 13.08.2026)
+
+Phase 1 von `docs/plan-datenvollstaendigkeit.md`. Die Reparaturen sind deployt, aber ihre
+Wirkung zeigt sich erst am nächtlichen Lauf.
+
+1. **Der erste Lauf mit `la:belegzahl` ist lang.** 1.834 Zählungen plus 262 Token-Aufrufe bei
+   rund 3 s Takt sind etwa 1,7 Stunden — der Lauf davor brauchte 14 Minuten. Das ist
+   erwartet. Was **nicht** erwartet ist: dass er die 10.500 reißt. Gegenprobe am Morgen
+   danach:
+   ```sql
+   SELECT lauf_id, count(*), min(beendet_am), max(beendet_am) FROM sync.aufgabe
+    WHERE lauf_id = (SELECT max(lauf_id) FROM sync.aufgabe) GROUP BY 1;
+   ```
+2. **Der erste Lauf reiht viele Abzüge nach**, weil sechs Belegarten und zehn Betriebe nie
+   gezählt wurden. Wie viele, sagt `mart.belegarchiv_zulauf` mit `zustand = 'abzug fehlt'`.
+   Bleibt diese Zahl über mehrere Tage stehen, greift das Nachreihen nicht — dann hinsehen.
+3. **Was in den sechs nicht freigegebenen Belegarten liegt**, ist ab dem ersten Lauf messbar:
+   ```sql
+   SELECT typ_id, ordner, sum(gezaehlt) AS belege, count(*) FILTER (WHERE gezaehlt > 0) AS betriebe
+     FROM mart.belegarchiv_zulauf WHERE NOT inhalt_holen GROUP BY 1,2 ORDER BY 3 DESC;
+   ```
+   Das ist die Entscheidungsgrundlage für Punkt 3 in Abschnitt 4 des Plans. **Eugene
+   entscheidet**, nicht der nächste Agent.
+4. **Die beiden Nachläufe sind noch nicht gelaufen** — sie laufen neben dem nächtlichen Lauf
+   und brauchen einen bewussten Befehl:
+   ```bash
+   bun run einreihen --foodnotify-inventurpositionen   # 358 Aufrufe, holt die 936 Positionen
+   bun run einreihen --aufgegebene --endpunkt fn:bestellpositionen   # 275 Aufrufe
+   ```
+   Danach müssen `mart.inventur_abgeschnitten` leer sein und die 322 Bestellungen ohne
+   Position auf 47 gesunken.
+5. **Ob die 275 wirklich wiederkommen, ist offen.** Sie sind alle mit HTTP 500 gescheitert,
+   und zu FoodNotify gibt es keinen Kontakt. Scheitern sie erneut mit demselben Code, ist es
+   eine Quellengrenze und gehört als solche dokumentiert — dann nicht ein drittes Mal
+   versuchen.
+
+## Der e2e-Test braucht eine Testdatenbank auf aktuellem Stand (13.08.2026)
+
+`lina_e2e_test` steht auf `0042` und ist damit 27 Migrationen hinter Produktion. Von 0
+aufbauen geht nicht: `0039` scheitert, und `0055` scheitert an einem Seed, der Betriebe
+voraussetzt (`gfgh_betrieb.betrieb_key` NOT NULL gegen eine leere `core.betrieb`).
+
+Was funktioniert hat, für den nächsten, der davorsteht:
+
+```bash
+createdb lina_e2e_0069
+pg_dump --schema-only --no-owner --no-privileges lina | psql -q -d lina_e2e_0069
+psql -d lina -tAc "COPY (SELECT filename, angewendet_am FROM public.schema_migration) TO STDOUT" \
+  | psql -d lina_e2e_0069 -c "COPY public.schema_migration (filename, angewendet_am) FROM STDIN"
+pg_dump --data-only --no-owner -t 'core.marke' -t 'core.hauptsparte' -t 'ampel.*' lina \
+  | psql -q -d lina_e2e_0069
+DATABASE_URL="postgresql://postgres@localhost/lina_e2e_0069" bun run migrate
+TEST_DATABASE_URL="postgresql://postgres@localhost/lina_e2e_0069" bun test --timeout 60000 src/sync/e2e.test.ts
+```
+
+Zwei Dinge, die dabei Zeit gekostet haben:
+
+* **`--timeout 60000` ist nötig.** Der FoodNotify-Durchstich braucht auf einem frischen
+  Schema mehr als die 5 s, die bun voreinstellt; läuft er in den Timeout, hält er die
+  Advisory-Sperre und **alle** folgenden Läufe melden `lauf_uebersprungen`. Das sieht dann
+  nach fünf kaputten Tests aus und ist einer.
+* **Die Datei nie mit `-t` filtern** (AGENTS.md / `docs/fehlerkatalog.md`): der Namensfilter
+  umgeht die Notbremse und der Test trifft die Produktivdatenbank.
+
+Fünf Tests scheitern auf einem so gebauten Schema **auch ohne jede Codeänderung** — zwei
+BWA-Sichten und eine Mart-Sicht, weil die materialisierten Sichten nie befüllt wurden, und
+zwei Budgetgrenzen, weil `config` beim ersten Import einfriert. Wer eine Änderung bewertet,
+misst gegen diesen Stand und nicht gegen null.

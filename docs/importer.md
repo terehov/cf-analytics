@@ -417,3 +417,74 @@ eine Liste „Antwort → Schlussfolgerung", die **vor** dem Aufruf feststeht un
 gedruckt wird. Wer den Schluss erst nach dem Ergebnis formuliert, findet immer einen.
 
 Läuft nach Regel 7a **nur im Terminal des Nutzers**, nicht aus der Agentenumgebung.
+
+---
+
+## Der Zulauf des Belegarchivs: zählen, dann holen (13.08.2026)
+
+Bis zum 13.08.2026 hatte das Belegarchiv **einen Abzug und danach nichts mehr**. Was daran
+falsch war und wie es aufgefallen ist, steht in `docs/fehlerkatalog.md`; hier steht, wie es
+jetzt läuft.
+
+**Zwei Endpunkte auf demselben Pfad.** `/intranet/ladenakte/beleglist` unterscheidet sich
+nur durch `length`:
+
+| Endpunkt | `length` | Antwort | schreibt |
+|---|---|---|---|
+| `la:belegzahl` | 1 | eine Zeile plus `recordsTotal` | eine Zeile `core.belegarchiv_bestand` (`quelle='zaehlung'`) |
+| `la:belegliste` | 100.000 | der ganze Ordner | alle Belege plus `quelle='abzug'` |
+
+**Der tägliche Ablauf.**
+
+1. `belegzaehlungEinreihen()` stellt je Betrieb und Belegart eine Zählung ein — als **eine**
+   `INSERT … SELECT` über das Kreuzprodukt `core.betrieb × core.belegart`, nicht als
+   Schleife. Migration `0059` hat vorgeführt, was 262 Einzelprüfungen kosten: sieben Minuten
+   Nachfüllzeit. Das Kreuzprodukt ist siebenmal so groß.
+2. Der Worker holt die Zählung. `laLaden()` schreibt den Zählstand und vergleicht ihn mit
+   `count(*)` aus `core.buchungsbeleg` für dasselbe Paar.
+3. Weicht er ab **und** ist die Belegart freigegeben (`core.belegart.inhalt_holen`), reiht
+   dieselbe Transaktion `la:belegliste` mit Priorität 93 nach. Der Worker holt sie im selben
+   Lauf, weil 93 vor 95 liegt.
+
+**Warum die Reihenfolge `ORDER BY lina_betrieb_id` zählt.** Der `storeId`-Token gilt je
+Betrieb und hält gemessene 172 s (`src/ladenakte/token.ts`). Werden die Ordner eines Betriebs
+nacheinander abgearbeitet, kostet er zwei Zusatzaufrufe je Betrieb statt zwei je Ordner —
+262 statt 3.668. `posten_holen()` sortiert bei gleicher Priorität nach `posten_id`, also nach
+Einreihreihenfolge.
+
+**Die Rechnung gegen das Tagesbudget** (LINA: 10.500, bisher verbraucht 82):
+
+```
+131 Betriebe x 14 Belegarten          1.834 Zaehlungen
++ storeId-Token, 2 je Betrieb           262
++ LINA-Tagesberichte wie bisher          82
++ nachgereihte Abzuege                 ~ 60   (296 Paare hatten in 28 Tagen Zulauf)
+--------------------------------------------
+                                     ~ 2.238 von 10.500
+```
+
+Bei dem am 13.08.2026 gemessenen Takt von rund 3 s je Aufruf sind das etwa 1,7 Stunden. Der
+Erstabzug brauchte für 621 **volle** Ordner acht Stunden — das ist der Unterschied, den die
+Zählung kauft.
+
+**Was sichtbar bleibt.** `mart.belegarchiv_zulauf` führt jedes der 1.834 Paare mit einem
+Zustand: `vollstaendig`, `abzug eingereiht`, `abzug fehlt`, `gezaehlt, nicht freigegeben`,
+`nie gezaehlt`. Dazu vier Zeilen in `mart.pruefung_uebersicht`. Ein Log-WARN wäre hier
+wertlos gewesen — niemand liest Logs, und genau deshalb hat der Stillstand zwei Tage
+gedauert.
+
+## FoodNotify: die Zählung einer Inventur blättert (13.08.2026)
+
+`fn:inventurpositionen` trägt seit dem 13.08.2026 `seite` als **Pflichtparameter**. Kein
+Vorgabewert: ein stilles `?? '1'` wäre der alte Zustand mit einem Parameter davor, und ein
+Posten ohne Seite ist ein Einreihungsfehler, kein HTTP-Fehler.
+
+Die Kette ist dieselbe wie bei `fn:bestellungen` und `fn:inventuren` — Seite 1 reiht die
+Seiten 2…n rückwärts ein, in derselben Transaktion, in der sie ihre Positionen schreibt.
+**Gelöscht wird nur auf Seite 1**; die Begründung steht im Fehlerkatalog und ist wichtiger
+als der Fehler, den sie behebt.
+
+Der Parameter änderte zugleich den Idempotenzschlüssel: alte Posten tragen nur `{uuid}`, neue
+`{uuid, seite}`. Deshalb wirkt `bun run einreihen --foodnotify-inventurpositionen` überhaupt —
+er stellt für jede bekannte Inventur eine frische Seite 1 ein (358 Aufrufe gegen ein
+Tagesbudget von 140.000).

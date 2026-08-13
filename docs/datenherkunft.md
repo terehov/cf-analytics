@@ -564,3 +564,49 @@ Zeile fest.
 **Warum nicht Genesis:** Der Destatis-REST-Dienst verlangt seit dem Wegfall des Gastzugangs
 eine Registrierung und liefert ohne Anmeldung HTML statt Daten (geprüft 11.08.2026). Eurostat
 verteilt dieselbe Reihe offen. Begründung in [`entscheidungen.md`](entscheidungen.md).
+
+---
+
+## Nachtrag 13.08.2026 — ein neuer Endpunkt und eine neue Freigabe
+
+### `la:belegzahl` — derselbe Pfad wie die Belegliste, andere Frage
+
+| | |
+|---|---|
+| Pfad | `/intranet/ladenakte/beleglist?admin=1&storeId=<tok>&typeId=<n>&start=0&length=1` |
+| Antwort | DataTables `{data, recordsTotal, recordsFiltered}` — eine Zeile, die verworfen wird |
+| schreibt | `core.belegarchiv_bestand` mit `quelle='zaehlung'`, sonst nichts |
+| Takt | täglich, je Betrieb und Belegart (131 × 14 = 1.834) |
+
+Gebraucht wird nur `recordsTotal`. Fehlt es, **wirft** der Lader: als 0 gelesen hieße es
+„Ordner leer", und der Abgleich holte diesen Ordner nie wieder — genau die Sorte stiller
+Fehler, gegen die dieser Endpunkt gebaut ist.
+
+`la:belegliste` ist unverändert und bleibt die einzige Quelle für `core.buchungsbeleg`. Die
+Zählung entscheidet nur, **ob** sie läuft.
+
+### Welche Zahl in `core.belegarchiv_bestand` woher kommt
+
+Ab dem 13.08.2026 stehen dort zwei Sorten Zeilen nebeneinander. Wer `records_total` liest,
+muss `quelle` mitlesen:
+
+* `quelle='zaehlung'` — täglich, nur die Zahl. Der aktuellste Stand.
+* `quelle='abzug'` — nur bei Abweichung, und dabei sind auch die Belege selbst geschrieben
+  worden. Der Zeitpunkt, an dem `core.buchungsbeleg` zuletzt stimmte.
+
+`mart.belegarchiv_fehlend` und `mart.belegarchiv_pruefung` nehmen weiterhin die jeweils
+jüngste Zeile je Paar, gleich welcher Quelle. Das ist richtig so: die frischeste Zahl ist die
+aussagekräftigste. Wer wissen will, wann zuletzt wirklich geholt wurde, nimmt
+`mart.belegarchiv_zulauf.zuletzt_abgezogen`.
+
+### `core.belegart.inhalt_holen` — was gezählt und was geholt wird
+
+Alle 14 FiBu-Ordner werden **gezählt**. Geholt werden die acht, die die Erhebung vom
+11.08.2026 erfasst hat (`1, 2, 3, 5, 3970, 3974, 3975, 3977`). Für die sechs übrigen — 16
+sonstige Dokumente, 3968 sonstige Auswertungen, 3969 USt-Voranmeldungen, 3971 Mahnungen,
+3972 Steuerunterlagen, 3976 OPOS-Listen — ist die Entscheidung offen
+(`docs/plan-datenvollstaendigkeit.md`, Abschnitt 4 Punkt 3). Was dort liegt, beantwortet ab
+dem ersten Lauf `mart.belegarchiv_zulauf` mit dem Zustand `gezaehlt, nicht freigegeben`.
+
+**Die 593.314 aus AGENTS.md bleiben damit eine Untergrenze** — aber ab jetzt eine, deren
+Abstand zur Wahrheit messbar ist statt geschätzt.

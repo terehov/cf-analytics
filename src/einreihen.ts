@@ -23,9 +23,19 @@
  *       nicht Teil von --foodnotify: lohnend fast nur bei Wilma Wunder
  *       (275 Stück), bei den anderen drei Marken kaum. Einmalig.
  *
- * Die drei Backfills bleiben ausdrücklich Handarbeit: sie stellen
+ *   bun run einreihen --foodnotify-inventurpositionen
+ *       Zieht die Zählung jeder bekannten Inventur neu (Seite 1). Nachlauf
+ *       zur Paginierung vom 13.08.2026 — 936 Positionen fehlten.
+ *
+ *   bun run einreihen --aufgegebene [--endpunkt fn:bestellpositionen]
+ *       Holt aufgegebene Posten in die Warteschlange zurück. Ohne diesen
+ *       Befehl sieht sie niemand je wieder an.
+ *
+ * Die Backfills bleiben ausdrücklich Handarbeit: sie stellen bis zu
  * Zehntausende Posten ein, und das soll eine Entscheidung sein, kein
- * Nebeneffekt eines Neustarts.
+ * Nebeneffekt eines Neustarts. Sie laufen NEBEN dem nächtlichen Lauf, nicht
+ * in ihm — der Worker arbeitet eine Warteschlange ab, gleich wer sie gefüllt
+ * hat.
  */
 import { query, eine, pool } from './db/pool'
 import { log } from './lib/log'
@@ -198,6 +208,113 @@ if (process.argv.includes('--foodnotify-inventuren')) {
   log.info('foodnotify-inventuren gesamt', {
     marken: zugaenge.map(z => z.schluessel), posten: gesamt,
     hinweis: 'weitere Seiten und Positionen folgen von selbst aus fn:inventuren',
+  })
+}
+
+/**
+ *   bun run einreihen --foodnotify-inventurpositionen
+ *       Zieht die ZAEHLUNG jeder bekannten Inventur neu — Seite 1, der Rest
+ *       folgt von selbst aus dem Laden.
+ *
+ *       ANLASS (13.08.2026). `fn:inventurpositionen` war bis heute nicht
+ *       paginiert und lieferte deshalb höchstens `perPage` = 800 Positionen.
+ *       In Produktion gemessen: keine der 358 Inventuren hat mehr als 800
+ *       Positionen, das Maximum ist exakt 800, und neun Inventuren fehlen
+ *       zusammen 936 Positionen (02.02. bis 03.08.2026). Betroffen sind die
+ *       grössten — also die mit dem höchsten Warenwert.
+ *
+ *       WARUM ALLE UND NICHT NUR DIE NEUN. Die neun sind die, denen man den
+ *       Abschnitt ANSIEHT (Kopfzahl > geladene Zeilen). Eine Inventur, deren
+ *       Kopf `anzahl_positionen` gar nicht führt, sähe vollständig aus, auch
+ *       wenn sie es nicht ist. 358 Aufrufe sind gegenüber dem Tagesbudget von
+ *       140.000 nichts — die Gewissheit ist mehr wert als die Ersparnis.
+ *
+ *       Idempotent gegen ALLE Posten mit demselben Parameter. Die alten
+ *       Posten tragen nur `{uuid}` ohne `seite` und sperren deshalb nicht:
+ *       genau deswegen wirkt dieser Befehl überhaupt.
+ */
+if (process.argv.includes('--foodnotify-inventurpositionen')) {
+  const r = await query<{ posten_id: number }>(
+    `INSERT INTO sync.warteschlange
+       (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter)
+     SELECT 'fn:inventurpositionen',
+            coalesce(i.erstellt_am::date, current_date),
+            coalesce(i.erstellt_am::date, current_date),
+            94, ks.marke_key,
+            jsonb_build_object('uuid', i.fn_uuid, 'seite', '1')
+       FROM core.inventur i
+       JOIN core.kostenstelle ks USING (kostenstelle_key)
+      WHERE NOT EXISTS (
+            SELECT 1 FROM sync.warteschlange w
+             WHERE w.endpunkt = 'fn:inventurpositionen'
+               AND w.marke_key = ks.marke_key
+               AND w.parameter = jsonb_build_object('uuid', i.fn_uuid, 'seite', '1'))
+     RETURNING posten_id`)
+  log.info('inventurpositionen nachgereiht', {
+    posten: r.length,
+    hinweis: 'Folgeseiten reiht das Laden selbst ein, sobald Seite 1 da ist',
+  })
+}
+
+/**
+ *   bun run einreihen --aufgegebene [--endpunkt fn:bestellpositionen]
+ *       Holt aufgegebene Posten zurück in die Warteschlange.
+ *
+ *       WARUM ES DAS BRAUCHT. `aufgegeben` setzt `erledigt_am` — der Posten
+ *       gilt damit als erledigt, und KEIN Code sieht ihn je wieder an. Am
+ *       13.08.2026 standen so 275 `fn:bestellpositionen` still, alle mit
+ *       HTTP 500 nach vier Versuchen zwischen dem 02. und 04.08.2026, alle aus
+ *       dem grossen Backfill. Folge: 322 Bestellungen über 686.535,93 EUR
+ *       hatten einen Kopf, aber keine einzige Position — sie zählen in
+ *       `mart.einkauf_beleg` voll mit und fehlen in jeder Positions- und
+ *       Preissicht. 275 der 322 gehen auf diese Posten zurück; die übrigen 47
+ *       sind mit `ok` geladene, tatsächlich leere Bestellungen.
+ *
+ *       WARUM WIEDERVORLAGE UND NICHT QUELLENGRENZE. HTTP 500 ist eine Aussage
+ *       über den Server, nicht über die Bestellung: derselbe Endpunkt hat für
+ *       66.000 andere Bestellungen geliefert, und die Fehler ballen sich auf
+ *       zwei Tage schwerer Backfill-Last. Eine Quellengrenze sähe anders aus —
+ *       404 oder 403, gleichmässig verteilt. Zu FoodNotify gibt es keinen
+ *       Kontakt, die Frage lässt sich also nur durch einen erneuten Versuch
+ *       beantworten. Er kostet 275 Aufrufe von 140.000.
+ *
+ *       BEWUSST EIN HANDBEFEHL. Ein automatischer Rücklauf im nächtlichen Lauf
+ *       würde einen dauerhaft kaputten Posten jede Nacht erneut versuchen —
+ *       ohne Obergrenze wäre das derselbe Bau wie der 403-Zweig in
+ *       `src/sync/worker.ts`, der seit neun Tagen bei netto ±0 Versuchen
+ *       steht. Die Obergrenze ist Sache von Phase 3.3.
+ *
+ *       Der Posten wird WIEDERBELEBT, nicht neu angelegt: eine zweite Zeile
+ *       für dieselbe Arbeit machte `ergebnis = 'aufgegeben'` als Zählgrösse
+ *       wertlos. `versuche = 0`, damit `MAX_VERSUCHE` wieder voll greift.
+ */
+if (process.argv.includes('--aufgegebene')) {
+  const nurEndpunkt = arg('endpunkt') ?? null
+  const r = await query<{ endpunkt: string; posten_id: number }>(
+    `UPDATE sync.warteschlange w
+        SET erledigt_am = NULL, ergebnis = NULL, versuche = 0,
+            in_arbeit_seit = NULL, faellig_ab = now()
+      WHERE w.ergebnis = 'aufgegeben'
+        AND ($1::text IS NULL OR w.endpunkt = $1)
+        -- Der Eindeutigkeitsindex ist partiell (WHERE erledigt_am IS NULL).
+        -- Steht fuer dieselbe Arbeit schon ein offener Posten, wuerde das
+        -- Wiederbeleben ihn verletzen — dann ist ohnehin nichts zu tun.
+        AND NOT EXISTS (
+            SELECT 1 FROM sync.warteschlange o
+             WHERE o.erledigt_am IS NULL
+               AND o.endpunkt = w.endpunkt
+               AND coalesce(o.betrieb_enc_id, '') = coalesce(w.betrieb_enc_id, '')
+               AND coalesce(o.marke_key, 0) = coalesce(w.marke_key, 0)
+               AND o.zeitraum_von = w.zeitraum_von AND o.zeitraum_bis = w.zeitraum_bis
+               AND coalesce(o.parameter::text, '{}') = coalesce(w.parameter::text, '{}'))
+     RETURNING w.endpunkt, w.posten_id`,
+    [nurEndpunkt])
+
+  const jeEndpunkt: Record<string, number> = {}
+  for (const z of r) jeEndpunkt[z.endpunkt] = (jeEndpunkt[z.endpunkt] ?? 0) + 1
+  log.info('aufgegebene posten wiederbelebt', {
+    posten: r.length, jeEndpunkt,
+    filter: nurEndpunkt ?? 'alle Endpunkte',
   })
 }
 

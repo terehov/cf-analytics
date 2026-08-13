@@ -42,16 +42,36 @@ UNION ALL SELECT 'tagesbudget',          count(*) FROM core.tagesbudget;
 
 \echo ''
 \echo '== 5. Soll gegen Ist je Belegart =='
-SELECT s.typ_id, a.name,
+-- SEIT 13.08.2026 UEBER DIE JEWEILS LETZTE MESSUNG, nicht ueber alle.
+-- core.belegarchiv_bestand ist eine Zeitreihe und bekommt seit der taeglichen
+-- Zaehlung (la:belegzahl, Migration 0069) 1.834 Zeilen am Tag. Ein sum() ueber
+-- alle Zeilen zaehlte denselben Ordner nach einer Woche siebenmal — und das
+-- Ergebnis saehe nicht falsch aus, sondern nur gross.
+WITH letzte AS (
+  SELECT DISTINCT ON (betrieb_key, typ_id) betrieb_key, typ_id, records_total
+    FROM core.belegarchiv_bestand
+   ORDER BY betrieb_key, typ_id, gemessen_am DESC)
+SELECT s.typ_id, a.name, a.inhalt_holen,
        sum(s.soll_anzahl)                              AS soll,
-       coalesce(sum(v.records_total), 0)               AS geholt,
+       coalesce(sum(v.records_total), 0)               AS gezaehlt,
        count(*) FILTER (WHERE v.betrieb_key IS NULL AND s.soll_anzahl > 0) AS betriebe_offen
   FROM manual.belegarchiv_soll s
   JOIN core.belegart a ON a.typ_id = s.typ_id
   LEFT JOIN core.betrieb b ON b.lina_betrieb_id = s.lina_betrieb_id
-  LEFT JOIN core.belegarchiv_bestand v
-         ON v.betrieb_key = b.betrieb_key AND v.typ_id = s.typ_id
- GROUP BY s.typ_id, a.name ORDER BY soll DESC;
+  LEFT JOIN letzte v ON v.betrieb_key = b.betrieb_key AND v.typ_id = s.typ_id
+ GROUP BY s.typ_id, a.name, a.inhalt_holen ORDER BY soll DESC;
+
+\echo ''
+\echo '== 5b. Bekommt das Belegarchiv noch Zulauf? (Migration 0069) =='
+SELECT zustand, count(*) AS ordner, sum(differenz) FILTER (WHERE differenz > 0) AS fehlende_belege
+  FROM mart.belegarchiv_zulauf GROUP BY zustand ORDER BY ordner DESC;
+
+\echo ''
+\echo '== 5c. Belege je Tag — zwei leere Tage in Folge sind ein Befund =='
+SELECT hochgeladen_am::date AS tag, count(*) AS belege
+  FROM core.buchungsbeleg
+ WHERE hochgeladen_am >= current_date - 14
+ GROUP BY 1 ORDER BY 1;
 
 \echo ''
 \echo '== 6. Tagesbudget — bleibt fuer die Tagesdaten genug uebrig? =='

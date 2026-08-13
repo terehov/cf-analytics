@@ -320,11 +320,22 @@ export async function fnLaden(k: FnKontext): Promise<number> {
             [ksKey, iv.fnUuid, iv.name, iv.art, iv.status, iv.anzahlPositionen, iv.notiz,
              iv.erstelltAm, iv.geaendertAm])
 
-          // Die Positionen folgen automatisch — Zeitraum ist das Anlagedatum
-          // der Inventur, wie bei Bestellungen das Bestelldatum.
+          /**
+           * Die Positionen folgen automatisch — Zeitraum ist das Anlagedatum
+           * der Inventur, wie bei Bestellungen das Bestelldatum.
+           *
+           * `seite: '1'` steht seit dem 13.08.2026 im Parameter, weil der
+           * Endpunkt blättert. Das ändert zugleich den Idempotenzschlüssel:
+           * `folgepostenEinreihen` vergleicht das ganze Parameter-JSON, und
+           * die alten Posten tragen nur `{uuid}`. Jede Inventur, deren
+           * Kopfseite erneut geladen wird, bekommt damit EINMAL einen frischen
+           * Positionsposten — genau der Nachlauf, den die neun bei 800
+           * abgeschnittenen Inventuren brauchen. Wer alle 358 auf einmal
+           * nachziehen will, nimmt `bun run einreihen --foodnotify-inventurpositionen`.
+           */
           const tag = (iv.erstelltAm ?? k.von).slice(0, 10)
           await folgepostenEinreihen(c, k.markeKey, 'fn:inventurpositionen',
-            { uuid: iv.fnUuid }, tag, 94)
+            { uuid: iv.fnUuid, seite: '1' }, tag, 94)
         }
 
         /**
@@ -344,7 +355,8 @@ export async function fnLaden(k: FnKontext): Promise<number> {
       }
 
       case 'fn:inventurpositionen': {
-        const positionen = inv.inventurpositionen(k.daten)
+        const seite = inv.inventurpositionen(k.daten)
+        const positionen = seite.positionen
         const uuid = k.parameter.uuid
         if (!uuid) throw new Error('fn:inventurpositionen ohne uuid im Posten')
 
@@ -360,9 +372,24 @@ export async function fnLaden(k: FnKontext): Promise<number> {
         }
         const inventurKey = Number(kopf.rows[0].inventur_key)
 
-        // Ersetzen statt upsert — die Antwort ist der VOLLSTÄNDIGE Stand
-        // der Zählung (wie core.bestellposition).
-        await c.query(`DELETE FROM core.inventurposition WHERE inventur_key = $1`, [inventurKey])
+        /**
+         * Ersetzen statt upsert — die Antwort ist der VOLLSTÄNDIGE Stand der
+         * Zählung (wie core.bestellposition).
+         *
+         * NUR AUF SEITE 1. Seit dieser Endpunkt blättert (13.08.2026), wäre
+         * ein Löschen je Seite der teuerste Fehler dieser Änderung: Seite 2
+         * löschte, was Seite 1 gerade geschrieben hat, und am Ende stünden
+         * genau die letzten 17 Positionen einer 817er-Inventur in der
+         * Datenbank. Das sähe aus wie eine sehr kleine Inventur — wieder
+         * lautlos, wieder plausibel, und schlimmer als der Fehler davor.
+         *
+         * Warum das trägt: Seite 1 reiht die Folgeseiten unten in DERSELBEN
+         * Transaktion ein. Entweder ist gelöscht UND die Kette steht, oder
+         * nichts von beidem.
+         */
+        if (seite.aktuelleSeite === 1) {
+          await c.query(`DELETE FROM core.inventurposition WHERE inventur_key = $1`, [inventurKey])
+        }
         for (const p of positionen) {
           // shopArticleId ist eine LIEFERANTEN-Artikelnummer — quelle
           // 'lieferant', wie core.bestellposition.lieferanten_nr. NICHT
@@ -378,6 +405,22 @@ export async function fnLaden(k: FnKontext): Promise<number> {
              VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
             [inventurKey, p.fnId, ware, p.name, p.shopName, p.basisEinheit,
              p.sollMenge, p.gezaehlteMenge, p.nachzaehlungMenge, p.preisJeBasiseinheit])
+        }
+
+        /**
+         * Seite 1 reiht alle übrigen Seiten ein — genauso gebaut wie bei
+         * fn:bestellungen und fn:inventuren, nicht anders. RÜCKWÄRTS, damit
+         * `posten_holen()` (Priorität, dann posten_id) sie in derselben
+         * Reihenfolge abarbeitet wie dort.
+         *
+         * Zeitraum ist der des auslösenden Postens: alle Seiten einer
+         * Inventur gehören zu deren Anlagedatum, nicht zu heute.
+         */
+        if (seite.aktuelleSeite === 1) {
+          for (let n = seite.gesamtSeiten; n >= 2; n--) {
+            await folgepostenEinreihen(c, k.markeKey, 'fn:inventurpositionen',
+              { uuid, seite: String(n) }, k.von, 94)
+          }
         }
         return positionen.length
       }

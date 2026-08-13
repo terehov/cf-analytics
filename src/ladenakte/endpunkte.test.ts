@@ -6,7 +6,7 @@
  */
 import { describe, expect, test } from 'bun:test'
 import {
-  LADENAKTE_ENDPUNKTE, LADENAKTE_KEYS, FIBU_BELEGARTEN, SEITENGROESSE,
+  LADENAKTE_ENDPUNKTE, LADENAKTE_KEYS, FIBU_BELEGARTEN, SEITENGROESSE, ZAEHLGROESSE,
   BAUM, ORDNERSEITE, pfadPruefen, VerbotenerPfad, VERBOTENE_SEGMENTE, istLadenakte,
 } from './endpunkte'
 import { ENDPUNKTE } from '../lina/endpunkte'
@@ -117,8 +117,8 @@ describe('Loeschsperre', () => {
 })
 
 describe('Register', () => {
-  test('drei Endpunkte, alle mit la:-Praefix und alle inaktiv', () => {
-    expect(LADENAKTE_ENDPUNKTE.length).toBe(3)
+  test('vier Endpunkte, alle mit la:-Praefix und alle inaktiv', () => {
+    expect(LADENAKTE_ENDPUNKTE.length).toBe(4)
     for (const ep of LADENAKTE_ENDPUNKTE) {
       expect(ep.key.startsWith('la:')).toBe(true)
       expect(istLadenakte(ep.key)).toBe(true)
@@ -134,7 +134,7 @@ describe('Register', () => {
 
   test('die geprueften Schluessel existieren wirklich', () => {
     // Sonst prueft der Test darueber einen Tippfehler statt eines Endpunkts.
-    for (const key of ['la:belegliste', 'la:bwa_longterm', 'la:stammdaten']) {
+    for (const key of ['la:belegzahl', 'la:belegliste', 'la:bwa_longterm', 'la:stammdaten']) {
       expect(LADENAKTE_KEYS.has(key)).toBe(true)
     }
   })
@@ -150,6 +150,7 @@ describe('Register', () => {
     const form = Object.fromEntries([...LADENAKTE_ENDPUNKTE, BAUM, ORDNERSEITE]
       .map(e => [e.key, e.form]))
     expect(form).toEqual({
+      'la:belegzahl': 'json',
       'la:belegliste': 'json',
       'la:bwa_longterm': 'html',
       'la:stammdaten': 'html',
@@ -182,6 +183,57 @@ describe('Parameter', () => {
     const p = ep.parameter('2026-08-01', '2026-08-01', { typeId: '3974', storeId: 'xyz' })
     expect(p.typeId).toBe('3974')
     expect(p.storeId).toBe('xyz')
+  })
+})
+
+/**
+ * DIE ZAEHLUNG — der Endpunkt, aus dem seit dem 13.08.2026 der Zulauf entsteht.
+ *
+ * Was diese Tests festhalten, ist nicht Kosmetik, sondern die Rechnung, die den
+ * taeglichen Abgleich ueberhaupt bezahlbar macht: 1.834 Zaehlungen am Tag gehen
+ * nur, solange eine Zaehlung eine Zeile holt. Wer hier length hochsetzt, holt
+ * versehentlich 131 x 14 volle Ordner — im Erstabzug waren das acht Stunden und
+ * mehrere hundert Megabyte, und das Tagesbudget von 10.500 waere gerissen.
+ */
+describe('Zaehlung', () => {
+  const zahl = LADENAKTE_ENDPUNKTE.find(e => e.key === 'la:belegzahl')!
+  const liste = LADENAKTE_ENDPUNKTE.find(e => e.key === 'la:belegliste')!
+
+  test('holt EINE Zeile — daran haengt, dass 1.834 Aufrufe am Tag tragbar sind', () => {
+    const p = zahl.parameter('2026-08-13', '2026-08-13', { storeId: 'tok', typeId: '1' })
+    expect(p.length).toBe(String(ZAEHLGROESSE))
+    expect(ZAEHLGROESSE).toBe(1)
+    expect(p.start).toBe('0')
+  })
+
+  /**
+   * Nicht 0: DataTables deutet length=0 je nach Fassung als "keine Begrenzung"
+   * und liefert dann den ganzen Ordner — genau das, was die Zaehlung vermeidet.
+   */
+  test('nicht null Zeilen, sondern eine — null hiesse bei DataTables "alle"', () => {
+    expect(ZAEHLGROESSE).toBeGreaterThan(0)
+  })
+
+  test('derselbe Pfad und derselbe Token wie der volle Abzug', () => {
+    expect(zahl.pfad).toBe(liste.pfad)
+    expect(zahl.braucht).toBe('beleg_token')
+    expect(zahl.ebene).toBe('betrieb')
+  })
+
+  test('dieselbe Sortierung wie der Abzug — sonst zaehlt sie etwas anderes', () => {
+    const p = zahl.parameter('2026-08-13', '2026-08-13', {})
+    expect(p['order[0][column]']).toBe('0')
+    expect(p['order[0][dir]']).toBe('asc')
+  })
+
+  test('Betrieb und Ordner kommen von aussen', () => {
+    const p = zahl.parameter('2026-08-13', '2026-08-13', { typeId: '3969', storeId: 'xyz' })
+    expect(p.typeId).toBe('3969')
+    expect(p.storeId).toBe('xyz')
+  })
+
+  test('der Pfad der Zaehlung kommt durch die Loeschsperre', () => {
+    expect(() => pfadPruefen(zahl.pfad)).not.toThrow()
   })
 })
 

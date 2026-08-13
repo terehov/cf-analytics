@@ -311,58 +311,21 @@ export async function inventurenNachfuellen(
 /**
  * Ladenakte nachfuellen — Belegarchiv, BWA-Historie, Stammdatenblatt.
  *
- * EINGEREIHT WIRD NUR, WAS FEHLT. Grundlage ist `manual.belegarchiv_soll`:
- * die Vollzaehlung vom 11.08.2026, 1.048 Paare aus Betrieb und Belegart, davon
- * 621 nicht leer. Die 427 leeren werden gar nicht erst aufgerufen.
- *
- * Der Lauf ist damit selbstheilend und selbstbegrenzend: was einmal geholt ist,
- * steht in `core.belegarchiv_bestand` und wird nicht erneut eingereiht. Faellt
- * ein Posten aus, kommt er beim naechsten Lauf wieder.
- *
- * KEIN HANDBEFEHL. Der Erstabzug sind rund 1.400 Aufrufe und laeuft ueber
- * mehrere Sync-Laeufe von selbst durch — kein `einreihen --ladenakte`, das
- * jemand ausloesen muesste und dessen Ausfall niemandem auffiele. Genau daran
- * stand LINA am 02.08.2026 acht Tage still.
+ * KEIN HANDBEFEHL. Alles hier laeuft ueber mehrere Sync-Laeufe von selbst
+ * durch — kein `einreihen --ladenakte`, das jemand ausloesen muesste und
+ * dessen Ausfall niemandem auffiele. Genau daran stand LINA am 02.08.2026
+ * acht Tage still.
  *
  * `WHERE NOT EXISTS` statt `ON CONFLICT DO NOTHING`: der Eindeutigkeitsindex
  * auf der Warteschlange ist partiell (`WHERE erledigt_am IS NULL`), ein
  * Konflikt-Insert reiht also alles Erledigte erneut ein. Welche Zustaende das
- * NOT EXISTS sperrt und welche nicht, steht bei `einreihenWennNeu()` — daran
+ * NOT EXISTS sperrt und welche nicht, steht bei `einreihenJeMonat()` — daran
  * haengt, ob die Momentaufnahmen je wieder aufgefrischt werden.
  */
 export async function ladenakteNachfuellen(heute: string): Promise<number> {
   let n = 0
 
-  /*
-   * 1. Belegordner: je Betrieb und Belegart einer, aber nur wo Belege liegen
-   *    und noch nichts Brauchbares abgerufen wurde.
-   *
-   *    „NICHTS BRAUCHBARES" IST NICHT DASSELBE WIE „NICHTS". Der Bestandseintrag
-   *    entsteht in `laLaden()` VOR der Pruefung auf null Zeilen — eine einzige
-   *    Leerantwort wuerde einen Ordner sonst fuer immer als geholt festschreiben,
-   *    obwohl die Vollzaehlung vom 11.08.2026 dort Belege gesehen hat. Genau
-   *    dieser Widerspruch — Soll ueber null, gemessen null — ist der Grund, es
-   *    noch einmal zu versuchen, und nicht der Grund, es sein zu lassen.
-   *
-   *    Die Messung selbst bleibt stehen: `core.belegarchiv_bestand` traegt
-   *    `gemessen_am` im Schluessel und ist eine Zeitreihe. Haelt der Widerspruch
-   *    an, kostet er eine Anfrage je Nacht und steht in Abschnitt 5 von
-   *    `docs/ladenakte-lauf-pruefen.sql` — sichtbar statt still.
-   */
-  const belege = await query<{ lina_betrieb_id: number; typ_id: string }>(
-    `SELECT s.lina_betrieb_id, s.typ_id
-       FROM manual.belegarchiv_soll s
-       JOIN core.betrieb b ON b.lina_betrieb_id = s.lina_betrieb_id
-      WHERE s.soll_anzahl > 0
-        AND NOT EXISTS (SELECT 1 FROM core.belegarchiv_bestand v
-                         WHERE v.betrieb_key = b.betrieb_key AND v.typ_id = s.typ_id
-                           AND v.records_total > 0)
-      ORDER BY s.lina_betrieb_id, s.typ_id`)
-
-  for (const z of belege) {
-    n += await einreihenWennNeu('la:belegliste', heute, PRIORITAET_LADENAKTE,
-      { linaBetriebId: String(z.lina_betrieb_id), typeId: z.typ_id })
-  }
+  n += await belegzaehlungEinreihen(heute)
 
   /*
    * 2. BWA-Historie und Stammdatenblatt: je Betrieb einer im Kalendermonat.
@@ -408,43 +371,95 @@ export async function ladenakteNachfuellen(heute: string): Promise<number> {
 const PRIORITAET_LADENAKTE = 95
 
 /**
- * Einreihen fuer den EINMALIGEN Abzug — das Belegarchiv.
+ * Die taegliche Zaehlung des Belegarchivs: je Betrieb und Belegart eine.
  *
- * Ob ein Ordner ueberhaupt angeboten wird, entscheidet der Aufrufer an
- * `core.belegarchiv_bestand`. Diese Funktion verhindert nur, dass derselbe
- * Ordner zweimal gleichzeitig in der Schlange steht.
+ * WAS HIER ERSETZT WURDE UND WARUM. Bis zum 13.08.2026 stand an dieser Stelle
+ * eine Abfrage gegen `manual.belegarchiv_soll` — die Handzaehlung vom
+ * 11.08.2026, die kein Code je fortgeschrieben hat. Sie reihte einen Ordner
+ * genau so lange ein, bis es fuer ihn einen Bestandssatz mit `records_total >
+ * 0` gab. Das ist die Bedingung eines EINMALIGEN Abzugs, nicht die eines
+ * laufenden Abgleichs: am 12.08.2026 um 13:25 war der Abzug fertig, und
+ * seither lieferte sie null Zeilen. Nachgemessen am 13.08.2026 in Produktion —
+ * die Laeufe 85 bis 88 hatten je NULL `la:*`-Aufgaben, alle 621 Posten standen
+ * auf "ok", und `core.buchungsbeleg` bekam zwei Tage lang keinen einzigen
+ * Beleg mehr, bei einem Mittel von 331 am Tag. Der Lauf meldete durchgaengig
+ * "ok". Ein Importer ohne Arbeit sieht genauso aus wie einer, der fertig ist.
  *
- * Zwei Zustaende sperren:
- *   offen (erledigt_am IS NULL)  er kommt ohnehin dran
- *   'aufgegeben'                 sonst waechst die Warteschlange jede Nacht um
- *                                denselben kaputten Posten. Er steht in
- *                                Abschnitt 3 von `docs/ladenakte-lauf-pruefen.sql`
- *                                und will angesehen, nicht wiederholt werden.
+ * DER TORWAECHTER IST JETZT DIE MESSUNG SELBST, keine eingefrorene Liste. Jede
+ * Zaehlung entscheidet in `laLaden()`, ob ein Abzug folgt (Vergleich
+ * `records_total` gegen `count(*)` in `core.buchungsbeleg`). Damit ist
+ * `manual.belegarchiv_soll` kein Tor mehr, sondern nur noch die historische
+ * Zaehlung vom 11.08.2026 — sie bleibt stehen, weil `mart.belegarchiv_fehlend`
+ * sie als dritte Zahl neben Bestand und Ist fuehrt.
  *
- * ⚠ FUER ETWAS, DAS SICH WIEDERHOLEN SOLL, IST DAS DIE FALSCHE FUNKTION —
- * dafuer gibt es `einreihenJeMonat()` gleich darunter. Der Unterschied hat am
- * 12.08.2026 zwei Fehler nacheinander gekostet: erst sperrte hier JEDE erledigte
- * Zeile fuer immer, wodurch die Momentaufnahmen ab September wortlos ausgeblieben
- * waeren; dann liess die Lockerung Posten mit 'keine_daten' jede Nacht durch.
- * Beides sind Symptome derselben Verwechslung — ein Wiederholtakt gehoert an den
- * Zeitraum, nicht an einen Ergebniswert.
+ * NEUE BETRIEBE UND ORDNER KOMMEN VON SELBST DAZU: die Menge entsteht als
+ * Kreuzprodukt aus `core.betrieb` und `core.belegart`, beide live gelesen.
+ * Zehn Betriebe hatten am 13.08.2026 keine Soll-Zeile und waren damit
+ * unerreichbar — heute keiner davon operativ, aber ein neu eroeffneter
+ * Betrieb waere denselben Weg gegangen und ebenso stumm herausgefallen.
  *
- * Der partielle Eindeutigkeitsindex (`warteschlange_offen_uq … WHERE erledigt_am
- * IS NULL`) traegt das mit: erledigte Zeilen stehen gar nicht erst darin.
+ * EINE EINZIGE ABFRAGE statt 1.834 Rundreisen. Migration 0059 hat vorgefuehrt,
+ * was 262 Einzelpruefungen kosten: sieben Minuten Nachfuellzeit. Das
+ * Kreuzprodukt ist siebenmal so gross — als Schleife waere es die Rueckkehr
+ * desselben Fehlers. Der Index aus 0059 (`endpunkt, zeitraum_von`) traegt das
+ * NOT EXISTS.
+ *
+ * DER TAKT HAENGT AM ZEITRAUM, nicht an einem Ergebniswert — dieselbe Lehre
+ * wie bei `einreihenJeMonat()`: gibt es fuer diesen Kalendertag schon eine
+ * Zeile, passiert nichts, gleich wie sie ausgegangen ist. Morgen gibt es eine
+ * frische.
+ *
+ * ORDER BY lina_betrieb_id: der `storeId`-Token gilt je BETRIEB und haelt
+ * gemessene 172 s (`src/ladenakte/token.ts`). Werden die Ordner eines Betriebs
+ * nacheinander abgearbeitet, kostet er zwei Zusatzaufrufe je Betrieb statt
+ * zwei je Ordner. `posten_holen()` sortiert bei gleicher Prioritaet nach
+ * `posten_id`, also nach Einreihreihenfolge.
  */
-async function einreihenWennNeu(
-  endpunkt: string, heute: string, prioritaet: number, parameter: Record<string, string>,
-): Promise<number> {
+async function belegzaehlungEinreihen(heute: string): Promise<number> {
   const r = await query<{ posten_id: number }>(
-    `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, parameter)
-     SELECT $1, $2::date, $2::date, $3, $4::jsonb
+    `INSERT INTO sync.warteschlange
+       (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, parameter)
+     SELECT 'la:belegzahl', $1::date, $1::date, $2, p.parameter
+       FROM (SELECT jsonb_build_object(
+                      'linaBetriebId', b.lina_betrieb_id::text,
+                      'typeId',        a.typ_id) AS parameter
+               FROM core.betrieb b
+               CROSS JOIN core.belegart a
+              WHERE b.lina_betrieb_id IS NOT NULL
+                -- Der Lohn-Zweig steht gar nicht erst in core.belegart
+                -- (Migration 0053, Falle 1). Die Bedingung ist der zweite
+                -- Guertel: wer dort je eine Zeile ergaenzt, holt damit nicht
+                -- versehentlich Ausweisdokumente und Krankmeldungen.
+                AND a.zweig = 'fibu'
+              ORDER BY b.lina_betrieb_id, a.typ_id) p
       WHERE NOT EXISTS (SELECT 1 FROM sync.warteschlange w
-                         WHERE w.endpunkt = $1 AND w.parameter = $4::jsonb
-                           AND (w.erledigt_am IS NULL OR w.ergebnis = 'aufgegeben'))
+                         WHERE w.endpunkt = 'la:belegzahl'
+                           AND w.zeitraum_von = $1::date
+                           AND w.parameter = p.parameter)
      RETURNING posten_id`,
-    [endpunkt, heute, prioritaet, JSON.stringify(parameter)])
+    [heute, PRIORITAET_LADENAKTE])
   return r.length
 }
+
+/*
+ * HIER STAND `einreihenWennNeu()` — entfernt am 13.08.2026 mit dem Umbau auf
+ * die taegliche Zaehlung.
+ *
+ * Sie war das Einreihen fuer den EINMALIGEN Abzug des Belegarchivs und sperrte
+ * zwei Zustaende: offen (kommt ohnehin dran) und 'aufgegeben' (sonst waechst
+ * die Warteschlange jede Nacht um denselben kaputten Posten). Ihr einziger
+ * Aufrufer war der Belegordner-Zweig oben, und der entscheidet jetzt nicht
+ * mehr hier, sondern in `laLaden()` an einer gemessenen Abweichung.
+ *
+ * Die Lehre bleibt und steht in docs/fehlerkatalog.md (12.08.2026, zwei
+ * Eintraege): ein Wiederholtakt gehoert an den ZEITRAUM, nicht an einen
+ * Ergebniswert. Erst sperrte diese Funktion jede erledigte Zeile fuer immer,
+ * wodurch die Momentaufnahmen ab September wortlos ausgeblieben waeren; dann
+ * liess die Lockerung Posten mit 'keine_daten' jede Nacht durch. Beides
+ * Symptome derselben Verwechslung. `einreihenJeMonat()` gleich darunter macht
+ * es richtig, `belegzaehlungEinreihen()` weiter oben ebenso — beide haengen
+ * am Zeitraum.
+ */
 
 /**
  * Einreihen fuer eine MONATLICHE Momentaufnahme — BWA-Historie, Stammdatenblatt.

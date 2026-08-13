@@ -307,3 +307,54 @@ beschriebene Befund — 5.466 als `menge_unstimmig` markierte Positionen liefen 
 gehört hierher: **wer eine geprüfte Größe nachrechnet, verliert die Prüfung.** `0042` hat
 `preis_je_einheit` genau dafür gebaut und setzt sie auf NULL, wo die Gesamtmenge nicht
 belastbar ist; eine Sicht, die die Formel wiederholt, umgeht diesen NULL-Wert.
+
+---
+
+## Belegarchiv-Zulauf (Migration `0069`, 13.08.2026)
+
+Zwei Spalten und zwei Sichten. Der Anlass steht in `docs/fehlerkatalog.md`, die Mechanik in
+`docs/importer.md` — hier die Schemaentscheidungen und ihre Begründung.
+
+### `core.belegart.inhalt_holen` — die Freigabe steht in der Datenbank, nicht im Code
+
+Ob der **Inhalt** eines Ordners geholt wird, ist eine fachliche Frage. Für sechs der
+vierzehn Belegarten (16, 3968, 3969, 3971, 3972, 3976) ist sie offen und gehört Eugene
+(Punkt 3 in Abschnitt 4 von `docs/plan-datenvollstaendigkeit.md`). Stünde sie als Konstante
+im Quelltext, wäre das Umschalten ein Commit, ein Build und ein Deployment; so ist es ein
+`UPDATE` auf eine Zeile.
+
+**Gezählt werden alle vierzehn**, auch die nicht freigegebenen. Das ist kein Widerspruch,
+sondern die Entscheidungsgrundlage: erst die Zählung sagt, ob dort überhaupt etwas liegt,
+das die Aufrufe lohnt. Was dabei herauskommt, steht in `mart.belegarchiv_zulauf` als
+Zustand `gezaehlt, nicht freigegeben` — sichtbar statt still.
+
+Gesetzt wird die Spalte **aus der Zählung abgeleitet** (`WHERE EXISTS … belegarchiv_soll`)
+und nicht als Liste hingeschrieben. Eine hingeschriebene Liste kann von dem abweichen, was
+tatsächlich geholt ist; eine abgeleitete nicht.
+
+### `core.belegarchiv_bestand.quelle` — Zählung und Abzug auseinanderhalten
+
+`zaehlung` kommt täglich, `abzug` nur bei Abweichung. Ohne die Trennung wäre die Tabelle nach
+wenigen Tagen überwiegend voll mit Zählungen, und niemand könnte mehr sagen, wann ein Ordner
+zuletzt wirklich **geholt** wurde. Die 621 vorhandenen Zeilen vom 12.08.2026 stammen
+ausnahmslos aus vollen Abzügen und bekommen deshalb den Vorgabewert `abzug`.
+
+Die Tabelle bleibt eine Zeitreihe (`gemessen_am` im Primärschlüssel). Das kostet 1.834 Zeilen
+am Tag und ist genau das, was Phase 4 des Plans für den Zulauf-Wächter braucht: eine
+tagesgenaue Kurve je Ordner. Der Index `(betrieb_key, typ_id, quelle, gemessen_am DESC)`
+trägt die Frage „letzter Abzug", die der Index aus `0053` ohne `quelle` nicht beantwortet.
+
+### Warum `manual.belegarchiv_soll` stehen bleibt
+
+Sie ist als Tor abgesetzt, aber nicht gelöscht: `mart.belegarchiv_fehlend` führt sie als
+dritte Zahl neben Bestand und Ist, und **wer nur zwei davon hat, kann „LINA hat weniger"
+nicht von „wir haben weniger geholt" unterscheiden**. Als Handzählung vom 11.08.2026 bleibt
+sie außerdem der einzige Beleg dafür, wie der Bestand vor dem ersten Abzug aussah.
+
+### Die Bedingung ist `<>`, nicht `<`
+
+Nachgemessen am 13.08.2026 in Produktion: für **alle 621** abgezogenen Ordner stimmten
+`count(*)` aus `core.buchungsbeleg` und `records_total` auf den Beleg genau überein, kein
+einziger Ausreißer. Die Gleichheit ist damit eine belastbare Invariante — und Ungleichheit
+fängt drei Fälle, die ein „ist er gewachsen?" durchließe: den abgebrochenen Abzug, den in
+LINA gelöschten Beleg und den nie geholten Ordner.

@@ -63,8 +63,31 @@ describe('Pfadbau', () => {
     expect(() => fnEndpunkt('fn:inventuren').pfad({ erpIds: '', seite: '1' }, null)).toThrow('erpIds')
   })
 
-  test('fn:inventurpositionen baut den items-Pfad aus der uuid', () => {
-    expect(fnEndpunkt('fn:inventurpositionen').pfad({ uuid: 'inv-1' }, null))
-      .toBe('/api/erp/stocktakings/inv-1/items')
+  test('fn:inventurpositionen baut den items-Pfad aus uuid und Seite', () => {
+    expect(fnEndpunkt('fn:inventurpositionen').pfad({ uuid: 'inv-1', seite: '1' }, null))
+      .toBe('/api/erp/stocktakings/inv-1/items?page=1')
+    expect(fnEndpunkt('fn:inventurpositionen').pfad({ uuid: 'inv-1', seite: '2' }, null))
+      .toBe('/api/erp/stocktakings/inv-1/items?page=2')
+  })
+
+  /**
+   * Der Fehler, der bis zum 13.08.2026 lief: der Pfad kannte keinen
+   * page-Parameter, /api/erp/stocktakings/{uuid}/items lieferte deshalb
+   * immer nur die erste Seite von perPage 800. Neun Inventuren in
+   * Produktion endeten bei exakt 800, zusammen fehlten 936 Positionen —
+   * HTTP 200, kein Fehler, kein Log.
+   *
+   * Der Posten OHNE Seite muss werfen und darf nicht auf 1 zurückfallen:
+   * ein stiller Vorgabewert waere genau der alte Zustand, nur mit einem
+   * Parameter davor. Ein Posten ohne Seite ist ein Einreihungsfehler.
+   */
+  test('fn:inventurpositionen ohne Seite wirft — kein stiller Rückfall auf Seite 1', () => {
+    expect(() => fnEndpunkt('fn:inventurpositionen').pfad({ uuid: 'inv-1' }, null))
+      .toThrow('"seite"')
+  })
+
+  test('fn:inventurpositionen ohne uuid wirft', () => {
+    expect(() => fnEndpunkt('fn:inventurpositionen').pfad({ seite: '1' }, null))
+      .toThrow('"uuid"')
   })
 })

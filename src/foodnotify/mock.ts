@@ -277,32 +277,71 @@ export function fnMockStarten(opt: FnMockOptionen = {}) {
                 status: { name: 'counting' }, totalNumberOfItems: 1, note: 'Nachzählung offen' },
             ],
           }
-          return json({ errors: [], code: 200, isError: false, payload: {
+          return json({
             data: seiten[seite] ?? [],
-            pagination: { currentPage: seite, totalPages: 2, totalItems: 2 },
-          } })
+            pagination: { perPage: 1, currentPage: seite, totalPages: 2, totalItems: 2 },
+          })
         }
-        case '/api/erp/stocktakings/inv-1/items':
+
+        /**
+         * DIE ZÄHLUNG EINER INVENTUR — PAGINIERT, UND ZWAR ECHT.
+         *
+         * Bis zum 13.08.2026 lieferte diese Attrappe eine nackte Liste ohne
+         * Seitenangabe, und der Pfadbau kannte keinen `page`-Parameter. Beides
+         * zusammen hiess: der Fehler, der in Produktion neun Inventuren bei
+         * exakt 800 Positionen abschnitt (936 fehlende Positionen), konnte
+         * hier gar nicht auftreten. Eine Attrappe, die den Fehlerfall nicht
+         * herstellen kann, beweist nichts.
+         *
+         * `inv-1` hat deshalb ZWEI Seiten bei perPage 1. Das prüft beides in
+         * einem Durchgang: dass Seite 2 überhaupt geholt wird, und dass sie
+         * nicht löscht, was Seite 1 geschrieben hat.
+         */
+        default: {
+          const items = pfad.match(/^\/api\/erp\/stocktakings\/([^/]+)\/items$/)
+          if (!items) break
+          const seite = Number(url.searchParams.get('page') ?? 1)
           // Wie im Inventar §4 belegt: Sollbestand, gezählte Menge, Preis je
           // Basiseinheit. Eine Position ohne shopArticleId (item-2) prüft den
           // Rückfall auf ware_key = NULL.
-          return json({ errors: [], code: 200, isError: false, payload: [
-            { id: 'item-1', name: 'Granini Orangensaft Mw 6X1,00',
-              shopArticleId: 'L-9001', shopName: 'HFS Getränke', baseUnit: 'ml',
-              theoreticalStockLevelInBaseUnits: 29612.59, countedAmountInBaseUnits: 6000,
-              reviewAmountInBaseUnits: 6000, pricePerBaseUnit: 0.0025533 },
-            { id: 'item-2', name: 'Zwiebeln Rot Sack 10Kg',
-              shopArticleId: null, shopName: null, baseUnit: 'kg',
-              theoreticalStockLevelInBaseUnits: 12, countedAmountInBaseUnits: 10.5,
-              reviewAmountInBaseUnits: null, pricePerBaseUnit: 2.4 },
-          ] })
-        case '/api/erp/stocktakings/inv-2/items':
-          return json({ errors: [], code: 200, isError: false, payload: [
-            { id: 'item-3', name: 'Prosecco Spumante Zardetto 0,75L',
-              shopArticleId: 'L-9002', shopName: 'Distra Aposto', baseUnit: 'l',
-              theoreticalStockLevelInBaseUnits: 8.25, countedAmountInBaseUnits: 6,
-              reviewAmountInBaseUnits: null, pricePerBaseUnit: 8.9 },
-          ] })
+          const zaehlungen: Record<string, unknown[][]> = {
+            'inv-1': [
+              [{ id: 'item-1', name: 'Granini Orangensaft Mw 6X1,00',
+                 shopArticleId: 'L-9001', shopName: 'HFS Getränke', baseUnit: 'ml',
+                 theoreticalStockLevelInBaseUnits: 29612.59, countedAmountInBaseUnits: 6000,
+                 reviewAmountInBaseUnits: 6000, pricePerBaseUnit: 0.0025533 }],
+              [{ id: 'item-2', name: 'Zwiebeln Rot Sack 10Kg',
+                 shopArticleId: null, shopName: null, baseUnit: 'kg',
+                 theoreticalStockLevelInBaseUnits: 12, countedAmountInBaseUnits: 10.5,
+                 reviewAmountInBaseUnits: null, pricePerBaseUnit: 2.4 }],
+            ],
+            'inv-2': [
+              [{ id: 'item-3', name: 'Prosecco Spumante Zardetto 0,75L',
+                 shopArticleId: 'L-9002', shopName: 'Distra Aposto', baseUnit: 'l',
+                 theoreticalStockLevelInBaseUnits: 8.25, countedAmountInBaseUnits: 6,
+                 reviewAmountInBaseUnits: null, pricePerBaseUnit: 8.9 }],
+            ],
+          }
+          const alle = zaehlungen[items[1]!]
+          if (!alle) break
+          /**
+           * DIE HÜLLE IST SEIT DEM 13.08.2026 GEMESSEN, nicht mehr abgeleitet.
+           * Am Rohbestand aller 358 Antworten in Produktion geprüft: beide
+           * stocktakings-Pfade antworten mit `{data, pagination}` auf der
+           * OBERSTEN Ebene — NICHT mit der erp-Hülle
+           * `{code,errors,isError,payload}`, die der übrige /api/erp/*-Zweig
+           * verwendet. Die alte Annahme stand als Vorbehalt in
+           * endpunkte.ts und hier; sie ist damit widerlegt
+           * (docs/foodnotify-api-inventar.md).
+           */
+          return json({
+            data: alle[seite - 1] ?? [],
+            pagination: {
+              perPage: 1, currentPage: seite,
+              totalPages: alle.length, totalItems: alle.flat().length,
+            },
+          })
+        }
       }
       return json({ message: 'not found' }, { status: 404 })
     },

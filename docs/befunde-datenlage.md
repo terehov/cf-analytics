@@ -1367,3 +1367,106 @@ Buchungskonten zu nehmen. Gemessen: von 71.780 Eingangsrechnungen der letzten
 zwölf Monate tragen **1.816** ein Sachkonto (2,5 %), verteilt auf 32
 verschiedene. `kreditor_konto` steht bei 37.818. Als Grundlage für eine
 Abgrenzung reicht beides nicht.
+
+---
+
+## Der Zulauf, den niemand vermisst hat (gemessen 13.08.2026)
+
+Alle Zahlen über die Metabase-API gegen Produktion, lesend.
+
+### Das Belegarchiv wächst um rund 331 Belege am Tag — und um 0 an zweien
+
+```sql
+SELECT hochgeladen_am::date AS tag, count(*) AS belege
+  FROM core.buchungsbeleg
+ WHERE hochgeladen_am >= current_date - 14
+ GROUP BY 1 ORDER BY 1;
+```
+
+| Tag | Belege |
+|---|---|
+| 07.08. | 533 |
+| 08.08. | 89 |
+| 09.08. | 187 |
+| 10.08. | 659 |
+| 11.08. | 488 |
+| **12.08.** | **keine Zeile** |
+| **13.08.** | **keine Zeile** |
+
+Mittel der 28 Tage davor: **331** am Tag, Minimum 43, Maximum 702. Die Streuung ist groß —
+ein einzelner schwacher Tag ist deshalb kein Befund, zwei leere sind einer.
+
+**Wo der Zulauf herkommt.** Zwei Belegarten tragen 93 %:
+
+| `typ_id` | Ordner | Belege/Tag |
+|---|---|---|
+| 1 | Eingangsrechnungen und Avise | 222,2 |
+| 5 | Kassenbelege | 86,8 |
+| 2 | Ausgangsrechnungen | 10,4 |
+| 3977 | Kontoauszüge | 6,0 |
+| 3 | Inventur und Bruchlisten | 3,3 |
+| 3975 | Susa | 1,6 |
+| 3974 | BWA | 0,3 |
+| 3970 | Lieferscheine | 0,0 |
+
+Das ist **kein** Argument dafür, nur die beiden zu zählen. Nur 296 der 1.834 Paare aus
+Betrieb und Ordner hatten in 28 Tagen überhaupt Zulauf — welche 296 das morgen sind, weiß
+niemand vorher, und genau diese Sorte Abkürzung hat den Stillstand verursacht.
+
+**Wie groß ein Tagesdelta ist:** im Mittel 8,1 Belege je Ordner und Tag, 95. Perzentil 36,
+Maximum 161. Klein genug, dass ein voller Ordnerabzug bei Abweichung vertretbar ist.
+
+### `lina_id` ist innerhalb eines Ordners fast, aber nicht ganz monoton
+
+```sql
+SELECT corr(lina_id::numeric, extract(epoch FROM hochgeladen_am)), count(*)
+  FROM core.buchungsbeleg
+ WHERE hochgeladen_am IS NOT NULL AND lina_id ~ '^[0-9]+$'
+ GROUP BY betrieb_key, typ_id HAVING count(*) >= 50;
+```
+
+410 Ordner mit mindestens 50 Belegen: Korrelation im Mittel **0,991**, aber nur 53 davon über
+0,999, **acht unter 0,9**, kleinster Wert **0,779**. Über alle Betriebe eines `typ_id`
+zusammen fällt sie auf 0,15 bis 0,92 — dort mischen sich verschiedene ID-Bereiche.
+
+**Warum das zählt:** „fast monoton" trägt keine Delta-Abfrage. Wer `start=<bekannter Stand>`
+setzt, verlässt sich auf ein stabiles Zeilenraster, und acht Ordner sagen, dass es das nicht
+ist. Diese Messung ist der Grund für die Zählung statt des Delta-Fensters.
+
+### Die Invariante, auf der der neue Abgleich steht
+
+```sql
+WITH letzte AS (SELECT DISTINCT ON (betrieb_key, typ_id) betrieb_key, typ_id, records_total
+                  FROM core.belegarchiv_bestand ORDER BY betrieb_key, typ_id, gemessen_am DESC),
+     gehalten AS (SELECT betrieb_key, typ_id, count(*) AS n FROM core.buchungsbeleg GROUP BY 1,2)
+SELECT count(*) FILTER (WHERE coalesce(g.n,0) = l.records_total) AS stimmt,
+       count(*) FILTER (WHERE coalesce(g.n,0) <> l.records_total) AS weicht_ab
+  FROM letzte l LEFT JOIN gehalten g USING (betrieb_key, typ_id);
+```
+
+**621 von 621 stimmen überein, null Abweichungen.** Das macht `count(*) <> records_total` zu
+einer brauchbaren Bedingung und nicht zu einer Wette.
+
+### Neun Inventuren enden bei exakt 800
+
+358 Inventuren, Maximum der geladenen Positionen **exakt 800**, Maximum laut Kopf **1.426**.
+Neun Inventuren fehlen zusammen **936 Positionen**, die größte allein 626. Alle neun stammen
+aus Großküchen — es sind die Inventuren mit dem höchsten Warenwert.
+
+Aus derselben Quelle, und **nicht** dasselbe: **28,7 %** aller 81.190 Inventurpositionen
+(23.315) tragen keine gezählte Menge. Das ist eine Eigenschaft der Zählung, keine Lücke im
+Abruf, und die Paginierung ändert daran nichts.
+
+### 322 Bestellungen ohne eine einzige Position — aber nur 275 sind ein Fehler
+
+686.535,93 € Bestellsumme ohne Positionen. Aufgeschlüsselt:
+
+| Zustand des Positions-Postens | Bestellungen |
+|---|---|
+| `aufgegeben` (HTTP 500, 4 Versuche) | **275** |
+| `ok` — die Bestellung ist wirklich leer | 47 |
+
+Die 275 verteilen sich auf Enchilada (271), Aposto (2) und Wilma Wunder (2) und fallen
+ausnahmslos in den 02. bis 04.08.2026, also in den großen Backfill. 1.100 Versuche insgesamt,
+keine einzige Rohantwort gespeichert. **Die 47 sind kein Befund** — wer sie mitzählt,
+repariert etwas, das in Ordnung ist.

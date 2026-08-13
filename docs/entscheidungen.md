@@ -1504,3 +1504,65 @@ Wirkung, nachgemessen am 12.08.2026: die negativen `mehrkosten` — also die erf
 (150,0 und 200,0 Prozent). Belastbar ist die Sicht im einstelligen bis niedrig
 zweistelligen Bereich — dort, wo Einkaufsbefunde tatsächlich liegen. Dreistellige
 Abweichungen gehören vor der Weitergabe am Beleg geprüft.
+
+---
+
+## 13.08.2026 — Phase 1 des Datenvollständigkeits-Plans
+
+Anlass: `docs/plan-datenvollstaendigkeit.md`, Abschnitt 3, Phase 1 — alles, was **heute**
+Daten verliert, die morgen nicht mehr nachholbar sind.
+
+### Der Belegarchiv-Zulauf wird gezählt, nicht geraten
+
+Drei Wege standen zur Wahl:
+
+**A — jede Nacht alles neu holen.** Ehrlich und viel zu teuer: 621 volle Ordner brauchten im
+Erstabzug acht Stunden und mehrere hundert Megabyte. Bei 1.048 nicht leeren Paaren wäre das
+der ganze Tag, jeden Tag, für einen Zuwachs von im Mittel 331 Belegen.
+
+**B — nur das Delta holen** (`start=<bekannter Stand>&length=…`). Ein Aufruf statt zwei, und
+er bringt gleich die neuen Zeilen mit. **Verworfen**, weil `start` eine Zeilennummer ist und
+keine Beleg-ID: wird in der Mitte eines Ordners einer gelöscht und einer angehängt, bleibt
+`recordsTotal` gleich, das Fenster verschiebt sich, und der neue Beleg fehlt für immer. Die
+Gegenprobe ist gemessen — `lina_id` läuft innerhalb eines Ordners nicht verlässlich mit der
+Uploadzeit (Korrelation im Mittel 0,991, aber acht Ordner unter 0,9, kleinster Wert 0,779).
+Ein lautloser Verlust als Reparatur eines lautlosen Verlusts wäre die falsche Richtung.
+
+**C — zählen, dann bei Abweichung ganz holen.** Gewählt. Die Zählung kostet eine Zeile, der
+volle Abzug bleibt unverändert — samt seiner Vollständigkeitsprüfung (`Zeilen ==
+recordsTotal`), die die einzige Zusicherung ist, die es überhaupt gibt. 1.834 Zählungen plus
+262 Token-Aufrufe sind rund 2.238 von 10.500 Aufrufen am Tag.
+
+### Verglichen wird gegen `count(*)`, nicht gegen die letzte Zählung
+
+Naheliegend wäre „ist `records_total` seit gestern gewachsen?". Die gewählte Bedingung ist
+„halten wir genau so viele, wie LINA zählt?" — sie fängt zusätzlich den mittendrin
+abgebrochenen Abzug, den in LINA gelöschten Beleg und den nie geholten Ordner. Belastbar ist
+sie, weil die Gleichheit gemessen ist: am 13.08.2026 stimmte sie für alle 621 abgezogenen
+Ordner auf den Beleg genau.
+
+### Die sechs nie geholten Belegarten werden gezählt, aber nicht geholt
+
+Punkt 3 in Abschnitt 4 des Plans ist offen und gehört Eugene. Sie **nicht** zu zählen hieße,
+die Entscheidung ohne Grundlage zu lassen; sie zu **holen** hieße, sie vorwegzunehmen. Also:
+zählen, nicht holen, und den Zustand in `mart.belegarchiv_zulauf` sichtbar machen. Umschalten
+ist danach ein `UPDATE` auf `core.belegart.inhalt_holen`, keine Migration.
+
+### Die 275 aufgegebenen Posten werden wiederbelebt, nicht neu angelegt
+
+Eine zweite Zeile für dieselbe Arbeit machte `ergebnis = 'aufgegeben'` als Zählgröße wertlos
+— und genau diese Zahl steht ab sofort in `mart.pruefung_uebersicht`. Der Posten wird deshalb
+zurückgesetzt (`versuche = 0`, `erledigt_am = NULL`), nicht dupliziert.
+
+**Und es bleibt ein Handbefehl.** Ein automatischer nächtlicher Rücklauf ohne Obergrenze wäre
+derselbe Bau wie der 403-Zweig in `src/sync/worker.ts`: `versuche` hoch, `versuche` runter,
+netto ±0, seit neun Tagen. Die Obergrenze ist Phase 3.3; bis dahin ist ein bewusster Befehl
+ehrlicher als eine Schleife, die nie endet.
+
+### `einreihenWennNeu()` ist entfallen
+
+Ihr einziger Aufrufer war der Belegordner-Zweig. Die Lehre, für die sie zweimal bezahlt hat,
+steht in `docs/fehlerkatalog.md` (12.08.2026) und im Quelltext an ihrer Stelle: ein
+Wiederholtakt gehört an den **Zeitraum**, nicht an einen Ergebniswert. Dead code mit einer
+ausführlichen Begründung ist schlimmer als kein Code — der nächste liest die Begründung und
+sucht den Aufrufer.

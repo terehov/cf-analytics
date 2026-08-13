@@ -14,7 +14,7 @@ import type { PoolClient } from 'pg'
 import { inTransaktion, inBloecken, mehrzeilig } from '../db/pool'
 import { log } from '../lib/log'
 import { bwaLongtermLesen, stammdatenLesen, monatsspalte, deutscheZahl } from './html'
-import { SEITENGROESSE } from './endpunkte'
+import { SEITENGROESSE, ZAEHLGROESSE } from './endpunkte'
 
 export type LaKontext = {
   ep: { key: string; pfad: string; form?: 'json' | 'html' }
@@ -155,6 +155,7 @@ export async function laLaden(k: LaKontext): Promise<number> {
     }
 
     switch (k.ep.key) {
+      case 'la:belegzahl':    return belegzahlSchreiben(c, k, bk, linaBetriebId, rawId, abgerufenAm)
       case 'la:belegliste':   return belegeSchreiben(c, k, bk, linaBetriebId, rawId, abgerufenAm)
       case 'la:bwa_longterm': return bwaSchreiben(c, k, bk, rawId, abgerufenAm)
       case 'la:stammdaten':   return stammdatenSchreiben(c, k, bk, rawId, abgerufenAm)
@@ -183,6 +184,118 @@ export function schluesseltabelleEntfernen(html: string): string {
       ? '<!-- Tabelle mit API-Schluesseln vor der Rohablage entfernt (AGENTS.md Regel 2) -->'
       : t)
 }
+
+// ---------------------------------------------------------------------------
+// Zaehlung — der taegliche Abgleich, aus dem der Zulauf entsteht
+// ---------------------------------------------------------------------------
+
+/**
+ * Eine Zaehlung schreiben und daraus entscheiden, ob der Ordner neu geholt wird.
+ *
+ * DIE INVARIANTE, GEGEN DIE HIER GEPRUEFT WIRD, IST NICHT "ist er gewachsen",
+ * SONDERN "halten wir genau so viele, wie LINA zaehlt". Am 13.08.2026 in
+ * Produktion nachgemessen: fuer alle 621 abgezogenen Ordner stimmten
+ * `count(*)` aus `core.buchungsbeleg` und `records_total` auf den Beleg genau
+ * ueberein, kein einziger Ausreisser. Das macht die Gleichheit zu einer
+ * belastbaren Bedingung — und sie faengt drei Faelle, die ein blosses
+ * "gewachsen?" durchliesse:
+ *
+ *   - ein Abzug, der mittendrin abgebrochen ist (wir haben weniger),
+ *   - ein in LINA geloeschter Beleg (LINA hat weniger),
+ *   - ein Ordner, der noch nie geholt wurde (wir haben null).
+ *
+ * DER FOLGEPOSTEN ENTSTEHT IN DERSELBEN TRANSAKTION wie die Zaehlung — wie bei
+ * FoodNotify (`folgepostenEinreihen`). Bricht der Lauf dazwischen ab, ist
+ * entweder beides geschrieben oder nichts; eine Zaehlung ohne ihren Abzug kann
+ * es nicht geben.
+ *
+ * GESPERRT WIRD NUR EIN OFFENER POSTEN, nicht ein aufgegebener — anders als
+ * `einreihenWennNeu()` in nachfuellen.ts. Der Unterschied ist beabsichtigt:
+ * dort kannte niemand den Bedarf, hier ist er gemessen. Ein Ordner, dessen
+ * Abzug gestern scheiterte, hat heute immer noch eine echte Luecke, und die
+ * gehoert erneut versucht. Waechst die Warteschlange dadurch, dann um genau
+ * die Ordner, die tatsaechlich fehlen — sichtbar in `mart.belegarchiv_zulauf`.
+ */
+async function belegzahlSchreiben(
+  c: PoolClient, k: LaKontext, bk: number, linaBetriebId: number,
+  rawId: string, abgerufenAm: Date,
+): Promise<number> {
+  const d = k.daten as { recordsTotal?: number; recordsFiltered?: number }
+  const typId = String(k.parameter.typeId ?? '')
+  if (!typId) throw new Error('la:belegzahl: typeId fehlt im Posten')
+
+  /**
+   * Ohne `recordsTotal` ist die Antwort wertlos — und gefaehrlich: sie als 0
+   * zu lesen hiesse "der Ordner ist leer", und der Abgleich holte ihn nie
+   * wieder. Werfen ist hier die einzige ehrliche Antwort.
+   */
+  const total = Number(d?.recordsTotal)
+  if (!Number.isInteger(total) || total < 0) {
+    throw new Error(
+      `la:belegzahl Betrieb ${linaBetriebId} Ordner ${typId}: recordsTotal fehlt oder ist `
+      + `keine Zahl (${JSON.stringify(d?.recordsTotal)}). Eine Zaehlung ohne Zaehlstand ist `
+      + `keine Zaehlung — als 0 gelesen hiesse sie "Ordner leer" und der Abgleich waere still.`)
+  }
+
+  await c.query(
+    `INSERT INTO core.belegarchiv_bestand
+       (betrieb_key, lina_betrieb_id, typ_id, gemessen_am, records_total,
+        records_filtered, seitengroesse, archivierte_enthalten, raw_id, quelle)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,false,$8,'zaehlung')`,
+    [bk, linaBetriebId, typId, abgerufenAm, total,
+     Number(d?.recordsFiltered ?? total), ZAEHLGROESSE, rawId])
+
+  /**
+   * Der Abzug wird nachgereiht, wenn Zaehlstand und Bestand auseinanderlaufen
+   * UND die Belegart zum Holen freigegeben ist (`core.belegart.inhalt_holen`).
+   *
+   * Die Freigabe steht in der Datenbank und nicht hier im Code, weil sie eine
+   * FACHLICHE Entscheidung ist: sechs der vierzehn Belegarten wurden nie
+   * geholt (16, 3968, 3969, 3971, 3972, 3976), und ob sie geholt werden
+   * sollen, entscheidet Eugene — Punkt 3 in docs/plan-datenvollstaendigkeit.md
+   * Abschnitt 4. Gezaehlt werden sie ab sofort trotzdem: erst die Zaehlung
+   * sagt, ob dort ueberhaupt etwas liegt, das die Entscheidung lohnt.
+   *
+   * Damit dieser Zweig nicht zu dem wird, wovor AGENTS.md warnt — ein "nichts
+   * zu tun", das aussieht wie Erfolg — steht der Fall in
+   * `mart.belegarchiv_zulauf` als eigene Zeile: gezaehlt, abweichend, nicht
+   * freigegeben.
+   */
+  const nachgereiht = await c.query<{ posten_id: number }>(
+    `WITH gehalten AS (
+          SELECT count(*) AS n FROM core.buchungsbeleg
+           WHERE betrieb_key = $1 AND typ_id = $2)
+     INSERT INTO sync.warteschlange
+       (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, parameter)
+     SELECT 'la:belegliste', $3::date, $3::date, $4, $5::jsonb
+       FROM gehalten g, core.belegart a
+      WHERE a.typ_id = $2 AND a.inhalt_holen
+        AND g.n <> $6
+        AND NOT EXISTS (SELECT 1 FROM sync.warteschlange w
+                         WHERE w.endpunkt = 'la:belegliste'
+                           AND w.parameter = $5::jsonb
+                           AND w.erledigt_am IS NULL)
+     RETURNING posten_id`,
+    [bk, typId, abgerufenAm.toISOString().slice(0, 10), PRIORITAET_ABZUG,
+     JSON.stringify({ linaBetriebId: String(linaBetriebId), typeId: typId }), total])
+
+  if (nachgereiht.rows.length > 0) {
+    log.info('belegarchiv: abweichung gezaehlt, abzug nachgereiht', {
+      linaBetriebId, typ_id: typId, records_total: total,
+    })
+  }
+
+  // Eine Zaehlung ist eine Zeile — nicht `total`. Sonst zeigte sync.aufgabe
+  // fuer diesen Posten 8.384 geladene Zeilen, wo eine Zahl geholt wurde.
+  return 1
+}
+
+/**
+ * Der nachgereihte Abzug laeuft VOR den uebrigen Ladenakte-Posten (95), aber
+ * hinter LINAs Tagesdaten. Er ist die Reparatur einer gemessenen Luecke; die
+ * Zaehlungen, die ihn ausgeloest haben, duerfen ihm nicht den Rang ablaufen.
+ */
+const PRIORITAET_ABZUG = 93
 
 // ---------------------------------------------------------------------------
 // Belege

@@ -178,11 +178,23 @@ lauf('Ende-zu-Ende', () => {
     // Umsatzbericht und Artikelbericht stammen aus verschiedenen Beispielen und
     // widersprechen sich zwangsläufig. Geprüft wird, dass die Sichten laufen —
     // ein Tippfehler im SQL fällt sonst erst in Postico auf.
-    // Seit Migration 0029 zwei statt drei Zeilen: die Wareneinsatzpruefung
-    // ist stillgelegt. Sie hat nie ausgeloest, weil ihr Filter auf
-    // IS NOT NULL prueft und fixer_we nie NULL ist, sondern 0.
-    const { rows } = await db.query(`SELECT * FROM mart.pruefung_uebersicht`)
-    expect(rows).toHaveLength(2)
+    // Seit Migration 0029 ohne die Wareneinsatzpruefung: sie hat nie
+    // ausgeloest, weil ihr Filter auf IS NOT NULL prueft und fixer_we nie
+    // NULL ist, sondern 0.
+    // Seit Migration 0069 kommen vier Zulaufpruefungen dazu — der Befund vom
+    // 13.08.2026: eine Quelle ohne Zulauf ist ein Fehler, kein Normalzustand,
+    // und der Lauf hat sie zweimal als "ok" gemeldet.
+    const { rows } = await db.query(
+      `SELECT pruefung FROM mart.pruefung_uebersicht ORDER BY pruefung`)
+    expect(rows.map(r => r.pruefung)).toEqual([
+      'Belegarchiv: Ordner ohne den faelligen Abzug',
+      'Belegarchiv: seit ueber 36 h nicht gezaehlt',
+      'Bestellung: Kopf ohne eine einzige Position',
+      'Bon: avgTicket vs. Umsatz/Rechnungen',
+      'Inventur: Zaehlung abgeschnitten',
+      'Umsatz: Artikelsumme vs. Umsatzbericht',
+      'Warteschlange: aufgegebene Posten',
+    ])
   })
 
   /**
@@ -1475,9 +1487,16 @@ lauf('FoodNotify Ende-zu-Ende', () => {
     const { workerLauf } = await import('./worker')
     const r = await workerLauf('manuell')
     expect(r.status).toBe('ok')
-    // Seite 1 + Seite 2 (rückwärts eingereiht) + je eine Positionen-Zeile
-    // für inv-1 und inv-2 = 4 Posten, alle in diesem einen Lauf.
-    expect(r.ok).toBe(4)
+    /**
+     * Fünf Posten in einem Lauf: Inventurliste Seite 1 und 2, dazu die
+     * Zählungen — inv-1 über ZWEI Seiten, inv-2 über eine.
+     *
+     * Die fünfte ist die, die es bis zum 13.08.2026 nicht gab. Der Pfadbau
+     * kannte keinen `page`-Parameter, also endete jede Zählung nach
+     * `perPage`. In Produktion waren das 800: neun Inventuren abgeschnitten,
+     * 936 Positionen fehlend, HTTP 200, kein Log.
+     */
+    expect(r.ok).toBe(5)
 
     const { rows: inventuren } = await db.query(
       `SELECT i.fn_uuid, i.name, i.art, i.status, i.anzahl_positionen, k.erp_id
@@ -1517,6 +1536,32 @@ lauf('FoodNotify Ende-zu-Ende', () => {
     // Ohne shopArticleId bleibt die Ware NULL statt erfunden.
     const zwiebeln = positionen.find(p => p.name.startsWith('Zwiebeln'))!
     expect(zwiebeln.ware).toBeNull()
+
+    /**
+     * SEITE 2 DARF NICHT LÖSCHEN, WAS SEITE 1 GESCHRIEBEN HAT.
+     *
+     * Das Laden ersetzt die Zählung einer Inventur vollständig (DELETE, dann
+     * INSERT) — richtig, solange eine Antwort der ganze Stand ist. Sobald
+     * geblättert wird, ist sie das nicht mehr: ein DELETE je Seite liesse am
+     * Ende nur die LETZTE Seite stehen. Bei der 817er-Inventur aus Produktion
+     * wären das 17 statt 817 Positionen, und es sähe aus wie eine sehr kleine
+     * Inventur. Deshalb löscht nur Seite 1.
+     *
+     * inv-1 hat in der Attrappe zwei Seiten zu je einer Position. Beide sind
+     * hier — Granini von Seite 1, Zwiebeln von Seite 2.
+     */
+    expect(orangensaft).toBeDefined()
+    expect(zwiebeln).toBeDefined()
+    const { rows: [inv1] } = await db.query(
+      `SELECT count(*)::int AS n FROM core.inventurposition p
+         JOIN core.inventur i USING (inventur_key)
+        WHERE i.fn_uuid = 'inv-1'`)
+    expect(Number(inv1.n)).toBe(2)
+
+    // Und der Kopf sagt dasselbe wie die Zeilen: nichts ist abgeschnitten.
+    const { rows: abgeschnitten } = await db.query(
+      `SELECT fn_uuid, fehlend FROM mart.inventur_abgeschnitten`)
+    expect(abgeschnitten).toEqual([])
 
     // Nichts blieb für Aposto liegen (Enchilada steht nach dem vorigen Test
     // bewusst noch vertagt — das ist kein Leck dieses Tests).
@@ -1677,11 +1722,19 @@ lauf('e2e Ladenakte', () => {
      * Fremdschluessel von core.belegarchiv_bestand.
      */
     const { FIBU_BELEGARTEN } = await import('../ladenakte/endpunkte')
+    /**
+     * `inhalt_holen` wird hier NICHT pauschal auf true gesetzt, sondern so
+     * verteilt wie in Produktion: die acht am 11.08.2026 gezaehlten Belegarten
+     * true, die sechs nie gezaehlten false. Nur so laesst sich der Zweig
+     * pruefen, der "nichts zu tun" bedeutet — und genau der ist es, der
+     * zweimal Tage gekostet hat.
+     */
+    const freigegeben = new Set(['1', '2', '3', '5', '3970', '3974', '3975', '3977'])
     for (const [i, b] of FIBU_BELEGARTEN.entries()) {
       await db.query(
-        `INSERT INTO core.belegart (typ_id, name, zweig, hat_soll, reihenfolge)
-         VALUES ($1,$2,'fibu',true,$3) ON CONFLICT (typ_id) DO NOTHING`,
-        [b.typId, b.name, i])
+        `INSERT INTO core.belegart (typ_id, name, zweig, hat_soll, reihenfolge, inhalt_holen)
+         VALUES ($1,$2,'fibu',true,$3,$4) ON CONFLICT (typ_id) DO NOTHING`,
+        [b.typId, b.name, i, freigegeben.has(b.typId)])
     }
   })
 
@@ -1868,5 +1921,208 @@ lauf('e2e Ladenakte', () => {
     const { rows } = await db.query(
       `SELECT count(*)::int AS n FROM sync.warteschlange WHERE endpunkt = 'la:stammdaten'`)
     expect(Number(rows[0].n)).toBe(1)
+  })
+
+  /**
+   * ================================================================
+   * DER ZULAUF DES BELEGARCHIVS — die Tests zum Befund vom 13.08.2026
+   * ================================================================
+   *
+   * Was passiert war: `ladenakteNachfuellen()` reihte einen Ordner nur ein,
+   * solange es fuer ihn keinen Bestandssatz mit records_total > 0 gab. Der
+   * Abzug lief am 12.08.2026 um 13:25 fertig — danach lieferte die Bedingung
+   * null Zeilen, und core.buchungsbeleg bekam zwei Tage lang keinen Beleg
+   * mehr, bei einem Mittel von 331 am Tag. Die Laeufe 85 bis 88 meldeten
+   * dabei 269 von 269 Aufgaben "ok".
+   *
+   * Kein Test haette das gesehen, weil keiner den ZWEITEN Tag geprueft hat.
+   * Genau das tun die folgenden.
+   */
+  describe('Zulauf des Belegarchivs', () => {
+    /** Frischer Anfang je Test: sonst traegt der Bestand des vorigen weiter. */
+    const zuruecksetzen = () => db.query(
+      `TRUNCATE sync.warteschlange, core.belegarchiv_bestand, core.buchungsbeleg
+       RESTART IDENTITY CASCADE`)
+
+    const zahl = async (sql: string, p: unknown[] = []) =>
+      Number((await db.query(sql, p)).rows[0].n)
+
+    test('die Zaehlung holt EINE Zeile und schreibt keinen einzigen Beleg', async () => {
+      const { workerLauf } = await import('./worker')
+      const { cacheLeeren } = await import('../ladenakte/token')
+      await zuruecksetzen(); cacheLeeren()
+
+      await db.query(
+        `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, parameter)
+         VALUES ('la:belegzahl', current_date, current_date, 95, '{"linaBetriebId":"15","typeId":"1"}')`)
+
+      const r = await workerLauf('manuell')
+      expect(r.fehler).toBe(0)
+
+      /**
+       * Der Kern: die Zaehlung SIEHT 61 Belege und SCHREIBT keinen. Wuerde
+       * sie welche schreiben, waere sie ein zweiter, halber Abzug — und die
+       * Vollstaendigkeitspruefung von la:belegliste (Zeilen == recordsTotal)
+       * haette hier zu Recht geworfen.
+       */
+      expect(await zahl(
+        `SELECT records_total AS n FROM core.belegarchiv_bestand WHERE quelle = 'zaehlung'`)).toBe(61)
+      expect(await zahl(
+        `SELECT seitengroesse AS n FROM core.belegarchiv_bestand WHERE quelle = 'zaehlung'`)).toBe(1)
+
+      // Und der Abzug wurde nachgereiht, weil 61 <> 0 ist.
+      expect(await zahl(
+        `SELECT count(*)::int AS n FROM sync.warteschlange
+          WHERE endpunkt = 'la:belegliste' AND parameter->>'typeId' = '1'`)).toBe(1)
+      // Der Lauf hat ihn im selben Durchgang abgearbeitet (Prioritaet 93 < 95).
+      expect(await zahl(`SELECT count(*)::int AS n FROM core.buchungsbeleg`)).toBe(61)
+    })
+
+    /**
+     * DER EIGENTLICHE FEHLER: der ZWEITE Tag.
+     *
+     * Der Abzug ist durch, der Bestand stimmt — und trotzdem muss die
+     * Zaehlung am naechsten Tag wieder laufen. Was sie NICHT tun darf, ist
+     * den Ordner erneut ganz zu holen: 621 volle Abzuege waren im Erstabzug
+     * acht Stunden.
+     */
+    test('am naechsten Tag wird wieder gezaehlt, aber nicht erneut abgezogen', async () => {
+      const { ladenakteNachfuellen } = await import('./nachfuellen')
+      const { workerLauf } = await import('./worker')
+      const { cacheLeeren } = await import('../ladenakte/token')
+      await zuruecksetzen(); cacheLeeren()
+
+      // Tag 1: zaehlen, abziehen.
+      await ladenakteNachfuellen('2026-08-13')
+      // 14 Belegarten x 1 Betrieb — das Kreuzprodukt, nicht die Soll-Liste.
+      expect(await zahl(
+        `SELECT count(*)::int AS n FROM sync.warteschlange WHERE endpunkt = 'la:belegzahl'`)).toBe(14)
+      await workerLauf('manuell')
+      /**
+       * 75 = 61 aus Ordner 1 plus je 2 aus den sieben uebrigen FREIGEGEBENEN
+       * Ordnern. Die sechs nicht freigegebenen sind gezaehlt und nicht geholt
+       * — genau diese Trennung macht die Zahl aussagekraeftig: waeren es 89,
+       * haette die Freigabe nicht gegriffen.
+       */
+      expect(await zahl(`SELECT count(*)::int AS n FROM core.buchungsbeleg`)).toBe(75)
+      expect(await zahl(
+        `SELECT count(DISTINCT typ_id)::int AS n FROM core.buchungsbeleg`)).toBe(8)
+
+      // Tag 2: frische Zaehlungen, KEIN zweiter Abzug — der Bestand stimmt.
+      const abzuegeVorher = await zahl(
+        `SELECT count(*)::int AS n FROM sync.warteschlange WHERE endpunkt = 'la:belegliste'`)
+      await ladenakteNachfuellen('2026-08-14')
+      expect(await zahl(
+        `SELECT count(*)::int AS n FROM sync.warteschlange
+          WHERE endpunkt = 'la:belegzahl' AND zeitraum_von = '2026-08-14'`)).toBe(14)
+      await workerLauf('manuell')
+      expect(await zahl(
+        `SELECT count(*)::int AS n FROM sync.warteschlange WHERE endpunkt = 'la:belegliste'`))
+        .toBe(abzuegeVorher)
+
+      // Zweimal gezaehlt heisst zwei Messpunkte: die Zeitreihe ist der Beleg
+      // dafuer, dass hier ueberhaupt jemand hingesehen hat.
+      expect(await zahl(
+        `SELECT count(*)::int AS n FROM core.belegarchiv_bestand
+          WHERE quelle = 'zaehlung' AND typ_id = '1'`)).toBe(2)
+    })
+
+    /**
+     * Der Fall, den ein blosses "ist er gewachsen?" durchliesse: unser
+     * Bestand ist KLEINER geworden, LINAs Zahl steht still. So sieht ein
+     * mittendrin abgebrochener Abzug aus.
+     */
+    test('fehlende Belege bei gleicher LINA-Zahl loesen einen Abzug aus', async () => {
+      const { ladenakteNachfuellen } = await import('./nachfuellen')
+      const { workerLauf } = await import('./worker')
+      const { cacheLeeren } = await import('../ladenakte/token')
+      await zuruecksetzen(); cacheLeeren()
+
+      await ladenakteNachfuellen('2026-08-13')
+      await workerLauf('manuell')
+      expect(await zahl(`SELECT count(*)::int AS n FROM core.buchungsbeleg`)).toBe(75)
+
+      // Ein halber Abzug: zehn Belege fehlen, LINA zaehlt weiter 61.
+      await db.query(
+        `DELETE FROM core.buchungsbeleg WHERE buchungsbeleg_key IN (
+           SELECT buchungsbeleg_key FROM core.buchungsbeleg WHERE typ_id = '1' LIMIT 10)`)
+      expect(await zahl(
+        `SELECT count(*)::int AS n FROM core.buchungsbeleg WHERE typ_id = '1'`)).toBe(51)
+
+      // Die Sicht benennt es, bevor irgendetwas nachlaeuft.
+      const { rows: [vorher] } = await db.query(
+        `SELECT zustand, differenz FROM mart.belegarchiv_zulauf
+          WHERE typ_id = '1' AND lina_betrieb_id = 15`)
+      expect(vorher).toMatchObject({ zustand: 'abzug fehlt', differenz: 10 })
+
+      await ladenakteNachfuellen('2026-08-14')
+      await workerLauf('manuell')
+      expect(await zahl(
+        `SELECT count(*)::int AS n FROM core.buchungsbeleg WHERE typ_id = '1'`)).toBe(61)
+    })
+
+    /**
+     * Der Zweig, der "nichts zu tun" bedeutet — und der deshalb SICHTBAR sein
+     * muss. Belegart 3969 (USt-Voranmeldungen) ist nicht freigegeben: gezaehlt
+     * wird sie, geholt nicht. Ohne die Sicht saehe das genauso aus wie ein
+     * leerer Ordner.
+     */
+    test('eine nicht freigegebene Belegart wird gezaehlt, aber nicht geholt', async () => {
+      const { workerLauf } = await import('./worker')
+      const { cacheLeeren } = await import('../ladenakte/token')
+      await zuruecksetzen(); cacheLeeren()
+
+      await db.query(
+        `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, parameter)
+         VALUES ('la:belegzahl', current_date, current_date, 95, '{"linaBetriebId":"15","typeId":"3969"}')`)
+      const r = await workerLauf('manuell')
+      expect(r.fehler).toBe(0)
+
+      // Gezaehlt: ja. Abzug: nein. Belege: keine.
+      expect(await zahl(
+        `SELECT records_total AS n FROM core.belegarchiv_bestand WHERE typ_id = '3969'`)).toBe(2)
+      expect(await zahl(
+        `SELECT count(*)::int AS n FROM sync.warteschlange WHERE endpunkt = 'la:belegliste'`)).toBe(0)
+      expect(await zahl(`SELECT count(*)::int AS n FROM core.buchungsbeleg`)).toBe(0)
+
+      // Und genau so steht es in der Sicht — nicht nur in einem Log.
+      const { rows } = await db.query(
+        `SELECT zustand, differenz FROM mart.belegarchiv_zulauf
+          WHERE typ_id = '3969' AND lina_betrieb_id = 15`)
+      expect(rows[0]).toMatchObject({ zustand: 'gezaehlt, nicht freigegeben', differenz: 2 })
+    })
+
+    /**
+     * Die Sicht ist die Sichtbarkeit. Wenn sie nicht zwischen "alles geholt"
+     * und "noch nie hingesehen" unterscheiden kann, ist sie so nutzlos wie
+     * der Lauf, der 269 von 269 ok meldet.
+     */
+    test('mart.belegarchiv_zulauf trennt vollstaendig von nie gezaehlt', async () => {
+      const { workerLauf } = await import('./worker')
+      const { cacheLeeren } = await import('../ladenakte/token')
+      await zuruecksetzen(); cacheLeeren()
+
+      // Vor dem ersten Lauf: alle 14 Ordner stehen auf "nie gezaehlt".
+      expect(await zahl(
+        `SELECT count(*)::int AS n FROM mart.belegarchiv_zulauf WHERE zustand = 'nie gezaehlt'`))
+        .toBe(14)
+
+      await db.query(
+        `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, parameter)
+         VALUES ('la:belegzahl', current_date, current_date, 95, '{"linaBetriebId":"15","typeId":"1"}')`)
+      await workerLauf('manuell')
+
+      const { rows } = await db.query(
+        `SELECT zustand, gezaehlt, gehalten, differenz FROM mart.belegarchiv_zulauf
+          WHERE typ_id = '1' AND lina_betrieb_id = 15`)
+      expect(rows[0]).toMatchObject({
+        zustand: 'vollstaendig', gezaehlt: 61, gehalten: 61, differenz: 0,
+      })
+
+      // Die uebrigen 13 sind weiterhin ungezaehlt — kein stiller Gruen-Anstrich.
+      expect(await zahl(
+        `SELECT count(*)::int AS n FROM mart.belegarchiv_zulauf WHERE zustand = 'nie gezaehlt'`))
+        .toBe(13)
+    })
   })
 })

@@ -24,6 +24,8 @@ Diese Datei ist der Einstieg. Die inhaltliche Wahrheit steht in `docs/`.
 7a. **Den Sync-Prozess nicht aus der Agentenumgebung gegen das echte LINA starten.** Am 26.07.2026 wurden vier Anmeldungen abgelehnt, obwohl Passwort, Felder und Header nachweislich stimmten — derselbe Befehl im Terminal des Nutzers meldete sich beim ersten Versuch an. Der Netzwerkweg der Agentenumgebung wird von LINA an der Anmeldung abgewiesen, mit der irreführenden Meldung „Benutzername oder Passwort ist falsch!". Migrationen, Tests gegen die Attrappe und Datenbankarbeit sind davon nicht betroffen. Wer den Import starten will: **den Nutzer bitten** (`bun run sync`) oder den Container. Hergang in `docs/protokoll-anmeldeverfahren.md`.
 8. **Die Browserkennung bleibt stimmig.** Wer `LINA_USER_AGENT` ändert, ändert damit auch die Client-Hints (die Version wird daraus gelesen). Eine Chrome-Kennung ohne `sec-ch-ua`/`sec-fetch-*` gibt es bei keinem echten Browser und fällt mehr auf als gar keine Kennung. Begründung in `docs/importer.md`.
 9. **Jeder Befund landet in `docs/`, bevor der Commit steht.** Eine Erkenntnis, die nur in einer Commit-Nachricht oder einem Code-Kommentar existiert, ist für den nächsten Agenten nicht auffindbar. Welche Datei wofür zuständig ist, steht unten unter *Dokumentationspflicht*.
+10. **Eine Quelle ohne Zulauf ist ein Fehler, kein Normalzustand.** Der Lauf darf sie nicht als „ok" melden. Wer einen Zweig baut, der „nichts zu tun" bedeutet, macht ihn **sichtbar** — im Lauf, in einer Prüfsicht, im Dashboard. Nicht in einem Log: Logs liest niemand.
+    Diese Regel hat dieses Projekt zweimal Tage gekostet, beide Male mit derselben Signatur. Am 02.08.2026 stand LINA acht Tage still, weil das Einreihen ein eigener Zeitplan war und ausfiel — der Sync lief fehlerfrei weiter. Am 12.08.2026 fror das Belegarchiv ein, weil seine Einreihbedingung die eines einmaligen Abzugs war; die Läufe 85 bis 88 meldeten 269 von 269 Aufgaben „ok" und holten null Belege. **Ein Importer ohne Arbeit sieht genauso aus wie einer, der fertig ist.** Der Unterschied muss in der Datenbank stehen, nicht im Kopf dessen, der zuletzt hingesehen hat.
 
 ### Namenskonvention
 
@@ -133,6 +135,7 @@ Handgeschriebenes SQL, nummeriert, wird der Reihe nach angewendet. Bewusst handg
 | `0029_pruefung_wareneinsatz_stilllegen.sql` | Prüfsicht gelöscht, `abdeckung_pct` repariert — sie stand immer auf 100 % |
 | `0030_foodnotify.sql` | **FoodNotify**: Marke, Kostenstelle, POS-Zuordnung, Rezept, Zutat, Ware, Einkauf. Räumt LINAs WAWI-Tabellen ab |
 | `0049_vergleichsgruppen.sql` | Betrieb gegen Marke und gegen Stadt. Die **einzige belastbare Stadtangabe** ist `mart.nachbarschaft.ort` aus `manual.betrieb_standort` — `core.betrieb.stadt` ist bei allen 141 NULL |
+| `0069_belegarchiv_zulauf.sql` | **Der Zulauf des Belegarchivs.** `core.belegart.inhalt_holen` und `core.belegarchiv_bestand.quelle`, dazu `mart.belegarchiv_zulauf` und `mart.inventur_abgeschnitten`. Der Torwächter ist ab hier die tägliche Zählung (`la:belegzahl`) und nicht mehr `manual.belegarchiv_soll` |
 | `pruefung.sql` | Verifikation gegen den Bayreuth-Fall aus dem Excel (kein Migrationsschritt) |
 
 Die Tabelle nennt die tragenden Migrationen, nicht jede einzelne. Der verbindliche Stand steht in `public.schema_migration`.
@@ -200,12 +203,14 @@ sync.ts / einreihen.ts Einstiegspunkte
 ```bash
 bun install
 bun run migrate                              # Schema anwenden (idempotent)
-bun test                                     # nachgemessen am 04.08.2026: 455 pass, 120 skip ohne TEST_DATABASE_URL
+bun test                                     # nachgemessen am 13.08.2026: 668 pass, 141 skip ohne TEST_DATABASE_URL
 bun run sync                                 # nachfüllen UND abarbeiten
 bun run einreihen --taeglich                 # nur nachfüllen (sync macht das selbst)
 bun run einreihen --historie --von 2018-01-01 --bis 2026-07-24
 bun run einreihen --foodnotify               # FoodNotify-Backfill starten
 bun run einreihen --foodnotify-inventuren    # Inventur-Backfill starten (B1, lohnend fast nur bei Wilma Wunder)
+bun run einreihen --foodnotify-inventurpositionen   # Zählung jeder Inventur neu (Nachlauf zur Paginierung)
+bun run einreihen --aufgegebene --endpunkt fn:bestellpositionen   # aufgegebene Posten zurückholen
 bun run health                               # Health-Endpunkt (Container-CMD)
 curl localhost:3000/health                     # lebt der Container?
 curl localhost:3000/status                     # muss jemand hinsehen? (503 = ja)
@@ -268,11 +273,25 @@ SELECT * FROM sync.schema_abweichung WHERE quittiert_am IS NULL;
 SELECT * FROM sync.warteschlange WHERE letzter_fehler IS NOT NULL;
 ```
 
+Bekommt jede Quelle noch Zulauf? (Regel 10 — seit 13.08.2026)
+
+```sql
+-- Belegarchiv: eine Zeile je Betrieb und Ordner, 1.834 insgesamt
+SELECT zustand, count(*) FROM mart.belegarchiv_zulauf GROUP BY 1 ORDER BY 2 DESC;
+SELECT * FROM mart.belegarchiv_zulauf WHERE zustand = 'abzug fehlt';
+-- Inventuren, deren Kopf mehr Positionen meldet als geladen sind (Erwartung: leer)
+SELECT * FROM mart.inventur_abgeschnitten;
+```
+
 Nach jedem größeren Backfill zuerst:
 
 ```sql
 SELECT * FROM mart.pruefung_uebersicht;   -- rechnet LINAs Aggregate gegen unsere Artikeldaten nach
 ```
+
+Seit dem 13.08.2026 stehen dort vier Zulaufprüfungen mit drin. **`auffaellig = 0` heißt nicht
+„nichts zu tun", sondern „nichts Auffälliges gemessen"** — die Zeile „Belegarchiv: seit über
+36 h nicht gezählt" ist die, die den Unterschied macht.
 
 **`sync.aufgabe.status = 'keine_daten'` ist ein Normalzustand, kein Fehler.** LINA antwortet mit HTTP 500 und leerem Body, wenn ein Betrieb für einen Bericht keine Daten hat. Darauf darf nie ein Retry laufen.
 
