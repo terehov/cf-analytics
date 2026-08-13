@@ -1620,3 +1620,33 @@ werden.
 die Frage, die sie beantworten. „Hol die Jahre 2018 bis 2024" ist eine
 **Entscheidung**. „Es fehlen 936 Positionen, die schon einmal da sein sollten"
 ist ein **Befund** — und ein Befund gehört repariert, nicht angeboten.
+
+---
+
+## 13.08.2026 (abends): Zwei Entscheidungen aus dem Review-Nachtrag
+
+Beide von Eugene, mit den finalen Zahlen aus Lauf 89 (dem ersten mit
+täglicher Zählung) auf dem Tisch. Grundlage:
+`docs/plan-datenvollstaendigkeit-nachtrag.md`, Abschnitt „Entscheidungen".
+
+### Entscheidung 5: Nachholauf für Bestelldetails — 12 Monate zurück
+
+Alle 66.966 FoodNotify-Bestellungen wurden genau einmal im Detail geholt und
+seither nie wieder; Status, Liefermengen (`adjustedQuantity`) und Preise sind
+auf dem Stand des Erstabrufs eingefroren. Der einmalige Nachholauf (Punkt 2.6
+des Nachtrags) geht **12 Monate zurück**: 22.581 Bestellungen ≈ 45.200
+Aufrufe, verteilt auf zwei Nächte. Nicht gewählt: der komplette nicht-finale
+Bestand (63.604 ≈ 127.000 Aufrufe) — das Dreifache für Zeiträume, die keine
+Auswertung aktiv vergleicht. Ältere Bestellungen bleiben bewusst auf dem
+Stand des Erstabrufs; wer sie ansieht, findet diese Grenze hier.
+
+### Entscheidung 3 (Hauptplan): Die sechs nie geholten Belegarten — nicht holen
+
+Finale Zählung: 476 Ordner, 20.501 Belege (sonstige Dokumente 6.028,
+USt-Voranmeldungen 3.469, sonstige Auswertungen 3.416, OPOS-Listen 3.382,
+Steuerunterlagen 692, Mahnungen 314). Nach den Namen kein Wareneinkauf, keine
+Auswertung braucht sie. `core.belegart.inhalt_holen` bleibt für alle sechs
+`false`. Die Absicherung, die die Entscheidung umkehrbar macht: die tägliche
+Zählung läuft für sie weiter, und `mart.belegarchiv_zulauf` führt sie als
+„gezaehlt, nicht freigegeben" — entsteht dort plötzlich Volumen, ist es
+sichtbar, und das Umschalten ist ein UPDATE auf eine Zeile.
