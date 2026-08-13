@@ -138,7 +138,7 @@ lauf('nachfuellen — was nicht nachwachsen darf', () => {
         ADD CONSTRAINT test_nichts_geht CHECK (endpunkt = '__unmoeglich__') NOT VALID`)
     try {
       const stand = await nachfuellen()
-      expect(stand).toEqual({ lina: 0, foodnotify: 0, ladenakte: 0 })
+      expect(stand).toEqual({ lina: 0, foodnotify: 0, ladenakte: 0, wiederbelebt: 0 })
       // Und die Warteschlange ist unverändert leer geblieben.
       expect(await offen(AKTIVE_ENDPUNKTE[0]!.key)).toBe(0)
     } finally {
@@ -379,5 +379,213 @@ lauf('nachfuellen — Inventuren', () => {
     const { foodnotifyNachfuellen } = await import('./nachfuellen')
     await foodnotifyNachfuellen()
     expect(await offen('fn:inventuren')).toBe(0)
+  })
+})
+
+/**
+ * ================================================================
+ * WAS DER LAUF SEIT DEM 13.08.2026 VON SELBST REPARIERT
+ * ================================================================
+ *
+ * Beides stand kurzzeitig als Handbefehl in `einreihen.ts`. Entscheidung
+ * Eugene vom selben Tag: kein Befehl auf dem Server. Was fehlt, holt der
+ * Lauf — und was der Lauf holt, muss ein Test begrenzen, sonst wird aus
+ * "repariert sich selbst" ein Posten, der jede Nacht wiederkommt.
+ */
+lauf('nachfuellen — Selbstreparatur', () => {
+  beforeAll(async () => {
+    process.env.DATABASE_URL = DB!
+    db = new Client({ connectionString: DB })
+    await db.connect()
+  })
+  afterAll(async () => { await db?.end() })
+
+  const zahl = async (sql: string, p: unknown[] = []) =>
+    Number((await db.query(sql, p)).rows[0].n)
+
+  // --- Inventurzaehlung -------------------------------------------------
+
+  /**
+   * Eine Inventur, deren Kopf mehr Positionen meldet als geladen sind —
+   * genau die Lage der neun in Produktion, die bei exakt 800 abgeschnitten
+   * waren (936 fehlende Positionen).
+   */
+  const inventurAufbauen = async (kopf: number, geladen: number) => {
+    await db.query('TRUNCATE sync.warteschlange')
+    await db.query('TRUNCATE core.inventurposition, core.inventur CASCADE')
+    await db.query('DELETE FROM core.kostenstelle')
+    const { rows: [m] } = await db.query(`
+      INSERT INTO core.marke (schluessel, name) VALUES ('aposto','Aposto')
+      ON CONFLICT (schluessel) DO UPDATE SET name = excluded.name RETURNING marke_key`)
+    const { rows: [ks] } = await db.query(
+      `INSERT INTO core.kostenstelle
+         (marke_key, kostenstelle_id, restaurant_id, erp_id, name, restaurant_name, art)
+       VALUES ($1, 8001, 6001, 10483, 'Küche Test', 'Testbetrieb', 'kueche')
+       RETURNING kostenstelle_key`, [m.marke_key])
+    const { rows: [i] } = await db.query(
+      `INSERT INTO core.inventur
+         (kostenstelle_key, fn_uuid, name, art, status, anzahl_positionen, erstellt_am)
+       VALUES ($1, 'inv-luecke', 'Kücheninventur', 'full', 'signed', $2, '2026-07-31')
+       RETURNING inventur_key`, [ks.kostenstelle_key, kopf])
+    for (let n = 0; n < geladen; n++) {
+      await db.query(
+        `INSERT INTO core.inventurposition (inventur_key, fn_id, name) VALUES ($1,$2,$3)`,
+        [i.inventur_key, `p${n}`, `Ware ${n}`])
+    }
+    return m.marke_key as number
+  }
+
+  test('eine unvollstaendige Zaehlung wird von selbst nachgereiht — Seite 1', async () => {
+    const marke = await inventurAufbauen(5, 3)
+    const { inventurpositionenNachziehen } = await import('./nachfuellen')
+    expect(await inventurpositionenNachziehen(marke)).toBe(1)
+
+    const { rows } = await db.query(
+      `SELECT parameter, prioritaet, zeitraum_von::text FROM sync.warteschlange
+        WHERE endpunkt = 'fn:inventurpositionen'`)
+    expect(rows).toHaveLength(1)
+    expect(rows[0].parameter).toEqual({ uuid: 'inv-luecke', seite: '1' })
+    // Der Zeitraum ist das Anlagedatum der Inventur, nicht heute — sonst
+    // zeigt der Fortschritt ueberall "heute" statt des Jahres.
+    expect(rows[0].zeitraum_von).toBe('2026-07-31')
+    expect(rows[0].prioritaet).toBe(94)
+  })
+
+  /**
+   * DER TEIL, DER WEHTUT, WENN ER FEHLT. 349 der 358 Inventuren in
+   * Produktion sind vollstaendig. Feuerte die Bedingung auch fuer sie,
+   * stellte der Lauf jede Nacht 358 Posten ein statt neun.
+   */
+  test('eine vollstaendige Zaehlung wird NICHT nachgereiht', async () => {
+    const marke = await inventurAufbauen(3, 3)
+    const { inventurpositionenNachziehen } = await import('./nachfuellen')
+    expect(await inventurpositionenNachziehen(marke)).toBe(0)
+    expect(await zahl(
+      `SELECT count(*)::int AS n FROM sync.warteschlange
+        WHERE endpunkt = 'fn:inventurpositionen'`)).toBe(0)
+  })
+
+  test('solange der Posten offen ist, kommt kein zweiter dazu', async () => {
+    const marke = await inventurAufbauen(5, 3)
+    const { inventurpositionenNachziehen } = await import('./nachfuellen')
+    await inventurpositionenNachziehen(marke)
+    expect(await inventurpositionenNachziehen(marke)).toBe(0)
+  })
+
+  /**
+   * Gesperrt wird gegen JEDE offene Seite derselben Inventur, nicht nur
+   * gegen Seite 1. Sonst stellt der naechste Lauf eine zweite Seite 1,
+   * waehrend Seite 2 noch laeuft — und Seite 1 loescht beim Laden alles,
+   * was Seite 2 gerade geschrieben hat.
+   */
+  test('auch eine offene Folgeseite sperrt — sonst loescht Seite 1 sie weg', async () => {
+    const marke = await inventurAufbauen(5, 3)
+    await db.query(
+      `INSERT INTO sync.warteschlange
+         (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter)
+       VALUES ('fn:inventurpositionen', current_date, current_date, 94, $1,
+               '{"uuid":"inv-luecke","seite":"2"}')`, [marke])
+    const { inventurpositionenNachziehen } = await import('./nachfuellen')
+    expect(await inventurpositionenNachziehen(marke)).toBe(0)
+  })
+
+  // --- Aufgegebene Posten ----------------------------------------------
+
+  /** Ein aufgegebener Posten, gestern gescheitert, Quelle antwortet heute. */
+  const aufgegebenenAufbauen = async (opt: {
+    wiederbelebt?: number; alterStunden?: number; quelleAntwortet?: boolean
+  } = {}) => {
+    await db.query('TRUNCATE sync.warteschlange')
+    await db.query('DELETE FROM sync.aufgabe'); await db.query('DELETE FROM sync.lauf')
+    await db.query(
+      `INSERT INTO sync.warteschlange
+         (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, parameter,
+          versuche, erledigt_am, ergebnis, letzter_fehler, wiederbelebt)
+       VALUES ('fn:bestellpositionen', current_date, current_date, 90,
+               '{"erpId":"10483","orderId":"b1"}', 4,
+               now() - make_interval(hours => $1), 'aufgegeben', 'HTTP 500', $2)`,
+      [opt.alterStunden ?? 30, opt.wiederbelebt ?? 0])
+    if (opt.quelleAntwortet !== false) {
+      // sync.aufgabe.lauf_id ist ein Fremdschluessel auf sync.lauf — ohne den
+      // Lauf gibt es die Aufgabe nicht. lauf_id ist GENERATED ALWAYS, die
+      // Nummer kommt also von der Datenbank und nicht aus dem Test.
+      const { rows: [l] } = await db.query(
+        `INSERT INTO sync.lauf (ausloeser, status, beendet_am)
+         VALUES ('manuell', 'ok', now() - interval '2 hours') RETURNING lauf_id`)
+      await db.query(
+        `INSERT INTO sync.aufgabe (lauf_id, endpunkt, versuch, status, zeilen, beendet_am)
+         VALUES ($1, 'fn:bestellpositionen', 1, 'ok', 5, now() - interval '2 hours')`,
+        [l.lauf_id])
+    }
+  }
+
+  test('ein aufgegebener Posten kommt von selbst zurueck', async () => {
+    await aufgegebenenAufbauen()
+    const { aufgegebeneWiederbeleben } = await import('./nachfuellen')
+    expect(await aufgegebeneWiederbeleben()).toBe(1)
+
+    const { rows: [p] } = await db.query(
+      `SELECT erledigt_am, ergebnis, versuche, wiederbelebt FROM sync.warteschlange`)
+    expect(p.erledigt_am).toBeNull()
+    expect(p.ergebnis).toBeNull()
+    // versuche faengt neu an, wiederbelebt zaehlt die Leben.
+    expect(p.versuche).toBe(0)
+    expect(p.wiederbelebt).toBe(1)
+  })
+
+  /**
+   * DIE OBERGRENZE IST DER GANZE PUNKT. Ohne sie kostet ein dauerhaft
+   * kaputter Posten jede Nacht MAX_VERSUCHE Aufrufe und kommt nie zur
+   * Ruhe — derselbe Bau wie der 403-Zweig im Worker, der seit neun Tagen
+   * bei netto plus minus null steht.
+   */
+  test('nach drei Wiederbelebungen bleibt er liegen', async () => {
+    await aufgegebenenAufbauen({ wiederbelebt: 3 })
+    const { aufgegebeneWiederbeleben } = await import('./nachfuellen')
+    expect(await aufgegebeneWiederbeleben()).toBe(0)
+    expect(await zahl(
+      `SELECT count(*)::int AS n FROM sync.warteschlange WHERE ergebnis = 'aufgegeben'`)).toBe(1)
+  })
+
+  /**
+   * Ohne diese Bedingung verbraeuchte ein zweitaegiger Ausfall der
+   * Gegenstelle alle drei Wiederbelebungen aller Posten — ausgerechnet
+   * bevor sie wieder erreichbar ist.
+   */
+  test('schweigt die Quelle, ruht die Wiederbelebung', async () => {
+    await aufgegebenenAufbauen({ quelleAntwortet: false })
+    const { aufgegebeneWiederbeleben } = await import('./nachfuellen')
+    expect(await aufgegebeneWiederbeleben()).toBe(0)
+  })
+
+  /** Fuenf Sync-Laeufe an einem Tag (12.08.2026) duerfen nicht fuenf Leben kosten. */
+  test('zweimal am selben Tag zaehlt einmal', async () => {
+    await aufgegebenenAufbauen({ alterStunden: 2 })
+    const { aufgegebeneWiederbeleben } = await import('./nachfuellen')
+    expect(await aufgegebeneWiederbeleben()).toBe(0)
+  })
+
+  test('ein offener Zwilling verhindert das Wiederbeleben', async () => {
+    await aufgegebenenAufbauen()
+    await db.query(
+      `INSERT INTO sync.warteschlange
+         (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, parameter)
+       VALUES ('fn:bestellpositionen', current_date, current_date, 90,
+               '{"erpId":"10483","orderId":"b1"}')`)
+    const { aufgegebeneWiederbeleben } = await import('./nachfuellen')
+    // Ohne diese Sperre verletzte das UPDATE den partiellen
+    // Eindeutigkeitsindex warteschlange_offen_uq.
+    expect(await aufgegebeneWiederbeleben()).toBe(0)
+  })
+
+  test('mart.posten_aufgegeben trennt "wird versucht" von "endgueltig"', async () => {
+    await aufgegebenenAufbauen({ wiederbelebt: 3 })
+    const { rows } = await db.query(
+      `SELECT zustand, wiederbelebt, quelle_antwortet FROM mart.posten_aufgegeben`)
+    expect(rows[0]).toMatchObject({ zustand: 'endgueltig', wiederbelebt: 3, quelle_antwortet: true })
+
+    await aufgegebenenAufbauen({ wiederbelebt: 1 })
+    const { rows: r2 } = await db.query(`SELECT zustand FROM mart.posten_aufgegeben`)
+    expect(r2[0].zustand).toBe('wird erneut versucht')
   })
 })

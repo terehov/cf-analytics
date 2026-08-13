@@ -193,7 +193,9 @@ lauf('Ende-zu-Ende', () => {
       'Bon: avgTicket vs. Umsatz/Rechnungen',
       'Inventur: Zaehlung abgeschnitten',
       'Umsatz: Artikelsumme vs. Umsatzbericht',
-      'Warteschlange: aufgegebene Posten',
+      // Seit 0070 ausdruecklich nur die ENDGUELTIGEN: ein aufgegebener Posten,
+      // den der Lauf noch dreimal zurueckholt, ist Betrieb und kein Befund.
+      'Warteschlange: endgueltig aufgegeben',
     ])
   })
 

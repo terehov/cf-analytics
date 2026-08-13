@@ -914,18 +914,42 @@ Wirkung zeigt sich erst am nächtlichen Lauf.
    ```
    Das ist die Entscheidungsgrundlage für Punkt 3 in Abschnitt 4 des Plans. **Eugene
    entscheidet**, nicht der nächste Agent.
-4. **Die beiden Nachläufe sind noch nicht gelaufen** — sie laufen neben dem nächtlichen Lauf
-   und brauchen einen bewussten Befehl:
-   ```bash
-   bun run einreihen --foodnotify-inventurpositionen   # 358 Aufrufe, holt die 936 Positionen
-   bun run einreihen --aufgegebene --endpunkt fn:bestellpositionen   # 275 Aufrufe
+4. **Die beiden Nachläufe brauchen keinen Befehl mehr** (Entscheidung Eugene, 13.08.2026,
+   Migration `0070`). Der nächtliche Lauf zieht unvollständige Inventurzählungen selbst nach
+   und holt aufgegebene Posten höchstens dreimal zurück. Nachzuprüfen ist deshalb nur, ob es
+   auch passiert:
+   ```sql
+   SELECT count(*), sum(fehlend) FROM mart.inventur_abgeschnitten;   -- Erwartung: 0
+   SELECT zustand, count(*) FROM mart.posten_aufgegeben GROUP BY 1;
+   SELECT count(*) FROM core.bestellung b WHERE NOT EXISTS
+     (SELECT 1 FROM core.bestellposition p WHERE p.bestellung_key = b.bestellung_key);
    ```
-   Danach müssen `mart.inventur_abgeschnitten` leer sein und die 322 Bestellungen ohne
-   Position auf 47 gesunken.
+   Die letzte Zahl muss von 322 auf **47** fallen — nicht auf 0. Die 47 sind mit `ok`
+   geladene, tatsächlich leere Bestellungen und kein Befund.
 5. **Ob die 275 wirklich wiederkommen, ist offen.** Sie sind alle mit HTTP 500 gescheitert,
-   und zu FoodNotify gibt es keinen Kontakt. Scheitern sie erneut mit demselben Code, ist es
-   eine Quellengrenze und gehört als solche dokumentiert — dann nicht ein drittes Mal
-   versuchen.
+   und zu FoodNotify gibt es keinen Kontakt. Der Lauf versucht es dreimal und hört dann von
+   selbst auf; was danach in `mart.posten_aufgegeben` auf `endgueltig` steht, ist eine Grenze
+   der Quelle und gehört als solche in `docs/befunde-datenlage.md` — **nicht** ein viertes
+   Mal versucht. Wer den Zähler zurücksetzt, ohne die Ursache zu kennen, hat ihn nur
+   umgangen.
+
+6. **Die Zulaufsicht führt 1.974 Zeilen, nicht 1.834** — gemessen nach dem Deployment von
+   `0069` am 13.08.2026. `core.betrieb` hat **141** Betriebe mit LINA-ID, die Vollzählung vom
+   11.08.2026 kannte **131**. Die zehn zusätzlichen sind drei geschlossene, sechs ohne
+   Geschäft und ein Testbetrieb, alle mit null Belegen — und alle in der Ladenakte
+   erreichbar: `la:bwa_longterm` und `la:stammdaten` liefen für alle 141 mit `ok`.
+
+   Offen ist nur, ob ihr Baumknoten `belegarchiv_<id>` überhaupt Ordner führt. Führt er
+   keine, wirft `belegToken()` seit dem 13.08.2026 `KeinBelegarchiv`, und der Client
+   quittiert das als `keine_daten` statt als Fehler — kein Retry, kein `aufgegeben`, und die
+   negative Antwort wird für 90 s gemerkt, damit nicht alle vierzehn Ordner desselben
+   Betriebs dieselbe Absage einzeln abholen. Nach dem ersten Lauf nachsehen:
+   ```sql
+   SELECT status, count(*) FROM sync.aufgabe
+    WHERE endpunkt = 'la:belegzahl' GROUP BY 1;
+   ```
+   Stehen dort 140 Zeilen `keine_daten`, ist die Vermutung bestätigt und der Preis 20 Aufrufe
+   am Tag. Stehen dort 1.974 `ok`, war die Sorge unbegründet.
 
 ## Der e2e-Test braucht eine Testdatenbank auf aktuellem Stand (13.08.2026)
 

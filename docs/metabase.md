@@ -773,3 +773,22 @@ ausgefallener Lauf soll die Zeile nicht sofort rot färben. Zwei ausgefallene sc
 
 Keine dieser Sichten hängt bisher an einer Karte. Das ist Absicht — das Zulauf-Dashboard ist
 Phase 4 des Plans, und dieser Commit stellt nur die Zahlen bereit, gegen die es gebaut wird.
+
+## `mart.posten_aufgegeben` (Migration `0070`, 13.08.2026)
+
+Seit dem 13.08.2026 holt der nächtliche Lauf aufgegebene Posten von selbst zurück — höchstens
+dreimal. Damit zerfällt „aufgegeben" in zwei Zustände, und nur einer davon ist ein Befund:
+
+| `zustand` | bedeutet |
+|---|---|
+| `wird erneut versucht` | der Lauf holt ihn zurück, solange `quelle_antwortet` true ist. **Betrieb, kein Befund.** |
+| `endgueltig` | der Vorrat ist aufgebraucht. Das ist die Aussage „diese Daten sind aus der Quelle nicht zu bekommen" |
+
+`quelle_antwortet` sagt, ob derselbe Endpunkt in den letzten 24 Stunden überhaupt einmal
+geliefert hat. Steht dort false, ruht die Wiederbelebung — sonst verbrauchte ein zweitägiger
+Ausfall der Gegenstelle den ganzen Vorrat, ausgerechnet bevor sie wieder da ist.
+
+**Die Zeile in `mart.pruefung_uebersicht` zählt ausdrücklich nur die endgültigen.** Wer beide
+Zustände in eine Zahl wirft, bekommt eine Kachel, die immer rot ist — und eine Kachel, die
+immer rot ist, sieht sich niemand mehr an. Das ist dieselbe Lehre wie bei der
+Wareneinsatz-Prüfung, die 2026 immer grün zeigte (Migration 0029), nur andersherum.

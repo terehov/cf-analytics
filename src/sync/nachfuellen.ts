@@ -26,7 +26,11 @@ import { log } from '../lib/log'
 import { AKTIVE_ENDPUNKTE, istMomentaufnahme, einreihPrioritaet } from '../lina/endpunkte'
 import { geschaeftstag } from '../lib/time'
 
-export type NachfuellStand = { lina: number; foodnotify: number; ladenakte: number }
+export type NachfuellStand = {
+  lina: number; foodnotify: number; ladenakte: number
+  /** Aufgegebene Posten, die dieser Lauf zurueckgeholt hat. */
+  wiederbelebt: number
+}
 
 /**
  * LINA: die letzten NACHZUEGLER_TAGE Geschäftstage, die Jahresberichte
@@ -218,9 +222,71 @@ export async function foodnotifyNachfuellen(): Promise<number> {
     }
 
     n += await inventurenNachfuellen(marke.marke_key, heute)
+    n += await inventurpositionenNachziehen(marke.marke_key)
   }
 
   return n
+}
+
+/**
+ * Inventuren, deren Zaehlung unvollstaendig ist, noch einmal holen.
+ *
+ * DIE BEDINGUNG IST DIESELBE WIE BEIM BELEGARCHIV: haelt `core.inventurposition`
+ * genau so viele Zeilen, wie der Kopf sagt? `anzahl_positionen` kommt aus
+ * `totalNumberOfItems` der Inventurliste — es ist FoodNotifys eigene Aussage
+ * darueber, wie viele Positionen die Inventur hat, und damit die richtige
+ * Gegenprobe.
+ *
+ * WARUM DAS KEIN HANDBEFEHL IST. Bis zum 13.08.2026 stand hier ein
+ * `einreihen --foodnotify-inventurpositionen`, das jemand haette ausloesen
+ * muessen. Genau die Bauform hat am 02.08.2026 acht Tage LINA-Stillstand
+ * gekostet: ein Schritt, den ein Mensch anstossen muss, faellt irgendwann aus,
+ * und sein Ausfall sieht aus wie Ruhe. Der Lauf macht es jetzt selbst.
+ *
+ * SELBSTBEGRENZEND, UND DAS IST GEMESSEN. Am 13.08.2026 in Produktion:
+ * 349 der 358 Inventuren stimmen auf die Position genau ueberein, 9 sind bei
+ * exakt 800 abgeschnitten, NULL andere Ausreisser, und keine einzige Inventur
+ * ohne Positionen. Die Bedingung feuert also fuer genau die neun und danach
+ * fuer keine mehr. Bliebe eine dauerhaft ungleich, kostet sie einen Aufruf je
+ * Nacht und steht sichtbar in `mart.inventur_abgeschnitten` — das ist der
+ * bewusste Preis dafuer, dass eine echte Luecke nicht vergessen wird.
+ *
+ * NUR SEITE 1 wird eingereiht; die Folgeseiten reiht das Laden selbst ein.
+ * Gesperrt wird gegen jeden OFFENEN Posten derselben Inventur, gleich welcher
+ * Seite — sonst stellt der naechste Lauf eine zweite Seite 1, waehrend die
+ * erste noch laeuft, und beide loeschen sich gegenseitig die Zaehlung.
+ */
+export async function inventurpositionenNachziehen(markeKey: number): Promise<number> {
+  const r = await query<{ posten_id: number }>(
+    `INSERT INTO sync.warteschlange
+       (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter)
+     SELECT 'fn:inventurpositionen',
+            coalesce(i.erstellt_am::date, current_date),
+            coalesce(i.erstellt_am::date, current_date),
+            94, $1,
+            jsonb_build_object('uuid', i.fn_uuid, 'seite', '1')
+       FROM core.inventur i
+       JOIN core.kostenstelle ks USING (kostenstelle_key)
+       JOIN LATERAL (SELECT count(*) AS geladen FROM core.inventurposition ip
+                      WHERE ip.inventur_key = i.inventur_key) p ON true
+      WHERE ks.marke_key = $1
+        AND i.anzahl_positionen IS NOT NULL
+        AND i.anzahl_positionen <> p.geladen
+        AND NOT EXISTS (
+            SELECT 1 FROM sync.warteschlange w
+             WHERE w.endpunkt = 'fn:inventurpositionen'
+               AND w.marke_key = $1
+               AND w.parameter->>'uuid' = i.fn_uuid
+               AND w.erledigt_am IS NULL)
+     RETURNING posten_id`,
+    [markeKey])
+
+  if (r.length > 0) {
+    log.info('inventurzaehlung unvollstaendig — nachgereiht', {
+      markeKey, inventuren: r.length,
+    })
+  }
+  return r.length
 }
 
 /**
@@ -504,8 +570,72 @@ async function einreihenJeMonat(
   return r.length
 }
 
+/**
+ * Aufgegebene Posten zurueck in die Warteschlange holen — begrenzt.
+ *
+ * DAS PROBLEM. `ergebnis = 'aufgegeben'` setzt `erledigt_am`. Der Posten gilt
+ * damit als erledigt, und bis zum 13.08.2026 sah ihn KEIN Code je wieder an.
+ * In Produktion lagen so 275 `fn:bestellpositionen` still — alle HTTP 500,
+ * alle vier Versuche, alle aus dem Backfill vom 02. bis 04.08.2026. Folge:
+ * 322 Bestellungen ueber 686.535,93 EUR mit Kopf und ohne eine einzige
+ * Position, die in `mart.einkauf_beleg` voll mitzaehlen.
+ *
+ * WARUM BEGRENZT UND NICHT EINFACH IMMER WIEDER. Ohne Obergrenze waere das
+ * derselbe Bau wie der 403-Zweig in `src/sync/worker.ts`: dort zaehlt
+ * `posten_holen()` die Versuche hoch und der Zweig wieder herunter, netto ±0,
+ * seit neun Tagen. Ein Posten, der wirklich nicht holbar ist, wuerde jede
+ * Nacht vier Aufrufe kosten und nie zur Ruhe kommen. `wiederbelebt` zaehlt
+ * mit; nach `MAX_WIEDERBELEBUNGEN` ist Schluss, und dann steht der Posten
+ * sichtbar in `mart.posten_aufgegeben` als endgueltig.
+ *
+ * NUR WENN DIE QUELLE GERADE NACHWEISLICH ANTWORTET. Ohne diese Bedingung
+ * verbraeuchte ein zweitaegiger Ausfall der Gegenstelle alle Wiederbelebungen
+ * aller Posten, und danach waere der Vorrat aufgebraucht — ausgerechnet dann,
+ * wenn die Quelle wieder da ist. Gefordert wird deshalb mindestens EIN 'ok'
+ * desselben Endpunkts in den letzten 24 Stunden.
+ *
+ * FRUEHESTENS NACH 20 STUNDEN, damit ein Posten nicht zweimal am selben Tag
+ * wiederbelebt wird, wenn der Sync mehrmals laeuft (am 12.08.2026 waren es
+ * fuenf Laeufe). 20 statt 24: der Zeitplan steht auf 05:02, und zwei Laeufe
+ * an aufeinanderfolgenden Tagen liegen nie exakt 24 Stunden auseinander.
+ */
+export async function aufgegebeneWiederbeleben(): Promise<number> {
+  const r = await query<{ endpunkt: string }>(
+    `UPDATE sync.warteschlange w
+        SET erledigt_am = NULL, ergebnis = NULL, versuche = 0,
+            in_arbeit_seit = NULL, faellig_ab = now(),
+            wiederbelebt = w.wiederbelebt + 1
+      WHERE w.ergebnis = 'aufgegeben'
+        AND w.wiederbelebt < $1
+        AND w.erledigt_am < now() - interval '20 hours'
+        -- Die Quelle muss gerade antworten, sonst ist der Versuch verschenkt.
+        AND EXISTS (SELECT 1 FROM sync.aufgabe a
+                     WHERE a.endpunkt = w.endpunkt AND a.status = 'ok'
+                       AND a.beendet_am > now() - interval '24 hours')
+        -- Der Eindeutigkeitsindex ist partiell (WHERE erledigt_am IS NULL).
+        -- Steht fuer dieselbe Arbeit schon ein offener Posten, wuerde das
+        -- Wiederbeleben ihn verletzen — dann ist ohnehin nichts zu tun.
+        AND NOT EXISTS (
+            SELECT 1 FROM sync.warteschlange o
+             WHERE o.erledigt_am IS NULL
+               AND o.endpunkt = w.endpunkt
+               AND coalesce(o.betrieb_enc_id, '') = coalesce(w.betrieb_enc_id, '')
+               AND coalesce(o.marke_key, 0) = coalesce(w.marke_key, 0)
+               AND o.zeitraum_von = w.zeitraum_von AND o.zeitraum_bis = w.zeitraum_bis
+               AND coalesce(o.parameter::text, '{}') = coalesce(w.parameter::text, '{}'))
+     RETURNING w.endpunkt`,
+    [config.MAX_WIEDERBELEBUNGEN])
+
+  if (r.length > 0) {
+    const jeEndpunkt: Record<string, number> = {}
+    for (const z of r) jeEndpunkt[z.endpunkt] = (jeEndpunkt[z.endpunkt] ?? 0) + 1
+    log.info('aufgegebene posten wiederbelebt', { posten: r.length, jeEndpunkt })
+  }
+  return r.length
+}
+
 export async function nachfuellen(): Promise<NachfuellStand> {
-  const stand: NachfuellStand = { lina: 0, foodnotify: 0, ladenakte: 0 }
+  const stand: NachfuellStand = { lina: 0, foodnotify: 0, ladenakte: 0, wiederbelebt: 0 }
 
   try {
     stand.lina = await linaNachfuellen()
@@ -525,7 +655,13 @@ export async function nachfuellen(): Promise<NachfuellStand> {
     log.error('nachfüllen ladenakte gescheitert — der Lauf geht weiter', { fehler: String(e) })
   }
 
-  if (stand.lina > 0 || stand.foodnotify > 0 || stand.ladenakte > 0) {
+  try {
+    stand.wiederbelebt = await aufgegebeneWiederbeleben()
+  } catch (e) {
+    log.error('wiederbeleben gescheitert — der Lauf geht weiter', { fehler: String(e) })
+  }
+
+  if (stand.lina > 0 || stand.foodnotify > 0 || stand.ladenakte > 0 || stand.wiederbelebt > 0) {
     log.info('nachgefüllt', stand)
   }
   return stand

@@ -29,17 +29,46 @@ export type Holer = {
  */
 export const HALTBARKEIT_MS = 90_000
 
-type Eintrag = { wert: string; geholtAm: number }
+/**
+ * „Dieser Betrieb hat gar kein Belegarchiv" — eine ANTWORT, kein Fehler.
+ *
+ * Der Unterschied entscheidet über 560 Anfragen am Tag. Seit der tägliche
+ * Abgleich jeden Betrieb zählt (13.08.2026), werden 141 Betriebe angefragt;
+ * die Vollzählung vom 11.08.2026 kannte nur 131. Für die zehn übrigen — drei
+ * geschlossen, sechs ohne Geschäft, einer Test, alle mit null Belegen — ist
+ * offen, ob der Baumknoten `belegarchiv_<id>` überhaupt Ordner führt.
+ *
+ * Liefe das als gewöhnlicher Fehler, käme jeder der 140 Posten viermal wieder
+ * und landete danach auf `aufgegeben` — jede Nacht aufs Neue, weil die Zählung
+ * am nächsten Tag frische Posten stellt. Als `keine_daten` ist es das, was es
+ * ist: gefragt, nichts da, kein Retry. Dieselbe Behandlung wie LINAs HTTP 500
+ * mit leerem Rumpf (AGENTS.md, „Wo man nachschaut").
+ */
+export class KeinBelegarchiv extends Error {
+  constructor(linaBetriebId: string) {
+    super(`Betrieb ${linaBetriebId} hat im Belegarchiv keinen einzigen Ordner`)
+    this.name = 'KeinBelegarchiv'
+  }
+}
+
+/**
+ * `wert === null` merkt sich die NEGATIVE Antwort — sonst fragen alle vierzehn
+ * Belegarten desselben Betriebs nacheinander denselben Baumknoten ab und
+ * bekommen vierzehnmal dieselbe Absage. Mit dem Merker sind es zwei Anfragen
+ * je Betrieb und Tag statt achtundzwanzig.
+ */
+type Eintrag = { wert: string | null; geholtAm: number }
 const cache = new Map<string, Eintrag>()
 
 /** Für Tests und für den Laufbeginn. */
 export function cacheLeeren(): void { cache.clear() }
 export function cacheGroesse(): number { return cache.size }
 
-function ausCache(schluessel: string, jetzt: number): string | null {
+/** `undefined` = nichts gemerkt, `null` = gemerkt, dass es nichts gibt. */
+function ausCache(schluessel: string, jetzt: number): string | null | undefined {
   const e = cache.get(schluessel)
-  if (!e) return null
-  if (jetzt - e.geholtAm > HALTBARKEIT_MS) { cache.delete(schluessel); return null }
+  if (!e) return undefined
+  if (jetzt - e.geholtAm > HALTBARKEIT_MS) { cache.delete(schluessel); return undefined }
   return e.wert
 }
 
@@ -79,11 +108,17 @@ export async function belegToken(
 ): Promise<string> {
   const schluessel = `beleg:${linaBetriebId}`
   const alt = ausCache(schluessel, jetzt)
-  if (alt) return alt
+  if (alt !== undefined) {
+    if (alt === null) throw new KeinBelegarchiv(linaBetriebId)
+    return alt
+  }
 
   const knoten = await baumknoten(h, `belegarchiv_${linaBetriebId}`)
   const kinder: any[] = Array.isArray(knoten) ? knoten : (knoten?.children ?? [])
-  if (kinder.length === 0) throw new Error(`Belegarchiv von Betrieb ${linaBetriebId} hat keine Ordner`)
+  if (kinder.length === 0) {
+    cache.set(schluessel, { wert: null, geholtAm: jetzt })
+    throw new KeinBelegarchiv(linaBetriebId)
+  }
   const { pfad, query } = zerlegen(String(kinder[0]?.a_attr?.['data-link'] ?? ''))
   pfadPruefen(pfad)
 

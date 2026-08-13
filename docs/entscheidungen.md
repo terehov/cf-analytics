@@ -1566,3 +1566,57 @@ steht in `docs/fehlerkatalog.md` (12.08.2026) und im Quelltext an ihrer Stelle: 
 Wiederholtakt gehört an den **Zeitraum**, nicht an einen Ergebniswert. Dead code mit einer
 ausführlichen Begründung ist schlimmer als kein Code — der nächste liest die Begründung und
 sucht den Aufrufer.
+
+### Revidiert am selben Tag: kein Handbefehl, der Lauf macht es selbst
+
+~~Die 275 aufgegebenen Posten werden wiederbelebt, nicht neu angelegt … Und es
+bleibt ein Handbefehl.~~ ~~`bun run einreihen --foodnotify-inventurpositionen`~~
+
+**Entscheidung Eugene, 13.08.2026: kein Befehl auf dem Server.** Was fehlt, holt
+der nächtliche Lauf. Beide Schalter sind wieder aus `src/einreihen.ts`
+verschwunden.
+
+Meine Begründung für die Handbefehle war, dass ein automatischer Rücklauf ohne
+Obergrenze derselbe Bau wäre wie der 403-Zweig im Worker. Der Einwand stimmt —
+die Schlussfolgerung war falsch. Nicht „dann eben von Hand", sondern „dann eben
+mit Obergrenze". Ein Handbefehl ist keine Reparatur, sondern eine Verabredung,
+und Verabredungen fallen aus: genau daran stand LINA am 02.08.2026 acht Tage
+still, und genau daran fror das Belegarchiv am 12.08.2026 ein. Zweimal dieselbe
+Signatur, zweimal Tage — und beide Male hätte ein Mensch „nur kurz" etwas
+anstoßen müssen.
+
+Was jetzt stattdessen läuft, in `nachfuellen()` bei **jedem** Sync-Lauf:
+
+* `inventurpositionenNachziehen()` vergleicht `core.inventur.anzahl_positionen`
+  mit den geladenen Zeilen. Dieselbe Bauart wie beim Belegarchiv: eine
+  gemessene Invariante statt einer Liste. Sie ist belastbar — 349 von 358
+  stimmen auf die Position genau überein, 9 sind abgeschnitten, **null** andere
+  Ausreißer, keine Inventur ohne Positionen.
+* `aufgegebeneWiederbeleben()` holt aufgegebene Posten höchstens
+  `MAX_WIEDERBELEBUNGEN` (3) mal zurück, und nur, wenn derselbe Endpunkt in den
+  letzten 24 Stunden mindestens einmal `ok` geliefert hat.
+
+### Warum drei Wiederbelebungen und nicht unbegrenzt
+
+Der ursprüngliche Einwand bleibt gültig und wird durch die Obergrenze
+beantwortet: ein dauerhaft kaputter Posten kostete sonst jede Nacht
+`MAX_VERSUCHE` Aufrufe und käme nie zur Ruhe. Drei Anläufe an drei Tagen
+unterscheiden einen Aussetzer der Gegenstelle von einer Grenze der Quelle; was
+danach noch steht, ist eine — und steht als solche in `mart.posten_aufgegeben`.
+
+Die Zahl ist tragbar, weil `aufgegeben` selten ist: 275 von 168.725 erledigten
+Posten sind **0,16 %**, gemessen am 13.08.2026.
+
+### Warum die Wiederbelebung ein frisches `ok` verlangt
+
+Ohne diese Bedingung verbrauchte ein zweitägiger Ausfall der Gegenstelle den
+gesamten Vorrat aller Posten — ausgerechnet bevor sie wieder erreichbar ist.
+Drei Leben sind nur dann drei Chancen, wenn sie nicht gegen eine Wand verspielt
+werden.
+
+### Was ein Handbefehl bleiben darf
+
+`--historie` und `--foodnotify`. Der Unterschied ist nicht die Größe, sondern
+die Frage, die sie beantworten. „Hol die Jahre 2018 bis 2024" ist eine
+**Entscheidung**. „Es fehlen 936 Positionen, die schon einmal da sein sollten"
+ist ein **Befund** — und ein Befund gehört repariert, nicht angeboten.

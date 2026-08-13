@@ -485,6 +485,58 @@ Seiten 2…n rückwärts ein, in derselben Transaktion, in der sie ihre Position
 als der Fehler, den sie behebt.
 
 Der Parameter änderte zugleich den Idempotenzschlüssel: alte Posten tragen nur `{uuid}`, neue
-`{uuid, seite}`. Deshalb wirkt `bun run einreihen --foodnotify-inventurpositionen` überhaupt —
-er stellt für jede bekannte Inventur eine frische Seite 1 ein (358 Aufrufe gegen ein
-Tagesbudget von 140.000).
+`{uuid, seite}`.
+
+## Was der Lauf von selbst repariert (13.08.2026)
+
+Zwei Funktionen in `nachfuellen()`, beide bei **jedem** Sync-Lauf. Sie sind der Grund, warum
+es für die Lücken aus Phase 1 keinen Handbefehl gibt — Entscheidung Eugene vom 13.08.2026,
+Begründung in `docs/entscheidungen.md`.
+
+### `inventurpositionenNachziehen(markeKey)`
+
+Vergleicht je Inventur `core.inventur.anzahl_positionen` (FoodNotifys
+`totalNumberOfItems`) mit den geladenen Zeilen und reiht bei Abweichung **Seite 1** neu ein;
+die Folgeseiten reiht das Laden selbst ein.
+
+Gesperrt wird gegen jeden **offenen** Posten derselben Inventur, gleich welcher Seite. Ohne
+das stellt der nächste Lauf eine zweite Seite 1, während Seite 2 noch läuft — und Seite 1
+löscht beim Laden alles weg, was Seite 2 gerade geschrieben hat.
+
+Selbstbegrenzend, und das ist gemessen: 349 der 358 Inventuren stimmen auf die Position
+genau überein, neun waren bei exakt 800 abgeschnitten, null andere Ausreißer. Bliebe eine
+dauerhaft ungleich, kostet sie einen Aufruf je Nacht und steht in
+`mart.inventur_abgeschnitten` — der bewusste Preis dafür, dass eine echte Lücke nicht
+vergessen wird.
+
+### `aufgegebeneWiederbeleben()`
+
+Setzt aufgegebene Posten zurück (`erledigt_am = NULL`, `ergebnis = NULL`, `versuche = 0`) und
+zählt `wiederbelebt` hoch. Drei Bedingungen begrenzen sie:
+
+| Bedingung | wogegen |
+|---|---|
+| `wiederbelebt < MAX_WIEDERBELEBUNGEN` (3) | ein dauerhaft kaputter Posten, der jede Nacht vier Aufrufe kostet |
+| letztes Scheitern liegt über 20 h zurück | fünf Sync-Läufe an einem Tag (12.08.2026) kosten sonst fünf Leben |
+| derselbe Endpunkt hatte in 24 h ein `ok` | ein zweitägiger Ausfall der Gegenstelle verbraucht sonst den ganzen Vorrat |
+
+Dazu die Sperre gegen einen offenen Zwilling: der Eindeutigkeitsindex ist partiell
+(`WHERE erledigt_am IS NULL`), ein Wiederbeleben würde ihn sonst verletzen.
+
+`versuche` und `wiederbelebt` sind **nicht dasselbe**: `versuche` zählt die Anläufe innerhalb
+eines Lebens und fängt beim Wiederbeleben bei 0 an, `wiederbelebt` zählt die Leben.
+
+### Die Rechnung
+
+FoodNotify, Tagesbudget 140.000, verbraucht 155 bis 1.000:
+
+```
+275 aufgegebene x hoechstens 4 Versuche x 3 Wiederbelebungen
+  = hoechstens 3.300 Aufrufe, verteilt auf mehrere Tage        2,4 %
+9 abgeschnittene Inventuren, Seite 1 plus Folgeseiten
+  = rund 20 Aufrufe, einmalig                                  0,01 %
+```
+
+Danach fällt beides auf null zurück, weil die Bedingungen nicht mehr zutreffen. Kein
+Dauerverbrauch — und das ist nachprüfbar, nicht behauptet: `mart.posten_aufgegeben` zeigt,
+wie viele noch Leben haben.

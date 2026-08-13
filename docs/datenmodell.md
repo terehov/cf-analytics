@@ -358,3 +358,34 @@ Nachgemessen am 13.08.2026 in Produktion: für **alle 621** abgezogenen Ordner s
 einziger Ausreißer. Die Gleichheit ist damit eine belastbare Invariante — und Ungleichheit
 fängt drei Fälle, die ein „ist er gewachsen?" durchließe: den abgebrochenen Abzug, den in
 LINA gelöschten Beleg und den nie geholten Ordner.
+
+## Wiederbelebung aufgegebener Posten (Migration `0070`, 13.08.2026)
+
+### `sync.warteschlange.wiederbelebt` — die Leben, nicht die Versuche
+
+Zwei Zähler nebeneinander, und sie zu verwechseln wäre teuer:
+
+| Spalte | zählt | wird zurückgesetzt |
+|---|---|---|
+| `versuche` | Anläufe **innerhalb** eines Lebens, Grenze `MAX_VERSUCHE` (4) | beim Wiederbeleben auf 0 |
+| `wiederbelebt` | die **Leben**, Grenze `MAX_WIEDERBELEBUNGEN` (3) | nie |
+
+Ohne den zweiten Zähler gäbe es keine Obergrenze: `versuche` fängt bei jedem Rückholen neu
+an, ein dauerhaft kaputter Posten liefe also unbegrenzt weiter. Genau das tut der 403-Zweig
+in `src/sync/worker.ts` heute — `posten_holen()` zählt hoch, der Zweig zählt herunter, netto
+±0 seit neun Tagen. Ein zweiter Zähler ist die kleinste Änderung, die das ausschließt.
+
+`smallint`, nicht `integer`: der Wertebereich ist 0 bis 3.
+
+**Der Index ist partiell** (`WHERE ergebnis = 'aufgegeben'`). Am 13.08.2026 sind das 275 von
+168.725 erledigten Zeilen — ein vollständiger Index wäre hier 600-mal so groß wie nötig, und
+die Tabelle wächst mit jedem Lauf.
+
+### Warum die Inventuren keine Schemaänderung brauchten
+
+Sie haben ihre Invariante schon: `core.inventur.anzahl_positionen` kommt aus FoodNotifys
+`totalNumberOfItems` und sagt, wie viele Positionen die Zählung hat. Ein Zähler wie
+`wiederbelebt` wäre dort überflüssig — die Quelle sagt selbst, wann es reicht.
+
+`core.bestellung` hat kein Gegenstück dazu (nachgesehen am 13.08.2026: die Spalte existiert
+schlicht nicht). Deshalb der Unterschied in der Behandlung, und nicht aus Laune.

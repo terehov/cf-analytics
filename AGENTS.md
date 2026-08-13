@@ -136,6 +136,7 @@ Handgeschriebenes SQL, nummeriert, wird der Reihe nach angewendet. Bewusst handg
 | `0030_foodnotify.sql` | **FoodNotify**: Marke, Kostenstelle, POS-Zuordnung, Rezept, Zutat, Ware, Einkauf. Räumt LINAs WAWI-Tabellen ab |
 | `0049_vergleichsgruppen.sql` | Betrieb gegen Marke und gegen Stadt. Die **einzige belastbare Stadtangabe** ist `mart.nachbarschaft.ort` aus `manual.betrieb_standort` — `core.betrieb.stadt` ist bei allen 141 NULL |
 | `0069_belegarchiv_zulauf.sql` | **Der Zulauf des Belegarchivs.** `core.belegart.inhalt_holen` und `core.belegarchiv_bestand.quelle`, dazu `mart.belegarchiv_zulauf` und `mart.inventur_abgeschnitten`. Der Torwächter ist ab hier die tägliche Zählung (`la:belegzahl`) und nicht mehr `manual.belegarchiv_soll` |
+| `0070_wiederbelebung.sql` | `sync.warteschlange.wiederbelebt` und `mart.posten_aufgegeben`. Der Lauf holt aufgegebene Posten hoechstens dreimal selbst zurueck und zieht unvollstaendige Inventurzaehlungen selbst nach — **kein Handbefehl** |
 | `pruefung.sql` | Verifikation gegen den Bayreuth-Fall aus dem Excel (kein Migrationsschritt) |
 
 Die Tabelle nennt die tragenden Migrationen, nicht jede einzelne. Der verbindliche Stand steht in `public.schema_migration`.
@@ -209,8 +210,6 @@ bun run einreihen --taeglich                 # nur nachfüllen (sync macht das s
 bun run einreihen --historie --von 2018-01-01 --bis 2026-07-24
 bun run einreihen --foodnotify               # FoodNotify-Backfill starten
 bun run einreihen --foodnotify-inventuren    # Inventur-Backfill starten (B1, lohnend fast nur bei Wilma Wunder)
-bun run einreihen --foodnotify-inventurpositionen   # Zählung jeder Inventur neu (Nachlauf zur Paginierung)
-bun run einreihen --aufgegebene --endpunkt fn:bestellpositionen   # aufgegebene Posten zurückholen
 bun run health                               # Health-Endpunkt (Container-CMD)
 curl localhost:3000/health                     # lebt der Container?
 curl localhost:3000/status                     # muss jemand hinsehen? (503 = ja)
@@ -281,7 +280,16 @@ SELECT zustand, count(*) FROM mart.belegarchiv_zulauf GROUP BY 1 ORDER BY 2 DESC
 SELECT * FROM mart.belegarchiv_zulauf WHERE zustand = 'abzug fehlt';
 -- Inventuren, deren Kopf mehr Positionen meldet als geladen sind (Erwartung: leer)
 SELECT * FROM mart.inventur_abgeschnitten;
+-- Posten, die der Worker aufgegeben hat. 'endgueltig' heisst: der Lauf versucht
+-- es nicht mehr, und das will jemand gelesen haben.
+SELECT zustand, count(*) FROM mart.posten_aufgegeben GROUP BY 1;
 ```
+
+**Nichts davon braucht einen Befehl.** Abgeschnittene Inventurzählungen und aufgegebene
+Posten repariert der nächtliche Lauf selbst (`inventurpositionenNachziehen()` und
+`aufgegebeneWiederbeleben()` in `src/sync/nachfuellen.ts`). Handarbeit bleiben nur die beiden
+Historien-Backfills — `--historie` und `--foodnotify` —, weil sie eine Entscheidung sind und
+kein Befund.
 
 Nach jedem größeren Backfill zuerst:
 

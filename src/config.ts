@@ -305,6 +305,26 @@ const Schema = z.object({
   ANFRAGE_TIMEOUT_MS: z.coerce.number().int().min(1_000).default(60_000),
 
   MAX_VERSUCHE: z.coerce.number().int().min(1).default(4),
+
+  /**
+   * Wie oft ein aufgegebener Posten vom naechtlichen Lauf zurueckgeholt wird.
+   *
+   * `aufgegeben` setzt `erledigt_am` — bis zum 13.08.2026 sah den Posten
+   * danach kein Code je wieder an. In Produktion lagen so 275
+   * `fn:bestellpositionen` still, und mit ihnen 322 Bestellungen ueber
+   * 686.535,93 EUR ohne eine einzige Position.
+   *
+   * Drei, nicht unbegrenzt: ein Posten, der wirklich nicht holbar ist, kostet
+   * sonst jede Nacht MAX_VERSUCHE Aufrufe und kommt nie zur Ruhe — derselbe
+   * Bau wie der 403-Zweig im Worker, der seit neun Tagen bei netto ±0 steht.
+   * Drei Anlaeufe an drei Tagen unterscheiden einen Aussetzer der Gegenstelle
+   * von einer Quellengrenze; was danach noch steht, ist eine.
+   *
+   * Und drei, nicht null: aufgegeben ist selten. Gemessen am 13.08.2026 sind
+   * es 275 von 169.000 erledigten Posten, also 0,16 % — der Rueckhol-Vorrat
+   * kann die Budgets nicht sprengen.
+   */
+  MAX_WIEDERBELEBUNGEN: z.coerce.number().int().min(0).default(3),
   /** Ab so vielen Fehlern in Folge pausiert der Worker den ganzen Lauf. */
   ABBRUCH_NACH_FEHLERN: z.coerce.number().int().min(1).default(10),
 

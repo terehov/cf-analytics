@@ -1470,3 +1470,27 @@ Die 275 verteilen sich auf Enchilada (271), Aposto (2) und Wilma Wunder (2) und 
 ausnahmslos in den 02. bis 04.08.2026, also in den großen Backfill. 1.100 Versuche insgesamt,
 keine einzige Rohantwort gespeichert. **Die 47 sind kein Befund** — wer sie mitzählt,
 repariert etwas, das in Ordnung ist.
+
+### Korrektur 13.08.2026: 1.974 statt 1.834 Paare aus Betrieb und Ordner
+
+Nach dem Deployment von `0069` gemessen: `mart.belegarchiv_zulauf` führt **1.974** Zeilen,
+nicht die 1.834, mit denen Migration `0053` und der Plan rechnen.
+
+```sql
+SELECT count(*) FILTER (WHERE lina_betrieb_id IS NOT NULL) FROM core.betrieb;  -- 141
+SELECT count(DISTINCT lina_betrieb_id) FROM manual.belegarchiv_soll;           -- 131
+```
+
+141 × 14 = 1.974. Die Differenz sind zehn Betriebe, die die Vollzählung vom 11.08.2026 nicht
+erfasst hat: drei geschlossene, sechs ohne Geschäft, ein Testbetrieb — alle mit **null**
+Belegen. Sie sind kein Fehler der neuen Sicht, sondern genau der Grund für sie: unter dem
+alten Torwächter (`manual.belegarchiv_soll`) waren sie unerreichbar, und ein neu eröffneter
+Betrieb wäre denselben Weg gegangen.
+
+**Erreichbar sind sie:** `la:bwa_longterm` und `la:stammdaten` liefen für alle 141 mit `ok`,
+also auch für diese zehn. Ob ihr Belegarchiv-Baumknoten Ordner führt, sagt erst der erste
+Lauf mit `la:belegzahl` (offener Punkt 6 in `docs/offene-punkte.md`).
+
+Die Aufrufrechnung ändert sich entsprechend: **1.974 Zählungen + 282 Token-Aufrufe + 82
+Tagesberichte ≈ 2.338 von 10.500** statt der 2.238, die in der Commit-Nachricht zu `0069`
+stehen. Am Ergebnis ändert das nichts — 22 % statt 21 %.

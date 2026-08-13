@@ -2605,6 +2605,14 @@ Seitenangabe mit zurück, und Seite 1 reiht die Folgeseiten rückwärts ein, gen
 bei `fn:bestellungen` und `fn:inventuren`. Dazu `mart.inventur_abgeschnitten` mit der
 Erwartung „leer".
 
+**Und was die 936 zurückholt, ohne dass jemand etwas tippt.**
+`inventurpositionenNachziehen()` läuft bei jedem Sync-Lauf und vergleicht
+`core.inventur.anzahl_positionen` mit den geladenen Zeilen — dieselbe Bauart wie beim
+Belegarchiv, eine gemessene Invariante statt einer Liste. Sie ist belastbar: 349 der 358
+Inventuren stimmen auf die Position genau überein, neun sind abgeschnitten, **null** andere
+Ausreißer, keine einzige Inventur ohne Positionen. Die Bedingung feuert also für genau die
+neun und danach für keine mehr.
+
 **Die Falle in der Reparatur, und sie wäre teurer gewesen als der Fehler.** Das Laden ersetzt
 die Zählung einer Inventur vollständig (`DELETE`, dann `INSERT`) — richtig, solange eine
 Antwort der ganze Stand ist. Sobald geblättert wird, ist sie das nicht mehr: ein `DELETE` je
@@ -2629,10 +2637,13 @@ Versuchen zwischen dem 02. und 04.08.2026, also im großen Backfill. 1.100 Versu
 keine einzige Rohantwort gespeichert. Die restlichen 47 der 322 sind mit `ok` geladene,
 tatsächlich leere Bestellungen — das ist kein Fehler.
 
-**Was ihn verhindert.** `bun run einreihen --aufgegebene [--endpunkt …]` belebt aufgegebene
-Posten wieder (`versuche = 0`, `erledigt_am = NULL`), und
-`mart.pruefung_uebersicht` führt „Warteschlange: aufgegebene Posten" als eigene Zeile — sie
-standen vorher nur in `src/status.ts`, das niemand liest, wenn nichts weh tut.
+**Was ihn verhindert.** `aufgegebeneWiederbeleben()` läuft bei jedem Sync-Lauf und holt
+aufgegebene Posten zurück (`versuche = 0`, `erledigt_am = NULL`) — höchstens
+`MAX_WIEDERBELEBUNGEN` mal, mitgezählt in `sync.warteschlange.wiederbelebt`, und nur, wenn
+derselbe Endpunkt in den letzten 24 Stunden mindestens einmal `ok` geliefert hat. Was danach
+noch steht, ist eine Grenze der Quelle und steht als `endgueltig` in
+`mart.posten_aufgegeben`; `mart.pruefung_uebersicht` zählt genau diese. Vorher standen sie
+nur in `src/status.ts`, das niemand liest, wenn nichts weh tut.
 
 **Warum Wiedervorlage und nicht „Quellengrenze".** HTTP 500 ist eine Aussage über den Server,
 nicht über die Bestellung: derselbe Endpunkt hat für 66.000 andere Bestellungen geliefert,
@@ -2640,6 +2651,14 @@ und die Fehler ballen sich auf zwei Tage schwerer Backfill-Last. Eine Quellengre
 anders aus — 404 oder 403, gleichmäßig verteilt. Zu FoodNotify gibt es keinen Kontakt, die
 Frage lässt sich also nur durch einen erneuten Versuch beantworten.
 
-**Warum ein Handbefehl und kein automatischer Rücklauf.** Ohne Obergrenze wäre ein
-nächtlicher Rücklauf derselbe Bau wie der 403-Zweig in `src/sync/worker.ts`, der seit neun
-Tagen bei netto ±0 Versuchen steht. Die Obergrenze ist Phase 3.3 des Plans.
+**Warum mit Obergrenze und nicht einfach immer wieder.** Ohne sie wäre der nächtliche
+Rücklauf derselbe Bau wie der 403-Zweig in `src/sync/worker.ts`, der seit neun Tagen bei
+netto ±0 Versuchen steht: ein dauerhaft kaputter Posten kostete jede Nacht `MAX_VERSUCHE`
+Aufrufe und käme nie zur Ruhe.
+
+**Nachtrag vom selben Tag.** Zuerst stand hier ein Handbefehl
+(`bun run einreihen --aufgegebene`) mit genau dieser Begründung. Der Einwand stimmte, die
+Schlussfolgerung nicht: nicht „dann eben von Hand", sondern „dann eben mit Obergrenze". Ein
+Handbefehl ist keine Reparatur, sondern eine Verabredung — und die beiden teuersten Ausfälle
+dieses Projekts (02.08. und 12.08.2026) waren ausgefallene Verabredungen. Entscheidung
+Eugene, 13.08.2026: kein Befehl auf dem Server.

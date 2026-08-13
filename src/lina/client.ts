@@ -19,7 +19,7 @@ import { eine } from '../db/pool'
 import { LinaSession, sessionAbgelaufen, AnmeldungFehlgeschlagen } from './auth'
 import { schemaFuer } from './schemas'
 import type { Endpunkt } from './endpunkte'
-import { belegToken, bwaHash, stammPfad } from '../ladenakte/token'
+import { belegToken, bwaHash, stammPfad, KeinBelegarchiv } from '../ladenakte/token'
 
 export type Ergebnis =
   /**
@@ -221,9 +221,23 @@ export class LinaClient {
        */
       let pfad = ep.pfad
       if (ep.braucht) {
-        const aufgeloest = await this.aufloesen(ep, parameter)
-        parameter = aufgeloest.parameter
-        pfad = aufgeloest.pfad
+        /**
+         * „Der Betrieb hat gar kein Belegarchiv" ist eine ANTWORT und kein
+         * Fehler — sonst käme jeder seiner vierzehn Ordner viermal wieder und
+         * landete auf `aufgegeben`, jede Nacht aufs Neue. Behandelt wie LINAs
+         * HTTP 500 mit leerem Rumpf: `keine_daten`, kein Retry. Begründung
+         * ausführlich bei `KeinBelegarchiv` in src/ladenakte/token.ts.
+         */
+        try {
+          const aufgeloest = await this.aufloesen(ep, parameter)
+          parameter = aufgeloest.parameter
+          pfad = aufgeloest.pfad
+        } catch (e) {
+          if (e instanceof KeinBelegarchiv) {
+            return { art: 'keine_daten', status: 200, dauerMs: Date.now() - start }
+          }
+          throw e
+        }
       }
 
       let res = await this.request(ep, parameter, pfad)
