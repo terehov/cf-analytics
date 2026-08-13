@@ -43,6 +43,8 @@ Diese Datei ist der Einstieg. Die inhaltliche Wahrheit steht in `docs/`.
 
 Verbunden werden sie über `core.pos_artikel`: `plu = core.artikel.artikelnummer`. **Dieser Join gilt nur, wo `core.kostenstelle.kassensystem = 'amadeus'`** — bei anderen Kassensystemen ist `plu` ein fremder Nummernkreis und trifft still falsche Artikel. Begründung und Messwerte in `docs/foodnotify-0-1-nummernraum.md`.
 
+> ⚠️ **`core.pos_artikel` und `core.rezept` sind leer — Stand 14.08.2026, in Produktion nachgezählt.** Null Zeilen, kein `INSERT` im ganzen Repo, kein FoodNotify-Endpunkt dafür. Der Absatz darüber beschreibt die Brücke, wie sie gedacht ist, nicht wie sie steht: wer heute darauf joint, bekommt null Zeilen und keinen Fehler. Beide stehen seit `0076` im Quellenregister als `erwartet: false`, damit die Lücke sichtbar bleibt. Was zu klären ist: `docs/offene-punkte.md`.
+
 LINAs Tabellen heißen nach LINA-**Berichten** (`umsatzbericht_tag`), FoodNotifys nach **Fachbegriffen** (`rezept`, `ware`, `bestellung`). Deshalb kollidieren sie nicht.
 
 Kommentare sind deutsch, damit sie in Postico lesbar sind.
@@ -143,6 +145,7 @@ Handgeschriebenes SQL, nummeriert, wird der Reihe nach angewendet. Bewusst handg
 | `0073_namensvergleich_apostroph.sql` | `core.name_norm()` **loescht** Apostrophe, statt sie in Leerzeichen zu wandeln (59 exakte Namenstreffer vorher, 60 nachher, 0 verloren). Dazu `mart.kostenstelle_ohne_betrieb` als Entscheidungsliste — die offenen Faelle werden **sichtbar gemacht, nicht geraten** |
 | `0074_nachzuegler_selbstmessung.sql` | **Das Nachzuegler-Fenster misst sich selbst.** `mart.nachzuegler_tiefe` und `mart.bwa_rueckbuchung` — beide Zahlen, mit denen der Plan die Fenster begruenden wollte, waren Artefakte der Fenster selbst. Eine Pruefzeile meldet, wenn am Rand noch Aenderungen ankommen |
 | `0075_anzeige_ehrlich.sql` | **Die Anzeige sagt, was sie meint.** `mart.einkauf_ladestand` trennt Rueckstand (eine Seite hat einen ganzen Lauf ueberlebt) von laufender Arbeit und von fehlendem Zugriff — vorher standen **alle 251** Monatszeilen auf „… laedt". Dazu `sync.warteschlange.gesperrt_seit` mit `ergebnis = 'kein_zugriff'`, das den unbegrenzten 403-Zweig beendet, und ein Schreiber fuer `sync.fortschritt`, das acht Wochen lang vier Leser und keinen hatte |
+| `0076_quelle_zulauf.sql` | **Der Waechter aus Phase 4.** `sync.quelle` als Register der Zulauferwartungen und `mart.quelle_zulauf` als Messung dazu — **zwei** Zahlen, `zuletzt_gefragt` und `zuletzt_zulauf`, weil die beiden Ausfaelle dieses Projekts verschiedene waren: am 12.08.2026 wurde nicht mehr gefragt, am 10.08.2026 war der Zeitstempel frisch und die Tabellen leer. Der Lauf meldet ab hier `teilweise` statt `ok`, wenn eine erwartete Quelle stumm ist |
 | `pruefung.sql` | Verifikation gegen den Bayreuth-Fall aus dem Excel (kein Migrationsschritt) |
 
 Die Tabelle nennt die tragenden Migrationen, nicht jede einzelne. Der verbindliche Stand steht in `public.schema_migration`.
@@ -210,7 +213,7 @@ sync.ts / einreihen.ts Einstiegspunkte
 ```bash
 bun install
 bun run migrate                              # Schema anwenden (idempotent)
-bun test                                     # nachgemessen am 14.08.2026: 690 pass, 173 skip, 0 fail ohne TEST_DATABASE_URL
+bun test                                     # nachgemessen am 14.08.2026: 698 pass, 180 skip, 0 fail ohne TEST_DATABASE_URL
 bun run sync                                 # nachfüllen UND abarbeiten
 bun run einreihen --taeglich                 # nur nachfüllen (sync macht das selbst)
 bun run einreihen --historie --von 2018-01-01 --bis 2026-07-24
@@ -285,6 +288,10 @@ SELECT * FROM sync.warteschlange WHERE letzter_fehler IS NOT NULL;
 Bekommt jede Quelle noch Zulauf? (Regel 10 — seit 13.08.2026)
 
 ```sql
+-- DIE EINE ABFRAGE, die alle darunter abdeckt (seit 0076). ERWARTUNG: nichts
+-- ausser 'ok' und 'nicht erwartet'. Auf wird_noch_gefragt sehen: false heisst,
+-- der Importer holt die Quelle gar nicht mehr ab — ein Baufehler.
+SELECT * FROM mart.quelle_zulauf WHERE erwartet AND zustand <> 'ok';
 -- Belegarchiv: eine Zeile je Betrieb und Ordner, 1.834 insgesamt
 SELECT zustand, count(*) FROM mart.belegarchiv_zulauf GROUP BY 1 ORDER BY 2 DESC;
 SELECT * FROM mart.belegarchiv_zulauf WHERE zustand = 'abzug fehlt';

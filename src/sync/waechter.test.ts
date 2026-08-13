@@ -15,6 +15,27 @@ import { readFileSync } from 'node:fs'
 import { endpunkteZusichern, RegisterVerletzt } from './waechter'
 import { TRANSFORMIERTE_ENDPUNKTE } from './laden'
 import { ENDPUNKTE, AKTIVE_ENDPUNKTE, type Endpunkt } from '../lina/endpunkte'
+import { LADENAKTE_ENDPUNKTE } from '../ladenakte/endpunkte'
+import { FN_ENDPUNKTE } from '../foodnotify/endpunkte'
+import { QUELLEN } from './quellen'
+
+/**
+ * Alle drei Register zusammen — LINA, Ladenakte und FoodNotify.
+ *
+ * Sie stehen in drei Dateien, weil sie drei verschiedene Formen haben
+ * (`FnEndpunkt` kennt kein `aktiv`: was dort steht, ist aktiv). Für die Frage
+ * „hat jede Quelle einen Wächtereintrag?" sind sie eine Menge.
+ */
+const ALLE_AKTIVEN: string[] = [
+  ...AKTIVE_ENDPUNKTE.map(e => e.key),
+  ...LADENAKTE_ENDPUNKTE.filter(e => e.aktiv).map(e => e.key),
+  ...FN_ENDPUNKTE.map(e => e.key),
+]
+
+const ALLE_INAKTIVEN: string[] = [
+  ...ENDPUNKTE.filter(e => !e.aktiv).map(e => e.key),
+  ...LADENAKTE_ENDPUNKTE.filter(e => !e.aktiv).map(e => e.key),
+]
 
 /**
  * Den Wächter gegen ein verändertes Register laufen lassen.
@@ -144,5 +165,73 @@ describe('RegisterVerletzt', () => {
 
   test('zaehlt einen einzelnen Verstoss auch als einen', () => {
     expect(new RegisterVerletzt(['a: eins']).message).toContain('1 Verstoss)')
+  })
+})
+
+/**
+ * DER WÄCHTER ÜBER DEN WÄCHTER (Migration `0076`, Plan Phase 4).
+ *
+ * `mart.quelle_zulauf` misst nur, was in `sync.quelle` steht. Ein Endpunkt
+ * ohne Registereintrag ist damit **unsichtbar für genau die Sicht, die
+ * Unsichtbarkeit verhindern soll** — und das wäre die Wiederholung des Fehlers
+ * eine Ebene höher.
+ *
+ * Deshalb prüft dieser Test ohne Datenbank: jeder aktive Endpunkt hat einen
+ * Eintrag, und jeder Eintrag hat einen Endpunkt. Wer eine neue Quelle
+ * anschliesst, kommt ohne Eintrag nicht am Test vorbei.
+ */
+describe('Quellenregister', () => {
+  test('jeder aktive Endpunkt steht im Register', () => {
+    const registriert = new Set(QUELLEN.map(q => q.endpunkt).filter(Boolean))
+    const fehlend = ALLE_AKTIVEN.filter(k => !registriert.has(k))
+    expect(fehlend).toEqual([])
+  })
+
+  test('kein Registereintrag zeigt auf einen Endpunkt, den es nicht gibt', () => {
+    const bekannt = new Set([...ALLE_AKTIVEN, ...ALLE_INAKTIVEN])
+    const verwaist = QUELLEN
+      .map(q => q.endpunkt)
+      .filter((k): k is string => Boolean(k) && !bekannt.has(k!))
+    expect(verwaist).toEqual([])
+  })
+
+  /**
+   * Die Constraints der Tabelle noch einmal in TypeScript — sie sollen beim
+   * Test scheitern und nicht beim nächtlichen Lauf, wo ein Fehler im
+   * Nachfüllen ohnehin abgefangen wird und nur im Log steht.
+   */
+  test('jede Quelle misst an genau einer Stelle', () => {
+    for (const q of QUELLEN) {
+      const beides = Boolean(q.endpunkt) && Boolean(q.tabelle)
+      const keines = !q.endpunkt && !q.tabelle
+      expect({ quelle: q.quelle, beides, keines })
+        .toEqual({ quelle: q.quelle, beides: false, keines: false })
+    }
+  })
+
+  test('die Schluessel sind eindeutig', () => {
+    const namen = QUELLEN.map(q => q.quelle)
+    expect(namen).toHaveLength(new Set(namen).size)
+  })
+
+  /**
+   * Was bewusst still ist, braucht eine Begründung — sonst ist es nur eine
+   * Ausnahme, die jemand eingetragen hat, und niemand weiss mehr warum.
+   * Dieselbe Regel wie bei `NUR_ROH` oben.
+   */
+  test('jede nicht erwartete Quelle traegt eine Begruendung', () => {
+    const ohne = QUELLEN.filter(q => q.erwartet === false && !q.bemerkung)
+    expect(ohne.map(q => q.quelle)).toEqual([])
+  })
+
+  /**
+   * Und die Gegenprobe: eine Kadenz von null oder negativ wäre eine Quelle,
+   * die immer stumm ist — ein Alarm, der immer schlägt, wird abgeschaltet.
+   */
+  test('jede Kadenz ist positiv und nicht laenger als ein Quartal', () => {
+    for (const q of QUELLEN) {
+      expect({ quelle: q.quelle, ok: q.kadenz_stunden > 0 && q.kadenz_stunden <= 92 * 24 })
+        .toEqual({ quelle: q.quelle, ok: true })
+    }
   })
 })

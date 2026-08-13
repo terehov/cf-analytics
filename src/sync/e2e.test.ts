@@ -265,6 +265,18 @@ lauf('Ende-zu-Ende', () => {
       // Seit 0070 ausdruecklich nur die ENDGUELTIGEN: ein aufgegebener Posten,
       // den der Lauf noch dreimal zurueckholt, ist Betrieb und kein Befund.
       'Warteschlange: endgueltig aufgegeben',
+      /**
+       * Beide seit 0076 — die Zeilen, die alle anderen abdecken. Sie stehen
+       * am Ende der alphabetischen Liste und ganz oben auf dem Dashboard:
+       * jede Pruefung darueber setzt voraus, dass etwas SCHIEFGEHT. Der
+       * teuerste Fehler dieses Projekts hat nichts davon getan.
+       *
+       * Zwei Zeilen und nicht eine, weil es zwei Ausfallarten sind: „die
+       * Quelle liefert nichts" ist ein Befund, „wir fragen nicht mehr" ist
+       * ein Baufehler.
+       */
+      'Zulauf: Quelle ohne Zulauf in ihrer Kadenz',
+      'Zulauf: Quelle wird nicht mehr abgefragt',
     ])
   })
 
@@ -2757,5 +2769,165 @@ lauf('e2e Ladenakte', () => {
       // Aufraeumen: der zweite Betrieb gehoert nicht in die folgenden Tests.
       await db.query(`DELETE FROM core.betrieb WHERE lina_betrieb_id = 99`)
     })
+  })
+})
+
+/**
+ * Der Wächter über den Zulauf (Migration `0076`, Plan Phase 4).
+ *
+ * DER KONSTRUKTIONSFEHLER, den er abfängt, hat dieses Projekt zweimal Tage
+ * gekostet — und beide Male auf verschiedene Weise, weshalb die Sicht ZWEI
+ * Zahlen führt und nicht eine:
+ *
+ *   02.08. / 12.08.2026   Es wurde nicht mehr GEFRAGT. Der Lauf meldete
+ *                         269 von 269 Aufgaben „ok" und holte null Belege.
+ *   10.08.2026            Es wurde gefragt, der Zeitstempel war frisch —
+ *                         und `core.bewertung_thema` stand auf null Zeilen.
+ *
+ * Eine Zahl allein hätte beide Male beruhigt.
+ */
+lauf('Zulauf je Quelle', () => {
+  let db: Client
+
+  beforeAll(async () => {
+    db = new Client({ connectionString: DB })
+    await db.connect()
+  })
+  afterAll(async () => {
+    await db.query(`DELETE FROM sync.quelle WHERE quelle LIKE 'test:%'`)
+    await db.end()
+  })
+
+  /**
+   * Eine vollständig kontrollierte Lage: vier Quellen, vier Zustände. Das
+   * echte Register kommt aus `quellenSpiegeln()` und wird hier ausdrücklich
+   * nicht verwendet — es hinge sonst am Zufall, was die Testdatenbank gerade
+   * enthält, und der Test prüfte die Fixtures statt die Sicht.
+   */
+  async function lageAufbauen() {
+    await db.query(`DELETE FROM sync.quelle`)
+    await db.query(`DELETE FROM sync.aufgabe WHERE endpunkt LIKE 'test:%'`)
+    await db.query(
+      `INSERT INTO sync.quelle (quelle, bezeichnung, system, endpunkt, kadenz_stunden, erwartet, bemerkung)
+       VALUES ('test:ok',    'Hat Zulauf',        'lina', 'test:ok',    36, true,  NULL),
+              ('test:leer',  'Gefragt, nichts',   'lina', 'test:leer',  36, true,  NULL),
+              ('test:stumm', 'Nicht mehr gefragt','lina', 'test:stumm', 36, true,  NULL),
+              ('test:nie',   'Noch nie',          'lina', 'test:nie',   36, true,  NULL),
+              ('test:egal',  'Bewusst still',     'lina', 'test:egal',  36, false, 'Demodaten')`)
+
+    const { rows: [l] } = await db.query(
+      `INSERT INTO sync.lauf (ausloeser, status) VALUES ('manuell','ok') RETURNING lauf_id`)
+
+    const aufgabe = (endpunkt: string, vorStunden: number, zeilen: number) => db.query(
+      `INSERT INTO sync.aufgabe (lauf_id, endpunkt, status, zeilen, beendet_am)
+       VALUES ($1, $2, 'ok', $3, now() - ($4 || ' hours')::interval)`,
+      [l.lauf_id, endpunkt, zeilen, vorStunden])
+
+    // Frisch gefragt, frischer Zulauf.
+    await aufgabe('test:ok', 1, 42)
+    // Frisch gefragt — und null Zeilen. Der Yext-Fall vom 10.08.2026.
+    await aufgabe('test:leer', 1, 0)
+    await aufgabe('test:leer', 100, 42)
+    // Zuletzt vor Tagen gefragt. Der Belegarchiv-Fall vom 12.08.2026.
+    await aufgabe('test:stumm', 100, 42)
+    // test:nie und test:egal bekommen gar keine Aufgabe.
+    return String(l.lauf_id)
+  }
+
+  test('trennt "liefert nichts" von "wird nicht mehr gefragt"', async () => {
+    await lageAufbauen()
+    const { rows } = await db.query(
+      `SELECT quelle, zustand, wird_noch_gefragt FROM mart.quelle_zulauf ORDER BY quelle`)
+    const nach = Object.fromEntries(rows.map(r => [r.quelle, r]))
+
+    expect(nach['test:ok'].zustand).toBe('ok')
+
+    /**
+     * DER KERN. Beide sind „stumm", und die Unterscheidung ist der ganze
+     * Unterschied zwischen einem Befund und einem Baufehler:
+     *   test:leer   wird noch gefragt — die Quelle liefert nichts.
+     *   test:stumm  wird nicht mehr gefragt — WIR fragen nicht mehr.
+     */
+    expect(nach['test:leer'].zustand).toBe('stumm')
+    expect(nach['test:leer'].wird_noch_gefragt).toBe(true)
+    expect(nach['test:stumm'].zustand).toBe('stumm')
+    expect(nach['test:stumm'].wird_noch_gefragt).toBe(false)
+
+    // Noch nie eine Zeile — sieht aus wie ein frisch aufgesetztes System.
+    expect(nach['test:nie'].zustand).toBe('nie')
+
+    /**
+     * Und was bewusst still ist, ist kein Alarm. Ohne diesen Zustand stünde
+     * die Prüfzeile dauerhaft rot, und eine Zeile, die nie auf null geht,
+     * liest niemand mehr — dieselbe Überlegung wie in 0070, 0071 und 0073.
+     */
+    expect(nach['test:egal'].zustand).toBe('nicht erwartet')
+  })
+
+  test('der Lauf meldet nicht mehr "ok", wenn eine Quelle stumm ist', async () => {
+    const laufId = await lageAufbauen()
+    const { zulaufPruefen } = await import('./zulauf')
+
+    const stumm = await zulaufPruefen(laufId)
+    // test:leer, test:stumm und test:nie — test:egal zaehlt nicht mit.
+    expect(stumm).toBe(3)
+
+    const { rows: [l] } = await db.query(
+      `SELECT status, notiz FROM sync.lauf WHERE lauf_id = $1`, [laufId])
+    expect(l.status).toBe('teilweise')
+    expect(l.notiz).toContain('test:stumm')
+    // Die schaerfere Teilmenge wird eigens genannt.
+    expect(l.notiz).toContain('nicht mehr abgefragt')
+  })
+
+  test('ein bereits gescheiterter Lauf behaelt seinen Grund', async () => {
+    const laufId = await lageAufbauen()
+    await db.query(
+      `UPDATE sync.lauf SET status = 'abgebrochen', notiz = 'Zugang gesperrt'
+        WHERE lauf_id = $1`, [laufId])
+    const { zulaufPruefen } = await import('./zulauf')
+    await zulaufPruefen(laufId)
+
+    const { rows: [l] } = await db.query(
+      `SELECT status, notiz FROM sync.lauf WHERE lauf_id = $1`, [laufId])
+    // Die erste Ursache ist die wichtigere und darf nicht ueberschrieben
+    // werden — ein abgebrochener Lauf hat naturgemaess keinen Zulauf.
+    expect(l.status).toBe('abgebrochen')
+    expect(l.notiz).toContain('Zugang gesperrt')
+    expect(l.notiz).toContain('ohne Zulauf')
+  })
+
+  test('alles in Ordnung heisst 0 und laesst den Lauf in Ruhe', async () => {
+    const laufId = await lageAufbauen()
+    await db.query(`DELETE FROM sync.quelle WHERE quelle <> 'test:ok'`)
+    const { zulaufPruefen } = await import('./zulauf')
+    expect(await zulaufPruefen(laufId)).toBe(0)
+    const { rows: [l] } = await db.query(
+      `SELECT status, notiz FROM sync.lauf WHERE lauf_id = $1`, [laufId])
+    expect(l.status).toBe('ok')
+    expect(l.notiz).toBeNull()
+  })
+
+  /**
+   * Und der Abgleich mit dem Code-Register: `quellenSpiegeln()` ist der
+   * einzige Schreiber, und er raeumt auch auf. Eine Quelle, die im Code
+   * verschwindet, stuende sonst fuer immer als „stumm" in der Sicht.
+   */
+  test('quellenSpiegeln setzt das Register auf den Stand des Codes', async () => {
+    await lageAufbauen()
+    const { quellenSpiegeln, QUELLEN } = await import('./quellen')
+    expect(await quellenSpiegeln()).toBe(QUELLEN.length)
+
+    const { rows: [r] } = await db.query(
+      `SELECT count(*)::int AS n,
+              count(*) FILTER (WHERE quelle LIKE 'test:%')::int AS reste
+         FROM sync.quelle`)
+    expect(r.n).toBe(QUELLEN.length)
+    expect(r.reste).toBe(0)
+
+    // Zweimal spiegeln legt nichts doppelt an und aendert nichts.
+    expect(await quellenSpiegeln()).toBe(QUELLEN.length)
+    const { rows: [n2] } = await db.query(`SELECT count(*)::int AS n FROM sync.quelle`)
+    expect(n2.n).toBe(QUELLEN.length)
   })
 })

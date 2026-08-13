@@ -299,6 +299,17 @@ oder benannt; eine Rückbuchung in einem Vormonat erscheint im nächsten Lauf.
 
 ### Phase 4 — der Wächter
 
+> **Erledigt am 14.08.2026, Migration `0076`.** `sync.quelle` als Register der
+> Zulauferwartungen (in `src/sync/quellen.ts`, nicht als Seed), `mart.quelle_zulauf`
+> als Messung, eine Karte an zweiter Stelle auf dem Import-Dashboard, zwei
+> Prüfzeilen und ein Lauf, der `teilweise` meldet statt `ok`. Gemessen wird
+> **zweierlei** — `zuletzt_gefragt` und `zuletzt_zulauf` —, weil die beiden
+> Ausfälle dieses Projekts verschiedene waren.
+>
+> Zwei Funde beim Anlegen: `fn:profil` war ein Einmalposten (läuft jetzt täglich
+> mit), und drei `core`-Tabellen haben null Zeilen und keinen Schreiber
+> (`offene-punkte.md`).
+
 Der eigentliche Konstruktionsfehler hinter allen Befunden: **Stillstand sieht
 aus wie Erfolg.** Das Belegarchiv lieferte zwei Tage nichts, und der Lauf meldete
 269 von 269 ok. Derselbe Fehler kostete am 02.08.2026 schon einmal acht Tage.

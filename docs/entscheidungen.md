@@ -1869,3 +1869,43 @@ und nicht als Pause an der Kombination. Genau das steht jetzt drin.
 
 Entfernen hätte vier Leser und eine seit `0005` gepflegte Struktur weggeworfen, um eine
 Prüfung loszuwerden, die nur deshalb nichts sagte, weil niemand sie bediente.
+
+### Der Wächter misst zwei Zahlen, nicht eine
+
+„Bekommt die Quelle noch Zulauf?" wäre mit einer Zahl zu beantworten — dem
+Zeitpunkt der letzten Zeile. Die beiden Ausfälle, die diesen Wächter nötig
+gemacht haben, waren aber verschiedene:
+
+* **12.08.2026, Belegarchiv:** es wurde nicht mehr **gefragt**. Die
+  Einreihbedingung war die eines einmaligen Abzugs.
+* **10.08.2026, Yext-Analytics:** es wurde gefragt, der Merker war frisch — und
+  die Tabellen waren leer.
+
+Eine Zahl allein hätte beide Male beruhigt. `zuletzt_gefragt` und
+`zuletzt_zulauf` trennen sie, und `wird_noch_gefragt` macht daraus die Frage,
+auf die es ankommt: **ist das ein Befund oder ein Baufehler?** Eine Quelle, die
+nichts liefert, kann in Ordnung sein. Eine, die niemand mehr abfragt, nie.
+
+### Das Register steht in TypeScript, nicht in der Migration
+
+Eine Tabelle mit einem `INSERT`-Seed wäre kürzer. Sie wäre aber ein **zweiter
+Ort** für dieselbe Sache — und der zweite Ort ist immer der veraltete. Wer einen
+Endpunkt anlegt, sieht das Register in `src/sync/quellen.ts` direkt daneben, und
+`waechter.test.ts` prüft **ohne Datenbank**, dass keiner ohne Eintrag durchkommt.
+
+Der Preis ist ein Schreibvorgang je Lauf (`quellenSpiegeln()`), und zwar als
+Vollabgleich: was im Code verschwindet, verschwindet auch in der Sicht. Ohne das
+stünde ein abgeschalteter Endpunkt für immer als „stumm" da — bis jemand die
+Zeile nicht mehr liest.
+
+### Der Lauf wird `teilweise`, nicht `fehlgeschlagen`
+
+Regel 10 verlangt, dass der Lauf eine stumme Quelle nicht als „ok" meldet. Sie
+verlangt nicht, dass er scheitert — und das wäre auch falsch: der Lauf hat
+getan, was er konnte, und ein Exitcode 1 ließe Dokploy den Container neu
+starten, was nichts löst und alles langsamer macht.
+
+`teilweise` steht in `mart.sync_status`, die Namen stehen in der Notiz, `/status`
+wird gelb (oder rot, wenn gar nicht mehr gefragt wird), und auf dem
+Import-Dashboard steht die Zahl an zweiter Stelle. Ein Lauf, der schon
+`abgebrochen` ist, behält seinen Status — die erste Ursache ist die wichtigere.

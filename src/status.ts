@@ -20,6 +20,7 @@
  */
 import { config } from './config'
 import { eine, query } from './db/pool'
+import { zulaufStand } from './sync/zulauf'
 
 export type Stufe = 'ok' | 'warnung' | 'stoerung'
 
@@ -163,6 +164,62 @@ export async function statusErheben(): Promise<Statusbericht> {
           : 'nichts aufgegeben',
         werte: { endgueltig: 0, wird_erneut_versucht: nochOffen },
       })
+
+  // --- 4b. Bekommt jede Quelle noch Zulauf? -------------------------------
+  //
+  /**
+   * Die Prüfung zu AGENTS.md Regel 10, und die einzige hier, die etwas
+   * findet, das gar keine Spur hinterlässt.
+   *
+   * Alle Prüfungen darüber setzen voraus, dass etwas SCHIEFGEHT: ein Posten
+   * scheitert, ein Lauf bricht ab, eine Struktur weicht ab. Der teuerste
+   * Fehler dieses Projekts hat nichts davon getan. Am 12.08.2026 fror das
+   * Belegarchiv ein, die Läufe 85 bis 88 meldeten 269 von 269 Aufgaben „ok",
+   * und `core.buchungsbeleg` bekam zwei Tage lang keinen einzigen Beleg. Es
+   * gab nichts zu finden, weil nichts passierte.
+   *
+   * ZWEI STUFEN, WEIL ES ZWEI AUSFALLARTEN GIBT — dieselbe Unterscheidung wie
+   * bei Yext darunter:
+   *
+   *   stumm, wird aber noch gefragt  → die Quelle liefert nichts. Ein Befund,
+   *                                    vielleicht ein richtiger (Betriebsferien,
+   *                                    keine Inventuren). Warnung.
+   *   wird gar nicht mehr gefragt    → wir haben aufgehört zu fragen. Ein
+   *                                    Baufehler, und der bekannte. Störung.
+   */
+  const zulauf = await zulaufStand()
+  if (zulauf === null || Number(zulauf.erwartet) === 0) {
+    // Vor dem ersten Lauf mit dieser Version ist das Register leer. Kein
+    // Fehler, aber es soll dastehen — sonst hält jemand die fehlende Zeile
+    // für ein „alles gut".
+    p.push({
+      name: 'zulauf', stufe: 'ok',
+      meldung: 'Quellenregister noch nicht gefüllt — der nächste Lauf tut das',
+      naechster_schritt: 'Bleibt es dabei, ist quellenSpiegeln() nicht gelaufen: '
+                       + 'SELECT count(*) FROM sync.quelle;',
+    })
+  } else {
+    const stumm = Number(zulauf.stumm)
+    const ungefragt = Number(zulauf.ungefragt)
+    p.push(stumm === 0
+      ? {
+          name: 'zulauf', stufe: 'ok',
+          meldung: `alle ${zulauf.erwartet} erwarteten Quellen haben Zulauf`,
+          werte: { erwartet: Number(zulauf.erwartet) },
+        }
+      : {
+          name: 'zulauf',
+          stufe: ungefragt > 0 ? 'stoerung' : 'warnung',
+          meldung: ungefragt > 0
+            ? `${ungefragt} Quelle(n) werden gar nicht mehr abgefragt: ${zulauf.namen.join(', ')}`
+            : `${stumm} Quelle(n) ohne Zulauf: ${zulauf.namen.join(', ')}`,
+          naechster_schritt:
+            "SELECT * FROM mart.quelle_zulauf WHERE zustand <> 'ok'; " +
+            'Auf wird_noch_gefragt sehen: false heisst, die Einreihbedingung ist kaputt ' +
+            '(so wie am 12.08.2026 beim Belegarchiv), true heisst, die Quelle liefert nichts.',
+          werte: { erwartet: Number(zulauf.erwartet), stumm, ungefragt, quellen: zulauf.namen },
+        })
+  }
 
   // --- 5. Hat sich LINAs Antwortstruktur geändert? ------------------------
   const abweichung = await eine<{ n: number }>(

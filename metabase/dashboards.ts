@@ -1614,11 +1614,23 @@ export const dashboards: Dashboard[] = [
       { teile: [{ text: '# Import — Überwachung\n\n> **„keine Daten“ ist kein Fehler** — LINA meldet das, wenn ein Betrieb einen Bericht nicht führt. Nur was unter „Fehler“ steht, ist einer.' }] },
       { teile: [
         { karte: 'im_ampel' },
+        { karte: 'im_zulauf' },
         { karte: 'im_prozent' },
         { karte: 'im_tempo' },
         { karte: 'im_restzeit' },
       ] },
       { teile: [{ karte: 'im_kopf' }] },
+
+      /*
+       * Die Zulauftabelle steht GANZ OBEN und nicht bei „wie vollständig
+       * ist es?". Das ist Absicht: alles, was unter dieser Zeile folgt,
+       * setzt voraus, dass es Arbeit gibt. Fortschritt, Tempo und Restzeit
+       * sehen bei einem Importer ohne Arbeit genau so aus wie bei einem, der
+       * fertig ist — 100 %, kein Fehler, keine Restzeit. Genau so stand die
+       * Seite am 12.08.2026 da, während das Belegarchiv einfror.
+       */
+      { teile: [{ text: '## Bekommt jede Quelle noch Zulauf?\n\n**Ein Importer ohne Arbeit sieht genauso aus wie einer, der fertig ist.** Die Karten darunter messen Arbeit; diese hier misst, ob es überhaupt welche geben müsste. „Wird noch gefragt? **NEIN**" ist der schwerere Fall: dann holt der Importer diese Quelle gar nicht mehr ab.' }] },
+      { teile: [{ karte: 'im_quellen', hoehe: 12 }] },
 
       { teile: [{ text: '## Woran hängt es?\n\n**Ruht der Zugang, steht alles still** — dann erübrigt sich die weitere Suche. Sperren laufen von selbst ab; nur ein Anmeldefehler braucht einen Menschen.' }] },
       { teile: [{ karte: 'im_sperre' }] },

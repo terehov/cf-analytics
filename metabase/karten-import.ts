@@ -33,6 +33,49 @@ SELECT CASE WHEN sperre_art IS NULL THEN 'frei'
        END AS "Zugang"
   FROM mart.import_gesamt`,
   },
+  /*
+   * DIE KARTE ZU REGEL 10, und sie steht bewusst an zweiter Stelle — direkt
+   * hinter der Zugangsampel und vor allem, was Fortschritt misst.
+   *
+   * Jede Karte darunter setzt voraus, dass es Arbeit GIBT. Fortschritt, Tempo
+   * und Restzeit sehen bei einem Importer, der nichts mehr zu tun hat, genau
+   * so aus wie bei einem, der fertig ist: 100 %, kein Fehler, keine Restzeit.
+   * Am 12.08.2026 stand die Seite so da, während das Belegarchiv einfror.
+   *
+   * Als Zahl und nicht als Tabelle, weil die Frage eine Ja-Nein-Frage ist.
+   * Die Namen stehen in der Tabelle darunter.
+   */
+  {
+    schluessel: 'im_zulauf',
+    name: 'Quellen ohne Zulauf',
+    beschreibung:
+      'Muss 0 sein. Jede andere Zahl heißt: eine Quelle liefert seit länger als erwartet keine Zeile mehr — und das sieht man an keiner anderen Karte dieser Seite, weil ein Importer ohne Arbeit genauso aussieht wie einer, der fertig ist. Die Namen stehen in der Tabelle „Zulauf je Quelle".',
+    anzeige: 'scalar',
+    sql: `
+SELECT count(*) FILTER (WHERE zustand IN ('stumm','nie')) AS "Quellen ohne Zulauf"
+  FROM mart.quelle_zulauf WHERE erwartet`,
+  },
+  {
+    schluessel: 'im_quellen',
+    name: 'Zulauf je Quelle',
+    beschreibung:
+      'Eine Zeile je Quelle, die stillsten zuerst. „Wird noch gefragt?" ist die wichtigere der beiden Spalten: „nein" heißt, der Importer holt diese Quelle gar nicht mehr ab — ein Baufehler, und genau der, der am 12.08.2026 das Belegarchiv einfrieren ließ. „ja" bei fehlendem Zulauf heißt, die Quelle selbst liefert nichts; das kann in Ordnung sein (keine Inventuren, keine neuen Belege). Zeilen mit „nicht erwartet" liefern absichtlich nichts — die Begründung steht daneben.',
+    anzeige: 'table',
+    sql: `
+SELECT bezeichnung          AS "Quelle",
+       system               AS "System",
+       zustand              AS "Zustand",
+       CASE WHEN NOT erwartet THEN NULL
+            WHEN wird_noch_gefragt THEN 'ja' ELSE 'NEIN' END AS "Wird noch gefragt?",
+       zuletzt_zulauf       AS "Letzter Zulauf",
+       stunden_ohne_zulauf  AS "Stunden ohne Zulauf",
+       kadenz_stunden       AS "Erwartet alle (h)",
+       bemerkung            AS "Bemerkung"
+  FROM mart.quelle_zulauf
+ ORDER BY CASE zustand WHEN 'nie' THEN 0 WHEN 'stumm' THEN 1
+                       WHEN 'ok' THEN 2 ELSE 3 END,
+          stunden_ohne_zulauf DESC NULLS FIRST`,
+  },
   {
     schluessel: 'im_prozent',
     name: 'Fortschritt',

@@ -1094,3 +1094,63 @@ SELECT count(*) AS zeilen,
        count(*) FILTER (WHERE pausiert_bis > now()) AS pausiert
   FROM sync.fortschritt;
 ```
+
+## Drei `core`-Tabellen mit null Zeilen und keinem Schreiber (14.08.2026)
+
+Gefunden beim Anlegen des Quellenregisters (Migration `0076`) — vorher stand es
+nirgends, weil eine Tabelle ohne Eintrag in keiner Sicht auftaucht.
+
+| Tabelle | Zeilen | Schreiber im Repo | Endpunkt |
+|---|---|---|---|
+| `core.rezept` | 0 | keiner | keiner (`src/foodnotify/endpunkte.ts` führt neun, keiner davon) |
+| `core.pos_artikel` | 0 | keiner | keiner |
+| `core.ware_stand` | 0 | keiner | keiner |
+
+Zum Vergleich: `core.ware` hat 43.271 Zeilen — die Waren kommen über die
+Bestellpositionen herein, nicht über einen Stammdatenabruf.
+
+**`core.pos_artikel` ist der unangenehme Fall.** `AGENTS.md` beschreibt ihn als
+die Brücke zwischen LINA-Artikel und FoodNotify-Rezept (`plu =
+core.artikel.artikelnummer`, gültig nur bei `kassensystem = 'amadeus'`) — als
+bestünde sie. Sie besteht nicht. Wer darauf joint, bekommt null Zeilen und
+keinen Fehler.
+
+**Wer muss was klären:**
+
+1. **Gibt es bei FoodNotify einen Rezept-Endpunkt?** `docs/foodnotify-api-inventar.md`
+   führt 126 Pfade; unser Register nutzt neun. Wenn ja, ist es Stufe 4 desselben
+   Plans und keine große Sache. Wenn nein, ist es eine Quellengrenze wie bei
+   Warengruppen und Lieferanten (`plan-datenvollstaendigkeit.md`, Abschnitt 5).
+2. **Braucht die Auswertung sie überhaupt?** Der theoretische Wareneinsatz läuft
+   heute über `core.artikel.fixer_we`, dessen Herkunft ungeklärt ist (Regel 5).
+   Ein echter Rezeptbezug wäre die Ablösung dafür — das ist eine fachliche
+   Entscheidung und keine technische.
+
+Bis dahin stehen alle drei im Register als `erwartet: false` **mit Begründung**.
+Das ist der Unterschied zu vorher: eine leere Tabelle ohne Eintrag ist
+unsichtbar, eine leere Tabelle mit Eintrag ist eine Entscheidung.
+
+## Nachprüfung nach dem Deploy von `0076` (Phase 4)
+
+```sql
+-- 1. Das Register ist gefuellt. ERWARTUNG: so viele Zeilen wie QUELLEN in
+--    src/sync/quellen.ts. Steht hier 0, ist quellenSpiegeln() nicht gelaufen.
+SELECT count(*) FROM sync.quelle;
+
+-- 2. Der Waechter selbst. ERWARTUNG nach einem vollen Lauf: alles auf 'ok',
+--    ausser den vier bewusst stillen ('nicht erwartet').
+SELECT zustand, count(*) FROM mart.quelle_zulauf GROUP BY 1 ORDER BY 2 DESC;
+SELECT * FROM mart.quelle_zulauf WHERE erwartet AND zustand <> 'ok';
+
+-- 3. Die schaerfere Frage. ERWARTUNG: leer. Steht hier etwas, fragt der
+--    Importer eine Quelle gar nicht mehr ab — der Fehler vom 12.08.2026.
+SELECT * FROM mart.quelle_zulauf WHERE erwartet AND NOT wird_noch_gefragt;
+
+-- 4. Und die Gegenprobe am Lauf: meldet er noch 'ok'?
+SELECT lauf_id, status, notiz FROM sync.lauf ORDER BY lauf_id DESC LIMIT 3;
+
+-- 5. fn:profil laeuft jetzt taeglich mit. VORHER: vier Aufgaben, alle vom
+--    02.08.2026. ERWARTUNG: eine je Marke und Tag.
+SELECT beendet_am::date, count(*) FROM sync.aufgabe
+ WHERE endpunkt = 'fn:profil' GROUP BY 1 ORDER BY 1 DESC LIMIT 5;
+```

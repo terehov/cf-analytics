@@ -17,6 +17,7 @@ import { einkaufspreisNachlauf } from './sync/einkaufspreis'
 import { einkaufSichtenNachlauf } from './sync/einkauf_sichten'
 import { zuordnungNachlauf } from './sync/zuordnung'
 import { yextNachlauf } from './yext/nachlauf'
+import { zulaufPruefen } from './sync/zulauf'
 
 const ausloeser = process.argv.includes('--backfill') ? 'backfill'
                 : process.argv.includes('--manuell')  ? 'manuell'
@@ -107,6 +108,23 @@ try {
   // 02.08.2026 LINA acht Tage stillstehen lassen, ohne dass es auffiel.
   // Wirft nie, siehe Kopf von yext/nachlauf.ts.
   await yextNachlauf()
+
+  /**
+   * ZULETZT, UND ERST HIER: bekommt jede Quelle noch Zulauf?
+   *
+   * Die Regel aus AGENTS.md 10 — eine Quelle ohne Zulauf ist ein Fehler, kein
+   * Normalzustand, und der Lauf darf sie nicht als „ok" melden. Bis hierher
+   * konnte er nichts anderes: `sync.lauf.status` kannte genau eine Frage, und
+   * das war „sind Aufgaben gescheitert?". Eine Quelle, die niemand mehr
+   * abfragt, erzeugt keine gescheiterte Aufgabe — sie erzeugt gar keine.
+   *
+   * NACH allen Nachläufen, nicht davor. Die vier Yext-Quellen werden von
+   * `yextNachlauf()` gefüllt; eine Prüfung davor meldete sie in jedem Lauf als
+   * stumm, und ein Alarm, der immer schlägt, ist keiner.
+   *
+   * Wirft nie, siehe Kopf von sync/zulauf.ts.
+   */
+  await zulaufPruefen(r.laufId)
 
   await pool.end().catch(() => {})
   // Exitcode 1 nur bei Abbruch - 'teilweise' ist normal (einzelne Betriebe ohne Daten).

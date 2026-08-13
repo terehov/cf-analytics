@@ -937,3 +937,31 @@ weggearbeitet"** — `erstellt_am` gegen den Beginn des letzten beendeten Laufs.
 eigenen Betrieb heißt, dass uns dessen Bestellungen fehlen, ohne dass etwas rot wird. Die
 Prüfzeile zählt deshalb **nur die eigenen** — eine Zeile, die nie auf null geht, liest niemand
 mehr (dieselbe Überlegung wie bei `0070`, `0071` und `0073`).
+
+## `mart.quelle_zulauf` — die Sicht zu Regel 10 (Migration `0076`, 14.08.2026)
+
+Bekommt jede Quelle noch Zulauf? Vier Zustände, und der Unterschied zwischen
+zweien davon ist der ganze Punkt:
+
+| `zustand` | Bedeutung |
+|---|---|
+| `ok` | Zulauf innerhalb der erwarteten Kadenz |
+| `stumm` | seit länger als `kadenz_stunden` keine Zeile mehr |
+| `nie` | es ist noch nie eine Zeile entstanden |
+| `nicht erwartet` | liefert bewusst nichts, **mit** Begründung in `bemerkung` |
+
+**Auf `wird_noch_gefragt` sehen, nicht nur auf `zustand`.** `false` heißt, der
+Importer holt diese Quelle gar nicht mehr ab — ein Baufehler, und genau der vom
+12.08.2026. `true` bei fehlendem Zulauf heißt, die Quelle selbst liefert nichts;
+das kann in Ordnung sein (keine Inventuren, keine neuen Belege).
+
+Zwei Prüfzeilen, nicht eine: „Quelle ohne Zulauf in ihrer Kadenz" und „Quelle
+wird nicht mehr abgefragt". Gezählt werden nur die **erwarteten** — die bewusst
+stillen stehen in der Sicht und in keiner Zahl. Eine Prüfzeile, die nie auf null
+geht, liest niemand mehr.
+
+**Die Kadenzen sind großzügig gewählt und je Quelle begründet**
+(`src/sync/quellen.ts`): 36 h für alles Tägliche, 8 Tage für alles, was nur bei
+Bedarf Zeilen liefert (Belegabzug, Inventuren), 35 Tage für Momentaufnahmen.
+Eine Schwelle, die bei jedem normalen Schwanken ausschlägt, wird abgeschaltet;
+eine, die nie ausschlägt, wird nicht gelesen. Beides ist derselbe Fehler.

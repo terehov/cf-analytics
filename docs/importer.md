@@ -826,3 +826,48 @@ rückwärts laufende Historienlauf den erreichten Stand nicht zurückdreht.
 Die Funktion **wirft nie**: der Fortschritt ist eine Beobachtung über die Arbeit, nicht die
 Arbeit. Ein Fehler beim Notieren darf den Posten nicht mitnehmen, der gerade sauber geladen
 wurde.
+
+## Der Wächter über den Zulauf (Migration `0076`, 14.08.2026)
+
+Phase 4 des Plans, und der Punkt, unter dem alle anderen stehen: **Stillstand
+sieht aus wie Erfolg.** Zweimal hat das diesem Projekt Tage gekostet, und beide
+Male auf verschiedene Weise — deshalb führt die Sicht **zwei** Zahlen:
+
+| | Was ausfiel | Was frisch aussah |
+|---|---|---|
+| 02.08. / 12.08.2026 | es wurde nicht mehr **gefragt** | 269 von 269 Aufgaben „ok" |
+| 10.08.2026 (Yext) | es kamen keine **Zeilen** | der Merker, täglich erneuert |
+
+Eine Zahl allein hätte beide Male beruhigt.
+
+**Drei Teile, mehr nicht** (der Plan verlangt ausdrücklich, es klein zu halten —
+ein Wächter, der drei Wochen Arbeit ist, entsteht nie):
+
+1. **`src/sync/quellen.ts`** — das Register: welche Quelle in welchem Takt
+   Zulauf haben muss, je Eintrag begründet. In TypeScript und nicht als Seed in
+   der Migration, damit es neben den Endpunkten liegt, die es beschreibt, und
+   damit `waechter.test.ts` es **ohne Datenbank** gegen `AKTIVE_ENDPUNKTE`
+   prüfen kann: kein aktiver Endpunkt kommt ohne Eintrag durch.
+2. **`mart.quelle_zulauf`** — die Messung. Über `sync.aufgabe`, wo der Importer
+   selbst protokolliert hat; direkt an der Tabelle für Yext, das keine Aufgabe
+   schreibt (und dort ist es ohnehin die schärfere Prüfung).
+3. **`src/sync/zulauf.ts`** — der Lauf meldet nicht mehr blind „ok". Läuft als
+   **letztes**, nach allen Nachläufen: davor wäre Yext noch nicht geladen, und
+   vier Quellen stünden in jedem Lauf als stumm da.
+
+**Was der Lauf tut und was ausdrücklich nicht.** Er setzt `sync.lauf.status`
+von `ok` auf `teilweise` und schreibt die Namen in die Notiz. Kein
+`fehlgeschlagen` und kein Exitcode 1: der Lauf hat getan, was er konnte, und ein
+Neustart durch Dokploy löst nichts. Ein Lauf, der schon `abgebrochen` ist,
+behält seinen Grund — die erste Ursache ist die wichtigere.
+
+**Zwei Funde beim Anlegen des Registers**, beide vorher unsichtbar:
+
+* **`fn:profil` war ein Einmalposten** — vier Aufgaben, alle vom 02.08.2026,
+  danach nie wieder. Es liefert die Benutzer-ID, aus der `fnEndpunkt()` die
+  Pfade **aller anderen** FoodNotify-Aufrufe baut. Ändert sie sich, laufen sie
+  geschlossen ins Leere. Läuft seit dem 14.08.2026 täglich mit den übrigen
+  Stammdaten mit (+4 Aufrufe am Tag gegen 140.000 Budget).
+* **Drei `core`-Tabellen haben null Zeilen und keinen Schreiber**:
+  `core.rezept`, `core.pos_artikel`, `core.ware_stand`. Sie stehen im Register
+  als `erwartet: false` mit Begründung — siehe `offene-punkte.md`.

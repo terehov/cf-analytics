@@ -26,6 +26,7 @@ import { log } from '../lib/log'
 import { AKTIVE_ENDPUNKTE, istMomentaufnahme, einreihPrioritaet } from '../lina/endpunkte'
 import { geschaeftstag } from '../lib/time'
 import { endpunkteZusichern } from './waechter'
+import { quellenSpiegeln } from './quellen'
 
 export type NachfuellStand = {
   lina: number; foodnotify: number; ladenakte: number
@@ -217,17 +218,25 @@ export async function foodnotifyNachfuellen(): Promise<number> {
      * lange aus jeder betriebsbezogenen Sicht. Gemessen am 13.08.2026 lagen
      * die Stammdaten 11 Tage zurück.
      *
-     * Die Verschwendung ist zudem winzig: drei Endpunkte mal vier Marken
-     * sind 12 Aufrufe am Tag, gegen ein FoodNotify-Tagesbudget von 140.000
+     * Die Verschwendung ist zudem winzig: vier Endpunkte mal vier Marken
+     * sind 16 Aufrufe am Tag, gegen ein FoodNotify-Tagesbudget von 140.000
      * bei rund 200 verbrauchten. Das ist der billigste Punkt dieses ganzen
      * Plans.
+     *
+     * `fn:profil` KAM AM 14.08.2026 DAZU und war bis dahin ein Einmalposten:
+     * vier Aufgaben insgesamt, alle vom 02.08.2026, danach nie wieder. Es
+     * liefert die FoodNotify-Benutzer-ID, aus der `fnEndpunkt()` die Pfade
+     * aller anderen Aufrufe baut — ändert sie sich, laufen die anderen
+     * Endpunkte ins Leere, und zwar geschlossen. Ein Einmalposten für eine
+     * Angabe, an der alles andere hängt, ist derselbe Bau wie der einmalige
+     * Belegarchiv-Abzug vom 12.08.2026.
      *
      * Der Takt hängt weiterhin am ZEITRAUM und nicht an einem Ergebniswert —
      * gibt es für heute schon eine Zeile, passiert nichts, gleich wie sie
      * ausgegangen ist. Dieselbe Lehre wie bei `einreihenJeMonat()`.
      */
     const { fnEndpunkt } = await import('../foodnotify/endpunkte')
-    for (const ep of ['fn:betriebe', 'fn:kostenstellen', 'fn:pos_standorte']) {
+    for (const ep of ['fn:profil', 'fn:betriebe', 'fn:kostenstellen', 'fn:pos_standorte']) {
       const r = await query(
         `INSERT INTO sync.warteschlange
            (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter)
@@ -822,6 +831,15 @@ export async function nachfuellen(): Promise<NachfuellStand> {
    * Gegenstelle. Er tritt beim ersten Lauf nach dem Deploy auf oder nie.
    */
   endpunkteZusichern()
+
+  /**
+   * Und direkt danach das Quellenregister spiegeln (Migration `0076`).
+   *
+   * Es steht hier und nicht am Ende, weil `mart.quelle_zulauf` sonst bis nach
+   * dem ersten Lauf leer wäre — und eine leere Wächtersicht ist genau der
+   * Zustand, gegen den sie gebaut ist. Wirft nie, siehe `sync/quellen.ts`.
+   */
+  await quellenSpiegeln()
 
   const stand: NachfuellStand = { lina: 0, foodnotify: 0, ladenakte: 0, wiederbelebt: 0 }
 
