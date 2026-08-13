@@ -74,6 +74,7 @@ Kommentare sind deutsch, damit sie in Postico lesbar sind.
 | **`plan-foodnotify.md`** | **Der Plan für FoodNotify**: was geholt wird, wie es mit LINA verzahnt wird, in welcher Reihenfolge | Zuerst, wenn du an FoodNotify baust |
 | **`foodnotify-api-inventar.md`** | FoodNotify: 126 API-Pfade, vier Marken im Vergleich, der defekte Verkaufs-Import | Bevor du einen FoodNotify-Endpunkt anfasst |
 | **`datensicherung.md`** | Welche Rohdaten wir sichern sollten, solange LINA erreichbar ist — nach Wert und Kosten sortiert | Wenn du über neue Endpunkte oder Backfill-Tiefe entscheidest |
+| **`plan-datenvollstaendigkeit.md`** | **Was der Sync nicht nachhält**: das Audit vom 13.08.2026 mit jeder Messung, die Reihenfolge der Reparaturen, und was Eugene entscheiden muss | Bevor du an `nachfuellen.ts`, am Belegarchiv oder an einem Nachlauf baust |
 | **`offene-punkte.md`** | Was ungeklärt ist und wer es klären muss | Bevor du etwas als fertig meldest |
 | **`datenlage-round-table.html`** / `.pdf` | Was der Round-Table-Map noch fehlt — nach der Messreihe vom 11.08.2026 nur noch Rechte, Bounti/OpenTable, Stammdatenpflege und fachliche Festlegungen | Bevor du einen Punkt als „fehlt" weitergibst |
 | **`payloads/`** | Echte, anonymisierte LINA-Antworten aus der Exploration | Als Referenz; identisch mit den Test-Fixtures |
