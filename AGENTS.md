@@ -138,6 +138,7 @@ Handgeschriebenes SQL, nummeriert, wird der Reihe nach angewendet. Bewusst handg
 | `0049_vergleichsgruppen.sql` | Betrieb gegen Marke und gegen Stadt. Die **einzige belastbare Stadtangabe** ist `mart.nachbarschaft.ort` aus `manual.betrieb_standort` — `core.betrieb.stadt` ist bei allen 141 NULL |
 | `0069_belegarchiv_zulauf.sql` | **Der Zulauf des Belegarchivs.** `core.belegart.inhalt_holen` und `core.belegarchiv_bestand.quelle`, dazu `mart.belegarchiv_zulauf` und `mart.inventur_abgeschnitten`. Der Torwächter ist ab hier die tägliche Zählung (`la:belegzahl`) und nicht mehr `manual.belegarchiv_soll` |
 | `0070_wiederbelebung.sql` | `sync.warteschlange.wiederbelebt` und `mart.posten_aufgegeben`. Der Lauf holt aufgegebene Posten hoechstens dreimal selbst zurueck und zieht unvollstaendige Inventurzaehlungen selbst nach — **kein Handbefehl** |
+| `0071_pruefsichten_hygiene.sql` | Die Pruefsichten sagen wieder, was sie meinen: die 36-h-Zeile klammert Betriebe ohne Belegarchiv aus und fuehrt sie als eigene Zeile (Erwartung **konstant**, nicht null), `mart.belegarchiv_zulauf` bekommt `zaehlung_status`. Eine Kachel, die nie auf null geht, liest niemand mehr |
 | `pruefung.sql` | Verifikation gegen den Bayreuth-Fall aus dem Excel (kein Migrationsschritt) |
 
 Die Tabelle nennt die tragenden Migrationen, nicht jede einzelne. Der verbindliche Stand steht in `public.schema_migration`.
@@ -205,7 +206,7 @@ sync.ts / einreihen.ts Einstiegspunkte
 ```bash
 bun install
 bun run migrate                              # Schema anwenden (idempotent)
-bun test                                     # nachgemessen am 13.08.2026: 668 pass, 141 skip ohne TEST_DATABASE_URL
+bun test                                     # nachgemessen am 13.08.2026 (abends): 683 pass, 157 skip, 0 fail ohne TEST_DATABASE_URL
 bun run sync                                 # nachfüllen UND abarbeiten
 bun run einreihen --taeglich                 # nur nachfüllen (sync macht das selbst)
 bun run einreihen --historie --von 2018-01-01 --bis 2026-07-24

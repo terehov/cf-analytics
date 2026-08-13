@@ -2662,3 +2662,108 @@ Schlussfolgerung nicht: nicht „dann eben von Hand", sondern „dann eben mit O
 Handbefehl ist keine Reparatur, sondern eine Verabredung — und die beiden teuersten Ausfälle
 dieses Projekts (02.08. und 12.08.2026) waren ausgefallene Verabredungen. Entscheidung
 Eugene, 13.08.2026: kein Befehl auf dem Server.
+
+## 13.08.2026 (abends) — das Review der Reparatur findet die Fehler der Reparatur
+
+Phase 1 lief, war deployt und gemessen (0069/0070 in Produktion, Lauf 89 bestätigte die
+Wirkung: 0 abgeschnittene Inventuren, Bestellungen ohne Position von 322 auf 47, 0 endgültig
+aufgegebene Posten). Ein unabhängiges Review derselben Implementierung fand trotzdem drei
+Fehler — und alle drei sind **von der Reparatur selbst mitgebracht** worden. Das ist die
+eigentliche Lehre dieses Abschnitts: eine Reparatur ist neuer Code und verdient dieselbe
+Skepsis wie der Code, den sie ersetzt.
+
+### Die Folgeseiten-Sperre hätte die zweite Inventur-Reparatur verhungern lassen
+
+**Symptom.** Keines — noch nicht. Der Fehler war gestellt und hätte beim nächsten Auslöser
+zugeschlagen, lautlos wie sein Vorgänger.
+
+**Ursache.** `inventurpositionenNachziehen()` sperrt richtig nur gegen OFFENE Posten. Die
+Folgeseiten ab 2 laufen aber über `folgepostenEinreihen()`, und das sperrte gegen ALLE
+Posten, erledigte eingeschlossen. `sync.warteschlange` wird nie aufgeräumt — die Sperre ist
+also dauerhaft. Beim ZWEITEN Reparaturzyklus einer Inventur mit mehr als 800 Positionen
+hätte Seite 1 den ganzen Bestand gelöscht, 800 zurückgeschrieben, und Seite 2 wäre nie wieder
+eingereiht worden: der erledigte Zwilling `{uuid, seite:'2'}` aus dem ersten Zyklus blockiert.
+
+**Wie weit es gestellt war.** Am 13.08.2026 in Produktion gemessen: 9 Inventuren über 800
+Positionen (Maximum 1.426) — und für **alle neun** stand der erledigte Seite-2-Posten schon
+in der Warteschlange. Der zweite Zyklus hätte exakt die **936 Positionen** wieder verloren,
+die der erste gerade zurückgeholt hatte, und der Lauf hätte Seite 1 danach jede Nacht neu
+gelöscht und geladen. Ausgelöst hätte ihn jede Kopfänderung in FoodNotify — eine ergänzte
+oder gelöschte Position genügt.
+
+**Warum der erste Zyklus gut ging.** Reiner Zufall: die alten Posten trugen `{uuid}`, die
+neuen `{uuid, seite}`. Der Formatwechsel machte sie zu verschiedenen Idempotenzschlüsseln,
+also griff die Sperre einmalig nicht. Ein einmaliger Umstand, kein Schutz — und genau so
+etwas liest sich hinterher wie Absicht.
+
+**Was ihn verhindert.** `folgepostenEinreihen()` hat einen Sperrmodus: `'alle'` (Vorgabe, wie
+bisher — die Sperre eines EINMALIGEN Abrufs) und `'offen'` (die Sperre eines WIEDERHOLBAREN).
+Die Folgeseiten von `fn:inventurpositionen` nutzen `'offen'`; das reicht, weil Seite 1 sie in
+DERSELBEN Transaktion einreiht, in der sie löscht. Alles andere bleibt bei `'alle'`. Dazu ein
+Test, der den zweiten Zyklus wirklich fährt (`e2e.test.ts`, „der ZWEITE Reparaturzyklus holt
+die Folgeseiten wieder mit") — ohne den Fix ist er rot, nachgeprüft.
+
+### Ein in LINA gelöschter Beleg machte den Ordner unheilbar
+
+**Symptom.** Keines im Bestand — aber ein Ordner, der jede Nacht ganz neu geholt wird, ohne
+dass sich je etwas ändert.
+
+**Ursache.** Die Abzugsbedingung aus 0069 prüft bewusst auf UNGLEICH und nicht auf KLEINER,
+damit sie auch den abgebrochenen Abzug fängt. Nur konnte der Abzug einen geschrumpften Ordner
+gar nicht reparieren: `belegeSchreiben()` war ein reiner Upsert, in LINA gelöschte Belege
+blieben bei uns stehen. Ab dem ersten gelöschten Beleg galt damit dauerhaft
+`gehalten > gezaehlt`, und `mart.belegarchiv_zulauf` pendelte zwischen „abzug eingereiht" und
+„abzug fehlt" — Letzteres sagte dabei das Falsche: der Abzug fehlte nicht, er war wirkungslos.
+
+**Gemessen.** Unter 1.645 fertig gezählten Paaren am 13.08.2026 noch **kein einziger Fall**.
+Eine Frage der Zeit, kein Akutproblem — LINA löscht selten, aber es kommt vor, und 0069 nennt
+den Fall selbst als Auslöser. Der größte freigegebene Ordner hält 12.668 Belege; ein einziger
+dort gelöschter Beleg hätte diese Menge jede Nacht neu über die Leitung geschickt.
+
+**Was ihn verhindert.** `verschwundeneEntfernen()` löscht nach einem vollen Abzug die Belege
+des Paars `(betrieb_key, typ_id)`, deren `lina_id` nicht in der Antwort steht — in derselben
+Transaktion wie der Upsert. Dieselbe Logik wie bei `core.bestellposition` und
+`core.inventurposition`: ersetzen statt ewig anhäufen. Sicher ist das, weil die Antwort der
+VOLLSTÄNDIGE Ordner ist (`length=100000`, und die Prüfung `zeilen.length === recordsTotal`
+lässt nichts anderes durch); archivierte Belege stehen mit in der Liste. Ohne `recordsTotal`
+wird nichts gelöscht — aus „unbekannt" darf kein Löschbefehl werden.
+
+**Die Schranke, und warum sie zwei Teile hat.** Mehr als **5 %** eines Ordners UND mehr als
+**10 Belege** in einer Nacht sind keine Pflege mehr, sondern ein Befund: dann wirft der Abzug,
+die Transaktion läuft zurück, und es wird nichts gelöscht. Der Anteil allein wäre bei kleinen
+Ordnern eine Dauerwarnung (Belegart 3970 führt 17 Ordner mit im Schnitt 32 Belegen — dort ist
+ein gelöschter Beleg schon über 3 %); die absolute Zahl allein wäre bei den großen blind. Was
+die Schranke abfangen soll, ist nicht die Pflege, sondern der Ausfall — LINA räumt einen
+Ordner ab, oder die Antwort war trotz `recordsTotal` unvollständig. Im zweiten Fall wäre
+unser Löschen der eigentliche Datenverlust.
+
+### „Seit über 36 h nicht gezählt" zählte Betriebe mit, die gar kein Belegarchiv haben
+
+**Symptom.** Eine Kachel, die nie auf null geht — und die deshalb niemand mehr ansieht. Das
+ist derselbe Verlust wie eine Kachel, die immer grün ist, nur langsamer.
+
+**Ursache.** Die Ladenakte kennt Betriebe, deren Baumknoten keinen einzigen Ordner führt.
+`belegToken()` wirft dafür `KeinBelegarchiv`, der Client macht `keine_daten` daraus — gefragt,
+nichts da, kein Retry. Richtig so. Nur bekommen sie damit **nie** eine Zeile in
+`core.belegarchiv_bestand`, standen also für immer auf „nie gezaehlt" und für immer in der
+Prüfzeile.
+
+**Gemessen.** Am 13.08.2026 während Lauf 89: 1.645 von 1.974 Paaren gezählt, ausnahmslos
+Status `ok`, **kein einziges `keine_daten`**. Die ausstehenden 329 Paare gehören aber zu den
+23 noch nicht gezählten Betrieben — und darunter sind genau die zehn, die die Vollzählung vom
+11.08.2026 nicht kannte (drei geschlossene, sechs ohne Geschäft, einer Test, alle mit null
+Belegen). Diese Migration kommt der Messung also absichtlich zuvor: die Zeile entsteht,
+bevor sie zum ersten Mal rot wird, nicht danach.
+
+**Was ihn verhindert.** Migration `0071`. `mart.belegarchiv_zulauf` bekommt den Zustand
+`kein belegarchiv` und die Spalte `zaehlung_status`; die 36-h-Zeile klammert ihn aus und
+führt ihn als eigene Zeile „Belegarchiv: Betrieb ohne Belegarchiv" — Erwartung dort ist
+**konstant**, nicht null. Der Zustand ist eng gefasst: nur wo wir auch nichts halten und nie
+etwas gezählt haben. Ein Betrieb, der sein Belegarchiv VERLIERT, steht weiter auf „abzug
+fehlt" und gehört angesehen.
+
+**Warum die Ausklammerung ein Zeitfenster hat (7 Tage).** Sie stützt sich auf einen Befund,
+und ein Befund veraltet. Ohne Fenster nähme ein einziges `keine_daten` aus dem März einen
+Betrieb für immer aus der Überwachung — und fiele die Zählung ganz aus, wäre ausgerechnet die
+Zeile still, die den Ausfall melden soll. Mit Fenster altert die Ausnahme heraus und der
+Betrieb fällt zurück in die 36-h-Zeile. **Eine Ausnahme darf ihren Beleg nicht überleben.**

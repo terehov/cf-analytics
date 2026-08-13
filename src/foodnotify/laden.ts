@@ -415,11 +415,18 @@ export async function fnLaden(k: FnKontext): Promise<number> {
          *
          * Zeitraum ist der des auslösenden Postens: alle Seiten einer
          * Inventur gehören zu deren Anlagedatum, nicht zu heute.
+         *
+         * SPERRMODUS 'offen' — die einzige Stelle mit diesem Modus, und der
+         * Grund steht ausführlich bei `folgepostenEinreihen()`. Kurz: eine
+         * Inventur wird MEHRFACH nachgezogen (jede Kopfänderung löst einen
+         * Zyklus aus), und mit der Alle-Posten-Sperre bliebe ab dem zweiten
+         * Zyklus alles ab Seite 2 für immer aus. Wir hielten 800 statt
+         * 1.426, und der Lauf löschte und lüde Seite 1 jede Nacht neu.
          */
         if (seite.aktuelleSeite === 1) {
           for (let n = seite.gesamtSeiten; n >= 2; n--) {
             await folgepostenEinreihen(c, k.markeKey, 'fn:inventurpositionen',
-              { uuid, seite: String(n) }, k.von, 94)
+              { uuid, seite: String(n) }, k.von, 94, 'offen')
           }
         }
         return positionen.length
@@ -434,13 +441,58 @@ export async function fnLaden(k: FnKontext): Promise<number> {
 }
 
 /**
- * Folgeposten idempotent einreihen: NOT EXISTS gegen ALLE Posten, auch
- * erledigte — die Warnung aus 0005 gilt: der Offen-Index ist partiell, ein
- * ON CONFLICT DO NOTHING würde Erledigtes erneut einreihen.
+ * Wogegen ein Folgeposten gesperrt wird.
+ *
+ *   alle   gegen JEDEN Posten derselben Parameter, erledigte eingeschlossen.
+ *          Das ist die Sperre eines EINMALIGEN Abrufs: was einmal geholt
+ *          wurde, wird nicht erneut geholt. Die Warnung aus 0005 gilt hier —
+ *          der Offen-Index ist partiell, ein ON CONFLICT DO NOTHING wuerde
+ *          Erledigtes erneut einreihen.
+ *   offen  nur gegen einen noch OFFENEN Posten. Das ist die Sperre eines
+ *          WIEDERHOLBAREN Abrufs: er soll nicht zweimal gleichzeitig laufen,
+ *          aber sehr wohl ein zweites Mal.
+ */
+type Sperrmodus = 'alle' | 'offen'
+
+/**
+ * Folgeposten idempotent einreihen.
+ *
+ * WARUM ES HIER ZWEI MODI GIBT — der Fehler vom 13.08.2026.
+ *
+ * Bis dahin sperrte diese Funktion ausnahmslos gegen ALLE Posten. Fuer die
+ * Seiten von `fn:bestellungen` und fuer die Bestelldetails ist das richtig:
+ * sie werden je Parameter genau einmal geholt.
+ *
+ * Fuer die Folgeseiten von `fn:inventurpositionen` ist es falsch, und zwar
+ * verlustbringend. Eine Inventur wird nachgezogen, sobald ihr Kopf mehr
+ * Positionen meldet als geladen sind (`inventurpositionenNachziehen()`), und
+ * das kann JEDES MAL passieren, wenn in FoodNotify eine Position dazukommt
+ * oder wegfaellt. Im ZWEITEN Zyklus einer Inventur mit mehr als 800
+ * Positionen loescht Seite 1 den ganzen Bestand, schreibt 800 zurueck — und
+ * Seite 2 wird nicht mehr eingereiht, weil der ERLEDIGTE Zwilling
+ * {uuid, seite:'2'} aus dem ersten Zyklus sperrt. `sync.warteschlange` wird
+ * nie aufgeraeumt, die Sperre ist also dauerhaft. Ergebnis: wir halten 800
+ * statt 1.426, die Invariante bleibt ungleich, und der naechste Lauf
+ * wiederholt Loeschen und Neuladen von Seite 1 — jede Nacht, fuer immer.
+ *
+ * Am 13.08.2026 in Produktion gemessen: 9 Inventuren ueber 800 Positionen
+ * (Maximum 1.426), und fuer alle neun stand der erledigte {uuid, seite:'2'}
+ * bereits in der Warteschlange. Die Sperre war also bei allen neun schon
+ * scharf; der zweite Zyklus haette exakt die 936 Positionen wieder verloren,
+ * die der erste gerade zurueckgeholt hat. Dass der erste Zyklus gut ging,
+ * lag allein am Formatwechsel — die alten Posten trugen {uuid}, die neuen
+ * {uuid, seite}. Ein einmaliger Zufall, kein Schutz.
+ *
+ * Warum 'offen' fuer die Folgeseiten genuegt: Seite 1 reiht sie in DERSELBEN
+ * Transaktion ein, in der sie loescht. Innerhalb eines Zyklus sind sie damit
+ * offen und gesperrt; ein zweiter Zyklus beginnt erst, wenn der erste
+ * abgearbeitet ist (`inventurpositionenNachziehen()` sperrt gegen jeden
+ * offenen Posten derselben Inventur, gleich welcher Seite).
  */
 async function folgepostenEinreihen(
   c: PoolClient, markeKey: number, endpunkt: string,
   parameter: Record<string, string>, zeitraum: string, prioritaet: number,
+  sperre: Sperrmodus = 'alle',
 ) {
   await c.query(
     `INSERT INTO sync.warteschlange
@@ -448,8 +500,9 @@ async function folgepostenEinreihen(
      SELECT $1, $2::date, $2::date, $3, $4, $5::jsonb
       WHERE NOT EXISTS (
             SELECT 1 FROM sync.warteschlange w
-             WHERE w.endpunkt = $1 AND w.marke_key = $4 AND w.parameter = $5::jsonb)`,
-    [endpunkt, zeitraum, prioritaet, markeKey, JSON.stringify(parameter)])
+             WHERE w.endpunkt = $1 AND w.marke_key = $4 AND w.parameter = $5::jsonb
+               AND ($6 = 'alle' OR w.erledigt_am IS NULL))`,
+    [endpunkt, zeitraum, prioritaet, markeKey, JSON.stringify(parameter), sperre])
 }
 
 /** kostenstelle_key über (marke, erpId) — wirft, wenn die Kostenstelle fehlt. */

@@ -389,3 +389,26 @@ Sie haben ihre Invariante schon: `core.inventur.anzahl_positionen` kommt aus Foo
 
 `core.bestellung` hat kein Gegenstück dazu (nachgesehen am 13.08.2026: die Spalte existiert
 schlicht nicht). Deshalb der Unterschied in der Behandlung, und nicht aus Laune.
+
+## Prüfsichten-Hygiene (Migration `0071`, 13.08.2026)
+
+**Keine Schemaänderung an einer Tabelle.** 0071 ändert drei Sichten (`metabase.md`) und legt
+genau einen Index an.
+
+### `aufgabe_belegzahl_betrieb` — der Zugriffspfad für „war die letzte Zählung keine_daten?"
+
+```sql
+CREATE INDEX aufgabe_belegzahl_betrieb
+    ON sync.aufgabe ((parameter->>'linaBetriebId'), beendet_am DESC)
+ WHERE endpunkt = 'la:belegzahl';
+```
+
+`mart.belegarchiv_zulauf` muss je Betrieb die jüngste `la:belegzahl`-Aufgabe finden. Der
+vorhandene Index aus 0005 — `(endpunkt, betrieb_enc_id, beendet_am DESC)` — trägt die Frage
+nicht: `betrieb_enc_id` ist bei allen `la:`-Zeilen NULL, der Betrieb steckt im
+`parameter`-JSON.
+
+**Partiell auf den einen Endpunkt**, weil das die einzige Frage ist, die diesen Pfad braucht —
+und weil `sync.aufgabe` seit 0069 um 1.834 Zeilen am Tag wächst, rund 670.000 im Jahr. Ein
+voller Index wäre hier deutlich größer als nötig. Es ist derselbe Grund wie bei
+`warteschlange_aufgegeben` in 0070.

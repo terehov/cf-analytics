@@ -605,3 +605,60 @@ die Ampel nicht.
 
 Eine Warnung, die zu viel behauptet, wird genauso ignoriert wie eine, die nie ausschlägt —
 dieselbe Lehre wie bei der Wareneinsatz-Prüfung, die bis Migration `0029` immer grün zeigte.
+
+## Zwei Sperrmodi beim Einreihen von Folgeposten (13.08.2026, Phase 1c)
+
+`folgepostenEinreihen()` in `src/foodnotify/laden.ts` entscheidet, ob ein Folgeposten
+entsteht. Bis zum 13.08.2026 kannte es nur eine Antwort: sperren gegen ALLE Posten
+derselben Parameter, erledigte eingeschlossen. Seither sind es zwei.
+
+| Modus | Sperrt gegen | Bedeutung | Wer nutzt ihn |
+|---|---|---|---|
+| `'alle'` (Vorgabe) | jeden Posten derselben Parameter | ein EINMALIGER Abruf: was einmal geholt wurde, wird nicht erneut geholt | `fn:bestellungen`-Seiten, `fn:bestellung`, `fn:bestellpositionen`, `fn:inventuren`-Seiten |
+| `'offen'` | nur einen noch offenen Posten | ein WIEDERHOLBARER Abruf: nicht zweimal gleichzeitig, aber sehr wohl ein zweites Mal | die Folgeseiten von `fn:inventurpositionen` |
+
+**Warum der Unterschied sein muss.** Eine Inventur wird nachgezogen, sobald ihr Kopf mehr
+Positionen meldet als geladen sind — und das passiert bei JEDER Änderung in FoodNotify, nicht
+einmal. Seite 1 löscht dabei den ganzen Bestand und lädt neu, die Folgeseiten müssen also
+jedes Mal mitkommen. Mit `'alle'` blockierte ab dem zweiten Zyklus der erledigte Zwilling
+`{uuid, seite:'2'}` aus dem ersten. Hergang und Messwerte in `fehlerkatalog.md`.
+
+**Warum `'offen'` innerhalb eines Zyklus genügt.** Seite 1 reiht die Folgeseiten in DERSELBEN
+Transaktion ein, in der sie löscht — entweder ist gelöscht UND die Kette steht, oder nichts
+von beidem. Bis zur Abarbeitung sind sie offen und damit gesperrt. Ein zweiter Zyklus beginnt
+ohnehin erst, wenn der erste durch ist: `inventurpositionenNachziehen()` sperrt gegen jeden
+offenen Posten derselben Inventur, gleich welcher Seite.
+
+**Was bewusst bei `'alle'` bleibt.** Die Bestelldetails (`fn:bestellung`,
+`fn:bestellpositionen`) sperren absichtlich dauerhaft. Dass sie damit nie nachaltern, ist ein
+eigener Befund und bekommt einen eigenen Takt — Punkt 2.6 in
+`plan-datenvollstaendigkeit-nachtrag.md`, nicht diese Sperre.
+
+## Der Abzug kann jetzt schrumpfen (13.08.2026, Phase 1c)
+
+`belegeSchreiben()` in `src/ladenakte/laden.ts` war ein reiner Upsert. Ein in LINA gelöschter
+Beleg blieb bei uns stehen — und weil der Zulaufabgleich aus 0069 auf GLEICHHEIT prüft, galt
+ab dem ersten gelöschten Beleg dauerhaft `gehalten > gezaehlt`. Der Lauf holte den vollen
+Ordner jede Nacht neu, bis zu 12.668 Belege, ohne dass sich je etwas änderte.
+
+`verschwundeneEntfernen()` löscht deshalb nach jedem vollen Abzug die Belege des Paars
+`(betrieb_key, typ_id)`, deren `lina_id` nicht in der Antwort steht.
+
+* **Nur bei geprüfter Vollständigkeit.** Ohne `recordsTotal` wird nichts gelöscht; mit
+  `recordsTotal` hat die Prüfung `zeilen.length === recordsTotal` eine Zeile darüber schon
+  geworfen, falls etwas fehlt.
+* **`core.buchungsbeleg_steuer` hängt per `ON DELETE CASCADE` dran** (0053) — es bleibt nichts
+  verwaist. Der Test prüft genau das, nicht eine Zeilenzahl.
+* **Schranke: mehr als 5 % UND mehr als 10 Belege in einer Nacht → werfen statt löschen.**
+  Beide Teile sind nötig; die Begründung mit den gemessenen Ordnergrößen steht als Kommentar
+  am Konstantenpaar `SCHWUND_ANTEIL` / `SCHWUND_MINDESTZAHL`.
+* **Geworfen wird in derselben Transaktion, in der gelöscht wird.** „Nichts gelöscht" ist
+  deshalb keine Zusage des Codes, sondern die Folge des Rücklaufs.
+* **Unterhalb der Schranke wird geloggt.** Eine Löschung ist die einzige Stelle, an der uns
+  Daten absichtlich abhandenkommen; lautlos darf das nicht passieren.
+
+**Ein Beleg, der den Ordner wechselt, geht nicht verloren.** Der Upsert-Schlüssel ist
+`(betrieb_key, lina_id)` ohne `typ_id` (0053, Falle 5). Zieht der neue Ordner zuerst ab,
+steht der Beleg schon auf der neuen `typ_id` und die Löschbedingung des alten trifft ihn
+nicht mehr; zieht der alte zuerst ab, löscht er ihn und der Abzug des neuen schreibt ihn
+wieder. Spätestens in der zweiten Nacht steht er richtig.

@@ -70,9 +70,33 @@ export type MockOptionen = {
   sperreArt?: 429 | 403 | 'challenge' | 'anmeldung'
   /** Sekundenwert für den Retry-After-Header, falls gesetzt. */
   retryAfter?: number
+  /**
+   * LINA-Betriebs-IDs, deren Baumknoten `belegarchiv_<id>` KEINE Ordner
+   * führt. Das ist kein Fehler, sondern eine Antwort — die Ladenakte kennt
+   * Betriebe ohne Belegarchiv (drei geschlossene, sechs ohne Geschäft, einer
+   * Test, gemessen 13.08.2026). `belegToken()` wirft dafür `KeinBelegarchiv`,
+   * der Client macht `keine_daten` daraus, und `mart.belegarchiv_zulauf`
+   * führt sie seit 0071 als eigenen Zustand statt für immer als „nie
+   * gezählt".
+   */
+  ohneBelegarchiv?: string[]
 }
 
+/**
+ * Wie viele Belege je Ordner in LINA „gelöscht" wurden — typeId auf Anzahl.
+ *
+ * Der Fall, den man nicht proben kann, ohne ihn zu bauen: LINA räumt auf.
+ * Danach zählt der Ordner weniger, als wir halten, und der Abzug muss
+ * schrumpfen können. Bis zum 13.08.2026 konnte er das nicht (reiner Upsert),
+ * und die Folge war ein Ordner, der jede Nacht ganz neu geholt wurde, ohne
+ * je zu konvergieren. Die Attrappe lässt die Belege vom ENDE der Liste
+ * verschwinden und zieht `recordsTotal` mit — wie LINA es täte.
+ */
+export type Geloescht = Record<string, number>
+
 export function mockStarten(opt: MockOptionen = {}) {
+  /** Veränderbar zur Laufzeit: der Test lässt Belege zwischen zwei Läufen verschwinden. */
+  const geloescht: Geloescht = {}
   const gueltigeSessions = new Set<string>()
   /** Ausgegebene, noch nicht eingelöste secrets — je Aufruf eins, einmal gültig. */
   const offeneSecrets = new Set<string>()
@@ -184,6 +208,11 @@ export function mockStarten(opt: MockOptionen = {}) {
         const id = url.searchParams.get('id') ?? ''
         const salz = `${Math.random().toString(16).slice(2)}${'0'.repeat(40)}`.slice(0, 86)
         if (id.startsWith('belegarchiv_')) {
+          // Ein Betrieb ohne einen einzigen Ordner: leere Kinderliste, HTTP 200.
+          // Genau so sieht es aus — kein Fehler, nur nichts da.
+          if ((opt.ohneBelegarchiv ?? []).includes(id.slice('belegarchiv_'.length))) {
+            return new Response('[]', { headers: { 'content-type': 'text/html' } })
+          }
           return new Response(JSON.stringify([{
             text: 'Eingangsrechnungen und Avise',
             a_attr: { 'data-link': `/intranet/ladenakte/showBelegarchivFolder?storeId=${salz}&typeId=1&admin=1` },
@@ -255,9 +284,20 @@ export function mockStarten(opt: MockOptionen = {}) {
          * und 427 von 1.048 nachweislich leere Ordner gezaehlt hat.
          */
         const typ = url.searchParams.get('typeId') ?? '1'
-        const alle = typ === '1' ? f.data : f.data.slice(0, 2).map((z, i) => ({
+        const vorhanden = typ === '1' ? f.data : f.data.slice(0, 2).map((z, i) => ({
           ...z, id: `${typ}00${i}`, encryptedId: `enc-${typ}-${i}`,
         }))
+
+        /**
+         * GELÖSCHTE BELEGE FALLEN VOM ENDE WEG, UND recordsTotal FÄLLT MIT.
+         *
+         * Beides gehört zusammen: eine Zählung, die weiter die alte Zahl
+         * meldet, wäre der Fall „abgebrochener Abzug" und nicht der Fall
+         * „LINA hat gelöscht". Nur wenn die Zahl mitsinkt, prüft der Test
+         * wirklich, ob unser Bestand schrumpfen kann.
+         */
+        const weg = geloescht[typ] ?? 0
+        const alle = weg > 0 ? vorhanden.slice(0, Math.max(0, vorhanden.length - weg)) : vorhanden
 
         return Response.json({
           ...f,
@@ -334,6 +374,11 @@ export function mockStarten(opt: MockOptionen = {}) {
     /** Header des letzten Aufrufs — damit prüfbar ist, wie wir uns ausgeben. */
     get letzteHeader() { return letzteHeader },
     sessionErzwingenAblaufen: () => { abgelaufen = true },
+    /**
+     * Belege in LINA „löschen" — die letzten `anzahl` eines Ordners
+     * verschwinden aus Liste UND Zählung. `0` macht es rückgängig.
+     */
+    belegeLoeschen: (typId: string, anzahl: number) => { geloescht[typId] = anzahl },
     stop: () => server.stop(true),
   }
 }

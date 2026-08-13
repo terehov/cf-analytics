@@ -187,6 +187,14 @@ lauf('Ende-zu-Ende', () => {
     const { rows } = await db.query(
       `SELECT pruefung FROM mart.pruefung_uebersicht ORDER BY pruefung`)
     expect(rows.map(r => r.pruefung)).toEqual([
+      /**
+       * Seit 0071 die fuenfte Zulaufpruefung, und die einzige, deren
+       * Erwartung KONSTANZ ist statt null: Betriebe, deren Ladenakte gar
+       * kein Belegarchiv fuehrt. Sie steht hier, weil diese Paare sonst in
+       * der 36-h-Zeile fuer immer rot stuenden — und eine Kachel, die nie
+       * auf null geht, liest niemand mehr.
+       */
+      'Belegarchiv: Betrieb ohne Belegarchiv',
       'Belegarchiv: Ordner ohne den faelligen Abzug',
       'Belegarchiv: seit ueber 36 h nicht gezaehlt',
       'Bestellung: Kopf ohne eine einzige Position',
@@ -1572,6 +1580,93 @@ lauf('FoodNotify Ende-zu-Ende', () => {
         WHERE erledigt_am IS NULL AND marke_key = $1`, [aposto])
     expect(Number(offen.n)).toBe(0)
   })
+
+  /**
+   * DER ZWEITE REPARATURZYKLUS — der Fehler, den der erste versteckt hat.
+   *
+   * `inventurpositionenNachziehen()` holt eine Inventur erneut, sobald ihr
+   * Kopf mehr Positionen meldet als geladen sind. Das passiert nicht einmal,
+   * sondern bei JEDER Änderung in FoodNotify. Seite 1 löscht dabei den
+   * ganzen Bestand und lädt neu — die Folgeseiten müssen also jedes Mal
+   * mitkommen.
+   *
+   * Bis zum 13.08.2026 kamen sie das nicht. `folgepostenEinreihen()` sperrte
+   * gegen ALLE Posten, erledigte eingeschlossen, und `sync.warteschlange`
+   * wird nie aufgeräumt: der erledigte Zwilling {uuid, seite:'2'} aus dem
+   * ERSTEN Zyklus blockierte den zweiten für immer. Ergebnis wäre gewesen:
+   * Seite 1 schreibt 800 Positionen, Seite 2 kommt nie, die Invariante
+   * bleibt ungleich — und der nächste Lauf löscht und lädt Seite 1 erneut,
+   * jede Nacht.
+   *
+   * In Produktion am 13.08.2026 gemessen: 9 Inventuren über 800 Positionen
+   * (Maximum 1.426), und für alle neun stand der erledigte Seite-2-Posten
+   * schon in der Warteschlange. Der zweite Zyklus hätte exakt die 936
+   * Positionen wieder verloren, die der erste zurückgeholt hat. Dass der
+   * erste gut ging, lag allein am Formatwechsel von {uuid} auf {uuid, seite}
+   * — ein einmaliger Zufall, kein Schutz.
+   *
+   * Der Test baut genau das nach: die Attrappe hat für inv-1 zwei Seiten zu
+   * je einer Position, der vorige Test hat beide geholt und dabei den
+   * erledigten Seite-2-Posten hinterlassen.
+   */
+  test('der ZWEITE Reparaturzyklus holt die Folgeseiten wieder mit', async () => {
+    const { inventurpositionenNachziehen } = await import('./nachfuellen')
+    const { workerLauf } = await import('./worker')
+
+    // Vorbedingung aus dem vorigen Test: beide Seiten sind geholt, und der
+    // Seite-2-Posten steht ERLEDIGT in der Schlange. Ohne ihn prüft der Test
+    // nichts — deshalb hier laut statt still.
+    const seite2 = async () => Number((await db.query(
+      `SELECT count(*)::int AS n FROM sync.warteschlange
+        WHERE endpunkt = 'fn:inventurpositionen' AND marke_key = $1
+          AND parameter->>'uuid' = 'inv-1' AND parameter->>'seite' = '2'`,
+      [aposto])).rows[0].n)
+    expect(await seite2()).toBe(1)
+    const { rows: [vorbedingung] } = await db.query(
+      `SELECT count(*)::int AS n FROM sync.warteschlange
+        WHERE endpunkt = 'fn:inventurpositionen' AND marke_key = $1
+          AND parameter->>'uuid' = 'inv-1' AND erledigt_am IS NULL`, [aposto])
+    expect(Number(vorbedingung.n)).toBe(0)
+
+    /**
+     * Der Auslöser, wie er in Wirklichkeit entsteht: in FoodNotify fällt eine
+     * Position weg oder kommt hinzu, der Kopf sagt etwas anderes als unsere
+     * Zeilen. Hier über eine gelöschte Position — Kopf 2, geladen 1.
+     */
+    await db.query(
+      `DELETE FROM core.inventurposition WHERE inventurposition_key IN (
+         SELECT ip.inventurposition_key FROM core.inventurposition ip
+           JOIN core.inventur i USING (inventur_key)
+          WHERE i.fn_uuid = 'inv-1' LIMIT 1)`)
+    const geladen = async () => Number((await db.query(
+      `SELECT count(*)::int AS n FROM core.inventurposition ip
+         JOIN core.inventur i USING (inventur_key) WHERE i.fn_uuid = 'inv-1'`)).rows[0].n)
+    expect(await geladen()).toBe(1)
+    // Die Sicht benennt es, bevor irgendetwas nachläuft.
+    expect((await db.query(
+      `SELECT fehlend FROM mart.inventur_abgeschnitten WHERE fn_uuid = 'inv-1'`)).rows)
+      .toHaveLength(1)
+
+    // Zyklus zwei: nachziehen reiht Seite 1 ein, Seite 1 reiht Seite 2 nach.
+    expect(await inventurpositionenNachziehen(aposto)).toBe(1)
+    await workerLauf('manuell')
+
+    /**
+     * DER KERN. Ein FRISCHER Seite-2-Posten muss entstanden sein — mit der
+     * alten Alle-Posten-Sperre bliebe es bei dem einen aus Zyklus 1, und der
+     * Bestand stünde auf 1 statt 2.
+     */
+    expect(await seite2()).toBe(2)
+    expect(await geladen()).toBe(2)
+
+    // Und die Invariante steht wieder: Kopf und Zeilen sind gleich.
+    expect((await db.query(
+      `SELECT fn_uuid FROM mart.inventur_abgeschnitten WHERE fn_uuid = 'inv-1'`)).rows)
+      .toEqual([])
+
+    // Selbstbegrenzend: ein dritter Zyklus wird gar nicht erst eingereiht.
+    expect(await inventurpositionenNachziehen(aposto)).toBe(0)
+  })
 })
 
 /**
@@ -1684,7 +1779,14 @@ lauf('e2e Ladenakte', () => {
   let db: Client
 
   beforeAll(async () => {
-    mock = mockStarten()
+    /**
+     * Betrieb 99 hat keinen einzigen Belegordner — der Fall, den die
+     * Ladenakte fuer zehn der 141 Betriebe kennt (drei geschlossene, sechs
+     * ohne Geschaeft, einer Test). Er gehoert in die Attrappe und nicht in
+     * einen von Hand gesetzten Datenbankzustand: nur so laeuft er durch die
+     * ganze Kette bis in die Pruefsicht.
+     */
+    mock = mockStarten({ ohneBelegarchiv: ['99'] })
     process.env.LINA_BASE_URL = mock.url
     process.env.LINA_USER = 'testuser'
     process.env.LINA_PASSWORD = 'geheim'
@@ -1941,10 +2043,19 @@ lauf('e2e Ladenakte', () => {
    * Genau das tun die folgenden.
    */
   describe('Zulauf des Belegarchivs', () => {
-    /** Frischer Anfang je Test: sonst traegt der Bestand des vorigen weiter. */
-    const zuruecksetzen = () => db.query(
-      `TRUNCATE sync.warteschlange, core.belegarchiv_bestand, core.buchungsbeleg
-       RESTART IDENTITY CASCADE`)
+    /**
+     * Frischer Anfang je Test: sonst traegt der Bestand des vorigen weiter.
+     * Die Attrappe wird mit zurueckgesetzt — ein Test, der Belege in LINA
+     * loeschen laesst, darf den naechsten nicht mit einem halben Ordner erben.
+     */
+    const zuruecksetzen = async () => {
+      for (const typ of ['1', '2', '3', '5', '3970', '3974', '3975', '3977']) {
+        mock.belegeLoeschen(typ, 0)
+      }
+      await db.query(
+        `TRUNCATE sync.warteschlange, core.belegarchiv_bestand, core.buchungsbeleg
+         RESTART IDENTITY CASCADE`)
+    }
 
     const zahl = async (sql: string, p: unknown[] = []) =>
       Number((await db.query(sql, p)).rows[0].n)
@@ -2125,6 +2236,207 @@ lauf('e2e Ladenakte', () => {
       expect(await zahl(
         `SELECT count(*)::int AS n FROM mart.belegarchiv_zulauf WHERE zustand = 'nie gezaehlt'`))
         .toBe(13)
+    })
+
+    /**
+     * ================================================================
+     * SCHRUMPFENDE ORDNER — der Befund N2 vom 13.08.2026
+     * ================================================================
+     *
+     * Die Abzugsbedingung aus 0069 prueft auf UNGLEICH und nicht auf
+     * KLEINER, damit sie auch den abgebrochenen Abzug faengt. Nur konnte
+     * der Abzug einen geschrumpften Ordner gar nicht reparieren:
+     * belegeSchreiben() war ein reiner Upsert, in LINA geloeschte Belege
+     * blieben bei uns stehen. Ab dem ersten geloeschten Beleg galt damit
+     * dauerhaft gehalten > gezaehlt — und der Lauf holte den vollen
+     * Ordner jede Nacht neu, bis zu 12.668 Belege, ohne dass sich je
+     * etwas aenderte. Der Zustand pendelte zwischen "abzug eingereiht"
+     * und "abzug fehlt", und Letzteres sagte dabei das Falsche: der Abzug
+     * fehlte nicht, er war wirkungslos.
+     *
+     * Am 13.08.2026 in Produktion gemessen: unter 1.645 fertig gezaehlten
+     * Paaren noch kein einziger Fall. Das ist eine Frage der Zeit und
+     * kein Akutproblem — LINA loescht selten, aber es kommt vor.
+     */
+    test('ein in LINA geloeschter Beleg verschwindet auch bei uns — und der Ordner konvergiert', async () => {
+      const { ladenakteNachfuellen } = await import('./nachfuellen')
+      const { workerLauf } = await import('./worker')
+      const { cacheLeeren } = await import('../ladenakte/token')
+      await zuruecksetzen(); cacheLeeren()
+
+      // Tag 1: voller Ordner.
+      await ladenakteNachfuellen('2026-08-13')
+      await workerLauf('manuell')
+      expect(await zahl(
+        `SELECT count(*)::int AS n FROM core.buchungsbeleg WHERE typ_id = '1'`)).toBe(61)
+      const { rows: vorher } = await db.query(
+        `SELECT lina_id FROM core.buchungsbeleg WHERE typ_id = '1'`)
+
+      // In LINA verschwindet ein Beleg — Liste UND Zaehlung sagen jetzt 60.
+      mock.belegeLoeschen('1', 1)
+
+      // Tag 2: die Zaehlung erkennt die Abweichung und reiht den Abzug nach.
+      await ladenakteNachfuellen('2026-08-14'); cacheLeeren()
+      await workerLauf('manuell')
+
+      /**
+       * DER KERN: 60, nicht 61. Und zwar GEZIELT — genau eine lina_id ist
+       * weg, der Rest steht unveraendert. Ein Abzug, der einfach alles neu
+       * schreibt, saehe hier genauso aus; die Mengendifferenz zeigt, dass
+       * geloescht und nicht nur neu geladen wurde.
+       */
+      expect(await zahl(
+        `SELECT count(*)::int AS n FROM core.buchungsbeleg WHERE typ_id = '1'`)).toBe(60)
+      const { rows: nachher } = await db.query(
+        `SELECT lina_id FROM core.buchungsbeleg WHERE typ_id = '1'`)
+      const uebrig = new Set(nachher.map(z => z.lina_id))
+      const fehlend = vorher.map(z => z.lina_id).filter(id => !uebrig.has(id))
+      expect(fehlend).toHaveLength(1)
+
+      /**
+       * Die Steuerzeilen haengen per ON DELETE CASCADE dran (0053). Geprueft
+       * wird nicht die Zahl, sondern die Aussage: es bleibt nichts verwaist.
+       */
+      expect(await zahl(
+        `SELECT count(*)::int AS n FROM core.buchungsbeleg_steuer s
+           LEFT JOIN core.buchungsbeleg b USING (buchungsbeleg_key)
+          WHERE b.buchungsbeleg_key IS NULL`)).toBe(0)
+
+      // Der Ordner steht wieder auf gleich — das ist die Konvergenz.
+      const { rows: [zulauf] } = await db.query(
+        `SELECT zustand, gezaehlt, gehalten, differenz FROM mart.belegarchiv_zulauf
+          WHERE typ_id = '1' AND lina_betrieb_id = 15`)
+      expect(zulauf).toMatchObject({
+        zustand: 'vollstaendig', gezaehlt: 60, gehalten: 60, differenz: 0,
+      })
+
+      /**
+       * Tag 3 ist der eigentliche Beweis: KEIN weiterer Abzug. Ohne das
+       * Loeschen stuende hier jede Nacht ein neuer, fuer immer.
+       */
+      const abzuegeVorher = await zahl(
+        `SELECT count(*)::int AS n FROM sync.warteschlange WHERE endpunkt = 'la:belegliste'`)
+      await ladenakteNachfuellen('2026-08-15'); cacheLeeren()
+      await workerLauf('manuell')
+      expect(await zahl(
+        `SELECT count(*)::int AS n FROM sync.warteschlange WHERE endpunkt = 'la:belegliste'`))
+        .toBe(abzuegeVorher)
+    })
+
+    /**
+     * DIE GEGENPROBE — und der Grund, warum das Loeschen eine Schranke hat.
+     *
+     * Ein Ordner, aus dem in einer Nacht ein Fuenftel verschwindet, ist keine
+     * Pflege mehr. Entweder raeumt LINA ihn ab, oder die Antwort war trotz
+     * recordsTotal unvollstaendig — und im zweiten Fall waere unser Loeschen
+     * der eigentliche Datenverlust. Dann lieber stehen lassen und werfen:
+     * die Transaktion laeuft zurueck, der Posten landet nach seinen Versuchen
+     * in mart.posten_aufgegeben, und ein Mensch entscheidet.
+     */
+    test('mehr als 5 % Schwund in einer Nacht wirft, statt zu loeschen', async () => {
+      const { ladenakteNachfuellen } = await import('./nachfuellen')
+      const { workerLauf } = await import('./worker')
+      const { cacheLeeren } = await import('../ladenakte/token')
+      await zuruecksetzen(); cacheLeeren()
+
+      await ladenakteNachfuellen('2026-08-13')
+      await workerLauf('manuell')
+      expect(await zahl(
+        `SELECT count(*)::int AS n FROM core.buchungsbeleg WHERE typ_id = '1'`)).toBe(61)
+
+      // 12 von 61 sind 19,7 % — ueber beiden Schranken (5 % und 10 Stueck).
+      mock.belegeLoeschen('1', 12)
+      await ladenakteNachfuellen('2026-08-14'); cacheLeeren()
+      const r = await workerLauf('manuell')
+
+      // Der Abzug ist gescheitert, und er sagt auch, woran.
+      expect(r.fehler).toBeGreaterThan(0)
+      const { rows: [posten] } = await db.query(
+        `SELECT letzter_fehler FROM sync.warteschlange
+          WHERE endpunkt = 'la:belegliste' AND parameter->>'typeId' = '1'
+          ORDER BY posten_id DESC LIMIT 1`)
+      expect(String(posten.letzter_fehler)).toContain('nicht mehr in LINAs Liste')
+
+      // NICHTS geloescht — die Transaktion ist zurueckgelaufen.
+      expect(await zahl(
+        `SELECT count(*)::int AS n FROM core.buchungsbeleg WHERE typ_id = '1'`)).toBe(61)
+
+      // Und der Befund steht in der Sicht, nicht nur im Log: LINA zaehlt 49,
+      // wir halten 61.
+      const { rows: [zulauf] } = await db.query(
+        `SELECT gezaehlt, gehalten, differenz FROM mart.belegarchiv_zulauf
+          WHERE typ_id = '1' AND lina_betrieb_id = 15`)
+      expect(zulauf).toMatchObject({ gezaehlt: 49, gehalten: 61, differenz: -12 })
+    })
+
+    /**
+     * ================================================================
+     * BETRIEBE OHNE BELEGARCHIV — der Befund N3 vom 13.08.2026
+     * ================================================================
+     *
+     * Die Ladenakte kennt Betriebe, deren Baumknoten keinen einzigen Ordner
+     * fuehrt. belegToken() wirft dafuer KeinBelegarchiv, der Client macht
+     * daraus keine_daten — gefragt, nichts da, kein Retry. Richtig so.
+     *
+     * Nur bekommen sie damit NIE eine Zeile in core.belegarchiv_bestand,
+     * standen also fuer immer auf "nie gezaehlt" und fuer immer in der Zeile
+     * "seit ueber 36 h nicht gezaehlt". Eine Kachel, die nie auf null geht,
+     * liest niemand mehr — und dann ist auch der echte Ausfall unsichtbar.
+     * Das ist derselbe Verlust wie eine Kachel, die immer gruen ist, nur
+     * langsamer.
+     */
+    test('ein Betrieb ohne Belegarchiv bekommt einen eigenen Zustand statt ewiger Roete', async () => {
+      const { workerLauf } = await import('./worker')
+      const { cacheLeeren } = await import('../ladenakte/token')
+      await zuruecksetzen(); cacheLeeren()
+
+      /**
+       * Ein zweiter Betrieb, dessen Baumknoten leer antwortet — der Fall
+       * geht durch die ganze Kette, nicht nur durch die Sicht: Attrappe →
+       * belegToken → KeinBelegarchiv → keine_daten → sync.aufgabe → Sicht.
+       */
+      await db.query(
+        `INSERT INTO core.betrieb (enc_id, name, lina_betrieb_id)
+         VALUES ('enc-99','Aposto Testbetrieb ohne Ladenakte',99)
+         ON CONFLICT (enc_id) DO NOTHING`)
+      await db.query(
+        `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, parameter)
+         VALUES ('la:belegzahl', current_date, current_date, 95, '{"linaBetriebId":"99","typeId":"1"}')`)
+
+      await workerLauf('manuell')
+
+      // Kein Fehler, kein Retry — eine Antwort.
+      const { rows: [aufgabe] } = await db.query(
+        `SELECT status FROM sync.aufgabe
+          WHERE endpunkt = 'la:belegzahl' AND parameter->>'linaBetriebId' = '99'
+          ORDER BY aufgabe_id DESC LIMIT 1`)
+      expect(aufgabe.status).toBe('keine_daten')
+
+      // Die Sicht benennt ihn — und zwar anders als "nie gezaehlt".
+      const { rows: [zulauf] } = await db.query(
+        `SELECT zustand, zaehlung_status FROM mart.belegarchiv_zulauf
+          WHERE lina_betrieb_id = 99 AND typ_id = '1'`)
+      expect(zulauf).toMatchObject({ zustand: 'kein belegarchiv', zaehlung_status: 'keine_daten' })
+
+      /**
+       * DER PUNKT DER GANZEN UEBUNG: die 36-h-Zeile zaehlt ihn nicht mehr
+       * mit, und die eigene Zeile fuehrt ihn dafuer sichtbar. Ein Zweig, der
+       * "nichts zu tun" bedeutet, muss sichtbar sein (AGENTS.md Regel 10) —
+       * er darf nur nicht in der Zahl stehen, die einen Ausfall meldet.
+       */
+      const zeile = async (name: string) => (await db.query(
+        `SELECT geprueft, auffaellig FROM mart.pruefung_uebersicht WHERE pruefung = $1`,
+        [name])).rows[0]
+      const ohneArchiv = await zeile('Belegarchiv: Betrieb ohne Belegarchiv')
+      expect(Number(ohneArchiv.auffaellig)).toBe(14)
+
+      const gezaehlt36 = await zeile('Belegarchiv: seit ueber 36 h nicht gezaehlt')
+      // Zwei Betriebe x 14 Ordner = 28, davon 14 ausgeklammert.
+      expect(Number(gezaehlt36.geprueft)).toBe(14)
+      expect(Number(gezaehlt36.auffaellig)).toBe(14)
+
+      // Aufraeumen: der zweite Betrieb gehoert nicht in die folgenden Tests.
+      await db.query(`DELETE FROM core.betrieb WHERE lina_betrieb_id = 99`)
     })
   })
 })

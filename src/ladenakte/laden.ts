@@ -323,6 +323,15 @@ async function belegeSchreiben(
       + `Entweder deckelt LINA jetzt doch, oder die Antwort ist unvollstaendig.`)
   }
 
+  /**
+   * Der Bestand VOR dem Upsert — der Nenner der Schwundrechnung weiter unten.
+   * Nach dem Upsert wäre er verfälscht, weil neue Belege schon mitzählen.
+   */
+  const vorher = await c.query<{ n: number }>(
+    `SELECT count(*)::int AS n FROM core.buchungsbeleg
+      WHERE betrieb_key = $1 AND typ_id = $2`, [bk, typId])
+  const gehaltenVorher = Number(vorher.rows[0].n)
+
   await c.query(
     `INSERT INTO core.belegarchiv_bestand
        (betrieb_key, lina_betrieb_id, typ_id, gemessen_am, records_total,
@@ -331,7 +340,12 @@ async function belegeSchreiben(
     [bk, linaBetriebId, typId, abgerufenAm, total,
      Number(d?.recordsFiltered ?? total), SEITENGROESSE, rawId])
 
-  if (zeilen.length === 0) return 0
+  if (zeilen.length === 0) {
+    // NICHT hier aussteigen, ohne aufgeräumt zu haben: ein leer gewordener
+    // Ordner ist der extremste Schwundfall, und genau der muss auffallen.
+    await verschwundeneEntfernen(c, bk, typId, [], gehaltenVorher, linaBetriebId, total)
+    return 0
+  }
 
   // Kein stiller Verlust: was belegBetrag verwirft, steht im Log. Sonst sieht
   // ein Lauf mit lauter unlesbaren Betraegen genauso aus wie ein sauberer.
@@ -415,7 +429,108 @@ async function belegeSchreiben(
 
   // Steuerzeilen: taxItems {"0":..,"7":..,"19":..} lang abgelegt.
   await steuerSchreiben(c, bk, zeilen)
+
+  await verschwundeneEntfernen(
+    c, bk, typId, zeilen.map(z => String(z.id ?? '')),
+    gehaltenVorher, linaBetriebId, total)
+
   return geschrieben
+}
+
+/**
+ * Wie viel eines Ordners in EINER Nacht verschwinden darf, bevor der Abzug
+ * lieber wirft als loescht.
+ *
+ * BEIDE Schranken muessen gerissen sein — Anteil UND absolute Zahl. Der
+ * Anteil allein waere bei kleinen Ordnern eine Dauerwarnung: gemessen am
+ * 13.08.2026 in Produktion fuehrt Belegart 3970 (Lieferscheine) 17 Ordner mit
+ * zusammen 542 Belegen, im Schnitt 32 Stueck. Dort ist EIN geloeschter Beleg
+ * schon mehr als 3 %, bei zehn Belegen im Ordner sind es 10 % — und LINA
+ * loescht nun einmal gelegentlich einen Beleg. Die absolute Zahl allein waere
+ * umgekehrt bei den grossen Ordnern blind: der groesste freigegebene haelt
+ * 12.668 Belege, dort sind zwanzig verschwundene Belege nichts.
+ *
+ * Was die Schranke abfangen soll, ist nicht die Pflege, sondern der Ausfall:
+ * LINA raeumt einen Ordner ab, oder die Antwort war trotz `recordsTotal`
+ * unvollstaendig. Beides sieht nach dem Loeschen aus wie ein kleiner Ordner —
+ * lautlos und plausibel, genau die Signatur, an der dieses Projekt schon
+ * zweimal Tage verloren hat.
+ */
+const SCHWUND_ANTEIL = 0.05
+const SCHWUND_MINDESTZAHL = 10
+
+/**
+ * Belege loeschen, die LINA nicht mehr fuehrt.
+ *
+ * WARUM DAS SEIN MUSS. `belegeSchreiben()` war bis zum 13.08.2026 ein reiner
+ * Upsert: ein in LINA geloeschter Beleg blieb bei uns fuer immer stehen. Der
+ * Zulaufabgleich aus 0069 prueft aber auf GLEICHHEIT (`gehalten <> gezaehlt`),
+ * und zwar bewusst — nur so faengt er auch den abgebrochenen Abzug. Ab dem
+ * ersten geloeschten Beleg galt damit dauerhaft `gehalten > gezaehlt`, der
+ * Lauf holte den vollen Ordner jede Nacht neu (bis zu 12.668 Belege), und
+ * nichts aenderte sich je. Der Zustand pendelte zwischen "abzug eingereiht"
+ * und "abzug fehlt" — Letzteres sagte dabei das Falsche: der Abzug fehlte
+ * nicht, er war wirkungslos.
+ *
+ * WARUM DAS SICHER IST. Die Antwort IST der vollstaendige Ordner: `length`
+ * ist 100.000, und die Pruefung `zeilen.length === recordsTotal` eine Zeile
+ * weiter oben laesst nichts anderes durch. Archivierte Belege stehen mit in
+ * der Liste (Feld `archived` kommt in den Zeilen mit) und werden deshalb
+ * nicht faelschlich geloescht — der Beweis ist die am 13.08.2026 gemessene
+ * Gleichheit ueber alle abgezogenen Ordner. `core.buchungsbeleg_steuer`
+ * haengt per ON DELETE CASCADE dran (0053), es bleibt nichts verwaist.
+ * Dieselbe Logik traegt schon `core.bestellposition` und
+ * `core.inventurposition`: ersetzen statt ewig anhaeufen.
+ *
+ * OHNE recordsTotal WIRD NICHTS GELOESCHT. Dann ist die Vollstaendigkeit
+ * ungeprueft, und aus "unbekannt" darf kein Loeschbefehl werden.
+ *
+ * EIN BELEG, DER DEN ORDNER WECHSELT, geht nicht verloren: der Upsert-
+ * Schluessel ist (betrieb_key, lina_id) ohne typ_id (0053, Falle 5). Zieht
+ * der neue Ordner zuerst ab, steht der Beleg schon auf der neuen typ_id und
+ * die Loeschbedingung des alten trifft ihn nicht mehr. Zieht der alte zuerst
+ * ab, loescht er ihn, und der Abzug des neuen schreibt ihn wieder — dessen
+ * Zaehlung reiht ihn nach. Spaetestens in der zweiten Nacht steht er richtig.
+ *
+ * GEWORFEN WIRD IN DERSELBEN TRANSAKTION wie geloescht. "Nichts geloescht"
+ * ist deshalb keine Zusage des Codes, sondern die Folge des Ruecklaufs.
+ */
+async function verschwundeneEntfernen(
+  c: PoolClient, bk: number, typId: string, gelieferteIds: string[],
+  gehaltenVorher: number, linaBetriebId: number, total: number,
+): Promise<void> {
+  if (total < 0) return
+  if (gehaltenVorher === 0) return
+
+  const weg = await c.query<{ lina_id: string }>(
+    `DELETE FROM core.buchungsbeleg b
+      WHERE b.betrieb_key = $1 AND b.typ_id = $2
+        AND NOT EXISTS (SELECT 1 FROM unnest($3::text[]) AS g(lina_id)
+                         WHERE g.lina_id = b.lina_id)
+      RETURNING b.lina_id`,
+    [bk, typId, gelieferteIds])
+  if (weg.rowCount === 0) return
+
+  const anzahl = weg.rowCount ?? 0
+  const anteil = anzahl / gehaltenVorher
+  if (anzahl > SCHWUND_MINDESTZAHL && anteil > SCHWUND_ANTEIL) {
+    throw new Error(
+      `la:belegliste Betrieb ${linaBetriebId} Ordner ${typId}: ${anzahl} von `
+      + `${gehaltenVorher} Belegen stehen nicht mehr in LINAs Liste `
+      + `(${(anteil * 100).toFixed(1)} %, recordsTotal ${total}). Ueber `
+      + `${(SCHWUND_ANTEIL * 100).toFixed(0)} % und mehr als ${SCHWUND_MINDESTZAHL} Stueck `
+      + `ist das keine Pflege mehr, sondern ein Befund — entweder raeumt LINA den `
+      + `Ordner ab, oder die Antwort war trotz recordsTotal unvollstaendig. `
+      + `Es wird nichts geloescht; der Posten steht in mart.posten_aufgegeben, `
+      + `sobald die Versuche aufgebraucht sind.`)
+  }
+
+  // Unterhalb der Schwelle ist es Pflege — aber nicht lautlos: eine Loeschung
+  // ist die einzige Stelle, an der uns Daten absichtlich abhandenkommen.
+  log.info('belegarchiv: in LINA geloeschte Belege entfernt', {
+    linaBetriebId, typ_id: typId, geloescht: anzahl,
+    gehalten_vorher: gehaltenVorher, anteil_pct: Number((anteil * 100).toFixed(2)),
+  })
 }
 
 async function steuerSchreiben(

@@ -983,3 +983,52 @@ Fünf Tests scheitern auf einem so gebauten Schema **auch ohne jede Codeänderun
 BWA-Sichten und eine Mart-Sicht, weil die materialisierten Sichten nie befüllt wurden, und
 zwei Budgetgrenzen, weil `config` beim ersten Import einfriert. Wer eine Änderung bewertet,
 misst gegen diesen Stand und nicht gegen null.
+
+## Nach dem Deployment von `0071` zu prüfen (offen seit 13.08.2026)
+
+Phase 1c (N1/N2/N3 aus `plan-datenvollstaendigkeit-nachtrag.md`) ist ein Deploy mit einer
+Migration. Was danach am nächsten Nachtlauf nachzumessen ist — lesend über die Metabase-API,
+`DATABASE_URL` zeigt lokal:
+
+```sql
+-- 1. Die 36-h-Zeile muss nach einem FERTIGEN Lauf auf 0 stehen. Vor 0071 war
+--    das strukturell unmöglich, sobald ein Betrieb ohne Belegarchiv dabei war.
+SELECT * FROM mart.pruefung_uebersicht
+ WHERE pruefung LIKE 'Belegarchiv%';
+
+-- 2. Wie viele Betriebe haben wirklich kein Belegarchiv? Erwartung: bis zu zehn
+--    Betriebe, also bis zu 140 Paare. Ab dann ist die Zahl KONSTANT, und jede
+--    Änderung ist ein Befund.
+SELECT betrieb, count(*) FROM mart.belegarchiv_zulauf
+ WHERE zustand = 'kein belegarchiv' GROUP BY 1 ORDER BY 1;
+
+-- 3. Schrumpft irgendwo ein Ordner? Erwartung: leer oder kurzlebig. Eine Zeile,
+--    die zwei Nächte in Folge steht, heisst, dass das Löschen nicht greift.
+SELECT betrieb, typ_id, ordner, gezaehlt, gehalten, differenz, zustand
+  FROM mart.belegarchiv_zulauf
+ WHERE zuletzt_gezaehlt IS NOT NULL AND differenz < 0;
+
+-- 4. Hat die Schwundschranke ausgelöst? Dann steht der Ordner mit seiner
+--    Begründung hier, und ein Mensch entscheidet — es wurde nichts gelöscht.
+SELECT * FROM sync.warteschlange
+ WHERE endpunkt = 'la:belegliste' AND letzter_fehler LIKE '%nicht mehr in LINAs Liste%';
+
+-- 5. Der zweite Inventur-Reparaturzyklus. Erwartung: leer. Steht hier eine
+--    Inventur mit geladen = 800 (oder einem Vielfachen), greift die
+--    Folgeseiten-Sperre wieder.
+SELECT * FROM mart.inventur_abgeschnitten;
+```
+
+**Was die Messung NICHT beweisen kann.** N1 und N2 sind Reparaturen an latenten Fehlern: N1
+schlägt erst zu, wenn FoodNotify den Kopf einer der neun großen Inventuren ändert, N2 erst,
+wenn LINA einen Beleg löscht. Ein leerer Befund am Tag nach dem Deploy heißt also „noch nicht
+eingetreten", nicht „behoben". Der Beweis, dass die Fehler gefangen sind, steht in den Tests
+— beide sind gegen den zurückgebauten Fix rot geprüft, nicht nur grün geschrieben.
+
+**Was die fünf verbleibenden e2e-Fehlschläge sind.** Gegen einen frischen Schema-Klon
+scheitern fünf Tests aus fremden Suiten, und zwar vor wie nach dieser Änderung identisch:
+dreimal „materialized view has not been populated" (der Klon aus `pg_dump --schema-only`
+bringt keine aufgefrischten Sichten mit) und zweimal die Budgetgrenzen, die `config` aus der
+echten `.env` einfriert statt aus dem Test. Beides sind Artefakte der Testumgebung, keine
+Befunde. `bun test` ohne `TEST_DATABASE_URL` ist grün (683 pass, 157 skip, 0 fail,
+nachgemessen am 13.08.2026), die 407 Kartentests ebenso.

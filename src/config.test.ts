@@ -1,5 +1,27 @@
 import { describe, expect, test } from 'bun:test'
-import { fnZugaenge, type Config } from './config'
+import { config, fnZugaenge, type Config } from './config'
+
+/**
+ * DIE LEINE ZWISCHEN CODE UND SICHT.
+ *
+ * `mart.posten_aufgegeben` (Migration 0070) entscheidet mit einem fest
+ * verdrahteten `wiederbelebt >= 3`, ob ein Posten „endgueltig" heisst.
+ * `src/status.ts` und `src/sync/nachfuellen.ts` lesen dieselbe Grenze aus
+ * `MAX_WIEDERBELEBUNGEN`. Eine Sicht kann keine Umgebungsvariable lesen, und
+ * eine Einstellungstabelle wäre mehr Bau, als das Problem verdient — also
+ * hält dieser Test die beiden Zahlen zusammen.
+ *
+ * Wer die Grenze ändern will, bekommt hier einen roten Test, und der nennt
+ * die Sicht, die mitgeändert werden muss. Das ist keine Kopplung, aber es
+ * ist der Unterschied zwischen „auseinandergelaufen" und „gemeinsam
+ * geändert": ohne den Test führte eine 5 in der Umgebung zu einem Dashboard,
+ * das zwei Posten aufgibt, die der Lauf noch zweimal zurückholt.
+ */
+describe('Wiederbelebungsgrenze', () => {
+  test('MAX_WIEDERBELEBUNGEN ist 3 — dieselbe 3 wie in mart.posten_aufgegeben', () => {
+    expect(config.MAX_WIEDERBELEBUNGEN).toBe(3)
+  })
+})
 
 /**
  * Die Paarprüfung läuft in `laden()` beim Import des Moduls — getestet wird

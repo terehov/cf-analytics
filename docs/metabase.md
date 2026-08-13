@@ -792,3 +792,56 @@ Ausfall der Gegenstelle den ganzen Vorrat, ausgerechnet bevor sie wieder da ist.
 Zustände in eine Zahl wirft, bekommt eine Kachel, die immer rot ist — und eine Kachel, die
 immer rot ist, sieht sich niemand mehr an. Das ist dieselbe Lehre wie bei der
 Wareneinsatz-Prüfung, die 2026 immer grün zeigte (Migration 0029), nur andersherum.
+
+## Prüfsichten-Hygiene (Migration `0071`, 13.08.2026)
+
+Drei Stellen, an denen die Anzeige etwas anderes sagte, als sie meint. Alle drei führen zum
+selben Ergebnis: eine Kachel, die dauerhaft rot steht, sieht sich niemand mehr an — derselbe
+Verlust wie eine, die dauerhaft grün steht, nur langsamer.
+
+### `mart.belegarchiv_zulauf`: ein Zustand mehr und eine Spalte mehr
+
+Neu ist der Zustand **`kein belegarchiv`** und die Spalte **`zaehlung_status`**.
+
+Die Ladenakte kennt Betriebe, deren Baumknoten keinen einzigen Ordner führt (drei
+geschlossene, sechs ohne Geschäft, einer Test — gemessen 13.08.2026). Für sie wirft
+`belegToken()` ein `KeinBelegarchiv`, der Client macht `keine_daten` daraus. Sie bekommen
+damit nie eine Zeile in `core.belegarchiv_bestand` und standen für immer auf „nie gezaehlt".
+
+`zaehlung_status` ist der Ausgang der jüngsten `la:belegzahl`-Aufgabe **je Betrieb** — nicht
+je Ordner, weil das fehlende Belegarchiv eine Eigenschaft des Betriebs ist — und **nur aus
+den letzten sieben Tagen**. Das Fenster ist Absicht, die Begründung steht in
+`entscheidungen.md`: eine Ausnahme darf ihren Beleg nicht überleben.
+
+Der Zustand ist eng gefasst: nur wo wir auch nichts halten und nie etwas gezählt haben. Ein
+Betrieb, der sein Belegarchiv VERLIERT, steht weiter auf „abzug fehlt" und gehört angesehen.
+
+### Zwei Zeilen in `mart.pruefung_uebersicht`, und eine liest sich anders
+
+Die Zeile **„Belegarchiv: seit ueber 36 h nicht gezaehlt"** klammert `kein belegarchiv` aus —
+in `geprueft` wie in `auffaellig`. Sie zählt jetzt nur noch Paare, für die eine Zählung
+überhaupt zu erwarten ist.
+
+Neu daneben: **„Belegarchiv: Betrieb ohne Belegarchiv"**. Ihre **Erwartung ist KONSTANZ,
+nicht null** — die einzige Zeile der Übersicht, für die das gilt. Die Zahl ist eine
+Eigenschaft des Bestands und kein Rückstand; interessant ist allein, wenn sie sich ändert:
+nach oben heißt, ein Betrieb hat sein Belegarchiv verloren oder ein neuer ist ohne eines
+angelegt worden, nach unten heißt, einer hat eines bekommen und wird ab jetzt gezählt.
+
+Ohne diese Zeile wäre „kein Belegarchiv" ein stiller Zweig, der „nichts zu tun" bedeutet —
+genau das, wovor AGENTS.md Regel 10 warnt. Ausklammern allein hätte den Fall unsichtbar
+gemacht statt ehrlich.
+
+### `mart.posten_aufgegeben`: gleiche Logik, ehrlicher Kommentar
+
+Die Sicht ist unverändert. Ihr Kommentar nennt jetzt `config.MAX_WIEDERBELEBUNGEN` beim Namen
+und den Test, der die 3 festhält (`src/config.test.ts`). Eine Sicht kann keine
+Umgebungsvariable lesen; wer die Grenze ändert, ändert damit still die Bedeutung dieser
+Spalte und die von `src/status.ts`. Der rote Test führt zur Sicht.
+
+### Und was „abzug fehlt" jetzt wieder heißt
+
+Der Sichtkommentar sagte bis dahin nicht, dass ein Abzug fehlerfrei laufen und trotzdem nichts
+ändern konnte. Seit `verschwundeneEntfernen()` (im selben Deploy) löscht der Abzug, was LINA
+nicht mehr führt — „abzug fehlt" heißt damit wieder, was es sagt: eine Abweichung ist gemessen
+und es steht kein Posten dafür.

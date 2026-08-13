@@ -1650,3 +1650,73 @@ Auswertung braucht sie. `core.belegart.inhalt_holen` bleibt für alle sechs
 Zählung läuft für sie weiter, und `mart.belegarchiv_zulauf` führt sie als
 „gezaehlt, nicht freigegeben" — entsteht dort plötzlich Volumen, ist es
 sichtbar, und das Umschalten ist ein UPDATE auf eine Zeile.
+
+## 13.08.2026 (Phase 1c): Vier Entscheidungen aus der Umsetzung des Review-Nachtrags
+
+### Ein Sperrmodus statt einer Sonderregel für Inventuren
+
+`folgepostenEinreihen()` hätte auch fest verdrahtet werden können: „für
+`fn:inventurpositionen` gilt etwas anderes". Stattdessen gibt es zwei benannte Modi
+(`'alle'` / `'offen'`), und der Aufrufer wählt.
+
+**Warum.** Die Unterscheidung ist keine Eigenschaft dieses einen Endpunkts, sondern der
+Frage, ob ein Abruf EINMALIG oder WIEDERHOLBAR ist. Genau diese Verwechslung hat dieses
+Projekt am 12.08.2026 schon einmal Tage gekostet (das Belegarchiv fror ein, weil die
+Einreihbedingung die eines einmaligen Abzugs war). Ein Name, der die Frage stellt, ist mehr
+wert als ein `if` mit dem Namen des Endpunkts darin — der nächste, der einen wiederholbaren
+Abruf baut, sieht die Wahl, statt sie zu übersehen.
+
+### Bei zu großem Schwund wird geworfen, nicht gelöscht — und nicht gewarnt
+
+Drei Wege standen zur Wahl, wenn nach einem Abzug auffällig viele Belege fehlen: löschen und
+warnen, nur warnen, oder werfen.
+
+**Entschieden: werfen.** Eine Warnung steht im Log, und Logs liest niemand (AGENTS.md
+Regel 10). Löschen wäre der eigentliche Datenverlust, falls die Antwort trotz `recordsTotal`
+unvollständig war — dann hätten wir aus einer fremden Störung einen eigenen Schaden gemacht.
+Werfen lässt die Transaktion zurücklaufen, der Bestand bleibt vollständig, der Posten läuft
+über die Versuche in `mart.posten_aufgegeben`, und die Differenz steht sichtbar in
+`mart.belegarchiv_zulauf`. Ein Mensch entscheidet, und bis dahin ist nichts verloren.
+
+**Der Preis, bewusst in Kauf genommen:** ein Ordner, den LINA wirklich abräumt, scheitert
+dann jede Nacht, bis jemand hinsieht. Das ist richtig herum — lieber ein Befund zu viel als
+eine Löschung zu viel.
+
+### Die Schwundschranke hat zwei Teile, nicht einen
+
+**5 % UND mehr als 10 Belege**, beides muss gerissen sein.
+
+**Warum nicht nur der Anteil.** Gemessen am 13.08.2026: Belegart 3970 führt 17 Ordner mit
+zusammen 542 Belegen, im Schnitt 32 Stück. Dort ist ein einziger gelöschter Beleg schon über
+3 %, bei zehn Belegen im Ordner sind es 10 %. Eine Schranke, die bei normaler Pflege
+ausschlägt, wird abgeschaltet.
+
+**Warum nicht nur die absolute Zahl.** Der größte freigegebene Ordner hält 12.668 Belege.
+Zwanzig verschwundene Belege sind dort nichts, und eine Schranke, die dort erst bei Tausenden
+greift, wäre bei den kleinen Ordnern blind.
+
+### Die Ausklammerung „kein Belegarchiv" hat ein Zeitfenster von sieben Tagen
+
+Betriebe ohne Belegarchiv aus der 36-h-Prüfzeile zu nehmen, wäre auch dauerhaft möglich
+gewesen — der Zustand ändert sich selten.
+
+**Entschieden: sieben Tage, danach fällt der Betrieb zurück in die Zeile.**
+
+**Warum.** Die Ausnahme stützt sich auf einen Befund (`keine_daten` bei der Zählung), und ein
+Befund veraltet. Ohne Fenster nähme ein einziges `keine_daten` aus dem März einen Betrieb für
+immer aus der Überwachung. Schlimmer: fiele die Zählung insgesamt aus, wäre ausgerechnet die
+Zeile still, die den Ausfall melden soll — der Wächter hätte sich selbst abgeschaltet.
+**Eine Ausnahme darf ihren Beleg nicht überleben.**
+
+### Das Wiederbelebungs-Limit bleibt an zwei Stellen, gehalten von einem Test
+
+`mart.posten_aufgegeben` verdrahtet `wiederbelebt >= 3`, `src/status.ts` und
+`src/sync/nachfuellen.ts` lesen `MAX_WIEDERBELEBUNGEN`. Eine Einstellungstabelle, aus der
+beide lesen, wäre die saubere Lösung.
+
+**Entschieden: nicht bauen.** Eine Tabelle, eine Migration, ein Lesepfad in der Sicht und ein
+Pflegeweg — für eine Zahl, die sich seit ihrer Einführung nicht geändert hat. Stattdessen
+hält `src/config.test.ts` den Vorgabewert auf 3 fest, und die Kommentare an beiden Stellen
+verweisen aufeinander. Wer die Grenze ändern will, bekommt einen roten Test, und der nennt
+die Sicht, die mitzuändern ist. Das ist keine Kopplung, aber es ist der Unterschied zwischen
+„auseinandergelaufen" und „gemeinsam geändert".
