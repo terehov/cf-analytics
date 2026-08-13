@@ -170,6 +170,9 @@ export async function laden(k: Kontext): Promise<number> {
     const bk = (enc: string) => keys.get(enc)
     let geschrieben = 0
 
+    // Wer hier einen `case` ergänzt oder entfernt, ergänzt oder entfernt ihn
+    // auch in TRANSFORMIERTE_ENDPUNKTE ganz unten. Der Test dazu liest diese
+    // Datei und vergleicht beides — die Liste kann also nicht davonlaufen.
     switch (k.ep.key) {
       case 'getUmsatzbericht':
       case 'getUmsatzbericht:speisen':
@@ -757,11 +760,48 @@ export async function laden(k: Kontext): Promise<number> {
       // ist append-only, es ist nichts verloren.
 
       default:
-        // Noch keine Transformation — der Raw-Layer hat die Daten trotzdem.
-        // Nachträglich transformieren geht jederzeit, ohne LINA anzufassen.
+        /**
+         * Noch keine Transformation — der Raw-Layer hat die Daten trotzdem.
+         * Nachträglich transformieren geht jederzeit, ohne LINA anzufassen.
+         *
+         * DIESER ZWEIG IST STILL, UND DAS IST DAS PROBLEM. Was hier
+         * durchrutscht, schreibt raw, meldet „ok" und transformiert nichts —
+         * genau daran ist der Aktionsbericht einmal monatelang vorbeigelaufen.
+         * Deshalb prüft `endpunkteZusichern()` (src/sync/waechter.ts) beim
+         * Start jedes Laufs, dass kein AKTIVER Endpunkt hier landet. Wer einen
+         * Endpunkt aktiviert, ohne ihm einen Fall zu geben, bekommt einen
+         * lauten Fehler statt einer leeren Tabelle.
+         */
         break
     }
 
     return geschrieben
   })
 }
+
+/**
+ * Welche LINA-Endpunkte der Dispatch oben nach `core` transformiert.
+ *
+ * SIE STEHT HIER UND NICHT IM WAECHTER, damit sie neben dem `switch` liegt,
+ * den sie beschreibt. `src/sync/waechter.ts` prüft damit beim Start jedes
+ * Laufs, dass kein AKTIVER Endpunkt im stillen `default:`-Zweig landet.
+ *
+ * Dass die Liste vom `switch` abweicht, fängt `waechter.test.ts` ab: der Test
+ * liest diese Datei und vergleicht die `case`-Zeilen gegen diese Menge. Eine
+ * doppelt gepflegte Liste ohne solchen Abgleich wäre nur eine zweite Stelle,
+ * an der dieselbe Sache falsch stehen kann.
+ */
+export const TRANSFORMIERTE_ENDPUNKTE: ReadonlySet<string> = new Set([
+  'getUmsatzbericht',
+  'getUmsatzbericht:speisen',
+  'getUmsatzbericht:getraenke',
+  'getPersonalkosten',
+  'getKennzahlen:absolut',
+  'getKennzahlen:relativ',
+  'getAktionsbericht',
+  'getZeitzonenbericht',
+  'getVordefinierteZeitzonenBericht',
+  'getArtikelverkaufsbericht',
+  'analyticsFilterOptions',
+  'articleApi:franchise',
+])

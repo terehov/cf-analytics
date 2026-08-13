@@ -695,3 +695,32 @@ ausdrücklich als nicht final, solange niemand gemessen hat, ob sich solche Best
 
 **Priorität 30:** hinter LINAs Tagesdaten (10) und dem Stammdaten-Abgleich (20), klar vor dem
 Backfill (89/90).
+
+## Der Wächter über das Berichtsregister (13.08.2026, Phase 2.5/2.7)
+
+Einen Endpunkt zu aktivieren ist ein Einzeiler: `aktiv: false` wird `aktiv: true`. Ob dahinter
+etwas passiert, hängt an drei weiteren Stellen — und **jede versagt lautlos**. Der Posten
+meldet „ok", die Zieltabelle bleibt leer.
+
+`endpunkteZusichern()` (`src/sync/waechter.ts`) prüft deshalb beim Start jedes Laufs drei
+Zusicherungen und **wirft**, statt zu warnen:
+
+| # | Zusicherung | Was sonst passiert |
+|---|---|---|
+| 1 | Die `schrittweite` hat einen Einreihzweig in `linaNachfuellen()` | `monat` hat keinen. Alle vier `getReport`-Endpunkte tragen ihn — wer einen aktiviert, reiht **null** Posten ein |
+| 2 | Der Endpunkt hat einen Fall im Dispatch von `laden.ts` | der stille `default: break`. Schreibt raw, meldet „ok", transformiert nichts — genau daran ist der Aktionsbericht einmal monatelang vorbeigelaufen |
+| 3 | `ebene: 'betrieb'` braucht einen Producer für `betrieb_enc_id` | **es gibt keinen.** Nachgesehen am 13.08.2026: kein einziger `INSERT` im Repo setzt die Spalte, sie wird nur gelesen. Der Aufruf liefe ohne `storeId` los |
+
+**Warum er wirft und nicht warnt.** Ein Log-WARN liest niemand. Und anders als die Befunde in
+der Datenbank ist das kein Datenzustand, sondern ein Baufehler: er entsteht beim Deploy und
+ist beim Deploy behebbar. Der Aufruf steht in `nachfuellen()` ausdrücklich **vor** und
+**außerhalb** der `try`-Blöcke — alles andere dort darf scheitern, ohne den Lauf zu
+verhindern; hier ist es umgekehrt, weil die Folge genau null Arbeit bei „ok" wäre.
+
+Geprüft wird zweimal: als Test vor dem Deploy (`waechter.test.ts`, mit je einer Verletzung
+je Zusicherung) und zur Laufzeit, falls jemand am Test vorbei deployt.
+
+**`TRANSFORMIERTE_ENDPUNKTE` steht in `laden.ts`, neben dem `switch`, den es beschreibt.**
+Eine doppelt gepflegte Liste ohne Abgleich wäre nur eine zweite Stelle, an der dasselbe falsch
+stehen kann — deshalb liest `waechter.test.ts` die Datei und vergleicht die `case`-Zeilen
+gegen die Menge.

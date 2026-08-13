@@ -2835,3 +2835,27 @@ niemand — zu FoodNotify gibt es keinen Kontakt. Bis dahin gilt es als **nicht*
 gegen nachher sagt, ob sich alte Bestellungen überhaupt noch ändern. Erst danach lässt sich
 entscheiden, ob der lange Schwanz jenseits von 45 Tagen einen Wochentakt braucht oder Ruhe
 hat.
+
+### Drei Wege, einen Endpunkt zu aktivieren, ohne dass etwas passiert
+
+**Symptom.** Keines — bisher. Alle drei sind gestellt und noch nicht ausgelöst, weil die
+betroffenen Endpunkte auf `aktiv: false` stehen.
+
+**Die drei Lücken** (alle am 13.08.2026 am Code nachgesehen):
+
+1. **`linaNachfuellen()` hat keinen Zweig für `schrittweite: 'monat'`.** Es kennt `tag`,
+   `jahr` und Momentaufnahmen. Alle vier `getReport`-Endpunkte tragen `monat`. Wer einen davon
+   auf `aktiv: true` setzt, reiht **null** Posten ein und bekommt keinen Fehler.
+2. **Der Dispatch in `laden.ts` hat einen stillen `default: break`.** Was dort durchrutscht,
+   schreibt raw, meldet „ok" und transformiert nichts.
+3. **`sync.warteschlange.betrieb_enc_id` hat keinen Producer.** Der Worker liest die Spalte,
+   um daraus `storeId` zu setzen (`worker.ts`) — aber **kein einziger `INSERT` im ganzen Repo
+   schreibt sie**. Ein aktivierter Betriebs-Endpunkt liefe ohne `storeId` los, ohne Fehler.
+
+**Warum das zusammengehört.** Es sind drei verschiedene Dateien, aber ein Fehler: das Register
+sagt „aktiv", und der Code drumherum hat davon nichts mitbekommen. Wer nur eine der drei
+Lücken schließt, steht bei der nächsten wieder da.
+
+**Was ihn verhindert.** `endpunkteZusichern()` prüft alle drei beim Start jedes Laufs und
+wirft — mit einer Meldung je Verstoß, nicht nur der ersten. Gegengeprüft: `getReport:97` auf
+`aktiv: true` gesetzt liefert alle drei Meldungen auf einmal. Details in `importer.md`.

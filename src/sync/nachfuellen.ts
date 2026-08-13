@@ -25,6 +25,7 @@ import { config, fnZugaenge } from '../config'
 import { log } from '../lib/log'
 import { AKTIVE_ENDPUNKTE, istMomentaufnahme, einreihPrioritaet } from '../lina/endpunkte'
 import { geschaeftstag } from '../lib/time'
+import { endpunkteZusichern } from './waechter'
 
 export type NachfuellStand = {
   lina: number; foodnotify: number; ladenakte: number
@@ -737,6 +738,22 @@ export async function aufgegebeneWiederbeleben(): Promise<number> {
 }
 
 export async function nachfuellen(): Promise<NachfuellStand> {
+  /**
+   * ZUERST DER WÄCHTER, UND AUSDRÜCKLICH OHNE `try`.
+   *
+   * Alles darunter fängt seine Fehler ab, weil ein Fehler beim Nachfüllen den
+   * Lauf nicht verhindern soll — die Warteschlange enthält in aller Regel noch
+   * Arbeit. Hier ist es umgekehrt: ein Endpunkt ohne Einreihzweig, ohne
+   * Dispatch-Fall oder ohne Producer für seinen Schlüssel liefert genau NULL
+   * Arbeit und meldet dabei „ok". Ein Lauf, der so etwas verschweigt, ist
+   * schlimmer als ein Lauf, der abbricht: der Abbruch steht in
+   * `mart.sync_status` und in `/status`, die stille Lücke nirgends.
+   *
+   * Der Fehler ist ausserdem deterministisch — er hängt am Code, nicht an der
+   * Gegenstelle. Er tritt beim ersten Lauf nach dem Deploy auf oder nie.
+   */
+  endpunkteZusichern()
+
   const stand: NachfuellStand = { lina: 0, foodnotify: 0, ladenakte: 0, wiederbelebt: 0 }
 
   try {
