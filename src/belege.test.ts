@@ -7,9 +7,11 @@
  * der teuerste Fehler des Projekts) und die Dateinamen (ein Zeichen zu viel,
  * und der Abzug bricht beim 1.400. Beleg ab).
  */
-import { describe, expect, test } from 'bun:test'
+import { afterAll, describe, expect, test } from 'bun:test'
+import { rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { deflateSync } from 'node:zlib'
-import { erechnungXml, dateiname, ablage, nurLesend, type Beleg } from './belege'
+import { erechnungXml, dateiname, ablage, manifestOeffnen, nurLesend, type Beleg } from './belege'
 import { pfadPruefen, VerbotenerPfad } from './ladenakte/endpunkte'
 
 /** Ein PDF-Gerüst mit einem Strom darin — mehr braucht der Sucher nicht. */
@@ -97,6 +99,40 @@ describe('Ablage', () => {
 
   test('Ordner trennt nach Belegart und Betrieb', () => {
     expect(ablage('/belege', b)).toBe('/belege/eingangsrechnungen_und_avise/62')
+  })
+})
+
+describe('Manifest', () => {
+  const wurzel = `${tmpdir()}/belege-test-${process.pid}`
+
+  afterAll(async () => { await rm(wurzel, { recursive: true, force: true }) })
+
+  /*
+   * Der Fehler vom 13.08.2026: der Abzug meldete sich an, öffnete das Manifest
+   * und starb an ENOENT, weil ./belege noch nicht existierte. Zwischen
+   * Anmeldung und Abbruch lag nichts — teuer ist daran nicht die Sekunde,
+   * sondern die Anmeldung, von der es nur eine gibt.
+   */
+  test('legt ein fehlendes Zielverzeichnis an', async () => {
+    const ziel = `${wurzel}/noch/nicht/da`
+    const strom = await manifestOeffnen(ziel)
+    await new Promise<void>(f => strom.end(f))
+    expect(await Bun.file(`${ziel}/manifest.jsonl`).exists()).toBe(true)
+  })
+
+  /*
+   * Fortsetzbarkeit ist nur halb da, wenn die Dateien bleiben und ihre
+   * Kopfdaten verschwinden. Ein zweiter Lauf hängt an.
+   */
+  test('hängt an, statt den vorigen Lauf zu überschreiben', async () => {
+    const ziel = `${wurzel}/zweimal`
+    for (const lauf of [1, 2]) {
+      const strom = await manifestOeffnen(ziel)
+      strom.write(`{"lauf":${lauf}}\n`)
+      await new Promise<void>(f => strom.end(f))
+    }
+    const zeilen = (await Bun.file(`${ziel}/manifest.jsonl`).text()).trim().split('\n')
+    expect(zeilen).toEqual(['{"lauf":1}', '{"lauf":2}'])
   })
 })
 

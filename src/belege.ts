@@ -54,11 +54,13 @@
  *   BELEGE_MAX=2000                      # harte Obergrenze an Dateien für diesen Lauf
  *   TAKT_MIN_MS=2000 TAKT_MAX_MS=5000    # beaufsichtigt schneller
  */
+import { createWriteStream } from 'node:fs'
+import { mkdir } from 'node:fs/promises'
 import { inflateRawSync, inflateSync } from 'node:zlib'
 import { config } from './config'
 import { log } from './lib/log'
 import { BAUM, ORDNERSEITE, pfadPruefen } from './ladenakte/endpunkte'
-import { belegToken, KeinBelegarchiv, cacheLeeren, type Holer } from './ladenakte/token'
+import { belegToken, KeinBelegarchiv, cacheLeeren, verwerfen, type Holer } from './ladenakte/token'
 import { LinaSession } from './lina/auth'
 import type { Endpunkt } from './lina/endpunkte'
 
@@ -313,75 +315,145 @@ function holerAus(sitzung: LinaSession): Holer {
   }
 }
 
+/**
+ * Das Manifest öffnen — zwei Dinge, die beide schon einmal schiefgingen.
+ *
+ * DAS VERZEICHNIS MUSS DASTEHEN, BEVOR DER STROM AUFGEHT. `Bun.write()` legt
+ * fehlende Ordner selbst an, ein Schreibstrom nicht — er scheitert mit einem
+ * ENOENT auf einen leeren Pfad, das wie ein Fehler im Code aussieht und keiner
+ * im Dateisystem ist. Genau daran ist der erste Abzug am 13.08.2026 gestorben,
+ * nach der Anmeldung und vor der ersten Datei.
+ *
+ * ANGEHÄNGT, NICHT ÜBERSCHRIEBEN. Der Abzug ist fortsetzbar: fertige PDFs
+ * werden übersprungen. Ein Strom im Normalmodus setzte das Manifest beim
+ * zweiten Start auf null — die Dateien lägen dann auf der Platte, ihre
+ * Kopfdaten aber nicht mehr daneben. Und genau die sind der Grund, warum der
+ * Korpus mehr ist als ein Haufen PDFs.
+ */
+export async function manifestOeffnen(ziel: string) {
+  await mkdir(ziel, { recursive: true })
+  return createWriteStream(`${ziel}/manifest.jsonl`, { flags: 'a' })
+}
+
 export async function ziehen(belege: Beleg[], ziel: string, grenze: number): Promise<void> {
   const sitzung = new LinaSession()
   await sitzung.anmelden()
   cacheLeeren()
   const holer = holerAus(sitzung)
 
-  const manifest = Bun.file(`${ziel}/manifest.jsonl`).writer()
+  const manifest = await manifestOeffnen(ziel)
   let geladen = 0, uebersprungen = 0, mitXml = 0, fehler = 0
   const ohneArchiv = new Set<number>()
+
+  /**
+   * Ein einzelner Aussetzer darf einen Lauf über zwei Stunden nicht beenden —
+   * eine Serie von Aussetzern muss es. Ein abgelaufener Token, ein Timeout,
+   * eine HTML-Seite statt eines PDF: das kommt vor, kostet einen Beleg und ist
+   * beim nächsten Start nachholbar, weil fertige Dateien übersprungen werden.
+   *
+   * Zehn hintereinander sind etwas anderes. Dann stimmt etwas Grundsätzliches
+   * nicht — Sitzung tot, Zugang gesperrt, LINA weg — und Weitermachen hiesse,
+   * 1.500-mal gegen dieselbe Wand zu laufen. Bei genau einem Zugang ist das der
+   * teuerste Fehler, den dieser Code machen kann (AGENTS.md Regel 7).
+   */
+  const SERIE_BIS_ABBRUCH = 10
+  let serie = 0
 
   try {
     for (const b of belege) {
       if (geladen >= grenze) { log.info('belege: Obergrenze erreicht', { grenze }); break }
+      if (serie >= SERIE_BIS_ABBRUCH) {
+        log.error('belege: Abbruch — zu viele Fehlschlaege hintereinander', { serie, geladen })
+        break
+      }
       if (ohneArchiv.has(b.lina_betrieb_id)) { uebersprungen++; continue }
 
       const ordner = ablage(ziel, b)
       const pfad = `${ordner}/${dateiname(b)}`
       if (await Bun.file(pfad).exists()) { uebersprungen++; continue }
 
-      let token: string
       try {
-        token = await belegToken(holer, String(b.lina_betrieb_id))
+        let token: string
+        try {
+          token = await belegToken(holer, String(b.lina_betrieb_id))
+        } catch (e) {
+          if (e instanceof KeinBelegarchiv) { ohneArchiv.add(b.lina_betrieb_id); uebersprungen++; continue }
+          throw e
+        }
+
+        pfadPruefen(GET_BELEG)
+        await schlaf(takt())
+        const url = `${config.LINA_BASE_URL}${GET_BELEG}?`
+          + new URLSearchParams({ admin: '1', storeId: token, id: b.encrypted_id })
+        const res = await fetch(url, {
+          headers: sitzung.header({ referer: `${config.LINA_BASE_URL}/intranet/ladenakte` }),
+          redirect: 'manual',
+          signal: AbortSignal.timeout(config.ANFRAGE_TIMEOUT_MS),
+        })
+
+        /**
+         * 429 heisst „zu schnell", 403 heisst „nicht mehr". Beides ist eine
+         * Aussage über den Zugang und nicht über diesen Beleg — als Fehlschlag
+         * unter anderen durchzulaufen und in vier Sekunden wiederzukommen wäre
+         * genau die falsche Antwort. Sofort Schluss, ohne Serie abzuwarten.
+         */
+        if (res.status === 429 || res.status === 403) {
+          throw new Error(`LINA hat gesperrt (HTTP ${res.status}) — Lauf beendet, `
+            + `${geladen} Dateien liegen bereits im Ziel und werden beim naechsten Start uebersprungen`)
+        }
+
+        const bytes = Buffer.from(await res.arrayBuffer())
+
+        /**
+         * Eine HTML-Fehlerseite mit HTTP 200 ist der Normalfall bei LINA, wenn
+         * etwas nicht stimmt. Als `.pdf` gespeichert wäre sie im Korpus ein
+         * stiller Blindgänger — der PIM-Pipeline fiele sie erst beim Parsen auf.
+         */
+        if (!res.ok || bytes.length < 5 || bytes.subarray(0, 5).toString('latin1') !== '%PDF-') {
+          fehler++
+          serie++
+          /*
+           * Der Token gilt 90 s und deckt alle Ordner eines Betriebs ab. Ist er
+           * abgelaufen, antwortet LINA mit einer Seite statt einer Datei —
+           * dann hilft ein frischer, und der naechste Beleg desselben Betriebs
+           * kommt durch.
+           */
+          verwerfen('beleg', String(b.lina_betrieb_id))
+          log.warn('belege: keine PDF-Antwort', {
+            lina_id: b.lina_id, betrieb: b.lina_betrieb_id, status: res.status, bytes: bytes.length,
+          })
+          continue
+        }
+
+        await Bun.write(pfad, bytes)
+        const xml = erechnungXml(bytes)
+        if (xml) { await Bun.write(pfad.replace(/\.pdf$/, '.xml'), xml); mitXml++ }
+        geladen++
+        serie = 0
+
+        manifest.write(JSON.stringify({
+          ...b,
+          datei: pfad.slice(ziel.length + 1),
+          bytes: bytes.length,
+          erechnung_xml: xml ? pfad.replace(/\.pdf$/, '.xml').slice(ziel.length + 1) : null,
+        }) + '\n')
       } catch (e) {
-        if (e instanceof KeinBelegarchiv) { ohneArchiv.add(b.lina_betrieb_id); uebersprungen++; continue }
-        throw e
-      }
-
-      pfadPruefen(GET_BELEG)
-      await schlaf(takt())
-      const url = `${config.LINA_BASE_URL}${GET_BELEG}?`
-        + new URLSearchParams({ admin: '1', storeId: token, id: b.encrypted_id })
-      const res = await fetch(url, {
-        headers: sitzung.header({ referer: `${config.LINA_BASE_URL}/intranet/ladenakte` }),
-        redirect: 'manual',
-        signal: AbortSignal.timeout(config.ANFRAGE_TIMEOUT_MS),
-      })
-      const bytes = Buffer.from(await res.arrayBuffer())
-
-      /**
-       * Eine HTML-Fehlerseite mit HTTP 200 ist der Normalfall bei LINA, wenn
-       * etwas nicht stimmt. Als `.pdf` gespeichert wäre sie im Korpus ein
-       * stiller Blindgänger — der PIM-Pipeline fiele sie erst beim Parsen auf.
-       */
-      if (!res.ok || bytes.length < 5 || Buffer.from(bytes.subarray(0, 5)).toString('latin1') !== '%PDF-') {
+        if (e instanceof Error && e.message.startsWith('LINA hat gesperrt')) throw e
         fehler++
-        log.warn('belege: keine PDF-Antwort', {
-          lina_id: b.lina_id, betrieb: b.lina_betrieb_id, status: res.status, bytes: bytes.length,
+        serie++
+        verwerfen('beleg', String(b.lina_betrieb_id))
+        log.warn('belege: Beleg uebersprungen', {
+          lina_id: b.lina_id, betrieb: b.lina_betrieb_id, fehler: String(e), serie,
         })
         continue
       }
-
-      await Bun.write(pfad, bytes)
-      const xml = erechnungXml(bytes)
-      if (xml) { await Bun.write(pfad.replace(/\.pdf$/, '.xml'), xml); mitXml++ }
-      geladen++
-
-      manifest.write(JSON.stringify({
-        ...b,
-        datei: pfad.slice(ziel.length + 1),
-        bytes: bytes.length,
-        erechnung_xml: xml ? pfad.replace(/\.pdf$/, '.xml').slice(ziel.length + 1) : null,
-      }) + '\n')
 
       if (geladen % 25 === 0) {
         log.info('belege: Fortschritt', { geladen, uebersprungen, mitXml, fehler, von: belege.length })
       }
     }
   } finally {
-    await manifest.end()
+    await new Promise<void>(fertig => manifest.end(fertig))
   }
 
   log.info('belege: fertig', { geladen, uebersprungen, mitXml, fehler, ziel })
