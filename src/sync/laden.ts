@@ -174,9 +174,25 @@ export async function laden(k: Kontext): Promise<number> {
     // auch in TRANSFORMIERTE_ENDPUNKTE ganz unten. Der Test dazu liest diese
     // Datei und vergleicht beides — die Liste kann also nicht davonlaufen.
     switch (k.ep.key) {
+      /*
+       * Die zehn Umsatzberichte — einer ohne Filter (die Gesamtzeile) und
+       * neun je Hauptsparte. Sie teilen sich einen Fall, weil sie sich nur
+       * im Query-Parameter unterscheiden: `hauptsparten` steht im Posten,
+       * und die Zuordnung darunter schlägt daraus die `hauptsparte_key`
+       * nach. Ein neuer Spartenendpunkt ist damit ein Registereintrag und
+       * eine `case`-Zeile, kein Codeumbau (0077).
+       */
       case 'getUmsatzbericht':
       case 'getUmsatzbericht:speisen':
-      case 'getUmsatzbericht:getraenke': {
+      case 'getUmsatzbericht:getraenke':
+      case 'getUmsatzbericht:gutscheine':
+      case 'getUmsatzbericht:sonstiges':
+      case 'getUmsatzbericht:sv_getraenke':
+      case 'getUmsatzbericht:sv_speisen':
+      case 'getUmsatzbericht:lieferkosten':
+      case 'getUmsatzbericht:pfand':
+      case 'getUmsatzbericht:trinkgeld':
+      case 'getUmsatzbericht:gutschein_95': {
         const posId = k.parameter.hauptsparten ? Number(k.parameter.hauptsparten) : null
         let hsKey: number | null = null
         if (posId !== null) {
@@ -795,6 +811,14 @@ export const TRANSFORMIERTE_ENDPUNKTE: ReadonlySet<string> = new Set([
   'getUmsatzbericht',
   'getUmsatzbericht:speisen',
   'getUmsatzbericht:getraenke',
+  'getUmsatzbericht:gutscheine',
+  'getUmsatzbericht:sonstiges',
+  'getUmsatzbericht:sv_getraenke',
+  'getUmsatzbericht:sv_speisen',
+  'getUmsatzbericht:lieferkosten',
+  'getUmsatzbericht:pfand',
+  'getUmsatzbericht:trinkgeld',
+  'getUmsatzbericht:gutschein_95',
   'getPersonalkosten',
   'getKennzahlen:absolut',
   'getKennzahlen:relativ',

@@ -2930,3 +2930,50 @@ jedem Ausgang fort: Erfolg, `keine_daten`, Wiedervorlage, Aufgeben. `pausiert_bi
 genau die Wiedervorlage, die der Worker gerade gesetzt hat — die Selbstdrosselung sitzt seit
 langem als `faellig_ab` am Posten und nicht als Pause an der Kombination. Ein Ende-zu-Ende-Test
 prüft nach einem echten Lauf, dass alle sechs Endpunkte dastehen.
+
+### Der Schwund rechnete mit dem, was er selbst unplausibel nennt
+
+**Symptom.** `mart.inventur_schwund` wies für den Februar 2026 **minus 2,97 Mio €**
+aus — aus einer einzigen Zeile.
+
+**Ursache.** `mart.inventurposition` kennzeichnet seit Migration `0062` jede
+Position über 50.000 € als `unplausibel`. `mart.inventur_schwund` liest dieselbe
+Basistabelle, hat das Kennzeichen aber nie ausgewertet. Am 14.08.2026 in
+Produktion: **123 von 82.126 Positionen**, verteilt auf 53 Inventuren.
+
+**Die allgemeine Form:** eine Kennzeichnung, die nur eine von zwei Sichten
+kennt, ist keine. Sie beruhigt an der einen Stelle und wirkt an der anderen
+weiter.
+
+**Was ihn verhindert.** Seit `0077` filtert `mart.inventur_schwund` genauso —
+und nennt in `positionen_unplausibel` und `wert_unplausibel`, was dabei
+herausfiel. Ein Ende-zu-Ende-Test baut den Fall nach: zwei normale Positionen
+(1.100 € Soll, 100 € Schwund) und eine über 3 Mio €; erwartet werden 1.100 und
+100, nicht 3.001.100.
+
+### Ein Beleg aus 2038 machte vier Frischeangaben unbrauchbar
+
+**Symptom.** `max(monat)` stand in `mart.einkauf_kreditor_monat`,
+`mart.fremdeinkauf`, `mart.buchungsbeleg_monat` und
+`mart.wareneinsatz_beleg_monat` auf **2038-01**. 20 Lieferanten trugen ein
+Zukunftsdatum als „letzter Beleg".
+
+**Ursache.** 13 von 605.835 Belegen tragen ein Belegdatum, das mehr als ein Jahr
+NACH ihrem eigenen Hochladedatum liegt — vier davon auf 2038-01-19, hochgeladen
+2025. Ein Erfassungsfehler in LINA, und dorthin reicht niemand von uns.
+
+**Was ihn verhindert.** `belegDatum()` in `src/ladenakte/laden.ts` setzt
+`beleg_datum` in diesem Fall auf NULL und hebt den Rohwert nach
+`beleg_datum_roh` — dieselbe Behandlung wie bei unglaubhaften Beträgen (`0058`).
+Alle vier Sichten filtern ohnehin auf `beleg_datum IS NOT NULL`; die Zeilen
+fallen also von selbst heraus, ohne dass eine Sicht geändert werden musste.
+
+**Die Grenze hängt am Upload und nicht an einer Jahreszahl.** Eine feste
+Schranke („nach 2030 ist falsch") veraltet still und wird irgendwann selbst zum
+Fehler. Ein Jahr Toleranz, weil Voraus- und Dauerrechnungen regulär in der
+Zukunft liegen: 39 Belege liegen mehr als 30 Tage voraus, aber nur 13 mehr als
+ein Jahr. Rückwärts wird nicht gefiltert — 6.802 Belege datieren mehr als zehn
+Jahre vor ihrem Upload, das sind nachgereichte Altbelege.
+
+**Und was verworfen wird, bleibt lesbar:** `mart.belegdatum_ausreisser`. Eine
+Bereinigung ohne eigene Anzeige wäre derselbe stille Zweig wie der Fehler davor.

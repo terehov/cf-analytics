@@ -61,6 +61,30 @@ export const QUELLEN: readonly Quelle[] = [
     system: 'lina', endpunkt: 'getUmsatzbericht:speisen', kadenz_stunden: TAEGLICH },
   { quelle: 'getUmsatzbericht:getraenke', bezeichnung: 'Umsatz Hauptsparte Getraenke',
     system: 'lina', endpunkt: 'getUmsatzbericht:getraenke', kadenz_stunden: TAEGLICH },
+  /*
+   * Die acht uebrigen Hauptsparten (0077). Sie sind der einzige Fall im
+   * Register, in dem eine Quelle legitim NULL Zeilen liefern kann, ohne dass
+   * etwas kaputt ist: ob LINA eine Sparte ueberhaupt bebucht, wissen wir
+   * nicht. Deshalb eine Woche Kadenz und nicht 36 Stunden — bleibt eine
+   * Sparte laenger still, ist das eine Aussage ueber das Geschaeft und keine
+   * ueber den Importer, und `mart.hauptsparte_abdeckung` sagt, was fehlt.
+   */
+  { quelle: 'getUmsatzbericht:gutscheine', bezeichnung: 'Umsatz Hauptsparte Gutscheine',
+    system: 'lina', endpunkt: 'getUmsatzbericht:gutscheine', kadenz_stunden: WOECHENTLICH },
+  { quelle: 'getUmsatzbericht:sonstiges', bezeichnung: 'Umsatz Hauptsparte Sonstiges',
+    system: 'lina', endpunkt: 'getUmsatzbericht:sonstiges', kadenz_stunden: WOECHENTLICH },
+  { quelle: 'getUmsatzbericht:sv_getraenke', bezeichnung: 'Umsatz Strassenverkauf Getraenke',
+    system: 'lina', endpunkt: 'getUmsatzbericht:sv_getraenke', kadenz_stunden: WOECHENTLICH },
+  { quelle: 'getUmsatzbericht:sv_speisen', bezeichnung: 'Umsatz Strassenverkauf Speisen',
+    system: 'lina', endpunkt: 'getUmsatzbericht:sv_speisen', kadenz_stunden: WOECHENTLICH },
+  { quelle: 'getUmsatzbericht:lieferkosten', bezeichnung: 'Umsatz Hauptsparte Lieferkosten',
+    system: 'lina', endpunkt: 'getUmsatzbericht:lieferkosten', kadenz_stunden: WOECHENTLICH },
+  { quelle: 'getUmsatzbericht:pfand', bezeichnung: 'Umsatz Hauptsparte Pfand',
+    system: 'lina', endpunkt: 'getUmsatzbericht:pfand', kadenz_stunden: WOECHENTLICH },
+  { quelle: 'getUmsatzbericht:trinkgeld', bezeichnung: 'Umsatz Hauptsparte Trinkgeld',
+    system: 'lina', endpunkt: 'getUmsatzbericht:trinkgeld', kadenz_stunden: WOECHENTLICH },
+  { quelle: 'getUmsatzbericht:gutschein_95', bezeichnung: 'Umsatz Hauptsparte Gutschein (95)',
+    system: 'lina', endpunkt: 'getUmsatzbericht:gutschein_95', kadenz_stunden: WOECHENTLICH },
   { quelle: 'getPersonalkosten', bezeichnung: 'Personalkosten je Betrieb und Tag',
     system: 'lina', endpunkt: 'getPersonalkosten', kadenz_stunden: TAEGLICH },
   { quelle: 'getZeitzonenbericht', bezeichnung: 'Umsatz je Stunde',

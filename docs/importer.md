@@ -871,3 +871,27 @@ behält seinen Grund — die erste Ursache ist die wichtigere.
 * **Drei `core`-Tabellen haben null Zeilen und keinen Schreiber**:
   `core.rezept`, `core.pos_artikel`, `core.ware_stand`. Sie stehen im Register
   als `erwartet: false` mit Begründung — siehe `offene-punkte.md`.
+
+## Zehn Umsatzberichte statt zwei (Migration `0077`, 14.08.2026)
+
+`getUmsatzbericht` wird jetzt zehnmal geholt: einmal ohne Filter (die
+Gesamtzeile) und neunmal je Hauptsparte. Der Unterschied ist ein einziges
+Query-Feld (`hauptsparten`), und der Loader schlägt daraus die `hauptsparte_key`
+nach — alle zehn teilen sich deshalb einen `case`.
+
+**`hauptsparten` erwartet die `posId`, NICHT die `nummer`.** Mit der `nummer`
+kommt kommentarlos 0 €. Das steht seit dem 26.07.2026 am Eintrag für Speisen und
+gilt für alle. Drei der zehn Sparten tragen zweistellige `posId` (92 Pfand,
+94 Trinkgeld, 95 Gutschein) — ein älterer Nummernkreis, aber ebenfalls `posId`.
+
+**Aufrufe:** acht zusätzliche Endpunkte × 10 Nachzügler-Tage = 80 am Tag.
+
+```
+vorher       6 × 10 + 2 × 21 (Personal, Artikel) + 2 BWA-Jahre    ~104
+Sparten      8 × 10                                                +80
+                                                       ~184 von 10.500
+```
+
+Ein neuer Spartenendpunkt ist damit ein Registereintrag, eine `case`-Zeile, ein
+Schema-Eintrag und eine Zeile im Quellenregister — der Wächter
+(`waechter.test.ts`) lässt keinen davon weg.

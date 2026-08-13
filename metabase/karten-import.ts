@@ -512,6 +512,47 @@ SELECT fn_name        AS "Restaurant (FoodNotify)",
   FROM manual.betrieb_zuordnung_offen
  ORDER BY bestellungen DESC NULLS LAST`,
   },
+  /*
+   * DIE BEIDEN KARTEN ZU 0077. Beide zeigen etwas, das aus einer Summe
+   * HERAUSGERECHNET wurde — und genau deshalb gibt es sie: eine
+   * Bereinigung ohne eigene Anzeige ist derselbe stille Zweig wie der
+   * Fehler davor.
+   */
+  {
+    schluessel: 'dq_sparten',
+    name: 'Wie viel Umsatz laesst sich auf Sparten aufteilen?',
+    beschreibung:
+      'Der Umsatz wird zweimal geholt: einmal als Gesamtzeile und einmal je Hauptsparte (Speisen, Getränke, Pfand, Trinkgeld, Straßenverkauf, Gutscheine, Lieferkosten, Sonstiges). Die Differenz ist der Umsatz, der sich keiner Sparte zuordnen lässt. Bis zum 14.08.2026 wurden nur zwei der zehn Sparten geholt, und 31,8 % blieben übrig. Ein kleiner Rest ist normal — LINA führt zehn Sparten, und ob jede davon bebucht wird, ist eine Frage an den Fachbereich.',
+    anzeige: 'table',
+    sql: `
+SELECT monat                AS "Monat",
+       umsatz_gesamt        AS "Umsatz gesamt",
+       umsatz_sparten       AS "davon auf Sparten",
+       nicht_aufteilbar     AS "nicht aufteilbar",
+       nicht_aufteilbar_pct AS "nicht aufteilbar %",
+       sparten_mit_umsatz   AS "Sparten mit Umsatz",
+       sparten_bekannt      AS "Sparten bekannt"
+  FROM mart.hauptsparte_abdeckung
+ ORDER BY monat DESC
+ LIMIT 24`,
+  },
+  {
+    schluessel: 'dq_belegdatum',
+    name: 'Belege mit unmoeglichem Datum',
+    beschreibung:
+      'Belege, deren Belegdatum mehr als ein Jahr NACH ihrem eigenen Upload liegt — bis 2038. Sie stehen in keiner Monatsauswertung mehr, weil ein einziger davon „letzter Beleg" auf 2038 setzt und damit jede Frischeangabe unbrauchbar macht. Hier stehen sie trotzdem: was verworfen wird, muss nachlesbar bleiben. Die Zahl soll konstant bleiben; wächst sie, liefert LINA neue Ausreißer.',
+    anzeige: 'table',
+    sql: `
+SELECT betrieb              AS "Betrieb",
+       ordner               AS "Ordner",
+       belegdatum_laut_lina AS "Belegdatum laut LINA",
+       hochgeladen_am       AS "Hochgeladen",
+       tage_voraus          AS "Tage voraus",
+       lieferant            AS "Lieferant",
+       re_nummer            AS "Rechnungsnummer",
+       netto                AS "Netto"
+  FROM mart.belegdatum_ausreisser`,
+  },
   {
     schluessel: 'dq_unplausibel',
     name: 'Unplausible BWA-Quoten',

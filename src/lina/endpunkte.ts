@@ -218,6 +218,125 @@ export const ENDPUNKTE: Endpunkt[] = [
       report: 'intranet-umsatz', ...konzernZeitraum(von, bis), hauptsparten: '10002',
     }),
   },
+  /*
+   * DIE ACHT ÜBRIGEN HAUPTSPARTEN (Plan 5.1, Entscheidung 4, 14.08.2026).
+   *
+   * Die Frage des Plans lautete: „ist der Spartenfilter ein Parameter, den wir
+   * einfach mit weiteren posId aufrufen können — dann ist die Reparatur klein."
+   * Die Antwort stand seit dem 26.07.2026 im Register selbst: die beiden
+   * Einträge darüber unterscheiden sich von `getUmsatzbericht` durch genau
+   * einen Query-Parameter, und `src/sync/laden.ts` schlägt daraus schon heute
+   * generisch die `hauptsparte_key` nach. Es fehlten acht Zeilen.
+   *
+   * WAS DAS EINBRINGT. Gemessen an den letzten 30 Tagen (14.08.2026):
+   * 9.002.801,71 € Gesamtumsatz, davon Speisen 3.504.469,69 und Getränke
+   * 2.634.893,62 — **2.863.438,40 € oder 31,8 % standen nur in der
+   * Gesamtzeile** und waren nicht aufteilbar. Ob es danach null ist, sagt
+   * `mart.hauptsparte_abdeckung`; ein Rest kann echt sein, denn ob LINA jede
+   * der zehn Sparten bebucht, ist eine Frage an den Fachbereich.
+   *
+   * WAS ES KOSTET. Acht Endpunkte × 10 Nachzügler-Tage = 80 Aufrufe am Tag.
+   * Das LINA-Tagesbudget ist 10.500, verbraucht wurden bis hierher rund 104.
+   *
+   * `hauptsparten` ERWARTET DIE posId, NICHT DIE nummer — mit der nummer
+   * kommt kommentarlos 0 €. Das steht seit dem 26.07.2026 am Eintrag für
+   * Speisen und gilt hier genauso; die posId ist die Zahl aus
+   * `core.hauptsparte.pos_id`.
+   */
+  {
+    key: 'getUmsatzbericht:gutscheine',
+    ebene: 'konzern',
+    pfad: '/intranet/analytics/getUmsatzbericht',
+    schrittweite: 'tag',
+    zweck: 'Umsatz nur Hauptsparte Gutscheine (posId 10003)',
+    aktiv: true,
+    hinweis: 'LINA fuehrt ZWEI Gutschein-Sparten: 10003 "Gutscheine" (nummer 3) und '
+           + '95 "Gutschein" (nummer 57). Welche bebucht wird, ist offen — deshalb beide.',
+    parameter: (von, bis) => ({
+      report: 'intranet-umsatz', ...konzernZeitraum(von, bis), hauptsparten: '10003',
+    }),
+  },
+  {
+    key: 'getUmsatzbericht:sonstiges',
+    ebene: 'konzern',
+    pfad: '/intranet/analytics/getUmsatzbericht',
+    schrittweite: 'tag',
+    zweck: 'Umsatz nur Hauptsparte Sonstiges / Divers (posId 10004)',
+    aktiv: true,
+    parameter: (von, bis) => ({
+      report: 'intranet-umsatz', ...konzernZeitraum(von, bis), hauptsparten: '10004',
+    }),
+  },
+  {
+    key: 'getUmsatzbericht:sv_getraenke',
+    ebene: 'konzern',
+    pfad: '/intranet/analytics/getUmsatzbericht',
+    schrittweite: 'tag',
+    zweck: 'Umsatz nur Hauptsparte Straßenverkauf Getränke (posId 10006)',
+    aktiv: true,
+    parameter: (von, bis) => ({
+      report: 'intranet-umsatz', ...konzernZeitraum(von, bis), hauptsparten: '10006',
+    }),
+  },
+  {
+    key: 'getUmsatzbericht:sv_speisen',
+    ebene: 'konzern',
+    pfad: '/intranet/analytics/getUmsatzbericht',
+    schrittweite: 'tag',
+    zweck: 'Umsatz nur Hauptsparte Straßenverkauf Speisen (posId 10007)',
+    aktiv: true,
+    parameter: (von, bis) => ({
+      report: 'intranet-umsatz', ...konzernZeitraum(von, bis), hauptsparten: '10007',
+    }),
+  },
+  {
+    key: 'getUmsatzbericht:lieferkosten',
+    ebene: 'konzern',
+    pfad: '/intranet/analytics/getUmsatzbericht',
+    schrittweite: 'tag',
+    zweck: 'Umsatz nur Hauptsparte Lieferkosten (posId 10008)',
+    aktiv: true,
+    parameter: (von, bis) => ({
+      report: 'intranet-umsatz', ...konzernZeitraum(von, bis), hauptsparten: '10008',
+    }),
+  },
+  {
+    key: 'getUmsatzbericht:pfand',
+    ebene: 'konzern',
+    pfad: '/intranet/analytics/getUmsatzbericht',
+    schrittweite: 'tag',
+    zweck: 'Umsatz nur Hauptsparte Pfand (posId 92)',
+    aktiv: true,
+    hinweis: 'Zweistellige posId — die drei Sparten 92, 94 und 95 stammen aus einem '
+           + 'aelteren Nummernkreis als die 100xx. Beides sind posId, nicht nummer.',
+    parameter: (von, bis) => ({
+      report: 'intranet-umsatz', ...konzernZeitraum(von, bis), hauptsparten: '92',
+    }),
+  },
+  {
+    key: 'getUmsatzbericht:trinkgeld',
+    ebene: 'konzern',
+    pfad: '/intranet/analytics/getUmsatzbericht',
+    schrittweite: 'tag',
+    zweck: 'Umsatz nur Hauptsparte Trinkgeld (posId 94)',
+    aktiv: true,
+    parameter: (von, bis) => ({
+      report: 'intranet-umsatz', ...konzernZeitraum(von, bis), hauptsparten: '94',
+    }),
+  },
+  {
+    key: 'getUmsatzbericht:gutschein_95',
+    ebene: 'konzern',
+    pfad: '/intranet/analytics/getUmsatzbericht',
+    schrittweite: 'tag',
+    zweck: 'Umsatz nur Hauptsparte Gutschein (posId 95)',
+    aktiv: true,
+    hinweis: 'Die zweite Gutschein-Sparte, siehe getUmsatzbericht:gutscheine. Beide '
+           + 'zu holen ist billiger, als zu raten, welche gemeint ist.',
+    parameter: (von, bis) => ({
+      report: 'intranet-umsatz', ...konzernZeitraum(von, bis), hauptsparten: '95',
+    }),
+  },
   {
     key: 'getPersonalkosten',
     ebene: 'konzern',

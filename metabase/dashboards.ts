@@ -1588,6 +1588,14 @@ export const dashboards: Dashboard[] = [
       { teile: [{ karte: 'dq_datenstand', hoehe: 12, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ karte: 'dq_ohne_bruecke' }] },
       { teile: [{ karte: 'dq_zuordnung_offen', hoehe: 9 }] },
+
+      /*
+       * Beide seit 0077. Sie gehoeren zusammen, weil sie dieselbe Frage
+       * stellen: was faellt aus den Summen heraus, und wissen wir davon?
+       */
+      { teile: [{ text: '## Was aus den Summen herausfaellt\n\nBeides ist bewusst herausgerechnet — und steht deshalb hier. Eine Bereinigung ohne eigene Anzeige ist derselbe stille Zweig wie der Fehler davor.' }] },
+      { teile: [{ karte: 'dq_sparten', hoehe: 10 }] },
+      { teile: [{ karte: 'dq_belegdatum', hoehe: 8 }] },
       { teile: [{ karte: 'dq_gaeste', hoehe: 10,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       // Volle Breite: die Spalte mit den Beispielnamen ist der Zweck der

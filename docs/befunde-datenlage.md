@@ -1608,3 +1608,42 @@ man hingesehen hat.
 Daneben, aus demselben Abzug: **47 Bestellungen haben einen Kopf und keine einzige Position**
 (Wilma Wunder 20, Deutsche Konzepte 18, Enchilada 5, Aposto 4), verteilt über 26 Monate. Der
 Plan nannte 46; die Differenz ist der laufende Zulauf, nicht ein Widerspruch.
+
+## Ein Drittel des Umsatzes war nicht aufteilbar (14.08.2026)
+
+Gemessen über die letzten 30 Tage, in Produktion:
+
+| | € |
+|---|---|
+| Gesamtumsatz (`getUmsatzbericht` ohne Filter) | 9.002.801,71 |
+| davon Speisen (`posId` 10001) | 3.504.469,69 |
+| davon Getränke (10002) | 2.634.893,62 |
+| **nicht aufteilbar** | **2.863.438,40 (31,8 %)** |
+
+`core.hauptsparte` führt **zehn** Sparten; geholt wurden zwei. Die übrigen acht
+sind Gutscheine (10003), Sonstiges (10004), Straßenverkauf Getränke und Speisen
+(10006/10007), Lieferkosten (10008), Pfand (92), Trinkgeld (94) und eine zweite
+Gutschein-Sparte (95).
+
+**Die Frage des Plans war, ob der Spartenfilter ein Parameter ist** — dann sei
+die Reparatur klein. Sie war klein: `getUmsatzbericht:speisen` unterscheidet
+sich von `getUmsatzbericht` durch genau einen Query-Parameter, und der Loader
+schlägt daraus schon seit dem 26.07.2026 generisch die `hauptsparte_key` nach.
+Es fehlten acht Registereinträge und acht `case`-Zeilen.
+
+Ob danach null übrig bleibt, sagt `mart.hauptsparte_abdeckung` — und ein Rest
+kann echt sein: ob LINA jede der zehn Sparten bebucht, ist eine Frage an den
+Fachbereich und keine an den Importer.
+
+## Belegdatum und Hochladedatum (14.08.2026)
+
+Von 605.835 Belegen im Archiv:
+
+| Verhältnis zum eigenen Upload | Belege |
+|---|---|
+| mehr als **ein Jahr voraus** | **13** — Erfassungsfehler, bis 2038-01-19 |
+| mehr als 30 Tage voraus | 39 — die übrigen 26 sind Voraus- und Dauerrechnungen |
+| mehr als zehn Jahre zurück | 6.802 — nachgereichte Altbelege, kein Fehler |
+
+**Die Lehre für Plausibilitätsgrenzen:** eine feste Jahreszahl veraltet still.
+Das Hochladedatum ist eine harte Tatsache in derselben Zeile und altert nicht.

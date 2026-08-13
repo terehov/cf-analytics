@@ -308,6 +308,16 @@ export const SCHEMATA: Record<string, z.ZodTypeAny> = {
   'getUmsatzbericht':                 UmsatzberichtSchema,
   'getUmsatzbericht:speisen':         UmsatzberichtSchema,
   'getUmsatzbericht:getraenke':       UmsatzberichtSchema,
+  // Die acht uebrigen Hauptsparten (0077). Gleiche Antwortstruktur, anderer
+  // Filter — deshalb dasselbe Schema und kein eigenes.
+  'getUmsatzbericht:gutscheine':      UmsatzberichtSchema,
+  'getUmsatzbericht:sonstiges':       UmsatzberichtSchema,
+  'getUmsatzbericht:sv_getraenke':    UmsatzberichtSchema,
+  'getUmsatzbericht:sv_speisen':      UmsatzberichtSchema,
+  'getUmsatzbericht:lieferkosten':    UmsatzberichtSchema,
+  'getUmsatzbericht:pfand':           UmsatzberichtSchema,
+  'getUmsatzbericht:trinkgeld':       UmsatzberichtSchema,
+  'getUmsatzbericht:gutschein_95':    UmsatzberichtSchema,
   'getPersonalkosten':                PersonalkostenSchema,
   'getKennzahlen:absolut':            KennzahlenSchema,
   'getKennzahlen:relativ':            KennzahlenSchema,

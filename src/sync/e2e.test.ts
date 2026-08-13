@@ -227,6 +227,12 @@ lauf('Ende-zu-Ende', () => {
        * der 36-h-Zeile fuer immer rot stuenden — und eine Kachel, die nie
        * auf null geht, liest niemand mehr.
        */
+      /**
+       * Seit 0077, und die Erwartung ist NICHT null, sondern KONSTANZ: der
+       * Rohwert der 13 Ausreisser bleibt erhalten, die Zeile bleibt also
+       * stehen. Waechst sie, liefert LINA neue — das ist die Frage.
+       */
+      'Belegarchiv: Belegdatum spaeter als der eigene Upload',
       'Belegarchiv: Betrieb ohne Belegarchiv',
       'Belegarchiv: Ordner ohne den faelligen Abzug',
       'Belegarchiv: seit ueber 36 h nicht gezaehlt',
@@ -254,6 +260,12 @@ lauf('Ende-zu-Ende', () => {
       'Einkauf: 403 auf einem EIGENEN Betrieb',
       'Einkauf: Bestellseiten aus einem frueheren Lauf offen',
       'Einkauf: Kostenstelle ohne Betrieb, mit Bestellungen',
+      /**
+       * Auch hier Konstanz statt null: eine Einzelposition ueber 50.000 EUR
+       * ist ein Erfassungsfehler in FoodNotify, den wir nicht beheben
+       * koennen. Sie soll nur nicht mehr in den Schwund einfliessen.
+       */
+      'Inventur: Position ueber 50.000 EUR (aus dem Schwund genommen)',
       'Inventur: Zaehlung abgeschnitten',
       /**
        * Seit 0074 — und die einzige Zeile, die etwas über unser eigenes
@@ -262,6 +274,12 @@ lauf('Ende-zu-Ende', () => {
        */
       'Nachzuegler: Aenderungen am Rand des Fensters',
       'Umsatz: Artikelsumme vs. Umsatzbericht',
+      /**
+       * Seit 0077. Gezaehlt werden MONATE, nicht Euro: "in drei Monaten
+       * laesst sich ein Drittel nicht aufteilen" ist die Aussage, die
+       * jemand braucht.
+       */
+      'Umsatz: Monat mit mehr als 10 % nicht aufteilbarem Umsatz',
       // Seit 0070 ausdruecklich nur die ENDGUELTIGEN: ein aufgegebener Posten,
       // den der Lauf noch dreimal zurueckholt, ist Betrieb und kein Befund.
       'Warteschlange: endgueltig aufgegeben',
@@ -2929,5 +2947,161 @@ lauf('Zulauf je Quelle', () => {
     expect(await quellenSpiegeln()).toBe(QUELLEN.length)
     const { rows: [n2] } = await db.query(`SELECT count(*)::int AS n FROM sync.quelle`)
     expect(n2.n).toBe(QUELLEN.length)
+  })
+})
+
+/**
+ * Datenqualität: was eine EINZELNE Zeile in einer Sicht anrichtet
+ * (Migration `0077`, Plan 5.4).
+ */
+lauf('Eine Zeile kippt eine Sicht', () => {
+  let db: Client
+
+  beforeAll(async () => {
+    db = new Client({ connectionString: DB })
+    await db.connect()
+  })
+  afterAll(async () => { await db.end() })
+
+  /**
+   * `mart.inventurposition` nennt eine Position über 50.000 € seit `0062`
+   * `unplausibel`. `mart.inventur_schwund` hat das Kennzeichen bis zum
+   * 14.08.2026 ignoriert — der Februar 2026 stand deshalb in Produktion mit
+   * **minus 2,97 Mio €** da, aus EINER Zeile. Eine Kennzeichnung, die nur
+   * eine von zwei Sichten kennt, ist keine.
+   */
+  test('der Schwund rechnet nicht mit dem, was er selbst unplausibel nennt', async () => {
+    await db.query('BEGIN')
+    try {
+      const { rows: [m] } = await db.query(
+        `INSERT INTO core.marke (schluessel, name) VALUES ('dq','DQ-Marke')
+         ON CONFLICT (schluessel) DO UPDATE SET name = excluded.name RETURNING marke_key`)
+      const { rows: [b] } = await db.query(
+        `INSERT INTO core.betrieb (name, enc_id) VALUES ('DQ Betrieb','dq-enc-1')
+         ON CONFLICT (enc_id) DO UPDATE SET name = excluded.name RETURNING betrieb_key`)
+      const { rows: [k] } = await db.query(
+        `INSERT INTO core.kostenstelle (marke_key, kostenstelle_id, restaurant_id, name,
+                                        restaurant_name, art, betrieb_key)
+         VALUES ($1, 9901, 9901, 'DQ Küche', 'DQ Betrieb', 'kueche', $2)
+         RETURNING kostenstelle_key`, [m.marke_key, b.betrieb_key])
+      const { rows: [i] } = await db.query(
+        `INSERT INTO core.inventur (kostenstelle_key, fn_uuid, name, art, status, erstellt_am)
+         VALUES ($1, 'dq-inv-1', 'Monatsinventur', 'full', 'signed', '2026-02-15')
+         RETURNING inventur_key`, [k.kostenstelle_key])
+
+      const pos = (name: string, soll: number, gezaehlt: number, preis: number) => db.query(
+        `INSERT INTO core.inventurposition
+           (inventur_key, fn_id, name, soll_menge, gezaehlt_menge, preis_je_basiseinheit)
+         VALUES ($1, $2, $2, $3, $4, $5)`, [i.inventur_key, name, soll, gezaehlt, preis])
+
+      // Zwei gewöhnliche Positionen: Schwund 100 € auf 1.100 € Soll.
+      await pos('Mehl',   100, 90, 10)
+      await pos('Zucker', 10,  10, 10)
+      // Und die eine, die alles kippt: 3 Mio € Soll, nichts gezählt.
+      await pos('Erfassungsfehler', 60_000, 0, 50)
+
+      const { rows: [r] } = await db.query(
+        `SELECT soll_eur, schwund_eur, positionen, positionen_unplausibel, wert_unplausibel
+           FROM mart.inventur_schwund WHERE betrieb_key = $1`, [b.betrieb_key])
+
+      // Ohne den Filter stünde hier 3.001.100 bzw. 3.000.100.
+      expect(Number(r.soll_eur)).toBe(1100)
+      expect(Number(r.schwund_eur)).toBe(100)
+      expect(Number(r.positionen)).toBe(2)
+
+      /**
+       * UND SIE VERSCHWINDET NICHT STILL. Eine Bereinigung ohne diese beiden
+       * Spalten wäre derselbe stille Zweig wie der Fehler davor — Regel 10
+       * gilt auch für das, was wir selbst weglassen.
+       */
+      expect(Number(r.positionen_unplausibel)).toBe(1)
+      expect(Number(r.wert_unplausibel)).toBe(3_000_000)
+    } finally {
+      await db.query('ROLLBACK')
+    }
+  })
+
+  /**
+   * `core.buchungsbeleg` mit einem Belegdatum nach dem eigenen Upload: der
+   * Beleg fällt aus den datumsbezogenen Sichten und steht trotzdem da.
+   */
+  test('ein Beleg aus 2038 faellt aus den Sichten und bleibt lesbar', async () => {
+    await db.query('BEGIN')
+    try {
+      const { rows: [b] } = await db.query(
+        `INSERT INTO core.betrieb (name, enc_id) VALUES ('DQ Beleg','dq-enc-2')
+         ON CONFLICT (enc_id) DO UPDATE SET name = excluded.name RETURNING betrieb_key`)
+      await db.query(
+        `INSERT INTO core.belegart (typ_id, name, reihenfolge)
+         VALUES ('1','Eingangsrechnungen', 1) ON CONFLICT (typ_id) DO NOTHING`)
+      await db.query(
+        `INSERT INTO core.buchungsbeleg
+           (betrieb_key, lina_betrieb_id, typ_id, lina_id, beleg_datum, beleg_datum_roh,
+            hochgeladen_am, netto)
+         VALUES ($1, 1, '1', 'dq-2038', NULL, '2038-01-19', '2025-02-05', 100)`,
+        [b.betrieb_key])
+
+      // Nicht in der Monatssicht: beleg_datum ist NULL.
+      const { rows: monat } = await db.query(
+        `SELECT 1 FROM mart.buchungsbeleg_monat WHERE betrieb_key = $1`, [b.betrieb_key])
+      expect(monat).toHaveLength(0)
+
+      // Aber sichtbar, mit dem Rohwert und dem Abstand.
+      const { rows: [a] } = await db.query(
+        // ::text, weil db/pool.ts einen eigenen Datumsparser registriert:
+        // je nachdem, ob es geladen ist, kaeme ein Date oder eine Zeichenkette.
+        `SELECT belegdatum_laut_lina::text, tage_voraus FROM mart.belegdatum_ausreisser
+          WHERE betrieb_key = $1`, [b.betrieb_key])
+      expect(a.belegdatum_laut_lina).toBe('2038-01-19')
+      expect(Number(a.tage_voraus)).toBeGreaterThan(4000)
+    } finally {
+      await db.query('ROLLBACK')
+    }
+  })
+
+  /**
+   * Und die Sicht, an der man sieht, ob die acht neuen Sparten gewirkt haben
+   * (Plan 5.1). Sie rechnet die Summe der Sparten gegen die Gesamtzeile —
+   * genau die Rechnung, die vorher niemand angestellt hat und die 31,8 %
+   * unaufteilbaren Umsatz freigelegt hat.
+   */
+  test('die Spartenabdeckung nennt den Rest beim Namen', async () => {
+    await db.query('BEGIN')
+    try {
+      const { rows: [b] } = await db.query(
+        `INSERT INTO core.betrieb (name, enc_id) VALUES ('DQ Umsatz','dq-enc-3')
+         ON CONFLICT (enc_id) DO UPDATE SET name = excluded.name RETURNING betrieb_key`)
+      const zeile = (hsPosId: number | null, umsatz: number) => db.query(
+        `INSERT INTO core.umsatzbericht_tag
+           (betrieb_key, geschaeftstag, hauptsparte_key, umsatz_netto)
+         VALUES ($1, '2026-03-10',
+                 (SELECT hauptsparte_key FROM core.hauptsparte WHERE pos_id = $2), $3)`,
+        [b.betrieb_key, hsPosId, umsatz])
+
+      await zeile(null, 1000)    // die Gesamtzeile
+      await zeile(10001, 600)    // Speisen
+      await zeile(10002, 300)    // Getränke
+
+      const { rows: [r] } = await db.query(
+        `SELECT umsatz_gesamt, umsatz_sparten, nicht_aufteilbar, nicht_aufteilbar_pct,
+                sparten_mit_umsatz
+           FROM mart.hauptsparte_abdeckung WHERE monat = '2026-03-01'`)
+      expect(Number(r.umsatz_gesamt)).toBe(1000)
+      expect(Number(r.umsatz_sparten)).toBe(900)
+      expect(Number(r.nicht_aufteilbar)).toBe(100)
+      expect(Number(r.nicht_aufteilbar_pct)).toBe(10)
+      expect(Number(r.sparten_mit_umsatz)).toBe(2)
+
+      // Und mit einer dritten Sparte schliesst sich die Luecke — das ist
+      // genau, was die acht neuen Endpunkte tun sollen.
+      await zeile(94, 100)       // Trinkgeld
+      const { rows: [n] } = await db.query(
+        `SELECT nicht_aufteilbar, sparten_mit_umsatz FROM mart.hauptsparte_abdeckung
+          WHERE monat = '2026-03-01'`)
+      expect(Number(n.nicht_aufteilbar)).toBe(0)
+      expect(Number(n.sparten_mit_umsatz)).toBe(3)
+    } finally {
+      await db.query('ROLLBACK')
+    }
   })
 })

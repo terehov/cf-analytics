@@ -1909,3 +1909,45 @@ starten, was nichts löst und alles langsamer macht.
 wird gelb (oder rot, wenn gar nicht mehr gefragt wird), und auf dem
 Import-Dashboard steht die Zahl an zweiter Stelle. Ein Lauf, der schon
 `abgebrochen` ist, behält seinen Status — die erste Ursache ist die wichtigere.
+
+### Entscheidung 4 beantwortet: die acht übrigen Hauptsparten werden geholt
+
+Der Plan fragte: „lohnt sich der Aufwand? *Empfehlung: ja, wenn es ein Parameter
+ist.*" Es ist einer — `getUmsatzbericht:speisen` unterscheidet sich von
+`getUmsatzbericht` durch genau ein Query-Feld, und `src/sync/laden.ts` schlägt
+daraus schon seit dem 26.07.2026 generisch die `hauptsparte_key` nach.
+
+**Kosten:** acht Endpunkte × 10 Nachzügler-Tage = 80 Aufrufe am Tag. Das
+LINA-Tagesbudget ist 10.500, verbraucht wurden bis dahin rund 104.
+**Nutzen:** 31,8 % des Umsatzes waren nicht aufteilbar (2.863.438,40 € in
+30 Tagen).
+
+**Beide Gutschein-Sparten werden geholt.** LINA führt `posId` 10003
+(„Gutscheine", nummer 3) und 95 („Gutschein", nummer 57). Welche bebucht wird,
+wissen wir nicht — und zwei Aufrufe am Tag sind billiger als eine Vermutung, die
+später jemand für eine Messung hält.
+
+### Das Belegdatum wird verworfen, nicht korrigiert
+
+Ein Beleg mit Belegdatum 2038, hochgeladen 2025, ließe sich „reparieren" — etwa
+auf das Hochladedatum setzen. Das wäre ein erfundener Wert. Dieselbe Regel wie
+bei den Beträgen seit `0058`: **aus „unbekannt" darf kein Wert werden.**
+
+`beleg_datum` wird NULL, der Rohwert steht in `beleg_datum_roh`, und alle vier
+betroffenen Sichten filtern ohnehin auf `beleg_datum IS NOT NULL` — es musste
+keine einzige Sicht geändert werden. Sichtbar bleibt der Fall in
+`mart.belegdatum_ausreisser`.
+
+**Die Grenze hängt am Hochladedatum, nicht an einer Jahreszahl.** Eine feste
+Schranke veraltet still und wird irgendwann selbst zum Fehler; das Upload-Datum
+steht in derselben Zeile und altert nicht.
+
+### `mart.inventur_schwund` filtert selbst, statt auf `mart.inventurposition` zu joinen
+
+Die 50.000-€-Schwelle steht damit an zwei Stellen. Ein Join auf die Sicht wäre
+DRY, würde aber die Aggregation über 82.126 Positionen verdoppeln — und
+`inventur_schwund` ist eine Sicht, die je Betrieb und Monat gruppiert.
+
+Zusammengehalten werden die beiden Stellen durch den Ende-zu-Ende-Test, der
+beide Zahlen gegen dieselbe Lage prüft. Eine doppelte Konstante mit Test ist
+besser als eine einzelne mit doppeltem Plan.

@@ -97,6 +97,43 @@ const belegBetrag = (roh: unknown): number | null => {
 }
 
 /**
+ * Dasselbe für das Belegdatum: was nicht sein kann, wird NULL — und der
+ * Rohwert wandert nach `beleg_datum_roh` (Migration `0077`).
+ *
+ * DER BEFUND. Am 14.08.2026 in Produktion gemessen: 13 von 605.835 Belegen
+ * tragen ein Belegdatum, das mehr als ein Jahr NACH ihrem eigenen Hochladedatum
+ * liegt — vier davon auf **2038-01-19**. Sie haben `max(monat)` in vier
+ * Mart-Sichten auf Januar 2038 gesetzt und damit das Frischemaß unbrauchbar
+ * gemacht; 20 Lieferanten trugen ein Zukunftsdatum als „letzter Beleg".
+ *
+ * WARUM DIE GRENZE AM UPLOAD HÄNGT UND NICHT AN EINER JAHRESZAHL. Eine feste
+ * Schranke („nach 2030 ist falsch") veraltet still und wird irgendwann selbst
+ * zum Fehler. Das Hochladedatum ist eine harte Tatsache: ein Beleg, der ein
+ * Jahr nach seinem eigenen Upload datiert, ist falsch erfasst, gleich welches
+ * Jahr wir schreiben.
+ *
+ * EIN JAHR TOLERANZ UND NICHT NULL. Voraus-, Dauer- und Wartungsrechnungen
+ * datieren regulär in die Zukunft. Gemessen liegen 39 Belege mehr als 30 Tage
+ * voraus, aber nur 13 mehr als ein Jahr — und genau die 13 sind die Ausreißer.
+ *
+ * RÜCKWÄRTS WIRD NICHT GEFILTERT. 6.802 Belege datieren mehr als zehn Jahre vor
+ * ihrem Upload; das sind nachgereichte Altbelege und keine Fehler. Sie stören
+ * auch nichts, weil `max(monat)` nach oben misst.
+ */
+export const belegDatum = (roh: unknown, hochgeladenAm: Date | null): {
+  datum: string | null; unglaubhaft: string | null
+} => {
+  const d = ausDatum(roh)
+  if (d === null || hochgeladenAm === null) return { datum: d, unglaubhaft: null }
+  const grenze = new Date(hochgeladenAm)
+  grenze.setFullYear(grenze.getFullYear() + 1)
+  // Vergleich als ISO-Zeichenkette: `d` ist YYYY-MM-DD, und die Grenze wird
+  // auf dasselbe Format gebracht. Damit hängt nichts an einer Zeitzone.
+  const grenzeIso = grenze.toISOString().slice(0, 10)
+  return d > grenzeIso ? { datum: null, unglaubhaft: d } : { datum: d, unglaubhaft: null }
+}
+
+/**
  * `zusatz` entsteht durch LÖSCHEN der bekannten Felder, nicht durch Aufzählen
  * der unbekannten. Damit ist jedes Feld, das LINA künftig hinzufügt, sofort in
  * der Datenbank statt still verloren — und `mart.buchungsbeleg_zusatzfelder`
@@ -362,7 +399,7 @@ async function belegeSchreiben(
 
   const spalten = [
     'betrieb_key', 'lina_betrieb_id', 'typ_id', 'lina_id', 'encrypted_id',
-    'beleg_datum', 'leistungs_datum', 're_nummer', 'netto', 'netto_split_roh',
+    'beleg_datum', 'beleg_datum_roh', 'leistungs_datum', 're_nummer', 'netto', 'netto_split_roh',
     'belegart_roh', 'belegart_name', 'zuordnung_fibu', 'verkaeufer_name', 'verkaeufer_id',
     'kreditor_konto', 'sachkonto', 'sachkonto_7', 'sachkonto_0', 'datev_guid',
     'parashift_status', 'parashift_id', 'hochgeladen_von_hash', 'hochgeladen_von_name',
@@ -378,7 +415,10 @@ async function belegeSchreiben(
       typ_id: typId,
       lina_id: String(z.id ?? ''),
       encrypted_id: leerZuNull(z.encryptedId),
-      beleg_datum: ausDatum(z.belegDatum),
+      beleg_datum: belegDatum(z.belegDatum, ausUnix(z.uploadedOnTime)).datum,
+      // Was verworfen wurde, bleibt lesbar — sonst waere die Bereinigung
+      // selbst der stille Zweig, gegen den Regel 10 geschrieben ist.
+      beleg_datum_roh: belegDatum(z.belegDatum, ausUnix(z.uploadedOnTime)).unglaubhaft,
       leistungs_datum: ausDatum(z.leistungsDatum),
       re_nummer: leerZuNull(z.reNumber),
       // Bei unlesbarem Betrag NULL, nicht 0 — sonst wird aus „unbekannt" ein Wert.
@@ -417,6 +457,7 @@ async function belegeSchreiben(
          typ_id = EXCLUDED.typ_id,
          encrypted_id = EXCLUDED.encrypted_id,
          beleg_datum = EXCLUDED.beleg_datum,
+         beleg_datum_roh = EXCLUDED.beleg_datum_roh,
          netto = EXCLUDED.netto,
          zuordnung_fibu = EXCLUDED.zuordnung_fibu,
          sachkonto = EXCLUDED.sachkonto,

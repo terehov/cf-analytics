@@ -325,6 +325,14 @@ Normalzustand — der Lauf darf sie nicht als „ok" melden.**
 
 ### Phase 5 — Reichweite
 
+> **5.1 und 5.4 erledigt am 14.08.2026, Migration `0077`.** Der Spartenfilter
+> ist ein Parameter, wie vermutet — acht Registereinträge und acht
+> `case`-Zeilen, +80 Aufrufe am Tag von 10.500. Die Zukunftsbelege sind an der
+> **Quelle** behandelt (`beleg_datum` wird NULL, Rohwert in `beleg_datum_roh`),
+> nicht in den Sichten: alle vier filtern ohnehin auf `IS NOT NULL`, es musste
+> keine geändert werden. `mart.inventur_schwund` kennt jetzt das
+> `unplausibel`-Kennzeichen. 5.2 und 5.3 folgen mit `0078`.
+
 | # | Was |
 |---|---|
 | 5.1 | Hauptsparten: acht statt zwei. Zuerst klären, ob der Spartenfilter ein Parameter ist, den wir einfach mit weiteren `posId` aufrufen können — dann ist die Reparatur klein. Kostet Aufrufe: das LINA-Tagesbudget ist 10.500, verbraucht werden 82. |

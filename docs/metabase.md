@@ -965,3 +965,24 @@ geht, liest niemand mehr.
 Bedarf Zeilen liefert (Belegabzug, Inventuren), 35 Tage für Momentaufnahmen.
 Eine Schwelle, die bei jedem normalen Schwanken ausschlägt, wird abgeschaltet;
 eine, die nie ausschlägt, wird nicht gelesen. Beides ist derselbe Fehler.
+
+## Drei Sichten zu Datenqualität und Sparten (Migration `0077`, 14.08.2026)
+
+* **`mart.hauptsparte_abdeckung`** — Gesamtumsatz gegen die Summe der Sparten,
+  je Monat. `nicht_aufteilbar_pct` ist die Zahl: sie stand vor dem 14.08.2026
+  bei 31,8 %, weil zwei von zehn Sparten geholt wurden. Die Gesamtzeile
+  (`hauptsparte_key IS NULL`) wird **nicht** durch die Summe der Sparten
+  ersetzt — die Differenz ist genau die Aussage.
+* **`mart.belegdatum_ausreisser`** — Belege, deren Belegdatum mehr als ein Jahr
+  nach ihrem eigenen Upload lag. Sie stehen mit `beleg_datum = NULL` in `core`
+  und fallen damit aus allen datumsbezogenen Sichten. **Erwartung ist Konstanz,
+  nicht null:** der Rohwert bleibt erhalten, die Zeile bleibt stehen. Wächst
+  sie, liefert LINA neue Ausreißer.
+* **`mart.inventur_schwund`** rechnet seit `0077` nicht mehr mit Positionen, die
+  `mart.inventurposition` selbst `unplausibel` nennt (über 50.000 € je
+  Position). Was herausfiel, steht in `positionen_unplausibel` und
+  `wert_unplausibel`.
+
+**Die gemeinsame Regel:** was aus einer Summe herausgerechnet wird, bekommt eine
+eigene Spalte oder eine eigene Sicht. Eine Bereinigung ohne Anzeige ist derselbe
+stille Zweig wie der Fehler davor — und der Befund von übermorgen.

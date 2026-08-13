@@ -146,6 +146,7 @@ Handgeschriebenes SQL, nummeriert, wird der Reihe nach angewendet. Bewusst handg
 | `0074_nachzuegler_selbstmessung.sql` | **Das Nachzuegler-Fenster misst sich selbst.** `mart.nachzuegler_tiefe` und `mart.bwa_rueckbuchung` — beide Zahlen, mit denen der Plan die Fenster begruenden wollte, waren Artefakte der Fenster selbst. Eine Pruefzeile meldet, wenn am Rand noch Aenderungen ankommen |
 | `0075_anzeige_ehrlich.sql` | **Die Anzeige sagt, was sie meint.** `mart.einkauf_ladestand` trennt Rueckstand (eine Seite hat einen ganzen Lauf ueberlebt) von laufender Arbeit und von fehlendem Zugriff — vorher standen **alle 251** Monatszeilen auf „… laedt". Dazu `sync.warteschlange.gesperrt_seit` mit `ergebnis = 'kein_zugriff'`, das den unbegrenzten 403-Zweig beendet, und ein Schreiber fuer `sync.fortschritt`, das acht Wochen lang vier Leser und keinen hatte |
 | `0076_quelle_zulauf.sql` | **Der Waechter aus Phase 4.** `sync.quelle` als Register der Zulauferwartungen und `mart.quelle_zulauf` als Messung dazu — **zwei** Zahlen, `zuletzt_gefragt` und `zuletzt_zulauf`, weil die beiden Ausfaelle dieses Projekts verschiedene waren: am 12.08.2026 wurde nicht mehr gefragt, am 10.08.2026 war der Zeitstempel frisch und die Tabellen leer. Der Lauf meldet ab hier `teilweise` statt `ok`, wenn eine erwartete Quelle stumm ist |
+| `0077_datenqualitaet_und_sparten.sql` | **Was eine einzelne Zeile anrichtet.** 13 Belege datierten mehr als ein Jahr nach ihrem eigenen Upload (bis 2038) und setzten `max(monat)` in vier Sichten auf 2038-01 — ihr Rohwert steht jetzt in `beleg_datum_roh`, sichtbar in `mart.belegdatum_ausreisser`. `mart.inventur_schwund` rechnet nicht mehr mit dem, was es selbst `unplausibel` nennt (Februar 2026 stand mit minus 2,97 Mio EUR aus EINER Zeile). Dazu acht weitere Hauptsparten und `mart.hauptsparte_abdeckung`: 31,8 % des Umsatzes waren nicht aufteilbar |
 | `pruefung.sql` | Verifikation gegen den Bayreuth-Fall aus dem Excel (kein Migrationsschritt) |
 
 Die Tabelle nennt die tragenden Migrationen, nicht jede einzelne. Der verbindliche Stand steht in `public.schema_migration`.
@@ -213,7 +214,7 @@ sync.ts / einreihen.ts Einstiegspunkte
 ```bash
 bun install
 bun run migrate                              # Schema anwenden (idempotent)
-bun test                                     # nachgemessen am 14.08.2026: 698 pass, 180 skip, 0 fail ohne TEST_DATABASE_URL
+bun test                                     # nachgemessen am 14.08.2026: 705 pass, 185 skip, 0 fail ohne TEST_DATABASE_URL
 bun run sync                                 # nachfüllen UND abarbeiten
 bun run einreihen --taeglich                 # nur nachfüllen (sync macht das selbst)
 bun run einreihen --historie --von 2018-01-01 --bis 2026-07-24
