@@ -264,11 +264,87 @@ lauf('mart.einkauf_ladestand', () => {
         `INSERT INTO core.bestellung (kostenstelle_key, fn_id, bestellt_am)
          VALUES ($1, 'ohne-positionen', '2025-11-25')`, [k.kostenstelle_key])
       const { rows: [r] } = await db.query(`
-        SELECT bestellungen, mit_positionen, positionen_pct
+        SELECT bestellungen, mit_positionen, positionen_pct, ohne_positionen
           FROM mart.einkauf_ladestand WHERE monat = '2025-11-01'`)
       expect(Number(r.bestellungen)).toBe(3)
       expect(Number(r.mit_positionen)).toBe(2)
       expect(Number(r.positionen_pct)).toBeCloseTo(66.7, 1)
+      // Dieselbe Aussage absolut. 66,7 % liest man weg, „1" nicht.
+      expect(Number(r.ohne_positionen)).toBe(1)
+    } finally {
+      await db.query('ROLLBACK')
+    }
+  })
+
+  /**
+   * DIE DREI ZUSTAENDE (Migration 0075, Plan 3.1/3.2).
+   *
+   * Bis dahin hiess `liste_vollstaendig` schlicht „keine offene
+   * fn:bestellungen-Seite". Am 14.08.2026 um 00:16, waehrend Lauf 90 lief,
+   * standen damit **alle 251** Monatszeilen aller vier Marken auf
+   * „… laedt" — nicht die 60, die der Plan erwartet hatte. Der naechtliche
+   * Lauf reiht je Kostenstelle die letzte Bestellseite ein; solange die
+   * abgearbeitet wird, ist „offene Seite" der Regelzustand und keine
+   * Aussage.
+   *
+   * Die Unterscheidung ist nicht „offen oder nicht", sondern „hat ein
+   * ganzer Lauf sie nicht weggearbeitet".
+   */
+  test('unterscheidet laufende Arbeit von Rueckstand und von fehlendem Zugriff', async () => {
+    await db.query('BEGIN')
+    try {
+      const { rows: [k] } = await db.query(
+        'SELECT kostenstelle_key, marke_key FROM core.kostenstelle LIMIT 1')
+      await db.query('TRUNCATE sync.warteschlange, sync.aufgabe, sync.lauf RESTART IDENTITY CASCADE')
+
+      // Ein Lauf, der vor einer Stunde begann und sauber endete.
+      await db.query(
+        `INSERT INTO sync.lauf (gestartet_am, beendet_am, ausloeser, status)
+         VALUES (now() - interval '1 hour', now() - interval '30 minutes', 'zeitplan', 'ok')`)
+
+      const seite = (erstelltVor: string, ergebnis: string | null, erpId: string) => db.query(
+        `INSERT INTO sync.warteschlange
+           (endpunkt, zeitraum_von, zeitraum_bis, marke_key, parameter,
+            erstellt_am, erledigt_am, ergebnis)
+         VALUES ('fn:bestellungen', current_date, current_date, $1, $4::jsonb,
+                 now() - $2::interval, CASE WHEN $3::text IS NULL THEN NULL ELSE now() END, $3)`,
+        [k.marke_key, erstelltVor, ergebnis, JSON.stringify({ erpId, seite: '1' })])
+
+      const zustand = async () => (await db.query(
+        `SELECT DISTINCT zustand, seiten_rueckstand, seiten_offen, seiten_kein_zugriff
+           FROM mart.einkauf_ladestand`)).rows
+
+      /*
+       * 1. Eine Seite, die HEUTE NACHT entstanden ist. Sie ist offen, aber
+       *    sie ist Arbeit — genau der Fall, der vorher alles einfaerbte.
+       */
+      await seite('10 minutes', null, '10483')
+      let z = await zustand()
+      expect(z).toHaveLength(1)
+      expect(z[0].zustand).toBe('vollstaendig')
+      expect(Number(z[0].seiten_offen)).toBe(1)
+      expect(Number(z[0].seiten_rueckstand)).toBe(0)
+
+      /*
+       * 2. Eine Seite, die den Lauf von vorhin ueberlebt hat. Jetzt fehlen
+       *    ganze Bestellungen, und die Prozentspalte sieht das nicht.
+       */
+      await seite('3 hours', null, '10485')
+      z = await zustand()
+      expect(z[0].zustand).toBe('laedt')
+      expect(Number(z[0].seiten_rueckstand)).toBe(1)
+
+      /*
+       * 3. Ohne Rueckstand, aber mit einer dauerhaft verweigerten
+       *    Kostenstelle: das ist kein Ladevorgang, sondern eine Grenze.
+       */
+      await db.query(
+        `UPDATE sync.warteschlange SET erledigt_am = now(), ergebnis = 'ok'
+          WHERE parameter->>'erpId' = '10485'`)
+      await seite('3 hours', 'kein_zugriff', '11805')
+      z = await zustand()
+      expect(z[0].zustand).toBe('kein zugriff')
+      expect(Number(z[0].seiten_kein_zugriff)).toBe(1)
     } finally {
       await db.query('ROLLBACK')
     }

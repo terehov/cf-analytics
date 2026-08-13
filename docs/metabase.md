@@ -909,3 +909,31 @@ Zeilen** — „zwei Endpunkte sehen zu kurz" ist die Aussage, die jemand brauch
 Fenster begründen wollte, waren Artefakte der Fenster selbst (`befunde-datenlage.md`,
 13.08.2026). Eine Größe, die man nur einmal schätzt und danach nie wieder ansieht, veraltet
 still. Diese hier meldet sich.
+
+## Der Ladestand kennt drei Zustände (Migration `0075`, 14.08.2026)
+
+`mart.einkauf_ladestand.liste_vollstaendig` hieß bis dahin „keine offene
+`fn:bestellungen`-Seite". Am 14.08.2026 um 00:16 gemessen, während Lauf 90 lief, standen damit
+**alle 251 Monatszeilen aller vier Marken** auf unvollständig — nicht die 60, die der Plan
+erwartet hatte. Der nächtliche Lauf reiht je Kostenstelle die letzte Bestellseite ein; solange
+die abgearbeitet wird, ist „offene Seite" der Regelzustand und keine Aussage.
+
+Die Unterscheidung ist nicht „offen oder nicht", sondern **„hat ein ganzer Lauf sie nicht
+weggearbeitet"** — `erstellt_am` gegen den Beginn des letzten beendeten Laufs.
+
+| Spalte | Bedeutung |
+|---|---|
+| `seiten_offen` | alle offenen Seiten. Während eines Laufs normalerweise > 0 — **keine** Aussage |
+| `seiten_rueckstand` | Seiten, die einen ganzen Lauf überlebt haben. **Das** ist die Aussage |
+| `seiten_kein_zugriff` | dauerhaft mit 403 verweigert. Kein Ladevorgang, sondern eine Grenze |
+| `ohne_positionen` | Bestellungen mit Kopf und ohne eine einzige Position, absolut |
+| `zustand` | `laedt` / `kein zugriff` / `vollstaendig` — ein Wert, damit die Karte nicht rechnet |
+
+`ohne_positionen` steht neben `positionen_pct`, weil 99,9 % wie fertig aussieht und
+47 fehlende Bestellungen nicht.
+
+**Neu daneben: `mart.posten_ohne_zugriff`.** Erwartung: nur Zeilen mit
+`eigener_betrieb = false`. Ein 403 auf einer fremden Kostenstelle ist richtig; einer auf einem
+eigenen Betrieb heißt, dass uns dessen Bestellungen fehlen, ohne dass etwas rot wird. Die
+Prüfzeile zählt deshalb **nur die eigenen** — eine Zeile, die nie auf null geht, liest niemand
+mehr (dieselbe Überlegung wie bei `0070`, `0071` und `0073`).

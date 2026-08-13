@@ -142,6 +142,7 @@ Handgeschriebenes SQL, nummeriert, wird der Reihe nach angewendet. Bewusst handg
 | `0072_bestelldetails_altern.sql` | **Bestelldetails altern nach.** `core.bestellung.detail_geholt_am` und `mart.bestelldetail_stand`. Bis dahin wurde jede der 66.966 Bestellungen **genau einmal** im Detail geholt und keine je erneut — Liefermengen und Preisstaende standen auf dem Stand des ersten Abrufs. Der Nachholauf ist kein Befehl, sondern eine Obergrenze im Nachtlauf |
 | `0073_namensvergleich_apostroph.sql` | `core.name_norm()` **loescht** Apostrophe, statt sie in Leerzeichen zu wandeln (59 exakte Namenstreffer vorher, 60 nachher, 0 verloren). Dazu `mart.kostenstelle_ohne_betrieb` als Entscheidungsliste — die offenen Faelle werden **sichtbar gemacht, nicht geraten** |
 | `0074_nachzuegler_selbstmessung.sql` | **Das Nachzuegler-Fenster misst sich selbst.** `mart.nachzuegler_tiefe` und `mart.bwa_rueckbuchung` — beide Zahlen, mit denen der Plan die Fenster begruenden wollte, waren Artefakte der Fenster selbst. Eine Pruefzeile meldet, wenn am Rand noch Aenderungen ankommen |
+| `0075_anzeige_ehrlich.sql` | **Die Anzeige sagt, was sie meint.** `mart.einkauf_ladestand` trennt Rueckstand (eine Seite hat einen ganzen Lauf ueberlebt) von laufender Arbeit und von fehlendem Zugriff — vorher standen **alle 251** Monatszeilen auf „… laedt". Dazu `sync.warteschlange.gesperrt_seit` mit `ergebnis = 'kein_zugriff'`, das den unbegrenzten 403-Zweig beendet, und ein Schreiber fuer `sync.fortschritt`, das acht Wochen lang vier Leser und keinen hatte |
 | `pruefung.sql` | Verifikation gegen den Bayreuth-Fall aus dem Excel (kein Migrationsschritt) |
 
 Die Tabelle nennt die tragenden Migrationen, nicht jede einzelne. Der verbindliche Stand steht in `public.schema_migration`.
@@ -209,7 +210,7 @@ sync.ts / einreihen.ts Einstiegspunkte
 ```bash
 bun install
 bun run migrate                              # Schema anwenden (idempotent)
-bun test                                     # nachgemessen am 13.08.2026 (abends): 683 pass, 157 skip, 0 fail ohne TEST_DATABASE_URL
+bun test                                     # nachgemessen am 14.08.2026: 690 pass, 173 skip, 0 fail ohne TEST_DATABASE_URL
 bun run sync                                 # nachfüllen UND abarbeiten
 bun run einreihen --taeglich                 # nur nachfüllen (sync macht das selbst)
 bun run einreihen --historie --von 2018-01-01 --bis 2026-07-24
@@ -292,6 +293,11 @@ SELECT * FROM mart.inventur_abgeschnitten;
 -- Posten, die der Worker aufgegeben hat. 'endgueltig' heisst: der Lauf versucht
 -- es nicht mehr, und das will jemand gelesen haben.
 SELECT zustand, count(*) FROM mart.posten_aufgegeben GROUP BY 1;
+-- Was uns die Quelle dauerhaft verweigert (403). ERWARTUNG: nur fremde
+-- Kostenstellen. eigener_betrieb = true ist ein Rechteproblem, keine Grenze.
+SELECT * FROM mart.posten_ohne_zugriff;
+-- Einkauf: laufende Arbeit vs. echter Rueckstand vs. fehlender Zugriff
+SELECT zustand, count(*) FROM mart.einkauf_ladestand GROUP BY 1;
 ```
 
 **Nichts davon braucht einen Befehl.** Abgeschnittene Inventurzählungen und aufgegebene

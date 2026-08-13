@@ -780,3 +780,49 @@ neu          6 × 10 + 2 × 21 (Personal, Artikel)           102
 Kennzahlen   2 Endpunkte × 2 Jahre statt × 1                +2
                                               ~104 von 10.500
 ```
+
+## Der 403-Zweig hat jetzt ein Ende (Migration `0075`, 14.08.2026)
+
+FoodNotify antwortet auf Kostenstellen, die uns nicht gehören, mit HTTP 403. Das ist kein
+Kontoproblem, sondern eine Ressourcengrenze — deshalb ruht seit dem 03.08.2026 nur der eine
+Posten und nicht die ganze Marke.
+
+Nur endete das nie. `sync.warteschlange.gesperrt_seit` hält jetzt fest, **seit wann** die
+Quelle nein sagt; jeder Erfolg räumt die Spalte wieder ab. Drei Stufen:
+
+| Zustand | Was passiert |
+|---|---|
+| unter `SPERRE_AUFGEBEN_TAGE` (14) | Posten ruht 24 h, wie bisher |
+| darüber, Quelle antwortet sonst | `ergebnis = 'kein_zugriff'`, geschlossen |
+| darüber, Quelle antwortet nirgends | Posten bleibt liegen — es ist das Konto |
+
+`kein_zugriff` ist ein eigener Ausgang neben `aufgegeben`, weil
+`aufgegebeneWiederbeleben()` nur letzteres anfasst. Sonst holte der nächtliche Lauf einen
+403-Posten dreimal zurück, um dreimal dieselbe Antwort zu bekommen — drei Wochen Rauschen für
+eine Aussage, die am ersten Tag feststand.
+
+Sichtbar in `mart.posten_ohne_zugriff`, und zwar mit der Frage, auf die es ankommt:
+`eigener_betrieb`. Bei einer fremden Kostenstelle ist der 403 richtig und die Sache erledigt;
+bei einem eigenen Betrieb fehlen uns dessen Bestellungen.
+
+## `sync.fortschritt` wird geschrieben (Migration `0075`, 14.08.2026)
+
+Die Tabelle hatte seit `0005` vier Leser und keinen Schreiber — 0 Zeilen in Produktion, und
+`/health` meldete daraus für immer „null pausierte Endpunkte". `standSchreiben()` in
+`worker.ts` schreibt sie jetzt bei jedem Ausgang fort:
+
+| Ausgang | `letzter_erfolg_am` | `fehler_in_folge` | `pausiert_bis` |
+|---|---|---|---|
+| `ok` | `now()` | 0 | `NULL` |
+| `keine_daten` | `now()` | 0 | `NULL` |
+| Wiedervorlage | bleibt | +1 | die gerade gesetzte Frist |
+| aufgegeben | bleibt | +1 | `NULL` |
+
+`keine_daten` zählt ausdrücklich als Erfolg: ein gelungener Aufruf ohne Inhalt ist kein
+Fehler (Regel in `AGENTS.md`), und sonst sähe ein geschlossener Betrieb aus wie einer, den wir
+nicht erreichen. `letzter_zeitraum` wird über `greatest()` fortgeschrieben, damit der
+rückwärts laufende Historienlauf den erreichten Stand nicht zurückdreht.
+
+Die Funktion **wirft nie**: der Fortschritt ist eine Beobachtung über die Arbeit, nicht die
+Arbeit. Ein Fehler beim Notieren darf den Posten nicht mitnehmen, der gerade sauber geladen
+wurde.

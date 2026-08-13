@@ -863,7 +863,7 @@ SELECT betrieb                        AS "Betrieb",
     schluessel: 'wa_ladestand',
     name: 'Wie vollständig sind die Einkaufsdaten?',
     beschreibung:
-      'ZUERST LESEN. „Positionen %" misst nur die Tiefe der BEREITS GELADENEN Bestellungen — fehlende Bestellungen sieht die Spalte nicht. Ob die Bestell-Liste einer Marke vollständig ist, sagt „Seiten offen": solange dort etwas steht, fehlen ganze Bestellungen, egal was die Prozentspalte behauptet. Die Seiten laufen je Kostenstelle chronologisch AUFSTEIGEND — bei unfertigen Marken fehlen also gerade die JÜNGSTEN Monate.',
+      'ZUERST LESEN. „Positionen %" misst nur die Tiefe der BEREITS GELADENEN Bestellungen — fehlende Bestellungen sieht die Spalte nicht. Ob die Bestell-Liste einer Marke vollständig ist, sagt „Seiten Rückstand": das sind Seiten, die einen ganzen nächtlichen Lauf überstanden haben, ohne abgearbeitet zu werden. Solange dort etwas steht, fehlen ganze Bestellungen, egal was die Prozentspalte behauptet. Die Seiten laufen je Kostenstelle chronologisch AUFSTEIGEND — bei unfertigen Marken fehlen also gerade die JÜNGSTEN Monate. „⚠ kein Zugriff" ist etwas anderes als „… lädt": dort verweigert der Lieferant eine Kostenstelle dauerhaft, und es wird auch nichts mehr nachkommen.',
     anzeige: 'table',
     parameter: [MARKE],
     // Der Vorgaenger dieser Beschreibung versprach das Gegenteil ("erst
@@ -871,14 +871,32 @@ SELECT betrieb                        AS "Betrieb",
     // geladen. Beides falsch, und die Karte war ausgerechnet als
     // Vertrauensanker deklariert: Enchilada stand mit "1 Bestellung /
     // 100,0 %" da, waehrend 600 Listen-Seiten offen waren.
+    /*
+     * DREI ZUSTAENDE STATT EINEM HAEKCHEN (Migration 0075, Plan 3.2).
+     *
+     * Bis dahin stand hier "… laedt", sobald IRGENDEINE offene
+     * fn:bestellungen-Seite der Marke in der Schlange lag. Am 14.08.2026
+     * um 00:16 gemessen, waehrend Lauf 90 lief: alle 251 Monatszeilen
+     * aller vier Marken standen so da. Eine Warnung, die jede Nacht
+     * ueberall ausschlaegt, ist keine mehr.
+     *
+     * "kein Zugriff" ist bewusst ein eigener Text und kein Ladehinweis:
+     * dort verweigert FoodNotify eine Kostenstelle dauerhaft mit 403, und
+     * es kommt nichts nach. Ob das in Ordnung ist, sagt
+     * mart.posten_ohne_zugriff — bei einer fremden Kostenstelle ja, bei
+     * einem eigenen Betrieb nicht.
+     */
     sql: `
 SELECT monat                AS "Monat",
        marke                AS "Marke",
        bestellungen         AS "Bestellungen",
        mit_positionen       AS "davon mit Positionen",
        positionen_pct       AS "Positionen %",
-       seiten_offen         AS "Seiten offen",
-       CASE WHEN liste_vollstaendig THEN '✓' ELSE '… lädt' END AS "Liste vollständig?",
+       nullif(ohne_positionen, 0) AS "ohne Positionen",
+       seiten_rueckstand    AS "Seiten Rückstand",
+       CASE zustand WHEN 'vollstaendig' THEN '✓'
+                    WHEN 'kein zugriff' THEN '⚠ kein Zugriff'
+                    ELSE '… lädt' END AS "Liste vollständig?",
        -- Die drei Spalten sagen, was NICHT im Einkaufsvolumen steht bzw.
        -- dort fraglich steht. status_unbekannt ist der Waechter: > 0
        -- heisst, ein Status kommt nicht durch den Importer — genau der

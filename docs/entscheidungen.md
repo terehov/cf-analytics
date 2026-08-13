@@ -1830,3 +1830,42 @@ der Wirkung nicht.
 Der Takt hängt in beiden Fällen weiter am **Zeitraum** (Kalendertag bzw. Montag der Woche) und
 nicht an einem Ergebniswert. Ein Wiederholtakt, der an einem Ausgang hängt, kennt immer einen,
 an den niemand gedacht hat.
+
+### `kein_zugriff` ist ein eigener Ausgang, nicht ein Sonderfall von `aufgegeben`
+
+Ein Posten, den FoodNotify dauerhaft mit 403 ablehnt, könnte auch als `aufgegeben` enden — die
+Spalte gibt es, und `mart.posten_aufgegeben` zeigt sie an. Dagegen sprechen zwei Dinge.
+
+**Technisch:** `aufgegebeneWiederbeleben()` holt jeden aufgegebenen Posten bis zu dreimal
+zurück, sobald der Endpunkt irgendwo ein frisches `ok` hat — und `fn:bestellungen` hat das
+jede Nacht. Der Posten liefe drei Wochen im Kreis für eine Antwort, die am ersten Tag
+feststand.
+
+**Inhaltlich, und das ist der eigentliche Grund:** `aufgegeben` heißt „wir haben es nicht
+geschafft", `kein_zugriff` heißt „es gehört uns nicht". Das erste ist ein Befund und gehört
+untersucht, das zweite ist eine Grenze und gehört notiert. Zwei Zustände in einer Spalte
+zusammenzufassen, heißt, die Frage „muss jemand etwas tun?" wieder offen zu lassen.
+
+### Vierzehn Tage, bevor ein 403 als Grenze gilt
+
+Kürzer wäre eine Wette gegen die Verwaltung: ein nachgetragener Anspruch braucht Tage, nicht
+Stunden. Länger hieße, dass eine fremde Kostenstelle die Ladestandsanzeige einen Monat lang
+einfärbt. Nachgemessen: Posten 28629 lag zwölf Tage in dieser Schleife, ohne dass sich etwas
+bewegte.
+
+**Und geschlossen wird nur mit Gegenprobe** — derselbe Endpunkt derselben Marke muss in den
+letzten 24 Stunden irgendwo ein `ok` gehabt haben. Ohne diese Bedingung räumte ein abgelaufenes
+Passwort nach vierzehn Tagen den halben Bestand als „Quellengrenze" weg, und zwar lautlos.
+
+### `sync.fortschritt` füllen, nicht entfernen
+
+Punkt 3.4 des Plans ließ beides offen: „füllen oder ersatzlos aus `src/health.ts` entfernen".
+Entschieden wurde füllen, nach dem Nachsehen, wer sie liest.
+
+Drei der vier Spalten beantworten Fragen, die tatsächlich gestellt werden — wo steht welcher
+Endpunkt (`0019`), welcher Betrieb hängt seit wann (`0039`). Nur `pausiert_bis` hatte keine
+Entsprechung mehr, weil die Selbstdrosselung inzwischen als `faellig_ab` **am Posten** sitzt
+und nicht als Pause an der Kombination. Genau das steht jetzt drin.
+
+Entfernen hätte vier Leser und eine seit `0005` gepflegte Struktur weggeworfen, um eine
+Prüfung loszuwerden, die nur deshalb nichts sagte, weil niemand sie bediente.

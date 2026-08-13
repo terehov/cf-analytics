@@ -2859,3 +2859,74 @@ Lücken schließt, steht bei der nächsten wieder da.
 **Was ihn verhindert.** `endpunkteZusichern()` prüft alle drei beim Start jedes Laufs und
 wirft — mit einer Meldung je Verstoß, nicht nur der ersten. Gegengeprüft: `getReport:97` auf
 `aktiv: true` gesetzt liefert alle drei Meldungen auf einmal. Details in `importer.md`.
+
+### Die Ladestandskarte meldete an jedem Abend „… lädt" — für alles
+
+**Symptom.** `mart.einkauf_ladestand.liste_vollstaendig` stand am 14.08.2026 um 00:16 in
+**allen 251 Monatszeilen aller vier Marken** auf falsch. Die Karte „Wie vollständig sind die
+Einkaufsdaten?" ist als Vertrauensanker deklariert und sagte damit über den gesamten Bestand
+seit 2021: unvollständig.
+
+| Marke | Monatszeilen | davon „… lädt" |
+|---|---|---|
+| Aposto | 60 | 60 |
+| Deutsche Konzepte | 56 | 56 |
+| Enchilada | 60 | 60 |
+| Wilma Wunder | 75 | 75 |
+
+**Ursache.** Die Spalte zählte offene `fn:bestellungen`-Posten je Marke — einen **momentanen
+Warteschlangenzustand** — und behauptete damit etwas über die **Daten**. Der nächtliche Lauf
+reiht je Kostenstelle die letzte Bestellseite ein; solange die abgearbeitet wird, ist „offene
+Seite" der Regelzustand.
+
+**Der Plan hatte hier etwas anderes gemessen** und nannte 60 Enchilada-Zeilen, verursacht vom
+hängenden Posten 28629. Das war eine Messung ohne laufenden Lauf. Beide Zahlen stimmen, sie
+beschreiben verschiedene Momente — und die schlechtere ist der Normalfall.
+
+**Was ihn verhindert.** Seit Migration `0075` unterscheidet die Sicht nicht mehr „offen oder
+nicht", sondern „hat ein ganzer Lauf sie nicht weggearbeitet": `erstellt_am` gegen den Beginn
+des letzten beendeten Laufs. Das ist ein Fakt an der Sache statt eines Zustands an der
+Schlange — dieselbe Lehre wie bei `detail_geholt_am` (`0072`) und der täglichen Zählung
+(`0069`). Ein Test in `src/foodnotify/mart_einkauf.test.ts` hält alle drei Zustände fest.
+
+### Der 403-Zweig hatte kein Ende
+
+**Symptom.** Posten 28629 (`fn:bestellungen`, Enchilada, `erpId` 11805, „Layer-Chemie
+Testbetrieb") lag vom 02.08. bis zum 14.08.2026 in der Warteschlange und stand nach zwölf
+Tagen immer noch auf `versuche = 0`. Er kostete einen Aufruf am Tag und färbte die
+Ladestandskarte.
+
+**Ursache.** `sync.posten_holen()` zählt `versuche` hoch, der 403-Zweig in `worker.ts` zählt
+mit `greatest(0, versuche - 1)` wieder herunter und springt per `continue` am Aufgeben-Zweig
+vorbei. Netto ±0 pro Tag. Das ist **bewusst so gebaut** — ein fehlender Anspruch kann
+nachgetragen werden — hatte aber keine Obergrenze.
+
+**Was ihn verhindert.** `sync.warteschlange.gesperrt_seit` (Migration `0075`) hält den Fakt
+fest, der fehlte: seit wann sagt die Quelle nein. Nach `SPERRE_AUFGEBEN_TAGE` (14) wird der
+Posten mit `ergebnis = 'kein_zugriff'` geschlossen — **nicht** mit `aufgegeben`, sonst holte
+ihn `aufgegebeneWiederbeleben()` dreimal zurück, um dreimal dasselbe 403 zu bekommen.
+
+**Die Gegenprobe gehört dazu:** geschlossen wird nur, wenn derselbe Endpunkt derselben Marke
+in den letzten 24 Stunden irgendwo ein `ok` hatte. Sagt der Zugang überall nein, ist es das
+Konto und keine Ressourcengrenze — dann bleibt der Posten liegen. Ohne diese Bedingung
+räumte ein abgelaufenes Passwort nach vierzehn Tagen den halben Bestand als „Quellengrenze"
+weg. Der Ende-zu-Ende-Test prüft beide Ausgänge.
+
+### Eine Tabelle mit vier Lesern und keinem Schreiber
+
+**Symptom.** `sync.fortschritt` stand seit Migration `0005` (26.07.2026) auf **0 Zeilen**.
+`src/health.ts` liest daraus `pausierteKombinationen` und meldete strukturbedingt für immer
+„null pausierte Endpunkte". Ebenso `mart.sync_status` und zwei Sichten aus `0019`/`0039`.
+
+**Ursache.** Kein einziger `INSERT` im Repo schrieb sie. Der Name kollidiert dabei mit einer
+lokalen Hilfsfunktion `fortschritt()` in `worker.ts`, die nur ins Log schreibt — wer danach
+greppt, findet Treffer und hört auf zu suchen.
+
+**Warum das die gefährlichste Sorte Prüfung ist.** Sie schlägt nie aus. Eine Prüfung, die
+nicht ausschlagen kann, wird nicht hinterfragt, sondern geglaubt.
+
+**Was ihn verhindert.** `standSchreiben()` in `worker.ts` (Migration `0075`) schreibt sie bei
+jedem Ausgang fort: Erfolg, `keine_daten`, Wiedervorlage, Aufgeben. `pausiert_bis` trägt dabei
+genau die Wiedervorlage, die der Worker gerade gesetzt hat — die Selbstdrosselung sitzt seit
+langem als `faellig_ab` am Posten und nicht als Pause an der Kombination. Ein Ende-zu-Ende-Test
+prüft nach einem echten Lauf, dass alle sechs Endpunkte dastehen.

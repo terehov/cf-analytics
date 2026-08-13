@@ -24,6 +24,16 @@ export type FnMockOptionen = {
    * dann Stille — lautlos wie im Original.
    */
   leerAb?: Record<string, number>
+  /**
+   * erpIds, auf die die Attrappe mit HTTP 403 antwortet — dieselbe Antwort,
+   * die FoodNotify am 03.08.2026 fuer Kostenstelle 11805 gab.
+   *
+   * DER FALL, DEN ES ZU TESTEN GILT: 403 heisst dort NICHT „dieser Zugang
+   * nicht", sondern „diese Kostenstelle nicht". FoodNotify betreibt in einem
+   * Mandanten auch Betriebe, die uns nicht gehoeren. Der Worker muss das vom
+   * Kontoproblem unterscheiden — und irgendwann aufhoeren zu fragen (0075).
+   */
+  verboten?: number[]
 }
 
 /**
@@ -35,6 +45,7 @@ export function fnMockStarten(opt: FnMockOptionen = {}) {
   let anmeldungen = 0
   const zaehler: Record<string, number> = {}
   const sessions = new Set<string>()
+  const verboten = new Set<number>(opt.verboten ?? [])
 
   const json = (body: unknown, init: ResponseInit = {}) =>
     new Response(JSON.stringify(body), {
@@ -70,6 +81,15 @@ export function fnMockStarten(opt: FnMockOptionen = {}) {
       const cookie = req.headers.get('cookie') ?? ''
       const angemeldet = [...sessions].some(s => cookie.includes(s))
       if (!angemeldet) return json({ message: 'Unauthenticated' }, { status: 401 })
+
+      /**
+       * Die verbotene Ressource. Steht VOR `leerAb` und vor dem Router:
+       * 403 kommt im Original ebenfalls, bevor irgendein Inhalt entsteht.
+       */
+      const erp = pfad.match(/^\/api\/(\d+)\//)?.[1]
+      if (erp && verboten.has(Number(erp))) {
+        return json({ message: 'Forbidden' }, { status: 403 })
+      }
 
       const abWann = opt.leerAb?.[pfad]
       if (abWann !== undefined && zaehler[pfad]! >= abWann) {
@@ -351,6 +371,18 @@ export function fnMockStarten(opt: FnMockOptionen = {}) {
     url: `http://localhost:${server.port}`,
     zaehler,
     get anmeldungen() { return anmeldungen },
+    /**
+     * Eine Ressource im Lauf verbieten bzw. wieder freigeben.
+     *
+     * WARUM VERAENDERBAR UND NICHT NUR EINE OPTION: `config` friert
+     * `FN_BASE_URL` beim ersten Import ein, es gibt im Ende-zu-Ende-Test also
+     * genau eine Attrappe. Der 403-Verlauf braucht aber beide Zustaende
+     * nacheinander — erst verweigert die Quelle, dann traegt jemand den
+     * Anspruch nach. Dieselbe Bauart wie `belegeLoeschen()` in der
+     * LINA-Attrappe.
+     */
+    verbieten: (erpId: number) => { verboten.add(erpId) },
+    freigeben: (erpId: number) => { verboten.delete(erpId) },
     stop: () => server.stop(true),
   }
 }

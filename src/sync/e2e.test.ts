@@ -146,6 +146,39 @@ lauf('Ende-zu-Ende', () => {
     expect(schwellen).toBeGreaterThan(0)
   }, 60_000)
 
+  /**
+   * `sync.fortschritt` hatte vier Leser und keinen Schreiber (Plan 3.4).
+   *
+   * Die Tabelle steht seit Migration `0005` da. Am 14.08.2026 in Produktion
+   * nachgezaehlt: **0 Zeilen** — und `src/health.ts` meldete daraus
+   * strukturbedingt fuer immer „null pausierte Endpunkte". Eine Pruefung, die
+   * nie ausschlagen kann, ist schlimmer als keine: sie beruhigt.
+   *
+   * Der Test steht hier und nicht bei den Sichten, weil nur ein echter Lauf
+   * beweist, dass der Schreiber tatsaechlich laeuft. Eine Zusicherung ueber
+   * die Tabellenform haette den alten Zustand genauso bestanden.
+   */
+  test('sync.fortschritt wird vom Lauf fortgeschrieben', async () => {
+    /*
+     * Die sechs Endpunkte des ersten Laufs, namentlich. Eine Gesamtzahl
+     * waere von der Reihenfolge der Testdateien abhaengig — der Bestand
+     * dieser sechs ist es nicht.
+     *
+     * getAktionsbericht ist dabei: `keine_daten` ist ein gelungener Aufruf
+     * ohne Inhalt (AGENTS.md) und schiebt den Stand vor. Sonst saehe ein
+     * geschlossener Betrieb aus wie einer, den wir nicht erreichen.
+     */
+    const { rows } = await db.query(
+      `SELECT endpunkt, letzter_zeitraum, letzter_erfolg_am IS NOT NULL AS hatte_erfolg
+         FROM sync.fortschritt
+        WHERE endpunkt IN ('getUmsatzbericht','getUmsatzbericht:speisen','getPersonalkosten',
+                           'getZeitzonenbericht','getArtikelverkaufsbericht','getAktionsbericht')
+        ORDER BY endpunkt`)
+    expect(rows).toHaveLength(6)
+    expect(rows.every(r => r.hatte_erfolg)).toBe(true)
+    expect(rows.every(r => r.letzter_zeitraum !== null)).toBe(true)
+  })
+
   test('der Sessionablauf mitten im Lauf wird abgefangen', async () => {
     // sessionAblaufNach: 3 — der Mock hat mitten im Lauf abgelaufen und der
     // Client musste sich neu anmelden. Wären die Aufrufe danach fehlgeschlagen,
@@ -211,6 +244,15 @@ lauf('Ende-zu-Ende', () => {
        * NICHT mit — sonst stünde die Zeile dauerhaft rot, und sie soll eine
        * Entscheidungsliste sein, keine Tapete.
        */
+      /**
+       * Beide seit 0075, und beide bewusst NICHT „offene Seiten" bzw.
+       * „403 gesehen": gezaehlt wird nur, was einen ganzen Lauf ueberlebt
+       * hat, und nur ein 403 auf einem EIGENEN Betrieb. Am 14.08.2026 um
+       * 00:16 standen sonst alle 251 Monatszeilen der Ladestandskarte auf
+       * „… laedt" — waehrend der Lauf sie gerade abarbeitete.
+       */
+      'Einkauf: 403 auf einem EIGENEN Betrieb',
+      'Einkauf: Bestellseiten aus einem frueheren Lauf offen',
       'Einkauf: Kostenstelle ohne Betrieb, mit Bestellungen',
       'Inventur: Zaehlung abgeschnitten',
       /**
@@ -1836,6 +1878,112 @@ lauf('FoodNotify Ende-zu-Ende', () => {
       const nachher = await zeile()
       expect(Number(nachher.geprueft)).toBe(3)
       expect(Number(nachher.auffaellig)).toBe(0)
+    })
+  })
+
+  /**
+   * Der 403-Zweig hatte kein Ende (Migration 0075, Plan 3.3 und 3.5).
+   *
+   * `posten_holen()` zaehlt `versuche` hoch, der 403-Zweig zaehlt es wieder
+   * herunter — netto ±0 pro Tag. Posten 28629 lag deshalb vom 02.08. bis
+   * zum 14.08.2026 in der Schlange und stand immer noch auf `versuche = 0`,
+   * waehrend er alle 60 Enchilada-Monatszeilen der Ladestandskarte auf
+   * „unvollstaendig" faerbte.
+   *
+   * Geprueft wird der ganze Verlauf, weil jede Stufe fuer sich falsch sein
+   * kann: ruhen, den Fakt festhalten, die Gegenprobe machen, schliessen —
+   * und nicht wiederbeleben.
+   */
+  describe('403 auf einer fremden Ressource laeuft von selbst aus', () => {
+    const posten = async () => (await db.query(
+      `SELECT posten_id, ergebnis, erledigt_am, gesperrt_seit, versuche
+         FROM sync.warteschlange
+        WHERE endpunkt = 'fn:bestellungen' AND marke_key = $1
+          AND parameter->>'erpId' = '10484'
+        ORDER BY posten_id DESC LIMIT 1`, [aposto])).rows[0]
+
+    test('erst ruhen, dann schliessen — und nur, wenn die Quelle sonst antwortet', async () => {
+      const { workerLauf } = await import('./worker')
+
+      /*
+       * Ausgangslage: GENAU EINE offene Bestellseite, und die auf der
+       * Kostenstelle, die gleich 403 sagt. Erledigte Posten wieder zu
+       * oeffnen ginge nicht — der Eindeutigkeitsindex ist partiell und
+       * kollidiert, sobald dieselbe Seite zweimal geholt wurde.
+       */
+      await db.query(
+        `DELETE FROM sync.warteschlange
+          WHERE endpunkt = 'fn:bestellungen' AND erledigt_am IS NULL`)
+      await db.query(
+        `INSERT INTO sync.warteschlange
+           (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter)
+         VALUES ('fn:bestellungen', current_date, current_date, 10, $1,
+                 '{"erpId":"10484","seite":"7"}'::jsonb)`, [aposto])
+
+      fnMock.verbieten(10484)
+      try {
+        await workerLauf('manuell')
+
+        /**
+         * Erste Stufe: der Posten ruht, der Fakt steht fest. Genau EIN
+         * Posten ist betroffen — die andere Kostenstelle laeuft weiter.
+         * Das ist der Befund vom 03.08.2026: 403 heisst „diese
+         * Kostenstelle nicht", nicht „dieser Zugang nicht".
+         */
+        const ruht = await posten()
+        expect(ruht.ergebnis).toBeNull()
+        expect(ruht.erledigt_am).toBeNull()
+        expect(ruht.gesperrt_seit).not.toBeNull()
+
+        /**
+         * Zweite Stufe, die Gegenprobe: der Posten ist alt genug, ABER die
+         * Quelle antwortet nirgends mehr. Dann ist es das Konto und keine
+         * Ressourcengrenze — und geschlossen wird nichts.
+         */
+        await db.query(
+          `UPDATE sync.warteschlange
+              SET gesperrt_seit = now() - interval '30 days', faellig_ab = now()
+            WHERE posten_id = $1`, [ruht.posten_id])
+        const merker = await db.query(
+          `UPDATE sync.aufgabe SET status = 'fehler'
+            WHERE endpunkt = 'fn:bestellungen' AND status = 'ok' RETURNING aufgabe_id`)
+        await workerLauf('manuell')
+        expect((await posten()).ergebnis).toBeNull()
+
+        /**
+         * Dritte Stufe: derselbe Posten, dieselbe Frist — aber die Quelle
+         * antwortet wieder. Jetzt ist die Aussage belastbar, und der Posten
+         * wird geschlossen. `kein_zugriff`, nicht `aufgegeben`.
+         */
+        await db.query(
+          `UPDATE sync.aufgabe SET status = 'ok' WHERE aufgabe_id = ANY($1)`,
+          [merker.rows.map(r => r.aufgabe_id)])
+        await db.query(
+          `UPDATE sync.warteschlange SET faellig_ab = now() WHERE posten_id = $1`,
+          [ruht.posten_id])
+        await workerLauf('manuell')
+
+        const zu = await posten()
+        expect(zu.ergebnis).toBe('kein_zugriff')
+        expect(zu.erledigt_am).not.toBeNull()
+
+        /**
+         * Und er bleibt zu. `aufgegebeneWiederbeleben()` fasst nur
+         * `aufgegeben` an — sonst holte der naechtliche Lauf ihn dreimal
+         * zurueck, um dreimal dasselbe 403 zu bekommen.
+         */
+        const { aufgegebeneWiederbeleben } = await import('./nachfuellen')
+        await aufgegebeneWiederbeleben()
+        expect((await posten()).ergebnis).toBe('kein_zugriff')
+
+        // Sichtbar, und mit der Frage, auf die es ankommt: gehoert uns das?
+        const { rows: sicht } = await db.query(
+          `SELECT erp_id, eigener_betrieb FROM mart.posten_ohne_zugriff`)
+        expect(sicht).toHaveLength(1)
+        expect(sicht[0].erp_id).toBe('10484')
+      } finally {
+        fnMock.freigeben(10484)
+      }
     })
   })
 })

@@ -33,6 +33,58 @@ function wiedervorlage(versuche: number): string {
 }
 
 /**
+ * `sync.fortschritt` fortschreiben — je Endpunkt und Betrieb.
+ *
+ * DIE TABELLE HATTE VIER LESER UND KEINEN SCHREIBER. Sie steht seit Migration
+ * `0005` da; am 14.08.2026 in Produktion nachgezaehlt: **0 Zeilen**. Gelesen
+ * wird sie von `src/health.ts` (`pausierteKombinationen`), `mart.sync_status`
+ * und zwei Sichten aus `0019`/`0039`. Der Gesundheitsbericht meldete daraus
+ * strukturbedingt fuer immer „null pausierte Endpunkte" — die gefaehrlichste
+ * Sorte Pruefung, weil sie nie ausschlaegt und deshalb nie hinterfragt wird.
+ *
+ * WARUM FUELLEN UND NICHT ENTFERNEN (Plan 3.4 liess beides offen): drei der
+ * vier Spalten beantworten Fragen, die tatsaechlich jemand stellt — wo steht
+ * welcher Endpunkt, welcher Betrieb haengt seit wann. Nur `pausiert_bis`
+ * hatte keine Entsprechung mehr, weil die Selbstdrosselung inzwischen als
+ * `faellig_ab` am POSTEN sitzt und nicht als Pause an der Kombination.
+ * Deshalb steht hier genau das drin: die Wiedervorlage, die der Worker gerade
+ * gesetzt hat.
+ *
+ * WIRFT NIE. Der Fortschritt ist eine Beobachtung ueber die Arbeit, nicht die
+ * Arbeit. Ein Fehler beim Notieren darf den Posten nicht mitnehmen, der
+ * gerade sauber geladen wurde.
+ */
+async function standSchreiben(
+  endpunkt: string,
+  betriebEncId: string | null,
+  zeitraumBis: string | null,
+  erfolg: boolean,
+  wiedervorlageIn: string | null,
+): Promise<void> {
+  await query(
+    `INSERT INTO sync.fortschritt
+       (endpunkt, betrieb_enc_id, letzter_zeitraum, letzter_erfolg_am,
+        fehler_in_folge, pausiert_bis)
+     VALUES ($1, coalesce($2, ''), CASE WHEN $4 THEN $3::date END,
+             CASE WHEN $4 THEN now() END,
+             CASE WHEN $4 THEN 0 ELSE 1 END,
+             CASE WHEN $5::text IS NULL THEN NULL ELSE now() + $5::interval END)
+     ON CONFLICT (endpunkt, betrieb_enc_id) DO UPDATE
+        -- greatest() ignoriert NULL: der Historienlauf arbeitet rueckwaerts
+        -- und darf den erreichten Stand nicht zurueckdrehen.
+        SET letzter_zeitraum  = greatest(excluded.letzter_zeitraum,
+                                         fortschritt.letzter_zeitraum),
+            letzter_erfolg_am = coalesce(excluded.letzter_erfolg_am,
+                                         fortschritt.letzter_erfolg_am),
+            fehler_in_folge   = CASE WHEN $4 THEN 0
+                                     ELSE fortschritt.fehler_in_folge + 1 END,
+            pausiert_bis      = excluded.pausiert_bis`,
+    [endpunkt, betriebEncId, zeitraumBis, erfolg, wiedervorlageIn],
+  ).catch(e => log.warn('fortschritt nicht fortgeschrieben — der Posten bleibt davon unberuehrt',
+                        { endpunkt, fehler: String(e).slice(0, 200) }))
+}
+
+/**
  * Schlüssel der Advisory-Sperre. Frei gewählt, muss nur stabil sein.
  * (`sync.worker` als Zahl gelesen — irgendein fester Wert tut es.)
  */
@@ -579,12 +631,16 @@ async function workerLaufIntern(
 
         ok++; fehlerInFolge = 0
         await query(
+          // gesperrt_seit raeumt der Erfolg mit ab: ein nachgetragener
+          // Anspruch soll die Frist nicht mit sich herumtragen (0075).
           `UPDATE sync.warteschlange
-              SET erledigt_am = now(), in_arbeit_seit = NULL, ergebnis = 'ok', letzter_fehler = NULL
+              SET erledigt_am = now(), in_arbeit_seit = NULL, ergebnis = 'ok',
+                  letzter_fehler = NULL, gesperrt_seit = NULL
             WHERE posten_id = $1`, [posten.posten_id])
         await protokoll(laufId, epKey, posten, 'ok', res, quellClient, null, zeilen)
         log.debug('geladen', { endpunkt: epKey, von, zeilen, dauerMs: res.dauerMs })
         await fortschritt(epKey, von, zeilen, res.dauerMs)
+        await standSchreiben(epKey, posten.betrieb_enc_id ?? null, bis, true, null)
         continue
       }
 
@@ -599,6 +655,10 @@ async function workerLaufIntern(
         // Auch hier eine Zeile: eine lange Strecke ohne Daten (geschlossener
         // Betrieb, Zeitraum vor der Eroeffnung) ist sonst wieder Stille.
         await fortschritt(epKey, von, null, res.dauerMs)
+        // `keine_daten` ist ein gelungener Aufruf, kein Fehler (AGENTS.md).
+        // Er schiebt den Stand vor, sonst sieht ein geschlossener Betrieb
+        // in `sync.fortschritt` aus wie einer, den wir nicht erreichen.
+        await standSchreiben(epKey, posten.betrieb_enc_id ?? null, bis, true, null)
         continue
       }
 
@@ -650,22 +710,78 @@ async function workerLaufIntern(
        *
        * 429 bleibt marken-weit: „zu schnell" gilt fuer den Zugang, nicht
        * fuer die Ressource.
+       *
+       * --- UND SEIT 0075 MIT EINEM ENDE -----------------------------------
+       *
+       * Der Zweig oben war richtig gedacht und lief trotzdem unbegrenzt:
+       * `posten_holen()` zaehlt `versuche` hoch, dieser Zweig zaehlt es
+       * wieder herunter, netto ±0 pro Tag. Posten 28629 (Enchilada, erpId
+       * 11805, „Layer-Chemie Testbetrieb") lag vom 02.08. bis zum 14.08.2026
+       * darin und stand immer noch auf `versuche = 0` — waehrend er ueber
+       * `liste_vollstaendig` alle 60 Enchilada-Monatszeilen der Ladestands-
+       * karte auf „unvollstaendig" faerbte.
+       *
+       * `gesperrt_seit` ist der Fakt, der gefehlt hat: seit wann sagt die
+       * Quelle nein. Nach SPERRE_AUFGEBEN_TAGE wird der Posten geschlossen —
+       * mit `kein_zugriff` und nicht mit `aufgegeben`, weil
+       * `aufgegebeneWiederbeleben()` ihn sonst dreimal zurueckholte, um
+       * dreimal dasselbe 403 zu bekommen.
+       *
+       * DIE GEGENPROBE, DAMIT KEIN KONTOPROBLEM ALS QUELLENGRENZE ENDET:
+       * geschlossen wird nur, wenn derselbe Endpunkt derselben Marke in den
+       * letzten 24 Stunden irgendwo ein `ok` hatte. Sagt der Zugang ueberall
+       * nein, bleibt der Posten liegen und der Lauf stoppt wie gehabt nach
+       * ABBRUCH_NACH_FEHLERN.
        */
       if (res.art === 'gesperrt' && res.sperrArt === 'http_403' && quelle.art === 'fn') {
         const bisWann = res.wartenBis
           ?? new Date(Date.now() + config.SPERRE_PAUSE_STUNDEN * 3_600_000)
-        await query(
-          `UPDATE sync.warteschlange
+        const stand = await eine<{ tage: number; quelle_antwortet: boolean }>(
+          `UPDATE sync.warteschlange w
               SET in_arbeit_seit = NULL, versuche = greatest(0, versuche - 1),
-                  letzter_fehler = $2, faellig_ab = $1::timestamptz
-            WHERE posten_id = $3`,
+                  letzter_fehler = $2, faellig_ab = $1::timestamptz,
+                  gesperrt_seit = coalesce(w.gesperrt_seit, now())
+            WHERE w.posten_id = $3
+        RETURNING EXTRACT(epoch FROM (now() - w.gesperrt_seit)) / 86400 AS tage,
+                  EXISTS (SELECT 1 FROM sync.aufgabe a
+                           WHERE a.endpunkt = w.endpunkt
+                             AND a.marke_key IS NOT DISTINCT FROM w.marke_key
+                             AND a.status = 'ok'
+                             AND a.beendet_am > now() - interval '24 hours')
+                    AS quelle_antwortet`,
           [bisWann, res.fehler.slice(0, 2000), posten.posten_id])
+
+        const tage = Number(stand?.tage ?? 0)
+        if (tage >= config.SPERRE_AUFGEBEN_TAGE && stand?.quelle_antwortet) {
+          await query(
+            `UPDATE sync.warteschlange
+                SET erledigt_am = now(), in_arbeit_seit = NULL, ergebnis = 'kein_zugriff',
+                    letzter_fehler = $2
+              WHERE posten_id = $1`,
+            [posten.posten_id,
+             `${res.fehler.slice(0, 1800)} — seit ${Math.floor(tage)} Tagen abgelehnt, `
+             + `waehrend derselbe Endpunkt derselben Marke antwortet. Als Quellengrenze `
+             + `geschlossen, siehe mart.posten_ohne_zugriff.`])
+          await protokoll(laufId, epKey, posten, 'uebersprungen', res, quellClient, res.fehler)
+          uebersprungen++
+          // KEIN fehlerInFolge++: das hier ist eine beantwortete Frage und
+          // kein Fehlschlag. Hochzaehlen hiesse, dass ein Aufraeumen den
+          // Lauf abbrechen kann.
+          log.warn('foodnotify 403 dauerhaft — posten als kein_zugriff geschlossen', {
+            marke: quelle.marke, endpunkt: epKey, parameter: posten.parameter,
+            tage: Math.floor(tage), sicht: 'mart.posten_ohne_zugriff',
+          })
+          continue
+        }
+
         await protokoll(laufId, epKey, posten, 'uebersprungen', res, quellClient, res.fehler)
         uebersprungen++
         fehlerInFolge++
         log.warn('foodnotify 403 auf einer ressource — nur dieser posten ruht', {
           marke: quelle.marke, endpunkt: epKey, parameter: posten.parameter,
-          fehlerInFolge, vertagtBis: bisWann,
+          fehlerInFolge, vertagtBis: bisWann, gesperrtSeitTagen: Math.floor(tage),
+          schliesstNach: config.SPERRE_AUFGEBEN_TAGE,
+          quelleAntwortet: stand?.quelle_antwortet ?? null,
         })
         continue
       }
@@ -731,14 +847,19 @@ async function workerLaufIntern(
                   letzter_fehler = $1
             WHERE posten_id = $2`, [res.fehler.slice(0, 2000), posten.posten_id])
         log.error('posten aufgegeben', { endpunkt: epKey, von, versuche: posten.versuche, fehler: res.fehler })
+        await standSchreiben(epKey, posten.betrieb_enc_id ?? null, null, false, null)
       } else {
+        const frist = wiedervorlage(posten.versuche)
         await query(
           `UPDATE sync.warteschlange
               SET in_arbeit_seit = NULL, letzter_fehler = $1,
                   faellig_ab = now() + $2::interval
             WHERE posten_id = $3`,
-          [res.fehler.slice(0, 2000), wiedervorlage(posten.versuche), posten.posten_id])
+          [res.fehler.slice(0, 2000), frist, posten.posten_id])
         log.warn('wiedervorlage', { endpunkt: epKey, von, versuche: posten.versuche, fehler: res.fehler })
+        // Genau diese Frist ist die „Selbstdrosselung dieser Kombination",
+        // die `sync.fortschritt.pausiert_bis` seit Migration 0005 meint.
+        await standSchreiben(epKey, posten.betrieb_enc_id ?? null, null, false, frist)
       }
       await protokoll(laufId, epKey, posten, aufgeben ? 'uebersprungen' : 'fehler', res, quellClient, res.fehler)
       } catch (e) {

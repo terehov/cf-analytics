@@ -327,6 +327,30 @@ const Schema = z.object({
   MAX_WIEDERBELEBUNGEN: z.coerce.number().int().min(0).default(3),
 
   /**
+   * Nach wie vielen Tagen dauerhafter Ablehnung (HTTP 403) ein FoodNotify-Posten
+   * geschlossen wird — mit `ergebnis = 'kein_zugriff'`, nicht `aufgegeben`.
+   *
+   * DER ZWEIG, DEN ES BEENDET. `worker.ts` vertagt einen 403 um 24 Stunden und
+   * nimmt dem Posten dabei einen Versuch ab (`versuche - 1`), weil
+   * `posten_holen()` vorher hochgezählt hat. Netto ±0 pro Tag — der Posten
+   * kommt nie am Aufgeben-Zweig vorbei. Das ist bewusst so gebaut (ein
+   * fehlender Anspruch kann nachgetragen werden), hatte aber kein Ende:
+   * Posten 28629 lag vom 02.08. bis zum 14.08.2026 darin und stand immer noch
+   * auf `versuche = 0`.
+   *
+   * VIERZEHN TAGE, weil das die Frist ist, in der ein nachgetragener Anspruch
+   * realistisch ankommt. Kürzer wäre eine Wette gegen die Verwaltung; länger
+   * hiesse, dass eine fremde Kostenstelle die Ladestandsanzeige einen Monat
+   * lang einfärbt.
+   *
+   * DIE GEGENPROBE STEHT IM WORKER: geschlossen wird nur, wenn derselbe
+   * Endpunkt derselben Marke in den letzten 24 Stunden irgendwo ein `ok`
+   * hatte. Sagt der Zugang ÜBERALL nein, ist es das Konto und keine Ressource
+   * — dann bleibt der Posten liegen, statt still weggeräumt zu werden.
+   */
+  SPERRE_AUFGEBEN_TAGE: z.coerce.number().int().min(1).default(14),
+
+  /**
    * Das rollierende Fenster für das Auffrischen der Bestelldetails (Tage).
    *
    * DER BEFUND DAHINTER. Am 13.08.2026 in Produktion gemessen: von 66.966

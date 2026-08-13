@@ -280,6 +280,12 @@ oder benannt; eine Rückbuchung in einem Vormonat erscheint im nächsten Lauf.
 
 ### Phase 3 — die Anzeige ehrlich machen
 
+> **Erledigt am 14.08.2026, Migration `0075`.** Alle fünf Punkte, 3.5 ausdrücklich
+> **ohne** Handgriff: `sync.warteschlange.gesperrt_seit` beendet den 403-Zweig
+> von selbst, Posten 28629 läuft am 16.08.2026 aus. Eine Messung korrigiert
+> dabei 3.1: nicht 60 Zeilen standen auf „… lädt", sondern alle 251
+> (`fehlerkatalog.md`, `befunde-datenlage.md`).
+
 | # | Was | Berührt |
 |---|---|---|
 | 3.1 | `mart.einkauf_ladestand` in **einer** Migration um beides erweitern: gesperrte Posten getrennt von offenen zählen, und „Bestellung mit Kopf, ohne Position" als eigene Spalte. Beide Änderungen fassen dieselbe Sicht an. | neue Migration |

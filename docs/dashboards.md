@@ -976,3 +976,24 @@ Die ältere Seite bleibt. Sie fragt **fachlich**: welchen Betrieben fehlen Daten
 Zahlen gegen LINAs eigene Aggregate, wer ist überhaupt beurteilbar. Diese hier fragt
 **technisch**: läuft der Abruf. Wer eine fehlende Zahl sucht, fängt hier an und geht dann
 dorthin.
+
+### „Wie vollständig sind die Einkaufsdaten?" — drei Zustände statt eines Häkchens
+
+Die Karte `wa_ladestand` zeigte bis zum 14.08.2026 zwei Zustände: `✓` oder `… lädt`. Gemessen
+um 00:16, während der nächtliche Lauf arbeitete, stand `… lädt` in **allen 251 Zeilen**.
+
+Seit Migration `0075` sind es drei:
+
+| Anzeige | Bedeutung |
+|---|---|
+| `✓` | die Liste ist durch |
+| `… lädt` | Rückstand aus einem früheren Lauf — es fehlen **ganze** Bestellungen |
+| `⚠ kein Zugriff` | der Lieferant verweigert eine Kostenstelle dauerhaft. Es kommt nichts nach |
+
+**Warum der dritte Zustand ein eigener Text ist und kein Ladehinweis:** „lädt" verspricht, dass
+es gleich da ist. Bei einem 403 ist es nie da, und wer darauf wartet, wartet umsonst. Ob das in
+Ordnung ist, sagt `mart.posten_ohne_zugriff` — bei einer fremden Kostenstelle ja, bei einem
+eigenen Betrieb nicht.
+
+Dazu die Spalte **„ohne Positionen"** neben „Positionen %". Dieselbe Aussage absolut: 99,9 %
+liest man weg, „18" nicht.

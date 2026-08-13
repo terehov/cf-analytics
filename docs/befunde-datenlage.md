@@ -1584,3 +1584,27 @@ Rand des Fensters noch Änderungen ankommen.
 
 **Die allgemeine Lehre:** eine Kennzahl über die Aktualität fremder Daten ist nur so tief wie
 das eigene Abrufverhalten. Wer sie ohne diesen Vorbehalt zitiert, misst sich selbst.
+
+## Der Ladestand mass die Warteschlange, nicht die Daten (14.08.2026)
+
+Gemessen um 00:16 Uhr über die Metabase-API, **während Lauf 90 lief**:
+
+```sql
+SELECT count(*) AS zeilen,
+       count(*) FILTER (WHERE NOT liste_vollstaendig) AS zeigt_laedt
+  FROM mart.einkauf_ladestand;
+-- 251 | 251
+```
+
+Alle vier Marken, alle Monate seit 2021: „… lädt". Der Plan hatte 60 Enchilada-Zeilen genannt
+und den hängenden Posten 28629 als Ursache — das war eine Messung zu einem Zeitpunkt **ohne**
+laufenden Lauf. Beide Zahlen stimmen und beschreiben verschiedene Momente; der Normalfall ist
+die schlechtere.
+
+**Die Lehre ist dieselbe wie bei den Nachzügler-Fenstern darüber:** eine Kennzahl, die einen
+momentanen Zustand unseres eigenen Betriebs misst, sagt nichts über die Daten. Sie sagt, wann
+man hingesehen hat.
+
+Daneben, aus demselben Abzug: **47 Bestellungen haben einen Kopf und keine einzige Position**
+(Wilma Wunder 20, Deutsche Konzepte 18, Enchilada 5, Aposto 4), verteilt über 26 Monate. Der
+Plan nannte 46; die Differenz ist der laufende Zulauf, nicht ein Widerspruch.

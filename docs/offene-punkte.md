@@ -1066,3 +1066,31 @@ sich alte Bestellungen überhaupt noch? Vor dem Lauf steht die Statusverteilung 
 (`imported` 47.340, `pending` 16.203, `canceled` 3.350, `accepted` 61, `finished` 12); danach
 sagt der Vergleich, ob `imported` als final gelten darf und ob der lange Schwanz jenseits von
 45 Tagen einen Wochentakt braucht. Solange das offen ist, gilt `imported` als **nicht** final.
+
+## Nachprüfung nach dem Deploy von `0075` (Phase 3)
+
+```sql
+-- 1. Die Ladestandskarte. VORHER (14.08.2026, 00:16, waehrend Lauf 90):
+--    251 von 251 Zeilen auf "… laedt". ERWARTUNG danach: die allermeisten
+--    auf 'vollstaendig', Rueckstand nur, wo wirklich etwas haengt.
+SELECT zustand, count(*) FROM mart.einkauf_ladestand GROUP BY 1 ORDER BY 2 DESC;
+
+-- 2. Posten 28629 laeuft von selbst aus. Er ist seit dem 02.08.2026
+--    gesperrt; mit SPERRE_AUFGEBEN_TAGE = 14 schliesst ihn der Lauf am
+--    16.08.2026. Vorher steht er hier mit gesperrt_seit, danach dort.
+SELECT posten_id, gesperrt_seit, ergebnis FROM sync.warteschlange WHERE posten_id = 28629;
+SELECT * FROM mart.posten_ohne_zugriff;
+
+-- 3. Die Gegenprobe, auf die es ankommt. ERWARTUNG: 0. Steht hier etwas,
+--    fehlen uns die Bestellungen eines EIGENEN Betriebs.
+SELECT * FROM mart.pruefung_uebersicht
+ WHERE pruefung = 'Einkauf: 403 auf einem EIGENEN Betrieb';
+
+-- 4. sync.fortschritt. VORHER: 0 Zeilen, seit Migration 0005.
+--    ERWARTUNG nach dem ersten Lauf: eine Zeile je Endpunkt, alle mit
+--    letzter_erfolg_am.
+SELECT count(*) AS zeilen,
+       count(*) FILTER (WHERE letzter_erfolg_am IS NOT NULL) AS mit_erfolg,
+       count(*) FILTER (WHERE pausiert_bis > now()) AS pausiert
+  FROM sync.fortschritt;
+```
