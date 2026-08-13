@@ -337,7 +337,7 @@ es nicht** — sie haben sich durch Nachmessen und Bauen erledigt, nicht durch F
 
 ### Zuerst: sechs Messaufrufe, die Eugene starten muss
 
-`bun run messen d1` bis `d6`. Je ein lesender Aufruf, nicht aus der Agentenumgebung
+`bun run lina-fragen d1` bis `d6`. Je ein lesender Aufruf, nicht aus der Agentenumgebung
 (Regel 7a). Sie entscheiden, **welche der Rechteanfragen überhaupt gestellt werden muss** —
 solange sie nicht gelaufen sind, ist jede Aufwandsschätzung geraten.
 
@@ -479,7 +479,7 @@ laufenden Bestand zeigt:
   Ordner mit 12.000 Zeilen dieselbe Struktur liefert, ist gemessen (Feldliste identisch),
   aber nicht als Test abgesichert.
 * **Die Token-Obergrenze ist unbekannt.** Gemessen sind 172 s Gültigkeit, angesetzt sind 90 s.
-  `bun run messen d9` misst die Obergrenze über sieben Minuten. Bis dahin gilt: der Client
+  `bun run lina-fragen d9` misst die Obergrenze über sieben Minuten. Bis dahin gilt: der Client
   holt bei unbrauchbarer Antwort einmal neu, das trägt auch ohne die Messung.
 * **Sechs Belegarten wurden nie gezählt** (16, 3968, 3969, 3971, 3972, 3976). Der Abzug holt
   sie, aber `manual.belegarchiv_soll` führt für sie 0 — sie werden deshalb **nicht

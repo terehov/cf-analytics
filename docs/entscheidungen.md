@@ -967,7 +967,7 @@ Betriebstage). Gegenprobe gegen die BWA: impliziter Stundenlohn 21,12 € im Med
 der 838 Betriebsmonate im Band 14–32 €/h.
 
 **Entschieden: Kapitel 2.1 wird auf `eff_*` gebaut**, nicht auf eine Freigabe gewartet.
-Bericht 107 bleibt als Messaufruf (`bun run messen d2`) auf der Liste — er würde die
+Bericht 107 bleibt als Messaufruf (`bun run lina-fragen d2`) auf der Liste — er würde die
 Rückrechnung ersetzen und zusätzlich Schichtebene liefern, aber er blockiert nichts mehr.
 
 ### Messaufrufe bekommen einen eigenen Befehl statt einer Anleitung
@@ -976,7 +976,7 @@ Sechs Fragen im Dokument waren mit je einem lesenden Aufruf entscheidbar, aber n
 sie gestellt. Der Grund war Reibung: `AGENTS.md` Regel 7a verbietet den Sync aus der
 Agentenumgebung, und eine Anleitung in Prosa wird nicht ausgeführt.
 
-**Entschieden: `bun run messen <id>`** (`src/messen.ts`). Ein Request, keine Schreibvorgänge
+**Entschieden: `bun run lina-fragen <id>`** (`src/messen.ts`). Ein Request, keine Schreibvorgänge
 — weder in LINA noch in die eigene Datenbank —, dieselbe Drosselung und dieselbe
 Anmelde-Notbremse wie im Sync. Jede Messung nennt **vor** dem Aufruf, welche Antwort welche
 Schlussfolgerung erlaubt; wer den Schluss erst nach dem Ergebnis formuliert, findet immer
@@ -1310,7 +1310,7 @@ durch Regel 1 ausgeschlossen (Abschnitt „Die Standortkarte wartet auf Koordina
 B will, muss diese Auslegung **ausdrücklich** ändern — und nicht stillschweigend, weil die
 Zahlen diesmal wertvoller erscheinen. Erschwerend: Der Aufwand lässt sich nicht vorab
 messen, ohne den Zustandswechsel schon einmal zu machen; ein rein lesender Messaufruf im
-Sinne von `bun run messen` gibt es hier nicht.
+Sinne von `bun run lina-fragen` gibt es hier nicht.
 
 **Nicht entschieden.** Dieser Abschnitt legt nichts fest. Er hält fest, dass die Ablehnung
 vom 11.08.2026 unter einer Annahme getroffen wurde, die seit dem 12.08.2026 nicht mehr gilt,

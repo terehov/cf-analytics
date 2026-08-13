@@ -54,6 +54,23 @@ export const ERLAUBTE_PFADE: RegExp[] = [
    */
   /^\/intranet\/ladenakte\/ladenstamm$/,
   /^\/intranet\/ladenakte\/ladenstamm\/laden\/[0-9a-f]{20,120}\/admin\/1\/?$/,
+  /*
+   * Die Belegdatei selbst. Bis zum 13.08.2026 stand hier nichts dergleichen,
+   * und der Satz "keine einzige Belegdatei heruntergeladen" in
+   * docs/lina-api-inventar-ladenakte.md war woertlich gemeint.
+   *
+   * Eingetragen fuer `src/korpus.ts` — den beaufsichtigten Einzelabzug eines
+   * Beispielkorpus. Der naechtliche Lauf ruft diesen Pfad NICHT auf; er hat
+   * keinen Endpunkt darauf und keinen Grund dazu. Wer das aendern will,
+   * aendert damit die Datenmenge, die dieser Importer bewegt, um drei
+   * Groessenordnungen — 593.677 Dateien statt 593.677 Zeilen.
+   *
+   * Lesend wie alles hier: ein GET, der eine Datei zurueckgibt. Der einzige
+   * variable Teil ist `id=<encryptedId>`, und der steht im Query, den
+   * `pfadPruefen()` bewusst nicht anfasst — er kann keinen anderen Endpunkt
+   * ansprechen.
+   */
+  /^\/intranet\/ladenakte\/getBeleg$/,
 ]
 
 /**

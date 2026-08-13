@@ -20,9 +20,9 @@
  * Drosselung, das Tagesbudget und die Anmelde-Notbremse aus Regel 7 gelten
  * unverändert — der Client ist derselbe wie im Sync.
  *
- *   bun run messen              # Liste aller Messungen
- *   bun run messen d1           # eine Messung
- *   bun run messen d1 --roh     # zusätzlich die ersten 4000 Zeichen der Antwort
+ *   bun run lina-fragen              # Liste aller Messungen
+ *   bun run lina-fragen d1           # eine Messung
+ *   bun run lina-fragen d1 --roh     # zusätzlich die ersten 4000 Zeichen der Antwort
  *
  * Jede Messung sagt VORHER, welche Antwort welche Schlussfolgerung erlaubt.
  * Das ist Absicht: wer den Schluss erst nach dem Ergebnis formuliert, findet
@@ -406,7 +406,7 @@ function hilfe() {
   console.log(`
 Einmalige LESENDE Messaufrufe gegen LINA.
 
-  bun run messen <id> [--roh]
+  bun run lina-fragen <id> [--roh]
 
 d1-d5 sind je EIN Request. d7-d9 brauchen mehrere und sagen das dazu.
 Der Client drosselt, führt das Tagesbudget und bricht nach EINEM gescheiterten

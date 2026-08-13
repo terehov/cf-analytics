@@ -399,7 +399,7 @@ Diese Datei ist bisher LINA-lastig geschrieben; der ganze FoodNotify-Importer (`
 
 ## `src/messen.ts` — Einzelmessungen ohne Warteschlange (11.08.2026)
 
-`bun run messen <d1..d6>` stellt **einen** lesenden Aufruf gegen LINA und druckt Status,
+`bun run lina-fragen <d1..d6>` stellt **einen** lesenden Aufruf gegen LINA und druckt Status,
 Form, Größe und die ersten Zeichen der Antwort. Kein Schreibvorgang — weder in LINA
 (Regel 1) noch in `raw.api_antwort`: `LinaClient.holen()` holt und gibt zurück, das Ablegen
 macht `sync/laden.ts`, und das läuft hier nicht.
@@ -417,6 +417,50 @@ eine Liste „Antwort → Schlussfolgerung", die **vor** dem Aufruf feststeht un
 gedruckt wird. Wer den Schluss erst nach dem Ergebnis formuliert, findet immer einen.
 
 Läuft nach Regel 7a **nur im Terminal des Nutzers**, nicht aus der Agentenumgebung.
+
+---
+
+## `src/korpus.ts` — Belegdateien als Beispieldaten für das PIM (13.08.2026)
+
+`bun run belege-herunterladen` zieht **Dateien** statt Zeilen: die PDFs aus LINAs
+Belegarchiv und die darin eingebetteten E-Rechnungs-XML. Zweck ist ein Testkorpus für
+die Matching-Pipeline des PIM bei brain.food — **kein Teil des nächtlichen Laufs**, kein
+Eintrag in `ENDPUNKTE`, nichts, was `nachfuellen()` je einreiht.
+
+Bis dahin galt der Satz aus `docs/lina-api-inventar-ladenakte.md` wörtlich: *keine einzige
+Belegdatei heruntergeladen*. Mit `getBeleg` in `ERLAUBTE_PFADE` gilt er nicht mehr, und
+das ist der Grund, warum der Eintrag dort einen längeren Kommentar trägt als die anderen
+fünf: er ändert die Größenordnung dessen, was dieser Importer bewegen kann.
+
+**Weg A, nicht Weg B.** Weg B (`/finanzen/document/filelistByBelegart`) lieferte `lineItems`
+und `is_xrechnung` fertig strukturiert — Labels frei Haus. Er hängt am aktiven Mandanten,
+und ein Mandantenwechsel ist ausgeschlossen: der Zugang steht auf CONCEPT FAMILY
+Franchise AG und bleibt dort (Eugene, 13.08.2026). Bleibt Weg A, dieselbe Tür wie täglich.
+
+**Was an die Stelle der Labels tritt.** Der Kopf jedes Belegs steht schon in
+`core.buchungsbeleg` — Lieferant, Netto, MwSt-Aufteilung, Kreditor, Sachkonto, DATEV-GUID,
+Bar/Küche. Er geht als `manifest.jsonl` mit. Positionen gibt es nur dort, wo eine E-Rechnung
+im PDF steckt.
+
+**Die Dateinamen-Heuristik ist eine Untergrenze, keine Erkennung.** 113 Belege heißen
+„…zugferd…", aber ein ZUGFeRD-PDF muss das nicht. Erkannt wird deshalb erst nach dem
+Laden, an den Bytes: jeder `stream…endstream`-Block wird ausgepackt und auf die
+Wurzelelemente `CrossIndustryInvoice` (ZUGFeRD/Factur-X) und `Invoice` im UBL-Namensraum
+(XRechnung) geprüft. XMP-Metadaten sind ebenfalls XML und werden ausdrücklich nicht
+mitgezählt — sonst hielte der Lauf 300.000 Scans für E-Rechnungen.
+
+**Auswahl aus der Produktion, Dateien von LINA.** Die lokale Datenbank ist ein Torso ohne
+Belegarchiv; gelesen wird deshalb über Metabase `/api/dataset`, streng SELECT. Die Auswahl
+ist sortiert statt zufällig — derselbe Aufruf liefert morgen denselben Korpus, sonst wäre er
+als Testbestand wertlos. Gemessen am 13.08.2026: **1.585 Belege** (542 Lieferscheine,
+113 E-Rechnungs-Verdacht, 930 gestreute Eingangsrechnungen).
+
+**Vorschau vor Abzug.** Ohne `KORPUS_ZIEHEN=1` wird nur gerechnet: Zahl je Topf, Obergrenze,
+geschätzte Dauer. Fortsetzbar ist er ohnehin — was auf der Platte liegt, wird übersprungen.
+
+Läuft nach Regel 7a **nur im Terminal des Nutzers**. Der Takt ist derselbe wie im Sync;
+für den beaufsichtigten Lauf lässt er sich über `TAKT_MIN_MS`/`TAKT_MAX_MS` senken, aber
+über Umgebungsvariablen für diesen einen Lauf — es gibt genau einen Zugang.
 
 ---
 

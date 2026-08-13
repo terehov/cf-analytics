@@ -155,7 +155,7 @@ unbekannt, gemessen ist nur eine Untergrenze. Deshalb **Token neu holen und den 
 genau einmal wiederholen**, wenn eine Antwort kein JSON ist oder `recordsTotal` fehlt.
 Das kostet im Normalfall nichts und rettet den Betrieb im Ausnahmefall.
 
-Offen geblieben: die Obergrenze. `bun run messen d9` misst sie über sieben Minuten.
+Offen geblieben: die Obergrenze. `bun run lina-fragen d9` misst sie über sieben Minuten.
 
 ---
 

@@ -200,7 +200,7 @@ Stunden_Küche   = Umsatz_Speisen   / effKueche
 
 **Was daraus folgt:** Kapitel 2.1 hängt **nicht** an Bericht 107. Der Bericht bleibt
 interessant — er brächte die Schichtebene für 2.3 —, aber er blockiert nichts. Der Messaufruf
-dafür ist `bun run messen d2`.
+dafür ist `bun run lina-fragen d2`.
 
 **Was weiter gilt:** Personalstunden je *Zeitzone* gibt es nicht (die Stunden liegen je Tag
 vor), und die **Soll**-Stunden für den Plan-Ist-Vergleich aus 7.2 stecken im Dienstplan, der

@@ -215,7 +215,10 @@ bun run health                               # Health-Endpunkt (Container-CMD)
 curl localhost:3000/health                     # lebt der Container?
 curl localhost:3000/status                     # muss jemand hinsehen? (503 = ja)
 bun run typecheck
-bun run messen                               # LESENDE Einzelmessungen gegen LINA, d1-d6
+bun run lina-fragen                          # LESENDE Einzelmessungen gegen LINA, d1-d6
+                                             # (nur im Terminal des Nutzers, Regel 7a)
+bun run belege-herunterladen                 # Vorschau: welche Belegdateien ein Korpuslauf zöge
+KORPUS_ZIEHEN=1 bun run belege-herunterladen # zieht die PDFs und die eingebetteten E-Rechnungs-XML
                                              # (nur im Terminal des Nutzers, Regel 7a)
 ```
 
