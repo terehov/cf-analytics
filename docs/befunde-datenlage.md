@@ -1494,3 +1494,46 @@ Lauf mit `la:belegzahl` (offener Punkt 6 in `docs/offene-punkte.md`).
 Die Aufrufrechnung ändert sich entsprechend: **1.974 Zählungen + 282 Token-Aufrufe + 82
 Tagesberichte ≈ 2.338 von 10.500** statt der 2.238, die in der Commit-Nachricht zu `0069`
 stehen. Am Ergebnis ändert das nichts — 22 % statt 21 %.
+
+### Nachher-Messung Lauf 89 (13.08.2026, 13:55–18:02, manuell gestartet)
+
+Der erste vollständige Lauf mit der täglichen Zählung. 2.685 Aufgaben, **0 Fehler**,
+alle 1.974 Zählungen durch, **0 `keine_daten`** — auch die zehn Betriebe ohne Soll-Zeile
+haben also ein Belegarchiv. 68 Abzüge nachgereiht, LINA-Budget 2.206 von 10.500 (deckt
+sich mit der Rechnung oben).
+
+| Kriterium aus dem Plan | vorher | nachher |
+|---|---|---|
+| `core.buchungsbeleg` bekommt täglich Zulauf | 0 am 12./13.08. | **+12.482** am 13.08., Bestand 605.835 |
+| Keine Inventur endet bei 800 | 9 (936 Positionen fehlend) | **0** |
+| Belegarchiv-Anteil August in `mart.fremdeinkauf` | 52,3 % | **55,8 %** (Mai 76,5 / Juni 78,6 / Juli 72,9) |
+
+Das dritte Kriterium ist erst teilweise erfüllt, und das ist erklärbar, kein Defekt:
+von den nachgeholten Belegen trägt nur ein Bruchteil ein August-`beleg_datum` (der
+größte Einzelfund unten reicht bis 2020 zurück), und der August ist zum Messzeitpunkt
+13 Tage alt — der Anteil baut sich über den Monat auf, jetzt mit täglicher Zählung
+statt eingefrorenem Torwächter. Beobachten, nicht reparieren.
+
+Die 275 wiederbelebten Posten sind alle durchgelaufen: 0 aufgegeben, 0 endgültig.
+Übrig bleiben die 47 Bestellungen ohne Position von oben — für alle 47 hat
+`fn:bestellpositionen` mit `ok` und 0 Zeilen geantwortet, das ist die Quellengrenze,
+kein Rest.
+
+**Größter Einzelfund: „INSOLVENT - Aposto Muenster GmbH" (LINA-ID 178).** Ein Betrieb,
+den die eingefrorene Handzählung (`manual.belegarchiv_soll`) nie kannte und der unter
+dem alten Torwächter bauartbedingt unerreichbar war:
+
+```sql
+SELECT count(*), count(DISTINCT typ_id), round(sum(netto))
+  FROM core.buchungsbeleg WHERE lina_betrieb_id = 178;
+-- 4.518 Belege, 7 Ordner, 428.175 EUR netto, Belegdaten bis 09/2025
+```
+
+Der Plan hatte genau diesen Fall als Hypothese formuliert („ein neu eröffneter Betrieb
+nähme denselben Weg") — er war längst eingetreten, nur rückwärts: ein geschlossener.
+
+Dazu die Entscheidungsgrundlage für Punkt 3 des Plans (nie geholte Belegarten), jetzt
+vollständig gezählt: **476 Ordner, 20.501 Belege** in den sechs Belegarten mit
+`inhalt_holen = false` — sonstige Dokumente, USt-Voranmeldungen, sonstige Auswertungen,
+OPOS-Listen, Steuerunterlagen, Mahnungen. Sichtbar in `mart.belegarchiv_zulauf` als
+„gezaehlt, nicht freigegeben"; die Zählung läuft täglich weiter, auch ohne Freigabe.
