@@ -1537,3 +1537,50 @@ vollständig gezählt: **476 Ordner, 20.501 Belege** in den sechs Belegarten mit
 `inhalt_holen = false` — sonstige Dokumente, USt-Voranmeldungen, sonstige Auswertungen,
 OPOS-Listen, Steuerunterlagen, Mahnungen. Sichtbar in `mart.belegarchiv_zulauf` als
 „gezaehlt, nicht freigegeben"; die Zählung läuft täglich weiter, auch ohne Freigabe.
+
+## 13.08.2026 — zwei viel zitierte Zahlen waren Artefakte ihres eigenen Fensters
+
+Beide Zahlen, mit denen `plan-datenvollstaendigkeit.md` die Punkte 2.1 und 2.3 begründet,
+halten der Nachrechnung nicht stand. Nicht weil falsch gerechnet wurde, sondern weil **beide
+Messungen von dem Fenster begrenzt sind, das sie ausmessen sollten.**
+
+### „Umsatz und Artikel setzen sich binnen fünf Tagen"
+
+An `raw.api_antwort.payload_hash` gemessen — wie oft sich derselbe Geschäftstag zwischen zwei
+Abrufen noch geändert hat, nach Abstand in Tagen:
+
+| Abstand | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| `getArtikelverkaufsbericht` | 22 | 28 | 31 | 31 | 31 | 31 | 30 | 31 | 30 | 30 | 9 |
+| `getPersonalkosten` | 13 | 23 | 25 | 22 | 21 | 20 | 22 | 24 | 21 | 22 | 9 |
+| `getUmsatzbericht` | – | 5 | 1 | 1 | 1 | – | – | 1 | 1 | 1 | – |
+
+**Der Umsatzbericht setzt sich, der Artikelbericht nicht.** Bei Artikel und Personal ist die
+Rate bis Tag 10 flach — kein Abklingen. Der Einbruch bei Tag 11 ist kein Befund, sondern
+`NACHZUEGLER_TAGE = 10`: dort hören wir auf hinzusehen. Wie lange LINA wirklich nachbucht,
+**wissen wir nicht** — nur, dass es länger ist als zehn Tage.
+
+### „Rückbuchungen reichen sieben Monate zurück"
+
+`core.kennzahlen_monat` ist append-only, echte Wertänderungen sind also zählbar. Sie reichen
+tatsächlich bis Abstand 7 — aber die betroffenen Monate sind **ausnahmslos die des laufenden
+Jahres**, und sieben Monate ist genau der Abstand von August zu Januar.
+
+Alles dahinter (Abstand 8 bis 24) zeigt konstant 655 Werte aus einem einzigen Monat, zuletzt
+am 27./28.07.2026 — die Altjahre aus dem einmaligen Backfill, je zweimal geholt, also je eine
+Erst-gegen-Zweit-Differenz. **Keine Rückbuchung.**
+
+Ursache: `linaNachfuellen()` reihte nur das Jahr von „gestern" ein. Rückbuchungen waren damit
+nur innerhalb des laufenden Jahres beobachtbar. **Dieselbe Messung hätte im Januar „null
+Monate Tiefe" ergeben** — und niemand hätte bemerkt, dass die Zahl den Kalender beschreibt.
+
+### Was daraus folgt
+
+Die Fenster sind verbreitert (21 Tage für Personal und Artikel, Vorjahr für die BWA), aber die
+neuen Zahlen sind ausdrücklich **Schätzungen mit Reserve und keine Messergebnisse**. Damit die
+nächste Zahl eine Messung sein kann, misst sich das Fenster ab Migration `0074` selbst:
+`mart.nachzuegler_tiefe`, `mart.bwa_rueckbuchung`, und eine Prüfzeile, die anschlägt, wenn am
+Rand des Fensters noch Änderungen ankommen.
+
+**Die allgemeine Lehre:** eine Kennzahl über die Aktualität fremder Daten ist nur so tief wie
+das eigene Abrufverhalten. Wer sie ohne diesen Vorbehalt zitiert, misst sich selbst.

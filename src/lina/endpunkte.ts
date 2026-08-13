@@ -119,6 +119,30 @@ export type Endpunkt = {
    * niemand gedacht hat.
    */
   takt?: 'monat' | 'woche'
+  /**
+   * Wie viele Tage rückwärts dieser Tagesbericht nachgeholt wird. Ohne
+   * Angabe gilt `config.NACHZUEGLER_TAGE`.
+   *
+   * WARUM JE ENDPUNKT UND NICHT GLOBAL. Am 13.08.2026 an
+   * `raw.api_antwort.payload_hash` gemessen — wie oft sich derselbe
+   * Geschäftstag zwischen zwei Abrufen noch geändert hat, nach Abstand:
+   *
+   *   Abstand              1   2   3   4   5   6   7   8   9  10  11
+   *   getArtikelverkauf   22  28  31  31  31  31  30  31  30  30   9
+   *   getPersonalkosten   13  23  25  22  21  20  22  24  21  22   9
+   *   getUmsatzbericht     -   5   1   1   1   -   -   1   1   1   -
+   *
+   * Drei Endpunkte, drei völlig verschiedene Kurven — ein gemeinsames
+   * Fenster kann für höchstens einen davon richtig sein.
+   *
+   * UND DIE ZAHLEN OBEN SIND ABGESCHNITTEN: bei Artikel und Personal ist
+   * die Rate bis Tag 10 flach, der Einbruch bei Tag 11 ist die Grenze von
+   * `NACHZUEGLER_TAGE` und kein Abklingen. Wo das Fenster hier steht, ist
+   * deshalb eine Schätzung mit Reserve und keine Messung — die Messung
+   * liefert ab jetzt `mart.nachzuegler_tiefe`, und die Prüfübersicht
+   * meldet, wenn am Rand noch etwas ankommt.
+   */
+  nachzuegler_tage?: number
   hinweis?: string
   /**
    * Welche Form die Antwort hat. Vorgabe `json` — so verhalten sich alle
@@ -201,6 +225,18 @@ export const ENDPUNKTE: Endpunkt[] = [
     schrittweite: 'tag',
     zweck: 'Personalkostenquoten, Effektivitäten, betriebsindividuelle Ampelschwellen',
     aktiv: true,
+    /**
+     * 21 statt 10 Tage. Die Änderungsrate ist bis Tag 10 flach (rund 22 je
+     * Tag) — sie klingt nicht ab, wir hören nur auf hinzusehen. Drei Wochen
+     * sind deshalb eine Schätzung mit Reserve, kein Messergebnis; die
+     * Messung liefert `mart.nachzuegler_tiefe`.
+     *
+     * `core.personalkosten` ist ein Upsert ohne Historie: was hier nicht
+     * nachgeholt wird, ist unwiederbringlich falsch und sieht dabei richtig
+     * aus. Von allen Tagesberichten ist das der, bei dem ein zu kurzes
+     * Fenster am wenigsten auffällt.
+     */
+    nachzuegler_tage: 21,
     parameter: (von, bis) => ({ report: 'intranet-personalkosten', ...konzernZeitraum(von, bis) }),
   },
   {
@@ -228,6 +264,18 @@ export const ENDPUNKTE: Endpunkt[] = [
     schrittweite: 'tag',
     zweck: 'Verkaufszahlen je Artikel und Betrieb, inkl. fixed_we und Verkaufspreisen',
     aktiv: true,
+    /**
+     * 21 statt 10 Tage — und ausdrücklich GEGEN die Annahme des Plans, der
+     * Artikelbericht komme mit fünf Tagen aus. Gemessen ändert er sich an
+     * JEDEM der ersten zehn Tage rund dreißigmal, ohne abzuklingen; er ist
+     * damit der unruhigste der drei geprüften Tagesberichte.
+     *
+     * Der Preis ist Zeilenvolumen, nicht Aufrufzahl: elf zusätzliche
+     * Abrufe am Tag, aber die größte Antwort im Register. Sie schreiben in
+     * `core.artikelverkauf_tag`, das partitioniert ist und den Upsert je
+     * Tag ersetzt — es wächst dadurch nicht.
+     */
+    nachzuegler_tage: 21,
     hinweis: 'Größte Antwort, ca. 2 MB. Dominiert das Zeilenvolumen (~20 Mio./Jahr).',
     parameter: (von, bis) => ({ report: 'intranet-artikel', ...konzernZeitraum(von, bis) }),
   },

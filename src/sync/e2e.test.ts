@@ -213,6 +213,12 @@ lauf('Ende-zu-Ende', () => {
        */
       'Einkauf: Kostenstelle ohne Betrieb, mit Bestellungen',
       'Inventur: Zaehlung abgeschnitten',
+      /**
+       * Seit 0074 — und die einzige Zeile, die etwas über unser eigenes
+       * Hinsehen sagt statt über die Daten: kommen am Rand des
+       * Nachzügler-Fensters noch Änderungen an, ist es zu kurz.
+       */
+      'Nachzuegler: Aenderungen am Rand des Fensters',
       'Umsatz: Artikelsumme vs. Umsatzbericht',
       // Seit 0070 ausdruecklich nur die ENDGUELTIGEN: ein aufgegebener Posten,
       // den der Lauf noch dreimal zurueckholt, ist Betrieb und kein Befund.

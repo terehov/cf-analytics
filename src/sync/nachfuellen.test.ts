@@ -655,3 +655,106 @@ lauf('Takt der Momentaufnahmen', () => {
     }
   })
 })
+
+/**
+ * Die beiden Rückschaufenster — Punkte 2.1 und 2.3 des Plans.
+ *
+ * Beide Zahlen, mit denen der Plan sie begründen wollte, waren Artefakte
+ * der Fenster selbst: die Änderungsrate der Tagesberichte bricht genau bei
+ * `NACHZUEGLER_TAGE` ein, und die „Rückbuchungstiefe von sieben Monaten"
+ * ist der Abstand von August zu Januar. Geprüft wird deshalb, dass die
+ * Fenster tun, was sie sollen — nicht, dass eine bestimmte Zahl stimmt.
+ */
+lauf('Rückschaufenster', () => {
+  beforeAll(async () => {
+    process.env.DATABASE_URL = DB!
+    db = new Client({ connectionString: DB })
+    await db.connect()
+  })
+  afterAll(async () => { await db?.end() })
+  beforeEach(async () => { await db.query('TRUNCATE sync.warteschlange') })
+
+  test('das Nachzügler-Fenster gilt je Endpunkt, nicht global', async () => {
+    const { linaNachfuellen } = await import('./nachfuellen')
+    const { config } = await import('../config')
+    const { endpunkt } = await import('../lina/endpunkte')
+    await linaNachfuellen()
+
+    const tage = async (key: string) => Number((await db.query(
+      `SELECT count(DISTINCT zeitraum_von)::int AS n FROM sync.warteschlange WHERE endpunkt = $1`,
+      [key])).rows[0].n)
+
+    /**
+     * Der Umsatzbericht setzt sich gemessen nach zwei Tagen und bleibt
+     * deshalb auf dem globalen Fenster. Personalkosten und Artikelverkauf
+     * ändern sich an JEDEM der ersten zehn Tage — sie bekommen ihr eigenes.
+     */
+    expect(endpunkt('getUmsatzbericht').nachzuegler_tage).toBeUndefined()
+    expect(await tage('getUmsatzbericht')).toBe(config.NACHZUEGLER_TAGE)
+
+    for (const key of ['getPersonalkosten', 'getArtikelverkaufsbericht']) {
+      const eigenes = endpunkt(key).nachzuegler_tage
+      expect(eigenes).toBe(21)
+      expect(await tage(key)).toBe(eigenes!)
+      // Die Gegenprobe: es ist wirklich MEHR als das globale Fenster.
+      // Ohne sie wäre der Test grün, auch wenn beide Zahlen zufällig
+      // gleich wären und die Endpunkt-Eigenschaft gar nicht gelesen würde.
+      expect(eigenes!).toBeGreaterThan(config.NACHZUEGLER_TAGE)
+    }
+  })
+
+  test('getKennzahlen holt das laufende Jahr UND das Vorjahr', async () => {
+    const { linaNachfuellen } = await import('./nachfuellen')
+    await linaNachfuellen()
+
+    const { rows } = await db.query(
+      `SELECT DISTINCT extract(year FROM zeitraum_von)::int AS jahr
+         FROM sync.warteschlange WHERE endpunkt LIKE 'getKennzahlen%'
+        ORDER BY jahr DESC`)
+    expect(rows).toHaveLength(2)
+    expect(Number(rows[0].jahr) - Number(rows[1].jahr)).toBe(1)
+
+    /**
+     * Und der Jahresposten geht über das GANZE Jahr — nicht über einen Tag.
+     * Ohne diese Prüfung fiele ein vertauschtes von/bis nicht auf: LINA
+     * lieferte dann eine leere BWA, und der Posten meldete „ok".
+     */
+    const { rows: [spanne] } = await db.query(
+      `SELECT min(zeitraum_von)::text AS von, max(zeitraum_bis)::text AS bis
+         FROM sync.warteschlange WHERE endpunkt LIKE 'getKennzahlen%'`)
+    expect(spanne.von.slice(5)).toBe('01-01')
+    expect(spanne.bis.slice(5)).toBe('12-31')
+  })
+
+  /**
+   * Der eigentliche Punkt von 2.2: der Handbefehl `--historie` repariert den
+   * Jahreswechsel NICHT, weil `sync.historie_einreihen()` gegen ALLE Posten
+   * prüft und der erledigte Jahresposten blockiert. Der nächtliche Lauf
+   * braucht ihn deshalb gar nicht — sein `ON CONFLICT DO NOTHING` läuft
+   * gegen einen PARTIELLEN Index, den ein erledigter Posten nicht besetzt.
+   */
+  test('ein ERLEDIGTER Jahresposten blockiert den nächsten Lauf nicht', async () => {
+    const { linaNachfuellen } = await import('./nachfuellen')
+    await linaNachfuellen()
+    const vorher = Number((await db.query(
+      `SELECT count(*)::int AS n FROM sync.warteschlange WHERE endpunkt LIKE 'getKennzahlen%'`
+    )).rows[0].n)
+    expect(vorher).toBeGreaterThan(0)
+
+    // Solange sie offen sind, wächst nichts nach.
+    await linaNachfuellen()
+    expect(Number((await db.query(
+      `SELECT count(*)::int AS n FROM sync.warteschlange WHERE endpunkt LIKE 'getKennzahlen%'`
+    )).rows[0].n)).toBe(vorher)
+
+    // Erledigt wie vom Worker — und jetzt MUSS erneut eingereiht werden.
+    await db.query(
+      `UPDATE sync.warteschlange SET erledigt_am = now(), ergebnis = 'ok'
+        WHERE endpunkt LIKE 'getKennzahlen%'`)
+    await linaNachfuellen()
+    expect(Number((await db.query(
+      `SELECT count(*)::int AS n FROM sync.warteschlange
+        WHERE endpunkt LIKE 'getKennzahlen%' AND erledigt_am IS NULL`
+    )).rows[0].n)).toBe(vorher)
+  })
+})

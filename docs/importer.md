@@ -750,3 +750,33 @@ monatlich, also entstehen neue Kostenstellen auch täglich.
 **Er meldet auch, wenn er nichts tut.** Die Logzeile führt `zugeordnet` **und**
 `offen_mit_bestellungen`. „0 zugeordnet" allein liest sich wie „nichts zu tun"; erst mit der
 zweiten Zahl steht da, ob wirklich nichts zu tun ist oder ob jemand entscheiden muss.
+
+## Die beiden Rückschaufenster (13.08.2026, Phase 2.1–2.3)
+
+**Je Endpunkt statt global.** `Endpunkt.nachzuegler_tage` überschreibt
+`config.NACHZUEGLER_TAGE`. Gesetzt ist es bei `getPersonalkosten` und
+`getArtikelverkaufsbericht` (je 21 Tage); alle übrigen bleiben beim globalen Wert. Die
+Begründung samt Messreihe steht in `befunde-datenlage.md` — kurz: die drei geprüften
+Tagesberichte haben drei völlig verschiedene Kurven, ein gemeinsames Fenster kann für
+höchstens einen richtig sein.
+
+**`getKennzahlen` holt laufendes Jahr UND Vorjahr**, das ganze Jahr über. Zwei zusätzliche
+Aufrufe je Lauf. Das Vorjahr läuft ausdrücklich nicht nur bis August mit: erst dadurch wird
+die Rückbuchungstiefe überhaupt beobachtbar, und ein Fenster, das im September wortlos
+schmaler wird, ist wieder eines, dessen Grenze niemand sieht.
+
+**Punkt 2.2 des Plans erledigt sich damit.** Er verlangte einen einmaligen Nachholauf an
+`sync.historie_einreihen()` vorbei, weil die Funktion erledigte Zeiträume überspringt. Der
+nächtliche Lauf braucht sie gar nicht: sein `ON CONFLICT DO NOTHING` läuft gegen einen
+**partiellen** Index (`WHERE erledigt_am IS NULL`), den ein erledigter Posten nicht besetzt.
+Das Vorjahr wird also beim nächsten Lauf von selbst geholt — kein Befehl auf dem Server. Ein
+Test hält genau das fest.
+
+**Was das an Aufrufen kostet** (LINA-Tagesbudget 10.500, verbraucht ~82):
+
+```
+heute        8 Tagesendpunkte × 10 Tage                     80
+neu          6 × 10 + 2 × 21 (Personal, Artikel)           102
+Kennzahlen   2 Endpunkte × 2 Jahre statt × 1                +2
+                                              ~104 von 10.500
+```

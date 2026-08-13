@@ -58,15 +58,29 @@ export async function linaNachfuellen(): Promise<number> {
    * erneut, wenn er fertig ist. Genau das soll er: die Zieltabellen sind
    * Upserts, der zweite Abruf korrigiert den ersten.
    */
-  const tage: string[] = []
-  for (let i = 1; i <= config.NACHZUEGLER_TAGE; i++) {
-    tage.push(geschaeftstag(new Date(Date.now() - i * 24 * 3600 * 1000)))
+  /**
+   * DAS FENSTER GILT JE ENDPUNKT, nicht global (13.08.2026, Punkt 2.3).
+   *
+   * An `raw.api_antwort.payload_hash` gemessen ändern sich die drei
+   * geprüften Tagesberichte völlig verschieden: der Umsatzbericht setzt
+   * sich nach zwei Tagen, Personalkosten und Artikelverkauf ändern sich
+   * an JEDEM der ersten zehn Tage rund zwanzig- bzw. dreißigmal. Ein
+   * gemeinsames Fenster kann für höchstens einen davon richtig sein.
+   *
+   * Die Tage werden je Endpunkt gerechnet, weil `nachzuegler_tage`
+   * verschieden ist — die frühere gemeinsame Liste hätte sonst für alle
+   * den größten Wert genommen.
+   */
+  const tageBis = (n: number): string[] => {
+    const t: string[] = []
+    for (let i = 1; i <= n; i++) t.push(geschaeftstag(new Date(Date.now() - i * 24 * 3600 * 1000)))
+    return t
   }
 
   let n = 0
   for (const ep of AKTIVE_ENDPUNKTE) {
     if (ep.schrittweite !== 'tag') continue
-    for (const tag of tage) {
+    for (const tag of tageBis(ep.nachzuegler_tage ?? config.NACHZUEGLER_TAGE)) {
       const r = await query(
         `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet)
          VALUES ($1, $2, $2, $3) ON CONFLICT DO NOTHING RETURNING posten_id`,
@@ -75,15 +89,44 @@ export async function linaNachfuellen(): Promise<number> {
     }
   }
 
-  // Kennzahlen laufen jahresweise und werden erneut geholt, weil die BWA
-  // rückwirkend nachgebucht wird. Append-only fängt das ab.
-  const jahr = gestern.slice(0, 4)
+  /**
+   * Kennzahlen laufen jahresweise und werden erneut geholt, weil die BWA
+   * rückwirkend nachgebucht wird. Append-only fängt das ab.
+   *
+   * DAS LAUFENDE JAHR UND DAS VORJAHR (13.08.2026, Punkt 2.1). Bis dahin
+   * war es nur das Jahr von „gestern", und das hatte zwei Folgen:
+   *
+   *   - Nachbuchungen ins VORJAHR kamen nie an. Gemessen: 2025 wurde
+   *     zuletzt am 27.07.2026 geholt, 2018–2024 zwischen dem 27.07. und
+   *     dem 01.08. Dezember-2025-Korrekturen aus Februar/März 2026 stehen
+   *     bis heute nicht in `core.kennzahlen_monat`.
+   *   - Und wir konnten es nicht einmal merken. Die viel zitierte
+   *     „Rückbuchungstiefe von sieben Monaten" ist genau der Abstand von
+   *     August zu Januar — also die Breite des Fensters, nicht LINAs
+   *     Verhalten. Im Januar hätte dieselbe Messung „null Monate" ergeben.
+   *
+   * Zwei Jahre kosten zwei zusätzliche Aufrufe je Lauf (zwei Endpunkte mal
+   * ein Jahr mehr), gegen ein Tagesbudget von 10.500 bei rund 82
+   * verbrauchten. Das Vorjahr LÄUFT DAS GANZE JAHR MIT und nicht nur bis
+   * August: erst dadurch wird die Rückbuchungstiefe überhaupt beobachtbar
+   * (`mart.bwa_rueckbuchung`), und ein Fenster, das im September wortlos
+   * schmaler wird, ist wieder eines, dessen Grenze niemand sieht.
+   *
+   * `ON CONFLICT DO NOTHING` ist hier richtig: der Eindeutigkeitsindex ist
+   * partiell (`WHERE erledigt_am IS NULL`), ein ERLEDIGTER Jahresposten
+   * blockiert also nichts. Genau deshalb braucht dieser Punkt auch keinen
+   * Nachholauf an `sync.historie_einreihen()` vorbei (Punkt 2.2): der
+   * nächste Lauf holt das Vorjahr von selbst.
+   */
+  const jahr = Number(gestern.slice(0, 4))
   for (const ep of AKTIVE_ENDPUNKTE.filter(e => e.schrittweite === 'jahr')) {
-    const r = await query(
-      `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet)
-       VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING RETURNING posten_id`,
-      [ep.key, `${jahr}-01-01`, `${jahr}-12-31`, einreihPrioritaet(ep.key)])
-    n += r.length
+    for (const j of [jahr, jahr - 1]) {
+      const r = await query(
+        `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet)
+         VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING RETURNING posten_id`,
+        [ep.key, `${j}-01-01`, `${j}-12-31`, einreihPrioritaet(ep.key)])
+      n += r.length
+    }
   }
 
   /**

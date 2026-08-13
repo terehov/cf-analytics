@@ -890,3 +890,22 @@ bleibt so.
 mit.** Wer sie mitzählte, bekäme eine Zeile, die nie auf null geht — und die liest dann
 niemand mehr. Dieselbe Überlegung wie bei „Betrieb ohne Belegarchiv" (0071) und
 „endgueltig aufgegeben" (0070).
+
+## Zwei Sichten, die unser eigenes Hinsehen messen (Migration `0074`, 13.08.2026)
+
+`mart.nachzuegler_tiefe` und `mart.bwa_rueckbuchung` beantworten dieselbe Frage für
+Tagesberichte und BWA: **wie lange bucht LINA nach?** Beide zählen echte Änderungen —
+verschiedener `payload_hash` bzw. verschiedener Wert bei erneutem Abruf.
+
+Sie sind der ungewöhnliche Fall einer Sicht, die nicht über die Daten spricht, sondern über
+das Fenster, durch das wir sie ansehen. `am_rand_noch_aenderungen` ist die Spalte, auf die man
+sieht: `true` heißt, dass am äußeren Rand des Abrufsfensters noch Änderungen ankommen — dann
+ist es zu kurz, und was dahinter liegt, sehen wir nicht.
+
+Die Prüfzeile „Nachzuegler: Aenderungen am Rand des Fensters" zählt **Endpunkte, nicht
+Zeilen** — „zwei Endpunkte sehen zu kurz" ist die Aussage, die jemand braucht.
+
+**Warum das hier steht und nicht in einem Kommentar:** die Zahlen, mit denen der Plan die
+Fenster begründen wollte, waren Artefakte der Fenster selbst (`befunde-datenlage.md`,
+13.08.2026). Eine Größe, die man nur einmal schätzt und danach nie wieder ansieht, veraltet
+still. Diese hier meldet sich.
