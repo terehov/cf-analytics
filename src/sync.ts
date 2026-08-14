@@ -18,6 +18,7 @@ import { einkaufSichtenNachlauf } from './sync/einkauf_sichten'
 import { zuordnungNachlauf } from './sync/zuordnung'
 import { yextNachlauf } from './yext/nachlauf'
 import { zulaufPruefen } from './sync/zulauf'
+import { pflegeNachlauf } from './pflege/nachlauf'
 
 const ausloeser = process.argv.includes('--backfill') ? 'backfill'
                 : process.argv.includes('--manuell')  ? 'manuell'
@@ -54,9 +55,9 @@ try {
    * gestern; ein neu zugeordneter Betrieb wäre einen Tag lang in den Zahlen
    * und nicht in den Sichten.
    *
-   * Dieselbe Falle wie bei `yextNachlauf()`, der bis heute NACH dem
-   * Round-Table-Refresh läuft und deshalb zwei Betrieben eine veraltete Note
-   * in die Ampel schreibt (Punkt 5.3 des Plans).
+   * Dieselbe Falle hatte `yextNachlauf()` — er lief bis zum 14.08.2026 NACH
+   * dem Round-Table-Refresh und schrieb deshalb zwei Betrieben eine veraltete
+   * Note in die Ampel (Punkt 5.3 des Plans). Seitdem steht er direkt darunter.
    *
    * Wirft nie, siehe Kopf von sync/zuordnung.ts.
    */
@@ -83,6 +84,20 @@ try {
    * Wirft nie, siehe Kopf von yext/nachlauf.ts.
    */
   await yextNachlauf()
+
+  /**
+   * DRITTER Nachlauf, und ebenfalls VOR allem Materialisierten: die
+   * Handpflege. Er liest die Dateien aus `pflege/` ein und zieht einmal im
+   * Monat Feiertage und Schulferien nach.
+   *
+   * `manual.om_einschaetzung` ist eine der sechs Round-Table-Kennzahlen, und
+   * `mart.round_table_monat` ist seit Migration `0039` materialisiert — käme
+   * die Pflege danach, trüge die Ampel die Note vom Vortag. Dieselbe Falle
+   * wie bei Yext darüber.
+   *
+   * Wirft nie, siehe Kopf von pflege/nachlauf.ts.
+   */
+  await pflegeNachlauf()
 
   // Nachlauf: die Auswahllisten der Metabase-Filter aktuell halten. Steht
   // bewusst NACH dem Import und kann ihn nicht scheitern lassen — die

@@ -23,9 +23,30 @@
  *       nicht Teil von --foodnotify: lohnend fast nur bei Wilma Wunder
  *       (275 Stück), bei den anderen drei Marken kaum. Einmalig.
  *
- * Die beiden HISTORIEN-Backfills bleiben ausdrücklich Handarbeit: sie stellen
- * Zehntausende Posten ein, und das soll eine Entscheidung sein, kein
- * Nebeneffekt eines Neustarts.
+ * SEIT DEM 14.08.2026 BRAUCHT MAN KEINEN DAVON MEHR. Alle vier Schalter haben
+ * eine Entsprechung im nächtlichen Lauf:
+ *
+ *   --taeglich                  macht `bun run sync` seit dem 02.08.2026 selbst
+ *   --historie                  `historieNachziehen()` holt fehlende
+ *                               Geschäftstage nach, HISTORIE_JE_LAUF (2.000)
+ *                               je Nacht, neueste zuerst
+ *   --foodnotify                die vier Organisationsposten laufen täglich
+ *                               mit (`foodnotifyNachfuellen`)
+ *   --foodnotify-inventuren     `inventurenNachfuellen()` zieht die letzte
+ *                               Seite je Marke bei jedem Lauf nach und baut
+ *                               die erpIds-Liste live aus `core.kostenstelle`
+ *
+ * Bis dahin stand hier, die Historien-Backfills blieben ausdrücklich
+ * Handarbeit: sie stellten Zehntausende Posten ein, und das solle eine
+ * Entscheidung sein. Das Argument war richtig und die Folgerung falsch —
+ * dieselbe Falle wie überall sonst in diesem Projekt. **Eine Entscheidung, die
+ * jemand jedes Mal neu treffen muss, wird irgendwann nicht mehr getroffen, und
+ * ihr Ausfall sieht aus wie Ruhe.** An die Stelle der Entscheidung tritt eine
+ * Obergrenze je Nacht; auf 0 gesetzt hört das Nachholen auf.
+ *
+ * Die Schalter bleiben trotzdem stehen. Als Entscheidung über einen BESTIMMTEN
+ * Zeitraum („hol mir 2015 bis 2017") sind sie weiter brauchbar, und der
+ * Trockenlauf `--taeglich` zeigt, was anstünde, ohne etwas abzuarbeiten.
  *
  * WAS HIER AUSDRÜCKLICH NICHT STEHT — und warum das der Punkt ist.
  *

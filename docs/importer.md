@@ -926,3 +926,67 @@ sind zwei Aufrufe (Entitäten und Ordner).
 sondern ruft denselben Abgleich auf und druckt ihn lesbar aus. Wer eine neue
 Entität in `VON_HAND` einträgt, will vor dem Schreiben sehen, was daraus folgt;
 der nächtliche Lauf zeigt das nicht, er schreibt.
+
+## Kein Backfill mehr auf Zuruf (14.08.2026)
+
+`bun run einreihen --historie` war der letzte Befehl, den ein Mensch anstoßen
+musste. Am 14.08.2026 nachgemessen hatte er nichts mehr zu tun: für die acht
+alten Tagesendpunkte fehlt seit dem 01.01.2018 **kein einziger** Geschäftstag.
+
+**Das war Glück und kein Argument.** Mit den acht neuen Hauptsparten (`0077`)
+fehlen rund 3.100 Tage je Endpunkt — die es ohne einen automatischen Weg erst
+ab heute gäbe, und niemand hätte es der Spartenauswertung angesehen.
+
+`historieNachziehen()` in `src/sync/nachfuellen.ts` vergleicht deshalb bei jedem
+Lauf die Abdeckung jedes aktiven Tagesendpunkts gegen `HISTORIE_AB` und reiht
+die fehlenden Tage ein — **neueste zuerst** und höchstens `HISTORIE_JE_LAUF`
+(2.000) über alle Endpunkte zusammen.
+
+```
+laufender Betrieb   ~184
+Nachholen          2.000
+                   ~2.184 von 10.500
+```
+
+Bei diesem Tempo stehen die acht Sparten nach gut zwei Wochen. Danach reiht die
+Funktion 0 Posten ein und kostet eine Abfrage je Endpunkt und Nacht.
+
+**Neueste zuerst** ist keine Geschmacksfrage: ein Backfill, der vorne anfängt,
+liefert das Nützlichste zuletzt, und bricht er ab, fehlt genau das.
+
+Die vier Schalter in `src/einreihen.ts` bleiben stehen — als Entscheidung über
+einen *bestimmten* Zeitraum sind sie weiter brauchbar. Gebraucht werden sie
+nicht mehr; `--foodnotify` und `--foodnotify-inventuren` sind seit dem
+13.08.2026 ohnehin täglicher Betrieb.
+
+## Die Handpflege hat einen Weg (Migration `0079`, 14.08.2026)
+
+Sechs Tabellen, sechs Wege — und fünf davon führten durch eine Migration. Jetzt
+einer: eine Datei in `pflege/`, committet und gepusht, wird vom nächsten Lauf
+eingelesen (`pflegeNachlauf()`, vor allem Materialisierten, weil
+`manual.om_einschaetzung` in den Round Table eingeht).
+
+**Drei Eigenschaften, die weder ein Upload noch ein Formular hätte:** eine
+Historie (`git log`), eine Überprüfung vor dem Wirksamwerden (der Commit ist
+lesbar), und einen Weg zurück (`git revert`).
+
+**Nur Upsert, nie Löschen.** Eine Zeile, die aus der Datei verschwindet, bleibt
+in der Tabelle — eine versehentlich halb gespeicherte Excel-Datei würde sonst
+Monate an Noten entfernen, und der Verlust sähe aus wie ein Betrieb ohne
+Bewertung.
+
+**Und ganz oder gar nicht.** Ein unbekannter Spaltenname, ein Betriebsname, den
+es nicht gibt, eine Zahl, die keine ist: die ganze Datei wird abgewiesen, der
+Grund steht in `mart.pflege_stand`. Der wichtigste Fall ist der Tippfehler im
+Betriebsnamen — der einzige, bei dem ein nachsichtiger Importer eine Note
+**verschwinden** ließe, ohne dass irgendwo etwas rot wird.
+
+**Die Spaltennamen kommen aus dem Register in `src/pflege/tabellen.ts`, die
+Typen aus dem Katalog.** Nie aus der Datei: sonst wäre die Kopfzeile einer CSV
+eine Eingabe in SQL.
+
+**Feiertage und Schulferien holt der Lauf selbst** — einmal im Monat von
+`openholidaysapi.org`, derselben Quelle, die schon in `manual.feiertag.quelle`
+steht. Sie liefert beides über denselben Weg, frei und ohne Schlüssel, und
+stellt die Jahre weit im Voraus bereit (am 14.08.2026 nachgesehen: 2029
+vollständig). Vorlauf drei Jahre.

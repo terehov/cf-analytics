@@ -148,6 +148,7 @@ Handgeschriebenes SQL, nummeriert, wird der Reihe nach angewendet. Bewusst handg
 | `0076_quelle_zulauf.sql` | **Der Waechter aus Phase 4.** `sync.quelle` als Register der Zulauferwartungen und `mart.quelle_zulauf` als Messung dazu — **zwei** Zahlen, `zuletzt_gefragt` und `zuletzt_zulauf`, weil die beiden Ausfaelle dieses Projekts verschiedene waren: am 12.08.2026 wurde nicht mehr gefragt, am 10.08.2026 war der Zeitstempel frisch und die Tabellen leer. Der Lauf meldet ab hier `teilweise` statt `ok`, wenn eine erwartete Quelle stumm ist |
 | `0077_datenqualitaet_und_sparten.sql` | **Was eine einzelne Zeile anrichtet.** 13 Belege datierten mehr als ein Jahr nach ihrem eigenen Upload (bis 2038) und setzten `max(monat)` in vier Sichten auf 2038-01 — ihr Rohwert steht jetzt in `beleg_datum_roh`, sichtbar in `mart.belegdatum_ausreisser`. `mart.inventur_schwund` rechnet nicht mehr mit dem, was es selbst `unplausibel` nennt (Februar 2026 stand mit minus 2,97 Mio EUR aus EINER Zeile). Dazu acht weitere Hauptsparten und `mart.hauptsparte_abdeckung`: 31,8 % des Umsatzes waren nicht aufteilbar |
 | `0078_yext_ohne_handbefehl.sql` | **Yext braucht keinen Befehl mehr.** Vollabgleich (25 Monate) und Zuordnungsabgleich liefen zuletzt am 03.08.2026 von Hand; ab hier monatlich im Nachtlauf. Dazu `mart.betrieb_ohne_yext` (sieben operative Betriebe fehlten in JEDER Bewertungstabelle), `mart.yext_abgleich`, und `yextNachlauf()` steht jetzt VOR dem Round-Table-Refresh |
+| `0079_handpflege_und_kalender.sql` | **Ein Importweg fuer die Handpflege.** Dateien in `pflege/` liest der Nachtlauf ein (`sync.pflege_import`, `mart.pflege_stand`); Feiertage und Schulferien holt er einmal im Monat selbst. Anlass ist `manual.om_einschaetzung`: 22 Noten, fest im Quelltext von `0044` auf einen verdrahteten Monat — seit Juli 2026 ist `ampel_om` fuer alle 141 Betriebe leer |
 | `pruefung.sql` | Verifikation gegen den Bayreuth-Fall aus dem Excel (kein Migrationsschritt) |
 
 Die Tabelle nennt die tragenden Migrationen, nicht jede einzelne. Der verbindliche Stand steht in `public.schema_migration`.
@@ -215,8 +216,11 @@ sync.ts / einreihen.ts Einstiegspunkte
 ```bash
 bun install
 bun run migrate                              # Schema anwenden (idempotent)
-bun test                                     # nachgemessen am 14.08.2026: 712 pass, 185 skip, 0 fail ohne TEST_DATABASE_URL
+bun test                                     # nachgemessen am 14.08.2026: 719 pass, 194 skip, 0 fail ohne TEST_DATABASE_URL
 bun run sync                                 # nachfüllen UND abarbeiten
+# Die vier Schalter braucht seit dem 14.08.2026 NIEMAND mehr — jeder hat eine
+# Entsprechung im naechtlichen Lauf. Sie bleiben als Entscheidung ueber einen
+# BESTIMMTEN Zeitraum und als Trockenlauf.
 bun run einreihen --taeglich                 # nur nachfüllen (sync macht das selbst)
 bun run einreihen --historie --von 2018-01-01 --bis 2026-07-24
 bun run einreihen --foodnotify               # FoodNotify-Backfill starten
@@ -263,9 +267,18 @@ munter weiter, meldete „ok" und tat nichts — LINA stand acht Tage still, wä
 der Importer fehlerfrei durchlief. **Ein Importer ohne Arbeit sieht genauso aus wie
 einer, der fertig ist.** Ein Zeitplan, ein Ausfallpunkt.
 
-Die beiden **Backfills** (`--historie`, `--foodnotify`) bleiben ausdrücklich
-Handarbeit: sie stellen Zehntausende Posten ein, und das soll eine Entscheidung
-sein, kein Nebeneffekt eines Neustarts.
+**Seit dem 14.08.2026 braucht der Betrieb keinen einzigen Handbefehl mehr.** Bis
+dahin stand hier, die Backfills (`--historie`, `--foodnotify`) blieben
+ausdrücklich Handarbeit — sie stellten Zehntausende Posten ein, und das solle
+eine Entscheidung sein. Das Argument war richtig und die Folgerung falsch:
+**eine Entscheidung, die jemand jedes Mal neu treffen muss, wird irgendwann
+nicht mehr getroffen, und ihr Ausfall sieht aus wie Ruhe.** An ihre Stelle tritt
+eine Obergrenze je Nacht (`HISTORIE_JE_LAUF`, 2.000 von 10.500 Aufrufen); auf 0
+gesetzt hört das Nachholen auf.
+
+Ebenfalls im Nachtlauf, ohne Befehl: der Yext-Vollabgleich und der
+Zuordnungsabgleich (monatlich), die Handpflege aus `pflege/` (bei jedem Lauf)
+und die Feiertage/Schulferien (monatlich, `openholidaysapi.org`).
 
 Der Sync läuft **tagsüber** (Fenster 7–23 Uhr, konfigurierbar). Das ist Absicht: ein einzelner Client um drei Uhr früh ist im Log ein Ausreißer, dieselben Anfragen im Tagesverkehr von 141 Betrieben fallen nicht auf.
 
@@ -309,11 +322,16 @@ SELECT * FROM mart.posten_ohne_zugriff;
 SELECT zustand, count(*) FROM mart.einkauf_ladestand GROUP BY 1;
 ```
 
-**Nichts davon braucht einen Befehl.** Abgeschnittene Inventurzählungen und aufgegebene
-Posten repariert der nächtliche Lauf selbst (`inventurpositionenNachziehen()` und
-`aufgegebeneWiederbeleben()` in `src/sync/nachfuellen.ts`). Handarbeit bleiben nur die beiden
-Historien-Backfills — `--historie` und `--foodnotify` —, weil sie eine Entscheidung sind und
-kein Befund.
+**Nichts davon braucht einen Befehl — und seit dem 14.08.2026 gilt das ohne Ausnahme.**
+Abgeschnittene Inventurzählungen und aufgegebene Posten repariert der nächtliche Lauf selbst
+(`inventurpositionenNachziehen()`, `aufgegebeneWiederbeleben()`), fehlende Geschäftstage holt
+`historieNachziehen()` nach, dauerhaft mit 403 abgelehnte Posten laufen von selbst aus
+(`0075`), Yext gleicht sich monatlich voll ab (`0078`), und die handgepflegten Tabellen
+kommen aus `pflege/` (`0079`).
+
+Was ein Mensch noch entscheidet, ist keine Bedienung, sondern ein Urteil: die offenen
+Betriebszuordnungen (`mart.betrieb_ohne_yext`, `mart.kostenstelle_ohne_betrieb`) und die
+Noten in `pflege/om_einschaetzung.csv`.
 
 Nach jedem größeren Backfill zuerst:
 

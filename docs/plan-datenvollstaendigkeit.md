@@ -349,6 +349,14 @@ Normalzustand — der Lauf darf sie nicht als „ok" melden.**
 
 ### Phase 6 — Handpflege wartbar machen
 
+> **Erledigt am 14.08.2026, Migration `0079`.** Ein Weg für alle sechs Tabellen:
+> eine Datei in `pflege/`, committet und gepusht, liest der nächtliche Lauf ein
+> — nur Upsert, ganz oder gar nicht, Betrieb per Name. Feiertage und
+> Schulferien holt er einmal im Monat selbst von `openholidaysapi.org`.
+> `mart.pflege_stand` sagt, ob eine Datei abgewiesen wurde **und** ob der
+> Inhalt noch bis heute reicht — die zweite Frage ist die, die niemandem
+> auffällt.
+
 Nicht sechs Einzellösungen, sondern **ein** wiederholbarer Importweg
 (Excel/CSV → Tabelle), der für `om_einschaetzung`, `gfgh_betrieb`, `bwa_zeile`
 und `sachkonto` zusammen taugt — statt wie heute einmal in einer Migration

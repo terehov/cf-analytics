@@ -261,6 +261,14 @@ lauf('Ende-zu-Ende', () => {
       'Einkauf: Bestellseiten aus einem frueheren Lauf offen',
       'Einkauf: Kostenstelle ohne Betrieb, mit Bestellungen',
       /**
+       * Beide seit 0079. Zwei Zeilen, weil es zwei verschiedene Fehler
+       * sind: eine abgewiesene Datei ist ein Tippfehler von heute, eine
+       * veraltete Tabelle ist eine Pflege, die vor Monaten aufgehoert hat.
+       * Die zweite faellt niemandem auf — genau deshalb steht sie da.
+       */
+      'Handpflege: Datei abgewiesen',
+      'Handpflege: Tabelle veraltet oder laeuft aus',
+      /**
        * Auch hier Konstanz statt null: eine Einzelposition ueber 50.000 EUR
        * ist ein Erfassungsfehler in FoodNotify, den wir nicht beheben
        * koennen. Sie soll nur nicht mehr in den Schwund einfliessen.

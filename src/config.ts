@@ -375,6 +375,54 @@ const Schema = z.object({
   YEXT_VOLLABGLEICH_TAGE: z.coerce.number().int().min(1).default(30),
 
   /**
+   * Wie viele Jahre im Voraus Feiertage und Schulferien geholt werden.
+   *
+   * `manual.feiertag` reicht bis zum 26.12.2027, `manual.schulferien` bis zum
+   * 11.01.2028 — beide einmal befüllt, von keinem Code fortgeschrieben. Das
+   * ist die gefährliche Sorte Frist: sie läuft irgendwann aus, und wer dann
+   * auf die Umsatzentwicklung sieht, vergleicht einen Feiertag mit einem
+   * Werktag, ohne dass etwas rot wird.
+   *
+   * Drei Jahre, weil die Länder ihre Ferientermine so weit im Voraus
+   * veröffentlichen (am 14.08.2026 nachgesehen: 2029 vollständig) — und weil
+   * ein Vorlauf, der kürzer ist als die Zeit zwischen zwei Blicken auf diese
+   * Tabelle, keiner ist.
+   */
+  KALENDER_VORLAUF_JAHRE: z.coerce.number().int().min(1).max(10).default(3),
+
+  /** Abstand zwischen zwei Kalenderabgleichen. Ein Feiertag verschiebt sich nicht. */
+  KALENDER_ABSTAND_TAGE: z.coerce.number().int().min(1).default(30),
+
+  /** Ab welchem Tag die Historie vollständig sein soll. */
+  HISTORIE_AB: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).default('2018-01-01'),
+
+  /**
+   * Wie viele fehlende Geschäftstage der nächtliche Lauf höchstens nachholt.
+   *
+   * WAS DAMIT AUFHÖRT, HANDARBEIT ZU SEIN. `bun run einreihen --historie` war
+   * der letzte Backfill, den ein Mensch anstoßen musste. Am 14.08.2026
+   * nachgemessen ist die Historie der acht alten Tagesendpunkte **lückenlos**
+   * seit 2018-01-01 — der Befehl hatte nichts mehr zu tun. Mit den acht neuen
+   * Hauptsparten (`0077`) hat er wieder etwas: rund 3.100 Tage × 8 Endpunkte,
+   * die es sonst erst ab heute gäbe.
+   *
+   * ZWEITAUSEND, weil der Rest bei diesem Tempo in gut zwei Wochen steht und
+   * das Tagesbudget dabei nie in die Nähe der Grenze kommt:
+   *
+   *   laufender Betrieb   ~184
+   *   Nachholen           2.000
+   *                       ~2.184 von 10.500
+   *
+   * NEUESTE ZUERST. Ein Backfill, der vorne anfängt, liefert das Nützlichste
+   * zuletzt — und wenn er abbricht, fehlt genau das. Rückwärts ist nach der
+   * ersten Nacht der letzte Monat da.
+   *
+   * Auf 0 gesetzt hört das Nachholen auf, ohne dass jemand Code anfasst. Das
+   * ist die Notbremse; ein Handbefehl ist es nicht mehr.
+   */
+  HISTORIE_JE_LAUF: z.coerce.number().int().min(0).default(2_000),
+
+  /**
    * Das rollierende Fenster für das Auffrischen der Bestelldetails (Tage).
    *
    * DER BEFUND DAHINTER. Am 13.08.2026 in Produktion gemessen: von 66.966

@@ -1977,3 +1977,57 @@ an** — und eine falsche Note im Round Table löst dieselbe Eskalationsstufe au
 wie eine echte. Dieselbe Entscheidung wie bei den Kostenstellen ohne Betrieb
 (`0073`): sichtbar machen, nicht raten. `mart.betrieb_ohne_yext` ist die
 Arbeitsliste, `VON_HAND` die Stelle, an der ein Mensch entscheidet.
+
+### Die Backfills laufen jetzt mit, statt auf Zuruf
+
+Bis zum 14.08.2026 stand in `AGENTS.md`, in `einreihen.ts` und im Kopf von
+`nachfuellen.ts` derselbe Satz: die Historien-Backfills blieben **ausdrücklich**
+Handarbeit, sie stellten Zehntausende Posten ein, und das solle eine
+Entscheidung sein, kein Nebeneffekt eines Neustarts.
+
+Das Argument war richtig und die Folgerung falsch. **Eine Entscheidung, die
+jemand jedes Mal neu treffen muss, wird irgendwann nicht mehr getroffen, und ihr
+Ausfall sieht aus wie Ruhe** — genau die Signatur, die dieses Projekt zweimal
+Tage gekostet hat.
+
+An die Stelle der Entscheidung tritt eine **Obergrenze je Nacht**
+(`HISTORIE_JE_LAUF`, 2.000 von 10.500 Aufrufen). Das ist dieselbe Bauart wie
+beim Bestelldetail-Nachholauf (`0072`): kein Befehl, sondern eine Zahl, die sich
+von selbst abarbeitet und dabei nie in die Nähe des Budgets kommt. Auf 0 gesetzt
+hört sie auf — das ist die Notbremse und kein Handgriff.
+
+### Der Kanal für die Handpflege ist das Repository
+
+Drei Wege standen zur Wahl: ein Upload auf den Server, ein Web-Formular, oder
+eine Datei im Repo.
+
+Das Repo gewinnt, und zwar nicht aus Bequemlichkeit. Es bringt drei Dinge mit,
+die die anderen beiden erst bauen müssten: eine **Historie** (wer hat wann
+welche Note geändert), eine **Überprüfung vor dem Wirksamwerden** (der Commit
+ist lesbar, bevor er ausgerollt wird), und einen **Weg zurück** (`git revert`).
+Ein Web-Formular wäre außerdem ein zweites System mit eigener Anmeldung, eigener
+Rechteverwaltung und eigener Ausfallwahrscheinlichkeit.
+
+Der Preis ist eine Deploy-Runde je Änderung. Bei einer Notenliste, die einmal im
+Monat gepflegt wird, ist das keiner.
+
+### Feiertage kommen aus einer fremden Schnittstelle, nicht aus einer Formel
+
+Deutsche Feiertage sind berechenbar — aus dem Osterdatum und einer Tabelle je
+Bundesland. Genau das wäre hier falsch gewesen.
+
+`manual.feiertag` trägt 21 verschiedene Namen für die Feiertage, darunter
+„1. Weihnachtsfeiertag" **und** „1. Weihnachtstag", „Neujahr" **und**
+„Neujahrstag" — die Spur zweier Quellen (`feiertage-api.de` und
+`openholidaysapi.org`). Der Primärschlüssel enthält den Namen. Eine eigene
+Berechnung hätte also entweder Dubletten erzeugt oder Namen überschrieben, die
+seit 2018 in Auswertungen stecken.
+
+Dazu kommt: **Schulferien sind nicht berechenbar.** Sie werden je Land
+festgelegt. Eine Quelle, die beides liefert, ist einer Formel plus einer zweiten
+Quelle vorzuziehen.
+
+Genommen wird `openholidaysapi.org` — frei, ohne Schlüssel, ohne Anmeldung, und
+bereits eine der beiden Quellen des Bestands. **Der Bestand wird nicht
+umgeschrieben:** neue Namen legen im Zweifel eine zusätzliche Zeile an, statt
+eine alte zu ändern.

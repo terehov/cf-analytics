@@ -14,17 +14,30 @@
  * Deshalb füllt der Lauf sich jetzt selbst. Ein einziger Zeitplan
  * (`bun run sync`), ein einziger Ausfallpunkt.
  *
- * WAS HIER NICHT PASSIERT: der einmalige Historien-Backfill
- * (`einreihen --historie`, `einreihen --foodnotify`). Der wird bewusst
- * von Hand angestoßen — er stellt Zehntausende Posten ein, und das soll
- * eine Entscheidung sein, kein Nebeneffekt eines Neustarts.
+ * UND SEIT DEM 14.08.2026 AUCH DIE BACKFILLS. Bis dahin stand hier, der
+ * Historien-Backfill bleibe bewusst Handarbeit: er stelle Zehntausende
+ * Posten ein, und das solle eine Entscheidung sein. Das Argument war
+ * richtig und die Folgerung falsch — dieselbe Falle wie überall sonst
+ * hier. Eine Entscheidung, die jemand jedes Mal neu treffen muss, wird
+ * irgendwann nicht mehr getroffen, und ihr Ausfall sieht aus wie Ruhe.
+ *
+ * Jetzt gilt stattdessen eine OBERGRENZE JE NACHT (`HISTORIE_JE_LAUF`,
+ * 2.000 von 10.500 Aufrufen). Das ist dieselbe Bauart wie beim
+ * Bestelldetail-Nachholauf (`0072`): kein Befehl, sondern eine Zahl, die
+ * sich von selbst abarbeitet und dabei nie in die Nähe des Budgets kommt.
+ * Auf 0 gesetzt hört es auf — das ist die Notbremse, kein Handbefehl.
+ *
+ * Die Schalter in `src/einreihen.ts` bleiben stehen: als Entscheidung über
+ * einen bestimmten Zeitraum sind sie weiter brauchbar. Gebraucht werden
+ * sie nicht mehr.
  */
 
 import { query, eine } from '../db/pool'
 import { config, fnZugaenge } from '../config'
 import { log } from '../lib/log'
-import { AKTIVE_ENDPUNKTE, istMomentaufnahme, einreihPrioritaet } from '../lina/endpunkte'
+import { AKTIVE_ENDPUNKTE, istMomentaufnahme, einreihPrioritaet, PRIORITAET } from '../lina/endpunkte'
 import { geschaeftstag } from '../lib/time'
+import { istLadenakte } from '../ladenakte/endpunkte'
 import { endpunkteZusichern } from './waechter'
 import { quellenSpiegeln } from './quellen'
 
@@ -170,6 +183,73 @@ export async function linaNachfuellen(): Promise<number> {
                WHERE endpunkt = $1 AND zeitraum_von = ${periodenBeginn})
        RETURNING posten_id`,
       [ep.key, ep.takt === 'woche' ? gestern : monatsErster, einreihPrioritaet(ep.key)])
+    n += r.length
+  }
+
+  n += await historieNachziehen()
+
+  return n
+}
+
+/**
+ * Die Historie nachziehen — der letzte Backfill, der ein Handbefehl war.
+ *
+ * WAS HIER ERSETZT WIRD. `bun run einreihen --historie --von … --bis …` stellte
+ * die Vergangenheit in einem Schwung ein. Der Befehl bleibt (er ist als
+ * Entscheidung über einen Zeitraum weiterhin brauchbar), aber niemand muss ihn
+ * mehr aufrufen: **eine Reparatur, die ein Mensch anstoßen muss, ist keine
+ * Reparatur, sondern eine Verabredung.** Sie fällt irgendwann aus, und ihr
+ * Ausfall sieht aus wie Ruhe.
+ *
+ * DASS ER BISHER NICHTS ZU TUN HATTE, WAR GLÜCK UND KEIN ARGUMENT. Am
+ * 14.08.2026 in Produktion nachgemessen: für die acht alten Tagesendpunkte
+ * fehlt seit dem 01.01.2018 **kein einziger** Geschäftstag. Mit den acht neuen
+ * Hauptsparten (`0077`) fehlen dagegen rund 3.100 Tage je Endpunkt — die es
+ * ohne diese Funktion erst ab heute gäbe, und niemand hätte es der
+ * Spartenauswertung angesehen.
+ *
+ * NEUESTE ZUERST (`ORDER BY tag DESC`). Ein Backfill, der vorne anfängt,
+ * liefert das Nützlichste zuletzt; bricht er ab, fehlt genau das. Rückwärts
+ * steht nach der ersten Nacht der letzte Monat.
+ *
+ * DIE OBERGRENZE GILT ÜBER ALLE ENDPUNKTE ZUSAMMEN, nicht je Endpunkt — sonst
+ * wäre die Zahl im Budget eine andere als die in der Einstellung, sobald
+ * jemand einen Endpunkt hinzufügt.
+ *
+ * Nur `schrittweite: 'tag'`: Jahresberichte reiht `linaNachfuellen()` ohnehin
+ * für das laufende und das Vorjahr ein, und Momentaufnahmen haben keine
+ * Vergangenheit (siehe `istMomentaufnahme`).
+ */
+export async function historieNachziehen(): Promise<number> {
+  if (config.HISTORIE_JE_LAUF === 0) return 0
+
+  let uebrig = config.HISTORIE_JE_LAUF
+  let n = 0
+
+  for (const ep of AKTIVE_ENDPUNKTE) {
+    if (uebrig <= 0) break
+    if (ep.schrittweite !== 'tag' || istLadenakte(ep.key)) continue
+
+    const r = await query<{ posten_id: string }>(
+      `WITH fehlend AS (
+           SELECT t::date AS tag
+             FROM generate_series($2::date, current_date - 1, interval '1 day') t
+            WHERE NOT EXISTS (
+                  SELECT 1 FROM sync.warteschlange w
+                   WHERE w.endpunkt = $1 AND w.zeitraum_von = t::date)
+            ORDER BY t DESC
+            LIMIT $3)
+       INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet)
+       SELECT $1, tag, tag, $4 FROM fehlend
+       RETURNING posten_id`,
+      [ep.key, config.HISTORIE_AB, uebrig, PRIORITAET.historie])
+
+    if (r.length > 0) {
+      log.info('historie nachgezogen', {
+        endpunkt: ep.key, posten: r.length, ab: config.HISTORIE_AB,
+      })
+    }
+    uebrig -= r.length
     n += r.length
   }
 
