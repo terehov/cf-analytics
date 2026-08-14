@@ -658,6 +658,72 @@ lauf('Sperre gegen parallele Worker', () => {
       await d.query('SELECT pg_advisory_unlock($1)', [SPERRE])
     } finally { await d.end() }
   })
+
+  /**
+   * Der uebersprungene Start selbst muss in der Datenbank stehen (0081).
+   *
+   * Am 14.08.2026 uebersprang der 05:00-Start den Import (Lauf 90 hielt die
+   * Sperre), lief 15 Minuten Nachlaeufe und sah in Dokploy aus wie ein
+   * erfolgreicher Sync — die einzige Spur war eine Logzeile. Genau die Luecke
+   * pruefen diese beiden Tests: die Zeile entsteht, und sie verfaelscht die
+   * Leser nicht, die "letzter echter Lauf" meinen.
+   */
+  test('ein übersprungener Start hinterlässt eine abgeschlossene Zeile in sync.lauf', async () => {
+    const halter = new Client({ connectionString: DB })
+    const db = new Client({ connectionString: DB })
+    await halter.connect(); await db.connect()
+    try {
+      // Keine Zugangssperre im Weg — die prüft workerLauf VOR der Laufsperre.
+      await db.query(`DELETE FROM sync.zugangssperre`)
+      expect(await nimm(halter)).toBe(true)
+      const { rows: [blocker] } = await db.query(
+        `INSERT INTO sync.lauf (ausloeser, status) VALUES ('manuell','laeuft')
+         RETURNING lauf_id`)
+
+      const { workerLauf } = await import('./worker')
+      const r = await workerLauf('zeitplan')
+      expect(r.status).toBe('lauf_uebersprungen')
+
+      const { rows: [zeile] } = await db.query(
+        `SELECT status, beendet_am, notiz, aufgaben_gesamt
+           FROM sync.lauf ORDER BY lauf_id DESC LIMIT 1`)
+      expect(zeile.status).toBe('uebersprungen')
+      expect(zeile.beendet_am).not.toBeNull()
+      expect(Number(zeile.aufgaben_gesamt)).toBe(0)
+      // Die Notiz nennt den Blockierer — sonst erklärt die Zeile nichts.
+      expect(String(zeile.notiz)).toContain(`Lauf ${blocker.lauf_id}`)
+
+      await db.query(`DELETE FROM sync.lauf WHERE lauf_id >= $1`, [blocker.lauf_id])
+    } finally {
+      await halter.query('SELECT pg_advisory_unlock($1)', [SPERRE]).catch(() => {})
+      await halter.end(); await db.end()
+    }
+  }, 30_000)
+
+  test('übersprungene Starts verdünnen das Drei-Läufe-Fenster des Statusberichts nicht', async () => {
+    const db = new Client({ connectionString: DB })
+    await db.connect()
+    try {
+      await db.query(`DELETE FROM sync.zugangssperre`)
+      const { rows: [{ lauf_id: ab }] } = await db.query(
+        `INSERT INTO sync.lauf (ausloeser, status, beendet_am, notiz)
+         VALUES ('zeitplan','fehlgeschlagen', now(), 'Test 0081') RETURNING lauf_id`)
+      await db.query(
+        `INSERT INTO sync.lauf (ausloeser, status, beendet_am, notiz)
+         SELECT 'zeitplan','fehlgeschlagen', now(), 'Test 0081' FROM generate_series(1, 2)`)
+      // Der jüngste Eintrag ist ein Skip — er darf die drei Fehlschläge
+      // dahinter nicht aus dem Fenster schieben.
+      await db.query(
+        `INSERT INTO sync.lauf (ausloeser, status, beendet_am, notiz)
+         VALUES ('zeitplan','uebersprungen', now(), 'Test 0081')`)
+
+      const { statusErheben } = await import('../status')
+      const bericht = await statusErheben()
+      expect(bericht.pruefungen.find(x => x.name === 'laeufe')!.stufe).toBe('stoerung')
+
+      await db.query(`DELETE FROM sync.lauf WHERE lauf_id >= $1`, [ab])
+    } finally { await db.end() }
+  }, 30_000)
 })
 
 /**

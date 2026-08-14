@@ -114,8 +114,12 @@ export async function statusErheben(): Promise<Statusbericht> {
   //
   // Ein einzelner abgebrochener Lauf ist Alltag (Signal, Budget, Fensterende).
   // Drei gescheiterte in Folge sind es nicht.
+  // Uebersprungene und gesperrte Starts (0081) haben beendet_am gesetzt, sind
+  // aber keine Laeufe: drei Skips im Fenster verdeckten drei echte Fehlschlaege.
   const laeufe = await query<{ status: string }>(
-    `SELECT status FROM sync.lauf WHERE beendet_am IS NOT NULL ORDER BY lauf_id DESC LIMIT 3`)
+    `SELECT status FROM sync.lauf
+      WHERE beendet_am IS NOT NULL AND status NOT IN ('uebersprungen','gesperrt')
+      ORDER BY lauf_id DESC LIMIT 3`)
   const alleGescheitert = laeufe.length === 3 && laeufe.every(l => l.status === 'fehlgeschlagen')
   p.push(alleGescheitert
     ? {

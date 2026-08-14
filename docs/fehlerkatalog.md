@@ -3043,3 +3043,33 @@ ist einen Tag alt, ohne dass es jemandem auffällt. Dieselbe Falle wie bei
 **Was ihn verhindert.** `yextNachlauf()` steht jetzt als zweiter Nachlauf, vor
 allem Materialisierten. Ein Test in `src/yext/nachlauf.test.ts` vergleicht die
 beiden Positionen in `sync.ts`.
+
+---
+
+## 14.08.2026 — der übersprungene Lauf sah aus wie ein erfolgreicher
+
+**Symptom.** Der 05:00-Start füllte die Warteschlange, übersprang den Import (Lauf 90
+hielt die Laufsperre bis zu seinem Abbruch um 08:00) und lief danach 15 Minuten
+Nachläufe und Yext. In Dokploy: grün, flott, unauffällig. Genau so wurde er gelesen —
+als durchgelaufener Sync. Dass kein einziger Posten importiert wurde, stand in einer
+einzigen Logzeile (`lauf übersprungen — es läuft bereits einer`) und sonst nirgends;
+in `sync.lauf` fehlte der Start komplett.
+
+**Warum das mehr ist als ein Schönheitsfehler.** Es ist zum dritten Mal dieselbe
+Signatur (02.08.: Einreihen als eigener Zeitplan fiel aus; 12.08.: Belegarchiv fror
+hinter „269 von 269 ok" ein): ein Zweig, der „nichts zu tun" bedeutet, war nur im Log
+sichtbar — und Logs liest niemand (AGENTS.md Regel 10). Eine Kette übersprungener
+Starts während eines langen Backfills sieht in der Lauf-Historie aus wie ein Loch im
+Zeitplan.
+
+**Fix (`0081`, `worker.ts`).** Jeder Start, der nicht arbeitet, hinterlässt eine
+sofort beendete Zeile in `sync.lauf`: `uebersprungen` (Notiz nennt den blockierenden
+Lauf) oder `gesperrt` (Notiz nennt Art und Ablauf der Zugangssperre). Sichtbar in
+`mart.sync_status` und `mart.import_lauf`.
+
+**Die Falle im Fix.** Zwei Leser meinen „letzter echter Lauf" und müssen die neuen
+Zustände ausklammern, sonst kippt der Fix ins Gegenteil: `status.ts` prüft die letzten
+drei beendeten Läufe auf „alle fehlgeschlagen" — drei Skips verdeckten drei echte
+Fehlschläge; `health.ts` misst „veraltet" am jüngsten `beendet_am` — ein Tag voller
+Skips hielte `/health` ewig frisch, während der Import steht. Beide filtern jetzt,
+beide Tests dazu in `e2e.test.ts` („Sperre gegen parallele Worker").

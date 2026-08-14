@@ -30,9 +30,13 @@ async function erheben(): Promise<Zustand> {
   // TEXT auf und sortierte alphabetisch — 9 vor 71. Genau das war bis zum
   // 04.08.2026 der Fall und liess /health monatelang einen falschen „letzten
   // Lauf" melden (und damit ein falsches `veraltet`).
+  // Uebersprungene und gesperrte Starts (0081) zaehlen hier nicht: ein Tag
+  // voller Skips hielte "veraltet" sonst ewig gruen, waehrend der Import steht.
   const lauf = await eine<any>(
     `SELECT lauf_id::text AS lauf_id_text, status, beendet_am
-       FROM sync.lauf ORDER BY lauf_id DESC LIMIT 1`)
+       FROM sync.lauf
+      WHERE status NOT IN ('uebersprungen','gesperrt')
+      ORDER BY lauf_id DESC LIMIT 1`)
   const abw = await eine<any>(
     `SELECT count(*)::int AS n FROM sync.schema_abweichung WHERE quittiert_am IS NULL`)
   const pausiert = await eine<any>(
