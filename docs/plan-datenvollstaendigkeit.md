@@ -1,12 +1,18 @@
 # Plan: alles holen, alles aktuell halten
 
-> **Stand 13.08.2026 abends: Phase 1, 1c und 2 sind umgesetzt und committet,
-> aber NICHT deployt** — Produktion steht auf `0070`, die Migrationen `0071`
-> bis `0074` liegen bereit. Was seit dem Schreiben dieses Plans gemessen wurde
-> und ihm widerspricht, steht in `befunde-datenlage.md` (die beiden
-> Fenster-Artefakte zu 2.1/2.3) und `lina-api-korrekturen.md` (`fn:betriebe`
-> zu 2.8). Die Nachprüfungen nach dem Deploy stehen in `offene-punkte.md`.
-> Offen bleiben die Phasen 3 bis 6 und die vier Entscheidungen in Abschnitt 4.
+> **Stand 14.08.2026: ALLE SECHS PHASEN sind umgesetzt und committet.**
+> Produktion steht auf `0074` (Phase 1, 1c und 2, deployt am 13.08. abends);
+> die Migrationen `0075` bis `0080` liegen bereit und decken die Phasen 3 bis 6
+> samt den Entscheidungen 1, 3 und 4 ab.
+>
+> **Der Betrieb braucht ab hier keinen Handbefehl mehr** — auch die
+> Historien-Backfills, der Yext-Vollabgleich, der Zuordnungsabgleich und die
+> Handpflege laufen im Nachtlauf mit. Was ein Mensch noch entscheidet, steht in
+> `entscheidungen.md` unter *Was ein Mensch weiterhin entscheidet*.
+>
+> Was seit dem Schreiben dieses Plans gemessen wurde und ihm widerspricht, steht
+> in `befunde-datenlage.md` und `lina-api-korrekturen.md`. Die Nachpruefungen
+> nach dem Deploy stehen in `offene-punkte.md`.
 
 Stand 13.08.2026. Grundlage ist ein Audit vom selben Tag, das jede Aussage in
 der Produktionsdatenbank nachgemessen hat — nicht am Code, nicht an der lokalen
@@ -365,6 +371,13 @@ verdrahtet. Dazu automatisch nachziehbar: Feiertage, Schulferien, Marktindex.
 ---
 
 ## 4. Was Eugene entscheiden muss
+
+> **Stand 14.08.2026: drei der vier sind entschieden und umgesetzt.**
+> 1 — umgesetzt in `0080` (vierter Ampelzustand `unvollstaendig`; zurueckdrehen
+> ist eine Zeile). 3 — entschieden am 13.08.: nicht holen. 4 — umgesetzt in
+> `0077`, der Spartenfilter war ein Parameter. **Offen bleibt nur 2**, und das
+> ist keine technische Frage: die OM-Noten kommen von Menschen. Der Weg dafuer
+> ist seit `0079` eine Zeile in `pflege/om_einschaetzung.csv`.
 
 1. **Darf eine Ampel grün sein, wenn ein Signal fehlt?**
    Heute ja — drei operative Betriebe stehen im August auf Grün, obwohl die

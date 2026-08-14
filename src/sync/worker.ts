@@ -144,6 +144,32 @@ async function sperreHolen(): Promise<{ frei: boolean; freigeben: () => Promise<
   }
 }
 
+/**
+ * Einen Start, der NICHT arbeitet, in sync.lauf festhalten — sofort beendet,
+ * null Aufgaben, mit Notiz.
+ *
+ * Warum das eine Datenbankzeile sein muss und keine Logzeile: am 14.08.2026
+ * fuellte der 05:00-Start die Warteschlange, uebersprang den Import (Lauf 90
+ * hielt die Sperre bis zu seinem Abbruch um 08:00) und lief 15 Minuten
+ * Nachlaeufe. In Dokploy sah das aus wie ein flotter, erfolgreicher Sync —
+ * und genau so wurde es gelesen. Die einzige Spur war die Logzeile darueber.
+ * Zum dritten Mal dieselbe Signatur (02.08., 12.08.): ein "nichts zu tun",
+ * das nur im Log steht, sieht aus wie Erfolg. AGENTS.md Regel 10.
+ *
+ * Wer "letzter echter Lauf" meint, klammert beide Zustaende aus — so wie
+ * src/status.ts (Drei-Laeufe-Fenster) und src/health.ts (veraltet-Messung).
+ * mart.sync_status und mart.import_lauf zeigen sie absichtlich.
+ */
+async function startOhneArbeitFesthalten(
+  ausloeser: 'zeitplan' | 'manuell' | 'backfill',
+  status: 'uebersprungen' | 'gesperrt', notiz: string,
+): Promise<void> {
+  await query(
+    `INSERT INTO sync.lauf (ausloeser, status, beendet_am, notiz)
+     VALUES ($1, $2, now(), $3)`,
+    [ausloeser, status, notiz])
+}
+
 export type LaufErgebnis = {
   laufId: string | null
   ok: number
@@ -176,6 +202,8 @@ export async function workerLauf(
       hinweis: ruht.hinweis,
       freigeben: "erst im Browser prüfen, dann SELECT sync.sperre_aufheben('name');",
     })
+    await startOhneArbeitFesthalten(ausloeser, 'gesperrt',
+      `zugang gesperrt (${ruht.art}) — pausiert bis ${ruht.pausiert_bis.toISOString()}`)
     return { laufId: null, ok: 0, keineDaten: 0, fehler: 0, uebersprungen: 0, status: 'gesperrt' }
   }
 
@@ -184,6 +212,13 @@ export async function workerLauf(
     // Kein Fehler, sondern der Normalfall bei einem stündlichen Zeitplan und
     // einem noch laufenden Backfill. Exitcode bleibt 0.
     log.info('lauf übersprungen — es läuft bereits einer', { ausloeser })
+    const blockierer = await eine<{ lauf_id: string }>(
+      `SELECT lauf_id FROM sync.lauf WHERE status = 'laeuft'
+        ORDER BY lauf_id DESC LIMIT 1`)
+    await startOhneArbeitFesthalten(ausloeser, 'uebersprungen',
+      blockierer
+        ? `Lauf ${blockierer.lauf_id} läuft noch — dieser Start hat nichts importiert`
+        : 'Laufsperre belegt, aber kein Lauf im Zustand laeuft — dieser Start hat nichts importiert')
     return { laufId: null, ok: 0, keineDaten: 0, fehler: 0, uebersprungen: 0,
              status: 'lauf_uebersprungen' }
   }

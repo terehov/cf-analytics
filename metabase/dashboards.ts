@@ -43,12 +43,15 @@ const F_BESTELLUNG: Parameter = {
   id: 'd-bestellung', name: 'bestellung', 'display-name': 'Beleg', type: 'string/=',
 }
 // Bewertung als Auswahlliste. Feste Werte statt Datenquelle: es gibt genau
-// diese vier, und "ohne" steht fuer NULL -- das liefert keine Spalte.
+// diese fuenf, und "ohne" steht fuer NULL -- das liefert keine Spalte.
 const F_AMPEL: Parameter = {
   id: 'd-ampel', name: 'ampel', 'display-name': 'Bewertung', type: 'string/=',
-  // Feste Liste statt Datenquelle: es gibt genau diese vier, und 'ohne'
-  // steht fuer NULL -- das liefert keine Spalte.
-  festeWerte: ['rot', 'orange', 'gruen', 'ohne'],
+  /*
+   * 'unvollstaendig' seit Migration 0080: gruen setzt seitdem voraus, dass
+   * ALLE sechs Signale vorlagen. Vorher fiel ein fehlendes Signal durch auf
+   * gruen — das Urteil wurde also gut, WEIL etwas fehlte.
+   */
+  festeWerte: ['rot', 'orange', 'unvollstaendig', 'gruen', 'ohne'],
 }
 // Der Bereich einer Einzelampel. Zusammen mit der Bewertung beschreibt er
 // genau ein Segment eines gestapelten Balkens -- "Personal / rot".
@@ -753,6 +756,14 @@ export const dashboards: Dashboard[] = [
           klick: [{ ziel: 'dd_filialen', uebergabe: { ampel: 'rot' }, fest: true }] },
         { karte: 'rt_kachel_orange',
           klick: [{ ziel: 'dd_filialen', uebergabe: { ampel: 'orange' }, fest: true }] },
+        /*
+         * Zwischen orange und gruen, weil es dort hingehoert: seit 0080 ist
+         * "es fehlt ein Signal" von "alles gut" getrennt. Vorher lief diese
+         * Zahl unter Gruen mit — das Urteil wurde also gut, WEIL etwas
+         * fehlte.
+         */
+        { karte: 'rt_unvollstaendig',
+          klick: [{ ziel: 'dd_filialen', uebergabe: { ampel: 'unvollstaendig' }, fest: true }] },
         { karte: 'rt_kachel_gruen',
           klick: [{ ziel: 'dd_filialen', uebergabe: { ampel: 'gruen' }, fest: true }] },
         { karte: 'rt_kachel_ohne_urteil',
@@ -765,6 +776,15 @@ export const dashboards: Dashboard[] = [
         { karte: 'rt_kachel_nicht_operativ',
           klick: [{ ziel: 'pf_portfolio', uebergabe: {}, fest: true }] },
       ] },
+      /*
+       * Und direkt unter den Kacheln: WORAN es liegt. Eine Zahl
+       * "8 unvollstaendig" ohne die Liste dahinter ist ein Vorwurf ohne
+       * Adresse — die Tabelle sagt, welcher Betrieb welches Signal
+       * vermissen laesst, und die haeufigste Antwort ist seit Juli 2026
+       * die Vor-Ort-Note.
+       */
+      { teile: [{ karte: 'rt_fehlende_signale', hoehe: 10 }] },
+
       // Neben der Bewertungskachel steht jetzt, WORAN sie haengt. Die Note
       // allein ist auf dieser Ebene eine Zahl ohne Griff -- "4,23" sagt
       // niemandem, was zu tun ist. "Bestellung · 2,14" schon, und ein Klick

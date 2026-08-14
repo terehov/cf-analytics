@@ -349,7 +349,7 @@ SELECT coalesce(s.ampel_emoji, '⚪')     AS "●",
                              WHEN 'Sofort handeln'    THEN 2
                              WHEN 'Nachforschung'     THEN 3 ELSE 4 END,
           CASE s.ampel WHEN 'rot' THEN 1 WHEN 'orange' THEN 2
-                       WHEN 'gruen' THEN 3 ELSE 4 END,
+                       WHEN 'unvollstaendig' THEN 3 WHEN 'gruen' THEN 4 ELSE 5 END,
           s.umsatz DESC NULLS LAST`,
     visualisierung: {
       column_settings: {

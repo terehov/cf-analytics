@@ -83,7 +83,7 @@ SELECT '🟠 ' || count(*) AS "Orange"
   {
     schluessel: 'rt_kachel_gruen',
     name: 'Grün',
-    beschreibung: 'Betriebe, bei denen alle bewerteten Ampeln grün sind.',
+    beschreibung: 'Betriebe, bei denen ALLE SECHS Kennzahlen vorlagen und keine auffällig war. Seit dem 14.08.2026 zählt hier nicht mehr mit, wem ein Signal fehlt — vorher wurde ein Urteil grün, WEIL etwas fehlte. Wem was fehlt, steht in der Kachel „Unvollständig" daneben.',
     anzeige: 'scalar',
     parameter: [MONAT.monat, KONZEPT.marke],
     sql: `${MONAT_CTE}
@@ -97,6 +97,53 @@ SELECT '🟢 ' || count(*) AS "Grün"
     visualisierung: {
       'scalar.field': 'Grün',
     },
+  },
+  /*
+   * DIE KACHEL, DIE ES VORHER NICHT GAB — und die Zahl, die vorher unter
+   * "Grün" mitlief. Seit Migration 0080 ist "alle Signale gut" von "es
+   * fehlt eines" getrennt; bis dahin fiel ein fehlendes Signal durch auf
+   * gruen, das Urteil wurde also GUT, WEIL etwas fehlte.
+   */
+  {
+    schluessel: 'rt_unvollstaendig',
+    name: 'Unvollständig',
+    beschreibung: 'Betriebe, bei denen mindestens eine der sechs Kennzahlen fehlt und keine der vorhandenen auffällig ist. Das ist KEIN gutes Urteil, sondern ein fehlendes — und bis zum 14.08.2026 stand es unter „Grün". Welche Kennzahl fehlt, sagt die Tabelle „Was fehlt für ein vollständiges Urteil?".',
+    anzeige: 'scalar',
+    parameter: [MONAT.monat, KONZEPT.marke],
+    sql: `${MONAT_CTE}
+SELECT '⚪ ' || count(*) AS "Unvollständig"
+  FROM mart.round_table_monat r
+  CROSS JOIN gewaehlt g
+ WHERE r.gesamt = 'unvollstaendig'
+   AND r.monat = g.monat
+   AND r.operativ
+   [[AND r.konzept = {{marke}}]]`,
+    visualisierung: {
+      'scalar.field': 'Unvollständig',
+    },
+  },
+  {
+    schluessel: 'rt_fehlende_signale',
+    name: 'Was fehlt für ein vollständiges Urteil?',
+    beschreibung: 'Je Betrieb: welche der sechs Round-Table-Kennzahlen im gewählten Monat nicht vorlag. Die häufigste ist seit Juli 2026 die Vor-Ort-Note — sie wird über die Datei „pflege/om_einschaetzung.csv" nachgetragen, nicht mehr über einen Entwicklereingriff.',
+    anzeige: 'table',
+    parameter: [MONAT.monat, KONZEPT.marke],
+    sql: `${MONAT_CTE}
+SELECT u.betrieb                                   AS "Betrieb",
+       u.konzept                                   AS "Marke",
+       u.signale_fehlen                            AS "fehlende Signale",
+       CASE WHEN u.fehlt_umsatz     THEN '✗' END   AS "Umsatz",
+       CASE WHEN u.fehlt_personal   THEN '✗' END   AS "Personal",
+       CASE WHEN u.fehlt_we_bar     THEN '✗' END   AS "WE Bar",
+       CASE WHEN u.fehlt_we_kueche  THEN '✗' END   AS "WE Küche",
+       CASE WHEN u.fehlt_bewertung  THEN '✗' END   AS "Bewertung",
+       CASE WHEN u.fehlt_om         THEN '✗' END   AS "Vor Ort"
+  FROM mart.round_table_unvollstaendig u
+  CROSS JOIN gewaehlt g
+ WHERE u.monat = g.monat
+   AND u.operativ
+   [[AND u.konzept = {{marke}}]]
+ ORDER BY u.signale_fehlen DESC, u.betrieb`,
   },
   {
     // Diese Kachel hat im Excel kein Pendant, und genau das war das Problem:
@@ -328,7 +375,7 @@ SELECT r.betrieb                                            AS "Betrieb",
  WHERE r.monat = g.monat
    AND r.operativ
    [[AND r.konzept = {{marke}}]]
- ORDER BY CASE r.gesamt WHEN 'rot' THEN 1 WHEN 'orange' THEN 2 WHEN 'gruen' THEN 3 ELSE 4 END,
+ ORDER BY CASE r.gesamt WHEN 'rot' THEN 1 WHEN 'orange' THEN 2 WHEN 'unvollstaendig' THEN 3 WHEN 'gruen' THEN 4 ELSE 5 END,
           CASE r.intensitaet
             WHEN 'Sofort eskalieren' THEN 1 WHEN 'Sofort handeln' THEN 2
             WHEN 'Nachforschung'     THEN 3 ELSE 4 END,

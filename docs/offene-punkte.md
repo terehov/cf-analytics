@@ -1191,3 +1191,44 @@ Gastronomie, `EK_06` → Wirtshaus am Schlossplatz). Sie stehen in
 trägt die `betrieb_key` ein; der nächste Lauf holt die Bewertungen dann von
 selbst. Geraten wird nicht: eine falsche Note im Round Table löst dieselbe
 Eskalationsstufe aus wie eine echte.
+
+## Nachprüfung nach dem Deploy von `0079` und `0080`
+
+```sql
+-- 1. Die Handpflege. ERWARTUNG: fehler IS NULL ueberall.
+SELECT tabelle, zeilen, letzter_stand, reicht_noch_tage, zustand, fehler
+  FROM mart.pflege_stand;
+
+-- 2. Feiertage und Schulferien. VORHER: 1.127 Zeilen bis 2027-12-26 und
+--    591 bis 2028-01-11. ERWARTUNG nach dem ersten Monatslauf: beide
+--    reichen drei Jahre voraus (KALENDER_VORLAUF_JAHRE).
+SELECT max(datum) FROM manual.feiertag;
+SELECT max(bis)   FROM manual.schulferien;
+
+-- 3. Die Historie holt sich selbst nach. VORHER: die acht neuen Sparten
+--    haben keinen einzigen Tag vor heute. ERWARTUNG: je Nacht bis zu
+--    2.000 Posten dazu, neueste zuerst, nach gut zwei Wochen vollstaendig.
+SELECT endpunkt, min(zeitraum_von) AS von, count(*) AS posten
+  FROM sync.warteschlange WHERE endpunkt LIKE 'getUmsatzbericht:%'
+ GROUP BY 1 ORDER BY 1;
+
+-- 4. Die Ampel. VORHER (Juni bis August): 19 gruen, 17 orange, 198 rot.
+--    ERWARTUNG: die gruenen wandern nach unvollstaendig, rot und orange
+--    bleiben unveraendert.
+SELECT gesamt, count(*) FROM mart.round_table_monat
+ WHERE monat >= date_trunc('month', current_date) - interval '2 months'
+ GROUP BY 1 ORDER BY 2 DESC;
+
+-- 5. Und die Frage dahinter: welches Signal fehlt?
+SELECT count(*) FILTER (WHERE fehlt_om)        AS ohne_om,
+       count(*) FILTER (WHERE fehlt_bewertung) AS ohne_bewertung,
+       count(*) FILTER (WHERE fehlt_umsatz)    AS ohne_umsatz
+  FROM mart.round_table_unvollstaendig
+ WHERE monat = (date_trunc('month', current_date) - interval '2 months')::date;
+```
+
+**Der eine Punkt, der einen Menschen braucht:** die OM-Noten für Juli und August
+(Entscheidung 2 des Hauptplans). Ohne sie bleibt `ampel_om` leer, und seit `0080`
+heißt das nicht mehr „grün", sondern „unvollständig" — was es ist. Der Weg dafür
+ist eine Zeile in `pflege/om_einschaetzung.csv`, committet und gepusht; die
+Datei liegt mit den 22 Juni-Noten bereits im Repo.

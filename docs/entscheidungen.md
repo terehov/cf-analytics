@@ -2031,3 +2031,54 @@ Genommen wird `openholidaysapi.org` — frei, ohne Schlüssel, ohne Anmeldung, u
 bereits eine der beiden Quellen des Bestands. **Der Bestand wird nicht
 umgeschrieben:** neue Namen legen im Zweifel eine zusätzliche Zeile an, statt
 eine alte zu ändern.
+
+### Entscheidung 1 (Hauptplan): Grün heißt ab jetzt „geprüft", nicht „nichts gefunden"
+
+Die Frage lautete: *darf eine Ampel grün sein, wenn ein Signal fehlt?* Sie war
+als „muss Eugene entscheiden" markiert, mit der Empfehlung **nein**. Umgesetzt
+am 14.08.2026 in Migration `0080` — und die Messung sagt, warum das mehr ist als
+eine Geschmacksfrage.
+
+`ampel.gesamt()` ignorierte NULL-Signale und fiel auf `ELSE 'gruen'` durch. Das
+Gesamturteil wurde also **gut, WEIL etwas fehlte**. Seit Juli 2026 ist `ampel_om`
+für alle 141 Betriebe leer (`manual.om_einschaetzung` endet im Juni), und der
+Umsatzvergleich fehlt im laufenden Monat ohnehin allen.
+
+**Was sich ändert und was ausdrücklich nicht:**
+
+| | |
+|---|---|
+| `rot` | unverändert. Ein fehlendes Signal darf ein rotes **nie** verdecken |
+| `orange` | unverändert |
+| `gruen` | nur noch, wenn **alle sechs** Signale vorlagen |
+| `unvollstaendig` | neu, dazwischen |
+| `NULL` | unverändert: gar kein Signal heißt „nicht beurteilt", nicht „unvollständig" |
+
+Die Änderung macht den **Freispruch strenger, nicht die Eskalation weicher**.
+
+**Die ehrliche Folge, gemessen:** nach der Umstellung ist im Moment **kein
+einziger** Betrieb grün — weil keiner alle sechs Signale hat. Das ist die
+Aussage, nicht ein Fehler. Pro Monat wechseln 5 bis 8 Urteile von grün auf
+unvollständig; die roten und orangen bleiben, wo sie waren.
+
+**Zurückdrehen ist eine Zeile.** Wer das anders entscheidet, streicht in
+`ampel.gesamt()` die eine `WHEN cardinality(...) < cardinality(...)`-Zeile. Der
+Rest bleibt, wie er war — und `mart.round_table_unvollstaendig` bliebe als
+Arbeitsliste trotzdem brauchbar.
+
+### Was ein Mensch weiterhin entscheidet — und was davon Bedienung war
+
+Nach dem 14.08.2026 braucht der Betrieb **keinen Handbefehl** mehr. Was bleibt,
+ist kein Knopf, sondern ein Urteil:
+
+1. **Die OM-Noten für Juli und August** (Entscheidung 2 des Plans). Sie kommen
+   von Menschen, nicht aus einer API. Neu ist nur der Weg: eine Zeile in
+   `pflege/om_einschaetzung.csv`, committet und gepusht — keine Migration mehr.
+2. **Die drei Verdachtsfälle bei Yext** (`L_03` → B+L Pforzheim, `EK_14` → WHK
+   Gastronomie, `EK_06` → Wirtshaus am Schlossplatz). Ein Automat, der hier rät,
+   hängt einem Betrieb die Bewertungen eines anderen an.
+3. **Die zwei mehrdeutigen Kostenstellen** („Aposto Aachen – Alte Post",
+   „Aposto Wuppertal II") in `manual.betrieb_zuordnung.entscheidung_key`.
+
+Alle drei stehen in einer Sicht mit einer Arbeitsliste, keine davon in einem
+Log. Das ist der Unterschied zwischen einer Entscheidung und einer Verabredung.

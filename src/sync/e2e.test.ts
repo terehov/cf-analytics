@@ -281,6 +281,13 @@ lauf('Ende-zu-Ende', () => {
        * Nachzügler-Fensters noch Änderungen an, ist es zu kurz.
        */
       'Nachzuegler: Aenderungen am Rand des Fensters',
+      /**
+       * Seit 0080. Gezaehlt wird der VORVORMONAT und nicht der laufende:
+       * im laufenden fehlt der Umsatzvergleich bei ALLEN 141 Betrieben,
+       * weil die BWA noch nicht gebucht ist. Eine Zeile, die deshalb
+       * jeden Monat auf 141 steht, ist keine Pruefung mehr.
+       */
+      'Round Table: operativer Betrieb ohne vollstaendige Signale (Vorvormonat)',
       'Umsatz: Artikelsumme vs. Umsatzbericht',
       /**
        * Seit 0077. Gezaehlt werden MONATE, nicht Euro: "in drei Monaten

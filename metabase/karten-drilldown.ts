@@ -195,7 +195,7 @@ SELECT r.betrieb                                            AS "Betrieb",
    -- fuehrte die Kachel "Ohne Urteil" auf eine leere Liste.
    [[AND coalesce(r.gesamt, 'ohne') = {{ampel}}]]
    [[AND r.intensitaet = {{intensitaet}}]]
- ORDER BY CASE r.gesamt WHEN 'rot' THEN 1 WHEN 'orange' THEN 2 WHEN 'gruen' THEN 3 ELSE 4 END,
+ ORDER BY CASE r.gesamt WHEN 'rot' THEN 1 WHEN 'orange' THEN 2 WHEN 'unvollstaendig' THEN 3 WHEN 'gruen' THEN 4 ELSE 5 END,
           CASE r.intensitaet WHEN 'Sofort eskalieren' THEN 1 WHEN 'Sofort handeln' THEN 2
                              WHEN 'Nachforschung' THEN 3 ELSE 4 END,
           r.betrieb`,
@@ -258,7 +258,7 @@ SELECT a.bereich_name        AS "Bereich",
    [[AND a.intensitaet = {{intensitaet}}]]
  ORDER BY a.reihenfolge,
           CASE a.ampel WHEN 'rot' THEN 1 WHEN 'orange' THEN 2
-                       WHEN 'gruen' THEN 3 ELSE 4 END,
+                       WHEN 'unvollstaendig' THEN 3 WHEN 'gruen' THEN 4 ELSE 5 END,
           a.wert DESC NULLS LAST,
           a.betrieb`,
     visualisierung: {
@@ -408,7 +408,7 @@ SELECT t.betrieb                         AS "Betrieb",
    [[AND t.betrieb = {{betrieb}}]]
    [[AND kz.hauptkonzept = {{marke}}]]
  ORDER BY CASE ab.gesamt WHEN 'rot' THEN 1 WHEN 'orange' THEN 2
-                         WHEN 'gruen' THEN 3 ELSE 4 END,
+                         WHEN 'unvollstaendig' THEN 3 WHEN 'gruen' THEN 4 ELSE 5 END,
           t.betrieb,
           t.reihenfolge`,
   },

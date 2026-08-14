@@ -997,3 +997,23 @@ eigenen Betrieb nicht.
 
 Dazu die Spalte **„ohne Positionen"** neben „Positionen %". Dieselbe Aussage absolut: 99,9 %
 liest man weg, „18" nicht.
+
+### Der Round Table hat eine vierte Kachel (Migration `0080`, 14.08.2026)
+
+Zwischen „Orange" und „Grün" steht jetzt **„Unvollständig"** — Betriebe, bei
+denen mindestens eine der sechs Kennzahlen fehlt und keine der vorhandenen
+auffällig ist.
+
+**Diese Zahl lief bis dahin unter „Grün" mit.** `ampel.gesamt()` ignorierte
+fehlende Signale und fiel auf grün durch: das Urteil wurde gut, weil etwas
+fehlte. Seit Juli 2026 ist die Vor-Ort-Note für alle 141 Betriebe leer.
+
+Darunter die Tabelle **„Was fehlt für ein vollständiges Urteil?"** — eine Zahl
+„8 unvollständig" ohne die Liste dahinter ist ein Vorwurf ohne Adresse. Die
+Tabelle sagt je Betrieb, welches der sechs Signale fehlt; die häufigste Antwort
+ist die Vor-Ort-Note, und die wird über `pflege/om_einschaetzung.csv`
+nachgetragen.
+
+**Die Sortierung überall ist rot → orange → unvollständig → grün.** Unvollständig
+steht vor grün, weil es mehr Aufmerksamkeit verdient: bei grün ist nichts zu
+tun, bei unvollständig fehlt etwas.
