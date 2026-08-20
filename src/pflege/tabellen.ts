@@ -57,6 +57,29 @@ export type Ziel = {
 }
 
 export const ZIELE: readonly Ziel[] = [
+  /**
+   * Die Klassengrenzen des Wettereffekts (Migration `0087`).
+   *
+   * WARUM DAS HIER STEHT UND NICHT IM QUELLTEXT: die Grenzen sind eine
+   * fachliche Festlegung, keine Konstante. Der erste Satz ist gemessen
+   * (20.08.2026, 4.735 Tage an 48 Orten), aber „ab wann ist es zu heiß" ist
+   * eine Frage an den Betrieb und nicht an die Verteilung. Eine Verschiebung
+   * ist damit eine Zeile hier — nicht eine Migration.
+   *
+   * ACHTUNG: `von` ist einschließlich, `bis` ist ausschließlich, leer heißt
+   * offen. Wer eine Grenze verschiebt, muss die Nachbarklasse mitziehen —
+   * sonst entsteht eine Lücke, und Tage verschwinden lautlos aus den
+   * Kacheln. `mart.wetter_klasse_pruefung` rechnet genau das nach und steht
+   * als Prüfzeile in `mart.pruefung_uebersicht`.
+   */
+  {
+    datei: 'wetter_klasse.csv',
+    tabelle: 'manual.wetter_klasse',
+    schluessel: ['kategorie', 'klasse'],
+    spalten: ['kategorie', 'klasse', 'reihenfolge', 'von', 'bis'],
+    pflicht: ['kategorie', 'klasse', 'reihenfolge'],
+    zweck: 'Klassengrenzen fuer den Wettereffekt (Temperatur, Niederschlag, Sonne)',
+  },
   {
     datei: 'om_einschaetzung.csv',
     tabelle: 'manual.om_einschaetzung',

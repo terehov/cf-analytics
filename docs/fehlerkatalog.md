@@ -3255,3 +3255,96 @@ eigene Zeile *gemischte Ferienlage*.
 **Die Lehre.** Eine Klassengrenze, die weicher ist als ihre Beschriftung, ist
 eine falsche Zahl mit einer richtigen Überschrift — und niemand liest die
 Definition nach, wenn die Überschrift plausibel klingt.
+
+## Ein Join auf einem Ausdruck, und der Plan kippte bei mehr Daten (20.08.2026)
+
+**Symptom.** Der Refresh von `mart.vergleichstag_basis` brauchte 40,9 s. Ohne
+jeden Codeeingriff lief er am selben Tag **ins Zeitlimit** — Abbruch nach
+1.075 s.
+
+**Ursache.** Dazwischen hatte eine zweite Session den Kalender-Nachlauf
+repariert. Der Bestand wurde vollständiger: 10 Bundesländer wurden 16, 1.127
+Feiertagszeilen wurden 1.760, 591 Ferienzeiträume wurden 1.268. Damit kippte
+der Ausführungsplan von `mart.betrieb_kalender`:
+
+```
+Merge Cond:  (p.kuerzel = ftf.kuerzel)
+Join Filter: (ftf.datum = (u.geschaeftstag + 1))
+```
+
+Vor- und Folgetag wurden als **Ausdruck** im Join gesucht
+(`t.geschaeftstag + 1`). Postgres nahm nur das Bundesland als
+Verbundbedingung und prüfte das Datum je Zeile als Filter — also für jede der
+443.304 Zeilen alle Feiertage dieses Landes, dreimal. Bei zehn Ländern ging das
+gerade noch durch.
+
+**Was ihn heute verhindert.** Migration `0088`: Vor- und Folgetag sind Spalten
+der Tagesachse statt Ausdrücke im Join, damit ist es eine Gleichheit auf zwei
+Spalten und Postgres darf hashen. Die kleinen Verbundtabellen stehen zusätzlich
+auf `MATERIALIZED`. Gemessen: **22,0 s** für die Sicht über alle 141 Betriebe,
+Wertgleichheit gegen die alte Fassung über 15.720 Zeilen mit null Abweichung
+geprüft.
+
+**Die Lehre, und sie ist die teure.** Eine Sicht, die mit dem heutigen Bestand
+schnell ist, ist damit nicht schnell. Dieser Plan kippte, weil eine **andere
+Baustelle Daten vervollständigte** — die Reparatur war richtig, und trotzdem
+war die Folge ein Ausfall. Ein Join auf einem Ausdruck ist die Stelle, an der
+so etwas zuerst nachgibt.
+
+## Ein `w.*` in einer Sicht wächst nicht mit (20.08.2026)
+
+**Symptom.** `mart.betrieb_wetter_tag` war als `SELECT s.betrieb_key, b.name,
+w.*` gebaut. Nachdem `mart.wetter_tag` in `0087` fünf Spalten dazubekam, fehlten
+sie in der Sicht darüber — ohne Fehlermeldung.
+
+**Ursache.** Postgres schreibt die Spaltenliste eines `*` beim Anlegen der
+Sicht fest. Was danach in der Quelltabelle entsteht, kommt nie an. Das `*`
+sieht mitwachsend aus und ist das Gegenteil.
+
+**Was ihn heute verhindert.** Die Sicht schreibt ihre Spalten aus. Wer eine
+`mart`-Sicht auf einer anderen aufbaut, die noch wachsen wird, nennt die
+Spalten — oder erzeugt sie in derselben Migration neu.
+
+## Sechzig Sekunden waren zu wenig für ein altes Jahr (20.08.2026)
+
+**Symptom.** Ein Wetter-Backfill über 96 Ortsjahre schrieb 596.032 Zeilen und
+meldete **30 Fehler** — alle in den Jahren 2024 und älter, keiner in 2025/2026.
+
+**Ursache.** Nicht die Quelle, sondern das Zeitlimit im Client. Nachgestellt
+braucht ein Bright-Sky-Aufruf für 2024 **108 Sekunden**, während die jüngsten
+Jahrgänge in wenigen Sekunden kommen; das Archiv wird für alte Jahre spürbar
+langsamer. Das Limit stand auf 60 s.
+
+**Was ihn heute verhindert.** Das Limit steht auf 180 s, mit der Messung als
+Begründung daneben. Wichtiger noch: ein gescheitertes Ortsjahr ist kein
+Verlust — `mart.wetter_rueckstand` führt es weiter als `fehlt`, und die nächste
+Nacht holt es erneut. Genau dafür ist der Rückstand eine Zahl, die fallen muss
+(Regel 10).
+
+**Nebenbefund, gleicher Tag:** die erste Fassung des Schreibers stapelte 500
+Zeilen je `INSERT` und brauchte damit 18 Rundreisen für ein Ortsjahr. Bei 60
+Ortsjahren je Nacht wäre der Nachlauf allein eine Stunde gelaufen — für Daten,
+die in einer einzigen Antwort ankommen. Jetzt ein `unnest` über zwölf Arrays,
+ein Aufruf.
+
+## Ein Test, der die Frische maß statt der Logik (20.08.2026)
+
+**Symptom.** `src/sync/vergleichstag.test.ts` wurde rot, ohne dass jemand die
+Logik angefasst hatte.
+
+**Ursache.** Er stellte die `LATERAL`-Fassung gegen die **Materialisierung**.
+Als die zweite Session den Feiertagsbestand austauschte, rechnete die eine
+Seite mit dem neuen Kalender und die andere mit dem alten. Der Test maß damit
+die Frische der Sicht, nicht die Gleichwertigkeit des Umbaus — und schlug für
+etwas an, wofür er nicht zuständig ist.
+
+**Was ihn heute verhindert.** Zwei getrennte Zusicherungen: *Ist der Umbau
+wertgleich?* prüft der Test live gegen live. *Ist die Sicht frisch?* prüft die
+Zeile über `mart.vergleichstag_stand` in `mart.pruefung_uebersicht`. Ein dritter
+Test hält Materialisierung und Fensterfassung gegeneinander — aber erst, nachdem
+er nachgesehen hat, ob der Kalender überhaupt derselbe ist; sonst sagt er es
+laut und prüft nicht.
+
+**Die Lehre.** Ein Test, der zwei Eigenschaften gleichzeitig prüft, schlägt bei
+der einen an und meint die andere. Wer ihn dann „repariert", repariert die
+falsche.

@@ -610,3 +610,52 @@ dem ersten Lauf `mart.belegarchiv_zulauf` mit dem Zustand `gezaehlt, nicht freig
 
 **Die 593.314 aus AGENTS.md bleiben damit eine Untergrenze** — aber ab jetzt eine, deren
 Abstand zur Wahrheit messbar ist statt geschätzt.
+
+## Wetter — Bright Sky auf DWD-Messdaten (seit 20.08.2026)
+
+Die vierte externe Quelle neben LINA, FoodNotify und Yext. `api.brightsky.dev`,
+**kein Schlüssel, keine Anmeldung**, keine Registrierung.
+
+**Lizenz, und sie ist der Grund für die Wahl.** Bright Sky liefert Messdaten
+des Deutschen Wetterdienstes; DWD-Daten stehen unter **GeoNutzV** und sind auch
+gewerblich frei — mit Namensnennung. Die steht in `src/wetter/quelle.ts`
+(`HERKUNFT`) und gehört in die Kartenbeschreibung des Wetter-Reiters.
+Open-Meteo wäre bequemer gewesen, sein kostenloser Zugang ist aber ausdrücklich
+auf nicht-gewerbliche Nutzung beschränkt (`entscheidungen.md`, E1).
+
+**Wie die Tabellen zusammenfinden.** Nicht über eine Orts-ID, sondern über die
+**auf zwei Nachkommastellen gerundete Koordinate** aus
+`manual.betrieb_standort` — rund 1,1 km und damit weit unter dem
+Stationsabstand. 48 Gitterpunkte für 60 Betriebe (20.08.2026). Ein
+nachgetragener Standort bringt seinen Gitterpunkt ohne Codeeingriff mit.
+
+```
+manual.betrieb_standort.breitengrad/laengengrad
+  → round(…, 2) → mart.wetter_ort
+  → manual.wetter_stunde (breite, laenge, zeitpunkt)
+  → mart.wetter_tag → mart.betrieb_wetter_tag → mart.vergleichstag
+```
+
+**Zeitbehandlung, und hier liegt die Falle.** `zeitpunkt` ist `timestamptz` und
+damit UTC-verankert, **nicht Ortszeit**: in der Nacht zur Winterzeit gibt es
+02:00 Ortszeit zweimal, und ein Schlüssel auf der Ortszeit kollidiert dort. Der
+Geschäftstag wird beim Lesen über `core.geschaeftstag()` abgeleitet — und
+**der beginnt um 08:00 Berliner Zeit**, nicht um Mitternacht. Wer naiv auf den
+Kalendertag verdichtet, verschiebt das Wetter um acht Stunden gegen den Umsatz.
+
+**Zwei Eigenheiten der Schnittstelle, am 20.08.2026 nachgemessen:**
+
+| | |
+|---|---|
+| `last_date` | liefert nur die Stunde **00:00** dieses Tages. Ein Aufruf über 2025-01-01…2025-12-31 bringt **8.737 statt 8.760** Werte — die letzten 23 Stunden fehlen. `hole()` setzt deshalb intern den Folgetag ein; sonst fehlte in jedem Jahr der Silvesterabend |
+| `sunshine` | in **5,4 %** der Stunden `NULL`. Bleibt `NULL` und wird nicht zu 0 — eine Messlücke ist keine Bewölkung. Der Sonnenanteil rechnet gegen die *belegten* Stunden |
+
+**Feldabdeckung** über 8.737 Stunden eines Jahres: Temperatur, Niederschlag,
+Bewölkung, Wind und Zustand zu 100 %, Sonnenschein zu 94,6 %. Ein Aufruf
+liefert ein volles Jahr in 5,1 MB.
+
+**Was die Zahlen nicht sagen.** Die nächste Station lag im Test 5,2 km entfernt;
+Bright Sky fällt je *Feld* auf weiter entfernte Stationen zurück, wenn die
+nächste es nicht misst. `distanz_m` steht deshalb in jeder Zeile — eine Messung
+aus 25 km ist etwas anderes als eine aus 3 km. Und: **81 Betriebe haben keine
+Koordinate und bekommen bauartbedingt kein Wetter** (`mart.kalender_fehlend`).

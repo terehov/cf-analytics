@@ -1019,3 +1019,25 @@ einen alten Stand, gegen den es abgleicht. Genau daran hing der
 Ende-zu-Ende-Test nach `0080`. `vergleichstagAuffrischen()` fängt diesen einen
 Fehlercode ab und befüllt einmal ohne CONCURRENTLY; danach greift der normale
 Weg.
+
+**Das Wetter holt der Lauf selbst** (`src/wetter/nachlauf.ts`, seit Migration
+`0086`). Zwei Dinge an einer Stelle: ein **rollierendes Fenster** über die
+letzten 14 Tage (48 Aufrufe, einer je Gitterpunkt — DWD-Stationen melden nach
+und korrigieren) und ein **Backfill mit Obergrenze**
+(`WETTER_BACKFILL_JE_LAUF`, Vorgabe 60 Ortsjahre), neueste zuerst. Kein
+Handbefehl; auf 0 gesetzt hört das Nachholen auf.
+
+Die Einheit ist das **Ortsjahr, also genau ein Aufruf** — Bright Sky liefert
+ein volles Jahr in einer Antwort. Der Plan nannte die Größe
+`WETTER_BACKFILL_ORTE_PRO_NACHT`; ein Ort trägt aber neun Jahre, die Zahl im
+Namen hätte um den Faktor neun danebengelegen.
+
+Er steht **vor `vergleichstagNachlauf()`**: dessen Hülle liest über
+`mart.betrieb_wetter_tag` mit. Wirft nie — ein fehlender Wetterwert ist eine
+leere Spalte, kein verlorener Umsatz.
+
+**Gemessen am 20.08.2026:** 48 + 66 Aufrufe, 596.032 Zeilen, 1.024 s. Dabei 30
+Fehlschläge, alle in Jahrgängen ab 2024 abwärts — ein Aufruf für 2024 braucht
+108 s, das Zeitlimit stand auf 60. Es steht jetzt auf 180 s. Ein gescheitertes
+Ortsjahr bleibt in `mart.wetter_rueckstand` als `fehlt` stehen und wird in der
+nächsten Nacht erneut geholt.

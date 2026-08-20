@@ -1045,3 +1045,35 @@ jede Migration, die eine Prüfzeile ergänzt, erzeugt `pruefung_uebersicht`
 komplett neu — arbeiten zwei Sessions parallel, überschreibt die später
 angewendete Migration die Zeilen der früheren still. Als eigene Sicht kostet
 eine solche Kollision eine Zeile statt drei Prüfungen.
+
+## Wetter (`0086`, `0087`)
+
+**`mart.wetter_tag` führt zwei Verdichtungen je Tag**, und beide sind auf den
+**Geschäftstag** gerechnet — der beginnt um 08:00 Berliner Zeit, nicht um
+Mitternacht. `fenster_*` sind die ersten 16 Stunden (08–24, Entscheidung E2,
+99,5 % des Umsatzes), `tag_*` ist der volle Geschäftstag. Karten zeigen das
+Fenster; der Ganztagssatz steht daneben, damit die Wahl überprüfbar bleibt.
+
+**Drei Regeln für Wetterkarten:**
+
+1. **Die Sonnenklasse ist relativ, Temperatur und Niederschlag sind absolut.**
+   Ein absoluter Sonnenanteil im Fenster 08–24 misst die Jahreszeit: im Januar
+   wären 71,2 % der Tage „trüb", im Juni 19,6 %. `sonne_abweichung_pp` rechnet
+   gegen die letzten 28 Tage am selben Ort.
+2. **Die Klassengrenzen stehen in `manual.wetter_klasse`**, gepflegt über
+   `pflege/wetter_klasse.csv`. Wer eine Grenze verschiebt, muss die
+   Nachbarklasse mitziehen — `mart.wetter_klasse_pruefung` rechnet es nach und
+   steht als Prüfzeile in der Übersicht.
+3. **Die Namensnennung gehört auf den Wetter-Reiter.** DWD-Daten sind unter
+   GeoNutzV frei, aber nicht anonym: *„Wetterdaten: Deutscher Wetterdienst
+   (DWD), bezogen über Bright Sky"*. Der Text steht in `src/wetter/quelle.ts`
+   als `HERKUNFT`, damit er beim Quellenwechsel mitgeändert wird.
+
+**Was eine Wetterkachel nicht darf: neben einer Feiertagskachel addiert
+werden.** Ein Feiertag im Sommer ist auch ein warmer Tag. Die drei Effekte
+stehen nebeneinander, nicht gegeneinander verrechnet.
+
+**Die Abdeckung ist kleiner als beim Kalender.** Wetter braucht Koordinaten,
+und die haben 60 von 141 Betrieben — der Kalender kommt seit `0084` auch ohne
+aus. Eine Wetterkachel zeigt also weniger Betriebe als die Feiertagskachel
+daneben, und das gehört in die Beschreibung.

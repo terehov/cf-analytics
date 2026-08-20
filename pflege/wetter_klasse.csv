@@ -1,0 +1,14 @@
+kategorie;klasse;reihenfolge;von;bis
+temperatur;unter 5 Grad;1;;5
+temperatur;5 bis 15 Grad;2;5;15
+temperatur;15 bis 22 Grad;3;15;22
+temperatur;22 bis 28 Grad;4;22;28
+temperatur;ueber 28 Grad;5;28;
+niederschlag;trocken;1;;0.05
+niederschlag;leicht bis 2 mm;2;0.05;2
+niederschlag;Regen ueber 2 mm;3;2;
+sonne;deutlich trueber;1;;-20
+sonne;etwas trueber;2;-20;-5
+sonne;wie ueblich;3;-5;5
+sonne;etwas sonniger;4;5;20
+sonne;deutlich sonniger;5;20;

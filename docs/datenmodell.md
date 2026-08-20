@@ -517,3 +517,31 @@ Schreibweisen einander zu; `mart.feiertag_normiert` wendet sie an und behält
 den Rohwert in `name_roh`. **Normiert wird beim Lesen, nicht beim Import** —
 dieselbe Haltung wie bei `raw.api_antwort`: die Rohzeilen bleiben, wie die
 Quelle sie geliefert hat. Anlass und Messwerte in `befunde-datenlage.md`.
+
+## Wetter (`0086`, `0087`)
+
+**Der Schlüssel ist die gerundete Koordinate, keine Orts-ID.** Zwei
+Nachkommastellen sind rund 1,1 km und damit weit unter dem Stationsabstand
+(im Test 5,2 km). 48 Gitterpunkte für 60 Betriebe, keine ID-Verwaltung, und
+zwei Betriebe an derselben Adresse bekommen bauartbedingt dasselbe Wetter. Wer
+einen Standort nachträgt, bringt seinen Gitterpunkt ohne Codeeingriff mit —
+`mart.wetter_ort` ist abgeleitet, nicht gepflegt.
+
+**`manual.wetter_stunde.zeitpunkt` ist `timestamptz` und damit UTC-verankert,
+nicht Ortszeit.** In der Nacht zur Winterzeit gibt es 02:00 Ortszeit zweimal;
+ein Schlüssel auf der Ortszeit kollidiert dort. Geschäftstag und Stunde werden
+beim Lesen über `core.geschaeftstag()` abgeleitet — und der schneidet um 08:00
+Berliner Zeit. Wer naiv auf den Kalendertag verdichtet, verschiebt das Wetter
+um acht Stunden gegen den Umsatz.
+
+**Stündlich und nicht gleich der Tageswert.** 48 Gitterpunkte × 3.144 Tage ×
+24 h sind rund 3,6 Mio Zeilen — neben 27,7 Mio Artikelzeilen nichts. Dafür ist
+„wie war das Wetter zur Mittagszeit" später ohne neuen Abruf beantwortbar. Ein
+Gewitter um 4 Uhr räumt keine Terrasse; ein Tagesmaximum weiß das nicht.
+
+**Die Klassengrenzen sind Daten, nicht Code** (`manual.wetter_klasse`, gepflegt
+über `pflege/wetter_klasse.csv`) — dieselbe Bauart wie das Ampel-Regelwerk.
+`von` einschließlich, `bis` ausschließlich, `NULL` offen; jede Kategorie ist
+nach unten **und** oben offen, damit ein 42-Grad-Tag in der Randklasse landet
+statt herauszufallen. `mart.wetter_klasse_pruefung` findet Lücken und
+Überlappungen.

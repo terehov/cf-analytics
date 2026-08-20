@@ -32,7 +32,7 @@ export type Quelle = {
   /** Schlüssel. Bei Endpunkten deren `key`, sonst ein sprechender Name. */
   quelle: string
   bezeichnung: string
-  system: 'lina' | 'ladenakte' | 'foodnotify' | 'yext' | 'intern'
+  system: 'lina' | 'ladenakte' | 'foodnotify' | 'yext' | 'intern' | 'wetter'
   /** Gemessen über `sync.aufgabe`. Schließt `tabelle` aus. */
   endpunkt?: string
   /** Gemessen direkt an der Zieltabelle. Für Nachläufe ohne `sync.aufgabe`. */
@@ -244,6 +244,23 @@ export const QUELLEN: readonly Quelle[] = [
     system: 'foodnotify', tabelle: { schema: 'core', name: 'ware_stand', zeitspalte: 'geladen_am' },
     kadenz_stunden: MONATLICH, erwartet: false,
     bemerkung: 'Kein Schreiber im Repo, 0 Zeilen. core.ware selbst hat 43.271.' },
+  /**
+   * WETTER — Bright Sky auf DWD-Messdaten, seit Migration `0086`.
+   *
+   * Gemessen an der Zieltabelle und nicht an `sync.aufgabe`: der Abruf läuft
+   * als Nachlauf und stellt keine Posten ein. Genau der Fall, für den
+   * `tabelle` in diesem Register steht.
+   *
+   * KADENZ wie ein Kalendertag plus Reserve. Das rollierende Fenster schreibt
+   * jede Nacht die letzten 14 Tage neu — bleibt `geholt_am` stehen, hat der
+   * Nachlauf nicht gearbeitet oder Bright Sky antwortet nicht mehr. Beides
+   * will jemand gelesen haben, bevor die Wetterkacheln still altern.
+   */
+  { quelle: 'wetter:stunde', bezeichnung: 'Wetter je Gitterpunkt und Stunde (DWD/Bright Sky)',
+    system: 'wetter', tabelle: { schema: 'manual', name: 'wetter_stunde', zeitspalte: 'geholt_am' },
+    kadenz_stunden: TAEGLICH,
+    bemerkung: 'Rollierendes Fenster ueber 14 Tage plus Backfill mit Obergrenze. '
+             + 'Rueckstand steht in mart.wetter_rueckstand.' },
 ] as const
 
 /**

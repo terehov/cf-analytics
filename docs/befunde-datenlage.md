@@ -1819,3 +1819,94 @@ Montag einen leeren Vergleichsvorrat, über alle acht Jahre. Diese Tage bleiben
 in `mart.vergleichstag_basis` stehen (Regel 10) — eine Tagesliste, in der Tage
 fehlen, ohne dass es dasteht, ist die schlimmere Variante. Auswertungen filtern
 deshalb auf `vergleichstage = 4`.
+
+## Was das Wetter am Umsatz bewegt (20.08.2026)
+
+Gemessen über `mart.wetter_effekt_gruppe`, 48 Gitterpunkte, Zeitraum ab
+01.01.2023, nur Tage mit vier sauberen Vergleichstagen **und** vollständigem
+16-Stunden-Fenster. Der Wetterbestand war dabei erst zu rund einem Viertel
+gefüllt (121 von 432 Ortsjahren) — die Zahlen tragen, die Fallzahlen wachsen
+noch.
+
+**Alles gegen den gewöhnlichen Tag gerechnet, nicht gegen null** (siehe oben,
+der Nullpunkt liegt bei −3,5 %).
+
+| Temperatur (Maximum 08–24) | Tage | gegen Basis |
+|---|---:|---:|
+| unter 5 °C | 1.904 | −1,8 pp |
+| 5–15 °C | 4.545 | +0,1 pp |
+| 15–22 °C | 3.701 | +1,5 pp |
+| **22–28 °C** | 2.335 | **+4,0 pp** |
+| **über 28 °C** | 1.328 | **−3,0 pp** |
+
+**Der Zusammenhang ist kein Anstieg, sondern ein umgekehrtes U.** Der beste
+Bereich liegt bei 22 bis 28 Grad; darüber fällt der Umsatz unter den der
+5–15-Grad-Tage. Hitze kostet — und das ist die Aussage, die man verliert, wenn
+man Temperatur linear gegen Umsatz rechnet.
+
+| Niederschlag (Summe 08–24) | Tage | gegen Basis |
+|---|---:|---:|
+| trocken | 9.260 | +2,6 pp |
+| leicht bis 2 mm | 2.276 | −1,5 pp |
+| Regen über 2 mm | 2.277 | **−5,3 pp** |
+
+| Sonne (relativ zu den letzten 28 Tagen) | Tage | gegen Basis |
+|---|---:|---:|
+| deutlich trüber (< −20 pp) | 2.988 | −4,4 pp |
+| etwas trüber | 3.714 | +1,5 pp |
+| wie üblich | 1.361 | −0,6 pp |
+| etwas sonniger | 1.754 | +1,1 pp |
+| deutlich sonniger (> +20 pp) | 3.857 | **+4,3 pp** |
+
+Die beiden Randklassen sind sauber und gegenläufig; die drei mittleren liegen
+im Rauschen und sind nicht monoton. Wer daraus eine Feinabstufung liest,
+überinterpretiert.
+
+**Die Spannen liegen bei 7 bis 9 Prozentpunkten** — deutlich unter den 137
+Punkten des Feiertagskalenders. Wetter erklärt einen schlechten Tag, ein
+Feiertag erklärt eine schlechte Woche.
+
+## Die vorgeschlagene Sonnenklasse maß die Jahreszeit (20.08.2026)
+
+`docs/plan-kalender-wetter.md` schlug für die Sonne absolute Grenzen vor: „trüb
+unter 25 % Sonnenanteil". Nachgemessen über 4.735 Tage an 48 Orten ist der
+Anteil „trüber" Tage:
+
+| Monat | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| trüb % | **71,2** | 65,5 | 44,7 | 27,6 | 33,5 | **19,6** | 42,2 | 22,1 | 54,7 | 66,9 | 63,0 | 68,0 |
+
+Im Januar ist fast jeder Tag „trüb", im Juni jeder fünfte. Der Grund ist kein
+Wetter, sondern das Fenster: von 08 bis 24 Uhr sind im Winter acht der sechzehn
+Stunden dunkel. **Eine Klasse, die im Januar 71 % der Tage einsammelt, heißt
+nicht „trüb", sie heißt „Winter".** Die Klasse misst deshalb seit `0087`
+relativ — Sonnenanteil des Tages minus dem der letzten 28 Tage am selben Ort,
+dieselbe Konstruktion wie beim Vergleichstag.
+
+Temperatur und Niederschlag bleiben absolut: dort ist die Grenze fachlich
+lesbar („über 28 Grad"), und die Verteilung trägt sie —
+15,1 / 30,2 / 24,1 / 16,6 / 14,0 % bei der Temperatur und 66,0 / 16,2 / 17,8 %
+beim Niederschlag.
+
+## Der Feiertagsbestand wechselte mitten in der Arbeit (20.08.2026)
+
+Eine zweite Session reparierte den Kalender-Nachlauf; er hatte seit Migration
+`0079` jede Nacht alle zwanzig Aufrufe an einer Längenbegrenzung verloren und
+nie eine Zeile geschrieben. Danach:
+
+| | vorher | nachher |
+|---|---:|---:|
+| `manual.feiertag` | 1.127 | **1.760** |
+| Bundesländer | 10 | **16** |
+| `manual.schulferien` | 591 | **1.268** |
+| Reichweite | 2018-01-01 – 2027-12-26 | **2020-01-01** – 2030-01-11 |
+
+**Zwei Folgen, die niemand bestellt hatte.** Erstens stehen 2018 und 2019
+seitdem ohne jeden Feiertag da — bei 11.442 und 14.268 Umsatztagen. Ohne
+Feiertage landet ein Neujahr im *Vergleichsvorrat*, der Schnitt der vier
+Vergleichs-Mittwoche fällt, und der Folgemittwoch glänzt. Die Effektsichten
+trifft es nicht (sie rechnen ab 2023), die Tagesliste schon.
+`mart.feiertag_jahresluecke` meldet es ab jetzt; Erwartung leer.
+
+Zweitens kippte der Ausführungsplan von `mart.betrieb_kalender` — siehe
+`fehlerkatalog.md`, „Ein Join auf einem Ausdruck".

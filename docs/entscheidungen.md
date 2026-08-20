@@ -2183,8 +2183,11 @@ sind unter GeoNutzV auch gewerblich frei, mit Namensnennung — die gehört ins
 Dashboard. Der Abruf liegt hinter `src/wetter/quelle.ts`; ein Quellenwechsel
 ist eine Datei, keine Migration.
 
-**E2 — Zeitfenster für die Wetterverdichtung: 11–24 Uhr**, abweichend vom
-Planvorschlag 11–22. Nachgemessen am Umsatz 2026 über
+~~**E2 — Zeitfenster für die Wetterverdichtung: 11–24 Uhr**~~ — das war die
+*Empfehlung*, nicht die Entscheidung. **Eugene hat am 20.08.2026 08–24 Uhr
+gewählt** (99,5 % des Umsatzes 2026 statt 95,0 %). Umgesetzt ist 08–24; alles
+Folgende gilt entsprechend. Die ursprüngliche Abwägung bleibt stehen, weil sie
+die Alternativen begründet: Nachgemessen am Umsatz 2026 über
 `core.zeitzonenbericht_stunde`: 11–22 deckt **89,7 %**, 11–24 deckt **95,0 %**,
 08–22 deckt 94,3 %. Late Night trägt 5,7 % und ist bei den bar-lastigen
 Betrieben Teil des Geschäfts; das Frühstück trägt 4,6 % und würde den
@@ -2236,3 +2239,21 @@ aber es baut still falsche Zahlen.
 
 **Kosten der Entscheidung:** die Materialisierung trägt 443.304 statt 188.640
 Zeilen. Gemessen am 20.08.2026: Aufbau 39 s, `REFRESH CONCURRENTLY` **40,9 s**.
+
+**Was 08–24 konkret heißt, und es ist nicht der Kalendertag.**
+`core.geschaeftstag()` schneidet um **08:00 Berliner Zeit**
+(`(zeitpunkt AT TIME ZONE 'Europe/Berlin') - interval '8 hours'`). Das Fenster
+08–24 sind damit exakt die **ersten 16 der 24 Stunden eines Geschäftstags**;
+draußen bleiben die Stunden 0 bis 7 des Folgemorgens — 0,5 % des Umsatzes und
+die Nachttiefstwerte. Genau darin unterscheiden sich die beiden gespeicherten
+Verdichtungen noch: beim Temperatur-**Minimum**. Bei Maximum und Summen liegen
+sie eng beieinander, was bei der Wahl absehbar war und in Kauf genommen wurde.
+
+**E3, nachgetragen am 20.08.2026: die Klassengrenzen sind jetzt gemessen.**
+Temperatur und Niederschlag bleiben wie vorgeschlagen — die Verteilung trägt
+sie (15,1 / 30,2 / 24,1 / 16,6 / 14,0 % und 66,0 / 16,2 / 17,8 % über 4.735
+Tage an 48 Orten). **Die Sonnenklasse nicht.** „Trüb unter 25 % Anteil" traf im
+Januar 71,2 % der Tage und im Juni 19,6 %: im Fenster 08–24 sind im Winter acht
+von sechzehn Stunden dunkel, die Klasse misst also die Jahreszeit. Sie rechnet
+seit `0087` **relativ** gegen die letzten 28 Tage am selben Ort — dieselbe
+Konstruktion wie der Vergleichstag, aus demselben Grund.

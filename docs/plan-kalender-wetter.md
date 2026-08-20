@@ -445,3 +445,48 @@ Prototyp-SQL ist nicht erhalten, die fachliche Aussage trägt beide Werte.
 Der Tag **vor** einem Feiertag liegt bei **+20,9 pp** gegen den gewöhnlichen
 Tag (1.918 Tage), der Tag danach bei −4,7 pp. Das ist mehr als die Hälfte der
 Feiertage selbst wert.
+
+## 9. Phase 3 und 4 (20.08.2026)
+
+Migrationen `0086` (Wetter laden), `0087` (Wettereffekt) und `0088`
+(Kalender-Ausführungsplan) sind angewendet. Entscheidungen: **E1 Bright
+Sky/DWD**, **E2 Fenster 08–24 Uhr** (Eugene, abweichend vom Planvorschlag
+11–22), **E3 gemessen statt geraten**, **E4 gestrichen**.
+
+**Fünf weitere Stellen, an denen der Plan nicht trug:**
+
+1. **Die Sonnenklasse maß die Jahreszeit.** „Trüb unter 25 % Anteil" traf im
+   Januar 71,2 % der Tage und im Juni 19,6 % — im Fenster 08–24 sind im Winter
+   acht von sechzehn Stunden dunkel. Sie rechnet jetzt relativ gegen die
+   letzten 28 Tage am selben Ort.
+2. **Der Geschäftstag beginnt um 08:00**, nicht um Mitternacht
+   (`core.geschaeftstag()`). Der Plan sprach vom „Kalendertag"; wer den nimmt,
+   verschiebt das Wetter um acht Stunden gegen den Umsatz.
+3. **`last_date` bei Bright Sky liefert nur die Stunde 00:00** dieses Tages —
+   8.737 statt 8.760 Werten im Jahr. Ohne Korrektur fehlte in jedem Jahr der
+   Silvesterabend.
+4. **`WETTER_BACKFILL_ORTE_PRO_NACHT` begrenzt die falsche Größe.** Ein Ort
+   trägt neun Jahre, also neun Aufrufe. Die Obergrenze zählt jetzt Ortsjahre,
+   also Aufrufe: `WETTER_BACKFILL_JE_LAUF`.
+5. **Der Kalender-Ausführungsplan kippte**, als eine zweite Session den
+   Kalender-Nachlauf reparierte und aus 10 Bundesländern 16 wurden. Refresh:
+   40,9 s → Zeitlimit nach 1.075 s → **92,6 s** nach `0088`. Ursache war ein
+   Join auf `geschaeftstag + 1`.
+
+**Gemessene Laufzeiten**
+
+| | |
+|---|---|
+| `mart.betrieb_kalender` über 141 Betriebe | 22,0 s |
+| `REFRESH CONCURRENTLY mart.vergleichstag_basis` | **92,6 s** (443.304 Zeilen) |
+| Wetter-Nachlauf, 48 + 66 Aufrufe | 1.024 s, 596.032 Zeilen |
+| Bright Sky, ein Ortsjahr 2025 | wenige Sekunden |
+| Bright Sky, ein Ortsjahr 2024 | **108 s** — Zeitlimit steht jetzt auf 180 s |
+
+**Offen:** der Wetter-Backfill steht bei 121 von 432 Ortsjahren (2026 und 2025
+vollständig, 2024 zu 20/48). Der Rest kommt in den nächsten Nächten von selbst
+nach — `mart.wetter_rueckstand` führt die Zahl.
+
+**Phase 5 (Dashboards) ist noch nicht begonnen.** Grund steht im Bericht: drei
+der vier zu ändernden Dateien in `metabase/` tragen unversionierte Änderungen
+einer zweiten Session.

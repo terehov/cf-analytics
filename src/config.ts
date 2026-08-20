@@ -441,6 +441,43 @@ const Schema = z.object({
   HISTORIE_JE_LAUF: z.coerce.number().int().min(0).default(2_000),
 
   /**
+   * Wetter-Backfill: wie viele ORTSJAHRE eine Nacht höchstens holt.
+   *
+   * Ein Ortsjahr ist genau EIN Aufruf gegen Bright Sky — die Schnittstelle
+   * liefert ein volles Jahr in einer Antwort (8.737 Stundenwerte für 2025,
+   * 5,1 MB, am 20.08.2026 nachgemessen). Die Einheit ist deshalb der Aufruf
+   * und nicht der Ort: sie begrenzt genau das, was Last erzeugt.
+   *
+   * ABWEICHUNG VOM PLAN, mit Absicht. `docs/plan-kalender-wetter.md` nennt
+   * `WETTER_BACKFILL_ORTE_PRO_NACHT` mit Vorgabe 10. Ein Ort trägt aber neun
+   * Jahre, also neun Aufrufe — die Zahl im Namen hätte um den Faktor neun
+   * danebengelegen, und eine Obergrenze, die etwas anderes begrenzt als ihr
+   * Name sagt, ist keine.
+   *
+   * SECHZIG: 48 Gitterpunkte × 9 Jahre sind 432 Ortsjahre, also gut sieben
+   * Nächte. Dazu die 48 Aufrufe des rollierenden Fensters — zusammen unter
+   * 110 Aufrufen je Nacht gegen einen Dienst, der ganze Jahre am Stück
+   * ausliefert.
+   *
+   * NEUESTE ZUERST, aus demselben Grund wie bei HISTORIE_JE_LAUF: bricht es
+   * ab, fehlt die alte Historie und nicht das laufende Jahr.
+   *
+   * Auf 0 gesetzt hört das Nachholen auf. Das ist die Notbremse; ein
+   * Handbefehl ist es nicht.
+   */
+  WETTER_BACKFILL_JE_LAUF: z.coerce.number().int().min(0).default(60),
+
+  /**
+   * Das rollierende Fenster für das Wetter (Tage).
+   *
+   * DWD-Stationen melden nach und korrigieren; ein einmal geholter Tag ist
+   * nicht endgültig. Vierzehn Tage sind ein Kompromiss aus „Korrekturen
+   * einsammeln" und „48 Aufrufe je Nacht" — eine Anfrage je Gitterpunkt deckt
+   * das ganze Fenster ab, die Zahl der Aufrufe hängt also nicht daran.
+   */
+  WETTER_FENSTER_TAGE: z.coerce.number().int().min(1).default(14),
+
+  /**
    * Das rollierende Fenster für das Auffrischen der Bestelldetails (Tage).
    *
    * DER BEFUND DAHINTER. Am 13.08.2026 in Produktion gemessen: von 66.966

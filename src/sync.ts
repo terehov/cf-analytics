@@ -14,6 +14,7 @@ import { auswahllistenNachlauf } from './sync/auswahllisten'
 import { deckungsbeitragNachlauf } from './sync/deckungsbeitrag'
 import { roundTableNachlauf } from './sync/round_table'
 import { vergleichstagNachlauf } from './sync/vergleichstag'
+import { wetterNachlauf } from './wetter/nachlauf'
 import { einkaufspreisNachlauf } from './sync/einkaufspreis'
 import { einkaufSichtenNachlauf } from './sync/einkauf_sichten'
 import { zuordnungNachlauf } from './sync/zuordnung'
@@ -119,6 +120,17 @@ try {
   // damit die Urteile auf ①–③ nie älter sind als der letzte Lauf.
   // Wirft nie, siehe Kopf von sync/round_table.ts.
   await roundTableNachlauf()
+
+  /**
+   * Das Wetter, und es steht VOR dem Vergleichstag: dessen Hülle liest über
+   * mart.betrieb_wetter_tag mit. Andersherum zeigten die Wetterspalten den
+   * Stand vom Vortag — dieselbe Falle wie bei Yext und der Handpflege.
+   *
+   * Rollierendes Fenster über 14 Tage (48 Aufrufe) plus Backfill mit
+   * Obergrenze (WETTER_BACKFILL_JE_LAUF, Vorgabe 60). Kein Handbefehl.
+   * Wirft nie, siehe Kopf von wetter/nachlauf.ts.
+   */
+  await wetterNachlauf()
 
   /**
    * Und der Vergleichstag, aus demselben Grund: mart.vergleichstag_basis ist

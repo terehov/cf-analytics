@@ -39,20 +39,42 @@ const BETRIEBE = 3
  * CTE `basis` ist auf die Probe eingeschränkt. Bewusst NICHT aufgeräumt:
  * dies ist die Referenz, und eine geglättete Referenz beweist nichts.
  */
-const REFERENZ = `
+/**
+ * BEIDE FASSUNGEN LIVE, ueber denselben kleinen Bestand.
+ *
+ * Die erste Version dieses Tests stellte die LATERAL-Fassung gegen die
+ * MATERIALISIERUNG. Das war falsch zugeschnitten und ist am 20.08.2026
+ * aufgeflogen: eine zweite Session reparierte den Kalender-Nachlauf, der
+ * Feiertagsbestand sprang von 1.127 auf 1.760 Zeilen — und der Test wurde rot,
+ * ohne dass sich an der Logik etwas geändert hatte. Er maß die Frische der
+ * Materialisierung, nicht die Gleichwertigkeit des Umbaus.
+ *
+ * Das sind zwei verschiedene Zusicherungen, und sie gehören getrennt:
+ *   - Ist der Umbau wertgleich?  → dieser Test, live gegen live.
+ *   - Ist die Sicht frisch?      → die Prüfzeile über mart.vergleichstag_stand.
+ *
+ * Die Fensterfassung unten ist eine Abschrift aus 0084. Wer die Materialisierung
+ * ändert, ändert sie hier mit — dafür steht der Test darunter, der beide
+ * gegeneinander hält, sobald die Sicht frisch ist.
+ */
+const LIVE_GEGEN_LIVE = `
 WITH probe AS (
-  SELECT betrieb_key FROM mart.vergleichstag_basis
-   WHERE kalender_quelle = 'bundesland'
-   GROUP BY 1 HAVING count(*) > 1500
-   ORDER BY betrieb_key LIMIT ${BETRIEBE}
+  SELECT k.betrieb_key
+    FROM mart.betrieb_kalender k
+    JOIN mart.umsatz_tag u USING (betrieb_key, geschaeftstag)
+   WHERE k.kalender_quelle = 'bundesland'
+   GROUP BY 1 HAVING count(*) FILTER (WHERE u.umsatz_netto > 0) > 1500
+   ORDER BY k.betrieb_key LIMIT ${BETRIEBE}
 ), basis AS (
   SELECT k.betrieb_key, k.geschaeftstag, k.wochentag_nr,
          k.ist_feiertag, k.ist_schulferien, u.umsatz_netto, u.gaeste
     FROM mart.betrieb_kalender k
-    JOIN mart.umsatz_tag u
-      ON u.betrieb_key = k.betrieb_key AND u.geschaeftstag = k.geschaeftstag
+    JOIN mart.umsatz_tag u USING (betrieb_key, geschaeftstag)
    WHERE k.betrieb_key IN (SELECT betrieb_key FROM probe)
-), lateral_fassung AS (
+),
+-- (A) Die Logik aus 0051, woertlich. Bewusst nicht aufgeraeumt: dies ist die
+--     Referenz, und eine geglaettete Referenz beweist nichts.
+lateral_fassung AS (
   SELECT b.betrieb_key, b.geschaeftstag,
          v.tage                     AS vergleichstage,
          round(v.umsatz_schnitt, 2) AS umsatz_vergleich,
@@ -80,6 +102,51 @@ WITH probe AS (
                    ORDER BY r2.geschaeftstag DESC
                    LIMIT 4) r
     ) v ON true
+),
+-- (B) Die Fensterfassung aus 0084.
+markiert AS (
+  SELECT b.*, count(*) FILTER (WHERE NOT b.ist_feiertag AND b.umsatz_netto > 0)
+           OVER (PARTITION BY b.betrieb_key, b.wochentag_nr ORDER BY b.geschaeftstag
+                 ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS vorher
+    FROM basis b
+), vorrat AS (
+  SELECT betrieb_key, wochentag_nr, geschaeftstag, umsatz_netto, gaeste, ist_schulferien,
+         row_number() OVER (PARTITION BY betrieb_key, wochentag_nr
+                            ORDER BY geschaeftstag) AS rang
+    FROM basis WHERE NOT ist_feiertag AND umsatz_netto > 0
+), kum AS (
+  SELECT v.betrieb_key, v.wochentag_nr, v.rang, v.geschaeftstag,
+         sum(v.umsatz_netto) OVER w                       AS ku,
+         sum(v.gaeste) FILTER (WHERE v.gaeste > 0) OVER w AS kg,
+         count(*)      FILTER (WHERE v.gaeste > 0) OVER w AS kgn,
+         sum(v.ist_schulferien::int) OVER w               AS kf
+    FROM vorrat v
+  WINDOW w AS (PARTITION BY v.betrieb_key, v.wochentag_nr ORDER BY v.rang)
+), fenster_roh AS (
+  SELECT m.betrieb_key, m.geschaeftstag, m.umsatz_netto, m.ist_schulferien,
+         least(m.vorher, 4) AS tage,
+         (a.ku - coalesce(v.ku, 0)) / nullif(least(m.vorher, 4), 0) AS schnitt,
+         (a.kg - coalesce(v.kg, 0)) AS gs, (a.kgn - coalesce(v.kgn, 0)) AS gn,
+         (a.kf - coalesce(v.kf, 0)) AS fs,
+         c.geschaeftstag AS von, a.geschaeftstag AS bis
+    FROM markiert m
+    LEFT JOIN kum a ON a.betrieb_key = m.betrieb_key
+                   AND a.wochentag_nr = m.wochentag_nr AND a.rang = m.vorher
+    LEFT JOIN kum v ON v.betrieb_key = m.betrieb_key
+                   AND v.wochentag_nr = m.wochentag_nr AND v.rang = m.vorher - 4
+    LEFT JOIN kum c ON c.betrieb_key = m.betrieb_key
+                   AND c.wochentag_nr = m.wochentag_nr
+                   AND m.vorher > 0 AND c.rang = greatest(m.vorher - 3, 1)
+), fenster_fassung AS (
+  SELECT betrieb_key, geschaeftstag, tage AS vergleichstage,
+         round(schnitt, 2) AS umsatz_vergleich,
+         CASE WHEN gn > 0 THEN round(gs::numeric / gn, 1) END AS gaeste_vergleich,
+         CASE WHEN schnitt > 0
+              THEN round(100.0 * (umsatz_netto - schnitt) / schnitt, 1) END AS abweichung_pct,
+         CASE WHEN ist_schulferien THEN tage - coalesce(fs, 0)
+              ELSE coalesce(fs, 0) END AS ferien_abweichung,
+         von AS vergleich_von, bis AS vergleich_bis
+    FROM fenster_roh
 )
 SELECT count(*)::int AS zeilen,
        count(*) FILTER (WHERE a.betrieb_key IS NULL OR b.betrieb_key IS NULL)::int AS zeile_fehlt,
@@ -92,10 +159,7 @@ SELECT count(*)::int AS zeilen,
        count(*) FILTER (WHERE a.vergleich_bis     IS DISTINCT FROM b.vergleich_bis)::int     AS ab_vergleich_bis,
        count(*) FILTER (WHERE a.vergleichstage = 0)::int AS ohne_vergleich
   FROM lateral_fassung a
-  FULL JOIN mart.vergleichstag_basis b
-    ON b.betrieb_key = a.betrieb_key AND b.geschaeftstag = a.geschaeftstag
- WHERE a.betrieb_key IS NOT NULL
-    OR b.betrieb_key IN (SELECT betrieb_key FROM probe)`
+  FULL JOIN fenster_fassung b USING (betrieb_key, geschaeftstag)`
 
 /**
  * Der Test braucht Daten UND eine befüllte Materialisierung. Beides fehlt in
@@ -124,7 +188,7 @@ describe('Vergleichstag: Fensterfassung gegen die LATERAL-Fassung aus 0051', () 
     const grund = await bereit()
     if (grund) { console.log(`uebersprungen — ${grund}`); return }
 
-    const [r] = await query<Record<string, number>>(REFERENZ)
+    const [r] = await query<Record<string, number>>(LIVE_GEGEN_LIVE)
     expect(r).toBeDefined()
 
     // Erst die Voraussetzung: die Probe muss ueberhaupt etwas enthalten, und
@@ -182,6 +246,41 @@ describe('Vergleichstag: Fensterfassung gegen die LATERAL-Fassung aus 0051', () 
              (SELECT count(*)::int FROM mart.vergleichstag_basis) AS basis`)
     expect(r!.huelle).toBe(r!.basis)
   }, 60_000)
+
+  /**
+   * Und zusätzlich gegen das, was WIRKLICH ausgeliefert wird — aber nur, wenn
+   * die Materialisierung frisch ist. Ist sie es nicht, sagt der Test das laut
+   * und prüft nicht: eine veraltete Sicht ist ein Betriebszustand und kein
+   * Logikfehler, und die Prüfzeile über mart.vergleichstag_stand ist dafür
+   * zuständig. Genau diese Vermischung hat den Test am 20.08.2026 rot gemacht,
+   * als eine zweite Session den Feiertagsbestand austauschte.
+   */
+  test('die Materialisierung stimmt mit der Fensterfassung ueberein', async () => {
+    const grund = await bereit()
+    if (grund) { console.log(`uebersprungen — ${grund}`); return }
+
+    // Genaue Frischeprobe: trägt die Materialisierung denselben Kalender wie
+    // mart.betrieb_kalender gerade? Ein Zeitstempelvergleich wäre gröber.
+    const [drift] = await query<{ abweichend: number }>(`
+      SELECT count(*)::int AS abweichend
+        FROM mart.vergleichstag_basis v
+        JOIN mart.betrieb_kalender k USING (betrieb_key, geschaeftstag)
+       WHERE v.feiertag IS DISTINCT FROM k.feiertag`)
+    if (drift!.abweichend > 0) {
+      console.log(`uebersprungen — Materialisierung veraltet: ${drift!.abweichend} `
+        + `Zeilen tragen einen anderen Feiertagsstand als mart.betrieb_kalender. `
+        + `Das ist die Aussage von mart.vergleichstag_stand, nicht dieses Tests.`)
+      return
+    }
+
+    const [r] = await query<Record<string, number>>(`
+      SELECT count(*)::int AS zeilen,
+             count(*) FILTER (WHERE v.umsatz_vergleich IS DISTINCT FROM b.umsatz_vergleich)::int AS ab_umsatz,
+             count(*) FILTER (WHERE v.abweichung_pct   IS DISTINCT FROM b.abweichung_pct)::int   AS ab_abw
+        FROM mart.vergleichstag_basis v
+        JOIN (SELECT * FROM mart.vergleichstag) b USING (betrieb_key, geschaeftstag)`)
+    expect({ ab_umsatz: r!.ab_umsatz, ab_abw: r!.ab_abw }).toEqual({ ab_umsatz: 0, ab_abw: 0 })
+  }, 120_000)
 })
 
 describe('Feiertagsnamen', () => {
