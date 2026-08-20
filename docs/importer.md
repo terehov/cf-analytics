@@ -1000,3 +1000,22 @@ eine Eingabe in SQL.
 steht. Sie liefert beides über denselben Weg, frei und ohne Schlüssel, und
 stellt die Jahre weit im Voraus bereit (am 14.08.2026 nachgesehen: 2029
 vollständig). Vorlauf drei Jahre.
+
+**Der Vergleichstag wird nachts materialisiert** (`src/sync/vergleichstag.ts`,
+seit Migration `0084`). Er steht **nach `pflegeNachlauf()`** — der schreibt die
+Feiertage, aus denen die Sicht liest; andersherum trüge die Materialisierung
+den Kalenderstand vom Vortag. Dieselbe Falle, die `yextNachlauf()` bis zum
+14.08.2026 hatte.
+
+Gemessen am 20.08.2026: `REFRESH ... CONCURRENTLY` über 443.304 Zeilen in
+**40,9 s** — neben den zwei Minuten des Artikel-Refresh (`0068`) unauffällig.
+Wirft nie: ein misslungener Refresh bedeutet einen veralteten Vergleichstag,
+keine verlorenen Daten.
+
+**Ein Sonderfall, den `round_table.ts` nebenan nicht behandelt:** `REFRESH ...
+CONCURRENTLY` scheitert mit PG `55000`, wenn die Sicht **nie befüllt** wurde —
+der Normalfall in einer frisch geklonten Datenbank, denn CONCURRENTLY braucht
+einen alten Stand, gegen den es abgleicht. Genau daran hing der
+Ende-zu-Ende-Test nach `0080`. `vergleichstagAuffrischen()` fängt diesen einen
+Fehlercode ab und befüllt einmal ohne CONCURRENTLY; danach greift der normale
+Weg.

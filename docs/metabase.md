@@ -1004,3 +1004,44 @@ stille Zweig wie der Fehler davor — und der Befund von übermorgen.
 vier Monaten Wirkung: die Spalte stand in allen 1.497 Zeilen auf NULL, weil
 `POWERLISTINGS_LIVE` angefordert und `LISTINGS_LIVE` gelesen wurde. Eine leere
 Spalte hinter einer grünen Ampel fällt sonst niemandem auf.
+
+## Kalender und Vergleichstag (`0084`, `0085`)
+
+**`mart.vergleichstag_basis` ist materialisiert und wird nachts aufgefrischt**
+(`src/sync/vergleichstag.ts`, gemessen 40,9 s über 443.304 Zeilen). Die alte
+Sicht `mart.vergleichstag` bleibt als dünne Hülle darüber bestehen — sie
+rechnete bis dahin je Zeile vier Nachbartage nach und war nur mit Filter
+benutzbar. Genau deshalb hatte sie zwischen `0051` und `0084` **keine einzige
+Karte**: geladen, gerechnet, nie gezeigt.
+
+**Vier Regeln für Karten auf diesen Sichten:**
+
+1. **Immer auf `vergleichstage = 4` filtern.** Ein Vergleich aus einem Tag ist
+   keiner, und `vergleichstage = 0` ist häufiger als man denkt (17,6 % der
+   Zeilen, überwiegend dauerhafte Ruhetage).
+2. **Der Nullpunkt liegt bei −3,5 %, nicht bei 0.** Ein einzelner Tag wird
+   gegen den *Mittelwert* von vier Tagen gestellt; bei rechtsschiefen
+   Tagesumsätzen liegt der darüber. Karten zeigen deshalb
+   `median_gegen_basis_pp`, nicht nur `median_pct` — oder stellen die Zeile
+   *gewöhnlicher Tag* daneben.
+3. **Einen Median nicht weiterverdichten.** Der Median über „alle Betriebe der
+   Marke" ist nicht der Median der Betriebs-Mediane. Karten mit Marken- oder
+   Zeitraumfilter rechnen auf `mart.kalendertag_lage` mit `percentile_cont`;
+   `mart.kalendereffekt_gruppe` ist die fertige Gruppenzahl, richtig gerechnet.
+4. **Die drei Effekte nicht addieren.** Feiertag, Ferienlage und Wetter stehen
+   *nebeneinander*, nicht gegeneinander verrechnet. Ein Feiertag im Sommer ist
+   auch ein warmer Tag.
+
+**`kalender_quelle` gehört in jede Karte, die nach Betrieb aufteilt.**
+`bundesweit` heißt: kein gepflegter Standort, nur die neun bundesweiten
+Feiertage, keine Schulferien. Das betrifft 81 der 141 Betriebe, davon neun mit
+laufendem Umsatz (22 %). Eine Kachel, die 78 % der Gruppe zeigt und wie 100 %
+aussieht, ist schlimmer als keine — die Arbeitsliste dazu ist
+`mart.kalender_fehlend`.
+
+**`mart.pruefung_kalender` steht bewusst als eigene Sicht** und wird in
+`mart.pruefung_uebersicht` mit einer einzigen `UNION`-Zeile eingehängt. Grund:
+jede Migration, die eine Prüfzeile ergänzt, erzeugt `pruefung_uebersicht`
+komplett neu — arbeiten zwei Sessions parallel, überschreibt die später
+angewendete Migration die Zeilen der früheren still. Als eigene Sicht kostet
+eine solche Kollision eine Zeile statt drei Prüfungen.

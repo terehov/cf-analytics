@@ -466,3 +466,54 @@ deshalb am Ende der Quellzeichenkette und haben in der Zielkette keine Entsprech
 **Gemessen über alle 79 Restaurants × 141 Betriebe:** 59 exakte Treffer vorher, 60 nachher,
 **0 verloren**, keine neue Kollision. Apostrophe tragen nur 6 der 79 Restaurantnamen und
 keiner der 141 Betriebsnamen. Genau ein Betrieb hing daran.
+
+## Der Vergleichstag als Materialisierung (`0084`)
+
+**Warum die Sicht aus `0051` so nicht materialisierbar war.** Sie holte je
+Zeile über `LEFT JOIN LATERAL … ORDER BY geschaeftstag DESC LIMIT 4` ihre vier
+Nachbartage. Über den ganzen Bestand wurde der Aufbau **nach zehn Minuten
+abgebrochen**; die Fassung mit Fensterfunktion und Kumulierung braucht 33,1 s
+kalt und 35,2 s warm (188.640 Zeilen), beziehungsweise 39 s für die
+443.304 Zeilen aller 141 Betriebe.
+
+**Wie der Umbau funktioniert.** Der Vergleichsvorrat — kein Feiertag, Umsatz
+> 0 — bekommt je Betrieb und Wochentag eine laufende Nummer (`row_number`) und
+eine kumulierte Summe. Der Schnitt der letzten vier Vorrats-Tage vor einem
+beliebigen Tag ist dann eine **Differenz zweier kumulierter Werte** statt einer
+eigenen Suche: zwei Gleichheits-Joins gegen 188.640 Unterabfragen. Feiertage
+bleiben außerhalb des Vorrats, bekommen aber weiterhin einen Vergleichswert —
+genau die Eigenschaft, um die es fachlich geht.
+
+**Dass das keine Näherung ist, ist ein Test und keine Messung.**
+`src/sync/vergleichstag.test.ts` stellt die Logik aus `0051` wörtlich gegen
+das, was in der Materialisierung steht, und besteht nur bei null Abweichung in
+acht Spalten. Am 20.08.2026 über 9.432 Zeilen, drei Betriebe, volle Historie
+2018–2026, 352 Feiertage darin: null.
+
+**Der Kalender deckt seit `0084` alle 141 Betriebe**, nicht mehr nur die 60 mit
+gepflegter PLZ. Wer keinen Standort hat, bekommt die neun **bundesweiten**
+Feiertage und **keine** Schulferien — `ist_schulferien` ist dort `NULL` und
+nicht `false`, weil zwischen Bayern und Bremen sechs Wochen Sommerferien
+liegen. `NULL` heißt unbekannt, `false` hieße nachgesehen. Die Herkunft steht
+in `kalender_quelle`.
+
+**Zwei Nachschlagewege wurden dabei ersetzt.** Die alte Sicht holte Feiertag
+und Ferien je Zeile per `LATERAL … LIMIT 1`; bei 141 Betrieben und vier
+Nachschlagen (Feiertag, Ferien, Vortag, Folgetag) wären das 1,8 Mio
+Unterabfragen. Stattdessen werden beide einmal auf `(kuerzel, datum)`
+vorverdichtet — Schulferien über `generate_series` auf Tageszeilen — und per
+Gleichheits-Join angehängt. `min(name)` statt `LIMIT 1`: dieselbe Absicht,
+deterministisch.
+
+**Vor- und Folgetag über `datum ± 1`, nicht über `lag`/`lead`.** Die Tagesachse
+ist der Bestand selbst, und der ist nicht lückenlos: 3.144 verschiedene
+Geschäftstage in 3.146 Kalendertagen (20.08.2026). `lag` spränge über die
+beiden Lücken hinweg und behauptete eine Nachbarschaft, die es nicht gibt.
+
+## Feiertagsnamen werden beim Lesen vereinheitlicht (`0084`)
+
+`manual.feiertag_alias` (Tabelle, in `pflege/` erweiterbar) ordnet
+Schreibweisen einander zu; `mart.feiertag_normiert` wendet sie an und behält
+den Rohwert in `name_roh`. **Normiert wird beim Lesen, nicht beim Import** —
+dieselbe Haltung wie bei `raw.api_antwort`: die Rohzeilen bleiben, wie die
+Quelle sie geliefert hat. Anlass und Messwerte in `befunde-datenlage.md`.

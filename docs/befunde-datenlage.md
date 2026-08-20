@@ -1647,3 +1647,133 @@ Von 605.835 Belegen im Archiv:
 
 **Die Lehre für Plausibilitätsgrenzen:** eine feste Jahreszahl veraltet still.
 Das Hochladedatum ist eine harte Tatsache in derselben Zeile und altert nicht.
+
+## Was Feiertage, Ferien und Brückentage am Umsatz bewegen (20.08.2026)
+
+Gemessen über `mart.kalendereffekt_gruppe`, lokal, Zeitraum ab 01.01.2023
+(rollierend: drei volle Jahre plus das laufende), nur Tage mit **vier** sauberen
+Vergleichstagen, nur Betriebe mit eigenem Landeskalender.
+
+**Der Nullpunkt liegt nicht bei null — und das ist der wichtigste Satz hier.**
+Ein *gewöhnlicher* Tag (kein Feiertag, kein Nachbar eines Feiertags) hat einen
+Median von **−3,5 %**, gemessen über 56.226 Tage. Das ist kein Missstand,
+sondern Bauart: verglichen wird ein einzelner Tag gegen den **Mittelwert** von
+vier Tagen, und bei rechtsschiefen Tagesumsätzen liegt der Mittelwert über dem
+Median. Wer die Kacheln gegen null liest, hält die halbe Gruppe für schwach.
+Deshalb steht in beiden Effektsichten `median_gegen_basis_pp` daneben.
+
+| Feiertag | Tage | Betriebe | Median | gegen Basis |
+|---|---:|---:|---:|---:|
+| Christi Himmelfahrt | 190 | 52 | **+68,4 %** | +71,9 pp |
+| Pfingstmontag | 190 | 52 | +52,4 % | +55,9 pp |
+| Fronleichnam | 175 | 48 | +35,1 % | +38,6 pp |
+| Tag der Deutschen Einheit | 141 | 49 | +34,9 % | +38,4 pp |
+| Ostermontag | 188 | 52 | +32,7 % | +36,2 pp |
+| Tag der Arbeit | 189 | 52 | +16,8 % | +20,3 pp |
+| 2. Weihnachtsfeiertag | 143 | 50 | +1,9 % | +5,4 pp |
+| 1. Weihnachtsfeiertag | 143 | 50 | −0,4 % | +3,1 pp |
+| Allerheiligen | 126 | 44 | −0,6 % | +3,0 pp |
+| Mariä Himmelfahrt | 45 | 15 | −4,2 % | −0,7 pp |
+| Friedensfest | 57 | 15 | −12,0 % | −8,5 pp |
+| Heilige Drei Könige | 123 | 32 | −17,7 % | −14,2 pp |
+| Karfreitag | 188 | 51 | **−32,1 %** | −28,6 pp |
+| Neujahr | 186 | 50 | **−68,7 %** | −65,2 pp |
+
+Drei weitere Zeilen sind zu dünn für eine Aussage und stehen nur der
+Vollständigkeit halber: Buß- und Bettag (3 Tage, 1 Betrieb), Weltkindertag
+(3/1), Reformationstag (12/4).
+
+**Die Spanne geht über 137 Prozentpunkte.** Ein Betrieb, der Christi
+Himmelfahrt mit einem gewöhnlichen Donnerstag verglichen bekommt, sieht ein
+Wunder; an Neujahr sieht er eine Katastrophe. Beides ist der Kalender.
+
+**Der Brückentag ist der Fund, den der Plan nur vermutet hat:**
+
+| Lage | Tage | Median | gegen Basis |
+|---|---:|---:|---:|
+| Tag **vor** einem Feiertag | 1.918 | +17,4 % | **+20,9 pp** |
+| gewöhnlicher Tag | 56.226 | −3,5 % | 0,0 pp |
+| Tag **nach** einem Feiertag | 1.960 | −8,2 % | −4,7 pp |
+
+Der Abend vor einem Feiertag ist ein eigenes Geschäft und trägt gut zwanzig
+Punkte — mehr als die Hälfte der Feiertage selbst. Der Tag danach kostet
+knapp fünf.
+
+**Schulferien sind über die Gruppe gemittelt fast wirkungslos**, und das gehört
+genauso ins Ergebnis:
+
+| Lage | Tage | Median | gegen Basis |
+|---|---:|---:|---:|
+| gleiche Ferienlage | 27.095 | +0,3 % | +3,8 pp |
+| Tag in den Ferien, Vergleichstage nicht | 6.430 | −1,3 % | +2,2 pp |
+| gemischte Ferienlage (1–3 von 4) | 27.675 | −6,8 % | −3,3 pp |
+| Tag außerhalb, Vergleichstage in den Ferien | 1.006 | −5,8 % | −2,3 pp |
+
+Die Aussage taugt trotzdem — aber **je Betrieb, nicht als Gruppenzahl**: ein
+Stadtbetrieb im Pendlergeschäft und ein Ausflugslokal liegen hier mit
+umgekehrten Vorzeichen. Genau dafür ist `mart.kalendereffekt` da.
+
+**Abweichung gegen `docs/plan-kalender-wetter.md`, Abschnitt 3.** Die
+Feiertagstabelle reproduziert sich auf die Stelle genau (gleiche Tage, gleiche
+Betriebe, gleiche Mediane). Bei den Ferien nicht: der Plan nennt 5.756 Tage und
+−0,2 % für „Tag in den Ferien"; gemessen sind es **6.430 und −1,3 %**. Die
+Gegenrichtung stimmt fast exakt (1.005/−5,7 % im Plan, 1.006/−5,8 % gemessen).
+Die Plan-Zahl ist nicht nachvollziehbar, weil das Prototyp-SQL nicht erhalten
+ist; die fachliche Aussage — Ferien wirken über die Gruppe kaum — trägt beide.
+
+**Was diese Zahlen nicht sind: eine Kausalaussage.** Der Vergleich gegen
+dieselben vier Wochentage nimmt Saison, Preisniveau und Betriebsgröße heraus —
+mehr nicht. Und sie sind **nicht addierbar**: ein Feiertag im Sommer ist auch
+ein warmer Tag. Wer Feiertag, Ferien und (ab `0086`) Wetter zusammenzählt,
+zählt doppelt.
+
+## Zwei Quellen, zwei Schreibweisen für denselben Feiertag (20.08.2026)
+
+`manual.feiertag` trägt **21 Namen aus zwei Quellen**: `feiertage-api.de`
+lieferte 2018–2019, `openholidaysapi.org` ab 2020. Vier Feiertage schreiben sie
+verschieden:
+
+| bis 2019 | ab 2020 |
+|---|---|
+| Neujahrstag | Neujahr |
+| 1. Weihnachtstag | 1. Weihnachtsfeiertag |
+| 2. Weihnachtstag | 2. Weihnachtsfeiertag |
+| Augsburger Friedensfest | Friedensfest |
+
+**Was das anrichtet:** jede Auswertung, die nach Feiertagsnamen gruppiert,
+spaltet diese vier in je zwei Zeilen mit halber Fallzahl — ausgerechnet
+Neujahr, den Extremwert der ganzen Auswertung. Zwei plausibel aussehende
+Zahlen, keine Fehlermeldung. Aufgeräumt wird beim Lesen
+(`manual.feiertag_alias` → `mart.feiertag_normiert`), nicht beim Import: die
+Rohzeilen bleiben, wie die Quelle sie geliefert hat.
+`mart.feiertag_namenswechsel` schlägt an, wenn eine fünfte Schreibweise
+dazukommt. Erwartung: leer.
+
+## Corona steckt im Bestand (20.08.2026)
+
+| Monat | Betriebe mit Umsatz |
+|---|---:|
+| Januar 2021 | **27** |
+| April 2020 | 32 |
+| Dezember 2020 | 38 |
+| Normalbetrieb (2021 ab Juni) | 59–60 |
+
+Ein Feiertagseffekt über die ganze Historie mischt die Lockdown-Monate mit, und
+zwar besonders hässlich: ein Feiertag mit Umsatz wird gegen vier Vergleichstage
+**vor** der Schließung gerechnet. Deshalb hat `mart.kalender_zeitraum` eine
+**rollierende** Untergrenze — die letzten drei vollen Jahre plus das laufende,
+heute der 01.01.2023. Eine feste Jahreszahl wäre 2030 unsinnig und veraltet
+still.
+
+## Jeder sechste Tag hat gar keinen Vergleich (20.08.2026)
+
+In einer Stichprobe von 9.432 Tageszeilen über drei Betriebe mit voller
+Historie standen **1.661 (17,6 %)** auf `vergleichstage = 0` — es gab keinen
+einzigen vergleichbaren Vortag desselben Wochentags.
+
+Der Anfang der Historie erklärt davon nur einen Bruchteil. Der Rest sind
+**dauerhafte Ruhetage**: ein Betrieb, der montags schließt, hat für *jeden*
+Montag einen leeren Vergleichsvorrat, über alle acht Jahre. Diese Tage bleiben
+in `mart.vergleichstag_basis` stehen (Regel 10) — eine Tagesliste, in der Tage
+fehlen, ohne dass es dasteht, ist die schlimmere Variante. Auswertungen filtern
+deshalb auf `vergleichstage = 4`.

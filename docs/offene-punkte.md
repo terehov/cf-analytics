@@ -346,7 +346,7 @@ solange sie nicht gelaufen sind, ist jede Aufwandsschätzung geraten.
 | `d1` Kassenjournal | Rechtefrage (403) oder Aufwandsfrage (200)? Der einzige Punkt der Rechteliste, bei dem wir nicht wissen, ob es einer ist |
 | `d2` Bericht 107 je Betrieb | ob Kapitel 2.3 (Schichtebene) erfüllbar ist. 2.1 hängt nicht mehr daran |
 | `d3` Reservierungs-Schnittstelle | wie groß die OpenTable-Anbindung werden muss |
-| `d4` Wetteranalyse | ob `mart.vergleichstag` vollständig wird oder eine externe Wetterquelle braucht |
+| ~~`d4` Wetteranalyse~~ | **entschieden am 20.08.2026: wird nicht gemessen.** Auch im besten Fall liefert LINA eine *Tages*-Wetterlage — damit kein Stundenraster, kein Gastro-Fenster, keine Historie ab 2018 und ein weiterer undokumentierter HTML-Endpunkt. Die externe Quelle (Bright Sky auf DWD-Messdaten) kann alles davon. Begründung in `entscheidungen.md`, E4 — dort steht auch, warum die im Plan genannte Begründung nicht mit `src/messen.ts` übereinstimmte |
 | `d5` Hauptsparten-Filter | ob der Speisen-/Getränke-Anteil je Zeitfenster für zwei Aufrufe am Tag zu haben ist |
 | `d6` Yext `USER_NAME` | ob 3.1 auf Personenebene geht, ohne Bounti |
 

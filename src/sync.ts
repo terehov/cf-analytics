@@ -13,6 +13,7 @@ import { nachfuellen } from './sync/nachfuellen'
 import { auswahllistenNachlauf } from './sync/auswahllisten'
 import { deckungsbeitragNachlauf } from './sync/deckungsbeitrag'
 import { roundTableNachlauf } from './sync/round_table'
+import { vergleichstagNachlauf } from './sync/vergleichstag'
 import { einkaufspreisNachlauf } from './sync/einkaufspreis'
 import { einkaufSichtenNachlauf } from './sync/einkauf_sichten'
 import { zuordnungNachlauf } from './sync/zuordnung'
@@ -118,6 +119,19 @@ try {
   // damit die Urteile auf ①–③ nie älter sind als der letzte Lauf.
   // Wirft nie, siehe Kopf von sync/round_table.ts.
   await roundTableNachlauf()
+
+  /**
+   * Und der Vergleichstag, aus demselben Grund: mart.vergleichstag_basis ist
+   * seit Migration 0084 materialisiert. Steht NACH pflegeNachlauf() weiter
+   * oben — der schreibt die Feiertage, aus denen die Sicht liest. Andersherum
+   * trüge die Materialisierung den Kalenderstand vom Vortag; dieselbe Falle,
+   * die yextNachlauf() bis zum 14.08.2026 hatte.
+   *
+   * Gemessen 35 s über 188.640 Zeilen (20.08.2026), neben den zwei Minuten
+   * des Artikel-Refresh unauffällig.
+   * Wirft nie, siehe Kopf von sync/vergleichstag.ts.
+   */
+  await vergleichstagNachlauf()
 
   /**
    * Dritter Nachlauf: die Einkaufspreise gegen die Verteilung derselben

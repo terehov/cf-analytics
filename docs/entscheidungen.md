@@ -2161,3 +2161,72 @@ weiterlaufen zu lassen hieße, unter einer Sperre zu arbeiten, die den nächsten
 Start ohnehin abweist. Dasselbe gilt für das Arbeitsfenster. Beides je
 Anbieter zu führen wäre vertretbar, ist aber eine eigene Entscheidung — siehe
 `offene-punkte.md`.
+
+## 20.08.2026 — Kalender- und Wetterauswertung: fünf Festlegungen
+
+Vorlage ist `docs/plan-kalender-wetter.md`, Abschnitt 5. Eugene hat den Bau
+freigegeben, ohne die Einzelfragen zu beantworten; die Empfehlungen wurden
+umgesetzt und stehen hier mit ihrer Begründung, damit eine andere Antwort
+später ein Änderungsgrund ist und keine Archäologie.
+
+**E1 — Wetterquelle: Bright Sky auf DWD-Messdaten** (`api.brightsky.dev`).
+Open-Meteo wäre der bequemere Weg, scheidet aber aus: der kostenlose Zugang ist
+ausdrücklich auf **nicht-gewerbliche** Nutzung beschränkt, und das hier ist
+gewerblich. Die *Daten* stehen unter CC-BY 4.0, der *Zugang* nicht. DWD-Daten
+sind unter GeoNutzV auch gewerblich frei, mit Namensnennung — die gehört ins
+Dashboard. Der Abruf liegt hinter `src/wetter/quelle.ts`; ein Quellenwechsel
+ist eine Datei, keine Migration.
+
+**E2 — Zeitfenster für die Wetterverdichtung: 11–24 Uhr**, abweichend vom
+Planvorschlag 11–22. Nachgemessen am Umsatz 2026 über
+`core.zeitzonenbericht_stunde`: 11–22 deckt **89,7 %**, 11–24 deckt **95,0 %**,
+08–22 deckt 94,3 %. Late Night trägt 5,7 % und ist bei den bar-lastigen
+Betrieben Teil des Geschäfts; das Frühstück trägt 4,6 % und würde den
+Wetterwert für 26 % Abendessen mitziehen, ohne selbst ins Gewicht zu fallen.
+Die Verdichtung über den **Kalendertag** wird zusätzlich gespeichert, die Wahl
+ist also umkehrbar.
+
+**E3 — Klassengrenzen für das Wetter:** die vorgeschlagenen Werte als
+Startbelegung, aber **nicht als Endstand**. Sie sind geraten, nicht gemessen.
+Sie stehen in `manual.wetter_klasse`, also in `pflege/`, also ohne Migration
+änderbar; nach dem ersten Backfill wird die tatsächliche Verteilung gemessen
+und eine nachgeschärfte Belegung vorgelegt.
+
+**E4 — Der Messaufruf `d4` entfällt** — aber nicht mit der Begründung aus dem
+Plan. Der Plan schreibt, „zwei der drei Antworten führen ohnehin zur externen
+Quelle, und die dritte wäre bei Betrieben von Dresden bis Freiburg
+unbrauchbar". Das stimmt nicht mit `src/messen.ts` überein: das
+Dresden-Freiburg-Argument gehört zu Antwort **2** („nur eine Wetterlage für die
+ganze Gruppe"). Antwort **1** („Wetterlage je Betrieb und Tag") **würde** die
+externe Quelle erübrigen, und zwar für alle 141 Betriebe statt für 60.
+
+Die Entscheidung bleibt trotzdem „streichen", mit der tragfähigen Begründung:
+LINA liefert im besten Fall eine **Tages**-Wetterlage. Damit kein Stundenraster,
+also kein Gastro-Fenster und keine Terrassenfrage; keine Historie ab 2018; und
+ein weiterer undokumentierter HTML-Endpunkt in der Abhängigkeitskette. Bright
+Sky kann alles davon. ~~`d4` in `offene-punkte.md`~~ ist damit aufgelöst.
+
+**E5 — Betriebe ohne gepflegten Standort kommen in den Kalender, mit den
+bundesweiten Feiertagen als Rückfall.** Nicht im Plan, sondern beim Bauen
+aufgefallen: `mart.betrieb_kalender` kannte nur die **60** Betriebe mit
+gepflegter PLZ. Die Materialisierung hätte für 81 Betriebe keine einzige Zeile
+gehabt — auch nicht in der Tagesliste, auch nicht für den reinen
+Wochentagsvergleich, der gar kein Bundesland braucht. Betroffen sind neun
+Betriebe mit laufendem Umsatz, **15,1 Mio € (22 %)**, angeführt vom
+umsatzstärksten Betrieb der Gruppe.
+
+Die neun bundesweiten Feiertage tragen genau die großen Ausschläge (Neujahr
+−68,7 %, Christi Himmelfahrt +68,4 %, Karfreitag −32,1 %, Pfingstmontag
++52,4 %); es fehlen die regionalen. Woher der Kalender eines Betriebs kommt,
+steht in `mart.betrieb_kalender.kalender_quelle`, und
+`mart.kalendereffekt_gruppe` filtert auf `bundesland` — die **veröffentlichten
+Gruppenzahlen sind damit identisch** zur 60er-Variante, die Tagesliste deckt
+aber alle 141 Betriebe.
+
+**Verworfen:** alle 141 ohne Feiertagslogik für die 81. Dann landen Feiertage
+ungefiltert im Vergleichsvorrat, ein Neujahr zieht den Schnitt der vier
+Vergleichs-Mittwoche nach unten und lässt den Folgemittwoch glänzen. Billiger,
+aber es baut still falsche Zahlen.
+
+**Kosten der Entscheidung:** die Materialisierung trägt 443.304 statt 188.640
+Zeilen. Gemessen am 20.08.2026: Aufbau 39 s, `REFRESH CONCURRENTLY` **40,9 s**.

@@ -3158,3 +3158,100 @@ fertig ist, bevor die andere ihre erste Antwort hat. Gegengeprüft: rot auf
 zurückgebauten Fix **rot** sein. Sonst ist er die Sorte Prüfung, die nie
 ausschlägt und deshalb nie hinterfragt wird — dieselbe Klasse wie „grün hieß
 nichts gefunden, nicht geprüft".
+
+## Eine Gegenprobe, die den ganzen Bestand nicht gesehen hat (20.08.2026)
+
+**Symptom.** Der Umbau von `mart.vergleichstag` von `LATERAL`-je-Zeile auf
+Fensterfunktionen war am 14.08.2026 mit „null Abweichung" gegengeprüft worden.
+Der Entwurf verlor trotzdem Zeilen, und eine Spalte war falsch.
+
+**Ursache.** Die Gegenprobe lief über **einen Betrieb und 222 Tage in 2026**.
+In diesem Ausschnitt kommen beide Fehler nicht vor:
+
+1. `WHERE vorher > 0` im Entwurf warf die Zeilen am **Anfang der Historie**
+   weg — dort gibt es noch keinen vergleichbaren Vortag. Die `LATERAL`-Fassung
+   behält sie mit `vergleichstage = 0`. In 2026 gibt es keine solche Zeile.
+2. `ferien_abweichung` ist bei `vergleichstage = 0` eine Zählung über die
+   **leere Menge**, also `0` und nicht `NULL`. Der Entwurf lieferte `NULL`.
+   Betroffen: **1.661 von 9.432 Zeilen (17,6 %)** — weit überwiegend
+   dauerhafte Ruhetage, denn ein Betrieb, der montags schließt, hat für jeden
+   Montag einen leeren Vorrat. In einem Ausschnitt aus 2026 über einen Betrieb,
+   der täglich öffnet: null Fälle.
+
+**Was ihn heute verhindert.** `src/sync/vergleichstag.test.ts` schneidet über
+**Betriebe** zu, nicht über den Zeitraum: drei Betriebe mit *voller* Historie,
+rund 9.400 Zeilen. Zwei Zusicherungen im Test sorgen dafür, dass ein leeres
+oder verkürztes Ergebnis nicht als „null Abweichung" durchgeht — die Probe muss
+mehr als 1.000 Zeilen haben **und** mindestens eine mit `vergleichstage = 0`.
+
+**Die Lehre.** Bei einer Rechnung, die je Betrieb und Wochentag über die
+gesamte Historie läuft, ist ein Zeitausschnitt keine Stichprobe, sondern eine
+andere Rechnung. Zuschneiden über die Entität, nie über die Zeitachse.
+
+## Ein Filter, der nicht durchgereicht wird (20.08.2026)
+
+**Symptom.** `SELECT * FROM mart.vergleichstag WHERE betrieb_key = 42` sah nach
+einer billigen Abfrage aus. Eine Gegenprobe über sechs Betriebe lief nach
+zwanzig Minuten noch, und ein `pkill` auf den `psql`-Client beendete den
+Serverprozess nicht — die Abfrage hielt weiter eine Sperre, an der die nächste
+Migration hängenblieb.
+
+**Ursache.** Die Sicht referenziert ihre CTE `basis` **zweimal** (als `b` und
+als `r2` in der `LATERAL`). Postgres inlined nur **einfach** referenzierte
+CTEs; `basis` wird also materialisiert, und der Filter auf `betrieb_key` wird
+nicht hineingereicht. Die Sicht baute für jede Abfrage alle 188.640 Zeilen auf
+und scannte sie je Ergebniszeile erneut.
+
+**Was ihn heute verhindert.** Die Sicht liest seit `0084` eine
+Materialisierung; der Filter trifft einen Index. Für Gegenproben wird die
+**Basis** klein gemacht, nicht das Ergebnis gefiltert.
+
+**Zwei Lehren.** Ein `WHERE` auf einer Sicht ist keine Zusicherung, dass
+weniger gerechnet wird — bei mehrfach referenzierten CTEs ist es das Gegenteil.
+Und: `pkill` beendet den Client, nicht die Abfrage. Wer eine lange Abfrage
+loswerden will, braucht `pg_terminate_backend`, sonst arbeitet sie weiter und
+sperrt.
+
+## Der Nullpunkt lag nicht bei null (20.08.2026)
+
+**Symptom.** In der ersten Fassung der Effektsichten sah fast jede Kategorie
+leicht negativ aus. Ein *gewöhnlicher* Tag stand bei −3,5 %, und damit hätten
+die Kacheln der Reihe nach gemeldet, die Gruppe liege unter ihrem eigenen
+Schnitt.
+
+**Ursache.** Kein Fehler in den Daten, sondern die Bauart des Vergleichs: ein
+einzelner Tag wird gegen den **Mittelwert** von vier Tagen gestellt.
+Tagesumsätze sind rechtsschief — ein paar sehr starke Tage, viele mittlere —,
+und bei einer rechtsschiefen Verteilung liegt der Mittelwert über dem Median.
+Der typische Tag liegt also unter dem Schnitt seiner vier Vorgänger, ohne dass
+irgendetwas schiefgelaufen wäre.
+
+**Was ihn heute verhindert.** `mart.kalendereffekt` und
+`mart.kalendereffekt_gruppe` führen `basis_pct` (der gewöhnliche Tag dieses
+Betriebs) und `median_gegen_basis_pp` (die Zahl, die man eigentlich meint). Die
+Kategorie `brueckentag` enthält dafür ausdrücklich eine Zeile *gewöhnlicher
+Tag*, und die Kategorie `wochentag` bleibt stehen, obwohl sie bauartbedingt
+nichts misst — beide sind der Maßstab, an dem man einen echten Effekt erkennt.
+
+**Die Lehre.** Wenn eine Kennzahl einen impliziten Nullpunkt hat, muss er
+gemessen und danebengestellt werden. Sonst liest jeder gegen die Null, und die
+ist hier um dreieinhalb Punkte verschoben.
+
+## Ein Etikett, das für die Hälfte der Zeilen falsch war (20.08.2026)
+
+**Symptom.** Die Zeile „Tag in den Ferien, Vergleichstage nicht" zählte 12.494
+Tage. Nachgerechnet waren es 6.430.
+
+**Ursache.** Die Einordnung fragte nur `ferien_abweichung <> 0` — also *irgendein*
+Unterschied unter den vier Vergleichstagen. Die Beschriftung behauptet aber
+etwas Stärkeres: dass **alle vier** anders liegen. 6.064 Tage mit ein bis drei
+abweichenden Vergleichstagen liefen unter einem Etikett, das für sie nicht galt,
+und zogen den Median mit.
+
+**Was ihn heute verhindert.** `mart.kalendertag_lage` verlangt
+`ferien_abweichung = 4` für die beiden klaren Lagen und führt die Mischfälle als
+eigene Zeile *gemischte Ferienlage*.
+
+**Die Lehre.** Eine Klassengrenze, die weicher ist als ihre Beschriftung, ist
+eine falsche Zahl mit einer richtigen Überschrift — und niemand liest die
+Definition nach, wenn die Überschrift plausibel klingt.
