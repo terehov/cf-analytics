@@ -261,6 +261,14 @@ lauf('Ende-zu-Ende', () => {
       'Einkauf: Bestellseiten aus einem frueheren Lauf offen',
       'Einkauf: Kostenstelle ohne Betrieb, mit Bestellungen',
       /**
+       * Seit 0084 bis 0090 und bis zum 20.08.2026 nicht hier eingetragen: der
+       * Test laeuft nur mit TEST_DATABASE_URL, ohne die Variable wird er
+       * uebersprungen — und dann faellt eine veraltete Erwartung niemandem
+       * auf (derselbe Befund wie in docs/offene-punkte.md).
+       */
+      'Feiertag: Jahr mit Umsatz, aber ohne Feiertage',
+      'Feiertag: Name endet vor dem Ende der Historie',
+      /**
        * Beide seit 0079. Zwei Zeilen, weil es zwei verschiedene Fehler
        * sind: eine abgewiesene Datei ist ein Tippfehler von heute, eine
        * veraltete Tabelle ist eine Pflege, die vor Monaten aufgehoert hat.
@@ -275,6 +283,20 @@ lauf('Ende-zu-Ende', () => {
        */
       'Inventur: Position ueber 50.000 EUR (aus dem Schwund genommen)',
       'Inventur: Zaehlung abgeschnitten',
+      /**
+       * Seit 0091, und die zweite ist die interessantere: sie vergleicht die
+       * Zuordnung Sicht -> Nachlauf gegen pg_matviews. Wer die elfte
+       * materialisierte Sicht anlegt und den Refresh vergisst, sieht es am
+       * naechsten Morgen statt in einem halben Jahr. Erwartung beide Male 0.
+       *
+       * ACHTUNG, im Ende-zu-Ende-Test ist die erste Zeile NICHT null: der
+       * Testbestand hat keinen abgeschlossenen Sync-Lauf, und die Merker der
+       * Refreshes fehlen deshalb. Geprueft wird hier nur, dass die Zeilen da
+       * sind — die Zahlen dahinter prueft `mart.materialisierung_stand`
+       * gegen die echte Datenbank.
+       */
+      'Materialisierung: aelter als der letzte Lauf',
+      'Materialisierung: Sicht ohne Refresh im Nachlauf',
       /**
        * Seit 0074 — und die einzige Zeile, die etwas über unser eigenes
        * Hinsehen sagt statt über die Daten: kommen am Rand des
@@ -297,7 +319,12 @@ lauf('Ende-zu-Ende', () => {
       'Umsatz: Monat mit mehr als 10 % nicht aufteilbarem Umsatz',
       // Seit 0070 ausdruecklich nur die ENDGUELTIGEN: ein aufgegebener Posten,
       // den der Lauf noch dreimal zurueckholt, ist Betrieb und kein Befund.
+      'Vergleichstag: Betrieb mit Umsatz, aber ohne Bundesland',
+      'Vergleichstag: Materialisierung aelter als der letzte Lauf',
       'Warteschlange: endgueltig aufgegeben',
+      'Wetter: Backfill-Rueckstand in Ortsjahren',
+      'Wetter: Gitterpunkt ohne Messwert fuer gestern',
+      'Wetter: Klassengrenzen mit Luecke oder Ueberlappung',
       /**
        * Beide seit 0076 — die Zeilen, die alle anderen abdecken. Sie stehen
        * am Ende der alphabetischen Liste und ganz oben auf dem Dashboard:

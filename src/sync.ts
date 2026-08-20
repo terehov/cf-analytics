@@ -101,18 +101,10 @@ try {
    */
   await pflegeNachlauf()
 
-  // Nachlauf: die Auswahllisten der Metabase-Filter aktuell halten. Steht
-  // bewusst NACH dem Import und kann ihn nicht scheitern lassen — die
-  // Funktion wirft nie, siehe Kopf von sync/auswahllisten.ts. Hier
-  // angehängt, damit ein neuer Betrieb ohne Zutun im Filter auftaucht,
-  // statt auf einen eigenen Zeitplan zu warten, den jemand einrichten muss.
-  await auswahllistenNachlauf()
-
   // Zweiter Nachlauf, gleiche Regeln: mart.deckungsbeitrag_warengruppe ist
   // seit Migration 0027 materialisiert und muss aufgefrischt werden, sobald
   // neue Artikelverkäufe da sind. Wirft nie, siehe Kopf von
-  // sync/deckungsbeitrag.ts. Steht NACH den Auswahllisten, weil der Refresh
-  // der längere von beiden ist — die Filterlisten sollen nicht darauf warten.
+  // sync/deckungsbeitrag.ts.
   await deckungsbeitragNachlauf()
 
   // Gleiche Regeln: mart.round_table_monat und mart.round_table_trend sind
@@ -122,9 +114,40 @@ try {
   await roundTableNachlauf()
 
   /**
-   * Das Wetter, und es steht VOR dem Vergleichstag: dessen Hülle liest über
-   * mart.betrieb_wetter_tag mit. Andersherum zeigten die Wetterspalten den
-   * Stand vom Vortag — dieselbe Falle wie bei Yext und der Handpflege.
+   * Die Auswahllisten der Metabase-Filter — und sie stehen seit dem
+   * 20.08.2026 HINTER dem Round-Table-Refresh.
+   *
+   * Bis dahin liefen sie vor allem Materialisierten, mit der Begründung, die
+   * Filterlisten sollten nicht auf den langen Refresh warten. Der Preis
+   * dafür stand in `VORGABE_MONAT`: der voreingestellte Monat der Dashboards
+   * liest `max(monat)` aus `mart.round_table_monat`, und die trug zu diesem
+   * Zeitpunkt noch den Stand des Vorlaufs. Der erste Monat mit einem Urteil
+   * kam damit eine Nacht zu spät in den Filter.
+   *
+   * Dieselbe Falle wie bei `yextNachlauf()` und der Handpflege weiter oben,
+   * nur andersherum: dort stand der SCHREIBER hinter der Materialisierung,
+   * hier der LESER davor.
+   *
+   * Der Preis der neuen Reihenfolge, ehrlich genannt: stirbt der Prozess
+   * zwischen Import und Refresh, bleiben die Filterlisten eine Nacht stehen.
+   * Das fällt auf — die Prüfung „dashboard_filter“ in src/status.ts vergleicht
+   * die Liste mit mart.betrieb. Ein stillschweigend falscher Vorgabemonat
+   * fiel nicht auf.
+   *
+   * Wirft nie, siehe Kopf von sync/auswahllisten.ts.
+   */
+  await auswahllistenNachlauf()
+
+  /**
+   * Das Wetter. Es steht vor dem Vergleichstag, aber es MUSS nicht dort
+   * stehen — die Begründung dafür war bis zum 20.08.2026 falsch.
+   *
+   * Behauptet wurde, die Materialisierung lese über mart.betrieb_wetter_tag
+   * mit. Sie tut es nicht: mart.vergleichstag_basis liest ausschließlich
+   * mart.betrieb_kalender und mart.umsatz_tag (in pg_depend nachgesehen).
+   * Die Wetterspalten hängen in der dünnen Hülle mart.vergleichstag darüber,
+   * seit Migration 0086 — und die ist eine gewöhnliche Sicht. Das Wetter ist
+   * damit live und kann gar nicht veralten.
    *
    * Rollierendes Fenster über 14 Tage (48 Aufrufe) plus Backfill mit
    * Obergrenze (WETTER_BACKFILL_JE_LAUF, Vorgabe 60). Kein Handbefehl.

@@ -1046,6 +1046,15 @@ komplett neu — arbeiten zwei Sessions parallel, überschreibt die später
 angewendete Migration die Zeilen der früheren still. Als eigene Sicht kostet
 eine solche Kollision eine Zeile statt drei Prüfungen.
 
+**`mart.pruefung_materialisierung` (`0091`) folgt demselben Muster** und steht
+über `mart.materialisierung_stand`: eine Zeile je materialisierter Sicht, mit
+der Frage, ob sie so frisch ist wie der letzte Lauf. Die zweite Prüfzeile
+vergleicht die Zuordnung Sicht → Nachlauf gegen `pg_matviews` — wer eine neue
+materialisierte Sicht anlegt und den Refresh vergisst, sieht es am nächsten
+Morgen. Der Vergleichstag steht dort mit drin und hat seit `0084` zusätzlich
+seine eigene Zeile in `mart.pruefung_kalender`; wer die Sicht das nächste Mal
+ohnehin neu erzeugt, kann sie dort streichen.
+
 ## Wetter (`0086`, `0087`)
 
 **`mart.wetter_tag` führt zwei Verdichtungen je Tag**, und beide sind auf den

@@ -104,6 +104,12 @@ export const LISTEN_JE_DASHBOARD: Record<string, Record<string, string>> = {
  * stillschweigend. Deshalb wird er hier bei jedem Sync-Lauf neu gesetzt, aus
  * denselben Daten, die auch die Karten lesen. Was von selbst aktuell bleibt,
  * kann nicht vergessen werden.
+ *
+ * REIHENFOLGE: `auswahllistenNachlauf()` muss NACH `roundTableNachlauf()`
+ * stehen. `mart.round_table_monat` ist seit Migration 0039 materialisiert —
+ * davor gelesen liefert sie den Stand des VORLAUFS, und der Vorgabemonat
+ * hinkt eine Nacht hinterher. Genau so stand es bis zum 20.08.2026 in
+ * src/sync.ts.
  */
 const VORGABE_MONAT = `
   SELECT to_char(max(monat), 'YYYY-MM') AS w

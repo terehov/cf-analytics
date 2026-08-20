@@ -34,21 +34,24 @@
  */
 import { log } from '../lib/log'
 import { pool, query } from '../db/pool'
+import { sichtAuffrischen } from './auffrischen'
 
 /**
  * CONCURRENTLY, damit niemand während des Neuaufbaus vor einem sperrenden
  * Dashboard sitzt — der Grund, aus dem diese Datei überhaupt existiert,
  * wäre sonst zur Refresh-Zeit wieder da. Die dafür nötigen eindeutigen
- * Indizes liegen in Migration 0063.
+ * Indizes liegen in Migration 0063. Der eine Fall, in dem CONCURRENTLY
+ * bauartbedingt nicht geht — eine nie befuellte Sicht —, steckt seit dem
+ * 20.08.2026 in sync/auffrischen.ts.
  */
-const REFRESHES = [
-  `REFRESH MATERIALIZED VIEW CONCURRENTLY mart.einkauf_kreditor_monat`,
-  `REFRESH MATERIALIZED VIEW CONCURRENTLY mart.einkaufspreis_monat_basis`,
-  `REFRESH MATERIALIZED VIEW CONCURRENTLY mart.einkaufspreis_betrieb_basis`,
+const SICHTEN = [
+  'mart.einkauf_kreditor_monat',
+  'mart.einkaufspreis_monat_basis',
+  'mart.einkaufspreis_betrieb_basis',
   // Migration 0064, nachgezogen nach der Messung an der fertigen Seite:
   // diese beiden trugen die restlichen 5,8 s von Dashboard 16 fast allein.
-  `REFRESH MATERIALIZED VIEW CONCURRENTLY mart.einkauf_betrieb_monat_basis`,
-  `REFRESH MATERIALIZED VIEW CONCURRENTLY mart.einkauf_pruefung_basis`,
+  'mart.einkauf_betrieb_monat_basis',
+  'mart.einkauf_pruefung_basis',
 ]
 
 /** Notnagel gegen stille Blockaden, keine erwartete Laufzeit. */
@@ -69,7 +72,7 @@ export async function einkaufSichtenAuffrischen(): Promise<Auffrischung> {
   const client = await pool.connect()
   try {
     await client.query(`SET statement_timeout = ${ZEITGRENZE_MS}`)
-    for (const refresh of REFRESHES) await client.query(refresh)
+    for (const sicht of SICHTEN) await sichtAuffrischen(client, sicht)
 
     const dauerS = Math.round((Date.now() - t0) / 100) / 10
     await query(

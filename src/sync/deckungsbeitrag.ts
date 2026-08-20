@@ -30,6 +30,7 @@
  */
 import { log } from '../lib/log'
 import { pool, query } from '../db/pool'
+import { sichtAuffrischen } from './auffrischen'
 
 /**
  * CONCURRENTLY, damit niemand während des Neuaufbaus vor einem sperrenden
@@ -38,8 +39,11 @@ import { pool, query } from '../db/pool'
  * Der Preis von CONCURRENTLY ist, dass es langsamer ist als ein sperrender
  * Refresh und doppelt Platz braucht. Beides ist hier ohne Bedeutung: das
  * Ergebnis sind rund 174.000 Zeilen, und der Lauf passiert einmal je Import.
+ * Der eine Fall, in dem CONCURRENTLY
+ * bauartbedingt nicht geht — eine nie befuellte Sicht —, steckt seit dem
+ * 20.08.2026 in sync/auffrischen.ts.
  */
-const REFRESH = `REFRESH MATERIALIZED VIEW CONCURRENTLY mart.deckungsbeitrag_warengruppe`
+const SICHT = 'mart.deckungsbeitrag_warengruppe'
 
 /**
  * Ein Refresh über 27,5 Mio. Zeilen darf dauern — aber nicht endlos. Ohne
@@ -74,7 +78,7 @@ export async function deckungsbeitragAuffrischen(): Promise<Auffrischung> {
   const client = await pool.connect()
   try {
     await client.query(`SET statement_timeout = ${ZEITGRENZE_MS}`)
-    await client.query(REFRESH)
+    await sichtAuffrischen(client, SICHT)
 
     const dauerS = Math.round((Date.now() - t0) / 100) / 10
 

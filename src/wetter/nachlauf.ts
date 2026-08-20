@@ -9,9 +9,13 @@
  *      14.08.2026. `WETTER_BACKFILL_JE_LAUF` (Vorgabe 60) arbeitet die 432
  *      Ortsjahre in gut sieben Nächten ab, neueste zuerst.
  *
- * REIHENFOLGE: VOR `vergleichstagNachlauf()`. Die Materialisierung liest über
- * `mart.betrieb_wetter_tag` mit; käme das Wetter danach, trüge sie den
- * Wetterstand vom Vortag. Dieselbe Falle wie bei Yext und der Handpflege.
+ * REIHENFOLGE: keine. Hier stand bis zum 20.08.2026, der Nachlauf müsse VOR
+ * `vergleichstagNachlauf()` laufen, weil die Materialisierung über
+ * `mart.betrieb_wetter_tag` mitlese. Das stimmt nicht: `mart.vergleichstag_basis`
+ * liest nur `mart.betrieb_kalender` und `mart.umsatz_tag`. Die Wetterspalten
+ * sitzen in der dünnen Hülle `mart.vergleichstag` darüber (Migration 0086),
+ * einer gewöhnlichen Sicht — das Wetter ist live und veraltet nicht. Die
+ * Stelle im Ablauf bleibt, wo sie ist; sie ist nur keine Bedingung.
  *
  * WIRFT NIE. Ein fehlender Wetterwert ist eine leere Spalte, kein verlorener
  * Umsatz — und ganz sicher kein Grund, einen Importlauf scheitern zu lassen.

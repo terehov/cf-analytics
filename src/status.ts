@@ -351,6 +351,55 @@ export async function statusErheben(): Promise<Statusbericht> {
         })
   }
 
+  // --- Frischen sich die materialisierten Sichten noch auf? --------------
+  //
+  // Zehn Sichten haengen an vier Nachlaeufen, und alle vier fangen jeden
+  // Fehler ab. Das ist Absicht: ein misslungener Refresh bedeutet veraltete
+  // Zahlen, nicht verlorene Daten, und darf einen Import nicht scheitern
+  // lassen. Der Preis war, dass ein dauerhaft scheiternder Refresh genauso
+  // aussah wie ein gelungener Lauf -- sync.lauf.status kennt nur die Frage
+  // "sind Aufgaben gescheitert?", und ein Refresh ist keine Aufgabe.
+  //
+  // Seit Migration 0091 beantwortet mart.materialisierung_stand beides: ist
+  // jede Sicht so frisch wie der letzte Lauf, und haengt ueberhaupt jede an
+  // einem Nachlauf. Die Sicht liest dafuer nur sync.merker, sync.lauf und
+  // pg_matviews -- nie die Materialisierungen selbst.
+  //
+  // WARNUNG, nicht STOERUNG: die Zahlen sind veraltet, nicht falsch, und der
+  // Import ist gelungen. Dieselbe Abstufung wie im Nachlauf, der log.warn
+  // schreibt und nicht log.error.
+  const materialisierung = await query<{ sicht: string; zustand: string }>(
+    `SELECT sicht, zustand
+       FROM mart.materialisierung_stand
+      WHERE zustand <> 'aktuell'
+      ORDER BY sicht`)
+
+  const ohneNachlauf = materialisierung.filter(m => m.zustand === 'ohne Refresh')
+  const veraltet = materialisierung.filter(m => m.zustand !== 'ohne Refresh')
+
+  if (materialisierung.length === 0) {
+    p.push({
+      name: 'materialisierung',
+      stufe: 'ok',
+      meldung: 'alle materialisierten Sichten so frisch wie der letzte Lauf',
+    })
+  } else {
+    p.push({
+      name: 'materialisierung',
+      stufe: 'warnung',
+      meldung: ohneNachlauf.length > 0
+        ? `${ohneNachlauf.length} materialisierte Sicht(en) ohne Refresh im Nachlauf`
+        : `${veraltet.length} materialisierte Sicht(en) aelter als der letzte Lauf`,
+      naechster_schritt: ohneNachlauf.length > 0
+        ? 'Eine neue Sicht ohne Auffrischung. Refresh in den passenden Nachlauf eintragen und in die Zuordnung von mart.materialisierung_stand (Migration 0091).'
+        : 'Im Log des letzten Laufs nach "nicht aufgefrischt" suchen -- die Nachlaeufe werfen nie, sie warnen nur. Danach mart.materialisierung_stand.',
+      werte: {
+        veraltet: veraltet.map(m => `${m.sicht} (${m.zustand})`),
+        ohneNachlauf: ohneNachlauf.map(m => m.sicht),
+      },
+    })
+  }
+
   // --- Yext: laeuft der Nachlauf, und kommen die Analytics mit? -----------
   //
   // Bis zum 10.08.2026 gab es hier gar nichts. Yext konnte still stehen — ein

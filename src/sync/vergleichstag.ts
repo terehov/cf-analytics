@@ -28,13 +28,13 @@
  */
 import { log } from '../lib/log'
 import { pool, query } from '../db/pool'
+import { sichtAuffrischen } from './auffrischen'
 
 /**
  * CONCURRENTLY, damit niemand während des Neuaufbaus vor einem sperrenden
  * Dashboard sitzt. Der dafür nötige eindeutige Index liegt in Migration 0084.
  */
-const REFRESH_NEBENLAEUFIG = `REFRESH MATERIALIZED VIEW CONCURRENTLY mart.vergleichstag_basis`
-const REFRESH_EINFACH      = `REFRESH MATERIALIZED VIEW mart.vergleichstag_basis`
+const SICHT = 'mart.vergleichstag_basis'
 
 /**
  * Gemessen 35 s über 188.640 Zeilen; bei geschlossener Standortlücke etwa
@@ -44,13 +44,11 @@ const REFRESH_EINFACH      = `REFRESH MATERIALIZED VIEW mart.vergleichstag_basis
 const ZEITGRENZE_MS = 10 * 60 * 1000
 
 /**
- * PG 55000 heißt hier: die materialisierte Sicht wurde nie befüllt. Das ist
- * der Normalfall in einer frisch geklonten Datenbank, und CONCURRENTLY kann
- * damit bauartbedingt nichts anfangen — es braucht einen alten Stand, gegen
- * den es abgleicht. Genau daran hing der Ende-zu-Ende-Test nach 0080.
- * Einmal ohne CONCURRENTLY befüllen, danach greift der normale Weg.
+ * Der Sonderfall „nie befüllt" (PG 55000) steckt seit dem 20.08.2026 in
+ * sync/auffrischen.ts — er stand hier zuerst, weil genau daran der
+ * Ende-zu-Ende-Test nach 0080 hängengeblieben ist, und fehlte den drei
+ * Nachläufen nebenan. Jetzt teilen sich alle vier einen Weg.
  */
-const NIE_BEFUELLT = '55000'
 
 export type Auffrischung = {
   status: 'aufgefrischt' | 'fehler'
@@ -69,14 +67,7 @@ export async function vergleichstagAuffrischen(): Promise<Auffrischung> {
   let nebenlaeufig = true
   try {
     await client.query(`SET statement_timeout = ${ZEITGRENZE_MS}`)
-    try {
-      await client.query(REFRESH_NEBENLAEUFIG)
-    } catch (e: any) {
-      if (e?.code !== NIE_BEFUELLT) throw e
-      log.info('Vergleichstag war nie befuellt — einmal ohne CONCURRENTLY')
-      nebenlaeufig = false
-      await client.query(REFRESH_EINFACH)
-    }
+    nebenlaeufig = await sichtAuffrischen(client, SICHT)
 
     const dauerS = Math.round((Date.now() - t0) / 100) / 10
     await query(

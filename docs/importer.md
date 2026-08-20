@@ -140,7 +140,7 @@ Der Container läuft über `health.ts` und beantwortet zwei **verschiedene** Fra
 
 **`/health` darf nur rot werden, wenn ein Neustart hilft.** Bei einer Zugangssperre hilft er nicht — er macht es schlimmer: Dokploy drehte den Container im Kreis, während LINA ohnehin gerade nichts von uns hören will.
 
-`/status` prüft neun Dinge und sagt zu jedem, was daraus folgt:
+`/status` prüft elf Dinge und sagt zu jedem, was daraus folgt:
 
 | Prüfung | Stufe | wann |
 |---|---|---|
@@ -148,10 +148,12 @@ Der Container läuft über `health.ts` und beantwortet zwei **verschiedene** Fra
 | `fortschritt` | **Störung** | seit `STATUS_STILLSTAND_STUNDEN` (3) kein Posten erledigt, obwohl fällige Arbeit da ist |
 | `laeufe` | **Störung** | die letzten drei Läufe sind fehlgeschlagen |
 | `aufgegebene_posten` | Warnung | in 24 h wurde ein Zeitraum endgültig aufgegeben — der fehlt dauerhaft |
+| `zulauf` | Warnung / **Störung** | eine erwartete Quelle bekommt keinen Zulauf mehr. Störung, wenn der Importer sie gar nicht mehr abfragt — das ist ein Baufehler, kein Ausfall |
 | `schema` | Warnung | LINA liefert etwas anderes als erwartet |
 | `bwa_bruecke` | Warnung | aktive Betriebe ohne LINA-ID — sie tauchen in keiner BWA-Auswertung auf |
 | `bwa_fortschritt` | Warnung | die **Spitze** steht mehr als `STATUS_BWA_RUECKSTAND_MONATE` (3) Monate zurück — Verdacht auf fehlende BWA-Rechte, denn dann liefert `getKennzahlen` kommentarlos Nullen |
 | `dashboard_filter` | Warnung | die Auswahllisten der Metabase-Filter kennen nicht mehr alle Betriebe — ein fehlender Betrieb im Dropdown fällt sonst niemandem auf |
+| `materialisierung` | Warnung | eine materialisierte Sicht ist älter als der letzte Lauf — oder hängt an gar keinem Nachlauf. Die Refreshes werfen nie, ein gescheiterter sah bis `0091` aus wie ein gelungener Lauf |
 | `yext` | Warnung | der Yext-Nachlauf hängt (> 48 h), oder er läuft und die **Analytics-Tabellen sind leer** |
 
 `warnung` bleibt bei **HTTP 200**: Dinge, die man wissen sollte, wecken niemanden nachts. Nur `stoerung` gibt 503.

@@ -25,19 +25,22 @@
  */
 import { log } from '../lib/log'
 import { pool, query } from '../db/pool'
+import { sichtAuffrischen } from './auffrischen'
 
 /**
  * CONCURRENTLY, damit niemand während des Neuaufbaus vor einem sperrenden
  * Dashboard sitzt. Die dafür nötigen eindeutigen Indizes liegen in
- * Migration 0039.
+ * Migration 0039. Der eine Fall, in dem CONCURRENTLY
+ * bauartbedingt nicht geht — eine nie befuellte Sicht —, steckt seit dem
+ * 20.08.2026 in sync/auffrischen.ts.
  */
-const REFRESHES = [
-  `REFRESH MATERIALIZED VIEW CONCURRENTLY mart.round_table_monat`,
-  `REFRESH MATERIALIZED VIEW CONCURRENTLY mart.round_table_trend`,
+const SICHTEN = [
+  'mart.round_table_monat',
+  'mart.round_table_trend',
   // Migration 0068: der Artikel-Drill-Down. LINA-Ware wie die beiden
   // oben, deshalb hier und nicht in einkauf_sichten.ts (FoodNotify).
   // Unabhaengig von den Round-Table-Sichten, liest nur artikelverkauf.
-  `REFRESH MATERIALIZED VIEW CONCURRENTLY mart.artikel_monat_basis`,
+  'mart.artikel_monat_basis',
 ]
 
 /** Der Artikel-Refresh (0068) verdichtet 27,7 Mio Tageszeilen und liegt
@@ -60,7 +63,7 @@ export async function roundTableAuffrischen(): Promise<Auffrischung> {
   const client = await pool.connect()
   try {
     await client.query(`SET statement_timeout = ${ZEITGRENZE_MS}`)
-    for (const refresh of REFRESHES) await client.query(refresh)
+    for (const sicht of SICHTEN) await sichtAuffrischen(client, sicht)
 
     const dauerS = Math.round((Date.now() - t0) / 100) / 10
     await query(
