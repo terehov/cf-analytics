@@ -2257,3 +2257,37 @@ Januar 71,2 % der Tage und im Juni 19,6 %: im Fenster 08–24 sind im Winter ach
 von sechzehn Stunden dunkel, die Klasse misst also die Jahreszeit. Sie rechnet
 seit `0087` **relativ** gegen die letzten 28 Tage am selben Ort — dieselbe
 Konstruktion wie der Vergleichstag, aus demselben Grund.
+
+## 21.08.2026 — Geschlossene Betriebe fallen aus ⑫ heraus
+
+**Angefragt:** „Enchi-Gruppe geschlossene ausschließen." Das ist kein Betrieb,
+sondern ein Konzept in `mart.konzept_zuordnung` — der Sammelposten für 34
+geschlossene und insolvente Enchilada-Betriebe, keiner davon mit laufendem
+Umsatz.
+
+**Umgesetzt als Daten, nicht als Name im SQL.** `manual.kalender_ausschluss`,
+gepflegt über `pflege/kalender_ausschluss.csv` — dieselbe Bauart wie
+`manual.wetter_klasse`. Grund: es gibt **drei weitere Konzepte mit derselben
+Signatur** (Franchisegebergesellschaften 17, Sonstige Enchilada Gruppe 9, Ghost
+Kitchen 3, alle ohne laufenden Umsatz). Sie bleiben vorerst drin, weil danach
+nicht gefragt war; `mart.kalender_ausschluss_kandidaten` führt sie als
+Entscheidungsliste.
+
+**Wo der Ausschluss wirkt — und wo nicht.** Gefiltert wird in der
+**Auswertungsschicht**: `mart.kalendertag_lage`, `mart.wettertag_lage` und die
+Tagesliste auf ⑫. `mart.vergleichstag_basis` bleibt **vollständig** — die
+Rohebene verliert keine Zeile, und wer einen geschlossenen Betrieb nachsehen
+will, kann das weiterhin (Regel 10: sichtbar machen, nicht verschwinden
+lassen).
+
+**Verworfen: Filterung über `operativ` statt über das Konzept.** Ein Betrieb,
+der 2025 geschlossen hat, war 2023 operativ — seine Feiertagsdaten von damals
+sind fachlich gültig. Ein `operativ`-Filter hätte je nach Stichtag andere
+Historie gezeigt und wäre bei jedem Monatswechsel anders ausgefallen. Das
+Konzept ist die stabilere Aussage: dieser Betrieb ist zu, dauerhaft.
+
+**Nebenbefund, der in die Kartenlesung gehört:** durch den Ausschluss von drei
+Tagen sprang Neujahr von −68,7 auf −97,3 %. Nicht wegen des Gewichts, sondern
+weil der Median dort auf der Kante zwischen „hat auf" und „hat zu" sitzt. Steht
+als Spaltenkommentar an `mart.kalendereffekt_gruppe.median_pct`, damit es
+niemand als Umsatzrückgang zitiert.

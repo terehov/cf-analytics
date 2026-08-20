@@ -58,6 +58,28 @@ export type Ziel = {
 
 export const ZIELE: readonly Ziel[] = [
   /**
+   * Konzepte, die aus der Kalender- und Wetterauswertung herausfallen
+   * (Migration `0093`).
+   *
+   * Angefragt am 21.08.2026: „Enchi-Gruppe geschlossene ausschliessen" — ein
+   * Sammelposten aus 34 geschlossenen und insolventen Betrieben, keiner davon
+   * mit laufendem Umsatz. Drei weitere Konzepte tragen dieselbe Signatur und
+   * sind eine Zeile hier entfernt; welche, sagt
+   * `mart.kalender_ausschluss_kandidaten`.
+   *
+   * ACHTUNG: der Ausschluss wirkt NUR in der Auswertungsschicht.
+   * `mart.vergleichstag_basis` bleibt vollständig — wer einen geschlossenen
+   * Betrieb nachsehen will, kann das weiterhin.
+   */
+  {
+    datei: 'kalender_ausschluss.csv',
+    tabelle: 'manual.kalender_ausschluss',
+    schluessel: ['hauptkonzept'],
+    spalten: ['hauptkonzept', 'grund'],
+    pflicht: ['hauptkonzept', 'grund'],
+    zweck: 'Konzepte ohne laufenden Betrieb aus ⑫ heraushalten',
+  },
+  /**
    * Die Klassengrenzen des Wettereffekts (Migration `0087`).
    *
    * WARUM DAS HIER STEHT UND NICHT IM QUELLTEXT: die Grenzen sind eine

@@ -525,6 +525,12 @@ SELECT vergleichstag.geschaeftstag AS "Tag",
   FROM mart.vergleichstag
   LEFT JOIN mart.konzept_zuordnung z USING (betrieb_key)
  WHERE 1 = 1
+   -- Wie in mart.kalendertag_lage: geschlossene Sammelposten raus. Die
+   -- Liste ist das Klickziel der Kacheln darueber; zeigte sie Betriebe,
+   -- die dort nicht mitzaehlen, waere die Summe nicht nachvollziehbar.
+   AND NOT EXISTS (SELECT 1 FROM mart.konzept_zuordnung zz
+                     JOIN manual.kalender_ausschluss aa ON aa.hauptkonzept = zz.hauptkonzept
+                    WHERE zz.betrieb_key = vergleichstag.betrieb_key)
    [[AND vergleichstag.betrieb = {{betrieb}}]]
    [[AND z.hauptkonzept = {{marke}}]]
    [[AND {{zeitraum}}]]

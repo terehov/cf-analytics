@@ -1910,3 +1910,47 @@ trifft es nicht (sie rechnen ab 2023), die Tagesliste schon.
 
 Zweitens kippte der Ausführungsplan von `mart.betrieb_kalender` — siehe
 `fehlerkatalog.md`, „Ein Join auf einem Ausdruck".
+
+## Geschlossene Betriebe verschoben Neujahr um 28 Punkte (21.08.2026)
+
+`mart.konzept_zuordnung` führt vier Konzepte, in denen **kein einziger Betrieb
+laufenden Umsatz macht**:
+
+| Konzept | Betriebe | mit laufendem Umsatz |
+|---|---:|---:|
+| Enchi-Gruppe geschlossene | 34 | 0 |
+| Franchisegebergesellschaften | 17 | 0 |
+| Sonstige Enchilada Gruppe | 9 | 0 |
+| Ghost Kitchen | 3 | 0 |
+
+Die Namen der Betriebe sagen es selbst: *GESCHLOSSEN Enchilada Kassel*,
+*INSOLVENT - Enchilada Gießen*. Auf Wunsch (21.08.2026) fällt
+**Enchi-Gruppe geschlossene** aus der Kalender- und Wetterauswertung; die
+übrigen drei stehen in `mart.kalender_ausschluss_kandidaten` und sind eine
+Zeile in `pflege/kalender_ausschluss.csv` entfernt.
+
+**Was das an den Zahlen bewegt — und warum das lehrreich ist:**
+
+| Feiertag | Tage | davon geschlossen | mit | ohne |
+|---|---:|---:|---:|---:|
+| Neujahr | 186 | 3 | −68,7 % | **−97,3 %** |
+| 1. Weihnachtsfeiertag | 143 | 3 | −0,4 % | **+5,8 %** |
+| Pfingstmontag | 190 | 3 | +52,4 % | +54,8 % |
+| Karfreitag | 188 | 3 | −32,1 % | −32,1 % |
+
+**Drei von 186 Tagen verschieben Neujahr um 28 Punkte.** Das liegt nicht am
+Gewicht dieser Betriebe, sondern an der **Verteilung**: an Neujahr steht ein
+großer Teil der Gruppe bei −100 % — der Betrieb hatte zu. Der Median sitzt
+genau auf der Kante zwischen „hat auf" und „hat zu" und kippt, sobald eine
+Handvoll Beobachtungen dazukommt oder wegfällt.
+
+Sichtbar wird das in den Quartilen, und genau dafür stehen sie da:
+
+| Feiertag | p25 | Median | p75 |
+|---|---:|---:|---:|
+| Neujahr | −100,0 | −97,3 | −0,1 |
+| 1. Weihnachtsfeiertag | −100,0 | +5,8 | +64,1 |
+
+**Die Lehre:** die Neujahrszahl ist keine typische Umsatzveränderung, sondern
+eine Grenze. Wer sie zitiert, nennt p25 und p75 dazu — sonst liest sie sich als
+„Neujahr kostet 97 % Umsatz", und das gilt für keinen einzelnen Betrieb.
