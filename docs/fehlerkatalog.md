@@ -3073,3 +3073,88 @@ drei beendeten Läufe auf „alle fehlgeschlagen" — drei Skips verdeckten drei
 Fehlschläge; `health.ts` misst „veraltet" am jüngsten `beendet_am` — ein Tag voller
 Skips hielte `/health` ewig frisch, während der Import steht. Beide filtern jetzt,
 beide Tests dazu in `e2e.test.ts` („Sperre gegen parallele Worker").
+
+---
+
+## 19.08.2026 — was der Umbau auf zwei Schleifen ans Licht brachte
+
+Drei Befunde. Der erste bestand schon, der zweite entstand durch den Umbau
+und wurde vorher behoben, der dritte ist die Sorte, die man dreimal sucht.
+
+### 1. Ein Kommentar behauptete das Gegenteil dessen, was der Code tat
+
+**Symptom.** In `src/sync/worker.ts` stand über dem FoodNotify-Client:
+„Eigener Takt (anderes Zielsystem), **aber dasselbe Tagesbudget aus derselben
+Zählung** — der eine Worker bleibt die eine Bremse."
+
+**Befund.** Falsch seit dem 02.08.2026. Der Satz kam am 04.08.2026 herein und
+beschrieb den Stand davor. `src/foodnotify/client.ts` zählt seither
+`endpunkt LIKE 'fn:%'` gegen `FN_TAGESBUDGET` — zwei Budgets, nicht eines.
+
+**Warum das teuer war.** Der Satz war das einzige geschriebene Argument gegen
+genau den Umbau, der jetzt gemacht wurde. Wer ihn las, hielt die Serialität
+für eine tragende Entscheidung. Sie war ein Überbleibsel.
+
+**Was ihn verhindert.** Der Kommentar steht jetzt durchgestrichen mit Datum
+darüber, nicht gelöscht — sonst stellt der Nächste dieselbe Annahme neu auf.
+Das ist der dritte Fall dieser Klasse in diesem Projekt.
+
+### 2. `core.partition_anlegen` vertrug keine zwei gleichzeitigen Anrufer
+
+**Symptom (nachgestellt, PostgreSQL 18.4).** Zwei gleichzeitige Aufrufe für
+dieselbe noch fehlende Partition, mit einem `pg_sleep` im Fenster zwischen
+`IF NOT EXISTS` und `EXECUTE`:
+
+```
+[B] COMMIT
+[A] ERROR:  relation "p_2026_10" already exists
+[A] CONTEXT: SQL statement "CREATE TABLE part.p_2026_10 PARTITION OF ..."
+```
+
+Das reißt die ganze Ladetransaktion mit.
+
+**Wann es aufgetreten wäre.** Alle drei Ladepfade rufen `partition_anlegen`
+als erste Handlung ihrer Transaktion, mit
+`unnest(ARRAY[current_date, current_date + 1])`. Das Fenster ist also der
+**letzte Tag jedes Monats**, beim ersten gleichzeitigen Ladepaar. Ein Fehler,
+der an einem Tag im Monat auftritt, wie ein zufälliger Ladefehler aussieht und
+danach durch die Wiedervorlage verschwindet.
+
+**Behebung.** Migration `0083`: `CREATE TABLE IF NOT EXISTS` **plus**
+`EXCEPTION WHEN duplicate_table OR duplicate_object OR unique_violation THEN
+NULL`. Zwei Gürtel, weil `IF NOT EXISTS` das Fenster nicht vollständig
+schließt. Der BRIN-Index bekommt dabei seinen Namen ausgeschrieben — ohne
+Namen gibt es kein `IF NOT EXISTS`, und der Fall „CREATE TABLE hat
+übersprungen" legte sonst einen **zweiten** BRIN-Index auf dieselbe Spalte an:
+erlaubt, still, und dauerhaft doppelte Schreiblast.
+
+**Bleibt offen:** `CREATE TABLE ... PARTITION OF` hält eine
+`AccessExclusiveLock` auf die *Eltern*tabelle bis zum COMMIT. Solange eine
+Ladetransaktion offen ist, warten die INSERTs der anderen Schleife in
+`raw.api_antwort`. Einmal im Monat, Dauer einer Ladetransaktion. Siehe
+`offene-punkte.md`.
+
+### 3. Ein Test, der grün war, ohne etwas zu zeigen
+
+**Symptom.** Der erste Entwurf des Tests „beide Schleifen arbeiten
+verschränkt" zählte die Herkunftswechsel in `sync.aufgabe` und verlangte
+`> 1`. Er war grün — **auch gegen den alten, seriellen Worker**, gemessen in
+einem Arbeitsbaum auf `HEAD`.
+
+**Ursache.** Der Aufbau benutzte die vier FoodNotify-A1-Posten, die mitten im
+Lauf Folgeposten mit anderer Priorität nachreihen. Auch seriell entstanden so
+zwei Blöcke und damit zwei Wechsel. Der Test maß die Priorisierung, nicht die
+Nebenläufigkeit.
+
+**Behebung.** Der Aufbau ist jetzt der Test: beide Anbieter auf derselben
+Priorität, FoodNotify auf `current_date`, LINA im Juni 2026 — eine Schleife
+arbeitet damit erst den einen, dann den anderen Block ab, also genau **ein**
+Wechsel. Dazu eine künstliche Antwortverzögerung in beiden Attrappen
+(`langsamMs` bzw. `fnMock.langsam()`), weil bei Takt 0 sonst die eine Schlange
+fertig ist, bevor die andere ihre erste Antwort hat. Gegengeprüft: rot auf
+`HEAD`, grün nach dem Umbau.
+
+**Die Lehre, und sie ist die alte.** Ein neuer Test muss gegen den
+zurückgebauten Fix **rot** sein. Sonst ist er die Sorte Prüfung, die nie
+ausschlägt und deshalb nie hinterfragt wird — dieselbe Klasse wie „grün hieß
+nichts gefunden, nicht geprüft".

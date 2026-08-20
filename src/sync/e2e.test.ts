@@ -2212,6 +2212,352 @@ lauf('Getrennte Anbietergrenzen', () => {
 })
 
 /**
+ * Zwei Schleifen, ein Lauf — die Zusicherungen des Umbaus aus Migration 0082.
+ *
+ * LINA und FoodNotify arbeiten seit 0082 nebeneinander statt hintereinander.
+ * Gemessener Anlass (Lauf 95 vom 18.08.2026): 10 h 10 LINA plus 2 h 12
+ * FoodNotify ergaben 12 h 17 Wandzeit, weil FoodNotify in LINAs Taktpausen
+ * stillstand.
+ *
+ * WAS HIER NICHT GEPRUEFT WIRD: dass der Lauf schneller ist. Wandzeit ist auf
+ * einem Testrechner keine Zusicherung, und beide Takte stehen im Test ohnehin
+ * auf 0 ms. Die Zusicherung lautet „beide Stroeme laufen in derselben
+ * Wandzeit, ohne sich in die Quere zu kommen" — und die steht hinterher als
+ * Zustand in der Datenbank, nicht auf einer Stoppuhr.
+ */
+lauf('Zwei Schleifen, ein Lauf', () => {
+  let db: Client
+  let port: number
+  let aposto: number
+
+  /** Die vier Organisationsposten, aus denen sich FoodNotify selbst weitertreibt. */
+  const fnPosten = async () => {
+    await db.query(
+      `INSERT INTO sync.warteschlange
+         (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter) VALUES
+         ('fn:profil',         current_date, current_date, 5, $1, '{}'),
+         ('fn:betriebe',       current_date, current_date, 5, $1, '{}'),
+         ('fn:kostenstellen',  current_date, current_date, 5, $1, '{}'),
+         ('fn:pos_standorte',  current_date, current_date, 6, $1, '{}')`,
+      [aposto])
+  }
+
+  const linaPosten = async (n = 5) => {
+    for (let i = 1; i <= n; i++) {
+      await db.query(
+        `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet)
+         VALUES ('getUmsatzbericht', $1::date, $1::date, 10)`, [`2026-06-0${i}`])
+    }
+  }
+
+  const frisch = async () => {
+    await db.query(`DELETE FROM sync.zugangssperre`)
+    await db.query(`TRUNCATE sync.warteschlange, sync.aufgabe, sync.lauf RESTART IDENTITY CASCADE`)
+    await db.query(`TRUNCATE core.bestellposition, core.bestellung, core.ware,
+                       core.lieferant, core.kostenstelle RESTART IDENTITY CASCADE`)
+  }
+
+  beforeAll(async () => {
+    const { config } = await import('../config')
+    port = Number(new URL(config.LINA_BASE_URL).port)
+    db = new Client({ connectionString: DB })
+    await db.connect()
+    const { rows } = await db.query(`SELECT marke_key, schluessel FROM core.marke`)
+    aposto = Number(rows.find(r => r.schluessel === 'aposto')!.marke_key)
+  })
+
+  afterAll(async () => {
+    await db.query(`DELETE FROM sync.zugangssperre`)
+    await db.end()
+  })
+
+  /**
+   * Die Drossel selbst. Zieht eine Schleife den Posten des anderen Anbieters,
+   * waehlt die Weiche im Worker brav den richtigen Client — es entstuende kein
+   * Fehler, nur zwei Aufrufer auf einer Instanz und damit doppeltes Tempo
+   * gegen den einen LINA-Zugang. Reine SQL-Pruefung: keine Attrappe, kein
+   * Worker, keine Zeitmessung.
+   */
+  test('posten_holen(lina) zieht nie einen fn-Posten, und umgekehrt', async () => {
+    await frisch()
+    const { rows: [l] } = await db.query(
+      `INSERT INTO sync.lauf (ausloeser) VALUES ('manuell') RETURNING lauf_id`)
+    await db.query(
+      `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet)
+       VALUES ('getUmsatzbericht', current_date, current_date, 10)`)
+    await db.query(
+      `INSERT INTO sync.warteschlange
+         (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter)
+       VALUES ('fn:profil', current_date, current_date, 10, $1, '{}')`, [aposto])
+
+    const holen = async (anbieter: string | null) => {
+      const { rows } = await db.query(
+        `SELECT endpunkt, marke_key FROM sync.posten_holen($1, $2)`, [l.lauf_id, anbieter])
+      return rows[0]?.endpunkt ?? null
+    }
+
+    expect(await holen('lina')).toBe('getUmsatzbericht')
+    // Der eigentliche Beweis: leer, OBWOHL der fn-Posten offen und faellig ist.
+    expect(await holen('lina')).toBeNull()
+    expect(await holen('fn')).toBe('fn:profil')
+    expect(await holen('fn')).toBeNull()
+
+    // Keine Doppelreservierung. `posten_holen` zaehlt bei JEDER Reservierung
+    // hoch — eine doppelte ueberlebt als versuche = 2 und ist damit im
+    // Nachhinein nachweisbar. Zustand statt Zeitmessung.
+    const { rows: [v] } = await db.query(
+      `SELECT max(versuche)::int AS hoechster,
+              count(*) FILTER (WHERE in_arbeit_seit IS NOT NULL)::int AS reserviert
+         FROM sync.warteschlange`)
+    expect(v.hoechster).toBe(1)
+    expect(v.reserviert).toBe(2)
+  })
+
+  /**
+   * Kein stiller Rueckfall auf „alles". Ein Tippfehler im Anbieternamen soll
+   * scheitern und nicht beschleunigen — und der Aufruf OHNE Anbieter muss
+   * weiter gehen, sonst bricht src/einreihen.ts.
+   */
+  test('ein unbekannter Anbieter wirft, ohne Anbieter bleibt alles erlaubt', async () => {
+    await frisch()
+    const { rows: [l] } = await db.query(
+      `INSERT INTO sync.lauf (ausloeser) VALUES ('manuell') RETURNING lauf_id`)
+    await linaPosten(1)
+
+    await expect(
+      db.query(`SELECT * FROM sync.posten_holen($1, 'quatsch')`, [l.lauf_id]),
+    ).rejects.toThrow(/unbekannter Anbieter/)
+
+    const { rows } = await db.query(
+      `SELECT endpunkt FROM sync.posten_holen($1)`, [l.lauf_id])
+    expect(rows[0].endpunkt).toBe('getUmsatzbericht')
+  })
+
+  /**
+   * Die FoodNotify-Schlange ist typisch nach Minuten leer, LINA laeuft
+   * Stunden weiter. Frueher war „Schlange leer" ein Feld fuer den ganzen
+   * Lauf — die fertige Schleife haette den Lauf beschrieben und beendet.
+   */
+  test('eine leere FoodNotify-Schlange beendet den LINA-Worker nicht', async () => {
+    await frisch()
+    await linaPosten(5)
+    const mock = mockStarten({ port })
+    try {
+      const { workerLauf } = await import('./worker')
+      const r = await workerLauf('manuell')
+      expect(r.status).toBe('ok')
+      expect(r.ok).toBe(5)
+    } finally { mock.stop() }
+
+    const { rows: [o] } = await db.query(
+      `SELECT count(*)::int AS offen FROM sync.warteschlange WHERE erledigt_am IS NULL`)
+    expect(o.offen).toBe(0)
+  }, 30_000)
+
+  /** Das Spiegelbild — und die Aussage, die bisher nur zufaellig galt. */
+  test('eine leere LINA-Schlange beendet den FoodNotify-Worker nicht', async () => {
+    await frisch()
+    await fnPosten()
+    const mock = mockStarten({ port })
+    let r: Awaited<ReturnType<typeof import('./worker')['workerLauf']>>
+    try {
+      const { workerLauf } = await import('./worker')
+      r = await workerLauf('manuell')
+    } finally { mock.stop() }
+
+    expect(r!.status).toBe('ok')
+    /**
+     * KEINE feste Zahl. Die FoodNotify-Attrappe zaehlt ueber die ganze
+     * Testdatei hinweg mit (`leerAb` greift ab dem vierten Aufruf derselben
+     * Bestellseite), die Zahl der Folgeposten haengt also davon ab, was vorher
+     * in dieser Datei lief. Geprueft wird die Zusicherung, nicht der Zufall:
+     * die vier A1-Posten sind mindestens abgearbeitet, nichts bleibt offen,
+     * und LINA hat keinen einzigen Posten angefasst.
+     */
+    expect(r!.ok).toBeGreaterThanOrEqual(4)
+    const { rows: [o] } = await db.query(
+      `SELECT count(*) FILTER (WHERE erledigt_am IS NULL AND marke_key IS NOT NULL)::int AS offen
+         FROM sync.warteschlange`)
+    expect(o.offen).toBe(0)
+    const { rows: [a] } = await db.query(
+      `SELECT count(*) FILTER (WHERE marke_key IS NULL)::int     AS lina,
+              count(*) FILTER (WHERE marke_key IS NOT NULL)::int AS fn
+         FROM sync.aufgabe WHERE lauf_id = $1`, [r!.laufId])
+    expect(a.lina).toBe(0)
+    expect(a.fn).toBe(r!.ok)
+  }, 30_000)
+
+  /**
+   * Die Zaehler des Laufs sind die SUMME beider Schleifen, und es ist EIN
+   * Lauf. Frueher schrieb das `finally` am Ende DER Schleife; mit zweien
+   * haette die zuerst fertige `sync.lauf` geschlossen, waehrend die andere
+   * weiterarbeitet — ein Lauf, der fertig aussieht und weiterlaeuft, mit
+   * Zaehlern auf einem Zwischenstand.
+   */
+  test('ein Lauf, eine Zeile, und die Zahlen sind die Summe beider Schleifen', async () => {
+    await frisch()
+    await linaPosten(5)
+    await fnPosten()
+    const mock = mockStarten({ port })
+    let r: Awaited<ReturnType<typeof import('./worker')['workerLauf']>>
+    try {
+      const { workerLauf } = await import('./worker')
+      r = await workerLauf('manuell')
+    } finally { mock.stop() }
+
+    expect(r!.status).toBe('ok')
+    expect(r!.fehler).toBe(0)
+
+    /**
+     * Beide Anbieter haben unter DERSELBEN lauf_id gearbeitet. Die
+     * LINA-Seite ist mit 5 festgelegt; die FoodNotify-Seite ist es nicht
+     * (siehe Begruendung im Test darueber), deshalb wird sie gezaehlt und
+     * nicht geraten. Geprueft wird die Summeneigenschaft.
+     */
+    const { rows: [a] } = await db.query(
+      `SELECT count(*) FILTER (WHERE marke_key IS NULL)::int     AS lina,
+              count(*) FILTER (WHERE marke_key IS NOT NULL)::int AS fn,
+              count(DISTINCT lauf_id)::int                       AS laeufe
+         FROM sync.aufgabe WHERE lauf_id = $1`, [r!.laufId])
+    expect(a.lina).toBe(5)
+    expect(a.fn).toBeGreaterThanOrEqual(4)
+    expect(a.laeufe).toBe(1)
+    expect(r!.ok).toBe(a.lina + a.fn)
+
+    const { rows: [z] } = await db.query(
+      `SELECT count(*)::int                                       AS laeufe,
+              max(aufgaben_gesamt)::int                           AS gesamt,
+              max(aufgaben_ok)::int                               AS ok,
+              count(*) FILTER (WHERE beendet_am IS NULL)::int      AS offen
+         FROM sync.lauf WHERE lauf_id = $1`, [r!.laufId])
+    expect(z.laeufe).toBe(1)
+    expect(z.gesamt).toBe(a.lina + a.fn)
+    expect(z.ok).toBe(a.lina + a.fn)
+    expect(z.offen).toBe(0)
+
+    // Und die Notiz nennt BEIDE Anbieter — sonst waere nach dem Lauf nicht
+    // erkennbar, ob einer von beiden still ausgefallen ist (Regel 10).
+    const { rows: [n] } = await db.query(
+      `SELECT notiz FROM sync.lauf WHERE lauf_id = $1`, [r!.laufId])
+    expect(n.notiz).toContain('LINA')
+    expect(n.notiz).toContain('FoodNotify')
+  }, 60_000)
+
+  /**
+   * DER NACHWEIS DER VERSCHRAENKUNG, ganz ohne Uhr.
+   *
+   * `sync.aufgabe` protokolliert jede Abarbeitung mit aufsteigender
+   * `aufgabe_id` und mit `marke_key`. Ob sich die beiden Schleifen abgewechselt
+   * haben, ist damit hinterher eine SQL-Frage: wie oft wechselt die Herkunft
+   * entlang der Reihenfolge? Seriell hintereinander gaebe es genau EINEN
+   * Wechsel (erst der eine Block, dann der andere).
+   *
+   * Keine Zeitmessung, keine Toleranz — ein Zustand in der Datenbank. Und der
+   * Test ist gegen den zurueckgebauten Umbau rot: mit einer Schleife arbeitet
+   * die Warteschlange streng nach Prioritaet, also blockweise.
+   */
+  test('beide Schleifen arbeiten verschraenkt, nicht hintereinander', async () => {
+    await frisch()
+    /**
+     * DER AUFBAU IST DER TEST. Beide Anbieter bekommen dieselbe Prioritaet;
+     * die Schlangenordnung (prioritaet, zeitraum_von DESC, endpunkt,
+     * posten_id) entscheidet dann am Datum. Die FoodNotify-Posten tragen
+     * `current_date`, die LINA-Posten liegen im Juni 2026 — EINE Schleife
+     * arbeitet also erst alle FoodNotify- und dann alle LINA-Posten ab, das
+     * ist genau EIN Wechsel der Herkunft. Zwei Schleifen erzeugen mehr.
+     *
+     * Und beide Attrappen antworten kuenstlich langsam, sonst waere die eine
+     * Schlange fertig, bevor die andere ihre erste Antwort hat, und auch
+     * nebenlaeufig gaebe es nur einen Wechsel. Gemessen wird trotzdem nichts
+     * an der Uhr: die Verzoegerung stellt nur sicher, dass sich die beiden
+     * Stroeme ueberhaupt begegnen koennen.
+     *
+     * Keine Folgeposten: `fn:profil` und `fn:betriebe` reihen nichts nach,
+     * die Ordnung bleibt also ueber den ganzen Lauf die oben beschriebene.
+     */
+    await linaPosten(6)   // 2026-06-01 bis -06, Prioritaet 10
+    for (let i = 1; i <= 6; i++) {
+      await db.query(
+        `INSERT INTO sync.warteschlange
+           (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter)
+         VALUES ('fn:profil', current_date, current_date, 10, $1, $2)`,
+        [aposto, JSON.stringify({ n: String(i) })])
+    }
+
+    const mock = mockStarten({ port, langsamMs: 60 })
+    fnMock.langsam(60)
+    let laufId: string | null
+    try {
+      const { workerLauf } = await import('./worker')
+      laufId = (await workerLauf('manuell')).laufId
+    } finally { mock.stop(); fnMock.langsam(0) }
+
+    const { rows: [w] } = await db.query(
+      `SELECT count(*)::int AS wechsel FROM (
+         SELECT marke_key IS NULL AS lina,
+                lag(marke_key IS NULL) OVER (ORDER BY aufgabe_id) AS vorher
+           FROM sync.aufgabe WHERE lauf_id = $1) x
+        WHERE vorher IS NOT NULL AND lina IS DISTINCT FROM vorher`, [laufId])
+    // Seriell waere das genau 1. Mehr heisst: die beiden Schleifen haben sich
+    // abgewechselt, also in derselben Wandzeit gearbeitet.
+    expect(w.wechsel).toBeGreaterThan(1)
+  }, 60_000)
+
+  /**
+   * LINAs Zugangssperre beendet BEIDE Schleifen.
+   *
+   * `sync.zugangssperre` ist global — `sperre_aktiv()` kennt keine
+   * Anbieterspalte, und `workerLauf()` fragt sie beim Start fuer beide ab.
+   * Liefe FoodNotify hier weiter, arbeitete er unter einer Sperre, die ihn
+   * beim naechsten Start ohnehin abweist. Diese Zusicherung gab es bisher
+   * nirgends: die vorhandenen Sperrtests laufen alle mit leerer
+   * FoodNotify-Schlange und koennen sie deshalb nicht sehen.
+   */
+  test('eine LINA-Zugangssperre beendet auch den FoodNotify-Worker', async () => {
+    await frisch()
+    await linaPosten(1)
+    // Viele FoodNotify-Posten, damit „ist nicht durchgelaufen" ueberhaupt
+    // messbar ist. Prioritaet hinter LINA, damit die Sperre zuerst greift.
+    for (let i = 1; i <= 200; i++) {
+      await db.query(
+        `INSERT INTO sync.warteschlange
+           (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter)
+         VALUES ('fn:bestellungen', current_date, current_date, 90, $1, $2)`,
+        [aposto, JSON.stringify({ erpId: '10484', seite: String(i) })])
+    }
+
+    const mock = mockStarten({ port, sperreAb: 1, sperreArt: 429 })
+    let r: Awaited<ReturnType<typeof import('./worker')['workerLauf']>>
+    try {
+      const { workerLauf } = await import('./worker')
+      r = await workerLauf('manuell')
+      expect(r.status).toBe('abgebrochen')
+      // Regel 7 bleibt gewahrt: genau ein Versuch gegen den gesperrten Zugang.
+      expect(mock.gesperrteAufrufe).toBe(1)
+    } finally { mock.stop() }
+
+    const { rows: [n] } = await db.query(
+      `SELECT notiz FROM sync.lauf WHERE lauf_id = $1`, [r!.laufId])
+    expect(n.notiz).toContain('Zugang gesperrt')
+
+    /**
+     * UNTERE SCHRANKE, keine feste Zahl: wo genau die FoodNotify-Schleife
+     * aussteigt, haengt daran, wie weit sie war, als das Abbruchflag kam.
+     * Die Behauptung lautet „sie ist nicht durchgelaufen", und die ist
+     * deterministisch.
+     */
+    const { rows: [o] } = await db.query(
+      `SELECT count(*) FILTER (WHERE erledigt_am IS NULL)::int        AS offen,
+              count(*) FILTER (WHERE in_arbeit_seit IS NOT NULL)::int AS haengt
+         FROM sync.warteschlange WHERE marke_key IS NOT NULL`)
+    expect(o.offen).toBeGreaterThan(100)
+    // Nichts bleibt reserviert liegen — sonst wartet es eine Stunde auf
+    // sync.haengende_posten_freigeben().
+    expect(o.haengt).toBe(0)
+  }, 60_000)
+})
+
+/**
  * Ladenakte: Belegarchiv, BWA-Historie und Stammdatenblatt durch die ganze
  * Kette — Warteschlange, Tokenaufloesung, Parser, core.
  *

@@ -54,6 +54,14 @@ export class FnClient {
   get budgetUebrig() { return Math.max(0, fnGrenzen().tagesbudget - this.heuteVerbraucht) }
 
   /**
+   * Gegenstueck zu `LinaClient.budgetVerbraucht`. Gebraucht seit die beiden
+   * Anbieter in eigenen Schleifen laufen: die Schlusszeile des Laufs nennt
+   * beide Verbraeuche, sonst waere nach dem Umbau die Haelfte des Laufs in
+   * der Zusammenfassung unsichtbar.
+   */
+  get budgetVerbraucht() { return this.heuteVerbraucht }
+
+  /**
    * Das Notfallnetz — aber NUR über FoodNotify-Aufrufe.
    *
    * `endpunkt LIKE 'fn:%'` ist der ganze Unterschied zur früheren Fassung

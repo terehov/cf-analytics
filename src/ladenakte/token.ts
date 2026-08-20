@@ -13,6 +13,20 @@
  * Belegarten desselben Betriebs ab. Die Obergrenze ist unbekannt, deshalb
  * ist die Haltbarkeit hier bewusst kürzer angesetzt, und der Client holt bei
  * einer unbrauchbaren Antwort einmal neu.
+ *
+ * **DIESE DATEI GEHÖRT DER LINA-SCHLEIFE, UND ZWAR IHR ALLEIN.** Der
+ * Zwischenspeicher unten liegt auf Modulebene und hat kein Dedupe für
+ * gleichzeitig laufende Auflösungen: zwei Aufrufer desselben Betriebs holen
+ * beide je zwei Anfragen, also vier statt zwei — gegen den einen LINA-Zugang.
+ * Und die Haltbarkeit oben ist ausdrücklich darauf gerechnet, dass EIN
+ * Aufrufer die Ordner eines Betriebs am Stück abarbeitet; verschränkte
+ * Aufrufer ließen die Token vor Gebrauch ablaufen.
+ *
+ * Seit Migration 0082 laufen zwei Importschleifen nebeneinander. Das ist hier
+ * gefahrlos, weil `la:*` ausschließlich Posten ohne `marke_key` sind und
+ * damit ausschließlich in der LINA-Schleife laufen — `belegToken`, `bwaHash`
+ * und `stammPfad` bekommen den `LinaClient` als `Holer`. Wer die LINA-Seite
+ * später noch einmal teilt, bricht als Erstes hier etwas.
  */
 import type { Endpunkt } from '../lina/endpunkte'
 import { BAUM, ORDNERSEITE, pfadPruefen } from './endpunkte'

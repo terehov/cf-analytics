@@ -6,9 +6,9 @@ Was hier an Fallstricken steckt und schon einmal zugeschlagen hat, steht gesamme
 `fehlerkatalog.md` — besonders die Abschnitte zum partiellen Eindeutigkeitsindex und dazu,
 warum ein Lauf früher an jedem Verbindungsfehler starb.
 
-## Eine Schlange, kein Modus-Unterschied
+## Eine Schlange, zwei Schleifen, kein Modus-Unterschied
 
-Es gibt **keinen** getrennten Backfill- und Sync-Modus. Beides sind Einträge in `sync.warteschlange`, die ein einzelner Worker konstant und langsam abarbeitet:
+Es gibt **keinen** getrennten Backfill- und Sync-Modus. Beides sind Einträge in `sync.warteschlange`, die konstant und langsam abgearbeitet werden:
 
 | Priorität | Bedeutung |
 |---|---|
@@ -20,6 +20,16 @@ Es gibt **keinen** getrennten Backfill- und Sync-Modus. Beides sind Einträge in
 | 90 | Historie, rückwärts |
 
 Aktuelle Daten können damit nie hinter dem Backfill verhungern, und es gibt nur einen Codepfad statt zweier, die auseinanderlaufen.
+
+**Seit dem 19.08.2026 (Migration `0082`) arbeiten zwei Schleifen an dieser einen Schlange — eine je Anbieter.** LINA (Posten ohne `marke_key`, inklusive der `la:*`-Ladenakte) und FoodNotify (`marke_key IS NOT NULL`) laufen nebenläufig im selben Prozess; `sync.posten_holen(lauf, anbieter)` grenzt jede auf ihre Seite ein, zusammengeführt wird mit `Promise.allSettled`.
+
+Der Grund ist gemessen: in Lauf 95 (18.08.2026) brauchte LINA 10 h 10 und FoodNotify 2 h 12, und weil sie sich eine Schleife teilten, dauerte der Lauf 12 h 17. FoodNotify stand in LINAs Taktpausen still — mit eigenem Takt und eigenem Budget. Aus der Summe wird jetzt das Maximum, der Lauf also rund zwei Stunden kürzer.
+
+**Die Drosselung ändert sich dabei nicht.** Sie hängt an der Client-Instanz (`letzterRequest` ist ein Instanzfeld), und je Anbieter gibt es weiterhin genau eine Instanz mit genau einem Aufrufer. Jedes Anbietersystem sieht denselben Mindestabstand wie vorher. Die Advisory-Sperre bleibt eine je Prozess. **Die Grenze verläuft bei „ein Aufrufer je Client", nicht bei „eine Schleife"** — ein zweiter Worker desselben Anbieters wäre eine echte Ratenerhöhung und ist ausgeschlossen; Begründung in `entscheidungen.md`.
+
+Was je Anbieter getrennt zählt: `fehlerInFolge` (sonst löschten FoodNotifys 20–60 Erfolge je LINA-Abruf LINAs Fehlerserie, und `ABBRUCH_NACH_FEHLERN` löste nie mehr aus), der reservierte Posten, die Notiz und die Tempomessung der Restschätzung. Was gemeinsam bleibt: die Zähler des Laufs, `MAX_POSTEN_PRO_LAUF`, das Arbeitsfenster, die Zugangssperre und ein eigener Zähler für Datenbankfehler beim Ziehen.
+
+Die Restschätzung rechnet seither **je Anbieter das Bindende (Tempo oder Tagesrate) und danach das Maximum beider** — die alte Summenformel setzte voraus, dass beide sich eine Schleife teilen.
 
 **12 und 14 sind keine Feinheit, sondern eine echte Kette.** Ein Tagesbericht legt die Betriebe an — ihr Schlüssel ist LINAs `encId`, und die kommt nur dort vor. `analyticsFilterOptions` heftet ihnen die *numerische* LINA-ID an, verbunden über den Namen, weil `encId` in dieser Antwort fehlt. Und `getKennzahlen` kennt Betriebe ausschließlich über diese Zahl. Reißt die Kette, meldet der Posten trotzdem `ok` und `core.kennzahlen_monat` bleibt leer — am 26.07.2026 sind so 7.860 BWA-Zeilen durchgefallen. Genauso still hängt `articleApi:franchise` am Artikelverkaufsbericht: es ordnet Warengruppen nur Artikeln zu, die `core.artikel` schon kennt.
 

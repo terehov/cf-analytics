@@ -2082,3 +2082,82 @@ ist kein Knopf, sondern ein Urteil:
 
 Alle drei stehen in einer Sicht mit einer Arbeitsliste, keine davon in einem
 Log. Das ist der Unterschied zwischen einer Entscheidung und einer Verabredung.
+
+---
+
+## Zwei Importschleifen, eine je Anbieter (19.08.2026)
+
+**Anlass, gemessen an Lauf 95 vom 18.08.2026.** Der Lauf begann um 03:03 und
+war gegen 15:20 fertig — 12 h 17 min. Aufgeteilt nach Anbieter, gerechnet aus
+den Fortschrittszeilen des Laufprotokolls:
+
+| Anbieter | Posten | Dauer | je Posten |
+|---|---|---|---|
+| LINA gesamt | 4.160 | **10 h 10 min** | |
+| — davon `la:belegzahl` | 1.974 | 6 h 51 min | ~12,5 s |
+| — davon Historie (`sv_*`) | 2.000 | 2 h 57 min | ~5,3 s |
+| — davon Tagesdaten | 186 | 22 min | ~7 s |
+| FoodNotify | 6.097 | **2 h 12 min** | ~1,3 s |
+
+10 h 10 + 2 h 12 = 12 h 22 gerechnet gegen 12 h 17 gemessen. Die beiden
+Anbieter teilten sich **eine** serielle Schleife, also addierte sich ihre Zeit.
+FoodNotify stand dabei in LINAs Taktpausen still — mit eigenem Takt
+(200–500 ms), eigenem Tagesbudget und nichts zu tun. Jeder LINA-Abruf zahlt
+seine 4–6 s **additiv** zur Antwortzeit, weil `letzterRequest` in
+`src/lina/client.ts` erst *nach* der Antwort gestempelt wird.
+
+**Entscheidung:** eine Schleife je Anbieter, nebenläufig im selben Prozess,
+zusammengeführt mit `Promise.allSettled`. Aus der Summe wird das Maximum.
+
+**Warum das die „Ein Worker"-Entscheidung nicht bricht.** Weiter oben steht
+„Zehn Worker wären zehnfaches Tempo gegen einen Zugang ohne Limits". Das
+Argument gilt **prozessübergreifend**: zehn `bun run sync` nebeneinander sind
+zehn Client-Instanzen mit zehn eigenen `letzterRequest`-Feldern und zehn
+Budgetzählern, die alle denselben Datenbankstand laden. Die Drosselung hängt
+an der **Instanz**, nicht an der Schleife. Die Grenze verläuft deshalb nicht
+bei „eine Schleife", sondern bei **„ein Aufrufer je Client"** — und die bleibt
+gewahrt: je Anbieter genau eine Instanz, genau ein Aufrufer. Die Advisory-
+Sperre bleibt unangetastet: ein Prozess, eine Sperre, zwei Schleifen darin.
+
+**Was jeder Anbieter sieht, ändert sich nicht.** Derselbe Mindestabstand,
+dasselbe Budget. Was sich ändert, ist allein, wer während der Pause des
+anderen arbeiten darf. Nachprüfbar nach dem ersten echten Lauf: die
+Abstandsverteilung der LINA-Aufrufe muss weiter bei ≥ 4.000 ms liegen. Rutscht
+das Minimum darunter, zieht jemand zweimal am selben Client.
+
+**Der Anbieterfilter ist die Drossel, nicht eine Optimierung.** Ohne ihn zögen
+beide Schleifen aus derselben Schlange; die Weiche im Worker wählte brav den
+richtigen Client, und zwei Aufrufer hingen an einer Instanz: beide lesen
+dasselbe `letzterRequest`, schlafen gleich lang und feuern gleichzeitig.
+Doppelte LINA-Rate in Zweierbursts, ohne eine einzige Meldung. Deshalb
+Migration `0082` (`sync.posten_holen(lauf, anbieter)`, unbekannter Wert wirft)
+**und** ein zweiter Gürtel im Worker, der einen fremden Posten zurücklegt und
+das laut protokolliert.
+
+**Was der Umbau NICHT bringt — die ehrliche Zahl.** Der Lauf geht von 12 h 17
+auf **rund 10 h 10**, also gut zwei Stunden. Mehr ist nicht drin, denn LINA
+allein braucht diese 10 h und ist der kritische Pfad. **Zwei Drittel davon
+sind `la:belegzahl`** (6 h 51 für 141 Betriebe × 14 FiBu-Ordner, jede Nacht
+neu). Wer den Lauf wirklich kurz haben will, kürzt dort — nicht an der
+Nebenläufigkeit. Steht in `offene-punkte.md`.
+
+**Weiter geht die Nebenläufigkeit nicht.** Ein zweiter Worker desselben
+Anbieters wäre eine echte Ratenerhöhung — zwei Instanzen, zwei Taktzähler,
+zwei Budgets aus demselben Datenbankstand. Für FoodNotify ginge das nur mit
+einer geteilten Schranke, die den nächsten Slot **vor** dem Request
+reserviert; dabei muss der Takt um die mittlere Antwortzeit angehoben werden,
+sonst ist der Umbau selbst eine Beschleunigung. Für LINA gar nicht: der
+Token-Cache der Ladenakte (`src/ladenakte/token.ts`) ist modulglobal, hat kein
+Dedupe für gleichzeitige Auflösungen, und seine 90-Sekunden-Frist ist
+ausdrücklich auf **einen** Aufrufer gerechnet, der die Ordner eines Betriebs
+am Stück abarbeitet. Wer mehr FoodNotify-Durchsatz will, dreht
+`FN_TAKT_MIN_MS` — eine Zahl in der Konfiguration, in einer Zeile
+zurückzunehmen, statt derselben Beschleunigung als Struktur versteckt.
+
+**Was bewusst beim Alten bleibt:** die Zugangssperre beendet **beide**
+Schleifen. `sync.zugangssperre` ist global (`sperre_aktiv()` kennt keine
+Anbieterspalte) und wird beim Start für beide geprüft; FoodNotify
+weiterlaufen zu lassen hieße, unter einer Sperre zu arbeiten, die den nächsten
+Start ohnehin abweist. Dasselbe gilt für das Arbeitsfenster. Beides je
+Anbieter zu führen wäre vertretbar, ist aber eine eigene Entscheidung — siehe
+`offene-punkte.md`.

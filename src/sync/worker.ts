@@ -1,12 +1,26 @@
 /**
- * Der Worker: eine Schlange, ein Tempo, kein Unterschied zwischen laufendem
- * Sync und Backfill.
+ * Der Worker: eine Schlange, ein Tempo JE ANBIETER, kein Unterschied zwischen
+ * laufendem Sync und Backfill.
  *
- * Er läuft, bis eines davon eintritt:
- *   * Die Schlange ist leer.
- *   * Das Arbeitsfenster endet.
- *   * Das Tagesbudget ist aufgebraucht.
- *   * Zu viele Fehler in Folge — dann bricht er ab, statt stur weiterzulaufen.
+ * Seit Migration 0082 laufen zwei Schleifen nebeneinander — eine für LINA
+ * (Posten ohne `marke_key`, inklusive der `la:*`-Ladenakte), eine für
+ * FoodNotify. Der Grund steht ausführlich bei `schleife()` weiter unten; kurz:
+ * jeder LINA-Abruf zahlt 4–6 s Taktpause ADDITIV zur Antwortzeit, und in genau
+ * diesen Pausen stand FoodNotify still, obwohl es seit dem 02.08.2026 eigenen
+ * Takt und eigenes Budget hat. Gemessen an Lauf 95 (18.08.2026): 12 h 17 statt
+ * der 10 h 10, die LINA allein braucht.
+ *
+ * **Das ist keine Lockerung der Drosselung.** Je Anbieter bleibt es bei genau
+ * einer Client-Instanz mit genau einem Aufrufer; jedes Anbietersystem sieht
+ * denselben Mindestabstand wie vorher. Was sich ändert, ist nur, wer während
+ * der Pause des anderen arbeiten darf.
+ *
+ * Jede Schleife läuft, bis eines davon eintritt:
+ *   * Ihre Schlange ist leer.
+ *   * Das Arbeitsfenster endet (eine Einstellung für den ganzen Lauf).
+ *   * Ihr Tagesbudget ist aufgebraucht.
+ *   * Zu viele Fehler in Folge — je Anbieter gezählt.
+ *   * Der Zugang ist gesperrt oder ein Signal kam — das beendet beide.
  *
  * Jeder Posten wird einzeln quittiert. Ein Absturz mitten im Lauf kostet
  * höchstens den einen Posten; alles andere steht in der Datenbank.
@@ -100,6 +114,14 @@ const SPERRE = 8_142_026
  * zwei denselben Posten greifen; parallel arbeiten dürften sie trotzdem, und
  * das Tagesbudget zählt jeder Prozess für sich im Speicher. Zehn Worker wären
  * zehnfaches Tempo und zehnfaches Budget.
+ *
+ * **Dieses Argument gilt PROZESSÜBERGREIFEND und nicht gegen die zwei
+ * Schleifen seit 0082.** Zehn Prozesse sind zehn Client-Instanzen mit zehn
+ * eigenen `letzterRequest`-Feldern und zehn Budgetzählern, die alle denselben
+ * Datenbankstand laden. Die zwei Schleifen teilen sich einen Prozess, diese
+ * eine Sperre und je Anbieter genau eine Instanz — die Drosselung hängt an
+ * der Instanz, nicht an der Schleife. Die Grenze verläuft also nicht bei
+ * „eine Schleife", sondern bei „ein Aufrufer je Client".
  *
  * Vor dem 25.07.2026 hat das Arbeitsfenster diesen Fall zufällig gedeckelt.
  * Seit es entfallen ist, braucht es die Sperre explizit.
@@ -254,8 +276,22 @@ async function workerLaufIntern(
 
   /**
    * Der zweite Quellclient: FoodNotify, ein Client für alle vier Mandanten.
-   * Eigener Takt (anderes Zielsystem), aber dasselbe Tagesbudget aus
-   * derselben Zählung — der eine Worker bleibt die eine Bremse.
+   *
+   * HIER STAND: „Eigener Takt (anderes Zielsystem), aber dasselbe Tagesbudget
+   * aus derselben Zählung — der eine Worker bleibt die eine Bremse." Der Satz
+   * kam am 04.08.2026 herein und beschrieb den Stand VOR dem 02.08.2026: seit
+   * damals hat FoodNotify ein eigenes Tagesbudget (`fnGrenzen().tagesbudget`,
+   * gezählt über `endpunkt LIKE 'fn:%'`). Ein Kommentar, der das Gegenteil
+   * dessen behauptet, was der Code tut — zum dritten Mal in diesem Projekt,
+   * und deshalb steht er hier durchgestrichen statt gelöscht.
+   *
+   * WAS HEUTE GILT: eigener Takt UND eigenes Budget, also zwei Bremsen. Seit
+   * Migration 0082 auch zwei Schleifen. Die eine Bremse ist die INSTANZ: je
+   * Anbieter genau ein Client, und der hat genau einen Aufrufer — `letzterRequest`,
+   * `heuteVerbraucht` und `letzteWartezeitMs` haben damit je einen Schreiber.
+   * Ein zweiter Aufrufer auf derselben Instanz wäre die eine Änderung, die
+   * das Tempo tatsächlich erhöht (beide lesen dasselbe `letzterRequest`,
+   * schlafen gleich lang und feuern gleichzeitig).
    */
   const fnClient = new FnClient()
   await fnClient.budgetLaden()
@@ -273,10 +309,92 @@ async function workerLaufIntern(
   const laufId = String(lauf!.lauf_id)
   log.info('lauf gestartet', { laufId, ausloeser })
 
+  /**
+   * GEMEINSAM: die Zahlen, die den ganzen Lauf beschreiben.
+   *
+   * Beide Schleifen zaehlen hier hinein, und das ist richtig — `sync.lauf`
+   * beschreibt EINEN Lauf, gleich von wie vielen Anbietern er gespeist wurde.
+   * Zerreissen kann dabei nichts: `++` ist im Event-Loop unteilbar, und es
+   * gibt keine Lesen-ueber-`await`-Schreiben-Folge auf diesen Feldern. Wer
+   * hier Mutexe einbaut, loest ein Problem, das es nicht gibt.
+   *
+   * Was NICHT gemeinsam sein darf, steht in `jeAnbieter` darunter. Die Regel
+   * dahinter: geteilt wird, was den LAUF beschreibt; getrennt wird, was eine
+   * ENTSCHEIDUNG ueber einen Anbieter traegt.
+   */
   let ok = 0, keineDaten = 0, fehler = 0, uebersprungen = 0
-  let fehlerInFolge = 0
-  let status: 'ok' | 'teilweise' | 'fehlgeschlagen' | 'abgebrochen' = 'ok'
-  let notiz: string | null = null
+
+  /**
+   * GETRENNT: alles, woraus ein Anbieter eine Entscheidung ableitet.
+   *
+   * `fehlerInFolge` ist der Grund, warum es diese Struktur ueberhaupt gibt.
+   * Der Zaehler wird von JEDEM Erfolg auf null gesetzt, und FoodNotify
+   * quittiert bei 200–500 ms Takt rund 20 bis 60 Posten in der Zeit, die LINA
+   * fuer einen einzigen braucht. Geteilt haetten die FoodNotify-Erfolge LINAs
+   * Fehlerserie fortlaufend weggewischt: ABBRUCH_NACH_FEHLERN — die einzige
+   * Grenze fuer die Fehler, die nicht in den Sperrpfad laufen (Zeitueberlauf,
+   * HTTP 500 mit Rumpf, kein JSON) — haette nie mehr ausgeloest. Eine
+   * Notbremse, die nie ausschlaegt, wird nie hinterfragt; dieselbe Signatur
+   * wie „gruen hiess nichts gefunden, nicht geprueft".
+   *
+   * `reserviert` ist der zweite Zwangsfall: es sind jetzt dauerhaft ZWEI
+   * Posten gleichzeitig reserviert. Ein einzelnes Feld fasst einen davon, und
+   * der andere haenge bis zur Stundengrenze von
+   * `sync.haengende_posten_freigeben()` auf `in_arbeit_seit` — bei einem
+   * Containerstopp je Stopp ein Posten.
+   *
+   * `letztesEnde` misst den Abstand zwischen zwei Posten DESSELBEN Anbieters.
+   * Mit einem geteilten Zeitstempel maessen beide Faecher den gemeinsamen
+   * Ankunftsabstand beider Stroeme (rechnerisch ~1,0 s statt LINAs ~8 s) —
+   * und die Restschaetzung zeigte fuer LINA ein Achtel der Wahrheit. Das ist
+   * derselbe Fehler, den Punkt 5 im Kopfkommentar der Restschaetzung schon
+   * einmal behoben hat, nur ueber einen anderen Mechanismus wieder eingebaut.
+   */
+  type Anbieter = 'lina' | 'fn'
+  const ANBIETER = ['lina', 'fn'] as const
+  const NAME: Record<Anbieter, string> = { lina: 'LINA', fn: 'FoodNotify' }
+
+  type Anbieterstand = {
+    ok: number
+    keineDaten: number
+    fehler: number
+    fehlerInFolge: number
+    status: 'ok' | 'teilweise' | 'fehlgeschlagen' | 'abgebrochen'
+    notiz: string | null
+    reserviert: string | null
+    letztesEnde: number | null
+  }
+  const neuerStand = (): Anbieterstand => ({
+    ok: 0, keineDaten: 0, fehler: 0, fehlerInFolge: 0,
+    status: 'ok', notiz: null, reserviert: null, letztesEnde: null,
+  })
+  const jeAnbieter: Record<Anbieter, Anbieterstand> =
+    { lina: neuerStand(), fn: neuerStand() }
+
+  /**
+   * Fehler beim ZIEHEN des naechsten Postens gehoeren keinem Anbieter.
+   *
+   * `posten_holen` scheitert an der Datenbank, nicht an LINA oder FoodNotify.
+   * Landete das in den getrennten Zaehlern, braeuchte eine Datenbankstoerung
+   * doppelt so viele Fehler bis zum Not-Aus wie vorher — beide Schleifen
+   * drehen dabei in ihrer 5-Sekunden-Warteschleife. Ein eigener, globaler
+   * Zaehler beendet beide.
+   */
+  let dbFehlerInFolge = 0
+
+  /**
+   * Der Grund, aus dem BEIDE Schleifen aussteigen sollen, ohne dass ein
+   * Signal kam. Heute gibt es genau einen: LINAs Zugangssperre.
+   *
+   * `sync.zugangssperre` ist global — `sperre_aktiv()` kennt keine
+   * Anbieterspalte, und `workerLauf()` prueft sie beim Start fuer beide
+   * Anbieter. Liesse man FoodNotify nach LINAs Sperre weiterlaufen, arbeitete
+   * er stundenlang unter einer Sperre, die ihn beim naechsten Start ohnehin
+   * blockiert — der Lauf widerspraeche seiner eigenen Startpruefung. Die
+   * Alternative waere, die Sperre je Anbieter zu fuehren; das ist eine eigene
+   * Entscheidung mit eigener Migration und steht in docs/offene-punkte.md.
+   */
+  let laufAbbruch: string | null = null
 
   /**
    * Sauberes Herunterfahren bei Ctrl-C und beim Containerstopp.
@@ -297,17 +415,37 @@ async function workerLaufIntern(
    * Ein zweites Signal heißt „jetzt sofort" und wird auch so behandelt.
    */
   let abbruchSignal: string | null = null
-  let aktuellerPosten: string | null = null
   let abgeschlossen = false
+
+  /**
+   * Der Ausgang des LAUFS — nicht der einer Schleife.
+   *
+   * Beschrieben wird er erst am Zusammenfuehrpunkt aus `jeAnbieter`, oder im
+   * aeusseren `catch`. Er hier stehenzulassen und von beiden Schleifen
+   * beschreiben zu lassen, waere ein Feld mit zwei Bedeutungen: FoodNotify ist
+   * nach Minuten fertig und liesse `ok` stehen, LINA setzt Stunden spaeter
+   * `abgebrochen` — welcher Wert ueberlebt, haenge dann an der Reihenfolge.
+   */
+  let status: 'ok' | 'teilweise' | 'fehlgeschlagen' | 'abgebrochen' = 'ok'
+  let notiz: string | null = null
 
   const laufFortschreiben = async (endStatus: typeof status, endNotiz: string | null) => {
     if (abgeschlossen) return
     abgeschlossen = true
-    // Den reservierten Posten freigeben, sonst wartet er eine Stunde auf
-    // sync.haengende_posten_freigeben(), obwohl niemand mehr an ihm arbeitet.
-    if (aktuellerPosten) {
-      await query(`UPDATE sync.warteschlange SET in_arbeit_seit = NULL WHERE posten_id = $1`,
-        [aktuellerPosten]).catch(() => {})
+    /**
+     * ALLE Reservierungen freigeben, nicht die eine.
+     *
+     * Es sind zwei Schleifen, also bis zu zwei gleichzeitig reservierte
+     * Posten. Was hier liegen bleibt, wartet eine Stunde auf
+     * `sync.haengende_posten_freigeben()`, obwohl niemand mehr daran
+     * arbeitet — und Docker schickt beim Stoppen SIGTERM und zehn Sekunden
+     * spaeter SIGKILL, das passiert also bei jedem Containerstopp.
+     */
+    const reserviert = ANBIETER.map(a => jeAnbieter[a].reserviert).filter(Boolean)
+    if (reserviert.length > 0) {
+      await query(
+        `UPDATE sync.warteschlange SET in_arbeit_seit = NULL WHERE posten_id = ANY($1)`,
+        [reserviert]).catch(() => {})
     }
     await query(
       `UPDATE sync.lauf
@@ -429,30 +567,64 @@ async function workerLaufIntern(
    * Der erste Posten hat keinen Vorgaenger und bleibt deshalb aussen vor.
    */
   const tempo = { lina: { n: 0, ms: 0 }, fn: { n: 0, ms: 0 } }
-  let letztesEnde: number | null = null
-  const jePosten = (art: 'lina' | 'fn'): number | null =>
+  const jePosten = (art: Anbieter): number | null =>
     tempo[art].n > 0 ? tempo[art].ms / tempo[art].n : null
-  const restschaetzung = (faellig: { lina: number; fn: number }): string | null => {
-    const jeLina = jePosten('lina'), jeFn = jePosten('fn')
-    // Arbeit ohne Messung: keine Zahl. Sie waere sonst die des anderen.
-    if (faellig.lina > 0 && jeLina === null) return null
-    if (faellig.fn > 0 && jeFn === null) return null
-    const nachTempo = faellig.lina * (jeLina ?? 0) + faellig.fn * (jeFn ?? 0)
-    const nachBudget = 86_400_000 * Math.max(
-      faellig.lina / config.TAGESBUDGET,
-      faellig.fn / fnBudget)
-    return dauerLesbar(Math.max(nachTempo, nachBudget))
+  const budgetJe: Record<Anbieter, number> =
+    { lina: config.TAGESBUDGET, fn: fnBudget }
+
+  /**
+   * SUMME WAR RICHTIG, SOLANGE ES EINE SCHLEIFE WAR. Jetzt ist es das Maximum.
+   *
+   * Die alte Formel rechnete `lina * tempoLina + fn * tempoFn` und begruendete
+   * das ausdruecklich damit, dass „sie sich EINE Schleife teilen, also wartet
+   * der eine, solange der andere bremst". Genau diese Praemisse zieht der
+   * Umbau weg: beide Stroeme laufen jetzt in derselben Wandzeit. Die Summe
+   * zaehlte FoodNotifys Zeit ein zweites Mal als angebliche Wartezeit LINAs.
+   *
+   * Auch die Verrechnung mit dem Budget wandert eine Ebene tiefer. Frueher
+   * stand eine Summe ueber Tempo gegen ein Maximum ueber Budget; richtig ist,
+   * je Anbieter das Bindende zu nehmen (Tempo oder Tagesrate) und danach den
+   * langsameren der beiden Anbieter — der bestimmt, wann der Lauf endet.
+   *
+   * Der Fehler war bis zum Umbau meist unsichtbar, weil das Budget dominierte:
+   * 10.500 Aufrufe am Tag sind 8,2 s je LINA-Posten, gemessen waren ~8 s. Er
+   * wird in dem Moment sichtbar, in dem ein Anbieter langsamer laeuft, als
+   * sein Budget erlaubt — und die Ladenakte tut das mit ~12,5 s je Posten.
+   *
+   * „Wer nicht gemessen hat, erbt nichts" gilt unveraendert weiter, nur jetzt
+   * je Anbieter: hat ein Anbieter faellige Arbeit ohne eigene Messung, gibt es
+   * keine Zahl statt einer geliehenen.
+   */
+  const restschaetzung = (faellig: Record<Anbieter, number>): string | null => {
+    let groesste = 0
+    for (const a of ANBIETER) {
+      if (faellig[a] === 0) continue
+      const je = jePosten(a)
+      if (je === null) return null
+      groesste = Math.max(groesste, faellig[a] * je,
+                          86_400_000 * faellig[a] / budgetJe[a])
+    }
+    return groesste > 0 ? dauerLesbar(groesste) : null
   }
 
-  const fortschritt = async (endpunkt: string, von: string, zeilen: number | null, dauerMs?: number) => {
+  /**
+   * `anbieter` steht jetzt als Parameter da statt aus dem Endpunktnamen
+   * abgeleitet zu werden: der Aufrufer WEISS, in welcher Schleife er steckt,
+   * und `endpunkt.startsWith('fn:')` war nur die Nachbildung derselben
+   * Information aus einem Namen.
+   */
+  const fortschritt = async (
+    anbieter: Anbieter, endpunkt: string, von: string,
+    zeilen: number | null, dauerMs?: number,
+  ) => {
     const n = ok + keineDaten + fehler
     const jetzt = Date.now()
-    if (letztesEnde !== null) {
-      const art = endpunkt.startsWith('fn:') ? 'fn' : 'lina'
-      tempo[art].n++
-      tempo[art].ms += jetzt - letztesEnde
+    const stand = jeAnbieter[anbieter]
+    if (stand.letztesEnde !== null) {
+      tempo[anbieter].n++
+      tempo[anbieter].ms += jetzt - stand.letztesEnde
     }
-    letztesEnde = jetzt
+    stand.letztesEnde = jetzt
     if (config.FORTSCHRITT_ALLE === 0 || n % config.FORTSCHRITT_ALLE !== 0) return
     /**
      * `marke_key IS NULL` heisst LINA (Migration 0031) — dieselbe Weiche wie
@@ -465,10 +637,22 @@ async function workerLaufIntern(
          FROM sync.warteschlange WHERE erledigt_am IS NULL`)
       .catch(() => null)
     const faellig = r ? { lina: Number(r.lina), fn: Number(r.fn) } : null
+    /**
+     * `anbieter` und `offenJe` sind neu und nicht Kosmetik: zwei Schleifen
+     * schreiben verschraenkt in dasselbe Log. Ohne die Kennzeichnung ist um
+     * 04:00 nicht mehr zu erkennen, welcher Anbieter wo steht — und ob einer
+     * von beiden ueberhaupt noch arbeitet. Genau das ist der Zustand, den
+     * AGENTS.md Regel 10 sichtbar haben will.
+     *
+     * `imLauf` bleibt die Gesamtzahl beider Schleifen (sie speist die
+     * Kadenz), `imLaufJe` nennt den Anteil dieses Anbieters.
+     */
     log.info('fortschritt', {
-      endpunkt, von, zeilen, dauerMs,
+      anbieter, endpunkt, von, zeilen, dauerMs,
       imLauf: n,
+      imLaufJe: stand.ok + stand.keineDaten + stand.fehler,
       offen: faellig ? faellig.lina + faellig.fn : null,
+      offenJe: faellig ? faellig[anbieter] : null,
       vertagt: r ? Number(r.vertagt) : null,
       rest: faellig && faellig.lina + faellig.fn > 0 ? restschaetzung(faellig) : null,
     })
@@ -493,37 +677,133 @@ async function workerLaufIntern(
     process.on(signal, fn)
   }
 
-  try {
+  /**
+   * EINE SCHLEIFE JE ANBIETER — der ganze Zweck dieses Umbaus.
+   *
+   * Vorher lief hier eine Schleife fuer beide. Weil jeder LINA-Abruf seine
+   * Taktpause von 4–6 s ADDITIV zur Antwortzeit zahlt (`letzterRequest` wird
+   * erst nach der Antwort gestempelt), stand FoodNotify in genau diesen
+   * Pausen still — mit eigenem Takt, eigenem Budget und nichts zu tun.
+   * Gemessen an Lauf 95 (18.08.2026): 10 h 10 LINA plus 2 h 12 FoodNotify
+   * ergaben 12 h 17 Wandzeit. Nebeneinander ist es das Maximum statt der
+   * Summe.
+   *
+   * WAS DAS NICHT IST: eine Lockerung der Drosselung. Jeder Anbieter behaelt
+   * genau eine Client-Instanz, und die hat weiterhin genau einen Aufrufer —
+   * `letzterRequest`, `heuteVerbraucht` und `letzteWartezeitMs` haben also
+   * unveraendert je einen Schreiber. LINA sieht denselben Mindestabstand wie
+   * vorher. Der Anbieterfilter in `sync.posten_holen` (Migration 0082) ist
+   * die Bedingung dafuer und keine Optimierung: ohne ihn zoegen beide
+   * Schleifen aus derselben Schlange, beide Aufrufer haengen an derselben
+   * Instanz, und die Rate verdoppelt sich lautlos.
+   *
+   * WEITER GEHT ES NICHT. Ein zweiter Worker DESSELBEN Anbieters waere eine
+   * echte Ratenerhoehung — zwei Instanzen mit zwei Taktzaehlern und zwei
+   * Budgets, die beide denselben Datenbankstand laden. Fuer FoodNotify
+   * ginge das nur mit einer geteilten Schranke, die den naechsten Slot VOR
+   * dem Request reserviert; fuer LINA gar nicht, weil der Token-Cache der
+   * Ladenakte modulglobal ist und seine 90-Sekunden-Frist ausdruecklich auf
+   * einen Aufrufer gerechnet ist, der die Ordner eines Betriebs am Stueck
+   * abarbeitet. Wer mehr FoodNotify-Durchsatz will, dreht FN_TAKT_MIN_MS —
+   * eine Zahl in der Konfiguration, in einer Zeile zuruecknehmbar, statt
+   * derselben Beschleunigung als Struktur versteckt.
+   */
+  const schleife = async (anbieter: Anbieter): Promise<void> => {
+    const stand = jeAnbieter[anbieter]
+    const eigenerClient = anbieter === 'fn' ? fnClient : client
+
     while (true) {
       if (abbruchSignal) {
-        status = 'abgebrochen'
-        notiz = `durch ${abbruchSignal} beendet`
+        stand.status = 'abgebrochen'
+        stand.notiz = `durch ${abbruchSignal} beendet`
         break
       }
-      if (!client.imFenster()) { notiz = 'Arbeitsfenster beendet'; break }
       /**
-       * Die Budgets sind JE ANBIETER getrennt (seit 02.08.2026), also
-       * bricht der Lauf erst ab, wenn BEIDE erschöpft sind.
-       *
-       * Vorher stand hier `||`: ein aufgebrauchtes FoodNotify-Budget
-       * beendete den Lauf, und LINAs Tagesdaten blieben liegen, obwohl
-       * ihr eigenes Budget unberührt war. Ein Anbieter an seiner Grenze
-       * darf den anderen nicht anhalten.
-       *
-       * Ist nur eines leer, laufen die Posten des anderen weiter — die
-       * Posten des erschöpften werden unten übersprungen und bleiben
-       * offen für den nächsten Lauf.
+       * Der andere Anbieter hat den Lauf beendet (heute nur: LINAs
+       * Zugangssperre). Kein eigener Befund, deshalb kein eigener Status —
+       * die Notiz sagt, woher es kam.
        */
-      if (client.budgetUebrig === 0 && fnClient.budgetUebrig === 0) {
-        notiz = 'Tagesbudget beider Anbieter aufgebraucht'; break
+      if (laufAbbruch) {
+        stand.status = 'abgebrochen'
+        stand.notiz = `beendet, weil ${laufAbbruch}`
+        break
       }
+      /**
+       * Das Arbeitsfenster bleibt EINE Einstellung fuer den ganzen Lauf.
+       *
+       * `imFenster()` haengt zwar am LINA-Client, liest aber nur
+       * FENSTER_VON_STUNDE/FENSTER_BIS_STUNDE aus der Konfiguration — es ist
+       * kein LINA-Zustand, sondern eine globale Uhrzeitfrage, die dort nur
+       * zufaellig wohnt. Deshalb fragen beide Schleifen dieselbe Stelle: das
+       * ist genau das Verhalten von vorher.
+       *
+       * Fachlich waere ein Fenster je Anbieter vertretbar — die Begruendung
+       * („Aufrufe gehen im Tagesverkehr unter") ist ein LINA-Argument, und
+       * FoodNotify ist ein bezahlter REST-Dienst. Das waere aber eine
+       * Verhaltensaenderung, die niemand bestellt hat, und sie faellt heute
+       * nicht auf, weil die Vorgabe 0–24 ist. Steht in docs/offene-punkte.md.
+       */
+      if (!client.imFenster()) {
+        stand.notiz = 'Arbeitsfenster beendet'; break
+      }
+      /**
+       * Die Budgets sind JE ANBIETER getrennt (seit 02.08.2026) — und jetzt
+       * sind es auch die Schleifen. Damit wird aus der frueheren
+       * `&&`-Bedingung („erst abbrechen, wenn BEIDE erschoepft sind", weil
+       * eine Schleife beide bediente) die einfache Frage nach dem eigenen
+       * Topf. Der andere Anbieter laeuft weiter, ohne dass es hier stehen
+       * muesste.
+       *
+       * FOLGE FUER `uebersprungen`: der Zurueckleg-Pfad weiter unten (Posten
+       * gezogen, Budget leer) verliert seine Hauptrolle — wer kein Budget
+       * hat, zieht jetzt gar nichts mehr. Er bleibt als Absicherung fuer das
+       * Rennen zwischen Pruefung und Zug stehen. Wer `aufgaben_uebersprungen`
+       * ueber Laeufe hinweg vergleicht, sieht hier einen Knick ohne Stoerung.
+       */
+      if (eigenerClient.budgetUebrig === 0) {
+        stand.notiz = 'Tagesbudget aufgebraucht'; break
+      }
+      /**
+       * Die Obergrenze gilt fuer den LAUF, nicht je Anbieter — deshalb die
+       * gemeinsamen Zaehler. Zwei Schleifen koennen im selben Augenblick
+       * unter der Grenze liegen und danach je einen Posten verarbeiten: sie
+       * kann um bis zu einen Posten je Anbieter ueberschritten werden. Bei
+       * der Vorgabe 0 (aus) und beim Antesten mit 1 spielt das keine Rolle;
+       * ein Test, der auf Gleichheit prueft, muss es wissen.
+       */
       if (config.MAX_POSTEN_PRO_LAUF > 0 && ok + keineDaten + fehler >= config.MAX_POSTEN_PRO_LAUF) {
-        notiz = 'Postenobergrenze je Lauf erreicht'; break
+        stand.notiz = 'Postenobergrenze je Lauf erreicht'; break
       }
-      if (fehlerInFolge >= config.ABBRUCH_NACH_FEHLERN) {
-        status = 'abgebrochen'
-        notiz = `${fehlerInFolge} Fehler in Folge — Lauf gestoppt, statt weiter gegen LINA zu laufen`
-        log.error('abbruch wegen fehlerhäufung', { fehlerInFolge })
+      /**
+       * JE ANBIETER GEZAEHLT, und das ist keine Feinheit.
+       *
+       * Geteilt war dieser Zaehler nach dem Umbau wirkungslos: jeder Erfolg
+       * setzt ihn auf null, und FoodNotify quittiert 20 bis 60 Posten in der
+       * Zeit, die LINA fuer einen braucht. Eine LINA-Fehlerserie haette
+       * ABBRUCH_NACH_FEHLERN nie erreicht — der Worker liefe stundenlang mit
+       * vollem Takt weiter gegen ein LINA, das nicht mehr antwortet. Mehr
+       * Anfragen gegen ein System im Ausnahmezustand ist die teuerste Sorte
+       * Ratenerhoehung.
+       */
+      if (stand.fehlerInFolge >= config.ABBRUCH_NACH_FEHLERN) {
+        stand.status = 'abgebrochen'
+        stand.notiz = `${stand.fehlerInFolge} Fehler in Folge — abgebrochen, `
+                    + `statt weiter gegen ${NAME[anbieter]} zu laufen`
+        log.error('abbruch wegen fehlerhäufung', {
+          anbieter, fehlerInFolge: stand.fehlerInFolge,
+        })
+        break
+      }
+      /**
+       * Die Datenbank ist weg — das gehoert keinem Anbieter, deshalb der
+       * globale Zaehler. Liefe er je Anbieter, braeuchte eine
+       * Datenbankstoerung doppelt so viele Fehler bis zum Not-Aus, und beide
+       * Schleifen drehten dabei in ihrer Wartezeit.
+       */
+      if (dbFehlerInFolge >= config.ABBRUCH_NACH_FEHLERN) {
+        stand.status = 'abgebrochen'
+        stand.notiz = `${dbFehlerInFolge} Datenbankfehler in Folge — ohne Datenbank `
+                    + `kann der Worker nichts Sinnvolles tun`
         break
       }
 
@@ -537,10 +817,13 @@ async function workerLaufIntern(
        */
       let posten: any
       try {
-        posten = await eine<any>(`SELECT * FROM sync.posten_holen($1)`, [laufId])
+        posten = await eine<any>(`SELECT * FROM sync.posten_holen($1, $2)`, [laufId, anbieter])
+        dbFehlerInFolge = 0
       } catch (e) {
-        fehlerInFolge++
-        log.error('posten_holen fehlgeschlagen', { fehlerInFolge, fehler: String(e).slice(0, 300) })
+        dbFehlerInFolge++
+        log.error('posten_holen fehlgeschlagen', {
+          anbieter, dbFehlerInFolge, fehler: String(e).slice(0, 300),
+        })
         await schlaf(5_000)
         continue
       }
@@ -551,18 +834,50 @@ async function workerLaufIntern(
        * Unterschied nicht sieht, sucht am naechsten Tag nach verlorenen Daten.
        */
       if (!posten?.posten_id) {
+        /**
+         * NACH ANBIETER GEFILTERT, sonst meldet der eine die vertagten Posten
+         * des anderen als seinen Grund. Die FoodNotify-Schlange ist typisch
+         * nach Minuten leer, waehrend LINA noch Stunden laeuft — ohne Filter
+         * stuende in der Notiz „nichts faellig — 1.778 Posten vertagt", und
+         * gemeint waeren fremde. Genau den Unterschied hat der Umbau vom
+         * 03.08.2026 muehsam eingefuehrt.
+         */
         const w = await eine<{ vertagt: number; naechste: Date | null }>(
           `SELECT count(*)::int AS vertagt, min(faellig_ab) AS naechste
              FROM sync.warteschlange
-            WHERE erledigt_am IS NULL AND faellig_ab > now()`).catch(() => null)
+            WHERE erledigt_am IS NULL AND faellig_ab > now()
+              AND marke_key IS ${anbieter === 'fn' ? 'NOT NULL' : 'NULL'}`).catch(() => null)
         const vertagt = w ? Number(w.vertagt) : 0
-        notiz ??= vertagt > 0
+        stand.notiz ??= vertagt > 0
           ? `nichts faellig — ${vertagt} Posten vertagt bis ${w?.naechste?.toISOString() ?? '?'}`
           : 'Schlange leer'
         break
       }
+      /**
+       * Der zweite Guertel hinter dem Anbieterfilter in `posten_holen`.
+       *
+       * Zoege eine Schleife einen fremden Posten, waehlte die Weiche darunter
+       * brav den richtigen Client — es entstuende kein Fehler, nur zwei
+       * Aufrufer auf einer Instanz und damit doppeltes Tempo gegen den einen
+       * LINA-Zugang, ohne eine einzige Meldung. Deshalb wird es hier geprueft,
+       * der Posten zurueckgelegt und laut protokolliert.
+       */
+      const postenAnbieter: Anbieter = posten.marke_key != null ? 'fn' : 'lina'
+      if (postenAnbieter !== anbieter) {
+        await query(
+          `UPDATE sync.warteschlange
+              SET in_arbeit_seit = NULL, versuche = greatest(0, versuche - 1)
+            WHERE posten_id = $1`, [posten.posten_id]).catch(() => {})
+        log.error('posten des falschen anbieters gezogen — zurueckgelegt', {
+          anbieter, postenAnbieter, postenId: String(posten.posten_id),
+          endpunkt: posten.endpunkt,
+          hinweis: 'sync.posten_holen filtert nicht — Migration 0082 fehlt oder wurde ueberschrieben',
+        })
+        await schlaf(1_000)
+        continue
+      }
       // Merken, damit ein Signal die Reservierung wieder lösen kann.
-      aktuellerPosten = String(posten.posten_id)
+      stand.reserviert = String(posten.posten_id)
 
       /**
        * Ab hier ist alles gekapselt. Vorher war nur `laden()` geschützt, und
@@ -652,7 +967,7 @@ async function workerLaufIntern(
                 laufId, betriebEncId: posten.betrieb_enc_id ?? null,
               })
         } catch (e) {
-          fehler++; fehlerInFolge++
+          fehler++; stand.fehler++; stand.fehlerInFolge++
           await query(
             `UPDATE sync.warteschlange
                 SET in_arbeit_seit = NULL, letzter_fehler = $1,
@@ -664,7 +979,7 @@ async function workerLaufIntern(
           continue
         }
 
-        ok++; fehlerInFolge = 0
+        ok++; stand.ok++; stand.fehlerInFolge = 0
         await query(
           // gesperrt_seit raeumt der Erfolg mit ab: ein nachgetragener
           // Anspruch soll die Frist nicht mit sich herumtragen (0075).
@@ -674,14 +989,14 @@ async function workerLaufIntern(
             WHERE posten_id = $1`, [posten.posten_id])
         await protokoll(laufId, epKey, posten, 'ok', res, quellClient, null, zeilen)
         log.debug('geladen', { endpunkt: epKey, von, zeilen, dauerMs: res.dauerMs })
-        await fortschritt(epKey, von, zeilen, res.dauerMs)
+        await fortschritt(anbieter, epKey, von, zeilen, res.dauerMs)
         await standSchreiben(epKey, posten.betrieb_enc_id ?? null, bis, true, null)
         continue
       }
 
       // --- Kein Fehler: der Betrieb hat für diesen Bericht nichts --------
       if (res.art === 'keine_daten') {
-        keineDaten++; fehlerInFolge = 0
+        keineDaten++; stand.keineDaten++; stand.fehlerInFolge = 0
         await query(
           `UPDATE sync.warteschlange
               SET erledigt_am = now(), in_arbeit_seit = NULL, ergebnis = 'keine_daten'
@@ -689,7 +1004,7 @@ async function workerLaufIntern(
         await protokoll(laufId, epKey, posten, 'keine_daten', res, quellClient)
         // Auch hier eine Zeile: eine lange Strecke ohne Daten (geschlossener
         // Betrieb, Zeitraum vor der Eroeffnung) ist sonst wieder Stille.
-        await fortschritt(epKey, von, null, res.dauerMs)
+        await fortschritt(anbieter, epKey, von, null, res.dauerMs)
         // `keine_daten` ist ein gelungener Aufruf, kein Fehler (AGENTS.md).
         // Er schiebt den Stand vor, sonst sieht ein geschlossener Betrieb
         // in `sync.fortschritt` aus wie einer, den wir nicht erreichen.
@@ -771,7 +1086,7 @@ async function workerLaufIntern(
       if (res.art === 'gesperrt' && res.sperrArt === 'http_403' && quelle.art === 'fn') {
         const bisWann = res.wartenBis
           ?? new Date(Date.now() + config.SPERRE_PAUSE_STUNDEN * 3_600_000)
-        const stand = await eine<{ tage: number; quelle_antwortet: boolean }>(
+        const sperrstand = await eine<{ tage: number; quelle_antwortet: boolean }>(
           `UPDATE sync.warteschlange w
               SET in_arbeit_seit = NULL, versuche = greatest(0, versuche - 1),
                   letzter_fehler = $2, faellig_ab = $1::timestamptz,
@@ -786,8 +1101,8 @@ async function workerLaufIntern(
                     AS quelle_antwortet`,
           [bisWann, res.fehler.slice(0, 2000), posten.posten_id])
 
-        const tage = Number(stand?.tage ?? 0)
-        if (tage >= config.SPERRE_AUFGEBEN_TAGE && stand?.quelle_antwortet) {
+        const tage = Number(sperrstand?.tage ?? 0)
+        if (tage >= config.SPERRE_AUFGEBEN_TAGE && sperrstand?.quelle_antwortet) {
           await query(
             `UPDATE sync.warteschlange
                 SET erledigt_am = now(), in_arbeit_seit = NULL, ergebnis = 'kein_zugriff',
@@ -811,12 +1126,12 @@ async function workerLaufIntern(
 
         await protokoll(laufId, epKey, posten, 'uebersprungen', res, quellClient, res.fehler)
         uebersprungen++
-        fehlerInFolge++
+        stand.fehlerInFolge++
         log.warn('foodnotify 403 auf einer ressource — nur dieser posten ruht', {
           marke: quelle.marke, endpunkt: epKey, parameter: posten.parameter,
-          fehlerInFolge, vertagtBis: bisWann, gesperrtSeitTagen: Math.floor(tage),
+          fehlerInFolge: stand.fehlerInFolge, vertagtBis: bisWann, gesperrtSeitTagen: Math.floor(tage),
           schliesstNach: config.SPERRE_AUFGEBEN_TAGE,
-          quelleAntwortet: stand?.quelle_antwortet ?? null,
+          quelleAntwortet: sperrstand?.quelle_antwortet ?? null,
         })
         continue
       }
@@ -825,6 +1140,21 @@ async function workerLaufIntern(
         const stunden = res.sperrArt === 'anmeldung'
           ? config.SPERRE_ANMELDUNG_STUNDEN : config.SPERRE_PAUSE_STUNDEN
         const bisWann = res.wartenBis ?? new Date(Date.now() + stunden * 3_600_000)
+        /**
+         * DIESER UPDATE GILT NUR, SOLANGE ES EINE FoodNotify-SCHLEIFE GIBT.
+         *
+         * Er setzt `in_arbeit_seit = NULL` fuer ALLE offenen Posten der Marke,
+         * nicht nur fuer den eigenen. Bei einer FN-Schleife ist das
+         * unschaedlich: reserviert ist ohnehin nur der Posten in der Hand.
+         * Wer FoodNotify spaeter je Marke aufteilt, stiehlt damit dem
+         * Nachbarn die Reservierung — derselbe Posten wuerde ein zweites Mal
+         * gezogen. Dann muss die Bedingung auf `posten_id` eingeschraenkt
+         * oder `in_arbeit_seit` aus dem SET herausgenommen werden.
+         *
+         * Dem LINA-Worker kann er nichts anhaben: `marke_key = $4` ist fuer
+         * `marke_key IS NULL` nie wahr, und mit `posten_holen` verklemmt er
+         * nicht, weil das dank FOR UPDATE SKIP LOCKED nie wartet.
+         */
         await query(
           `UPDATE sync.warteschlange
               SET in_arbeit_seit = NULL,
@@ -848,7 +1178,7 @@ async function workerLaufIntern(
               SET in_arbeit_seit = NULL, versuche = greatest(0, versuche - 1),
                   letzter_fehler = $1
             WHERE posten_id = $2`, [res.fehler.slice(0, 2000), posten.posten_id])
-        aktuellerPosten = null
+        stand.reserviert = null
         await protokoll(laufId, epKey, posten, 'uebersprungen', res, quellClient, res.fehler)
 
         const bis = await eine<{ bis: Date }>(
@@ -858,9 +1188,27 @@ async function workerLaufIntern(
            res.status, epKey, res.fehler.slice(0, 2000), laufId,
            res.wartenBis ?? null])
 
-        status = 'abgebrochen'
-        notiz = `Zugang gesperrt (${res.sperrArt}) — Pause bis ${bis?.bis?.toISOString() ?? '?'}`
+        /**
+         * DIESE SPERRE BEENDET BEIDE SCHLEIFEN, nicht nur die eigene.
+         *
+         * `sync.zugangssperre` ist global — `sperre_aktiv()` kennt keine
+         * Anbieterspalte, und `workerLauf()` fragt sie beim Start fuer beide
+         * Anbieter ab, BEVOR irgendein Netzkontakt entsteht. Liefe FoodNotify
+         * hier weiter, arbeitete er unter einer Sperre, die ihn beim naechsten
+         * Start ohnehin abweist: der Lauf widerspraeche seiner eigenen
+         * Startpruefung.
+         *
+         * Fachlich sauberer waere eine Sperre je Anbieter — FoodNotifys Daten
+         * sind von LINAs Zugang unberuehrt. Das ist eine eigene Entscheidung
+         * mit eigener Migration und steht in docs/offene-punkte.md; sie hier
+         * nebenbei zu treffen, hiesse die Startpruefung und diesen Zweig
+         * auseinanderlaufen zu lassen.
+         */
+        laufAbbruch = `der ${NAME[anbieter]}-Zugang gesperrt ist (${res.sperrArt})`
+        stand.status = 'abgebrochen'
+        stand.notiz = `Zugang gesperrt (${res.sperrArt}) — Pause bis ${bis?.bis?.toISOString() ?? '?'}`
         log.error('ZUGANG GESPERRT — Lauf wird beendet', {
+          anbieter,
           art: res.sperrArt,
           status: res.status,
           fehler: res.fehler,
@@ -872,7 +1220,7 @@ async function workerLaufIntern(
       }
 
       // --- Fehler -------------------------------------------------------
-      fehler++; fehlerInFolge++
+      fehler++; stand.fehler++; stand.fehlerInFolge++
       const aufgeben = !res.wiederholbar || posten.versuche >= config.MAX_VERSUCHE
       if (aufgeben) {
         uebersprungen++
@@ -910,10 +1258,10 @@ async function workerLaufIntern(
          * ein zweiter Fehler an dieser Stelle würde genau den Abbruch
          * auslösen, den dieser Block verhindern soll.
          */
-        fehler++; fehlerInFolge++
+        fehler++; stand.fehler++; stand.fehlerInFolge++
         log.error('posten abgebrochen', {
-          endpunkt: posten.endpunkt, postenId: posten.posten_id,
-          fehlerInFolge, fehler: String(e).slice(0, 300),
+          anbieter, endpunkt: posten.endpunkt, postenId: posten.posten_id,
+          fehlerInFolge: stand.fehlerInFolge, fehler: String(e).slice(0, 300),
         })
         await query(
           `UPDATE sync.warteschlange
@@ -924,11 +1272,59 @@ async function workerLaufIntern(
         ).catch(() => log.error('konnte den Posten nicht freigeben — greift erst die Stundengrenze',
                                 { postenId: posten.posten_id }))
       } finally {
-        aktuellerPosten = null
+        stand.reserviert = null
       }
     }
+  }
 
+  /**
+   * DER ZUSAMMENFUEHRPUNKT. Alles, was den LAUF abschliesst, gehoert hierhin
+   * und nicht ans Ende einer Schleife.
+   *
+   * `allSettled` und nicht `all`: `all` lehnt beim ersten Fehler ab und liesse
+   * die andere Schleife weiterlaufen, waehrend das `finally` unten `sync.lauf`
+   * schon schliesst — ein Lauf, der fertig aussieht und weiterarbeitet, mit
+   * Zaehlern, die auf einem Zwischenstand einfrieren, waehrend in
+   * `sync.aufgabe` weiter Zeilen mit derselben `lauf_id` einlaufen. Das ist
+   * dieselbe Klasse Fehler wie „ein Start, der nichts tut, steht nur im Log"
+   * (Migration 0081), nur am anderen Ende des Laufs.
+   *
+   * Wirft eine Schleife, wird der Fehler unten aus `ausgang` wieder geworfen —
+   * aber erst, nachdem die andere sauber zu Ende gekommen ist.
+   */
+  const ausgang = await Promise.allSettled(ANBIETER.map(a => schleife(a)))
+
+  try {
+    const geplatzt = ausgang.find(e => e.status === 'rejected')
+    if (geplatzt && geplatzt.status === 'rejected') throw geplatzt.reason
+
+    /**
+     * Ein Lauf, zwei Ausgaenge — der schwerere gewinnt.
+     *
+     * Ohne diese Rangfolge entschiede die Reihenfolge, in der die Schleifen
+     * fertig werden: FoodNotify ist nach Minuten durch und liesse `ok`
+     * stehen, LINA setzt Stunden spaeter `abgebrochen`.
+     */
+    const RANG = { ok: 0, teilweise: 1, abgebrochen: 2, fehlgeschlagen: 3 } as const
+    for (const a of ANBIETER) {
+      const s = jeAnbieter[a]
+      if (s.fehler > 0 && s.status === 'ok') s.status = 'teilweise'
+      if (RANG[s.status] > RANG[status]) status = s.status
+    }
     if (fehler > 0 && status === 'ok') status = 'teilweise'
+
+    /**
+     * BEIDE Notizen, immer und mit Namen davor. Frueher stand hier ein Feld
+     * fuer den ganzen Lauf; nach dem Umbau schriebe der zuerst fertige
+     * Anbieter „Schlange leer" hinein, waehrend der andere noch elf Stunden
+     * arbeitet — die Notiz loege ueber den Lauf, den sie beschreibt. Und wer
+     * gar nichts zu melden hat, wird trotzdem genannt: dass ein Anbieter
+     * ueberhaupt gelaufen ist, ist die Information (AGENTS.md Regel 10).
+     */
+    notiz = ANBIETER
+      .map(a => `${NAME[a]}: ${jeAnbieter[a].notiz ?? 'ohne Befund'} `
+              + `(${jeAnbieter[a].ok + jeAnbieter[a].keineDaten + jeAnbieter[a].fehler} Posten)`)
+      .join(' · ')
   } catch (e) {
     // Ohne diesen Zweig wird ein abgestürzter Lauf als 'ok' verbucht: die
     // Zeile oben wird übersprungen, `status` steht noch auf seinem Anfangswert,
@@ -945,9 +1341,23 @@ async function workerLaufIntern(
     // Derselbe idempotente Pfad wie im Signalfall — wer zuerst kommt, gewinnt,
     // der zweite Aufruf tut nichts.
     await laufFortschreiben(status, notiz)
+    /**
+     * BEIDE Anbieter mit eigenen Zahlen. Vorher stand hier nur LINAs
+     * Budgetverbrauch — nach dem Umbau waere die Haelfte des Laufs in der
+     * Schlusszeile unsichtbar, und ob FoodNotify ueberhaupt gearbeitet hat,
+     * liesse sich daraus nicht ablesen.
+     */
     log.info('lauf beendet', {
       laufId, status, ok, keineDaten, fehler, uebersprungen,
-      budgetVerbraucht: client.budgetVerbraucht, notiz,
+      lina: {
+        ...jeAnbieter.lina, letztesEnde: undefined, reserviert: undefined,
+        budgetVerbraucht: client.budgetVerbraucht,
+      },
+      fn: {
+        ...jeAnbieter.fn, letztesEnde: undefined, reserviert: undefined,
+        budgetVerbraucht: fnClient.budgetVerbraucht,
+      },
+      notiz,
     })
     // Der Pool wird hier BEWUSST nicht geschlossen. Er gehört dem Prozess,
     // nicht diesem Lauf: `pool.end()` an dieser Stelle machte workerLauf zu

@@ -50,6 +50,19 @@ const LOGIN_ZIEL = '/common/index/dologin'
 
 export type MockOptionen = {
   port?: number
+  /**
+   * Kuenstliche Antwortverzoegerung in Millisekunden, fuer JEDEN Datenaufruf.
+   *
+   * Gebraucht seit Migration 0082, um Nebenlaeufigkeit ueberhaupt PRUEFBAR zu
+   * machen. Im Test stehen beide Takte auf 0 ms — ohne Verzoegerung ist die
+   * FoodNotify-Schlange abgearbeitet, bevor LINAs erster Posten zurueck ist,
+   * und ein Lauf mit zwei Schleifen sieht in `sync.aufgabe` genauso aus wie
+   * einer mit einer. Der Test waere gruen, ohne irgendetwas zu zeigen.
+   *
+   * Die Anmeldung bleibt absichtlich schnell: verzoegert wird die ARBEIT,
+   * nicht der Aufbau der Sitzung.
+   */
+  langsamMs?: number
   /** Nach so vielen Aufrufen die Session einmal für ungültig erklären. */
   sessionAblaufNach?: number
   /** Endpunkte, die 500 mit leerem Body liefern (der "keine Daten"-Fall). */
@@ -183,6 +196,10 @@ export function mockStarten(opt: MockOptionen = {}) {
 
       aufrufe++
       if (opt.sessionAblaufNach && aufrufe > opt.sessionAblaufNach) abgelaufen = true
+
+      // Ab hier gilt die kuenstliche Verzoegerung: die Arbeit wird langsam,
+      // die Anmeldung darueber bleibt schnell.
+      if (opt.langsamMs) await Bun.sleep(opt.langsamMs)
 
       // Sperre — der Fall, den man nicht proben kann, ohne ihn zu bauen.
       if (opt.sperreAb && aufrufe >= opt.sperreAb && opt.sperreArt !== 'anmeldung') {

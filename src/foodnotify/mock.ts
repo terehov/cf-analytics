@@ -46,6 +46,21 @@ export function fnMockStarten(opt: FnMockOptionen = {}) {
   const zaehler: Record<string, number> = {}
   const sessions = new Set<string>()
   const verboten = new Set<number>(opt.verboten ?? [])
+  /**
+   * Kuenstliche Antwortverzoegerung, zur Laufzeit umstellbar.
+   *
+   * Dieselbe Bauart und derselbe Grund wie `verbieten()` weiter unten:
+   * `config` friert `FN_BASE_URL` beim ersten Import ein, es gibt in der
+   * ganzen Testdatei also genau EINE FoodNotify-Attrappe — eine Option im
+   * Konstruktor kaeme fuer spaetere Suiten zu spaet.
+   *
+   * Gebraucht seit Migration 0082: im Test stehen beide Takte auf 0 ms, und
+   * ohne Verzoegerung ist eine der beiden Schlangen abgearbeitet, bevor die
+   * andere ihre erste Antwort hat. Ein Lauf mit zwei Schleifen saehe in
+   * `sync.aufgabe` dann genauso aus wie einer mit einer — der Test waere
+   * gruen, ohne irgendetwas zu zeigen.
+   */
+  let langsamMs = 0
 
   const json = (body: unknown, init: ResponseInit = {}) =>
     new Response(JSON.stringify(body), {
@@ -58,6 +73,7 @@ export function fnMockStarten(opt: FnMockOptionen = {}) {
       const url = new URL(req.url)
       const pfad = url.pathname
       zaehler[pfad] = (zaehler[pfad] ?? 0) + 1
+      if (langsamMs) await Bun.sleep(langsamMs)
 
       if (pfad === '/api/user/auth/signin_check' && req.method === 'POST') {
         anmeldungen++
@@ -383,6 +399,8 @@ export function fnMockStarten(opt: FnMockOptionen = {}) {
      */
     verbieten: (erpId: number) => { verboten.add(erpId) },
     freigeben: (erpId: number) => { verboten.delete(erpId) },
+    /** Antworten kuenstlich verzoegern (0 = aus). Begruendung oben bei `langsamMs`. */
+    langsam: (ms: number) => { langsamMs = ms },
     stop: () => server.stop(true),
   }
 }

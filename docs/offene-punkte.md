@@ -1232,3 +1232,85 @@ SELECT count(*) FILTER (WHERE fehlt_om)        AS ohne_om,
 heißt das nicht mehr „grün", sondern „unvollständig" — was es ist. Der Weg dafür
 ist eine Zeile in `pflege/om_einschaetzung.csv`, committet und gepusht; die
 Datei liegt mit den 22 Juni-Noten bereits im Repo.
+
+---
+
+## Nach dem Umbau auf zwei Importschleifen (19.08.2026)
+
+Alle vier bewusst offen gelassen — sie gehören nicht in dieselbe Änderung.
+
+### 1. `la:belegzahl` ist jetzt der kritische Pfad — 6 h 51 von 10 h 10
+
+**Das ist der Punkt mit dem größten Hebel, und der Umbau auf zwei Schleifen
+rührt ihn nicht an.** Gemessen an Lauf 95 (18.08.2026): die LINA-Schleife
+braucht 10 h 10, davon `la:belegzahl` allein 6 h 51 — 1.974 Posten
+(141 Betriebe × 14 FiBu-Ordner) zu je ~12,5 s, **jede Nacht neu**. Der Rest
+ist Historie (2 h 57, endlich — sie läuft von selbst leer) und Tagesdaten
+(22 min).
+
+Der Kreuzprodukt-Takt ist seit dem 13.08.2026 richtig gebaut: die Messung ist
+der Torwächter, keine eingefrorene Liste (`belegzaehlungEinreihen()`). Was
+offen ist, ist die **Frequenz**: 1.974 Zählungen je Nacht förderten in Lauf 95
+rund 30 Abweichungen zutage.
+
+Naheliegend: die Betriebe über die Woche verteilen — ~20 je Nacht, 282 Posten,
+knapp 1 h statt 6 h 51. Das lässt die Entscheidung vom 13.08. unangetastet
+(die Messung bleibt der Torwächter, nur die Kadenz ändert sich) und kostet:
+ein fehlender Beleg fällt bis zu sieben Tage später auf. **Das ist eine
+fachliche Abwägung und keine technische** — jemand muss sagen, ob eine Woche
+Verzug tragbar ist.
+
+Rechnung für den ganzen Lauf, wenn beides zusammenkommt:
+
+| Stand | LINA | FoodNotify | Lauf |
+|---|---|---|---|
+| vor dem Umbau | 10 h 10 | 2 h 12 | **12 h 17** (Summe) |
+| nach dem Umbau | 10 h 10 | 2 h 12 | **~10 h 10** (Maximum) |
+| + Belegzahl wöchentlich | ~4 h 18 | 2 h 12 | **~4 h 18** |
+| + Historie ausgelaufen | ~1 h 21 | 2 h 12 | **~2 h 12** (dann ist FoodNotify der Pfad) |
+
+### 2. `partition_anlegen` gehört vor die Ladetransaktion
+
+`0083` behebt den **Abbruch** bei zwei gleichzeitigen Anrufern, nicht den
+**Stau**: `CREATE TABLE ... PARTITION OF` hält eine `AccessExclusiveLock` auf
+die Elterntabelle bis zum COMMIT, und solange wartet die andere Schleife mit
+ihren INSERTs in `raw.api_antwort`. Einmal im Monat, Dauer einer
+Ladetransaktion. Der gründliche Weg ist ein Aufruf **außerhalb** der
+Transaktion (autocommit ⇒ die Sperre fällt sofort), einmal je Lauf oder bei
+Datumswechsel, und die drei Aufrufe in `sync/laden.ts`, `ladenakte/laden.ts`
+und `foodnotify/laden.ts` fallen weg. Eigene Änderung, eigenes Risiko.
+
+### 3. Zugangssperre und Arbeitsfenster gelten weiter für beide Anbieter
+
+`sync.zugangssperre` kennt keine Anbieterspalte, und `sperre_aktiv()` wird beim
+Start für beide geprüft. Eine LINA-Sperre beendet deshalb auch die
+FoodNotify-Schleife — konsistent mit der Startprüfung, aber fachlich zu grob:
+FoodNotifys Daten sind von LINAs Zugang unberührt. Dasselbe beim Arbeitsfenster
+(`FENSTER_VON_STUNDE`/`_BIS_STUNDE`): die Begründung („Aufrufe gehen im
+Tagesverkehr unter") ist ein LINA-Argument, FoodNotify ist ein bezahlter
+REST-Dienst. Beides je Anbieter zu führen kostet eine Migration
+(`sperre_aktiv(anbieter)`) und eine bewusste Entscheidung. Fällt heute nicht
+auf, weil das Fenster auf 0–24 steht.
+
+### 4. Zahlen, die nach dem ersten echten Lauf nachzumessen sind
+
+* **Die LINA-Abstandsverteilung.** Muss weiter bei ≥ 4.000 ms liegen. Rutscht
+  das Minimum darunter, hängen zwei Aufrufer an einer Client-Instanz — dann
+  greift der Anbieterfilter nicht.
+* **Das LINA-Tagesvolumen** (`count(*) FROM sync.aufgabe WHERE endpunkt NOT
+  LIKE 'fn:%'` je Tag, vorher gegen nachher). Bei 8,2 s je Posten sind
+  86.400 s ⁄ 8,2 s ≈ **10.550 Aufrufe am Tag** — `TAGESBUDGET` steht auf
+  10.500. Bei einem Lauf von ~10 h werden davon nur rund 4.400 gebraucht, das
+  Budget bindet also nicht. Es wäre erst dann die tatsächliche Grenze, wenn
+  die LINA-Schleife rund um die Uhr Arbeit hätte. Bisher war es unerreichbar,
+  jetzt ist es in Sichtweite.
+* **`aufgaben_uebersprungen`** hat still die Bedeutung gewechselt: der
+  Budget-Zurücklegepfad ist für den Normalfall tot, weil eine Schleife ohne
+  Budget gar nichts mehr zieht. Wer die Kennzahl über Läufe hinweg vergleicht,
+  sieht einen Knick ohne Störung.
+* **`SHOW timezone` auf der Produktionsdatenbank.** `budgetTagWechseln()`
+  rechnet nach UTC, `budgetLaden()` nach `date_trunc('day', now())` in der
+  Sitzungszeitzone. Lokal stimmen beide überein (UTC). Steht die Produktion
+  auf `Europe/Berlin`, laufen Speicher- und Datenbankzähler ein bis zwei
+  Stunden auseinander, und ein Lauf über Mitternacht bekommt sein Budget zu
+  früh oder zu spät zurück. Besteht unabhängig vom Umbau.

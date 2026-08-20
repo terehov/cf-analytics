@@ -26,7 +26,26 @@ pg.types.setTypeParser(1082, (v: string) => v)
 
 export const pool = new pg.Pool({
   connectionString: config.DATABASE_URL,
-  max: 4,
+  /**
+   * 4 war die Zahl für EINE Importschleife. Seit Migration 0082 laufen zwei
+   * nebeneinander (LINA und FoodNotify), und jede hält beim Laden dauerhaft
+   * eine Verbindung für ihre Transaktion, während daneben je Posten rund fünf
+   * kurze Abfragen laufen: `posten_holen`, das Quittierungs-`UPDATE`,
+   * `protokoll()`, `standSchreiben()` und die Fortschrittszählung.
+   *
+   * WARUM DAS BEI 4 NICHT LAUT SCHEITERT, sondern leise: Enge äußert sich als
+   * `connectionTimeoutMillis`-Abbruch nach 10 s — und „timeout exceeded when
+   * trying to connect" zählt `istTransient()` weiter unten als wiederholbar.
+   * Der Lauf wiederholt also dreimal und kommt durch. Sichtbar wäre nur ein
+   * Lauf, der ohne erkennbaren Grund langsamer wird, mit ein paar
+   * Warnzeilen — genau die Sorte Symptom, die man wochenlang falsch liest.
+   *
+   * 8 statt 6: zwei Transaktionsverbindungen plus zwei Abfrageströme sind
+   * vier, und der doppelte Wert lässt Platz für die Nachläufe, die nach dem
+   * Import auf demselben Pool arbeiten. Die Laufsperre zählt NICHT mit — sie
+   * hat bewusst eine eigene `pg.Client`-Verbindung (siehe `sperreHolen()`).
+   */
+  max: 8,
   // Der Importer arbeitet lange und langsam; Verbindungen sollen nicht
   // mitten in einem Lauf wegsterben.
   idleTimeoutMillis: 60_000,
