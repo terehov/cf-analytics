@@ -1754,7 +1754,7 @@ Altquelle stellte sich heraus, dass sie die fraglichen Tage selbst markiert, im
 Feld `hinweis` — und dass vier Zeilen dort *keine* landesweiten Feiertage sind:
 BW Reformationstag, BY Buß- und Bettag, SN und TH Fronleichnam (je 2018 und
 2019, zusammen 76 Betriebstage). Eugene hat am 20.08.2026 entschieden, auf eine
-Quelle zu gehen; `0088` löscht die 231 Zeilen von `feiertage-api.de`.
+Quelle zu gehen; `0089` löscht die 231 Zeilen von `feiertage-api.de`.
 
 **2018 und 2019 haben damit keine Feiertage mehr.** Für `mart.kalendereffekt`
 folgenlos — `mart.kalender_zeitraum` beginnt rollierend erst 2023 —, für

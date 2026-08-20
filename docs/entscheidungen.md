@@ -934,10 +934,10 @@ heißen nach derselben Stadt, und „Alter Kranen GmbH" trägt gar keinen Ort im
 
 Feiertage stammten bis zum 20.08.2026 aus **zwei** Quellen: `openholidaysapi.org` reicht bei
 den gesetzlichen Feiertagen nicht vor 2020 zurück, unsere Umsatzhistorie beginnt 2018, und für
-2018/2019 kamen sie deshalb von `feiertage-api.de`. **Diese zweite Quelle ist mit `0088`
+2018/2019 kamen sie deshalb von `feiertage-api.de`. **Diese zweite Quelle ist mit `0089`
 entfallen** — sie führte vier nicht landesweite Tage als Feiertage (BW Reformationstag, BY
 Buß- und Bettag, SN und TH Fronleichnam) und schrieb vier weitere anders. Der Preis steht in
-`0088` und ist bewusst bezahlt: **2018 und 2019 haben keine Feiertage.** Ab wann ein Land
+`0089` und ist bewusst bezahlt: **2018 und 2019 haben keine Feiertage.** Ab wann ein Land
 Termine hat, sagt `mart.kalender_abdeckung`; `mart.kalender_zeitraum` (0085) beginnt ohnehin
 rollierend erst drei volle Jahre vor heute.
 
@@ -2025,7 +2025,7 @@ Bundesland. Genau das wäre hier falsch gewesen.
 „Neujahrstag" — die Spur zweier Quellen (`feiertage-api.de` und
 `openholidaysapi.org`). Der Primärschlüssel enthält den Namen. Eine eigene
 Berechnung hätte also entweder Dubletten erzeugt oder Namen überschrieben, die
-seit 2018 in Auswertungen stecken. Seit `0088` ist nur noch eine Quelle drin,
+seit 2018 in Auswertungen stecken. Seit `0089` ist nur noch eine Quelle drin,
 und damit ein Namensschema; `manual.feiertag_alias` (0084) bleibt als Puffer für
 den Fall, dass die Quelle selbst umbenennt.
 

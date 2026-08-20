@@ -1,5 +1,5 @@
 -- =====================================================================
--- 0088 Eine Quelle fuer die Feiertage — und alle sechzehn Laender
+-- 0089 Eine Quelle fuer die Feiertage — und alle sechzehn Laender
 --
 -- ANLASS (20.08.2026). manual.feiertag trug zwei Quellen: 2018 und 2019
 -- von feiertage-api.de, ab 2020 von openholidaysapi.org. 0051 hat das so
@@ -65,7 +65,7 @@ DELETE FROM manual.feiertag WHERE quelle = 'feiertage-api.de';
 
 COMMENT ON TABLE manual.feiertag IS
 'Gesetzliche Feiertage je Bundesland, ab 2020, ausschliesslich aus openholidaysapi.org. '
-'2018 und 2019 lagen bis zum 20.08.2026 aus feiertage-api.de darin und sind mit 0088 '
+'2018 und 2019 lagen bis zum 20.08.2026 aus feiertage-api.de darin und sind mit 0089 '
 'entfallen (siehe Migration): die Quelle fuehrte vier nicht landesweite Tage als '
 'Feiertage und schrieb vier weitere anders. VOR 2020 STEHT HIER NICHTS — das ist eine '
 'Luecke, keine Aussage. Wer bis 2018 auswertet, liest mart.kalender_abdeckung dazu. '
@@ -172,7 +172,7 @@ COMMENT ON COLUMN mart.kalender_abdeckung.feiertagsjahre_ohne_zeile IS
 
 
 INSERT INTO sync.merker (schluessel, wert) VALUES
-    ('migration_0088', to_jsonb(
+    ('migration_0089', to_jsonb(
         'Feiertage kommen nur noch aus openholidaysapi.org; die 231 Zeilen von '
         'feiertage-api.de (2018/2019) sind geloescht. Grund: vier nicht landesweite '
         'Tage als Feiertage gefuehrt (BW Reformationstag, BY Buss- und Bettag, SN '
