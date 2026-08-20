@@ -217,7 +217,7 @@ sync.ts / einreihen.ts Einstiegspunkte
 ```bash
 bun install
 bun run migrate                              # Schema anwenden (idempotent)
-bun test                                     # nachgemessen am 14.08.2026: 719 pass, 194 skip, 0 fail ohne TEST_DATABASE_URL
+bun test                                     # nachgemessen am 20.08.2026: 736 pass, 207 skip, 0 fail ohne TEST_DATABASE_URL
 bun run sync                                 # nachfüllen UND abarbeiten
 # Die vier Schalter braucht seit dem 14.08.2026 NIEMAND mehr — jeder hat eine
 # Entsprechung im naechtlichen Lauf. Sie bleiben als Entscheidung ueber einen

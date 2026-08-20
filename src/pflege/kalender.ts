@@ -14,6 +14,23 @@
  * braucht keinen Schlüssel und keine Anmeldung, und stellt die Jahre weit im
  * Voraus bereit (am 14.08.2026 nachgesehen: 2029 vollständig).
  *
+ * WARUM JAHR FÜR JAHR UND NICHT IN EINEM ZUG — nachgetragen am 20.08.2026.
+ * Die erste Fassung holte die ganze Reichweite mit einem Aufruf je Land und
+ * Endpunkt: `validFrom=2026-01-01&validTo=2029-12-31`. Die Schnittstelle
+ * beantwortet das nicht, sie weist es ab:
+ *
+ *     HTTP 400 — "The maximum date range is 1095 days."
+ *
+ * Bei `KALENDER_VORLAUF_JAHRE=3` sind es 1460 Tage. Damit scheiterten **alle
+ * zwanzig** Aufrufe jeder Nacht, seit `0079` läuft; geschrieben wurde nie eine
+ * Zeile. Aufgefallen ist es nicht, weil der Bestand noch bis Ende 2027 reicht
+ * und `mart.pflege_stand` deshalb `ok` sagt — die Prüfzeile hätte erst im
+ * Februar 2027 angeschlagen.
+ *
+ * Die Spanne auf zwei Jahre zu kürzen träfe die Grenze auf den Tag genau
+ * (1095) und fiele beim nächsten Schaltjahr wieder um. Deshalb eine Anfrage je
+ * Kalenderjahr: höchstens 366 Tage, unabhängig vom eingestellten Vorlauf.
+ *
  * WAS NICHT ÜBERSCHRIEBEN WIRD. Die vorhandenen Zeilen tragen zwei
  * Schreibweisen desselben Tages („1. Weihnachtsfeiertag" gegen „1.
  * Weihnachtstag", „Neujahr" gegen „Neujahrstag") — die Spur der zwei Quellen.
@@ -32,6 +49,39 @@ import { log } from '../lib/log'
 
 const BASIS = 'https://openholidaysapi.org'
 
+/**
+ * Die Obergrenze der Schnittstelle für EINE Anfrage, in Tagen. Gemessen am
+ * 20.08.2026 gegen `PublicHolidays` und `SchoolHolidays`: 1095 Tage gehen
+ * durch, 1096 werden mit HTTP 400 abgewiesen. Die Zahl steht hier, damit der
+ * Test sie prüfen kann — nicht, weil irgendwo bis an sie herangegangen wird.
+ */
+export const MAX_SPANNE_TAGE = 1095
+
+export type Spanne = { jahr: number; von: string; bis: string }
+
+/**
+ * Ein Kalenderjahr je Anfrage, vom laufenden Jahr bis `vorlauf` Jahre voraus.
+ *
+ * Ganze Jahre und nicht „ab heute", weil die Schulferien eines Jahres als
+ * Zeitraum kommen: wer am 20.08. bei `validFrom` einsteigt, verliert die
+ * Sommerferien, die im Juli begonnen haben — und mit ihnen jede Angabe für
+ * die Tage davor.
+ */
+export function spannen(vorlauf: number, heute = new Date()): Spanne[] {
+  const jahr = heute.getUTCFullYear()
+  const raus: Spanne[] = []
+  for (let j = jahr; j <= jahr + vorlauf; j++) {
+    raus.push({ jahr: j, von: `${j}-01-01`, bis: `${j}-12-31` })
+  }
+  return raus
+}
+
+/** Die Adresse eines Abrufs. Ausgelagert, damit der Test sie sehen kann. */
+export function abrufUrl(pfad: string, land: string, von: string, bis: string): string {
+  return `${BASIS}/${pfad}?countryIsoCode=DE&languageIsoCode=DE`
+       + `&validFrom=${von}&validTo=${bis}&subdivisionCode=DE-${land}`
+}
+
 type Eintrag = {
   startDate: string
   endDate: string
@@ -41,21 +91,76 @@ type Eintrag = {
 /**
  * Ein Aufruf gegen die offene Schnittstelle.
  *
- * KEIN RETRY UND KEIN EIGENES TEMPO. Es sind zwei Aufrufe je Bundesland und
- * Jahr, einmal im Monat — bei zehn Ländern und drei Jahren sind das 60. Wer
- * dafür eine Drosselung baut, baut sie für nichts. Ein Fehlschlag wird
+ * KEIN RETRY UND KEIN EIGENES TEMPO. Es sind zwei Aufrufe je Bundesland, Jahr
+ * und Endpunkt, einmal im Monat — bei zehn Ländern und vier Jahren sind das
+ * 80. Wer dafür eine Drosselung baut, baut sie für nichts. Ein Fehlschlag wird
  * geworfen; der Aufrufer sammelt ihn ein und der nächste Lauf versucht es
  * erneut.
  */
-async function holen(pfad: string, land: string, von: string, bis: string): Promise<Eintrag[]> {
-  const url = `${BASIS}/${pfad}?countryIsoCode=DE&languageIsoCode=DE`
-            + `&validFrom=${von}&validTo=${bis}&subdivisionCode=DE-${land}`
-  const r = await fetch(url, {
+async function holen(pfad: string, land: string, s: Spanne): Promise<Eintrag[]> {
+  const r = await fetch(abrufUrl(pfad, land, s.von, s.bis), {
     headers: { accept: 'application/json' },
     signal: AbortSignal.timeout(config.ANFRAGE_TIMEOUT_MS),
   })
-  if (!r.ok) throw new Error(`${pfad} ${land}: HTTP ${r.status}`)
+  if (!r.ok) throw new Error(`HTTP ${r.status}`)
   return await r.json() as Eintrag[]
+}
+
+type Abruf = { eintraege: Eintrag[]; fehler: string | null }
+
+/**
+ * Alle Jahre eines Endpunkts für ein Land.
+ *
+ * EIN GESCHEITERTES JAHR HÄLT DIE ANDEREN NICHT AUF. Das ist kein Luxus: die
+ * Länder veröffentlichen ihre Ferientermine unterschiedlich weit voraus, und
+ * ein Land, dessen letztes Jahr noch fehlt, würde sonst nie eines seiner
+ * früheren Jahre nachziehen.
+ *
+ * DIE FEHLER WERDEN ZU EINER MELDUNG ZUSAMMENGEZOGEN, weil der Aufrufer sie
+ * zählt: `nachlauf.ts` setzt den Merker nur, wenn höchstens eine Meldung
+ * ansteht. Drei Zeilen für ein einziges hakendes Land würden diese Schwelle
+ * bedeutungslos machen.
+ */
+async function jahrweise(pfad: string, land: string, sp: Spanne[]): Promise<Abruf> {
+  const eintraege: Eintrag[] = []
+  const gescheitert: string[] = []
+  for (const s of sp) {
+    try {
+      eintraege.push(...await holen(pfad, land, s))
+    } catch (e) {
+      gescheitert.push(`${s.jahr}: ${String((e as Error).message ?? e).slice(0, 60)}`)
+    }
+  }
+  return {
+    eintraege,
+    fehler: gescheitert.length === 0 ? null
+      : `${pfad} ${land} — ${gescheitert.join('; ')}`.slice(0, 200),
+  }
+}
+
+/**
+ * Dieselbe Zeile nur einmal — je Schlüssel gewinnt die erste.
+ *
+ * DER GRUND STEHT IM JAHRESWECHSEL. Die Schnittstelle liefert jeden Zeitraum,
+ * der die angefragte Spanne BERÜHRT, ungekürzt zurück. Die Weihnachtsferien
+ * vom 23.12.2027 bis 08.01.2028 kommen deshalb zweimal: einmal aus der Scheibe
+ * 2027, einmal aus der von 2028. Beide Male identisch (am 20.08.2026 für alle
+ * zehn Länder nachgesehen) — nur nimmt Postgres das nicht hin:
+ *
+ *     ON CONFLICT DO UPDATE command cannot affect row a second time
+ *
+ * Und es scheitert nicht die Zeile, sondern die ganze Anweisung. Ohne diesen
+ * Schritt schreibt der Nachzug die Feiertage und bei den Ferien NICHTS.
+ *
+ * Einzeltage brauchen das nicht: ein Datum liegt in genau einer Scheibe.
+ */
+export function einmalig<T>(zeilen: T[], schluessel: (z: T) => string): T[] {
+  const m = new Map<string, T>()
+  for (const z of zeilen) {
+    const s = schluessel(z)
+    if (!m.has(s)) m.set(s, z)
+  }
+  return [...m.values()]
 }
 
 /** Der deutsche Name. Ohne ihn ist der Eintrag für uns wertlos. */
@@ -87,43 +192,53 @@ export async function kalenderNachziehen(): Promise<Kalenderstand> {
     return stand
   }
 
-  const jahr = new Date().getFullYear()
-  const von = `${jahr}-01-01`
-  const bis = `${jahr + config.KALENDER_VORLAUF_JAHRE}-12-31`
+  const sp = spannen(config.KALENDER_VORLAUF_JAHRE)
 
   for (const { kuerzel } of laender) {
-    try {
-      const f = await holen('PublicHolidays', kuerzel, von, bis)
-      const zeilen = f.map(e => ({ d: e.startDate, n: name(e) })).filter(z => z.n)
-      if (zeilen.length) {
+    const f = await jahrweise('PublicHolidays', kuerzel, sp)
+    if (f.fehler) stand.fehler.push(f.fehler)
+    const feiertage = f.eintraege.map(e => ({ d: e.startDate, n: name(e) })).filter(z => z.n)
+    if (feiertage.length) {
+      try {
         const r = await query(
           `INSERT INTO manual.feiertag (kuerzel, datum, name, quelle)
            SELECT $1, d::date, n, 'openholidaysapi.org'
              FROM unnest($2::text[], $3::text[]) AS x(d, n)
            ON CONFLICT (kuerzel, datum, name) DO NOTHING
            RETURNING datum`,
-          [kuerzel, zeilen.map(z => z.d), zeilen.map(z => z.n)])
+          [kuerzel, feiertage.map(z => z.d), feiertage.map(z => z.n)])
         stand.feiertage += r.length
+      } catch (e) {
+        stand.fehler.push(`Feiertage ${kuerzel} schreiben: ${String((e as Error).message ?? e).slice(0, 120)}`)
       }
-    } catch (e) {
-      stand.fehler.push(`Feiertage ${kuerzel}: ${String((e as Error).message ?? e).slice(0, 120)}`)
     }
 
-    try {
-      const s = await holen('SchoolHolidays', kuerzel, von, bis)
-      const zeilen = s.map(e => ({ v: e.startDate, b: e.endDate, n: name(e) })).filter(z => z.n)
-      if (zeilen.length) {
+    const s = await jahrweise('SchoolHolidays', kuerzel, sp)
+    if (s.fehler) stand.fehler.push(s.fehler)
+    const ferien = einmalig(
+      s.eintraege.map(e => ({ v: e.startDate, b: e.endDate, n: name(e) })).filter(z => z.n)
+        // Der längste Zeitraum zuerst: sollte eine Scheibe einen Zeitraum doch
+        // einmal beschneiden, gewinnt der ungekürzte.
+        .sort((a, b) => b.b.localeCompare(a.b)),
+      z => `${z.v}|${z.n}`)
+    if (ferien.length) {
+      try {
         const r = await query(
           `INSERT INTO manual.schulferien (kuerzel, von, bis, name, quelle)
            SELECT $1, v::date, b::date, n, 'openholidaysapi.org'
              FROM unnest($2::text[], $3::text[], $4::text[]) AS x(v, b, n)
            ON CONFLICT (kuerzel, von, name) DO UPDATE SET bis = excluded.bis
+             -- Nur schreiben, was sich WIRKLICH aendert. Ohne diese Zeile
+             -- meldet der Lauf jeden Monat dieselben 245 Ferienzeitraeume als
+             -- Arbeit, und ein Blick ins Log kann Bewegung nicht von Stillstand
+             -- unterscheiden.
+             WHERE manual.schulferien.bis IS DISTINCT FROM excluded.bis
            RETURNING von`,
-          [kuerzel, zeilen.map(z => z.v), zeilen.map(z => z.b), zeilen.map(z => z.n)])
+          [kuerzel, ferien.map(z => z.v), ferien.map(z => z.b), ferien.map(z => z.n)])
         stand.ferien += r.length
+      } catch (e) {
+        stand.fehler.push(`Schulferien ${kuerzel} schreiben: ${String((e as Error).message ?? e).slice(0, 120)}`)
       }
-    } catch (e) {
-      stand.fehler.push(`Schulferien ${kuerzel}: ${String((e as Error).message ?? e).slice(0, 120)}`)
     }
   }
 

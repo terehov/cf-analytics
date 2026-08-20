@@ -52,9 +52,20 @@ export async function pflegeNachlauf(): Promise<void> {
          VALUES ('kalender_nachgezogen', jsonb_build_object('am', now()))
          ON CONFLICT (schluessel) DO UPDATE SET wert = excluded.wert, gesetzt_am = now()`)
     }
-    log.info('kalender nachgezogen', {
-      feiertage: k.feiertage, ferien: k.ferien, fehler: k.fehler,
-    })
+    /*
+     * FEHLER GEHEN ALS FEHLER RAUS. Bis zum 20.08.2026 stand hier ein
+     * `log.info('kalender nachgezogen', { … fehler: [20 Eintraege] })` — und
+     * genau so las es sich auch: wie ein geglueckter Lauf. Dass keine einzige
+     * Zeile geschrieben wurde, weil die Schnittstelle jede Anfrage mit HTTP
+     * 400 abwies, stand in einem Feld, auf das niemand sieht.
+     */
+    if (k.fehler.length > 0) {
+      log.error('kalender nur teilweise nachgezogen', {
+        feiertage: k.feiertage, ferien: k.ferien, fehler: k.fehler,
+      })
+    } else {
+      log.info('kalender nachgezogen', { feiertage: k.feiertage, ferien: k.ferien })
+    }
   } catch (e) {
     log.error('kalender nicht nachgezogen — der Lauf geht weiter',
       { fehler: String(e).slice(0, 300) })

@@ -387,6 +387,12 @@ const Schema = z.object({
    * veröffentlichen (am 14.08.2026 nachgesehen: 2029 vollständig) — und weil
    * ein Vorlauf, der kürzer ist als die Zeit zwischen zwei Blicken auf diese
    * Tabelle, keiner ist.
+   *
+   * DER WERT GEHT NICHT IN EINE ANFRAGE. Die Schnittstelle beantwortet
+   * höchstens 1095 Tage am Stück; an dieser Grenze ist der Nachzug vom 14. bis
+   * zum 20.08.2026 jede Nacht gescheitert. `spannen()` in `pflege/kalender.ts`
+   * zerlegt den Vorlauf seither in Kalenderjahre — jeder Wert bis 10 ist
+   * dadurch wieder gefahrlos.
    */
   KALENDER_VORLAUF_JAHRE: z.coerce.number().int().min(1).max(10).default(3),
 
