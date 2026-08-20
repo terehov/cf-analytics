@@ -28,62 +28,85 @@ beforeAll(async () => {
 const tage = (von: string, bis: string) =>
   (Date.parse(bis) - Date.parse(von)) / 86_400_000
 
-describe('spannen', () => {
-  const heute = new Date('2026-08-20T12:00:00Z')
-
-  test('vom laufenden Jahr bis zum Vorlauf, ganze Jahre', () => {
-    expect(k.spannen(3, heute)).toEqual([
-      { jahr: 2026, von: '2026-01-01', bis: '2026-12-31' },
-      { jahr: 2027, von: '2027-01-01', bis: '2027-12-31' },
-      { jahr: 2028, von: '2028-01-01', bis: '2028-12-31' },
-      { jahr: 2029, von: '2029-01-01', bis: '2029-12-31' },
-    ])
+describe('abrufplan', () => {
+  const LAENDER = ['BW', 'BY']
+  const plan = (o: Partial<Parameters<typeof k.abrufplan>[0]> = {}) => k.abrufplan({
+    laender: LAENDER, vorhanden: new Set<string>(), boden: 2020,
+    jahr: 2026, vorlauf: 3, hoechstens: 1000, ...o,
   })
 
-  /**
-   * Das laufende Jahr beginnt am 1. Januar und nicht heute. Sonst fielen im
-   * August die Sommerferien aus dem Abruf — sie haben im Juli begonnen, und
-   * `validFrom` schneidet nach Beginn ab, nicht nach Ende.
-   */
-  test('das laufende Jahr beginnt am 1. Januar, nicht heute', () => {
-    expect(k.spannen(1, heute)[0]!.von).toBe('2026-01-01')
+  test('das laufende Jahr und der Vorlauf sind IMMER dabei', () => {
+    // Auch wenn Zeilen da sind: Thueringen hat 2019 den Weltkindertag
+    // bekommen, und Ferientermine werden nachgeschoben.
+    const alles = new Set(Array.from({ length: 10 }, (_, i) => `BW|${2020 + i}`))
+    const j = plan({ laender: ['BW'], vorhanden: alles }).map(a => a.jahr)
+    expect(j).toEqual([2026, 2027, 2028, 2029])
   })
 
-  /** DER TEST, DER DEN FEHLER GEFUNDEN HÄTTE. */
-  test('keine Spanne überschreitet die Grenze der Schnittstelle', () => {
+  test('die Historie kommt nur, wo sie fehlt', () => {
+    const da = new Set(['BW|2020', 'BW|2021', 'BW|2022', 'BW|2023', 'BW|2024'])
+    const j = plan({ laender: ['BW'], vorhanden: da }).map(a => a.jahr)
+    expect(j).toEqual([2026, 2027, 2028, 2029, 2025])
+  })
+
+  test('der Boden wird nicht unterschritten', () => {
+    // Vor 2020 hat die Quelle keine Feiertage. Ein Abruf dorthin kaeme
+    // jeden Monat leer zurueck.
+    const jahre = plan({ laender: ['BW'] }).map(a => a.jahr)
+    expect(Math.min(...jahre)).toBe(2020)
+  })
+
+  test('das juengste fehlende Jahr zuerst, quer ueber die Laender', () => {
+    // Sonst fuellt sich BW bis 2020 auf, waehrend BY noch bei 2025 steht.
+    const historie = plan().filter(a => a.jahr < 2026)
+    expect(historie.slice(0, 4).map(a => `${a.kuerzel}${a.jahr}`))
+      .toEqual(['BW2025', 'BY2025', 'BW2024', 'BY2024'])
+  })
+
+  test('die Obergrenze schneidet das AELTESTE ab, nicht das laufende Jahr', () => {
+    const p = plan({ hoechstens: 10 })
+    expect(p).toHaveLength(10)
+    // Acht Plaetze fuer laufendes Jahr + Vorlauf (zwei Laender), dann die
+    // beiden juengsten Historienjahre.
+    expect(p.slice(8).map(a => a.jahr)).toEqual([2025, 2025])
+  })
+
+  test('nichts zu tun ist ein leerer Plan, kein Fehler', () => {
+    expect(k.abrufplan({
+      laender: [], vorhanden: new Set(), boden: 2020,
+      jahr: 2026, vorlauf: 3, hoechstens: 10,
+    })).toEqual([])
+  })
+
+  /** DER TEST, DER DEN FEHLER VOM 14.08. GEFUNDEN HAETTE. */
+  test('keine Anfrage ueberschreitet die Grenze der Schnittstelle', () => {
     for (const vorlauf of [1, 2, 3, 5, 10]) {
-      for (const s of k.spannen(vorlauf, heute)) {
-        // Vorlauf und Jahr stehen mit in der Erwartung, damit ein Fehlschlag
+      for (const a of plan({ vorlauf, boden: 2016 })) {
+        // Land und Jahr stehen mit in der Erwartung, damit ein Fehlschlag
         // sagt, WELCHE Anfrage zu weit greift.
-        expect({ vorlauf, jahr: s.jahr, zuWeit: tage(s.von, s.bis) > k.MAX_SPANNE_TAGE })
-          .toEqual({ vorlauf, jahr: s.jahr, zuWeit: false })
+        expect({ vorlauf, a: `${a.kuerzel}${a.jahr}`, zuWeit: tage(a.von, a.bis) > k.MAX_SPANNE_TAGE })
+          .toEqual({ vorlauf, a: `${a.kuerzel}${a.jahr}`, zuWeit: false })
       }
     }
   })
 
   test('auch ein Schaltjahr bleibt unter der Grenze', () => {
-    const [s] = k.spannen(0, new Date('2028-03-01T00:00:00Z'))
-    expect(s).toEqual({ jahr: 2028, von: '2028-01-01', bis: '2028-12-31' })
-    expect(tage(s!.von, s!.bis)).toBe(365)
+    const a = plan({ laender: ['BW'], jahr: 2028, vorlauf: 0 })[0]!
+    expect(a).toEqual({ kuerzel: 'BW', jahr: 2028, von: '2028-01-01', bis: '2028-12-31' })
+    expect(tage(a.von, a.bis)).toBe(365)
   })
 
-  test('die Reihe ist lückenlos — kein Jahr fällt zwischen zwei Anfragen', () => {
-    const s = k.spannen(4, heute)
-    for (let i = 1; i < s.length; i++) {
-      expect(s[i]!.jahr).toBe(s[i - 1]!.jahr + 1)
-      expect(tage(s[i - 1]!.bis, s[i]!.von)).toBe(1)
-    }
+  test('ein ganzes Jahr, nicht ab heute', () => {
+    // Sonst fielen im August die Sommerferien aus dem Abruf: validFrom
+    // schneidet nach BEGINN, und der liegt im Juli.
+    expect(plan({ laender: ['BW'] })[0]!.von).toBe('2026-01-01')
   })
 
-  test('Vorlauf 0 ist eine Spanne, nicht keine', () => {
-    expect(k.spannen(0, heute)).toHaveLength(1)
-  })
-
-  test('der Jahreswechsel wird nach UTC gezogen', () => {
-    // 31.12. 23:00 UTC ist in Berlin schon der 1.1. — maßgeblich ist UTC,
-    // wie überall sonst im Importer auch.
-    expect(k.spannen(0, new Date('2026-12-31T23:00:00Z'))[0]!.jahr).toBe(2026)
-    expect(k.spannen(0, new Date('2027-01-01T00:00:00Z'))[0]!.jahr).toBe(2027)
+  test('die Boeden stehen bei der Quelle, nicht beim Aufrufer', () => {
+    // Feiertage gibt es dort ab 2020, Schulferien ab 2016 — am 20.08.2026
+    // gemessen und im Kommentar von BODEN belegt.
+    expect(k.BODEN.PublicHolidays).toBe(2020)
+    expect(k.BODEN.SchoolHolidays).toBe(2017)
   })
 })
 
@@ -142,6 +165,74 @@ describe('einmalig', () => {
   })
 })
 
+describe('ohneVarianten', () => {
+  /**
+   * MV FUEHRT ZWEI SCHULFORMEN. Sommerferien 2025: 14.07.-30.08. fuer die
+   * allgemeinbildenden Schulen, 28.07.-06.09. fuer die berufsbildenden. Wer
+   * beide behaelt, gibt Mecklenburg-Vorpommern acht Wochen Sommerferien statt
+   * sieben — und ist_schulferien misst dann eine Schulform, die kaum jemand
+   * mit Kindern in ein Restaurant bringt.
+   */
+  test('von zwei Schulformen bleibt die allgemeinbildende', () => {
+    const raus = k.ohneVarianten([
+      { v: '2025-07-28', b: '2025-09-06', n: 'Sommerferien', r: 2 },  // BBS
+      { v: '2025-07-14', b: '2025-08-30', n: 'Sommerferien', r: 1 },  // ABS
+    ])
+    expect(raus).toEqual([{ v: '2025-07-14', b: '2025-08-30', n: 'Sommerferien', r: 1 }])
+  })
+
+  /** SH: die Inseln haben eine Woche frueher Herbstferien als das Festland. */
+  test('von Land und Insel bleibt das Land', () => {
+    const raus = k.ohneVarianten([
+      { v: '2024-10-14', b: '2024-11-01', n: 'Herbstferien', r: 2 },  // Sylt, Foehr, ...
+      { v: '2024-10-21', b: '2024-11-01', n: 'Herbstferien', r: 0 },  // das ganze Land
+    ])
+    expect(raus.map(z => z.v)).toEqual(['2024-10-21'])
+  })
+
+  /**
+   * DER FALL, AN DEM EINE GRUPPIERUNG NACH MONAT ZERBRICHT: die beiden
+   * SH-Herbstferien 2018 beginnen im September und im Oktober.
+   */
+  test('Varianten ueber die Monatsgrenze zaehlen als eine', () => {
+    const raus = k.ohneVarianten([
+      { v: '2018-09-24', b: '2018-10-19', n: 'Herbstferien', r: 2 },
+      { v: '2018-10-01', b: '2018-10-19', n: 'Herbstferien', r: 0 },
+    ])
+    expect(raus).toHaveLength(1)
+    expect(raus[0]!.v).toBe('2018-10-01')
+  })
+
+  /**
+   * UND DER FALL, AN DEM EINE GRUPPIERUNG NACH NAMEN ALLEIN ZERBRICHT:
+   * Weihnachtsferien kommen zweimal im Kalenderjahr vor.
+   */
+  test('Januar und Dezember sind zwei Ereignisse, kein Duplikat', () => {
+    const raus = k.ohneVarianten([
+      { v: '2026-01-01', b: '2026-01-05', n: 'Weihnachtsferien', r: 0 },
+      { v: '2026-12-23', b: '2027-01-05', n: 'Weihnachtsferien', r: 0 },
+    ])
+    expect(raus).toHaveLength(2)
+  })
+
+  test('verschiedene Ferien duerfen sich ueberlappen', () => {
+    // MV legt 2023 einen "Zusaetzlichen Ferientag" in die Pfingstferien.
+    const raus = k.ohneVarianten([
+      { v: '2023-05-26', b: '2023-05-30', n: 'Pfingstferien', r: 0 },
+      { v: '2023-05-26', b: '2023-05-26', n: 'Zusätzlicher Ferientag', r: 0 },
+    ])
+    expect(raus).toHaveLength(2)
+  })
+
+  test('bei gleicher Geltung gewinnt der laengere Zeitraum', () => {
+    const raus = k.ohneVarianten([
+      { v: '2026-12-20', b: '2027-01-03', n: 'Weihnachtsferien', r: 0 },
+      { v: '2026-12-22', b: '2027-01-03', n: 'Weihnachtsferien', r: 0 },
+    ])
+    expect(raus.map(z => z.v)).toEqual(['2026-12-20'])
+  })
+})
+
 /**
  * DIE GEGENPROBE GEGEN DIE ECHTE SCHNITTSTELLE — nur mit `TEST_NETZ=1`.
  *
@@ -155,10 +246,21 @@ const netz = process.env.TEST_NETZ ? describe : describe.skip
 
 netz('gegen openholidaysapi.org', () => {
   test('eine Jahresspanne wird beantwortet', async () => {
-    const [s] = k.spannen(0, new Date('2026-08-20T12:00:00Z'))
-    const r = await fetch(k.abrufUrl('PublicHolidays', 'BW', s!.von, s!.bis))
+    const [a] = k.abrufplan({ laender: ['BW'], vorhanden: new Set(), boden: 2020,
+                              jahr: 2026, vorlauf: 0, hoechstens: 1 })
+    const r = await fetch(k.abrufUrl('PublicHolidays', 'BW', a!.von, a!.bis))
     expect(r.status).toBe(200)
     expect((await r.json() as unknown[]).length).toBeGreaterThan(0)
+  }, 30_000)
+
+  test('die Laenderliste kommt auf sechzehn', async () => {
+    // Sie steht nicht im Code, sondern kommt aus derselben Schnittstelle.
+    const r = await fetch('https://openholidaysapi.org/Subdivisions'
+      + '?countryIsoCode=DE&languageIsoCode=DE')
+    const codes = (await r.json() as { code: string }[]).map(x => x.code)
+    expect(codes).toHaveLength(16)
+    expect(codes).toContain('DE-BW')
+    expect(codes).toContain('DE-MV')
   }, 30_000)
 
   test('die Spanne der alten Fassung wird abgewiesen', async () => {

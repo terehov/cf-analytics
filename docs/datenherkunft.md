@@ -553,8 +553,8 @@ Daraus lässt sich jedes Zeitfenster frei schneiden (`mart.umsatz_zeitfenster`, 
 | Tabelle | Herkunft | Stand |
 |---|---|---|
 | `manual.plz_bundesland` | `api.zippopotam.us`, 44 PLZ einzeln aufgelöst, Koordinaten als Gegenprobe | 11.08.2026 |
-| `manual.feiertag` | `feiertage-api.de` (2018–2019), `openholidaysapi.org` (ab 2020) | 11.08.2026 |
-| `manual.schulferien` | `openholidaysapi.org`, 2017–2027 | 11.08.2026 |
+| `manual.feiertag` | `openholidaysapi.org`, ab 2020, alle 16 Länder | 20.08.2026 |
+| `manual.schulferien` | `openholidaysapi.org`, ab 2017, alle 16 Länder | 20.08.2026 |
 | `manual.marktindex` | Eurostat `sts_setu_m`, NACE I56, Quelldaten Destatis | 11.08.2026 |
 
 **Warum zwei Feiertagsquellen:** `openholidaysapi.org` reicht bei den gesetzlichen Feiertagen

@@ -390,7 +390,7 @@ const Schema = z.object({
    *
    * DER WERT GEHT NICHT IN EINE ANFRAGE. Die Schnittstelle beantwortet
    * höchstens 1095 Tage am Stück; an dieser Grenze ist der Nachzug vom 14. bis
-   * zum 20.08.2026 jede Nacht gescheitert. `spannen()` in `pflege/kalender.ts`
+   * zum 20.08.2026 jede Nacht gescheitert. `abrufplan()` in `pflege/kalender.ts`
    * zerlegt den Vorlauf seither in Kalenderjahre — jeder Wert bis 10 ist
    * dadurch wieder gefahrlos.
    */
@@ -398,6 +398,18 @@ const Schema = z.object({
 
   /** Abstand zwischen zwei Kalenderabgleichen. Ein Feiertag verschiebt sich nicht. */
   KALENDER_ABSTAND_TAGE: z.coerce.number().int().min(1).default(30),
+
+  /**
+   * Wie viele Abrufe ein Lauf je Endpunkt höchstens macht.
+   *
+   * KEINE DROSSEL, SONDERN EIN DECKEL. Der laufende Bedarf sind 16 Länder mal
+   * vier Jahre, also 64 — die Grenze greift nur, wenn zusätzlich Historie
+   * fehlt: eine leere Datenbank braucht beim ersten Mal 16 mal zehn Jahre.
+   * Was über den Deckel läuft, ist das älteste Jahr und fehlt beim nächsten
+   * Lauf immer noch; der Rückstand baut sich also von selbst ab, statt dass
+   * jemand einen Nachhol-Befehl gibt.
+   */
+  KALENDER_ABRUFE_MAX: z.coerce.number().int().min(1).default(200),
 
   /** Ab welchem Tag die Historie vollständig sein soll. */
   HISTORIE_AB: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).default('2018-01-01'),

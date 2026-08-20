@@ -1749,6 +1749,48 @@ Rohzeilen bleiben, wie die Quelle sie geliefert hat.
 `mart.feiertag_namenswechsel` schlägt an, wenn eine fünfte Schreibweise
 dazukommt. Erwartung: leer.
 
+**Nachtrag vom selben Tag: die zweite Quelle ist raus.** Beim Nachsehen an der
+Altquelle stellte sich heraus, dass sie die fraglichen Tage selbst markiert, im
+Feld `hinweis` — und dass vier Zeilen dort *keine* landesweiten Feiertage sind:
+BW Reformationstag, BY Buß- und Bettag, SN und TH Fronleichnam (je 2018 und
+2019, zusammen 76 Betriebstage). Eugene hat am 20.08.2026 entschieden, auf eine
+Quelle zu gehen; `0088` löscht die 231 Zeilen von `feiertage-api.de`.
+
+**2018 und 2019 haben damit keine Feiertage mehr.** Für `mart.kalendereffekt`
+folgenlos — `mart.kalender_zeitraum` beginnt rollierend erst 2023 —, für
+`mart.vergleichstag` nicht: dort landen die Feiertage dieser zwei Jahre im
+Vergleichsvorrat. Wo ein Land Termine hat und wo nicht, steht in
+`mart.kalender_abdeckung`; `mart.betrieb_kalender.ist_feiertag` heißt vor 2020
+**unbekannt**, nicht „kein Feiertag".
+
+`manual.feiertag_alias` bleibt trotzdem stehen: die vier Aliasse laufen jetzt
+ins Leere, aber die Mechanik ist die Antwort auf eine Umbenennung durch die
+Quelle selbst — und die ist mit einer Quelle nicht unwahrscheinlicher geworden.
+
+## Zwei Länder führen Ferien in Varianten (20.08.2026)
+
+Beim Ausweiten auf alle 16 Bundesländer kamen **30 überlappende
+Ferienzeiträume** in die Tabelle, alle in MV und SH. Der Grund sind zwei
+verschiedene Arten von Teilgeltung, die die Quelle in zwei verschiedenen
+Feldern führt:
+
+| Land | Feld | Beispiel |
+|---|---|---|
+| MV | `groups` | Sommerferien 2025: 14.07.–30.08. für allgemeinbildende (`DE-MV-ABS`), 28.07.–06.09. für berufsbildende Schulen (`DE-MV-BBS`) |
+| SH | `comment` | Herbstferien 2024: ab 14.10. für Sylt, Föhr, Amrum, Helgoland und die Halligen, ab 21.10. für das übrige Land |
+
+Über alle 16 Länder und vier Jahre nachgesehen sind das die einzigen beiden;
+432 von 497 Einträgen tragen gar keine Einschränkung.
+
+**Genommen wird die weiteste Variante** — ein Betrieb hängt an einem
+Bundesland, nicht an einer Schulform und nicht an einer Insel. Wer beide
+behält, gibt MV acht Wochen Sommerferien statt sieben. Die Auswahl läuft über
+die Überschneidung und nicht über den Monat: die beiden SH-Herbstferien 2018
+beginnen am 24.09. und am 01.10., und nach Namen allein fielen die
+Weihnachtsferien im Januar mit denen im Dezember zusammen.
+`mart.kalender_abdeckung.ferien_ueberlappungen` schlägt an, wenn eine dritte
+Art dazukommt. Erwartung: null.
+
 ## Corona steckt im Bestand (20.08.2026)
 
 | Monat | Betriebe mit Umsatz |

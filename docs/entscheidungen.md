@@ -932,10 +932,14 @@ Koordinaten liefert — die Koordinaten dienten als Gegenprobe gegen die bereits
 **Nicht über den Ortsnamen**, aus demselben Grund wie in Migration `0008`: fünf Betriebe
 heißen nach derselben Stadt, und „Alter Kranen GmbH" trägt gar keinen Ort im Namen.
 
-Feiertage stammen aus **zwei** Quellen: `openholidaysapi.org` reicht bei den gesetzlichen
-Feiertagen nicht vor 2020 zurück, unsere Umsatzhistorie beginnt 2018. Für 2018/2019 kommen
-sie von `feiertage-api.de`. Die Spalte `quelle` hält den Bruch je Zeile fest — wer ihn nicht
-sieht, hält zwei Jahre ohne Feiertage für zwei Jahre ohne Feiertagswirkung.
+Feiertage stammten bis zum 20.08.2026 aus **zwei** Quellen: `openholidaysapi.org` reicht bei
+den gesetzlichen Feiertagen nicht vor 2020 zurück, unsere Umsatzhistorie beginnt 2018, und für
+2018/2019 kamen sie deshalb von `feiertage-api.de`. **Diese zweite Quelle ist mit `0088`
+entfallen** — sie führte vier nicht landesweite Tage als Feiertage (BW Reformationstag, BY
+Buß- und Bettag, SN und TH Fronleichnam) und schrieb vier weitere anders. Der Preis steht in
+`0088` und ist bewusst bezahlt: **2018 und 2019 haben keine Feiertage.** Ab wann ein Land
+Termine hat, sagt `mart.kalender_abdeckung`; `mart.kalender_zeitraum` (0085) beginnt ohnehin
+rollierend erst drei volle Jahre vor heute.
 
 ### Eigene Zeitfenster ersetzen LINAs Zonen nicht, sie stehen daneben
 
@@ -2016,12 +2020,14 @@ Monat gepflegt wird, ist das keiner.
 Deutsche Feiertage sind berechenbar — aus dem Osterdatum und einer Tabelle je
 Bundesland. Genau das wäre hier falsch gewesen.
 
-`manual.feiertag` trägt 21 verschiedene Namen für die Feiertage, darunter
+`manual.feiertag` trug 21 verschiedene Namen für die Feiertage, darunter
 „1. Weihnachtsfeiertag" **und** „1. Weihnachtstag", „Neujahr" **und**
 „Neujahrstag" — die Spur zweier Quellen (`feiertage-api.de` und
 `openholidaysapi.org`). Der Primärschlüssel enthält den Namen. Eine eigene
 Berechnung hätte also entweder Dubletten erzeugt oder Namen überschrieben, die
-seit 2018 in Auswertungen stecken.
+seit 2018 in Auswertungen stecken. Seit `0088` ist nur noch eine Quelle drin,
+und damit ein Namensschema; `manual.feiertag_alias` (0084) bleibt als Puffer für
+den Fall, dass die Quelle selbst umbenennt.
 
 Dazu kommt: **Schulferien sind nicht berechenbar.** Sie werden je Land
 festgelegt. Eine Quelle, die beides liefert, ist einer Formel plus einer zweiten
