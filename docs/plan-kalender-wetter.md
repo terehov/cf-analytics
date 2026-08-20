@@ -490,3 +490,34 @@ nach — `mart.wetter_rueckstand` führt die Zahl.
 **Phase 5 (Dashboards) ist noch nicht begonnen.** Grund steht im Bericht: drei
 der vier zu ändernden Dateien in `metabase/` tragen unversionierte Änderungen
 einer zweiten Session.
+
+## 10. Phase 5 und 6 (20.08.2026) — der Plan ist umgesetzt
+
+**`metabase/karten-kalender.ts` mit 16 Karten**, das Dashboard
+`db_kalender` („⑫ Feiertage, Ferien, Wetter", Sammlung *Betrieb*, vier
+Reiter) und zwei Karten auf bestehenden Seiten. Begründung jeder Darstellung in
+`docs/dashboards.md`.
+
+**Abweichungen vom Plan, alle begründet:**
+
+* **Kein Monatsfilter** auf `db_kalender`, nur Zeitraum/Betrieb/Marke. Ein
+  Stichmonat ließe von 190 Christi-Himmelfahrt-Tagen einen übrig.
+* **Jede Karte rechnet auf der Tagesebene**, keine auf `mart.kalendereffekt` —
+  ein Median lässt sich nicht weiterverdichten. Die Effektsicht bleibt der
+  Drill-Down auf Betriebsebene.
+* **Überall „Punkte gegen einen normalen Tag"** statt roher Prozente, mit
+  mitgerechnetem Basiswert unter denselben Filtern.
+* Die Reihe *„War das ein guter Tag?"* auf `dd_betrieb` hat eine zweite Session
+  gebaut (`dd_betrieb_tagesart`, `dd_betrieb_effektivitaet`) — sie liest
+  `mart.vergleichstag`, also die Materialisierung aus `0084`.
+* **`0090`**: 2018/2019 bleiben ohne Feiertage und werden nicht nachgezogen
+  (entschieden). Die Prüfzeile zählt nur noch Jahre, die der Kalender abzudecken
+  behauptet; sichtbar bleiben sie mit `zustand = 'vor Kalenderbeginn'`.
+
+**Die sieben Prüfzeilen stehen** und melden, was sie sollen — Erwartung 0 außer
+bei zwei bewusst offenen Zahlen: 9 Betriebe ohne Standort (konstant, bis Eugene
+sie pflegt) und der Wetter-Backfill-Rückstand (fällt von Nacht zu Nacht).
+
+**Damit ist der Plan abgearbeitet.** Was er ausdrücklich nicht tut, tut er
+weiterhin nicht: die Standortlücke schließen, Events erfassen, ein Modell
+bauen, den Marktindex anfassen.

@@ -31,6 +31,7 @@ import { karten as kartenYext } from './karten-yext'
 import { karten as kartenAktionen } from './karten-aktionen'
 import { karten as kartenVergleich } from './karten-vergleich'
 import { karten as kartenFremdeinkauf } from './karten-fremdeinkauf'
+import { karten as kartenKalender } from './karten-kalender'
 import type { Karte } from './typen'
 
 const DB = process.env.DATABASE_URL
@@ -40,6 +41,7 @@ const alleKarten: Karte[] = [
   ...kartenRoundTable, ...kartenFach, ...kartenDrilldown,
   ...kartenPortfolio, ...kartenImport, ...kartenStandort, ...kartenBewertung,
   ...kartenAktionen, ...kartenVergleich, ...kartenFremdeinkauf, ...kartenYext,
+  ...kartenKalender,
 ]
 
 let db: Client

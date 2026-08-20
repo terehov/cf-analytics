@@ -953,6 +953,11 @@ export const dashboards: Dashboard[] = [
         { karte: 'um_kachel_monat' },
         { karte: 'um_kachel_gaeste' },
         { karte: 'um_kachel_bon' },
+        // Der Einstieg in ⑫. Steht hier und nicht auf einer eigenen Seite,
+        // weil die Frage "war das ein guter Tag" beim Umsatz aufkommt und
+        // nicht in einem Dashboard, das man erst suchen muss.
+        { karte: 'kw_kachel_feiertagseffekt',
+          klick: [{ ziel: 'db_kalender', uebergabe: {} }] },
       ] },
       { teile: [{ karte: 'um_verlauf_tag', hoehe: 9 }] },
       { teile: [{ text: '## Gegen Vorjahr\n\nEuro und Prozent stehen absichtlich in **zwei getrennten Diagrammen**: übereinandergelegt lassen sich die beiden Maßstäbe so wählen, dass ein Zusammenhang entsteht, den die Zahlen gar nicht hergeben.' }] },
@@ -1584,6 +1589,13 @@ export const dashboards: Dashboard[] = [
       // 36 Pixel je Balken, und ein Name wie "getPersonalkosten" braucht
       // mehr. Metabase laesst die Beschriftung dann weg.
       { teile: [{ karte: 'dq_backfill_balken' }] },
+      // REGEL 10, und der Grund steht in docs/plan-kalender-wetter.md: die
+      // Kacheln auf ⑫ zeigen weniger als die ganze Gruppe, weil das Wetter
+      // eine Koordinate braucht. Eine Kachel, die 78 % zeigt und wie 100 %
+      // aussieht, ist schlimmer als keine.
+      { teile: [{ text: '## Wer fehlt in Kalender und Wetter?\n\nFür diese Betriebe ist **kein Standort hinterlegt**. Sie bekommen die bundesweiten Feiertage, aber keine Schulferien und kein Wetter — auf ⑫ Feiertage, Ferien, Wetter fehlen sie in den Wetterkacheln. Erledigt sich durch Nachtragen der Adresse; die Auswertungen wachsen dann von selbst mit.' }] },
+      { teile: [{ karte: 'kw_ohne_kalender', hoehe: 9,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ text: '## Kommen die Daten an?' }] },
       { teile: [{ karte: 'dq_backfill', hoehe: 11 }] },
       { teile: [{ karte: 'dq_sync' }] },
@@ -1740,6 +1752,107 @@ export const dashboards: Dashboard[] = [
       { teile: [{ text: '## Wer fehlt auf der Karte\n\nFür diese Betriebe ist keine Adresse hinterlegt. **Die mit Umsatz stehen oben** — bei denen lohnt das Nachtragen zuerst.' }] },
       { teile: [{ karte: 'so_fehlend', hoehe: 12,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+    ],
+  },
+  {
+    schluessel: 'db_kalender',
+    name: '⑫ Feiertage, Ferien, Wetter',
+    beschreibung:
+      'Was der Kalender und das Wetter am Umsatz bewegen — jeder Tag gemessen gegen die '
+      + 'letzten vier gleichen Wochentage ohne Feiertag. Die vier Reiter behandeln die '
+      + 'Effekte getrennt, weil sie sich nicht addieren lassen: ein Feiertag im Sommer ist '
+      + 'auch ein warmer Tag. Unten in der Tagesliste landet jeder Klick von oben.',
+    sammlung: 'Betrieb',
+    // BETRIEB, MARKE, ZEITRAUM — und ausdruecklich KEIN Monatsfilter.
+    // Jede Karte hier verdichtet ueber viele Tage; ein Stichmonat liesse
+    // von "190 Christi-Himmelfahrt-Tage" genau einen uebrig, und der
+    // Median einer einzigen Beobachtung ist diese Beobachtung.
+    filter: [F_ZEITRAUM, F_BETRIEB, F_MARKE],
+    tabs: [
+      { name: 'Feiertage', reihen: [
+        { teile: [{ text:
+          '# ⑫ Feiertage, Ferien, Wetter\n\n'
+          + 'Jeder Tag wird gegen den Durchschnitt der letzten **vier gleichen Wochentage** '
+          + 'gestellt — ohne Feiertage, ohne Ruhetage. Damit sind Saison, Preisniveau und '
+          + 'Betriebsgröße schon herausgerechnet.\n\n'
+          + '**Die Zahlen heißen „Punkte gegen einen normalen Tag".** Das ist wichtig: ein '
+          + 'einzelner Tag liegt fast immer etwas unter dem Durchschnitt seiner vier '
+          + 'Vorgänger, auch wenn nichts schiefgelaufen ist. Gegen null gelesen sähe die '
+          + 'halbe Gruppe schwach aus.' }] },
+        { teile: [
+          { karte: 'kw_kachel_bester_feiertag', breite: 12,
+            klick: [{ ziel: 'db_kalender', uebergabe: {} }] },
+          { karte: 'kw_kachel_schlechtester', breite: 12,
+            klick: [{ ziel: 'db_kalender', uebergabe: {} }] },
+        ] },
+        { teile: [{ karte: 'kw_feiertag_tabelle', hoehe: 11,
+          klick: [{ ziel: 'db_kalender', uebergabe: {} }] }] },
+        { teile: [{ karte: 'kw_feiertag_marke', hoehe: 9 }] },
+        { teile: [{ text:
+          '## Was als Nächstes ansteht\n\n'
+          + 'Die einzige Tabelle hier, die nach vorn schaut — für die Personal- und '
+          + 'Warenplanung.' }] },
+        { teile: [{ karte: 'kw_naechste_feiertage', hoehe: 11,
+          klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      ] },
+
+      { name: 'Ferien & Wochentage', reihen: [
+        { teile: [{ text:
+          '## Schulferien\n\n'
+          + 'Über die ganze Gruppe gemittelt ist der Effekt klein. **Das heißt nicht, dass '
+          + 'er für einen einzelnen Betrieb klein ist** — ein Stadtbetrieb im '
+          + 'Pendlergeschäft und ein Ausflugslokal liegen hier mit umgekehrten Vorzeichen. '
+          + 'Oben einen Betrieb wählen.' }] },
+        { teile: [
+          { karte: 'kw_ferien_lage', breite: 12, hoehe: 9 },
+          { karte: 'kw_ferien_bundesland', breite: 12, hoehe: 9 },
+        ] },
+        { teile: [{ text:
+          '## Brückentage\n\n'
+          + 'Der Abend **vor** einem Feiertag ist ein eigenes Geschäft und wiegt mehr als '
+          + 'die Hälfte der Feiertage selbst. Der Tag danach kostet.' }] },
+        { teile: [{ karte: 'kw_brueckentag', hoehe: 9 }] },
+        { teile: [{ text:
+          '## Der Maßstab\n\n'
+          + 'Die Wochentage messen hier absichtlich fast nichts — sie sind bereits '
+          + 'herausgerechnet. Die Kachel zeigt, **wie ein Nicht-Effekt aussieht**. Wer '
+          + 'daneben einen Feiertag mit sechzig Punkten sieht, weiß, dass die Zahl etwas '
+          + 'bedeutet.' }] },
+        { teile: [{ karte: 'kw_wochentag', hoehe: 9 }] },
+      ] },
+
+      { name: 'Wetter', reihen: [
+        { teile: [{ text:
+          '## Wetter\n\n'
+          + 'Gemessen wird das Wetter **gegenüber dem, was in diesen Wochen normal war** — '
+          + 'nicht der rohe Zusammenhang zwischen Temperatur und Umsatz. Der würde vor '
+          + 'allem die Jahreszeit messen.\n\n'
+          + '⚠️ **Weniger Betriebe als nebenan.** Wetter braucht eine hinterlegte '
+          + 'Koordinate; Feiertage kommen auch ohne aus. Wer fehlt, steht in der '
+          + 'Datenqualität.\n\n'
+          + '*Wetterdaten: Deutscher Wetterdienst (DWD), bezogen über Bright Sky.*' }] },
+        { teile: [{ karte: 'kw_temperatur', hoehe: 9 }] },
+        { teile: [
+          { karte: 'kw_regen', breite: 12, hoehe: 9 },
+          { karte: 'kw_sonne', breite: 12, hoehe: 9 },
+        ] },
+        { teile: [{ text:
+          '## Die Streuung dahinter\n\n'
+          + 'Ein Punkt je Betrieb und Tag. Die Balken oben zeigen den typischen Fall — hier '
+          + 'sieht man, wie weit die einzelnen Tage auseinanderliegen. Aus einem einzelnen '
+          + 'warmen Tag lässt sich nichts ableiten.' }] },
+        { teile: [{ karte: 'kw_streuung', hoehe: 11 }] },
+      ] },
+
+      { name: 'Tagesliste', reihen: [
+        { teile: [{ text:
+          '## Jeder einzelne Tag\n\n'
+          + 'Das Ziel jedes Klicks von oben. **Vergleichstage = 0** heißt: es gab keinen '
+          + 'vergleichbaren Vortag desselben Wochentags — meist ein Ruhetag. Solche Tage '
+          + 'bleiben stehen, damit die Liste keine Lücken hat, über die niemand stolpert.' }] },
+        { teile: [{ karte: 'kw_tagesliste', hoehe: 16,
+          klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      ] },
     ],
   },
 ]

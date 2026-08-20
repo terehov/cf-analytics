@@ -1017,3 +1017,83 @@ nachgetragen.
 **Die Sortierung überall ist rot → orange → unvollständig → grün.** Unvollständig
 steht vor grün, weil es mehr Aufmerksamkeit verdient: bei grün ist nichts zu
 tun, bei unvollständig fehlt etwas.
+
+## ⑫ Feiertage, Ferien, Wetter (`db_kalender`)
+
+**Der Anlass war eine Frage ohne Antwort.** Feiertage und Schulferien lagen
+seit Migration `0051` in der Datenbank, `mart.vergleichstag` rechnete jeden Tag
+gegen seine vier Vorgänger — und keine einzige Karte griff die Sicht auf.
+Geladen, gerechnet, nie gezeigt. Die Seite schließt das und nimmt das Wetter
+mit, weil es denselben Unterbau braucht.
+
+**Vier Reiter, weil sich die Effekte nicht addieren lassen.** Ein Feiertag im
+Sommer ist auch ein warmer Tag; wer Feiertags-, Ferien- und Wettereffekt
+zusammenzählt, zählt denselben Euro zweimal. Getrennte Reiter machen das
+räumlich klar, eine gemeinsame Reihe hätte zur Addition eingeladen.
+
+**Kein Monatsfilter, und das ist der wichtigste Bauentscheid der Seite.** Jede
+Karte hier verdichtet über viele Tage. Ein Stichmonat ließe von 190
+Christi-Himmelfahrt-Tagen genau einen übrig, und der Median einer einzigen
+Beobachtung ist diese Beobachtung. Gefiltert wird über **Zeitraum, Betrieb und
+Marke** — dieselbe Überlegung wie bei den Verläufen auf ③, nur konsequenter.
+
+### Warum überall „Punkte gegen einen normalen Tag" steht
+
+Ein einzelner Tag wird gegen den **Mittelwert** von vier Tagen gestellt. Bei
+rechtsschiefen Tagesumsätzen liegt der Mittelwert über dem Median — der
+typische Tag liegt also unter dem Schnitt seiner Vorgänger, ohne dass etwas
+schiefgelaufen wäre. Gemessen am 20.08.2026: **−3,5 %** über 56.226 gewöhnliche
+Tage.
+
+Die Karten zeigen deshalb die Differenz zu diesem Nullpunkt, nicht den rohen
+Prozentwert. **Ohne diese Korrektur läse jede Kachel die halbe Gruppe als
+schwach.** Der Basiswert wird dabei unter denselben Filtern mitgerechnet wie
+die Kachel selbst; ein fest verdrahteter Wert wäre bei jedem Betriebsfilter
+falsch.
+
+### Warum jede Karte auf der Tagesebene rechnet
+
+`mart.kalendereffekt` steht fertig da und wird trotzdem von keiner Karte
+gelesen. Grund: **ein Median lässt sich nicht weiterverdichten.** Der Median
+einer Marke ist nicht der Median der Betriebs-Mediane. Jede Karte rechnet
+deshalb mit `percentile_cont` direkt auf `mart.kalendertag_lage` bzw.
+`mart.wettertag_lage`. Die fertige Effektsicht ist der Drill-Down auf
+Betriebsebene, nicht die Zwischenstufe für Gruppenzahlen.
+
+### Die einzelnen Karten
+
+| Reiter | Karte | Warum diese Darstellung |
+|---|---|---|
+| Feiertage | zwei Kacheln (bester/schwächster) | Der Einstieg in zwei Zahlen. Mindestens 20 vergleichbare Tage, sonst gewinnt ein Ausreißer |
+| | `kw_feiertag_tabelle` | Tabelle statt Balken: die Spannen (unteres/oberes Viertel) gehören daneben, sonst sieht ein breit streuender Wert präzise aus. Farbskala auf der Punktespalte |
+| | `kw_feiertag_marke` | Gruppierte Balken, auf die sechs stärksten Feiertage begrenzt — vierzehn × vier Marken wären 56 Balken |
+| | `kw_naechste_feiertage` | Die **einzige** Karte, die nach vorn schaut. Der Grund, warum jemand die Seite ein zweites Mal öffnet |
+| Ferien & Wochentage | `kw_ferien_lage` / `_bundesland` | Nebeneinander, weil die Gruppenzahl klein ist und die Länderaufteilung erklärt, warum |
+| | `kw_brueckentag` | Enthält die Zeile *gewöhnlicher Tag* — sie steht per Definition auf null und ist der sichtbare Nullpunkt der ganzen Seite |
+| | `kw_wochentag` | **Misst absichtlich fast nichts.** Der Wochentag ist im Vergleichstag schon herausgerechnet; die Kachel zeigt, wie ein Nicht-Effekt aussieht. Ohne diesen Maßstab fehlt die Einordnung für alles andere |
+| Wetter | `kw_temperatur` | Balken über Klassen, nicht Streudiagramm: der Zusammenhang ist ein umgekehrtes U, und eine Trendlinie würde ihn verstecken |
+| | `kw_regen` / `kw_sonne` | Nebeneinander, gleiche Skala, gleiche Lesart |
+| | `kw_streuung` | Direkt unter den Balken, weil die Streuung die Aussage relativiert. Auf 3.000 Punkte begrenzt |
+| Tagesliste | `kw_tagesliste` | Das Ziel jedes Drill-Downs. Führt Ruhetage mit `Vergleichstage = 0` **mit**, statt sie wegzulassen |
+
+### Zwei Karten auf fremden Seiten
+
+* **`db_umsatz`** bekommt `kw_kachel_feiertagseffekt` — die Spannweite zwischen
+  bestem und schwächstem Feiertag, Klick führt auf ⑫. Sie steht dort, weil die
+  Frage „war das ein guter Tag" beim Umsatz aufkommt und nicht in einem
+  Dashboard, das man erst suchen muss.
+* **`db_datenqualitaet`** bekommt `kw_ohne_kalender`: die Betriebe mit Umsatz,
+  für die kein Standort hinterlegt ist. **Regel 10** — die Wetterkacheln auf ⑫
+  zeigen weniger als die ganze Gruppe, und eine Kachel, die 78 % zeigt und wie
+  100 % aussieht, ist schlimmer als keine. Keine festen Zahlen im Kartentext:
+  sie erledigt sich durch Nachtragen der Adressen.
+
+### Was bewusst fehlt
+
+**Die Ampelfarben.** Rot/Gelb/Grün sind auf dieser Seite tabu — ein roter
+Neujahrsbalken läse sich als Warnung, und Neujahr ist keine. Die Farbskalen der
+beiden Tabellen laufen deshalb über Rot–Weiß–Grün als *Richtungsanzeige*, nicht
+als Bewertung.
+
+**Eine Gesamtaussage.** Es gibt keine Kachel „so viel bringt der Kalender
+insgesamt". Sie wäre die Addition, die der ganze Seitenaufbau vermeidet.
