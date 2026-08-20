@@ -1627,7 +1627,11 @@ export const dashboards: Dashboard[] = [
        */
       { teile: [{ text: '## Was aus den Summen herausfaellt\n\nBeides ist bewusst herausgerechnet — und steht deshalb hier. Eine Bereinigung ohne eigene Anzeige ist derselbe stille Zweig wie der Fehler davor.' }] },
       { teile: [{ karte: 'dq_sparten', hoehe: 10 }] },
-      { teile: [{ karte: 'dq_belegdatum', hoehe: 8 }] },
+      // hoehe 9, nicht 8: MINDESTHOEHE.table verlangt neun Einheiten
+      // (Kopfzeile plus rund sechs Datenzeilen). Der Wert stand seit
+      // 7f290c8 auf 8 und fiel erst am 20.08.2026 auf -- uebernehmen.ts
+      // war seitdem nicht gelaufen.
+      { teile: [{ karte: 'dq_belegdatum', hoehe: 9 }] },
       { teile: [{ karte: 'dq_gaeste', hoehe: 10,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       // Volle Breite: die Spalte mit den Beispielnamen ist der Zweck der

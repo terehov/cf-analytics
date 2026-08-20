@@ -67,11 +67,17 @@ const WETTER_ABDECKUNG =
  */
 const LAGE = `
 WITH lage AS (
-    SELECT l.*
-      FROM mart.kalendertag_lage l
+    -- KEIN ALIAS auf mart.kalendertag_lage, und das ist Pflicht: Metabase
+    -- baut aus einem Feldfilter \`WHERE mart.kalendertag_lage.geschaeftstag
+    -- BETWEEN ...\` mit dem TABELLENNAMEN. Steht die Tabelle unter einem
+    -- Alias, findet Postgres die Referenz nicht -- und zwar erst, wenn
+    -- jemand den Filter setzt. uebernehmen.ts prueft das statisch;
+    -- docs/fehlerkatalog.md, "Ein Feldfilter auf eine Tabelle mit Alias".
+    SELECT kalendertag_lage.*
+      FROM mart.kalendertag_lage
       LEFT JOIN mart.konzept_zuordnung z USING (betrieb_key)
      WHERE 1 = 1
-       [[AND l.betrieb = {{betrieb}}]]
+       [[AND kalendertag_lage.betrieb = {{betrieb}}]]
        [[AND z.hauptkonzept = {{marke}}]]
        [[AND {{zeitraum}}]]
 ), basis AS (
@@ -86,21 +92,23 @@ WITH lage AS (
 
 const WETTERLAGE = `
 WITH lage AS (
-    SELECT w.*
-      FROM mart.wettertag_lage w
+    -- Alias-Verbot wie oben.
+    SELECT wettertag_lage.*
+      FROM mart.wettertag_lage
       LEFT JOIN mart.konzept_zuordnung z USING (betrieb_key)
      WHERE 1 = 1
-       [[AND w.betrieb = {{betrieb}}]]
+       [[AND wettertag_lage.betrieb = {{betrieb}}]]
        [[AND z.hauptkonzept = {{marke}}]]
        [[AND {{zeitraum}}]]
 ), basis AS (
-    SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY abweichung_pct)::numeric AS wert
-      FROM mart.kalendertag_lage l
-      LEFT JOIN mart.konzept_zuordnung z USING (betrieb_key)
-     WHERE l.kategorie = 'brueckentag' AND l.auspraegung = 'gewoehnlicher Tag'
-       [[AND l.betrieb = {{betrieb}}]]
-       [[AND z.hauptkonzept = {{marke}}]]
-       [[AND {{zeitraum}}]]
+    -- Der Nullpunkt leitet sich aus DENSELBEN Tagen ab, statt den
+    -- Feldfilter ein zweites Mal zu setzen: ein Feldfilter traegt genau
+    -- eine Tabelle, und das ist hier wettertag_lage.
+    SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY k.abweichung_pct)::numeric AS wert
+      FROM mart.kalendertag_lage k
+      JOIN (SELECT DISTINCT betrieb_key, geschaeftstag FROM lage) t
+        ON t.betrieb_key = k.betrieb_key AND t.geschaeftstag = k.geschaeftstag
+     WHERE k.kategorie = 'brueckentag' AND k.auspraegung = 'gewoehnlicher Tag'
 )`
 
 const DIM_KALENDER: Record<string, [string, string, string]> =
@@ -205,11 +213,11 @@ SELECT auspraegung                                              AS "Feiertag",
     parameter: [P_BETRIEB, P_MARKE, P_ZEITRAUM],
     sql: `
 WITH lage AS (
-    SELECT l.*, coalesce(z.hauptkonzept, 'ohne Marke') AS marke
-      FROM mart.kalendertag_lage l
+    SELECT kalendertag_lage.*, coalesce(z.hauptkonzept, 'ohne Marke') AS marke
+      FROM mart.kalendertag_lage
       LEFT JOIN mart.konzept_zuordnung z USING (betrieb_key)
-     WHERE l.kategorie = 'feiertag'
-       [[AND l.betrieb = {{betrieb}}]]
+     WHERE kalendertag_lage.kategorie = 'feiertag'
+       [[AND kalendertag_lage.betrieb = {{betrieb}}]]
        [[AND z.hauptkonzept = {{marke}}]]
        [[AND {{zeitraum}}]]
 ), stark AS (
@@ -465,16 +473,16 @@ SELECT klasse   AS "Sonne",
     anzeige: 'scatter',
     parameter: [P_BETRIEB, P_MARKE, P_ZEITRAUM],
     sql: `
-SELECT round(w.fenster_temp_max, 1) AS "Temperatur °C",
-       round(w.abweichung_pct, 1)   AS "Abweichung %",
-       w.betrieb                    AS "Betrieb"
-  FROM mart.wettertag_lage w
+SELECT round(wettertag_lage.fenster_temp_max, 1) AS "Temperatur °C",
+       round(wettertag_lage.abweichung_pct, 1)   AS "Abweichung %",
+       wettertag_lage.betrieb                    AS "Betrieb"
+  FROM mart.wettertag_lage
   LEFT JOIN mart.konzept_zuordnung z USING (betrieb_key)
- WHERE w.kategorie = 'temperatur'
-   [[AND w.betrieb = {{betrieb}}]]
+ WHERE wettertag_lage.kategorie = 'temperatur'
+   [[AND wettertag_lage.betrieb = {{betrieb}}]]
    [[AND z.hauptkonzept = {{marke}}]]
    [[AND {{zeitraum}}]]
- ORDER BY w.geschaeftstag DESC
+ ORDER BY wettertag_lage.geschaeftstag DESC
  LIMIT 3000`,
     template_tag_dimension: DIM_WETTER,
     visualisierung: {
@@ -500,29 +508,32 @@ SELECT round(w.fenster_temp_max, 1) AS "Temperatur °C",
     anzeige: 'table',
     parameter: [P_BETRIEB, P_MARKE, P_ZEITRAUM],
     sql: `
-SELECT v.geschaeftstag     AS "Tag",
-       v.betrieb           AS "Betrieb",
-       v.wochentag         AS "Wochentag",
-       v.feiertag          AS "Feiertag",
-       v.schulferien       AS "Schulferien",
-       CASE WHEN v.vortag_feiertag   THEN 'nach Feiertag'
-            WHEN v.folgetag_feiertag THEN 'vor Feiertag' END AS "Brückenlage",
-       v.temp_max          AS "Temperatur °C",
-       v.niederschlag      AS "Regen mm",
-       v.sonne_pct         AS "Sonne %",
-       round(v.umsatz_netto)     AS "Umsatz €",
-       round(v.umsatz_vergleich) AS "Vergleich €",
-       v.abweichung_pct    AS "Abweichung %",
-       v.vergleichstage    AS "Vergleichstage"
-  FROM mart.vergleichstag v
+SELECT vergleichstag.geschaeftstag AS "Tag",
+       vergleichstag.betrieb         AS "Betrieb",
+       vergleichstag.wochentag       AS "Wochentag",
+       vergleichstag.feiertag        AS "Feiertag",
+       vergleichstag.schulferien     AS "Schulferien",
+       CASE WHEN vergleichstag.vortag_feiertag   THEN 'nach Feiertag'
+            WHEN vergleichstag.folgetag_feiertag THEN 'vor Feiertag' END AS "Brückenlage",
+       vergleichstag.temp_max        AS "Temperatur °C",
+       vergleichstag.niederschlag    AS "Regen mm",
+       vergleichstag.sonne_pct       AS "Sonne %",
+       round(vergleichstag.umsatz_netto)     AS "Umsatz €",
+       round(vergleichstag.umsatz_vergleich) AS "Vergleich €",
+       vergleichstag.abweichung_pct  AS "Abweichung %",
+       vergleichstag.vergleichstage  AS "Vergleichstage"
+  FROM mart.vergleichstag
   LEFT JOIN mart.konzept_zuordnung z USING (betrieb_key)
  WHERE 1 = 1
-   [[AND v.betrieb = {{betrieb}}]]
+   [[AND vergleichstag.betrieb = {{betrieb}}]]
    [[AND z.hauptkonzept = {{marke}}]]
    [[AND {{zeitraum}}]]
- ORDER BY v.geschaeftstag DESC, v.betrieb
+ ORDER BY vergleichstag.geschaeftstag DESC, vergleichstag.betrieb
  LIMIT 2000`,
-    template_tag_dimension: { zeitraum: ['mart', 'vergleichstag_basis', 'geschaeftstag'] },
+    // Der Feldfilter zeigte bis zum 20.08.2026 auf mart.vergleichstag_basis,
+    // die in diesem SQL gar nicht vorkommt -- der Aliaspruefer konnte das
+    // nicht sehen, Postgres haette es erst beim gesetzten Filter gemeldet.
+    template_tag_dimension: { zeitraum: ['mart', 'vergleichstag', 'geschaeftstag'] },
     visualisierung: {
       'table.column_formatting': [{
         columns: ['Abweichung %'], type: 'range',

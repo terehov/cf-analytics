@@ -3348,3 +3348,56 @@ laut und prüft nicht.
 **Die Lehre.** Ein Test, der zwei Eigenschaften gleichzeitig prüft, schlägt bei
 der einen an und meint die andere. Wer ihn dann „repariert", repariert die
 falsche.
+
+## Die Sicht, die nach vorn schaut, schaute auf eine Achse ohne Zukunft (20.08.2026)
+
+**Symptom.** `mart.feiertag_kalender` — laut Plan „die einzige Sicht, die nach
+vorn schaut, und der Grund, warum jemand das Dashboard zweimal öffnet" —
+lieferte **null Zeilen**. Fehlerfrei, schnell, leer. Seit ihrer Entstehung in
+`0085`.
+
+**Ursache.** Sie baute auf `mart.betrieb_kalender`, und dessen Tagesachse ist
+`SELECT DISTINCT geschaeftstag FROM mart.umsatz_tag` — also ausschließlich
+Tage, an denen es bereits Umsatz **gab**. Ein `WHERE geschaeftstag >
+current_date` darauf kann nichts finden.
+
+**Wie es aufgefallen ist, und das ist der eigentliche Punkt.** Weder der
+Kartentest noch die Prüfsichten haben angeschlagen: das SQL war gültig, die
+Sicht existierte, die Karte lief. Gefunden wurde es erst, als **jede einzelne
+Karte gegen die Produktivinstanz ausgeführt und ihre Zeilenzahl angesehen**
+wurde. 15 von 16 trugen Daten oder waren erklärbar leer (Wetter-Backfill läuft
+noch); diese eine war es nicht.
+
+**Was ihn heute verhindert.** `0092`: die Tagesachse kommt aus
+`manual.feiertag`, nicht aus dem Umsatz. Dazu `mart.feiertag_vorausschau` als
+Prüfzeile — eine Vorausschau, die still leer läuft, sieht aus wie „keine
+Feiertage in Sicht" und ist von „kaputt" nicht zu unterscheiden.
+
+**Die Lehre.** „Läuft ohne Fehler" ist bei einer Auswertung keine Aussage. Eine
+Karte, die null Zeilen liefert, ist von einer richtigen nur durch **Hinsehen**
+zu unterscheiden — und zwar auf dem Bestand, für den sie gebaut wurde. Nach
+jeder Übernahme jede neue Karte einmal ausführen und die Zeilenzahl lesen.
+
+## Ein Feldfilter auf eine Tabelle mit Alias, zum zweiten Mal (20.08.2026)
+
+**Symptom.** `uebernehmen.ts` brach ab: zwölf der sechzehn neuen Karten trugen
+einen Feldfilter `{{zeitraum}}` auf `mart.kalendertag_lage` bzw.
+`mart.wettertag_lage`, führten die Tabelle im SQL aber unter dem Alias `l`
+beziehungsweise `w`.
+
+**Ursache.** Dieselbe wie am 28.07.2026: Metabase erzeugt aus einem Feldfilter
+`WHERE mart.kalendertag_lage.geschaeftstag BETWEEN …` mit dem **Tabellennamen**.
+Steht die Tabelle unter einem Alias, findet Postgres die Referenz nicht — und
+zwar erst, wenn jemand den Filter setzt.
+
+**Warum der Kartentest es nicht fand.** `metabase/karten.test.ts` ersetzt den
+Platzhalter durch eine einfache Bedingung, nicht durch die
+tabellenqualifizierte Form, die Metabase generiert. Der statische Prüfer in
+`uebernehmen.ts` fand es dagegen sofort — und **vor** dem ersten Schreibzugriff.
+
+**Ein dritter Fall im selben Durchgang, den der Prüfer nicht sehen konnte:**
+`kw_tagesliste` ließ den Feldfilter auf `mart.vergleichstag_basis` zeigen,
+während das SQL aus `mart.vergleichstag` las. Die Tabelle kam im SQL gar nicht
+vor, also gab es auch keinen Alias zu bemängeln. Wer einen Feldfilter setzt,
+prüft **beides**: dass die Tabelle im SQL vorkommt, und dass sie ohne Alias
+dasteht.

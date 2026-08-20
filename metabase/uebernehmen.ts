@@ -121,6 +121,22 @@ for (const d of dashboards) {
  * Jeder Eintrag braucht einen fachlichen Grund.
  */
 const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
+  // --- ⑫ Feiertage, Ferien, Wetter -----------------------------------
+  // Die Spannweite zwischen bestem und schwaechstem Feiertag ist eine
+  // LANGFRISTZAHL: sie braucht viele Termine je Feiertag, sonst gewinnt ein
+  // Ausreisser. Ein Monat liesse von 190 Christi-Himmelfahrt-Tagen einen
+  // uebrig. Der Klick fuehrt auf ⑫, wo der Zeitraum dann wirkt.
+  kw_kachel_feiertagseffekt: {
+    monat:    'Langfristzahl ueber alle Termine; ein Stichmonat liesse einen Termin uebrig.',
+    zeitraum: 'Langfristzahl ueber alle Termine; der Zeitraum wirkt auf ⑫ nach dem Klick.',
+  },
+  // Die einzige Karte des Dashboards, die NACH VORN schaut: die naechsten
+  // 90 Tage. Ein Zeitraumfilter auf die Vergangenheit wuerde sie leeren --
+  // und zwar genau dann, wenn jemand oben einen Zeitraum einstellt, um die
+  // Kacheln darueber zu schaerfen.
+  kw_naechste_feiertage: {
+    zeitraum: 'Schaut 90 Tage nach VORN; ein Zeitraum in der Vergangenheit leerte sie.',
+  },
   // --- Zeitreihen: der Monatsfilter waehlt einen Stichmonat, und genau den
   // --- darf eine Verlaufskurve nicht haben. Sonst bleibt ein Punkt uebrig.
   // dd_marken_verlauf steht weiter unten bei den Markenkarten -- ein
