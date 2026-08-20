@@ -555,6 +555,211 @@ SELECT geschaeftstag AS "Geschäftstag",
     },
   },
   {
+    schluessel: 'dd_betrieb_tagesart',
+    name: 'Betrieb — Umsatz nach Tagesart',
+    beschreibung:
+      'Tagesumsatz, eingefärbt nach der Art des Tages. Ein Feiertag am Sonntag zählt '
+      + 'als Feiertag, ein Samstag in den Ferien als Samstag; für Betriebe ohne '
+      + 'gepflegten Standort gelten die bundesweiten Feiertage. Darübergelegt die '
+      + 'Personal- und die Wareneinsatzquote aus der BWA — **je Monat**, feiner liegen '
+      + 'beide nicht vor, und nur für gebuchte Monate.\n\n'
+      + 'Ohne gewählten Betrieb entscheidet der Umsatzanteil über die Tagesart '
+      + '(Feiertage und Ferien sind Ländersache). Ohne Zeitraum die letzten 90 Tage.',
+    anzeige: 'combo',
+    parameter: [P_BETRIEB, P_ZEITRAUM],
+    // FUENF SAEULEN-SPALTEN, eine je Tagesart, gestapelt. Metabase kann in
+    // nativem SQL keine Saeulen nach einer Textspalte faerben; da jeder Tag
+    // genau EINE Tagesart hat, traegt die Stapelung je Tag genau eine
+    // Saeule -- und jede Tagesart bekommt ihre feste Farbe. Die Rangfolge
+    // (Feiertag vor Sonntag vor Samstag vor Ferientag) steht im CASE.
+    //
+    // Die Tagesart kommt aus mart.vergleichstag (materialisiert seit 0084)
+    // und NICHT aus mart.betrieb_kalender: die Kalendersicht rechnet je
+    // Aufruf ihr Kreuzprodukt neu, gemessen am 20.08.2026 mit 4,4 s allein
+    // fuer den Join -- die Materialisierung braucht dafuer eine Sekunde.
+    //
+    // Die Quoten sind MONATSWERTE aus der BWA. Die Tagesquote pek_* ist
+    // laut docs/datenherkunft.md Personalkosten SEIT MONATSANFANG durch
+    // Umsatz DES TAGES -- als Quote unbrauchbar, am 20.08.2026 nachgemessen
+    // (Median steigt durchs Monatsdrittel: 146/410/679 Prozent). Der
+    // Wareneinsatz liegt ohnehin nur je Monat vor (BWA bzw. Belegarchiv).
+    //
+    // Fallback und Feldfilter wie bei dd_betrieb_verlauf: die Eingrenzung
+    // steht NUR in der ersten CTE, der 90-Tage-Rueckfall gilt dem
+    // Kein-Filter-Fall, ein bewusst gesetzter Zeitraum wird bis zu einem
+    // Jahr vollstaendig gezeichnet.
+    sql: `
+WITH tage AS (
+    SELECT betrieb_key, geschaeftstag, sum(umsatz_netto) AS umsatz
+      FROM mart.umsatz_tag
+     WHERE 1 = 1
+       [[AND betrieb = {{betrieb}}]]
+       [[AND {{zeitraum}}]]
+     GROUP BY betrieb_key, geschaeftstag
+), fenster AS (
+    SELECT t.* FROM tage t
+     WHERE t.geschaeftstag >= (SELECT max(geschaeftstag) - 89 FROM tage)
+        OR (SELECT max(geschaeftstag) - min(geschaeftstag) FROM tage) <= 366
+), eingeordnet AS (
+    SELECT f.geschaeftstag, f.umsatz,
+           CASE WHEN v.ist_feiertag                           THEN 'Feiertag'
+                WHEN extract(isodow FROM f.geschaeftstag) = 7 THEN 'Sonntag'
+                WHEN extract(isodow FROM f.geschaeftstag) = 6 THEN 'Samstag'
+                WHEN v.ist_schulferien                        THEN 'Ferientag'
+                ELSE 'Werktag' END AS tagesart
+      FROM fenster f
+      LEFT JOIN mart.vergleichstag v USING (betrieb_key, geschaeftstag)
+), tagesart_je_tag AS (
+    -- Ohne Betriebsfilter je Tag die Tagesart, die fuer den groessten
+    -- Umsatzanteil galt: ein Feiertag in Bayern ist keiner in Hamburg.
+    SELECT DISTINCT ON (geschaeftstag) geschaeftstag, tagesart
+      FROM (SELECT geschaeftstag, tagesart, sum(umsatz) AS u
+              FROM eingeordnet GROUP BY 1, 2) s
+     ORDER BY geschaeftstag, u DESC
+), je_tag AS (
+    SELECT e.geschaeftstag, a.tagesart, sum(e.umsatz) AS umsatz
+      FROM eingeordnet e JOIN tagesart_je_tag a USING (geschaeftstag)
+     GROUP BY 1, 2
+), bwa AS (
+    SELECT monat,
+           100.0 * sum(wert_absolut) FILTER (WHERE kennzahl = 'Personalkosten ohne GF')
+                 / nullif(sum(wert_absolut) FILTER (WHERE kennzahl = 'Umsatz'), 0) AS pk_quote,
+           100.0 * sum(wert_absolut) FILTER (WHERE kennzahl IN ('WE Bar','WE Küche'))
+                 / nullif(sum(wert_absolut) FILTER (WHERE kennzahl = 'Umsatz'), 0) AS we_quote
+      FROM mart.bwa_kennzahl
+     WHERE 1 = 1
+       [[AND betrieb = {{betrieb}}]]
+     GROUP BY monat
+    HAVING sum(wert_absolut) FILTER (WHERE kennzahl = 'Umsatz') > 0
+)
+SELECT j.geschaeftstag AS "Geschäftstag",
+       CASE WHEN j.tagesart = 'Werktag'   THEN round(j.umsatz) END AS "Werktag",
+       CASE WHEN j.tagesart = 'Ferientag' THEN round(j.umsatz) END AS "Ferientag",
+       CASE WHEN j.tagesart = 'Samstag'   THEN round(j.umsatz) END AS "Samstag",
+       CASE WHEN j.tagesart = 'Sonntag'   THEN round(j.umsatz) END AS "Sonntag",
+       CASE WHEN j.tagesart = 'Feiertag'  THEN round(j.umsatz) END AS "Feiertag",
+       round(b.pk_quote, 1) AS "Personalquote % (Monat)",
+       round(b.we_quote, 1) AS "Wareneinsatzquote % (Monat)"
+  FROM je_tag j
+  LEFT JOIN bwa b ON b.monat = date_trunc('month', j.geschaeftstag)::date
+ ORDER BY j.geschaeftstag`,
+    template_tag_dimension: { zeitraum: ['mart', 'umsatz_tag', 'geschaeftstag'] },
+    visualisierung: {
+      'graph.dimensions': ['Geschäftstag'],
+      'graph.metrics': ['Werktag', 'Ferientag', 'Samstag', 'Sonntag', 'Feiertag',
+                        'Personalquote % (Monat)', 'Wareneinsatzquote % (Monat)'],
+      'stackable.stack_type': 'stacked',
+      'graph.y_axis.title_text': 'Umsatz netto (€)',
+      'graph.x_axis.title_text': '',
+      // Die Ampelfarben (Rot/Gelb/Gruen) sind hier TABU: ein roter
+      // Feiertagsbalken laese sich als Warnung. Werktage treten grau
+      // zurueck, das Wochenende ist eine Blaufamilie, Ferien und Feiertage
+      // stechen heraus. Farbabstaende am 20.08.2026 auf
+      // Farbfehlsichtigkeit geprueft.
+      series_settings: {
+        Werktag:   { color: '#B5BCC2' },
+        Ferientag: { color: '#C4457E' },
+        Samstag:   { color: '#5B8FD9' },
+        Sonntag:   { color: '#2F5597' },
+        Feiertag:  { color: '#D9762B' },
+        'Personalquote % (Monat)':     { display: 'line', axis: 'right', color: '#33393F', 'line.width': 2 },
+        'Wareneinsatzquote % (Monat)': { display: 'line', axis: 'right', color: '#0E7C7B', 'line.width': 2 },
+      },
+    },
+  },
+  {
+    schluessel: 'dd_betrieb_effektivitaet',
+    name: 'Betrieb — Effektivität je Tag',
+    beschreibung:
+      'Umsatz je geleisteter Personalstunde (LINAs Effektivität) je Tag, eingefärbt '
+      + 'nach Tagesart wie oben. Ohne gewählten Betrieb: Gesamtumsatz geteilt durch '
+      + 'die Summe der Personalstunden aller Betriebe mit erfassten Stunden. Tage '
+      + 'ohne erfasste Stunden bleiben leer — das ist eine Lücke, kein Nullwert.',
+    anzeige: 'bar',
+    parameter: [P_BETRIEB, P_ZEITRAUM],
+    // Die Effektivitaet ist die EINZIGE Personalkennzahl, die je Tag
+    // traegt: sie schwankt tageweise und steigt nicht durchs Monatsdrittel
+    // (Median 53/52/53 Euro je Stunde, gemessen am 20.08.2026) -- anders
+    // als die Tagesquoten, siehe Kommentar am Dateikopf.
+    //
+    // Ohne Betriebsfilter wird NICHT der Mittelwert der Effektivitaeten
+    // gebildet (der Schnitt zweier Quotienten ist kein Quotient), sondern
+    // Umsatz durch Stunden: die Stunden je Betrieb sind Umsatz geteilt
+    // durch Effektivitaet -- die Rueckrechnung aus docs/entscheidungen.md,
+    // am 11.08.2026 gegen die BWA geprueft (Median-Stundenlohn 21,12 EUR).
+    // NULLIF AM AEUSSEREN QUOTIENTEN, nachgetragen am 21.08.2026: der
+    // Schutz eff_gesamt > 0 sichert nur die INNERE Division. Ergibt die
+    // Summe darueber exakt 0 -- ein Tag mit null Umsatz und erfassten
+    // Stunden --, faellt die Karte mit "division by zero". Lokal gibt es
+    // keinen solchen Tag, in Produktion schon; aufgefallen beim
+    // Ausfuehren der Karte gegen die Produktivinstanz. EXPLAIN im
+    // Kartentest kann das nicht sehen.
+    // eff_gesamt > 0 schliesst Tage ohne erfasste Stunden aus, tage = 1
+    // haelt kuenftige Monatsposten aus dem Backfill heraus.
+    sql: `
+WITH tage AS (
+    SELECT betrieb_key, geschaeftstag, sum(umsatz_netto) AS umsatz
+      FROM mart.umsatz_tag
+     WHERE 1 = 1
+       [[AND betrieb = {{betrieb}}]]
+       [[AND {{zeitraum}}]]
+     GROUP BY betrieb_key, geschaeftstag
+), fenster AS (
+    SELECT t.* FROM tage t
+     WHERE t.geschaeftstag >= (SELECT max(geschaeftstag) - 89 FROM tage)
+        OR (SELECT max(geschaeftstag) - min(geschaeftstag) FROM tage) <= 366
+), eingeordnet AS (
+    SELECT f.betrieb_key, f.geschaeftstag, f.umsatz,
+           CASE WHEN v.ist_feiertag                           THEN 'Feiertag'
+                WHEN extract(isodow FROM f.geschaeftstag) = 7 THEN 'Sonntag'
+                WHEN extract(isodow FROM f.geschaeftstag) = 6 THEN 'Samstag'
+                WHEN v.ist_schulferien                        THEN 'Ferientag'
+                ELSE 'Werktag' END AS tagesart
+      FROM fenster f
+      LEFT JOIN mart.vergleichstag v USING (betrieb_key, geschaeftstag)
+), tagesart_je_tag AS (
+    SELECT DISTINCT ON (geschaeftstag) geschaeftstag, tagesart
+      FROM (SELECT geschaeftstag, tagesart, sum(umsatz) AS u
+              FROM eingeordnet GROUP BY 1, 2) s
+     ORDER BY geschaeftstag, u DESC
+), stunden AS (
+    SELECT e.geschaeftstag,
+           sum(e.umsatz)                 AS umsatz,
+           sum(e.umsatz / p.eff_gesamt)  AS personalstunden
+      FROM eingeordnet e
+      JOIN mart.personalkosten p
+        ON p.betrieb_key = e.betrieb_key AND p.zeitraum_von = e.geschaeftstag
+       AND p.tage = 1 AND p.eff_gesamt > 0
+     GROUP BY 1
+)
+SELECT s.geschaeftstag AS "Geschäftstag",
+       CASE WHEN a.tagesart = 'Werktag'   THEN round(s.umsatz / nullif(s.personalstunden, 0), 1) END AS "Werktag",
+       CASE WHEN a.tagesart = 'Ferientag' THEN round(s.umsatz / nullif(s.personalstunden, 0), 1) END AS "Ferientag",
+       CASE WHEN a.tagesart = 'Samstag'   THEN round(s.umsatz / nullif(s.personalstunden, 0), 1) END AS "Samstag",
+       CASE WHEN a.tagesart = 'Sonntag'   THEN round(s.umsatz / nullif(s.personalstunden, 0), 1) END AS "Sonntag",
+       CASE WHEN a.tagesart = 'Feiertag'  THEN round(s.umsatz / nullif(s.personalstunden, 0), 1) END AS "Feiertag"
+  FROM stunden s
+  JOIN tagesart_je_tag a USING (geschaeftstag)
+ ORDER BY s.geschaeftstag`,
+    template_tag_dimension: { zeitraum: ['mart', 'umsatz_tag', 'geschaeftstag'] },
+    visualisierung: {
+      'graph.dimensions': ['Geschäftstag'],
+      'graph.metrics': ['Werktag', 'Ferientag', 'Samstag', 'Sonntag', 'Feiertag'],
+      'stackable.stack_type': 'stacked',
+      'graph.y_axis.title_text': 'Umsatz je Personalstunde (€)',
+      'graph.x_axis.title_text': '',
+      // Dieselben Farben wie dd_betrieb_tagesart -- die Farbe folgt der
+      // Tagesart, nicht der Karte.
+      series_settings: {
+        Werktag:   { color: '#B5BCC2' },
+        Ferientag: { color: '#C4457E' },
+        Samstag:   { color: '#5B8FD9' },
+        Sonntag:   { color: '#2F5597' },
+        Feiertag:  { color: '#D9762B' },
+      },
+    },
+  },
+  {
     schluessel: 'dd_betrieb_ampelverlauf',
     name: 'Betrieb — Ampelverlauf je Bereich',
     beschreibung:

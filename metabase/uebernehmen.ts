@@ -125,7 +125,8 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
   // Die Spannweite zwischen bestem und schwaechstem Feiertag ist eine
   // LANGFRISTZAHL: sie braucht viele Termine je Feiertag, sonst gewinnt ein
   // Ausreisser. Ein Monat liesse von 190 Christi-Himmelfahrt-Tagen einen
-  // uebrig. Der Klick fuehrt auf ⑫, wo der Zeitraum dann wirkt.
+  // uebrig, ein Quartal nicht viel mehr. Der Klick fuehrt auf ⑫, wo der
+  // Zeitraum dann wirkt.
   kw_kachel_feiertagseffekt: {
     monat:    'Langfristzahl ueber alle Termine; ein Stichmonat liesse einen Termin uebrig.',
     zeitraum: 'Langfristzahl ueber alle Termine; der Zeitraum wirkt auf ⑫ nach dem Klick.',
@@ -143,6 +144,8 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
   // zweiter Eintrag hier wuerde ihn ueberschreiben, nicht ergaenzen.
   pf_marken_umsatzanteil: { monat: 'Verlauf ueber alle Monate.' },
   dd_betrieb_verlauf:     { monat: 'Verlauf ueber alle Monate.' },
+  dd_betrieb_tagesart:    { monat: 'Tagesverlauf; eingegrenzt wird ueber den Zeitraumfilter.' },
+  dd_betrieb_effektivitaet: { monat: 'Tagesverlauf; eingegrenzt wird ueber den Zeitraumfilter.' },
   dd_betrieb_ampelverlauf:{ monat: 'Verlauf ueber alle Monate.' },
   dd_betrieb_sparte:      { monat: 'Verlauf ueber alle Monate.' },
   vg_ort_umsatz:          { monat: 'Verlauf ueber alle Monate.' },

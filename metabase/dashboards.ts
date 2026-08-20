@@ -391,6 +391,21 @@ export const dashboards: Dashboard[] = [
         { karte: 'dd_betrieb_verlauf',
           klick: [{ ziel: 'db_umsatz', uebergabe: {} }] },
       ] },
+      // Gewuenscht am 20.08.2026: am Tagesumsatz soll ohne Nachdenken
+      // ablesbar sein, was fuer ein Tag das war (Werktag, Ferien, Feiertag,
+      // Samstag, Sonntag) -- und was der Umsatz an Personal und Ware
+      // gekostet hat. Volle Breite aus demselben Grund wie der Verlauf
+      // darueber: bis zu 90 Saeulen. Die Effektivitaet direkt darunter,
+      // gleiche Zeitachse, gleiche Farben -- wer beide uebereinander sieht,
+      // erkennt den teuren schwachen Sonntag an einem Blick.
+      { teile: [
+        { karte: 'dd_betrieb_tagesart', hoehe: 10,
+          klick: [{ ziel: 'db_umsatz', uebergabe: {} }] },
+      ] },
+      { teile: [
+        { karte: 'dd_betrieb_effektivitaet',
+          klick: [{ ziel: 'db_personal', uebergabe: {} }] },
+      ] },
       ] },
       { name: 'Gäste & Bewertungen', reihen: [
       // Die Gaeste-Sicht. Zwei Linien, die man nicht verwechseln darf:

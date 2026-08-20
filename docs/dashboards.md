@@ -742,6 +742,50 @@ wären hier der sichere Weg zur Fehldeutung.
 
 ---
 
+## Tagesart und Effektivität auf dem Betriebsblatt (angefragt 20.08.2026)
+
+**Gefragt am 20.08.2026:** am Tagesumsatz soll ohne Nachdenken ablesbar sein, was für ein
+Tag das war — regulärer Arbeitstag, Ferientag, Feiertag, Samstag, Sonntag — und darüber
+gelegt, wie viel Personal und Materialeinsatz nötig waren, um diesen Umsatz zu erzielen.
+Ursprünglich für den Stundenverlauf gewünscht; warum es die Tagesebene wurde, steht unten.
+
+Zwei neue Karten auf ③ Betrieb, Reiter *Überblick*, direkt unter dem Tagesverlauf:
+
+| Karte | Zeigt |
+|---|---|
+| `dd_betrieb_tagesart` | Tagesumsatz als Säulen, eingefärbt nach Tagesart; darüber Personal- und Wareneinsatzquote aus der BWA als Linien (rechte Achse, je **Monat**) |
+| `dd_betrieb_effektivitaet` | Umsatz je geleisteter Personalstunde (`eff_gesamt`) je Tag, dieselben Farben |
+
+**Die Tagesart hat eine Rangfolge:** Feiertag schlägt Sonntag schlägt Samstag schlägt
+Ferientag. Ein Feiertag am Sonntag ist ein Feiertag, ein Samstag in den Schulferien ein
+Samstag — die Ferien färben nur Tage, die sonst gewöhnliche Werktage wären. Quelle ist
+`mart.vergleichstag` (materialisiert seit `0084`, bundesweite Feiertage als Rückfall für
+Betriebe ohne Standort). Ohne Betriebsfilter entscheidet je Tag der Umsatzanteil, denn
+Feiertage und Ferien sind Ländersache.
+
+**Warum die Quoten Monatswerte sind und keine Tageslinien.** Die Tagesquote `pek_*` ist
+Personalkosten **seit Monatsanfang** durch Umsatz **des Tages** (`docs/datenherkunft.md`) —
+am 20.08.2026 nachgemessen: ihr Median steigt durch die Monatsdrittel von 146 über 410 auf
+679 Prozent. Als Linie über den Tagen sähe das aus wie explodierende Kosten zum Monatsende
+und wäre doch nur die Bauart der Kennzahl. Der Wareneinsatz liegt ohnehin nur je Monat vor.
+Deshalb tragen beide Linien den Zusatz „(Monat)" und brechen ab, wo der Steuerberater noch
+nicht gebucht hat.
+
+**Warum nicht je Stunde.** Der Stundenbericht liefert nur Umsatz — keine Stunden, keine
+Sparten (`0052`). Personal gibt es je Tag (`eff_gesamt`), Ware je Monat. Eine „Effektivität
+je Stunde" wäre eine flache Linie aus Tageswerten in feinerem Raster: erfundene Präzision.
+Sollte Bericht 107 („Gearbeitete Stunden", Messpunkt `d2` in `src/messen.ts`) je Schicht
+liefern, wird die Stundenebene möglich — vorher nicht.
+
+**Die Farben meiden die Ampel.** Rot, Gelb und Grün sind auf diesen Seiten Urteile; ein
+roter Feiertagsbalken läse sich als Warnung. Stattdessen: Werktage grau (sie sind der
+Hintergrund, nicht die Nachricht), Samstag und Sonntag als helle und dunkle Stufe derselben
+Blaufamilie, Ferientage magenta, Feiertage orange. Die Abstände sind am 20.08.2026 auf
+Farbfehlsichtigkeit geprüft; die Tagesart steht zusätzlich im Tooltip, Farbe ist nie die
+einzige Auskunft.
+
+---
+
 ## Fallen beim Bauen einer neuen Karte
 
 **Komma-Join bindet schwächer als `LEFT JOIN`.** Bei

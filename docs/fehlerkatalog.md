@@ -3401,3 +3401,38 @@ während das SQL aus `mart.vergleichstag` las. Die Tabelle kam im SQL gar nicht
 vor, also gab es auch keinen Alias zu bemängeln. Wer einen Feldfilter setzt,
 prüft **beides**: dass die Tabelle im SQL vorkommt, und dass sie ohne Alias
 dasteht.
+
+## Eine Division, die nur in Produktion durch null ging (21.08.2026)
+
+**Symptom.** `dd_betrieb_effektivitaet` auf ③ Betrieb meldete in Metabase
+`ERROR: division by zero`. Lokal lief die Karte, `metabase/karten.test.ts` war
+grün, `uebernehmen.ts` hatte sie ohne Beanstandung übernommen.
+
+**Ursache.** Die Karte rechnet Umsatz je Personalstunde. Die inneren Divisionen
+sind mit `eff_gesamt > 0` abgesichert, die **äußeren fünf** waren es nicht:
+
+```sql
+round(s.umsatz / s.personalstunden, 1)
+```
+
+`personalstunden` ist `sum(e.umsatz / p.eff_gesamt)`. Ergibt diese Summe exakt
+0 — ein Tag mit null Umsatz und erfassten Stunden —, dividiert die Karte durch
+null. Im lokalen Bestand gibt es keinen solchen Tag, im produktiven schon.
+
+**Warum keine der drei Prüfungen es fand.** `karten.test.ts` fährt `EXPLAIN`:
+Postgres prüft damit Syntax, Tabellen, Spalten und Typen, **führt aber nicht
+aus** — eine Division durch null entsteht erst beim Rechnen. Der statische
+Prüfer in `uebernehmen.ts` sucht nach Aliasfallen und wirkungslosen Filtern,
+nicht nach Laufzeitfehlern. Und der lokale Bestand kannte den auslösenden Fall
+nicht.
+
+**Was ihn heute verhindert.** `nullif(s.personalstunden, 0)` an allen fünf
+Stellen. Der Wert kann dadurch nichts Richtiges verändern — er macht aus einem
+Absturz eine leere Zelle.
+
+**Die Lehre, und sie ist dieselbe wie eine Seite weiter oben.** Nach jeder
+Übernahme jede berührte Karte einmal **ausführen**, nicht nur übernehmen. Ein
+grüner Provisionierungslauf sagt, dass die Karte angelegt wurde — nicht, dass
+sie rechnet. Zwei von achtzehn Karten dieses Durchgangs waren fehlerfrei
+angelegt und trotzdem unbrauchbar: eine lieferte still null Zeilen
+(`mart.feiertag_kalender`), eine stürzte ab.
