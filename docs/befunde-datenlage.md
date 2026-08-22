@@ -1954,3 +1954,80 @@ Sichtbar wird das in den Quartilen, und genau dafür stehen sie da:
 **Die Lehre:** die Neujahrszahl ist keine typische Umsatzveränderung, sondern
 eine Grenze. Wer sie zitiert, nennt p25 und p75 dazu — sonst liest sie sich als
 „Neujahr kostet 97 % Umsatz", und das gilt für keinen einzelnen Betrieb.
+
+---
+
+## Pflichtartikel: was die Quote misst und was nicht (22.08.2026)
+
+Gemessen im jeweiligen Laufzeitraum der Liste (Wilma Wunder 13.04.–04.10.2026,
+Aposto und Enchilada ab 01.01.2026), nur Kostenstellen mit Betriebszuordnung.
+
+| Konzept | Betriebe | Einkauf | abseits der Liste |
+|---|---:|---:|---:|
+| Enchilada | 21 | 3,00 Mio € | **24,4 %** |
+| Aposto | 10 | 2,28 Mio € | **31,6 %** |
+| Wilma Wunder | 14 | 1,01 Mio € | **40,8 %** |
+
+**Die Spreizung zwischen den Betrieben ist die eigentliche Aussage**, nicht die
+absolute Höhe: 13,7 % bis 60 % innerhalb desselben Konzepts, bei gleicher Liste
+und gleicher Datengrundlage.
+
+### Warum die absolute Höhe wenig sagt
+
+**Die Listen führen ganze Warengruppen nicht.** Kein Reinigungsmittel, keine
+Verpackung, keinen Kaffee, keine Weine außer den genannten. Die größten
+„abseits"-Posten bei Wilma Wunder waren deshalb:
+
+| Artikel | Lieferant | Ausgaben |
+|---|---|---:|
+| J. Hornig Röstmeister Graz 1000G Bohne | J.J. Darboven | 8.960 € |
+| Augustiner Hell 30L Keg | Trinkkontor | 7.954 € |
+| Büble Bayr. Hell 50L | Hubauer Getränke | 7.857 € |
+| Lattiz 4L Milchschaumzubereitung | Distra | 3.942 € |
+
+Kaffee und Fassbier sind kein Verstoß, sondern eine Lücke der Liste. **Wer die
+Quote ohne diese Einordnung weitergibt, erzeugt eine Diskussion über das falsche
+Thema.** Deshalb steht die Artikeltabelle als eigener Reiter auf der Seite und
+nicht als Beilage.
+
+### Die Messung hat eine bekannte Unschärfe, und sie ist beziffert
+
+`namensgleich` — Name trifft die Liste, Nummer nicht — trägt 1,2 bis 3,8 % der
+Ausgaben je Betrieb. **Solange diese Zahl groß ist, ist die Quote eine
+Obergrenze.** Die größten Einzelfälle:
+
+| bestellt | auf der Liste | Betriebe | Ausgaben |
+|---|---|---:|---:|
+| Cheddar / Gouda Mix (`500096`) | `268` | 20 | 105.194 € |
+| Burrata (`275`) | `46010027` | 9 | 24.877 € |
+| Hausgemachter Grapefruit-Sirup (`108820`) | `10957` | 14 | 13.690 € |
+| Ziegenrolle (`500111`) | `278` | 10 | 10.704 € |
+
+Dass **zwanzig** Betriebe dieselbe abweichende Nummer bestellen, ist das
+Erkennungsmerkmal: das ist eine Nachfolgenummer des Lieferanten und kein
+Verhalten. Jede bestätigte Zeile in `pflege/pflichtartikel_alias.csv` macht die
+Quote genauer.
+
+### 28 Listenartikel bezieht kein einziger Betrieb
+
+Bei Enchilada betrifft es unter anderem „Komali Maistortillas Gelb 15cm"
+(`110141`), „Salsa Tk Karton" (`48614`), „Caesar Dressing Schale 1Kg"
+(`2302091`) — alle drei zuletzt **2025** bestellt, also vor Beginn der 2026er
+Laufzeit. Ein Artikel, den niemand bezieht, ist fast nie ein Verstoß aller
+gleichzeitig: er ist ausgelistet, umnummeriert oder stand nie im Sortiment. Das
+ist eine Listenpflege, keine Betriebsfrage.
+
+### Und eine Grenze, die vor der Auswertung liegt
+
+**Nicht jede Kostenstelle bestellt über FoodNotify.** Im Zwölfmonatsfenster
+gemessen:
+
+| Marke | Küche bestellt | Bar bestellt |
+|---|---|---|
+| Wilma Wunder | **6 von 15** | 15 von 15 |
+| Enchilada | 20 von 26 | 22 von 26 |
+| Aposto | 10 von 11 | 10 von 11 |
+
+Bei Wilma Wunder läuft die Küche also überwiegend **nicht** über das
+Bestellsystem. Das verzerrt die Quote nicht (sie ist ein Anteil an dem, was
+sichtbar ist), begrenzt aber, worüber sie überhaupt etwas sagt.

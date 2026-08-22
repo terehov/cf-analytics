@@ -1086,3 +1086,57 @@ stehen nebeneinander, nicht gegeneinander verrechnet.
 und die haben 60 von 141 Betrieben — der Kalender kommt seit `0084` auch ohne
 aus. Eine Wetterkachel zeigt also weniger Betriebe als die Feiertagskachel
 daneben, und das gehört in die Beschreibung.
+
+---
+
+## Pflichtartikel-Sichten (Migration `0094`)
+
+Welche Sicht welche Frage beantwortet. Die drei `*_basis`-Sichten sind
+Rechenstände und werden **nicht direkt abgefragt** — sie tragen die Erklärung
+nicht.
+
+| Sicht | Frage |
+|---|---|
+| `mart.pflichtartikel_betrieb` | **Die Leitzahl.** Welcher Anteil der Ausgaben läuft an der Liste vorbei, je Betrieb, mit Rang und Datenbasis |
+| `mart.pflichtartikel_einkauf` | dasselbe je Monat und Zustand — für Verlauf und Kacheln |
+| `mart.pflichtartikel_klassifikation` | je bestelltem Artikel: steht er auf der Liste? Fünf Zustände |
+| `mart.pflichtartikel_abseits` | **Der Drilldown.** Welche Artikel genau, nach Ausgaben |
+| `mart.pflichtartikel_verdacht` | Arbeitsliste: gleicher Name, andere Nummer → Nachfolgenummer? |
+| `mart.pflichtartikel_abdeckung` | Gegenrichtung: welcher Pflichtartikel wurde nicht bezogen |
+| `mart.pflichtartikel_nicht_pruefbar` | die 112 Positionen ohne Artikelnummer |
+| `mart.pflichtartikel_regional` | Auflösung der regionalen Gerichte auf Betriebe |
+| `mart.pflichtartikel_stand` | Listenumfang und Laufzeit |
+| `mart.pflichtartikel_ueberlappung` | Prüfsicht, Erwartung **leer** |
+| `mart.pflichtartikel_regional_offen` | Prüfsicht, Erwartung **leer** |
+
+### Drei Regeln für Karten auf diesen Sichten
+
+**1. `abseits_pct` nie ohne `datenbasis`.** Ein Betrieb mit drei Bestellungen
+kommt rechnerisch auf 90 % — richtig gerechnet und trotzdem keine Aussage.
+Tabellen tragen die Spalte, Diagramme filtern auf `belastbar` und sagen das in
+ihrer Beschreibung.
+
+**2. `namensgleich` ist kein Befund, sondern die Unschärfe.** Diese Ausgaben
+zählen weder als erfüllt noch als abseits. Solange die Zahl groß ist, ist
+`abseits_pct` eine **Obergrenze**. Sie gehört als eigene Kachel sichtbar
+daneben, nie stillschweigend in einen der beiden Töpfe.
+
+**3. Kein Zeitraumfilter.** Der Zeitraum ist die Laufzeit der Liste und wird in
+`0094` geschnitten. Ein freier Filter darüber könnte diesen Schnitt nur
+aufweichen.
+
+### Was nachgesehen wird
+
+```sql
+-- Erwartung: nichts Auffaelliges. Die dritte Zeile ist die stille — eine
+-- ausgelaufene Liste erzeugt keinen Fehler, sondern eine leere Seite.
+SELECT * FROM mart.pruefung_uebersicht WHERE pruefung LIKE 'Pflichtartikel%';
+
+-- Die lohnendste Arbeit: bestaetigte Nachfolgenummern machen die Quote genauer.
+SELECT * FROM mart.pflichtartikel_verdacht ORDER BY ausgaben DESC LIMIT 20;
+
+-- Und die Rangliste selbst.
+SELECT konzept, betrieb, abseits_pct, datenbasis
+  FROM mart.pflichtartikel_betrieb
+ WHERE datenbasis = 'belastbar' ORDER BY abseits_pct DESC;
+```

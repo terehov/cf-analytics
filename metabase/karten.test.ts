@@ -31,6 +31,7 @@ import { karten as kartenYext } from './karten-yext'
 import { karten as kartenAktionen } from './karten-aktionen'
 import { karten as kartenVergleich } from './karten-vergleich'
 import { karten as kartenFremdeinkauf } from './karten-fremdeinkauf'
+import { karten as kartenPflichtartikel } from './karten-pflichtartikel'
 import { karten as kartenKalender } from './karten-kalender'
 import type { Karte } from './typen'
 
@@ -40,7 +41,7 @@ const lauf = DB ? describe : describe.skip
 const alleKarten: Karte[] = [
   ...kartenRoundTable, ...kartenFach, ...kartenDrilldown,
   ...kartenPortfolio, ...kartenImport, ...kartenStandort, ...kartenBewertung,
-  ...kartenAktionen, ...kartenVergleich, ...kartenFremdeinkauf, ...kartenYext,
+  ...kartenAktionen, ...kartenVergleich, ...kartenFremdeinkauf, ...kartenPflichtartikel, ...kartenYext,
   ...kartenKalender,
 ]
 

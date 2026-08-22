@@ -34,6 +34,7 @@ import { karten as kartenAktionen } from './karten-aktionen'
 import { karten as kartenVergleich } from './karten-vergleich'
 import { karten as kartenKalender } from './karten-kalender'
 import { karten as kartenFremdeinkauf } from './karten-fremdeinkauf'
+import { karten as kartenPflichtartikel } from './karten-pflichtartikel'
 import { dashboards } from './dashboards'
 import { auslegen, MINDESTHOEHE } from './layout'
 import type { Karte, Kachel, Dashboard, Reihe } from './typen'
@@ -47,7 +48,7 @@ const METABASE = config.METABASE_URL
 
 const alleKarten: Karte[] = [
   ...kartenDrilldown, ...kartenPortfolio, ...kartenRoundTable, ...kartenFach, ...kartenImport, ...kartenStandort,
-  ...kartenBewertung, ...kartenAktionen, ...kartenYext, ...kartenVergleich, ...kartenFremdeinkauf,
+  ...kartenBewertung, ...kartenAktionen, ...kartenYext, ...kartenVergleich, ...kartenFremdeinkauf, ...kartenPflichtartikel,
   ...kartenKalender,
 ]
 

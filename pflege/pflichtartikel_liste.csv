@@ -1,0 +1,7 @@
+konzept;bereich;gueltig_von;gueltig_bis;name;quelle_datei;notiz
+Wilma Wunder;kueche;2026-04-13;2026-10-04;Sommer-Standardkarte Küche;WW_PAL_Küche_Sommer-Standardkarte_2026.pdf;START 13.04.2026 / ENDE 04.10.2026, so auf der Vorlage
+Wilma Wunder;bar;2026-04-13;2026-10-04;Sommer-Standardkarte Bar;WW_PAL_Bar_Sommer-Standardkarte_2026.pdf;START 13.04.2026 / ENDE 04.10.2026, so auf der Vorlage
+Aposto;kueche;2026-01-01;;PAL Aposto 2026 — Küche;PAL Aposto 2026.xlsx (Blatt Küche);"Die Vorlage nennt nur das Jahr; gueltig_von auf Jahresbeginn gesetzt, Ende offen"
+Aposto;bar;2026-01-01;;PAL Aposto 2026 — Bar und Eiskarte;PAL Aposto 2026.xlsx (Blätter Bar, Eiskarte);"Die Vorlage nennt nur das Jahr; Eiskarte als Rubrik in der Bar-Liste gefuehrt"
+Enchilada;kueche;2026-01-01;;PAL Enchilada 2026 — Küche;2026 PAL Enchilada.xlsx (Blätter Küche *);"Die Vorlage nennt nur das Jahr; gueltig_von auf Jahresbeginn gesetzt, Ende offen"
+Enchilada;bar;2026-01-01;;PAL Enchilada 2026 — Bar;2026 PAL Enchilada.xlsx (Blätter Bar *);"Die Vorlage nennt nur das Jahr; gueltig_von auf Jahresbeginn gesetzt, Ende offen"

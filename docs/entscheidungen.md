@@ -2291,3 +2291,96 @@ Tagen sprang Neujahr von −68,7 auf −97,3 %. Nicht wegen des Gewichts, sonder
 weil der Median dort auf der Kante zwischen „hat auf" und „hat zu" sitzt. Steht
 als Spaltenkommentar an `mart.kalendereffekt_gruppe.median_pct`, damit es
 niemand als Umsatzrückgang zitiert.
+
+---
+
+## 22.08.2026 — Pflichtartikel: die Frage wurde umgedreht
+
+**Anlass.** Der Fachbereich hat Pflichtartikellisten (PAL) übergeben: je Konzept
+eine Vorgabe, welche Artikel ein Betrieb führen muss. Zwei PDF (Wilma Wunder,
+Küche und Bar), zwei XLSX (Aposto, Enchilada). Gefragt war, „welche Standorte
+sich daran halten und welche nicht".
+
+**Entschieden: die Leitzahl ist der Anteil daneben, nicht die Erfüllung.**
+Auf Rückfrage präzisiert: gefragt ist, **welche Betriebe abseits der
+Pflichtartikel bestellen**, mit einer Quote zum Sortieren. Also nicht „wie viele
+der 765 Positionen hat der Betrieb bezogen", sondern „welcher Anteil seiner
+Ausgaben entfällt auf Artikel, die auf keiner Liste stehen".
+
+Der Unterschied ist nicht kosmetisch. Die Erfüllungslesart wurde gemessen und
+verworfen: sie füllte die Rangliste mit geschlossenen und insolventen Häusern,
+weil ein Betrieb mit wenigen Bestellungen zwangsläufig wenige Pflichtartikel
+bezieht. Der Ausgabenanteil normiert das von selbst.
+
+**Auf Ausgaben gerechnet, nicht auf Artikelzahl.** Eine Palette Fremdbier wiegt
+mehr als eine Packung Zahnstocher. Dieselbe Entscheidung wie bei
+`mart.fremdeinkauf`.
+
+**Entschieden: Gültigkeit wird geführt und geschnitten.** Die Wilma-Wunder-Liste
+ist ausdrücklich eine Sommerkarte (START 13.04.2026, ENDE 04.10.2026); Aposto
+und Enchilada nennen nur „2026". Jede Bestellposition wird gegen die Liste
+geprüft, die **am Bestelltag** galt. Eine Januarbestellung gegen die Sommerkarte
+zu prüfen misst die Karte und nicht den Betrieb.
+
+*Verworfen: Gültigkeit nur dokumentieren.* Wäre einfacher gewesen, hätte aber
+die Wilma-Zahlen unlesbar gemacht — sie stünden dann für einen Zeitraum, in dem
+die Vorgabe teilweise gar nicht galt.
+
+*Verworfen: Zeitraum fest auf die Gültigkeit ohne jeden Filter.* Ist fachlich
+dasselbe und wurde umgesetzt; der Unterschied ist nur, dass die Seite bewusst
+**keinen** Zeitraumfilter anbietet, statt einen anzubieten, der den Schnitt
+aufweichen würde.
+
+**Entschieden: Namensabgleich zusätzlich zum Nummernabgleich.** 112 der 765
+Positionen tragen keine Artikelnummer — überwiegend GFGH-Getränke („Pepsi Cola",
+„Granini Apfelsaft naturtrüb"), weil jeder Betrieb seinen eigenen regionalen
+Getränkefachgroßhandel mit eigenem Nummernkreis hat. Die Händler stehen in
+FoodNotify (Getränke Keller, HFS, GLH, Trinkkontor), nur die Nummern passen
+nicht. Für sie ist der Name der einzig mögliche Nachweis.
+
+**Aber in zwei getrennten Zuständen, nicht in einem.** Der Namensabgleich trifft
+zwei sehr verschiedene Fälle, und sie zusammenzuwerfen wäre der eigentliche
+Fehler gewesen:
+
+| Fall | Zustand | zählt als |
+|---|---|---|
+| Listenposition **ohne** Nummer, Name trifft | `pflicht_namentlich` | erfüllt — es gibt keinen anderen Nachweis |
+| Listenposition **mit** Nummer, Name trifft, Nummer weicht ab | `namensgleich` | **weder noch** — Verdacht auf Nachfolgenummer |
+
+Dieselbe Begründung wie bei `ampel.gesamt()` in `0080` und der
+Lieferantenfreigabe in `0055`: ein Zustand, der „wir wissen es nicht" bedeutet,
+darf nicht in den Topf fallen, der „in Ordnung" oder „Verstoß" heißt.
+
+**Entschieden: Nachfolgenummern werden gepflegt, nicht geraten.** Artikelnummern
+wechseln, während die Liste stehen bleibt: „Cheddar / Gouda Mix" lief bis
+13.11.2025 unter Distra `268` und läuft seit 15.11.2025 unter `500096` — gleicher
+Name, gleiches Gebinde, 105.194 € bei 20 Betrieben. Die Liste des Fachbereichs
+zu korrigieren hätte die Vorlage verfälscht; den Namenstreffer automatisch als
+erfüllt zu werten hätte geraten. Stattdessen `manual.pflichtartikel_alias`,
+gefüllt über `pflege/pflichtartikel_alias.csv`, gespeist aus
+`mart.pflichtartikel_verdacht`.
+
+**Entschieden: Deutsche Konzepte bleibt außen vor.** Für die Marke liegt keine
+Liste vor. Ohne Ausschluss stünde sie mit 100 % „abseits" in jeder Rangliste —
+das wäre keine Aussage, sondern eine fehlende Datei.
+
+**Entschieden: regionale Gerichte gelten nur, wo die Vorlage sie nennt.** 24
+Artikel der Wilma-Wunder-Küchenliste tragen eine Ortsangabe in Klammern
+(„Sauerbraten (Dresden, Köln, Düsseldorf)"). In der **Abdeckung** zählen sie nur
+bei den genannten Betrieben — für Passau ist ein Dresdner Sauerbraten kein
+fehlender Artikel. In der **Quote** gelten sie dagegen für alle als freigegeben:
+wer sie kauft, kauft nicht abseits. Was sich nicht auflösen lässt, steht in
+`mart.pflichtartikel_regional_offen` und gilt vorsorglich für alle — lieber ein
+Treffer zu viel auf der Arbeitsliste als einer, der still verschwindet.
+
+**Entschieden: eigene Seite, kein Reiter auf `db_einkauf`.** Anders als bei
+`db_fremdeinkauf` ist es hier nicht eine andere Quelle (beide stehen auf
+FoodNotify-Bestellungen), sondern eine andere **Frage**: `db_einkauf` fragt, was
+der Einkauf kostet, `db_pflichtartikel` fragt, ob gekauft wird, was gekauft
+werden soll. Auf einer Seite hätten die Zahlen nebeneinandergestanden, ohne dass
+eine die andere erklärt. Dazu eine Kachel auf ③ Betrieb, direkt neben der
+Fremdeinkaufskachel — die beiden ergänzen sich und werden leicht verwechselt:
+Fremdeinkauf fragt, ob der **Lieferant** freigegeben ist, Pflichtartikel fragen,
+ob der **Artikel** auf der Liste steht. Ein Betrieb kann beim freigegebenen
+Lieferanten am Sortiment vorbei bestellen, und genau dieser Fall ist auf der
+Fremdeinkaufsseite unsichtbar.

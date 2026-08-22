@@ -152,6 +152,57 @@ export const ZIELE: readonly Ziel[] = [
     pflicht: ['monat'],
     zweck: 'Gastronomie-Marktindex (Destatis) als Vergleichsgroesse',
   },
+
+  /**
+   * Die Pflichtartikellisten (Migration `0094`).
+   *
+   * DIE REIHENFOLGE DIESER DREI EINTRÄGE IST BINDEND. `pflichtartikel`
+   * hängt per Fremdschlüssel an `pflichtartikel_liste` — steht die
+   * Kopfzeile noch nicht, wird die ganze Positionsdatei abgewiesen (und
+   * das zu Recht: eine Liste ohne Laufzeit ist nicht auswertbar). Die
+   * Schleife in `pflegeEinlesen()` läuft `ZIELE` der Reihe nach durch,
+   * also steht der Kopf hier vor den Positionen.
+   *
+   * WARUM DIE LISTEN ÜBERHAUPT HIER LIEGEN UND NICHT NUR IN DER
+   * MIGRATION. Die Wilma-Wunder-Liste ist eine Sommerkarte mit Laufzeit
+   * bis zum 04.10.2026; die Winterkarte ist damit absehbar und soll ein
+   * Commit sein, keine Migration. Dieselbe Begründung wie bei
+   * `om_einschaetzung.csv`, wo 22 Noten fest im Quelltext von `0044`
+   * standen und ab Juli 2026 stillschweigend ausliefen.
+   */
+  {
+    datei: 'pflichtartikel_liste.csv',
+    tabelle: 'manual.pflichtartikel_liste',
+    schluessel: ['konzept', 'bereich', 'gueltig_von'],
+    spalten: ['konzept', 'bereich', 'gueltig_von', 'gueltig_bis', 'name',
+      'quelle_datei', 'stand', 'notiz'],
+    pflicht: ['konzept', 'bereich', 'gueltig_von'],
+    zweck: 'Kopfzeile je Pflichtartikelliste — Konzept, Bereich, Laufzeit',
+  },
+  {
+    datei: 'pflichtartikel.csv',
+    tabelle: 'manual.pflichtartikel',
+    /*
+     * Der Schlüssel enthält die BEZEICHNUNG, weil 112 der 767 Positionen
+     * keine Artikelnummer haben (GFGH-Getränke: jeder Betrieb hat einen
+     * eigenen Nummernkreis). Die Tabelle trägt dafür UNIQUE NULLS NOT
+     * DISTINCT — sonst ließe Postgres beliebig viele „Pepsi Cola ohne
+     * Nummer" nebeneinander zu.
+     */
+    schluessel: ['konzept', 'bereich', 'gueltig_von', 'artikelnummer', 'bezeichnung'],
+    spalten: ['konzept', 'bereich', 'gueltig_von', 'artikelnummer', 'bezeichnung',
+      'lieferant', 'rubrik', 'optional', 'nur_betriebe', 'quelle', 'notiz'],
+    pflicht: ['konzept', 'bereich', 'gueltig_von', 'bezeichnung'],
+    zweck: 'Die einzelnen Pflichtartikel je Liste',
+  },
+  {
+    datei: 'pflichtartikel_alias.csv',
+    tabelle: 'manual.pflichtartikel_alias',
+    schluessel: ['konzept', 'artikelnummer'],
+    spalten: ['konzept', 'artikelnummer', 'gilt_fuer', 'grund', 'gilt_ab'],
+    pflicht: ['konzept', 'artikelnummer', 'gilt_fuer'],
+    zweck: 'Nachfolgenummern: welche bestellte Nummer erfuellt welche Listenposition',
+  },
 ] as const
 
 /** Wo die Dateien liegen. Repo-Wurzel, damit sie im Container mit ausgerollt werden. */

@@ -1141,3 +1141,83 @@ als Bewertung.
 
 **Eine Gesamtaussage.** Es gibt keine Kachel „so viel bringt der Kalender
 insgesamt". Sie wäre die Addition, die der ganze Seitenaufbau vermeidet.
+
+---
+
+## `db_pflichtartikel` — Einkauf abseits der Sortimentsvorgabe
+
+**Was die Seite beantwortet.** Welche Betriebe an der Pflichtartikelliste ihres
+Konzepts vorbei bestellen. Grundlage: Migration `0094`, Karten in
+`metabase/karten-pflichtartikel.ts`.
+
+**Warum eine eigene Seite und kein Reiter auf `db_einkauf`.** Bei
+`db_fremdeinkauf` war der Grund eine andere Datenquelle. Hier stehen beide
+Seiten auf denselben FoodNotify-Bestellungen — der Grund ist eine andere
+**Frage**: `db_einkauf` fragt, was der Einkauf kostet, diese Seite fragt, ob
+gekauft wird, was gekauft werden soll. Auf einer Seite hätten die Zahlen
+nebeneinandergestanden, ohne dass eine die andere erklärt.
+
+### Vier Reiter, und die Reihenfolge ist die Leseanweisung
+
+| Reiter | Inhalt |
+|---|---|
+| **Wer weicht ab** | vier Kacheln, Rangliste, Betriebstabelle, Verlauf, Lieferanten |
+| **Was gekauft wurde** | die Artikel hinter der Quote — die Gegenprobe |
+| **Abdeckung** | die Gegenrichtung: welcher Pflichtartikel fehlt |
+| **Listenpflege** | Nachfolgenummern, nicht prüfbare Positionen, Laufzeiten |
+
+**Der zweite Reiter ist keine Beilage.** Auf ihm entscheidet sich, ob eine hohe
+Quote ein Befund ist: die Listen führen weder Reinigungsmittel noch Verpackung,
+Kaffee oder Wein — was dort fehlt, taucht zwangsläufig als „abseits" auf. Am
+22.08.2026 standen bei Wilma Wunder Kaffee und Fassbier ganz oben. Ohne diesen
+Reiter wäre die Quote eine Behauptung.
+
+### Warum diese Darstellungen
+
+**Rangliste als `row` (Balken quer), nicht als Tabelle.** Die gestellte Frage
+war eine Sortierfrage („welche halten sich am wenigsten dran"), und ein
+Querbalken beantwortet sie ohne Lesen. Die Tabelle steht direkt darunter, weil
+der Balken die zweite nötige Angabe nicht tragen kann — siehe nächster Absatz.
+
+**Das Balkendiagramm filtert auf `datenbasis = 'belastbar'`, die Tabelle nicht.**
+Ein Balken lässt sich nicht mit einer Fußnote lesen. Ohne diesen Filter standen
+am 22.08.2026 geschlossene und insolvente Häuser mit zwei Bestellungen an der
+Spitze — die Rangliste hätte auf die falschen Betriebe gezeigt. Wer die dünnen
+Fälle sehen will, findet sie vollständig in der Tabelle, mitsamt der Spalte, die
+sie als dünn ausweist.
+
+**Vier Kacheln statt drei.** Die vierte („Unklar: gleicher Name, andere Nummer")
+ist die Ehrlichkeit der Seite: solange sie eine große Zahl zeigt, ist der Anteil
+daneben eine Obergrenze. Dieselbe Bauart wie „Noch nicht eingeordnet" auf
+`db_fremdeinkauf` — eine Kachel, die die Unschärfe beziffert, statt sie
+wegzulassen.
+
+**Der Verlauf als `line`, mit einer Warnung in der Beschreibung.** Ein Sprung
+nach oben ist meist keine Verhaltensänderung, sondern ein Lieferant, der eine
+Artikelnummer umgestellt hat. Ohne diesen Hinweis liest sich jede Stufe als
+Befund.
+
+**Die Abdeckungsliste hat eine Übersichtskarte davor.** Ungefiltert stehen 4.668
+fehlende Zeilen an; Metabase zeigt bei nativen Abfragen 2.000 und sagt nicht,
+dass es kürzt. Die Übersicht zählt je Betrieb, statt aufzuzählen, und der
+Textblock darüber sagt ausdrücklich, dass die Detailtabelle für **einen** Betrieb
+gedacht ist. Eine abgeschnittene Liste sieht sonst aus wie eine vollständige.
+
+**Kein Zeitraumfilter — als einzige Seite dieser Sammlung.** Der Zeitraum ist die
+Laufzeit der Liste: Wilma Wunder 13.04.–04.10.2026, Aposto und Enchilada ab
+01.01.2026. Ein freier Filter darüber könnte den Schnitt nur aufweichen, und
+eine Sommerkarte gegen Januarbestellungen misst die Karte statt den Betrieb.
+
+### Die Kachel auf ③ Betrieb
+
+`pa_kachel_betrieb` steht im Reiter „Einkauf & Inventur" direkt neben
+`fe_kachel_verweis`. Die beiden gehören nebeneinander, weil sie sich **ergänzen**
+und leicht verwechselt werden: Fremdeinkauf fragt, ob der **Lieferant**
+freigegeben ist, Pflichtartikel fragen, ob der **Artikel** auf der
+Sortimentsliste steht. Ein Betrieb kann beim freigegebenen Lieferanten am
+Sortiment vorbei bestellen — und genau dieser Fall ist auf der
+Fremdeinkaufsseite unsichtbar.
+
+Sie rechnet bewusst **dieselbe** Formel wie `pa_abseits_quote` auf der Zielseite:
+eine Kachel, die beim Klick auf eine andere Zahl führt als sie selbst zeigt, ist
+schlimmer als keine Kachel.

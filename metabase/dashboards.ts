@@ -511,6 +511,18 @@ export const dashboards: Dashboard[] = [
       // Klick mit, weil beide Seiten ihn unter demselben Namen kennen.
       { teile: [{ karte: 'fe_kachel_verweis', breite: 8,
         klick: [{ ziel: 'db_fremdeinkauf', uebergabe: {}, fest: true }] }] },
+      // Und daneben die Pflichtartikel (Migration 0094). Dieselbe Bauart
+      // und derselbe Grund wie bei der Kachel darueber: das Betriebsblatt
+      // stellt die Frage, beantwortet wird sie auf der eigenen Seite.
+      //
+      // Die beiden gehoeren nebeneinander, weil sie sich ERGAENZEN und
+      // leicht verwechselt werden: Fremdeinkauf fragt, ob der LIEFERANT
+      // freigegeben ist, Pflichtartikel fragen, ob der ARTIKEL auf der
+      // Sortimentsliste steht. Ein Betrieb kann beim freigegebenen
+      // Lieferanten am Sortiment vorbei bestellen — und genau dieser Fall
+      // ist auf der Fremdeinkaufsseite unsichtbar.
+      { teile: [{ karte: 'pa_kachel_betrieb', breite: 8,
+        klick: [{ ziel: 'db_pflichtartikel', uebergabe: {}, fest: true }] }] },
       ] },
       { name: 'Maßnahmen & Datenstand', reihen: [
       { teile: [{ text: '## Maßnahmen und Datenstand' }] },
@@ -1405,6 +1417,80 @@ export const dashboards: Dashboard[] = [
           { ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } },
           { ziel: 'dd_fremdeinkauf', spalte: 'Lieferant', uebergabe: { lieferant: 'Lieferant' } },
         ] }] },
+    ],
+  },
+
+  // ---------------------------------------------------------------------
+  // Pflichtartikel (Migration 0094).
+  //
+  // EIGENE SEITE UND KEIN REITER AUF db_einkauf — trotz gleicher
+  // Datenquelle (FoodNotify-Bestellungen), und damit aus einem anderen
+  // Grund als bei db_fremdeinkauf. Dort waren es zwei Quellen, hier sind
+  // es zwei FRAGEN: db_einkauf fragt, was der Einkauf kostet,
+  // db_pflichtartikel fragt, ob gekauft wird, was gekauft werden soll.
+  // Auf einer Seite haetten die Zahlen nebeneinandergestanden, ohne dass
+  // eine davon die andere erklaert.
+  //
+  // KEIN ZEITRAUMFILTER, und das ist der wichtigste Unterschied zu allen
+  // Nachbarseiten. Der Zeitraum IST die Laufzeit der Liste: die
+  // Wilma-Wunder-Sommerkarte gilt vom 13.04. bis 04.10.2026. Ein freier
+  // Filter darueber koennte diesen Schnitt nur aufweichen, und eine
+  // Sommerkarte gegen Januarbestellungen misst die Karte statt den
+  // Betrieb.
+  // ---------------------------------------------------------------------
+  {
+    schluessel: 'db_pflichtartikel',
+    name: 'Pflichtartikel — Einkauf abseits der Sortimentsvorgabe',
+    beschreibung:
+      'Welche Betriebe an der Pflichtartikelliste ihres Konzepts vorbei bestellen, gemessen am Anteil der Ausgaben. Dazu die Artikel dahinter, die Gegenrichtung (welcher Pflichtartikel fehlt) und der Pflegestand der Listen. Grundlage sind die Listen des Fachbereichs für Wilma Wunder, Aposto und Enchilada; Deutsche Konzepte hat keine Liste und fehlt deshalb.',
+    sammlung: 'Betrieb',
+    // Der Markenfilter heisst in den Sichten `konzept` und traegt die
+    // FoodNotify-Marke — dieselben drei Werte, unter denen die Listen
+    // gepflegt werden.
+    filter: [F_BETRIEB, F_MARKE, F_LIEFERANT],
+    tabs: [
+      { name: 'Wer weicht ab', reihen: [
+        { teile: [{ text: '# Einkauf abseits der Pflichtartikel\n\n**Die Leitzahl ist der Anteil, nicht die Erfüllung.** Gemessen wird, welcher Teil der Ausgaben eines Betriebs auf Artikel entfällt, die auf **keiner** Pflichtartikelliste seines Konzepts stehen — auf Euro gerechnet, nicht auf die Artikelzahl.\n\n**Drei Dinge gehören zum Lesen dazu.**\n\n**1. Was die Listen nicht führen, taucht hier zwangsläufig auf.** Reinigungsmittel, Verpackung, Kaffee, Weine außer den genannten — nichts davon steht auf den Listen. Am 22.08.2026 lagen bei Wilma Wunder Kaffee und Fassbier ganz oben im Abseits-Topf. Das ist eine Lücke der Liste, kein Verstoß. Die Tabelle „Was abseits der Liste gekauft wurde" ist deshalb keine Beilage, sondern die Gegenprobe.\n\n**2. „Dünn" heißt: richtig gerechnet, trotzdem keine Aussage.** Ein Betrieb mit drei Bestellungen kommt leicht auf 90 %. Das Balkendiagramm zeigt deshalb nur belastbare Fälle; die Tabelle zeigt alle und sagt, welche das sind.\n\n**3. Der Anteil ist eine Obergrenze, solange „Unklar" groß ist.** Lieferanten vergeben Nachfolgenummern, während die Liste stehen bleibt: „Cheddar / Gouda Mix" wechselte zum 15.11.2025 von Distra 268 auf 500096 — 105.194 € bei 20 Betrieben, die sonst als Abweichung gezählt hätten. Der Reiter „Listenpflege" löst solche Fälle auf.\n\n**Der Zeitraum ist die Laufzeit der Liste** und deshalb nicht wählbar. Wilma Wunder: 13.04.–04.10.2026 (Sommer-Standardkarte). Aposto und Enchilada: ab 01.01.2026, offen.' }] },
+        { teile: [
+          { karte: 'pa_abseits_summe' },
+          { karte: 'pa_abseits_quote' },
+          { karte: 'pa_unschaerfe' },
+          { karte: 'pa_betriebe_ausgewertet' },
+        ] },
+        { teile: [{ karte: 'pa_rangliste', hoehe: 11,
+          klick: [{ ziel: 'dd_betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+        // Klickspalte nur auf dem Betrieb, nicht auf der ganzen Zeile:
+        // sonst navigiert ein Klick auf eine Prozentzahl weg.
+        { teile: [{ karte: 'pa_betrieb_tabelle', hoehe: 12,
+          klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+        { teile: [
+          { karte: 'pa_verlauf', breite: 14, hoehe: 9 },
+          { karte: 'pa_lieferant', breite: 10, hoehe: 9 },
+        ] },
+      ] },
+      { name: 'Was gekauft wurde', reihen: [
+        { teile: [{ text: '## Die Artikel hinter der Quote\n\n**Hier entscheidet sich, ob eine hohe Quote ein Befund ist.** Stehen oben Reinigungsmittel, Verpackung oder Kaffee, fehlt der Liste eine Warengruppe — dann gehört die Zahl relativiert und nicht weitergegeben. Steht dort ein Konkurrenzprodukt zu einem Pflichtartikel, ist es einer.\n\nNach Ausgaben sortiert: oben lohnt das Hinsehen am meisten.' }] },
+        { teile: [{ karte: 'pa_abseits_artikel', hoehe: 16,
+          klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      ] },
+      { name: 'Abdeckung', reihen: [
+        { teile: [{ text: '## Die Gegenrichtung: was fehlt\n\nNicht mehr „wie viel läuft daneben", sondern „welcher Pflichtartikel wurde nicht bezogen". Zwei Einschränkungen gehören dazu: Positionen **ohne Artikelnummer** stehen nicht hier (sie sind über die Nummer nicht prüfbar — siehe Reiter „Listenpflege"), und ein Artikel kann unter einer **Nachfolgenummer** gekauft worden sein.\n\n**Die zweite Tabelle zuerst lesen.** Ein Artikel, den *kein* Betrieb bezieht, ist fast nie ein Verstoß aller gleichzeitig — er ist ausgelistet, umnummeriert oder stand nie im Sortiment.' }] },
+        { teile: [{ karte: 'pa_abdeckung_niemand', hoehe: 12 }] },
+        { teile: [{ karte: 'pa_abdeckung_betrieb', hoehe: 11,
+          klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+        // Die Detailliste zuletzt und mit dem Hinweis, dass sie fuer EINEN
+        // Betrieb gedacht ist: ungefiltert stehen ueber 4.000 Zeilen an,
+        // und Metabase zeigt davon 2.000 — ohne zu sagen, dass es kuerzt.
+        { teile: [{ text: '### Und die einzelnen Artikel\n\n**Diese Tabelle erst mit gesetztem Betriebsfilter lesen.** Ungefiltert stehen über 4.000 Zeilen an, von denen Metabase die ersten 2.000 zeigt — ohne darauf hinzuweisen.' }] },
+        { teile: [{ karte: 'pa_abdeckung_fehlend', hoehe: 14,
+          klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      ] },
+      { name: 'Listenpflege', reihen: [
+        { teile: [{ text: '## Woran die Messung hängt\n\n**Die erste Tabelle ist die lohnendste Arbeit auf dieser Seite.** Jede bestätigte Nachfolgenummer macht den Anteil auf dem ersten Reiter genauer. Bestätigt wird in `pflege/pflichtartikel_alias.csv` — Datei ändern, committen, pushen; der nächste nächtliche Lauf übernimmt es, und die Zeile verschwindet von hier.\n\n**Die zweite Tabelle ist die Grenze der Messung.** 112 der 765 Positionen tragen keine Artikelnummer, überwiegend Getränke vom regionalen Getränkefachgroßhandel — dort hat jeder Betrieb einen eigenen Nummernkreis. Für sie bleibt nur der Namensabgleich.\n\n**Die dritte sagt, wie lange die Grundlage noch gilt.** Läuft eine Liste aus, misst diese Seite ab dem Folgetag nichts mehr — und nichts sieht aus wie „keine Beanstandungen".' }] },
+        { teile: [{ karte: 'pa_verdacht', hoehe: 14 }] },
+        { teile: [{ karte: 'pa_nicht_pruefbar', hoehe: 13 }] },
+        { teile: [{ karte: 'pa_listen', hoehe: 9 }] },
+      ] },
     ],
   },
 

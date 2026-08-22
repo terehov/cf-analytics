@@ -17,6 +17,7 @@ import { vergleichstagNachlauf } from './sync/vergleichstag'
 import { wetterNachlauf } from './wetter/nachlauf'
 import { einkaufspreisNachlauf } from './sync/einkaufspreis'
 import { einkaufSichtenNachlauf } from './sync/einkauf_sichten'
+import { pflichtartikelSichtenNachlauf } from './sync/pflichtartikel_sichten'
 import { zuordnungNachlauf } from './sync/zuordnung'
 import { yextNachlauf } from './yext/nachlauf'
 import { zulaufPruefen } from './sync/zulauf'
@@ -186,6 +187,19 @@ try {
    * Wirft nie, siehe Kopf von sync/einkauf_sichten.ts.
    */
   await einkaufSichtenNachlauf()
+
+  /**
+   * Und die Pflichtartikelauswertung gleich hinterher (Migration `0094`):
+   * welcher Anteil des Einkaufs läuft an der Sortimentsvorgabe vorbei.
+   *
+   * HIER UND NICHT WEITER OBEN. Die Listen selbst kommen aus `pflege/` und
+   * werden von `pflegeNachlauf()` eingelesen; die Bestellpositionen, gegen
+   * die geprüft wird, kommen aus dem Import darüber. Beides muss stehen —
+   * ein Refresh davor trüge den Listenstand von gestern, und eine gerade
+   * bestätigte Nachfolgenummer wirkte einen Lauf lang nicht.
+   * Wirft nie, siehe Kopf von sync/pflichtartikel_sichten.ts.
+   */
+  await pflichtartikelSichtenNachlauf()
 
   /**
    * ZULETZT, UND ERST HIER: bekommt jede Quelle noch Zulauf?

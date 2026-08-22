@@ -3436,3 +3436,127 @@ grüner Provisionierungslauf sagt, dass die Karte angelegt wurde — nicht, dass
 sie rechnet. Zwei von achtzehn Karten dieses Durchgangs waren fehlerfrei
 angelegt und trotzdem unbrauchbar: eine lieferte still null Zeilen
 (`mart.feiertag_kalender`), eine stürzte ab.
+
+---
+
+## Pflichtartikel: vier Fehler, die alle eine plausible Zahl erzeugt hätten (22.08.2026)
+
+Beim Bau der Pflichtartikelauswertung (Migration `0094`). Keiner der vier hat
+sich gemeldet — jeder lieferte ein Ergebnis, das man hätte weitergeben können.
+
+### 1. Der falsche Schlüssel: `core.ware.fn_id` statt `bestellposition.lieferanten_nr`
+
+**Symptom.** Die Pflichtartikellisten nennen Lieferanten-Artikelnummern (Distra
+`300047`, Chefs Culinar `60038400`). Der naheliegende Join geht über
+`core.ware.fn_id` — und traf bei Enchilada **100 %**, bei Aposto **10,1 %** und
+bei Wilma Wunder **18,2 %**.
+
+**Ursache.** `core.ware.fn_id` führt **zwei verschiedene Nummernkreise in
+derselben Spalte**, unterschieden durch `core.ware.quelle`:
+
+| `quelle` | Bedeutung | Aposto | Enchilada | Wilma Wunder |
+|---|---|---:|---:|---:|
+| `concrete_product` | interne FoodNotify-ID | 9.449 | 3.114 | 12.609 |
+| `lieferant` | Lieferanten-Artikelnummer | 29 | 3.032 | 184 |
+
+Enchilada traf zu 100 %, weil dort zufällig 3.032 Waren mit `quelle =
+'lieferant'` stehen. Bei Aposto sind es 29. Die interne ID ist zudem nicht
+einmal je Ware eindeutig: derselbe Aperol steht bei Aposto unter **zwanzig**
+`concrete_product`-IDs, eine je Gebinde und Shop-Zuordnung.
+
+**Was ihn heute verhindert.** Der Abgleich läuft über
+`core.bestellposition.lieferanten_nr` — die Spalte ist über alle vier Marken zu
+**99,8 %** gefüllt (591.590 von 634.175 Positionen), und die Trefferquote der
+Listennummern liegt bei 96,9 bis 100 %.
+
+**Die Lehre.** Eine Trefferquote von 100 % bei einer Marke und 10 % bei der
+nächsten ist kein Datenproblem der zweiten Marke, sondern ein Hinweis auf den
+falschen Schlüssel. Die erste Zahl hat es fast verdeckt.
+
+### 2. Die Bereichsbindung, die kein Mensch hinterfragt hätte
+
+**Symptom.** Aposto stand mit **80,7 %** Einkauf abseits der Bar-Pflichtliste
+da — ein Wert, der nach einem schweren Befund aussieht.
+
+**Ursache.** Die Listen sind nach Küche und Bar gegliedert, und
+`core.kostenstelle.art` kennt genau dieselben zwei Werte. Der Join lag also auf
+der Hand. Er ist trotzdem falsch: die größten „abseits"-Posten der Aposto-**Bar**
+waren Mozzarella (48.382 €), Pizzateigkugeln, Spaghettinester und Rumpsteak.
+**Die Betriebe buchen nicht so, wie die Liste gegliedert ist** — Küchenware
+läuft über die Bar-Kostenstelle und umgekehrt.
+
+**Was ihn heute verhindert.** Geprüft wird je Konzept gegen die **Vereinigung**
+beider Listen. Der Bereich bleibt als beschreibende Spalte erhalten, nie als
+Bedingung. Aposto fiel damit von 80,7 auf **34,1 %**.
+
+**Die Lehre.** Zwei Felder mit denselben Ausprägungen sind noch keine
+gemeinsame Dimension. Hier hieß beides „Küche" und „Bar" und meinte einmal die
+Gliederung einer Karte und einmal die Buchungsstelle einer Bestellung.
+
+### 3. `core.name_norm()` auf einem Artikelnamen — `kg` ist dort kein `kg`
+
+**Symptom.** Der Namensabgleich zwischen Listenposition und Bestellposition traf
+Artikel mit Gebindeangabe nicht.
+
+**Ursache.** `core.name_norm()` stammt aus `0073` und ist für **Betriebsnamen**
+gebaut. Sie streicht am Wortende Rechtsformen — `gmbh`, `ohg`, `ug` und `kg`,
+weil das dort **Kommanditgesellschaft** heißt. In einem Artikelnamen sind
+dieselben zwei Buchstaben eine **Mengenangabe**:
+
+```
+core.name_norm('Cheddar / Gouda Mix Karton 4 X 2,5Kg')
+  -> 'cheddar / gouda mix karton 4 x 2,5'
+```
+
+„2,5Kg" und „2,5" sind nicht dasselbe Produkt. Ein Vergleich, der die Menge
+wegwirft, trifft das falsche Gebinde und meldet sich nicht.
+
+**Was ihn heute verhindert.** `core.artikel_name_norm()` (Migration `0094`) —
+faltet Umlaute und Akzente, löscht Apostrophe (der nachgemessene Befund aus
+`0073`: „Bailey's" → „baileys", nicht „bailey s"), schneidet FoodNotifys
+Gebindewiederholung ab dem Doppelpunkt ab und streicht **keine** Wortendungen.
+
+**Die Lehre.** Eine Normalisierungsfunktion trägt die Annahmen ihres
+Gegenstands. Sie auf einen anderen Gegenstand anzuwenden ist keine
+Wiederverwendung, sondern ein stiller Bedeutungswechsel.
+
+### 4. Drei materialisierte Sichten, fehlerfrei angelegt und leer
+
+**Symptom.** Migration `0094` lief ohne Fehler durch. `mart.pflichtartikel_stand`
+zeigte alle sechs Listen mit 765 Positionen — und
+`mart.pflichtartikel_klassifikation` gab **null Zeilen** zurück.
+
+**Ursache.** `CREATE MATERIALIZED VIEW ... AS SELECT` füllt **sofort**, mit dem
+Stand dieses Augenblicks. Die Sichten entstehen in Abschnitt 7, 8 und 10 der
+Migration, die Listen kommen aber erst in Abschnitt 18 dazu. Zwischen beiden lag
+die gesamte Auswertung — auf einer leeren Tabelle.
+
+**Was ihn heute verhindert.** Abschnitt 19 der Migration frischt alle drei am
+Ende ausdrücklich auf, absichtlich ohne `CONCURRENTLY` (das braucht einen
+vorhandenen Stand, PG 55000 — dieselbe Falle wie in `0084`).
+
+**Die Lehre — und es ist die dritte Wiederholung derselben.** Reihenfolge in
+einer Migration ist Fachlogik, nicht Formatierung. Eine leere materialisierte
+Sicht erzeugt keinen Fehler, sondern eine leere Seite, und eine leere Seite
+sieht aus wie „keine Beanstandungen" (Regel 10). Genau wie
+`mart.feiertag_kalender` in `0092`: fehlerfrei, schnell, leer.
+
+### Nachtrag: derselbe Fehler zweimal in einer Ortsauflösung
+
+Die 24 regionalen Gerichte der Wilma-Wunder-Küchenliste („Sauerbraten (Dresden,
+Köln, Düsseldorf)") sollten auf Betriebe aufgelöst werden. Sieben von 24 blieben
+ohne Treffer — und zwar aus **zwei** Gründen gleichzeitig:
+
+* **Umlaute nur auf einer Seite gefaltet.** Die Vorlage schreibt „Nürnberg",
+  `core.name_norm` macht aus dem Betriebsnamen „wilma wunder nuernberg". Ein
+  Vergleich, der nur eine Seite faltet, findet nichts — und liefert dabei keinen
+  Fehler, sondern eine leere Menge.
+* **Wortreihenfolge.** Die Vorlage sagt „Mainz Ballplatz", der Betrieb heißt
+  „Wilma Wunder **Ballplatz Mainz** GmbH". Jeder Teilstringvergleich über die
+  ganze Angabe scheitert daran.
+
+Heute laufen **beide** Seiten durch `core.name_norm`, und getroffen wird
+**wortweise**: jedes Wort der Ortsangabe muss im Betriebsnamen vorkommen, die
+Reihenfolge ist egal. Vorher 7 von 24 ohne Betrieb, danach 0.
+`mart.pflichtartikel_regional_offen` führt die Zahl weiter, denn sie darf nicht
+still wieder wachsen.

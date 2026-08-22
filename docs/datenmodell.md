@@ -545,3 +545,75 @@ Gewitter um 4 Uhr räumt keine Terrasse; ein Tagesmaximum weiß das nicht.
 nach unten **und** oben offen, damit ein 42-Grad-Tag in der Randklasse landet
 statt herauszufallen. `mart.wetter_klasse_pruefung` findet Lücken und
 Überlappungen.
+
+---
+
+## Pflichtartikel (Migration `0094`)
+
+Drei handgepflegte Tabellen und drei Materialisierungen. Die Vorgaben kommen vom
+Fachbereich, die Bewegungsdaten aus FoodNotify.
+
+### Die drei `manual`-Tabellen
+
+| Tabelle | Schlüssel | Inhalt |
+|---|---|---|
+| `manual.pflichtartikel_liste` | Konzept + Bereich + `gueltig_von` | Kopfzeile je Liste: Laufzeit, Quelle |
+| `manual.pflichtartikel` | dazu Artikelnummer + Bezeichnung | die 765 Positionen |
+| `manual.pflichtartikel_alias` | Konzept + Artikelnummer | Nachfolgenummern |
+
+**`gueltig_von` steht im Schlüssel**, damit eine Folgeliste neben der bisherigen
+stehen kann statt sie zu überschreiben. Die Wilma-Wunder-Liste ist eine
+Sommerkarte mit Laufzeit bis 04.10.2026; die Winterkarte ist damit absehbar und
+soll ein Commit in `pflege/` sein, keine Migration.
+
+**`UNIQUE NULLS NOT DISTINCT` auf `manual.pflichtartikel`.** 112 der 765
+Positionen haben keine Artikelnummer — bei GFGH-Getränken hat jeder Betrieb
+einen eigenen Nummernkreis. Ohne `NULLS NOT DISTINCT` ließe Postgres beliebig
+viele „Pepsi Cola ohne Nummer" nebeneinander zu, und der Pflege-Upsert hätte
+keinen Angriffspunkt.
+
+### `core.artikel_name_norm()` — und warum nicht `core.name_norm()`
+
+Eine zweite Normalisierungsfunktion neben der aus `0073`, und das ist kein
+Versehen. `core.name_norm()` ist für **Betriebsnamen** gebaut und streicht am
+Wortende Rechtsformen — darunter `kg`, weil das dort *Kommanditgesellschaft*
+heißt. In einem Artikelnamen ist „2,5Kg" eine **Mengenangabe**, und ein
+Vergleich, der sie wegwirft, trifft das falsche Gebinde. Hergang im
+`fehlerkatalog.md`.
+
+`core.artikel_name_norm()` faltet Umlaute und Akzente, **löscht** Apostrophe
+(der nachgemessene Befund aus `0073`: „Bailey's" → „baileys"), schneidet
+FoodNotifys Gebindewiederholung ab dem ersten Doppelpunkt ab
+(`"… 2,5Kg:karton 4 X 2,5Kg"`) und macht aus allem Übrigen ein Leerzeichen.
+Letzteres hat eine beabsichtigte Nebenwirkung: `LIKE`-Platzhalter können den
+Namensvergleich nicht erreichen.
+
+### Der Schlüssel zwischen Liste und Einkauf
+
+**`core.bestellposition.lieferanten_nr`, nicht `core.ware.fn_id`.** Letztere
+führt je nach `core.ware.quelle` zwei verschiedene Nummernkreise in derselben
+Spalte; über sie gemessen trafen 10,1 % der Aposto-Listennummern, über
+`lieferanten_nr` 100 %. Die Spalte ist zu 99,8 % gefüllt. Begründung mit
+Messwerten im Kopf von `0094` und im `fehlerkatalog.md`.
+
+**Der Bereich (Küche/Bar) ist beschreibend, nie eine Joinbedingung.** Die
+Betriebe buchen Küchenware über die Bar-Kostenstelle und umgekehrt; geprüft wird
+je Konzept gegen die Vereinigung beider Listen.
+
+### Die drei Materialisierungen
+
+| Sicht | Korn | Trägt |
+|---|---|---|
+| `mart.pflichtartikel_klassifikation_basis` | Konzept × Fenster × Artikel | den Zustand je Artikel |
+| `mart.pflichtartikel_einkauf_basis` | + Betrieb × Monat × Zustand | Kacheln, Verlauf, Rangliste |
+| `mart.pflichtartikel_artikel_basis` | Konzept × Fenster × Betrieb × Artikel | beide Drilldowns |
+
+**Die Klassifikation läuft über Artikel, nicht über Positionen.** Im
+Zwölfmonatsfenster stehen 6.852 verschiedene Artikel gegen rund 600.000
+Positionen, und der Namensabgleich ist ein Präfixvergleich gegen bis zu 765
+Listeneinträge. Über die Positionen gerechnet lief er in einen Zeitausfall
+(> 2 min, abgebrochen), über die Artikel sind es Sekunden.
+
+**Die Reihenfolge beim Auffrischen ist bindend**: die beiden unteren lesen die
+obere. Steht in `src/sync/pflichtartikel_sichten.ts`, registriert in
+`mart.materialisierung_stand` unter dem Merker `pflichtartikel_refresh`.

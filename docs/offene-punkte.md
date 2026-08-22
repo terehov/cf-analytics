@@ -1314,3 +1314,51 @@ auf, weil das Fenster auf 0–24 steht.
   auf `Europe/Berlin`, laufen Speicher- und Datenbankzähler ein bis zwei
   Stunden auseinander, und ein Lauf über Mitternacht bekommt sein Budget zu
   früh oder zu spät zurück. Besteht unabhängig vom Umbau.
+
+---
+
+## Pflichtartikel (Stand 22.08.2026)
+
+**Für den Fachbereich — vier Fragen, die die Auswertung genauer machen:**
+
+1. **Nachfolgenummern bestätigen.** `mart.pflichtartikel_verdacht` führt 63
+   Fälle, in denen ein Artikel mit dem Listennamen unter abweichender Nummer
+   bestellt wird — der größte ist „Cheddar / Gouda Mix" (Distra `268` → `500096`,
+   105.194 €, 20 Betriebe). Jede bestätigte Zeile geht nach
+   `pflege/pflichtartikel_alias.csv`. **Solange sie offen sind, ist jede Quote
+   auf der Seite eine Obergrenze.**
+
+2. **Die 112 Positionen ohne Artikelnummer.** Überwiegend GFGH-Getränke, weil
+   jeder Betrieb einen eigenen Getränkefachgroßhandel mit eigenem Nummernkreis
+   hat. Sie sind nur über den Namen prüfbar. Wer die Nummern je Händler
+   nachträgt, macht daraus eine Messung — `mart.pflichtartikel_nicht_pruefbar`
+   sagt, welche bisher gar keinen Treffer haben.
+
+3. **Führen die Listen bewusst keinen Kaffee, keine Reinigungsmittel und keine
+   Verpackung?** Diese Warengruppen erscheinen zwangsläufig als „abseits" und
+   tragen bei Wilma Wunder die größten Einzelposten (J. Hornig Röstkaffee 8.960 €,
+   Augustiner Hell 7.954 €). Ist das Absicht, gehört ein Hinweis in die
+   Seitenbeschreibung; ist es eine Lücke, gehören sie auf die Liste.
+
+4. **28 Listenartikel bezieht kein einziger Betrieb** — bei Enchilada unter
+   anderem „Komali Maistortillas Gelb 15cm", „Salsa Tk Karton", „Caesar Dressing
+   Schale 1Kg", alle zuletzt 2025 bestellt. Ausgelistet, umnummeriert oder nie im
+   Sortiment? `mart.pflichtartikel_abdeckung` (Reiter „Abdeckung") führt sie.
+
+**Technisch offen:**
+
+5. **Die Wilma-Wunder-Liste läuft am 04.10.2026 aus.** Danach misst
+   `db_pflichtartikel` für die Marke **nichts** — fehlerfrei und leer. Die
+   Prüfzeile „Liste läuft in weniger als 30 Tagen aus" meldet es ab dem
+   04.09.2026. Die Winterkarte kommt als Datei nach `pflege/` und braucht keine
+   Migration.
+
+6. **Wilma Wunders Küche läuft überwiegend nicht über FoodNotify** (6 von 15
+   Kostenstellen mit Bestellungen im Zwölfmonatsfenster). Die Quote bleibt
+   richtig — sie ist ein Anteil an dem, was sichtbar ist —, aber sie sagt für
+   diese Marke weniger als für Aposto und Enchilada. Ob die übrigen Küchen
+   anders bestellen oder gar nicht erfasst sind, ist ungeklärt.
+
+7. **Deutsche Konzepte hat keine Pflichtartikelliste** und ist deshalb auf der
+   Seite gar nicht enthalten. Sobald eine vorliegt, sind es zwei Zeilen in
+   `pflege/pflichtartikel_liste.csv` und die Positionen.
