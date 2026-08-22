@@ -1102,7 +1102,7 @@ nicht.
 | `mart.pflichtartikel_klassifikation` | je bestelltem Artikel: steht er auf der Liste? Fünf Zustände |
 | `mart.pflichtartikel_abseits` | **Der Drilldown.** Welche Artikel genau, nach Ausgaben |
 | `mart.pflichtartikel_verdacht` | Arbeitsliste: gleicher Name, andere Nummer → Nachfolgenummer? |
-| `mart.pflichtartikel_abdeckung` | Gegenrichtung: welcher Pflichtartikel wurde nicht bezogen |
+| `mart.pflichtartikel_abdeckung` | Gegenrichtung: welcher Pflichtartikel wurde nicht bezogen — **immer mit `datenbasis` lesen** |
 | `mart.pflichtartikel_nicht_pruefbar` | die 112 Positionen ohne Artikelnummer |
 | `mart.pflichtartikel_regional` | Auflösung der regionalen Gerichte auf Betriebe |
 | `mart.pflichtartikel_stand` | Listenumfang und Laufzeit |
@@ -1124,6 +1124,14 @@ daneben, nie stillschweigend in einen der beiden Töpfe.
 **3. Kein Zeitraumfilter.** Der Zeitraum ist die Laufzeit der Liste und wird in
 `0094` geschnitten. Ein freier Filter darüber könnte diesen Schnitt nur
 aufweichen.
+
+**4. In der Abdeckung gilt dieselbe Regel wie bei der Quote** (seit `0095`):
+`bezogen = false` ohne `datenbasis` ist irreführend. Ein Betrieb ohne eine
+einzige Bestellung im Laufzeitraum hat *jeden* Pflichtartikel „nicht bezogen" —
+am 22.08.2026 waren das 1.503 von 4.669 Fehlmeldungen aus sieben Häusern.
+`mart.pflichtartikel_abdeckung` filtert sie **nicht** weg (Regel 10: sichtbar
+machen, nicht verschwinden lassen), aber jede Karte darauf muss die Spalte
+zeigen oder ausklammern und das sagen.
 
 ### Was nachgesehen wird
 

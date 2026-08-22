@@ -2031,3 +2031,28 @@ gemessen:
 Bei Wilma Wunder läuft die Küche also überwiegend **nicht** über das
 Bestellsystem. Das verzerrt die Quote nicht (sie ist ein Anteil an dem, was
 sichtbar ist), begrenzt aber, worüber sie überhaupt etwas sagt.
+
+
+### Nachtrag 22.08.2026: ein Drittel der „fehlenden" Pflichtartikel war gar keine Aussage
+
+`mart.pflichtartikel_abdeckung` führt eine Zeile je Betrieb und Pflichtartikel.
+Ein Betrieb ohne eine einzige Bestellung im Laufzeitraum bekommt damit für
+**jeden** Artikel ein `bezogen = false`:
+
+| Datenbasis | Betriebe | Fehlmeldungen |
+|---|---:|---:|
+| belastbar | 45 | 3.166 |
+| keine Bestellung | 7 | **1.503** |
+
+Sieben Häuser — darunter „Geschlossen Wilma Wunder Hannover" — trugen ein
+Drittel aller Fehlmeldungen, ohne dass über ihr Sortiment irgendetwas bekannt
+wäre. In der Liste standen sie ganz oben, weil ihnen am meisten fehlte.
+
+**Dieselbe Signatur wie in `0080`, nur mit umgekehrtem Vorzeichen.** Dort wurde
+ein Urteil *gut*, weil ein Signal fehlte; hier wird es *maximal schlecht*, weil
+Daten fehlen. Beide Male entscheidet die Lücke über das Urteil.
+
+Seit `0095` trägt die Sicht `datenbasis`. Gefiltert wird nichts — die Zeilen
+bleiben vollständig, sie sind nur als das lesbar, was sie sind. Nebenbefund:
+die Liste „Pflichtartikel, die niemand bezieht" fiel dadurch von 28 auf 27, weil
+ein Artikel nur durch die datenlosen Betriebe dort gelandet war.

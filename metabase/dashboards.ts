@@ -1447,10 +1447,21 @@ export const dashboards: Dashboard[] = [
     // Der Markenfilter heisst in den Sichten `konzept` und traegt die
     // FoodNotify-Marke — dieselben drei Werte, unter denen die Listen
     // gepflegt werden.
-    filter: [F_BETRIEB, F_MARKE, F_LIEFERANT],
+    // KEIN Lieferantenfilter: er wirkte auf eine von fuenfzehn Karten, und
+    // ein Filter, der fuer die ganze Seite gilt und fast nichts tut, ist
+    // eine Falle. Begruendung in karten-pflichtartikel.ts.
+    //
+    // F_MARKE liest mart.konzept_zuordnung.hauptkonzept (LINA), die Sichten
+    // hier fuehren core.marke.name (FoodNotify). Die drei Werte, um die es
+    // geht, stehen in BEIDEN gleich — "Aposto", "Enchilada", "Wilma Wunder",
+    // nachgesehen am 22.08.2026. Der Filter traegt aber acht weitere
+    // Konzepte, fuer die es keine Liste gibt; wer eines davon waehlt, sieht
+    // eine leere Seite. Das ist richtig so und der Grund, aus dem der
+    // Textblock oben sagt, welche drei Konzepte ueberhaupt gemessen werden.
+    filter: [F_BETRIEB, F_MARKE],
     tabs: [
       { name: 'Wer weicht ab', reihen: [
-        { teile: [{ text: '# Einkauf abseits der Pflichtartikel\n\n**Die Leitzahl ist der Anteil, nicht die Erfüllung.** Gemessen wird, welcher Teil der Ausgaben eines Betriebs auf Artikel entfällt, die auf **keiner** Pflichtartikelliste seines Konzepts stehen — auf Euro gerechnet, nicht auf die Artikelzahl.\n\n**Drei Dinge gehören zum Lesen dazu.**\n\n**1. Was die Listen nicht führen, taucht hier zwangsläufig auf.** Reinigungsmittel, Verpackung, Kaffee, Weine außer den genannten — nichts davon steht auf den Listen. Am 22.08.2026 lagen bei Wilma Wunder Kaffee und Fassbier ganz oben im Abseits-Topf. Das ist eine Lücke der Liste, kein Verstoß. Die Tabelle „Was abseits der Liste gekauft wurde" ist deshalb keine Beilage, sondern die Gegenprobe.\n\n**2. „Dünn" heißt: richtig gerechnet, trotzdem keine Aussage.** Ein Betrieb mit drei Bestellungen kommt leicht auf 90 %. Das Balkendiagramm zeigt deshalb nur belastbare Fälle; die Tabelle zeigt alle und sagt, welche das sind.\n\n**3. Der Anteil ist eine Obergrenze, solange „Unklar" groß ist.** Lieferanten vergeben Nachfolgenummern, während die Liste stehen bleibt: „Cheddar / Gouda Mix" wechselte zum 15.11.2025 von Distra 268 auf 500096 — 105.194 € bei 20 Betrieben, die sonst als Abweichung gezählt hätten. Der Reiter „Listenpflege" löst solche Fälle auf.\n\n**Der Zeitraum ist die Laufzeit der Liste** und deshalb nicht wählbar. Wilma Wunder: 13.04.–04.10.2026 (Sommer-Standardkarte). Aposto und Enchilada: ab 01.01.2026, offen.' }] },
+        { teile: [{ text: '# Einkauf abseits der Pflichtartikel\n\n**Die Leitzahl ist der Anteil, nicht die Erfüllung.** Gemessen wird, welcher Teil der Ausgaben eines Betriebs auf Artikel entfällt, die auf **keiner** Pflichtartikelliste seines Konzepts stehen — auf Euro gerechnet, nicht auf die Artikelzahl.\n\n**Drei Dinge gehören zum Lesen dazu.**\n\n**1. Was die Listen nicht führen, taucht hier zwangsläufig auf — und das ist nicht immer ein Fehler.** Am 22.08.2026 lagen bei Wilma Wunder Kaffee und Fassbier ganz oben im Abseits-Topf, und der Fachbereich hat die beiden gegensätzlich entschieden: **Bier und Wein sind ausdrücklich die Wahl des Betriebs** — die Wilma-Wunder-Liste führt „Individueller Wein & Bier" als leeren Abschnitt —, **J.-Hornig-Kaffee dagegen ist Pflicht** und stand nur nicht auf der Liste; er ist seither nachgetragen. Reinigungsmittel und Verpackung sind weiterhin ungeklärt. **Ein großer Posten hier ist eine Frage, keine Antwort** — deshalb ist der Reiter „Was gekauft wurde" keine Beilage, sondern die Gegenprobe.\n\n**2. „Dünn" heißt: richtig gerechnet, trotzdem keine Aussage.** Ein Betrieb mit drei Bestellungen kommt leicht auf 90 %. Das Balkendiagramm zeigt deshalb nur belastbare Fälle; die Tabelle zeigt alle und sagt, welche das sind.\n\n**3. Der Anteil ist eine Obergrenze, solange „Unklar" groß ist.** Lieferanten vergeben Nachfolgenummern, während die Liste stehen bleibt: „Cheddar / Gouda Mix" wechselte zum 15.11.2025 von Distra 268 auf 500096 — 105.194 € bei 20 Betrieben, die sonst als Abweichung gezählt hätten. Der Reiter „Listenpflege" löst solche Fälle auf.\n\n**Der Zeitraum ist die Laufzeit der Liste** und deshalb nicht wählbar. Wilma Wunder: 13.04.–04.10.2026 (Sommer-Standardkarte). Aposto und Enchilada: ab 01.01.2026, offen.' }] },
         { teile: [
           { karte: 'pa_abseits_summe' },
           { karte: 'pa_abseits_quote' },

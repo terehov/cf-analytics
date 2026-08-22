@@ -471,6 +471,41 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
   // gewaehlten Betrieb — 1 oder 0 sagt dagegen genau das Richtige.
   fe_freigabestand:       { betrieb: 'Die Freigabeliste gilt konzernweit; sie kennt keinen Betrieb.',
                             marke: 'ebenso -- ein Dachlieferant gehoert keiner Marke.' },
+  // --- Pflichtartikel (0094) ------------------------------------------
+  // Die Verweiskachel auf ③ Betrieb. Gleiche Bauart und gleicher Grund wie
+  // fe_kachel_verweis daneben: sie zeigt eine feste Groesse und fuehrt zum
+  // Klick auf die Seite, wo eingegrenzt wird.
+  pa_kachel_betrieb: {
+    monat: 'Der Zeitraum IST die Laufzeit der Pflichtartikelliste (Wilma Wunder '
+         + '13.04.-04.10.2026) und wird in 0094 geschnitten. Ein Stichmonat darueber '
+         + 'wuerde den Schnitt aufweichen, nicht schaerfen.',
+    zeitraum: 'ebenso -- db_pflichtartikel hat aus demselben Grund als einzige Seite '
+            + 'gar keinen Zeitraumfilter.',
+  },
+  // Die vier Karten der Listenpflege. Sie beschreiben die LISTE und das
+  // Konzept, nicht einen Betrieb -- ein Betriebsfilter machte aus
+  // "20 Betriebe bestellen diese Nummer" eine Zahl ueber nichts.
+  pa_verdacht: {
+    betrieb: 'Nachfolgenummern sind Listenpflege, keine Betriebsfrage. Die Spalte '
+           + '"Betriebe" ist gerade das Erkennungsmerkmal: bestellen zwanzig Betriebe '
+           + 'dieselbe abweichende Nummer, ist es eine Umnummerierung des Lieferanten '
+           + 'und kein Verhalten. Gefiltert stuende dort ueberall 1.',
+  },
+  pa_abdeckung_niemand: {
+    betrieb: 'Sucht Artikel, die KEIN Betrieb bezieht -- die Aussage entsteht erst ueber '
+           + 'alle Betriebe hinweg. Mit Betriebsfilter waere es dieselbe Liste wie '
+           + '"Welche Pflichtartikel fehlen" darunter, nur mit irrefuehrendem Titel.',
+  },
+  pa_nicht_pruefbar: {
+    betrieb: 'Zaehlt Positionen der LISTE ohne Artikelnummer. Die Liste gilt je Konzept; '
+           + 'ein Betriebsfilter machte aus "112 nicht pruefbar" eine Zahl ueber nichts. '
+           + 'Dieselbe Bauart wie fe_pflegestand darunter.',
+  },
+  pa_listen: {
+    betrieb: 'Laufzeit und Umfang der Listen selbst -- die gelten je Konzept und Bereich, '
+           + 'nicht je Betrieb.',
+  },
+
   fe_pflegestand:         { betrieb: 'Zaehlt den Stand der drei Pflegetabellen. Die gelten '
                                    + 'konzernweit -- ein Betriebsfilter machte aus "5 von 32 '
                                    + 'eingeordnet" eine Zahl ueber nichts.',

@@ -36,27 +36,49 @@
 // ---------------------------------------------------------------------
 // WAS DIE ZAHLEN NICHT SAGEN, UND WARUM DAS IN DEN BESCHREIBUNGEN STEHT
 //
-// Die Listen fuehren kein Reinigungsmittel, keine Verpackung, keinen
-// Kaffee und keine Weine ausser den genannten. Am 22.08.2026 standen bei
-// Wilma Wunder Kaffee (J. Hornig ueber Darboven) und Fassbier
-// (Augustiner, Bueble) ganz oben im "abseits"-Topf. Das ist kein
-// Verstoss, sondern eine Luecke der Liste — und wer die Quote ohne diese
-// Einordnung weitergibt, erzeugt eine Diskussion ueber das falsche Thema.
+// Am 22.08.2026 standen bei Wilma Wunder zwei Posten ganz oben im
+// "abseits"-Topf: Kaffee (J. Hornig ueber Darboven) und Fassbier
+// (Augustiner, Bueble). Beide sahen gleich aus und waren es NICHT — der
+// Fachbereich hat sie am selben Tag gegensaetzlich entschieden:
+//
+//   BIER UND WEIN SIND AUSDRUECKLICH DIE WAHL DES BETRIEBS. "Augustiner
+//   kein Muss". Die Wilma-Wunder-Liste sagt das selbst: sie fuehrt
+//   "Individueller Wein & Bier" als Abschnitt OHNE Artikel. Diese
+//   Einkaeufe erscheinen zwangslaeufig als "abseits" und sind kein
+//   Verstoss. Das gehoert in jede Beschreibung, in der die Quote
+//   vorkommt — sonst fuehrt die Zahl in eine Diskussion ueber das
+//   falsche Thema.
+//
+//   KAFFEE IST PFLICHT. "Hornig muss". Der Artikel stand nur nicht auf
+//   der Liste — 14 von 14 aktiven Betrieben bezogen ihn trotzdem.
+//   Nachgetragen ueber pflege/pflichtartikel.csv (Distra-Nummer der
+//   Liste: J.J. Darboven 1913002); die Wilma-Wunder-Quote faellt damit
+//   von 32,0 auf 29,4 %.
+//
+// DIE LEHRE FUER DIESE SEITE: ein grosser Posten im "abseits"-Topf ist
+// eine FRAGE an den Fachbereich, keine Antwort. Reinigungsmittel und
+// Verpackung stehen weiterhin auf keiner Liste und sind ungeklaert.
 // =====================================================================
 
-import type { Karte, Parameter } from './typen'
+import type { Karte } from './typen'
 import { P_BETRIEB, P_MARKE } from './gemeinsam'
 
 const BETRIEB = P_BETRIEB
 const MARKE = P_MARKE
 
-/**
- * Der Lieferant. OHNE Werteliste, wie auf db_fremdeinkauf: der Filter
- * wird aus einer Tabelle heraus geklickt, nicht getippt.
+/*
+ * KEIN LIEFERANTENFILTER — und das war ein Baufehler, den der statische
+ * Pruefer in uebernehmen.ts gefunden hat.
+ *
+ * Erst stand hier ein dashboardweiter Filter "lieferant", der auf genau
+ * EINE von fuenfzehn Karten wirkte. Metabase-Filter gelten fuer die ganze
+ * Seite, ueber alle Reiter hinweg: wer ihn setzt, sieht vierzehn Karten
+ * unveraendert und eine gefilterte — und haelt die vierzehn fuer
+ * gefiltert. Vierzehn Ausnahmen einzutragen waere die falsche Antwort
+ * gewesen; die richtige ist, den Filter wegzulassen. Wer die Artikelliste
+ * auf einen Lieferanten eingrenzen will, nimmt Metabases Spaltenfilter
+ * auf der Tabelle selbst.
  */
-const LIEFERANT: Parameter = {
-  id: 'pa-lieferant-param', name: 'lieferant', 'display-name': 'Lieferant', type: 'string/=',
-}
 
 /**
  * Der Betriebsfilter der Auswertungssichten heisst dort `betrieb`, der
@@ -76,7 +98,7 @@ export const karten: Karte[] = [
     schluessel: 'pa_abseits_summe',
     name: 'Einkauf abseits der Pflichtartikelliste',
     beschreibung:
-      'Wie viel Euro im Laufzeitraum der Pflichtartikelliste für Artikel ausgegeben wurde, die auf keiner Liste des Konzepts stehen. Nicht als Verstoß lesen, ohne die Artikel daneben angesehen zu haben: die Listen führen weder Reinigungsmittel noch Verpackung, Kaffee oder Wein — was dort fehlt, taucht hier zwangsläufig auf. Der Zeitraum ist die Laufzeit der Liste und nicht frei wählbar.',
+      'Wie viel Euro im Laufzeitraum der Pflichtartikelliste für Artikel ausgegeben wurde, die auf keiner Liste des Konzepts stehen. Nicht als Verstoß lesen, ohne die Artikel daneben angesehen zu haben: Bier und Wein sind ausdrücklich die Wahl des Betriebs (die Wilma-Wunder-Liste führt „Individueller Wein & Bier" als leeren Abschnitt), und Reinigungsmittel und Verpackung stehen auf keiner Liste. Solche Einkäufe erscheinen hier zwangsläufig. Der Zeitraum ist die Laufzeit der Liste und nicht frei wählbar.',
     anzeige: 'scalar',
     parameter: [BETRIEB, MARKE],
     // coalesce: ein Betrieb ohne Abweichung zeigt 0 und keine leere Kachel
@@ -235,9 +257,9 @@ SELECT coalesce(lieferant, 'ohne Lieferantenangabe') AS "Lieferant",
     schluessel: 'pa_abseits_artikel',
     name: 'Was abseits der Liste gekauft wurde',
     beschreibung:
-      'Die einzelnen Artikel hinter der Quote, nach Ausgaben sortiert — die eigentliche Arbeitsliste. Hier entscheidet sich, ob eine hohe Quote ein Befund ist: stehen oben Reinigungsmittel, Verpackung oder Kaffee, fehlt der Liste eine Warengruppe. Steht dort ein Konkurrenzprodukt zu einem Pflichtartikel, ist es einer.',
+      'Die einzelnen Artikel hinter der Quote, nach Ausgaben sortiert — die eigentliche Arbeitsliste. Hier entscheidet sich, ob eine hohe Quote ein Befund ist, und die Antwort ist nicht vorhersehbar: Fassbier gehört hierher (Bier und Wein sind ausdrücklich die Wahl des Betriebs), J.-Hornig-Kaffee gehörte nicht hierher und steht seit dem 22.08.2026 auf der Liste. Ein großer Posten ist eine Frage an den Fachbereich, keine Antwort.',
     anzeige: 'table',
-    parameter: [BETRIEB, MARKE, LIEFERANT],
+    parameter: [BETRIEB, MARKE],
     sql: `
 SELECT betrieb           AS "Betrieb",
        artikel           AS "Artikel",
@@ -248,7 +270,6 @@ SELECT betrieb           AS "Betrieb",
        letzte_bestellung AS "zuletzt bestellt"
   FROM mart.pflichtartikel_abseits
  WHERE true${FILTER}
-   [[AND lieferant = {{lieferant}}]]
  ORDER BY ausgaben DESC
  LIMIT 500`,
   },
@@ -302,7 +323,7 @@ SELECT konzept               AS "Konzept",
     schluessel: 'pa_abdeckung_betrieb',
     name: 'Wie viele Pflichtartikel fehlen je Betrieb',
     beschreibung:
-      'Wie viele Artikel der Pflichtartikelliste ein Betrieb im Laufzeitraum nicht bezogen hat. Die Zahl ist eine Obergrenze: ein Artikel kann unter einer Nachfolgenummer gekauft worden sein, und Artikel, die kein einziger Betrieb bezieht, stehen fast immer für eine veraltete Liste — beides steht auf dem Reiter „Listenpflege". Positionen ohne Artikelnummer sind nicht enthalten.',
+      'Wie viele Artikel der Pflichtartikelliste ein Betrieb im Laufzeitraum nicht bezogen hat. Immer zusammen mit der Spalte „Datenbasis" lesen: „keine Bestellung" heißt, dass der Betrieb im Laufzeitraum gar nichts bestellt hat — dann fehlt zwangsläufig alles, und das sagt nichts über sein Sortiment. Die Zahl ist außerdem eine Obergrenze: ein Artikel kann unter einer Nachfolgenummer gekauft worden sein, und Artikel, die kein einziger Betrieb bezieht, stehen fast immer für eine veraltete Liste — beides steht auf dem Reiter „Listenpflege". Positionen ohne Artikelnummer sind nicht enthalten.',
     anzeige: 'table',
     parameter: [BETRIEB, MARKE],
     sql: `
@@ -311,11 +332,15 @@ SELECT konzept AS "Konzept",
        count(*) FILTER (WHERE NOT bezogen) AS "fehlende Pflichtartikel",
        count(*)                            AS "Pflichtartikel gesamt",
        round(100.0 * count(*) FILTER (WHERE bezogen) / nullif(count(*), 0), 1)
-         AS "bezogen (%)"
+         AS "bezogen (%)",
+       min(datenbasis)                     AS "Datenbasis"
   FROM mart.pflichtartikel_abdeckung
  WHERE NOT optional${FILTER}
  GROUP BY 1, 2
- ORDER BY 3 DESC`,
+ -- Betriebe ohne jede Bestellung ans ENDE, nicht an die Spitze: sonst
+ -- fuehren sieben Haeuser ohne Daten eine Liste an, die von Sortiment
+ -- handeln soll (Migration 0095).
+ ORDER BY (min(datenbasis) = 'keine Bestellung'), 3 DESC`,
   },
 
   {
@@ -331,7 +356,8 @@ SELECT betrieb       AS "Betrieb",
        lieferant     AS "Lieferant",
        artikelnummer AS "Artikelnummer",
        bezeichnung   AS "Pflichtartikel",
-       nur_betriebe  AS "nur für"
+       nur_betriebe  AS "nur für",
+       datenbasis    AS "Datenbasis"
   FROM mart.pflichtartikel_abdeckung
  WHERE NOT bezogen
    AND NOT optional${FILTER}
@@ -349,7 +375,7 @@ SELECT betrieb       AS "Betrieb",
     schluessel: 'pa_abdeckung_niemand',
     name: 'Pflichtartikel, die niemand bezieht',
     beschreibung:
-      'Artikel, die auf der Liste stehen und von keinem einzigen Betrieb des Konzepts bestellt wurden. Das ist so gut wie nie ein Verstoß aller Betriebe gleichzeitig, sondern ein Hinweis auf die Liste selbst: ausgelistet, umnummeriert oder nie im Sortiment. Die erste Adresse, wenn eine Quote unerklärlich hoch aussieht.',
+      'Artikel, die auf der Liste stehen und von keinem einzigen Betrieb des Konzepts bestellt wurden. Das ist so gut wie nie ein Verstoß aller Betriebe gleichzeitig, sondern ein Hinweis auf die Liste selbst: ausgelistet, umnummeriert oder nie im Sortiment. Die erste Adresse, wenn eine Quote unerklärlich hoch aussieht. Betriebe, die im Laufzeitraum überhaupt nichts bestellt haben, sind ausgeklammert — sie hätten jede Zeile mitgezählt, ohne etwas über den Artikel zu sagen.',
     anzeige: 'table',
     parameter: [MARKE],
     sql: `
@@ -361,6 +387,12 @@ SELECT konzept       AS "Konzept",
        count(*)      AS "Betriebe ohne Bezug"
   FROM mart.pflichtartikel_abdeckung
  WHERE NOT optional
+   -- Betriebe ohne eine einzige Bestellung im Laufzeitraum bleiben
+   -- draussen (Migration 0095): sie haben nichts bezogen, weil sie NICHTS
+   -- bezogen haben. Drin gelassen haetten sie jede Zeile um sieben
+   -- erhoeht und "niemand bezieht das" fuer Artikel behauptet, die sehr
+   -- wohl bezogen werden.
+   AND datenbasis <> 'keine Bestellung'
    [[AND konzept = {{marke}}]]
  GROUP BY 1, 2, 3, 4, 5
 HAVING count(*) FILTER (WHERE bezogen) = 0

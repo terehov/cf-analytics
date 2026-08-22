@@ -1334,16 +1334,47 @@ auf, weil das Fenster auf 0–24 steht.
    nachträgt, macht daraus eine Messung — `mart.pflichtartikel_nicht_pruefbar`
    sagt, welche bisher gar keinen Treffer haben.
 
-3. **Führen die Listen bewusst keinen Kaffee, keine Reinigungsmittel und keine
-   Verpackung?** Diese Warengruppen erscheinen zwangsläufig als „abseits" und
-   tragen bei Wilma Wunder die größten Einzelposten (J. Hornig Röstkaffee 8.960 €,
-   Augustiner Hell 7.954 €). Ist das Absicht, gehört ein Hinweis in die
-   Seitenbeschreibung; ist es eine Lücke, gehören sie auf die Liste.
+3. ~~**Führen die Listen bewusst keinen Kaffee, keine Reinigungsmittel und keine
+   Verpackung?**~~ **Beantwortet am 22.08.2026 — und zwar gegensätzlich für die
+   beiden Beispiele, was den Punkt erst lehrreich macht.**
+
+   * **Bier und Wein: ausdrücklich die Wahl des Betriebs.** „Augustiner kein
+     Muss". Die Wilma-Wunder-Liste sagt das selbst — sie führt „Individueller
+     Wein & Bier" als Abschnitt **ohne Artikel**. Diese Einkäufe erscheinen
+     zwangsläufig als „abseits" und sind kein Verstoß. Steht jetzt im Textblock
+     des Dashboards und in den Kartenbeschreibungen.
+   * **Kaffee: Pflicht.** „Hornig muss". Der Artikel stand nur nicht auf der
+     Liste, obwohl **14 von 14** aktiven Betrieben ihn bezogen. Nachgetragen
+     über `pflege/pflichtartikel.csv` (J.J. Darboven `1913002`, 98.937 € im
+     Laufzeitraum); die Wilma-Wunder-Quote fällt damit von 32,0 auf 29,4 %.
+
+   **Offen bleibt:** Reinigungsmittel und Verpackung (Layer-Chemie, Tork
+   Falthandtücher) stehen auf keiner Liste und sind nicht entschieden.
+
+   **Und eine Anschlussfrage, die eine Zeile kostet:** neben dem Kaffee laufen
+   weitere Darboven-Artikel über alle oder fast alle Betriebe. Gehören sie
+   ebenfalls auf die Liste?
+
+   | Artikel | Nummer | Betriebe (von 14) | Ausgaben |
+   |---|---|---:|---:|
+   | J. Hornig Zuckersticks rot | `14001` | **14** | 3.818 € |
+   | JJD Kaffeesahne 240×7,5 g | `13341` | 11 | 915 € |
+   | Idee Kaffee entkoffeiniert 250 g | `1017252` | 8 | 6.613 € |
+   | J. Hornig Wasserglas | `14008` | 8 | 313 € |
+   | JJD Classics Gebäck | `13907` | 7 | 6.570 € |
+
+   Nicht nachgetragen wurde **Hornig Röstmeister Espresso** (`1842001`): nur
+   2 von 14 Betrieben — das ist eine örtliche Wahl, kein Pflichtartikel. Ihn
+   einzutragen hätte zwölf Fehlmeldungen erzeugt.
 
 4. **28 Listenartikel bezieht kein einziger Betrieb** — bei Enchilada unter
    anderem „Komali Maistortillas Gelb 15cm", „Salsa Tk Karton", „Caesar Dressing
    Schale 1Kg", alle zuletzt 2025 bestellt. Ausgelistet, umnummeriert oder nie im
    Sortiment? `mart.pflichtartikel_abdeckung` (Reiter „Abdeckung") führt sie.
+
+   **Stand 22.08.2026: der Fachbereich klärt das und liefert nach.** Bis dahin
+   bleiben die Zeilen stehen — sie als „Verstoß aller Betriebe gleichzeitig" zu
+   lesen wäre falsch, sie wegzufiltern wäre eine stille Kürzung.
 
 **Technisch offen:**
 

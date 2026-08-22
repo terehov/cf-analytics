@@ -2384,3 +2384,42 @@ Fremdeinkauf fragt, ob der **Lieferant** freigegeben ist, Pflichtartikel fragen,
 ob der **Artikel** auf der Liste steht. Ein Betrieb kann beim freigegebenen
 Lieferanten am Sortiment vorbei bestellen, und genau dieser Fall ist auf der
 Fremdeinkaufsseite unsichtbar.
+
+
+---
+
+## 22.08.2026 — Pflichtartikel: die erste Rückmeldung des Fachbereichs
+
+**Zwei Posten, die gleich aussahen, und gegensätzlich entschieden wurden.** Auf
+der frisch übernommenen Seite standen bei Wilma Wunder Kaffee und Fassbier ganz
+oben im „abseits"-Topf. Die Antwort:
+
+**Bier und Wein sind ausdrücklich die Wahl des Betriebs** („Augustiner kein
+Muss"). Das bestätigt, was die Vorlage selbst schon sagte und niemand gelesen
+hatte: die Wilma-Wunder-Bar-Liste führt einen Abschnitt „Individueller Wein &
+Bier" **ohne einen einzigen Artikel**. Diese Einkäufe erscheinen zwangsläufig als
+Abweichung und sind keine.
+
+*Verworfen: Getränke aus der Quote herausrechnen.* Wäre die bequeme Lösung und
+die falsche — die Quote misst den Anteil am Einkauf, und Bier ist Einkauf. Wer
+sie kleinrechnet, macht sie unvergleichbar mit den anderen Konzepten. Stattdessen
+steht die Einordnung jetzt im Textblock der Seite und in den Beschreibungen der
+Karten, die die Quote zeigen.
+
+**Kaffee ist dagegen Pflicht** („Hornig muss"). Der Artikel stand schlicht nicht
+auf der Liste, obwohl 14 von 14 aktiven Betrieben ihn beziehen — 98.937 € im
+Laufzeitraum. Nachgetragen als eine Zeile in `pflege/pflichtartikel.csv`
+(J.J. Darboven `1913002`), ohne Migration. Die Wilma-Wunder-Quote fällt damit von
+32,0 auf 29,4 %.
+
+**Nicht nachgetragen: Hornig Röstmeister Espresso (`1842001`).** Nur 2 von 14
+Betrieben. „Hornig muss" meint den Hauskaffee, nicht jede Hornig-Nummer; ihn
+einzutragen hätte zwölf Betriebe fälschlich als „Pflichtartikel fehlt" gemeldet.
+Die übrigen Darboven-Artikel (Zuckersticks 14/14, Kaffeesahne 11/14, Gebäck 7/14)
+stehen als Anschlussfrage in `offene-punkte.md` — bei 14/14 wäre ein Nachtrag
+risikolos, bei 7/14 nicht, und geraten wird hier nicht.
+
+**Die Lehre, und sie gehört auf die Seite:** ein großer Posten im „abseits"-Topf
+ist eine **Frage** an den Fachbereich, keine Antwort. Zwei optisch identische
+Fälle, zwei gegensätzliche Entscheidungen — und beide Male hätte die Auswertung
+allein danebengelegen.
