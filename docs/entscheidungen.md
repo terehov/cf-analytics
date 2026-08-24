@@ -2650,3 +2650,66 @@ Was mit den **26 Standorten ohne Betrieb** geschieht. Bei sechzehn ist die Antwo
 „nichts" (Fremdmandant, unbekannte Häuser), bei sechs steht dieselbe Entscheidung aus wie
 bei Yext. Die Liste steht jetzt als `mart.bounti_standort_offen` mit Gewicht statt als
 einmalige Recherche in einem Dokument — siehe `offene-punkte.md`.
+
+---
+
+## 24.08.2026 — Alle separaten Dienste laufen nebeneinander
+
+**Vorgabe von Eugene, wörtlich:** *„Man kann Lina, FoodNotify, Yext und Bounti
+parallelisieren."* und *„Wetter und Feiertage ebenso. Faustregel: Alle separaten
+Dienste parallelisieren."*
+
+Umgesetzt als zwei Phasen in `sync.ts` — Phase A die fünf Dienste nebeneinander,
+Phase B die Ableitungen seriell wie bisher. Der Ablauf steht in
+[`importer.md`](importer.md).
+
+### Warum das keine Optimierung ist, sondern eine Korrektur
+
+Die alte Reihenfolge war nie begründet, sie war gewachsen. Jeder Nachlauf trug
+in seinem Kopf die Regel „**sie läuft NACH dem Import**" — und keiner der vier
+las etwas, das der Import schreibt. Gemessen an Lauf 101 stand die
+FoodNotify-Spur nach zwei Stunden acht Stunden still, während Yext und Bounti
+auf ein Ende warteten, das sie nichts anging.
+
+### Was NICHT parallelisiert wurde, und warum
+
+**Die Ladenakte bekommt keine eigene Spur.** Sie ist derselbe Dienst wie die
+LINA-Berichte: gleicher Host, gleiche Sitzung, gleiches Tempo. Eine dritte Spur
+wäre doppeltes Tempo gegen einen fremden Zugang und damit ein Verstoß gegen
+Regel 3. Die Faustregel sagt „separate Dienste" — die Ladenakte ist keiner. Das
+ist auch der Grund, warum der Lauf **nicht kürzer wird**: die LINA-Spur trägt
+zehn von zehn Stunden.
+
+**Phase B bleibt seriell, vollständig.** Die Kette ist dreimal teuer erkauft
+worden, und die Regel dahinter ist jedes Mal dieselbe: was eine materialisierte
+Sicht liest, muss vor ihrem Refresh geschrieben sein. Diese Bedingung wird durch
+die Parallelisierung nicht schwächer, sondern **strenger** — Phase A ist
+vollständig fertig, bevor Phase B anfängt.
+
+### Der Preis, und warum er angenommen wurde
+
+Yext und Bounti gleichen ihre Betriebszuordnung monatlich ab. Dieser Abgleich
+sieht `core.betrieb` jetzt im Stand des Laufbeginns statt nach dem Import: ein
+Betrieb, der in dieser Nacht zuerst auftaucht, bekäme seine Zuordnung erst beim
+nächsten Monatsabgleich.
+
+Angenommen, weil gemessen: **seit Juli 2026 ist kein einziger neuer Betrieb
+dazugekommen**, und der Fall bliebe die ganze Zeit sichtbar
+(`mart.betrieb_ohne_yext`, `mart.bounti_ohne_betrieb`, beide an
+`mart.pruefung_uebersicht`). Eine Sonderbehandlung für einen Fall, der in
+anderthalb Monaten nie eintrat, wäre ein Zweig, den niemand je durchläuft — und
+davon hat dieses Projekt genug bezahlt.
+
+### Zwei Dinge, die dabei absichtlich gleich geblieben sind
+
+**Die Fehlersemantik des Imports.** Scheitert er, scheitert der Lauf — nur eben
+erst, nachdem die vier Dienste zu Ende gekommen sind. Ihre Arbeit ist getan und
+soll nicht mitverworfen werden. Der Fehlerbehandler hängt **sofort** am Import
+und nicht erst am `await`: sonst wäre eine Ablehnung während des Wartens auf die
+Dienste eine unbehandelte Zusage, und die beendet den Prozess mitten im Lauf,
+ohne dass `sync.lauf` je geschlossen wird.
+
+**Das Versprechen „wirft nie".** Alle vier Dienste geben es in ihrem Kopf.
+`Promise.allSettled` **prüft** es jetzt, statt sich darauf zu verlassen: bricht
+einer doch, steht er als Fehler im Log und der Lauf geht weiter. Verschluckt
+wird nichts (Regel 10).

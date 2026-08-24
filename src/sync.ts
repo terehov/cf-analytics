@@ -48,79 +48,141 @@ try {
    */
   await nachfuellen()
 
-  const r = await workerLauf(ausloeser as any)
+  /**
+   * ══════════════════════════════════════════════════════════════════
+   * PHASE A — DIE DIENSTE, PARALLEL.
+   *
+   * Faustregel seit dem 24.08.2026 (Eugene): **alle separaten Dienste
+   * parallelisieren.** Fünf Quellen, fünf fremde Häuser, fünf eigene
+   * Limits — sie konkurrieren um nichts als um die Datenbank, und die ist
+   * nicht der Engpass.
+   *
+   * WAS VORHER WAR, UND WARUM ES GEMESSEN FALSCH WAR. Bis heute lief nur
+   * die Warteschlange parallel, und auch die nur ZWEISPURIG (LINA, FN);
+   * Yext, Bounti, Wetter und Handpflege hingen als `await`-Kette dahinter.
+   * Nachgemessen an Lauf 101 (24.08.2026):
+   *
+   *   FoodNotify-Spur   05:06:52 → 07:03:52   (1 h 57)
+   *   LINA-Spur         05:06:51 → 15:14:49   (10 h 08)
+   *
+   * Die FoodNotify-Spur war nach zwei Stunden fertig und stand danach acht
+   * Stunden still, während Yext und Bounti bis 15:15 warteten, um dann
+   * zwanzig Minuten zu arbeiten. Nichts daran war eine Abhängigkeit.
+   *
+   * WAS DAS BRINGT — und was NICHT. Der Lauf wird dadurch **nicht kürzer**:
+   * die LINA-Spur trägt 10 von 10 Stunden, davon 6 h 40 allein die
+   * Belegzählung (docs/importer.md). Was sich ändert, ist zweierlei:
+   *
+   *   1. Bewertungen, Schulungen, Wetter und Handnoten stehen um 05:30
+   *      statt um 15:30 — zehn Stunden früher.
+   *   2. Sie gehen nicht mehr verloren, wenn der Import abbricht. 30 der
+   *      bisher 101 Läufe stehen auf `abgebrochen`; in jedem davon liefen
+   *      die vier Dienste bisher GAR NICHT, weil sie hinter dem Import
+   *      standen.
+   *
+   * WARUM DIE WARTESCHLANGE TROTZDEM ZWEISPURIG BLEIBT. LINA-Berichte und
+   * Ladenakte sind DERSELBE Dienst — gleicher Host, gleiche Sitzung,
+   * gleiches Tempo (AGENTS.md Regel 3). Eine dritte Spur dafür wäre nicht
+   * Parallelität, sondern doppeltes Tempo gegen einen Zugang, der uns nicht
+   * gehört. Die Faustregel sagt „separate Dienste", und die Ladenakte ist
+   * keiner.
+   *
+   * DER PREIS, EHRLICH GENANNT. Yext und Bounti gleichen ihre
+   * Betriebszuordnung einmal im Monat ab, und dieser Abgleich sieht künftig
+   * `core.betrieb` im Stand des LAUFBEGINNS statt nach dem Import. Ein
+   * Betrieb, der in dieser Nacht ZUERST auftaucht, bekäme seine Zuordnung
+   * damit erst beim nächsten Monatsabgleich. Gemessen: seit Juli 2026 ist
+   * kein einziger neuer Betrieb dazugekommen, und der Fall bliebe die ganze
+   * Zeit sichtbar — `mart.betrieb_ohne_yext` und `mart.bounti_ohne_betrieb`
+   * führen ihn, beide hängen an `mart.pruefung_uebersicht`.
+   *
+   * DIE VERBINDUNGEN REICHEN. Der Pool steht auf `max: 8`; jeder Zweig hier
+   * greift seine Abfragen streng nacheinander ab, hält also höchstens EINE
+   * Verbindung. Zwei Worker-Spuren plus vier Dienste sind sechs. Die
+   * Verbindung der Laufsperre zählt nicht mit — sie liegt bewusst außerhalb
+   * des Pools (siehe `sperreHolen()` in sync/worker.ts).
+   * ══════════════════════════════════════════════════════════════════
+   */
+  const importP = workerLauf(ausloeser as any)
+
+  /*
+   * Der Fehlerbehandler wird SOFORT angehängt und nicht erst beim `await`
+   * weiter unten. Bricht der Import ab, während wir noch auf die Dienste
+   * warten, wäre das sonst eine unbehandelte Ablehnung — und die beendet
+   * den Prozess mitten im Lauf, ohne dass `sync.lauf` je geschlossen wird.
+   */
+  const importErgebnis = importP.then(
+    wert  => ({ status: 'erfuellt'  as const, wert }),
+    grund => ({ status: 'abgelehnt' as const, grund }))
+
+  /*
+   * Die vier Dienste. Alle vier versprechen in ihrem Kopf, NIE zu werfen —
+   * `allSettled` prüft dieses Versprechen, statt sich darauf zu verlassen.
+   * Bricht eines doch, steht es als Fehler im Log und der Lauf geht weiter;
+   * lautlos verschluckt wird nichts (Regel 10).
+   */
+  const dienste: Array<[string, Promise<void>]> = [
+    ['yext',       yextNachlauf()],
+    ['bounti',     bountiNachlauf()],
+    ['wetter',     wetterNachlauf()],
+    ['handpflege', pflegeNachlauf()],
+  ]
+
+  const diensteAusgang = await Promise.allSettled(dienste.map(([, p]) => p))
+  for (const [i, e] of diensteAusgang.entries()) {
+    if (e.status === 'rejected') {
+      log.error('ein Dienst hat entgegen seiner Zusage geworfen — der Lauf geht weiter', {
+        dienst: dienste[i]![0], fehler: String(e.reason).slice(0, 300),
+      })
+    }
+  }
+
+  const imp = await importErgebnis
+  /*
+   * Die Fehlersemantik des Imports bleibt EXAKT wie vorher: wirft er, wirft
+   * dieser Lauf. Nur eben erst, nachdem die vier Dienste zu Ende gekommen
+   * sind — ihre Arbeit ist getan und soll nicht mit verworfen werden.
+   */
+  if (imp.status === 'abgelehnt') throw imp.grund
+  const r = imp.wert
+
+  log.info('phase a fertig — dienste gelaufen', {
+    dienste: dienste.map(([name], i) =>
+      `${name}: ${diensteAusgang[i]!.status === 'fulfilled' ? 'ok' : 'FEHLER'}`).join(' · '),
+  })
 
   /**
-   * ERSTER Nachlauf, und er muss der erste sein: Kostenstelle → Betrieb.
+   * ══════════════════════════════════════════════════════════════════
+   * PHASE B — DIE ABLEITUNGEN, SERIELL.
    *
-   * Alle folgenden Nachläufe rechnen auf `betrieb_key` — die Auswahllisten,
-   * der Deckungsbeitrag, der Round Table, die Einkaufssichten. Liefe die
+   * Hier ändert sich nichts, und das ist Absicht: die Reihenfolge dieser
+   * Kette ist dreimal teuer erkauft worden. Die Regel dahinter ist immer
+   * dieselbe — **was eine materialisierte Sicht liest, muss vor ihrem
+   * Refresh geschrieben sein.** Ein Nachlauf hinter seinem eigenen Leser
+   * ist einen Tag alt, ohne dass es jemandem auffällt (14.08.2026: zwei
+   * Betriebe trugen dauerhaft eine Bewertungsnote aus dem Vortag).
+   *
+   * Yext und die Handpflege schreiben Round-Table-Kennzahlen. Dass sie
+   * jetzt in Phase A stehen, erfüllt diese Bedingung strenger als vorher:
+   * sie sind fertig, BEVOR Phase B überhaupt anfängt.
+   * ══════════════════════════════════════════════════════════════════
+   */
+
+  /**
+   * ERSTER Nachlauf der Kette: Kostenstelle → Betrieb.
+   *
+   * Alle folgenden rechnen auf `betrieb_key` — die Auswahllisten, der
+   * Deckungsbeitrag, der Round Table, die Einkaufssichten. Liefe die
    * Zuordnung dahinter, zeigten sie bis zum nächsten Lauf den Stand von
    * gestern; ein neu zugeordneter Betrieb wäre einen Tag lang in den Zahlen
    * und nicht in den Sichten.
    *
-   * Dieselbe Falle hatte `yextNachlauf()` — er lief bis zum 14.08.2026 NACH
-   * dem Round-Table-Refresh und schrieb deshalb zwei Betrieben eine veraltete
-   * Note in die Ampel (Punkt 5.3 des Plans). Seitdem steht er direkt darunter.
+   * Er gehört nicht in Phase A: er ist kein Dienst, sondern eine Rechnung
+   * auf dem, was FoodNotify in Phase A geladen hat.
    *
    * Wirft nie, siehe Kopf von sync/zuordnung.ts.
    */
   await zuordnungNachlauf()
-
-  /**
-   * ZWEITER Nachlauf, und seit dem 14.08.2026 VOR dem Round Table (Punkt 5.3).
-   *
-   * Er hing bis dahin ganz am Ende, hinter dem Round-Table-Refresh — und
-   * `mart.round_table_monat` ist seit Migration `0039` materialisiert. Zwei
-   * Betriebe trugen deshalb dauerhaft eine Bewertungsnote aus dem VORTAG in
-   * der Ampel: die Note kam an, die Sicht war schon aufgefrischt.
-   *
-   * Dieselbe Falle wie bei `zuordnungNachlauf()` darüber, und dieselbe
-   * Antwort: was eine materialisierte Sicht liest, muss vor ihrem Refresh
-   * geschrieben sein. Ein Nachlauf, der hinter seinem eigenen Leser steht,
-   * ist einen Tag alt, ohne dass es jemandem auffällt.
-   *
-   * Anders als die übrigen hängt er nicht am Importergebnis, sondern an der
-   * Uhr — er läuft höchstens einmal am Tag und prüft das selbst. Einmal im
-   * Monat zieht er dabei die ganze Reihe gerade (25 Monate) und gleicht die
-   * Zuordnung der Betriebe ab; beides war bis zum 14.08.2026 Handarbeit.
-   *
-   * Wirft nie, siehe Kopf von yext/nachlauf.ts.
-   */
-  await yextNachlauf()
-
-  /**
-   * DRITTER Nachlauf, und ebenfalls VOR allem Materialisierten: die
-   * Handpflege. Er liest die Dateien aus `pflege/` ein und zieht einmal im
-   * Monat Feiertage und Schulferien nach.
-   *
-   * `manual.om_einschaetzung` ist eine der sechs Round-Table-Kennzahlen, und
-   * `mart.round_table_monat` ist seit Migration `0039` materialisiert — käme
-   * die Pflege danach, trüge die Ampel die Note vom Vortag. Dieselbe Falle
-   * wie bei Yext darüber.
-   *
-   * Wirft nie, siehe Kopf von pflege/nachlauf.ts.
-   */
-  await pflegeNachlauf()
-
-  /**
-   * VIERTER Nachlauf: Bounti — Schulungsstand, Personalbewegung, Audits.
-   *
-   * SEINE STELLE IST FREI WAEHLBAR, und das steht hier ausdruecklich: keine
-   * der Bounti-Sichten aus Migration `0096` ist materialisiert, alle lesen
-   * live. Er steht trotzdem hier oben bei den anderen Fachquellen, damit die
-   * Reihenfolge stimmt, falls eine davon später materialisiert wird — bei
-   * Yext war genau das der Fehler, der zwei Betrieben eine Note aus dem
-   * Vortag in die Ampel geschrieben hat.
-   *
-   * Er haengt an der Uhr, nicht am Importergebnis, und laeuft hoechstens
-   * alle 20 Stunden. Die Zuweisungen holt er in Rotation mit einer
-   * Obergrenze, nicht auf Befehl — der Rueckstand steht in
-   * `mart.bounti_zuweisung_stand` und muss von Nacht zu Nacht fallen.
-   *
-   * Wirft nie, siehe Kopf von bounti/nachlauf.ts.
-   */
-  await bountiNachlauf()
 
   // Zweiter Nachlauf, gleiche Regeln: mart.deckungsbeitrag_warengruppe ist
   // seit Migration 0027 materialisiert und muss aufgefrischt werden, sobald
@@ -159,22 +221,20 @@ try {
    */
   await auswahllistenNachlauf()
 
-  /**
-   * Das Wetter. Es steht vor dem Vergleichstag, aber es MUSS nicht dort
-   * stehen — die Begründung dafür war bis zum 20.08.2026 falsch.
+  /*
+   * HIER STAND `wetterNachlauf()` — seit dem 24.08.2026 in Phase A.
    *
-   * Behauptet wurde, die Materialisierung lese über mart.betrieb_wetter_tag
-   * mit. Sie tut es nicht: mart.vergleichstag_basis liest ausschließlich
-   * mart.betrieb_kalender und mart.umsatz_tag (in pg_depend nachgesehen).
-   * Die Wetterspalten hängen in der dünnen Hülle mart.vergleichstag darüber,
-   * seit Migration 0086 — und die ist eine gewöhnliche Sicht. Das Wetter ist
-   * damit live und kann gar nicht veralten.
+   * Der Kopf von wetter/nachlauf.ts sagt es selbst: „REIHENFOLGE: keine."
+   * Die frühere Begründung (die Materialisierung lese über
+   * mart.betrieb_wetter_tag mit) war am 20.08.2026 in pg_depend widerlegt
+   * worden: mart.vergleichstag_basis liest ausschließlich
+   * mart.betrieb_kalender und mart.umsatz_tag, die Wetterspalten hängen in
+   * der gewöhnlichen Sicht mart.vergleichstag darüber und sind live.
    *
-   * Rollierendes Fenster über 14 Tage (48 Aufrufe) plus Backfill mit
-   * Obergrenze (WETTER_BACKFILL_JE_LAUF, Vorgabe 60). Kein Handbefehl.
-   * Wirft nie, siehe Kopf von wetter/nachlauf.ts.
+   * Bright Sky ist ein eigener Dienst mit eigenem Tempo und teilt sich mit
+   * niemandem hier ein Limit — es gab keinen Grund, ihn neun Stunden warten
+   * zu lassen.
    */
-  await wetterNachlauf()
 
   /**
    * Und der Vergleichstag, aus demselben Grund: mart.vergleichstag_basis ist

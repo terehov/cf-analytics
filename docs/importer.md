@@ -6,6 +6,80 @@ Was hier an Fallstricken steckt und schon einmal zugeschlagen hat, steht gesamme
 `fehlerkatalog.md` — besonders die Abschnitte zum partiellen Eindeutigkeitsindex und dazu,
 warum ein Lauf früher an jedem Verbindungsfehler starb.
 
+## Zwei Phasen: die Dienste nebeneinander, die Ableitungen danach (24.08.2026)
+
+`sync.ts` war bis zum 24.08.2026 eine Kette von `await`s: erst der Import, dann
+Yext, Handpflege, Bounti, dann alles Materialisierte. **Nur die Warteschlange
+lief parallel, und auch die nur zweispurig.**
+
+Nachgemessen an Lauf 101:
+
+| Spur | von | bis | Dauer |
+|---|---|---|---|
+| FoodNotify | 05:06:52 | 07:03:52 | 1 h 57 |
+| LINA (Berichte) | 05:06:51 | 08:30:14 | 3 h 23 |
+| LINA (Ladenakte) | 08:30:25 | 15:14:49 | 6 h 44 |
+
+Die FoodNotify-Spur stand nach zwei Stunden still und wartete acht Stunden;
+Yext und Bounti warteten bis 15:15, um dann zwanzig Minuten zu arbeiten.
+
+**Faustregel seitdem (Eugene): alle separaten Dienste parallelisieren.**
+
+```text
+  nachfuellen()                     Vorlauf: die Schlange füllen
+
+  ── Phase A ── die Dienste, nebeneinander ───────────────
+     workerLauf()   LINA-Spur ‖ FoodNotify-Spur
+     yextNachlauf()
+     bountiNachlauf()
+     wetterNachlauf()
+     pflegeNachlauf()               Handpflege + Feiertage/Schulferien
+  ── Sammelpunkt: Promise.allSettled ─────────────────────
+
+  ── Phase B ── die Ableitungen, seriell ─────────────────
+     zuordnungNachlauf()            Kostenstelle → Betrieb
+     deckungsbeitrag · roundTable · auswahllisten · vergleichstag
+     einkaufspreis · einkaufSichten · pflichtartikel · zulaufPruefen
+```
+
+**Was das bringt — und was nicht.** Der Lauf wird dadurch **nicht kürzer**: die
+LINA-Spur trägt zehn von zehn Stunden, davon 6 h 40 allein die Belegzählung.
+Was sich ändert:
+
+1. Bewertungen, Schulungen, Wetter und Handnoten stehen um **05:30 statt 15:30**.
+2. Sie gehen **nicht mehr verloren, wenn der Import abbricht.** 30 der bisher
+   101 Läufe stehen auf `abgebrochen`; in jedem davon liefen die vier Dienste
+   gar nicht, weil sie dahinter standen.
+
+**Warum die Warteschlange trotzdem zweispurig bleibt.** LINA-Berichte und
+Ladenakte sind derselbe Dienst — gleicher Host, gleiche Sitzung, gleiches Tempo
+(Regel 3). Eine dritte Spur wäre nicht Parallelität, sondern doppeltes Tempo
+gegen einen fremden Zugang. Die Faustregel sagt „separate Dienste", und die
+Ladenakte ist keiner.
+
+**Die Grenze zwischen den Phasen ist die Bedingung, an der alles hängt.** Yext
+und die Handpflege schreiben Round-Table-Kennzahlen, und `mart.round_table_monat`
+ist seit Migration `0039` materialisiert. Liefe der Refresh los, während die
+beiden noch schreiben, trüge die Ampel die Note vom Vortag — derselbe Fehler wie
+am 14.08.2026, nur als Wettlauf statt als Reihenfolge und damit nicht einmal
+verlässlich reproduzierbar. `src/sync/phasen.test.ts` prüft am Quelltext, dass
+jede Ableitung hinter dem Sammelpunkt steht und kein Dienst herausfällt.
+
+**Der Preis, ehrlich genannt.** Yext und Bounti gleichen ihre Betriebszuordnung
+einmal im Monat ab, und dieser Abgleich sieht `core.betrieb` künftig im Stand
+des Laufbeginns statt nach dem Import. Ein Betrieb, der in dieser Nacht zuerst
+auftaucht, bekäme seine Zuordnung erst beim nächsten Monatsabgleich. Gemessen:
+seit Juli 2026 kam kein neuer Betrieb dazu, und der Fall stünde die ganze Zeit
+in `mart.betrieb_ohne_yext` und `mart.bounti_ohne_betrieb` — beide hängen an
+`mart.pruefung_uebersicht`.
+
+**Die Verbindungen reichen.** Der Pool steht auf `max: 8`; jeder Zweig greift
+seine Abfragen streng nacheinander ab, hält also höchstens eine Verbindung. Zwei
+Worker-Spuren plus vier Dienste sind sechs. Die Verbindung der Laufsperre zählt
+nicht mit, sie liegt außerhalb des Pools.
+
+---
+
 ## Eine Schlange, zwei Schleifen, kein Modus-Unterschied
 
 Es gibt **keinen** getrennten Backfill- und Sync-Modus. Beides sind Einträge in `sync.warteschlange`, die konstant und langsam abgearbeitet werden:

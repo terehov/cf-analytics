@@ -76,7 +76,19 @@ describe('Yext-Nachlauf', () => {
     // herausfaellt -- genau so stand LINA am 02.08.2026 acht Tage still.
     const sync = await Bun.file(`${import.meta.dir}/../sync.ts`).text()
     expect(sync).toContain('yextNachlauf')
-    expect(sync).toMatch(/await\s+yextNachlauf\(\)/)
+    /*
+     * ~~await yextNachlauf()~~ — seit dem 24.08.2026 wird der Nachlauf in
+     * Phase A GESTARTET und nicht mehr einzeln abgewartet: er laeuft neben
+     * dem Import statt dahinter. Gesucht wird deshalb der Aufruf, nicht das
+     * `await` davor.
+     *
+     * Die Zusage, die dieser Test schuetzt, ist unveraendert: der Nachlauf
+     * muss in sync.ts VORKOMMEN. Eine Ladefunktion kann am Nachlauf haengen
+     * und trotzdem nie laufen, wenn der Nachlauf selbst herausfaellt.
+     */
+    expect(sync).toMatch(/yextNachlauf\(\)/)
+    // Und er muss in der Dienstliste der Phase A stehen, nicht irgendwo.
+    expect(sync).toMatch(/\['yext',\s*yextNachlauf\(\)\]/)
   })
 
   test('der Analytics-Aufruf steht in einem eigenen try', async () => {
@@ -146,13 +158,32 @@ describe('Yext ohne Handbefehl', () => {
    * 14.08.2026 bei zwei Betrieben der Fall. Ein Nachlauf, der hinter seinem
    * eigenen Leser steht, ist einen Tag alt, ohne dass es jemandem auffällt.
    */
-  test('yextNachlauf steht VOR roundTableNachlauf', async () => {
+  test('yextNachlauf ist fertig, BEVOR roundTableNachlauf beginnt', async () => {
     const sync = await Bun.file(`${import.meta.dir}/../sync.ts`).text()
-    const yext = sync.indexOf('await yextNachlauf()')
+    const yext = sync.indexOf("['yext',")
+    const sammelpunkt = sync.indexOf('await Promise.allSettled(dienste')
     const rt = sync.indexOf('await roundTableNachlauf()')
+
     expect(yext).toBeGreaterThan(0)
+    expect(sammelpunkt).toBeGreaterThan(0)
     expect(rt).toBeGreaterThan(0)
-    expect(yext).toBeLessThan(rt)
+
+    /*
+     * DREI STELLEN STATT ZWEI, und das ist der ganze Unterschied zum
+     * 24.08.2026. Vorher genuegte `yext vor roundTable`, weil beide
+     * `await`s waren. Jetzt wird Yext in Phase A nur GESTARTET — die Zusage
+     * haengt am SAMMELPUNKT dazwischen:
+     *
+     *   1. der Dienst wird gestartet,
+     *   2. Phase A wird vollstaendig abgewartet,
+     *   3. erst danach faellt die Materialisierung.
+     *
+     * Ohne Punkt 2 waere die Parallelisierung genau der Fehler, den dieser
+     * Test seit dem 14.08.2026 verhindern soll: die Ampel truege die Note
+     * vom Vortag, weil der Refresh dem Schreiber davonlaeuft.
+     */
+    expect(yext).toBeLessThan(sammelpunkt)
+    expect(sammelpunkt).toBeLessThan(rt)
   })
 
   /**

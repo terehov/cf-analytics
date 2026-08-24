@@ -15,7 +15,16 @@
  *      aus LINA und FoodNotify ist die Arbeit; eine fehlende Schulungszahl
  *      ist eine leere Kachel, kein verlorenes Datum. Diese Funktion faengt
  *      alles und wirft nie.
- *   2. Sie laeuft NACH dem Import.
+ *   2. ~~Sie laeuft NACH dem Import.~~ Seit dem 24.08.2026 laeuft sie
+ *      NEBEN ihm, in Phase A von sync.ts — Bounti ist ein eigener Dienst
+ *      mit eigenem Stundenlimit (3.000) und konkurriert mit nichts.
+ *      Bis dahin stand sie hinter einem zehnstuendigen Import und begann
+ *      um 15:15; jetzt beginnt sie um 05:07. Wichtiger noch: in den 30 von
+ *      101 Laeufen mit Status `abgebrochen` lief sie bisher GAR NICHT.
+ *
+ *      Ihre Stelle ist weiterhin frei waehlbar (keine Bounti-Sicht ist
+ *      materialisiert), und Phase A endet vor Phase B — die Bedingung
+ *      „vor allem Materialisierten" ist damit strenger erfuellt als vorher.
  *   3. Sie laeuft HOECHSTENS EINMAL AM TAG (BOUNTI_ABSTAND_STUNDEN, 20).
  *
  *      ~~Der Sync-Lauf ist stuendlich~~ — NACHGEMESSEN AM 24.08.2026 IST

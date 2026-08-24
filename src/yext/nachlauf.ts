@@ -21,7 +21,22 @@
  *      LINA und FoodNotify ist die Arbeit; eine fehlende Bewertung bedeutet
  *      eine graue Ampel, kein verlorenes Datum. Diese Funktion faengt alles
  *      und wirft nie.
- *   2. Sie laeuft NACH dem Import.
+ *   2. ~~Sie laeuft NACH dem Import.~~ Seit dem 24.08.2026 laeuft sie
+ *      NEBEN ihm, in Phase A von sync.ts. Yext ist ein eigener Dienst mit
+ *      eigenem Stundenlimit und teilt sich mit LINA und FoodNotify nichts
+ *      ausser der Datenbank — es gab keinen Grund, zehn Stunden zu warten,
+ *      um dann zwanzig Minuten zu arbeiten. Die Bedingung, die WIRKLICH
+ *      gilt, ist eine andere und bleibt erfuellt: dieser Nachlauf schreibt
+ *      eine Round-Table-Kennzahl und muss deshalb VOR
+ *      `roundTableNachlauf()` fertig sein. Phase A endet, bevor Phase B
+ *      beginnt — strenger als vorher, nicht lockerer.
+ *
+ *      DER PREIS: der monatliche Zuordnungsabgleich unten sieht
+ *      `core.betrieb` jetzt im Stand des Laufbeginns statt nach dem Import.
+ *      Ein Betrieb, der in dieser Nacht zuerst auftaucht, bekaeme seine
+ *      Yext-Zuordnung erst beim naechsten Monatsabgleich. Gemessen: seit
+ *      Juli 2026 kam kein neuer Betrieb dazu, und der Fall stuende die
+ *      ganze Zeit in `mart.betrieb_ohne_yext`.
  *   3. Sie laeuft HOECHSTENS EINMAL AM TAG. Der Sync-Lauf ist stuendlich; ein
  *      stuendlicher Yext-Lauf waere 24-mal dieselbe Antwort. Bewertungen
  *      tropfen ueber Wochen ein, kein Gast schreibt zur vollen Stunde.

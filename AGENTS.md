@@ -225,6 +225,21 @@ status.ts              Statusbericht fürs Monitoring — acht Prüfungen
 sync.ts / einreihen.ts Einstiegspunkte
 ```
 
+**`sync.ts` hat seit dem 24.08.2026 zwei Phasen.** Phase A startet die fünf
+separaten Dienste **nebeneinander** — LINA und FoodNotify über den zweispurigen
+Worker, dazu Yext, Bounti, Wetter und die Handpflege; Phase B rechnet danach
+seriell die Ableitungen (Zuordnung, alle materialisierten Sichten,
+Zulaufprüfung). Faustregel von Eugene: *alle separaten Dienste parallelisieren*.
+Die Ladenakte bekommt **keine** eigene Spur — sie ist derselbe Dienst wie die
+LINA-Berichte, und eine zweite Spur wäre doppeltes Tempo gegen einen fremden
+Zugang (Regel 3).
+
+Die Grenze zwischen den Phasen ist die Bedingung, an der alles hängt: was eine
+materialisierte Sicht liest, muss vor ihrem Refresh geschrieben sein.
+`src/sync/phasen.test.ts` prüft sie am Quelltext — und dass kein Dienst
+herausfällt. Wer dort etwas verschiebt, liest zuerst `docs/importer.md`,
+Abschnitt „Zwei Phasen".
+
 ---
 
 ## Befehle
