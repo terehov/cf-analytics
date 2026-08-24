@@ -645,3 +645,27 @@ Doku sagt „0.8 is 80%" für das eine und liefert das andere bereits als
 Prozentzahl. Beide landen nach Regel 6 als Prozentzahl in der Datenbank; die
 Umrechnung passiert in `src/bounti/laden.ts` und warnt, wenn sich die Skala
 ändert.
+
+## `core.bestellung`: zwei Fingerabdrücke (Migration `0098`)
+
+| Spalte | Bedeutung |
+|---|---|
+| `listen_fingerabdruck` | md5 über den kanonisch sortierten Eintrag aus `fn:bestellungen`, bei jedem Listenabruf neu gesetzt |
+| `detail_fingerabdruck` | für welchen Listenstand `fn:bestellung` zuletzt geholt wurde |
+
+`listen_fingerabdruck IS DISTINCT FROM detail_fingerabdruck` heißt: das Detail
+ist nicht auf dem Stand der Liste, also gibt es Arbeit. Das ersetzt das
+rollierende 45-Tage-Fenster, das jede Bestellung vierzehnmal holte, obwohl sie
+sich im Schnitt einmal ändert.
+
+**Warum aus der Liste und nicht aus dem Detail.** `raw.payload_hash` auf
+`fn:bestellpositionen` ist als Änderungsmerkmal unbrauchbar: 81 % der
+Änderungen dort sind `concreteProduct.stock` (der aktuelle Lagerbestand des
+Artikels) und `timeModified` des Artikelstamms. Gemessen am 25.08.2026: in 400
+Bestellungen über zwölf Tage änderte sich **kein einziges Mal** etwas am Inhalt
+der Bestellung, während 322 der 400 Rohantworten verschieden waren. Der
+Listeneintrag trägt diese Felder nicht.
+
+**NULL in beiden Spalten** ist der Bestand aus der Zeit vor `0098`. Er gilt
+nicht als veraltet — `NULL IS DISTINCT FROM NULL` ist falsch — und bekommt
+seinen Vergleichswert, sobald sein Listeneintrag das nächste Mal gelesen wird.

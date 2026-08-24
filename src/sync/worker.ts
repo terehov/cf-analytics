@@ -108,9 +108,15 @@ const SPERRE = 8_142_026
  * Genau ein Worker gleichzeitig, prozessübergreifend.
  *
  * Ohne diese Sperre ist die Drosselung wirkungslos, sobald die Schlange länger
- * ist als ein Lauf: Dokploy startet `bun run sync` stündlich, ein Backfill-Lauf
- * dauert aber bis zum Tagesbudget — also viele Stunden. Die Läufe würden sich
- * stapeln. `FOR UPDATE SKIP LOCKED` in der Warteschlange verhindert nur, dass
+ * ist als ein Lauf: Dokploy startet `bun run sync` **täglich um 05:05** (bis
+ * zum 25.08.2026 stand hier „stündlich" — nachgemessen falsch, siehe
+ * `docs/fehlerkatalog.md`), ein Lauf dauert aber zehn Stunden. Ohne Sperre
+ * würden sich Läufe stapeln, sobald jemand einen zweiten von Hand auslöst —
+ * am 14.08.2026 gab es genau das (00:14 und 09:26).
+ *
+ * Das Argument wird durch den täglichen Takt nicht schwächer, sondern
+ * enger: es schützt nicht mehr gegen 24 automatische Läufe, sondern gegen
+ * den einen von Hand ausgelösten, der mitten in einen laufenden fällt. `FOR UPDATE SKIP LOCKED` in der Warteschlange verhindert nur, dass
  * zwei denselben Posten greifen; parallel arbeiten dürften sie trotzdem, und
  * das Tagesbudget zählt jeder Prozess für sich im Speicher. Zehn Worker wären
  * zehnfaches Tempo und zehnfaches Budget.
@@ -144,7 +150,7 @@ async function sperreHolen(): Promise<{ frei: boolean; freigeben: () => Promise<
    *
    * Bricht sie weg, ist die Sperre weg: Postgres gibt Advisory-Sperren beim
    * Verbindungsende frei. Ein paralleler Lauf wäre damit möglich, ist aber
-   * unwahrscheinlich (der Zeitplan startet stündlich) und deutlich harmloser
+   * unwahrscheinlich (es läuft nur ein Lauf am Tag) und deutlich harmloser
    * als ein Absturz mitten im Schreiben. Deshalb Warnung statt Abbruch.
    */
   verbindung.on('error', (e) => {
@@ -213,7 +219,9 @@ export async function workerLauf(
    * hätte die eine Anfrage schon geschickt, die er nicht schicken darf.
    *
    * Der Zustand liegt in der Datenbank, nicht im Prozess — sonst wäre er beim
-   * stündlichen Neustart wieder weg. Dieselbe Lektion wie beim Tagesbudget.
+   * nächsten Prozessstart wieder weg. Dieselbe Lektion wie beim Tagesbudget —
+   * und bei einem TÄGLICHEN Takt wiegt sie schwerer, nicht leichter: was der
+   * Prozess vergisst, ist einen ganzen Tag lang vergessen.
    */
   const ruht = await eine<{ art: string; pausiert_bis: Date; hinweis: string | null }>(
     `SELECT art, pausiert_bis, hinweis FROM sync.sperre_aktiv()`)
@@ -231,7 +239,7 @@ export async function workerLauf(
 
   const sperre = await sperreHolen()
   if (!sperre.frei) {
-    // Kein Fehler, sondern der Normalfall bei einem stündlichen Zeitplan und
+    // Kein Fehler, sondern der Normalfall bei einem Zeitplan und
     // einem noch laufenden Backfill. Exitcode bleibt 0.
     log.info('lauf übersprungen — es läuft bereits einer', { ausloeser })
     const blockierer = await eine<{ lauf_id: string }>(
@@ -271,7 +279,7 @@ async function workerLaufIntern(
 ): Promise<LaufErgebnis> {
   const client = new LinaClient()
   // Das Tagesbudget gilt über Läufe hinweg, nicht je Prozess — sonst wäre es
-  // beim stündlichen Zeitplan wirkungslos. Begründung in client.ts.
+  // beim Zeitplan wirkungslos. Begründung in client.ts.
   await client.budgetLaden()
 
   /**

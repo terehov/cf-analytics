@@ -141,15 +141,29 @@ export async function fnLaden(k: FnKontext): Promise<number> {
         const ksKey = await kostenstelleKey(c, k.markeKey, Number(erpId))
 
         for (const b of seite.bestellungen) {
-          await c.query(
+          /**
+           * DER FINGERABDRUCK ENTSCHEIDET, OB DAS DETAIL GEHOLT WIRD (0098).
+           *
+           * `RETURNING` liefert nach dem Upsert den NEUEN Listenstand gegen
+           * den ALTEN Detailstand — genau die Frage, die hier zu beantworten
+           * ist. Bei einer neuen Bestellung ist detail_fingerabdruck NULL,
+           * `IS DISTINCT FROM` also wahr, und das Detail wird geholt wie
+           * bisher.
+           */
+          const r = await c.query(
             `INSERT INTO core.bestellung
-               (kostenstelle_key, fn_id, bestellnummer, bestellt_am, status)
-             VALUES ($1,$2,$3,$4,$5)
+               (kostenstelle_key, fn_id, bestellnummer, bestellt_am, status,
+                listen_fingerabdruck)
+             VALUES ($1,$2,$3,$4,$5,$6)
              ON CONFLICT (kostenstelle_key, fn_id) DO UPDATE SET
                bestellnummer = EXCLUDED.bestellnummer,
                bestellt_am = EXCLUDED.bestellt_am,
-               status = EXCLUDED.status`,
-            [ksKey, b.fnId, b.bestellnummer, b.bestelltAm, b.status])
+               status = EXCLUDED.status,
+               listen_fingerabdruck = EXCLUDED.listen_fingerabdruck
+             RETURNING (listen_fingerabdruck IS DISTINCT FROM detail_fingerabdruck)
+                       AS veraltet`,
+            [ksKey, b.fnId, b.bestellnummer, b.bestelltAm, b.status, b.fingerabdruck])
+          const veraltet = r.rows[0]?.veraltet === true
           /**
            * Kopf und Positionen je Bestellung. Der Zeitraum des Postens ist
            * das BESTELLDATUM — damit zeigt der Fortschritt, in welchem Jahr
@@ -169,8 +183,23 @@ export async function fnLaden(k: FnKontext): Promise<number> {
            * Vorn heißt: eine Seite bringt 25 Bestellungen, die vollständig
            * geladen werden, bevor die nächste Seite folgt.
            */
-          await folgepostenEinreihen(c, k.markeKey, 'fn:bestellung', p, tag, 89)
-          await folgepostenEinreihen(c, k.markeKey, 'fn:bestellpositionen', p, tag, 89)
+          /**
+           * SPERRMODUS 'offen' UND NICHT 'alle' — seit Migration 0098.
+           *
+           * 'alle' hiess: je Bestellung genau ein Detailabruf, fuer immer.
+           * Das war fuer den Backfill richtig und hat als laufender Abgleich
+           * dazu gefuehrt, dass `bestelldetailsAuffrischen()` an der Sperre
+           * vorbei einreihen musste — und weil dort niemand wusste, WAS sich
+           * geaendert hat, holte es pauschal alles der letzten 45 Tage.
+           *
+           * Jetzt entscheidet der Fingerabdruck, und die Sperre muss nur noch
+           * verhindern, dass derselbe Abruf zweimal GLEICHZEITIG in der
+           * Schlange steht. Das ist genau 'offen'.
+           */
+          if (veraltet) {
+            await folgepostenEinreihen(c, k.markeKey, 'fn:bestellung', p, tag, 89, 'offen')
+            await folgepostenEinreihen(c, k.markeKey, 'fn:bestellpositionen', p, tag, 89, 'offen')
+          }
         }
 
         /**
@@ -240,7 +269,18 @@ export async function fnLaden(k: FnKontext): Promise<number> {
              -- dieser Endpunkt Liefermenge, Lieferdatum und Preisstand bringt —
              -- der Listen-Upsert bei fn:bestellungen frischt allein den Status
              -- auf und darf deshalb nicht so tun, als sei das Detail geholt.
-             detail_geholt_am = now()`,
+             detail_geholt_am = now(),
+             -- UND FUER WELCHEN LISTENSTAND (0098). Damit ist beantwortbar,
+             -- ob das Detail zum letzten Listeneintrag passt — die Frage, an
+             -- der seit heute der naechste Abruf haengt.
+             --
+             -- Genommen wird der Stand, der JETZT in der Zeile steht. Das
+             -- setzt voraus, dass die Liste dieser Kostenstelle waehrend
+             -- eines Laufs nicht zweimal gelesen wird; sie wird es nicht
+             -- (ein Posten je Seite und Lauf). Waere es anders, bliebe eine
+             -- Aenderung bis zur naechsten haengen — sichtbar in
+             -- mart.bestelldetail_offen, nicht verloren.
+             detail_fingerabdruck = core.bestellung.listen_fingerabdruck`,
           [ksKey, orderId, kopf.bestellnummer, lieferantKey, kopf.bestelltAm,
            kopf.geliefertAm, kopf.status, kopf.summe, kopf.belegNummer,
            kopf.belegDatum, kopf.kommentar])

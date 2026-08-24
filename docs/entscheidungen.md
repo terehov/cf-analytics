@@ -59,7 +59,7 @@ Lauf 10 hat es vorgeführt: 3.802 Posten in 16,9 Stunden, dann `Tagesbudget aufg
 **Das ändert die Last je Zeiteinheit nicht.** Was LINA sieht, regeln `TAKT_MIN_MS`/`TAKT_MAX_MS`; die bleiben bei 10–20 s. Das Budget entscheidet nur, wann der Tag vorzeitig endet. Die Lehre ist die Kopplung: wer den Takt ändert, muss das Budget nachziehen — sonst schlägt die Bremse zu, die nie bremsen sollte.
 
 ### Ein Worker, abgesichert per Advisory-Sperre
-`FOR UPDATE SKIP LOCKED` verhindert doppelte Posten, aber nicht doppeltes Tempo — und das Tagesbudget zählt jeder Prozess für sich im Speicher. Seit dem Wegfall des Arbeitsfensters läuft ein Backfill viele Stunden, der stündliche Zeitplan würde also Lauf um Lauf danebenstarten. Zehn Worker wären zehnfaches Tempo gegen einen Zugang ohne Limits. Die Sperre liegt auf einer **eigenen** Verbindung, nicht auf einer gepoolten: sonst wartet `pool.end()` auf sie.
+`FOR UPDATE SKIP LOCKED` verhindert doppelte Posten, aber nicht doppeltes Tempo — und das Tagesbudget zählt jeder Prozess für sich im Speicher. Seit dem Wegfall des Arbeitsfensters läuft ein Backfill viele Stunden — ein zweiter, von Hand ausgelöster Lauf würde also danebenstarten (am 14.08.2026 gab es genau das: 00:14 und 09:26). Der Zeitplan selbst läuft **täglich**, nicht stündlich; nachgemessen am 24.08.2026, siehe `fehlerkatalog.md`. Zehn Worker wären zehnfaches Tempo gegen einen Zugang ohne Limits. Die Sperre liegt auf einer **eigenen** Verbindung, nicht auf einer gepoolten: sonst wartet `pool.end()` auf sie.
 
 ### Stammdaten historisieren statt überschreiben
 LINA kennt für Stammdaten keine Historie. Eine Verkaufsmenge ohne den Einkaufspreis und die Warengruppe, die **damals** galten, ist eine Zahl ohne Bedeutung. Durchgängiges Muster: `<ding>` hält den aktuellen Stand für Joins, `<ding>_stand` die Historie je Monat, append-only. Betrifft Artikel, Warengruppen, Waren, Einkaufspreise.
@@ -114,7 +114,7 @@ Ein Pflichtparameter ohne Vorgabe lässt jede Karte beim ersten Öffnen scheiter
 ### Takt auf 10–20 s, und eine Sperre wird als Sperre behandelt
 *Eugene:* „Auch später auf Production kannst du dir Zeit auf zehn bis zwanzig Sekunden stellen. Allerdings, falls es dort eine Sperre gibt, brauchen wir dafür eine Graceful Behandlung." — Zwei Messungen tragen die Halbierung: über 526 Aufrufe antwortet LINA in 623 ms bei 30.228 ms Wartezeit (**98 % Leerlauf**), und ein beaufsichtigter Lauf bei 5–12 s über mehrere hundert Aufrufe blieb ohne jede Reaktion. 10–20 s liegt dazwischen und in dem Bereich, den auch ein Mensch beim Durchklicken erzeugt.
 
-**Die Bedingung ist der wichtigere Teil.** Beim Bauen der Sperrbehandlung kam heraus, dass der Importer auf eine Sperre bisher mit dem Gegenteil des Richtigen reagierte: Posten als `aufgegeben` abschreiben, zehnmal nachfassen, stündlich wiederholen — und im schlimmsten Fall zehn Anmeldeversuche in Folge gegen ein sperrbares Konto, also genau das, was harte Regel 6 verbietet. Jetzt ist eine Sperre eine eigene Ergebnisart, der Lauf endet sofort, der Posten bleibt unangetastet, und die Pause steht in `sync.zugangssperre` — in der Datenbank, weil sie sonst den stündlichen Neustart nicht überlebt.
+**Die Bedingung ist der wichtigere Teil.** Beim Bauen der Sperrbehandlung kam heraus, dass der Importer auf eine Sperre bisher mit dem Gegenteil des Richtigen reagierte: Posten als `aufgegeben` abschreiben, zehnmal nachfassen, Lauf für Lauf wiederholen — und im schlimmsten Fall zehn Anmeldeversuche in Folge gegen ein sperrbares Konto, also genau das, was harte Regel 6 verbietet. Jetzt ist eine Sperre eine eigene Ergebnisart, der Lauf endet sofort, der Posten bleibt unangetastet, und die Pause steht in `sync.zugangssperre` — in der Datenbank, weil sie sonst den nächsten Prozessstart nicht überlebt.
 
 ### Eine Sperre wartet nicht auf einen Menschen — aber sie meldet sich
 *Eugene:* „Falls es in die Sperre kommt, soll es nicht auf eine Freigabe warten, sondern einfach im Zeitintervall von einem Tag neu versuchen oder vielleicht zwei Tagen. Und dann wär's doch sinnvoll, wenn es zu wiederholten Problemen beim Import führt, dass wir benachrichtigt werden über ein Health Endpoint."
@@ -646,7 +646,7 @@ Zwei Anbieter, zwei Verträge, zwei Risiken; seit dem 02.08.2026 auch zwei Budge
 
 ## Inventuren bleiben ein reiner Backfill — kein laufender Abgleich in nachfuellen.ts (04.08.2026)
 
-**Die Frage.** `src/sync/nachfuellen.ts` zieht für Bestellungen stündlich die
+**Die Frage.** `src/sync/nachfuellen.ts` zieht für Bestellungen in jedem Lauf die
 jeweils NEUESTE Seite je Kostenstelle nach (`foodnotifyNachfuellen()`), weil neue
 Bestellungen sonst für immer unentdeckt blieben — der Backfill kennt nur die
 Seiten, die es beim Start gab. Sollen Inventuren dasselbe bekommen?
@@ -656,7 +656,7 @@ Stück bei Aposto allein, täglich neue, und wirtschaftlich sofort relevant
 (Einkaufspreise). Inventuren sind laut `docs/foodnotify-api-inventar.md` §8b
 eine „Runde Monatsinventuren" — bei Wilma Wunder 275 über zwei Jahre, das sind
 grob 10–15 im Monat, bei den anderen drei Marken einstellig bis niedrig
-zweistellig **insgesamt**. Eine stündliche Abfrage würde 24-mal am Tag prüfen,
+zweistellig **insgesamt**. Eine Abfrage im Nachtlauf würde täglich prüfen,
 ob sich etwas geändert hat, das sich im Schnitt alle zwei bis drei Tage ändert —
 und nur bei Wilma Wunder überhaupt in einer Menge, die eine Schwundrechnung
 trägt (275 Stück, 154 signiert; bei Aposto und Deutsche Konzepte ist die
@@ -2713,3 +2713,80 @@ ohne dass `sync.lauf` je geschlossen wird.
 `Promise.allSettled` **prüft** es jetzt, statt sich darauf zu verlassen: bricht
 einer doch, steht er als Fehler im Log und der Lauf geht weiter. Verschluckt
 wird nichts (Regel 10).
+
+---
+
+## 25.08.2026 — Zuordnung täglich, Bestelldetails nach Änderung
+
+Zwei Vorgaben von Eugene an einem Tag, und beide haben denselben Kern: **ein
+Takt ist keine Antwort auf eine Frage nach Richtigkeit.**
+
+### Z1 — Die Betriebszuordnung läuft für jeden Dienst täglich
+
+*„Die Zuordnung soll ebenso jeden Tag passieren."*
+
+| Dienst | vorher | jetzt |
+|---|---|---|
+| FoodNotify — Kostenstelle → Betrieb | täglich | unverändert täglich |
+| Yext — Entität → Betrieb | alle 30 Tage | **täglich** |
+| Bounti — Standort → Betrieb | alle 30 Tage | **täglich**, und nach den Stammdaten statt davor |
+
+**Warum das nicht nur eine Zahl ist.** Die alte Begründung stand wörtlich im
+Code: *„die Namensheuristik entscheidet dabei — und eine Entscheidung, die sich
+täglich neu fällt, ist keine."* Der Satz stimmt. Die Antwort darauf war
+trotzdem falsch: seltener zu entscheiden macht eine Entscheidung nicht
+haltbarer, es verlängert nur das Fenster, in dem ein neuer Betrieb aus jeder
+Auswertung fällt — bis zu 30 Tage.
+
+**Haltbar wird sie dadurch, dass einmal Entschiedenes nicht neu verhandelt
+wird.** Bounti konnte das seit dem 24.08.2026 (`bereits zugeordnet`), Yext
+nicht: dort las der Abgleich `manual.betrieb_fremd_id` gar nicht und schrieb mit
+`DO UPDATE`, also überschreibend. Täglich ausgeführt hätte das bedeutet: benennt
+jemand einen Betrieb in LINA um oder legt Yext eine zweite Entität mit ähnlichem
+Namen an, kippt die Zuordnung über Nacht — und niemand hat einen Anlass
+hinzusehen, weil nichts scheitert.
+
+Der Yext-Abgleich liest jetzt den Bestand, meldet ihn als `bereits zugeordnet`
+und lässt ihn unberührt; die Heuristik greift nur noch für Entitäten ohne
+Zuordnung. Damit er prüfbar wurde, ist die Rechnung als reine Funktion
+herausgelöst (`zuordnungRechnen()`, wie in `bounti/zuordnen.ts`) — sie steckte
+vorher zwischen zwei Schnittstellenaufrufen und einem Schreibvorgang.
+
+**Zwei Dinge sind dabei nebenbei repariert worden.** `manual.betrieb_standort`
+wird nur noch überschrieben, wo `herkunft = 'concept_family'` steht — ein von
+Hand gepflegter Standort ist eine Entscheidung und hätte sonst jede Nacht
+verloren. Und Bountis Abgleich lief **vor** `stammdatenLaden()`, las also
+`core.bounti_standort` im Stand des Vortags: ein neuer Standort war frühestens
+einen Monat **und einen Tag** nach seinem Auftauchen zugeordnet.
+
+### Z2 — Bestelldetails werden nach Änderung geholt, nicht nach Frist
+
+*„stelle sicher, dass bei FoodNotify nicht die ganze Zeit die gleichen
+Bestellungen mehrfach abgerufen werden, sondern dass es sauber jeweils nur
+einmal passiert."*
+
+Umgesetzt als Migration `0098`. Gemessen wurde vorher, was die alte
+Auffrischung einbrachte: von 5.920 Aufrufen je Nacht **4.288 nachweislich
+nichts**. Details in [`importer.md`](importer.md).
+
+**Warum nicht das Fenster verkleinern.** Das wäre ein Einzeiler gewesen. Es
+bliebe aber dabei, dass jede Bestellung vierzehnmal geholt wird, obwohl sie sich
+einmal ändert — und es hinge an einer Messung ohne Monatswechsel.
+
+**Der Auslöser statt der Frist.** `core.bestellung` trägt
+`listen_fingerabdruck` (was die Liste sagt) und `detail_fingerabdruck` (wofür
+das Detail geholt wurde). Gehen sie auseinander, gibt es Arbeit. Der Zustand
+steht in der Datenbank, nicht in einer Zeitrechnung.
+
+**Warum der Fingerabdruck aus der LISTE kommt und nicht aus dem Detail.** Auf
+dem Detail wäre `raw.payload_hash` das Naheliegende — und er ist unbrauchbar:
+81 % der Änderungen dort sind `concreteProduct.stock` und `timeModified` des
+Artikelstamms. Der Listeneintrag trägt beides nicht.
+
+### Was daran nicht entschieden ist
+
+**Ob der Lagerbestand erfasst werden soll.** Heute nicht, und der Wert aus der
+Bestellantwort wäre auch die falsche Quelle: er gilt zum Abrufzeitpunkt, nicht
+zur Bestellung. Für den Zutatenverbrauch ist die Inventur die richtige Quelle
+(`/api/erp/stocktakings`, `theoreticalStockLevelInBaseUnits`) — eine echte
+Zählung zu einem bekannten Stichtag, und dieses Projekt lädt sie bereits.

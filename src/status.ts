@@ -88,7 +88,32 @@ export async function statusErheben(): Promise<Statusbericht> {
     `SELECT round(EXTRACT(epoch FROM (now() - max(erledigt_am))) / 3600, 1) AS stunden
        FROM sync.warteschlange WHERE erledigt_am IS NOT NULL`)
   const stillStunden = letzter?.stunden === null ? null : Number(letzter?.stunden)
+
+  /**
+   * NUR WAEHREND EIN LAUF LAEUFT — und das ist seit dem 25.08.2026 der
+   * Unterschied zwischen einer Meldung und einem nächtlichen Fehlalarm.
+   *
+   * Die Schwelle von drei Stunden stammt aus der Annahme, der Zeitplan
+   * starte stündlich; dann heisst „drei Stunden kein Fortschritt bei
+   * fälliger Arbeit" tatsächlich „es klemmt". Der Zeitplan startet aber
+   * TÄGLICH um 05:05 (nachgemessen 24.08.2026, `docs/fehlerkatalog.md`),
+   * und ein Lauf endet gegen 15:15. Zwischen 15:15 und 05:05 arbeitet
+   * niemand — vierzehn Stunden, in denen jede fällige Zeile diese Prüfung
+   * auf `stoerung` gestellt hätte. Ein Alarm, der jede Nacht schlägt, wird
+   * abgeschaltet und nimmt die echten Fälle mit.
+   *
+   * DIE ABDECKUNG GEHT DABEI NICHT VERLOREN. Der Fall „es startet gar kein
+   * Lauf mehr" gehört nicht hierher, und er ist abgedeckt: `health.ts`
+   * meldet `veraltet`, sobald 36 Stunden ohne abgeschlossenen Lauf
+   * vergangen sind. Diese Prüfung beantwortet die andere Frage — kommt ein
+   * LAUFENDER Lauf voran.
+   */
+  const laufend = await eine<{ n: number }>(
+    `SELECT count(*)::int AS n FROM sync.lauf WHERE beendet_am IS NULL`)
+  const laeuftGerade = Number(laufend?.n ?? 0) > 0
+
   const steht = !gesperrt
+    && laeuftGerade
     && Number(faellig?.n ?? 0) > 0
     && stillStunden !== null && stillStunden > config.STATUS_STILLSTAND_STUNDEN
   p.push(steht
@@ -106,8 +131,12 @@ export async function statusErheben(): Promise<Statusbericht> {
         stufe: 'ok',
         meldung: Number(faellig?.n ?? 0) === 0
           ? 'nichts fällig'
-          : `${faellig!.n} fällig, zuletzt vor ${stillStunden ?? '?'} h etwas erledigt`,
-        werte: { faellig: faellig?.n, stundenOhneFortschritt: stillStunden },
+          : !laeuftGerade
+            // Regel 10: dass gerade NICHT geprüft wird, ist die Information.
+            // Sonst liest sich „ok" als „läuft", und es läuft gar nichts.
+            ? `${faellig!.n} fällig, aber gerade läuft kein Lauf — der nächste startet um 05:05`
+            : `${faellig!.n} fällig, zuletzt vor ${stillStunden ?? '?'} h etwas erledigt`,
+        werte: { faellig: faellig?.n, stundenOhneFortschritt: stillStunden, laeuftGerade },
       })
 
   // --- 3. Scheitern die Läufe? --------------------------------------------

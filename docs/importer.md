@@ -154,10 +154,10 @@ Was dann passiert:
 
 1. **Der Posten bleibt offen.** Er wird *nicht* als `aufgegeben` quittiert, und sein verbrauchter Versuch wird zurückgegeben. Mit dem Zeitraum ist nichts verkehrt, nur mit dem Zugang — ihn abzuschreiben wäre eine Falschaussage über die Daten.
 2. **Der Lauf endet sofort.** Nicht erst nach `ABBRUCH_NACH_FEHLERN`. Zehn weitere Anfragen gegen ein System, das gerade „nein" gesagt hat, sind genau das Gegenteil von dem, was man will.
-3. **Die Pause steht in `sync.zugangssperre`**, nicht im Prozess. Sonst wäre sie beim stündlichen Neustart wieder weg — dieselbe Lektion wie beim Tagesbudget.
+3. **Die Pause steht in `sync.zugangssperre`**, nicht im Prozess. Sonst wäre sie beim nächsten Prozessstart wieder weg — dieselbe Lektion wie beim Tagesbudget. Bei einem **täglichen** Takt wiegt das schwerer, nicht leichter: was der Prozess vergisst, ist einen ganzen Tag lang vergessen.
 4. **Der nächste Lauf nimmt gar keinen Kontakt auf.** Die Prüfung steht vor der Laufsperre und vor jeder Anmeldung: auch ein Login ist Kontakt.
 
-**Beim Anmeldefehler wird in diesem Prozess kein zweites Mal angemeldet.** Bis zum 26.07.2026 tat der Code genau das — zehnmal in Folge, stündlich wiederholt, gegen ein sperrbares Konto. Siehe `fehlerkatalog.md`.
+**Beim Anmeldefehler wird in diesem Prozess kein zweites Mal angemeldet.** Bis zum 26.07.2026 tat der Code genau das — zehnmal in Folge, Lauf für Lauf wiederholt, gegen ein sperrbares Konto. Siehe `fehlerkatalog.md`.
 
 Nachsehen und — wenn man nicht warten will — abkürzen:
 
@@ -300,7 +300,7 @@ Die Drosselung ist keine Höflichkeit, sondern das, was die Integration am Leben
 
 **Nicht nachts abschalten.** Die frühere Begründung war, ein Client um drei Uhr früh sei im Log ein Ausreißer. Das stimmt — aber ein Gerät, das jeden Abend schlagartig verstummt und morgens wieder anspringt, ist eine deutlichere Kante als ein gleichmäßiges Rinnsal. Was das Tempo begrenzt, sind `TAKT_*` und `TAGESBUDGET`, nicht die Uhrzeit.
 
-**Das Budget zählt über Läufe hinweg.** `LinaClient.budgetLaden()` holt beim Laufstart die heutigen Zeilen aus `sync.aufgabe`. Bis zum 26.07.2026 lag der Zähler nur im Arbeitsspeicher — und weil jeder Lauf ein frisch startender Prozess ist, begann er stündlich wieder bei null. Die Bremse war wirkungslos, was nur deshalb nicht auffiel, weil der Takt sie ohnehin nie erreichen ließ.
+**Das Budget zählt über Läufe hinweg.** `LinaClient.budgetLaden()` holt beim Laufstart die heutigen Zeilen aus `sync.aufgabe`. Bis zum 26.07.2026 lag der Zähler nur im Arbeitsspeicher — und weil jeder Lauf ein frisch startender Prozess ist, begann er bei jedem Start wieder bei null. Die Bremse war wirkungslos, was nur deshalb nicht auffiel, weil der Takt sie ohnehin nie erreichen ließ.
 
 Die tatsächlich gewartete Zeit steht je Aufruf in `sync.aufgabe.wartezeit_ms` — die Drosselung ist damit im Nachhinein prüfbar, nicht nur behauptet. Nachgemessen am 26.07.2026 über 526 Aufrufe: **623 ms Antwortzeit gegen 30.228 ms Warten, also 98 % Leerlauf.** Der Engpass ist ausschließlich die selbst gesetzte Pause; an der Zahl der Anfragen lässt sich nichts sparen, weil eine Antwort bereits alle 141 Betriebe enthält.
 
@@ -477,7 +477,7 @@ Diese Datei ist bisher LINA-lastig geschrieben; der ganze FoodNotify-Importer (`
 
 **Bewusst kein eigener Schalter in `fn:kostenstellen`** — anders als `fn:bestellungen` wird `fn:inventuren` NICHT automatisch angestoßen, wenn die Kostenstellen einer Marke geladen werden. Grund: Inventuren lohnen praktisch nur bei Wilma Wunder (plan-foodnotify.md Stufe 4), ein automatischer Anstoß für alle vier Marken wäre unnötige Last ohne Gegenwert bei drei von vieren.
 
-**Und kein Eintrag im laufenden Abgleich** (`src/sync/nachfuellen.ts`) — anders als Bestellungen, wo stündlich die jeweils letzte Seite je Kostenstelle nachgezogen wird. Begründung mit Zahlen: `docs/entscheidungen.md`, „Inventuren bleiben ein reiner Backfill".
+**Und kein Eintrag im laufenden Abgleich** (`src/sync/nachfuellen.ts`) — anders als Bestellungen, wo in jedem Lauf die jeweils letzte Seite je Kostenstelle nachgezogen wird. Begründung mit Zahlen: `docs/entscheidungen.md`, „Inventuren bleiben ein reiner Backfill".
 
 **Die Antworthülle ist nicht gemessen, nur abgeleitet.** `/api/erp/stocktakings` folgt dem Pfadmuster `/api/erp/*`, für das drei andere Endpunkte die `{code,errors,isError,payload}`-Hülle bestätigt haben — aber der stocktakings-Pfad selbst wurde nie gegen das echte FoodNotify abgefragt (harte Regel, `AGENTS.md`). Mock und Tests bilden die plausibelste Form nach (`payload.data` + `payload.pagination`, dieselbe Schachtelung, an der die Exploration bei Wilma Wunder einmal gescheitert ist — `docs/foodnotify-api-inventar.md` §1). Der erste echte Abruf gehört von Hand geprüft, bevor jemand den geladenen Zeilen traut.
 
@@ -1232,12 +1232,72 @@ als 14 Tage war. Das Fenster steht auf 45.
 | **15–45 Tage — nachweislich eingefroren** | **2.144** | **4.288** |
 
 **72 % der FoodNotify-Aufrufe je Nacht holen Daten, die sich nachweislich nicht
-mehr ändern.** `BESTELLDETAIL_FENSTER_TAGE` von 45 auf 14 zu setzen wäre ein
-Einzeiler in der Konfiguration und spart rund 4.300 Aufrufe je Nacht.
+mehr ändern.**
 
-**Was dagegen spricht und geprüft gehört, bevor jemand es tut:** die zwölf Tage
-Beobachtung decken keine Monatsabrechnung ab. Wenn Rechnungen zum Monatsende
-gebündelt nachgetragen werden, träfe eine 14-Tage-Grenze genau den Fall, für den
-die Auffrischung gebaut wurde (Phase 2.6). Die Messung müsste also über einen
-Monatswechsel laufen — `raw.api_antwort` reicht derzeit bis 02.08.2026 zurück und
-enthält den Wechsel 31.07./01.08. nicht mehr vollständig.
+> ### Behoben am 25.08.2026 (Migration `0098`) — und zwar anders als hier vorgeschlagen
+>
+> Der naheliegende Einzeiler wäre gewesen, `BESTELLDETAIL_FENSTER_TAGE` von 45
+> auf 14 zu setzen: 4.288 Aufrufe gespart. Er wurde **nicht** gewählt, aus zwei
+> Gründen. Erstens bliebe es dabei, dass jede Bestellung im Fenster
+> **vierzehnmal** geholt wird, obwohl sie sich im Schnitt einmal ändert.
+> Zweitens hinge er an einer Messung über zwölf Tage ohne Monatswechsel —
+> genau der Fall, für den die Auffrischung gebaut wurde.
+>
+> **Stattdessen entscheidet jetzt ein Auslöser statt einer Frist.** Die
+> Bestellliste (`fn:bestellungen`) wird ohnehin in jedem Lauf geholt und trägt
+> genau die Felder, die sich ändern — `shopOrderStatus`, `shopOrderInvoices`,
+> `shopOrderDeliveryNote`, `extDeliveryNoteId`, `billingSyncStatus`, `total`,
+> `markedShopOrder`, `comment`. Einen Lagerbestand enthält sie **nicht**; das
+> Rauschen, an dem `payload_hash` auf dem Detail scheitert, gibt es hier gar
+> nicht.
+>
+> `core.bestellung` trägt deshalb zwei Spalten:
+>
+> | Spalte | Bedeutung |
+> |---|---|
+> | `listen_fingerabdruck` | md5 des kanonisch sortierten Listeneintrags, bei jedem Listenabruf neu |
+> | `detail_fingerabdruck` | für welchen Listenstand das Detail geholt wurde |
+>
+> Gehen beide auseinander, gibt es Arbeit — und zwar **genau einmal je
+> Änderung**. Der Zustand steht damit in der Datenbank statt in einer
+> Zeitrechnung (Regel 10); `mart.bestelldetail_offen` zählt ihn, und die
+> Prüfzeile „FoodNotify: Detail passt nicht zum Listenstand" hängt daran.
+>
+> **Was dabei mitgehen musste:** die alte Prüfzeile „Bestellung: Details im
+> Fenster älter als 48 h" beschreibt ein Verfahren, das es nicht mehr gibt.
+> Sie ist aus `mart.pruefung_uebersicht` entfernt worden — ein Prüflabel, das
+> etwas anderes sagt als es misst, steht in derselben Tabelle wie die richtigen
+> und wird genauso gelesen.
+>
+> **Der Preis:** die Liste ist jetzt das Auge des Abgleichs, also wird sie
+> tiefer gelesen — `BESTELLDETAIL_LISTENSEITEN` (Vorgabe 2) statt nur der
+> letzten Seite. Eine Seite fasst 25 Bestellungen; die aktivste Kostenstelle
+> hatte in 14 Tagen genau 25, der Median 8. Kosten: rund 300 Listenaufrufe je
+> Nacht statt 152, gegen bis zu 5.920 eingesparte Detailaufrufe.
+>
+> **Einmalig in der ersten Nacht:** alle Bestellungen auf den gelesenen
+> Listenseiten haben noch keinen `detail_fingerabdruck` und werden deshalb
+> einmal nachgeholt — rund 3.500 Aufrufe, also weniger als bisher jede Nacht.
+> Danach fällt der Verbrauch auf die tatsächlichen Änderungen.
+
+**Der Einwand, der die Lösung geformt hat:** die zwölf Tage Beobachtung decken
+keine Monatsabrechnung ab. Wenn Rechnungen zum Monatsende gebündelt nachgetragen
+werden, träfe eine 14-Tage-Grenze genau den Fall, für den die Auffrischung
+gebaut wurde (Phase 2.6). Der Fingerabdruck verfehlt ihn nicht: er sieht die
+Änderung, wann immer sie kommt, solange die Bestellung in den gelesenen
+Listenseiten steht.
+
+### Und der Lagerbestand?
+
+Er wird **nicht erfasst** — `core.bestellposition` hat keine Lagerspalte, und das
+soll so bleiben. Der Wert in der Bestellantwort ist der Bestand **zum
+Abrufzeitpunkt**, nicht der zur Bestellung; er taugt deshalb grundsätzlich nicht
+dazu, den Verbrauch einer Zutat nachzuvollziehen. Ihn mitzuschreiben ergäbe eine
+Zeitreihe, deren Stützstellen davon abhängen, wann wir zufällig abgefragt haben.
+
+Die richtige Quelle dafür gibt es bereits und dieses Projekt lädt sie: die
+Inventur (`/api/erp/stocktakings`) mit `theoreticalStockLevelInBaseUnits` und
+`countedAmountInBaseUnits` je Position. Sie ist eine echte Zählung zu einem
+bekannten Stichtag. Wer den Zutatenverbrauch rechnen will, stellt sie gegen die
+Bestellungen — nicht gegen einen Lagerstand, der als Beiwerk in einer
+Bestellantwort mitgeliefert wurde.

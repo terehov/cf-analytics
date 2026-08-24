@@ -37,9 +37,16 @@
  *      Yext-Zuordnung erst beim naechsten Monatsabgleich. Gemessen: seit
  *      Juli 2026 kam kein neuer Betrieb dazu, und der Fall stuende die
  *      ganze Zeit in `mart.betrieb_ohne_yext`.
- *   3. Sie laeuft HOECHSTENS EINMAL AM TAG. Der Sync-Lauf ist stuendlich; ein
- *      stuendlicher Yext-Lauf waere 24-mal dieselbe Antwort. Bewertungen
- *      tropfen ueber Wochen ein, kein Gast schreibt zur vollen Stunde.
+ *   3. Sie laeuft HOECHSTENS EINMAL AM TAG. ~~Der Sync-Lauf ist
+ *      stuendlich~~ — er ist TAEGLICH (nachgemessen 24.08.2026: ein Lauf je
+ *      Tag um 05:05, keine einzige uebersprungene Zeile in sync.lauf, wo bei
+ *      stuendlichem Takt neun je Tag stuenden). Die Sperre schuetzt deshalb
+ *      gegen einen von Hand ausgeloesten ZWEITEN Lauf desselben Tages, nicht
+ *      gegen 24. Bewertungen tropfen ueber Wochen ein; zweimal am Tag zu
+ *      fragen brachte nichts.
+ *
+ *      NICHT BETROFFEN: der Zuordnungsabgleich weiter unten. Der laeuft seit
+ *      dem 25.08.2026 in JEDEM Lauf, weil er idempotent ist — siehe dort.
  *
  * Was geholt wird, sind drei Monate (der laufende, der Vormonat und einer als
  * Reserve). Aeltere Staende sind kumuliert und aendern sich nicht mehr — dafuer
@@ -162,27 +169,49 @@ export async function yextNachlauf(): Promise<void> {
      * Reparatur, die ein Mensch anstossen muss, ist keine Reparatur, sondern
      * eine Verabredung — dieselbe Lehre wie beim Belegarchiv am 12.08.2026.
      *
-     * MONATLICH UND NICHT TAEGLICH: es kostet zwei Aufrufe (Entitaeten und
-     * Ordner), aber die Namensheuristik entscheidet dabei — und eine
-     * Entscheidung, die sich taeglich neu faellt, ist keine. Neue Betriebe
-     * entstehen ohnehin nicht taeglich.
+     * ~~MONATLICH UND NICHT TAEGLICH~~ — SEIT DEM 25.08.2026 TAEGLICH.
+     *
+     * Die alte Begruendung lautete: "die Namensheuristik entscheidet dabei,
+     * und eine Entscheidung, die sich taeglich neu faellt, ist keine." Der
+     * Satz stimmt — nur war die Antwort darauf falsch. Seltener zu
+     * entscheiden macht eine Entscheidung nicht haltbarer, es verlaengert
+     * nur das Fenster, in dem ein neuer Betrieb aus jeder Bewertungstabelle
+     * faellt: bis zu 30 Tage.
+     *
+     * Die richtige Antwort steht jetzt in zuordnen.ts: **einmal
+     * Entschiedenes wird nicht neu verhandelt.** Der Abgleich liest
+     * `manual.betrieb_fremd_id`, meldet bestehende Zuordnungen als
+     * `bereits zugeordnet` und laesst sie unberuehrt; die Heuristik greift
+     * nur noch fuer Entitaeten, die NOCH KEINE Zuordnung haben. Damit ist
+     * der taegliche Lauf idempotent — er kann nichts kippen, was schon
+     * steht, und schliesst eine Luecke am Tag ihres Entstehens statt bis zu
+     * einem Monat spaeter.
+     *
+     * WAS ER KOSTET: zwei Aufrufe (Entitaeten und Ordner) je Nacht, gegen
+     * ein Stundenlimit von 5.000. Das ist der Preis fuer eine Zuordnung,
+     * die nie aelter als einen Tag ist.
+     *
+     * DER MERKER BLEIBT, obwohl er nicht mehr taktet: `mart.yext_abgleich`
+     * (Migration 0078) liest ihn und zeigt, wann der Abgleich zuletzt lief.
+     * Ohne ihn stuende dort dauerhaft "nie" — und eine Sicht, die einen
+     * laufenden Abgleich als ausgefallen meldet, wird abgeschaltet.
      *
      * Eigenes `try`: ein Fehler hier darf die Staende nicht mitnehmen. Die
      * Zuordnung von gestern ist besser als keine.
      */
-    if (await vollabgleichFaellig('yext_letzte_zuordnung')) {
-      try {
-        const z = await zuordnungAbgleichen({ schreiben: true })
-        await merkerSetzen('yext_letzte_zuordnung')
-        log.info('yext-zuordnung abgeglichen', {
-          zugeordnet: z.zugeordnet, geschrieben: z.geschrieben, offen: z.offen,
-          offeneNamen: z.offene_namen.map(o => `${o.id} ${o.name}`),
-          sicht: 'mart.betrieb_ohne_yext',
-        })
-      } catch (e) {
-        log.warn('yext-zuordnung fehlgeschlagen — die Staende laufen trotzdem',
-          { fehler: String((e as Error).message ?? e).slice(0, 300) })
-      }
+    try {
+      const z = await zuordnungAbgleichen({ schreiben: true })
+      await merkerSetzen('yext_letzte_zuordnung')
+      log.info('yext-zuordnung abgeglichen', {
+        zugeordnet: z.zugeordnet, geschrieben: z.geschrieben, offen: z.offen,
+        bereits: z.treffer.filter(t => t.art === 'bereits zugeordnet').length,
+        neu: z.treffer.filter(t => t.art !== 'bereits zugeordnet' && t.art !== 'von Hand').length,
+        offeneNamen: z.offene_namen.map(o => `${o.id} ${o.name}`),
+        sicht: 'mart.betrieb_ohne_yext',
+      })
+    } catch (e) {
+      log.warn('yext-zuordnung fehlgeschlagen — die Staende laufen trotzdem',
+        { fehler: String((e as Error).message ?? e).slice(0, 300) })
     }
 
     /**

@@ -321,11 +321,18 @@ const Schema = z.object({
    * Ab wann `/status` einen Stillstand meldet (Stunden ohne erledigten Posten,
    * obwohl fällige Arbeit in der Schlange liegt).
    *
-   * Der Zeitplan läuft stündlich, ein Lauf schafft also normalerweise etwas.
-   * Drei Stunden ohne jeden Fortschritt bei vorhandener Arbeit heißt: es
-   * klemmt. Ruht der Zugang gerade, zählt das NICHT als Stillstand — dafür
-   * gibt es eine eigene Meldung, und zwei Alarme für eine Ursache sind einer
-   * zu viel.
+   * ~~Der Zeitplan läuft stündlich~~ — er läuft TÄGLICH um 05:05, ein Lauf
+   * dauert rund zehn Stunden (nachgemessen 24.08.2026). Die drei Stunden
+   * gelten deshalb seit dem 25.08.2026 nur noch WÄHREND eines laufenden
+   * Laufs: zwischen 15:15 und 05:05 arbeitet niemand, und jede fällige Zeile
+   * hätte die Prüfung vierzehn Stunden lang auf `stoerung` gestellt. Die
+   * Bedingung steht in status.ts; dass gar kein Lauf mehr startet, meldet
+   * health.ts nach 36 Stunden als `veraltet`.
+   *
+   * Drei Stunden ohne jeden Fortschritt bei vorhandener Arbeit und laufendem
+   * Lauf heißt: es klemmt. Ruht der Zugang gerade, zählt das NICHT als
+   * Stillstand — dafür gibt es eine eigene Meldung, und zwei Alarme für eine
+   * Ursache sind einer zu viel.
    */
   STATUS_STILLSTAND_STUNDEN: z.coerce.number().min(0.1).default(3),
   /**
@@ -588,21 +595,47 @@ const Schema = z.object({
   WETTER_FENSTER_TAGE: z.coerce.number().int().min(1).default(14),
 
   /**
-   * Das rollierende Fenster für das Auffrischen der Bestelldetails (Tage).
+   * ~~BESTELLDETAIL_FENSTER_TAGE~~ — ENTFALLEN mit Migration `0098`.
    *
-   * DER BEFUND DAHINTER. Am 13.08.2026 in Produktion gemessen: von 66.966
-   * Bestellungen wurde JEDE GENAU EINMAL im Detail geholt, keine einzige je
-   * erneut (66.966 Aufgaben, 66.966 verschiedene `orderId`, 0 mehrfach).
-   * Liefermenge, Lieferdatum, Belegnummer und alle Preisstände standen damit
-   * auf dem Stand des ersten Abrufs — in den Einkaufssichten also
-   * Bestellmengen, wo Liefermengen stehen sollten.
+   * Das rollierende Fenster holte jede Bestellung der letzten 45 Tage jede
+   * Nacht neu: 2.960 Bestellungen mal zwei Endpunkte = 5.920 Aufrufe.
+   * Nachgerechnet über `raw.payload_hash` am 25.08.2026 brachten davon
+   * 4.288 nachweislich nichts: von 408 gemessenen Kopfänderungen lagen 277
+   * in den ersten drei Tagen, 189 bis Tag sieben, 6 bis Tag 14 und **keine**
+   * danach; bei den Positionen änderte sich in 400 Bestellungen über zwölf
+   * Tage **nichts** am Inhalt — nur der mitgelieferte Lagerbestand des
+   * Artikelstamms, den dieses Projekt gar nicht erfasst.
    *
-   * 45 Tage, weil eine Bestellung so lange nach dem Bestelldatum noch
-   * geliefert, korrigiert und abgerechnet wird. Gemessen sind das 2.981
-   * nicht-finale Bestellungen und damit 5.962 Aufrufe je Nacht — 4,3 % des
-   * FoodNotify-Tagesbudgets von 140.000, bei heute rund 200 verbrauchten.
+   * Ersetzt durch einen Auslöser statt einer Frist: `core.bestellung` trägt
+   * `listen_fingerabdruck` und `detail_fingerabdruck`, und das Detail wird
+   * geholt, wenn beide auseinandergehen. Kein Knopf dafür — der Auslöser ist
+   * eine Eigenschaft der Daten, keine Einstellung.
+   *
+   * Wie viele Listenseiten je Kostenstelle dafür gelesen werden, steht
+   * darunter.
    */
-  BESTELLDETAIL_FENSTER_TAGE: z.coerce.number().int().min(1).default(45),
+
+  /**
+   * Wie viele Seiten der Bestellliste je Kostenstelle in jedem Lauf gelesen
+   * werden — von der letzten rückwärts.
+   *
+   * DIE LISTE IST SEIT `0098` DAS AUGE DES ABGLEICHS: nur was in ihr steht,
+   * kann als geändert erkannt werden. Sie kostet einen Aufruf je Seite und
+   * Kostenstelle, das Detail kostet zwei je Bestellung — die Liste ist also
+   * um Größenordnungen billiger als das, was sie einspart.
+   *
+   * ZWEI, UND DAS IST GEMESSEN. Eine Seite fasst 25 Bestellungen
+   * (`page_size` in endpunkte.ts). In den letzten 14 Tagen — dem Zeitraum,
+   * in dem Änderungen überhaupt vorkommen — hatte die aktivste Kostenstelle
+   * 25 Bestellungen, der Median 8, das 95. Perzentil 20. Eine Seite deckt
+   * damit den Änderungszeitraum gerade so ab, zwei Seiten mit deutlichem
+   * Abstand (50 Bestellungen ≈ 28 Tage bei der aktivsten, Monate bei den
+   * übrigen).
+   *
+   * Kosten: 152 Kostenstellen × 2 = rund 300 Aufrufe je Nacht statt 152.
+   * Eingespart werden dafür bis zu 5.920.
+   */
+  BESTELLDETAIL_LISTENSEITEN: z.coerce.number().int().min(1).max(20).default(2),
 
   /**
    * Wie weit zurück der eingefrorene Altbestand nachgeholt wird (Monate).

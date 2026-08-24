@@ -70,7 +70,7 @@ export class FnClient {
    * weil dort jeder tatsächliche Aufruf steht, laufübergreifend und
    * neustartfest: `heuteVerbraucht` läge sonst nur im Arbeitsspeicher, und
    * jeder Lauf ist ein frisch startender Prozess — der Zähler begänne
-   * stündlich wieder bei null und das Budget hätte nie gegriffen.
+   * bei jedem Prozessstart wieder bei null und das Budget hätte nie gegriffen.
    */
   async budgetLaden() {
     this.budgetTagWechseln()

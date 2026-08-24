@@ -68,7 +68,60 @@ describe('bestellliste (paginate)', () => {
     expect(s.bestellungen[0]).toEqual({
       fnId: 'b1', bestellnummer: 'A-100',
       bestelltAm: '2021-10-15T09:00:00.000Z', status: 'imported',
+      // Seit Migration 0098: der Fingerabdruck des Listeneintrags. Er wird
+      // hier nicht auf einen festen Wert geprüft — das prüfen die drei
+      // Tests unten, und ein fester md5 in einer Strukturprüfung wäre nur
+      // eine zweite Stelle, an der er gepflegt werden müsste.
+      fingerabdruck: s.bestellungen[0]!.fingerabdruck,
     })
+    expect(s.bestellungen[0]!.fingerabdruck).toMatch(/^[0-9a-f]{32}$/)
+  })
+
+  /**
+   * DER FINGERABDRUCK — und was an ihm hängt (Migration 0098).
+   *
+   * Seit dem 25.08.2026 löst er den Detailabruf aus: gleicher Abdruck heißt
+   * „nichts zu tun". Vorher wurde jede Bestellung der letzten 45 Tage jede
+   * Nacht neu geholt — 5.920 Aufrufe, von denen 4.288 nachweislich nichts
+   * einbrachten.
+   *
+   * Zwei Eigenschaften tragen das, und beide sind hier geprüft: er ändert
+   * sich NICHT ohne Grund (sonst holt der Lauf alles jede Nacht) und er
+   * ändert sich SEHR WOHL, wenn sich am Eintrag etwas ändert (sonst
+   * verpasst er die Rechnung, für die es ihn gibt).
+   */
+  test('gleicher Eintrag, gleicher Fingerabdruck', () => {
+    const eintrag = { id: 'b1', orderNumber: 'A-100',
+                      shopOrderStatus: { name: 'imported' }, shopOrderInvoices: [] }
+    const a = bestellliste({ current_page: 1, page_count: 1, data: [eintrag] })
+    const b = bestellliste({ current_page: 1, page_count: 1, data: [eintrag] })
+    expect(a.bestellungen[0]!.fingerabdruck).toBe(b.bestellungen[0]!.fingerabdruck)
+  })
+
+  test('andere Feldreihenfolge, gleicher Fingerabdruck', () => {
+    /*
+     * Die Reihenfolge der Schlüssel ist eine Zusage des Servers, keine der
+     * Sprache. Ohne kanonisches Sortieren wären nach einer Umstellung bei
+     * FoodNotify auf einen Schlag ALLE Abdrücke anders — und der nächste
+     * Lauf holte 50.000 Bestellungen im Detail.
+     */
+    const a = bestellliste({ current_page: 1, page_count: 1, data: [
+      { id: 'b1', orderNumber: 'A-100', shopOrderStatus: { name: 'imported' } }] })
+    const b = bestellliste({ current_page: 1, page_count: 1, data: [
+      { shopOrderStatus: { name: 'imported' }, orderNumber: 'A-100', id: 'b1' }] })
+    expect(a.bestellungen[0]!.fingerabdruck).toBe(b.bestellungen[0]!.fingerabdruck)
+  })
+
+  test('nachgetragene Rechnung ändert den Fingerabdruck', () => {
+    // Der Fall, für den die Auffrischung überhaupt gebaut wurde (Phase 2.6):
+    // FoodNotify trägt die Rechnung Tage später nach.
+    const ohne = bestellliste({ current_page: 1, page_count: 1, data: [
+      { id: 'b1', orderNumber: 'A-100', shopOrderInvoices: [] }] })
+    const mit = bestellliste({ current_page: 1, page_count: 1, data: [
+      { id: 'b1', orderNumber: 'A-100',
+        shopOrderInvoices: [{ id: 596359, invoiceNumber: 'R-1' }] }] })
+    expect(mit.bestellungen[0]!.fingerabdruck)
+      .not.toBe(ohne.bestellungen[0]!.fingerabdruck)
   })
   test('Storno wird als storno erkannt, nicht als [object Object]', () => {
     const s = bestellliste({ current_page: 1, page_count: 1, total_count: 1, data: [

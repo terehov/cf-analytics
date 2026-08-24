@@ -76,9 +76,6 @@ import {
 } from './laden'
 import { zuordnungAbgleichen } from './zuordnen'
 
-/** Wie oft die Standortzuordnung abgeglichen wird (Tage). */
-const ZUORDNUNG_ABSTAND_TAGE = 30
-
 async function faellig(schluessel: string, stunden: number): Promise<boolean> {
   const r = await eine<{ faellig: boolean }>(
     `SELECT coalesce((wert->>'am')::timestamptz < now() - ($2 || ' hours')::interval, true)
@@ -110,35 +107,58 @@ export async function bountiNachlauf(): Promise<void> {
       return
     }
 
+    const stamm = await stammdatenLaden()
+
     /*
-     * ERST DIE ZUORDNUNG. Ein Standort ohne Eintrag in
-     * manual.betrieb_fremd_id wird geladen, faellt aber aus JEDER
-     * Betriebsauswertung heraus — lautlos, weil die Sichten ueber die
-     * Zuordnung joinen. Monatlich und nicht taeglich, weil hier eine
-     * Entscheidung faellt und eine Entscheidung, die sich taeglich neu
-     * faellt, keine ist.
+     * DIE ZUORDNUNG — TAEGLICH, UND NACH DEN STAMMDATEN.
+     *
+     * Ein Standort ohne Eintrag in manual.betrieb_fremd_id wird geladen,
+     * faellt aber aus JEDER Betriebsauswertung heraus — lautlos, weil die
+     * Sichten ueber die Zuordnung joinen. Zwei Dinge daran waren falsch:
+     *
+     * 1. ~~Monatlich~~, mit der Begruendung "eine Entscheidung, die sich
+     *    taeglich neu faellt, ist keine". Der Satz stimmt, die Antwort war
+     *    falsch: seltener zu entscheiden macht die Entscheidung nicht
+     *    haltbarer, es verlaengert nur das Fenster, in dem ein neuer
+     *    Standort unsichtbar bleibt — bis zu 30 Tage. Haltbar wird sie
+     *    dadurch, dass `zuordnungRechnen()` Bestehendes als
+     *    `bereits zugeordnet` durchreicht und nie neu verhandelt. Das tut
+     *    es seit dem 24.08.2026; der taegliche Lauf ist damit idempotent.
+     *
+     * 2. ~~VOR stammdatenLaden()~~. Der Abgleich las
+     *    `core.bounti_standort`, und gefuellt wird die Tabelle von genau
+     *    der Funktion, die danach lief — er sah also immer den Bestand des
+     *    VORTAGS. Zusammen mit dem Monatstakt hiess das: ein neuer Standort
+     *    war fruehestens einen Monat und einen Tag nach seinem Auftauchen
+     *    zugeordnet. Beides ist jetzt weg.
+     *
+     * OHNE ZUSAETZLICHEN AUFRUF: die Standorte kommen aus der Datenbank,
+     * die `stammdatenLaden()` gerade geschrieben hat, nicht noch einmal
+     * von der Schnittstelle. Bei Seitengroesse 20 waeren das je Nacht fuenf
+     * Aufrufe fuer eine Liste, die schon dasteht.
      *
      * Eigenes try: ein Fehler hier darf die Daten nicht mitnehmen. Die
      * Zuordnung von gestern ist besser als keine.
      */
-    if (await faellig('bounti_letzte_zuordnung', ZUORDNUNG_ABSTAND_TAGE * 24)) {
-      try {
-        const z = await zuordnungAbgleichen({ schreiben: true })
-        await merkerSetzen('bounti_letzte_zuordnung')
-        log.info('bounti-zuordnung abgeglichen', {
-          standorte: z.standorte, zugeordnet: z.zugeordnet,
-          geschrieben: z.geschrieben, offen: z.offen,
-          mehrdeutig: z.mehrdeutig.length,
-          offeneNamen: z.offene_namen.slice(0, 10).map(o => `${o.id} ${o.name}`),
-          sicht: 'mart.bounti_ohne_betrieb',
-        })
-      } catch (e) {
-        log.warn('bounti-zuordnung fehlgeschlagen — die Daten laufen trotzdem',
-          { fehler: String((e as Error).message ?? e).slice(0, 300) })
-      }
+    try {
+      const standorte = await query<{ id: string; name: string }>(
+        `SELECT bounti_id AS id, name FROM core.bounti_standort ORDER BY name`)
+      const z = await zuordnungAbgleichen({ schreiben: true, standorte })
+      await merkerSetzen('bounti_letzte_zuordnung')
+      log.info('bounti-zuordnung abgeglichen', {
+        standorte: z.standorte, zugeordnet: z.zugeordnet,
+        geschrieben: z.geschrieben, offen: z.offen,
+        bereits: z.treffer.filter(t => t.art === 'bereits zugeordnet').length,
+        neu: z.treffer.filter(t => t.art !== 'bereits zugeordnet' && t.art !== 'von Hand').length,
+        mehrdeutig: z.mehrdeutig.length,
+        offeneNamen: z.offene_namen.slice(0, 10).map(o => `${o.id} ${o.name}`),
+        sicht: 'mart.bounti_ohne_betrieb',
+      })
+    } catch (e) {
+      log.warn('bounti-zuordnung fehlgeschlagen — die Daten laufen trotzdem',
+        { fehler: String((e as Error).message ?? e).slice(0, 300) })
     }
 
-    const stamm = await stammdatenLaden()
     const katalog = await lerneinheitenLaden()
     const zuw = await zuweisungenLaden()
     const fortschritt = await fortschrittLaden()
@@ -149,9 +169,13 @@ export async function bountiNachlauf(): Promise<void> {
      * Am 24.08.2026 scheiterte `auditberichteLaden()` im zweiten Lauf an
      * einem Formatfehler (`after` als Kalendertag statt ISO-Zeitstempel).
      * Der Fehler riss den ganzen Nachlauf mit — und weil der Merker erst am
-     * ENDE gesetzt wird, blieb er ungesetzt: der stuendliche Sync-Lauf
-     * haette Bounti von da an jede Stunde erneut abgefragt, rund 400 Aufrufe
-     * gegen ein Stundenlimit von 3.000.
+     * ENDE gesetzt wird, blieb er ungesetzt: jeder folgende Sync-Lauf haette
+     * Bounti erneut abgefragt, rund 400 Aufrufe gegen ein Stundenlimit von
+     * 3.000. (Hier stand "der stuendliche Sync-Lauf … jede Stunde" — der
+     * Zeitplan ist taeglich, der Schaden waere also kleiner gewesen als
+     * behauptet. Die Trennung bleibt trotzdem richtig: die Audits sind der
+     * kleinste Teil dieser Quelle und duerfen die Schulungsdaten nicht
+     * mitnehmen.)
      *
      * Die Audits sind der kleinste Teil dieser Quelle (drei Haeuser nutzen
      * das Modul). Sie duerfen die Schulungsdaten nicht mitnehmen — dieselbe

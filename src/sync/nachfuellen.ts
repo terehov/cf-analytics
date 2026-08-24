@@ -365,19 +365,39 @@ export async function foodnotifyNachfuellen(): Promise<number> {
         WHERE k.marke_key = $1 AND k.erp_id IS NOT NULL`,
       [marke.marke_key])
 
+    /*
+     * DIE LETZTEN N SEITEN, NICHT NUR DIE LETZTE — seit Migration 0098.
+     *
+     * Bis dahin genuegte die letzte Seite: sie sollte nur NEUE Bestellungen
+     * finden, und die stehen am Ende (Sortierung timeCreated ASC). Seit 0098
+     * ist die Liste zugleich das AUGE des Detailabgleichs — nur was in ihr
+     * steht, kann als geaendert erkannt werden. Eine Bestellung, die von der
+     * letzten Seite gerutscht ist, bevor ihre Rechnung nachgetragen wurde,
+     * fiele sonst durch.
+     *
+     * Gemessen: eine Seite fasst 25 Bestellungen, die aktivste Kostenstelle
+     * hatte in 14 Tagen genau 25 (Median 8, p95 20). Eine Seite deckt den
+     * Aenderungszeitraum gerade so ab, zwei mit Abstand. Der Preis sind rund
+     * 150 zusaetzliche Listenaufrufe je Nacht — gegen bis zu 5.920
+     * eingesparte Detailaufrufe.
+     */
     for (const s of seiten) {
-      const r = await query(
-        `INSERT INTO sync.warteschlange
-           (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter)
-         SELECT 'fn:bestellungen', $1::date, $1::date, 20, $2, $3::jsonb
-          WHERE NOT EXISTS (
-                SELECT 1 FROM sync.warteschlange w
-                 WHERE w.endpunkt = 'fn:bestellungen' AND w.marke_key = $2
-                   AND w.parameter = $3::jsonb AND w.erledigt_am IS NULL)
-         RETURNING posten_id`,
-        [heute, marke.marke_key,
-         JSON.stringify({ erpId: String(s.erp_id), seite: String(s.letzte_seite) })])
-      n += r.length
+      for (let i = 0; i < config.BESTELLDETAIL_LISTENSEITEN; i++) {
+        const seite = s.letzte_seite - i
+        if (seite < 1) break
+        const r = await query(
+          `INSERT INTO sync.warteschlange
+             (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter)
+           SELECT 'fn:bestellungen', $1::date, $1::date, 20, $2, $3::jsonb
+            WHERE NOT EXISTS (
+                  SELECT 1 FROM sync.warteschlange w
+                   WHERE w.endpunkt = 'fn:bestellungen' AND w.marke_key = $2
+                     AND w.parameter = $3::jsonb AND w.erledigt_am IS NULL)
+           RETURNING posten_id`,
+          [heute, marke.marke_key,
+           JSON.stringify({ erpId: String(s.erp_id), seite: String(seite) })])
+        n += r.length
+      }
     }
 
     n += await inventurenNachfuellen(marke.marke_key, heute)
@@ -440,24 +460,31 @@ export async function bestelldetailsAuffrischen(markeKey: number): Promise<numbe
          JOIN core.kostenstelle ks USING (kostenstelle_key)
         WHERE ks.marke_key = $1
           AND ks.erp_id IS NOT NULL
-          AND coalesce(b.status, '') NOT IN ('canceled', 'finished')
           -- Die Nachholtiefe aus Entscheidung 5. Aelteres bleibt liegen; das
           -- ist eine Grenze und kein Rueckstand.
           AND b.bestellt_am > now() - make_interval(months => $2::int)
-          AND (
-              -- der eingefrorene Altbestand: seit 0072 nicht aufgefrischt
-              b.detail_geholt_am IS NULL
-              -- oder das rollierende Fenster, hoechstens einmal am Tag.
-              -- 20 statt 24 Stunden aus demselben Grund wie bei der
-              -- Wiederbelebung: zwei Laeufe an aufeinanderfolgenden Tagen
-              -- liegen nie exakt 24 Stunden auseinander.
-           OR (b.bestellt_am > now() - make_interval(days => $3::int)
-               AND b.detail_geholt_am < now() - interval '20 hours'))
-        -- JUENGSTE ZUERST: damit deckt die Obergrenze immer erst das Fenster
-        -- und dann den Altbestand. Dieselbe Entscheidung wie beim
-        -- Bestell-Backfill am 02.08.2026 — aktuelle Preise vor der Historie.
+          /*
+           * DER AUSLOESER SEIT MIGRATION 0098: der Listenstand passt nicht
+           * zum Detailstand. Hier stand vorher eine Frist — "alles der
+           * letzten 45 Tage, hoechstens einmal am Tag" —, und die holte
+           * 2.960 Bestellungen je Nacht, von denen sich 2.144 nachweislich
+           * nicht mehr aenderten.
+           *
+           * Der Statusfilter (NOT IN canceled, finished) ist mit
+           * weggefallen und wird nicht vermisst: er griff nie (13 von 67.632
+           * Bestellungen stehen je auf 'finished'), und wenn eine Bestellung
+           * storniert wird, AENDERT sich ihr Listeneintrag — sie wird dann
+           * genau einmal nachgeholt, was richtig ist.
+           *
+           * detail_geholt_am IS NULL faellt ebenfalls von selbst hierunter:
+           * ohne Detailabruf gibt es keinen detail_fingerabdruck, und NULL
+           * ist von jedem Wert verschieden.
+           */
+          AND b.listen_fingerabdruck IS DISTINCT FROM b.detail_fingerabdruck
+        -- JUENGSTE ZUERST: dieselbe Entscheidung wie beim Bestell-Backfill
+        -- am 02.08.2026 — aktuelle Preise vor der Historie.
         ORDER BY b.bestellt_am DESC
-        LIMIT $4
+        LIMIT $3
      ), posten AS (
        SELECT ep AS endpunkt, f.tag,
               jsonb_build_object('erpId', f.erp_id::text, 'orderId', f.fn_id) AS parameter
@@ -478,8 +505,7 @@ export async function bestelldetailsAuffrischen(markeKey: number): Promise<numbe
              WHERE w.endpunkt = p.endpunkt AND w.marke_key = $1
                AND w.parameter = p.parameter AND w.erledigt_am IS NULL)
      RETURNING posten_id`,
-    [markeKey, config.BESTELLDETAIL_NACHHOLTIEFE_MONATE,
-     config.BESTELLDETAIL_FENSTER_TAGE, config.BESTELLDETAIL_JE_LAUF])
+    [markeKey, config.BESTELLDETAIL_NACHHOLTIEFE_MONATE, config.BESTELLDETAIL_JE_LAUF])
 
   if (r.length > 0) {
     log.info('bestelldetails aufgefrischt — posten eingereiht', {

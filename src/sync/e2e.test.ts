@@ -641,7 +641,7 @@ lauf('Robustheit gegen Datenbankausfälle', () => {
  * Die Sperre gegen parallele Worker.
  *
  * Seit das Arbeitsfenster entfallen ist (25.07.2026), läuft ein Backfill-Lauf
- * bis zum Tagesbudget — also viele Stunden. Der stündliche Zeitplan würde ohne
+ * bis zum Tagesbudget — also viele Stunden. Ein zweiter Lauf würde ohne
  * Sperre Lauf um Lauf danebenstarten. `FOR UPDATE SKIP LOCKED` verhindert nur
  * doppelte Posten, nicht doppeltes Tempo, und das Tagesbudget zählt jeder
  * Prozess für sich im Speicher. Zehn Worker wären zehnfaches Tempo.
@@ -1375,7 +1375,7 @@ lauf('Zugangssperre', () => {
    * Der schwerste Fall. Vorher lief hier genau das, was harte Regel 6
    * verbietet: `holen()` fing den Anmeldefehler als gewöhnlichen Fehler ab,
    * beim nächsten Posten war die Session immer noch nicht angemeldet, also
-   * wurde erneut angemeldet — bis zu zehnmal in Folge, stündlich wiederholt.
+   * wurde erneut angemeldet — bis zu zehnmal in Folge, Lauf für Lauf wiederholt.
    */
   test('Anmeldefehler: genau EIN Versuch, niemals eine Schleife', async () => {
     await frisch()

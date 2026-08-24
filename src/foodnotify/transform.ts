@@ -9,6 +9,7 @@
  * und raw behält ohnehin alles.
  */
 import { auspacken } from './huelle'
+import { createHash } from 'node:crypto'
 
 const alsObjekt = (x: unknown): Record<string, any> | null =>
   typeof x === 'object' && x !== null && !Array.isArray(x) ? x as Record<string, any> : null
@@ -135,6 +136,8 @@ export type BestellungZeile = {
   bestellnummer: string | null
   bestelltAm: string | null
   status: string | null
+  /** md5 des Listeneintrags — der Ausloeser fuer den Detailabruf (0098). */
+  fingerabdruck: string
 }
 
 export type Bestellliste = {
@@ -142,6 +145,49 @@ export type Bestellliste = {
   gesamtSeiten: number
   gesamt: number | null
   bestellungen: BestellungZeile[]
+}
+
+/**
+ * Kanonische Form eines Wertes: Objektschluessel sortiert, Reihenfolge in
+ * Listen erhalten.
+ *
+ * WARUM SORTIEREN. `JSON.stringify` schreibt Schluessel in der Reihenfolge,
+ * in der sie beim Parsen ankamen. Fuer dieselbe Antwort ist das stabil —
+ * aber es ist eine Zusage des Servers und keine der Sprache. Aendert
+ * FoodNotify die Feldreihenfolge, sind auf einen Schlag ALLE Fingerabdruecke
+ * anders, und der naechste Lauf holt 50.000 Bestellungen im Detail. Das
+ * Sortieren kostet nichts und nimmt diese Moeglichkeit heraus.
+ */
+function kanonisch(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(kanonisch)
+  if (v && typeof v === 'object') {
+    const o = v as Record<string, unknown>
+    const raus: Record<string, unknown> = {}
+    for (const k of Object.keys(o).sort()) raus[k] = kanonisch(o[k])
+    return raus
+  }
+  return v
+}
+
+/**
+ * Der Fingerabdruck eines Listeneintrags — die Grundlage dafuer, dass ein
+ * Bestelldetail genau einmal je Aenderung geholt wird (Migration 0098).
+ *
+ * ES WIRD DER GANZE EINTRAG GEHASHT, und das ist eine gemessene
+ * Entscheidung, keine Bequemlichkeit. Der Listeneintrag traegt: id, name,
+ * total, comment, markedShop, orderNumber, timeCreated, createdByUser,
+ * updatedByUser, markedShopOrder, shopOrderStatus, shopOrderChanges,
+ * billingSyncStatus, extDeliveryNoteId, shopOrderInvoices,
+ * shopOrderDeliveryNote. Kein einziges davon ist fluechtig — anders als im
+ * DETAIL, wo `concreteProduct.stock` (der aktuelle Lagerbestand des
+ * Artikels) und `timeModified` des Artikelstamms bei 81 % der Abrufe eine
+ * Aenderung vortaeuschen, die keine ist.
+ *
+ * Eine Teilmenge zu hashen waere die schlechtere Wahl: sie muesste raten,
+ * welches Feld FoodNotify morgen fuer eine Rechnungsnummer benutzt.
+ */
+export function listenFingerabdruck(eintrag: unknown): string {
+  return createHash('md5').update(JSON.stringify(kanonisch(eintrag))).digest('hex')
 }
 
 /** /api/{erpId}/shop-order/paginate — eine Seite der Bestellliste. */
@@ -156,6 +202,7 @@ export function bestellliste(daten: unknown): Bestellliste {
       bestellnummer: alsText(o.orderNumber),
       bestelltAm: alsZeit(o.timeCreated),
       status: alsBezeichnung(o.shopOrderStatus),
+      fingerabdruck: listenFingerabdruck(e),
     }]
   })
   return {

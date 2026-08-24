@@ -127,8 +127,8 @@ export class LinaClient {
    * Das Tagesbudget aus der Datenbank holen, statt bei null anzufangen.
    *
    * `heuteVerbraucht` lag nur im Arbeitsspeicher — und jeder Lauf ist ein
-   * frisch startender Prozess (`docker exec … bun run sync`, stündlich). Der
-   * Zähler begann also stündlich wieder bei null, und `TAGESBUDGET` hat in
+   * frisch startender Prozess (`docker exec … bun run sync`). Der
+   * Zähler begann also bei jedem Start wieder bei null, und `TAGESBUDGET` hat in
    * Produktion nie gegriffen. Ausgerechnet die Bremse, die als Notfallnetz
    * gegen einen Fehler im Tempo gedacht war, war die einzige ohne Wirkung.
    *
@@ -178,7 +178,7 @@ export class LinaClient {
      * Ohne diese Sperre lief genau das, was harte Regel 6 verbietet: `holen()`
      * fing `AnmeldungFehlgeschlagen` als gewöhnlichen Fehler ab, beim nächsten
      * Posten war die Session immer noch nicht angemeldet, also wurde erneut
-     * angemeldet — bis zu zehnmal in Folge, und der stündliche Zeitplan
+     * angemeldet — bis zu zehnmal in Folge, und der Zeitplan
      * wiederholte das. Bei einem Konto, das sich sperren lässt, und genau
      * einem Zugang ist das der teuerste Fehler, den dieser Code machen kann.
      */

@@ -144,6 +144,108 @@ export type Zuordnungsbericht = {
 }
 
 /**
+ * Der reine Rechenteil — dieselbe Bauart wie `zuordnungRechnen()` in
+ * bounti/zuordnen.ts, und aus demselben Grund herausgeloest: er ist die
+ * Stelle, an der ENTSCHIEDEN wird, und eine Entscheidung gehoert geprueft.
+ *
+ * Bis zum 25.08.2026 steckte diese Rechnung mitten in `zuordnungAbgleichen()`
+ * zwischen zwei Schnittstellenaufrufen und einem Schreibvorgang — testbar war
+ * sie damit nicht, und genau in diesem Zustand ist sie taeglich geworden.
+ *
+ * KEIN ZUSTAND, KEINE SEITENWIRKUNG: rein hinein, rein heraus. `bestehend`
+ * und `vonHand` sind Parameter und keine Konstanten, damit ein Test beides
+ * stellen kann, ohne die echte Handliste anzufassen — sie waechst mit jeder
+ * Entscheidung, und ein Test, der aus fremdem Grund ausschlaegt, wird
+ * abgeschaltet.
+ */
+export function zuordnungRechnen(
+  entitaeten: YextEntitaet[],
+  betriebe: { betrieb_key: number; name: string }[],
+  /** fremd_id → betrieb_key, aus manual.betrieb_fremd_id. */
+  bestehend: Map<string, number> = new Map(),
+  vonHand: Record<string, number | null> = VON_HAND,
+): { treffer: Treffer[]; offen: YextEntitaet[]; ausdruecklichOffen: string[] } {
+  const nachKey = new Map(betriebe.map(b => [b.betrieb_key, b.name]))
+
+  /**
+   * DIE BESTEHENDEN ZUORDNUNGEN — und warum sie hier vorher fehlten.
+   *
+   * Bis zum 24.08.2026 rechnete dieser Abgleich jedes Mal von vorn: nur
+   * `VON_HAND` galt als gesetzt, alles andere entschied die Namensheuristik
+   * neu. Geschrieben wurde mit `DO UPDATE`, also **ueberschreibend**.
+   *
+   * Solange der Abgleich monatlich lief, war das ein seltenes Risiko. Seit
+   * er TAEGLICH laeuft, waere es ein taegliches: benennt jemand einen
+   * Betrieb in LINA um oder legt Yext eine zweite Entitaet mit aehnlichem
+   * Namen an, kippte die Zuordnung ueber Nacht — und niemand haette einen
+   * Anlass hinzusehen, weil nichts scheitert.
+   *
+   * Genau davor warnte der alte Kommentar in nachlauf.ts: "eine
+   * Entscheidung, die sich taeglich neu faellt, ist keine". Die Antwort
+   * darauf ist nicht, seltener zu entscheiden, sondern **einmal Entschiedenes
+   * nicht neu zu verhandeln** — dieselbe Bauart, die bounti/zuordnen.ts seit
+   * seinem zweiten Lauf hat (`bereits zugeordnet`).
+   */
+  const treffer: Treffer[] = []
+  const offen: YextEntitaet[] = []
+  /*
+   * Bereits vergebene Betriebe sind belegt, BEVOR die Heuristik anfaengt.
+   * Sonst greift sich der Namensabgleich einen Betrieb, der schon einer
+   * anderen Entitaet gehoert, und die Zuordnung wandert.
+   */
+  const belegt = new Set<number>(bestehend.values())
+
+  // Von Hand entschiedene Zuordnungen zuerst -- sie sollen den Betrieb
+  // belegen, bevor der Namensabgleich ihn sich greift.
+  for (const [entitaetsId, betriebKey] of Object.entries(vonHand)) {
+    if (betriebKey === null) continue
+    const e = entitaeten.find(x => x.meta?.id === entitaetsId)
+    if (!e) { log.warn('Zuordnung von Hand zeigt auf eine unbekannte Entitaet', { entitaetsId }); continue }
+    const name = nachKey.get(betriebKey)
+    if (!name) { log.warn('Zuordnung von Hand zeigt auf einen unbekannten Betrieb', { entitaetsId, betriebKey }); continue }
+    belegt.add(betriebKey)
+    treffer.push({ entitaetsId, betriebKey, yext: e.name ?? '', betrieb: name, art: 'von Hand', e })
+  }
+
+  for (const e of entitaeten) {
+    const id = String(e.meta?.id)
+    if (id in vonHand) continue
+
+    /*
+     * Schon zugeordnet? Dann ist das ein Treffer und keine offene Frage —
+     * unabhaengig davon, ob der Name heute noch passt. Die Entscheidung
+     * steht in manual.betrieb_fremd_id und wird hier nicht neu verhandelt.
+     * Wer sie aendern will, traegt sie in VON_HAND ein oder loescht die
+     * Zeile; beides ist eine Handlung und kein Nebeneffekt.
+     */
+    const schon = bestehend.get(id)
+    if (schon !== undefined && nachKey.has(schon)) {
+      belegt.add(schon)
+      treffer.push({ entitaetsId: id, betriebKey: schon, yext: e.name ?? '',
+                     betrieb: nachKey.get(schon)!, art: 'bereits zugeordnet', e })
+      continue
+    }
+
+    const nE = norm(e.name ?? '')
+    let b = betriebe.find(x => norm(x.name) === nE && !belegt.has(x.betrieb_key))
+    let art = 'Name identisch'
+    if (!b) {
+      // Deckt den Regelfall ab: LINA fuehrt die Rechtsform mit, Yext nicht.
+      b = betriebe.find(x => !belegt.has(x.betrieb_key) &&
+        (norm(x.name).includes(nE) || nE.includes(norm(x.name))))
+      art = 'Name enthaelt'
+    }
+    if (b) {
+      belegt.add(b.betrieb_key)
+      treffer.push({ entitaetsId: id, betriebKey: b.betrieb_key, yext: e.name ?? '', betrieb: b.name, art, e })
+    } else offen.push(e)
+  }
+
+  const ausdruecklichOffen = Object.entries(vonHand).filter(([, v]) => v === null).map(([k]) => k)
+  return { treffer, offen, ausdruecklichOffen }
+}
+
+/**
  * Der Abgleich. `schreiben: false` rechnet nur — dieselbe Rechnung, damit die
  * Vorschau nicht von der Uebernahme abweichen kann.
  *
@@ -187,43 +289,13 @@ export async function zuordnungAbgleichen(
 
   const betriebe = await query<{ betrieb_key: number; name: string }>(
     `SELECT betrieb_key, name FROM core.betrieb WHERE aktiv ORDER BY betrieb_key`)
-  const nachKey = new Map(betriebe.map(b => [b.betrieb_key, b.name]))
 
-  const treffer: Treffer[] = []
-  const offen: YextEntitaet[] = []
-  const belegt = new Set<number>()
+  const vorhanden = await query<{ betrieb_key: number; fremd_id: string }>(
+    `SELECT betrieb_key, fremd_id FROM manual.betrieb_fremd_id WHERE system = 'yext'`)
+  const bestehend = new Map(vorhanden.map(z => [z.fremd_id, z.betrieb_key]))
 
-  // Von Hand entschiedene Zuordnungen zuerst -- sie sollen den Betrieb
-  // belegen, bevor der Namensabgleich ihn sich greift.
-  for (const [entitaetsId, betriebKey] of Object.entries(VON_HAND)) {
-    if (betriebKey === null) continue
-    const e = entitaeten.find(x => x.meta?.id === entitaetsId)
-    if (!e) { log.warn('Zuordnung von Hand zeigt auf eine unbekannte Entitaet', { entitaetsId }); continue }
-    const name = nachKey.get(betriebKey)
-    if (!name) { log.warn('Zuordnung von Hand zeigt auf einen unbekannten Betrieb', { entitaetsId, betriebKey }); continue }
-    belegt.add(betriebKey)
-    treffer.push({ entitaetsId, betriebKey, yext: e.name ?? '', betrieb: name, art: 'von Hand', e })
-  }
-
-  for (const e of entitaeten) {
-    const id = String(e.meta?.id)
-    if (id in VON_HAND) continue
-    const nE = norm(e.name ?? '')
-    let b = betriebe.find(x => norm(x.name) === nE && !belegt.has(x.betrieb_key))
-    let art = 'Name identisch'
-    if (!b) {
-      // Deckt den Regelfall ab: LINA fuehrt die Rechtsform mit, Yext nicht.
-      b = betriebe.find(x => !belegt.has(x.betrieb_key) &&
-        (norm(x.name).includes(nE) || nE.includes(norm(x.name))))
-      art = 'Name enthaelt'
-    }
-    if (b) {
-      belegt.add(b.betrieb_key)
-      treffer.push({ entitaetsId: id, betriebKey: b.betrieb_key, yext: e.name ?? '', betrieb: b.name, art, e })
-    } else offen.push(e)
-  }
-
-  const ausdruecklichOffen = Object.entries(VON_HAND).filter(([, v]) => v === null).map(([k]) => k)
+  const { treffer, offen, ausdruecklichOffen } =
+    zuordnungRechnen(entitaeten, betriebe, bestehend)
   const mitGeo = treffer.filter(t =>
     koordinate(t.e)?.latitude != null && koordinate(t.e)?.longitude != null)
 
@@ -268,7 +340,14 @@ export async function zuordnungAbgleichen(
        strasse = EXCLUDED.strasse, plz = EXCLUDED.plz, ort = EXCLUDED.ort,
        breitengrad = EXCLUDED.breitengrad, laengengrad = EXCLUDED.laengengrad,
        herkunft = EXCLUDED.herkunft, genauigkeit = EXCLUDED.genauigkeit,
-       notiz = EXCLUDED.notiz, geaendert_am = now()`,
+       notiz = EXCLUDED.notiz, geaendert_am = now()
+     -- NUR was Yext selbst geschrieben hat. Ein von Hand gepflegter
+     -- Standort (herkunft <> 'concept_family') bleibt unangetastet: er ist
+     -- eine Entscheidung, und seit dem 24.08.2026 laeuft dieser Abgleich
+     -- taeglich — ohne diese Zeile ueberschriebe er sie jede Nacht neu.
+     -- In Produktion stehen heute 60 Zeilen, alle von Yext; die Bedingung
+     -- kostet also nichts und verhindert den Fall, bevor er eintritt.
+     WHERE betrieb_standort.herkunft = 'concept_family'`,
     [mitGeo.map(t => t.betriebKey), mitGeo.map(t => t.e.address?.line1 || null),
      mitGeo.map(t => t.e.address?.postalCode || null), mitGeo.map(t => t.e.address?.city || null),
      mitGeo.map(t => koordinate(t.e)!.latitude), mitGeo.map(t => koordinate(t.e)!.longitude)])
