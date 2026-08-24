@@ -1453,29 +1453,55 @@ werden Pflichtschulungen in Bounti tatsächlich mit Frist zugewiesen? Ist der An
 Frist groß (Spalte `ohne_frist` in `mart.bounti_schulung_betrieb_monat`), ist die Kennzahl
 „überfällig" wertlos.
 
-**3. 26 Bounti-Standorte ohne Betrieb — und drei davon sind teuer.**
-Gemessen am 24.08.2026 nach dem ersten echten Lauf (Zahlen in `bounti-api-inventar.md` §8).
-62 von 88 sind zugeordnet; die 26 offenen zerfallen in vier Gruppen, und nur die erste eilt:
+**3. 26 Bounti-Standorte ohne Betrieb — und nur bei sechs fehlt wirklich eine Zuordnung.**
+Am 24.08.2026 gegen alle drei Systeme geprüft (LINA `core.betrieb`, FoodNotify
+`core.kostenstelle`, Yext über die API). **598 von 2.372 aktiven Mitarbeitenden — jede
+vierte Person — hängen an einem dieser Standorte.** Die Liste zerfällt in fünf Gruppen, und
+sie verlangen Verschiedenes:
 
-* **Die drei auditierten Häuser** — *Wirtshaus am Münzplatz* (110 Berichte), *Wirtshaus im
-  Park Mönchengladbach* (22), *Würzburger Augustiner* (1). **Alle 133 Auditberichte hängen an
-  diesen dreien**, und solange sie keinen Betrieb haben, ist die gesamte Auditauswertung leer
-  — `mart.bounti_audit_betrieb_monat` lieferte im ersten Lauf null Zeilen. Wer die drei
-  zuordnet, schaltet 133 bewertete Begehungen frei. In LINA fällt für „Wirtshaus im Park
-  Mönchengladbach" allenfalls `[100] INSOLVENT - Besitos MG GmbH` auf (MG = Mönchengladbach)
-  — **ein Verdacht, keine Zuordnung.**
-* **Sieben Berliner Standorte** (Zoo Berlin, Tierpark Berlin, BRLO, Schoenwetter Mauerpark,
-  Park am Gleisdreieck ×2, Norddeich Strand Norden). In LINA gibt es dazu **nichts**. Gehören
-  sie zur Gruppe? Sind es fremde Mandanten im selben Bounti-Konto (wie bei Yext die Kunden
-  der Family & Friends Marketing)? Das weiß nur der Fachbereich.
-* **Fünf Fälle, die auch bei Yext ausdrücklich offen sind** — dieselbe Entscheidung löst
-  beide (Besitos Würzburg, Carls Brauhaus, Riegele Augsburg, Würzburger Hofbräukeller,
-  Lehners Pforzheim).
-* **Vier Nicht-Betriebe** (LINA TEST, Concept Family, Concept Family Intern, Ops Enchilada) —
-  bereits als `null` eingetragen, erledigt.
+**a) Fremdmandant „Gimme Gelato" (7 Standorte, 6 aktive Personen).** Charlottenburg, Zoo
+Berlin, Tierpark Berlin, Park am Gleisdreieck @ Jules, Park am Gleisdreieck BRLO,
+Schoenwetter Mauerpark, Norddeich Strand Norden. Sechs davon tragen eine `GG_*`-Entität im
+Yext-Ordner *Gimme Gelato* — demselben Ordner, den `src/yext/zuordnen.ts` ausdrücklich als
+**fremden Kunden** der Family & Friends Marketing ausschließt. **Hier fehlt nichts:** sie
+teilen sich den Bounti-Mandanten, so wie sie sich das Yext-Konto teilen. Zu bestätigen ist
+nur, dass das so gewollt ist — dann gehören sie dauerhaft als `null` in `VON_HAND`.
 
-Umgekehrt fehlen **8 operativen Betrieben mit Umsatz** die Bounti-Standorte; sie stehen in
-derselben Sicht unter `richtung = 'betrieb ohne standort'`.
+**b) Neun Häuser, die das ganze Projekt nicht kennt (338 aktive Personen).** Wirtshaus am
+Münzplatz, Wirtshaus im Park Mönchengladbach, Würzburger Augustiner, Wirtshaus am Platz
+Freiburg, Wirtshaus am Dom Würzburg, Augustiner Wirtshaus Rosenheim, Wirtshaus am Markt
+Heidelberg, Wirtshaus Tucher-bräu am Opernhaus Nürnberg, Wirtshaus im Heuport Regensburg.
+**In keinem der drei Systeme** — nicht in LINA, nicht in FoodNotify, nicht in Yext. Die
+Lücke ist also nicht die Bounti-Zuordnung, sondern eine viel größere Frage: *wem gehören
+diese Häuser, und warum kennt LINA sie nicht?* Ausgerechnet **drei davon sind die einzigen,
+die auditieren** (110, 22 und 1 Bericht) — die gesamte Auditstrecke hängt an dieser Frage.
+
+**c) Fünf Fälle, bei denen dieselbe Entscheidung auch Yext blockiert (219 aktive Personen).**
+Riegele Augsburg (`EK_11`), Carls Brauhaus Stuttgart (`EK_06`), Würzburger Hofbräukeller
+(`EK_14`), Besitos Würzburg (`B_04`), Lehners Pforzheim (`L_03`) — alle fünf stehen seit dem
+03.08.2026 in `src/yext/zuordnen.ts` als **ausdrücklich offen**. **Eine Entscheidung schließt
+beide Systeme.** Für drei gibt es einen LINA-Verdacht: Carls Brauhaus → `[138] Wirtshaus am
+Schlossplatz`, Hofbräukeller → `[122] WHK Gastronomie`, Lehners Pforzheim → `[21] B+L
+Pforzheim`. Alle drei sind operative Betriebe mit Umsatz und stehen auch in der
+Gegenrichtung auf der Liste.
+
+**d) Mehrdeutig in LINA (1 Standort, 27 aktive Personen).** „Schlager Cafe" trifft auf drei
+Gesellschaften: `[116]` Beteiligungs AG, `[117]` Düsseldorf GmbH, `[118]` Franchise AG. Yext
+hat sich entschieden — `SC_01` zeigt auf `[117]`. Ob Bounti dasselbe Haus meint, ist eine
+Rückfrage von einer Minute.
+
+**e) Keine Betriebe (4).** LINA TEST, Concept Family, Concept Family Intern, Ops Enchilada —
+bereits als `null` eingetragen, erledigt.
+
+**FoodNotify ist bei keinem einzigen der 26 die Lücke.** FN deckt die vier Marken ab
+(Aposto, Enchilada, Wilma Wunder, Deutsche Konzepte); Einzelkonzepte und Wirtshäuser sind
+dort gar keine Kunden.
+
+**Die Gegenrichtung: 8 operative Betriebe mit Umsatz ohne Bounti-Standort** — B+L Pforzheim,
+BS Bier & Speisen, Gastronomie Wilsdruffer Straße, SCHAFFERONE, Schlager Cafe Düsseldorf,
+WHK Gastronomie, Wirtshaus am Schlossplatz, Wirtshaus Im Jagdgrund. **Sechs davon haben auch
+keine Yext-Zuordnung** — es ist dieselbe Population wie der Yext-Befund vom 14.08.2026, und
+sie fällt damit in JEDER externen Auswertung heraus.
 
 **4. Die Fluktuationsrate kommt aus LINA — und der Weg dorthin ist ungemessen.**
 Korrigiert am 24.08.2026 auf Eugenes Rückfrage (Hergang in `entscheidungen.md`, B4). Die aus
