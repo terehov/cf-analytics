@@ -82,6 +82,27 @@ const FILTER = `
    [[AND betrieb = {{betrieb}}]]
    [[AND konzept = {{marke}}]]`
 
+/**
+ * Der Leerzustand — und warum er sein muss.
+ *
+ * Ohne ihn zeigt jede Zaehlkachel eine ehrliche, richtig gerechnete NULL,
+ * solange Bounti nichts geliefert hat. "0 ueberfaellige Schulungen" liest
+ * sich aber als "alles erledigt" und nicht als "wir wissen nichts" — und
+ * das ist der teurere der beiden Irrtuemer.
+ *
+ * Genau der Fall trat am 24.08.2026 ein: Migration 0097 stand in
+ * Produktion, BOUNTI_API_TOKEN war dort noch nicht gesetzt, und die
+ * Round-Table-Uebersicht meldete null Rueckstand fuer 141 Betriebe.
+ *
+ * Dieselbe Bauart wie rt_kachel_massnahmen und rt_kachel_bewertung: die 0
+ * gibt es erst wieder, wenn die QUELLE etwas geliefert hat und nur nichts
+ * offen ist. Gelesen wird gegen mart und nicht gegen core — Metabase soll
+ * nur mart sehen muessen (docs/metabase.md).
+ */
+const OHNE_DATEN = `(SELECT gesamt FROM mart.bounti_abdeckung
+                      WHERE kennzahl = 'Standorte in Bounti') = 0`
+const LEER = "'– Bounti liefert noch nichts'"
+
 export const karten: Karte[] = [
 
   // ===================================================================
@@ -98,7 +119,8 @@ export const karten: Karte[] = [
     anzeige: 'scalar',
     parameter: [BETRIEB, MARKE],
     sql: `
-SELECT coalesce(sum(ueberfaellig), 0) AS "Überfällige Schulungen"
+SELECT CASE WHEN ${OHNE_DATEN} THEN ${LEER}
+            ELSE coalesce(sum(ueberfaellig), 0)::text END AS "Überfällige Schulungen"
   FROM mart.bounti_betrieb_stand
  WHERE in_bounti AND operativ${FILTER}`,
   },
@@ -113,8 +135,9 @@ SELECT coalesce(sum(ueberfaellig), 0) AS "Überfällige Schulungen"
     anzeige: 'scalar',
     parameter: [BETRIEB, MARKE],
     sql: `
-SELECT coalesce(sum(koepfe_ueberfaellig), 0) || ' von ' || coalesce(sum(koepfe_aktiv), 0)
-       AS "Personen mit Rückstand"
+SELECT CASE WHEN ${OHNE_DATEN} THEN ${LEER}
+            ELSE coalesce(sum(koepfe_ueberfaellig), 0) || ' von ' || coalesce(sum(koepfe_aktiv), 0)
+       END AS "Personen mit Rückstand"
   FROM mart.bounti_betrieb_stand
  WHERE in_bounti AND operativ${FILTER}`,
   },
@@ -129,9 +152,10 @@ SELECT coalesce(sum(koepfe_ueberfaellig), 0) || ' von ' || coalesce(sum(koepfe_a
     anzeige: 'scalar',
     parameter: [BETRIEB, MARKE],
     sql: `
-SELECT coalesce(
+SELECT CASE WHEN ${OHNE_DATEN} THEN ${LEER}
+            ELSE coalesce(
          to_char(round(100.0 * sum(abgeschlossen) / nullif(sum(zuweisungen), 0), 1), 'FM990.0') || ' %',
-         '– keine Zuweisung') AS "Erfüllungsquote"
+         '– keine Zuweisung') END AS "Erfüllungsquote"
   FROM mart.bounti_betrieb_stand
  WHERE in_bounti AND operativ${FILTER}`,
   },
@@ -150,7 +174,8 @@ SELECT coalesce(
     anzeige: 'scalar',
     parameter: [BETRIEB, MARKE],
     sql: `
-SELECT coalesce(sum(ohne_frist), 0) AS "Offen, ohne Frist"
+SELECT CASE WHEN ${OHNE_DATEN} THEN ${LEER}
+            ELSE coalesce(sum(ohne_frist), 0)::text END AS "Offen, ohne Frist"
   FROM mart.bounti_betrieb_stand
  WHERE in_bounti AND operativ${FILTER}`,
   },
@@ -165,7 +190,8 @@ SELECT coalesce(sum(ohne_frist), 0) AS "Offen, ohne Frist"
     anzeige: 'scalar',
     parameter: [BETRIEB, MARKE],
     sql: `
-SELECT coalesce(sum(koepfe_aktiv), 0) AS "Personen in Bounti"
+SELECT CASE WHEN ${OHNE_DATEN} THEN ${LEER}
+            ELSE coalesce(sum(koepfe_aktiv), 0)::text END AS "Personen in Bounti"
   FROM mart.bounti_betrieb_stand
  WHERE in_bounti AND operativ${FILTER}`,
   },
@@ -181,8 +207,9 @@ SELECT coalesce(sum(koepfe_aktiv), 0) AS "Personen in Bounti"
     anzeige: 'scalar',
     parameter: [BETRIEB, MARKE],
     sql: `
-SELECT coalesce(to_char(round(avg(ergebnis_pct), 1), 'FM990.0') || ' %', '– kein Ergebnis')
-       AS "Ø Prüfungsergebnis"
+SELECT CASE WHEN ${OHNE_DATEN} THEN ${LEER}
+            ELSE coalesce(to_char(round(avg(ergebnis_pct), 1), 'FM990.0') || ' %', '– kein Ergebnis')
+       END AS "Ø Prüfungsergebnis"
   FROM mart.bounti_schulung_person
  WHERE betrieb_key IS NOT NULL AND operativ AND ergebnis_pct IS NOT NULL${FILTER}`,
   },
@@ -199,8 +226,10 @@ SELECT coalesce(to_char(round(avg(ergebnis_pct), 1), 'FM990.0') || ' %', '– ke
     anzeige: 'scalar',
     parameter: [BETRIEB, MARKE],
     sql: `
-SELECT coalesce(sum(auditberichte), 0) || ' von '
-       || (SELECT count(*) FROM mart.bounti_auditbericht_liste) AS "Auditberichte mit Betrieb"
+SELECT CASE WHEN ${OHNE_DATEN} THEN ${LEER}
+            ELSE coalesce(sum(auditberichte), 0) || ' von '
+              || (SELECT count(*) FROM mart.bounti_auditbericht_liste)
+       END AS "Auditberichte mit Betrieb"
   FROM mart.bounti_betrieb_stand
  WHERE in_bounti AND operativ${FILTER}`,
   },
@@ -217,7 +246,9 @@ SELECT coalesce(sum(auditberichte), 0) || ' von '
     // Bewusst ohne Parameter: ein Betriebs- oder Markenfilter hätte hier
     // nichts, worauf er greifen könnte.
     sql: `
-SELECT (gesamt - zugeordnet) || ' von ' || gesamt AS "Personen ohne Betrieb"
+SELECT CASE WHEN gesamt = 0 THEN ${LEER}
+            ELSE (gesamt - zugeordnet) || ' von ' || gesamt
+       END AS "Personen ohne Betrieb"
   FROM mart.bounti_abdeckung
  WHERE kennzahl = 'Aktive Personen'`,
   },

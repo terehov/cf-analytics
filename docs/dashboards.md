@@ -1336,6 +1336,22 @@ archivierten Konto — Bounti schließt Zuweisungen beim Archivieren offenbar mi
 Die Arbeitslisten filtern archivierte Konten trotzdem heraus: ein stillgelegtes
 Konto holt nichts nach.
 
+### Der Leerzustand: „– Bounti liefert noch nichts"
+
+Am Tag der Übernahme standen die Sichten in Produktion und die Daten nicht:
+`BOUNTI_API_TOKEN` ist dort eine Runtime-Variable, die noch fehlt. Die
+Round-Table-Übersicht meldete daraufhin **null überfällige Schulungen für 141
+Betriebe** — richtig gerechnet und maximal irreführend.
+
+Alle acht Kacheln prüfen deshalb zuerst, ob überhaupt ein Bounti-Standort in der
+Datenbank steht, und schreiben sonst **„– Bounti liefert noch nichts"**. Die `0`
+gibt es erst wieder, wenn die Quelle etwas geliefert hat und nur nichts offen
+ist. Dieselbe Bauart wie `rt_kachel_massnahmen` („– keine erfasst") und
+`rt_kachel_bewertung`.
+
+Geprüft wird gegen `mart.bounti_abdeckung`, nicht gegen `core.bounti_standort` —
+Metabase soll nur `mart` sehen müssen.
+
 ### Kein Monatsfilter auf der Schulungsseite
 
 `db_schulung` hat als einziges Fach-Dashboard **keinen** Monatsfilter. Er hätte

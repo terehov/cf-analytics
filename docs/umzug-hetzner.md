@@ -340,6 +340,14 @@ ANFRAGE_TIMEOUT_MS FENSTER_VON_STUNDE FENSTER_BIS_STUNDE PORT
 > meldet dann *„Bounti nicht eingerichtet (kein Token)"*. Wer nach einem
 > Deployment leere Schulungskacheln sieht, sieht zuerst dort nach.
 >
+> **Nachgeprüft am 24.08.2026: es fehlt.** Produktion hat die Sichten aus `0096`
+> und `0097`, aber null Standorte, null Personen, null Zuweisungen. Die Kacheln
+> schreiben deshalb „– Bounti liefert noch nichts" statt einer irreführenden `0`
+> (`dashboards.md`). Sobald der Token in Dokploy steht, füllt der nächste
+> Nachtlauf sie von selbst — die lokale Messung ergab 88 Standorte, 4.796
+> Personen und 74.683 Zuweisungen, der erste Vollabgleich dauert wegen der
+> Rotation über `BOUNTI_LERNEINHEITEN_JE_LAUF` mehrere Nächte.
+>
 > **`METABASE_URL` / `METABASE_USER` / `METABASE_PASSWORD` gehören NICHT in
 > Dokploy.** Sie werden nur von `metabase/uebernehmen.ts` und
 > `metabase/beziehungen.ts` gelesen, und das Dockerfile kopiert `metabase/`
