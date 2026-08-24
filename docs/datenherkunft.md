@@ -659,3 +659,80 @@ Bright Sky fällt je *Feld* auf weiter entfernte Stationen zurück, wenn die
 nächste es nicht misst. `distanz_m` steht deshalb in jeder Zeile — eine Messung
 aus 25 km ist etwas anderes als eine aus 3 km. Und: **81 Betriebe haben keine
 Koordinate und bekommen bauartbedingt kein Wetter** (`mart.kalender_fehlend`).
+
+
+## Bounti — Schulung, Personalstand und Audits (seit 24.08.2026)
+
+Die **fünfte** externe Quelle nach LINA, FoodNotify, Yext und Bright Sky. Sie beantwortet den
+Bericht **„E-Learning erfolgreiche Kurse"** aus `examples/Umsetzung Berichte (1).xlsx`.
+
+**Nicht** die „Fluktuationsraten" aus derselben Liste: die gehört zu LINA, *Team > Mitarbeiter
+> Stammdaten* (`/personal/mitarbeiter/manageusers`), wo Eintritt und Austritt stehen. Sie wird
+hier auch **nicht genähert** — Begründung unten unter Punkt 3.
+
+Vollständiges Inventar, alle Fallen und der Abgleich gegen die Anforderung:
+`docs/bounti-api-inventar.md`. Hier nur, was man zum Deuten der Zahlen wissen muss.
+
+### Der Schlüssel: Standort → Betrieb
+
+Wie bei Yext über `manual.betrieb_fremd_id`, hier mit `system = 'bounti'`. Und aus demselben
+Grund: LINA führt die Rechtsform mit („Enchilada Leipzig GmbH"), die Fachsysteme nicht.
+`src/bounti/zuordnen.ts` schlägt über die Namen vor und **schreibt nur, was eindeutig ist** —
+passen zwei Betriebe gleich gut, bleibt der Standort offen und steht in
+`mart.bounti_ohne_betrieb`. Ein falsch zugeordneter Standort trägt seine Zahlen in ein fremdes
+Haus, und das sieht man der Zahl nicht an.
+
+Die Person → Standort-Zuordnung kommt dagegen **mit ID aus Bounti** und muss nicht geraten
+werden.
+
+### Drei Dinge, die die Zahlen anders lesbar machen
+
+**1. Eine Person kann an mehreren Standorten stehen.** Bounti liefert `locations` als Liste,
+und die eigene Doku zu `/locations/progress` sagt ausdrücklich, sie zähle Mitarbeitende *„in
+all their locations"*. Jede über Personen aggregierte Betriebszahl zählt diese Menschen
+deshalb **mehrfach**; die Summe über alle Betriebe ist größer als die Kopfzahl des
+Unternehmens. Wer die Differenz sucht: `mart.bounti_mehrfachzuordnung`.
+
+**2. Die Zuordnung Person → Standort ist die von HEUTE.** Bounti führt dazu keine Historie.
+Wer den Betrieb gewechselt hat, bringt seine alten Zuweisungen in den neuen Betrieb mit. Für
+den laufenden Monat ist das richtig, für weit zurückliegende Monate eine Annäherung.
+
+**3. Ein Personalstand steht hier nicht — mit Absicht.** Bounti liefert weder Eintritts- noch
+Austrittsdatum; man könnte den Bestand monatlich mitschreiben und daraus Zu- und Abgänge
+rechnen. Genau das ist am 24.08.2026 wieder ausgebaut worden, bevor die Migration angewendet
+war: es hätte **Konten im Schulungssystem** gezählt und wie die **Fluktuationsrate**
+ausgesehen. Die kommt aus LINA — und Bounti liest die Personaldaten selbst von dort (eigener
+LINA-API-Schlüssel mit Scope *Personalstammdaten und Kosten*,
+`lina-api-inventar-ladenakte.md` §4 e). Welcher LINA-Weg trägt, klärt `bun run lina-fragen d10`.
+
+Was bleibt, ist die **Standortzuordnung** je Person — sie trägt die Schulungsauswertung. Wer
+in Bounti keinen Standort hat, fällt aus jeder Betriebszahl heraus; die Prüfung `bounti` in
+`/status` führt die Zahl.
+
+### Zwei Prozentskalen in einer Schnittstelle
+
+| Feld | wie es ankommt | wie es gespeichert wird |
+|---|---|---|
+| `assessmentScore` (Kurs) | **Bruch** — Bountis Doku: *„0.8 is 80%"* | `ergebnis_pct = 80.00` |
+| `achievedPercentage` (Audit) | **Prozentzahl** — `85` | `prozent = 85.00`, **nicht** umgerechnet |
+
+`alsProzent()` prüft die Skala mit und meldet, wenn Bounti sie wechselt. Regel 6 gilt auch
+hier: in der Datenbank steht `23.64`, nie `0.2364`.
+
+### Was fehlt und wodurch es ersetzt ist
+
+**Ein Pflichtkennzeichen am Kurs gibt es nicht** — `/courses` liefert `{id, name}` und sonst
+nichts. Ersatzweg ist die Frist: eine Zuweisung **mit** `dueAt` ist verbindlich gemeint. Das
+ist eine Annahme über die Arbeitsweise, keine Zusage der Schnittstelle, und deshalb weist
+`mart.bounti_schulung_betrieb_monat` die fristlosen Zuweisungen als eigene Spalte
+`ohne_frist` aus, statt sie mitzuzählen.
+
+### Wo man nachsieht, ob es noch läuft
+
+| Frage | Sicht |
+|---|---|
+| Bekommt die Quelle noch Zulauf? | `mart.quelle_zulauf`, Zeilen `bounti:*` |
+| Fällt der Zuweisungsrückstand? | `mart.bounti_zuweisung_stand` — Zeilen mit `zustand = 'nie'` **müssen** weniger werden |
+| Fehlt ein Betrieb ganz? | `mart.bounti_ohne_betrieb` |
+| Stimmt unsere Rechnung mit Bountis eigener? | `mart.bounti_fortschritt_gegenprobe` |
+| Alles zusammen | `mart.pruefung_bounti`, dazu die Prüfung `bounti` in `/status` |

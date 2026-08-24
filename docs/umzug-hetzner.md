@@ -328,11 +328,18 @@ FN_ENCHILADA_USER FN_ENCHILADA_PASSWORD
 FN_WILMA_WUNDER_USER FN_WILMA_WUNDER_PASSWORD
 FN_DEUTSCHE_KONZEPTE_USER FN_DEUTSCHE_KONZEPTE_PASSWORD
 YEXT_API_KEY
+BOUNTI_API_TOKEN
 TAKT_MIN_MS TAKT_MAX_MS FN_TAKT_MIN_MS FN_TAKT_MAX_MS
 TAGESBUDGET MAX_POSTEN_PRO_LAUF MAX_VERSUCHE ABBRUCH_NACH_FEHLERN
 ANFRAGE_TIMEOUT_MS FENSTER_VON_STUNDE FENSTER_BIS_STUNDE PORT
 ```
 
+> **`BOUNTI_API_TOKEN` seit dem 24.08.2026 (Migration `0096`).** Fehlt es in
+> Dokploy, überspringt der Bounti-Nachlauf **still** — so ist er gebaut, denn
+> die Quelle ist optional. Sichtbar wird es nur an einer Stelle: `/status`
+> meldet dann *„Bounti nicht eingerichtet (kein Token)"*. Wer nach einem
+> Deployment leere Schulungskacheln sieht, sieht zuerst dort nach.
+>
 > **`METABASE_URL` / `METABASE_USER` / `METABASE_PASSWORD` gehören NICHT in
 > Dokploy.** Sie werden nur von `metabase/uebernehmen.ts` und
 > `metabase/beziehungen.ts` gelesen, und das Dockerfile kopiert `metabase/`

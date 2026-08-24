@@ -374,7 +374,12 @@ solange sie nicht gelaufen sind, ist jede Aufwandsschätzung geraten.
 * **Dienstplan freigeben** — Bedarf ist deutlich kleiner geworden: die Ist-Stunden haben wir,
   die **Soll**-Stunden je Tag und Bereich stehen im Tagesbudget der Ladenakte. Der Dienstplan
   bringt nur noch die **Schicht- und Personenzuordnung** für 2.3.
-* **Mitarbeiter-Stammdaten** — für 4.2 auf Personenebene.
+* ~~**Mitarbeiter-Stammdaten** — für 4.2 auf Personenebene~~ → **erledigt am 24.08.2026, es
+  war nie eine Rechtefrage** (oder ist es seit Juli nicht mehr): das Menü meldet für alle fünf
+  Personal-Einträge `access=true`, siehe `lina-api-korrekturen.md`, Korrektur 6. Der Punkt
+  verlässt diese Liste und steht ab jetzt unter *Bounti → Punkt 4* als **Aufwandsfrage**: die
+  Adresse der Datenquelle ist noch zu finden. Betrifft zwei Kennzahlen — „Fluktuationsraten"
+  (Ebene Laden) und Kapitel 4.2 auf Personenebene.
 * **Bericht 118** — inzwischen der *vierte* Weg zum Wareneinsatz und damit der am wenigsten
   dringende.
 
@@ -1393,3 +1398,157 @@ auf, weil das Fenster auf 0–24 steht.
 7. **Deutsche Konzepte hat keine Pflichtartikelliste** und ist deshalb auf der
    Seite gar nicht enthalten. Sobald eine vorliegt, sind es zwei Zeilen in
    `pflege/pflichtartikel_liste.csv` und die Positionen.
+
+
+## Bounti (angebunden 24.08.2026)
+
+Die Anbindung steht und ist am **24.08.2026 zum ersten Mal gegen die echte Schnittstelle
+gelaufen** — Messwerte in `bounti-api-inventar.md` §8. Was hier steht, sind die Fragen, die
+danach offen geblieben sind.
+
+### Erledigt durch den ersten Lauf
+
+| Frage | Antwort |
+|---|---|
+| Sind Rollen als **Bereich** gepflegt? | **Ja** — 28 Rollen: Bar, Küche, Service, Spülküche, Biergarten, Catering, Fahrer, Manager … Die Auswertung je Bereich ist möglich |
+| Nimmt Bounti `limit=100`? | Ja, kein Rückfall auf 20 |
+| Tragen die Zuweisungen Fristen? | Ja — 203 von 207 in der Stichprobe. „Überfällig" ist berechenbar |
+| Wie groß ist der Katalog? | 441 Kurse + 29 Pfade. Die Rotation musste von 40 auf **120** je Nacht |
+| Gibt es in `customFields` eine Personalnummer? | **Nein — null Felder konfiguriert.** Es gibt keinen gemeinsamen Schlüssel mit LINA |
+
+**Die letzte Zeile ist die teure:** ohne diesen Schlüssel bleibt Kapitel 4.2 (Kurswirkung je
+Person) unerreichbar — es sei denn, die LINA-Personalstammdaten öffnen sich, und dort ist die
+Rechtefrage seit dem 24.08.2026 **beantwortet** (`lina-api-korrekturen.md`, Korrektur 6). Der
+Weg dorthin wird noch gesucht.
+
+### Die Fragen, die `bun run bounti:pruefen` weiterhin beantwortet
+
+| | entscheidet |
+|---|---|
+| **Sind Rollen als BEREICH gepflegt** (Küche, Service, Bar) — oder stehen dort nur Rechte-Rollen wie „Admin"? | `datenlage-round-table.html` nennt den Bereich den *wichtigsten* Punkt an Bounti: welchem Bereich ein Mensch zugeordnet ist, weiß sonst kein System. Stehen dort nur Rechte, ist die Auswertung je Bereich nicht möglich — und das ist eine Meldung an den Fachbereich, keine Codeänderung |
+| **Gibt es in `customFields` eine Personalnummer, die auch LINA führt?** | Ob Kapitel 4.2 (Kurswirkung je Person) überhaupt erreichbar wird. LINAs Mitarbeiterstammdaten sind für unseren Zugang gesperrt; ohne einen gemeinsamen Schlüssel gibt es keinen Join zwischen Kursabschluss und Verkaufsverhalten |
+| Nimmt Bounti `limit=100`? | nur Aufrufzahlen |
+| Ist `assessmentScore` ein Bruch? | eine Quote, die um den Faktor 100 danebenliegt |
+| Wie viele Kurse und Pfade gibt es? | ob `BOUNTI_LERNEINHEITEN_JE_LAUF = 40` passt |
+| Tragen die Zuweisungen Fristen? | ob „überfällig" berechenbar ist — siehe unten |
+| Wie heißen die Standorte? | wie viel von der Zuordnung der Automat schafft |
+
+### Fachliche Festlegungen — Eugene beziehungsweise der Fachbereich
+
+**1. Ersetzt die Auditnote die OM-Einschätzung in der Ampel?**
+`manual.om_einschaetzung` ist seit Juli 2026 leer, `ampel_om` damit für alle 141 Betriebe.
+Bountis `LOCATION_AUDIT` liefert eine bewertete Begehung mit Punktzahl — die erste objektive
+Betriebsnote aus einem Fachsystem. **Bewusst nicht verdrahtet** (Entscheidung B5,
+`entscheidungen.md`): eine Auditnote misst etwas anderes als eine Vor-Ort-Einschätzung, sie
+hängt an einem Fragenkatalog und daran, wer wie oft auditiert. Drei Möglichkeiten: sie
+ersetzt die OM-Note, sie tritt als siebtes Signal daneben, oder sie bleibt eine eigene
+Auswertung ohne Ampelwirkung. Die Zahlen dafür stehen ab dem ersten Lauf in
+`mart.bounti_audit_betrieb_monat`.
+
+**2. Was ist eine Pflichtschulung?**
+Die Schnittstelle kennt **kein Pflichtkennzeichen** — `/courses` liefert `{id, name}` und
+sonst nichts. Die Anbindung nimmt ersatzweise an: *eine Zuweisung mit Frist (`dueAt`) ist
+verbindlich gemeint, eine ohne nicht.* Das ist eine Annahme über die Arbeitsweise. Zu klären:
+werden Pflichtschulungen in Bounti tatsächlich mit Frist zugewiesen? Ist der Anteil ohne
+Frist groß (Spalte `ohne_frist` in `mart.bounti_schulung_betrieb_monat`), ist die Kennzahl
+„überfällig" wertlos.
+
+**3. 26 Bounti-Standorte ohne Betrieb — und drei davon sind teuer.**
+Gemessen am 24.08.2026 nach dem ersten echten Lauf (Zahlen in `bounti-api-inventar.md` §8).
+62 von 88 sind zugeordnet; die 26 offenen zerfallen in vier Gruppen, und nur die erste eilt:
+
+* **Die drei auditierten Häuser** — *Wirtshaus am Münzplatz* (110 Berichte), *Wirtshaus im
+  Park Mönchengladbach* (22), *Würzburger Augustiner* (1). **Alle 133 Auditberichte hängen an
+  diesen dreien**, und solange sie keinen Betrieb haben, ist die gesamte Auditauswertung leer
+  — `mart.bounti_audit_betrieb_monat` lieferte im ersten Lauf null Zeilen. Wer die drei
+  zuordnet, schaltet 133 bewertete Begehungen frei. In LINA fällt für „Wirtshaus im Park
+  Mönchengladbach" allenfalls `[100] INSOLVENT - Besitos MG GmbH` auf (MG = Mönchengladbach)
+  — **ein Verdacht, keine Zuordnung.**
+* **Sieben Berliner Standorte** (Zoo Berlin, Tierpark Berlin, BRLO, Schoenwetter Mauerpark,
+  Park am Gleisdreieck ×2, Norddeich Strand Norden). In LINA gibt es dazu **nichts**. Gehören
+  sie zur Gruppe? Sind es fremde Mandanten im selben Bounti-Konto (wie bei Yext die Kunden
+  der Family & Friends Marketing)? Das weiß nur der Fachbereich.
+* **Fünf Fälle, die auch bei Yext ausdrücklich offen sind** — dieselbe Entscheidung löst
+  beide (Besitos Würzburg, Carls Brauhaus, Riegele Augsburg, Würzburger Hofbräukeller,
+  Lehners Pforzheim).
+* **Vier Nicht-Betriebe** (LINA TEST, Concept Family, Concept Family Intern, Ops Enchilada) —
+  bereits als `null` eingetragen, erledigt.
+
+Umgekehrt fehlen **8 operativen Betrieben mit Umsatz** die Bounti-Standorte; sie stehen in
+derselben Sicht unter `richtung = 'betrieb ohne standort'`.
+
+**4. Die Fluktuationsrate kommt aus LINA — und der Weg dorthin ist ungemessen.**
+Korrigiert am 24.08.2026 auf Eugenes Rückfrage (Hergang in `entscheidungen.md`, B4). Die aus
+Bounti-Konten gerechnete Näherung ist **wieder entfernt**, nicht nur umbenannt: eine fast
+richtige Zahl ist teurer als eine fehlende.
+
+**Der nächste Schritt ist eine Messung, keine Anfrage:**
+
+```
+bun run lina-fragen d10
+```
+
+**Stand 24.08.2026, zweite Messung: es ist KEINE Rechtefrage mehr.** `/common/api/menu`
+meldet für *Mitarbeiter, Lohnbuchhaltung, Lohnrechner, Upload Lohndateien* und
+**Personalstruktur** durchgängig `access=true` — die Aussage `access:false` vom 25.07.2026 ist
+damit widerlegt (`lina-api-korrekturen.md`, Korrektur 6). **Der Punkt verlässt die
+Rechteliste an Concept Family und wird eine Aufwandsfrage.**
+
+Offen ist jetzt der **Weg**, und das ist eine kleinere Frage:
+
+* `/personal/mitarbeiter/manageusers` antwortet weiterhin **HTTP 200 mit 0 Bytes** — zweimal
+  gemessen, als JSON und als HTML. Bei `access=true` spricht das für eine **Hülle, die ihre
+  Daten per zweitem Aufruf holt**, wie das Belegarchiv mit `getFilesUrl` (Korrektur 5).
+* Das Menü nennt die fünf Einträge **ohne Route** — LINA führt die Adresse in einem anderen
+  Feld als `route`/`url`/`link`/`href`. `d10` gibt seit dem 24.08. den **ganzen Knoten** aus,
+  statt das Feld zu erraten, und ruft jede gefundene Adresse gleich ab.
+* Der Ladenakte-Baum für `laden_15` lieferte kein Array — die erste Fassung starb daran
+  (`{} is not iterable`). `d10` druckt jetzt aus, was wirklich kommt, und probiert zusätzlich
+  die Wurzelknoten.
+
+**Nächster Schritt:** `bun run lina-fragen d10` erneut (nicht aus der Agentenumgebung,
+Regel 7a). Bringt auch die neue Fassung nur leere Antworten, ist der billigste nächste Schritt
+**einmal das Netzwerkprotokoll im Browser**: welche Adresse lädt die Mitarbeiterliste? Eine
+Adresse aus dem Protokoll ist in fünf Minuten geholt; weiter zu raten kostet mehr.
+
+**Was danach noch zu prüfen ist, bevor eine Zahl entsteht:** ob Eintritts- und Austrittsdatum
+dabei sind, und ob **ausgeschiedene** Personen mitgeliefert werden. Ohne die letzten sieht
+jeder Austritt aus wie ein Verschwinden — dieselbe Falle wie bei Bounti, nur an einer anderen
+Quelle.
+
+Die drei möglichen Ausgänge stehen in der Messung selbst. Der ungünstigste — `access: false`
+auch je Betrieb — macht daraus eine **Rechtefrage an Concept Family**, deren Administrator die
+LINA-API-Schlüssel selbst anlegt (er hat den Bounti-Schlüssel mit Scope *Personalstammdaten
+und Kosten* eingerichtet). Das ist keine Anfrage an LINA und berührt die Entscheidung vom
+11.08.2026 nicht.
+
+Bis dahin hat die Kennzahl **keine Quelle — und bekommt auch keine geschätzte.**
+
+### Nach dem ersten echten Lauf nachzumessen
+
+* **Fällt der Zuweisungsrückstand?** `mart.bounti_zuweisung_stand`, Zeilen mit
+  `zustand = 'nie'`. Die Zahl muss von Nacht zu Nacht kleiner werden und 0 erreichen. Bleibt
+  sie stehen, ist `BOUNTI_LERNEINHEITEN_JE_LAUF` zu klein oder das Aufrufbudget geht vorher
+  aus.
+* **Stimmt unsere Rechnung mit Bountis eigener?** `mart.bounti_fortschritt_gegenprobe`. Die
+  beiden sind nicht per Konstruktion gleich (Bounti zählt je Person und Kurs nur die letzte
+  Zuweisung), eine große Abweichung ist trotzdem ein Befund.
+* **Wie viele Menschen stehen an mehreren Standorten?** `mart.bounti_mehrfachzuordnung`. Sie
+  zählen in jedem ihrer Betriebe mit; ist die Zahl groß, muss das neben jeder Betriebszahl
+  stehen.
+* **Wie viele Personen haben gar keinen Standort?** Sie zählen in **keinem** Betrieb und
+  fehlen damit lautlos in der Schulungsquote — die Prüfung `bounti` in `/status` schlägt
+  deshalb an, sobald es welche gibt.
+* **Werden in Bounti Menschen gelöscht statt archiviert?**
+  `mart.bounti_zuweisung_ohne_mitarbeiter`. Wird gelöscht, verlieren die Zuweisungen ihren
+  Betriebsbezug und fallen aus der Quote.
+
+### Noch nicht gebaut, bewusst
+
+* **Auditberichte im Detail** (Antworten je Frage): ein Aufruf je Bericht, und keine Kennzahl
+  liest sie.
+* **Auditpläne** (`/audits/{id}/schedules`): dort steht `completionStatus` mit
+  geplant/erledigt/überfällig je Intervall. Das ist eine Soll-Ist-Frage und hat erst Sinn,
+  wenn Auditpflichten fachlich festgelegt sind.
+* **Keine Metabase-Karten.** Die `mart`-Sichten stehen, das Dashboard nicht — es gibt bis zum
+  ersten Lauf keine Zahl, gegen die man eine Karte prüfen könnte.

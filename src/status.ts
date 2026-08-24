@@ -482,6 +482,102 @@ export async function statusErheben(): Promise<Statusbericht> {
     }
   }
 
+  // --- Bounti: laeuft der Nachlauf, und faellt der Rueckstand? -------------
+  //
+  // ZWEI SIGNALE, AUS DEMSELBEN GRUND WIE BEI YEXT DARUEBER — und eines
+  // davon gibt es nur hier: der Zuweisungsrueckstand.
+  //
+  // Zuweisungen lassen sich nicht inkrementell holen, der Lauf arbeitet sie
+  // in Rotation mit einer Obergrenze ab. Damit gibt es einen Zustand, den
+  // Yext nicht kennt: der Nachlauf laeuft taeglich sauber, und der Bestand
+  // wird trotzdem nie vollstaendig, weil die Obergrenze zu klein ist oder
+  // das Aufrufbudget jede Nacht vorher ausgeht. Von aussen sieht das aus wie
+  // ein gepflegter Bestand — dieselbe Signatur wie beim Belegarchiv am
+  // 12.08.2026, nur langsamer.
+  //
+  // Deshalb wird nicht der Rueckstand ALLEIN gemeldet (der ist beim ersten
+  // Backfill normal), sondern der Rueckstand NEBEN einem frischen Merker.
+  if (!config.BOUNTI_API_TOKEN) {
+    p.push({
+      name: 'bounti', stufe: 'ok',
+      meldung: 'Bounti nicht eingerichtet (kein Token) — Schulungs- und Auditkarten bleiben leer',
+    })
+  } else {
+    const b = await eine<{
+      alter_stunden: number | null; nie: number; lerneinheiten: number; ohne_standort: number
+    }>(
+      `SELECT round(EXTRACT(epoch FROM (now() - (m.wert->>'am')::timestamptz)) / 3600, 1)
+                AS alter_stunden,
+              (SELECT count(*) FROM mart.bounti_zuweisung_stand WHERE zustand = 'nie') AS nie,
+              (SELECT count(*) FROM core.bounti_lerneinheit)                           AS lerneinheiten,
+              /*
+               * Wer in Bounti keinen Standort hat, faellt aus JEDER
+               * Betriebszahl heraus — lautlos, weil die Zuordnung zum Betrieb
+               * ueber den Standort laeuft. Die Zahl gehoert neben die Quote.
+               */
+              (SELECT count(*) FROM core.bounti_mitarbeiter m2
+                WHERE NOT m2.archiviert
+                  AND NOT EXISTS (SELECT 1 FROM core.bounti_mitarbeiter_standort ms
+                                   WHERE ms.mitarbeiter_id = m2.bounti_id))            AS ohne_standort
+         FROM (SELECT 1) x
+         LEFT JOIN sync.merker m ON m.schluessel = 'bounti_letzter_lauf'`)
+
+    const nie = Number(b?.nie ?? 0)
+    const werte = {
+      alterStunden: b?.alter_stunden, nochNieGeholt: nie,
+      lerneinheiten: Number(b?.lerneinheiten ?? 0),
+      ohneStandort: Number(b?.ohne_standort ?? 0),
+    }
+
+    if (b?.alter_stunden == null) {
+      p.push({
+        name: 'bounti', stufe: 'warnung',
+        meldung: 'Bounti-Nachlauf ist noch nie gelaufen',
+        naechster_schritt:
+          'Erst "bun run bounti:pruefen" im Container — es prüft das Token und die fünf Annahmen, '
+          + 'gegen die diese Anbindung gebaut wurde. Danach fährt der Sync den Nachlauf selbst mit.',
+      })
+    } else if (b.alter_stunden > 48) {
+      p.push({
+        name: 'bounti', stufe: 'warnung',
+        meldung: `Bounti-Nachlauf seit ${b.alter_stunden} h nicht gelaufen`,
+        naechster_schritt: 'Läuft der Sync noch? Der Nachlauf hängt an ihm — siehe Prüfung "laeufe".',
+        werte,
+      })
+    } else if (nie > 0) {
+      p.push({
+        name: 'bounti', stufe: 'warnung',
+        meldung: `Bounti läuft, aber ${nie} Kurse/Pfade wurden noch nie im Detail geholt`,
+        naechster_schritt:
+          'Beim ersten Aufbau normal — die Zahl MUSS von Nacht zu Nacht fallen '
+          + '(mart.bounti_zuweisung_stand). Bleibt sie stehen, ist BOUNTI_LERNEINHEITEN_JE_LAUF zu '
+          + 'klein oder das Aufrufbudget geht vorher aus; im Log nach "bounti-zuweisungen noch im '
+          + 'Rueckstand" sehen.',
+        werte,
+      })
+    } else if (Number(b.ohne_standort) > 0) {
+      // Kein Defekt, aber eine Zahl, die niemand raet: diese Menschen
+      // zaehlen in KEINEM Betrieb mit, und die Schulungsquote sieht
+      // trotzdem vollstaendig aus.
+      p.push({
+        name: 'bounti', stufe: 'warnung',
+        meldung: `Bounti aktuell, aber ${b.ohne_standort} aktive Mitarbeitende haben keinen Standort`,
+        naechster_schritt:
+          'Sie fallen aus jeder Betriebsauswertung heraus, ohne eine Lücke zu hinterlassen. '
+          + 'In Bounti einem Standort zuordnen — oder, wenn es Zentrale/Aushilfen sind, '
+          + 'als bekannt abhaken.',
+        werte,
+      })
+    } else {
+      p.push({
+        name: 'bounti', stufe: 'ok',
+        meldung: `Bounti aktuell (vor ${b.alter_stunden} h), Zuweisungsbestand vollständig, `
+               + `alle aktiven Mitarbeitenden einem Standort zugeordnet`,
+        werte,
+      })
+    }
+  }
+
   return {
     status: schlimmste(p.map(x => x.stufe)),
     geprueft_am: new Date().toISOString(),

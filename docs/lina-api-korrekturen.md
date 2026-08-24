@@ -300,3 +300,55 @@ das steht auch in `entscheidungen.md`, damit es niemand für Vergesslichkeit hä
 **Entscheidung**, keinen Automaten, und stehen dafür in `mart.kostenstelle_ohne_betrieb`.
 Bei „Aposto Wuppertal II" führt LINA zwei Gesellschaften gleichen Namens; welche gemeint ist,
 sagt kein Name. Wer hier raten lässt, ordnet 246 Bestellungen lautlos dem falschen Betrieb zu.
+
+---
+
+## KORREKTUR 6 — Die Personalrechte sind **da** (24.08.2026)
+
+**Die alte Aussage**, seit dem 25.07.2026 in `lina-api-inventar.md` §5 und seither in jeder
+Aufwandsschätzung mitgeschleppt:
+
+> ~~Team > Mitarbeiter > Stammdaten | `/personal/mitarbeiter/manageusers` | **`access: false`**
+> für den genutzten Account~~
+
+**Gemessen am 24.08.2026** (`bun run lina-fragen d10`, Schritt 1, aus `/common/api/menu` —
+derselben Quelle wie damals):
+
+```
+Mitarbeiter            access=true
+Lohnbuchhaltung        access=true
+Lohnrechner            access=true
+Upload Lohndateien     access=true
+Personalstruktur       access=true
+```
+
+**Fünfmal `true`.** Ob sich die Rechte seit Juli geändert haben oder ob damals ein anderer
+Knoten gelesen wurde, lässt sich nicht mehr feststellen — beides ist möglich, und für die
+Folge ist es gleichgültig: **die Personaldaten sind für diesen Zugang keine Rechtefrage
+mehr.** Damit fällt der Punkt „Mitarbeiter-Stammdaten" aus der Rechteliste an Concept Family
+heraus und wird zu einer Aufwandsfrage.
+
+**Was damit NOCH NICHT geklärt ist — und was man deshalb nicht behaupten darf:**
+
+1. **Die Adresse.** Das Menü nennt die fünf Namen ohne Route; das Feld, in dem LINA sie
+   führt, heißt anders als `route`/`url`/`link`/`href`. `d10` gibt seit heute den **ganzen
+   Knoten** aus, statt das Feld zu erraten.
+2. **`/personal/mitarbeiter/manageusers` liefert weiter HTTP 200 mit 0 Bytes** — zweimal
+   gemessen, einmal als JSON, einmal als HTML. Bei `access=true` heißt das mit einiger
+   Wahrscheinlichkeit: die Seite ist eine **Hülle**, die ihre Daten per zweitem Aufruf holt —
+   dieselbe Bauart wie das Belegarchiv mit `getFilesUrl` (Korrektur 5). `d10` sucht seither
+   im HTML nach genau solchen Ankern.
+3. **Ob „Mitarbeiter" im Menü derselbe Knoten ist wie `manageusers`.** Nicht gemessen. Der
+   Name allein sagt es nicht.
+4. **Ob Eintritts- und Austrittsdatum überhaupt dabei sind**, und ob **ausgeschiedene**
+   Personen mitgeliefert werden. Ohne die letzten sieht jeder Austritt aus wie ein
+   Verschwinden — und die Fluktuationsrate wäre wieder nur halb, genau wie bei Bounti.
+
+**Ein Name aus der Liste verdient dabei besondere Aufmerksamkeit: `Personalstruktur`.** Wenn
+irgendwo eine Kopfzahl je Betrieb steht, dann dort.
+
+**Woran das hängt:** an der Kennzahl „Fluktuationsraten" (Berichtsliste, Ebene *Laden*,
+Prio 3, *Status Bericht = 1*). Sie kommt aus LINA und nicht aus Bounti — Bounti liest die
+Personaldaten selbst über einen LINA-API-Schlüssel mit dem Scope *Personalstammdaten und
+Kosten* (`lina-api-inventar-ladenakte.md` §4 e). Der Hergang dieser Verwechslung steht in
+`entscheidungen.md`, B4.

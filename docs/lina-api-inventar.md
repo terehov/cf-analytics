@@ -293,7 +293,7 @@ verkaufsstellen:       0 Gesamtbetrieb | 1 Ausser Betrieb | 2 AmadeusGO | 51 Coc
 | Team > Mitarbeiter > Zeitkonten | `/personal/zeitkonto/zeitkonto` | Zeiterfassung, Ist-Stunden |
 | Team > Mitarbeiter > Urlaubsplanung | `/personal/zeitkonto/urlaub` | nichtproduktive Kosten (Urlaub) |
 | Team > Dienstpläne | `/personal/dienstplan/…` | Soll-Stunden, Dienstplan-Forecast |
-| Team > Mitarbeiter > Stammdaten | `/personal/mitarbeiter/manageusers` | **`access:false`** für den genutzten Account |
+| Team > Mitarbeiter > Stammdaten | `/personal/mitarbeiter/manageusers` | ~~**`access:false`** für den genutzten Account~~ → **widerlegt am 24.08.2026**: das Menü meldet für *Mitarbeiter, Lohnbuchhaltung, Lohnrechner, Upload Lohndateien, Personalstruktur* durchgängig `access=true` (`lina-api-korrekturen.md`, Korrektur 6). Der Pfad selbst antwortet weiterhin **HTTP 200 mit 0 Bytes** — vermutlich eine Hülle, die nachlädt. Weg wird gesucht: `bun run lina-fragen d10` |
 | POS > Verkauf / Stammdaten | Artikel, Artikelpreise, Sparten, MecCodes | POS-Stammdaten |
 | Finance / BWA | Menü „Finance" (Badge „20") | BWA/SuSa, Rechnungsdaten |
 | Buy | Einkauf/Bestellungen | Einkaufsartikel, Lieferanten |

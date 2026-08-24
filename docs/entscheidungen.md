@@ -2423,3 +2423,141 @@ risikolos, bei 7/14 nicht, und geraten wird hier nicht.
 ist eine **Frage** an den Fachbereich, keine Antwort. Zwei optisch identische
 Fälle, zwei gegensätzliche Entscheidungen — und beide Male hätte die Auswertung
 allein danebengelegen.
+
+
+## 24.08.2026 — Bounti: fünf Festlegungen beim Anbinden
+
+Anlass ist Eugenes Auftrag, Bounti anzubinden, und die Rückfrage, ob die Anforderung
+überhaupt bekannt ist. Sie ist es: `examples/Umsetzung Berichte (1).xlsx` führt auf der
+Ebene *Laden* die Berichte **„E-Learning erfolgreiche Kurse"** und **„Fluktuationsraten"**,
+die Projektbeschreibung verlangt *„die Mitarbeiterqualifikation muss durch Bounti übergeben
+werden"*, und `datenlage-round-table.html` nennt die fünf Felder für Kapitel 4.1/4.2. Der
+Abgleich Punkt für Punkt steht in `bounti-api-inventar.md` §4.
+
+### B1 — Es wird ausschließlich gelesen, und zwar durch fehlenden Code
+
+Von 29 Pfaden schreiben 22. Darunter `DELETE /employees/{id}`, `PATCH /company` und
+`POST /notifications` — Push-Nachrichten an alle Mitarbeitenden. `src/bounti/client.ts` kennt
+deshalb **keine andere Methode als GET**; es gibt keinen Parameter, über den versehentlich
+ein POST entstehen könnte.
+
+Das ist bewusst schärfer als bei Yext, wo `yextHolen()` einen Körper annimmt (der
+Analytics-Bericht ist ein POST, obwohl er liest). Bei Yext ist die schlimmste Folge eine
+falsche Zahl. Hier wäre sie eine Nachricht auf hundert Telefonen.
+
+### B2 — Name und Vorname werden gespeichert, E-Mail und Telefon nicht
+
+Deckung durch die Entscheidung vom 13.08.2026 (*„Personenbezug: die Linie verschiebt sich,
+und zwar begründet"*): mit der Round-Table-Map gibt es den Zweck, den es vorher nicht gab,
+und Kapitel 4.2 verlangt die Zuordnung ausdrücklich **je Mitarbeiter**. Eine überfällige
+Pflichtschulung ohne Namen ist eine Zahl, mit der niemand etwas tun kann.
+
+`email`, `phone` und die Werte aus `customFields` bleiben draußen — für keine Kennzahl nötig.
+Dieselbe Linie wie bei `core.bewertung`, wo `authorName` steht und `authorEmail` fehlt.
+
+**Ausnahme mit Zweck:** aus `customFields` werden die **Feldnamen** und ihre Belegungszahl
+mitgeschrieben (`core.bounti_feldname`), nie die Werte. Grund: läge dort eine Personalnummer,
+die auch LINA kennt, wäre das die Brücke, an der Kapitel 4.2 heute scheitert — LINAs
+Mitarbeiterstammdaten sind für unseren Zugang gesperrt. Die Frage ist so beim ersten echten
+Lauf beantwortet, ohne unbesehen Freitextfelder zu importieren.
+
+### B3 — Zuweisungen laufen in Rotation, nicht auf Befehl
+
+`/{courses|paths}/{id}/assignments` kennt **keinen Zeitfilter** — kein `after`, kein
+`updatedAt`. Inkrementell geht nur `/audits/reports`, der einzige Endpunkt der ganzen
+Schnittstelle mit `after`/`before`.
+
+Damit gab es zwei Wege: ein Handbefehl, der den Bestand gelegentlich geradezieht, oder eine
+Obergrenze im Nachtlauf. Die Entscheidung vom 14.08.2026 (*„Betrieb ohne Handbefehl"*) gilt
+weiter und ist hier zum ersten Mal von Anfang an eingebaut: `BOUNTI_LERNEINHEITEN_JE_LAUF`
+(Vorgabe 40) arbeitet je Nacht die am längsten nicht geholten ab, nie geholte zuerst. Der
+Rückstand steht in `mart.bounti_zuweisung_stand` und **muss von Nacht zu Nacht fallen** —
+`/status` schlägt an, wenn er neben einem frischen Merker stehen bleibt.
+
+### ~~B4 — Fluktuation wird mitgeschrieben, nicht abgefragt~~ → **revidiert am 24.08.2026**
+
+> **Die Überschrift war falsch, und zwar in der Sache.** Eugene hat noch am selben Tag
+> nachgefragt, ob die Fluktuationsrate nicht aus LINA komme. Sie kommt aus LINA.
+>
+> `kennzahlen-mapping.md` führte eine Zeile *„Fluktuationsraten, E-Learning | Team / Bounti"* —
+> **zwei** Kennzahlen mit **zwei** Quellen in paarweiser Reihenfolge: Fluktuation → *Team*
+> (LINA), E-Learning → *Bounti*. In `examples/Umsetzung Berichte (1).xlsx` sind es ohnehin zwei
+> getrennte Berichte, und der entscheidende Unterschied steht in derselben Datei: „E-Learning
+> erfolgreiche Kurse" hat *Status Bericht = 0*, **„Fluktuationsraten" hat *Status Bericht = 1*** —
+> den Bericht gibt es in LINA also bereits.
+>
+> Eintritt und Austritt stehen in **Team > Mitarbeiter > Stammdaten**
+> (`/personal/mitarbeiter/manageusers`); der genutzte Zugang hat darauf `access:false`
+> (`lina-api-inventar.md` §5). Das ist eine **Rechtefrage**, kein Datenmangel — und sie stand
+> längst in `offene-punkte.md` unter *Mitarbeiter-Stammdaten*, dort nur mit Kapitel 4.2
+> begründet.
+>
+> **Erster Reparaturversuch — und warum er nicht reichte.** Zunächst blieb die gebaute
+> Momentaufnahme stehen und wurde nur beschriftet: Spalte `abgangsquote_pct` statt
+> `fluktuation_pct`, Sichtkommentar beginnend mit „DAS IST NICHT DIE FLUKTUATIONSRATE".
+> Eugenes Antwort darauf war der eigentliche Punkt: *„Das macht keinen Sinn und verwirrt."*
+>
+> **Er hat recht, und die Regel dahinter steht seit `0029` im Haus.** Damals ist
+> `mart.pruefung_wareneinsatz` stillgelegt worden, statt sie „ungefähr" stehen zu lassen.
+> Eine Zahl, die *fast* richtig aussieht, ist teurer als eine, die fehlt: die fehlende fällt
+> auf, die fast richtige wird verwendet — und keine Beschriftung überlebt den Weg in eine
+> Präsentation. Ein Warnhinweis an einer Kennzahl ist kein Ersatz dafür, sie nicht zu bauen.
+>
+> **Also entfernt**, bevor die Migration irgendwo angewendet war: `core.bounti_mitarbeiter_stand`
+> und `mart.bounti_personal_monat` gibt es nicht mehr, die Fortschreibung im Lader auch nicht.
+> `core.bounti_mitarbeiter` bleibt — die Schulungsauswertung braucht die Person als Schlüssel
+> und ihre Standortzuordnung.
+>
+> **Und der Befund, der die Sache endgültig entscheidet, lag längst im Haus** — nur in einer
+> anderen Datei: `lina-api-inventar-ladenakte.md` §4 e), Erhebung vom 11.08.2026. **Bounti
+> hält einen LINA-API-Schlüssel mit dem Scope *Personalstammdaten und Kosten*.** Bounti liest
+> die Personaldaten also aus LINA. Sie aus Bounti zurückzurechnen hieße, eine Kopie gegen ihr
+> Original zu messen.
+>
+> **Was stattdessen passiert:** die Herkunft wird gemessen, nicht geraten. `access: false`
+> stammt vom 25.07.2026 und von der **Konzernebene** — derselben, die auch für BWA und Belege
+> HTTP 500 liefert, während die Ladenakte je Betrieb beides herausgibt. Ob es hier ebenso ist,
+> hat nie jemand geprüft. Dafür gibt es seit heute `bun run lina-fragen d10`: ein lesender
+> Aufruf, der entscheidet, ob es eine Aufwands- oder eine Rechtefrage ist — und die ginge an
+> **Concept Family**, deren Administrator die API-Schlüssel selbst anlegt, nicht an LINA
+> (Entscheidung vom 11.08.2026 bleibt unberührt).
+
+**Der ursprüngliche Wortlaut, durchgestrichen, weil die Konstruktion hier nicht mehr steht:**
+
+~~Bounti liefert weder Eintritts- noch Austrittsdatum. `core.bounti_mitarbeiter_stand` schreibt
+deshalb je Lauf den laufenden Monat fort, eine Zeile je Person, Monat und Standort — dieselbe
+Konstruktion wie die `*_stand`-Tabellen aus `0002`.~~
+
+**Der Preis ist genannt statt verschwiegen:** die Reihe beginnt am Tag der Anbindung. Der
+erste Monat trägt `datenbasis = 'erster Monat'` und **keine Rate**, weil dort jede Person ein
+Zugang und niemand ein Abgang ist. Dieselbe Überlegung wie bei `mart.pflichtartikel_abdeckung`
+(`0095`): „hat nichts bestellt" ist nicht „hat alles vergessen".
+
+### B5 — Die Auditnote geht NICHT in die Ampel
+
+`LOCATION_AUDIT` ist eine bewertete Begehung eines Betriebs mit Punktzahl — die erste
+objektive Betriebsnote aus einem Fachsystem. `manual.om_einschaetzung`, die subjektive Note
+des Operations Managers, ist seit Juli 2026 leer (`0079`). Der Ersatz liegt so nahe, dass er
+ausgesprochen gehört.
+
+**Und er wird trotzdem nicht gebaut.** `ampel.gesamt()` bleibt unberührt,
+`mart.bounti_audit_betrieb_monat` steht daneben. Eine Auditnote misst etwas anderes als eine
+OM-Einschätzung — sie hängt an einem Fragenkatalog, den jemand entworfen hat, und an der
+Frage, wer wie oft auditiert. Ob sie die OM-Note ersetzt, ergänzt oder danebensteht,
+entscheidet der Fachbereich; die Frage steht in `offene-punkte.md`.
+
+Begründung ist Migration `0080`: dort ist die Ampel ausdrücklich um einen vierten Zustand
+erweitert worden, damit ein **fehlendes** Signal nicht mehr als grün durchfällt. Ein Signal
+still durch ein anderes zu ersetzen, wäre derselbe Fehler von der anderen Seite.
+
+### Was daran nicht entschieden ist
+
+~~Diese Anbindung ist gegen die OpenAPI-Spezifikation gebaut und nie gegen die echte
+Schnittstelle gelaufen~~ → **am 24.08.2026 nachgeholt.** Der Zugang steht, der erste volle
+Lauf ist durch, die Messwerte stehen in `bounti-api-inventar.md` §8. Die wichtigste offene
+Annahme hat sich bestätigt: die 28 Rollen sind echte **Bereiche** (Bar, Küche, Service,
+Spülküche …), die Auswertung je Bereich ist damit möglich.
+
+Zwei Annahmen sind gefallen: `customFields` ist **leer** — es gibt keinen gemeinsamen
+Schlüssel mit LINA — und der Katalog ist mit 470 Lerneinheiten so groß, dass die Rotation von
+40 auf 120 je Nacht angehoben werden musste.

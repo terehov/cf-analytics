@@ -1148,3 +1148,54 @@ SELECT konzept, betrieb, abseits_pct, datenbasis
   FROM mart.pflichtartikel_betrieb
  WHERE datenbasis = 'belastbar' ORDER BY abseits_pct DESC;
 ```
+
+## Bounti-Sichten (Migration `0096`, 24.08.2026)
+
+Neun Sichten, **keine einzige Karte** — und das ist Absicht: bis zum ersten echten Lauf gibt
+es keine Zahl, gegen die man eine Karte prüfen könnte. Ein Dashboard, das auf leeren Tabellen
+gebaut wird, sieht fertig aus und ist es nicht.
+
+An der Sichtbarkeit ändert sich nichts: `core.bounti_*` fällt unter die Schemaregel
+(`core` versteckt), `mart.bounti_*` ist automatisch sichtbar. `metabase/sichtbarkeit.ts`
+braucht keine Zeile.
+
+| Sicht | wofür |
+|---|---|
+| `mart.bounti_schulung_betrieb_monat` | Erfüllungsquote je Betrieb, Monat und Art (Kurs/Pfad), dazu überfällig und Notenschnitt |
+| `mart.bounti_audit_betrieb_monat` | Auditnoten je Betrieb, Monat und Auditart — **nur** `LOCATION_AUDIT` |
+| `mart.bounti_standort_betrieb` | die Brücke Standort → Betrieb |
+| `mart.bounti_ohne_betrieb` | die Arbeitsliste der Zuordnung, **beide Richtungen** |
+| `mart.bounti_mehrfachzuordnung` | Personen an mehreren Standorten — die Erklärung für jede Summendifferenz |
+| `mart.bounti_fortschritt_gegenprobe` | unsere Rechnung gegen Bountis eigene Aggregation |
+| `mart.bounti_zuweisung_stand` | der Rückstand, der fallen muss |
+| `mart.bounti_zuweisung_ohne_mitarbeiter` | Zuweisungen an gelöschte Personen |
+| `mart.pruefung_bounti` | **sechs** Prüfzeilen — und sie hängen seit `0096` an `mart.pruefung_uebersicht`, werden also von der bestehenden Karte mitgelesen. Eine Prüfsicht, die niemand liest, ist keine |
+
+**Vier Dinge gehören auf jede Karte, die daraus gebaut wird** — sie sind der Unterschied
+zwischen einer Zahl und einer belastbaren Zahl:
+
+1. **Eine Person kann an mehreren Standorten stehen.** Jede über Personen aggregierte
+   Betriebszahl zählt sie mehrfach; die Summe über alle Betriebe ist größer als die Kopfzahl
+   des Unternehmens.
+2. **Es gibt hier keine Fluktuationszahl, und das ist kein Versehen.** Die Kennzahl der
+   Berichtsliste kommt aus LINA; eine aus Bounti-Konten gerechnete Näherung stand kurz im
+   Entwurf und ist wieder entfernt worden (`entscheidungen.md`, B4). Wer eine Karte
+   „Fluktuation" baut, baut sie auf der LINA-Quelle — sobald `lina-fragen d10` gelaufen ist.
+3. **Zuweisungen ohne Frist sind keine Pflichtschulungen.** Die Spalte `ohne_frist` steht
+   daneben, weil die Schnittstelle kein Pflichtkennzeichen kennt; ist sie groß, ist
+   „überfällig" wertlos.
+4. **Solange `mart.bounti_zuweisung_stand` Zeilen mit `zustand = 'nie'` führt, ist der
+   Bestand unvollständig.** Eine Erfüllungsquote auf halbem Bestand sieht aus wie eine
+   schlechte Quote.
+
+```sql
+-- Steht der Bestand schon? Erst wenn hier 0 steht, sind die Quoten belastbar.
+SELECT zustand, count(*) FROM mart.bounti_zuweisung_stand GROUP BY zustand;
+
+-- Erfüllung je Betrieb im laufenden Monat.
+SELECT b.name, s.zugewiesen, s.abgeschlossen, s.ueberfaellig, s.ohne_frist, s.erfuellung_pct
+  FROM mart.bounti_schulung_betrieb_monat s
+  JOIN core.betrieb b ON b.betrieb_key = s.betrieb_key
+ WHERE s.monat = date_trunc('month', current_date)::date AND s.art = 'kurs'
+ ORDER BY s.erfuellung_pct NULLS LAST;
+```

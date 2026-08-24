@@ -16,7 +16,9 @@
     "typecheck": "tsc --noEmit",
     "lina-fragen": "bun run src/messen.ts",
     "belege-vorschau": "bun run src/belege.ts",
-    "belege-herunterladen": "bun run src/belege.ts --ziehen"
+    "belege-herunterladen": "bun run src/belege.ts --ziehen",
+    "bounti:pruefen": "bun run src/bounti_pruefen.ts",
+    "bounti:zuordnen": "bun run src/bounti_zuordnen.ts"
   },
   "dependencies": {
     "pg": "^8.22.0",

@@ -100,6 +100,112 @@ const Schema = z.object({
    */
   YEXT_API_VERSION: z.string().regex(/^\d{8}$/).default('20240401'),
 
+  // --- Bounti --------------------------------------------------------------
+  /**
+   * Lesender Zugang zum Schulungssystem (External API v1).
+   *
+   * Optional, und zwar dauerhaft — wie Yext und das Wetter. Der Importer
+   * laeuft ohne Bounti vollstaendig weiter; die Schulungs- und Auditkacheln
+   * bleiben dann leer, und das ist ein sichtbarer Zustand
+   * (mart.quelle_zulauf), kein Startfehler.
+   *
+   * BEARER, KEIN BENUTZER UND KEIN PASSWORT. Bounti vergibt API-Schluessel
+   * ueber den Kundenservice; es gibt keine Anmeldung, kein Ablaufdatum im
+   * Schluessel und keine Erneuerung zur Laufzeit. Ein 403 INVALID_API_KEY
+   * ist deshalb immer ein Fall fuer einen Menschen und nie fuer eine
+   * Wiederholungsschleife.
+   *
+   * WAS DIESER SCHLUESSEL NICHT ENTSCHEIDET: welche Standorte zu welchem
+   * Betrieb gehoeren. Massgeblich ist manual.betrieb_fremd_id mit
+   * system = 'bounti' — dieselbe Konstruktion wie bei Yext, aus demselben
+   * Grund: die Namen stimmen nicht ueberein.
+   */
+  BOUNTI_API_TOKEN: z.string().optional(),
+  BOUNTI_BASE_URL: z.string().default('https://api.bounti.co'),
+
+  /**
+   * Wie viele Zeilen eine Seite tragen soll.
+   *
+   * Die Spezifikation nennt die Voreinstellung 20 und eine Obergrenze von
+   * 100 nur bei einem einzigen Endpunkt. 100 ist deshalb ein Versuch, kein
+   * gesichertes Wissen — der Client nimmt bei einem 400 zu `limit` dauerhaft
+   * 20 (src/bounti/client.ts). Wer den Wert hier senkt, spart nichts ausser
+   * Zeit; wer ihn erhoeht, riskiert diesen Rueckfall bei jedem Lauf.
+   */
+  BOUNTI_SEITE: z.coerce.number().int().min(1).max(100).default(100),
+
+  /** Rueckhalt gegen einen Seitenlauf, der nicht endet. 500 Seiten sind bei */
+  /** 100 Zeilen 50.000 Zeilen — mehr als jede Liste dieser Anbindung hat.   */
+  BOUNTI_SEITEN_MAX: z.coerce.number().int().min(1).default(500),
+
+  /**
+   * Das Aufrufbudget EINES Laufs.
+   *
+   * Bountis Limit sind 3.000 Anfragen je Stunde, und der Nachlauf laeuft
+   * hoechstens einmal am Tag — 1.200 lassen also reichlich Luft und decken
+   * den taeglichen Bedarf um ein Vielfaches:
+   *
+   *   Standorte, Rollen, Kurse, Pfade, Audits, Fortschritt   ~10
+   *   Mitarbeitende (aktiv und archiviert, 100 je Seite)     ~40
+   *   Auditberichte inkrementell                             ~5
+   *   Zuweisungen (Rotation, siehe unten)                    Rest
+   *
+   * Ist es aufgebraucht, hoert der Lauf geordnet auf; was fehlt, steht in
+   * mart.bounti_zuweisung_stand und wird in der naechsten Nacht geholt.
+   * Auf 0 laesst sich nichts stellen — dafuer gibt es das Weglassen des
+   * Schluessels.
+   */
+  BOUNTI_AUFRUFE_MAX: z.coerce.number().int().min(1).default(1_200),
+
+  /**
+   * Wie viel Kontingent uebrig bleiben soll.
+   *
+   * Bounti meldet den Rest in jeder Antwort (RateLimit-Remaining). Faellt er
+   * unter diesen Wert, sagt der Lauf es einmal deutlich. Der Grund ist nicht
+   * Hoeflichkeit: Bounti ist ein System im laufenden Betrieb, und wer das
+   * Stundenkontingent leerraeumt, sperrt fuer den Rest der Stunde auch die
+   * App der Mitarbeitenden aus, wenn sie am selben Schluessel haengt.
+   */
+  BOUNTI_RESERVE: z.coerce.number().int().min(0).default(200),
+
+  /**
+   * Wie viele Kurse und Lernpfade eine Nacht hoechstens im Detail holt.
+   *
+   * DIE OBERGRENZE STATT DES HANDBEFEHLS (Entscheidung vom 14.08.2026).
+   * Zuweisungen lassen sich nicht inkrementell holen: der Endpunkt kennt
+   * weder `after` noch einen Aenderungszeitstempel, es gibt nur "alle,
+   * seitenweise". Der Lauf arbeitet deshalb je Nacht so viele Lerneinheiten
+   * ab, die am laengsten nicht geholten zuerst — nie geholte vor veralteten.
+   *
+   * HUNDERTZWANZIG, und das ist seit dem 24.08.2026 nachgemessen statt
+   * geschaetzt. Der erste echte Zugriff zeigte den Katalog:
+   *
+   *   441 Kurse + 29 Pfade         = 470 Lerneinheiten
+   *   Stichprobe: 207 Zuweisungen  = 3 Seiten a 100
+   *   also rund 1.400 Aufrufe fuer einen vollstaendigen Durchgang
+   *
+   * Mit den urspruenglich angesetzten 40 haette der erste Bestand ZWOELF
+   * NAECHTE gebraucht — und waehrend dieser zwoelf Naechte zeigte jede
+   * Erfuellungsquote zu wenig, ohne dass man es ihr ansieht. Mit 120 sind
+   * es vier Naechte, bei rund 360 Aufrufen je Nacht: ein Viertel des
+   * Laufbudgets (1.200) und ein Achtel von Bountis Stundenlimit.
+   *
+   * Danach altert keine Lerneinheit laenger als vier Tage nach.
+   * mart.bounti_zuweisung_stand sagt, ob das reicht.
+   */
+  BOUNTI_LERNEINHEITEN_JE_LAUF: z.coerce.number().int().min(0).default(120),
+
+  /**
+   * Abstand zwischen zwei Bounti-Nachlaeufen (Stunden).
+   *
+   * 20 statt 24, aus demselben Grund wie bei Yext: bei genau 24 rutscht der
+   * Lauf taeglich eine Stunde spaeter und faellt irgendwann ganz aus dem
+   * Zeitfenster. Der Sync-Lauf ist stuendlich; ein stuendlicher Bounti-Lauf
+   * waere 24-mal dieselbe Antwort — niemand schliesst zur vollen Stunde
+   * einen Kurs ab.
+   */
+  BOUNTI_ABSTAND_STUNDEN: z.coerce.number().int().min(1).default(20),
+
   // --- Metabase ------------------------------------------------------------
   /**
    * Eigener Benutzer für die Dashboard-Provisionierung.
@@ -719,5 +825,16 @@ export function konfigZumLoggen(c: Config = config) {
     foodnotify: fnZugaenge(c).length === 0
       ? 'keine Marke konfiguriert'
       : fnZugaenge(c).map(z => `${z.schluessel}: ${z.user} (Passwortlänge ${z.password.length})`),
+    /**
+     * Die LÄNGE, nie der Wert — dieselbe Begründung wie beim LINA-Passwort
+     * weiter oben. Ein Bearer-Token ist derselben Falle ausgesetzt: steht es
+     * unquotiert in der `.env` und enthält ein `$` oder `#`, kürzt Bun es
+     * still, und Bounti antwortet völlig zu Recht mit 403 INVALID_API_KEY.
+     * Eine gemeldete Länge, die nicht zum hinterlegten Token passt, zeigt
+     * das sofort.
+     */
+    bounti: c.BOUNTI_API_TOKEN
+      ? `konfiguriert (Tokenlänge ${c.BOUNTI_API_TOKEN.length})`
+      : 'kein Token',
   }
 }

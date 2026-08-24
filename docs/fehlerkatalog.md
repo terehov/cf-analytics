@@ -3560,3 +3560,101 @@ Heute laufen **beide** Seiten durch `core.name_norm`, und getroffen wird
 Reihenfolge ist egal. Vorher 7 von 24 ohne Betrieb, danach 0.
 `mart.pflichtartikel_regional_offen` führt die Zahl weiter, denn sie darf nicht
 still wieder wachsen.
+
+
+## Eine Messung, die etwas anderes fragte, als ihr Begleittext sagte (24.08.2026)
+
+**Symptom.** `bun run lina-fragen d10` sollte klären, ob LINAs Personalstammdaten je
+Betrieb erreichbar sind — die Frage, an der die Kennzahl „Fluktuationsraten" hängt. Der
+Begleittext lautete *„Die Mitarbeiterverwaltung einmal MIT Betriebskontext abrufen (Weg A,
+wie die Ladenakte)"*. Ergebnis: **HTTP 200, 0 Bytes.**
+
+**Ursache.** Der Aufruf ging als `GET /personal/mitarbeiter/manageusers?admin=1` hinaus.
+`admin=1` ist **kein Betriebskontext** — es ist ein Schalter, den fast jeder Ladenakte-Pfad
+ohnehin trägt. Der Betriebsweg (Weg A) läuft über `/…/laden/<hash>/admin/1/` oder über einen
+`storeId`-Token, den man sich in zwei Schritten holt (`belegarchivToken()` in `messen.ts`
+macht genau das). Die Messung hat also die Konzernebene ein zweites Mal gefragt und sich als
+Betriebsebene ausgegeben.
+
+**Warum das gefährlich ist und nicht nur schlampig.** Das Ergebnis war nicht offensichtlich
+falsch, sondern *unauffällig*: ein leerer 200er hätte sich mühelos als „auch je Betrieb
+nichts" lesen lassen — und damit hätte eine Kennzahl auf Grundlage einer Messung als
+unerreichbar gegolten, **die nie stattgefunden hat**. Genau die Bauart Fehler, die dieses
+Projekt sonst in den Daten hat: eine plausible Antwort auf eine ungestellte Frage.
+
+**Was ihn künftig verhindert.** `d10` ist dreischrittig und benennt jeden Schritt einzeln:
+Rechtelage aus `/common/api/menu` (dieselbe Quelle, aus der der `access:false`-Befund vom
+25.07.2026 stammt), die Seite als **HTML** statt als JSON, und der Ladenakte-Baum des
+Betriebs — der zeigt, ob es je Betrieb überhaupt einen Personalknoten gibt, statt es
+anzunehmen. Dazu ein Deutungseintrag für „200 mit leerem Body", der vorher fehlte.
+
+**Die stehengebliebene Lehre für die anderen Messungen:** Wo `aufruf:` einen Weg behauptet,
+muss `pfad:` und `parameter:` diesen Weg auch gehen. Bei `d2` steht `ebene: 'betrieb'` als
+Parameter — **ungeprüft, ob LINA den kennt.** Wer `d2` fährt, sieht sich das vorher an.
+
+## Vier Fehler in der Bounti-Anbindung, gefunden vor dem ersten Deploy (24.08.2026)
+
+Gefunden durch eine adversariale Vorab-Prüfung des Änderungssatzes (48 Befunde, 27 überlebten
+die Gegenrede) und durch das Nachfahren des Laufs. **Keiner davon hätte einen Fehler geworfen** —
+alle vier enden mit „bounti-nachlauf fertig".
+
+### 1. Das Aufräumen ohne Gegenstück löschte ALLE Zuordnungen
+
+**Symptom (nachgestellt, nicht vermutet).** Antwortet `GET /locations` einmal ohne die
+`rows`-Hülle — oder bricht der Seitenlauf ab —, ist `core.bounti_mitarbeiter_standort`
+danach **leer**, während `core.bounti_standort` unverändert gefüllt aussieht. Jede
+Betriebszahl ist ab da leer, der Lauf meldet Erfolg.
+
+**Ursache.** Der `INSERT` hing an `if (msM.length > 0)`, das `DELETE` daneben an
+`if (alleIds.length > 0)` — **zwei verschiedene Bedingungen aus zwei unabhängigen Quellen.**
+Ist `msM` leer, liefert `unnest('{}','{}')` null Zeilen, `NOT EXISTS` ist damit für jede Zeile
+wahr, und die Anweisung räumt sämtliche Zuordnungen der geladenen Personen ab. Lokal
+nachgemessen: 5 von 5 Zeilen getroffen.
+
+**Was ihn künftig verhindert.** Beide `DELETE` hängen jetzt am selben Wächter wie ihr `INSERT`.
+Zusätzlich bricht `stammdatenLaden()` ab, wenn Bounti **null Standorte** liefert — eine leere
+Stammliste ist nie ein gültiger Zustand, und ein Abbruch ist sichtbar (Merker bleibt stehen,
+`/status` meldet nach 48 h), ein leergeräumter Bestand nicht. `src/bounti/schutz.test.ts`
+prüft beides.
+
+### 2. Eine doppelte Zeile kippte den ganzen Sammel-INSERT
+
+**Symptom.** `ON CONFLICT DO UPDATE command cannot affect row a second time` (SQLSTATE 21000)
+— und zwar nicht für die doppelte Zeile, sondern für **alle** Zeilen der Anweisung.
+
+**Ursache.** Bountis Cursor zeigt auf die ID des ersten Elements der nächsten Seite.
+Verschiebt sich das Fenster während des Blätterns (jemand legt eine Person an), erscheint eine
+Zeile auf zwei Seiten. Bei 4.796 Mitarbeitenden über 48 Seiten ist das kein theoretischer Fall.
+
+**Was ihn künftig verhindert.** `ohneDoppel()` vor jedem Sammel-INSERT. Derselbe Fehler,
+dieselbe Antwort wie bei `einmalig()` in `src/pflege/kalender.ts`.
+
+### 3. Der zweite Lauf meldete „offen: 81", wo nichts offen war
+
+**Symptom.** Erster Zuordnungslauf: 62 von 88 zugeordnet. Zweiter Lauf gegen dieselbe
+Datenbank: **7 zugeordnet, 81 offen.**
+
+**Ursache.** Der Schutz gegen Doppelvergabe schließt jeden Betrieb aus, der schon einem
+Bounti-Standort gehört. Beim zweiten Lauf gilt das auch für **seinen eigenen** Standort — der
+findet dann keinen Kandidaten mehr und fällt auf „offen".
+
+**Warum das gefährlich ist.** Der Schreibvorgang blieb korrekt; falsch war nur die Meldung.
+Genau das ist die teurere Sorte: ein nächtliches Protokoll mit „offen: 81" führt dazu, dass
+die Zahl nicht mehr gelesen wird — und dann fehlen auch die echten Fälle.
+
+**Was ihn künftig verhindert.** `zuordnungRechnen()` bekommt die bestehenden Zuordnungen als
+Parameter; ein Standort, der schon zugeordnet ist, ist ein Treffer (`art = 'bereits
+zugeordnet'`) und keine offene Frage. Drei Tests, einer davon für den Zustand von vorher.
+
+### 4. Sechs Prüfzeilen, die niemand las
+
+`mart.pruefung_bounti` stand als eigene Sicht da — gelesen wurde sie von nichts.
+`mart.pruefung_uebersicht` dagegen hängt an einer Metabase-Karte und an den
+Ende-zu-Ende-Tests. Eine Messung, die niemanden erreicht, ist genau das, wovor Regel 10 warnt.
+Die Zeilen werden jetzt angehängt — mit demselben `pg_get_viewdef`-Verfahren wie in `0094`,
+das die Sicht ergänzt statt sie neu zu schreiben.
+
+**Die gemeinsame Lehre der vier:** drei davon standen in Code, der bereits einmal gegen die
+echte Schnittstelle gelaufen war und dabei 15.804 Zuweisungen korrekt geladen hat. **Ein
+gelungener Lauf beweist nicht, dass der nächste gelingt** — er beweist nur, dass die
+Bedingungen dieses einen Laufs günstig waren.

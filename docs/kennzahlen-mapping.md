@@ -91,7 +91,15 @@ Die vorliegende `JULI_Round_Table_Ampelsystem.xlsx` enthält kaputte Referenzen,
 | Wareneinsatz nach Sparte / Verkaufsstelle / Zeitzone | Filter-Kombinationen vorhanden, aber WE nur monatlich aus BWA | 🟡 eingeschränkt |
 | Verkaufspreise – Optimierungsvorschlag | `getArtikelverkaufsbericht.prices` | 🟡 Datenbasis da |
 | Verweildauer am Tisch | — | 🔴 (OpenTable) |
-| Fluktuationsraten, E-Learning | Team / Bounti | 🔴 |
+| E-Learning erfolgreiche Kurse | **Bounti** | 🟢 **angebunden 24.08.2026** — `mart.bounti_schulung_betrieb_monat`. Einschränkung: die API kennt **kein Pflichtkennzeichen** am Kurs, Ersatz ist die Frist der Zuweisung. Siehe `bounti-api-inventar.md` |
+| Fluktuationsraten | **LINA, Team > Mitarbeiter > Stammdaten** (`/personal/mitarbeiter/manageusers`) | 🔴 **`access:false`** für den genutzten Zugang — Rechtefrage, kein Datenmangel. Eintritt und Austritt stehen dort; die Berichtsliste führt den Bericht mit *Status Bericht = 1*, in LINA gibt es ihn also bereits. **Nicht** aus Bounti — Bounti liest die Personaldaten selbst aus LINA (eigener API-Schlüssel, Scope *Personalstammdaten und Kosten*). Eine Näherung aus Bounti-Konten stand kurz im Entwurf und ist wieder entfernt. Nächster Schritt: `bun run lina-fragen d10` |
+
+> **Korrektur 24.08.2026.** Bis heute standen diese beiden Berichte in **einer** Zeile
+> („Fluktuationsraten, E-Learning | Team / Bounti"). Die Quellen gehörten dabei paarweise zu
+> den Kennzahlen — Fluktuation zu *Team*, E-Learning zu *Bounti* —, und beim Anbinden von
+> Bounti ist beides zunächst falsch zusammengezogen worden. Die Zeile ist deshalb geteilt:
+> zwei Kennzahlen, zwei Quellen, zwei Zustände. In `examples/Umsetzung Berichte (1).xlsx`
+> stehen sie ohnehin als getrennte Berichte.
 
 ### Ebene „Franchise" (Konzept)
 

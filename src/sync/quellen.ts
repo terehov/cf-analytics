@@ -27,12 +27,13 @@
  */
 import { query } from '../db/pool'
 import { log } from '../lib/log'
+import { config } from '../config'
 
 export type Quelle = {
   /** Schlüssel. Bei Endpunkten deren `key`, sonst ein sprechender Name. */
   quelle: string
   bezeichnung: string
-  system: 'lina' | 'ladenakte' | 'foodnotify' | 'yext' | 'intern' | 'wetter'
+  system: 'lina' | 'ladenakte' | 'foodnotify' | 'yext' | 'intern' | 'wetter' | 'bounti'
   /** Gemessen über `sync.aufgabe`. Schließt `tabelle` aus. */
   endpunkt?: string
   /** Gemessen direkt an der Zieltabelle. Für Nachläufe ohne `sync.aufgabe`. */
@@ -200,6 +201,66 @@ export const QUELLEN: readonly Quelle[] = [
   { quelle: 'yext:betrieb_sichtbarkeit', bezeichnung: 'Sichtbarkeit je Betrieb',
     system: 'yext', tabelle: { schema: 'core', name: 'betrieb_sichtbarkeit', zeitspalte: 'geladen_am' },
     kadenz_stunden: 48 },
+
+  // --- Bounti: gemessen an den Tabellen ---------------------------------
+  /*
+   * Wie bei Yext und beim Wetter: der Bounti-Nachlauf haengt an der Uhr und
+   * stellt keine Posten in die Warteschlange — gemessen wird deshalb direkt
+   * an den Zieltabellen.
+   *
+   * KADENZ 48 STUNDEN fuer alles, was jede Nacht angefasst wird. Der
+   * Nachlauf laeuft hoechstens alle 20 Stunden; 48 laesst einen
+   * ausgefallenen Lauf durch und schlaegt beim zweiten an.
+   *
+   * `erwartet` HAENGT AM TOKEN, und das ist der Unterschied zwischen einer
+   * Pruefzeile und einem Dauerlaerm. Ohne BOUNTI_API_TOKEN ueberspringt der
+   * Nachlauf sich selbst — die Tabellen bleiben dann zu Recht leer, und
+   * ohne diese Zeile meldete `zulaufPruefen()` JEDEN Lauf als `teilweise`
+   * und `/status` waere dauerhaft rot. Ein Alarm, der immer schlaegt, ist
+   * keiner (dieselbe Ueberlegung wie bei den `erwartet: false`-Eintraegen
+   * weiter unten).
+   *
+   * Sichtbar bleibt der Zustand trotzdem: `mart.quelle_zulauf` fuehrt die
+   * Zeilen weiter, nur eben als `nicht erwartet`, und `/status` sagt
+   * ausdruecklich "Bounti nicht eingerichtet (kein Token)".
+   */
+  { quelle: 'bounti:standort', bezeichnung: 'Bounti-Standorte',
+    system: 'bounti', tabelle: { schema: 'core', name: 'bounti_standort', zeitspalte: 'geladen_am' },
+    kadenz_stunden: 48, erwartet: Boolean(config.BOUNTI_API_TOKEN) },
+  { quelle: 'bounti:mitarbeiter', bezeichnung: 'Mitarbeitende (aktiv und archiviert)',
+    system: 'bounti', tabelle: { schema: 'core', name: 'bounti_mitarbeiter', zeitspalte: 'geladen_am' },
+    kadenz_stunden: 48, erwartet: Boolean(config.BOUNTI_API_TOKEN) },
+  { quelle: 'bounti:zuweisung', bezeichnung: 'Kurs- und Pfadzuweisungen je Person',
+    system: 'bounti', tabelle: { schema: 'core', name: 'bounti_zuweisung', zeitspalte: 'geladen_am' },
+    kadenz_stunden: 48, erwartet: Boolean(config.BOUNTI_API_TOKEN),
+    bemerkung: 'Rotation mit Obergrenze (BOUNTI_LERNEINHEITEN_JE_LAUF), kein Handbefehl. '
+             + 'Rueckstand steht in mart.bounti_zuweisung_stand.' },
+  { quelle: 'bounti:fortschritt', bezeichnung: 'Kursfortschritt je Standort (Bountis Aggregat)',
+    system: 'bounti', tabelle: { schema: 'core', name: 'bounti_standort_fortschritt', zeitspalte: 'geladen_am' },
+    kadenz_stunden: 48, erwartet: Boolean(config.BOUNTI_API_TOKEN) },
+  /*
+   * GEMESSEN AN `erstellt_am`, NICHT AN `geladen_am` — und das ist der
+   * einzige Eintrag im ganzen Register, bei dem das noetig ist.
+   *
+   * Der Grund: die Auditberichte werden mit sieben Tagen Ueberlappung
+   * geholt, damit ein spaeterer Abschluss noch ankommt. Damit schreibt
+   * JEDER Lauf dieselben Zeilen erneut und setzt `geladen_am` neu. Eine
+   * Kadenzpruefung auf `geladen_am` koennte also niemals ausschlagen — sie
+   * waere genau die Sorte Zeile, die immer gruen ist und deshalb nichts
+   * mehr sagt (0070, 0071, 0090). `erstellt_am` misst dagegen, ob noch
+   * auditiert WIRD.
+   *
+   * MONATLICH statt woechentlich, weil das eine Aussage ueber den Betrieb
+   * ist und nicht ueber den Importer: am 24.08.2026 benutzten GENAU DREI
+   * Haeuser das Auditmodul (110, 22 und 1 Bericht). Bei so wenigen Quellen
+   * ist eine Woche Stille kein Befund, ein Monat schon.
+   */
+  { quelle: 'bounti:auditbericht', bezeichnung: 'Durchgefuehrte Audits',
+    system: 'bounti', tabelle: { schema: 'core', name: 'bounti_auditbericht', zeitspalte: 'erstellt_am' },
+    kadenz_stunden: MONATLICH, erwartet: Boolean(config.BOUNTI_API_TOKEN),
+    bemerkung: 'An erstellt_am gemessen: die 7-Tage-Ueberlappung setzt geladen_am jede Nacht '
+             + 'neu, eine Pruefung darauf koennte nie ausschlagen. Nur drei Haeuser auditieren '
+             + '(Stand 24.08.2026).' },
 
   // --- Bewusst still: sie stehen hier, damit sie sichtbar sind ----------
   /*

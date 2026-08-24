@@ -20,6 +20,7 @@ import { einkaufSichtenNachlauf } from './sync/einkauf_sichten'
 import { pflichtartikelSichtenNachlauf } from './sync/pflichtartikel_sichten'
 import { zuordnungNachlauf } from './sync/zuordnung'
 import { yextNachlauf } from './yext/nachlauf'
+import { bountiNachlauf } from './bounti/nachlauf'
 import { zulaufPruefen } from './sync/zulauf'
 import { pflegeNachlauf } from './pflege/nachlauf'
 
@@ -101,6 +102,25 @@ try {
    * Wirft nie, siehe Kopf von pflege/nachlauf.ts.
    */
   await pflegeNachlauf()
+
+  /**
+   * VIERTER Nachlauf: Bounti — Schulungsstand, Personalbewegung, Audits.
+   *
+   * SEINE STELLE IST FREI WAEHLBAR, und das steht hier ausdruecklich: keine
+   * der Bounti-Sichten aus Migration `0096` ist materialisiert, alle lesen
+   * live. Er steht trotzdem hier oben bei den anderen Fachquellen, damit die
+   * Reihenfolge stimmt, falls eine davon später materialisiert wird — bei
+   * Yext war genau das der Fehler, der zwei Betrieben eine Note aus dem
+   * Vortag in die Ampel geschrieben hat.
+   *
+   * Er haengt an der Uhr, nicht am Importergebnis, und laeuft hoechstens
+   * alle 20 Stunden. Die Zuweisungen holt er in Rotation mit einer
+   * Obergrenze, nicht auf Befehl — der Rueckstand steht in
+   * `mart.bounti_zuweisung_stand` und muss von Nacht zu Nacht fallen.
+   *
+   * Wirft nie, siehe Kopf von bounti/nachlauf.ts.
+   */
+  await bountiNachlauf()
 
   // Zweiter Nachlauf, gleiche Regeln: mart.deckungsbeitrag_warengruppe ist
   // seit Migration 0027 materialisiert und muss aufgefrischt werden, sobald
