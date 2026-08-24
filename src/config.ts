@@ -200,9 +200,13 @@ const Schema = z.object({
    *
    * 20 statt 24, aus demselben Grund wie bei Yext: bei genau 24 rutscht der
    * Lauf taeglich eine Stunde spaeter und faellt irgendwann ganz aus dem
-   * Zeitfenster. Der Sync-Lauf ist stuendlich; ein stuendlicher Bounti-Lauf
-   * waere 24-mal dieselbe Antwort — niemand schliesst zur vollen Stunde
-   * einen Kurs ab.
+   * Zeitfenster.
+   *
+   * ~~Der Sync-Lauf ist stuendlich~~ — er ist TAEGLICH (nachgemessen am
+   * 24.08.2026: ein Lauf je Tag um 05:05, keine einzige uebersprungene
+   * Zeile in sync.lauf). Der Abstand schuetzt deshalb nicht gegen 24
+   * Laeufe am Tag, sondern gegen einen von Hand ausgeloesten ZWEITEN Lauf
+   * desselben Tages. Begruendung ausfuehrlich in bounti/nachlauf.ts.
    */
   BOUNTI_ABSTAND_STUNDEN: z.coerce.number().int().min(1).default(20),
 

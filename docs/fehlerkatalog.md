@@ -3692,3 +3692,53 @@ Frist", und die Beschreibung nennt beide Zahlen mit ihrem jeweiligen Bezug.
 Dieselbe Falle wie bei den zwei Personalkosten-Größen auf einer Seite (`dashboards.md`):
 zwei richtige Zahlen nebeneinander, die niemand auseinanderhält, weil niemand dazuschreibt,
 dass es zwei sind.
+
+---
+
+## „Der Sync-Lauf ist stündlich" — er ist täglich (24.08.2026)
+
+**Symptom.** Achtzehn Stellen im Code und in den Dokumenten begründen eine
+Entscheidung mit „der Zeitplan startet stündlich": die Laufsperre, das
+Tagesbudget in `LinaClient`, die Zugangssperre in der Datenbank, die
+20-Stunden-Fenster von Yext und Bounti.
+
+**Gemessen.** In `sync.lauf` steht seit dem 15.08.2026 **genau ein Lauf je Tag**,
+täglich zwischen 05:03 und 05:08. Und — das ist der schlagende Teil — **keine
+einzige Zeile mit `status = 'uebersprungen'`**. Migration `0081` legt diese Zeile
+seit dem 14.08.2026 für jeden Start an, der die Laufsperre belegt findet. Ein
+Lauf dauert zehn Stunden; bei einem stündlichen Zeitplan wären das rund **neun
+übersprungene Zeilen pro Tag**. Es gibt null.
+
+**Was daran folgenlos ist.** Die Entscheidungen selbst bleiben alle richtig. Die
+Laufsperre schützt weiterhin — nur nicht gegen 24 Läufe am Tag, sondern gegen
+einen von Hand ausgelösten **zweiten** Lauf desselben Tages; am 14.08.2026 gab es
+genau das (00:14 und 09:26). Das Tagesbudget in der Datenbank statt im Speicher
+ist bei einem täglichen Takt sogar zwingender, nicht weniger.
+
+**Was daran nicht folgenlos ist.** Bei einem täglichen Takt bekommt ein
+Nachlauf, dessen Lauf abbricht, **an diesem Tag keine zweite Gelegenheit** —
+30 der bisher 101 Läufe stehen auf `abgebrochen`. Bei stündlichem Takt hätte er
+sie. Das ändert nichts an der Bauweise, aber an der Erwartung: „läuft morgen
+wieder" heißt hier wirklich morgen und nicht in einer Stunde.
+
+**Warum die Annahme so lange stand.** Sie war einmal richtig — die frühen
+Kommentare stammen aus dem Juli 2026, als der Zeitplan tatsächlich stündlich
+lief. Geändert wurde er in Dokploy, also außerhalb des Repositorys, und ein
+Kommentar altert nicht mit. Die Prämisse ist danach von Datei zu Datei
+weitergereicht worden, weil sie als „bekannt" galt: `bounti/nachlauf.ts` zitiert
+`yext/nachlauf.ts`, `config.ts` zitiert beide.
+
+**Korrigiert sind die drei Bounti-Stellen** (`bounti/nachlauf.ts`,
+`bounti/laden.ts`, `config.ts` bei `BOUNTI_ABSTAND_STUNDEN`) — jeweils mit der
+Messung und der Begründung, warum die Sperre trotzdem bleibt. **Offen sind
+fünfzehn weitere** in `yext/nachlauf.ts`, `sync/worker.ts`, `lina/client.ts`,
+`foodnotify/client.ts`, `sync/e2e.test.ts`, `docs/importer.md` und
+`docs/entscheidungen.md`. Sie sind hier aufgeführt statt stillschweigend
+mitgeändert, weil jede von ihnen ein eigenes Argument trägt, das man einzeln
+nachlesen muss — eine Sammelersetzung von „stündlich" durch „täglich" würde
+mindestens zwei davon in eine falsche Aussage verwandeln.
+
+**Die Lehre.** Eine Tatsache über die Umgebung, die außerhalb des Repositorys
+eingestellt wird, gehört nicht in achtzehn Kommentare, sondern an **eine** Stelle,
+auf die die anderen verweisen. Und sie gehört gemessen: `sync.lauf` wusste die
+Antwort die ganze Zeit.

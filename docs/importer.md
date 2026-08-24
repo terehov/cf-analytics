@@ -1043,3 +1043,127 @@ Fehlschläge, alle in Jahrgängen ab 2024 abwärts — ein Aufruf für 2024 brau
 108 s, das Zeitlimit stand auf 60. Es steht jetzt auf 180 s. Ein gescheitertes
 Ortsjahr bleibt in `mart.wetter_rueckstand` als `fehlt` stehen und wird in der
 nächsten Nacht erneut geholt.
+
+---
+
+## Was jede Nacht abgefragt wird — und was davon etwas bringt (24.08.2026)
+
+Anlass war eine Frage von Eugene: *„Die Anzahl der Requests scheint mir verrückt
+hoch. Wenn alles per Backfill aufgefüllt wurde, muss doch nur ein Tag pro Betrieb
+geholt werden."* Nachgemessen an Lauf 101 (24.08., 10 h 08, 10.355 Aufgaben) und
+am `raw`-Archiv der letzten zwölf Tage. Die Vermutung stimmt, aber aus zwei
+verschiedenen Gründen.
+
+### Die Verteilung
+
+| Anteil | Endpunkt | Aufrufe | Zeilen | Zeit |
+|--:|---|--:|--:|--:|
+| 55 % | `la:belegzahl` | 1.974 | 1.974 | 6 h 40 |
+| 25 % | Historien-Backfill (`getUmsatzbericht:trinkgeld`) | 1.990 | 282.141 | 2 h 57 |
+| 16 % | `fn:bestellung` + `fn:bestellpositionen` | 6.002 | 44.991 | 1 h 51 |
+| 4 % | alles Übrige | ~390 | 570.000 | ~30 min |
+
+Nur der zweite Block ist Backfill und damit endlich (noch ~9.500 Tage, bei 2.000
+je Lauf also rund fünf Nächte). Die beiden anderen laufen **jede Nacht neu**.
+
+### `la:belegzahl`: 1.974 Aufrufe für einen Tag — aber nicht wegen des Tages
+
+Die 1.974 sind **nicht** 1.974 Tage. Es ist **141 Betriebe × 14 Belegarten für
+genau einen Stichtag**, und jede Antwort ist eine einzige Zahl (`recordsTotal`).
+
+Der Grund ist kein Versehen, sondern eine bewusste Entscheidung aus dem
+13.08.2026: die Ladenakte bietet **kein Delta**. Ein Fenster über Zeilenversatz
+(`start=<bekannt>`) wurde verworfen, weil `lina_id` innerhalb eines Ordners nicht
+verlässlich mit der Uploadzeit mitläuft — gemessen: Korrelation im Mittel 0,991,
+aber acht Ordner unter 0,9, kleinster Wert 0,779. Wird in der Mitte eines Ordners
+gelöscht und hinten angehängt, bliebe `recordsTotal` gleich, das Fenster
+verschöbe sich, und der neue Beleg fehlte **für immer, lautlos**. Die tägliche
+Zählung ist der Ersatz für das fehlende Delta.
+
+**Was sie kostet, und was sie findet:**
+
+| Lauf | Zählproben | daraus volle Abzüge |
+|--:|--:|--:|
+| 96 | 1.974 | 41 |
+| 97 | 1.974 | 34 |
+| 98 | 1.974 | 26 |
+| 99 | 1.974 | 20 |
+| 100 | 1.974 | 17 |
+| 101 | 1.974 | 21 |
+
+**Rund ein Prozent.** 1.953 Proben je Nacht à 12,2 s (7,2 s Arbeit, 5,0 s Pause)
+stellen fest, dass sich nichts geändert hat — 6 h 37 der Laufzeit.
+
+**Und der Sparmechanismus greift kaum:** eine Zählprobe kostet im Mittel
+7.159 ms, ein **voller Ordnerabzug** (`la:belegliste`, derselbe Pfad mit großem
+`length`) 8.272 ms. Die Probe spart also **13 % gegenüber dem, was sie vermeiden
+soll** — der Preis ist der HTTP-Umlauf gegen eine Weboberfläche, nicht die
+Nutzlast. Zum Vergleich: `la:belegliste` holte im selben Lauf **108.839 Zeilen in
+21 Aufrufen**.
+
+Daraus folgt: der Hebel ist nicht die Probe, sondern der **Takt**. Bei
+wöchentlicher Rotation statt täglich (282 statt 1.974 Proben je Nacht) fiele
+dieser Block von 6 h 40 auf rund 55 min; der Preis wäre, dass ein neuer Beleg bis
+zu sieben Tage später auffällt. Das ist eine fachliche Abwägung und keine
+technische — deshalb steht sie hier und ist nicht umgesetzt.
+
+### FoodNotify: 2.144 der 2.960 aufgefrischten Bestellungen sind nachweislich eingefroren
+
+`bestelldetailsAuffrischen()` holt jede Bestellung der letzten
+`BESTELLDETAIL_FENSTER_TAGE` (45) erneut, sofern ihr Status nicht `canceled` oder
+`finished` ist. Gemessen sind das **2.960 Bestellungen × 2 Endpunkte = 5.920
+Aufrufe je Nacht**.
+
+**Die Statusbedingung greift praktisch nie.** In Produktion:
+
+| Status | Bestellungen |
+|---|--:|
+| `imported` | 47.920 |
+| `pending` | 16.288 |
+| `canceled` | 3.350 |
+| `accepted` | 61 |
+| **`finished`** | **13** |
+
+13 von 67.632. Eine Bestellung verlässt das Fenster also faktisch nie über ihren
+Status, sondern nur, indem sie 45 Tage alt wird.
+
+**Was die Auffrischung tatsächlich einbringt** — `raw.api_antwort` hat
+`payload_hash`, die Frage ist also exakt beantwortbar:
+
+*Positionen* (`fn:bestellpositionen`, 400 Bestellungen, 4.026 Abrufe über 12 Tage):
+322 der 400 Antworten änderten sich auf Rohebene — **aber 0 von 400 änderten sich
+im Inhalt der Bestellung.** Der Unterschied steckt ausschließlich in Feldern, die
+FoodNotify mitliefert und die nichts mit der Bestellung zu tun haben:
+`concreteProduct.stock` (aktueller Lagerbestand), `timeModified` des
+Artikelstamms, `productStockDetails.arrivingOrders`. Position, Menge, Preis,
+Status: unverändert. **`payload_hash` ist bei diesem Endpunkt kein
+Änderungsmerkmal, sondern das Rauschen des Artikelstamms.**
+
+*Köpfe* (`fn:bestellung`, 3.182 Bestellungen, 31.942 Abrufe): 87,2 % änderten
+sich kein einziges Mal. Die 408, die sich änderten, taten es hier:
+
+| Alter der Bestellung bei der Änderung | Änderungen |
+|---|--:|
+| 0–3 Tage | 277 |
+| 4–7 Tage | 189 |
+| 8–14 Tage | 6 |
+| **älter als 14 Tage** | **0** |
+
+In zwölf Tagen Beobachtung keine einzige Änderung an einer Bestellung, die älter
+als 14 Tage war. Das Fenster steht auf 45.
+
+| | Bestellungen | Aufrufe je Nacht |
+|---|--:|--:|
+| 0–14 Tage — ändert sich noch | 816 | 1.632 |
+| **15–45 Tage — nachweislich eingefroren** | **2.144** | **4.288** |
+
+**72 % der FoodNotify-Aufrufe je Nacht holen Daten, die sich nachweislich nicht
+mehr ändern.** `BESTELLDETAIL_FENSTER_TAGE` von 45 auf 14 zu setzen wäre ein
+Einzeiler in der Konfiguration und spart rund 4.300 Aufrufe je Nacht.
+
+**Was dagegen spricht und geprüft gehört, bevor jemand es tut:** die zwölf Tage
+Beobachtung decken keine Monatsabrechnung ab. Wenn Rechnungen zum Monatsende
+gebündelt nachgetragen werden, träfe eine 14-Tage-Grenze genau den Fall, für den
+die Auffrischung gebaut wurde (Phase 2.6). Die Messung müsste also über einen
+Monatswechsel laufen — `raw.api_antwort` reicht derzeit bis 02.08.2026 zurück und
+enthält den Wechsel 31.07./01.08. nicht mehr vollständig.

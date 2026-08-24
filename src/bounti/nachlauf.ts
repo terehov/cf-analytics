@@ -17,8 +17,27 @@
  *      alles und wirft nie.
  *   2. Sie laeuft NACH dem Import.
  *   3. Sie laeuft HOECHSTENS EINMAL AM TAG (BOUNTI_ABSTAND_STUNDEN, 20).
- *      Der Sync-Lauf ist stuendlich; niemand schliesst zur vollen Stunde
- *      einen Kurs ab.
+ *
+ *      ~~Der Sync-Lauf ist stuendlich~~ — NACHGEMESSEN AM 24.08.2026 IST
+ *      ER TAEGLICH. In sync.lauf steht seit dem 15.08. genau EIN Lauf je
+ *      Tag, taeglich um 05:03 bis 05:08, und KEINE EINZIGE Zeile mit
+ *      status = 'uebersprungen' — die Migration 0081 legt sie an, sobald
+ *      ein Start die Laufsperre belegt findet. Bei einem stuendlichen
+ *      Zeitplan waeren das rund neun Zeilen je Tag, weil ein Lauf zehn
+ *      Stunden dauert. Es gibt keine.
+ *
+ *      DIE SPERRE BLEIBT TROTZDEM RICHTIG, nur mit anderer Begruendung:
+ *      sie schuetzt nicht mehr gegen 24 Laeufe am Tag, sondern gegen den
+ *      ZWEITEN Lauf eines Tages — am 14.08.2026 gab es zwei (00:14 und
+ *      09:26), und von Hand ausgeloeste Laeufe sind ausdruecklich
+ *      vorgesehen. Niemand schliesst binnen neun Stunden einen Kurs ab,
+ *      der die Zahlen bewegt.
+ *
+ *      WAS DER TAEGLICHE TAKT KOSTET, und das ist neu: bricht ein Lauf ab
+ *      (30 der bisher 101 Laeufe), bekommt Bounti an diesem Tag KEINE
+ *      zweite Gelegenheit. Bei einem stuendlichen Zeitplan haette es die.
+ *      Der Merker steht deshalb weiterhin am ENDE — ein halb geladener
+ *      Bestand darf nicht 20 Stunden lang wie ein vollstaendiger aussehen.
  *
  * WAS DIESER NACHLAUF NICHT AUFFRISCHT: keine einzige materialisierte
  * Sicht. Alle Bounti-Sichten aus Migration 0096 sind gewoehnliche Views und

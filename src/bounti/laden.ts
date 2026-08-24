@@ -528,9 +528,16 @@ export async function auditberichteLaden(): Promise<{ zeilen: number; ab: string
    * Das ist die unangenehmste Sorte Fehler dieser Anbindung: er tritt erst
    * auf, wenn schon Daten da sind, also nie beim Ausprobieren und immer im
    * Betrieb. Und er waere teuer geworden — der Nachlauf setzt seinen Merker
-   * erst am Ende, ein Abbruch hier haette ihn also nie gesetzt, und der
-   * stuendliche Sync-Lauf haette Bounti von da an JEDE Stunde erneut
-   * abgefragt statt einmal am Tag.
+   * erst am Ende, ein Abbruch hier haette ihn also nie gesetzt, und jeder
+   * folgende Sync-Lauf haette Bounti erneut abgefragt statt einmal am Tag.
+   *
+   * (Hier stand "der stuendliche Sync-Lauf … JEDE Stunde". Der Zeitplan
+   * ist taeglich, nachgemessen am 24.08.2026 — siehe bounti/nachlauf.ts.
+   * Der Schaden waere also kleiner gewesen als hier behauptet: ein
+   * zusaetzlicher Lauf je Tag, nicht 24. Die Trennung der Audits in ein
+   * eigenes `try` bleibt trotzdem richtig, denn der eigentliche Grund ist
+   * ein anderer — die Audits sind der kleinste Teil dieser Quelle und
+   * duerfen die Schulungsdaten nicht mitnehmen.)
    */
   const stand = await eine<{ ab: Date | null }>(
     `SELECT max(erstellt_am) - interval '7 days' AS ab FROM core.bounti_auditbericht`)
