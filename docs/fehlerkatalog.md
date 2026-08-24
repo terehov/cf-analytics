@@ -3658,3 +3658,37 @@ das die Sicht ergänzt statt sie neu zu schreiben.
 echte Schnittstelle gelaufen war und dabei 15.804 Zuweisungen korrekt geladen hat. **Ein
 gelungener Lauf beweist nicht, dass der nächste gelingt** — er beweist nur, dass die
 Bedingungen dieses einen Laufs günstig waren.
+
+---
+
+## „Rund 40 %" neben einer Kachel, die 5.832 zeigt (24.08.2026)
+
+**Symptom.** Die Kachel `bo_kachel_ohne_frist` zeigt für die operativen Betriebe **5.832**.
+Ihre Beschreibung sagte: *„Ist die Zahl groß — konzernweit sind es rund 40 % —…"*. Dieselbe
+Angabe stand in vier Dokumenten und im Kopfkommentar der Kartendatei.
+
+**Beide Zahlen stimmen.** 29.513 der 74.683 Zuweisungen tragen kein Fälligkeitsdatum, das
+sind 39,5 %. Nur zählt die Kachel etwas anderes: Im `CASE` von
+`mart.bounti_schulung_person` gewinnt `abgeschlossen` vor `ohne Frist` — und **21.505 der
+29.513 sind längst abgeschlossen**. Offen und ohne Frist bleiben 8.008, in operativen
+Betrieben 5.832 von 57.984, also **10,1 %**.
+
+**Warum das die gefährlichere Sorte Fehler ist.** Nichts stürzt ab, keine Prüfung schlägt
+an, und beide Zahlen halten einer Einzelprüfung stand. Der Fehler entsteht erst durch die
+Nachbarschaft: Wer die Kachel liest und den Satz daneben, rechnet 5.832 gegen 40 % und
+schließt auf einen Gesamtbestand von 14.500 Zuweisungen. Der ist frei erfunden.
+
+**Gefunden beim Gegenrechnen**, nicht beim Testen — `SELECT sum(ohne_frist) … WHERE
+in_bounti AND operativ` gegen `count(*) … WHERE faellig_am IS NULL`. Die 521 Kartentests
+prüfen, ob eine Abfrage läuft; ob ihre Beschreibung dasselbe meint wie ihr Ergebnis, prüft
+nichts.
+
+**Was ihn künftig verhindert.** Keine Prüfung — die gibt es hier nicht. Stattdessen eine
+Regel, die jetzt im Kopf von `karten-bounti.ts` steht: **eine Prozentangabe in einer
+Beschreibung muss denselben Nenner haben wie die Karte selbst, oder ihren Nenner
+ausdrücklich nennen.** Die Kachel heißt jetzt „Offen, ohne Frist" statt „Zuweisungen ohne
+Frist", und die Beschreibung nennt beide Zahlen mit ihrem jeweiligen Bezug.
+
+Dieselbe Falle wie bei den zwei Personalkosten-Größen auf einer Seite (`dashboards.md`):
+zwei richtige Zahlen nebeneinander, die niemand auseinanderhält, weil niemand dazuschreibt,
+dass es zwei sind.

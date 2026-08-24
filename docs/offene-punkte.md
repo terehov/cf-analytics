@@ -1453,6 +1453,19 @@ werden Pflichtschulungen in Bounti tatsächlich mit Frist zugewiesen? Ist der An
 Frist groß (Spalte `ohne_frist` in `mart.bounti_schulung_betrieb_monat`), ist die Kennzahl
 „überfällig" wertlos.
 
+> **Nachgemessen am 24.08.2026: 29.513 von 74.683 Zuweisungen (39,5 %) tragen überhaupt
+> kein Fälligkeitsdatum — davon sind aber 21.505 längst abgeschlossen.** Offen *und* ohne
+> Frist bleiben **8.008**, in operativen Betrieben 5.832 von 57.984 (10,1 %).
+>
+> Die Kennzahl „überfällig" ist damit **nicht** wertlos: es bleiben 45.170 Zuweisungen mit
+> Frist, davon 15.941 überfällig. Die Frage an den Fachbereich bleibt trotzdem stehen, nur
+> kleiner als befürchtet — bei jeder zehnten offenen Zuweisung ist „noch nicht gemacht"
+> von „zu spät" nicht zu unterscheiden.
+>
+> Seit Migration `0097` stehen beide Zahlen nebeneinander: `zustand` hat vier Werte statt
+> zwei, „ohne Frist" ist ein eigener davon, und auf jeder Seite steht eine eigene Kachel
+> dafür (`entscheidungen.md`, B9).
+
 **3. 26 Bounti-Standorte ohne Betrieb — und nur bei sechs fehlt wirklich eine Zuordnung.**
 Am 24.08.2026 gegen alle drei Systeme geprüft (LINA `core.betrieb`, FoodNotify
 `core.kostenstelle`, Yext über die API). **598 von 2.372 aktiven Mitarbeitenden — jede
@@ -1502,6 +1515,16 @@ BS Bier & Speisen, Gastronomie Wilsdruffer Straße, SCHAFFERONE, Schlager Cafe D
 WHK Gastronomie, Wirtshaus am Schlossplatz, Wirtshaus Im Jagdgrund. **Sechs davon haben auch
 keine Yext-Zuordnung** — es ist dieselbe Population wie der Yext-Befund vom 14.08.2026, und
 sie fällt damit in JEDER externen Auswertung heraus.
+
+> **Seit dem 24.08.2026 ist diese Recherche keine einmalige mehr.** Migration `0097` legt
+> `mart.bounti_standort_offen` an: dieselbe Liste, aber mit dem Gewicht dahinter — aktive
+> Personen, Zuweisungen, Auditberichte je Standort, nach Gewicht sortiert. Sie steht auf
+> „Schulung und Audits — Bounti" (Reiter *Abdeckung*) und auf „Datenqualität und Import",
+> zusammen mit `mart.bounti_abdeckung` und der Gegenrichtung
+> (`mart.bounti_betrieb_stand WHERE NOT in_bounti`).
+>
+> Wer die Liste abarbeitet, sieht die Zahl fallen. Vorher hätte man diesen Absatz neu
+> schreiben müssen, um dasselbe zu erfahren.
 
 **4. Die Fluktuationsrate kommt aus LINA — und der Weg dorthin ist ungemessen.**
 Korrigiert am 24.08.2026 auf Eugenes Rückfrage (Hergang in `entscheidungen.md`, B4). Die aus

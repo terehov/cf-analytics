@@ -23,12 +23,14 @@ metabase/
   karten-portfolio.ts   Ebenen ⑥ und ⑦
   karten-round-table.ts Die Excel-Ablösung
   karten-fach.ts        Umsatz, Struktur, Personal, Ware, BWA, Datenqualität
+  karten-bounti.ts      Schulung und Audits (Bounti)
   dashboards.ts         Welche Karte auf welchem Dashboard, in welcher Reihe
   uebernehmen.ts        Trägt alles nach Metabase ein
   sichtbarkeit.ts       Setzt, welche Tabellen Metabase zeigt (siehe metabase-sichtbarkeit.md)
 ```
 
-Stand 26.07.2026: **98 Karten, 17 Dashboards, drei Sammlungen.**
+~~Stand 26.07.2026: **98 Karten, 17 Dashboards, drei Sammlungen.**~~
+Stand 24.08.2026: **285 Karten, 34 Dashboards, vier Sammlungen.**
 
 ### Übernehmen
 
@@ -112,6 +114,11 @@ zeigt die Waren und Betriebe hinter einer der vier Sperren des Preisvergleichs).
 | `Trend_2Monate`, `Ampelhistorie` | Round Table — Trend und Ampelhistorie |
 | `Ursachenanalyse`, `Massnahmen` | Round Table — Ursachen und Maßnahmen |
 | `Regeln` (die offene Schwellenfrage) | Round Table — Regelwerk-Vergleich |
+
+Der Reiter „Lage" trägt seit dem 24.08.2026 unter der Betriebstabelle einen
+Block **Schulung und Audits** — vier Kacheln und die Betriebsrangliste aus
+Bounti. Er hat im Excel kein Pendant und geht in **keine Ampel** ein; warum das
+so bleibt, steht weiter unten unter „Bounti".
 
 ### Betrieb — die Fachberichte
 
@@ -1221,3 +1228,117 @@ Fremdeinkaufsseite unsichtbar.
 Sie rechnet bewusst **dieselbe** Formel wie `pa_abseits_quote` auf der Zielseite:
 eine Kachel, die beim Klick auf eine andere Zahl führt als sie selbst zeigt, ist
 schlimmer als keine Kachel.
+
+---
+
+## Bounti: Schulung und Audits (24.08.2026)
+
+Die fünfte Quelle bekommt ihre Auswertung. Die Daten stehen seit Migration 0096,
+die **Auswertungsschicht** seit 0097: neun Sichten in `mart`, die keine Tabelle
+anlegen und nichts nachholen — sie verdichten den Bestand.
+
+### Wo es steht
+
+| Ort | Was |
+|---|---|
+| **① Round Table**, Reiter „Lage", unter der Betriebstabelle | vier Kacheln und die Betriebsrangliste — Klick auf den Namen führt zu ③ Betrieb, Klick auf „Überfällig" zur Schulungsseite mit gesetztem Betrieb |
+| **③ Betrieb**, Reiter „Schulung & Audit" | dieselben Zahlen für einen Betrieb, dazu Verlauf, Personenliste, Lerneinheiten, Rollen, Auditberichte |
+| **Schulung und Audits — Bounti** (neues Dashboard, Sammlung „Betrieb") | vier Reiter: Stand, Wer muss nachholen, Audits, Abdeckung |
+| **Datenqualität und Import** | Abdeckung, Standorte ohne Betrieb, Zuweisungsabgleich, Gegenprobe |
+
+Der Weg von oben nach unten ist damit durchgehend:
+**① Round Table → Betrieb → Person → einzelne Zuweisung.**
+
+### Die fünf Regeln, die jede Karte befolgt
+
+**1. Stand heute, kein Stichmonat.** Keine dieser Karten liest `{{monat}}`.
+„Überfällig" ist eine Aussage über **heute**; in den Monat der Zuweisung
+zurückgerechnet stünde eine täglich steigende Zahl unter einem abgeschlossenen
+Monat — und zwar dauerhaft falsch, weil sie sich nach Monatsende weiter ändert.
+Jede dieser Ausnahmen steht begründet in `FILTER_AUSNAHME`, und **jede Seite sagt
+es in ihrer Überschrift**. Eine stumme Ausnahme wäre hier schlimmer als der
+fehlende Filter: die Kacheln stehen neben monatsgefilterten.
+
+Die einzige Karte mit Zeitachse ist `bo_verlauf`, und sie trägt ihre 24 Monate
+selbst. Ihr Monat ist der der **Zuweisung**, nicht der des Abschlusses — sonst
+verschwände die nie erledigte Pflichtschulung aus der Statistik, also genau der
+Fall, um den es geht.
+
+**2. Nur operative Betriebe.** 13 der 62 zugeordneten Betriebe sind geschlossen,
+verwaltend oder ohne Umsatz; an ihnen hängen **6.330 Zuweisungen**. Sie in den
+Rückstand zu zählen ist derselbe Fehler, den Migration 0039 für die Ampeln
+behoben hat.
+
+**3. Keine Quote ohne die Datenbasis daneben.** Gemessen am 24.08.2026: Aposto
+Schweinfurt, **eine** aktive Person, 30 Zuweisungen, davon 17 überfällig — nach
+der Rangliste der schlechteste Betrieb des Konzerns. Die Spalte `datenbasis`
+sagt „dünn", und ohne sie wäre die Rangliste eine Liste kleiner Betriebe.
+
+**4. „Offen ohne Frist" ist kein Rückstand.** Es kann **nie** überfällig werden.
+Wer es unter „offen" mitzählt, hält einen Betrieb für säumig, der nichts
+versäumt hat. Deshalb hat `zustand` vier Werte statt zwei, und deshalb gibt es
+eine eigene Kachel dafür.
+
+**Zwei Zahlen, die man nicht verwechseln darf** — der erste Wurf dieser Karten
+hat es getan: 29.513 der 74.683 Zuweisungen tragen überhaupt kein
+Fälligkeitsdatum (39,5 %), davon sind aber **21.505 längst abgeschlossen**.
+Offen und ohne Frist bleiben 8.008; in operativen Betrieben 5.832 von 57.984,
+also 10 %. Die Kachelbeschreibung sagte zuerst „rund 40 %" neben einer Kachel,
+die 5.832 zeigt.
+
+**5. Die Abdeckung gehört auf jede Seite, die Bounti-Zahlen zeigt.**
+
+### Die Zahl, die alles einordnet
+
+26 der 88 Standorte haben keinen Betrieb. Daran hängen **592 der 2.346 aktiven
+Personen — jede vierte — und alle 133 Auditberichte.** Jede Betriebszahl dieser
+Seiten lässt sie aus.
+
+Deshalb steht `bo_kachel_ausserhalb` auf ① direkt neben den drei Kacheln, aus
+denen diese Menschen herausfallen, und `bo_abdeckung` sowohl auf der
+Schulungsseite als auch auf „Datenqualität und Import". Eine Kennzahl, die nur
+dort steht, wo man sie ohnehin vermutet, erreicht niemanden (Regel 10).
+
+`bo_kachel_ausserhalb` ist die einzige Karte mit **vier** Filterausnahmen, und
+alle vier haben denselben Grund: ihr Gegenstand sind die Standorte, die weder
+Betrieb noch Marke haben. Ein Filter darauf setzte die Kachel auf null — also
+genau die Zahl, die sie zeigen soll.
+
+### Die leere Audittabelle bleibt stehen
+
+`bo_audit_betrieb` ist am 24.08.2026 **leer**, und das ist kein Fehler: alle 133
+Berichte hängen an drei Standorten ohne Betrieb (Wirtshaus am Münzplatz 110,
+Wirtshaus im Park Mönchengladbach 22, Würzburger Augustiner 1).
+
+Die Karte wurde trotzdem gebaut. Eine weggelassene Karte sieht aus wie eine
+Frage, die niemand gestellt hat; eine leere mit erklärender Beschreibung ist
+eine Frage mit Adresse. Daneben steht `bo_audit_liste`, die alle Berichte führt —
+**auch die ohne Betrieb** — mit der Spalte „— kein Betrieb zugeordnet".
+
+Viele dieser Audits sind Tagesprotokolle mit 0 oder 100 %. Dort ist der Wert ein
+**Haken und keine Note**; das steht in den Beschreibungen, damit niemand einen
+Durchschnitt daraus bildet und ihn für eine Qualitätskennzahl hält.
+
+### Was bewusst nicht gebaut wurde
+
+**Keine siebte Ampel.** Weder die Erfüllungsquote noch die Auditnote wird ein
+Round-Table-Signal, und die Auditnote ersetzt die seit Juli 2026 leere
+Vor-Ort-Note **nicht**. Beides entscheidet der Fachbereich
+(`offene-punkte.md`), nicht eine Kartendefinition. Eine Ampel, deren Bedeutung
+sich still ändert, ist schlimmer als eine graue. Genau deshalb steht der
+Bounti-Block auf ① **unter** der Betriebstabelle und mit eigener Überschrift und
+nicht zwischen den Ampelkacheln.
+
+**Keine Fluktuation.** Eintritt und Austritt stehen in LINA, nicht in Bounti;
+das Archivierungskennzeichen ist kein Austrittsdatum. Gemessen: von den
+überfälligen Zuweisungen in operativen Betrieben hängt **genau eine** an einem
+archivierten Konto — Bounti schließt Zuweisungen beim Archivieren offenbar mit.
+Die Arbeitslisten filtern archivierte Konten trotzdem heraus: ein stillgelegtes
+Konto holt nichts nach.
+
+### Kein Monatsfilter auf der Schulungsseite
+
+`db_schulung` hat als einziges Fach-Dashboard **keinen** Monatsfilter. Er hätte
+auf 18 von 20 Karten keine Wirkung, und ein Filter, der fast nichts bewegt, ist
+schlimmer als keiner: man hält die Seite für gefiltert. Dasselbe Argument, das
+bei den Pflichtartikeln gegen den Lieferantenfilter entschieden hat.

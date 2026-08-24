@@ -617,3 +617,31 @@ Listeneinträge. Über die Positionen gerechnet lief er in einen Zeitausfall
 **Die Reihenfolge beim Auffrischen ist bindend**: die beiden unteren lesen die
 obere. Steht in `src/sync/pflichtartikel_sichten.ts`, registriert in
 `mart.materialisierung_stand` unter dem Merker `pflichtartikel_refresh`.
+
+
+## Bounti: Schulung und Audits (Migrationen `0096`, `0097`)
+
+Elf Tabellen in `core`, achtzehn Sichten in `mart`. Der Aufbau und jede
+gemessene Zahl stehen in [`bounti-api-inventar.md`](bounti-api-inventar.md) —
+§ 9 beschreibt die Auswertungsschicht, die Dashboards darauf stehen in
+[`dashboards.md`](dashboards.md).
+
+Drei Eigenheiten, die hier festgehalten gehören, weil sie beim Lesen der Sichten
+sonst als Fehler erscheinen:
+
+**Eine Person kann an mehreren Standorten stehen.** Jede über Personen
+aggregierte Betriebszahl zählt sie mehrfach; die Summe über alle Betriebe ist
+deshalb größer als die Kopfzahl des Unternehmens.
+`mart.bounti_mehrfachzuordnung` ist keine Fehlerliste, sondern die Erklärung
+dafür.
+
+**Die Zuordnung Person → Standort ist die von heute.** Bounti führt dazu keine
+Historie. Wer den Betrieb gewechselt hat, bringt seine alten Zuweisungen mit —
+weit zurückliegende Monate in `mart.bounti_schulung_verlauf` sind deshalb eine
+Annäherung und keine Messung.
+
+**`assessmentScore` ist ein Bruch, `achievedPercentage` nicht.** Bountis eigene
+Doku sagt „0.8 is 80%" für das eine und liefert das andere bereits als
+Prozentzahl. Beide landen nach Regel 6 als Prozentzahl in der Datenbank; die
+Umrechnung passiert in `src/bounti/laden.ts` und warnt, wenn sich die Skala
+ändert.

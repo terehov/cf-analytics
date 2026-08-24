@@ -35,6 +35,7 @@ import { karten as kartenVergleich } from './karten-vergleich'
 import { karten as kartenKalender } from './karten-kalender'
 import { karten as kartenFremdeinkauf } from './karten-fremdeinkauf'
 import { karten as kartenPflichtartikel } from './karten-pflichtartikel'
+import { karten as kartenBounti } from './karten-bounti'
 import { dashboards } from './dashboards'
 import { auslegen, MINDESTHOEHE } from './layout'
 import type { Karte, Kachel, Dashboard, Reihe } from './typen'
@@ -49,7 +50,7 @@ const METABASE = config.METABASE_URL
 const alleKarten: Karte[] = [
   ...kartenDrilldown, ...kartenPortfolio, ...kartenRoundTable, ...kartenFach, ...kartenImport, ...kartenStandort,
   ...kartenBewertung, ...kartenAktionen, ...kartenYext, ...kartenVergleich, ...kartenFremdeinkauf, ...kartenPflichtartikel,
-  ...kartenKalender,
+  ...kartenKalender, ...kartenBounti,
 ]
 
 // Reihen in Kacheln umrechnen — EINMAL, damit Pruefung und Ausgabe
@@ -164,6 +165,79 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
   bwa_kennzahlen:         { monat: 'BWA-Verlauf ueber alle gebuchten Monate.' },
   bwa_wasserfall:         { zeitraum: 'EIN Monat, EIN Wasserfall — dafuer ist der Monatsfilter da. '
                                     + 'Ueber einen Zeitraum waeren die Bloecke Summen ohne Aussage.' },
+
+  // --- Bounti: Schulung und Audits ----------------------------------
+  //
+  // ALLE Karten dieser Gruppe zeigen den STAND VON HEUTE. Das ist keine
+  // Bequemlichkeit, sondern die einzige richtige Zeitlogik fuer den
+  // Gegenstand: "ueberfaellig" ist eine Aussage ueber heute. Rechnet man
+  // sie in den Monat der Zuweisung zurueck, steht eine taeglich
+  // steigende Zahl unter einem abgeschlossenen Monat -- und zwar
+  // dauerhaft falsch, weil sie sich nach dem Monatsende weiter aendert.
+  //
+  // Die einzige Karte mit Zeitachse ist bo_verlauf, und die traegt ihre
+  // 24 Monate selbst: ein Stichmonat liesse dort einen Punkt uebrig.
+  //
+  // Die Ueberschriften auf ①, ③ und der Schulungsseite sagen das jeweils
+  // ausdruecklich -- eine stumme Ausnahme waere hier schlimmer als der
+  // fehlende Filter, weil die Kacheln neben monatsgefilterten stehen.
+  bo_kachel_ueberfaellig: { monat: 'Stand HEUTE. "Ueberfaellig" ist eine Aussage ueber heute — in den Monat der Zuweisung zurueckgerechnet stuende eine taeglich steigende Zahl unter einem abgeschlossenen Monat.',
+                            zeitraum: 'Stand heute; ein Zeitraum in der Vergangenheit sagt nichts ueber offene Fristen.' },
+  bo_kachel_betroffene:   { monat: 'Stand heute — wie die Kachel daneben.',
+                            zeitraum: 'Stand heute; ein Zeitraum in der Vergangenheit sagt nichts ueber offene Fristen.' },
+  bo_kachel_erfuellung:   { monat: 'Erfuellung des GESAMTBESTANDS an Zuweisungen, nicht eines Monats.',
+                            zeitraum: 'Stand heute; ein Zeitraum in der Vergangenheit sagt nichts ueber offene Fristen.' },
+  bo_kachel_ohne_frist:   { monat: 'Bestandszahl: Zuweisungen ganz ohne Faelligkeitsdatum.',
+                            zeitraum: 'ebenso.' },
+  bo_kachel_koepfe:       { monat: 'Kopfzahl der aktiven Bounti-Konten, Stand heute.',
+                            zeitraum: 'ebenso.' },
+  bo_kachel_ergebnis:     { monat: 'Schnitt ueber alle Abschlusstests des Bestands.',
+                            zeitraum: 'ebenso.' },
+  bo_kachel_audit:        { monat: 'Zaehlt, wie viele Berichte ueberhaupt einen Betrieb haben — '
+                                 + 'eine Frage der Zuordnung, nicht des Monats.',
+                            zeitraum: 'ebenso.' },
+  // Die einzige Karte mit VIER Ausnahmen, und alle vier haben denselben
+  // Grund: ihr Gegenstand sind die Standorte, die WEDER Betrieb NOCH
+  // Marke haben. Ein Filter darauf haette nichts, worauf er greifen
+  // koennte -- und wuerde die Kachel auf null setzen, also genau die
+  // Zahl verstecken, die sie zeigen soll.
+  bo_kachel_ausserhalb:   { monat: 'Zuordnungsluecke, kein Monatswert.',
+                            zeitraum: 'ebenso.',
+                            marke: 'Der Gegenstand sind Standorte OHNE Betrieb — sie haben keine Marke.',
+                            betrieb: 'ebenso: sie haben keinen Betrieb. Ein Filter setzte die Kachel auf null.' },
+  bo_betriebe:            { monat: 'Stand HEUTE. "Ueberfaellig" ist eine Aussage ueber heute — in den Monat der Zuweisung zurueckgerechnet stuende eine taeglich steigende Zahl unter einem abgeschlossenen Monat.',
+                            zeitraum: 'Stand heute; ein Zeitraum in der Vergangenheit sagt nichts ueber offene Fristen.' },
+  bo_marken:              { monat: 'Erfuellung des Gesamtbestands je Marke, Stand heute.',
+                            zeitraum: 'ebenso.' },
+  bo_verlauf:             { monat: 'Verlauf ueber 24 Monate — ein Stichmonat liesse einen Punkt uebrig.',
+                            zeitraum: 'Die Karte traegt ihr Fenster selbst; der Monat ist der der ZUWEISUNG.' },
+  bo_personen:            { monat: 'Arbeitsliste, Stand heute — wer JETZT etwas offen hat.',
+                            zeitraum: 'ebenso.' },
+  bo_lerneinheiten:       { monat: 'Bestand je Lerneinheit ueber die gesamte Historie.',
+                            zeitraum: 'ebenso.' },
+  bo_rollen:              { monat: 'Kopfzahl je Rolle, Stand heute.',
+                            zeitraum: 'ebenso.' },
+  bo_audit_betrieb:       { monat: 'Auditbestand ueber die gesamte geladene Historie — bei derzeit '
+                                 + '133 Berichten waere ein Stichmonat eine leere Tabelle.',
+                            zeitraum: 'ebenso.' },
+  bo_audit_liste:         { monat: 'Berichtsliste, neueste zuerst — eingegrenzt wird ueber die Spalten.',
+                            zeitraum: 'ebenso.' },
+  // Die drei Abdeckungs- und Technikkarten: ihr Gegenstand ist per
+  // Definition das, was KEINEN Betrieb hat, beziehungsweise der Zustand
+  // der Anbindung. Beides kennt weder Marke noch Betrieb.
+  bo_abdeckung:           { marke: 'Zaehlt gegen den GESAMTBESTAND aus Bounti — eine Markeneinschraenkung '
+                                 + 'waere genau die Verengung, die die Tabelle sichtbar machen soll.',
+                            betrieb: 'ebenso.' },
+  bo_standorte_offen:     { marke: 'Der Gegenstand sind Standorte OHNE Betrieb — sie haben keine Marke.',
+                            betrieb: 'ebenso: sie haben keinen Betrieb.' },
+  bo_mehrfach:            { marke: 'Personen an mehreren Standorten — die Zeile gehoert zu KEINEM '
+                                 + 'einzelnen Betrieb, das ist ihr Inhalt.',
+                            betrieb: 'ebenso.' },
+  bo_zuweisungsstand:     { marke: 'Zustand des Abgleichs je Lerneinheit — eine Lerneinheit gehoert '
+                                 + 'keinem Betrieb und keiner Marke.',
+                            betrieb: 'ebenso.' },
+  bo_gegenprobe:          { marke: 'Die Gegenprobe rechnet je STANDORT; mart.bounti_fortschritt_gegenprobe '
+                                 + 'fuehrt keine Marke. Den Betrieb liest sie.' },
 
   // --- Aktionen: feste Fenster statt Stichmonat -----------------------------
   ak_uebersicht:          { monat: 'Festes 12-Monats-Fenster einschliesslich des laufenden Monats — '

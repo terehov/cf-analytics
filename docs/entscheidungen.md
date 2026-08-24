@@ -2561,3 +2561,92 @@ Spülküche …), die Auswertung je Bereich ist damit möglich.
 Zwei Annahmen sind gefallen: `customFields` ist **leer** — es gibt keinen gemeinsamen
 Schlüssel mit LINA — und der Katalog ist mit 470 Lerneinheiten so groß, dass die Rotation von
 40 auf 120 je Nacht angehoben werden musste.
+
+---
+
+## 24.08.2026 — Bounti: vier Festlegungen beim Auswerten
+
+Migration `0097` und `metabase/karten-bounti.ts`. Die Anbindung stand, die Frage war,
+**wie** die Zahlen gezeigt werden. Vier Entscheidungen, die sich später teuer korrigieren
+ließen.
+
+### B6 — Stand heute statt Stichmonat, und der Monatsfilter wird ausgelassen
+
+Alle anderen Fach-Dashboards hängen am Monatsfilter des Round Table. Die Bounti-Karten
+tun es nicht: sie zeigen den **Stand von heute** und lesen `{{monat}}` überhaupt nicht.
+
+„Überfällig" ist eine Aussage über heute. Rechnet man sie in den Monat der Zuweisung
+zurück, steht eine täglich steigende Zahl unter einem abgeschlossenen Monat — und sie
+ändert sich nach dessen Ende weiter. Das ist keine Ungenauigkeit, sondern eine Zahl, die
+etwas anderes behauptet als sie misst.
+
+**Der Preis dieser Entscheidung ist Erklärungsarbeit.** Auf ① stehen die Kacheln neben
+monatsgefilterten und sehen genauso aus. Deshalb: 22 Einträge in `FILTER_AUSNAHME` mit
+einzelner Begründung, und — wichtiger — **jede Seite sagt es in ihrer Überschrift**. Eine
+stumme Ausnahme wäre hier schlimmer als der fehlende Filter.
+
+Die einzige Karte mit Zeitachse trägt ihr Fenster selbst und zeigt den Monat der
+**Zuweisung**, nicht den des Abschlusses — sonst verschwände die nie erledigte
+Pflichtschulung aus der Statistik, also genau der Fall, um den es geht.
+
+### B7 — Die Leitsicht geht von `core.betrieb` aus, nicht von Bounti
+
+`mart.bounti_betrieb_stand` führt **alle 141 Betriebe**, auch die 79 ohne Bounti-Standort,
+mit leeren Zahlen und der Spalte `in_bounti`.
+
+Andersherum gebaut wäre die Sicht kürzer und falscher: eine Liste von 62 Betrieben sieht
+aus wie der Konzern. Der Unterschied zwischen „dort ist nichts offen" und „wir wissen
+nichts über diesen Betrieb" betrifft mehr als die Hälfte der Zeilen — und acht davon sind
+operative Betriebe mit Umsatz.
+
+Dasselbe Muster wie `mart.bounti_ohne_betrieb` in `0096`, nur in der Auswertung statt in
+der Überwachung: Regel 10 verlangt, dass eine Quelle ohne Zufluss **in der Datenbank**
+sichtbar ist, nicht nur in einem Log.
+
+### B8 — Die leere Audittabelle wird gebaut und bleibt stehen
+
+`bo_audit_betrieb` liefert am Tag ihrer Entstehung **null Zeilen**: alle 133 Auditberichte
+hängen an drei Standorten ohne Betriebszuordnung.
+
+Sie wegzulassen wäre naheliegend gewesen. Eine weggelassene Karte sieht aber aus wie eine
+Frage, die niemand gestellt hat; eine leere mit erklärender Beschreibung ist eine Frage
+mit Adresse. Daneben steht `bo_audit_liste`, die **alle** Berichte führt, auch die ohne
+Betrieb, mit „— kein Betrieb zugeordnet" in der Betriebsspalte.
+
+Dieselbe Überlegung wie bei `rt_kachel_ohne_urteil`: ein Betrieb ohne BWA sah im Excel aus
+wie ein Betrieb ohne Befund.
+
+### B9 — „Ohne Frist" ist ein eigener Zustand, kein Sonderfall von „offen"
+
+`zustand` in `mart.bounti_schulung_person` hat vier Werte: `abgeschlossen`, `ueberfaellig`,
+`offen`, `ohne Frist`.
+
+**Die Reihenfolge der `CASE`-Zweige ist Teil der Entscheidung: abgeschlossen gewinnt vor
+ohne-Frist.** Eine erledigte Zuweisung ohne Frist zählt als erledigt und nicht als
+Sonderfall. `ohne Frist` heißt deshalb **offen und ohne Frist**.
+
+Das sind zwei verschiedene Zahlen, und der erste Wurf dieser Karten hat sie verwechselt:
+**29.513 der 74.683 Zuweisungen tragen überhaupt kein Fälligkeitsdatum (39,5 %) — davon
+sind aber 21.505 längst abgeschlossen.** Offen und ohne Frist bleiben 8.008, in operativen
+Betrieben 5.832 von 57.984 (10,1 %). Die Kachelbeschreibung sagte zuerst „rund 40 %" neben
+einer Kachel, die 5.832 zeigt. Beide Zahlen stimmen für sich, zusammen sind sie falsch.
+
+Offen und ohne Frist kann nie überfällig werden. Wer es unter „offen" mitzählt, hält einen
+Betrieb für säumig, der nichts versäumt hat. Und je größer die Zahl, desto weniger misst
+die Erfüllungsquote: ohne Frist ist „noch nicht gemacht" von „zu spät" nicht zu
+unterscheiden. Deshalb hat der Zustand eine eigene Kachel und steht in jeder
+Betriebstabelle als eigene Spalte.
+
+### Was daran nicht entschieden ist
+
+Ob die **Auditnote** die Vor-Ort-Note im Round Table ersetzt — siehe B5, unverändert offen.
+
+Ob die **Erfüllungsquote** ein siebtes Ampelsignal wird. Sie steht auf ① unter der
+Betriebstabelle und mit eigener Überschrift, ausdrücklich außerhalb der Ampel. Der Platz
+ist bewusst gewählt: zwischen den Ampelkacheln hätte sie die Bedeutung der Ampel still
+verschoben.
+
+Was mit den **26 Standorten ohne Betrieb** geschieht. Bei sechzehn ist die Antwort
+„nichts" (Fremdmandant, unbekannte Häuser), bei sechs steht dieselbe Entscheidung aus wie
+bei Yext. Die Liste steht jetzt als `mart.bounti_standort_offen` mit Gewicht statt als
+einmalige Recherche in einem Dokument — siehe `offene-punkte.md`.

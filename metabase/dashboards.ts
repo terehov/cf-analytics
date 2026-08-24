@@ -524,6 +524,36 @@ export const dashboards: Dashboard[] = [
       { teile: [{ karte: 'pa_kachel_betrieb', breite: 8,
         klick: [{ ziel: 'db_pflichtartikel', uebergabe: {}, fest: true }] }] },
       ] },
+      // EIGENER REITER seit dem 24.08.2026. Die Bounti-Zahlen gehoeren
+      // nicht unter "Personal · Ware · BWA": dort stehen Kosten und
+      // Quoten aus BWA und Kasse, hier steht, was die Menschen dieses
+      // Betriebs gelernt haben — andere Quelle, andere Frage, andere
+      // Zeitlogik (Stand heute statt Stichmonat).
+      //
+      // Weder Monat noch Zeitraum wirken auf diesem Reiter; die
+      // Begruendung steht je Karte in FILTER_AUSNAHME und im Text oben.
+      { name: 'Schulung & Audit', reihen: [
+      { teile: [{ text: '## Schulung und Audits\n\nAus **Bounti**. **Stand heute** — Monat und Zeitraum oben wirken auf diesem Reiter nicht: „überfällig" ist eine Aussage über heute. Die einzige Zeitachse ist der Verlauf, und der zeigt den Monat der **Zuweisung**, nicht den des Abschlusses.\n\nHat dieser Betrieb keinen Bounti-Standort, bleibt alles hier leer — das heißt **„nicht angebunden"** und nicht „nichts offen". Wer das prüfen will: „Datenqualität und Import", Abschnitt Bounti.' }] },
+      { teile: [
+        { karte: 'bo_kachel_ueberfaellig',
+          klick: [{ ziel: 'db_schulung', uebergabe: {}, fest: true }] },
+        { karte: 'bo_kachel_betroffene',
+          klick: [{ ziel: 'db_schulung', uebergabe: {}, fest: true }] },
+        { karte: 'bo_kachel_erfuellung',
+          klick: [{ ziel: 'db_schulung', uebergabe: {}, fest: true }] },
+        { karte: 'bo_kachel_ohne_frist',
+          klick: [{ ziel: 'db_schulung', uebergabe: {}, fest: true }] },
+      ] },
+      { teile: [{ karte: 'bo_verlauf' }] },
+      // Die Arbeitsliste dieses Betriebs — die tiefste Ebene, die es
+      // gibt: nicht mehr "der Betrieb haengt hinterher", sondern wer.
+      { teile: [{ karte: 'bo_personen', hoehe: 12 }] },
+      { teile: [{ karte: 'bo_lerneinheiten', hoehe: 11 }] },
+      { teile: [
+        { karte: 'bo_rollen', breite: 10, hoehe: 9 },
+        { karte: 'bo_audit_liste', breite: 14, hoehe: 9 },
+      ] },
+      ] },
       { name: 'Maßnahmen & Datenstand', reihen: [
       { teile: [{ text: '## Maßnahmen und Datenstand' }] },
       { teile: [{ karte: 'dd_betrieb_massnahmen' }] },
@@ -842,6 +872,48 @@ export const dashboards: Dashboard[] = [
       { teile: [{ text: '## Die Betriebe\n\nSortiert nach Handlungsdruck: rot vor orange vor grün, innerhalb dessen nach Dringlichkeit.' }] },
       { teile: [{ karte: 'rt_tabelle', hoehe: 14,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+
+      // ---------------------------------------------------------------
+      // SCHULUNG UND AUDITS (Bounti) — seit dem 24.08.2026.
+      //
+      // Bewusst UNTER der Betriebstabelle und mit eigener Ueberschrift:
+      // diese Zahlen gehen in KEINES der sechs Ampelsignale ein. Sie
+      // zwischen die Ampelkacheln zu setzen hiesse, die Bedeutung der
+      // Ampel still zu verschieben — und eine Ampel, deren Bedeutung sich
+      // still aendert, ist schlimmer als eine graue.
+      //
+      // Der Monatsfilter oben wirkt hier nicht, und das ist der Grund
+      // fuer die Ausnahmen in FILTER_AUSNAHME: "ueberfaellig" ist eine
+      // Aussage ueber HEUTE. Zurueckgerechnet in den Monat der Zuweisung
+      // stuende eine taeglich steigende Zahl unter einem abgeschlossenen
+      // Monat. Die Ueberschrift sagt es, damit niemand die Kacheln fuer
+      // den gewaehlten Monat haelt.
+      //
+      // Die vierte Kachel ist die wichtigste: 592 der 2346 aktiven
+      // Personen haengen an Standorten ohne Betrieb und fallen aus den
+      // drei Kacheln links davon heraus.
+      // ---------------------------------------------------------------
+      { teile: [{ text: '## Schulung und Audits — Stand heute\n\nAus **Bounti**, dem Schulungssystem. **Diese Zahlen gehen in keine Ampel ein** und der Monatsfilter oben wirkt auf sie nicht: „überfällig" ist eine Aussage über heute, nicht über den gewählten Monat.\n\nDie Kachel ganz rechts ist die wichtigste — so viele Menschen hängen an Bounti-Standorten, die **keinem Betrieb zugeordnet** sind. Sie fehlen in allen drei Kacheln links davon und in der Tabelle darunter.' }] },
+      { teile: [
+        { karte: 'bo_kachel_ueberfaellig',
+          klick: [{ ziel: 'db_schulung', uebergabe: {}, fest: true }] },
+        { karte: 'bo_kachel_betroffene',
+          klick: [{ ziel: 'db_schulung', uebergabe: {}, fest: true }] },
+        { karte: 'bo_kachel_erfuellung',
+          klick: [{ ziel: 'db_schulung', uebergabe: {}, fest: true }] },
+        { karte: 'bo_kachel_ausserhalb',
+          klick: [{ ziel: 'db_schulung', uebergabe: {}, fest: true }] },
+      ] },
+      // Der Drill-Down bis zum Betrieb: der Name fuehrt auf ③ Betrieb,
+      // wo der Reiter "Schulung & Audit" dieselben Zahlen fuer diesen
+      // einen Betrieb aufmacht. Die Spalte "Überfällig" fuehrt dagegen
+      // auf die Schulungsseite mit gesetztem Betriebsfilter — dort steht,
+      // WER nachholen muss, und das ist die naechste Frage nach "wie viel".
+      { teile: [{ karte: 'bo_betriebe', hoehe: 12,
+        klick: [
+          { ziel: 'dd_betrieb',   spalte: 'Betrieb',    uebergabe: { betrieb: 'Betrieb' } },
+          { ziel: 'db_schulung',  spalte: 'Überfällig', uebergabe: { betrieb: 'Betrieb' } },
+        ] }] },
       ] },
       // ---------------------------------------------------------------
       // Die Markenebene. Sie stand bis zum 27.07.2026 auf einer eigenen
@@ -1117,6 +1189,91 @@ export const dashboards: Dashboard[] = [
         klick: [{ ziel: 'db_personal', uebergabe: { monat: 'Monat' } }] }] },
       { teile: [{ karte: 'pe_bereich', hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ karte: 'pe_effektivitaet', hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+    ],
+  },
+
+  // ===================================================================
+  // SCHULUNG UND AUDITS — die Bounti-Seite.
+  //
+  // Eigenes Dashboard und nicht ein Reiter auf "Personal": die Quelle ist
+  // eine andere (Bounti statt BWA und Kasse), die Zeitlogik ist eine
+  // andere (Stand heute statt Stichmonat) und die Frage ist eine andere
+  // (was koennen die Leute, nicht was kosten sie).
+  //
+  // KEIN MONATSFILTER, und das ist die wichtigste Festlegung dieser
+  // Seite. Ein Monatsfilter im Kopf haette auf 18 von 20 Karten keine
+  // Wirkung — jede von ihnen zeigt den Stand von heute. Ein Filter, der
+  // fast nichts bewegt, ist schlimmer als keiner: man haelt die Seite
+  // fuer gefiltert. Die eine Karte mit Zeitachse (bo_verlauf) traegt ihre
+  // 24 Monate selbst.
+  // ===================================================================
+  {
+    schluessel: 'db_schulung',
+    name: 'Schulung und Audits — Bounti',
+    beschreibung:
+      'Wer hat welche Pflichtschulung offen, welche Schulung liegt konzernweit brach, und was ist auditiert worden. Aus Bounti. Stand heute — diese Seite kennt bewusst keinen Monatsfilter.',
+    sammlung: 'Betrieb',
+    filter: [F_MARKE, F_BETRIEB],
+    tabs: [
+      { name: 'Stand', reihen: [
+      { teile: [{ text: '# Schulung und Audits\n\nAus **Bounti**, dem Schulungssystem der Concept Family. **Alles auf dieser Seite ist der Stand von heute** — es gibt keinen Monatsfilter, weil „überfällig" eine Aussage über heute ist.\n\n**Drei Zahlen, die man zusammen lesen muss:** die überfälligen Zuweisungen (wie viel), die Personen dahinter (wie viele Menschen), und wie viele Konten überhaupt bei einem Betrieb ankommen (der Reiter „Abdeckung"). Die dritte entscheidet, wie ernst die ersten beiden zu nehmen sind.\n\n**Offene Zuweisungen ohne Frist zählen nicht als Rückstand** — sie können nie überfällig werden. Das ist nicht dieselbe Zahl wie „trägt kein Fälligkeitsdatum": davon gibt es konzernweit 29.513, aber 21.505 davon sind längst abgeschlossen.' }] },
+      { teile: [
+        { karte: 'bo_kachel_ueberfaellig' },
+        { karte: 'bo_kachel_betroffene' },
+        { karte: 'bo_kachel_erfuellung' },
+        { karte: 'bo_kachel_ohne_frist' },
+      ] },
+      { teile: [
+        { karte: 'bo_kachel_koepfe' },
+        { karte: 'bo_kachel_ergebnis' },
+        { karte: 'bo_kachel_audit',
+          klick: [{ ziel: 'db_schulung', uebergabe: {}, fest: true }] },
+        { karte: 'bo_kachel_ausserhalb' },
+      ] },
+      { teile: [{ text: '## Wer hängt hinterher\n\nSortiert nach **überfälligen Schulungen je Kopf**. Die Rohzahl führt sonst dauerhaft die großen Häuser an. Ein Klick auf den Namen öffnet das Betriebsblatt, ein Klick auf „Überfällig" filtert diese Seite auf den Betrieb.' }] },
+      { teile: [{ karte: 'bo_betriebe', hoehe: 13,
+        klick: [
+          { ziel: 'dd_betrieb',  spalte: 'Betrieb',    uebergabe: { betrieb: 'Betrieb' } },
+          { ziel: 'db_schulung', spalte: 'Überfällig', uebergabe: { betrieb: 'Betrieb' } },
+        ] }] },
+      { teile: [
+        // Die Frage vor jeder Massnahme: dieser eine Betrieb oder die
+        // ganze Marke? Derselbe Aufbau wie der Markenreiter auf ①.
+        { karte: 'bo_marken', breite: 12, hoehe: 9,
+          klick: [{ ziel: 'db_schulung', uebergabe: { marke: 'Marke' } }] },
+        { karte: 'bo_rollen', breite: 12, hoehe: 9 },
+      ] },
+      { teile: [{ karte: 'bo_verlauf', hoehe: 9 }] },
+      ] },
+
+      { name: 'Wer muss nachholen', reihen: [
+      { teile: [{ text: '# Wer muss nachholen\n\nDie Arbeitsliste. **Ein Betrieb holt keine Schulung nach — eine Person tut es.**\n\nOben die Menschen, darunter die Schulungen. Beide Richtungen sind nötig: eine Lerneinheit, die über *alle* Betriebe bei 25 % steht, ist kein Betriebsproblem, sondern ein Problem der Lerneinheit — zu lang, zu unklar oder an die falschen Rollen verteilt. In der Betriebsrangliste ist diese Frage nicht zu stellen.' }] },
+      { teile: [{ karte: 'bo_personen', hoehe: 14,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      { teile: [{ karte: 'bo_lerneinheiten', hoehe: 13 }] },
+      ] },
+
+      { name: 'Audits', reihen: [
+      { teile: [{ text: '# Audits\n\nBounti führt zwei Arten: **Standort-Audits** (Tagesprotokolle, Reinigungs- und Temperaturkontrollen) und Personal-Audits. Nur die ersten beziehen sich auf einen Betrieb.\n\n> ⚠️ **Stand 24.08.2026: alle 133 Berichte hängen an drei Standorten OHNE Betriebszuordnung** — Wirtshaus am Münzplatz (110), Wirtshaus im Park Mönchengladbach (22), Würzburger Augustiner (1). Die Tabelle „Auditnote je Betrieb" ist deshalb leer, und das ist kein Fehler. Sie füllt sich, sobald die Zuordnung entschieden ist (Reiter „Abdeckung").\n\nViele dieser Audits sind Tagesprotokolle mit 0 oder 100 % — dort ist der Wert ein **Haken und keine Note**. Und: **die Auditnote ersetzt die Vor-Ort-Note des Round Table nicht.** Ob sie das soll, entscheidet der Fachbereich.' }] },
+      { teile: [{ karte: 'bo_audit_betrieb', hoehe: 9,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      { teile: [{ karte: 'bo_audit_liste', hoehe: 14 }] },
+      ] },
+
+      { name: 'Abdeckung', reihen: [
+      { teile: [{ text: '# Abdeckung\n\n**Der Reiter, den man zuerst liest.** Jede Zahl auf den drei Reitern davor lässt die Standorte ohne Betriebszuordnung aus — und das ist rund ein Viertel der Menschen und der gesamte Auditbestand.\n\nDie Filter oben wirken hier bewusst nicht: der Gegenstand dieser Tabellen ist das, was **keinen** Betrieb und **keine** Marke hat.' }] },
+      { teile: [{ karte: 'bo_abdeckung', hoehe: 9 }] },
+      { teile: [{ text: '## Bounti-Standorte ohne Betrieb\n\nNach Gewicht sortiert, nicht nach Namen: wer von oben abarbeitet, holt zuerst die Auswertung zurück, die am meisten fehlt.\n\n**Sechzehn der 26 Zeilen sind kein Fehler.** Sieben gehören zum Fremdmandanten Gimme Gelato und sollen keinen Betrieb bekommen; neun Wirtshäuser kennt weder LINA noch FoodNotify noch Yext — dort ist die Frage nicht „welcher Betrieb", sondern „wem gehören sie". Bei sechs steht eine Entscheidung aus, dieselbe, die auch bei Yext offen ist. Vier sind Test- und Verwaltungseinträge.' }] },
+      { teile: [{ karte: 'bo_standorte_offen', hoehe: 12 }] },
+      { teile: [{ text: '## Die Gegenrichtung\n\nBetriebe mit Umsatz, die in Bounti nicht vorkommen. Für sie ist jede Zahl dieser Seite leer — und eine leere Zahl liest sich als „nichts offen", nicht als „nicht angebunden".' }] },
+      { teile: [{ karte: 'bo_ohne_bounti', hoehe: 9,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      { teile: [{ text: '## Warum Summen auseinandergehen\n\nKeine Fehlerliste, sondern die Erklärung: wer an zwei Standorten geführt wird, zählt in beiden Betrieben.' }] },
+      { teile: [{ karte: 'bo_mehrfach', hoehe: 9 }] },
+      { teile: [{ text: '## Läuft der Abgleich?\n\nZuweisungen lassen sich nicht inkrementell holen; der Nachtlauf arbeitet je Nacht einen Teil der Lerneinheiten ab. **Die Zahl, die fallen muss, ist „nie"** — bleibt sie stehen, läuft der Nachlauf nicht mehr, und ein eingefrorener Fortschritt sieht aus wie ein gepflegter.' }] },
+      { teile: [{ karte: 'bo_zuweisungsstand', hoehe: 11 }] },
+      { teile: [{ karte: 'bo_gegenprobe', hoehe: 11 }] },
+      ] },
     ],
   },
 
@@ -1749,6 +1906,23 @@ export const dashboards: Dashboard[] = [
       // Volle Breite: die Spalte mit den Beispielnamen ist der Zweck der
       // Karte, und auf zwoelf Einheiten sah man davon drei Namen.
       { teile: [{ karte: 'dq_konzept' }] },
+
+      /*
+       * BOUNTI seit dem 24.08.2026. Dieselbe Frage wie der Rest der
+       * Seite: kommen die Daten an, und bei wem nicht. Die Abdeckung
+       * steht bewusst ZWEIMAL — hier und auf der Schulungsseite selbst.
+       * Eine Kennzahl, die nur dort steht, wo man sie ohnehin schon
+       * vermutet, erreicht niemanden (Regel 10).
+       */
+      { teile: [{ text: '## Bounti — Schulung und Audits\n\nWie viel von Bounti überhaupt bei einem Betrieb ankommt. **Am 24.08.2026: 62 von 88 Standorten, 1754 von 2346 aktiven Personen — und 0 von 133 Auditberichten.** Die Auswertungen auf „Schulung und Audits" lassen den Rest aus.' }] },
+      { teile: [{ karte: 'bo_abdeckung', hoehe: 9 }] },
+      { teile: [{ karte: 'bo_standorte_offen', hoehe: 11 }] },
+      { teile: [{ karte: 'bo_ohne_bounti', hoehe: 9,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      { teile: [{ text: '### Läuft der Zuweisungsabgleich?\n\n**Die Zahl, die fallen muss, ist „nie".** Zuweisungen lassen sich nicht inkrementell holen — der Nachtlauf arbeitet je Nacht einen Teil ab, die am längsten nicht geholten zuerst. Bleibt „nie" stehen, läuft der Nachlauf nicht mehr, und ein eingefrorener Fortschritt sieht aus wie ein gepflegter.' }] },
+      { teile: [{ karte: 'bo_zuweisungsstand', hoehe: 11 }] },
+      { teile: [{ karte: 'bo_gegenprobe', hoehe: 11 }] },
+      { teile: [{ karte: 'bo_mehrfach', hoehe: 9 }] },
     ],
   },
 

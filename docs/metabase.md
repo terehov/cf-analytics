@@ -1199,3 +1199,60 @@ SELECT b.name, s.zugewiesen, s.abgeschlossen, s.ueberfaellig, s.ohne_frist, s.er
  WHERE s.monat = date_trunc('month', current_date)::date AND s.art = 'kurs'
  ORDER BY s.erfuellung_pct NULLS LAST;
 ```
+
+---
+
+## Bounti-Auswertungssichten (Migration `0097`, 24.08.2026)
+
+Neun weitere `mart`-Sichten, keine neue Tabelle. Die aus `0096` beantworten, **ob die
+Anbindung stimmt**; diese beantworten, **was die Daten über die Betriebe sagen**.
+
+| Sicht | Ebene | Inhalt |
+|---|---|---|
+| `mart.bounti_schulung_person` | Zuweisung | die unterste Ebene — Person, Lerneinheit, Frist, **vier** Zustände |
+| `mart.bounti_person_stand` | Person | die Arbeitsliste: wer muss was nachholen, seit wann |
+| `mart.bounti_betrieb_stand` | Betrieb | die **Leitsicht**, Stand heute, **alle 141 Betriebe** |
+| `mart.bounti_schulung_verlauf` | Betrieb × Monat | die einzige Zeitachse; Monat = der der **Zuweisung** |
+| `mart.bounti_lerneinheit_betrieb` | Lerneinheit | die andere Leserichtung: welche Schulung liegt brach |
+| `mart.bounti_auditbericht_liste` | Auditbericht | **einschließlich** der Berichte ohne Betrieb |
+| `mart.bounti_rolle_betrieb` | Rolle | Kopfzahl je Bereich — die einzige Strukturaussage ohne LINA |
+| `mart.bounti_standort_offen` | Standort | die Zuordnungslücke **mit Gewicht** (Köpfe, Zuweisungen, Audits) |
+| `mart.bounti_abdeckung` | je Gegenstand | wie viel überhaupt bei einem Betrieb ankommt |
+
+### Vier Dinge, die man wissen muss, bevor man eine dieser Sichten abfragt
+
+**1. `mart.bounti_betrieb_stand` führt auch Betriebe ohne Bounti.** `in_bounti = false`
+heißt „wir wissen nichts über diesen Betrieb", nicht „dort ist nichts offen". Wer nach
+`ueberfaellig` sortiert, ohne auf `in_bounti` zu filtern, hält 79 leere Zeilen für
+vorbildliche Betriebe.
+
+**2. `operativ` filtern.** 13 der 62 zugeordneten Betriebe sind geschlossen, verwaltend
+oder ohne Umsatz; an ihnen hängen 6.330 Zuweisungen. Dieselbe Linie wie `0039` für die
+Ampeln — nur ohne den Filter sind sie in jeder Rangliste dabei.
+
+**3. `betrieb_key IS NULL` ist kein Datenfehler, sondern der Befund.**
+`mart.bounti_schulung_person` und `mart.bounti_auditbericht_liste` führen absichtlich auch
+die Zeilen ohne Betriebszuordnung. Am 24.08.2026 sind das 10.369 Zuweisungen und **alle**
+133 Auditberichte. Wer sie herausfiltert, bekommt eine saubere Zahl über einen Ausschnitt.
+
+**4. `ohne_frist` gehört neben jede Erfüllungsquote — und meint „offen und ohne Frist".**
+Im `CASE` gewinnt `abgeschlossen` vor `ohne Frist`. Kein Fälligkeitsdatum tragen 29.513 der
+74.683 Zuweisungen (39,5 %), aber 21.505 davon sind abgeschlossen; offen bleiben 8.008, in
+operativen Betrieben 5.832. Wer die andere Zahl braucht, zählt in `core.bounti_zuweisung`
+auf `faellig_am IS NULL`.
+
+### Die Gegenprobe von Hand
+
+```sql
+-- Deckt sich die Leitsicht mit der untersten Ebene?
+SELECT sum(ueberfaellig) FROM mart.bounti_betrieb_stand WHERE in_bounti AND operativ;
+SELECT count(*) FROM mart.bounti_schulung_person
+ WHERE betrieb_key IS NOT NULL AND operativ AND zustand = 'ueberfaellig';
+-- am 24.08.2026 beide: 12.352
+
+-- Was fällt heraus?
+SELECT * FROM mart.bounti_abdeckung;
+```
+
+An der Sichtbarkeit ändert sich nichts: `mart.bounti_*` ist über die Schemaregel automatisch
+sichtbar, `metabase/sichtbarkeit.ts` braucht keinen Eintrag.

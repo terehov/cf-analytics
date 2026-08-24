@@ -368,3 +368,74 @@ als Beleg). **26 bleiben offen** und stehen in `mart.bounti_ohne_betrieb`:
 * **1 mehrdeutiger** (Schlager Cafe: drei gleichnamige Gesellschaften in LINA)
 
 Umgekehrt: **8 operative Betriebe mit Umsatz haben keinen Bounti-Standort.**
+
+---
+
+## 9. Die Auswertungsschicht (Migration `0097`, 24.08.2026)
+
+`0096` hat die Daten geholt und neun Sichten gebaut, die beantworten, **ob die
+Anbindung stimmt** — Zuordnungslücken, Rückstand des Zuweisungsabgleichs,
+Gegenprobe gegen Bountis eigene Aggregation. Das ist Betriebsüberwachung, keine
+Auswertung.
+
+`0097` liefert die andere Hälfte: **was die Daten über die Betriebe sagen.** Neun
+Sichten auf dem vorhandenen Bestand, keine neue Tabelle, kein neuer Abruf.
+
+| Sicht | Ebene | Wofür |
+|---|---|---|
+| `mart.bounti_schulung_person` | eine Zeile je **Zuweisung** | die Grundlage aller anderen; vier Zustände statt zwei |
+| `mart.bounti_person_stand` | je **Person** | die Arbeitsliste — wer muss was nachholen |
+| `mart.bounti_betrieb_stand` | je **Betrieb** | die Leitsicht, Stand heute |
+| `mart.bounti_schulung_verlauf` | je Betrieb und **Monat** | die einzige Zeitachse |
+| `mart.bounti_lerneinheit_betrieb` | je **Lerneinheit** | die andere Leserichtung |
+| `mart.bounti_auditbericht_liste` | je **Auditbericht** | einschließlich der ohne Betrieb |
+| `mart.bounti_rolle_betrieb` | je **Rolle** | die einzige Strukturaussage ohne LINA |
+| `mart.bounti_standort_offen` | je **unzugeordnetem Standort** | die Arbeitsliste der Zuordnung, nach Gewicht |
+| `mart.bounti_abdeckung` | je **Gegenstand** | wie viel überhaupt bei einem Betrieb ankommt |
+
+### Drei Festlegungen, die man den Sichten sonst nicht ansieht
+
+**Stand heute, nicht Stichmonat.** `bounti_betrieb_stand` kennt keinen Monat.
+„Überfällig" ist eine Aussage über heute; in den Monat der Zuweisung
+zurückgerechnet stünde eine täglich steigende Zahl unter einem abgeschlossenen
+Monat. Den Verlauf gibt es daneben, und dort ist der Monat der der **Zuweisung** —
+dieselbe Festlegung wie in `0096`, aus demselben Grund: sonst fällt die nie
+erledigte Pflichtschulung aus der Statistik.
+
+**Alle Betriebe, auch die ohne Bounti.** `bounti_betrieb_stand` geht von
+`core.betrieb` aus und hängt Bounti links an, nicht umgekehrt. Ein Betrieb ohne
+Standort steht damit **mit leeren Zahlen** in derselben Tabelle statt gar nicht.
+Die Spalte `in_bounti` ist der Unterschied zwischen „keine überfällige Schulung"
+und „wir wissen es nicht" — und sie betrifft **79 der 141 Betriebe**, acht davon
+operativ mit Umsatz.
+
+**`operativ` steht am Ende jeder Spaltenliste.** Nicht aus Nachlässigkeit:
+`CREATE OR REPLACE VIEW` kann Spalten nur anhängen, nicht einschieben. Ein
+mittig eingefügtes Feld quittiert Postgres mit `42P16` — und zwar erst beim
+zweiten Lauf der Migration, also auf dem Zielsystem und nicht beim Entwickeln.
+
+### Gemessene Zahlen (24.08.2026)
+
+| | gesamt | in einer Betriebsauswertung | fällt heraus |
+|---|--:|--:|--:|
+| Standorte | 88 | 62 | 26 |
+| aktive Personen | 2.346 | 1.754 | **592** |
+| Zuweisungen | 74.683 | 64.314 | 10.369 |
+| Auditberichte | 133 | **0** | 133 |
+| Betriebe | 141 | 62 | 79 |
+| davon operativ | 57 | 49 | 8 |
+
+Von den 64.314 zugeordneten Zuweisungen hängen weitere **6.330 an nicht
+operativen Betrieben** (geschlossen, verwaltend, ohne Umsatz). Die Auswertungen
+filtern sie heraus — dieselbe Linie wie Migration `0039` für die Ampeln.
+
+**Zuweisungen ohne Frist: 29.513 von 74.683.** Sie können nie überfällig werden.
+Solange die Zahl so groß ist, misst die Erfüllungsquote weniger, als sie zu
+messen scheint: ohne Frist ist „noch nicht gemacht" von „zu spät" nicht zu
+unterscheiden.
+
+**Archivierte Konten sind kein Problem.** Von den überfälligen Zuweisungen in
+operativen Betrieben hängt **genau eine** an einem archivierten Konto — Bounti
+schließt beim Archivieren offenbar mit. Die Annahme, hier läge eine große
+Karteileiche, war falsch; die Arbeitslisten filtern trotzdem, weil ein
+stillgelegtes Konto nichts nachholt.
