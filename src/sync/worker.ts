@@ -1228,7 +1228,36 @@ async function workerLaufIntern(
       }
 
       // --- Fehler -------------------------------------------------------
-      fehler++; stand.fehler++; stand.fehlerInFolge++
+      /**
+       * NUR ERSTFEHLER ZAEHLEN ALS „FEHLER IN FOLGE" (01.09.2026).
+       *
+       * Ein Posten, den die Schlange schon als gescheitert kennt — eine
+       * Wiedervorlage (`versuche > 1`) oder ein wiederbelebter (`wiederbelebt
+       * > 0`) —, beweist mit seinem naechsten Scheitern nichts Neues ueber
+       * den ANBIETER. Dieselbe Unterscheidung, die der 403-Zweig weiter oben
+       * trifft: der Posten ist kaputt, nicht der Zugang.
+       *
+       * Der Anlass, gemessen: die Laeufe 108–110 brachen alle drei ab, weil
+       * `aufgegebeneWiederbeleben()` zehn Posten mit deterministischem
+       * HTTP 500 zurueckholte und `posten_holen()` sie (aelteste Daten,
+       * `zeitraum_von DESC`) zwangslaeufig hintereinander ans Spurende
+       * sortierte — exakt ABBRUCH_NACH_FEHLERN Fehler in Folge, jede Nacht.
+       * Ein echter Ausfall der Gegenstelle erzeugt dagegen massenhaft
+       * ERSTfehler und erreicht die Notbremse weiterhin.
+       *
+       * Zweierlei bewusst:
+       *   - `bekanntKaputt` setzt den Zaehler NICHT zurueck. Keine neue
+       *     Information unterbricht keine Serie — ein bekannt kaputter
+       *     Posten zwischen zehn echten Erstfehlern rettet den Lauf nicht.
+       *   - Zwei Pfade lassen einen faktischen Erstversuch als bekannt
+       *     gelten und machen die Bremse damit UNempfindlicher, nie
+       *     empfindlicher: `sync.haengende_posten_freigeben()` setzt
+       *     `versuche` nicht zurueck, und der Catch-all unten verbraucht
+       *     bei einem Datenbankfehler einen Versuch.
+       */
+      const bekanntKaputt = posten.versuche > 1 || posten.wiederbelebt > 0
+      fehler++; stand.fehler++
+      if (!bekanntKaputt) stand.fehlerInFolge++
       const aufgeben = !res.wiederholbar || posten.versuche >= config.MAX_VERSUCHE
       if (aufgeben) {
         uebersprungen++

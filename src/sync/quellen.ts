@@ -125,10 +125,17 @@ export const QUELLEN: readonly Quelle[] = [
 
   // --- Ladenakte --------------------------------------------------------
   /*
-   * Die tägliche Zählung ist seit 0069 der Torwächter des Belegarchivs.
-   * Fällt sie aus, friert das Archiv ein — genau der 12.08.2026.
+   * Die Zählung ist seit 0069 der Torwächter des Belegarchivs. Fällt sie
+   * aus, friert das Archiv ein — genau der 12.08.2026.
+   *
+   * Seit dem 01.09.2026 ist sie GESTAFFELT (bewegte Ordner täglich, stille
+   * wöchentlich, nie geladene Belegarten monatlich — nachfuellen.ts). Die
+   * Kadenz hier bleibt trotzdem TAEGLICH, und das ist kein Widerspruch:
+   * diese Zeile misst je ENDPUNKT, und der bekommt weiter jede Nacht
+   * Zulauf (~330 Posten). Die feine Prüfung je Betrieb und Ordner ist die
+   * Zeile "Zaehlung ueberfaellig (Takt je Freigabe)" aus 0099.
    */
-  { quelle: 'la:belegzahl', bezeichnung: 'Taegliche Zaehlung des Belegarchivs',
+  { quelle: 'la:belegzahl', bezeichnung: 'Gestaffelte Zaehlung des Belegarchivs',
     system: 'ladenakte', endpunkt: 'la:belegzahl', kadenz_stunden: TAEGLICH },
   /*
    * Der Abzug läuft NUR, wenn die Zählung eine Abweichung meldet. An

@@ -61,6 +61,13 @@ export function fnMockStarten(opt: FnMockOptionen = {}) {
    * gruen, ohne irgendetwas zu zeigen.
    */
   let langsamMs = 0
+  /**
+   * Pfade, die mit HTTP 500 antworten — der Fall der 282 Bestellungen vom
+   * 04.08.2026 (docs/foodnotify-http500.md): deterministisch, an die eine
+   * Ressource gebunden, Fehlerkoerper ohne verwertbare Meldung. Zur Laufzeit
+   * umstellbar, aus demselben Grund wie `verbieten()` unten.
+   */
+  const kaputt = new Set<string>()
 
   const json = (body: unknown, init: ResponseInit = {}) =>
     new Response(JSON.stringify(body), {
@@ -105,6 +112,15 @@ export function fnMockStarten(opt: FnMockOptionen = {}) {
       const erp = pfad.match(/^\/api\/(\d+)\//)?.[1]
       if (erp && verboten.has(Number(erp))) {
         return json({ message: 'Forbidden' }, { status: 403 })
+      }
+
+      /**
+       * Die kaputte Ressource: HTTP 500 mit nichtssagendem JSON-Koerper,
+       * wie im Original. Steht vor `leerAb` und dem Router — der Fehler
+       * entsteht dort, bevor irgendein Inhalt entsteht.
+       */
+      if (kaputt.has(pfad)) {
+        return json({ errors: [], code: 500, isError: true, payload: null }, { status: 500 })
       }
 
       const abWann = opt.leerAb?.[pfad]
@@ -401,6 +417,13 @@ export function fnMockStarten(opt: FnMockOptionen = {}) {
     freigeben: (erpId: number) => { verboten.delete(erpId) },
     /** Antworten kuenstlich verzoegern (0 = aus). Begruendung oben bei `langsamMs`. */
     langsam: (ms: number) => { langsamMs = ms },
+    /**
+     * Einen Pfad kaputt machen bzw. reparieren (HTTP 500 mit Koerper) —
+     * der deterministische Ressourcenfehler aus docs/foodnotify-http500.md.
+     * Gleiche Bauart wie `verbieten()`/`freigeben()`, gleicher Grund.
+     */
+    kaputtMachen: (pfad: string) => { kaputt.add(pfad) },
+    reparieren: (pfad: string) => { kaputt.delete(pfad) },
     stop: () => server.stop(true),
   }
 }

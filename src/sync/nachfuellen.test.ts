@@ -491,20 +491,29 @@ lauf('nachfuellen — Selbstreparatur', () => {
 
   // --- Aufgegebene Posten ----------------------------------------------
 
-  /** Ein aufgegebener Posten, gestern gescheitert, Quelle antwortet heute. */
+  /**
+   * Aufgegebene Posten, gestern gescheitert, Quelle antwortet heute.
+   *
+   * `anzahl` > 1 legt b1..bN an, b1 am aeltesten — die Staffelung ueber
+   * `erledigt_am` macht die "aelteste zuerst"-Reihenfolge der begrenzten
+   * Wiederbelebung pruefbar.
+   */
   const aufgegebenenAufbauen = async (opt: {
     wiederbelebt?: number; alterStunden?: number; quelleAntwortet?: boolean
+    anzahl?: number
   } = {}) => {
     await db.query('TRUNCATE sync.warteschlange')
     await db.query('DELETE FROM sync.aufgabe'); await db.query('DELETE FROM sync.lauf')
-    await db.query(
-      `INSERT INTO sync.warteschlange
-         (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, parameter,
-          versuche, erledigt_am, ergebnis, letzter_fehler, wiederbelebt)
-       VALUES ('fn:bestellpositionen', current_date, current_date, 90,
-               '{"erpId":"10483","orderId":"b1"}', 4,
-               now() - make_interval(hours => $1), 'aufgegeben', 'HTTP 500', $2)`,
-      [opt.alterStunden ?? 30, opt.wiederbelebt ?? 0])
+    for (let i = 1; i <= (opt.anzahl ?? 1); i++) {
+      await db.query(
+        `INSERT INTO sync.warteschlange
+           (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, parameter,
+            versuche, erledigt_am, ergebnis, letzter_fehler, wiederbelebt)
+         VALUES ('fn:bestellpositionen', current_date, current_date, 90,
+                 jsonb_build_object('erpId', '10483', 'orderId', 'b' || $3::text), 4,
+                 now() - make_interval(hours => $1), 'aufgegeben', 'HTTP 500', $2)`,
+        [(opt.alterStunden ?? 30) + ((opt.anzahl ?? 1) - i), opt.wiederbelebt ?? 0, i])
+    }
     if (opt.quelleAntwortet !== false) {
       // sync.aufgabe.lauf_id ist ein Fremdschluessel auf sync.lauf — ohne den
       // Lauf gibt es die Aufgabe nicht. lauf_id ist GENERATED ALWAYS, die
@@ -563,6 +572,34 @@ lauf('nachfuellen — Selbstreparatur', () => {
     await aufgegebenenAufbauen({ alterStunden: 2 })
     const { aufgegebeneWiederbeleben } = await import('./nachfuellen')
     expect(await aufgegebeneWiederbeleben()).toBe(0)
+  })
+
+  /**
+   * DIE OBERGRENZE JE LAUF (01.09.2026). Zehn wiederbelebte, deterministisch
+   * kaputte Posten liefen in den Laeufen 108-110 hintereinander ans Spurende
+   * und trafen mit exakt zehn Fehlern in Folge ABBRUCH_NACH_FEHLERN. Ein Lauf
+   * holt darum hoechstens WIEDERBELEBUNGEN_JE_LAUF zurueck, die aeltesten
+   * zuerst; der Rest wartet auf die naechste Nacht.
+   */
+  test('ein Lauf weckt hoechstens WIEDERBELEBUNGEN_JE_LAUF, die aeltesten zuerst', async () => {
+    await aufgegebenenAufbauen({ anzahl: 5 })
+    const { aufgegebeneWiederbeleben } = await import('./nachfuellen')
+    const { config } = await import('../config')
+    expect(config.WIEDERBELEBUNGEN_JE_LAUF).toBe(3)
+
+    expect(await aufgegebeneWiederbeleben()).toBe(3)
+
+    // b1..b3 sind am aeltesten und wach, b4/b5 bleiben aufgegeben liegen.
+    const { rows } = await db.query(
+      `SELECT parameter->>'orderId' AS o, ergebnis FROM sync.warteschlange ORDER BY 1`)
+    expect(rows.map(r => `${r.o}:${r.ergebnis ?? 'offen'}`)).toEqual(
+      ['b1:offen', 'b2:offen', 'b3:offen', 'b4:aufgegeben', 'b5:aufgegeben'])
+
+    // Was ein Lauf zuruecklaesst, holt der naechste — b4 und b5 sind
+    // laengst ueber der 20-Stunden-Frist.
+    expect(await aufgegebeneWiederbeleben()).toBe(2)
+    expect(await zahl(
+      `SELECT count(*)::int AS n FROM sync.warteschlange WHERE ergebnis = 'aufgegeben'`)).toBe(0)
   })
 
   test('ein offener Zwilling verhindert das Wiederbeleben', async () => {

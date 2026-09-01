@@ -235,7 +235,7 @@ lauf('Ende-zu-Ende', () => {
       'Belegarchiv: Belegdatum spaeter als der eigene Upload',
       'Belegarchiv: Betrieb ohne Belegarchiv',
       'Belegarchiv: Ordner ohne den faelligen Abzug',
-      'Belegarchiv: seit ueber 36 h nicht gezaehlt',
+      'Belegarchiv: Zaehlung ueberfaellig (Takt je Freigabe)',
       /**
        * Seit 0072. Gezählt wird NUR das rollierende Fenster, nicht der
        * Altbestand — der arbeitet sich über mehrere Nächte ab und stünde
@@ -2142,6 +2142,105 @@ lauf('FoodNotify Ende-zu-Ende', () => {
 })
 
 /**
+ * Die Notbremse zaehlt nur ERSTFEHLER (01.09.2026).
+ *
+ * Der Anlass, in Produktion gemessen: die Laeufe 108-110 brachen alle drei
+ * ab, weil `aufgegebeneWiederbeleben()` zehn Posten mit deterministischem
+ * HTTP 500 zurueckholte und `posten_holen()` sie (aelteste Daten,
+ * `zeitraum_von DESC`) hintereinander ans Spurende sortierte — exakt
+ * ABBRUCH_NACH_FEHLERN Fehler in Folge, jede Nacht, an zehn Bestellungen,
+ * die mit der Gegenstelle nichts zu tun hatten.
+ *
+ * Die Unterscheidung: ein Posten, den die Schlange schon als gescheitert
+ * kennt (Wiedervorlage oder wiederbelebt), beweist mit seinem naechsten
+ * Scheitern nichts Neues ueber den ANBIETER. Ein echter Ausfall erzeugt
+ * massenhaft ERSTfehler — und genau die muessen die Bremse weiterhin
+ * ausloesen. Beide Richtungen stehen hier, denn ein Test nur fuer die neue
+ * Milde bewiese nicht, dass die Bremse noch bremst.
+ */
+lauf('Fehlerhaeufung und die Notbremse', () => {
+  let db: Client
+  let aposto: number
+  let port: number
+
+  /** Bestellungen, die die Attrappe deterministisch mit HTTP 500 quittiert. */
+  const kaputtePfade = Array.from({ length: 10 }, (_, i) => `/api/10483/shop-order/k${i + 1}/change`)
+
+  const postenEinreihen = async (wiederbelebt: number) => {
+    await db.query(`DELETE FROM sync.zugangssperre`)
+    await db.query(`TRUNCATE sync.warteschlange, sync.aufgabe, sync.lauf RESTART IDENTITY CASCADE`)
+    for (let i = 1; i <= 10; i++) {
+      await db.query(
+        `INSERT INTO sync.warteschlange
+           (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter, wiederbelebt)
+         VALUES ('fn:bestellpositionen', current_date, current_date, 90, $1,
+                 jsonb_build_object('erpId', '10483', 'orderId', 'k' || $2::text), $3)`,
+        [aposto, i, wiederbelebt])
+    }
+  }
+
+  beforeAll(async () => {
+    const { config } = await import('../config')
+    port = Number(new URL(config.LINA_BASE_URL).port)
+    db = new Client({ connectionString: DB })
+    await db.connect()
+    const { rows } = await db.query(`SELECT marke_key, schluessel FROM core.marke`)
+    aposto = Number(rows.find(r => r.schluessel === 'aposto')!.marke_key)
+    for (const pfad of kaputtePfade) fnMock.kaputtMachen(pfad)
+  })
+
+  afterAll(async () => {
+    // Reparieren, nicht liegen lassen: die Attrappe lebt fuer die ganze Datei.
+    for (const pfad of kaputtePfade) fnMock.reparieren(pfad)
+    await db.query(`DELETE FROM sync.zugangssperre`)
+    await db.end()
+  })
+
+  /** Die Regression fuer den echten Ausfall: frische Posten bremsen weiter. */
+  test('zehn ERSTfehler in Folge brechen die Spur ab', async () => {
+    await postenEinreihen(0)
+    const mock = mockStarten({ port })
+    try {
+      const { workerLauf } = await import('./worker')
+      const r = await workerLauf('manuell')
+      expect(r.status).toBe('abgebrochen')
+    } finally { mock.stop() }
+
+    const { rows: [l] } = await db.query(
+      `SELECT status, notiz FROM sync.lauf ORDER BY lauf_id DESC LIMIT 1`)
+    expect(l.status).toBe('abgebrochen')
+    expect(String(l.notiz)).toContain('Fehler in Folge')
+  }, 30_000)
+
+  /**
+   * DER KERN DES FIXES: dieselben zehn Fehler, aber auf wiederbelebten
+   * Posten — die Spur laeuft durch, die Posten warten auf ihre
+   * Wiedervorlage, und der Lauf endet ehrlich auf 'teilweise'.
+   */
+  test('zehn Fehler auf wiederbelebten Posten brechen NICHT ab', async () => {
+    await postenEinreihen(1)
+    const mock = mockStarten({ port })
+    try {
+      const { workerLauf } = await import('./worker')
+      const r = await workerLauf('manuell')
+      expect(r.status).toBe('teilweise')
+    } finally { mock.stop() }
+
+    const { rows: [l] } = await db.query(
+      `SELECT status, notiz FROM sync.lauf ORDER BY lauf_id DESC LIMIT 1`)
+    expect(l.status).toBe('teilweise')
+    expect(String(l.notiz)).not.toContain('Fehler in Folge')
+
+    // Alle zehn haben genau EINEN Versuch verbraucht und liegen offen auf
+    // Wiedervorlage — nichts wurde aufgegeben, nichts abgebrochen.
+    const { rows: [z] } = await db.query(
+      `SELECT count(*)::int AS n FROM sync.warteschlange
+        WHERE erledigt_am IS NULL AND versuche = 1 AND letzter_fehler = 'HTTP 500'`)
+    expect(Number(z.n)).toBe(10)
+  }, 30_000)
+})
+
+/**
  * Takt und Tagesbudget gelten JE ANBIETER (seit 02.08.2026).
  *
  * LINA und FoodNotify sind zwei Firmen mit zwei Verträgen. Vorher zählten
@@ -2943,9 +3042,22 @@ lauf('e2e Ladenakte', () => {
       const abzuegeVorher = await zahl(
         `SELECT count(*)::int AS n FROM sync.warteschlange WHERE endpunkt = 'la:belegliste'`)
       await ladenakteNachfuellen('2026-08-14')
+      /**
+       * ACHT, NICHT MEHR VIERZEHN (01.09.2026): die sechs Belegarten mit
+       * inhalt_holen = false sind gestern gezaehlt worden, und ein Abzug
+       * folgt fuer sie nie — sie laufen jetzt im Monatstakt. Die acht
+       * freigegebenen sind noch im Bootstrap-Fenster (junge Historie) und
+       * bleiben taeglich. Der gestaffelte Takt im Detail:
+       * 'gestaffelter Takt: still heisst Bucket-Tag, nie geladen heisst Monat'.
+       */
       expect(await zahl(
         `SELECT count(*)::int AS n FROM sync.warteschlange
-          WHERE endpunkt = 'la:belegzahl' AND zeitraum_von = '2026-08-14'`)).toBe(14)
+          WHERE endpunkt = 'la:belegzahl' AND zeitraum_von = '2026-08-14'`)).toBe(8)
+      expect(await zahl(
+        `SELECT count(*)::int AS n FROM sync.warteschlange w JOIN core.belegart a
+            ON a.typ_id = w.parameter->>'typeId'
+          WHERE w.endpunkt = 'la:belegzahl' AND w.zeitraum_von = '2026-08-14'
+            AND NOT a.inhalt_holen`)).toBe(0)
       await workerLauf('manuell')
       expect(await zahl(
         `SELECT count(*)::int AS n FROM sync.warteschlange WHERE endpunkt = 'la:belegliste'`))
@@ -3021,6 +3133,81 @@ lauf('e2e Ladenakte', () => {
         `SELECT zustand, differenz FROM mart.belegarchiv_zulauf
           WHERE typ_id = '3969' AND lina_betrieb_id = 15`)
       expect(rows[0]).toMatchObject({ zustand: 'gezaehlt, nicht freigegeben', differenz: 2 })
+    })
+
+    /**
+     * ================================================================
+     * DER GESTAFFELTE TAKT (01.09.2026) — entscheidungen.md
+     * ================================================================
+     *
+     * Gemessen an Lauf 109: 1.974 Zaehlungen je Nacht, 6,68 von 7,18
+     * Stunden, 1,37 % veraenderte Staende. Seitdem: bewegte Ordner
+     * taeglich, stille am Wochentags-Bucket ihres Betriebs, nie geladene
+     * Belegarten am Monatstags-Bucket.
+     *
+     * Alle Daten hier sind FIX und ankern an `heute` (dem Parameter), nicht
+     * an now() — nur `gemessen_am` traegt Fixdaten relativ zu diesen Tagen.
+     * Betrieb 15: Wochen-Bucket 15 % 7 = 1 (Montag), Monats-Bucket
+     * 15 % 28 = 15 (also der 16. eines Monats).
+     */
+    test('gestaffelter Takt: still heisst Bucket-Tag, nie geladen heisst Monat', async () => {
+      const { ladenakteNachfuellen } = await import('./nachfuellen')
+      await zuruecksetzen()
+
+      const belegzahlPosten = async (tag: string) => zahl(
+        `SELECT count(*)::int AS n FROM sync.warteschlange
+          WHERE endpunkt = 'la:belegzahl' AND zeitraum_von = $1::date`, [tag])
+
+      /**
+       * Eine ruhige Historie fuer alle 14 Ordner: aelteste Zaehlung alt
+       * genug (kein Bootstrap), juengste zwei Tage her (kein Netz), ein
+       * einziger Stand im Fenster (keine Bewegung), Stand == gehalten == 0
+       * (keine Abweichung).
+       */
+      await db.query(`
+        INSERT INTO core.belegarchiv_bestand
+          (betrieb_key, lina_betrieb_id, typ_id, gemessen_am, records_total,
+           seitengroesse, quelle)
+        SELECT b.betrieb_key, b.lina_betrieb_id, a.typ_id, t.tag::timestamptz, 0, 1, 'zaehlung'
+          FROM core.betrieb b
+          CROSS JOIN core.belegart a
+          CROSS JOIN (VALUES ('2026-08-26'), ('2026-09-13')) t(tag)
+         WHERE b.lina_betrieb_id = 15 AND a.zweig = 'fibu'`)
+
+      // Dienstag, kein Bucket: KEINE Zaehlung ist faellig — das ist der
+      // ganze Gewinn. (Die Rueckgabe zaehlt auch BWA/Stammdaten-Monatsposten
+      // mit, deshalb wird hier der Endpunkt gezaehlt, nicht die Summe.)
+      await ladenakteNachfuellen('2026-09-15')
+      expect(await belegzahlPosten('2026-09-15')).toBe(0)
+
+      // Montag = Wochen-Bucket des Betriebs: die 8 freigegebenen Ordner.
+      await ladenakteNachfuellen('2026-09-14')
+      expect(await belegzahlPosten('2026-09-14')).toBe(8)
+
+      // Der 16. = Monats-Bucket des Betriebs: die 6 nie geladenen Ordner.
+      await ladenakteNachfuellen('2026-09-16')
+      expect(await belegzahlPosten('2026-09-16')).toBe(6)
+
+      // Bewegung macht taeglich: ein neuer Stand fuer Ordner 1 im Fenster,
+      // und der ruhige Dienstag hat genau diesen einen Posten.
+      await db.query(`
+        INSERT INTO core.belegarchiv_bestand
+          (betrieb_key, lina_betrieb_id, typ_id, gemessen_am, records_total,
+           seitengroesse, quelle)
+        SELECT betrieb_key, 15, '1', '2026-09-12'::timestamptz, 61, 1, 'zaehlung'
+          FROM core.betrieb WHERE lina_betrieb_id = 15`)
+      await db.query(`TRUNCATE sync.warteschlange RESTART IDENTITY`)
+      await ladenakteNachfuellen('2026-09-15')
+      expect(await belegzahlPosten('2026-09-15')).toBe(1)
+      expect(await zahl(
+        `SELECT count(*)::int AS n FROM sync.warteschlange
+          WHERE endpunkt = 'la:belegzahl' AND parameter->>'typeId' = '1'`)).toBe(1)
+
+      // Und das Auffangnetz: lange nichts gezaehlt heisst faellig, Bucket
+      // hin oder her — 8 nach acht Tagen, alle 14 nach 32.
+      await db.query(`TRUNCATE sync.warteschlange RESTART IDENTITY`)
+      await ladenakteNachfuellen('2026-10-20')
+      expect(await belegzahlPosten('2026-10-20')).toBe(14)
     })
 
     /**
@@ -3237,7 +3424,8 @@ lauf('e2e Ladenakte', () => {
       expect(zulauf).toMatchObject({ zustand: 'kein belegarchiv', zaehlung_status: 'keine_daten' })
 
       /**
-       * DER PUNKT DER GANZEN UEBUNG: die 36-h-Zeile zaehlt ihn nicht mehr
+       * DER PUNKT DER GANZEN UEBUNG: die Ueberfaellig-Zeile (bis 0099: 36 h
+       * pauschal) zaehlt ihn nicht mehr
        * mit, und die eigene Zeile fuehrt ihn dafuer sichtbar. Ein Zweig, der
        * "nichts zu tun" bedeutet, muss sichtbar sein (AGENTS.md Regel 10) —
        * er darf nur nicht in der Zahl stehen, die einen Ausfall meldet.
@@ -3248,7 +3436,7 @@ lauf('e2e Ladenakte', () => {
       const ohneArchiv = await zeile('Belegarchiv: Betrieb ohne Belegarchiv')
       expect(Number(ohneArchiv.auffaellig)).toBe(14)
 
-      const gezaehlt36 = await zeile('Belegarchiv: seit ueber 36 h nicht gezaehlt')
+      const gezaehlt36 = await zeile('Belegarchiv: Zaehlung ueberfaellig (Takt je Freigabe)')
       // Zwei Betriebe x 14 Ordner = 28, davon 14 ausgeklammert.
       expect(Number(gezaehlt36.geprueft)).toBe(14)
       expect(Number(gezaehlt36.auffaellig)).toBe(14)

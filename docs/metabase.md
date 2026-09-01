@@ -825,7 +825,7 @@ Betrieb, der sein Belegarchiv VERLIERT, steht weiter auf „abzug fehlt" und geh
 
 ### Zwei Zeilen in `mart.pruefung_uebersicht`, und eine liest sich anders
 
-Die Zeile **„Belegarchiv: seit ueber 36 h nicht gezaehlt"** klammert `kein belegarchiv` aus —
+Die Zeile **„Belegarchiv: Zaehlung ueberfaellig (Takt je Freigabe)"** (bis `0099`: „seit ueber 36 h nicht gezaehlt"; seit dem gestaffelten Takt vom 01.09.2026 misst sie 10 Tage fuer freigegebene und 36 fuer nie geladene Belegarten) klammert `kein belegarchiv` aus —
 in `geprueft` wie in `auffaellig`. Sie zählt jetzt nur noch Paare, für die eine Zählung
 überhaupt zu erwarten ist.
 

@@ -2790,3 +2790,79 @@ Bestellantwort wäre auch die falsche Quelle: er gilt zum Abrufzeitpunkt, nicht
 zur Bestellung. Für den Zutatenverbrauch ist die Inventur die richtige Quelle
 (`/api/erp/stocktakings`, `theoreticalStockLevelInBaseUnits`) — eine echte
 Zählung zu einem bekannten Stichtag, und dieses Projekt lädt sie bereits.
+
+## 01.09.2026 — Die Notbremse zählt Erstfehler, die Belegzählung zählt nach Bedarf
+
+Anlass waren die Läufe 108–110: drei Nächte in Folge `abgebrochen`, und 6,68
+von 7,18 Stunden des Laufs gingen in eine Zählung mit 1,37 % Ertrag. Beide
+Entscheidungen von Eugene, beide auf Messungen aus Produktion.
+
+### N1 — Wiederholungsfehler zählen nicht als „Fehler in Folge"
+
+*„Können wir die Reihenfolge nicht so anpassen, dass die zehn Fehler nicht in
+Folge kommen und damit der Lauf nicht abbricht?"*
+
+Reines Umsortieren trägt nicht: wiederbelebte Posten haben die ältesten Daten
+und laufen unter `zeitraum_von DESC` zwangsläufig als Letzte — wenn sie dran
+sind, ist nichts mehr übrig, das man dazwischenschieben könnte. Der Gedanke
+trägt in anderer Form, und zwar doppelt:
+
+1. Ein Posten, den die Schlange schon als gescheitert kennt (`versuche > 1`
+   oder `wiederbelebt > 0`), erhöht `fehlerInFolge` **nicht** — sein
+   Scheitern ist eine bekannte Antwort, kein Signal über den Anbieter. Ein
+   echter Ausfall erzeugt massenhaft **Erst**fehler und trifft die Bremse
+   weiterhin (beide Richtungen im e2e-Test).
+2. Ein Lauf weckt höchstens `WIEDERBELEBUNGEN_JE_LAUF = 3` aufgegebene
+   Posten, älteste zuerst; `config.laden()` erzwingt Abstand zur Notbremse.
+
+**Ausdrücklich NICHT entschieden:** die Statussemantik bleibt. Bricht eine
+Spur wirklich ab, ist der Lauf `abgebrochen` und Exitcode 1 — verhindern
+statt umdeklarieren.
+
+### N2 — Die Belegzählung verlässt den Kalendertakt
+
+Gemessen seit dem 20.08.: von 1.974 nächtlichen Zählungen ändern 1,37 % ihren
+Stand; 1.834 Paare bewegten sich in zwölf Tagen nie; 846 gehören zu den sechs
+Belegarten mit `inhalt_holen = false`, für die nie ein Abzug folgt — 2 h 52
+je Nacht ohne Folgeschritt. Der ganze „Rückstand" von 20.599 Belegen liegt
+ausschließlich in diesen nie geladenen Belegarten; die acht geladenen sind
+vollständig.
+
+Der neue Takt (`belegzaehlungEinreihen()`):
+
+| Fall | Takt |
+|---|---|
+| nie gezählt, junge Historie (< 14 Tage), Bewegung in 14 Tagen, Zählung ≠ gehaltener Bestand | täglich |
+| freigegebene, stille Ordner | Wochentags-Bucket des **Betriebs** (`lina_betrieb_id % 7`), Netz nach 8 Tagen |
+| nie geladene Belegarten | Monatstags-Bucket (`% 28`, gestreut statt 846 am Monatsersten), Netz nach 32 Tagen |
+
+**Der Preis, ehrlich genannt.** Ein lange stiller Ordner, der plötzlich
+Belege bekommt, wird erst am Bucket-Tag bemerkt — bis zu 7 Tage, nach einer
+Abbruchnacht bis zu 8; eine nie geladene Belegart bis zu ~32 Tage. Für
+Buchhaltungsbelege, die beim Eintreffen Wochen alt sind, entschieden
+vertretbar. Erwartet ~330 statt 1.974 Zählungen je Nacht (gegen Produktion
+trockengerechnet: 366 am 01.09.), Laufende ~06:40 statt 12:36.
+
+**Der Bucket hängt am Betrieb, nicht am Paar:** sonst verstreuten sich die
+14 Ordner eines Betriebs über die Woche, und der storeId-Token (90 s Cache je
+Betrieb) würde je Tag statt je Woche neu aufgelöst.
+
+**Der Takt hängt damit teils an der Messung** — mit offenen Augen gegen die
+alte Falle „Takt am Ergebniswert": `keine_daten` (Betrieb ohne Belegarchiv)
+zählt ausdrücklich wie eine Messung, sonst liefe er ewig täglich; ein Paar,
+dessen Zählung scheitert, bleibt fällig, bis sie beantwortet ist.
+
+**Mitgezogen:** die Prüfzeile „seit ueber 36 h nicht gezaehlt" maß unter dem
+neuen Takt Unsinn und heißt seit Migration `0099` „Zaehlung ueberfaellig
+(Takt je Freigabe)" — 10 Tage für freigegebene, 36 für nie geladene
+Belegarten. `mart.quelle_zulauf` blieb unverändert: sie misst je Endpunkt,
+und der bekommt weiter jede Nacht Zulauf.
+
+### Was daran nicht entschieden ist
+
+Ob die zehn verbliebenen HTTP-500-Bestellungen je kommen, entscheidet
+FoodNotify; sie laufen über `mart.posten_aufgegeben` aus. Und ob die
+Ordnerliste aus dem LINA-Baumknoten (`belegarchiv_<id>`, `children`) die
+Kreuzprodukt-Menge weiter verkleinern kann, ist offen — die Baum-Antwort
+landet nicht in `raw.api_antwort`; ein protokollierter Baumknoten würde es
+beantworten.

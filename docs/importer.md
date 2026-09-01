@@ -43,7 +43,9 @@ Yext und Bounti warteten bis 15:15, um dann zwanzig Minuten zu arbeiten.
 ```
 
 **Was das bringt — und was nicht.** Der Lauf wird dadurch **nicht kürzer**: die
-LINA-Spur trägt zehn von zehn Stunden, davon 6 h 40 allein die Belegzählung.
+LINA-Spur trägt zehn von zehn Stunden, davon 6 h 40 allein die Belegzählung
+*(Stand 24.08.; seit dem 01.09.2026 ist die Zählung gestaffelt und dieser Block
+auf gut eine Stunde gefallen — siehe unten)*.
 Was sich ändert:
 
 1. Bewertungen, Schulungen, Wetter und Handnoten stehen um **05:30 statt 15:30**.
@@ -1175,11 +1177,17 @@ soll** — der Preis ist der HTTP-Umlauf gegen eine Weboberfläche, nicht die
 Nutzlast. Zum Vergleich: `la:belegliste` holte im selben Lauf **108.839 Zeilen in
 21 Aufrufen**.
 
-Daraus folgt: der Hebel ist nicht die Probe, sondern der **Takt**. Bei
-wöchentlicher Rotation statt täglich (282 statt 1.974 Proben je Nacht) fiele
-dieser Block von 6 h 40 auf rund 55 min; der Preis wäre, dass ein neuer Beleg bis
-zu sieben Tage später auffällt. Das ist eine fachliche Abwägung und keine
-technische — deshalb steht sie hier und ist nicht umgesetzt.
+Daraus folgt: der Hebel ist nicht die Probe, sondern der **Takt**.
+
+> **Umgesetzt am 01.09.2026** (Entscheidung N2 in `entscheidungen.md`, Messungen
+> dort): bewegte Ordner täglich, stille am Wochentags-Bucket ihres Betriebs,
+> die sechs nie geladenen Belegarten (`inhalt_holen = false` — 846 der 1.974
+> Proben, ohne jeden Folgeschritt) am Monatstags-Bucket. Auffangnetze nach 8
+> bzw. 32 Tagen, Abweichung Zählung↔Bestand zählt immer täglich. Erwartet
+> ~330 Proben je Nacht statt 1.974, der Block fällt von 6 h 40 auf gut eine
+> Stunde; der Preis — ein lange stiller Ordner fällt erst am Bucket-Tag auf,
+> bis zu 7 Tage — ist die dort begründete fachliche Abwägung. Die Prüfzeile
+> heißt seit `0099` „Zaehlung ueberfaellig (Takt je Freigabe)" (10/36 Tage).
 
 ### FoodNotify: 2.144 der 2.960 aufgefrischten Bestellungen sind nachweislich eingefroren
 

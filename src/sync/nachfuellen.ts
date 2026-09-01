@@ -724,7 +724,48 @@ export async function ladenakteNachfuellen(heute: string): Promise<number> {
 const PRIORITAET_LADENAKTE = 95
 
 /**
- * Die taegliche Zaehlung des Belegarchivs: je Betrieb und Belegart eine.
+ * Die Zaehlung des Belegarchivs — gestaffelt nach dem, was sie je gefunden hat.
+ *
+ * DER GESTAFFELTE TAKT (01.09.2026, Entscheidung in docs/entscheidungen.md).
+ * Bis dahin lief je Betrieb und Belegart JEDE Nacht eine Zaehlung: 1.974
+ * Aufrufe, 6,68 von 7,18 Stunden des Laufs 109 — fuer 1,37 % veraenderte
+ * Staende. 846 der 1.974 gehoeren zu den sechs Belegarten mit
+ * `inhalt_holen = false`, fuer die `laLaden()` nachweislich NIE einen Abzug
+ * nachreiht: 2 h 52 je Nacht ohne jeden Folgeschritt. Jetzt gilt:
+ *
+ *   taeglich      freigegebene Paare (`inhalt_holen`), die eine der vier
+ *                 Fragen bejahen: nie gezaehlt? Historie juenger als 14
+ *                 Tage (Bootstrap fuer neue Betriebe/Ordner)? Bewegung in
+ *                 14 Tagen (mehr als ein Zaehlstand)? juengste Zaehlung
+ *                 weicht vom gehaltenen Bestand ab (ein liegengebliebener
+ *                 Abzug darf nicht bis zum Bucket-Tag warten)?
+ *   woechentlich  die uebrigen freigegebenen — am Wochentags-Bucket ihres
+ *                 BETRIEBS (`lina_betrieb_id % 7`), plus ein Auffangnetz
+ *                 nach 8 Tagen, das einen verpassten Bucket-Tag am
+ *                 Folgetag repariert.
+ *   monatlich     die nie geladenen Belegarten — am Monatstags-Bucket des
+ *                 Betriebs (`% 28`, verteilt statt 846 am Monatsersten),
+ *                 Auffangnetz nach 32 Tagen.
+ *
+ * Der Preis, ehrlich genannt: ein Ordner, der lange still war und ploetzlich
+ * Belege bekommt, wird erst am Bucket-Tag bemerkt — bis zu 7 Tage, nach einer
+ * Abbruchnacht bis zu 8. Fuer Buchhaltungsbelege, die beim Eintreffen Wochen
+ * alt sind, ist das entschieden vertretbar. Die Pruefzeile in
+ * `mart.pruefung_uebersicht` misst seit 0099 gegen genau diese Takte
+ * (10 bzw. 36 Tage).
+ *
+ * BUCKET JE BETRIEB, NICHT JE PAAR: sonst verstreuten sich die 14 Ordner
+ * eines Betriebs ueber die Woche, und der storeId-Token (90 s Cache je
+ * Betrieb) wuerde je Tag statt je Woche neu aufgeloest — dasselbe Argument
+ * wie beim ORDER BY unten.
+ *
+ * DER TAKT HAENGT DAMIT TEILS AN DER MESSUNG, nicht mehr nur am Zeitraum —
+ * mit offenen Augen, denn die Lehre aus dem Fehlerkatalog (ein Takt am
+ * Ergebniswert kennt immer einen vergessenen Ausgang) hat hier zwei Waechter:
+ * der Fall `keine_daten` (Betrieb ohne Belegarchiv, es entsteht nie eine
+ * Bestandszeile) zaehlt ausdruecklich wie eine Messung, sonst liefe er ewig
+ * taeglich; und ein Paar, dessen Zaehlung SCHEITERT, bleibt faellig — das ist
+ * gewollt, ein Fehler soll wiederkommen, bis er beantwortet ist.
  *
  * WAS HIER ERSETZT WURDE UND WARUM. Bis zum 13.08.2026 stand an dieser Stelle
  * eine Abfrage gegen `manual.belegarchiv_soll` — die Handzaehlung vom
@@ -757,10 +798,9 @@ const PRIORITAET_LADENAKTE = 95
  * desselben Fehlers. Der Index aus 0059 (`endpunkt, zeitraum_von`) traegt das
  * NOT EXISTS.
  *
- * DER TAKT HAENGT AM ZEITRAUM, nicht an einem Ergebniswert — dieselbe Lehre
- * wie bei `einreihenJeMonat()`: gibt es fuer diesen Kalendertag schon eine
- * Zeile, passiert nichts, gleich wie sie ausgegangen ist. Morgen gibt es eine
- * frische.
+ * EIN POSTEN JE PAAR UND TAG, gleich wie er ausgeht: das tagesweise
+ * NOT EXISTS unten bleibt — mehrere Laeufe am selben Tag reihen nichts
+ * doppelt ein.
  *
  * ORDER BY lina_betrieb_id: der `storeId`-Token gilt je BETRIEB und haelt
  * gemessene 172 s (`src/ladenakte/token.ts`). Werden die Ordner eines Betriebs
@@ -778,12 +818,63 @@ async function belegzaehlungEinreihen(heute: string): Promise<number> {
                       'typeId',        a.typ_id) AS parameter
                FROM core.betrieb b
                CROSS JOIN core.belegart a
+               -- Alles, was die Zaehlung dieses Paares je ergeben hat.
+               -- quelle = 'zaehlung', sonst verfaelschen Abzugszeilen die
+               -- Bewegungs- und Standfragen. Die Fenster ankern an $1
+               -- (Geschaeftstag), nicht an now() — die Tests rechnen mit
+               -- festen Tagen.
+               LEFT JOIN LATERAL (
+                 SELECT max(z.gemessen_am)  AS juengste,
+                        min(z.gemessen_am)  AS aelteste,
+                        count(DISTINCT z.records_total)
+                          FILTER (WHERE z.gemessen_am >= $1::date - interval '14 days')
+                                            AS stufen14,
+                        (array_agg(z.records_total ORDER BY z.gemessen_am DESC))[1]
+                                            AS letzter_stand
+                   FROM core.belegarchiv_bestand z
+                  WHERE z.betrieb_key = b.betrieb_key AND z.typ_id = a.typ_id
+                    AND z.quelle = 'zaehlung') z ON true
+               -- Der gehaltene Bestand — dieselbe Zahl, gegen die laLaden()
+               -- nach jeder Zaehlung den Abzug entscheidet.
+               LEFT JOIN LATERAL (
+                 SELECT count(*) AS n FROM core.buchungsbeleg d
+                  WHERE d.betrieb_key = b.betrieb_key AND d.typ_id = a.typ_id) g ON true
+               -- "Kein Belegarchiv" ist eine Antwort, keine fehlende Messung:
+               -- solche Betriebe bekommen nie eine Bestandszeile und liefen
+               -- sonst ueber den Nie-gezaehlt-Zweig ewig taeglich. Eine
+               -- keine_daten-Aufgabe der letzten 14 Tage zaehlt wie eine
+               -- Messung; der Wochen-Bucket bleibt als Sonde.
+               LEFT JOIN (SELECT DISTINCT k.parameter->>'linaBetriebId' AS lb
+                            FROM sync.aufgabe k
+                           WHERE k.endpunkt = 'la:belegzahl'
+                             AND k.status = 'keine_daten'
+                             AND k.beendet_am >= $1::date - interval '14 days') kd
+                      ON kd.lb = b.lina_betrieb_id::text
               WHERE b.lina_betrieb_id IS NOT NULL
                 -- Der Lohn-Zweig steht gar nicht erst in core.belegart
                 -- (Migration 0053, Falle 1). Die Bedingung ist der zweite
                 -- Guertel: wer dort je eine Zeile ergaenzt, holt damit nicht
                 -- versehentlich Ausweisdokumente und Krankmeldungen.
                 AND a.zweig = 'fibu'
+                AND CASE WHEN a.inhalt_holen THEN
+                         -- taeglich, wenn eine der vier Fragen offen ist:
+                            (z.juengste IS NULL AND kd.lb IS NULL)
+                         OR z.aelteste >= $1::date - interval '14 days'
+                         OR z.stufen14 > 1
+                         OR (z.juengste IS NOT NULL
+                             AND z.letzter_stand IS DISTINCT FROM g.n)
+                         -- Auffangnetz: repariert einen verpassten Bucket-Tag
+                         -- am Folgetag, nicht erst eine Woche spaeter.
+                         OR z.juengste < $1::date - interval '8 days'
+                         -- sonst woechentlich, am Bucket-Tag des Betriebs:
+                         OR b.lina_betrieb_id % 7 = extract(dow from $1::date)::int
+                    ELSE
+                         -- nie geladene Belegarten: monatlich reicht — es
+                         -- folgt kein Abzug, nur die Bestandszahl.
+                            b.lina_betrieb_id % 28 = extract(day from $1::date)::int - 1
+                         OR (z.juengste IS NULL AND kd.lb IS NULL)
+                         OR z.juengste < $1::date - interval '32 days'
+                    END
               ORDER BY b.lina_betrieb_id, a.typ_id) p
       WHERE NOT EXISTS (SELECT 1 FROM sync.warteschlange w
                          WHERE w.endpunkt = 'la:belegzahl'
@@ -887,36 +978,81 @@ async function einreihenJeMonat(
  * an aufeinanderfolgenden Tagen liegen nie exakt 24 Stunden auseinander.
  */
 export async function aufgegebeneWiederbeleben(): Promise<number> {
+  /**
+   * HOECHSTENS `WIEDERBELEBUNGEN_JE_LAUF` AUF EINMAL (01.09.2026).
+   *
+   * Wiederbelebte Posten tragen die aeltesten Daten und laufen darum
+   * (`zeitraum_von DESC` in `posten_holen()`) zwangslaeufig hintereinander
+   * am Ende der Spur. Zehn davon, alle deterministisch kaputt, trafen in
+   * den Laeufen 108–110 exakt ABBRUCH_NACH_FEHLERN — drei Naechte in Folge
+   * brach die FoodNotify-Spur an ihrer eigenen Wiederbelebung ab. Die
+   * Obergrenze haelt eine volle Runde strukturell unter der Notbremse
+   * (Kreuzpruefung in config.ts); was ein Lauf nicht zurueckholt, holt der
+   * naechste — die aeltesten zuerst.
+   *
+   * FOR UPDATE SKIP LOCKED, WEIL DER VORLAUF NICHT ALLEIN IST. `nachfuellen()`
+   * laeuft VOR der Laufsperre (`sperreHolen()` kommt erst in `workerLauf()`);
+   * am 12.08.2026 liefen fuenf Laeufe an einem Tag. Zwei gleichzeitige
+   * Vorlaeufe wuerden dieselben Posten waehlen und `wiederbelebt` doppelt
+   * abbuchen — SKIP LOCKED laesst den zweiten die Zeilen des ersten
+   * ueberspringen, und das aeussere `ergebnis = 'aufgegeben'` prueft nach
+   * dem Sperren erneut, was der Planner beim Nachlesen sonst uebernaehme.
+   */
   const r = await query<{ endpunkt: string }>(
     `UPDATE sync.warteschlange w
         SET erledigt_am = NULL, ergebnis = NULL, versuche = 0,
             in_arbeit_seit = NULL, faellig_ab = now(),
             wiederbelebt = w.wiederbelebt + 1
-      WHERE w.ergebnis = 'aufgegeben'
-        AND w.wiederbelebt < $1
-        AND w.erledigt_am < now() - interval '20 hours'
-        -- Die Quelle muss gerade antworten, sonst ist der Versuch verschenkt.
-        AND EXISTS (SELECT 1 FROM sync.aufgabe a
-                     WHERE a.endpunkt = w.endpunkt AND a.status = 'ok'
-                       AND a.beendet_am > now() - interval '24 hours')
-        -- Der Eindeutigkeitsindex ist partiell (WHERE erledigt_am IS NULL).
-        -- Steht fuer dieselbe Arbeit schon ein offener Posten, wuerde das
-        -- Wiederbeleben ihn verletzen — dann ist ohnehin nichts zu tun.
-        AND NOT EXISTS (
-            SELECT 1 FROM sync.warteschlange o
-             WHERE o.erledigt_am IS NULL
-               AND o.endpunkt = w.endpunkt
-               AND coalesce(o.betrieb_enc_id, '') = coalesce(w.betrieb_enc_id, '')
-               AND coalesce(o.marke_key, 0) = coalesce(w.marke_key, 0)
-               AND o.zeitraum_von = w.zeitraum_von AND o.zeitraum_bis = w.zeitraum_bis
-               AND coalesce(o.parameter::text, '{}') = coalesce(w.parameter::text, '{}'))
+      WHERE w.posten_id IN (
+            SELECT k.posten_id
+              FROM sync.warteschlange k
+             WHERE k.ergebnis = 'aufgegeben'
+               AND k.wiederbelebt < $1
+               AND k.erledigt_am < now() - interval '20 hours'
+               -- Die Quelle muss gerade antworten, sonst ist der Versuch verschenkt.
+               AND EXISTS (SELECT 1 FROM sync.aufgabe a
+                            WHERE a.endpunkt = k.endpunkt AND a.status = 'ok'
+                              AND a.beendet_am > now() - interval '24 hours')
+               -- Der Eindeutigkeitsindex ist partiell (WHERE erledigt_am IS NULL).
+               -- Steht fuer dieselbe Arbeit schon ein offener Posten, wuerde das
+               -- Wiederbeleben ihn verletzen — dann ist ohnehin nichts zu tun.
+               AND NOT EXISTS (
+                   SELECT 1 FROM sync.warteschlange o
+                    WHERE o.erledigt_am IS NULL
+                      AND o.endpunkt = k.endpunkt
+                      AND coalesce(o.betrieb_enc_id, '') = coalesce(k.betrieb_enc_id, '')
+                      AND coalesce(o.marke_key, 0) = coalesce(k.marke_key, 0)
+                      AND o.zeitraum_von = k.zeitraum_von AND o.zeitraum_bis = k.zeitraum_bis
+                      AND coalesce(o.parameter::text, '{}') = coalesce(k.parameter::text, '{}'))
+             ORDER BY k.erledigt_am, k.posten_id
+             LIMIT $2
+               FOR UPDATE SKIP LOCKED)
+        AND w.ergebnis = 'aufgegeben'
      RETURNING w.endpunkt`,
-    [config.MAX_WIEDERBELEBUNGEN])
+    [config.MAX_WIEDERBELEBUNGEN, config.WIEDERBELEBUNGEN_JE_LAUF])
 
   if (r.length > 0) {
     const jeEndpunkt: Record<string, number> = {}
     for (const z of r) jeEndpunkt[z.endpunkt] = (jeEndpunkt[z.endpunkt] ?? 0) + 1
-    log.info('aufgegebene posten wiederbelebt', { posten: r.length, jeEndpunkt })
+    /**
+     * Nur wenn die Obergrenze voll ausgeschoepft wurde, kann etwas
+     * zurueckgeblieben sein — dann steht die Zahl daneben, damit „3
+     * wiederbelebt" nicht wie „alle" liest. Die Zaehlung ist bewusst eine
+     * zweite, ungesperrte Abfrage: fuers Log reicht ungefaehr, und eine
+     * exakte Zahl waere den Sperraufwand nicht wert.
+     */
+    let zurueckgestellt = 0
+    if (r.length >= config.WIEDERBELEBUNGEN_JE_LAUF) {
+      const z = await eine<{ n: number }>(
+        `SELECT count(*)::int AS n
+           FROM sync.warteschlange k
+          WHERE k.ergebnis = 'aufgegeben'
+            AND k.wiederbelebt < $1
+            AND k.erledigt_am < now() - interval '20 hours'`,
+        [config.MAX_WIEDERBELEBUNGEN])
+      zurueckgestellt = Number(z?.n ?? 0)
+    }
+    log.info('aufgegebene posten wiederbelebt', { posten: r.length, jeEndpunkt, zurueckgestellt })
   }
   return r.length
 }

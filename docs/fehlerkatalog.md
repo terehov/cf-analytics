@@ -333,6 +333,35 @@ erledigten Posten** zeigt. Eine Prüfung gegen einen frischen Posten hätte ihn 
 Voraussetzung für einen unbeaufsichtigten Backfill: ein einzelner Posten darf scheitern, der Lauf
 nicht.
 
+### Zehn wiederbelebte Posten brachen drei Nächte in Folge den Lauf ab (01.09.2026)
+
+**Symptom.** Die Läufe 108, 109 und 110 endeten alle auf `abgebrochen`, Exitcode 1, Notiz
+„FoodNotify: 10 Fehler in Folge". Jede Nacht dieselben zehn `fn:bestellpositionen` — die zehn
+verbliebenen HTTP-500-Bestellungen aus `docs/foodnotify-http500.md`.
+
+**Ursache.** Drei Bauteile, jedes für sich richtig, zusammen ein Uhrwerk:
+`aufgegebeneWiederbeleben()` holte **alle** fälligen aufgegebenen Posten zurück — zufällig
+zehn. `sync.posten_holen()` sortiert `zeitraum_von DESC`, und wiederbelebte Posten tragen die
+ältesten Daten: sie laufen **zwangsläufig hintereinander am Spurende**, wenn nichts mehr
+dazwischen liegt. Und `ABBRUCH_NACH_FEHLERN` stand auf zehn — exakt die Zahl der Posten. Die
+Notbremse, gebaut gegen ein FoodNotify im Ausnahmezustand, feuerte auf zehn Bestellungen, die
+mit dem Zustand der Gegenstelle nichts zu tun hatten. Kein Zufall übrigens, dass es zehn
+waren: es waren *alle*, die die Wiederbelebung hergab, und jede Zahl ≥ 10 hätte denselben
+Effekt gehabt.
+
+**Heute.** Zweifach, Gürtel und Hosenträger. Erstens zählt ein **Wiederholungsfehler nicht
+mehr als „Fehler in Folge"** (`worker.ts`): ein Posten, den die Schlange schon als gescheitert
+kennt (`versuche > 1` oder `wiederbelebt > 0`), beweist mit seinem nächsten Scheitern nichts
+Neues über den Anbieter — dieselbe Unterscheidung, die der 403-Zweig längst traf. Ein echter
+Ausfall erzeugt massenhaft **Erst**fehler und erreicht die Bremse weiterhin; der e2e-Test
+prüft beide Richtungen. Zweitens weckt ein Lauf höchstens `WIEDERBELEBUNGEN_JE_LAUF` Posten
+(Vorgabe 3), älteste zuerst, und `config.laden()` erzwingt, dass diese Zahl unter
+`ABBRUCH_NACH_FEHLERN` liegt.
+
+**Die Lehre.** Eine Notbremse und ein Nachschubmechanismus, die dieselbe Zahl teilen, sind
+kein Zufall, der auf sich warten lässt. Und: „Fehler in Folge" ist nur dann ein Signal über
+die *Gegenstelle*, wenn jeder Fehler eine *neue* Frage war.
+
 ### Ein stummer Server legte den Worker still
 
 **Symptom.** `getUmsatzbericht:speisen` stand über zehn Minuten „in Arbeit", während der Posten

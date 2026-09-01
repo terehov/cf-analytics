@@ -444,6 +444,26 @@ const Schema = z.object({
   MAX_WIEDERBELEBUNGEN: z.coerce.number().int().min(0).default(3),
 
   /**
+   * Wie viele Posten EIN Lauf hoechstens wiederbelebt — zusaetzlich zur
+   * Lebenszeitgrenze MAX_WIEDERBELEBUNGEN darueber.
+   *
+   * Der Anlass, gemessen an den Laeufen 108–110: zehn zurueckgeholte
+   * Posten mit deterministischem HTTP 500 liefen (aelteste Daten,
+   * `zeitraum_von DESC`) zwangslaeufig hintereinander ans Spurende und
+   * trafen mit exakt zehn Fehlern in Folge ABBRUCH_NACH_FEHLERN — drei
+   * Naechte in Folge brach die FoodNotify-Spur an ihrer eigenen
+   * Wiederbelebung ab.
+   *
+   * Drei, nicht mehr: weit genug unter der Notbremse, dass eine volle
+   * Wiederbelebungsrunde sie nie erreichen kann (die Kreuzpruefung in
+   * `laden()` erzwingt das). Und drei ist kein Flaschenhals: aufgegebene
+   * Posten sind selten (0,16 % am 13.08.2026), und was ein Lauf nicht
+   * zurueckholt, holt der naechste — `ORDER BY erledigt_am` nimmt die
+   * aeltesten zuerst.
+   */
+  WIEDERBELEBUNGEN_JE_LAUF: z.coerce.number().int().min(0).default(3),
+
+  /**
    * Nach wie vielen Tagen dauerhafter Ablehnung (HTTP 403) ein FoodNotify-Posten
    * geschlossen wird — mit `ergebnis = 'kein_zugriff'`, nicht `aufgegeben`.
    *
@@ -768,6 +788,21 @@ function laden() {
     throw new Error(
       'METABASE_USER und METABASE_PASSWORD müssen beide gesetzt sein oder beide fehlen — ' +
       `gesetzt ist nur ${r.data.METABASE_USER ? 'der Benutzer' : 'das Passwort'}`)
+  }
+  /**
+   * Eine volle Wiederbelebungsrunde darf die Notbremse nie erreichen können.
+   * Seit dem 01.09.2026 zählen Wiederholungsfehler ohnehin nicht mehr als
+   * „Fehler in Folge" (sync/worker.ts) — diese Prüfung ist der Gürtel zum
+   * Hosenträger: fällt jene Unterscheidung einer späteren Änderung zum
+   * Opfer, kann die Wiederbelebung den Abbruch trotzdem nicht allein
+   * herbeiführen. Die Läufe 108–110 sind der Beleg, dass genau diese
+   * Gleichheit drei Nächte in Folge den Lauf gekostet hat.
+   */
+  if (r.data.WIEDERBELEBUNGEN_JE_LAUF >= r.data.ABBRUCH_NACH_FEHLERN) {
+    throw new Error(
+      `WIEDERBELEBUNGEN_JE_LAUF (${r.data.WIEDERBELEBUNGEN_JE_LAUF}) muss unter ` +
+      `ABBRUCH_NACH_FEHLERN (${r.data.ABBRUCH_NACH_FEHLERN}) liegen — sonst kann eine ` +
+      'volle Wiederbelebungsrunde die FoodNotify-Spur allein abbrechen (Läufe 108–110)')
   }
   return r.data
 }

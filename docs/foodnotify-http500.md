@@ -1,5 +1,24 @@
 # HTTP 500 bei `/shop-order/{id}/change` — Meldung an FoodNotify
 
+> **Nachtrag 01.09.2026 — die Kernaussage ist überholt.** Die Wiederbelebung
+> (`aufgegebeneWiederbeleben()`, Migration 0070) hat **282 der 292** hier
+> gemeldeten Bestellungen nachträglich doch geholt: in `sync.warteschlange`
+> stehen 282 Posten `fn:bestellpositionen` mit `ergebnis = 'ok'` und
+> `wiederbelebt = 1`. „Deterministisch und dauerhaft" war also nur
+> „deterministisch am Messtag" — auf FoodNotify-Seite hat sich etwas bewegt.
+> **10 Bestellungen fehlen weiterhin** (alle Enchilada, Juli/August 2026);
+> sie laufen über `mart.posten_aufgegeben` aus.
+>
+> Der Rest des Dokuments bleibt als Messprotokoll vom 04.08.2026 stehen —
+> als Meldung an FoodNotify ist er nicht mehr zu verwenden.
+>
+> Und eine Lehre daraus steht im Fehlerkatalog: exakt diese zehn Posten
+> haben in den Läufen 108–110 drei Nächte in Folge die FoodNotify-Spur
+> abgebrochen, weil zehn wiederbelebte Fehler in Folge die Notbremse
+> `ABBRUCH_NACH_FEHLERN` trafen. Seit dem 01.09.2026 zählen
+> Wiederholungsfehler nicht mehr als „Fehler in Folge", und ein Lauf
+> weckt höchstens `WIEDERBELEBUNGEN_JE_LAUF` Posten.
+
 **Stand 04.08.2026.** Daten: `docs/foodnotify-http500.csv` (282 Zeilen, eine je betroffener
 Bestellung).
 
