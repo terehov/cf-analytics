@@ -2866,3 +2866,74 @@ Ordnerliste aus dem LINA-Baumknoten (`belegarchiv_<id>`, `children`) die
 Kreuzprodukt-Menge weiter verkleinern kann, ist offen — die Baum-Antwort
 landet nicht in `raw.api_antwort`; ein protokollierter Baumknoten würde es
 beantworten.
+
+---
+
+## 12.09.2026 — Der Zugang für andere: MCP statt Datenbankzugang
+
+Der Plan steht in `docs/plan-skybridge.md`; hier nur die Entscheidungen daraus.
+
+### Der MCP-Server sieht `mart`, `manual` und `ampel` — nicht `core`
+
+*Die Frage:* Daniel und die OMs sollen ihre Fragen selbst stellen können, mit ChatGPT,
+Copilot oder Claude. Der kurze Weg wäre ein Werkzeug `sql_ausfuehren` auf einer
+Leseverbindung über die ganze Datenbank.
+
+*Dagegen spricht der Fehlerkatalog.* Von den Fehlern, die dieses Projekt gemacht hat, hat
+sich fast keiner gemeldet — es kam kein Stacktrace, sondern eine plausibel aussehende
+falsche Zahl. `stadt` ist bei allen 141 Betrieben `NULL` und `GROUP BY stadt` ergibt
+schweigend **eine** Gruppe; 79 Betriebe ohne Geschäft verdünnen jeden Mittelwert;
+`core.pos_artikel` ist leer und liefert null Zeilen statt eines Fehlers; LINAs Warenwirtschaft
+ist Demodaten. Ein Sprachmodell trifft diese Fallen schneller und häufiger als ein Mensch,
+und niemand prüft nach.
+
+**Entschieden:** derselbe Grundsatz wie bei Metabase (`metabase.md`), nur schärfer erzwungen —
+eine eigene Datenbankrolle `mcp_leser` mit `USAGE` ausschließlich auf `mart`, `manual`,
+`ampel`, `default_transaction_read_only` und `statement_timeout`. Nicht ein SQL-Filter im
+Code: den umgeht man mit einer CTE, einer Funktion oder einem `search_path`. Der Codefilter
+kommt dazu, als erste Hürde mit lesbarer Meldung, nicht als einzige.
+
+*Der Preis:* Fragen, die `core` bräuchten, sind nicht beantwortbar. Das ist Absicht — sie
+sind die Arbeitsliste für neue `mart`-Sichten, und `mcp.zugriff` macht sie zählbar.
+
+### Der Befund-Anhang: Warnungen reisen mit der Antwort, als Daten
+
+Die 178 Tabellenkommentare in `mart` sagen bereits, was man mit einer Sicht **nicht** tun
+soll. Sie nützen nichts, wenn sie beim Abfragen nicht dabei sind.
+
+**Entschieden:** jede Antwort trägt ein Feld `hinweise[]`, maschinell angehängt anhand der
+berührten Sichten, dazu den Datenstand der betroffenen Betriebe. Die Fallstricke liegen in
+`mcp.fallstrick` **als Daten**, nicht als `if` im Code — dieselbe Begründung wie bei den
+Ampelregelwerken (`datenmodell.md`, Entscheidung 5): eine neue Warnung ist eine Migration,
+kein Deploy. Das ist harte Regel 10, angewandt auf Auswertungen: die stille Falle muss im
+Ergebnis sichtbar werden, nicht in einem Dokument, das niemand liest.
+
+### Skybridge als Gerüst, aber selbst gehostet — nicht auf Alpic
+
+*Für Skybridge:* der Round Table ist ein Farbraster; als Text im Chat ist er unlesbar,
+als gerenderte Tabelle ist er das Produkt. Skybridge liefert genau das (MCP-Werkzeug +
+React-Ansicht, ein Codestand für Claude, ChatGPT und VS Code), ist MIT-lizenziert und bleibt
+im vorhandenen Stack — TypeScript und Zod.
+
+*Gegen Alpic als Hosting:* die Datenbank ist von außen nicht erreichbar und soll es nicht
+werden. Eine gehostete App außerhalb des Hetzner-Servers braucht genau das, oder einen
+Tunnel, der dasselbe Loch mit mehr beweglichen Teilen ist. Der Server, auf dem Postgres und
+Metabase schon stehen, ist der richtige Ort — als eigene Dokploy-Application, **nicht** als
+Endpunkt in `src/health.ts`: ein Webdienst mit Publikumsverkehr hat einen anderen Lastverlauf
+und ein anderes Risikoprofil als ein Batch-Container, der nachts läuft.
+
+Alpics Tunnel bleibt für die Entwicklung (Phase 1) — dort fließt keine Datenbankverbindung.
+
+### Kein Schreibzugriff
+
+`manual` ist das einzige Schema, das von Hand entsteht, und das einzige, das ein Backfill
+nicht wiederherstellen kann. Ein Modell, das dort Maßnahmen anlegt, erzeugt Einträge, die
+niemand verantwortet. Wenn Schreiben kommt, dann als eigener Plan mit Bestätigungsschritt.
+
+### Jede Abfrage wird protokolliert
+
+`mcp.zugriff` (Nutzer, Client, Werkzeug, SQL, Zeilen, Dauer). Zwei Gründe: eine Zahl, die im
+Round Table landet, muss rekonstruierbar sein — eine Chat-Antwort ist kein Beleg. Und ein
+Dienst ohne Zulauf ist ein Fehler, kein Normalzustand (Regel 10): wird der Server nicht
+benutzt, muss man das sehen. Wiederholte Fragen aus dem freien SQL sind die
+Anforderungsliste für die nächsten `mart`-Sichten und Metabase-Karten.

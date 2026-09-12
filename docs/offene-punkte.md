@@ -1601,3 +1601,21 @@ Bis dahin hat die Kennzahl **keine Quelle — und bekommt auch keine geschätzte
   wenn Auditpflichten fachlich festgelegt sind.
 * **Keine Metabase-Karten.** Die `mart`-Sichten stehen, das Dashboard nicht — es gibt bis zum
   ersten Lauf keine Zahl, gegen die man eine Karte prüfen könnte.
+
+## MCP-Zugang für andere Nutzer (Plan: `plan-skybridge.md`)
+
+Vier Punkte, die Eugene entscheiden muss, bevor Phase 0 beginnt:
+
+* **Welcher Identitätsanbieter?** Gibt es bei Concept Family bereits Microsoft 365 / Entra,
+  an das sich der Zugang hängen lässt? Das wäre die beste Antwort — Ausscheiden aus dem
+  Unternehmen bedeutet dann von selbst Zugangsverlust. Sonst WorkOS oder Clerk mit
+  Allowlist; Skybridge bringt für beide ein Beispiel mit.
+* **Wer bekommt freies SQL (Ring 3)?** Die Leitplanken sind Technik, kein Urteil — ein
+  richtiges Ergebnis kann falsch gedeutet werden. Vorschlag: zunächst nur Eugene und Daniel,
+  alle anderen Ring 1 und 2.
+* **Öffentlicher Hostname und TLS für `mcp.<domain>`.** Claude und ChatGPT verbinden von
+  außen; das ist der erste Dienst dieses Projekts, für den das gilt. Metabase liegt heute
+  hinter dem Dokploy-Proxy, die Datenbank ist gar nicht erreichbar — und bleibt es.
+* **Dürfen Zahlen aus dem Chat weitergegeben werden?** Eine Frage an das Unternehmen, keine
+  technische. Der Datenstand-Anhang beantwortet „war die Zahl fertig", nicht „durfte sie
+  raus".
