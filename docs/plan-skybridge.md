@@ -1,4 +1,4 @@
-# Plan: die Daten selbst befragen — ein eigener MCP-Server neben und statt Metabase
+# Plan: die Daten selbst befragen — ein eigener MCP-Server neben und statt dem BI-Tool
 
 Stand 13.09.2026. Dritte Fassung. Die erste (12.09.) und die zweite (13.09. früh) sind
 überarbeitet; ihre Fehler stehen in Abschnitt 0 und bleiben in `entscheidungen.md`
@@ -6,25 +6,30 @@ durchgestrichen erhalten.
 
 **Der Anlass:** Daniel und die OMs sollen jede Frage an die Daten selbst stellen können —
 jede Gruppierung, jede Beziehung, nicht nur die 285 Fragen, die schon jemand als
-Metabase-Karte gebaut hat — mit dem Werkzeug, das sie ohnehin benutzen: ChatGPT, Copilot
-oder Claude. **Und zwar ohne Metabase:** der Server ist eine Alternative dazu, für Menschen
-ohne Metabase-Zugang heute, und mit der Möglichkeit, Metabase später abzulösen.
+Karte im BI-Tool gebaut hat — mit dem Werkzeug, das sie ohnehin benutzen: ChatGPT, Copilot
+oder Claude. **Und zwar ohne BI-Tool:** der Server ist eine Alternative dazu, für Menschen
+ohne Zugang zum BI-Tool heute, und mit der Möglichkeit, es später abzulösen.
+
+> **Sprachregelung.** „BI-Tool" meint die Auswertungsoberfläche des Unternehmens — heute
+> Metabase. Der Plan ist bewusst an dieser Rolle geschrieben und nicht am Produkt: was hier
+> steht, gilt auch nach einem Wechsel. Wo der Produktname unten trotzdem fällt, geht es um
+> eine konkrete Eigenschaft dieses Produkts — eine Datei, eine Schnittstelle, eine Version.
 
 ---
 
 ## 0. Was diese Fassung anders sieht
 
-**Die Zielsetzung, präzisiert am 13.09.2026 (Eugene):** der Server ist kein Zusatz zu
-Metabase, sondern eine **Alternative** — für Nutzer ohne Metabase-Zugang sofort, und
+**Die Zielsetzung, präzisiert am 13.09.2026 (Eugene):** der Server ist kein Zusatz zum
+BI-Tool, sondern eine **Alternative** — für Nutzer ohne Zugang dorthin sofort, und
 perspektivisch als Ablösung. Daraus folgt, was die zweite Fassung falsch gewichtet hatte:
 
-* **Metabases eingebauter MCP-Server ist nicht der Weg.** Er existiert (seit Version 60,
-  unsere Instanz läuft auf v0.63) und wäre in einem halben Tag eingeschaltet — aber er
-  braucht einen Metabase-Nutzer, seine Beziehungen liegen in Metabases Katalog, seine
-  Rechte in Metabases Gruppen. Genau das soll wegfallen können. Er bleibt eine Notiz für
+* **Der im BI-Tool eingebaute MCP-Server ist nicht der Weg.** Er existiert (Metabase seit
+  Version 60, unsere Instanz läuft auf v0.63) und wäre in einem halben Tag eingeschaltet —
+  aber er braucht ein Konto dort, seine Beziehungen liegen in dessen Katalog, seine Rechte
+  in dessen Gruppen. Genau das soll wegfallen können. Er bleibt eine Notiz für
   den Fall, dass jemand ihn zum Vergleich einschalten will; gebaut wird darauf nichts.
-* **Alles, was Metabase heute an Wissen hält, muss in die Datenbank oder ins Repository.**
-  Die FK-Verdrahtung aus `beziehungen.ts` wird zur Tabelle `mcp.achse` — und Metabase
+* **Alles, was das BI-Tool heute an Wissen hält, muss in die Datenbank oder ins Repository.**
+  Die FK-Verdrahtung aus `beziehungen.ts` wird zur Tabelle `mcp.achse` — und das BI-Tool
   liest sie künftig **von dort**, statt umgekehrt. Die Karten in `metabase/karten-*.ts`
   werden zur gemeinsamen Berichtsdefinition, aus der beide Oberflächen gespeist werden.
 * **Der Server muss die Fragen der 285 Karten beantworten können, nicht nur neue.** Sonst
@@ -32,7 +37,7 @@ perspektivisch als Ablösung. Daraus folgt, was die zweite Fassung falsch gewich
 
 Was aus der vertieften Recherche bleibt, jeder Punkt mit einer Zahl dahinter:
 
-1. **Metabase muss nicht mehr die einzige Oberfläche sein, aber seine Karten sind das
+1. **Das BI-Tool muss nicht mehr die einzige Oberfläche sein, aber seine Karten sind das
    Beste, was dieses Repository hat.** Sie werden weiterverwendet — als Berichte
    (ein Werkzeug, 285 Schlüssel) und als Beispiele.
 2. **285 Werkzeuge waren ein Fehler.** Cursor kappt bei 40 Werkzeugen, Copilot bei 128,
@@ -45,14 +50,14 @@ Was aus der vertieften Recherche bleibt, jeder Punkt mit einer Zahl dahinter:
    nicht davor. Die Sicherheit muss also *in* den freien Weg, nicht daneben.
 4. **Es fehlte die Beziehungsschicht.** `mart` besteht aus Sichten, und Postgres kennt
    keine Fremdschlüssel auf Sichten (`metabase/beziehungen.ts` hat genau dieses Problem
-   für Metabase gelöst). Ein Modell, das `mart.umsatz_tag` mit `mart.personalkosten`
+   für das BI-Tool gelöst). Ein Modell, das `mart.umsatz_tag` mit `mart.personalkosten`
    verbinden will, muss wissen, dass beide über `betrieb_key` und den Tag zusammenfinden —
    und dass `betrieb` als Name **nicht** eindeutig ist. Ohne diese Schicht gibt es keine
    „beliebige Beziehung", nur beliebige Joins.
 
 Was bleibt: **nur `mart`, `manual`, `ampel`**; erzwungen über eine Datenbankrolle; jede
 Antwort trägt ihre Fallstricke; kein Schreibzugriff; jede Abfrage protokolliert.
-**Und neu: der Server hängt an nichts, was Metabase gehört.**
+**Und neu: der Server hängt an nichts, was dem BI-Tool gehört.**
 
 ---
 
@@ -94,12 +99,12 @@ Plan schließt (Abschnitt 5).
 
 ---
 
-## 2. Was Metabase heute leistet — und was der Server davon übernehmen muss
+## 2. Was das BI-Tool heute leistet — und was der Server davon übernehmen muss
 
-Eine Alternative muss wissen, wofür sie Alternative ist. Was Metabase in diesem Projekt
+Eine Alternative muss wissen, wofür sie Alternative ist. Was das BI-Tool in diesem Projekt
 tatsächlich tut, steht in `dashboards.md` und `metabase-sichtbarkeit.md`:
 
-| Metabase heute | Übernimmt der Server so | Bleibt Metabase |
+| BI-Tool heute | Übernimmt der Server so | Bleibt beim BI-Tool |
 |---|---|---|
 | 285 Karten auf ~40 Dashboards, natives SQL mit Parametern | `bericht_ausfuehren(schluessel, parameter)` — **ein** Werkzeug, dieselbe SQL, dieselben Parameter, aus `metabase/karten-*.ts` gelesen (Abschnitt 4) | — |
 | Drill-Down Marke → Filiale → Betrieb mit mitlaufendem Filter | Die Ansicht trägt den Filter im Zustand (`state-and-context`); ein Klick auf eine Zeile ruft `bericht_ausfuehren` der nächsten Ebene über `useCallTool` | — |
@@ -107,24 +112,24 @@ tatsächlich tut, steht in `dashboards.md` und `metabase-sichtbarkeit.md`:
 | Tabelle, Balken, Linie, Kombi, Fläche, Punktwolke | React-Ansichten in Skybridge | — |
 | Pivot Wochentag × Stunde, Wasserfall, Punktkarte | Pivot und Wasserfall als Ansicht; **Karte nicht** — `mart.standort` ist ohnehin für 81 von 141 leer | Karte, bis Standorte gepflegt sind |
 | FK-Sprünge (`beziehungen.ts`) | `mcp.achse` — die Quelle, aus der `beziehungen.ts` künftig liest | — |
-| Tabellen- und Spaltenbeschreibungen | Kommen aus dem Katalog, waren nie Metabases | — |
+| Tabellen- und Spaltenbeschreibungen | Kommen aus dem Katalog, gehörten nie dem BI-Tool | — |
 | Dashboard an der Wand, Dauer-URL, Abonnement per Mail, Filter über mehrere Karten | **Nicht.** Ein Chat ist kein Bildschirm im Büro und keine Montags-Mail | Solange jemand das braucht |
 | Nutzer, Gruppen, Rechte | Identitätsanbieter + `mcp.nutzer_stufe` (Abschnitt 7) | — |
 | Schreiben in `manual` (Maßnahmen, Ursachen, OM-Einschätzung) | **Nicht** (Abschnitt 7) | Ja — bis ein eigener Plan mit Bestätigungsschritt kommt |
 
-**Die Folge für die Architektur:** die Karten sind heute Code, der Metabase provisioniert
+**Die Folge für die Architektur:** die Karten sind heute Code, der das BI-Tool provisioniert
 (`metabase/uebernehmen.ts`). Sie werden zur **Berichtsdefinition mit zwei Abnehmern**:
-`uebernehmen.ts` schreibt sie weiter nach Metabase, der MCP-Server liest sie beim Start.
-Eine Karte, einmal gebaut, ist an beiden Orten da. Fällt Metabase weg, fällt nur ein
+`uebernehmen.ts` schreibt sie weiter dorthin, der MCP-Server liest sie beim Start.
+Eine Karte, einmal gebaut, ist an beiden Orten da. Fällt das BI-Tool weg, fällt nur ein
 Abnehmer weg.
 
-**Wann Metabase gehen kann,** ist keine Planfrage, sondern eine Messung: wenn Metabases
+**Wann das BI-Tool gehen kann,** ist keine Planfrage, sondern eine Messung: wenn sein
 Anmeldeprotokoll über einen Monat nur noch Eugene zeigt und `mcp.zugriff` den Rest. Bis
 dahin laufen beide, aus derselben Quelle.
 
 **Zur Notiz:** Metabase 60+ bringt einen eigenen MCP-Server mit (`/api/metabase-mcp`,
-OAuth aus Metabase, Rechte je Nutzer). Für dieses Ziel ungeeignet, weil er einen
-Metabase-Nutzer voraussetzt und seine Beziehungen in Metabases Katalog hält — genau das,
+eigenes OAuth, Rechte je Nutzer). Für dieses Ziel ungeeignet, weil er ein Konto im BI-Tool
+voraussetzt und seine Beziehungen in dessen Katalog hält — genau das,
 was nicht mehr Voraussetzung sein soll. Wer ihn zum Vergleich einschalten will, kann das
 in einer halben Stunde; die zehn Fallenfragen aus 6.3 taugen auch dafür.
 
@@ -132,7 +137,7 @@ in einer halben Stunde; die zehn Fallenfragen aus 6.3 taugen auch dafür.
 
 ## 3. Der Server (Skybridge)
 
-Ein Dienst, drei Aufgaben: die Berichte, die Metabase heute zeigt; freie Fragen mit
+Ein Dienst, drei Aufgaben: die Berichte, die das BI-Tool heute zeigt; freie Fragen mit
 Prüfung **vor** dem Lauf und Befund-Anhang **am** Ergebnis; und die Ansichten, ohne die
 ein Ampelraster im Chat unlesbar wäre.
 
@@ -146,7 +151,7 @@ mcp.<domain>            ← Skybridge-App, eigene Dokploy-Application
    ▼
 PostgreSQL 18           ← Rolle `mcp_leser`: mart/manual/ampel/mcp, nur lesend
    ▲
-   └── Metabase (solange es läuft) liest dieselben Karten und dieselben Achsen
+   └── BI-Tool (solange es läuft) liest dieselben Karten und dieselben Achsen
 ```
 
 **Warum Skybridge** (MIT, TypeScript, Zod — der Stack dieses Repositories): ein
@@ -159,7 +164,7 @@ WorkOS/Auth0/Clerk/Descope/Stytch oder einen beliebigen IdP mit Discovery-Dokume
 Ansicht — hier wandert die volle Tabelle hin, das Modell bekommt nur die gekürzte).
 
 **Warum selbst gehostet, nicht auf Alpic:** die Datenbank ist von außen nicht erreichbar
-und soll es nicht werden. Ein eigener Container neben Postgres und Metabase, kein Endpunkt
+und soll es nicht werden. Ein eigener Container neben Postgres und dem BI-Tool, kein Endpunkt
 in `src/health.ts` — der Importer ist ein nächtlicher Batch, ein Dienst mit
 Publikumsverkehr hat ein anderes Risikoprofil. Alpics Tunnel bleibt für die Entwicklung.
 
@@ -173,7 +178,7 @@ Datenbank deutsch ist und das Modell sonst übersetzt und dabei danebengreift.
 | Werkzeug | Tut | Kanal |
 |---|---|---|
 | `berichte_suchen(stichwort)` | Die 285 Karten nach Name, Beschreibung, Dashboard — liefert Schlüssel und Parameter | Text |
-| `bericht_ausfuehren(schluessel, parameter)` | **Die Metabase-Ablösung in einem Werkzeug.** Dieselbe SQL, dieselben Parameter, dieselbe Anzeigeart wie die Karte; Werte aus `werteliste`/`festeWerte` geprüft | Text + **Ansicht** je `anzeige` |
+| `bericht_ausfuehren(schluessel, parameter)` | **Die Ablösung des BI-Tools in einem Werkzeug.** Dieselbe SQL, dieselben Parameter wie die Karte; Werte aus `werteliste`/`festeWerte` geprüft | Text; die Darstellung wählt das Modell |
 | `sichten_suchen(stichwort)` | Sichten samt Kommentar, Körnung, Achsen | Text |
 | `sicht_beschreiben(name)` | Spalten mit Kommentar, Körnung, Achsen, Kennzahlen mit Aggregationsregel, **Fallstricke**, **Beispielabfragen aus den Karten**, drei Beispielzeilen | Text |
 | `achsen_zeigen(sicht_a, sicht_b?)` | Worüber zwei Sichten zusammenfinden — oder alle Achsen einer Sicht | Text |
@@ -185,8 +190,8 @@ Datenbank deutsch ist und das Modell sonst übersetzt und dabei danebengreift.
 
 **Ein Werkzeug, 285 Berichte.** `bericht_ausfuehren` liest `Karte[]` aus
 `metabase/karten-*.ts` — `schluessel`, `sql`, `parameter`, `anzeige`, `visualisierung`
-sind schon da (`metabase/typen.ts`). Der Übersetzer ist dieselbe Datei wie für Metabase,
-nur mit anderem Ziel: Metabase-Template-Tags (`{{monat}}`) werden zu `$1`, `werteliste`
+sind schon da (`metabase/typen.ts`). Der Übersetzer ist dieselbe Datei wie für das BI-Tool,
+nur mit anderem Ziel: dessen Template-Tags (`{{monat}}`) werden zu `$1`, `werteliste`
 wird zur Prüfung des Parameters gegen die Spalte, `anzeige` wählt die Ansicht. Das Modell
 sieht ein Werkzeug mit einem Enum von 285 Schlüsseln, die es über `berichte_suchen`
 findet — nicht 285 Werkzeugdefinitionen im Kontext.
@@ -223,11 +228,11 @@ sie steht neben den Daten, auf die sie sich bezieht.
 **Erstbefüllung, halb automatisch:** `mcp.sicht_achse` aus den Spaltennamen (die
 Konvention „Schlüssel heißt in Quelle und Ziel gleich" gilt im ganzen Schema —
 `beziehungen.ts` nutzt sie schon). **`beziehungen.ts` liest seine `ACHSEN` danach aus
-`mcp.achse` statt aus einer Konstante** — die Datenbank ist die Quelle, Metabase ein
+`mcp.achse` statt aus einer Konstante** — die Datenbank ist die Quelle, das BI-Tool ein
 Abnehmer; sonst gäbe es zwei Wahrheiten über dieselbe Beziehung. `mcp.fallstrick` aus den 114 Kommentaren mit Warnwort
 und `fehlerkatalog.md`. **Die Körnung von Hand** — 165 Sichten, zwei Tage, und der Ertrag
 geht nicht nur an den MCP-Server: dieselbe Zeile gehört in den Tabellenkommentar, dann
-hat Metabase sie auch. Regel für neue Sichten in `metabase.md`: *ohne Körnung im
+hat das BI-Tool sie auch. Regel für neue Sichten in `metabase.md`: *ohne Körnung im
 Kommentar keine Sicht.*
 
 ### 5.1 Körnung ist die halbe Sicherheit
@@ -337,7 +342,7 @@ für die nächsten `mart`-Sichten.
 
 ---
 
-## 7. Anmeldung — ohne Metabase und ohne fremden Anbieter
+## 7. Anmeldung — ohne BI-Tool und ohne fremden Anbieter
 
 > **Geändert am 13.09.2026.** Dieser Abschnitt empfahl einen Identitätsanbieter, am liebsten
 > Entra. Das war falsch: **ChatGPT meldet sich beim Verbinden per Dynamic Client
@@ -354,7 +359,7 @@ Rechte in `mcp.nutzer.stufe`:
 |---|---|
 | `lesen` | Berichte, Katalog, Datenstand, Betriebe suchen |
 | `fragen` | zusätzlich freies SQL |
-| — | schreiben: niemand. `manual` bleibt Metabase und Postico |
+| — | schreiben: niemand. `manual` bleibt BI-Tool und Postico |
 
 **Zwei Datenbankrollen**, weil `mcp_leser` Nutzereingaben als SQL ausführt: die
 Anmeldetabellen liegen außerhalb ihrer Rechte, sonst wäre der Signierschlüssel abfragbar.
@@ -364,8 +369,8 @@ automatischer Entzug beim Austritt — wer geht, wird hier stillgelegt. Das steh
 `offene-punkte.md`, weil es ein Ablauf ist und keine Einstellung.
 
 **Was bewusst noch nicht kommt: Sicht je Betrieb.** Ein OM, der nur seine Betriebe sehen
-darf, wäre Row-Level-Security auf `mart` — technisch möglich, aber Metabase kann das heute
-auch nicht, und eine Alternative muss zuerst gleichziehen.
+darf, wäre Row-Level-Security auf `mart` — technisch möglich, aber das BI-Tool kann das
+heute auch nicht, und eine Alternative muss zuerst gleichziehen.
 
 ## 8. Was in welchem Client ankommt
 
@@ -397,7 +402,7 @@ Ampeltabellen.
 | **3 — Prüfung** | Parser, Regeln, Befund-Anhang, Protokoll | **fertig.** Die zehn Fallenfragen laufen als Testdatei |
 | **4 — Ansichten** | Ampelraster, Ergebnistabelle | **fertig** für die beiden Tabellen. **Diagramme zeichnet das Modell**, nicht der Server — entschieden am 13.09.2026 (`entscheidungen.md`, 6); dafür trägt jede Antwort `spalten_info` und `darstellung` |
 | **5 — Betrieb** | Dokploy, TLS, Nutzer anlegen | **teilweise.** Die Anmeldung ist gebaut und gemessen (Migration `0102`, `mcp/src/anmeldung/`); offen bleiben Hostname, TLS und die Dokploy-Application |
-| **6 — Messen** | `mcp.zugriff` gegen Metabases Anmeldeprotokoll | **offen** — vier Wochen nach Phase 5 |
+| **6 — Messen** | `mcp.zugriff` gegen das Anmeldeprotokoll des BI-Tools | **offen** — vier Wochen nach Phase 5 |
 
 ### Wie es geplant war
 
@@ -408,11 +413,11 @@ Ampeltabellen.
 | **2 — Berichte** (2 Tage) | Skybridge-Gerüst, OAuth, `berichte_suchen`, `bericht_ausfuehren` über alle 285 Karten, Tabellen-Ansicht; Tunnel gegen Claude und ChatGPT | Zeile „Enchilada Bayreuth" im Chat = `migrations/pruefung.sql`; **jede** Karte läuft mit Standardparametern fehlerfrei (Testdatei) |
 | **3 — Prüfung** (2 Tage) | `abfrage_pruefen` mit Parser, `EXPLAIN`, Regeln aus `mcp.fallstrick`; `abfrage_ausfuehren`; Befund-Anhang; Protokoll; Testdatei mit den zehn Fallenfragen | Alle zehn: richtig oder gesperrt/gewarnt |
 | **4 — Ansichten** (2 Tage) | Ampelraster, Linie/Balken/Kombi, Drill-Down mit Filter im Zustand, Pivot; Farben aus `ampel.regelwerk` | Die fünf Drill-Down-Dashboards sind im Chat durchklickbar |
-| **5 — Betrieb** (1 Tag) | Dokploy-Application, Hostname/TLS, IdP, `mcp.nutzer_stufe`, `/status`-Prüfzeile; Daniel und ein OM ohne Metabase-Zugang freigeschaltet, eine Seite „so fragt man" | — |
-| **6 — Messen** (vier Wochen, nebenher) | `mcp.zugriff` gegen Metabases Anmeldeprotokoll: wer braucht Metabase noch, wofür | Eine Tabelle, die die Ablösefrage beantwortet |
+| **5 — Betrieb** (1 Tag) | Dokploy-Application, Hostname/TLS, IdP, `mcp.nutzer_stufe`, `/status`-Prüfzeile; Daniel und ein OM ohne Zugang zum BI-Tool freigeschaltet, eine Seite „so fragt man" | — |
+| **6 — Messen** (vier Wochen, nebenher) | `mcp.zugriff` gegen das Anmeldeprotokoll des BI-Tools: wer braucht es noch, wofür | Eine Tabelle, die die Ablösefrage beantwortet |
 
 **Gut anderthalb Wochen.** Phase 2 vor Phase 3, bewusst: die Berichte sind der Teil, der
-Metabase ersetzt, und sie tragen kein Risiko einer falschen Zahl — es ist dieselbe SQL.
+das BI-Tool ersetzt, und sie tragen kein Risiko einer falschen Zahl — es ist dieselbe SQL.
 Das freie Fragen kommt danach, mit seinen Leitplanken.
 
 ---
@@ -424,7 +429,7 @@ Das freie Fragen kommt danach, mit seinen Leitplanken.
 2. Die Abdeckungslücken bleiben — 60 von 141 Standorte, `pos_artikel` leer, Belegarchiv ein
    Torso. Der Server macht sie **sichtbarer**, füllt keine.
 3. Kein Schreibzugriff.
-4. Er ersetzt Metabase **nicht an der Wand**: ein Dashboard, das im Büro hängt oder montags
+4. Er ersetzt das BI-Tool **nicht an der Wand**: ein Dashboard, das im Büro hängt oder montags
    per Mail kommt, ist kein Chat. Was sich im Chat wiederholt, gehört als Karte in
    `metabase/karten-*.ts` — dann ist es an beiden Orten. Das Protokoll sagt, was das ist.
 5. Er ersetzt den Agenten im Repository nicht: alles, was `core`, den Importer oder eine
@@ -439,7 +444,7 @@ Das freie Fragen kommt danach, mit seinen Leitplanken.
 * **Öffentlicher Hostname und TLS** für `mcp.<domain>` — der erste Dienst dieses Projekts,
   der von außen erreichbar ist. Die Datenbank bleibt es nicht.
 * **Wer bekommt freies SQL?** Vorschlag: Eugene, Daniel; alle anderen `lesen`.
-* **Wer soll als Erster ohne Metabase arbeiten?** Ein OM als Pilot in Phase 5 sagt mehr als
+* **Wer soll als Erster ohne das BI-Tool arbeiten?** Ein OM als Pilot in Phase 5 sagt mehr als
   Daniel, der beides hat.
 * **Darf eine Zahl aus dem Chat das Haus verlassen?** Eine Frage an das Unternehmen; der
   Datenstand-Anhang beantwortet „war sie fertig", nicht „durfte sie raus".
@@ -461,10 +466,10 @@ Plan wurde deshalb aus dem SQL-Text gezählt, nicht aus dem Katalog.
 ## 13. Die eine Entscheidung
 
 > **Die Karten sind die Berichtsdefinition, die Datenbank hält die Beziehungen, und beide
-> Oberflächen — Metabase heute, der Chat morgen — lesen von dort. Freies Fragen bekommt
+> Oberflächen — das BI-Tool heute, der Chat morgen — lesen von dort. Freies Fragen bekommt
 > Regeln auf dem Syntaxbaum, nicht Bitten im Prompt.**
 
-So hängt der Server an nichts, was Metabase gehört, und Metabase kann gehen, wenn das
+So hängt der Server an nichts, was dem BI-Tool gehört, und es kann gehen, wenn das
 Protokoll sagt, dass niemand es mehr öffnet. Die semantische Schicht ist der Unterschied
 zwischen 90 und 98 Prozent — und zwischen einer falschen Zahl und einer Verweigerung. Sie
 existiert in diesem Repository bereits, bis auf die Körnung.

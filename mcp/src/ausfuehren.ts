@@ -349,7 +349,7 @@ export async function abfrageAusfuehren(
  * Einen Bericht ausfuehren.
  *
  * OHNE FALLSTRICK-PRUEFUNG, und das ist Absicht: die Abfrage stammt nicht
- * von einem Modell, sondern aus metabase/karten-*.ts — gebaut von denen,
+ * von einem Modell, sondern aus den Kartendefinitionen (metabase/karten-*.ts) — gebaut von denen,
  * die das Schema kennen, statisch geprueft von uebernehmen.ts und in
  * metabase/karten.test.ts einzeln gegen Postgres gehalten. Eine Regel, die
  * hier anschluege, wuerde eine bewusste Entscheidung als Falle melden.

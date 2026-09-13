@@ -2,11 +2,11 @@
 // Alle Karten an einer Stelle.
 //
 // WARUM DIESE DATEI SEIT DEM 13.09.2026 EXISTIERT. Die Karten hatten bis
-// dahin genau einen Abnehmer — uebernehmen.ts, das Metabase damit
+// dahin genau einen Abnehmer — uebernehmen.ts, das damit das BI-Tool
 // provisioniert — und die Liste stand dort mitten im Skript. Seit der
 // MCP-Server dieselben Karten als Berichte ausfuehrt (docs/plan-skybridge.md),
 // gibt es zwei Abnehmer, und eine zweite Liste waere eine zweite Wahrheit:
-// eine Karte, die in Metabase steht und im Chat fehlt, faellt niemandem auf,
+// eine Karte, die im BI-Tool steht und im Chat fehlt, faellt niemandem auf,
 // bis jemand nach ihr sucht.
 //
 // Wer eine Kartendatei ergaenzt, ergaenzt sie HIER — danach ist sie an

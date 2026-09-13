@@ -2991,34 +2991,41 @@ Sicht.
 
 ---
 
-## 13.09.2026 (2) — Der Server ist eine Alternative zu Metabase, kein Zusatz
+## 13.09.2026 (2) — Der Server ist eine Alternative zum BI-Tool, kein Zusatz
 
-*Eugene:* der MCP-Server soll Metabase ersetzen können — für Nutzer ohne Metabase-Zugang
+*Eugene:* der MCP-Server soll das BI-Tool ersetzen können — für Nutzer ohne Zugang dorthin
 sofort, perspektivisch ganz.
 
-**Damit fällt „Metabase MCP zuerst" vom selben Morgen.** Metabases eingebauter Server
-setzt einen Metabase-Nutzer voraus, hält seine Beziehungen in Metabases Katalog und seine
-Rechte in Metabases Gruppen — genau die drei Dinge, die nicht mehr Voraussetzung sein
+> **Sprachregelung, ab dem 13.09.2026 auf Eugenes Wunsch:** in Plan, README und Code heißt
+> es **BI-Tool**, nicht Metabase — die Rolle ist gemeint, nicht das Produkt, und der Plan
+> soll einen Wechsel überleben. Der Produktname bleibt stehen, wo es um eine konkrete
+> Eigenschaft geht: das Verzeichnis `metabase/`, `METABASE_URL`, das Platzhalterformat,
+> `docs/metabase.md`. Ältere Einträge dieses Protokolls sind nicht umgeschrieben — sie sind
+> Zeitdokumente.
+
+**Damit fällt „BI-Tool-MCP zuerst" vom selben Morgen.** Der dort eingebaute Server
+setzt ein Konto im BI-Tool voraus, hält seine Beziehungen in dessen Katalog und seine
+Rechte in dessen Gruppen — genau die drei Dinge, die nicht mehr Voraussetzung sein
 sollen. Er bleibt eine Notiz zum Vergleich, gebaut wird auf ihm nichts.
 
-**Entschieden, damit der Server an nichts hängt, was Metabase gehört:**
+**Entschieden, damit der Server an nichts hängt, was dem BI-Tool gehört:**
 
 1. **Die Karten werden zur Berichtsdefinition mit zwei Abnehmern.** `metabase/karten-*.ts`
-   bleibt, `uebernehmen.ts` provisioniert damit weiter Metabase, und der Server liest
+   bleibt, `uebernehmen.ts` provisioniert damit weiter das BI-Tool, und der Server liest
    dieselben `Karte[]` als `bericht_ausfuehren(schluessel, parameter)` — ein Werkzeug, 285
-   Schlüssel, dieselbe SQL. Fällt Metabase weg, fällt ein Abnehmer weg. Der Preis: die
-   Karten bleiben Metabase-Dialekt (`{{monat}}`-Template-Tags), der Server übersetzt. Ein
+   Schlüssel, dieselbe SQL. Fällt das BI-Tool weg, fällt ein Abnehmer weg. Der Preis: die
+   Karten bleiben im Dialekt des BI-Tools (`{{monat}}`-Template-Tags), der Server übersetzt. Ein
    eigenes Berichtsformat wäre sauberer und hieße, 285 Karten anzufassen — nicht jetzt.
 2. **Die Beziehungen wandern in die Datenbank.** `mcp.achse` ist die Quelle;
    `beziehungen.ts` liest seine `ACHSEN` von dort statt aus einer Konstante. Sonst gäbe es
    zwei Wahrheiten über dieselbe Beziehung.
 3. **Eigene Nutzer über einen Identitätsanbieter**, Stufen in `mcp.nutzer_stufe`. Ohne
-   diese Antwort gibt es keine Nutzer ohne Metabase — deshalb die erste Frage an Eugene.
+   diese Antwort gibt es keine Nutzer ohne das BI-Tool — deshalb die erste Frage an Eugene.
 4. **Berichte vor freiem Fragen** (Phase 2 vor 3): die Berichte sind der Teil, der
-   Metabase ersetzt, und tragen kein Risiko einer falschen Zahl — es ist dieselbe SQL.
+   das BI-Tool ersetzt, und tragen kein Risiko einer falschen Zahl — es ist dieselbe SQL.
 5. **Nicht ersetzt, ausdrücklich:** das Dashboard an der Wand, die Montags-Mail, die
-   Dauer-URL, Schreiben in `manual`, die Punktkarte. Wann Metabase gehen kann, entscheidet
-   eine Messung — Metabases Anmeldeprotokoll gegen `mcp.zugriff` über einen Monat — nicht
+   Dauer-URL, Schreiben in `manual`, die Punktkarte. Wann das BI-Tool gehen kann, entscheidet
+   eine Messung — sein Anmeldeprotokoll gegen `mcp.zugriff` über einen Monat — nicht
    der Plan.
 
 
@@ -3269,9 +3276,9 @@ richtig, `src/db.ts`); fuer ein Modell, das zeichnen soll, ist `"136612.46"` ein
 Die Server-`instructions` (was jeder Client beim Verbinden liest) sagen dasselbe in drei
 Saetzen: Form ist deine Sache, Prozent nicht skalieren, Ampeln zaehlen.
 
-### Was mit Metabases Anzeigeart geschieht
+### Was mit der Anzeigeart des BI-Tools geschieht
 
-Sie wird **genannt, nicht vorgegeben**: „In Metabase steht dieser Bericht als `line` — ein
+Sie wird **genannt, nicht vorgegeben**: „Im BI-Tool steht dieser Bericht als `line` — ein
 Hinweis, keine Vorgabe." Wegwerfen waere Informationsverlust, vorschreiben waere die
 abgelehnte Entscheidung.
 

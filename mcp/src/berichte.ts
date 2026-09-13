@@ -1,5 +1,10 @@
 /**
- * Die 285 Metabase-Karten als Berichte — die eigentliche Metabase-Abloesung.
+ * Die 285 Karten des BI-Tools als Berichte — die eigentliche Abloesung.
+ *
+ * „BI-Tool" meint die Auswertungsoberflaeche des Unternehmens, heute
+ * Metabase. Wo der Produktname unten faellt, geht es um sein konkretes
+ * Platzhalterformat — das muss hier genauso behandelt werden wie dort,
+ * sonst zeigt derselbe Bericht zwei verschiedene Zahlen.
  *
  * WARUM EIN WERKZEUG UND NICHT 285. Jede Werkzeugbeschreibung kostet ein
  * Modell 300–600 Token, bevor die erste Frage gestellt ist; Cursor kappt bei
@@ -16,9 +21,7 @@
  * OHNE Plausibilitaetsfilter gibt es in keiner Karte, aber `stadt` steht in
  * mancher Ausgabespalte, weil die Karte sie als leer AUSWEIST).
  *
- * DIE UEBERSETZUNG. Metabase kennt zwei Platzhalter, und beide muessen hier
- * genauso behandelt werden wie dort — sonst zeigt derselbe Bericht in
- * Metabase und im Chat verschiedene Zahlen:
+ * DIE UEBERSETZUNG. Das BI-Tool kennt zwei Platzhalter (Metabase-Syntax):
  *
  *   {{name}}      ein Wert. Wird zu $1, $2, … — als Parameter, nicht als
  *                 Text eingesetzt. Ein Betriebsname mit Apostroph (und die
@@ -26,13 +29,13 @@
  *                 Syntaxfehler, im schlimmeren Fall mehr.
  *   [[ ... ]]     ein optionaler Block. Steht fuer KEINEN der Platzhalter
  *                 darin ein Wert an, faellt der ganze Block weg. Genau so
- *                 macht es Metabase.
+ *                 macht es das BI-Tool.
  *
- * Dazu die Feldfilter (`template_tag_dimension`): dort baut Metabase die
+ * Dazu die Feldfilter (`template_tag_dimension`): dort baut das BI-Tool die
  * ganze Klausel selbst, aus TABELLE.SPALTE — nicht schemaqualifiziert.
  * Deshalb hier genauso. Dass die Tabelle im Karten-SQL nicht unter einem
  * Alias stehen darf, prueft uebernehmen.ts statisch; das ist dieselbe
- * Bedingung, unter der die Karte auch in Metabase laeuft
+ * Bedingung, unter der die Karte auch im BI-Tool laeuft
  * (docs/fehlerkatalog.md, "Ein Feldfilter auf eine Tabelle mit Alias").
  */
 import type { Karte, Parameter } from '../../metabase/typen'

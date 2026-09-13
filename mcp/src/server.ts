@@ -206,8 +206,8 @@ export const app = new Skybridge({
       name: 'berichte_suchen',
       title: 'Fertige Berichte finden',
       description:
-        'Sucht unter den 285 fertigen Berichten (denselben, die auch die Metabase-Dashboards ' +
-        'zeigen) nach Stichwort. Liefert Schluessel, Beschreibung und Parameter. ERST HIER ' +
+        'Sucht unter den 285 fertigen Berichten (denselben, die auch die Dashboards im ' +
+        'BI-Tool zeigen) nach Stichwort. Liefert Schluessel, Beschreibung und Parameter. ERST HIER ' +
         'SUCHEN, bevor eine eigene Abfrage geschrieben wird: ein fertiger Bericht ist von ' +
         'Menschen gebaut, die das Schema kennen, und gegen die Excel-Vorlage verifiziert.',
       inputSchema: { stichwort: z.string().describe('z. B. "round table", "umsatz marke", "personal"') },
@@ -230,7 +230,7 @@ export const app = new Skybridge({
       name: 'bericht_ausfuehren',
       title: 'Fertigen Bericht ausfuehren',
       description:
-        'Fuehrt einen der fertigen Berichte aus — dieselbe Abfrage, die die Metabase-Karte ' +
+        'Fuehrt einen der fertigen Berichte aus — dieselbe Abfrage, die die Karte im BI-Tool ' +
         'zeigt, mit denselben Parametern. Der Schluessel kommt aus berichte_suchen. ' +
         'Parameter als Objekt, z. B. {"monat":"2026-07-01","marke":"Enchilada"}. Ein Zeitraum ' +
         'als {"von":"2026-01-01","bis":"2026-03-31"}. Die DARSTELLUNG des Ergebnisses ist deine ' +
@@ -261,7 +261,7 @@ export const app = new Skybridge({
           koernung: e.koernung, datenstand: e.datenstand, hinweise: e.hinweise,
           spalten_info: e.spalten_info, darstellung: e.darstellung,
         },
-        content: `${karte.name}: ${e.zeilen_gesamt} Zeilen. In Metabase steht dieser Bericht als ` +
+        content: `${karte.name}: ${e.zeilen_gesamt} Zeilen. Im BI-Tool steht dieser Bericht als ` +
                  `"${karte.anzeige}" — ein Hinweis, keine Vorgabe: waehle die Form selbst.`,
         _meta: { weitere: e.weitere, anzeige: karte.anzeige,
                  visualisierung: karte.visualisierung, bericht: berichtBeschreiben(karte) },

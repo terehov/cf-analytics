@@ -1,7 +1,11 @@
 # Der MCP-Zugang
 
 Die Zahlen der Concept Family AG aus **Claude, ChatGPT und GitHub Copilot**
-befragen — ohne Metabase-Zugang. Plan und Begründung: [`docs/plan-skybridge.md`](../docs/plan-skybridge.md).
+befragen — ohne Zugang zum BI-Tool. Plan und Begründung: [`docs/plan-skybridge.md`](../docs/plan-skybridge.md).
+
+> **Sprachregelung.** „BI-Tool" meint die Auswertungsoberfläche des Unternehmens — heute
+> Metabase. Wo der Produktname fällt, geht es um eine konkrete Eigenschaft dieses Produkts
+> (ein Verzeichnis, ein Platzhalterformat), nicht um die Rolle.
 
 ## Was er ist
 
@@ -9,7 +13,7 @@ Ein MCP-Server (Skybridge) mit zehn Werkzeugen auf der Auswertungsschicht:
 
 | Werkzeug | Wofür |
 |---|---|
-| `berichte_suchen` · `bericht_ausfuehren` | Die 285 fertigen Berichte — dieselben, die die Metabase-Dashboards zeigen |
+| `berichte_suchen` · `bericht_ausfuehren` | Die 285 fertigen Berichte — dieselben, die die Dashboards im BI-Tool zeigen |
 | `sichten_suchen` · `sicht_beschreiben` · `achsen_zeigen` | Der Katalog: Körnung, Spalten, Achsen, Fallstricke, Beispielabfragen |
 | `betriebe_suchen` · `datenstand` | Wer ist gemeint, und was ist überhaupt beurteilbar |
 | `abfrage_pruefen` · `abfrage_ausfuehren` | Freies SQL — mit Prüfung auf dem Syntaxbaum |
@@ -157,13 +161,13 @@ Antwort mit Daten bringt mit, was ein Modell fuer die Wahl braucht:
 | `zeilen` | Zahlen als Zahlen, nicht als Text |
 
 Sagt der Nutzer „lieber als Balken", stellt das Modell die vorliegenden Daten neu dar — ohne
-neue Abfrage. Metabases Anzeigeart eines Berichts wird genannt, nicht vorgegeben.
+neue Abfrage. Die Anzeigeart, die das BI-Tool für einen Bericht führt, wird genannt — nicht vorgegeben.
 
 ## Was er nicht tut
 
 * **Keine Diagramme.** Bewusst — siehe oben.
 
-* **Kein Schreiben.** `manual` bleibt Metabase und Postico.
+* **Kein Schreiben.** `manual` bleibt BI-Tool und Postico.
 * **Kein Dashboard an der Wand**, keine Montags-Mail, keine Dauer-URL.
-* **Keine Sicht je Betrieb** — ein OM sieht alles oder nichts. Metabase kann
-  das heute auch nicht; steht in `docs/offene-punkte.md`.
+* **Keine Sicht je Betrieb** — ein OM sieht alles oder nichts. Das BI-Tool
+  kann das heute auch nicht; steht in `docs/offene-punkte.md`.

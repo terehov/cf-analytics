@@ -1604,9 +1604,9 @@ Bis dahin hat die Kennzahl **keine Quelle — und bekommt auch keine geschätzte
 
 ## MCP-Zugang für andere Nutzer (Plan: `plan-skybridge.md`)
 
-Der Server soll Metabase ersetzen können — für Nutzer ohne Metabase-Zugang sofort. Er
-hängt deshalb an nichts, was Metabase gehört (Karten als gemeinsame Berichtsdefinition,
-Beziehungen in `mcp.achse`, eigene Nutzer). Metabases eingebauter MCP-Server (v0.63,
+Der Server soll das BI-Tool ersetzen können — für Nutzer ohne Zugang dorthin sofort. Er
+hängt deshalb an nichts, was dem BI-Tool gehört (Karten als gemeinsame Berichtsdefinition,
+Beziehungen in `mcp.achse`, eigene Nutzer). Der dort eingebaute MCP-Server (Metabase v0.63,
 Admin → AI) ist damit nur eine Vergleichsoption, keine Stufe.
 
 Fünf Punkte, die Eugene entscheiden muss:
@@ -1618,8 +1618,8 @@ Fünf Punkte, die Eugene entscheiden muss:
 * **Wer bekommt freies SQL?** Stufe `fragen` in `mcp.nutzer_stufe`. Die Leitplanken sind
   Technik, kein Urteil — ein richtiges Ergebnis kann falsch gedeutet werden. Vorschlag:
   zunächst nur Eugene und Daniel.
-* **Soll ein OM nur seine Betriebe sehen?** Das wäre Row-Level-Security auf `mart`. Metabase
-  kann es heute nicht; eine Alternative muss zuerst gleichziehen. Wenn ja, ein eigener
+* **Soll ein OM nur seine Betriebe sehen?** Das wäre Row-Level-Security auf `mart`. Das
+  BI-Tool kann es heute nicht; eine Alternative muss zuerst gleichziehen. Wenn ja, ein eigener
   Plan — die Zuordnung OM → Betrieb gibt es nirgends als Tabelle.
 * **Öffentlicher Hostname und TLS für `mcp.<domain>`.** Claude und ChatGPT verbinden von
   außen; das ist der erste Dienst dieses Projekts, für den das gilt. Die Datenbank ist es
@@ -1659,10 +1659,10 @@ Phasen 1 bis 4 stehen (13.09.2026). Was fehlt, fehlt nicht im Code:
   muss).
 * **Die ersten Nutzer.** Eine Zeile je Person in `mcp.nutzer_stufe`. Wer dort fehlt, kommt
   nicht hinein — dass jemand sich anmelden kann, heißt nicht, dass er die Zahlen sehen darf.
-* **Ein Pilot ohne Metabase-Zugang.** Daniel hat beides; ein OM, der nur den Chat hat, sagt
-  mehr darüber, ob der Server wirklich eine Alternative ist.
-* **Row-Level-Security je Betrieb** — falls ein OM nur seine Betriebe sehen soll. Metabase
-  kann das heute auch nicht, und die Zuordnung OM → Betrieb gibt es nirgends als Tabelle.
+* **Ein Pilot ohne Zugang zum BI-Tool.** Daniel hat beides; ein OM, der nur den Chat hat,
+  sagt mehr darüber, ob der Server wirklich eine Alternative ist.
+* **Row-Level-Security je Betrieb** — falls ein OM nur seine Betriebe sehen soll. Das
+  BI-Tool kann das heute auch nicht, und die Zuordnung OM → Betrieb gibt es nirgends als Tabelle.
   Eigener Plan, wenn es kommt.
 * **Die restlichen `mart`-Sichten mit Körnung versehen,** sobald die Migrationen vollständig
   durchlaufen: gepflegt sind 158, gemessen an einer Datenbank mit 64 von 101 Migrationen.
