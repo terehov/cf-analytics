@@ -24,6 +24,7 @@ import type pg from 'pg'
 import { pool } from './db'
 import type { Katalog } from './katalog'
 import { pruefen, type Befund, type Pruefergebnis } from './pruefen'
+import { darstellungshinweis, spaltenBeschreiben, type SpalteInfo } from './spalten_info'
 
 /** Was das Modell sieht. Mehr sprengt den Kontext, bevor es etwas beantwortet. */
 export const ZEILEN_FUER_MODELL = 500
@@ -56,6 +57,10 @@ export type Ergebnis = {
   protokoll_id: number | null
   /** Alles ueber ZEILEN_FUER_MODELL hinaus — nur fuer die Ansicht. */
   weitere: Record<string, unknown>[]
+  /** Je Spalte: Rolle, Einheit, Wertevielfalt — damit das Modell die Form waehlen kann. */
+  spalten_info: SpalteInfo[]
+  /** Der Satz, der dem Modell die Darstellung ueberlaesst — samt der Fallen dabei. */
+  darstellung: string
 }
 
 export class Gesperrt extends Error {
@@ -218,7 +223,7 @@ async function protokollieren(e: {
  */
 async function laufenLassen(
   sql: string, werte: unknown[], pruefung: Pruefergebnis, nutzer: Nutzer,
-  werkzeug: string, parameter: unknown, schaetzen: boolean,
+  werkzeug: string, parameter: unknown, schaetzen: boolean, katalog: Katalog,
 ): Promise<Ergebnis> {
   const start = Date.now()
   const c = await pool.connect()
@@ -261,12 +266,22 @@ async function laufenLassen(
   const dauer = Date.now() - start
 
   const spalten = (r.fields ?? []).map(f => f.name)
+  /**
+   * ZAHLEN ALS ZAHLEN. pg liefert numeric (1700) und int8 (20) als Text,
+   * damit der Importer beim Rechnen nichts verliert (src/db.ts). Ein Modell,
+   * das die Daten darstellen soll, braucht das Gegenteil: "136612.46" ist
+   * fuer ein Diagrammwerkzeug ein Wort, 136612.46 ist ein Wert. Der Verlust
+   * jenseits von 2^53 spielt bei Eurobetraegen keine Rolle.
+   */
+  const numerisch = new Set((r.fields ?? []).map((f, i) => [f.dataTypeID, i] as const)
+    .filter(([t]) => t === 1700 || t === 20).map(([, i]) => i))
   let gekuerzt = 0
   const alle = (r.rows as unknown as unknown[][]).map(zeile => {
     const o: Record<string, unknown> = {}
     spalten.forEach((s, i) => {
       const v = zeile[i]
-      if (typeof v === 'string' && v.length > ZELLE_MAX) { gekuerzt++; o[s] = v.slice(0, ZELLE_MAX) + ' …' }
+      if (numerisch.has(i) && typeof v === 'string' && v !== '' && !Number.isNaN(Number(v))) o[s] = Number(v)
+      else if (typeof v === 'string' && v.length > ZELLE_MAX) { gekuerzt++; o[s] = v.slice(0, ZELLE_MAX) + ' …' }
       else o[s] = v
     })
     return o
@@ -300,12 +315,16 @@ async function laufenLassen(
     zeilen: alle.length, dauer_ms: dauer,
   })
 
+  const spalten_info = spaltenBeschreiben(spalten, alle.slice(0, ZEILEN_FUER_ANSICHT), katalog, pruefung.sichten)
+
   return {
     zeilen, weitere, spalten,
     zeilen_gesamt: alle.length,
     abgeschnitten: alle.length > ZEILEN_FUER_MODELL,
     koernung: pruefung.koernung,
     hinweise, datenstand, dauer_ms: dauer, protokoll_id,
+    spalten_info,
+    darstellung: darstellungshinweis(spalten_info, alle.length),
   }
 }
 
@@ -323,7 +342,7 @@ export async function abfrageAusfuehren(
     throw new Gesperrt(pruefung)
   }
 
-  return laufenLassen(sql, [], pruefung, nutzer, 'abfrage_ausfuehren', { sql }, true)
+  return laufenLassen(sql, [], pruefung, nutzer, 'abfrage_ausfuehren', { sql }, true, katalog)
 }
 
 /**
@@ -348,7 +367,7 @@ export async function berichtAusfuehren(
       .map(s => ({ sicht: s, koernung: katalog.sichten.get(s)?.koernung ?? null }))
       .filter(k => k.koernung !== null),
   }
-  return laufenLassen(sql, werte, pruefung, nutzer, `bericht:${schluessel}`, parameter, false)
+  return laufenLassen(sql, werte, pruefung, nutzer, `bericht:${schluessel}`, parameter, false, katalog)
 }
 
 export { protokollieren }

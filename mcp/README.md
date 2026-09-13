@@ -104,7 +104,7 @@ bun run nutzer sperren  daniel@brain.food          # stilllegen + alle Tokens wi
 ## Befehle
 
 ```bash
-bun test                 # 356 Tests: Fallenfragen, Umgehungen aus dem Review, Anmeldeablauf
+bun test                 # 366 Tests: Fallenfragen, Umgehungen aus dem Review, Anmeldeablauf, Spaltenprofil
 bun run typecheck
 bun run build            # die Ansichten (vite) — vor dem ersten Start noetig
 bun run start            # Produktionsstart; Port aus __PORT, nicht PORT
@@ -145,7 +145,23 @@ SELECT mcp.achsen_ableiten();        -- neue Sichten und Achsen nachführen
 SELECT mcp.koernung_in_kommentare(); -- Körnung in die Tabellenkommentare
 ```
 
+## Wer die Diagramme malt
+
+**Das Modell — nicht dieser Server.** Er zeichnet nichts und schreibt keine Form vor. Jede
+Antwort mit Daten bringt mit, was ein Modell fuer die Wahl braucht:
+
+| Feld | Inhalt |
+|---|---|
+| `spalten_info` | je Spalte: Rolle (`zeit` / `merkmal` / `kennzahl` / `ampel` / `schluessel`), Einheit, Zahl der verschiedenen Werte, Spanne |
+| `darstellung` | „Die Form ist deine Entscheidung" — plus die Fallen dieser konkreten Daten (zwei Groessenordnungen, zu viele Kategorien, eine einzelne Zahl) |
+| `zeilen` | Zahlen als Zahlen, nicht als Text |
+
+Sagt der Nutzer „lieber als Balken", stellt das Modell die vorliegenden Daten neu dar — ohne
+neue Abfrage. Metabases Anzeigeart eines Berichts wird genannt, nicht vorgegeben.
+
 ## Was er nicht tut
+
+* **Keine Diagramme.** Bewusst — siehe oben.
 
 * **Kein Schreiben.** `manual` bleibt Metabase und Postico.
 * **Kein Dashboard an der Wand**, keine Montags-Mail, keine Dauer-URL.

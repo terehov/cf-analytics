@@ -64,6 +64,18 @@ const ERGEBNIS_SCHEMA = {
     umsatz_veraltet: z.number(),
     bwa_im_rueckstand: z.number(),
   }).nullable(),
+  /** Je Spalte, was ein Modell fuer die Wahl der Darstellung wissen muss. */
+  spalten_info: z.array(z.object({
+    spalte: z.string(),
+    rolle: z.enum(['zeit', 'merkmal', 'kennzahl', 'ampel', 'schluessel']),
+    einheit: z.string().nullish(),
+    verschieden: z.number(),
+    spanne: z.tuple([z.number(), z.number()]).optional(),
+    beispiele: z.array(z.string()).optional(),
+    hinweis: z.string().optional(),
+  })),
+  /** Die Uebergabe an das Modell: die Form ist seine Entscheidung — und die Fallen dabei. */
+  darstellung: z.string(),
 }
 
 const nutzerAus = (a: Angemeldet): Nutzer =>
@@ -85,6 +97,28 @@ export const app = new Skybridge({
   description:
     'Die Zahlen der Concept Family AG befragen: Round Table, Umsatz, Personal, Einkauf, ' +
     'Bewertungen, Schulung. Fertige Berichte und freie Abfragen auf der Auswertungsschicht.',
+
+  /**
+   * Was jeder Client als Anweisung fuer den ganzen Server bekommt.
+   *
+   * *Eugene, 13.09.2026:* die Darstellung entscheidet das Modell, nicht der
+   * Server. Deshalb steht hier keine Formvorgabe, sondern die Uebergabe: die
+   * Daten kommen aufbereitet (Zahlen als Zahlen, je Spalte Rolle und
+   * Einheit, ein Hinweis auf die Fallen) — zeichnen tut, wer sie bekommt.
+   */
+  instructions:
+    'Du sprichst mit der Auswertungsschicht der Concept Family AG (Gastronomie, 141 Betriebe, ' +
+    'ein Dutzend Marken). ' +
+    'DARSTELLUNG: Jede Antwort mit Daten traegt `spalten_info` (Rolle, Einheit, Wertevielfalt je ' +
+    'Spalte) und `darstellung` (einen Hinweis mit den Fallen dieser Daten). Die Form ist DEINE ' +
+    'Entscheidung — waehle sie und zeichne sie mit deinen eigenen Mitteln: Diagramm, Tabelle ' +
+    'oder eine grosse Einzelzahl. Der Nutzer darf jederzeit eine andere Form verlangen; dann ' +
+    'die vorliegenden Daten neu darstellen, nicht neu abfragen. ' +
+    'ZAHLEN: Prozentwerte sind schon Prozent (23.64), nie mit 100 multiplizieren. Ampeln ' +
+    '(rot/orange/gruen) zaehlen, nie mitteln. ' +
+    'EHRLICHKEIT: `hinweise` und `datenstand` gehoeren zur Antwort — wer eine Zahl weitergibt, ' +
+    'nennt, bis wann sie gilt und was an ihr unvollstaendig ist. Eine gesperrte Abfrage nicht ' +
+    'umformulieren, sondern nach der genannten Berichtigung neu stellen.',
 
   /**
    * Einmal beim Start: Parser laden und den Katalog holen. `katalogLaden`
@@ -199,7 +233,8 @@ export const app = new Skybridge({
         'Fuehrt einen der fertigen Berichte aus — dieselbe Abfrage, die die Metabase-Karte ' +
         'zeigt, mit denselben Parametern. Der Schluessel kommt aus berichte_suchen. ' +
         'Parameter als Objekt, z. B. {"monat":"2026-07-01","marke":"Enchilada"}. Ein Zeitraum ' +
-        'als {"von":"2026-01-01","bis":"2026-03-31"}.',
+        'als {"von":"2026-01-01","bis":"2026-03-31"}. Die DARSTELLUNG des Ergebnisses ist deine ' +
+        'Sache — `spalten_info` und `darstellung` in der Antwort helfen bei der Wahl.',
       inputSchema: {
         schluessel: z.string().describe('Schluessel des Berichts aus berichte_suchen'),
         parameter: z.record(z.string(), z.any()).optional()
@@ -224,8 +259,10 @@ export const app = new Skybridge({
         structuredContent: {
           spalten: e.spalten, zeilen: e.zeilen, zeilen_gesamt: e.zeilen_gesamt,
           koernung: e.koernung, datenstand: e.datenstand, hinweise: e.hinweise,
+          spalten_info: e.spalten_info, darstellung: e.darstellung,
         },
-        content: `${karte.name}: ${e.zeilen_gesamt} Zeilen.`,
+        content: `${karte.name}: ${e.zeilen_gesamt} Zeilen. In Metabase steht dieser Bericht als ` +
+                 `"${karte.anzeige}" — ein Hinweis, keine Vorgabe: waehle die Form selbst.`,
         _meta: { weitere: e.weitere, anzeige: karte.anzeige,
                  visualisierung: karte.visualisierung, bericht: berichtBeschreiben(karte) },
       }
@@ -444,7 +481,9 @@ export const app = new Skybridge({
         'Datenstand bei sich. Eine Abfrage mit einer bekannten Falle wird NICHT ausgefuehrt — ' +
         'die Meldung nennt den Grund und meist die Berichtigung. ' +
         'VORHER sicht_beschreiben und achsen_zeigen benutzen; hoechstens ' +
-        `${ZEILEN_FUER_MODELL} Zeilen kommen zurueck, also im SQL zusammenfassen.`,
+        `${ZEILEN_FUER_MODELL} Zeilen kommen zurueck, also im SQL zusammenfassen. Die DARSTELLUNG ` +
+        'des Ergebnisses ist deine Sache — `spalten_info` und `darstellung` helfen bei der Wahl, ' +
+        'und der Nutzer darf jede andere Form verlangen.',
       inputSchema: { sql: z.string().describe('Ein einzelnes SELECT (WITH erlaubt)') },
       outputSchema: ERGEBNIS_SCHEMA,
       annotations: { readOnlyHint: true },
@@ -457,6 +496,7 @@ export const app = new Skybridge({
         structuredContent: {
           spalten: e.spalten, zeilen: e.zeilen, zeilen_gesamt: e.zeilen_gesamt,
           koernung: e.koernung, hinweise: e.hinweise, datenstand: e.datenstand,
+          spalten_info: e.spalten_info, darstellung: e.darstellung,
         },
         content: `${e.zeilen_gesamt} Zeilen in ${e.dauer_ms} ms.`,
         _meta: { weitere: e.weitere, protokoll_id: e.protokoll_id },
@@ -491,6 +531,7 @@ export const app = new Skybridge({
         structuredContent: {
           spalten: e.spalten, zeilen: e.zeilen, zeilen_gesamt: e.zeilen_gesamt,
           koernung: e.koernung, datenstand: e.datenstand, hinweise: e.hinweise,
+          spalten_info: e.spalten_info, darstellung: e.darstellung,
         },
         content: `Round Table: ${e.zeilen_gesamt} Betriebe.`,
         _meta: { weitere: e.weitere },

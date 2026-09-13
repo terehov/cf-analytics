@@ -395,7 +395,7 @@ Ampeltabellen.
 | **1 — Katalog** | Schema `mcp`, Rolle `mcp_leser`, Körnung | **fertig.** 158 Sichten mit Körnung (0 offen), 71 Tabellenkommentare ergänzt, `beziehungen.ts` liest aus `mcp.achse` |
 | **2 — Berichte** | `berichte_suchen`, `bericht_ausfuehren` | **fertig.** Alle 285 Karten übersetzen zu gültigem SQL, ohne und mit gesetzten Filtern (Test) |
 | **3 — Prüfung** | Parser, Regeln, Befund-Anhang, Protokoll | **fertig.** Die zehn Fallenfragen laufen als Testdatei |
-| **4 — Ansichten** | Ampelraster, Ergebnistabelle | **fertig** für die beiden, die Text nicht kann |
+| **4 — Ansichten** | Ampelraster, Ergebnistabelle | **fertig** für die beiden Tabellen. **Diagramme zeichnet das Modell**, nicht der Server — entschieden am 13.09.2026 (`entscheidungen.md`, 6); dafür trägt jede Antwort `spalten_info` und `darstellung` |
 | **5 — Betrieb** | Dokploy, TLS, Nutzer anlegen | **teilweise.** Die Anmeldung ist gebaut und gemessen (Migration `0102`, `mcp/src/anmeldung/`); offen bleiben Hostname, TLS und die Dokploy-Application |
 | **6 — Messen** | `mcp.zugriff` gegen Metabases Anmeldeprotokoll | **offen** — vier Wochen nach Phase 5 |
 

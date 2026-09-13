@@ -3231,3 +3231,53 @@ des Tests.
 Kein zweiter Faktor, keine Passwortregel ausser Laenge, kein Widerrufs-Endpunkt (RFC 7009) —
 `bun run nutzer sperren` tut dasselbe. Kein Schutz je Betrieb (RLS). Alles davon steht in
 `offene-punkte.md`; nichts davon ist eine Luecke, die niemand kennt.
+
+
+---
+
+## 13.09.2026 (6) — Die Darstellung entscheidet das Modell, nicht der Server
+
+*Eugene:* die Modelle sollen selbst entscheiden, wie sie die Daten darstellen — er traut
+ihnen das mehr zu als einer statischen Festlegung. Und der Nutzer soll die Diagrammart im
+Gespraech aendern koennen.
+
+### ~~Die Karte entscheidet die Form, und der Server zeichnet sie (SVG)~~ → verworfen
+
+Der Vorschlag war, `anzeige` und `visualisierung` der 285 Karten in eigene SVG-Ansichten zu
+uebersetzen — „dieselbe Darstellung an der Wand und im Chat". Eugene hat ihn abgelehnt, und
+das Argument traegt: eine Karte legt vor einem Jahr fest, was ein Modell heute mit Blick auf
+die konkreten Daten besser entscheidet — und im Gespraech laesst sich die Form aendern, an
+der Wand nicht. Ein angefangenes Modul `diagramm.ts` (Spezifikation, Pruefung, Serienkappung)
+ist entfernt.
+
+### Was der Server stattdessen tut: die Grundlage liefern
+
+Ein Modell, das nur Spaltennamen und Zahlen sieht, raet — es haelt `monat` fuer eine
+Kategorie, `we_kueche_pct` fuer Euro und `betrieb_key` fuer eine Menge. Deshalb traegt jede
+Antwort mit Daten seither zwei Dinge:
+
+* **`spalten_info`** je Spalte: Rolle (`zeit`, `merkmal`, `kennzahl`, `ampel`, `schluessel`),
+  Einheit aus `mcp.kennzahl`, Zahl der verschiedenen Werte, Spanne bei Kennzahlen.
+* **`darstellung`**: der Satz, der die Form dem Modell ueberlaesst — und die drei Fallen
+  nennt, die bei freier Wahl erfahrungsgemaess zuschnappen: zwei Groessenordnungen auf einer
+  Achse, mehr Kategorien als unterscheidbare Farben, ein Balken fuer eine einzelne Zahl.
+
+Dazu **Zahlen als Zahlen**: `numeric` und `int8` kommen aus pg als Text (fuer den Importer
+richtig, `src/db.ts`); fuer ein Modell, das zeichnen soll, ist `"136612.46"` ein Wort und
+`136612.46` ein Wert. Die Antwort wandelt um.
+
+Die Server-`instructions` (was jeder Client beim Verbinden liest) sagen dasselbe in drei
+Saetzen: Form ist deine Sache, Prozent nicht skalieren, Ampeln zaehlen.
+
+### Was mit Metabases Anzeigeart geschieht
+
+Sie wird **genannt, nicht vorgegeben**: „In Metabase steht dieser Bericht als `line` — ein
+Hinweis, keine Vorgabe." Wegwerfen waere Informationsverlust, vorschreiben waere die
+abgelehnte Entscheidung.
+
+### Die vorhandenen Ansichten bleiben, neue Diagrammansichten kommen nicht
+
+`ergebnis`, `bericht` und `round-table` zeigen Tabellen; sie hindern das Modell nicht daran,
+daneben zu zeichnen, und das Ampelraster war ausdruecklich gewuenscht. Ob sie auf Dauer
+bleiben, entscheidet die Nutzung — wenn die Modelle die Tabelle ohnehin selbst besser
+zeigen, koennen sie gehen.

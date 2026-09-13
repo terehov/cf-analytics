@@ -216,6 +216,7 @@ Ein eigener Dienst mit eigener `package.json`, eigenem Dockerfile und eigener Da
 | `src/ast.ts` | Die Abfrage als Syntaxbaum (`libpg-query` — der Parser von PostgreSQL selbst, als WASM) |
 | `src/berichte.ts` | Metabase-Platzhalter → `$1`. Optionale Bloecke `[[…]]` genau wie dort |
 | `src/ausfuehren.ts` | Grenzen, Befund-Anhang, Protokoll. `gesperrtText()` — eine Sperre MUSS ihren Grund mitliefern |
+| `src/spalten_info.ts` | Je Spalte Rolle, Einheit, Wertevielfalt, plus der Darstellungshinweis. **Der Server zeichnet nichts** — die Form waehlt das Modell (Entscheidung 13.09.2026, 6) |
 | `src/anmeldung/` | Der eigene Autorisierungsserver: OAuth 2.1 mit PKCE, argon2id-Passwoerter, Dynamic Client Registration. **Eigene Datenbankrolle** `mcp_anmeldung` |
 | `test/fallen.test.ts` | **Die zehn Fallenfragen** — die Regressionssicherung des Vorhabens |
 
@@ -268,7 +269,7 @@ Abschnitt „Zwei Phasen".
 
 ```bash
 # Der MCP-Zugang (mcp/, eigene package.json — dort `bun install` laufen lassen)
-cd mcp && bun test          # 356 Tests: die zehn Fallenfragen, elf Umgehungen aus dem Review, der ganze Anmeldeablauf
+cd mcp && bun test          # 366 Tests: Fallenfragen, Umgehungen aus dem Review, Anmeldeablauf, Spaltenprofil
 cd mcp && bun run nutzer liste    # Nutzer verwalten (anlegen, stufe, passwort, sperren)
 cd mcp && bun run start     # braucht MCP_DATABASE_URL und MCP_OAUTH_ISSUER
 cd mcp && bun run katalog:abzug   # test/katalog.json neu aus der Datenbank ziehen
