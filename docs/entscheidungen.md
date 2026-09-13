@@ -2872,6 +2872,8 @@ beantworten.
 ## 12.09.2026 — Der Zugang für andere: MCP statt Datenbankzugang
 
 Der Plan steht in `docs/plan-skybridge.md`; hier nur die Entscheidungen daraus.
+**Am 13.09.2026 überarbeitet** — die revidierten Punkte stehen unten durchgestrichen, die
+Überarbeitung als eigener Eintrag danach.
 
 ### Der MCP-Server sieht `mart`, `manual` und `ampel` — nicht `core`
 
@@ -2937,3 +2939,51 @@ Round Table landet, muss rekonstruierbar sein — eine Chat-Antwort ist kein Bel
 Dienst ohne Zulauf ist ein Fehler, kein Normalzustand (Regel 10): wird der Server nicht
 benutzt, muss man das sehen. Wiederholte Fragen aus dem freien SQL sind die
 Anforderungsliste für die nächsten `mart`-Sichten und Metabase-Karten.
+
+
+---
+
+## 13.09.2026 — Überarbeitung: Metabase MCP zuerst, freies SQL als Hauptweg
+
+Vier Befunde der vertieften Recherche, jeder revidiert einen Punkt vom Vortag.
+
+### ~~Ein eigener Server ist der erste Schritt~~ → Metabase MCP einschalten und messen
+
+Metabase hat seit Version 60 (April 2026) einen eingebauten MCP-Server (`/api/metabase-mcp`):
+frei, OAuth aus Metabase selbst, Rechte je Nutzer, Claude/ChatGPT/VS Code als Clients,
+SQL je Gruppe abschaltbar, 200 Zeilen je Seite. Unsere Instanz läuft auf v0.63 — er ist
+schon da. Er liest die Tabellenkommentare und die FK-Verdrahtung aus `beziehungen.ts`; die
+Schemabegrenzung auf `mart`/`manual`/`ampel` gilt automatisch, weil Metabase nichts anderes
+sieht. **Entschieden:** Stufe 0 ist Einschalten plus zwei Wochen Messung gegen zehn
+Fallenfragen; der eigene Server (Stufe 1) baut nur, was die Messung als Lücke zeigt —
+Prüfung vor dem Lauf, Befund-Anhang, Ampelansicht, eigenes Protokoll. *Nachzuprüfen an
+der Instanz: dass der Server in der Open-Source-Ausgabe enthalten ist.*
+
+### ~~Die 285 Karten werden Werkzeuge~~ → sie werden Beispiele
+
+Cursor kappt bei 40 Werkzeugen, Copilot bei 128, Claude Desktop um 100; jede Beschreibung
+kostet 300–600 Token und die Qualität sinkt ab etwa 50 messbar. **Entschieden:** acht
+Werkzeuge. Die Karten liefert `sicht_beschreiben` als Beispielabfragen der Betreuer für
+genau die Sicht, um die es geht — Wissen, das nur dann Kontext kostet, wenn es gebraucht
+wird.
+
+### ~~Freies SQL als „Ring 3", die meisten Fragen enden davor~~ → freies SQL ist der Hauptweg
+
+„Jede Gruppierung, jede Beziehung" heißt, das Modell schreibt die Abfrage. Die Sicherheit
+muss also in diesen Weg hinein. **Entschieden:** `abfrage_pruefen` mit dem echten
+Postgres-Parser (`libpg-query`) — Fallstricke als Prädikate auf dem Syntaxbaum, mit Schwere
+`warnung` oder `sperre`, plus `EXPLAIN` vor dem Lauf. Eine Sperre läuft nicht und kommt mit
+Grund und, wo möglich, korrigiertem SQL zurück. Begründung aus dem dbt-Benchmark (April
+2026): mit semantischer Schicht 98–100 % statt 84–90 %, und ein Fehler ist eine Verweigerung
+statt einer selbstbewusst falschen Zahl; 81,2 % der Text-to-SQL-Fehler liegen auf Schema-
+und Bedeutungsebene.
+
+### Neu: eine Beziehungs- und Körnungsschicht als Daten (`mcp.sicht`, `mcp.achse`, `mcp.kennzahl`)
+
+Aus dem SQL-Text der Migrationen gezählt (13.09.2026): 191 `mart`-Sichten, 132 mit
+`betrieb_key`, 85 mit `monat`, 82 mit `konzept`. Von 188 Kommentaren tragen 114 ein
+Warnwort, aber nur **23 nennen ihre Körnung** („eine Zeile je …") — und die Körnung ist
+das Erste, was ein Modell braucht, bevor es summiert. **Entschieden:** Körnung von Hand für
+165 Sichten, *auch in den Tabellenkommentar* — dann nützt sie Metabase MCP, Metabase und
+jedem Agenten gleichzeitig. Neue Regel in `metabase.md`: ohne Körnung im Kommentar keine
+Sicht.

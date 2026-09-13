@@ -3771,3 +3771,36 @@ mindestens zwei davon in eine falsche Aussage verwandeln.
 eingestellt wird, gehört nicht in achtzehn Kommentare, sondern an **eine** Stelle,
 auf die die anderen verweisen. Und sie gehört gemessen: `sync.lauf` wusste die
 Antwort die ganze Zeit.
+
+## Die Migrationen laufen aus dem Nichts nicht durch (13.09.2026)
+
+**Symptom.** Auf einer leeren Datenbank bricht `bun run migrate` — und jede Nachbildung
+davon, nummerierte Dateien alphabetisch, jede in ihrer Transaktion — bei der 40. Datei ab:
+`0039_betriebsstatus_und_plausibilitaet.sql` meldet `column p.gebinde does not exist`.
+Stellt man diese Datei hinter `0041` zurück, scheitert als nächstes
+`0039_einkaufspreis_belastbar.sql` mit `column bp.preis_je_einheit does not exist`. Die
+Spalten entstehen in `0041_einkaufspreis_gebinde` und `0042_bestellposition_preis`.
+
+**Ursache.** Zwei Dateien tragen eine Nummer, die kleiner ist als die der Migrationen,
+auf die sie sich stützen. In Produktion hat das nie gestört: `public.schema_migration`
+merkt sich Dateinamen, und angewendet wird, was beim jeweiligen Deploy neu war — die
+Reihenfolge war die des Erscheinens, nicht die der Nummer. Die Nummer beschreibt also
+nicht die Anwendungsreihenfolge, und nur die Produktionsdatenbank weiß sie noch.
+
+**Nachgemessen 13.09.2026** auf PostgreSQL 16 in der Agentenumgebung (18 stand nicht zur
+Verfügung; die Fehler sind fehlende Spalten, keine Versionsmerkmale). Ein Versuch, die
+verbleibenden 62 Dateien in Wiederholungsrunden anzuwenden, kam auf 64 von 101 und blieb
+dann an `cannot drop columns from view` hängen — `CREATE OR REPLACE VIEW` verträgt keine
+Reihenfolge, in der eine spätere Fassung vor einer früheren läuft.
+
+**Was das heute bedeutet.** Eine frische Testdatenbank nach `docs/`-Anleitung
+(`createdb lina_test && TEST_DATABASE_URL=…`) lässt sich mit dem Repository allein nicht
+aufbauen; die DB-Tests setzen stillschweigend eine Datenbank voraus, die die Migrationen in
+Produktionsreihenfolge gesehen hat. Ein neuer Rechner braucht ein `pg_dump --schema-only`
+aus Produktion.
+
+**Was ihn künftig verhindert — noch nichts.** Zwei Wege, beide nicht entschieden: die
+beiden Dateien umnummerieren (bricht `schema_migration` in Produktion, außer man trägt die
+Umbenennung dort nach) oder ein Test, der die Migrationen gegen eine leere Datenbank
+laufen lässt und damit jede künftige Rückwärtsnummer sofort meldet. Der zweite ist der
+Test, der diesen Fehler am 12.08.2026 gefunden hätte. Eingetragen in `offene-punkte.md`.

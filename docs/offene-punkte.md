@@ -1604,18 +1604,33 @@ Bis dahin hat die Kennzahl **keine Quelle — und bekommt auch keine geschätzte
 
 ## MCP-Zugang für andere Nutzer (Plan: `plan-skybridge.md`)
 
-Vier Punkte, die Eugene entscheiden muss, bevor Phase 0 beginnt:
+**Zuerst, ½ Tag:** in Metabase (v0.63) unter Admin → AI den eingebauten MCP-Server
+einschalten und prüfen, dass er in der Open-Source-Ausgabe läuft — die Dokumentation nennt
+keine Einschränkung, gemessen ist es an unserer Instanz nicht. Dann Daniel freischalten und
+die zehn Fallenfragen aus dem Plan (Abschnitt 6.3) stellen; zwei Wochen das
+Abfrageprotokoll auswerten, bevor irgendetwas gebaut wird.
+
+Dazu vier Punkte, die Eugene entscheiden muss:
 
 * **Welcher Identitätsanbieter?** Gibt es bei Concept Family bereits Microsoft 365 / Entra,
   an das sich der Zugang hängen lässt? Das wäre die beste Antwort — Ausscheiden aus dem
   Unternehmen bedeutet dann von selbst Zugangsverlust. Sonst WorkOS oder Clerk mit
   Allowlist; Skybridge bringt für beide ein Beispiel mit.
-* **Wer bekommt freies SQL (Ring 3)?** Die Leitplanken sind Technik, kein Urteil — ein
-  richtiges Ergebnis kann falsch gedeutet werden. Vorschlag: zunächst nur Eugene und Daniel,
-  alle anderen Ring 1 und 2.
-* **Öffentlicher Hostname und TLS für `mcp.<domain>`.** Claude und ChatGPT verbinden von
-  außen; das ist der erste Dienst dieses Projekts, für den das gilt. Metabase liegt heute
-  hinter dem Dokploy-Proxy, die Datenbank ist gar nicht erreichbar — und bleibt es.
+* **Wer bekommt freies SQL?** In Metabase ist das das native-query-Recht je Gruppe, im
+  eigenen Server die Stufe `fragen`. Die Leitplanken sind Technik, kein Urteil — ein
+  richtiges Ergebnis kann falsch gedeutet werden. Vorschlag: zunächst nur Eugene und Daniel.
+* **Öffentlicher Hostname und TLS** — für Metabase sofort (Claude Desktop verbindet nicht
+  mit `localhost`; ChatGPT, Claude und VS Code müssen in Metabases CORS-Liste), für
+  `mcp.<domain>` später. Das ist der erste Dienst dieses Projekts, der von außen erreichbar
+  ist. Die Datenbank ist es nicht — und bleibt es.
 * **Dürfen Zahlen aus dem Chat weitergegeben werden?** Eine Frage an das Unternehmen, keine
   technische. Der Datenstand-Anhang beantwortet „war die Zahl fertig", nicht „durfte sie
   raus".
+
+## Migrationen aus dem Nichts
+
+Zwei Dateien mit der Nummer `0039` stützen sich auf `0041` und `0042`; eine leere Datenbank
+lässt sich mit `bun run migrate` nicht aufbauen (`fehlerkatalog.md`, 13.09.2026). Zu
+entscheiden: Umnummerieren mit Nachtrag in `public.schema_migration` der Produktion, oder
+ein Test gegen eine leere Datenbank, der Rückwärtsnummern künftig sofort meldet. Bis dahin
+braucht ein neuer Rechner ein `pg_dump --schema-only` aus Produktion.

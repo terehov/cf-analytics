@@ -1,426 +1,411 @@
-# Plan: Skybridge — die Daten selbst befragen
+# Plan: die Daten selbst befragen — Metabase MCP zuerst, Skybridge für die Leitplanken
 
-Stand 12.09.2026.
+Stand 13.09.2026. Zweite Fassung; die erste vom 12.09. ist überarbeitet, ihre Fehler stehen
+in Abschnitt 0 und bleiben in `entscheidungen.md` durchgestrichen erhalten.
 
-**Der Anlass ist ein Engpass, kein fehlendes Feature.** Es gibt heute zwei Wege zu einer
-Zahl, und beide gehen über jemanden, der vorher dafür gearbeitet hat:
-
-| Weg | Was er kann | Wo er endet |
-|---|---|---|
-| **Metabase** — 285 Karten aus `metabase/` | Jede Frage, die schon jemand gestellt hat, sofort und richtig | Bei der 286. Frage |
-| **Ein Agent im Repository** (Claude Code) | Auch neue Fragen, mit Zugriff auf `docs/` und die Rohdaten | Bei dem einen Menschen, der ihn startet und das Repository kennt |
-
-Daniel hat eine Frage, die auf keiner Karte steht. Er hat ChatGPT, Copilot und Claude, und
-er hat kein SQL, kein Repository und keinen Grund, auf Eugene zu warten.
-
-Dieser Plan schließt diese Lücke: **ein MCP-Server über `mart`**, den Claude, ChatGPT und
-Copilot als Connector einbinden, gebaut mit **Skybridge**. Er beschreibt dabei
-ausdrücklich auch, was dabei **nicht** gebaut wird — der gefährlichste Teil dieses Vorhabens
-ist nicht das, was es nicht kann, sondern das, was es falsch könnte.
+**Der Anlass:** Daniel und die OMs sollen jede Frage an die Daten selbst stellen können —
+jede Gruppierung, jede Beziehung, nicht nur die 285 Fragen, die schon jemand als
+Metabase-Karte gebaut hat — und zwar mit dem Werkzeug, das sie ohnehin benutzen: ChatGPT,
+Copilot oder Claude.
 
 ---
 
-## 1. Warum nicht einfach „die Datenbank an ChatGPT hängen"
+## 0. Was die zweite Fassung anders sieht
 
-Der naheliegende Bauplan ist ein Werkzeug `sql_ausfuehren(text)` auf einer Leseverbindung.
-Zehn Zeilen Code, fertig in einer Stunde. **In genau dieser Datenbank ist er die falsche
-Lösung**, und der Beleg dafür steht bereits geschrieben: `docs/fehlerkatalog.md`.
+Vier Befunde aus der vertieften Recherche, jeder ändert den Plan:
 
-Dieses Projekt hat zwei Dutzend Fehler gemacht, und **fast keiner davon hat sich gemeldet**.
-Kein Stacktrace, keine leere Ergebnismenge — eine plausibel aussehende falsche Zahl. Ein
-Sprachmodell, das SQL schreibt, macht dieselben Fehler, nur schneller, häufiger und ohne
-Commit-Nachricht:
+1. **Metabase hat seit Version 60 (April 2026) einen eingebauten MCP-Server.** Frei,
+   OAuth eingebaut, Streamable HTTP, Rechte je Nutzer wie in Metabase, Claude/ChatGPT/VS
+   Code als Clients. Unsere Instanz läuft auf v0.63 — **er ist schon da**, nur nicht
+   eingeschaltet. Die erste Fassung hat ihn übersehen und einen Server entworfen, der
+   zur Hälfte das nachbaut, was Metabase schon kann.
+2. **285 Werkzeuge waren ein Fehler.** Cursor kappt bei 40 Werkzeugen, Copilot bei 128,
+   Claude Desktop um 100 — und die Qualität sinkt messbar ab etwa 50, weil jede
+   Werkzeugbeschreibung 300–600 Token kostet, bevor die erste Frage gestellt ist. Die
+   Karten sind wertvoll, aber als **Beispiele**, nicht als Werkzeuge.
+3. **Freies SQL ist der Hauptweg, nicht der Notausgang.** „Jede Gruppierung, jede
+   Beziehung" heißt: das Modell schreibt die Abfrage. Die erste Fassung hat das als
+   „Ring 3" nach hinten gestellt und gehofft, die meisten Fragen enden davor. Sie enden
+   nicht davor. Die Sicherheit muss also *in* den freien Weg, nicht daneben.
+4. **Es fehlte die Beziehungsschicht.** `mart` besteht aus Sichten, und Postgres kennt
+   keine Fremdschlüssel auf Sichten (`metabase/beziehungen.ts` hat genau dieses Problem
+   für Metabase gelöst). Ein Modell, das `mart.umsatz_tag` mit `mart.personalkosten`
+   verbinden will, muss wissen, dass beide über `betrieb_key` und den Tag zusammenfinden —
+   und dass `betrieb` als Name **nicht** eindeutig ist. Ohne diese Schicht gibt es keine
+   „beliebige Beziehung", nur beliebige Joins.
 
-| Falle | Was das Modell schreibt | Was herauskommt |
-|---|---|---|
-| `core.betrieb.stadt` ist bei **allen 141** Betrieben `NULL` | `GROUP BY stadt` | **Eine** Gruppe mit allen Betrieben. Keine Fehlermeldung |
-| 79 der 141 Betriebe machen keinen Umsatz (Beteiligungsgesellschaften, Insolvenzen, Testeinträge), `aktiv` steht bei allen auf `true` | `avg(...) FROM ... betrieb` | Jeder Mittelwert um mehr als die Hälfte verdünnt |
-| `mart.fremdeinkauf` führt mehrere `quelle`-Zeilen je Betrieb und Monat | `sum(netto) GROUP BY betrieb` | Doppelzählung |
-| `mart.einkaufspreis_betrieb` ist nur mit `vergleichbar = true` lesbar — und sein Tabellenkommentar widerspricht an drei Stellen der gebauten Sicht (Befund 12.08.2026) | Preisvergleich über alle Zeilen | Ein Betrieb sieht teuer aus, weil er andere Gebinde kauft |
-| Prozentwerte sind Prozentzahlen (`23.64`), das Excel speichert Brüche (`0.2364`) | `wert * 100` | Faktor-100-Fehler in beide Richtungen |
-| Der BWA-Versatz ist **je Betrieb verschieden** (Juni 2026: am 25.07. erst 22 von 131 gebucht) | Join auf `date_trunc('month', tag)` | Personalquote gegen den falschen Monat |
-| `core.pos_artikel` und `core.rezept` sind **leer** (nachgezählt 14.08.2026) | Join Verkauf → Rezept → Ware | Null Zeilen, kein Fehler |
-| Stände gelten über Zeiträume, nicht über Monatsgleichheit | `stand.monat = date_trunc(...)` | `NULL`-Wareneinsatz, sieht aus wie „nicht gepflegt" |
-| LINAs Warenwirtschaft ist **Demodaten** (harte Regel 5) | `SELECT ... FROM core.wawi_*` | Erfundene Zahlen, korrekt summiert |
-
-Jede dieser Fallen ist in `mart` bereits ausgeräumt — dafür ist die Schicht da. Der Grundsatz
-aus `metabase.md` gilt deshalb hier unverändert und wird zur **tragenden Entscheidung dieses
-Plans**:
-
-> **Der MCP-Server sieht `mart`, `manual` und `ampel`. Sonst nichts.**
-
-Wer in `core` joinen muss, um eine Frage zu beantworten, hat eine Lücke in `mart` gefunden —
-dann gehört dort eine Sicht hin. Das ist keine Bequemlichkeit, es ist der einzige Ort, an dem
-dieses Wissen bereits vollständig und gepflegt vorliegt.
+Was bleibt: **nur `mart`, `manual`, `ampel`**; erzwungen über eine Datenbankrolle; jede
+Antwort trägt ihre Fallstricke; kein Schreibzugriff; jede Abfrage protokolliert.
 
 ---
 
-## 2. Der Hebel, den wir schon haben
+## 1. Was die Forschung dazu sagt
 
-Der eigentliche Grund, warum dieses Vorhaben tragfähig ist: **das Wissen, das ein
-Sprachmodell braucht, ist bereits geschrieben — und zwar dort, wo es maschinell abholbar
-ist.**
+Zwei Zahlen tragen den ganzen Plan.
 
-| Bestand | Anzahl | Wo |
-|---|---|---|
-| `mart`-Sichten mit Tabellenkommentar | **178** | `COMMENT ON VIEW` in den Migrationen |
-| Materialisierte Sichten mit Kommentar | 12 | dito |
-| Spaltenkommentare in `mart` | 46 | dito |
-| Geprüfte, parametrisierte SQL-Karten | **285** | `metabase/karten-*.ts` |
-| Fachdokumentation | ~24.000 Zeilen | `docs/`, `AGENTS.md` |
+**Semantische Schicht gegen rohes Text-to-SQL** — dbt-Benchmark, April 2026, mit Claude
+Sonnet 4.6 und GPT-5.3-Codex: auf einem *modellierten* Projekt steigt die Trefferquote von
+**90,0 % auf 98,2 %** (Sonnet) bzw. **84,1 % auf 100 %** (GPT) — und wichtiger als die
+Prozentpunkte ist die **Art des Scheiterns**: ohne semantische Schicht ist ein Fehler eine
+selbstbewusst falsche Zahl, mit ihr ist er eine Verweigerung („kann ich so nicht
+beantworten"). **81,2 % der Text-to-SQL-Fehler entstehen auf Schema- und Bedeutungsebene**,
+nicht in der Syntax. Das ist wörtlich die Erfahrung dieses Projekts aus `fehlerkatalog.md`.
 
-Diese Kommentare sagen nicht nur, was eine Sicht enthält. Sie sagen, **was man mit ihr nicht
-tun soll** — „immer auf genau eine `quelle` filtern", „nur mit `vergleichbar = true` lesen",
-„die beiden Spalten dürfen nicht verwechselt werden". Die Dokumentationspflicht aus
-`AGENTS.md` hält sie aktuell.
+Eine semantische Schicht ist dabei nichts Magisches. Sie ist: **Körnung** (eine Zeile je
+was?), **Achsen** (worüber wird gruppiert und verbunden?), **Kennzahlen** (was darf man
+summieren, was nur als Median lesen?) und **Regeln** (was darf man nicht?). Genau das steht
+in diesem Repository bereits — verteilt auf Tabellenkommentare, `docs/` und die Karten.
 
-Ein Sprachmodell, das diese Kommentare zusammen mit dem Schema bekommt, ist kein raten des
-Datenmodells mehr — es liest dieselbe Warnung wie ein Mensch in Postico. **Der MCP-Server ist
-im Kern ein Zustellweg für diese Kommentare**, nicht für die Tabellen.
+**Was aus dem SQL-Text der Migrationen gemessen wurde** (13.09.2026, jeweils letzte
+Definition einer Sicht):
 
----
+| | Anzahl |
+|---|---|
+| `mart`-Sichten | **191** (188 mit Kommentar, 3 ohne) |
+| davon mit `betrieb_key` | 132 |
+| mit `monat` | 85 |
+| mit `konzept` | 82 |
+| mit `geschaeftstag` | 42 |
+| mit `kostenstelle` (FoodNotify-Achse) | 21 |
+| mit `lieferant` | 15 · `ort` 12 · `bundesland` 9 · `ware` 10 · `warengruppe` 6 |
+| Kommentare, die ihre **Körnung** ausschreiben („eine Zeile je …") | **23 von 188** |
+| Kommentare mit einem Warnwort (nicht, nie, nur mit, immer auf, darf) | **114 von 188** |
 
-## 3. Was Skybridge ist
-
-[Skybridge](https://github.com/alpic-ai/skybridge) (MIT, von Alpic) ist ein
-TypeScript-Framework für MCP-Server **mit Oberfläche**: man registriert Werkzeuge auf einem
-Express-basierten MCP-Server und hängt an jedes Werkzeug eine React-Ansicht, die **im Chat
-selbst** gerendert wird. Typinferenz läuft durchgehend vom Werkzeug bis in die Ansicht.
-Dazu: lokaler Emulator, Hot Reload und ein Tunnel, mit dem die lokale Fassung direkt gegen
-echtes Claude und echtes ChatGPT getestet werden kann.
-
-**Warum das hier und nicht das nackte MCP-SDK:**
-
-1. **Eine Ampel ist eine Farbe, keine Zeichenkette.** Der Round Table ist ein Raster aus
-   rot/orange/grün. Als Text im Chat ist er unlesbar; als gerenderte Tabelle ist er das
-   Produkt. Genau das ist Skybridges Zweck.
-2. **Ein Codestand für drei Clients.** Die Unterschiede zwischen Claude, ChatGPT und VS Code
-   abstrahiert das Framework; wir schreiben die Werkzeuge einmal.
-3. **Der Tunnel spart die Runde über ein Deployment.** Eine Änderung an einem Werkzeug lässt
-   sich in echtem Claude prüfen, bevor irgendetwas auf dem Hetzner-Server steht.
-4. **TypeScript und Zod** sind bereits der Stack dieses Repositories (`src/lina/schemas.ts`,
-   `src/config.ts`) — kein zweites Ökosystem.
-
-**Was Skybridge nicht ist:** kein Datenzugriff, kein Sicherheitsmodell, keine Fachlogik.
-Alles, was die Zahlen richtig macht, bauen wir — Skybridge liefert die Hülle und die
-Oberfläche.
+Die Warnungen sind da. **Die Körnung fehlt in 165 Kommentaren** — und die Körnung ist das
+Erste, was ein Modell braucht, bevor es summiert. Das ist die konkreteste Lücke, die dieser
+Plan schließt (Abschnitt 5).
 
 ---
 
-## 4. Architektur
+## 2. Stufe 0 — Metabase MCP einschalten (diese Woche)
+
+Der eingebaute Server (`/api/metabase-mcp`, Admin → AI → MCP) bringt fertig mit, was die
+erste Fassung bauen wollte:
+
+| Was er kann | Warum das hier schon passt |
+|---|---|
+| Suchen über Tabellen, Modelle, Kennzahlen, Fragen, Dashboards | Metabase sieht nur `mart`, `manual`, `ampel` (`metabase-sichtbarkeit.md`) — **die Schemabegrenzung gilt automatisch** |
+| Tabellen- und Spaltenbeschreibungen | Sind die Kommentare aus den Migrationen — Metabase liest sie aus dem Katalog |
+| Abfragen bauen (MBQL) mit Joins entlang bekannter Beziehungen | `beziehungen.ts` hat `betrieb_key` und `aktion_key` als FK verdrahtet; das Modell bekommt Betriebsnamen statt Schlüsselzahlen |
+| SQL ausführen — **je Gruppe abschaltbar** (native-query-Recht) | Daniel: nur MBQL. Eugene: SQL. Ohne eine Zeile Code |
+| Ergebnis als Balken, Linie, Tabelle im Chat | Für Verläufe ausreichend |
+| OAuth aus Metabase selbst, Rechte je Nutzer | Kein Identitätsanbieter nötig — die Nutzer sind schon in Metabase |
+| Bestehende Fragen und Dashboards lesen | Die 285 Karten sind als **Beispiele** sofort da |
+| Seitenweise 200 Zeilen, höchstens 2.000 | Die Zeilengrenze, die wir bauen wollten |
+
+**Was er nicht kann — und was daraus die Stufe 1 macht:**
+
+| Lücke | Folge |
+|---|---|
+| Kein Befund-Anhang: das Ergebnis trägt seine Fallstricke nicht bei sich; der Kommentar ist da, aber nur, wenn das Modell ihn gelesen hat | Die Kernidee der ersten Fassung bleibt offen |
+| Kein Datenstand am Ergebnis | „Juli-Zahlen" ohne die Information, dass die BWA bei Mai steht |
+| Keine Prüfung der Abfrage vor dem Lauf (Gruppierung über eine Spalte, die überall NULL ist; `fremdeinkauf` ohne `quelle`) | Die stillen Fallen bleiben still |
+| Keine Ampelansicht — nur Balken, Linie, Tabelle | Der Round Table als Text |
+| Kein eigenes Protokoll je Frage, nur Metabases Abfrageprotokoll | Reicht für „wer hat was gefragt", nicht für „welche Frage kam zehnmal" |
+
+**Ablauf Stufe 0:**
+
+1. Admin → AI-Funktionen an, MCP an. Kein API-Schlüssel nötig — der ist nur für Metabot.
+2. Öffentlicher Hostname mit TLS für Metabase (Claude Desktop verbindet nicht mit
+   `localhost`; ChatGPT, Claude und VS Code müssen in Metabases CORS-Liste).
+3. Gruppe *Fachbereich* ohne native-query-Recht, Gruppe *Analyse* mit.
+4. Daniel bekommt den Connector und **die zehn Fallenfragen aus Abschnitt 6.3** — dieselben,
+   gegen die später Stufe 1 gemessen wird.
+5. **Zwei Wochen messen**, nicht meinen: Metabases Abfrageprotokoll auswerten. Welche
+   Fragen kamen, welche endeten in einer falschen Zahl, welche in einer Verweigerung.
+
+**Die Entscheidung am Ende von Stufe 0:** Wenn die Fallenfragen mit Beschreibungen und
+FK-Verdrahtung schon sauber laufen, ist Stufe 1 ein Ausbau (Ampeln, Protokoll), keine
+Rettung. Wenn nicht, wissen wir aus dem Protokoll *welche* Fallen — und bauen genau dafür.
+
+**Zu prüfen, bevor jemand darauf baut** (in `offene-punkte.md`): dass der MCP-Server in der
+Open-Source-Ausgabe enthalten ist — die Dokumentation nennt keine Einschränkung, die
+Release-Seite spricht von „frei und Open Source", aber gemessen ist es an unserer Instanz
+noch nicht.
+
+---
+
+## 3. Stufe 1 — der eigene Server (Skybridge)
+
+Für das, was Metabase MCP nicht tut: die Prüfung **vor** dem Lauf, der Befund-Anhang **am**
+Ergebnis, die Ampel als Ansicht, das eigene Protokoll. Alles andere — Suche, Katalog,
+Beispiele — kann er auch, aber das ist nicht sein Grund.
 
 ```
 Daniel (Claude / ChatGPT / VS Code Copilot)
    │  MCP über HTTPS, OAuth
    ▼
-mcp.<domain>            ← Skybridge-App, Dokploy-Application, eigener Container
-   │  Werkzeuge, Ansichten, Befund-Anhang, Protokoll
+mcp.<domain>            ← Skybridge-App, eigene Dokploy-Application
+   │  Katalog · Prüfung · Ausführung · Befund-Anhang · Ansichten · Protokoll
    ▼
-PostgreSQL 18           ← Rolle `mcp_leser`: nur mart/manual/ampel, nur lesend
-   ▲
-   │
-Importer (bestehend)    ← unverändert, schreibt weiter
+PostgreSQL 18           ← Rolle `mcp_leser`: mart/manual/ampel, nur lesend
 ```
 
-**Ein eigener Container neben dem Importer, kein Endpunkt in `src/health.ts`.** Der Importer
-ist ein Batch-Prozess, der nachts läuft und dessen Container bewusst „oben bleibt und nichts
-tut" (`src/health.ts`). Ein Webdienst mit Publikumsverkehr gehört nicht in denselben Prozess:
-er hat einen anderen Lastverlauf, ein anderes Neustartverhalten und ein völlig anderes
-Risikoprofil. Dokploy trennt sie ohnehin sauber — dasselbe Muster wie Metabase
-(`docs/architektur.md`).
+**Warum Skybridge** (MIT, TypeScript, Zod — der Stack dieses Repositories): ein
+Werkzeug + eine React-Ansicht, ein Codestand für Claude, ChatGPT und VS Code; ein Tunnel,
+um gegen echtes Claude und ChatGPT zu testen, bevor etwas auf dem Server steht; OAuth über
+WorkOS/Auth0/Clerk/Descope/Stytch oder einen beliebigen IdP mit Discovery-Dokument
+(`customProvider({ issuer, audience })`) — die Identität kommt im Handler als
+`extra.http.authInfo` an. Drei Antwortkanäle je Werkzeug, die wir gezielt nutzen:
+`structuredContent` (liest das Modell), `content` (Zusammenfassung), `_meta` (nur die
+Ansicht — hier wandert die volle Tabelle hin, das Modell bekommt nur die gekürzte).
 
-**Warum selbst gehostet und nicht auf Alpic.** Alpic wäre bequemer (Deploy aus dem
-Repository, MCP-Analytics, SOC 2). Es scheitert an einem Satz: **die Datenbank ist nicht von
-außen erreichbar, und sie soll es nicht werden.** Eine gehostete App außerhalb des
-Hetzner-Servers braucht genau das — oder einen Tunnel, der dasselbe Loch mit mehr beweglichen
-Teilen ist. Der Server, auf dem Postgres und Metabase schon stehen, ist der richtige Ort.
-Skybridge ist dafür ausdrücklich vorgesehen („self-host on any Node.js-compatible platform").
-
-Alpic bleibt als Option für **Phase 1** (Tunnel zum Testen gegen echtes Claude/ChatGPT vom
-Entwicklungsrechner aus) — dort fließen nur Testdaten und keine Datenbankverbindung.
+**Warum selbst gehostet, nicht auf Alpic:** die Datenbank ist von außen nicht erreichbar
+und soll es nicht werden. Ein eigener Container neben Postgres und Metabase, kein Endpunkt
+in `src/health.ts` — der Importer ist ein nächtlicher Batch, ein Dienst mit
+Publikumsverkehr hat ein anderes Risikoprofil. Alpics Tunnel bleibt für die Entwicklung.
 
 ---
 
-## 5. Die Werkzeuge — drei Ringe
+## 4. Die Werkzeuge — acht, nicht 285
 
-Nicht ein Werkzeug „frag die Datenbank", sondern drei Ringe mit abnehmender Sicherheit und
-zunehmender Freiheit. Die meisten Fragen enden im ersten Ring.
+Verb-basierte Namen, wie Skybridge sie empfiehlt; deutsch, weil das ganze Vokabular der
+Datenbank deutsch ist und das Modell sonst übersetzt und dabei danebengreift.
 
-### Ring 1 — Fertige Fragen (die 285 Karten)
-
-Die Metabase-Karten sind bereits **parametrisiertes, geprüftes SQL mit typisierten
-Parametern** (`metabase/typen.ts`: `Parameter`, `werteliste`, `festeWerte`). Sie sind das
-Beste, was dieses Repository hat, und sie sind heute nur in Metabase abrufbar.
-
-Aus jeder Karte wird ein MCP-Werkzeug — dieselbe SQL, dieselben Parameter, kein Modell, das
-etwas generiert:
-
-| Werkzeug | Parameter | Liefert |
+| Werkzeug | Tut | Kanal |
 |---|---|---|
-| `round_table` | `monat`, optional `konzept`, `regelwerk` | Das Ampelraster, gerendert |
-| `betriebsblatt` | `betrieb`, `monat` | Kennzahlen, Verlauf, Personal, Ware, BWA |
-| `umsatz_verlauf` | `betrieb`/`konzept`, `von`, `bis` | Zeitreihe als Chart |
-| `marke_vergleich` | `monat`, `kennzahl` | Betrieb gegen Markenmedian |
-| `standorte_vergleichen` | `betriebe[]`, `zeitraum` | Mehrere Betriebe nebeneinander |
-| `datenstand` | optional `betrieb` | **Was überhaupt beurteilbar ist** |
-| `import_lage` | — | Läuft der Import, was fehlt |
+| `sichten_suchen(stichwort)` | Sichten samt Kommentar, Körnung, Achsen | Text |
+| `sicht_beschreiben(name)` | Spalten mit Kommentar, Körnung, Achsen, Kennzahlen mit Aggregationsregel, **Fallstricke**, **Beispielabfragen aus den Karten**, drei Beispielzeilen | Text |
+| `achsen_zeigen(sicht_a, sicht_b?)` | Worüber zwei Sichten zusammenfinden — oder alle Achsen einer Sicht | Text |
+| `betriebe_suchen(text)` | Löst „Enchilada Karls" nach `betrieb_key` auf, mit Konzept, Status, Datenstand. Fünf Betriebe heißen „Karlsruhe" | Text |
+| `abfrage_pruefen(sql)` | Parsen, Sichten erkennen, Regeln anwenden, `EXPLAIN` — **ohne zu laufen**. Liefert Hinweise und geschätzte Zeilen | Text |
+| `abfrage_ausfuehren(sql)` | Prüfen, dann laufen. Ergebnis + `hinweise[]` + Datenstand der berührten Betriebe | Text + Tabelle |
+| `datenstand(betrieb?)` | Was überhaupt beurteilbar ist | Text |
+| `round_table(monat, konzept?, regelwerk?)` | Das Ampelraster — die eine Ansicht, die Text nicht kann | **Ansicht** |
 
-`werteliste` wird zum Auswahl-Werkzeug (`betriebe_suchen("Enchilada Karls")`) — dieselbe
-Falle wie in Metabase: **der Betriebsname ist nicht eindeutig**, fünf Betriebe heißen
-„Karlsruhe". Aufgelöst wird immer über `betrieb_key`, angezeigt mit Konzept davor.
+**Die Karten werden zu Beispielen.** `sicht_beschreiben('mart.personalkosten')` liefert
+neben Spalten und Fallstricken die Abfragen der Karten, die diese Sicht benutzen — samt
+der Zeile `pek_gesamt > 0 AND pek_gesamt <= 200` und dem Median, die
+`karten-drilldown.ts` als Bedingung dafür nennt, dass eine Personalquote überhaupt zu
+gebrauchen ist. Eine Beispielabfrage der Betreuer ist für ein Modell mehr wert als eine
+Beschreibung: sie zeigt, *wie* man die Sicht richtig fragt. 285 Karten werden so zu
+Wissen, das nur dann Kontext kostet, wenn es gebraucht wird.
 
-**Der Aufwand ist gering, weil die Karten schon als Daten vorliegen.** Ein Übersetzer von
-`Karte` nach MCP-Werkzeugdefinition ist eine Datei, kein Projekt — dasselbe Muster wie
-`metabase/uebernehmen.ts`, nur mit einem anderen Ziel.
+**`abfrage_pruefen` ist als eigenes Werkzeug da, damit das Modell es vor einer großen
+Frage aufrufen kann** — und `abfrage_ausfuehren` ruft es ohnehin intern auf. Zwei Wege
+zum selben Schutz, keiner davon optional.
 
-### Ring 2 — Katalog
+---
 
-Damit das Modell die Lücke zwischen Ring 1 und Ring 3 überhaupt sieht:
+## 5. Der semantische Katalog — Schema `mcp`
 
-| Werkzeug | Liefert |
+Schichtname, deshalb englisch wie `raw`, `sync`, `mart`. Fünf Tabellen, **alle als
+Daten**, keine als Code — dieselbe Begründung wie bei den Ampelregelwerken
+(`datenmodell.md`, Entscheidung 5): eine neue Regel ist eine Migration, kein Deploy, und
+sie steht neben den Daten, auf die sie sich bezieht.
+
+| Tabelle | Eine Zeile je | Trägt |
+|---|---|---|
+| `mcp.sicht` | Sicht | **Körnung** („eine Zeile je Betrieb und Monat"), Themengebiet, ob summierbar, Verweis auf `docs/` |
+| `mcp.achse` | Achse | `betrieb_key → mart.betrieb.betrieb`, `konzept`, `monat`, `geschaeftstag`, `kostenstelle → marke`, `bundesland` (über `betrieb_bundesland`), `ort` (über `nachbarschaft` — **die einzige belastbare Stadtangabe**), `lieferant`, `ware`, `aktion_key` |
+| `mcp.sicht_achse` | Sicht × Achse | Welche Achsen eine Sicht trägt — daraus folgt, was womit joinbar ist |
+| `mcp.kennzahl` | Sicht × Spalte | Aggregationsregel: `summe`, `median`, `letzter_stand`, `nicht_aggregieren`; Einheit (`prozentzahl`, `euro`) |
+| `mcp.fallstrick` | Regel | Bedingung auf der **geparsten** Abfrage (siehe 5.2), Hinweistext, Schwere (`warnung` / `sperre`) |
+
+**Erstbefüllung, halb automatisch:** `mcp.sicht_achse` aus den Spaltennamen (die
+Konvention „Schlüssel heißt in Quelle und Ziel gleich" gilt im ganzen Schema —
+`beziehungen.ts` nutzt sie schon). `mcp.fallstrick` aus den 114 Kommentaren mit Warnwort
+und `fehlerkatalog.md`. **Die Körnung von Hand** — 165 Sichten, zwei Tage, und der Ertrag
+geht nicht nur an den MCP-Server: dieselbe Zeile gehört in den Tabellenkommentar, dann
+hat Metabase sie auch. Regel für neue Sichten in `metabase.md`: *ohne Körnung im
+Kommentar keine Sicht.*
+
+### 5.1 Körnung ist die halbe Sicherheit
+
+Der häufigste stille Fehler ist eine Summe über die falsche Körnung: `mart.umsatz_tag`
+darf man summieren, `mart.umsatz_tag_sparte` nur je Sparte, `mart.round_table_monat`
+gar nicht (Prozentwerte, Mediane). Steht die Körnung im Katalog, kann `abfrage_pruefen`
+eine `sum()` über eine Sicht mit `summierbar = false` **ablehnen**, nicht nur anmerken.
+
+### 5.2 Fallstricke als Regeln auf dem Syntaxbaum
+
+Die erste Fassung wollte Hinweise „anhand der Sichten, die in der Abfrage vorkommen"
+anhängen — ein Textabgleich. Das reicht nicht für „`GROUP BY stadt`" oder „`fremdeinkauf`
+ohne Filter auf `quelle`". Dafür braucht es die Abfrage als Baum.
+
+**`libpg-query` / `pgsql-parser` ist der echte Postgres-Parser als Bibliothek** (npm,
+Stand 13.09.2026: 17.7 / 18.2). Damit ist eine Regel ein Prädikat auf dem Baum:
+
+| Regel (Beispiele) | Schwere |
 |---|---|
-| `sichten_suchen(stichwort)` | Passende `mart`-Sichten mit ihrem Tabellenkommentar |
-| `sicht_beschreiben(name)` | Spalten, Typen, Spaltenkommentare, Zeilenzahl, **Fallstricke**, Beispielzeilen |
-| `befunde_lesen(thema)` | Die einschlägigen Absätze aus `befunde-datenlage.md` und `fehlerkatalog.md` |
+| Gruppierung oder Filter auf `stadt` in einer Sicht, die sie aus `core.betrieb` zieht | `sperre` — die Spalte ist bei allen 141 Betrieben NULL |
+| `mart.fremdeinkauf` ohne Gleichheitsfilter auf `quelle` | `sperre` — Doppelzählung |
+| `mart.einkaufspreis_betrieb` ohne `vergleichbar = true` | `sperre` |
+| `sum()` über eine Spalte mit Regel `median` oder `nicht_aggregieren` | `sperre` |
+| Join zweier Sichten über eine Spalte, die keine gemeinsame Achse ist | `warnung` |
+| Join über `betrieb` (Name) statt `betrieb_key` | `sperre` — fünf Betriebe heißen „Karlsruhe" |
+| `mart.personalkosten` ohne `pek_gesamt`-Plausibilitätsfilter | `warnung` mit dem Filter aus der Karte |
+| Betriebe ohne laufendes Geschäft im Nenner (`betrieb_status`) | `warnung` mit der Zahl (79 von 141) |
+| Prozentwert mit `* 100` oder `/ 100` | `warnung` — Prozentwerte sind schon Prozentzahlen |
+| `EXPLAIN` schätzt > 5 Mio. gelesene Zeilen | `sperre` mit Vorschlag, den Zeitraum einzugrenzen |
 
-`sicht_beschreiben` ist das wichtigste Werkzeug des ganzen Servers. Es beantwortet die Frage,
-die vor jedem SQL steht — und es beantwortet sie mit dem Kommentar, der neben den Daten in
-der Datenbank steht und von der Dokumentationspflicht aktuell gehalten wird.
+Eine `sperre` läuft nicht. Sie kommt mit dem Grund und, wo möglich, mit dem korrigierten
+SQL zurück — das Modell bessert nach, der Mensch sieht beides im Protokoll. Das ist die
+Verweigerung aus dem dbt-Benchmark, in dieses Repository übersetzt: **eine falsche Zahl,
+die nicht entsteht, ist die einzige, die niemand weitergibt.**
 
-### Ring 3 — Freies SQL, mit Leitplanken
+### 5.3 Was mit jeder Antwort mitreist
 
-`abfrage_ausfuehren(sql)` — für alles, was Ring 1 nicht abdeckt. Die Leitplanken stehen in
-Abschnitt 6 und sind **keine Prompt-Anweisungen**.
+```
+{ zeilen: [...],            // höchstens 500, Rest in _meta für die Ansicht
+  koernung: "eine Zeile je Betrieb und Monat",
+  hinweise: [ "...", "..." ],
+  datenstand: { umsatz_bis: "2026-09-10", bwa_bis: "2026-07", betriebe_unvollstaendig: 3 },
+  protokoll_id: 4711 }
+```
 
 ---
 
 ## 6. Leitplanken, die nicht im Prompt stehen
 
-Eine Regel, die nur im Systemprompt steht, ist eine Bitte. Alles Folgende ist erzwungen.
-
-### 6.1 Die Datenbankrolle
+### 6.1 Die Rolle
 
 ```sql
 CREATE ROLE mcp_leser LOGIN PASSWORD :'pw';
 ALTER ROLE mcp_leser SET default_transaction_read_only = on;
 ALTER ROLE mcp_leser SET statement_timeout = '20s';
 ALTER ROLE mcp_leser SET idle_in_transaction_session_timeout = '30s';
-ALTER ROLE mcp_leser SET work_mem = '32MB';
-
+ALTER ROLE mcp_leser SET search_path = mart, manual, ampel;
 REVOKE ALL ON SCHEMA public, raw, part, core, sync FROM mcp_leser;
-GRANT USAGE ON SCHEMA mart, manual, ampel TO mcp_leser;
-GRANT SELECT ON ALL TABLES IN SCHEMA mart, manual, ampel TO mcp_leser;
+GRANT USAGE ON SCHEMA mart, manual, ampel, mcp TO mcp_leser;
+GRANT SELECT ON ALL TABLES IN SCHEMA mart, manual, ampel, mcp TO mcp_leser;
 ALTER DEFAULT PRIVILEGES IN SCHEMA mart GRANT SELECT ON TABLES TO mcp_leser;
+GRANT INSERT ON mcp.zugriff TO mcp_leser;   -- das Einzige, was geschrieben wird
 ```
 
-**Warum die Rolle und nicht eine Prüfung im Code:** ein SQL-Parser, der `core` verbieten
-soll, ist eine Liste von Umgehungen, die man nicht kennt (CTE, Funktion, `search_path`,
-Kommentartrick). Postgres hat diese Prüfung eingebaut und sie ist vollständig. Der
-Code-Filter kommt trotzdem dazu — als **erste** Hürde mit einer verständlichen Meldung, nicht
-als einzige.
+Ein SQL-Filter im Code, der `core` verbieten soll, ist eine Liste von Umgehungen (CTE,
+Funktion, `search_path`, Kommentar). Postgres hat die Prüfung eingebaut und vollständig.
+Der Parser aus 5.2 kommt **dazu** — für die Fallstricke, nicht für die Rechte.
 
-**Der Importer behält seine eigene Rolle.** `DATABASE_URL` und die MCP-Verbindung teilen
-keinen Zugang; der Server bekommt eine eigene Umgebungsvariable (`MCP_DATABASE_URL`). Harte
-Regel 2 gilt unverändert.
+Der Importer behält seine Rolle; `MCP_DATABASE_URL` ist eine eigene Variable (Regel 2).
 
-### 6.2 Grenzen am Ergebnis
+### 6.2 Grenzen
 
-| Grenze | Wert | Warum |
+| | Wert | Warum |
 |---|---|---|
-| Zeilen je Antwort | 500, hart abgeschnitten mit Hinweis | `mart.umsatz_tag` hat 443.304 Zeilen. Eine unbegrenzte Antwort sprengt das Kontextfenster und kostet Geld, bevor sie irgendetwas beantwortet |
-| Laufzeit | 20 s (`statement_timeout`) | Ein Modell wartet nicht, es probiert etwas anderes |
-| Gleichzeitige Abfragen je Nutzer | 2 | Der Server teilt sich die Maschine mit dem Importer |
-| Nur `SELECT`/`WITH` | Codefilter **und** Leserolle | siehe oben |
+| Zeilen an das Modell | 500 | `mart.umsatz_tag` hat 443.304 Zeilen; mehr sprengt den Kontext, bevor es etwas beantwortet |
+| Zeilen an die Ansicht (`_meta`) | 5.000 | Eine Tabelle darf blättern, ein Modell nicht |
+| Laufzeit | 20 s | Ein Modell wartet nicht, es probiert etwas anderes |
+| Geschätzte Zeilen (`EXPLAIN`) | 5 Mio. | Vor dem Lauf, nicht nach dem Timeout |
+| Gleichzeitig je Nutzer | 2 | Der Server teilt sich die Maschine mit dem Importer |
 
-### 6.3 Der Befund-Anhang — die eigentliche Erfindung
+### 6.3 Die zehn Fallenfragen
 
-**Jede Antwort trägt die Fallstricke der berührten Sichten bei sich.** Nicht als Hoffnung,
-dass das Modell den Kommentar gelesen hat, sondern als Feld `hinweise[]` neben den Daten,
-maschinell angehängt anhand der Sichten, die in der Abfrage vorkommen.
+Sie sind die Regressionssicherung des ganzen Vorhabens, werden in Stufe 0 gegen Metabase
+MCP gestellt und in Stufe 1 als Testdatei festgehalten. Jede muss entweder richtig
+beantwortet werden oder eine Sperre/Warnung tragen:
 
-```
-{ zeilen: [...], hinweise: [
-    "mart.fremdeinkauf: ohne Filter auf genau eine quelle zählt diese Abfrage doppelt.",
-    "stadt ist bei allen 141 Betrieben NULL — GROUP BY stadt ergibt eine Gruppe.",
-    "Stand: Umsatz bis 10.09.2026, BWA bis 07/2026 (je Betrieb verschieden, siehe datenstand)." ] }
-```
+1. Umsatz je Stadt, letzter Monat *(stadt ist NULL)*
+2. Durchschnittliche Personalquote aller Betriebe *(79 ohne Geschäft; Median statt Mittel; Tagesnenner)*
+3. Fremdeinkauf je Betrieb, Summe über das Jahr *(quelle)*
+4. Welcher Betrieb zahlt am meisten für Mozzarella *(vergleichbar; Gebinde)*
+5. Personalquote von „Karlsruhe" *(fünf Betriebe)*
+6. Umsatz und Personalkosten Juli nebeneinander *(BWA-Versatz je Betrieb)*
+7. Wareneinsatz aus Rezepturen *(pos_artikel leer)*
+8. Umsatz nach Bundesland *(60 von 141 Standorte gepflegt)*
+9. Wareneinsatzquote als Bruch × 100 *(Prozentzahl)*
+10. Umsatz gegen Vorjahr, kumuliert *(umsatz_ytd statt Handrechnung)*
 
-Die Fallstricke liegen **als Daten** in `mcp.fallstrick` (Sicht, optional Spalte, optional
-Bedingung, Text) — nicht als `if` im Code. Dasselbe Muster wie die Ampelregelwerke
-(`datenmodell.md`, Entscheidung 5): eine neue Warnung ist eine Migration, kein Deploy, und
-sie steht neben den Daten, auf die sie sich bezieht. Erstbefüllung aus den vorhandenen
-Tabellenkommentaren und `fehlerkatalog.md`.
+### 6.4 Protokoll
 
-**Das ist harte Regel 10, angewandt auf Auswertungen:** eine stille Falle muss im Ergebnis
-sichtbar werden, nicht in einem Dokument, das niemand liest.
-
-### 6.4 Der Datenstand hängt immer dran
-
-`mart.datenstand` beantwortet, welche Zeilen überhaupt beurteilbar sind — LINA liefert
-5–6 Tage nach, die BWA je Betrieb verschieden weit. In Metabase ist das eine Karte, die man
-aufrufen kann. Hier ist es **kein eigener Schritt**: jede Antwort, die Betriebe enthält,
-trägt den Datenstand der betroffenen Betriebe im Anhang. Wer die Juli-Zahlen eines Betriebs
-zieht, dessen BWA bei Mai steht, sieht das in derselben Antwort.
-
-### 6.5 Protokoll
-
-Neues Schema `mcp` (Schichtname, deshalb englisch — dieselbe Begründung wie `raw`, `sync`,
-`mart`), eine Tabelle:
-
-```
-mcp.zugriff(id, zeitpunkt, nutzer, client, werkzeug, parameter jsonb,
-            sql text, zeilen int, dauer_ms int, fehler text)
-```
-
-Zwei Gründe, beide aus diesem Repository:
-
-1. **Wenn eine Zahl im Round Table landet, muss rekonstruierbar sein, woher sie kam.** Eine
-   Chat-Antwort ist kein Beleg; die Zeile in `mcp.zugriff` ist einer.
-2. **Ein Dienst ohne Zulauf ist ein Fehler, kein Normalzustand** (harte Regel 10). Wird der
-   Server nicht benutzt, muss man das sehen — in `mart.mcp_nutzung` und in `/status`, nicht
-   im Gefühl. Und wenn dieselbe Frage zwanzigmal über Ring 3 gestellt wird, gehört sie als
-   Karte nach Ring 1 und als Sicht nach `mart`.
-
-Aus Punkt 2 folgt der Rückkanal, der dieses Vorhaben davor bewahrt, ein Spielzeug zu
-bleiben: **`mcp.zugriff` ist die Anforderungsliste für die nächsten `mart`-Sichten.**
+`mcp.zugriff(id, zeitpunkt, nutzer, client, werkzeug, parameter jsonb, sql, hinweise
+jsonb, gesperrt bool, zeilen, dauer_ms, fehler)`. Eine Zahl, die im Round Table landet,
+muss rekonstruierbar sein — die Chat-Antwort ist kein Beleg, die Zeile hier ist einer.
+Und: ein Dienst ohne Zulauf ist ein Fehler (Regel 10) — `mart.mcp_nutzung`, eine
+Prüfzeile in `/status`. Wiederholte Fragen und häufige Sperren sind die Anforderungsliste
+für die nächsten `mart`-Sichten.
 
 ---
 
-## 7. Anmeldung und wer was darf
+## 7. Anmeldung
 
-Skybridge bringt OAuth-Beispiele für Clerk, Auth0, Descope, WorkOS, Stytch und Authplane mit;
-alle drei Zielclients sprechen OAuth 2.1 + PKCE nach der MCP-Autorisierungsspezifikation.
+Stufe 0: Metabases eigener OAuth-Server, Nutzer und Gruppen wie gehabt. **Nichts zu
+entscheiden.**
 
-**Vorschlag: ein Anbieter mit Allowlist, keine eigene Nutzerverwaltung.** Bei einer
-Handvoll Menschen (Eugene, Daniel, die OMs) ist eine Nutzerdatenbank Aufwand ohne Gegenwert.
-Entscheidungsbedarf besteht nur an einer Stelle — ob Concept Family bereits ein
-Identitätssystem hat, an das sich das hängen lässt (Microsoft 365 / Entra ist die
-wahrscheinlichste Antwort und wäre die beste: dann ist Ausscheiden aus dem Unternehmen
-gleichbedeutend mit Zugangsverlust). Das steht in `offene-punkte.md`.
-
-**Rechte in Stufen, erst wenn jemand sie braucht:**
-
-| Stufe | Wer | Darf |
-|---|---|---|
-| `lesen` | alle Freigeschalteten | Ring 1 und 2 |
-| `fragen` | Eugene, Daniel | zusätzlich Ring 3 (freies SQL) |
-| — | niemand | schreiben. `manual.*` bleibt Metabase und Postico |
-
-**Kein Schreibzugriff, bewusst.** Maßnahmen, Ursachen und OM-Einschätzungen sind das einzige,
-was hier von Hand entsteht. Ein Modell, das sie anlegt, erzeugt Einträge, die niemand
-verantwortet — und `manual` ist das Schema, das ein Backfill nicht wiederherstellen kann.
-Wenn das kommt, dann als eigener Plan mit Bestätigungsschritt, nicht nebenbei.
+Stufe 1: ein Anbieter mit Discovery-Dokument. Gibt es bei Concept Family Microsoft 365 /
+Entra, ist das der richtige (`customProvider({ issuer, audience })`): Ausscheiden aus dem
+Unternehmen heißt dann Zugangsverlust. Sonst WorkOS oder Clerk mit Allowlist. Rechte in
+zwei Stufen — `lesen` (Katalog, fertige Werkzeuge) und `fragen` (freies SQL) — und **kein
+Schreiben**: `manual` ist das einzige Schema, das von Hand entsteht und das ein Backfill
+nicht wiederherstellen kann.
 
 ---
 
 ## 8. Was in welchem Client ankommt
 
-Ehrlich, weil die Unterschiede echt sind:
-
 | | Claude | ChatGPT | Copilot (VS Code) |
 |---|---|---|---|
-| Remote-MCP-Connector | ja (Pro/Max/Team/Enterprise) | ja — Developer Mode (Pro/Plus/Business/Enterprise), org-weit über Admin | ja, OAuth 2.1 + PKCE |
-| OAuth | ja | ja | ja |
-| **Gerenderte Ansichten** (Ampeltabelle, Chart) | ja | ja | eingeschränkt — Werkzeugergebnisse als Daten |
-| Einrichtung durch | Nutzer | Admin (Business/Enterprise) oder Nutzer | `mcp.json` im Arbeitsbereich |
+| Metabase MCP (Stufe 0) | ja | ja, Developer Mode oder Admin-Freigabe | ja |
+| Charts aus Metabase MCP | Balken/Linie/Tabelle | dito, nach CORS-Freigabe | dito |
+| Skybridge-Ansichten (Stufe 1) | ja | ja | eingeschränkt — Daten statt Ansicht |
+| Werkzeugobergrenze | ~100 | — | 128 |
 
-**Folge für den Bau:** jedes Werkzeug muss auch **ohne** Ansicht eine brauchbare Antwort
-liefern. Die Ansicht ist die Kür, die strukturierte Antwort die Pflicht — sonst ist der
-Server in Copilot wertlos. Das ist ohnehin Skybridges Modell (`structuredContent` neben der
-Ansicht), es muss nur beim Schneiden der Antworten eingehalten werden.
-
-Für Daniel ist **ChatGPT der wahrscheinliche Einstieg** und Claude der bessere Ort für die
-Ampeltabellen. Beide werden bedient, keiner wird bevorzugt.
+Folge: jedes Werkzeug muss ohne seine Ansicht brauchbar sein; die Ansicht ist die Kür.
 
 ---
 
 ## 9. Phasen
 
-Jede Phase endet an etwas Vorzeigbarem. Keine Phase beginnt, bevor die vorige gemessen ist.
+| Phase | Inhalt | Fertig, wenn |
+|---|---|---|
+| **0 — Metabase MCP** (diese Woche, ½ Tag) | Einschalten, Hostname/TLS, CORS, Gruppen, Daniel freischalten, zehn Fallenfragen | Daniel hat in ChatGPT eine Frage beantwortet bekommen, die auf keiner Karte steht |
+| **0b — Messen** (zwei Wochen, nebenher) | Abfrageprotokoll auswerten: Fragen, Fallen, Verweigerungen | Eine Tabelle: welche der zehn Fallen fielen zu |
+| **1 — Katalog** (2 Tage) | Migration: `mcp.*`, Rolle, Körnung von Hand für 165 Sichten — **auch in die Kommentare**, dann hat Metabase sie sofort | `psql` als `mcp_leser`: `core.betrieb` → *permission denied*, `mart.round_table_monat` → Zahlen; Körnung in jedem Kommentar |
+| **2 — Prüfung** (2 Tage) | `abfrage_pruefen` mit Parser, `EXPLAIN`, Regeln aus `mcp.fallstrick`; Testdatei mit den zehn Fragen | Alle zehn: richtig oder gesperrt/gewarnt |
+| **3 — Server** (2 Tage) | Skybridge-Gerüst, acht Werkzeuge, Befund-Anhang, Protokoll; Tunnel gegen Claude und ChatGPT | Zeile „Enchilada Bayreuth" im Chat = `migrations/pruefung.sql` |
+| **4 — Ansicht** (1 Tag) | Ampelraster; Farben aus `ampel.regelwerk` | — |
+| **5 — Betrieb** (1 Tag) | Dokploy-Application, IdP, Freischalten, `/status` | Vier Wochen später: `mcp.zugriff` ausgewertet |
 
-### Phase 0 — Der Zugang (½ Tag)
-* Migration: Rolle `mcp_leser`, Schema `mcp`, `mcp.zugriff`, `mcp.fallstrick`
-* `mart.mcp_nutzung` und eine Prüfzeile in `/status`
-* **Fertig, wenn** `psql` als `mcp_leser` ein `SELECT` auf `core.betrieb` mit
-  *permission denied* beantwortet und eines auf `mart.round_table_monat` mit Zahlen.
-
-### Phase 1 — Der schmale Server (2–3 Tage)
-* Skybridge-Gerüst, Ring 2 vollständig (`sichten_suchen`, `sicht_beschreiben`)
-* Ring 1 mit **sechs** Werkzeugen: `round_table`, `betriebsblatt`, `umsatz_verlauf`,
-  `datenstand`, `betriebe_suchen`, `import_lage`
-* Über den Tunnel gegen echtes Claude **und** echtes ChatGPT geprüft
-* **Fertig, wenn** die Ampelzeile „Enchilada Bayreuth" im Chat dieselben zehn Werte zeigt wie
-  `migrations/pruefung.sql` gegen das Excel. Dieselbe Prüfzeile wie beim Round Table selbst —
-  sie ist die verbindliche Zieldefinition und bleibt es.
-
-### Phase 2 — Freies SQL mit Leitplanken (2 Tage)
-* `abfrage_ausfuehren` mit Codefilter, Zeilengrenze, Protokoll
-* Befund-Anhang, erstbefüllt aus Tabellenkommentaren und `fehlerkatalog.md`
-* **Fertig, wenn** zehn bewusst gestellte Fallenfragen (die Tabelle aus Abschnitt 1) entweder
-  richtig beantwortet werden oder eine Warnung tragen. Diese zehn Fragen werden als
-  Testdatei festgehalten — sie sind die Regressionssicherung des ganzen Vorhabens.
-
-### Phase 3 — Ansichten (2 Tage)
-* Ampelraster, Zeitreihe, Vergleichstabelle als React-Ansichten
-* Farben und Schwellen aus `ampel.regelwerk`, nicht neu erfunden
-
-### Phase 4 — Betrieb und Ausrollen (1 Tag)
-* Dokploy-Application, eigener Container, Healthcheck
-* Daniel wird freigeschaltet, mit einer Seite „so fragt man"
-* **Messen statt hoffen:** nach vier Wochen `mcp.zugriff` auswerten — welche Fragen kamen,
-  welche über Ring 3, welche davon gehören als Sicht nach `mart`.
-
-**Gesamt: gut eine Woche Arbeit.** Der größte Posten ist nicht der Server, sondern Phase 2 —
-die Leitplanken und ihre Prüfung.
+Phase 1 hat auch dann Wert, wenn Stufe 1 nie gebaut wird: die Körnung in den Kommentaren
+verbessert Metabase MCP, Metabase selbst und jeden Agenten im Repository.
 
 ---
 
-## 10. Was dieser Plan nicht löst
+## 10. Was der Plan nicht löst
 
-Damit niemand es später als Überraschung erlebt:
-
-1. **Ein richtiges Ergebnis kann falsch gedeutet werden.** Der Befund-Anhang warnt vor
-   bekannten Fallen. Er kann nicht verhindern, dass jemand eine korrekte Zahl in einen
-   falschen Satz packt. Die Ampel ersetzt kein Urteil.
-2. **Die Abdeckungslücken bleiben.** 60 von 141 Betrieben haben einen gepflegten Standort,
-   `core.pos_artikel` ist leer, das Belegarchiv ist ein Torso, Inventuren sind praktisch nur
-   bei Wilma Wunder belastbar. Der MCP-Server macht diese Lücken **sichtbarer** — er füllt
-   keine.
-3. **Kein Schreibzugriff** (Abschnitt 7).
-4. **Er ersetzt Metabase nicht.** Ein Dashboard, das jeden Monat dieselbe Frage beantwortet,
-   ist einer Chat-Antwort überlegen: reproduzierbar, teilbar, ohne Kosten je Aufruf. Der
-   MCP-Server ist für die Fragen **davor** und **danach** — und was sich wiederholt, gehört
-   als Karte nach Metabase. `mcp.zugriff` sagt, welche das sind.
-5. **Er ersetzt den Agenten im Repository nicht.** Alles, was `raw`, `core`, den Importer
-   oder eine neue `mart`-Sicht braucht, bleibt Arbeit im Repository, mit `docs/` daneben.
-6. **Kosten entstehen beim Nutzer, nicht bei uns** — jede Abfrage kostet Tokens in Daniels
-   Abo. Die Zeilengrenze ist auch deshalb keine Schikane.
+1. Ein richtiges Ergebnis kann falsch gedeutet werden. Die Sperre verhindert die falsche
+   Zahl, nicht den falschen Satz.
+2. Die Abdeckungslücken bleiben — 60 von 141 Standorte, `pos_artikel` leer, Belegarchiv ein
+   Torso. Der Server macht sie **sichtbarer**, füllt keine.
+3. Kein Schreibzugriff.
+4. Er ersetzt Metabase nicht: was sich wiederholt, gehört als Karte dorthin — das Protokoll
+   sagt, was das ist.
+5. Er ersetzt den Agenten im Repository nicht: alles, was `core`, den Importer oder eine
+   neue Sicht braucht, bleibt Arbeit hier, mit `docs/` daneben.
+6. Kosten entstehen im Abo des Nutzers, je Token. Die 500 Zeilen sind auch deshalb.
 
 ---
 
 ## 11. Was Eugene entscheiden muss
 
-Übernommen nach `offene-punkte.md`:
-
-* **Identitätsanbieter** — gibt es Microsoft 365 / Entra bei Concept Family, an das sich der
-  Zugang hängen lässt? Sonst WorkOS oder Clerk mit Allowlist.
-* **Wer bekommt Ring 3?** Freies SQL ist mächtig und die Leitplanken sind Technik, kein
-  Urteil. Vorschlag: zunächst Eugene und Daniel.
-* **Öffentlicher Hostname und TLS** für `mcp.<domain>` — Claude und ChatGPT verbinden von
-  außen, anders als Metabase, das heute hinter dem Dokploy-Proxy liegt.
-* **Darf Daniel Zahlen aus dem Chat weitergeben?** Das ist eine Frage an das Unternehmen,
-  keine technische. Der Datenstand-Anhang ist die Antwort auf „war die Zahl überhaupt
-  fertig", nicht auf „durfte sie raus".
+* **Stufe 0 jetzt starten?** Kostet einen halben Tag und liefert die Messung, auf der
+  Stufe 1 steht.
+* **Öffentlicher Hostname und TLS** für Metabase (Stufe 0) und später `mcp.<domain>`.
+* **Wer bekommt SQL?** In Metabase: native-query-Recht je Gruppe. Vorschlag: Eugene, Daniel.
+* **Identitätsanbieter für Stufe 1** — Entra, falls vorhanden.
+* **Darf eine Zahl aus dem Chat das Haus verlassen?** Eine Frage an das Unternehmen; der
+  Datenstand-Anhang beantwortet „war sie fertig", nicht „durfte sie raus".
 
 ---
 
-## 12. Die eine Entscheidung, auf die alles zurückfällt
+## 12. Nebenbefund
 
-Wenn von diesem Plan ein Satz überleben soll, dann dieser:
+Beim Versuch, den Katalog an einer frischen Datenbank zu messen, stellte sich heraus, dass
+die Migrationen **aus dem Nichts nicht durchlaufen**: `0039_betriebsstatus_und_plausibilitaet`
+braucht `gebinde` aus `0041`, `0039_einkaufspreis_belastbar` braucht `preis_je_einheit` aus
+`0042`. In Produktion sind sie in der Reihenfolge ihres Erscheinens angewendet worden und
+stehen; auf einer leeren Datenbank bricht `bun run migrate` bei der 40. Datei ab.
+Nachgemessen 13.09.2026 auf PostgreSQL 16; Einzelheiten in `fehlerkatalog.md`. Für diesen
+Plan wurde deshalb aus dem SQL-Text gezählt, nicht aus dem Katalog.
 
-> **Nicht die Datenbank wird angeschlossen, sondern `mart` — und mit jeder Antwort reist der
-> Kommentar mit, der sagt, was man mit ihr nicht tun darf.**
+---
 
-Alles andere in diesem Dokument ist Ausführung. Diese Entscheidung ist der Unterschied
-zwischen einem Werkzeug, das Daniel schneller macht, und einem, das schneller falsche Zahlen
-produziert, als irgendjemand sie prüfen kann.
+## 13. Die eine Entscheidung
+
+> **Erst einschalten, was schon da ist, und zwei Wochen messen. Dann nur das bauen, was
+> die Messung verlangt — und das mit Regeln auf dem Syntaxbaum, nicht mit Bitten im
+> Prompt.**
+
+Die semantische Schicht ist der Unterschied zwischen 90 und 98 Prozent — und zwischen einer
+falschen Zahl und einer Verweigerung. Sie existiert in diesem Repository bereits, bis auf
+die Körnung. Die Körnung ist zwei Tage Arbeit und nützt an drei Stellen gleichzeitig.
