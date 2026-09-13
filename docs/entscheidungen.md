@@ -3178,3 +3178,56 @@ Festgehalten in `test/fallen.test.ts`.
 Zustimmungsseiten, Mandanten, Client-Geheimnisse, implizite Ablaeufe, Passwortregeln mit
 Sonderzeichen. Verlangt wird nur Laenge (12 Zeichen) — das Einzige, was messbar hilft, und
 drei Menschen koennen sich einen Satz merken.
+
+
+---
+
+## 13.09.2026 (5) — Review des MCP-Zugangs: angreifen statt lesen
+
+Der Server war gebaut, getestet, gruen. Der Review bestand nicht im Lesen, sondern in elf
+Abfragen, die durchkommen sollten, es aber nicht durften — und einem `psql`-Aufruf als die
+falsche Rolle. Alle Befunde in `fehlerkatalog.md`; hier die Entscheidungen, die daraus folgen.
+
+### Rechte in `mcp` werden namentlich vergeben, nie pauschal
+
+Weil das Schema zwei Arten von Tabellen traegt — Katalog fuer den Leser, Anmeldung fuer die
+Anmeldung — und ein pauschales `GRANT ON ALL TABLES` die Trennung bei jedem Aufruf wieder
+aufhebt. Migration `0103` bricht ab, wenn der Leser nach dem Lauf an den Signierschluessel
+kaeme, und `mart.mcp_rechte_pruefung` (Erwartung: leer) wacht danach.
+
+### Jede freie Abfrage laeuft in einer Transaktion, die zurueckgerollt wird
+
+Auch bei Erfolg. *Die Alternative* — nur den Pruefer um `set_config` zu ergaenzen — waere eine
+Liste, und Listen haben Luecken. `ROLLBACK` hat keine: Postgres nimmt jede
+Sitzungseinstellung zurueck, die in der Transaktion gesetzt wurde. Der Pruefer bleibt als
+erster Riegel mit lesbarer Meldung; getestet wird der zweite ausdruecklich ohne den ersten.
+
+### Ein Name ohne Schema wird normiert oder gesperrt, nie geraten
+
+`fremdeinkauf` wird zu `mart.fremdeinkauf`, wenn der Katalog die Sicht kennt — dann greifen
+ihre Regeln. Sonst Sperre mit dem Hinweis, das Schema zu schreiben. Die Alternative, den
+`search_path` der Rolle nachzubilden, haette `pg_catalog` mitgebracht.
+
+### Aliasse werden aufgeloest — bis zur Grenze des Ausdrucks
+
+`spalte AS alias` wird durchgereicht; `spalte * 2 AS alias` nicht. Das ist eine gezogene
+Grenze, keine uebersehene: eine vollstaendige Ausdrucksanalyse waere ein zweiter Planer, und
+die Faelle dahinter faengt die Rolle (kein Zugriff auf `core`) oder der Datenstand-Anhang.
+
+### Ein wiederverwendeter Auffrischungstoken ist 60 Sekunden lang eine Wiederholung
+
+Danach Diebstahl. Die reine Lehre — jede Wiederverwendung widerruft die Kette — bestraft den
+Client fuer eine verlorene Antwort; jede Netzstoerung endete in einer Neuanmeldung.
+
+Die Frist gilt NUR fuer einen Token, der durch Rotation ersetzt wurde und dessen Nachfolger
+noch unbenutzt ist — das ist das Kennzeichen der verlorenen Antwort. Jeder andere widerrufene
+Token ist ein Konflikt, und die Familie faellt. *Die erste Fassung* liess jeden kuerzlich
+widerrufenen Token wiederholen; der Test zeigte, dass damit die Diebstahlserkennung sich
+selbst aufhob. Eine Regel, die im Test faellt, bevor sie im Betrieb faellt, ist der Zweck
+des Tests.
+
+### Was der Review NICHT geaendert hat, bewusst
+
+Kein zweiter Faktor, keine Passwortregel ausser Laenge, kein Widerrufs-Endpunkt (RFC 7009) —
+`bun run nutzer sperren` tut dasselbe. Kein Schutz je Betrieb (RLS). Alles davon steht in
+`offene-punkte.md`; nichts davon ist eine Luecke, die niemand kennt.

@@ -3804,3 +3804,98 @@ beiden Dateien umnummerieren (bricht `schema_migration` in Produktion, außer ma
 Umbenennung dort nach) oder ein Test, der die Migrationen gegen eine leere Datenbank
 laufen lässt und damit jede künftige Rückwärtsnummer sofort meldet. Der zweite ist der
 Test, der diesen Fehler am 12.08.2026 gefunden hätte. Eingetragen in `offene-punkte.md`.
+
+
+## Der MCP-Zugang im Review — elf Umgehungen und ein Generalschluessel (13.09.2026)
+
+Ein Review des frisch gebauten MCP-Servers, mit Angriffen statt Lesen. Alles hier ist
+**gemessen**: jede Abfrage lief tatsaechlich durch den Pruefer, jeder Rechtefehler stand
+tatsaechlich in `psql`. Keine der Luecken war im Betrieb — der Server ist nie ausgerollt
+worden —, und genau deshalb steht der Review vor dem Ausrollen.
+
+### 1. `rechte_auffrischen()` gab den Signierschluessel zurueck
+
+**Symptom.** Nach Migration `0102` war `mcp.oauth_schluessel` fuer `mcp_leser` unsichtbar.
+Ein Aufruf von `SELECT mcp.rechte_auffrischen()` — laut Kommentar und README „idempotent,
+nach jeder Migration aufrufbar" — und als `mcp_leser`: `SELECT count(*) FROM
+mcp.oauth_schluessel` → **1**.
+
+**Ursache.** `0100` vergab `SELECT ON ALL TABLES IN SCHEMA mcp` pauschal, weil es damals nur
+den Katalog gab. `0102` entzog die Anmeldetabellen — aber die Funktion vergab beim naechsten
+Aufruf wieder pauschal. Ein Routineaufruf haette einem Nutzer mit Stufe `fragen` den privaten
+Schluessel gegeben: `SELECT privat_jwk FROM mcp.oauth_schluessel`, und ab dann stellt er sich
+Tokens selbst aus.
+
+Dieselbe Wurzel: `ALTER DEFAULT PRIVILEGES ... IN SCHEMA mcp GRANT SELECT` machte **jede neue
+Tabelle** in `mcp` sofort lesbar. Gemessen mit `CREATE TABLE mcp._probe(x int)`.
+
+**Was ihn verhindert.** Migration `0103`: im Schema `mcp` wird **namentlich** vergeben, nie
+pauschal; die Standardvergabe fuer `mcp` ist zurueckgenommen; die Migration bricht ab, wenn
+`mcp_leser` nach dem Lauf doch an `oauth_schluessel` oder `nutzer` kaeme; und
+`mart.mcp_rechte_pruefung` (Erwartung: leer) meldet es, falls es je wieder kippt.
+
+**Die Lehre.** *Pauschal* und *sicher* schliessen sich aus, sobald ein Schema zwei Arten von
+Tabellen traegt. Eine neue Tabelle, die niemand lesen kann, faellt sofort auf; eine, die jeder
+lesen kann, faellt nie auf.
+
+### 2. Der Pruefer sah Sichten ohne Schema nicht
+
+**Symptom.** `SELECT betrieb, sum(netto) FROM fremdeinkauf GROUP BY betrieb` — ohne `mart.`
+— lief durch. Mit `mart.` war es gesperrt (Doppelzaehlung ohne Filter auf `quelle`).
+
+**Ursache.** Die Regel prueft `z.sichten.has('mart.fremdeinkauf')`; im Baum stand nur
+`fremdeinkauf`. Die Rolle hat `mart` im `search_path`, also lief die Abfrage — und zaehlte
+doppelt. Dieselbe Luecke oeffnete `pg_stat_activity` und alles aus `pg_catalog`, das ohne
+Schema erreichbar ist.
+
+**Was ihn verhindert.** Ein Name ohne Schema wird auf `mart.<name>` normiert, wenn es die
+Sicht im Katalog gibt — und ist sonst gesperrt. Nicht geraten, nicht durchgelassen.
+
+### 3. `set_config` ueberlebte die Abfrage — auf der Pool-Verbindung
+
+**Symptom.** `SELECT set_config('statement_timeout','0',false)` lief durch den Pruefer. Auf
+derselben Verbindung danach `SHOW statement_timeout` → **0**. Der Pool reicht diese Verbindung
+an die naechste Abfrage weiter — die dann ohne Zeitgrenze lief.
+
+**Was ihn verhindert.** Zwei Riegel. Der Pruefer sperrt `set_config`, `pg_sleep`, Advisory
+Locks, Datei- und Netzfunktionen namentlich. Und jede Abfrage laeuft in einer eigenen
+Transaktion `BEGIN READ ONLY` + `SET LOCAL statement_timeout` + `ROLLBACK`: Postgres nimmt
+bei ROLLBACK jede Sitzungseinstellung zurueck, die in der Transaktion gesetzt wurde. Der
+zweite Riegel haelt auch, wenn der erste eine Luecke hat — im Test wird er deshalb ohne den
+Pruefer geprueft.
+
+### 4. Alias-Waesche
+
+`SELECT sum(x.pek) FROM (SELECT pek_gesamt AS pek FROM mart.personalkosten) x` — die
+Kennzahlregel kannte `pek_gesamt`, sah aber `pek`. Der Baum merkt sich seither `spalte AS
+alias` und loest Aggregate, Gruppierungen und Filter durch den Alias hindurch auf. Was er
+**nicht** aufloest: Ausdruecke (`pek_gesamt * 2 AS pek`). Das ist eine bewusste Grenze, keine
+Luecke, die niemand kennt.
+
+### 5. Kleinere, alle gemessen
+
+| Abfrage | vorher | Ursache |
+|---|---|---|
+| `WHERE geschaeftstag BETWEEN a AND b` | Warnung „ohne Zeitraum" | `BETWEEN` ist im Baum kein Operator `>=`, sondern `kind = AEXPR_BETWEEN` |
+| `WHERE vergleichbar = false`, `WHERE NOT vergleichbar` | galten als Filter | die Regel sah nur, DASS verglichen wurde, nicht womit |
+| `we_bar_pct * 100.0`, `* 100::numeric` | nicht erkannt | nur `ival` gelesen; `fval` und `TypeCast` uebersehen |
+| `SELECT * INTO neu FROM …` | ein SELECT wie jeder | `intoClause` nicht geprueft; die Rolle haette es verweigert, mit unverstaendlicher Meldung |
+| gesperrte Abfrage | „wurde nicht ausgefuehrt" | der Grund steckte im Objekt und wurde nie zugestellt (siehe `entscheidungen.md`) |
+
+### 6. Die Anmeldung: zwei Loecher, ein Aergernis
+
+* **Kein Limit je Herkunft.** Die Sperre nach Fehlversuchen hing am Konto; erfundene Adressen
+  trafen keines und kosteten trotzdem je 120 ms argon2 (mit Absicht: Zeitangleich). Ein
+  Rechenzeit-Loch mit einer Zeile Skript. `/register` fuellte ohne Limit die Clienttabelle.
+  Jetzt: 10 Anmeldungen und 5 Registrierungen je Minute und Adresse.
+* **Wiederverwendung war immer Diebstahl.** Ein Client, dessen Tokenantwort in der Leitung
+  verloren ging, legte den alten Token erneut vor — und verlor die ganze Kette. Jede
+  Netzstoerung haette in einer Neuanmeldung geendet. Jetzt: 60 Sekunden Gnadenfrist — aber
+  nur fuer einen Token, der durch ROTATION ersetzt wurde und dessen Nachfolger noch unbenutzt
+  ist (haette der Client ihn erhalten, haette er ihn benutzt). Dann wird der nie zugestellte
+  Nachfolger widerrufen und ein frischer ausgestellt. Alles andere ist ein Konflikt, und die
+  Familie faellt. **Die erste Fassung der Frist war selbst ein Loch**, gefunden im Test: sie
+  liess jeden kuerzlich widerrufenen Token wiederholen — auch die, die die
+  Diebstahlserkennung gerade widerrufen hatte. Ein Dieb mit einem Geschwistertoken haette
+  die Erkennung damit selbst aufgehoben.
+* Ein totes Express-Middleware fuer Werkzeugfehler, das nie erreicht wurde.

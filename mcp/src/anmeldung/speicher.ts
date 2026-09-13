@@ -169,13 +169,51 @@ export async function auffrischungAusstellen(
 export async function auffrischungEinloesen(token: string, clientId: string) {
   const h = await hash(token)
   const [zeile] = await anmeldungAbfragen<{
-    subject: string; widerrufen_am: string | null; laeuft_ab: string
-  }>(`SELECT subject, widerrufen_am, laeuft_ab FROM mcp.oauth_token
+    subject: string; widerrufen_am: string | null; laeuft_ab: string; ersetzt_durch: string | null
+  }>(`SELECT subject, widerrufen_am, laeuft_ab, ersetzt_durch FROM mcp.oauth_token
         WHERE token_hash = $1 AND client_id = $2`, [h, clientId])
 
   if (!zeile) return { fehler: 'unbekannt' as const }
 
   if (zeile.widerrufen_am) {
+    /**
+     * GNADENFRIST, REVIEW 13.09.2026 — und ihre Grenze, gefunden im Test.
+     *
+     * Der gutartige Fall: die Tokenantwort ging in der Leitung verloren, der
+     * Client hat den Nachfolger nie gesehen und legt den alten Token erneut
+     * vor. Ihn dafuer mit Widerruf der ganzen Kette zu bestrafen hiesse: jede
+     * Netzstoerung endet in einer Neuanmeldung.
+     *
+     * Woran man den gutartigen Fall ERKENNT: der alte Token wurde durch
+     * Rotation ersetzt (ersetzt_durch gesetzt), und sein Nachfolger ist
+     * noch unbenutzt (lebt). Haette der Client den Nachfolger erhalten,
+     * haette er ihn benutzt. Dann — innerhalb von 60 s — wird der nie
+     * zugestellte Nachfolger widerrufen und ein frischer ausgestellt.
+     *
+     * ALLES ANDERE IST EIN KONFLIKT: ein Token, der ohne Nachfolger
+     * widerrufen wurde (Diebstahlserkennung, Stilllegung), oder dessen
+     * Nachfolger schon benutzt ist, oder der aelter als 60 s ist. Dann faellt
+     * die Familie. Die erste Fassung der Frist liess JEDEN kuerzlich
+     * widerrufenen Token wiederholen — und damit haette ein Dieb mit einem
+     * Geschwistertoken die Diebstahlserkennung selbst wieder aufgehoben.
+     */
+    const seitWiderruf = Date.now() - new Date(zeile.widerrufen_am).getTime()
+    if (zeile.ersetzt_durch && seitWiderruf < 60_000) {
+      const [nachfolger] = await anmeldungAbfragen<{ lebt: boolean }>(
+        `SELECT widerrufen_am IS NULL AS lebt FROM mcp.oauth_token WHERE token_hash = $1`,
+        [zeile.ersetzt_durch])
+      if (nachfolger?.lebt) {
+        // Nie zugestellt: bare widerrufen, OHNE Nachfolger — damit er selbst
+        // keine Wiederholung mehr ausloesen kann.
+        await anmeldungAbfragen(
+          `UPDATE mcp.oauth_token SET widerrufen_am = now() WHERE token_hash = $1`,
+          [zeile.ersetzt_durch])
+        const neu = await auffrischungAusstellen(clientId, zeile.subject)
+        await anmeldungAbfragen(
+          `UPDATE mcp.oauth_token SET ersetzt_durch = $2 WHERE token_hash = $1`, [h, await hash(neu)])
+        return { subject: zeile.subject, neu }
+      }
+    }
     await anmeldungAbfragen(
       `UPDATE mcp.oauth_token SET widerrufen_am = now()
         WHERE subject = $1 AND widerrufen_am IS NULL`, [zeile.subject])

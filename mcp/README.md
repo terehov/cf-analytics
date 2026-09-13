@@ -20,7 +20,7 @@ bevor die erste Frage gestellt ist; Cursor kappt bei 40 Werkzeugen, Copilot bei
 128, Claude Desktop um 100, und die Antwortqualität sinkt messbar ab etwa 50.
 Die Karten sind deshalb *ein* Werkzeug mit 285 Schlüsseln.
 
-## Die drei Riegel
+## Die vier Riegel
 
 1. **Die Rolle.** `mcp_leser` sieht `mart`, `manual`, `ampel`, `mcp` — sonst
    nichts, nur lesend, mit `statement_timeout`. Ein SQL-Filter im Code wäre
@@ -30,7 +30,12 @@ Die Karten sind deshalb *ein* Werkzeug mit 285 Schlüsseln.
    zerlegt und gegen `mcp.fallstrick` gehalten. Eine bekannte Falle wird
    **gesperrt**, mit Grund und meist mit der Berichtigung. Das ist die
    Verweigerung statt der selbstbewusst falschen Zahl.
-3. **Der Befund-Anhang.** Jede Antwort trägt die Fallstricke der berührten
+3. **Die Transaktion.** Jede freie Abfrage läuft in `BEGIN READ ONLY` mit
+   `SET LOCAL statement_timeout` und endet mit `ROLLBACK` — auch bei Erfolg.
+   Was eine Abfrage an der Sitzung ändert (`set_config`), nimmt Postgres
+   damit zurück, bevor die Verbindung an die nächste geht. Der Prüfer sperrt
+   solche Funktionen zusätzlich; dieser Riegel hält auch ohne ihn.
+4. **Der Befund-Anhang.** Jede Antwort trägt die Fallstricke der berührten
    Sichten, ihre Körnung und den Datenstand bei sich — nicht als Hoffnung,
    dass jemand den Tabellenkommentar gelesen hat.
 
@@ -99,7 +104,7 @@ bun run nutzer sperren  daniel@brain.food          # stilllegen + alle Tokens wi
 ## Befehle
 
 ```bash
-bun test                 # 340 Tests, darunter die zehn Fallenfragen
+bun test                 # 356 Tests: Fallenfragen, Umgehungen aus dem Review, Anmeldeablauf
 bun run typecheck
 bun run build            # die Ansichten (vite) — vor dem ersten Start noetig
 bun run start            # Produktionsstart; Port aus __PORT, nicht PORT
@@ -127,6 +132,11 @@ kein Deploy (dieselbe Begründung wie bei den Ampelregelwerken).
 | Wie eine Spalte aggregiert werden darf | `mcp.kennzahl` |
 | Eine neue Falle | `mcp.fallstrick` — `art` muss in `src/pruefen.ts` umgesetzt sein, **sonst startet der Server nicht** |
 | Beziehungen | `mcp.achse`; `metabase/beziehungen.ts` liest von dort |
+
+**Rechte im Schema `mcp` werden namentlich vergeben.** Wer eine Katalogtabelle
+ergänzt, trägt sie in `mcp.rechte_auffrischen()` ein (Migration `0103`); eine
+neue Tabelle ist sonst für keine Rolle lesbar — absichtlich. `mart.mcp_rechte_pruefung`
+muss leer sein.
 
 Nach jeder Migration, die eine `mart`-Sicht anlegt:
 

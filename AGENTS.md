@@ -268,7 +268,7 @@ Abschnitt „Zwei Phasen".
 
 ```bash
 # Der MCP-Zugang (mcp/, eigene package.json — dort `bun install` laufen lassen)
-cd mcp && bun test          # 340 Tests: die zehn Fallenfragen und der ganze Anmeldeablauf
+cd mcp && bun test          # 356 Tests: die zehn Fallenfragen, elf Umgehungen aus dem Review, der ganze Anmeldeablauf
 cd mcp && bun run nutzer liste    # Nutzer verwalten (anlegen, stufe, passwort, sperren)
 cd mcp && bun run start     # braucht MCP_DATABASE_URL und MCP_OAUTH_ISSUER
 cd mcp && bun run katalog:abzug   # test/katalog.json neu aus der Datenbank ziehen

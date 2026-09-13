@@ -28,7 +28,7 @@ import { abfragen } from './db'
 import { katalogLaden } from './katalog_laden'
 import type { Katalog } from './katalog'
 import { pruefen } from './pruefen'
-import { anmeldungMontieren } from './anmeldung/endpunkte'
+import { anmeldungMontieren, metadaten } from './anmeldung/endpunkte'
 import { anmeldungAbfragen, anmeldungEingerichtet } from './anmeldung/db'
 import { zugangstokenPruefen } from './anmeldung/schluessel'
 
@@ -142,18 +142,7 @@ export const app = new Skybridge({
     return {
       baseUrl: basis,
       scopesSupported: ['mcp'],
-      oauthMetadata: {
-        issuer: basis,
-        authorization_endpoint: `${basis}/authorize`,
-        token_endpoint: `${basis}/token`,
-        registration_endpoint: `${basis}/register`,
-        jwks_uri: `${basis}/jwks`,
-        response_types_supported: ['code'],
-        grant_types_supported: ['authorization_code', 'refresh_token'],
-        code_challenge_methods_supported: ['S256'],
-        token_endpoint_auth_methods_supported: ['none'],
-        scopes_supported: ['mcp'],
-      },
+      oauthMetadata: metadaten(basis),
       verifier: {
         /**
          * Ortlich geprueft, ohne Netzaufruf: der oeffentliche Schluessel
@@ -530,19 +519,14 @@ export type AppType = typeof app
   if (basis) anmeldungMontieren(app.express, { aussteller: basis, publikum: basis })
 }
 
-app.express.use((fehler: any, _req: any, antwort: any, weiter: any) => {
-  if (fehler instanceof Gesperrt) {
-    return antwort.status(200).json({
-      gesperrt: true,
-      befunde: fehler.pruefung.befunde,
-      sichten: fehler.pruefung.sichten,
-    })
-  }
-  if (fehler instanceof NichtErlaubt || fehler instanceof BerichtFehler) {
-    return antwort.status(400).json({ fehler: fehler.message })
-  }
-  return weiter(fehler)
-})
+/**
+ * Keine eigene Fehlerbehandlung fuer Werkzeugfehler: Skybridge macht aus
+ * einer Ausnahme im Handler eine Werkzeugantwort mit isError — und genau
+ * die Nachricht liest das Modell. Gesperrt.message traegt deshalb den
+ * ganzen Befund (ausfuehren.ts, gesperrtText). Ein Express-Middleware dafuer
+ * stand hier bis zum Review vom 13.09.2026 und war tot: kein Werkzeugfehler
+ * erreicht es je.
+ */
 
 app.express.get('/status', async (_req: any, antwort: any) => {
   try {

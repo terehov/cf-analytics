@@ -295,3 +295,82 @@ describe('Die Sperre erklaert sich', () => {
     expect(text).toContain('Ausserdem zu beachten')
   })
 })
+
+/**
+ * DIE ELF UMGEHUNGEN AUS DEM REVIEW VOM 13.09.2026.
+ *
+ * Jede dieser Abfragen kam durch den Pruefer, bevor er ueberarbeitet wurde —
+ * gemessen, nicht vermutet. Sie stehen hier, damit keine davon zurueckkommt.
+ * Die Sperre im Pruefer ist jeweils der ERSTE Riegel; wo es einen zweiten
+ * gibt (Rolle, Transaktion), nennt der Kommentar ihn.
+ */
+describe('Umgehungen aus dem Review', () => {
+
+  test('U1 Sicht ohne Schema — die Regel fuer mart.fremdeinkauf sah sie nicht', () => {
+    const e = gesperrt(`SELECT betrieb, sum(netto) FROM fremdeinkauf GROUP BY betrieb`)
+    expect(e.erlaubt).toBe(false)
+    // Normiert auf mart.fremdeinkauf, und DANN greift die Quellenregel.
+    expect(e.schluessel).toContain('fremdeinkauf_quelle')
+  })
+
+  test('U1b Systemtabelle ohne Schema ist gesperrt', () => {
+    const e = gesperrt(`SELECT query FROM pg_stat_activity`)
+    expect(e.erlaubt).toBe(false)
+    expect(e.schluessel).toContain('sicht_ohne_schema')
+  })
+
+  test('U2 Alias-Waesche: sum(pek) ueber pek_gesamt AS pek', () => {
+    const e = gesperrt(`SELECT sum(x.pek) FROM (SELECT pek_gesamt AS pek FROM mart.personalkosten) x`)
+    expect(e.erlaubt).toBe(false)
+    expect(e.schluessel).toContain('aggregat_sum_pek_gesamt')
+  })
+
+  test('U3 set_config und pg_sleep sind gesperrt (zweiter Riegel: ROLLBACK)', () => {
+    expect(gesperrt(`SELECT set_config('statement_timeout','0',false)`).schluessel)
+      .toContain('funktion_set_config')
+    expect(gesperrt(`SELECT pg_sleep(60)`).schluessel).toContain('funktion_pg_sleep')
+    // Auch schemaqualifiziert.
+    expect(gesperrt(`SELECT pg_catalog.pg_sleep(60)`).schluessel).toContain('funktion_pg_sleep')
+  })
+
+  test('U4 BETWEEN ist ein Zeitraum — kein falscher Alarm mehr', () => {
+    const e = gesperrt(`SELECT sum(umsatz_netto) FROM mart.umsatz_tag
+                         WHERE geschaeftstag BETWEEN '2026-01-01' AND '2026-01-31'`)
+    expect(e.erlaubt).toBe(true)
+    expect(e.schluessel).not.toContain('umsatz_tag_ohne_zeitraum')
+  })
+
+  test('U5 vergleichbar = false und NOT vergleichbar sind KEIN Filter auf true', () => {
+    expect(gesperrt(`SELECT * FROM mart.einkaufspreis_betrieb WHERE vergleichbar = false`).schluessel)
+      .toContain('einkaufspreis_vergleichbar')
+    expect(gesperrt(`SELECT * FROM mart.einkaufspreis_betrieb WHERE NOT vergleichbar`).schluessel)
+      .toContain('einkaufspreis_vergleichbar')
+    // Und die richtigen Schreibweisen bleiben richtig.
+    expect(gesperrt(`SELECT * FROM mart.einkaufspreis_betrieb WHERE vergleichbar = true`).schluessel)
+      .not.toContain('einkaufspreis_vergleichbar')
+    expect(gesperrt(`SELECT * FROM mart.einkaufspreis_betrieb WHERE vergleichbar AND ware = 'x'`).schluessel)
+      .not.toContain('einkaufspreis_vergleichbar')
+  })
+
+  test('U6 mal 100.0 und mal 100::numeric werden erkannt', () => {
+    expect(gesperrt(`SELECT we_bar_pct * 100.0 FROM mart.round_table_monat`).schluessel)
+      .toContain('prozent_skaliert')
+    expect(gesperrt(`SELECT we_bar_pct * 100::numeric FROM mart.round_table_monat`).schluessel)
+      .toContain('prozent_skaliert')
+    expect(gesperrt(`SELECT 100 * we_bar_pct FROM mart.round_table_monat`).schluessel)
+      .toContain('prozent_skaliert')
+  })
+
+  test('U7 SELECT INTO ist gesperrt (zweiter Riegel: READ ONLY)', () => {
+    const e = gesperrt(`SELECT * INTO neu FROM mart.betrieb`)
+    expect(e.erlaubt).toBe(false)
+    expect(e.schluessel).toContain('select_into')
+  })
+
+  test('Unqualifiziert, aber bekannt: mart wird ergaenzt und die Abfrage laeuft', () => {
+    const e = gesperrt(`SELECT betrieb, sum(umsatz_netto) FROM umsatz_tag
+                         WHERE geschaeftstag >= '2026-01-01' GROUP BY betrieb`)
+    expect(e.erlaubt).toBe(true)
+    expect(e.sichten).toContain('mart.umsatz_tag')
+  })
+})

@@ -195,7 +195,14 @@ lauf('Autorisierungsserver', () => {
     expect(zweite.access_token).toBeTruthy()
     expect(zweite.refresh_token).not.toBe(erste.refresh_token)
 
-    // Der ALTE Token noch einmal: gilt als abhandengekommen.
+    // Die Gnadenfrist von 60 s hinter uns lassen, ohne zu warten: den
+    // Widerruf des alten Tokens in der Datenbank zwei Minuten zurueckdatieren.
+    await anmeldungAbfragen(
+      `UPDATE mcp.oauth_token SET widerrufen_am = now() - interval '2 minutes'
+        WHERE subject = (SELECT subject FROM mcp.nutzer WHERE email = $1)
+          AND widerrufen_am IS NOT NULL`, [EMAIL])
+
+    // Der ALTE Token noch einmal, NACH der Frist: gilt als abhandengekommen.
     const dritte = await postForm('/token', {
       grant_type: 'refresh_token', refresh_token: erste.refresh_token, client_id: clientId,
     })
@@ -227,6 +234,48 @@ lauf('Autorisierungsserver', () => {
     expect(r.status).toBe(400)
   })
 
+  test('Das OpenID-Dokument sagt dasselbe wie das OAuth-Dokument', async () => {
+    const o = await (await fetch(basis + '/.well-known/openid-configuration')).json()
+    expect(o.registration_endpoint).toBe(basis + '/register')
+    expect(o.code_challenge_methods_supported).toEqual(['S256'])
+  })
+
+  /**
+   * REVIEW 13.09.2026: die Wiederverwendungserkennung bestrafte auch den
+   * Client, dessen Antwort nur in der Leitung verloren ging. Innerhalb von
+   * 60 s ist ein alter Token eine Wiederholung, kein Diebstahl.
+   */
+  test('Ein alter Auffrischungstoken gleich nach der Rotation ist eine Wiederholung, kein Diebstahl', async () => {
+    const { verifier, code } = await ablauf()
+    const erste = await (await postForm('/token', {
+      grant_type: 'authorization_code', code, client_id: clientId,
+      redirect_uri: RUECK, code_verifier: verifier,
+    })).json()
+    const zweite = await (await postForm('/token', {
+      grant_type: 'refresh_token', refresh_token: erste.refresh_token, client_id: clientId,
+    })).json()
+    // Sofort danach den ALTEN noch einmal — als haette die Antwort nicht geklappt.
+    const dritte = await postForm('/token', {
+      grant_type: 'refresh_token', refresh_token: erste.refresh_token, client_id: clientId,
+    })
+    expect(dritte.status).toBe(200)
+    const d = await dritte.json()
+    expect(d.refresh_token).toBeTruthy()
+
+    // Der nie zugestellte Nachfolger (zweite) ist bare widerrufen. Taucht er
+    // trotzdem auf, halten ZWEI Parteien Tokens derselben Linie — ein
+    // Konflikt, und die Familie faellt, samt d. Das ist gewollt: ein
+    // ehrlicher Client legt nie beide vor.
+    const vierte = await postForm('/token', {
+      grant_type: 'refresh_token', refresh_token: zweite.refresh_token, client_id: clientId,
+    })
+    expect(vierte.status).toBe(400)
+    const fuenfte = await postForm('/token', {
+      grant_type: 'refresh_token', refresh_token: d.refresh_token, client_id: clientId,
+    })
+    expect(fuenfte.status).toBe(400)
+  })
+
   test('Der oeffentliche Schluessel wird ausgeliefert, der private nie', async () => {
     const j = await (await fetch(basis + '/jwks')).json()
     expect(j.keys.length).toBeGreaterThan(0)
@@ -237,5 +286,37 @@ lauf('Autorisierungsserver', () => {
       expect(k.p).toBeUndefined()
       expect(k.q).toBeUndefined()
     }
+  })
+
+  // ZULETZT, mit Absicht: diese beiden Tests fluten /anmelden und /register
+  // von 127.0.0.1 und loesen damit die Bremse aus — eine Minute lang. Jeder
+  // Test danach, der sich anmelden will, bekaeme 429. Beim ersten Lauf
+  // genau so passiert.
+  /**
+   * REVIEW 13.09.2026: Die Sperre nach Fehlversuchen hing nur am Konto.
+   * Erfundene Adressen trafen keines — und kosteten trotzdem je 120 ms
+   * argon2, mit Absicht. Ohne Bremse je Herkunft ein Rechenzeit-Loch.
+   */
+  test('Zu viele Anmeldeversuche von einer Adresse werden gebremst', async () => {
+    let letzter = 0
+    for (let i = 0; i < 12; i++) {
+      const r = await postForm('/anmelden', { anfrage: 'x', email: `nix${i}@example.invalid`, passwort: 'y' })
+      letzter = r.status
+      if (letzter === 429) break
+    }
+    expect(letzter).toBe(429)
+  })
+
+  test('Auch die Registrierung ist gebremst', async () => {
+    let letzter = 0
+    for (let i = 0; i < 8; i++) {
+      const r = await fetch(basis + '/register', { method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_name: 'Flut ' + i, redirect_uris: ['https://x.example/cb'] }) })
+      letzter = r.status
+      if (letzter === 429) break
+    }
+    expect(letzter).toBe(429)
+    await anmeldungAbfragen(`DELETE FROM mcp.oauth_client WHERE client_name LIKE 'Flut %'`)
   })
 })

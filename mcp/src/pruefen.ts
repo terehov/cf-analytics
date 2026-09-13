@@ -74,6 +74,14 @@ export const REGELARTEN: Record<string, RegelImpl> = {
   filter_noetig: (z, f) => {
     if (!betrifftSicht(z, f)) return false
     const s = f.parameter.spalte
+    if (f.parameter.wert !== undefined) {
+      // Ein bestimmter Wert wird verlangt: `vergleichbar = true` oder blank
+      // `WHERE vergleichbar`. `= false` und `NOT vergleichbar` sind das
+      // Gegenteil und zaehlen nicht (Review 13.09.2026).
+      const werte = z.gleichheitWerte.get(s)
+      const positiv = werte?.has(f.parameter.wert) || z.wahrheitswert.has(s)
+      return !positiv
+    }
     return !z.gleichheit.has(s) && !z.wahrheitswert.has(s) && !z.bereich.has(s)
   },
 
@@ -102,7 +110,7 @@ export const REGELARTEN: Record<string, RegelImpl> = {
   prozent_skaliert: (z, f, k) => {
     if (!betrifftSicht(z, f)) return false
     for (const s of z.mal_hundert) {
-      if (k.kennzahlRegel.get(s)?.regel && istProzentspalte(s, k)) return true
+      if (istProzentspalte(s, k)) return true
       if (/_pct$|^prozent|_prozent$/.test(s)) return true
     }
     return false
@@ -179,6 +187,74 @@ export function pruefen(sql: string, katalog: Katalog): Pruefergebnis {
   }
 
   // --- feste Regeln -------------------------------------------------
+
+  /**
+   * Relationen OHNE Schema auf den Katalog abbilden.
+   *
+   * REVIEW 13.09.2026: `SELECT betrieb, sum(netto) FROM fremdeinkauf GROUP BY
+   * betrieb` lief durch — die Regel fuer mart.fremdeinkauf sah nur
+   * `fremdeinkauf` und erkannte ihre Sicht nicht; die Rolle hat mart im
+   * search_path, also lief die Abfrage und zaehlte doppelt. Dieselbe Luecke
+   * oeffnete `pg_stat_activity` und alles andere aus pg_catalog, das ohne
+   * Schema erreichbar ist.
+   *
+   * Deshalb: ein Name ohne Schema wird zu `mart.<name>`, wenn es die Sicht im
+   * Katalog gibt — und ist sonst gesperrt. Nicht geraten, nicht durchgelassen.
+   */
+  for (const s of [...z.sichten]) {
+    if (s.includes('.')) continue
+    const kandidat = `mart.${s}`
+    z.sichten.delete(s)
+    if (katalog.sichten.has(kandidat)) {
+      z.sichten.add(kandidat)
+    } else {
+      z.sichten.add(s)
+      sperre('sicht_ohne_schema',
+        `"${s}" steht ohne Schema und ist keine bekannte mart-Sicht. Ohne Schema koennte das ` +
+        `alles Moegliche sein — auch eine Systemtabelle.`,
+        'Sichten immer mit Schema schreiben: mart.<name>. sichten_suchen findet den Namen.')
+    }
+  }
+
+  /**
+   * Funktionen, die nichts mit Auswerten zu tun haben.
+   *
+   * REVIEW 13.09.2026: `SELECT set_config('statement_timeout','0',false)` lief
+   * durch den Pruefer — und die Einstellung ueberlebt in der Sitzung, die der
+   * Pool an die naechste Abfrage weitergibt (gemessen: SHOW ergab danach 0).
+   * Damit waere die Zeitgrenze der Rolle mit einer Zeile ausgehebelt gewesen.
+   * `pg_sleep` haelt eine Verbindung fest, Advisory Locks halten andere fest,
+   * die Dateifunktionen lesen den Server.
+   *
+   * Der zweite Riegel dagegen ist die Transaktion in ausfuehren.ts (ROLLBACK
+   * nimmt set_config zurueck); dieser hier ist der erste, mit Meldung.
+   */
+  const VERBOTENE_FUNKTIONEN = new Set([
+    'set_config', 'pg_sleep', 'pg_sleep_for', 'pg_sleep_until',
+    'pg_terminate_backend', 'pg_cancel_backend', 'pg_reload_conf',
+    'pg_read_file', 'pg_read_binary_file', 'pg_ls_dir', 'pg_stat_file',
+    'lo_import', 'lo_export', 'lo_get', 'lo_put', 'lo_unlink',
+    'dblink', 'dblink_connect', 'dblink_exec', 'pg_notify',
+    'pg_advisory_lock', 'pg_advisory_lock_shared', 'pg_advisory_xact_lock',
+    'pg_advisory_xact_lock_shared', 'pg_try_advisory_lock', 'pg_try_advisory_xact_lock',
+    'pg_try_advisory_lock_shared', 'pg_try_advisory_xact_lock_shared',
+    'pg_export_snapshot', 'brin_summarize_new_values', 'query_to_xml',
+  ])
+  for (const f of z.funktionen) {
+    if (VERBOTENE_FUNKTIONEN.has(f)) {
+      sperre(`funktion_${f}`,
+        `${f}() ist hier gesperrt: die Funktion wertet nichts aus, sie veraendert die Sitzung, ` +
+        `haelt Verbindungen fest oder liest den Server.`)
+    }
+  }
+
+  if (z.select_into) {
+    sperre('select_into',
+      'SELECT ... INTO legt eine Tabelle an. Der Zugang ist lesend; die Rolle wuerde es ' +
+      'ohnehin verweigern, aber diese Meldung ist verstaendlicher.',
+      'Das INTO weglassen.')
+  }
+
   if (z.anweisungen !== 1) {
     sperre('eine_anweisung',
       `Genau eine Anweisung je Aufruf, gezaehlt wurden ${z.anweisungen}. Mehrere Anweisungen ` +

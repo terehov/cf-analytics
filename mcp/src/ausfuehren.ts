@@ -20,6 +20,7 @@
  *      mcp.zugriff ist einer. Und: ein Dienst ohne Zulauf ist ein Fehler,
  *      kein Normalzustand.
  */
+import type pg from 'pg'
 import { pool } from './db'
 import type { Katalog } from './katalog'
 import { pruefen, type Befund, type Pruefergebnis } from './pruefen'
@@ -30,6 +31,8 @@ export const ZEILEN_FUER_MODELL = 500
 export const ZEILEN_FUER_ANSICHT = 5_000
 /** Geschaetzte gelesene Zeilen, ab denen abgewiesen wird. */
 export const ZEILEN_SCHAETZUNG_GRENZE = 5_000_000
+/** Zeichen je Zelle fuer das Modell. Ein Belegtext von 40 kB sprengt den Kontext genauso wie 40.000 Zeilen. */
+export const ZELLE_MAX = 2_000
 
 export type Nutzer = { subject: string | null; anzeige: string | null; client: string | null }
 
@@ -105,9 +108,9 @@ export function gesperrtText(p: Pruefergebnis): string {
  * Grund, die Abfrage zu verweigern: derselbe Fehler kommt gleich mit einer
  * besseren Meldung aus der Ausfuehrung selbst.
  */
-async function zeilenSchaetzen(sql: string, werte: unknown[]): Promise<number | null> {
+async function zeilenSchaetzen(c: pg.PoolClient, sql: string, werte: unknown[]): Promise<number | null> {
   try {
-    const r = await pool.query(`EXPLAIN (FORMAT JSON) ${sql}`, werte)
+    const r = await c.query(`EXPLAIN (FORMAT JSON) ${sql}`, werte)
     const plan = (r.rows[0] as any)?.['QUERY PLAN']?.[0]?.Plan
     return typeof plan?.['Plan Rows'] === 'number' ? plan['Plan Rows'] : null
   } catch {
@@ -197,27 +200,75 @@ async function protokollieren(e: {
   }
 }
 
-/** Eine bereits geprueft-sichere Abfrage ausfuehren und einpacken. */
+/**
+ * Eine bereits geprueft-sichere Abfrage ausfuehren und einpacken.
+ *
+ * IN EINER EIGENEN TRANSAKTION, DIE ZURUECKGEROLLT WIRD — auch bei Erfolg.
+ * REVIEW 13.09.2026: `set_config('statement_timeout','0',false)` in einer
+ * Abfrage ueberlebte in der Sitzung, und der Pool reicht dieselbe Sitzung an
+ * die naechste Abfrage weiter. Der Pruefer sperrt set_config seither, aber
+ * eine Sperre im Pruefer ist eine Liste, und Listen haben Luecken. Die
+ * Transaktion hat keine: Postgres nimmt bei ROLLBACK jede Einstellung
+ * zurueck, die in der Transaktion gesetzt wurde — set_config eingeschlossen.
+ *
+ * `BEGIN READ ONLY` und `SET LOCAL statement_timeout` dazu: die Rolle setzt
+ * beides ohnehin, aber hier steht es an der Abfrage selbst und haengt an
+ * keiner Rolleneinstellung, die jemand spaeter aendert. `EXPLAIN` laeuft in
+ * derselben Transaktion, damit auch er unter der Grenze steht.
+ */
 async function laufenLassen(
   sql: string, werte: unknown[], pruefung: Pruefergebnis, nutzer: Nutzer,
-  werkzeug: string, parameter: unknown,
+  werkzeug: string, parameter: unknown, schaetzen: boolean,
 ): Promise<Ergebnis> {
   const start = Date.now()
+  const c = await pool.connect()
   let r
   try {
-    r = await pool.query({ text: sql, values: werte, rowMode: 'array' as never })
+    await c.query('BEGIN READ ONLY')
+    await c.query(`SET LOCAL statement_timeout = '20s'`)
+
+    if (schaetzen) {
+      const geschaetzt = await zeilenSchaetzen(c, sql, werte)
+      if (geschaetzt !== null && geschaetzt > ZEILEN_SCHAETZUNG_GRENZE) {
+        await c.query('ROLLBACK').catch(() => {})
+        const befund: Befund = {
+          schluessel: 'zu_gross', schwere: 'sperre',
+          hinweis:
+            `Postgres schaetzt ${geschaetzt.toLocaleString('de-DE')} zu lesende Zeilen — die Grenze ` +
+            `liegt bei ${ZEILEN_SCHAETZUNG_GRENZE.toLocaleString('de-DE')}. Der Server teilt sich die ` +
+            `Maschine mit dem naechtlichen Import.`,
+          berichtigung: 'Den Zeitraum eingrenzen oder im SQL zusammenfassen statt Einzelzeilen zu ziehen.',
+        }
+        const mit = { ...pruefung, erlaubt: false, befunde: [...pruefung.befunde, befund] }
+        await protokollieren({ nutzer, werkzeug, sql, sichten: pruefung.sichten,
+          hinweise: mit.befunde, gesperrt: true })
+        throw new Gesperrt(mit)
+      }
+    }
+
+    r = await c.query({ text: sql, values: werte, rowMode: 'array' as never })
+    await c.query('ROLLBACK')
   } catch (e) {
+    await c.query('ROLLBACK').catch(() => {})
+    if (e instanceof Gesperrt) throw e
     const meldung = String((e as Error)?.message ?? e)
     await protokollieren({ nutzer, werkzeug, parameter, sql, sichten: pruefung.sichten,
       dauer_ms: Date.now() - start, fehler: meldung })
     throw e
+  } finally {
+    c.release()
   }
   const dauer = Date.now() - start
 
   const spalten = (r.fields ?? []).map(f => f.name)
+  let gekuerzt = 0
   const alle = (r.rows as unknown as unknown[][]).map(zeile => {
     const o: Record<string, unknown> = {}
-    spalten.forEach((s, i) => { o[s] = zeile[i] })
+    spalten.forEach((s, i) => {
+      const v = zeile[i]
+      if (typeof v === 'string' && v.length > ZELLE_MAX) { gekuerzt++; o[s] = v.slice(0, ZELLE_MAX) + ' …' }
+      else o[s] = v
+    })
     return o
   })
 
@@ -235,6 +286,12 @@ async function laufenLassen(
         `steht nicht drin.`,
       berichtigung: 'Im SQL zusammenfassen (GROUP BY, sum, count) statt Einzelzeilen zu ziehen, ' +
         'oder den Zeitraum enger fassen.',
+    })
+  }
+  if (gekuerzt > 0) {
+    hinweise.push({
+      schluessel: 'zellen_gekuerzt', schwere: 'warnung',
+      hinweis: `${gekuerzt} Zelle(n) waren laenger als ${ZELLE_MAX} Zeichen und wurden abgeschnitten.`,
     })
   }
 
@@ -266,23 +323,7 @@ export async function abfrageAusfuehren(
     throw new Gesperrt(pruefung)
   }
 
-  const geschaetzt = await zeilenSchaetzen(sql, [])
-  if (geschaetzt !== null && geschaetzt > ZEILEN_SCHAETZUNG_GRENZE) {
-    const befund: Befund = {
-      schluessel: 'zu_gross', schwere: 'sperre',
-      hinweis:
-        `Postgres schaetzt ${geschaetzt.toLocaleString('de-DE')} zu lesende Zeilen — die Grenze ` +
-        `liegt bei ${ZEILEN_SCHAETZUNG_GRENZE.toLocaleString('de-DE')}. Der Server teilt sich die ` +
-        `Maschine mit dem naechtlichen Import.`,
-      berichtigung: 'Den Zeitraum eingrenzen oder im SQL zusammenfassen statt Einzelzeilen zu ziehen.',
-    }
-    const mit = { ...pruefung, erlaubt: false, befunde: [...pruefung.befunde, befund] }
-    await protokollieren({ nutzer, werkzeug: 'abfrage_ausfuehren', sql,
-      sichten: pruefung.sichten, hinweise: mit.befunde, gesperrt: true })
-    throw new Gesperrt(mit)
-  }
-
-  return laufenLassen(sql, [], pruefung, nutzer, 'abfrage_ausfuehren', { sql })
+  return laufenLassen(sql, [], pruefung, nutzer, 'abfrage_ausfuehren', { sql }, true)
 }
 
 /**
@@ -307,7 +348,7 @@ export async function berichtAusfuehren(
       .map(s => ({ sicht: s, koernung: katalog.sichten.get(s)?.koernung ?? null }))
       .filter(k => k.koernung !== null),
   }
-  return laufenLassen(sql, werte, pruefung, nutzer, `bericht:${schluessel}`, parameter)
+  return laufenLassen(sql, werte, pruefung, nutzer, `bericht:${schluessel}`, parameter, false)
 }
 
 export { protokollieren }

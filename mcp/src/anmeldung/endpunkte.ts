@@ -37,6 +37,63 @@ import {
 /** Gueltigkeit eines Zugangstokens. Kurz, weil die Auffrischung billig ist. */
 export const TOKEN_SEKUNDEN = 3600
 
+/**
+ * Das Discovery-Dokument — an EINER Stelle, damit server.ts (fuer Skybridges
+ * /.well-known/oauth-authorization-server) und der OpenID-Alias unten
+ * dasselbe sagen.
+ */
+export function metadaten(basis: string) {
+  return {
+    issuer: basis,
+    authorization_endpoint: `${basis}/authorize`,
+    token_endpoint: `${basis}/token`,
+    registration_endpoint: `${basis}/register`,
+    jwks_uri: `${basis}/jwks`,
+    response_types_supported: ['code'],
+    grant_types_supported: ['authorization_code', 'refresh_token'],
+    code_challenge_methods_supported: ['S256'],
+    token_endpoint_auth_methods_supported: ['none'],
+    scopes_supported: ['mcp'],
+  }
+}
+
+/**
+ * Bremse je Herkunft — im Speicher, ohne Abhaengigkeit.
+ *
+ * REVIEW 13.09.2026: die Sperre nach Fehlversuchen haengt am KONTO. Wer
+ * /anmelden mit erfundenen Adressen bombardiert, trifft kein Konto — und
+ * kostet trotzdem je Versuch 120 ms argon2, mit Absicht (Zeitangleich). Ohne
+ * Bremse je Herkunft ist das ein Rechenzeit-Loch mit einer Zeile Skript; und
+ * /register fuellte ohne Bremse die Clienttabelle mit Muell.
+ *
+ * Bewusst simpel: ein Fenster je Adresse, keine Verteilung ueber Instanzen —
+ * es gibt eine. Hinter Dokploys Proxy ist x-forwarded-for die echte Adresse;
+ * direkt am Container waere es die des Proxys, und dann bremst die Bremse
+ * alle zusammen. Das ist der schlechtere von zwei Fehlern nur, wenn man ihn
+ * nicht kennt — deshalb steht er hier.
+ */
+class Bremse {
+  private fenster = new Map<string, number[]>()
+  constructor(private readonly hoechstens: number, private readonly proMs: number) {}
+  zuViel(schluessel: string): number | null {
+    const jetzt = Date.now()
+    const liste = (this.fenster.get(schluessel) ?? []).filter(t => jetzt - t < this.proMs)
+    if (liste.length >= this.hoechstens) {
+      this.fenster.set(schluessel, liste)
+      return Math.ceil((liste[0]! + this.proMs - jetzt) / 1000)
+    }
+    liste.push(jetzt)
+    this.fenster.set(schluessel, liste)
+    // Nicht endlos wachsen: alte Schluessel gelegentlich abraeumen.
+    if (this.fenster.size > 10_000) {
+      for (const [k, v] of this.fenster) if (!v.some(t => jetzt - t < this.proMs)) this.fenster.delete(k)
+    }
+    return null
+  }
+}
+const anmeldeBremse = new Bremse(10, 60_000)
+const registrierBremse = new Bremse(5, 60_000)
+
 const html = (a: Response, code: number, inhalt: string) =>
   a.status(code)
    .set('Content-Type', 'text/html; charset=utf-8')
@@ -77,6 +134,11 @@ export function anmeldungMontieren(app: Express, o: { aussteller: string; publik
   // sie hat, kann genau eines — ein Anmeldeformular anzeigen lassen. Zugang
   // entsteht erst, wenn ein Mensch dort ein gueltiges Passwort eingibt.
   app.post('/register', async (anfrage, antwort) => {
+    const warte = registrierBremse.zuViel(herkunft(anfrage) ?? '?')
+    if (warte !== null) {
+      return antwort.status(429).set('Retry-After', String(warte))
+        .json({ error: 'too_many_requests', error_description: `Zu viele Registrierungen. In ${warte} s erneut.` })
+    }
     const koerper = anfrage.body ?? {}
     const uris: unknown = koerper.redirect_uris
     if (!Array.isArray(uris) || uris.length === 0 || !uris.every(u => typeof u === 'string')) {
@@ -113,6 +175,12 @@ export function anmeldungMontieren(app: Express, o: { aussteller: string; publik
       response_types: ['code'],
       client_id_issued_at: Math.floor(Date.now() / 1000),
     })
+  })
+
+  // Manche Clients suchen zuerst das OpenID-Dokument. Dieselben Angaben,
+  // anderer Pfad — Skybridge bedient nur den OAuth-Pfad.
+  app.get('/.well-known/openid-configuration', (_anfrage, antwort) => {
+    antwort.set('Access-Control-Allow-Origin', '*').json(metadaten(aussteller))
   })
 
   // --- Der oeffentliche Schluessel -----------------------------------
@@ -164,6 +232,12 @@ export function anmeldungMontieren(app: Express, o: { aussteller: string; publik
 
   // --- Anmeldung entgegennehmen --------------------------------------
   app.post('/anmelden', async (anfrage, antwort) => {
+    const warte = anmeldeBremse.zuViel(herkunft(anfrage) ?? '?')
+    if (warte !== null) {
+      await anmeldungProtokollieren({ erfolg: false, grund: 'bremse', herkunft: herkunft(anfrage) })
+      return html(antwort, 429, fehlerseite('Zu viele Versuche',
+        `Von dieser Adresse kamen zu viele Anmeldeversuche. Bitte in ${warte} Sekunden erneut.`))
+    }
     const koerper = anfrage.body ?? {}
     const email = typeof koerper.email === 'string' ? koerper.email.trim() : ''
     const passwort = typeof koerper.passwort === 'string' ? koerper.passwort : ''

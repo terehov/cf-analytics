@@ -81,6 +81,39 @@ lauf('Ausfuehrung', () => {
       .rejects.toThrow(/permission denied|read-only/i)
   })
 
+  /**
+   * REVIEW 13.09.2026. Vorher: set_config in einer Abfrage, und die naechste
+   * Abfrage auf derselben Pool-Verbindung lief ohne Zeitgrenze. Der Pruefer
+   * sperrt set_config jetzt — aber dieser Test umgeht den Pruefer bewusst
+   * und fragt die Datenbank direkt: haelt der ZWEITE Riegel, die
+   * Transaktion mit ROLLBACK, auch allein?
+   */
+  test('eine Sitzungseinstellung ueberlebt die Abfrage nicht', async () => {
+    const c = await pool.connect()
+    try {
+      await c.query('BEGIN READ ONLY')
+      await c.query(`SET LOCAL statement_timeout = '20s'`)
+      await c.query(`SELECT set_config('statement_timeout', '0', false)`)
+      await c.query('ROLLBACK')
+      const [{ statement_timeout }] = (await c.query('SHOW statement_timeout')).rows
+      expect(statement_timeout).toBe('20s')   // die Rolleneinstellung, nicht 0
+    } finally { c.release() }
+  })
+
+  test('pg_sleep und SELECT INTO kommen nicht bis zur Datenbank', async () => {
+    await expect(abfrageAusfuehren(`SELECT pg_sleep(30)`, katalog, nutzer)).rejects.toBeInstanceOf(Gesperrt)
+    await expect(abfrageAusfuehren(`SELECT * INTO x FROM mart.betrieb`, katalog, nutzer)).rejects.toBeInstanceOf(Gesperrt)
+  })
+
+  test('die Abfrage laeuft READ ONLY — auch ohne den Pruefer', async () => {
+    const c = await pool.connect()
+    try {
+      await c.query('BEGIN READ ONLY')
+      await expect(c.query(`CREATE TEMP TABLE t AS SELECT 1`)).rejects.toThrow(/read-only/i)
+      await c.query('ROLLBACK')
+    } finally { c.release() }
+  })
+
   test('der Befund-Anhang traegt Koernung und Datenstand', async () => {
     const e = await abfrageAusfuehren(`
       SELECT betrieb_key, sum(umsatz_netto) AS umsatz
