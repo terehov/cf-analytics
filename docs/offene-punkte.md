@@ -1635,3 +1635,27 @@ lässt sich mit `bun run migrate` nicht aufbauen (`fehlerkatalog.md`, 13.09.2026
 entscheiden: Umnummerieren mit Nachtrag in `public.schema_migration` der Produktion, oder
 ein Test gegen eine leere Datenbank, der Rückwärtsnummern künftig sofort meldet. Bis dahin
 braucht ein neuer Rechner ein `pg_dump --schema-only` aus Produktion.
+
+
+## MCP-Server: was nach dem Bau offen ist
+
+Phasen 1 bis 4 stehen (13.09.2026). Was fehlt, fehlt nicht im Code:
+
+* **Der Identitätsanbieter.** `MCP_OAUTH_ISSUER` oder `MCP_WORKOS_DOMAIN` — ohne eine der
+  beiden startet der Server nicht, und das ist Absicht. Entra wäre die beste Antwort.
+* **Das Passwort der Leserolle.** `ALTER ROLE mcp_leser LOGIN PASSWORD '...'` — einmal von
+  Hand, als Datenbankadministrator. Bis dahin steht es in `mcp.einrichtung_offen` und
+  `/status` meldet es als Störung.
+* **Hostname und TLS für `mcp.<domain>`**, plus eine Dokploy-Application aus
+  `mcp/Dockerfile` (Build-Kontext ist das Wurzelverzeichnis, weil `metabase/` mit hinein
+  muss).
+* **Die ersten Nutzer.** Eine Zeile je Person in `mcp.nutzer_stufe`. Wer dort fehlt, kommt
+  nicht hinein — dass jemand sich anmelden kann, heißt nicht, dass er die Zahlen sehen darf.
+* **Ein Pilot ohne Metabase-Zugang.** Daniel hat beides; ein OM, der nur den Chat hat, sagt
+  mehr darüber, ob der Server wirklich eine Alternative ist.
+* **Row-Level-Security je Betrieb** — falls ein OM nur seine Betriebe sehen soll. Metabase
+  kann das heute auch nicht, und die Zuordnung OM → Betrieb gibt es nirgends als Tabelle.
+  Eigener Plan, wenn es kommt.
+* **Die restlichen `mart`-Sichten mit Körnung versehen,** sobald die Migrationen vollständig
+  durchlaufen: gepflegt sind 158, gemessen an einer Datenbank mit 64 von 101 Migrationen.
+  `mcp.koernung_fehlend` nennt die Lücke in Produktion.

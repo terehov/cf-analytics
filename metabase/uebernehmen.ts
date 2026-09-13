@@ -22,20 +22,7 @@
 // wird zuerst gesucht.
 // =====================================================================
 
-import { karten as kartenRoundTable } from './karten-round-table'
-import { karten as kartenFach } from './karten-fach'
-import { karten as kartenDrilldown } from './karten-drilldown'
-import { karten as kartenPortfolio } from './karten-portfolio'
-import { karten as kartenImport } from './karten-import'
-import { karten as kartenStandort } from './karten-standort'
-import { karten as kartenBewertung } from './karten-bewertung'
-import { karten as kartenYext } from './karten-yext'
-import { karten as kartenAktionen } from './karten-aktionen'
-import { karten as kartenVergleich } from './karten-vergleich'
-import { karten as kartenKalender } from './karten-kalender'
-import { karten as kartenFremdeinkauf } from './karten-fremdeinkauf'
-import { karten as kartenPflichtartikel } from './karten-pflichtartikel'
-import { karten as kartenBounti } from './karten-bounti'
+import { alleKarten } from './karten'
 import { dashboards } from './dashboards'
 import { auslegen, MINDESTHOEHE } from './layout'
 import type { Karte, Kachel, Dashboard, Reihe } from './typen'
@@ -47,11 +34,6 @@ const PORT = 8899
 // Metabase-Instanz laeuft (Server, Testumgebung).
 const METABASE = config.METABASE_URL
 
-const alleKarten: Karte[] = [
-  ...kartenDrilldown, ...kartenPortfolio, ...kartenRoundTable, ...kartenFach, ...kartenImport, ...kartenStandort,
-  ...kartenBewertung, ...kartenAktionen, ...kartenYext, ...kartenVergleich, ...kartenFremdeinkauf, ...kartenPflichtartikel,
-  ...kartenKalender, ...kartenBounti,
-]
 
 // Reihen in Kacheln umrechnen — EINMAL, damit Pruefung und Ausgabe
 // dieselben Zahlen sehen.

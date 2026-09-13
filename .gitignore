@@ -41,3 +41,7 @@ belege/
 # Neuerzeugung ein anderer Binaerklumpen. Wer es braucht, erzeugt es neu.
 # Die Dateien bleiben lokal vorhanden.
 *.pdf
+
+# MCP-Server: Bauergebnisse
+mcp/dist/
+mcp/.skybridge/

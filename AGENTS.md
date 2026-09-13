@@ -205,6 +205,24 @@ als Kommentar in die `karten-*.ts`. Was vor einem Fehlschluss schützt, bleibt. 
 gehören feste Messwerte hinein („am 26.07.2026 waren es 79 von 141"): sie veralten still.
 Regel und Beispiele in `docs/dashboards.md`.
 
+### `mcp/` — der Zugang aus Claude, ChatGPT und Copilot
+
+Ein eigener Dienst mit eigener `package.json`, eigenem Dockerfile und eigener Datenbankrolle. Er liest `metabase/karten-*.ts` als Berichtsdefinition und `mcp.*` als semantischen Katalog; er haengt an **nichts**, was Metabase gehoert. Plan und Begruendung: `docs/plan-skybridge.md`, Einrichtung: `mcp/README.md`.
+
+| Datei | Wofuer |
+|---|---|
+| `src/server.ts` | Die zehn Werkzeuge. **Zehn, nicht 285** — Clients kappen bei 40 bis 128, und die Antwortqualitaet sinkt ab etwa 50 |
+| `src/pruefen.ts` | Die Pruefung vor dem Lauf. Feste Regeln im Code, fachliche aus `mcp.fallstrick` |
+| `src/ast.ts` | Die Abfrage als Syntaxbaum (`libpg-query` — der Parser von PostgreSQL selbst, als WASM) |
+| `src/berichte.ts` | Metabase-Platzhalter → `$1`. Optionale Bloecke `[[…]]` genau wie dort |
+| `src/ausfuehren.ts` | Grenzen, Befund-Anhang, Protokoll |
+| `test/fallen.test.ts` | **Die zehn Fallenfragen** — die Regressionssicherung des Vorhabens |
+
+**Zwei Regeln, die hier nicht verhandelbar sind:**
+
+1. **Eine Regelart in `mcp.fallstrick` ohne Umsetzung in `src/pruefen.ts` laesst den Server nicht starten.** Eine Wache, die nicht wacht, ist schlimmer als keine — dieselbe Begruendung wie harte Regel 10.
+2. **Jedes Werkzeug muss ohne seine Ansicht brauchbar sein.** In Copilot gibt es keine gerenderte Ansicht; das Ergebnis steht deshalb immer auch in `structuredContent`.
+
 ### `src/` — Importer
 
 ```
@@ -245,6 +263,13 @@ Abschnitt „Zwei Phasen".
 ---
 
 ## Befehle
+
+```bash
+# Der MCP-Zugang (mcp/, eigene package.json — dort `bun install` laufen lassen)
+cd mcp && bun test          # 321 Tests, darunter die zehn Fallenfragen
+cd mcp && bun run start     # braucht MCP_DATABASE_URL und MCP_OAUTH_ISSUER
+cd mcp && bun run katalog:abzug   # test/katalog.json neu aus der Datenbank ziehen
+```
 
 ```bash
 bun install

@@ -55,6 +55,7 @@
 // =====================================================================
 
 import { config } from '../src/config'
+import { query } from '../src/db/pool'
 
 const METABASE = config.METABASE_URL ?? 'http://localhost:3000'
 const DB_ID = 2
@@ -66,11 +67,35 @@ const DB_ID = 2
  * fuer einen Menschen lesbar macht. Der Schluessel heisst in Quelle und
  * Ziel gleich -- das ist die Konvention im ganzen Schema und zugleich
  * das Erkennungsmerkmal.
+ *
+ * SEIT DEM 13.09.2026 AUS DER DATENBANK, nicht mehr aus einer Konstante
+ * hier. Der MCP-Server (mcp/, docs/plan-skybridge.md) braucht dieselbe
+ * Auskunft -- worueber zwei Sichten zusammenfinden --, und zwei Listen
+ * derselben Beziehungen waeren zwei Wahrheiten: eine Achse, die hier
+ * ergaenzt und dort vergessen wird, faellt niemandem auf, bis jemand einen
+ * Sprung vermisst, den es in Metabase gibt und im Chat nicht.
+ *
+ * Die Tabelle fuehrt AUCH Achsen ohne Dimensionssicht (monat,
+ * geschaeftstag, konzept). Die sind fuer den Chat wichtig, fuer Metabase
+ * aber kein Fremdschluessel -- ein FK braucht ein Ziel. Deshalb der Filter
+ * auf `ziel_sicht IS NOT NULL`: dieselbe Entscheidung wie vorher, nur steht
+ * sie jetzt in den Daten statt in der Auswahl der Zeilen.
  */
-const ACHSEN = [
-  { schluessel: 'betrieb_key', ziel: 'betrieb', name: 'betrieb' },
-  { schluessel: 'aktion_key', ziel: 'aktion', name: 'aktion' },
-] as const
+type Achse = { schluessel: string; ziel: string; name: string }
+
+const ACHSEN: readonly Achse[] = (await query<Achse>(`
+  SELECT achse                                    AS schluessel,
+         split_part(ziel_sicht, '.', 2)           AS ziel,
+         anzeige_spalte                           AS name
+    FROM mcp.achse
+   WHERE ziel_sicht IS NOT NULL
+   ORDER BY achse`)).map(a => ({ ...a }))
+
+if (ACHSEN.length === 0) {
+  console.error('mcp.achse enthaelt keine Dimension mit ziel_sicht — Migration 0101 angewendet?')
+  console.error('Ohne Achsen gibt es nichts zu verdrahten; das waere ein stiller Leerlauf.')
+  process.exit(1)
+}
 
 /** Sichten, die selbst Dimension sind -- dort ist der Schluessel PK, nicht FK. */
 const ZIELE = new Set<string>(ACHSEN.map(a => a.ziel))

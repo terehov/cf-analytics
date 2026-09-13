@@ -11,6 +11,7 @@ Bei ~36 Mio. Zeilen im Jahr und einem kleinen Team ist Docker Compose auf einer 
 | Postgres 18 | Managed Database | Backups eingebaut, Ziel **Bunny Storage S3** — anderer Anbieter, andere Ausfalldomäne |
 | Importer | Application, GitHub App, Build-Typ **Dockerfile** | siehe unten |
 | Metabase | Application aus Docker-Image | Phase 4 |
+| MCP-Server | Application, Build-Typ **Dockerfile** (`mcp/Dockerfile`, Kontext = Wurzelverzeichnis) | Der Zugang aus Claude, ChatGPT und Copilot. Eigener Container, **nicht** im Importer-Image: Publikumsverkehr, anderer Lastverlauf, anderes Risikoprofil — und der erste Dienst dieses Projekts, der von aussen erreichbar ist. `docs/plan-skybridge.md` |
 
 **Kein Docker Compose:** Postgres ist managed, Metabase ist eine eigene App. Compose würde die Backup-Oberfläche kosten und nichts bringen.
 

@@ -379,6 +379,24 @@ Ampeltabellen.
 
 ## 9. Phasen
 
+> **Stand 13.09.2026: Phasen 1 bis 4 sind gebaut** (Migrationen `0100`/`0101`, Verzeichnis
+> `mcp/`, 321 Tests). Phase 5 braucht Entscheidungen, die nicht im Repository liegen —
+> Identitätsanbieter, Hostname, TLS —, Phase 6 braucht einen Monat Betrieb. Was jeweils
+> tatsächlich entstand, steht in der letzten Spalte; was anders entschieden wurde als hier
+> geplant, in `entscheidungen.md` unter dem 13.09.2026 (3).
+
+| Phase | Inhalt | Stand |
+|---|---|---|
+| **1 — Katalog** | Schema `mcp`, Rolle `mcp_leser`, Körnung | **fertig.** 158 Sichten mit Körnung (0 offen), 71 Tabellenkommentare ergänzt, `beziehungen.ts` liest aus `mcp.achse` |
+| **2 — Berichte** | `berichte_suchen`, `bericht_ausfuehren` | **fertig.** Alle 285 Karten übersetzen zu gültigem SQL, ohne und mit gesetzten Filtern (Test) |
+| **3 — Prüfung** | Parser, Regeln, Befund-Anhang, Protokoll | **fertig.** Die zehn Fallenfragen laufen als Testdatei |
+| **4 — Ansichten** | Ampelraster, Ergebnistabelle | **fertig** für die beiden, die Text nicht kann |
+| **5 — Betrieb** | Dokploy, IdP, TLS, Freischalten | **offen** — braucht die Antworten aus Abschnitt 11 |
+| **6 — Messen** | `mcp.zugriff` gegen Metabases Anmeldeprotokoll | **offen** — vier Wochen nach Phase 5 |
+
+### Wie es geplant war
+
+
 | Phase | Inhalt | Fertig, wenn |
 |---|---|---|
 | **1 — Katalog** (2 Tage) | Migration: `mcp.*`, Rolle `mcp_leser`; `beziehungen.ts` liest aus `mcp.achse`; Körnung von Hand für 165 Sichten — **auch in die Kommentare** | `psql` als `mcp_leser`: `core.betrieb` → *permission denied*, `mart.round_table_monat` → Zahlen; Körnung in jedem Kommentar; `bun run metabase/beziehungen.ts` unverändert im Ergebnis |

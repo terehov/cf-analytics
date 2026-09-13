@@ -3020,3 +3020,81 @@ sollen. Er bleibt eine Notiz zum Vergleich, gebaut wird auf ihm nichts.
    Dauer-URL, Schreiben in `manual`, die Punktkarte. Wann Metabase gehen kann, entscheidet
    eine Messung — Metabases Anmeldeprotokoll gegen `mcp.zugriff` über einen Monat — nicht
    der Plan.
+
+
+---
+
+## 13.09.2026 (3) — Der MCP-Server, gebaut
+
+Umgesetzt sind die Phasen 1 bis 4 des Plans: Katalog, Berichte, Prüfung, Ansichten. Was
+dabei anders entschieden wurde als im Plan, steht hier.
+
+### Die Körnung kam in die Tabellenkommentare, nicht nur in den Katalog
+
+Der Plan sah 165 Sichten Handarbeit vor. Gemacht sind **158**, und sie stehen an zwei Orten:
+in `mcp.sicht.koernung` und — über `mcp.koernung_in_kommentare()` — im Tabellenkommentar
+selbst. Die Funktion hängt an, statt zu ersetzen, und erkennt an der Marke `Koernung:`, dass
+sie schon dort war.
+
+*Warum nicht von Hand in die Migrationen:* `COMMENT ON` ersetzt vollständig. 158 bestehende
+Kommentare neu zu schreiben, um einen Satz zu ergänzen, wäre 158 Gelegenheiten, einen
+bestehenden Kommentar zu verlieren. Beim ersten Lauf hat die Funktion 71 Kommentare ergänzt.
+
+### Eine Regelart ohne Umsetzung lässt den Server nicht starten
+
+`mcp.fallstrick.art` nennt die Regelart, `mcp/src/pruefen.ts` setzt sie um. Fehlt die
+Umsetzung, wirft `regelartenPruefen()` beim Start. *Die Alternative wäre gewesen, unbekannte
+Arten zu überspringen* — und damit könnte eine Migration eine Wache eintragen, die nicht
+wacht. Das ist genau der stille Ausfall, gegen den Regel 10 geschrieben ist, nur diesmal im
+Schutzmechanismus selbst.
+
+### ~~Eine Sicht ist als Ganzes summierbar oder nicht~~ → die Spaltenregel gewinnt
+
+Die erste Fassung des Prüfers sperrte jede `sum()` über eine Sicht mit
+`summen_erlaubt = false`. Zwei Fehler auf einmal, beide von den Tests gefunden:
+
+1. **Übersperrung.** Eine Abfrage, die `mart.nachbarschaft` nur als Dimension danebenstellt,
+   um an den Ort zu kommen, summiert nicht aus ihr — sie summiert aus `mart.umsatz_tag`. Der
+   Prüfer sperrte damit genau den Weg, den die Berichtigung der `stadt`-Regel vorschlägt.
+   **Ein Prüfer, der den richtigen Weg verbietet, ist kein Schutz, sondern die erste Fassung,
+   die Daniel wegwirft.**
+2. **Widerspruch.** `mart.round_table_monat` ist als Ganzes nicht summierbar, sein
+   `umsatz_ist` aber ausdrücklich doch („die einzige echte Summe dieser Sicht").
+
+**Entschieden:** `mcp.sicht_katalog` führt seither die Spaltenliste jeder Sicht, und der
+Prüfer ordnet eine aggregierte Spalte ihrer Quelle zu. Die Spaltenregel aus `mcp.kennzahl`
+ist die präzisere und gewinnt; der Sichtbefund fängt nur noch Spalten ohne eigene Regel — und
+warnt, statt zu sperren.
+
+### Berichte laufen NICHT durch den Fallstrick-Prüfer
+
+Die 285 Karten stammen nicht von einem Modell, sondern von Menschen, die das Schema kennen;
+`uebernehmen.ts` prüft sie statisch, `metabase/karten.test.ts` einzeln gegen Postgres. Eine
+Fallstrick-Regel, die hier anschlüge, würde eine bewusste Entscheidung als Falle melden.
+Körnung und Datenstand reisen trotzdem mit — sie sind Einordnung, kein Vorwurf.
+
+### Das Protokoll hebt das Lesezeichen ausdrücklich
+
+`mcp_leser` trägt `default_transaction_read_only = on`. Der einzige INSERT des Servers — das
+Protokoll — stellt seine eine Transaktion ausdrücklich auf `READ WRITE`. *Die Alternative
+wäre eine zweite Rolle gewesen*, mit zweitem Passwort und zweitem Pool für eine Tabelle.
+Gefährlich ist es nicht: die Rolle hat überhaupt nur auf `mcp.zugriff` ein INSERT-Recht, auf
+alles andere nur SELECT. Die Rechte sind die Sperre, das Lesezeichen der zweite Riegel — und
+der wird an genau einer Stelle gehoben.
+
+### Wer nicht in `mcp.nutzer_stufe` steht, bekommt nichts
+
+Kein stillschweigendes „lesen" für jeden, der sich anmelden kann. Der Identitätsanbieter
+sagt, WER jemand ist, nicht, dass er die Zahlen dieses Unternehmens sehen darf. Die zweite
+Frage beantwortet eine Zeile, die jemand bewusst angelegt hat.
+
+### Die Kartenliste steht jetzt in `metabase/karten.ts`
+
+Sie stand dreimal im Repository: in `uebernehmen.ts`, in `karten.test.ts` und wäre ein
+viertes Mal im MCP-Server gelandet. Jetzt einmal, mit drei Abnehmern.
+
+### Skybridges Telemetrie ist aus
+
+Das CLI meldet Nutzungsdaten an PostHog. Ein Dienst, der die Zahlen eines Unternehmens
+ausliefert, hat keinen Anlass, nebenbei nach draußen zu funken — und in einer Umgebung mit
+enger Egress-Regel scheitert der Build sonst daran (hier beim ersten Versuch gesehen).

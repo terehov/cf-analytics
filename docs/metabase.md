@@ -80,6 +80,16 @@ stellen: Admin → Tabellenmetadaten → Schema `core` → Sichtbarkeit.
 Jede dieser Sichten trägt einen Tabellenkommentar; Metabase zeigt ihn als Beschreibung an.
 Dort steht auch, was man mit ihr **nicht** tun soll.
 
+> **Seit dem 13.09.2026: keine neue `mart`-Sicht ohne Körnung.** Der Kommentar muss
+> ausschreiben, wovon die Sicht eine Zeile führt — „eine Zeile je Betrieb und Monat". Der
+> Grund ist gemessen: von 188 Kommentaren trugen 114 ein Warnwort, aber nur **23** ihre
+> Körnung. Genau die braucht aber jeder, der summiert, zuerst: `mart.umsatz_tag` darf man
+> summieren, `mart.umsatz_tag_sparte` nur je Sparte, `mart.round_table_monat` gar nicht.
+>
+> Gepflegt wird sie in `mcp.sicht.koernung`; `mcp.koernung_in_kommentare()` hängt sie an den
+> Tabellenkommentar an, damit Metabase und Postico sie ebenfalls zeigen. Fehlende stehen in
+> `mcp.koernung_fehlend`. Siehe `docs/datenmodell.md`, Schema `mcp`.
+
 **Eine Ausnahme, gefunden am 12.08.2026:** der Tabellenkommentar von
 `mart.einkaufspreis_betrieb` (Migration `0056`) beschreibt an drei Stellen eine andere Sicht
 als die gebaute — Preisbasis, Bezugsgröße von `mehrkosten`, Bedeutung von `preis`. Wer die
