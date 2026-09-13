@@ -2947,7 +2947,7 @@ Anforderungsliste für die nächsten `mart`-Sichten und Metabase-Karten.
 
 Vier Befunde der vertieften Recherche, jeder revidiert einen Punkt vom Vortag.
 
-### ~~Ein eigener Server ist der erste Schritt~~ → Metabase MCP einschalten und messen
+### ~~Ein eigener Server ist der erste Schritt~~ → ~~Metabase MCP einschalten und messen~~ → doch der eigene Server (siehe Eintrag darunter)
 
 Metabase hat seit Version 60 (April 2026) einen eingebauten MCP-Server (`/api/metabase-mcp`):
 frei, OAuth aus Metabase selbst, Rechte je Nutzer, Claude/ChatGPT/VS Code als Clients,
@@ -2987,3 +2987,36 @@ das Erste, was ein Modell braucht, bevor es summiert. **Entschieden:** Körnung 
 165 Sichten, *auch in den Tabellenkommentar* — dann nützt sie Metabase MCP, Metabase und
 jedem Agenten gleichzeitig. Neue Regel in `metabase.md`: ohne Körnung im Kommentar keine
 Sicht.
+
+
+---
+
+## 13.09.2026 (2) — Der Server ist eine Alternative zu Metabase, kein Zusatz
+
+*Eugene:* der MCP-Server soll Metabase ersetzen können — für Nutzer ohne Metabase-Zugang
+sofort, perspektivisch ganz.
+
+**Damit fällt „Metabase MCP zuerst" vom selben Morgen.** Metabases eingebauter Server
+setzt einen Metabase-Nutzer voraus, hält seine Beziehungen in Metabases Katalog und seine
+Rechte in Metabases Gruppen — genau die drei Dinge, die nicht mehr Voraussetzung sein
+sollen. Er bleibt eine Notiz zum Vergleich, gebaut wird auf ihm nichts.
+
+**Entschieden, damit der Server an nichts hängt, was Metabase gehört:**
+
+1. **Die Karten werden zur Berichtsdefinition mit zwei Abnehmern.** `metabase/karten-*.ts`
+   bleibt, `uebernehmen.ts` provisioniert damit weiter Metabase, und der Server liest
+   dieselben `Karte[]` als `bericht_ausfuehren(schluessel, parameter)` — ein Werkzeug, 285
+   Schlüssel, dieselbe SQL. Fällt Metabase weg, fällt ein Abnehmer weg. Der Preis: die
+   Karten bleiben Metabase-Dialekt (`{{monat}}`-Template-Tags), der Server übersetzt. Ein
+   eigenes Berichtsformat wäre sauberer und hieße, 285 Karten anzufassen — nicht jetzt.
+2. **Die Beziehungen wandern in die Datenbank.** `mcp.achse` ist die Quelle;
+   `beziehungen.ts` liest seine `ACHSEN` von dort statt aus einer Konstante. Sonst gäbe es
+   zwei Wahrheiten über dieselbe Beziehung.
+3. **Eigene Nutzer über einen Identitätsanbieter**, Stufen in `mcp.nutzer_stufe`. Ohne
+   diese Antwort gibt es keine Nutzer ohne Metabase — deshalb die erste Frage an Eugene.
+4. **Berichte vor freiem Fragen** (Phase 2 vor 3): die Berichte sind der Teil, der
+   Metabase ersetzt, und tragen kein Risiko einer falschen Zahl — es ist dieselbe SQL.
+5. **Nicht ersetzt, ausdrücklich:** das Dashboard an der Wand, die Montags-Mail, die
+   Dauer-URL, Schreiben in `manual`, die Punktkarte. Wann Metabase gehen kann, entscheidet
+   eine Messung — Metabases Anmeldeprotokoll gegen `mcp.zugriff` über einen Monat — nicht
+   der Plan.

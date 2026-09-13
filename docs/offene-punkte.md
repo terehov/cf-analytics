@@ -1604,25 +1604,26 @@ Bis dahin hat die Kennzahl **keine Quelle — und bekommt auch keine geschätzte
 
 ## MCP-Zugang für andere Nutzer (Plan: `plan-skybridge.md`)
 
-**Zuerst, ½ Tag:** in Metabase (v0.63) unter Admin → AI den eingebauten MCP-Server
-einschalten und prüfen, dass er in der Open-Source-Ausgabe läuft — die Dokumentation nennt
-keine Einschränkung, gemessen ist es an unserer Instanz nicht. Dann Daniel freischalten und
-die zehn Fallenfragen aus dem Plan (Abschnitt 6.3) stellen; zwei Wochen das
-Abfrageprotokoll auswerten, bevor irgendetwas gebaut wird.
+Der Server soll Metabase ersetzen können — für Nutzer ohne Metabase-Zugang sofort. Er
+hängt deshalb an nichts, was Metabase gehört (Karten als gemeinsame Berichtsdefinition,
+Beziehungen in `mcp.achse`, eigene Nutzer). Metabases eingebauter MCP-Server (v0.63,
+Admin → AI) ist damit nur eine Vergleichsoption, keine Stufe.
 
-Dazu vier Punkte, die Eugene entscheiden muss:
+Fünf Punkte, die Eugene entscheiden muss:
 
 * **Welcher Identitätsanbieter?** Gibt es bei Concept Family bereits Microsoft 365 / Entra,
   an das sich der Zugang hängen lässt? Das wäre die beste Antwort — Ausscheiden aus dem
   Unternehmen bedeutet dann von selbst Zugangsverlust. Sonst WorkOS oder Clerk mit
   Allowlist; Skybridge bringt für beide ein Beispiel mit.
-* **Wer bekommt freies SQL?** In Metabase ist das das native-query-Recht je Gruppe, im
-  eigenen Server die Stufe `fragen`. Die Leitplanken sind Technik, kein Urteil — ein
-  richtiges Ergebnis kann falsch gedeutet werden. Vorschlag: zunächst nur Eugene und Daniel.
-* **Öffentlicher Hostname und TLS** — für Metabase sofort (Claude Desktop verbindet nicht
-  mit `localhost`; ChatGPT, Claude und VS Code müssen in Metabases CORS-Liste), für
-  `mcp.<domain>` später. Das ist der erste Dienst dieses Projekts, der von außen erreichbar
-  ist. Die Datenbank ist es nicht — und bleibt es.
+* **Wer bekommt freies SQL?** Stufe `fragen` in `mcp.nutzer_stufe`. Die Leitplanken sind
+  Technik, kein Urteil — ein richtiges Ergebnis kann falsch gedeutet werden. Vorschlag:
+  zunächst nur Eugene und Daniel.
+* **Soll ein OM nur seine Betriebe sehen?** Das wäre Row-Level-Security auf `mart`. Metabase
+  kann es heute nicht; eine Alternative muss zuerst gleichziehen. Wenn ja, ein eigener
+  Plan — die Zuordnung OM → Betrieb gibt es nirgends als Tabelle.
+* **Öffentlicher Hostname und TLS für `mcp.<domain>`.** Claude und ChatGPT verbinden von
+  außen; das ist der erste Dienst dieses Projekts, für den das gilt. Die Datenbank ist es
+  nicht — und bleibt es.
 * **Dürfen Zahlen aus dem Chat weitergegeben werden?** Eine Frage an das Unternehmen, keine
   technische. Der Datenstand-Anhang beantwortet „war die Zahl fertig", nicht „durfte sie
   raus".
