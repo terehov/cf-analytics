@@ -337,30 +337,35 @@ für die nächsten `mart`-Sichten.
 
 ---
 
-## 7. Anmeldung — ohne Metabase
+## 7. Anmeldung — ohne Metabase und ohne fremden Anbieter
 
-Der Server hat eigene Nutzer, sonst wäre er keine Alternative. Ein Anbieter mit
-Discovery-Dokument: gibt es bei Concept Family Microsoft 365 / Entra, ist das der richtige
-(`customProvider({ issuer, audience })`) — Ausscheiden aus dem Unternehmen heißt dann
-Zugangsverlust, und niemand pflegt eine zweite Nutzerliste. Sonst WorkOS oder Clerk mit
-Allowlist. Die Identität kommt im Handler als `extra.http.authInfo.extra.subject` an und
-steht in jeder Zeile von `mcp.zugriff`.
+> **Geändert am 13.09.2026.** Dieser Abschnitt empfahl einen Identitätsanbieter, am liebsten
+> Entra. Das war falsch: **ChatGPT meldet sich beim Verbinden per Dynamic Client
+> Registration selbst an, und Entra hat dafür keinen Endpunkt.** Entschieden ist deshalb
+> eine eigene Anmeldung — bei drei Nutzern ohnehin die ehrlichere Größe.
+> Einzelheiten in `entscheidungen.md` (13.09.2026, 4).
 
-Rechte in `mcp.nutzer_stufe(subject, stufe)`:
+Der Server ist sein eigener Autorisierungsserver: OAuth 2.1 mit PKCE, Nutzer und
+argon2id-Passwörter in `mcp.nutzer`, Dynamic Client Registration in zwanzig Zeilen.
+
+Rechte in `mcp.nutzer.stufe`:
 
 | Stufe | Darf |
 |---|---|
 | `lesen` | Berichte, Katalog, Datenstand, Betriebe suchen |
 | `fragen` | zusätzlich freies SQL |
-| — | schreiben: niemand. `manual` bleibt Metabase und Postico, bis ein eigener Plan mit Bestätigungsschritt kommt |
+| — | schreiben: niemand. `manual` bleibt Metabase und Postico |
+
+**Zwei Datenbankrollen**, weil `mcp_leser` Nutzereingaben als SQL ausführt: die
+Anmeldetabellen liegen außerhalb ihrer Rechte, sonst wäre der Signierschlüssel abfragbar.
+
+**Was das kostet:** kein zweiter Faktor, keine Passwortrücksetzung per Mail, und kein
+automatischer Entzug beim Austritt — wer geht, wird hier stillgelegt. Das steht in
+`offene-punkte.md`, weil es ein Ablauf ist und keine Einstellung.
 
 **Was bewusst noch nicht kommt: Sicht je Betrieb.** Ein OM, der nur seine Betriebe sehen
-darf, wäre Row-Level-Security auf `mart` — technisch möglich (`entscheidungen.md`,
-„LINA-Login perspektivisch für RLS-Scope"), aber Metabase kann das heute auch nicht, und
-eine Alternative muss zuerst gleichziehen. Steht in `offene-punkte.md` als Frage, nicht
-als Phase.
-
----
+darf, wäre Row-Level-Security auf `mart` — technisch möglich, aber Metabase kann das heute
+auch nicht, und eine Alternative muss zuerst gleichziehen.
 
 ## 8. Was in welchem Client ankommt
 
@@ -391,7 +396,7 @@ Ampeltabellen.
 | **2 — Berichte** | `berichte_suchen`, `bericht_ausfuehren` | **fertig.** Alle 285 Karten übersetzen zu gültigem SQL, ohne und mit gesetzten Filtern (Test) |
 | **3 — Prüfung** | Parser, Regeln, Befund-Anhang, Protokoll | **fertig.** Die zehn Fallenfragen laufen als Testdatei |
 | **4 — Ansichten** | Ampelraster, Ergebnistabelle | **fertig** für die beiden, die Text nicht kann |
-| **5 — Betrieb** | Dokploy, IdP, TLS, Freischalten | **offen** — braucht die Antworten aus Abschnitt 11 |
+| **5 — Betrieb** | Dokploy, TLS, Nutzer anlegen | **teilweise.** Die Anmeldung ist gebaut und gemessen (Migration `0102`, `mcp/src/anmeldung/`); offen bleiben Hostname, TLS und die Dokploy-Application |
 | **6 — Messen** | `mcp.zugriff` gegen Metabases Anmeldeprotokoll | **offen** — vier Wochen nach Phase 5 |
 
 ### Wie es geplant war
@@ -430,8 +435,7 @@ Das freie Fragen kommt danach, mit seinen Leitplanken.
 
 ## 11. Was Eugene entscheiden muss
 
-* **Identitätsanbieter** — Entra, falls vorhanden; sonst WorkOS oder Clerk. Ohne diese
-  Antwort gibt es keine Nutzer ohne Metabase.
+* ~~Identitätsanbieter~~ — entschieden und gebaut: eigene Anmeldung, keine fremde.
 * **Öffentlicher Hostname und TLS** für `mcp.<domain>` — der erste Dienst dieses Projekts,
   der von außen erreichbar ist. Die Datenbank bleibt es nicht.
 * **Wer bekommt freies SQL?** Vorschlag: Eugene, Daniel; alle anderen `lesen`.

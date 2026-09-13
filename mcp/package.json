@@ -9,9 +9,11 @@
     "dev": "bun run --watch start.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
-    "katalog:abzug": "bun run src/katalog_export.ts > test/katalog.json"
+    "katalog:abzug": "bun run src/katalog_export.ts > test/katalog.json",
+    "nutzer": "bun run src/nutzer_verwalten.ts"
   },
   "dependencies": {
+    "jose": "6",
     "libpg-query": "^17.7.4",
     "pg": "^8.22.0",
     "skybridge": "^2.0.0",
@@ -20,6 +22,7 @@
   "devDependencies": {
     "@skybridge/vite-plugin": "2",
     "@types/bun": "latest",
+    "@types/express": "^5.0.6",
     "@types/node": "^22.20.2",
     "@types/pg": "^8.20.0",
     "@types/react": "^19.3.0",

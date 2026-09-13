@@ -190,6 +190,29 @@ export function pruefen(sql: string, katalog: Katalog): Pruefergebnis {
       'Leserolle, aber diese Meldung ist verstaendlicher als "permission denied".')
   }
 
+  /**
+   * Die Anmeldetabellen sind auch innerhalb von `mcp` tabu.
+   *
+   * Tragend ist der Rechteentzug in Migration 0102 — `mcp_leser` bekommt auf
+   * diese Tabellen gar kein SELECT, Postgres antwortet mit „permission
+   * denied". Diese Regel hier ersetzt das nicht, sie erklaert es: eine
+   * verstaendliche Meldung ist besser als ein Rechtefehler, den das Modell
+   * fuer einen Tippfehler haelt und dreimal umformuliert.
+   */
+  const ANMELDETABELLEN = new Set([
+    'mcp.nutzer', 'mcp.oauth_client', 'mcp.oauth_code', 'mcp.oauth_token',
+    'mcp.oauth_schluessel', 'mcp.anmeldung_protokoll',
+  ])
+  for (const s of z.sichten) {
+    if (ANMELDETABELLEN.has(s)) {
+      sperre('anmeldedaten',
+        `${s} gehoert zur Anmeldung und ist fuer Abfragen gesperrt — dort liegen Passworthashes ` +
+        `und der Signierschluessel. Die Leserolle hat darauf ohnehin kein Recht; diese Meldung ` +
+        `sagt nur, warum.`,
+        'Wer wissen will, wer den Zugang benutzt, nimmt mart.mcp_nutzung oder mart.mcp_anmeldung.')
+    }
+  }
+
   for (const s of z.sichten) {
     const schema = s.includes('.') ? s.split('.')[0] : null
     if (schema === null) {

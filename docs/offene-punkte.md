@@ -1641,11 +1641,19 @@ braucht ein neuer Rechner ein `pg_dump --schema-only` aus Produktion.
 
 Phasen 1 bis 4 stehen (13.09.2026). Was fehlt, fehlt nicht im Code:
 
-* **Der Identitätsanbieter.** `MCP_OAUTH_ISSUER` oder `MCP_WORKOS_DOMAIN` — ohne eine der
-  beiden startet der Server nicht, und das ist Absicht. Entra wäre die beste Antwort.
-* **Das Passwort der Leserolle.** `ALTER ROLE mcp_leser LOGIN PASSWORD '...'` — einmal von
-  Hand, als Datenbankadministrator. Bis dahin steht es in `mcp.einrichtung_offen` und
-  `/status` meldet es als Störung.
+* ~~**Der Identitätsanbieter.**~~ Entfällt: der Server bringt seine eigene Anmeldung mit
+  (Migration `0102`). Entra wäre daran gescheitert, dass ChatGPT sich per Dynamic Client
+  Registration anmeldet und Entra dafür keinen Endpunkt hat.
+* **Wer geht, muss stillgelegt werden.** Das ist der Preis der eigenen Anmeldung: es gibt
+  keinen Unternehmensanbieter, der einen Austritt von selbst durchreicht.
+  `bun run nutzer sperren <email>` setzt `aktiv = false` und widerruft alle Tokens. Gehört
+  in die Abläufe der Personalseite, nicht in eine Erinnerung.
+* **Kein zweiter Faktor.** Für drei Menschen mit langen Passwörtern vertretbar, aber es ist
+  eine Entscheidung und keine Selbstverständlichkeit. Wenn der Kreis wächst, gehört sie
+  neu getroffen.
+* **Die Passwörter der beiden Rollen.** `ALTER ROLE mcp_leser LOGIN PASSWORD '...'` und
+  dasselbe für `mcp_anmeldung` — einmal von Hand, als Datenbankadministrator. Bis dahin
+  steht beides in `mcp.einrichtung_offen` und `/status` meldet es als Störung.
 * **Hostname und TLS für `mcp.<domain>`**, plus eine Dokploy-Application aus
   `mcp/Dockerfile` (Build-Kontext ist das Wurzelverzeichnis, weil `metabase/` mit hinein
   muss).

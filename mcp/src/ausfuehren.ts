@@ -57,8 +57,44 @@ export type Ergebnis = {
 
 export class Gesperrt extends Error {
   constructor(readonly pruefung: Pruefergebnis) {
-    super('Die Abfrage wurde nicht ausgefuehrt.')
+    super(gesperrtText(pruefung))
+    this.name = 'Gesperrt'
   }
+}
+
+/**
+ * Der Text, den das Modell zu sehen bekommt, wenn eine Abfrage nicht laeuft.
+ *
+ * DIESE FUNKTION IST DER PUNKT DES GANZEN PRUEFERS. Eine Sperre, die nur
+ * „nicht ausgefuehrt" sagt, ist keine Verweigerung, sondern ein Raetsel: das
+ * Modell formuliert dieselbe falsche Abfrage dreimal um und gibt dann auf
+ * oder — schlimmer — weicht auf etwas aus, das laeuft und falsch ist. Der
+ * Unterschied zwischen einer Verweigerung und einer selbstbewusst falschen
+ * Zahl entsteht erst hier, im Text.
+ *
+ * Deshalb: jeder Grund einzeln, und wo es eine Berichtigung gibt, die
+ * Berichtigung dazu. Beim Durchprobieren gefunden — der erste Entwurf warf
+ * einen Satz ohne jeden Befund.
+ */
+export function gesperrtText(p: Pruefergebnis): string {
+  const sperren = p.befunde.filter(b => b.schwere === 'sperre')
+  const warnungen = p.befunde.filter(b => b.schwere === 'warnung')
+
+  const zeilen = ['Die Abfrage wurde NICHT ausgefuehrt. Grund:']
+  for (const b of sperren) {
+    zeilen.push(`\n• ${b.hinweis}`)
+    if (b.berichtigung) zeilen.push(`  So geht es stattdessen: ${b.berichtigung}`)
+    if (b.quelle) zeilen.push(`  (Beleg: ${b.quelle})`)
+  }
+  if (warnungen.length) {
+    zeilen.push('\nAusserdem zu beachten, sobald die Abfrage laeuft:')
+    for (const b of warnungen) zeilen.push(`• ${b.hinweis}`)
+  }
+  zeilen.push(
+    '\nDie Abfrage bitte berichtigen und erneut stellen — NICHT bloss anders formulieren: ' +
+    'die Sperre haengt an der Bedeutung, nicht am Wortlaut. sicht_beschreiben nennt die ' +
+    'Koernung und die Fallstricke der beteiligten Sichten.')
+  return zeilen.join('\n')
 }
 
 /**

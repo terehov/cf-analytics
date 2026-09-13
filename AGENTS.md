@@ -215,12 +215,14 @@ Ein eigener Dienst mit eigener `package.json`, eigenem Dockerfile und eigener Da
 | `src/pruefen.ts` | Die Pruefung vor dem Lauf. Feste Regeln im Code, fachliche aus `mcp.fallstrick` |
 | `src/ast.ts` | Die Abfrage als Syntaxbaum (`libpg-query` — der Parser von PostgreSQL selbst, als WASM) |
 | `src/berichte.ts` | Metabase-Platzhalter → `$1`. Optionale Bloecke `[[…]]` genau wie dort |
-| `src/ausfuehren.ts` | Grenzen, Befund-Anhang, Protokoll |
+| `src/ausfuehren.ts` | Grenzen, Befund-Anhang, Protokoll. `gesperrtText()` — eine Sperre MUSS ihren Grund mitliefern |
+| `src/anmeldung/` | Der eigene Autorisierungsserver: OAuth 2.1 mit PKCE, argon2id-Passwoerter, Dynamic Client Registration. **Eigene Datenbankrolle** `mcp_anmeldung` |
 | `test/fallen.test.ts` | **Die zehn Fallenfragen** — die Regressionssicherung des Vorhabens |
 
 **Zwei Regeln, die hier nicht verhandelbar sind:**
 
 1. **Eine Regelart in `mcp.fallstrick` ohne Umsetzung in `src/pruefen.ts` laesst den Server nicht starten.** Eine Wache, die nicht wacht, ist schlimmer als keine — dieselbe Begruendung wie harte Regel 10.
+1a. **Die Anmeldetabellen gehoeren `mcp_anmeldung`, nicht `mcp_leser`.** `mcp_leser` fuehrt Nutzereingaben als SQL aus; haette sie Zugriff, waere `SELECT privat_jwk FROM mcp.oauth_schluessel` eine gueltige Abfrage — und damit die Anmeldung umgangen. Wer eine Tabelle in `mcp` ergaenzt, entscheidet zuerst, welcher der beiden Rollen sie gehoert.
 2. **Jedes Werkzeug muss ohne seine Ansicht brauchbar sein.** In Copilot gibt es keine gerenderte Ansicht; das Ergebnis steht deshalb immer auch in `structuredContent`.
 
 ### `src/` — Importer
@@ -266,7 +268,8 @@ Abschnitt „Zwei Phasen".
 
 ```bash
 # Der MCP-Zugang (mcp/, eigene package.json — dort `bun install` laufen lassen)
-cd mcp && bun test          # 321 Tests, darunter die zehn Fallenfragen
+cd mcp && bun test          # 340 Tests: die zehn Fallenfragen und der ganze Anmeldeablauf
+cd mcp && bun run nutzer liste    # Nutzer verwalten (anlegen, stufe, passwort, sperren)
 cd mcp && bun run start     # braucht MCP_DATABASE_URL und MCP_OAUTH_ISSUER
 cd mcp && bun run katalog:abzug   # test/katalog.json neu aus der Datenbank ziehen
 ```

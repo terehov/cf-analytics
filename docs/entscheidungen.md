@@ -3098,3 +3098,83 @@ viertes Mal im MCP-Server gelandet. Jetzt einmal, mit drei Abnehmern.
 Das CLI meldet Nutzungsdaten an PostHog. Ein Dienst, der die Zahlen eines Unternehmens
 ausliefert, hat keinen Anlass, nebenbei nach draußen zu funken — und in einer Umgebung mit
 enger Egress-Regel scheitert der Build sonst daran (hier beim ersten Versuch gesehen).
+
+
+---
+
+## 13.09.2026 (4) — Eigene Anmeldung statt eines fremden Identitaetsanbieters
+
+*Eugene:* kein externer Anbieter, Passwoerter in Postgres, es werden zwei bis drei Nutzer sein.
+
+### ~~Entra waere die beste Antwort~~ → Entra haette nicht funktioniert
+
+Die Empfehlung aus dem Plan war falsch, und zwar aus einem technischen Grund, nicht aus
+Geschmack. **ChatGPT und Claude melden sich beim Verbinden per Dynamic Client Registration
+(RFC 7591) selbst an. Microsoft Entra hat dafuer keinen Endpunkt** — das ist keine
+Einstellung, sondern eine Luecke im Funktionsumfang. Mit Entra braeuchte es einen
+Zwischenserver, der die Registrierung nachreicht.
+
+Belegt im Quelltext von Skybridge selbst: `registration_endpoint` ist laut RFC 8414
+optional, „a no-DCR IdP simply omits it; a proxy, or pre-registered clients, supply
+registration".
+
+**Entschieden:** dieser Server ist sein eigener Autorisierungsserver. Der Teil, den es
+braucht, ist klein — ein Anmeldeformular, ein Code, ein Token —, und die Registrierung, an
+der Entra scheitert, ist hier ein Endpunkt von zwanzig Zeilen.
+
+**Der Preis, ausdruecklich genannt:** kein zweiter Faktor, keine Passwortruecksetzung per
+Mail, und **kein automatischer Entzug beim Austritt aus dem Unternehmen**. Wer geht, muss in
+`mcp.nutzer` auf `aktiv = false` gesetzt werden. Das ist die eigentliche Einbusse gegenueber
+einem Unternehmensanbieter; sie steht in `offene-punkte.md`.
+
+### Zwei Datenbankrollen — die wichtigste Entscheidung daran
+
+`mcp_leser` fuehrt **Nutzereingaben als SQL aus** (`abfrage_ausfuehren`), und `mcp` steht auf
+der Liste der erlaubten Schemata, weil der Katalog dort liegt. Laegen die Passworthashes und
+der Signierschluessel im selben Schema mit denselben Rechten, waere
+
+```sql
+SELECT privat_jwk FROM mcp.oauth_schluessel;
+```
+
+eine gueltige Abfrage — und wer sie stellt, kann sich fortan **beliebige Tokens ausstellen**,
+also die Anmeldung ganz umgehen. Kein Randfall: es ist der erste Weg, den ein Modell beim
+Herumprobieren findet.
+
+**Entschieden:** eine zweite Rolle `mcp_anmeldung` mit eigener Verbindung. Sie sieht nur die
+Anmeldetabellen; `mcp_leser` bekommt darauf gar kein Recht. Gemessen in beide Richtungen
+(`test/ausfuehren.test.ts`, `test/anmeldung.test.ts`), nicht behauptet.
+
+Der Pruefer meldet den Zugriff zusaetzlich verstaendlich — aber tragend ist die Rolle.
+
+### RS256 statt eines gemeinsamen Geheimnisses
+
+Der Ressourcenteil prueft Tokens mit dem **oeffentlichen** Schluessel. Mit HS256 koennte
+jeder, der pruefen darf, auch ausstellen — und genau diese Trennung ist der Zweck der
+zweiten Rolle. Ein asymmetrisches Verfahren haelt sie auch dann, wenn beide Teile im selben
+Prozess laufen. Der Schluessel liegt in der Datenbank, nicht in einer Umgebungsvariablen:
+ein Neustart soll nicht jedes Token entwerten, eine Rotation kein Deploy brauchen.
+
+### Die Stufe wird bei jedem Aufruf frisch gelesen
+
+Sie steht auch im Token, und von dort waere sie schneller. Aber ein Token lebt eine Stunde:
+wer jemandem den Zugang entzieht, will nicht bis zu sechzig Minuten warten. Bei drei Nutzern
+kostet die Abfrage nichts, und sie macht `aktiv = false` zu dem, wonach es aussieht.
+
+### Eine Sperre muss ihren Grund mitliefern
+
+Beim Durchspielen des ganzen Ablaufs gefunden: die gesperrte Abfrage kam beim Modell als
+„Die Abfrage wurde nicht ausgefuehrt" an — der Grund steckte im Objekt und wurde nie
+zugestellt. **Damit war die Verweigerung genau das, was sie nicht sein soll: ein Raetsel.**
+Ein Modell beantwortet ein Raetsel, indem es dieselbe falsche Abfrage umformuliert, oder
+indem es auf etwas ausweicht, das laeuft und falsch ist.
+
+`gesperrtText()` setzt seither jeden Grund, jede Berichtigung und jeden Beleg in die
+Fehlermeldung — samt des ausdruecklichen Hinweises, **nicht** bloss umzuformulieren.
+Festgehalten in `test/fallen.test.ts`.
+
+### Was NICHT gebaut wurde
+
+Zustimmungsseiten, Mandanten, Client-Geheimnisse, implizite Ablaeufe, Passwortregeln mit
+Sonderzeichen. Verlangt wird nur Laenge (12 Zeichen) — das Einzige, was messbar hilft, und
+drei Menschen koennen sich einen Satz merken.

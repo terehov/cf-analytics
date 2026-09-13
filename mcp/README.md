@@ -34,32 +34,72 @@ Die Karten sind deshalb *ein* Werkzeug mit 285 Schlüsseln.
    Sichten, ihre Körnung und den Datenstand bei sich — nicht als Hoffnung,
    dass jemand den Tabellenkommentar gelesen hat.
 
+## Anmeldung — ohne fremden Anbieter
+
+Dieser Server ist sein **eigener** Autorisierungsserver: OAuth 2.1 mit PKCE,
+Passwörter als argon2id-Hash in Postgres, Nutzer in `mcp.nutzer`.
+
+*Warum nicht Entra, WorkOS oder Auth0:* bei drei Nutzern ist ein Vertrag mehr
+Aufwand als Gewinn — und Entra hätte gar nicht funktioniert. ChatGPT meldet
+sich beim Verbinden per **Dynamic Client Registration** selbst an, und Entra
+hat dafür keinen Endpunkt. Hier ist die Registrierung ein Endpunkt von
+zwanzig Zeilen.
+
+*Was das kostet, ehrlich:* kein zweiter Faktor, keine Passwortrücksetzung per
+Mail, und **kein automatischer Entzug beim Austritt** — wer geht, muss hier
+auf `aktiv = false` gesetzt werden.
+
+### Zwei Datenbankrollen, und warum das kein Umstand ist
+
+`mcp_leser` führt Nutzereingaben als SQL aus, und `mcp` ist ein erlaubtes
+Schema. Lägen Passworthashes und Signierschlüssel unter derselben Rolle, wäre
+`SELECT privat_jwk FROM mcp.oauth_schluessel` eine gültige Abfrage — und wer
+sie stellt, stellt sich fortan selbst Tokens aus. Deshalb:
+
+| Rolle | Sieht | Sieht nicht |
+|---|---|---|
+| `mcp_leser` | `mart`, `manual`, `ampel`, den Katalog in `mcp` | die Anmeldetabellen |
+| `mcp_anmeldung` | `mcp.nutzer`, `mcp.oauth_*` | die Auswertungsdaten |
+
+Beides ist in `test/ausfuehren.test.ts` und `test/anmeldung.test.ts` gemessen,
+nicht behauptet.
+
 ## Einrichten
 
 ```bash
-# 1. Migrationen (legen Schema mcp und die Rolle an)
+# 1. Migrationen (legen Schema mcp und beide Rollen an)
 bun run migrate
 
 # 2. Einmal von Hand, als Datenbankadministrator:
-#    ALTER ROLE mcp_leser LOGIN PASSWORD '...';
+#    ALTER ROLE mcp_leser     LOGIN PASSWORD '...';
+#    ALTER ROLE mcp_anmeldung LOGIN PASSWORD '...';
 #    Solange das fehlt, meldet es /status und mcp.einrichtung_offen.
 
 # 3. Umgebung (mcp/.env oder Dokploy)
 MCP_DATABASE_URL=postgresql://mcp_leser:...@host/lina
-MCP_OAUTH_ISSUER=https://login.microsoftonline.com/<tenant>/v2.0
-MCP_OAUTH_AUDIENCE=cf-analytics-mcp
+MCP_AUTH_DATABASE_URL=postgresql://mcp_anmeldung:...@host/lina
+MCP_OEFFENTLICHE_URL=https://mcp.concept-family.de
 
-# 4. Nutzer freischalten — wer hier fehlt, kommt nicht hinein:
-#    INSERT INTO mcp.nutzer_stufe (subject, anzeige, stufe)
-#    VALUES ('<oauth-subject>', 'Daniel', 'lesen');
+# 4. Nutzer anlegen — das Passwort wird abgefragt, nie als Argument übergeben
+bun run nutzer anlegen eugene@brain.food "Eugene" fragen
+bun run nutzer anlegen daniel@brain.food "Daniel" lesen
 
-bun install && bun run start
+bun install && bun run build && bun run start
+```
+
+### Nutzer verwalten
+
+```bash
+bun run nutzer liste
+bun run nutzer stufe    daniel@brain.food fragen   # wirkt sofort, nicht erst beim nächsten Token
+bun run nutzer passwort daniel@brain.food          # widerruft bestehende Tokens
+bun run nutzer sperren  daniel@brain.food          # stilllegen + alle Tokens widerrufen
 ```
 
 ## Befehle
 
 ```bash
-bun test                 # 326 Tests, darunter die zehn Fallenfragen
+bun test                 # 340 Tests, darunter die zehn Fallenfragen
 bun run typecheck
 bun run build            # die Ansichten (vite) — vor dem ersten Start noetig
 bun run start            # Produktionsstart; Port aus __PORT, nicht PORT
@@ -72,7 +112,8 @@ Die Datenbanktests laufen nur mit gesetzter Variable — und zwar bewusst
 pruefen, ist die Rolle selbst.
 
 ```bash
-MCP_DATABASE_URL=postgresql://mcp_leser:...@host/lina bun test
+MCP_DATABASE_URL=postgresql://mcp_leser:...@host/lina \
+MCP_AUTH_DATABASE_URL=postgresql://mcp_anmeldung:...@host/lina bun test
 ```
 
 ## Den Katalog pflegen

@@ -16,7 +16,7 @@
  * `structuredContent` — die Ansicht ist die Kuer, die Daten sind die Pflicht.
  * Was NUR die Ansicht bekommt (die Zeilen 501 bis 5.000), steht in `_meta`.
  */
-import { Skybridge, customProvider, workosProvider } from 'skybridge/server'
+import { Skybridge } from 'skybridge/server'
 import { z } from 'zod'
 import { parserBereitstellen } from './ast'
 import { anmelden, fragenDuerfen, NichtErlaubt, type Angemeldet } from './auth'
@@ -28,6 +28,9 @@ import { abfragen } from './db'
 import { katalogLaden } from './katalog_laden'
 import type { Katalog } from './katalog'
 import { pruefen } from './pruefen'
+import { anmeldungMontieren } from './anmeldung/endpunkte'
+import { anmeldungAbfragen, anmeldungEingerichtet } from './anmeldung/db'
+import { zugangstokenPruefen } from './anmeldung/schluessel'
 
 /**
  * Die Form, in der JEDES Ergebnis zurueckkommt — Bericht wie freie Abfrage.
@@ -106,27 +109,69 @@ export const app = new Skybridge({
   },
 
   /**
-   * OAuth gegen den Identitaetsanbieter des Unternehmens.
+   * OAuth — von diesem Server selbst, ohne fremden Anbieter.
    *
-   * `MCP_OAUTH_ISSUER` genuegt, wenn der Anbieter ein Discovery-Dokument
-   * veroeffentlicht — das tun Entra, Auth0, Keycloak und die meisten
-   * anderen. WorkOS hat einen eigenen Bausteinsatz, deshalb der Zweig.
-   * Welcher es wird, ist eine offene Frage an Eugene (offene-punkte.md);
-   * der Code haengt an keiner der beiden Antworten.
+   * *Eugene, 13.09.2026:* kein externer Identitaetsanbieter, Passwoerter in
+   * Postgres. Bei drei Nutzern ist das die ehrlichere Groesse — und es
+   * loest nebenbei das Problem, an dem Entra gescheitert waere: ChatGPT
+   * meldet sich beim Verbinden per Dynamic Client Registration selbst an,
+   * und Entra hat dafuer keinen Endpunkt. Hier sind es zwanzig Zeilen
+   * (src/anmeldung/endpunkte.ts).
+   *
+   * KEIN `customProvider`, obwohl der Server jetzt sein eigener Aussteller
+   * ist: der wuerde beim Start sein eigenes Discovery-Dokument ueber HTTP
+   * abrufen — ein Server, der auf sich selbst wartet, bevor er lauscht. Die
+   * Angaben stehen hier ohnehin fest, und der Pruefer arbeitet mit dem
+   * Schluessel aus der Datenbank statt ueber einen Netzaufruf.
    */
   oauth: () => {
-    const publikum = process.env.MCP_OAUTH_AUDIENCE ?? 'cf-analytics-mcp'
-    if (process.env.MCP_WORKOS_DOMAIN) {
-      return workosProvider({ domain: process.env.MCP_WORKOS_DOMAIN, audience: publikum })
-    }
-    const issuer = process.env.MCP_OAUTH_ISSUER
-    if (!issuer) {
+    const basis = (process.env.MCP_OEFFENTLICHE_URL ?? '').replace(/\/$/, '')
+    if (!basis) {
       throw new Error(
-        'Weder MCP_OAUTH_ISSUER noch MCP_WORKOS_DOMAIN gesetzt. Ohne Anmeldung startet dieser ' +
-        'Server nicht — er zeigt Betriebszahlen, und ein offener Zugang dazu waere kein ' +
-        'Versehen, sondern eine Entscheidung, die niemand getroffen hat.')
+        'MCP_OEFFENTLICHE_URL fehlt — z. B. https://mcp.example.de. Ohne die oeffentliche ' +
+        'Adresse kann dieser Server weder Tokens ausstellen noch pruefen: sie ist Aussteller ' +
+        'und Publikum zugleich.')
     }
-    return customProvider({ issuer, audience: publikum })
+    if (!anmeldungEingerichtet()) {
+      throw new Error(
+        'MCP_AUTH_DATABASE_URL fehlt. Die Anmeldung hat eine EIGENE Datenbankrolle ' +
+        '(mcp_anmeldung) — bewusst getrennt von mcp_leser, unter der die Abfragen der Nutzer ' +
+        'laufen. Sonst waere der Signierschluessel per SELECT abfragbar.')
+    }
+
+    return {
+      baseUrl: basis,
+      scopesSupported: ['mcp'],
+      oauthMetadata: {
+        issuer: basis,
+        authorization_endpoint: `${basis}/authorize`,
+        token_endpoint: `${basis}/token`,
+        registration_endpoint: `${basis}/register`,
+        jwks_uri: `${basis}/jwks`,
+        response_types_supported: ['code'],
+        grant_types_supported: ['authorization_code', 'refresh_token'],
+        code_challenge_methods_supported: ['S256'],
+        token_endpoint_auth_methods_supported: ['none'],
+        scopes_supported: ['mcp'],
+      },
+      verifier: {
+        /**
+         * Ortlich geprueft, ohne Netzaufruf: der oeffentliche Schluessel
+         * liegt in der Datenbank. Ein JWKS-Abruf gegen die eigene Adresse
+         * waere ein Umweg ueber das Netz zu sich selbst.
+         */
+        async verifyAccessToken(token: string) {
+          const { payload } = await zugangstokenPruefen(token, basis, basis)
+          return {
+            token,
+            clientId: String(payload.client_id ?? ''),
+            scopes: ['mcp'],
+            expiresAt: payload.exp,
+            extra: payload as Record<string, unknown>,
+          }
+        },
+      },
+    }
   },
 
   handler: (server, { katalog }: { katalog: Katalog }) => server
@@ -473,6 +518,18 @@ export type AppType = typeof app
  * — wo es einen gibt — den berichtigten Weg. Genau darin besteht der
  * Unterschied zwischen einer Verweigerung und einer falschen Zahl.
  */
+/**
+ * Der Autorisierungsserver: /authorize, /anmelden, /token, /register, /jwks.
+ *
+ * Vor `run()` montiert — danach haengt Skybridge seine eigenen Routen und
+ * die Fehlerbehandlung an, und eine spaeter registrierte Route kaeme nicht
+ * mehr davor.
+ */
+{
+  const basis = (process.env.MCP_OEFFENTLICHE_URL ?? '').replace(/\/$/, '')
+  if (basis) anmeldungMontieren(app.express, { aussteller: basis, publikum: basis })
+}
+
 app.express.use((fehler: any, _req: any, antwort: any, weiter: any) => {
   if (fehler instanceof Gesperrt) {
     return antwort.status(200).json({
@@ -494,8 +551,15 @@ app.express.get('/status', async (_req: any, antwort: any) => {
       abfragen(`SELECT coalesce(sum(aufrufe), 0)::int AS aufrufe_7t
                   FROM mart.mcp_nutzung WHERE tag > current_date - 7`),
     ])
+    // Die Anmeldung laeuft auf der ZWEITEN Verbindung; ihr Zustand gehoert
+    // in dieselbe Antwort, sonst prueft der Monitor nur die halbe Miete.
+    const [anmeldung] = await anmeldungAbfragen<{ nutzer: number; gescheitert_24h: number }>(
+      `SELECT (SELECT count(*)::int FROM mcp.nutzer WHERE aktiv)              AS nutzer,
+              (SELECT count(*)::int FROM mcp.anmeldung_protokoll
+                WHERE NOT erfolg AND zeitpunkt > now() - interval '24 hours') AS gescheitert_24h`)
     const stufe = offen.length ? 'stoerung' : 'ok'
-    antwort.status(stufe === 'ok' ? 200 : 503).json({ status: stufe, einrichtung_offen: offen, ...nutzung[0] })
+    antwort.status(stufe === 'ok' ? 200 : 503).json({
+      status: stufe, einrichtung_offen: offen, ...nutzung[0], ...anmeldung })
   } catch (e) {
     antwort.status(503).json({ status: 'stoerung', fehler: String(e).slice(0, 300) })
   }

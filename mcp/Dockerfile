@@ -76,6 +76,11 @@ USER bun
 # Skybridge liest den Port aus __PORT, nicht aus PORT. Ohne das lauscht der
 # Container auf 3000, waehrend Dokploy woanders anklopft — und der
 # Health-Check bleibt rot, ohne dass im Log etwas steht.
+# Gebraucht werden zur Laufzeit ausserdem (in Dokploy setzen, nicht hier):
+#   MCP_DATABASE_URL        die Leserolle
+#   MCP_AUTH_DATABASE_URL   die Anmelderolle — bewusst eine ANDERE
+#   MCP_OEFFENTLICHE_URL    die oeffentliche Adresse; Aussteller und Publikum
+#                           der Tokens zugleich
 ENV __PORT=3000
 EXPOSE 3000
 CMD ["bun", "run", "mcp/start.ts"]

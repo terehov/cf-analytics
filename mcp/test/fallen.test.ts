@@ -16,6 +16,7 @@
 import { beforeAll, describe, expect, test } from 'bun:test'
 import { parserBereitstellen } from '../src/ast'
 import { katalogAusJson } from '../src/katalog_laden'
+import { gesperrtText } from '../src/ausfuehren'
 import { pruefen, type Befund } from '../src/pruefen'
 import abzug from './katalog.json'
 
@@ -255,5 +256,42 @@ describe('Feste Regeln', () => {
     expect(e.schluessel).toContain('summe_ungeprueft_mart.round_table_monat')
     // Warnung, nicht Sperre: vielleicht weiss der Fragende etwas, was hier fehlt.
     expect(e.befunde.find(b => b.schluessel.startsWith('summe_ungeprueft'))!.schwere).toBe('warnung')
+  })
+})
+
+/**
+ * Der Text, den ein Modell bei einer Sperre zu sehen bekommt.
+ *
+ * WARUM DAS EINEN EIGENEN TEST HAT. Bis zum 13.09.2026 warf die Sperre
+ * nur „Die Abfrage wurde nicht ausgefuehrt." — der Grund blieb im Objekt
+ * stecken und kam nie beim Modell an. Beim Durchspielen des ganzen
+ * Ablaufs gefunden: aus Sicht des Modells war die Sperre ein Raetsel, und
+ * ein Raetsel beantwortet es, indem es dieselbe falsche Abfrage umformuliert.
+ *
+ * Damit war die Verweigerung genau das, was sie NICHT sein soll: ein
+ * Hindernis statt einer Antwort. Diese Tests halten das fest.
+ */
+describe('Die Sperre erklaert sich', () => {
+
+  test('Der Grund, die Berichtigung und der Beleg stehen im Text', () => {
+    const e = pruefen(`SELECT stadt, count(*) FROM mart.betrieb GROUP BY stadt`, katalog)
+    const text = gesperrtText(e)
+    expect(text).toContain('NICHT ausgefuehrt')
+    expect(text).toContain('bei ALLEN 141 Betrieben NULL')          // der Grund
+    expect(text).toContain('mart.nachbarschaft.ort')                 // die Berichtigung
+    expect(text).toContain('docs/metabase.md')                       // der Beleg
+  })
+
+  test('Der Text raet ausdruecklich vom blossen Umformulieren ab', () => {
+    const text = gesperrtText(pruefen(`SELECT sum(we_bar_pct) FROM mart.round_table_monat`, katalog))
+    expect(text).toContain('NICHT bloss anders formulieren')
+    expect(text).toContain('sicht_beschreiben')
+  })
+
+  test('Warnungen stehen dabei, aber getrennt von den Sperren', () => {
+    const text = gesperrtText(pruefen(
+      `SELECT stadt, avg(pek_gesamt) FROM mart.personalkosten GROUP BY stadt`, katalog))
+    expect(text).toContain('Grund:')
+    expect(text).toContain('Ausserdem zu beachten')
   })
 })

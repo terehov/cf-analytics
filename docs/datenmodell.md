@@ -691,7 +691,11 @@ ChatGPT und Copilot befragbar macht.
 | `mcp.sicht_achse` | Sicht × Achse | Abgeleitet aus dem Katalog, nicht von Hand |
 | `mcp.kennzahl` | Sicht × Spalte | Welche Aggregation die Spalte verträgt |
 | `mcp.fallstrick` | Regel | Was vor dem Lauf gesperrt oder gewarnt wird |
-| `mcp.nutzer_stufe` | Nutzer | `lesen` / `fragen` / `gesperrt` |
+| `mcp.nutzer` | Nutzer | Mailadresse, argon2id-Hash, Stufe (`lesen`/`fragen`/`gesperrt`), aktiv |
+| `mcp.oauth_client` | registriertem Client | ChatGPT, Claude, VS Code — melden sich selbst an |
+| `mcp.oauth_code` · `mcp.oauth_token` | Code bzw. Auffrischungstoken | jeweils als Hash |
+| `mcp.oauth_schluessel` | Schluessel | das RS256-Paar, mit dem Tokens signiert werden |
+| `mcp.anmeldung_protokoll` | Anmeldeversuch | gelungen wie gescheitert |
 | `mcp.zugriff` | Anfrage | Das Protokoll |
 | `mcp.einrichtung_offen` | offener Punkt | Was die Migration nicht selbst tun konnte |
 
@@ -748,3 +752,33 @@ Server kommt **dazu**, für die Fallstricke, nicht für die Rechte.
 Das Passwort setzt ein Mensch von Hand (harte Regel 2). Bis dahin steht der Fehlstand in
 `mcp.einrichtung_offen` und `/status` meldet ihn — die Migration bricht **nicht** ab, das
 hielte sonst den Containerstart an.
+
+
+### Die Anmeldung: zwei Rollen, nicht eine (Migration 0102, 13.09.2026)
+
+Der MCP-Server ist seit dem 13.09.2026 sein **eigener** Autorisierungsserver — kein Entra,
+kein WorkOS. Begründung in `entscheidungen.md`; hier steht, was das fürs Schema heißt.
+
+**Die tragende Entscheidung ist die zweite Datenbankrolle.** `mcp_leser` führt
+Nutzereingaben als SQL aus, und `mcp` steht auf der Liste der erlaubten Schemata, weil der
+Katalog dort liegt. Lägen Passworthashes und Signierschlüssel unter derselben Rolle, wäre
+
+```sql
+SELECT privat_jwk FROM mcp.oauth_schluessel;
+```
+
+eine gültige Abfrage — und wer sie stellt, kann sich beliebige Tokens ausstellen, also die
+Anmeldung ganz umgehen.
+
+| Rolle | Sieht | Sieht nicht |
+|---|---|---|
+| `mcp_leser` | `mart`, `manual`, `ampel`, den Katalog in `mcp` | `mcp.nutzer`, `mcp.oauth_*`, `mcp.anmeldung_protokoll` |
+| `mcp_anmeldung` | genau diese Anmeldetabellen | `mart`, `manual`, `ampel`, `core` |
+
+Beide Richtungen sind gemessen (`psql` als die jeweilige Rolle, und in den Tests), nicht
+angenommen. Eingerichtet von `mcp.rechte_anmeldung_auffrischen()`, idempotent.
+
+**Was als Hash gespeichert wird:** Passwörter mit argon2id (`Bun.password`),
+Autorisierungscodes und Auffrischungstokens mit SHA-256. Ein Datenbankabzug enthält damit
+nichts unmittelbar Verwendbares — die einzige Ausnahme ist der private Signierschlüssel, und
+genau deshalb ist er für `mcp_leser` unsichtbar.

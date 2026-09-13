@@ -1,18 +1,21 @@
 /**
  * Wer darf was.
  *
- * DER SERVER HAT EIGENE NUTZER, sonst waere er keine Alternative zu
- * Metabase (docs/plan-skybridge.md). Die Identitaet kommt vom
- * Identitaetsanbieter als OAuth-Subject; die Stufe steht in
- * `mcp.nutzer_stufe`.
+ * DER SERVER HAT EIGENE NUTZER — seit dem 13.09.2026 mit eigener Anmeldung
+ * statt eines fremden Identitaetsanbieters (Migration 0102,
+ * src/anmeldung/). Die Identitaet steht im Zugangstoken, die Stufe wird
+ * trotzdem BEI JEDEM AUFRUF frisch gelesen.
  *
- * WER DORT NICHT STEHT, BEKOMMT NICHTS. Kein stillschweigendes "lesen" fuer
- * jeden, der sich anmelden kann: der Anbieter sagt, WER jemand ist, nicht,
- * dass er die Zahlen dieses Unternehmens sehen darf. Die zweite Frage
- * beantwortet diese Tabelle, und ihre Antwort ist eine Zeile, die jemand
- * bewusst angelegt hat.
+ * WARUM NICHT EINFACH DIE STUFE AUS DEM TOKEN. Sie steht dort auch, und sie
+ * waere schneller. Aber ein Token lebt eine Stunde: wer jemandem den Zugang
+ * entzieht, will nicht bis zu sechzig Minuten warten, bis das wirkt. Bei
+ * drei Nutzern kostet die Abfrage nichts, und sie macht `aktiv = false` zu
+ * dem, wonach es aussieht — sofort.
+ *
+ * WER NICHT IN `mcp.nutzer` STEHT, BEKOMMT NICHTS. Ein gueltiges Token
+ * allein genuegt nicht; das Konto muss es noch geben und aktiv sein.
  */
-import { abfragen } from './db'
+import { nutzerNachSubject } from './anmeldung/speicher'
 
 export type Stufe = 'lesen' | 'fragen' | 'gesperrt'
 
@@ -28,12 +31,12 @@ export class NichtErlaubt extends Error {}
 /** Aus dem geprueften Token die Kennung ziehen. */
 export function subjektAus(extra: any): string | null {
   const a = extra?.http?.authInfo
-  return a?.extra?.sub ?? a?.extra?.subject ?? a?.clientId ?? null
+  return a?.extra?.sub ?? a?.extra?.subject ?? null
 }
 
 export function anzeigeAus(extra: any): string | null {
   const e = extra?.http?.authInfo?.extra
-  return e?.name ?? e?.email ?? e?.preferred_username ?? null
+  return e?.name ?? e?.email ?? null
 }
 
 export async function anmelden(extra: any): Promise<Angemeldet> {
@@ -41,21 +44,20 @@ export async function anmelden(extra: any): Promise<Angemeldet> {
   if (!subject) {
     throw new NichtErlaubt(
       'Keine Anmeldung erkannt. Dieser Zugang ist nicht oeffentlich — der Connector muss mit ' +
-      'dem Unternehmenskonto verbunden sein.')
+      'einem freigeschalteten Konto verbunden sein.')
   }
-  const [zeile] = await abfragen<{ stufe: Stufe; anzeige: string | null }>(
-    `SELECT stufe, anzeige FROM mcp.nutzer_stufe WHERE subject = $1`, [subject])
 
-  if (!zeile || zeile.stufe === 'gesperrt') {
+  const nutzer = await nutzerNachSubject(subject)
+  if (!nutzer || !nutzer.aktiv || nutzer.stufe === 'gesperrt') {
     throw new NichtErlaubt(
-      `Fuer diese Anmeldung ist kein Zugang hinterlegt. Freischalten heisst: eine Zeile in ` +
-      `mcp.nutzer_stufe mit subject = '${subject}'. Das ist Absicht — dass jemand sich anmelden ` +
-      `kann, heisst nicht, dass er die Zahlen sehen darf.`)
+      'Dieses Konto ist nicht (mehr) freigeschaltet. Ein gueltiges Token allein genuegt nicht — ' +
+      'das Konto muss in mcp.nutzer aktiv sein.')
   }
+
   return {
     subject,
-    anzeige: zeile.anzeige ?? anzeigeAus(extra),
-    stufe: zeile.stufe,
+    anzeige: nutzer.anzeige ?? anzeigeAus(extra),
+    stufe: nutzer.stufe,
     client: extra?.http?.authInfo?.clientId ?? null,
   }
 }
@@ -64,8 +66,8 @@ export async function anmelden(extra: any): Promise<Angemeldet> {
 export function fragenDuerfen(n: Angemeldet): void {
   if (n.stufe !== 'fragen') {
     throw new NichtErlaubt(
-      'Freies SQL ist fuer diese Anmeldung nicht freigegeben (Stufe "lesen"). Die fertigen ' +
+      'Freies SQL ist fuer dieses Konto nicht freigegeben (Stufe "lesen"). Die fertigen ' +
       'Berichte stehen zur Verfuegung — berichte_suchen findet sie. Wer freies SQL braucht, ' +
-      'bekommt in mcp.nutzer_stufe die Stufe "fragen".')
+      'bekommt in mcp.nutzer die Stufe "fragen".')
   }
 }
