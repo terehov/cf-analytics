@@ -452,15 +452,26 @@ SELECT s.quelle                                  AS "Quelle",
     schluessel: 'dq_lochtage',
     name: 'Tage mit Datenloch',
     beschreibung:
-      'Tage der letzten 120 Tage, an denen deutlich weniger Betriebe Umsatz melden als im 28-Tage-Schnitt davor. Die jüngsten etwa sechs Tage füllt LINA von selbst nach — dort ist eine Zeile normal. Ältere Zeilen sind echte Löcher: diese Tage fehlen in jeder Auswertung und gehören neu eingereiht. Anlassfall: der 22.07.2026 mit 0 von ~54 erwarteten Betrieben.',
+      'Tage der letzten 120 Tage, an denen deutlich weniger Betriebe Umsatz melden als im 28-Tage-Schnitt davor. '
+      + 'Die jüngsten Tage füllt LINA von selbst nach — dort steht „im Fenster", und die Zeile ist normal. '
+      + 'Ältere Tage reiht der nächtliche Lauf von selbst neu ein, für alle Tagesberichte: „faellig" wartet auf die '
+      + 'nächste Nacht, „eingereiht" ist unterwegs, „wartet" wurde geholt und blieb leer, „aufgegeben" blieb es '
+      + 'dreimal — dann hat das Kassensystem den Tag wirklich nicht. Anlassfall: der 22.07.2026 mit 0 von rund 54 '
+      + 'erwarteten Betrieben, einmal zu früh geholt und sieben Wochen nie wieder.',
     anzeige: 'table',
+    // Seit 0101 traegt die Sicht den Zustand — die Karte zeigt ihn, weil ein
+    // Auftrag ("gehoert neu eingereiht"), den kein Mechanismus ausfuehrt,
+    // die Regel-10-Signatur in Kartenform ist. Sieben Wochen stand der
+    // 22.07.2026 hier, und niemand reihte ihn ein.
     sql: `
 SELECT geschaeftstag        AS "Geschäftstag",
        wochentag            AS "Wochentag",
        betriebe_mit_umsatz  AS "Betriebe mit Umsatz",
        betriebe_erwartet    AS "erwartet",
        umsatz               AS "Umsatz",
-       befund               AS "Befund"
+       befund               AS "Befund",
+       zustand              AS "Zustand",
+       nachgeholt           AS "nachgeholt"
   FROM mart.umsatz_lochtag
  ORDER BY geschaeftstag DESC`,
     visualisierung: {

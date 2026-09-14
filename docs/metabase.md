@@ -1271,6 +1271,18 @@ Nacht, das ist Betrieb und kein Befund.
 SELECT * FROM mart.umsatztag_luecke WHERE zustand <> 'im Fenster';   -- Erwartung: leer nach einer Woche
 ```
 
+**`mart.umsatz_lochtag`** (seit `0101`, 14.09.2026) — dieselbe Bauart für den Fall, den die Lücke
+oben nicht sieht: **beide** Berichte leer. Die Sicht aus `0039` (Tage der letzten 120 Tage mit
+weniger als 60 % der Betriebe mit Umsatz gegen den 28-Tage-Schnitt davor) trägt jetzt am Ende
+`alter_tage`, `nachgeholt`, `offen`, `zuletzt_eingereiht` und `zustand` mit denselben fünf
+Werten; `lochtageNachziehen()` liest `faellig`, die Prüfübersicht zählt `aufgegeben`. Die ersten
+sechs Spalten sind unverändert (`CREATE OR REPLACE VIEW` kann nur anhängen); die Karte „Tage mit
+Datenloch" zeigt den Zustand mit. Anlass: 20.–22.07.2026, sieben Wochen null in beiden Berichten.
+
+```sql
+SELECT * FROM mart.umsatz_lochtag WHERE zustand <> 'im Fenster';   -- Erwartung: leer nach einer Woche
+```
+
 **`mart.nachzuegler_tiefe`** misst den Rand jetzt am konfigurierten Fenster
 (`sync.quelle.nachzuegler_tage`, neue Spalten `rand_konfiguriert`, `aenderungen_pct`). Bis
 `0100` war `rand` der größte beobachtete Abstand — 60, weil Lauf 1 am 26.07.2026 Tage mit

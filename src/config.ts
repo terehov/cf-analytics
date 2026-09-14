@@ -623,6 +623,26 @@ const Schema = z.object({
    * was der Test eingereiht hat.
    */
   NACHLESE_JE_LAUF: z.coerce.number().int().min(0).default(100),
+  /**
+   * Wie viele Geschaeftstage EIN Lauf hoechstens als Lochtage nachholt
+   * (`lochtageNachziehen()`, Sicht `mart.umsatz_lochtag`). 0 schaltet ab.
+   *
+   * Der Fall, den NULLTAGE_JE_LAUF nicht sieht: BEIDE Tagesberichte stehen
+   * leer, weil LINA den Tag beim einzigen Abruf noch nicht hatte. Gemessen am
+   * 14.09.2026: 20.–22.07.2026, am 26.07. im ersten Lauf geholt (vier bis
+   * sechs Tage nach dem Geschaeftstag; LINA fuellt den Artikelverkauf erst
+   * nach fuenf bis sieben Tagen), das taegliche Fenster begann am 02.08. und
+   * reichte bis zum 23.07. Der 22.07. stand seitdem bei allen 141 Betrieben
+   * auf null — in beiden Berichten, in jeder Auswertung, ohne Meldung.
+   *
+   * Ein Lochtag ist ein Tag, an dem weniger als 60 % der Betriebe Umsatz
+   * melden, die es im 28-Tage-Schnitt davor taten. Er wird fuer JEDEN
+   * Konzern-Tagesbericht neu eingereiht, dessen Fenster ihn nicht mehr
+   * erreicht — auch fuer den Artikelverkauf, denn hier ist der Umsatzbericht
+   * selbst das Signal. Ein Tag kostet bis zu 16 Aufrufe; zehn je Nacht sind
+   * 160, und Lochtage sind selten (zwei in acht Monaten).
+   */
+  LOCHTAGE_JE_LAUF: z.coerce.number().int().min(0).default(10),
 
   /**
    * Wetter-Backfill: wie viele ORTSJAHRE eine Nacht höchstens holt.

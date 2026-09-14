@@ -65,6 +65,7 @@ lauf('Ende-zu-Ende', () => {
     // workerLauf() in dieser Datei endet als lauf_uebersprungen.
     process.env.HISTORIE_JE_LAUF = '0'
     process.env.NULLTAGE_JE_LAUF = '0'
+    process.env.LOCHTAGE_JE_LAUF = '0'
     process.env.NACHLESE_JE_LAUF = '0'
     process.env.FENSTER_VON_STUNDE = '0'
     process.env.FENSTER_BIS_STUNDE = '24'
@@ -2793,6 +2794,7 @@ lauf('e2e Ladenakte', () => {
     // workerLauf() in dieser Datei endet als lauf_uebersprungen.
     process.env.HISTORIE_JE_LAUF = '0'
     process.env.NULLTAGE_JE_LAUF = '0'
+    process.env.LOCHTAGE_JE_LAUF = '0'
     process.env.NACHLESE_JE_LAUF = '0'
     process.env.FENSTER_VON_STUNDE = '0'
     process.env.FENSTER_BIS_STUNDE = '24'

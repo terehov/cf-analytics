@@ -3880,3 +3880,32 @@ sein Zeitlimit von fünf Sekunden, der Lauf hielt die Laufsperre weiter, und fü
 Tests endeten als `lauf_uebersprungen`. Die e2e-Umgebung setzt seither `HISTORIE_JE_LAUF`,
 `NULLTAGE_JE_LAUF` und `NACHLESE_JE_LAUF` auf 0: ein Lauf holt dort nur, was der Test
 eingereiht hat.
+
+## Drei Tage im Juli wurden zu früh geholt und nie wieder — sieben Wochen null in beiden Berichten (14.09.2026)
+
+**Symptom.** Der 22.07.2026 steht in `core.umsatzbericht_tag` bei allen 141 Betrieben auf 0 €
+und in `core.artikelverkauf_tag` ohne eine einzige Zeile; der 21.07. mit Umsatz bei 21 statt
+rund 55 Betrieben (13.268 € statt rund 300.000), der 20.07. mit 3.244 statt rund 3.500
+Artikeln. Aufgefallen am 10.09.2026 beim Bau der Artikelaktion, als ein Juli-Vergleich auf 30
+Tagen stand — und zunächst falsch gedeutet: der Umsatzbericht „führte 141 Zeilen", also galt er
+als vollständig. **Zeilen sind keine Umsätze.**
+
+**Ursache.** Der erste echte Lauf am 26.07.2026 holte die Tage 20.–23.07. genau einmal, vier
+bis sechs Tage nach dem Geschäftstag. LINA hatte sie noch nicht: der 23.07. kam mit
+`columns: 0` (19 KB) zurück und war beim nächsten Abruf am 02.08. voll (3.503 Artikel, 1,1 MB)
+— LINA füllt den Artikelverkaufsbericht erst nach fünf bis sieben Tagen. Das tägliche
+Nachzügler-Fenster begann am 02.08. und reichte zehn Tage zurück, genau bis zum 23.07. Die drei
+Tage davor blieben stehen: `historieNachziehen()` prüft, ob je ein Posten existierte, nicht,
+was er brachte; `nulltageNachziehen()` (`0100`) verlangt Artikelumsatz über null. Beide
+Berichte leer ist für beide unsichtbar. Dieselbe Signatur wie Regel 10 — kein Fehler, nur eine
+Zeile weniger. Und die Karte „Tage mit Datenloch" zeigte den Tag seit dem 03.08. mit dem Satz
+„gehören neu eingereiht": ein Auftrag ohne Mechanismus.
+
+**Was ihn heute verhindert.** `mart.umsatz_lochtag` ist seit `0101` eine Arbeitsliste mit
+Zustand, und `lochtageNachziehen()` reiht jeden fälligen Tag für **alle** Konzern-Tagesberichte
+neu ein — höchstens `LOCHTAGE_JE_LAUF` je Nacht, dreimal, dann `aufgegeben` und in der
+Prüfübersicht. Die Karte zeigt den Zustand mit. Gemessen mit:
+
+```sql
+SELECT geschaeftstag, betriebe_mit_umsatz, betriebe_erwartet, zustand FROM mart.umsatz_lochtag;
+```

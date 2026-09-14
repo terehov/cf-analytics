@@ -565,6 +565,10 @@ Fehlende **Kalendertage** zwischen 01.01.2018 und 07.08.2026: Umsatz 3, Zeitzone
 Artikelverkauf 3 — und das sind ausschließlich die letzten Sync-Tage (04.–06.08.2026, dazu
 22.07.2026 beim Artikelverkauf). **Es gibt keine Löcher in der Historie.**
 
+> **Nachtrag 14.09.2026:** Das zählte Kalendertage ohne Zeile. Der 21. und 22.07.2026 haben
+> Zeilen — mit null: beide Tagesberichte wurden am 26.07. zu früh geholt und nie wieder
+> (`fehlerkatalog.md`, „Drei Tage im Juli"). Seit `0101` holt der Lauf solche Tage nach.
+
 Was es gibt, ist Wachstum der Gruppe:
 
 | Jahr | Betriebe mit Umsatz | mit Vorjahresvergleich |

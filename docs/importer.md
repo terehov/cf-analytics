@@ -300,6 +300,7 @@ Die Drosselung ist keine Höflichkeit, sondern das, was die Integration am Leben
 | `MAX_VERSUCHE` | 4 | danach wird ein Posten aufgegeben |
 | `FN_POSITIONEN_MAX_NAECHTE` | 10 | `fn:bestellpositionen` mit HTTP 500: eine Wiedervorlage je **Nacht**, so viele Nächte (10.09.2026) |
 | `NULLTAGE_JE_LAUF` | 30 | Geschäftstage, die ein Lauf höchstens als Nulltage nachholt (`mart.umsatztag_luecke`, 10.09.2026) |
+| `LOCHTAGE_JE_LAUF` | 10 | Geschäftstage, die ein Lauf höchstens als Lochtage nachholt (`mart.umsatz_lochtag`, 14.09.2026) — beide Berichte leer, alle Tagesberichte neu |
 | `NACHLESE_JE_LAUF` | 100 | Tage, die ein Lauf höchstens als monatliche Nachlese einreiht (10.09.2026) |
 | `ABBRUCH_NACH_FEHLERN` | 10 | Fehler in Folge → Lauf stoppt |
 
@@ -1356,3 +1357,29 @@ las `pflegeNachlauf()` in Produktion nie eine Datei (`sync.pflege_import`: 0 Zei
 **Für die Tests:** die e2e-Umgebung setzt `HISTORIE_JE_LAUF`, `NULLTAGE_JE_LAUF` und
 `NACHLESE_JE_LAUF` auf 0. Ein Lauf holt dort nur, was der Test eingereiht hat; alles andere
 lief in das Fünf-Sekunden-Limit des Durchstichs und hielt die Laufsperre für den Rest der Datei.
+
+## Lochtage: wenn beide Berichte leer sind (Migration `0101`, 14.09.2026)
+
+**Der Fall, den `nulltageNachziehen()` nicht sieht.** Es verlangt Artikelverkauf über null bei
+Tagesumsatz null — den Kassenausfall mit später Nachlieferung. Am 20.–22.07.2026 stehen aber
+**beide** Berichte leer: der erste echte Lauf am 26.07. holte die Tage vier bis sechs Tage nach
+dem Geschäftstag, und LINA hatte sie noch nicht (der 23.07. kam im selben Lauf ebenso mit
+`columns: 0` zurück und war am 02.08. voll). Das tägliche Fenster begann am 02.08. und reichte
+bis zum 23.07.; `historieNachziehen()` hält einen `ok`-Posten für erledigt. Der 22.07. stand
+seitdem bei allen 141 Betrieben auf null, in jeder Auswertung, sieben Wochen lang — die Karte
+„Tage mit Datenloch" zeigte ihn mit dem Satz „gehören neu eingereiht", und niemand tat es.
+
+**`lochtageNachziehen()` — nach `nulltageNachziehen()`.** Liest `mart.umsatz_lochtag`
+(`zustand = 'faellig'`): Geschäftstage, an denen weniger als 60 % der Betriebe Umsatz melden,
+die es im 28-Tage-Schnitt davor taten. Das Signal ist der Umsatzbericht selbst, deshalb gibt es
+hier kein Orakel und keine Ausnahme: jeder Tag wird für **jeden** aktiven Konzern-Tagesbericht
+eingereiht, dessen Fenster ihn nicht mehr erreicht — auch für den Artikelverkauf. Priorität
+`nacharbeit`, höchstens `LOCHTAGE_JE_LAUF` (10) Tage je Nacht; ein Tag kostet bis zu 16
+Aufrufe. Zustände und Zähler wie bei den Nulltagen: `im Fenster`, `faellig`, `eingereiht`,
+`wartet` (eine Woche), `aufgegeben` (dreimal geholt, bleibt leer — dann hat LINA den Tag
+wirklich nicht). Die Prüfübersicht zählt nur `aufgegeben`.
+
+Nach dem ersten Lauf mit `0101` müssen der 20., 21. und 22.07.2026 aus `mart.umsatz_lochtag`
+verschwinden — und der Juli 2026 ändert sich in jeder Auswertung, die ihn liest.
+
+**Für die Tests:** `LOCHTAGE_JE_LAUF` steht in der e2e-Umgebung ebenfalls auf 0.

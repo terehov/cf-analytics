@@ -1428,3 +1428,16 @@ fehlt an beiden Tagen genauso (beide Berichte wurden am 26.07. zu früh und dana
 geholt). Ein Vergleich gegen einen lückenhaften Zeitraum
 überzeichnet den Zuwachs; die Spalte macht das sichtbar, statt es in einer Fußnote zu
 verstecken. Hergang in `offene-punkte.md`.
+
+---
+
+## „Tage mit Datenloch" zeigt jetzt, was der Lauf damit tut (14.09.2026)
+
+Die Karte auf „Datenqualität und Import" stand seit dem 03.08.2026 mit dem Satz „gehören neu
+eingereiht" — und niemand tat es: der 22.07.2026 blieb sieben Wochen darin stehen, mit null
+Betrieben in beiden Tagesberichten. Seit Migration `0101` reiht der Lauf solche Tage selbst nach
+(`lochtageNachziehen()`, `docs/importer.md`), und die Karte trägt die Spalten **Zustand** und
+**nachgeholt**: „im Fenster" ist normal, „faellig" wartet auf die nächste Nacht, „aufgegeben"
+heißt dreimal geholt und weiter leer — dann hat das Kassensystem den Tag nicht. Eine Karte, die
+einen Auftrag formuliert, den kein Mechanismus ausführt, ist die Regel-10-Signatur in
+Kartenform.

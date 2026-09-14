@@ -687,6 +687,13 @@ Posten für `getUmsatzbericht`, deren `erstellt_am` hinter `zeitraum_von + Fenst
 also nicht vom täglichen Fenster stammen. Ein Tag ist ein Konzernbericht; die Nachholung gilt
 für alle Betriebe des Tages.
 
+**`mart.umsatz_lochtag`** (Sicht seit `0039`, erweitert in `0101`): je Geschäftstag der letzten
+120 Tage mit `betriebe_mit_umsatz < 0.6 × betriebe_erwartet` (28-Tage-Schnitt davor). Neu
+angehängt: `alter_tage`, `nachgeholt`, `offen`, `zuletzt_eingereiht`, `zustand` — gerechnet wie in
+`mart.umsatztag_luecke`, aus denselben `getUmsatzbericht`-Posten hinter dem Fenster. Ein Tag,
+der zugleich Nulltag und Lochtag ist, zählt seine Nachholungen deshalb in beiden Sichten — das
+ist richtig, es sind dieselben Aufrufe.
+
 **`mart.pflichtartikel_klassifikation_basis`**: das CTE `ist` gruppiert auf
 `(konzept, gueltig_von, gueltig_bis, nr, nm)` mit `min(bp.name) AS name_roh`. Vorher stand
 der Rohname im DISTINCT, und Umlaut-Varianten sprengten den Unique-Index

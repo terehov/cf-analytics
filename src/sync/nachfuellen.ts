@@ -44,7 +44,7 @@ import { quellenSpiegeln } from './quellen'
 export type NachfuellStand = {
   lina: number; foodnotify: number; ladenakte: number
   /** Aufgegebene Posten, die dieser Lauf zurueckgeholt hat. */
-  wiederbelebt: number; nulltage: number; nachlese: number
+  wiederbelebt: number; nulltage: number; nachlese: number; lochtage: number
 }
 
 /**
@@ -324,6 +324,64 @@ export async function nulltageNachziehen(): Promise<number> {
   log.info('nulltage nachgezogen', {
     tage: tage.map(t => `${t.tag} (${t.betriebe} Betriebe)`),
     posten: n, sicht: 'mart.umsatztag_luecke',
+  })
+  return n
+}
+
+/**
+ * Lochtage nachholen — der Fall, den `nulltageNachziehen()` nicht sieht.
+ *
+ * DER FALL. Der Lauf holt einen Geschaeftstag, bevor LINA ihn hat, und das
+ * Fenster erreicht ihn danach nie wieder. Dann stehen BEIDE Berichte leer,
+ * und die Luecke oben (Artikelverkauf kennt Umsatz, Umsatzbericht nicht)
+ * hat nichts zu vergleichen. Gemessen am 14.09.2026: 20.–22.07.2026, am
+ * 26.07. im ersten Lauf vier bis sechs Tage nach dem Geschaeftstag geholt —
+ * der 23.07. kam im selben Lauf ebenso leer und war am 02.08. voll —, das
+ * taegliche Fenster begann am 02.08. und reichte bis zum 23.07. Der 22.07.
+ * stand sieben Wochen bei allen 141 Betrieben auf null, in jeder Auswertung.
+ *
+ * DAS SIGNAL ist der Umsatzbericht selbst: `mart.umsatz_lochtag` (seit 0039
+ * die Karte "Tage mit Datenloch", seit 0101 mit Zustand) nennt Tage, an denen
+ * weniger als 60 % der Betriebe Umsatz melden, die es im 28-Tage-Schnitt
+ * davor taten. Deshalb gibt es hier kein Orakel und keine Ausnahme: jeder
+ * faellige Tag wird fuer JEDEN aktiven Konzern-Tagesbericht eingereiht,
+ * dessen Fenster ihn nicht mehr erreicht — auch fuer den Artikelverkauf.
+ *
+ * DIESELBEN DREI GRENZEN wie bei den Nulltagen: hoechstens LOCHTAGE_JE_LAUF
+ * Tage je Nacht (ein Tag kostet bis zu 16 Aufrufe), eine Woche `wartet`
+ * nach einem Nachholen ohne Ertrag, `aufgegeben` nach dem dritten — dann
+ * hat LINA den Tag wirklich nicht, und die Pruefuebersicht zaehlt ihn.
+ */
+export async function lochtageNachziehen(): Promise<number> {
+  if (config.LOCHTAGE_JE_LAUF === 0) return 0
+  const tage = await query<{ tag: string; alter_tage: number; betriebe: number; erwartet: number }>(
+    `SELECT geschaeftstag::text     AS tag,
+            alter_tage::int         AS alter_tage,
+            betriebe_mit_umsatz::int AS betriebe,
+            betriebe_erwartet::int  AS erwartet
+       FROM mart.umsatz_lochtag
+      WHERE zustand = 'faellig'
+      ORDER BY geschaeftstag DESC
+      LIMIT $1`,
+    [config.LOCHTAGE_JE_LAUF])
+  if (tage.length === 0) return 0
+
+  let n = 0
+  for (const ep of AKTIVE_ENDPUNKTE) {
+    if (ep.schrittweite !== 'tag' || ep.ebene !== 'konzern') continue
+    const fenster = ep.nachzuegler_tage ?? config.NACHZUEGLER_TAGE
+    for (const t of tage) {
+      if (t.alter_tage <= fenster) continue
+      const r = await query(
+        `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet)
+         VALUES ($1, $2, $2, $3) ON CONFLICT DO NOTHING RETURNING posten_id`,
+        [ep.key, t.tag, PRIORITAET.nacharbeit])
+      n += r.length
+    }
+  }
+  log.info('lochtage nachgezogen', {
+    tage: tage.map(t => `${t.tag} (${t.betriebe} von ${t.erwartet} Betrieben)`),
+    posten: n, sicht: 'mart.umsatz_lochtag',
   })
   return n
 }
@@ -1203,7 +1261,7 @@ export async function nachfuellen(): Promise<NachfuellStand> {
    */
   await quellenSpiegeln()
 
-  const stand: NachfuellStand = { lina: 0, foodnotify: 0, ladenakte: 0, wiederbelebt: 0, nulltage: 0, nachlese: 0 }
+  const stand: NachfuellStand = { lina: 0, foodnotify: 0, ladenakte: 0, wiederbelebt: 0, nulltage: 0, nachlese: 0, lochtage: 0 }
 
   try {
     stand.lina = await linaNachfuellen()
@@ -1215,6 +1273,12 @@ export async function nachfuellen(): Promise<NachfuellStand> {
     stand.nulltage = await nulltageNachziehen()
   } catch (e) {
     log.error('nulltage nachziehen gescheitert — der Lauf geht weiter', { fehler: String(e) })
+  }
+
+  try {
+    stand.lochtage = await lochtageNachziehen()
+  } catch (e) {
+    log.error('lochtage nachziehen gescheitert — der Lauf geht weiter', { fehler: String(e) })
   }
 
   try {
@@ -1242,7 +1306,7 @@ export async function nachfuellen(): Promise<NachfuellStand> {
   }
 
   if (stand.lina > 0 || stand.foodnotify > 0 || stand.ladenakte > 0 || stand.wiederbelebt > 0
-      || stand.nulltage > 0 || stand.nachlese > 0) {
+      || stand.nulltage > 0 || stand.nachlese > 0 || stand.lochtage > 0) {
     log.info('nachgefüllt', stand)
   }
   return stand
