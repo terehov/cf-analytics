@@ -23,11 +23,11 @@
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:15px;line-height:1.5;padding-inline:clamp(16px,4vw,40px);padding-block:32px 64px;font-variant-numeric:tabular-nums}
 main{max-width:1080px;margin:0 auto;display:grid;gap:40px}
-h1,h2{font-family:"Fraunces","Iowan Old Style",Georgia,serif;font-variation-settings:"SOFT" 60,"opsz" 96;font-weight:500;letter-spacing:-.01em;margin:0}
+h1,h2{font-family:"Fraunces","Iowan Old Style",Georgia,serif;font-variation-settings:"SOFT" 60,"opsz" 96;font-weight:500;letter-spacing:-.01em;text-wrap:balance;margin:0}
 h1{font-size:clamp(30px,4.6vw,46px);line-height:1.08}
 h2{font-size:clamp(22px,2.6vw,27px);line-height:1.2;margin-bottom:12px}
 .eyebrow{font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--mute);font-weight:500;margin-bottom:12px}
-p{margin:0}
+p{max-width:66ch;margin:0}
 .lead{font-size:17px;color:var(--ink);margin-top:18px}
 .lead b{font-weight:600}
 header p+p{margin-top:10px}
@@ -72,7 +72,7 @@ sup{color:var(--rest);font-weight:600}
 .legend .a::before{background:var(--akt)} .legend .r::before{background:var(--rest)}
 .tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);font-size:12.5px;line-height:1.4;padding:7px 10px;border-radius:5px;transform:translate(-50%,-110%);white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.18)}
 .tip b{font-weight:600}
-ul.notes{margin:12px 0 0;padding-left:20px;display:grid;gap:8px;color:var(--ink2)}
+ul.notes{max-width:72ch;margin:12px 0 0;padding-left:20px;display:grid;gap:8px;color:var(--ink2)}
 ul.notes li::marker{color:var(--mute)}
 ul.notes b{color:var(--ink);font-weight:600}
 footer{color:var(--mute);font-size:12.5px;border-top:1px solid var(--line);padding-top:14px}
@@ -81,7 +81,7 @@ footer{color:var(--mute);font-size:12.5px;border-top:1px solid var(--line);paddi
 </style>
 <main>
 <header>
-  <div class="eyebrow">Wilma Wunder · Aktionsauswertung je Betrieb · Datenstand 10.09.2026</div>
+  <div class="eyebrow">Wilma Wunder · Aktionsauswertung je Betrieb · Datenstand 14.09.2026</div>
   <h1>Glücksrad, August 2026</h1>
   <p class="lead">Die Auswertung ist möglich, und der August ist vollständig: alle 14 Wilma-Wunder-Betriebe liegen mit allen 31 Tagen vor. Die 51 Aktionsartikel aus der Liste sind das Kerngericht-Sortiment und tragen <b>44,8 %</b> des Nettoumsatzes.</p>
   <p class="lead">Die deutlichste Spur der Aktion ist der <b>Nachlass</b>: Auf die Aktionsartikel wurden im August <b>6,5 %</b> vom hinterlegten Verkaufspreis eingeräumt, im Juli 3,7 %. Beim übrigen Sortiment blieb der Nachlass unverändert. Das entspricht rund <b>38.000 €</b> brutto zusätzlichem Nachlass. Die verkaufte Menge stieg gegenüber Juli um 10,2 %, der Gesamtumsatz der Betriebe um 6,3 %.</p>
@@ -101,13 +101,13 @@ footer{color:var(--mute);font-size:12.5px;border-top:1px solid var(--line);paddi
   <table>
     <thead><tr>
       <th>Betrieb</th>
-      <th class="num">Menge August</th>
+      <th class="num">Menge<br>August</th>
       <th class="num">vs. Juli</th>
       <th class="num">vs. Aug. 2025<sup>2</sup></th>
-      <th class="num">Netto August</th>
+      <th class="num">Netto<br>August</th>
       <th class="num">vs. Juli</th>
-      <th class="num">Anteil am Nettoumsatz</th>
-      <th class="num">Nachlass Aug. · Juli</th>
+      <th class="num">Anteil am<br>Nettoumsatz</th>
+      <th class="num">Nachlass<br>Aug. · Juli</th>
     </tr></thead>
     <tbody>
 <tr>
@@ -263,7 +263,7 @@ footer{color:var(--mute);font-size:12.5px;border-top:1px solid var(--line);paddi
 </tr></tfoot>
   </table>
   </div>
-  <p class="note">Im Juli fehlt der 22.07. im Datenbestand: Der Artikelverkaufsbericht wurde für diesen Tag bei keinem Betrieb geladen (Importlücke, der Tagesumsatz liegt vor). Der Juli steht deshalb auf 30 Tagen, und der Vergleich überzeichnet den Zuwachs um rund 3 Prozentpunkte.</p>
+  <p class="note">Im Juli fehlt der 22.07. ganz und der 21.07. zum größten Teil: Das Kassensystem hat für diese Tage keine Daten, auch bei erneutem Abruf am 14.09. nicht. Der Juli steht deshalb auf 30 Tagen, und der Vergleich überzeichnet den Zuwachs um rund 3 Prozentpunkte.</p>
 </section>
 
 <section>
@@ -298,10 +298,10 @@ footer{color:var(--mute);font-size:12.5px;border-top:1px solid var(--line);paddi
     <thead><tr>
       <th>Nr.</th><th>Artikel</th>
       <th class="num">Betriebe</th>
-      <th class="num">Menge August</th>
+      <th class="num">Menge<br>August</th>
       <th class="num">vs. Juli</th>
-      <th class="num">Menge Aug. 2025</th>
-      <th class="num">Netto August</th>
+      <th class="num">Menge<br>Aug. 2025</th>
+      <th class="num">Netto<br>August</th>
     </tr></thead>
     <tbody>
 <tr>
@@ -780,7 +780,7 @@ footer{color:var(--mute);font-size:12.5px;border-top:1px solid var(--line);paddi
   </ul>
 </section>
 
-<footer>Concept Family Analytics · Zahlen aus der Produktionsdatenbank, abgefragt am 10.09.2026 · Nettoumsatz ohne MwSt., Nachlass auf Bruttobasis</footer>
+<footer>Concept Family Analytics · Zahlen aus der Produktionsdatenbank, abgefragt am 10.09.2026, unverändert bestätigt am 14.09.2026 · Nettoumsatz ohne MwSt., Nachlass auf Bruttobasis</footer>
 </main>
 <script>
 (function(){

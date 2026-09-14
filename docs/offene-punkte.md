@@ -1608,6 +1608,10 @@ Bis dahin hat die Kennzahl **keine Quelle — und bekommt auch keine geschätzte
 Tagesberichte nach; die drei Tage holt der erste Lauf danach. Hergang in `fehlerkatalog.md`
 („Drei Tage im Juli"). Der Text darunter bleibt als Befund stehen.
 
+**Nachtrag 14.09.2026 abends:** Der Nachholversuch brachte byte-gleich leere Antworten — LINA hat
+den 21. und 22.07. nicht. Der Juli 2026 bleibt in allen Auswertungen um diese anderthalb Tage
+kürzer; von unserer Seite ist das nicht nachholbar. Die Sicht führt die Tage bis `aufgegeben`.
+
 Beim Bau der Artikelaktion aufgefallen: `core.artikelverkauf_tag` hat für den **22.07.2026
 keinen einzigen Betrieb** und für den 21.07. nur 21 statt rund 55. **Korrektur vom 14.09.2026:**
 Der Umsatzbericht ist an beiden Tagen NICHT vollständig, wie hier zunächst stand — er führt

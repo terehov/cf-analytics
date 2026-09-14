@@ -1379,7 +1379,9 @@ Aufrufe. Zustände und Zähler wie bei den Nulltagen: `im Fenster`, `faellig`, `
 `wartet` (eine Woche), `aufgegeben` (dreimal geholt, bleibt leer — dann hat LINA den Tag
 wirklich nicht). Die Prüfübersicht zählt nur `aufgegeben`.
 
-Nach dem ersten Lauf mit `0101` müssen der 20., 21. und 22.07.2026 aus `mart.umsatz_lochtag`
-verschwinden — und der Juli 2026 ändert sich in jeder Auswertung, die ihn liest.
+Der erste Lauf mit `0101` (14.09.2026) holte den 21. und 22.07. neu — und bekam byte-gleich
+dieselben leeren Antworten wie am 26.07. LINA hat die Tage nicht. Sie gehen jetzt den
+vorgesehenen Weg: `wartet`, zwei weitere Anläufe, `aufgegeben`. Die 2 in der Prüfübersicht ist
+dann eine Aussage über das Kassensystem, keine offene Arbeit (`fehlerkatalog.md`, Nachtrag).
 
 **Für die Tests:** `LOCHTAGE_JE_LAUF` steht in der e2e-Umgebung ebenfalls auf 0.

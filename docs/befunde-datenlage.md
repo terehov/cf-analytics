@@ -567,7 +567,9 @@ Artikelverkauf 3 — und das sind ausschließlich die letzten Sync-Tage (04.–0
 
 > **Nachtrag 14.09.2026:** Das zählte Kalendertage ohne Zeile. Der 21. und 22.07.2026 haben
 > Zeilen — mit null: beide Tagesberichte wurden am 26.07. zu früh geholt und nie wieder
-> (`fehlerkatalog.md`, „Drei Tage im Juli"). Seit `0101` holt der Lauf solche Tage nach.
+> (`fehlerkatalog.md`, „Drei Tage im Juli"). Der Lauf hat sie am 14.09. nachgeholt und
+> byte-gleich leere Antworten bekommen: LINA hat die Tage nicht. Das sind die zwei echten
+> Löcher der Historie.
 
 Was es gibt, ist Wachstum der Gruppe:
 

@@ -3909,3 +3909,15 @@ Prüfübersicht. Die Karte zeigt den Zustand mit. Gemessen mit:
 ```sql
 SELECT geschaeftstag, betriebe_mit_umsatz, betriebe_erwartet, zustand FROM mart.umsatz_lochtag;
 ```
+
+**Nachtrag 14.09.2026, nach dem ersten Lauf mit `0101`.** Der Lauf (20:41) holte die drei Tage
+für alle 16 Tagesberichte neu. Die Antworten sind byte-gleich mit denen vom 26.07.:
+Artikelverkauf 22.07. `columns: 0` (19.402 Bytes), 21.07. 369 Artikel, 20.07. 3.244;
+Umsatzbericht 21.07. 32.265 Bytes, 22.07. 31.865 Bytes, alle Betriebe null. **LINA hat die Tage
+nicht** — sieben Wochen später genauso wenig wie damals. Der zu frühe Abruf war also nur die
+halbe Ursache: für den 21. und 22.07. gab es bei LINA nie etwas nachzuholen (der 23.07. dagegen
+kam am 02.08., und der 20.07. ist mit 3.244 Artikeln vollständig, so wie LINA ihn hat). Die
+Sicht führt beide Tage jetzt als `wartet`; nach zwei weiteren Anläufen stehen sie als
+`aufgegeben` in der Prüfübersicht — und das ist der richtige Endzustand: die 2 dort ist die
+Aussage „das Kassensystem hat diese Tage nicht", keine offene Arbeit. Von unserer Seite ist
+das nicht nachholbar.
