@@ -143,6 +143,25 @@ export type Endpunkt = {
    * meldet, wenn am Rand noch etwas ankommt.
    */
   nachzuegler_tage?: number
+  /**
+   * Monatliche Nachlese: einmal im Monat werden die Tage zwischen dem Ende
+   * des Fensters und so vielen Tagen zurueck neu eingereiht
+   * (`nachleseNachziehen()`). Fuer Berichte, die sich nachweislich noch
+   * aendern, wenn das Fenster laengst zu ist — gemessen an
+   * `mart.nachzuegler_tiefe` mit konfiguriertem Rand (seit 0100).
+   */
+  nachlese_tage?: number
+  /**
+   * Kanonische Form der Antwort fuer den Hash in `raw.api_antwort`
+   * (`payload_hash`): was hier zurueckkommt, wird mit sortierten Schluesseln
+   * serialisiert und gehasht. Fuer Endpunkte, deren Arrays keine Reihenfolge
+   * tragen — getArtikelverkaufsbericht liefert `columns` bei jedem Abruf
+   * anders sortiert (10.09.2026: 2.466 von 3.414 Positionen vertauscht,
+   * Inhalt gleich). Ohne diese Ordnung zaehlte `mart.nachzuegler_tiefe` jeden
+   * Abruf als Aenderung. Darf die Daten NICHT veraendern, nur ordnen; der
+   * Lader bekommt weiterhin das Original.
+   */
+  kanonisch?: (daten: unknown) => unknown
   hinweis?: string
   /**
    * Welche Form die Antwort hat. Vorgabe `json` — so verhalten sich alle
@@ -182,6 +201,24 @@ const konzernZeitraum = (von: string, bis: string) => ({
   brutto: '0',
   preExistingRevenue: '0',
 })
+
+/**
+ * getArtikelverkaufsbericht: `columns` (der Artikelkatalog) nach `artnr`
+ * ordnen. Die Zeilen (`rows`) sind Objekte je Betrieb mit Artikelnummern als
+ * Schluesseln — die sortiert der kanonische Serialisierer ohnehin.
+ */
+function artikelverkaufKanonisch(daten: unknown): unknown {
+  if (daten === null || typeof daten !== 'object' || Array.isArray(daten)) return daten
+  const d = daten as Record<string, unknown>
+  if (!Array.isArray(d.columns)) return daten
+  const rang = (c: unknown) => {
+    const n = (c as Record<string, unknown> | null)?.artnr
+    return typeof n === 'number' ? n : Number(n ?? Number.MAX_SAFE_INTEGER)
+  }
+  const columns = [...d.columns].sort((a, b) => rang(a) - rang(b)
+    || JSON.stringify(a).localeCompare(JSON.stringify(b)))
+  return { ...d, columns }
+}
 
 export const ENDPUNKTE: Endpunkt[] = [
   {
@@ -356,6 +393,13 @@ export const ENDPUNKTE: Endpunkt[] = [
      * Fenster am wenigsten auffällt.
      */
     nachzuegler_tage: 21,
+    /**
+     * Und einmal im Monat zwei Monate zurueck (10.09.2026): am letzten Tag
+     * des Fensters aenderten sich noch 24 von 30 Abrufen, mit echten Werten
+     * (pekGesamt, effGesamt) — Lohn schliesst monatlich ab, nicht binnen
+     * drei Wochen. 41 Aufrufe im Monat statt 14 zusaetzlicher je Nacht.
+     */
+    nachlese_tage: 62,
     parameter: (von, bis) => ({ report: 'intranet-personalkosten', ...konzernZeitraum(von, bis) }),
   },
   {
@@ -395,6 +439,7 @@ export const ENDPUNKTE: Endpunkt[] = [
      * Tag ersetzt — es wächst dadurch nicht.
      */
     nachzuegler_tage: 21,
+    kanonisch: artikelverkaufKanonisch,
     hinweis: 'Größte Antwort, ca. 2 MB. Dominiert das Zeilenvolumen (~20 Mio./Jahr).',
     parameter: (von, bis) => ({ report: 'intranet-artikel', ...konzernZeitraum(von, bis) }),
   },

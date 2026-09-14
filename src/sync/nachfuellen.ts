@@ -44,7 +44,7 @@ import { quellenSpiegeln } from './quellen'
 export type NachfuellStand = {
   lina: number; foodnotify: number; ladenakte: number
   /** Aufgegebene Posten, die dieser Lauf zurueckgeholt hat. */
-  wiederbelebt: number
+  wiederbelebt: number; nulltage: number; nachlese: number
 }
 
 /**
@@ -253,6 +253,126 @@ export async function historieNachziehen(): Promise<number> {
     n += r.length
   }
 
+  return n
+}
+
+
+/**
+ * Das Orakel fuer Nulltage: der Tagesbericht mit dem laengsten Fenster.
+ * Kennt er fuer einen Betrieb und Tag Umsatz, den der Umsatzbericht nicht
+ * kennt, hat die Kasse nachgeliefert, nachdem das kurze Fenster zu war.
+ */
+const NULLTAG_ORAKEL = 'getArtikelverkaufsbericht'
+
+/**
+ * Nulltage nachholen (seit 10.09.2026, Migration `0100`).
+ *
+ * DER FALL. Eine Kasse faellt aus oder liefert nicht hoch; LINA fuehrt den
+ * Betrieb an diesen Tagen mit null. Kommt die Nachlieferung erst nach mehr
+ * als NACHZUEGLER_TAGE (10) Tagen, hat der taegliche Lauf den Umsatzbericht
+ * dieser Tage zum letzten Mal geholt, als er noch null war — und holt ihn
+ * nie wieder. `historieNachziehen()` hilft nicht: es prueft, ob je ein
+ * Posten existierte, nicht, ob er etwas brachte. Der Artikelverkaufsbericht
+ * dagegen laeuft 21 Tage nach und hat die Nachlieferung gesehen.
+ *
+ * Gemessen am 10.09.2026: Aposto Schwetzingen 04.–14.08. (45.486 EUR netto
+ * im Artikelverkauf, 0 im Umsatzbericht) und Enchilada Aschaffenburg
+ * 31.07.–10.08. (37.570 EUR). Beide standen so im Round Table.
+ *
+ * WAS PASSIERT. `mart.umsatztag_luecke` nennt die Tage (`zustand =
+ * 'faellig'`). Jeder davon wird fuer JEDEN Konzern-Tagesbericht neu
+ * eingereiht, dessen Fenster den Tag nicht mehr erreicht — der Umsatzbericht
+ * mit allen Hauptsparten, die Zeitzonen, die Aktionen. Nicht das Orakel
+ * selbst, und nichts, was der taegliche Lauf ohnehin holt. Ein Tag ist ein
+ * Konzernbericht, also ein Aufruf je Endpunkt fuer alle 141 Betriebe.
+ *
+ * DREI GRENZEN. Hoechstens NULLTAGE_JE_LAUF Tage je Nacht (ein Tag kostet bis
+ * zu 14 Aufrufe). Ein Tag, der nach dem Nachholen weiter null steht, wartet
+ * eine Woche (`wartet`) und wird nach dem dritten Versuch nicht mehr
+ * angefasst (`aufgegeben`) — die Pruefuebersicht zaehlt genau diese. Und
+ * was laenger ausfaellt als das Fenster des Orakels (21 Tage), sieht auch
+ * diese Sicht nicht: dann stehen beide Berichte auf null.
+ */
+export async function nulltageNachziehen(): Promise<number> {
+  if (config.NULLTAGE_JE_LAUF === 0) return 0
+  const tage = await query<{ tag: string; alter_tage: number; betriebe: number }>(
+    `SELECT geschaeftstag::text AS tag,
+            min(alter_tage)::int  AS alter_tage,
+            count(*)::int         AS betriebe
+       FROM mart.umsatztag_luecke
+      WHERE zustand = 'faellig'
+      GROUP BY geschaeftstag
+      ORDER BY geschaeftstag DESC
+      LIMIT $1`,
+    [config.NULLTAGE_JE_LAUF])
+  if (tage.length === 0) return 0
+
+  let n = 0
+  for (const ep of AKTIVE_ENDPUNKTE) {
+    if (ep.schrittweite !== 'tag' || ep.ebene !== 'konzern' || ep.key === NULLTAG_ORAKEL) continue
+    const fenster = ep.nachzuegler_tage ?? config.NACHZUEGLER_TAGE
+    for (const t of tage) {
+      // Was das eigene Fenster noch erreicht, holt der taegliche Lauf selbst.
+      if (t.alter_tage <= fenster) continue
+      const r = await query(
+        `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet)
+         VALUES ($1, $2, $2, $3) ON CONFLICT DO NOTHING RETURNING posten_id`,
+        [ep.key, t.tag, PRIORITAET.nacharbeit])
+      n += r.length
+    }
+  }
+  log.info('nulltage nachgezogen', {
+    tage: tage.map(t => `${t.tag} (${t.betriebe} Betriebe)`),
+    posten: n, sicht: 'mart.umsatztag_luecke',
+  })
+  return n
+}
+
+/**
+ * Monatliche Nachlese fuer Tagesberichte, die sich noch aendern, wenn ihr
+ * Fenster laengst zu ist (`nachlese_tage` in `src/lina/endpunkte.ts`).
+ *
+ * Der Anlass: getPersonalkosten aenderte sich am 10.09.2026 an Tag 22 — dem
+ * letzten Tag seines 21-Tage-Fensters — noch bei 24 von 30 Abrufen, und
+ * zwar mit echten Werten (pekGesamt, effGesamt), nicht mit Rauschen. Lohn
+ * schliesst monatlich ab; ein taegliches Fenster, das lang genug waere,
+ * kostete 20 Sekunden je Aufruf und Tag. Stattdessen einmal im Monat die
+ * Tage zwischen Fensterende und `nachlese_tage` zurueck — fuer
+ * Personalkosten 41 Aufrufe, rund 15 Minuten, einmal.
+ *
+ * Der Merker `nachlese:<endpunkt>` traegt den Monat, in dem zuletzt
+ * eingereiht wurde; ein Lauf, der ihn liest, reiht im selben Monat nicht
+ * noch einmal ein.
+ */
+export async function nachleseNachziehen(): Promise<number> {
+  if (config.NACHLESE_JE_LAUF === 0) return 0
+  const monat = geschaeftstag(new Date()).slice(0, 7)
+  let n = 0
+  for (const ep of AKTIVE_ENDPUNKTE) {
+    if (ep.schrittweite !== 'tag' || !ep.nachlese_tage) continue
+    if (n >= config.NACHLESE_JE_LAUF) break
+    const schluessel = `nachlese:${ep.key}`
+    const stand = await eine<{ wert: { monat?: string } | null }>(
+      `SELECT wert FROM sync.merker WHERE schluessel = $1`, [schluessel])
+    if (stand?.wert?.monat === monat) continue
+
+    const fenster = ep.nachzuegler_tage ?? config.NACHZUEGLER_TAGE
+    const r = await query<{ posten_id: string }>(
+      `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet)
+       SELECT $1, t::date, t::date, $4
+         FROM generate_series(current_date - $2::int, current_date - $3::int - 1, interval '1 day') t
+        ORDER BY t DESC
+        LIMIT $5
+       ON CONFLICT DO NOTHING RETURNING posten_id`,
+      [ep.key, ep.nachlese_tage, fenster, PRIORITAET.nacharbeit, config.NACHLESE_JE_LAUF - n])
+    await query(
+      `INSERT INTO sync.merker (schluessel, wert)
+       VALUES ($1, jsonb_build_object('monat', $2::text, 'am', now(), 'posten', $3::int))
+       ON CONFLICT (schluessel) DO UPDATE SET wert = excluded.wert, gesetzt_am = now()`,
+      [schluessel, monat, r.length])
+    log.info('nachlese eingereiht', { endpunkt: ep.key, posten: r.length, tage: ep.nachlese_tage, monat })
+    n += r.length
+  }
   return n
 }
 
@@ -1083,12 +1203,24 @@ export async function nachfuellen(): Promise<NachfuellStand> {
    */
   await quellenSpiegeln()
 
-  const stand: NachfuellStand = { lina: 0, foodnotify: 0, ladenakte: 0, wiederbelebt: 0 }
+  const stand: NachfuellStand = { lina: 0, foodnotify: 0, ladenakte: 0, wiederbelebt: 0, nulltage: 0, nachlese: 0 }
 
   try {
     stand.lina = await linaNachfuellen()
   } catch (e) {
     log.error('nachfüllen lina gescheitert — der Lauf geht weiter', { fehler: String(e) })
+  }
+
+  try {
+    stand.nulltage = await nulltageNachziehen()
+  } catch (e) {
+    log.error('nulltage nachziehen gescheitert — der Lauf geht weiter', { fehler: String(e) })
+  }
+
+  try {
+    stand.nachlese = await nachleseNachziehen()
+  } catch (e) {
+    log.error('nachlese gescheitert — der Lauf geht weiter', { fehler: String(e) })
   }
 
   try {
@@ -1109,7 +1241,8 @@ export async function nachfuellen(): Promise<NachfuellStand> {
     log.error('wiederbeleben gescheitert — der Lauf geht weiter', { fehler: String(e) })
   }
 
-  if (stand.lina > 0 || stand.foodnotify > 0 || stand.ladenakte > 0 || stand.wiederbelebt > 0) {
+  if (stand.lina > 0 || stand.foodnotify > 0 || stand.ladenakte > 0 || stand.wiederbelebt > 0
+      || stand.nulltage > 0 || stand.nachlese > 0) {
     log.info('nachgefüllt', stand)
   }
   return stand

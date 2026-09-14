@@ -422,6 +422,25 @@ const Schema = z.object({
   ANFRAGE_TIMEOUT_MS: z.coerce.number().int().min(1_000).default(60_000),
 
   MAX_VERSUCHE: z.coerce.number().int().min(1).default(4),
+  /**
+   * Wie viele NAECHTE ein `fn:bestellpositionen`-Posten mit HTTP 500 bekommt,
+   * bevor er aufgegeben wird — eine Wiedervorlage je Nacht statt MAX_VERSUCHE
+   * Minuten-Wiedervorlagen.
+   *
+   * Gemessen am 10.09.2026 ueber 45 Tage: 318 Bestellungen scheiterten mit
+   * 500, 287 davon kamen spaeter doch — und zwar ALLE erst am Tag 9 bis 11
+   * nach dem ersten Fehler, nach exakt drei Fehlnaechten plus Wiederbelebung.
+   * Die Erholung ist also unser Zeitplan, nicht FoodNotifys: nach dem
+   * vierten Versuch lag der Posten eine Woche als `aufgegeben`, bis
+   * `aufgegebeneWiederbeleben()` ihn zurueckholte. Lieferdatum und
+   * Belegdatum erklaeren die 500er nicht (gleiche Quote vor und nach beiden).
+   *
+   * Zehn Naechte kosten hoechstens zehn Aufrufe je Bestellung — bei ein bis
+   * elf betroffenen Bestellungen je Nacht unter 20 Aufrufen, gegen ein
+   * FoodNotify-Tagesbudget von mehreren Tausend. Was danach noch 500 sagt,
+   * geht den bekannten Weg: aufgegeben, dreimal wiederbelebt, endgueltig.
+   */
+  FN_POSITIONEN_MAX_NAECHTE: z.coerce.number().int().min(1).default(10),
 
   /**
    * Wie oft ein aufgegebener Posten vom naechtlichen Lauf zurueckgeholt wird.
@@ -576,6 +595,34 @@ const Schema = z.object({
    * ist die Notbremse; ein Handbefehl ist es nicht mehr.
    */
   HISTORIE_JE_LAUF: z.coerce.number().int().min(0).default(2_000),
+  /**
+   * Wie viele Geschaeftstage EIN Lauf hoechstens als Nulltage nachholt
+   * (`nulltageNachziehen()`, Sicht `mart.umsatztag_luecke`). 0 schaltet ab.
+   *
+   * Der Anlass, gemessen am 10.09.2026: Aposto Schwetzingen (04.–14.08.) und
+   * Enchilada Aschaffenburg (31.07.–10.08.) standen im Umsatzbericht auf
+   * null, im Artikelverkaufsbericht mit 45.486 bzw. 37.570 EUR netto. Die
+   * Kassen hatten erst nach elf Tagen nachgeliefert, das Fenster des
+   * Umsatzberichts (NACHZUEGLER_TAGE = 10) war da schon zu, das des
+   * Artikelverkaufs (21 Tage) noch offen. Kein Mechanismus holte jenseits des
+   * Fensters nach. Jetzt reiht der Lauf solche Tage fuer jeden Tagesbericht
+   * mit kurzem Fenster neu ein — hoechstens so viele je Nacht, weil ein Tag
+   * bis zu 14 Aufrufe kostet (30 Tage ≈ 400 Aufrufe ≈ 40 Minuten).
+   *
+   * Nicht stattdessen das Fenster verbreitern: 21 Tage haetten diese beiden
+   * Faelle gerade so erwischt, den naechsten laengeren nicht — und kosteten
+   * jede Nacht 154 Aufrufe fuer Tage, die sich zu 95 % nicht aendern.
+   */
+  NULLTAGE_JE_LAUF: z.coerce.number().int().min(0).default(30),
+  /**
+   * Wie viele Tage EIN Lauf hoechstens als monatliche Nachlese einreiht
+   * (`nachleseNachziehen()`, `nachlese_tage` in endpunkte.ts). 0 schaltet ab.
+   * Heute braucht das nur getPersonalkosten (41 Tage im Monat); die Grenze
+   * ist die Obergrenze, die jeder neue Import bekommt — kein Schalter, aber
+   * einer, den die e2e-Tests auf 0 stellen, damit ein Lauf dort nur holt,
+   * was der Test eingereiht hat.
+   */
+  NACHLESE_JE_LAUF: z.coerce.number().int().min(0).default(100),
 
   /**
    * Wetter-Backfill: wie viele ORTSJAHRE eine Nacht höchstens holt.

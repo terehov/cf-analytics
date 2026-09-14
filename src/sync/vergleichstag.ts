@@ -97,6 +97,7 @@ export async function vergleichstagNachlauf(): Promise<void> {
   if (r.status === 'aufgefrischt') {
     log.info('Vergleichstag aufgefrischt', { dauer_s: r.dauerS, nebenlaeufig: r.nebenlaeufig })
   } else {
-    log.warn('Vergleichstag nicht aufgefrischt', { grund: r.meldung, dauer_s: r.dauerS })
+    // ERROR, nicht WARN — siehe pflichtartikel_sichten.ts (10.09.2026).
+    log.error('Vergleichstag nicht aufgefrischt', { grund: r.meldung, dauer_s: r.dauerS })
   }
 }

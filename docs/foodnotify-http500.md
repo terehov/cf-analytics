@@ -18,6 +18,13 @@
 > `ABBRUCH_NACH_FEHLERN` trafen. Seit dem 01.09.2026 zählen
 > Wiederholungsfehler nicht mehr als „Fehler in Folge", und ein Lauf
 > weckt höchstens `WIEDERBELEBUNGEN_JE_LAUF` Posten.
+>
+> **Nachtrag 10.09.2026.** Die 282 kamen nicht, weil sich bei FoodNotify etwas
+> bewegte, sondern weil unser Zeitplan sie erst dann wieder fragte: alle am Tag
+> 9–11 nach dem ersten Fehler, nach drei Fehlnächten, Aufgeben und einer Woche
+> bis zur Wiederbelebung. Seitdem bekommt ein 500 auf dieser Ressource eine
+> Wiedervorlage je Nacht, `FN_POSITIONEN_MAX_NAECHTE = 10` Nächte lang
+> (`entscheidungen.md`, E3 vom 10.09.2026).
 
 **Stand 04.08.2026.** Daten: `docs/foodnotify-http500.csv` (282 Zeilen, eine je betroffener
 Bestellung).

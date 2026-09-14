@@ -8,8 +8,10 @@
  * wird **grün, wenn ein Signal wegfällt**.
  *
  * DER KANAL IST DAS REPOSITORY, und das ist keine Notlösung. Eine Datei in
- * `pflege/` wird committet, gepusht, mit dem Container ausgerollt und vom
- * nächsten nächtlichen Lauf eingelesen. Damit hat die Handpflege ohne einen
+ * `pflege/` wird committet, gepusht, mit dem Container ausgerollt (`COPY
+ * pflege ./pflege` im Dockerfile — die Zeile fehlte bis zum 10.09.2026, und
+ * der Weg endete still vor dem Container) und vom nächsten nächtlichen Lauf
+ * eingelesen. Damit hat die Handpflege ohne einen
  * einzigen neuen Server-Handgriff genau das, was ihr fehlte:
  *
  *   * eine Historie (wer hat wann welche Note geändert — `git log`),
@@ -374,7 +376,17 @@ export async function dateiEinlesen(ziel: Ziel, text: string): Promise<Importber
 export async function pflegeEinlesen(): Promise<Importbericht[]> {
   const berichte: Importbericht[] = []
   if (!existsSync(PFLEGE_ORDNER)) {
-    log.debug('kein pflege-Ordner — nichts einzulesen', { ordner: PFLEGE_ORDNER })
+    /*
+     * WARN, nicht DEBUG. Auf `debug` war genau dieser Zweig vom 14.08. bis
+     * zum 10.09.2026 in Produktion unsichtbar: das Dockerfile kopierte
+     * `pflege/` nicht ins Image, der Ordner fehlte in jedem Lauf, und
+     * `sync.pflege_import` blieb bei 0 Zeilen — waehrend der Round Table
+     * jeden operativen Betrieb mit "OM-Note fehlt" fuehrte. Ein Ordner, der
+     * laut Bauplan da sein muss und fehlt, ist eine Meldung auf `info`-Niveau
+     * des Betriebs, keine Entwicklerspur.
+     */
+    log.warn('kein pflege-Ordner — Handpflege uebersprungen; im Container fehlt COPY pflege',
+      { ordner: PFLEGE_ORDNER, sicht: 'mart.pflege_stand' })
     return berichte
   }
   const vorhanden = new Set(readdirSync(PFLEGE_ORDNER))

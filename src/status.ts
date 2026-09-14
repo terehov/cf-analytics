@@ -395,8 +395,9 @@ export async function statusErheben(): Promise<Statusbericht> {
   // pg_matviews -- nie die Materialisierungen selbst.
   //
   // WARNUNG, nicht STOERUNG: die Zahlen sind veraltet, nicht falsch, und der
-  // Import ist gelungen. Dieselbe Abstufung wie im Nachlauf, der log.warn
-  // schreibt und nicht log.error.
+  // Import ist gelungen. (Der Nachlauf selbst schreibt seit dem 10.09.2026
+  // log.error, wenn ein Refresh scheitert — sechzehn Naechte Pflichtartikel
+  // auf altem Stand hatte davor niemand im Log gesehen.)
   const materialisierung = await query<{ sicht: string; zustand: string }>(
     `SELECT sicht, zustand
        FROM mart.materialisierung_stand
@@ -421,7 +422,7 @@ export async function statusErheben(): Promise<Statusbericht> {
         : `${veraltet.length} materialisierte Sicht(en) aelter als der letzte Lauf`,
       naechster_schritt: ohneNachlauf.length > 0
         ? 'Eine neue Sicht ohne Auffrischung. Refresh in den passenden Nachlauf eintragen und in die Zuordnung von mart.materialisierung_stand (Migration 0091).'
-        : 'Im Log des letzten Laufs nach "nicht aufgefrischt" suchen -- die Nachlaeufe werfen nie, sie warnen nur. Danach mart.materialisierung_stand.',
+        : 'Im Log des letzten Laufs nach "nicht aufgefrischt" suchen (log.error) -- die Nachlaeufe werfen nie. Danach mart.materialisierung_stand. Scheitert ein CONCURRENTLY-Refresh am Unique-Index, hat die Sicht Dubletten im Korn (Fall vom 25.08.-10.09.2026).',
       werte: {
         veraltet: veraltet.map(m => `${m.sicht} (${m.zustand})`),
         ohneNachlauf: ohneNachlauf.map(m => m.sicht),

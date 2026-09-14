@@ -367,13 +367,17 @@ async function workerLaufIntern(
     keineDaten: number
     fehler: number
     fehlerInFolge: number
+    /** Fehler auf Posten, die zum ERSTEN Mal scheitern — nur sie machen den Lauf `teilweise`. */
+    erstfehler: number
+    /** Fehler auf bekannt kaputten Posten (versuche > 1 oder wiederbelebt) — Betrieb, kein Befund. */
+    wiederholer: number
     status: 'ok' | 'teilweise' | 'fehlgeschlagen' | 'abgebrochen'
     notiz: string | null
     reserviert: string | null
     letztesEnde: number | null
   }
   const neuerStand = (): Anbieterstand => ({
-    ok: 0, keineDaten: 0, fehler: 0, fehlerInFolge: 0,
+    ok: 0, keineDaten: 0, fehler: 0, fehlerInFolge: 0, erstfehler: 0, wiederholer: 0,
     status: 'ok', notiz: null, reserviert: null, letztesEnde: null,
   })
   const jeAnbieter: Record<Anbieter, Anbieterstand> =
@@ -975,7 +979,7 @@ async function workerLaufIntern(
                 laufId, betriebEncId: posten.betrieb_enc_id ?? null,
               })
         } catch (e) {
-          fehler++; stand.fehler++; stand.fehlerInFolge++
+          fehler++; stand.fehler++; stand.fehlerInFolge++; stand.erstfehler++
           await query(
             `UPDATE sync.warteschlange
                 SET in_arbeit_seit = NULL, letzter_fehler = $1,
@@ -1256,10 +1260,29 @@ async function workerLaufIntern(
        *     bei einem Datenbankfehler einen Versuch.
        */
       const bekanntKaputt = posten.versuche > 1 || posten.wiederbelebt > 0
-      fehler++; stand.fehler++
-      if (!bekanntKaputt) stand.fehlerInFolge++
-      const aufgeben = !res.wiederholbar || posten.versuche >= config.MAX_VERSUCHE
+      if (bekanntKaputt) stand.wiederholer++
+      else { stand.fehlerInFolge++; stand.erstfehler++ }
+      /*
+       * NACHTTAKT fuer fn:bestellpositionen mit HTTP 500 (10.09.2026). Der
+       * 500 dieser Ressource haelt Tage an, nicht Minuten: 287 von 318
+       * betroffenen Bestellungen kamen spaeter doch — alle erst am Tag 9–11,
+       * nach drei Fehlnaechten, Aufgeben und einer Woche bis zur
+       * Wiederbelebung. Minuten-Wiedervorlagen verbrauchen an so einem
+       * Posten nur Versuche; eine Wiedervorlage je Nacht, FN_POSITIONEN_
+       * MAX_NAECHTE Naechte lang, holt die Positionen, sobald FoodNotify sie
+       * hergibt, und kostet hoechstens einen Aufruf je Nacht und Bestellung.
+       */
+      const nachtTakt = quelle.art === 'fn' && epKey === 'fn:bestellpositionen' && res.status === 500
+      const maxVersuche = nachtTakt ? config.FN_POSITIONEN_MAX_NAECHTE : config.MAX_VERSUCHE
+      const aufgeben = !res.wiederholbar || posten.versuche >= maxVersuche
       if (aufgeben) {
+        /*
+         * Aufgegeben zaehlt als `uebersprungen`, nicht als `fehler` — so
+         * steht es auch in sync.aufgabe (protokoll() unten). Bis zum
+         * 10.09.2026 zaehlte der Posten in BEIDE Spalten: sync.lauf meldete
+         * 11 Fehler und 11 Uebersprungene fuer dieselben elf Posten, waehrend
+         * sync.aufgabe null Fehler fuehrte.
+         */
         uebersprungen++
         await query(
           `UPDATE sync.warteschlange
@@ -1269,14 +1292,20 @@ async function workerLaufIntern(
         log.error('posten aufgegeben', { endpunkt: epKey, von, versuche: posten.versuche, fehler: res.fehler })
         await standSchreiben(epKey, posten.betrieb_enc_id ?? null, null, false, null)
       } else {
-        const frist = wiedervorlage(posten.versuche)
+        fehler++; stand.fehler++
+        const frist = nachtTakt ? '1 day' : wiedervorlage(posten.versuche)
         await query(
           `UPDATE sync.warteschlange
               SET in_arbeit_seit = NULL, letzter_fehler = $1,
-                  faellig_ab = now() + $2::interval
+                  faellig_ab = CASE WHEN $4::boolean
+                                    THEN date_trunc('day', now()) + interval '1 day'
+                                    ELSE now() + $2::interval END
             WHERE posten_id = $3`,
-          [res.fehler.slice(0, 2000), frist, posten.posten_id])
-        log.warn('wiedervorlage', { endpunkt: epKey, von, versuche: posten.versuche, fehler: res.fehler })
+          [res.fehler.slice(0, 2000), frist, posten.posten_id, nachtTakt])
+        log.warn('wiedervorlage', {
+          endpunkt: epKey, von, versuche: posten.versuche, fehler: res.fehler,
+          takt: nachtTakt ? `naechste Nacht (${posten.versuche}/${maxVersuche})` : frist,
+        })
         // Genau diese Frist ist die „Selbstdrosselung dieser Kombination",
         // die `sync.fortschritt.pausiert_bis` seit Migration 0005 meint.
         await standSchreiben(epKey, posten.betrieb_enc_id ?? null, null, false, frist)
@@ -1295,7 +1324,7 @@ async function workerLaufIntern(
          * ein zweiter Fehler an dieser Stelle würde genau den Abbruch
          * auslösen, den dieser Block verhindern soll.
          */
-        fehler++; stand.fehler++; stand.fehlerInFolge++
+        fehler++; stand.fehler++; stand.fehlerInFolge++; stand.erstfehler++
         log.error('posten abgebrochen', {
           anbieter, endpunkt: posten.endpunkt, postenId: posten.posten_id,
           fehlerInFolge: stand.fehlerInFolge, fehler: String(e).slice(0, 300),
@@ -1343,12 +1372,23 @@ async function workerLaufIntern(
      * stehen, LINA setzt Stunden spaeter `abgebrochen`.
      */
     const RANG = { ok: 0, teilweise: 1, abgebrochen: 2, fehlgeschlagen: 3 } as const
+    /*
+     * NUR ERSTFEHLER MACHEN DEN LAUF `teilweise` (10.09.2026). Ein Posten,
+     * der gestern schon scheiterte, beweist heute nichts Neues — dieselbe
+     * Unterscheidung, die die Notbremse seit dem 01.09.2026 trifft. Neun
+     * Laeufe in Folge (112–120) standen auf `teilweise` wegen ein bis elf
+     * bekannter HTTP-500-Posten derselben Kostenstelle; ein Status, der
+     * jeden Tag gelb ist, kann keinen neuen Fehler mehr zeigen. Die
+     * Wiederholer verschwinden nicht: sie stehen in der Notiz, in
+     * sync.aufgabe und in mart.posten_aufgegeben.
+     */
     for (const a of ANBIETER) {
       const s = jeAnbieter[a]
-      if (s.fehler > 0 && s.status === 'ok') s.status = 'teilweise'
+      if (s.erstfehler > 0 && s.status === 'ok') s.status = 'teilweise'
       if (RANG[s.status] > RANG[status]) status = s.status
     }
-    if (fehler > 0 && status === 'ok') status = 'teilweise'
+    const erstfehler = ANBIETER.reduce((n, a) => n + jeAnbieter[a].erstfehler, 0)
+    if (erstfehler > 0 && status === 'ok') status = 'teilweise'
 
     /**
      * BEIDE Notizen, immer und mit Namen davor. Frueher stand hier ein Feld
@@ -1359,8 +1399,12 @@ async function workerLaufIntern(
      * ueberhaupt gelaufen ist, ist die Information (AGENTS.md Regel 10).
      */
     notiz = ANBIETER
-      .map(a => `${NAME[a]}: ${jeAnbieter[a].notiz ?? 'ohne Befund'} `
-              + `(${jeAnbieter[a].ok + jeAnbieter[a].keineDaten + jeAnbieter[a].fehler} Posten)`)
+      .map(a => {
+        const s = jeAnbieter[a]
+        const zusatz = s.wiederholer > 0 ? `, davon ${s.wiederholer} bekannte Wiederholer` : ''
+        return `${NAME[a]}: ${s.notiz ?? 'ohne Befund'} `
+             + `(${s.ok + s.keineDaten + s.fehler} Posten${zusatz})`
+      })
       .join(' · ')
   } catch (e) {
     // Ohne diesen Zweig wird ein abgestürzter Lauf als 'ok' verbucht: die

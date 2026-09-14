@@ -2056,3 +2056,54 @@ Seit `0095` trägt die Sicht `datenbasis`. Gefiltert wird nichts — die Zeilen
 bleiben vollständig, sie sind nur als das lesbar, was sie sind. Nebenbefund:
 die Liste „Pflichtartikel, die niemand bezieht" fiel dadurch von 28 auf 27, weil
 ein Artikel nur durch die datenlosen Betriebe dort gelandet war.
+
+## Zwei Kassen lieferten elf Tage später — und drei Messungen, die Zahlen einordnen (10.09.2026)
+
+Gemessen gegen Produktion über die Metabase-API (`/api/dataset`), Läufe 112–120.
+
+**Aposto Schwetzingen 04.–14.08. und Enchilada Aschaffenburg 31.07.–10.08.** stehen in
+`core.umsatzbericht_tag` mit 0 Rechnungen; der letzte Roh-Abruf von `getArtikelverkaufsbericht`
+für dieselben Tage (Abstand 12–22 Tage, also nach der Nachlieferung) kennt 45.486 € bzw.
+37.570 € netto. LINA hatte die Daten; unser Fenster für den Umsatzbericht war zu. Die Abfrage,
+mit der sich das je Betrieb und Tag prüfen lässt:
+
+```sql
+WITH r AS (SELECT zeitraum_von, payload, row_number() OVER (PARTITION BY zeitraum_von ORDER BY abgerufen_am DESC) rn
+             FROM raw.api_antwort WHERE endpunkt = 'getArtikelverkaufsbericht' AND zeitraum_von = zeitraum_bis AND http_status = 200
+              AND zeitraum_von BETWEEN current_date - 60 AND current_date - 12),
+     avb AS (SELECT r.zeitraum_von::date tag, e->>'encId' enc_id,
+                    (SELECT round(sum(v::numeric)) FROM jsonb_each_text(e->'netto') x(k,v)) netto
+               FROM r, jsonb_array_elements(r.payload->'rows') e WHERE r.rn = 1)
+SELECT b.name, count(*) tage, sum(avb.netto) avb_netto
+  FROM avb JOIN core.betrieb b USING (enc_id)
+  LEFT JOIN (SELECT b.enc_id, t.geschaeftstag::date tag, sum(t.umsatz_netto) ub
+               FROM core.umsatzbericht_tag t JOIN core.betrieb b USING (betrieb_key) GROUP BY 1, 2) u USING (enc_id, tag)
+ WHERE avb.netto > 100 AND coalesce(u.ub, 0) = 0 GROUP BY 1 ORDER BY 2 DESC;
+```
+
+Über 60 Tage waren es **genau diese zwei Betriebe** — kein dritter. Seit `0100` beantwortet
+`mart.umsatztag_luecke` die Frage laufend.
+
+**Der Hash des Artikelverkaufsberichts war kein Änderungssignal.** Zwei Abrufe desselben,
+20 Tage alten Geschäftstags: 1.187.555 gegen 1.187.551 Bytes, `columns` 3.414 Einträge auf
+beiden Seiten, 2.466 an anderer Position, keiner fehlt, keiner anders — LINA sortiert den
+Artikelkatalog bei jedem Abruf neu. In `rows` unterschieden sich sieben von 141 Betrieben: drei
+Preise neu, vier Null-Einträge in `netto`. Die „rund 30 Änderungen je Tag" vom 13.08. waren
+also der Serialisierer. Der Client hasht seit dem 10.09. eine kanonische Form.
+
+**Personalkosten ändern sich wirklich, und lange.** Derselbe 20 Tage alte Tag, zwei Abrufe:
+fünf Betriebe mit anderen Werten, z. B. Enchilada Würzburg `pekGesamt` 388,23 → 475,93,
+Domhof `effGesamt` 37,57 → 34,17. Am Tag 22 (Fensterrand) noch 24 von 30 Abrufen geändert.
+Deshalb die monatliche Nachlese über 62 Tage.
+
+**HTTP 500 auf Bestellpositionen hängt nicht am Liefer- oder Belegdatum.** 45 Tage,
+124.780 Positionsabrufe: vor dem Liefertag 11 Fehler auf 1.196 (0,9 %), ab Liefertag 1.029 auf
+124.780 (0,8 %). Vor dem Belegdatum 3 auf 2.509, ohne Beleg 954 auf 35.674 (2,7 %), mit Beleg
+83 auf 87.793 (0,1 %) — Bestellungen ohne Beleg scheitern häufiger, aber „Beleg da" ist keine
+Bedingung. 318 Bestellungen scheiterten mindestens einmal, 287 kamen später, alle am Tag 9–11
+nach exakt drei Fehlnächten: die Erholung folgt unserem Zeitplan.
+
+**Speicher.** `part.api_antwort_2026_08` 5,4 GB (Backfill-Monat), `2026_09` 560 MB nach zehn
+Nächten — rund 1,7 GB je Monat im Regelbetrieb, Datenbank 16 GB. Je Nacht liefert
+`la:belegliste` 128 MB Rohtext (31 Abzüge zu 4,2 MB), `fn:bestellungen` 43 MB,
+`getArtikelverkaufsbericht` 24 MB; Postgres komprimiert das etwa fünffach.

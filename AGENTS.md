@@ -342,6 +342,9 @@ SELECT * FROM mart.quelle_zulauf WHERE erwartet AND zustand <> 'ok';
 -- Belegarchiv: eine Zeile je Betrieb und Ordner, 1.834 insgesamt
 SELECT zustand, count(*) FROM mart.belegarchiv_zulauf GROUP BY 1 ORDER BY 2 DESC;
 SELECT * FROM mart.belegarchiv_zulauf WHERE zustand = 'abzug fehlt';
+-- Nulltage: Artikelverkauf kennt Umsatz, Umsatzbericht steht null (seit 0100). ERWARTUNG:
+-- nichts ausser 'im Fenster'; 'aufgegeben' heisst: dreimal nachgeholt, LINA sagt weiter null.
+SELECT * FROM mart.umsatztag_luecke WHERE zustand <> 'im Fenster';
 -- Inventuren, deren Kopf mehr Positionen meldet als geladen sind (Erwartung: leer)
 SELECT * FROM mart.inventur_abgeschnitten;
 -- Posten, die der Worker aufgegeben hat. 'endgueltig' heisst: der Lauf versucht

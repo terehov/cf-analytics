@@ -1256,3 +1256,41 @@ SELECT * FROM mart.bounti_abdeckung;
 
 An der Sichtbarkeit ändert sich nichts: `mart.bounti_*` ist über die Schemaregel automatisch
 sichtbar, `metabase/sichtbarkeit.ts` braucht keinen Eintrag.
+
+## Nulltage, der Rand des Fensters, das Korn der Pflichtartikel (Migration `0100`, 10.09.2026)
+
+**`mart.umsatztag_luecke`** — je Betrieb und Geschäftstag der letzten 120 Tage: Artikelverkauf
+kennt Umsatz, Umsatzbericht steht auf null. Die Spur eines Kassenausfalls, dessen Nachlieferung
+erst nach dem kurzen Fenster kam. Gemessen beim Anlegen: Aposto Schwetzingen 04.–14.08. und
+Enchilada Aschaffenburg 31.07.–10.08., je elf Tage, zusammen 83.000 € netto. Die Sicht ist
+zugleich Arbeitsliste des Laufs (`nulltageNachziehen()` liest `zustand = 'faellig'`) und
+Prüfgrundlage: die Prüfübersicht zählt **nur `aufgegeben`** — was fällig ist, holt die nächste
+Nacht, das ist Betrieb und kein Befund.
+
+```sql
+SELECT * FROM mart.umsatztag_luecke WHERE zustand <> 'im Fenster';   -- Erwartung: leer nach einer Woche
+```
+
+**`mart.nachzuegler_tiefe`** misst den Rand jetzt am konfigurierten Fenster
+(`sync.quelle.nachzuegler_tage`, neue Spalten `rand_konfiguriert`, `aenderungen_pct`). Bis
+`0100` war `rand` der größte beobachtete Abstand — 60, weil Lauf 1 am 26.07.2026 Tage mit
+Abstand 23–60 einmalig holte — und die Prüfzeile „Änderungen am Rand des Fensters" konnte für
+keinen LINA-Bericht anschlagen. `am_rand_noch_aenderungen` verlangt jetzt mehr als jeden zehnten
+Abruf mit Änderung an den letzten beiden Fenstertagen. Nach dem Deploy wird die Zeile für
+`getPersonalkosten` rot (80 % am Tag 22) — das ist richtig; die monatliche Nachlese
+(`nachlese_tage`) ist die Antwort darauf, die Zeile bleibt als Messung stehen.
+
+Zwei Vorbehalte beim Lesen der Sicht stehen in ihrem `COMMENT`: die Kurve des
+Artikelverkaufsberichts bis zum 10.09. ist Rauschen (`columns` in Zufallsreihenfolge; seit dem
+10.09. kanonischer Hash), und ein Betrieb, der erst nach dem Fenster nachliefert, ist hier nur
+ein leises Signal — dafür gibt es `mart.umsatztag_luecke`.
+
+**`mart.pflichtartikel_klassifikation_basis`** hat dasselbe Korn wie zuvor, aber `name_roh`
+ist `min()` über alle Schreibweisen. Zwei Rohnamen desselben Artikels („Rapsöl 10L" /
+„Rapsoel 10L") ließen den CONCURRENTLY-Refresh vom 25.08. bis 10.09. jede Nacht scheitern;
+`mart.materialisierung_stand` führte drei Sichten als „veraltet", das Dashboard zeigte zwei
+Wochen alte Zahlen. Die elf abhängigen Sichten wurden mit `0100` wortgleich neu angelegt —
+Metabase liest `COMMENT ON` nur beim ersten Mal, deshalb tragen alle ihre Kommentare wieder.
+
+**Neue Prüfzeile:** „Umsatz: Nulltag mit Artikelverkauf ausserhalb des Fensters (3x nachgeholt,
+bleibt null)". Erwartung 0; `geprueft` ist die Zahl aller Lücken, auch der fälligen.
