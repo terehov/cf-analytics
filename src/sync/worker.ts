@@ -198,6 +198,55 @@ async function startOhneArbeitFesthalten(
     [ausloeser, status, notiz])
 }
 
+/**
+ * Vorgaenger schliessen, deren Prozess ohne Abschluss verschwand.
+ *
+ * Am 14.09.2026 um 21:58 loeste ein Push auf main den Deploy aus. Der
+ * Containerwechsel beendete den per `docker exec` gestarteten Sync (Lauf 125)
+ * OHNE Signal — das Signal-Handling weiter unten (25.07.2026) kam nie dran.
+ * Die Laufsperre haengt an der Verbindung und war beim naechsten Start frei;
+ * die Zeile in sync.lauf blieb auf 'laeuft' mit null Zaehlern, ein Posten
+ * hing bis zur Stundengrenze auf in_arbeit_seit, und mart.sync_status zeigte
+ * einen Lauf, der arbeitet. Dieselbe Signatur wie am 25.07., nur ohne den
+ * Weg, den das Signal-Handling damals geoeffnet hat.
+ *
+ * Wer hier steht, HAELT die Sperre. Ein Lauf im Zustand 'laeuft' kann also
+ * keinen lebenden Prozess mehr haben — sein Prozess ist weg. Also wird er
+ * geschlossen, mit den Zaehlern aus sync.aufgabe (dieselbe Rechnung wie in
+ * laufFortschreiben: gesamt = ok + keine_daten + fehler, ok = nur ok) und
+ * dem Ende seiner letzten Aufgabe als beendet_am. Reservierte Posten werden
+ * freigegeben — sonst warten sie die Stundengrenze ab, obwohl niemand mehr
+ * an ihnen arbeitet.
+ *
+ * Nicht in workerLaufIntern, sondern davor: der neue Lauf soll seine eigene
+ * Zeile erst anlegen, wenn die alte geschlossen ist — sonst zeigt
+ * mart.sync_status fuer einen Moment zwei laufende.
+ */
+export async function verwaisteLaeufeSchliessen(): Promise<number> {
+  const geschlossen = await query<{ lauf_id: string }>(
+    `UPDATE sync.lauf l
+        SET status = 'abgebrochen',
+            beendet_am = coalesce((SELECT max(a.beendet_am) FROM sync.aufgabe a WHERE a.lauf_id = l.lauf_id), now()),
+            aufgaben_gesamt = (SELECT count(*) FROM sync.aufgabe a WHERE a.lauf_id = l.lauf_id AND a.status IN ('ok','keine_daten','fehler')),
+            aufgaben_ok = (SELECT count(*) FROM sync.aufgabe a WHERE a.lauf_id = l.lauf_id AND a.status = 'ok'),
+            aufgaben_fehler = (SELECT count(*) FROM sync.aufgabe a WHERE a.lauf_id = l.lauf_id AND a.status = 'fehler'),
+            aufgaben_uebersprungen = (SELECT count(*) FROM sync.aufgabe a WHERE a.lauf_id = l.lauf_id AND a.status = 'uebersprungen'),
+            notiz = concat_ws(' — ', l.notiz,
+                      'Prozess ohne Abschluss beendet (Sperre beim naechsten Start frei; Containerwechsel?), geschlossen am '
+                      || to_char(now(), 'DD.MM.YYYY HH24:MI'))
+      WHERE l.status = 'laeuft'
+      RETURNING l.lauf_id`)
+  if (geschlossen.length === 0) return 0
+  const frei = await query<{ posten_id: string }>(
+    `UPDATE sync.warteschlange SET in_arbeit_seit = NULL
+      WHERE in_arbeit_seit IS NOT NULL AND erledigt_am IS NULL
+      RETURNING posten_id`)
+  log.warn('verwaiste Laeufe geschlossen', {
+    laeufe: geschlossen.map(g => g.lauf_id), posten_freigegeben: frei.length,
+  })
+  return geschlossen.length
+}
+
 export type LaufErgebnis = {
   laufId: string | null
   ok: number
@@ -252,6 +301,7 @@ export async function workerLauf(
     return { laufId: null, ok: 0, keineDaten: 0, fehler: 0, uebersprungen: 0,
              status: 'lauf_uebersprungen' }
   }
+  await verwaisteLaeufeSchliessen()
   try {
     return await workerLaufIntern(ausloeser)
   } finally {

@@ -743,6 +743,64 @@ lauf('Sperre gegen parallele Worker', () => {
     }
   }, 30_000)
 
+  /**
+   * Der Vorgaenger, der ohne Abschluss verschwand (14.09.2026, Lauf 125).
+   *
+   * Ein Push auf main loeste den Deploy aus; der Containerwechsel beendete den
+   * per docker exec gestarteten Sync ohne Signal. Die Sperre haengt an der
+   * Verbindung und war beim naechsten Start frei — die Zeile in sync.lauf
+   * blieb auf 'laeuft' mit null Zaehlern, ein reservierter Posten hing bis zur
+   * Stundengrenze. Der naechste Start schliesst den Vorgaenger deshalb selbst,
+   * BEVOR er seine eigene Zeile anlegt. Geprueft wird die Funktion gegen die
+   * Datenbank und ihre Stellung im Start am Quelltext (wie phasen.test.ts).
+   */
+  test('ein Vorgänger auf laeuft, dessen Prozess verschwand, wird beim nächsten Start geschlossen', async () => {
+    const db = new Client({ connectionString: DB })
+    await db.connect()
+    try {
+      const { rows: [verwaist] } = await db.query(
+        `INSERT INTO sync.lauf (ausloeser, status) VALUES ('zeitplan','laeuft') RETURNING lauf_id`)
+      await db.query(
+        `INSERT INTO sync.aufgabe (lauf_id, endpunkt, status, beendet_am)
+         VALUES ($1, 'getUmsatzbericht', 'ok',     now() - interval '2 hours'),
+                ($1, 'getUmsatzbericht', 'fehler', now() - interval '1 hour')`, [verwaist.lauf_id])
+      const { rows: [posten] } = await db.query(
+        `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, in_arbeit_seit)
+         VALUES ('la:belegzahl', DATE '2026-07-01', DATE '2026-07-01', now() - interval '2 hours')
+         RETURNING posten_id`)
+
+      const { verwaisteLaeufeSchliessen } = await import('./worker')
+      expect(await verwaisteLaeufeSchliessen()).toBeGreaterThanOrEqual(1)
+
+      const { rows: [alt] } = await db.query(
+        `SELECT status, beendet_am, notiz, aufgaben_gesamt, aufgaben_ok, aufgaben_fehler
+           FROM sync.lauf WHERE lauf_id = $1`, [verwaist.lauf_id])
+      expect(alt.status).toBe('abgebrochen')
+      expect(alt.beendet_am).not.toBeNull()
+      expect(Number(alt.aufgaben_gesamt)).toBe(2)
+      expect(Number(alt.aufgaben_ok)).toBe(1)
+      expect(Number(alt.aufgaben_fehler)).toBe(1)
+      expect(String(alt.notiz)).toContain('ohne Abschluss')
+      const { rows: [p] } = await db.query(
+        `SELECT in_arbeit_seit FROM sync.warteschlange WHERE posten_id = $1`, [posten.posten_id])
+      expect(p.in_arbeit_seit).toBeNull()
+      // Ein zweiter Aufruf findet nichts mehr.
+      expect(await verwaisteLaeufeSchliessen()).toBe(0)
+
+      // Und der Start ruft es an der richtigen Stelle: NACH der Sperre (sonst
+      // schloesse ein uebersprungener Start den lebenden Blockierer) und VOR
+      // der eigenen Zeile.
+      const quelle = await Bun.file(new URL('./worker.ts', import.meta.url)).text()
+      const aufruf = quelle.indexOf('await verwaisteLaeufeSchliessen()')
+      expect(aufruf).toBeGreaterThan(quelle.indexOf('const sperre = await sperreHolen()'))
+      expect(aufruf).toBeLessThan(quelle.indexOf('return await workerLaufIntern(ausloeser)'))
+
+      await db.query(`DELETE FROM sync.aufgabe WHERE lauf_id = $1`, [verwaist.lauf_id])
+      await db.query(`DELETE FROM sync.lauf WHERE lauf_id = $1`, [verwaist.lauf_id])
+      await db.query(`DELETE FROM sync.warteschlange WHERE posten_id = $1`, [posten.posten_id])
+    } finally { await db.end() }
+  }, 30_000)
+
   test('übersprungene Starts verdünnen das Drei-Läufe-Fenster des Statusberichts nicht', async () => {
     const db = new Client({ connectionString: DB })
     await db.connect()

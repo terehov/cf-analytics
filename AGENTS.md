@@ -291,6 +291,14 @@ täglich 05:02   bun run sync
 > Bei stündlichem Lauf wären es rund 24 IDs je Tag. Wer das Intervall ändert, ändert damit
 > auch die Yext-Fälligkeit (20 Stunden) — bei einem Lauf pro Tag greift sie faktisch immer.
 
+**Kein Push auf `main`, solange ein Lauf aktiv ist.** Der Push löst den Deploy aus, und der
+Containerwechsel beendet den per `docker exec` gestarteten Sync **ohne Signal** — am 14.09.2026
+um 21:58 genau so passiert: Lauf 125 starb mitten in den Belegarchiv-Zählungen, 335 Posten
+blieben offen, Phase B lief nicht, und `mart.sync_status` zeigte stundenlang einen Lauf, der
+arbeitet. Vorher nachsehen: `SELECT lauf_id, status FROM sync.lauf ORDER BY lauf_id DESC LIMIT 1`
+— steht dort `laeuft`, warten. Wer so stirbt, wird vom nächsten Start als `abgebrochen`
+geschlossen (`verwaisteLaeufeSchliessen()`, `docs/importer.md`).
+
 `sync` füllt die Warteschlange zu Beginn jedes Laufs selbst (`src/sync/nachfuellen.ts`):
 LINAs Nachzügler-Fenster, Jahresberichte, monatliche Momentaufnahmen und FoodNotifys
 jeweils letzte Bestellseite je Kostenstelle.

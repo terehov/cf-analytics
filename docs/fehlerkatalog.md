@@ -3921,3 +3921,32 @@ Sicht führt beide Tage jetzt als `wartet`; nach zwei weiteren Anläufen stehen 
 `aufgegeben` in der Prüfübersicht — und das ist der richtige Endzustand: die 2 dort ist die
 Aussage „das Kassensystem hat diese Tage nicht", keine offene Arbeit. Von unserer Seite ist
 das nicht nachholbar.
+
+## Ein Push auf main beendete den laufenden Sync — und die Zeile blieb auf „läuft" (14.09.2026)
+
+**Symptom.** Lauf 125 (manuell um 20:41 gestartet, um die Lochtage aus `0101` nachzuholen)
+erledigte bis 21:58:24 946 Aufgaben und verstummte. `mart.sync_status` führte ihn Stunden
+später noch als `laeuft` mit null Zählern, ein `la:belegzahl`-Posten hing auf `in_arbeit_seit`,
+335 Posten blieben offen, Phase B (alle Refreshes) lief nicht. Dokploy zeigte den Schedule-Job
+als fehlgeschlagen.
+
+**Ursache.** Um 21:58:23 wurde ein Commit auf `main` gepusht. Der Push löst den Deploy aus, der
+Container wird neu gebaut, und ein per `docker exec` gestarteter Prozess stirbt mit dem alten
+Container — **ohne Signal**. Das Signal-Handling aus dem Fall vom 25.07.2026 (Ctrl-C,
+Containerstopp) konnte deshalb nichts schreiben. Die Laufsperre hängt an der Verbindung und
+war sofort frei; nur die Zeile in `sync.lauf` wusste nichts davon. Sekundengenau nachgemessen:
+letzte Aufgabe 21:58:24.61, Reservierung 21:58:24.62, danach kein einziger Aufruf.
+
+**Was ihn heute verhindert.** Zwei Dinge. `verwaisteLaeufeSchliessen()` in `worker.ts`: wer die
+Sperre bekommt, schließt jeden Vorgänger auf `laeuft` als `abgebrochen` — mit den Zählern aus
+`sync.aufgabe`, dem Ende seiner letzten Aufgabe als `beendet_am` und einer Notiz — und gibt
+reservierte Posten frei, bevor er seine eigene Zeile anlegt. Und die Regel in `AGENTS.md`:
+**kein Push auf `main`, solange ein Lauf aktiv ist.** Vorher nachsehen:
+
+```sql
+SELECT lauf_id, status, gestartet_am FROM sync.lauf ORDER BY lauf_id DESC LIMIT 1;
+```
+
+Was der abgeschossene Lauf bis dahin geschafft hatte, blieb: LINA und FoodNotify waren
+vollständig, es fehlten nur die Belegarchiv-Zählungen. Der nächste Nachtlauf holt sie nach und
+rechnet Phase B.

@@ -1385,3 +1385,20 @@ vorgesehenen Weg: `wartet`, zwei weitere Anläufe, `aufgegeben`. Die 2 in der Pr
 dann eine Aussage über das Kassensystem, keine offene Arbeit (`fehlerkatalog.md`, Nachtrag).
 
 **Für die Tests:** `LOCHTAGE_JE_LAUF` steht in der e2e-Umgebung ebenfalls auf 0.
+
+## Verwaiste Läufe schließen sich beim nächsten Start (14.09.2026)
+
+**Der Fall:** Ein Push auf `main` löst den Deploy aus, und der Containerwechsel beendet den per
+`docker exec` gestarteten Sync **ohne Signal** — Lauf 125 am 14.09.2026 um 21:58, mitten in den
+Belegarchiv-Zählungen. Die Laufsperre hängt an der Verbindung und ist sofort frei; die Zeile
+in `sync.lauf` bleibt auf `laeuft` mit null Zählern, ein reservierter Posten wartet die
+Stundengrenze ab. Das Signal-Handling vom 25.07.2026 hilft hier nicht, es bekommt kein Signal.
+
+**`verwaisteLaeufeSchliessen()` — in `workerLauf()`, nach der Sperre, vor der eigenen Zeile.**
+Wer die Sperre hält, weiß: kein Lauf auf `laeuft` hat noch einen Prozess. Jeder solche
+Vorgänger wird `abgebrochen`, mit den Zählern aus `sync.aufgabe` (gleiche Rechnung wie
+`laufFortschreiben`), dem Ende seiner letzten Aufgabe als `beendet_am` und einer Notiz;
+reservierte Posten werden freigegeben. Ein übersprungener Start (Sperre belegt) tut das
+ausdrücklich nicht — dort lebt der Blockierer.
+
+**Die Regel dazu steht in `AGENTS.md`:** kein Push auf `main`, solange ein Lauf aktiv ist.
