@@ -36,6 +36,7 @@ import { karten as kartenKalender } from './karten-kalender'
 import { karten as kartenFremdeinkauf } from './karten-fremdeinkauf'
 import { karten as kartenPflichtartikel } from './karten-pflichtartikel'
 import { karten as kartenBounti } from './karten-bounti'
+import { karten as kartenArtikelaktion } from './karten-artikelaktion'
 import { dashboards } from './dashboards'
 import { auslegen, MINDESTHOEHE } from './layout'
 import type { Karte, Kachel, Dashboard, Reihe } from './typen'
@@ -50,7 +51,7 @@ const METABASE = config.METABASE_URL
 const alleKarten: Karte[] = [
   ...kartenDrilldown, ...kartenPortfolio, ...kartenRoundTable, ...kartenFach, ...kartenImport, ...kartenStandort,
   ...kartenBewertung, ...kartenAktionen, ...kartenYext, ...kartenVergleich, ...kartenFremdeinkauf, ...kartenPflichtartikel,
-  ...kartenKalender, ...kartenBounti,
+  ...kartenKalender, ...kartenBounti, ...kartenArtikelaktion,
 ]
 
 // Reihen in Kacheln umrechnen — EINMAL, damit Pruefung und Ausgabe

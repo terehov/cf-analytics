@@ -284,3 +284,30 @@ WITH z AS (
  */
 export const WOCHENTAGE =
   `(ARRAY['Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'])`
+
+/**
+ * Eine LISTE von Artikelnummern als Freitext — fuer die Artikelaktion.
+ *
+ * Kein Feldfilter, keine Auswahlliste: 51 Nummern klickt niemand aus
+ * einem Dropdown, aus einer Excel-Spalte kopiert man sie in einem Zug.
+ * Getrennt wird in der Karte an allem, was keine Ziffer ist. Der Preis
+ * — eine vertippte Nummer trifft still nichts — wird auf der Seite
+ * durch eine eigene Pruefkarte bezahlt (karten-artikelaktion.ts).
+ */
+export const P_ARTIKELNUMMERN: Parameter = {
+  id: 'artikelnummern-param', name: 'artikelnummern', 'display-name': 'Artikelnummern',
+  type: 'text', required: false,
+}
+
+/**
+ * Ein einzelner Zeitraum als zwei Datumsfelder, fuer die Artikelaktion.
+ * Nicht P_ZEITRAUM (Feldfilter): die Karten rechnen aus von/bis zwei
+ * weitere Zeitraeume (davor, Vorjahr), und ein Feldfilter kann nur EINE
+ * Klausel setzen — dieselbe Ueberlegung wie bei P_VON_A/P_BIS_A.
+ */
+export const P_VON: Parameter = {
+  id: 'von-param', name: 'von', 'display-name': 'Von', type: 'date/single', required: false,
+}
+export const P_BIS: Parameter = {
+  id: 'bis-param', name: 'bis', 'display-name': 'Bis', type: 'date/single', required: false,
+}

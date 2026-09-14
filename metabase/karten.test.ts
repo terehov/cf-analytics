@@ -34,6 +34,7 @@ import { karten as kartenFremdeinkauf } from './karten-fremdeinkauf'
 import { karten as kartenPflichtartikel } from './karten-pflichtartikel'
 import { karten as kartenKalender } from './karten-kalender'
 import { karten as kartenBounti } from './karten-bounti'
+import { karten as kartenArtikelaktion } from './karten-artikelaktion'
 import type { Karte } from './typen'
 
 const DB = process.env.DATABASE_URL
@@ -43,7 +44,7 @@ const alleKarten: Karte[] = [
   ...kartenRoundTable, ...kartenFach, ...kartenDrilldown,
   ...kartenPortfolio, ...kartenImport, ...kartenStandort, ...kartenBewertung,
   ...kartenAktionen, ...kartenVergleich, ...kartenFremdeinkauf, ...kartenPflichtartikel, ...kartenYext,
-  ...kartenKalender, ...kartenBounti,
+  ...kartenKalender, ...kartenBounti, ...kartenArtikelaktion,
 ]
 
 let db: Client
