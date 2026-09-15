@@ -162,7 +162,7 @@ export function nurLesend(sql: string): void {
   if (SCHREIBWORT.test(s)) throw new Error(`Schreibwort in der Abfrage — abgelehnt`)
 }
 
-async function ausProduktion(sql: string): Promise<Beleg[]> {
+export async function ausProduktion(sql: string): Promise<Beleg[]> {
   nurLesend(sql)
   const { METABASE_URL, METABASE_USER, METABASE_PASSWORD } = config
   if (!METABASE_USER || !METABASE_PASSWORD) {
@@ -335,7 +335,19 @@ export async function manifestOeffnen(ziel: string) {
   return createWriteStream(`${ziel}/manifest.jsonl`, { flags: 'a' })
 }
 
-export async function ziehen(belege: Beleg[], ziel: string, grenze: number): Promise<void> {
+/**
+ * Wohin ein Beleg kommt. `digital` steht erst nach dem Laden fest — deshalb
+ * fragt der Abzug beide Orte, bevor er einen Beleg für „schon da" hält.
+ */
+export type Ablage = {
+  ordner(b: Beleg, digital: boolean): string
+  name(b: Beleg): string
+}
+
+export async function ziehen(
+  belege: Beleg[], ziel: string, grenze: number,
+  ort: Ablage = { ordner: b => ablage(ziel, b), name: dateiname },
+): Promise<void> {
   const sitzung = new LinaSession()
   await sitzung.anmelden()
   cacheLeeren()
@@ -368,9 +380,9 @@ export async function ziehen(belege: Beleg[], ziel: string, grenze: number): Pro
       }
       if (ohneArchiv.has(b.lina_betrieb_id)) { uebersprungen++; continue }
 
-      const ordner = ablage(ziel, b)
-      const pfad = `${ordner}/${dateiname(b)}`
-      if (await Bun.file(pfad).exists()) { uebersprungen++; continue }
+      const name = ort.name(b)
+      const schonDa = await Promise.all([false, true].map(d => Bun.file(`${ort.ordner(b, d)}/${name}`).exists()))
+      if (schonDa.some(Boolean)) { uebersprungen++; continue }
 
       try {
         let token: string
@@ -425,9 +437,16 @@ export async function ziehen(belege: Beleg[], ziel: string, grenze: number): Pro
           continue
         }
 
-        await Bun.write(pfad, bytes)
+        /*
+         * XML VOR PDF. Das PDF ist das Merkmal für „schon da"; stirbt der Lauf
+         * zwischen beiden Schreibvorgängen, fehlt so das PDF und der Beleg
+         * kommt beim nächsten Start wieder — statt als PDF ohne sein XML
+         * liegen zu bleiben.
+         */
         const xml = erechnungXml(bytes)
+        const pfad = `${ort.ordner(b, xml !== null)}/${name}`
         if (xml) { await Bun.write(pfad.replace(/\.pdf$/, '.xml'), xml); mitXml++ }
+        await Bun.write(pfad, bytes)
         geladen++
         serie = 0
 

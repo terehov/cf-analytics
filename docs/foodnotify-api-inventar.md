@@ -206,6 +206,51 @@ id, kind, name, quantity, unit, cost, artikelId, supplier, subRecipeId, group
 **`subRecipeId`: Rezepte enthalten Rezepte.** Die Auflösung muss rekursiv sein,
 sonst fehlen die Kosten der Zwischenprodukte. Zyklen abfangen.
 
+### Gemessen am 14.09.2026 — Vollabzug Enchilada (`src/rezepte.ts`)
+
+Alle Rezepte der Marke mit Kopf, Zutaten, Meta und Schritten, 8.304 GETs ohne
+eine Sperre. Ablage und Feldbeschreibung: `belege/coyacan/README.md` (lokal,
+nicht im Git). Was davon über den Abzug hinaus gilt:
+
+* **Die Liste ist über die Seiten nicht stabil.** Sortiert wird nach
+  `createdAt`, und 760 von 2.076 Einträgen teilen den Zeitstempel mit dem
+  Vorgänger. An Seitengrenzen stehen 21 Einträge doppelt — und entsprechend
+  fehlen vermutlich 21. Aus den geholten Rezepten verweisen 52 IDs auf Rezepte,
+  die nicht in der Liste stehen (Unterrezepte und Kassenzuordnung); ihre IDs
+  liegen meist direkt neben geladenen. **Ein Import über `?page=N` allein ist
+  nicht vollständig.** `src/rezepte.ts` holt deshalb jede verwiesene ID ohne
+  Listeneintrag einzeln über `/api/recipes/{id}` nach, rekursiv, und hält das
+  Ergebnis in `nachgeholt.json` fest; 404 gilt dort als gelöscht.
+  **Nachgemessen am 15.09.2026: 56 IDs** — die 52 plus 4, auf die erst nachgeholte
+  Rezepte zeigen — **alle geladen, keine 404.** Gelöscht war keines; die Liste hat
+  sie nur nicht gezeigt. Ob sie darüber hinaus Rezepte verschluckt, auf die nichts
+  verweist, ist nicht messbar, solange die Liste die einzige Aufzählung ist.
+* Die Liste zeigt **2.055** Rezepte (01.08.2026: 1.846); mit den nachgeholten hat
+  die Marke mindestens **2.111**.
+* `/api/recipes/{id}` liefert dieselbe Form wie ein Listeneintrag:
+  `id, name, imagePath, createdAt, groups[], tags[]` — keine Kosten, kein Gewicht.
+* **`artikelId` ist die Artikelnummer beim Lieferanten** und trifft in ZUGFeRD-
+  Rechnungen `ram:SellerAssignedID`: 152 von 207 Distra-Nummern aus den Rezepten
+  stehen in den 56 Distra-E-Rechnungen von Coyacan 2026, namensgleich. Damit
+  sind Rezeptzutaten mit echten Rechnungspreisen verbindbar, ohne FoodNotifys
+  Bestellungen. Gilt nur, wo der Lieferant in Rezept und Rechnung derselbe ist
+  (Getränke: HFS in den Rezepten, trinkkontor auf den Rechnungen — 0 Treffer).
+* `kind` ∈ `ingredient`, `sub_recipe`, `product_group`. `sub_recipe` trägt nie
+  `artikelId`/`supplier`; `product_group` trägt beide, Namen enden auf „(EN)",
+  Bedeutung ungeklärt.
+* **`cost` ist nicht aus Unterrezepten nachrechenbar** — weder über Gewicht noch
+  mit `meta.weight.loss` (0 bei 1.163 Rezepten, 100 bei 476, sonst krumm;
+  Bedeutung offen). Als FoodNotifys Wert übernehmen, nicht selbst skalieren.
+* Lieferanten in Rezepten sind **standortbezogen benannt**: „DISTRA
+  Enchilada_Coyacan" (`supplier.id` 6421) in 2.738 Zutatenzeilen der Marke.
+* Bilder: `imagePath` `/i/r/<sha1>.png|jpg` (1.169 Rezepte), Schrittfotos in
+  `steps[].images[].url` `/i/rs/<sha1>.jpg` (2.708), relativ zu
+  `https://my.foodnotify.com`. Ob sie ohne Sitzung abrufbar sind, ist nicht geprüft.
+* POS-Zuordnung Enchilada Köln (`/api/pos/mapping/1095/articles`): Form
+  `{items[]}` mit `plu, name, recipeId, recipeTitle, price` (String), `vat`,
+  `isSyncing, isIgnored, remoteProductId, externalId`. 164 von 1.046
+  Kassenartikeln haben ein Rezept — dieselbe dünne Pflege wie in Gera.
+
 ---
 
 ## 4. Warenwirtschaft
