@@ -23,11 +23,11 @@
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:15px;line-height:1.5;padding-inline:clamp(16px,4vw,40px);padding-block:32px 64px;font-variant-numeric:tabular-nums}
 main{max-width:1080px;margin:0 auto;display:grid;gap:40px}
-h1,h2{font-family:"Fraunces","Iowan Old Style",Georgia,serif;font-variation-settings:"SOFT" 60,"opsz" 96;font-weight:500;letter-spacing:-.01em;text-wrap:balance;margin:0}
+h1,h2{font-family:"Fraunces","Iowan Old Style",Georgia,serif;font-variation-settings:"SOFT" 60,"opsz" 96;font-weight:500;letter-spacing:-.01em;margin:0}
 h1{font-size:clamp(30px,4.6vw,46px);line-height:1.08}
 h2{font-size:clamp(22px,2.6vw,27px);line-height:1.2;margin-bottom:12px}
 .eyebrow{font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--mute);font-weight:500;margin-bottom:12px}
-p{max-width:66ch;margin:0}
+p{margin:0}
 .lead{font-size:17px;color:var(--ink);margin-top:18px}
 .lead b{font-weight:600}
 header p+p{margin-top:10px}
@@ -72,7 +72,7 @@ sup{color:var(--rest);font-weight:600}
 .legend .a::before{background:var(--akt)} .legend .r::before{background:var(--rest)}
 .tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);font-size:12.5px;line-height:1.4;padding:7px 10px;border-radius:5px;transform:translate(-50%,-110%);white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.18)}
 .tip b{font-weight:600}
-ul.notes{max-width:72ch;margin:12px 0 0;padding-left:20px;display:grid;gap:8px;color:var(--ink2)}
+ul.notes{margin:12px 0 0;padding-left:20px;display:grid;gap:8px;color:var(--ink2)}
 ul.notes li::marker{color:var(--mute)}
 ul.notes b{color:var(--ink);font-weight:600}
 footer{color:var(--mute);font-size:12.5px;border-top:1px solid var(--line);padding-top:14px}
@@ -277,11 +277,11 @@ footer{color:var(--mute);font-size:12.5px;border-top:1px solid var(--line);paddi
   <text class="band-l" x="491.0" y="32">Aktionszeitraum August</text>
   <line class="grid" x1="44" x2="632" y1="256.0" y2="256.0"/><text class="tick" x="36" y="260.0" text-anchor="end">0 %</text><line class="grid" x1="44" x2="632" y1="208.4" y2="208.4"/><text class="tick" x="36" y="212.4" text-anchor="end">2 %</text><line class="grid" x1="44" x2="632" y1="160.8" y2="160.8"/><text class="tick" x="36" y="164.8" text-anchor="end">4 %</text><line class="grid" x1="44" x2="632" y1="113.2" y2="113.2"/><text class="tick" x="36" y="117.2" text-anchor="end">6 %</text><line class="grid" x1="44" x2="632" y1="65.6" y2="65.6"/><text class="tick" x="36" y="69.6" text-anchor="end">8 %</text><line class="grid" x1="44" x2="632" y1="18.0" y2="18.0"/><text class="tick" x="36" y="22.0" text-anchor="end">10 %</text>
   <text class="tick" x="44.0" y="276" text-anchor="middle">01.06.</text><text class="tick" x="142.0" y="276" text-anchor="middle">15.06.</text><text class="tick" x="240.0" y="276" text-anchor="middle">29.06.</text><text class="tick" x="338.0" y="276" text-anchor="middle">13.07.</text><text class="tick" x="436.0" y="276" text-anchor="middle">27.07.</text><text class="tick" x="534.0" y="276" text-anchor="middle">10.08.</text><text class="tick" x="632.0" y="276" text-anchor="middle">24.08.</text>
-  <path class="l-rest" d="M44.0,98.9 L93.0,110.8 L142.0,189.4 L191.0,96.5 L240.0,134.6 L289.0,163.2 L338.0,146.5 L387.0,141.8 L436.0,132.2 L485.0,127.5 L534.0,144.1 L583.0,141.8 L632.0,151.3"/>
+  <path class="l-rest" d="M44.0,98.9 L93.0,110.8 L142.0,189.4 L191.0,96.5 L240.0,134.6 L289.0,163.2 L338.0,146.5 L387.0,141.8 L436.0,132.2 L485.0,127.5 L534.0,144.1 L583.0,144.1 L632.0,144.1"/>
   <path class="l-akt" d="M44.0,158.4 L93.0,177.5 L142.0,167.9 L191.0,175.1 L240.0,165.6 L289.0,165.6 L338.0,165.6 L387.0,172.7 L436.0,141.8 L485.0,122.7 L534.0,108.4 L583.0,103.7 L632.0,82.3"/>
-  <circle class="p-rest" cx="44.0" cy="98.9" r="4"/><circle class="p-akt" cx="44.0" cy="158.4" r="4"/><circle class="p-rest" cx="93.0" cy="110.8" r="4"/><circle class="p-akt" cx="93.0" cy="177.5" r="4"/><circle class="p-rest" cx="142.0" cy="189.4" r="4"/><circle class="p-akt" cx="142.0" cy="167.9" r="4"/><circle class="p-rest" cx="191.0" cy="96.5" r="4"/><circle class="p-akt" cx="191.0" cy="175.1" r="4"/><circle class="p-rest" cx="240.0" cy="134.6" r="4"/><circle class="p-akt" cx="240.0" cy="165.6" r="4"/><circle class="p-rest" cx="289.0" cy="163.2" r="4"/><circle class="p-akt" cx="289.0" cy="165.6" r="4"/><circle class="p-rest" cx="338.0" cy="146.5" r="4"/><circle class="p-akt" cx="338.0" cy="165.6" r="4"/><circle class="p-rest" cx="387.0" cy="141.8" r="4"/><circle class="p-akt" cx="387.0" cy="172.7" r="4"/><circle class="p-rest" cx="436.0" cy="132.2" r="4"/><circle class="p-akt" cx="436.0" cy="141.8" r="4"/><circle class="p-rest" cx="485.0" cy="127.5" r="4"/><circle class="p-akt" cx="485.0" cy="122.7" r="4"/><circle class="p-rest" cx="534.0" cy="144.1" r="4"/><circle class="p-akt" cx="534.0" cy="108.4" r="4"/><circle class="p-rest" cx="583.0" cy="141.8" r="4"/><circle class="p-akt" cx="583.0" cy="103.7" r="4"/><circle class="p-rest" cx="632.0" cy="151.3" r="4"/><circle class="p-akt" cx="632.0" cy="82.3" r="4"/>
+  <circle class="p-rest" cx="44.0" cy="98.9" r="4"/><circle class="p-akt" cx="44.0" cy="158.4" r="4"/><circle class="p-rest" cx="93.0" cy="110.8" r="4"/><circle class="p-akt" cx="93.0" cy="177.5" r="4"/><circle class="p-rest" cx="142.0" cy="189.4" r="4"/><circle class="p-akt" cx="142.0" cy="167.9" r="4"/><circle class="p-rest" cx="191.0" cy="96.5" r="4"/><circle class="p-akt" cx="191.0" cy="175.1" r="4"/><circle class="p-rest" cx="240.0" cy="134.6" r="4"/><circle class="p-akt" cx="240.0" cy="165.6" r="4"/><circle class="p-rest" cx="289.0" cy="163.2" r="4"/><circle class="p-akt" cx="289.0" cy="165.6" r="4"/><circle class="p-rest" cx="338.0" cy="146.5" r="4"/><circle class="p-akt" cx="338.0" cy="165.6" r="4"/><circle class="p-rest" cx="387.0" cy="141.8" r="4"/><circle class="p-akt" cx="387.0" cy="172.7" r="4"/><circle class="p-rest" cx="436.0" cy="132.2" r="4"/><circle class="p-akt" cx="436.0" cy="141.8" r="4"/><circle class="p-rest" cx="485.0" cy="127.5" r="4"/><circle class="p-akt" cx="485.0" cy="122.7" r="4"/><circle class="p-rest" cx="534.0" cy="144.1" r="4"/><circle class="p-akt" cx="534.0" cy="108.4" r="4"/><circle class="p-rest" cx="583.0" cy="144.1" r="4"/><circle class="p-akt" cx="583.0" cy="103.7" r="4"/><circle class="p-rest" cx="632.0" cy="144.1" r="4"/><circle class="p-akt" cx="632.0" cy="82.3" r="4"/>
   <text class="lab lab-akt" x="642.0" y="86.3">Aktionsartikel 7,3 %</text>
-  <text class="lab lab-rest" x="642.0" y="155.3">übriges Sortiment 4,4 %</text>
+  <text class="lab lab-rest" x="642.0" y="148.1">übriges Sortiment 4,7 %</text>
   <line id="cross" class="cross" x1="0" x2="0" y1="18" y2="256" hidden/>
   <rect id="hit" x="44" y="18" width="588" height="238" fill="transparent"/>
 </svg>
@@ -784,7 +784,7 @@ footer{color:var(--mute);font-size:12.5px;border-top:1px solid var(--line);paddi
 </main>
 <script>
 (function(){
-  var D=[{"x":44,"kw":"01.06.","tage":7,"a":4.1,"r":6.6,"m":19010,"an":40.3},{"x":93,"kw":"08.06.","tage":7,"a":3.3,"r":6.1,"m":17113,"an":40.1},{"x":142,"kw":"15.06.","tage":7,"a":3.7,"r":2.8,"m":16008,"an":38.5},{"x":191,"kw":"22.06.","tage":7,"a":3.4,"r":6.7,"m":15354,"an":42.3},{"x":240,"kw":"29.06.","tage":7,"a":3.8,"r":5.1,"m":19676,"an":43},{"x":289,"kw":"06.07.","tage":7,"a":3.8,"r":3.9,"m":19239,"an":43.4},{"x":338,"kw":"13.07.","tage":7,"a":3.8,"r":4.6,"m":19961,"an":44.4},{"x":387,"kw":"20.07.","tage":6,"a":3.5,"r":4.8,"m":16097,"an":45},{"x":436,"kw":"27.07.","tage":7,"a":4.8,"r":5.2,"m":20127,"an":44.4},{"x":485,"kw":"03.08.","tage":7,"a":5.6,"r":5.4,"m":21074,"an":44.5},{"x":534,"kw":"10.08.","tage":7,"a":6.2,"r":4.7,"m":18886,"an":44},{"x":583,"kw":"17.08.","tage":7,"a":6.4,"r":4.8,"m":20908,"an":45.6},{"x":632,"kw":"24.08.","tage":7,"a":7.3,"r":4.4,"m":20880,"an":45.6}];
+  var D=[{"x":44,"kw":"01.06.","tage":7,"a":4.1,"r":6.6,"m":19010,"an":40.3},{"x":93,"kw":"08.06.","tage":7,"a":3.3,"r":6.1,"m":17113,"an":40.1},{"x":142,"kw":"15.06.","tage":7,"a":3.7,"r":2.8,"m":16008,"an":38.5},{"x":191,"kw":"22.06.","tage":7,"a":3.4,"r":6.7,"m":15354,"an":42.3},{"x":240,"kw":"29.06.","tage":7,"a":3.8,"r":5.1,"m":19676,"an":43},{"x":289,"kw":"06.07.","tage":7,"a":3.8,"r":3.9,"m":19239,"an":43.4},{"x":338,"kw":"13.07.","tage":7,"a":3.8,"r":4.6,"m":19961,"an":44.4},{"x":387,"kw":"20.07.","tage":6,"a":3.5,"r":4.8,"m":16097,"an":45},{"x":436,"kw":"27.07.","tage":7,"a":4.8,"r":5.2,"m":20127,"an":44.4},{"x":485,"kw":"03.08.","tage":7,"a":5.6,"r":5.4,"m":21074,"an":44.5},{"x":534,"kw":"10.08.","tage":7,"a":6.2,"r":4.7,"m":18886,"an":44},{"x":583,"kw":"17.08.","tage":7,"a":6.4,"r":4.7,"m":20908,"an":45.6},{"x":632,"kw":"24.08.","tage":7,"a":7.3,"r":4.7,"m":20880,"an":45.6}];
   var fig=document.getElementById('fig'),svg=fig.querySelector('svg'),hit=document.getElementById('hit'),cross=document.getElementById('cross'),tip=document.getElementById('tip');
   var f1=function(v){return v.toLocaleString('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1})+'\u00a0%'};
   function pt(ev){var p=svg.createSVGPoint();p.x=ev.clientX;p.y=ev.clientY;return p.matrixTransform(svg.getScreenCTM().inverse());}
