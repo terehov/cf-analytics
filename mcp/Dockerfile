@@ -16,9 +16,16 @@
 # uebernehmen.ts fuer Metabase und von diesem Server fuer den Chat
 # (docs/plan-skybridge.md, Abschnitt 2). Sie muessen also mit ins Image.
 
-FROM oven/bun:1.2.19-alpine AS bau
+# BAUEN MIT NODE 24, NICHT MIT ALPINES `nodejs`. `vite build` laeuft unter
+# Node (Shebang), und vite 8 verlangt >= 20.19, skybridge 2 sogar >= 22.23.1
+# (`fs.globSync` in views/scan-views.js). `apk add nodejs` auf dem Bun-Image
+# (Alpine 3.20) liefert 20.15.1 — der erste Bau in Dokploy scheiterte am
+# 15.09.2026 genau daran: "does not provide an export named 'globSync'".
+# Deshalb umgekehrt: das Node-Image als Grundlage, Bun als eine Datei
+# hineinkopiert, in derselben Version wie in der Laufzeitstufe.
+FROM node:24.15.0-alpine AS bau
 
-RUN apk add --no-cache nodejs
+COPY --from=oven/bun:1.2.19-alpine /usr/local/bin/bun /usr/local/bin/bun
 WORKDIR /app
 
 # Telemetrie aus, schon im Bau. Das Skybridge-CLI meldet Nutzungsdaten an
