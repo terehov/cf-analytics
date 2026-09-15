@@ -2,7 +2,7 @@
 -- Inhalt des semantischen Katalogs: Achsen, Koernung, Kennzahlregeln,
 -- Fallstricke.  Plan: docs/plan-skybridge.md, Abschnitt 5.
 --
--- Getrennt von 0100, weil das eine das Geruest ist und das andere Pflege:
+-- Getrennt von 0102, weil das eine das Geruest ist und das andere Pflege:
 -- diese Datei waechst mit jeder neuen Sicht und jedem neuen Befund weiter,
 -- die Tabellen darunter nicht.
 --

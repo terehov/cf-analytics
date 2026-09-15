@@ -3285,7 +3285,7 @@ falsche Rolle. Alle Befunde in `fehlerkatalog.md`; hier die Entscheidungen, die 
 
 Weil das Schema zwei Arten von Tabellen traegt — Katalog fuer den Leser, Anmeldung fuer die
 Anmeldung — und ein pauschales `GRANT ON ALL TABLES` die Trennung bei jedem Aufruf wieder
-aufhebt. Migration `0103` bricht ab, wenn der Leser nach dem Lauf an den Signierschluessel
+aufhebt. Migration `0105` bricht ab, wenn der Leser nach dem Lauf an den Signierschluessel
 kaeme, und `mart.mcp_rechte_pruefung` (Erwartung: leer) wacht danach.
 
 ### Jede freie Abfrage laeuft in einer Transaktion, die zurueckgerollt wird

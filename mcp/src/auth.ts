@@ -2,7 +2,7 @@
  * Wer darf was.
  *
  * DER SERVER HAT EIGENE NUTZER — seit dem 13.09.2026 mit eigener Anmeldung
- * statt eines fremden Identitaetsanbieters (Migration 0102,
+ * statt eines fremden Identitaetsanbieters (Migration 0104,
  * src/anmeldung/). Die Identitaet steht im Zugangstoken, die Stufe wird
  * trotzdem BEI JEDEM AUFRUF frisch gelesen.
  *

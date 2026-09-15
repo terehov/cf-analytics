@@ -15,7 +15,7 @@
  *
  * Deshalb: eigene Rolle, eigene Verbindung. `mcp_anmeldung` sieht die
  * Anmeldetabellen und sonst nichts; `mcp_leser` sieht sie nicht. Postgres
- * setzt das durch, nicht dieser Code (Migration 0102).
+ * setzt das durch, nicht dieser Code (Migration 0104).
  */
 import pg from 'pg'
 

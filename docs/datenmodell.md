@@ -709,7 +709,7 @@ und `counts`, Wert verworfen und dort abgelegt) sind quittiert. Die Abfrage
 
 ---
 
-## Schema `mcp`: der semantische Katalog (Migrationen 0100/0101, 13.09.2026)
+## Schema `mcp`: der semantische Katalog (Migrationen 0102/0103, 13.09.2026)
 
 Wissen **über** das Schema, keine Fachdaten — deshalb ein eigenes Schema und nicht ein paar
 Tabellen in `manual`. Derselbe Schnitt wie bei `sync`: der Betriebszustand eines Dienstes
@@ -741,7 +741,7 @@ aber nur **23** schreiben aus, wovon sie eine Zeile je Einheit führen. Genau da
 Sprachmodell, bevor es summiert: `mart.umsatz_tag` darf man summieren,
 `mart.umsatz_tag_sparte` nur je Sparte, `mart.round_table_monat` gar nicht.
 
-`0101` trägt sie für **158 Sichten** nach. `mcp.koernung_in_kommentare()` hängt sie
+`0103` trägt sie für **158 Sichten** nach. `mcp.koernung_in_kommentare()` hängt sie
 zusätzlich an den Tabellenkommentar — damit nützt dieselbe Arbeit dem MCP-Server, Metabase
 und jedem Agenten im Repository gleichzeitig. Die Funktion ist idempotent (sie erkennt die
 Marke `Koernung:`) und hat beim ersten Lauf 71 Kommentare ergänzt.
@@ -789,7 +789,7 @@ Das Passwort setzt ein Mensch von Hand (harte Regel 2). Bis dahin steht der Fehl
 hielte sonst den Containerstart an.
 
 
-### Die Anmeldung: zwei Rollen, nicht eine (Migration 0102, 13.09.2026)
+### Die Anmeldung: zwei Rollen, nicht eine (Migration 0104, 13.09.2026)
 
 Der MCP-Server ist seit dem 13.09.2026 sein **eigener** Autorisierungsserver — kein Entra,
 kein WorkOS. Begründung in `entscheidungen.md`; hier steht, was das fürs Schema heißt.

@@ -269,7 +269,7 @@ export function pruefen(sql: string, katalog: Katalog): Pruefergebnis {
   /**
    * Die Anmeldetabellen sind auch innerhalb von `mcp` tabu.
    *
-   * Tragend ist der Rechteentzug in Migration 0102 — `mcp_leser` bekommt auf
+   * Tragend ist der Rechteentzug in Migration 0104 — `mcp_leser` bekommt auf
    * diese Tabellen gar kein SELECT, Postgres antwortet mit „permission
    * denied". Diese Regel hier ersetzt das nicht, sie erklaert es: eine
    * verstaendliche Meldung ist besser als ein Rechtefehler, den das Modell

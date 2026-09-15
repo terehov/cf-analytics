@@ -3924,13 +3924,13 @@ worden —, und genau deshalb steht der Review vor dem Ausrollen.
 
 ### 1. `rechte_auffrischen()` gab den Signierschluessel zurueck
 
-**Symptom.** Nach Migration `0102` war `mcp.oauth_schluessel` fuer `mcp_leser` unsichtbar.
+**Symptom.** Nach Migration `0104` war `mcp.oauth_schluessel` fuer `mcp_leser` unsichtbar.
 Ein Aufruf von `SELECT mcp.rechte_auffrischen()` — laut Kommentar und README „idempotent,
 nach jeder Migration aufrufbar" — und als `mcp_leser`: `SELECT count(*) FROM
 mcp.oauth_schluessel` → **1**.
 
-**Ursache.** `0100` vergab `SELECT ON ALL TABLES IN SCHEMA mcp` pauschal, weil es damals nur
-den Katalog gab. `0102` entzog die Anmeldetabellen — aber die Funktion vergab beim naechsten
+**Ursache.** `0102` vergab `SELECT ON ALL TABLES IN SCHEMA mcp` pauschal, weil es damals nur
+den Katalog gab. `0104` entzog die Anmeldetabellen — aber die Funktion vergab beim naechsten
 Aufruf wieder pauschal. Ein Routineaufruf haette einem Nutzer mit Stufe `fragen` den privaten
 Schluessel gegeben: `SELECT privat_jwk FROM mcp.oauth_schluessel`, und ab dann stellt er sich
 Tokens selbst aus.
@@ -3938,7 +3938,7 @@ Tokens selbst aus.
 Dieselbe Wurzel: `ALTER DEFAULT PRIVILEGES ... IN SCHEMA mcp GRANT SELECT` machte **jede neue
 Tabelle** in `mcp` sofort lesbar. Gemessen mit `CREATE TABLE mcp._probe(x int)`.
 
-**Was ihn verhindert.** Migration `0103`: im Schema `mcp` wird **namentlich** vergeben, nie
+**Was ihn verhindert.** Migration `0105`: im Schema `mcp` wird **namentlich** vergeben, nie
 pauschal; die Standardvergabe fuer `mcp` ist zurueckgenommen; die Migration bricht ab, wenn
 `mcp_leser` nach dem Lauf doch an `oauth_schluessel` oder `nutzer` kaeme; und
 `mart.mcp_rechte_pruefung` (Erwartung: leer) meldet es, falls es je wieder kippt.

@@ -7,17 +7,17 @@
 --   -- als mcp_leser danach:
 --   SELECT count(*) FROM mcp.oauth_schluessel;   --> 1
 --
--- `rechte_auffrischen()` aus Migration 0100 vergibt `SELECT ON ALL TABLES IN
--- SCHEMA mcp` — pauschal, weil es damals nur den Katalog gab. Seit 0102
+-- `rechte_auffrischen()` aus Migration 0102 vergibt `SELECT ON ALL TABLES IN
+-- SCHEMA mcp` — pauschal, weil es damals nur den Katalog gab. Seit 0104
 -- liegen im selben Schema die Passworthashes und der Signierschluessel, und
--- 0102 entzieht sie der Leserolle wieder. Aber `rechte_auffrischen()` ist
+-- 0104 entzieht sie der Leserolle wieder. Aber `rechte_auffrischen()` ist
 -- laut Kommentar und README „idempotent, nach jeder Migration aufrufbar" —
 -- und genau dieser Aufruf haette den Entzug rueckgaengig gemacht. Eine
 -- Migration spaeter, ein Routineaufruf, und `mcp_leser` liest den
 -- Signierschluessel: der Nutzer mit Stufe `fragen` stellt sich Tokens aus.
 --
 -- Zweiter Befund, dieselbe Wurzel: `ALTER DEFAULT PRIVILEGES ... IN SCHEMA
--- mcp GRANT SELECT ON TABLES TO mcp_leser` (ebenfalls 0100) macht JEDE neue
+-- mcp GRANT SELECT ON TABLES TO mcp_leser` (ebenfalls 0102) macht JEDE neue
 -- Tabelle in `mcp` fuer die Leserolle lesbar, bevor irgendjemand entscheidet,
 -- ob sie das darf. Gemessen: `CREATE TABLE mcp._probe(x int)` — sofort
 -- lesbar.
@@ -96,8 +96,8 @@ END $$;
 
 COMMENT ON FUNCTION mcp.rechte_auffrischen() IS
 'Legt die Leserolle mcp_leser an und setzt ihre Rechte. Im Schema mcp wird NAMENTLICH
-vergeben, nie pauschal — die Anmeldetabellen (0102) duerfen ihr nie in die Hand fallen,
-auch nicht durch einen spaeteren Aufruf dieser Funktion (Befund 13.09.2026, siehe 0103).
+vergeben, nie pauschal — die Anmeldetabellen (0104) duerfen ihr nie in die Hand fallen,
+auch nicht durch einen spaeteren Aufruf dieser Funktion (Befund 13.09.2026, siehe 0105).
 Idempotent. Wer eine Katalogtabelle ergaenzt, traegt sie hier ein.';
 
 -- 3. Einmal ausfuehren, damit der Zustand stimmt — und die Gegenprobe gleich
@@ -108,7 +108,7 @@ DO $$
 BEGIN
   IF has_table_privilege('mcp_leser', 'mcp.oauth_schluessel', 'SELECT')
      OR has_table_privilege('mcp_leser', 'mcp.nutzer', 'SELECT') THEN
-    RAISE EXCEPTION 'mcp_leser kann die Anmeldetabellen lesen — das darf nach 0103 nicht sein';
+    RAISE EXCEPTION 'mcp_leser kann die Anmeldetabellen lesen — das darf nach 0105 nicht sein';
   END IF;
 END $$;
 

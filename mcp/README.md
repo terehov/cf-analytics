@@ -138,7 +138,7 @@ kein Deploy (dieselbe Begründung wie bei den Ampelregelwerken).
 | Beziehungen | `mcp.achse`; `metabase/beziehungen.ts` liest von dort |
 
 **Rechte im Schema `mcp` werden namentlich vergeben.** Wer eine Katalogtabelle
-ergänzt, trägt sie in `mcp.rechte_auffrischen()` ein (Migration `0103`); eine
+ergänzt, trägt sie in `mcp.rechte_auffrischen()` ein (Migration `0105`); eine
 neue Tabelle ist sonst für keine Rolle lesbar — absichtlich. `mart.mcp_rechte_pruefung`
 muss leer sein.
 

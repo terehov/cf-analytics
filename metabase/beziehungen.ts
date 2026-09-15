@@ -92,7 +92,7 @@ const ACHSEN: readonly Achse[] = (await query<Achse>(`
    ORDER BY achse`)).map(a => ({ ...a }))
 
 if (ACHSEN.length === 0) {
-  console.error('mcp.achse enthaelt keine Dimension mit ziel_sicht — Migration 0101 angewendet?')
+  console.error('mcp.achse enthaelt keine Dimension mit ziel_sicht — Migration 0103 angewendet?')
   console.error('Ohne Achsen gibt es nichts zu verdrahten; das waere ein stiller Leerlauf.')
   process.exit(1)
 }

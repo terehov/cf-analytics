@@ -1686,7 +1686,7 @@ braucht ein neuer Rechner ein `pg_dump --schema-only` aus Produktion.
 Phasen 1 bis 4 stehen (13.09.2026). Was fehlt, fehlt nicht im Code:
 
 * ~~**Der Identitätsanbieter.**~~ Entfällt: der Server bringt seine eigene Anmeldung mit
-  (Migration `0102`). Entra wäre daran gescheitert, dass ChatGPT sich per Dynamic Client
+  (Migration `0104`). Entra wäre daran gescheitert, dass ChatGPT sich per Dynamic Client
   Registration anmeldet und Entra dafür keinen Endpunkt hat.
 * **Wer geht, muss stillgelegt werden.** Das ist der Preis der eigenen Anmeldung: es gibt
   keinen Unternehmensanbieter, der einen Austritt von selbst durchreicht.

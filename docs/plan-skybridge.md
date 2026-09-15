@@ -389,7 +389,7 @@ Ampeltabellen.
 
 ## 9. Phasen
 
-> **Stand 13.09.2026: Phasen 1 bis 4 sind gebaut** (Migrationen `0100`/`0101`, Verzeichnis
+> **Stand 13.09.2026: Phasen 1 bis 4 sind gebaut** (Migrationen `0102`/`0103`, Verzeichnis
 > `mcp/`, 321 Tests). Phase 5 braucht Entscheidungen, die nicht im Repository liegen —
 > Identitätsanbieter, Hostname, TLS —, Phase 6 braucht einen Monat Betrieb. Was jeweils
 > tatsächlich entstand, steht in der letzten Spalte; was anders entschieden wurde als hier
@@ -401,7 +401,7 @@ Ampeltabellen.
 | **2 — Berichte** | `berichte_suchen`, `bericht_ausfuehren` | **fertig.** Alle 285 Karten übersetzen zu gültigem SQL, ohne und mit gesetzten Filtern (Test) |
 | **3 — Prüfung** | Parser, Regeln, Befund-Anhang, Protokoll | **fertig.** Die zehn Fallenfragen laufen als Testdatei |
 | **4 — Ansichten** | Ampelraster, Ergebnistabelle | **fertig** für die beiden Tabellen. **Diagramme zeichnet das Modell**, nicht der Server — entschieden am 13.09.2026 (`entscheidungen.md`, 6); dafür trägt jede Antwort `spalten_info` und `darstellung` |
-| **5 — Betrieb** | Dokploy, TLS, Nutzer anlegen | **teilweise.** Die Anmeldung ist gebaut und gemessen (Migration `0102`, `mcp/src/anmeldung/`); offen bleiben Hostname, TLS und die Dokploy-Application |
+| **5 — Betrieb** | Dokploy, TLS, Nutzer anlegen | **teilweise.** Die Anmeldung ist gebaut und gemessen (Migration `0104`, `mcp/src/anmeldung/`); offen bleiben Hostname, TLS und die Dokploy-Application |
 | **6 — Messen** | `mcp.zugriff` gegen das Anmeldeprotokoll des BI-Tools | **offen** — vier Wochen nach Phase 5 |
 
 ### Wie es geplant war
