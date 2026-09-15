@@ -71,6 +71,29 @@ export class Gesperrt extends Error {
 }
 
 /**
+ * Ausnahmen, die SCHON in mcp.zugriff stehen.
+ *
+ * Seit dem 15.09.2026 traegt eine Middleware (zugriff_protokoll.ts) jeden
+ * gescheiterten Werkzeugaufruf ein, der sonst keinen Eintrag bekaeme. Der
+ * Abfrageweg hier schreibt seine Eintraege aber selbst — mit SQL, Sichten und
+ * Befunden, die die Middleware nicht mehr sieht — und muss das kenntlich
+ * machen, sonst stuende jede Sperre zweimal im Protokoll und mart.mcp_nutzung
+ * zaehlte sie doppelt. Eine Gesperrt ist immer protokolliert (beide Stellen,
+ * die sie werfen, schreiben vorher); alles andere wird beim Werfen markiert.
+ */
+const PROTOKOLLIERT = Symbol('protokolliert')
+
+export function alsProtokolliert<T>(e: T): T {
+  if (e !== null && typeof e === 'object') (e as Record<symbol, unknown>)[PROTOKOLLIERT] = true
+  return e
+}
+
+export function istProtokolliert(e: unknown): boolean {
+  return e instanceof Gesperrt
+    || (e !== null && typeof e === 'object' && (e as Record<symbol, unknown>)[PROTOKOLLIERT] === true)
+}
+
+/**
  * Der Text, den das Modell zu sehen bekommt, wenn eine Abfrage nicht laeuft.
  *
  * DIESE FUNKTION IST DER PUNKT DES GANZEN PRUEFERS. Eine Sperre, die nur
@@ -259,7 +282,7 @@ async function laufenLassen(
     const meldung = String((e as Error)?.message ?? e)
     await protokollieren({ nutzer, werkzeug, parameter, sql, sichten: pruefung.sichten,
       dauer_ms: Date.now() - start, fehler: meldung })
-    throw e
+    throw alsProtokolliert(e)
   } finally {
     c.release()
   }

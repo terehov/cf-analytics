@@ -91,7 +91,10 @@ function zeitraumTeile(wert: unknown): [string, string] | null {
   return null
 }
 
-export class BerichtFehler extends Error {}
+/** Mit Namen, damit der Eintrag in mcp.zugriff "BerichtFehler: …" heisst und nicht "Error: …". */
+export class BerichtFehler extends Error {
+  constructor(meldung: string) { super(meldung); this.name = 'BerichtFehler' }
+}
 
 /**
  * Karte + Werte → ausfuehrbares SQL mit Parametern.

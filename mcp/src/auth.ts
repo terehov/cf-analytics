@@ -26,7 +26,10 @@ export type Angemeldet = {
   client: string | null
 }
 
-export class NichtErlaubt extends Error {}
+/** Mit Namen, damit der Eintrag in mcp.zugriff "NichtErlaubt: …" heisst und nicht "Error: …". */
+export class NichtErlaubt extends Error {
+  constructor(meldung: string) { super(meldung); this.name = 'NichtErlaubt' }
+}
 
 /** Aus dem geprueften Token die Kennung ziehen. */
 export function subjektAus(extra: any): string | null {

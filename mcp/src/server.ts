@@ -31,6 +31,7 @@ import { pruefen } from './pruefen'
 import { anmeldungMontieren, metadaten } from './anmeldung/endpunkte'
 import { anmeldungAbfragen, anmeldungEingerichtet } from './anmeldung/db'
 import { zugangstokenPruefen } from './anmeldung/schluessel'
+import { gescheiterteAufrufeProtokollieren } from './zugriff_protokoll'
 
 /**
  * Die Form, in der JEDES Ergebnis zurueckkommt — Bericht wie freie Abfrage.
@@ -80,6 +81,9 @@ const ERGEBNIS_SCHEMA = {
 
 const nutzerAus = (a: Angemeldet): Nutzer =>
   ({ subject: a.subject, anzeige: a.anzeige, client: a.client })
+
+/** Startzeit des Prozesses — fuer /status. */
+const GESTARTET = new Date().toISOString()
 
 /**
  * Die Sichten, die ein Karten-SQL anspricht — fuer den Koernungs-Anhang.
@@ -198,6 +202,10 @@ export const app = new Skybridge({
   },
 
   handler: (server, { katalog }: { katalog: Katalog }) => server
+
+    // Jeder gescheiterte Aufruf steht im Protokoll — auch der, dessen
+    // Werkzeug vor dem eigenen protokollieren() abbrach (zugriff_protokoll.ts).
+    .mcpMiddleware('tools/call', gescheiterteAufrufeProtokollieren)
 
     // =================================================================
     // Berichte — die Metabase-Abloesung
@@ -363,7 +371,7 @@ export const app = new Skybridge({
       },
       annotations: { readOnlyHint: true },
     }, async ({ sicht, andere }, extra) => {
-      await anmelden(extra)
+      const nutzer = await anmelden(extra)
       const voll = (n: string) => (n.includes('.') ? n : `mart.${n}`)
       const a = katalog.sichten.get(voll(sicht))
       if (!a) throw new Error(`${voll(sicht)} steht nicht im Katalog.`)
@@ -373,6 +381,8 @@ export const app = new Skybridge({
                  dimension: ach?.ziel_sicht, anzeige: ach?.anzeige_spalte }
       })
       if (!andere) {
+        await protokollieren({ nutzer: nutzerAus(nutzer), werkzeug: 'achsen_zeigen',
+          parameter: { sicht }, zeilen: a.achsen.length })
         return {
           structuredContent: { sicht: a.sicht, achsen: beschreiben(a.achsen) },
           content: `${a.sicht} traegt: ${a.achsen.join(', ') || '(keine bekannte Achse)'}`,
@@ -381,6 +391,8 @@ export const app = new Skybridge({
       const b = katalog.sichten.get(voll(andere))
       if (!b) throw new Error(`${voll(andere)} steht nicht im Katalog.`)
       const gemeinsam = a.achsen.filter(x => b.achsen.includes(x))
+      await protokollieren({ nutzer: nutzerAus(nutzer), werkzeug: 'achsen_zeigen',
+        parameter: { sicht, andere }, zeilen: gemeinsam.length })
       return {
         structuredContent: {
           a: a.sicht, b: b.sicht, gemeinsam: beschreiben(gemeinsam),
@@ -431,7 +443,8 @@ export const app = new Skybridge({
       inputSchema: { betrieb: z.string().optional().describe('Name oder Teil davon; leer = alle') },
       annotations: { readOnlyHint: true },
     }, async ({ betrieb }, extra) => {
-      await anmelden(extra)
+      const nutzer = await anmelden(extra)
+      const start = Date.now()
       const zeilen = betrieb
         ? await abfragen(`SELECT betrieb, konzept, letzter_tag::text, umsatz_alter_tage,
                                  bwa_monat::text, bwa_verzug_monate, befund
@@ -440,6 +453,10 @@ export const app = new Skybridge({
         : await abfragen(`SELECT befund, count(*)::int AS betriebe,
                                  max(letzter_tag)::text AS umsatz_bis, max(bwa_monat)::text AS bwa_bis
                             FROM mart.datenstand GROUP BY befund ORDER BY 2 DESC`)
+      // Mit Dauer: am 15.09.2026 lief genau diese Abfrage in die 20-s-Grenze,
+      // und niemand konnte hinterher sagen, wie lange sie sonst braucht.
+      await protokollieren({ nutzer: nutzerAus(nutzer), werkzeug: 'datenstand',
+        parameter: { betrieb }, zeilen: zeilen.length, dauer_ms: Date.now() - start })
       return { structuredContent: { zeilen }, content: `${zeilen.length} Zeilen.` }
     })
 
@@ -583,8 +600,10 @@ app.express.get('/status', async (_req: any, antwort: any) => {
               (SELECT count(*)::int FROM mcp.anmeldung_protokoll
                 WHERE NOT erfolg AND zeitpunkt > now() - interval '24 hours') AS gescheitert_24h`)
     const stufe = offen.length ? 'stoerung' : 'ok'
+    // `gestartet`: seit wann DIESER Container laeuft. Nach einem Push die
+    // einzige Auskunft von aussen, ob der neue Stand schon antwortet.
     antwort.status(stufe === 'ok' ? 200 : 503).json({
-      status: stufe, einrichtung_offen: offen, ...nutzung[0], ...anmeldung })
+      status: stufe, gestartet: GESTARTET, einrichtung_offen: offen, ...nutzung[0], ...anmeldung })
   } catch (e) {
     antwort.status(503).json({ status: 'stoerung', fehler: String(e).slice(0, 300) })
   }
