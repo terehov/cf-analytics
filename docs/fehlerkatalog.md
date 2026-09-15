@@ -3881,6 +3881,134 @@ Tests endeten als `lauf_uebersprungen`. Die e2e-Umgebung setzt seither `HISTORIE
 `NULLTAGE_JE_LAUF` und `NACHLESE_JE_LAUF` auf 0: ein Lauf holt dort nur, was der Test
 eingereiht hat.
 
+## Die Migrationen laufen aus dem Nichts nicht durch (13.09.2026)
+
+**Symptom.** Auf einer leeren Datenbank bricht `bun run migrate` — und jede Nachbildung
+davon, nummerierte Dateien alphabetisch, jede in ihrer Transaktion — bei der 40. Datei ab:
+`0039_betriebsstatus_und_plausibilitaet.sql` meldet `column p.gebinde does not exist`.
+Stellt man diese Datei hinter `0041` zurück, scheitert als nächstes
+`0039_einkaufspreis_belastbar.sql` mit `column bp.preis_je_einheit does not exist`. Die
+Spalten entstehen in `0041_einkaufspreis_gebinde` und `0042_bestellposition_preis`.
+
+**Ursache.** Zwei Dateien tragen eine Nummer, die kleiner ist als die der Migrationen,
+auf die sie sich stützen. In Produktion hat das nie gestört: `public.schema_migration`
+merkt sich Dateinamen, und angewendet wird, was beim jeweiligen Deploy neu war — die
+Reihenfolge war die des Erscheinens, nicht die der Nummer. Die Nummer beschreibt also
+nicht die Anwendungsreihenfolge, und nur die Produktionsdatenbank weiß sie noch.
+
+**Nachgemessen 13.09.2026** auf PostgreSQL 16 in der Agentenumgebung (18 stand nicht zur
+Verfügung; die Fehler sind fehlende Spalten, keine Versionsmerkmale). Ein Versuch, die
+verbleibenden 62 Dateien in Wiederholungsrunden anzuwenden, kam auf 64 von 101 und blieb
+dann an `cannot drop columns from view` hängen — `CREATE OR REPLACE VIEW` verträgt keine
+Reihenfolge, in der eine spätere Fassung vor einer früheren läuft.
+
+**Was das heute bedeutet.** Eine frische Testdatenbank nach `docs/`-Anleitung
+(`createdb lina_test && TEST_DATABASE_URL=…`) lässt sich mit dem Repository allein nicht
+aufbauen; die DB-Tests setzen stillschweigend eine Datenbank voraus, die die Migrationen in
+Produktionsreihenfolge gesehen hat. Ein neuer Rechner braucht ein `pg_dump --schema-only`
+aus Produktion.
+
+**Was ihn künftig verhindert — noch nichts.** Zwei Wege, beide nicht entschieden: die
+beiden Dateien umnummerieren (bricht `schema_migration` in Produktion, außer man trägt die
+Umbenennung dort nach) oder ein Test, der die Migrationen gegen eine leere Datenbank
+laufen lässt und damit jede künftige Rückwärtsnummer sofort meldet. Der zweite ist der
+Test, der diesen Fehler am 12.08.2026 gefunden hätte. Eingetragen in `offene-punkte.md`.
+
+
+## Der MCP-Zugang im Review — elf Umgehungen und ein Generalschluessel (13.09.2026)
+
+Ein Review des frisch gebauten MCP-Servers, mit Angriffen statt Lesen. Alles hier ist
+**gemessen**: jede Abfrage lief tatsaechlich durch den Pruefer, jeder Rechtefehler stand
+tatsaechlich in `psql`. Keine der Luecken war im Betrieb — der Server ist nie ausgerollt
+worden —, und genau deshalb steht der Review vor dem Ausrollen.
+
+### 1. `rechte_auffrischen()` gab den Signierschluessel zurueck
+
+**Symptom.** Nach Migration `0104` war `mcp.oauth_schluessel` fuer `mcp_leser` unsichtbar.
+Ein Aufruf von `SELECT mcp.rechte_auffrischen()` — laut Kommentar und README „idempotent,
+nach jeder Migration aufrufbar" — und als `mcp_leser`: `SELECT count(*) FROM
+mcp.oauth_schluessel` → **1**.
+
+**Ursache.** `0102` vergab `SELECT ON ALL TABLES IN SCHEMA mcp` pauschal, weil es damals nur
+den Katalog gab. `0104` entzog die Anmeldetabellen — aber die Funktion vergab beim naechsten
+Aufruf wieder pauschal. Ein Routineaufruf haette einem Nutzer mit Stufe `fragen` den privaten
+Schluessel gegeben: `SELECT privat_jwk FROM mcp.oauth_schluessel`, und ab dann stellt er sich
+Tokens selbst aus.
+
+Dieselbe Wurzel: `ALTER DEFAULT PRIVILEGES ... IN SCHEMA mcp GRANT SELECT` machte **jede neue
+Tabelle** in `mcp` sofort lesbar. Gemessen mit `CREATE TABLE mcp._probe(x int)`.
+
+**Was ihn verhindert.** Migration `0105`: im Schema `mcp` wird **namentlich** vergeben, nie
+pauschal; die Standardvergabe fuer `mcp` ist zurueckgenommen; die Migration bricht ab, wenn
+`mcp_leser` nach dem Lauf doch an `oauth_schluessel` oder `nutzer` kaeme; und
+`mart.mcp_rechte_pruefung` (Erwartung: leer) meldet es, falls es je wieder kippt.
+
+**Die Lehre.** *Pauschal* und *sicher* schliessen sich aus, sobald ein Schema zwei Arten von
+Tabellen traegt. Eine neue Tabelle, die niemand lesen kann, faellt sofort auf; eine, die jeder
+lesen kann, faellt nie auf.
+
+### 2. Der Pruefer sah Sichten ohne Schema nicht
+
+**Symptom.** `SELECT betrieb, sum(netto) FROM fremdeinkauf GROUP BY betrieb` — ohne `mart.`
+— lief durch. Mit `mart.` war es gesperrt (Doppelzaehlung ohne Filter auf `quelle`).
+
+**Ursache.** Die Regel prueft `z.sichten.has('mart.fremdeinkauf')`; im Baum stand nur
+`fremdeinkauf`. Die Rolle hat `mart` im `search_path`, also lief die Abfrage — und zaehlte
+doppelt. Dieselbe Luecke oeffnete `pg_stat_activity` und alles aus `pg_catalog`, das ohne
+Schema erreichbar ist.
+
+**Was ihn verhindert.** Ein Name ohne Schema wird auf `mart.<name>` normiert, wenn es die
+Sicht im Katalog gibt — und ist sonst gesperrt. Nicht geraten, nicht durchgelassen.
+
+### 3. `set_config` ueberlebte die Abfrage — auf der Pool-Verbindung
+
+**Symptom.** `SELECT set_config('statement_timeout','0',false)` lief durch den Pruefer. Auf
+derselben Verbindung danach `SHOW statement_timeout` → **0**. Der Pool reicht diese Verbindung
+an die naechste Abfrage weiter — die dann ohne Zeitgrenze lief.
+
+**Was ihn verhindert.** Zwei Riegel. Der Pruefer sperrt `set_config`, `pg_sleep`, Advisory
+Locks, Datei- und Netzfunktionen namentlich. Und jede Abfrage laeuft in einer eigenen
+Transaktion `BEGIN READ ONLY` + `SET LOCAL statement_timeout` + `ROLLBACK`: Postgres nimmt
+bei ROLLBACK jede Sitzungseinstellung zurueck, die in der Transaktion gesetzt wurde. Der
+zweite Riegel haelt auch, wenn der erste eine Luecke hat — im Test wird er deshalb ohne den
+Pruefer geprueft.
+
+### 4. Alias-Waesche
+
+`SELECT sum(x.pek) FROM (SELECT pek_gesamt AS pek FROM mart.personalkosten) x` — die
+Kennzahlregel kannte `pek_gesamt`, sah aber `pek`. Der Baum merkt sich seither `spalte AS
+alias` und loest Aggregate, Gruppierungen und Filter durch den Alias hindurch auf. Was er
+**nicht** aufloest: Ausdruecke (`pek_gesamt * 2 AS pek`). Das ist eine bewusste Grenze, keine
+Luecke, die niemand kennt.
+
+### 5. Kleinere, alle gemessen
+
+| Abfrage | vorher | Ursache |
+|---|---|---|
+| `WHERE geschaeftstag BETWEEN a AND b` | Warnung „ohne Zeitraum" | `BETWEEN` ist im Baum kein Operator `>=`, sondern `kind = AEXPR_BETWEEN` |
+| `WHERE vergleichbar = false`, `WHERE NOT vergleichbar` | galten als Filter | die Regel sah nur, DASS verglichen wurde, nicht womit |
+| `we_bar_pct * 100.0`, `* 100::numeric` | nicht erkannt | nur `ival` gelesen; `fval` und `TypeCast` uebersehen |
+| `SELECT * INTO neu FROM …` | ein SELECT wie jeder | `intoClause` nicht geprueft; die Rolle haette es verweigert, mit unverstaendlicher Meldung |
+| gesperrte Abfrage | „wurde nicht ausgefuehrt" | der Grund steckte im Objekt und wurde nie zugestellt (siehe `entscheidungen.md`) |
+
+### 6. Die Anmeldung: zwei Loecher, ein Aergernis
+
+* **Kein Limit je Herkunft.** Die Sperre nach Fehlversuchen hing am Konto; erfundene Adressen
+  trafen keines und kosteten trotzdem je 120 ms argon2 (mit Absicht: Zeitangleich). Ein
+  Rechenzeit-Loch mit einer Zeile Skript. `/register` fuellte ohne Limit die Clienttabelle.
+  Jetzt: 10 Anmeldungen und 5 Registrierungen je Minute und Adresse.
+* **Wiederverwendung war immer Diebstahl.** Ein Client, dessen Tokenantwort in der Leitung
+  verloren ging, legte den alten Token erneut vor — und verlor die ganze Kette. Jede
+  Netzstoerung haette in einer Neuanmeldung geendet. Jetzt: 60 Sekunden Gnadenfrist — aber
+  nur fuer einen Token, der durch ROTATION ersetzt wurde und dessen Nachfolger noch unbenutzt
+  ist (haette der Client ihn erhalten, haette er ihn benutzt). Dann wird der nie zugestellte
+  Nachfolger widerrufen und ein frischer ausgestellt. Alles andere ist ein Konflikt, und die
+  Familie faellt. **Die erste Fassung der Frist war selbst ein Loch**, gefunden im Test: sie
+  liess jeden kuerzlich widerrufenen Token wiederholen — auch die, die die
+  Diebstahlserkennung gerade widerrufen hatte. Ein Dieb mit einem Geschwistertoken haette
+  die Erkennung damit selbst aufgehoben.
+* Ein totes Express-Middleware fuer Werkzeugfehler, das nie erreicht wurde.
+
 ## Drei Tage im Juli wurden zu früh geholt und nie wieder — sieben Wochen null in beiden Berichten (14.09.2026)
 
 **Symptom.** Der 22.07.2026 steht in `core.umsatzbericht_tag` bei allen 141 Betrieben auf 0 €

@@ -2952,3 +2952,425 @@ Ob 21 Tage für den Artikelverkaufsbericht richtig sind, weiß erst die Kurve mi
 Hashes — frühestens Anfang Oktober. Ob 10 % am Rand die richtige Schwelle ist, ebenfalls. Und
 ob die zehn endgültig aufgegebenen HTTP-500-Bestellungen je kommen, entscheidet weiter
 FoodNotify.
+
+---
+
+## 12.09.2026 — Der Zugang für andere: MCP statt Datenbankzugang
+
+Der Plan steht in `docs/plan-skybridge.md`; hier nur die Entscheidungen daraus.
+**Am 13.09.2026 überarbeitet** — die revidierten Punkte stehen unten durchgestrichen, die
+Überarbeitung als eigener Eintrag danach.
+
+### Der MCP-Server sieht `mart`, `manual` und `ampel` — nicht `core`
+
+*Die Frage:* Daniel und die OMs sollen ihre Fragen selbst stellen können, mit ChatGPT,
+Copilot oder Claude. Der kurze Weg wäre ein Werkzeug `sql_ausfuehren` auf einer
+Leseverbindung über die ganze Datenbank.
+
+*Dagegen spricht der Fehlerkatalog.* Von den Fehlern, die dieses Projekt gemacht hat, hat
+sich fast keiner gemeldet — es kam kein Stacktrace, sondern eine plausibel aussehende
+falsche Zahl. `stadt` ist bei allen 141 Betrieben `NULL` und `GROUP BY stadt` ergibt
+schweigend **eine** Gruppe; 79 Betriebe ohne Geschäft verdünnen jeden Mittelwert;
+`core.pos_artikel` ist leer und liefert null Zeilen statt eines Fehlers; LINAs Warenwirtschaft
+ist Demodaten. Ein Sprachmodell trifft diese Fallen schneller und häufiger als ein Mensch,
+und niemand prüft nach.
+
+**Entschieden:** derselbe Grundsatz wie bei Metabase (`metabase.md`), nur schärfer erzwungen —
+eine eigene Datenbankrolle `mcp_leser` mit `USAGE` ausschließlich auf `mart`, `manual`,
+`ampel`, `default_transaction_read_only` und `statement_timeout`. Nicht ein SQL-Filter im
+Code: den umgeht man mit einer CTE, einer Funktion oder einem `search_path`. Der Codefilter
+kommt dazu, als erste Hürde mit lesbarer Meldung, nicht als einzige.
+
+*Der Preis:* Fragen, die `core` bräuchten, sind nicht beantwortbar. Das ist Absicht — sie
+sind die Arbeitsliste für neue `mart`-Sichten, und `mcp.zugriff` macht sie zählbar.
+
+### Der Befund-Anhang: Warnungen reisen mit der Antwort, als Daten
+
+Die 178 Tabellenkommentare in `mart` sagen bereits, was man mit einer Sicht **nicht** tun
+soll. Sie nützen nichts, wenn sie beim Abfragen nicht dabei sind.
+
+**Entschieden:** jede Antwort trägt ein Feld `hinweise[]`, maschinell angehängt anhand der
+berührten Sichten, dazu den Datenstand der betroffenen Betriebe. Die Fallstricke liegen in
+`mcp.fallstrick` **als Daten**, nicht als `if` im Code — dieselbe Begründung wie bei den
+Ampelregelwerken (`datenmodell.md`, Entscheidung 5): eine neue Warnung ist eine Migration,
+kein Deploy. Das ist harte Regel 10, angewandt auf Auswertungen: die stille Falle muss im
+Ergebnis sichtbar werden, nicht in einem Dokument, das niemand liest.
+
+### Skybridge als Gerüst, aber selbst gehostet — nicht auf Alpic
+
+*Für Skybridge:* der Round Table ist ein Farbraster; als Text im Chat ist er unlesbar,
+als gerenderte Tabelle ist er das Produkt. Skybridge liefert genau das (MCP-Werkzeug +
+React-Ansicht, ein Codestand für Claude, ChatGPT und VS Code), ist MIT-lizenziert und bleibt
+im vorhandenen Stack — TypeScript und Zod.
+
+*Gegen Alpic als Hosting:* die Datenbank ist von außen nicht erreichbar und soll es nicht
+werden. Eine gehostete App außerhalb des Hetzner-Servers braucht genau das, oder einen
+Tunnel, der dasselbe Loch mit mehr beweglichen Teilen ist. Der Server, auf dem Postgres und
+Metabase schon stehen, ist der richtige Ort — als eigene Dokploy-Application, **nicht** als
+Endpunkt in `src/health.ts`: ein Webdienst mit Publikumsverkehr hat einen anderen Lastverlauf
+und ein anderes Risikoprofil als ein Batch-Container, der nachts läuft.
+
+Alpics Tunnel bleibt für die Entwicklung (Phase 1) — dort fließt keine Datenbankverbindung.
+
+### Kein Schreibzugriff
+
+`manual` ist das einzige Schema, das von Hand entsteht, und das einzige, das ein Backfill
+nicht wiederherstellen kann. Ein Modell, das dort Maßnahmen anlegt, erzeugt Einträge, die
+niemand verantwortet. Wenn Schreiben kommt, dann als eigener Plan mit Bestätigungsschritt.
+
+### Jede Abfrage wird protokolliert
+
+`mcp.zugriff` (Nutzer, Client, Werkzeug, SQL, Zeilen, Dauer). Zwei Gründe: eine Zahl, die im
+Round Table landet, muss rekonstruierbar sein — eine Chat-Antwort ist kein Beleg. Und ein
+Dienst ohne Zulauf ist ein Fehler, kein Normalzustand (Regel 10): wird der Server nicht
+benutzt, muss man das sehen. Wiederholte Fragen aus dem freien SQL sind die
+Anforderungsliste für die nächsten `mart`-Sichten und Metabase-Karten.
+
+
+---
+
+## 13.09.2026 — Überarbeitung: Metabase MCP zuerst, freies SQL als Hauptweg
+
+Vier Befunde der vertieften Recherche, jeder revidiert einen Punkt vom Vortag.
+
+### ~~Ein eigener Server ist der erste Schritt~~ → ~~Metabase MCP einschalten und messen~~ → doch der eigene Server (siehe Eintrag darunter)
+
+Metabase hat seit Version 60 (April 2026) einen eingebauten MCP-Server (`/api/metabase-mcp`):
+frei, OAuth aus Metabase selbst, Rechte je Nutzer, Claude/ChatGPT/VS Code als Clients,
+SQL je Gruppe abschaltbar, 200 Zeilen je Seite. Unsere Instanz läuft auf v0.63 — er ist
+schon da. Er liest die Tabellenkommentare und die FK-Verdrahtung aus `beziehungen.ts`; die
+Schemabegrenzung auf `mart`/`manual`/`ampel` gilt automatisch, weil Metabase nichts anderes
+sieht. **Entschieden:** Stufe 0 ist Einschalten plus zwei Wochen Messung gegen zehn
+Fallenfragen; der eigene Server (Stufe 1) baut nur, was die Messung als Lücke zeigt —
+Prüfung vor dem Lauf, Befund-Anhang, Ampelansicht, eigenes Protokoll. *Nachzuprüfen an
+der Instanz: dass der Server in der Open-Source-Ausgabe enthalten ist.*
+
+### ~~Die 285 Karten werden Werkzeuge~~ → sie werden Beispiele
+
+Cursor kappt bei 40 Werkzeugen, Copilot bei 128, Claude Desktop um 100; jede Beschreibung
+kostet 300–600 Token und die Qualität sinkt ab etwa 50 messbar. **Entschieden:** acht
+Werkzeuge. Die Karten liefert `sicht_beschreiben` als Beispielabfragen der Betreuer für
+genau die Sicht, um die es geht — Wissen, das nur dann Kontext kostet, wenn es gebraucht
+wird.
+
+### ~~Freies SQL als „Ring 3", die meisten Fragen enden davor~~ → freies SQL ist der Hauptweg
+
+„Jede Gruppierung, jede Beziehung" heißt, das Modell schreibt die Abfrage. Die Sicherheit
+muss also in diesen Weg hinein. **Entschieden:** `abfrage_pruefen` mit dem echten
+Postgres-Parser (`libpg-query`) — Fallstricke als Prädikate auf dem Syntaxbaum, mit Schwere
+`warnung` oder `sperre`, plus `EXPLAIN` vor dem Lauf. Eine Sperre läuft nicht und kommt mit
+Grund und, wo möglich, korrigiertem SQL zurück. Begründung aus dem dbt-Benchmark (April
+2026): mit semantischer Schicht 98–100 % statt 84–90 %, und ein Fehler ist eine Verweigerung
+statt einer selbstbewusst falschen Zahl; 81,2 % der Text-to-SQL-Fehler liegen auf Schema-
+und Bedeutungsebene.
+
+### Neu: eine Beziehungs- und Körnungsschicht als Daten (`mcp.sicht`, `mcp.achse`, `mcp.kennzahl`)
+
+Aus dem SQL-Text der Migrationen gezählt (13.09.2026): 191 `mart`-Sichten, 132 mit
+`betrieb_key`, 85 mit `monat`, 82 mit `konzept`. Von 188 Kommentaren tragen 114 ein
+Warnwort, aber nur **23 nennen ihre Körnung** („eine Zeile je …") — und die Körnung ist
+das Erste, was ein Modell braucht, bevor es summiert. **Entschieden:** Körnung von Hand für
+165 Sichten, *auch in den Tabellenkommentar* — dann nützt sie Metabase MCP, Metabase und
+jedem Agenten gleichzeitig. Neue Regel in `metabase.md`: ohne Körnung im Kommentar keine
+Sicht.
+
+
+---
+
+## 13.09.2026 (2) — Der Server ist eine Alternative zum BI-Tool, kein Zusatz
+
+*Eugene:* der MCP-Server soll das BI-Tool ersetzen können — für Nutzer ohne Zugang dorthin
+sofort, perspektivisch ganz.
+
+> **Sprachregelung, ab dem 13.09.2026 auf Eugenes Wunsch:** in Plan, README und Code heißt
+> es **BI-Tool**, nicht Metabase — die Rolle ist gemeint, nicht das Produkt, und der Plan
+> soll einen Wechsel überleben. Der Produktname bleibt stehen, wo es um eine konkrete
+> Eigenschaft geht: das Verzeichnis `metabase/`, `METABASE_URL`, das Platzhalterformat,
+> `docs/metabase.md`. Ältere Einträge dieses Protokolls sind nicht umgeschrieben — sie sind
+> Zeitdokumente.
+
+**Damit fällt „BI-Tool-MCP zuerst" vom selben Morgen.** Der dort eingebaute Server
+setzt ein Konto im BI-Tool voraus, hält seine Beziehungen in dessen Katalog und seine
+Rechte in dessen Gruppen — genau die drei Dinge, die nicht mehr Voraussetzung sein
+sollen. Er bleibt eine Notiz zum Vergleich, gebaut wird auf ihm nichts.
+
+**Entschieden, damit der Server an nichts hängt, was dem BI-Tool gehört:**
+
+1. **Die Karten werden zur Berichtsdefinition mit zwei Abnehmern.** `metabase/karten-*.ts`
+   bleibt, `uebernehmen.ts` provisioniert damit weiter das BI-Tool, und der Server liest
+   dieselben `Karte[]` als `bericht_ausfuehren(schluessel, parameter)` — ein Werkzeug, 285
+   Schlüssel, dieselbe SQL. Fällt das BI-Tool weg, fällt ein Abnehmer weg. Der Preis: die
+   Karten bleiben im Dialekt des BI-Tools (`{{monat}}`-Template-Tags), der Server übersetzt. Ein
+   eigenes Berichtsformat wäre sauberer und hieße, 285 Karten anzufassen — nicht jetzt.
+2. **Die Beziehungen wandern in die Datenbank.** `mcp.achse` ist die Quelle;
+   `beziehungen.ts` liest seine `ACHSEN` von dort statt aus einer Konstante. Sonst gäbe es
+   zwei Wahrheiten über dieselbe Beziehung.
+3. **Eigene Nutzer über einen Identitätsanbieter**, Stufen in `mcp.nutzer_stufe`. Ohne
+   diese Antwort gibt es keine Nutzer ohne das BI-Tool — deshalb die erste Frage an Eugene.
+4. **Berichte vor freiem Fragen** (Phase 2 vor 3): die Berichte sind der Teil, der
+   das BI-Tool ersetzt, und tragen kein Risiko einer falschen Zahl — es ist dieselbe SQL.
+5. **Nicht ersetzt, ausdrücklich:** das Dashboard an der Wand, die Montags-Mail, die
+   Dauer-URL, Schreiben in `manual`, die Punktkarte. Wann das BI-Tool gehen kann, entscheidet
+   eine Messung — sein Anmeldeprotokoll gegen `mcp.zugriff` über einen Monat — nicht
+   der Plan.
+
+
+---
+
+## 13.09.2026 (3) — Der MCP-Server, gebaut
+
+Umgesetzt sind die Phasen 1 bis 4 des Plans: Katalog, Berichte, Prüfung, Ansichten. Was
+dabei anders entschieden wurde als im Plan, steht hier.
+
+### Die Körnung kam in die Tabellenkommentare, nicht nur in den Katalog
+
+Der Plan sah 165 Sichten Handarbeit vor. Gemacht sind **158**, und sie stehen an zwei Orten:
+in `mcp.sicht.koernung` und — über `mcp.koernung_in_kommentare()` — im Tabellenkommentar
+selbst. Die Funktion hängt an, statt zu ersetzen, und erkennt an der Marke `Koernung:`, dass
+sie schon dort war.
+
+*Warum nicht von Hand in die Migrationen:* `COMMENT ON` ersetzt vollständig. 158 bestehende
+Kommentare neu zu schreiben, um einen Satz zu ergänzen, wäre 158 Gelegenheiten, einen
+bestehenden Kommentar zu verlieren. Beim ersten Lauf hat die Funktion 71 Kommentare ergänzt.
+
+### Eine Regelart ohne Umsetzung lässt den Server nicht starten
+
+`mcp.fallstrick.art` nennt die Regelart, `mcp/src/pruefen.ts` setzt sie um. Fehlt die
+Umsetzung, wirft `regelartenPruefen()` beim Start. *Die Alternative wäre gewesen, unbekannte
+Arten zu überspringen* — und damit könnte eine Migration eine Wache eintragen, die nicht
+wacht. Das ist genau der stille Ausfall, gegen den Regel 10 geschrieben ist, nur diesmal im
+Schutzmechanismus selbst.
+
+### ~~Eine Sicht ist als Ganzes summierbar oder nicht~~ → die Spaltenregel gewinnt
+
+Die erste Fassung des Prüfers sperrte jede `sum()` über eine Sicht mit
+`summen_erlaubt = false`. Zwei Fehler auf einmal, beide von den Tests gefunden:
+
+1. **Übersperrung.** Eine Abfrage, die `mart.nachbarschaft` nur als Dimension danebenstellt,
+   um an den Ort zu kommen, summiert nicht aus ihr — sie summiert aus `mart.umsatz_tag`. Der
+   Prüfer sperrte damit genau den Weg, den die Berichtigung der `stadt`-Regel vorschlägt.
+   **Ein Prüfer, der den richtigen Weg verbietet, ist kein Schutz, sondern die erste Fassung,
+   die Daniel wegwirft.**
+2. **Widerspruch.** `mart.round_table_monat` ist als Ganzes nicht summierbar, sein
+   `umsatz_ist` aber ausdrücklich doch („die einzige echte Summe dieser Sicht").
+
+**Entschieden:** `mcp.sicht_katalog` führt seither die Spaltenliste jeder Sicht, und der
+Prüfer ordnet eine aggregierte Spalte ihrer Quelle zu. Die Spaltenregel aus `mcp.kennzahl`
+ist die präzisere und gewinnt; der Sichtbefund fängt nur noch Spalten ohne eigene Regel — und
+warnt, statt zu sperren.
+
+### Berichte laufen NICHT durch den Fallstrick-Prüfer
+
+Die 285 Karten stammen nicht von einem Modell, sondern von Menschen, die das Schema kennen;
+`uebernehmen.ts` prüft sie statisch, `metabase/karten.test.ts` einzeln gegen Postgres. Eine
+Fallstrick-Regel, die hier anschlüge, würde eine bewusste Entscheidung als Falle melden.
+Körnung und Datenstand reisen trotzdem mit — sie sind Einordnung, kein Vorwurf.
+
+### Das Protokoll hebt das Lesezeichen ausdrücklich
+
+`mcp_leser` trägt `default_transaction_read_only = on`. Der einzige INSERT des Servers — das
+Protokoll — stellt seine eine Transaktion ausdrücklich auf `READ WRITE`. *Die Alternative
+wäre eine zweite Rolle gewesen*, mit zweitem Passwort und zweitem Pool für eine Tabelle.
+Gefährlich ist es nicht: die Rolle hat überhaupt nur auf `mcp.zugriff` ein INSERT-Recht, auf
+alles andere nur SELECT. Die Rechte sind die Sperre, das Lesezeichen der zweite Riegel — und
+der wird an genau einer Stelle gehoben.
+
+### Wer nicht in `mcp.nutzer_stufe` steht, bekommt nichts
+
+Kein stillschweigendes „lesen" für jeden, der sich anmelden kann. Der Identitätsanbieter
+sagt, WER jemand ist, nicht, dass er die Zahlen dieses Unternehmens sehen darf. Die zweite
+Frage beantwortet eine Zeile, die jemand bewusst angelegt hat.
+
+### Die Kartenliste steht jetzt in `metabase/karten.ts`
+
+Sie stand dreimal im Repository: in `uebernehmen.ts`, in `karten.test.ts` und wäre ein
+viertes Mal im MCP-Server gelandet. Jetzt einmal, mit drei Abnehmern.
+
+### Skybridges Telemetrie ist aus
+
+Das CLI meldet Nutzungsdaten an PostHog. Ein Dienst, der die Zahlen eines Unternehmens
+ausliefert, hat keinen Anlass, nebenbei nach draußen zu funken — und in einer Umgebung mit
+enger Egress-Regel scheitert der Build sonst daran (hier beim ersten Versuch gesehen).
+
+
+---
+
+## 13.09.2026 (4) — Eigene Anmeldung statt eines fremden Identitaetsanbieters
+
+*Eugene:* kein externer Anbieter, Passwoerter in Postgres, es werden zwei bis drei Nutzer sein.
+
+### ~~Entra waere die beste Antwort~~ → Entra haette nicht funktioniert
+
+Die Empfehlung aus dem Plan war falsch, und zwar aus einem technischen Grund, nicht aus
+Geschmack. **ChatGPT und Claude melden sich beim Verbinden per Dynamic Client Registration
+(RFC 7591) selbst an. Microsoft Entra hat dafuer keinen Endpunkt** — das ist keine
+Einstellung, sondern eine Luecke im Funktionsumfang. Mit Entra braeuchte es einen
+Zwischenserver, der die Registrierung nachreicht.
+
+Belegt im Quelltext von Skybridge selbst: `registration_endpoint` ist laut RFC 8414
+optional, „a no-DCR IdP simply omits it; a proxy, or pre-registered clients, supply
+registration".
+
+**Entschieden:** dieser Server ist sein eigener Autorisierungsserver. Der Teil, den es
+braucht, ist klein — ein Anmeldeformular, ein Code, ein Token —, und die Registrierung, an
+der Entra scheitert, ist hier ein Endpunkt von zwanzig Zeilen.
+
+**Der Preis, ausdruecklich genannt:** kein zweiter Faktor, keine Passwortruecksetzung per
+Mail, und **kein automatischer Entzug beim Austritt aus dem Unternehmen**. Wer geht, muss in
+`mcp.nutzer` auf `aktiv = false` gesetzt werden. Das ist die eigentliche Einbusse gegenueber
+einem Unternehmensanbieter; sie steht in `offene-punkte.md`.
+
+### Zwei Datenbankrollen — die wichtigste Entscheidung daran
+
+`mcp_leser` fuehrt **Nutzereingaben als SQL aus** (`abfrage_ausfuehren`), und `mcp` steht auf
+der Liste der erlaubten Schemata, weil der Katalog dort liegt. Laegen die Passworthashes und
+der Signierschluessel im selben Schema mit denselben Rechten, waere
+
+```sql
+SELECT privat_jwk FROM mcp.oauth_schluessel;
+```
+
+eine gueltige Abfrage — und wer sie stellt, kann sich fortan **beliebige Tokens ausstellen**,
+also die Anmeldung ganz umgehen. Kein Randfall: es ist der erste Weg, den ein Modell beim
+Herumprobieren findet.
+
+**Entschieden:** eine zweite Rolle `mcp_anmeldung` mit eigener Verbindung. Sie sieht nur die
+Anmeldetabellen; `mcp_leser` bekommt darauf gar kein Recht. Gemessen in beide Richtungen
+(`test/ausfuehren.test.ts`, `test/anmeldung.test.ts`), nicht behauptet.
+
+Der Pruefer meldet den Zugriff zusaetzlich verstaendlich — aber tragend ist die Rolle.
+
+### RS256 statt eines gemeinsamen Geheimnisses
+
+Der Ressourcenteil prueft Tokens mit dem **oeffentlichen** Schluessel. Mit HS256 koennte
+jeder, der pruefen darf, auch ausstellen — und genau diese Trennung ist der Zweck der
+zweiten Rolle. Ein asymmetrisches Verfahren haelt sie auch dann, wenn beide Teile im selben
+Prozess laufen. Der Schluessel liegt in der Datenbank, nicht in einer Umgebungsvariablen:
+ein Neustart soll nicht jedes Token entwerten, eine Rotation kein Deploy brauchen.
+
+### Die Stufe wird bei jedem Aufruf frisch gelesen
+
+Sie steht auch im Token, und von dort waere sie schneller. Aber ein Token lebt eine Stunde:
+wer jemandem den Zugang entzieht, will nicht bis zu sechzig Minuten warten. Bei drei Nutzern
+kostet die Abfrage nichts, und sie macht `aktiv = false` zu dem, wonach es aussieht.
+
+### Eine Sperre muss ihren Grund mitliefern
+
+Beim Durchspielen des ganzen Ablaufs gefunden: die gesperrte Abfrage kam beim Modell als
+„Die Abfrage wurde nicht ausgefuehrt" an — der Grund steckte im Objekt und wurde nie
+zugestellt. **Damit war die Verweigerung genau das, was sie nicht sein soll: ein Raetsel.**
+Ein Modell beantwortet ein Raetsel, indem es dieselbe falsche Abfrage umformuliert, oder
+indem es auf etwas ausweicht, das laeuft und falsch ist.
+
+`gesperrtText()` setzt seither jeden Grund, jede Berichtigung und jeden Beleg in die
+Fehlermeldung — samt des ausdruecklichen Hinweises, **nicht** bloss umzuformulieren.
+Festgehalten in `test/fallen.test.ts`.
+
+### Was NICHT gebaut wurde
+
+Zustimmungsseiten, Mandanten, Client-Geheimnisse, implizite Ablaeufe, Passwortregeln mit
+Sonderzeichen. Verlangt wird nur Laenge (12 Zeichen) — das Einzige, was messbar hilft, und
+drei Menschen koennen sich einen Satz merken.
+
+
+---
+
+## 13.09.2026 (5) — Review des MCP-Zugangs: angreifen statt lesen
+
+Der Server war gebaut, getestet, gruen. Der Review bestand nicht im Lesen, sondern in elf
+Abfragen, die durchkommen sollten, es aber nicht durften — und einem `psql`-Aufruf als die
+falsche Rolle. Alle Befunde in `fehlerkatalog.md`; hier die Entscheidungen, die daraus folgen.
+
+### Rechte in `mcp` werden namentlich vergeben, nie pauschal
+
+Weil das Schema zwei Arten von Tabellen traegt — Katalog fuer den Leser, Anmeldung fuer die
+Anmeldung — und ein pauschales `GRANT ON ALL TABLES` die Trennung bei jedem Aufruf wieder
+aufhebt. Migration `0105` bricht ab, wenn der Leser nach dem Lauf an den Signierschluessel
+kaeme, und `mart.mcp_rechte_pruefung` (Erwartung: leer) wacht danach.
+
+### Jede freie Abfrage laeuft in einer Transaktion, die zurueckgerollt wird
+
+Auch bei Erfolg. *Die Alternative* — nur den Pruefer um `set_config` zu ergaenzen — waere eine
+Liste, und Listen haben Luecken. `ROLLBACK` hat keine: Postgres nimmt jede
+Sitzungseinstellung zurueck, die in der Transaktion gesetzt wurde. Der Pruefer bleibt als
+erster Riegel mit lesbarer Meldung; getestet wird der zweite ausdruecklich ohne den ersten.
+
+### Ein Name ohne Schema wird normiert oder gesperrt, nie geraten
+
+`fremdeinkauf` wird zu `mart.fremdeinkauf`, wenn der Katalog die Sicht kennt — dann greifen
+ihre Regeln. Sonst Sperre mit dem Hinweis, das Schema zu schreiben. Die Alternative, den
+`search_path` der Rolle nachzubilden, haette `pg_catalog` mitgebracht.
+
+### Aliasse werden aufgeloest — bis zur Grenze des Ausdrucks
+
+`spalte AS alias` wird durchgereicht; `spalte * 2 AS alias` nicht. Das ist eine gezogene
+Grenze, keine uebersehene: eine vollstaendige Ausdrucksanalyse waere ein zweiter Planer, und
+die Faelle dahinter faengt die Rolle (kein Zugriff auf `core`) oder der Datenstand-Anhang.
+
+### Ein wiederverwendeter Auffrischungstoken ist 60 Sekunden lang eine Wiederholung
+
+Danach Diebstahl. Die reine Lehre — jede Wiederverwendung widerruft die Kette — bestraft den
+Client fuer eine verlorene Antwort; jede Netzstoerung endete in einer Neuanmeldung.
+
+Die Frist gilt NUR fuer einen Token, der durch Rotation ersetzt wurde und dessen Nachfolger
+noch unbenutzt ist — das ist das Kennzeichen der verlorenen Antwort. Jeder andere widerrufene
+Token ist ein Konflikt, und die Familie faellt. *Die erste Fassung* liess jeden kuerzlich
+widerrufenen Token wiederholen; der Test zeigte, dass damit die Diebstahlserkennung sich
+selbst aufhob. Eine Regel, die im Test faellt, bevor sie im Betrieb faellt, ist der Zweck
+des Tests.
+
+### Was der Review NICHT geaendert hat, bewusst
+
+Kein zweiter Faktor, keine Passwortregel ausser Laenge, kein Widerrufs-Endpunkt (RFC 7009) —
+`bun run nutzer sperren` tut dasselbe. Kein Schutz je Betrieb (RLS). Alles davon steht in
+`offene-punkte.md`; nichts davon ist eine Luecke, die niemand kennt.
+
+
+---
+
+## 13.09.2026 (6) — Die Darstellung entscheidet das Modell, nicht der Server
+
+*Eugene:* die Modelle sollen selbst entscheiden, wie sie die Daten darstellen — er traut
+ihnen das mehr zu als einer statischen Festlegung. Und der Nutzer soll die Diagrammart im
+Gespraech aendern koennen.
+
+### ~~Die Karte entscheidet die Form, und der Server zeichnet sie (SVG)~~ → verworfen
+
+Der Vorschlag war, `anzeige` und `visualisierung` der 285 Karten in eigene SVG-Ansichten zu
+uebersetzen — „dieselbe Darstellung an der Wand und im Chat". Eugene hat ihn abgelehnt, und
+das Argument traegt: eine Karte legt vor einem Jahr fest, was ein Modell heute mit Blick auf
+die konkreten Daten besser entscheidet — und im Gespraech laesst sich die Form aendern, an
+der Wand nicht. Ein angefangenes Modul `diagramm.ts` (Spezifikation, Pruefung, Serienkappung)
+ist entfernt.
+
+### Was der Server stattdessen tut: die Grundlage liefern
+
+Ein Modell, das nur Spaltennamen und Zahlen sieht, raet — es haelt `monat` fuer eine
+Kategorie, `we_kueche_pct` fuer Euro und `betrieb_key` fuer eine Menge. Deshalb traegt jede
+Antwort mit Daten seither zwei Dinge:
+
+* **`spalten_info`** je Spalte: Rolle (`zeit`, `merkmal`, `kennzahl`, `ampel`, `schluessel`),
+  Einheit aus `mcp.kennzahl`, Zahl der verschiedenen Werte, Spanne bei Kennzahlen.
+* **`darstellung`**: der Satz, der die Form dem Modell ueberlaesst — und die drei Fallen
+  nennt, die bei freier Wahl erfahrungsgemaess zuschnappen: zwei Groessenordnungen auf einer
+  Achse, mehr Kategorien als unterscheidbare Farben, ein Balken fuer eine einzelne Zahl.
+
+Dazu **Zahlen als Zahlen**: `numeric` und `int8` kommen aus pg als Text (fuer den Importer
+richtig, `src/db.ts`); fuer ein Modell, das zeichnen soll, ist `"136612.46"` ein Wort und
+`136612.46` ein Wert. Die Antwort wandelt um.
+
+Die Server-`instructions` (was jeder Client beim Verbinden liest) sagen dasselbe in drei
+Saetzen: Form ist deine Sache, Prozent nicht skalieren, Ampeln zaehlen.
+
+### Was mit der Anzeigeart des BI-Tools geschieht
+
+Sie wird **genannt, nicht vorgegeben**: „Im BI-Tool steht dieser Bericht als `line` — ein
+Hinweis, keine Vorgabe." Wegwerfen waere Informationsverlust, vorschreiben waere die
+abgelehnte Entscheidung.
+
+### Die vorhandenen Ansichten bleiben, neue Diagrammansichten kommen nicht
+
+`ergebnis`, `bericht` und `round-table` zeigen Tabellen; sie hindern das Modell nicht daran,
+daneben zu zeichnen, und das Ampelraster war ausdruecklich gewuenscht. Ob sie auf Dauer
+bleiben, entscheidet die Nutzung — wenn die Modelle die Tabelle ohnehin selbst besser
+zeigen, koennen sie gehen.

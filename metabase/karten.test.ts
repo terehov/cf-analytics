@@ -20,32 +20,11 @@
 
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Client } from 'pg'
-import { karten as kartenFach } from './karten-fach'
-import { karten as kartenRoundTable } from './karten-round-table'
-import { karten as kartenDrilldown } from './karten-drilldown'
-import { karten as kartenPortfolio } from './karten-portfolio'
-import { karten as kartenImport } from './karten-import'
-import { karten as kartenStandort } from './karten-standort'
-import { karten as kartenBewertung } from './karten-bewertung'
-import { karten as kartenYext } from './karten-yext'
-import { karten as kartenAktionen } from './karten-aktionen'
-import { karten as kartenVergleich } from './karten-vergleich'
-import { karten as kartenFremdeinkauf } from './karten-fremdeinkauf'
-import { karten as kartenPflichtartikel } from './karten-pflichtartikel'
-import { karten as kartenKalender } from './karten-kalender'
-import { karten as kartenBounti } from './karten-bounti'
-import { karten as kartenArtikelaktion } from './karten-artikelaktion'
+import { alleKarten } from './karten'
 import type { Karte } from './typen'
 
 const DB = process.env.DATABASE_URL
 const lauf = DB ? describe : describe.skip
-
-const alleKarten: Karte[] = [
-  ...kartenRoundTable, ...kartenFach, ...kartenDrilldown,
-  ...kartenPortfolio, ...kartenImport, ...kartenStandort, ...kartenBewertung,
-  ...kartenAktionen, ...kartenVergleich, ...kartenFremdeinkauf, ...kartenPflichtartikel, ...kartenYext,
-  ...kartenKalender, ...kartenBounti, ...kartenArtikelaktion,
-]
 
 let db: Client
 

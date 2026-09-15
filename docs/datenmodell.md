@@ -10,6 +10,7 @@ manual  OM-Einschätzung, Ursachen, Maßnahmen, YEXT-Bewertungen
 ampel   Regelwerke
 sync    Betriebszustand des Importers                    nicht in Metabase
 mart    Sichten für Metabase — hier fängt jede Frage an
+mcp     semantischer Katalog für den Chat-Zugang          nicht in Metabase
 ```
 
 Welche Schemata Metabase synchronisieren soll und warum: `metabase.md`.
@@ -705,3 +706,114 @@ Schreibweisen.
 **`sync.schema_abweichung`**: fünf Zeilen vom 29.07./01.08.2026 (int4-Überläufe bei `guests`
 und `counts`, Wert verworfen und dort abgelegt) sind quittiert. Die Abfrage
 `WHERE quittiert_am IS NULL` aus `AGENTS.md` ist wieder leer.
+
+---
+
+## Schema `mcp`: der semantische Katalog (Migrationen 0102/0103, 13.09.2026)
+
+Wissen **über** das Schema, keine Fachdaten — deshalb ein eigenes Schema und nicht ein paar
+Tabellen in `manual`. Derselbe Schnitt wie bei `sync`: der Betriebszustand eines Dienstes
+gehört nicht zwischen die Zahlen, über die er Auskunft gibt. Der Name ist englisch wie `raw`,
+`core` und `mart` — ein Schichtname, kein LINA-Begriff.
+
+Gebraucht wird er vom MCP-Server (`mcp/`, `docs/plan-skybridge.md`), der die Daten aus Claude,
+ChatGPT und Copilot befragbar macht.
+
+| Tabelle | Eine Zeile je | Trägt |
+|---|---|---|
+| `mcp.sicht` | `mart`-Sicht | **Körnung**, Thema, ob eine naive Summe etwas bedeutet |
+| `mcp.achse` | Achse | Worüber gruppiert und verbunden wird |
+| `mcp.sicht_achse` | Sicht × Achse | Abgeleitet aus dem Katalog, nicht von Hand |
+| `mcp.kennzahl` | Sicht × Spalte | Welche Aggregation die Spalte verträgt |
+| `mcp.fallstrick` | Regel | Was vor dem Lauf gesperrt oder gewarnt wird |
+| `mcp.nutzer` | Nutzer | Mailadresse, argon2id-Hash, Stufe (`lesen`/`fragen`/`gesperrt`), aktiv |
+| `mcp.oauth_client` | registriertem Client | ChatGPT, Claude, VS Code — melden sich selbst an |
+| `mcp.oauth_code` · `mcp.oauth_token` | Code bzw. Auffrischungstoken | jeweils als Hash |
+| `mcp.oauth_schluessel` | Schluessel | das RS256-Paar, mit dem Tokens signiert werden |
+| `mcp.anmeldung_protokoll` | Anmeldeversuch | gelungen wie gescheitert |
+| `mcp.zugriff` | Anfrage | Das Protokoll |
+| `mcp.einrichtung_offen` | offener Punkt | Was die Migration nicht selbst tun konnte |
+
+### Die Körnung ist das wichtigste Feld
+
+**Gemessen am 13.09.2026:** von 188 Tabellenkommentaren in `mart` tragen 114 ein Warnwort,
+aber nur **23** schreiben aus, wovon sie eine Zeile je Einheit führen. Genau das braucht ein
+Sprachmodell, bevor es summiert: `mart.umsatz_tag` darf man summieren,
+`mart.umsatz_tag_sparte` nur je Sparte, `mart.round_table_monat` gar nicht.
+
+`0103` trägt sie für **158 Sichten** nach. `mcp.koernung_in_kommentare()` hängt sie
+zusätzlich an den Tabellenkommentar — damit nützt dieselbe Arbeit dem MCP-Server, Metabase
+und jedem Agenten im Repository gleichzeitig. Die Funktion ist idempotent (sie erkennt die
+Marke `Koernung:`) und hat beim ersten Lauf 71 Kommentare ergänzt.
+
+`koernung IS NULL` ist deshalb kein Schönheitsfehler: es steht in `mcp.koernung_fehlend` und
+erzeugt zur Laufzeit eine Warnung. Eine Lücke, die sich zeigt, ist besser als eine geratene
+Angabe, die sich nicht zeigt (harte Regel 10).
+
+### Regeln als Daten, Prädikate als Code
+
+`mcp.fallstrick.art` benennt eine **Regelart**, die Parameter stehen daneben, das Prädikat
+steht in `mcp/src/pruefen.ts`. Dasselbe Muster wie bei den Ampelregelwerken (Entscheidung 5):
+eine neue Warnung ist eine Migration, kein Deploy.
+
+**Eine Regelart ohne Umsetzung lässt den Server nicht starten.** Sonst könnte eine Migration
+eine Wache eintragen, die nicht wacht — genau die Sorte stiller Ausfall, gegen die Regel 10
+geschrieben wurde.
+
+### `mcp.achse` ist die Quelle, Metabase der Abnehmer
+
+`metabase/beziehungen.ts` führte seine Achsen bis zum 13.09.2026 als Konstante. Seit der
+MCP-Server dieselbe Auskunft braucht — worüber zwei Sichten zusammenfinden —, liest das
+Skript sie aus `mcp.achse`. Zwei Listen derselben Beziehungen wären zwei Wahrheiten: eine
+Achse, die hier ergänzt und dort vergessen wird, fällt niemandem auf, bis jemand einen Sprung
+vermisst, den es in Metabase gibt und im Chat nicht.
+
+Die Tabelle führt **auch** Achsen ohne Dimensionssicht (`monat`, `geschaeftstag`, `konzept`).
+Für den Chat sind sie wichtig, für Metabase kein Fremdschlüssel — ein FK braucht ein Ziel.
+Der Filter `ziel_sicht IS NOT NULL` hält dieselbe Entscheidung fest wie vorher die Auswahl
+der Zeilen im Skript.
+
+### Die Leserolle
+
+`mcp_leser`: `USAGE` nur auf `mart`, `manual`, `ampel`, `mcp`, `SELECT` darauf, und als
+einziges Schreibrecht `INSERT` auf `mcp.zugriff`. Dazu
+`default_transaction_read_only = on`, `statement_timeout = 20s`.
+
+**Warum die Rolle und nicht ein SQL-Filter im Code:** ein Filter, der `core` verbieten soll,
+ist eine Liste von Umgehungen, die man nicht kennt — CTE, Funktion, `search_path`,
+Kommentartrick. Postgres hat die Prüfung eingebaut und sie ist vollständig. Der Parser im
+Server kommt **dazu**, für die Fallstricke, nicht für die Rechte.
+
+Das Passwort setzt ein Mensch von Hand (harte Regel 2). Bis dahin steht der Fehlstand in
+`mcp.einrichtung_offen` und `/status` meldet ihn — die Migration bricht **nicht** ab, das
+hielte sonst den Containerstart an.
+
+
+### Die Anmeldung: zwei Rollen, nicht eine (Migration 0104, 13.09.2026)
+
+Der MCP-Server ist seit dem 13.09.2026 sein **eigener** Autorisierungsserver — kein Entra,
+kein WorkOS. Begründung in `entscheidungen.md`; hier steht, was das fürs Schema heißt.
+
+**Die tragende Entscheidung ist die zweite Datenbankrolle.** `mcp_leser` führt
+Nutzereingaben als SQL aus, und `mcp` steht auf der Liste der erlaubten Schemata, weil der
+Katalog dort liegt. Lägen Passworthashes und Signierschlüssel unter derselben Rolle, wäre
+
+```sql
+SELECT privat_jwk FROM mcp.oauth_schluessel;
+```
+
+eine gültige Abfrage — und wer sie stellt, kann sich beliebige Tokens ausstellen, also die
+Anmeldung ganz umgehen.
+
+| Rolle | Sieht | Sieht nicht |
+|---|---|---|
+| `mcp_leser` | `mart`, `manual`, `ampel`, den Katalog in `mcp` | `mcp.nutzer`, `mcp.oauth_*`, `mcp.anmeldung_protokoll` |
+| `mcp_anmeldung` | genau diese Anmeldetabellen | `mart`, `manual`, `ampel`, `core` |
+
+Beide Richtungen sind gemessen (`psql` als die jeweilige Rolle, und in den Tests), nicht
+angenommen. Eingerichtet von `mcp.rechte_anmeldung_auffrischen()`, idempotent.
+
+**Was als Hash gespeichert wird:** Passwörter mit argon2id (`Bun.password`),
+Autorisierungscodes und Auffrischungstokens mit SHA-256. Ein Datenbankabzug enthält damit
+nichts unmittelbar Verwendbares — die einzige Ausnahme ist der private Signierschlüssel, und
+genau deshalb ist er für `mcp_leser` unsichtbar.

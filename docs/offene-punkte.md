@@ -1645,3 +1645,69 @@ das nicht (`WHERE NOT EXISTS` gegen alle Posten, auch erledigte); es braucht ein
 Geschäftstag, an dem deutlich weniger Betriebe Umsatz melden als im 28-Tage-Schnitt
 (`dq_lochtage` zeigt ihn), sollte nach Ende des Fensters von selbst neu eingereiht werden —
 mit Obergrenze und Zähler, wie `nulltageNachziehen()`, aber am Umsatzbericht selbst gemessen.
+
+## MCP-Zugang für andere Nutzer (Plan: `plan-skybridge.md`)
+
+Der Server soll das BI-Tool ersetzen können — für Nutzer ohne Zugang dorthin sofort. Er
+hängt deshalb an nichts, was dem BI-Tool gehört (Karten als gemeinsame Berichtsdefinition,
+Beziehungen in `mcp.achse`, eigene Nutzer). Der dort eingebaute MCP-Server (Metabase v0.63,
+Admin → AI) ist damit nur eine Vergleichsoption, keine Stufe.
+
+Fünf Punkte, die Eugene entscheiden muss:
+
+* **Welcher Identitätsanbieter?** Gibt es bei Concept Family bereits Microsoft 365 / Entra,
+  an das sich der Zugang hängen lässt? Das wäre die beste Antwort — Ausscheiden aus dem
+  Unternehmen bedeutet dann von selbst Zugangsverlust. Sonst WorkOS oder Clerk mit
+  Allowlist; Skybridge bringt für beide ein Beispiel mit.
+* **Wer bekommt freies SQL?** Stufe `fragen` in `mcp.nutzer_stufe`. Die Leitplanken sind
+  Technik, kein Urteil — ein richtiges Ergebnis kann falsch gedeutet werden. Vorschlag:
+  zunächst nur Eugene und Daniel.
+* **Soll ein OM nur seine Betriebe sehen?** Das wäre Row-Level-Security auf `mart`. Das
+  BI-Tool kann es heute nicht; eine Alternative muss zuerst gleichziehen. Wenn ja, ein eigener
+  Plan — die Zuordnung OM → Betrieb gibt es nirgends als Tabelle.
+* **Öffentlicher Hostname und TLS für `mcp.<domain>`.** Claude und ChatGPT verbinden von
+  außen; das ist der erste Dienst dieses Projekts, für den das gilt. Die Datenbank ist es
+  nicht — und bleibt es.
+* **Dürfen Zahlen aus dem Chat weitergegeben werden?** Eine Frage an das Unternehmen, keine
+  technische. Der Datenstand-Anhang beantwortet „war die Zahl fertig", nicht „durfte sie
+  raus".
+
+## Migrationen aus dem Nichts
+
+Zwei Dateien mit der Nummer `0039` stützen sich auf `0041` und `0042`; eine leere Datenbank
+lässt sich mit `bun run migrate` nicht aufbauen (`fehlerkatalog.md`, 13.09.2026). Zu
+entscheiden: Umnummerieren mit Nachtrag in `public.schema_migration` der Produktion, oder
+ein Test gegen eine leere Datenbank, der Rückwärtsnummern künftig sofort meldet. Bis dahin
+braucht ein neuer Rechner ein `pg_dump --schema-only` aus Produktion.
+
+
+## MCP-Server: was nach dem Bau offen ist
+
+Phasen 1 bis 4 stehen (13.09.2026). Was fehlt, fehlt nicht im Code:
+
+* ~~**Der Identitätsanbieter.**~~ Entfällt: der Server bringt seine eigene Anmeldung mit
+  (Migration `0104`). Entra wäre daran gescheitert, dass ChatGPT sich per Dynamic Client
+  Registration anmeldet und Entra dafür keinen Endpunkt hat.
+* **Wer geht, muss stillgelegt werden.** Das ist der Preis der eigenen Anmeldung: es gibt
+  keinen Unternehmensanbieter, der einen Austritt von selbst durchreicht.
+  `bun run nutzer sperren <email>` setzt `aktiv = false` und widerruft alle Tokens. Gehört
+  in die Abläufe der Personalseite, nicht in eine Erinnerung.
+* **Kein zweiter Faktor.** Für drei Menschen mit langen Passwörtern vertretbar, aber es ist
+  eine Entscheidung und keine Selbstverständlichkeit. Wenn der Kreis wächst, gehört sie
+  neu getroffen.
+* **Die Passwörter der beiden Rollen.** `ALTER ROLE mcp_leser LOGIN PASSWORD '...'` und
+  dasselbe für `mcp_anmeldung` — einmal von Hand, als Datenbankadministrator. Bis dahin
+  steht beides in `mcp.einrichtung_offen` und `/status` meldet es als Störung.
+* **Hostname und TLS für `mcp.<domain>`**, plus eine Dokploy-Application aus
+  `mcp/Dockerfile` (Build-Kontext ist das Wurzelverzeichnis, weil `metabase/` mit hinein
+  muss).
+* **Die ersten Nutzer.** Eine Zeile je Person in `mcp.nutzer_stufe`. Wer dort fehlt, kommt
+  nicht hinein — dass jemand sich anmelden kann, heißt nicht, dass er die Zahlen sehen darf.
+* **Ein Pilot ohne Zugang zum BI-Tool.** Daniel hat beides; ein OM, der nur den Chat hat,
+  sagt mehr darüber, ob der Server wirklich eine Alternative ist.
+* **Row-Level-Security je Betrieb** — falls ein OM nur seine Betriebe sehen soll. Das
+  BI-Tool kann das heute auch nicht, und die Zuordnung OM → Betrieb gibt es nirgends als Tabelle.
+  Eigener Plan, wenn es kommt.
+* **Die restlichen `mart`-Sichten mit Körnung versehen,** sobald die Migrationen vollständig
+  durchlaufen: gepflegt sind 158, gemessen an einer Datenbank mit 64 von 101 Migrationen.
+  `mcp.koernung_fehlend` nennt die Lücke in Produktion.

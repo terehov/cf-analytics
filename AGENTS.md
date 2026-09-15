@@ -82,6 +82,7 @@ Kommentare sind deutsch, damit sie in Postico lesbar sind.
 | **`datensicherung.md`** | Welche Rohdaten wir sichern sollten, solange LINA erreichbar ist — nach Wert und Kosten sortiert | Wenn du über neue Endpunkte oder Backfill-Tiefe entscheidest |
 | **`plan-datenvollstaendigkeit.md`** | **Was der Sync nicht nachhält**: das Audit vom 13.08.2026 mit jeder Messung, die Reihenfolge der Reparaturen, und was Eugene entscheiden muss | Bevor du an `nachfuellen.ts`, am Belegarchiv oder an einem Nachlauf baust |
 | **`plan-datenvollstaendigkeit-nachtrag.md`** | **Ergänzt den Plan, ersetzt ihn nicht.** Das Review vom 13.08.2026 der fertigen Phase 1: drei Konstruktionsfehler der neuen Mechanik (Phase 1c) und vier Ergänzungen zu Phase 2 — darunter, dass Bestelldetails nie nachaltern | Zusammen mit dem Plan darüber, bevor du Phase 1c oder 2 anfasst |
+| **`plan-skybridge.md`** | **Der Plan, mit dem andere die Daten selbst befragen** — Daniel mit ChatGPT, Copilot oder Claude, **ohne BI-Tool**: ein eigener MCP-Server (Skybridge), der die 285 Karten als Berichte ausfuehrt, Koernung, Achsen und Fallstricke als Daten in `mcp.*` haelt, freie Abfragen auf dem Syntaxbaum prueft und ueber `mcp_leser` nur `mart`/`manual`/`ampel` sieht. Das BI-Tool liest kuenftig dieselben Karten und Achsen, bis es gehen kann | Bevor du am MCP-Zugang, an `mcp_leser`, an `mcp.*`, an `beziehungen.ts` oder an einer Sicht-Koernung arbeitest |
 | **`offene-punkte.md`** | Was ungeklärt ist und wer es klären muss | Bevor du etwas als fertig meldest |
 | **`datenlage-round-table.html`** / `.pdf` | Was der Round-Table-Map noch fehlt — nach der Messreihe vom 11.08.2026 nur noch Rechte, Bounti/OpenTable, Stammdatenpflege und fachliche Festlegungen | Bevor du einen Punkt als „fehlt" weitergibst |
 | **`payloads/`** | Echte, anonymisierte LINA-Antworten aus der Exploration | Als Referenz; identisch mit den Test-Fixtures |
@@ -205,6 +206,27 @@ als Kommentar in die `karten-*.ts`. Was vor einem Fehlschluss schützt, bleibt. 
 gehören feste Messwerte hinein („am 26.07.2026 waren es 79 von 141"): sie veralten still.
 Regel und Beispiele in `docs/dashboards.md`.
 
+### `mcp/` — der Zugang aus Claude, ChatGPT und Copilot
+
+Ein eigener Dienst mit eigener `package.json`, eigenem Dockerfile und eigener Datenbankrolle. Er liest `metabase/karten-*.ts` als Berichtsdefinition und `mcp.*` als semantischen Katalog; er haengt an **nichts**, was dem BI-Tool gehoert. Plan und Begruendung: `docs/plan-skybridge.md`, Einrichtung: `mcp/README.md`.
+
+| Datei | Wofuer |
+|---|---|
+| `src/server.ts` | Die zehn Werkzeuge. **Zehn, nicht 285** — Clients kappen bei 40 bis 128, und die Antwortqualitaet sinkt ab etwa 50 |
+| `src/pruefen.ts` | Die Pruefung vor dem Lauf. Feste Regeln im Code, fachliche aus `mcp.fallstrick` |
+| `src/ast.ts` | Die Abfrage als Syntaxbaum (`libpg-query` — der Parser von PostgreSQL selbst, als WASM) |
+| `src/berichte.ts` | Platzhalter des BI-Tools → `$1`. Optionale Bloecke `[[…]]` genau wie dort |
+| `src/ausfuehren.ts` | Grenzen, Befund-Anhang, Protokoll. `gesperrtText()` — eine Sperre MUSS ihren Grund mitliefern |
+| `src/spalten_info.ts` | Je Spalte Rolle, Einheit, Wertevielfalt, plus der Darstellungshinweis. **Der Server zeichnet nichts** — die Form waehlt das Modell (Entscheidung 13.09.2026, 6) |
+| `src/anmeldung/` | Der eigene Autorisierungsserver: OAuth 2.1 mit PKCE, argon2id-Passwoerter, Dynamic Client Registration. **Eigene Datenbankrolle** `mcp_anmeldung` |
+| `test/fallen.test.ts` | **Die zehn Fallenfragen** — die Regressionssicherung des Vorhabens |
+
+**Zwei Regeln, die hier nicht verhandelbar sind:**
+
+1. **Eine Regelart in `mcp.fallstrick` ohne Umsetzung in `src/pruefen.ts` laesst den Server nicht starten.** Eine Wache, die nicht wacht, ist schlimmer als keine — dieselbe Begruendung wie harte Regel 10.
+1a. **Die Anmeldetabellen gehoeren `mcp_anmeldung`, nicht `mcp_leser`.** `mcp_leser` fuehrt Nutzereingaben als SQL aus; haette sie Zugriff, waere `SELECT privat_jwk FROM mcp.oauth_schluessel` eine gueltige Abfrage — und damit die Anmeldung umgangen. Wer eine Tabelle in `mcp` ergaenzt, entscheidet zuerst, welcher der beiden Rollen sie gehoert.
+2. **Jedes Werkzeug muss ohne seine Ansicht brauchbar sein.** In Copilot gibt es keine gerenderte Ansicht; das Ergebnis steht deshalb immer auch in `structuredContent`.
+
 ### `src/` — Importer
 
 ```
@@ -245,6 +267,14 @@ Abschnitt „Zwei Phasen".
 ---
 
 ## Befehle
+
+```bash
+# Der MCP-Zugang (mcp/, eigene package.json — dort `bun install` laufen lassen)
+cd mcp && bun test          # 366 Tests: Fallenfragen, Umgehungen aus dem Review, Anmeldeablauf, Spaltenprofil
+cd mcp && bun run nutzer liste    # Nutzer verwalten (anlegen, stufe, passwort, sperren)
+cd mcp && bun run start     # braucht MCP_DATABASE_URL und MCP_OAUTH_ISSUER
+cd mcp && bun run katalog:abzug   # test/katalog.json neu aus der Datenbank ziehen
+```
 
 ```bash
 bun install

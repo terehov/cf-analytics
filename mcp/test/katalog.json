@@ -1,0 +1,3553 @@
+{
+ "sichten": [
+  {
+   "sicht": "mart.aktion",
+   "koernung": "Marketingaktion, mit hinterlegter und tatsaechlicher Laufzeit",
+   "thema": "aktion",
+   "summen_erlaubt": false,
+   "kommentar": "Die Marketingaktionen als Dimension. gueltig_von/bis ist die HINTERLEGTE Laufzeit,\nerster_/letzter_umsatztag die TATSAECHLICHE -- die beiden auseinanderzuhalten lohnt sich:\neine unbefristete Aktion ohne Umsatz seit Monaten ist im Kassensystem noch aktiv und\nfaktisch tot.\n\nKoernung: Marketingaktion, mit hinterlegter und tatsaechlicher Laufzeit",
+   "spalten": [
+    "aktion_key",
+    "lina_id",
+    "aktion",
+    "gueltig_von",
+    "gueltig_bis",
+    "unbefristet",
+    "erster_umsatztag",
+    "letzter_umsatztag"
+   ],
+   "achsen": [
+    "aktion_key"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.aktionsumsatz",
+   "koernung": "Betrieb, Geschaeftstag und Aktion",
+   "thema": "aktion",
+   "summen_erlaubt": true,
+   "kommentar": "Aktionsumsaetze mit Namen. Eine Zeile je Betrieb, Tag und Aktion -- und nur dort, wo es\nUmsatz gab.\n\nanteil_pct kommt von LINA und ist der Anteil am NETTO-TAGESUMSATZ des Betriebs. Ueber Tage\nhinweg darf man ihn NICHT mitteln: das gewichtet einen 900-Euro-Tag wie einen\n9.000-Euro-Tag. Fuer den Monat: mart.aktionsumsatz_monat.\n\nKoernung: Betrieb, Geschaeftstag und Aktion",
+   "spalten": [
+    "geschaeftstag",
+    "monat",
+    "betrieb_key",
+    "betrieb",
+    "stadt",
+    "konzept",
+    "aktion_key",
+    "aktion",
+    "umsatz_netto",
+    "umsatz_brutto",
+    "anteil_pct"
+   ],
+   "achsen": [
+    "aktion_key",
+    "betrieb_key",
+    "geschaeftstag",
+    "konzept",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.aktionsumsatz_monat",
+   "koernung": "Betrieb, Monat und Aktion, mit Anteil am Gesamtumsatz",
+   "thema": "aktion",
+   "summen_erlaubt": false,
+   "kommentar": "Aktionsumsatz je Betrieb und Monat, mit dem Anteil am Gesamtumsatz des Betriebs.\n\nanteil_pct hat den Umsatz aus mart.umsatz_tag im Nenner, nicht die Summe der Aktionen --\ngefragt ist, wie viel vom Geschaeft auf eine Aktion entfaellt. Bleibt NULL, wenn fuer den\nMonat kein Umsatzbericht vorliegt; das ist ehrlicher als eine 100.\n\ntage_mit_umsatz zaehlt nur Tage MIT Umsatz. Ein Monat mit 3 statt 30 Tagen kann heissen:\ndie Aktion lief nur drei Tage -- oder es sind nur drei Tage geholt. Der Datenstand steht\nin mart.datenstand.\n\nKoernung: Betrieb, Monat und Aktion, mit Anteil am Gesamtumsatz",
+   "spalten": [
+    "monat",
+    "betrieb_key",
+    "betrieb",
+    "stadt",
+    "konzept",
+    "aktion_key",
+    "aktion",
+    "umsatz_netto",
+    "tage_mit_umsatz",
+    "umsatz_betrieb_gesamt",
+    "anteil_pct"
+   ],
+   "achsen": [
+    "aktion_key",
+    "betrieb_key",
+    "konzept",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.ampel_bereich",
+   "koernung": "Betrieb, Monat und Bereich — die sechs Ampeln im Langformat",
+   "thema": "round_table",
+   "summen_erlaubt": false,
+   "kommentar": "Die sechs Ampeln des Round Table im Langformat: eine Zeile je Betrieb, Monat und Bereich,\nmit dem zugrunde liegenden Wert und der erfassten Ursache.\nFuer alles, was ueber Bereiche hinweg zaehlt oder gruppiert — \"Rot-Treiber nach Bereich\",\nAmpelhistorie, Ursachenzuordnung. Fuer die klassische Round-Table-Tabelle bleibt\nmart.round_table_monat die richtige Sicht.\nACHTUNG: eine Summe ueber wert ist sinnlos, die Spalte mischt Prozente mit Schulnoten.\nampel IS NULL heisst \"keine Daten\", nicht \"in Ordnung\" — Betriebe ohne BWA sehen sonst\naus wie unauffaellige Betriebe.\n\nKoernung: Betrieb, Monat und Bereich — die sechs Ampeln im Langformat",
+   "spalten": [
+    "monat",
+    "betrieb_key",
+    "betrieb",
+    "stadt",
+    "konzept",
+    "bwa_monat",
+    "bereich",
+    "bereich_name",
+    "reihenfolge",
+    "wert",
+    "ampel",
+    "emoji",
+    "ampel_text",
+    "gesamt",
+    "intensitaet",
+    "prioritaet",
+    "massnahme",
+    "ursache_code",
+    "ursache",
+    "ursache_notiz"
+   ],
+   "achsen": [
+    "bereich",
+    "betrieb_key",
+    "konzept",
+    "monat"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "ampel",
+     "einheit": "text",
+     "hinweis": "Ampeln zaehlen, nicht mitteln."
+    }
+   ],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.artikel_monat",
+   "koernung": "Betrieb, Monat und Artikel",
+   "thema": "umsatz",
+   "summen_erlaubt": true,
+   "kommentar": "Artikelverkauf je Artikel, Betrieb und Monat — die schnelle Grundlage des\nArtikel-Drill-Downs. Gleiche Zahlen wie mart.artikelverkauf, nur verdichtet;\nwer Tage braucht, liest weiter die Tagessicht. deckungsbeitrag und\numsatz_mit_we gehoeren zusammen: ein DB-Prozent rechnet gegen umsatz_mit_we,\nnicht gegen den vollen Umsatz.\n\nKoernung: Betrieb, Monat und Artikel",
+   "spalten": [
+    "artikel_key",
+    "artikel",
+    "warengruppe",
+    "betrieb_key",
+    "betrieb",
+    "konzept",
+    "monat",
+    "menge",
+    "umsatz_netto",
+    "deckungsbeitrag",
+    "umsatz_mit_we",
+    "verkaufstage"
+   ],
+   "achsen": [
+    "artikel_key",
+    "betrieb_key",
+    "konzept",
+    "monat",
+    "warengruppe"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.artikel_monat_basis",
+   "koernung": "Betrieb, Monat und Artikel (Zwischenstufe von mart.artikel_monat)",
+   "thema": "umsatz",
+   "summen_erlaubt": true,
+   "kommentar": "Rechenstand von mart.artikel_monat, aufgefrischt im Sync-Nachlauf\n(src/sync/round_table.ts). NICHT direkt abfragen — die Sicht darueber ist\ndie dokumentierte Schnittstelle.\n\nKoernung: Betrieb, Monat und Artikel (Zwischenstufe von mart.artikel_monat)",
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.artikelverkauf",
+   "koernung": "Betrieb, Geschaeftstag und Artikel, mit dem Wareneinsatzansatz DES TAGES",
+   "thema": "umsatz",
+   "summen_erlaubt": true,
+   "kommentar": "Artikelverkaeufe mit Namen, Warengruppe und dem Wareneinsatzansatz, der AN DIESEM TAG galt.\nDie groesste Sicht des Systems - rund 20 Millionen Zeilen im Jahr. In Metabase immer nach\ngeschaeftstag filtern, dann greift das Partition Pruning und es werden nur die betroffenen\nMonate gelesen.\n\nfixer_we ist NULL, wenn fuer diesen Tag kein Ansatz erfasst ist. Dann sind auch\nwareneinsatz_theoretisch und deckungsbeitrag NULL - das ist Absicht. Eine Null waere eine\nBehauptung, ein NULL ist die Wahrheit. Wie gross die Luecke ist, zeigt abdeckung_pct in\nmart.deckungsbeitrag_warengruppe.\n\nwarengruppe_geschaetzt = true heisst: die Warengruppe stammt aus einer SPAETEREN\nMomentaufnahme und wurde rueckwirkend angenommen. Fuer die Historie ist das der Normalfall\n(LINA fuehrt keine Warengruppenhistorie), fuer eine Umgruppierungsanalyse ist es der\nAusschlusskandidat. Begruendung an core.artikel_warengruppe_zeitraum.\n\nKoernung: Betrieb, Geschaeftstag und Artikel, mit dem Wareneinsatzansatz DES TAGES",
+   "spalten": [
+    "geschaeftstag",
+    "monat",
+    "betrieb_key",
+    "betrieb",
+    "stadt",
+    "konzept",
+    "artikel_key",
+    "artikelnummer",
+    "artikel",
+    "grosskategorie",
+    "warengruppe",
+    "detailkategorie",
+    "warengruppe_geschaetzt",
+    "menge",
+    "umsatz_netto",
+    "umsatz_brutto",
+    "verkaufspreis",
+    "fixer_we",
+    "wareneinsatz_theoretisch",
+    "deckungsbeitrag"
+   ],
+   "achsen": [
+    "artikel_key",
+    "betrieb_key",
+    "geschaeftstag",
+    "konzept",
+    "monat",
+    "warengruppe"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.backfill_fortschritt",
+   "koernung": "Endpunkt",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "Wie weit ist der Backfill je Endpunkt? Die Sicht, die man morgens aufmacht.\nProzentwerte sind Prozentzahlen (23.64), nie Brueche.\nEin Lauf laesst sich jederzeit unterbrechen und neu starten: der Zustand steht in\nsync.warteschlange, nicht im Prozess. Nach einem pg_dump/restore macht der Importer auf dem\nZielserver genau hier weiter.\n\nKoernung: Endpunkt",
+   "spalten": [
+    "endpunkt",
+    "posten_gesamt",
+    "erledigt",
+    "offen",
+    "offen_laufend",
+    "offen_historie",
+    "geladen",
+    "keine_daten",
+    "aufgegeben",
+    "prozent",
+    "aeltester_geladen",
+    "juengster_geladen",
+    "aeltester_offener",
+    "juengster_offener"
+   ],
+   "achsen": [
+    "endpunkt"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.betrieb",
+   "koernung": "Betrieb",
+   "thema": "stammdaten",
+   "summen_erlaubt": false,
+   "kommentar": "Betriebsuebersicht mit allen Konzepten als Text. Fuer Markenschnitte NICHT diese Sicht\nnehmen, sondern mart.konzept_zuordnung.hauptkonzept - sonst zaehlt ein mehrfach\nzugeordneter Betrieb in mehreren Marken mit.\n\nKoernung: Betrieb",
+   "spalten": [
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "stadt",
+    "aktiv",
+    "hat_bwa",
+    "konzepte"
+   ],
+   "achsen": [
+    "betrieb_key"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.betrieb_bundesland",
+   "koernung": "Betrieb mit gepflegter PLZ",
+   "thema": "stammdaten",
+   "summen_erlaubt": false,
+   "kommentar": "Betrieb auf Bundesland, ueber die gepflegte PLZ. Enthaelt nur Betriebe, die in manual.betrieb_standort stehen — am 11.08.2026 sind das 60 von 141. Wer hier fehlt, bekommt keine Feiertage und keinen Vergleichstag.\n\nKoernung: Betrieb mit gepflegter PLZ",
+   "spalten": [
+    "betrieb_key",
+    "betrieb",
+    "plz",
+    "ort",
+    "bundesland",
+    "kuerzel"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "bundesland",
+    "ort"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.betrieb_kalender",
+   "koernung": "Betrieb und Geschaeftstag, mit Feiertag und Ferienlage",
+   "thema": "kalender",
+   "summen_erlaubt": false,
+   "kommentar": "Je Betrieb und Geschaeftstag: Wochentag, Feiertag im eigenen Bundesland, Schulferien im eigenen Bundesland. Grundlage fuer mart.vergleichstag. Nur Betriebe mit gepflegter PLZ.\n\nKoernung: Betrieb und Geschaeftstag, mit Feiertag und Ferienlage",
+   "spalten": [
+    "betrieb_key",
+    "betrieb",
+    "bundesland_kuerzel",
+    "bundesland",
+    "geschaeftstag",
+    "wochentag_nr",
+    "wochentag",
+    "feiertag",
+    "schulferien",
+    "ist_feiertag",
+    "ist_schulferien"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "bundesland",
+    "geschaeftstag"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.betrieb_kapazitaet",
+   "koernung": "Betrieb, im juengsten Kapazitaetsstand",
+   "thema": "stammdaten",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.betrieb_ohne_lina_id",
+   "koernung": "Betrieb ohne BWA-Bruecke — Erwartung: leer",
+   "thema": "pruefung",
+   "summen_erlaubt": false,
+   "kommentar": "Betriebe ohne Bruecke zur BWA. ERWARTUNG: leer. Jede Zeile hier ist ein Betrieb, der in\nkeiner Kennzahlenauswertung auftaucht - ohne Fehlermeldung, weil ihn der Importer schlicht\nnicht zuordnen kann. Zu fuellen ist die Spalte ueber den Endpunkt analyticsFilterOptions,\nder monatlich als Momentaufnahme laeuft.\n\nKoernung: Betrieb ohne BWA-Bruecke — Erwartung: leer",
+   "spalten": [
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "stadt",
+    "aktiv",
+    "hat_bwa",
+    "zuletzt_am"
+   ],
+   "achsen": [
+    "betrieb_key"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.betrieb_ohne_yext",
+   "koernung": "Betrieb ohne Yext-Zuordnung",
+   "thema": "bewertung",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.betrieb_status",
+   "koernung": "Betrieb, mit der Unterscheidung laufendes Geschaeft / kein Geschaeft",
+   "thema": "stammdaten",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.betrieb_wetter_tag",
+   "koernung": "Betrieb und Geschaeftstag",
+   "thema": "wetter",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.bewertung_antwort",
+   "koernung": "Antwort auf eine Bewertung",
+   "thema": "bewertung",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.bewertung_einzel",
+   "koernung": "einzelner Bewertung",
+   "thema": "bewertung",
+   "summen_erlaubt": false,
+   "kommentar": "Einzelne Bewertungen MIT Text, je Betrieb -- die Lesesicht hinter der Kennzahl.\nSternewertungen ohne Text sind ausgelassen: sie beantworten die Frage \"was\nschreiben die Gaeste\" nicht. Nicht zum Rechnen -- dafuer ist\nmart.bewertung_verlauf da.\n\nKoernung: einzelner Bewertung",
+   "spalten": [
+    "betrieb_key",
+    "betrieb",
+    "konzept",
+    "quelle",
+    "publisher",
+    "rating",
+    "publiziert_am",
+    "datum",
+    "monat",
+    "autor",
+    "inhalt",
+    "url"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "konzept",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.bewertung_ladestand",
+   "koernung": "Quelle und Publisher: Abdeckung und letzter Lauf des Yext-Importers",
+   "thema": "bewertung",
+   "summen_erlaubt": false,
+   "kommentar": "Ladestand der Bewertungen je Quelle und Portal: Abdeckung, Zeitraum und\nletzter Lauf. Erste Anlaufstelle, wenn eine Ampel im Round Table grau bleibt.\n\nKoernung: Quelle und Publisher: Abdeckung und letzter Lauf des Yext-Importers",
+   "spalten": [
+    "quelle",
+    "publisher",
+    "betriebe",
+    "von",
+    "bis",
+    "bewertungen_aktuell",
+    "schnitt_aktuell",
+    "zuletzt_geladen"
+   ],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.bewertung_note",
+   "koernung": "Betrieb und Monat",
+   "thema": "bewertung",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.bewertung_thema",
+   "koernung": "Bewertung und erkanntem Thema",
+   "thema": "bewertung",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.bewertung_thema_monat",
+   "koernung": "Monat, Thema und Marke",
+   "thema": "bewertung",
+   "summen_erlaubt": true,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.bewertung_verlauf",
+   "koernung": "Betrieb, Monat, Quelle und Publisher; schnitt_stand ist KUMULIERT, schnitt_monat nur der Monat — die beiden nicht verwechseln",
+   "thema": "bewertung",
+   "summen_erlaubt": false,
+   "kommentar": "Bewertungsverlauf je Betrieb und Monat: kumulierter Stand (das, was ein Gast\nsieht, Grundlage der Ampel) neben dem Monatswert (Differenz zum Vormonat,\nFruehwarnung). Monatsspalten sind NULL, wo der Vormonat fehlt — eine Luecke\nwird nicht zu einem starken Monat verrechnet.\n\nKoernung: Betrieb, Monat, Quelle und Publisher; schnitt_stand ist KUMULIERT, schnitt_monat nur der Monat — die beiden nicht verwechseln",
+   "spalten": [
+    "betrieb_key",
+    "betrieb",
+    "stadt",
+    "konzept",
+    "monat",
+    "quelle",
+    "publisher",
+    "schnitt_stand",
+    "anzahl_stand",
+    "anzahl_monat",
+    "schnitt_monat"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "konzept",
+    "monat"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "summe",
+     "spalte": "anzahl_monat",
+     "einheit": "anzahl",
+     "hinweis": null
+    },
+    {
+     "regel": "letzter_stand",
+     "spalte": "anzahl_stand",
+     "einheit": "anzahl",
+     "hinweis": null
+    },
+    {
+     "regel": "mittel",
+     "spalte": "schnitt_monat",
+     "einheit": "note",
+     "hinweis": null
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "schnitt_stand",
+     "einheit": "note",
+     "hinweis": "KUMULIERTER Stand bis zu diesem Monat. Ueber Monate hinweg nicht mitteln — dafuer ist schnitt_monat da."
+    }
+   ],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.bounti_abdeckung",
+   "koernung": "Betrieb: was Bounti von ihm kennt",
+   "thema": "schulung",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.bounti_audit_betrieb_monat",
+   "koernung": "Betrieb und Monat",
+   "thema": "schulung",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.bounti_lerneinheit_betrieb",
+   "koernung": "Betrieb und Lerneinheit",
+   "thema": "schulung",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.bounti_mehrfachzuordnung",
+   "koernung": "Person, die an mehreren Standorten haengt und in jedem mitzaehlt",
+   "thema": "schulung",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.bounti_person_stand",
+   "koernung": "Person und Standort",
+   "thema": "schulung",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.bounti_rolle_betrieb",
+   "koernung": "Betrieb und Rolle",
+   "thema": "schulung",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.bounti_schulung_betrieb_monat",
+   "koernung": "Betrieb, Monat und Schulungsart",
+   "thema": "schulung",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.bounti_schulung_person",
+   "koernung": "Zuweisung und Standort — die unterste Ebene",
+   "thema": "schulung",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.bounti_schulung_verlauf",
+   "koernung": "Betrieb",
+   "thema": "schulung",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.buchungsbeleg",
+   "koernung": "Buchungsbeleg",
+   "thema": "beleg",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.buchungsbeleg_konto",
+   "koernung": "Buchungsbeleg mit gefuelltem Sachkonto",
+   "thema": "beleg",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.buchungsbeleg_monat",
+   "koernung": "Betrieb, Monat und Belegtyp",
+   "thema": "beleg",
+   "summen_erlaubt": true,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.buchungsbeleg_zusatzfelder",
+   "koernung": "Zusatzfeld der Buchungsbelege",
+   "thema": "beleg",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.bwa_kennzahl",
+   "koernung": "BWA-Kennzahl — die Stammliste",
+   "thema": "bwa",
+   "summen_erlaubt": false,
+   "kommentar": "BWA-Kennzahlen mit Betriebsname, Stadt und Marke -- die Sicht, mit der Metabase arbeitet.\nIdentisch zu mart.kennzahlen_aktuell, nur mit aufgeloesten Namen; wer die Schluessel\nbraucht, nimmt weiterhin die andere.\n\nACHTUNG: gebucht = false heisst NICHT \"null Umsatz\", sondern \"der Steuerberater hat diesen\nMonat noch nicht gebucht\". getKennzahlen liefert immer das ganze Jahr, ungebuchte Monate\nals 0,00 statt NULL. Wer darauf nicht filtert, bekommt fuer jeden kuenftigen Monat eine\nvollstaendige, gruene und vollstaendig erfundene Auswertung -- am 26.07.2026 einmal\npassiert, September bis Dezember fuer alle 131 Betriebe.\n\nFuer \"was wussten wir am Stichtag X\" stattdessen direkt core.kennzahlen_monat mit\nabgerufen_am <= X abfragen.\n\nKoernung: BWA-Kennzahl — die Stammliste",
+   "spalten": [
+    "betrieb_key",
+    "betrieb",
+    "stadt",
+    "konzept",
+    "monat",
+    "kennzahl",
+    "wert_absolut",
+    "wert_prozent",
+    "abgerufen_am",
+    "gebucht"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "konzept",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.bwa_longterm",
+   "koernung": "Betrieb, Monat und BWA-Zeile aus der Langzeitreihe seit 2009",
+   "thema": "bwa",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.bwa_longterm_stand",
+   "koernung": "Betrieb: wie weit die Langzeitreihe reicht",
+   "thema": "bwa",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.bwa_plan_ist",
+   "koernung": "Betrieb, Monat und BWA-Zeile, Plan gegen Ist",
+   "thema": "bwa",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.bwa_prozent_unplausibel",
+   "koernung": "Betrieb, Monat und Kennzahl mit unplausiblem Prozentwert",
+   "thema": "pruefung",
+   "summen_erlaubt": false,
+   "kommentar": "BWA-Quoten, die mart.kennzahlen_aktuell als unplausibel aussortiert (ueber 1.000 Prozent).\numsatz_absolut steht daneben, weil er fast immer die Erklaerung ist: ein Nenner nahe null.\nErwartungswert ist NICHT null -- geschlossene Betriebe buchen weiter Restkosten. Auffaellig\nwaere ein AKTIVER Betrieb mit nennenswertem Umsatz in dieser Liste.\n\nKoernung: Betrieb, Monat und Kennzahl mit unplausiblem Prozentwert",
+   "spalten": [
+    "betrieb_key",
+    "betrieb",
+    "aktiv",
+    "monat",
+    "kennzahl",
+    "wert_prozent",
+    "wert_absolut",
+    "umsatz_absolut",
+    "abgerufen_am"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.bwa_pruefung",
+   "koernung": "Pruefzeile zur BWA",
+   "thema": "pruefung",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.bwa_quellen_vergleich",
+   "koernung": "Betrieb, Monat und Kennzahl, BWA-Quellen gegeneinander",
+   "thema": "bwa",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.bwa_rueckbuchung",
+   "koernung": "Abstand in Monaten zwischen Buchung und Berichtsmonat",
+   "thema": "bwa",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.bwa_rueckstand",
+   "koernung": "Betrieb — \"nie gebucht\" ist kein Rueckstand",
+   "thema": "bwa",
+   "summen_erlaubt": false,
+   "kommentar": "Wer bei der BWA hinterherhaengt -- und wer nie eine hatte.\n\nDer Massstab ist die SPITZE der Gruppe, nicht der Kalender: verglichen wird mit dem\njuengsten Monat, den irgendein Betrieb gebucht hat. Ein Steuerberater, der generell spaet\ndran ist, erzeugt so keinen Befund.\n\nlage, mit den Zahlen vom 26.07.2026:\n  aktuell        23  auf Hoehe der Spitze (Juni 2026)\n  im Rueckstand  46  gebucht, aber aelter als die Spitze\n  nie gebucht    62  hatte noch nie eine BWA. KEIN Fehler, es gibt Betriebe ohne\n                     BWA-Anbindung\n  ungeprueft     10  noch kein getKennzahlen-Posten hat diesen Betrieb angefasst\n\nauffaellig ist die Zeile fuer das Monitoring: mehr als einen Monat hinter der Spitze. Ein\nMonat Rueckstand ist der Normalfall (38 von 69 buchenden Betrieben), zwei sind es nicht --\ngemessen trifft die Schwelle 8 Betriebe.\n\nKoernung: Betrieb — \"nie gebucht\" ist kein Rueckstand",
+   "spalten": [
+    "betrieb_key",
+    "betrieb",
+    "stadt",
+    "konzept",
+    "letzter_monat",
+    "spitze",
+    "rueckstand_monate",
+    "lage",
+    "auffaellig",
+    "geprueft_am"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "konzept"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.bwa_zeile_ungepflegt",
+   "koernung": "BWA-Zeile ohne Pflege",
+   "thema": "bwa",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.datenstand",
+   "koernung": "Betrieb: bis wann Umsatz, bis wann BWA. Vor jeder Auswertung lesen",
+   "thema": "betrieb",
+   "summen_erlaubt": false,
+   "kommentar": "Wie alt die Daten jedes Betriebs je Quelle sind. befund nennt das dringendste\nProblem: kein Umsatz geladen > Umsatz veraltet (aelter als ACHT Tage — LINA\nliefert 5-6 Tage grundsaetzlich nach, erst darueber fehlt wirklich etwas) >\nkeine BWA gebucht > keine Artikeldaten > vollstaendig.\n\nKoernung: Betrieb: bis wann Umsatz, bis wann BWA. Vor jeder Auswertung lesen",
+   "spalten": [
+    "betrieb",
+    "stadt",
+    "konzept",
+    "aktiv",
+    "hat_bwa",
+    "bwa_bruecke",
+    "erster_tag",
+    "letzter_tag",
+    "umsatztage",
+    "umsatz_alter_tage",
+    "bwa_monat",
+    "bwa_verzug_monate",
+    "artikeltage",
+    "letzter_artikeltag",
+    "letzter_personaltag",
+    "befund",
+    "betrieb_key"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "konzept"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "bwa_verzug_monate",
+     "einheit": "anzahl",
+     "hinweis": null
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "umsatz_alter_tage",
+     "einheit": "tage",
+     "hinweis": null
+    }
+   ],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.deckungsbeitrag_stand",
+   "koernung": "materialisierter Deckungsbeitragssicht: wie alt ihre Zahlen sind",
+   "thema": "betrieb",
+   "summen_erlaubt": false,
+   "kommentar": "Wie alt die Zahlen in mart.deckungsbeitrag_warengruppe sind. aufgefrischt_am ist NULL, solange\nder erste Refresh im Sync-Nachlauf nicht gelaufen ist -- die Sicht selbst ist dann trotzdem\ngefuellt, naemlich mit dem Stand aus der Migration.\n\nKoernung: materialisierter Deckungsbeitragssicht: wie alt ihre Zahlen sind",
+   "spalten": [
+    "aufgefrischt_am",
+    "dauer_s",
+    "zeilen",
+    "juengster_monat"
+   ],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.deckungsbeitrag_warengruppe",
+   "koernung": "Betrieb, Monat und Warengruppe",
+   "thema": "umsatz",
+   "summen_erlaubt": true,
+   "kommentar": "Deckungsbeitrag je Warengruppe und Monat. Prozentwerte sind Prozentzahlen (23.64), nie Brueche.\n\nMATERIALISIERT seit 01.08.2026 -- die Zahlen sind so alt wie der letzte REFRESH. Der laeuft im\nNachlauf jedes Sync-Laufs; der Stand steht in mart.deckungsbeitrag_stand.\n\nWer sie von Hand auffrischt:\n    REFRESH MATERIALIZED VIEW CONCURRENTLY mart.deckungsbeitrag_warengruppe;\n\nZUERST AUF abdeckung_pct SEHEN. Sie sagt, welcher Anteil des Umsatzes ueberhaupt einen\nhinterlegten Wareneinsatzansatz hat. Bei 60 Prozent Abdeckung ist der Deckungsbeitrag\nstrukturell zu hoch, und zwar ohne dass man es der Zahl ansieht.\n\nDIE SPALTE WAR BIS 0029 DEFEKT: sie filterte auf fixer_we IS NOT NULL, doch fixer_we ist nie\nNULL (LINA liefert 0.0000). Sie stand deshalb ausnahmslos auf 100. Seit 0029 filtert sie auf\nfixer_we > 0 und zeigt die tatsaechliche, deutlich niedrigere Abdeckung.\n\nACHTUNG BEIM WARENEINSATZ: wareneinsatz_theoretisch beruht auf core.artikel.fixer_we, und\ndessen Herkunft ist seit dem 27.07.2026 ungeklaert (LINAs Warenwirtschaft enthaelt Demodaten,\ndie Rezepturen werden in FoodNotify gepflegt). Der Deckungsbeitrag ist als Umsatzgliederung\nbelastbar, als Margenaussage NICHT. Siehe docs/plan-foodnotify.md, Stufe 2.4.\n\nACHTUNG: umsatz_netto_pos ist der POS-Artikelumsatz und NICHT das BWA-Umsatzkonto aus\ncore.kennzahlen_monat - die beiden weichen systematisch ab.\n\nKoernung: Betrieb, Monat und Warengruppe",
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.einkauf_beleg",
+   "koernung": "Bestellung (Belegkopf), nicht je Position; storniert kennzeichnet statt auszublenden",
+   "thema": "einkauf",
+   "summen_erlaubt": true,
+   "kommentar": "Belegkopf je Bestellung — eine Zeile je Bestellung, nicht je Position (dafuer\nist mart.einkauf_position da). STORNOS STEHEN HIER MIT DRIN und sind an\n`storniert` erkennbar, wie in mart.einkauf_position: das ist die Beweissicht,\nwer summiert filtert selbst. `betrieb` ist NULL, solange die Kostenstelle\nkeinem LINA-Betrieb zugeordnet ist. `summe` ist die Summe der geladenen\nPositionen, nicht der FoodNotify-Kopfwert — konsistent mit\nmart.einkauf_betrieb_monat.\n\nKoernung: Bestellung (Belegkopf), nicht je Position; storniert kennzeichnet statt auszublenden",
+   "spalten": [
+    "bestellung_key",
+    "marke",
+    "fn_betrieb",
+    "betrieb",
+    "bereich",
+    "bestellnummer",
+    "beleg_nummer",
+    "bestellt_am",
+    "bestelldatum",
+    "monat",
+    "lieferdatum",
+    "lieferant",
+    "bestellstatus",
+    "storniert",
+    "positionen",
+    "summe"
+   ],
+   "achsen": [
+    "bereich",
+    "lieferant",
+    "marke",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.einkauf_betrieb_monat",
+   "koernung": "Betrieb und Monat",
+   "thema": "einkauf",
+   "summen_erlaubt": true,
+   "kommentar": "Einkaufsvolumen je Betrieb, Bereich (Bar/Kueche) und Monat. Nur zugeordnete\nBetriebe — die Sicht existiert, um neben dem LINA-Umsatz zu stehen.\n`einkauf_netto` ist OHNE Stornos (Migration 0043); was storniert wurde, steht\nin `storniert_netto` daneben.\n\nKoernung: Betrieb und Monat",
+   "spalten": [
+    "betrieb_key",
+    "betrieb",
+    "marke",
+    "bereich",
+    "monat",
+    "bestellungen",
+    "positionen",
+    "einkauf_netto",
+    "lieferanten",
+    "bestellungen_storniert",
+    "storniert_netto"
+   ],
+   "achsen": [
+    "bereich",
+    "betrieb_key",
+    "marke",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.einkauf_betrieb_monat_basis",
+   "koernung": "Betrieb und Monat (Zwischenstufe von mart.einkauf_betrieb_monat)",
+   "thema": "einkauf",
+   "summen_erlaubt": true,
+   "kommentar": "Rechenstand von mart.einkauf_betrieb_monat, aufgefrischt im Sync-Nachlauf\n(src/sync/einkauf_sichten.ts). NICHT direkt abfragen — die Sicht darueber ist die\ndokumentierte Schnittstelle.\n\nKoernung: Betrieb und Monat (Zwischenstufe von mart.einkauf_betrieb_monat)",
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.einkauf_kreditor_monat",
+   "koernung": "Betrieb, Monat und Kreditor",
+   "thema": "einkauf",
+   "summen_erlaubt": true,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.einkauf_ladestand",
+   "koernung": "Marke: wie weit der Bestellimport gekommen ist",
+   "thema": "einkauf",
+   "summen_erlaubt": false,
+   "kommentar": "Wie vollstaendig ist ein Monat geladen? Der Backfill laeuft rueckwaerts von\nheute; ein duenner Monat in der Vergangenheit ist Ladestand, nicht Einbruch.\nVor jeder Aussage ueber einen Zeitraum hier nachsehen. `storniert` ist aus dem\nEinkaufsvolumen heraus, `pending` zaehlt noch mit (ungeklaert),\n`status_unbekannt` > 0 heisst: ein Status kommt nicht durch den Importer.\n\nKoernung: Marke: wie weit der Bestellimport gekommen ist",
+   "spalten": [
+    "marke",
+    "monat",
+    "bestellungen",
+    "mit_kopfdaten",
+    "mit_positionen",
+    "positionen_pct",
+    "seiten_erledigt",
+    "seiten_offen",
+    "liste_vollstaendig",
+    "storniert",
+    "pending",
+    "status_unbekannt"
+   ],
+   "achsen": [
+    "marke",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.einkauf_position",
+   "koernung": "Bestellposition",
+   "thema": "einkauf",
+   "summen_erlaubt": true,
+   "kommentar": "Jede bestellte Position mit Betrieb, Marke, Lieferant und Ware. Echte\nBelegpreise aus FoodNotify — nicht Katalogpreise. `betrieb` ist NULL, solange\ndie Kostenstelle keinem LINA-Betrieb zugeordnet ist. STORNOS STEHEN HIER MIT\nDRIN und sind an `storniert` erkennbar: das ist die Beweissicht. Wer Summen\nbildet, filtert `NOT storniert` — oder nimmt einkauf_betrieb_monat.\n\nKoernung: Bestellposition",
+   "spalten": [
+    "bestellposition_key",
+    "bestellung_key",
+    "marke",
+    "fn_betrieb",
+    "betrieb",
+    "bereich",
+    "bestellt_am",
+    "bestelldatum",
+    "monat",
+    "lieferant",
+    "ware",
+    "ware_fn_id",
+    "positionsname",
+    "menge",
+    "gebinde_menge",
+    "gesamt_menge",
+    "einheit",
+    "einzelpreis",
+    "summe_preis",
+    "preis_abweichend",
+    "ersetzt",
+    "beleg_nummer",
+    "bestellstatus",
+    "storniert"
+   ],
+   "achsen": [
+    "bereich",
+    "lieferant",
+    "marke",
+    "monat",
+    "ware"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.einkauf_pruefung",
+   "koernung": "Pruefzeile zum Einkauf",
+   "thema": "pruefung",
+   "summen_erlaubt": false,
+   "kommentar": "Positionen, die in der Preisreihe fehlen oder dort auffallen — mit Grund und\ndem ueblichen Preis derselben Ware zum Vergleich. Damit die Luecke sichtbar ist\nstatt still.\n\nKoernung: Pruefzeile zum Einkauf",
+   "spalten": [
+    "marke",
+    "betrieb",
+    "bestelldatum",
+    "bestellnummer",
+    "ware",
+    "menge",
+    "gebinde_menge",
+    "gesamt_menge",
+    "einheit",
+    "summe_preis",
+    "preis_je_gebinde",
+    "ueblich",
+    "grund"
+   ],
+   "achsen": [
+    "marke",
+    "ware"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.einkauf_pruefung_basis",
+   "koernung": "Pruefzeile (Zwischenstufe von mart.einkauf_pruefung)",
+   "thema": "pruefung",
+   "summen_erlaubt": false,
+   "kommentar": "Rechenstand von mart.einkauf_pruefung, aufgefrischt im Sync-Nachlauf. Traegt\nzusaetzlich bestellposition_key und bestellung_key; letzterer steht seit 0067\nauch in der Sicht darueber — er traegt den Klick zum Beleg.\n\nKoernung: Pruefzeile (Zwischenstufe von mart.einkauf_pruefung)",
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.einkaufspreis_betrieb",
+   "koernung": "Betrieb, Ware und Monat; NUR mit vergleichbar = true lesen",
+   "thema": "einkauf",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.einkaufspreis_betrieb_basis",
+   "koernung": "Betrieb, Ware und Monat (Zwischenstufe von mart.einkaufspreis_betrieb)",
+   "thema": "einkauf",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.einkaufspreis_monat",
+   "koernung": "Ware, Marke, Einheit und Monat — echte Belegpreise aus FoodNotify",
+   "thema": "einkauf",
+   "summen_erlaubt": false,
+   "kommentar": "Einkaufspreis je Ware und Monat. FUEHREND ist der Preis je GEBINDE (was ein\nbestellter Karton gekostet hat) -- er braucht nur sumPrice und Menge und ist\ndamit belastbar. Der Preis je Basiseinheit steht daneben, wo FoodNotifys\nGebindeangabe verwertbar war; sie schwankt fuer dieselbe Ware um Faktor 140.000.\nGruppiert ueber den NAMEN: FoodNotify vergibt je Betrieb eigene Waren-IDs.\nSTORNIERTE Bestellungen sind ausgeschlossen (Migration 0043).\nSEIT 0062 MIT gebinde_typisch: derselbe Artikel wird im selben Monat mit\nverschiedenen Gebindegroessen gebucht (Grana Padano 8,82 bei gebinde_menge 1\nund 17,64 bei 2). Der Median kippt dann zwischen beiden, und das sieht wie eine\nPreisverdopplung aus. Wer zwei Monate vergleicht, muss gebinde_typisch\nmitvergleichen -- mart.einkaufspreis_veraenderung tut das.\n\nKoernung: Ware, Marke, Einheit und Monat — echte Belegpreise aus FoodNotify",
+   "spalten": [
+    "ware",
+    "marke",
+    "einheit",
+    "monat",
+    "bestellungen",
+    "gebinde",
+    "menge",
+    "ausgaben",
+    "preis_je_gebinde",
+    "preis_min",
+    "preis_max",
+    "preis_je_einheit_median",
+    "gebinde_typisch",
+    "gebinde_varianten"
+   ],
+   "achsen": [
+    "marke",
+    "monat",
+    "ware"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "summe",
+     "spalte": "ausgaben",
+     "einheit": "euro",
+     "hinweis": null
+    },
+    {
+     "regel": "median",
+     "spalte": "preis_je_einheit_median",
+     "einheit": "euro",
+     "hinweis": null
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "preis_je_gebinde",
+     "einheit": "euro",
+     "hinweis": "Ein Preis je Gebinde. Ueber verschiedene Gebindegroessen hinweg nicht vergleichbar — dafuer preis_je_einheit_median."
+    }
+   ],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.einkaufspreis_monat_basis",
+   "koernung": "Ware, Marke, Einheit und Monat (Zwischenstufe von mart.einkaufspreis_monat)",
+   "thema": "einkauf",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.einkaufspreis_veraenderung",
+   "koernung": "Ware, Marke und Monat, mit dem Vormonatsvergleich",
+   "thema": "einkauf",
+   "summen_erlaubt": false,
+   "kommentar": "Preisveraenderung je Ware und Gebinde gegenueber dem VORMONAT.\nveraenderung_pct ist NULL, wenn der letzte Einkauf laenger her ist als einen\nMonat — ein Halbjahressprung als Monatsveraenderung waere eine erfundene Zahl.\n\nKoernung: Ware, Marke und Monat, mit dem Vormonatsvergleich",
+   "spalten": [
+    "ware",
+    "marke",
+    "einheit",
+    "monat",
+    "preis",
+    "vormonat_preis",
+    "vormonat",
+    "veraenderung_pct",
+    "bestellungen",
+    "gebinde",
+    "menge",
+    "ausgaben",
+    "verdaechtig",
+    "gebinde_typisch",
+    "vormonat_gebinde",
+    "gebinde_varianten",
+    "gebinde_gewechselt"
+   ],
+   "achsen": [
+    "marke",
+    "monat",
+    "ware"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.feiertag_bundesweit",
+   "koernung": "Datum, das in allen Bundeslaendern Feiertag ist",
+   "thema": "kalender",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.feiertag_kalender",
+   "koernung": "Feiertag und Bundesland",
+   "thema": "kalender",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.feiertag_normiert",
+   "koernung": "Feiertag, Datum und Bundesland, Namen vereinheitlicht",
+   "thema": "kalender",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.feiertag_vorausschau",
+   "koernung": "kommendem Feiertag",
+   "thema": "kalender",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.fremdeinkauf",
+   "koernung": "Betrieb, Monat, Lieferant UND Quelle — ohne Filter auf genau eine Quelle wird doppelt gezaehlt",
+   "thema": "einkauf",
+   "summen_erlaubt": true,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [
+    {
+     "regel": "summe",
+     "spalte": "netto",
+     "einheit": "euro",
+     "hinweis": "Nur mit Filter auf genau eine quelle summieren, sonst Doppelzaehlung."
+    }
+   ],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.historie_stand",
+   "koernung": "Quelle: wie weit die Historie zurueckreicht",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "Wie weit die Historie je Endpunkt zurueckreicht. tage_hinter_spitze zeigt\ndie Schieflage: solange der Backfill datumsweise laeuft (Migration 0021),\nbleiben alle Endpunkte dicht beieinander. Laeuft ein Wert davon, arbeitet\njemand wieder endpunktweise ab.\n\nKoernung: Quelle: wie weit die Historie zurueckreicht",
+   "spalten": [
+    "endpunkt",
+    "erledigt",
+    "offen",
+    "reicht_zurueck_bis",
+    "naechstes_datum",
+    "tage_hinter_spitze"
+   ],
+   "achsen": [
+    "endpunkt"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.import_bericht",
+   "koernung": "Bericht: Fortschritt, Aktualitaet, Gesundheit",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "Je LINA-Bericht: Fortschritt, Datenreichweite, Aktualitaet und Gesundheit.\n\ntage_alt ist die wichtigste Spalte: sie sagt, wie alt die juengsten Daten dieses Berichts sind.\nBei taeglichen Berichten sind 1-2 Tage normal.\n\nzustand = \"wartet\" heisst nicht \"kaputt\": der laufende Betrieb hat Vorrang vor der Historie,\ndeshalb koennen Historienposten laenger unberuehrt bleiben.\n\nKoernung: Bericht: Fortschritt, Aktualitaet, Gesundheit",
+   "spalten": [
+    "endpunkt",
+    "prozent",
+    "posten",
+    "erledigt",
+    "offen",
+    "geladen",
+    "keine_daten",
+    "aufgegeben",
+    "reicht_zurueck_bis",
+    "geladen_bis",
+    "tage_alt",
+    "letzter_erfolg",
+    "stunden_seit_erfolg",
+    "aufrufe_24h",
+    "fehler_24h",
+    "dauer_ms_schnitt",
+    "betriebe_pausiert",
+    "zustand"
+   ],
+   "achsen": [
+    "endpunkt"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.import_betrieb",
+   "koernung": "Betrieb: was fehlt, wie weit die Daten reichen",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "Je Betrieb: wie viel geladen ist und wie weit die Daten reichen.\n\naufgegeben > 0 heisst, dass ein Posten nach mehreren Versuchen aufgegeben wurde -- das ist die\nSpalte, die eine echte Luecke anzeigt. keine_daten dagegen ist Normalzustand fuer Betriebe, die\neinen Bericht nicht fuehren.\n\nKoernung: Betrieb: was fehlt, wie weit die Daten reichen",
+   "spalten": [
+    "betrieb_key",
+    "betrieb",
+    "enc_id",
+    "erledigt",
+    "offen",
+    "prozent",
+    "reicht_zurueck_bis",
+    "geladen_bis",
+    "keine_daten",
+    "aufgegeben",
+    "berichte_pausiert"
+   ],
+   "achsen": [
+    "betrieb_key"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.import_fehler",
+   "koernung": "Fehlermuster der letzten 24 Stunden",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "Fehlermuster der letzten 24 Stunden, nach Haeufigkeit. Zeitstempel und lange Zahlen sind im\nText durch <zeit> und <zahl> ersetzt, damit gleichartige Fehler zusammenfallen.\n\nHier stehen NUR echte Fehler. \"keine_daten\" ist keiner: LINA antwortet mit HTTP 500 und leerem\nBody, wenn ein Betrieb fuer einen Bericht nichts hat -- ein geschlossenes Haus oder ein\nBericht, den dieser Betrieb nicht fuehrt.\n\nKoernung: Fehlermuster der letzten 24 Stunden",
+   "spalten": [
+    "endpunkt",
+    "http_status",
+    "fehler",
+    "faelle",
+    "betriebe",
+    "zuerst",
+    "zuletzt"
+   ],
+   "achsen": [
+    "endpunkt"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.import_gesamt",
+   "koernung": "Lauf insgesamt — eine einzige Zeile",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "Eine Zeile: Fortschritt, Tempo, geschaetzte Restzeit, Datenreichweite und eine etwaige\nZugangssperre. Die Restzeit ist aus dem Durchsatz der letzten Stunde gerechnet und daher eine\nGroessenordnung, keine Zusage -- sie aendert sich mit dem Tagesbudget und mit LINAs Tempo.\n\nKoernung: Lauf insgesamt — eine einzige Zeile",
+   "spalten": [
+    "posten_gesamt",
+    "erledigt",
+    "offen",
+    "offen_laufend",
+    "offen_historie",
+    "aufgegeben",
+    "prozent",
+    "reicht_zurueck_bis",
+    "geladen_bis",
+    "tempo_pro_stunde",
+    "reststunden",
+    "fertig_etwa",
+    "sperre_art",
+    "sperre_bis",
+    "sperre_hinweis"
+   ],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.import_lauf",
+   "koernung": "Importlauf",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "Die Importlaeufe, juengster zuerst. status = \"abgebrochen\" mit einer Notiz ueber SIGTERM ist\nder Normalfall bei einem Lauf mit Zeitfrist -- der naechste macht weiter, wo dieser aufhoerte.\nDer Zustand liegt in der Datenbank, nicht im Prozess. Seit 0081 erscheinen auch\nuebersprungene und gesperrte Starts als eigene Zeilen mit 0 Aufgaben — eine Kette davon\nerklaert ein Loch im Zulauf, das vorher wie ein fehlender Zeitplan aussah.\n\nKoernung: Importlauf",
+   "spalten": [
+    "lauf_id",
+    "gestartet_am",
+    "beendet_am",
+    "dauer",
+    "ausloeser",
+    "status",
+    "aufgaben_gesamt",
+    "aufgaben_ok",
+    "aufgaben_fehler",
+    "aufgaben_uebersprungen",
+    "posten_pro_minute",
+    "notiz"
+   ],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.import_naechste",
+   "koernung": "offenem Posten in Abarbeitungsreihenfolge",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "Die offene Warteschlange in der Reihenfolge der Abarbeitung. Zeile 1 ist der naechste Posten.\nlaeuft_gerade = true heisst, dass ein Worker ihn gerade in Arbeit hat.\n\nPrioritaet: <= 10 sind die laufenden Tage (heute, gestern), >= 90 ist die Historie. Der\nlaufende Betrieb geht immer vor -- deshalb kann die Historie tagelang stillstehen, ohne dass\netwas kaputt ist.\n\nKoernung: offenem Posten in Abarbeitungsreihenfolge",
+   "spalten": [
+    "posten_id",
+    "position",
+    "endpunkt",
+    "betrieb",
+    "zeitraum_von",
+    "zeitraum_bis",
+    "prioritaet",
+    "art",
+    "faellig_ab",
+    "versuche",
+    "in_arbeit_seit",
+    "laeuft_gerade",
+    "letzter_fehler"
+   ],
+   "achsen": [
+    "endpunkt"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.import_puls",
+   "koernung": "Stunde der letzten drei Tage",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "Posten je Stunde, letzte drei Tage. Eine Luecke ist eine Pause (Sperre, Budget oder kein\nlaufender Prozess), ein Absacken ohne Fehler meistens das Tagesbudget.\n\nwartezeit_ms ist die selbst auferlegte Drosselung -- sie soll da sein. Steigt sie ohne unser\nZutun, hat LINA gebremst.\n\nKoernung: Stunde der letzten drei Tage",
+   "spalten": [
+    "stunde",
+    "geladen",
+    "keine_daten",
+    "fehler",
+    "gesamt",
+    "dauer_ms",
+    "wartezeit_ms"
+   ],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.import_sperre",
+   "koernung": "Zugangssperre, aktive zuerst",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "Zugangssperren, juengste zuerst. aktiv = true heisst, dass der Import gerade ruht.\n\nSperren laufen von selbst ab -- der Importer kommt ohne Zutun zurueck. Die Ausnahme ist\nart = 'anmeldung': die muss jemand ansehen, weil es nur einen Zugang gibt und wiederholte\nAnmeldeversuche zur Kontosperre fuehren.\n\nDer Hinweis ist LINAs eigene Meldung, keine Vermutung von uns.\n\nKoernung: Zugangssperre, aktive zuerst",
+   "spalten": [
+    "sperre_id",
+    "art",
+    "erkannt_am",
+    "pausiert_bis",
+    "stunden_noch",
+    "http_status",
+    "endpunkt",
+    "hinweis",
+    "lauf_id",
+    "aufgehoben_am",
+    "aufgehoben_von",
+    "aktiv"
+   ],
+   "achsen": [
+    "endpunkt"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.import_strukturaenderung",
+   "koernung": "erkannter Strukturaenderung — Erwartung: leer",
+   "thema": "pruefung",
+   "summen_erlaubt": false,
+   "kommentar": "Wenn LINA das Format einer Antwort aendert, steht es hier. Erwartung: leer.\n\nEine offene Zeile heisst, dass ein Bericht anders aussieht als erwartet -- dann stimmen die\nDaten dieses Berichts moeglicherweise nicht mehr, ohne dass irgendetwas fehlgeschlagen waere.\nGenau diese Sorte Fehler meldet sich sonst nicht.\n\nKoernung: erkannter Strukturaenderung — Erwartung: leer",
+   "spalten": [
+    "abweichung_id",
+    "endpunkt",
+    "erkannt_am",
+    "erwartet",
+    "tatsaechlich",
+    "quittiert_am",
+    "offen"
+   ],
+   "achsen": [
+    "endpunkt"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.inventur",
+   "koernung": "Inventur (Zaehlung), mit bewertetem Bestand",
+   "thema": "inventur",
+   "summen_erlaubt": false,
+   "kommentar": "Inventurkoepfe mit bewertetem Soll- und Zaehlbestand, eine Zeile je Inventur.\nLOHNEND FAST NUR BEI WILMA WUNDER (278 Stueck, 157 signiert; Enchilada 49,\nAposto 19, Deutsche Konzepte 9 — gemessen 09.08.2026 nach dem ersten echten\nLauf). STORNIERTE UND UNSIGNIERTE INVENTUREN STEHEN HIER MIT DRIN (Beweissicht\nwie mart.einkauf_position) und sind an `storniert` bzw. `signiert` erkennbar.\n\nUNPLAUSIBLE POSITIONEN SIND AUS DEN EURO-SUMMEN AUSGENOMMEN: FoodNotifys\nSollmenge ist fuer einen kleinen Teil der Positionen unbrauchbar (Migration\n0046). Wie viele es je Inventur waren, steht in `positionen_unplausibel` —\neine Zeile mit hohem Wert dort ist mit Vorsicht zu lesen.\n\nWer eine Schwundaussage treffen will, nimmt mart.inventur_schwund: die rechnet\nnur mit signierten, nicht stornierten Inventuren.\n\nKoernung: Inventur (Zaehlung), mit bewertetem Bestand",
+   "spalten": [
+    "inventur_key",
+    "marke",
+    "fn_betrieb",
+    "betrieb",
+    "bereich",
+    "name",
+    "art",
+    "status",
+    "signiert",
+    "storniert",
+    "erstellt_am",
+    "datum",
+    "geaendert_am",
+    "positionen_erwartet",
+    "positionen_geladen",
+    "positionen_unplausibel",
+    "soll_bewertet",
+    "gezaehlt_bewertet",
+    "schwund_eur"
+   ],
+   "achsen": [
+    "bereich",
+    "marke"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.inventur_abgeschnitten",
+   "koernung": "Inventur, deren Positionsliste abgeschnitten wirkt",
+   "thema": "pruefung",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.inventur_schwund",
+   "koernung": "Betrieb und Monat, bewerteter Schwund",
+   "thema": "inventur",
+   "summen_erlaubt": true,
+   "kommentar": "Bewerteter Schwund je Betrieb und Monat. SEIT 0062 GRUNDLEGEND ENGER GEFASST,\nweil die Sicht vorher drei verschiedene Dinge in einer Zahl vermischt hat:\n (a) TESTINVENTUREN sind raus. 61 von 358 tragen \"Test\" im Namen, eine davon\n     signiert mit 285 Positionen. Sie stehen in inventuren_test.\n (b) GERECHNET WIRD NUR UEBER GEZAEHLTE POSITIONEN. 27.395 von 67.219\n     Positionen tragen ein Soll ohne jede Zaehlung -- eine nicht gezaehlte\n     Position ist kein Schwund, sondern eine Luecke. Was so herausfaellt,\n     steht in positionen_ohne_zaehlung und soll_eur_ohne_zaehlung.\n     Teilinventuren (\"Inventur Bar Juni\") sind der haeufigste Grund und in\n     inventuren_teilbereich gezaehlt.\n (c) NICHT GELOEST: der theoretische Bestand selbst ist aufgeblaeht. Gemessen\n     971.750 g Pizzateig gegen 138.000 g gezaehlt. Wird der Verbrauch nicht\n     gegen den Bestand gebucht, waechst das Soll mit jeder Lieferung.\n     soll_je_gezaehlt macht es sichtbar: liegt der Wert weit ueber 1, ist\n     KEINE Schwundzahl dieser Zeile belastbar.\nNUR SIGNIERTE Inventuren zaehlen in den Euro-Spalten, stornierte sind ganz\nausgeschlossen. Eine flaechige Aussage ueber alle Marken bleibt unmoeglich:\nInventuren gibt es praktisch nur bei Wilma Wunder.\n\nKoernung: Betrieb und Monat, bewerteter Schwund",
+   "spalten": [
+    "betrieb_key",
+    "betrieb",
+    "marke",
+    "monat",
+    "inventuren",
+    "inventuren_signiert",
+    "soll_eur",
+    "gezaehlt_eur",
+    "schwund_eur",
+    "schwund_pct",
+    "inventuren_test",
+    "inventuren_teilbereich",
+    "positionen",
+    "positionen_ohne_zaehlung",
+    "soll_eur_ohne_zaehlung",
+    "soll_je_gezaehlt"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "marke",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.inventurposition",
+   "koernung": "gezaehlter Ware je Inventur",
+   "thema": "inventur",
+   "summen_erlaubt": true,
+   "kommentar": "Die einzelne Zaehlung: eine Zeile je Ware und Inventur, mit Mengen, Preis je\nBasiseinheit, bewertetem Soll und Ist sowie der Differenz. Der Inventurkopf\n(Betrieb, Datum, Status) steht mit dabei, damit sich die Sicht allein filtern\nlaesst.\n\n`differenz_menge` / `differenz_eur` sind SOLL MINUS GEZAEHLT: positiv heisst,\nes fehlt etwas (Schwund); negativ heisst, es ist mehr da als gebucht\n(Ueberbestand, meist ein Buchungsfehler).\n\nANDERS ALS mart.inventur FILTERT DIESE SICHT NICHTS WEG. Unplausible\nPositionen (Migration 0046: Positionswert ueber 50.000 EUR, FoodNotify-\nArtefakte) bleiben stehen und tragen `unplausibel = true` — wer eine einzelne\nZaehlung ansieht, sucht gerade die Ausreisser. Fuer Summen und Schwundquoten\ngilt weiterhin mart.inventur bzw. mart.inventur_schwund, die sie ausnehmen.\n\nDIE BASISEINHEIT GEHOERT ZUR MENGE: dieselbe Ware fuehrt bei FoodNotify\nPositionen in `g` und in `mpce` nebeneinander. Eine Menge ohne ihre Einheit\nist hier keine Aussage.\n\nKoernung: gezaehlter Ware je Inventur",
+   "spalten": [
+    "inventurposition_key",
+    "inventur_key",
+    "marke",
+    "betrieb",
+    "fn_betrieb",
+    "bereich",
+    "inventur",
+    "datum",
+    "inventur_status",
+    "signiert",
+    "storniert",
+    "ware",
+    "lieferant",
+    "basis_einheit",
+    "soll_menge",
+    "gezaehlt_menge",
+    "nachzaehlung_menge",
+    "preis_je_basiseinheit",
+    "soll_eur",
+    "gezaehlt_eur",
+    "differenz_menge",
+    "differenz_eur",
+    "differenz_pct",
+    "unplausibel",
+    "ware_key",
+    "betrieb_key"
+   ],
+   "achsen": [
+    "bereich",
+    "betrieb_key",
+    "lieferant",
+    "marke",
+    "ware"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.kalender_abdeckung",
+   "koernung": "Bundesland: wie weit Feiertage und Ferien reichen",
+   "thema": "kalender",
+   "summen_erlaubt": false,
+   "kommentar": "Je Bundesland: was an Feiertagen und Schulferien da ist, ab wann, und welche Jahre innerhalb des Bestands KEINE Zeile haben. Die Sicht existiert, weil eine leere Feiertagsliste zwei Dinge heissen kann — \"an diesen Tagen wurde gearbeitet\" oder \"wir wissen es nicht\". Vor 2020 ist es immer das zweite. betriebe sagt, ob an einem Land ueberhaupt etwas haengt: die sechs ohne Betrieb werden mitgefuehrt, damit ein neuer Standort nicht auf seinen Kalender warten muss.\n\nKoernung: Bundesland: wie weit Feiertage und Ferien reichen",
+   "spalten": [
+    "kuerzel",
+    "bundesland",
+    "betriebe",
+    "feiertage",
+    "feiertag_von",
+    "feiertag_bis",
+    "feiertagsjahre_ohne_zeile",
+    "ferienzeitraeume",
+    "ferien_von",
+    "ferien_bis",
+    "ferienjahre_ohne_zeile",
+    "ferien_ueberlappungen"
+   ],
+   "achsen": [
+    "bundesland"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.kalender_fehlend",
+   "koernung": "Betrieb ohne gepflegten Standort — die Abdeckungsluecke",
+   "thema": "pruefung",
+   "summen_erlaubt": false,
+   "kommentar": "Betriebe mit Umsatz im laufenden Jahr, fuer die kein Bundesland ableitbar ist — nach Umsatz sortiert, damit der teuerste Fall oben steht. Am 11.08.2026 sind es 9, angefuehrt vom umsatzstaerksten Haus der Gruppe. Sie fehlen damit in jeder Feiertags- und Vergleichstagsrechnung, ohne dass es auffaellt.\n\nKoernung: Betrieb ohne gepflegten Standort — die Abdeckungsluecke",
+   "spalten": [
+    "betrieb_key",
+    "betrieb",
+    "grund",
+    "letzter_umsatztag",
+    "umsatz_2026"
+   ],
+   "achsen": [
+    "betrieb_key"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.kalendereffekt",
+   "koernung": "Betrieb und Kalenderlage — was ein Feiertag am Umsatz bewegt",
+   "thema": "kalender",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.kalendereffekt_gruppe",
+   "koernung": "Marke und Kalenderlage",
+   "thema": "kalender",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.kalendertag_lage",
+   "koernung": "Geschaeftstag und Bundesland",
+   "thema": "kalender",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.kennzahlen_aktuell",
+   "koernung": "Betrieb, Monat und BWA-Kennzahl, im juengsten abgerufenen Stand",
+   "thema": "bwa",
+   "summen_erlaubt": false,
+   "kommentar": "Juengster bekannter BWA-Stand, je Wertspalte getrennt aufgeloest -- Euro und Prozent kommen\naus zwei getrennten LINA-Aufrufen und wuerden sich sonst gegenseitig verdraengen.\nabgerufen_am ist der juengste der beiden Abrufe.\n\nwert_prozent ist plausibilitaetsgefiltert (mart.bwa_prozent_plausibel): ueber 1.000 Prozent\nwird NULL, weil dort der Umsatz im Nenner verschwunden ist und die Quote nichts mehr aussagt.\nwert_absolut bleibt in derselben Zeile erhalten -- der Euro-Betrag ist richtig und wird\ngebraucht. Die verworfenen Werte stehen in mart.bwa_prozent_unplausibel.\n\nFuer \"was wussten wir am Stichtag X\" stattdessen direkt core.kennzahlen_monat mit\nabgerufen_am <= X abfragen.\n\nKoernung: Betrieb, Monat und BWA-Kennzahl, im juengsten abgerufenen Stand",
+   "spalten": [
+    "betrieb_key",
+    "monat",
+    "kennzahl",
+    "wert_absolut",
+    "wert_prozent",
+    "abgerufen_am"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "monat"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "summe",
+     "spalte": "wert_absolut",
+     "einheit": "euro",
+     "hinweis": null
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "wert_prozent",
+     "einheit": "prozentzahl",
+     "hinweis": "Kommt fertig aus LINA (mode=relativ). Selbst aus den Hauptsparten gerechnet ergibt das nachweislich falsche Werte — 45,90 statt 23,64 (datenmodell.md, Entscheidung 3)."
+    }
+   ],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.konzept_schnitt_monat",
+   "koernung": "Marke und Monat; die Prozentwerte sind MEDIANE, die Ampeln gezaehlt",
+   "thema": "round_table",
+   "summen_erlaubt": false,
+   "kommentar": "DER MARKENSCHNITT FUER METABASE. Eine Zeile je Marke und Monat, bewertet mit dem\nSTANDARDREGELWERK. In Metabase nach monat filtern.\n\nDie Prozentwerte sind MEDIANE, nicht Mittelwerte -- ein einzelner Ausreisser soll den\nVergleichsmassstab einer ganzen Marke nicht verziehen. Gemessen: die Personalquote erreicht\nbis 316.576,50 Prozent, weil der Umsatz im Nenner steht und gegen null gehen kann.\numsatz_ist ist dagegen eine echte Summe -- Umsatz addiert sich, Quoten nicht.\nBewertung und OM-Score sind Mittelwerte: beide sind auf 1 bis 5 begrenzt und koennen nicht\nentgleisen.\n\nohne_urteil zaehlt die Betriebe ohne BWA-Stand. Im Excel fielen die unsichtbar unter den\nTisch und sahen aus wie Betriebe ohne Befund.\n\nFuer ein anderes Regelwerk: mart.konzept_schnitt(monat, 'lina_betrieb').\n\nKoernung: Marke und Monat; die Prozentwerte sind MEDIANE, die Ampeln gezaehlt",
+   "spalten": [
+    "monat",
+    "konzept",
+    "betriebe",
+    "umsatz_ist",
+    "umsatz_pct",
+    "personalkosten_ogf_pct",
+    "we_bar_pct",
+    "we_kueche_pct",
+    "online_bewertung",
+    "om_score",
+    "ampeln_rot",
+    "ampeln_orange",
+    "ampeln_gruen",
+    "ohne_urteil",
+    "massnahme_faellig"
+   ],
+   "achsen": [
+    "konzept",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.konzept_zuordnung",
+   "koernung": "Betrieb, mit der Zahl seiner Konzepte — die Arbeitsliste der Mehrdeutigen",
+   "thema": "stammdaten",
+   "summen_erlaubt": false,
+   "kommentar": "Welche Marke gilt fuer welchen Betrieb - und woher das kommt. GENAU EINE ZEILE JE BETRIEB,\ndeshalb in allen anderen Sichten diese hier joinen und nicht core.betrieb_konzept.\nDie Zeilen mit herkunft = 'mehrdeutig - Entscheidung fehlt' sind die Arbeitsliste: solange\nsie offen sind, laufen diese Betriebe in allen Markenauswertungen unter \"(nicht zugeordnet)\".\nErste Frage vor jedem Markenvergleich: SELECT * FROM mart.konzept_zuordnung WHERE hauptkonzept IS NULL;\n\nKoernung: Betrieb, mit der Zahl seiner Konzepte — die Arbeitsliste der Mehrdeutigen",
+   "spalten": [
+    "betrieb_key",
+    "betrieb",
+    "stadt",
+    "aktiv",
+    "anzahl_konzepte",
+    "konzepte",
+    "hauptkonzept",
+    "herkunft"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "hauptkonzept"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.kreditor_betrieb_monat",
+   "koernung": "Betrieb, Monat und Kreditor",
+   "thema": "einkauf",
+   "summen_erlaubt": true,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.kreditor_konzern",
+   "koernung": "Kreditor ueber den ganzen Konzern",
+   "thema": "einkauf",
+   "summen_erlaubt": true,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.lieferant_freigabe_stand",
+   "koernung": "Lieferant — die Arbeitsliste der Einordnung",
+   "thema": "einkauf",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.marke_vergleich",
+   "koernung": "Betrieb, Monat und Kennzahl, mit Markenmedian, Abstand und Rang",
+   "thema": "round_table",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.markt_vergleich",
+   "koernung": "Monat: der Marktindex gegen den eigenen Umsatz",
+   "thema": "kalender",
+   "summen_erlaubt": false,
+   "kommentar": "Kapitel 1.1 und 9.2: unser Umsatzwachstum gegen den Markt. delta_pp vergleicht gegen die NOMINALE Marktreihe, weil unsere Umsaetze nominal sind. Die reale Reihe steht daneben und beantwortet die andere Frage: wie viel davon war Preis. Der Marktindex endet einen bis zwei Monate vor dem laufenden Monat — dann bleibt die Spalte leer, sie wird nicht fortgeschrieben.\n\nKoernung: Monat: der Marktindex gegen den eigenen Umsatz",
+   "spalten": [
+    "monat",
+    "umsatz_netto",
+    "wir_ggue_vorjahr_pct",
+    "markt_nominal_ggue_vorjahr_pct",
+    "markt_real_ggue_vorjahr_pct",
+    "delta_pp",
+    "marktindex_stand"
+   ],
+   "achsen": [
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.massnahme",
+   "koernung": "Massnahme",
+   "thema": "round_table",
+   "summen_erlaubt": false,
+   "kommentar": "Massnahmen-Tracking mit Betriebsnamen und Faelligkeit — das Excel-Blatt Massnahmen.\nist_offen fasst die vier nicht-erledigten Zustaende zusammen, so wie das Excel-Dashboard\nsie zaehlte (Offen + In Arbeit + Eskalieren), plus \"Wartet auf Rueckmeldung\", das dort\nschlicht vergessen wurde.\nueberfaellig und tage_bis_faellig beziehen sich auf HEUTE und aendern sich damit taeglich —\nfuer eine Auswertung zum Stichtag stattdessen faellig_am direkt vergleichen.\nGeschrieben wird in manual.massnahme; Metabase liest hier nur.\n\nKoernung: Massnahme",
+   "spalten": [
+    "massnahme_id",
+    "monat",
+    "betrieb",
+    "stadt",
+    "konzept",
+    "bereich",
+    "ursache",
+    "massnahme",
+    "verantwortlich",
+    "faellig_am",
+    "status",
+    "prioritaet",
+    "fortschritt",
+    "notizen",
+    "ist_offen",
+    "ueberfaellig",
+    "tage_bis_faellig",
+    "erstellt_am",
+    "geaendert_am",
+    "betrieb_key"
+   ],
+   "achsen": [
+    "bereich",
+    "betrieb_key",
+    "konzept",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.materialisierung_stand",
+   "koernung": "materialisierter Sicht: wann sie zuletzt aufgefrischt wurde",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "Koernung: materialisierter Sicht: wann sie zuletzt aufgefrischt wurde",
+   "spalten": [
+    "sicht",
+    "schluessel",
+    "nachlauf",
+    "zuletzt_aufgefrischt",
+    "dauer_s",
+    "letzter_lauf",
+    "zustand"
+   ],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.mcp_nutzung",
+   "koernung": "Tag und Werkzeug des MCP-Zugangs",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "Nutzung des MCP-Zugangs je Tag und Werkzeug. Die Spalte gesperrt ist die\ninteressanteste: sie zaehlt, wie oft eine Falle zugeschnappt haette. Bleibt die Sicht\nleer, benutzt niemand den Zugang — das ist ein Befund, kein Normalzustand (Regel 10).\n\nKoernung: eine Zeile je Tag und Werkzeug.",
+   "spalten": [
+    "tag",
+    "werkzeug",
+    "aufrufe",
+    "nutzer",
+    "gesperrt",
+    "fehler",
+    "dauer_ms_schnitt",
+    "dauer_ms_max",
+    "zeilen"
+   ],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.mcp_wiederholte_fragen",
+   "koernung": "normalisierter freier Abfrage",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "Freie Abfragen, die mehr als einmal gestellt wurden — die Anforderungsliste fuer die\nnaechsten mart-Sichten und Karten. Was sich wiederholt, gehoert hinterlegt, damit es\nnicht jedes Mal neu erfunden (und jedes Mal neu falsch) wird.\n\nKoernung: eine Zeile je normalisierter Abfrage.",
+   "spalten": [
+    "abfrage_signatur",
+    "beispiel",
+    "mal",
+    "nutzer",
+    "zuletzt",
+    "je_gesperrt"
+   ],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.nachbarschaft",
+   "koernung": "Betrieb mit gepflegtem Ort — die einzige belastbare Stadtangabe",
+   "thema": "stammdaten",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.nachbarschaft_fehlend",
+   "koernung": "Betrieb ohne gepflegten Ort",
+   "thema": "pruefung",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.personalkosten",
+   "koernung": "Betrieb und Abrechnungszeitraum (TAGESzeilen) — die Quoten haben den Tagesumsatz im Nenner und sind nur als Median und mit Plausibilitaetsfilter zu gebrauchen",
+   "thema": "personal",
+   "summen_erlaubt": false,
+   "kommentar": "Personalkostenquoten und Effektivitaeten je Betrieb und Zeitraum, gesamt und je Bereich\n(Service, Bar, Kueche) — die Berichte \"Personalkosten/Effektivitaet\" und \"... pro Bereich\".\n\npek_* sind Quoten in Prozent, eff_* ist Umsatz je Personalstunde in Euro. Beide heissen im\nLINA-Bericht \"Effektivitaet\"; wer sie in ein Diagramm legt, bekommt zwei Achsen.\n\nACHTUNG BEI DER GROESSENORDNUNG. Diese Quoten haben den Umsatz im NENNER, und der geht bei\nBetrieben ohne Geschaeftsbetrieb gegen null. Gemessen am 26.07.2026: pek_gesamt bis\n316.576,50 Prozent — Enchilada Wuerzburg am 15.06.2026 bei 6,05 EUR Tagesumsatz. Das ist keine\nAnomalie in den Daten, sondern die Bauart der Kennzahl.\n\nEin einziger solcher Tag verschiebt einen Mittelwert um Groessenordnungen: ueber alle\nTageswerte liegt der Mittelwert bei 610,7 Prozent, der Median bei 383,4 — und beide sind\nunbrauchbar. Erst mit einem Umsatzfilter wird die Zahl plausibel (113,0 Prozent bei\npek_gesamt <= 200).\n\nFuer Auswertungen deshalb: den MEDIAN nehmen UND Betriebe ohne Umsatz ausschliessen. Welche das\nsind, zeigt die Karte \"Betriebe ohne laufendes Geschaeft\" auf dem Dashboard \"Portfolio und\nPotenzial\"; die Hintergruende stehen in docs/befunde-datenlage.md.\n\nNICHT UEBER ZEITRAEUME SUMMIEREN. Ein Posten deckt zeitraum_von bis zeitraum_bis ab, und die\nZeitraeume koennen sich zwischen Tages- und Monatsabruf ueberlappen. Fuer einen Monatswert\nden Posten mit dem passenden Zeitraum nehmen, nicht die Tage addieren — Quoten und\nStundenwerte sind ohnehin nicht additiv.\n\npersoog_bwa ist die Groesse, auf der die Round-Table-Ampel Personal beruht.\nschwelle_*_lina sind die betriebsindividuellen Schwellen aus LINA und meist ANDERE als die\n28/32 des Excel-Regelblatts; ampel_global und ampel_lina zeigen den Unterschied nebeneinander.\n\nKoernung: Betrieb und Abrechnungszeitraum (TAGESzeilen) — die Quoten haben den Tagesumsatz im Nenner und sind nur als Median und mit Plausibilitaetsfilter zu gebrauchen",
+   "spalten": [
+    "betrieb",
+    "stadt",
+    "konzept",
+    "zeitraum_von",
+    "zeitraum_bis",
+    "monat",
+    "tage",
+    "pek_gesamt",
+    "pek_service",
+    "pek_bar",
+    "pek_kueche",
+    "eff_gesamt",
+    "eff_service",
+    "eff_bar",
+    "eff_kueche",
+    "persoog_bwa",
+    "schwelle_gruen_lina",
+    "schwelle_orange_lina",
+    "ampel_global",
+    "ampel_lina",
+    "betrieb_key"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "konzept",
+    "monat"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "median",
+     "spalte": "pek_bar",
+     "einheit": "prozentzahl",
+     "hinweis": null
+    },
+    {
+     "regel": "median",
+     "spalte": "pek_gesamt",
+     "einheit": "prozentzahl",
+     "hinweis": "TAGESzeile mit dem Tagesumsatz im Nenner. An einem Tag mit 6,05 EUR Umsatz ergibt das 316.576 %. Median UND Filter pek_gesamt > 0 AND pek_gesamt <= 200 (so macht es jede Karte)."
+    },
+    {
+     "regel": "median",
+     "spalte": "pek_kueche",
+     "einheit": "prozentzahl",
+     "hinweis": null
+    },
+    {
+     "regel": "median",
+     "spalte": "pek_service",
+     "einheit": "prozentzahl",
+     "hinweis": null
+    }
+   ],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.pflichtartikel_abdeckung",
+   "koernung": "Betrieb und Pflichtartikel mit Nummer",
+   "thema": "pflichtartikel",
+   "summen_erlaubt": false,
+   "kommentar": "Eine Zeile je Betrieb und Pflichtartikel mit Nummer: wurde er im\nGueltigkeitszeitraum bezogen? bezogen = false ist der fehlende Artikel.\n\nIMMER ZUSAMMEN MIT datenbasis LESEN. \"keine Bestellung\" heisst, dass der Betrieb\nim Laufzeitraum gar nichts bestellt hat — fuer ihn fehlt zwangslaeufig JEDER\nPflichtartikel, und das ist keine Aussage ueber sein Sortiment. Am 22.08.2026\nstammten 1.503 von 4.669 Fehlmeldungen aus sieben solchen Betrieben.\n\nPositionen ohne Artikelnummer fehlen hier bewusst — sie sind ueber die Nummer\nnicht pruefbar und stehen in mart.pflichtartikel_nicht_pruefbar.\n\nRegionale Gerichte gelten nur an den Standorten, die die Vorlage nennt\n(mart.pflichtartikel_regional). Laesst sich die Ortsangabe nicht aufloesen,\ngilt der Artikel vorsorglich fuer alle — sichtbar in\nmart.pflichtartikel_regional_offen.\n\nWer nach einem Artikel sucht, den KEIN Betrieb fuehrt, gruppiert nach\nbezeichnung UND klammert datenbasis = 'keine Bestellung' aus: das ist dann\nkein Betriebsproblem, sondern eine veraltete Liste.\n\nKoernung: Betrieb und Pflichtartikel mit Nummer",
+   "spalten": [
+    "konzept",
+    "betrieb",
+    "betrieb_key",
+    "gueltig_von",
+    "gueltig_bis",
+    "bereich",
+    "lieferant",
+    "artikelnummer",
+    "bezeichnung",
+    "optional",
+    "nur_betriebe",
+    "bezogen",
+    "positionen",
+    "ausgaben",
+    "letzte_bestellung",
+    "datenbasis"
+   ],
+   "achsen": [
+    "bereich",
+    "betrieb_key",
+    "konzept",
+    "lieferant"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.pflichtartikel_abseits",
+   "koernung": "Betrieb und gekauftem Artikel, der auf keiner Pflichtartikelliste seines Konzepts steht",
+   "thema": "pflichtartikel",
+   "summen_erlaubt": true,
+   "kommentar": "Was ein Betrieb gekauft hat, das auf keiner Pflichtartikelliste seines\nKonzepts steht — nach Ausgaben die Arbeitsliste hinter der Quote.\n\nZum Lesen gehoert die Gegenprobe: die Listen fuehren keinen Reinigungs- und\nVerpackungsbedarf und keine Weine ausser den genannten. Steht so etwas oben,\nist es kein Verstoss, sondern eine Luecke der Liste.\n\nKoernung: Betrieb und gekauftem Artikel, der auf keiner Pflichtartikelliste seines Konzepts steht",
+   "spalten": [
+    "konzept",
+    "betrieb",
+    "betrieb_key",
+    "artikelnummer",
+    "artikel",
+    "lieferant",
+    "positionen",
+    "ausgaben",
+    "erste_bestellung",
+    "letzte_bestellung"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "konzept",
+    "lieferant"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.pflichtartikel_artikel_basis",
+   "koernung": "Pflichtartikel und Artikel (Zwischenstufe)",
+   "thema": "pflichtartikel",
+   "summen_erlaubt": false,
+   "kommentar": "Rechenstand: ein Artikel je Betrieb im Fenster, mit Zustand und Ausgaben.\nTraegt sowohl mart.pflichtartikel_abseits als auch mart.pflichtartikel_abdeckung.\nNICHT direkt abfragen.\n\nKoernung: Pflichtartikel und Artikel (Zwischenstufe)",
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.pflichtartikel_betrieb",
+   "koernung": "Betrieb und Pflichtartikel",
+   "thema": "pflichtartikel",
+   "summen_erlaubt": false,
+   "kommentar": "Die Rangliste: welcher Anteil des Einkaufs laeuft an der Pflichtartikelliste\nvorbei. abseits_pct ist die Leitzahl, gerechnet auf die AUSGABEN und nicht auf\ndie Artikelzahl.\n\nImmer zusammen mit datenbasis lesen: \"duenn\" heisst weniger als zehn\nBestellungen oder weniger als 5.000 EUR im Fenster — dort ist der Prozentwert\nrichtig gerechnet und trotzdem keine Aussage.\n\nnamensgleich_pct ist die Unschaerfe: Artikel, deren Name auf der Liste steht\nund deren Nummer nicht. Solange diese Zahl gross ist, ist abseits_pct eine\nObergrenze. Was dahintersteckt, zeigt mart.pflichtartikel_verdacht.\n\nKoernung: Betrieb und Pflichtartikel",
+   "spalten": [
+    "konzept",
+    "betrieb",
+    "betrieb_key",
+    "von_monat",
+    "bis_monat",
+    "bestellungen",
+    "ausgaben",
+    "ausgaben_pflicht",
+    "ausgaben_abseits",
+    "pflicht_pct",
+    "namensgleich_pct",
+    "abseits_pct",
+    "rang_im_konzept",
+    "datenbasis"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "konzept"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.pflichtartikel_einkauf",
+   "koernung": "Betrieb, Pflichtartikel und Monat",
+   "thema": "pflichtartikel",
+   "summen_erlaubt": true,
+   "kommentar": "Einkauf je Betrieb und Monat, aufgeteilt nach dem Zustand gegen die\nPflichtartikelliste. Nur Monate innerhalb der Listenlaufzeit — eine Bestellung\nwird gegen die Liste geprueft, die am Bestelltag galt.\n\nKoernung: Betrieb, Pflichtartikel und Monat",
+   "spalten": [
+    "konzept",
+    "betrieb",
+    "betrieb_key",
+    "monat",
+    "zustand",
+    "positionen",
+    "bestellungen",
+    "artikel",
+    "ausgaben"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "konzept",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.pflichtartikel_einkauf_basis",
+   "koernung": "Betrieb, Pflichtartikel und Monat (Zwischenstufe)",
+   "thema": "pflichtartikel",
+   "summen_erlaubt": true,
+   "kommentar": "Rechenstand fuer mart.pflichtartikel_einkauf. NICHT direkt abfragen.\n\nKoernung: Betrieb, Pflichtartikel und Monat (Zwischenstufe)",
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.pflichtartikel_klassifikation",
+   "koernung": "Pflichtartikel mit seiner Einordnung",
+   "thema": "pflichtartikel",
+   "summen_erlaubt": false,
+   "kommentar": "Je bestelltem Artikel: steht er auf der Pflichtartikelliste des Konzepts?\nFuenf Zustaende. pflicht = Nummer steht auf der Liste. alias = Nummer wurde von\nHand einer Listennummer zugeordnet (Nachfolgenummer). pflicht_namentlich = die\nListenposition hat gar keine Nummer (GFGH-Getraenke), der Name trifft — das ist\ndort der einzige moegliche Nachweis. namensgleich = der Name trifft eine\nListenposition, die Nummer weicht ab; das ist ein VERDACHT auf eine\nNachfolgenummer und zaehlt NICHT als erfuellt. abseits = nichts davon.\n\nKoernung: Pflichtartikel mit seiner Einordnung",
+   "spalten": [
+    "konzept",
+    "gueltig_von",
+    "gueltig_bis",
+    "artikelnummer",
+    "artikel",
+    "zustand",
+    "liste_bezeichnung",
+    "liste_nummer",
+    "liste_lieferant",
+    "liste_bereich",
+    "optional",
+    "nur_betriebe"
+   ],
+   "achsen": [
+    "konzept"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.pflichtartikel_klassifikation_basis",
+   "koernung": "Pflichtartikel mit Einordnung (Zwischenstufe)",
+   "thema": "pflichtartikel",
+   "summen_erlaubt": false,
+   "kommentar": "Rechenstand: ein bestellter Artikel je Konzept und Gueltigkeitsfenster, mit\nseinem Zustand gegen die Pflichtartikelliste. NICHT direkt abfragen — die Sicht\nmart.pflichtartikel_klassifikation darueber traegt die Erklaerung.\n\nKoernung: Pflichtartikel mit Einordnung (Zwischenstufe)",
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.pflichtartikel_nicht_pruefbar",
+   "koernung": "Pflichtartikel ohne Artikelnummer — ueberwiegend GFGH-Getraenke mit betriebseigenen Nummernkreisen",
+   "thema": "pflichtartikel",
+   "summen_erlaubt": false,
+   "kommentar": "Pflichtartikel ohne Artikelnummer — ueberwiegend GFGH-Getraenke, bei denen\njeder Betrieb einen eigenen Nummernkreis hat. Fuer sie ist der Namensabgleich\nder einzige Nachweis.\n\n\"kein Treffer\" heisst NICHT \"wird nicht gefuehrt\": es kann ebenso gut heissen,\ndass der Haendler den Artikel anders schreibt. Erst die nachgetragene Nummer in\npflege/pflichtartikel.csv macht daraus eine Messung.\n\nKoernung: Pflichtartikel ohne Artikelnummer — ueberwiegend GFGH-Getraenke mit betriebseigenen Nummernkreisen",
+   "spalten": [
+    "konzept",
+    "bereich",
+    "lieferant",
+    "bezeichnung",
+    "rubrik",
+    "namensabgleich_moeglich",
+    "betriebe_mit_treffer",
+    "ausgaben",
+    "zustand"
+   ],
+   "achsen": [
+    "bereich",
+    "konzept",
+    "lieferant"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.pflichtartikel_regional",
+   "koernung": "regionalem Pflichtartikel und Betrieb, auf den er aufgeloest wird",
+   "thema": "pflichtartikel",
+   "summen_erlaubt": false,
+   "kommentar": "Aufloesung der regionalen Gerichte auf Betriebe. Der Ortsname stammt aus einer\nKlammer in der Vorlage und ist kein Schluessel — getroffen wird ueber\nTeilwortsuche. Was ohne Treffer bleibt, steht in\nmart.pflichtartikel_regional_offen und gilt vorsorglich fuer alle Betriebe des\nKonzepts.\n\nKoernung: regionalem Pflichtartikel und Betrieb, auf den er aufgeloest wird",
+   "spalten": [
+    "konzept",
+    "bereich",
+    "gueltig_von",
+    "artikelnummer",
+    "bezeichnung",
+    "nur_betriebe",
+    "ort_roh",
+    "ort",
+    "betrieb_key",
+    "betrieb"
+   ],
+   "achsen": [
+    "bereich",
+    "betrieb_key",
+    "konzept",
+    "ort"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.pflichtartikel_regional_offen",
+   "koernung": "regionalem Pflichtartikel, dessen Ort keinem Betrieb zugeordnet werden konnte",
+   "thema": "pflichtartikel",
+   "summen_erlaubt": false,
+   "kommentar": "Regionale Gerichte, deren Ortsangabe auf keinen Betrieb passt. ERWARTUNG: leer.\nSolange hier etwas steht, gilt der Artikel vorsorglich fuer ALLE Betriebe des\nKonzepts und erzeugt in mart.pflichtartikel_abdeckung Fehlmeldungen — sichtbar,\nnicht still.\n\nKoernung: regionalem Pflichtartikel, dessen Ort keinem Betrieb zugeordnet werden konnte",
+   "spalten": [
+    "konzept",
+    "bereich",
+    "artikelnummer",
+    "bezeichnung",
+    "nur_betriebe"
+   ],
+   "achsen": [
+    "bereich",
+    "konzept"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.pflichtartikel_stand",
+   "koernung": "Pflichtartikelliste: Laufzeit, Umfang und ungepflegte Positionen",
+   "thema": "pflichtartikel",
+   "summen_erlaubt": false,
+   "kommentar": "Eine Zeile je Liste: Laufzeit, Umfang, und wie viele Positionen ohne\nArtikelnummer dastehen. ohne_nummer ist die Zahl, die den pruefbaren Anteil\nbegrenzt — diese Positionen sind nur ueber den Namen erreichbar.\n\nKoernung: Pflichtartikelliste: Laufzeit, Umfang und ungepflegte Positionen",
+   "spalten": [
+    "konzept",
+    "bereich",
+    "liste",
+    "gueltig_von",
+    "gueltig_bis",
+    "laeuft",
+    "artikel",
+    "mit_nummer",
+    "ohne_nummer",
+    "optional",
+    "nur_regional",
+    "lieferanten",
+    "quelle_datei"
+   ],
+   "achsen": [
+    "bereich",
+    "konzept"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.pflichtartikel_ueberlappung",
+   "koernung": "Artikel, der auf mehr als einer Pflichtartikelliste steht",
+   "thema": "pflichtartikel",
+   "summen_erlaubt": false,
+   "kommentar": "Zwei Pflichtartikellisten desselben Konzepts mit ueberlappender, aber nicht\ngleicher Laufzeit. ERWARTUNG: leer. Solange hier etwas steht, zaehlt jede\nBestellposition im ueberlappenden Zeitraum doppelt.\n\nKoernung: Artikel, der auf mehr als einer Pflichtartikelliste steht",
+   "spalten": [
+    "konzept",
+    "bereich_a",
+    "von_a",
+    "bis_a",
+    "bereich_b",
+    "von_b",
+    "bis_b"
+   ],
+   "achsen": [
+    "konzept"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.pflichtartikel_verdacht",
+   "koernung": "Verdachtsfall: gekaufter Artikel, der einem Pflichtartikel aehnelt, ohne ihn zu sein",
+   "thema": "pflichtartikel",
+   "summen_erlaubt": false,
+   "kommentar": "Artikel, deren NAME eine Listenposition trifft, deren NUMMER aber abweicht —\nder Verdacht auf eine Nachfolgenummer. Zaehlt bewusst NICHT als erfuellt.\n\nWer eine Zeile bestaetigt, traegt sie in pflege/pflichtartikel_alias.csv ein;\nab dem naechsten Lauf zaehlt der Artikel als Pflichtartikel. Anlass war Distra\n268 \"Cheddar / Gouda Mix\", seit 15.11.2025 unter 500096 gefuehrt.\n\nKoernung: Verdachtsfall: gekaufter Artikel, der einem Pflichtartikel aehnelt, ohne ihn zu sein",
+   "spalten": [
+    "konzept",
+    "bestellte_nummer",
+    "bestellter_artikel",
+    "nummer_auf_liste",
+    "bezeichnung_auf_liste",
+    "lieferant_auf_liste",
+    "betriebe",
+    "positionen",
+    "ausgaben",
+    "letzte_bestellung"
+   ],
+   "achsen": [
+    "konzept"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.posten_aufgegeben",
+   "koernung": "endgueltig aufgegebenem Posten",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.preisentwicklung_ware",
+   "koernung": "Ware und Monat — abgeloest durch mart.einkaufspreis_monat",
+   "thema": "einkauf",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.pruefung_bon",
+   "koernung": "Betrieb und Monat",
+   "thema": "pruefung",
+   "summen_erlaubt": false,
+   "kommentar": "Durchschnittsbon: LINAs avgTicket gegen Umsatz/Rechnungen. Abweichungen sind hier NICHT\nautomatisch ein Fehler - avgTicket kann auf Brutto oder auf einer anderen Rechnungsmenge\nberuhen (Sammelrechnungen, stornierte Bons). Die Sicht sagt, WO nachzusehen ist, nicht was falsch ist.\nToleranz 5 Cent.\n\nKoernung: Betrieb und Monat",
+   "spalten": [
+    "betrieb",
+    "geschaeftstag",
+    "umsatz_netto",
+    "rechnungen",
+    "lina_bon",
+    "bon_gerechnet",
+    "differenz",
+    "auffaellig"
+   ],
+   "achsen": [
+    "geschaeftstag"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.pruefung_pflichtartikel",
+   "koernung": "Pruefzeile zu den Pflichtartikeln",
+   "thema": "pruefung",
+   "summen_erlaubt": false,
+   "kommentar": "Vier Pruefzeilen zur Pflichtartikelauswertung. Die dritte ist die stille: eine\nausgelaufene Liste erzeugt keinen Fehler, sondern eine leere Seite — und die\nsieht aus wie \"nichts zu beanstanden\".\n\nKoernung: Pruefzeile zu den Pflichtartikeln",
+   "spalten": [
+    "pruefung",
+    "geprueft",
+    "auffaellig",
+    "sicht"
+   ],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.pruefung_uebersicht",
+   "koernung": "Pruefung: stimmen die Zahlen",
+   "thema": "pruefung",
+   "summen_erlaubt": false,
+   "kommentar": "Erste Abfrage nach jedem groesseren Backfill: SELECT * FROM mart.pruefung_uebersicht;\nDie Spalte auffaellig ist eine Arbeitsliste, kein Alarm.\n\nDie Zeile \"Wareneinsatz: Abdeckung unter 90 %\" ist am 01.08.2026 entfallen (Migration\n0029). Sie hat nie ausgeloest, weil ihr Filter auf IS NOT NULL prueft und fixer_we nie\nNULL ist, sondern 0. Sie meldete 100 % Abdeckung fuer 5.068 Zeilen, darunter 2.590 ohne\njeden hinterlegten Ansatz. Ein Waechter, der immer gruen zeigt, ist schlimmer als keiner.\n\nDer Soll-Ist-Vergleich des Wareneinsatzes kommt in Stufe 2.4 auf Basis der\nFoodNotify-Zutatenkosten zurueck, siehe docs/plan-foodnotify.md.\n\nKoernung: Pruefung: stimmen die Zahlen",
+   "spalten": [
+    "pruefung",
+    "geprueft",
+    "auffaellig",
+    "sicht"
+   ],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.pruefung_umsatz",
+   "koernung": "Betrieb und Monat, gegengerechnet gegen LINAs Aggregate",
+   "thema": "pruefung",
+   "summen_erlaubt": false,
+   "kommentar": "Tagesumsatz aus den Artikelzeilen neu aufaddiert gegen getUmsatzbericht.\nErste Frage nach jedem Backfill: SELECT count(*) FROM mart.pruefung_umsatz WHERE auffaellig;\nErwartung 0. Ist es nicht 0, vor der naechsten Auswertung klaeren - nicht danach.\nNur Tage, an denen BEIDE Berichte geladen sind; ein fehlender Bericht faellt hier\nnicht auf, dafuer ist mart.backfill_fortschritt zustaendig.\n\nKoernung: Betrieb und Monat, gegengerechnet gegen LINAs Aggregate",
+   "spalten": [
+    "betrieb",
+    "geschaeftstag",
+    "lina_netto",
+    "artikel_netto",
+    "differenz",
+    "differenz_pct",
+    "auffaellig"
+   ],
+   "achsen": [
+    "geschaeftstag"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.quelle_zulauf",
+   "koernung": "Quelle und Endpunkt: kommt ueberhaupt etwas an",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.regelwerk",
+   "koernung": "Ampelregelwerk — die Auswahlliste fuer den Dropdown",
+   "thema": "stammdaten",
+   "summen_erlaubt": false,
+   "kommentar": "Auswahlliste der Regelwerke. In Metabase als Quelle fuer den Dropdown-Parameter der\nRound-Table-Frage hinterlegen, dann ist das Umschalten ein Klick in der Oberflaeche.\n\nKoernung: Ampelregelwerk — die Auswahlliste fuer den Dropdown",
+   "spalten": [
+    "regelwerk_key",
+    "name",
+    "beschreibung",
+    "ist_standard"
+   ],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.round_table_basis",
+   "koernung": "aktivem Betrieb und Monat, ohne Ampelbewertung",
+   "thema": "round_table",
+   "summen_erlaubt": false,
+   "kommentar": "Die Zahlen des Round Table, noch ohne Ampel: eine Zeile je aktivem Betrieb und Monat.\nWICHTIG: bwa_monat weist aus, aus welchem Monat Personal- und Wareneinsatzwerte stammen.\nWeil die BWA vom Steuerberater importiert wird und 1-2 Monate nachhinkt, ist das oft NICHT\nder Berichtsmonat - im Excel wurde derselbe Versatz stillschweigend gepflegt (Juli-Report\nmit Mai-Werten, erkennbar nur an einer Kopfzeile).\nBewertet in mart.round_table_monat bzw. mart.round_table().\n\nKoernung: aktivem Betrieb und Monat, ohne Ampelbewertung",
+   "spalten": [
+    "betrieb_key",
+    "betrieb",
+    "stadt",
+    "konzept",
+    "monat",
+    "bwa_monat",
+    "umsatz_ist",
+    "umsatz_vj",
+    "umsatz_pct",
+    "personalkosten_ogf_pct",
+    "we_bar_pct",
+    "we_kueche_pct",
+    "online_bewertung",
+    "om_score"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "konzept",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.round_table_gesamt_wechsel",
+   "koernung": "Betrieb und Monat, in dem die Gesamtampel gewechselt hat",
+   "thema": "round_table",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.round_table_monat",
+   "koernung": "Betrieb und Monat, fertig bewertet mit dem Standardregelwerk",
+   "thema": "round_table",
+   "summen_erlaubt": false,
+   "kommentar": "DER ROUND TABLE FUER METABASE. Ersetzt das Excel-Blatt \"Eingabe\", eine Zeile je Betrieb und\nMonat, fertig bewertet mit dem STANDARDREGELWERK (ampel.regelwerk.ist_standard).\nIn Metabase nach monat filtern.\nWer die betriebsindividuellen LINA-Schwellen braucht, nimmt die Funktion\nmart.round_table(monat, 'lina_betrieb'); den Unterschied zeigt mart.round_table_vergleich().\n\nKoernung: Betrieb und Monat, fertig bewertet mit dem Standardregelwerk",
+   "spalten": [
+    "monat",
+    "betrieb",
+    "konzept",
+    "stadt",
+    "bwa_monat",
+    "umsatz_ist",
+    "umsatz_vj",
+    "umsatz_pct",
+    "personalkosten_ogf_pct",
+    "we_bar_pct",
+    "we_kueche_pct",
+    "online_bewertung",
+    "om_score",
+    "ampel_umsatz",
+    "ampel_personal",
+    "ampel_we_bar",
+    "ampel_we_kueche",
+    "ampel_bewertung",
+    "ampel_om",
+    "gesamt",
+    "intensitaet",
+    "massnahme",
+    "prioritaet",
+    "betrieb_key"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "konzept",
+    "monat"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "gesamt",
+     "einheit": "text",
+     "hinweis": "Eine Ampel. Der Mittelwert zweier Ampeln ist keine Ampel — zaehlen statt mitteln."
+    },
+    {
+     "regel": "mittel",
+     "spalte": "online_bewertung",
+     "einheit": "note",
+     "hinweis": null
+    },
+    {
+     "regel": "median",
+     "spalte": "personalkosten_ogf_pct",
+     "einheit": "prozentzahl",
+     "hinweis": "Reicht bis 1132 % (befunde-datenlage.md). Median, und nur mit Plausibilitaetsfilter."
+    },
+    {
+     "regel": "summe",
+     "spalte": "umsatz_ist",
+     "einheit": "euro",
+     "hinweis": "Die einzige echte Summe dieser Sicht."
+    },
+    {
+     "regel": "median",
+     "spalte": "umsatz_pct",
+     "einheit": "prozentzahl",
+     "hinweis": "Median statt Mittelwert: ein einzelner Ausreisser verzieht sonst die ganze Marke."
+    },
+    {
+     "regel": "median",
+     "spalte": "we_bar_pct",
+     "einheit": "prozentzahl",
+     "hinweis": null
+    },
+    {
+     "regel": "median",
+     "spalte": "we_kueche_pct",
+     "einheit": "prozentzahl",
+     "hinweis": null
+    }
+   ],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.round_table_trend",
+   "koernung": "Betrieb, Bereich und Monat, mit den beiden Vormonaten daneben",
+   "thema": "round_table",
+   "summen_erlaubt": false,
+   "kommentar": "Drei-Monats-Blick je Betrieb und Bereich — das Excel-Blatt Trend_2Monate, ohne das\nNachtragen der Vormonate von Hand.\ntrend uebernimmt die Excel-Beschriftung (↗ besser/gleich, ↘ schlechter) und kennt die\nRichtung des Bereichs: bei Personal- und Wareneinsatzquoten ist ein kleinerer Wert besser.\nampelwechsel ist die schaerfere Frage — sie zeigt, wer die Farbe gewechselt hat, und ist\ndie Liste, mit der ein Round Table anfangen sollte.\nFuer den ersten Monat der Historie sind beide Spalten leer; es gibt keinen Vormonat.\n\nKoernung: Betrieb, Bereich und Monat, mit den beiden Vormonaten daneben",
+   "spalten": [
+    "monat",
+    "betrieb_key",
+    "betrieb",
+    "stadt",
+    "konzept",
+    "bereich",
+    "bereich_name",
+    "reihenfolge",
+    "wert_vorvormonat",
+    "wert_vormonat",
+    "wert",
+    "veraenderung",
+    "trend",
+    "ampel",
+    "ampel_vormonat",
+    "ampelwechsel"
+   ],
+   "achsen": [
+    "bereich",
+    "betrieb_key",
+    "konzept",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.round_table_unvollstaendig",
+   "koernung": "Betrieb und Monat, dem mindestens eine Ampel fehlt",
+   "thema": "round_table",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.sachkonto_fehlend",
+   "koernung": "Sachkonto ohne Zuordnung",
+   "thema": "bwa",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.sachkonto_monat",
+   "koernung": "Betrieb, Monat und Sachkonto",
+   "thema": "bwa",
+   "summen_erlaubt": true,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.stadt_schnitt_monat",
+   "koernung": "Ort und Monat, nur Orte mit mehr als einem laufenden Betrieb",
+   "thema": "round_table",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.stadt_vergleich",
+   "koernung": "Betrieb, Monat und Kennzahl, gemessen an den Nachbarbetrieben am Ort",
+   "thema": "round_table",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.standort",
+   "koernung": "Betrieb UND Monat — in Metabase immer nach Monat filtern",
+   "thema": "stammdaten",
+   "summen_erlaubt": false,
+   "kommentar": "Betriebe mit Koordinate, je Monat, mit der Round-Table-Gesamtampel — die Grundlage der\nKarte. Eine Zeile je Betrieb UND Monat, deshalb in Metabase immer nach monat filtern, sonst\nliegen sieben Punkte uebereinander.\nLEER, SOLANGE manual.betrieb_standort LEER IST. Das ist kein Fehler: LINA liefert fuer\nBetriebe keine Adresse, die Standorte muessen von Hand oder aus einer Liste von Concept\nFamily kommen. Wie viele fehlen, sagt mart.standort_fehlend.\n\nKoernung: Betrieb UND Monat — in Metabase immer nach Monat filtern",
+   "spalten": [
+    "betrieb_key",
+    "betrieb",
+    "konzept",
+    "ort",
+    "plz",
+    "strasse",
+    "breitengrad",
+    "laengengrad",
+    "genauigkeit",
+    "monat",
+    "ampel",
+    "ampel_emoji",
+    "punkt",
+    "umsatz",
+    "personalkosten_ogf_pct",
+    "we_bar_pct",
+    "we_kueche_pct",
+    "intensitaet",
+    "prioritaet"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "konzept",
+    "monat",
+    "ort"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.standort_fehlend",
+   "koernung": "Betrieb ohne Koordinaten",
+   "thema": "pruefung",
+   "summen_erlaubt": false,
+   "kommentar": "Betriebe ohne Koordinate — die Arbeitsliste fuer die Karte, nach Umsatz sortierbar.\nERWARTUNG: mit der Zeit leer, zumindest fuer die Betriebe mit Umsatz. Am 26.07.2026 waren\ndas alle 141, weil LINA keine Adressen liefert.\n\nKoernung: Betrieb ohne Koordinaten",
+   "spalten": [
+    "betrieb_key",
+    "betrieb",
+    "konzept",
+    "aktiv",
+    "macht_umsatz",
+    "umsatz_gesamt"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "konzept"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.sync_status",
+   "koernung": "Quelle: laeuft der Import",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "Gesundheit der letzten Laeufe, juengster zuerst. Erste Anlaufstelle, wenn Zahlen fehlen.\nSeit 0081 stehen hier auch Starts, die nicht gearbeitet haben: status uebersprungen\n(Laufsperre belegt, Notiz nennt den blockierenden Lauf) und gesperrt (Zugang ruht).\n0 Aufgaben ist bei diesen Zeilen keine Auffaelligkeit, sondern ihre Aussage.\n\nKoernung: Quelle: laeuft der Import",
+   "spalten": [
+    "lauf_id",
+    "gestartet_am",
+    "beendet_am",
+    "ausloeser",
+    "status",
+    "aufgaben_gesamt",
+    "aufgaben_ok",
+    "aufgaben_fehler",
+    "aufgaben_uebersprungen",
+    "dauer_s",
+    "offene_abweichungen",
+    "pausierte_kombinationen"
+   ],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.tagesbudget",
+   "koernung": "Betrieb und Geschaeftstag, Budget gegen Ist",
+   "thema": "umsatz",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.umsatz_je_sitzplatz",
+   "koernung": "Betrieb und Monat, bezogen auf die Sitzplaetze aus der Ladenakte",
+   "thema": "umsatz",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.umsatz_lochtag",
+   "koernung": "Betrieb und fehlendem Geschaeftstag — eine Luecke, kein Umsatz",
+   "thema": "pruefung",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.umsatz_stunde",
+   "koernung": "Betrieb, Geschaeftstag und Stunde",
+   "thema": "umsatz",
+   "summen_erlaubt": true,
+   "kommentar": "Umsatz je Betrieb, Geschaeftstag und Stunde. ACHTUNG bei der Tagesgrenze: der Geschaeftstag\nlaeuft 08:00 bis 07:59 des Folgetags, die Stunden 0-7 gehoeren also zum VORTAG. geschaeftstag\nist bereits entsprechend umgerechnet - nach stunde sortieren ergibt deshalb keinen zeitlichen\nVerlauf, dafuer nach ((stunde + 16) % 24) sortieren.\n\nKoernung: Betrieb, Geschaeftstag und Stunde",
+   "spalten": [
+    "geschaeftstag",
+    "monat",
+    "betrieb_key",
+    "betrieb",
+    "konzept",
+    "stunde",
+    "umsatz_netto"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag",
+    "konzept",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.umsatz_tag",
+   "koernung": "Betrieb und Geschaeftstag — diese Sicht darf man bedenkenlos summieren",
+   "thema": "umsatz",
+   "summen_erlaubt": true,
+   "kommentar": "Tagesumsatz je Betrieb, GESAMT. Genau eine Zeile je Betrieb und Geschaeftstag - diese Sicht\ndarf man bedenkenlos aufsummieren.\nDie Aufteilung nach Speisen und Getraenken steht in mart.umsatz_tag_sparte. Beide zusammen\nzu zaehlen ergaebe den doppelten Umsatz; in core.umsatzbericht_tag liegen sie in derselben\nTabelle, unterschieden nur durch hauptsparte_key IS NULL. Genau deshalb sind sie hier getrennt.\ndurchschnittsbon und umsatz_pro_gast kommen fertig von LINA - nicht selbst nachrechnen.\n\nKoernung: Betrieb und Geschaeftstag — diese Sicht darf man bedenkenlos summieren",
+   "spalten": [
+    "geschaeftstag",
+    "monat",
+    "betrieb_key",
+    "betrieb",
+    "stadt",
+    "konzept",
+    "umsatz_netto",
+    "umsatz_brutto",
+    "rechnungen",
+    "gaeste",
+    "durchschnittsbon",
+    "umsatz_pro_gast"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag",
+    "konzept",
+    "monat"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "mittel",
+     "spalte": "durchschnittsbon",
+     "einheit": "euro",
+     "hinweis": "Ein Quotient. Ueber mehrere Tage nicht mitteln, sondern Umsatz durch Rechnungen neu rechnen."
+    },
+    {
+     "regel": "summe",
+     "spalte": "gaeste",
+     "einheit": "anzahl",
+     "hinweis": null
+    },
+    {
+     "regel": "summe",
+     "spalte": "rechnungen",
+     "einheit": "anzahl",
+     "hinweis": null
+    },
+    {
+     "regel": "summe",
+     "spalte": "umsatz_brutto",
+     "einheit": "euro",
+     "hinweis": null
+    },
+    {
+     "regel": "summe",
+     "spalte": "umsatz_netto",
+     "einheit": "euro",
+     "hinweis": null
+    }
+   ],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.umsatz_tag_sparte",
+   "koernung": "Betrieb, Geschaeftstag, Hauptsparte und Verkaufsstelle",
+   "thema": "umsatz",
+   "summen_erlaubt": true,
+   "kommentar": "Tagesumsatz je Betrieb, aufgeteilt nach Hauptsparte bzw. Verkaufsstelle. Nur die\naufgeteilten Zeilen - der Gesamtwert steht in mart.umsatz_tag und ist hier bewusst NICHT\nenthalten, damit eine Summe ueber diese Sicht nicht doppelt zaehlt.\nGeholt werden bisher nur Speisen und Getraenke; die Summe beider ist deshalb kleiner als\nder Gesamtumsatz.\n\nKoernung: Betrieb, Geschaeftstag, Hauptsparte und Verkaufsstelle",
+   "spalten": [
+    "geschaeftstag",
+    "monat",
+    "betrieb_key",
+    "betrieb",
+    "konzept",
+    "hauptsparte",
+    "verkaufsstelle",
+    "umsatz_netto",
+    "umsatz_brutto",
+    "rechnungen",
+    "gaeste",
+    "durchschnittsbon",
+    "umsatz_pro_gast"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag",
+    "hauptsparte",
+    "konzept",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.umsatz_ytd",
+   "koernung": "Betrieb und Monat, mit Vorjahr und kumulierten Werten daneben",
+   "thema": "umsatz",
+   "summen_erlaubt": false,
+   "kommentar": "Monats- und Jahresumsatz je Betrieb mit Vorjahresvergleich — die Spalten G, H und I des\nExcel-Blatts Eingabe, die dort jeden Monat von Hand nachgetragen wurden.\numsatz_ytd laeuft vom 1. Januar bis zum Berichtsmonat einschliesslich, der Vergleich gegen\ndenselben Ausschnitt des Vorjahres. Prozentwerte sind Prozentzahlen (10.60), nicht Brueche —\nim Excel stand dort ein Bruch (0.106).\nSOLANGE DER HISTORIEN-BACKFILL LAEUFT sind alle *_vj-Spalten leer. Das ist kein Fehler,\nsondern fehlende Vergangenheit; mart.backfill_fortschritt sagt, wie weit er ist.\n\nKoernung: Betrieb und Monat, mit Vorjahr und kumulierten Werten daneben",
+   "spalten": [
+    "betrieb",
+    "stadt",
+    "konzept",
+    "monat",
+    "umsatz_monat",
+    "umsatz_monat_vj",
+    "umsatz_pct",
+    "umsatz_ytd",
+    "umsatz_ytd_vj",
+    "umsatz_ytd_pct",
+    "rechnungen",
+    "gaeste",
+    "bon_schnitt",
+    "umsatz_pro_gast",
+    "betrieb_key"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "konzept",
+    "monat"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "umsatz_pct",
+     "einheit": "prozentzahl",
+     "hinweis": "Veraenderung zum Vorjahr. Ueber Betriebe hinweg weder summieren noch mitteln."
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "umsatz_ytd_pct",
+     "einheit": "prozentzahl",
+     "hinweis": null
+    }
+   ],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.umsatz_zeitfenster",
+   "koernung": "Betrieb, Geschaeftstag und Zeitfenster aus manual.zeitfenster",
+   "thema": "umsatz",
+   "summen_erlaubt": true,
+   "kommentar": "Umsatz je Betrieb, Geschaeftstag und selbst geschnittenem Zeitfenster, aus dem Stundenbericht. Deckt die volle Historie ab 01.01.2018 ab. NICHT vergleichbar mit core.zeitzonenbericht_zone: LINAs Zonen brechen bei 11:30 und 17:30, diese hier auf vollen Stunden. Wie bei den LINA-Zonen liefert der Stundenbericht nur UMSATZ — keine Gaeste, keine Bons, keine Sparten. Das bleibt offen.\n\nKoernung: Betrieb, Geschaeftstag und Zeitfenster aus manual.zeitfenster",
+   "spalten": [
+    "betrieb_key",
+    "betrieb",
+    "geschaeftstag",
+    "fenster_key",
+    "fenster",
+    "reihenfolge",
+    "ueber_mitternacht",
+    "umsatz_netto"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.umsatz_zeitzone",
+   "koernung": "Betrieb, Geschaeftstag und vordefinierter Zeitzone aus LINA",
+   "thema": "umsatz",
+   "summen_erlaubt": true,
+   "kommentar": "Umsatz je Betrieb, Geschaeftstag und vordefinierter Zeitzone (Fruehstueck, Mittagszeit,\nHappy Hour, ...). \"Late Night\" laeuft ueber Mitternacht: minute_von 1320 > minute_bis 60.\n\nKoernung: Betrieb, Geschaeftstag und vordefinierter Zeitzone aus LINA",
+   "spalten": [
+    "geschaeftstag",
+    "monat",
+    "betrieb_key",
+    "betrieb",
+    "konzept",
+    "zeitzone",
+    "minute_von",
+    "minute_bis",
+    "umsatz_netto"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag",
+    "konzept",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.ursachen_analyse",
+   "koernung": "Monat und Ursache, aufgeschluesselt nach Bereich",
+   "thema": "round_table",
+   "summen_erlaubt": false,
+   "kommentar": "Wie oft welche Ursache hinter einer roten oder orangen Ampel steht — das Excel-Blatt\nUrsachenanalyse, je Monat statt nur fuer den jeweils aktuellen.\nfaelle zaehlt wie im Excel nur rote und orange Ampeln, faelle_gesamt auch die gruenen —\ndie Differenz sind Ursachen, die jemand erfasst hat, obwohl die Kennzahl in Ordnung war.\nprioritaet folgt der Excel-Regel: ab 3 Faellen Hoch, bei 2 Mittel.\nLEER, SOLANGE NIEMAND URSACHEN ERFASST. manual.ursache wird von Hand gepflegt, LINA kennt\nkeine Ursachen. Eine leere Sicht heisst hier \"nicht erfasst\", nicht \"keine Probleme\".\n\nKoernung: Monat und Ursache, aufgeschluesselt nach Bereich",
+   "spalten": [
+    "monat",
+    "ursache_code",
+    "ursache",
+    "reihenfolge",
+    "faelle",
+    "faelle_gesamt",
+    "rot",
+    "orange",
+    "umsatz",
+    "personal",
+    "we_bar",
+    "we_kueche",
+    "prioritaet",
+    "betriebe"
+   ],
+   "achsen": [
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.vergleichstag",
+   "koernung": "Betrieb und Geschaeftstag, gegen seine vier Vorgaenger gerechnet",
+   "thema": "kalender",
+   "summen_erlaubt": false,
+   "kommentar": "Kapitel 7.1 der Round-Table-Map: jeder Tag gegen den Durchschnitt der letzten vier gleichen Wochentage ohne Feiertag und ohne Ruhetag. abweichung_pct ist die Antwort auf \"war das ein guter Samstag\". IMMER auf Betrieb oder Zeitraum filtern — die Sicht rechnet je Zeile vier Nachbartage nach. Was hier NICHT drinsteckt: lokale Events und Wetter.\n\nKoernung: Betrieb und Geschaeftstag, gegen seine vier Vorgaenger gerechnet",
+   "spalten": [
+    "betrieb_key",
+    "betrieb",
+    "geschaeftstag",
+    "wochentag",
+    "feiertag",
+    "ist_schulferien",
+    "umsatz_netto",
+    "gaeste",
+    "vergleichstage",
+    "umsatz_vergleich",
+    "gaeste_vergleich",
+    "abweichung_pct",
+    "ferien_abweichung",
+    "vergleich_von",
+    "vergleich_bis"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.vergleichstag_basis",
+   "koernung": "Betrieb und Geschaeftstag — die materialisierte Grundlage",
+   "thema": "kalender",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.vergleichstag_stand",
+   "koernung": "materialisierter Vergleichstagssicht: wie alt ihre Zahlen sind",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.wareneinsatz_beleg_monat",
+   "koernung": "Betrieb und Monat, Wareneinsatz aus Belegen",
+   "thema": "bwa",
+   "summen_erlaubt": true,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.wareneinsatz_quellen",
+   "koernung": "Betrieb und Monat, die Wareneinsatzquellen nebeneinander",
+   "thema": "bwa",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.wetter_effekt",
+   "koernung": "Betrieb und Wetterklasse",
+   "thema": "wetter",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.wetter_effekt_gruppe",
+   "koernung": "Marke und Wetterklasse",
+   "thema": "wetter",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.wetter_ort",
+   "koernung": "Gitterpunkt mit den Betrieben, die daran haengen",
+   "thema": "wetter",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.wetter_rueckstand",
+   "koernung": "Gitterpunkt und Jahr — die Arbeitsliste des Wetter-Backfills",
+   "thema": "pruefung",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.wetter_tag",
+   "koernung": "Gitterpunkt und Tag",
+   "thema": "wetter",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.yext_abgleich",
+   "koernung": "Betrieb mit seiner Yext-Entsprechung",
+   "thema": "bewertung",
+   "summen_erlaubt": false,
+   "kommentar": null,
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.zeitfenster_pruefung",
+   "koernung": "Pruefzeile je Zeitfenster",
+   "thema": "pruefung",
+   "summen_erlaubt": false,
+   "kommentar": "Stunden, die in keinem oder in mehr als einem Fenster liegen, mit dem Umsatz, der daran haengt. Erwartung: die Stunden 1 bis 7 fallen bewusst heraus (dort liegen 0,2 % des Umsatzes, die Haeuser sind zu). Jede andere Zeile ist ein Definitionsfehler.\n\nKoernung: Pruefzeile je Zeitfenster",
+   "spalten": [
+    "stunde",
+    "fenster",
+    "befund",
+    "umsatz_2026"
+   ],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.zugangssperre",
+   "koernung": "Zugangssperre",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "Erkannte Zugangssperren, juengste zuerst. ERWARTUNG: leer.\nSteht hier eine Zeile mit aktiv = true, ruht der Importer und nimmt keinen Kontakt zu LINA\nauf. Das ist Absicht und kein Defekt -- erst im Browser pruefen, ob der Zugang wieder geht,\ndann sync.sperre_aufheben('name') aufrufen.\n\nKoernung: Zugangssperre",
+   "spalten": [
+    "sperre_id",
+    "erkannt_am",
+    "pausiert_bis",
+    "aktiv",
+    "verbleibt",
+    "art",
+    "http_status",
+    "endpunkt",
+    "hinweis",
+    "lauf_id",
+    "aufgehoben_am",
+    "aufgehoben_von"
+   ],
+   "achsen": [
+    "endpunkt"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  }
+ ],
+ "achsen": [
+  {
+   "achse": "aktion_key",
+   "bezeichnung": "Marketingaktion",
+   "art": "schluessel",
+   "ziel_sicht": "mart.aktion",
+   "ziel_spalte": "aktion_key",
+   "anzeige_spalte": "aktion",
+   "hinweis": null
+  },
+  {
+   "achse": "artikel_key",
+   "bezeichnung": "Artikel (POS)",
+   "art": "schluessel",
+   "ziel_sicht": null,
+   "ziel_spalte": null,
+   "anzeige_spalte": null,
+   "hinweis": "Was verkauft wird — die Position auf dem Bon. Nicht core.ware (was eingekauft wird)."
+  },
+  {
+   "achse": "bereich",
+   "bezeichnung": "Bereich",
+   "art": "merkmal",
+   "ziel_sicht": null,
+   "ziel_spalte": null,
+   "anzeige_spalte": null,
+   "hinweis": "Die sechs Round-Table-Bereiche (Umsatz, Personal, WE Bar, WE Kueche, Bewertung, OM)."
+  },
+  {
+   "achse": "betrieb_key",
+   "bezeichnung": "Betrieb",
+   "art": "schluessel",
+   "ziel_sicht": "mart.betrieb",
+   "ziel_spalte": "betrieb_key",
+   "anzeige_spalte": "betrieb",
+   "hinweis": "Die einzige belastbare Verbindung zwischen Sichten auf Betriebsebene. NIE ueber den Namen verbinden: fuenf Betriebe heissen \"Karlsruhe\" (datenmodell.md, Markenebene)."
+  },
+  {
+   "achse": "bundesland",
+   "bezeichnung": "Bundesland",
+   "art": "merkmal",
+   "ziel_sicht": null,
+   "ziel_spalte": null,
+   "anzeige_spalte": null,
+   "hinweis": "Haengt an der PLZ aus manual.betrieb_standort — gepflegt fuer 60 von 141 Betrieben. Wer danach gruppiert, sieht nur diese 60. Die Luecke steht in mart.kalender_fehlend."
+  },
+  {
+   "achse": "endpunkt",
+   "bezeichnung": "API-Endpunkt",
+   "art": "merkmal",
+   "ziel_sicht": null,
+   "ziel_spalte": null,
+   "anzeige_spalte": null,
+   "hinweis": null
+  },
+  {
+   "achse": "geschaeftstag",
+   "bezeichnung": "Geschaeftstag",
+   "art": "zeit",
+   "ziel_sicht": null,
+   "ziel_spalte": null,
+   "anzeige_spalte": null,
+   "hinweis": "Der Geschaeftstag laeuft 08:00-07:59 Europe/Berlin, nicht Mitternacht bis Mitternacht (core.business_date()). Nicht mit dem Kalendertag verwechseln."
+  },
+  {
+   "achse": "hauptkonzept",
+   "bezeichnung": "Hauptmarke",
+   "art": "merkmal",
+   "ziel_sicht": null,
+   "ziel_spalte": null,
+   "anzeige_spalte": null,
+   "hinweis": "Die 1:1-Aufloesung von konzept. Wo sie leer ist, fehlt eine Entscheidung — siehe mart.konzept_zuordnung."
+  },
+  {
+   "achse": "hauptsparte",
+   "bezeichnung": "Hauptsparte",
+   "art": "merkmal",
+   "ziel_sicht": null,
+   "ziel_spalte": null,
+   "anzeige_spalte": null,
+   "hinweis": "Speisen/Getraenke. Im LINA-Umsatzbericht stehen Gesamt- UND Hauptspartenzeilen in derselben Tabelle — in mart ist das getrennt, in core nicht."
+  },
+  {
+   "achse": "konzept",
+   "bezeichnung": "Marke (Konzept)",
+   "art": "merkmal",
+   "ziel_sicht": null,
+   "ziel_spalte": null,
+   "anzeige_spalte": null,
+   "hinweis": "In LINA heissen die Marken Konzepte. Faktisch 1:n — 131 Betriebe, keiner in mehreren Gruppen (nachgemessen 26.07.2026). Mehrdeutige laufen als \"(nicht zugeordnet)\" mit."
+  },
+  {
+   "achse": "kostenstelle",
+   "bezeichnung": "Kostenstelle (FoodNotify)",
+   "art": "merkmal",
+   "ziel_sicht": null,
+   "ziel_spalte": null,
+   "anzeige_spalte": null,
+   "hinweis": "Die FoodNotify-Achse. Die Marke ergibt sich ueber kostenstelle.marke_key, nicht ueber eine zweite Mandantenspalte (datenmodell.md, FoodNotify)."
+  },
+  {
+   "achse": "kreditor",
+   "bezeichnung": "Kreditor",
+   "art": "merkmal",
+   "ziel_sicht": null,
+   "ziel_spalte": null,
+   "anzeige_spalte": null,
+   "hinweis": null
+  },
+  {
+   "achse": "lieferant",
+   "bezeichnung": "Lieferant",
+   "art": "merkmal",
+   "ziel_sicht": null,
+   "ziel_spalte": null,
+   "anzeige_spalte": null,
+   "hinweis": null
+  },
+  {
+   "achse": "marke",
+   "bezeichnung": "Marke (FoodNotify-Mandant)",
+   "art": "merkmal",
+   "ziel_sicht": null,
+   "ziel_spalte": null,
+   "anzeige_spalte": null,
+   "hinweis": "Der FoodNotify-Mandant, NICHT dasselbe wie konzept. Einkauf haengt hier, Umsatz an konzept."
+  },
+  {
+   "achse": "mitarbeiter_id",
+   "bezeichnung": "Mitarbeiter (Bounti)",
+   "art": "schluessel",
+   "ziel_sicht": null,
+   "ziel_spalte": null,
+   "anzeige_spalte": null,
+   "hinweis": "Menschen koennen an mehreren Standorten haengen und zaehlen dann in jedem Betrieb mit (mart.bounti_mehrfachzuordnung)."
+  },
+  {
+   "achse": "monat",
+   "bezeichnung": "Monat",
+   "art": "zeit",
+   "ziel_sicht": null,
+   "ziel_spalte": null,
+   "anzeige_spalte": null,
+   "hinweis": "Immer der Monatserste als date. Der BWA-Monat ist JE BETRIEB ein anderer — wer Umsatz und BWA nebeneinanderstellt, liest bwa_monat mit (datenmodell.md, Entscheidung 6)."
+  },
+  {
+   "achse": "ort",
+   "bezeichnung": "Ort",
+   "art": "merkmal",
+   "ziel_sicht": null,
+   "ziel_spalte": null,
+   "anzeige_spalte": null,
+   "hinweis": "Die EINZIGE belastbare Stadtangabe, gespeist aus manual.betrieb_standort. Die Spalte \"stadt\" ist etwas anderes und ueberall NULL."
+  },
+  {
+   "achse": "ware",
+   "bezeichnung": "Ware",
+   "art": "merkmal",
+   "ziel_sicht": null,
+   "ziel_spalte": null,
+   "anzeige_spalte": null,
+   "hinweis": "FoodNotify-Rohware, NICHT core.artikel (was verkauft wird). Ueber den NAMEN gruppieren, nicht ueber die Waren-ID: dieselbe Ware wird unter mehreren IDs gefuehrt (866 Saetze, 428 Namen — fehlerkatalog.md)."
+  },
+  {
+   "achse": "warengruppe",
+   "bezeichnung": "Warengruppe",
+   "art": "merkmal",
+   "ziel_sicht": null,
+   "ziel_spalte": null,
+   "anzeige_spalte": null,
+   "hinweis": null
+  }
+ ],
+ "fallstricke": [
+  {
+   "schluessel": "bundesland_luecke",
+   "art": "abdeckung_luecke",
+   "schwere": "warnung",
+   "sicht": null,
+   "parameter": {
+    "achse": "bundesland",
+    "gesamt": 141,
+    "gepflegt": 60
+   },
+   "hinweis": "Das Bundesland haengt an der PLZ aus manual.betrieb_standort, und die ist fuer 60 von 141 Betrieben gepflegt. Neun der fehlenden haben laufenden Umsatz 2026: zusammen 15,1 Mio EUR von 68,7 Mio EUR, also 22 %, angefuehrt vom umsatzstaerksten Betrieb der Gruppe. Eine Auswertung nach Bundesland ist damit eine Aussage ueber einen Teil, nicht ueber die Gruppe.",
+   "berichtigung": "mart.kalender_fehlend danebenstellen, damit die Luecke sichtbar bleibt.",
+   "quelle": "docs/plan-kalender-wetter.md, Abschnitt 1"
+  },
+  {
+   "schluessel": "bwa_versatz",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": null,
+   "parameter": {
+    "spalten": [
+     "bwa_monat"
+    ]
+   },
+   "hinweis": "Umsatz und BWA stehen NICHT im selben Monat: der Round Table nimmt den Umsatz des Berichtsmonats und die BWA des juengsten verfuegbaren Monats bis dahin — je Betrieb einzeln. Im Juni 2026 waren am 25.07. erst 22 von 131 Betrieben gebucht. Welcher Monat es je Betrieb war, steht in bwa_monat.",
+   "berichtigung": "bwa_monat mit ausgeben, wenn Personal- oder Wareneinsatzzahlen gezeigt werden.",
+   "quelle": "docs/datenmodell.md, Entscheidung 6"
+  },
+  {
+   "schluessel": "einkaufspreis_vergleichbar",
+   "art": "filter_noetig",
+   "schwere": "sperre",
+   "sicht": "mart.einkaufspreis_betrieb",
+   "parameter": {
+    "wert": true,
+    "spalte": "vergleichbar"
+   },
+   "hinweis": "mart.einkaufspreis_betrieb ist nur mit vergleichbar = true zu lesen. Ohne den Filter vergleicht die Abfrage verschiedene Gebindegroessen und Einheiten miteinander; ein Betrieb sieht dann teuer aus, weil er anders einkauft.",
+   "berichtigung": "WHERE vergleichbar = true ergaenzen. Und den Tabellenkommentar dieser einen Sicht NICHT als Erklaerung nehmen — er beschreibt an drei Stellen eine andere Sicht als die gebaute (Befund 12.08.2026).",
+   "quelle": "docs/metabase.md, Abschnitt zu Migration 0056"
+  },
+  {
+   "schluessel": "fremdeinkauf_quelle",
+   "art": "filter_noetig",
+   "schwere": "sperre",
+   "sicht": "mart.fremdeinkauf",
+   "parameter": {
+    "spalte": "quelle"
+   },
+   "hinweis": "mart.fremdeinkauf fuehrt je Betrieb und Monat mehrere Zeilen — eine je Quelle. Ohne Filter auf genau eine Quelle wird jeder Betrag doppelt gezaehlt.",
+   "berichtigung": "WHERE quelle = '...' ergaenzen (eine Quelle, nicht mehrere).",
+   "quelle": "Tabellenkommentar mart.fremdeinkauf"
+  },
+  {
+   "schluessel": "grosse_tabelle_ohne_zeitraum",
+   "art": "zeitraum_noetig",
+   "schwere": "warnung",
+   "sicht": "mart.artikelverkauf",
+   "parameter": {
+    "spalte": "geschaeftstag"
+   },
+   "hinweis": "mart.artikelverkauf liegt auf einer partitionierten Tabelle mit rund 20 Mio. Zeilen je Jahr. Ohne Einschraenkung auf einen Zeitraum liest die Abfrage quer durch alle Partitionen.",
+   "berichtigung": "WHERE geschaeftstag >= ... ergaenzen.",
+   "quelle": "docs/datenmodell.md, Abschnitt Partitionierung"
+  },
+  {
+   "schluessel": "join_ueber_betriebsname",
+   "art": "join_ueber_name",
+   "schwere": "sperre",
+   "sicht": null,
+   "parameter": {
+    "statt": "betrieb_key",
+    "spalte": "betrieb"
+   },
+   "hinweis": "Verbindung ueber den Betriebsnamen. Der Name ist NICHT eindeutig: fuenf Betriebe heissen \"Karlsruhe\" (fuenf Restaurants in einer Stadt, kein Restaurant in fuenf Marken). Ein Join darueber mischt sie zusammen.",
+   "berichtigung": "Ueber betrieb_key verbinden. Fuer die Anzeige gehoeren Konzept und Name zusammen.",
+   "quelle": "docs/datenmodell.md, Abschnitt Markenebene"
+  },
+  {
+   "schluessel": "nenner_ohne_geschaeft",
+   "art": "nenner_unvollstaendig",
+   "schwere": "warnung",
+   "sicht": null,
+   "parameter": {},
+   "hinweis": "Nur 62 der 141 gefuehrten Betriebe machen ueberhaupt Umsatz. Die uebrigen 79 sind Beteiligungsgesellschaften, geschlossene oder noch nicht eroeffnete Standorte und Testeintraege — sie liefern Umsatzberichte ueber 0 EUR, und core.betrieb.aktiv steht bei allen 141 auf true. Jeder Mittelwert ueber \"alle Betriebe\" ist damit um mehr als die Haelfte verduennt, jede Zaehlung hat einen Nenner, der zu 56 % aus Zeilen besteht, die gar kein Geschaeft beschreiben.",
+   "berichtigung": "Ueber mart.betrieb_status auf Betriebe mit laufendem Geschaeft einschraenken.",
+   "quelle": "docs/befunde-datenlage.md, Befund 1"
+  },
+  {
+   "schluessel": "ort_luecke",
+   "art": "abdeckung_luecke",
+   "schwere": "warnung",
+   "sicht": null,
+   "parameter": {
+    "achse": "ort",
+    "gesamt": 141,
+    "gepflegt": 60
+   },
+   "hinweis": "Der Ort kommt aus manual.betrieb_standort und ist fuer 60 von 141 Betrieben gepflegt. mart.nachbarschaft_fehlend nennt die uebrigen.",
+   "berichtigung": null,
+   "quelle": "docs/metabase.md"
+  },
+  {
+   "schluessel": "personalquote_ungefiltert",
+   "art": "filter_noetig",
+   "schwere": "warnung",
+   "sicht": "mart.personalkosten",
+   "parameter": {
+    "spalte": "pek_gesamt",
+    "beispiel": "pek_gesamt > 0 AND pek_gesamt <= 200"
+   },
+   "hinweis": "mart.personalkosten fuehrt TAGESzeilen, und die Quoten darin haben den Tagesumsatz im Nenner. An einem Tag mit 6,05 EUR Umsatz ergibt das 316.576 Prozent; ueber alle Tageswerte liegt der Median bei 383 Prozent. Ohne Plausibilitaetsfilter ist jede Zusammenfassung Unsinn.",
+   "berichtigung": "WHERE pek_gesamt > 0 AND pek_gesamt <= 200 ergaenzen und den MEDIAN nehmen, nicht den Mittelwert — genau so macht es jede Metabase-Karte.",
+   "quelle": "metabase/karten-drilldown.ts, Konstante PLAUSIBEL"
+  },
+  {
+   "schluessel": "prozent_skaliert",
+   "art": "prozent_skaliert",
+   "schwere": "warnung",
+   "sicht": null,
+   "parameter": {},
+   "hinweis": "Prozentwerte sind in diesem Schema durchgaengig PROZENTZAHLEN (23.64), nie Brueche (0.2364). Das Excel macht es andersherum — das ist die haeufigste Fehlerquelle des Projekts. Eine Multiplikation mit 100 ergibt hier den Faktor-100-Fehler.",
+   "berichtigung": "Den Faktor weglassen.",
+   "quelle": "AGENTS.md, harte Regel 6"
+  },
+  {
+   "schluessel": "stadt_immer_null",
+   "art": "spalte_immer_null",
+   "schwere": "sperre",
+   "sicht": null,
+   "parameter": {
+    "spalte": "stadt"
+   },
+   "hinweis": "Die Spalte \"stadt\" ist bei ALLEN 141 Betrieben NULL — LINA liefert fuer Betriebe keine Adresse (nachgemessen 26.07.2026, erneut 10.08.2026). Wer danach gruppiert, bekommt keine Fehlermeldung, sondern EINE Gruppe mit allen Betrieben darin.",
+   "berichtigung": "Die gepflegte Stadt steht in mart.nachbarschaft.ort. Statt mart.<sicht>.stadt also ueber betrieb_key auf mart.nachbarschaft verbinden und nach ort gruppieren.",
+   "quelle": "docs/metabase.md, Abschnitt \"Die Spalte stadt ist ueberall NULL\""
+  },
+  {
+   "schluessel": "umsatz_tag_ohne_zeitraum",
+   "art": "zeitraum_noetig",
+   "schwere": "warnung",
+   "sicht": "mart.umsatz_tag",
+   "parameter": {
+    "spalte": "geschaeftstag"
+   },
+   "hinweis": "mart.umsatz_tag fuehrt 443.304 Tageszeilen ab 01.01.2018. Ohne Zeitraum ist das Ergebnis gross und die Antwort langsam.",
+   "berichtigung": "WHERE geschaeftstag >= ... ergaenzen.",
+   "quelle": "docs/plan-kalender-wetter.md"
+  },
+  {
+   "schluessel": "ware_ueber_id",
+   "art": "gruppierung_falsch",
+   "schwere": "warnung",
+   "sicht": null,
+   "parameter": {
+    "statt": "ware",
+    "spalte": "ware_fn_id"
+   },
+   "hinweis": "Dieselbe Ware wird in FoodNotify unter mehreren IDs gefuehrt — 866 Saetze auf 428 Namen. Wer ueber die ID gruppiert, zersplittert eine Preisreihe in Einzelpunkte.",
+   "berichtigung": "Ueber den Warennamen gruppieren.",
+   "quelle": "docs/fehlerkatalog.md"
+  },
+  {
+   "schluessel": "wareneinsatz_ansatz",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.deckungsbeitrag_warengruppe",
+   "parameter": {},
+   "hinweis": "Der theoretische Wareneinsatz dieser Sicht steht auf core.artikel.fixer_we, dessen Herkunft ungeklaert ist. Als Umsatzgliederung brauchbar, ALS MARGENAUSSAGE NICHT. Vor jeder Ableitung auf abdeckung_pct sehen.",
+   "berichtigung": null,
+   "quelle": "AGENTS.md, harte Regel 5"
+  }
+ ]
+}

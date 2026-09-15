@@ -608,6 +608,65 @@ export async function statusErheben(): Promise<Statusbericht> {
     }
   }
 
+  // --- Der MCP-Zugang ----------------------------------------------------
+  //
+  // Zwei Fragen an einen Dienst, der die Zahlen nach draussen gibt.
+  //
+  // ERSTENS: ist er ueberhaupt eingerichtet? mcp.einrichtung_offen haelt fest,
+  // was die Migration nicht selbst tun konnte — die Leserolle braucht ein
+  // Passwort, und das setzt ein Mensch. Ohne sie laeuft der Server nicht, und
+  // das faellt sonst erst auf, wenn Daniel sich beschwert.
+  //
+  // ZWEITENS, und das ist der eigentliche Punkt: BENUTZT IHN JEMAND? Ein
+  // Dienst ohne Zulauf ist ein Fehler, kein Normalzustand (harte Regel 10).
+  // Ein MCP-Server, den niemand aufruft, sieht von aussen genauso aus wie
+  // einer, der laeuft — der Unterschied steht in mcp.zugriff und nirgends
+  // sonst. Deshalb eine Warnung statt Schweigen: entweder kommt niemand
+  // durch die Anmeldung, oder der Zugang nuetzt nicht, wofuer er gebaut
+  // wurde. Beides gehoert angesehen, keines weckt jemanden nachts.
+  {
+    const vorhanden = await eine<any>(
+      `SELECT to_regclass('mcp.zugriff') IS NOT NULL AS da`)
+    if (vorhanden?.da) {
+      const offen = await query<any>(
+        `SELECT punkt, meldung, behebung FROM mcp.einrichtung_offen ORDER BY punkt`)
+      const n = await eine<any>(
+        `SELECT count(*)::int AS aufrufe,
+                count(*) FILTER (WHERE gesperrt)::int AS gesperrt,
+                count(DISTINCT subject)::int AS nutzer,
+                max(zeitpunkt) AS zuletzt
+           FROM mcp.zugriff WHERE zeitpunkt > now() - interval '7 days'`)
+      const werte = { aufrufe_7t: n?.aufrufe ?? 0, gesperrt_7t: n?.gesperrt ?? 0,
+                      nutzer_7t: n?.nutzer ?? 0, zuletzt: n?.zuletzt ?? null }
+
+      if (offen.length > 0) {
+        p.push({
+          name: 'mcp', stufe: 'stoerung',
+          meldung: `MCP-Zugang nicht fertig eingerichtet: ${offen.map(o => o.punkt).join(', ')}`,
+          naechster_schritt: offen.map(o => o.behebung).join(' — '),
+          werte,
+        })
+      } else if ((n?.aufrufe ?? 0) === 0) {
+        p.push({
+          name: 'mcp', stufe: 'warnung',
+          meldung: 'Der MCP-Zugang wurde in sieben Tagen kein einziges Mal aufgerufen',
+          naechster_schritt:
+            'Entweder kommt niemand durch die Anmeldung (mcp.nutzer_stufe prüfen), oder der '
+            + 'Zugang nützt nicht, wofür er gebaut wurde. Beides ist ein Befund — ein Dienst '
+            + 'ohne Zulauf ist kein Normalzustand.',
+          werte,
+        })
+      } else {
+        p.push({
+          name: 'mcp', stufe: 'ok',
+          meldung: `MCP-Zugang benutzt: ${werte.aufrufe_7t} Aufrufe von ${werte.nutzer_7t} `
+                 + `Nutzer(n) in sieben Tagen, davon ${werte.gesperrt_7t} gesperrt`,
+          werte,
+        })
+      }
+    }
+  }
+
   return {
     status: schlimmste(p.map(x => x.stufe)),
     geprueft_am: new Date().toISOString(),
