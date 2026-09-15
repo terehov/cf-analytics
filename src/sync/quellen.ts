@@ -28,6 +28,7 @@
 import { query } from '../db/pool'
 import { log } from '../lib/log'
 import { config } from '../config'
+import { ENDPUNKTE } from '../lina/endpunkte'
 
 export type Quelle = {
   /** Schlüssel. Bei Endpunkten deren `key`, sonst ein sprechender Name. */
@@ -342,22 +343,42 @@ export const QUELLEN: readonly Quelle[] = [
  * Wirft nie. Das Register ist die Beobachtung über die Arbeit, nicht die
  * Arbeit.
  */
+/**
+ * Das konfigurierte Rueckschaufenster eines Tagesberichts, sonst null.
+ *
+ * Seit 0100 steht es in `sync.quelle.nachzuegler_tage`, damit
+ * `mart.nachzuegler_tiefe` den Rand des Fensters am KONFIGURIERTEN Wert
+ * misst — nicht am groessten je beobachteten Abstand. Der lag bei 60, weil
+ * Lauf 1 am 26.07.2026 einige Tage mit Abstand 23–60 einmalig holte, und
+ * die Pruefzeile "Aenderungen am Rand des Fensters" konnte fuer keinen
+ * LINA-Bericht anschlagen (gemessen 10.09.2026). Die Zahl hier ist dieselbe,
+ * die `linaNachfuellen()` beim Einreihen benutzt — eine Quelle, zwei Leser.
+ */
+export function nachzueglerFenster(endpunktKey: string | undefined): number | null {
+  if (!endpunktKey) return null
+  const ep = ENDPUNKTE.find(e => e.key === endpunktKey)
+  if (!ep || ep.schrittweite !== 'tag') return null
+  return ep.nachzuegler_tage ?? config.NACHZUEGLER_TAGE
+}
+
 export async function quellenSpiegeln(): Promise<number> {
   try {
     await query(
       `INSERT INTO sync.quelle
          (quelle, bezeichnung, system, endpunkt, schema_name, tabelle, zeitspalte,
-          kadenz_stunden, erwartet, bemerkung)
+          kadenz_stunden, erwartet, bemerkung, nachzuegler_tage)
        SELECT q->>'quelle', q->>'bezeichnung', q->>'system', q->>'endpunkt',
               q->>'schema_name', q->>'tabelle', q->>'zeitspalte',
-              (q->>'kadenz_stunden')::int, (q->>'erwartet')::boolean, q->>'bemerkung'
+              (q->>'kadenz_stunden')::int, (q->>'erwartet')::boolean, q->>'bemerkung',
+              (q->>'nachzuegler_tage')::int
          FROM jsonb_array_elements($1::jsonb) AS q
        ON CONFLICT (quelle) DO UPDATE
           SET bezeichnung = excluded.bezeichnung, system = excluded.system,
               endpunkt = excluded.endpunkt, schema_name = excluded.schema_name,
               tabelle = excluded.tabelle, zeitspalte = excluded.zeitspalte,
               kadenz_stunden = excluded.kadenz_stunden, erwartet = excluded.erwartet,
-              bemerkung = excluded.bemerkung`,
+              bemerkung = excluded.bemerkung,
+              nachzuegler_tage = excluded.nachzuegler_tage`,
       [JSON.stringify(QUELLEN.map(q => ({
         quelle: q.quelle, bezeichnung: q.bezeichnung, system: q.system,
         endpunkt: q.endpunkt ?? null,
@@ -367,6 +388,7 @@ export async function quellenSpiegeln(): Promise<number> {
         kadenz_stunden: q.kadenz_stunden,
         erwartet: q.erwartet ?? true,
         bemerkung: q.bemerkung ?? null,
+        nachzuegler_tage: nachzueglerFenster(q.endpunkt),
       })))])
 
     const weg = await query<{ quelle: string }>(

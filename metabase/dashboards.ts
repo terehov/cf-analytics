@@ -204,6 +204,34 @@ const F_BIS_A: Parameter = { id: 'd-bis-a', name: 'bis_a', 'display-name': 'A bi
 const F_VON_B: Parameter = { id: 'd-von-b', name: 'von_b', 'display-name': 'B von', type: 'date/single' }
 const F_BIS_B: Parameter = { id: 'd-bis-b', name: 'bis_b', 'display-name': 'B bis', type: 'date/single' }
 
+// Die Artikelnummern der Aktion, als Freitext. Absichtlich OHNE Werteliste
+// und als einzelner Textwert: aus einer Excel-Spalte kopiert man 51 Nummern
+// in einem Zug, getrennt wird an allem, was keine Ziffer ist. Die Vorgabe
+// ist die letzte grosse Auswertung (Gluecksrad Wilma Wunder, August 2026),
+// damit die Seite beim Oeffnen etwas zeigt — eine VORGABE, keine Grenze.
+const F_ARTIKELNUMMERN: Parameter = {
+  id: 'd-artikelnummern', name: 'artikelnummern', 'display-name': 'Artikelnummern', type: 'text',
+  default: '1160021, 1160005, 1160006, 1160018, 1220023, 1220032, 1220004, 1220009, 1220013, '
+         + '1220024, 1220011, 1220012, 1220031, 1220019, 1220027, 1220022, 1220025, 1220014, '
+         + '1220028, 1220006, 1220007, 1220008, 1220026, 1220029, 1200001, 1340063, 1200005, '
+         + '1200004, 1200003, 1180003, 1180009, 1180002, 1100001, 1100002, 1100004, 1100003, '
+         + '1100039, 1100027, 1120006, 1120003, 1120012, 1120001, 1120002, 1140010, 1140008, '
+         + '2800131, 2800132, 2800134, 2800133, 2800136, 2800135',
+}
+// Der Aktionszeitraum als zwei Datumsfelder. Kein Bereichsfilter: die
+// Karten leiten aus von/bis den Zeitraum davor und das Vorjahr ab, und
+// ein Feldfilter kann nur EINE Klausel setzen.
+//
+// Die Vorgabe ist FEST und gehoert zur Artikelliste darueber: Gluecksrad,
+// August 2026. Ein mitlaufender Monat (wie beim Monatsfilter) waere hier
+// falsch — die Liste bliebe stehen und der Zeitraum liefe weiter, und
+// die Seite zeigte beim Oeffnen eine Aktion in einem Monat, in dem sie
+// nicht lief. Dazu ein Messwert: MIT Wert falten die Karten die Grenzen
+// zu Konstanten und laufen in 0,6 s, OHNE Wert (current_date-Rueckfall)
+// in 8 s, siehe karten-artikelaktion.ts. Wer die Felder leert, wartet.
+const F_VON: Parameter = { id: 'd-von', name: 'von', 'display-name': 'Aktion von', type: 'date/single', default: '2026-08-01' }
+const F_BIS: Parameter = { id: 'd-bis', name: 'bis', 'display-name': 'Aktion bis', type: 'date/single', default: '2026-08-31' }
+
 export const dashboards: Dashboard[] = [
   // ===================================================================
   // DIE DRILL-DOWN-KETTE — Marke → Filiale → Betrieb
@@ -1121,6 +1149,57 @@ export const dashboards: Dashboard[] = [
       { teile: [{ karte: 'akd_verlauf', hoehe: 9 }] },
       { teile: [{ karte: 'akd_betriebe', hoehe: 12,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+    ],
+  },
+
+  /*
+   * Eine Aktion, die nur als LISTE VON ARTIKELNUMMERN existiert.
+   *
+   * Anlass 10.09.2026: das Gluecksrad von Wilma Wunder (August 2026) ist im
+   * Kassensystem keine Aktion — mart.aktion kennt es nicht —, Marketing
+   * schickt stattdessen 51 Artikelnummern. Der Aktionen-Reiter auf
+   * db_umsatz kann damit nichts anfangen. Diese Seite nimmt die Liste als
+   * Filter und rechnet Menge, Umsatz, Anteil und vor allem den NACHLASS je
+   * Betrieb, gegen den Zeitraum davor und das Vorjahr. Begruendungen im
+   * Kopf von karten-artikelaktion.ts.
+   */
+  {
+    schluessel: 'db_artikelaktion',
+    name: 'Artikelaktion — je Betrieb',
+    beschreibung:
+      'Eine Aktion, die über eine Liste von Artikelnummern definiert ist: Menge, Umsatz, Anteil und '
+      + 'eingeräumter Nachlass je Betrieb, gegen den Zeitraum davor und das Vorjahr. Nummern oben '
+      + 'einfügen, Zeitraum setzen.',
+    sammlung: 'Betrieb',
+    filter: [F_ARTIKELNUMMERN, F_VON, F_BIS, F_MARKE, F_BETRIEB],
+    reihen: [
+      { teile: [{ text:
+        '# Artikelaktion\n\n'
+        + 'Für Aktionen, die im Kassensystem nicht als Aktion angelegt sind, sondern nur als '
+        + '**Liste von Artikeln** existieren. Die Artikelnummern oben einfügen — durch Komma, '
+        + 'Leerzeichen oder Zeilenumbruch getrennt, direkt aus einer Excel-Spalte kopiert — und '
+        + 'den Aktionszeitraum setzen. Ohne Zeitraum gilt der letzte abgeschlossene Monat.\n\n'
+        + 'Gezählt werden alle Betriebe, die im Zeitraum mindestens einen Artikel der Liste verkauft '
+        + 'haben. Verglichen wird mit dem **gleich langen Zeitraum unmittelbar davor** und mit '
+        + '**denselben Tagen im Vorjahr**. Das Vorjahr ist selten eine gleiche Basis: Betriebe und '
+        + 'Artikel, die es damals nicht gab, fehlen dort.\n\n'
+        + '**Die wichtigste Zahl ist der Nachlass.** Bei einer Preisaktion steigt er nur auf die '
+        + 'Aktionsartikel; die verkaufte Menge sagt allein wenig, weil Aktionslisten meist das '
+        + 'Kernsortiment sind und ohnehin einen großen Teil des Umsatzes tragen. Alle Umsätze netto; '
+        + 'der Nachlass wird brutto gegen den hinterlegten Verkaufspreis gerechnet.' }] },
+      { teile: [{ karte: 'aa_kopf', hoehe: 9 }] },
+      { teile: [{ text: '## Je Betrieb\n\nSortiert nach Umsatz mit den Aktionsartikeln. Ein Betrieb, bei dem der Nachlass gegenüber dem Zeitraum davor nicht steigt, hat die Aktion womöglich nicht gefahren.' }] },
+      { teile: [{ karte: 'aa_betrieb', hoehe: 12,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      { teile: [
+        { karte: 'aa_verlauf_nachlass', breite: 12, hoehe: 9 },
+        { karte: 'aa_verlauf_menge', breite: 12, hoehe: 9 },
+      ] },
+      { teile: [{ text: '## Je Artikel\n\nMit den Namen aus dem Kassensystem. Weicht ein Name von der eigenen Liste ab, ist dort die Nummer vertauscht.' }] },
+      { teile: [{ karte: 'aa_artikel', hoehe: 12,
+        klick: [{ ziel: 'dd_artikel', spalte: 'Artikel', uebergabe: { artikel: 'Artikel' } }] }] },
+      { teile: [{ text: '## Stimmt die Liste?\n\nEine Nummer, die nichts trifft, fehlt oben einfach — ohne Fehlermeldung. Diese Tabelle nennt jede solche Nummer. **Leer ist das Ziel.**' }] },
+      { teile: [{ karte: 'aa_liste_pruefung', hoehe: 9 }] },
     ],
   },
 

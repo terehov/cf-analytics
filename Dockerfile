@@ -21,6 +21,15 @@ RUN bun install --frozen-lockfile --production
 
 COPY src ./src
 COPY migrations ./migrations
+# pflege/ MUSS mit ins Image: pflegeNachlauf() liest die handgepflegten
+# Tabellen (OM-Noten, Marktindex, Pflichtartikellisten) aus diesem Ordner,
+# und der Kanal ist ausdruecklich das Repository (src/pflege/tabellen.ts).
+# Bis zum 10.09.2026 fehlte diese Zeile: der Container hatte keinen Ordner,
+# pflegeEinlesen() kehrte still zurueck (log.debug), sync.pflege_import blieb
+# in Produktion bei 0 Zeilen, und der Round Table meldete fuer jeden
+# operativen Betrieb "OM-Note fehlt". Was in manual.* stand, kam von einem
+# Lauf vom Notebook aus. src/pflege/dockerfile.test.ts haelt die Zeile fest.
+COPY pflege ./pflege
 
 # Leserechte fuer den spaeteren USER bun erzwingen, unabhaengig davon, mit
 # welchen lokalen Rechten die Dateien im Build-Kontext liegen. COPY uebernimmt
@@ -30,7 +39,7 @@ COPY migrations ./migrations
 # der Container startete dann als root, scheiterte aber an jedem COPY-Pfad,
 # sobald USER bun ihn lesen wollte. Gefunden beim Testen von CMD ["bun","run",
 # "start"] am 05.08.2026, siehe docs/umzug-hetzner.md.
-RUN chmod -R a+rX ./src ./migrations
+RUN chmod -R a+rX ./src ./migrations ./pflege
 
 # Nicht als root laufen
 USER bun

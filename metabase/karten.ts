@@ -33,11 +33,13 @@ import { karten as kartenKalender } from './karten-kalender'
 import { karten as kartenFremdeinkauf } from './karten-fremdeinkauf'
 import { karten as kartenPflichtartikel } from './karten-pflichtartikel'
 import { karten as kartenBounti } from './karten-bounti'
+import { karten as kartenArtikelaktion } from './karten-artikelaktion'
 
 export const alleKarten: Karte[] = [
   ...kartenDrilldown, ...kartenPortfolio, ...kartenRoundTable, ...kartenFach, ...kartenImport,
   ...kartenStandort, ...kartenBewertung, ...kartenAktionen, ...kartenYext, ...kartenVergleich,
   ...kartenFremdeinkauf, ...kartenPflichtartikel, ...kartenKalender, ...kartenBounti,
+  ...kartenArtikelaktion,
 ]
 
 /** Eine Karte an ihrem Schluessel. */

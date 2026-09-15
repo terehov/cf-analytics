@@ -89,3 +89,33 @@ export function jsonOhneNullzeichen(text: string, endpunkt: string): unknown {
   }
   return daten
 }
+
+/**
+ * JSON-Text mit rekursiv sortierten Objektschluesseln — die Form, die der
+ * LINA-Client seit dem 10.09.2026 hasht (`raw.api_antwort.payload_hash`).
+ *
+ * WARUM. `mart.nachzuegler_tiefe` misst am Hash, ob sich ein Geschaeftstag
+ * zwischen zwei Abrufen geaendert hat. Fuer getArtikelverkaufsbericht galt
+ * bis dahin jeder Abruf als Aenderung: LINA liefert das Feld `columns` in
+ * zufaelliger Reihenfolge (10.09.2026: 2.466 von 3.414 Positionen vertauscht,
+ * Inhalt identisch), und die 21-Tage-Begruendung vom 13.08.2026 fusste auf
+ * diesem Rauschen. Reihenfolgen von Objektschluesseln sind in JSON ohne
+ * Bedeutung; wer sie hasht, misst den Serialisierer, nicht die Daten.
+ * Arrays bleiben, wie sie sind — ihre Reihenfolge KANN Bedeutung haben; wo
+ * sie keine hat, sortiert der Endpunkt selbst vor (`Endpunkt.kanonisch`).
+ */
+export function kanonischerJsonText(wert: unknown): string {
+  return JSON.stringify(sortiert(wert))
+}
+
+function sortiert(wert: unknown): unknown {
+  if (Array.isArray(wert)) return wert.map(sortiert)
+  if (wert !== null && typeof wert === 'object') {
+    const aus: Record<string, unknown> = {}
+    for (const k of Object.keys(wert as Record<string, unknown>).sort()) {
+      aus[k] = sortiert((wert as Record<string, unknown>)[k])
+    }
+    return aus
+  }
+  return wert
+}

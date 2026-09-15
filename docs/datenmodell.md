@@ -671,6 +671,41 @@ Listeneintrag trägt diese Felder nicht.
 nicht als veraltet — `NULL IS DISTINCT FROM NULL` ist falsch — und bekommt
 seinen Vergleichswert, sobald sein Listeneintrag das nächste Mal gelesen wird.
 
+## Nulltage, Fensterrand, Pflichtartikel-Korn (Migration `0100`, 10.09.2026)
+
+**`sync.quelle.nachzuegler_tage`** (integer, NULL für alles außer Tagesberichten): das
+konfigurierte Rückschaufenster, gespiegelt aus `src/lina/endpunkte.ts` durch `quellenSpiegeln()`
+bei jedem Lauf. Bis zum ersten Lauf nach `0100` NULL; `mart.nachzuegler_tiefe` fällt dann auf
+den beobachteten Abstand zurück. Zweck: der Rand des Fensters wird am Sollwert gemessen, nicht
+an einem Artefakt aus Lauf 1.
+
+**`mart.umsatztag_luecke`** (Sicht, nicht materialisiert; rund 70 ms lokal, in Produktion
+eine Aggregation über 120 Tage `core.artikelverkauf_tag` mit Partitionsbeschneidung): eine
+Zeile je Betrieb und Geschäftstag, an dem `sum(artikelverkauf_tag.umsatz_netto) > 0` und die
+Gesamtzeile des Umsatzberichts (`hauptsparte_key IS NULL AND verkaufsstelle_key IS NULL`) null
+oder fehlend ist. `nachgeholt`/`offen`/`zuletzt_eingereiht` kommen aus `sync.warteschlange`:
+Posten für `getUmsatzbericht`, deren `erstellt_am` hinter `zeitraum_von + Fenster + 1` liegt —
+also nicht vom täglichen Fenster stammen. Ein Tag ist ein Konzernbericht; die Nachholung gilt
+für alle Betriebe des Tages.
+
+**`mart.umsatz_lochtag`** (Sicht seit `0039`, erweitert in `0101`): je Geschäftstag der letzten
+120 Tage mit `betriebe_mit_umsatz < 0.6 × betriebe_erwartet` (28-Tage-Schnitt davor). Neu
+angehängt: `alter_tage`, `nachgeholt`, `offen`, `zuletzt_eingereiht`, `zustand` — gerechnet wie in
+`mart.umsatztag_luecke`, aus denselben `getUmsatzbericht`-Posten hinter dem Fenster. Ein Tag,
+der zugleich Nulltag und Lochtag ist, zählt seine Nachholungen deshalb in beiden Sichten — das
+ist richtig, es sind dieselben Aufrufe.
+
+**`mart.pflichtartikel_klassifikation_basis`**: das CTE `ist` gruppiert auf
+`(konzept, gueltig_von, gueltig_bis, nr, nm)` mit `min(bp.name) AS name_roh`. Vorher stand
+der Rohname im DISTINCT, und Umlaut-Varianten sprengten den Unique-Index
+`pflichtartikel_klassifikation_korn`. Eine materialisierte Sicht ist nicht änderbar, deshalb
+`DROP … CASCADE` und Neuanlage samt elf Abhängigen (aus `pg_get_viewdef` gezogen, daher in
+Postgres-Formatierung). `src/sync/pflichtartikel_sichten.test.ts` prüft das Korn mit beiden
+Schreibweisen.
+
+**`sync.schema_abweichung`**: fünf Zeilen vom 29.07./01.08.2026 (int4-Überläufe bei `guests`
+und `counts`, Wert verworfen und dort abgelegt) sind quittiert. Die Abfrage
+`WHERE quittiert_am IS NULL` aus `AGENTS.md` ist wieder leer.
 
 ---
 

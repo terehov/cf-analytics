@@ -92,6 +92,7 @@ export async function roundTableNachlauf(): Promise<void> {
   if (r.status === 'aufgefrischt') {
     log.info('Round Table aufgefrischt', { dauer_s: r.dauerS })
   } else {
-    log.warn('Round Table nicht aufgefrischt', { grund: r.meldung, dauer_s: r.dauerS })
+    // ERROR, nicht WARN — siehe pflichtartikel_sichten.ts (10.09.2026).
+    log.error('Round Table nicht aufgefrischt', { grund: r.meldung, dauer_s: r.dauerS })
   }
 }

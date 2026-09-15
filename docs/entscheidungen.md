@@ -2867,6 +2867,92 @@ Kreuzprodukt-Menge weiter verkleinern kann, ist offen — die Baum-Antwort
 landet nicht in `raw.api_antwort`; ein protokollierter Baumknoten würde es
 beantworten.
 
+## 10.09.2026 — Nulltage nachholen statt Fenster verbreitern; nur Erstfehler färben den Lauf
+
+Anlass ist die Importprüfung der Läufe 112–120 (`fehlerkatalog.md`, „Vier Befunde aus neun
+Nächten Import"). Sechs Entscheidungen, eine davon revidiert eine Formulierung vom 01.09.
+
+### E1 — Nulltage werden gezielt nachgeholt, das Fenster bleibt bei zehn Tagen
+
+Zwei Kassenausfälle von je elf Tagen ließen 83.000 € Umsatz im Umsatzbericht bei null. Zwei
+Wege: `NACHZUEGLER_TAGE` auf 21 heben, oder die Tage erkennen und nachholen.
+
+**Nachholen.** Der Artikelverkaufsbericht (21 Tage) ist das Orakel: kennt er Umsatz für einen
+Betrieb und Tag, den der Umsatzbericht nicht kennt, hat die Kasse nachgeliefert
+(`mart.umsatztag_luecke`). `nulltageNachziehen()` reiht den Tag für jeden Konzern-Tagesbericht
+neu ein, dessen Fenster ihn nicht mehr erreicht. Ein breiteres Fenster hätte genau diese zwei
+Fälle gerade so erwischt, den nächsten längeren nicht, und kostete jede Nacht 154 Aufrufe für
+Tage, die sich zu 95 % nicht ändern. Grenzen: `NULLTAGE_JE_LAUF = 30` Tage je Nacht (ein Tag
+kostet bis zu 14 Aufrufe), drei Anläufe je Tag im Wochenabstand, danach `aufgegeben` — und
+diese zählt die Prüfübersicht, nicht die fälligen.
+
+Was der Weg nicht kann: einen Ausfall sehen, der länger dauert als 21 Tage. Dann stehen beide
+Berichte auf null, und niemand widerspricht.
+
+### E2 — Nur Erstfehler machen den Lauf `teilweise`
+
+N1 vom 01.09. sagte: Wiederholungsfehler zählen nicht als „Fehler in Folge", *und der Lauf
+endet ehrlich auf `teilweise`*. Neun Läufe später steht fest, was das heißt: neun Mal gelb
+wegen derselben ein bis elf Posten. Ein Status, der jeden Tag gelb ist, zeigt keinen neuen
+Fehler mehr — dieselbe Überlegung wie bei jeder Prüfzeile, die nie auf null geht.
+
+Deshalb gilt die Unterscheidung aus N1 jetzt auch für den Status: ein Posten, den die Schlange
+schon als gescheitert kennt, färbt den Lauf nicht. Er verschwindet nicht — Notiz („davon n
+bekannte Wiederholer"), `sync.aufgabe`, `mart.posten_aufgegeben`. Was N1 ausdrücklich nicht
+entschieden hatte, bleibt: eine wirklich abgebrochene Spur ist `abgebrochen` und Exitcode 1.
+
+Nebenher stimmt die Zählung: ein aufgegebener Posten ist `uebersprungen`, so wie
+`sync.aufgabe` ihn führt — nicht zusätzlich `fehler`.
+
+### E3 — HTTP 500 auf `fn:bestellpositionen`: eine Nacht je Versuch, zehn Nächte
+
+Gemessen über 45 Tage: 287 von 318 betroffenen Bestellungen kamen später doch, **alle** am
+Tag 9 bis 11 nach dem ersten Fehler — nach drei Fehlnächten, Aufgeben und einer Woche bis zur
+Wiederbelebung. Die Erholung ist unser Zeitplan, nicht FoodNotifys. Weder Lieferdatum noch
+Belegdatum trennen scheiternde von gelingenden Abrufen (0,9 % vs. 0,8 % Fehlerquote).
+
+Deshalb für genau diesen Fall: `faellig_ab` auf die nächste Nacht statt auf fünf Minuten,
+`FN_POSITIONEN_MAX_NAECHTE = 10` Nächte statt `MAX_VERSUCHE = 4` Versuche. Kosten: ein Aufruf je
+Nacht und Bestellung, in Summe unter zwanzig. Verworfen: sofortige Wiederholung im selben Lauf
+(die Minuten-Wiedervorlage lief ohnehin ins Leere, weil die FoodNotify-Spur nach zehn Minuten
+fertig ist) und eine Meldung an FoodNotify (`foodnotify-http500.md` ist als Meldung überholt).
+
+### E4 — Der Rand des Fensters ist der konfigurierte, und gehasht wird die kanonische Form
+
+`mart.nachzuegler_tiefe` verglich gegen den größten beobachteten Abstand (60, ein Artefakt aus
+Lauf 1). Jetzt gegen `sync.quelle.nachzuegler_tage`, gespiegelt aus `endpunkte.ts` — eine
+Quelle, zwei Leser. Schwelle: mehr als jeder zehnte Abruf am Rand noch geändert. Die Schwelle
+ist eine Setzung: 4,8 % beim Umsatzbericht sind die Kassenausfälle, die E1 auffängt; 80 % bei
+den Personalkosten sind ein zu kurzes Fenster.
+
+Der LINA-Client hasht seit heute sortierte Schlüssel und für `getArtikelverkaufsbericht` die
+nach `artnr` geordneten `columns`. Der Rohtext in `raw.api_antwort.payload` bleibt, was LINA
+schickte — der Hash ist eine Ableitung. Folge: in der Nacht der Umstellung zählt jeder Tag
+einmal als „geändert" (alter Hash gegen neuen); die Kurve für den Artikelverkauf wird erst mit
+neuen Abrufen aussagekräftig.
+
+### E5 — Personalkosten: monatliche Nachlese statt längerem Fenster
+
+24 von 30 Abrufen am letzten Fenstertag mit echten Wertänderungen (pekGesamt, effGesamt) —
+Lohn schließt monatlich ab. Ein 62-Tage-Fenster kostete bei 20 Sekunden je Aufruf 14 weitere
+Minuten je Nacht; die Nachlese (`nachlese_tage: 62`, einmal im Monat die Tage hinter dem
+Fenster) kostet 41 Aufrufe im Monat. Merker `nachlese:getPersonalkosten`, Obergrenze
+`NACHLESE_JE_LAUF` — die Obergrenze, die jeder neue Import bekommt.
+
+### E6 — `pflege/` gehört ins Image, und ein fehlender Ordner ist eine Warnung
+
+Der Kanal war richtig gedacht (Repository, `git log`, `git revert`) und endete vor dem
+Container. Verworfen: ein Volume oder ein Upload — das wäre wieder ein Weg außerhalb des
+Repositorys. `dockerfile.test.ts` hält die COPY-Zeile fest, weil ein Test, der ein Image baut,
+nirgends von selbst läuft.
+
+### Was daran nicht entschieden ist
+
+Ob 21 Tage für den Artikelverkaufsbericht richtig sind, weiß erst die Kurve mit kanonischen
+Hashes — frühestens Anfang Oktober. Ob 10 % am Rand die richtige Schwelle ist, ebenfalls. Und
+ob die zehn endgültig aufgegebenen HTTP-500-Bestellungen je kommen, entscheidet weiter
+FoodNotify.
+
 ---
 
 ## 12.09.2026 — Der Zugang für andere: MCP statt Datenbankzugang

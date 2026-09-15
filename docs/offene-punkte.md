@@ -1602,6 +1602,50 @@ Bis dahin hat die Kennzahl **keine Quelle — und bekommt auch keine geschätzte
 * **Keine Metabase-Karten.** Die `mart`-Sichten stehen, das Dashboard nicht — es gibt bis zum
   ersten Lauf keine Zahl, gegen die man eine Karte prüfen könnte.
 
+## Artikelverkaufsbericht: 21. und 22.07.2026 nie vollständig geholt (10.09.2026)
+
+**Erledigt am 14.09.2026 mit Migration `0101`:** `lochtageNachziehen()` reiht Lochtage für alle
+Tagesberichte nach; die drei Tage holt der erste Lauf danach. Hergang in `fehlerkatalog.md`
+(„Drei Tage im Juli"). Der Text darunter bleibt als Befund stehen.
+
+**Nachtrag 14.09.2026 abends:** Der Nachholversuch brachte byte-gleich leere Antworten — LINA hat
+den 21. und 22.07. nicht. Der Juli 2026 bleibt in allen Auswertungen um diese anderthalb Tage
+kürzer; von unserer Seite ist das nicht nachholbar. Die Sicht führt die Tage bis `aufgegeben`.
+
+Beim Bau der Artikelaktion aufgefallen: `core.artikelverkauf_tag` hat für den **22.07.2026
+keinen einzigen Betrieb** und für den 21.07. nur 21 statt rund 55. **Korrektur vom 14.09.2026:**
+Der Umsatzbericht ist an beiden Tagen NICHT vollständig, wie hier zunächst stand — er führt
+zwar 141 Zeilen, aber am 22.07. mit 0 EUR bei allen und am 21.07. mit Umsatz bei nur 21
+Betrieben (13.268 EUR statt rund 300.000). Beide Berichte wurden für den 20.–22.07. genau
+einmal geholt, am 26.07.2026 (Lauf 1 bzw. 3, vier bis sechs Tage nach dem Geschäftstag),
+und LINA hatte die Tage da noch nicht: der 23.07. kam im selben Lauf ebenso leer
+(`columns: 0`) und war beim nächsten Abruf am 02.08. voll (3.503 Artikel). Das tägliche
+Fenster begann am 02.08. und reichte genau bis zum 23.07. zurück. Die Posten in
+`sync.warteschlange` für `getArtikelverkaufsbericht` vom 20. bis 22.07. stehen alle auf
+`ergebnis = 'ok'`, erledigt am 26.07.2026, **je genau ein Posten** — der 23.07. dagegen hat zehn
+Posten (Nachzügler-Fenster) bis zum 14.08. Die drei Tage wurden also einmal geholt, als LINA
+sie noch nicht gebucht hatte, und danach nie wieder: das Nachzügler-Fenster reicht heute nicht
+mehr dorthin, und `historieNachziehen()` hält einen `ok`-Posten für erledigt. Dieselbe
+Signatur wie Regel 10 — kein Fehler, nur eine Zeile weniger. Auch `nulltageNachziehen()` aus
+`0100` greift hier nicht: es verlangt Artikelumsatz über null bei Tagesumsatz null, und hier
+stehen beide auf null.
+
+Gemessen mit:
+
+```sql
+SELECT d::date AS tag,
+       (SELECT count(DISTINCT betrieb_key) FROM core.artikelverkauf_tag WHERE geschaeftstag = d::date) AS artikelverkauf,
+       (SELECT count(DISTINCT betrieb_key) FROM core.umsatzbericht_tag  WHERE geschaeftstag = d::date) AS umsatzbericht
+  FROM generate_series(DATE '2026-07-19', DATE '2026-07-24', interval '1 day') d ORDER BY 1;
+```
+
+**Zu entscheiden:** die drei Tage für ALLE Tagesberichte erneut einreihen. `--historie` tut
+das nicht (`WHERE NOT EXISTS` gegen alle Posten, auch erledigte); es braucht einen direkten
+`INSERT` in `sync.warteschlange`, den der nächste Nachtlauf abarbeitet. Grundsätzlicher: ein
+Geschäftstag, an dem deutlich weniger Betriebe Umsatz melden als im 28-Tage-Schnitt
+(`dq_lochtage` zeigt ihn), sollte nach Ende des Fensters von selbst neu eingereiht werden —
+mit Obergrenze und Zähler, wie `nulltageNachziehen()`, aber am Umsatzbericht selbst gemessen.
+
 ## MCP-Zugang für andere Nutzer (Plan: `plan-skybridge.md`)
 
 Der Server soll das BI-Tool ersetzen können — für Nutzer ohne Zugang dorthin sofort. Er

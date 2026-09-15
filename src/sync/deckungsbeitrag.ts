@@ -120,6 +120,7 @@ export async function deckungsbeitragNachlauf(): Promise<void> {
   } else {
     // Warnung, nicht Fehler: der Import ist gelungen, nur die Auswertung
     // hinkt. Wie weit, steht in mart.deckungsbeitrag_stand.
-    log.warn('Deckungsbeitrag nicht aufgefrischt', { grund: r.meldung, dauer_s: r.dauerS })
+    // ERROR, nicht WARN — siehe pflichtartikel_sichten.ts (10.09.2026).
+    log.error('Deckungsbeitrag nicht aufgefrischt', { grund: r.meldung, dauer_s: r.dauerS })
   }
 }

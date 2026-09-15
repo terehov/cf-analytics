@@ -138,7 +138,7 @@ lauf('nachfuellen — was nicht nachwachsen darf', () => {
         ADD CONSTRAINT test_nichts_geht CHECK (endpunkt = '__unmoeglich__') NOT VALID`)
     try {
       const stand = await nachfuellen()
-      expect(stand).toEqual({ lina: 0, foodnotify: 0, ladenakte: 0, wiederbelebt: 0 })
+      expect(stand).toEqual({ lina: 0, foodnotify: 0, ladenakte: 0, wiederbelebt: 0, nulltage: 0, nachlese: 0, lochtage: 0 })
       // Und die Warteschlange ist unverändert leer geblieben.
       expect(await offen(AKTIVE_ENDPUNKTE[0]!.key)).toBe(0)
     } finally {
@@ -793,5 +793,331 @@ lauf('Rückschaufenster', () => {
       `SELECT count(*)::int AS n FROM sync.warteschlange
         WHERE endpunkt LIKE 'getKennzahlen%' AND erledigt_am IS NULL`
     )).rows[0].n)).toBe(vorher)
+  })
+})
+
+/**
+ * Nulltage nachholen (10.09.2026, Migration `0100`).
+ *
+ * Der Fall: die Kasse eines Betriebs lieferte erst nach mehr als
+ * NACHZUEGLER_TAGE nach. Der Artikelverkaufsbericht (21 Tage) hat es gesehen,
+ * der Umsatzbericht (10 Tage) steht fuer immer auf null — bis
+ * `nulltageNachziehen()` den Tag fuer alle Tagesberichte mit kurzem Fenster
+ * neu einreiht. Gemessen an Aposto Schwetzingen und Enchilada Aschaffenburg:
+ * elf Tage, 45.486 bzw. 37.570 EUR netto, die im Round Table fehlten.
+ */
+lauf('nulltage — was der Artikelverkauf kennt und der Umsatzbericht nicht', () => {
+  let db: Client
+  let betrieb: number
+  let artikel: number
+  const ALT = 30      // ausserhalb beider Fenster (10 und 21)
+  const MITTEL = 15   // ausserhalb des kurzen, innerhalb des langen Fensters
+
+  const tag = (vorTagen: number) => {
+    const d = new Date(); d.setUTCDate(d.getUTCDate() - vorTagen)
+    return d.toISOString().slice(0, 10)
+  }
+
+  beforeAll(async () => {
+    process.env.DATABASE_URL = DB!
+    process.env.HISTORIE_JE_LAUF = '0'
+    db = new Client({ connectionString: DB })
+    await db.connect()
+    const { rows: [b] } = await db.query(
+      `INSERT INTO core.betrieb (enc_id, name) VALUES ('test-nulltag', 'Test Nulltag GmbH')
+       ON CONFLICT (enc_id) DO UPDATE SET name = excluded.name RETURNING betrieb_key`)
+    betrieb = b.betrieb_key
+    const { rows: [a] } = await db.query(
+      `INSERT INTO core.artikel (artikelnummer, name) VALUES (999999901, 'Test Nulltag Artikel')
+       ON CONFLICT (artikelnummer) DO UPDATE SET name = excluded.name RETURNING artikel_key`)
+    artikel = a.artikel_key
+    for (const t of [tag(ALT), tag(MITTEL)]) {
+      await db.query(`SELECT core.partition_anlegen('core.artikelverkauf_tag', $1::date)`, [t])
+      await db.query(
+        `INSERT INTO core.artikelverkauf_tag (betrieb_key, geschaeftstag, artikel_key, menge, umsatz_netto, umsatz_brutto)
+         VALUES ($1, $2, $3, 3, 123.45, 146.91)`, [betrieb, t, artikel])
+    }
+    // Der alte Tag steht als Null-ZEILE da (so schreibt der Lader), der
+    // mittlere hat gar keine Zeile — beides ist eine Luecke.
+    await db.query(
+      `INSERT INTO core.umsatzbericht_tag (betrieb_key, geschaeftstag, umsatz_netto, umsatz_brutto, rechnungen, gaeste)
+       VALUES ($1, $2, 0, 0, 0, 0)`, [betrieb, tag(ALT)])
+  })
+
+  afterAll(async () => {
+    await db.query(`DELETE FROM core.artikelverkauf_tag WHERE betrieb_key = $1`, [betrieb])
+    await db.query(`DELETE FROM core.umsatzbericht_tag WHERE betrieb_key = $1`, [betrieb])
+    await db.query(`DELETE FROM core.artikel WHERE artikel_key = $1`, [artikel])
+    await db.query(`DELETE FROM core.betrieb WHERE betrieb_key = $1`, [betrieb])
+    await db.query(`DELETE FROM sync.merker WHERE schluessel LIKE 'nachlese:%'`)
+    await db?.end()
+  })
+
+  beforeEach(async () => {
+    await db.query('TRUNCATE sync.warteschlange')
+  })
+
+  test('die Sicht nennt beide Tage als faellig', async () => {
+    const { rows } = await db.query(
+      `SELECT geschaeftstag::text AS tag, zustand FROM mart.umsatztag_luecke
+        WHERE betrieb_key = $1 ORDER BY 1`, [betrieb])
+    expect(rows.map(r => `${r.tag} ${r.zustand}`)).toEqual([
+      `${tag(ALT)} faellig`, `${tag(MITTEL)} faellig`,
+    ])
+  })
+
+  test('reiht je Tagesbericht nur ein, was dessen Fenster nicht mehr erreicht', async () => {
+    const { nulltageNachziehen } = await import('./nachfuellen')
+    const n = await nulltageNachziehen()
+    expect(n).toBeGreaterThan(0)
+
+    const tage = async (endpunkt: string) => {
+      const { rows } = await db.query(
+        `SELECT zeitraum_von::text AS t FROM sync.warteschlange
+          WHERE endpunkt = $1 AND erledigt_am IS NULL ORDER BY 1`, [endpunkt])
+      return rows.map(r => r.t)
+    }
+    // Die Testbank kann weitere Luecken tragen (ein Klon mit Artikelverkauf,
+    // aber ohne Umsatzbericht) — geprueft wird deshalb je Tag, nicht die Liste.
+    // Kurzes Fenster (10): beide Tage.
+    expect(await tage('getUmsatzbericht')).toEqual(expect.arrayContaining([tag(ALT), tag(MITTEL)]))
+    expect(await tage('getZeitzonenbericht')).toEqual(expect.arrayContaining([tag(ALT), tag(MITTEL)]))
+    // Langes Fenster (21): nur der alte Tag — den mittleren holt das Fenster selbst.
+    expect(await tage('getPersonalkosten')).toContain(tag(ALT))
+    expect(await tage('getPersonalkosten')).not.toContain(tag(MITTEL))
+    // Das Orakel nie: es HAT die Daten.
+    expect(await tage('getArtikelverkaufsbericht')).toEqual([])
+  })
+
+  test('ein zweiter Aufruf legt fuer diese Tage nichts nach — sie sind eingereiht', async () => {
+    const { nulltageNachziehen } = await import('./nachfuellen')
+    await nulltageNachziehen()
+    const { rows } = await db.query(
+      `SELECT DISTINCT zustand FROM mart.umsatztag_luecke WHERE betrieb_key = $1`, [betrieb])
+    expect(rows.map(r => r.zustand)).toEqual(['eingereiht'])
+    const je = async () => (await db.query(
+      `SELECT count(*)::int AS n FROM sync.warteschlange
+        WHERE endpunkt = 'getUmsatzbericht' AND zeitraum_von IN ($1::date, $2::date)`,
+      [tag(ALT), tag(MITTEL)])).rows[0].n
+    const vorher = await je()
+    expect(vorher).toBe(2)
+    await nulltageNachziehen()
+    expect(await je()).toBe(vorher)
+  })
+
+  test('bleibt der Tag nach dem Nachholen null, wartet er eine Woche', async () => {
+    const { nulltageNachziehen } = await import('./nachfuellen')
+    await nulltageNachziehen()
+    // Der Lauf hat geholt — und LINA sagte wieder null.
+    await db.query(`UPDATE sync.warteschlange SET erledigt_am = now(), ergebnis = 'ok'`)
+    const { rows } = await db.query(
+      `SELECT DISTINCT zustand FROM mart.umsatztag_luecke WHERE betrieb_key = $1`, [betrieb])
+    expect(rows.map(r => r.zustand)).toEqual(['wartet'])
+    await nulltageNachziehen()
+    const { rows: [o] } = await db.query(
+      `SELECT count(*)::int AS n FROM sync.warteschlange
+        WHERE endpunkt = 'getUmsatzbericht' AND erledigt_am IS NULL
+          AND zeitraum_von IN ($1::date, $2::date)`, [tag(ALT), tag(MITTEL)])
+    expect(o.n).toBe(0)
+  })
+
+  test('NULLTAGE_JE_LAUF = 0 schaltet ab', async () => {
+    process.env.NULLTAGE_JE_LAUF = '0'
+    try {
+      // config ist beim ersten Import eingefroren — deshalb frisch laden.
+      const { config } = await import('../config')
+      if (config.NULLTAGE_JE_LAUF !== 0) return   // schon geladen; dann ist der Test hier nicht messbar
+      const { nulltageNachziehen } = await import('./nachfuellen')
+      expect(await nulltageNachziehen()).toBe(0)
+    } finally {
+      delete process.env.NULLTAGE_JE_LAUF
+    }
+  })
+})
+
+/**
+ * Lochtage nachholen (14.09.2026, Migration `0101`).
+ *
+ * Der Fall, den die Nulltage nicht sehen: BEIDE Tagesberichte stehen leer,
+ * weil LINA den Tag beim einzigen Abruf noch nicht hatte. 20.–22.07.2026, am
+ * 26.07. geholt, nie wieder — der 22.07. stand sieben Wochen bei allen 141
+ * Betrieben auf null. Signal ist der Umsatzbericht selbst: weniger als 60 %
+ * der Betriebe mit Umsatz gegen den 28-Tage-Schnitt davor.
+ */
+lauf('lochtage — ein Tag, an dem fast niemand Umsatz meldet', () => {
+  let db: Client
+  const betriebe: number[] = []
+  const ALT = 30      // ausserhalb beider Fenster (10 und 21)
+  const MITTEL = 15   // ausserhalb des kurzen, innerhalb des langen Fensters
+
+  const tag = (vorTagen: number) => {
+    const d = new Date(); d.setUTCDate(d.getUTCDate() - vorTagen)
+    return d.toISOString().slice(0, 10)
+  }
+
+  beforeAll(async () => {
+    process.env.DATABASE_URL = DB!
+    process.env.HISTORIE_JE_LAUF = '0'
+    db = new Client({ connectionString: DB })
+    await db.connect()
+    for (const i of [1, 2, 3]) {
+      const { rows: [b] } = await db.query(
+        `INSERT INTO core.betrieb (enc_id, name) VALUES ($1, $2)
+         ON CONFLICT (enc_id) DO UPDATE SET name = excluded.name RETURNING betrieb_key`,
+        [`test-lochtag-${i}`, `Test Lochtag ${i} GmbH`])
+      betriebe.push(b.betrieb_key)
+    }
+    // Sechzig Tage Umsatz bei allen dreien — bis auf den ALTEN Tag (keiner,
+    // "komplett leer") und den MITTLEREN (einer von dreien: 1 < 0,6 x 3,
+    // "lueckenhaft"). Der 28-Tage-Schnitt davor steht damit bei drei.
+    for (let v = 60; v >= 1; v--) {
+      for (const [i, b] of betriebe.entries()) {
+        const umsatz = v === ALT ? 0 : (v === MITTEL && i > 0 ? 0 : 100)
+        await db.query(
+          `INSERT INTO core.umsatzbericht_tag (betrieb_key, geschaeftstag, umsatz_netto, umsatz_brutto, rechnungen, gaeste)
+           VALUES ($1, $2, $3, $3, 1, 1)`, [b, tag(v), umsatz])
+      }
+    }
+  })
+
+  afterAll(async () => {
+    await db.query(`DELETE FROM core.umsatzbericht_tag WHERE betrieb_key = ANY($1)`, [betriebe])
+    await db.query(`DELETE FROM core.betrieb WHERE betrieb_key = ANY($1)`, [betriebe])
+    await db?.end()
+  })
+
+  beforeEach(async () => {
+    await db.query('TRUNCATE sync.warteschlange')
+  })
+
+  test('die Sicht nennt beide Tage als faellig — einen leer, einen lueckenhaft', async () => {
+    const { rows } = await db.query(
+      `SELECT geschaeftstag::text AS tag, befund, zustand FROM mart.umsatz_lochtag
+        WHERE geschaeftstag IN ($1::date, $2::date) ORDER BY 1`, [tag(ALT), tag(MITTEL)])
+    expect(rows.map(r => `${r.tag} ${r.befund} ${r.zustand}`)).toEqual([
+      `${tag(ALT)} komplett leer faellig`, `${tag(MITTEL)} lückenhaft faellig`,
+    ])
+  })
+
+  test('reiht JEDEN Tagesbericht ein, dessen Fenster den Tag nicht mehr erreicht — auch den Artikelverkauf', async () => {
+    const { lochtageNachziehen } = await import('./nachfuellen')
+    const n = await lochtageNachziehen()
+    expect(n).toBeGreaterThan(0)
+
+    const tage = async (endpunkt: string) => {
+      const { rows } = await db.query(
+        `SELECT zeitraum_von::text AS t FROM sync.warteschlange
+          WHERE endpunkt = $1 AND erledigt_am IS NULL ORDER BY 1`, [endpunkt])
+      return rows.map(r => r.t)
+    }
+    // Kurzes Fenster (10): beide Tage.
+    expect(await tage('getUmsatzbericht')).toEqual(expect.arrayContaining([tag(ALT), tag(MITTEL)]))
+    expect(await tage('getZeitzonenbericht')).toEqual(expect.arrayContaining([tag(ALT), tag(MITTEL)]))
+    // Langes Fenster (21): nur der alte Tag — den mittleren holt das Fenster selbst.
+    expect(await tage('getArtikelverkaufsbericht')).toContain(tag(ALT))
+    expect(await tage('getArtikelverkaufsbericht')).not.toContain(tag(MITTEL))
+    expect(await tage('getPersonalkosten')).toContain(tag(ALT))
+    expect(await tage('getPersonalkosten')).not.toContain(tag(MITTEL))
+  })
+
+  test('ein zweiter Aufruf legt fuer diese Tage nichts nach — sie sind eingereiht', async () => {
+    const { lochtageNachziehen } = await import('./nachfuellen')
+    await lochtageNachziehen()
+    const { rows } = await db.query(
+      `SELECT DISTINCT zustand FROM mart.umsatz_lochtag
+        WHERE geschaeftstag IN ($1::date, $2::date)`, [tag(ALT), tag(MITTEL)])
+    expect(rows.map(r => r.zustand)).toEqual(['eingereiht'])
+    const je = async () => (await db.query(
+      `SELECT count(*)::int AS n FROM sync.warteschlange
+        WHERE endpunkt = 'getUmsatzbericht' AND zeitraum_von IN ($1::date, $2::date)`,
+      [tag(ALT), tag(MITTEL)])).rows[0].n
+    const vorher = await je()
+    expect(vorher).toBe(2)
+    await lochtageNachziehen()
+    expect(await je()).toBe(vorher)
+  })
+
+  test('bleibt der Tag nach dem Nachholen leer, wartet er eine Woche', async () => {
+    const { lochtageNachziehen } = await import('./nachfuellen')
+    await lochtageNachziehen()
+    // Der Lauf hat geholt — und LINA hatte den Tag wieder nicht.
+    await db.query(`UPDATE sync.warteschlange SET erledigt_am = now(), ergebnis = 'ok'`)
+    const { rows } = await db.query(
+      `SELECT DISTINCT zustand FROM mart.umsatz_lochtag
+        WHERE geschaeftstag IN ($1::date, $2::date)`, [tag(ALT), tag(MITTEL)])
+    expect(rows.map(r => r.zustand)).toEqual(['wartet'])
+    await lochtageNachziehen()
+    const { rows: [o] } = await db.query(
+      `SELECT count(*)::int AS n FROM sync.warteschlange
+        WHERE endpunkt = 'getUmsatzbericht' AND erledigt_am IS NULL
+          AND zeitraum_von IN ($1::date, $2::date)`, [tag(ALT), tag(MITTEL)])
+    expect(o.n).toBe(0)
+  })
+
+  test('LOCHTAGE_JE_LAUF = 0 schaltet ab', async () => {
+    process.env.LOCHTAGE_JE_LAUF = '0'
+    try {
+      // config ist beim ersten Import eingefroren — deshalb frisch laden.
+      const { config } = await import('../config')
+      if (config.LOCHTAGE_JE_LAUF !== 0) return   // schon geladen; dann ist der Test hier nicht messbar
+      const { lochtageNachziehen } = await import('./nachfuellen')
+      expect(await lochtageNachziehen()).toBe(0)
+    } finally {
+      delete process.env.LOCHTAGE_JE_LAUF
+    }
+  })
+})
+
+/**
+ * Monatliche Nachlese (10.09.2026): Berichte, die sich noch aendern, wenn
+ * ihr Fenster zu ist, bekommen einmal im Monat die Tage zwischen Fensterende
+ * und `nachlese_tage` zurueck. Gemessen an getPersonalkosten: 24 von 30
+ * Abrufen am letzten Fenstertag noch geaendert.
+ */
+lauf('nachlese — einmal im Monat weiter zurueck', () => {
+  let db: Client
+
+  beforeAll(async () => {
+    process.env.DATABASE_URL = DB!
+    db = new Client({ connectionString: DB })
+    await db.connect()
+  })
+  afterAll(async () => {
+    await db.query(`DELETE FROM sync.merker WHERE schluessel LIKE 'nachlese:%'`)
+    await db?.end()
+  })
+  beforeEach(async () => {
+    await db.query('TRUNCATE sync.warteschlange')
+    await db.query(`DELETE FROM sync.merker WHERE schluessel LIKE 'nachlese:%'`)
+  })
+
+  test('reiht genau die Tage zwischen Fensterende und Nachlese-Tiefe ein', async () => {
+    const { nachleseNachziehen } = await import('./nachfuellen')
+    const { AKTIVE_ENDPUNKTE } = await import('../lina/endpunkte')
+    const { config } = await import('../config')
+    const ep = AKTIVE_ENDPUNKTE.find(e => e.nachlese_tage)
+    expect(ep).toBeDefined()
+    const fenster = ep!.nachzuegler_tage ?? config.NACHZUEGLER_TAGE
+
+    const n = await nachleseNachziehen()
+    expect(n).toBe(ep!.nachlese_tage! - fenster)
+    const { rows: [r] } = await db.query(
+      `SELECT count(*)::int AS n,
+              min(current_date - zeitraum_von)::int AS juengst,
+              max(current_date - zeitraum_von)::int AS aeltest
+         FROM sync.warteschlange WHERE endpunkt = $1 AND erledigt_am IS NULL`, [ep!.key])
+    expect(r.n).toBe(n)
+    expect(r.juengst).toBe(fenster + 1)
+    expect(r.aeltest).toBe(ep!.nachlese_tage)
+  })
+
+  test('im selben Monat kein zweites Mal', async () => {
+    const { nachleseNachziehen } = await import('./nachfuellen')
+    expect(await nachleseNachziehen()).toBeGreaterThan(0)
+    await db.query('TRUNCATE sync.warteschlange')
+    expect(await nachleseNachziehen()).toBe(0)
+    const { rows: [m] } = await db.query(
+      `SELECT wert->>'monat' AS monat FROM sync.merker WHERE schluessel LIKE 'nachlese:%' LIMIT 1`)
+    expect(m.monat).toBe(new Date().toISOString().slice(0, 7))
   })
 })

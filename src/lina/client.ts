@@ -14,7 +14,7 @@
 import { config } from '../config'
 import { stundeInGeschaeftszeitzone } from '../lib/time'
 import { log } from '../lib/log'
-import { ohneNullzeichen, jsonOhneNullzeichen } from '../lib/text'
+import { ohneNullzeichen, jsonOhneNullzeichen, kanonischerJsonText } from '../lib/text'
 import { eine } from '../db/pool'
 import { LinaSession, sessionAbgelaufen, AnmeldungFehlgeschlagen } from './auth'
 import { schemaFuer } from './schemas'
@@ -314,7 +314,16 @@ export class LinaClient {
       }
 
       const bytes = new TextEncoder().encode(text).length
-      const hash = Bun.SHA256.hash(text, 'hex')
+      /*
+       * Gehasht wird die KANONISCHE Form, nicht der Rohtext (seit 10.09.2026):
+       * sortierte Schluessel, und was der Endpunkt als reihenfolgelos kennt
+       * (`kanonisch`), vorher geordnet. Der Rohtext bleibt, was in
+       * raw.api_antwort.payload landet — der Hash ist eine Ableitung fuer
+       * mart.nachzuegler_tiefe, keine Versicherung. Siehe lib/text.ts.
+       */
+      const hash = Bun.SHA256.hash(
+        form === 'html' ? text : kanonischerJsonText(ep.kanonisch ? ep.kanonisch(daten) : daten),
+        'hex')
       return { art: 'ok', daten, form, status: res.status, bytes, hash, dauerMs }
 
     } catch (e) {

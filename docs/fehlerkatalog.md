@@ -3772,6 +3772,115 @@ eingestellt wird, gehört nicht in achtzehn Kommentare, sondern an **eine** Stel
 auf die die anderen verweisen. Und sie gehört gemessen: `sync.lauf` wusste die
 Antwort die ganze Zeit.
 
+## Vier Befunde aus neun Nächten Import — alle still (10.09.2026)
+
+Die Läufe 112 bis 120 (02.–10.09.2026) liefen je rund zwei Stunden, jede Quelle hatte
+Zulauf, der Backfill stand auf 100 %, keine Zugangssperre. Alles grün — und darunter vier
+Fehler, zwei davon mit fehlenden Zahlen im Round Table. Gemessen gegen Produktion über die
+Metabase-API; Migration `0100` und der zugehörige Commit beheben alle vier.
+
+### 1. `pflege/` war nie im Container
+
+**Symptom.** `sync.pflege_import` hat in Produktion **0 Zeilen**. `mart.pflege_stand` führt
+`manual.marktindex` (Stand 05/2026) und `manual.om_einschaetzung` (06/2026) als „veraltet",
+`mart.round_table_unvollstaendig` alle 56 operativen Betriebe mit `fehlt_om = true` — in
+jedem Monat seit Juli.
+
+**Ursache.** Das Dockerfile kopierte `src` und `migrations`, nicht `pflege`. `pflegeEinlesen()`
+prüft `existsSync(PFLEGE_ORDNER)` und kehrt bei Fehlen mit `log.debug` zurück — in Produktion
+läuft `LOG_LEVEL=info`, die Zeile erschien also nie. Was in `manual.*` steht, kam von einem
+Lauf vom Notebook aus (25.08.2026, 12:00, derselbe Zeitstempel wie der letzte gelungene
+Pflichtartikel-Refresh). Der Kommentar in `tabellen.ts` versprach „mit dem Container
+ausgerollt"; niemand hatte geprüft, ob der Container den Ordner hat.
+
+**Verhindert durch.** `COPY pflege ./pflege` und `chmod` im Dockerfile;
+`src/pflege/dockerfile.test.ts` liest das Dockerfile und hält beides fest (derselbe Stil wie
+`phasen.test.ts`); der fehlende Ordner ist jetzt `log.warn` mit Hinweis auf die COPY-Zeile.
+
+### 2. Zwei Kassen lieferten elf Tage später — der Umsatzbericht blieb bei null
+
+**Symptom.** `core.umsatzbericht_tag` führt Aposto Schwetzingen vom 04. bis 14.08. und
+Enchilada Aschaffenburg vom 31.07. bis 10.08. mit 0 Rechnungen und 0 € — je elf Tage.
+`core.artikelverkauf_tag` kennt für dieselben Tage 45.486 € bzw. 37.570 € netto. Beide
+Betriebe standen so im August-Round-Table.
+
+**Ursache.** Beide Kassen lieferten erst nach elf oder mehr Tagen an LINA. Der Umsatzbericht
+wird `NACHZUEGLER_TAGE = 10` Tage lang erneut geholt, der Artikelverkaufsbericht 21 Tage. Als
+die Nachlieferung kam, war das kurze Fenster zu; das lange sah sie noch. Kein Mechanismus
+holte jenseits des Fensters nach — `historieNachziehen()` prüft, ob je ein Posten existierte,
+nicht, ob er etwas brachte. Beweis je Tag: der letzte Roh-Abruf von
+`getArtikelverkaufsbericht` (`rows[encId].netto`) gegen `core.umsatzbericht_tag`.
+
+**Verhindert durch.** `mart.umsatztag_luecke` (Artikelverkauf > 0, Umsatzbericht = 0, älter
+als das Fenster) und `nulltageNachziehen()`, das diese Tage für jeden Konzern-Tagesbericht mit
+kurzem Fenster neu einreiht — höchstens `NULLTAGE_JE_LAUF` je Nacht, drei Anläufe je Tag im
+Wochenabstand, danach `aufgegeben` und in der Prüfübersicht gezählt. Die 22 bekannten Tage
+holt der erste Lauf nach dem Deploy. Grenze: ein Ausfall, der länger dauert als das Fenster
+des Artikelverkaufs (21 Tage), ist für beide Berichte unsichtbar.
+
+### 3. Der Wächter über das Fenster war blind, und die Messung, die ihn begründete, war Rauschen
+
+**Symptom.** `mart.pruefung_uebersicht` meldete „Nachzügler: Änderungen am Rand des Fensters"
+nur für Ladenakte-Momentaufnahmen (Rand 0, trivial) — nie für einen LINA-Tagesbericht.
+Dabei änderten sich `getUmsatzbericht` an Tag 10 noch 3 von 63 Abrufen (die beiden
+Kassenausfälle aus Punkt 2) und `getPersonalkosten` an Tag 22 noch **24 von 30**.
+
+**Ursache, zweifach.** `mart.nachzuegler_tiefe` setzte `rand` auf den größten je beobachteten
+Abstand — und Lauf 1 (26.07.2026) hatte 38 Tage mit Abstand 23 bis 60 einmalig geholt. Der
+Rand stand also für jeden Bericht bei 60, die Prüfung verglich gegen ein Fenster, das es nicht
+gibt. Und die Kurve für `getArtikelverkaufsbericht` (bis Tag 21 „rund 30 Änderungen je Tag",
+die Begründung der 21 Tage vom 13.08.) war kein Nachbuchen: LINA liefert das Feld `columns`
+in zufälliger Reihenfolge (2.466 von 3.414 Positionen vertauscht, Inhalt gleich), der Hash des
+Rohtexts unterschied sich bei jedem Abruf. Die echten Änderungen an Tag 20 waren sieben
+Betriebe mit drei Preisen und ein paar Null-Einträgen.
+
+**Verhindert durch.** `sync.quelle.nachzuegler_tage` trägt das konfigurierte Fenster
+(`quellenSpiegeln()`), die Sicht misst den Rand daran und schlägt an, wenn dort mehr als jeder
+zehnte Abruf noch eine Änderung bringt. Der LINA-Client hasht eine kanonische Form (sortierte
+Schlüssel, `columns` nach `artnr`; `lib/text.ts`, `Endpunkt.kanonisch`). Für
+`getPersonalkosten` gibt es eine monatliche Nachlese über 62 Tage (`nachlese_tage`), weil Lohn
+monatlich schließt und ein 62-Tage-Fenster bei 20 Sekunden je Aufruf nicht tragbar wäre.
+
+### 4. Der Pflichtartikel-Refresh scheiterte sechzehn Nächte lang an „Rapsöl"
+
+**Symptom.** `mart.materialisierung_stand`: die drei `pflichtartikel_*`-Sichten „veraltet",
+zuletzt aufgefrischt 25.08.2026 12:00. Das Pflichtartikel-Dashboard zeigte zwei Wochen alte
+Zahlen, ohne dass es jemand sah.
+
+**Ursache.** `REFRESH MATERIALIZED VIEW CONCURRENTLY` braucht den Unique-Index
+`(konzept, gueltig_von, nr, nm)`. Das CTE `ist` in `0094` führte `name_roh` im DISTINCT;
+seit Ende August kommen Bestellpositionen als „Rapsöl 10L" **und** „Rapsoel 10L" (dazu
+„Milchaufschäumer"/„Milchaufschaeumer", „rahmkä"/„rahmkae") — gleiche Nummer, gleicher
+normalisierter Name, zwei Zeilen. Der Refresh warf, `pflichtartikelSichtenNachlauf()` fing
+und schrieb `log.warn`. Gefunden, indem die Sichtdefinition in einem DO-Block gegen Produktion
+gerechnet und das Korn gezählt wurde: 4.478 Zeilen, 6 Dubletten.
+
+**Verhindert durch.** `0100` legt die Klassifikation mit `min(name_roh)` je Korn neu an (und
+mit ihr die elf abhängigen Sichten, wortgleich); `src/sync/pflichtartikel_sichten.test.ts`
+bestellt beide Schreibweisen und verlangt einen durchlaufenden CONCURRENTLY-Refresh mit einer
+Zeile. Ein gescheiterter Refresh ist in allen fünf Nachläufen jetzt `log.error`.
+
+### Nebenbefund: neun Läufe „teilweise", und die Zahl stimmte auch nicht
+
+Alle neun Läufe standen auf `teilweise` — wegen 1 bis 11 `fn:bestellpositionen` mit HTTP 500,
+alle aus einer Kostenstelle (Bar Enchilada Augsburg, DISTRA). `fehler++` zählte auch bekannte
+Wiederholer, und ein aufgegebener Posten zählte als Fehler **und** als übersprungen: Lauf 112
+meldete 11 Fehler und 11 Übersprungene für dieselben elf Posten, `sync.aufgabe` führte null
+Fehler. Seit 10.09. färben nur Erstfehler den Lauf; Wiederholer stehen in der Notiz, Aufgegebene
+zählen als übersprungen. Zu den 500ern selbst: 287 von 318 kamen später doch — alle am Tag 9
+bis 11, nach drei Fehlnächten plus Wiederbelebung, also im Takt unseres Zeitplans. Liefer- und
+Belegdatum erklären sie nicht (gleiche Quote davor und danach). Jetzt eine Wiedervorlage je
+Nacht, zehn Nächte lang (`FN_POSITIONEN_MAX_NAECHTE`).
+
+### Und ein Test, der die Sperre hielt
+
+Die neuen Nachfüllschritte reihten in der e2e-Datei Dutzende LINA-Posten ein (auf einem Klon
+mit Artikelverkauf, aber ohne Umsatzbericht sogar Hunderte). Der „Durchstich"-Test lief in
+sein Zeitlimit von fünf Sekunden, der Lauf hielt die Laufsperre weiter, und fünfzehn spätere
+Tests endeten als `lauf_uebersprungen`. Die e2e-Umgebung setzt seither `HISTORIE_JE_LAUF`,
+`NULLTAGE_JE_LAUF` und `NACHLESE_JE_LAUF` auf 0: ein Lauf holt dort nur, was der Test
+eingereiht hat.
+
 ## Die Migrationen laufen aus dem Nichts nicht durch (13.09.2026)
 
 **Symptom.** Auf einer leeren Datenbank bricht `bun run migrate` — und jede Nachbildung
@@ -3899,3 +4008,73 @@ Luecke, die niemand kennt.
   Diebstahlserkennung gerade widerrufen hatte. Ein Dieb mit einem Geschwistertoken haette
   die Erkennung damit selbst aufgehoben.
 * Ein totes Express-Middleware fuer Werkzeugfehler, das nie erreicht wurde.
+
+## Drei Tage im Juli wurden zu früh geholt und nie wieder — sieben Wochen null in beiden Berichten (14.09.2026)
+
+**Symptom.** Der 22.07.2026 steht in `core.umsatzbericht_tag` bei allen 141 Betrieben auf 0 €
+und in `core.artikelverkauf_tag` ohne eine einzige Zeile; der 21.07. mit Umsatz bei 21 statt
+rund 55 Betrieben (13.268 € statt rund 300.000), der 20.07. mit 3.244 statt rund 3.500
+Artikeln. Aufgefallen am 10.09.2026 beim Bau der Artikelaktion, als ein Juli-Vergleich auf 30
+Tagen stand — und zunächst falsch gedeutet: der Umsatzbericht „führte 141 Zeilen", also galt er
+als vollständig. **Zeilen sind keine Umsätze.**
+
+**Ursache.** Der erste echte Lauf am 26.07.2026 holte die Tage 20.–23.07. genau einmal, vier
+bis sechs Tage nach dem Geschäftstag. LINA hatte sie noch nicht: der 23.07. kam mit
+`columns: 0` (19 KB) zurück und war beim nächsten Abruf am 02.08. voll (3.503 Artikel, 1,1 MB)
+— LINA füllt den Artikelverkaufsbericht erst nach fünf bis sieben Tagen. Das tägliche
+Nachzügler-Fenster begann am 02.08. und reichte zehn Tage zurück, genau bis zum 23.07. Die drei
+Tage davor blieben stehen: `historieNachziehen()` prüft, ob je ein Posten existierte, nicht,
+was er brachte; `nulltageNachziehen()` (`0100`) verlangt Artikelumsatz über null. Beide
+Berichte leer ist für beide unsichtbar. Dieselbe Signatur wie Regel 10 — kein Fehler, nur eine
+Zeile weniger. Und die Karte „Tage mit Datenloch" zeigte den Tag seit dem 03.08. mit dem Satz
+„gehören neu eingereiht": ein Auftrag ohne Mechanismus.
+
+**Was ihn heute verhindert.** `mart.umsatz_lochtag` ist seit `0101` eine Arbeitsliste mit
+Zustand, und `lochtageNachziehen()` reiht jeden fälligen Tag für **alle** Konzern-Tagesberichte
+neu ein — höchstens `LOCHTAGE_JE_LAUF` je Nacht, dreimal, dann `aufgegeben` und in der
+Prüfübersicht. Die Karte zeigt den Zustand mit. Gemessen mit:
+
+```sql
+SELECT geschaeftstag, betriebe_mit_umsatz, betriebe_erwartet, zustand FROM mart.umsatz_lochtag;
+```
+
+**Nachtrag 14.09.2026, nach dem ersten Lauf mit `0101`.** Der Lauf (20:41) holte die drei Tage
+für alle 16 Tagesberichte neu. Die Antworten sind byte-gleich mit denen vom 26.07.:
+Artikelverkauf 22.07. `columns: 0` (19.402 Bytes), 21.07. 369 Artikel, 20.07. 3.244;
+Umsatzbericht 21.07. 32.265 Bytes, 22.07. 31.865 Bytes, alle Betriebe null. **LINA hat die Tage
+nicht** — sieben Wochen später genauso wenig wie damals. Der zu frühe Abruf war also nur die
+halbe Ursache: für den 21. und 22.07. gab es bei LINA nie etwas nachzuholen (der 23.07. dagegen
+kam am 02.08., und der 20.07. ist mit 3.244 Artikeln vollständig, so wie LINA ihn hat). Die
+Sicht führt beide Tage jetzt als `wartet`; nach zwei weiteren Anläufen stehen sie als
+`aufgegeben` in der Prüfübersicht — und das ist der richtige Endzustand: die 2 dort ist die
+Aussage „das Kassensystem hat diese Tage nicht", keine offene Arbeit. Von unserer Seite ist
+das nicht nachholbar.
+
+## Ein Push auf main beendete den laufenden Sync — und die Zeile blieb auf „läuft" (14.09.2026)
+
+**Symptom.** Lauf 125 (manuell um 20:41 gestartet, um die Lochtage aus `0101` nachzuholen)
+erledigte bis 21:58:24 946 Aufgaben und verstummte. `mart.sync_status` führte ihn Stunden
+später noch als `laeuft` mit null Zählern, ein `la:belegzahl`-Posten hing auf `in_arbeit_seit`,
+335 Posten blieben offen, Phase B (alle Refreshes) lief nicht. Dokploy zeigte den Schedule-Job
+als fehlgeschlagen.
+
+**Ursache.** Um 21:58:23 wurde ein Commit auf `main` gepusht. Der Push löst den Deploy aus, der
+Container wird neu gebaut, und ein per `docker exec` gestarteter Prozess stirbt mit dem alten
+Container — **ohne Signal**. Das Signal-Handling aus dem Fall vom 25.07.2026 (Ctrl-C,
+Containerstopp) konnte deshalb nichts schreiben. Die Laufsperre hängt an der Verbindung und
+war sofort frei; nur die Zeile in `sync.lauf` wusste nichts davon. Sekundengenau nachgemessen:
+letzte Aufgabe 21:58:24.61, Reservierung 21:58:24.62, danach kein einziger Aufruf.
+
+**Was ihn heute verhindert.** Zwei Dinge. `verwaisteLaeufeSchliessen()` in `worker.ts`: wer die
+Sperre bekommt, schließt jeden Vorgänger auf `laeuft` als `abgebrochen` — mit den Zählern aus
+`sync.aufgabe`, dem Ende seiner letzten Aufgabe als `beendet_am` und einer Notiz — und gibt
+reservierte Posten frei, bevor er seine eigene Zeile anlegt. Und die Regel in `AGENTS.md`:
+**kein Push auf `main`, solange ein Lauf aktiv ist.** Vorher nachsehen:
+
+```sql
+SELECT lauf_id, status, gestartet_am FROM sync.lauf ORDER BY lauf_id DESC LIMIT 1;
+```
+
+Was der abgeschossene Lauf bis dahin geschafft hatte, blieb: LINA und FoodNotify waren
+vollständig, es fehlten nur die Belegarchiv-Zählungen. Der nächste Nachtlauf holt sie nach und
+rechnet Phase B.

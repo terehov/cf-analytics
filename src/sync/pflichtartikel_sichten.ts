@@ -102,6 +102,15 @@ export async function pflichtartikelSichtenNachlauf(): Promise<void> {
   if (r.status === 'aufgefrischt') {
     log.info('Pflichtartikelsichten aufgefrischt', { dauer_s: r.dauerS })
   } else {
-    log.warn('Pflichtartikelsichten nicht aufgefrischt', { grund: r.meldung, dauer_s: r.dauerS })
+    /*
+     * ERROR, nicht WARN (seit 10.09.2026): mart.pflichtartikel_* standen vom
+     * 25.08. bis 10.09.2026 sechzehn Naechte lang auf einem alten Stand, weil
+     * der Refresh am Unique-Index scheiterte — und die einzige Spur war ein
+     * warn-Eintrag, den niemand liest, plus 'veraltet' in
+     * mart.materialisierung_stand. Ein Refresh, der jede Nacht scheitert,
+     * ist ein Fehler des Systems, auch wenn die Zahlen nur alt und nicht
+     * falsch sind. Der Lauf geht weiter, das aendert sich nicht.
+     */
+    log.error('Pflichtartikelsichten nicht aufgefrischt', { grund: r.meldung, dauer_s: r.dauerS })
   }
 }

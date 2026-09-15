@@ -1358,3 +1358,86 @@ Metabase soll nur `mart` sehen müssen.
 auf 18 von 20 Karten keine Wirkung, und ein Filter, der fast nichts bewegt, ist
 schlimmer als keiner: man hält die Seite für gefiltert. Dasselbe Argument, das
 bei den Pflichtartikeln gegen den Lieferantenfilter entschieden hat.
+
+---
+
+## Artikelaktion — je Betrieb (`db_artikelaktion`, angefragt 10.09.2026)
+
+**Der Anlass war eine Excel mit 51 Artikelnummern.** Wilma Wunder fuhr im August 2026 ein
+„Glücksrad" und wollte die Aktion je Standort ausgewertet haben. Im Kassensystem gibt es
+diese Aktion nicht — `mart.aktion` kennt für Wilma Wunder im August nur „Sekt alkoholfrei"
+und „Sarti Aktion". Die Aktion existiert ausschließlich als Liste von Artikeln plus
+Zeitraum. Der Aktionen-Reiter auf `db_umsatz` kann damit nichts anfangen; diese Seite
+nimmt die Liste selbst als Filter.
+
+**Die Nummern sind ein Freitextfilter, keine Auswahlliste.** Das widerspricht der Regel
+„Auswahllisten statt Freitext" weiter oben, und zwar mit Absicht: 51 Nummern klickt niemand
+aus einem Dropdown, aus einer Excel-Spalte kopiert man sie in einem Zug. Getrennt wird in
+der Karte an allem, was keine Ziffer ist — Komma, Leerzeichen, Zeilenumbruch. Der Preis
+des Freitexts ist derselbe wie beim Betriebsnamen: **eine vertippte Nummer trifft still
+nichts**, die Tabelle ist dann eine Zeile kürzer. Bezahlt wird er durch die Karte
+„Nummern ohne Treffer" am Seitenende, die jede Nummer nennt, die im Katalog fehlt oder im
+Zeitraum keinen Verkauf hat. Leer ist dort das Ziel.
+
+**Der Filter trägt eine Vorgabe** — die Glücksrad-Liste —, damit die Seite beim Öffnen
+etwas zeigt. Der Zeitraum fällt ohne Wert auf den letzten abgeschlossenen Monat zurück,
+über denselben `coalesce([[ … ]])`-Mechanismus wie der Monatsfilter. Beides sind
+Vorgaben, keine Grenzen.
+
+**Die Leitzahl ist der Nachlass, nicht die Menge.** Nachgemessen am Glücksrad: Die 51
+Artikel sind das Kernsortiment von Wilma Wunder und tragen 45 % des Nettoumsatzes; ihre
+Menge stieg im August um 10 %, der Gesamtumsatz um 6 % — kaum ein Aktionseffekt. Der
+eingeräumte Nachlass dagegen stieg auf die Aktionsartikel von 3,7 % auf 6,5 %, Woche für
+Woche bis 7,3 %, während er beim übrigen Sortiment stehen blieb. Gerechnet als
+`1 − umsatz_brutto / (menge × verkaufspreis)`, brutto gegen brutto, weil `verkaufspreis`
+der Kartenpreis inklusive Mehrwertsteuer ist (brutto je Stück liegt nahe daran, netto je
+Stück rund 7 % darunter). Er enthält **alle** Rabatte; deshalb stehen der Zeitraum davor
+und das übrige Sortiment auf jeder Karte daneben.
+
+**Zwei Vergleichszeiträume, beide gerechnet, keiner gewählt.** „Davor" ist gleich lang und
+endet am Tag vor der Aktion; „Vorjahr" sind dieselben Kalendertage ein Jahr früher. Das
+Vorjahr ist nie eine gleiche Basis — vier der vierzehn Wilma-Betriebe und 15 der 51 Artikel
+gab es im August 2025 nicht —, und der Kopftext sagt das.
+
+**Grundgesamtheit sind die Betriebe, die im Zeitraum mindestens einen Artikel der Liste
+verkauft haben**, nicht die Betriebe einer Marke. Die Artikelnummern sind je Konzept
+vergeben, einzelne Nummern der Wilma-Liste laufen aber auch bei Schlager Cafe Düsseldorf
+und Lehners Karlsruhe. Der Markenfilter grenzt ein, er definiert nicht.
+
+**Gerechnet wird auf `core.artikelverkauf_tag`, nicht auf `mart.artikelverkauf`.** Die
+Tagessicht zieht sieben `LEFT JOIN` für Warengruppen und Wareneinsatz nach, die hier
+niemand braucht; gebraucht werden `umsatz_brutto` und `verkaufspreis`, die
+`mart.artikel_monat` nicht führt.
+
+**Die Zeitraumgrenzen stehen als Ausdruck in jeder `WHERE`-Klausel, nicht als Unterabfrage
+auf die CTE — und das ist der Unterschied zwischen 8,4 s und 0,6 s je Karte** (nachgemessen
+am 10.09.2026, dieselbe Abfrage). Mit `(SELECT von FROM zeitraum)` kennt der Planer die
+Grenzen nicht; der Plan enthält alle rund hundert Monatspartitionen mit je vier Scan-Knoten,
+und jeder parallele Worker initialisiert diese 1.700 Knoten, bevor er die drei liest, die
+er braucht (im `EXPLAIN ANALYZE`: 4,9 s Anlaufzeit des `Parallel Append`, die eigentlichen
+Scans zusammen unter 200 ms). `coalesce('2026-08-01'::date, …)` dagegen faltet der Planer
+zu einer Konstanten, sobald Metabase den Filterwert eingesetzt hat, und der Plan kennt nur
+noch drei Partitionen. Deshalb tragen Von und Bis eine **feste** Vorgabe (der
+Glücksrad-Monat, passend zur Artikelliste): ohne Wert fällt die Karte auf `current_date`
+zurück und damit auf den langsamen Weg. Ein mitlaufender Vorgabemonat wie beim Monatsfilter
+wäre hier falsch — die Liste bliebe stehen, der Zeitraum liefe weiter.
+
+**„Tage ohne Daten" steht im Kopf, weil der Juli 2026 eine Lücke hat.** Für den 22.07.2026
+hat kein Betrieb Artikelverkäufe, für den 21.07. nur 21 von rund 55 — und der Tagesumsatz
+fehlt an beiden Tagen genauso (beide Berichte wurden am 26.07. zu früh und danach nie wieder
+geholt). Ein Vergleich gegen einen lückenhaften Zeitraum
+überzeichnet den Zuwachs; die Spalte macht das sichtbar, statt es in einer Fußnote zu
+verstecken. Hergang in `offene-punkte.md`.
+
+---
+
+## „Tage mit Datenloch" zeigt jetzt, was der Lauf damit tut (14.09.2026)
+
+Die Karte auf „Datenqualität und Import" stand seit dem 03.08.2026 mit dem Satz „gehören neu
+eingereiht" — und niemand tat es: der 22.07.2026 blieb sieben Wochen darin stehen, mit null
+Betrieben in beiden Tagesberichten. Seit Migration `0101` reiht der Lauf solche Tage selbst nach
+(`lochtageNachziehen()`, `docs/importer.md`), und die Karte trägt die Spalten **Zustand** und
+**nachgeholt**: „im Fenster" ist normal, „faellig" wartet auf die nächste Nacht, „aufgegeben"
+heißt dreimal geholt und weiter leer — dann hat das Kassensystem den Tag nicht. Eine Karte, die
+einen Auftrag formuliert, den kein Mechanismus ausführt, ist die Regel-10-Signatur in
+Kartenform.

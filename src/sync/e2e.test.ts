@@ -53,6 +53,20 @@ lauf('Ende-zu-Ende', () => {
     process.env.DATABASE_URL = DB!
     process.env.TAKT_MIN_MS = '0'
     process.env.TAKT_MAX_MS = '0'
+    // Auch die FoodNotify-Attrappe wird nicht gedrosselt. Ohne diese beiden
+    // Zeilen gilt FN_TAKT_* aus .env (200–500 ms), und der Durchstich mit
+    // 16 Aufrufen brauchte 4,9 der erlaubten 5 Sekunden (gemessen 10.09.2026).
+    process.env.FN_TAKT_MIN_MS = '0'
+    process.env.FN_TAKT_MAX_MS = '0'
+    // Ein Lauf holt hier nur, was der Test eingereiht hat: kein Nachholen
+    // der Historie, keine Nulltage, keine monatliche Nachlese (10.09.2026).
+    // Sonst reiht nachfuellen() Dutzende LINA-Posten ein, der Durchstich
+    // laeuft in sein Zeitlimit, haelt die Laufsperre — und jeder spaetere
+    // workerLauf() in dieser Datei endet als lauf_uebersprungen.
+    process.env.HISTORIE_JE_LAUF = '0'
+    process.env.NULLTAGE_JE_LAUF = '0'
+    process.env.LOCHTAGE_JE_LAUF = '0'
+    process.env.NACHLESE_JE_LAUF = '0'
     process.env.FENSTER_VON_STUNDE = '0'
     process.env.FENSTER_BIS_STUNDE = '24'
     process.env.LOG_LEVEL ??= 'error'
@@ -317,6 +331,8 @@ lauf('Ende-zu-Ende', () => {
        * jemand braucht.
        */
       'Umsatz: Monat mit mehr als 10 % nicht aufteilbarem Umsatz',
+      // Seit 0100: nur die dreimal nachgeholten, weiter leeren Tage zaehlen (10.09.2026).
+      'Umsatz: Nulltag mit Artikelverkauf ausserhalb des Fensters (3x nachgeholt, bleibt null)',
       // Seit 0070 ausdruecklich nur die ENDGUELTIGEN: ein aufgegebener Posten,
       // den der Lauf noch dreimal zurueckholt, ist Betrieb und kein Befund.
       'Vergleichstag: Betrieb mit Umsatz, aber ohne Bundesland',
@@ -725,6 +741,64 @@ lauf('Sperre gegen parallele Worker', () => {
       await halter.query('SELECT pg_advisory_unlock($1)', [SPERRE]).catch(() => {})
       await halter.end(); await db.end()
     }
+  }, 30_000)
+
+  /**
+   * Der Vorgaenger, der ohne Abschluss verschwand (14.09.2026, Lauf 125).
+   *
+   * Ein Push auf main loeste den Deploy aus; der Containerwechsel beendete den
+   * per docker exec gestarteten Sync ohne Signal. Die Sperre haengt an der
+   * Verbindung und war beim naechsten Start frei — die Zeile in sync.lauf
+   * blieb auf 'laeuft' mit null Zaehlern, ein reservierter Posten hing bis zur
+   * Stundengrenze. Der naechste Start schliesst den Vorgaenger deshalb selbst,
+   * BEVOR er seine eigene Zeile anlegt. Geprueft wird die Funktion gegen die
+   * Datenbank und ihre Stellung im Start am Quelltext (wie phasen.test.ts).
+   */
+  test('ein Vorgänger auf laeuft, dessen Prozess verschwand, wird beim nächsten Start geschlossen', async () => {
+    const db = new Client({ connectionString: DB })
+    await db.connect()
+    try {
+      const { rows: [verwaist] } = await db.query(
+        `INSERT INTO sync.lauf (ausloeser, status) VALUES ('zeitplan','laeuft') RETURNING lauf_id`)
+      await db.query(
+        `INSERT INTO sync.aufgabe (lauf_id, endpunkt, status, beendet_am)
+         VALUES ($1, 'getUmsatzbericht', 'ok',     now() - interval '2 hours'),
+                ($1, 'getUmsatzbericht', 'fehler', now() - interval '1 hour')`, [verwaist.lauf_id])
+      const { rows: [posten] } = await db.query(
+        `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, in_arbeit_seit)
+         VALUES ('la:belegzahl', DATE '2026-07-01', DATE '2026-07-01', now() - interval '2 hours')
+         RETURNING posten_id`)
+
+      const { verwaisteLaeufeSchliessen } = await import('./worker')
+      expect(await verwaisteLaeufeSchliessen()).toBeGreaterThanOrEqual(1)
+
+      const { rows: [alt] } = await db.query(
+        `SELECT status, beendet_am, notiz, aufgaben_gesamt, aufgaben_ok, aufgaben_fehler
+           FROM sync.lauf WHERE lauf_id = $1`, [verwaist.lauf_id])
+      expect(alt.status).toBe('abgebrochen')
+      expect(alt.beendet_am).not.toBeNull()
+      expect(Number(alt.aufgaben_gesamt)).toBe(2)
+      expect(Number(alt.aufgaben_ok)).toBe(1)
+      expect(Number(alt.aufgaben_fehler)).toBe(1)
+      expect(String(alt.notiz)).toContain('ohne Abschluss')
+      const { rows: [p] } = await db.query(
+        `SELECT in_arbeit_seit FROM sync.warteschlange WHERE posten_id = $1`, [posten.posten_id])
+      expect(p.in_arbeit_seit).toBeNull()
+      // Ein zweiter Aufruf findet nichts mehr.
+      expect(await verwaisteLaeufeSchliessen()).toBe(0)
+
+      // Und der Start ruft es an der richtigen Stelle: NACH der Sperre (sonst
+      // schloesse ein uebersprungener Start den lebenden Blockierer) und VOR
+      // der eigenen Zeile.
+      const quelle = await Bun.file(new URL('./worker.ts', import.meta.url)).text()
+      const aufruf = quelle.indexOf('await verwaisteLaeufeSchliessen()')
+      expect(aufruf).toBeGreaterThan(quelle.indexOf('const sperre = await sperreHolen()'))
+      expect(aufruf).toBeLessThan(quelle.indexOf('return await workerLaufIntern(ausloeser)'))
+
+      await db.query(`DELETE FROM sync.aufgabe WHERE lauf_id = $1`, [verwaist.lauf_id])
+      await db.query(`DELETE FROM sync.lauf WHERE lauf_id = $1`, [verwaist.lauf_id])
+      await db.query(`DELETE FROM sync.warteschlange WHERE posten_id = $1`, [posten.posten_id])
+    } finally { await db.end() }
   }, 30_000)
 
   test('übersprungene Starts verdünnen das Drei-Läufe-Fenster des Statusberichts nicht', async () => {
@@ -2215,21 +2289,31 @@ lauf('Fehlerhaeufung und die Notbremse', () => {
   /**
    * DER KERN DES FIXES: dieselben zehn Fehler, aber auf wiederbelebten
    * Posten — die Spur laeuft durch, die Posten warten auf ihre
-   * Wiedervorlage, und der Lauf endet ehrlich auf 'teilweise'.
+   * Wiedervorlage.
+   *
+   * Bis zum 10.09.2026 endete der Lauf hier auf 'teilweise'. Seitdem zaehlen
+   * nur ERSTfehler fuer den Status — dieselbe Unterscheidung wie bei der
+   * Notbremse: neun Laeufe in Folge (112–120) standen wegen ein bis elf
+   * bekannter Wiederholer auf gelb, und ein Status, der jeden Tag gelb ist,
+   * zeigt keinen neuen Fehler mehr. Die Wiederholer stehen in der Notiz.
    */
-  test('zehn Fehler auf wiederbelebten Posten brechen NICHT ab', async () => {
+  test('zehn Fehler auf wiederbelebten Posten brechen NICHT ab — und faerben den Lauf nicht', async () => {
     await postenEinreihen(1)
     const mock = mockStarten({ port })
     try {
       const { workerLauf } = await import('./worker')
       const r = await workerLauf('manuell')
-      expect(r.status).toBe('teilweise')
+      expect(r.status).toBe('ok')
     } finally { mock.stop() }
 
     const { rows: [l] } = await db.query(
-      `SELECT status, notiz FROM sync.lauf ORDER BY lauf_id DESC LIMIT 1`)
-    expect(l.status).toBe('teilweise')
+      `SELECT status, notiz, aufgaben_fehler, aufgaben_uebersprungen FROM sync.lauf ORDER BY lauf_id DESC LIMIT 1`)
+    expect(l.status).toBe('ok')
     expect(String(l.notiz)).not.toContain('Fehler in Folge')
+    expect(String(l.notiz)).toContain('10 bekannte Wiederholer')
+    // Die Fehler verschwinden nicht aus der Zaehlung — nur aus dem Status.
+    expect(Number(l.aufgaben_fehler)).toBe(10)
+    expect(Number(l.aufgaben_uebersprungen)).toBe(0)
 
     // Alle zehn haben genau EINEN Versuch verbraucht und liegen offen auf
     // Wiedervorlage — nichts wurde aufgegeben, nichts abgebrochen.
@@ -2237,6 +2321,52 @@ lauf('Fehlerhaeufung und die Notbremse', () => {
       `SELECT count(*)::int AS n FROM sync.warteschlange
         WHERE erledigt_am IS NULL AND versuche = 1 AND letzter_fehler = 'HTTP 500'`)
     expect(Number(z.n)).toBe(10)
+
+    /*
+     * NACHTTAKT (10.09.2026): HTTP 500 auf fn:bestellpositionen wird nicht in
+     * Minuten, sondern in der naechsten Nacht wiedervorgelegt. 287 von 318
+     * solchen Bestellungen kamen spaeter doch — alle erst nach drei
+     * Fehlnaechten plus einer Woche Wiederbelebung, also am Zeitplan, nicht
+     * an FoodNotify gemessen.
+     */
+    const { rows: [f] } = await db.query(
+      `SELECT count(*)::int AS n FROM sync.warteschlange
+        WHERE erledigt_am IS NULL
+          AND faellig_ab >= date_trunc('day', now()) + interval '1 day'
+          AND faellig_ab <  date_trunc('day', now()) + interval '2 days'`)
+    expect(Number(f.n)).toBe(10)
+  }, 30_000)
+
+  /**
+   * Und nach FN_POSITIONEN_MAX_NAECHTE Naechten ist Schluss: aufgegeben, nicht
+   * als Fehler gezaehlt (sync.aufgabe fuehrt sie als 'uebersprungen', sync.lauf
+   * zaehlte sie bis zum 10.09.2026 in BEIDE Spalten), der Lauf bleibt 'ok',
+   * weil kein einziger Posten zum ersten Mal scheiterte.
+   */
+  test('in der letzten Nacht wird aufgegeben — als uebersprungen, nicht als Fehler', async () => {
+    await postenEinreihen(0)
+    const { config } = await import('../config')
+    await db.query(`UPDATE sync.warteschlange SET versuche = $1`, [config.FN_POSITIONEN_MAX_NAECHTE - 1])
+    const mock = mockStarten({ port })
+    try {
+      const { workerLauf } = await import('./worker')
+      const r = await workerLauf('manuell')
+      expect(r.status).toBe('ok')
+    } finally { mock.stop() }
+
+    const { rows: [l] } = await db.query(
+      `SELECT status, notiz, aufgaben_fehler, aufgaben_uebersprungen FROM sync.lauf ORDER BY lauf_id DESC LIMIT 1`)
+    expect(l.status).toBe('ok')
+    expect(Number(l.aufgaben_uebersprungen)).toBe(10)
+    expect(Number(l.aufgaben_fehler)).toBe(0)
+    expect(String(l.notiz)).toContain('10 bekannte Wiederholer')
+
+    const { rows: [a] } = await db.query(
+      `SELECT count(*)::int AS n FROM sync.warteschlange WHERE ergebnis = 'aufgegeben'`)
+    expect(Number(a.n)).toBe(10)
+    const { rows: [p] } = await db.query(
+      `SELECT count(*)::int AS n FROM sync.aufgabe WHERE status = 'uebersprungen' AND endpunkt = 'fn:bestellpositionen'`)
+    expect(Number(p.n)).toBe(10)
   }, 30_000)
 })
 
@@ -2710,6 +2840,20 @@ lauf('e2e Ladenakte', () => {
     process.env.DATABASE_URL = DB!
     process.env.TAKT_MIN_MS = '0'
     process.env.TAKT_MAX_MS = '0'
+    // Auch die FoodNotify-Attrappe wird nicht gedrosselt. Ohne diese beiden
+    // Zeilen gilt FN_TAKT_* aus .env (200–500 ms), und der Durchstich mit
+    // 16 Aufrufen brauchte 4,9 der erlaubten 5 Sekunden (gemessen 10.09.2026).
+    process.env.FN_TAKT_MIN_MS = '0'
+    process.env.FN_TAKT_MAX_MS = '0'
+    // Ein Lauf holt hier nur, was der Test eingereiht hat: kein Nachholen
+    // der Historie, keine Nulltage, keine monatliche Nachlese (10.09.2026).
+    // Sonst reiht nachfuellen() Dutzende LINA-Posten ein, der Durchstich
+    // laeuft in sein Zeitlimit, haelt die Laufsperre — und jeder spaetere
+    // workerLauf() in dieser Datei endet als lauf_uebersprungen.
+    process.env.HISTORIE_JE_LAUF = '0'
+    process.env.NULLTAGE_JE_LAUF = '0'
+    process.env.LOCHTAGE_JE_LAUF = '0'
+    process.env.NACHLESE_JE_LAUF = '0'
     process.env.FENSTER_VON_STUNDE = '0'
     process.env.FENSTER_BIS_STUNDE = '24'
     process.env.LOG_LEVEL ??= 'error'

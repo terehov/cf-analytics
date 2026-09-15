@@ -34,7 +34,6 @@ const PORT = 8899
 // Metabase-Instanz laeuft (Server, Testumgebung).
 const METABASE = config.METABASE_URL
 
-
 // Reihen in Kacheln umrechnen — EINMAL, damit Pruefung und Ausgabe
 // dieselben Zahlen sehen.
 const typVon = (s: string) => alleKarten.find(k => k.schluessel === s)?.anzeige

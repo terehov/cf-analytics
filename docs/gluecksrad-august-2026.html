@@ -1,0 +1,806 @@
+<meta charset="utf-8">
+<title>Glücksrad August 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,400..700,0..100&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#F1F3F0; --sf:#FFFFFF; --ink:#1B1F1D; --ink2:#4E5754; --mute:#7A827E; --line:#D5DBD7; --line2:#E7EBE8;
+  --akt:#0097A0; --akt-soft:#D9EEEF; --rest:#B5720A; --band:#E3F0EE;
+  --pos:#1B6E3C; --neg:#A23B2A;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141816; --sf:#1C211F; --ink:#E6EAE7; --ink2:#B4BCB8; --mute:#8C9591; --line:#313935; --line2:#262D2A;
+    --akt:#00979C; --akt-soft:#1E3A3B; --rest:#BD8528; --band:#1F2A28;
+    --pos:#6CC48C; --neg:#E58A78;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141816; --sf:#1C211F; --ink:#E6EAE7; --ink2:#B4BCB8; --mute:#8C9591; --line:#313935; --line2:#262D2A;
+  --akt:#00979C; --akt-soft:#1E3A3B; --rest:#BD8528; --band:#1F2A28;
+  --pos:#6CC48C; --neg:#E58A78;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:15px;line-height:1.5;padding-inline:clamp(16px,4vw,40px);padding-block:32px 64px;font-variant-numeric:tabular-nums}
+main{max-width:1080px;margin:0 auto;display:grid;gap:40px}
+h1,h2{font-family:"Fraunces","Iowan Old Style",Georgia,serif;font-variation-settings:"SOFT" 60,"opsz" 96;font-weight:500;letter-spacing:-.01em;margin:0}
+h1{font-size:clamp(30px,4.6vw,46px);line-height:1.08}
+h2{font-size:clamp(22px,2.6vw,27px);line-height:1.2;margin-bottom:12px}
+.eyebrow{font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--mute);font-weight:500;margin-bottom:12px}
+p{margin:0}
+.lead{font-size:17px;color:var(--ink);margin-top:18px}
+.lead b{font-weight:600}
+header p+p{margin-top:10px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.kpi{padding:16px 18px 16px 0;display:grid;gap:4px;align-content:start}
+.kpi+.kpi{padding-left:18px;border-left:1px solid var(--line2)}
+.kpi .l{font-size:12.5px;color:var(--mute);letter-spacing:.02em}
+.kpi .v{font-family:"Fraunces",Georgia,serif;font-variation-settings:"SOFT" 30,"opsz" 60;font-size:30px;line-height:1.05;font-weight:500}
+.kpi .v small{font-size:16px;color:var(--ink2);font-family:"IBM Plex Sans",sans-serif;font-weight:500;margin-left:2px}
+.kpi .d{font-size:13px;color:var(--ink2)}
+.kpi.hi .v{color:var(--akt)}
+section p.note{color:var(--ink2);margin-top:10px}
+.tw{overflow-x:auto;margin-top:16px;border-top:1px solid var(--line)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:8px 10px;text-align:left;vertical-align:baseline;border-bottom:1px solid var(--line2);white-space:nowrap}
+thead th{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);font-weight:500;padding-top:10px;padding-bottom:8px;white-space:normal;line-height:1.25;vertical-align:bottom}
+thead th.num{text-align:right}
+th[scope="row"]{font-weight:500}
+td.num{text-align:right}
+td.mono{color:var(--mute)}
+.pos{color:var(--pos)} .neg{color:var(--neg)} .na{color:var(--mute)}
+.hint{color:var(--mute);font-size:12.5px;font-weight:400}
+td.nachlass b{font-weight:600;color:var(--akt)}
+tr.total th,tr.total td{border-top:2px solid var(--line);border-bottom:0;font-weight:600;padding-top:10px}
+tr.total .hint{font-weight:400}
+tbody tr:hover td,tbody tr:hover th{background:var(--line2)}
+sup{color:var(--rest);font-weight:600}
+.figure{margin-top:16px;position:relative;background:var(--sf);border:1px solid var(--line);border-radius:6px;padding:14px 14px 10px}
+.chart{width:100%;height:auto;display:block;overflow:visible}
+.chart .grid{stroke:var(--line2);stroke-width:1}
+.chart .tick{fill:var(--mute);font-size:11.5px;font-family:"IBM Plex Sans",sans-serif}
+.chart .band{fill:var(--band)}
+.chart .band-l{fill:var(--ink2);font-size:11.5px;font-family:"IBM Plex Sans",sans-serif;letter-spacing:.04em;text-transform:uppercase}
+.chart .l-akt{fill:none;stroke:var(--akt);stroke-width:2.2;stroke-linejoin:round;stroke-linecap:round}
+.chart .l-rest{fill:none;stroke:var(--rest);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.chart .p-akt{fill:var(--akt);stroke:var(--sf);stroke-width:2}
+.chart .p-rest{fill:var(--rest);stroke:var(--sf);stroke-width:2}
+.chart .lab{font-size:12.5px;font-family:"IBM Plex Sans",sans-serif;font-weight:500;fill:var(--ink)}
+.chart .cross{stroke:var(--ink2);stroke-width:1;stroke-dasharray:3 3}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--ink2);padding:8px 4px 0}
+.legend span::before{content:"";display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:7px;vertical-align:middle}
+.legend .a::before{background:var(--akt)} .legend .r::before{background:var(--rest)}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);font-size:12.5px;line-height:1.4;padding:7px 10px;border-radius:5px;transform:translate(-50%,-110%);white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.tip b{font-weight:600}
+ul.notes{margin:12px 0 0;padding-left:20px;display:grid;gap:8px;color:var(--ink2)}
+ul.notes li::marker{color:var(--mute)}
+ul.notes b{color:var(--ink);font-weight:600}
+footer{color:var(--mute);font-size:12.5px;border-top:1px solid var(--line);padding-top:14px}
+:focus-visible{outline:2px solid var(--akt);outline-offset:2px}
+@media (max-width:640px){.kpi+.kpi{border-left:0;padding-left:0}.kpis{border-bottom:0}.kpi{border-bottom:1px solid var(--line2)}}
+</style>
+<main>
+<header>
+  <div class="eyebrow">Wilma Wunder · Aktionsauswertung je Betrieb · Datenstand 14.09.2026</div>
+  <h1>Glücksrad, August 2026</h1>
+  <p class="lead">Die Auswertung ist möglich, und der August ist vollständig: alle 14 Wilma-Wunder-Betriebe liegen mit allen 31 Tagen vor. Die 51 Aktionsartikel aus der Liste sind das Kerngericht-Sortiment und tragen <b>44,8 %</b> des Nettoumsatzes.</p>
+  <p class="lead">Die deutlichste Spur der Aktion ist der <b>Nachlass</b>: Auf die Aktionsartikel wurden im August <b>6,5 %</b> vom hinterlegten Verkaufspreis eingeräumt, im Juli 3,7 %. Beim übrigen Sortiment blieb der Nachlass unverändert. Das entspricht rund <b>38.000 €</b> brutto zusätzlichem Nachlass. Die verkaufte Menge stieg gegenüber Juli um 10,2 %, der Gesamtumsatz der Betriebe um 6,3 %.</p>
+</header>
+
+<section class="kpis" aria-label="Kennzahlen August 2026">
+  <div class="kpi"><div class="l">Verkaufte Aktionsartikel</div><div class="v">91.611</div><div class="d">Juli: 83.139 · +10,2 %</div></div>
+  <div class="kpi"><div class="l">Nettoumsatz Aktionsartikel</div><div class="v">1.157.310<small>€</small></div><div class="d">Juli: 1.073.642 € · +7,8 %</div></div>
+  <div class="kpi"><div class="l">Anteil am Nettoumsatz</div><div class="v">44,8 %</div><div class="d">Juli: 44,2 %</div></div>
+  <div class="kpi hi"><div class="l">Nachlass auf Aktionsartikel</div><div class="v">6,5 %</div><div class="d">Juli: 3,7 % · übriges Sortiment im August: 4,9 %</div></div>
+</section>
+
+<section>
+  <h2>Je Betrieb</h2>
+  <p>Menge und Nettoumsatz der 51 Aktionsartikel im August 2026, dazu der Anteil am Nettoumsatz des Betriebs und der eingeräumte Nachlass (August fett, Juli daneben). Sortiert nach Umsatz.</p>
+  <div class="tw">
+  <table>
+    <thead><tr>
+      <th>Betrieb</th>
+      <th class="num">Menge<br>August</th>
+      <th class="num">vs. Juli</th>
+      <th class="num">vs. Aug. 2025<sup>2</sup></th>
+      <th class="num">Netto<br>August</th>
+      <th class="num">vs. Juli</th>
+      <th class="num">Anteil am<br>Nettoumsatz</th>
+      <th class="num">Nachlass<br>Aug. · Juli</th>
+    </tr></thead>
+    <tbody>
+<tr>
+  <th scope="row">Mainz, Am Markt</th>
+  <td class="num">13.038</td>
+  <td class="num pos">+8,1 %</td>
+  <td class="num pos">+11,9 %</td>
+  <td class="num">169.206 €</td>
+  <td class="num pos">+6,1 %</td>
+  <td class="num">47,6 %</td>
+  <td class="num nachlass"><b>6,0 %</b> <span class="hint">3,9 %</span></td>
+</tr>
+<tr>
+  <th scope="row">Dresden</th>
+  <td class="num">12.728</td>
+  <td class="num pos">+17,3 %</td>
+  <td class="num pos">+30,3 %</td>
+  <td class="num">163.086 €</td>
+  <td class="num pos">+15,2 %</td>
+  <td class="num">46,2 %</td>
+  <td class="num nachlass"><b>4,8 %</b> <span class="hint">1,9 %</span></td>
+</tr>
+<tr>
+  <th scope="row">Düsseldorf</th>
+  <td class="num">10.836</td>
+  <td class="num pos">+1,0 %</td>
+  <td class="num pos">+42,5 %</td>
+  <td class="num">138.993 €</td>
+  <td class="num neg">−0,4 %</td>
+  <td class="num">42,1 %</td>
+  <td class="num nachlass"><b>6,2 %</b> <span class="hint">4,2 %</span></td>
+</tr>
+<tr>
+  <th scope="row">Karlsruhe</th>
+  <td class="num">7.267</td>
+  <td class="num pos">+6,5 %</td>
+  <td class="num pos">+16,8 %</td>
+  <td class="num">96.394 €</td>
+  <td class="num pos">+3,7 %</td>
+  <td class="num">46,7 %</td>
+  <td class="num nachlass"><b>6,9 %</b> <span class="hint">3,3 %</span></td>
+</tr>
+<tr>
+  <th scope="row">Viernheim</th>
+  <td class="num">7.114</td>
+  <td class="num pos">+21,3 %</td>
+  <td class="num na"><span class="hint">seit 12/2025</span></td>
+  <td class="num">88.872 €</td>
+  <td class="num pos">+17,2 %</td>
+  <td class="num">47,5 %</td>
+  <td class="num nachlass"><b>6,1 %</b> <span class="hint">1,7 %</span></td>
+</tr>
+<tr>
+  <th scope="row">Freudenstadt</th>
+  <td class="num">6.617</td>
+  <td class="num pos">+9,9 %</td>
+  <td class="num na"><span class="hint">seit 02/2026</span></td>
+  <td class="num">82.087 €</td>
+  <td class="num pos">+7,4 %</td>
+  <td class="num">50,9 %</td>
+  <td class="num nachlass"><b>7,0 %</b> <span class="hint">3,5 %</span></td>
+</tr>
+<tr>
+  <th scope="row">Bochum</th>
+  <td class="num">5.956</td>
+  <td class="num pos">+5,3 %</td>
+  <td class="num na"><span class="hint">seit 05/2026</span></td>
+  <td class="num">69.672 €</td>
+  <td class="num neg">−1,2 %</td>
+  <td class="num">48,9 %</td>
+  <td class="num nachlass"><b>9,7 %</b> <span class="hint">3,1 %</span></td>
+</tr>
+<tr>
+  <th scope="row">Speyer</th>
+  <td class="num">5.365</td>
+  <td class="num pos">+23,2 %</td>
+  <td class="num pos">+36,1 %</td>
+  <td class="num">67.885 €</td>
+  <td class="num pos">+19,4 %</td>
+  <td class="num">43,2 %</td>
+  <td class="num nachlass"><b>5,0 %</b> <span class="hint">1,1 %</span></td>
+</tr>
+<tr>
+  <th scope="row">Passau</th>
+  <td class="num">4.363</td>
+  <td class="num pos">+3,3 %</td>
+  <td class="num pos">+9,4 %</td>
+  <td class="num">55.464 €</td>
+  <td class="num pos">+0,1 %</td>
+  <td class="num">40,5 %</td>
+  <td class="num nachlass"><b>4,1 %</b> <span class="hint">1,1 %</span></td>
+</tr>
+<tr>
+  <th scope="row">Mainz, Ballplatz</th>
+  <td class="num">4.309</td>
+  <td class="num pos">+25,4 %</td>
+  <td class="num pos">+23,6 %</td>
+  <td class="num">52.316 €</td>
+  <td class="num pos">+23,8 %</td>
+  <td class="num">39,7 %</td>
+  <td class="num nachlass"><b>6,0 %</b> <span class="hint">3,6 %</span></td>
+</tr>
+<tr>
+  <th scope="row">Nürnberg</th>
+  <td class="num">4.196</td>
+  <td class="num pos">+13,7 %</td>
+  <td class="num na"><span class="hint">seit 11/2025</span></td>
+  <td class="num">52.240 €</td>
+  <td class="num pos">+10,8 %</td>
+  <td class="num">49,3 %</td>
+  <td class="num nachlass"><b>7,8 %</b> <span class="hint">5,3 %</span></td>
+</tr>
+<tr>
+  <th scope="row">Köln</th>
+  <td class="num">3.466</td>
+  <td class="num pos">+9,8 %</td>
+  <td class="num pos">+25,9 %</td>
+  <td class="num">44.382 €</td>
+  <td class="num pos">+8,9 %</td>
+  <td class="num">36,4 %</td>
+  <td class="num nachlass"><b>11,9 %</b> <span class="hint">9,2 %</span></td>
+</tr>
+<tr>
+  <th scope="row">Stuttgart</th>
+  <td class="num">3.461</td>
+  <td class="num neg">−2,6 %</td>
+  <td class="num pos">+17,6 %</td>
+  <td class="num">42.978 €</td>
+  <td class="num neg">−0,5 %</td>
+  <td class="num">40,1 %</td>
+  <td class="num nachlass"><b>8,7 %</b> <span class="hint">10,0 %</span></td>
+</tr>
+<tr>
+  <th scope="row">Recklinghausen</th>
+  <td class="num">2.895</td>
+  <td class="num pos">+6,5 %</td>
+  <td class="num pos">+24,4 %</td>
+  <td class="num">33.735 €</td>
+  <td class="num pos">+6,3 %</td>
+  <td class="num">40,1 %</td>
+  <td class="num nachlass"><b>5,8 %</b> <span class="hint">4,8 %</span></td>
+</tr></tbody>
+    <tfoot>
+<tr class="total">
+  <th scope="row">Alle 14 Betriebe</th>
+  <td class="num">91.611</td>
+  <td class="num pos">+10,2 %</td>
+  <td class="num pos">+23,8 %<span class="hint"> (10 Betr.)</span></td>
+  <td class="num">1.157.310 €</td>
+  <td class="num pos">+7,8 %</td>
+  <td class="num">44,8 %</td>
+  <td class="num nachlass"><b>6,5 %</b> <span class="hint">3,7 %</span></td>
+</tr></tfoot>
+  </table>
+  </div>
+  <p class="note">Im Juli fehlt der 22.07. ganz und der 21.07. zum größten Teil: Das Kassensystem hat für diese Tage keine Daten, auch bei erneutem Abruf am 14.09. nicht. Der Juli steht deshalb auf 30 Tagen, und der Vergleich überzeichnet den Zuwachs um rund 3 Prozentpunkte.</p>
+</section>
+
+<section>
+  <h2>Der Nachlass steigt nur bei den Aktionsartikeln</h2>
+  <p>Nachlass je Woche über alle 14 Betriebe: Bruttoumsatz gegen Menge mal hinterlegten Verkaufspreis. Bis Ende Juli liegen die Aktionsartikel unter dem übrigen Sortiment, ab der ersten Augustwoche darüber, und der Abstand wächst bis Monatsende.</p>
+  <div class="figure" id="fig">
+    
+<svg class="chart" viewBox="0 0 760 300" role="img" aria-labelledby="chart-t">
+  <title id="chart-t">Nachlass je Woche, Aktionsartikel gegen übriges Sortiment, Juni bis August 2026</title>
+  <rect class="band" x="460.5" y="18" width="171.5" height="238"/>
+  <text class="band-l" x="491.0" y="32">Aktionszeitraum August</text>
+  <line class="grid" x1="44" x2="632" y1="256.0" y2="256.0"/><text class="tick" x="36" y="260.0" text-anchor="end">0 %</text><line class="grid" x1="44" x2="632" y1="208.4" y2="208.4"/><text class="tick" x="36" y="212.4" text-anchor="end">2 %</text><line class="grid" x1="44" x2="632" y1="160.8" y2="160.8"/><text class="tick" x="36" y="164.8" text-anchor="end">4 %</text><line class="grid" x1="44" x2="632" y1="113.2" y2="113.2"/><text class="tick" x="36" y="117.2" text-anchor="end">6 %</text><line class="grid" x1="44" x2="632" y1="65.6" y2="65.6"/><text class="tick" x="36" y="69.6" text-anchor="end">8 %</text><line class="grid" x1="44" x2="632" y1="18.0" y2="18.0"/><text class="tick" x="36" y="22.0" text-anchor="end">10 %</text>
+  <text class="tick" x="44.0" y="276" text-anchor="middle">01.06.</text><text class="tick" x="142.0" y="276" text-anchor="middle">15.06.</text><text class="tick" x="240.0" y="276" text-anchor="middle">29.06.</text><text class="tick" x="338.0" y="276" text-anchor="middle">13.07.</text><text class="tick" x="436.0" y="276" text-anchor="middle">27.07.</text><text class="tick" x="534.0" y="276" text-anchor="middle">10.08.</text><text class="tick" x="632.0" y="276" text-anchor="middle">24.08.</text>
+  <path class="l-rest" d="M44.0,98.9 L93.0,110.8 L142.0,189.4 L191.0,96.5 L240.0,134.6 L289.0,163.2 L338.0,146.5 L387.0,141.8 L436.0,132.2 L485.0,127.5 L534.0,144.1 L583.0,144.1 L632.0,144.1"/>
+  <path class="l-akt" d="M44.0,158.4 L93.0,177.5 L142.0,167.9 L191.0,175.1 L240.0,165.6 L289.0,165.6 L338.0,165.6 L387.0,172.7 L436.0,141.8 L485.0,122.7 L534.0,108.4 L583.0,103.7 L632.0,82.3"/>
+  <circle class="p-rest" cx="44.0" cy="98.9" r="4"/><circle class="p-akt" cx="44.0" cy="158.4" r="4"/><circle class="p-rest" cx="93.0" cy="110.8" r="4"/><circle class="p-akt" cx="93.0" cy="177.5" r="4"/><circle class="p-rest" cx="142.0" cy="189.4" r="4"/><circle class="p-akt" cx="142.0" cy="167.9" r="4"/><circle class="p-rest" cx="191.0" cy="96.5" r="4"/><circle class="p-akt" cx="191.0" cy="175.1" r="4"/><circle class="p-rest" cx="240.0" cy="134.6" r="4"/><circle class="p-akt" cx="240.0" cy="165.6" r="4"/><circle class="p-rest" cx="289.0" cy="163.2" r="4"/><circle class="p-akt" cx="289.0" cy="165.6" r="4"/><circle class="p-rest" cx="338.0" cy="146.5" r="4"/><circle class="p-akt" cx="338.0" cy="165.6" r="4"/><circle class="p-rest" cx="387.0" cy="141.8" r="4"/><circle class="p-akt" cx="387.0" cy="172.7" r="4"/><circle class="p-rest" cx="436.0" cy="132.2" r="4"/><circle class="p-akt" cx="436.0" cy="141.8" r="4"/><circle class="p-rest" cx="485.0" cy="127.5" r="4"/><circle class="p-akt" cx="485.0" cy="122.7" r="4"/><circle class="p-rest" cx="534.0" cy="144.1" r="4"/><circle class="p-akt" cx="534.0" cy="108.4" r="4"/><circle class="p-rest" cx="583.0" cy="144.1" r="4"/><circle class="p-akt" cx="583.0" cy="103.7" r="4"/><circle class="p-rest" cx="632.0" cy="144.1" r="4"/><circle class="p-akt" cx="632.0" cy="82.3" r="4"/>
+  <text class="lab lab-akt" x="642.0" y="86.3">Aktionsartikel 7,3 %</text>
+  <text class="lab lab-rest" x="642.0" y="148.1">übriges Sortiment 4,7 %</text>
+  <line id="cross" class="cross" x1="0" x2="0" y1="18" y2="256" hidden/>
+  <rect id="hit" x="44" y="18" width="588" height="238" fill="transparent"/>
+</svg>
+    <div class="legend"><span class="a">Aktionsartikel (51 Artikel)</span><span class="r">übriges Sortiment</span></div>
+    <div class="tip" id="tip" hidden></div>
+  </div>
+</section>
+
+<section>
+  <h2>Je Artikel</h2>
+  <p>Alle 51 Artikel der Liste mit Namen aus dem Kassensystem, sortiert nach verkaufter Menge im August. „Betriebe“ zählt, in wie vielen der 14 Betriebe der Artikel im August verkauft wurde.</p>
+  <div class="tw">
+  <table>
+    <thead><tr>
+      <th>Nr.</th><th>Artikel</th>
+      <th class="num">Betriebe</th>
+      <th class="num">Menge<br>August</th>
+      <th class="num">vs. Juli</th>
+      <th class="num">Menge<br>Aug. 2025</th>
+      <th class="num">Netto<br>August</th>
+    </tr></thead>
+    <tbody>
+<tr>
+  <td class="num mono">1100001</td>
+  <td>Durchstarter</td>
+  <td class="num">14</td>
+  <td class="num">5.183</td>
+  <td class="num pos">+12,1 %</td>
+  <td class="num ">3.907</td>
+  <td class="num">65.091 €</td>
+</tr>
+<tr>
+  <td class="num mono">1200001</td>
+  <td>Flamm-Klassiker</td>
+  <td class="num">14</td>
+  <td class="num">4.896</td>
+  <td class="num pos">+11,3 %</td>
+  <td class="num ">3.592</td>
+  <td class="num">55.293 €</td>
+</tr>
+<tr>
+  <td class="num mono">1100002</td>
+  <td>Kräftig&amp;Deftig</td>
+  <td class="num">14</td>
+  <td class="num">4.359</td>
+  <td class="num pos">+20,7 %</td>
+  <td class="num ">3.056</td>
+  <td class="num">59.060 €</td>
+</tr>
+<tr>
+  <td class="num mono">1160006</td>
+  <td>Getrüffelte Pommes</td>
+  <td class="num">14</td>
+  <td class="num">4.240</td>
+  <td class="num pos">+5,9 %</td>
+  <td class="num ">3.643</td>
+  <td class="num">31.997 €</td>
+</tr>
+<tr>
+  <td class="num mono">2800133</td>
+  <td>Sommerbowl</td>
+  <td class="num">14</td>
+  <td class="num">4.222</td>
+  <td class="num neg">−2,0 %</td>
+  <td class="num na"><span class="hint">neu</span></td>
+  <td class="num">50.899 €</td>
+</tr>
+<tr>
+  <td class="num mono">1180002</td>
+  <td>Ziegenkäse-Avocado-Salatissimo</td>
+  <td class="num">14</td>
+  <td class="num">3.483</td>
+  <td class="num pos">+6,5 %</td>
+  <td class="num ">3.332</td>
+  <td class="num">46.922 €</td>
+</tr>
+<tr>
+  <td class="num mono">1120003</td>
+  <td>Eggs Benedict&amp;Wilma</td>
+  <td class="num">14</td>
+  <td class="num">3.435</td>
+  <td class="num pos">+12,6 %</td>
+  <td class="num ">2.628</td>
+  <td class="num">39.610 €</td>
+</tr>
+<tr>
+  <td class="num mono">1220007</td>
+  <td>Schnitzel Schwein</td>
+  <td class="num">14</td>
+  <td class="num">3.317</td>
+  <td class="num pos">+12,3 %</td>
+  <td class="num ">3.008</td>
+  <td class="num">51.647 €</td>
+</tr>
+<tr>
+  <td class="num mono">1180003</td>
+  <td>Caesar Salad´</td>
+  <td class="num">14</td>
+  <td class="num">3.215</td>
+  <td class="num neg">−2,4 %</td>
+  <td class="num ">3.527</td>
+  <td class="num">36.194 €</td>
+</tr>
+<tr>
+  <td class="num mono">1340063</td>
+  <td>Flammizza</td>
+  <td class="num">14</td>
+  <td class="num">3.051</td>
+  <td class="num pos">+3,5 %</td>
+  <td class="num na"><span class="hint">neu</span></td>
+  <td class="num">37.029 €</td>
+</tr>
+<tr>
+  <td class="num mono">1120012</td>
+  <td>Guten Morgen Toast</td>
+  <td class="num">14</td>
+  <td class="num">2.941</td>
+  <td class="num pos">+8,2 %</td>
+  <td class="num ">2.525</td>
+  <td class="num">34.967 €</td>
+</tr>
+<tr>
+  <td class="num mono">1120006</td>
+  <td>Avocado-Nest</td>
+  <td class="num">14</td>
+  <td class="num">2.928</td>
+  <td class="num pos">+12,1 %</td>
+  <td class="num ">2.032</td>
+  <td class="num">36.437 €</td>
+</tr>
+<tr>
+  <td class="num mono">1200003</td>
+  <td>Ziegenpeter</td>
+  <td class="num">14</td>
+  <td class="num">2.824</td>
+  <td class="num pos">+10,6 %</td>
+  <td class="num ">2.137</td>
+  <td class="num">32.639 €</td>
+</tr>
+<tr>
+  <td class="num mono">1220032</td>
+  <td>Knödelgipfel</td>
+  <td class="num">14</td>
+  <td class="num">2.789</td>
+  <td class="num pos">+25,3 %</td>
+  <td class="num na"><span class="hint">neu</span></td>
+  <td class="num">36.728 €</td>
+</tr>
+<tr>
+  <td class="num mono">1220026</td>
+  <td>Smash Croissant</td>
+  <td class="num">14</td>
+  <td class="num">2.701</td>
+  <td class="num pos">+17,4 %</td>
+  <td class="num na"><span class="hint">neu</span></td>
+  <td class="num">36.378 €</td>
+</tr>
+<tr>
+  <td class="num mono">1220029</td>
+  <td>Trüffel Käsespätzle</td>
+  <td class="num">14</td>
+  <td class="num">2.694</td>
+  <td class="num pos">+13,1 %</td>
+  <td class="num na"><span class="hint">neu</span></td>
+  <td class="num">35.987 €</td>
+</tr>
+<tr>
+  <td class="num mono">2800132</td>
+  <td>Bällebad.<sup>1</sup></td>
+  <td class="num">14</td>
+  <td class="num">2.468</td>
+  <td class="num pos">+5,6 %</td>
+  <td class="num na"><span class="hint">neu</span></td>
+  <td class="num">31.929 €</td>
+</tr>
+<tr>
+  <td class="num mono">1220006</td>
+  <td>Schnitzel Kalb</td>
+  <td class="num">14</td>
+  <td class="num">2.380</td>
+  <td class="num pos">+21,7 %</td>
+  <td class="num ">1.979</td>
+  <td class="num">51.431 €</td>
+</tr>
+<tr>
+  <td class="num mono">1220004</td>
+  <td>Lachs-Spinat-Nudeln</td>
+  <td class="num">14</td>
+  <td class="num">2.256</td>
+  <td class="num pos">+7,6 %</td>
+  <td class="num ">2.341</td>
+  <td class="num">30.986 €</td>
+</tr>
+<tr>
+  <td class="num mono">1100004</td>
+  <td>Lachs und Lecker</td>
+  <td class="num">14</td>
+  <td class="num">2.119</td>
+  <td class="num pos">+19,6 %</td>
+  <td class="num ">1.514</td>
+  <td class="num">30.477 €</td>
+</tr>
+<tr>
+  <td class="num mono">2800135</td>
+  <td>Sonnentaler</td>
+  <td class="num">14</td>
+  <td class="num">2.035</td>
+  <td class="num pos">+9,8 %</td>
+  <td class="num na"><span class="hint">neu</span></td>
+  <td class="num">27.400 €</td>
+</tr>
+<tr>
+  <td class="num mono">1220023</td>
+  <td>Fitnessnudel</td>
+  <td class="num">14</td>
+  <td class="num">2.031</td>
+  <td class="num pos">+14,7 %</td>
+  <td class="num ">2.134</td>
+  <td class="num">27.100 €</td>
+</tr>
+<tr>
+  <td class="num mono">1180009</td>
+  <td>Sommerwiese</td>
+  <td class="num">14</td>
+  <td class="num">1.954</td>
+  <td class="num neg">−2,0 %</td>
+  <td class="num ">1.689</td>
+  <td class="num">25.300 €</td>
+</tr>
+<tr>
+  <td class="num mono">1200005</td>
+  <td>Flammkuchen Schnecken</td>
+  <td class="num">14</td>
+  <td class="num">1.913</td>
+  <td class="num pos">+13,7 %</td>
+  <td class="num ">1.375</td>
+  <td class="num">13.568 €</td>
+</tr>
+<tr>
+  <td class="num mono">2800134</td>
+  <td>Garnelengarten</td>
+  <td class="num">14</td>
+  <td class="num">1.751</td>
+  <td class="num pos">+0,3 %</td>
+  <td class="num na"><span class="hint">neu</span></td>
+  <td class="num">27.074 €</td>
+</tr>
+<tr>
+  <td class="num mono">1200004</td>
+  <td>Wilma Kunterbunt</td>
+  <td class="num">14</td>
+  <td class="num">1.545</td>
+  <td class="num pos">+9,7 %</td>
+  <td class="num ">887</td>
+  <td class="num">18.313 €</td>
+</tr>
+<tr>
+  <td class="num mono">1120002</td>
+  <td>Strammer Max</td>
+  <td class="num">14</td>
+  <td class="num">1.279</td>
+  <td class="num pos">+16,7 %</td>
+  <td class="num ">846</td>
+  <td class="num">15.029 €</td>
+</tr>
+<tr>
+  <td class="num mono">1220009</td>
+  <td>Rinderroulade</td>
+  <td class="num">14</td>
+  <td class="num">1.233</td>
+  <td class="num pos">+50,9 %</td>
+  <td class="num ">1.153</td>
+  <td class="num">25.917 €</td>
+</tr>
+<tr>
+  <td class="num mono">1160018</td>
+  <td>Gurken-Lachs-Tatar</td>
+  <td class="num">14</td>
+  <td class="num">1.194</td>
+  <td class="num pos">±0,0 %</td>
+  <td class="num ">1.304</td>
+  <td class="num">15.088 €</td>
+</tr>
+<tr>
+  <td class="num mono">1160005</td>
+  <td>Dreierlei mit Brot</td>
+  <td class="num">14</td>
+  <td class="num">1.129</td>
+  <td class="num pos">+9,9 %</td>
+  <td class="num ">1.103</td>
+  <td class="num">9.948 €</td>
+</tr>
+<tr>
+  <td class="num mono">1160021</td>
+  <td>Croque Madame &amp; Wilma</td>
+  <td class="num">14</td>
+  <td class="num">1.082</td>
+  <td class="num pos">+12,8 %</td>
+  <td class="num na"><span class="hint">neu</span></td>
+  <td class="num">13.355 €</td>
+</tr>
+<tr>
+  <td class="num mono">1100039</td>
+  <td>Reiche Ritter</td>
+  <td class="num">14</td>
+  <td class="num">1.022</td>
+  <td class="num pos">+16,5 %</td>
+  <td class="num na"><span class="hint">neu</span></td>
+  <td class="num">9.936 €</td>
+</tr>
+<tr>
+  <td class="num mono">1120001</td>
+  <td>Stramme Wilma</td>
+  <td class="num">14</td>
+  <td class="num">996</td>
+  <td class="num pos">+16,9 %</td>
+  <td class="num ">451</td>
+  <td class="num">11.509 €</td>
+</tr>
+<tr>
+  <td class="num mono">1100003</td>
+  <td>Pflanzengourmet</td>
+  <td class="num">14</td>
+  <td class="num">946</td>
+  <td class="num pos">+8,5 %</td>
+  <td class="num ">629</td>
+  <td class="num">11.543 €</td>
+</tr>
+<tr>
+  <td class="num mono">2800131</td>
+  <td>Bruschetta à la Wilma<sup>1</sup></td>
+  <td class="num">14</td>
+  <td class="num">827</td>
+  <td class="num neg">−16,0 %</td>
+  <td class="num na"><span class="hint">neu</span></td>
+  <td class="num">7.533 €</td>
+</tr>
+<tr>
+  <td class="num mono">1140008</td>
+  <td>Lila Wolke</td>
+  <td class="num">14</td>
+  <td class="num">748</td>
+  <td class="num pos">+15,8 %</td>
+  <td class="num ">432</td>
+  <td class="num">7.346 €</td>
+</tr>
+<tr>
+  <td class="num mono">1140010</td>
+  <td>Bali Bowl</td>
+  <td class="num">14</td>
+  <td class="num">739</td>
+  <td class="num neg">−2,5 %</td>
+  <td class="num ">508</td>
+  <td class="num">7.189 €</td>
+</tr>
+<tr>
+  <td class="num mono">1220008</td>
+  <td>Schnitzel VEGAN</td>
+  <td class="num">14</td>
+  <td class="num">710</td>
+  <td class="num pos">+26,8 %</td>
+  <td class="num ">527</td>
+  <td class="num">10.816 €</td>
+</tr>
+<tr>
+  <td class="num mono">1100027</td>
+  <td>Käsevariation</td>
+  <td class="num">13</td>
+  <td class="num">611</td>
+  <td class="num pos">+10,5 %</td>
+  <td class="num ">338</td>
+  <td class="num">7.411 €</td>
+</tr>
+<tr>
+  <td class="num mono">1220024</td>
+  <td>Currywurst</td>
+  <td class="num">2</td>
+  <td class="num">577</td>
+  <td class="num neg">−0,7 %</td>
+  <td class="num ">292</td>
+  <td class="num">6.085 €</td>
+</tr>
+<tr>
+  <td class="num mono">1220011</td>
+  <td>Wilmas Sauerbraten</td>
+  <td class="num">3</td>
+  <td class="num">389</td>
+  <td class="num pos">+31,0 %</td>
+  <td class="num ">481</td>
+  <td class="num">7.512 €</td>
+</tr>
+<tr>
+  <td class="num mono">1220013</td>
+  <td>Meenzer Teller</td>
+  <td class="num">2</td>
+  <td class="num">266</td>
+  <td class="num pos">+1,1 %</td>
+  <td class="num ">462</td>
+  <td class="num">4.032 €</td>
+</tr>
+<tr>
+  <td class="num mono">1220012</td>
+  <td>Himmel un Ääd</td>
+  <td class="num">2</td>
+  <td class="num">209</td>
+  <td class="num pos">+47,2 %</td>
+  <td class="num ">185</td>
+  <td class="num">3.244 €</td>
+</tr>
+<tr>
+  <td class="num mono">2800136</td>
+  <td>Sommerbowl Veggie</td>
+  <td class="num">12</td>
+  <td class="num">197</td>
+  <td class="num neg">−1,0 %</td>
+  <td class="num na"><span class="hint">neu</span></td>
+  <td class="num">2.084 €</td>
+</tr>
+<tr>
+  <td class="num mono">1220022</td>
+  <td>Fleischpflanzerl</td>
+  <td class="num">1</td>
+  <td class="num">168</td>
+  <td class="num pos">+11,3 %</td>
+  <td class="num ">263</td>
+  <td class="num">2.316 €</td>
+</tr>
+<tr>
+  <td class="num mono">1220019</td>
+  <td>Wilmas Schäufele</td>
+  <td class="num">1</td>
+  <td class="num">148</td>
+  <td class="num pos">+42,3 %</td>
+  <td class="num ">221</td>
+  <td class="num">3.268 €</td>
+</tr>
+<tr>
+  <td class="num mono">1220028</td>
+  <td>Frankfurter Grüne Soße</td>
+  <td class="num">1</td>
+  <td class="num">139</td>
+  <td class="num pos">+13,9 %</td>
+  <td class="num na"><span class="hint">neu</span></td>
+  <td class="num">1.611 €</td>
+</tr>
+<tr>
+  <td class="num mono">1220014</td>
+  <td>Wilmas Lieblingsgericht</td>
+  <td class="num">1</td>
+  <td class="num">111</td>
+  <td class="num pos">+13,3 %</td>
+  <td class="num ">108</td>
+  <td class="num">1.382 €</td>
+</tr>
+<tr>
+  <td class="num mono">1220025</td>
+  <td>Pfälzer Teller</td>
+  <td class="num">1</td>
+  <td class="num">78</td>
+  <td class="num pos">+95,0 %</td>
+  <td class="num ">80</td>
+  <td class="num">1.395 €</td>
+</tr>
+<tr>
+  <td class="num mono">1220031</td>
+  <td>Vespervariation</td>
+  <td class="num">1</td>
+  <td class="num">59</td>
+  <td class="num pos">±0,0 %</td>
+  <td class="num na"><span class="hint">neu</span></td>
+  <td class="num">801 €</td>
+</tr>
+<tr>
+  <td class="num mono">1220027</td>
+  <td>Hochzeitsessen</td>
+  <td class="num">1</td>
+  <td class="num">24</td>
+  <td class="num pos">+26,3 %</td>
+  <td class="num na"><span class="hint">neu</span></td>
+  <td class="num">500 €</td>
+</tr></tbody>
+  </table>
+  </div>
+</section>
+
+<section>
+  <h2>Datenbasis und Vorbehalte</h2>
+  <ul class="notes">
+    <li><b>Quelle</b> ist der Artikelverkaufsbericht aus LINA je Betrieb, Tag und Artikelnummer, Stand des Nachtlaufs vom 10.09.2026. LINA bucht bis rund zehn Tage nach; der 31.08. wurde am 10.09. zuletzt geholt. Die Augustzahlen gelten damit als abgeschlossen.</li>
+    <li><b>Das Glücksrad ist in LINA nicht als Aktion angelegt.</b> Im August führen bei Wilma Wunder nur „Sekt alkoholfrei“ und „Sarti Aktion“ Aktionsumsatz. Die Auswertung geht deshalb über die 51 Artikelnummern aus der Liste.</li>
+    <li><b>Nachlass</b> heißt hier: 1 minus Bruttoumsatz geteilt durch Menge mal hinterlegten Verkaufspreis. Darin stecken alle Rabatte, nicht nur das Glücksrad. Deshalb steht der Juli daneben und das übrige Sortiment im Chart: Nur bei den Aktionsartikeln bewegt sich der Wert.</li>
+    <li><sup>1</sup> <b>Zwei Namen sind in der Excel-Liste vertauscht:</b> 2800131 heißt im Kassensystem „Bruschetta à la Wilma“, 2800132 „Bällebad“. Gerechnet wurde nach Nummer, die Namen oben sind die aus LINA.</li>
+    <li><sup>2</sup> <b>Der Vorjahresvergleich ist keine gleiche Basis.</b> Vier Betriebe (Nürnberg, Viernheim, Freudenstadt, Bochum) hatten im August 2025 noch keinen Umsatz, und 15 der 51 Artikel wurden im August 2025 noch nicht verkauft. Der Zuwachs enthält also auch Sortimentsänderungen. Der Gesamtumsatz derselben zehn Betriebe stieg gegenüber August 2025 um 1,8 %, die Menge der Aktionsartikel um 23,8 %.</li>
+    <li><b>Nicht enthalten:</b> Schlager Cafe Düsseldorf und Lehners Karlsruhe führen einzelne dieser Artikelnummern, gehören aber nicht zu Wilma Wunder. Der Testladen ist ebenfalls ausgeschlossen.</li>
+    <li>Die Woche ab 31.08. (ein Tag) fehlt im Chart.</li>
+  </ul>
+</section>
+
+<footer>Concept Family Analytics · Zahlen aus der Produktionsdatenbank, abgefragt am 10.09.2026, unverändert bestätigt am 14.09.2026 · Nettoumsatz ohne MwSt., Nachlass auf Bruttobasis</footer>
+</main>
+<script>
+(function(){
+  var D=[{"x":44,"kw":"01.06.","tage":7,"a":4.1,"r":6.6,"m":19010,"an":40.3},{"x":93,"kw":"08.06.","tage":7,"a":3.3,"r":6.1,"m":17113,"an":40.1},{"x":142,"kw":"15.06.","tage":7,"a":3.7,"r":2.8,"m":16008,"an":38.5},{"x":191,"kw":"22.06.","tage":7,"a":3.4,"r":6.7,"m":15354,"an":42.3},{"x":240,"kw":"29.06.","tage":7,"a":3.8,"r":5.1,"m":19676,"an":43},{"x":289,"kw":"06.07.","tage":7,"a":3.8,"r":3.9,"m":19239,"an":43.4},{"x":338,"kw":"13.07.","tage":7,"a":3.8,"r":4.6,"m":19961,"an":44.4},{"x":387,"kw":"20.07.","tage":6,"a":3.5,"r":4.8,"m":16097,"an":45},{"x":436,"kw":"27.07.","tage":7,"a":4.8,"r":5.2,"m":20127,"an":44.4},{"x":485,"kw":"03.08.","tage":7,"a":5.6,"r":5.4,"m":21074,"an":44.5},{"x":534,"kw":"10.08.","tage":7,"a":6.2,"r":4.7,"m":18886,"an":44},{"x":583,"kw":"17.08.","tage":7,"a":6.4,"r":4.7,"m":20908,"an":45.6},{"x":632,"kw":"24.08.","tage":7,"a":7.3,"r":4.7,"m":20880,"an":45.6}];
+  var fig=document.getElementById('fig'),svg=fig.querySelector('svg'),hit=document.getElementById('hit'),cross=document.getElementById('cross'),tip=document.getElementById('tip');
+  var f1=function(v){return v.toLocaleString('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1})+'\u00a0%'};
+  function pt(ev){var p=svg.createSVGPoint();p.x=ev.clientX;p.y=ev.clientY;return p.matrixTransform(svg.getScreenCTM().inverse());}
+  function show(ev){
+    var p=pt(ev),best=0,bd=1e9;
+    for(var i=0;i<D.length;i++){var d=Math.abs(D[i].x-p.x);if(d<bd){bd=d;best=i;}}
+    var w=D[best];
+    cross.setAttribute('x1',w.x);cross.setAttribute('x2',w.x);cross.hidden=false;
+    tip.innerHTML='<b>Woche ab '+w.kw+'</b>'+(w.tage<7?' ('+w.tage+' Tage)':'')+'<br>Aktionsartikel: <b>'+f1(w.a)+'</b><br>übriges Sortiment: '+f1(w.r)+'<br>Menge: '+w.m.toLocaleString('de-DE')+' · Anteil '+f1(w.an);
+    tip.hidden=false;
+    var r=svg.getBoundingClientRect(),fr=fig.getBoundingClientRect(),vb=svg.viewBox.baseVal;
+    var sx=r.width/vb.width;
+    tip.style.left=(r.left-fr.left+w.x*sx)+'px';tip.style.top=(r.top-fr.top+18*sx)+'px';
+  }
+  hit.addEventListener('mousemove',show);
+  hit.addEventListener('touchstart',function(e){show(e.touches[0]);},{passive:true});
+  hit.addEventListener('mouseleave',function(){cross.hidden=true;tip.hidden=true;});
+})();
+</script>

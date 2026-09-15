@@ -298,6 +298,10 @@ Die Drosselung ist keine Höflichkeit, sondern das, was die Integration am Leben
 | `FENSTER_VON_STUNDE` / `_BIS_` | 0 / 24 | durchgehend — das Arbeitsfenster ist entfallen, siehe `entscheidungen.md` |
 | `ANFRAGE_TIMEOUT_MS` | 60.000 | Zeitlimit je Anfrage; ohne das hängt ein stummer Server den Worker auf |
 | `MAX_VERSUCHE` | 4 | danach wird ein Posten aufgegeben |
+| `FN_POSITIONEN_MAX_NAECHTE` | 10 | `fn:bestellpositionen` mit HTTP 500: eine Wiedervorlage je **Nacht**, so viele Nächte (10.09.2026) |
+| `NULLTAGE_JE_LAUF` | 30 | Geschäftstage, die ein Lauf höchstens als Nulltage nachholt (`mart.umsatztag_luecke`, 10.09.2026) |
+| `LOCHTAGE_JE_LAUF` | 10 | Geschäftstage, die ein Lauf höchstens als Lochtage nachholt (`mart.umsatz_lochtag`, 14.09.2026) — beide Berichte leer, alle Tagesberichte neu |
+| `NACHLESE_JE_LAUF` | 100 | Tage, die ein Lauf höchstens als monatliche Nachlese einreiht (10.09.2026) |
 | `ABBRUCH_NACH_FEHLERN` | 10 | Fehler in Folge → Lauf stoppt |
 
 **Nicht nachts abschalten.** Die frühere Begründung war, ein Client um drei Uhr früh sei im Log ein Ausreißer. Das stimmt — aber ein Gerät, das jeden Abend schlagartig verstummt und morgens wieder anspringt, ist eine deutlichere Kante als ein gleichmäßiges Rinnsal. Was das Tempo begrenzt, sind `TAKT_*` und `TAGESBUDGET`, nicht die Uhrzeit.
@@ -308,7 +312,7 @@ Die tatsächlich gewartete Zeit steht je Aufruf in `sync.aufgabe.wartezeit_ms` �
 
 **Den Takt zu senken ist eine bewusste Entscheidung, keine Optimierung.** Es gibt genau einen Zugang, und eine Sperre wäre nicht rückgängig zu machen. Für einen beaufsichtigten Backfill ist ein schnellerer Takt vertretbar — dann aber über Umgebungsvariablen für diesen einen Lauf, nicht als neue Vorgabe in `src/config.ts`.
 
-Wiedervorlage nach Fehlern: exponentiell mit Jitter, gedeckelt bei sechs Stunden. Nie im festen Takt nachfassen.
+Wiedervorlage nach Fehlern: exponentiell mit Jitter, gedeckelt bei sechs Stunden. Nie im festen Takt nachfassen. **Ausnahme seit 10.09.2026:** HTTP 500 auf `fn:bestellpositionen` wird in der nächsten Nacht wiedervorgelegt, `FN_POSITIONEN_MAX_NAECHTE` Nächte lang — der 500 dieser Ressource hält Tage an (287 von 318 kamen am Tag 9–11), Minuten-Wiedervorlagen verbrauchten nur Versuche.
 
 ## Drei Fehlerarten, die auseinandergehalten werden
 
@@ -1054,6 +1058,12 @@ einer: eine Datei in `pflege/`, committet und gepusht, wird vom nächsten Lauf
 eingelesen (`pflegeNachlauf()`, vor allem Materialisierten, weil
 `manual.om_einschaetzung` in den Round Table eingeht).
 
+> **Nachtrag 10.09.2026:** „vom nächsten Lauf eingelesen" galt vom 14.08. bis zum
+> 10.09.2026 nur auf dem Notebook. Das Dockerfile kopierte `pflege/` nicht ins Image,
+> der Ordner fehlte im Container, und `pflegeEinlesen()` kehrte auf `debug` still
+> zurück — `sync.pflege_import` hatte in Produktion null Zeilen. Seitdem `COPY pflege`,
+> `dockerfile.test.ts` und `log.warn` bei fehlendem Ordner.
+
 **Drei Eigenschaften, die weder ein Upload noch ein Formular hätte:** eine
 Historie (`git log`), eine Überprüfung vor dem Wirksamwerden (der Commit ist
 lesbar), und einen Weg zurück (`git revert`).
@@ -1309,3 +1319,86 @@ Inventur (`/api/erp/stocktakings`) mit `theoreticalStockLevelInBaseUnits` und
 bekannten Stichtag. Wer den Zutatenverbrauch rechnen will, stellt sie gegen die
 Bestellungen — nicht gegen einen Lagerstand, der als Beiwerk in einer
 Bestellantwort mitgeliefert wurde.
+
+## Nulltage hinter dem Fenster, Nachlese, Erstfehler (Migration `0100`, 10.09.2026)
+
+Vier Änderungen am Lauf, alle aus der Importprüfung der Läufe 112–120
+(`fehlerkatalog.md`, „Vier Befunde aus neun Nächten Import").
+
+**`nulltageNachziehen()` — nach `linaNachfuellen()`.** Liest `mart.umsatztag_luecke`
+(`zustand = 'faellig'`): Geschäftstage, an denen `core.artikelverkauf_tag` Umsatz kennt und
+`core.umsatzbericht_tag` null steht, älter als das Fenster. Jeder Tag wird für jeden aktiven
+Konzern-Tagesbericht eingereiht, dessen eigenes Fenster ihn nicht mehr erreicht — nicht für das
+Orakel `getArtikelverkaufsbericht`, nicht für Ladenakte. Priorität `nacharbeit`. Höchstens
+`NULLTAGE_JE_LAUF` Tage je Nacht. Die Sicht kennt fünf Zustände: `im Fenster` (holt der Lauf
+ohnehin), `faellig`, `eingereiht`, `wartet` (vor weniger als sieben Tagen nachgeholt, immer noch
+null), `aufgegeben` (dreimal nachgeholt). Die Prüfübersicht zählt nur `aufgegeben`.
+
+**`nachleseNachziehen()` — danach.** Für Endpunkte mit `nachlese_tage` (heute nur
+`getPersonalkosten`, 62) einmal im Monat die Tage zwischen Fensterende und Nachlese-Tiefe,
+höchstens `NACHLESE_JE_LAUF` je Lauf. Merker `nachlese:<endpunkt>` trägt den Monat. 41
+Aufrufe je Monat.
+
+**Der Status kennt Erstfehler und Wiederholer.** `Anbieterstand` zählt beide getrennt; nur
+`erstfehler > 0` macht eine Spur und damit den Lauf `teilweise`. Wiederholer stehen in der
+Notiz („(552 Posten, davon 2 bekannte Wiederholer)"). Ein aufgegebener Posten zählt als
+`uebersprungen`, nicht mehr zusätzlich als `fehler` — `sync.lauf` und `sync.aufgabe` stimmen
+damit wieder überein. `aufgaben_gesamt` bleibt `ok + keine_daten + fehler`.
+
+**Nachttakt für HTTP 500 auf `fn:bestellpositionen`.** `faellig_ab = morgen 00:00 UTC`,
+`versuche` zählt Nächte bis `FN_POSITIONEN_MAX_NAECHTE`; danach der bekannte Weg über
+`aufgegeben` und Wiederbelebung. Die e2e-Tests im Block „Fehlerhaeufung und die Notbremse"
+prüfen Takt, Grenze und Zählung.
+
+**Und der Container hat jetzt `pflege/`.** `COPY pflege ./pflege` im Dockerfile; ohne die Zeile
+las `pflegeNachlauf()` in Produktion nie eine Datei (`sync.pflege_import`: 0 Zeilen bis
+10.09.2026). Ein fehlender Ordner ist `log.warn`, kein `debug`.
+
+**Für die Tests:** die e2e-Umgebung setzt `HISTORIE_JE_LAUF`, `NULLTAGE_JE_LAUF` und
+`NACHLESE_JE_LAUF` auf 0. Ein Lauf holt dort nur, was der Test eingereiht hat; alles andere
+lief in das Fünf-Sekunden-Limit des Durchstichs und hielt die Laufsperre für den Rest der Datei.
+
+## Lochtage: wenn beide Berichte leer sind (Migration `0101`, 14.09.2026)
+
+**Der Fall, den `nulltageNachziehen()` nicht sieht.** Es verlangt Artikelverkauf über null bei
+Tagesumsatz null — den Kassenausfall mit später Nachlieferung. Am 20.–22.07.2026 stehen aber
+**beide** Berichte leer: der erste echte Lauf am 26.07. holte die Tage vier bis sechs Tage nach
+dem Geschäftstag, und LINA hatte sie noch nicht (der 23.07. kam im selben Lauf ebenso mit
+`columns: 0` zurück und war am 02.08. voll). Das tägliche Fenster begann am 02.08. und reichte
+bis zum 23.07.; `historieNachziehen()` hält einen `ok`-Posten für erledigt. Der 22.07. stand
+seitdem bei allen 141 Betrieben auf null, in jeder Auswertung, sieben Wochen lang — die Karte
+„Tage mit Datenloch" zeigte ihn mit dem Satz „gehören neu eingereiht", und niemand tat es.
+
+**`lochtageNachziehen()` — nach `nulltageNachziehen()`.** Liest `mart.umsatz_lochtag`
+(`zustand = 'faellig'`): Geschäftstage, an denen weniger als 60 % der Betriebe Umsatz melden,
+die es im 28-Tage-Schnitt davor taten. Das Signal ist der Umsatzbericht selbst, deshalb gibt es
+hier kein Orakel und keine Ausnahme: jeder Tag wird für **jeden** aktiven Konzern-Tagesbericht
+eingereiht, dessen Fenster ihn nicht mehr erreicht — auch für den Artikelverkauf. Priorität
+`nacharbeit`, höchstens `LOCHTAGE_JE_LAUF` (10) Tage je Nacht; ein Tag kostet bis zu 16
+Aufrufe. Zustände und Zähler wie bei den Nulltagen: `im Fenster`, `faellig`, `eingereiht`,
+`wartet` (eine Woche), `aufgegeben` (dreimal geholt, bleibt leer — dann hat LINA den Tag
+wirklich nicht). Die Prüfübersicht zählt nur `aufgegeben`.
+
+Der erste Lauf mit `0101` (14.09.2026) holte den 21. und 22.07. neu — und bekam byte-gleich
+dieselben leeren Antworten wie am 26.07. LINA hat die Tage nicht. Sie gehen jetzt den
+vorgesehenen Weg: `wartet`, zwei weitere Anläufe, `aufgegeben`. Die 2 in der Prüfübersicht ist
+dann eine Aussage über das Kassensystem, keine offene Arbeit (`fehlerkatalog.md`, Nachtrag).
+
+**Für die Tests:** `LOCHTAGE_JE_LAUF` steht in der e2e-Umgebung ebenfalls auf 0.
+
+## Verwaiste Läufe schließen sich beim nächsten Start (14.09.2026)
+
+**Der Fall:** Ein Push auf `main` löst den Deploy aus, und der Containerwechsel beendet den per
+`docker exec` gestarteten Sync **ohne Signal** — Lauf 125 am 14.09.2026 um 21:58, mitten in den
+Belegarchiv-Zählungen. Die Laufsperre hängt an der Verbindung und ist sofort frei; die Zeile
+in `sync.lauf` bleibt auf `laeuft` mit null Zählern, ein reservierter Posten wartet die
+Stundengrenze ab. Das Signal-Handling vom 25.07.2026 hilft hier nicht, es bekommt kein Signal.
+
+**`verwaisteLaeufeSchliessen()` — in `workerLauf()`, nach der Sperre, vor der eigenen Zeile.**
+Wer die Sperre hält, weiß: kein Lauf auf `laeuft` hat noch einen Prozess. Jeder solche
+Vorgänger wird `abgebrochen`, mit den Zählern aus `sync.aufgabe` (gleiche Rechnung wie
+`laufFortschreiben`), dem Ende seiner letzten Aufgabe als `beendet_am` und einer Notiz;
+reservierte Posten werden freigegeben. Ein übersprungener Start (Sperre belegt) tut das
+ausdrücklich nicht — dort lebt der Blockierer.
+
+**Die Regel dazu steht in `AGENTS.md`:** kein Push auf `main`, solange ein Lauf aktiv ist.
