@@ -165,6 +165,17 @@
    "fallstricke": []
   },
   {
+   "sicht": "mart.artikeltage_basis",
+   "koernung": "Betrieb mit Artikelverkaeufen (Zwischenstufe von mart.datenstand)",
+   "thema": "betrieb",
+   "summen_erlaubt": false,
+   "kommentar": "Artikeltage je Betrieb: an wie vielen Geschaeftstagen Artikelverkaeufe vorliegen, und der\nletzte davon. Zwischenstufe von mart.datenstand, naechtlich im Round-Table-Nachlauf\naufgefrischt (Migration 0106). Betriebe ohne Artikelzeilen fehlen hier; mart.datenstand\nfuehrt sie mit 0.\n\nKoernung: eine Zeile je Betrieb mit Artikelverkaeufen",
+   "spalten": [],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
    "sicht": "mart.artikelverkauf",
    "koernung": "Betrieb, Geschaeftstag und Artikel, mit dem Wareneinsatzansatz DES TAGES",
    "thema": "umsatz",

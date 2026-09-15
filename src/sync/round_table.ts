@@ -41,6 +41,10 @@ const SICHTEN = [
   // oben, deshalb hier und nicht in einkauf_sichten.ts (FoodNotify).
   // Unabhaengig von den Round-Table-Sichten, liest nur artikelverkauf.
   'mart.artikel_monat_basis',
+  // Migration 0106: Artikeltage je Betrieb fuer mart.datenstand. Liest
+  // ebenfalls nur artikelverkauf; vorher zaehlte die Sicht bei JEDEM Aufruf
+  // 27 Mio Zeilen, und der MCP-Zugang haengt jede Antwort daran.
+  'mart.artikeltage_basis',
 ]
 
 /** Der Artikel-Refresh (0068) verdichtet 27,7 Mio Tageszeilen und liegt

@@ -78,6 +78,13 @@ COPY metabase ./metabase
 
 RUN chmod -R a+rX ./mcp ./metabase
 
+# ARBEITSVERZEICHNIS mcp/, NICHT /app. Skybridge liefert die gebauten
+# Ansichten unter /assets aus `process.cwd()/dist/assets` aus
+# (skybridge/dist/server/express.js). Mit /app als Arbeitsverzeichnis suchte
+# es /app/dist/assets: jede Ansicht in ChatGPT blieb leer, jede Datei 404.
+# Gefunden am 15.09.2026 am ersten Ergebnis im Chat.
+WORKDIR /app/mcp
+
 USER bun
 
 # Skybridge liest den Port aus __PORT, nicht aus PORT. Ohne das lauscht der
@@ -90,4 +97,4 @@ USER bun
 #                           der Tokens zugleich
 ENV __PORT=3000
 EXPOSE 3000
-CMD ["bun", "run", "mcp/start.ts"]
+CMD ["bun", "run", "start.ts"]
