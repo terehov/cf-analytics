@@ -94,13 +94,38 @@ class Bremse {
 const anmeldeBremse = new Bremse(10, 60_000)
 const registrierBremse = new Bremse(5, 60_000)
 
-const html = (a: Response, code: number, inhalt: string) =>
+/**
+ * Die Sicherheitsrichtlinie der Anmeldeseite.
+ *
+ * `form-action` GILT AUCH FUER DIE WEITERLEITUNG NACH DEM ABSENDEN. Das
+ * Formular geht an /anmelden (self), die Antwort ist ein 302 zur Rueckadresse
+ * des Clients. Stand dort nur 'self', brach Chrome genau diesen Schritt ab —
+ * "Refused to load https://chatgpt.com/connector/oauth/…" —, obwohl Passwort
+ * und Code schon stimmten. Gefunden am 15.09.2026 beim ersten Verbinden aus
+ * ChatGPT; der Test mit fetch sah es nie, weil fetch keine CSP kennt.
+ *
+ * Aufgenommen wird nur die HERKUNFT der einen Rueckadresse, die vorher exakt
+ * gegen die Registrierung geprueft wurde — kein Pfad, kein Platzhalter, und
+ * nur http(s).
+ */
+export function sicherheitsrichtlinie(rueckadresse?: string): string {
+  let ziel = ''
+  if (rueckadresse) {
+    try {
+      const u = new URL(rueckadresse)
+      if (u.protocol === 'https:' || u.protocol === 'http:') ziel = ` ${u.origin}`
+    } catch { /* keine gueltige Adresse: dann bleibt es bei 'self' */ }
+  }
+  return `default-src 'none'; style-src 'unsafe-inline'; form-action 'self'${ziel}`
+}
+
+const html = (a: Response, code: number, inhalt: string, rueckadresse?: string) =>
   a.status(code)
    .set('Content-Type', 'text/html; charset=utf-8')
    // Die Anmeldeseite gehoert in kein fremdes Fenster und in keinen Cache.
    .set('Cache-Control', 'no-store')
    .set('X-Frame-Options', 'DENY')
-   .set('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'")
+   .set('Content-Security-Policy', sicherheitsrichtlinie(rueckadresse))
    .send(inhalt)
 
 const herkunft = (r: Request) =>
@@ -225,9 +250,11 @@ export function anmeldungMontieren(app: Express, o: { aussteller: string; publik
       scope: q.scope, resource: q.resource,
     }, aussteller)
 
+    // Die Rueckadresse ist oben exakt gegen die Registrierung geprueft — nur
+    // deshalb darf ihre Herkunft in die Sicherheitsrichtlinie.
     return html(antwort, 200, anmeldeseite({
       formulartoken, clientName: client.client_name,
-    }))
+    }), q.redirect_uri)
   })
 
   // --- Anmeldung entgegennehmen --------------------------------------
@@ -259,9 +286,11 @@ export function anmeldungMontieren(app: Express, o: { aussteller: string; publik
         scope: anliegen.scope, resource: anliegen.resource,
       }, aussteller)
       const client = await clientHolen(anliegen.client_id!)
+      // Auch das zweite Absenden endet mit der Weiterleitung. Die Rueckadresse
+      // stammt aus dem signierten Formulartoken, geprueft bei /authorize.
       return html(antwort, 401, anmeldeseite({
         formulartoken, clientName: client?.client_name ?? null, fehler: grund, email,
-      }))
+      }), anliegen.redirect_uri)
     }
 
     const nutzer = await nutzerNachEmail(email)

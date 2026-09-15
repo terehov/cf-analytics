@@ -17,7 +17,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import express from 'express'
 import type { Server } from 'node:http'
 import { anmeldungAbfragen, anmeldungPool } from '../src/anmeldung/db'
-import { anmeldungMontieren } from '../src/anmeldung/endpunkte'
+import { anmeldungMontieren, sicherheitsrichtlinie } from '../src/anmeldung/endpunkte'
 import { zugangstokenPruefen } from '../src/anmeldung/schluessel'
 
 const DB = process.env.MCP_AUTH_DATABASE_URL
@@ -288,6 +288,28 @@ lauf('Autorisierungsserver', () => {
     }
   })
 
+  /**
+   * Chrome wendet `form-action` auch auf die Weiterleitung NACH dem Absenden
+   * an. Stand dort nur 'self', blieb die Anmeldung aus ChatGPT am 15.09.2026
+   * hinter dem richtigen Passwort stehen. fetch kennt keine CSP und folgt
+   * hier ohnehin nicht — deshalb wird der Kopf geprueft, nicht das Verhalten.
+   */
+  test('Die Anmeldeseite erlaubt die Weiterleitung zur Rueckadresse — auch nach einem Fehlversuch', async () => {
+    const erwartet = `form-action 'self' ${new URL(RUECK).origin}`
+    const { challenge } = await pkce()
+    const seite = await fetch(
+      `${basis}/authorize?response_type=code&client_id=${clientId}` +
+      `&redirect_uri=${encodeURIComponent(RUECK)}&code_challenge=${challenge}` +
+      `&code_challenge_method=S256`)
+    expect(seite.status).toBe(200)
+    expect(seite.headers.get('content-security-policy')).toContain(erwartet)
+
+    const nochmal = await postForm('/anmelden', {
+      anfrage: anfrageFeldAus(await seite.text()), email: EMAIL, passwort: 'falsch' })
+    expect(nochmal.status).toBe(401)
+    expect(nochmal.headers.get('content-security-policy')).toContain(erwartet)
+  })
+
   // ZULETZT, mit Absicht: diese beiden Tests fluten /anmelden und /register
   // von 127.0.0.1 und loesen damit die Bremse aus — eine Minute lang. Jeder
   // Test danach, der sich anmelden will, bekaeme 429. Beim ersten Lauf
@@ -318,5 +340,26 @@ lauf('Autorisierungsserver', () => {
     }
     expect(letzter).toBe(429)
     await anmeldungAbfragen(`DELETE FROM mcp.oauth_client WHERE client_name LIKE 'Flut %'`)
+  })
+})
+
+/** Ohne Datenbank: die Richtlinie selbst. */
+describe('Sicherheitsrichtlinie der Anmeldeseite', () => {
+  const nurSelf = "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'"
+
+  test('nimmt die Herkunft der Rueckadresse auf, nie ihren Pfad', () => {
+    expect(sicherheitsrichtlinie('https://chatgpt.com/connector/oauth/abc123?x=1'))
+      .toBe(`${nurSelf} https://chatgpt.com`)
+  })
+
+  test('ohne oder mit unbrauchbarer Rueckadresse bleibt es bei self', () => {
+    expect(sicherheitsrichtlinie()).toBe(nurSelf)
+    expect(sicherheitsrichtlinie('javascript:alert(1)')).toBe(nurSelf)
+    expect(sicherheitsrichtlinie('keine adresse')).toBe(nurSelf)
+  })
+
+  test('localhost behaelt seinen Port', () => {
+    expect(sicherheitsrichtlinie('http://localhost:6274/oauth/callback'))
+      .toBe(`${nurSelf} http://localhost:6274`)
   })
 })
