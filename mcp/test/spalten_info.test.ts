@@ -43,6 +43,23 @@ describe('Spaltenprofil', () => {
     expect(info[0]!.hinweis).toContain('zaehlen')
   })
 
+  /**
+   * Die fertigen Berichte (dd_filialen_tabelle) liefern die Ampeln als Emojis
+   * aus ampel.beschriftung, mit ⚪ fuer "keine Ampel berechenbar" — in Spalten
+   * namens "●" und "◐ Umsatz". Bis 16.09.2026 galten sie als Merkmal: dem
+   * Modell fehlte die Zaehlregel, und das Ampelraster faerbte nichts.
+   */
+  test('Ampeln als Emojis (●, ◐ Umsatz) und "unvollstaendig" gelten ebenfalls als Ampel', () => {
+    const zeilen = [
+      { '●': '🔴', '◐ Umsatz': '🟢', gesamt: 'rot',            Marke: 'Enchilada' },
+      { '●': '🟠', '◐ Umsatz': '⚪', gesamt: 'unvollstaendig', Marke: 'Aposto' },
+      { '●': '⚪', '◐ Umsatz': '🟠', gesamt: 'orange',         Marke: 'Enchilada' },
+    ]
+    const info = spaltenBeschreiben(['●', '◐ Umsatz', 'gesamt', 'Marke'], zeilen, katalog, ['mart.round_table_monat'])
+    const rolle = Object.fromEntries(info.map(i => [i.spalte, i.rolle]))
+    expect(rolle).toEqual({ '●': 'ampel', '◐ Umsatz': 'ampel', gesamt: 'ampel', Marke: 'merkmal' })
+  })
+
   test('Der Katalog geht vor der Datenprobe: eine Kennzahl mit Einheit bleibt es auch ohne Zeilen', () => {
     // Gefunden an einer leeren Antwort: umsatz_netto wurde als Merkmal angeboten.
     const info = spaltenBeschreiben(['monat', 'umsatz_netto'], [], katalog, ['mart.umsatz_tag'])

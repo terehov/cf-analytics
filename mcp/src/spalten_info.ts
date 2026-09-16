@@ -40,7 +40,18 @@ export type SpalteInfo = {
   hinweis?: string
 }
 
-const AMPELWERTE = new Set(['rot', 'orange', 'gruen', 'grün', 'grau', 'gelb'])
+/**
+ * Woerter aus mart.round_table_monat (rot, orange, gruen, unvollstaendig),
+ * Emojis aus ampel.beschriftung (🔴 🟠 🟢) und das ⚪, das die Karten
+ * (metabase/karten-drilldown.ts) fuer "keine Ampel berechenbar" setzen.
+ * Ohne die Emojis galten die Ampelspalten der fertigen Berichte ("●",
+ * "◐ Umsatz") als Merkmal — dem Modell fehlte die Zaehl-statt-mitteln-Regel,
+ * und das Ampelraster (views/round-table.tsx) faerbte nichts.
+ */
+const AMPELWERTE = new Set([
+  'rot', 'orange', 'gruen', 'grün', 'grau', 'gelb', 'unvollstaendig',
+  '🔴', '🟠', '🟡', '🟢', '⚪',
+])
 
 const zahl = (v: unknown): number | null => {
   if (typeof v === 'number') return Number.isFinite(v) ? v : null
