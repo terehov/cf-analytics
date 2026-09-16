@@ -412,9 +412,18 @@ export function pruefen(sql: string, katalog: Katalog): Pruefergebnis {
     })
   }
 
+  /**
+   * JEDER BEFUND EINMAL. `avg(umsatz_pct)` im SELECT und noch einmal im
+   * ORDER BY ergab zweimal denselben Befund — der Nutzer las in Claude
+   * denselben Absatz zweimal (16.09.2026). Der Grund zaehlt, nicht die
+   * Zahl der Fundstellen.
+   */
+  const eindeutig = befunde.filter((b, i) =>
+    befunde.findIndex(x => x.schluessel === b.schluessel && x.hinweis === b.hinweis) === i)
+
   return {
-    erlaubt: !befunde.some(b => b.schwere === 'sperre'),
-    befunde,
+    erlaubt: !eindeutig.some(b => b.schwere === 'sperre'),
+    befunde: eindeutig,
     sichten: [...z.sichten],
     koernung,
   }

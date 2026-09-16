@@ -136,6 +136,15 @@ describe('Die Middleware', () => {
     expect(await datenAlsTextErgaenzen({ method: 'tools/call', params: {} }, extraMit('claude-user'), async () => leer)).toBe(leer)
   })
 
+  test('eine Sperre (_meta.gesperrt) bleibt unangetastet — ihr Text traegt den Befund schon', async () => {
+    const sperre = {
+      content: [{ type: 'text', text: 'Die Abfrage wurde NICHT ausgefuehrt. Grund: …' }],
+      structuredContent: { spalten: [], zeilen: [], zeilen_gesamt: 0, hinweise: [{ schluessel: 'x', schwere: 'sperre', hinweis: 'h' }] },
+      _meta: { gesperrt: true },
+    }
+    expect(await datenAlsTextErgaenzen({ method: 'tools/call', params: {} }, extraMit('claude-user'), async () => sperre)).toBe(sperre)
+  })
+
   test('ein Text-content (nicht normalisiert) wird zur Liste mit beiden Bloecken', async () => {
     const e = await datenAlsTextErgaenzen({ method: 'tools/call', params: {} }, extraMit('claude-user'),
       async () => ({ content: '3 Zeilen.', structuredContent: { zeilen: [{ a: 1 }] } })) as any

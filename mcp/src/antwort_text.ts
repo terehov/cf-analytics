@@ -88,6 +88,10 @@ export async function datenAlsTextErgaenzen<T>(
   const ergebnis = await next()
   const r = ergebnis as any
   if (!istObjekt(r) || r.isError) return ergebnis
+  // Eine Sperre (server.ts, abfrage_ausfuehren) traegt ihren ganzen Befund
+  // schon als Text; die leere Ergebnisform noch einmal anzuhaengen hilft
+  // niemandem.
+  if ((r._meta as { gesperrt?: unknown } | undefined)?.gesperrt === true) return ergebnis
   const sc = r.structuredContent
   if (!istObjekt(sc) || Object.keys(sc).length === 0) return ergebnis
   if (wirtAus(extra) === 'openai') return ergebnis

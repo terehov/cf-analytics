@@ -514,7 +514,33 @@ export const app = new Skybridge({
     }, async ({ sql }, extra) => {
       const nutzer = await anmelden(extra)
       fragenDuerfen(nutzer)
-      const e = await abfrageAusfuehren(sql, katalog, nutzerAus(nutzer))
+      let e
+      try {
+        e = await abfrageAusfuehren(sql, katalog, nutzerAus(nutzer))
+      } catch (f) {
+        if (!(f instanceof Gesperrt)) throw f
+        /**
+         * EINE SPERRE IST EINE ANTWORT, KEIN FEHLER. Bis zum 16.09.2026 lief
+         * sie als Ausnahme durch, Skybridge machte daraus isError — und Claude
+         * zeigte dem Nutzer dazu einen roten Kasten „Failed to load this
+         * connector", obwohl der Server genau das getan hatte, wofuer es den
+         * Pruefer gibt. Deshalb hier eine gewoehnliche Antwort in der Form des
+         * Ergebnisses: keine Zeilen, die Befunde als `hinweise` (die Ansicht
+         * zeigt sie als Sperre), der ganze Text fuer das Modell.
+         * Protokolliert ist die Sperre schon (abfrageAusfuehren).
+         */
+        return {
+          structuredContent: {
+            spalten: [], zeilen: [], zeilen_gesamt: 0,
+            koernung: f.pruefung.koernung, hinweise: f.pruefung.befunde, datenstand: null,
+            spalten_info: [],
+            darstellung: 'Nichts darzustellen — die Abfrage wurde nicht ausgefuehrt. Dem Nutzer ' +
+                         'den Grund und die Berichtigung nennen, dann berichtigt neu stellen.',
+          },
+          content: f.message,
+          _meta: { weitere: [], protokoll_id: null, gesperrt: true },
+        }
+      }
       return {
         structuredContent: {
           spalten: e.spalten, zeilen: e.zeilen, zeilen_gesamt: e.zeilen_gesamt,

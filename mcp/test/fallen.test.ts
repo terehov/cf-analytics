@@ -294,6 +294,21 @@ describe('Die Sperre erklaert sich', () => {
     expect(text).toContain('Grund:')
     expect(text).toContain('Ausserdem zu beachten')
   })
+
+  /**
+   * Claude, 16.09.2026: avg(umsatz_pct) stand im SELECT und im ORDER BY, und
+   * der Nutzer las denselben Befund zweimal. Der Grund zaehlt, nicht die Zahl
+   * der Fundstellen.
+   */
+  test('Derselbe Befund steht nur einmal, auch wenn das Aggregat zweimal vorkommt', () => {
+    const e = pruefen(
+      `SELECT konzept, avg(umsatz_pct) FROM mart.umsatz_ytd GROUP BY konzept ORDER BY avg(umsatz_pct) DESC`,
+      katalog)
+    expect(e.erlaubt).toBe(false)
+    expect(e.befunde.filter(b => b.schluessel === 'aggregat_avg_umsatz_pct')).toHaveLength(1)
+    const text = gesperrtText(e)
+    expect(text.split('avg(umsatz_pct) ist nicht zulaessig')).toHaveLength(2)
+  })
 })
 
 /**
