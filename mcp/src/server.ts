@@ -32,6 +32,7 @@ import { anmeldungMontieren, metadaten } from './anmeldung/endpunkte'
 import { anmeldungAbfragen, anmeldungEingerichtet } from './anmeldung/db'
 import { zugangstokenPruefen } from './anmeldung/schluessel'
 import { gescheiterteAufrufeProtokollieren } from './zugriff_protokoll'
+import { datenAlsTextErgaenzen } from './antwort_text'
 
 /**
  * Die Form, in der JEDES Ergebnis zurueckkommt — Bericht wie freie Abfrage.
@@ -206,6 +207,11 @@ export const app = new Skybridge({
     // Jeder gescheiterte Aufruf steht im Protokoll — auch der, dessen
     // Werkzeug vor dem eigenen protokollieren() abbrach (zugriff_protokoll.ts).
     .mcpMiddleware('tools/call', gescheiterteAufrufeProtokollieren)
+
+    // Die Daten auch als Text: Claudes Modell sieht structuredContent nicht
+    // (16.09.2026), ChatGPTs schon — deshalb nur fuer Hosts ausser ChatGPT
+    // (antwort_text.ts).
+    .mcpMiddleware('tools/call', datenAlsTextErgaenzen)
 
     // =================================================================
     // Berichte — die Metabase-Abloesung
