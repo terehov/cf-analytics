@@ -1441,3 +1441,47 @@ Betrieben in beiden Tagesberichten. Seit Migration `0101` reiht der Lauf solche 
 heißt dreimal geholt und weiter leer — dann hat das Kassensystem den Tag nicht. Eine Karte, die
 einen Auftrag formuliert, den kein Mechanismus ausführt, ist die Regel-10-Signatur in
 Kartenform.
+
+## „Welche Schwelle gilt für wen?" — das Regelwerk auf dem Dashboard (20.09.2026)
+
+Auf **Round Table — Regelwerk-Vergleich** (`db_rt_regelwerk`) steht seit Migration `0107`
+eine Karte über dem Schwellenvergleich: `rt_schwellen`, eine Tabelle auf
+`mart.ampel_schwelle`.
+
+**Warum eine Karte und kein Textblock.** Bis zum 20.09.2026 waren die Schwellen vier Zahlen,
+die man in eine Markdown-Kachel schreiben konnte. Seit der Wareneinsatz je Marke gilt, sind
+es sechzehn Zeilen, und sie ändern sich per `UPDATE` ohne Deploy — genau dafür liegt das
+Regelwerk seit `0004` als Daten vor. Ein abgeschriebener Textblock wäre beim nächsten
+`UPDATE` still falsch, und niemand wüsste, welche der beiden Zahlen gilt. Die Karte liest
+dieselbe Zeile, nach der die Ampel urteilt.
+
+**Warum ohne Monatsfilter.** `ampel.regel` führt keine Historie; welche Schwelle im Mai
+galt, weiß die Datenbank nicht. Eine Karte, die auf einen Stichmonat filterte, behauptete
+eine Gültigkeit, die die Daten nicht haben. Begründet in `FILTER_AUSNAHME`
+(`uebernehmen.ts`), wie jede andere Ausnahme auch.
+
+**Warum als Tabelle.** Sechzehn Zeilen mit einer Textspalte („grün bis 17,00 · orange bis
+19,00") sind zum Lesen da, nicht zum Überfliegen. Ein Diagramm über Schwellen verschiedener
+Einheiten — Prozentpunkte gegen Schulnoten — mischte zwei Skalen auf einer Achse.
+
+### `rt_fehlende_signale` unterscheidet jetzt zwei Zeichen
+
+**✗** heißt „die Zahl fehlt" — da muss jemand etwas nachtragen. **⊘** heißt „die Zahl ist
+da, aber für diese Marke wird hier bewusst nicht bewertet"; die Spalte „Warum ⊘" nennt den
+Grund. Wären beide dasselbe Kreuz, stünden die zwölf Deutschen Konzepte auf einer
+Arbeitsliste, auf der sie nichts verloren haben — und der Nachtrag, den sie auslösen,
+existiert nicht.
+
+### Was an Zahlen in Kartentexten geändert wurde
+
+Die Personalschwelle stand als Zahl in sechs Dateien. Sie steht jetzt an **einer** Stelle
+(`SCHWELLE()` und `ZIEL_PERSONAL_GRUEN` in `metabase/gemeinsam.ts`), und `SCHWELLE()` liest
+`ampel.regel` — dieselbe Zeile wie die Ampel. Die Ziellinien der Diagramme brauchen
+weiterhin eine Zahl (eine Visualisierungseinstellung kann kein SQL lesen); sie steht dafür
+einmal dort, mit der Pflicht, `ampel.regel` zu folgen. Dasselbe Muster wie bei der
+Bewertungsschwelle in `karten-bewertung.ts` seit dem 03.08.2026.
+
+Die Klassengrenzen von `pf_streuung` liegen seither auf den Ampelschwellen (30 / 34 / 38 /
+44 / 50 statt 26 / 29 / 32 / 36 / 42): sonst läuft die Grenze zwischen Grün und Orange
+mitten durch einen Balken, und die Verteilung beantwortet die Frage „wie viele sind drüber"
+gerade nicht.

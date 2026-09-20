@@ -139,6 +139,12 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
                                  + 'und fuehrt keine Marke.' },
   rt_ursachen:            { marke: 'Dieselbe Verdichtung wie der Verlauf darunter — '
                                  + 'mart.ursachen_analyse fuehrt keine Marke.' },
+  // Das Regelwerk selbst hat keinen Monat: ampel.regel fuehrt keine
+  // Historie, es gilt immer der aktuelle Stand. Eine Karte, die auf einen
+  // Stichmonat filterte, behauptete eine Gueltigkeit, die die Daten nicht
+  // haben — welche Schwelle im Mai galt, weiss diese Datenbank nicht.
+  rt_schwellen:           { monat: 'ampel.regel fuehrt keine Historie; es gilt immer der '
+                                 + 'aktuelle Stand.' },
   um_verlauf_tag:         { monat: 'Tagesverlauf; eingegrenzt wird ueber den Zeitraumfilter.' },
   um_verlauf_monat:       { monat: 'Monatsverlauf mit Vorjahr — den Zeitraum liest er als Feldfilter.' },
   um_verlauf_delta:       { monat: 'Monatsverlauf — den Zeitraum liest er als Feldfilter.' },

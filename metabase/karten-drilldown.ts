@@ -17,7 +17,7 @@
 // =====================================================================
 
 import type { Karte } from './typen'
-import { MONAT_CTE, MONAT_CTE_UMSATZ, ZEITRAUM_CTE, P_MONAT, P_MARKE, P_BETRIEB, P_AMPEL, P_BEREICH, P_INTENSITAET, P_ZEITRAUM, P_INVENTUR, P_BESTELLUNG } from './gemeinsam'
+import { MONAT_CTE, MONAT_CTE_UMSATZ, ZEITRAUM_CTE, P_MONAT, P_MARKE, P_BETRIEB, P_AMPEL, P_BEREICH, P_INTENSITAET, P_ZEITRAUM, P_INVENTUR, P_BESTELLUNG, ZIEL_PERSONAL_GRUEN, ZIEL_PERSONAL_GRUEN_TEXT } from './gemeinsam'
 
 // ---------------------------------------------------------------------
 // Personalquoten sind nur mit Filter und Median zu gebrauchen.
@@ -291,9 +291,9 @@ SELECT r.betrieb                AS "Betrieb",
     visualisierung: {
       'graph.dimensions': ['Betrieb'],
       'graph.metrics': ['Personal o. GF %'],
-      'graph.goal_value': 28,
+      'graph.goal_value': ZIEL_PERSONAL_GRUEN,
       'graph.show_goal': true,
-      'graph.goal_label': 'Grün bis 28 %',
+      'graph.goal_label': ZIEL_PERSONAL_GRUEN_TEXT,
       'graph.x_axis.title_text': 'Personalkosten ohne GF (%)',
     },
   },

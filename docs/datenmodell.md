@@ -817,3 +817,82 @@ angenommen. Eingerichtet von `mcp.rechte_anmeldung_auffrischen()`, idempotent.
 Autorisierungscodes und Auffrischungstokens mit SHA-256. Ein Datenbankabzug enthält damit
 nichts unmittelbar Verwendbares — die einzige Ausnahme ist der private Signierschlüssel, und
 genau deshalb ist er für `mcp_leser` unsichtbar.
+
+## Schwellen je Marke: `ampel.regel_konzept` (Migration `0107`, 20.09.2026)
+
+Seit `0004` lag das Ampelregelwerk als Daten in `ampel.regel` — eine Zeile je Regelwerk und
+Bereich, mit **einer** Schwelle für alle 141 Betriebe. Der Wareneinsatz gilt seit `0107` je
+Marke, und dafür kam eine Tabelle dazu.
+
+```
+ampel.regel_konzept
+  (regelwerk_key, bereich)  →  ampel.regel        FK, ON DELETE CASCADE
+  konzept_key               →  core.konzept
+  schwelle_gruen / _orange
+  ohne_urteil  boolean      hier wird BEWUSST nicht bewertet
+  hinweis      text         warum — bei ohne_urteil Pflicht
+```
+
+Zwei CHECK-Beschränkungen, beide gegen stille Fehler:
+
+* **`regel_konzept_entweder_oder`** — ein Satz ist entweder vollständig oder ausdrücklich
+  ausgesetzt. Eine fehlende Schwelle fiele sonst in `ampel.bewerte()` auf den Rückfall
+  durch, und niemand sähe, dass die Marke eigentlich einen eigenen Wert haben sollte.
+* **`regel_konzept_ausgesetzt_begruendet`** — `ohne_urteil` ohne `hinweis` ist in einem
+  Jahr nicht mehr von einem vergessenen Satz zu unterscheiden.
+
+### `ampel.bewerte()` löst jetzt in drei Stufen auf
+
+Von spezifisch nach allgemein. Die Reihenfolge steht fest, damit sie nicht beim ersten
+Überschneidungsfall neu erfunden wird — heute überschneiden sich die oberen beiden nirgends:
+
+1. `core.schwellenwert_betrieb`, wenn die Regel `schwellenquelle = 'lina_betrieb'` trägt
+   (nur Personal, nur im Regelwerk `lina_betrieb`)
+2. `ampel.regel_konzept` für das Hauptkonzept des Betriebs — trägt die Zeile `ohne_urteil`,
+   ist das Ergebnis `NULL`
+3. die festen Schwellen der Regel selbst
+
+Das `EXISTS` vor Stufe 2 ist kein Zierrat: ohne es kostete jede Bewertung die
+Konzeptauflösung, auch in den vier Bereichen ohne Markensätze. `mart.round_table_monat`
+ruft die Funktion beim Auffrischen rund **88.000 Mal** auf (141 Betriebe × 104 Monate ×
+6 Bereiche).
+
+### Warum die Konzeptauflösung im Schema `ampel` liegt
+
+`ampel.hauptkonzept(betrieb_key)` und `ampel.konzept_je_betrieb` bilden dieselbe Regel ab
+wie `mart.konzept_zuordnung.hauptkonzept` (Handentscheidung vor LINA-Eindeutigkeit,
+Mehrdeutige bleiben `NULL`), liegen aber bewusst nicht dort: `ampel.bewerte()` hängt an
+dieser Auflösung, und `mart` hängt an `ampel.bewerte()`. Ein Blick von `ampel` nach `mart`
+wäre ein Ring, der beim nächsten `CREATE OR REPLACE` in `mart` auffliegt. Dass `ampel` nach
+`core` sieht, gibt es seit `0004` (`core.schwellenwert_betrieb`).
+
+**Mehrdeutige Betriebe fallen auf den Rückfall** — sie haben kein Hauptkonzept und damit
+keinen Markensatz. Wer das ändern will, pflegt `manual.betrieb_hauptkonzept`; die
+Arbeitsliste steht in `mart.konzept_zuordnung WHERE hauptkonzept IS NULL`.
+
+## Der Katalog liest Spalten aus `pg_attribute` (Migration `0108`, 20.09.2026)
+
+`mcp.achsen_ableiten()` und `mcp.sicht_katalog` lasen die Spalten aus
+`information_schema.columns`. **Dort stehen materialisierte Sichten nicht** — der
+SQL-Standard kennt sie nicht, also führt PostgreSQL sie dort auch nicht. Die Folge: die
+vierzehn materialisierten `mart`-Sichten hatten seit dem Aufbau des Katalogs keine Spalten
+und keine Achsen, darunter `mart.round_table_monat`. Hergang und Auswirkung in
+`fehlerkatalog.md`.
+
+Seither aus `pg_attribute`, mit ausgeschriebener Relationsart:
+
+```sql
+WHERE n.nspname = 'mart'
+  AND c.relkind IN ('r','v','m','p','f')   -- Tabelle, Sicht, materialisiert, Partition, fremd
+  AND a.attnum > 0 AND NOT a.attisdropped
+```
+
+**Die Liste ist bewusst ausgeschrieben und nicht weggelassen.** Ein `relkind`-Filter, den
+es nicht gibt, nimmt alles mit, auch Indizes und Sequenzen; einer, der nur `'v'` nennt,
+wiederholt genau den Fehler. Ausgeschrieben fällt der nächste Relationstyp beim Lesen auf.
+
+**Regel für alles, was den Schemakatalog abfragt:** `information_schema` beantwortet Fragen
+nach Objekten, die es nicht kennt, mit einer leeren Menge und nicht mit einem Fehler. Wer
+über `mart` inventarisiert, nimmt `pg_class`/`pg_attribute`. Die Sichtenliste in `0102`
+macht es an einer Stelle schon richtig (`UNION ... pg_matviews`) — nur bei den Spalten
+nicht.

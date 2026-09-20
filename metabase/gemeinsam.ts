@@ -311,3 +311,35 @@ export const P_VON: Parameter = {
 export const P_BIS: Parameter = {
   id: 'bis-param', name: 'bis', 'display-name': 'Bis', type: 'date/single', required: false,
 }
+
+// ---------------------------------------------------------------------
+// Ampelschwellen — aus dem Regelwerk, nicht aus einer Karte
+//
+// Seit 0004 liegt das Regelwerk als Daten in `ampel.regel`, damit eine
+// Schwellenaenderung ein UPDATE ist und kein Deploy. Eine Zahl, die eine
+// Karte noch einmal hinschreibt, macht daraus zwei Wahrheiten ohne
+// Hinweis darauf, welche gilt — und genau das ist am 20.09.2026
+// passiert: die Personalschwelle wanderte von 28/32 auf 34/38, und in
+// sechs Dateien stand weiter 28.
+//
+// Deshalb zwei Wege, und beide fuehren zurueck auf `ampel.regel`:
+//   SCHWELLE(...)  fuer SQL. Die Karte liest dieselbe Zeile wie die Ampel.
+//   ZIEL_*         fuer Ziellinien. Eine Visualisierungseinstellung kann
+//                  kein SQL lesen; die Zahl steht deshalb EINMAL hier,
+//                  mit der Pflicht, ampel.regel zu folgen.
+//
+// Der Wareneinsatz fehlt hier mit Absicht: seine Schwellen gelten seit
+// 0107 je Marke (ampel.regel_konzept), eine einzelne Zahl waere dort
+// schlicht falsch. Wer sie braucht, liest mart.ampel_schwelle.
+// ---------------------------------------------------------------------
+
+/** Die Schwelle als Unterabfrage — fuer SQL in Karten. */
+export const SCHWELLE = (bereich: string, stufe: 'gruen' | 'orange') =>
+  `(SELECT ar.schwelle_${stufe} FROM ampel.regel ar
+        WHERE ar.regelwerk_key = 'round_table_global' AND ar.bereich = '${bereich}')`
+
+/** Personalkosten ohne GF: gruen bis 34 %, orange bis 38 % (Stand 20.09.2026). */
+export const ZIEL_PERSONAL_GRUEN = 34
+export const ZIEL_PERSONAL_GRUEN_TEXT = 'Grün bis 34 %'
+/** Der Satz, der in Kartenbeschreibungen erklaert, was die Ampel Personal misst. */
+export const PERSONAL_SCHWELLEN_TEXT = '34 / 38 %'

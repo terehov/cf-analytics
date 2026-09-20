@@ -279,15 +279,21 @@ SELECT b.betrieb                                                   AS "Betrieb",
       'Wie weit vergleichbare Betriebe auseinanderliegen. Liegen alle eng beieinander, ist die Quote durch das Geschäft vorgegeben und kaum zu ändern. Streuen sie weit, ist sie beeinflussbar — dann lohnt die Frage, was die günstigen Betriebe anders machen. Nur operative Betriebe.',
     anzeige: 'bar',
     parameter: [P_MONAT, P_MARKE],
+    // Die Klassengrenzen liegen auf den Ampelschwellen (34 und 38,
+    // Stand 20.09.2026) und nicht auf runden Zahlen: sonst laeuft die
+    // Grenze zwischen Gruen und Orange mitten durch einen Balken, und
+    // die Verteilung beantwortet die Frage "wie viele sind drueber"
+    // gerade nicht. Davor lagen sie auf 26/29/32/36/42, passend zu den
+    // alten Schwellen 28/32.
     sql: `${MONAT_CTE},
 klassen AS (
     SELECT CASE
-             WHEN r.personalkosten_ogf_pct < 26 THEN '1 — unter 26 %'
-             WHEN r.personalkosten_ogf_pct < 29 THEN '2 — 26 bis 29 %'
-             WHEN r.personalkosten_ogf_pct < 32 THEN '3 — 29 bis 32 %'
-             WHEN r.personalkosten_ogf_pct < 36 THEN '4 — 32 bis 36 %'
-             WHEN r.personalkosten_ogf_pct < 42 THEN '5 — 36 bis 42 %'
-             ELSE                                    '6 — über 42 %'
+             WHEN r.personalkosten_ogf_pct < 30 THEN '1 — unter 30 %'
+             WHEN r.personalkosten_ogf_pct <= 34 THEN '2 — 30 bis 34 % (grün)'
+             WHEN r.personalkosten_ogf_pct <= 38 THEN '3 — 34 bis 38 % (orange)'
+             WHEN r.personalkosten_ogf_pct < 44 THEN '4 — 38 bis 44 %'
+             WHEN r.personalkosten_ogf_pct < 50 THEN '5 — 44 bis 50 %'
+             ELSE                                    '6 — über 50 %'
            END AS klasse
       FROM mart.round_table_monat r
       CROSS JOIN gewaehlt g

@@ -107,7 +107,7 @@ SELECT '🟢 ' || count(*) AS "Grün"
   {
     schluessel: 'rt_unvollstaendig',
     name: 'Unvollständig',
-    beschreibung: 'Betriebe, bei denen mindestens eine der sechs Kennzahlen fehlt und keine der vorhandenen auffällig ist. Das ist KEIN gutes Urteil, sondern ein fehlendes — und bis zum 14.08.2026 stand es unter „Grün". Welche Kennzahl fehlt, sagt die Tabelle „Was fehlt für ein vollständiges Urteil?".',
+    beschreibung: 'Betriebe, bei denen mindestens eine der sechs Ampeln nicht gestellt werden konnte und keine der übrigen auffällig ist. Das ist KEIN gutes Urteil, sondern ein unvollständiges — und bis zum 14.08.2026 stand es unter „Grün". Zwei Ursachen: die Zahl fehlt, oder für diese Marke wird in diesem Bereich bewusst nicht bewertet. Welche wo, sagt die Tabelle „Was fehlt für ein vollständiges Urteil?".',
     anzeige: 'scalar',
     parameter: [MONAT.monat, KONZEPT.marke],
     sql: `${MONAT_CTE}
@@ -125,25 +125,42 @@ SELECT '⚪ ' || count(*) AS "Unvollständig"
   {
     schluessel: 'rt_fehlende_signale',
     name: 'Was fehlt für ein vollständiges Urteil?',
-    beschreibung: 'Je Betrieb: welche der sechs Round-Table-Kennzahlen im gewählten Monat nicht vorlag. Die häufigste ist seit Juli 2026 die Vor-Ort-Note — sie wird über die Datei „pflege/om_einschaetzung.csv" nachgetragen, nicht mehr über einen Entwicklereingriff.',
+    beschreibung: 'Je Betrieb: warum das Urteil im gewählten Monat nicht vollständig ist. '
+      + '✗ heißt „die Zahl fehlt" — da muss jemand etwas nachtragen; die häufigste ist seit '
+      + 'Juli 2026 die Vor-Ort-Note aus „pflege/om_einschaetzung.csv". ⊘ heißt „die Zahl ist da, '
+      + 'aber für diese Marke wird hier bewusst nicht bewertet" — nachtragen hilft dann nicht, '
+      + 'nur entscheiden. Seit dem 20.09.2026 betrifft das den Getränkeeinsatz der Deutschen '
+      + 'Konzepte (Brauereibindung); die Spalte „Warum ⊘" nennt den Grund.',
     anzeige: 'table',
     parameter: [MONAT.monat, KONZEPT.marke],
+    // ZWEI ZEICHEN, ZWEI BEDEUTUNGEN. Bis 0107 gab es nur eine Ursache
+    // fuer ein unvollstaendiges Urteil: die Zahl fehlte. Seit die
+    // Wareneinsatzschwellen je Marke gelten, gibt es eine zweite -- und
+    // waere sie hier dasselbe Kreuz, stuende der Betrieb auf einer
+    // Arbeitsliste, auf der er nichts verloren hat.
     sql: `${MONAT_CTE}
 SELECT u.betrieb                                   AS "Betrieb",
        u.konzept                                   AS "Marke",
        u.signale_fehlen                            AS "fehlende Signale",
-       CASE WHEN u.fehlt_umsatz     THEN '✗' END   AS "Umsatz",
-       CASE WHEN u.fehlt_personal   THEN '✗' END   AS "Personal",
-       CASE WHEN u.fehlt_we_bar     THEN '✗' END   AS "WE Bar",
-       CASE WHEN u.fehlt_we_kueche  THEN '✗' END   AS "WE Küche",
-       CASE WHEN u.fehlt_bewertung  THEN '✗' END   AS "Bewertung",
-       CASE WHEN u.fehlt_om         THEN '✗' END   AS "Vor Ort"
+       CASE WHEN u.fehlt_umsatz     THEN '✗'
+            WHEN u.ohne_schwelle_umsatz    THEN '⊘' END AS "Umsatz",
+       CASE WHEN u.fehlt_personal   THEN '✗'
+            WHEN u.ohne_schwelle_personal  THEN '⊘' END AS "Personal",
+       CASE WHEN u.fehlt_we_bar     THEN '✗'
+            WHEN u.ohne_schwelle_we_bar    THEN '⊘' END AS "WE Bar",
+       CASE WHEN u.fehlt_we_kueche  THEN '✗'
+            WHEN u.ohne_schwelle_we_kueche THEN '⊘' END AS "WE Küche",
+       CASE WHEN u.fehlt_bewertung  THEN '✗'
+            WHEN u.ohne_schwelle_bewertung THEN '⊘' END AS "Bewertung",
+       CASE WHEN u.fehlt_om         THEN '✗'
+            WHEN u.ohne_schwelle_om        THEN '⊘' END AS "Vor Ort",
+       u.grund_ohne_schwelle                       AS "Warum ⊘"
   FROM mart.round_table_unvollstaendig u
   CROSS JOIN gewaehlt g
  WHERE u.monat = g.monat
    AND u.operativ
    [[AND u.konzept = {{marke}}]]
- ORDER BY u.signale_fehlen DESC, u.betrieb`,
+ ORDER BY u.signale_fehlen DESC, u.signale_ohne_schwelle DESC, u.betrieb`,
   },
   {
     // Diese Kachel hat im Excel kein Pendant, und genau das war das Problem:
@@ -726,7 +743,7 @@ SELECT betrieb                AS "Betrieb",
     schluessel: 'rt_regelwerk_vergleich',
     name: 'Vergleich der Schwellenwerte',
     beschreibung:
-      'Betriebe, bei denen die einheitlichen Round-Table-Schwellen (28/32 %) zu einem anderen Urteil führen als die betriebsindividuellen Schwellen aus LINA. Nur diese Fälle sind strittig — bei allen übrigen erübrigt sich die Diskussion.',
+      'Betriebe, bei denen die einheitlichen Round-Table-Schwellen (34/38 %) zu einem anderen Urteil führen als die betriebsindividuellen Schwellen aus LINA. Nur diese Fälle sind strittig — bei allen übrigen erübrigt sich die Diskussion.',
     anzeige: 'table',
     parameter: [MONAT.monat],
     sql: `${MONAT_CTE}
@@ -748,5 +765,39 @@ SELECT betrieb                AS "Betrieb",
                   AND m.monat   = g.monat
                   AND m.operativ)
  ORDER BY v.betrieb`,
+  },
+
+  /*
+   * DAS REGELWERK ZUM NACHLESEN.
+   *
+   * Seit dem 20.09.2026 gilt der Wareneinsatz je Marke — WE Bar von 17
+   * bis 22, WE Kueche von 23 bis 27, und bei den Deutschen Konzepten gar
+   * nicht. Bis dahin war "welche Schwelle gilt hier eigentlich" eine
+   * Frage, die man aus dem Kopf beantworten konnte; jetzt nicht mehr,
+   * und sie wird bei jedem roten Feld gestellt.
+   *
+   * Die Karte liest mart.ampel_schwelle und nicht eine Liste in dieser
+   * Datei. Sonst haette die naechste Schwellenaenderung wieder zwei
+   * Wahrheiten -- die in der Datenbank, nach der geurteilt wird, und die
+   * auf dem Dashboard, die jemand liest.
+   */
+  {
+    schluessel: 'rt_schwellen',
+    name: 'Welche Schwelle gilt für wen?',
+    beschreibung:
+      'Das Regelwerk, nach dem die sechs Ampeln urteilen — direkt aus der Datenbank gelesen, '
+      + 'nicht abgeschrieben. Seit dem 20.09.2026 gilt der Wareneinsatz JE MARKE; wer keinen '
+      + 'eigenen Satz hat, wird an der Zeile „(alle übrigen Marken)" gemessen. „kein Urteil" '
+      + 'heißt: hier wird bewusst nicht bewertet — der Grund steht in der Spalte „Warum".',
+    anzeige: 'table',
+    sql: `
+SELECT s.bereich_name      AS "Bereich",
+       s.konzept           AS "Marke",
+       s.gilt              AS "Schwelle",
+       s.betriebe_operativ AS "operative Betriebe",
+       s.hinweis           AS "Warum"
+  FROM mart.ampel_schwelle s
+ WHERE s.ist_standard
+ ORDER BY s.reihenfolge, s.ist_rueckfall DESC, s.konzept`,
   },
 ]

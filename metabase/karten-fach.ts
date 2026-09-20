@@ -16,7 +16,7 @@
 // =====================================================================
 
 import type { Karte, Parameter } from './typen'
-import { MONAT_CTE, MONAT_CTE_UMSATZ, MONAT_CTE_BWA, P_MONAT, P_BETRIEB, P_ZEITRAUM, P_MARKE, P_ARTIKEL, WOCHENTAGE } from './gemeinsam'
+import { MONAT_CTE, MONAT_CTE_UMSATZ, MONAT_CTE_BWA, P_MONAT, P_BETRIEB, P_ZEITRAUM, P_MARKE, P_ARTIKEL, WOCHENTAGE, SCHWELLE, ZIEL_PERSONAL_GRUEN, ZIEL_PERSONAL_GRUEN_TEXT } from './gemeinsam'
 
 // Der Monat ist bewusst kein Pflichtfeld — siehe gemeinsam.ts.
 const ZEITRAUM = P_ZEITRAUM
@@ -476,9 +476,9 @@ SELECT r.betrieb                AS "Betrieb",
     visualisierung: {
       'graph.dimensions': ['Betrieb'],
       'graph.metrics': ['Personal o. GF %'],
-      'graph.goal_value': 28,
+      'graph.goal_value': ZIEL_PERSONAL_GRUEN,
       'graph.show_goal': true,
-      'graph.goal_label': 'Grün bis 28 %',
+      'graph.goal_label': ZIEL_PERSONAL_GRUEN_TEXT,
       'graph.x_axis.title_text': 'Personalkosten ohne GF (%)',
     },
   },
@@ -489,7 +489,7 @@ SELECT r.betrieb                AS "Betrieb",
     schluessel: 'pe_quote_tabelle',
     name: 'Personalkostenquote — alle Betriebe',
     beschreibung:
-      'Alle Betriebe mit Ampel und Abstand zur 28-%-Schwelle, gerechnet auf den Personalkosten ohne '
+      'Alle Betriebe mit Ampel und Abstand zur Grün-Schwelle (34 %), gerechnet auf den Personalkosten ohne '
       + 'Geschäftsführung aus der BWA. Ein positiver Wert in „Δ Schwelle" heißt: um so viele '
       + 'Prozentpunkte liegt der Betrieb über der Grenze. „BWA-Alter" sagt, wie alt die zugrunde '
       + 'liegende Buchung ist — bei mehreren Monaten ist das Urteil entsprechend alt.',
@@ -500,7 +500,7 @@ SELECT r.betrieb                            AS "Betrieb",
        r.konzept                            AS "Marke",
        coalesce(ap.emoji, '⚪')              AS "●",
        r.personalkosten_ogf_pct             AS "Personal o. GF %",
-       round(r.personalkosten_ogf_pct - 28, 1) AS "Δ Schwelle",
+       round(r.personalkosten_ogf_pct - ${SCHWELLE('personal', 'gruen')}, 1) AS "Δ Schwelle",
        r.bwa_monat                          AS "BWA-Stand",
        r.bwa_alter_monate                   AS "BWA-Alter (Monate)"
   FROM mart.round_table_monat r
@@ -572,7 +572,7 @@ SELECT betrieb            AS "Betrieb",
   {
     schluessel: 'pe_verlauf',
     name: 'Personalkostenquote im Verlauf',
-    beschreibung: 'Die Personalkostenquote über die Monate, aus den Zahlen des Steuerberaters. Die Linie bei 28 % ist die Grenze, ab der die Ampel im Round Table auf Grün steht.',
+    beschreibung: 'Die Personalkostenquote über die Monate, aus den Zahlen des Steuerberaters. Die Linie bei 34 % ist die Grenze, ab der die Ampel im Round Table auf Grün steht (seit dem 20.09.2026; davor 28 %).',
     anzeige: 'line',
     parameter: [BETRIEB, ZEITRAUM],
     sql: `
@@ -600,7 +600,7 @@ SELECT monat                                                     AS "Monat",
     visualisierung: {
       'graph.dimensions': ['Monat'],
       'graph.metrics': ['Ø Personal o. GF %', 'Median'],
-      'graph.goal_value': 28,
+      'graph.goal_value': ZIEL_PERSONAL_GRUEN,
       'graph.show_goal': true,
       'graph.goal_label': 'Grün-Schwelle',
     },

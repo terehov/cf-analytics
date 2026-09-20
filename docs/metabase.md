@@ -1316,3 +1316,46 @@ Metabase liest `COMMENT ON` nur beim ersten Mal, deshalb tragen alle ihre Kommen
 
 **Neue Prüfzeile:** „Umsatz: Nulltag mit Artikelverkauf ausserhalb des Fensters (3x nachgeholt,
 bleibt null)". Erwartung 0; `geprueft` ist die Zahl aller Lücken, auch der fälligen.
+
+## `mart.ampel_schwelle` — das Regelwerk zum Nachlesen (Migration `0107`, 20.09.2026)
+
+Solange eine Schwelle für alle galt, war „welche Schwelle gilt hier eigentlich" eine Frage,
+die man aus dem Kopf beantworten konnte. Seit der Wareneinsatz je Marke gilt, nicht mehr —
+und sie wird bei jedem roten Feld gestellt.
+
+Die Sicht löst die drei Stufen aus `ampel.bewerte()` auf: eine Zeile je Regelwerk, Bereich
+und Marke, dazu je Bereich die Zeile **„(alle übrigen Marken)"** — der Rückfall aus
+`ampel.regel`, an dem gemessen wird, wer keinen eigenen Satz hat.
+
+```sql
+SELECT bereich_name, konzept, gilt, betriebe_operativ
+  FROM mart.ampel_schwelle WHERE ist_standard
+ ORDER BY reihenfolge, ist_rueckfall DESC, konzept;
+```
+
+Drei Spalten, die man kennen sollte:
+
+* **`gilt`** — die Schwelle als lesbarer Satz („grün bis 17,00 · orange bis 19,00",
+  „kein Urteil", „je Betrieb aus LINA"). Das Dezimalkomma wird von Hand gesetzt:
+  `to_char()` folgt `lc_numeric`, und das steht auf dem Server auf `C`.
+* **`ohne_urteil`** — hier wird bewusst nicht bewertet, der Grund steht in `hinweis`.
+* **`betriebe_operativ`** — wen die Zeile heute trifft. Beim Rückfall sind das genau die
+  operativen Betriebe, deren Marke in diesem Bereich **keinen** eigenen Satz hat. Eine
+  Schwelle ohne Betriebe dahinter ist meist ein Rest und kein Regelwerk.
+
+**Keine Historie.** `ampel.regel` führt immer nur den aktuellen Stand; welche Schwelle im
+Mai galt, weiß diese Datenbank nicht. Deshalb hat die Sicht keine Zeitachse und die Karte
+darauf keinen Monatsfilter (Ausnahme in `uebernehmen.ts` begründet).
+
+### Zwei Sichten, die eine zweite Ursache dazubekommen haben
+
+`mart.round_table_unvollstaendig` trennt seither `fehlt_*` (die Zahl fehlt) von
+`ohne_schwelle_*` (die Zahl ist da, die Marke wird hier bewusst nicht bewertet), dazu
+`signale_ohne_schwelle` und `grund_ohne_schwelle`. Die sechs `ohne_schwelle_*`-Spalten
+bilden die sechs `fehlt_*` vollständig ab, obwohl heute nur `we_bar` belegt ist — wer
+morgen einen Bereich aussetzt, braucht die Spalte schon, sonst verschwindet es wieder still.
+
+`mart.ampel_bereich` kennt in `ampel_text` jetzt drei Fälle statt zwei: ein Urteil schlägt
+**„– keine Schwelle"** schlägt **„– keine Daten"**. Dazu die Spalten `ohne_schwelle` und
+`ohne_schwelle_hinweis`. `ampel IS NULL` heißt damit nicht mehr eindeutig „keine Daten" —
+in keinem der beiden Fälle heißt es „in Ordnung".

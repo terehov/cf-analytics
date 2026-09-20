@@ -1711,3 +1711,69 @@ Phasen 1 bis 4 stehen (13.09.2026). Was fehlt, fehlt nicht im Code:
 * **Die restlichen `mart`-Sichten mit Körnung versehen,** sobald die Migrationen vollständig
   durchlaufen: gepflegt sind 158, gemessen an einer Datenbank mit 64 von 101 Migrationen.
   `mcp.koernung_fehlend` nennt die Lücke in Produktion.
+
+## WE Bar bei den Deutschen Konzepten hat keine Schwelle (offen seit 20.09.2026)
+
+Mit Migration `0107` wird der Getränkeeinsatz der Deutschen Konzepte **bewusst nicht
+bewertet** — die Brauereibindungen machen ihn zwischen diesen Betrieben unvergleichbar
+(Begründung und Messung in `entscheidungen.md` und `befunde-datenlage.md`). Zwölf operative
+Betriebe stehen damit in diesem Bereich ohne Ampel.
+
+**Zu klären, fachlich, nicht technisch:** ob es eine Größe gibt, an der sich der
+Getränkeeinsatz dieser Betriebe messen lässt. Drei Wege, die offenstehen:
+
+* eine Schwelle **je Betrieb** statt je Marke — `core.schwellenwert_betrieb` und die Stufe
+  `schwellenquelle = 'lina_betrieb'` in `ampel.bewerte()` gäbe es dafür schon, gepflegt
+  würde sie aber von Hand.
+* den **gebundenen Anteil** des Getränkeeinsatzes herausrechnen und nur den Rest bewerten.
+  Dafür bräuchte es die Brauereiverträge als Daten; heute liegen sie nirgends.
+* bei „kein Urteil" bleiben und die Betriebe in diesem Bereich über den **Abstand zum
+  Markenmedian** statt über eine Ampel führen (`mart.marke_vergleich` kann das bereits).
+
+Solange nichts entschieden ist, ist der Zustand sichtbar und nicht still:
+`mart.round_table_unvollstaendig.ohne_schwelle_we_bar` mit `grund_ohne_schwelle`, die Karte
+„Was fehlt für ein vollständiges Urteil?" mit ⊘, und `mart.ampel_schwelle` mit „kein Urteil".
+
+**Nebenpunkt derselben Entscheidung:** das Konzept `Lehners` hat eine eigene Zeile in
+`ampel.regel_konzept` bekommen, obwohl es heute keinen Betrieb trägt — damit ein umgehängter
+Betrieb nicht stillschweigend den Wilma-Satz auf den Getränkeeinsatz bekommt. Das war
+**nicht vorgegeben, sondern abgeleitet**; wer es anders will, löscht zwei Zeilen.
+
+## Der Katalogabzug wird von Hand gezogen (offen seit 20.09.2026)
+
+Drei Fehler an `mcp/test/katalog.json` sind am 20.09.2026 behoben (Hergang in
+`fehlerkatalog.md`): die Datei stammte aus einer unvollständigen Datenbank, sie driftet,
+weil `mcp.achsen_ableiten()` jede neue `mart`-Sicht selbsttätig aufnimmt, und der Test, der
+das prüfen soll, verglich kollationsabhängige Reihenfolgen.
+
+**Was bleibt:** die Datei wird weiterhin **von Hand** gezogen, und der Abgleich gegen die
+Datenbank läuft nur, wenn jemand `MCP_DATABASE_URL` setzt. Die Routine steht jetzt in
+AGENTS.md, aber eine Routine ist kein Mechanismus.
+
+**Zu entscheiden**, wenn es wieder weh tut:
+
+* den Abzug im nächtlichen Lauf schreiben und als Diff sichtbar machen — dann ist eine
+  Drift eine Änderung im Arbeitsverzeichnis und kein Zufallsfund.
+* oder `MCP_DATABASE_URL` in der Entwicklungsumgebung fest hinterlegen, damit der Abgleich
+  bei jedem `bun test` mitläuft. Dann braucht es eine lokale Datenbank auf aktuellem Stand
+  — siehe den Punkt zur Testdatenbank weiter oben.
+
+Bis dahin: **nach jeder Migration mit neuer `mart`-Sicht**
+`cd mcp && MCP_DATABASE_URL=… bun run katalog:abzug`, gegen eine **vollständige**
+Datenbank. Ein Abzug aus einem Teilklon trägt dessen Lücken ein und macht die Drift nur
+unauffälliger.
+
+## 37 `mart`-Sichten stehen ohne Körnung im MCP-Katalog (offen seit 20.09.2026)
+
+`mcp.koernung_fehlend` ist die Arbeitsliste, und sie steht bei **37 von 195** Sichten —
+fast durchweg Prüfsichten (`mart.pruefung_*`, `mart.belegarchiv_*`, `mart.bounti_*`). Sie
+sind dort, weil `mcp.achsen_ableiten()` jede neue `mart`-Sicht aufnimmt; eine Körnung
+bekommt sie nur von Hand.
+
+Die zwei gefährlichsten — die mit drei oder mehr Achsen, also den meisten Joins — haben mit
+`0108` eine bekommen: `mart.betrieb_sichtbarkeit` und `mart.posten_ohne_zugriff`. Der Rest
+ist nicht dringend, aber auch nicht harmlos: ein Modell, das `mart.pruefung_bon` für eine
+Bonliste hält, zählt Prüfzeilen und nennt das Ergebnis Bons.
+
+**Erwartung laut `0102`: die Liste wird kleiner, nicht größer.** Derzeit wächst sie mit
+jeder Migration, die eine Prüfsicht anlegt.

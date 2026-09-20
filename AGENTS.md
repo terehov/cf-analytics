@@ -105,7 +105,7 @@ Commit.
 | dich zwischen zwei Wegen entschieden | `entscheidungen.md`, mit Begründung. Revidierte Entscheidungen bleiben stehen, durchgestrichen |
 | am Schema gearbeitet | `datenmodell.md` |
 | am Importer gearbeitet | `importer.md` |
-| eine `mart`-Sicht gebaut oder geändert | `metabase.md` |
+| eine `mart`-Sicht gebaut oder geändert | `metabase.md` — **und** den MCP-Katalogabzug neu ziehen: `cd mcp && MCP_DATABASE_URL=… bun run katalog:abzug`, gegen eine **vollständige** Datenbank. `mcp.achsen_ableiten()` nimmt jede neue Sicht selbsttätig auf, die Abzugsdatei aber nicht — am 20.09.2026 war sie 37 Sichten weit gedriftet |
 | eine Dashboard-Karte gebaut oder eine Visualisierung gewählt | `dashboards.md` — und **warum diese Darstellung**, nicht nur welche |
 | in den echten Daten etwas gefunden, das andere Zahlen relativiert | `befunde-datenlage.md`, mit Datum und der Abfrage, mit der du es gemessen hast |
 | etwas gemessen, das andere Zahlen einordnet | dorthin, wo die Zahl gelesen wird — meist `metabase.md` oder `datenherkunft.md` |

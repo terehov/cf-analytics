@@ -3374,3 +3374,81 @@ abgelehnte Entscheidung.
 daneben zu zeichnen, und das Ampelraster war ausdruecklich gewuenscht. Ob sie auf Dauer
 bleiben, entscheidet die Nutzung — wenn die Modelle die Tabelle ohnehin selbst besser
 zeigen, koennen sie gehen.
+
+---
+
+## Neue Ampelschwellen, und die erste, die je Marke gilt (20.09.2026, Migration `0107`)
+
+Eugene hat das Regelwerk neu gesetzt. Vier der sechs Bereiche bekommen andere Zahlen,
+und beim Wareneinsatz fällt eine Annahme, die seit `0004` im Schema steckte: **eine
+Schwelle für alle Betriebe**.
+
+| Bereich | Marke | grün | orange | davor |
+|---|---|---|---|---|
+| Umsatz vs. Vorjahr | alle | ≥ +5 % | ≥ 0 % | 10 / 0 |
+| Personal o. GF | alle | ≤ 34 | ≤ 38 | 28 / 32 |
+| Online-Bewertung | alle | ≥ 4,40 | ≥ 4,00 | unverändert |
+| OM vor Ort | alle | ≥ 4 | ≥ 3 | unverändert |
+| WE Bar | Wilma Wunder | ≤ 17 | ≤ 19 | 23 / 26 für alle |
+| | Aposto | ≤ 19 | ≤ 22 | |
+| | Enchilada | ≤ 22 | ≤ 24 | |
+| | Deutsche Konzepte | **kein Urteil** | | |
+| | alle übrigen | ≤ 17 | ≤ 19 | |
+| WE Küche | Wilma Wunder | ≤ 25 | ≤ 27 | 25 / 30 für alle |
+| | Aposto | ≤ 23 | ≤ 25 | |
+| | Enchilada | ≤ 24 | ≤ 26 | |
+| | Deutsche Konzepte | ≤ 25 | ≤ 27 | |
+| | alle übrigen | ≤ 25 | ≤ 27 | |
+
+### Warum eine Tabelle und kein zweites Regelwerk
+
+`ampel.regelwerk` unterscheidet eine **Philosophie** — alle gleich messen (`round_table_global`)
+gegen LINAs betriebsindividuelle Werte (`lina_betrieb`). Eine Marke ist keine andere
+Philosophie, sondern eine andere **Zahl** in derselben. Als Regelwerk modelliert bräuchte
+jede Marke ein eigenes, und jede Auswertung eine Fallunterscheidung darüber, welches gilt.
+
+Deshalb `ampel.regel_konzept`: eine Zeile je Regelwerk, Bereich und Konzept, die
+`ampel.regel` für die Betriebe dieser Marke überschreibt. `ampel.bewerte()` löst seither in
+drei Stufen auf, von spezifisch nach allgemein — Betrieb (LINA) → Marke → Rückfall.
+
+### Entscheidung: WE Bar bei den Deutschen Konzepten bleibt ohne Urteil
+
+Die Brauereibindungen dieser Betriebe machen den Getränkeeinsatz zwischen ihnen
+unvergleichbar; eine gemeinsame Schwelle wäre geraten. Nachgemessen am 20.09.2026 in
+Produktion: die zwölf operativen Betriebe mit Zahl streuen von **7,50 % bis 27,59 %** —
+jede einheitliche Grenze schnitte mitten hindurch.
+
+Die Alternative — die alten 23/26 einfach weiterlaufen lassen — wurde verworfen: eine
+Ampel, die niemand begründen kann, ist schlechter als keine. Die Zahl bleibt in jeder
+Tabelle sichtbar, nur ohne Farbe.
+
+**Das ist ausdrücklich kein fehlendes Signal im Sinne von `0080`, sondern ein ausgesetztes.**
+Der Unterschied steht in getrennten Spalten von `mart.round_table_unvollstaendig`:
+`fehlt_we_bar` heißt „keine Zahl, jemand muss nachtragen", `ohne_schwelle_we_bar` heißt
+„Zahl da, Schwelle offen — nachtragen hilft nicht, entscheiden hilft". Ohne diese Trennung
+wäre `unvollstaendig` wieder das, wovor `0080` warnt: ein anderes Wort für „keine Ahnung".
+
+### Entscheidung: der Rückfall ist der Wilma-Satz
+
+Wer keinen eigenen Satz hat — Kooperationspartner, Besitos, Schlager Cafe, Ghost Kitchen
+und jede Marke, die morgen dazukommt — wird an Wilma Wunder gemessen. Eugenes Vorgabe.
+
+Die Folge, die man kennen muss: **die Wilma-Zahlen stehen zweimal** — einmal als Rückfall
+in `ampel.regel`, einmal als eigener Satz in `ampel.regel_konzept`. Das ist Absicht. Die
+beiden bedeuten Verschiedenes und dürfen auseinanderlaufen, ohne dass jemand erst die
+Herkunft der Zahl rekonstruieren muss.
+
+### Nebenentscheidung: `Lehners` bekommt denselben Satz wie die Deutschen Konzepte
+
+Das Konzept `Lehners` trägt heute keinen Betrieb — die Lehners-Häuser laufen unter dem
+Hauptkonzept „Deutsche Konzepte" (nachgemessen 20.09.2026). Es bekommt trotzdem eine
+Zeile. Würde ein Betrieb morgen dorthin umgehängt, bekäme er sonst stillschweigend den
+Wilma-Satz auf den Getränkeeinsatz — genau das Urteil, das oben als geraten verworfen wurde.
+**Nicht von Eugene vorgegeben, sondern abgeleitet; wer es anders will, löscht zwei Zeilen
+aus `ampel.regel_konzept`.**
+
+### „Gelb" heißt weiter „Orange"
+
+Eugene sagt bei Wareneinsatz und Bewertungen „gelb", beim Personal „orange". Die mittlere
+Stufe bleibt im System `orange` 🟠 — auf Nachfrage bestätigt. Eine Umbenennung hätte nur die
+Beschriftung in `ampel.beschriftung` betroffen, nicht den Schlüssel.

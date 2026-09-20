@@ -2113,3 +2113,45 @@ nach exakt drei Fehlnächten: die Erholung folgt unserem Zeitplan.
 Nächten — rund 1,7 GB je Monat im Regelbetrieb, Datenbank 16 GB. Je Nacht liefert
 `la:belegliste` 128 MB Rohtext (31 Abzüge zu 4,2 MB), `fn:bestellungen` 43 MB,
 `getArtikelverkaufsbericht` 24 MB; Postgres komprimiert das etwa fünffach.
+
+## Was die neuen Schwellen an den Urteilen ändern (20.09.2026)
+
+Gemessen in Produktion über `mart.round_table_monat`, **August 2026, 57 operative
+Betriebe**, alte gegen neue Schwellen auf denselben Zahlen. Die Werte sind unverändert —
+nur das Regelwerk ist ein anderes (Migration `0107`).
+
+| Bereich | 🟢 alt | 🟠 alt | 🔴 alt | 🟢 neu | 🟠 neu | 🔴 neu | ⚪ neu |
+|---|---|---|---|---|---|---|---|
+| Umsatz vs. VJ | 7 | 14 | 32 | **11** | **10** | 32 | 4 |
+| Personal o. GF | 5 | 4 | 43 | **14** | **16** | **22** | 5 |
+| WE Bar | 44 | 3 | 5 | **30** | 4 | **6** | **17** |
+| WE Küche | 38 | 10 | 4 | **34** | 10 | **8** | 5 |
+
+Drei Dinge, die man daraus lesen sollte:
+
+**Das Personal war das eigentliche Thema.** 43 von 52 bewerteten Betrieben standen auf rot,
+gegen eine Schwelle, die im Excel-Blatt „Regeln" ausdrücklich als „Default, bei Bedarf Werte
+anpassen" stand. Eine Ampel, bei der vier von fünf rot sind, sortiert nicht mehr — sie
+färbt. Mit 34/38 sind es 22 rot, 16 orange, 14 grün; das ist wieder eine Verteilung, aus
+der sich eine Arbeitsliste ableiten lässt. Die Grundaussage von
+„Personalquoten bis 1132 %" weiter oben bleibt davon unberührt: die Quoten sind hoch, die
+Schwelle war nur keine brauchbare Trennlinie mehr.
+
+**Beim Umsatz verschiebt sich nichts nach rot.** 32 rot vorher wie nachher — die Grenze
+zwischen rot und orange liegt unverändert bei 0 %. Verschoben hat sich nur die Grenze
+zwischen grün und orange: vier Betriebe zwischen +5 % und +10 % sind von orange nach grün
+gewandert.
+
+**Beim Getränkeeinsatz wachsen die weißen Felder von 5 auf 17.** Zwölf davon sind die
+Deutschen Konzepte, für die bewusst nicht mehr bewertet wird (Begründung in
+`entscheidungen.md`). Sie stehen nicht unter „keine Daten": `mart.round_table_unvollstaendig`
+führt sie in `ohne_schwelle_we_bar`, mit Grund. **Wer Ampeln zählt, muss beides
+auseinanderhalten** — sonst sieht eine bewusste Entscheidung aus wie eine Datenlücke.
+
+### Die Streuung, die gegen eine gemeinsame WE-Bar-Schwelle spricht
+
+Die zwölf operativen Deutschen Konzepte mit Getränkeeinsatzzahl, August 2026:
+**7,50 % bis 27,59 %** (Ratskeller Saarbrücken bis Wirtshaus Lautenschlager). Zum Vergleich
+liegen die drei Sätze, die Eugene gesetzt hat, zwischen 17 und 22 Prozent grün. Jede
+einheitliche Grenze schnitte diese Spanne mitten durch, und zwar nicht nach Leistung,
+sondern nach Brauereivertrag.

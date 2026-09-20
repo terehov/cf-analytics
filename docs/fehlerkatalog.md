@@ -4078,3 +4078,104 @@ SELECT lauf_id, status, gestartet_am FROM sync.lauf ORDER BY lauf_id DESC LIMIT 
 Was der abgeschossene Lauf bis dahin geschafft hatte, blieb: LINA und FoodNotify waren
 vollständig, es fehlten nur die Belegarchiv-Zählungen. Der nächste Nachtlauf holt sie nach und
 rechnet Phase B.
+
+## Der MCP-Katalog sah vierzehn Sichten nicht an — darunter die wichtigste (20.09.2026)
+
+**Symptom.** Keins. Genau das ist der Punkt.
+
+```
+-- in Produktion, 20.09.2026
+SELECT count(*) FROM mcp.sicht_achse WHERE sicht = 'mart.round_table_monat';
+--> 0
+```
+
+Null Achsen für die meistgenutzte Sicht des Hauses. Dasselbe für `round_table_trend`,
+`deckungsbeitrag_warengruppe`, `vergleichstag_basis` und zehn weitere — **genau die
+vierzehn materialisierten Sichten, und nur die.** Sie standen im Katalog, mit Körnung, mit
+Fallstricken, und ohne eine einzige Spalte.
+
+**Ursache.** `mcp.achsen_ableiten()` und `mcp.sicht_katalog` (beide `0102`) lasen die
+Spalten aus `information_schema.columns`. Dort stehen materialisierte Sichten **nicht** —
+der SQL-Standard kennt sie nicht, also führt PostgreSQL sie dort nicht. Keine Fehlermeldung,
+keine leere Tabelle, nur eine leere Ergebnismenge. Die Sichten**liste** war nie betroffen:
+sie zieht `pg_matviews` ausdrücklich mit dazu. Nur die Spalten nicht.
+
+**Was das im Betrieb bedeutete**, seit dem Aufbau des Katalogs am 13.09.2026:
+
+| | |
+|---|---|
+| `achsen_zeigen` | schlug für diese vierzehn **keinen einzigen Join** vor |
+| `sicht_beschreiben` | nannte **keine Spalte** — das Modell riet sie aus dem Namen |
+| `summe_ungeprueft` | konnte auf ihnen **nie** anschlagen. `SELECT sum(om_score) FROM mart.round_table_monat` — eine Summe über Schulnoten — lief ungewarnt durch |
+
+Der Kommentar an `mcp.sicht_katalog` sagt es selbst: „Die Spaltenliste trägt die Prüfung."
+Ohne sie ist die Prüfung auf diesen Sichten blind.
+
+**Behoben** in Migration `0108`: `pg_attribute` statt `information_schema.columns`, mit
+ausgeschriebener `relkind IN ('r','v','m','p','f')` — damit der nächste Relationstyp
+auffällt, statt still herauszufallen. Dieselbe Änderung in `mcp/src/katalog_export.ts`.
+Danach: `round_table_monat` 3 Achsen, `round_table_trend` 4, 375 Zuordnungen statt 331.
+
+**Was ihn künftig verhindert.** `katalog_abzug.test.ts` vergleicht seither auch die
+Sichtenliste, und die Abzugsdatei führt die Spalten — eine leere Spaltenliste bei einer
+Sicht, die welche hat, fällt damit beim nächsten Abgleich auf.
+
+**Die Lehre ist älter als dieser Fehler und steht schon in Regel 10:** eine Abfrage, die
+„nichts gefunden" bedeutet, sieht aus wie eine, die nichts zu finden hatte.
+`information_schema` ist genau so eine Quelle — sie antwortet auf Fragen nach Objekten,
+die sie nicht kennt, mit Schweigen statt mit einem Fehler.
+
+## Die Abzugsdatei des MCP-Katalogs stammte aus einer unvollständigen Datenbank (20.09.2026)
+
+**Symptom.** `mcp/test/katalog.json` führte **159** Sichten, `mcp.sicht` in Produktion
+**196**. Und **77** der 159 hatten keine Spaltenliste, wo es in einer vollständigen
+Datenbank 14 sind. Gefallen ist nichts: die zehn Fallenfragen laufen gegen diese Datei und
+waren grün.
+
+**Ursache.** Die Datei wurde von Hand gezogen (`bun run katalog:abzug`), und zwar gegen
+eine Entwicklungsdatenbank, der ein Großteil der `mart`-Sichten fehlte — vermutlich der
+Schema-Klon `lina_mcp_0915`. Die Fallenfragen prüften seither gegen einen Katalog, den es
+so nie gegeben hat.
+
+**Dazu driftet sie von selbst:** `mcp.achsen_ableiten()` trägt jede neue `mart`-Sicht
+selbsttätig ein, und der nächtliche Lauf ruft sie auf. Die Liste wächst also ohne
+Migration, ohne Commit, ohne dass etwas meldet.
+
+**Warum es niemandem auffiel.** `katalog_abzug.test.ts` vergleicht genau das — aber nur,
+wenn `MCP_DATABASE_URL` gesetzt ist, sonst `describe.skip`. Der Skip ist im Testlauf
+sichtbar (`3 pass, 2 skip`), nur setzt die Variable im Alltag niemand. Und selbst wer sie
+setzte, kam nicht weiter — siehe den nächsten Eintrag.
+
+**Behoben:** Datei am 20.09.2026 gegen einen vollständigen Klon auf Stand `0108` neu
+gezogen, vorher gegen Produktion abgeglichen (fünf Inhaltsprüfsummen über `mcp.sicht`,
+`mcp.achse`, `mcp.kennzahl`, `mcp.fallstrick`, `mcp.sicht_achse` — alle identisch). Der
+Test vergleicht seither auch die Sichtenliste.
+
+**Was ihn künftig verhindert.** Die Zeile in AGENTS.md unter *Dokumentationspflicht*: wer
+eine `mart`-Sicht baut, zieht den Abzug neu. **Gegen eine vollständige Datenbank**, nicht
+gegen einen Teilklon.
+
+## Derselbe Test hätte gegen Produktion nie bestehen können — die Kollation (20.09.2026)
+
+**Symptom.** `katalog_abzug.test.ts` vergleicht mit `toEqual` zwei Arrays, deren
+Reihenfolge aus dem `ORDER BY` der Abfrage kam. Die hängt an der Kollation der Datenbank:
+
+```
+lokal (Postgres.app, en_US.UTF-8)   … kalender_fehlend, kalender_zeitraum, kalendereffekt …
+Produktion (Linux, glibc)           … kalendereffekt, kalender_fehlend, kalendertag_lage …
+```
+
+Beide heißen `en_US.UTF-8` und meinen Verschiedenes: glibc übergeht den Unterstrich auf der
+ersten Vergleichsstufe, macOS nicht. Bei **vollkommen gleichem Inhalt** ist die Reihenfolge
+eine andere, und `toEqual` auf Arrays vergleicht der Reihe nach.
+
+**Der Test war damit doppelt wirkungslos:** er lief nicht, und wenn er gelaufen wäre, hätte
+er über eine Sortierung gemeldet, die niemanden interessiert — mit einem Diff, der wie
+Inhaltsdrift aussieht.
+
+**Behoben:** `mcp/src/katalog_ordnung.ts` sortiert nach UTF-16-Code-Einheiten, in
+JavaScript. Abzug und Test benutzen dieselbe Funktion; das `ORDER BY` in SQL bleibt der
+Lesbarkeit halber stehen, verlassen tut sich niemand mehr darauf.
+
+**Die Lehre:** ein Vergleich über Datenbankgrenzen hinweg darf seine Reihenfolge nicht aus
+der Datenbank nehmen. `en_US.UTF-8` ist kein Versprechen, sondern ein Name.
