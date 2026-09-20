@@ -4179,3 +4179,73 @@ Lesbarkeit halber stehen, verlassen tut sich niemand mehr darauf.
 
 **Die Lehre:** ein Vergleich über Datenbankgrenzen hinweg darf seine Reihenfolge nicht aus
 der Datenbank nehmen. `en_US.UTF-8` ist kein Versprechen, sondern ein Name.
+
+## Drei Sichten liefen für Metabase und waren für die Leserolle unlesbar (20.09.2026, eine halbe Stunde nach dem Deploy)
+
+**Symptom.** `mart.ampel_schwelle`, `mart.ampel_bereich` und
+`mart.round_table_unvollstaendig` gaben über den MCP-Zugang nur noch
+`current transaction is aborted` zurück. In Metabase lief alles. Direkt als `mcp_leser`
+gefragt, steht da, was wirklich los ist:
+
+```
+ERROR:  permission denied for schema core
+LINE 8:   FROM core.betrieb_konzept bk
+CONTEXT:  SQL function "hauptkonzept" during inlining
+```
+
+**Ursache — die Regel, an der es hängt:**
+
+> Eine **Sicht** greift auf ihre Tabellen mit den Rechten ihres **Eigentümers** zu.
+> Ein **Funktionsrumpf** greift mit den Rechten des **Aufrufers** zu — auch dann, wenn die
+> Funktion aus einer Sicht heraus gerufen wird.
+
+Deshalb liest `mcp_leser` seit jeher `mart.konzept_zuordnung`, obwohl darunter
+`core.betrieb_konzept` liegt, das `0105` ihm ausdrücklich entzieht. Migration `0107` hat
+dieselbe Auflösung in `ampel.hauptkonzept()` gelegt — und damit den Schutz der Sicht
+aufgehoben, lautlos.
+
+**Warum es durch alle Prüfungen kam:**
+
+* Lokal getestet wurde als **Eigentümer**. Da läuft es.
+* Die 391 MCP-Tests liefen gegen die echte `mcp_leser`-Rolle — aber keiner davon las eine
+  der drei Sichten.
+* Und die Probe, mit der ich es nach dem Deploy prüfen wollte, war untauglich:
+  **`SELECT count(*) FROM <sicht>` wertet die Spaltenausdrücke der Sicht gar nicht aus.**
+  Die Funktion wurde nie gerufen, die Probe war grün, und ich habe daraufhin eine halbe
+  Stunde lang eine Laufzeitursache gesucht, die es nicht gab.
+
+**Ein zweiter Fall, älter und gleich mitbehoben.** `mart.quelle_zulauf` ruft
+`mart.quelle_messen()`, und die liest `sync`. Die Sicht steht seit `0102` im MCP-Katalog
+und war für die Leserolle **seit `0076` nie lesbar** — ausgerechnet die Zulaufprüfung, die
+nach Regel 10 sichtbar machen soll, wenn eine Quelle stillsteht.
+
+**Behoben** in `0109`, mit zwei Wegen, je nach Fall:
+
+| | |
+|---|---|
+| Auflösung in die **Sicht** ziehen | `ampel.konzept_je_betrieb` löst jetzt selbst auf, `ampel.hauptkonzept()` ist nur noch eine Hülle darum. Dasselbe für `ampel.bewerte()` über die neue Sicht `ampel.schwelle_je_betrieb` |
+| **SECURITY DEFINER** mit festem `search_path` | `mart.quelle_messen()` — dort geht der erste Weg nicht, der zweite Zweig baut die Abfrage dynamisch aus `sync.quelle` zusammen |
+
+**Was ihn künftig verhindert.** `mart.leserolle_pruefung` (Erwartung: leer) findet jede
+Funktion in `ampel`/`mart`, deren Rumpf in ein gesperrtes Schema greift, und steht in
+`mart.pruefung_uebersicht`. Dazu zwei Tests in `mcp/test/ausfuehren.test.ts`, die **gegen
+die echte Leserolle** laufen: einer liest die vier betroffenen Sichten mit `SELECT *` —
+ausdrücklich nicht mit `count(*)` —, der andere hält die Prüfsicht auf leer.
+
+## Die echte Fehlermeldung des MCP-Servers wird vom Datenstand verdeckt (20.09.2026)
+
+**Symptom.** Jeder Fehler in einer Abfrage kommt als `current transaction is aborted,
+commands ignored until end of transaction block` zurück. Die Ursache — hier
+`permission denied for schema core`, ebenso gut ein `statement timeout` — steht nirgends.
+
+**Ursache.** Der Server hängt an jede Antwort den Datenstand. Scheitert die eigentliche
+Abfrage, läuft diese zweite auf derselben, bereits abgebrochenen Transaktion und meldet
+den Folgefehler. Der wird zurückgegeben, der erste ist weg.
+
+**Folge im Alltag:** Ich habe deshalb zuerst auf einen Zeitüberschreitung getippt, lokal
+65 ms gemessen und nichts gefunden. Die Diagnose stand erst, als ich die Abfrage direkt als
+`mcp_leser` gegen die Datenbank gestellt habe, am Server vorbei.
+
+**Noch nicht behoben** — steht in `docs/offene-punkte.md`. Der Fix gehört in
+`mcp/src/db.ts`: bei einem Fehler zuerst zurückrollen, den Datenstand auf einer frischen
+Verbindung holen oder ganz weglassen, und die ursprüngliche Meldung durchreichen.

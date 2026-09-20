@@ -896,3 +896,30 @@ nach Objekten, die es nicht kennt, mit einer leeren Menge und nicht mit einem Fe
 über `mart` inventarisiert, nimmt `pg_class`/`pg_attribute`. Die Sichtenliste in `0102`
 macht es an einer Stelle schon richtig (`UNION ... pg_matviews`) — nur bei den Spalten
 nicht.
+
+## Rechte: Sicht gegen Funktionsrumpf (Migration `0109`, 20.09.2026)
+
+**Die Regel, die `0107` verletzt hat und die für jede künftige Sicht gilt:**
+
+> Eine **Sicht** greift auf ihre Tabellen mit den Rechten ihres **Eigentümers** zu.
+> Ein **Funktionsrumpf** greift mit den Rechten des **Aufrufers** zu — auch dann, wenn die
+> Funktion aus einer Sicht heraus gerufen wird.
+
+Darauf beruht die ganze Sichtbarkeitsordnung dieses Schemas: `mcp_leser` darf `core`,
+`raw`, `part` und `sync` nicht sehen (`0105`), liest aber `mart.konzept_zuordnung`, weil
+die Sicht den Zugriff für ihn übernimmt. Wer denselben Zugriff in eine Funktion verlegt,
+hebt diesen Schutz auf — und merkt es nicht, weil der Entwickler als Eigentümer testet.
+
+`ampel.konzept_je_betrieb` löst die Marke deshalb seit `0109` selbst auf, und
+`ampel.hauptkonzept()` ist nur noch eine Hülle um die Sicht. Dasselbe für
+`ampel.bewerte()`: es liest `core.schwellenwert_betrieb` über `ampel.schwelle_je_betrieb`
+statt direkt. Das war noch nicht zugeschnappt — die Stufe greift nur im Regelwerk
+`lina_betrieb` —, wäre aber beim nächsten Schwellenwechsel derselbe Fehler gewesen.
+
+Wo der erste Weg nicht geht, weil die Abfrage dynamisch entsteht, bleibt **`SECURITY
+DEFINER` mit festem `search_path`** — so bei `mart.quelle_messen()`, deren zweiter Zweig
+Schema, Tabelle und Zeitspalte aus `sync.quelle` zusammensetzt. Vertretbar dort, weil die
+Funktion nichts entgegennimmt, nur liest und drei Zeitstempel zurückgibt; die Bezeichner
+stammen aus einer Tabelle, in die nur der Importer schreibt, und gehen durch `format('%I')`.
+
+Gefunden wird der nächste Fall von `mart.leserolle_pruefung`.

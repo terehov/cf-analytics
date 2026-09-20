@@ -1359,3 +1359,34 @@ morgen einen Bereich aussetzt, braucht die Spalte schon, sonst verschwindet es w
 **„– keine Schwelle"** schlägt **„– keine Daten"**. Dazu die Spalten `ohne_schwelle` und
 `ohne_schwelle_hinweis`. `ampel IS NULL` heißt damit nicht mehr eindeutig „keine Daten" —
 in keinem der beiden Fälle heißt es „in Ordnung".
+
+## `mart.leserolle_pruefung` — hebt eine Funktion den Schutz ihrer Sicht auf? (Migration `0109`)
+
+**Die Regel, die dahintersteht, gilt für jede neue `mart`-Sicht:**
+
+> Eine **Sicht** greift auf ihre Tabellen mit den Rechten ihres **Eigentümers** zu.
+> Ein **Funktionsrumpf** mit denen des **Aufrufers** — auch aus einer Sicht heraus.
+
+`mcp_leser` darf `core`, `raw`, `part` und `sync` nicht sehen (`0105`). Solange eine Sicht
+selbst dorthin greift, ist das kein Problem: sie tut es mit den Rechten ihres Eigentümers.
+Sobald derselbe Zugriff in eine Funktion wandert, ist die Sicht für die Leserolle tot —
+und zwar lautlos, denn als Eigentümer getestet läuft alles. Am 20.09.2026 hat das drei
+Sichten gekostet, Hergang in `fehlerkatalog.md`.
+
+Zwei Wege heraus, beide in `0109` vorgeführt:
+
+* **Die Auflösung in die Sicht ziehen.** So macht es `ampel.konzept_je_betrieb`;
+  `ampel.hauptkonzept()` ist nur noch eine Hülle darum. Der Vorzugsweg.
+* **`SECURITY DEFINER` mit festem `search_path`.** Nur, wenn der erste Weg nicht geht —
+  bei `mart.quelle_messen()` etwa, weil deren zweiter Zweig die Abfrage dynamisch aus
+  `sync.quelle` zusammenbaut.
+
+`mart.leserolle_pruefung` findet den nächsten Fall, **Erwartung: leer**, und steht in
+`mart.pruefung_uebersicht`. Sie ist eine Textsuche im Funktionsrumpf: sie findet keinen
+Zugriff über dynamisches SQL und keinen über einen Alias. Leer heißt „nichts
+Offensichtliches", nicht „bewiesen sauber" — der harte Nachweis sind die zwei Tests in
+`mcp/test/ausfuehren.test.ts`, die gegen die echte Leserolle lesen.
+
+**Und die Probe, die nichts beweist:** `SELECT count(*) FROM <sicht>` wertet die
+Spaltenausdrücke der Sicht **nicht** aus. Wer so prüft, ob eine Sicht lesbar ist, bekommt
+grün und weiß nichts. `SELECT * FROM <sicht> LIMIT 1` nehmen.

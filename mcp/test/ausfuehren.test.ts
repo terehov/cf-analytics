@@ -76,6 +76,34 @@ lauf('Ausfuehrung', () => {
     await expect(abfragen(`SELECT 1 FROM core.betrieb LIMIT 1`)).rejects.toThrow(/permission denied/i)
   })
 
+  /**
+   * BEFUND 20.09.2026, eine halbe Stunde nach dem Deploy von 0107.
+   *
+   * Eine SICHT greift auf ihre Tabellen mit den Rechten ihres EIGENTUEMERS
+   * zu, ein FUNKTIONSRUMPF mit denen des AUFRUFERS -- auch aus einer Sicht
+   * heraus. 0107 hatte die Konzeptaufloesung in ampel.hauptkonzept() gelegt,
+   * und damit waren drei mart-Sichten fuer diese Rolle unlesbar, waehrend
+   * Metabase sie anstandslos zeigte.
+   *
+   * WARUM DIE PROBE VORHER GRUEN WAR: `SELECT count(*) FROM <sicht>` wertet
+   * die Spaltenausdruecke der Sicht gar nicht aus -- die Funktion wurde nie
+   * gerufen. Deshalb hier `SELECT *` mit LIMIT und nicht count(*).
+   */
+  test('die Auswertungssichten sind fuer die Leserolle wirklich lesbar', async () => {
+    for (const sicht of ['mart.ampel_schwelle', 'mart.ampel_bereich',
+                         'mart.round_table_unvollstaendig', 'mart.quelle_zulauf']) {
+      await abfragen(`SELECT * FROM ${sicht} LIMIT 1`)
+    }
+  })
+
+  /** Und derselbe Befund als Regel statt als Liste: mart.leserolle_pruefung
+   *  findet jede Funktion in ampel/mart, die den Schutz ihrer Sicht aufhebt. */
+  test('kein Funktionsrumpf hebt den Schutz seiner Sicht auf', async () => {
+    const offen = await abfragen<{ funktion: string; greift_auf: string }>(
+      `SELECT funktion, greift_auf FROM mart.leserolle_pruefung`)
+    expect(offen).toEqual([])
+  })
+
   test('schreiben geht nur ins Protokoll, sonst nirgends', async () => {
     await expect(abfragen(`DELETE FROM manual.massnahme WHERE false`))
       .rejects.toThrow(/permission denied|read-only/i)

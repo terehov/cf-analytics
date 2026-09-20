@@ -1777,3 +1777,20 @@ Bonliste hält, zählt Prüfzeilen und nennt das Ergebnis Bons.
 
 **Erwartung laut `0102`: die Liste wird kleiner, nicht größer.** Derzeit wächst sie mit
 jeder Migration, die eine Prüfsicht anlegt.
+
+## Der MCP-Server verdeckt seine eigenen Fehlermeldungen (offen seit 20.09.2026)
+
+Scheitert eine Abfrage, kommt `current transaction is aborted` zurück und nicht die
+Ursache. Der Server hängt an jede Antwort den Datenstand; diese zweite Abfrage läuft auf
+derselben, bereits abgebrochenen Transaktion und liefert den Folgefehler. Hergang in
+`fehlerkatalog.md`.
+
+**Das kostet Zeit, und zwar genau dann, wenn man sie nicht hat.** Am 20.09.2026 sah ein
+`permission denied for schema core` wie eine Zeitüberschreitung aus; die Diagnose stand
+erst, als die Abfrage am Server vorbei direkt als `mcp_leser` lief.
+
+**Zu tun**, in `mcp/src/db.ts`: bei einem Fehler zuerst `ROLLBACK`, den Datenstand auf
+einer frischen Verbindung holen oder im Fehlerfall ganz weglassen, und die ursprüngliche
+Meldung durchreichen. Ein Timeout sollte als Timeout ankommen und ein Rechtefehler als
+Rechtefehler — beides sind Meldungen, nach denen ein Modell die Abfrage berichtigen kann,
+und genau dafür ist die Antwortform gebaut.
