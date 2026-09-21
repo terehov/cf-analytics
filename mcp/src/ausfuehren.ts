@@ -23,7 +23,7 @@
 import type pg from 'pg'
 import { pool } from './db'
 import type { Katalog } from './katalog'
-import { sichtlage } from './gesundheit'
+import { nachpruefen, sichtlage } from './gesundheit'
 import { pgFehlerText, sqlstateVon } from './pg_fehler'
 import { pruefen, type Befund, type Pruefergebnis } from './pruefen'
 import { darstellungshinweis, spaltenBeschreiben, type SpalteInfo } from './spalten_info'
@@ -426,12 +426,35 @@ async function laufenLassen(
 /**
  * Freies SQL: pruefen, schaetzen, ausfuehren.
  */
+/**
+ * Pruefen — und was der Gesundheitslauf als defekt fuehrt, vorher nachprobieren.
+ *
+ * Die erste Pruefung sagt, welche Sichten die Abfrage beruehrt und welche davon
+ * laut Momentaufnahme liegen. Genau die werden JETZT probiert (gesundheit.ts,
+ * nachpruefen), dann wird mit dem berichtigten Stand noch einmal geprueft. Im
+ * Normalfall — nichts verdaechtig — ist das eine Pruefung und keine Probe.
+ *
+ * Warum nicht einfach auf den Messwert sperren: am 21.09.2026 stammte der
+ * Messwert von vor der Migration, die den Defekt behob, und der Pruefer
+ * sperrte eine Stunde lang gesunde Sichten. Ein Messwert ist ein Anlass zu
+ * pruefen, kein Urteil.
+ */
+export async function pruefenMitNachprobe(sql: string, katalog: Katalog): Promise<Pruefergebnis> {
+  const erste = pruefen(sql, katalog, sichtlage())
+  const lage = sichtlage()
+  const verdaechtig = erste.sichten.filter(s => lage.defekt.has(s) || lage.unklar.has(s))
+  if (!verdaechtig.length) return erste
+  await nachpruefen(verdaechtig)
+  return pruefen(sql, katalog, sichtlage())
+}
+
 export async function abfrageAusfuehren(
   sql: string, katalog: Katalog, nutzer: Nutzer,
 ): Promise<Ergebnis> {
-  // Mit der Lage aus dem Gesundheitslauf: eine defekte Sicht wird hier
-  // abgewiesen, statt in einem Postgres-Fehler zu enden (21.09.2026).
-  const pruefung = pruefen(sql, katalog, sichtlage())
+  // Mit der Lage aus dem Gesundheitslauf, nachprobiert: eine Sicht, die JETZT
+  // nicht laeuft, wird hier abgewiesen, statt in einem Postgres-Fehler zu
+  // enden (21.09.2026).
+  const pruefung = await pruefenMitNachprobe(sql, katalog)
 
   if (!pruefung.erlaubt) {
     await protokollieren({ nutzer, werkzeug: 'abfrage_ausfuehren', sql,

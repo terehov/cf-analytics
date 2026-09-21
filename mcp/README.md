@@ -188,9 +188,12 @@ genau das drei Sichten kaputt in Produktion gebracht, am 21.09. elf.
 Was der Lauf findet, geht ans Modell:
 
 * `abfrage_ausfuehren` und `abfrage_pruefen` **sperren** eine Abfrage auf eine defekte Sicht,
-  mit der Postgres-Meldung im Befund `sicht_defekt` — aber nur, wenn die Messung jünger als
-  sechs Stunden ist. Sonst bleibt es eine Warnung: eine reparierte Sicht darf nicht an einem
-  alten Messwert hängen bleiben.
+  mit der Postgres-Meldung im Befund `sicht_defekt` — aber erst, nachdem sie die Sicht
+  **selbst nachprobiert** haben: ein Messwert ist ein Anlass zu prüfen, kein Urteil.
+  Gesperrt wird nur, was jetzt nicht läuft. Der Grund steht in `docs/fehlerkatalog.md`
+  (21.09.2026, abends): nach dem ersten Deploy sperrte der Prüfer eine Stunde lang auf
+  einem Messwert von vor der Migration. Und nur, wenn die Messung jünger als sechs Stunden
+  ist — sonst bleibt es eine Warnung.
 * `sichten_suchen` liefert eine defekte Sicht **weiter mit**, gekennzeichnet. Sie
   wegzulassen wäre bequemer und schlechter — das Modell suchte weiter und wiche auf eine
   Sicht mit anderer Körnung aus.

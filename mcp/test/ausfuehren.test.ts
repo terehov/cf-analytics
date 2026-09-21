@@ -15,7 +15,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { parserBereitstellen } from '../src/ast'
 import { abfrageAusfuehren, Abfragefehler, Gesperrt, probeplanen } from '../src/ausfuehren'
 import { abfragen, pool } from '../src/db'
-import { defekteSichten, gesundheitPruefen } from '../src/gesundheit'
+import { defekteSichten, gesundheitPruefen, standSetzen, unklareSichten } from '../src/gesundheit'
 import { katalogLaden } from '../src/katalog_laden'
 import type { Katalog } from '../src/katalog'
 
@@ -264,6 +264,40 @@ lauf('Ausfuehrung', () => {
   })
 
   /**
+   * DER DEPLOY-FALL VOM 21.09.2026 ABENDS, nachgestellt. Der erste
+   * Gesundheitslauf lief vor der Migration, hielt acht Sichten als defekt im
+   * Speicher, und nach der Migration sperrte der Pruefer eine Stunde lang
+   * gesunde Sichten — auf einem Messwert, den mart.sicht_defekt laengst nicht
+   * mehr deckte. Hier: ein erfundener Defekt an einer gesunden Sicht, frisch
+   * datiert. Die Abfrage muss trotzdem laufen, und der Eintrag muss danach
+   * weg sein — die Nachprobe hat ihn widerlegt.
+   */
+  test('ein veralteter Defekt im Speicher sperrt nicht — die Nachprobe widerlegt ihn', async () => {
+    const erfunden = { sqlstate: '42501', meldung: 'Postgres SQLSTATE 42501: permission denied (erfunden)', geprueft_am: new Date() }
+    standSetzen([['mart.betrieb', erfunden], ['mart.umsatz_tag', erfunden]], new Date())
+
+    const e = await abfrageAusfuehren(`SELECT count(*)::int AS n FROM mart.betrieb`, katalog, nutzer)
+    expect(e.zeilen).toHaveLength(1)
+    expect(e.hinweise.find(h => h.schluessel.startsWith('sicht_defekt'))).toBeUndefined()
+    expect(defekteSichten().has('mart.betrieb')).toBe(false)
+    // Was die Abfrage nicht beruehrt, wird auch nicht probiert: der zweite
+    // Eintrag bleibt, bis ihn jemand braucht oder der naechste Lauf kommt.
+    expect(defekteSichten().has('mart.umsatz_tag')).toBe(true)
+
+    standSetzen([], null)
+  })
+
+  /** Und die Warnung ohne Urteil verschwindet genauso, sobald die Sicht antwortet. */
+  test('eine veraltete Warnung ohne Urteil verschwindet nach der Nachprobe', async () => {
+    standSetzen([], new Date(), [['mart.betrieb', {
+      sqlstate: '57014', meldung: 'Postgres SQLSTATE 57014: statement timeout (erfunden)', geprueft_am: new Date() }]])
+    const e = await abfrageAusfuehren(`SELECT count(*)::int AS n FROM mart.betrieb`, katalog, nutzer)
+    expect(e.hinweise.find(h => h.schluessel.startsWith('sicht_unklar'))).toBeUndefined()
+    expect(unklareSichten().has('mart.betrieb')).toBe(false)
+    standSetzen([], null)
+  })
+
+  /**
    * DER GESUNDHEITSLAUF, gegen die echte Schicht und mit der echten Rolle.
    * Als Eigentuemer getestet laeuft alles (0109) — deshalb ist dieser Test
    * nur dann etwas wert, wenn MCP_DATABASE_URL auf mcp_leser zeigt.
@@ -274,6 +308,7 @@ lauf('Ausfuehrung', () => {
   test('der Gesundheitslauf probiert jede Sicht aus und findet keine defekte', async () => {
     const e = await gesundheitPruefen()
     expect(e.geprueft).toBeGreaterThan(100)
+    expect(e.abgelegt).toBe(true)
     if (e.defekt > 0) {
       const defekt = [...defekteSichten().entries()]
         .map(([s, d]) => `${s}: ${d.sqlstate} ${d.meldung.split('\n')[0]}`)

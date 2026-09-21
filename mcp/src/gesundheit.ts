@@ -52,6 +52,7 @@
  * Stunden ist. Ohne die saehe ein stehengebliebener Lauf aus wie eine
  * gesunde Schicht: mart.sicht_defekt ist dann naemlich leer.
  */
+import type pg from 'pg'
 import { pool } from './db'
 import { istSichtDefekt, pgFehlerText, sqlstateVon } from './pg_fehler'
 import type { Sichtlage } from './pruefen'
@@ -80,6 +81,9 @@ export const LAUF_BUDGET_MS = 120_000
 
 /** Wie oft der Lauf wiederholt wird. */
 export const TAKT_MS = 60 * 60 * 1000
+
+/** Wie bald nach einem Lauf, dessen Ablegen scheiterte, der naechste kommt. */
+export const WIEDERHOLUNG_MS = 5 * 60 * 1000
 
 /**
  * Wie alt eine Momentaufnahme sein darf, damit auf ihr Grund eine Abfrage
@@ -194,6 +198,8 @@ const SICHTEN_SQL = `
  */
 export async function gesundheitPruefen(): Promise<{
   geprueft: number; defekt: number; ohne_urteil: number; dauer_ms: number
+  /** Ist die Momentaufnahme in der Datenbank angekommen? Nein heisst: mart.sicht_defekt ist veraltet. */
+  abgelegt: boolean
 }> {
   const start = Date.now()
   const zeilen: Befundzeile[] = []
@@ -218,30 +224,14 @@ export async function gesundheitPruefen(): Promise<{
           zuletzt: sicht }))
         break
       }
-      const t = Date.now()
-      await c.query('SAVEPOINT probe')
-      try {
-        await c.query(`SELECT * FROM ${sicht} LIMIT 1`)
-        await c.query('RELEASE SAVEPOINT probe')
-        zeilen.push({ sicht, laeuft: true, sqlstate: null, meldung: null, dauer_ms: Date.now() - t })
-      } catch (e) {
-        await c.query('ROLLBACK TO SAVEPOINT probe')
-        await c.query('RELEASE SAVEPOINT probe')
-        zeilen.push({
-          sicht,
-          laeuft: !istSichtDefekt(e),
-          sqlstate: sqlstateVon(e),
-          meldung: pgFehlerText(e),
-          dauer_ms: Date.now() - t,
-        })
-      }
+      zeilen.push(await probieren(c, sicht))
     }
     await c.query('ROLLBACK')
   } finally {
     c.release()
   }
 
-  await melden(zeilen)
+  const abgelegt = await melden(zeilen)
   einteilen(zeilen, new Date())
 
   const defekt = stand.size
@@ -250,7 +240,95 @@ export async function gesundheitPruefen(): Promise<{
     stufe: defekt ? 'warn' : unklar.size ? 'warn' : 'info',
     msg: 'Gesundheitslauf', geprueft: zeilen.length, defekt, ohne_urteil: unklar.size, dauer_ms,
     sichten: [...stand.keys()].slice(0, 20), unklar: [...unklar.keys()].slice(0, 20) }))
-  return { geprueft: zeilen.length, defekt, ohne_urteil: unklar.size, dauer_ms }
+  return { geprueft: zeilen.length, defekt, ohne_urteil: unklar.size, dauer_ms, abgelegt }
+}
+
+/**
+ * EINE Sicht probieren — innerhalb einer laufenden Transaktion, hinter einem
+ * Savepoint. Der Savepoint ist der Grund, warum ein Fehler hier nicht die
+ * naechste Probe mitreisst (siehe gesundheitPruefen).
+ */
+async function probieren(c: pg.PoolClient, sicht: string): Promise<Befundzeile> {
+  const t = Date.now()
+  await c.query('SAVEPOINT probe')
+  try {
+    await c.query(`SELECT * FROM ${sicht} LIMIT 1`)
+    await c.query('RELEASE SAVEPOINT probe')
+    return { sicht, laeuft: true, sqlstate: null, meldung: null, dauer_ms: Date.now() - t }
+  } catch (e) {
+    await c.query('ROLLBACK TO SAVEPOINT probe')
+    await c.query('RELEASE SAVEPOINT probe')
+    return {
+      sicht,
+      laeuft: !istSichtDefekt(e),
+      sqlstate: sqlstateVon(e),
+      meldung: pgFehlerText(e),
+      dauer_ms: Date.now() - t,
+    }
+  }
+}
+
+/**
+ * Verdaechtige Sichten JETZT nachprobieren — bevor der Pruefer auf einen
+ * Messwert hin sperrt.
+ *
+ * DER FALL, DER DAS NOETIG GEMACHT HAT, 21.09.2026 abends, erster Deploy
+ * dieses Laufs: Dokploy startet den MCP-Server und den Importer aus demselben
+ * Push, und die Migration laeuft im Importer. Der erste Gesundheitslauf kam
+ * VOR 0110 — acht Sichten defekt, mcp.gesundheit_melden() gab es noch nicht,
+ * das Ablegen scheiterte, der Stand blieb im Speicher. Dann lief die
+ * Migration, die Sichten waren gesund, und der Pruefer sperrte trotzdem: bis
+ * zum naechsten Stundenlauf, auf einem Messwert von vor der Migration. In
+ * Claude stand "mart.vergleichstag ist DEFEKT", waehrend mart.sicht_defekt
+ * leer war.
+ *
+ * Ein Messwert ist also ein Anlass zu pruefen, kein Urteil. Sperren darf
+ * nur, was JETZT nicht laeuft. Der Preis ist eine Probe je verdaechtiger
+ * Sicht — und die faellt nur an, wenn ueberhaupt ein Verdacht besteht, also
+ * praktisch nie.
+ *
+ * NUR SICHTEN, DIE SCHON IM STAND STEHEN. Die Namen kommen aus dem
+ * Syntaxbaum der Nutzerabfrage; in ein `SELECT * FROM ${name}` darf davon
+ * nichts, was nicht vorher aus pg_catalog kam. Der Filter ueber `stand`
+ * und `unklar` stellt genau das sicher.
+ *
+ * Nur der Speicher wird berichtigt, nicht die Tabelle: mcp.gesundheit_melden
+ * ersetzt den ganzen Satz, und einen halben zu schreiben waere die Luege
+ * von der anderen Seite. mart.sicht_defekt hinkt damit hoechstens einen
+ * Stundenlauf hinterher — der Pruefer nicht.
+ */
+export async function nachpruefen(sichten: readonly string[]): Promise<void> {
+  const verdaechtig = sichten.filter(s => stand.has(s) || unklar.has(s))
+  if (!verdaechtig.length) return
+
+  const c = await pool.connect()
+  try {
+    await c.query('BEGIN READ ONLY')
+    await c.query(`SET LOCAL statement_timeout = '${PROBE_ZEITGRENZE}'`)
+    for (const sicht of verdaechtig) {
+      const z = await probieren(c, sicht)
+      const eintrag: Defekt = { sqlstate: z.sqlstate, meldung: z.meldung ?? '', geprueft_am: new Date() }
+      stand.delete(sicht)
+      unklar.delete(sicht)
+      if (!z.laeuft) stand.set(sicht, eintrag)
+      else if (z.meldung !== null) unklar.set(sicht, eintrag)
+    }
+    await c.query('ROLLBACK')
+  } catch (e) {
+    // Die Nachprobe selbst scheitert (Verbindung weg): dann bleibt der alte
+    // Stand — lieber einmal zu viel gesperrt als eine Sperre, die verschwindet,
+    // weil die Pruefung nicht stattfand.
+    await c.query('ROLLBACK').catch(() => {})
+    console.error(JSON.stringify({ t: new Date().toISOString(), stufe: 'error',
+      msg: 'Nachprobe gescheitert — alter Stand bleibt', sichten: verdaechtig,
+      fehler: String((e as Error)?.message ?? e).slice(0, 300) }))
+  } finally {
+    c.release()
+  }
+  console.log(JSON.stringify({ t: new Date().toISOString(), stufe: 'info',
+    msg: 'Nachprobe', sichten: verdaechtig,
+    noch_defekt: verdaechtig.filter(s => stand.has(s)),
+    noch_unklar: verdaechtig.filter(s => unklar.has(s)) }))
 }
 
 /**
@@ -265,20 +343,25 @@ export async function gesundheitPruefen(): Promise<{
  * Scheitert das Ablegen, scheitert der Lauf NICHT: der Stand im Speicher ist
  * gesetzt, und der Server arbeitet damit weiter. Geloggt wird es laut — eine
  * Momentaufnahme, die nicht in der Datenbank landet, fehlt in
- * mart.sicht_defekt und damit im Dashboard.
+ * mart.sicht_defekt und damit im Dashboard. Und der Lauf wird frueher
+ * wiederholt (gesundheitBeobachten): beim ersten Deploy am 21.09.2026 gab
+ * es die Funktion schlicht noch nicht, weil die Migration im anderen
+ * Container eine Minute spaeter kam.
  */
-async function melden(zeilen: Befundzeile[]): Promise<void> {
+async function melden(zeilen: Befundzeile[]): Promise<boolean> {
   const c = await pool.connect()
   try {
     await c.query('BEGIN')
     await c.query('SET TRANSACTION READ WRITE')
     await c.query('SELECT mcp.gesundheit_melden($1::jsonb)', [JSON.stringify(zeilen)])
     await c.query('COMMIT')
+    return true
   } catch (e) {
     await c.query('ROLLBACK').catch(() => {})
     console.error(JSON.stringify({ t: new Date().toISOString(), stufe: 'error',
       msg: 'Gesundheitslauf konnte nicht abgelegt werden — mart.sicht_defekt ist veraltet',
       fehler: String((e as Error)?.message ?? e).slice(0, 300) }))
+    return false
   } finally {
     c.release()
   }
@@ -320,20 +403,37 @@ export async function standLaden(): Promise<void> {
  * und `unref()` haelt den Prozess nicht am Leben, wenn er sonst fertig waere
  * (sonst endet kein Test mehr).
  */
-export function gesundheitBeobachten(takt = TAKT_MS): () => void {
+export function gesundheitBeobachten(takt = TAKT_MS, wiederholung = WIEDERHOLUNG_MS): () => void {
   let laeuft = false
+  let nachholen: ReturnType<typeof setTimeout> | null = null
   const einmal = async () => {
     if (laeuft) return      // ein langsamer Lauf darf sich nicht selbst ueberholen
     laeuft = true
-    try { await gesundheitPruefen() } catch (e) {
+    let abgelegt = true
+    try { abgelegt = (await gesundheitPruefen()).abgelegt } catch (e) {
+      abgelegt = false
       console.error(JSON.stringify({ t: new Date().toISOString(), stufe: 'error',
         msg: 'Gesundheitslauf gescheitert', fehler: String((e as Error)?.message ?? e).slice(0, 300) }))
     } finally { laeuft = false }
+    /**
+     * Nicht abgelegt oder gescheitert: in fuenf Minuten noch einmal, nicht
+     * erst in einer Stunde. Der haeufigste Grund ist ein Deploy, bei dem
+     * die Migration noch nicht durch ist — und dann ist der Stand im
+     * Speicher gleich doppelt falsch: er stammt von vor der Migration und
+     * steht in keiner Tabelle. Hoechstens eine Wiederholung auf einmal.
+     */
+    if (!abgelegt && nachholen === null) {
+      nachholen = setTimeout(() => { nachholen = null; void einmal() }, wiederholung)
+      nachholen.unref?.()
+    }
   }
 
   const ersterLauf = setTimeout(einmal, 10_000)
   const takten = setInterval(einmal, takt)
   ersterLauf.unref?.()
   takten.unref?.()
-  return () => { clearTimeout(ersterLauf); clearInterval(takten) }
+  return () => {
+    clearTimeout(ersterLauf); clearInterval(takten)
+    if (nachholen) clearTimeout(nachholen)
+  }
 }

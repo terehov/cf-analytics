@@ -4489,3 +4489,43 @@ stand nirgends — man musste Betrieb für Betrieb nachfragen.
 trägt jetzt beides, die Übersicht nach Befund **und** jeden Betrieb namentlich, der
 **nicht** vollständig ist, die schwersten Rückstände zuerst. Die vollständigen bleiben weg;
 über die ist nichts zu sagen. Die Werkzeugbeschreibung sagt das jetzt auch.
+
+## Der Prüfer sperrte nach dem Deploy gesunde Sichten — auf einem Messwert von vor der Migration (21.09.2026, abends)
+
+**Symptom.** Eine Stunde nach dem Deploy von `0110` und dem neuen Server meldete Claude
+weiter `mart.vergleichstag ist DEFEKT … permission denied for schema core` — als Sperre des
+Prüfers, nicht als Postgres-Fehler. Dabei war `mart.sicht_defekt` **leer**, und
+`mcp.sicht_gesundheit` hatte **0 Zeilen, nie geschrieben**.
+
+**Ursache — die Reihenfolge beim Deploy.** Dokploy startet MCP-Server und Importer aus
+demselben Push; die Migration läuft im Importer. Der erste Gesundheitslauf des Servers kam
+**vor** `0110`: acht Sichten defekt, gemessen, korrekt. Ablegen scheiterte —
+`mcp.gesundheit_melden()` gab es noch nicht —, aber der Stand blieb im Speicher, frisch
+datiert. Eine Minute später lief die Migration, die Sichten waren gesund, und der Prüfer
+sperrte trotzdem: bis zum nächsten Stundenlauf, auf einem Messwert, den die Datenbank
+längst nicht mehr deckte.
+
+Meine Zusicherung vom selben Tag — „höchstens ~10 s bis zum ersten Lauf" — galt nur für
+Migration **vor** Serverstart. Die Reihenfolge ist nicht steuerbar, also war die Sperre
+falsch gebaut: sie vertraute einem Messwert.
+
+**Behoben**, zweifach:
+
+* **Nachprobe vor der Sperre** (`gesundheit.ts`, `nachpruefen`; `ausfuehren.ts`,
+  `pruefenMitNachprobe`). Was die Momentaufnahme als defekt oder unklar führt **und** die
+  Abfrage berührt, wird jetzt sofort probiert — ein `SELECT * … LIMIT 1` je verdächtiger
+  Sicht, 5 s Grenze. Was läuft, fliegt aus dem Stand; gesperrt wird nur, was **jetzt** nicht
+  läuft. Ein Messwert ist ein Anlass zu prüfen, kein Urteil. Kostet nur, wenn ein Verdacht
+  besteht — also praktisch nie. Probiert werden ausschließlich Namen, die schon im Stand
+  stehen (aus `pg_catalog`), nie ein Name aus der Nutzerabfrage.
+* **Wiederholung nach fünf Minuten**, wenn das Ablegen scheitert (`gesundheitBeobachten`).
+  Damit hinkt auch `mart.sicht_defekt` nach so einem Deploy nur Minuten hinterher, nicht
+  eine Stunde.
+
+**Sofortmaßnahme in Produktion**, ohne Deploy: MCP-Container neu starten. Beim Start liest
+er die leere Tabelle, sperrt nichts, und der erste Lauf nach 10 s legt den gesunden Stand ab.
+
+**Was es künftig verhindert:** zwei Tests in `mcp/test/ausfuehren.test.ts` stellen den Fall
+nach — ein erfundener, frisch datierter Defekt an einer gesunden Sicht; die Abfrage muss
+laufen, der Eintrag muss danach weg sein, und ein Eintrag zu einer Sicht, die die Abfrage
+nicht berührt, muss bleiben.

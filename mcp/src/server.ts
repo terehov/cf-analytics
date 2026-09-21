@@ -21,15 +21,14 @@ import { z } from 'zod'
 import { parserBereitstellen } from './ast'
 import { anmelden, fragenDuerfen, NichtErlaubt, type Angemeldet } from './auth'
 import { abfrageAusfuehren, Abfragefehler, berichtAusfuehren, Gesperrt, probeplanen,
-         protokollieren, ZEILEN_FUER_MODELL, type Nutzer } from './ausfuehren'
+         protokollieren, pruefenMitNachprobe, ZEILEN_FUER_MODELL, type Nutzer } from './ausfuehren'
 import { berichtBeschreiben, berichteSuchen, BerichtFehler, alleKarten, karteFinden,
          uebersetzen } from './berichte'
 import { abfragen } from './db'
-import { defekteSichten, gesundheitBeobachten, gesundheitGemessenAm, sichtlage,
+import { defekteSichten, gesundheitBeobachten, gesundheitGemessenAm,
          standLaden, unklareSichten } from './gesundheit'
 import { katalogLaden } from './katalog_laden'
 import type { Katalog } from './katalog'
-import { pruefen } from './pruefen'
 import { anmeldungMontieren, metadaten } from './anmeldung/endpunkte'
 import { anmeldungAbfragen, anmeldungEingerichtet } from './anmeldung/db'
 import { zugangstokenPruefen } from './anmeldung/schluessel'
@@ -176,8 +175,9 @@ export const app = new Skybridge({
      *
      * DER STAND ZUERST, DER LAUF DANACH: der erste Nutzer nach einem Deploy
      * soll nicht auf 236 Proben warten, und die Momentaufnahme des letzten
-     * Laufs ist dafuer gut genug — sie traegt ihren Zeitstempel, und der
-     * Pruefer sperrt nur auf einer frischen Messung.
+     * Laufs ist dafuer gut genug — der Pruefer probiert ohnehin nach, bevor
+     * er auf sie hin sperrt (Deploy-Fall vom 21.09.2026: die Migration kam
+     * eine Minute NACH dem ersten Lauf, und der Stand war eine Stunde falsch).
      *
      * Der Lauf selbst blockiert den Start NICHT (gesundheit.ts): ein Server,
      * der erst nach einer Minute lauscht, sieht fuer Dokploy aus wie einer,
@@ -600,7 +600,7 @@ export const app = new Skybridge({
     }, async ({ sql }, extra) => {
       const nutzer = await anmelden(extra)
       fragenDuerfen(nutzer)
-      const e = pruefen(sql, katalog, sichtlage())
+      const e = await pruefenMitNachprobe(sql, katalog)
 
       /**
        * DIE ZWEITE HAELFTE DER PRUEFUNG, seit dem 21.09.2026.
