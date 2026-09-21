@@ -44,6 +44,7 @@ Feldes.
 | `bwa_zeile.csv` | `manual.bwa_zeile` | Zeile | Gliederung der BWA |
 | `sachkonto.csv` | `manual.sachkonto` | Kontonummer | Welche Sachkonten Wareneinsatz sind |
 | `marktindex.csv` | `manual.marktindex` | Monat | Gastronomie-Marktindex (Destatis) |
+| `betrieb_standort.csv` | `manual.betrieb_standort` | Betrieb | Adresse und Koordinate — Grundlage für Wetter, Bundesland und Karte |
 | `pflichtartikel_liste.csv` | `manual.pflichtartikel_liste` | Konzept + Bereich + gültig ab | Kopfzeile je Pflichtartikelliste: Laufzeit und Quelle |
 | `pflichtartikel.csv` | `manual.pflichtartikel` | dazu Artikelnummer + Bezeichnung | die einzelnen Pflichtartikel |
 | `pflichtartikel_alias.csv` | `manual.pflichtartikel_alias` | Konzept + Artikelnummer | Nachfolgenummern: welche bestellte Nummer erfüllt welche Listenposition |
@@ -141,3 +142,49 @@ sie greift nur der Namensabgleich. Wer die Nummer kennt, trägt sie in
 > eine Zeile mit nachgetragener Nummer ist für den Import eine **neue** Zeile,
 > die alte ohne Nummer bleibt stehen. Wer sie loswerden will, löscht sie in
 > Postico — bewusst und mit `WHERE`.
+
+## `betrieb_standort.csv` — sieben Adressen fehlen, darunter der größte Betrieb
+
+**Noch nicht angelegt.** Die Datei gibt es hier nicht, und eine fehlende Datei ist kein
+Fehler — sie wird übersprungen. Angelegt gehört sie, sobald jemand die sieben Adressen
+nachgesehen hat.
+
+`manual.betrieb_standort` ist für 60 von 141 Betrieben gepflegt. Am 21.09.2026 stand fest,
+**wer** in der Lücke steht: sieben operative Betriebe, darunter mit 515.628 € im September
+der umsatzstärkste der Gruppe. Die Liste kommt aus `mart.nachbarschaft_fehlend` und steht in
+`docs/offene-punkte.md`.
+
+**Was daran hängt.** Ohne Koordinate kein Gitterpunkt, also kein Wetter. Ohne PLZ kein
+Bundesland, also kein Feiertag und keine Schulferien. Beide Joins sind `LEFT JOIN` — der
+Betrieb fehlt also **still**: die Zeile ist da, die Spalten sind leer.
+
+Vorlage:
+
+```csv
+betrieb;strasse;plz;ort;breitengrad;laengengrad;herkunft;genauigkeit
+Wirtshaus am Schlossplatz GmbH;;;;;;manuell;
+```
+
+**`herkunft` ist Pflicht** und kennt vier Werte: `manuell` (nachgeschlagen), `geocoding`
+(berechnet), `concept_family` (aus einer Liste des Kunden), `lina` (gibt es nicht). Ohne die
+Spalte wird die Datei abgewiesen — besser als ein Constraint-Fehler aus der Tabelle.
+
+**Die PLZ allein bringt schon etwas.** Wer die Koordinaten nicht hat, trägt Straße, PLZ und
+Ort ein: damit ist das Bundesland da und mit ihm Feiertage und Schulferien. Das Wetter
+braucht die Koordinate, der Kalender nicht.
+
+**Zwei Prüfungen liegen in der Tabelle selbst, und sie weisen die ganze Datei ab:**
+
+* **Entweder beide Koordinaten oder keine.** Ein halber Punkt ist keiner.
+* **Grob Mitteleuropa** (Breite 45–56, Länge 5–16). Das fängt vertauschte Achsen ab, den
+  häufigsten Fehler beim Abtippen: 49.8/9.9 ist Würzburg, 9.9/49.8 liegt im Golf von Guinea.
+
+**Was eine Datei ohne Koordinatenspalten NICHT tut: sie löscht keine vorhandene Koordinate.**
+Geschrieben werden nur die Spalten, die in der Datei stehen. Wer die Adressen nachträgt, wirft
+damit also nicht die Wetterzuordnung der schon gepflegten Betriebe weg — nachgemessen, in
+`src/pflege/tabellen.test.ts` festgehalten.
+
+**Danach nachsehen:** `SELECT * FROM mart.nachbarschaft_fehlend WHERE umsatz_letzter_monat > 0;`
+Die Zeilen mit `status = 'operativ'` müssen verschwinden. Der Rest sind geschlossene und
+inaktive Betriebe, ein Testladen und die Franchisegeber-Gesellschaft — dort fehlt zu Recht
+nichts.

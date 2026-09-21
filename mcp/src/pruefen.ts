@@ -45,6 +45,38 @@ export type Pruefergebnis = {
   koernung: { sicht: string; koernung: string | null }[]
 }
 
+/**
+ * Was der Gesundheitslauf ueber die Sichten weiss.
+ *
+ * WARUM DER PRUEFER DAS BRAUCHT. Am 21.09.2026 hat `abfrage_pruefen` fuer SQL
+ * auf mart.vergleichstag und mart.betrieb_wetter_tag "Laeuft, mit 1
+ * Hinweis(en)" gemeldet — beide Sichten waren fuer die Leserolle unlesbar.
+ * Der Pruefer liest den Katalog, und der Katalog weiss nicht, ob eine Sicht
+ * laeuft. Ausprobiert wird sie in gesundheit.ts; hier kommt das Ergebnis an.
+ *
+ * ALS PARAMETER UND NICHT ALS IMPORT, damit diese Datei ohne Datenbank
+ * pruefbar bleibt: mcp/test/fallen.test.ts fuehrt hunderte Faelle gegen einen
+ * Katalog aus einer JSON-Datei.
+ */
+export type Sichtlage = {
+  defekt: ReadonlyMap<string, { sqlstate: string | null; meldung: string }>
+  /**
+   * Proben OHNE Urteil: nicht nachweislich kaputt, aber auch nicht nachweislich
+   * lesbar — meist ein Zeitueberlauf nach fuenf Sekunden. Nie eine Sperre,
+   * immer eine Warnung: die Sicht laeuft vielleicht, aber nicht ohne engen
+   * Zeitraum.
+   */
+  unklar: ReadonlyMap<string, { sqlstate: string | null; meldung: string }>
+  /**
+   * Ist die Messung frisch genug, um darauf eine Abfrage ABZUWEISEN? Ist sie
+   * es nicht, bleibt der Befund, wird aber nur eine Warnung — eine reparierte
+   * Sicht darf nicht an einem alten Messwert haengen bleiben.
+   */
+  frisch: boolean
+}
+
+export const KEINE_SICHTLAGE: Sichtlage = { defekt: new Map(), unklar: new Map(), frisch: false }
+
 /** Die Schemata, die der Server ueberhaupt anfassen darf. */
 export const ERLAUBTE_SCHEMATA = new Set(['mart', 'manual', 'ampel', 'mcp'])
 
@@ -167,7 +199,9 @@ export function regelartenPruefen(fallstricke: Fallstrick[]): void {
 // Die Pruefung
 // ---------------------------------------------------------------------
 
-export function pruefen(sql: string, katalog: Katalog): Pruefergebnis {
+export function pruefen(
+  sql: string, katalog: Katalog, lage: Sichtlage = KEINE_SICHTLAGE,
+): Pruefergebnis {
   const befunde: Befund[] = []
   const sperre = (schluessel: string, hinweis: string, berichtigung?: string) =>
     befunde.push({ schluessel, schwere: 'sperre', hinweis, berichtigung })
@@ -305,6 +339,62 @@ export function pruefen(sql: string, katalog: Katalog): Pruefergebnis {
         'Die passende mart-Sicht ueber sichten_suchen finden. Fehlt sie dort, ist das eine Luecke ' +
         'in mart — dann gehoert eine Sicht gebaut, keine Abfrage auf core.')
     }
+  }
+
+  /**
+   * Eine Sicht, die beim letzten Gesundheitslauf nicht gelesen werden konnte.
+   *
+   * DIESER BEFUND ERSETZT EINE LUEGE. Vorher hat abfrage_pruefen fuer SQL auf
+   * einer defekten Sicht "Laeuft" gemeldet, weil die Pruefung rein
+   * katalogbasiert war (21.09.2026). Jetzt steht hier, WAS nicht laeuft und
+   * mit welcher Postgres-Meldung — dieselbe Angabe, die die Ausfuehrung
+   * liefern wuerde, nur ohne den Umlauf.
+   *
+   * SPERRE NUR BEI FRISCHER MESSUNG. Eine Sicht, die vor sechs Stunden lag,
+   * kann inzwischen repariert sein; dann waere eine Sperre auf einem alten
+   * Messwert genau die Sorte stiller Fehlfunktion, gegen die dieser Pruefer
+   * geschrieben ist. Als Warnung bleibt der Befund trotzdem stehen.
+   */
+  for (const s of z.sichten) {
+    const d = lage.defekt.get(s)
+    if (!d) continue
+    befunde.push({
+      schluessel: `sicht_defekt_${s}`,
+      schwere: lage.frisch ? 'sperre' : 'warnung',
+      hinweis:
+        `${s} ist DEFEKT — beim letzten Gesundheitslauf liess sie sich nicht lesen. ` +
+        `Postgres meldet: ${d.meldung.split('\n')[0]}` +
+        (lage.frisch ? '' : ' (Messung aelter als sechs Stunden, kann behoben sein.)'),
+      berichtigung:
+        'Keine Abfrage auf diese Sicht laeuft, solange sie liegt — eine andere Formulierung ' +
+        'hilft nicht. Was noch defekt ist, steht in mart.sicht_defekt; woran es liegt, meist ' +
+        'in mart.leserolle_pruefung. Bis zur Behebung eine andere Sicht nehmen ' +
+        '(sichten_suchen) und dem Nutzer sagen, dass hier etwas fehlt.',
+      quelle: 'mart.sicht_defekt',
+    })
+  }
+
+  /**
+   * Eine Sicht, deren Probe ohne Urteil blieb — als mcp_leser kam in fuenf
+   * Sekunden keine Zeile. Kein Defekt, also keine Sperre; aber wer sie ohne
+   * engen Zeitraum fragt, laeuft in die 20-Sekunden-Grenze und bekommt dann
+   * einen Zeitueberlauf statt einer Zahl. Das soll VORHER dastehen.
+   */
+  for (const s of z.sichten) {
+    const u = lage.unklar.get(s)
+    if (!u || lage.defekt.has(s)) continue
+    befunde.push({
+      schluessel: `sicht_unklar_${s}`,
+      schwere: 'warnung',
+      hinweis:
+        `${s} hat beim letzten Gesundheitslauf in fuenf Sekunden keine Zeile geliefert ` +
+        `(${u.meldung.split('\n')[0]}). Die Sicht ist nicht kaputt, aber langsam — ohne ` +
+        `engen Zeitraum laeuft die Abfrage in die 20-Sekunden-Grenze.`,
+      berichtigung:
+        'Den Zeitraum eng fassen (ein Monat, ein Betrieb) und im SQL zusammenfassen statt ' +
+        'Einzelzeilen zu ziehen.',
+      quelle: 'mart.sicht_unklar',
+    })
   }
 
   // Aggregat ueber eine Spalte, die keine Aggregation vertraegt.

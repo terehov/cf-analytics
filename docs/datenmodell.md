@@ -923,3 +923,70 @@ Funktion nichts entgegennimmt, nur liest und drei Zeitstempel zurückgibt; die B
 stammen aus einer Tabelle, in die nur der Importer schreibt, und gehen durch `format('%I')`.
 
 Gefunden wird der nächste Fall von `mart.leserolle_pruefung`.
+
+## `0110` — die Regel greift auch für Funktionen **in** den gesperrten Schemata (21.09.2026)
+
+Der Abschnitt darüber hat die Regel formuliert und eine Wache dafür gebaut,
+`mart.leserolle_pruefung`. Beide waren zu eng gefasst, und das hat elf Sichten gekostet.
+
+Die Wache aus `0109` sucht nur unter den Funktionen **in** `ampel` und `mart`. Der nächste
+Fall stand woanders: `mart.wetter_tag` ruft `core.geschaeftstag()`, und deren Rumpf nennt
+`core.geschaefts_zeitzone()`. Schon dieser **Name** braucht `USAGE` auf `core`, das
+`mcp_leser` nicht hat — also war die Sicht unlesbar, und mit ihr alles, was auf ihr aufbaut:
+`mart.betrieb_wetter_tag`, `mart.vergleichstag`, die drei Wettereffektsichten,
+`mart.pruefung_kalender` und `mart.pruefung_uebersicht`. Dazu `mart.import_gesamt` über
+`sync.sperre_aktiv()`. Die vollständige Liste und die Messung stehen in
+`docs/fehlerkatalog.md`.
+
+**Die Regel gilt also in beide Richtungen und ist damit vollständig:**
+
+> Ein Funktionsrumpf erbt die Rechte des Aufrufers — **gleich in welchem Schema die Funktion
+> selbst steht.** Eine Funktion aus `core` in einer `mart`-Sicht ist derselbe Fall wie eine
+> Funktion aus `mart`, die auf `core` greift.
+
+`core.geschaeftstag()` ist seit `0110` **`SECURITY DEFINER`** mit festem `search_path`. Der
+erste Weg — die Auflösung in die Sicht ziehen — hätte hier bedeutet, `'Europe/Berlin'` an
+eine vierte Stelle zu schreiben; `core.geschaefts_zeitzone()` gibt es genau dagegen. Was es
+kostet, ist nachgemessen und steht im Funktionskommentar: **nichts Messbares** an der
+Abfrage, die es gebraucht hat (180–199 ms statt 170–203 ms über 657.334 Stundenwerte). Die
+Funktion wird dafür nicht mehr in die Abfrage eingesetzt — wer eine Bedingung der Form
+`core.geschaeftstag(spalte) = …` auf eine große Tabelle setzt, sieht besser vorher in den
+Plan. Ausdrucksindizes darauf gibt es keine (in `pg_index` nachgesehen).
+
+`mart.import_gesamt` geht den anderen Weg und liest die Zugangssperre selbst.
+`sync.sperre_aktiv()` gibt die **ganze** Zeile aus `sync.zugangssperre` zurück — Endpunkt,
+HTTP-Status, `lauf_id` —, und die Sicht braucht drei Spalten davon. Eine
+SECURITY-DEFINER-Hülle hätte der Leserolle den Rest mitgereicht. **Die Wahl zwischen den
+zwei Rezepten hängt also daran, wie viel die Funktion zurückgibt**, nicht nur daran, ob sie
+sich auflösen lässt.
+
+### Zwei Dinge, die eine Migration ab jetzt tun muss
+
+**1. `mcp.rechte_auffrischen()` am Ende, wenn sie eine Sicht in `mart`/`manual`/`ampel`
+angelegt hat.** `0105` setzt die Standardrechte mit `ALTER DEFAULT PRIVILEGES FOR ROLE
+<current_user>` — sie tragen nicht, wenn eine Migration mit einem anderen Zugang eingespielt
+wird. Genau so waren `ampel.schwelle_je_betrieb` (aus `0105`) und `mart.leserolle_pruefung`
+(aus `0109`) für die Leserolle unsichtbar, während Metabase sie zeigte. Die Gegenprobe ist
+`mart.sicht_ohne_leserecht`, Erwartung leer.
+
+**2. Ihre Wirkung nachweisen, und zwar als `mcp_leser`.** `0110` setzt dafür am Ende
+`SET LOCAL ROLE mcp_leser` und liest jede der dreizehn betroffenen Sichten mit
+`SELECT * … LIMIT 1` — nicht mit `count(*)`, das die Spaltenausdrücke gar nicht auswertet
+(die Falle aus `0107`). Liegt eine, bricht die Migration ab. Fehlt dem einspielenden Zugang
+die Mitgliedschaft in `mcp_leser`, gibt es eine Warnung statt eines Abbruchs: ein
+Deploy-Blocker aus dem falschen Grund wäre schlimmer, und der Gesundheitslauf des
+MCP-Servers holt die Probe dann nach.
+
+### Neu in `mcp`: `mcp.sicht_gesundheit`
+
+Eine Momentaufnahme, keine Sicht: was sich beim letzten Gesundheitslauf wirklich lesen ließ,
+eine Zeile je Relation in `mart`/`manual`/`ampel`. Geschrieben wird sie nur über
+`mcp.gesundheit_melden(jsonb)` — `SECURITY DEFINER`, damit die Leserolle in `mcp` weiter
+allein `mcp.zugriff` beschreiben darf (`0105`). **Die Transaktion des Aufrufers muss
+trotzdem `READ WRITE` sein:** `default_transaction_read_only` ist eine Eigenschaft der
+Transaktion und kein Recht, `SECURITY DEFINER` hilft dagegen nicht. Dieselbe Stelle, an der
+das Protokoll in `mcp.zugriff` schon `SET TRANSACTION READ WRITE` braucht.
+
+Warum die Probe nicht in der Datenbank stehen kann: eine Sicht kann sich nicht selbst
+ausprobieren, und wer es als Eigentümer tut, beweist nichts. Die Rolle `mcp_leser` trägt
+genau ein Prozess — der MCP-Server —, also probiert er.

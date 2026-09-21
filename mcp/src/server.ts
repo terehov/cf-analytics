@@ -20,11 +20,13 @@ import { Skybridge } from 'skybridge/server'
 import { z } from 'zod'
 import { parserBereitstellen } from './ast'
 import { anmelden, fragenDuerfen, NichtErlaubt, type Angemeldet } from './auth'
-import { abfrageAusfuehren, berichtAusfuehren, Gesperrt, protokollieren,
-         ZEILEN_FUER_MODELL, type Nutzer } from './ausfuehren'
+import { abfrageAusfuehren, Abfragefehler, berichtAusfuehren, Gesperrt, probeplanen,
+         protokollieren, ZEILEN_FUER_MODELL, type Nutzer } from './ausfuehren'
 import { berichtBeschreiben, berichteSuchen, BerichtFehler, alleKarten, karteFinden,
          uebersetzen } from './berichte'
 import { abfragen } from './db'
+import { defekteSichten, gesundheitBeobachten, gesundheitGemessenAm, sichtlage,
+         standLaden, unklareSichten } from './gesundheit'
 import { katalogLaden } from './katalog_laden'
 import type { Katalog } from './katalog'
 import { pruefen } from './pruefen'
@@ -83,6 +85,35 @@ const ERGEBNIS_SCHEMA = {
 const nutzerAus = (a: Angemeldet): Nutzer =>
   ({ subject: a.subject, anzeige: a.anzeige, client: a.client })
 
+/**
+ * Einen abgelehnten SQL-Lauf als gewoehnliche Antwort zurueckgeben.
+ *
+ * WARUM NICHT ALS WERKZEUGFEHLER. Skybridge macht aus einer Ausnahme `isError`,
+ * und Claude zeigt dazu „Failed to load this connector" — der Nutzer sieht
+ * weder SQLSTATE noch Meldung noch Berichtigung. Dieselbe Lehre wie bei der
+ * Sperre am 16.09.2026, hier fuer den Fall, dass Postgres selbst ablehnt.
+ *
+ * WARUM AN DREI STELLEN UND NICHT NUR BEI `abfrage_ausfuehren`: die fertigen
+ * Berichte laufen durch dieselbe Ausfuehrung. `kw_tagesliste` haengt an
+ * mart.vergleichstag und war am 21.09.2026 genauso tot wie die freie Abfrage
+ * darauf — ein Klickziel im Dashboard, das niemand mehr erreichte.
+ *
+ * Protokolliert ist der Fehler schon (ausfuehren.ts).
+ */
+function sqlFehlerAntwort(f: Abfragefehler, was: string) {
+  return {
+    structuredContent: {
+      spalten: [], zeilen: [], zeilen_gesamt: 0,
+      koernung: f.pruefung.koernung, hinweise: [f.befund], datenstand: null,
+      spalten_info: [],
+      darstellung: 'Nichts darzustellen — Postgres hat die Abfrage abgelehnt. Dem Nutzer die ' +
+                   'Meldung nennen und danach berichtigen.',
+    },
+    content: `${was} ist nicht gelaufen.\n\n${f.message}`,
+    _meta: { weitere: [], protokoll_id: null, sql_fehler: f.sqlstate },
+  }
+}
+
 /** Startzeit des Prozesses — fuer /status. */
 const GESTARTET = new Date().toISOString()
 
@@ -140,10 +171,26 @@ export const app = new Skybridge({
       console.warn(JSON.stringify({ t: new Date().toISOString(), stufe: 'warn',
         msg: 'Einrichtung offen', punkt: o.punkt, meldung: o.meldung }))
     }
+    /**
+     * Den Gesundheitsstand aus der Datenbank holen und den Lauf takten.
+     *
+     * DER STAND ZUERST, DER LAUF DANACH: der erste Nutzer nach einem Deploy
+     * soll nicht auf 236 Proben warten, und die Momentaufnahme des letzten
+     * Laufs ist dafuer gut genug — sie traegt ihren Zeitstempel, und der
+     * Pruefer sperrt nur auf einer frischen Messung.
+     *
+     * Der Lauf selbst blockiert den Start NICHT (gesundheit.ts): ein Server,
+     * der erst nach einer Minute lauscht, sieht fuer Dokploy aus wie einer,
+     * der nicht hochkommt.
+     */
+    await standLaden()
+    gesundheitBeobachten()
     console.log(JSON.stringify({ t: new Date().toISOString(), stufe: 'info',
       msg: 'Katalog geladen', sichten: katalog.sichten.size,
       mit_koernung: [...katalog.sichten.values()].filter(s => s.koernung).length,
-      fallstricke: katalog.fallstricke.length, berichte: alleKarten.length }))
+      fallstricke: katalog.fallstricke.length, berichte: alleKarten.length,
+      defekte_sichten: defekteSichten().size, unklare_sichten: unklareSichten().size,
+      gesundheit_gemessen_am: gesundheitGemessenAm()?.toISOString() ?? null }))
     return { katalog }
   },
 
@@ -267,8 +314,14 @@ export const app = new Skybridge({
           (nah.length ? ` Gemeint sein koennte: ${nah.join(', ')}.` : ' berichte_suchen hilft weiter.'))
       }
       const { sql, parameter: werte } = uebersetzen(karte, parameter ?? {})
-      const e = await berichtAusfuehren(schluessel, sql, werte, sichtenImText(karte.sql),
-        katalog, nutzerAus(nutzer), parameter ?? {})
+      let e
+      try {
+        e = await berichtAusfuehren(schluessel, sql, werte, sichtenImText(karte.sql),
+          katalog, nutzerAus(nutzer), parameter ?? {})
+      } catch (f) {
+        if (f instanceof Abfragefehler) return sqlFehlerAntwort(f, `Der Bericht "${karte.name}"`)
+        throw f
+      }
       return {
         structuredContent: {
           spalten: e.spalten, zeilen: e.zeilen, zeilen_gesamt: e.zeilen_gesamt,
@@ -299,17 +352,45 @@ export const app = new Skybridge({
     }, async ({ stichwort }, extra) => {
       const nutzer = await anmelden(extra)
       const w = stichwort.toLowerCase()
+      /**
+       * DEFEKTE SICHTEN WERDEN MITGELIEFERT, NICHT WEGGELASSEN.
+       *
+       * Eine Sicht, die es gibt und die gerade nicht laeuft, aus der Liste zu
+       * nehmen waere die bequemere Antwort und die schlechtere: das Modell
+       * suchte weiter, fiele auf eine Sicht mit anderer Koernung und lieferte
+       * eine Zahl, die etwas anderes bedeutet. Am 21.09.2026 war das der
+       * ganze Wettereinfluss — vier Sichten am Boden, und nichts sagte es.
+       *
+       * Also stehen sie drin, mit `defekt` und der Postgres-Meldung daneben.
+       */
+      const defekt = defekteSichten()
+      const unklar = unklareSichten()
       const treffer = [...katalog.sichten.values()]
         .filter(s => s.sicht.includes(w) || (s.thema ?? '').includes(w)
                   || (s.koernung ?? '').toLowerCase().includes(w)
                   || (s.kommentar ?? '').toLowerCase().includes(w))
         .slice(0, 30)
-        .map(s => ({ sicht: s.sicht, thema: s.thema, koernung: s.koernung, achsen: s.achsen }))
+        .map(s => ({
+          sicht: s.sicht, thema: s.thema, koernung: s.koernung, achsen: s.achsen,
+          defekt: defekt.has(s.sicht) || undefined,
+          defekt_meldung: defekt.get(s.sicht)?.meldung.split('\n')[0],
+          // Langsam, nicht kaputt: in der Probe kam in 5 s keine Zeile.
+          langsam: unklar.has(s.sicht) || undefined,
+        }))
+      const kaputt = treffer.filter(t => t.defekt).map(t => t.sicht)
+      const langsam = treffer.filter(t => t.langsam).map(t => t.sicht)
       await protokollieren({ nutzer: nutzerAus(nutzer), werkzeug: 'sichten_suchen',
         parameter: { stichwort }, zeilen: treffer.length })
       return {
-        structuredContent: { treffer },
-        content: `${treffer.length} Sichten zu "${stichwort}".`,
+        structuredContent: { treffer, defekt: kaputt },
+        content: `${treffer.length} Sichten zu "${stichwort}".` + (kaputt.length
+          ? ` ACHTUNG, ${kaputt.length} davon laufen derzeit NICHT: ${kaputt.join(', ')}. ` +
+            `Eine Abfrage darauf scheitert; was fehlt, dem Nutzer sagen statt auf eine Sicht ` +
+            `mit anderer Bedeutung auszuweichen.`
+          : '') + (langsam.length
+          ? ` ${langsam.length} davon sind LANGSAM (in der Probe keine Zeile in 5 s): ` +
+            `${langsam.join(', ')}. Nur mit engem Zeitraum abfragen.`
+          : ''),
       }
     })
 
@@ -443,27 +524,62 @@ export const app = new Skybridge({
       name: 'datenstand',
       title: 'Was ueberhaupt beurteilbar ist',
       description:
-        'Bis wann Umsatz geladen und bis wann die BWA gebucht ist — je Betrieb. VOR JEDER ' +
-        'AUSWERTUNG: LINA liefert 5–6 Tage nach, und der BWA-Stand ist je Betrieb ein anderer. ' +
-        'Eine Julizahl fuer einen Betrieb, dessen BWA bei Mai steht, ist keine Julizahl.',
-      inputSchema: { betrieb: z.string().optional().describe('Name oder Teil davon; leer = alle') },
+        'Bis wann Umsatz geladen und bis wann die BWA gebucht ist. VOR JEDER AUSWERTUNG: LINA ' +
+        'liefert 5–6 Tage nach, und der BWA-Stand ist je Betrieb ein anderer. Eine Julizahl ' +
+        'fuer einen Betrieb, dessen BWA bei Mai steht, ist keine Julizahl. ' +
+        'OHNE PARAMETER: die Uebersicht nach Befund (wie viele Betriebe vollstaendig sind, wie ' +
+        'viele ohne BWA, wie viele ohne Artikeldaten) UND dazu jeder Betrieb, der NICHT ' +
+        'vollstaendig ist, einzeln — die vollstaendigen bleiben ungenannt, sonst waeren es 141 ' +
+        'Zeilen ohne Aussage. MIT NAMEN: die Zeile dieses Betriebs, gleich ob vollstaendig ' +
+        'oder nicht.',
+      inputSchema: {
+        betrieb: z.string().optional().describe(
+          'Name oder Teil davon. Leer = Uebersicht nach Befund plus die Betriebe mit Rueckstand'),
+      },
       annotations: { readOnlyHint: true },
     }, async ({ betrieb }, extra) => {
       const nutzer = await anmelden(extra)
       const start = Date.now()
-      const zeilen = betrieb
-        ? await abfragen(`SELECT betrieb, konzept, letzter_tag::text, umsatz_alter_tage,
+      const JE_BETRIEB = `SELECT betrieb, konzept, letzter_tag::text, umsatz_alter_tage,
                                  bwa_monat::text, bwa_verzug_monate, befund
-                            FROM mart.datenstand WHERE betrieb ILIKE '%'||$1||'%'
+                            FROM mart.datenstand`
+      /**
+       * OHNE PARAMETER KAMEN BIS ZUM 21.09.2026 DREI ZEILEN ZURUECK — und die
+       * Beschreibung des Parameters sagte "leer = alle". Beides stimmte nicht
+       * zusammen: wer "alle" liest und "vollstaendig 75, keine BWA 36, keine
+       * Artikeldaten 30" bekommt, muss raten, WELCHE 36 das sind, und fragt
+       * dann Betrieb fuer Betrieb nach.
+       *
+       * Die Auskunft, die fehlte, ist nicht die Liste aller 141 Betriebe — die
+       * Uebersicht gibt es gerade deshalb —, sondern die Liste der
+       * auffaelligen. Also beides in einer Antwort: die Uebersicht als
+       * Einordnung, die Betriebe mit Rueckstand namentlich. Die vollstaendigen
+       * bleiben weg; ueber die ist nichts zu sagen.
+       */
+      const zeilen = betrieb
+        ? await abfragen(`${JE_BETRIEB} WHERE betrieb ILIKE '%'||$1||'%'
                            ORDER BY betrieb LIMIT 200`, [betrieb])
         : await abfragen(`SELECT befund, count(*)::int AS betriebe,
                                  max(letzter_tag)::text AS umsatz_bis, max(bwa_monat)::text AS bwa_bis
                             FROM mart.datenstand GROUP BY befund ORDER BY 2 DESC`)
+      const rueckstand = betrieb ? [] : await abfragen(
+        `${JE_BETRIEB} WHERE befund <> 'vollstaendig'
+          ORDER BY bwa_verzug_monate DESC NULLS LAST, umsatz_alter_tage DESC NULLS LAST,
+                   betrieb LIMIT 200`)
       // Mit Dauer: am 15.09.2026 lief genau diese Abfrage in die 20-s-Grenze,
       // und niemand konnte hinterher sagen, wie lange sie sonst braucht.
       await protokollieren({ nutzer: nutzerAus(nutzer), werkzeug: 'datenstand',
-        parameter: { betrieb }, zeilen: zeilen.length, dauer_ms: Date.now() - start })
-      return { structuredContent: { zeilen }, content: `${zeilen.length} Zeilen.` }
+        parameter: { betrieb }, zeilen: zeilen.length + rueckstand.length,
+        dauer_ms: Date.now() - start })
+      return {
+        structuredContent: betrieb
+          ? { zeilen }
+          : { zeilen, uebersicht: zeilen, betriebe_mit_rueckstand: rueckstand },
+        content: betrieb
+          ? `${zeilen.length} Zeilen.`
+          : `${zeilen.length} Befunde, dazu ${rueckstand.length} Betriebe mit Rueckstand ` +
+            `namentlich. Die vollstaendigen sind nicht aufgefuehrt.`,
+      }
     })
 
     // =================================================================
@@ -473,24 +589,71 @@ export const app = new Skybridge({
       name: 'abfrage_pruefen',
       title: 'Eine Abfrage pruefen, ohne sie auszufuehren',
       description:
-        'Prueft SQL gegen den semantischen Katalog, OHNE es laufen zu lassen: welche Sichten, ' +
-        'welche Koernung, welche Fallstricke, was gesperrt waere. Vor einer grossen oder ' +
-        'unsicheren Abfrage aufrufen — abfrage_ausfuehren prueft dasselbe noch einmal selbst.',
+        'Prueft SQL gegen den semantischen Katalog UND gegen die Datenbank, OHNE es laufen zu ' +
+        'lassen: welche Sichten, welche Koernung, welche Fallstricke, was gesperrt waere — und ' +
+        'ob Postgres die Abfrage ueberhaupt planen kann (EXPLAIN ohne ANALYZE, es wird nichts ' +
+        'ausgefuehrt). Ein Tippfehler in einem Spaltennamen und eine defekte Sicht fallen damit ' +
+        'hier auf und nicht erst beim Ausfuehren. Vor einer grossen oder unsicheren Abfrage ' +
+        'aufrufen — abfrage_ausfuehren prueft dasselbe noch einmal selbst.',
       inputSchema: { sql: z.string() },
       annotations: { readOnlyHint: true },
     }, async ({ sql }, extra) => {
       const nutzer = await anmelden(extra)
       fragenDuerfen(nutzer)
-      const e = pruefen(sql, katalog)
+      const e = pruefen(sql, katalog, sichtlage())
+
+      /**
+       * DIE ZWEITE HAELFTE DER PRUEFUNG, seit dem 21.09.2026.
+       *
+       * Bis dahin war dieses Werkzeug rein katalogbasiert und hat fuer SQL
+       * auf mart.vergleichstag und mart.betrieb_wetter_tag "Laeuft, mit 1
+       * Hinweis(en)" gemeldet — beide Sichten waren unlesbar. Der Katalog
+       * kennt die Bedeutung, nicht den Zustand. Also fragt der Pruefer jetzt
+       * auch Postgres: `EXPLAIN` plant, fuehrt nichts aus und faellt genau
+       * dort um, wo ein Spaltenname falsch ist, eine Sicht fehlt oder ein
+       * Funktionsrumpf in ein gesperrtes Schema greift.
+       *
+       * NUR, WENN DER KATALOG NICHTS GESPERRT HAT: gesperrtes SQL geht hier
+       * gar nicht bis zur Datenbank — das ist die Reihenfolge, die
+       * abfrage_ausfuehren auch einhaelt.
+       *
+       * `erlaubt` heisst danach: WUERDE LAUFEN — Katalog UND Postgres sagen ja.
+       * Was Postgres allein sagt, steht zusaetzlich in `laeuft`. Die erste
+       * Fassung liess `erlaubt` auf true stehen und haengte den Planungsfehler
+       * nur als Befund an; ein Client, der allein `erlaubt` liest, haette dann
+       * eine Sperre neben einem Ja gesehen.
+       */
+      const probe = e.erlaubt ? await probeplanen(sql) : null
+      if (probe && !probe.laeuft) {
+        e.erlaubt = false
+        e.befunde.push({
+          schluessel: `plan_fehler_${probe.sqlstate ?? 'unbekannt'}`,
+          schwere: 'sperre',
+          hinweis: `Postgres kann diese Abfrage nicht planen — sie wuerde nicht laufen.\n${probe.meldung}`,
+          berichtigung:
+            'Nach dieser Meldung berichtigen. sicht_beschreiben nennt die Spalten der ' +
+            'beteiligten Sichten; steht eine davon in mart.sicht_defekt, ist die Sicht selbst ' +
+            'kaputt und keine Abfrage darauf laeuft.',
+        })
+      }
+
+      const ergebnis = {
+        ...e,
+        laeuft: probe === null ? null : probe.laeuft,
+        geschaetzte_zeilen: probe?.geschaetzte_zeilen ?? null,
+      }
       await protokollieren({ nutzer: nutzerAus(nutzer), werkzeug: 'abfrage_pruefen', sql,
-        sichten: e.sichten, hinweise: e.befunde, gesperrt: !e.erlaubt })
+        sichten: e.sichten, hinweise: e.befunde,
+        gesperrt: !e.erlaubt || probe?.laeuft === false })
       return {
-        structuredContent: e,
-        content: e.erlaubt
-          ? e.befunde.length
-            ? `Laeuft, mit ${e.befunde.length} Hinweis(en).`
-            : 'Keine Beanstandung.'
-          : `GESPERRT: ${e.befunde.filter(b => b.schwere === 'sperre').map(b => b.hinweis).join(' ')}`,
+        structuredContent: ergebnis,
+        content: probe && !probe.laeuft
+          ? `LAEUFT NICHT — Postgres lehnt schon die Planung ab:\n${probe.meldung}`
+          : !e.erlaubt
+          ? `GESPERRT: ${e.befunde.filter(b => b.schwere === 'sperre').map(b => b.hinweis).join(' ')}`
+          : e.befunde.length
+            ? `Laeuft (von Postgres geplant), mit ${e.befunde.length} Hinweis(en).`
+            : 'Keine Beanstandung, und Postgres kann sie planen.',
       }
     })
 
@@ -518,6 +681,23 @@ export const app = new Skybridge({
       try {
         e = await abfrageAusfuehren(sql, katalog, nutzerAus(nutzer))
       } catch (f) {
+        /**
+         * EIN SQL-FEHLER IST AUCH EINE ANTWORT — mit der Meldung darin.
+         *
+         * BEFUND 21.09.2026: zurueck kam nur "current transaction is aborted"
+         * (SQLSTATE 25P02), und zwar bei JEDEM Fehler gleich — ein Tippfehler
+         * in einem Spaltennamen sah aus wie eine defekte Sicht. Die Ursache
+         * lag in ausfuehren.ts (das EXPLAIN brach die Transaktion ab, sein
+         * Fehler wurde verschluckt) und ist dort behoben; hier geht es um das,
+         * was beim Nutzer ankommt.
+         *
+         * Als gewoehnliche Antwort und nicht als Werkzeugfehler, aus demselben
+         * Grund wie bei der Sperre (16.09.2026): Skybridge macht aus einer
+         * Ausnahme isError, und Claude zeigt dazu "Failed to load this
+         * connector" — der Nutzer sieht dann weder SQLSTATE noch Meldung noch
+         * Berichtigung. Protokolliert ist der Fehler schon (ausfuehren.ts).
+         */
+        if (f instanceof Abfragefehler) return sqlFehlerAntwort(f, 'Die Abfrage')
         if (!(f instanceof Gesperrt)) throw f
         /**
          * EINE SPERRE IST EINE ANTWORT, KEIN FEHLER. Bis zum 16.09.2026 lief
@@ -574,8 +754,14 @@ export const app = new Skybridge({
       const karte = karteFinden('dd_filialen_tabelle') ?? karteFinden('rt_eingabe')
         ?? alleKarten.find(k => k.sql.includes('mart.round_table_monat'))!
       const { sql, parameter: werte } = uebersetzen(karte, { monat, marke })
-      const e = await berichtAusfuehren(karte.schluessel, sql, werte,
-        ['mart.round_table_monat'], katalog, nutzerAus(nutzer), { monat, marke })
+      let e
+      try {
+        e = await berichtAusfuehren(karte.schluessel, sql, werte,
+          ['mart.round_table_monat'], katalog, nutzerAus(nutzer), { monat, marke })
+      } catch (f) {
+        if (f instanceof Abfragefehler) return sqlFehlerAntwort(f, 'Der Round Table')
+        throw f
+      }
       return {
         structuredContent: {
           spalten: e.spalten, zeilen: e.zeilen, zeilen_gesamt: e.zeilen_gesamt,

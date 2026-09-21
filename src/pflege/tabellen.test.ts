@@ -170,3 +170,104 @@ lauf('dateiEinlesen', () => {
     expect(b.fehler).toBe('leere Datei')
   })
 })
+
+/**
+ * `betrieb_standort.csv` — der Weg, auf dem die sieben fehlenden Standorte
+ * hereinkommen sollen (Befund 21.09.2026, Liste in `docs/offene-punkte.md`).
+ *
+ * WARUM DIESES ZIEL EIGENE TESTS BRAUCHT UND `om_einschaetzung` OBEN NICHT
+ * GENUEGT: `manual.betrieb_standort` ist das einzige Pflegeziel mit
+ * Wertebereichsprüfungen in der Tabelle selbst — Koordinaten nur paarweise,
+ * und nur grob in Mitteleuropa. Beide fangen genau die Fehler ab, die beim
+ * Abtippen aus einer Adressliste entstehen, und beide müssen als
+ * **abgewiesene Datei** ankommen und nicht als halber Import.
+ */
+lauf('dateiEinlesen: betrieb_standort', () => {
+  const ziel = ZIELE.find(z => z.datei === 'betrieb_standort.csv')! as Ziel
+
+  beforeAll(async () => {
+    await query(
+      `INSERT INTO core.betrieb (name, enc_id) VALUES ('Standort Testbetrieb','standort-enc-1')
+       ON CONFLICT (enc_id) DO UPDATE SET name = excluded.name`)
+  })
+  afterAll(async () => {
+    await query(`DELETE FROM manual.betrieb_standort
+                  WHERE betrieb_key IN (SELECT betrieb_key FROM core.betrieb
+                                         WHERE enc_id = 'standort-enc-1')`)
+    await query(`DELETE FROM core.betrieb WHERE enc_id = 'standort-enc-1'`)
+  })
+
+  const punkt = async () => (await query<{ breitengrad: string | null; ort: string | null }>(
+    `SELECT s.breitengrad, s.ort FROM manual.betrieb_standort s
+       JOIN core.betrieb b USING (betrieb_key) WHERE b.enc_id = 'standort-enc-1'`))[0] ?? null
+
+  test('eine Adresse mit Koordinate kommt an', async () => {
+    const b = await dateiEinlesen(ziel,
+      'betrieb;strasse;plz;ort;breitengrad;laengengrad;herkunft;genauigkeit\n'
+      + 'Standort Testbetrieb;Marktplatz 1;97070;Würzburg;49.793000;9.951000;manuell;adresse')
+    expect(b.fehler).toBeNull()
+    expect(b.geschrieben).toBe(1)
+    expect((await punkt())!.ort).toBe('Würzburg')
+  })
+
+  /**
+   * DER FEHLER, DEN DIE TABELLE AUSDRUECKLICH ABFAENGT (Migration `0008`):
+   * 49.8/9.9 ist Würzburg, 9.9/49.8 liegt im Golf von Guinea. Beim Abtippen
+   * aus einer Liste ist das der wahrscheinlichste Griff daneben — und ohne
+   * die Prüfung stünde der Betrieb auf der Karte im Atlantik, mit Wetter
+   * dazu.
+   */
+  test('vertauschte Achsen weisen die GANZE Datei ab', async () => {
+    const vorher = await punkt()
+    const b = await dateiEinlesen(ziel,
+      'betrieb;breitengrad;laengengrad;herkunft\n'
+      + 'Standort Testbetrieb;9.951000;49.793000;manuell')
+    expect(b.fehler).not.toBeNull()
+    expect(b.geschrieben).toBe(0)
+    expect(await punkt()).toEqual(vorher)
+  })
+
+  test('eine halbe Koordinate ist keine', async () => {
+    const b = await dateiEinlesen(ziel,
+      'betrieb;breitengrad;herkunft\nStandort Testbetrieb;49.793000;manuell')
+    expect(b.fehler).not.toBeNull()
+    expect(b.geschrieben).toBe(0)
+  })
+
+  /** `herkunft` ist `NOT NULL` mit vier erlaubten Werten. Ohne die Spalte gäbe
+   *  es einen Constraint-Fehler statt einer Meldung — deshalb ist sie Pflicht. */
+  test('ohne herkunft wird die Datei abgewiesen und die Spalte genannt', async () => {
+    const b = await dateiEinlesen(ziel, 'betrieb;plz;ort\nStandort Testbetrieb;97070;Würzburg')
+    expect(b.fehler).toContain('herkunft')
+    expect(b.geschrieben).toBe(0)
+  })
+
+  test('eine erfundene herkunft weist die Datei ab', async () => {
+    const b = await dateiEinlesen(ziel,
+      'betrieb;plz;ort;herkunft\nStandort Testbetrieb;97070;Würzburg;geschaetzt')
+    expect(b.fehler).not.toBeNull()
+    expect(b.geschrieben).toBe(0)
+  })
+
+  /**
+   * Eine Adresse OHNE Koordinate ist erlaubt und nützlich: die PLZ allein
+   * bringt schon das Bundesland und damit Feiertage und Schulferien.
+   *
+   * UND SIE LOESCHT DIE KOORDINATE NICHT, die schon dasteht — nachgemessen,
+   * weil ich hier das Gegenteil erwartet hatte. Der Import schreibt nur die
+   * Spalten, die in der Datei stehen („nur ergänzt und überschrieben, nie
+   * gelöscht", pflege/README.md). Das ist die richtige Richtung: wer die
+   * Adressen nachträgt, weil das Bundesland fehlt, darf damit nicht die
+   * Wetterzuordnung der bereits gepflegten Betriebe wegwerfen.
+   */
+  test('eine Adresse ohne Koordinate ist erlaubt und loescht keine vorhandene', async () => {
+    const vorher = await punkt()
+    expect(vorher!.breitengrad).not.toBeNull()
+
+    const b = await dateiEinlesen(ziel,
+      'betrieb;plz;ort;herkunft\nStandort Testbetrieb;97070;Würzburg;concept_family')
+    expect(b.fehler).toBeNull()
+    expect(b.geschrieben).toBe(1)
+    expect((await punkt())!.breitengrad).toBe(vorher!.breitengrad)
+  })
+})

@@ -4238,14 +4238,254 @@ ausdrücklich nicht mit `count(*)` —, der andere hält die Prüfsicht auf leer
 commands ignored until end of transaction block` zurück. Die Ursache — hier
 `permission denied for schema core`, ebenso gut ein `statement timeout` — steht nirgends.
 
-**Ursache.** Der Server hängt an jede Antwort den Datenstand. Scheitert die eigentliche
+**Ursache.** ~~Der Server hängt an jede Antwort den Datenstand. Scheitert die eigentliche
 Abfrage, läuft diese zweite auf derselben, bereits abgebrochenen Transaktion und meldet
-den Folgefehler. Der wird zurückgegeben, der erste ist weg.
+den Folgefehler. Der wird zurückgegeben, der erste ist weg.~~
+
+> **Widerlegt am 21.09.2026.** `datenstandHolen()` benutzt `pool.query`, also eine **andere**
+> Verbindung, und wird auf dem Fehlerweg überhaupt nicht erreicht. Die wirkliche Ursache ist
+> das verschluckte `EXPLAIN` in `zeilenSchaetzen()` — siehe den Eintrag vom 21.09.2026,
+> Abschnitt 2. Dort auch behoben.
 
 **Folge im Alltag:** Ich habe deshalb zuerst auf einen Zeitüberschreitung getippt, lokal
 65 ms gemessen und nichts gefunden. Die Diagnose stand erst, als ich die Abfrage direkt als
 `mcp_leser` gegen die Datenbank gestellt habe, am Server vorbei.
 
-**Noch nicht behoben** — steht in `docs/offene-punkte.md`. Der Fix gehört in
+~~**Noch nicht behoben** — steht in `docs/offene-punkte.md`. Der Fix gehört in
 `mcp/src/db.ts`: bei einem Fehler zuerst zurückrollen, den Datenstand auf einer frischen
-Verbindung holen oder ganz weglassen, und die ursprüngliche Meldung durchreichen.
+Verbindung holen oder ganz weglassen, und die ursprüngliche Meldung durchreichen.~~
+**Behoben am 21.09.2026** — in `mcp/src/ausfuehren.ts` und `mcp/src/pg_fehler.ts`, nicht in
+`db.ts`: ein `SAVEPOINT` um das `EXPLAIN` und die vollständige Postgres-Meldung in der
+Antwort.
+
+## Elf `mart`-Sichten waren für die Leserolle unlesbar — und jeder Fehler sah gleich aus (21.09.2026)
+
+Eine Analysesitzung, vier Befunde. Der erste ist der aus `0109` noch einmal, eine Schicht
+tiefer; der zweite ist der Grund, warum der erste drei Wochen unentdeckt blieb.
+
+### 1. `core.geschaeftstag()` sperrt acht Sichten aus — darunter alles Wetter
+
+**Symptom.** Jede Abfrage über `abfrage_ausfuehren`, die `mart.wetter_tag`,
+`mart.betrieb_wetter_tag`, `mart.vergleichstag` oder `mart.wetter_effekt_gruppe` berührt,
+antwortet `current transaction is aborted, commands ignored until end of transaction block`.
+`mart.umsatz_tag`, `mart.betrieb`, `mart.nachbarschaft` laufen. Für Metabase läuft alles.
+
+**Die echte Meldung**, nachgemessen als `mcp_leser` in `psql` — am Server vorbei, weil der
+Server sie verschluckt:
+
+```
+SET ROLE mcp_leser;
+SELECT geschaeftstag, count(*) FROM mart.wetter_tag WHERE geschaeftstag = DATE '2026-08-15' GROUP BY 1;
+ERROR:  permission denied for schema core
+LINE 2: SELECT ((p_zeitpunkt AT TIME ZONE core.geschaefts_zeitzone()) ...
+CONTEXT:  SQL function "geschaeftstag" during inlining
+```
+
+**Ursache.** Dieselbe Regel wie in `0109` — ein Funktionsrumpf erbt die Rechte des
+**Aufrufers**, eine Sicht die ihres **Eigentümers** —, aber ein Fall, den `0109` nicht
+abgedeckt hat: `mart.wetter_tag` ruft `core.geschaeftstag()`, und deren Rumpf nennt
+`core.geschaefts_zeitzone()`. Schon dieser **Name** braucht `USAGE` auf dem Schema `core`,
+und `0105` entzieht es der Leserolle ausdrücklich.
+
+**Warum `mart.leserolle_pruefung` nichts gemeldet hat.** Die Wache aus `0109` sucht nur
+unter den Funktionen **in** `ampel` und `mart`. `core.geschaeftstag()` steht im gesperrten
+Schema selbst und fiel durch das Raster. Am 21.09. war die Prüfsicht leer, während elf
+Sichten lagen — und sie selbst war eine davon.
+
+**Die vollständige Messung.** `SELECT * … LIMIT 1` als `mcp_leser` gegen jede der 200
+Sichten in `mart`/`manual`/`ampel` (`count(*)` taugt dafür nicht, siehe der Eintrag vom
+20.09.):
+
+| Ursache | Sichten |
+|---|---|
+| `core.geschaeftstag()` → `permission denied for schema core` | `mart.wetter_tag`, `mart.betrieb_wetter_tag`, `mart.vergleichstag`, `mart.wetter_effekt`, `mart.wetter_effekt_gruppe`, `mart.wettertag_lage`, `mart.pruefung_kalender`, `mart.pruefung_uebersicht` |
+| `sync.sperre_aktiv()` → `permission denied for schema sync` | `mart.import_gesamt` |
+| kein `SELECT`-Recht für `mcp_leser` | `ampel.schwelle_je_betrieb` (aus `0105`), `mart.leserolle_pruefung` (aus `0109`) |
+
+Zwei davon wiegen über ihre eigene Zeile hinaus: `mart.pruefung_uebersicht` **ist** die
+Prüfliste, `mart.leserolle_pruefung` **ist** die Wache. Beide standen hinter der Tür, die
+sie aufmachen sollten. Und das Dashboard-Klickziel `kw_tagesliste` hängt an
+`mart.vergleichstag`, war also für ChatGPT und Claude ebenfalls tot.
+
+**Der dritte Fall — fehlende Rechte — hat eine eigene Wurzel.** `0105` setzt die
+Standardrechte mit `ALTER DEFAULT PRIVILEGES FOR ROLE <current_user>`. Wer eine Migration
+mit einem anderen Zugang einspielt, legt Sichten an, die niemand lesen darf. Das fällt nicht
+auf: die Sicht ist da, Metabase zeigt sie, nur die Leserolle sieht sie nicht.
+
+**Behoben** in `0110`, mit beiden Rezepten aus `0109`:
+
+| | |
+|---|---|
+| **SECURITY DEFINER** mit festem `search_path` | `core.geschaeftstag()`. Nicht auflösbar, ohne `'Europe/Berlin'` an eine vierte Stelle zu schreiben — `core.geschaefts_zeitzone()` gibt es genau dagegen |
+| Auflösung in die **Sicht** ziehen | `mart.import_gesamt` liest die Zugangssperre selbst. `sync.sperre_aktiv()` gibt die **ganze** Zeile zurück, mit Endpunkt, HTTP-Status und `lauf_id`; eine SECURITY-DEFINER-Hülle hätte der Leserolle den Rest mitgereicht |
+| `mcp.rechte_auffrischen()` am Ende der Migration | vergibt `SELECT` namentlich nach; steht jetzt als Pflicht im Funktionskommentar |
+
+**Was `SECURITY DEFINER` kostet**, nachgemessen an `mart.wetter_tag` über 657.334
+Stundenwerte: **nichts Messbares.** 180–199 ms statt 170–203 ms. Die Funktion wird nicht
+mehr in die Abfrage eingesetzt — im Plan steht danach `core.geschaeftstag(zeitpunkt)` statt
+des Ausdrucks —, aber die Kosten dieser Abfrage liegen im Seq Scan und im Hash Aggregate,
+nicht im Aufruf. Zum Vergleich, was Inlining überhaupt wert ist: 4,5 Mio. Aufrufe ohne
+jede Arbeit daneben (`generate_series`) brauchen 1,26 s eingesetzt und 3,23 s als Aufruf.
+Ausdrucksindizes auf `geschaeftstag()` gibt es keine — nachgesehen in `pg_index`.
+
+**Was es künftig verhindert** — drei Wachen, die verschiedene Dinge sehen, und das ist
+Absicht: die ersten zwei lesen den Katalog, die dritte probiert aus.
+
+| Sicht | findet | Erwartung |
+|---|---|---|
+| `mart.leserolle_pruefung` | Funktionen in **jedem** Schema, deren Rumpf ein gesperrtes Schema nennt — über `pg_depend`, nicht über eine Textsuche im Sichtkörper | leer |
+| `mart.sicht_ohne_leserecht` | Relationen in `mart`/`manual`/`ampel` ohne `SELECT` für `mcp_leser` | leer |
+| `mart.sicht_defekt` | was ein `SELECT * … LIMIT 1` **als `mcp_leser`** wirklich nicht lesen konnte, mit SQLSTATE und Meldung | leer |
+
+Alle drei stehen in `mart.pruefung_uebersicht`, dazu eine vierte Zeile, die anschlägt, wenn
+die Momentaufnahme älter als 24 Stunden ist — ohne die sähe ein stehengebliebener
+Gesundheitslauf aus wie eine gesunde Schicht, weil `mart.sicht_defekt` dann leer ist
+(Regel 10). Die Migration `0110` fährt ihre Gegenprobe selbst: sie setzt `ROLE mcp_leser`
+und bricht ab, wenn eine der dreizehn Sichten noch liegt.
+
+### 2. Der Server gab auf **jeden** Fehler dieselbe Meldung zurück
+
+**Das ist der schwerere Befund**, denn er hat den ersten verdeckt — und nicht nur ihn.
+
+**Symptom.** `abfrage_ausfuehren` antwortet `current transaction is aborted` (SQLSTATE
+`25P02`), gleich woran es liegt. Nachgemessen am 21.09. gegen die echte Datenbank:
+
+| SQL | zurück kam | zurück kommen müsste |
+|---|---|---|
+| `SELECT gibtsnicht FROM mart.betrieb` | `25P02` | `42703: column "gibtsnicht" does not exist` |
+| `SELECT … FROM mart.wetter_tag …` | `25P02` | `42501: permission denied for schema core` |
+| `SELECT … FROM mart.nachbarschaft` mit erfundener Spalte `bundesland` | `25P02` | `42703` |
+
+Ein Tippfehler, eine defekte Sicht und eine falsch geratene Spalte waren **nicht
+unterscheidbar**. Ein Modell kann darauf nur eines tun: dieselbe Abfrage noch einmal anders
+formulieren — genau das Verhalten, gegen das der Prüfer geschrieben wurde. Die dritte Zeile
+der Tabelle ist mir selbst passiert, während ich den ersten Befund nachmaß.
+
+**Ursache — nicht die, die hier am 20.09. stand.**
+
+> ~~Der Server hängt an jede Antwort den Datenstand. Scheitert die eigentliche Abfrage,
+> läuft diese zweite auf derselben, bereits abgebrochenen Transaktion und meldet den
+> Folgefehler.~~ Falsch. `datenstandHolen()` benutzt `pool.query`, also eine **andere**
+> Verbindung, und wird auf dem Fehlerweg gar nicht erreicht.
+
+Die Ursache steht in `mcp/src/ausfuehren.ts`, in `zeilenSchaetzen()`:
+
+```ts
+try {
+  const r = await c.query(`EXPLAIN (FORMAT JSON) ${sql}`, werte)   // scheitert
+  …
+} catch {
+  return null            // <- und hier war der echte Fehler weg
+}
+```
+
+Ein gescheitertes Statement bricht in Postgres die **Transaktion** ab, nicht nur sich
+selbst. Das leere `catch` fing den Fehler des `EXPLAIN` und ließ die Transaktion
+abgebrochen zurück; die eigentliche Abfrage lief hinein und bekam `25P02`. Der Kommentar
+darüber behauptete das Gegenteil — „derselbe Fehler kommt gleich mit einer besseren Meldung
+aus der Ausführung selbst" — und war damit die zweite falsche Erklärung an derselben
+Stelle.
+
+**Die zweite Hälfte des Symptoms — „die nächste Abfrage schlägt auch fehl" — ließ sich
+nicht reproduzieren**, weder gegen die Produktion noch lokal: der Fehlerweg rollt zurück,
+bevor er die Verbindung in den Pool zurückgibt. In der Sitzung sah es nur so aus, weil
+**alle vier** probierten Sichten aus demselben Grund lagen — jeder Versuch scheiterte
+erneut, und ein `SELECT 1` dazwischen lief.
+
+**Behoben** in `mcp/src/ausfuehren.ts` und `mcp/src/pg_fehler.ts`:
+
+* **`SAVEPOINT` um das `EXPLAIN`.** `ROLLBACK TO SAVEPOINT` nimmt nur die Schätzung zurück,
+  die Transaktion lebt weiter, und der Fehler der Abfrage ist ihr eigener.
+* **`pgFehlerText()`** legt SQLSTATE, Meldung, `detail`, `hint`, `where` und `position` in
+  **eine** Meldung. `where` ist die Zeile, ohne die am 21.09. nicht zu sehen war, dass der
+  Fehler aus einem Funktionsrumpf kommt und nicht aus der Sicht. Dazu eine Deutung je
+  Klasse: dass `42501` ein Rechteproblem ist und Umformulieren **nicht** hilft, steht in
+  keiner Postgres-Meldung.
+* **`Abfragefehler`** kommt als gewöhnliche Antwort zurück, nicht als Werkzeugfehler —
+  dieselbe Lehre wie bei der Sperre am 16.09.: Skybridge macht aus einer Ausnahme
+  `isError`, und Claude zeigt dazu „Failed to load this connector".
+* Der echte Fehler steht jetzt auch in `mcp.zugriff.fehler`. Nachgezählt in der
+  Produktion am 21.09.: von 32 protokollierten Fehlern trugen **25** die Folgemeldung und
+  damit keine Ursache.
+
+**Was es künftig verhindert.** Vier Tests in `mcp/test/ausfuehren.test.ts` gegen die echte
+Datenbank — der SQLSTATE muss `42703` sein und darf nicht `25P02` sein; die nächste Abfrage
+muss **ohne einen Aufruf dazwischen** laufen; drei Fehler hintereinander dürfen die
+Verbindung nicht vergiften; der Protokolleintrag muss den echten Fehler tragen. Dazu
+`mcp/test/pg_fehler.test.ts` ohne Datenbank für die Form der Meldung.
+
+### 3. `abfrage_pruefen` meldete „Läuft" für SQL, das nicht laufen kann
+
+**Symptom.** Für die Abfrage auf `mart.vergleichstag` + `mart.betrieb_wetter_tag` —
+beides defekte Sichten — antwortete `abfrage_pruefen` „Laeuft, mit 1 Hinweis(en)".
+
+**Ursache.** Die Prüfung war rein katalogbasiert. Sie kennt Körnung, Achsen und Fallstricke,
+also die **Bedeutung** — und nicht den **Zustand**: nicht, ob es die Spalte gibt, und nicht,
+ob die Sicht läuft.
+
+**Behoben**, zweigleisig, weil die beiden Wege verschiedene Fragen beantworten:
+
+* **`EXPLAIN` gegen die Datenbank**, sobald der Katalog nichts gesperrt hat. Ohne `ANALYZE`
+  wird nichts ausgeführt — es wird geplant, und beim Planen fällt der falsche Spaltenname,
+  die fehlende Sicht und der Rechtefehler aus dem Funktionsrumpf auf. `erlaubt` heißt danach
+  „würde laufen" — Katalog **und** Postgres sagen ja; was Postgres allein sagt, steht
+  zusätzlich im neuen Feld `laeuft`.
+* **Der Gesundheitslauf** (`mcp/src/gesundheit.ts`) probiert stündlich jede Sicht aus und
+  legt das Ergebnis in `mcp.sicht_gesundheit` ab. Eine berührte defekte Sicht wird damit als
+  Befund `sicht_defekt` **gesperrt**, mit der Postgres-Meldung darin — und `sichten_suchen`
+  liefert sie weiter mit, aber als defekt gekennzeichnet. Sie wegzulassen wäre die bequemere
+  und schlechtere Antwort: das Modell suchte weiter und wiche auf eine Sicht mit anderer
+  Körnung aus.
+
+Zwei Feinheiten, beide aus dem Fehler selbst gelernt:
+
+* **Gesperrt wird nur auf einer frischen Messung** (jünger als sechs Stunden). Eine
+  reparierte Sicht darf nicht an einem alten Messwert hängen bleiben; danach bleibt der
+  Befund, wird aber eine Warnung.
+* **Ein Zeitüberlauf ist kein Defekt.** `57014` und die Klassen `08`/`53`/`57`/`58` sagen
+  nichts darüber, ob die Sicht lesbar **ist** — sonst stünde nach einer langsamen Nacht die
+  halbe Schicht in `mart.sicht_defekt` und der Befund wäre nichts mehr wert. **Aber er
+  verschwindet auch nicht:** eine Probe ohne Urteil steht in `mart.sicht_unklar`, hat eine
+  eigene Prüfzeile, und der Prüfer gibt sie als **Warnung** `sicht_unklar` mit — eine Sicht,
+  die als `mcp_leser` in fünf Sekunden keine Zeile liefert, läuft ohne engen Zeitraum in die
+  20-Sekunden-Grenze. Dasselbe für einen Fehler ohne SQLSTATE (Verbindung, Client): sagt
+  nichts über die Sicht, zählt aber nicht mehr still als gesund. Die erste Fassung vom
+  selben Tag hatte beides stumm als „läuft" verbucht.
+
+**Was auch der Gesundheitslauf nicht sieht**, nachgemessen am 21.09.2026 an derselben
+kaputten Funktion in zwei Zuständen: ob ein Fehler beim **Planen** oder erst beim **Lesen**
+auffällt, hängt daran, ob Postgres die Funktion in die Abfrage einsetzt — und eine
+SQL-Funktion mit einer `SET`-Klausel (`proconfig`) wird **nicht** eingesetzt.
+
+| Zustand von `core.geschaeftstag()` | Probe findet |
+|---|---|
+| `SECURITY INVOKER`, kein `search_path` | **8** Sichten (Fehler beim Planen) |
+| `SECURITY INVOKER`, mit `search_path` | **6** Sichten (Fehler erst beim Lesen) |
+
+Die zwei, die verschwinden, sind `mart.pruefung_kalender` und `mart.pruefung_uebersicht` —
+`UNION ALL`-Ketten, bei denen `LIMIT 1` nach dem ersten Zweig aufhört; der Zweig mit dem
+Fehler wird nie gelesen. Kaputt wären sie trotzdem, sobald jemand die ganze Liste abfragt.
+**Eine leere `mart.sicht_defekt` heißt also „was die Probe erreicht, läuft" — nicht „jede
+Zeile jeder Sicht läuft".** Genau deshalb stehen die zwei Katalogwachen daneben und nicht
+davor.
+
+**Was der Lauf kostet**, nachgemessen über 236 Relationen: 1,3 s warm, 15,1 s gegen einen
+Klon mit vollen Daten und kaltem Cache, 24,3 s beim ersten Lauf gegen einen frisch gefüllten
+Klon. Der kalte Lauf hing mit 23,5 s an einer einzigen
+Sicht (`mart.wettertag_lage`) — **obwohl `SET LOCAL statement_timeout = '5s'` gesetzt war
+und in der Gegenprobe nachweislich greift** (dieselbe Sicht mit 100 ms Grenze: nach 103 ms
+abgebrochen, `57014`; `pg_sleep(5)` mit 2 s Grenze: nach 2.009 ms). Woran dieser eine Lauf
+vorbeikam, ist **nicht geklärt** und steht in `docs/offene-punkte.md`. Bis dahin hält eine
+zweite Grenze den Lauf im Zaum, die nicht in Postgres hängt, sondern in der Schleife:
+`LAUF_BUDGET_MS = 120_000`, danach bricht er ab und sagt es laut.
+
+### 4. `datenstand` ohne Parameter lieferte drei Zeilen und dokumentierte „alle"
+
+**Symptom.** Der Parameter war als „leer = alle" beschrieben, die Antwort waren drei
+Aggregatzeilen: vollständig 75, keine BWA 36, keine Artikeldaten 30. **Welche** 36 das sind,
+stand nirgends — man musste Betrieb für Betrieb nachfragen.
+
+**Behoben** ohne die 141-Zeilen-Liste, die die Übersicht gerade vermeidet: die Antwort
+trägt jetzt beides, die Übersicht nach Befund **und** jeden Betrieb namentlich, der
+**nicht** vollständig ist, die schwersten Rückstände zuerst. Die vollständigen bleiben weg;
+über die ist nichts zu sagen. Die Werkzeugbeschreibung sagt das jetzt auch.

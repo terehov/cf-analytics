@@ -13,8 +13,9 @@
  */
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { parserBereitstellen } from '../src/ast'
-import { abfrageAusfuehren, Gesperrt } from '../src/ausfuehren'
+import { abfrageAusfuehren, Abfragefehler, Gesperrt, probeplanen } from '../src/ausfuehren'
 import { abfragen, pool } from '../src/db'
+import { defekteSichten, gesundheitPruefen } from '../src/gesundheit'
 import { katalogLaden } from '../src/katalog_laden'
 import type { Katalog } from '../src/katalog'
 
@@ -96,12 +97,51 @@ lauf('Ausfuehrung', () => {
     }
   })
 
+  /**
+   * BEFUND 21.09.2026, die Fortsetzung desselben Fehlers eine Schicht tiefer.
+   *
+   * Jede Abfrage auf eine Wettersicht oder den Vergleichstag antwortete
+   * "current transaction is aborted". Die Ursache: mart.wetter_tag ruft
+   * core.geschaeftstag(), deren Rumpf core.geschaefts_zeitzone() nennt — und
+   * schon dieser NAME braucht USAGE auf dem gesperrten Schema core. Elf
+   * Sichten lagen, darunter die Pruefliste selbst und die Wache aus 0109.
+   * Behoben in Migration 0110.
+   *
+   * WARUM DIESE LISTE NAMENTLICH UND NICHT NUR ALS REGEL: die Regel unten
+   * findet die Ursache, diese Liste findet den Rueckfall. Beides, weil die
+   * Regel eine Textsuche ist und die keine Vollstaendigkeit beweist.
+   */
+  // 30 s statt der 5 s von bun, und der Grund ist gemessen: gegen einen Klon
+  // mit vollen Daten und KALTEM Cache brauchen diese dreizehn Sichten zusammen
+  // mehr als fuenf Sekunden — mart.wettertag_lage allein las 657.334
+  // Stundenwerte von der Platte. Warm sind es Millisekunden. Ein Test, der am
+  // Kaltstart scheitert, wird abgeschaltet statt gelesen.
+  test('die Wettersichten und der Vergleichstag sind lesbar', async () => {
+    for (const sicht of ['mart.wetter_tag', 'mart.betrieb_wetter_tag', 'mart.vergleichstag',
+                         'mart.wetter_effekt', 'mart.wetter_effekt_gruppe', 'mart.wettertag_lage',
+                         'mart.import_gesamt', 'mart.pruefung_kalender',
+                         'mart.pruefung_uebersicht', 'ampel.schwelle_je_betrieb',
+                         'mart.leserolle_pruefung', 'mart.sicht_defekt',
+                         'mart.sicht_ohne_leserecht', 'mart.sicht_unklar']) {
+      await abfragen(`SELECT * FROM ${sicht} LIMIT 1`)
+    }
+  }, 30_000)
+
   /** Und derselbe Befund als Regel statt als Liste: mart.leserolle_pruefung
-   *  findet jede Funktion in ampel/mart, die den Schutz ihrer Sicht aufhebt. */
+   *  findet jede Funktion, die den Schutz ihrer Sicht aufhebt — seit 0110 in
+   *  JEDEM Schema und nicht nur in ampel/mart. */
   test('kein Funktionsrumpf hebt den Schutz seiner Sicht auf', async () => {
-    const offen = await abfragen<{ funktion: string; greift_auf: string }>(
-      `SELECT funktion, greift_auf FROM mart.leserolle_pruefung`)
+    const offen = await abfragen<{ funktion: string; greift_auf: string; sichten: string }>(
+      `SELECT funktion, greift_auf, sichten FROM mart.leserolle_pruefung`)
     expect(offen).toEqual([])
+  })
+
+  /** Die zweite Luecke vom 21.09.2026: eine Sicht, auf die die Leserolle gar
+   *  kein SELECT hat. Zwei gab es, angelegt von 0105 und 0109. */
+  test('jede Sicht der Auswertungsschicht ist fuer die Leserolle lesbar', async () => {
+    const ohne = await abfragen<{ sicht: string; eigentuemer: string }>(
+      `SELECT sicht, eigentuemer FROM mart.sicht_ohne_leserecht`)
+    expect(ohne).toEqual([])
   })
 
   test('schreiben geht nur ins Protokoll, sonst nirgends', async () => {
@@ -141,6 +181,115 @@ lauf('Ausfuehrung', () => {
       await c.query('ROLLBACK')
     } finally { c.release() }
   })
+
+  /**
+   * DER FEHLER, DER JEDEN ANDEREN FEHLER VERDECKT HAT — Befund 21.09.2026.
+   *
+   * `zeilenSchaetzen` setzt ein EXPLAIN vor jede Abfrage. Scheitert das, ist in
+   * Postgres die ganze TRANSAKTION abgebrochen, nicht nur das Statement; das
+   * leere catch liess sie so zurueck, die eigentliche Abfrage lief hinein und
+   * bekam 25P02 — "current transaction is aborted". Damit sah JEDER Fehler
+   * gleich aus: der Tippfehler wie die defekte Sicht.
+   *
+   * Zwei Dinge muessen also gelten, und beide stehen hier:
+   *   1. die Meldung ist die ECHTE (42703 und der Spaltenname), nicht 25P02
+   *   2. die naechste Abfrage laeuft — ohne einen Aufruf, der nur aufraeumt
+   */
+  test('ein SQL-Fehler nennt die Ursache und nicht die Folgemeldung', async () => {
+    const fehler = await abfrageAusfuehren(
+      `SELECT gibtsnicht FROM mart.betrieb`, katalog, nutzer)
+      .then(() => null, (e: unknown) => e)
+
+    expect(fehler).toBeInstanceOf(Abfragefehler)
+    const f = fehler as Abfragefehler
+    expect(f.sqlstate).toBe('42703')                       // undefined_column
+    expect(f.message).toContain('gibtsnicht')
+    // Die Folgemeldung darf gar nicht mehr vorkommen.
+    expect(f.sqlstate).not.toBe('25P02')
+    expect(f.message).not.toContain('current transaction is aborted')
+  })
+
+  test('nach einem SQL-Fehler laeuft die naechste Abfrage sofort', async () => {
+    await expect(abfrageAusfuehren(`SELECT * FROM mart.betrieb WHERE gibtsnicht = 1`,
+      katalog, nutzer)).rejects.toBeInstanceOf(Abfragefehler)
+
+    // KEIN Aufruf dazwischen, der die Verbindung wieder gerade biegt: genau
+    // das musste der Nutzer am 21.09.2026 tun, und es kostete ihn je Fehler
+    // zwei Aufrufe.
+    const e = await abfrageAusfuehren(`SELECT count(*)::int AS n FROM mart.betrieb`,
+      katalog, nutzer)
+    expect(e.zeilen).toHaveLength(1)
+  })
+
+  /** Und dasselbe fuer den Fall, der den Befund ausgeloest hat: eine Abfrage,
+   *  die an einer Sicht scheitert, gefolgt von einer gueltigen. */
+  test('mehrere Fehler hintereinander vergiften die Verbindung nicht', async () => {
+    for (const sql of [`SELECT quatsch FROM mart.betrieb`,
+                       `SELECT * FROM mart.gibtsnicht LIMIT 1`,
+                       `SELECT 1/0 AS x FROM mart.betrieb LIMIT 1`]) {
+      await expect(abfrageAusfuehren(sql, katalog, nutzer)).rejects.toBeInstanceOf(Abfragefehler)
+    }
+    const e = await abfrageAusfuehren(`SELECT count(*)::int AS n FROM mart.betrieb`,
+      katalog, nutzer)
+    expect(e.zeilen_gesamt).toBe(1)
+  })
+
+  /** Der Fehler steht im Protokoll — mit SQLSTATE, damit hinterher jemand
+   *  sagen kann, WARUM eine Zahl fehlt (vorher stand dort nur 25P02). */
+  test('der echte Fehler landet in mcp.zugriff', async () => {
+    await abfrageAusfuehren(`SELECT auchnicht FROM mart.betrieb`, katalog, nutzer).catch(() => {})
+    const [zeile] = await abfragen<{ fehler: string }>(
+      `SELECT fehler FROM mcp.zugriff
+        WHERE subject = 'test|1' AND fehler IS NOT NULL
+        ORDER BY zugriff_id DESC LIMIT 1`)
+    expect(zeile.fehler).toContain('42703')
+    expect(zeile.fehler).toContain('auchnicht')
+  })
+
+  /**
+   * DIE PRUEFUNG FRAGT JETZT AUCH POSTGRES. Vorher war sie rein
+   * katalogbasiert und meldete "Laeuft" fuer SQL, das nicht laufen kann.
+   * EXPLAIN ohne ANALYZE fuehrt nichts aus — es plant, und beim Planen faellt
+   * genau das auf.
+   */
+  test('probeplanen erkennt eine Abfrage, die nicht laufen kann', async () => {
+    const schlecht = await probeplanen(`SELECT gibtsnicht FROM mart.betrieb`)
+    expect(schlecht.laeuft).toBe(false)
+    expect(schlecht.sqlstate).toBe('42703')
+    expect(schlecht.meldung).toContain('gibtsnicht')
+
+    const gut = await probeplanen(`SELECT count(*) FROM mart.betrieb`)
+    expect(gut.laeuft).toBe(true)
+    expect(gut.geschaetzte_zeilen).toBeGreaterThan(0)
+  })
+
+  /**
+   * DER GESUNDHEITSLAUF, gegen die echte Schicht und mit der echten Rolle.
+   * Als Eigentuemer getestet laeuft alles (0109) — deshalb ist dieser Test
+   * nur dann etwas wert, wenn MCP_DATABASE_URL auf mcp_leser zeigt.
+   */
+  // 90 s: 236 Relationen, warm 1,3 s, kalt gemessen 24,3 s — und das Budget des
+  // Laufs selbst liegt bei 120 s. Der Test soll am Budget scheitern, wenn etwas
+  // klemmt, nicht an bun.
+  test('der Gesundheitslauf probiert jede Sicht aus und findet keine defekte', async () => {
+    const e = await gesundheitPruefen()
+    expect(e.geprueft).toBeGreaterThan(100)
+    if (e.defekt > 0) {
+      const defekt = [...defekteSichten().entries()]
+        .map(([s, d]) => `${s}: ${d.sqlstate} ${d.meldung.split('\n')[0]}`)
+      throw new Error(`${e.defekt} Sichten laufen nicht:\n${defekt.join('\n')}`)
+    }
+    // Die Momentaufnahme liegt in der Datenbank, nicht nur im Speicher —
+    // sonst sieht sie niemand im Dashboard.
+    const [stand] = await abfragen<{ n: number; am: string; unklar: number }>(
+      `SELECT count(*)::int AS n, max(geprueft_am)::text AS am,
+              (SELECT count(*)::int FROM mart.sicht_unklar) AS unklar
+         FROM mcp.sicht_gesundheit`)
+    expect(stand.n).toBe(e.geprueft)
+    expect(stand.am).not.toBeNull()
+    // Was ohne Urteil blieb, steht in der Sicht — und stimmt mit dem Lauf ueberein.
+    expect(stand.unklar).toBe(e.ohne_urteil)
+  }, 90_000)
 
   test('der Befund-Anhang traegt Koernung und Datenstand', async () => {
     const e = await abfrageAusfuehren(`

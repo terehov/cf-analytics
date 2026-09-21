@@ -1778,7 +1778,7 @@ Bonliste hält, zählt Prüfzeilen und nennt das Ergebnis Bons.
 **Erwartung laut `0102`: die Liste wird kleiner, nicht größer.** Derzeit wächst sie mit
 jeder Migration, die eine Prüfsicht anlegt.
 
-## Der MCP-Server verdeckt seine eigenen Fehlermeldungen (offen seit 20.09.2026)
+## ~~Der MCP-Server verdeckt seine eigenen Fehlermeldungen~~ (erledigt 21.09.2026)
 
 Scheitert eine Abfrage, kommt `current transaction is aborted` zurück und nicht die
 Ursache. Der Server hängt an jede Antwort den Datenstand; diese zweite Abfrage läuft auf
@@ -1789,8 +1789,98 @@ derselben, bereits abgebrochenen Transaktion und liefert den Folgefehler. Hergan
 `permission denied for schema core` wie eine Zeitüberschreitung aus; die Diagnose stand
 erst, als die Abfrage am Server vorbei direkt als `mcp_leser` lief.
 
-**Zu tun**, in `mcp/src/db.ts`: bei einem Fehler zuerst `ROLLBACK`, den Datenstand auf
+~~**Zu tun**, in `mcp/src/db.ts`: bei einem Fehler zuerst `ROLLBACK`, den Datenstand auf
 einer frischen Verbindung holen oder im Fehlerfall ganz weglassen, und die ursprüngliche
-Meldung durchreichen. Ein Timeout sollte als Timeout ankommen und ein Rechtefehler als
-Rechtefehler — beides sind Meldungen, nach denen ein Modell die Abfrage berichtigen kann,
-und genau dafür ist die Antwortform gebaut.
+Meldung durchreichen.~~
+
+**Erledigt am 21.09.2026 — und die Ursache oben war die falsche.** Der Datenstand läuft über
+`pool.query`, also eine andere Verbindung, und wird auf dem Fehlerweg nie erreicht. Schuld
+war das verschluckte `EXPLAIN` in `zeilenSchaetzen()`: ein gescheitertes Statement bricht die
+**Transaktion** ab, das leere `catch` ließ sie so zurück, und die eigentliche Abfrage lief
+hinein. Behoben mit einem `SAVEPOINT` um das `EXPLAIN` und der vollständigen Postgres-Meldung
+(SQLSTATE, `detail`, `hint`, `where`) in der Antwort. Ein Timeout kommt jetzt als Timeout an
+und ein Rechtefehler als Rechtefehler. Hergang in `fehlerkatalog.md`, 21.09.2026.
+
+## Acht operative Betriebe haben keinen Standort — darunter der umsatzstärkste (offen seit 21.09.2026)
+
+`manual.betrieb_standort` ist für **60 von 141** Betrieben gepflegt. Das ist bekannt und in
+`0086` eingerechnet: 81 Betriebe bekommen bauartbedingt kein Wetter. Neu ist, **wer** in der
+Lücke steht. `mart.nachbarschaft_fehlend`, am 21.09.2026 gegen die Produktion gemessen, nach
+Umsatz des letzten Monats sortiert:
+
+| Betrieb | Marke | Status | Umsatz 09/2026 |
+|---|---|---|---|
+| Wirtshaus am Schlossplatz GmbH | Deutsche Konzepte | operativ | **515.628 €** |
+| Wirtshaus Lautenschlager GmbH | Deutsche Konzepte | operativ | 260.106 € |
+| WHK Gastronomie GmbH | Deutsche Konzepte | operativ | 239.760 € |
+| BS Bier & Speisen Gastro GmbH | Deutsche Konzepte | operativ | 170.743 € |
+| SCHAFFERONE GmbH | Kooperationspartner | operativ | 137.903 € |
+| Gastronomie Wilsdruffer Straße GmbH | Enchilada | operativ | 84.598 € |
+| B+L Pforzheim GmbH | Deutsche Konzepte | operativ | 59.572 € |
+
+Die übrigen 19 Zeilen der Sicht sind geschlossen, inaktiv, ein Testladen oder die
+Franchisegeber-Gesellschaft — dort fehlt zu Recht nichts.
+
+**Was daran hängt.** Ohne Koordinate kein Gitterpunkt, also kein Wetter (`mart.wetter_tag`
+und alles darauf); ohne PLZ kein Bundesland, also kein Feiertag und keine Schulferien
+(`mart.vergleichstag.kalender_quelle`). **Der umsatzstärkste Betrieb der Gruppe fehlt in
+jeder Wetter- und jeder Bundeslandauswertung** — und weil der Join ein `LEFT JOIN` ist,
+fehlt er still: die Zeile ist da, die Wetterspalten sind leer.
+
+**Die Vorlage aus der Analysesitzung hat einen Punkt zu viel.** „Aposto Augsburg (PLZ 86150
+vorhanden, aber nicht in `nachbarschaft`)" trifft nicht zu: Aposto Augsburg steht **nicht**
+in `mart.nachbarschaft_fehlend`, ist also gepflegt. Sechs von sieben Namen der Vorlage sind
+bestätigt, Aposto Augsburg ist keiner.
+
+**Zu tun, und es braucht einen Menschen:** sieben Adressen, sieben Koordinaten. Die
+Zuordnung über Yext (`src/yext/zuordnen.ts` schreibt `manual.betrieb_standort` mit
+`herkunft = 'concept_family'`) greift hier offenbar nicht — warum, ist nicht nachgesehen.
+Bis dahin gilt für jede Wetter- und Bundeslandauswertung: `temp_max IS NOT NULL` filtern und
+**dazusagen, dass der größte Betrieb fehlt**.
+
+## Eine Probe kam an ihrer `statement_timeout`-Grenze vorbei (offen seit 21.09.2026)
+
+Der erste Gesundheitslauf gegen einen frisch gefüllten Klon brauchte 24,3 s für 236
+Relationen, davon **23,5 s allein für `mart.wettertag_lage`** — obwohl in derselben
+Transaktion `SET LOCAL statement_timeout = '5s'` gesetzt war. Warm gelaufen sind es 1,3 s
+für alle.
+
+Die Grenze **greift**, zweimal nachgemessen an derselben Verbindung und in derselben Form
+(`BEGIN READ ONLY`, `SET LOCAL`, `SAVEPOINT` je Probe):
+
+* `mart.wettertag_lage` mit 100 ms Grenze → nach **103 ms** abgebrochen, `57014`
+* `pg_sleep(5)` mit 2 s Grenze → nach **2.009 ms** abgebrochen, `57014`, und die Einstellung
+  überlebt `ROLLBACK TO SAVEPOINT`
+
+Der eine Lauf ist damit nicht erklärt. Kalter Cache erklärt die **Dauer**, nicht das
+ausgebliebene Abbrechen. Nicht reproduzierbar, weil der Cache inzwischen warm ist.
+
+**Was einstweilen davor steht:** eine zweite Grenze, die nicht in Postgres hängt, sondern in
+der Schleife — `LAUF_BUDGET_MS = 120_000` in `mcp/src/gesundheit.ts`. Danach bricht der Lauf
+ab, meldet es als Fehler und lässt den Rest ungeprüft; sichtbar daran, dass `geprueft` in
+`mcp.sicht_gesundheit` fällt.
+
+**Zu klären:** ob es an einer nicht unterbrechbaren I/O-Folge lag (dann wäre es harmlos und
+ein reiner Kaltstart-Effekt) oder daran, dass `SET LOCAL` in irgendeiner Lage doch nicht
+greift (dann hängt mehr daran — dieselbe Einstellung ist der zweite Riegel unter jeder
+Abfrage in `ausfuehren.ts`). Der Weg dahin: den Lauf gegen einen Klon mit kaltem Cache
+wiederholen und `pg_stat_activity` mitschreiben.
+
+## Vorwochenmittel als Prognose: 30 % MAPE am Tag (Befund 21.09.2026)
+
+Kein offener Punkt, sondern eine Messung für den Fall, dass ein Prognosemodul geplant wird.
+Backtest September 2025 bis August 2026, Prognose = Mittel des Wochentags der vier
+Vorwochen (die Logik, mit der `mart.vergleichstag` seinen Vergleichswert bildet):
+
+| Horizont | MAPE |
+|---|---|
+| Tag | 30 % |
+| Woche | 15 % |
+| Monat | 9 % |
+
+Eine additive Kalenderkorrektur je Marke bringt **nichts**: 30,0 % → 29,9 %.
+
+**Was daraus folgt, wenn jemand ein Modul baut:** Effekte **je Betrieb** rechnen, nicht je
+Marke, und als Referenz für einen Feiertag den **Vorjahres-Feiertag** nehmen, nicht die vier
+Vorwochen. Die Zahlen stammen aus der Analysesitzung vom 21.09.2026; die Abfrage dazu ist
+nicht mit überliefert, also vor einer Entscheidung nachrechnen.

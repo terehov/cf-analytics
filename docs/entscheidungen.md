@@ -3452,3 +3452,34 @@ aus `ampel.regel_konzept`.**
 Eugene sagt bei Wareneinsatz und Bewertungen „gelb", beim Personal „orange". Die mittlere
 Stufe bleibt im System `orange` 🟠 — auf Nachfrage bestätigt. Eine Umbenennung hätte nur die
 Beschriftung in `ampel.beschriftung` betroffen, nicht den Schlüssel.
+
+## 21.09.2026 — `SECURITY DEFINER` statt `USAGE ON SCHEMA core` für die Leserolle
+
+Elf `mart`-Sichten waren für `mcp_leser` unlesbar, acht davon wegen einer einzigen Zeile:
+`core.geschaeftstag()` nennt in ihrem Rumpf `core.geschaefts_zeitzone()`, und schon dieser
+Name braucht `USAGE` auf `core`. Drei Wege standen zur Wahl.
+
+| Weg | verworfen, weil |
+|---|---|
+| `GRANT USAGE ON SCHEMA core TO mcp_leser` | eine Zeile, und sie öffnet der Leserolle **jede** Funktion in `core`. Die Regel aus `0105` — in den gesperrten Schemata wird nichts pauschal vergeben — ist genau deshalb da |
+| `'Europe/Berlin'` als Literal in den Rumpf | hält das Inlining, verteilt die Zeitzone aber auf eine **vierte** Stelle. `core.geschaeftstag()`, `core.geschaeftstag_grenzen()` und `core.pruefe_lina_epoch()` lesen sie heute aus **einer** Funktion; die gibt es genau dagegen |
+| **`SECURITY DEFINER` mit festem `search_path`** | **gewählt.** Ein Rezept, das `0109` schon vorgeführt hat (`mart.quelle_messen`), und der Preis ist gemessen, nicht geschätzt |
+
+**Der Preis, weil er der einzige Einwand war.** Eine `SECURITY DEFINER`-Funktion wird nicht
+mehr in die Abfrage eingesetzt; im Plan steht danach `core.geschaeftstag(zeitpunkt)` statt
+des Ausdrucks. Nachgemessen am 21.09.2026 gegen einen Klon mit 657.334 Stundenwerten:
+
+| | |
+|---|---|
+| `SELECT geschaeftstag, count(*) FROM mart.wetter_tag WHERE geschaeftstag = DATE '2026-08-15' GROUP BY 1` | **180–199 ms** statt 170–203 ms |
+| 4,5 Mio. Aufrufe ohne jede Arbeit daneben (`generate_series`, eine Minute Takt über acht Jahre) | 3,23 s statt 1,26 s |
+
+Die zweite Zeile zeigt, was Inlining wert ist; die erste, dass es hier nichts wert ist. Die
+Kosten dieser Abfrage liegen im Seq Scan und im Hash Aggregate über 657.334 Zeilen. Dazu
+nachgesehen: **Ausdrucksindizes auf `geschaeftstag()` gibt es nicht** (`pg_index`), und die
+vier Wettersichten lesen `manual.wetter_stunde` ohnehin vollständig — es gibt also keine
+Bedingung, die das Inlining in eine Indexnutzung umsetzen könnte.
+
+**Was zu beachten bleibt:** wer künftig eine Bedingung der Form
+`core.geschaeftstag(spalte) = …` auf eine große Tabelle setzt, sollte vorher in den Plan
+sehen. Das steht im Funktionskommentar, nicht nur hier.

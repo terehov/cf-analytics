@@ -3218,11 +3218,12 @@
    "koernung": "eine Funktion, die in ein gesperrtes Schema greift — ERWARTUNG: keine Zeile",
    "thema": "import",
    "summen_erlaubt": null,
-   "kommentar": "Funktionen in ampel und mart, deren Rumpf in ein fuer mcp_leser gesperrtes Schema greift.\nERWARTUNG: LEER.\n\nEine Sicht greift auf ihre Tabellen mit den Rechten ihres EIGENTUEMERS zu, ein\nFunktionsrumpf mit denen des AUFRUFERS — auch aus einer Sicht heraus. Wer den Zugriff auf\ncore/sync in eine Funktion verlegt, hebt damit den Schutz der Sicht auf, und zwar lautlos:\nals Eigentuemer getestet laeuft alles.\n\nZwei Wege heraus, beide in 0109 vorgefuehrt: die Aufloesung in die SICHT ziehen\n(ampel.konzept_je_betrieb), oder — wenn das an dynamischem SQL scheitert — SECURITY\nDEFINER mit festem search_path (mart.quelle_messen).\n\nACHTUNG, die Pruefung ist eine Textsuche im Rumpf. Sie findet keinen Zugriff ueber\ndynamisches SQL und keinen ueber einen Alias. Eine leere Zeile heisst \"nichts Offensichtliches\",\nnicht \"bewiesen sauber\".\n\nKoernung: eine Zeile je Funktion, die in ein gesperrtes Schema greift.",
+   "kommentar": "Funktionen, deren Rumpf in ein fuer mcp_leser gesperrtes Schema greift, und die Sichten,\ndie daran haengen. ERWARTUNG: LEER.\n\nEine Sicht greift auf ihre Tabellen mit den Rechten ihres EIGENTUEMERS zu, ein\nFunktionsrumpf mit denen des AUFRUFERS — auch aus einer Sicht heraus. Wer den Zugriff auf\ncore/raw/part/sync in eine Funktion verlegt, hebt damit den Schutz der Sicht auf, und zwar\nlautlos: als Eigentuemer getestet laeuft alles.\n\nZwei Wege heraus, beide vorgefuehrt: die Aufloesung in die SICHT ziehen\n(ampel.konzept_je_betrieb in 0109, der Zweig `sperre` in mart.import_gesamt in 0110), oder —\nwenn das an dynamischem SQL oder an einer vielfach benutzten Funktion scheitert — SECURITY\nDEFINER mit festem search_path (mart.quelle_messen in 0109, core.geschaeftstag in 0110).\n\nSEIT 0110 IN JEDEM SCHEMA. Bis dahin sah sie nur unter den Funktionen in ampel und mart\nnach und meldete am 21.09.2026 nichts, obwohl elf Sichten lagen: core.geschaeftstag() steht\nim gesperrten Schema selbst. Gefunden wird jetzt (a) jede Funktion in ampel/mart und (b)\njede Funktion beliebigen Schemas, an der eine Sicht in mart/manual/ampel haengt — letzteres\nueber pg_depend, dem ein Alias gleichgueltig ist.\n\nACHTUNG, die Pruefung ist eine Textsuche im Rumpf. Sie findet keinen Zugriff ueber\ndynamisches SQL, keinen ueber eine zweite Funktion dazwischen und keinen ueber einen Alias.\nEine leere Liste heisst \"nichts Offensichtliches\", nicht \"bewiesen sauber\" — bewiesen wird\nes erst dadurch, dass jede Sicht wirklich gelesen wird (mart.sicht_defekt).\n\nKoernung: eine Zeile je Funktion, die in ein gesperrtes Schema greift.",
    "spalten": [
     "funktion",
     "greift_auf",
-    "befund"
+    "befund",
+    "sichten"
    ],
    "achsen": [],
    "kennzahlen": [],
@@ -4458,6 +4459,54 @@
     "konzept",
     "monat"
    ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.sicht_defekt",
+   "koernung": "eine Sicht, die sich nicht lesen laesst — ERWARTUNG: keine Zeile",
+   "thema": "import",
+   "summen_erlaubt": null,
+   "kommentar": "Die Sichten, die beim letzten Gesundheitslauf des MCP-Servers NICHT gelesen werden konnten\n— mit dem echten Postgres-Fehler daneben (SQLSTATE und Meldung). ERWARTUNG: LEER.\n\nAnders als mart.leserolle_pruefung und mart.sicht_ohne_leserecht liest diese Sicht keinen\nKatalog: sie zeigt, was ein SELECT * ... LIMIT 1 als mcp_leser wirklich ergeben hat. Damit\nfaellt auch eine Sicht auf, die an einer fehlenden Spalte oder einem Ausdruck scheitert und\nin keinem Rechteraster auftaucht.\n\nDer MCP-Server gibt diese Liste dem Modell mit: abfrage_pruefen und sichten_suchen melden\neine beruehrte defekte Sicht als Befund `sicht_defekt`, statt \"Laeuft\" zu sagen. Am\n21.09.2026 hat abfrage_pruefen genau das noch mit \"Laeuft, mit 1 Hinweis(en)\" quittiert.\n\nLEER HEISST NICHT ZWANGSLAEUFIG GESUND: leer ist sie auch, wenn der Gesundheitslauf gar\nnicht mehr laeuft. Ob er laeuft, sagt geprueft_am — und die Pruefliste sieht darauf.\n\nKoernung: eine Zeile je Sicht, die nicht gelesen werden konnte.",
+   "spalten": [
+    "sicht",
+    "sqlstate",
+    "meldung",
+    "geprueft_am"
+   ],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.sicht_ohne_leserecht",
+   "koernung": "eine Tabelle oder Sicht ohne Leserecht — ERWARTUNG: keine Zeile",
+   "thema": "import",
+   "summen_erlaubt": null,
+   "kommentar": "Tabellen und Sichten in mart/manual/ampel, auf die mcp_leser kein SELECT hat.\nERWARTUNG: LEER.\n\nDer Rechteentzug ist hier kein Schutz, sondern ein Versehen: die Auswertungsschicht ist\ngenau das, was diese Rolle sehen soll. Entsteht, wenn eine Migration mit einem anderen\nZugang eingespielt wird als dem, fuer den 0105 die Standardrechte gesetzt hat — die\nStandardvergabe gilt FOR ROLE <current_user>. Behebung: SELECT mcp.rechte_auffrischen();\n\nLeer auch auf einer Datenbank ohne die Rolle mcp_leser, absichtlich: has_table_privilege\nbekommt die Rollen-OID aus einer Unterabfrage und liefert dann NULL.\n\nKoernung: eine Zeile je Tabelle oder Sicht ohne Leserecht.",
+   "spalten": [
+    "sicht",
+    "eigentuemer",
+    "befund"
+   ],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.sicht_unklar",
+   "koernung": "eine Sicht, deren Probe ohne Urteil blieb — ERWARTUNG: keine Zeile",
+   "thema": "import",
+   "summen_erlaubt": null,
+   "kommentar": "Die Sichten, bei denen der Gesundheitslauf KEIN Urteil hatte: nicht nachweislich kaputt\n(sonst stuenden sie in mart.sicht_defekt), aber auch nicht nachweislich lesbar. ERWARTUNG:\nLEER.\n\nMeist sqlstate 57014 — in fuenf Sekunden kam als mcp_leser keine einzige Zeile. Das ist kein\nDefekt, aber eine Sicht, die mit der 20-Sekunden-Grenze abgefragt wird und in der Probe schon\nan fuenf scheitert, laeuft ohne engen Zeitraum in dieselbe Grenze; der MCP-Server gibt das\ndem Modell als Warnung mit. Ohne sqlstate: der Fehler kam nicht von Postgres (Verbindung,\nClient) und sagt nichts ueber die Sicht — steht hier, damit er nicht still als \"laeuft\" zaehlt.\n\nKoernung: eine Zeile je Sicht, deren Probe ohne Urteil blieb.",
+   "spalten": [
+    "sicht",
+    "sqlstate",
+    "meldung",
+    "dauer_ms",
+    "geprueft_am"
+   ],
+   "achsen": [],
    "kennzahlen": [],
    "fallstricke": []
   },

@@ -1390,3 +1390,46 @@ Offensichtliches", nicht „bewiesen sauber" — der harte Nachweis sind die zwe
 **Und die Probe, die nichts beweist:** `SELECT count(*) FROM <sicht>` wertet die
 Spaltenausdrücke der Sicht **nicht** aus. Wer so prüft, ob eine Sicht lesbar ist, bekommt
 grün und weiß nichts. `SELECT * FROM <sicht> LIMIT 1` nehmen.
+
+## Drei Wachen für die Lesbarkeit der Schicht (Migration `0110`, 21.09.2026)
+
+Die Wache aus `0109` hat ihren eigenen Nachfolgefall nicht gefunden: sie sucht nur unter den
+Funktionen **in** `ampel`/`mart`, und `core.geschaeftstag()` steht im gesperrten Schema
+selbst. Ergebnis: elf Sichten unlesbar für `mcp_leser`, darunter alle Wettersichten,
+`mart.vergleichstag`, die Prüfliste `mart.pruefung_uebersicht` und die Wache selbst. Hergang
+und Messung in `fehlerkatalog.md`, die Schemaseite in `datenmodell.md`.
+
+Seither sehen drei Sichten hin, und sie sehen **verschiedene Dinge** — das ist der Punkt,
+nicht Redundanz:
+
+| Sicht | Grundlage | findet | findet nicht |
+|---|---|---|---|
+| `mart.leserolle_pruefung` | `pg_proc` + `pg_depend` | Funktionen in **jedem** Schema, deren Rumpf `core`/`raw`/`part`/`sync` nennt, samt der Sichten, die daran hängen | Zugriff über dynamisches SQL, über eine zweite Funktion dazwischen, über einen Alias |
+| `mart.sicht_ohne_leserecht` | `pg_class` + `has_table_privilege` | Relationen in `mart`/`manual`/`ampel` ohne `SELECT` für `mcp_leser` | alles, was ein Recht hat und trotzdem nicht läuft |
+| `mart.sicht_defekt` | `mcp.sicht_gesundheit` | was ein `SELECT * … LIMIT 1` **als `mcp_leser`** wirklich nicht lesen konnte — mit SQLSTATE und Meldung | nichts, solange der Lauf läuft. Genau deshalb steht in der Prüfliste eine Zeile, die anschlägt, wenn er älter als 24 Stunden ist |
+| `mart.sicht_unklar` | `mcp.sicht_gesundheit` | Proben **ohne Urteil**: Zeitüberlauf nach fünf Sekunden oder ein Fehler ohne SQLSTATE. Kein Defekt, aber der Prüfer warnt — ohne engen Zeitraum läuft so eine Sicht in die 20-Sekunden-Grenze | ob die Sicht mit engem Zeitraum läuft; das weiß erst die Abfrage |
+
+**Erwartung bei allen vier: leer.** Alle vier stehen in `mart.pruefung_uebersicht`.
+
+**Die dritte hat einen eigenen blinden Fleck**, und deshalb ersetzt sie die ersten zwei
+nicht: sie liest jede Sicht mit `LIMIT 1`, und bei einer `UNION ALL`-Kette hört Postgres
+nach dem ersten Zweig auf. Ein Fehler in einem späteren Zweig fällt damit nur auf, wenn er
+beim **Planen** auffällt — nachgemessen am 21.09.2026: dieselbe kaputte Funktion ergab 8
+Befunde, solange der Fehler beim Planen entstand, und nur 6, als er erst beim Lesen entstand
+(Messung in `fehlerkatalog.md`). **Leer heißt „was die Probe erreicht, läuft".**
+
+**Die dritte ist trotzdem die einzige, die überhaupt etwas beweist**, und sie ist keine Sicht über den Katalog,
+sondern eine Momentaufnahme: der MCP-Server probiert stündlich jede Relation aus und legt
+das Ergebnis über `mcp.gesundheit_melden(jsonb)` in `mcp.sicht_gesundheit` ab. Das muss der
+Server tun und kann nicht in der Datenbank stehen — eine Sicht kann sich nicht selbst
+ausprobieren, und wer es als Eigentümer tut, beweist nichts (die Lehre aus `0107`). Kosten,
+nachgemessen über 236 Relationen: 1,3 s warm.
+
+**Für eine neue `mart`-Sicht folgt daraus zweierlei**, und beides gehört in die Migration,
+nicht in einen guten Vorsatz:
+
+1. **`SELECT mcp.rechte_auffrischen();` am Ende.** Die Standardrechte aus `0105` gelten
+   `FOR ROLE <current_user>` und tragen nicht, wenn eine Migration mit einem anderen Zugang
+   eingespielt wird.
+2. **Die Wirkung als `mcp_leser` nachweisen**, mit `SELECT * … LIMIT 1` und niemals mit
+   `count(*)`. `0110` macht es am eigenen Ende vor.

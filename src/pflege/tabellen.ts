@@ -146,6 +146,43 @@ export const ZIELE: readonly Ziel[] = [
     pflicht: ['kontonummer'],
     zweck: 'Sachkontenrahmen — welche Konten Wareneinsatz sind',
   },
+  /**
+   * Wo ein Betrieb steht (Migration `0008`).
+   *
+   * WARUM DAS HIER LANDET, ZWEI JAHRE NACH DER TABELLE. `manual.betrieb_standort`
+   * ist für 60 von 141 Betrieben gepflegt, und am 21.09.2026 stand fest, WER
+   * in der Lücke steht: sieben **operative** Betriebe, darunter mit 515.628 €
+   * im September der umsatzstärkste der Gruppe (`mart.nachbarschaft_fehlend`,
+   * Liste in `docs/offene-punkte.md`). Ohne Koordinate kein Wetter, ohne PLZ
+   * kein Bundesland und damit kein Feiertag — und weil beide Joins `LEFT` sind,
+   * fehlt der Betrieb still: die Zeile ist da, die Spalten sind leer.
+   *
+   * Bis hierher gab es für diese Tabelle nur zwei Wege: Postico oder
+   * `src/yext/zuordnen.ts`, das sie aus den Yext-Adressen füllt und diese
+   * sieben offenbar nicht trifft. Beides ist kein Weg für sieben nachgesehene
+   * Adressen. Jetzt ist es einer: Datei anlegen, committen, pushen — der
+   * nächste Nachtlauf übernimmt es.
+   *
+   * `herkunft` ist Pflicht, weil die Tabelle sie `NOT NULL` führt und nur vier
+   * Werte zulässt: `manuell` für nachgeschlagen, `geocoding` für berechnet,
+   * `concept_family` für eine Liste des Kunden, `lina` gibt es nicht. Wer sie
+   * wegließe, bekäme einen Constraint-Fehler statt einer Meldung.
+   *
+   * ACHTUNG, DIE TABELLE PRÜFT ZWEI DINGE NACH: entweder beide Koordinaten
+   * oder keine, und sie müssen grob in Mitteleuropa liegen (45–56 / 5–16).
+   * Letzteres fängt vertauschte Achsen ab — 49.8/9.9 ist Würzburg, 9.9/49.8
+   * liegt im Golf von Guinea. Eine Datei mit vertauschten Spalten wird
+   * **ganz** abgewiesen, und der Grund steht in `mart.pflege_stand`.
+   */
+  {
+    datei: 'betrieb_standort.csv',
+    tabelle: 'manual.betrieb_standort',
+    schluessel: ['betrieb_key'],
+    spalten: ['betrieb_key', 'strasse', 'plz', 'ort', 'land',
+              'breitengrad', 'laengengrad', 'herkunft', 'genauigkeit', 'notiz'],
+    pflicht: ['herkunft'],
+    zweck: 'Adresse und Koordinate je Betrieb — Grundlage fuer Wetter, Bundesland und Karte',
+  },
   {
     datei: 'marktindex.csv',
     tabelle: 'manual.marktindex',

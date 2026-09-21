@@ -23,6 +23,8 @@
 import type pg from 'pg'
 import { pool } from './db'
 import type { Katalog } from './katalog'
+import { sichtlage } from './gesundheit'
+import { pgFehlerText, sqlstateVon } from './pg_fehler'
 import { pruefen, type Befund, type Pruefergebnis } from './pruefen'
 import { darstellungshinweis, spaltenBeschreiben, type SpalteInfo } from './spalten_info'
 
@@ -67,6 +69,43 @@ export class Gesperrt extends Error {
   constructor(readonly pruefung: Pruefergebnis) {
     super(gesperrtText(pruefung))
     this.name = 'Gesperrt'
+  }
+}
+
+/**
+ * Eine Abfrage, die Postgres abgelehnt hat — mit dem ECHTEN Fehler darin.
+ *
+ * WARUM DAS EINE EIGENE KLASSE IST UND NICHT DER PG-FEHLER SELBST. Der Fehler
+ * aus `pg` traegt seine Ursache in `code`, `hint`, `where` und `detail`; was
+ * beim Modell ankommt, ist aber allein `message`. Bis zum 21.09.2026 stand
+ * dort "current transaction is aborted" und sonst nichts — und damit war ein
+ * Tippfehler in einem Spaltennamen von einer defekten Sicht nicht zu
+ * unterscheiden. Hier wird die ganze Meldung in `message` gelegt, einmal, an
+ * einer Stelle.
+ *
+ * `befund` macht daraus einen Eintrag in der Form, in der jeder andere Hinweis
+ * auch kommt: damit kann server.ts eine gewoehnliche Antwort daraus bauen
+ * statt eines Werkzeugfehlers. Das ist die Lehre vom 16.09.2026 — ein
+ * Werkzeugfehler erscheint in Claude als "Failed to load this connector", und
+ * der Nutzer sieht weder Grund noch Berichtigung.
+ */
+export class Abfragefehler extends Error {
+  readonly sqlstate: string | null
+  readonly befund: Befund
+
+  constructor(readonly urspruenglich: unknown, readonly pruefung: Pruefergebnis) {
+    super(pgFehlerText(urspruenglich))
+    this.name = 'Abfragefehler'
+    this.sqlstate = sqlstateVon(urspruenglich)
+    this.befund = {
+      schluessel: `sql_fehler_${this.sqlstate ?? 'unbekannt'}`,
+      schwere: 'sperre',
+      hinweis: `Postgres hat die Abfrage abgelehnt.\n${this.message}`,
+      berichtigung:
+        'Die Meldung nennt die Ursache — danach berichtigen, nicht bloss umformulieren. ' +
+        'sicht_beschreiben nennt die Spalten der beteiligten Sichten; steht die Sicht in ' +
+        'mart.sicht_defekt, ist sie selbst kaputt und keine Abfrage darauf laeuft.',
+    }
   }
 }
 
@@ -133,15 +172,38 @@ export function gesperrtText(p: Pruefergebnis): string {
  *
  * `EXPLAIN` ohne ANALYZE fuehrt nichts aus — es kostet nur die Planung.
  * Schlaegt es fehl (etwa weil eine Spalte nicht existiert), ist das kein
- * Grund, die Abfrage zu verweigern: derselbe Fehler kommt gleich mit einer
- * besseren Meldung aus der Ausfuehrung selbst.
+ * Grund, die Abfrage zu verweigern: derselbe Fehler kommt gleich aus der
+ * Ausfuehrung selbst, und die kennt ihn genauer.
+ *
+ * DER SAVEPOINT IST DER GANZE PUNKT DIESER FUNKTION — und sein Fehlen war der
+ * schlimmste Fehler dieses Servers. BEFUND 21.09.2026:
+ *
+ *   Ein gescheitertes Statement bricht in Postgres die TRANSAKTION ab, nicht
+ *   nur sich selbst. Das leere catch hier fing den Fehler des EXPLAIN und
+ *   liess die Transaktion abgebrochen zurueck. Die eigentliche Abfrage lief
+ *   danach in eine abgebrochene Transaktion und bekam 25P02 — "current
+ *   transaction is aborted". Der echte Fehler war in diesem catch
+ *   verschwunden.
+ *
+ *   Wirkung: jede fehlerhafte Abfrage, welcher Art auch immer, kam als
+ *   dieselbe Meldung zurueck. Nachgemessen am selben Tag — `SELECT gibtsnicht
+ *   FROM mart.betrieb` und eine Abfrage auf eine defekte Sicht ergaben
+ *   beide 25P02 und sonst nichts.
+ *
+ * Mit dem Savepoint nimmt `ROLLBACK TO SAVEPOINT` nur das EXPLAIN zurueck.
+ * Die Transaktion lebt weiter, die Abfrage laeuft, und ihr Fehler ist ihr
+ * eigener.
  */
 async function zeilenSchaetzen(c: pg.PoolClient, sql: string, werte: unknown[]): Promise<number | null> {
+  await c.query('SAVEPOINT schaetzung')
   try {
     const r = await c.query(`EXPLAIN (FORMAT JSON) ${sql}`, werte)
+    await c.query('RELEASE SAVEPOINT schaetzung')
     const plan = (r.rows[0] as any)?.['QUERY PLAN']?.[0]?.Plan
     return typeof plan?.['Plan Rows'] === 'number' ? plan['Plan Rows'] : null
   } catch {
+    await c.query('ROLLBACK TO SAVEPOINT schaetzung').catch(() => {})
+    await c.query('RELEASE SAVEPOINT schaetzung').catch(() => {})
     return null
   }
 }
@@ -277,12 +339,22 @@ async function laufenLassen(
     r = await c.query({ text: sql, values: werte, rowMode: 'array' as never })
     await c.query('ROLLBACK')
   } catch (e) {
+    /**
+     * ROLLBACK VOR ALLEM ANDEREN. Die Verbindung geht gleich in den Pool
+     * zurueck, und eine abgebrochene Transaktion darin macht die naechste
+     * Abfrage eines beliebigen anderen Nutzers kaputt. `.catch` daneben, weil
+     * ein ROLLBACK auf einer weggebrochenen Verbindung selbst wirft — und
+     * dann waere der eigentliche Fehler wieder verloren.
+     */
     await c.query('ROLLBACK').catch(() => {})
     if (e instanceof Gesperrt) throw e
-    const meldung = String((e as Error)?.message ?? e)
+    // Der ECHTE Fehler ins Protokoll, nicht nur seine erste Zeile: wer
+    // hinterher wissen will, warum eine Zahl fehlt, braucht SQLSTATE und
+    // Zusammenhang (21.09.2026).
+    const fehler = new Abfragefehler(e, pruefung)
     await protokollieren({ nutzer, werkzeug, parameter, sql, sichten: pruefung.sichten,
-      dauer_ms: Date.now() - start, fehler: meldung })
-    throw alsProtokolliert(e)
+      dauer_ms: Date.now() - start, fehler: fehler.message })
+    throw alsProtokolliert(fehler)
   } finally {
     c.release()
   }
@@ -357,7 +429,9 @@ async function laufenLassen(
 export async function abfrageAusfuehren(
   sql: string, katalog: Katalog, nutzer: Nutzer,
 ): Promise<Ergebnis> {
-  const pruefung = pruefen(sql, katalog)
+  // Mit der Lage aus dem Gesundheitslauf: eine defekte Sicht wird hier
+  // abgewiesen, statt in einem Postgres-Fehler zu enden (21.09.2026).
+  const pruefung = pruefen(sql, katalog, sichtlage())
 
   if (!pruefung.erlaubt) {
     await protokollieren({ nutzer, werkzeug: 'abfrage_ausfuehren', sql,
@@ -391,6 +465,56 @@ export async function berichtAusfuehren(
       .filter(k => k.koernung !== null),
   }
   return laufenLassen(sql, werte, pruefung, nutzer, `bericht:${schluessel}`, parameter, false, katalog)
+}
+
+/**
+ * Prueft, ob Postgres diese Abfrage ueberhaupt PLANEN kann — ohne sie
+ * auszufuehren.
+ *
+ * WARUM ES DAS GIBT. `abfrage_pruefen` hat am 21.09.2026 "Laeuft, mit 1
+ * Hinweis(en)" fuer SQL gemeldet, das auf zwei defekten Sichten stand. Die
+ * Pruefung davor liest den Katalog: sie kennt Koernung, Achsen und
+ * Fallstricke und damit alles Fachliche — aber nicht, ob es die Spalte gibt,
+ * die da steht, und nicht, ob die Sicht laeuft. Beides weiss Postgres, und
+ * `EXPLAIN` fragt es fuer den Preis der Planung.
+ *
+ * EXPLAIN OHNE ANALYZE FUEHRT NICHTS AUS. Es plant — und genau beim Planen
+ * faellt der Rechtefehler aus einem Funktionsrumpf auf ("during inlining"),
+ * der Tippfehler in einem Spaltennamen und die fehlende Sicht. Was es NICHT
+ * findet, ist ein Fehler, der erst beim Lesen entsteht; dafuer gibt es den
+ * Gesundheitslauf.
+ *
+ * In einer eigenen, zurueckgerollten READ-ONLY-Transaktion, aus denselben
+ * Gruenden wie `laufenLassen` — und mit einer kurzen Zeitgrenze: die Planung
+ * einer grossen Abfrage soll niemanden warten lassen.
+ */
+export async function probeplanen(sql: string): Promise<{
+  laeuft: boolean
+  sqlstate: string | null
+  meldung: string | null
+  geschaetzte_zeilen: number | null
+}> {
+  const c = await pool.connect()
+  try {
+    await c.query('BEGIN READ ONLY')
+    await c.query(`SET LOCAL statement_timeout = '5s'`)
+    try {
+      const r = await c.query(`EXPLAIN (FORMAT JSON) ${sql}`)
+      const plan = (r.rows[0] as any)?.['QUERY PLAN']?.[0]?.Plan
+      return {
+        laeuft: true, sqlstate: null, meldung: null,
+        geschaetzte_zeilen: typeof plan?.['Plan Rows'] === 'number' ? plan['Plan Rows'] : null,
+      }
+    } catch (e) {
+      return {
+        laeuft: false, sqlstate: sqlstateVon(e), meldung: pgFehlerText(e),
+        geschaetzte_zeilen: null,
+      }
+    }
+  } finally {
+    await c.query('ROLLBACK').catch(() => {})
+    c.release()
+  }
 }
 
 export { protokollieren }

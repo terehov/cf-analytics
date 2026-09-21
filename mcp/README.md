@@ -16,7 +16,7 @@ Ein MCP-Server (Skybridge) mit zehn Werkzeugen auf der Auswertungsschicht:
 | `berichte_suchen` · `bericht_ausfuehren` | Die 285 fertigen Berichte — dieselben, die die Dashboards im BI-Tool zeigen |
 | `sichten_suchen` · `sicht_beschreiben` · `achsen_zeigen` | Der Katalog: Körnung, Spalten, Achsen, Fallstricke, Beispielabfragen |
 | `betriebe_suchen` · `datenstand` | Wer ist gemeint, und was ist überhaupt beurteilbar |
-| `abfrage_pruefen` · `abfrage_ausfuehren` | Freies SQL — mit Prüfung auf dem Syntaxbaum |
+| `abfrage_pruefen` · `abfrage_ausfuehren` | Freies SQL — mit Prüfung auf dem Syntaxbaum **und** gegen die Datenbank (`EXPLAIN`, seit 21.09.2026) |
 | `round_table` | Das Ampelraster als Ansicht |
 
 **Zehn, nicht 285.** Jede Werkzeugbeschreibung kostet ein Modell 300–600 Token,
@@ -171,3 +171,48 @@ neue Abfrage. Die Anzeigeart, die das BI-Tool für einen Bericht führt, wird ge
 * **Kein Dashboard an der Wand**, keine Montags-Mail, keine Dauer-URL.
 * **Keine Sicht je Betrieb** — ein OM sieht alles oder nichts. Das BI-Tool
   kann das heute auch nicht; steht in `docs/offene-punkte.md`.
+
+---
+
+## Der Gesundheitslauf
+
+Jede Stunde probiert der Server **jede** Relation in `mart`/`manual`/`ampel` mit
+`SELECT * … LIMIT 1` aus — als `mcp_leser`, denn nur das beweist etwas — und legt das
+Ergebnis über `mcp.gesundheit_melden(jsonb)` in `mcp.sicht_gesundheit` ab. Code:
+`src/gesundheit.ts`, Kosten 1,3 s für 236 Relationen (nachgemessen 21.09.2026).
+
+**Warum das nicht in der Datenbank stehen kann:** eine Sicht kann sich nicht selbst
+ausprobieren, und wer es als Eigentümer tut, bekommt grün und weiß nichts. Am 20.09.2026 hat
+genau das drei Sichten kaputt in Produktion gebracht, am 21.09. elf.
+
+Was der Lauf findet, geht ans Modell:
+
+* `abfrage_ausfuehren` und `abfrage_pruefen` **sperren** eine Abfrage auf eine defekte Sicht,
+  mit der Postgres-Meldung im Befund `sicht_defekt` — aber nur, wenn die Messung jünger als
+  sechs Stunden ist. Sonst bleibt es eine Warnung: eine reparierte Sicht darf nicht an einem
+  alten Messwert hängen bleiben.
+* `sichten_suchen` liefert eine defekte Sicht **weiter mit**, gekennzeichnet. Sie
+  wegzulassen wäre bequemer und schlechter — das Modell suchte weiter und wiche auf eine
+  Sicht mit anderer Körnung aus.
+* Eine Probe **ohne Urteil** — Zeitüberlauf nach fünf Sekunden, oder ein Fehler ohne
+  SQLSTATE — ist kein Defekt und sperrt nichts. Sie steht in `mart.sicht_unklar`, wird in
+  `sichten_suchen` als `langsam` markiert und im Prüfer zur **Warnung** `sicht_unklar`: ohne
+  engen Zeitraum läuft so eine Sicht in die 20-Sekunden-Grenze.
+
+Nachsehen kann man es in `mart.sicht_defekt` (Erwartung: leer) und in
+`mart.pruefung_uebersicht`. Dort steht auch eine Zeile, die anschlägt, wenn die
+Momentaufnahme älter als 24 Stunden ist — **ohne die sähe ein stehengebliebener Lauf aus wie
+eine gesunde Schicht**, weil `mart.sicht_defekt` dann leer ist.
+
+## Fehler kommen als Fehler an
+
+Bis zum 21.09.2026 antwortete `abfrage_ausfuehren` auf **jeden** Fehler mit
+`current transaction is aborted` (SQLSTATE `25P02`) — ein Tippfehler in einem Spaltennamen
+war von einer defekten Sicht nicht zu unterscheiden. Ursache war ein verschlucktes `EXPLAIN`
+in `src/ausfuehren.ts`; Hergang in `docs/fehlerkatalog.md`.
+
+Jetzt trägt die Antwort SQLSTATE, Meldung, `detail`, `hint` und `where` (`src/pg_fehler.ts`),
+dazu eine Deutung je Fehlerklasse — dass `42501` ein Rechteproblem ist und Umformulieren
+nicht hilft, steht in keiner Postgres-Meldung. Und sie kommt als **gewöhnliche Antwort**,
+nicht als Werkzeugfehler: aus einer Ausnahme macht Skybridge `isError`, und Claude zeigt
+dazu „Failed to load this connector".
