@@ -990,3 +990,42 @@ das Protokoll in `mcp.zugriff` schon `SET TRANSACTION READ WRITE` braucht.
 Warum die Probe nicht in der Datenbank stehen kann: eine Sicht kann sich nicht selbst
 ausprobieren, und wer es als Eigentümer tut, beweist nichts. Die Rolle `mcp_leser` trägt
 genau ein Prozess — der MCP-Server —, also probiert er.
+
+## `0111` — das Wetter wird über Nacht materialisiert, nicht mehr live gelesen (21.09.2026)
+
+Der Sockel unter jeder Wetterabfrage war `mart.wetter_tag`: eine gewöhnliche Sicht, die bei
+jedem Aufruf alle 3,42 Mio. Zeilen aus `manual.wetter_stunde` (48 Gitterpunkte, 2018 bis
+heute) nach `core.geschaeftstag(zeitpunkt)` gruppiert — einem Funktionswert, also ohne Index
+und ohne Datumsfilter vor der Aggregation. Gemessen in Produktion am 21.09.2026:
+`mart.vergleichstag_basis` (materialisiert seit `0084`) ein Jahr **0,08 s**;
+`mart.wetter_tag` ein einzelner Tag **4,5 s**; `mart.betrieb_wetter_tag` ein Tag **7,4 s**,
+ein Jahr **ebenfalls 7,4 s** — die Kosten liegen vollständig im Gruppieren, nicht im
+angefragten Zeitraum. Eine Jahresauswertung über `mart.vergleichstag` mit sechs Faktoren lief
+deshalb in die 20-Sekunden-Grenze der Leserolle `mcp_leser` (`57014`); Hergang und Messreihe
+in `docs/fehlerkatalog.md`, die Abwägung der Alternativen in `docs/entscheidungen.md`.
+
+**Der Umbau, nach dem Vorbild von `0084`.** `mart.wetter_tag_basis` ist jetzt eine
+`MATERIALIZED VIEW` mit genau der bisherigen Abfrage, einem eindeutigen Index auf
+`(breite, laenge, geschaeftstag)` und einem zweiten auf `geschaeftstag`. `mart.wetter_tag`
+wird eine dünne Hülle darüber — Name und Spalten bleiben, wie bei `mart.vergleichstag` seit
+`0084`. `mart.betrieb_wetter_tag`, `mart.vergleichstag`, `mart.wetter_effekt_gruppe` und
+`mart.wettertag_lage` erben die Materialisierung unverändert, ohne selbst angefasst zu
+werden.
+
+**Aufgefrischt wird am Ende von `wetterNachlauf()`** (`src/wetter/nachlauf.ts`), über
+`sichtAuffrischen()` (`src/sync/auffrischen.ts`), mit `REFRESH MATERIALIZED VIEW
+CONCURRENTLY`. Nur der Wetter-Nachlauf schreibt `manual.wetter_stunde`, und der läuft einmal
+pro Nacht — ein zweiter Auslöser wäre ein Refresh ohne neue Zeilen darunter.
+
+**Das Wetter in `mart.vergleichstag` ist damit Stand des letzten Nachtlaufs, nicht mehr
+live.** Der Kommentar in `src/wetter/nachlauf.ts` (20.08.2026) nannte es bewusst live und
+hatte damals recht — nur wächst die Tabelle
+mit jedem Backfill-Jahr, und der Sockel wächst mit ihr.
+
+**Nachgemessen** auf einem Klon mit einem Fünftel des Bestands (Messreihe in
+`fehlerkatalog.md`): `mart.betrieb_wetter_tag` ein Tag von 190 ms auf unter 1 ms,
+`mart.wettertag_lage` ein Jahr von 2,9 s auf 93 ms, Refresh 2,1–2,7 s nebenläufig.
+`mart.vergleichstag` fällt nur von 310 auf 210 ms: der Rest ist der LEFT JOIN auf
+`mart.betrieb_wetter_tag` über die gerundeten Koordinaten, nicht die Aggregation. Die
+Produktionswerte nach dem Deploy stehen in `offene-punkte.md` aus. Ob der Refresh
+gelaufen ist, zeigt `mart.materialisierung_stand` unter dem Merker `wetter_tag_refresh`.

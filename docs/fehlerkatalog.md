@@ -3562,7 +3562,8 @@ die gesamte Auswertung — auf einer leeren Tabelle.
 
 **Was ihn heute verhindert.** Abschnitt 19 der Migration frischt alle drei am
 Ende ausdrücklich auf, absichtlich ohne `CONCURRENTLY` (das braucht einen
-vorhandenen Stand, PG 55000 — dieselbe Falle wie in `0084`).
+vorhandenen Stand — dieselbe Falle wie in `0084`; der SQLSTATE dafür ist
+`0A000` und nicht `55000`, berichtigt am 21.09.2026, siehe `importer.md`).
 
 **Die Lehre — und es ist die dritte Wiederholung derselben.** Reihenfolge in
 einer Migration ist Fachlogik, nicht Formatierung. Eine leere materialisierte
@@ -4529,3 +4530,82 @@ er die leere Tabelle, sperrt nichts, und der erste Lauf nach 10 s legt den gesun
 nach — ein erfundener, frisch datierter Defekt an einer gesunden Sicht; die Abfrage muss
 laufen, der Eintrag muss danach weg sein, und ein Eintrag zu einer Sicht, die die Abfrage
 nicht berührt, muss bleiben.
+
+## Eine Jahresauswertung über `mart.vergleichstag` lief in die 20-Sekunden-Grenze — der Sockel steckte im Wetter (21.09.2026, vormittags)
+
+**Symptom.** Nach der Reparatur der Leserechte (`0110`, derselbe Tag) stellte Claude über den
+MCP-Server eine Jahresauswertung auf `mart.vergleichstag` für alle operativen Betriebe: sechs
+Faktoren per `LATERAL VALUES` und ein Rückjoin auf die Basis. Die Abfrage lief in die
+`statement_timeout`-Grenze der Leserolle `mcp_leser`: `57014` nach 20,1 s.
+
+**Diagnoseweg.** Vier Zugriffe im Protokoll `mcp.zugriff`, dieselbe Sitzung:
+
+| Zugriff | Abfrage | Dauer | Ergebnis |
+|---|---|---|---|
+| 301 | Jahr, sechs Faktoren, Rückjoin | 20,1 s | Timeout `57014` |
+| 302 | Zählung als Vorprobe | 6,7 s | lief |
+| 303 | CTE `MATERIALIZED`, Filter vor dem Aggregieren | 11,1 s | 6 Zeilen |
+| 304 | dieselbe Abfrage, zusätzlich nach Marke | 12,2 s | 14 Zeilen |
+
+Der Server verhielt sich wie seit heute vorgesehen (Abschnitt „Der Server gab auf **jeden**
+Fehler dieselbe Meldung zurück" weiter oben): die echte Meldung mit Deutung statt `25P02`,
+die Sitzung blieb sauber, und Claude berichtigte die Abfrage selbst, ohne dieselbe
+Formulierung zu wiederholen.
+
+**Ursache.** `mart.wetter_tag` (`0086`) gruppiert bei jedem Aufruf alle 3,42 Mio. Zeilen aus
+`manual.wetter_stunde` (48 Gitterpunkte, 2018 bis heute) nach `core.geschaeftstag(zeitpunkt)`
+— einem Funktionswert, also ohne Index und ohne Datumsfilter vor der Aggregation. Gemessen in
+Produktion:
+
+| Sicht | Zeitraum | Dauer |
+|---|---|---|
+| `mart.vergleichstag_basis` (materialisiert seit `0084`) | ein Jahr | 0,08 s |
+| `mart.wetter_tag` | ein Tag | 4,5 s |
+| `mart.betrieb_wetter_tag` | ein Tag | 7,4 s |
+| `mart.betrieb_wetter_tag` | ein Jahr | 7,4 s |
+
+Die letzten beiden Zeilen zeigen den Befund: der Zeitraum ändert an der Dauer nichts, weil
+`mart.wetter_tag` unabhängig vom Filter erst den ganzen Bestand gruppiert und danach erst
+gefiltert wird. Derselbe Grund lässt die drei Wettereffektsichten
+(`mart.betrieb_wetter_tag`, `mart.wetter_effekt_gruppe`, `mart.wettertag_lage`) im
+stündlichen Gesundheitslauf als „unklar" stehen (`mart.sicht_unklar`): in 5 s keine Zeile.
+Der Kommentar in `src/wetter/nachlauf.ts` (20.08.2026) nannte das Wetter bewusst „live" —
+das stimmte damals, aber die Tabelle wächst mit jedem Backfill-Jahr und der Sockel mit ihr.
+
+**Behebung**, Migration `0111`: `mart.wetter_tag_basis` als `MATERIALIZED VIEW` mit
+eindeutigem Index auf `(breite, laenge, geschaeftstag)` und einem zweiten auf
+`geschaeftstag`; `mart.wetter_tag` wird eine dünne Hülle darüber, nach dem Vorbild von
+`0084`. `mart.betrieb_wetter_tag`, `mart.vergleichstag`, `mart.wetter_effekt_gruppe` und
+`mart.wettertag_lage` erben das unverändert. Aufgefrischt wird am Ende von
+`wetterNachlauf()` über `sichtAuffrischen()`, mit `REFRESH MATERIALIZED VIEW CONCURRENTLY` —
+nur der Wetter-Nachlauf schreibt `manual.wetter_stunde`, und der läuft einmal pro Nacht.
+Folge: das Wetter in `mart.vergleichstag` ist ab jetzt Stand des letzten Nachtlaufs, nicht
+mehr live. Schemaseite in `docs/datenmodell.md`, Abwägung der Alternativen in
+`docs/entscheidungen.md`.
+
+**Nachher-Messwerte**, auf einem Klon von `lina` (657.334 Stundenwerte, ein Fünftel des
+Produktionsbestands), als `mcp_leser`, drei Läufe:
+
+| Abfrage | vorher | nachher |
+|---|---|---|
+| `mart.wetter_tag`, ein Tag | 183–187 ms | 0,3–0,4 ms |
+| `mart.betrieb_wetter_tag`, ein Tag | 187–201 ms | 0,4–0,8 ms |
+| `mart.wettertag_lage`, ein Jahr | 2.881 ms | 93 ms |
+| `mart.wetter_effekt_gruppe`, ganz | 1.673 ms | 700 ms |
+| `mart.vergleichstag`, ein Jahr mit Wetter | 300–315 ms | 209–213 ms |
+| `REFRESH … CONCURRENTLY` | — | 2,1–2,7 s (der allererste nach der Migration 15,2 s) |
+
+Zeilenzahlen vorher gleich nachher. Zwei Dinge daran: `mart.vergleichstag` fällt nur um
+ein Drittel, denn was bleibt, ist der LEFT JOIN auf `mart.betrieb_wetter_tag` über die
+gerundeten Koordinaten, nicht die Aggregation (`mart.vergleichstag_basis` allein liefert
+dasselbe Jahr in 1–2 ms) — eine andere Baustelle. Und der Klon trägt ein Fünftel der
+Produktionszeilen; die Abfrage danach wächst damit nicht mit, der Refresh schon. Die
+Produktionswerte stehen in `offene-punkte.md` aus.
+
+**Nebenbefund derselben Sitzung:** `sichtAuffrischen()` in `src/sync/auffrischen.ts` fing
+den Fall „nie befüllt" an SQLSTATE `55000` ab — den wirft aber nur ein `SELECT` auf die
+leere Materialisierung; `REFRESH … CONCURRENTLY` wirft `0A000`. Der Fallback „einmal ohne
+CONCURRENTLY" hat damit seit dem 20.08.2026 nie gegriffen, für alle Nachläufe, unbemerkt,
+weil die Nachläufe jeden Fehler fangen. Gefunden vom neuen Refresh-Test in
+`src/wetter/wetter_tag.test.ts`, nachgestellt in psql, berichtigt (beide Codes), Details in
+`importer.md`.

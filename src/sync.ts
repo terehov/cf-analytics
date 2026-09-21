@@ -228,12 +228,29 @@ try {
    * Die frühere Begründung (die Materialisierung lese über
    * mart.betrieb_wetter_tag mit) war am 20.08.2026 in pg_depend widerlegt
    * worden: mart.vergleichstag_basis liest ausschließlich
-   * mart.betrieb_kalender und mart.umsatz_tag, die Wetterspalten hängen in
-   * der gewöhnlichen Sicht mart.vergleichstag darüber und sind live.
+   * mart.betrieb_kalender und mart.umsatz_tag.
    *
    * Bright Sky ist ein eigener Dienst mit eigenem Tempo und teilt sich mit
    * niemandem hier ein Limit — es gab keinen Grund, ihn neun Stunden warten
    * zu lassen.
+   *
+   * SEIT DEM 21.09.2026 FRISCHT DER WETTER-NACHLAUF AUCH AUF. Hier stand
+   * bis dahin, die Wetterspalten seien „live" — das war richtig und teuer:
+   * mart.wetter_tag gruppierte bei jeder Abfrage alle 3,42 Mio. Zeilen von
+   * manual.wetter_stunde nach core.geschaeftstag(zeitpunkt), und ein
+   * Funktionswert als Gruppenschlüssel nimmt keinen Index an. Gemessen in
+   * Produktion am 21.09.2026: mart.betrieb_wetter_tag braucht für EINEN Tag
+   * 7,4 s und für ein Jahr ebenfalls 7,4 s, mart.vergleichstag_basis für ein
+   * Jahr 0,08 s. Migration 0111 legt mart.wetter_tag_basis an; aufgefrischt
+   * wird am Ende von wetterNachlauf(), weil nur diese Funktion
+   * manual.wetter_stunde schreibt.
+   *
+   * Dass der Refresh damit in Phase A neben drei anderen Diensten läuft, ist
+   * der Grund für CONCURRENTLY — ein sperrender Refresh hielte jede Karte
+   * mit Wetterspalten für seine Dauer an. Die Reihenfolge-Aussage oben bleibt
+   * unberührt: mart.vergleichstag_basis liest kein Wetter, und die
+   * Wetterspalten hängen weiter in der gewöhnlichen Sicht
+   * mart.vergleichstag darüber.
    */
 
   /**

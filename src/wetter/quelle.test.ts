@@ -7,6 +7,12 @@
  * `core.geschaeftstag()` schneidet um 08:00 Berliner Zeit, und ein naiver
  * Kalendertag verschiebt das Wetter um acht Stunden gegen den Umsatz, ohne
  * dass es irgendwo auffällt.
+ *
+ * SEIT MIGRATION 0111 liegt die Verdichtung in einer materialisierten Sicht.
+ * Die drei Tests unten müssen nach ihrem INSERT deshalb `verdichten()` rufen;
+ * ohne das lasen sie den Stand vor ihrem eigenen Schreibvorgang. Was 0111
+ * sonst absichert — Spaltengleichheit der Hülle, eine Stichprobe gegen die
+ * Rohstunden und der Refresh selbst — steht in wetter_tag.test.ts.
  */
 import { afterAll, describe, expect, test } from 'bun:test'
 import { BrightSky } from './quelle'
@@ -77,7 +83,38 @@ async function saeubern() {
   } catch { /* keine Datenbank */ }
 }
 
-afterAll(saeubern)
+/**
+ * SEIT MIGRATION 0111 MUSS DAS HIER STEHEN. `mart.wetter_tag` war bis zum
+ * 21.09.2026 eine gewöhnliche Sicht: ein INSERT in `manual.wetter_stunde` war
+ * dort sofort zu sehen. Jetzt liegt die Verdichtung in
+ * `mart.wetter_tag_basis`, und ohne diesen Refresh prüfen die drei Tests
+ * darunter den Stand VOR ihrem eigenen INSERT — sie sahen nach dem Umbau
+ * keine einzige Zeile.
+ *
+ * Ohne CONCURRENTLY, obwohl der Nachtlauf es nebenläufig macht: hier soll
+ * nichts an einem fehlenden Vorstand hängen, und ein sperrender Refresh ist
+ * in einem Test das Einfachere.
+ *
+ * UND DIE DREI TESTS BRAUCHEN DESHALB EINE EIGENE ZEITGRENZE. Gemessen 1,8
+ * bis 2,2 s über 657.334 Stundenwerte (21.09.2026); Bun bricht einen Test
+ * ohne Angabe nach 5 s ab, und in Produktion sind es fünfmal so viele Zeilen.
+ * Genau daran sind sie am 21.09.2026 zuerst gescheitert — mit exakt 5.000 ms
+ * Laufzeit und einer Meldung, die nach einem Datenfehler aussah.
+ */
+async function verdichten() {
+  await query(`REFRESH MATERIALIZED VIEW mart.wetter_tag_basis`)
+}
+
+/**
+ * Am Ende BEIDES: die Probezeilen weg UND die Materialisierung nachgezogen.
+ * Ohne den zweiten Schritt bliebe der Gitterpunkt 55.99/5.01 in
+ * `mart.wetter_tag_basis` stehen, obwohl es ihn in den Rohstunden nicht mehr
+ * gibt — eine Zeile, die niemand mehr erklären kann.
+ */
+afterAll(async () => {
+  await saeubern()
+  try { await verdichten() } catch { /* keine Datenbank */ }
+})
 
 describe('mart.wetter_tag: Verdichtung auf den Geschaeftstag', () => {
   test('der Geschaeftstag beginnt um 08:00 Berliner Zeit, nicht um Mitternacht', async () => {
@@ -90,6 +127,7 @@ describe('mart.wetter_tag: Verdichtung auf den Geschaeftstag', () => {
        VALUES ($1,$2,'2025-06-10T07:00:00+02:00', 11, 0),
               ($1,$2,'2025-06-10T08:00:00+02:00', 22, 0)`,
       [PROBE.breite, PROBE.laenge])
+    await verdichten()
 
     const r = await query<{ geschaeftstag: string; tag_temp_max: string; stunden_fenster: number }>(
       `SELECT geschaeftstag::text, tag_temp_max::text, stunden_fenster
@@ -101,7 +139,7 @@ describe('mart.wetter_tag: Verdichtung auf den Geschaeftstag', () => {
     // gehoert damit nicht ins Fenster 08-24.
     expect(r[0]!.stunden_fenster).toBe(0)
     expect(r[1]!.stunden_fenster).toBe(1)
-  })
+ }, 120_000)
 
   test('die doppelte Stunde der Zeitumstellung kollidiert nicht', async () => {
     if (!await db()) { console.log('uebersprungen — keine Datenbank'); return }
@@ -115,6 +153,7 @@ describe('mart.wetter_tag: Verdichtung auf den Geschaeftstag', () => {
        VALUES ($1,$2,'2025-10-26T02:00:00+02:00', 9),
               ($1,$2,'2025-10-26T02:00:00+01:00', 8)`,
       [PROBE.breite, PROBE.laenge])
+    await verdichten()
 
     const [r] = await query<{ n: number; geschaeftstag: string }>(
       `SELECT count(*)::int AS n, geschaeftstag::text
@@ -126,7 +165,7 @@ describe('mart.wetter_tag: Verdichtung auf den Geschaeftstag', () => {
 
     expect(z!.n).toBe(2)                       // beide Zeilen sind da
     expect(r!.geschaeftstag).toBe('2025-10-25') // 02:00 minus 8 h ist der Vortag
-  })
+ }, 120_000)
 
   test('eine Messluecke bei der Sonne sieht nicht aus wie Bewoelkung', async () => {
     if (!await db()) { console.log('uebersprungen — keine Datenbank'); return }
@@ -140,6 +179,7 @@ describe('mart.wetter_tag: Verdichtung auf den Geschaeftstag', () => {
        VALUES ($1,$2,'2025-06-10T12:00:00+02:00', 60),
               ($1,$2,'2025-06-10T13:00:00+02:00', NULL)`,
       [PROBE.breite, PROBE.laenge])
+    await verdichten()
 
     const [r] = await query<{ pct: string; sonne_stunden: number; stunden: number }>(
       `SELECT fenster_sonne_pct::text AS pct, fenster_sonne_stunden AS sonne_stunden,
@@ -150,7 +190,7 @@ describe('mart.wetter_tag: Verdichtung auf den Geschaeftstag', () => {
     expect(Number(r!.pct)).toBe(100)
     expect(r!.sonne_stunden).toBe(1)   // nur eine Stunde war belegt …
     expect(r!.stunden).toBe(2)         // … von zwei im Fenster
-  })
+ }, 120_000)
 })
 
 describe('manual.wetter_klasse: die Grenzen', () => {

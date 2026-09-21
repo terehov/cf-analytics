@@ -1884,3 +1884,15 @@ Eine additive Kalenderkorrektur je Marke bringt **nichts**: 30,0 % → 29,9 %.
 Marke, und als Referenz für einen Feiertag den **Vorjahres-Feiertag** nehmen, nicht die vier
 Vorwochen. Die Zahlen stammen aus der Analysesitzung vom 21.09.2026; die Abfrage dazu ist
 nicht mit überliefert, also vor einer Entscheidung nachrechnen.
+
+## Nachher-Messung zu `0111` fehlt noch (offen seit 21.09.2026)
+
+Migration `0111` materialisiert `mart.wetter_tag_basis` gegen den Sockel, der eine
+Jahresauswertung über `mart.vergleichstag` in die 20-Sekunden-Grenze der Leserolle laufen
+ließ (Hergang in `fehlerkatalog.md`, Abwägung in `entscheidungen.md`). Die Vorher-Werte sind
+gemessen — `mart.betrieb_wetter_tag` 7,4 s je Aufruf, unabhängig vom Zeitraum. Die
+Nachher-Werte gibt es bisher nur vom Klon (ein Fünftel des Bestands, Messreihe in
+`fehlerkatalog.md`). Nach dem Deploy in Produktion nachmessen und in `fehlerkatalog.md`,
+`entscheidungen.md` und `datenmodell.md` nachtragen: dieselben Abfragen über `mcp.zugriff`
+(`dauer_ms`), dazu die Refresh-Dauer aus `mart.materialisierung_stand` (`dauer_s`) und ob
+die drei Wettersichten aus `mart.sicht_unklar` verschwunden sind.

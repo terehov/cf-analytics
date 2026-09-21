@@ -1100,13 +1100,28 @@ Gemessen am 20.08.2026: `REFRESH ... CONCURRENTLY` über 443.304 Zeilen in
 Wirft nie: ein misslungener Refresh bedeutet einen veralteten Vergleichstag,
 keine verlorenen Daten.
 
-**Ein Sonderfall, den `round_table.ts` nebenan nicht behandelt:** `REFRESH ...
-CONCURRENTLY` scheitert mit PG `55000`, wenn die Sicht **nie befüllt** wurde —
-der Normalfall in einer frisch geklonten Datenbank, denn CONCURRENTLY braucht
-einen alten Stand, gegen den es abgleicht. Genau daran hing der
-Ende-zu-Ende-Test nach `0080`. `vergleichstagAuffrischen()` fängt diesen einen
-Fehlercode ab und befüllt einmal ohne CONCURRENTLY; danach greift der normale
-Weg.
+**Ein Sonderfall:** `REFRESH ... CONCURRENTLY` scheitert, wenn die Sicht **nie
+befüllt** wurde — der Normalfall in einer frisch geklonten Datenbank, denn
+CONCURRENTLY braucht einen alten Stand, gegen den es abgleicht. Genau daran
+hing der Ende-zu-Ende-Test nach `0080`. `sichtAuffrischen()` in
+`src/sync/auffrischen.ts` fängt den Fall ab und befüllt einmal ohne
+CONCURRENTLY; danach greift der normale Weg. Seit dem 20.08.2026 teilen sich
+alle Nachläufe diesen Weg, `round_table.ts` eingeschlossen.
+
+**Und hier stand bis zum 21.09.2026 der falsche Fehlercode.** Es sind zwei
+verschiedene Meldungen, nachgemessen auf PostgreSQL 18.4:
+
+| Anweisung | SQLSTATE | Text |
+| --- | --- | --- |
+| `SELECT` auf eine unbefüllte Sicht | `55000` | materialized view "…" has not been populated |
+| `REFRESH … CONCURRENTLY` darauf | `0A000` | CONCURRENTLY cannot be used when the materialized view is not populated |
+
+`auffrischen.ts` prüfte nur auf `55000`, und den wirft der Refresh nie — der
+Fallback hat also seit dem 20.08.2026 kein einziges Mal gegriffen.
+Unbemerkt, weil die Nachläufe jeden Fehler fangen: ein frisches Deployment
+hätte alle Materialisierungen leer gelassen und dabei grün gemeldet. Seit dem
+21.09.2026 stehen beide Codes drin, und `src/wetter/wetter_tag.test.ts` fährt
+den Fall wirklich (`REFRESH … WITH NO DATA`, dann auffrischen).
 
 **Das Wetter holt der Lauf selbst** (`src/wetter/nachlauf.ts`, seit Migration
 `0086`). Zwei Dinge an einer Stelle: ein **rollierendes Fenster** über die

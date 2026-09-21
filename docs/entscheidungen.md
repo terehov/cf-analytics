@@ -3483,3 +3483,34 @@ Bedingung, die das Inlining in eine Indexnutzung umsetzen könnte.
 **Was zu beachten bleibt:** wer künftig eine Bedingung der Form
 `core.geschaeftstag(spalte) = …` auf eine große Tabelle setzt, sollte vorher in den Plan
 sehen. Das steht im Funktionskommentar, nicht nur hier.
+
+## 21.09.2026 — Wetter materialisiert statt live
+
+**Anlass.** Der Sockel unter jeder Wetterabfrage lag in `mart.wetter_tag`: eine gewöhnliche
+Sicht, die bei jedem Aufruf alle 3,42 Mio. Zeilen aus `manual.wetter_stunde` (48
+Gitterpunkte, 2018 bis heute) nach `core.geschaeftstag(zeitpunkt)` gruppiert — einem
+Funktionswert, also ohne Index und ohne Datumsfilter vor der Aggregation. Eine
+Jahresauswertung über `mart.vergleichstag` lief deshalb in die 20-Sekunden-Grenze der
+Leserolle `mcp_leser` (Hergang und Messreihe in `fehlerkatalog.md`). Drei Wege standen zur
+Wahl.
+
+| Weg | verworfen, weil |
+|---|---|
+| **Live lassen** | war die Ausgangslage. Der Sockel wächst mit jedem Backfill-Jahr; am 21.09.2026 stand er bei 7,4 s je Aufruf auf `mart.betrieb_wetter_tag`, **unabhängig vom angefragten Zeitraum** — ein Tag kostet dasselbe wie ein Jahr, weil erst gruppiert und dann gefiltert wird |
+| **Zeitgrenze der Leserolle erhöhen** | verschiebt nur, wann eine Abfrage in Timeout läuft. Ändert nichts an der Ursache — der nächste Backfill holt jede neue Grenze wieder ein —, und eine Freiabfrage, die 30 statt 20 s auf ein Gruppieren wartet, das nichts filtert, ist kein besseres Ergebnis, nur ein langsameres |
+| **`geschaeftstag` als Spalte in `manual.wetter_stunde` führen** | trägt den Umbau in eine 3,42-Mio.-Zeilen-Tabelle mit stündlichem Schreiber statt in eine Ableitung darüber, und verdoppelt die Herleitung: eine Spalte in der Rohtabelle **und** weiterhin `core.geschaeftstag()` in jeder Sicht, die nicht umgestellt ist |
+| **Materialisieren** | **gewählt.** Dasselbe Rezept wie bei `mart.vergleichstag_basis` (`0084`): das Aggregat ändert sich nur einmal pro Nacht, ist um Größenordnungen kleiner als seine Grundlage, und es gibt einen Leser — freie SQL-Abfragen über den MCP-Server —, der nicht zuverlässig vorfiltert |
+
+**Der Preis, ehrlich benannt.** Das Wetter in `mart.vergleichstag` ist ab jetzt Stand des
+letzten Nachtlaufs, nicht mehr live — eine Rückjustierung durch nachmeldende DWD-Stationen
+(dafür das rollierende 14-Tage-Fenster im Nachtlauf) erscheint erst am nächsten Morgen. Für
+eine Auswertungsschicht, die auf Geschäftstagen steht und nicht auf der laufenden Stunde, ist
+das kein Verlust: die feinste Auflösung, die irgendeine Wettersicht nach außen zeigt, ist der
+Geschäftstag.
+
+**Erwartung:** der Sockel fällt von rund 7 s auf Millisekunden, gemessen wie bei `0084` gegen
+die echte Produktionsdatenbank. Nachgemessen auf einem Klon mit einem Fünftel des Bestands:
+`mart.betrieb_wetter_tag` ein Tag von 190 ms auf unter 1 ms, `mart.wettertag_lage` ein Jahr
+von 2,9 s auf 93 ms, `mart.vergleichstag` ein Jahr nur von 310 auf 210 ms — der Rest dort ist
+der LEFT JOIN über die Koordinaten, nicht die Aggregation (Messreihe in `fehlerkatalog.md`).
+Die Produktionswerte nach dem Deploy stehen in `offene-punkte.md` aus.

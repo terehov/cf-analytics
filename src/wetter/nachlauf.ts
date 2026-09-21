@@ -9,16 +9,40 @@
  *      14.08.2026. `WETTER_BACKFILL_JE_LAUF` (Vorgabe 60) arbeitet die 432
  *      Ortsjahre in gut sieben Nächten ab, neueste zuerst.
  *
- * REIHENFOLGE: keine. Hier stand bis zum 20.08.2026, der Nachlauf müsse VOR
- * `vergleichstagNachlauf()` laufen, weil die Materialisierung über
- * `mart.betrieb_wetter_tag` mitlese. Das stimmt nicht: `mart.vergleichstag_basis`
- * liest nur `mart.betrieb_kalender` und `mart.umsatz_tag`. Die Wetterspalten
- * sitzen in der dünnen Hülle `mart.vergleichstag` darüber (Migration 0086),
- * einer gewöhnlichen Sicht — das Wetter ist live und veraltet nicht. Die
- * Stelle im Ablauf bleibt, wo sie ist; sie ist nur keine Bedingung.
+ *   3. DER REFRESH VON `mart.wetter_tag_basis`, seit dem 21.09.2026 (Migration
+ *      0111). Er steht hier und nicht in einem der Sammel-Nachläufe, weil
+ *      diese Funktion die EINZIGE ist, die `manual.wetter_stunde` schreibt —
+ *      der Refresh gehört hinter ihren Schreibvorgang, nicht an eine dritte
+ *      Stelle im Ablauf.
+ *
+ * DAS WETTER IST NICHT MEHR LIVE, seit dem 21.09.2026. Hier stand vorher, es
+ * sei es: die Wetterspalten sitzen in der dünnen Hülle `mart.vergleichstag`
+ * über der Materialisierung, und `mart.wetter_tag` war eine gewöhnliche Sicht.
+ * Das stimmte und war teuer. `mart.wetter_tag` gruppierte bei JEDER Abfrage
+ * alle 3,42 Mio. Zeilen von `manual.wetter_stunde` nach
+ * `core.geschaeftstag(zeitpunkt)`; ein Funktionswert als Gruppenschlüssel nimmt
+ * keinen Index an und lässt keinen Datumsfilter vor die Aggregation. Gemessen
+ * in Produktion am 21.09.2026: `mart.betrieb_wetter_tag` braucht für EINEN Tag
+ * 7,4 s und für ein ganzes Jahr ebenfalls 7,4 s, während
+ * `mart.vergleichstag_basis` ein Jahr in 0,08 s liefert. Eine Jahresauswertung
+ * mit Wetterspalten lief damit in die 20-s-Grenze der Leserolle. Seit 0111
+ * liegt die Verdichtung in `mart.wetter_tag_basis`, und der Preis dafür steht
+ * in dieser Datei: die Wetterzahlen sind so frisch wie der letzte Lauf.
+ *
+ * REIHENFOLGE: weiterhin keine — und das bleibt wahr.
+ * `mart.vergleichstag_basis` liest ausschließlich `mart.betrieb_kalender` und
+ * `mart.umsatz_tag`, kein Wetter; `vergleichstagNachlauf()` in Phase B ist
+ * also nach wie vor unabhängig von dieser Funktion. Und `mart.wetter_rueckstand`,
+ * die Arbeitsliste des Backfills, liest `manual.wetter_stunde` DIREKT und nicht
+ * über die Materialisierung — sie sagt dem nächsten Lauf die Wahrheit, auch
+ * wenn ein Refresh misslingt.
  *
  * WIRFT NIE. Ein fehlender Wetterwert ist eine leere Spalte, kein verlorener
  * Umsatz — und ganz sicher kein Grund, einen Importlauf scheitern zu lassen.
+ * Für den Refresh gilt dasselbe: ein misslungener Refresh bedeutet veraltete
+ * Wetterzahlen, nicht verlorene Daten. Sichtbar bleibt er trotzdem, über
+ * `mart.materialisierung_stand` unter dem Merker `wetter_tag_refresh` (0091)
+ * und als `log.error`.
  *
  * WAS SICHTBAR BLEIBT (Regel 10): `mart.wetter_rueckstand` führt eine Zahl,
  * die von Nacht zu Nacht FALLEN muss. Ein abgebrochener Backfill sieht sonst
@@ -26,7 +50,8 @@
  */
 import { config } from '../config'
 import { log } from '../lib/log'
-import { query } from '../db/pool'
+import { pool, query } from '../db/pool'
+import { sichtAuffrischen } from '../sync/auffrischen'
 import { BrightSky, type Ort, type Stundenwert, type Wetterquelle } from './quelle'
 
 /**
@@ -161,6 +186,75 @@ export async function wetterHolen(quelle: Wetterquelle = new BrightSky()): Promi
   return raus
 }
 
+/**
+ * Die Materialisierung aus 0111.
+ *
+ * CONCURRENTLY, damit niemand während des Neuaufbaus vor einem sperrenden
+ * Dashboard sitzt — und hier zusätzlich, weil diese Funktion in Phase A
+ * neben drei anderen Diensten läuft (src/sync.ts): ein sperrender Refresh
+ * würde jede Karte mit Wetterspalten für seine Dauer anhalten. Der dafür
+ * nötige eindeutige Index auf (breite, laenge, geschaeftstag) liegt in
+ * Migration 0111.
+ */
+const SICHT = 'mart.wetter_tag_basis'
+
+/**
+ * Gemessen 2,6 s nebenläufig über 657.334 Stundenwerte (Klon, 21.09.2026);
+ * in Produktion sind es gut fünfmal so viele Zeilen. Die Grenze ist ein
+ * Notnagel gegen stille Blockaden, keine erwartete Laufzeit — dieselbe Rolle
+ * wie in sync/vergleichstag.ts, und dieselben zehn Minuten.
+ */
+const ZEITGRENZE_MS = 10 * 60 * 1000
+
+export type Auffrischung = {
+  status: 'aufgefrischt' | 'fehler'
+  dauerS: number
+  nebenlaeufig?: boolean
+  meldung?: string
+}
+
+/**
+ * Frischt `mart.wetter_tag_basis` auf. Wirft nie — siehe Kopf dieser Datei.
+ *
+ * Eigene Verbindung statt `query()` aus db/pool, dieselben zwei Gründe wie in
+ * sync/vergleichstag.ts: `SET statement_timeout` gilt je Sitzung, und ein halb
+ * durchgelaufener REFRESH soll nicht automatisch wiederholt werden.
+ *
+ * Den Sonderfall „nie befüllt" trägt `sichtAuffrischen()` — eine Datenbank aus
+ * einem Schema-Abzug hat ausnahmslos unbefüllte Materialisierungen, und
+ * CONCURRENTLY braucht einen alten Stand. Welcher SQLSTATE dabei wirklich
+ * kommt, steht dort: 0A000 beim Refresh, 55000 erst beim Lesen.
+ */
+export async function wetterMaterialisierungAuffrischen(): Promise<Auffrischung> {
+  const t0 = Date.now()
+  const client = await pool.connect()
+  let nebenlaeufig = true
+  try {
+    await client.query(`SET statement_timeout = ${ZEITGRENZE_MS}`)
+    nebenlaeufig = await sichtAuffrischen(client, SICHT)
+
+    const dauerS = Math.round((Date.now() - t0) / 100) / 10
+    await query(
+      `INSERT INTO sync.merker (schluessel, wert)
+       VALUES ('wetter_tag_refresh',
+               jsonb_build_object('dauer_s', $1::numeric, 'nebenlaeufig', $2::boolean))
+       ON CONFLICT (schluessel)
+       DO UPDATE SET wert = EXCLUDED.wert, gesetzt_am = now()`,
+      [dauerS, nebenlaeufig])
+
+    return { status: 'aufgefrischt', dauerS, nebenlaeufig }
+  } catch (e) {
+    return {
+      status: 'fehler',
+      dauerS: Math.round((Date.now() - t0) / 100) / 10,
+      meldung: String(e),
+    }
+  } finally {
+    try { await client.query(`SET statement_timeout = 0`) } catch { /* egal */ }
+    client.release()
+  }
+}
+
 /** Der Aufruf für den Nachlauf: holt und protokolliert, ohne je zu werfen. */
 export async function wetterNachlauf(): Promise<void> {
   try {
@@ -179,5 +273,22 @@ export async function wetterNachlauf(): Promise<void> {
   } catch (e) {
     log.error('wetter nicht geholt — der Lauf geht weiter',
       { fehler: String(e).slice(0, 300) })
+  }
+
+  /*
+   * AUSSERHALB des try/catch darüber, und zwar mit Absicht: die
+   * Materialisierung soll auch dann nachgezogen werden, wenn Bright Sky
+   * gerade nicht antwortet. Im Bestand stehen dann die Werte der Vornacht,
+   * und die gehören in die Sicht — ein Abruf, der scheitert, darf nicht
+   * zusätzlich den Refresh kosten.
+   */
+  const a = await wetterMaterialisierungAuffrischen()
+  if (a.status === 'aufgefrischt') {
+    log.info('Wettersicht aufgefrischt', { dauer_s: a.dauerS, nebenlaeufig: a.nebenlaeufig })
+  } else {
+    // ERROR, nicht WARN — siehe sync/vergleichstag.ts (10.09.2026): ein
+    // Refresh, der jede Nacht scheitert, sieht bei WARN aus wie ein
+    // gelungener Lauf.
+    log.error('Wettersicht nicht aufgefrischt', { grund: a.meldung, dauer_s: a.dauerS })
   }
 }
