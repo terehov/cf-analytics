@@ -216,15 +216,24 @@ nicht im Git). Was davon über den Abzug hinaus gilt:
   `createdAt`, und 760 von 2.076 Einträgen teilen den Zeitstempel mit dem
   Vorgänger. An Seitengrenzen stehen 21 Einträge doppelt — und entsprechend
   fehlen vermutlich 21. Aus den geholten Rezepten verweisen 52 IDs auf Rezepte,
-  die nicht in der Liste stehen (Unterrezepte und Kassenzuordnung); ihre IDs
-  liegen meist direkt neben geladenen. **Ein Import über `?page=N` allein ist
-  nicht vollständig.** `src/rezepte.ts` holt deshalb jede verwiesene ID ohne
+  die nicht in der Liste stehen (Unterrezepte und Kassenzuordnung). **Ein Import
+  über `?page=N` allein ist nicht vollständig.** `src/rezepte.ts` holt deshalb jede verwiesene ID ohne
   Listeneintrag einzeln über `/api/recipes/{id}` nach, rekursiv, und hält das
   Ergebnis in `nachgeholt.json` fest; 404 gilt dort als gelöscht.
   **Nachgemessen am 15.09.2026: 56 IDs** — die 52 plus 4, auf die erst nachgeholte
   Rezepte zeigen — **alle geladen, keine 404.** Gelöscht war keines; die Liste hat
   sie nur nicht gezeigt. Ob sie darüber hinaus Rezepte verschluckt, auf die nichts
   verweist, ist nicht messbar, solange die Liste die einzige Aufzählung ist.
+* **Warum die 56 fehlten, ist mit der Pagination NICHT erklärt** (nachgemessen
+  17.09.2026). Nur 9 von ihnen lägen auf einer Seite, auf der ein Duplikat stand;
+  47 stammen aus 2023, wo die Liste 514 Rezepte zeigt. 11 haben einen
+  gleichnamigen Eintrag in der Liste und sind **in allen 11 Fällen der ältere**;
+  unter den 56 selbst häufen sich Namen („Soda spritzig (Basisartikel)" 7-mal,
+  „Taco Einzeln - Chimichurri" 9-mal). Das sieht nach älteren, abgelösten
+  Fassungen aus, die die Liste nicht mehr zeigt — welches Kriterium sie
+  ausblendet, ist unbekannt. Für einen Import heißt das: **die Liste ist keine
+  Aufzählung aller Rezepte**, und was nur über Verweise erreichbar ist, findet
+  man nur über Verweise.
 * Die Liste zeigt **2.055** Rezepte (01.08.2026: 1.846); mit den nachgeholten hat
   die Marke mindestens **2.111**.
 * `/api/recipes/{id}` liefert dieselbe Form wie ein Listeneintrag:
