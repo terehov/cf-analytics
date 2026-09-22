@@ -312,6 +312,23 @@ export const P_BIS: Parameter = {
   id: 'bis-param', name: 'bis', 'display-name': 'Bis', type: 'date/single', required: false,
 }
 
+/**
+ * Der Nachlass-Filter der Kassenkarten (0117): trifft den Aktionsnamen ohne
+ * Prozentzahl ("Glücksrad") ODER einen vollen Finanzwegnamen. Bewusst nicht
+ * die Finanzwegnummer — die 25-%-Stufe des Gluecksrads lief ueber zwei
+ * Nummern (3501 und 3168), eine Nummer wuerde die zweite still verlieren.
+ */
+export const P_FINANZWEG: Parameter = {
+  id: 'finanzweg-param', name: 'finanzweg', 'display-name': 'Nachlass (Aktion)', type: 'text',
+  required: false,
+}
+
+/** Teil eines Artikelnamens — der Rabattbericht kennt nur Namen, keine Nummern. */
+export const P_ARTIKEL_TEXT: Parameter = {
+  id: 'artikeltext-param', name: 'artikeltext', 'display-name': 'Artikel enthält', type: 'text',
+  required: false,
+}
+
 // ---------------------------------------------------------------------
 // Ampelschwellen — aus dem Regelwerk, nicht aus einer Karte
 //

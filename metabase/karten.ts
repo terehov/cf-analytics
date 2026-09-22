@@ -34,12 +34,13 @@ import { karten as kartenFremdeinkauf } from './karten-fremdeinkauf'
 import { karten as kartenPflichtartikel } from './karten-pflichtartikel'
 import { karten as kartenBounti } from './karten-bounti'
 import { karten as kartenArtikelaktion } from './karten-artikelaktion'
+import { karten as kartenKasse } from './karten-kasse'
 
 export const alleKarten: Karte[] = [
   ...kartenDrilldown, ...kartenPortfolio, ...kartenRoundTable, ...kartenFach, ...kartenImport,
   ...kartenStandort, ...kartenBewertung, ...kartenAktionen, ...kartenYext, ...kartenVergleich,
   ...kartenFremdeinkauf, ...kartenPflichtartikel, ...kartenKalender, ...kartenBounti,
-  ...kartenArtikelaktion,
+  ...kartenArtikelaktion, ...kartenKasse,
 ]
 
 /** Eine Karte an ihrem Schluessel. */

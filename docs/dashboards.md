@@ -1485,3 +1485,56 @@ Die Klassengrenzen von `pf_streuung` liegen seither auf den Ampelschwellen (30 /
 44 / 50 statt 26 / 29 / 32 / 36 / 42): sonst läuft die Grenze zwischen Grün und Orange
 mitten durch einen Balken, und die Verteilung beantwortet die Frage „wie viele sind drüber"
 gerade nicht.
+
+## Nachlässe und Kasse (`db_nachlass`, `db_kasse`, `aa_nachlass`, 23.09.2026)
+
+**Anlass war dieselbe Excel wie bei der Artikelaktion** — nur war die eigentliche Frage eine
+andere: nicht, wie viel von den 51 Artikeln verkauft wurde, sondern wie viel davon über die
+Glücksrad-Kassentasten (10/25/50 %) lief, je Betrieb. Das kann nur der Rabattbericht der Kasse
+(92), und der steht seit `0117` in `mart`. Zwei neue Seiten und eine Karte auf der
+Aktionsseite; Karten in `metabase/karten-kasse.ts`, Seiten in `dashboards.ts`.
+
+| Seite | Karten | Filter |
+|---|---|---|
+| **Nachlässe — je Betrieb** (`db_nachlass`) | `ka_nachlass_betrieb` (Betrieb × Stufe), `ka_nachlass_artikel` (Betrieb × Artikel × Stufe, mit „Artikel enthält"), `ka_nachlass_kosten` (Betrieb × Monat × Aktion, vollständig aus dem Tagesabschluss) | Nachlass (Aktion), Von, Bis, Marke, Betrieb |
+| **Kasse — Zahlarten, Bons, Storno** (`db_kasse`), fünf Reiter | Zahlarten: `ka_zahlart_verlauf`, `ka_zahlart_betrieb` · Bons: `ka_bon_tag`, `ka_bon_betrieb` · Storno: `ka_storno_grund`, `ka_storno_artikel` · Kellner und Stellen: `ka_stellen`, `ka_zeitzone_sparte`, `ka_kellner` · Geladen: `ka_ladestand` | Von, Bis, Marke, Betrieb |
+| **Artikelaktion** (`db_artikelaktion`), neu am Seitenende | `aa_nachlass` (Artikel × Stufe über alle gewählten Betriebe, „Auf der Liste" ja/nein/nicht zuordenbar) | zusätzlich „Nachlass (Aktion)", Vorgabe „Glücksrad" |
+
+**Warum diese Darstellungen.**
+
+* **Tabellen für die Nachlass-Zählung**, keine Balken: gefragt ist eine Zahl je Betrieb und Stufe,
+  die jemand in eine Rückmeldung abschreibt. Drei Stufen × 14 Betriebe als gruppierte Balken wären
+  42 Balken ohne ablesbaren Wert.
+* **Gestapelte Balken für den Zahlungsmix je Monat** (`ka_zahlart_verlauf`): Monat ist eine Summe,
+  kein Messpunkt, und die Frage ist „verschiebt sich der Anteil" — der Stapel zeigt Gesamtbetrag und
+  Aufteilung in einem. Trinkgeld und Rückgeld sind dort herausgenommen, weil sie in den
+  Zahlbeträgen stecken und den Stapel sonst unter null zögen.
+* **Kombination für Bons je Tag** (`ka_bon_tag`): Balken für die Zahl (Summe), Linie auf eigener
+  Achse für den Ø-Bon (ein Verhältnis) — zwei Größenordnungen, zwei Achsen.
+* **Pivot für Zeitzone × Hauptsparte:** Metabase hat keine Heatmap; die Pivot mit Zeitzonen als
+  Zeilen und Sparten als Spalten ist das nächste Werkzeug (dieselbe Wahl wie auf ⑪).
+* **Ein eigener Reiter „Geladen"**, weil die Kassendaten rückwärts nachgeladen werden: ein Monat,
+  der fehlt, sieht in jeder anderen Karte aus wie ein Monat ohne Nachlass. Die Karte zählt die
+  Lücken im gewählten Zeitraum. Marke und Betrieb wirken dort nicht (der Ladestand gilt je Bericht)
+  — in `uebernehmen.ts` als Filterausnahme begründet.
+
+**Der Nachlass-Filter ist eine Auswahlliste der Aktionsnamen ohne Prozentzahl** (`mart.finanzweg`,
+Spalte `aktion`): „Glücksrad" statt „25% Glücksrad'". So trifft die Stufe beide Kassentasten, über
+die sie lief. Auf der Aktionsseite gehört er nur zu `aa_nachlass` (`FILTER_NUR_FUER`); die
+übrigen Karten dort rechnen den Nachlass aus Preisen und kennen keine Kassentaste. Beide Wege
+bleiben nebeneinander stehen: der abgeleitete enthält auch Nachlässe, die nicht als Finanzweg
+gebucht werden, und die Differenz ist selbst eine Aussage (Plan 6.2).
+
+**Jede dieser Karten ist zugleich ein MCP-Bericht** und liest deshalb **nur `mart`** — der
+MCP-Zugang führt sie als `mcp_leser` aus. `mcp/test/berichte.test.ts` prüft das für jede `ka_*`-
+Karte und für `aa_nachlass`. Die älteren Karten der Aktionsseite lesen `core` und laufen im Chat
+nicht (am 23.09.2026 gemessen: `aa_kopf` → SQLSTATE 42501).
+
+**Gemessen** (Klon in Produktionsgröße, `metabase.md`): alle Karten dieser Seiten unter 1 s über den
+MCP-Weg, die Glücksrad-Karte 0,2 s.
+
+**Nach dem Deploy nötig:** `bun run metabase/uebernehmen.ts` (schreibt sofort in die
+Produktivinstanz) — erst, wenn `0117` dort angewendet ist, sonst scheitern die neuen Karten an
+fehlenden Sichten. Bis dahin existieren die Seiten nur hier. Geprüft ist bisher: `bun test
+metabase/karten.test.ts` gegen einen Klon auf Stand `0118` (562 grün) und die statischen Prüfungen
+aus `uebernehmen.ts` (Filterwirkung, Kacheln, Raster) in einer Abschrift ohne Metabase-Zugriff.

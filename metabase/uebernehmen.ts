@@ -104,6 +104,14 @@ for (const d of dashboards) {
  * Jeder Eintrag braucht einen fachlichen Grund.
  */
 const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
+  // --- Kasse, Reiter "Geladen" (0117) ---------------------------------
+  // Der Ladestand ist je BERICHT, nicht je Betrieb: ein Betriebsfilter
+  // haette keine Zeile, auf die er wirken koennte. Der Zeitraum wirkt
+  // (Spalte "Luecken im Zeitraum").
+  ka_ladestand: {
+    marke:   'Der Ladestand gilt je Bericht ueber alle Betriebe, nicht je Marke.',
+    betrieb: 'Der Ladestand gilt je Bericht ueber alle Betriebe, nicht je Betrieb.',
+  },
   // --- ⑫ Feiertage, Ferien, Wetter -----------------------------------
   // Die Spannweite zwischen bestem und schwaechstem Feiertag ist eine
   // LANGFRISTZAHL: sie braucht viele Termine je Feiertag, sonst gewinnt ein
@@ -800,6 +808,10 @@ function variablenVon(karte: Karte): Set<string> {
 const FILTER_NUR_FUER: Record<string, Record<string, string>> = {
   // dashboard: { filter: karte }
   dd_betrieb: { note: 'bw_einzel' },
+  // Der Nachlass-Filter gehoert zur einen Karte aus dem Rabattbericht; die
+  // uebrigen Karten der Seite rechnen den Nachlass aus Preisen und kennen
+  // keine Kassentaste (0117, Plan 6.2).
+  db_artikelaktion: { finanzweg: 'aa_nachlass' },
 }
 
 const filterFehler: string[] = []

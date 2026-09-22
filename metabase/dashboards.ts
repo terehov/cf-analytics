@@ -229,6 +229,19 @@ const F_ARTIKELNUMMERN: Parameter = {
 // nicht lief. Dazu ein Messwert: MIT Wert falten die Karten die Grenzen
 // zu Konstanten und laufen in 0,6 s, OHNE Wert (current_date-Rueckfall)
 // in 8 s, siehe karten-artikelaktion.ts. Wer die Felder leert, wartet.
+// Der Nachlass-Filter (0117): eine Auswahlliste der Aktionsnamen OHNE
+// Prozentzahl ("Glücksrad", nicht "25% Glücksrad'"), damit eine Stufe mit
+// zwei Kassentasten nicht an einer Nummer haengen bleibt. Vorgabe auf der
+// Aktionsseite ist das Gluecksrad — dieselbe Vorgabe wie die Artikelliste.
+const F_FINANZWEG: Parameter = {
+  id: 'd-finanzweg', name: 'finanzweg', 'display-name': 'Nachlass (Aktion)', type: 'string/=',
+  werteliste: ['mart', 'finanzweg', 'aktion'],
+}
+const F_FINANZWEG_GLUECKSRAD: Parameter = { ...F_FINANZWEG, default: 'Glücksrad' }
+// Von/Bis fuer die Kassenseiten, OHNE Vorgabe: die Karten fallen dann auf den
+// letzten abgeschlossenen Monat zurueck.
+const F_KASSE_VON: Parameter = { id: 'd-kasse-von', name: 'von', 'display-name': 'Von', type: 'date/single' }
+const F_KASSE_BIS: Parameter = { id: 'd-kasse-bis', name: 'bis', 'display-name': 'Bis', type: 'date/single' }
 const F_VON: Parameter = { id: 'd-von', name: 'von', 'display-name': 'Aktion von', type: 'date/single', default: '2026-08-01' }
 const F_BIS: Parameter = { id: 'd-bis', name: 'bis', 'display-name': 'Aktion bis', type: 'date/single', default: '2026-08-31' }
 
@@ -1173,7 +1186,7 @@ export const dashboards: Dashboard[] = [
       + 'eingeräumter Nachlass je Betrieb, gegen den Zeitraum davor und das Vorjahr. Nummern oben '
       + 'einfügen, Zeitraum setzen.',
     sammlung: 'Betrieb',
-    filter: [F_ARTIKELNUMMERN, F_VON, F_BIS, F_MARKE, F_BETRIEB],
+    filter: [F_ARTIKELNUMMERN, F_VON, F_BIS, F_MARKE, F_BETRIEB, F_FINANZWEG_GLUECKSRAD],
     reihen: [
       { teile: [{ text:
         '# Artikelaktion\n\n'
@@ -1202,6 +1215,79 @@ export const dashboards: Dashboard[] = [
         klick: [{ ziel: 'dd_artikel', spalte: 'Artikel', uebergabe: { artikel: 'Artikel' } }] }] },
       { teile: [{ text: '## Stimmt die Liste?\n\nEine Nummer, die nichts trifft, fehlt oben einfach — ohne Fehlermeldung. Diese Tabelle nennt jede solche Nummer. **Leer ist das Ziel.**' }] },
       { teile: [{ karte: 'aa_liste_pruefung', hoehe: 9 }] },
+      { teile: [{ text: '## Der gebuchte Nachlass\n\nAus dem Rabattbericht der Kasse: je Nachlass-Kassentaste (oben „Nachlass (Aktion)", z. B. Glücksrad) die Artikel auf den Bons. Das ist eine Messung, keine Ableitung aus Preisen — und sie zählt Artikel auf Bons **mit** Nachlass, nicht die verkaufte Menge, denn der Nachlass gilt für den ganzen Bon. Je Betrieb auf der Seite „Nachlässe — je Betrieb".' }] },
+      { teile: [{ karte: 'aa_nachlass', hoehe: 12 }] },
+    ],
+  },
+
+  /*
+   * Die Nachlaesse aus dem Rabattbericht und dem Tagesabschluss der Kasse
+   * (Migration 0117). Die Frage, die das Vorhaben ausgeloest hat — Gluecksrad
+   * je Betrieb und Artikel —, als eigene Seite, damit sie nicht an einer
+   * Artikelliste haengt: der Rabattbericht kennt alle Artikel auf den Bons.
+   */
+  {
+    schluessel: 'db_nachlass',
+    name: 'Nachlässe — je Betrieb',
+    beschreibung:
+      'Was über Nachlass- und Hausbon-Kassentasten gebucht wurde: je Betrieb und Stufe, je Artikel, '
+      + 'und was es gekostet hat. Oben die Aktion wählen, z. B. „Glücksrad".',
+    sammlung: 'Betrieb',
+    filter: [F_FINANZWEG, F_KASSE_VON, F_KASSE_BIS, F_MARKE, F_BETRIEB],
+    reihen: [
+      { teile: [{ text:
+        '# Nachlässe\n\n'
+        + 'Aus dem **Rabattbericht** der Kasse: je Nachlass-Kassentaste die Artikel auf den Bons, '
+        + 'auf die sie gebucht wurde. Der Nachlass gilt für den ganzen Bon — die Stückzahlen sind '
+        + 'Artikel **auf Nachlass-Bons**, nicht die verkaufte Menge. Die Kosten unten kommen aus dem '
+        + '**Tagesabschluss** und sind vollständig.\n\n'
+        + 'Die Kassendaten werden seit September 2026 rückwärts nachgeladen. Ein Monat ohne Zeilen '
+        + 'ist deshalb nicht null, sondern womöglich noch nicht geladen — Stand auf der Seite '
+        + '„Kasse — Zahlarten, Bons, Storno", Reiter „Geladen".' }] },
+      { teile: [{ karte: 'ka_nachlass_betrieb', hoehe: 12,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      { teile: [{ karte: 'ka_nachlass_artikel', hoehe: 12 }] },
+      { teile: [{ karte: 'ka_nachlass_kosten', hoehe: 12 }] },
+    ],
+  },
+
+  /*
+   * Die uebrigen Betriebsberichte der Kasse (0117): Zahlarten, Bons, Storno,
+   * Kellner und Stellen — und ein Reiter, der sagt, was davon ueberhaupt
+   * geladen ist (harte Regel 10: der Backfill laeuft rueckwaerts).
+   */
+  {
+    schluessel: 'db_kasse',
+    name: 'Kasse — Zahlarten, Bons, Storno',
+    beschreibung:
+      'Was die Kasse je Betrieb über den Umsatz hinaus weiß: wie Gäste zahlen, wie groß ein Bon ist, '
+      + 'was storniert wird, welcher Kellner und welche Stelle den Umsatz trägt.',
+    sammlung: 'Betrieb',
+    filter: [F_KASSE_VON, F_KASSE_BIS, F_MARKE, F_BETRIEB],
+    tabs: [
+      { name: 'Zahlarten', reihen: [
+        { teile: [{ text: '# Wie die Gäste zahlen\n\nAus dem Tagesabschluss der Kasse. Ohne Zeitraum gilt der letzte abgeschlossene Monat.' }] },
+        { teile: [{ karte: 'ka_zahlart_verlauf', hoehe: 9 }] },
+        { teile: [{ karte: 'ka_zahlart_betrieb', hoehe: 12 }] },
+      ] },
+      { name: 'Bons', reihen: [
+        { teile: [{ karte: 'ka_bon_tag', hoehe: 9 }] },
+        { teile: [{ karte: 'ka_bon_betrieb', hoehe: 12,
+          klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      ] },
+      { name: 'Storno', reihen: [
+        { teile: [{ karte: 'ka_storno_grund', hoehe: 9 }] },
+        { teile: [{ karte: 'ka_storno_artikel', hoehe: 12 }] },
+      ] },
+      { name: 'Kellner und Stellen', reihen: [
+        { teile: [{ karte: 'ka_stellen', hoehe: 9 }] },
+        { teile: [{ karte: 'ka_zeitzone_sparte', hoehe: 12 }] },
+        { teile: [{ karte: 'ka_kellner', hoehe: 12 }] },
+      ] },
+      { name: 'Geladen', reihen: [
+        { teile: [{ text: '## Was davon geladen ist\n\nEin Monat, der hier fehlt, fehlt auch in allen anderen Reitern — er ist dann **nicht null**, sondern unbekannt. **Lücken im Zeitraum** zählt die Monate im oben gewählten Zeitraum, die nicht oder nur teilweise geladen sind.' }] },
+        { teile: [{ karte: 'ka_ladestand', hoehe: 12 }] },
+      ] },
     ],
   },
 

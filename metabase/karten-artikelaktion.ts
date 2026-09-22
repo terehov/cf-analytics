@@ -56,7 +56,7 @@
 // =====================================================================
 
 import type { Karte } from './typen'
-import { P_ARTIKELNUMMERN, P_VON, P_BIS, P_MARKE, P_BETRIEB } from './gemeinsam'
+import { P_ARTIKELNUMMERN, P_VON, P_BIS, P_MARKE, P_BETRIEB, P_FINANZWEG } from './gemeinsam'
 
 const PARAMETER = [P_ARTIKELNUMMERN, P_VON, P_BIS, P_MARKE, P_BETRIEB]
 
@@ -424,5 +424,63 @@ SELECT l.artikelnummer                                              AS "Artikeln
                     WHERE v.periode = 'aktion' AND v.ist_aktion
                       AND v.artikel_key = aa.artikel_key)
  ORDER BY 3, 1`,
+  },
+
+  // -------------------------------------------------------------------
+  // Der gemessene Nachlass (Plan 6.2, seit 0117). Die Karten darueber
+  // leiten den Nachlass aus dem Preis ab (1 - bezahlt / Kartenpreis) und
+  // erfassen damit ALLE Rabatte. Diese hier liest den Rabattbericht der
+  // Kasse: je Nachlass-Kassentaste die Artikel auf den Bons. Beide bleiben
+  // nebeneinander stehen — die Differenz ist selbst eine Aussage.
+  //
+  // NUR mart (karten-kasse.ts, Regel 1): diese Karte laeuft auch im Chat.
+  // Die Liste schraenkt NICHT ein, sondern markiert: der Rabattbericht
+  // kennt nur Artikelnamen, und ein Name, der keiner Nummer zugeordnet
+  // werden konnte, fiele bei einem Filter still heraus.
+  // -------------------------------------------------------------------
+  {
+    schluessel: 'aa_nachlass',
+    name: 'Nachlass je Stufe und Artikel',
+    beschreibung:
+      'Wie viele Stück je Artikel auf Bons mit dem gewählten Nachlass standen — z. B. Glücksrad '
+      + 'mit 10, 25 und 50 % —, über alle gewählten Betriebe. Das ist die Zahl aus dem '
+      + 'Rabattbericht der Kasse, keine Ableitung aus Preisen. Der Nachlass gilt für den ganzen Bon: '
+      + 'die Stückzahl ist die Menge auf Nachlass-Bons, nicht die verkaufte Menge.\n\n'
+      + '**Auf der Liste** sagt, ob der Artikel zu den Nummern oben gehört; „nicht zuordenbar" heißt, '
+      + 'der Kassenname ließ sich keiner Nummer eindeutig zuordnen. Je Betrieb steht dieselbe Zahl '
+      + 'auf der Seite „Nachlässe — je Betrieb".',
+    anzeige: 'table',
+    parameter: [P_FINANZWEG, ...PARAMETER],
+    sql: `
+WITH liste AS (
+    SELECT DISTINCT t::bigint AS artikelnummer
+      FROM regexp_split_to_table(coalesce([[ {{artikelnummern}}, ]] ''), '[^0-9]+') AS t
+     WHERE t <> ''
+)
+SELECT n.artikel                                                   AS "Artikel",
+       max(n.artikelnummer)                                        AS "Artikelnummer",
+       CASE WHEN max(n.artikelnummer) IS NULL THEN 'nicht zuordenbar'
+            WHEN max(n.artikelnummer) IN (SELECT artikelnummer FROM liste) THEN 'ja'
+            ELSE 'nein' END                                        AS "Auf der Liste",
+       n.aktion                                                    AS "Nachlass",
+       n.prozentsatz                                               AS "Stufe %",
+       sum(n.menge)                                                AS "Stück auf Nachlass-Bons",
+       round(sum(n.nachlass_brutto), 2)                            AS "Nachlass",
+       count(DISTINCT n.betrieb_key)                               AS "Betriebe"
+  FROM mart.artikel_nachlass_tag n
+ WHERE n.geschaeftstag >= ${VON}
+   AND n.geschaeftstag <= ${BIS}
+   AND n.zeitraum_bis  <= ${BIS}
+   [[AND (n.aktion = {{finanzweg}} OR n.finanzweg_name = {{finanzweg}})]]
+   [[AND n.marke = {{marke}}]]
+   [[AND n.betrieb = {{betrieb}}]]
+ GROUP BY n.artikel, n.aktion, n.prozentsatz
+ ORDER BY sum(n.menge) DESC, n.artikel, n.prozentsatz`,
+    visualisierung: {
+      column_settings: {
+        '["name","Nachlass"]': EURO,
+        '["name","Stufe %"]': PROZENT,
+      },
+    },
   },
 ]
