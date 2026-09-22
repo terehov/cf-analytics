@@ -1,0 +1,81 @@
+{
+  "endpunkt": "GET /finanzen/api/getJournalData?businessdate=15.08.2026",
+  "hinweis": "Struktur des Kassenjournals (K1), erhoben 22.09.2026. Session-gebunden an den aktuell aktiven Betrieb, NICHT ueber laden= o.ae. steuerbar (getestet, ohne Wirkung). Hier: 0 Zeilen, da der session-gebundene Betrieb an diesem Tag keinen Umsatz hatte.",
+  "top_level_keys": [
+    "filter",
+    "businessdate",
+    "financetypes",
+    "financetypesNumber",
+    "articles",
+    "kellner",
+    "sites",
+    "terminals",
+    "vats",
+    "splits",
+    "filter_articles",
+    "filter_tables",
+    "filter_aktion",
+    "filter_summe",
+    "filter_site",
+    "filter_waiter",
+    "filter_terminal",
+    "revenue",
+    "to_show",
+    "umsatzsumme",
+    "umsatzsumme_filtered"
+  ],
+  "businessdate_unix": 1786744800,
+  "umsatzsumme": 0,
+  "to_show_beispiel": [],
+  "sites_beispiel": [
+    {
+      "id": 0,
+      "number": 0,
+      "name": "Gesamtbetrieb",
+      "description": "",
+      "active": "Y",
+      "profile_id": null,
+      "vat_level": 1,
+      "pricelevel_id": 0,
+      "print_onhold": "N",
+      "print_slips": "Y",
+      "code": null,
+      "color": "NOTSET"
+    },
+    {
+      "id": 1,
+      "number": 1,
+      "name": "Ausser Haus",
+      "description": "",
+      "active": "Y",
+      "profile_id": null,
+      "vat_level": 2,
+      "pricelevel_id": 0,
+      "print_onhold": "N",
+      "print_slips": "Y",
+      "code": null,
+      "color": "NOTSET"
+    },
+    {
+      "id": 2,
+      "number": 2,
+      "name": "Lieferdienst",
+      "description": "",
+      "active": "Y",
+      "profile_id": null,
+      "vat_level": 2,
+      "pricelevel_id": 2,
+      "print_onhold": "N",
+      "print_slips": "Y",
+      "code": null,
+      "color": "NOTSET"
+    }
+  ],
+  "financetypes_beispiel_keys": [
+    "-10",
+    "0",
+    "1",
+    "2",
+    "101"
+  ]
+}

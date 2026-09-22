@@ -1,0 +1,211 @@
+{
+  "endpunkt": "GET /intranet/storeanalytics/getReport?report=88&von=1.8.2026&bis=31.8.2026&reltime=custom&interval=8&laden=<encId>",
+  "hinweis": "Anonymisierter Ausschnitt, erhoben 22.09.2026 gegen Wilma Wunder Duesseldorf, August 2026",
+  "title": "Finanzwege",
+  "nBillsGesamt": 12186,
+  "balanceSumBrutto": 369841.08999999973,
+  "tableHead": [
+    [
+      {
+        "id": 0,
+        "field": "Nummer",
+        "header": "Nummer",
+        "sortable": false
+      },
+      {
+        "id": 1,
+        "field": "Finanzweg",
+        "header": "Finanzweg",
+        "sortable": false
+      },
+      {
+        "id": 2,
+        "field": "Finanzgruppe",
+        "header": "Finanzgruppe",
+        "sortable": false
+      },
+      {
+        "id": 3,
+        "field": "Umsatz",
+        "header": "Umsatz",
+        "sortable": false
+      },
+      {
+        "id": 4,
+        "field": "Anzahl",
+        "header": "Anzahl",
+        "sortable": false
+      }
+    ]
+  ],
+  "beispielzeilen": [
+    {
+      "Nummer": {
+        "value": 1
+      },
+      "Finanzweg": {
+        "value": "Boniert"
+      },
+      "Finanzgruppe": {
+        "value": "Umsatz"
+      },
+      "Umsatz": {
+        "value": 390379.14999999997,
+        "decimal": 2,
+        "style": "text-align: right;"
+      },
+      "Anzahl": {
+        "value": 76453,
+        "decimal": 0,
+        "style": "text-align: right;"
+      }
+    },
+    {
+      "Nummer": {
+        "value": 10
+      },
+      "Finanzweg": {
+        "value": "Sofortstorno"
+      },
+      "Finanzgruppe": {
+        "value": "Umsatz"
+      },
+      "Umsatz": {
+        "value": -20742.28,
+        "decimal": 2,
+        "style": "text-align: right;"
+      },
+      "Anzahl": {
+        "value": 3124,
+        "decimal": 0,
+        "style": "text-align: right;"
+      }
+    },
+    {
+      "Nummer": {
+        "value": 41
+      },
+      "Finanzweg": {
+        "value": "EC-Karte"
+      },
+      "Finanzgruppe": {
+        "value": "Unbar"
+      },
+      "Umsatz": {
+        "value": -135041.65999999995,
+        "decimal": 2,
+        "style": "text-align: right;"
+      },
+      "Anzahl": {
+        "value": 3783,
+        "decimal": 0,
+        "style": "text-align: right;"
+      }
+    },
+    {
+      "Nummer": {
+        "value": 20
+      },
+      "Finanzweg": {
+        "value": "Bar gegeben"
+      },
+      "Finanzgruppe": {
+        "value": "Bargeld"
+      },
+      "Umsatz": {
+        "value": -86374.98999999999,
+        "decimal": 2,
+        "style": "text-align: right;"
+      },
+      "Anzahl": {
+        "value": 3763,
+        "decimal": 0,
+        "style": "text-align: right;"
+      }
+    },
+    {
+      "Nummer": {
+        "value": 3168
+      },
+      "Finanzweg": {
+        "value": "25% Glücksrad"
+      },
+      "Finanzgruppe": {
+        "value": "Hausbon"
+      },
+      "Umsatz": {
+        "value": -109.49999999999994,
+        "decimal": 2,
+        "style": "text-align: right;"
+      },
+      "Anzahl": {
+        "value": 31,
+        "decimal": 0,
+        "style": "text-align: right;"
+      }
+    },
+    {
+      "Nummer": {
+        "value": 3500
+      },
+      "Finanzweg": {
+        "value": "10% Glücksrad"
+      },
+      "Finanzgruppe": {
+        "value": "Hausbon"
+      },
+      "Umsatz": {
+        "value": -6.550000000000001,
+        "decimal": 2,
+        "style": "text-align: right;"
+      },
+      "Anzahl": {
+        "value": 4,
+        "decimal": 0,
+        "style": "text-align: right;"
+      }
+    },
+    {
+      "Nummer": {
+        "value": 3501
+      },
+      "Finanzweg": {
+        "value": "25% Glücksrad'"
+      },
+      "Finanzgruppe": {
+        "value": "Hausbon"
+      },
+      "Umsatz": {
+        "value": -232.73999999999984,
+        "decimal": 2,
+        "style": "text-align: right;"
+      },
+      "Anzahl": {
+        "value": 66,
+        "decimal": 0,
+        "style": "text-align: right;"
+      }
+    },
+    {
+      "Nummer": {
+        "value": 3502
+      },
+      "Finanzweg": {
+        "value": "50% Glücksrad"
+      },
+      "Finanzgruppe": {
+        "value": "Hausbon"
+      },
+      "Umsatz": {
+        "value": -4281.5,
+        "decimal": 2,
+        "style": "text-align: right;"
+      },
+      "Anzahl": {
+        "value": 600,
+        "decimal": 0,
+        "style": "text-align: right;"
+      }
+    }
+  ]
+}

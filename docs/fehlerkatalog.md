@@ -4609,3 +4609,28 @@ CONCURRENTLY" hat damit seit dem 20.08.2026 nie gegriffen, für alle Nachläufe,
 weil die Nachläufe jeden Fehler fangen. Gefunden vom neuen Refresh-Test in
 `src/wetter/wetter_tag.test.ts`, nachgestellt in psql, berichtigt (beide Codes), Details in
 `importer.md`.
+
+## Der Betriebsbericht-Endpunkt lieferte zwei Monate lang leere Gerüste und galt als „gelöst" (22.09.2026)
+
+**Symptom:** Rabattbericht (92), Storno (38/39) und jeder andere Betriebsbericht kamen seit dem
+25.07.2026 mit `200` und `nBillsGesamt: 0` zurück, auch für den umsatzstärksten Betrieb. Daraus
+entstanden zwei falsche Befunde: der Rabattbericht greife „auf eine leere Datenquelle" zu, und
+Concept Family buche keine Rabatte. Der Tagesabschluss (97) lieferte 55 kB und galt deshalb als
+Beweis, dass der Weg funktioniert.
+
+**Ursache:** Der Weg war falsch. `/finanzen/analytics/getReport?storeId=<encId>` ignoriert
+`storeId` und liefert Gerüste. Der echte Weg lautet
+`/intranet/storeanalytics/getReport?laden=<encId>`, gefunden über die Netzwerkspur eines
+echten Klicks im Report Center. Die 55 kB bestanden aus 62 Tageszeilen mit lauter Nullen,
+und derselbe Aufruf lieferte für zwei Betriebe und zwei Monate byte-genau 65.830 Byte.
+**Die Größe einer Antwort ist kein Beleg für Inhalt.**
+
+**Was es künftig verhindert:** Jeder Betriebsbericht wird vor dem Aktivieren gegen
+`getUmsatzbericht` gegengeprüft. `balanceSumNetto` des Berichts muss den Nettoumsatz des
+Betriebs im selben Zeitraum treffen, für Wilma Wunder Düsseldorf im August 2026 auf den Cent
+330.080,34 €. Eine Antwort mit `nBillsGesamt: 0` bei einem Betrieb, der laut Umsatzbericht
+Umsatz hat, ist ein Fehler und kein „keine Daten". So steht es als Anforderung für Phase 2 in
+`plan-lina-kassendaten.md`. Hergang in `lina-api-korrekturen.md`, KORREKTUR 7.
+
+**Nebenbefund:** Wilma Wunder Markt Mainz heißt in LINA `Gastronomie am Markt Mainz GmbH`.
+Eine Suche nach „Wilma" im Namen findet 13 von 14 Betrieben.

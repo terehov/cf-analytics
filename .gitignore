@@ -28,6 +28,12 @@ examples/
 *.jpeg
 *.png
 *-snapshot.yml
+# Ausnahme (Eugene, 22.09.2026): das Screenshot-Archiv der LINA-Oberflaeche wird
+# versioniert — es haelt fest, wie Berichte und Verwaltungsseiten zu einem Datum
+# aussahen, fuer den Fall, dass LINA sie aendert oder der Zugang wegfaellt. Die
+# Bilder zeigen echte Umsaetze und koennen Mitarbeiternamen zeigen; Zugangsdaten,
+# Schluessel und IBANs sind ausgeschlossen (README im Ordner).
+!docs/lina-screenshots/**/*.png
 
 # Die heruntergeladenen Belegdateien: echte Rechnungen und Lieferscheine der
 # Concept Family AG als PDF, dazu die daraus gezogenen E-Rechnungs-XML und ein

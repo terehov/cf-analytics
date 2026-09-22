@@ -76,6 +76,10 @@ Meine POS-basierte Rechenvariante ergab dagegen 45,90 / 33,60 / 35,42 — **deut
 
 ## KORREKTUR 3 — Der Betriebswechsel ist gelöst: **`storeId`**
 
+> **Widerlegt am 22.09.2026 — siehe KORREKTUR 7.** `storeId` wird ignoriert; der Endpunkt
+> heißt `/intranet/storeanalytics/getReport` mit `laden=<encId>`. Der Text darunter bleibt als
+> Stand vom Juli stehen.
+
 **Falsch war:** „Die 72 Betriebs-Berichte sind session-gebunden an den aktiven Betrieb. Wie der Importer zwischen 141 Betrieben wechselt, ist ungeklärt — **die** offene Architekturfrage für Phase 3."
 
 **Richtig ist:** Es gibt gar keinen Session-Wechsel. Über das Management-Dashboard (`/intranet/index/madashboard`) führt je Betriebszeile ein Drill-Down-Button auf:
@@ -352,3 +356,61 @@ Prio 3, *Status Bericht = 1*). Sie kommt aus LINA und nicht aus Bounti — Bount
 Personaldaten selbst über einen LINA-API-Schlüssel mit dem Scope *Personalstammdaten und
 Kosten* (`lina-api-inventar-ladenakte.md` §4 e). Der Hergang dieser Verwechslung steht in
 `entscheidungen.md`, B4.
+
+---
+
+## KORREKTUR 7 — KORREKTUR 3 war falsch: der echte Endpunkt heißt anders (22.09.2026)
+
+**Im Browser erhoben, gegen Wilma Wunder Düsseldorf und den umsatzstärksten Betrieb
+(Wirtshaus am Schlossplatz).** Anlass war `plan-lina-kassendaten.md`, Phase 0 — die Frage,
+ob die Glücksrad-Nachlässe (Finanzwege 3500–3502) über einen Betriebsbericht zu bekommen
+sind. Dabei fiel auf: **jeder** Aufruf des in KORREKTUR 3 dokumentierten Endpunkts liefert
+für **jeden** Betrieb und **jeden** Zeitraum `nBillsGesamt: 0` und leere Tabellen — auch für
+Berichte, die zweifelsfrei Daten haben müssen (Artikelverkauf für einen Betrieb mit
+330.080,34 € Monatsumsatz laut `getUmsatzbericht`).
+
+**Falsch war:**
+
+~~```~~
+~~GET /finanzen/analytics/getReport~~
+~~    ?report=<id>&von=1.6.2026&bis=30.6.2026&reltime=lastMonth&interval=8~~
+~~    &storeId=<encId>~~
+~~```~~
+
+~~Verifiziert: `report=97` (Tagesabschluss) liefert mit `storeId` 55 KB echte Daten für den
+adressierten Betrieb.~~
+
+**Richtig ist:** Dieser Pfad existiert und antwortet mit `200`, aber `storeId` wird
+**ignoriert** — er landet auf einer Route, die keine Daten dahinter hat (vermutlich ein
+Alias oder ein Legacy-Rest der Konzernebene). Die 55 KB waren echt, aber sie waren
+**Struktur, nicht Inhalt**: Report 97 zwingt `interval` serverseitig auf `3` („pro Tag“) und
+baut damit für jeden Monat ~62 Gerüstzeilen auf, auch wenn jeder Wert darin `0` ist —
+**Bytegröße ist damit kein Beleg für echte Daten.** Nachgemessen: derselbe Aufruf lieferte
+für zwei verschiedene Betriebe und zwei verschiedene Monate exakt **65.830 Byte**, beide
+Male mit lauter Nullen.
+
+**Der tatsächliche Endpunkt**, gefunden über die Netzwerkspur eines echten UI-Klicks
+(„Bericht anzeigen“ im Report Center):
+
+```
+GET /intranet/storeanalytics/getReport
+    ?report=<id>&von=1.8.2026&bis=31.8.2026&reltime=custom&interval=8
+    &laden=<encId>
+```
+
+Zwei Unterschiede zu KORREKTUR 3: der Pfad steht unter `/intranet/storeanalytics/`, nicht
+unter `/finanzen/analytics/`, und der Parameter heißt **`laden`**, nicht `storeId`. Der
+Katalog-Aufruf folgt demselben Muster: `GET /intranet/storeanalytics/reportList?laden=<encId>`
+(72 Berichte, vollständig, siehe `lina-api-inventar-1d.md`). Mit `laden` liefert Report 27
+(Artikelverkaufsbericht) für Wilma Wunder Düsseldorf, August 2026: `nBillsGesamt: 12186`,
+`balanceSumBrutto: 369841,09` — **exakt** der Bruttoumsatz aus `getUmsatzbericht` für
+denselben Betrieb und Monat. Report 88 (Finanzwege) zeigt darunter die drei gesuchten
+Glücksrad-Finanzwege mit echten Werten (3500/3501/3502, dazu ein vierter, `3168`, ebenfalls
+„25% Glücksrad“ benannt — zwei verschiedene Finanzwege-Nummern mit demselben Namen, eine
+eigene Datenqualitätsfalle). Details, Werte und die Artikel×Finanzweg-Frage in
+`lina-api-inventar-1d.md`.
+
+**Für Phase 2/3 des Kassendaten-Plans heißt das:** jeder Aufruf, der auf KORREKTUR 3 basiert
+(auch der geplante `for (store of stores) for (report of reports)`-Loop), muss auf
+`/intranet/storeanalytics/getReport` und `laden=` umgestellt werden, bevor er gebaut wird —
+sonst holt der Importer 141 × 72 × leere Antworten und meldet das als Erfolg (Regel 10).
