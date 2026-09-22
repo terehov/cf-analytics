@@ -2039,7 +2039,8 @@ nächste Nachtlauf nach dem Deploy.
   und wird nicht nachgetragen (der Lader löst nur beim Laden auf). Im Klon mit Artikelverkauf bis
   12.08.2026 waren im August 2.155 von 2.240 Glücksrad-Zeilen aufgelöst. `aa_nachlass` markiert die
   übrigen als „nicht zuordenbar", statt sie wegzufiltern. Ein Nachtrag im Nachlauf wäre der Weg.
-* **Klone zum Löschen:** `lina_m5_0923` (Abnahmeklon, Stand `0118`, mit den Fixtures der Abnahme),
-  `lina_m5_last` (24 GB, synthetischer Vollbestand für die Leistungsmessung) und `lina_br_0922`
-  (Testklon, von `betriebsbericht.test.ts` geleert). Nichts davon wird noch gebraucht:
-  `dropdb lina_m5_last lina_m5_0923 lina_br_0922`.
+* **Klone:** `lina_m5_last` (24 GB, synthetischer Vollbestand der Leistungsmessung) ist am
+  23.09.2026 gelöscht. Stehen geblieben: `lina_m5_0923` (Abnahmeklon, Stand `0118`, mit den echten
+  Fixtures der Abnahme auf den echten Wilma-Wunder-Betrieben — damit lässt sich die Abnahme
+  wiederholen) und `lina_br_0922` (Testklon, von `betriebsbericht.test.ts` geleert, Stand `0118`).
+  Beide können weg, sobald niemand mehr nachmessen will: `dropdb lina_m5_0923 lina_br_0922`.
