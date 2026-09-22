@@ -596,6 +596,44 @@ const Schema = z.object({
    */
   HISTORIE_JE_LAUF: z.coerce.number().int().min(0).default(2_000),
   /**
+   * NOTBREMSE fuer die Betriebsberichte (Plan „Vollabzug", Entscheidung E8,
+   * 22.09.2026) — keine Tagesration.
+   *
+   * WAS DIE 4.000 WAREN UND WARUM SIE GEFALLEN SIND. Der Plan sah zuerst
+   * 4.000 Aufrufe je Nacht zusätzlich vor — eine Budgetwahl aus der ersten
+   * Rückfrage, nicht gemessen. Eugene am 22.09.2026: „Es kann gerne auch
+   * länger laden, solange wir das System nicht zuballern und sich über alle
+   * API-Aufrufe des gleichen Systems verteilen." Daraus folgt:
+   *
+   *   * Das Tempo bleibt (TAKT_*, harte Regel 3), TAGESBUDGET bleibt die
+   *     Obergrenze für ALLE LINA-Aufrufe zusammen.
+   *   * Betriebsberichte bekommen, was das Tagesgeschäft nicht braucht: der
+   *     Worker zieht einen Betriebsbericht nur, wenn danach noch Budget für
+   *     alle fälligen übrigen LINA-Posten bleibt, und dann ABWECHSELND mit
+   *     ihnen statt als Block (src/sync/worker.ts, linaPostenHolen).
+   *
+   * Diese Zahl begrenzt zweierlei: wie viele Betriebsbericht-Posten eine
+   * Nacht NEU einreiht (abzüglich der noch offenen) und wie viele der Worker
+   * in einem Lauf höchstens zieht. VOREINSTELLUNG = TAGESBUDGET, damit die
+   * Nacht nur vom Tagesbudget begrenzt wird. 0 schaltet ab — sofort, auch
+   * für bereits eingereihte Posten. Das ist die Notbremse; ein Handbefehl
+   * ist es nicht (AGENTS.md, Betrieb ohne Handbefehl).
+   */
+  BETRIEBSBERICHT_JE_LAUF: z.coerce.number().int().min(0).optional(),
+  /**
+   * Erstabruf eines Betriebsbericht-Zeitraums frühestens so viele Tage nach
+   * seinem Ende. LINAs Berichte füllen sich über fünf bis sieben Tage
+   * (backfill.md); ein zu früh geholter Tag liefert eine plausible, zu kleine
+   * Zahl. Die Gegenprobe gegen den Umsatzbericht fängt den Rest.
+   */
+  BETRIEBSBERICHT_REIFE_TAGE: z.coerce.number().int().min(1).default(7),
+  /**
+   * Einmaliger zweiter Abruf, so viele Tage nach dem Zeitraumende — das
+   * Nachzügler-Fenster der Betriebsberichte. Nur für Zeiträume, deren erster
+   * Abruf davor lag (also nicht für den Backfill). 0 schaltet ab.
+   */
+  BETRIEBSBERICHT_NACHLAUF_TAGE: z.coerce.number().int().min(0).default(14),
+  /**
    * Wie viele Geschaeftstage EIN Lauf hoechstens als Nulltage nachholt
    * (`nulltageNachziehen()`, Sicht `mart.umsatztag_luecke`). 0 schaltet ab.
    *
@@ -871,7 +909,12 @@ function laden() {
       `ABBRUCH_NACH_FEHLERN (${r.data.ABBRUCH_NACH_FEHLERN}) liegen — sonst kann eine ` +
       'volle Wiederbelebungsrunde die FoodNotify-Spur allein abbrechen (Läufe 108–110)')
   }
-  return r.data
+  /*
+   * Die Notbremse der Betriebsberichte folgt ungesetzt dem Tagesbudget — die
+   * Nacht soll nur vom Tagesbudget begrenzt sein (E8). Eine feste Zahl hier
+   * wäre die 4.000 von vorher, nur versteckt.
+   */
+  return { ...r.data, BETRIEBSBERICHT_JE_LAUF: r.data.BETRIEBSBERICHT_JE_LAUF ?? r.data.TAGESBUDGET }
 }
 
 /**
@@ -918,7 +961,7 @@ export function fnZugaenge(c: Config = config): FnZugang[] {
   })
 }
 
-export type Config = z.infer<typeof Schema>
+export type Config = z.infer<typeof Schema> & { BETRIEBSBERICHT_JE_LAUF: number }
 export const config: Config = laden()
 
 /** Nie das Passwort loggen — diese Sicht ist die einzige, die ausgegeben wird. */

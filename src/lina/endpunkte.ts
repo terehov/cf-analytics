@@ -6,16 +6,23 @@
  * Neue Berichte sind ein Eintrag, kein Codeumbau.
  *
  * Die beiden Ebenen aus Phase 1 unterscheiden sich in mehr als der URL:
- *   Konzern  /intranet/analytics/...  alle 141 Betriebe je Antwort,
- *                                     Datum als 01.06.2026
- *   Betrieb  /finanzen/analytics/...  ein Betrieb je Antwort (storeId),
- *                                     Datum als 1.6.2026  (ohne führende Null)
+ *   Konzern  /intranet/analytics/...       alle 141 Betriebe je Antwort,
+ *                                          Datum als 01.06.2026
+ *   Betrieb  /intranet/storeanalytics/...  ein Betrieb je Antwort (laden=<encId>),
+ *                                          Datum als 1.6.2026  (ohne führende Null)
+ *
+ * ~~Betrieb  /finanzen/analytics/...  (storeId)~~ — dieser Weg antwortet mit 200
+ * und leeren Gerüsten, für jeden Betrieb und Zeitraum (KORREKTUR 7, 22.09.2026).
+ * Die Betriebsberichte stehen seitdem in einem eigenen Register:
+ * `src/lina/betriebsberichte.ts`. Hier stehen nur Konzern- und Stammdaten.
  */
 import { LADENAKTE_ENDPUNKTE } from '../ladenakte/endpunkte'
+import { BETRIEBSBERICHTE } from './betriebsberichte'
 import { zuLinaDatum } from '../lib/time'
 
 export type Ebene = 'konzern' | 'betrieb' | 'stamm'
-export type Schrittweite = 'tag' | 'monat' | 'jahr' | 'momentaufnahme'
+/** `woche` gibt es nur bei Betriebsberichten der Fensterklasse W (sieben Tage). */
+export type Schrittweite = 'tag' | 'woche' | 'monat' | 'jahr' | 'momentaufnahme'
 
 /**
  * Momentaufnahmen sind etwas grundsätzlich anderes als Berichte.
@@ -81,6 +88,14 @@ export const PRIORITAET = {
   nachlauf: 20,
   /** Nacharbeit nach einem Fehler. */
   nacharbeit: 50,
+  /**
+   * Betriebsberichte (0113), laufend wie Historie — ihre Reihenfolge ist das
+   * Datum, nicht die Stufe. Sie konkurrieren NICHT ueber die Prioritaet mit
+   * den uebrigen LINA-Posten: die LINA-Spur zieht beide Haelften abwechselnd
+   * (sync.posten_holen 'lina_br' / 'lina_sonst'), und Betriebsberichte nur,
+   * solange das Budget fuer die faelligen uebrigen Posten reicht.
+   */
+  betriebsbericht: 85,
   /** Historie, rueckwaerts. */
   historie: 90,
 } as const
@@ -191,6 +206,19 @@ export type Endpunkt = {
    * Der Betrieb kommt dafür als `linaBetriebId` in den Zusatzparametern.
    */
   braucht?: 'beleg_token' | 'bwa_hash' | 'stamm_pfad'
+  /**
+   * Die Antwort ist ein JSON-String, der JSON enthält. So liefern LINAs
+   * Betriebsberichte (22.09.2026): `JSON.parse` ergibt einen String, erst das
+   * zweite Parsen das Objekt. Der Client packt beides aus, damit raw, Hash,
+   * Schema und Lader dasselbe Objekt sehen.
+   */
+  doppeltKodiert?: boolean
+  /**
+   * Unter welchem Parameternamen der Betrieb aus `sync.warteschlange.betrieb_enc_id`
+   * in die Anfrage geht. Nur Betriebsberichte haben einen (`laden`). Ein Posten
+   * mit Betrieb für einen Endpunkt ohne diese Angabe ist ein Baufehler und wirft.
+   */
+  betriebParameter?: 'laden'
 }
 
 /** Konzern-Ebene: DD.MM.YYYY mit führender Null. */
@@ -521,72 +549,14 @@ export const ENDPUNKTE: Endpunkt[] = [
     parameter: (von, bis) => ({ von: zuLinaDatum(von), bis: zuLinaDatum(bis), mode: 'relativ' }),
   },
 
-  // --- Betriebs-Ebene: 141 Aufrufe je Zeitraum, deshalb sparsam ----------
-  {
-    key: 'getReport:38',
-    ebene: 'betrieb',
-    pfad: '/finanzen/analytics/getReport',
-    schrittweite: 'monat',
-    zweck: 'Stornobericht',
-    aktiv: false,
-    hinweis: 'Bewusst deaktiviert: Storno wird bei Concept Family nicht genutzt. Jeder geprüfte Betrieb '
-           + 'lieferte nBillsGesamt = 0, während der Tagesabschluss desselben Betriebs volle Daten hat. '
-           + 'Struktur ist dokumentiert, falls sich das ändert.',
-    parameter: (von, bis) => ({
-      report: '38', von: zuLinaDatum(von, 'short'), bis: zuLinaDatum(bis, 'short'),
-      reltime: 'custom', interval: '8',
-    }),
-  },
-  {
-    key: 'getReport:107',
-    ebene: 'betrieb',
-    pfad: '/finanzen/analytics/getReport',
-    schrittweite: 'monat',
-    zweck: 'Gearbeitete Stunden je Betrieb — die Rohdaten hinter LINAs Effektivitäten',
-    aktiv: false,
-    hinweis:
-      'AM 25.07.2026 IM BROWSER VERIFIZIERT: nicht verfügbar. Der Bericht antwortet mit HTTP 500 und '
-    + 'leerem Body — auf BETRIEBSEBENE mit storeId, für den umsatzstärksten Betrieb, und für drei '
-    + 'verschiedene Zeiträume (Mai 2026, März 2026, Gesamtjahr 2025). Meine Holding-Hypothese war also '
-    + 'falsch. Dass es kein Datenproblem ist, zeigt der Gegentest: Bericht 97 (Tagesabschluss) und 114 '
-    + '(Kost-Sach-Bezug) liefern für denselben Betrieb und dieselben Parameter sauberes JSON. '
-    + 'Dasselbe Bild bei 7, 8, 9, 23, 24 und 118 — die gesamte Personal- und Wareneinsatzgruppe ist für '
-    + 'diesen Account gesperrt oder nicht lizenziert. '
-    + 'NICHT auf true stellen, ohne dass jemand die Rechte bei LINA geklärt hat: aktiviert kostet der '
-    + 'Bericht rund 8.500 Anfragen Backfill für garantiert leere Antworten.',
-    parameter: (von, bis) => ({
-      report: '107', von: zuLinaDatum(von, 'short'), bis: zuLinaDatum(bis, 'short'),
-      reltime: 'custom', interval: '8',
-    }),
-  },
-  {
-    key: 'getReport:23',
-    ebene: 'betrieb',
-    pfad: '/finanzen/analytics/getReport',
-    schrittweite: 'monat',
-    zweck: 'Personalkostenschätzung je Betrieb',
-    aktiv: false,
-    hinweis: 'Wie 107 am 25.07.2026 verifiziert: HTTP 500 auf Betriebsebene. Gilt für die ganze Gruppe '
-           + '7 (Wareneinsätze), 8 (Personalkosten Jahr), 9 (Urlaubsverteilung), 23, 24 (Personalrechner), '
-           + '107 und 118 (Wareneinsatz und Deckungsbeitrag). Erst nach Rechteklärung anfassen.',
-    parameter: (von, bis) => ({
-      report: '23', von: zuLinaDatum(von, 'short'), bis: zuLinaDatum(bis, 'short'),
-      reltime: 'custom', interval: '8',
-    }),
-  },
-  {
-    key: 'getReport:97',
-    ebene: 'betrieb',
-    pfad: '/finanzen/analytics/getReport',
-    schrittweite: 'monat',
-    zweck: 'Tagesabschluss je Betrieb',
-    aktiv: false,
-    hinweis: 'Erst ab Inbetriebnahme aktivieren, kein Backfill: 141 Aufrufe je Zeitraum.',
-    parameter: (von, bis) => ({
-      report: '97', von: zuLinaDatum(von, 'short'), bis: zuLinaDatum(bis, 'short'),
-      reltime: 'custom', interval: '8',
-    }),
-  },
+  // --- Betriebs-Ebene ------------------------------------------------------
+  //
+  // HIER STANDEN BIS ZUM 22.09.2026 VIER `getReport:*` (38, 107, 23, 97) mit
+  // dem Pfad /finanzen/analytics/getReport und storeId= — dem Weg, der für
+  // jeden Betrieb leere Gerüste liefert (KORREKTUR 7). Sie stehen jetzt mit
+  // korrigiertem Pfad in src/lina/betriebsberichte.ts, zusammen mit allen
+  // übrigen Betriebsberichten. Ihre Befunde (107/23 gesperrt, 38 nur mit
+  // nBillsGesamt = 0 gemessen) stehen dort als `hinweis`.
 
   // --- Stammdaten: Momentaufnahmen ohne Zeitraum -------------------------
   //
@@ -740,6 +710,7 @@ export const AKTIVE_ENDPUNKTE = ENDPUNKTE.filter(e => e.aktiv)
 export function endpunkt(key: string): Endpunkt {
   const e = ENDPUNKTE.find(x => x.key === key)
     ?? LADENAKTE_ENDPUNKTE.find(x => x.key === key)
+    ?? BETRIEBSBERICHTE.find(x => x.key === key)
   if (!e) throw new Error(`Unbekannter Endpunkt: ${key}`)
   return e
 }

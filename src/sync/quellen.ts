@@ -29,6 +29,7 @@ import { query } from '../db/pool'
 import { log } from '../lib/log'
 import { config } from '../config'
 import { ENDPUNKTE } from '../lina/endpunkte'
+import { BETRIEBSBERICHTE, type Fensterklasse } from '../lina/betriebsberichte'
 
 export type Quelle = {
   /** Schlüssel. Bei Endpunkten deren `key`, sonst ein sprechender Name. */
@@ -43,6 +44,8 @@ export type Quelle = {
   /** `false` = liefert bewusst nichts. Zählt in keiner Prüfzeile mit. */
   erwartet?: boolean
   bemerkung?: string
+  /** Nur Betriebsberichte: welcher Zeitraum eines Umsatztages wann fällig ist (0113). */
+  fensterklasse?: Fensterklasse
 }
 
 /** Ein Kalendertag plus Reserve für einen ausgefallenen Lauf. */
@@ -283,6 +286,46 @@ export const QUELLEN: readonly Quelle[] = [
              + 'neu, eine Pruefung darauf koennte nie ausschlagen. Nur drei Haeuser auditieren '
              + '(Stand 24.08.2026).' },
 
+  // --- LINA-Betriebsberichte (0113-0115) --------------------------------
+  /*
+   * Je aktivem Betriebsbericht eine Zeile. Die Kadenz folgt der
+   * Fensterklasse: ein Tagesbericht (T) bekommt jede Nacht den jüngsten
+   * reifen Tag, ein Wochenbericht (W) jede Woche ein Fenster, ein
+   * Monatsbericht einmal im Monat — plus im Backfill ohnehin jede Nacht.
+   *
+   * `erwartet` HÄNGT AN DER NOTBREMSE. Mit BETRIEBSBERICHT_JE_LAUF = 0 holt
+   * der Lauf absichtlich nichts; ohne diese Kopplung meldete zulaufPruefen()
+   * dann jeden Lauf als `teilweise` — ein Alarm, der immer schlägt, ist
+   * keiner (dieselbe Überlegung wie beim Bounti-Token). Sichtbar bleibt es:
+   * die Zeile steht als `nicht erwartet` mit Begründung da.
+   */
+  ...BETRIEBSBERICHTE
+    .filter(b => b.aktiv)
+    .map((b): Quelle => ({
+      quelle: b.key, bezeichnung: `Betriebsbericht ${b.bericht}: ${b.zweck}`,
+      system: 'lina', endpunkt: b.key,
+      kadenz_stunden: b.klasse === 'T' ? TAEGLICH : b.klasse === 'W' ? WOECHENTLICH : MONATLICH,
+      erwartet: config.BETRIEBSBERICHT_JE_LAUF > 0,
+      fensterklasse: b.klasse,
+      bemerkung: config.BETRIEBSBERICHT_JE_LAUF > 0 ? undefined
+        : 'BETRIEBSBERICHT_JE_LAUF = 0: Betriebsberichte sind per Notbremse abgeschaltet.',
+    })),
+  /*
+   * Gutscheine (81/82): registriert, nicht geholt. Wilma Wunder Düsseldorf
+   * verkauft keine LINA-Gutscheine (200 mit 0 Zeilen, Vermessung
+   * 22.09.2026). Bevor 5.115 Aufrufe Backfill für Leerzeilen laufen, an
+   * einem Betrieb MIT Gutscheinumsatz messen — offene-punkte.md.
+   */
+  ...BETRIEBSBERICHTE
+    .filter(b => b.bericht === 81 || b.bericht === 82)
+    .map((b): Quelle => ({
+      quelle: b.key, bezeichnung: `Betriebsbericht ${b.bericht}: ${b.zweck}`,
+      system: 'lina', endpunkt: b.key, kadenz_stunden: MONATLICH, erwartet: false,
+      fensterklasse: b.klasse,
+      bemerkung: 'Registriert, nicht aktiv: an Duesseldorf 0 Zeilen. Erst an einem Betrieb mit '
+               + 'Gutscheinumsatz messen (offene-punkte.md).',
+    })),
+
   // --- Bewusst still: sie stehen hier, damit sie sichtbar sind ----------
   /*
    * LINAs Warenwirtschaft ist Demodaten (AGENTS.md Regel 5). Die fünf
@@ -379,11 +422,11 @@ export async function quellenSpiegeln(): Promise<number> {
     await query(
       `INSERT INTO sync.quelle
          (quelle, bezeichnung, system, endpunkt, schema_name, tabelle, zeitspalte,
-          kadenz_stunden, erwartet, bemerkung, nachzuegler_tage)
+          kadenz_stunden, erwartet, bemerkung, nachzuegler_tage, fensterklasse)
        SELECT q->>'quelle', q->>'bezeichnung', q->>'system', q->>'endpunkt',
               q->>'schema_name', q->>'tabelle', q->>'zeitspalte',
               (q->>'kadenz_stunden')::int, (q->>'erwartet')::boolean, q->>'bemerkung',
-              (q->>'nachzuegler_tage')::int
+              (q->>'nachzuegler_tage')::int, q->>'fensterklasse'
          FROM jsonb_array_elements($1::jsonb) AS q
        ON CONFLICT (quelle) DO UPDATE
           SET bezeichnung = excluded.bezeichnung, system = excluded.system,
@@ -391,7 +434,8 @@ export async function quellenSpiegeln(): Promise<number> {
               tabelle = excluded.tabelle, zeitspalte = excluded.zeitspalte,
               kadenz_stunden = excluded.kadenz_stunden, erwartet = excluded.erwartet,
               bemerkung = excluded.bemerkung,
-              nachzuegler_tage = excluded.nachzuegler_tage`,
+              nachzuegler_tage = excluded.nachzuegler_tage,
+              fensterklasse = excluded.fensterklasse`,
       [JSON.stringify(QUELLEN.map(q => ({
         quelle: q.quelle, bezeichnung: q.bezeichnung, system: q.system,
         endpunkt: q.endpunkt ?? null,
@@ -402,6 +446,7 @@ export async function quellenSpiegeln(): Promise<number> {
         erwartet: q.erwartet ?? true,
         bemerkung: q.bemerkung ?? null,
         nachzuegler_tage: nachzueglerFenster(q.endpunkt),
+        fensterklasse: q.fensterklasse ?? null,
       })))])
 
     const weg = await query<{ quelle: string }>(

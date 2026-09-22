@@ -17,6 +17,8 @@ import type { Endpunkt } from '../lina/endpunkte'
 import { log } from '../lib/log'
 import { laLaden } from '../ladenakte/laden'
 import { istLadenakte } from '../ladenakte/endpunkte'
+import { istBetriebsbericht } from '../lina/betriebsberichte'
+import { betriebsberichtSchreiben } from './betriebsbericht_laden'
 
 type Kontext = {
   ep: Endpunkt
@@ -163,6 +165,20 @@ export async function laden(k: Kontext): Promise<number> {
        k.httpStatus, JSON.stringify(k.daten), k.hash, k.bytes, k.laufId])
     const rawId = String(roh.rows[0].id)
     const abgerufenAm = roh.rows[0].abgerufen_am
+
+    /*
+     * Betriebsberichte haben einen eigenen Lader (src/sync/betriebsbericht_laden.ts):
+     * ihre Antwort nennt keinen Betrieb — der steht nur im Posten —, und sie
+     * ersetzen je Betrieb und Zeitraum, statt je Zeile zu upserten. Der Wächter
+     * prüft ihren Ladeweg gegen GELADENE_BETRIEBSBERICHTE, nicht gegen den
+     * switch unten.
+     */
+    if (istBetriebsbericht(k.ep.key)) {
+      return betriebsberichtSchreiben(c, {
+        key: k.ep.key, von: k.von, bis: k.bis, daten: k.daten,
+        betriebEncId: k.betriebEncId, rawId,
+      })
+    }
 
     await c.query(`SELECT core.partition_anlegen('core.artikelverkauf_tag', $1::date)`, [k.von])
 

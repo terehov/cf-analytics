@@ -11,6 +11,7 @@
  * bei fehlenden Vergleichszeiträumen null liefert.
  */
 import { z } from 'zod'
+import { betriebsbericht } from './betriebsberichte'
 
 const zahl = z.number().nullable().optional()
 
@@ -149,19 +150,73 @@ export const AktionsberichtSchema = z.object({
   })),
 })
 
-/** Einheitliche Hülle aller 72 Betriebs-Reports. */
+/**
+ * Einheitliche Hülle aller 72 Betriebs-Reports.
+ *
+ * Nachgeschärft am 22.09.2026 an den ersten echten Antworten über den
+ * richtigen Endpunkt (KORREKTUR 7): `errors` fehlt meist ganz und war in
+ * Bericht 38 ein String — deshalb unbekannt statt string. `sortable` ist mal
+ * `false`, mal `""` und wird nicht geprüft. Die Blöcke in `table` tragen
+ * Ziffernschlüssel für die Zeilen und `businessDate` als Stichtag bzw.
+ * Zeitraum („01.08.2026" oder „01.08.2026 - 31.08.2026").
+ *
+ * Das Objekt, das hier geprüft wird, ist schon EINMAL entpackt: LINA liefert
+ * die Hülle als JSON-String im JSON (siehe `doppeltKodiert` im Register).
+ */
 export const BetriebsReportSchema = z.object({
   title: z.string(),
   timeframe: z.string(),
   from: z.number().optional(),
   to: z.number().optional(),
-  errors: z.string().nullable().optional(),
+  errors: z.unknown().optional(),
   nBillsGesamt: zahl,
+  balanceSumBrutto: zahl,
+  balanceSumNetto: zahl,
+  possibleIntervals: z.array(z.object({ value: z.number(), name: z.string() })).optional(),
+  defaultInterval: z.number().optional(),
   tableHead: z.array(z.array(z.object({
     id: z.number(), field: z.string(), header: z.string(),
   }))),
   table: z.array(z.record(z.string(), z.unknown())),
 })
+
+/**
+ * Die Hülle PLUS die Spalten, die dieser Bericht tragen muss.
+ *
+ * Die Hülle ist für alle 72 gleich, die Spalten sind es nicht — eine
+ * umbenannte Spalte käme sonst als NULL durch, und niemand merkte es
+ * (Plan „Vollabzug", 5.4). Geprüft wird über ALLE `tableHead`-Blöcke: 97
+ * liefert je Tag zwei Blockarten mit verschiedenen Spalten.
+ *
+ * Zweite Prüfung: das angefragte `interval` muss in `possibleIntervals` stehen.
+ * LINA ignoriert ein nicht unterstütztes STILL — wer Tageszeilen erwartet,
+ * bekäme Monatszeilen, die wie Tageszeilen aussehen.
+ */
+export function betriebsberichtSchema(
+  felder: readonly string[], dynamisch: RegExp | undefined, intervall: number,
+): z.ZodTypeAny {
+  return BetriebsReportSchema.superRefine((d, ctx) => {
+    const vorhanden = new Set(d.tableHead.flat().map(h => h.field))
+    for (const f of felder) {
+      if (!vorhanden.has(f)) {
+        ctx.addIssue({ code: 'custom', path: ['tableHead'], message: `Spalte fehlt: ${f}` })
+      }
+    }
+    const erwartet = new Set(felder)
+    for (const f of vorhanden) {
+      if (!erwartet.has(f) && !(dynamisch && dynamisch.test(f))) {
+        ctx.addIssue({ code: 'custom', path: ['tableHead'], message: `unbekannte Spalte: ${f}` })
+      }
+    }
+    if (d.possibleIntervals && !d.possibleIntervals.some(i => i.value === intervall)) {
+      ctx.addIssue({
+        code: 'custom', path: ['possibleIntervals'],
+        message: `interval ${intervall} nicht in possibleIntervals `
+               + `(${d.possibleIntervals.map(i => i.value).join(',')}) — LINA ignoriert ihn still`,
+      })
+    }
+  })
+}
 
 // --- Stammdaten-Momentaufnahmen ----------------------------------------
 //
@@ -345,6 +400,9 @@ export const SCHEMATA: Record<string, z.ZodTypeAny> = {
 
 export function schemaFuer(key: string): z.ZodTypeAny | null {
   if (SCHEMATA[key]) return SCHEMATA[key]
-  if (key.startsWith('getReport:')) return BetriebsReportSchema
+  if (key.startsWith('getReport:')) {
+    const b = betriebsbericht(key)
+    return b ? betriebsberichtSchema(b.felder, b.dynamisch, b.intervall) : BetriebsReportSchema
+  }
   return null
 }

@@ -31,6 +31,7 @@ import { config, fnGrenzen } from '../config'
 import { log } from '../lib/log'
 import { LinaClient, strukturPruefen } from '../lina/client'
 import { endpunkt } from '../lina/endpunkte'
+import { istBetriebsbericht } from '../lina/betriebsberichte'
 import { FnClient } from '../foodnotify/client'
 import { fnEndpunkt } from '../foodnotify/endpunkte'
 import { fnLaden } from '../foodnotify/laden'
@@ -770,6 +771,65 @@ async function workerLaufIntern(
    * eine Zahl in der Konfiguration, in einer Zeile zuruecknehmbar, statt
    * derselben Beschleunigung als Struktur versteckt.
    */
+  /**
+   * DIE VERSCHRAENKUNG DER BETRIEBSBERICHTE (Entscheidung E8, 22.09.2026).
+   *
+   * Eugene: „Es kann gerne auch länger laden, solange wir das System nicht
+   * zuballern und sich über alle API-Aufrufe des gleichen Systems verteilen."
+   * Die Betriebsberichte sind im Backfill rund 456.000 Posten — als Block
+   * am Stück wären das zehntausend Aufrufe desselben Endpunkts in Folge.
+   * Deshalb zieht die LINA-Spur ABWECHSELND: nach einem Betriebsbericht
+   * zuerst einen übrigen LINA-Posten, nach einem übrigen zuerst einen
+   * Betriebsbericht. Ist eine Hälfte leer, kommt die andere.
+   *
+   * DAS TEMPO ÄNDERT SICH NICHT. Es bleibt diese eine Schleife mit diesem
+   * einen Client; `sync.posten_holen(lauf, 'lina_br' | 'lina_sonst')` teilt
+   * nur die Schlange, aus der sie zieht (Migration 0113). Harte Regel 3.
+   *
+   * BETRIEBSBERICHTE BEKOMMEN, WAS ÜBRIG IST. Ein Betriebsbericht wird nur
+   * gezogen, wenn das Tagesbudget danach noch für alle FÄLLIGEN übrigen
+   * LINA-Posten reicht — das Tagesgeschäft (Tagesberichte, Ladenakte,
+   * Konzern-Historie) kann also nie an den Betriebsberichten scheitern.
+   * `TAGESBUDGET` bleibt die Obergrenze für alle LINA-Aufrufe zusammen.
+   * Vertagte übrige Posten (Wiedervorlage) zählen nicht mit; sie sind in
+   * diesem Augenblick nicht ziehbar.
+   *
+   * NOTBREMSE: `BETRIEBSBERICHT_JE_LAUF` (0 = keine Betriebsberichte, auch
+   * keine bereits eingereihten; Voreinstellung das Tagesbudget).
+   */
+  let brZuletzt = false
+  let brImLauf = 0
+  let brGrund: string | null = null
+  const linaPostenHolen = async (): Promise<any> => {
+    brGrund = null
+    let brErlaubt = config.BETRIEBSBERICHT_JE_LAUF > 0 && brImLauf < config.BETRIEBSBERICHT_JE_LAUF
+    if (!brErlaubt) {
+      brGrund = config.BETRIEBSBERICHT_JE_LAUF === 0
+        ? 'Betriebsberichte per Notbremse aus (BETRIEBSBERICHT_JE_LAUF = 0)'
+        : `Betriebsberichte: Obergrenze je Lauf erreicht (${config.BETRIEBSBERICHT_JE_LAUF})`
+    } else {
+      const sonst = await eine<{ n: number }>(
+        `SELECT count(*)::int AS n FROM sync.warteschlange
+          WHERE erledigt_am IS NULL AND in_arbeit_seit IS NULL AND faellig_ab <= now()
+            AND marke_key IS NULL AND endpunkt NOT LIKE 'getReport:%'`)
+      if (client.budgetUebrig - Number(sonst?.n ?? 0) < 1) {
+        brErlaubt = false
+        brGrund = 'Betriebsberichte: Restbudget gehoert dem Tagesgeschaeft'
+      }
+    }
+    const reihenfolge: ('lina_br' | 'lina_sonst')[] = !brErlaubt ? ['lina_sonst']
+      : brZuletzt ? ['lina_sonst', 'lina_br'] : ['lina_br', 'lina_sonst']
+    for (const haelfte of reihenfolge) {
+      const p = await eine<any>(`SELECT * FROM sync.posten_holen($1, $2)`, [laufId, haelfte])
+      if (p?.posten_id) {
+        brZuletzt = haelfte === 'lina_br'
+        if (brZuletzt) brImLauf++
+        return p
+      }
+    }
+    return null
+  }
+
   const schleife = async (anbieter: Anbieter): Promise<void> => {
     const stand = jeAnbieter[anbieter]
     const eigenerClient = anbieter === 'fn' ? fnClient : client
@@ -879,7 +939,9 @@ async function workerLaufIntern(
        */
       let posten: any
       try {
-        posten = await eine<any>(`SELECT * FROM sync.posten_holen($1, $2)`, [laufId, anbieter])
+        posten = anbieter === 'lina'
+          ? await linaPostenHolen()
+          : await eine<any>(`SELECT * FROM sync.posten_holen($1, $2)`, [laufId, anbieter])
         dbFehlerInFolge = 0
       } catch (e) {
         dbFehlerInFolge++
@@ -913,6 +975,9 @@ async function workerLaufIntern(
         stand.notiz ??= vertagt > 0
           ? `nichts faellig — ${vertagt} Posten vertagt bis ${w?.naechste?.toISOString() ?? '?'}`
           : 'Schlange leer'
+        // Liegen Betriebsberichte noch da, sagt die Notiz, warum sie liegen
+        // bleiben — sonst sieht die Notbremse aus wie eine leere Schlange.
+        if (anbieter === 'lina' && brGrund) stand.notiz += ` · ${brGrund}`
         break
       }
       /**
@@ -995,7 +1060,20 @@ async function workerLaufIntern(
         res = await fnClient.holen(quelle.ep, quelle.marke, extra)
       } else {
         parameter = quelle.ep.parameter(von, bis, extra)
-        if (posten.betrieb_enc_id) parameter.storeId = posten.betrieb_enc_id
+        /*
+         * Der Betrieb aus dem Posten, unter dem Namen, den der Endpunkt
+         * erwartet (Betriebsberichte: `laden`, KORREKTUR 7). Bis zum
+         * 22.09.2026 stand hier fest `storeId` — der Parameter des Wegs, der
+         * nur leere Gerueste liefert. Ein Posten mit Betrieb fuer einen
+         * Endpunkt ohne Betriebsparameter ist ein Baufehler: er liefe gegen
+         * den Sitzungsbetrieb und schriebe fremde Zahlen.
+         */
+        if (posten.betrieb_enc_id) {
+          if (!quelle.ep.betriebParameter) {
+            throw new Error(`${epKey}: Posten mit betrieb_enc_id, aber der Endpunkt kennt keinen Betriebsparameter`)
+          }
+          parameter[quelle.ep.betriebParameter] = posten.betrieb_enc_id
+        }
         res = await client.holen(quelle.ep, parameter)
       }
 
@@ -1279,6 +1357,63 @@ async function workerLaufIntern(
                             "SELECT sync.sperre_aufheben('name');",
         })
         break
+      }
+
+      /**
+       * --- Betriebsbericht: Fenster zu gross → halbieren --------------------
+       *
+       * LINA beantwortet einen Monatsaufruf von 96, 86 und 113 nach rund einer
+       * Minute mit 504 und einer 970-kB-HTML-Fehlerseite; sieben Tage laufen
+       * in 2,9 s, vierzehn in 31,9 s (Vermessung 22.09.2026). Bei einem
+       * umsatzstarken Betrieb kann schon eine Woche zu viel sein. Denselben
+       * Minutenaufruf viermal zu wiederholen, waere genau das Zuballern, das
+       * E8 ausschliesst. Also: das Fenster teilen, den Posten als
+       * `fenster_zu_gross` schliessen (sichtbar in sync.warteschlange.ergebnis
+       * und in sync.aufgabe), und die beiden Haelften reihen sich mit
+       * derselben Prioritaet ein. Ein einzelner Tag laesst sich nicht teilen —
+       * der faellt unten in den gewoehnlichen Fehlerpfad (Wiedervorlage,
+       * nach MAX_VERSUCHE aufgegeben, mart.posten_aufgegeben).
+       *
+       * Unser eigenes Zeitlimit (ANFRAGE_TIMEOUT_MS) zaehlt wie ein 504: es
+       * liegt in derselben Groessenordnung wie LINAs Gateway (~60 s), und wer
+       * zuerst aufgibt, ist Zufall.
+       *
+       * ZAEHLT ALS FEHLER IN FOLGE, NICHT ALS ERSTFEHLER. Eine Serie von 504
+       * heisst, dass LINA sich quaelt — dann soll die Notbremse greifen. Den
+       * Lauf `teilweise` zu faerben waere dagegen falsch: das Teilen ist die
+       * vorgesehene Antwort, kein Befund.
+       */
+      if (quelle.art === 'lina' && istBetriebsbericht(epKey) && res.art === 'fehler'
+          && (res.status === 504 || res.zeitueberschreitung) && von < bis) {
+        const tage = Math.round((Date.parse(bis) - Date.parse(von)) / 86_400_000) + 1
+        const mitte = new Date(Date.parse(von) + (Math.floor(tage / 2) - 1) * 86_400_000)
+          .toISOString().slice(0, 10)
+        const zweite = new Date(Date.parse(mitte) + 86_400_000).toISOString().slice(0, 10)
+        await query(
+          `INSERT INTO sync.warteschlange
+             (endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis, prioritaet, parameter)
+           SELECT $1, $2, h.von, h.bis, $3, $4::jsonb
+             FROM (VALUES ($5::date, $6::date), ($7::date, $8::date)) AS h(von, bis)
+           ON CONFLICT DO NOTHING`,
+          [epKey, posten.betrieb_enc_id, posten.prioritaet, JSON.stringify(posten.parameter ?? {}),
+           von, mitte, zweite, bis])
+        await query(
+          `UPDATE sync.warteschlange
+              SET erledigt_am = now(), in_arbeit_seit = NULL, ergebnis = 'fenster_zu_gross',
+                  letzter_fehler = $1
+            WHERE posten_id = $2`,
+          [`${res.fehler.slice(0, 1500)} — geteilt in ${von}..${mitte} und ${zweite}..${bis}`,
+           posten.posten_id])
+        uebersprungen++
+        stand.fehlerInFolge++
+        await protokoll(laufId, epKey, posten, 'uebersprungen', res, quellClient,
+          `${res.fehler} — Fenster geteilt`)
+        log.warn('betriebsbericht: fenster zu gross — geteilt', {
+          endpunkt: epKey, betrieb: posten.betrieb_enc_id, von, bis, tage,
+          status: res.status, zeitueberschreitung: res.zeitueberschreitung ?? false,
+          fehlerInFolge: stand.fehlerInFolge,
+        })
+        continue
       }
 
       // --- Fehler -------------------------------------------------------

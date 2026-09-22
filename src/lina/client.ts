@@ -50,7 +50,16 @@ export type Ergebnis =
       wartenBis: Date | null
       dauerMs: number
     }
-  | { art: 'fehler'; status: number | null; fehler: string; dauerMs: number; wiederholbar: boolean }
+  | {
+      art: 'fehler'; status: number | null; fehler: string; dauerMs: number; wiederholbar: boolean
+      /**
+       * Die Anfrage lief in unser eigenes Zeitlimit (`ANFRAGE_TIMEOUT_MS`).
+       * Bei einem Betriebsbericht über mehrere Tage heißt das dasselbe wie
+       * LINAs 504: das Fenster ist zu groß. Der Worker halbiert es dann,
+       * statt denselben Minutenaufruf viermal zu wiederholen.
+       */
+      zeitueberschreitung?: boolean
+    }
 
 const schlaf = (ms: number) => new Promise(r => setTimeout(r, ms))
 
@@ -261,6 +270,29 @@ export class LinaClient {
       }
 
       /**
+       * 504 Gateway Timeout — VOR der Abwehrseiten-Prüfung.
+       *
+       * LINA beantwortet einen Betriebsbericht, dessen Zeitraum zu groß ist,
+       * nach rund einer Minute mit einer 970-kB-HTML-Fehlerseite (gemessen
+       * 22.09.2026: 96, 86 und 113 für einen Monat). Diese Seite ist LINAs
+       * komplettes Seitengerüst. Liefe sie durch `nachAbwehrseiteAussehend()`
+       * und träfe dort zufällig ein Stichwort, würde aus einem zu großen
+       * Fenster eine Zugangssperre über 24 Stunden — die teuerste mögliche
+       * Fehlklassifikation. Deshalb wird der Statuscode zuerst gelesen.
+       *
+       * Wiederholbar bleibt es für alle, die das Fenster nicht verkleinern
+       * können (Konzernberichte, Tagesposten); was es verkleinern kann,
+       * entscheidet der Worker.
+       */
+      if (res.status === 504) {
+        return {
+          art: 'fehler', status: 504, dauerMs, wiederholbar: true,
+          fehler: `HTTP 504 Gateway Timeout nach ${Math.round(dauerMs / 1000)} s `
+                + `(${text.length} Zeichen Fehlerseite) — Zeitraum fuer LINA zu gross`,
+        }
+      }
+
+      /**
        * Sperre erkennen, bevor irgendetwas als Postenfehler durchgeht.
        *
        * 429 heißt „zu schnell", 403 heißt „nicht mehr". Beides ist eine
@@ -304,6 +336,17 @@ export class LinaClient {
           // gescheitert ist, stecken als Escape-Folge im Text und entstehen
           // erst beim Parsen. Siehe src/lib/text.ts.
           daten = jsonOhneNullzeichen(text, ep.key)
+          /**
+           * Doppelt kodiert: der erste Parse ergibt einen String, der JSON
+           * enthält (LINAs Betriebsberichte, 22.09.2026). Ausgepackt wird
+           * hier, damit raw, Hash, Schema und Lader dasselbe Objekt sehen —
+           * ein String in `raw.api_antwort.payload` wäre in SQL nicht
+           * abfragbar. Nur für Endpunkte, die es angekündigt haben: ein
+           * String an anderer Stelle soll auffallen, nicht verschwinden.
+           */
+          if (ep.doppeltKodiert && typeof daten === 'string') {
+            daten = jsonOhneNullzeichen(daten, ep.key)
+          }
         } catch {
           return {
             art: 'fehler', status: res.status, dauerMs,
@@ -339,7 +382,8 @@ export class LinaClient {
           fehler: e.message, wartenBis: null, dauerMs,
         }
       }
-      return { art: 'fehler', status: null, fehler: String(e), dauerMs, wiederholbar: true }
+      const zeitueberschreitung = (e as { name?: string })?.name === 'TimeoutError'
+      return { art: 'fehler', status: null, fehler: String(e), dauerMs, wiederholbar: true, zeitueberschreitung }
     }
   }
 

@@ -38,6 +38,7 @@ import { log } from '../lib/log'
 import { AKTIVE_ENDPUNKTE, istMomentaufnahme, einreihPrioritaet, PRIORITAET } from '../lina/endpunkte'
 import { geschaeftstag } from '../lib/time'
 import { istLadenakte } from '../ladenakte/endpunkte'
+import { AKTIVE_BETRIEBSBERICHTE } from '../lina/betriebsberichte'
 import { endpunkteZusichern } from './waechter'
 import { quellenSpiegeln } from './quellen'
 
@@ -45,6 +46,8 @@ export type NachfuellStand = {
   lina: number; foodnotify: number; ladenakte: number
   /** Aufgegebene Posten, die dieser Lauf zurueckgeholt hat. */
   wiederbelebt: number; nulltage: number; nachlese: number; lochtage: number
+  /** Betriebsbericht-Posten (Erstabruf, Nachlauf, Gegenprobe) — seit 0113. */
+  betriebsberichte: number
 }
 
 /**
@@ -256,6 +259,178 @@ export async function historieNachziehen(): Promise<number> {
   return n
 }
 
+
+/**
+ * Betriebsberichte einreihen — je Betrieb und Zeitraum, neueste zuerst
+ * (Plan „Vollabzug", Abschnitt 5; Migration 0113).
+ *
+ * DER ERSTE PRODUCER FUER `betrieb_enc_id`. Die Spalte steht seit 0005 da, der
+ * Worker liest sie, und bis zum 22.09.2026 setzte sie kein einziger INSERT
+ * (Waechter-Befund 13.08.2026). Hier wird sie gesetzt — sonst nirgends.
+ *
+ * DREI QUELLEN FUER POSTEN, in dieser Reihenfolge:
+ *
+ *   1. GEGENPROBE (`mart.betriebsbericht_gegenprobe`, nachholen = 'faellig'):
+ *      LINAs Summe traf den Umsatzbericht nicht. Neu eingereiht mit Nacharbeit-
+ *      Prioritaet, hoechstens dreimal, fruehestens eine Woche nach dem letzten
+ *      Abruf, nur fuer die letzten 60 Tage — wie die Nulltage aus 0100. Kein
+ *      Fehler im Posten, der in Minuten wiederholt wuerde: ein zu frueh
+ *      geholter Tag wird in Minuten nicht voller.
+ *   2. NACHLAUF: ein Zeitraum, dessen erster Abruf vor Ende + NACHLAUF_TAGE
+ *      lag, wird danach genau einmal neu geholt — das Nachzuegler-Fenster der
+ *      Betriebsberichte. Fuer den Backfill faellt das weg (sein erster Abruf
+ *      liegt ohnehin Monate nach dem Zeitraum).
+ *   3. ERSTABRUF, getrieben von Betrieb-Tagen MIT UMSATZ — und zwar der
+ *      VEREINIGUNG aus Umsatzbericht und Artikelverkauf (Plan 5.2, die Falle
+ *      darin: ein Tag, den der Umsatzbericht nicht kennt, wuerde sonst nie
+ *      gefragt; der 22.07.2026 stand sieben Wochen bei allen Betrieben auf
+ *      null). Ein Zeitraum ist faellig, wenn sein Ende REIFE_TAGE zurueckliegt.
+ *      Gefragt wird, ob es fuer genau diesen Zeitraum JE einen Posten gab —
+ *      gleich mit welchem Ausgang (ein Takt am Ergebniswert kennt immer einen
+ *      vergessenen Ausgang, fehlerkatalog.md, 12.08.2026).
+ *
+ * NEUESTE ZUERST, UEBER ALLE BETRIEBE GEMEINSAM. Die Monate werden absteigend
+ * abgearbeitet, und innerhalb eines Monats ordnet `sync.posten_holen()` nach
+ * Datum absteigend. Nach der ersten Nacht ist der juengste Monat fuer ALLE
+ * Betriebe da, nicht ein Betrieb fuer alle Jahre; bricht der Zugang ab, fehlt
+ * das Unwichtigste. `ORDER BY von DESC` — ein Test prueft es.
+ *
+ * DIE OBERGRENZE ZAEHLT DIE OFFENEN MIT. `BETRIEBSBERICHT_JE_LAUF` minus die
+ * noch offenen Betriebsbericht-Posten — sonst wuechse die Schlange jede Nacht
+ * um das, was der Lauf nicht geschafft hat. Voreinstellung ist das
+ * Tagesbudget: begrenzt wird die Nacht vom Budget, nicht von dieser Zahl (E8).
+ */
+export async function betriebsberichteNachfuellen(
+  heute: string = geschaeftstag(new Date()),
+): Promise<number> {
+  const grenze = config.BETRIEBSBERICHT_JE_LAUF
+  if (grenze === 0 || AKTIVE_BETRIEBSBERICHTE.length === 0) return 0
+  const keys = AKTIVE_BETRIEBSBERICHTE.map(b => b.key)
+
+  const offen = await eine<{ n: number }>(
+    `SELECT count(*)::int AS n FROM sync.warteschlange
+      WHERE erledigt_am IS NULL AND endpunkt LIKE 'getReport:%'`)
+  let uebrig = grenze - Number(offen?.n ?? 0)
+  if (uebrig <= 0) {
+    log.info('betriebsberichte: schlange voll, nichts neu eingereiht', {
+      offen: Number(offen?.n ?? 0), grenze,
+    })
+    return 0
+  }
+  let gegenprobe = 0, nachlauf = 0, erst = 0
+
+  // 1. Gegenprobe nachholen
+  const g = await query<{ endpunkt: string }>(
+    `WITH f AS (
+       SELECT endpunkt, betrieb_key, zeitraum_von, zeitraum_bis
+         FROM mart.betriebsbericht_gegenprobe
+        WHERE zeitraum_bis >= $4::date - 60 AND nachholen = 'faellig'
+          AND endpunkt = ANY($1::text[])
+        ORDER BY zeitraum_bis DESC, endpunkt
+        LIMIT $2),
+     ein AS (
+       INSERT INTO sync.warteschlange (endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis, prioritaet)
+       SELECT f.endpunkt, b.enc_id, f.zeitraum_von, f.zeitraum_bis, $3
+         FROM f JOIN core.betrieb b ON b.betrieb_key = f.betrieb_key
+       ON CONFLICT DO NOTHING
+       RETURNING endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis)
+     UPDATE core.betriebsbericht_abruf a
+        SET nachgeholt = a.nachgeholt + 1
+       FROM ein JOIN core.betrieb b ON b.enc_id = ein.betrieb_enc_id
+      WHERE a.endpunkt = ein.endpunkt AND a.betrieb_key = b.betrieb_key
+        AND a.zeitraum_von = ein.zeitraum_von AND a.zeitraum_bis = ein.zeitraum_bis
+     RETURNING a.endpunkt`,
+    [keys, uebrig, PRIORITAET.nacharbeit, heute])
+  gegenprobe = g.length
+  uebrig -= gegenprobe
+
+  // 2. Nachlauf: einmal neu, wenn der erste Abruf vor Ende + NACHLAUF_TAGE lag
+  if (uebrig > 0 && config.BETRIEBSBERICHT_NACHLAUF_TAGE > 0) {
+    const r = await query<{ posten_id: string }>(
+      `INSERT INTO sync.warteschlange (endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis, prioritaet)
+       SELECT a.endpunkt, b.enc_id, a.zeitraum_von, a.zeitraum_bis, $4
+         FROM core.betriebsbericht_abruf a
+         JOIN core.betrieb b ON b.betrieb_key = a.betrieb_key
+        WHERE a.endpunkt = ANY($1::text[])
+          AND a.abrufe = 1
+          AND a.zeitraum_bis >= $5::date - 60
+          AND a.zeitraum_bis + $2::int <= $5::date
+          AND a.erstmals_abgerufen_am < (a.zeitraum_bis + $2::int)::timestamptz
+        ORDER BY a.zeitraum_bis DESC, a.endpunkt
+        LIMIT $3
+       ON CONFLICT DO NOTHING
+       RETURNING posten_id`,
+      [keys, config.BETRIEBSBERICHT_NACHLAUF_TAGE, uebrig, PRIORITAET.betriebsbericht, heute])
+    nachlauf = r.length
+    uebrig -= nachlauf
+  }
+
+  // 3. Erstabruf, Monat fuer Monat rueckwaerts
+  const reif = new Date(`${heute}T00:00:00Z`)
+  reif.setUTCDate(reif.getUTCDate() - config.BETRIEBSBERICHT_REIFE_TAGE)
+  const reifBis = reif.toISOString().slice(0, 10)
+  const endpunkte = JSON.stringify(AKTIVE_BETRIEBSBERICHTE.map(b => ({ key: b.key, klasse: b.klasse })))
+  const monat = new Date(`${reifBis.slice(0, 7)}-01T00:00:00Z`)
+  const ab = `${config.HISTORIE_AB.slice(0, 7)}-01`
+  while (uebrig > 0 && monat.toISOString().slice(0, 10) >= ab) {
+    const m = monat.toISOString().slice(0, 10)
+    const r = await query<{ posten_id: string }>(
+      `WITH tage AS (
+         SELECT u.betrieb_key, u.geschaeftstag
+           FROM core.umsatzbericht_tag u
+          WHERE u.geschaeftstag >= $1::date AND u.geschaeftstag < ($1::date + interval '1 month')
+            AND u.hauptsparte_key IS NULL AND u.verkaufsstelle_key IS NULL
+            AND (coalesce(u.umsatz_netto, 0) <> 0 OR coalesce(u.rechnungen, 0) > 0)
+         UNION
+         SELECT a.betrieb_key, a.geschaeftstag
+           FROM core.artikelverkauf_tag a
+          WHERE a.geschaeftstag >= $1::date AND a.geschaeftstag < ($1::date + interval '1 month')
+            AND (coalesce(a.umsatz_netto, 0) <> 0 OR coalesce(a.menge, 0) <> 0)
+       ), ep AS (
+         SELECT * FROM jsonb_to_recordset($2::jsonb) AS e(key text, klasse text)
+       ), einheit AS (
+         SELECT DISTINCT e.key, b.enc_id,
+                CASE e.klasse
+                  WHEN 'T' THEN t.geschaeftstag
+                  WHEN 'W' THEN date_trunc('week', t.geschaeftstag)::date
+                  ELSE date_trunc('month', t.geschaeftstag)::date
+                END AS von,
+                CASE e.klasse
+                  WHEN 'T' THEN t.geschaeftstag
+                  WHEN 'W' THEN (date_trunc('week', t.geschaeftstag) + interval '6 days')::date
+                  ELSE (date_trunc('month', t.geschaeftstag) + interval '1 month - 1 day')::date
+                END AS bis
+           FROM tage t
+           JOIN core.betrieb b ON b.betrieb_key = t.betrieb_key
+          CROSS JOIN ep e
+          WHERE b.enc_id IS NOT NULL
+       )
+       INSERT INTO sync.warteschlange (endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis, prioritaet)
+       SELECT x.key, x.enc_id, x.von, x.bis, $5
+         FROM einheit x
+        WHERE x.bis <= $3::date
+          AND NOT EXISTS (
+              SELECT 1 FROM sync.warteschlange w
+               WHERE w.endpunkt = x.key AND w.betrieb_enc_id = x.enc_id
+                 AND w.zeitraum_von = x.von AND w.zeitraum_bis = x.bis)
+        ORDER BY x.von DESC, x.key, x.enc_id
+        LIMIT $4
+       RETURNING posten_id`,
+      [m, endpunkte, reifBis, uebrig, PRIORITAET.betriebsbericht])
+    erst += r.length
+    uebrig -= r.length
+    monat.setUTCMonth(monat.getUTCMonth() - 1)
+  }
+
+  const n = gegenprobe + nachlauf + erst
+  if (n > 0) {
+    log.info('betriebsberichte eingereiht', {
+      gegenprobe, nachlauf, erstabruf: erst, bis_monat: monat.toISOString().slice(0, 7),
+      grenze, sicht: 'mart.backfill_fortschritt',
+    })
+  }
+  return n
+}
 
 /**
  * Das Orakel fuer Nulltage: der Tagesbericht mit dem laengsten Fenster.
@@ -1261,7 +1436,7 @@ export async function nachfuellen(): Promise<NachfuellStand> {
    */
   await quellenSpiegeln()
 
-  const stand: NachfuellStand = { lina: 0, foodnotify: 0, ladenakte: 0, wiederbelebt: 0, nulltage: 0, nachlese: 0, lochtage: 0 }
+  const stand: NachfuellStand = { lina: 0, foodnotify: 0, ladenakte: 0, wiederbelebt: 0, nulltage: 0, nachlese: 0, lochtage: 0, betriebsberichte: 0 }
 
   try {
     stand.lina = await linaNachfuellen()
@@ -1300,13 +1475,19 @@ export async function nachfuellen(): Promise<NachfuellStand> {
   }
 
   try {
+    stand.betriebsberichte = await betriebsberichteNachfuellen()
+  } catch (e) {
+    log.error('nachfüllen betriebsberichte gescheitert — der Lauf geht weiter', { fehler: String(e) })
+  }
+
+  try {
     stand.wiederbelebt = await aufgegebeneWiederbeleben()
   } catch (e) {
     log.error('wiederbeleben gescheitert — der Lauf geht weiter', { fehler: String(e) })
   }
 
   if (stand.lina > 0 || stand.foodnotify > 0 || stand.ladenakte > 0 || stand.wiederbelebt > 0
-      || stand.nulltage > 0 || stand.nachlese > 0 || stand.lochtage > 0) {
+      || stand.nulltage > 0 || stand.nachlese > 0 || stand.lochtage > 0 || stand.betriebsberichte > 0) {
     log.info('nachgefüllt', stand)
   }
   return stand

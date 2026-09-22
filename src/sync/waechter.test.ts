@@ -12,9 +12,10 @@
  */
 import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
-import { endpunkteZusichern, RegisterVerletzt } from './waechter'
+import { endpunkteZusichern, RegisterVerletzt, betriebsberichtVerstoesse, BETRIEBSBERICHT_PFAD } from './waechter'
 import { TRANSFORMIERTE_ENDPUNKTE } from './laden'
-import { ENDPUNKTE, AKTIVE_ENDPUNKTE, type Endpunkt } from '../lina/endpunkte'
+import { ENDPUNKTE, AKTIVE_ENDPUNKTE, endpunkt, type Endpunkt } from '../lina/endpunkte'
+import { BETRIEBSBERICHTE, AKTIVE_BETRIEBSBERICHTE } from '../lina/betriebsberichte'
 import { LADENAKTE_ENDPUNKTE } from '../ladenakte/endpunkte'
 import { FN_ENDPUNKTE } from '../foodnotify/endpunkte'
 import { QUELLEN } from './quellen'
@@ -30,11 +31,13 @@ const ALLE_AKTIVEN: string[] = [
   ...AKTIVE_ENDPUNKTE.map(e => e.key),
   ...LADENAKTE_ENDPUNKTE.filter(e => e.aktiv).map(e => e.key),
   ...FN_ENDPUNKTE.map(e => e.key),
+  ...AKTIVE_BETRIEBSBERICHTE.map(e => e.key),
 ]
 
 const ALLE_INAKTIVEN: string[] = [
   ...ENDPUNKTE.filter(e => !e.aktiv).map(e => e.key),
   ...LADENAKTE_ENDPUNKTE.filter(e => !e.aktiv).map(e => e.key),
+  ...BETRIEBSBERICHTE.filter(e => !e.aktiv).map(e => e.key),
 ]
 
 /**
@@ -56,25 +59,27 @@ describe('endpunkteZusichern', () => {
   })
 
   /**
-   * Die `monat`-Falle. Alle vier `getReport`-Endpunkte tragen
-   * `schrittweite: 'monat'` und `aktiv: false`. Wer einen davon aktiviert,
-   * reiht null Posten ein — `linaNachfuellen()` hat für `monat` keinen Zweig.
+   * Die `monat`-Falle und die Producer-Falle im KONZERN-Register.
+   *
+   * Bis zum 22.09.2026 standen dort vier `getReport:*` mit `schrittweite:
+   * 'monat'` und `ebene: 'betrieb'`. Sie stehen jetzt im eigenen Register;
+   * ein solcher Eintrag im Konzern-Register bleibt ein doppelter Verstoß
+   * (kein Einreihzweig für `monat`, kein Producer für den Betrieb). Der
+   * Wächter muss BEIDE Gründe nennen — wer nur den einen behebt, stünde
+   * gleich wieder vor einem stillen Ausfall.
    */
-  test('ein aktivierter Monatsendpunkt wird gefunden', () => {
-    const report = ENDPUNKTE.find(e => e.key === 'getReport:38')!
-    expect(report.schrittweite).toBe('monat')
-    expect(report.aktiv).toBe(false)
+  test('ein Betriebs-Monatsendpunkt im Konzern-Register wird gefunden', () => {
+    const verirrt: Endpunkt = {
+      ...endpunkt('getUmsatzbericht'), key: 'getReport:verirrt', ebene: 'betrieb', schrittweite: 'monat',
+    }
+    const meldung = pruefeMit([...AKTIVE_ENDPUNKTE, verirrt])
+    expect(meldung).toContain('getReport:verirrt')
+    expect(meldung).toContain('keinen Einreihzweig')
+    expect(meldung).toContain('betrieb_enc_id')
+  })
 
-    // Der Endpunkt ist zugleich `ebene: 'betrieb'` — der Wächter muss BEIDE
-    // Gründe nennen, nicht beim ersten aufhören. Wer nur den einen behebt,
-    // stünde sonst gleich wieder vor einem stillen Ausfall.
-    mitEintrag(report, {}, () => {
-      const aktiv = [...AKTIVE_ENDPUNKTE, report]
-      const meldung = pruefeMit(aktiv)
-      expect(meldung).toContain('getReport:38')
-      expect(meldung).toContain('keinen Einreihzweig')
-      expect(meldung).toContain('betrieb_enc_id')
-    })
+  test('kein Betriebsendpunkt steht mehr im Konzern-Register', () => {
+    expect(ENDPUNKTE.filter(e => e.ebene === 'betrieb').map(e => e.key)).toEqual([])
   })
 
   /**
@@ -91,23 +96,36 @@ describe('endpunkteZusichern', () => {
   })
 
   /**
-   * Die Zusicherung mit der überraschendsten Messung: `betrieb_enc_id` wird im
-   * ganzen Repo nur GELESEN. Kein einziger INSERT setzt sie (nachgesehen am
-   * 13.08.2026). Ein aktivierter Betriebs-Endpunkt liefe also ohne `storeId`
-   * los — ohne Fehler.
+   * Die Zusicherung mit der überraschendsten Messung: `betrieb_enc_id` wurde bis
+   * zum 22.09.2026 im ganzen Repo nur GELESEN (nachgesehen am 13.08.2026).
+   *
+   * Seitdem gibt es genau ZWEI Schreiber, und dieser Test hält fest, dass es
+   * dabei bleibt: `betriebsberichteNachfuellen()` (der Producer) und das
+   * Teilen eines zu großen Fensters im Worker (übernimmt den Betrieb des
+   * geteilten Postens). Ein dritter Schreiber wäre ein zweiter Einreihweg,
+   * an dem der Wächter vorbeiliefe.
    */
-  test('kein INSERT im Repo setzt sync.warteschlange.betrieb_enc_id', () => {
+  test('betrieb_enc_id setzt nur der Producer der Betriebsberichte (und das Teilen im Worker)', () => {
     const quellen = [
       'src/sync/nachfuellen.ts', 'src/sync/laden.ts', 'src/sync/worker.ts',
       'src/foodnotify/laden.ts', 'src/ladenakte/laden.ts', 'src/einreihen.ts',
+      'src/sync/betriebsbericht_laden.ts',
     ]
+    const schreiber: string[] = []
     for (const datei of quellen) {
       const text = readFileSync(new URL(`../../${datei}`, import.meta.url), 'utf8')
-      // Alle INSERTs in die Warteschlange einsammeln und auf die Spalte prüfen.
       for (const m of text.matchAll(/INSERT INTO sync\.warteschlange([\s\S]{0,300}?)\)/g)) {
-        expect(m[1]).not.toContain('betrieb_enc_id')
+        if (!m[1]!.includes('betrieb_enc_id')) continue
+        // In welcher Funktion steht der INSERT?
+        const davor = text.slice(0, m.index)
+        const fn = [...davor.matchAll(/(?:async function|function) (\w+)|const (\w+) = async/g)].pop()
+        schreiber.push(`${datei}:${fn?.[1] ?? fn?.[2] ?? '?'}`)
       }
     }
+    expect([...new Set(schreiber)].sort()).toEqual([
+      'src/sync/nachfuellen.ts:betriebsberichteNachfuellen',
+      'src/sync/worker.ts:schleife',
+    ])
   })
 
   /**
@@ -141,7 +159,7 @@ function pruefeMit(endpunkte: Endpunkt[]): string {
       verstoesse.push(`${ep.key}: kein Fall im Dispatch von laden.ts`)
     }
     if (ep.ebene === 'betrieb') {
-      verstoesse.push(`${ep.key}: ebene 'betrieb' braucht betrieb_enc_id, das keinen Producer hat`)
+      verstoesse.push(`${ep.key}: ebene 'betrieb' im Konzern-Register — betrieb_enc_id hat hier keinen Producer`)
     }
   }
   return verstoesse.join('\n')
@@ -233,5 +251,74 @@ describe('Quellenregister', () => {
       expect({ quelle: q.quelle, ok: q.kadenz_stunden > 0 && q.kadenz_stunden <= 92 * 24 })
         .toEqual({ quelle: q.quelle, ok: true })
     }
+  })
+})
+
+/**
+ * DIE BETRIEBSBERICHTE (Migrationen 0113–0115).
+ *
+ * Geprüft wird mit derselben Funktion, die der Wächter beim Start jedes Laufs
+ * benutzt — kein nachgebauter Prüfkörper.
+ */
+describe('Betriebsberichte', () => {
+  test('jeder aktive Betriebsbericht ist stimmig', () => {
+    for (const b of AKTIVE_BETRIEBSBERICHTE) expect({ key: b.key, v: betriebsberichtVerstoesse(b) })
+      .toEqual({ key: b.key, v: [] })
+  })
+
+  /**
+   * KORREKTUR 7. Der Weg `/finanzen/analytics/getReport?storeId=` antwortet mit
+   * 200 und leeren Gerüsten — zwei Monate lang als „gelöst" geführt. Er darf
+   * nicht zurückkommen, auch nicht per Kopie eines alten Eintrags.
+   */
+  test('der alte Weg mit storeId wird gefunden', () => {
+    const b = AKTIVE_BETRIEBSBERICHTE.find(x => x.key === 'getReport:92')!
+    const alt = { ...b, pfad: '/finanzen/analytics/getReport', betriebParameter: undefined }
+    const v = betriebsberichtVerstoesse(alt).join('\n')
+    expect(v).toContain('KORREKTUR 7')
+    expect(v).toContain(BETRIEBSBERICHT_PFAD)
+  })
+
+  test('ein Betriebsbericht ohne Ladeweg wird gefunden', () => {
+    const b = AKTIVE_BETRIEBSBERICHTE.find(x => x.key === 'getReport:92')!
+    const v = betriebsberichtVerstoesse({ ...b, key: 'getReport:9999' }).join('\n')
+    expect(v).toContain('kein Ladeweg')
+  })
+
+  test('ein Betriebsbericht ohne erwartete Spalten wird gefunden', () => {
+    const b = AKTIVE_BETRIEBSBERICHTE.find(x => x.key === 'getReport:96')!
+    expect(betriebsberichtVerstoesse({ ...b, felder: [] }).join('\n')).toContain('keine erwarteten Spalten')
+  })
+
+  /**
+   * Die Fensterklassen aus der Vermessung vom 22.09.2026 — eine falsche Klasse
+   * kostet Faktor 30 oder läuft in 504.
+   */
+  test('die gemessenen Fensterklassen stehen im Register', () => {
+    const klasse = (n: number) => BETRIEBSBERICHTE.find(b => b.bericht === n)!.klasse
+    expect(klasse(92)).toBe('T')
+    expect(klasse(88)).toBe('T')
+    expect(klasse(96)).toBe('W')
+    expect(klasse(86)).toBe('W')
+    expect(klasse(113)).toBe('W')
+    expect(klasse(97)).toBe('M-Tag')
+    expect(klasse(90)).toBe('M-Tag')
+    expect(BETRIEBSBERICHTE.find(b => b.bericht === 97)!.intervall).toBe(3)
+  })
+
+  test('nicht geladen: 38, 114, 81, 82 und die gesperrten', () => {
+    for (const n of [38, 114, 81, 82, 107, 23]) {
+      expect({ n, aktiv: BETRIEBSBERICHTE.find(b => b.bericht === n)!.aktiv }).toEqual({ n, aktiv: false })
+    }
+    const aktiv = new Set(AKTIVE_BETRIEBSBERICHTE.map(b => b.bericht))
+    for (const n of [87, 64, 18, 12, 2, 3, 7, 8, 9, 24, 118]) expect(aktiv.has(n)).toBe(false)
+  })
+
+  test('Parameter: Datum ohne fuehrende Null, reltime custom, das Intervall der Klasse', () => {
+    const p92 = endpunkt('getReport:92').parameter('2026-08-01', '2026-08-01')
+    expect(p92).toEqual({ report: '92', von: '1.8.2026', bis: '1.8.2026', reltime: 'custom', interval: '8' })
+    const p97 = endpunkt('getReport:97').parameter('2026-08-01', '2026-08-31')
+    expect(p97.interval).toBe('3')
+    expect(p97.bis).toBe('31.8.2026')
   })
 })

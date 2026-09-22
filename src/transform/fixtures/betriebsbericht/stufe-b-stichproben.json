@@ -1,0 +1,1635 @@
+{
+ "_quelle": "Vermessung aller Betriebsberichte, 22.09.2026, Wilma Wunder Duesseldorf (lina-api-inventar-1d.md)",
+ "_hinweis": "Je Bericht die ZWEI Beispielzeilen, die die Vermessung aufbewahrt hat, in die echte Huelle gesetzt (Feldnamen aus tableHead, Werte unveraendert). Die Kopfbeschriftungen (header) sind aus den Feldnamen rekonstruiert (Unterstrich → Leerzeichen), wie sie in 96 und 70 im Original stehen. KEINE vollstaendigen Antworten — fuer den Ladeweg, nicht fuer Summen.",
+ "berichte": {
+  "getReport:108": {
+   "zeitraum": "monat",
+   "antwort": {
+    "possibleIntervals": [
+     {
+      "value": 8,
+      "name": "Kumuliert"
+     }
+    ],
+    "defaultInterval": 8,
+    "title": "Verkauszahlen",
+    "balanceSumBrutto": 369841.08999999973,
+    "balanceSumNetto": 330080.3405325536,
+    "nBillsGesamt": 12186,
+    "timeframe": "01.08.2026 - 31.08.2026",
+    "filters": [],
+    "tableHead": [
+     [
+      {
+       "id": 0,
+       "field": "Betrieb",
+       "header": "Betrieb",
+       "sortable": ""
+      },
+      {
+       "id": 1,
+       "field": "Datum",
+       "header": "Datum",
+       "sortable": ""
+      },
+      {
+       "id": 2,
+       "field": "Brutto",
+       "header": "Brutto",
+       "sortable": ""
+      },
+      {
+       "id": 3,
+       "field": "Anzahl_Artikel",
+       "header": "Anzahl Artikel",
+       "sortable": ""
+      },
+      {
+       "id": 4,
+       "field": "Anzahl_Zahlungen",
+       "header": "Anzahl Zahlungen",
+       "sortable": ""
+      },
+      {
+       "id": 5,
+       "field": "Anzahl_Rechnungen",
+       "header": "Anzahl Rechnungen",
+       "sortable": ""
+      }
+     ]
+    ],
+    "table": [
+     {
+      "businessDate": "01.08.2026 - 31.08.2026",
+      "0": {
+       "Betrieb": {
+        "value": "Wilma Wunder Düsseldorf GmbH"
+       },
+       "Datum": {
+        "value": 1785535200
+       },
+       "Brutto": {
+        "value": 22282.34
+       },
+       "Anzahl_Artikel": {
+        "value": 4173
+       },
+       "Anzahl_Zahlungen": {
+        "value": 1140
+       },
+       "Anzahl_Rechnungen": {
+        "value": 879
+       }
+      },
+      "1": {
+       "Betrieb": {
+        "value": "Wilma Wunder Düsseldorf GmbH"
+       },
+       "Datum": {
+        "value": 1785621600
+       },
+       "Brutto": {
+        "value": 10179.74
+       },
+       "Anzahl_Artikel": {
+        "value": 2275
+       },
+       "Anzahl_Zahlungen": {
+        "value": 451
+       },
+       "Anzahl_Rechnungen": {
+        "value": 326
+       }
+      }
+     }
+    ]
+   }
+  },
+  "getReport:39": {
+   "zeitraum": "monat",
+   "antwort": {
+    "possibleIntervals": [
+     {
+      "value": 8,
+      "name": "Kumuliert"
+     }
+    ],
+    "defaultInterval": 8,
+    "title": "Stronogrundbericht",
+    "balanceSumBrutto": 369841.08999999973,
+    "balanceSumNetto": 330080.3405325536,
+    "nBillsGesamt": 12186,
+    "timeframe": "01.08.2026 - 31.08.2026",
+    "filters": [],
+    "tableHead": [
+     [
+      {
+       "id": 0,
+       "field": "Artikelnummer",
+       "header": "Artikelnummer",
+       "sortable": ""
+      },
+      {
+       "id": 1,
+       "field": "Artikel",
+       "header": "Artikel",
+       "sortable": ""
+      },
+      {
+       "id": 2,
+       "field": "Stornotyp",
+       "header": "Stornotyp",
+       "sortable": ""
+      },
+      {
+       "id": 3,
+       "field": "Stornogrund",
+       "header": "Stornogrund",
+       "sortable": ""
+      },
+      {
+       "id": 4,
+       "field": "Anzahl",
+       "header": "Anzahl",
+       "sortable": ""
+      },
+      {
+       "id": 5,
+       "field": "Umsatz_Brutto",
+       "header": "Umsatz Brutto",
+       "sortable": ""
+      },
+      {
+       "id": 6,
+       "field": "Umsatz_Netto",
+       "header": "Umsatz Netto",
+       "sortable": ""
+      }
+     ]
+    ],
+    "table": [
+     {
+      "businessDate": "01.08.2026 - 31.08.2026",
+      "0": {
+       "Artikelnummer": {
+        "value": 100002
+       },
+       "Artikel": {
+        "value": "Artikel"
+       },
+       "Stornotyp": {
+        "value": "Sofortstorno"
+       },
+       "Stornogrund": {
+        "value": "Keine Zuordnung"
+       },
+       "Anzahl": {
+        "value": -143
+       },
+       "Umsatz_Brutto": {
+        "value": -500.5
+       },
+       "Umsatz_Netto": {
+        "value": -420.5882352941172
+       }
+      },
+      "1": {
+       "Artikelnummer": {
+        "value": 100002
+       },
+       "Artikel": {
+        "value": "Artikel"
+       },
+       "Stornotyp": {
+        "value": "Storno"
+       },
+       "Stornogrund": {
+        "value": "Keine Zuordnung"
+       },
+       "Anzahl": {
+        "value": 0
+       },
+       "Umsatz_Brutto": {
+        "value": 10.5
+       },
+       "Umsatz_Netto": {
+        "value": 8.823529411764707
+       }
+      }
+     }
+    ]
+   }
+  },
+  "getReport:53": {
+   "zeitraum": "monat",
+   "antwort": {
+    "possibleIntervals": [
+     {
+      "value": 8,
+      "name": "Kumuliert"
+     }
+    ],
+    "defaultInterval": 8,
+    "title": "Artikelbericht pro Kellner",
+    "balanceSumBrutto": 369841.08999999973,
+    "balanceSumNetto": 330080.3405325536,
+    "nBillsGesamt": 12186,
+    "timeframe": "01.08.2026 - 31.08.2026",
+    "filters": [],
+    "tableHead": [
+     [
+      {
+       "id": 0,
+       "field": "Artikelnummer",
+       "header": "Artikelnummer",
+       "sortable": ""
+      },
+      {
+       "id": 1,
+       "field": "Artikelname",
+       "header": "Artikelname",
+       "sortable": ""
+      },
+      {
+       "id": 2,
+       "field": "Brutto",
+       "header": "Brutto",
+       "sortable": ""
+      },
+      {
+       "id": 3,
+       "field": "Netto",
+       "header": "Netto",
+       "sortable": ""
+      },
+      {
+       "id": 4,
+       "field": "Anzahl_Artikel",
+       "header": "Anzahl Artikel",
+       "sortable": ""
+      }
+     ]
+    ],
+    "table": [
+     {
+      "businessDate": "01.08.2026 - 31.08.2026",
+      "0": {
+       "Artikelnummer": {
+        "value": ""
+       },
+       "Artikelname": {
+        "value": null
+       },
+       "Brutto": {
+        "value": 4628.25
+       },
+       "Netto": {
+        "value": 4224.426686562477
+       },
+       "Anzahl_Artikel": {
+        "value": 3226
+       }
+      },
+      "1": {
+       "Artikelnummer": {
+        "value": 100002
+       },
+       "Artikelname": {
+        "value": "0,3l Tafelwasser"
+       },
+       "Brutto": {
+        "value": 17.5
+       },
+       "Netto": {
+        "value": 14.705882352941178
+       },
+       "Anzahl_Artikel": {
+        "value": "5"
+       }
+      }
+     }
+    ]
+   }
+  },
+  "getReport:57": {
+   "zeitraum": "monat",
+   "antwort": {
+    "possibleIntervals": [
+     {
+      "value": 8,
+      "name": "Kumuliert"
+     }
+    ],
+    "defaultInterval": 8,
+    "title": "Gutschriften pro Kellner",
+    "balanceSumBrutto": 369841.08999999973,
+    "balanceSumNetto": 330080.3405325536,
+    "nBillsGesamt": 12186,
+    "timeframe": "01.08.2026 - 31.08.2026",
+    "filters": [],
+    "tableHead": [
+     [
+      {
+       "id": 0,
+       "field": "Kellnernummer",
+       "header": "Kellnernummer",
+       "sortable": ""
+      },
+      {
+       "id": 1,
+       "field": "Kellner",
+       "header": "Kellner",
+       "sortable": ""
+      },
+      {
+       "id": 2,
+       "field": "Datum",
+       "header": "Datum",
+       "sortable": ""
+      },
+      {
+       "id": 3,
+       "field": "Gutschriftnummer",
+       "header": "Gutschriftnummer",
+       "sortable": ""
+      },
+      {
+       "id": 4,
+       "field": "Rechnungsnummer",
+       "header": "Rechnungsnummer",
+       "sortable": ""
+      },
+      {
+       "id": 5,
+       "field": "Anzahl_Artikel",
+       "header": "Anzahl Artikel",
+       "sortable": ""
+      },
+      {
+       "id": 6,
+       "field": "Brutto",
+       "header": "Brutto",
+       "sortable": ""
+      }
+     ]
+    ],
+    "table": [
+     {
+      "businessDate": "01.08.2026 - 31.08.2026",
+      "0": {
+       "Kellnernummer": {
+        "value": 1169
+       },
+       "Kellner": {
+        "value": null
+       },
+       "Datum": {
+        "value": 1785535200
+       },
+       "Gutschriftnummer": {
+        "value": 192132
+       },
+       "Rechnungsnummer": {
+        "value": 1132050
+       },
+       "Anzahl_Artikel": {
+        "value": "Anzahl Artikel"
+       },
+       "Brutto": {
+        "value": 0
+       }
+      },
+      "1": {
+       "Kellnernummer": {
+        "value": 1103
+       },
+       "Kellner": {
+        "value": null
+       },
+       "Datum": {
+        "value": 1785535200
+       },
+       "Gutschriftnummer": {
+        "value": 192133
+       },
+       "Rechnungsnummer": {
+        "value": 1132070
+       },
+       "Anzahl_Artikel": {
+        "value": "Anzahl Artikel"
+       },
+       "Brutto": {
+        "value": 0
+       }
+      }
+     }
+    ]
+   }
+  },
+  "getReport:60": {
+   "zeitraum": "monat",
+   "antwort": {
+    "possibleIntervals": [
+     {
+      "value": 8,
+      "name": "Kumuliert"
+     }
+    ],
+    "defaultInterval": 8,
+    "title": "Umsatz pro Kellner",
+    "balanceSumBrutto": 369841.08999999973,
+    "balanceSumNetto": 330080.3405325536,
+    "nBillsGesamt": 12186,
+    "timeframe": "01.08.2026 - 31.08.2026",
+    "filters": [],
+    "tableHead": [
+     [
+      {
+       "id": 0,
+       "field": "Kellnernummer",
+       "header": "Kellnernummer",
+       "sortable": ""
+      },
+      {
+       "id": 1,
+       "field": "Kellner",
+       "header": "Kellner",
+       "sortable": ""
+      },
+      {
+       "id": 2,
+       "field": "Brutto",
+       "header": "Brutto",
+       "sortable": ""
+      },
+      {
+       "id": 3,
+       "field": "Netto",
+       "header": "Netto",
+       "sortable": ""
+      },
+      {
+       "id": 4,
+       "field": "Anzahl_Artikel",
+       "header": "Anzahl Artikel",
+       "sortable": ""
+      },
+      {
+       "id": 5,
+       "field": "Trinkgeld",
+       "header": "Trinkgeld",
+       "sortable": ""
+      }
+     ]
+    ],
+    "table": [
+     {
+      "businessDate": "01.08.2026 - 31.08.2026",
+      "0": {
+       "Kellnernummer": {
+        "value": 1000
+       },
+       "Kellner": {
+        "value": null
+       },
+       "Brutto": {
+        "value": 4628.25
+       },
+       "Netto": {
+        "value": 4224.426686562471
+       },
+       "Anzahl_Artikel": {
+        "value": "3226"
+       },
+       "Trinkgeld": {
+        "value": 0
+       }
+      },
+      "1": {
+       "Kellnernummer": {
+        "value": 1009
+       },
+       "Kellner": {
+        "value": null
+       },
+       "Brutto": {
+        "value": 3261.62
+       },
+       "Netto": {
+        "value": 2901.1056310374665
+       },
+       "Anzahl_Artikel": {
+        "value": "631"
+       },
+       "Trinkgeld": {
+        "value": 0
+       }
+      }
+     }
+    ]
+   }
+  },
+  "getReport:61": {
+   "zeitraum": "monat",
+   "antwort": {
+    "possibleIntervals": [
+     {
+      "value": 8,
+      "name": "Kumuliert"
+     }
+    ],
+    "defaultInterval": 8,
+    "title": "Umsatz pro Kellner pro Tag",
+    "balanceSumBrutto": 369841.08999999973,
+    "balanceSumNetto": 330080.3405325536,
+    "nBillsGesamt": 12186,
+    "timeframe": "01.08.2026 - 31.08.2026",
+    "filters": [],
+    "tableHead": [
+     [
+      {
+       "id": 0,
+       "field": "Tag",
+       "header": "Tag",
+       "sortable": ""
+      },
+      {
+       "id": 1,
+       "field": "Brutto",
+       "header": "Brutto",
+       "sortable": ""
+      },
+      {
+       "id": 2,
+       "field": "Netto",
+       "header": "Netto",
+       "sortable": ""
+      },
+      {
+       "id": 3,
+       "field": "Anzahl_Artikel",
+       "header": "Anzahl Artikel",
+       "sortable": ""
+      },
+      {
+       "id": 4,
+       "field": "Trinkgeld",
+       "header": "Trinkgeld",
+       "sortable": ""
+      }
+     ]
+    ],
+    "table": [
+     {
+      "businessDate": "01.08.2026 - 31.08.2026",
+      "0": {
+       "Tag": {
+        "value": ""
+       },
+       "Brutto": {
+        "value": 4628.25
+       },
+       "Netto": {
+        "value": 4224.426686562476
+       },
+       "Anzahl_Artikel": {
+        "value": 3226
+       },
+       "Trinkgeld": {
+        "value": 0
+       }
+      },
+      "1": {
+       "Tag": {
+        "value": 1785535200
+       },
+       "Brutto": {
+        "value": 92
+       },
+       "Netto": {
+        "value": 82.82415770046337
+       },
+       "Anzahl_Artikel": {
+        "value": "76"
+       },
+       "Trinkgeld": {
+        "value": 0
+       }
+      }
+     }
+    ]
+   }
+  },
+  "getReport:68": {
+   "zeitraum": "monat",
+   "antwort": {
+    "possibleIntervals": [
+     {
+      "value": 8,
+      "name": "Kumuliert"
+     }
+    ],
+    "defaultInterval": 8,
+    "title": "Umsatz nach Betriebsstellen",
+    "balanceSumBrutto": 369841.08999999973,
+    "balanceSumNetto": 330080.3405325536,
+    "nBillsGesamt": 12186,
+    "timeframe": "01.08.2026 - 31.08.2026",
+    "filters": [],
+    "tableHead": [
+     [
+      {
+       "id": 0,
+       "field": "Betriebsstelle",
+       "header": "Betriebsstelle",
+       "sortable": ""
+      },
+      {
+       "id": 1,
+       "field": "Umsatz_Brutto",
+       "header": "Umsatz Brutto",
+       "sortable": ""
+      },
+      {
+       "id": 2,
+       "field": "Umsatz_Netto",
+       "header": "Umsatz Netto",
+       "sortable": ""
+      },
+      {
+       "id": 3,
+       "field": "Anzahl_Artikel",
+       "header": "Anzahl Artikel",
+       "sortable": ""
+      },
+      {
+       "id": 4,
+       "field": "Anzahl_Gäste",
+       "header": "Anzahl Gäste",
+       "sortable": ""
+      },
+      {
+       "id": 5,
+       "field": "Pro_Kopf_Netto",
+       "header": "Pro Kopf Netto",
+       "sortable": ""
+      }
+     ]
+    ],
+    "table": [
+     {
+      "businessDate": "01.08.2026 - 31.08.2026",
+      "0": {
+       "Betriebsstelle": {
+        "value": "Restaurant"
+       },
+       "Umsatz_Brutto": {
+        "value": 347615.7599999998
+       },
+       "Umsatz_Netto": {
+        "value": 310794.0745308224
+       },
+       "Anzahl_Artikel": {
+        "value": "66922"
+       },
+       "Anzahl_Gäste": {
+        "value": 18818
+       },
+       "Pro_Kopf_Netto": {
+        "value": 16.51578672179947
+       }
+      },
+      "1": {
+       "Betriebsstelle": {
+        "value": "Bar"
+       },
+       "Umsatz_Brutto": {
+        "value": 4669.25
+       },
+       "Umsatz_Netto": {
+        "value": 4261.425037304636
+       },
+       "Anzahl_Artikel": {
+        "value": "3227"
+       },
+       "Anzahl_Gäste": {
+        "value": 591
+       },
+       "Pro_Kopf_Netto": {
+        "value": 7.21053305804507
+       }
+      }
+     }
+    ]
+   }
+  },
+  "getReport:69": {
+   "zeitraum": "monat",
+   "antwort": {
+    "possibleIntervals": [
+     {
+      "value": 8,
+      "name": "Kumuliert"
+     }
+    ],
+    "defaultInterval": 8,
+    "title": "Umsatz nach Betriebsstellen und Hauptsparten",
+    "balanceSumBrutto": 369841.08999999973,
+    "balanceSumNetto": 330080.3405325536,
+    "nBillsGesamt": 12186,
+    "timeframe": "01.08.2026 - 31.08.2026",
+    "filters": [],
+    "tableHead": [
+     [
+      {
+       "id": 0,
+       "field": "Betriebsstelle",
+       "header": "Betriebsstelle",
+       "sortable": ""
+      },
+      {
+       "id": 1,
+       "field": "Hauptsparte",
+       "header": "Hauptsparte",
+       "sortable": ""
+      },
+      {
+       "id": 2,
+       "field": "Umsatz_Brutto",
+       "header": "Umsatz Brutto",
+       "sortable": ""
+      },
+      {
+       "id": 3,
+       "field": "Umsatz_Netto",
+       "header": "Umsatz Netto",
+       "sortable": ""
+      },
+      {
+       "id": 4,
+       "field": "Anzahl_Artikel",
+       "header": "Anzahl Artikel",
+       "sortable": ""
+      }
+     ]
+    ],
+    "table": [
+     {
+      "businessDate": "01.08.2026 - 31.08.2026",
+      "0": {
+       "Betriebsstelle": {
+        "value": "Restaurant"
+       },
+       "Hauptsparte": {
+        "value": "Speisen"
+       },
+       "Umsatz_Brutto": {
+        "value": 197967.99999999983
+       },
+       "Umsatz_Netto": {
+        "value": 185016.82242990122
+       },
+       "Anzahl_Artikel": {
+        "value": "21089"
+       }
+      },
+      "1": {
+       "Betriebsstelle": {
+        "value": "Restaurant"
+       },
+       "Hauptsparte": {
+        "value": "Getränke"
+       },
+       "Umsatz_Brutto": {
+        "value": 147676.26
+       },
+       "Umsatz_Netto": {
+        "value": 124097.69747896356
+       },
+       "Anzahl_Artikel": {
+        "value": "44334"
+       }
+      }
+     }
+    ]
+   }
+  },
+  "getReport:71": {
+   "zeitraum": "monat",
+   "antwort": {
+    "possibleIntervals": [
+     {
+      "value": 8,
+      "name": "Kumuliert"
+     }
+    ],
+    "defaultInterval": 8,
+    "title": "Umsatz nach Verkaufsstelle und Hauptsparte",
+    "balanceSumBrutto": 369841.08999999973,
+    "balanceSumNetto": 330080.3405325536,
+    "nBillsGesamt": 12186,
+    "timeframe": "01.08.2026 - 31.08.2026",
+    "filters": [],
+    "tableHead": [
+     [
+      {
+       "id": 0,
+       "field": "Verkaufsstelle",
+       "header": "Verkaufsstelle",
+       "sortable": ""
+      },
+      {
+       "id": 1,
+       "field": "Hauptsparte",
+       "header": "Hauptsparte",
+       "sortable": ""
+      },
+      {
+       "id": 2,
+       "field": "Anzahl",
+       "header": "Anzahl",
+       "sortable": ""
+      },
+      {
+       "id": 3,
+       "field": "Umsatz_Brutto",
+       "header": "Umsatz Brutto",
+       "sortable": ""
+      },
+      {
+       "id": 4,
+       "field": "Umsatz_Netto",
+       "header": "Umsatz Netto",
+       "sortable": ""
+      }
+     ]
+    ],
+    "table": [
+     {
+      "businessDate": "01.08.2026 - 31.08.2026",
+      "0": {
+       "Verkaufsstelle": {
+        "value": "Gesamtbetrieb"
+       },
+       "Hauptsparte": {
+        "value": "Speisen"
+       },
+       "Anzahl": {
+        "value": 21793
+       },
+       "Umsatz_Brutto": {
+        "value": 201672.3699999998
+       },
+       "Umsatz_Netto": {
+        "value": 188476.58862796903
+       }
+      },
+      "1": {
+       "Verkaufsstelle": {
+        "value": "Ausser Haus"
+       },
+       "Hauptsparte": {
+        "value": "Speisen"
+       },
+       "Anzahl": {
+        "value": 226
+       },
+       "Umsatz_Brutto": {
+        "value": 2533
+       },
+       "Umsatz_Netto": {
+        "value": 2367.2897196261692
+       }
+      }
+     }
+    ]
+   }
+  },
+  "getReport:112": {
+   "zeitraum": "monat",
+   "antwort": {
+    "possibleIntervals": [
+     {
+      "value": 8,
+      "name": "Kumuliert"
+     }
+    ],
+    "defaultInterval": 8,
+    "title": "Umsatz nach Verkaufsstelle",
+    "balanceSumBrutto": 369841.08999999973,
+    "balanceSumNetto": 330080.3405325536,
+    "nBillsGesamt": 12186,
+    "timeframe": "01.08.2026 - 31.08.2026",
+    "filters": [],
+    "tableHead": [
+     [
+      {
+       "id": 0,
+       "field": "Verkaufsstelle",
+       "header": "Verkaufsstelle",
+       "sortable": ""
+      },
+      {
+       "id": 1,
+       "field": "Umsatz_Brutto",
+       "header": "Umsatz Brutto",
+       "sortable": ""
+      },
+      {
+       "id": 2,
+       "field": "Umsatz_Netto",
+       "header": "Umsatz Netto",
+       "sortable": ""
+      },
+      {
+       "id": 3,
+       "field": "Anzahl",
+       "header": "Anzahl",
+       "sortable": ""
+      },
+      {
+       "id": 4,
+       "field": "Anzahl_Gäste",
+       "header": "Anzahl Gäste",
+       "sortable": ""
+      },
+      {
+       "id": 5,
+       "field": "Pro_Kopf_Netto",
+       "header": "Pro Kopf Netto",
+       "sortable": ""
+      }
+     ]
+    ],
+    "table": [
+     {
+      "businessDate": "01.08.2026 - 31.08.2026",
+      "0": {
+       "Verkaufsstelle": {
+        "value": "Gesamtbetrieb"
+       },
+       "Umsatz_Brutto": {
+        "value": 367091.5899999998
+       },
+       "Umsatz_Netto": {
+        "value": 327531.11803981673
+       },
+       "Anzahl": {
+        "value": 72840
+       },
+       "Anzahl_Gäste": {
+        "value": 20443
+       },
+       "Pro_Kopf_Netto": {
+        "value": 16.021675783388776
+       }
+      },
+      "1": {
+       "Verkaufsstelle": {
+        "value": "Ausser Haus"
+       },
+       "Umsatz_Brutto": {
+        "value": 2749.5
+       },
+       "Umsatz_Netto": {
+        "value": 2549.2224927354105
+       },
+       "Anzahl": {
+        "value": 300
+       },
+       "Anzahl_Gäste": {
+        "value": 111
+       },
+       "Pro_Kopf_Netto": {
+        "value": 22.965968403021716
+       }
+      }
+     }
+    ]
+   }
+  },
+  "getReport:75": {
+   "zeitraum": "monat",
+   "antwort": {
+    "possibleIntervals": [
+     {
+      "value": 8,
+      "name": "Kumuliert"
+     }
+    ],
+    "defaultInterval": 8,
+    "title": "Zeitzonenbericht Feinsparten vordefinierte Zeitzonen",
+    "balanceSumBrutto": 369841.08999999973,
+    "balanceSumNetto": 330080.3405325536,
+    "nBillsGesamt": 12186,
+    "timeframe": "01.08.2026 - 31.08.2026",
+    "filters": [],
+    "tableHead": [
+     [
+      {
+       "id": 0,
+       "field": "Zeitzone",
+       "header": "Zeitzone",
+       "sortable": ""
+      },
+      {
+       "id": 1,
+       "field": "Brutto",
+       "header": "Brutto",
+       "sortable": ""
+      },
+      {
+       "id": 2,
+       "field": "Netto",
+       "header": "Netto",
+       "sortable": ""
+      },
+      {
+       "id": 3,
+       "field": "Durchschnitt_pro_Tag",
+       "header": "Durchschnitt pro Tag",
+       "sortable": ""
+      }
+     ]
+    ],
+    "table": [
+     {
+      "businessDate": "01.08.2026 - 31.08.2026",
+      "0": {
+       "Zeitzone": {
+        "value": "AFG"
+       },
+       "Brutto": {
+        "value": 38472.25
+       },
+       "Netto": {
+        "value": 32329.621848739513
+       },
+       "Durchschnitt_pro_Tag": {
+        "value": 9618.0625
+       }
+      },
+      "1": {
+       "Zeitzone": {
+        "value": "9:00 - 12:00"
+       },
+       "Brutto": {
+        "value": 6075.5
+       },
+       "Netto": {
+        "value": 5105.46218487395
+       },
+       "Durchschnitt_pro_Tag": {
+        "value": 195.98387096774192
+       }
+      }
+     }
+    ]
+   }
+  },
+  "getReport:76": {
+   "zeitraum": "monat",
+   "antwort": {
+    "possibleIntervals": [
+     {
+      "value": 8,
+      "name": "Kumuliert"
+     }
+    ],
+    "defaultInterval": 8,
+    "title": "Zeitzonenbericht Hauptsparten vordefinierte Zeitzonen",
+    "balanceSumBrutto": 369841.08999999973,
+    "balanceSumNetto": 330080.3405325536,
+    "nBillsGesamt": 12186,
+    "timeframe": "01.08.2026 - 31.08.2026",
+    "filters": [],
+    "tableHead": [
+     [
+      {
+       "id": 0,
+       "field": "Zeitzone",
+       "header": "Zeitzone",
+       "sortable": ""
+      },
+      {
+       "id": 1,
+       "field": "Brutto",
+       "header": "Brutto",
+       "sortable": ""
+      },
+      {
+       "id": 2,
+       "field": "Netto",
+       "header": "Netto",
+       "sortable": ""
+      },
+      {
+       "id": 3,
+       "field": "Durchschnitt_pro_Tag",
+       "header": "Durchschnitt pro Tag",
+       "sortable": ""
+      }
+     ]
+    ],
+    "table": [
+     {
+      "businessDate": "01.08.2026 - 31.08.2026",
+      "0": {
+       "Zeitzone": {
+        "value": "Speisen"
+       },
+       "Brutto": {
+        "value": 204205.36999999994
+       },
+       "Netto": {
+        "value": 190843.87834760087
+       },
+       "Durchschnitt_pro_Tag": {
+        "value": 22689.485555555548
+       }
+      },
+      "1": {
+       "Zeitzone": {
+        "value": "9:00 - 12:00"
+       },
+       "Brutto": {
+        "value": 40784.450000000004
+       },
+       "Netto": {
+        "value": 38116.308411215054
+       },
+       "Durchschnitt_pro_Tag": {
+        "value": 1315.6274193548388
+       }
+      }
+     }
+    ]
+   }
+  },
+  "getReport:86": {
+   "zeitraum": "tag",
+   "antwort": {
+    "possibleIntervals": [
+     {
+      "value": 8,
+      "name": "Kumuliert"
+     }
+    ],
+    "defaultInterval": 8,
+    "title": "Debitorenauswertung",
+    "balanceSumBrutto": 15920.61,
+    "balanceSumNetto": 14176.443807429512,
+    "nBillsGesamt": 493,
+    "timeframe": "15.08.2026",
+    "filters": [],
+    "tableHead": [
+     [
+      {
+       "id": 0,
+       "field": "Datum",
+       "header": "Datum",
+       "sortable": ""
+      },
+      {
+       "id": 1,
+       "field": "Rechnungsnummer",
+       "header": "Rechnungsnummer",
+       "sortable": ""
+      },
+      {
+       "id": 2,
+       "field": "Rechnung/Gutschrift",
+       "header": "Rechnung/Gutschrift",
+       "sortable": ""
+      },
+      {
+       "id": 3,
+       "field": "Anzahl_Artikel",
+       "header": "Anzahl Artikel",
+       "sortable": ""
+      },
+      {
+       "id": 4,
+       "field": "Finanzwege",
+       "header": "Finanzwege",
+       "sortable": ""
+      },
+      {
+       "id": 5,
+       "field": "Brutto",
+       "header": "Brutto",
+       "sortable": ""
+      },
+      {
+       "id": 6,
+       "field": "Debitor_-_Anschrift",
+       "header": "Debitor - Anschrift",
+       "sortable": ""
+      },
+      {
+       "id": 7,
+       "field": "Debitor",
+       "header": "Debitor",
+       "sortable": ""
+      }
+     ]
+    ],
+    "table": [
+     {
+      "businessDate": "15.08.2026",
+      "0": {
+       "Datum": {
+        "value": null
+       },
+       "Rechnungsnummer": {
+        "value": null
+       },
+       "Rechnung/Gutschrift": {
+        "value": null
+       },
+       "Anzahl_Artikel": {
+        "value": 3099
+       },
+       "Finanzwege": {
+        "value": null
+       },
+       "Brutto": {
+        "value": 15920.61
+       },
+       "Debitor_-_Anschrift": {
+        "value": null
+       },
+       "Debitor": {
+        "value": null
+       }
+      },
+      "1": {
+       "Datum": {
+        "value": 1786744800
+       },
+       "Rechnungsnummer": {
+        "value": 1138062
+       },
+       "Rechnung/Gutschrift": {
+        "value": "Rechnung"
+       },
+       "Anzahl_Artikel": {
+        "value": "7"
+       },
+       "Finanzwege": {
+        "value": "Trinkgeld,VISA"
+       },
+       "Brutto": {
+        "value": 11.5
+       },
+       "Debitor_-_Anschrift": {
+        "value": ""
+       },
+       "Debitor": {
+        "value": null
+       }
+      }
+     }
+    ]
+   }
+  },
+  "getReport:90": {
+   "zeitraum": "monat",
+   "antwort": {
+    "possibleIntervals": [
+     {
+      "value": 8,
+      "name": "Kumuliert"
+     }
+    ],
+    "defaultInterval": 8,
+    "title": "Monatsaufstellung Tag für Tag",
+    "balanceSumBrutto": 369841.08999999973,
+    "balanceSumNetto": 330080.3405325536,
+    "nBillsGesamt": 12186,
+    "timeframe": "01.08.2026 - 31.08.2026",
+    "filters": [],
+    "tableHead": [
+     [
+      {
+       "id": 0,
+       "field": "Datum",
+       "header": "Datum",
+       "sortable": ""
+      },
+      {
+       "id": 1,
+       "field": "Anzahl",
+       "header": "Anzahl",
+       "sortable": ""
+      },
+      {
+       "id": 2,
+       "field": "Brutto",
+       "header": "Brutto",
+       "sortable": ""
+      },
+      {
+       "id": 3,
+       "field": "Netto",
+       "header": "Netto",
+       "sortable": ""
+      },
+      {
+       "id": 4,
+       "field": "Ust",
+       "header": "Ust",
+       "sortable": ""
+      },
+      {
+       "id": 5,
+       "field": "Keine_Zuordnung",
+       "header": "Keine Zuordnung",
+       "sortable": ""
+      },
+      {
+       "id": 6,
+       "field": "19%_Mwst",
+       "header": "19% Mwst",
+       "sortable": ""
+      },
+      {
+       "id": 7,
+       "field": "7%_Mwst",
+       "header": "7% Mwst",
+       "sortable": ""
+      },
+      {
+       "id": 8,
+       "field": "0%",
+       "header": "0%",
+       "sortable": ""
+      },
+      {
+       "id": 9,
+       "field": "0%_Gutschein_older",
+       "header": "0% Gutschein older",
+       "sortable": ""
+      },
+      {
+       "id": 10,
+       "field": "16%_Mwst._older",
+       "header": "16% Mwst. older",
+       "sortable": ""
+      },
+      {
+       "id": 11,
+       "field": "5%_Mwst._older",
+       "header": "5% Mwst. older",
+       "sortable": ""
+      },
+      {
+       "id": 12,
+       "field": "NEUE_STEUER_AB_15",
+       "header": "NEUE STEUER AB 15",
+       "sortable": ""
+      }
+     ]
+    ],
+    "table": [
+     {
+      "businessDate": "01.08.2026 - 31.08.2026",
+      "0": {
+       "Datum": {
+        "value": 1785535200
+       },
+       "Anzahl": {
+        "value": 4173
+       },
+       "Brutto": {
+        "value": 22282.34
+       },
+       "Netto": {
+        "value": 19633.569936385735
+       },
+       "Ust": {
+        "value": 2648.7700636142654
+       },
+       "Keine_Zuordnung": {
+        "value": 0
+       },
+       "19%_Mwst": {
+        "value": 12638
+       },
+       "7%_Mwst": {
+        "value": 9644.34
+       },
+       "0%": {
+        "value": 0
+       },
+       "0%_Gutschein_older": {
+        "value": 0
+       },
+       "16%_Mwst._older": {
+        "value": 0
+       },
+       "5%_Mwst._older": {
+        "value": 0
+       },
+       "NEUE_STEUER_AB_15": {
+        "value": 0
+       }
+      },
+      "1": {
+       "Datum": {
+        "value": 1785621600
+       },
+       "Anzahl": {
+        "value": 2275
+       },
+       "Brutto": {
+        "value": 10179.74
+       },
+       "Netto": {
+        "value": 9075.615016099895
+       },
+       "Ust": {
+        "value": 1104.1249839001048
+       },
+       "Keine_Zuordnung": {
+        "value": 0
+       },
+       "19%_Mwst": {
+        "value": 4649.25
+       },
+       "7%_Mwst": {
+        "value": 5530.49
+       },
+       "0%": {
+        "value": 0
+       },
+       "0%_Gutschein_older": {
+        "value": 0
+       },
+       "16%_Mwst._older": {
+        "value": 0
+       },
+       "5%_Mwst._older": {
+        "value": 0
+       },
+       "NEUE_STEUER_AB_15": {
+        "value": 0
+       }
+      }
+     }
+    ]
+   }
+  },
+  "getReport:113": {
+   "zeitraum": "tag",
+   "antwort": {
+    "possibleIntervals": [
+     {
+      "value": 8,
+      "name": "Kumuliert"
+     }
+    ],
+    "defaultInterval": 8,
+    "title": "Tischtransfer",
+    "balanceSumBrutto": 15920.61,
+    "balanceSumNetto": 14176.443807429512,
+    "nBillsGesamt": 493,
+    "timeframe": "15.08.2026",
+    "filters": [],
+    "tableHead": [
+     [
+      {
+       "id": 0,
+       "field": "Datum",
+       "header": "Datum",
+       "sortable": ""
+      },
+      {
+       "id": 1,
+       "field": "Rechnungsnummer",
+       "header": "Rechnungsnummer",
+       "sortable": ""
+      },
+      {
+       "id": 2,
+       "field": "TischId",
+       "header": "TischId",
+       "sortable": ""
+      },
+      {
+       "id": 3,
+       "field": "Rechnung/Butschrift",
+       "header": "Rechnung/Butschrift",
+       "sortable": ""
+      },
+      {
+       "id": 4,
+       "field": "Anzahl_Artikel",
+       "header": "Anzahl Artikel",
+       "sortable": ""
+      },
+      {
+       "id": 5,
+       "field": "Finanzwege",
+       "header": "Finanzwege",
+       "sortable": ""
+      },
+      {
+       "id": 6,
+       "field": "Brutto",
+       "header": "Brutto",
+       "sortable": ""
+      },
+      {
+       "id": 7,
+       "field": "Status",
+       "header": "Status",
+       "sortable": ""
+      },
+      {
+       "id": 8,
+       "field": "Versuche",
+       "header": "Versuche",
+       "sortable": ""
+      },
+      {
+       "id": 9,
+       "field": "Antwort",
+       "header": "Antwort",
+       "sortable": ""
+      }
+     ]
+    ],
+    "table": [
+     {
+      "businessDate": "15.08.2026",
+      "0": {
+       "Datum": {
+        "value": 1786744800
+       },
+       "Rechnungsnummer": {
+        "value": 1138062
+       },
+       "TischId": {
+        "value": 1604340
+       },
+       "Rechnung/Butschrift": {
+        "value": "Rechnung"
+       },
+       "Anzahl_Artikel": {
+        "value": "7"
+       },
+       "Finanzwege": {
+        "value": "Trinkgeld,VISA"
+       },
+       "Brutto": {
+        "value": 11.5
+       },
+       "Status": {
+        "value": "Status"
+       },
+       "Versuche": {
+        "value": "Versuche"
+       },
+       "Antwort": {
+        "value": 0
+       }
+      },
+      "1": {
+       "Datum": {
+        "value": 1786744800
+       },
+       "Rechnungsnummer": {
+        "value": 1138348
+       },
+       "TischId": {
+        "value": 1604341
+       },
+       "Rechnung/Butschrift": {
+        "value": "Rechnung"
+       },
+       "Anzahl_Artikel": {
+        "value": "7"
+       },
+       "Finanzwege": {
+        "value": "Bar gegeben"
+       },
+       "Brutto": {
+        "value": 2.75
+       },
+       "Status": {
+        "value": "Status"
+       },
+       "Versuche": {
+        "value": "Versuche"
+       },
+       "Antwort": {
+        "value": 0
+       }
+      }
+     }
+    ]
+   }
+  }
+ }
+}

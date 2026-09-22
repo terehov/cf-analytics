@@ -22,11 +22,21 @@
  *      monatelang vorbeigelaufen.
  *
  *   3. PRODUCER FÜR `betrieb_enc_id`. Endpunkte mit `ebene: 'betrieb'`
- *      brauchen `storeId`; der Worker nimmt ihn aus
+ *      brauchen den Betrieb; der Worker nimmt ihn aus
  *      `sync.warteschlange.betrieb_enc_id` (`worker.ts`). Nachgesehen am
  *      13.08.2026: **kein einziger `INSERT` im ganzen Repo setzt diese
  *      Spalte.** Sie wird ausschliesslich gelesen. Ein aktivierter
- *      Betriebs-Endpunkt liefe also ohne `storeId` los — ohne Fehler.
+ *      Betriebs-Endpunkt liefe also ohne Betrieb los — ohne Fehler.
+ *
+ *      SEIT DEM 22.09.2026 ERFÜLLT, NICHT ENTFERNT. Der Producer heißt
+ *      `betriebsberichteNachfuellen()` und arbeitet ausschließlich das Register
+ *      `src/lina/betriebsberichte.ts` ab. Die Zusicherung lautet deshalb jetzt:
+ *      ein Betriebsendpunkt im KONZERN-Register ist weiterhin ein Verstoß (für
+ *      ihn gibt es keinen Producer); ein Betriebsbericht im eigenen Register
+ *      muss eine Fensterklasse, einen Ladeweg, ein Schema und den RICHTIGEN
+ *      Endpunkt haben — `/intranet/storeanalytics/getReport` mit `laden=`,
+ *      nicht `/finanzen/analytics/getReport` mit `storeId=`, der für jeden
+ *      Betrieb leere Gerüste liefert (KORREKTUR 7).
  *
  * WARUM ER WIRFT UND NICHT WARNT. Ein Log-WARN liest niemand (AGENTS.md
  * Regel 10). Und anders als die Befunde in der Datenbank ist das hier kein
@@ -41,8 +51,41 @@
  * die drei Lücken gemessen sind.
  */
 import { AKTIVE_ENDPUNKTE, istMomentaufnahme, type Schrittweite } from '../lina/endpunkte'
+import { AKTIVE_BETRIEBSBERICHTE, type Betriebsbericht, type Fensterklasse } from '../lina/betriebsberichte'
 import { istLadenakte } from '../ladenakte/endpunkte'
 import { TRANSFORMIERTE_ENDPUNKTE } from './laden'
+import { GELADENE_BETRIEBSBERICHTE } from './betriebsbericht_laden'
+
+/** Die Fensterklassen, für die `betriebsberichteNachfuellen()` Zeiträume bildet. */
+const EINREIHBARE_KLASSEN: ReadonlySet<Fensterklasse> = new Set<Fensterklasse>(['T', 'W', 'M-Tag', 'M'])
+
+/** Der Endpunkt aus KORREKTUR 7 — alles andere liefert leere Gerüste. */
+export const BETRIEBSBERICHT_PFAD = '/intranet/storeanalytics/getReport'
+
+/**
+ * Die Zusicherungen für einen Betriebsbericht. Ausgelagert, damit der Test
+ * sie gegen einen veränderten Eintrag laufen lassen kann — derselbe Code,
+ * kein nachgebauter Prüfkörper.
+ */
+export function betriebsberichtVerstoesse(b: Betriebsbericht): string[] {
+  const v: string[] = []
+  if (!EINREIHBARE_KLASSEN.has(b.klasse)) {
+    v.push(`${b.key}: Fensterklasse '${b.klasse}' hat keinen Einreihzweig in betriebsberichteNachfuellen().`)
+  }
+  if (!GELADENE_BETRIEBSBERICHTE.has(b.key)) {
+    v.push(`${b.key}: kein Ladeweg (weder eigener Lader noch Spaltenplan in betriebsbericht_laden.ts). `
+      + `Der Posten schriebe raw, meldete "ok" und transformierte nichts.`)
+  }
+  if (b.pfad !== BETRIEBSBERICHT_PFAD || b.betriebParameter !== 'laden') {
+    v.push(`${b.key}: Pfad ${b.pfad} mit Betriebsparameter '${b.betriebParameter ?? '—'}'. `
+      + `Richtig ist ${BETRIEBSBERICHT_PFAD} mit laden= — /finanzen/analytics/getReport mit storeId `
+      + `liefert fuer jeden Betrieb leere Gerueste (KORREKTUR 7).`)
+  }
+  if (b.felder.length === 0) {
+    v.push(`${b.key}: keine erwarteten Spalten — eine umbenannte Spalte kaeme als NULL durch.`)
+  }
+  return v
+}
 
 /**
  * Für welche Schrittweiten `linaNachfuellen()` einen Einreihzweig hat.
@@ -102,16 +145,19 @@ export function endpunkteZusichern(): void {
         + `einen Fall bauen oder ihn mit Begruendung in NUR_ROH eintragen.`)
     }
 
-    // 3. Producer für betrieb_enc_id, falls betriebsweise geholt wird
+    // 3. Producer für betrieb_enc_id: im Konzern-Register gibt es keinen.
+    //    Betriebsberichte gehören in src/lina/betriebsberichte.ts — nur dort
+    //    reiht betriebsberichteNachfuellen() je Betrieb ein.
     if (ep.ebene === 'betrieb') {
       verstoesse.push(
-        `${ep.key}: ebene 'betrieb' braucht storeId aus `
-        + `sync.warteschlange.betrieb_enc_id — diese Spalte hat aber KEINEN `
-        + `Producer (kein INSERT im Repo setzt sie, Stand 13.08.2026). Der `
-        + `Aufruf liefe ohne storeId los, ohne Fehler. Erst den Einreihweg je `
-        + `Betrieb bauen, dann aktivieren.`)
+        `${ep.key}: ebene 'betrieb' im Konzern-Register. Hier hat betrieb_enc_id `
+        + `keinen Producer — der Aufruf liefe ohne Betrieb los, ohne Fehler. `
+        + `Betriebsberichte gehoeren ins Register src/lina/betriebsberichte.ts.`)
     }
   }
+
+  // Die Betriebsberichte: Klasse, Ladeweg, richtiger Endpunkt, Schema.
+  for (const b of AKTIVE_BETRIEBSBERICHTE) verstoesse.push(...betriebsberichtVerstoesse(b))
 
   // Die Gegenprobe: eine Momentaufnahme ohne Momentaufnahme-Erkennung wäre
   // derselbe Fehler von der anderen Seite — sie liefe dann täglich statt

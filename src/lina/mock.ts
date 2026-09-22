@@ -93,6 +93,24 @@ export type MockOptionen = {
    * gezählt".
    */
   ohneBelegarchiv?: string[]
+  /**
+   * Betriebsberichte (`/intranet/storeanalytics/getReport`, seit 0113). Die
+   * Attrappe antwortet aus ECHTEN, anonymisierten Antworten vom 22.09.2026
+   * (src/transform/fixtures/betriebsbericht/) und bildet LINAs gemessene
+   * Eigenheiten nach:
+   *   * `leer`: Berichtsnummern, die mit 500 und leerem Rumpf antworten
+   *     (der „keine Daten"-Fall, und die neun „gesperrten").
+   *   * `zuGrossAbTagen`: ab wie vielen Tagen Zeitraum LINA mit 504 und einer
+   *     großen HTML-Fehlerseite antwortet (96: ein Monat, gemessen ~60 s).
+   *   * `doppeltKodiert`: die Hülle als JSON-String im JSON. Vorgabe true.
+   * Der alte Weg `/finanzen/analytics/getReport?storeId=` liefert — wie das
+   * echte LINA — 200 und ein leeres Gerüst (KORREKTUR 7).
+   */
+  betriebsberichte?: {
+    leer?: number[]
+    zuGrossAbTagen?: Record<number, number>
+    doppeltKodiert?: boolean
+  }
 }
 
 /**
@@ -107,9 +125,63 @@ export type MockOptionen = {
  */
 export type Geloescht = Record<string, number>
 
+/** „1.8.2026" → „2026-08-01". */
+function deIso(s: string | null): string | null {
+  const m = s ? /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(s) : null
+  return m ? `${m[3]}-${m[2]!.padStart(2, '0')}-${m[1]!.padStart(2, '0')}` : null
+}
+
+/** Berliner Mitternacht eines ISO-Tags als Unix-Sekunden — so trägt LINA `Datum`. */
+function berlinMitternacht(iso: string): number {
+  // Grob genug für die Attrappe: Sommerzeit (UTC+2) von April bis Oktober.
+  const monat = Number(iso.slice(5, 7))
+  const versatz = monat >= 4 && monat <= 10 ? 2 : 1
+  return Date.parse(`${iso}T00:00:00Z`) / 1000 - versatz * 3600
+}
+
+const bbFixture = (name: string) =>
+  JSON.parse(readFileSync(new URL(`../transform/fixtures/betriebsbericht/${name}`, import.meta.url), 'utf8'))
+
+/**
+ * Die Antwort eines Betriebsberichts aus den echten Fixtures. 92 wählt den
+ * Betrieb nach `laden` (wilma-01 … wilma-15), alle anderen liefern Wilma Wunder
+ * Düsseldorf. 96/86/113 bekommen ihr Datum auf den ersten angefragten Tag
+ * gesetzt — sonst lägen die Bons außerhalb des Fensters, und der Lader lehnte
+ * sie zu Recht ab.
+ */
+function betriebsberichtAntwort(report: number, laden: string, von: string): unknown | null {
+  if (report === 92) {
+    const f = bbFixture('report92-wilma-2026-08.json') as { betriebe: { encId: string; antwort: unknown }[] }
+    return (f.betriebe.find(b => b.encId === laden) ?? f.betriebe[1]!).antwort
+  }
+  const datei: Record<number, string> = {
+    88: 'report88-duesseldorf-2026-08.json', 97: 'report97-duesseldorf-2026-08.json',
+    96: 'report96-duesseldorf-2026-08-15.json', 99: 'report99-duesseldorf-2026-08-gekuerzt.json',
+  }
+  let antwort: any
+  if (datei[report]) antwort = bbFixture(datei[report]!).antwort
+  else {
+    const st = bbFixture('stufe-b-stichproben.json') as { berichte: Record<string, { antwort: unknown }> }
+    antwort = st.berichte[`getReport:${report}`]?.antwort
+  }
+  if (!antwort) return null
+  if (report === 96 || report === 86 || report === 113) {
+    const neu = structuredClone(antwort)
+    for (const b of neu.table) {
+      for (const [k, z] of Object.entries(b as Record<string, any>)) {
+        if (/^\d+$/.test(k) && z?.Datum?.value) z.Datum.value = berlinMitternacht(von)
+      }
+    }
+    return neu
+  }
+  return antwort
+}
+
 export function mockStarten(opt: MockOptionen = {}) {
   /** Veränderbar zur Laufzeit: der Test lässt Belege zwischen zwei Läufen verschwinden. */
   const geloescht: Geloescht = {}
+  /** Jeder `laden`-Wert, den ein Betriebsbericht bekam — in Reihenfolge. */
+  const ladenGesehen: string[] = []
   const gueltigeSessions = new Set<string>()
   /** Ausgegebene, noch nicht eingelöste secrets — je Aufruf eins, einmal gültig. */
   const offeneSecrets = new Set<string>()
@@ -337,6 +409,43 @@ export function mockStarten(opt: MockOptionen = {}) {
           { headers: { 'content-type': 'text/html' } })
       }
 
+      /**
+       * Betriebsberichte (0113). `laden` ist Pflicht — ohne Betrieb kennt LINA
+       * den Bericht nicht; die Attrappe lehnt ab, statt still den
+       * Sitzungsbetrieb zu liefern.
+       */
+      if (pfad === '/intranet/storeanalytics/getReport') {
+        const report = Number(url.searchParams.get('report'))
+        const laden = url.searchParams.get('laden')
+        zaehler[`getReport:${report}`] = (zaehler[`getReport:${report}`] ?? 0) + 1
+        ladenGesehen.push(laden ?? '')
+        if (!laden) return new Response('laden fehlt', { status: 400 })
+        const opt2 = opt.betriebsberichte ?? {}
+        if (opt2.leer?.includes(report)) return new Response('', { status: 500 })
+        const von = deIso(url.searchParams.get('von'))
+        const bis = deIso(url.searchParams.get('bis'))
+        if (!von || !bis) return new Response('von/bis fehlen', { status: 400 })
+        const tage = Math.round((Date.parse(bis) - Date.parse(von)) / 86_400_000) + 1
+        const grenze = opt2.zuGrossAbTagen?.[report]
+        if (grenze !== undefined && tage > grenze) {
+          return new Response(`<!DOCTYPE html><html lang="de-DE"><head><title>504</title></head><body>${'x'.repeat(5000)}</body></html>`,
+            { status: 504, headers: { 'content-type': 'text/html; charset=UTF-8' } })
+        }
+        const antwort = betriebsberichtAntwort(report, laden, von)
+        if (!antwort) return new Response('', { status: 500 })
+        const text = JSON.stringify(antwort)
+        return new Response(opt2.doppeltKodiert === false ? text : JSON.stringify(text),
+          { headers: { 'content-type': 'application/json' } })
+      }
+      if (pfad === '/finanzen/analytics/getReport') {
+        // Der falsche Weg: 200, plausible Hülle, keine Daten — für jeden Betrieb.
+        zaehler['falscher_weg'] = (zaehler['falscher_weg'] ?? 0) + 1
+        return Response.json({
+          title: 'Rabattbericht', timeframe: '', nBillsGesamt: 0, balanceSumBrutto: 0,
+          tableHead: [[]], table: [{ businessDate: '' }],
+        })
+      }
+
       const map: Record<string, string> = {
         '/intranet/analytics/getUmsatzbericht': 'getUmsatzbericht',
         '/intranet/analytics/getPersonalkosten': 'getPersonalkosten',
@@ -390,6 +499,8 @@ export function mockStarten(opt: MockOptionen = {}) {
     get gesperrteAufrufe() { return gesperrteAufrufe },
     /** Header des letzten Aufrufs — damit prüfbar ist, wie wir uns ausgeben. */
     get letzteHeader() { return letzteHeader },
+    /** Die `laden`-Werte aller Betriebsbericht-Aufrufe, in Reihenfolge. */
+    get ladenGesehen() { return ladenGesehen },
     sessionErzwingenAblaufen: () => { abgelaufen = true },
     /**
      * Belege in LINA „löschen" — die letzten `anzahl` eines Ordners
