@@ -634,6 +634,29 @@ const Schema = z.object({
    */
   BETRIEBSBERICHT_NACHLAUF_TAGE: z.coerce.number().int().min(0).default(14),
   /**
+   * Was bei den Betriebsberichten TAGESGESCHÄFT ist und was NACHLADEN
+   * (Migration `0116`, Entscheidung 23.09.2026).
+   *
+   * Ein Posten der Klassen T (Tag) und W (Woche), dessen Zeitraum in den
+   * letzten so vielen Tagen endet, läuft in Phase A — VOR den Auswertungen,
+   * damit neue Tage täglich ankommen. Alles Ältere, und die Monatsberichte
+   * immer, laufen in Phase C — NACH den Auswertungen, bis zum Tagesbudget.
+   *
+   * 21 = Reife (7) + Nachlauf (14): der zweite Abruf eines Tages fällt noch
+   * ins Tagesgeschäft. Ein Lauf, der ausfällt, verschiebt dadurch nichts ins
+   * Nachladen, solange er nicht drei Wochen fehlt — und dann holt Phase C es
+   * nach, neueste zuerst.
+   *
+   * WARUM DIE MONATSBERICHTE NIE TAGESGESCHÄFT SIND: 15 Berichte × 62
+   * Betriebe werden an EINEM Tag des Monats fällig (Monatsende + 7) und noch
+   * einmal zum Nachlauf. 930 Aufrufe sind bei ~5,3 s rund 80 Minuten, um die
+   * sich an zwei Tagen im Monat die Dashboards verspäteten — für Berichte,
+   * die entschieden einen Monat Verzug vertragen (entscheidungen.md,
+   * 22.09.2026, 7) und aus denen keine materialisierte Sicht liest. In
+   * Phase C kommen sie trotzdem zuerst dran: `posten_holen` ordnet nach Datum.
+   */
+  BETRIEBSBERICHT_LAUFEND_TAGE: z.coerce.number().int().min(0).default(21),
+  /**
    * Wie viele Geschaeftstage EIN Lauf hoechstens als Nulltage nachholt
    * (`nulltageNachziehen()`, Sicht `mart.umsatztag_luecke`). 0 schaltet ab.
    *

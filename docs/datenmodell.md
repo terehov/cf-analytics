@@ -1125,3 +1125,18 @@ eigene Entscheidung.
 * `core.partition_anlegen()` liest die Partitionsspalte aus dem Katalog (bisher fest
   `geschaeftstag`).
 * `sync.quelle.fensterklasse` für `mart.betriebsbericht_luecke`.
+
+### Tagesgeschäft und Nachladen (`0116`, 23.09.2026)
+
+* `sync.warteschlange.nachladen boolean NOT NULL DEFAULT false` — true heißt: läuft in Phase C,
+  nach den Ableitungen. Gesetzt vom Einreihweg (`importer.md`, „Drei Phasen"); die Vorgabe false
+  ist die harmlose Richtung — ein vergessener Einreihweg macht Phase A länger, verliert aber
+  nichts. Die Migration hat die offenen Posten eingeordnet (Priorität 90 ohne `la:*`, und
+  Betriebsberichte außer laufenden T/W).
+* `sync.posten_holen(lauf, anbieter)` kennt zusätzlich `lina_br_laufend` und
+  `lina_sonst_laufend` (dieselben Hälften mit `NOT nachladen`), je mit Teilindex.
+* `sync.historie_einreihen()` setzt `nachladen = true`.
+* `sync.lauf`: `tagesgeschaeft_bis` (Ende Phase A), `ableitungen_bis` (Ende Phase B — die Frische
+  der Dashboards), `nachladen_posten`, `nachladen_offen`. `mart.sync_status` hängt alle vier an.
+* `mart.materialisierung_stand` und `mart.vergleichstag_stand` messen gegen
+  `coalesce(tagesgeschaeft_bis, beendet_am)`, den Wetter-Merker gegen `gestartet_am`.

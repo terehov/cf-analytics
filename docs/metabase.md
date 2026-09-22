@@ -62,7 +62,7 @@ stellen: Admin → Tabellenmetadaten → Schema `core` → Sichtbarkeit.
 | BWA-Kennzahlen, jüngster Stand | `mart.kennzahlen_aktuell` |
 | Wer hängt bei der BWA hinterher? | `mart.bwa_rueckstand` — „nie gebucht" ist kein Rückstand |
 | Stimmen die Zahlen? | `mart.pruefung_uebersicht` |
-| Läuft der Import? | `mart.sync_status`, `mart.backfill_fortschritt` |
+| Läuft der Import? | `mart.sync_status`, `mart.backfill_fortschritt` — seit `0116` mit `ableitungen_bis` (wann die Auswertungen frisch waren) und `nachladen_offen` (was der Backfill noch vor sich hat) |
 | Fehlt einem Betrieb die BWA-Brücke? | `mart.betrieb_ohne_lina_id` — Erwartung: leer |
 | Ampeln über Bereiche hinweg zählen | `mart.ampel_bereich` — Langformat, eine Zeile je Bereich |
 | Umsatz kumuliert, Vorjahresvergleich | `mart.umsatz_ytd` |
@@ -1064,6 +1064,14 @@ materialisierte Sicht anlegt und den Refresh vergisst, sieht es am nächsten
 Morgen. Der Vergleichstag steht dort mit drin und hat seit `0084` zusätzlich
 seine eigene Zeile in `mart.pruefung_kalender`; wer die Sicht das nächste Mal
 ohnehin neu erzeugt, kann sie dort streichen.
+
+**„So frisch wie der letzte Lauf" heißt seit `0116`: aufgefrischt nach dem
+Tagesgeschäft.** Der Lauf endet seitdem erst nach dem Nachladen (Phase C),
+Stunden nach den Refreshes; gegen `beendet_am` stünde jede Sicht abends auf
+„veraltet". Bezug ist `sync.lauf.tagesgeschaeft_bis`, für den Wetter-Merker
+der Laufbeginn — der stand vorher seit `0111` jeden Tag grundlos auf
+„veraltet" (`fehlerkatalog.md`, 23.09.2026). Die Spalte `letzter_lauf` zeigt
+weiter das Laufende.
 
 ## Wetter (`0086`, `0087`)
 

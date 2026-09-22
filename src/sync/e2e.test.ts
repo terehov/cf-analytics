@@ -793,7 +793,8 @@ lauf('Sperre gegen parallele Worker', () => {
       const quelle = await Bun.file(new URL('./worker.ts', import.meta.url)).text()
       const aufruf = quelle.indexOf('await verwaisteLaeufeSchliessen()')
       expect(aufruf).toBeGreaterThan(quelle.indexOf('const sperre = await sperreHolen()'))
-      expect(aufruf).toBeLessThan(quelle.indexOf('return await workerLaufIntern(ausloeser)'))
+      // Seit 0116 heisst der Einstieg sitzungOeffnen (Tagesgeschaeft, dann Nachladen).
+      expect(aufruf).toBeLessThan(quelle.indexOf('return await sitzungOeffnen(ausloeser, freigeben)'))
 
       await db.query(`DELETE FROM sync.aufgabe WHERE lauf_id = $1`, [verwaist.lauf_id])
       await db.query(`DELETE FROM sync.lauf WHERE lauf_id = $1`, [verwaist.lauf_id])

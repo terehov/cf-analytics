@@ -154,7 +154,9 @@ so in `plan-lina-kassendaten.md`, §2):
 **nachgemessen rund 5,3 s je Aufruf** (`importer.md`, Verteilung einer Nacht: 1.990 Historienaufrufe
 in 2 h 57; die lokale `.env` steht auf 4–6 s, der Code-Standard wäre 10–20 s). 4.000 Aufrufe sind
 damit **rund sechs Stunden**, die ganze Nacht mit ~8.400 Aufrufen rund zwölf Stunden ab 05:02 —
-das passt in den Tag, aber der Lauf endet dann am Nachmittag. Wer den Takt je auf den
+das passt in den Tag, aber der Lauf endet dann am Nachmittag. *(Seit dem 23.09.2026, `0116`, ist
+das für die Dashboards gleichgültig: die Historie lädt in Phase C, NACH den Auswertungen; Phase B
+ist gerechnet gegen 07:20–08:00 fertig — `importer.md`, „Drei Phasen".)* Wer den Takt je auf den
 Code-Standard setzt, halbiert damit die Zahl der Aufrufe, die ein Tag überhaupt schafft
 (~3.800 bei 10–20 s) — dann ist die Grenze zu senken, nicht der Takt zu erhöhen.
 
@@ -597,7 +599,7 @@ Absichtserklärung.
 | **E5** | **Kellnerberichte mit Namen laden** | Erste Quelle mit Personennamen in `core` — Metabase-Sichtbarkeit und `mcp_leser`-Rechte beim Bau eigens festlegen |
 | **E6** | **Bericht 99 laden** (~10,8 GB Raw) | Monatsraster, Stufe B; Plattenplatz vor dem Backfill prüfen |
 | **E7** | **87 erst inhaltlich prüfen**, dann entscheiden | Teil der Vermessung: was steht in 87, das kein JSON-Bericht hat? |
-| **E8** | **Keine feste 4.000er-Grenze.** Die 4.000 stammten aus der ersten Rückfrage dieses Vorhabens (Budgetwahl, nicht gemessen). Eugene: *„Es kann gerne auch länger laden, solange wir das System nicht zuballern und sich über alle API-Aufrufe des gleichen Systems verteilen."* | Der Takt bleibt unverändert (Regel 3), `TAGESBUDGET` bleibt die Obergrenze für **alle** LINA-Aufrufe zusammen. Betriebsberichte bekommen, was nach dem Tagesgeschäft übrig bleibt, und werden **mit den übrigen LINA-Posten verschränkt** statt als Block am Stück — die Nacht wird länger, nicht dichter. `BETRIEBSBERICHT_JE_LAUF` bleibt als Notbremse (0 = aus) |
+| **E8** | **Keine feste 4.000er-Grenze.** Die 4.000 stammten aus der ersten Rückfrage dieses Vorhabens (Budgetwahl, nicht gemessen). Eugene: *„Es kann gerne auch länger laden, solange wir das System nicht zuballern und sich über alle API-Aufrufe des gleichen Systems verteilen."* | Der Takt bleibt unverändert (Regel 3), `TAGESBUDGET` bleibt die Obergrenze für **alle** LINA-Aufrufe zusammen. Betriebsberichte bekommen, was nach dem Tagesgeschäft übrig bleibt, und werden **mit den übrigen LINA-Posten verschränkt** statt als Block am Stück — die Nacht wird länger, nicht dichter. `BETRIEBSBERICHT_JE_LAUF` bleibt als Notbremse (0 = aus). **Ergänzt am 23.09.2026 (`0116`):** das Nachladen läuft NACH den Auswertungen (Phase C); vor ihnen nur die laufenden Tages- und Wochenberichte der letzten 21 Tage |
 
 ### Ergebnis der Vermessung vom 22.09.2026
 
@@ -645,6 +647,8 @@ Rund 155 lesende Aufrufe gegen Wilma Wunder Düsseldorf, Einzelwerte in
    rechnerisch gedeckt, aber **die Laufzeit ist zu beobachten**: bei nachgemessenen ~5,3 s je
    Aufruf dauert eine Nacht mit ~8.400 Aufrufen rund zwölf Stunden. Läuft der Lauf regelmäßig in den
    nächsten Start um 05:02 hinein, wird die Grenze gesenkt — **nicht der Takt erhöht** (Regel 3).
+   Seit `0116` (23.09.2026) verspätet die Laufdauer die Dashboards nicht mehr: die Historie lädt
+   nach den Auswertungen (Phase C). Die Grenze gegen den nächsten Start bleibt.
 7. **Regel 7a gilt unverändert.** Kein Lauf gegen das echte LINA aus der Agentenumgebung. Jede
    Messung in diesem Plan ist entweder ein Browser-Schritt im Terminal des Nutzers oder
    `bun run lina-fragen`.

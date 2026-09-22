@@ -303,6 +303,39 @@ lauf('Betriebsberichte mit Datenbank', () => {
     expect(await betriebsberichteNachfuellen('2026-09-22')).toBe(0)
   })
 
+  /**
+   * Tagesgeschäft oder Nachladen (0116, Entscheidung 23.09.2026): laufend
+   * sind nur Tages- und Wochenberichte, deren Zeitraum in den letzten
+   * BETRIEBSBERICHT_LAUFEND_TAGE (21) endet. Liest den Stand, den der Test
+   * darüber hinterlassen hat — beide Aufrufe (17.08. und 22.09.).
+   */
+  test('Einreihen: laufende Tages- und Wochenberichte sind Tagesgeschäft, alles andere Nachladen', async () => {
+    const { rows } = await db.query(
+      `SELECT endpunkt || ' ' || betrieb_enc_id || ' ' || zeitraum_von::text AS e, nachladen
+         FROM sync.warteschlange
+        WHERE endpunkt IN ('getReport:92', 'getReport:96', 'getReport:97')
+        ORDER BY 1`)
+    const n = Object.fromEntries(rows.map(r => [r.e, r.nachladen]))
+    // Am 17.08. eingereiht: Grenze 27.07.
+    expect(n['getReport:92 test-a 2026-08-10']).toBe(false)
+    expect(n['getReport:92 test-a 2026-07-15']).toBe(true)
+    expect(n['getReport:96 test-a 2026-07-13']).toBe(true)
+    // Monatsberichte sind nie Tagesgeschäft.
+    expect(n['getReport:97 test-a 2026-07-01']).toBe(true)
+    // Am 22.09. eingereiht: Grenze 01.09. — der August ist dort schon Historie.
+    expect(n['getReport:92 test-b 2026-08-12']).toBe(true)
+    expect(n['getReport:96 test-b 2026-08-10']).toBe(true)
+    // Und mit einem heutigen Datum, das den August laufend macht:
+    await db.query(`TRUNCATE sync.warteschlange`)
+    const { betriebsberichteNachfuellen } = await import('./nachfuellen')
+    await betriebsberichteNachfuellen('2026-08-24')
+    const { rows: l } = await db.query(
+      `SELECT endpunkt, zeitraum_von::text AS von, nachladen FROM sync.warteschlange
+        WHERE betrieb_enc_id = 'test-b' ORDER BY endpunkt, zeitraum_von`)
+    expect(l.filter(r => r.endpunkt === 'getReport:92').every(r => r.nachladen === false)).toBe(true)
+    expect(l.filter(r => r.endpunkt === 'getReport:97').every(r => r.nachladen === true)).toBe(true)
+  })
+
   test('neueste zuerst: bei knapper Obergrenze kommt der juengste Zeitraum fuer ALLE Betriebe', async () => {
     const { betriebsberichteNachfuellen } = await import('./nachfuellen')
     await db.query(`TRUNCATE sync.warteschlange`)
@@ -359,6 +392,20 @@ lauf('Betriebsberichte mit Datenbank', () => {
       `SELECT count(*)::int AS n, count(DISTINCT geschaeftstag)::int AS tage FROM core.bon
         WHERE betrieb_key = $1`, [betrieb.get('test-duesseldorf')])
     expect(bons).toEqual({ n: 3 * 519, tage: 3 })
+  })
+
+  test('Worker: ein geteiltes Fenster aus dem Nachladen bleibt Nachladen', async () => {
+    const { workerLauf } = await import('./worker')
+    await db.query(`TRUNCATE sync.warteschlange, sync.aufgabe, sync.lauf`)
+    cfg.TAGESBUDGET = 10000
+    await db.query(`
+      INSERT INTO sync.warteschlange (endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis, prioritaet, nachladen)
+      VALUES ('getReport:96', 'test-duesseldorf', '2026-08-10', '2026-08-16', 85, true)`)
+    await workerLauf('manuell')
+    const { rows } = await db.query(
+      `SELECT count(*)::int AS n, bool_and(nachladen) AS alle FROM sync.warteschlange`)
+    // 7 → 3 + 4 → 3 + 2 + 2: fünf Posten, alle geerbt.
+    expect(rows[0]).toEqual({ n: 5, alle: true })
   })
 
   test('Worker: Betriebsberichte werden mit den übrigen LINA-Posten verschränkt, nicht als Block', async () => {

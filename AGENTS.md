@@ -175,6 +175,7 @@ Handgeschriebenes SQL, nummeriert, wird der Reihe nach angewendet. Bewusst handg
 | `0113_betriebsberichte_warteschlange.sql` | **Die Warteschlange lernt Betriebsberichte.** `sync.posten_holen()` kennt die Hälften `lina_br`/`lina_sonst`, damit die LINA-Spur Betriebsberichte und übrige Posten **verschränkt** statt als Block (Entscheidung E8 — gleicher Takt, gleicher Client). Neues Ergebnis `fenster_zu_gross`: ein 504 bei mehrtägigem Fenster teilt den Posten, statt ihn zu wiederholen. `core.partition_anlegen()` liest die Partitionsspalte aus dem Katalog, `sync.quelle.fensterklasse` |
 | `0114_betriebsberichte_stufe_a.sql` | **Rabatt (92), Finanzwege (88/97), Bons (96), Tagesabschluss (97) — und die Gegenprobe.** Jeder Abruf hält LINAs `balanceSumBrutto` in `core.betriebsbericht_abruf` fest, `mart.betriebsbericht_gegenprobe` vergleicht mit dem Umsatzbericht (der falsche Endpunkt lieferte zwei Monate lang leere Gerüste plausibler Größe). `core.finanzweg_tag` trägt ZWEI Quellen (`bericht` 88 und 97 — gleiche Zahlen, einmal je Tag, einmal aus dem Monatsaufruf). Die Glücksrad-Wege laufen über den NAMEN (3501 und 3168 heißen beide „25 % Glücksrad") |
 | `0115_betriebsberichte_stufe_b.sql` | **Sechzehn Stufe-B-Tabellen**, befüllt über Spaltenpläne (`src/sync/betriebsbericht_laden.ts`): Storno mit Grund (39), Monatsaufstellung (90), Verkaufszahlen (108), unbare Zahlungen verdichtet (99), Kellner (60, 61, 53, 57 — LINA liefert keine Namen, 53/61 nicht einmal die Kellnernummer), Betriebs- und Verkaufsstellen, Zeitzone × Sparte, Debitor- und Tischbons (86, 113). Felder aus je zwei Beispielzeilen — an einem zweiten Betrieb bestätigen |
+| `0116_nachladen_nach_ableitungen.sql` | **Erst Tagesgeschäft, dann Auswertungen, dann Nachladen.** `sync.warteschlange.nachladen` trennt die Historie vom Tagesgeschäft (am Posten, nicht an der Uhr), `sync.posten_holen` kennt `lina_br_laufend`/`lina_sonst_laufend`, `sync.lauf` stempelt `tagesgeschaeft_bis` und `ableitungen_bis` und zählt `nachladen_posten`/`nachladen_offen` — alle vier in `mart.sync_status`. Vorher lief die Betriebsbericht-Historie in Phase A, und Phase B wäre erst gegen 20:30 gekommen. Die Frischeprüfungen messen seitdem gegen das Ende des Tagesgeschäfts; der Wetter-Merker stand seit `0111` jeden Tag grundlos auf „veraltet“ |
 | `pruefung.sql` | Verifikation gegen den Bayreuth-Fall aus dem Excel (kein Migrationsschritt) |
 
 Die Tabelle nennt die tragenden Migrationen, nicht jede einzelne. Der verbindliche Stand steht in `public.schema_migration`.
@@ -256,20 +257,31 @@ status.ts              Statusbericht fürs Monitoring — acht Prüfungen
 sync.ts / einreihen.ts Einstiegspunkte
 ```
 
-**`sync.ts` hat seit dem 24.08.2026 zwei Phasen.** Phase A startet die fünf
-separaten Dienste **nebeneinander** — LINA und FoodNotify über den zweispurigen
-Worker, dazu Yext, Bounti, Wetter und die Handpflege; Phase B rechnet danach
-seriell die Ableitungen (Zuordnung, alle materialisierten Sichten,
-Zulaufprüfung). Faustregel von Eugene: *alle separaten Dienste parallelisieren*.
+**`sync.ts` hat seit dem 23.09.2026 drei Phasen** (vorher zwei, seit dem
+24.08.2026). Phase A startet die fünf separaten Dienste **nebeneinander** — LINA
+und FoodNotify über den zweispurigen Worker, dazu Yext, Bounti, Wetter und die
+Handpflege; die LINA-Spur zieht dabei **nur das Tagesgeschäft**
+(`sync.warteschlange.nachladen = false`). Phase B rechnet danach seriell die
+Ableitungen (Zuordnung, alle materialisierten Sichten, Zulaufprüfung) und
+stempelt `sync.lauf.ableitungen_bis` — ab da zeigen die Dashboards den Vortag.
+Phase C lädt danach die Historie nach (Konzern-Historie, Betriebsberichte außer
+den laufenden Tages-/Wochenberichten), mit demselben Client, im selben Takt, bis
+zum Rest des Tagesbudgets, und frischt nur die drei Sichten erneut auf, die aus
+der Konzern-Historie lesen. Entscheidung Eugene: *erst Tagesgeschäft, dann
+nachladen*. Faustregel von Eugene: *alle separaten Dienste parallelisieren*.
 Die Ladenakte bekommt **keine** eigene Spur — sie ist derselbe Dienst wie die
 LINA-Berichte, und eine zweite Spur wäre doppeltes Tempo gegen einen fremden
 Zugang (Regel 3).
 
 Die Grenze zwischen den Phasen ist die Bedingung, an der alles hängt: was eine
-materialisierte Sicht liest, muss vor ihrem Refresh geschrieben sein.
-`src/sync/phasen.test.ts` prüft sie am Quelltext — und dass kein Dienst
-herausfällt. Wer dort etwas verschiebt, liest zuerst `docs/importer.md`,
-Abschnitt „Zwei Phasen".
+materialisierte Sicht liest, muss vor ihrem Refresh geschrieben sein — und das
+Nachladen darf nicht vor die Ableitungen rutschen, sonst stehen die Dashboards
+wieder bis zum Abend auf dem Vortag, ohne dass sich etwas meldet.
+`src/sync/phasen.test.ts` prüft beides am Quelltext — und dass kein Dienst
+herausfällt; mit `TEST_DATABASE_URL` auch das Verhalten gegen die Attrappe. Wer
+dort etwas verschiebt, liest zuerst `docs/importer.md`, Abschnitt „Drei Phasen".
+Was „Nachladen" ist, entscheidet der Einreihweg, nicht die Uhr und nicht die
+Priorität.
 
 ---
 

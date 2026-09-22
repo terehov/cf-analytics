@@ -40,6 +40,12 @@ import { alsIsoDatum } from '../lib/time'
 
 const schlaf = (ms: number) => new Promise(r => setTimeout(r, ms))
 
+/**
+ * Die beiden Importphasen eines Laufs (0116). Phase B, die Ableitungen, ist
+ * keine Worker-Phase — sie läuft in src/sync.ts zwischen den beiden.
+ */
+type Phase = 'tagesgeschaeft' | 'nachladen'
+
 /** Exponentiell mit Jitter — nie im festen Takt nachfassen. */
 function wiedervorlage(versuche: number): string {
   const basisMin = Math.min(6 * 60, 5 * 2 ** (versuche - 1))
@@ -255,11 +261,94 @@ export type LaufErgebnis = {
   fehler: number
   uebersprungen: number
   status: 'ok' | 'teilweise' | 'fehlgeschlagen' | 'abgebrochen' | 'lauf_uebersprungen' | 'gesperrt'
+  /** Phase C (0116): bearbeitete Nachlade-Posten und was danach noch offen ist. */
+  nachladen?: { posten: number; offen: number }
 }
 
+/**
+ * Die Phasen eines Laufs, von außen gesehen (Entscheidung 23.09.2026,
+ * Migration `0116`).
+ *
+ * „Erst Tagesgeschäft, dann nachladen": `src/sync.ts` ruft
+ *
+ *   workerOeffnen()      Sperre, Lauf anlegen, Clients anmelden-bereit
+ *   .tagesgeschaeft()    Phase A: beide Spuren, LINA nur `nachladen = false`
+ *     … Phase B (die Ableitungen) läuft in sync.ts, NICHT hier …
+ *   .ableitungenFertig() stempelt `sync.lauf.ableitungen_bis`
+ *   .nachladen()         Phase C: nur die LINA-Spur, alles Fällige
+ *   .abschliessen()      Status, Notiz, Sperre frei
+ *
+ * WARUM EINE SITZUNG UND NICHT ZWEI AUFRUFE VON `workerLauf()`. Zwei Aufrufe
+ * wären zwei LINA-Clients — also eine zweite ANMELDUNG je Nacht, gegen einen
+ * Zugang, den wir nicht besitzen (harte Regeln 3 und 7), und zwei
+ * `letzterRequest`-Felder, also für einen Augenblick doppeltes Tempo. Und die
+ * Laufsperre fiele zwischen A und C: ein Handstart mitten in Phase B bekäme
+ * sie und arbeitete neben Phase C. Die Sitzung hält EINEN Client und EINE
+ * Sperre über alle drei Phasen.
+ *
+ * Wirft eine Phase, hat die Sitzung den Lauf vorher selbst geschlossen
+ * (`fehlgeschlagen`) und die Sperre freigegeben — der Aufrufer muss nur
+ * weiterwerfen.
+ */
+export type PhasenErgebnis = {
+  /** Bearbeitete Posten dieser Phase (ok + keine_daten + Fehler), beide Spuren. */
+  posten: number
+  /**
+   * Konzern-Posten (nicht `getReport:%`), die in dieser Phase `ok` geladen
+   * wurden. Nach Phase C entscheidet diese Zahl, ob die Sichten auf
+   * `core.umsatzbericht_tag`/`core.artikelverkauf_tag` noch einmal
+   * aufgefrischt werden — Betriebsberichte speisen keine materialisierte
+   * Sicht (gemessen über pg_depend, 23.09.2026, docs/importer.md).
+   */
+  konzernOk: number
+  /** Die LINA-Spur ist in dieser Phase abgebrochen (Signal, Sperre, Fehlerserie). */
+  abgebrochen: boolean
+}
+
+export interface WorkerSitzung {
+  laufId: string | null
+  /** Gesetzt, wenn gar nicht gearbeitet wird (Zugang gesperrt, Lauf belegt). */
+  ohneArbeit: LaufErgebnis | null
+  tagesgeschaeft(): Promise<PhasenErgebnis>
+  ableitungenFertig(): Promise<void>
+  nachladen(): Promise<PhasenErgebnis>
+  /**
+   * `stummeQuellen` aus `zulaufPruefen()`; `fehler`, wenn zwischen den Phasen
+   * etwas geworfen hat — dann `fehlgeschlagen`.
+   */
+  abschliessen(zusatz?: { stummeQuellen?: number; fehler?: unknown }): Promise<LaufErgebnis>
+}
+
+/**
+ * Der ganze Lauf in einem Zug — Phase A, dann Phase C, OHNE die Ableitungen
+ * dazwischen. Für die Tests und jeden Aufrufer, der nur die Schlange leeren
+ * will; der Nachtlauf geht über `workerOeffnen()` (src/sync.ts).
+ */
 export async function workerLauf(
   ausloeser: 'zeitplan' | 'manuell' | 'backfill' = 'zeitplan',
 ): Promise<LaufErgebnis> {
+  const s = await workerOeffnen(ausloeser)
+  if (s.ohneArbeit) return s.ohneArbeit
+  await s.tagesgeschaeft()
+  await s.nachladen()
+  return await s.abschliessen()
+}
+
+/** Eine Sitzung, die nichts tut — für Starts ohne Arbeit. */
+function sitzungOhneArbeit(e: LaufErgebnis): WorkerSitzung {
+  const leer: PhasenErgebnis = { posten: 0, konzernOk: 0, abgebrochen: false }
+  return {
+    laufId: null, ohneArbeit: e,
+    tagesgeschaeft: async () => leer,
+    ableitungenFertig: async () => {},
+    nachladen: async () => leer,
+    abschliessen: async () => e,
+  }
+}
+
+export async function workerOeffnen(
+  ausloeser: 'zeitplan' | 'manuell' | 'backfill' = 'zeitplan',
+): Promise<WorkerSitzung> {
   /**
    * Ruht der Zugang, wird gar nicht erst angefangen.
    *
@@ -284,7 +373,8 @@ export async function workerLauf(
     })
     await startOhneArbeitFesthalten(ausloeser, 'gesperrt',
       `zugang gesperrt (${ruht.art}) — pausiert bis ${ruht.pausiert_bis.toISOString()}`)
-    return { laufId: null, ok: 0, keineDaten: 0, fehler: 0, uebersprungen: 0, status: 'gesperrt' }
+    return sitzungOhneArbeit(
+      { laufId: null, ok: 0, keineDaten: 0, fehler: 0, uebersprungen: 0, status: 'gesperrt' })
   }
 
   const sperre = await sperreHolen()
@@ -299,17 +389,25 @@ export async function workerLauf(
       blockierer
         ? `Lauf ${blockierer.lauf_id} läuft noch — dieser Start hat nichts importiert`
         : 'Laufsperre belegt, aber kein Lauf im Zustand laeuft — dieser Start hat nichts importiert')
-    return { laufId: null, ok: 0, keineDaten: 0, fehler: 0, uebersprungen: 0,
-             status: 'lauf_uebersprungen' }
+    return sitzungOhneArbeit({ laufId: null, ok: 0, keineDaten: 0, fehler: 0, uebersprungen: 0,
+             status: 'lauf_uebersprungen' })
   }
-  await verwaisteLaeufeSchliessen()
+  /*
+   * Die Sperre gibt ab hier die SITZUNG frei, am Ende von `abschliessen()` —
+   * nicht mehr ein `finally` um den Lauf. Sie hält damit über Phase B hinweg:
+   * ein Handstart während der Ableitungen findet sie belegt und hält das als
+   * `uebersprungen` fest, statt neben Phase C zu arbeiten.
+   *
+   * Schlägt ein Freigeben fehl, ist die Sperre über das Verbindungsende
+   * ohnehin weg — kein Grund, den Lauf als Fehler zu melden.
+   */
+  const freigeben = () => sperre.freigeben().catch(() => {})
   try {
-    return await workerLaufIntern(ausloeser)
-  } finally {
-    // `workerLaufIntern` schließt am Ende den Pool. Dann ist die Sperre über
-    // das Verbindungsende ohnehin schon weg, und der explizite Unlock schlägt
-    // fehl — das ist erwartet und kein Grund, den Lauf als Fehler zu melden.
-    await sperre.freigeben().catch(() => {})
+    await verwaisteLaeufeSchliessen()
+    return await sitzungOeffnen(ausloeser, freigeben)
+  } catch (e) {
+    await freigeben()
+    throw e
   }
 }
 
@@ -325,9 +423,10 @@ const ENDESIGNALE = ['SIGINT', 'SIGTERM'] as const
  */
 const ABSCHLUSSFRIST_MS = 5_000
 
-async function workerLaufIntern(
+async function sitzungOeffnen(
   ausloeser: 'zeitplan' | 'manuell' | 'backfill',
-): Promise<LaufErgebnis> {
+  sperreFreigeben: () => Promise<void>,
+): Promise<WorkerSitzung> {
   const client = new LinaClient()
   // Das Tagesbudget gilt über Läufe hinweg, nicht je Prozess — sonst wäre es
   // beim Zeitplan wirkungslos. Begründung in client.ts.
@@ -426,13 +525,31 @@ async function workerLaufIntern(
     notiz: string | null
     reserviert: string | null
     letztesEnde: number | null
+    /** `ok` geladene Konzern-Posten (nicht `getReport:%`) — nur LINA (0116). */
+    konzernOk: number
   }
   const neuerStand = (): Anbieterstand => ({
     ok: 0, keineDaten: 0, fehler: 0, fehlerInFolge: 0, erstfehler: 0, wiederholer: 0,
-    status: 'ok', notiz: null, reserviert: null, letztesEnde: null,
+    status: 'ok', notiz: null, reserviert: null, letztesEnde: null, konzernOk: 0,
   })
   const jeAnbieter: Record<Anbieter, Anbieterstand> =
     { lina: neuerStand(), fn: neuerStand() }
+
+  /**
+   * PHASE C HAT EINEN EIGENEN STAND (0116), und zwar aus denselben Gründen,
+   * aus denen die Anbieter getrennt zählen: `fehlerInFolge` ist eine Aussage
+   * über die Serie DIESER Phase, die Notiz beschreibt, warum SIE endete, und
+   * `letztesEnde` darf die zwölf Minuten von Phase B nicht als Taktpause eines
+   * einzigen Postens in die Restschätzung tragen.
+   *
+   * `aktiv` sagt, welcher Stand für einen Anbieter gerade zählt — die
+   * Fortschrittszeile liest ihn dort.
+   */
+  const nachladeStand = neuerStand()
+  const aktiv: Record<Anbieter, Anbieterstand> = { lina: jeAnbieter.lina, fn: jeAnbieter.fn }
+  let nachladenGelaufen = false
+  let nachladenPosten: number | null = null
+  let nachladenOffen: number | null = null
 
   /**
    * Fehler beim ZIEHEN des naechsten Postens gehoeren keinem Anbieter.
@@ -504,19 +621,31 @@ async function workerLaufIntern(
      * arbeitet — und Docker schickt beim Stoppen SIGTERM und zehn Sekunden
      * spaeter SIGKILL, das passiert also bei jedem Containerstopp.
      */
-    const reserviert = ANBIETER.map(a => jeAnbieter[a].reserviert).filter(Boolean)
+    const reserviert = [...ANBIETER.map(a => jeAnbieter[a]), nachladeStand]
+      .map(st => st.reserviert).filter(Boolean)
     if (reserviert.length > 0) {
       await query(
         `UPDATE sync.warteschlange SET in_arbeit_seit = NULL WHERE posten_id = ANY($1)`,
         [reserviert]).catch(() => {})
     }
+    /*
+     * DIE NOTIZ WIRD ANGEHÄNGT, NICHT ÜBERSCHRIEBEN (0116). Seit der Lauf erst
+     * nach Phase C schließt, schreibt `zulaufPruefen()` in Phase B seine
+     * Befunde in die Zeile eines Laufs, der noch `laeuft` — bis dahin kam es
+     * immer NACH diesem UPDATE. Überschrieben, wären die stummen Quellen aus
+     * der Notiz verschwunden. Der Worker selbst schreibt die Notiz nur hier.
+     */
     await query(
       `UPDATE sync.lauf
-          SET beendet_am = now(), status = $1, notiz = $2,
+          SET beendet_am = now(), status = $1,
+              notiz = concat_ws(' | ', $2::text, nullif(notiz, '')),
               aufgaben_gesamt = $3, aufgaben_ok = $4, aufgaben_fehler = $5,
-              aufgaben_uebersprungen = $6
+              aufgaben_uebersprungen = $6,
+              nachladen_posten = coalesce($8, nachladen_posten),
+              nachladen_offen  = coalesce($9, nachladen_offen)
         WHERE lauf_id = $7`,
-      [endStatus, endNotiz, ok + keineDaten + fehler, ok, fehler, uebersprungen, laufId],
+      [endStatus, endNotiz, ok + keineDaten + fehler, ok, fehler, uebersprungen, laufId,
+       nachladenPosten, nachladenOffen],
     ).catch(() => {})
   }
 
@@ -682,7 +811,7 @@ async function workerLaufIntern(
   ) => {
     const n = ok + keineDaten + fehler
     const jetzt = Date.now()
-    const stand = jeAnbieter[anbieter]
+    const stand = aktiv[anbieter]
     if (stand.letztesEnde !== null) {
       tempo[anbieter].n++
       tempo[anbieter].ms += jetzt - stand.letztesEnde
@@ -797,10 +926,20 @@ async function workerLaufIntern(
    * NOTBREMSE: `BETRIEBSBERICHT_JE_LAUF` (0 = keine Betriebsberichte, auch
    * keine bereits eingereihten; Voreinstellung das Tagesbudget).
    */
+  /*
+   * SEIT 0116 JE PHASE. In Phase A (Tagesgeschäft) zieht die Spur nur Posten
+   * mit `nachladen = false` — über die Hälften `lina_br_laufend` und
+   * `lina_sonst_laufend`; in Phase C (Nachladen) alles Fällige über `lina_br`
+   * und `lina_sonst`, also auch ein Tagesgeschäft, das in Phase A in eine
+   * Wiedervorlage ging. Verschränkung, Reserve und Notbremse gelten in beiden
+   * Phasen gleich; die Reserve zählt die übrigen Posten DERSELBEN Phase.
+   * `brImLauf` zählt über beide Phasen: die Notbremse gilt je Lauf.
+   */
   let brZuletzt = false
   let brImLauf = 0
   let brGrund: string | null = null
-  const linaPostenHolen = async (): Promise<any> => {
+  const linaPostenHolen = async (phase: Phase): Promise<any> => {
+    const nurLaufend = phase === 'tagesgeschaeft'
     brGrund = null
     let brErlaubt = config.BETRIEBSBERICHT_JE_LAUF > 0 && brImLauf < config.BETRIEBSBERICHT_JE_LAUF
     if (!brErlaubt) {
@@ -811,16 +950,20 @@ async function workerLaufIntern(
       const sonst = await eine<{ n: number }>(
         `SELECT count(*)::int AS n FROM sync.warteschlange
           WHERE erledigt_am IS NULL AND in_arbeit_seit IS NULL AND faellig_ab <= now()
-            AND marke_key IS NULL AND endpunkt NOT LIKE 'getReport:%'`)
+            AND marke_key IS NULL AND endpunkt NOT LIKE 'getReport:%'
+            ${nurLaufend ? 'AND NOT nachladen' : ''}`)
       if (client.budgetUebrig - Number(sonst?.n ?? 0) < 1) {
         brErlaubt = false
-        brGrund = 'Betriebsberichte: Restbudget gehoert dem Tagesgeschaeft'
+        brGrund = nurLaufend
+          ? 'Betriebsberichte: Restbudget gehoert dem Tagesgeschaeft'
+          : 'Betriebsberichte: Restbudget gehoert der Konzern-Historie'
       }
     }
     const reihenfolge: ('lina_br' | 'lina_sonst')[] = !brErlaubt ? ['lina_sonst']
       : brZuletzt ? ['lina_sonst', 'lina_br'] : ['lina_br', 'lina_sonst']
     for (const haelfte of reihenfolge) {
-      const p = await eine<any>(`SELECT * FROM sync.posten_holen($1, $2)`, [laufId, haelfte])
+      const p = await eine<any>(`SELECT * FROM sync.posten_holen($1, $2)`,
+        [laufId, nurLaufend ? `${haelfte}_laufend` : haelfte])
       if (p?.posten_id) {
         brZuletzt = haelfte === 'lina_br'
         if (brZuletzt) brImLauf++
@@ -830,8 +973,8 @@ async function workerLaufIntern(
     return null
   }
 
-  const schleife = async (anbieter: Anbieter): Promise<void> => {
-    const stand = jeAnbieter[anbieter]
+  const schleife = async (anbieter: Anbieter, phase: Phase, stand: Anbieterstand): Promise<void> => {
+    aktiv[anbieter] = stand
     const eigenerClient = anbieter === 'fn' ? fnClient : client
 
     while (true) {
@@ -940,7 +1083,7 @@ async function workerLaufIntern(
       let posten: any
       try {
         posten = anbieter === 'lina'
-          ? await linaPostenHolen()
+          ? await linaPostenHolen(phase)
           : await eine<any>(`SELECT * FROM sync.posten_holen($1, $2)`, [laufId, anbieter])
         dbFehlerInFolge = 0
       } catch (e) {
@@ -970,11 +1113,19 @@ async function workerLaufIntern(
           `SELECT count(*)::int AS vertagt, min(faellig_ab) AS naechste
              FROM sync.warteschlange
             WHERE erledigt_am IS NULL AND faellig_ab > now()
-              AND marke_key IS ${anbieter === 'fn' ? 'NOT NULL' : 'NULL'}`).catch(() => null)
+              AND marke_key IS ${anbieter === 'fn' ? 'NOT NULL' : 'NULL'}
+              ${anbieter === 'lina' && phase === 'tagesgeschaeft' ? 'AND NOT nachladen' : ''}`).catch(() => null)
         const vertagt = w ? Number(w.vertagt) : 0
+        /*
+         * In Phase A heißt „leer": das Tagesgeschäft ist abgearbeitet. Das
+         * Nachladen liegt dann noch da, und zwar mit Absicht — deshalb ein
+         * anderes Wort als „Schlange leer", das hier seit 0116 lügen würde.
+         */
+        const leer = anbieter === 'lina' && phase === 'tagesgeschaeft'
+          ? 'Tagesgeschaeft erledigt' : 'Schlange leer'
         stand.notiz ??= vertagt > 0
           ? `nichts faellig — ${vertagt} Posten vertagt bis ${w?.naechste?.toISOString() ?? '?'}`
-          : 'Schlange leer'
+          : leer
         // Liegen Betriebsberichte noch da, sagt die Notiz, warum sie liegen
         // bleiben — sonst sieht die Notbremse aus wie eine leere Schlange.
         if (anbieter === 'lina' && brGrund) stand.notiz += ` · ${brGrund}`
@@ -1120,6 +1271,7 @@ async function workerLaufIntern(
         }
 
         ok++; stand.ok++; stand.fehlerInFolge = 0
+        if (quelle.art === 'lina' && !istBetriebsbericht(epKey)) stand.konzernOk++
         await query(
           // gesperrt_seit raeumt der Erfolg mit ab: ein nachgetragener
           // Anspruch soll die Frist nicht mit sich herumtragen (0075).
@@ -1391,12 +1543,14 @@ async function workerLaufIntern(
         const zweite = new Date(Date.parse(mitte) + 86_400_000).toISOString().slice(0, 10)
         await query(
           `INSERT INTO sync.warteschlange
-             (endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis, prioritaet, parameter)
-           SELECT $1, $2, h.von, h.bis, $3, $4::jsonb
+             (endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis, prioritaet, parameter, nachladen)
+           SELECT $1, $2, h.von, h.bis, $3, $4::jsonb, $9
              FROM (VALUES ($5::date, $6::date), ($7::date, $8::date)) AS h(von, bis)
            ON CONFLICT DO NOTHING`,
+          // Die Hälften erben `nachladen` (0116): eine geteilte Woche aus der
+          // Historie bleibt Historie und rutscht nicht ins Tagesgeschäft.
           [epKey, posten.betrieb_enc_id, posten.prioritaet, JSON.stringify(posten.parameter ?? {}),
-           von, mitte, zweite, bis])
+           von, mitte, zweite, bis, posten.nachladen === true])
         await query(
           `UPDATE sync.warteschlange
               SET erledigt_am = now(), in_arbeit_seit = NULL, ergebnis = 'fenster_zu_gross',
@@ -1529,111 +1683,263 @@ async function workerLaufIntern(
   }
 
   /**
-   * DER ZUSAMMENFUEHRPUNKT. Alles, was den LAUF abschliesst, gehoert hierhin
-   * und nicht ans Ende einer Schleife.
+   * DIE HANDGRIFFE, MIT DENEN EINE PHASE ENDET — seit 0116 aufgeteilt.
    *
-   * `allSettled` und nicht `all`: `all` lehnt beim ersten Fehler ab und liesse
-   * die andere Schleife weiterlaufen, waehrend das `finally` unten `sync.lauf`
-   * schon schliesst — ein Lauf, der fertig aussieht und weiterarbeitet, mit
-   * Zaehlern, die auf einem Zwischenstand einfrieren, waehrend in
-   * `sync.aufgabe` weiter Zeilen mit derselben `lauf_id` einlaufen. Das ist
-   * dieselbe Klasse Fehler wie „ein Start, der nichts tut, steht nur im Log"
-   * (Migration 0081), nur am anderen Ende des Laufs.
+   * Bis zum 23.09.2026 stand hier EIN Zusammenführpunkt am Ende des Laufs:
+   * beide Schleifen, `allSettled`, Status, Notiz, fertig. Jetzt endet der
+   * Import zweimal (nach Phase A und nach Phase C), und dazwischen rechnet
+   * sync.ts die Ableitungen. Was den LAUF abschließt (Status, Notiz, Sperre),
+   * steht deshalb in `abschliessen()`; was eine PHASE abschließt, in der
+   * jeweiligen Methode.
    *
-   * Wirft eine Schleife, wird der Fehler unten aus `ausgang` wieder geworfen —
-   * aber erst, nachdem die andere sauber zu Ende gekommen ist.
+   * `scheitern()` ist der frühere `catch`-Zweig: ohne ihn würde ein
+   * abgestürzter Lauf als 'ok' verbucht (26.07.2026: `mart.sync_status` zeigte
+   * 'ok' mit aufgaben_fehler 1 bei einem Lauf, der an einem Datenbankfehler
+   * gestorben war).
    */
-  const ausgang = await Promise.allSettled(ANBIETER.map(a => schleife(a)))
+  let tagesgeschaeftGelaufen = false
+  let geschlossen = false
 
-  try {
-    const geplatzt = ausgang.find(e => e.status === 'rejected')
-    if (geplatzt && geplatzt.status === 'rejected') throw geplatzt.reason
-
-    /**
-     * Ein Lauf, zwei Ausgaenge — der schwerere gewinnt.
-     *
-     * Ohne diese Rangfolge entschiede die Reihenfolge, in der die Schleifen
-     * fertig werden: FoodNotify ist nach Minuten durch und liesse `ok`
-     * stehen, LINA setzt Stunden spaeter `abgebrochen`.
-     */
-    const RANG = { ok: 0, teilweise: 1, abgebrochen: 2, fehlgeschlagen: 3 } as const
-    /*
-     * NUR ERSTFEHLER MACHEN DEN LAUF `teilweise` (10.09.2026). Ein Posten,
-     * der gestern schon scheiterte, beweist heute nichts Neues — dieselbe
-     * Unterscheidung, die die Notbremse seit dem 01.09.2026 trifft. Neun
-     * Laeufe in Folge (112–120) standen auf `teilweise` wegen ein bis elf
-     * bekannter HTTP-500-Posten derselben Kostenstelle; ein Status, der
-     * jeden Tag gelb ist, kann keinen neuen Fehler mehr zeigen. Die
-     * Wiederholer verschwinden nicht: sie stehen in der Notiz, in
-     * sync.aufgabe und in mart.posten_aufgegeben.
-     */
-    for (const a of ANBIETER) {
-      const s = jeAnbieter[a]
-      if (s.erstfehler > 0 && s.status === 'ok') s.status = 'teilweise'
-      if (RANG[s.status] > RANG[status]) status = s.status
-    }
-    const erstfehler = ANBIETER.reduce((n, a) => n + jeAnbieter[a].erstfehler, 0)
-    if (erstfehler > 0 && status === 'ok') status = 'teilweise'
-
-    /**
-     * BEIDE Notizen, immer und mit Namen davor. Frueher stand hier ein Feld
-     * fuer den ganzen Lauf; nach dem Umbau schriebe der zuerst fertige
-     * Anbieter „Schlange leer" hinein, waehrend der andere noch elf Stunden
-     * arbeitet — die Notiz loege ueber den Lauf, den sie beschreibt. Und wer
-     * gar nichts zu melden hat, wird trotzdem genannt: dass ein Anbieter
-     * ueberhaupt gelaufen ist, ist die Information (AGENTS.md Regel 10).
-     */
-    notiz = ANBIETER
-      .map(a => {
-        const s = jeAnbieter[a]
-        const zusatz = s.wiederholer > 0 ? `, davon ${s.wiederholer} bekannte Wiederholer` : ''
-        return `${NAME[a]}: ${s.notiz ?? 'ohne Befund'} `
-             + `(${s.ok + s.keineDaten + s.fehler} Posten${zusatz})`
-      })
-      .join(' · ')
-  } catch (e) {
-    // Ohne diesen Zweig wird ein abgestürzter Lauf als 'ok' verbucht: die
-    // Zeile oben wird übersprungen, `status` steht noch auf seinem Anfangswert,
-    // und das `finally` schreibt ihn so weg. Am 26.07.2026 stand deshalb in
-    // mart.sync_status ein Lauf mit status 'ok' und aufgaben_fehler 1, obwohl
-    // er an einem Datenbankfehler gestorben war.
-    status = 'fehlgeschlagen'
-    notiz = `Lauf abgebrochen: ${String(e).slice(0, 500)}`
-    throw e
-  } finally {
+  const aufraeumen = async () => {
     // Handler wieder abmelden: workerLauf kann mehrfach im selben Prozess
     // laufen (Tests), und hängengebliebene Listener wären ein Leck.
     for (const [signal, fn] of behandler) process.off(signal, fn)
-    // Derselbe idempotente Pfad wie im Signalfall — wer zuerst kommt, gewinnt,
-    // der zweite Aufruf tut nichts.
-    await laufFortschreiben(status, notiz)
-    /**
-     * BEIDE Anbieter mit eigenen Zahlen. Vorher stand hier nur LINAs
-     * Budgetverbrauch — nach dem Umbau waere die Haelfte des Laufs in der
-     * Schlusszeile unsichtbar, und ob FoodNotify ueberhaupt gearbeitet hat,
-     * liesse sich daraus nicht ablesen.
-     */
-    log.info('lauf beendet', {
-      laufId, status, ok, keineDaten, fehler, uebersprungen,
-      lina: {
-        ...jeAnbieter.lina, letztesEnde: undefined, reserviert: undefined,
-        budgetVerbraucht: client.budgetVerbraucht,
-      },
-      fn: {
-        ...jeAnbieter.fn, letztesEnde: undefined, reserviert: undefined,
-        budgetVerbraucht: fnClient.budgetVerbraucht,
-      },
-      notiz,
-    })
-    // Der Pool wird hier BEWUSST nicht geschlossen. Er gehört dem Prozess,
-    // nicht diesem Lauf: `pool.end()` an dieser Stelle machte workerLauf zu
-    // einer Funktion, die man pro Prozess genau einmal aufrufen kann — jeder
-    // zweite Aufruf scheiterte mit „Cannot use a pool after calling end".
-    // Aufgefallen ist das erst, als der Ende-zu-Ende-Test einen zweiten
-    // Durchlauf für die Stammdaten bekam. Geschlossen wird in src/sync.ts.
+    await sperreFreigeben()
   }
 
-  return { laufId, ok, keineDaten, fehler, uebersprungen, status }
+  const scheitern = async (e: unknown) => {
+    if (geschlossen) return
+    geschlossen = true
+    status = 'fehlgeschlagen'
+    notiz = `Lauf abgebrochen: ${String(e).slice(0, 500)}`
+    await laufFortschreiben(status, notiz)
+    log.error('lauf abgebrochen', { laufId, fehler: String(e).slice(0, 300) })
+    await aufraeumen()
+  }
+
+  /** Wirft der erste abgelehnte Zweig — aber erst, nachdem alle zu Ende kamen. */
+  const zusammenfuehren = async (ausgang: PromiseSettledResult<void>[]) => {
+    const geplatzt = ausgang.find(e => e.status === 'rejected')
+    if (geplatzt && geplatzt.status === 'rejected') {
+      await scheitern(geplatzt.reason)
+      throw geplatzt.reason
+    }
+  }
+
+  const phasenErgebnis = (staende: Anbieterstand[]): PhasenErgebnis => ({
+    posten: staende.reduce((n, st) => n + st.ok + st.keineDaten + st.fehler, 0),
+    konzernOk: staende.reduce((n, st) => n + st.konzernOk, 0),
+    abgebrochen: staende.some(st => st.status === 'abgebrochen'),
+  })
+
+  /**
+   * PHASE A — das Tagesgeschäft, beide Spuren nebeneinander.
+   *
+   * `allSettled` und nicht `all`: `all` lehnt beim ersten Fehler ab und
+   * liesse die andere Schleife weiterlaufen, während der Lauf schon als
+   * gescheitert geschlossen wird — ein Lauf, der fertig aussieht und
+   * weiterarbeitet (dieselbe Klasse Fehler wie Migration 0081, nur am
+   * anderen Ende).
+   *
+   * Am Ende ein ZWISCHENSTAND in `sync.lauf`: Zähler und `tagesgeschaeft_bis`
+   * — Status und Notiz bleiben offen, der Lauf steht weiter auf `laeuft`.
+   * Stirbt der Prozess in Phase B oder C, schließt ihn der nächste Start mit
+   * den Zählern aus `sync.aufgabe` (`verwaisteLaeufeSchliessen()`).
+   */
+  const tagesgeschaeft = async (): Promise<PhasenErgebnis> => {
+    if (tagesgeschaeftGelaufen || geschlossen) throw new Error('Phase A läuft je Lauf genau einmal')
+    tagesgeschaeftGelaufen = true
+    const ausgang = await Promise.allSettled(
+      ANBIETER.map(a => schleife(a, 'tagesgeschaeft', jeAnbieter[a])))
+    await zusammenfuehren(ausgang)
+    await query(
+      `UPDATE sync.lauf
+          SET tagesgeschaeft_bis = now(),
+              aufgaben_gesamt = $1, aufgaben_ok = $2, aufgaben_fehler = $3,
+              aufgaben_uebersprungen = $4
+        WHERE lauf_id = $5`,
+      [ok + keineDaten + fehler, ok, fehler, uebersprungen, laufId]).catch(() => {})
+    const e = phasenErgebnis(ANBIETER.map(a => jeAnbieter[a]))
+    log.info('phase a fertig — tagesgeschaeft geladen', {
+      laufId, posten: e.posten,
+      lina: `${jeAnbieter.lina.notiz ?? 'ohne Befund'} (${jeAnbieter.lina.ok + jeAnbieter.lina.keineDaten + jeAnbieter.lina.fehler} Posten)`,
+      fn: `${jeAnbieter.fn.notiz ?? 'ohne Befund'} (${jeAnbieter.fn.ok + jeAnbieter.fn.keineDaten + jeAnbieter.fn.fehler} Posten)`,
+      budgetUebrig: client.budgetUebrig,
+    })
+    return e
+  }
+
+  /** Das Ende von Phase B, gestempelt — die Frische der Dashboards. */
+  const ableitungenFertig = async () => {
+    if (geschlossen) return
+    await query(`UPDATE sync.lauf SET ableitungen_bis = now() WHERE lauf_id = $1`, [laufId])
+      .catch(e => log.warn('ableitungen_bis nicht gestempelt', { fehler: String(e).slice(0, 200) }))
+  }
+
+  /**
+   * Was nach Phase C noch nachzuladen ist — die Zahl, an der man sieht, ob
+   * der Backfill läuft (harte Regel 10).
+   *
+   * Betriebsberichte zählen nicht mit, solange die Notbremse sie abschaltet:
+   * das ist eine Entscheidung, kein Rückstand, und ein Alarm, der wegen einer
+   * Entscheidung jede Nacht schlägt, wird nicht mehr gelesen. Die Notiz sagt
+   * es trotzdem.
+   */
+  const nachladenMessen = async () => {
+    const r = await eine<{ offen: number; faellig: number }>(
+      `SELECT count(*)::int AS offen,
+              count(*) FILTER (WHERE faellig_ab <= now())::int AS faellig
+         FROM sync.warteschlange
+        WHERE erledigt_am IS NULL AND marke_key IS NULL AND nachladen
+          AND ($1 OR endpunkt NOT LIKE 'getReport:%')`,
+      [config.BETRIEBSBERICHT_JE_LAUF > 0])
+    return { offen: Number(r?.offen ?? 0), faellig: Number(r?.faellig ?? 0) }
+  }
+
+  /**
+   * PHASE C — das Nachladen. Nur die LINA-Spur, derselbe Client, derselbe
+   * Takt (harte Regel 3), dasselbe Tagesbudget: Phase A hat es zuerst
+   * bekommen, hier läuft, was übrig ist.
+   *
+   * FoodNotify läuft hier NICHT noch einmal. Seine Spur war in Phase A zu
+   * Ende (leer oder vertagt), genau wie vor 0116 am Ende des Imports; einen
+   * FoodNotify-Backfill als Nachladen zu führen wäre eine eigene
+   * Entscheidung (docs/offene-punkte.md).
+   *
+   * NICHT GESTARTET wird Phase C, wenn die LINA-Spur in Phase A abgebrochen
+   * ist (Signal, Zugangssperre, Fehlerserie): eine Fehlerserie von vor
+   * zwölf Minuten ist kein Grund, es gleich wieder zu versuchen — dieselbe
+   * Vorsicht wie ABBRUCH_NACH_FEHLERN selbst. Der Grund steht in der Notiz.
+   */
+  const nachladen = async (): Promise<PhasenErgebnis> => {
+    if (geschlossen) return phasenErgebnis([])
+    if (!tagesgeschaeftGelaufen) throw new Error('Phase C erst nach Phase A')
+    if (nachladenGelaufen) throw new Error('Phase C läuft je Lauf genau einmal')
+    nachladenGelaufen = true
+    const nichtGestartet = abbruchSignal ? `Signal ${abbruchSignal}`
+      : laufAbbruch ? laufAbbruch
+      : jeAnbieter.lina.status === 'abgebrochen' ? 'die LINA-Spur ist im Tagesgeschaeft abgebrochen'
+      : null
+    if (nichtGestartet) {
+      nachladeStand.notiz = `nicht gestartet, weil ${nichtGestartet}`
+    } else {
+      const ausgang = await Promise.allSettled([schleife('lina', 'nachladen', nachladeStand)])
+      await zusammenfuehren(ausgang)
+    }
+    const e = phasenErgebnis([nachladeStand])
+    const stand = await nachladenMessen().catch(() => null)
+    nachladenPosten = e.posten
+    nachladenOffen = stand?.offen ?? null
+    /*
+     * HARTE REGEL 10. Ein Nachladen, das nichts tut, obwohl Fälliges
+     * aussteht, sieht aus wie eines, das fertig ist — außer es steht hier.
+     * Gründe gibt es (Tagesbudget in Phase A verbraucht, Arbeitsfenster zu,
+     * Postenobergrenze), aber jeder davon will gelesen werden. Deshalb
+     * `teilweise` mit Notiz, nicht `ok`.
+     */
+    if (!nichtGestartet && e.posten === 0 && (stand?.faellig ?? 0) > 0 && nachladeStand.status === 'ok') {
+      nachladeStand.status = 'teilweise'
+      nachladeStand.notiz = `NICHTS nachgeladen, obwohl ${stand!.faellig} faellig — `
+        + (nachladeStand.notiz ?? 'ohne Grund')
+    }
+    log.info('phase c fertig — nachgeladen', {
+      laufId, posten: e.posten, konzernOk: e.konzernOk, offen: nachladenOffen,
+      notiz: nachladeStand.notiz, budgetUebrig: client.budgetUebrig,
+    })
+    return e
+  }
+
+  /**
+   * DER ABSCHLUSS DES LAUFS. Ein Lauf, bis zu drei Ausgänge — der schwerere
+   * gewinnt.
+   *
+   * Ohne diese Rangfolge entschiede die Reihenfolge, in der die Schleifen
+   * fertig werden: FoodNotify ist nach Minuten durch und liesse `ok` stehen,
+   * LINA setzt Stunden später `abgebrochen`.
+   *
+   * `stummeQuellen` kommt aus `zulaufPruefen()` (Phase B). Die hat den Lauf
+   * im Zustand `laeuft` angetroffen und konnte ihn nicht herabstufen — das
+   * geschieht hier, mit derselben Regel: nur `ok` wird zu `teilweise`.
+   */
+  const abschliessen = async (
+    zusatz?: { stummeQuellen?: number; fehler?: unknown },
+  ): Promise<LaufErgebnis> => {
+    if (!geschlossen && zusatz?.fehler !== undefined) {
+      await scheitern(zusatz.fehler)
+    }
+    if (!geschlossen) {
+      geschlossen = true
+      const RANG = { ok: 0, teilweise: 1, abgebrochen: 2, fehlgeschlagen: 3 } as const
+      /*
+       * NUR ERSTFEHLER MACHEN DEN LAUF `teilweise` (10.09.2026). Ein Posten,
+       * der gestern schon scheiterte, beweist heute nichts Neues — dieselbe
+       * Unterscheidung, die die Notbremse seit dem 01.09.2026 trifft. Neun
+       * Laeufe in Folge (112–120) standen auf `teilweise` wegen ein bis elf
+       * bekannter HTTP-500-Posten derselben Kostenstelle; ein Status, der
+       * jeden Tag gelb ist, kann keinen neuen Fehler mehr zeigen. Die
+       * Wiederholer verschwinden nicht: sie stehen in der Notiz, in
+       * sync.aufgabe und in mart.posten_aufgegeben.
+       */
+      const staende: Array<[string, Anbieterstand]> = [
+        ...ANBIETER.map(a => [NAME[a], jeAnbieter[a]] as [string, Anbieterstand]),
+        ...(nachladenGelaufen ? [['Nachladen', nachladeStand] as [string, Anbieterstand]] : []),
+      ]
+      for (const [, st] of staende) {
+        if (st.erstfehler > 0 && st.status === 'ok') st.status = 'teilweise'
+        if (RANG[st.status] > RANG[status]) status = st.status
+      }
+      if ((zusatz?.stummeQuellen ?? 0) > 0 && status === 'ok') status = 'teilweise'
+
+      /**
+       * ALLE Notizen, immer und mit Namen davor. Wer nichts zu melden hat,
+       * wird trotzdem genannt: dass ein Anbieter überhaupt gelaufen ist, ist
+       * die Information (AGENTS.md Regel 10). Das Nachladen nennt zusätzlich,
+       * was offen bleibt — sonst sieht „Tagesbudget aufgebraucht" nach einem
+       * fertigen Backfill aus.
+       */
+      notiz = staende
+        .map(([name, st]) => {
+          const zusatzW = st.wiederholer > 0 ? `, davon ${st.wiederholer} bekannte Wiederholer` : ''
+          const offen = st === nachladeStand && nachladenOffen !== null ? `, ${nachladenOffen} offen` : ''
+          return `${name}: ${st.notiz ?? 'ohne Befund'} `
+               + `(${st.ok + st.keineDaten + st.fehler} Posten${zusatzW}${offen})`
+        })
+        .join(' · ')
+      await laufFortschreiben(status, notiz)
+      /**
+       * Alle Anbieter mit eigenen Zahlen, und das Nachladen daneben — ob
+       * FoodNotify überhaupt gearbeitet hat und was Phase C geschafft hat,
+       * muss sich aus der Schlusszeile ablesen lassen.
+       */
+      log.info('lauf beendet', {
+        laufId, status, ok, keineDaten, fehler, uebersprungen,
+        lina: {
+          ...jeAnbieter.lina, letztesEnde: undefined, reserviert: undefined,
+          budgetVerbraucht: client.budgetVerbraucht,
+        },
+        fn: {
+          ...jeAnbieter.fn, letztesEnde: undefined, reserviert: undefined,
+          budgetVerbraucht: fnClient.budgetVerbraucht,
+        },
+        nachladen: nachladenGelaufen
+          ? { ...nachladeStand, letztesEnde: undefined, reserviert: undefined, offen: nachladenOffen }
+          : null,
+        notiz,
+      })
+      // Der Pool wird hier BEWUSST nicht geschlossen. Er gehört dem Prozess,
+      // nicht diesem Lauf: `pool.end()` an dieser Stelle machte workerLauf zu
+      // einer Funktion, die man pro Prozess genau einmal aufrufen kann.
+      // Geschlossen wird in src/sync.ts.
+      await aufraeumen()
+    }
+    return {
+      laufId, ok, keineDaten, fehler, uebersprungen, status,
+      nachladen: nachladenPosten !== null
+        ? { posten: nachladenPosten, offen: nachladenOffen ?? 0 } : undefined,
+    }
+  }
+
+  return { laufId, ohneArbeit: null, tagesgeschaeft, ableitungenFertig, nachladen, abschliessen }
 }
 
 async function protokoll(

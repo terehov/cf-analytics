@@ -3572,3 +3572,54 @@ Tagen fällig, dazu ein Nachlauf nach 14 Tagen. Den laufenden Monat täglich neu
 je Monatsbericht 62 Aufrufe je Nacht statt zwei im Monat; für Stufe B (Kellner, Stellen,
 Storno) ist ein Monat Verzug vertretbar. Für 97 heißt das: die Tageswerte eines Monats stehen
 erst ab dem 7. des Folgemonats da — die Finanzwege der letzten Tage kommen bis dahin aus 88.
+
+## 23.09.2026 — Erst Tagesgeschäft, dann Auswertungen, dann Nachladen (Migration `0116`)
+
+**Die Frage.** Seit `0113` lud der Importer die Betriebsbericht-Historie mit dem ganzen Rest des
+Tagesbudgets, verschränkt mit den übrigen LINA-Posten, **in Phase A**. Bei ~5,3 s je Aufruf dauert
+eine Nacht damit rund 15,5 Stunden, und Phase B — alle Materialisierungen, der Round Table, die
+Zulaufprüfung — wäre erst gegen 20:30 gelaufen (`offene-punkte.md` hatte es als Punkt „Laufdauer"
+gemeldet). Zur Wahl standen: `BETRIEBSBERICHT_JE_LAUF` senken (der Backfill dauert länger), Phase B
+vor die Betriebsberichte ziehen, oder den Takt erhöhen (verboten, Regel 3).
+
+**Entschieden (Eugene, wörtlich):** *„Erst Tagesgeschäft, dann nachladen — Der Lauf holt zuerst
+die Tagesdaten und frischt die Auswertungen morgens auf. Danach lädt er die Historie bis zum
+Tagesbudget nach."*
+
+**Umgesetzt als drei Phasen** (`importer.md`, „Drei Phasen"): A das Tagesgeschäft, B die
+Ableitungen unverändert, C das Nachladen mit dem restlichen Budget. Fünf Festlegungen beim Bau:
+
+**1. „Nachladen" ist eine Eigenschaft des Postens, keine Uhrzeit und keine Prioritätsstufe.**
+`sync.warteschlange.nachladen`, gesetzt vom Einreihweg. Eine Uhrzeitgrenze wäre nach jedem
+verspäteten Start falsch; eine Prioritätsschwelle scheitert daran, dass 95 die tägliche Ladenakte
+ist und die Betriebsberichte laufend wie historisch auf 85 stehen (ihre Reihenfolge ist das Datum,
+`0113`). **Verworfen:** die Historie an `prioritaet >= 90` erkennen.
+
+**2. Laufend sind nur Tages- und Wochenberichte der letzten 21 Tage.** 21 = Reife 7 + Nachlauf 14,
+damit auch der zweite Abruf eines Tages Tagesgeschäft ist (`BETRIEBSBERICHT_LAUFEND_TAGE`).
+**Monatsberichte sind immer Nachladen:** sie werden an einem Tag im Monat für alle Betriebe fällig
+(930 Aufrufe, ~80 min), vertragen einen Monat Verzug (22.09.2026, 7) und speisen keine
+materialisierte Sicht. In Phase C kommen sie trotzdem zuerst dran.
+
+**3. Eine Sitzung über alle drei Phasen, nicht zwei Läufe.** Ein LINA-Client (eine Anmeldung je
+Nacht, ein `letzterRequest`) und eine Laufsperre, die über Phase B hält. Zwei `workerLauf()` wären
+eine zweite Anmeldung gegen den einzigen Zugang und ein Fenster, in dem ein Handstart neben
+Phase C arbeitet. Das Tagesbudget bleibt EINE Obergrenze; Phase A hat Vorrang, weil sie zuerst
+läuft.
+
+**4. Nach Phase C wird nur aufgefrischt, was sie berührt hat.** Über `pg_depend` gemessen: keine
+materialisierte Sicht liest aus Betriebsbericht-Tabellen. Die Konzern-Historie trifft
+Deckungsbeitrag, Round Table und Vergleichstag — diese drei laufen nach C, **nur** wenn C einen
+Konzern-Posten geladen hat. **Verworfen:** nach C immer alles auffrischen (zwölf Minuten für
+nichts, sobald die Konzern-Historie durch ist) und gar nicht auffrischen (dann stünde eine
+nachgeladene Sparte einen Tag später in den Karten — vertretbar, aber vermeidbar).
+
+**5. Ein Nachladen, das nichts schafft, ist nicht `ok`.** Regel 10: stehen fällige
+Nachlade-Posten da und Phase C hat keinen bearbeitet, endet der Lauf `teilweise` mit Grund in der
+Notiz. Dass sie etwas schafft, aber nicht alles, ist dagegen der Normalfall eines Backfills und
+bleibt `ok` — `nachladen_offen` in `mart.sync_status` zeigt, ob die Zahl fällt. Betriebsberichte
+unter der Notbremse (`BETRIEBSBERICHT_JE_LAUF = 0`) zählen nicht als offen: das ist eine
+Entscheidung, kein Rückstand.
+
+**Nicht mitentschieden:** ob ein FoodNotify-Backfill ebenfalls Nachladen sein soll. Seine Spur ist
+nach ~2 Stunden fertig und lief bisher in Phase A; das bleibt so (`offene-punkte.md`).

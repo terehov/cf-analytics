@@ -1917,11 +1917,25 @@ nächste Nachtlauf nach dem Deploy.
   einmal Zeilen geliefert hat, und die Monatsberichte kommen in der Reihenfolge „neueste zuerst"
   erst nach allen Tagesposten ab dem Monatsersten dran (geschätzt ~7.750 Aufrufe bis dorthin,
   bei ~7.800 verfügbaren in der ersten Nacht).
-* **Laufdauer:** mit ~5,3 s je Aufruf füllt eine Nacht das Tagesbudget in rund 15,5 Stunden
+* ~~**Laufdauer:** mit ~5,3 s je Aufruf füllt eine Nacht das Tagesbudget in rund 15,5 Stunden
   (05:02 bis ~20:30). **Phase B (alle Materialisierungen, Round Table) läuft erst danach** — der
   Round Table des Tages steht also abends statt vormittags. Ist das nicht tragbar:
   `BETRIEBSBERICHT_JE_LAUF` senken (nicht den Takt erhöhen, Regel 3), oder Phase B vor die
-  Betriebsberichte ziehen — das wäre ein Umbau von `sync.ts`/`phasen.test.ts`.
+  Betriebsberichte ziehen — das wäre ein Umbau von `sync.ts`/`phasen.test.ts`.~~
+  **Entschieden und gebaut am 23.09.2026 (`0116`):** erst Tagesgeschäft, dann Auswertungen, dann
+  Nachladen (`importer.md`, „Drei Phasen"). Der Lauf dauert weiter bis in den Abend, aber
+  Phase B ist gerechnet gegen 07:20–08:00 fertig. **Nach der ersten Nacht nachsehen:**
+  `SELECT lauf_id, gestartet_am, tagesgeschaeft_bis, ableitungen_bis, beendet_am, nachladen_posten,
+  nachladen_offen, status FROM mart.sync_status LIMIT 3;` — `ableitungen_bis` sollte am Vormittag
+  liegen (die erste Nacht holt das 21-Tage-Fenster der Tagesberichte auf einmal, dort eher gegen
+  10:30), `nachladen_offen` von Nacht zu Nacht fallen. Und
+  `SELECT * FROM mart.materialisierung_stand WHERE zustand <> 'aktuell';` — erwartet leer, auch
+  der Wetter-Merker.
+* **FoodNotify-Backfill als Nachladen?** (offen seit 23.09.2026) Die FoodNotify-Spur läuft
+  vollständig in Phase A, auch ein Bestellseiten- oder Inventur-Backfill — gemessen dauerte sie
+  zuletzt ~2 Stunden und bindet Phase B damit kaum. Wird ein großer FoodNotify-Backfill nötig, der
+  Phase A merklich verlängert, wäre `nachladen` auch dort zu setzen und Phase C um die zweite Spur
+  zu erweitern. Eugene entscheidet, wenn es so weit ist.
 * **`fenster_zu_gross`:** `SELECT endpunkt, count(*) FROM sync.warteschlange WHERE ergebnis =
   'fenster_zu_gross' GROUP BY 1;` — wie oft Wochen geteilt werden mussten, und bei welchen
   Betrieben. Laufen viele Tagesposten danach auf `aufgegeben`, ist ein Tag für LINA schon zu groß.

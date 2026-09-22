@@ -242,8 +242,12 @@ export async function historieNachziehen(): Promise<number> {
                    WHERE w.endpunkt = $1 AND w.zeitraum_von = t::date)
             ORDER BY t DESC
             LIMIT $3)
-       INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet)
-       SELECT $1, tag, tag, $4 FROM fehlend
+       -- nachladen = true (0116): die Historie laeuft in Phase C, NACH den
+       -- Auswertungen. Die Tage, die das Tagesgeschaeft braucht, hat
+       -- linaNachfuellen() davor schon eingereiht — hier landet nur, was
+       -- darueber hinaus fehlt.
+       INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, nachladen)
+       SELECT $1, tag, tag, $4, true FROM fehlend
        RETURNING posten_id`,
       [ep.key, config.HISTORIE_AB, uebrig, PRIORITAET.historie])
 
@@ -319,6 +323,21 @@ export async function betriebsberichteNachfuellen(
   }
   let gegenprobe = 0, nachlauf = 0, erst = 0
 
+  /*
+   * TAGESGESCHÄFT ODER NACHLADEN (0116, Entscheidung 23.09.2026). Laufend
+   * sind die Tages- und Wochenberichte (Klasse T/W), deren Zeitraum in den
+   * letzten BETRIEBSBERICHT_LAUFEND_TAGE endet — sie laufen in Phase A, vor
+   * den Auswertungen, damit neue Tage täglich ankommen. Alles andere läuft in
+   * Phase C, danach. Die Gegenprobe (1.) bleibt Tagesgeschäft: sie ist
+   * Nacharbeit an den letzten 60 Tagen und klein. Begründung der Grenze bei
+   * `BETRIEBSBERICHT_LAUFEND_TAGE` in src/config.ts.
+   */
+  const laufendKeys = AKTIVE_BETRIEBSBERICHTE
+    .filter(b => b.klasse === 'T' || b.klasse === 'W').map(b => b.key)
+  const laufendAbDatum = new Date(`${heute}T00:00:00Z`)
+  laufendAbDatum.setUTCDate(laufendAbDatum.getUTCDate() - config.BETRIEBSBERICHT_LAUFEND_TAGE)
+  const laufendAb = laufendAbDatum.toISOString().slice(0, 10)
+
   // 1. Gegenprobe nachholen
   const g = await query<{ endpunkt: string }>(
     `WITH f AS (
@@ -347,8 +366,9 @@ export async function betriebsberichteNachfuellen(
   // 2. Nachlauf: einmal neu, wenn der erste Abruf vor Ende + NACHLAUF_TAGE lag
   if (uebrig > 0 && config.BETRIEBSBERICHT_NACHLAUF_TAGE > 0) {
     const r = await query<{ posten_id: string }>(
-      `INSERT INTO sync.warteschlange (endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis, prioritaet)
-       SELECT a.endpunkt, b.enc_id, a.zeitraum_von, a.zeitraum_bis, $4
+      `INSERT INTO sync.warteschlange (endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis, prioritaet, nachladen)
+       SELECT a.endpunkt, b.enc_id, a.zeitraum_von, a.zeitraum_bis, $4,
+              NOT (a.endpunkt = ANY($6::text[]) AND a.zeitraum_bis >= $7::date)
          FROM core.betriebsbericht_abruf a
          JOIN core.betrieb b ON b.betrieb_key = a.betrieb_key
         WHERE a.endpunkt = ANY($1::text[])
@@ -360,7 +380,8 @@ export async function betriebsberichteNachfuellen(
         LIMIT $3
        ON CONFLICT DO NOTHING
        RETURNING posten_id`,
-      [keys, config.BETRIEBSBERICHT_NACHLAUF_TAGE, uebrig, PRIORITAET.betriebsbericht, heute])
+      [keys, config.BETRIEBSBERICHT_NACHLAUF_TAGE, uebrig, PRIORITAET.betriebsbericht, heute,
+       laufendKeys, laufendAb])
     nachlauf = r.length
     uebrig -= nachlauf
   }
@@ -405,8 +426,9 @@ export async function betriebsberichteNachfuellen(
           CROSS JOIN ep e
           WHERE b.enc_id IS NOT NULL
        )
-       INSERT INTO sync.warteschlange (endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis, prioritaet)
-       SELECT x.key, x.enc_id, x.von, x.bis, $5
+       INSERT INTO sync.warteschlange (endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis, prioritaet, nachladen)
+       SELECT x.key, x.enc_id, x.von, x.bis, $5,
+              NOT (x.key = ANY($6::text[]) AND x.bis >= $7::date)
          FROM einheit x
         WHERE x.bis <= $3::date
           AND NOT EXISTS (
@@ -416,7 +438,7 @@ export async function betriebsberichteNachfuellen(
         ORDER BY x.von DESC, x.key, x.enc_id
         LIMIT $4
        RETURNING posten_id`,
-      [m, endpunkte, reifBis, uebrig, PRIORITAET.betriebsbericht])
+      [m, endpunkte, reifBis, uebrig, PRIORITAET.betriebsbericht, laufendKeys, laufendAb])
     erst += r.length
     uebrig -= r.length
     monat.setUTCMonth(monat.getUTCMonth() - 1)

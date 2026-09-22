@@ -4662,3 +4662,20 @@ kommt der Tag aus dem Posten; Test „88: das Blockdatum ist kein Tag".
 den Statuscode — ein Treffer im Seitengerüst hätte eine 24-Stunden-Sperre des einzigen Zugangs
 ausgelöst. *Verhindert durch:* 504 wird vor der Abwehrprüfung gelesen (`src/lina/client.ts`), und
 der Worker teilt ein mehrtägiges Fenster statt es zu wiederholen (`importer.md`, „Betriebsberichte").
+
+## Der Wetter-Refresh stand seit `0111` jeden Tag auf „veraltet" — ohne veraltet zu sein (23.09.2026)
+
+*Symptom:* `mart.materialisierung_stand` meldete `mart.wetter_tag_basis` als `veraltet`, und die
+Prüfzeile „Materialisierung: aelter als der letzte Lauf" in `mart.pruefung_materialisierung`
+stand auf 1. Gemessen in Produktion am 23.09.2026: aufgefrischt 22.09. 03:14 UTC, Laufende 05:06
+UTC. *Ursache:* die Sicht vergleicht jeden Merker mit dem Laufende minus eine Stunde. Der
+Wetter-Refresh läuft seit `0111` am Ende von `wetterNachlauf()`, also in Phase A neben dem Import
+— und der dauert fast zwei Stunden. Der Merker war also immer „älter als der Lauf", obwohl der
+Refresh gelungen war. Eine Prüfzeile, die jeden Tag schlägt, liest niemand mehr — und dann auch
+nicht an dem Tag, an dem ein Refresh wirklich scheitert. *Verhindert durch:* `0116` misst jeden
+Merker gegen das, worauf sein Refresh wartet: der Wetter-Merker gegen den Laufbeginn, alle anderen
+gegen das Ende des Tagesgeschäfts (`sync.lauf.tagesgeschaeft_bis`). Dieselbe Änderung war mit den
+drei Phasen ohnehin nötig: ab `0116` endet der Lauf erst nach dem Nachladen, und gegen
+`beendet_am` stünde dann **jede** Materialisierung abends auf „veraltet".
+**Regel:** eine Frischeprüfung vergleicht mit dem Zeitpunkt, nach dem der Refresh laufen MUSS —
+nicht mit dem Ende von irgendetwas, das zufällig danach kommt.

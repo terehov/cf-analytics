@@ -4779,7 +4779,11 @@
     "aufgaben_uebersprungen",
     "dauer_s",
     "offene_abweichungen",
-    "pausierte_kombinationen"
+    "pausierte_kombinationen",
+    "tagesgeschaeft_bis",
+    "ableitungen_bis",
+    "nachladen_posten",
+    "nachladen_offen"
    ],
    "achsen": [],
    "kennzahlen": [],

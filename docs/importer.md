@@ -6,7 +6,131 @@ Was hier an Fallstricken steckt und schon einmal zugeschlagen hat, steht gesamme
 `fehlerkatalog.md` — besonders die Abschnitte zum partiellen Eindeutigkeitsindex und dazu,
 warum ein Lauf früher an jedem Verbindungsfehler starb.
 
+## Drei Phasen: erst das Tagesgeschäft, dann die Auswertungen, dann das Nachladen (23.09.2026)
+
+Entscheidung Eugene, wörtlich: *„Erst Tagesgeschäft, dann nachladen — Der Lauf holt zuerst die
+Tagesdaten und frischt die Auswertungen morgens auf. Danach lädt er die Historie bis zum
+Tagesbudget nach."* Begründung in `entscheidungen.md` (23.09.2026), Migration `0116`.
+
+**Anlass.** Seit `0113` luden die Betriebsberichte mit dem Budget, das nach dem Tagesgeschäft
+übrig blieb — verschränkt mit den übrigen LINA-Posten, aber in derselben Phase A. Bei ~5,3 s je
+Aufruf füllt eine Nacht das Tagesbudget (10.500) in rund 15,5 Stunden; Phase B (alle
+Materialisierungen, Round Table, Zulaufprüfung) wäre erst gegen 20:30 gelaufen, die Dashboards
+hätten den ganzen Tag den Vortag gezeigt.
+
+```text
+  nachfuellen()                     Vorlauf: die Schlange füllen (setzt nachladen je Posten)
+
+  workerOeffnen()                   Sperre + Lauf + EIN LINA-Client für alle Phasen
+  ── Phase A ── Tagesgeschäft, nebeneinander ──────────────
+     sitzung.tagesgeschaeft()       LINA-Spur: nur nachladen = false ‖ FoodNotify-Spur: alles
+     yext · bounti · wetter · pflege
+  ── Sammelpunkt: Promise.allSettled ── stempelt sync.lauf.tagesgeschaeft_bis ──
+
+  ── Phase B ── die Ableitungen, seriell, unverändert ─────
+     zuordnung · deckungsbeitrag · roundTable · auswahllisten · vergleichstag
+     einkaufspreis · einkaufSichten · pflichtartikel · zulaufPruefen
+  ── sitzung.ableitungenFertig() ── stempelt sync.lauf.ableitungen_bis ──
+
+  ── Phase C ── das Nachladen, nur die LINA-Spur ──────────
+     sitzung.nachladen()            alles Fällige, verschränkt, bis Budget/Fenster/Notbremse
+     wenn Konzern-Historie geladen: deckungsbeitrag · roundTable · vergleichstag
+  ── sitzung.abschliessen() ── Status, Notiz, nachladen_posten/_offen, Sperre frei ──
+```
+
+**Was „Nachladen" ist, steht am Posten:** `sync.warteschlange.nachladen` (`0116`), gesetzt vom
+Einreihweg. Nicht die Uhr (ein Lauf, der um 11:00 startet, hätte sonst kein Tagesgeschäft), und
+nicht die Priorität (90 heißt Historie, aber 95 heißt Ladenakte, und die Betriebsberichte stehen
+laufend wie historisch auf 85 — ihre Reihenfolge ist das Datum).
+
+| Einreihweg | `nachladen` |
+|---|---|
+| `historieNachziehen()` (Konzern-Historie, `HISTORIE_JE_LAUF`) | **true** |
+| `sync.historie_einreihen()` (`einreihen --historie`) | **true** |
+| Betriebsberichte, Klasse T/W, Zeitraum endet in den letzten `BETRIEBSBERICHT_LAUFEND_TAGE` (21) | false |
+| Betriebsberichte sonst — ältere T/W, **alle Monatsberichte** (M, M-Tag), auch ihr Nachlauf | **true** |
+| Gegenprobe-Nachholung (Priorität 50) | false |
+| Nachzügler-Fenster, Jahres-/Momentaufnahmen, Nulltage, Lochtage, Nachlese, Ladenakte, FoodNotify | false (Vorgabe) |
+| Fensterteilen im Worker (504) | erbt vom geteilten Posten |
+
+21 Tage = Reife (7) + Nachlauf (14): auch der zweite Abruf eines Tages ist Tagesgeschäft.
+Monatsberichte sind **nie** Tagesgeschäft: 15 Berichte × 62 Betriebe werden an einem Tag im Monat
+fällig (und noch einmal zum Nachlauf) — 930 Aufrufe, rund 80 Minuten, um die sich an zwei Tagen im
+Monat die Dashboards verspätet hätten, für Berichte, die einen Monat Verzug vertragen und aus
+denen keine materialisierte Sicht liest. In Phase C kommen sie trotzdem zuerst (`posten_holen`
+ordnet nach Datum).
+
+**Phase A.** `sync.posten_holen(lauf, 'lina_br_laufend' | 'lina_sonst_laufend')` — dieselben
+Hälften wie seit `0113`, ohne das Nachladen. Verschränkung, Reserve („Betriebsberichte nur, wenn
+das Budget danach für alle fälligen übrigen Posten reicht") und Notbremse wie bisher, die Reserve
+zählt die übrigen Posten derselben Phase. FoodNotify unverändert. Die LINA-Notiz heißt am Ende
+„Tagesgeschaeft erledigt" statt „Schlange leer" — die Schlange ist ja nicht leer.
+
+**Phase C.** Nur die LINA-Spur, `lina_br`/`lina_sonst` (alles Fällige — also auch ein
+Tagesgeschäftsposten, der in Phase A in eine Wiedervorlage ging). **Derselbe Client, derselbe
+Takt, dasselbe Tagesbudget** (harte Regel 3): Phase A hat es zuerst bekommen, Phase C erhält den
+Rest. Phase C startet **nicht**, wenn die LINA-Spur in Phase A abgebrochen ist (Signal,
+Zugangssperre, Fehlerserie) — die Notiz sagt es. FoodNotify läuft in Phase C nicht noch einmal
+(seine Spur war in Phase A zu Ende, wie vor `0116` am Importende).
+
+**Eine Sitzung, nicht zwei Läufe.** `workerOeffnen()` hält den LINA-Client und die Laufsperre
+über alle drei Phasen. Zwei `workerLauf()`-Aufrufe wären eine zweite Anmeldung je Nacht gegen
+einen Zugang, den wir nicht besitzen, und die Sperre fiele zwischen A und C: ein Handstart in
+Phase B arbeitete neben Phase C. `workerLauf()` bleibt als Zug „A, dann C, ohne B" für Tests und
+Handaufrufe.
+
+**Was nach Phase C aufgefrischt wird — und warum nur das.** Gemessen über `pg_depend` am
+23.09.2026 (rekursiv über Sichten bis zu den Tabellen): **keine** materialisierte Sicht liest aus
+einer Betriebsbericht-Tabelle. Die Konzern-Historie schreibt `core.umsatzbericht_tag` und
+`core.artikelverkauf_tag`; daraus lesen `mart.deckungsbeitrag_warengruppe`, der Round Table
+(`round_table_monat`, `_trend`, `artikel_monat_basis`, `artikeltage_basis`) und
+`mart.vergleichstag_basis`. Nur wenn Phase C mindestens einen Konzern-Posten `ok` geladen hat
+(`PhasenErgebnis.konzernOk`), laufen diese drei Nachläufe noch einmal (gemessen in Produktion am
+22.09.2026: 295 + 310 + 45 s). Einkauf, Pflichtartikel und Wetter lesen nichts, was Phase C
+schreibt; die Auswahllisten hängen am jüngsten Monat. Misslingt der Refresh nach C, zeigen die
+Sichten die nachgeladene Historie einen Tag später — der nächste Lauf holt es in Phase B nach.
+
+**Regel 10: was Phase C geschafft hat, steht in der Datenbank.** `sync.lauf` trägt seit `0116`
+`tagesgeschaeft_bis` (Ende A), `ableitungen_bis` (Ende B — **die Frische der Dashboards**),
+`nachladen_posten` und `nachladen_offen` (offene Nachlade-Posten nach C; Betriebsberichte zählen
+nicht mit, solange die Notbremse sie abschaltet). `mart.sync_status` führt alle vier. Hat Phase C
+**nichts** geschafft, obwohl Nachlade-Posten fällig sind (Budget in A verbraucht, Arbeitsfenster
+zu, Postenobergrenze), steht der Lauf auf `teilweise` mit „NICHTS nachgeladen, obwohl N fällig"
+in der Notiz. Ein Lauf auf `laeuft` mit gesetztem `ableitungen_bis` arbeitet am Nachladen.
+
+**Die Notiz wird seitdem angehängt, nicht überschrieben.** `zulaufPruefen()` (Phase B) trifft den
+Lauf jetzt im Zustand `laeuft` an und kann ihn nicht herabstufen; es hängt seine Notiz an, und
+`abschliessen({ stummeQuellen })` stuft beim Schließen herab (nur `ok` → `teilweise`, wie bisher).
+
+**Die Frischeprüfungen messen gegen das Ende des Tagesgeschäfts.** `mart.materialisierung_stand`
+und `mart.vergleichstag_stand` verglichen den Merker mit `beendet_am - 1 h`. Ab `0116` endet der
+Lauf erst nach C — jede Materialisierung stünde abends auf „veraltet". Bezug ist jetzt
+`coalesce(tagesgeschaeft_bis, beendet_am)`, für den Wetter-Merker (gesetzt in Phase A) der
+Laufbeginn. Dabei fiel ein Fehlalarm seit `0111` auf (`fehlerkatalog.md`, 23.09.2026).
+
+**Wann Phase B im Backfill fertig ist — die Rechnung.** Gemessen an den Läufen 126–133
+(15.–22.09.2026, vor den Betriebsberichten): Laufbeginn ~05:13, Import 1 h 33 – 1 h 56 (908–1.214
+Aufgaben, beide Spuren), Phase B danach 12,5 min (22.09.: Importende 07:06, letzter Refresh
+07:18). Dazu kommen die laufenden Tages- und Wochenberichte: 2 T-Berichte × 62 Betriebe, je Tag
+einmal Erstabruf und einmal Nachlauf = ~250 Aufrufe, an Wochentagen mit fälligen Wochen bis ~430,
+bei ~5,3 s also 22–38 min — falls die LINA-Spur die bindende ist. **Phase B ist damit gegen
+07:20–08:00 fertig statt gegen 20:30.** Nicht gemessen, sondern gerechnet; nachzusehen in
+`mart.sync_status.ableitungen_bis`. **Ausnahme: die erste Nacht nach dem Deploy** holt das ganze
+21-Tage-Fenster auf einmal (~14 Tage × 124 + 2 Wochen × 186 ≈ 2.100 Aufrufe, ~3 h) — dann gegen
+10:30.
+
+**Tests.** `src/sync/phasen.test.ts`: am Quelltext, dass Phase C nach jeder Ableitung steht und
+genau die drei Sichten danach auffrischt; mit `TEST_DATABASE_URL` gegen die Attrappe, dass Phase A
+kein Nachladen zieht, C erst nach dem Stempel von B beginnt, das Budget respektiert, „nichts
+geschafft" nicht `ok` ist, stumme Quellen aus B beim Schließen wirken und die Sperre über B hält.
+`src/sync/betriebsbericht.test.ts`: welcher Betriebsbericht Nachladen ist, und dass geteilte
+Fenster es erben.
+
 ## Zwei Phasen: die Dienste nebeneinander, die Ableitungen danach (24.08.2026)
+
+> **Seit dem 23.09.2026 sind es drei Phasen** (Abschnitt darüber). Was hier steht, gilt für
+> Phase A und B unverändert; neu ist, dass die LINA-Spur in Phase A nur das Tagesgeschäft zieht.
+
 
 `sync.ts` war bis zum 24.08.2026 eine Kette von `await`s: erst der Import, dann
 Yext, Handpflege, Bounti, dann alles Materialisierte. **Nur die Warteschlange
@@ -95,6 +219,10 @@ Es gibt **keinen** getrennten Backfill- und Sync-Modus. Beides sind Einträge in
 | 50 | Nacharbeit nach Fehlern — auch das Nachholen einer abweichenden Betriebsbericht-Gegenprobe (seit `0113`) |
 | 85 | Betriebsberichte (seit `0113`) — konkurrieren **nicht** über die Priorität, siehe „Betriebsberichte" unten |
 | 90 | Historie, rückwärts |
+
+Seit `0116` entscheidet **nicht die Priorität**, ob ein Posten vor oder nach den Ableitungen
+läuft, sondern `sync.warteschlange.nachladen` — siehe „Drei Phasen" oben. Die Priorität ordnet
+weiter innerhalb einer Phase.
 
 Aktuelle Daten können damit nie hinter dem Backfill verhungern, und es gibt nur einen Codepfad statt zweier, die auseinanderlaufen.
 
@@ -1511,8 +1639,10 @@ noch für alle reicht. Test: Budget 5, vier übrige Posten → genau ein Betrieb
 
 **Das Tempo ändert sich nicht.** Es bleibt eine Schleife mit einem Client (Regel 3). Verschränkt
 wird die Reihenfolge, nicht die Rate. Eine Nacht wird dadurch **länger**: bei ~5,3 s je Aufruf
-sind 10.500 Aufrufe rund 15,5 Stunden, der Lauf endet ab 05:02 also gegen 20:30. Phase B (die
-Materialisierungen) läuft erst danach — siehe `offene-punkte.md`.
+sind 10.500 Aufrufe rund 15,5 Stunden, der Lauf endet ab 05:02 also gegen 20:30. ~~Phase B (die
+Materialisierungen) läuft erst danach — siehe `offene-punkte.md`.~~ **Seit dem 23.09.2026
+(`0116`) nicht mehr:** die Betriebsbericht-Historie läuft in Phase C, nach den Ableitungen; in
+Phase A nur die laufenden Tages- und Wochenberichte. Siehe „Drei Phasen" oben.
 
 **Notbremse:** `BETRIEBSBERICHT_JE_LAUF` (Vorgabe: gleich `TAGESBUDGET`). Auf 0 zieht der Worker
 auch schon eingereihte Betriebsberichte nicht mehr, der Producer reiht nichts ein, und
