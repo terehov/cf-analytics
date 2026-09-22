@@ -1912,7 +1912,11 @@ nächste Nachtlauf nach dem Deploy.
   `aktiv: false` und nachmessen (Eugene: `bun run lina-fragen`).
 * **Gegenprobe und Lücken:** `SELECT befund, count(*) FROM mart.betriebsbericht_gegenprobe GROUP BY 1;`
   und die drei neuen Zeilen in `mart.pruefung_uebersicht`. Die Lückenzeile darf in der ersten
-  Nacht über 0 stehen (der Backfill beginnt), ab der zweiten nicht mehr.
+  Nacht über 0 stehen (der Backfill beginnt), ab der zweiten nicht mehr. Ebenso kann der erste
+  Lauf `teilweise` enden: `mart.quelle_zulauf` führt jeden Betriebsbericht als `nie`, bis er
+  einmal Zeilen geliefert hat, und die Monatsberichte kommen in der Reihenfolge „neueste zuerst"
+  erst nach allen Tagesposten ab dem Monatsersten dran (geschätzt ~7.750 Aufrufe bis dorthin,
+  bei ~7.800 verfügbaren in der ersten Nacht).
 * **Laufdauer:** mit ~5,3 s je Aufruf füllt eine Nacht das Tagesbudget in rund 15,5 Stunden
   (05:02 bis ~20:30). **Phase B (alle Materialisierungen, Round Table) läuft erst danach** — der
   Round Table des Tages steht also abends statt vormittags. Ist das nicht tragbar:
@@ -1965,6 +1969,14 @@ nächste Nachtlauf nach dem Deploy.
 * **Der Producer prüft nach dem Backfill jede Nacht alle Monate erneut (27 s am Klon).** Eine
   Wassermarke würde das sparen, aber einen nachträglich auftauchenden Umsatztag in einem alten
   Monat übersehen.
-* **Der Katalogabzug des MCP-Servers** (`mcp/test/katalog.json`) kennt die neuen `mart`-Sichten
-  aus `0112`/`0114` noch nicht — gegen eine vollständige Datenbank neu ziehen, wenn die
-  Auswertungsschicht dazukommt.
+* **`src/messen.ts`, Messung `d2` (Bericht 107) nutzt noch den alten Weg**
+  `/finanzen/analytics/getReport` — den, der für jeden Betrieb leere Gerüste liefert
+  (KORREKTUR 7). Die Frage selbst ist durch die Vermessung vom 22.09.2026 beantwortet (107 liefert
+  auch über `laden=` 500 ohne Rumpf); wer `d2` trotzdem startet, bekommt eine Antwort ohne
+  Aussage. Nicht umgebaut, weil der Befehl nur im Terminal des Nutzers läuft (Regel 7a).
+* ~~**Der Katalogabzug des MCP-Servers** kennt die neuen `mart`-Sichten noch nicht.~~ **Neu
+  gezogen am 22.09.2026** gegen einen vollständigen Klon auf Stand `0115` (lokale `lina` +
+  `0102`–`0115`): gegenüber dem Abzug davor genau die sechs neuen Sichten aus `0112`/`0114`
+  hinzugekommen, keine andere Sicht verändert. `cd mcp && bun test`: 387 grün;
+  `katalog_abzug.test.ts` gegen den Klon grün. Wenn die Auswertungsschicht (M5) dazukommt,
+  erneut ziehen.
