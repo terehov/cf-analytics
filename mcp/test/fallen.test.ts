@@ -474,6 +474,21 @@ describe('Betriebsberichte: Nachlass, Finanzwege, Bons', () => {
     expect(e.befunde.find(b => b.schluessel === 'finanzweg_name_exakt')!.schwere).toBe('warnung')
   })
 
+  test('Rabattbericht und Artikelverkauf ueber den Kassennamen verbunden — gewarnt, artikel_key nicht', () => {
+    const name = gesperrt(`
+      SELECT n.artikel, sum(n.menge), sum(a.menge)
+        FROM mart.artikel_nachlass_monat n
+        JOIN mart.artikel_monat a ON a.artikel = n.artikel AND a.monat = n.monat
+       WHERE n.monat = '2026-08-01' GROUP BY 1`)
+    expect(name.schluessel).toContain('nachlass_join_artikelname')
+    const schluessel = gesperrt(`
+      SELECT n.artikel, sum(n.menge)
+        FROM mart.artikel_nachlass_monat n
+        JOIN mart.artikel_monat a ON a.artikel_key = n.artikel_key AND a.monat = n.monat
+       WHERE n.monat = '2026-08-01' GROUP BY 1`)
+    expect(schluessel.schluessel).not.toContain('nachlass_join_artikelname')
+  })
+
   test('92 gegen 88/97 in einer Summe: Artikel und Vorgaenge — gewarnt', () => {
     const e = gesperrt(`
       SELECT n.betrieb, sum(n.menge) + sum(f.anzahl_vorgaenge)

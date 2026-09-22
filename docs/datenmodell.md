@@ -1168,6 +1168,6 @@ das Schema darüber hinaus trägt:
   Sichten in `mcp.sicht`; Aggregationsregeln in `mcp.kennzahl` — die Quotienten tragen eigene Namen
   (`bon_durchschnitt`, `stornoquote_pct`, `nachlass_anteil_pct` …), weil der Prüfer die Regel je
   **Spaltenname** über alle Sichten anwendet. Die Prüfsicht `mart.finanzweg_88_97_abgleich` ist über
-  `mcp.kennzahl` gegen `sum()`/`avg()` gesperrt. `0118` trägt 13 Fallstricke ein, drei davon mit
+  `mcp.kennzahl` gegen `sum()`/`avg()` gesperrt. `0118` trägt 14 Fallstricke ein, drei davon mit
   neuen Regelarten (`filter_ueber_spalte`, `wert_muster`, `sichten_mischen`, umgesetzt in
   `mcp/src/pruefen.ts`).

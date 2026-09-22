@@ -1,5 +1,5 @@
 -- =====================================================================
--- 0118 Die Fallen der Betriebsberichte im MCP-Pruefer (M5, Plan 6.3 Punkt 2)
+-- 0118 Die Fallen der Betriebsberichte im MCP-Pruefer (M5, Plan 6.3 Punkt 2) — 14 Eintraege
 --
 -- 0117 raeumt die Fallen in den Sichten aus, soweit eine Sicht das kann.
 -- Was bleibt, ist, was ein Modell mit diesen Sichten FALSCH FRAGEN kann —
@@ -87,6 +87,16 @@ INSERT INTO mcp.fallstrick (schluessel, art, schwere, sicht, parameter, hinweis,
    'fehlen bewusst) — fuer den vollstaendigen Nachlassbetrag je Aktion ist mart.nachlass_monat da.',
    'Verkaufsmengen stehen in mart.artikel_monat, Vorgaenge und Betraege je Aktion in mart.nachlass_monat.',
    'docs/metabase.md, Abschnitt zu 0117'),
+
+  -- --- Artikel ueber den Kassennamen verbunden -----------------------
+  ('nachlass_join_artikelname', 'join_ueber_name', 'warnung', 'mart.artikel_nachlass_monat',
+   '{"spalte":"artikel"}',
+   'Der Rabattbericht kennt nur den KASSENNAMEN eines Artikels. Ueber den Namen verbunden, trifft '
+   'er je Konzept andere Artikel (Artikelnummern sind je Konzept vergeben) und verliert jeden '
+   'Namen, der anders geschrieben ist.',
+   'Ueber artikel_key verbinden — gesetzt, wo der Name eindeutig einem im selben Betrieb und Zeitraum '
+   'verkauften Artikel entspricht. Was offen bleibt, steht in mart.rabatt_artikel_unaufgeloest.',
+   'docs/datenherkunft.md, Abschnitt Betriebsberichte'),
 
   -- --- Artikel (92) und Vorgaenge (88/97) in einer Summe --------------
   ('artikel_gegen_vorgaenge', 'sichten_mischen', 'warnung', NULL,

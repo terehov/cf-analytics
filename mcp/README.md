@@ -111,7 +111,7 @@ bun run nutzer sperren  daniel@brain.food          # stilllegen + alle Tokens wi
 ## Befehle
 
 ```bash
-bun test                 # 416 Tests ohne Datenbank, 461 mit (23.09.2026): Fallenfragen, Umgehungen, Anmeldeablauf, Spaltenprofil
+bun test                 # 417 Tests ohne Datenbank, 462 mit (23.09.2026): Fallenfragen, Umgehungen, Anmeldeablauf, Spaltenprofil
 bun run typecheck
 bun run build            # die Ansichten (vite) — vor dem ersten Start noetig
 bun run start            # Produktionsstart; Port aus __PORT, nicht PORT

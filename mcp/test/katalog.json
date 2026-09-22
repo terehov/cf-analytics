@@ -7064,6 +7064,18 @@
    "quelle": "docs/datenmodell.md, Abschnitt Markenebene"
   },
   {
+   "schluessel": "nachlass_join_artikelname",
+   "art": "join_ueber_name",
+   "schwere": "warnung",
+   "sicht": "mart.artikel_nachlass_monat",
+   "parameter": {
+    "spalte": "artikel"
+   },
+   "hinweis": "Der Rabattbericht kennt nur den KASSENNAMEN eines Artikels. Ueber den Namen verbunden, trifft er je Konzept andere Artikel (Artikelnummern sind je Konzept vergeben) und verliert jeden Namen, der anders geschrieben ist.",
+   "berichtigung": "Ueber artikel_key verbinden — gesetzt, wo der Name eindeutig einem im selben Betrieb und Zeitraum verkauften Artikel entspricht. Was offen bleibt, steht in mart.rabatt_artikel_unaufgeloest.",
+   "quelle": "docs/datenherkunft.md, Abschnitt Betriebsberichte"
+  },
+  {
    "schluessel": "nachlass_menge_deutung_monat",
    "art": "deutung",
    "schwere": "warnung",

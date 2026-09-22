@@ -3623,3 +3623,45 @@ Entscheidung, kein Rückstand.
 
 **Nicht mitentschieden:** ob ein FoodNotify-Backfill ebenfalls Nachladen sein soll. Seine Spur ist
 nach ~2 Stunden fertig und lief bisher in Phase A; das bleibt so (`offene-punkte.md`).
+
+## Die Kassendaten in `mart` und im MCP-Zugang (23.09.2026, Migrationen `0117`/`0118`)
+
+Auftrag Eugene: Fragen wie das Glücksrad soll der Fachbereich selbst über ChatGPT/Claude/Copilot
+beantworten, ohne SQL und ohne Auftrag; später ergänzt um „alle neuen Informationen über den MCP
+zugänglich und schnell". Fünf Entscheidungen beim Bau:
+
+**1. 97 vor 88, je Betrieb und Tag.** Beide Berichte tragen dieselbe Finanzwegzahl. 97 kommt aus
+einem Monatsaufruf und ist damit für einen ganzen Monat vollständig, 88 kommt früher (Tagesraster,
+Reife 7 Tage). Die Sicht nimmt je Betrieb und Tag 97, wo es ihn gibt, sonst 88 — nie beide.
+**Verworfen:** 88 als einzige Quelle (dann fehlten Monate, in denen nur 97 geladen ist) und eine
+Summe mit Filter auf `bericht` (eine Falle, die jede Abfrage neu stellen müsste).
+
+**2. Positive Vorzeichen in `mart`.** LINA führt Zahlungen, Nachlässe und Stornos negativ. Für den
+Fachbereich ist „Nachlass 4.281,50 €" die Zahl, nicht „−4.281,50". Die Spalten heißen nach dem,
+was sie zählen (`nachlass_brutto`, `storno_brutto`, `zahlbetrag`). Trinkgeld und Rückgeld stehen
+unter den Zahlarten negativ, weil sie in den Zahlbeträgen stecken — dann ergeben alle Zahlarten
+den Bruttoumsatz, nachgerechnet auf den Cent. **Verworfen:** `abs()` (dreht eine Rücknahme still
+um) und LINAs Vorzeichen (jede Karte müsste negieren).
+
+**3. `sichten_mischen` (Artikel gegen Vorgänge) warnt, statt zu sperren.** Plan 6.3 sah eine Sperre
+vor. Seit `0117` heißen die Spalten verschieden (`menge`, `anzahl_vorgaenge`), eine versehentliche
+Addition braucht also Absicht — und „Artikel je Nachlassvorgang" ist eine legitime Frage, die eine
+Sperre verbauen würde. Gesperrt bleibt, was sicher falsch ist: die Nummernliste und die Suche nach
+Nachlässen in den Bons.
+
+**4. Materialisiert wird nur, was gemessen zu langsam war.** In Produktionsgröße (Klon, `metabase.md`)
+waren es zwei Stellen: die Finanzwege je Monat (2,7 s für ein Jahr einer Marke) und der Ladestand
+(10,9 s — und der hängt an jeder MCP-Antwort). Alles andere wurde durch Umbau schnell
+(Ausdrucksindex auf den Monat, verdichten vor dem Benennen, Fensterfunktion statt zweiter
+Gruppierung). **Verworfen:** die Monatssichten des Rabattberichts und die Bonsichten zu
+materialisieren — 0,3 s für einen Monat über alle Betriebe rechtfertigen keinen dritten nächtlichen
+Refresh. Beide Materialisierungen frischen in Phase B **und** nach Phase C auf, Bedingung
+`c.posten > 0`: der Konzernzähler aus `0116` (`konzernOk`) zählt keine Betriebsberichte, und ein
+eigener Zähler im Worker hätte eine Datei berührt, an der parallel gearbeitet wird. Ein Refresh
+zu viel kostet 47 s, einer zu wenig einen Tag falschen Ladestand.
+
+**5. Die Karten lesen nur `mart`.** Der MCP-Server führt Karten als `mcp_leser` aus; eine Karte auf
+`core` läuft in Metabase und scheitert im Chat. Das kostet bei der Artikelaktion, dass `aa_nachlass`
+nicht auf die Hilfstabellen der Nachbarkarten zugreift, sondern die Artikelliste nur markiert
+(„auf der Liste" ja/nein/nicht zuordenbar) — ein Filter hätte nicht zuordenbare Kassennamen still
+verloren.

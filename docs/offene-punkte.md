@@ -1992,5 +1992,54 @@ nächste Nachtlauf nach dem Deploy.
   gezogen am 22.09.2026** gegen einen vollständigen Klon auf Stand `0115` (lokale `lina` +
   `0102`–`0115`): gegenüber dem Abzug davor genau die sechs neuen Sichten aus `0112`/`0114`
   hinzugekommen, keine andere Sicht verändert. `cd mcp && bun test`: 387 grün;
-  `katalog_abzug.test.ts` gegen den Klon grün. Wenn die Auswertungsschicht (M5) dazukommt,
-  erneut ziehen.
+  `katalog_abzug.test.ts` gegen den Klon grün. ~~Wenn die Auswertungsschicht (M5) dazukommt,
+  erneut ziehen.~~ **Erneut gezogen am 23.09.2026** gegen den Klon `lina_m5_0923` auf Stand
+  `0118`: nur die Sichten, Kennzahlen und Fallstricke aus `0117`/`0118` kamen dazu.
+
+
+## Kassensichten und MCP (M5): was nach dem Bau offen ist (seit 23.09.2026, `0117`/`0118`)
+
+### Nach dem Deploy, in dieser Reihenfolge
+
+* **`0117`/`0118` angewendet?** `SELECT filename FROM public.schema_migration WHERE filename >=
+  '0116'`. `0117` frischt beide Materialisierungen im Zug auf; in Produktion ist `core` zu dem
+  Zeitpunkt fast leer, das dauert Sekunden.
+* **MCP-Server neu starten, NACHDEM die Migration lief.** Der Server liest den Katalog einmal beim
+  Start; startet der neue Container vor dem Importer-Container, fehlen ihm Sichten und Fallstricke
+  bis zum nächsten Neustart. `/status` → `gestartet` gegen den Zeitpunkt der Migration halten.
+* **`bun run metabase/uebernehmen.ts`** — erst danach. Schreibt sofort in die Produktion
+  (AGENTS.md). Nicht ausgeführt, weil die Sichten dort vor dem Deploy nicht existieren.
+* **Katalogabzug gegen eine vollständige Datenbank neu ziehen**, sobald Produktion `0118` hat, und
+  gegen den Abzug aus dem Klon halten. Erwartung: kein Unterschied außer den Kommentaren.
+* **Nach der ersten Nacht:** `SELECT * FROM mart.materialisierung_stand WHERE schluessel =
+  'betriebsbericht_sichten_refresh'` (Erwartung: `aktuell`), `SELECT bericht, aussage FROM
+  mart.betriebsbericht_ladestand` (Erwartung: der jüngste reife Monat für alle Berichte der Stufe A
+  vollständig), und `mart.sicht_defekt` (Erwartung: leer — der Gesundheitslauf probiert die 33 neuen
+  Relationen als `mcp_leser`).
+* **Die Abnahme in Produktion wiederholen**, sobald August 2026 für 92 geladen ist: in ChatGPT oder
+  Claude „Wie viele Stück je Artikel liefen im August mit den Glücksrad-Finanzwegen, je Betrieb, bei
+  Wilma Wunder?" — Erwartung 149 / 1.413 / 7.335, Durchstarter 12 / 107 / 432. Die Antwort muss den
+  Ladestand-Hinweis tragen. `mcp.zugriff` zeigt das SQL.
+
+### Befunde beim Bau, nicht behoben
+
+* **Die älteren Artikelaktion-Karten laufen im Chat nicht.** `aa_kopf`, `aa_betrieb`,
+  `aa_verlauf_*`, `aa_artikel`, `aa_liste_pruefung` lesen `core.artikelverkauf_tag` (bewusst, siehe
+  `karten-artikelaktion.ts`) — als `mcp_leser` am 23.09.2026 gemessen: SQLSTATE 42501. In Metabase
+  laufen sie. Abhilfe wäre eine `mart`-Sicht mit `verkaufspreis` und `umsatz_brutto` je Artikel und
+  Tag, die die Karten lesen — dann aber mit der Messung aus `dashboards.md` (8,4 s gegen 0,6 s)
+  wiederholt. `aa_nachlass` liest nur `mart` und läuft im Chat.
+* **Der Fallstrick `bwa_versatz` hängt an JEDER Abfrage.** Art `deutung`, `sicht` NULL — die
+  Regelart prüft nur die Sicht, und NULL heißt „alle". Der Parameter `{"spalten":["bwa_monat"]}` wird
+  von `deutung` nicht gelesen. Folge: jede Antwort, auch die auf die Nachlass-Sichten, trägt die
+  BWA-Warnung. Nicht angefasst, weil die Fallenfrage 6 genau dieses Verhalten erwartet (sie fragt
+  ohne `bwa_monat`); zu entscheiden, ob `deutung` die Spaltenliste beachten soll.
+* **`artikel_key` im Rabattbericht setzt Artikelverkäufe desselben Betriebs und Zeitraums
+  voraus.** Lädt 92 einen Tag, bevor der Artikelverkauf für ihn da ist, bleibt `artikel_key` NULL
+  und wird nicht nachgetragen (der Lader löst nur beim Laden auf). Im Klon mit Artikelverkauf bis
+  12.08.2026 waren im August 2.155 von 2.240 Glücksrad-Zeilen aufgelöst. `aa_nachlass` markiert die
+  übrigen als „nicht zuordenbar", statt sie wegzufiltern. Ein Nachtrag im Nachlauf wäre der Weg.
+* **Klone zum Löschen:** `lina_m5_0923` (Abnahmeklon, Stand `0118`, mit den Fixtures der Abnahme),
+  `lina_m5_last` (24 GB, synthetischer Vollbestand für die Leistungsmessung) und `lina_br_0922`
+  (Testklon, von `betriebsbericht.test.ts` geleert). Nichts davon wird noch gebraucht:
+  `dropdb lina_m5_last lina_m5_0923 lina_br_0922`.

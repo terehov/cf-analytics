@@ -4679,3 +4679,39 @@ drei Phasen ohnehin nötig: ab `0116` endet der Lauf erst nach dem Nachladen, un
 `beendet_am` stünde dann **jede** Materialisierung abends auf „veraltet".
 **Regel:** eine Frischeprüfung vergleicht mit dem Zeitpunkt, nach dem der Refresh laufen MUSS —
 nicht mit dem Ende von irgendetwas, das zufällig danach kommt.
+
+## Ein Datumsbereich wandert nicht über einen Join in eine gruppierte Unterabfrage (23.09.2026, beim Bau von `0117`)
+
+*Symptom:* `mart.bon_zahlart_tag` brauchte für EINEN Monat 10,1 s (6,1 Mio. synthetische Bons),
+obwohl der Plan nur eine Monatspartition las — für den Hauptzweig. *Ursache:* die Zahl der Bons je
+Tag kam aus einer zweiten, gruppierten Unterabfrage, die über `(betrieb_key, geschaeftstag)`
+verbunden war. Postgres überträgt eine **Gleichheit** über einen Join in die andere Seite
+(Äquivalenzklassen), einen **Bereich** (`BETWEEN`, `>=`) nicht — die Unterabfrage las alle Bons
+aller Monate. Dieselbe Falle stand in zwei Sichten mit dem Monatsumsatz aus dem Umsatzbericht.
+*Verhindert durch:* die Zahl je Tag als Fensterfunktion über `(geschaeftstag, betrieb_key)` — ein
+Filter auf eine Spalte der Partitionierung darf in eine Fensterfunktion hinein — bzw. LATERAL je
+Betrieb und Monat über den Index. Danach 73 ms auf 30 Mio. Bons.
+
+Zwei Verwandte aus derselben Messung, beide vor dem ersten Einsatz behoben:
+* **Ein Monatsfilter auf einer Sicht schneidet keine Partition weg,** wenn der Monat ein Ausdruck
+  über der Partitionsspalte ist (9,3 s für einen Monat Rabattbericht). Behoben mit einem
+  Ausdrucksindex, den die Sicht mit **genau demselben** Ausdruck anspricht —
+  `date_trunc('month', geschaeftstag::timestamp)::date`; über `timestamptz` wäre `date_trunc` nicht
+  unveränderlich und nicht indexierbar.
+* **Ein Join, der nur eine abgeleitete Spalte liefert, kann die Schätzung verderben:** der Join auf
+  `core.finanzweg` für die Spalte `art` machte aus 1,0 s 6,5 s (Nested Loops). `art` kommt jetzt aus
+  der Zeile selbst, mit derselben Regel wie im Lader.
+
+**Regel:** Wer eine Sicht mit Zeitfilter baut, misst sie mit dem Zeitfilter in Produktionsgröße
+und liest im Plan nach, WELCHE Partitionen und welche Unterabfragen angefasst werden — die
+Gesamtzeit allein verrät nicht, welcher Zweig alles liest.
+
+## Der Ladestand hätte jede MCP-Antwort um elf Sekunden verlängert (23.09.2026, beim Bau von `0117`)
+
+*Symptom:* in der Leistungsmessung brauchte jeder Kassenbericht über den MCP-Weg 10–14 s, obwohl
+seine Abfrage in 9–2.700 ms lief. *Ursache:* `ladestandHolen()` hängt an jede Antwort den Satz aus
+`mart.betriebsbericht_ladestand`, und die Sicht rechnete über 454.626 Abrufzeilen (Größe nach
+vollständigem Backfill) 10,9 s. Gegen die leeren Tabellen des Abnahmeklons: 0,1 s — unauffällig.
+*Verhindert durch:* `mart.betriebsbericht_ladestand_basis` (materialisiert, 3 ms). **Regel:** was an
+JEDER Antwort hängt, wird in Produktionsgröße gemessen, bevor es an jede Antwort gehängt wird —
+dieselbe Lehre wie `0106` (`mart.datenstand`).
