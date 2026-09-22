@@ -15,7 +15,7 @@ Ein MCP-Server (Skybridge) mit zehn Werkzeugen auf der Auswertungsschicht:
 |---|---|
 | `berichte_suchen` · `bericht_ausfuehren` | Die 285 fertigen Berichte — dieselben, die die Dashboards im BI-Tool zeigen |
 | `sichten_suchen` · `sicht_beschreiben` · `achsen_zeigen` | Der Katalog: Körnung, Spalten, Achsen, Fallstricke, Beispielabfragen |
-| `betriebe_suchen` · `datenstand` | Wer ist gemeint, und was ist überhaupt beurteilbar |
+| `betriebe_suchen` · `datenstand` | Wer ist gemeint, und was ist überhaupt beurteilbar — `datenstand` nennt seit 23.09.2026 auch je Betriebsbericht den geladenen Zeitraum |
 | `abfrage_pruefen` · `abfrage_ausfuehren` | Freies SQL — mit Prüfung auf dem Syntaxbaum **und** gegen die Datenbank (`EXPLAIN`, seit 21.09.2026) |
 | `round_table` | Das Ampelraster als Ansicht |
 
@@ -42,6 +42,9 @@ Die Karten sind deshalb *ein* Werkzeug mit 285 Schlüsseln.
 4. **Der Befund-Anhang.** Jede Antwort trägt die Fallstricke der berührten
    Sichten, ihre Körnung und den Datenstand bei sich — nicht als Hoffnung,
    dass jemand den Tabellenkommentar gelesen hat.
+   Wer eine Kassensicht liest (Betriebsberichte, `0117`), bekommt dazu den
+   Ladestand des Berichts: ein Monat ohne Zeilen ist dort nicht null, sondern
+   nicht geladen.
 
 ## Anmeldung — ohne fremden Anbieter
 
@@ -108,7 +111,7 @@ bun run nutzer sperren  daniel@brain.food          # stilllegen + alle Tokens wi
 ## Befehle
 
 ```bash
-bun test                 # 366 Tests: Fallenfragen, Umgehungen aus dem Review, Anmeldeablauf, Spaltenprofil
+bun test                 # 416 Tests ohne Datenbank, 461 mit (23.09.2026): Fallenfragen, Umgehungen, Anmeldeablauf, Spaltenprofil
 bun run typecheck
 bun run build            # die Ansichten (vite) — vor dem ersten Start noetig
 bun run start            # Produktionsstart; Port aus __PORT, nicht PORT

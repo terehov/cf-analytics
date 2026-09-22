@@ -264,6 +264,30 @@ Stand 13.09.2026: 17.7 / 18.2). Damit ist eine Regel ein Prädikat auf dem Baum:
 | Prozentwert mit `* 100` oder `/ 100` | `warnung` — Prozentwerte sind schon Prozentzahlen |
 | `EXPLAIN` schätzt > 5 Mio. gelesene Zeilen | `sperre` mit Vorschlag, den Zeitraum einzugrenzen |
 
+**Nachtrag 23.09.2026 — die Kassendaten (`0118`).** Drei Regelarten kamen dazu, alle in
+`mcp/src/pruefen.ts` umgesetzt und in `mcp/test/fallen.test.ts` abgesichert:
+
+| Regelart | trifft | Beispiel |
+|---|---|---|
+| `filter_ueber_spalte` | eine Spalte gegen **feste** Werte (`=`, `IN`); ein Verbinden über die Spalte nicht | `finanzweg_nummer IN (3500, 3501, 3502)` auf den Nachlass-Sichten: **sperre** — 3168 ist auch 25 % Glücksrad |
+| `wert_muster` | eine Spalte gegen einen Text, der auf ein Muster passt (`=`, `IN`, `LIKE`, `ILIKE`, `~`) | `zahlart ILIKE '%glücksrad%'` auf `mart.bon_zahlart_tag`: **sperre** — 96 führt keine Nachlässe |
+| `sichten_mischen` | zwei Gruppen von Sichten in einer Abfrage mit Aggregat | Rabattbericht (Artikel) gegen 88/97 (Vorgänge): **warnung** |
+
+Die Doppelzählung 88/97 braucht keine Regel: `core` ist gesperrt, `mart.finanzweg_tag` nimmt je Tag
+eine Quelle, und die Prüfsicht mit beiden Zahlen ist über `mcp.kennzahl` gegen `sum()` gesperrt.
+Der Syntaxbaum liest dafür seit diesem Tag auch die Konstanten einer `IN`-Liste und die Texte in
+`LIKE`/`ILIKE`/`~` (`mcp/src/ast.ts`).
+
+**Der Ladestand reist mit.** Jede Antwort, die eine Kassensicht liest, trägt als Hinweis den Satz
+aus `mart.betriebsbericht_ladestand` (welcher Zeitraum des Berichts geladen ist) — ein Monat ohne
+Zeilen ist dort nicht null, sondern nicht geladen. Das Werkzeug `datenstand` führt dieselben Sätze
+unter `betriebsberichte`. Weil das an **jeder** Antwort hängt, ist die Sicht materialisiert
+(10,9 s → 3 ms in Produktionsgröße, `metabase.md`).
+
+**Suche mit Umlauten.** `berichte_suchen` und `sichten_suchen` falten Umlaute: „Glücksrad",
+„Gluecksrad" und „glucksrad" treffen dasselbe — die Migrationskommentare schreiben Umlaute aus,
+die Kartentexte nicht.
+
 Eine `sperre` läuft nicht. Sie kommt mit dem Grund und, wo möglich, mit dem korrigierten
 SQL zurück — das Modell bessert nach, der Mensch sieht beides im Protokoll. Das ist die
 Verweigerung aus dem dbt-Benchmark, in dieses Repository übersetzt: **eine falsche Zahl,

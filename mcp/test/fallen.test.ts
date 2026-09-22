@@ -389,3 +389,163 @@ describe('Umgehungen aus dem Review', () => {
     expect(e.sichten).toContain('mart.umsatz_tag')
   })
 })
+
+/**
+ * DIE FALLEN DER BETRIEBSBERICHTE (Migrationen 0117/0118, 23.09.2026).
+ *
+ * Jede dieser Fragen ist eine, die zum Gluecksrad wirklich gestellt wurde oder
+ * gestellt werden wird. Die Zahlen, die dahinter stehen, sind am Klon
+ * nachgerechnet (docs/metabase.md, Abschnitt zu 0117): 10 %: 149, 25 %: 1.413,
+ * 50 %: 7.335 Artikel auf Nachlass-Bons, August 2026, 14 Wilma-Wunder-Betriebe.
+ */
+describe('Betriebsberichte: Nachlass, Finanzwege, Bons', () => {
+
+  test('88/97: core.finanzweg_tag ist gesperrt — dort stuende jede Zahl zweimal', () => {
+    const e = gesperrt(`
+      SELECT finanzweg_name, sum(umsatz) FROM core.finanzweg_tag
+       WHERE geschaeftstag >= '2026-08-01' GROUP BY 1`)
+    expect(e.erlaubt).toBe(false)
+    expect(e.schluessel).toContain('schema_gesperrt')
+  })
+
+  test('88/97: die Pruefsicht mit beiden Zahlen nebeneinander ist gegen sum() gesperrt', () => {
+    const e = gesperrt(`
+      SELECT betrieb, sum(umsatz_88) + sum(umsatz_97) AS nachlass
+        FROM mart.finanzweg_88_97_abgleich
+       WHERE geschaeftstag >= '2026-08-01' GROUP BY betrieb`)
+    expect(e.erlaubt).toBe(false)
+    expect(e.schluessel).toContain('aggregat_sum_umsatz_88')
+    expect(e.schluessel).toContain('aggregat_sum_umsatz_97')
+    // Und sagt, wo die Summe steht.
+    expect(e.befunde.find(b => b.schluessel === 'aggregat_sum_umsatz_88')!.hinweis)
+      .toContain('mart.finanzweg_tag')
+  })
+
+  test('88/97: die Summe ueber mart.finanzweg_monat kommt durch — dort ist je Tag eine Quelle', () => {
+    const e = gesperrt(`
+      SELECT betrieb, aktion, prozentsatz, sum(betrag) AS nachlass, sum(anzahl_vorgaenge)
+        FROM mart.finanzweg_monat
+       WHERE monat = '2026-08-01' AND art = 'nachlass'
+       GROUP BY 1, 2, 3`)
+    expect(e.erlaubt).toBe(true)
+  })
+
+  test('Gluecksrad ueber eine Nummernliste ist gesperrt — 3168 fehlte', () => {
+    const e = gesperrt(`
+      SELECT betrieb, finanzweg_nummer, sum(menge)
+        FROM mart.artikel_nachlass_monat
+       WHERE monat = '2026-08-01' AND finanzweg_nummer IN (3500, 3501, 3502)
+       GROUP BY 1, 2`)
+    expect(e.erlaubt).toBe(false)
+    expect(e.schluessel).toContain('nachlass_nummernliste_monat')
+    expect(e.befunde.find(b => b.schluessel === 'nachlass_nummernliste_monat')!.berichtigung)
+      .toContain('aktion')
+  })
+
+  test('Auch eine einzelne Nummer mit = ist gesperrt, ein Verbinden ueber die Nummer nicht', () => {
+    expect(gesperrt(`SELECT sum(menge) FROM mart.artikel_nachlass_tag
+                      WHERE geschaeftstag >= '2026-08-01' AND finanzweg_nummer = 3501`).erlaubt).toBe(false)
+    const verbunden = gesperrt(`
+      SELECT f.aktion, sum(n.menge) FROM mart.artikel_nachlass_monat n
+        JOIN mart.finanzweg f ON f.finanzweg_nummer = n.finanzweg_nummer
+       WHERE n.monat = '2026-08-01' GROUP BY 1`)
+    expect(verbunden.schluessel).not.toContain('nachlass_nummernliste_monat')
+  })
+
+  test('Gluecksrad richtig: ueber aktion und prozentsatz — kommt durch, mit der Deutung', () => {
+    const e = gesperrt(`
+      SELECT prozentsatz, sum(menge) AS stueck,
+             sum(menge) FILTER (WHERE artikel = 'Durchstarter') AS durchstarter
+        FROM mart.artikel_nachlass_monat
+       WHERE aktion = 'Glücksrad' AND monat = '2026-08-01' AND marke = 'Wilma Wunder'
+       GROUP BY prozentsatz`)
+    expect(e.erlaubt).toBe(true)
+    // Die Zahl stimmt — sie bedeutet aber Artikel auf Nachlass-Bons, nicht Verkauf.
+    const d = e.befunde.find(b => b.schluessel === 'nachlass_menge_deutung_monat')!
+    expect(d.schwere).toBe('warnung')
+    expect(d.hinweis).toContain('NICHT die Verkaufsmenge')
+  })
+
+  test('Ein exakter Finanzwegname wird gewarnt — die zwei 25-%-Wege unterscheiden sich am Apostroph', () => {
+    const e = gesperrt(`
+      SELECT sum(menge) FROM mart.artikel_nachlass_monat
+       WHERE monat = '2026-08-01' AND finanzweg_name = '25% Glücksrad'`)
+    expect(e.schluessel).toContain('finanzweg_name_exakt')
+    expect(e.befunde.find(b => b.schluessel === 'finanzweg_name_exakt')!.schwere).toBe('warnung')
+  })
+
+  test('92 gegen 88/97 in einer Summe: Artikel und Vorgaenge — gewarnt', () => {
+    const e = gesperrt(`
+      SELECT n.betrieb, sum(n.menge) + sum(f.anzahl_vorgaenge)
+        FROM mart.artikel_nachlass_monat n
+        JOIN mart.finanzweg_monat f ON f.betrieb_key = n.betrieb_key AND f.monat = n.monat
+       WHERE n.monat = '2026-08-01' GROUP BY 1`)
+    expect(e.schluessel).toContain('artikel_gegen_vorgaenge')
+  })
+
+  /**
+   * GRUPPENKOEPFE IM RABATTBERICHT. Die Kopfzeilen eines Finanzweg-Blocks sind
+   * die Summe der Artikelzeilen darunter; mitgezaehlt verdoppeln sie jede Zahl.
+   * Sie stehen nicht in core (der Lader laedt sie nicht) und nicht in mart —
+   * und namenlose Zeilen (28 von 8.533 im August 2026) laesst die Sicht weg,
+   * weil die Gluecksrad-Zahl sie nicht zaehlt. Das prueft der Katalog: es gibt
+   * in den Nachlass-Sichten keine Spalte, ueber die ein Kopf hereinkaeme, und
+   * die richtige Abfrage braucht keinen Filter darauf.
+   */
+  test('Gruppenkoepfe (92): keine Kopf-Spalte in mart, und der Weg an mart vorbei ist gesperrt', () => {
+    for (const s of ['mart.artikel_nachlass_tag', 'mart.artikel_nachlass_monat']) {
+      const spalten = katalog.sichten.get(s)!.spalten
+      expect(spalten).toContain('artikel')
+      // Weder Kopfmarke noch Gruppennummer noch Zeilennummer der Antwort.
+      for (const x of ['ist_kopf', 'gruppe', 'zeile']) expect(spalten).not.toContain(x)
+    }
+    const roh = gesperrt(`
+      SELECT finanzweg_name, sum(anzahl) FROM core.rabatt_artikel_tag
+       WHERE geschaeftstag = '2026-08-01' GROUP BY 1`)
+    expect(roh.erlaubt).toBe(false)
+    expect(roh.schluessel).toContain('schema_gesperrt')
+    // Dasselbe fuer die Blockberichte mit Kopfzeilen (53, 61, 75, 76).
+    for (const s of ['mart.kellner_artikel_monat', 'mart.kellner_umsatz_tag',
+                     'mart.zeitzone_feinsparte_monat', 'mart.zeitzone_hauptsparte_monat']) {
+      expect(katalog.sichten.get(s)!.spalten).not.toContain('ist_kopf')
+    }
+  })
+
+  test('Gluecksrad in den Bons zu suchen ist gesperrt — 96 fuehrt keine Nachlaesse', () => {
+    const e = gesperrt(`
+      SELECT betrieb, sum(bons_mit_zahlart) FROM mart.bon_zahlart_tag
+       WHERE geschaeftstag BETWEEN '2026-08-01' AND '2026-08-31'
+         AND zahlart ILIKE '%glücksrad%'
+       GROUP BY 1`)
+    expect(e.erlaubt).toBe(false)
+    expect(e.schluessel).toContain('bon_ohne_nachlass')
+    // Eine echte Zahlart kommt durch.
+    const ok = gesperrt(`
+      SELECT betrieb, sum(bons_mit_zahlart) FROM mart.bon_zahlart_tag
+       WHERE geschaeftstag BETWEEN '2026-08-01' AND '2026-08-31' AND zahlart = 'EC-Karte'
+       GROUP BY 1`)
+    expect(ok.schluessel).not.toContain('bon_ohne_nachlass')
+  })
+
+  test('Ein Durchschnittsbon ueber Tage gemittelt ist gesperrt, aus den Summen gerechnet nicht', () => {
+    const falsch = gesperrt(`
+      SELECT betrieb, avg(bon_durchschnitt) FROM mart.bon_tag
+       WHERE geschaeftstag BETWEEN '2026-08-01' AND '2026-08-31' GROUP BY 1`)
+    expect(falsch.erlaubt).toBe(false)
+    expect(falsch.schluessel).toContain('aggregat_avg_bon_durchschnitt')
+    const richtig = gesperrt(`
+      SELECT betrieb, sum(bons_brutto) / nullif(sum(bons), 0) AS bon
+        FROM mart.bon_tag
+       WHERE geschaeftstag BETWEEN '2026-08-01' AND '2026-08-31' GROUP BY 1`)
+    expect(richtig.erlaubt).toBe(true)
+  })
+
+  test('Haupt- und Feinsparten der Zeitzonen zusammen summiert: gewarnt', () => {
+    const e = gesperrt(`
+      SELECT sum(h.umsatz_netto) + sum(f.umsatz_netto)
+        FROM mart.zeitzone_hauptsparte_monat h
+        JOIN mart.zeitzone_feinsparte_monat f USING (betrieb_key, monat)
+       WHERE h.monat = '2026-08-01'`)
+    expect(e.schluessel).toContain('zeitzone_ebenen_mischen')
+  })
+})

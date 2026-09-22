@@ -94,8 +94,16 @@ export type Zerlegung = {
   gruppiert: Set<string>
   /** Spalten, die mit `=` gegen etwas gehalten werden. */
   gleichheit: Set<string>
-  /** ... und gegen WELCHE Konstante. `vergleichbar = false` ist kein Filter auf true. */
+  /** ... und gegen WELCHE Konstante. `vergleichbar = false` ist kein Filter auf true.
+   *  Seit 23.09.2026 auch jede Konstante einer IN-Liste: `nummer IN (3500, 3501)`. */
   gleichheitWerte: Map<string, Set<string | number | boolean>>
+  /**
+   * Textkonstanten, gegen die eine Spalte verglichen wird — mit `=`, `IN`,
+   * `LIKE`, `ILIKE`, `~` oder `~*`. Fuer Regeln, die am WERT haengen und
+   * nicht an der Spalte: `zahlart ILIKE '%gluecksrad%'` auf den Bons fragt nach
+   * etwas, das 96 gar nicht fuehrt.
+   */
+  textvergleich: Map<string, Set<string>>
   /** Spalten in einem Bereichsvergleich (`>=`, `<`, BETWEEN). */
   bereich: Set<string>
   /** Spalten, die POSITIV als Wahrheitswert stehen (`WHERE vergleichbar`, nicht `NOT vergleichbar`). */
@@ -145,7 +153,7 @@ export function zerlegen(sql: string): Zerlegung {
   const baum = parseSync(sql)
   const z: Zerlegung = {
     sichten: new Set(), ctes: new Set(), spalten: new Set(), gruppiert: new Set(),
-    gleichheit: new Set(), gleichheitWerte: new Map(), bereich: new Set(),
+    gleichheit: new Set(), gleichheitWerte: new Map(), textvergleich: new Map(), bereich: new Set(),
     wahrheitswert: new Set(), aggregate: [], mal_hundert: new Set(), verbunden: new Set(),
     funktionen: new Set(), aliasse: new Map(), select_into: false,
     nur_select: true, anweisungen: (baum.stmts ?? []).length,
@@ -155,12 +163,24 @@ export function zerlegen(sql: string): Zerlegung {
     if (!s.stmt?.SelectStmt) z.nur_select = false
   }
 
+  const merkeText = (spalte: string, w: string | number | boolean | null) => {
+    if (typeof w !== 'string') return
+    if (!z.textvergleich.has(spalte)) z.textvergleich.set(spalte, new Set())
+    z.textvergleich.get(spalte)!.add(w)
+  }
+
   const merkeGleichheit = (spalte: string, gegen: Knoten | undefined) => {
     z.gleichheit.add(spalte)
-    const w = konstante(gegen)
-    if (w !== null) {
+    // Eine IN-Liste ist eine Liste von Gleichheiten: jede Konstante darin
+    // zaehlt. Vor dem 23.09.2026 fiel `nummer IN (3500, 3501, 3502)` hier
+    // durch, weil konstante() eine Liste nicht lesen kann.
+    const werte = Array.isArray(gegen?.List?.items) ? gegen!.List.items as Knoten[] : [gegen]
+    for (const g of werte) {
+      const w = konstante(g)
+      if (w === null) continue
       if (!z.gleichheitWerte.has(spalte)) z.gleichheitWerte.set(spalte, new Set())
       z.gleichheitWerte.get(spalte)!.add(w)
+      merkeText(spalte, w)
     }
   }
 
@@ -207,6 +227,9 @@ export function zerlegen(sql: string): Zerlegung {
 
         if (BEREICH_ARTEN.has(k.kind)) {
           if (links) z.bereich.add(links)
+        } else if (links && (k.kind === 'AEXPR_LIKE' || k.kind === 'AEXPR_ILIKE'
+                             || op === '~' || op === '~*')) {
+          merkeText(links, konstante(k.rexpr))
         } else if (op === '=') {
           if (links) merkeGleichheit(links, k.rexpr)
           if (rechts) merkeGleichheit(rechts, k.lexpr)
@@ -258,6 +281,8 @@ export function zerlegen(sql: string): Zerlegung {
   for (const [alias, spalte] of z.aliasse) {
     const w = z.gleichheitWerte.get(alias)
     if (w) z.gleichheitWerte.set(spalte, new Set([...(z.gleichheitWerte.get(spalte) ?? []), ...w]))
+    const t = z.textvergleich.get(alias)
+    if (t) z.textvergleich.set(spalte, new Set([...(z.textvergleich.get(spalte) ?? []), ...t]))
   }
 
   return z

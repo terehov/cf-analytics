@@ -77,6 +77,47 @@ describe('Berichte', () => {
     expect(new Set(mit.parameter)).toEqual(new Set(['2026-01-01', '2026-02-01']))
   })
 
+  /**
+   * Die Kassenkarten (0117) muessen im Chat auffindbar sein, mit dem Wort, das
+   * der Fachbereich benutzt — auch mit Umlaut, auch ohne. Und sie duerfen nur
+   * mart lesen: der MCP-Zugang fuehrt sie als mcp_leser aus, core ist dort
+   * gesperrt (die Artikelaktion-Karten aa_kopf … lesen core und laufen im Chat
+   * nicht — offene-punkte.md).
+   */
+  test('Die Kassenberichte werden gefunden — mit und ohne Umlaut', () => {
+    for (const wort of ['glücksrad', 'gluecksrad', 'nachlass', 'nachlässe']) {
+      const treffer = berichteSuchen(wort).map(b => b.schluessel)
+      expect({ wort, treffer: treffer.includes('ka_nachlass_betrieb') || treffer.includes('ka_nachlass_artikel') })
+        .toEqual({ wort, treffer: true })
+    }
+    for (const [wort, karte] of [['zahlart', 'ka_zahlart_betrieb'], ['storno', 'ka_storno_grund'],
+                                  ['kellner', 'ka_kellner'], ['bon', 'ka_bon_betrieb'],
+                                  ['betriebsstelle', 'ka_stellen'], ['zeitzone', 'ka_zeitzone_sparte'],
+                                  ['geladen', 'ka_ladestand']] as const) {
+      expect({ wort, gefunden: berichteSuchen(wort, 50).some(b => b.schluessel === karte) })
+        .toEqual({ wort, gefunden: true })
+    }
+  })
+
+  test('Die Kassenberichte lesen nur mart', () => {
+    const kasse = alleKarten.filter(k => k.schluessel.startsWith('ka_') || k.schluessel === 'aa_nachlass')
+    expect(kasse.length).toBeGreaterThanOrEqual(14)
+    for (const k of kasse) {
+      const z = zerlegen(uebersetzen(k, {}).sql)
+      const fremd = [...z.sichten].filter(s => !s.startsWith('mart.'))
+      expect({ karte: k.schluessel, fremd }).toEqual({ karte: k.schluessel, fremd: [] })
+    }
+  })
+
+  test('Der Gluecksrad-Bericht nimmt Nachlass, Zeitraum und Marke als Parameter', () => {
+    const { sql, parameter } = uebersetzen(karteFinden('ka_nachlass_betrieb')!,
+      { finanzweg: 'Glücksrad', von: '2026-08-01', bis: '2026-08-31', marke: 'Wilma Wunder' })
+    expect(parameter).toContain('Glücksrad')
+    expect(parameter).toContain('Wilma Wunder')
+    expect(sql).not.toContain('Glücksrad')
+    expect(sql).toContain('mart.artikel_nachlass_tag')
+  })
+
   test('Suche findet den Round Table ueber das Wort im Namen', () => {
     const treffer = berichteSuchen('round table')
     expect(treffer.length).toBeGreaterThan(0)

@@ -163,6 +163,16 @@ export function uebersetzen(
 }
 
 /**
+ * Klein geschrieben und Umlaute ausgeschrieben: "Glücksrad", "Gluecksrad" und
+ * "glucksrad" treffen dasselbe. Die Kommentare der Migrationen schreiben
+ * Umlaute aus, die Kartentexte nicht, und ein Nutzer tippt beides (23.09.2026).
+ */
+export function umlauteFalten(t: string): string {
+  return t.toLowerCase()
+    .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+}
+
+/**
  * Volltextsuche ueber Name, Beschreibung und Schluessel.
  *
  * Bewusst einfach: 285 Karten sind keine Datenmenge, und ein Modell sucht
@@ -170,12 +180,12 @@ export function uebersetzen(
  * schwerer als solche in der Beschreibung.
  */
 export function berichteSuchen(stichwort: string, grenze = 25): Bericht[] {
-  const worte = stichwort.toLowerCase().split(/\s+/).filter(Boolean)
+  const worte = umlauteFalten(stichwort).split(/\s+/).filter(Boolean)
   if (!worte.length) return alleKarten.slice(0, grenze).map(berichtBeschreiben)
 
   const bewerten = (k: Karte): number => {
-    const name = k.name.toLowerCase()
-    const rest = `${k.schluessel} ${k.beschreibung}`.toLowerCase()
+    const name = umlauteFalten(k.name)
+    const rest = umlauteFalten(`${k.schluessel} ${k.beschreibung}`)
     let punkte = 0
     for (const w of worte) {
       if (name.includes(w)) punkte += 3

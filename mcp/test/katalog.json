@@ -220,6 +220,100 @@
    "fallstricke": []
   },
   {
+   "sicht": "mart.artikel_nachlass_monat",
+   "koernung": "Betrieb × Monat × Finanzweg × Artikel — die Gluecksrad-Tabelle (92)",
+   "thema": "aktion",
+   "summen_erlaubt": true,
+   "kommentar": "Koernung: Betrieb × Monat × Finanzweg × Artikel — die Gluecksrad-Tabelle (F1 im Plan). Summe\nder Tageszeilen aus mart.artikel_nachlass_tag; ein Monatsabruf zaehlt nur, wo der Betrieb im\nMonat keinen Tagesabruf hat (aus_mehrtagesabruf = true).\n\nABNAHME am 23.09.2026 (Klon, echte Antworten der 14 Wilma-Wunder-Betriebe, August 2026):\nsum(menge) WHERE aktion = 'Gluecksrad' GROUP BY prozentsatz ergibt 10 %: 149, 25 %: 1.413\n(beide Nummern), 50 %: 7.335; davon Durchstarter 12 / 107 / 432 = 551.\n\nmenge = Artikel auf Bons mit diesem Nachlass, nicht Verkaufsmenge (der Nachlass gilt fuer den\nganzen Bon). Nachlass positiv. Fuer Vorgaenge und den vollstaendigen Betrag je Finanzweg:\nmart.nachlass_monat. Eine Aktion ueber aktion + prozentsatz buendeln, nie ueber\nfinanzweg_nummer. Ein fehlender Monat ist keine Null — mart.betriebsbericht_ladestand.",
+   "spalten": [
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "aktion",
+    "prozentsatz",
+    "finanzweg_name",
+    "finanzweg_nummer",
+    "finanzgruppe",
+    "artikel",
+    "artikel_key",
+    "artikelnummer",
+    "menge",
+    "nachlass_brutto",
+    "nachlass_netto",
+    "tage_mit_nachlass",
+    "aus_mehrtagesabruf",
+    "operativ"
+   ],
+   "achsen": [
+    "artikel_key",
+    "betrieb_key",
+    "marke",
+    "monat"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "summe",
+     "spalte": "menge",
+     "einheit": "anzahl",
+     "hinweis": "Artikel auf Bons mit diesem Nachlass — nicht Verkaufsmenge, nicht Vorgaenge."
+    },
+    {
+     "regel": "summe",
+     "spalte": "nachlass_brutto",
+     "einheit": "euro",
+     "hinweis": "Gewaehrter Nachlass, positiv."
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "prozentsatz",
+     "einheit": "prozentzahl",
+     "hinweis": "Der Satz des Finanzwegs, eine Eigenschaft — gruppieren, nicht rechnen."
+    }
+   ],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.artikel_nachlass_tag",
+   "koernung": "Betrieb × Abrufzeitraum (ein Tag) × Finanzweg × Artikel — Nachlassmenge aus dem Rabattbericht 92",
+   "thema": "aktion",
+   "summen_erlaubt": true,
+   "kommentar": "Koernung: Betrieb × Abrufzeitraum × Finanzweg × Artikel aus dem Rabattbericht (92). Im\nRegelbetrieb ist der Abrufzeitraum EIN TAG (tage = 1). Ein Mehrtagesabruf (tage > 1) steht nur\nda, wo es fuer diesen Betrieb im Zeitraum keinen Tagesabruf gibt. Fuer einen Zeitraum von..bis\nalso filtern: geschaeftstag >= von AND zeitraum_bis <= bis (und geschaeftstag <= bis, damit\nPostgres nur die betroffenen Monate liest).\n\nmenge ist die Zahl der ARTIKEL auf Bons, auf die dieser Nachlass gebucht wurde — NICHT die\nVerkaufsmenge und NICHT die Zahl der Nachlass-Vorgaenge. Der Nachlass gilt fuer den ganzen Bon:\nim August 2026 trugen 327 verschiedene Artikel einen Gluecksrad-Nachlass, auch Getraenke.\nnachlass_brutto/-netto sind der GEWAEHRTE Nachlass, positiv (LINA fuehrt ihn negativ).\n\nNur Zeilen MIT Artikelnamen: 28 von 8.533 Zeilen im August 2026 trugen keinen Namen, wohl aber\neinen Betrag — die Gluecksrad-Auswertung vom 22.09.2026 zaehlt sie nicht mit, diese Sicht auch\nnicht. Den vollstaendigen Nachlassbetrag je Finanzweg fuehrt mart.finanzweg_tag (88/97).\n\nEine Aktion buendelt man ueber aktion und prozentsatz, nie ueber finanzweg_nummer: zwei Wege\nheissen \"25 % Gluecksrad\" (3501, 3168), und die Nummer ist NULL, solange 88/97 fuer den Tag\nfehlt. artikel_key/artikelnummer sind ueber den NAMEN zugeordnet (92 liefert keine Nummer),\nnur bei genau einem Treffer im selben Betrieb und Zeitraum; die Luecken zeigt\nmart.rabatt_artikel_unaufgeloest.",
+   "spalten": [
+    "geschaeftstag",
+    "zeitraum_bis",
+    "tage",
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "aktion",
+    "prozentsatz",
+    "finanzweg_name",
+    "finanzweg_nummer",
+    "finanzgruppe",
+    "artikel",
+    "artikel_key",
+    "artikelnummer",
+    "menge",
+    "nachlass_brutto",
+    "nachlass_netto",
+    "zeilen",
+    "operativ"
+   ],
+   "achsen": [
+    "artikel_key",
+    "betrieb_key",
+    "geschaeftstag",
+    "marke",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
    "sicht": "mart.artikeltage_basis",
    "koernung": "Betrieb mit Artikelverkaeufen (Zwischenstufe von mart.datenstand)",
    "thema": "betrieb",
@@ -755,6 +849,87 @@
    "fallstricke": []
   },
   {
+   "sicht": "mart.betriebsbericht_ladestand",
+   "koernung": "ein Betriebsbericht — geladener Zeitraum als Satz",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "Koernung: ein Betriebsbericht. Fuer welchen Zeitraum er geladen ist: erster und letzter\ngeladener Monat, vollstaendig_ab/-bis (die juengste lueckenlose Strecke reifer Monate), wie\nviele reife Monate mit Umsatz fehlen, und die Aussage als Satz. Der MCP-Server haengt aussage an\njede Antwort, die eine der sichten liest — damit eine Auswertung ueber 2019 \"fuer 2019 nicht\ngeladen\" sagt statt 0 (harte Regel 10). Der Backfill laeuft rueckwaerts: waehrend er laeuft,\nsteht hier eine wachsende Strecke, und davor \"nicht geladen\".",
+   "spalten": [
+    "endpunkt",
+    "bericht",
+    "bezeichnung",
+    "fensterklasse",
+    "erster_monat",
+    "letzter_monat",
+    "vollstaendig_ab",
+    "vollstaendig_bis",
+    "monate_vollstaendig",
+    "monate_teilweise",
+    "monate_nicht_geladen",
+    "aussage",
+    "sichten"
+   ],
+   "achsen": [
+    "endpunkt"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.betriebsbericht_ladestand_basis",
+   "koernung": "Betriebsbericht × Monat — materialisierte Fassung von mart.betriebsbericht_ladestand_monat",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "Koernung: Betriebsbericht × Monat — die materialisierte Fassung von\nmart.betriebsbericht_ladestand_monat. Reife und Zustand gelten zum Zeitpunkt des Refresh (Phase B\nund nach Phase C, src/sync/betriebsbericht_sichten.ts). Gelesen wird die Sicht gleichen Namens\nohne _basis.",
+   "spalten": [
+    "endpunkt",
+    "bericht",
+    "bezeichnung",
+    "fensterklasse",
+    "monat",
+    "betriebe_mit_umsatz",
+    "betriebe_geladen",
+    "betriebe_leer",
+    "betrieb_tage_mit_umsatz",
+    "betrieb_tage_abgedeckt",
+    "zustand",
+    "sichten"
+   ],
+   "achsen": [
+    "endpunkt",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.betriebsbericht_ladestand_monat",
+   "koernung": "Betriebsbericht × Monat — wie viel geladen ist",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "Koernung: Betriebsbericht × Monat seit Januar 2018 (materialisiert in\nmart.betriebsbericht_ladestand_basis, Stand des letzten Laufs). Wie viel von einem Monat ist fuer diesen\nBericht geladen — gemessen an den Betrieben bzw. Betrieb-Tagen mit Umsatz (Umsatzbericht, nur\nreife Tage: aelter als 9 Tage). Tagesberichte (T, W) zaehlen Betrieb-Tage, Monatsberichte (M,\nM-Tag) Betriebe. Ein Abruf mit null Zeilen zaehlt als geladen, ebenso ein Posten, fuer den LINA\n\"keine Daten\" gemeldet hat (betriebe_leer).\n\nzustand: vollstaendig | teilweise | nicht geladen | kein Umsatz. \"nicht geladen\" ist der Fall,\num den es geht: eine Auswertung ueber diesen Monat liefert dann KEINE Zeile, und das heisst\nnicht null. sichten nennt die mart-Sichten, die aus dem Bericht lesen.",
+   "spalten": [
+    "endpunkt",
+    "bericht",
+    "bezeichnung",
+    "fensterklasse",
+    "monat",
+    "betriebe_mit_umsatz",
+    "betriebe_geladen",
+    "betriebe_leer",
+    "betrieb_tage_mit_umsatz",
+    "betrieb_tage_abgedeckt",
+    "zustand",
+    "sichten"
+   ],
+   "achsen": [
+    "endpunkt",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
    "sicht": "mart.betriebsbericht_luecke",
    "koernung": "Betriebsbericht × Betrieb × Tag — ERWARTUNG: keine Zeile",
    "thema": "import",
@@ -775,6 +950,76 @@
     "geschaeftstag"
    ],
    "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.betriebsstelle_hauptsparte_monat",
+   "koernung": "Betrieb × Monat × Betriebsstelle × Hauptsparte (69)",
+   "thema": "kasse",
+   "summen_erlaubt": true,
+   "kommentar": "Koernung: Betrieb × Monat × Betriebsstelle × Hauptsparte (69). hauptsparte ist LINAs Text,\nkein Schluessel auf core.hauptsparte. Summierbar.",
+   "spalten": [
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "betriebsstelle",
+    "hauptsparte",
+    "umsatz_brutto",
+    "umsatz_netto",
+    "artikel",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "hauptsparte",
+    "marke",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.betriebsstelle_monat",
+   "koernung": "Betrieb × Monat × Betriebsstelle (68)",
+   "thema": "kasse",
+   "summen_erlaubt": true,
+   "kommentar": "Koernung: Betrieb × Monat × Betriebsstelle (68: Restaurant, Bar, Dachterrasse …) — F7.\nSummierbar zum Betriebsumsatz. netto_je_gast aus den Summen neu gerechnet (LINAs eigener\nQuotient ist verworfen), stelle_anteil_pct ist die Prozentzahl vom Nettoumsatz des Betriebs —\nbeide nicht mitteln. Die Namen der Stellen vergibt jeder Betrieb selbst.",
+   "spalten": [
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "betriebsstelle",
+    "umsatz_brutto",
+    "umsatz_netto",
+    "artikel",
+    "gaeste",
+    "netto_je_gast",
+    "stelle_anteil_pct",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "marke",
+    "monat"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "netto_je_gast",
+     "einheit": "euro",
+     "hinweis": "Ueber Stellen oder Monate: sum(umsatz_netto) / sum(gaeste)."
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "stelle_anteil_pct",
+     "einheit": "prozentzahl",
+     "hinweis": null
+    }
+   ],
    "fallstricke": []
   },
   {
@@ -1019,6 +1264,109 @@
      "spalte": "schnitt_stand",
      "einheit": "note",
      "hinweis": "KUMULIERTER Stand bis zu diesem Monat. Ueber Monate hinweg nicht mitteln — dafuer ist schnitt_monat da."
+    }
+   ],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.bon_tag",
+   "koernung": "Betrieb × Tag — Bonkennzahlen aus dem Rechnungsausgangsbuch (96)",
+   "thema": "kasse",
+   "summen_erlaubt": true,
+   "kommentar": "Koernung: Betrieb × Tag, aus dem Rechnungsausgangsbuch (96, eine Zeile je Bon in core.bon) — F9.\n\nbons zaehlt die gueltigen Rechnungen. Eine stornierte Rechnung und ihre Gutschrift heben sich auf\n(15.08.2026 Duesseldorf: 13 und 13, +1.230,50 und -1.230,50 EUR); umsatz_brutto ist die Summe\nALLER Bons des Tages und trifft LINAs balanceSumBrutto. bon_durchschnitt = bons_brutto / bons,\nbon_median der Median der Rechnungen — beide nicht ueber Tage mitteln, sondern aus den Summen\nneu rechnen. gutschriftenquote_pct: Gutschriften je 100 ausgestellte Rechnungen (Prozentzahl).\nbons_geteilt_bezahlt: Rechnungen mit mehr als einer Zahlart (Trinkgeld, Rueckgeld und die\nTischuebergabe zaehlen dabei nicht als Zahlart).\n\nWAS 96 NICHT KANN: keine Uhrzeit, keine Artikel und KEINE Nachlass-Finanzwege — \"Bons mit\nAktion\" und \"Durchschnittsbon mit gegen ohne Aktion\" sind hieraus nicht beantwortbar (am\n15.08.2026 zeigte 88 fuer Duesseldorf 32 Gluecksrad-Vorgaenge, keiner der 519 Bons trug ihn).\nZeitraum immer ueber geschaeftstag filtern — core.bon hat rund 30 Mio. Zeilen.",
+   "spalten": [
+    "geschaeftstag",
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "bons",
+    "stornierte_bons",
+    "gutschriften",
+    "umsatz_brutto",
+    "bons_brutto",
+    "gutschriften_brutto",
+    "bon_durchschnitt",
+    "bon_median",
+    "artikel",
+    "bons_geteilt_bezahlt",
+    "debitor_bons",
+    "gutschriftenquote_pct",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag",
+    "marke",
+    "monat"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "bon_durchschnitt",
+     "einheit": "euro",
+     "hinweis": "Ein Quotient. Ueber Tage: sum(bons_brutto) / sum(bons)."
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "bon_median",
+     "einheit": "euro",
+     "hinweis": "Ein Median je Tag. Ueber Tage nicht mitteln und nicht summieren."
+    },
+    {
+     "regel": "summe",
+     "spalte": "bons",
+     "einheit": "anzahl",
+     "hinweis": null
+    },
+    {
+     "regel": "summe",
+     "spalte": "bons_brutto",
+     "einheit": "euro",
+     "hinweis": null
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "gutschriftenquote_pct",
+     "einheit": "prozentzahl",
+     "hinweis": "Ueber Tage: 100 * sum(gutschriften) / (sum(bons) + sum(stornierte_bons))."
+    }
+   ],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.bon_zahlart_tag",
+   "koernung": "Betrieb × Tag × Zahlart — Rechnungen mit dieser Zahlart (96); ueber Zahlarten NICHT summierbar",
+   "thema": "kasse",
+   "summen_erlaubt": false,
+   "kommentar": "Koernung: Betrieb × Tag × Zahlart — wie viele RECHNUNGEN diese Zahlart trugen (96). Ein Bon mit\nEC-Karte und Trinkgeld steht in beiden Zeilen: bons_mit_zahlart summiert sich ueber die\nZahlarten NICHT zu bons_gesamt, und bons_anteil_pct (Prozentzahl der Rechnungen des Tages) nicht\nzu 100. Die Tischuebergabe ist keine Zahlart und fehlt. Betraege je Zahlart liefert 96 nicht —\ndie stehen in mart.zahlart_monat (88/97). 96 fuehrt KEINE Nachlass-Finanzwege: eine Zeile\n\"Gluecksrad\" gibt es hier nicht, und ihr Fehlen heisst nicht \"kein Gluecksrad\".",
+   "spalten": [
+    "geschaeftstag",
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "zahlart",
+    "finanzgruppe",
+    "bons_mit_zahlart",
+    "bons_gesamt",
+    "bons_anteil_pct",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag",
+    "marke",
+    "monat"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "bons_anteil_pct",
+     "einheit": "prozentzahl",
+     "hinweis": "Ein Bon traegt mehrere Zahlarten — die Anteile summieren sich nicht zu 100."
     }
    ],
    "fallstricke": []
@@ -1875,6 +2223,62 @@
    "fallstricke": []
   },
   {
+   "sicht": "mart.debitor_monat",
+   "koernung": "Betrieb × Monat × Debitor (96)",
+   "thema": "kasse",
+   "summen_erlaubt": true,
+   "kommentar": "Koernung: Betrieb × Monat × Debitor — wer auf Rechnung kauft (F10), aus den Debitorfeldern\ndes Rechnungsausgangsbuchs (96). umsatz_brutto ist die Summe aller Bons dieses Debitors\n(Gutschriften mindern). Bericht 86 (core.debitor_bon) lieferte am 15.08.2026 dieselben Bons wie\n96 und ist hier deshalb nicht Quelle, sondern Gegenprobe.",
+   "spalten": [
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "debitor",
+    "debitor_anschrift",
+    "bons",
+    "gutschriften",
+    "umsatz_brutto",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "marke",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.debitorenauswertung_tag",
+   "koernung": "Betrieb × Tag × Debitor (86) — Gegenprobe zu mart.debitor_monat",
+   "thema": "kasse",
+   "summen_erlaubt": true,
+   "kommentar": "Koernung: Betrieb × Tag × Debitor aus der Debitorenauswertung (86). debitor NULL = Bons ohne\nDebitor — am 15.08.2026 lieferte 86 dieselben 519 Bons wie 96, ob 86 bei Betrieben MIT Debitoren\nnur deren Bons fuehrt, ist nicht gemessen (offene-punkte.md). Fuer die Frage \"wer kauft auf\nRechnung\" ist mart.debitor_monat (aus 96) die Quelle; diese Sicht ist die Gegenprobe.",
+   "spalten": [
+    "geschaeftstag",
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "debitor",
+    "debitor_anschrift",
+    "bons",
+    "zeilen",
+    "umsatz_brutto",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag",
+    "marke",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
    "sicht": "mart.deckungsbeitrag_stand",
    "koernung": "materialisierter Deckungsbeitragssicht: wie alt ihre Zahlen sind",
    "thema": "betrieb",
@@ -2489,6 +2893,27 @@
    "fallstricke": []
   },
   {
+   "sicht": "mart.finanzweg",
+   "koernung": "ein Finanzweg (LINA-Nummer) — Stamm aus 88/97",
+   "thema": "kasse",
+   "summen_erlaubt": false,
+   "kommentar": "Koernung: ein Finanzweg (LINAs Nummer). Der Stamm entsteht aus den Berichten 88 und 97 —\neine andere Quelle gibt es nicht. art: nachlass (Hausbon, Rabatt) | zahlart | umsatz |\nstatistik, abgeleitet aus der Finanzgruppe. aktion ist der Name ohne Prozentzahl, nur bei\nNachlaessen gesetzt.\n\nnamen > 1 heisst: dieselbe Nummer lief in verschiedenen Monaten oder Betrieben unter\nverschiedenen Namen. Dann taugt die Nummer allein nicht als Schluessel.\n\nDie Auswahlliste fuer den Finanzweg-Filter der Dashboards kommt von hier.",
+   "spalten": [
+    "finanzweg_nummer",
+    "finanzweg_name",
+    "finanzgruppe",
+    "art",
+    "prozentsatz",
+    "aktion",
+    "erstmals_gesehen",
+    "zuletzt_gesehen",
+    "namen"
+   ],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
    "sicht": "mart.finanzweg_88_97_abgleich",
    "koernung": "Betrieb × Tag × Finanzweg — Bericht 88 gegen 97; ERWARTUNG: kein weicht ab",
    "thema": "import",
@@ -2509,6 +2934,160 @@
    "achsen": [
     "betrieb_key",
     "geschaeftstag"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "anzahl_88",
+     "einheit": "anzahl",
+     "hinweis": "Pruefsicht: dieselbe Zahl wie anzahl_97. Summen stehen in mart.finanzweg_tag/_monat."
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "anzahl_97",
+     "einheit": "anzahl",
+     "hinweis": "Pruefsicht: dieselbe Zahl wie anzahl_88. Summen stehen in mart.finanzweg_tag/_monat."
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "umsatz_88",
+     "einheit": "euro",
+     "hinweis": "Pruefsicht: dieselbe Zahl wie umsatz_97 aus einem zweiten Bericht. Summen stehen in mart.finanzweg_tag/_monat (je Tag eine Quelle)."
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "umsatz_97",
+     "einheit": "euro",
+     "hinweis": "Pruefsicht: dieselbe Zahl wie umsatz_88 aus einem zweiten Bericht. Summen stehen in mart.finanzweg_tag/_monat (je Tag eine Quelle)."
+    }
+   ],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.finanzweg_monat",
+   "koernung": "Betrieb × Monat × Finanzweg — je Tag eine Quelle",
+   "thema": "kasse",
+   "summen_erlaubt": true,
+   "kommentar": "Koernung: Betrieb × Monat × Finanzweg — Summe von mart.finanzweg_tag (je Tag eine Quelle,\nquellen nennt sie: 97, 88 oder 97+88), materialisiert in mart.finanzweg_monat_basis und damit so\nfrisch wie der letzte Lauf (mart.materialisierung_stand). betrag positiv fuer Zahlungen und Nachlaesse,\nanzahl_vorgaenge sind Vorgaenge. tage_mit_wert zaehlt die Tage, an denen der Finanzweg\nueberhaupt vorkam — nicht die geladenen Tage (die stehen in mart.betriebsbericht_ladestand).",
+   "spalten": [
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "finanzweg_nummer",
+    "finanzweg_name",
+    "finanzgruppe",
+    "art",
+    "abschnitt",
+    "prozentsatz",
+    "aktion",
+    "betrag",
+    "anzahl_vorgaenge",
+    "tage_mit_wert",
+    "quellen",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "marke",
+    "monat"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "summe",
+     "spalte": "anzahl_vorgaenge",
+     "einheit": "anzahl",
+     "hinweis": "Vorgaenge, keine Artikel."
+    },
+    {
+     "regel": "summe",
+     "spalte": "betrag",
+     "einheit": "euro",
+     "hinweis": "Zahlungen und Nachlaesse positiv; Summe der Zahlarten = Bruttoumsatz."
+    }
+   ],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.finanzweg_monat_basis",
+   "koernung": "Betrieb × Monat × Finanzweg — materialisierte Fassung von mart.finanzweg_monat (ohne Namen)",
+   "thema": "kasse",
+   "summen_erlaubt": true,
+   "kommentar": "Koernung: Betrieb × Monat × Finanzweg — die materialisierte Summe von mart.finanzweg_tag (je\nBetrieb und Tag eine Quelle, 97 vor 88). Aufgefrischt in Phase B und nach Phase C\n(src/sync/betriebsbericht_sichten.ts); wie alt, sagt mart.materialisierung_stand. Gelesen wird\nmart.finanzweg_monat — dort stehen Betrieb, Marke und operativ live dazu.",
+   "spalten": [
+    "monat",
+    "betrieb_key",
+    "finanzweg_nummer",
+    "finanzweg_name",
+    "finanzgruppe",
+    "art",
+    "abschnitt",
+    "prozentsatz",
+    "aktion",
+    "betrag",
+    "anzahl_vorgaenge",
+    "tage_mit_wert",
+    "quellen"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.finanzweg_namen",
+   "koernung": "Finanzweg × Monat × Name — Namenshistorie",
+   "thema": "kasse",
+   "summen_erlaubt": false,
+   "kommentar": "Koernung: Finanzweg × Monat × Name — welche Namen eine Nummer wann trug (core.finanzweg_stand,\nappend-only). namen_im_monat > 1: verschiedene Betriebe fuehren dieselbe Nummer unter\nverschiedenen Namen — dann taugt die Nummer allein nicht als Schluessel.",
+   "spalten": [
+    "finanzweg_nummer",
+    "monat",
+    "finanzweg_name",
+    "finanzgruppe",
+    "namen_im_monat"
+   ],
+   "achsen": [
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.finanzweg_tag",
+   "koernung": "Betrieb × Tag × Finanzweg — je Tag EINE Quelle (97, sonst 88)",
+   "thema": "kasse",
+   "summen_erlaubt": true,
+   "kommentar": "Koernung: Betrieb × Tag × Finanzweg — aus GENAU EINER Quelle je Betrieb und Tag: Bericht 97\n(Tagesabschluss), wo es ihn gibt, sonst 88 (quelle_bericht). core.finanzweg_tag fuehrt beide,\nund eine Summe darueber waere doppelt (0114, gemessen auf den Cent gleich). Ein Mehrtagesabruf\nvon 88 (tage > 1) steht nur da, wo der Betrieb im Zeitraum keinen Tageswert hat.\n\nbetrag: Zahlungen und Nachlaesse POSITIV (LINA fuehrt sie negativ). Die Zahlarten eines Tages\nsummieren sich zum Bruttoumsatz — Trinkgeld und Rueckgeld stehen dabei negativ, weil sie in den\nZahlbetraegen darueber enthalten sind (Wilma Wunder Duesseldorf, August 2026: 369.841,09 EUR,\nnachgerechnet am 23.09.2026). Umsatzzeilen (Boniert, Sofortstorno, Storno) behalten LINAs\nVorzeichen.\n\nanzahl_vorgaenge zaehlt VORGAENGE (50 % Gluecksrad: 600 in Duesseldorf), nicht Artikel — der\nRabattbericht zaehlt fuer denselben Finanzweg 712 Artikel. Nie gegen mart.artikel_nachlass_*\naddieren. Eine Aktion buendelt man ueber aktion + prozentsatz, nicht ueber die Nummer.",
+   "spalten": [
+    "geschaeftstag",
+    "zeitraum_bis",
+    "tage",
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "quelle_bericht",
+    "finanzweg_nummer",
+    "finanzweg_name",
+    "finanzgruppe",
+    "art",
+    "abschnitt",
+    "prozentsatz",
+    "aktion",
+    "betrag",
+    "anzahl_vorgaenge",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag",
+    "marke",
+    "monat"
    ],
    "kennzahlen": [],
    "fallstricke": []
@@ -2576,6 +3155,35 @@
    "achsen": [
     "betrieb_key",
     "konzept"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.gutschrift",
+   "koernung": "eine Gutschrift (57)",
+   "thema": "kasse",
+   "summen_erlaubt": true,
+   "kommentar": "Koernung: eine Gutschrift (57 Gutschriften pro Kellner), mit Kellnernummer und der Rechnung, die\nsie aufhebt. gutschrift_brutto mit LINAs Vorzeichen (in den gemessenen Zeilen 0,00). Die Zahl je\nKellner und Monat steht fertig in mart.kellner_monat, die Zahl je Tag in mart.bon_tag.",
+   "spalten": [
+    "geschaeftstag",
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "kellnernummer",
+    "gutschriftnummer",
+    "rechnungsnummer",
+    "artikel",
+    "gutschrift_brutto",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag",
+    "marke",
+    "monat"
    ],
    "kennzahlen": [],
    "fallstricke": []
@@ -3135,6 +3743,103 @@
    "fallstricke": []
   },
   {
+   "sicht": "mart.kellner_artikel_monat",
+   "koernung": "Betrieb × Monat × Kellnerblock × Artikel (53) — immer mit monat filtern",
+   "thema": "kasse",
+   "summen_erlaubt": false,
+   "kommentar": "Koernung: Betrieb × Monat × Kellnerblock × Artikel (53 Artikelbericht pro Kellner) — der groesste\nBericht im Katalog, rund 6.700 Zeilen je Betrieb und Monat. IMMER mit monat filtern: die Tabelle\ndarunter ist nach monat partitioniert. Kellner wie in mart.kellner_umsatz_tag: kellner_block je\nBetrieb und Monat, kellnernummer nur bei eindeutiger Monatssumme. menge = verkaufte Stueck dieses\nArtikels durch diesen Kellner. Kopfzeilen nicht enthalten.",
+   "spalten": [
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "kellner_block",
+    "kellnernummer",
+    "artikelnummer",
+    "artikel",
+    "kellner_umsatz_brutto",
+    "kellner_umsatz_netto",
+    "menge",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "marke",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.kellner_monat",
+   "koernung": "Betrieb × Monat × Kellnernummer (60, 57) — Summe ueber Kellner ist NICHT der Betriebsumsatz",
+   "thema": "kasse",
+   "summen_erlaubt": false,
+   "kommentar": "Koernung: Betrieb × Monat × Kellnernummer (60 Umsatz pro Kellner, 57 Gutschriften) — F6.\nLINA liefert KEINEN Kellnernamen (Vermessung 22.09.2026); kellner ist dann \"Kellner <Nummer>\".\nDie Nummer ist eine Kassennummer JE BETRIEB, keine Person ueber Betriebe hinweg — eine Zuordnung\nzu Bounti-Konten ist damit nicht moeglich.\n\nDIE SUMME UEBER KELLNER IST NICHT DER BETRIEBSUMSATZ: ein Bon kann mehreren Kellnern\nzugeschlagen sein. kellner_anteil_pct ist der Anteil am Kellnerumsatz des Betriebs (netto,\nProzentzahl), nicht am Umsatzbericht. Die Tagesberichte je Kellner (61) und die Artikel je\nKellner (53) nennen den Kellner nicht einmal mit Nummer und stehen deshalb nicht in mart.",
+   "spalten": [
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "kellnernummer",
+    "kellner",
+    "kellner_umsatz_brutto",
+    "kellner_umsatz_netto",
+    "kellner_artikel",
+    "trinkgeld",
+    "gutschriften",
+    "gutschriften_brutto",
+    "kellner_anteil_pct",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "marke",
+    "monat"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "kellner_anteil_pct",
+     "einheit": "prozentzahl",
+     "hinweis": null
+    }
+   ],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.kellner_umsatz_tag",
+   "koernung": "Betrieb × Tag × Kellnerblock (61) — Kellnernummer nur bei eindeutiger Monatssumme",
+   "thema": "kasse",
+   "summen_erlaubt": false,
+   "kommentar": "Koernung: Betrieb × Tag × Kellnerblock (61 Umsatz pro Kellner pro Tag). LINA nennt den Kellner in\ndiesem Bericht NICHT, auch nicht mit Nummer: je Kellner ein Block, kellner_block zaehlt die Bloecke\nin Antwortreihenfolge und ist nur innerhalb eines Betriebs und Monats eine Kennung.\nkellnernummer steht da, wo die Monatssumme des Blocks genau EINEM Kellner aus Bericht 60 gleicht,\nsonst NULL. Die Kopfzeilen (Monatssummen) sind nicht enthalten. Die Summe ueber Kellner ist nicht\nder Betriebsumsatz (ein Bon kann mehreren Kellnern zugeschlagen sein).",
+   "spalten": [
+    "geschaeftstag",
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "kellner_block",
+    "kellnernummer",
+    "kellner_umsatz_brutto",
+    "kellner_umsatz_netto",
+    "kellner_artikel",
+    "trinkgeld",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag",
+    "marke",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
    "sicht": "mart.kennzahlen_aktuell",
    "koernung": "Betrieb, Monat und BWA-Kennzahl, im juengsten abgerufenen Stand",
    "thema": "bwa",
@@ -3549,6 +4254,46 @@
    "fallstricke": []
   },
   {
+   "sicht": "mart.monatsaufstellung_tag",
+   "koernung": "Betrieb × Tag — Monatsaufstellung (90) und Verkaufszahlen (108)",
+   "thema": "kasse",
+   "summen_erlaubt": true,
+   "kommentar": "Koernung: Betrieb × Tag — Monatsaufstellung Tag fuer Tag (90: Brutto, Netto, USt, Artikel,\nSteuersaetze) neben den Verkaufszahlen (108: Rechnungen, Zahlungen). Neu gegenueber dem\nUmsatzbericht ist zahlungen: am 01.08.2026 in Duesseldorf 879 Rechnungen mit 1.140 Zahlungen —\nzahlungen_je_rechnung 1,30 heisst, dass Tische geteilt zahlen. Nicht ueber Tage mitteln.\nsteuersaetze: LINAs uebrige Spalten als jsonb; die Schluessel wechseln je Betrieb und Zeit.\nbetrieb_name_lina ist der Name, den LINA in die Antwort schreibt — die Gegenprobe, dass der\nrichtige Betrieb abgefragt wurde.",
+   "spalten": [
+    "geschaeftstag",
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "umsatz_brutto",
+    "umsatz_netto",
+    "ust",
+    "artikel",
+    "rechnungen",
+    "zahlungen",
+    "zahlungen_je_rechnung",
+    "steuersaetze",
+    "betrieb_name_lina",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag",
+    "marke",
+    "monat"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "zahlungen_je_rechnung",
+     "einheit": null,
+     "hinweis": "Ueber Tage: sum(zahlungen) / sum(rechnungen)."
+    }
+   ],
+   "fallstricke": []
+  },
+  {
    "sicht": "mart.nachbarschaft",
    "koernung": "Betrieb mit gepflegtem Ort — die einzige belastbare Stadtangabe",
    "thema": "stammdaten",
@@ -3590,6 +4335,43 @@
     "konzept"
    ],
    "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.nachlass_monat",
+   "koernung": "Betrieb × Monat × Finanzgruppe × Aktion × Prozentsatz — vollstaendiger Nachlass (88/97)",
+   "thema": "aktion",
+   "summen_erlaubt": true,
+   "kommentar": "Koernung: Betrieb × Monat × Finanzgruppe × Aktion × Prozentsatz — was die Nachlaesse kosten\n(F2). Die Finanzwege einer Aktion sind zusammengefasst (finanzwege nennt sie): die beiden\n\"25 % Gluecksrad\" (3501, 3168) stehen in EINER Zeile. nachlass_brutto ist der gewaehrte\nNachlass, positiv, VOLLSTAENDIG (aus 88/97, nicht aus dem Rabattbericht). anzahl_vorgaenge sind\nVorgaenge, keine Artikel. nachlass_anteil_pct: Prozentzahl vom Bruttoumsatz des Betriebs im\nMonat (Umsatzbericht) — nicht mitteln, nicht summieren.",
+   "spalten": [
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "finanzgruppe",
+    "aktion",
+    "prozentsatz",
+    "finanzwege",
+    "nachlass_brutto",
+    "anzahl_vorgaenge",
+    "umsatz_brutto_monat",
+    "nachlass_anteil_pct",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "marke",
+    "monat"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "nachlass_anteil_pct",
+     "einheit": "prozentzahl",
+     "hinweis": "Anteil am Bruttoumsatz des Betriebs. Ueber Betriebe oder Monate aus den Summen neu rechnen."
+    }
+   ],
    "fallstricke": []
   },
   {
@@ -4762,6 +5544,78 @@
    "fallstricke": []
   },
   {
+   "sicht": "mart.storno_artikel_monat",
+   "koernung": "Betrieb × Monat × Artikel × Stornotyp × Stornogrund (39)",
+   "thema": "kasse",
+   "summen_erlaubt": true,
+   "kommentar": "Koernung: Betrieb × Monat × Artikel × Stornotyp × Stornogrund (39, enthaelt 38 vollstaendig).\nstorno_menge und storno_brutto sind POSITIV (LINA fuehrt Stornos negativ); eine Zeile kann\nnegativ werden, wenn in ihr mehr zurueckgenommen als storniert wurde. Stornotyp: Sofortstorno\n(vor dem Bonieren) | Storno (danach). Die Stornogruende sind eher Schwundgruende\n(entscheidungen.md) — \"Keine Zuordnung\" ist der haeufigste Grund und heisst: an der Kasse ohne\nGrund storniert. Artikelname aus dem Bericht, sonst aus core.artikel ueber die Nummer.",
+   "spalten": [
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "artikelnummer",
+    "artikel",
+    "stornotyp",
+    "stornogrund",
+    "storno_menge",
+    "storno_brutto",
+    "storno_netto",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "marke",
+    "monat"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "summe",
+     "spalte": "storno_brutto",
+     "einheit": "euro",
+     "hinweis": "Storniert, positiv."
+    }
+   ],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.storno_grund_monat",
+   "koernung": "Betrieb × Monat × Stornotyp × Stornogrund mit Stornoquote (39)",
+   "thema": "kasse",
+   "summen_erlaubt": true,
+   "kommentar": "Koernung: Betrieb × Monat × Stornotyp × Stornogrund (39). stornoquote_pct: storniertes Brutto\nals Prozentzahl vom Bruttoumsatz des Betriebs im Monat (Umsatzbericht, also NACH Storno) — ueber\nalle Gruende eines Betriebs summierbar, ueber Betriebe nicht mitteln. storno_brutto positiv.\nGemessen August 2026, Wilma Wunder Duesseldorf: 20.538,06 EUR storniert.",
+   "spalten": [
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "stornotyp",
+    "stornogrund",
+    "storno_menge",
+    "storno_brutto",
+    "artikel",
+    "umsatz_brutto_monat",
+    "stornoquote_pct",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "marke",
+    "monat"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "stornoquote_pct",
+     "einheit": "prozentzahl",
+     "hinweis": "Ueber Betriebe oder Monate aus den Summen neu rechnen."
+    }
+   ],
+   "fallstricke": []
+  },
+  {
    "sicht": "mart.sync_status",
    "koernung": "Quelle: laeuft der Import",
    "thema": "import",
@@ -4786,6 +5640,34 @@
     "nachladen_offen"
    ],
    "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.tagesabschluss_tag",
+   "koernung": "Betrieb × Tag × Hauptsparte × Steuersatz — Z-Bon (97)",
+   "thema": "kasse",
+   "summen_erlaubt": true,
+   "kommentar": "Koernung: Betrieb × Tag × Hauptsparte × Steuersatz aus dem Tagesabschluss (97, Z-Bon-Block).\nBRUTTO; ueber einen Monat summiert genau LINAs balanceSumBrutto (Duesseldorf August 2026:\n369.841,09 EUR). hauptsparte und steuersatz sind LINAs Texte (\"Speisen\", \"19%_Mwst\"), keine\nSchluessel. Die Finanzwege desselben Abschlusses stehen in mart.finanzweg_tag.",
+   "spalten": [
+    "geschaeftstag",
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "hauptsparte",
+    "steuersatz",
+    "umsatz_brutto",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag",
+    "hauptsparte",
+    "marke",
+    "monat"
+   ],
    "kennzahlen": [],
    "fallstricke": []
   },
@@ -4815,6 +5697,34 @@
    "achsen": [
     "betrieb_key",
     "konzept",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.tisch_tag",
+   "koernung": "Betrieb × Tag × Tisch (113)",
+   "thema": "kasse",
+   "summen_erlaubt": true,
+   "kommentar": "Koernung: Betrieb × Tag × Tisch (TischId aus dem Tischtransfer, 113). Am 15.08.2026 lieferte 113\ndieselben 519 Bons wie 96 — neu ist nur die TischId. tisch_id ist LINAs interne Kennung, kein\nTischname. Zeitraum immer ueber geschaeftstag filtern.",
+   "spalten": [
+    "geschaeftstag",
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "tisch_id",
+    "bons",
+    "umsatz_brutto",
+    "artikel",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag",
+    "marke",
     "monat"
    ],
    "kennzahlen": [],
@@ -5111,6 +6021,40 @@
    "fallstricke": []
   },
   {
+   "sicht": "mart.unbar_zahlung_monat",
+   "koernung": "Betrieb × Monat × Betriebsstelle × Zahlart — unbare Zahlungen (99)",
+   "thema": "kasse",
+   "summen_erlaubt": true,
+   "kommentar": "Koernung: Betrieb × Monat × Betriebsstelle × Zahlart — unbare Zahlungen (99, Entscheidung E6).\nzahlbetrag positiv (LINA fuehrt Zahlungen negativ), zahlungen = Zahl der Einzelzahlungen\n(Rueckbuchungen eingeschlossen), zahlung_durchschnitt daraus — nicht mitteln. Neu gegenueber\nmart.zahlart_monat ist nur die Betriebsstelle; die Summe je Zahlart sollte dort gleich sein.",
+   "spalten": [
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "betriebsstelle",
+    "zahlart",
+    "zahlbetrag",
+    "zahlungen",
+    "zahlung_durchschnitt",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "marke",
+    "monat"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "zahlung_durchschnitt",
+     "einheit": "euro",
+     "hinweis": "Ueber Zeilen: sum(zahlbetrag) / sum(zahlungen)."
+    }
+   ],
+   "fallstricke": []
+  },
+  {
    "sicht": "mart.ursachen_analyse",
    "koernung": "Monat und Ursache, aufgeschluesselt nach Bereich",
    "thema": "round_table",
@@ -5260,6 +6204,92 @@
     "zustand"
    ],
    "achsen": [
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.verkaufsstelle_hauptsparte_monat",
+   "koernung": "Betrieb × Monat × Verkaufsstelle × Hauptsparte (71)",
+   "thema": "kasse",
+   "summen_erlaubt": true,
+   "kommentar": "Koernung: Betrieb × Monat × Verkaufsstelle × Hauptsparte (71). Summierbar.",
+   "spalten": [
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "verkaufsstelle",
+    "hauptsparte",
+    "umsatz_brutto",
+    "umsatz_netto",
+    "artikel",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "hauptsparte",
+    "marke",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.verkaufsstelle_monat",
+   "koernung": "Betrieb × Monat × Verkaufsstelle (112)",
+   "thema": "kasse",
+   "summen_erlaubt": true,
+   "kommentar": "Koernung: Betrieb × Monat × Verkaufsstelle (112: Gesamtbetrieb, Ausser Haus, Strassenverkauf …)\n— F15 je Betrieb. Summierbar zum Betriebsumsatz (Duesseldorf August 2026: 367.091,59 +\n2.749,50 = 369.841,09 EUR brutto). Der Konzernweg ueber den Umsatzbericht (0112) liefert\ndasselbe je Tag; solange mart.verkaufsstelle_abdeckung dort nicht \"ok\" meldet, ist diese Sicht\ndie belastbare. netto_je_gast und stelle_anteil_pct nicht mitteln.",
+   "spalten": [
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "verkaufsstelle",
+    "umsatz_brutto",
+    "umsatz_netto",
+    "artikel",
+    "gaeste",
+    "netto_je_gast",
+    "stelle_anteil_pct",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "marke",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.verkaufsstelle_tag",
+   "koernung": "Betrieb × Tag × Verkaufsstelle aus dem Konzern-Umsatzbericht (0112)",
+   "thema": "kasse",
+   "summen_erlaubt": true,
+   "kommentar": "Koernung: Betrieb × Tag × Verkaufsstelle aus dem KONZERN-Umsatzbericht (getUmsatzbericht mit\nverkaufsstellen=, seit 0112). Der Parameter ist ungeprueft: solange mart.verkaufsstelle_abdeckung\nfuer den Monat nicht \"ok\" meldet, ist mart.verkaufsstelle_monat (Betriebsbericht 112) die\nbelastbare Zahl. Nie mit mart.umsatz_tag addieren — die Stellen sind ein Teil des Gesamtumsatzes.",
+   "spalten": [
+    "geschaeftstag",
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "verkaufsstelle_nummer",
+    "verkaufsstelle",
+    "umsatz_brutto",
+    "umsatz_netto",
+    "rechnungen",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag",
+    "marke",
     "monat"
    ],
    "kennzahlen": [],
@@ -5553,6 +6583,48 @@
    "fallstricke": []
   },
   {
+   "sicht": "mart.zahlart_monat",
+   "koernung": "Betrieb × Monat × Zahlart (88/97)",
+   "thema": "kasse",
+   "summen_erlaubt": true,
+   "kommentar": "Koernung: Betrieb × Monat × Zahlart (F3: Karte gegen bar, Lieferdienste, Gutscheine). Aus\n88/97, je Tag eine Quelle. zahlbetrag positiv; die Summe aller Zeilen eines Betriebs und\nMonats ist der Bruttoumsatz. Trinkgeld und Rueckgeld stehen NEGATIV, weil sie in den\nZahlbetraegen der anderen Zeilen stecken. zahlart_anteil_pct: Prozentzahl von allem, was\nGaeste bezahlt haben (Summe der positiven Zeilen, also einschliesslich Trinkgeld); fuer\nTrinkgeld und Rueckgeld leer. Nicht summieren, nicht mitteln.",
+   "spalten": [
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "zahlart",
+    "finanzweg_nummer",
+    "finanzgruppe",
+    "zahlbetrag",
+    "anzahl_vorgaenge",
+    "zahlart_anteil_pct",
+    "quellen",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "marke",
+    "monat"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "zahlart_anteil_pct",
+     "einheit": "prozentzahl",
+     "hinweis": "Anteil an allem, was Gaeste bezahlt haben. Aus den Summen neu rechnen."
+    },
+    {
+     "regel": "summe",
+     "spalte": "zahlbetrag",
+     "einheit": "euro",
+     "hinweis": null
+    }
+   ],
+   "fallstricke": []
+  },
+  {
    "sicht": "mart.zeitfenster_pruefung",
    "koernung": "Pruefzeile je Zeitfenster",
    "thema": "pruefung",
@@ -5565,6 +6637,61 @@
     "umsatz_2026"
    ],
    "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.zeitzone_feinsparte_monat",
+   "koernung": "Betrieb × Monat × Feinsparte × Zeitzone (75), ohne Kopfzeilen",
+   "thema": "kasse",
+   "summen_erlaubt": true,
+   "kommentar": "Koernung: Betrieb × Monat × Feinsparte × vordefinierte Zeitzone (75). Wie\nmart.zeitzone_hauptsparte_monat, eine Ebene feiner. Kopfzeilen nicht enthalten. Nie mit der\nHauptspartensicht zusammen summieren — es sind dieselben Umsaetze in zwei Gliederungen.",
+   "spalten": [
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "feinsparte",
+    "zeitzone",
+    "zeitzone_beginn",
+    "umsatz_brutto",
+    "umsatz_netto",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "marke",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.zeitzone_hauptsparte_monat",
+   "koernung": "Betrieb × Monat × Hauptsparte × Zeitzone (76), ohne Kopfzeilen",
+   "thema": "kasse",
+   "summen_erlaubt": true,
+   "kommentar": "Koernung: Betrieb × Monat × Hauptsparte × vordefinierte Zeitzone (76) — F8: wann verdienen wir\nwomit. Die Kopfzeilen des Berichts (Monatssumme je Sparte) sind NICHT enthalten; die Zeilen\nsummieren sich zur Sparte. zeitzone ist LINAs Text (\"9:00 - 12:00\"), zeitzone_beginn die Stunde\nzum Sortieren. Die Stundenwerte ohne Sparte stehen vollstaendiger in mart.umsatz_zeitzone\n(Konzernbericht). LINAs \"Durchschnitt pro Tag\" ist verworfen — aus der Summe neu rechnen.",
+   "spalten": [
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "hauptsparte",
+    "zeitzone",
+    "zeitzone_beginn",
+    "umsatz_brutto",
+    "umsatz_netto",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "hauptsparte",
+    "marke",
+    "monat"
+   ],
    "kennzahlen": [],
    "fallstricke": []
   },
@@ -5770,6 +6897,49 @@
  ],
  "fallstricke": [
   {
+   "schluessel": "artikel_gegen_vorgaenge",
+   "art": "sichten_mischen",
+   "schwere": "warnung",
+   "sicht": null,
+   "parameter": {
+    "a": [
+     "mart.artikel_nachlass_tag",
+     "mart.artikel_nachlass_monat"
+    ],
+    "b": [
+     "mart.finanzweg_tag",
+     "mart.finanzweg_monat",
+     "mart.nachlass_monat"
+    ]
+   },
+   "hinweis": "Der Rabattbericht (92) zaehlt ARTIKEL auf Nachlass-Bons, 88/97 zaehlen VORGAENGE (50 % Gluecksrad in Duesseldorf, August 2026: 712 Artikel gegen 600 Vorgaenge). Eine Summe ueber beide ist keine Zahl; ein Verhaeltnis (Artikel je Vorgang) ist dagegen zulaessig.",
+   "berichtigung": "Nie menge und anzahl_vorgaenge addieren. Betraege: mart.nachlass_monat ist vollstaendig, der Rabattbericht verteilt sie auf Artikel und laesst namenlose Zeilen weg.",
+   "quelle": "docs/metabase.md, Abschnitt zu 0117"
+  },
+  {
+   "schluessel": "bon_deutung",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.bon_tag",
+   "parameter": {},
+   "hinweis": "Bons aus dem Rechnungsausgangsbuch (96): keine Uhrzeit (Wartezeiten, Stundenprofile gehen nicht), keine Artikel und keine Nachlass-Finanzwege. bon_durchschnitt und bon_median sind Tageswerte — ueber mehrere Tage aus sum(bons_brutto) / sum(bons) neu rechnen, nicht mitteln.",
+   "berichtigung": "Stundenprofile: mart.umsatz_zeitzone. Nachlaesse: mart.nachlass_monat.",
+   "quelle": "docs/metabase.md, Abschnitt zu 0117"
+  },
+  {
+   "schluessel": "bon_ohne_nachlass",
+   "art": "wert_muster",
+   "schwere": "sperre",
+   "sicht": "mart.bon_zahlart_tag",
+   "parameter": {
+    "muster": "gl(ü|ue|u)cksrad|rabatt|hausbon|nachlass",
+    "spalte": "zahlart"
+   },
+   "hinweis": "Das Rechnungsausgangsbuch (96) fuehrt in den Finanzwegen eines Bons NUR Zahlarten — keine Nachlass- oder Hausbon-Wege (gemessen: 32 Gluecksrad-Vorgaenge in 88, null in 96). Eine solche Abfrage liefert null Zeilen und liest sich wie \"kein Gluecksrad\".",
+   "berichtigung": "Nachlaesse je Betrieb und Tag: mart.finanzweg_tag bzw. mart.nachlass_monat. \"Bons mit Aktion\" und \"Durchschnittsbon mit gegen ohne Aktion\" sind aus den vorhandenen Berichten NICHT beantwortbar.",
+   "quelle": "docs/metabase.md, Abschnitt zu 0117"
+  },
+  {
    "schluessel": "bundesland_luecke",
    "art": "abdeckung_luecke",
    "schwere": "warnung",
@@ -5811,6 +6981,52 @@
    "quelle": "docs/metabase.md, Abschnitt zu Migration 0056"
   },
   {
+   "schluessel": "finanzweg_88_97_pruefsicht",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.finanzweg_88_97_abgleich",
+   "parameter": {},
+   "hinweis": "Pruefsicht: dieselbe Finanzwegzahl aus ZWEI Berichten (88 und 97) nebeneinander. Wer daraus summiert, zaehlt doppelt.",
+   "berichtigung": "Finanzwege summieren: mart.finanzweg_tag bzw. mart.finanzweg_monat (je Betrieb und Tag genau eine Quelle).",
+   "quelle": "migrations/0114_betriebsberichte_stufe_a.sql"
+  },
+  {
+   "schluessel": "finanzweg_name_exakt",
+   "art": "filter_ueber_spalte",
+   "schwere": "warnung",
+   "sicht": null,
+   "parameter": {
+    "spalte": "finanzweg_name"
+   },
+   "hinweis": "Ein Finanzwegname exakt verglichen trifft nur EINEN Weg. Die beiden 25-%-Wege des Gluecksrads unterscheiden sich an einem Apostroph (\"25% Gluecksrad'\" und \"25% Gluecksrad\"), und derselbe Name kommt je Betrieb in anderer Schreibweise vor.",
+   "berichtigung": "Fuer eine Aktion: WHERE aktion = 'Glücksrad' AND prozentsatz = 25. Die Spalte aktion ist der Name ohne Prozentzahl und ohne Apostroph.",
+   "quelle": "docs/metabase.md, Abschnitt zu 0117"
+  },
+  {
+   "schluessel": "finanzweg_nummernliste_monat",
+   "art": "filter_ueber_spalte",
+   "schwere": "warnung",
+   "sicht": "mart.finanzweg_monat",
+   "parameter": {
+    "spalte": "finanzweg_nummer"
+   },
+   "hinweis": "Filter ueber finanzweg_nummer: fuer eine Zahlart meist richtig, fuer eine AKTION nicht — sie kann ueber mehrere Nummern laufen (Gluecksrad 25 %: 3501 und 3168).",
+   "berichtigung": "Fuer Nachlaesse ueber aktion und prozentsatz filtern, oder gleich mart.nachlass_monat nehmen (dort sind die Finanzwege einer Aktion schon zusammengefasst).",
+   "quelle": "docs/metabase.md, Abschnitt zu 0117"
+  },
+  {
+   "schluessel": "finanzweg_nummernliste_tag",
+   "art": "filter_ueber_spalte",
+   "schwere": "warnung",
+   "sicht": "mart.finanzweg_tag",
+   "parameter": {
+    "spalte": "finanzweg_nummer"
+   },
+   "hinweis": "Filter ueber finanzweg_nummer: fuer eine Zahlart meist richtig, fuer eine AKTION nicht — sie kann ueber mehrere Nummern laufen (Gluecksrad 25 %: 3501 und 3168).",
+   "berichtigung": "Fuer Nachlaesse ueber aktion und prozentsatz filtern, oder gleich mart.nachlass_monat nehmen (dort sind die Finanzwege einer Aktion schon zusammengefasst).",
+   "quelle": "docs/metabase.md, Abschnitt zu 0117"
+  },
+  {
    "schluessel": "fremdeinkauf_quelle",
    "art": "filter_noetig",
    "schwere": "sperre",
@@ -5846,6 +7062,50 @@
    "hinweis": "Verbindung ueber den Betriebsnamen. Der Name ist NICHT eindeutig: fuenf Betriebe heissen \"Karlsruhe\" (fuenf Restaurants in einer Stadt, kein Restaurant in fuenf Marken). Ein Join darueber mischt sie zusammen.",
    "berichtigung": "Ueber betrieb_key verbinden. Fuer die Anzeige gehoeren Konzept und Name zusammen.",
    "quelle": "docs/datenmodell.md, Abschnitt Markenebene"
+  },
+  {
+   "schluessel": "nachlass_menge_deutung_monat",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.artikel_nachlass_monat",
+   "parameter": {},
+   "hinweis": "menge ist die Zahl der Artikel auf Bons, auf die dieser Nachlass gebucht wurde — NICHT die Verkaufsmenge und NICHT die Zahl der Nachlassvorgaenge: der Nachlass gilt fuer den ganzen Bon (im August 2026 trugen 327 Artikel einen Gluecksrad-Nachlass, auch Getraenke). Nur Zeilen MIT Artikelnamen (die Gruppenkoepfe des Berichts sind nie geladen, 28 von 8.533 Zeilen ohne Namen fehlen bewusst) — fuer den vollstaendigen Nachlassbetrag je Aktion ist mart.nachlass_monat da.",
+   "berichtigung": "Verkaufsmengen stehen in mart.artikel_monat, Vorgaenge und Betraege je Aktion in mart.nachlass_monat.",
+   "quelle": "docs/metabase.md, Abschnitt zu 0117"
+  },
+  {
+   "schluessel": "nachlass_menge_deutung_tag",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.artikel_nachlass_tag",
+   "parameter": {},
+   "hinweis": "menge ist die Zahl der Artikel auf Bons, auf die dieser Nachlass gebucht wurde — NICHT die Verkaufsmenge und NICHT die Zahl der Nachlassvorgaenge: der Nachlass gilt fuer den ganzen Bon (im August 2026 trugen 327 Artikel einen Gluecksrad-Nachlass, auch Getraenke). Nur Zeilen MIT Artikelnamen (die Gruppenkoepfe des Berichts sind nie geladen, 28 von 8.533 Zeilen ohne Namen fehlen bewusst) — fuer den vollstaendigen Nachlassbetrag je Aktion ist mart.nachlass_monat da.",
+   "berichtigung": "Verkaufsmengen stehen in mart.artikel_monat, Vorgaenge und Betraege je Aktion in mart.nachlass_monat.",
+   "quelle": "docs/metabase.md, Abschnitt zu 0117"
+  },
+  {
+   "schluessel": "nachlass_nummernliste_monat",
+   "art": "filter_ueber_spalte",
+   "schwere": "sperre",
+   "sicht": "mart.artikel_nachlass_monat",
+   "parameter": {
+    "spalte": "finanzweg_nummer"
+   },
+   "hinweis": "Filter ueber finanzweg_nummer verliert still Zeilen. Eine Aktion laeuft oft ueber MEHRERE Finanzwege: die 25-%-Stufe des Gluecksrads ueber 3501 (\"25% Gluecksrad'\") UND 3168 (\"25% Gluecksrad\") — wer nach 3500/3501/3502 filterte, verlor in einem Betrieb 31 Vorgaenge. Dazu ist die Nummer im Rabattbericht NULL, solange 88/97 fuer den Tag fehlt.",
+   "berichtigung": "Ueber aktion und prozentsatz filtern: WHERE aktion = 'Glücksrad' (optional AND prozentsatz = 25). Welche Aktionen es gibt, steht in mart.finanzweg (Spalte aktion).",
+   "quelle": "docs/metabase.md, Abschnitt zu 0117"
+  },
+  {
+   "schluessel": "nachlass_nummernliste_tag",
+   "art": "filter_ueber_spalte",
+   "schwere": "sperre",
+   "sicht": "mart.artikel_nachlass_tag",
+   "parameter": {
+    "spalte": "finanzweg_nummer"
+   },
+   "hinweis": "Filter ueber finanzweg_nummer verliert still Zeilen. Eine Aktion laeuft oft ueber MEHRERE Finanzwege: die 25-%-Stufe des Gluecksrads ueber 3501 (\"25% Gluecksrad'\") UND 3168 (\"25% Gluecksrad\") — wer nach 3500/3501/3502 filterte, verlor in einem Betrieb 31 Vorgaenge. Dazu ist die Nummer im Rabattbericht NULL, solange 88/97 fuer den Tag fehlt.",
+   "berichtigung": "Ueber aktion und prozentsatz filtern: WHERE aktion = 'Glücksrad' (optional AND prozentsatz = 25). Welche Aktionen es gibt, steht in mart.finanzweg (Spalte aktion).",
+   "quelle": "docs/metabase.md, Abschnitt zu 0117"
   },
   {
    "schluessel": "nenner_ohne_geschaeft",
@@ -5929,6 +7189,23 @@
    "quelle": "docs/plan-kalender-wetter.md"
   },
   {
+   "schluessel": "verkaufsstelle_plus_gesamt",
+   "art": "sichten_mischen",
+   "schwere": "warnung",
+   "sicht": null,
+   "parameter": {
+    "a": [
+     "mart.verkaufsstelle_tag"
+    ],
+    "b": [
+     "mart.umsatz_tag"
+    ]
+   },
+   "hinweis": "Die Verkaufsstellen sind ein TEIL des Gesamtumsatzes (Gesamtbetrieb + Ausser Haus = Umsatz). Eine Summe ueber mart.verkaufsstelle_tag und mart.umsatz_tag zaehlt doppelt.",
+   "berichtigung": "Anteile rechnen, nicht addieren. Solange mart.verkaufsstelle_abdeckung nicht \"ok\" meldet, ist mart.verkaufsstelle_monat die belastbare Zahl.",
+   "quelle": "docs/metabase.md, Abschnitt zu 0112"
+  },
+  {
    "schluessel": "ware_ueber_id",
    "art": "gruppierung_falsch",
    "schwere": "warnung",
@@ -5960,6 +7237,23 @@
    "hinweis": "ampel_we_bar ist bei den Deutschen Konzepten (Lehners, Ratskeller, Wirtshaeuser) ABSICHTLICH leer, obwohl we_bar_pct dort steht: die Brauereibindungen machen den Getraenkeeinsatz dieser Betriebe untereinander unvergleichbar, eine Schwelle waere geraten (Entscheidung 20.09.2026). Wer Ampeln zaehlt, darf diese Betriebe nicht unter \"keine Daten\" fuehren.",
    "berichtigung": "Welche Schwelle fuer welche Marke gilt, steht in mart.ampel_schwelle; welche Betriebe es trifft, in mart.round_table_unvollstaendig.ohne_schwelle_we_bar.",
    "quelle": "migrations/0107_schwellen_je_marke.sql"
+  },
+  {
+   "schluessel": "zeitzone_ebenen_mischen",
+   "art": "sichten_mischen",
+   "schwere": "warnung",
+   "sicht": null,
+   "parameter": {
+    "a": [
+     "mart.zeitzone_hauptsparte_monat"
+    ],
+    "b": [
+     "mart.zeitzone_feinsparte_monat"
+    ]
+   },
+   "hinweis": "Haupt- und Feinsparten gliedern DENSELBEN Umsatz zweimal. Eine Summe ueber beide Sichten ist doppelt.",
+   "berichtigung": "Eine der beiden Sichten nehmen.",
+   "quelle": "docs/metabase.md, Abschnitt zu 0117"
   }
  ]
 }

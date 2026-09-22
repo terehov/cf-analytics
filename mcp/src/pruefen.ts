@@ -169,6 +169,53 @@ export const REGELARTEN: Record<string, RegelImpl> = {
    * ueberhaupt vorkommt.
    */
   deutung: (z, f) => betrifftSicht(z, f),
+
+  /**
+   * Eine Spalte wird gegen feste Werte gefiltert (`=` oder `IN`), und genau
+   * das ist die Falle — nicht die Spalte an sich. Anlass (23.09.2026): die
+   * 25-%-Stufe des Gluecksrads lief ueber ZWEI Finanzwegnummern (3501 und
+   * 3168); `finanzweg_nummer IN (3500, 3501, 3502)` verlor in einem Betrieb
+   * 31 Vorgaenge still. Ein Verbinden ueber die Spalte (Spalte = Spalte)
+   * zaehlt nicht — es gibt dort keinen festen Wert.
+   *
+   * Mit `parameter.werte` nur, wenn einer dieser Werte gefiltert wird.
+   */
+  filter_ueber_spalte: (z, f) => {
+    if (!betrifftSicht(z, f)) return false
+    const werte = z.gleichheitWerte.get(f.parameter.spalte)
+    if (!werte || werte.size === 0) return false
+    const nur: unknown[] | undefined = f.parameter.werte
+    if (!nur) return true
+    return [...werte].some(w => nur.some(n => String(n) === String(w)))
+  },
+
+  /**
+   * Eine Spalte wird gegen einen TEXT verglichen (=, IN, LIKE, ILIKE, ~, ~*),
+   * der auf ein Muster passt — z. B. "Gluecksrad" in den Zahlarten der Bons.
+   * Bericht 96 fuehrt keine Nachlass-Finanzwege; eine solche Abfrage liefert
+   * null Zeilen und liest sich wie "kein Gluecksrad".
+   */
+  wert_muster: (z, f) => {
+    if (!betrifftSicht(z, f)) return false
+    const texte = z.textvergleich.get(f.parameter.spalte)
+    if (!texte) return false
+    const muster = new RegExp(f.parameter.muster, 'i')
+    return [...texte].some(t => muster.test(t))
+  },
+
+  /**
+   * Zwei Gruppen von Sichten in EINER Abfrage mit Aggregat — dieselbe Groesse
+   * aus zwei Quellen, die verschieden zaehlen. Anlass: der Rabattbericht (92)
+   * zaehlt Artikel, 88/97 zaehlen Vorgaenge; eine Summe ueber beide ist keine
+   * Zahl. Warnung und nicht Sperre, wo ein Verhaeltnis beider (Artikel je
+   * Vorgang) eine legitime Frage ist — die Schwere steht in den Daten.
+   */
+  sichten_mischen: (z, f) => {
+    const a: string[] = f.parameter.a ?? []
+    const b: string[] = f.parameter.b ?? []
+    if (!a.some(s => z.sichten.has(s)) || !b.some(s => z.sichten.has(s))) return false
+    return z.aggregate.some(([fn]) => fn === 'sum' || fn === 'count' || fn === 'avg')
+  },
 }
 
 function istProzentspalte(spalte: string, k: Katalog): boolean {

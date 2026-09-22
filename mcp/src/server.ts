@@ -25,6 +25,7 @@ import { abfrageAusfuehren, Abfragefehler, berichtAusfuehren, Gesperrt, probepla
 import { berichtBeschreiben, berichteSuchen, BerichtFehler, alleKarten, karteFinden,
          uebersetzen } from './berichte'
 import { abfragen } from './db'
+import { umlauteFalten } from './berichte'
 import { defekteSichten, gesundheitBeobachten, gesundheitGemessenAm,
          standLaden, unklareSichten } from './gesundheit'
 import { katalogLaden } from './katalog_laden'
@@ -365,10 +366,13 @@ export const app = new Skybridge({
        */
       const defekt = defekteSichten()
       const unklar = unklareSichten()
+      // Umlaute gefaltet (23.09.2026): die Kommentare schreiben "Gluecksrad",
+      // der Nutzer fragt nach "Glücksrad" — ohne Faltung fand die Suche die
+      // Nachlass-Sichten nicht.
+      const wf = umlauteFalten(w)
       const treffer = [...katalog.sichten.values()]
-        .filter(s => s.sicht.includes(w) || (s.thema ?? '').includes(w)
-                  || (s.koernung ?? '').toLowerCase().includes(w)
-                  || (s.kommentar ?? '').toLowerCase().includes(w))
+        .filter(s => [s.sicht, s.thema ?? '', s.koernung ?? '', s.kommentar ?? '']
+                       .some(t => umlauteFalten(t).includes(wf)))
         .slice(0, 30)
         .map(s => ({
           sicht: s.sicht, thema: s.thema, koernung: s.koernung, achsen: s.achsen,
@@ -531,7 +535,9 @@ export const app = new Skybridge({
         'viele ohne BWA, wie viele ohne Artikeldaten) UND dazu jeder Betrieb, der NICHT ' +
         'vollstaendig ist, einzeln — die vollstaendigen bleiben ungenannt, sonst waeren es 141 ' +
         'Zeilen ohne Aussage. MIT NAMEN: die Zeile dieses Betriebs, gleich ob vollstaendig ' +
-        'oder nicht.',
+        'oder nicht. IMMER dazu: je Betriebsbericht (Nachlaesse, Finanzwege, Bons, Storno, ' +
+        'Kellner, Stellen, Zeitzonen) der geladene Zeitraum — ein Monat ausserhalb ist NICHT ' +
+        'null, sondern nicht geladen.',
       inputSchema: {
         betrieb: z.string().optional().describe(
           'Name oder Teil davon. Leer = Uebersicht nach Befund plus die Betriebe mit Rueckstand'),
@@ -566,6 +572,16 @@ export const app = new Skybridge({
         `${JE_BETRIEB} WHERE befund <> 'vollstaendig'
           ORDER BY bwa_verzug_monate DESC NULLS LAST, umsatz_alter_tage DESC NULLS LAST,
                    betrieb LIMIT 200`)
+      /**
+       * DIE BETRIEBSBERICHTE HABEN IHREN EIGENEN STAND (0117). Der Umsatz ist
+       * seit 2018 geladen, die Betriebsberichte fuellen sich ab dem Deploy
+       * rueckwaerts — eine Frage nach 2019 trifft dort lange auf nichts. Eine
+       * Zeile je Bericht, fertig als Satz; ein Fehler kostet nur diesen Teil.
+       */
+      const betriebsberichte = await abfragen(
+        `SELECT bericht, bezeichnung, erster_monat::text, letzter_monat::text,
+                vollstaendig_ab::text, vollstaendig_bis::text, aussage
+           FROM mart.betriebsbericht_ladestand ORDER BY bericht`).catch(() => [])
       // Mit Dauer: am 15.09.2026 lief genau diese Abfrage in die 20-s-Grenze,
       // und niemand konnte hinterher sagen, wie lange sie sonst braucht.
       await protokollieren({ nutzer: nutzerAus(nutzer), werkzeug: 'datenstand',
@@ -573,12 +589,14 @@ export const app = new Skybridge({
         dauer_ms: Date.now() - start })
       return {
         structuredContent: betrieb
-          ? { zeilen }
-          : { zeilen, uebersicht: zeilen, betriebe_mit_rueckstand: rueckstand },
-        content: betrieb
+          ? { zeilen, betriebsberichte }
+          : { zeilen, uebersicht: zeilen, betriebe_mit_rueckstand: rueckstand, betriebsberichte },
+        content: (betrieb
           ? `${zeilen.length} Zeilen.`
           : `${zeilen.length} Befunde, dazu ${rueckstand.length} Betriebe mit Rueckstand ` +
-            `namentlich. Die vollstaendigen sind nicht aufgefuehrt.`,
+            `namentlich. Die vollstaendigen sind nicht aufgefuehrt.`) +
+          (betriebsberichte.length ? ` Dazu ${betriebsberichte.length} Betriebsberichte mit ` +
+            `ihrem geladenen Zeitraum (betriebsberichte).` : ''),
       }
     })
 

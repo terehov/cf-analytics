@@ -242,6 +242,41 @@ async function datenstandHolen(zeilen: Record<string, unknown>[]): Promise<Daten
 }
 
 /**
+ * Wie weit die Betriebsberichte geladen sind, fuer die Sichten dieser Antwort.
+ *
+ * WARUM. Eine Auswertung ueber 2019 aus mart.artikel_nachlass_monat liefert,
+ * solange der Backfill dort nicht angekommen ist, KEINE Zeile — und ein Modell
+ * liest "keine Zeile" als "null Nachlass". Harte Regel 10: der Unterschied muss
+ * in der Antwort stehen. mart.betriebsbericht_ladestand fuehrt je Bericht den
+ * geladenen Zeitraum als Satz und die Sichten, die daraus lesen (Migration 0117).
+ *
+ * Nur fuer Sichten, die aus einem Betriebsbericht lesen — alle anderen Antworten
+ * bekommen nichts dazu. Ein Fehler hier kostet den Hinweis, nie die Antwort.
+ */
+async function ladestandHolen(sichten: string[]): Promise<Befund[]> {
+  if (!sichten.length) return []
+  try {
+    const r = await pool.query(
+      `SELECT endpunkt, aussage, (monate_nicht_geladen + monate_teilweise) > 0 AS luecken
+         FROM mart.betriebsbericht_ladestand
+        WHERE sichten && $1::text[]
+        ORDER BY bericht`, [sichten])
+    return (r.rows as { endpunkt: string; aussage: string; luecken: boolean }[]).map(z => ({
+      schluessel: `ladestand_${z.endpunkt.replace(/[^a-z0-9]+/gi, '_')}`,
+      schwere: 'warnung' as const,
+      hinweis: z.aussage,
+      berichtigung: z.luecken
+        ? 'Einen Monat ohne Zeilen NICHT als null weitergeben, sondern als "nicht geladen". Den Stand je '
+          + 'Monat nennt mart.betriebsbericht_ladestand_monat.'
+        : null,
+      quelle: 'mart.betriebsbericht_ladestand',
+    }))
+  } catch {
+    return []
+  }
+}
+
+/**
  * Ins Protokoll schreiben.
  *
  * WARUM HIER EINE SCHREIBENDE TRANSAKTION AUSDRUECKLICH ANGEFORDERT WIRD.
@@ -386,7 +421,7 @@ async function laufenLassen(
   const weitere = alle.slice(ZEILEN_FUER_MODELL, ZEILEN_FUER_ANSICHT)
   const datenstand = await datenstandHolen(alle.slice(0, ZEILEN_FUER_ANSICHT))
 
-  const hinweise = [...pruefung.befunde]
+  const hinweise = [...pruefung.befunde, ...await ladestandHolen(pruefung.sichten)]
   if (alle.length > ZEILEN_FUER_MODELL) {
     hinweise.push({
       schluessel: 'abgeschnitten', schwere: 'warnung',
