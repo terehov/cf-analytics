@@ -374,6 +374,54 @@ export const ENDPUNKTE: Endpunkt[] = [
       report: 'intranet-umsatz', ...konzernZeitraum(von, bis), hauptsparten: '95',
     }),
   },
+  /*
+   * DIE SIEBEN VERKAUFSSTELLEN (Plan „Vollabzug", Meilenstein M0, 22.09.2026).
+   *
+   * `core.umsatzbericht_tag.verkaufsstelle_key` steht seit `0003` im Schema,
+   * wird von einem Dutzend `mart`-Sichten mitgefuehrt und war bis hierher
+   * NIE gefuellt — `laden.ts` schrieb fest `null`, und kein Registereintrag
+   * sendete `verkaufsstellen`. `kennzahlen-mapping.md` fuehrte „Umsatz pro
+   * Verkaufsstelle" trotzdem als erledigt. Dieselbe Signatur wie Regel 10:
+   * eine Spalte, die aussieht, als waere sie versorgt.
+   *
+   * Bauart wie die Hauptsparten aus `0077`: ein Konzernaufruf je Tag und
+   * Stelle deckt alle 141 Betriebe; `laden.ts` schlaegt aus dem Parameter
+   * die `verkaufsstelle_key` nach (`core.verkaufsstelle.nummer`).
+   *
+   * UNGEPRUEFT, UND DESHALB MIT WAECHTER: `verkaufsstellen` erwartet laut
+   * `lina-api-inventar.md` §3.1 die `number` aus `analyticsFilterOptions` —
+   * „aus den Vue-Bundles extrahiert", nie gegen eine Antwort gemessen. Bei den
+   * Hauptsparten war die naheliegende Lesart falsch (posId statt number), und
+   * die falsche lieferte kommentarlos 0 EUR. Ob es hier genauso ist, zeigt
+   * `mart.verkaufsstelle_abdeckung` nach der ersten Nacht: die Summe der
+   * sieben Stellen muss den Gesamtumsatz treffen. 0 % heisst falsches Format,
+   * rund 700 % heisst, LINA ignoriert den Filter. Beides steht als Zeile in
+   * `mart.pruefung_uebersicht` (Migration `0112`).
+   *
+   * Kosten: 7 × 10 Nachzuegler-Tage = 70 Aufrufe je Nacht, die Historie
+   * (7 × ~3.100 Tage) laeuft ueber `HISTORIE_JE_LAUF` mit.
+   */
+  ...([
+    [0, 'gesamtbetrieb', 'Gesamtbetrieb'],
+    [1, 'ausser_haus', 'Ausser Haus'],
+    [2, 'amadeusgo', 'AmadeusGO'],
+    [51, 'cocktail_casino', 'Cocktail Casino'],
+    [52, 'delivery', 'Delivery'],
+    [53, 'to_go_lehners', 'To Go Lehners'],
+    [56, 'to_go_aktionspreis', 'To Go Aktionspreis'],
+  ] as const).map(([nummer, schluessel, name]): Endpunkt => ({
+    key: `getUmsatzbericht:vs_${schluessel}`,
+    ebene: 'konzern',
+    pfad: '/intranet/analytics/getUmsatzbericht',
+    schrittweite: 'tag',
+    zweck: `Umsatz nur Verkaufsstelle ${name} (Nummer ${nummer})`,
+    aktiv: true,
+    hinweis: 'verkaufsstellen erwartet laut Vue-Bundle die number — UNGEPRUEFT. '
+           + 'Gegenprobe: mart.verkaufsstelle_abdeckung.',
+    parameter: (von, bis) => ({
+      report: 'intranet-umsatz', ...konzernZeitraum(von, bis), verkaufsstellen: String(nummer),
+    }),
+  })),
   {
     key: 'getPersonalkosten',
     ebene: 'konzern',

@@ -1433,3 +1433,18 @@ nicht in einen guten Vorsatz:
    eingespielt wird.
 2. **Die Wirkung als `mcp_leser` nachweisen**, mit `SELECT * … LIMIT 1` und niemals mit
    `count(*)`. `0110` macht es am eigenen Ende vor.
+
+## `mart.verkaufsstelle_abdeckung` und die dritte Zeilenart im Umsatzbericht (Migration `0112`, 22.09.2026)
+
+Seit `0112` trägt `core.umsatzbericht_tag` je Betrieb und Tag **drei Arten** Zeilen: die
+Gesamtzeile (`hauptsparte_key` und `verkaufsstelle_key` NULL), je Hauptsparte eine und — neu — je
+Verkaufsstelle eine. Die Gesamtzeile ist die mit **beiden** Schlüsseln NULL. Alle bestehenden
+Sichten filtern so; `mart.hauptsparte_abdeckung` filterte nur die Hauptsparte und hätte jede
+Verkaufsstellenzeile als zweiten Gesamtumsatz gezählt — in `0112` repariert (Spaltenliste
+unverändert).
+
+`mart.verkaufsstelle_abdeckung` (ein Monat je Zeile) ist die Gegenprobe zum **ungeprüften**
+Parameter `verkaufsstellen`: die Summe der Stellen muss den Gesamtumsatz treffen. `zustand`
+nennt die beiden Fehlbilder ausdrücklich („Filter liefert 0 EUR", „LINA ignoriert den Filter").
+Eine Zeile in `mart.pruefung_uebersicht` zählt Monate mit `zustand` außer `ok`. Eine fachliche
+`mart`-Sicht „Umsatz je Verkaufsstelle" gibt es noch nicht — erst, wenn die Abdeckung stimmt.

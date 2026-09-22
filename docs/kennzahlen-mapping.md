@@ -65,7 +65,7 @@ Die vorliegende `JULI_Round_Table_Ampelsystem.xlsx` enthält kaputte Referenzen,
 
 | Bericht | Live | LINA-Quelle | Status |
 |---|---|---|---|
-| Umsatz pro Verkaufsstelle | 1 | `getUmsatzbericht` + `verkaufsstellen` | ✅ |
+| Umsatz pro Verkaufsstelle | 1 | `getUmsatzbericht` + `verkaufsstellen` | ~~✅~~ 🟡 **bis 22.09.2026 nie geholt** (`verkaufsstelle_key` war immer NULL). Seit `0112` geholt; Parameterformat ungeprüft — Gegenprobe `mart.verkaufsstelle_abdeckung` |
 | Personalkosten/Effektivität | 1 | `getPersonalkosten` (`pekGesamt`, `effGesamt`) | ✅ |
 | Personalkosten/Effektivität pro Bereich | 1 | `getPersonalkosten` (`…Service/Bar/Kueche`) | ✅ |
 | Wareneinsatz | 0,2 | `getKennzahlen` (`WE Bar`, `WE Küche`) | 🟡 nur monatlich, BWA-Lag |

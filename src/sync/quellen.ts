@@ -87,6 +87,19 @@ export const QUELLEN: readonly Quelle[] = [
     system: 'lina', endpunkt: 'getUmsatzbericht:trinkgeld', kadenz_stunden: WOECHENTLICH },
   { quelle: 'getUmsatzbericht:gutschein_95', bezeichnung: 'Umsatz Hauptsparte Gutschein (95)',
     system: 'lina', endpunkt: 'getUmsatzbericht:gutschein_95', kadenz_stunden: WOECHENTLICH },
+  /*
+   * Die sieben Verkaufsstellen (M0, Migration 0112). Dieselbe Begruendung
+   * wie bei den acht Hauptsparten darueber: eine Stelle wie „Cocktail
+   * Casino" kann legitim wochenlang ohne Umsatz sein, deshalb eine Woche
+   * Kadenz. Ob der Filter ueberhaupt wirkt, sagt nicht diese Zeile, sondern
+   * mart.verkaufsstelle_abdeckung.
+   */
+  ...ENDPUNKTE
+    .filter(e => e.key.startsWith('getUmsatzbericht:vs_'))
+    .map((e): Quelle => ({
+      quelle: e.key, bezeichnung: e.zweck, system: 'lina', endpunkt: e.key,
+      kadenz_stunden: WOECHENTLICH,
+    })),
   { quelle: 'getPersonalkosten', bezeichnung: 'Personalkosten je Betrieb und Tag',
     system: 'lina', endpunkt: 'getPersonalkosten', kadenz_stunden: TAEGLICH },
   { quelle: 'getZeitzonenbericht', bezeichnung: 'Umsatz je Stunde',

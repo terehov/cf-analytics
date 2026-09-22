@@ -192,12 +192,41 @@ export async function laden(k: Kontext): Promise<number> {
       case 'getUmsatzbericht:lieferkosten':
       case 'getUmsatzbericht:pfand':
       case 'getUmsatzbericht:trinkgeld':
-      case 'getUmsatzbericht:gutschein_95': {
+      case 'getUmsatzbericht:gutschein_95':
+      case 'getUmsatzbericht:vs_gesamtbetrieb':
+      case 'getUmsatzbericht:vs_ausser_haus':
+      case 'getUmsatzbericht:vs_amadeusgo':
+      case 'getUmsatzbericht:vs_cocktail_casino':
+      case 'getUmsatzbericht:vs_delivery':
+      case 'getUmsatzbericht:vs_to_go_lehners':
+      case 'getUmsatzbericht:vs_to_go_aktionspreis': {
         const posId = k.parameter.hauptsparten ? Number(k.parameter.hauptsparten) : null
         let hsKey: number | null = null
         if (posId !== null) {
           const r = await c.query(`SELECT hauptsparte_key FROM core.hauptsparte WHERE pos_id = $1`, [posId])
           hsKey = r.rows[0] ? Number(r.rows[0].hauptsparte_key) : null
+        }
+        /*
+         * Die Verkaufsstelle (Meilenstein M0, 22.09.2026). Bis hierher stand
+         * unten fest `verkaufsstelle_key: null` — die Spalte war seit 0003
+         * da und nie gefuellt.
+         *
+         * Eine unbekannte Nummer ist KEIN stiller Gesamtwert: ohne Schluessel
+         * landete die gefilterte Zeile auf (hauptsparte NULL, verkaufsstelle
+         * NULL) und ueberschriebe die Gesamtzeile des Tages mit dem Umsatz
+         * einer einzelnen Stelle. Deshalb wirft der Posten — er ist dann
+         * ein Baufehler im Register, kein Datenzustand.
+         */
+        const vsNummer = k.parameter.verkaufsstellen !== undefined ? Number(k.parameter.verkaufsstellen) : null
+        let vsKey: number | null = null
+        if (vsNummer !== null) {
+          const r = await c.query(
+            `SELECT verkaufsstelle_key FROM core.verkaufsstelle WHERE nummer = $1`, [vsNummer])
+          if (!r.rows[0]) {
+            throw new Error(`${k.ep.key}: Verkaufsstelle ${vsNummer} fehlt in core.verkaufsstelle — `
+              + 'ohne Schluessel ueberschriebe die Zeile den Gesamtumsatz des Tages')
+          }
+          vsKey = Number(r.rows[0].verkaufsstelle_key)
         }
         const spalten = ['betrieb_key','geschaeftstag','hauptsparte_key','verkaufsstelle_key',
                          'umsatz_netto','umsatz_brutto','rechnungen','gaeste',
@@ -226,7 +255,7 @@ export async function laden(k: Kontext): Promise<number> {
           .filter(z => bk(z.encId))
           .map(z => ({
             betrieb_key: bk(z.encId)!, geschaeftstag: z.geschaeftstag,
-            hauptsparte_key: hsKey, verkaufsstelle_key: null,
+            hauptsparte_key: hsKey, verkaufsstelle_key: vsKey,
             umsatz_netto: z.umsatzNetto, umsatz_brutto: z.umsatzBrutto,
             rechnungen: z.rechnungen, gaeste: z.gaeste,
             durchschnittsbon: z.durchschnittsbon, umsatz_pro_gast: z.umsatzProGast,
@@ -819,6 +848,13 @@ export const TRANSFORMIERTE_ENDPUNKTE: ReadonlySet<string> = new Set([
   'getUmsatzbericht:pfand',
   'getUmsatzbericht:trinkgeld',
   'getUmsatzbericht:gutschein_95',
+  'getUmsatzbericht:vs_gesamtbetrieb',
+  'getUmsatzbericht:vs_ausser_haus',
+  'getUmsatzbericht:vs_amadeusgo',
+  'getUmsatzbericht:vs_cocktail_casino',
+  'getUmsatzbericht:vs_delivery',
+  'getUmsatzbericht:vs_to_go_lehners',
+  'getUmsatzbericht:vs_to_go_aktionspreis',
   'getPersonalkosten',
   'getKennzahlen:absolut',
   'getKennzahlen:relativ',

@@ -60,3 +60,37 @@ describe('Einreihreihenfolge', () => {
     expect(endpunkt('getKennzahlen:absolut').aktiv).toBe(true)
   })
 })
+
+/**
+ * Meilenstein M0 (Migration 0112): die sieben Verkaufsstellen.
+ *
+ * Die Spalte `verkaufsstelle_key` war seit 0003 da und nie gefuellt. Der Test
+ * haelt fest, was die Reparatur ausmacht — und was an ihr ungeprueft ist.
+ */
+describe('Verkaufsstellen im Umsatzbericht (M0)', () => {
+  const vs = AKTIVE_ENDPUNKTE.filter(e => e.key.startsWith('getUmsatzbericht:vs_'))
+
+  test('sieben Endpunkte, je Verkaufsstelle aus dem Seed von 0002 einer', () => {
+    const nummern = vs.map(e => e.parameter('2026-08-15', '2026-08-15').verkaufsstellen)
+    expect(nummern.sort()).toEqual(['0', '1', '2', '51', '52', '53', '56'])
+  })
+
+  test('jeder sendet NUR den Verkaufsstellenfilter, keinen Spartenfilter', () => {
+    // Eine Kombination aus beiden ergaebe Zeilen, die keine Sicht erwartet
+    // (hauptsparte_key UND verkaufsstelle_key gesetzt).
+    for (const e of vs) {
+      const p = e.parameter('2026-08-15', '2026-08-15')
+      expect(p.hauptsparten).toBeUndefined()
+      expect(p.report).toBe('intranet-umsatz')
+      expect(p.von).toBe('15.08.2026')
+    }
+  })
+
+  test('sie sind Konzern-Tagesberichte und laufen damit im Nachzuegler-Fenster mit', () => {
+    for (const e of vs) {
+      expect(e.ebene).toBe('konzern')
+      expect(e.schrittweite).toBe('tag')
+      expect(einreihPrioritaet(e.key)).toBe(PRIORITAET.laufend)
+    }
+  })
+})

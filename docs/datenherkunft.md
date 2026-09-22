@@ -39,6 +39,7 @@ Backfill so billig ist — acht Aufrufe je Kalendertag, nicht 8 × 141.
 | `getUmsatzbericht` | `/intranet/analytics/getUmsatzbericht` | Tag | `core.umsatzbericht_tag` (Gesamtwert) |
 | `getUmsatzbericht:speisen` | derselbe, `hauptsparten=10001` | Tag | `core.umsatzbericht_tag` (Hauptsparte) |
 | `getUmsatzbericht:getraenke` | derselbe, `hauptsparten=10002` | Tag | `core.umsatzbericht_tag` (Hauptsparte) |
+| `getUmsatzbericht:vs_*` (7×, seit `0112`) | derselbe, `verkaufsstellen=<number>` | Tag | `core.umsatzbericht_tag` (**Verkaufsstelle**, `verkaufsstelle_key`) |
 | `getZeitzonenbericht` | `/intranet/analytics/getZeitzonenbericht` | Tag | `core.zeitzonenbericht_stunde` |
 | `getVordefinierteZeitzonenBericht` | `/intranet/analytics/getVordefinierteZeitzonenBericht` | Tag | `core.zeitzonenbericht_zone` |
 | `getArtikelverkaufsbericht` | `/intranet/analytics/getArtikelverkaufsbericht` | Tag | `core.artikelverkauf_tag` **+ `core.artikel` + `core.artikel_stand`** |
@@ -54,6 +55,18 @@ Spalte. Wer sie zusammenführt, nimmt `mart.kennzahlen_aktuell` — nicht `DISTI
 
 **`hauptsparten` erwartet `posId`, nicht `nummer`.** 10001 = Speisen, 10002 = Getränke. Mit
 `nummer` kommt kommentarlos 0 € zurück.
+
+**Seit `0112` (22.09.2026) auch je Verkaufsstelle — und der Parameter ist ungeprüft.**
+`core.umsatzbericht_tag.verkaufsstelle_key` stand seit `0003` im Schema und war nie gefüllt
+(`laden.ts` schrieb fest `null`). Sieben Registereinträge `getUmsatzbericht:vs_<stelle>` senden
+jetzt `verkaufsstellen=<number>` (0 Gesamtbetrieb, 1 Ausser Haus, 2 AmadeusGO, 51 Cocktail Casino,
+52 Delivery, 53 To Go Lehners, 56 To Go Aktionspreis). Das Format stammt aus dem Vue-Bundle
+(`lina-api-inventar.md` §3.1) und ist **nie gegen eine Antwort gemessen** — bei den Hauptsparten
+lieferte die naheliegende Lesart kommentarlos 0 €. Ob es stimmt, sagt `mart.verkaufsstelle_abdeckung`
+nach der ersten Nacht (Summe der Stellen gegen Gesamtumsatz; 0 % = falsches Format, ~700 % = Filter
+ignoriert). Die Zeilen je Tag sind damit **drei Arten**: Gesamt (beide Schlüssel NULL), Hauptsparte,
+Verkaufsstelle. Wer die Gesamtzeile will, filtert **beide** Schlüssel auf NULL —
+`mart.hauptsparte_abdeckung` tat das nicht und ist in `0112` repariert.
 
 ### Momentaufnahmen — nur „jetzt", kein Backfill
 

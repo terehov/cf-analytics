@@ -988,6 +988,20 @@ Ein neuer Spartenendpunkt ist damit ein Registereintrag, eine `case`-Zeile, ein
 Schema-Eintrag und eine Zeile im Quellenregister — der Wächter
 (`waechter.test.ts`) lässt keinen davon weg.
 
+## Sieben Verkaufsstellen (Migration `0112`, 22.09.2026 — Meilenstein M0)
+
+Dieselbe Bauart wie die zehn Umsatzberichte darüber: `getUmsatzbericht:vs_<stelle>` unterscheidet
+sich vom Gesamtbericht durch ein Query-Feld (`verkaufsstellen=<number>`), `laden.ts` schlägt daraus
+`core.verkaufsstelle.verkaufsstelle_key` nach, und alle teilen sich den `case` der Umsatzberichte.
+
+**Eine unbekannte Nummer wirft.** Ohne Schlüssel landete die gefilterte Zeile auf
+(`hauptsparte_key` NULL, `verkaufsstelle_key` NULL) — und überschriebe per Upsert die Gesamtzeile des
+Tages mit dem Umsatz einer einzelnen Stelle. Das ist ein Baufehler im Register, kein Datenzustand.
+
+**Aufrufe:** 7 × 10 Nachzügler-Tage = 70 je Nacht; die Historie (7 × ~3.100 Tage) läuft über
+`HISTORIE_JE_LAUF` mit. **Ungeprüft** ist das Parameterformat — `mart.verkaufsstelle_abdeckung`
+ist die Gegenprobe, siehe `datenherkunft.md`.
+
 ## Yext braucht keinen Befehl mehr (Migration `0078`, 14.08.2026)
 
 Drei Dinge hingen bis dahin an einem Menschen oder an der falschen Stelle:
