@@ -291,7 +291,7 @@ ein Beleg-/Rechnungsbuch für Debitoren, redundant mit Report 96, nicht mit K1 v
 | 97 Tagesabschluss | 351.766 | 12.186 | echte Daten je Tag (`interval` serverseitig auf 3 „pro Tag" erzwungen, `possibleIntervals` meldet nur diesen einen Wert) |
 | 92 Rabattbericht | 243.230 | 12.186 | echte Zeilen, s. o. |
 | 114 Kost-Sach-Bezug | 1.539 | 12.186 | **echt leer** — 0 Personalverzehr-Buchungen im Monat, kein Endpunktfehler (`table` hat nur die `businessDate`-Kopfzeile) |
-| 87 Erweiterter Tagesabschluss | 992.434 | — | **liefert HTML, kein JSON** — abweichend von der einheitlichen `getReport`-Hülle aus `lina-api-inventar-1b.md` §1.1. Vermutlich eine serverseitig gerenderte Sonderroute, wie der Stundenzettel. Nicht weiter zerlegt |
+| 87 Erweiterter Tagesabschluss | 992.434 | — | ~~**liefert HTML, kein JSON** — abweichend von der einheitlichen `getReport`-Hülle aus `lina-api-inventar-1b.md` §1.1. Vermutlich eine serverseitig gerenderte Sonderroute, wie der Stundenzettel. Nicht weiter zerlegt~~ **Widerlegt 22.09.2026:** JSON, 405.778 Byte, vier Tabellen (siehe „Vermessung aller Betriebsberichte", E7). Die 992 kB HTML waren vermutlich eine Fehlerseite — dieselbe Größenordnung wie die 970.059-Byte-Seite, mit der LINA eine `504 Gateway Timeout` beantwortet |
 | 99 Unbare Zahlungen nach Betriebsstelle | 2.117.042 | 12.186 | echte Daten, sehr groß (Betriebsstelle × Finanzweg × Tag vermutlich) |
 
 Alle bis auf 114 und 87 bestätigen `balanceSumBrutto: 369.841,09`, identisch mit
@@ -506,7 +506,7 @@ Nicht weiter verfolgt.
    eine der drei Lesarten, die der Plan unter Phase 3 offen lässt).
 3. **Historische Tiefe der Betriebsberichte an mehr als einem Betrieb** — ob 2018–2019 generell
    fehlt oder nur, weil Wilma Wunder Düsseldorf später eröffnet hat.
-4. **Bericht 87 (Erweiterter Tagesabschluss) liefert HTML statt JSON** — nicht zerlegt, unklar
+4. ~~**Bericht 87 (Erweiterter Tagesabschluss) liefert HTML statt JSON**~~ (widerlegt 22.09.2026, siehe E7 unten) — nicht zerlegt, unklar
    ob und wie er automatisiert gelesen werden könnte.
 5. **Wo die Glücksrad-Finanzwege (3168/3500–3502) als Stammdaten gepflegt werden**, wenn nicht
    unter `POS > Stammdaten > Finanzwege`.
@@ -571,3 +571,120 @@ geöffnet, danach `getJournalData?businessdate=15.08.2026` (0 Bons, Umsatz 0) un
 `/intranet/storeanalytics/storereportcenter?laden=`. Die **Daten**-Abrufe dahinter heißen
 `/intranet/storeanalytics/getReport` bzw. `reportList` und nehmen `laden=`. Oberfläche und
 Schnittstelle benennen denselben Schlüssel verschieden.
+
+---
+
+## Vermessung aller Betriebsberichte (22.09.2026, Wilma Wunder Düsseldorf)
+
+**Methodik.** Endpunkt `GET /intranet/storeanalytics/getReport?report=<id>&von=<d.m.yyyy>&bis=<d.m.yyyy>&reltime=custom&interval=8&laden=<encId>`, gegen den bereits angemeldeten Browser, mit ≥1,1 s Abstand zwischen den Aufrufen. Betrieb: Wilma Wunder Düsseldorf GmbH (`encId bc58d22f…`). Drei Zeiträume je Bericht: Monat August 2026 (1.8.–31.8.2026), Einzeltag 15.8.2026, historischer Monat Januar 2022 (1.1.–31.1.2022) — 42 Berichte aus dem Katalog der 72 Betriebsberichte, dazu 9 früher als gesperrt geführte und die Berichte 87/90/96 gesondert (Abschnitte E3/E4/E7/M2 unten). „Zeilen" zählt die numerisch indizierten Einträge in `table[0]`, nicht Kopf- oder Summenzeilen.
+
+### Berichtstabelle (Teil A, 42 Berichte)
+
+| ID | Name | Status M/T/22 | Bytes Monat | Zeilen M/T/22 | Intervalle | Spalten (kurz) | Körnung | Bemerkung |
+|---|---|---|---|---|---|---|---|---|
+| 18 | Ranking | 500/500/500 | 0 | –/–/– | – | – | – | keine Daten, alle drei Zeiträume (Regel: 500 + leerer Body = `keine_daten`, kein Fehler) |
+| 12 | Gutscheinumsatz | 500/500/500 | 0 | –/–/– | – | – | – | keine Daten, wie oben |
+| 108 | Verkauszahlen | 200/200/200 | 13.605 | 31/1/30 | Kumuliert | Betrieb, Datum, Brutto, Anzahl_Artikel, Anzahl_Zahlungen, Anzahl_Rechnungen | Tag | Monatsaufruf liefert bereits eine Zeile je Geschäftstag |
+| 29 | Artikelverkaufsbericht nach Betriebsstelle | 200/200/200 | 183.158 | 542/317/590 | Kumuliert | Artikelnummer, Artikel, Betriebsstellen, Anzahl, Umsatz_Brutto, Umsatz_Netto | Artikel × Betriebsstelle | erste Zeile je Block ist eine Betriebsstellen-Summenzeile ohne Artikelnummer |
+| 30 | Artikelverkaufsbericht nach Feinsparte | 200/200/200 | 208.618 | 603/368/662 | Kumuliert | Artikelnummer, Artikel, Feinsparte, Anzahl, Umsatz_Brutto, Umsatz_Netto | Artikel × Feinsparte | wie 29, Summenzeile je Feinsparte |
+| 31 | Artikelverkaufsbericht nach Meccode | 200/200/200 | 206.279 | 603/369/667 | Kumuliert | Artikelnummer, Artikel, Meccode, Anzahl, Umsatz_Brutto, Umsatz_Netto | Artikel × Meccode | wie 29 |
+| 32 | Artikelverkaufsbericht nach Steuersatz | 200/200/200 | 339.090 | 539/315/588 | Kumuliert | Artikelnummer, Artikel, Keine_Zuordnung, 19%_Mwst, 7%_Mwst, 0%, 0%_Gutschein_older, 16%_Mwst._older, 5%_Mwst._older, NEUE_STEUER_AB_15 | Artikel (Steuersätze als Spalten) | – |
+| 33 | Artikelverkaufsbericht nach Verkaufspreis | 200/200/200 | 434.654 | 1.208/406/1.218 | Kumuliert | Artikelnummer, Artikel, Anzahl, Einzelpreis, Umsatz_Brutto, Umsatz_Netto | Artikel × Einzelpreis | größte Artikel-Aufschlüsselung im Katalog (bis zu 1.218 Zeilen) |
+| 34 | Artikelverkaufsbericht nach Verkaufsstelle | 200/200/200 | 214.389 | 632/320/594 | Kumuliert | Artikelnummer, Artikel, Verkaufsstelle, Anzahl, Umsatz_Brutto, Umsatz_Netto | Artikel × Verkaufsstelle | – |
+| 38 | Stornobericht | 200/200/200 | 161.289 | 487/76/480 | Kumuliert | Artikelnummer, Artikel, Stornotyp, Anzahl, Umsatz_Brutto, Umsatz_Netto | Artikel × Stornotyp | s. E3 |
+| 39 | Stornogrundbericht | 200/200/200 | 195.554 | 533/77/480 | Kumuliert | Artikelnummer, Artikel, Stornotyp, Stornogrund, Anzahl, Umsatz_Brutto, Umsatz_Netto | Artikel × Stornotyp × Stornogrund | s. E3 |
+| 42 | Umsatz nach Feinsparten | 200/200/200 | 25.407 | 64/53/74 | Kumuliert | Feinsparte, Sparte, Hauptsparte, Anzahl, Umsatz_Brutto, Umsatz_Netto | Feinsparte | – |
+| 43 | Umsatz nach Hauptsparten | 200/200/200 | 2.747 | 4/3/5 | Kumuliert | Hauptsparte, Anzahl, Umsatz_Brutto, Umsatz_Netto | Hauptsparte | – |
+| 44 | Umsatz nach Hauptsparten pro Wochentag | 200/200/200 | 5.317 | 4/3/5 | Kumuliert | Hauptsparte, Montag…Sonntag | Hauptsparte (Wochentage als Spalten) | – |
+| 45 | Artikelverkaufsbericht nach Hauptsparte | 200/200/200 | 181.680 | 543/318/593 | Kumuliert | Artikelnummer, Artikel, Hauptsparte, Anzahl, Umsatz_Brutto, Umsatz_Netto | Artikel × Hauptsparte | – |
+| 46 | Umsatz nach Meccodes | 200/200/200 | 22.861 | 64/54/79 | Kumuliert | Meccode, Mecocodegruppe, Anzahl, Umsatz_Brutto, Umsatz_Netto | Meccode | – |
+| 47 | Umsatz nach Mecgruppen | 200/200/200 | 5.108 | 12/11/16 | Kumuliert | Mecocodegruppe, Anzahl, Umsatz_Brutto, Umsatz_Netto | Mecgruppe | – |
+| 48 | Umsatz nach Sparten | 200/200/200 | 6.673 | 15/13/30 | Kumuliert | Sparte, Hauptsparte, Anzahl, Umsatz_Brutto, Umsatz_Netto | Sparte | – |
+| 49 | Umsatz nach Steuer und Feinsparten | 200/200/200 | 95.556 | 64/53/74 | Kumuliert | Feinsparte, Umsatz_Brutto, Umsatz_Netto + je Steuersatz Brutto/Netto | Feinsparte (Steuersätze als Spaltenpaare) | – |
+| 105 | Umsatz nach Hauptsparten und Steuern | 200/200/200 | 2.028 | 4/2/5 | Kumuliert | Hauptsparte, 19%_Mwst, 7%_Mwst, 0% | Hauptsparte (Steuersätze als Spalten) | – |
+| 110 | Umsatz nach Hauptsparten, Steuern und Verkaufsstellen | 200/200/200 | 37.098 | 4/3/5 | Kumuliert | Hauptsparte + 80 Spalten Verkaufsstelle/Steuersatz-Kombinationen | Hauptsparte (Verkaufsstelle × Steuersatz als Spalten) | nur 4 Zeilen, aber ~81 Spalten — die Breite trägt die Körnung, nicht die Zeilenzahl |
+| 53 | Artikelbericht pro Kellner | 200/200/200 | 1.884.443 | 6.684/1.212/5.778 | Kumuliert | Artikelnummer, Artikelname, Brutto, Netto, Anzahl_Artikel | Kellner × Artikel | `Kellner`-Name-Feld in den Beispielzeilen leer/`null`, nur `Kellnernummer` indirekt über Blockzuordnung — größte Bytezahl des ganzen Katalogs |
+| 54 | Einzelbericht Kellner nach Feinsparten | 200/200/200 | 1.873.534 | 6.684/1.212/5.778 | Kumuliert | Feinspartennummer, Feinsparte, Brutto, Netto, Anzahl_Artikel | Kellner × Feinsparte | Zeilenzahl identisch mit 53 |
+| 57 | Gutschriften pro Kellner | 200/200/200 | 230.494 | 728/13/2.630 | Kumuliert | Kellnernummer, Kellner, Datum, Gutschriftnummer, Rechnungsnummer, Anzahl_Artikel, Brutto | Bon/Gutschrift | in den ersten Beispielzeilen (August) trug `Anzahl_Artikel` den Text „Anzahl Artikel" statt einer Zahl — wirkt wie eine ins Datenfeld gerutschte Spaltenbeschriftung, nicht an allen Zeilen geprüft |
+| 58 | Stornobericht pro Kellner | 200/200/200 | 604.873 | 1.611/101/1.627 | Kumuliert | Kellnernummer, Kellner, Artikelnummer, Artikelname, Finanzweg, Brutto, Netto, Anzahl_Artikel | Kellner × Artikel (Storno) | – |
+| 59 | Tischübergabe pro Kellner | 200/200/200 | 721.777 | 1.850/46/1.906 | Kumuliert | Zeitpunkt, Tisch, Kellner, Übergabe/Übername, an/von_Kellner, Brutto, Netto, Anzahl_Artikel | Vorgang (Tischübergabe-Ereignis) | – |
+| 60 | Umsatz pro Kellner | 200/200/200 | 11.031 | 25/11/23 | Kumuliert | Kellnernummer, Kellner, Brutto, Netto, Anzahl_Artikel, Trinkgeld | Kellner | Zeilenzahl ≈ Anzahl aktiver Kellner im Zeitraum |
+| 61 | Umsatz pro Kellner pro Tag | 200/200/200 | 105.394 | 324/22/299 | Kumuliert | Tag, Brutto, Netto, Anzahl_Artikel, Trinkgeld | Kellner × Tag | Titel nennt „pro Kellner", aber kein Kellner-Feld in den Spalten — 324 Zeilen für 31 Tage (≈10,5/Tag) legen nahe, dass die Kellner-Achse über mehrere `table`-Blöcke oder eine verdeckte Spalte läuft, nicht weiter zerlegt |
+| 64 | Aktionsreport | 200/200/200 | 2.078 | 1/1/1 | Kumuliert | Zeitzone, Brutto, Netto, Anzahl, Durchschnitt_pro_Tag, Anzahl_Gäste | unklar (nur 1 Zeile) | nur eine Summenzeile in allen drei Zeiträumen — deckt sich mit dem Befund aus A2/A3a, dass Aktionen (Glücksrad etc.) hier nicht sichtbar sind |
+| 68 | Umsatz nach Betriebsstellen | 200/200/200 | 3.083 | 3/2/2 | Kumuliert | Betriebsstelle, Umsatz_Brutto, Umsatz_Netto, Anzahl_Artikel, Anzahl_Gäste, Pro_Kopf_Netto | Betriebsstelle | – |
+| 69 | Umsatz nach Betriebsstellen und Hauptsparten | 200/200/200 | 4.495 | 11/6/10 | Kumuliert | Betriebsstelle, Hauptsparte, Umsatz_Brutto, Umsatz_Netto, Anzahl_Artikel | Betriebsstelle × Hauptsparte | – |
+| 71 | Umsatz nach Verkaufsstelle und Hauptsparte | 200/200/200 | 3.317 | 7/4/6 | Kumuliert | Verkaufsstelle, Hauptsparte, Anzahl, Umsatz_Brutto, Umsatz_Netto | Verkaufsstelle × Hauptsparte | – |
+| 112 | Umsatz nach Verkaufsstelle | 200/200/200 | 2.618 | 2/2/2 | Kumuliert | Verkaufsstelle, Umsatz_Brutto, Umsatz_Netto, Anzahl, Anzahl_Gäste, Pro_Kopf_Netto | Verkaufsstelle | – |
+| 73 | Zeitzonenbericht | 200/200/200 | 12.777 | 24/24/24 | **alle 15 Minuten, pro Stunde** | Zeitzone, Brutto, Netto, Anzahl, Durchschnitt_pro_Tag, Anzahl_Gäste_(Tischabschluss) | Stunde | einziger Bericht in Teil A mit mehr als einem `possibleIntervals`-Wert; 24 Zeilen bei `interval=8` entsprechen den 24 Stunden, unabhängig vom Zeitraum |
+| 74 | Zeitzonenbericht vordefinierte Zeitzonen | 200/200/200 | 3.930 | 6/6/6 | Kumuliert | Zeitzone, Brutto, Netto, Durchschnitt_pro_Tag, Anzahl_Gäste | Zeitzone (6 feste Fenster) | Zeilenzahl unabhängig vom Zeitraum (immer 6) |
+| 75 | Zeitzonenbericht Feinsparten vordefinierte Zeitzonen | 200/200/200 | 138.512 | 448/371/518 | Kumuliert | Zeitzone, Brutto, Netto, Durchschnitt_pro_Tag | Zeitzone × Feinsparte | – |
+| 76 | Zeitzonenbericht Hauptsparten vordefinierte Zeitzonen | 200/200/**500** | 10.459 | 28/21/– | Kumuliert | Zeitzone, Brutto, Netto, Durchschnitt_pro_Tag | Zeitzone × Hauptsparte | Januar 2022 liefert `keine_daten` (500, leerer Body) — einziger Bericht in Teil A, der bei der historischen Tiefe leer läuft, während der gleichnamige Bericht ohne Vorauswahl (43) für denselben Zeitraum Daten hat |
+| 81 | Gutscheine im Umlauf | 200/200/200 | 980 | 0/0/0 | Kumuliert | Gutscheinnummer, Erstellt, Erste_Transaktion, Letzte_Transaktion, Saldo, Anzahl_Transaktionen | Gutschein | 0 Zeilen in allen drei Zeiträumen, aber Status 200 — echt leer, kein Fehler |
+| 82 | Gutscheintransaktionen | 200/200/200 | 896 | 0/0/0 | Kumuliert | Gutscheinnummer, Startguthaben, Erstellt, Transaktionszeitpunkt, Betrag | Gutschein-Transaktion | wie 81, echt leer |
+| 86 | Debitorenauswertung | **504**/200/**504** | 970.059 (Fehlerseite) | –/520/– | – | Datum, Rechnungsnummer, Rechnung/Gutschrift, Anzahl_Artikel, Finanzwege, Brutto, Debitor_-_Anschrift, Debitor | Bon (Debitor-Rechnung) | Monats- und Jahresabruf liefern **504 Gateway Timeout** (identische 970.059-Byte-HTML-Fehlerseite), nur der Tagesabruf kommt durch — s. M2/E7 |
+| 90 | Monatsaufstellung Tag für Tag | 200/200/200 | 31.084 | 31/1/30 | Kumuliert | Datum, Anzahl, Brutto, Netto, Ust + Steuersatz-Spalten | Tag | s. M2 |
+| 113 | Tischtransfer | **504**/200/**504** | 970.059 (Fehlerseite) | –/519/– | – | Datum, Rechnungsnummer, TischId, Rechnung/Butschrift, Anzahl_Artikel, Finanzwege, Brutto, Status, Versuche, Antwort | Bon (Tischtransfer-Vorgang) | wie 86: Monat/Jahr timen aus, nur der Tag liefert |
+
+### E4 — die neun früher als „gesperrt" geführten Berichte
+
+Aufruf je Bericht: August 2026, Monat. Ergebnis für **alle neun** identisch:
+
+| ID | Name | Status | Bytes |
+|---|---|---|---|
+| 2 | BWA Jahresübersicht | 500 | 0 |
+| 3 | BWA monatlich | 500 | 0 |
+| 7 | Wareneinsätze | 500 | 0 |
+| 8 | Personalkosten | 500 | 0 |
+| 9 | Urlaubsverteilung | 500 | 0 |
+| 23 | Personalkostenschätzung | 500 | 0 |
+| 24 | Personalrechner | 500 | 0 |
+| 107 | Gearbeitete Stunden | 500 | 0 |
+| 118 | Wareneinsatz und Deckungsbeitrag | 500 | 0 |
+
+Kein einziger lieferte Daten, also entfiel der geplante Folgeaufruf für den 15.8.2026 bei allen neun. **Befund:** Alle neun antworten mit HTTP 500 und leerem Body — demselben Signaturmuster wie Bericht 18 (Ranking) oder 12 (Gutscheinumsatz) in Teil A, die unstrittig „nur keine Daten" bedeuten (Regel aus `AGENTS.md`: 500 + leerer Body = `keine_daten`, nie retryen). Diese Messung **kann eine echte Zugriffssperre nicht von echter Datenlosigkeit unterscheiden** — beide erzeugen dieselbe Antwort. Es gab keinen abweichenden Statuscode (z. B. 403), keine Fehlermeldung im Body und kein anderes Signal, das „gesperrt" von „nichts zu vermelden" trennen würde. Für Wilma Wunder Düsseldorf im August 2026 ist mit dieser Methode nicht feststellbar, ob die neun Berichte technisch gesperrt sind oder ob dieser Betrieb (bzw. dieser Zeitraum) für sie schlicht keine Daten führt — am ehesten plausibel für 7/8/9/23/24/107/118 (Personal- und Wareneinsatzdaten, die laut `AGENTS.md` harte Regel 5 ohnehin als LINA-Demodaten gelten und nicht ausgewertet werden), weniger eindeutig für 2/3 (BWA), die an anderer Stelle in diesem Dokument (Abschnitt A1) bereits als perBetrieb abrufbar dokumentiert sind.
+
+### E3 — Storno (38, 39)
+
+Beide Berichte sind in Teil A enthalten und liefern für August 2026 echte, von Null verschiedene Werte. Eigens nachgerechnet (Summe der Spalten `Anzahl` und `Umsatz_Brutto` über alle Zeilen, nicht die betriebsweiten `nBillsGesamt`/`balanceSumCount`, die den Gesamtbetrieb und nicht die Stornos abbilden):
+
+- **Bericht 38 (Stornobericht):** 487 Zeilen, Summe `Anzahl` = **−3.313**, Summe `Umsatz_Brutto` = **−20.538,06 €**. Stornotypen: `Sofortstorno`, `Storno`.
+- **Bericht 39 (Stornogrundbericht):** 533 Zeilen, Summe `Anzahl` = **−3.313**, Summe `Umsatz_Brutto` = **−20.538,06 €** (identisch mit 38, nur feiner nach Stornogrund aufgeschlüsselt). Beispielhafte Stornogründe: „Keine Zuordnung", „Gast umentschieden.", „Zu viel boniert.", „lange Wartezeit", „Gericht aus".
+
+**Befund:** `nBillsGesamt` (12.186) und `balanceSumCount` (73.140) sind in beiden Berichten die unveränderten Gesamtbetriebszahlen des Monats — sie sagen nichts über Stornos aus. Die eigentliche Stornozahl steckt in den Zeilensummen, und die sind für August 2026 klar größer null (negativ, wie für Rückbuchungen zu erwarten). Beide Berichte sind also produktiv und tragen echte Daten.
+
+### E7 — Bericht 87 (Erweiterter Tagesabschluss)
+
+**Korrektur einer bestehenden Angabe in diesem Dokument.** Abschnitt „A5" (oben, Zeile mit `87 Erweiterter Tagesabschluss`) vermerkt „**liefert HTML, kein JSON**". Nachgemessen am 22.09.2026, für denselben Betrieb und denselben Zeitraum (August 2026): der Aufruf liefert `Content-Type: application/json`, 405.778 Byte, und lässt sich **ohne** Sonderbehandlung mit `JSON.parse` lesen — keine HTML-Antwort. Die alte Angabe war entweder ein einmaliger Ausreißer (z. B. ein serverseitiger Fehlerzustand zum Zeitpunkt der ersten Messung) oder ein Irrtum in der damaligen Auswertung; mit der heutigen, zweifach reproduzierten Messung (Statusabfrage und Volltextabruf, je einmal) ist der Bericht eindeutig JSON. Rohantwort gespeichert (s. u.).
+
+Die Struktur folgt der üblichen `getReport`-Hülle, aber mit **vier** `table`-Blöcken statt einem:
+
+| Block | Zeilen | Spalten | entspricht |
+|---|---|---|---|
+| 0 | 539 | Artikelnummer, Artikel, Anzahl, Umsatz_Brutto, Umsatz_Netto, Anzahl_Durchschnitt_pro_Tag | Bericht 29 (Artikel je Betriebsstelle) bzw. 45, nur ohne die Gruppierungsspalte |
+| 1 | 543 | Artikelnummer, Artikel, Hauptsparte, Anzahl, Umsatz_Brutto, Umsatz_Netto | Bericht 45 (Artikel nach Hauptsparte) — Feldnamen und Zeilenzahl (543) fast identisch |
+| 2 | 3 | Betriebsstelle, Umsatz_Brutto, Umsatz_Netto, Anzahl_Artikel, Anzahl_Gäste, Pro_Kopf_Netto | Bericht 68 (Umsatz nach Betriebsstellen) — Feldnamen identisch, 3 Zeilen wie dort |
+| 3 | 24 | Zeitzone, Brutto, Netto, Anzahl, Durchschnitt_pro_Tag, Anzahl_Gäste_(Tischabschluss) | Bericht 73 (Zeitzonenbericht) — Feldnamen identisch, 24 Zeilen wie dort |
+
+**Befund:** Bericht 87 ist ein Sammelbericht, der vier Auswertungen bündelt, die einzeln bereits in Teil A stehen (29/45, 68, 73) — kein Feld darin, das nicht auch anderswo abrufbar wäre. Ein Abgleich mit 96 (Rechnungsausgangsbuch, separat gemessen unter „Nachtrag: Rechnungsausgangsbuch") zeigt keine Überschneidung: 96 ist bonebene ohne Artikelzeilen, 87 ist artikel-/zeitzonenbezogen ohne Bonbezug. Berichte 88, 92, 97, 99 wurden für diesen Vergleich nicht erneut abgerufen (bereits in Abschnitt A5/A3a dieses Dokuments mit Feldlisten dokumentiert); ihre dort erfassten Spalten (Finanzwege, Rabatt, Tagesabschluss, unbare Zahlungen) überschneiden sich inhaltlich ebenfalls nicht mit den vier Blöcken aus 87.
+
+Rohantwort gespeichert unter `scratchpad/phase0/vermessung/report87.html` (Dateiname historisch von der ursprünglichen HTML-Annahme, Inhalt ist JSON, doppelt kodiert wie bei allen `getReport`-Antworten).
+
+### M2 — Körnung (96, 90)
+
+- **Bericht 90 (Monatsaufstellung Tag für Tag):** Der Monatsaufruf liefert bereits **eine Zeile je Geschäftstag** (31 Zeilen für August, `Datum`-Feld mit `format: day`, alle 31 Kalendertage des Monats lückenlos vorhanden). Der Tagesaufruf für den 15.8.2026 liefert **eine** Zeile — Zeilenzahl gleich der Monatszeile dieses Tages (1 = 1). **Klassifikation: M-Tag.** Ein Monatsaufruf ersetzt hier 31 Tagesaufrufe vollständig.
+- **Bericht 96 (Rechnungsausgangsbuch):** Der Tagesaufruf für den 15.8.2026 liefert 519 Zeilen — **eine Zeile je Rechnung/Gutschrift/Storno**, nicht je Tag (493 Rechnungen, 13 stornierte, 13 Gutschriften laut Kopfzähler `nBillsGesamt`). Der Monatsaufruf für August 2026 und der historische Aufruf für Januar 2022 liefern **beide HTTP 504 Gateway Timeout** — der Bericht lässt sich für diesen Betrieb über einen ganzen Monat serverseitig nicht in einem Aufruf berechnen. Ein Vergleich „Monatszeilen dieses Tages gegen Tagesaufruf" ist damit **nicht messbar**, weil der Monatsaufruf gar nicht durchläuft. **Klassifikation: T** — nicht nur ausreichend, sondern **erzwungen**: für bonebene Berichte wie 96 (und ebenso 86, 113, die dieselbe 504-Signatur zeigen) ist ein Tagesaufruf die einzige Abrufform, die überhaupt eine Antwort liefert.
+
+### M2 nachgetragen — Bericht 96 in Wochenfenstern (22.09.2026, Hauptsitzung)
+
+Weil der Monatsaufruf in `504` läuft, drei weitere lesende Aufrufe, Wilma Wunder Düsseldorf:
+
+| Zeitraum | Status | Laufzeit | Byte | Zeilen | Tage |
+|---|---|---|---|---|---|
+| 3.–5.8.2026 | 200 | 1,3 s | 382.886 | 1.066 | 3, lückenlos |
+| 10.–16.8.2026 | 200 | 2,9 s | 951.982 | 2.658 | 7, lückenlos; 15.8. = 519 wie im Tagesaufruf |
+| 1.–14.8.2026 | 200 | 31,9 s | 2.299.001 | 6.430 | 14, lückenlos |
+| 1.–31.8.2026 | **504** | ~60 s | 970.059 (HTML-Fehlerseite) | — | — |
+
+Je Antwort eine Zeile ohne gültiges `Datum` (Summenzeile) — beim Laden auslassen. Die Laufzeit
+wächst deutlich schneller als die Zeilenzahl (7 Tage 2,9 s, 14 Tage 31,9 s). **Folge: Klasse W,
+sieben Tage je Aufruf, nie länger;** bei umsatzstarken Betrieben die Laufzeit im Importer messen.
