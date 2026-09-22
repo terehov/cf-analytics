@@ -127,6 +127,33 @@ lauf('Betriebsberichte mit Datenbank', () => {
     expect(s.n).toBe(0)
   })
 
+  /**
+   * Dieselbe Abnahme eine Schicht hoeher: mart ist, was der MCP-Zugang und
+   * jede Karte lesen (0117). Der Monatsabruf der Fixtures steht dort, weil der
+   * Betrieb im August keinen Tagesabruf hat — und buendelt die beiden
+   * 25-%-Wege ueber aktion und prozentsatz, ohne eine Nummer zu kennen
+   * (88/97 sind fuer diese Betriebe nicht geladen, finanzweg_nummer ist NULL).
+   */
+  test('M5: dieselben Zahlen aus mart.artikel_nachlass_monat, gebuendelt ueber aktion und prozentsatz', async () => {
+    const { rows } = await db.query(`
+      SELECT prozentsatz::int AS prozent, sum(menge)::int AS stueck,
+             sum(menge) FILTER (WHERE artikel = 'Durchstarter')::int AS durchstarter,
+             bool_and(aus_mehrtagesabruf) AS monatsabruf
+        FROM mart.artikel_nachlass_monat
+       WHERE aktion = 'Glücksrad' AND monat = '2026-08-01'
+       GROUP BY 1 ORDER BY 1`)
+    expect(rows).toEqual([
+      { prozent: 10, stueck: 149, durchstarter: 12, monatsabruf: true },
+      { prozent: 25, stueck: 1413, durchstarter: 107, monatsabruf: true },
+      { prozent: 50, stueck: 7335, durchstarter: 432, monatsabruf: true },
+    ])
+    // Die Tagessicht zeigt denselben Abruf mit seinem Zeitraum, nicht als Tag.
+    const { rows: [t] } = await db.query(`
+      SELECT min(geschaeftstag)::text AS von, max(zeitraum_bis)::text AS bis, max(tage)::int AS tage
+        FROM mart.artikel_nachlass_tag WHERE aktion = 'Glücksrad'`)
+    expect(t).toEqual({ von: '2026-08-01', bis: '2026-08-31', tage: 31 })
+  })
+
   test('ein zweiter Abruf ersetzt den Zeitraum, statt anzuhängen', async () => {
     const r92 = fixture('report92-wilma-2026-08.json') as { betriebe: { encId: string; antwort: unknown }[] }
     const b = r92.betriebe[1]!

@@ -14,6 +14,7 @@ import { auswahllistenNachlauf } from './sync/auswahllisten'
 import { deckungsbeitragNachlauf } from './sync/deckungsbeitrag'
 import { roundTableNachlauf } from './sync/round_table'
 import { vergleichstagNachlauf } from './sync/vergleichstag'
+import { betriebsberichtSichtenNachlauf } from './sync/betriebsbericht_sichten'
 import { wetterNachlauf } from './wetter/nachlauf'
 import { einkaufspreisNachlauf } from './sync/einkaufspreis'
 import { einkaufSichtenNachlauf } from './sync/einkauf_sichten'
@@ -216,6 +217,13 @@ try {
     // Wirft nie, siehe Kopf von sync/round_table.ts.
     await roundTableNachlauf()
 
+    // Die Kassensichten aus den Betriebsberichten (0117): Finanzwege je Monat
+    // und der Ladestand, den der MCP-Server an jede Kassenantwort haengt.
+    // Liest, was Phase A an laufenden Betriebsberichten geschrieben hat, und
+    // laeuft nach Phase C noch einmal (unten). Wirft nie, siehe Kopf von
+    // sync/betriebsbericht_sichten.ts.
+    await betriebsberichtSichtenNachlauf()
+
     /**
      * Die Auswahllisten der Metabase-Filter — und sie stehen seit dem
      * 20.08.2026 HINTER dem Round-Table-Refresh.
@@ -383,6 +391,19 @@ try {
       await deckungsbeitragNachlauf()
       await roundTableNachlauf()
       await vergleichstagNachlauf()
+    }
+    /**
+     * Die eine Ausnahme von "keine materialisierte Sicht liest Betriebsberichte"
+     * (seit 0117): die Finanzwege je Monat und der Ladestand. Phase C schreibt
+     * die Betriebsbericht-Historie — ohne diesen Refresh stuende sie erst nach
+     * der naechsten Nacht im Ladestand, und jede MCP-Antwort meldete einen
+     * Monat als "nicht geladen", der laengst da ist. Bedingung ist, dass C
+     * ueberhaupt Posten bearbeitet hat: auch ein "keine Daten" aendert den
+     * Ladestand. Ein Konzernzaehler taugt dafuer nicht (konzernOk zaehlt nur
+     * getReport-freie Posten).
+     */
+    if (c.posten > 0) {
+      await betriebsberichtSichtenNachlauf()
     }
 
     r = await sitzung.abschliessen({ stummeQuellen: stumm })

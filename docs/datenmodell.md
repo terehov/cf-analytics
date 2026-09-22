@@ -1140,3 +1140,34 @@ eigene Entscheidung.
   der Dashboards), `nachladen_posten`, `nachladen_offen`. `mart.sync_status` hängt alle vier an.
 * `mart.materialisierung_stand` und `mart.vergleichstag_stand` messen gegen
   `coalesce(tagesgeschaeft_bis, beendet_am)`, den Wetter-Merker gegen `gestartet_am`.
+
+## Auswertungsschicht der Betriebsberichte (`0117`, `0118`, 23.09.2026)
+
+Die Sichten selbst und ihre Fallen stehen in `metabase.md` („Kassensichten aus den
+Betriebsberichten"), die Zuordnung Tabelle → Sicht → Bericht in `datenherkunft.md`. Hier nur, was
+das Schema darüber hinaus trägt:
+
+* **Zwei reine Funktionen in `mart`:** `mart.finanzweg_aktion(text)` (Name ohne Prozentzahl und
+  Apostroph) und `mart.finanzweg_prozentsatz(text)` (dieselbe Regel wie `prozentAusName()` im
+  Lader). `IMMUTABLE`, **ohne Tabellenzugriff** — ein Funktionsrumpf läuft mit den Rechten des
+  Aufrufers (0109/0110), und diese beiden brauchen keine.
+* **Drei Indizes auf `core`:** `rabatt_artikel_tag_monat_idx` und `finanzweg_tag_monat_idx` auf
+  `(date_trunc('month', geschaeftstag::timestamp)::date, betrieb_key)` — der Monatsfilter einer
+  Sicht liegt auf einem Ausdruck und schneidet keine Partition weg; die Sichten bilden den Monat
+  mit genau diesem Ausdruck. `bon_debitor_idx` auf `core.bon (betrieb_key, geschaeftstag) WHERE
+  debitor IS NOT NULL`. Alle drei auf partitionierten Tabellen, also je Partition, auch für
+  künftige.
+* **Zwei materialisierte Sichten:** `mart.finanzweg_monat_basis` (eindeutiger Index über
+  Betrieb, Monat, Nummer, Name, Gruppe, Abschnitt mit `NULLS NOT DISTINCT`) und
+  `mart.betriebsbericht_ladestand_basis` (eindeutig über Endpunkt und Monat). Beide ohne Namen
+  bzw. mit dem Stand zum Refresh; gelesen werden die dünnen Sichten darüber
+  (`mart.finanzweg_monat`, `mart.betriebsbericht_ladestand_monat`). Eingetragen in
+  `mart.materialisierung_stand` unter `betriebsbericht_sichten_refresh`, per Anhängen an die
+  Sichtdefinition aus `0116` — findet `0117` die Verankerung nicht, bricht die Migration ab.
+* **Katalog:** Körnung, Thema (`kasse`, `aktion`, `import`) und Summierbarkeit für alle neuen
+  Sichten in `mcp.sicht`; Aggregationsregeln in `mcp.kennzahl` — die Quotienten tragen eigene Namen
+  (`bon_durchschnitt`, `stornoquote_pct`, `nachlass_anteil_pct` …), weil der Prüfer die Regel je
+  **Spaltenname** über alle Sichten anwendet. Die Prüfsicht `mart.finanzweg_88_97_abgleich` ist über
+  `mcp.kennzahl` gegen `sum()`/`avg()` gesperrt. `0118` trägt 13 Fallstricke ein, drei davon mit
+  neuen Regelarten (`filter_ueber_spalte`, `wert_muster`, `sichten_mischen`, umgesetzt in
+  `mcp/src/pruefen.ts`).

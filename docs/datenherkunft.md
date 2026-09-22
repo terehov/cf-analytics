@@ -112,6 +112,53 @@ desselben Betriebs und Zeitraums treffen (`mart.betriebsbericht_gegenprobe`). De
 `/finanzen/analytics/getReport?storeId=` lieferte zwei Monate lang leere Gerüste mit plausibler
 Größe — eine Antwort beweist nichts, ihre Summe schon.
 
+**Wo man sie liest (seit `0117`, 23.09.2026) — Tabelle → Sicht → Bericht.** Jede Tabelle aus
+`0112`–`0115` hat mindestens eine `mart`-Sicht, die `mcp_leser` lesen kann (in `0117` am Ende als
+`mcp_leser` mit `SELECT * … LIMIT 1` geprüft). Die Kernfragen stehen zusätzlich als Bericht, den
+`berichte_suchen`/`bericht_ausfuehren` finden und der zugleich eine Metabase-Karte ist:
+
+| `core`-Tabelle (Bericht) | `mart`-Sicht | Bericht / Karte |
+|---|---|---|
+| `rabatt_artikel_tag` (92) | `artikel_nachlass_tag`, `artikel_nachlass_monat`, `rabatt_artikel_unaufgeloest` (0114) | `ka_nachlass_betrieb`, `ka_nachlass_artikel`, `aa_nachlass` |
+| `finanzweg_tag` (88, 97) | `finanzweg_tag`, `finanzweg_monat` (über `finanzweg_monat_basis`), `nachlass_monat`, `zahlart_monat`, `finanzweg_88_97_abgleich` (0114) | `ka_nachlass_kosten`, `ka_zahlart_betrieb`, `ka_zahlart_verlauf` |
+| `finanzweg`, `finanzweg_stand` | `finanzweg`, `finanzweg_namen` | Auswahlliste „Nachlass (Aktion)" |
+| `bon` (96) | `bon_tag`, `bon_zahlart_tag`, `debitor_monat` | `ka_bon_betrieb`, `ka_bon_tag` |
+| `tagesabschluss_tag` (97) | `tagesabschluss_tag` | — (Prüfsicht, Plan F11) |
+| `monatsaufstellung_tag` (90), `verkaufszahlen_tag` (108) | `monatsaufstellung_tag` | — |
+| `storno_artikel_monat` (39) | `storno_artikel_monat`, `storno_grund_monat` | `ka_storno_grund`, `ka_storno_artikel` |
+| `kellner_umsatz_monat` (60), `gutschrift_kellner` (57) | `kellner_monat`, `gutschrift` | `ka_kellner` |
+| `kellner_umsatz_tag` (61) | `kellner_umsatz_tag` | — |
+| `kellner_artikel_monat` (53) | `kellner_artikel_monat` | — |
+| `betriebsstelle_umsatz_monat` (68), `betriebsstelle_hauptsparte_monat` (69) | `betriebsstelle_monat`, `betriebsstelle_hauptsparte_monat` | `ka_stellen` |
+| `verkaufsstelle_umsatz_monat` (112), `verkaufsstelle_hauptsparte_monat` (71) | `verkaufsstelle_monat`, `verkaufsstelle_hauptsparte_monat` | `ka_stellen` |
+| `umsatzbericht_tag` mit `verkaufsstelle_key` (0112) | `verkaufsstelle_tag`, `verkaufsstelle_abdeckung` (0112) | — |
+| `zeitzone_hauptsparte_monat` (76), `zeitzone_feinsparte_monat` (75) | `zeitzone_hauptsparte_monat`, `zeitzone_feinsparte_monat` | `ka_zeitzone_sparte` |
+| `unbar_zahlung_monat` (99) | `unbar_zahlung_monat` | — |
+| `debitor_bon` (86) | `debitorenauswertung_tag` | — |
+| `tischtransfer_bon` (113) | `tisch_tag` | — |
+| `betriebsbericht_abruf`, `bericht_hinweis` | `betriebsbericht_ladestand`, `…_ladestand_monat`, `betriebsbericht_gegenprobe`, `betriebsbericht_luecke`, `bericht_hinweis` (0114) | `ka_ladestand` |
+
+**Wie die Sichten zusammenfinden:**
+
+* **Betrieb** über `betrieb_key` (in jeder Sicht, dazu `enc_id`, `betrieb`, `marke`). Nie über den
+  Namen: „Markt Mainz" heißt in LINA „Gastronomie am Markt Mainz GmbH".
+* **Aktion** über `aktion` (Finanzwegname ohne Prozentzahl und Apostroph) und `prozentsatz` —
+  in `mart.finanzweg`, `mart.artikel_nachlass_*`, `mart.finanzweg_*`, `mart.nachlass_monat`.
+  Die Nummer ist im Rabattbericht NULL, solange 88/97 für den Tag fehlt.
+* **Artikel** aus 92: `artikel` ist der Kassenname, `artikel_key`/`artikelnummer` nur, wo der Name
+  eindeutig einem im selben Betrieb und Zeitraum **verkauften** Artikel entspricht. Wer
+  `mart.artikel_nachlass_*` mit `mart.artikel_monat` verbindet, tut es über `artikel_key` und
+  verliert die nicht zugeordneten Namen (`mart.rabatt_artikel_unaufgeloest`).
+* **Kellner:** `kellnernummer` (60, 57) je Betrieb. 53 und 61 tragen `kellner_block`; die Nummer
+  steht dort nur, wo die Monatssumme des Blocks genau einem Kellner aus 60 gleicht.
+* **Zeit:** Tagesberichte über `geschaeftstag` (partitioniert, der Filter muss dort liegen),
+  Monatsberichte über `monat`. Tagessichten aus 88/92 tragen dazu `zeitraum_bis` und `tage` — ein
+  Abruf zählt für einen Zeitraum, wenn er ganz darin liegt.
+
+**Ein fehlender Monat ist keine Null.** Der Backfill läuft rückwärts; wie weit er ist, sagt
+`mart.betriebsbericht_ladestand` je Bericht als Satz, und der MCP-Server hängt diesen Satz an jede
+Antwort auf eine der Sichten oben (`plan-skybridge.md`).
+
 ### Momentaufnahmen — nur „jetzt", kein Backfill
 
 LINA **überschreibt** Stammdaten. Es gibt keine Preishistorie; `prices[].updated` verrät nur, wann

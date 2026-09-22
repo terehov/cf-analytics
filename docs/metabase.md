@@ -1485,3 +1485,154 @@ Drei Zeilen in `mart.pruefung_uebersicht`: Lücken (9–60 Tage), aufgegebene Ge
 `mart.betriebsbericht_gegenprobe` rechnet je Abrufzeile gegen den Umsatzbericht. Über die ganze
 Historie ist das teuer; die Prüfzeile liest nur die letzten 60 Tage, wer mehr will, filtert
 `zeitraum_bis`.
+
+## Kassensichten aus den Betriebsberichten (Migrationen `0117`/`0118`, 23.09.2026)
+
+Bis `0115` lagen die neuen Kassendaten nur in `core` — für den MCP-Zugang (`mcp_leser`) und für
+jede Karte unerreichbar. Die Frage, die das Vorhaben ausgelöst hat (*„Wie viele Stück je Artikel
+liefen im August über die Glücksrad-Finanzwege 10/25/50 %, je Betrieb?"*), stand damit weiter nur
+per Auftrag. Seit `0117` steht sie in `mart` (M5 in `plan-lina-vollabzug.md`).
+
+**Abnahme am 23.09.2026** (Klon `lina_m5_0923` auf Stand `0118`, echte Antworten der 14
+Wilma-Wunder-Betriebe, August 2026, gelesen **als `mcp_leser` über `mcp/src/ausfuehren.ts`**): der
+Bericht `ka_nachlass_betrieb` (42 Zeilen, 14 Betriebe) summiert sich je Stufe zu **10 %: 149,
+25 %: 1.413, 50 %: 7.335**; `ka_nachlass_artikel` mit „Durchstarter" zu **12 / 107 / 432 = 551**;
+`aa_nachlass` und die freie Abfrage auf `mart.artikel_nachlass_monat` liefern dieselben Zahlen.
+Dieselbe Prüfung steht als Test in `src/sync/betriebsbericht.test.ts` („M5").
+
+### Die Sichten
+
+Jede fachliche Sicht trägt `betrieb_key`, `enc_id`, `betrieb`, `marke` und am **Ende** `operativ`
+(wie die Bounti-Sichten, `CREATE OR REPLACE VIEW` kann nur anhängen).
+
+| Sicht | Körnung | Quelle | worauf man achten muss |
+|---|---|---|---|
+| `mart.finanzweg` | ein Finanzweg | Stamm aus 88/97 | `aktion` = Name ohne Prozentzahl, nur bei Nachlässen |
+| `mart.finanzweg_namen` | Finanzweg × Monat × Name | `core.finanzweg_stand` | `namen_im_monat > 1`: die Nummer taugt nicht als Schlüssel |
+| `mart.artikel_nachlass_tag` | Betrieb × Abrufzeitraum (ein Tag) × Finanzweg × Artikel | 92 | `menge` = Artikel auf Nachlass-Bons, **nicht** Verkauf; nur Zeilen mit Artikelnamen |
+| `mart.artikel_nachlass_monat` | Betrieb × Monat × Finanzweg × Artikel | 92 | die Glücksrad-Tabelle |
+| `mart.finanzweg_tag` | Betrieb × Tag × Finanzweg | 97, sonst 88 | **je Betrieb und Tag eine Quelle** (`quelle_bericht`) |
+| `mart.finanzweg_monat` | Betrieb × Monat × Finanzweg | über `…_basis` (materialisiert) | so frisch wie der letzte Lauf |
+| `mart.nachlass_monat` | Betrieb × Monat × Finanzgruppe × Aktion × Prozentsatz | 88/97 | die zwei 25-%-Wege in **einer** Zeile; vollständiger Betrag |
+| `mart.zahlart_monat` | Betrieb × Monat × Zahlart | 88/97 | Summe aller Zeilen = Bruttoumsatz; Trinkgeld/Rückgeld negativ |
+| `mart.bon_tag` | Betrieb × Tag | 96 | keine Uhrzeit, keine Nachlässe; Ø-Bon aus Summen neu rechnen |
+| `mart.bon_zahlart_tag` | Betrieb × Tag × Zahlart | 96 | über Zahlarten **nicht** summierbar (ein Bon, mehrere Zahlarten) |
+| `mart.debitor_monat` | Betrieb × Monat × Debitor | 96 | Partialindex auf `core.bon` |
+| `mart.debitorenauswertung_tag` | Betrieb × Tag × Debitor | 86 | Gegenprobe; 86 lieferte am 15.08. dieselben Bons wie 96 |
+| `mart.tisch_tag` | Betrieb × Tag × Tisch | 113 | `tisch_id` ist LINAs Kennung, kein Name |
+| `mart.tagesabschluss_tag` | Betrieb × Tag × Hauptsparte × Steuersatz | 97 | brutto |
+| `mart.monatsaufstellung_tag` | Betrieb × Tag | 90 + 108 | `zahlungen_je_rechnung` nicht mitteln |
+| `mart.storno_artikel_monat` | Betrieb × Monat × Artikel × Typ × Grund | 39 | Storno **positiv** |
+| `mart.storno_grund_monat` | Betrieb × Monat × Typ × Grund | 39 | `stornoquote_pct` gegen den Bruttoumsatz nach Storno |
+| `mart.kellner_monat` | Betrieb × Monat × Kellnernummer | 60, 57 | kein Name; Summe über Kellner ≠ Betriebsumsatz |
+| `mart.kellner_umsatz_tag` | Betrieb × Tag × Kellnerblock | 61 | `kellnernummer` nur bei eindeutiger Monatssumme, sonst NULL |
+| `mart.kellner_artikel_monat` | Betrieb × Monat × Kellnerblock × Artikel | 53 | immer mit `monat` filtern (Partitionen) |
+| `mart.gutschrift` | eine Gutschrift | 57 | LINAs Vorzeichen |
+| `mart.betriebsstelle_monat`, `…_hauptsparte_monat` | Betrieb × Monat × Stelle (× Sparte) | 68, 69 | `netto_je_gast` aus Summen |
+| `mart.verkaufsstelle_monat`, `…_hauptsparte_monat` | Betrieb × Monat × Verkaufsstelle (× Sparte) | 112, 71 | die belastbare Verkaufsstellenzahl |
+| `mart.verkaufsstelle_tag` | Betrieb × Tag × Verkaufsstelle | Konzern-Umsatzbericht (`0112`) | gilt erst, wenn `mart.verkaufsstelle_abdeckung` „ok" sagt |
+| `mart.zeitzone_hauptsparte_monat`, `…_feinsparte_monat` | Betrieb × Monat × Sparte × Zeitzone | 76, 75 | ohne Kopfzeilen; nie beide zusammen summieren |
+| `mart.unbar_zahlung_monat` | Betrieb × Monat × Betriebsstelle × Zahlart | 99 | `zahlbetrag` positiv |
+| `mart.betriebsbericht_ladestand_monat` | Bericht × Monat | Abrufe + Warteschlange | über `…_basis` (materialisiert) |
+| `mart.betriebsbericht_ladestand` | ein Bericht | darüber | `aussage` hängt der MCP-Server an jede Kassenantwort |
+
+**Jede core-Tabelle aus `0112`–`0115` hat damit mindestens eine lesbare Sicht** (Vollständigkeitsliste
+Tabelle → Sicht → Bericht in `datenherkunft.md`, Abschnitt „Betriebsberichte").
+
+### Sechs Regeln, die in den Sichten stecken
+
+1. **Eine Quelle je Betrieb und Tag.** `core.finanzweg_tag` führt 88 und 97 mit denselben Zahlen.
+   `mart.finanzweg_tag` nimmt 97, wo es ihn gibt, sonst 88. Die Prüfsicht
+   `mart.finanzweg_88_97_abgleich` führt beide nebeneinander und ist im MCP-Katalog gegen `sum()`
+   gesperrt.
+2. **Der Abrufzeitraum.** 88 und 92 sind Tagesberichte; ein Mehrtagesabruf (Abnahme, Handabruf)
+   steht in der Tagessicht mit `tage > 1` und nur dort, wo der Betrieb im Zeitraum **keinen**
+   Tagesabruf hat. Karten filtern deshalb `geschaeftstag >= von AND zeitraum_bis <= bis` — ein
+   Abruf zählt, wenn er ganz im Zeitraum liegt — und zusätzlich `geschaeftstag <= bis`, damit
+   Postgres nur die betroffenen Monate liest.
+3. **Artikel gegen Vorgänge.** 92 zählt Artikel (`menge`), 88/97 zählen Vorgänge
+   (`anzahl_vorgaenge`). Die Spalten heißen absichtlich verschieden, keine heißt `anzahl`.
+4. **Nur Zeilen mit Artikelnamen** in den Nachlass-Sichten (28 von 8.533 Zeilen im August 2026 ohne
+   Namen, die Glücksrad-Zahl zählt sie nicht). Den vollständigen Nachlassbetrag führt
+   `mart.nachlass_monat`.
+5. **Aktionen über `aktion` + `prozentsatz`,** nie über eine Nummer (3501 **und** 3168 sind 25 %
+   Glücksrad). `mart.finanzweg_aktion()` und `mart.finanzweg_prozentsatz()` sind reine Funktionen
+   ohne Tabellenzugriff — sie laufen mit den Rechten des Aufrufers und brauchen nichts
+   (`sicht-gegen-funktionsrumpf`).
+6. **Vorzeichen.** LINA führt Zahlungen, Nachlässe und Stornos negativ; in `mart` sind
+   `nachlass_*`, `storno_*`, `zahlbetrag` und `betrag` (bei Zahlarten und Nachlässen) positiv.
+   Die Zahlarten eines Tages summieren sich damit zum Bruttoumsatz: Wilma Wunder Düsseldorf, August
+   2026, 369.841,09 EUR — nachgerechnet am 23.09.2026.
+
+### Leistung in Produktionsgröße — nachgemessen am 23.09.2026
+
+**Datenmenge.** Klon `lina_m5_last` (24 GB), synthetisch auf den **152.782 echten Betrieb-Tagen**
+mit Umsatz (79 Betriebe, 5.382 Betrieb-Monate, 2018 bis Juli 2026) aus `core.umsatzbericht_tag`:
+`core.rabatt_artikel_tag` 8,41 Mio. (55 Zeilen je Betrieb-Tag), `core.finanzweg_tag` 10,39 Mio.
+(34 Finanzwege aus 88 **und** 97), `core.bon` 30,15 Mio. (eine Zeile je echter Rechnung),
+`core.betriebsbericht_abruf` 454.626, `core.storno_artikel_monat` 2,69 Mio. (500 je Betrieb-Monat),
+`core.kellner_umsatz_tag` 4,2 Mio., `core.gutschrift_kellner` 2,15 Mio. **Nur 24 Monate in voller
+Dichte** (Aug 2024 – Jul 2026, der Rest wäre reine Schreibzeit): `core.kellner_artikel_monat`
+9,59 Mio. (6.700 je Betrieb-Monat; hochgerechnet auf alle 5.382 Betrieb-Monate ~36 Mio.),
+`core.debitor_bon` und `core.tischtransfer_bon` je 8,2 Mio. (hochgerechnet ~30 Mio. je Tabelle). Da
+diese Tabellen nach Monat partitioniert sind bzw. über den Tag gefiltert werden, ist für eine
+Monatsabfrage die Dichte je Monat entscheidend, nicht die Zahl der Monate. Die Werte sind nicht
+fachlich echt, nur in Menge und Verteilung.
+
+**Gemessen über den MCP-Ausführungsweg** (`abfrageAusfuehren`/`berichtAusfuehren` als `mcp_leser`,
+also mit Prüfung, Datenstand, Ladestand-Hinweis und Protokoll). „Erster Lauf" ist der erste
+Aufruf nach dem Laden — ein echter Kaltstart (Neustart von Postgres, leerer Dateicache) war nicht
+möglich, weil die Instanz mit einer parallelen Sitzung geteilt ist.
+
+| Abfrage | vorher | nachher: erster Lauf / warm (DB-Anteil) | Plan-Stichwort |
+|---|---|---|---|
+| Glücksrad 14 Betriebe × 1 Monat (Bericht `ka_nachlass_betrieb`) | 11,0 s (DB 0,16 s; 10,4 s Ladestand-Hinweis) | 0,50 / 0,21 s (0,17 s) | Seq Scan nur auf `rabatt_artikel_tag_2026_08` |
+| Durchstarter je Stufe (`ka_nachlass_artikel`) | 10,4 s | 0,15 / 0,14 s | wie oben |
+| Nachlass alle Betriebe × 1 Monat, Monatssicht | 9,3 s bzw. 2,2 s (ohne Ausdrucksindex, 7,8 Mio. Zeilen) | 0,43 / 0,44 s (0,30 s) | Index Scan `rabatt_artikel_tag_monat_idx` je Partition |
+| Zahlungsmix eine Marke × 12 Monate (`ka_zahlart_betrieb`) | 13,9 s (DB 2,7 s) | 0,14 / 0,14 s (5 ms) | Bitmap Heap Scan `finanzweg_monat_basis` |
+| Zahlungsmix alle Betriebe × Monat × 12 Monate (frei, 12.155 Zeilen) | — | 0,16 / 0,15 s (15 ms) | wie oben |
+| `mart.zahlart_monat` 1 Monat | 1,0 s → 6,5 s (Join auf `core.finanzweg` verdarb die Schätzung) | 0,17 s ohne den Join, danach materialisiert | — |
+| Nachlasskosten alle Betriebe × 12 Monate | 4,6 s (1 Monat, mit Join) | 0,17 / 0,17 s (31 ms) | materialisiert |
+| Storno je Grund alle Betriebe × 12 Monate (`ka_storno_grund`) | 11,4 s (DB 0,68 s) | 0,99 / 0,39 s (0,71 s) | Bitmap Heap Scan `storno_artikel_monat`, LATERAL je Betrieb-Monat in den Umsatzbericht |
+| Bonkennzahlen je Tag, 1 Monat, alle Betriebe (frei) | — | 0,18 / 0,18 s (42 ms) | Seq Scan nur auf `bon_2025_03` (335.229 Bons) |
+| Zahlarten je Bon, 1 Monat, alle Betriebe | 10,1 s (6,1 Mio. Bons, Unterabfrage las alle Monate) | 0,21 / 0,21 s (73 ms) | Fensterfunktion über (Tag, Betrieb), eine Partition |
+| Kellner-Artikel 1 Betrieb × 1 Monat | — | 0,17 / 0,15 s (31 ms) | eine Monatspartition |
+| Debitoren 12 Monate | — | 0,96 / 0,19 s (0,81 s) | Partialindex `bon_debitor_idx` |
+| Ladestand je Bericht | 10,9 s | 0,15 / 0,13 s (3 ms) | materialisiert |
+| `mart.datenstand` (hängt an jeder Antwort) | 14 ms | 0,13 s gesamt (2 ms) | unverändert |
+
+**Alle 35 gemessenen Abfragen blieben unter 1 s**, die längste im ersten Lauf 0,99 s (Storno über
+ein Jahr). Die Grundlast des MCP-Wegs ohne Datenbankzeit liegt bei rund 130 ms (Prüfung,
+Datenstand, Ladestand, Protokoll). Die Rohdaten der Messung: `messen.ts` im Arbeitsverzeichnis der
+Sitzung, nicht im Repo.
+
+### Was dafür gebaut wurde, und warum
+
+| Maßnahme | wogegen | gemessen |
+|---|---|---|
+| Ausdrucksindex `(date_trunc('month', geschaeftstag::timestamp)::date, betrieb_key)` auf `core.rabatt_artikel_tag` und `core.finanzweg_tag` | Ein Filter auf den **Monat** einer Sicht schneidet keine Partition weg (er liegt auf einem Ausdruck). Die Sichten bilden den Monat mit **genau** diesem Ausdruck — `date` auf `timestamp`, weil nur so `date_trunc` unveränderlich und indexierbar ist | 9,3 s → 0,17 s |
+| „Erst verdichten, dann benennen" in allen Sichten mit Gruppierung | Betrieb, Marke und Status in der Gruppierung ließen Postgres jede Zeile nach elf Schlüsseln sortieren | Teil der obigen Zahlen |
+| Kein Join auf `core.finanzweg` in `mart.finanzweg_tag` (`art` aus der Zeile abgeleitet, wie im Lader) | verdorbene Zeilenschätzung, Nested Loops | 6,5 s → 0,17 s |
+| Fensterfunktion statt zweiter Gruppierung in `mart.bon_zahlart_tag` | ein Datumsbereich wandert über einen Join **nicht** in eine gruppierte Unterabfrage — sie las alle Bons | 10,1 s → 0,07 s |
+| LATERAL je Betrieb-Monat in den Umsatzbericht (`nachlass_monat`, `storno_grund_monat`) | dieselbe Falle mit dem Monatsumsatz | — |
+| **Materialisiert:** `mart.finanzweg_monat_basis` (183.022 Zeilen, 33 MB) | jede 88-Zeile prüfte, ob es für ihren Tag 97 gibt | 2,7 s → 5 ms; Refresh 32,9 s nebenläufig |
+| **Materialisiert:** `mart.betriebsbericht_ladestand_basis` | der Ladestand hängt an **jeder** Kassenantwort | 10,9 s → 3 ms; Refresh 13,9 s nebenläufig |
+| Partialindex `bon_debitor_idx` auf `core.bon (betrieb_key, geschaeftstag) WHERE debitor IS NOT NULL` | Debitoren sind selten, ohne Index läse jede Monatsabfrage alle Bons | 0,19 s warm |
+
+**Nicht gemacht, weil nicht nötig:** BRIN (die Tabellen sind nach dem Tag partitioniert, das leistet
+mehr), Statistikziele (keine Fehlschätzung nach dem Umbau gemessen), eine Materialisierung von
+`mart.artikel_nachlass_monat` (0,3 s für einen Monat über alle Betriebe) und von `mart.bon_tag`
+(eine Partition je Monat).
+
+Beide Materialisierungen frischt `betriebsberichtSichtenNachlauf()` auf — in Phase B und nach
+Phase C (`importer.md`, „Drei Phasen"). `mart.materialisierung_stand` führt sie unter
+`betriebsbericht_sichten_refresh`; `0117` hängt die Einträge an die Sicht an, statt sie
+abzuschreiben (sie wurde in `0116` neu gefasst).
+
+### Die Karten lesen nur `mart`
+
+Der MCP-Zugang führt jede Karte als `mcp_leser` aus. Eine Karte auf `core` läuft in Metabase und
+scheitert im Chat mit „permission denied". Die neuen Karten (`ka_*`, `aa_nachlass`) lesen deshalb
+nur `mart`; `mcp/test/berichte.test.ts` prüft das. Die älteren Artikelaktion-Karten
+(`aa_kopf` … `aa_liste_pruefung`) lesen `core.artikelverkauf_tag` und laufen im Chat **nicht**
+(`offene-punkte.md`).

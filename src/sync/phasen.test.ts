@@ -54,6 +54,7 @@ const PHASE_B = [
   'zuordnungNachlauf',
   'deckungsbeitragNachlauf',
   'roundTableNachlauf',
+  'betriebsberichtSichtenNachlauf',
   'auswahllistenNachlauf',
   'vergleichstagNachlauf',
   'einkaufspreisNachlauf',
@@ -173,6 +174,20 @@ describe('sync.ts — Phase C nach Phase B', () => {
     for (const fn of ['einkaufSichtenNachlauf', 'pflichtartikelSichtenNachlauf', 'zulaufPruefen', 'zuordnungNachlauf']) {
       expect(block).not.toContain(`await ${fn}(`)
     }
+  })
+
+  /**
+   * Die Kassensichten (0117) lesen, was Phase C an Betriebsbericht-Historie
+   * schreibt — sie werden nach C noch einmal aufgefrischt, sobald C ueberhaupt
+   * gearbeitet hat. Fehlte der Aufruf, stuende der Backfill einer Nacht erst
+   * einen Tag spaeter im Ladestand (docs/importer.md, "Drei Phasen").
+   */
+  test('nach Phase C werden die Kassensichten aufgefrischt, wenn C Posten bearbeitet hat', () => {
+    const c = sync.indexOf(NACHLADEN)
+    const block = sync.slice(c, sync.indexOf(ABSCHLUSS))
+    expect(block).toContain('if (c.posten > 0)')
+    const bedingung = block.indexOf('if (c.posten > 0)')
+    expect(block.indexOf('await betriebsberichtSichtenNachlauf(', bedingung)).toBeGreaterThan(bedingung)
   })
 
   test('der Lauf wird erst nach Phase C geschlossen, mit dem Ergebnis der Zulaufprüfung', () => {

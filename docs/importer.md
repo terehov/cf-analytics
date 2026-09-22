@@ -80,8 +80,18 @@ Phase B arbeitete neben Phase C. `workerLauf()` bleibt als Zug „A, dann C, ohn
 Handaufrufe.
 
 **Was nach Phase C aufgefrischt wird — und warum nur das.** Gemessen über `pg_depend` am
-23.09.2026 (rekursiv über Sichten bis zu den Tabellen): **keine** materialisierte Sicht liest aus
-einer Betriebsbericht-Tabelle. Die Konzern-Historie schreibt `core.umsatzbericht_tag` und
+23.09.2026 (rekursiv über Sichten bis zu den Tabellen): ~~**keine** materialisierte Sicht liest aus
+einer Betriebsbericht-Tabelle.~~ **Seit `0117` (23.09.2026, später am Tag) lesen zwei:**
+`mart.finanzweg_monat_basis` (Finanzwege je Betrieb und Monat, aus `core.finanzweg_tag`) und
+`mart.betriebsbericht_ladestand_basis` (welcher Zeitraum je Bericht geladen ist, aus
+`core.betriebsbericht_abruf` und `sync.warteschlange`). Beide frischt
+`betriebsberichtSichtenNachlauf()` (`src/sync/betriebsbericht_sichten.ts`) in Phase B auf — direkt
+nach dem Round Table — und **nach Phase C noch einmal, sobald C überhaupt Posten bearbeitet hat**
+(`c.posten > 0`; auch ein „keine Daten" ändert den Ladestand). `konzernOk` taugt dafür nicht, es
+zählt nur Posten ohne `getReport:`. Ohne den zweiten Refresh stünde der Backfill einer Nacht erst
+am nächsten Morgen im Ladestand, und jede MCP-Antwort meldete einen Monat als „nicht geladen", der
+längst da ist. Gemessen auf einem Klon in Produktionsgröße: 32,9 s + 13,9 s nebenläufig.
+`src/sync/phasen.test.ts` prüft beide Aufrufe. Übrige Aussage unverändert: Die Konzern-Historie schreibt `core.umsatzbericht_tag` und
 `core.artikelverkauf_tag`; daraus lesen `mart.deckungsbeitrag_warengruppe`, der Round Table
 (`round_table_monat`, `_trend`, `artikel_monat_basis`, `artikeltage_basis`) und
 `mart.vergleichstag_basis`. Nur wenn Phase C mindestens einen Konzern-Posten `ok` geladen hat
