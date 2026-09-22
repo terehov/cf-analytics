@@ -92,7 +92,8 @@ Es gibt **keinen** getrennten Backfill- und Sync-Modus. Beides sind Einträge in
 | 12 | `analyticsFilterOptions` — braucht die Betriebe, liefert deren LINA-ID |
 | 14 | `getKennzahlen` — braucht die LINA-ID |
 | 20 | übrige Momentaufnahmen — brauchen den Artikelkatalog |
-| 50 | Nacharbeit nach Fehlern |
+| 50 | Nacharbeit nach Fehlern — auch das Nachholen einer abweichenden Betriebsbericht-Gegenprobe (seit `0113`) |
+| 85 | Betriebsberichte (seit `0113`) — konkurrieren **nicht** über die Priorität, siehe „Betriebsberichte" unten |
 | 90 | Historie, rückwärts |
 
 Aktuelle Daten können damit nie hinter dem Backfill verhungern, und es gibt nur einen Codepfad statt zweier, die auseinanderlaufen.
@@ -1431,3 +1432,142 @@ reservierte Posten werden freigegeben. Ein übersprungener Start (Sperre belegt)
 ausdrücklich nicht — dort lebt der Blockierer.
 
 **Die Regel dazu steht in `AGENTS.md`:** kein Push auf `main`, solange ein Lauf aktiv ist.
+
+## Betriebsberichte: je Betrieb, verschränkt, mit Gegenprobe (Migrationen `0113`–`0115`, 22.09.2026)
+
+Plan und Begründung: `plan-lina-vollabzug.md` (Abschnitte 3–5, Entscheidungen E1–E8). Hier
+steht, wie der Importer es tut.
+
+### Das Register und der Endpunkt
+
+`src/lina/betriebsberichte.ts` ist ein **eigenes** Register, nicht Teil von `ENDPUNKTE`. Jeder
+aktive Eintrag dort speist die Konzern-Einreihzweige (`linaNachfuellen`, `historieNachziehen`,
+Nulltage, Nachlese) — und die kennen keinen Betrieb. Die vier früheren `getReport:*` mit
+`/finanzen/analytics/getReport?storeId=` sind aus `ENDPUNKTE` entfernt: dieser Weg liefert für
+jeden Betrieb leere Gerüste (KORREKTUR 7). Der richtige:
+
+```
+GET /intranet/storeanalytics/getReport?report=<id>&von=1.8.2026&bis=31.8.2026&reltime=custom&interval=<n>&laden=<encId>
+```
+
+`laden` setzt der Worker aus `sync.warteschlange.betrieb_enc_id` (`worker.ts`, Parametername aus
+`Endpunkt.betriebParameter`). Ein Posten mit Betrieb für einen Endpunkt ohne Betriebsparameter
+wirft — er liefe sonst gegen den Sitzungsbetrieb.
+
+| Klasse | Zeitraum eines Postens | Berichte |
+|---|---|---|
+| T | ein Tag | 92, 88 |
+| W | eine ISO-Woche (Mo–So), nie länger | 96, 86, 113 |
+| M-Tag | ein Kalendermonat, Zeilen tragen ihr Datum | 97 (`interval=3`), 90, 108, 61 |
+| M | ein Kalendermonat | 39, 99, 60, 53, 57, 68, 69, 112, 71, 75, 76 |
+
+Registriert, aber aus: 38 (steckt in 39), 114 (für Düsseldorf echt leer), 81/82 (Gutscheine, 0
+Zeilen — mit `sync.quelle` `erwartet: false`), 107/23 (500 mit leerem Rumpf, auch über `laden=`).
+
+### Der Einreihweg: `betriebsberichteNachfuellen()` (`src/sync/nachfuellen.ts`)
+
+Der **einzige** Schreiber von `betrieb_enc_id` außer dem Fensterteilen im Worker (der Wächtertest
+prüft das am Quelltext). Drei Quellen, in dieser Reihenfolge:
+
+1. **Gegenprobe nachholen** — `mart.betriebsbericht_gegenprobe.nachholen = 'faellig'`: LINAs
+   Summe traf den Umsatzbericht nicht, der letzte Abruf ist über eine Woche her, weniger als
+   dreimal nachgeholt, Zeitraum jünger als 60 Tage. Priorität 50, `nachgeholt + 1`.
+2. **Nachlauf** — ein Zeitraum, dessen erster Abruf vor Ende + `BETRIEBSBERICHT_NACHLAUF_TAGE`
+   (14) lag, wird einmal neu geholt. Das ist das Nachzügler-Fenster der Betriebsberichte; für
+   den Backfill fällt es weg.
+3. **Erstabruf** — Monat für Monat rückwärts bis `HISTORIE_AB`. Treiber sind Betrieb-Tage mit
+   Umsatz aus **Umsatzbericht ODER Artikelverkauf** (die Vereinigung, Plan 5.2). Daraus je
+   Klasse der Zeitraum (Tag, ISO-Woche, Monat); fällig, wenn sein Ende
+   `BETRIEBSBERICHT_REIFE_TAGE` (7) zurückliegt. Eingereiht wird, was es für genau diesen
+   Zeitraum **je** gab — gleich mit welchem Ausgang (`NOT EXISTS` gegen alle Posten, Index
+   `warteschlange_betrieb_einheit`).
+
+**Neueste zuerst über alle Betriebe:** die Monate absteigend, im Monat `ORDER BY von DESC`, und
+`sync.posten_holen()` sortiert ebenso. Nach der ersten Nacht ist der jüngste Zeitraum für alle
+Betriebe da. Test: „neueste zuerst: bei knapper Obergrenze …" in `src/sync/betriebsbericht.test.ts`.
+
+**Die Obergrenze zählt die offenen mit:** eingereiht werden höchstens
+`BETRIEBSBERICHT_JE_LAUF − offene Betriebsbericht-Posten`. Sonst wüchse die Schlange jede Nacht um
+das, was der Lauf nicht geschafft hat.
+
+**Gemessen am lokalen Klon (22.09.2026, Daten bis 12.08.2026):** 455.919 Posten für die ganze
+Historie seit 2018 (92 und 88 je 153.363, 96/86/113 je 22.821, 15 Monatsberichte je 5.382).
+Eine Nacht mit 10.500 Posten einzureihen dauert 0,3 s. Ist alles eingereiht, prüft jeder Lauf
+alle Monate erneut und findet nichts — **27 s je Nacht**. Das ist der Preis dafür, dass ein
+nachträglich auftauchender Umsatztag auch in einem alten Monat noch gefunden wird.
+
+### Die Verschränkung: `linaPostenHolen()` (`src/sync/worker.ts`)
+
+Entscheidung E8: *„solange wir das System nicht zuballern und sich über alle API-Aufrufe des
+gleichen Systems verteilen."* Die LINA-Spur zieht **abwechselnd**: nach einem Betriebsbericht
+zuerst einen übrigen LINA-Posten, nach einem übrigen zuerst einen Betriebsbericht
+(`sync.posten_holen(lauf, 'lina_br' | 'lina_sonst')`, `0113`). Ist eine Hälfte leer, kommt die
+andere. Test: Folge `BKBKBK`.
+
+**Betriebsberichte bekommen, was übrig ist.** Vor jedem Zug wird gezählt, wie viele übrige
+LINA-Posten gerade fällig sind; ein Betriebsbericht wird nur gezogen, wenn das Tagesbudget danach
+noch für alle reicht. Test: Budget 5, vier übrige Posten → genau ein Betriebsbericht.
+`TAGESBUDGET` bleibt die Obergrenze für **alle** LINA-Aufrufe.
+
+**Das Tempo ändert sich nicht.** Es bleibt eine Schleife mit einem Client (Regel 3). Verschränkt
+wird die Reihenfolge, nicht die Rate. Eine Nacht wird dadurch **länger**: bei ~5,3 s je Aufruf
+sind 10.500 Aufrufe rund 15,5 Stunden, der Lauf endet ab 05:02 also gegen 20:30. Phase B (die
+Materialisierungen) läuft erst danach — siehe `offene-punkte.md`.
+
+**Notbremse:** `BETRIEBSBERICHT_JE_LAUF` (Vorgabe: gleich `TAGESBUDGET`). Auf 0 zieht der Worker
+auch schon eingereihte Betriebsberichte nicht mehr, der Producer reiht nichts ein, und
+`sync.quelle` führt die Berichte als `nicht erwartet` — die Notiz des Laufs sagt es
+(„Betriebsberichte per Notbremse aus").
+
+### Ein Fenster, das zu groß ist, wird geteilt — nicht wiederholt
+
+LINA beantwortet einen zu großen Zeitraum nach ~60 s mit **504** und einer 970-kB-HTML-Seite.
+Der Client liest 504 **vor** der Abwehrseiten-Prüfung (eine HTML-Seite mit zufälligem Stichwort
+hätte sonst eine 24-Stunden-Zugangssperre ausgelöst). Bei einem Betriebsbericht über mehrere Tage
+teilt der Worker den Posten in zwei Hälften (gleiche Priorität), schließt ihn mit dem neuen
+Ergebnis `fenster_zu_gross` und zählt ihn als `uebersprungen` plus einen Fehler in Folge (eine
+504-Serie soll die Notbremse erreichen, den Lauf aber nicht gelb färben). Unser eigenes
+Zeitlimit (`ANFRAGE_TIMEOUT_MS`) zählt wie ein 504. Ein einzelner Tag lässt sich nicht teilen und
+geht den gewöhnlichen Fehlerweg.
+
+### Laden: ersetzen statt upserten (`src/sync/betriebsbericht_laden.ts`)
+
+`laden()` legt wie immer zuerst `raw.api_antwort` ab und gibt Betriebsberichte dann an
+`betriebsberichtSchreiben()`. Die Zeilen haben keine stabile Kennung (Rechnungsnummer 0 neunmal
+an einem Tag, derselbe Artikel zweimal im Rabattbericht), also: DELETE im Zeitraum des Betriebs,
+dann INSERT über `jsonb_to_recordset`, Schlüssel ist die laufende Zeile der Antwort. Stufe A hat
+eigene Lader (92, 88, 97, 96), Stufe B einen **Spaltenplan** je Bericht (`SPALTENPLAENE`): Feld →
+Spalte → Typ, Datum aus einer Zeilenspalte oder dem Monat, Kopfzeilen als Gruppenkontext (53/61:
+Kellnerblock, 75/76: Sparte), Verdichten (99).
+
+Jeder Abruf schreibt eine Zeile in `core.betriebsbericht_abruf` — **auch bei null Zeilen** — mit
+LINAs `nBillsGesamt` und `balanceSumBrutto`. LINAs `errors` landet in `core.bericht_hinweis`.
+Strukturprüfungen, die nicht scheitern lassen, sondern melden (`sync.schema_abweichung`): 92
+Gruppenkopf gegen Zeilensumme, 96 Summe der Bons gegen `balanceSumBrutto`, 88/97 doppelte
+Finanzwegnummer. Ein Bon außerhalb des angefragten Fensters wirft.
+
+**Die Tagesfrage beantwortet der Posten, nicht die Antwort.** 88 schreibt für einen
+Monatsaufruf `businessDate: "01.08.2026"` — nur den Ersten (gemessen beim Bau, 22.09.2026). Nur
+97 (je Tag ein Block) trägt seinen Tag im Block; alle anderen Tag-/Zeitraumzuordnungen kommen
+aus `zeitraum_von`/`zeitraum_bis` des Postens oder aus einer Datumsspalte der Zeile.
+
+### Die Schemaprüfung je Bericht
+
+`betriebsberichtSchema()` (`src/lina/schemas.ts`): die Hülle, dazu jede erwartete Spalte aus
+`tableHead` (über alle Blöcke), keine unbekannte außer den Steuersatzspalten, und das angefragte
+`interval` in `possibleIntervals` — LINA ignoriert ein nicht unterstütztes still.
+
+### Doppelt kodiert
+
+Die gespeicherten Rohantworten vom 22.09.2026 sind teils ein JSON-String mit JSON darin. Ob das
+die Leitung ist oder die Art, wie sie im Browser gespeichert wurden, lässt sich aus den Dateien
+nicht sicher sagen. Der Client packt bei `doppeltKodiert` einen String ein zweites Mal aus, der
+Lader nimmt beides an; die Attrappe liefert standardmäßig doppelt kodiert.
+
+### Die Attrappe und die Tests
+
+`src/lina/mock.ts` antwortet auf `/intranet/storeanalytics/getReport` aus den echten Fixtures
+(`src/transform/fixtures/betriebsbericht/`), verlangt `laden`, kennt 500-leer (`leer`), 504 ab
+einer Fenstergröße (`zuGrossAbTagen`) und liefert auf dem alten Weg ein leeres Gerüst.
+`src/transform/betriebsbericht.test.ts` (ohne Datenbank, inkl. Abnahme M1) und
+`src/sync/betriebsbericht.test.ts` (mit `TEST_DATABASE_URL`, eigene Testdatenbank, nie mit `-t`).

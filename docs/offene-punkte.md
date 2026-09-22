@@ -1896,3 +1896,75 @@ Nachher-Werte gibt es bisher nur vom Klon (ein Fünftel des Bestands, Messreihe 
 `entscheidungen.md` und `datenmodell.md` nachtragen: dieselben Abfragen über `mcp.zugriff`
 (`dauer_ms`), dazu die Refresh-Dauer aus `mart.materialisierung_stand` (`dauer_s`) und ob
 die drei Wettersichten aus `mart.sicht_unklar` verschwunden sind.
+
+## Betriebsberichte: was nach dem Bau offen ist (seit 22.09.2026, Migrationen `0112`–`0115`)
+
+Gebaut und offline abgenommen (Glücksrad August 2026 aus den echten Rohantworten genau
+reproduziert). **Noch nie gegen das echte LINA gelaufen** — Regel 7a, der erste Lauf ist der
+nächste Nachtlauf nach dem Deploy.
+
+### Nach der ersten Nacht nachsehen
+
+* **Verkaufsstellen (M0):** `SELECT * FROM mart.verkaufsstelle_abdeckung;` — der Parameter
+  `verkaufsstellen=<number>` ist ungeprüft. `zustand` sagt, ob die Summe den Gesamtumsatz trifft;
+  „Filter liefert 0 EUR" heißt falsches Format, „LINA ignoriert den Filter" heißt, jede Stelle
+  trägt den Gesamtumsatz. Dann die sieben `vs_*`-Einträge in `src/lina/endpunkte.ts` auf
+  `aktiv: false` und nachmessen (Eugene: `bun run lina-fragen`).
+* **Gegenprobe und Lücken:** `SELECT befund, count(*) FROM mart.betriebsbericht_gegenprobe GROUP BY 1;`
+  und die drei neuen Zeilen in `mart.pruefung_uebersicht`. Die Lückenzeile darf in der ersten
+  Nacht über 0 stehen (der Backfill beginnt), ab der zweiten nicht mehr.
+* **Laufdauer:** mit ~5,3 s je Aufruf füllt eine Nacht das Tagesbudget in rund 15,5 Stunden
+  (05:02 bis ~20:30). **Phase B (alle Materialisierungen, Round Table) läuft erst danach** — der
+  Round Table des Tages steht also abends statt vormittags. Ist das nicht tragbar:
+  `BETRIEBSBERICHT_JE_LAUF` senken (nicht den Takt erhöhen, Regel 3), oder Phase B vor die
+  Betriebsberichte ziehen — das wäre ein Umbau von `sync.ts`/`phasen.test.ts`.
+* **`fenster_zu_gross`:** `SELECT endpunkt, count(*) FROM sync.warteschlange WHERE ergebnis =
+  'fenster_zu_gross' GROUP BY 1;` — wie oft Wochen geteilt werden mussten, und bei welchen
+  Betrieben. Laufen viele Tagesposten danach auf `aufgegeben`, ist ein Tag für LINA schon zu groß.
+* **Plattenplatz:** 53 (1,9 MB je Betrieb-Monat) und 99 (2,1 MB) sind zusammen rund 20 GB raw
+  für die Historie, 96/86/113 je Woche bis ~1 MB. E6 hat die 10,8 GB für 99 akzeptiert; 53 kam mit
+  E5 dazu, ohne dass die Größe beziffert war. Vor dem Backfill den freien Platz der Managed
+  Database prüfen.
+
+### Eugene entscheidet
+
+* **Bericht 88 im Tagesraster verzichtbar?** 97 liefert je Tag dieselbe Finanzwegtabelle aus
+  einem Monatsaufruf — gemessen an einem Betrieb und Monat, auf den Cent (KORREKTUR 8). 88 kostet
+  152.840 Aufrufe Historie, 97 5.115. Vorschlag: einige Wochen laufen lassen, dann
+  `SELECT befund, count(*) FROM mart.finanzweg_88_97_abgleich GROUP BY 1;` — steht dort über
+  viele Betriebe nur „gleich", 88 auf `aktiv: false`. Spart rund sechs Wochen Backfill.
+* **86 ein Duplikat von 96?** Am 15.08. lieferte die Debitorenauswertung dieselben 519 Bons wie
+  96. Ob sie bei Betrieben MIT Debitoren nur deren Bons führt, ist nicht gemessen. Kostet
+  22.821 Aufrufe Historie.
+* **Kellnernummer für 53 und 61:** beide nennen den Kellner nicht, nur Blöcke. Die Kopfsumme
+  eines Blocks gleicht der Zeile des Kellners in 60 (Düsseldorf: 4.628,25 € = Kellner 1000) —
+  eine Zuordnung darüber wäre möglich, ist aber nicht gebaut (sie wäre geraten, solange sie an
+  einem Betrieb geprüft ist).
+
+### Zu messen, bevor es gebaut wird (lesend, im Terminal des Nutzers)
+
+* **56 (Finanzwege pro Kellner) und 70 (Tische)** stehen nicht in der Vermessungstabelle und
+  sind deshalb nicht gebaut. 70 hat eine echte Tagesantwort im Scratchpad der Sitzung vom
+  22.09.2026 (159 Tische, 15.08.2026).
+* **114 (Kost-Sach-Bezug):** für Düsseldorf echt leer — an drei weiteren Betrieben messen.
+* **81/82 (Gutscheine):** registriert mit `erwartet: false`, nicht geholt; an einem Betrieb mit
+  LINA-Gutscheinen messen.
+* **Stufe-B-Strukturen an einem zweiten Betrieb:** die Spaltenpläne stammen aus je zwei
+  Beispielzeilen an Wilma Wunder Düsseldorf. Besonders 75/76 (Sparte und Zeitfenster in einer
+  Spalte), 53/61 (Kellnerblöcke), 113 (`Status`/`Versuche`/`Antwort` nur mit Platzhaltern gesehen).
+* **Historische Tiefe:** Düsseldorf Januar 2018 leer, 2020/2022 voll. Leere Antworten für Tage
+  mit Umsatz stehen als „leer trotz Umsatz" in der Gegenprobe; ältere als 60 Tage werden nicht
+  nachgeholt (`historisch`).
+
+### Risiko, bewusst stehen gelassen
+
+* **Ein 403 für EINEN Betrieb sperrt den ganzen Zugang für 24 Stunden** — der LINA-Sperrpfad des
+  Workers ist global, anders als bei FoodNotify (dort ruht nur der Posten). Laut Eugene sind alle
+  141 Betriebe erreichbar; tritt es doch auf, ist es in `sync.zugangssperre` sichtbar, und die
+  Ursache ist eine Rechtefrage.
+* **Der Producer prüft nach dem Backfill jede Nacht alle Monate erneut (27 s am Klon).** Eine
+  Wassermarke würde das sparen, aber einen nachträglich auftauchenden Umsatztag in einem alten
+  Monat übersehen.
+* **Der Katalogabzug des MCP-Servers** (`mcp/test/katalog.json`) kennt die neuen `mart`-Sichten
+  aus `0112`/`0114` noch nicht — gegen eine vollständige Datenbank neu ziehen, wenn die
+  Auswertungsschicht dazukommt.

@@ -1029,3 +1029,99 @@ mit jedem Backfill-Jahr, und der Sockel wächst mit ihr.
 `mart.betrieb_wetter_tag` über die gerundeten Koordinaten, nicht die Aggregation. Die
 Produktionswerte nach dem Deploy stehen in `offene-punkte.md` aus. Ob der Refresh
 gelaufen ist, zeigt `mart.materialisierung_stand` unter dem Merker `wetter_tag_refresh`.
+
+## Betriebsberichte (Migrationen `0113`–`0115`, 22.09.2026)
+
+Plan: `plan-lina-vollabzug.md`, Abschnitt 4. Was davon so gebaut ist und wo es abweicht:
+
+### Vier Regeln für alle Betriebsbericht-Tabellen
+
+1. **Ersetzen statt upserten.** Die Zeilen haben keine stabile Kennung (Rechnungsnummer 0
+   neunmal an einem Tag; derselbe Artikel zweimal im Rabattbericht, +3,50 und −3,50). Der
+   Schlüssel ist deshalb die laufende Zeile (`zeile`, bei Bons `laufnummer` je Tag), und jeder
+   Abruf ersetzt den Zeitraum des Betriebs. `raw.api_antwort` bleibt append-only; `core` ist
+   daraus neu aufbaubar.
+2. **Der Tag kommt aus dem Posten oder aus einer Datumsspalte, nie aus `businessDate`** — außer
+   bei 97 (je Tag ein Block). 88 meldet für einen Monat nur den Ersten.
+3. **Berichte der Klasse T tragen den Abrufzeitraum:** `geschaeftstag = zeitraum_von`, dazu
+   `zeitraum_bis`. Im Betrieb ist beides gleich; ein Mehrtagesabruf (Abnahme M1, Handabruf)
+   steht mit `zeitraum_bis > geschaeftstag` daneben — wer Tage summiert, filtert
+   `zeitraum_bis = geschaeftstag`.
+4. **Geldbeträge `numeric(16,4)`** in den neuen Tabellen: LINA liefert Netto mit vielen Stellen.
+
+### Stufe A (`0114`)
+
+| Tabelle | Körnung | Quelle | Anmerkung |
+|---|---|---|---|
+| `core.betriebsbericht_abruf` | Bericht × Betrieb × Abrufzeitraum | alle | LINAs `nBillsGesamt`/`balanceSumBrutto` je Abruf — die Gegenprobe. `abrufe`, `nachgeholt` |
+| `core.bericht_hinweis` | Bericht × Betrieb × Zeitraum × Text | alle | LINAs `errors` |
+| `core.finanzweg` | Nummer | 88, 97 | Stamm aus den Berichten; `art`/`prozentsatz` abgeleitet |
+| `core.finanzweg_stand` | Nummer × Monat × Name × Gruppe | 88, 97 | Namenshistorie, append-only |
+| `core.finanzweg_tag` | Betrieb × Tag × **Quellbericht** × Finanzweg | 88, 97 | partitioniert; **zwei Quellen für dieselbe Zahl** — `bericht` wählen |
+| `core.rabatt_artikel_tag` | Betrieb × Tag × Zeile | 92 | partitioniert; `finanzweg_nummer`, `artikel_key` abgeleitet |
+| `core.bon` | ein Bon | 96 | partitioniert, GIN auf `finanzwege text[]` |
+| `core.tagesabschluss_tag` | Betrieb × Tag × Hauptsparte × Steuersatz | 97 | brutto |
+
+**`core.finanzweg_tag` statt einer Tabelle je Bericht.** 97 liefert je Tag dieselbe
+Finanzwegtabelle wie 88 (gemessen: alle 34 Finanzwege über August auf den Cent gleich). Beide
+Quellen stehen in einer Tabelle mit `bericht` im Schlüssel — damit der Abgleich
+(`mart.finanzweg_88_97_abgleich`) eine Abfrage ist und ein späterer Verzicht auf den Tagesabruf
+von 88 keine Umbauten braucht. Der Preis: `sum()` über beide `bericht`-Werte zählt doppelt. Das
+steht im Tabellenkommentar.
+
+**`core.rabatt_artikel_tag` Zeile für Zeile, nicht verdichtet.** Gewährt und zurückgenommen
+stehen als zwei Zeilen (−3,50 mit Anzahl 1, +3,50 mit Anzahl 1). Die Auswertung vom 22.09.2026
+summiert `anzahl` über beide — verdichten hieße, eine Lesart festzulegen, die niemand bestellt
+hat. Zeilen **ohne** Artikelnamen sind echt (28 von 8.505 im August) und bleiben; die
+Gruppenköpfe sind nicht geladen (sie sind die Summe darunter).
+
+**`finanzweg_nummer` und `artikel_key` sind abgeleitet und dürfen NULL sein.** Die Nummer kommt
+aus 88/97 desselben Betriebs und Zeitraums über den Namen (nur bei genau einer Nummer je Name);
+beide Seiten tragen nach, wer zuletzt kommt. Der Artikel über `core.artikel_name_norm()` gegen
+die Artikel, die der Betrieb im selben Zeitraum verkauft hat, nur bei genau einem Treffer.
+`mart.rabatt_artikel_unaufgeloest` zeigt, was offen blieb.
+
+### Stufe B (`0115`)
+
+Je Bericht eine Tabelle mit `betrieb_key`, `monat` bzw. `geschaeftstag`, `zeile`, den
+Spalten aus dem Spaltenplan und `raw_id`:
+
+| Tabelle | Bericht | Körnung |
+|---|---|---|
+| `core.storno_artikel_monat` | 39 | Artikel × Stornotyp × Stornogrund je Monat |
+| `core.monatsaufstellung_tag` | 90 | Tag (Steuersätze als `jsonb`) |
+| `core.verkaufszahlen_tag` | 108 | Tag, mit `anzahl_zahlungen` und LINAs Betriebsnamen |
+| `core.unbar_zahlung_monat` | 99 | Betriebsstelle × Finanzweg je Monat — **verdichtet**, Einzelzahlungen nur in raw |
+| `core.kellner_umsatz_monat` | 60 | Kellnernummer je Monat (`kellner_name` von LINA null) |
+| `core.kellner_umsatz_tag` | 61 | Kellnerblock × Tag — **ohne** Kellnernummer |
+| `core.kellner_artikel_monat` | 53 | Kellnerblock × Artikel je Monat — **ohne** Kellnernummer, nach `monat` partitioniert |
+| `core.gutschrift_kellner` | 57 | eine Gutschrift |
+| `core.betriebsstelle_umsatz_monat` | 68 | Betriebsstelle je Monat |
+| `core.betriebsstelle_hauptsparte_monat` | 69 | Betriebsstelle × Hauptsparte je Monat |
+| `core.verkaufsstelle_umsatz_monat` | 112 | Verkaufsstelle je Monat |
+| `core.verkaufsstelle_hauptsparte_monat` | 71 | Verkaufsstelle × Hauptsparte je Monat |
+| `core.zeitzone_feinsparte_monat` | 75 | Feinsparte × Zeitfenster je Monat (Köpfe `ist_kopf`) |
+| `core.zeitzone_hauptsparte_monat` | 76 | Hauptsparte × Zeitfenster je Monat (Köpfe `ist_kopf`) |
+| `core.debitor_bon` | 86 | ein Bon (möglicherweise Duplikat von `core.bon`) |
+| `core.tischtransfer_bon` | 113 | ein Bon mit `tisch_id` |
+
+Die Felder stammen aus je **zwei Beispielzeilen** der Vermessung an einem Betrieb. Die Struktur
+ist an einem zweiten Betrieb zu bestätigen (`offene-punkte.md`); eine umbenannte Spalte fängt
+das Schema je Bericht ab.
+
+**Personenbezug (E5).** Die Kellnertabellen tragen eine Namensspalte, LINA füllt sie nicht. Sie
+liegen in `core` — für Metabase versteckt (`metabase-sichtbarkeit.md`, ganzes Schema) und für
+`mcp_leser` unsichtbar (liest nur `mart`/`manual`/`ampel`). Eine `mart`-Sicht darauf ist eine
+eigene Entscheidung.
+
+### Schema der Warteschlange (`0113`)
+
+* `sync.warteschlange.ergebnis` kennt `fenster_zu_gross` (geteilter Posten; wird nicht
+  wiederbelebt).
+* `sync.posten_holen(lauf, anbieter)` kennt `lina_br` und `lina_sonst` — die beiden Hälften der
+  LINA-Spur, mit je einem Teilindex.
+* `warteschlange_betrieb_einheit`: `(endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis)` für
+  den Producer.
+* `core.partition_anlegen()` liest die Partitionsspalte aus dem Katalog (bisher fest
+  `geschaeftstag`).
+* `sync.quelle.fensterklasse` für `mart.betriebsbericht_luecke`.

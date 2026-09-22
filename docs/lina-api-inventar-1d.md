@@ -688,3 +688,33 @@ Weil der Monatsaufruf in `504` läuft, drei weitere lesende Aufrufe, Wilma Wunde
 Je Antwort eine Zeile ohne gültiges `Datum` (Summenzeile) — beim Laden auslassen. Die Laufzeit
 wächst deutlich schneller als die Zeilenzahl (7 Tage 2,9 s, 14 Tage 31,9 s). **Folge: Klasse W,
 sieben Tage je Aufruf, nie länger;** bei umsatzstarken Betrieben die Laufzeit im Importer messen.
+
+## Nachtrag: beim Bau des Importers an den Rohantworten gemessen (22.09.2026)
+
+Kein neuer Aufruf gegen LINA — nachgerechnet an den Antworten dieser Erhebung (Scratchpad der
+Sitzung; anonymisierte Auszüge als Test-Fixtures unter `src/transform/fixtures/betriebsbericht/`).
+
+* **97 enthält die Finanzwegtabelle von 88 je Tag** — alle 34 Finanzwege über August auf den Cent
+  gleich (`lina-api-korrekturen.md`, KORREKTUR 8). Je Tag zwei Blöcke, 62 `tableHead`-Listen
+  für 62 Blöcke.
+* **`businessDate` von 88 ist bei einem Monatsaufruf nur der Erste** („01.08.2026"), anders als
+  27/55/92/99 („01.08.2026 - 31.08.2026").
+* **92, Gruppenköpfe:** 197 Gruppen über die 14 Wilma-Wunder-Betriebe, jede mit `Artikel = null`
+  und fettem `Rabatt`. Daneben 28 Zeilen OHNE Artikelnamen, die echte Werte tragen (Bochum,
+  „50% Glücksrad": Kopf 1.175, darunter Zeilen mit 1 und 15 Stück). Die Kopfzahl ist die Summe
+  ALLER Zeilen darunter; die Auswertung vom 22.09.2026 zählt nur Zeilen mit Namen (daher
+  7.335 statt 7.367 bei 50 %). Derselbe Name kann zweimal als Kopf stehen.
+* **92, Vorzeichen:** gewährt und zurückgenommen stehen als zwei Zeilen (−3,50 / +3,50), beide
+  mit positiver `Anzahl`.
+* **96:** `Rechnungsnummer` ist neunmal 0 an einem Tag, 20 von 519 Bons tragen in `Finanzwege`
+  den Text „Finanzwege" (die Spaltenbeschriftung), `Brutto` mal Ganzzahl, mal Dezimal,
+  `Anzahl_Artikel` Text. Die Summe der Bons trifft `balanceSumBrutto` (15.920,61).
+* **`Datum` ist die Berliner Mitternacht in Unix-Sekunden** (1786744800 = 15.08.2026 00:00
+  MESZ = 14.08. 22:00 UTC). Die Kurzauswertungen der Vermessung (`chunk*.json`, `minDate`)
+  haben in UTC gerechnet und zeigen deshalb den Vortag.
+* **99:** eine Zeile je einzelner unbarer Zahlung (8.780 im August), ohne Datum und ohne
+  Kennung; `Anzahl` −1 bei Rückbuchungen.
+* **86:** am 15.08. dieselben 519 Bons wie 96 plus eine Summenzeile (`Datum` null), Feld
+  `Rechnung/Gutschrift` statt `Rechnung/Butschrift`.
+* **Eingerutschte Spaltenbeschriftungen** stehen auch in 57 (`Anzahl_Artikel` = „Anzahl
+  Artikel"), 39 (`Artikel` = „Artikel") und 113 (`Status` = „Status", `Versuche` = „Versuche").

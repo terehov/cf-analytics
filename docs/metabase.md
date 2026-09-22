@@ -1448,3 +1448,32 @@ Parameter `verkaufsstellen`: die Summe der Stellen muss den Gesamtumsatz treffen
 nennt die beiden Fehlbilder ausdrücklich („Filter liefert 0 EUR", „LINA ignoriert den Filter").
 Eine Zeile in `mart.pruefung_uebersicht` zählt Monate mit `zustand` außer `ok`. Eine fachliche
 `mart`-Sicht „Umsatz je Verkaufsstelle" gibt es noch nicht — erst, wenn die Abdeckung stimmt.
+
+## Prüfsichten zu den Betriebsberichten (Migration `0114`, 22.09.2026)
+
+Fünf `mart`-Sichten, alle zum **Import**, keine davon eine fachliche Auswertung — die baut der
+nächste Schritt (M5 in `plan-lina-vollabzug.md`). Alle stehen im Katalog mit Körnung und
+`thema = 'import'`.
+
+| Sicht | Körnung | Erwartung |
+|---|---|---|
+| `mart.betriebsbericht_gegenprobe` | Bericht × Betrieb × Abrufzeitraum | `befund` ok; `nachholen` sagt, was der Lauf damit tut |
+| `mart.betriebsbericht_luecke` | Bericht × Betrieb × Tag (9–60 Tage alt) | **leer** ab der zweiten Nacht |
+| `mart.finanzweg_88_97_abgleich` | Betrieb × Tag × Finanzweg, wo beide Quellen da sind | kein `weicht ab` |
+| `mart.bericht_hinweis` | Bericht × Betrieb × Zeitraum × Text | LINAs eigene Hinweise, kein Importfehler |
+| `mart.rabatt_artikel_unaufgeloest` | Betrieb × Monat × Artikelname | so klein wie möglich — die Auflösungsquote |
+
+Drei Zeilen in `mart.pruefung_uebersicht`: Lücken (9–60 Tage), aufgegebene Gegenproben (60 Tage),
+88 gegen 97 (60 Tage).
+
+**Zwei Fallen für jede spätere Auswertung auf den neuen `core`-Tabellen:**
+
+* `core.finanzweg_tag` trägt dieselbe Zahl aus zwei Berichten (`bericht` 88 und 97). Eine Summe
+  über beide ist doppelt.
+* `core.rabatt_artikel_tag` und `core.finanzweg_tag` (Bericht 88) tragen den Abrufzeitraum; im
+  Betrieb ist er ein Tag. Wer Tage summiert, filtert `zeitraum_bis = geschaeftstag` — der
+  Monatsabruf der Abnahme M1 steht sonst daneben.
+
+`mart.betriebsbericht_gegenprobe` rechnet je Abrufzeile gegen den Umsatzbericht. Über die ganze
+Historie ist das teuer; die Prüfzeile liest nur die letzten 60 Tage, wer mehr will, filtert
+`zeitraum_bis`.

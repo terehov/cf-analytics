@@ -3514,3 +3514,61 @@ die echte Produktionsdatenbank. Nachgemessen auf einem Klon mit einem Fünftel d
 von 2,9 s auf 93 ms, `mart.vergleichstag` ein Jahr nur von 310 auf 210 ms — der Rest dort ist
 der LEFT JOIN über die Koordinaten, nicht die Aggregation (Messreihe in `fehlerkatalog.md`).
 Die Produktionswerte nach dem Deploy stehen in `offene-punkte.md` aus.
+
+## 22.09.2026 — Betriebsberichte: sieben Festlegungen beim Bau des Importers
+
+Die fachlichen Entscheidungen stehen im Plan (`plan-lina-vollabzug.md`, E1–E8 und „Ergebnis der
+Vermessung"). Hier stehen die, die beim Bau zu treffen waren (Migrationen `0112`–`0115`).
+
+**1. Ein eigenes Register, nicht `ENDPUNKTE`.** Jeder aktive Eintrag in `ENDPUNKTE` speist die
+Konzern-Einreihzweige, die keinen Betrieb kennen. Die Betriebsberichte stehen deshalb in
+`src/lina/betriebsberichte.ts` und werden nur von `betriebsberichteNachfuellen()` eingereiht —
+dieselbe Trennung wie bei der Ladenakte. Der Wächter behält seine dritte Zusicherung: ein
+Betriebsendpunkt im Konzern-Register bleibt ein Verstoß. Sie ist **erfüllt, nicht entfernt**.
+
+**2. Die Gegenprobe macht keinen Posten zum Fehler, sondern holt nach.** Der Plan (5.3) sagt:
+„Trifft es nicht … Fehler, nicht `keine_daten`". Gebaut ist: der Posten ist `ok`, die Abweichung
+steht in `mart.betriebsbericht_gegenprobe`, und der Producer reiht den Zeitraum frühestens eine
+Woche später erneut ein, höchstens dreimal, danach `aufgegeben` in `mart.pruefung_uebersicht`.
+Warum: ein Postenfehler geht in die Wiedervorlage von Minuten — ein zu früh geholter Tag wird in
+Minuten nicht voller. Und eine Serie solcher Fehler (etwa ein Tag, an dem der Umsatzbericht
+selbst null steht) hätte `ABBRUCH_NACH_FEHLERN` ausgelöst und die ganze LINA-Spur gestoppt. Die
+Sichtbarkeit, die der Plan will, bleibt: Prüfzeile mit Erwartung 0. **Nur Zeiträume der letzten 60
+Tage werden nachgeholt** — ältere Abweichungen sind historisch (LINA füllt nicht mehr nach), und
+die Betriebsberichte reichen je Betrieb evtl. nicht bis 2018 zurück (inventar-1d, A6): dreimal
+nachholen hieße vierfache Kosten für eine bekannte Lücke.
+
+**3. Verschränkt 1:1, mit Reserve fürs Tagesgeschäft.** E8 verlangt, dass sich die Aufrufe „über
+alle API-Aufrufe des gleichen Systems verteilen". Umgesetzt als Wechsel zwischen den beiden
+Hälften der LINA-Spur (`lina_br`/`lina_sonst`). Eine Gewichtung (etwa 3:1) wäre eine Zahl ohne
+Messung; 1:1 ist die einfachste Verteilung, und sobald das Tagesgeschäft abgearbeitet ist, laufen
+ohnehin nur noch Betriebsberichte. Die Reserve (Budget muss für alle fälligen übrigen Posten
+reichen) setzt „Betriebsberichte bekommen, was übrig ist" wörtlich um. **Verworfen:** eine eigene
+Prioritätsstufe unter der Historie — dann liefen die Betriebsberichte als Block am Ende.
+
+**4. Ein zu großes Fenster wird geteilt, nicht wiederholt.** 504 (oder unser Zeitlimit) bei einem
+mehrtägigen Posten → zwei Hälften, der alte Posten `fenster_zu_gross`. „Sichtbar machen, nicht
+still wiederholen" heißt hier: das Ergebnis steht in der Warteschlange und in `sync.aufgabe`, und
+jeder 504 zählt als Fehler in Folge (eine Serie stoppt die Spur). **Verworfen:** den Posten
+aufzugeben — dann bliebe die Woche für immer leer, obwohl zwei halbe Wochen gingen.
+
+**5. 88 bleibt im Tagesraster, obwohl 97 dieselben Zahlen liefert — vorerst.** Beim Bau gemessen
+(Wilma Wunder Düsseldorf, August 2026): die 31 Tagesblöcke von 97 summieren sich für alle 34
+Finanzwege auf den Cent und die Anzahl genau zum Monatsaufruf von 88. 97 kostet 5.115 Aufrufe
+Historie, 88 im Tagesraster 152.840. E1 hat 88 im Tagesraster entschieden, ohne diesen Befund zu
+kennen — deshalb wird hier nichts umgestoßen, sondern die Umstellung vorbereitet: beide Quellen
+schreiben in `core.finanzweg_tag` (mit `bericht`), `mart.finanzweg_88_97_abgleich` vergleicht
+sie Tag für Tag, und der Verzicht auf 88 ist danach ein `aktiv: false`. Die Frage steht in
+`offene-punkte.md` bei Eugene.
+
+**6. 99 wird in `core` verdichtet, 53 nicht.** 99 liefert eine Zeile je Zahlung ohne Datum und
+ohne Kennung — Zeilen, die niemand einzeln adressieren kann. `core.unbar_zahlung_monat` fasst je
+Betriebsstelle und Finanzweg zusammen; die Einzelzahlungen bleiben in raw (E6 hat die 10,8 GB
+dort akzeptiert). 53 (Artikel je Kellnerblock) ist dagegen schon verdichtet und bleibt Zeile für
+Zeile, nach `monat` partitioniert.
+
+**7. Monatsberichte werden nicht im laufenden Monat geholt.** Ein Monat ist ab seinem Ende + 7
+Tagen fällig, dazu ein Nachlauf nach 14 Tagen. Den laufenden Monat täglich neu zu holen, kostete
+je Monatsbericht 62 Aufrufe je Nacht statt zwei im Monat; für Stufe B (Kellner, Stellen,
+Storno) ist ein Monat Verzug vertretbar. Für 97 heißt das: die Tageswerte eines Monats stehen
+erst ab dem 7. des Folgemonats da — die Finanzwege der letzten Tage kommen bis dahin aus 88.

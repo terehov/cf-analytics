@@ -68,6 +68,50 @@ ignoriert). Die Zeilen je Tag sind damit **drei Arten**: Gesamt (beide Schlüsse
 Verkaufsstelle. Wer die Gesamtzeile will, filtert **beide** Schlüssel auf NULL —
 `mart.hauptsparte_abdeckung` tat das nicht und ist in `0112` repariert.
 
+### Betriebsberichte — je Betrieb, seit `0113` (22.09.2026)
+
+**Die 72 Berichte des Report Centers je Betrieb**, über `laden=<encId>` — die `encId` aus dem
+Umsatzbericht (`core.betrieb.enc_id`), alle 141 Betriebe mit einer Sitzung. Register:
+`src/lina/betriebsberichte.ts`; Lader: `src/sync/betriebsbericht_laden.ts`; Plan:
+`plan-lina-vollabzug.md`.
+
+| Bericht | Raster | landet in | was es trägt |
+|---|---|---|---|
+| 92 Rabattbericht | Tag | `core.rabatt_artikel_tag` | Nachlass je Finanzweg (Hausbon/Rabatt) und Artikel**name** |
+| 88 Finanzwege | Tag | `core.finanzweg_tag` (`bericht = 88`), `core.finanzweg`, `core.finanzweg_stand` | Umsatz und Vorgänge je Finanzweg |
+| 96 Rechnungsausgangsbuch | Woche | `core.bon` | eine Zeile je Bon: Art, Artikelzahl, Zahlarten, Brutto, Debitor |
+| 97 Tagesabschluss | Monat, Tageszeilen | `core.tagesabschluss_tag`, `core.finanzweg_tag` (`bericht = 97`) | je Tag Hauptsparte × Steuersatz **und** die volle Finanzwegtabelle |
+| 39, 90, 108, 99, 60, 61, 53, 57, 68, 69, 112, 71, 75, 76 | Monat | je eine Tabelle, `datenmodell.md` | Stufe B |
+| 86, 113 | Woche | `core.debitor_bon`, `core.tischtransfer_bon` | Bons mit Debitor- bzw. Tischfeldern |
+
+**Wie die Schlüssel zusammenfinden:**
+
+* **Betrieb:** über den Posten (`sync.warteschlange.betrieb_enc_id` → `core.betrieb.enc_id`). Die
+  Antworten selbst nennen keinen Betrieb — Ausnahme 108 (`Betrieb`, in
+  `core.verkaufszahlen_tag.betrieb_name_lina`), eine Gegenprobe der Adressierung.
+* **Finanzweg:** Nummer ↔ Name je Betrieb und Zeitraum aus 88/97. 92 kennt nur den Namen; die
+  Nummer an `core.rabatt_artikel_tag` ist daraus abgeleitet. **Nie über eine Nummernliste
+  filtern** — zwei „25 % Glücksrad" (3501 mit Apostroph, 3168 ohne).
+* **Artikel:** 92 und 53 tragen Namen bzw. Nummern. 92 wird über `core.artikel_name_norm()`
+  gegen die Verkäufe desselben Betriebs und Zeitraums aufgelöst (`artikel_key`, darf NULL sein;
+  offen bleibt es in `mart.rabatt_artikel_unaufgeloest`).
+* **Kellner:** nur die Kellnernummer (60, 57), und das ist eine Kassennummer je Betrieb. 53 und
+  61 nennen den Kellner gar nicht — nur Blöcke in Antwortreihenfolge.
+
+**Was diese Zahlen nicht sagen:**
+
+* 92: der Nachlass gilt für den **ganzen Bon**. „Menge X über 50 % Glücksrad" ist die Menge auf
+  Bons mit diesem Nachlass, nicht die Verkaufsmenge.
+* 88 vs. 92: `anzahl` zählt in 88 **Vorgänge**, in 92 **Artikel** — nie addieren.
+* 96: keine Uhrzeit, keine Artikel, **keine Nachlass-Finanzwege**. „Bons mit Aktion" ist damit
+  nicht beantwortbar.
+* 88 und 97 liefern dieselbe Finanzwegzahl aus zwei Berichten — wer summiert, wählt einen.
+
+**Die Gegenprobe:** jeder Abruf trägt LINAs `balanceSumBrutto`, und die muss den Umsatzbericht
+desselben Betriebs und Zeitraums treffen (`mart.betriebsbericht_gegenprobe`). Der Weg über
+`/finanzen/analytics/getReport?storeId=` lieferte zwei Monate lang leere Gerüste mit plausibler
+Größe — eine Antwort beweist nichts, ihre Summe schon.
+
 ### Momentaufnahmen — nur „jetzt", kein Backfill
 
 LINA **überschreibt** Stammdaten. Es gibt keine Preishistorie; `prices[].updated` verrät nur, wann
@@ -92,10 +136,10 @@ Margenbetrachtung, die sich nicht nachholen lässt.
 
 | | Warum |
 |---|---|
-| Betriebs-Reports (`getReport:*`, 72 Stück) | im Register als `aktiv: false`. Kosten 141 Aufrufe je Zeitraum statt einem. |
+| ~~Betriebs-Reports (`getReport:*`, 72 Stück)~~ | ~~im Register als `aktiv: false`. Kosten 141 Aufrufe je Zeitraum statt einem.~~ **Seit `0113` geladen**, siehe „Betriebsberichte" oben. Nicht geladen bleiben 38 (in 39 enthalten), 114, 81/82, 56, 70, 64, 87, 73/74, die Artikel-Schnitte 27–49 und die neun mit 500 ohne Rumpf |
 | Kassenjournal | ungeprüft, vermutlich HTML statt JSON, um Größenordnungen umfangreicher. **Fachlich seit 11.08.2026 gewollt** — der Personenbezug ist kein Ausschlussgrund mehr, siehe `entscheidungen.md`. Offen ist nur noch Format und Menge; das klärt ein lesender Aufruf. |
 | Personalberichte | im Browser verifiziert gesperrt. **Rechtefrage**, kein Verzicht — steht in `offene-punkte.md` bei Concept Family. |
-| Storno | wird bei Concept Family offenbar nicht genutzt. Begründung in `entscheidungen.md`. |
+| ~~Storno~~ | ~~wird bei Concept Family offenbar nicht genutzt. Begründung in `entscheidungen.md`.~~ **Widerlegt (KORREKTUR 7):** der Befund „nicht genutzt" kam vom falschen Endpunkt. Bericht 39 wird seit `0115` monatlich geladen (`core.storno_artikel_monat`) |
 
 ### Was aus LINA gar nicht kommt
 

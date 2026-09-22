@@ -4634,3 +4634,31 @@ Umsatz hat, ist ein Fehler und kein „keine Daten". So steht es als Anforderung
 
 **Nebenbefund:** Wilma Wunder Markt Mainz heißt in LINA `Gastronomie am Markt Mainz GmbH`.
 Eine Suche nach „Wilma" im Namen findet 13 von 14 Betrieben.
+
+## Drei Fallen beim Bau der Betriebsberichte, bevor sie Daten kosteten (22.09.2026)
+
+Keine davon hat Daten gekostet — alle drei sind beim Bau aufgefallen. Sie stehen hier, weil jede
+beim nächsten Umbau wiederkommen kann.
+
+**1. Eine Sicht hätte die Verkaufsstellen als zweiten Gesamtumsatz gezählt.**
+*Symptom (wäre gewesen):* `mart.hauptsparte_abdeckung.umsatz_gesamt` nach der ersten Nacht mit
+`0112` um die Verkaufsstellenumsätze zu hoch, `nicht_aufteilbar_pct` sprunghaft größer.
+*Ursache:* die Gesamtzeile wurde als `hauptsparte_key IS NULL` gelesen; seit `0112` gibt es auch
+Zeilen mit NULL-Hauptsparte und gesetzter Verkaufsstelle. *Verhindert durch:* `0112` filtert beide
+Schlüssel; vorher alle Sichten und Materialisierungen über `core.umsatzbericht_tag` im Katalog
+geprüft (`pg_views`/`pg_matviews`). **Regel:** wer eine neue Zeilenart in eine Tabelle mit
+NULL-als-Gesamtwert bringt, sucht vorher jeden Leser der NULL.
+
+**2. Das Blockdatum von 88 ist kein Tag.**
+*Symptom:* im Test „duplicate key … finanzweg_tag_2026_08_pkey" beim Tagesabruf, nachdem ein
+Monatsabruf geladen war. *Ursache:* 88 schreibt für einen Monatsaufruf `businessDate:
+"01.08.2026"`; die erste Fassung nahm das als Tag und buchte den Monat auf den Ersten
+(KORREKTUR 8). *Verhindert durch:* nur 97 liefert Tagesblöcke (`finanzwege(h, proTag)`), sonst
+kommt der Tag aus dem Posten; Test „88: das Blockdatum ist kein Tag".
+
+**3. Ein 504 hätte als Zugangssperre enden können.**
+*Ursache (wäre gewesen):* LINA beantwortet einen zu großen Betriebsbericht mit 504 und einer
+970-kB-HTML-Seite. Der Client prüfte eine Antwort erst auf Abwehrseiten-Stichwörter und dann auf
+den Statuscode — ein Treffer im Seitengerüst hätte eine 24-Stunden-Sperre des einzigen Zugangs
+ausgelöst. *Verhindert durch:* 504 wird vor der Abwehrprüfung gelesen (`src/lina/client.ts`), und
+der Worker teilt ein mehrtägiges Fenster statt es zu wiederholen (`importer.md`, „Betriebsberichte").

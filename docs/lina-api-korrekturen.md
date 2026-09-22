@@ -414,3 +414,36 @@ eigene Datenqualitätsfalle). Details, Werte und die Artikel×Finanzweg-Frage in
 (auch der geplante `for (store of stores) for (report of reports)`-Loop), muss auf
 `/intranet/storeanalytics/getReport` und `laden=` umgestellt werden, bevor er gebaut wird —
 sonst holt der Importer 141 × 72 × leere Antworten und meldet das als Erfolg (Regel 10).
+
+---
+
+## KORREKTUR 8 — 97 trägt die Finanzwege je Tag, und `businessDate` ist kein Tag (22.09.2026, beim Bau des Importers)
+
+Offline an den echten Rohantworten vom 22.09.2026 nachgerechnet (Wilma Wunder Düsseldorf,
+August 2026), kein zusätzlicher Aufruf gegen LINA.
+
+**Falsch war (Plan „Vollabzug", Abschnitt 3 und E1):** ~~Die Finanzwege je Tag gibt es nur über
+einen Tagesaufruf von 88 — „Klasse T", 152.840 Aufrufe Historie.~~
+
+**Richtig ist:** Der Tagesabschluss **97** liefert aus EINEM Monatsaufruf (`interval=3`) je Tag
+zwei Blöcke — Hauptsparte × Steuersatz **und die vollständige Finanzwegtabelle** im Format von
+88 (`Nummer`, `Finanzweg`, `Finanzgruppe`, `Umsatz`, `Anzahl`, mit denselben Abschnitten und
+Summenzeilen). Über die 31 Tage summiert treffen alle 34 Finanzwege den Monatsaufruf von 88 auf
+den Cent, die Anzahl genau — auch 3168, 3500, 3501, 3502. Die Hauptsparten-Blöcke summieren sich
+zu `balanceSumBrutto` (369.841,09). Damit kostet die Finanzwegtabelle je Betrieb-Tag 5.115 statt
+152.840 Aufrufe. Gemessen an EINEM Betrieb und EINEM Monat; der Importer lädt beide und
+vergleicht sie laufend (`mart.finanzweg_88_97_abgleich`). Ob 88 im Tagesraster entfallen kann,
+entscheidet Eugene (`offene-punkte.md`, `entscheidungen.md` 22.09.2026 Punkt 5).
+
+**Falsch war (stillschweigend angenommen):** ~~`table[].businessDate` nennt den Zeitraum des
+Blocks.~~
+
+**Richtig ist:** Bei 88 steht für einen Monatsaufruf (1.8.–31.8.) `businessDate: "01.08.2026"` —
+nur der erste Tag —, während 27, 55, 92 und 99 für denselben Zeitraum
+„01.08.2026 - 31.08.2026" schreiben und 97 je Block genau einen Tag. Wer das Blockdatum von 88
+als Tag nimmt, bucht einen Monat auf den Ersten (im Test als Schlüsselkollision aufgefallen).
+Der Importer nimmt den Tag deshalb nur bei 97 aus dem Block, sonst aus dem Posten oder aus einer
+Datumsspalte der Zeile.
+
+**Offen bleibt:** Ob die Leitung die Antwort doppelt JSON-kodiert, lässt sich aus den Dateien
+nicht sicher sagen — sie wurden teils als JSON-String gespeichert. Der Client packt beides aus.

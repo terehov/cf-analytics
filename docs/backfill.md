@@ -82,3 +82,24 @@ Reiht rückwärts ein, der jüngste Zeitraum zuerst. Fortschritt: `SELECT * FROM
 ## Noch zu messen
 
 Wie weit LINA tatsächlich zurückreicht, ist ungeklärt. Ein paar lesende Aufrufe (`getKennzahlen` für 2019/2020/2021, `getUmsatzbericht` für einen frühen Tag) klären das. Bis dahin ist `2018-01-01` eine Annahme — Zeiträume ohne Daten quittiert der Importer sauber als `keine_daten`, das schadet also nichts außer ein paar Aufrufen.
+
+## Betriebsberichte (seit `0113`, 22.09.2026)
+
+Ein eigener Backfill, ohne Befehl: `betriebsberichteNachfuellen()` reiht jede Nacht neueste zuerst
+ein, begrenzt durch `BETRIEBSBERICHT_JE_LAUF` (Vorgabe: das Tagesbudget) minus die noch offenen.
+Der Worker zieht sie verschränkt mit dem übrigen LINA-Verkehr und nur aus dem Budget, das das
+Tagesgeschäft nicht braucht (`importer.md`, „Betriebsberichte").
+
+**Umfang, gemessen am lokalen Klon (Umsatztage bis 12.08.2026):**
+
+| | Posten |
+|---|---|
+| 92, 88 (Tag) | je 153.363 |
+| 96, 86, 113 (Woche) | je 22.821 |
+| 15 Monatsberichte (97, 90, 108, 39, 99, 60, 61, 53, 57, 68, 69, 112, 71, 75, 76) | je 5.382 |
+| **zusammen** | **455.919** |
+
+Bei ~7.500 Betriebsbericht-Aufrufen je Nacht (10.500 Budget minus Tagesgeschäft, Ladenakte und
+Konzern-Historie) sind das rund **61 Nächte**. Ohne den Tagesabruf von 88 (siehe KORREKTUR 8 —
+97 trägt dieselben Zahlen) wären es 302.556 Posten, rund 40 Nächte. Die Schätzung gilt für den
+Takt der Produktion (~5,3 s); langsamer heißt länger, nicht dichter.
