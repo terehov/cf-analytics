@@ -1966,8 +1966,13 @@ nächste Nachtlauf nach dem Deploy.
   `SELECT vorlaeufig, count(*) FROM core.betriebsbericht_abruf WHERE endpunkt = 'getReport:97' AND zeitraum_bis >= current_date - 40 GROUP BY 1;`
   — erwartet eine vorläufige Zeile je Betrieb mit Umsatz, und
   `SELECT count(*) FROM sync.schema_abweichung WHERE endpunkt = 'getReport:97' AND tatsaechlich ? 'zeilen_ausserhalb';`
-  = 0 (liefert LINA für einen Teilmonat doch Tage außerhalb, stünde es hier). Offen ist auch, ob
-  LINA für den laufenden Monat überhaupt Blöcke bis zum Vortag führt oder erst später.
+  = 0 (liefert LINA für einen Teilmonat doch Tage außerhalb, stünde es hier). ~~Offen ist auch, ob
+  LINA für den laufenden Monat überhaupt Blöcke bis zum Vortag führt oder erst später.~~
+  **Gemessen am 23.09.2026 (ein lesender Aufruf im Browser):** 97 für Wilma Wunder Düsseldorf,
+  `von=1.9.2026&bis=22.9.2026&interval=3` → 200, 204.014 Byte, 44 Blöcke = zwei je Tag (Hauptsparten
+  und Finanzwege) vom 01.09. bis einschließlich 22.09. (dem Vortag), keiner außerhalb,
+  `balanceSumBrutto` 248.004,33. LINA führt den Vortag also schon am Folgetag. Die beiden Abfragen
+  oben bleiben die Abnahme in Produktion.
 * **86 ein Duplikat von 96?** Am 15.08. lieferte die Debitorenauswertung dieselben 519 Bons wie
   96. Ob sie bei Betrieben MIT Debitoren nur deren Bons führt, ist nicht gemessen. Kostet
   22.821 Aufrufe Historie.

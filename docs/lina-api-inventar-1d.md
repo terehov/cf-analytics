@@ -744,3 +744,11 @@ Was daraus folgt:
   erst ab Monatsende + 7 Tagen~~ seit `0120` jede Nacht für den laufenden Monat bis zum Vortag
   (vorläufig). **Ungemessen:** ob LINA einen Teilmonat (1.–Vortag) mit Blöcken bis zum Vortag
   beantwortet — alle Messungen hier sind abgeschlossene Monate oder einzelne Tage.
+
+### Nachtrag: 97 für einen Teilmonat (23.09.2026)
+
+Ein lesender Aufruf, Wilma Wunder Düsseldorf, `report=97&von=1.9.2026&bis=22.9.2026&interval=3`:
+200, 204.014 Byte, 44 Blöcke — je Tag ein Hauptsparten- und ein Finanzwegblock, vom 01.09. bis
+zum Vortag 22.09., keiner außerhalb des Zeitraums. Der Teilmonatsabruf aus Migration `0120`
+bekommt also, was er erwartet; ob die letzten Tage noch nachwachsen, zeigt erst der Vergleich mit
+dem reifen Monatsabruf.
