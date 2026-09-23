@@ -304,7 +304,11 @@ export const QUELLEN: readonly Quelle[] = [
     .map((b): Quelle => ({
       quelle: b.key, bezeichnung: `Betriebsbericht ${b.bericht}: ${b.zweck}`,
       system: 'lina', endpunkt: b.key,
-      kadenz_stunden: b.klasse === 'T' ? TAEGLICH : b.klasse === 'W' ? WOECHENTLICH : MONATLICH,
+      // Ein Bericht mit laufendem Monat (97, seit 0120) wird jede Nacht geholt
+      // und muss darum auch jede Nacht Zulauf haben — sonst fiele ein
+      // stehender Teilmonat erst nach fuenf Wochen auf.
+      kadenz_stunden: b.klasse === 'T' || b.laufenderMonat ? TAEGLICH
+        : b.klasse === 'W' ? WOECHENTLICH : MONATLICH,
       erwartet: config.BETRIEBSBERICHT_JE_LAUF > 0,
       fensterklasse: b.klasse,
       bemerkung: config.BETRIEBSBERICHT_JE_LAUF > 0 ? undefined

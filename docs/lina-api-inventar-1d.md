@@ -740,5 +740,7 @@ Was daraus folgt:
   von 97 gelegt.
 * **88 ist seit dem 23.09.2026 abgeschaltet** (Migration `0119`, `entscheidungen.md`). Ersparnis
   rund 153.000 Aufrufe Historie (am Klon 153.363 Posten) plus die laufenden Tagesaufrufe. Die
-  Finanzwege (Stamm, Nachlässe, Zahlarten) kommen nur noch aus 97 — und damit für einen Monat
-  erst ab Monatsende + 7 Tagen.
+  Finanzwege (Stamm, Nachlässe, Zahlarten) kommen nur noch aus 97 — ~~und damit für einen Monat
+  erst ab Monatsende + 7 Tagen~~ seit `0120` jede Nacht für den laufenden Monat bis zum Vortag
+  (vorläufig). **Ungemessen:** ob LINA einen Teilmonat (1.–Vortag) mit Blöcken bis zum Vortag
+  beantwortet — alle Messungen hier sind abgeschlossene Monate oder einzelne Tage.

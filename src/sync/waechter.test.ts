@@ -19,7 +19,7 @@ import { BETRIEBSBERICHTE, AKTIVE_BETRIEBSBERICHTE } from '../lina/betriebsberic
 import { LADENAKTE_ENDPUNKTE } from '../ladenakte/endpunkte'
 import { FN_ENDPUNKTE } from '../foodnotify/endpunkte'
 import { QUELLEN } from './quellen'
-import { GELADENE_BETRIEBSBERICHTE } from './betriebsbericht_laden'
+import { GELADENE_BETRIEBSBERICHTE, abrufVorlaeufig } from './betriebsbericht_laden'
 
 /**
  * Alle drei Register zusammen — LINA, Ladenakte und FoodNotify.
@@ -327,6 +327,28 @@ describe('Betriebsberichte', () => {
     expect(q?.bemerkung).toContain('97')
     expect(GELADENE_BETRIEBSBERICHTE.has('getReport:88')).toBe(true)
     expect(AKTIVE_BETRIEBSBERICHTE.some(b => b.bericht === 97)).toBe(true)
+  })
+
+  /**
+   * Der laufende Monat (0120): nur 97, nur ein Monatsbericht mit Tageszeilen —
+   * ein Monatsbericht ohne Tageszeilen haette keinen Tag, an dem „bis zum
+   * Vortag" endet. Und sein Zulauf wird taeglich erwartet, nicht monatlich.
+   */
+  test('laufender Monat: nur 97, Klasse M-Tag, taeglich erwartet', () => {
+    const mit = BETRIEBSBERICHTE.filter(b => b.laufenderMonat)
+    expect(mit.map(b => b.bericht)).toEqual([97])
+    for (const b of mit) expect(b.klasse).toBe('M-Tag')
+    expect(QUELLEN.find(q => q.endpunkt === 'getReport:97')?.kadenz_stunden).toBe(36)
+  })
+
+  test('vorläufig heißt: vor der Reife geholt (Ende weniger als 7 Tage vor dem Abruf)', () => {
+    expect(abrufVorlaeufig('2026-09-22', '2026-09-23', 7)).toBe(true)
+    expect(abrufVorlaeufig('2026-09-17', '2026-09-23', 7)).toBe(true)
+    expect(abrufVorlaeufig('2026-09-16', '2026-09-23', 7)).toBe(false)   // der reguläre Erstabruf
+    // Der Vormonat: vorlaeufig bis zum 06.09., am 07.09. (Monatsende + 7) endgueltig —
+    // derselbe Tag, an dem der Erstabruf ihn fuer reif hielte.
+    expect(abrufVorlaeufig('2026-08-31', '2026-09-06', 7)).toBe(true)
+    expect(abrufVorlaeufig('2026-08-31', '2026-09-07', 7)).toBe(false)
   })
 
   test('Parameter: Datum ohne fuehrende Null, reltime custom, das Intervall der Klasse', () => {

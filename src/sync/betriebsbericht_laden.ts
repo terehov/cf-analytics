@@ -26,6 +26,8 @@ import type { PoolClient } from 'pg'
 import * as bt from '../transform/betriebsbericht'
 import { betriebsbericht } from '../lina/betriebsberichte'
 import { log } from '../lib/log'
+import { config } from '../config'
+import { geschaeftstag } from '../lib/time'
 
 type Kontext = {
   key: string
@@ -34,6 +36,30 @@ type Kontext = {
   daten: unknown
   betriebEncId: string | null
   rawId: string
+  /** Geschäftstag des Abrufs — nur für Tests; sonst der heutige. */
+  heute?: string
+}
+
+/**
+ * Ist ein Abruf VORLÄUFIG? (0120, 23.09.2026)
+ *
+ * Ja, wenn sein Zeitraum zum Zeitpunkt des Abrufs noch nicht reif war: das
+ * Ende liegt weniger als BETRIEBSBERICHT_REIFE_TAGE vor dem Geschäftstag des
+ * Abrufs. LINA füllt einen Tag erst nach fünf bis sieben Tagen vollständig
+ * (0101) — die Zahlen der letzten Tage eines solchen Abrufs sind nicht
+ * endgültig. Der reguläre Erstabruf holt nie vor der Reife (bis <= heute −
+ * Reife) und ist deshalb nie vorläufig; vorläufig ist, was der Zweig
+ * „laufender Monat" holt (97 bis zum Vortag).
+ *
+ * Ein vorläufiger Abruf zählt nicht in der Gegenprobe (`befund =
+ * 'vorlaeufig'`), macht den Monat im Ladestand zu „teilweise" und wird von
+ * `betriebsberichteNachfuellen()` nachgezogen, bis er endgültig ist.
+ */
+export function abrufVorlaeufig(bis: string, heute: string,
+  reife: number = config.BETRIEBSBERICHT_REIFE_TAGE): boolean {
+  const grenze = new Date(`${heute}T00:00:00Z`)
+  grenze.setUTCDate(grenze.getUTCDate() - reife)
+  return bis > grenze.toISOString().slice(0, 10)
 }
 
 /** Spaltenpläne der Stufe B — je Bericht eine Tabelle, die Felder aus der Vermessung vom 22.09.2026. */
@@ -474,8 +500,24 @@ export async function betriebsberichtSchreiben(c: PoolClient, k: Kontext): Promi
         await abweichungMelden(c, k.key, { hinweis: '97 liefert je Tag einen eigenen Block (interval=3)' },
           { betrieb_key: betriebKey, von, bis, raw_id: rawId, zeilen_ohne_tag: ohneTag })
       }
+      /*
+       * NUR TAGE IM ANGEFRAGTEN ZEITRAUM (0120). Seit der Teilmonat jede
+       * Nacht geholt wird, ersetzt ein Abruf genau von..bis (DELETE+INSERT).
+       * Ein Block ausserhalb wuerde neben einem anderen Abruf stehen, den
+       * kein DELETE dieses Postens trifft — also doppelt. LINA liefert so
+       * etwas nicht (gemessen: 31 Tage auf 31 Tage); kaeme es doch, wird es
+       * gemeldet und nicht geschrieben.
+       */
+      const imFenster = (tag: string | null) => tag !== null && tag >= von && tag <= bis
+      const sparten = bt.tagesabschlussSparten(h)
+      const draussen = fw.filter(z => z.geschaeftstag !== null && !imFenster(z.geschaeftstag)).length
+        + sparten.filter(z => !imFenster(z.geschaeftstag)).length
+      if (draussen > 0) {
+        await abweichungMelden(c, k.key, { hinweis: '97 liefert nur Tage im angefragten Zeitraum' },
+          { betrieb_key: betriebKey, von, bis, raw_id: rawId, zeilen_ausserhalb: draussen })
+      }
       geschrieben += await finanzwegeSchreiben(c, k.key, 97, betriebKey, von, bis,
-        fw.filter(z => z.geschaeftstag !== null), rawId)
+        fw.filter(z => imFenster(z.geschaeftstag)), rawId)
       await c.query(
         `DELETE FROM core.tagesabschluss_tag
           WHERE betrieb_key = $1 AND geschaeftstag BETWEEN $2::date AND $3::date`,
@@ -483,7 +525,7 @@ export async function betriebsberichtSchreiben(c: PoolClient, k: Kontext): Promi
       geschrieben += await einfuegen(c, 'core.tagesabschluss_tag',
         { betrieb_key: betriebKey, raw_id: rawId },
         [['geschaeftstag', 'date'], ['hauptsparte', 'text'], ['steuersatz', 'text'], ['brutto', 'numeric']],
-        bt.tagesabschlussSparten(h))
+        sparten.filter(z => imFenster(z.geschaeftstag)))
       break
     }
 
@@ -555,18 +597,42 @@ export async function betriebsberichtSchreiben(c: PoolClient, k: Kontext): Promi
    * Die Gegenprobe-Zeile — IMMER, auch bei null Zeilen. Ein leerer Bericht
    * fuer einen Betrieb mit Umsatz ist genau der Fall, den sie finden soll.
    */
+  const vorlaeufig = abrufVorlaeufig(bis, k.heute ?? geschaeftstag(new Date()))
   await c.query(
     `INSERT INTO core.betriebsbericht_abruf AS a
        (endpunkt, bericht, betrieb_key, zeitraum_von, zeitraum_bis, n_bills,
-        balance_brutto, balance_netto, zeilen, hinweis, raw_id)
-     VALUES ($1, $2, $3, $4::date, $5::date, $6, $7, $8, $9, $10, $11)
+        balance_brutto, balance_netto, zeilen, hinweis, raw_id, vorlaeufig)
+     VALUES ($1, $2, $3, $4::date, $5::date, $6, $7, $8, $9, $10, $11, $12)
      ON CONFLICT (endpunkt, betrieb_key, zeitraum_von, zeitraum_bis) DO UPDATE SET
        n_bills = excluded.n_bills, balance_brutto = excluded.balance_brutto,
        balance_netto = excluded.balance_netto, zeilen = excluded.zeilen,
        hinweis = excluded.hinweis, raw_id = excluded.raw_id,
-       abrufe = a.abrufe + 1, zuletzt_abgerufen_am = now()`,
+       abrufe = a.abrufe + 1, zuletzt_abgerufen_am = now(),
+       vorlaeufig = excluded.vorlaeufig`,
     [k.key, bb.bericht, betriebKey, von, bis, h.nBills === null ? null : Math.round(h.nBills),
-     h.balanceBrutto, h.balanceNetto, geschrieben, h.hinweis, rawId])
+     h.balanceBrutto, h.balanceNetto, geschrieben, h.hinweis, rawId, vorlaeufig])
+
+  /*
+   * EIN ABRUF ERSETZT, WAS ER ENTHÄLT (0120). Der Lader hat oben die Daten
+   * von..bis des Betriebs geloescht und neu geschrieben. Eine Abrufzeile,
+   * deren Zeitraum ganz darin liegt, beschreibt damit Daten, die es nicht
+   * mehr gibt — sie geht mit. Anlass ist der Teilmonat von 97: jede Nacht
+   * 1.–Vortag, und ohne diesen Schritt stuenden nach einem Monat 30
+   * ueberlappende Abrufzeilen je Betrieb da, jede mit eigener Gegenprobe.
+   * So steht immer genau die juengste da, und der Vollmonat ersetzt sie.
+   */
+  await c.query(
+    `DELETE FROM core.betriebsbericht_abruf
+      WHERE endpunkt = $1 AND betrieb_key = $2
+        AND zeitraum_von >= $3::date AND zeitraum_bis <= $4::date
+        AND (zeitraum_von, zeitraum_bis) <> ($3::date, $4::date)`,
+    [k.key, betriebKey, von, bis])
+  await c.query(
+    `DELETE FROM core.bericht_hinweis
+      WHERE endpunkt = $1 AND betrieb_key = $2
+        AND zeitraum_von >= $3::date AND zeitraum_bis <= $4::date
+        AND (zeitraum_von, zeitraum_bis) <> ($3::date, $4::date)`,
+    [k.key, betriebKey, von, bis])
 
   // LINAs `errors`: ein Datenqualitaetskanal, kein technischer Fehler (1b §1.3).
   if (h.hinweis) {

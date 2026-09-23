@@ -1124,6 +1124,11 @@ eigene Entscheidung.
   Betriebsbericht abgeschaltet ist (`aktiv: false`, erstmals 88). Wird nicht wiederbelebt, zählt
   im Ladestand nicht als geladen (anders als `keine_daten`), steht nicht in
   `mart.posten_aufgegeben`.
+* Seit `0120`: `core.betriebsbericht_abruf.vorlaeufig` — der Abruf lag vor der Reife seines
+  Zeitraums (Ende weniger als `BETRIEBSBERICHT_REIFE_TAGE` vor dem Abruf), gesetzt vom Lader bei
+  jedem Abruf. Teilindex `WHERE vorlaeufig` (höchstens zwei Zeilen je Betrieb). Und: ein Abruf
+  **löscht jede Abrufzeile, deren Zeitraum er ganz enthält** — die Tabelle führt je Betrieb nur
+  noch die jüngste Teilmonatszeile, bis der Vollmonat sie ersetzt.
 * `sync.posten_holen(lauf, anbieter)` kennt `lina_br` und `lina_sonst` — die beiden Hälften der
   LINA-Spur, mit je einem Teilindex.
 * `warteschlange_betrieb_einheit`: `(endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis)` für

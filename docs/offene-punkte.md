@@ -1954,12 +1954,20 @@ nächste Nachtlauf nach dem Deploy.
   **Entschieden 23.09.2026: 88 ist abgeschaltet** (Migration `0119`), nach drei Stichproben statt
   einiger Wochen Abgleich — Düsseldorf August 2026, Markt Mainz 15.08.2026, Düsseldorf Januar
   2019, jede identisch (`entscheidungen.md`, 23.09.2026).
-* **Finanzwege des laufenden Monats (Folge aus `0119`).** Seit 88 abgeschaltet ist, kommen die
+* ~~**Finanzwege des laufenden Monats (Folge aus `0119`).** Seit 88 abgeschaltet ist, kommen die
   Finanzwege nur aus 97, einem Monatsbericht: Nachlasssummen und Zahlungsmix eines Monats stehen
   erst ab dem 7. des Folgemonats da, und so lange trägt der Rabattbericht (92) keine
   Finanzwegnummer. Möglich wäre, 97 zusätzlich für den laufenden Monat zu holen (ein Teilmonat,
   den der Erstabruf nach Monatsende ersetzt; ~62 Aufrufe je Nacht, ein neuer Einreihzweig). Nicht
-  gebaut — erst, wenn jemand die Monatssumme vor dem 7. braucht.
+  gebaut — erst, wenn jemand die Monatssumme vor dem 7. braucht.~~ **Gebaut am 23.09.2026**
+  (`0120`): 97 kommt jede Nacht bis zum Vortag, vorläufig; `importer.md`, „Der laufende Monat".
+* **Abnahme des laufenden Monats nach der ersten Nacht (`0120`).** Gegen die Attrappe und den
+  Klon getestet, nie gegen LINA. Nach dem Deploy nachsehen:
+  `SELECT vorlaeufig, count(*) FROM core.betriebsbericht_abruf WHERE endpunkt = 'getReport:97' AND zeitraum_bis >= current_date - 40 GROUP BY 1;`
+  — erwartet eine vorläufige Zeile je Betrieb mit Umsatz, und
+  `SELECT count(*) FROM sync.schema_abweichung WHERE endpunkt = 'getReport:97' AND tatsaechlich ? 'zeilen_ausserhalb';`
+  = 0 (liefert LINA für einen Teilmonat doch Tage außerhalb, stünde es hier). Offen ist auch, ob
+  LINA für den laufenden Monat überhaupt Blöcke bis zum Vortag führt oder erst später.
 * **86 ein Duplikat von 96?** Am 15.08. lieferte die Debitorenauswertung dieselben 519 Bons wie
   96. Ob sie bei Betrieben MIT Debitoren nur deren Bons führt, ist nicht gemessen. Kostet
   22.821 Aufrufe Historie.

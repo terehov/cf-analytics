@@ -349,8 +349,12 @@ lauf('Betriebsberichte mit Datenbank', () => {
     expect(await einheiten('getReport:96')).toEqual([
       { b: 'test-a', von: '2026-07-13', bis: '2026-07-19' },
     ])
+    // 97: der Juli regulär, dazu der laufende Monat bis zum Vortag (0120) —
+    // fuer beide Betriebe, die im August schon Umsatz hatten.
     expect(await einheiten('getReport:97')).toEqual([
       { b: 'test-a', von: '2026-07-01', bis: '2026-07-31' },
+      { b: 'test-a', von: '2026-08-01', bis: '2026-08-16' },
+      { b: 'test-b', von: '2026-08-01', bis: '2026-08-16' },
     ])
     // 88 ist abgeschaltet (0119): kein einziger Posten, obwohl er Klasse T ist.
     expect(await einheiten('getReport:88')).toEqual([])
@@ -403,7 +407,10 @@ lauf('Betriebsberichte mit Datenbank', () => {
       `SELECT endpunkt, zeitraum_von::text AS von, nachladen FROM sync.warteschlange
         WHERE betrieb_enc_id = 'test-b' ORDER BY endpunkt, zeitraum_von`)
     expect(l.filter(r => r.endpunkt === 'getReport:92').every(r => r.nachladen === false)).toBe(true)
-    expect(l.filter(r => r.endpunkt === 'getReport:97').every(r => r.nachladen === true)).toBe(true)
+    // Der reguläre Monatsabruf von 97 ist Nachladen; der laufende Monat bis
+    // zum Vortag (0120) ist Tagesgeschäft.
+    expect(l.filter(r => r.endpunkt === 'getReport:97').map(r => ({ von: r.von, nachladen: r.nachladen })))
+      .toEqual([{ von: '2026-08-01', nachladen: false }])
   })
 
   test('abgeschaltet: offene 88-Posten schliesst der Einreihweg, einen in Arbeit laesst er stehen', async () => {
@@ -446,6 +453,179 @@ lauf('Betriebsberichte mit Datenbank', () => {
     cfg.BETRIEBSBERICHT_JE_LAUF = 0
     expect(await betriebsberichteNachfuellen('2026-09-22')).toBe(0)
     cfg.BETRIEBSBERICHT_JE_LAUF = 100000
+  })
+
+  // -----------------------------------------------------------------------
+  // Der laufende Monat aus 97 (0120)
+  // -----------------------------------------------------------------------
+
+  /** 97-Fixture (August, Düsseldorf) auf von..bis geschnitten — wie LINA einen Teilmonat liefert. */
+  const antwort97 = (von: string, bis: string) => {
+    const a = structuredClone(fixture('report97-duesseldorf-2026-08.json').antwort)
+    const iso = (d: string) => d.split('.').reverse().join('-')
+    a.table = a.table.filter((b: any) => iso(b.businessDate) >= von && iso(b.businessDate) <= bis)
+    return a
+  }
+  /** Den Lader direkt, mit einem gesetzten Geschäftstag — sonst hinge „vorläufig" am Kalender. */
+  const schreibenMit = async (key: string, enc: string, von: string, bis: string, daten: unknown, heute: string) => {
+    const { betriebsberichtSchreiben } = await import('./betriebsbericht_laden')
+    await db.query('BEGIN')
+    try {
+      const n = await betriebsberichtSchreiben(db as any, { key, von, bis, daten, betriebEncId: enc, rawId: '0', heute })
+      await db.query('COMMIT')
+      return n
+    } catch (e) { await db.query('ROLLBACK'); throw e }
+  }
+
+  test('laufender Monat: der Teilmonat ist vorläufig, der nächste ersetzt ihn, der Vollmonat ersetzt beide', async () => {
+    const enc = 'test-b'
+    const bk = betrieb.get(enc)!
+    await db.query(`DELETE FROM core.betriebsbericht_abruf WHERE betrieb_key = $1`, [bk])
+    await db.query(`DELETE FROM core.finanzweg_tag WHERE betrieb_key = $1`, [bk])
+    await db.query(`DELETE FROM core.tagesabschluss_tag WHERE betrieb_key = $1`, [bk])
+    await db.query(`DELETE FROM core.umsatzbericht_tag WHERE betrieb_key = $1`, [bk])
+    // Umsatz fuer den ganzen August — sonst gaebe es nichts zu pruefen.
+    await db.query(`INSERT INTO core.umsatzbericht_tag (betrieb_key, geschaeftstag, umsatz_brutto, umsatz_netto, rechnungen)
+                    SELECT $1, d::date, 1000, 900, 50 FROM generate_series('2026-08-01'::date, '2026-08-31', '1 day') d`, [bk])
+    const stand = async () => (await db.query(
+      `SELECT (SELECT json_agg(json_build_object('von', zeitraum_von::text, 'bis', zeitraum_bis::text,
+                                                'vorlaeufig', vorlaeufig) ORDER BY zeitraum_bis)
+                 FROM core.betriebsbericht_abruf WHERE endpunkt = 'getReport:97' AND betrieb_key = $1) AS abrufe,
+              (SELECT count(DISTINCT geschaeftstag)::int FROM core.finanzweg_tag
+                WHERE bericht = 97 AND betrieb_key = $1) AS tage,
+              (SELECT count(*)::int FROM (SELECT geschaeftstag, finanzweg_nummer, abschnitt FROM mart.finanzweg_tag
+                WHERE betrieb_key = $1 GROUP BY 1, 2, 3 HAVING count(*) > 1) d) AS doppelt`, [bk])).rows[0]
+
+    // Nacht vom 21.08.: 1.–20., vorlaeufig (20.08. > 21.08. − 7).
+    await schreibenMit('getReport:97', enc, '2026-08-01', '2026-08-20', antwort97('2026-08-01', '2026-08-20'), '2026-08-21')
+    expect(await stand()).toEqual({ abrufe: [{ von: '2026-08-01', bis: '2026-08-20', vorlaeufig: true }], tage: 20, doppelt: 0 })
+    // Die Gegenprobe stellt einen vorlaeufigen Abruf nicht gegen den Umsatzbericht.
+    const gp = async () => (await db.query(
+      `SELECT befund, nachholen FROM mart.betriebsbericht_gegenprobe
+        WHERE endpunkt = 'getReport:97' AND betrieb_key = $1 ORDER BY zeitraum_bis`, [bk])).rows
+    expect(await gp()).toEqual([{ befund: 'vorlaeufig', nachholen: null }])
+    // Der Ladestand: der Monat ist teilweise, nie vollstaendig.
+    await db.query(`REFRESH MATERIALIZED VIEW mart.betriebsbericht_ladestand_basis`)
+    const ls = async () => (await db.query(
+      `SELECT zustand, betriebe_vorlaeufig FROM mart.betriebsbericht_ladestand_monat
+        WHERE endpunkt = 'getReport:97' AND monat = '2026-08-01'`)).rows[0]
+    expect(await ls()).toEqual({ zustand: 'teilweise', betriebe_vorlaeufig: 1 })
+
+    // Nacht vom 22.08.: 1.–21. ersetzt 1.–20. — eine Abrufzeile, keine Doppelzeile.
+    await schreibenMit('getReport:97', enc, '2026-08-01', '2026-08-21', antwort97('2026-08-01', '2026-08-21'), '2026-08-22')
+    expect(await stand()).toEqual({ abrufe: [{ von: '2026-08-01', bis: '2026-08-21', vorlaeufig: true }], tage: 21, doppelt: 0 })
+
+    // Nach der Reife: der Vollmonat ersetzt den Teilmonat und ist endgueltig.
+    await schreibenMit('getReport:97', enc, '2026-08-01', '2026-08-31', antwort97('2026-08-01', '2026-08-31'), '2026-09-08')
+    expect(await stand()).toEqual({ abrufe: [{ von: '2026-08-01', bis: '2026-08-31', vorlaeufig: false }], tage: 31, doppelt: 0 })
+    const { rows: [m] } = await db.query(
+      `SELECT string_agg(DISTINCT quelle_bericht::text, '+') AS quellen,
+              round(sum(betrag) FILTER (WHERE finanzweg_nummer = 3502), 2)::float AS b3502,
+              sum(anzahl_vorgaenge) FILTER (WHERE finanzweg_nummer = 3502)::int AS a3502
+         FROM mart.finanzweg_tag WHERE betrieb_key = $1`, [bk])
+    expect(m).toEqual({ quellen: '97', b3502: 4281.5, a3502: 600 })
+    const { rows: [sp] } = await db.query(
+      `SELECT round(sum(brutto), 2)::float AS s FROM core.tagesabschluss_tag WHERE betrieb_key = $1`, [bk])
+    expect(sp.s).toBe(369841.09)
+    expect((await gp()).map(g => g.befund)).not.toContain('vorlaeufig')
+    await db.query(`REFRESH MATERIALIZED VIEW mart.betriebsbericht_ladestand_basis`)
+    expect((await ls()).betriebe_vorlaeufig).toBe(0)
+  })
+
+  test('laufender Monat: ein Block ausserhalb des Zeitraums wird gemeldet, nicht geschrieben', async () => {
+    const enc = 'test-b'
+    const bk = betrieb.get(enc)!
+    // Die volle Antwort fuer einen Posten 1.–10.: nur zehn Tage landen in core.
+    await schreibenMit('getReport:97', enc, '2026-08-01', '2026-08-10', antwort97('2026-08-01', '2026-08-31'), '2026-09-08')
+    const { rows: [a] } = await db.query(
+      `SELECT count(DISTINCT geschaeftstag)::int AS tage, count(*)::int AS zeilen,
+              count(DISTINCT (geschaeftstag, finanzweg_nummer, abschnitt))::int AS eindeutig
+         FROM core.finanzweg_tag WHERE bericht = 97 AND betrieb_key = $1`, [bk])
+    // 1.–10. neu, 11.–31. aus dem Vollmonat davor — alles genau einmal.
+    expect(a.tage).toBe(31)
+    expect(a.zeilen).toBe(a.eindeutig)
+    const { rows: [w] } = await db.query(
+      `SELECT count(*)::int AS n FROM sync.schema_abweichung
+        WHERE endpunkt = 'getReport:97' AND tatsaechlich ? 'zeilen_ausserhalb'`)
+    expect(w.n).toBeGreaterThan(0)
+  })
+
+  test('Einreihen: laufender Monat am Monatsersten ist der ganze Vormonat, danach wird er nachgezogen, bis er endgueltig ist', async () => {
+    const { betriebsberichteNachfuellen } = await import('./nachfuellen')
+    await db.query(`TRUNCATE sync.warteschlange, core.umsatzbericht_tag, core.artikelverkauf_tag, core.betriebsbericht_abruf`)
+    cfg.BETRIEBSBERICHT_JE_LAUF = 100000
+    const a = betrieb.get('test-a')!
+    await db.query(`INSERT INTO core.umsatzbericht_tag (betrieb_key, geschaeftstag, umsatz_netto, rechnungen)
+                    VALUES ($1, '2026-08-30', 1000, 50)`, [a])
+    const posten97 = async () => (await db.query(
+      `SELECT zeitraum_von::text AS von, zeitraum_bis::text AS bis, nachladen, erledigt_am IS NULL AS offen
+         FROM sync.warteschlange WHERE endpunkt = 'getReport:97' ORDER BY posten_id`)).rows
+
+    // Heute = 01.09.: Vortag 31.08. → der ganze August, Tagesgeschaeft.
+    await betriebsberichteNachfuellen('2026-09-01')
+    expect(await posten97()).toEqual([{ von: '2026-08-01', bis: '2026-08-31', nachladen: false, offen: true }])
+    // Zweiter Lauf am selben Tag: nichts dazu.
+    await betriebsberichteNachfuellen('2026-09-01')
+    expect((await posten97()).length).toBe(1)
+
+    // Geladen (vorlaeufig), der Posten erledigt, einen Tag spaeter:
+    await db.query(`UPDATE sync.warteschlange SET erledigt_am = now() - interval '23 hours',
+                           erstellt_am = now() - interval '24 hours', ergebnis = 'ok'
+                     WHERE endpunkt = 'getReport:97'`)
+    await db.query(`INSERT INTO core.betriebsbericht_abruf
+                      (endpunkt, bericht, betrieb_key, zeitraum_von, zeitraum_bis, vorlaeufig,
+                       erstmals_abgerufen_am, zuletzt_abgerufen_am)
+                    VALUES ('getReport:97', 97, $1, '2026-08-01', '2026-08-31', true,
+                            now() - interval '23 hours', now() - interval '23 hours')`, [a])
+    // Heute = 02.09.: der vorlaeufige August wird nachgezogen (Schritt 0b).
+    await betriebsberichteNachfuellen('2026-09-02')
+    expect((await posten97()).filter(p => p.offen)).toEqual(
+      [{ von: '2026-08-01', bis: '2026-08-31', nachladen: false, offen: true }])
+
+    // Scheitert der Nachzug (keine_daten nach dem letzten Laden), wird nicht endlos wiederholt.
+    await db.query(`UPDATE sync.warteschlange SET erledigt_am = now(), ergebnis = 'keine_daten',
+                           erstellt_am = now() - interval '21 hours'
+                     WHERE endpunkt = 'getReport:97' AND erledigt_am IS NULL`)
+    await betriebsberichteNachfuellen('2026-09-03')
+    expect((await posten97()).filter(p => p.offen)).toEqual([])
+
+    // Endgueltig geladen: kein Nachzug, und der Erstabruf nach der Reife reiht
+    // nichts dazu (derselbe Schluessel hatte schon Posten).
+    await db.query(`UPDATE core.betriebsbericht_abruf SET vorlaeufig = false, zuletzt_abgerufen_am = now()
+                     WHERE endpunkt = 'getReport:97'`)
+    await betriebsberichteNachfuellen('2026-09-09')
+    expect((await posten97()).filter(p => p.offen)).toEqual([])
+
+    // Der Nachlauf kommt trotzdem, einmal: der letzte Abruf lag vor Ende + 14.
+    await db.query(`UPDATE core.betriebsbericht_abruf SET abrufe = 8,
+                           zuletzt_abgerufen_am = '2026-09-08 06:00+02'
+                     WHERE endpunkt = 'getReport:97'`)
+    await betriebsberichteNachfuellen('2026-09-15')
+    expect((await posten97()).filter(p => p.offen)).toEqual(
+      [{ von: '2026-08-01', bis: '2026-08-31', nachladen: true, offen: true }])
+  })
+
+  test('Worker: der Teilmonat kommt aus der Attrappe geschnitten und wird vom Vollmonat ersetzt', async () => {
+    const { workerLauf } = await import('./worker')
+    await db.query(`TRUNCATE sync.warteschlange, sync.aufgabe, sync.lauf`)
+    const bk = betrieb.get('test-duesseldorf')!
+    await db.query(`DELETE FROM core.betriebsbericht_abruf WHERE betrieb_key = $1 AND endpunkt = 'getReport:97'`, [bk])
+    await db.query(`DELETE FROM core.finanzweg_tag WHERE betrieb_key = $1 AND bericht = 97`, [bk])
+    cfg.TAGESBUDGET = 10000
+    await db.query(`INSERT INTO sync.warteschlange (endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis, prioritaet, nachladen)
+                    VALUES ('getReport:97', 'test-duesseldorf', '2026-08-01', '2026-08-20', 85, false)`)
+    await workerLauf('manuell')
+    const tage = async () => (await db.query(
+      `SELECT count(DISTINCT geschaeftstag)::int AS n FROM core.finanzweg_tag WHERE bericht = 97 AND betrieb_key = $1`, [bk])).rows[0].n
+    expect(await tage()).toBe(20)
+    await db.query(`INSERT INTO sync.warteschlange (endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis, prioritaet, nachladen)
+                    VALUES ('getReport:97', 'test-duesseldorf', '2026-08-01', '2026-08-31', 85, true)`)
+    await workerLauf('manuell')
+    expect(await tage()).toBe(31)
+    const { rows } = await db.query(
+      `SELECT zeitraum_von::text AS von, zeitraum_bis::text AS bis FROM core.betriebsbericht_abruf
+        WHERE betrieb_key = $1 AND endpunkt = 'getReport:97'`, [bk])
+    expect(rows).toEqual([{ von: '2026-08-01', bis: '2026-08-31' }])
   })
 
   // -----------------------------------------------------------------------

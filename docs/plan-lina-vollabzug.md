@@ -193,7 +193,7 @@ Tabelle unten mit beiden Zahlen.
 | **92** | Rabattbericht | T | **152.840** | 62 (+62 Nachlauf) | Die einzige Quelle für Nachlass × Artikel. Aktionen halten sich nicht an Monatsgrenzen (`plan-lina-kassendaten.md`, §4.5) |
 | ~~**88**~~ | ~~Finanzwege~~ | ~~T~~ | ~~**152.840**~~ | ~~62 (+62)~~ | ~~Trägt die Gegenprobe (`balanceSumBrutto` trifft `getUmsatzbericht` auf den Cent) und die Finanzweg-Stammdaten, die es sonst nirgends gibt~~ **Abgeschaltet 23.09.2026** (Migration `0119`): 97 liefert dieselbe Finanzwegtabelle je Tag aus einem Monatsaufruf — drei Stichproben identisch, zuletzt Januar 2019 (`lina-api-inventar-1d.md`, Nachtrag 23.09.2026). Stamm und Gegenprobe trägt jetzt 97 |
 | **96** | Rechnungsausgangsbuch | **W** (gemessen 22.09.2026) | **≈ 22.000** | 62/Woche ≈ 9 | Bonebene, so weit sie erreichbar ist: Bongröße, Zahlartenmix je Bon, Gutschriftenquote |
-| **97** | Tagesabschluss | M-Tag (gesichert) | **5.115** | 62/Monat ≈ 2 | Tageszeilen aus einem Monatsaufruf — der billigste Tagesbericht im Katalog. ~~Gegenprobe der Zahlarten~~ **Seit 23.09.2026 die einzige Quelle der Finanzwege** (Stamm, Zahlarten, Nachlässe) |
+| **97** | Tagesabschluss | M-Tag (gesichert) | **5.115** | ~~62/Monat ≈ 2~~ ≈ 62 je Nacht, sieben Nächte im Monat ≈ 124 (laufender Monat, `0120`) | Tageszeilen aus einem Monatsaufruf — der billigste Tagesbericht im Katalog. ~~Gegenprobe der Zahlarten~~ **Seit 23.09.2026 die einzige Quelle der Finanzwege** (Stamm, Zahlarten, Nachlässe) |
 | **F15** | `getUmsatzbericht`+`verkaufsstellen` | Konzern | 7 × Kalendertage ≈ **22.000** | **7** | Konzernebene: ein Aufruf deckt alle 141 Betriebe |
 
 **Summe Stufe A, Historie: rund 180.000 Aufrufe** (96 als W, ohne 88). ~~332.800 mit 88 im Tagesraster~~ (bis 23.09.2026), ~~315.910 (mit 96 als M-Tag) bzw. 463.635 (mit 96 als T)~~.
@@ -612,11 +612,24 @@ Wörtlich: *„Wenn du dir sicher bist, dass 97 die Werte genauso liefert, dann 
 |---|---|---|
 | **E1 für 88** | **88 wird nicht mehr geholt**, weder laufend noch als Historie. Die Finanzwege kommen nur aus **97** (Tagesabschluss, M-Tag, `interval=3`). Nachweis: drei Stichproben, jede identisch — Düsseldorf August 2026 (34/34), Markt Mainz 15.08.2026 (25/25), Düsseldorf Januar 2019 (22/22, `balanceSumBrutto` 315.456,17) | Migration `0119`: `aktiv: false` im Register, `sync.quelle` `erwartet = false` mit Begründung, offene 88-Posten mit dem neuen Ergebnis `abgeschaltet` geschlossen. Lader und Rohantworten bleiben (Regel 4); `mart.finanzweg_tag` nimmt 97 vor 88, die schon geladenen 88-Tage bleiben Rückfall. **Ersparnis ≈ 153.000 Aufrufe Historie** (am Klon 153.363) plus 62 (+62) je Nacht |
 
-**Der Preis:** 97 ist ein Monatsbericht. Die Finanzwege (Nachlässe, Zahlarten) eines Monats stehen
+~~**Der Preis:** 97 ist ein Monatsbericht. Die Finanzwege (Nachlässe, Zahlarten) eines Monats stehen
 erst ab Monatsende + 7 Tagen da, nicht mehr sieben Tage nach jedem Tag; ebenso lange trägt der
 Rabattbericht (92) keine Finanzwegnummer. Wer eine Aktion im laufenden Monat auswerten will,
-nimmt dafür 92 über `aktion`/`prozentsatz` — der braucht die Nummer nicht. Begründung in
+nimmt dafür 92 über `aktion`/`prozentsatz` — der braucht die Nummer nicht.~~ Begründung in
 `entscheidungen.md`, 23.09.2026.
+
+**Der laufende Monat aus 97 (`0120`, ebenfalls 23.09.2026).** Der Preis ist noch am selben Tag
+entfallen: 97 wird jede Nacht zusätzlich für den laufenden Monat bis zum Vortag geholt,
+**vorläufig**, und der Vormonat wird bis Monatsende + 7 nachgezogen, dann ist er endgültig.
+
+| | Aufrufe | wann |
+|---|---|---|
+| Teilmonat 1.–Vortag | ≈ 62 je Nacht (Betriebe mit Umsatz im Monat) | jede Nacht, Tagesgeschäft (Phase A) |
+| Vormonat im Nachzug | ≈ 62 je Nacht | nur in den ersten sieben Tagen eines Monats |
+| **zusammen** | **≈ 62, an sieben Tagen im Monat ≈ 124 je Nacht** | rund 2.300 im Monat — gegen ≈ 3.800 (62 + 62 Nachlauf je Nacht), die 88 im Tagesraster kostete |
+
+Der Erstabruf nach Monatsende + 7 entfällt dabei für 97 (derselbe Schlüssel ist schon geholt), der
+Nachlauf nach Monatsende + 14 bleibt.
 
 ### Ergebnis der Vermessung vom 22.09.2026
 

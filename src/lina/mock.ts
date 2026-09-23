@@ -149,7 +149,7 @@ const bbFixture = (name: string) =>
  * gesetzt — sonst lägen die Bons außerhalb des Fensters, und der Lader lehnte
  * sie zu Recht ab.
  */
-function betriebsberichtAntwort(report: number, laden: string, von: string): unknown | null {
+function betriebsberichtAntwort(report: number, laden: string, von: string, bis: string = von): unknown | null {
   if (report === 92) {
     const f = bbFixture('report92-wilma-2026-08.json') as { betriebe: { encId: string; antwort: unknown }[] }
     return (f.betriebe.find(b => b.encId === laden) ?? f.betriebe[1]!).antwort
@@ -165,6 +165,21 @@ function betriebsberichtAntwort(report: number, laden: string, von: string): unk
     antwort = st.berichte[`getReport:${report}`]?.antwort
   }
   if (!antwort) return null
+  /*
+   * 97 liefert je Tag einen Block mit seinem Datum — und nur Tage im
+   * angefragten Zeitraum (0120: der laufende Monat wird als Teilmonat
+   * 1.–Vortag geholt). Die Fixture ist der ganze August; hier wird sie auf
+   * von..bis geschnitten, wie LINA es täte.
+   */
+  if (report === 97) {
+    const neu = structuredClone(antwort)
+    const iso = (d: string) => d.split('.').reverse().join('-')
+    neu.table = neu.table.filter((b: any) => {
+      const tag = iso(String(b.businessDate ?? ''))
+      return tag >= von && tag <= bis
+    })
+    return neu
+  }
   if (report === 96 || report === 86 || report === 113) {
     const neu = structuredClone(antwort)
     for (const b of neu.table) {
@@ -431,7 +446,7 @@ export function mockStarten(opt: MockOptionen = {}) {
           return new Response(`<!DOCTYPE html><html lang="de-DE"><head><title>504</title></head><body>${'x'.repeat(5000)}</body></html>`,
             { status: 504, headers: { 'content-type': 'text/html; charset=UTF-8' } })
         }
-        const antwort = betriebsberichtAntwort(report, laden, von)
+        const antwort = betriebsberichtAntwort(report, laden, von, bis)
         if (!antwort) return new Response('', { status: 500 })
         const text = JSON.stringify(antwort)
         return new Response(opt2.doppeltKodiert === false ? text : JSON.stringify(text),

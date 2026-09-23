@@ -80,7 +80,7 @@ Umsatzbericht (`core.betrieb.enc_id`), alle 141 Betriebe mit einer Sitzung. Regi
 | 92 Rabattbericht | Tag | `core.rabatt_artikel_tag` | Nachlass je Finanzweg (Hausbon/Rabatt) und Artikel**name** |
 | ~~88 Finanzwege~~ | ~~Tag~~ | `core.finanzweg_tag` (`bericht = 88`), `core.finanzweg`, `core.finanzweg_stand` | ~~Umsatz und Vorgänge je Finanzweg~~ **Abgeschaltet 23.09.2026** (`0119`): dieselbe Tabelle kommt aus 97. Was bis dahin geladen war, bleibt in `core` und ist Rückfall in `mart.finanzweg_tag` |
 | 96 Rechnungsausgangsbuch | Woche | `core.bon` | eine Zeile je Bon: Art, Artikelzahl, Zahlarten, Brutto, Debitor |
-| 97 Tagesabschluss | Monat, Tageszeilen | `core.tagesabschluss_tag`, `core.finanzweg_tag` (`bericht = 97`), `core.finanzweg`, `core.finanzweg_stand` | je Tag Hauptsparte × Steuersatz **und** die volle Finanzwegtabelle — **seit 23.09.2026 die einzige laufende Quelle der Finanzwege**. Ein Monat steht erst ab Monatsende + 7 Tagen da |
+| 97 Tagesabschluss | Monat, Tageszeilen | `core.tagesabschluss_tag`, `core.finanzweg_tag` (`bericht = 97`), `core.finanzweg`, `core.finanzweg_stand` | je Tag Hauptsparte × Steuersatz **und** die volle Finanzwegtabelle — **seit 23.09.2026 die einzige laufende Quelle der Finanzwege**. ~~Ein Monat steht erst ab Monatsende + 7 Tagen da~~ Der laufende Monat kommt jede Nacht bis zum Vortag, **vorläufig** (`core.betriebsbericht_abruf.vorlaeufig`, `0120`); endgültig ab Monatsende + 7 |
 | 39, 90, 108, 99, 60, 61, 53, 57, 68, 69, 112, 71, 75, 76 | Monat | je eine Tabelle, `datenmodell.md` | Stufe B |
 | 86, 113 | Woche | `core.debitor_bon`, `core.tischtransfer_bon` | Bons mit Debitor- bzw. Tischfeldern |
 
@@ -108,9 +108,11 @@ Umsatzbericht (`core.betrieb.enc_id`), alle 141 Betriebe mit einer Sitzung. Regi
 * 88 und 97 liefern dieselbe Finanzwegzahl aus zwei Berichten — wer summiert, wählt einen
   (`mart.finanzweg_tag` tut es: 97, sonst 88). Nachgewiesen an drei Stichproben bis Januar 2019
   (`lina-api-inventar-1d.md`, Nachtrag 23.09.2026); deshalb ist 88 seitdem abgeschaltet.
-* Die Finanzwege eines Monats (Nachlasssummen, Zahlungsmix) fehlen bis etwa zum 7. des
-  Folgemonats — 97 ist ein Monatsbericht. Das ist nicht null, sondern noch nicht geladen
-  (`mart.betriebsbericht_ladestand`, Bericht 97).
+* ~~Die Finanzwege eines Monats (Nachlasssummen, Zahlungsmix) fehlen bis etwa zum 7. des
+  Folgemonats — 97 ist ein Monatsbericht.~~ Seit `0120` kommen die Finanzwege des laufenden
+  Monats jede Nacht bis zum Vortag — **vorläufig**: die letzten fünf bis sieben Tage füllt LINA
+  noch, eine Monatssumme ist bis Monatsende + 7 ein Zwischenstand
+  (`mart.betriebsbericht_ladestand_monat`: „teilweise", `betriebe_vorlaeufig`).
 
 **Die Gegenprobe:** jeder Abruf trägt LINAs `balanceSumBrutto`, und die muss den Umsatzbericht
 desselben Betriebs und Zeitraums treffen (`mart.betriebsbericht_gegenprobe`). Der Weg über
@@ -150,7 +152,8 @@ Größe — eine Antwort beweist nichts, ihre Summe schon.
 * **Aktion** über `aktion` (Finanzwegname ohne Prozentzahl und Apostroph) und `prozentsatz` —
   in `mart.finanzweg`, `mart.artikel_nachlass_*`, `mart.finanzweg_*`, `mart.nachlass_monat`.
   Die Nummer ist im Rabattbericht NULL, solange 97 (bis 23.09.2026 auch 88) für den Tag fehlt —
-  für den laufenden Monat also bis etwa zum 7. des Folgemonats.
+  ~~für den laufenden Monat also bis etwa zum 7. des Folgemonats~~ seit `0120` höchstens für die
+  jüngsten Tage (97 kommt jede Nacht bis zum Vortag).
 * **Artikel** aus 92: `artikel` ist der Kassenname, `artikel_key`/`artikelnummer` nur, wo der Name
   eindeutig einem im selben Betrieb und Zeitraum **verkauften** Artikel entspricht. Wer
   `mart.artikel_nachlass_*` mit `mart.artikel_monat` verbindet, tut es über `artikel_key` und

@@ -56,6 +56,14 @@ export type Betriebsbericht = Endpunkt & {
   stufe: 'A' | 'B'
   /** Wohin der Lader schreibt — für Wächter, Doku und die nächste Person. */
   tabellen: readonly string[]
+  /**
+   * Nur Monatsberichte mit Tageszeilen (M-Tag): jede Nacht ZUSÄTZLICH den
+   * laufenden Monat bis zum Vortag holen, vorläufig (seit 0120, 23.09.2026).
+   * Einziger Nutzer ist 97 — seit 88 abgeschaltet ist, kämen die Finanzwege
+   * sonst erst nach Monatsende + Reife. Einreihweg:
+   * `betriebsberichteNachfuellen()`, Schritt 0.
+   */
+  laufenderMonat: boolean
 }
 
 const BERICHT_PFAD = '/intranet/storeanalytics/getReport'
@@ -77,7 +85,7 @@ const SCHRITT: Record<Fensterklasse, Endpunkt['schrittweite']> = {
 type Eintrag = {
   bericht: number; klasse: Fensterklasse; intervall?: 3 | 8; stufe: 'A' | 'B'
   zweck: string; felder: readonly string[]; dynamisch?: RegExp
-  tabellen: readonly string[]; aktiv?: boolean; hinweis?: string
+  tabellen: readonly string[]; aktiv?: boolean; hinweis?: string; laufenderMonat?: boolean
 }
 
 /** Die Steuersatzspalten (19%_Mwst, 0%_Gutschein_older, NEUE_STEUER_AB_15, …). */
@@ -103,6 +111,7 @@ function bb(e: Eintrag): Betriebsbericht {
     dynamisch: e.dynamisch,
     stufe: e.stufe,
     tabellen: e.tabellen,
+    laufenderMonat: e.laufenderMonat ?? false,
   }
 }
 
@@ -147,15 +156,15 @@ export const BETRIEBSBERICHTE: Betriebsbericht[] = [
     tabellen: ['core.bon'],
   }),
   bb({
-    bericht: 97, klasse: 'M-Tag', intervall: 3, stufe: 'A',
+    bericht: 97, klasse: 'M-Tag', intervall: 3, stufe: 'A', laufenderMonat: true,
     zweck: 'Tagesabschluss: je Tag Hauptsparte × Steuersatz und die volle Finanzwegtabelle',
     felder: ['Hauptsparte', 'Nummer', 'Finanzweg', 'Finanzgruppe', 'Umsatz', 'Anzahl'],
     dynamisch: STEUERSPALTEN,
     tabellen: ['core.tagesabschluss_tag', 'core.finanzweg_tag'],
     hinweis: 'possibleIntervals fuehrt nur 3 "pro Tag". Je Tag zwei Bloecke: Hauptsparte × '
            + 'Steuersatz (brutto) und die Finanzwegtabelle wie in Bericht 88. Seit 23.09.2026 die '
-           + 'EINZIGE laufende Quelle der Finanzwege (88 abgeschaltet) — ein Monat steht damit '
-           + 'erst ab Monatsende + REIFE_TAGE da.',
+           + 'EINZIGE laufende Quelle der Finanzwege (88 abgeschaltet). Der laufende Monat kommt '
+           + 'jede Nacht bis zum Vortag, VORLAEUFIG; endgueltig erst ab Tag + REIFE_TAGE (0120).',
   }),
 
   // --- Stufe B: monatlich, soweit nicht anders gemessen ---------------------

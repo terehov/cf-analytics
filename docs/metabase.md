@@ -1465,7 +1465,7 @@ nächste Schritt (M5 in `plan-lina-vollabzug.md`). Alle stehen im Katalog mit K�
 
 | Sicht | Körnung | Erwartung |
 |---|---|---|
-| `mart.betriebsbericht_gegenprobe` | Bericht × Betrieb × Abrufzeitraum | `befund` ok; `nachholen` sagt, was der Lauf damit tut — seit `0119` auch `abgeschaltet` (Bericht wird nicht mehr geholt, etwa 88) |
+| `mart.betriebsbericht_gegenprobe` | Bericht × Betrieb × Abrufzeitraum | `befund` ok; `nachholen` sagt, was der Lauf damit tut — seit `0119` auch `abgeschaltet` (Bericht wird nicht mehr geholt, etwa 88). Seit `0120` `befund = 'vorlaeufig'`: vor der Reife geholt, nicht geprüft |
 | `mart.betriebsbericht_luecke` | Bericht × Betrieb × Tag (9–60 Tage alt) | **leer** ab der zweiten Nacht |
 | `mart.finanzweg_88_97_abgleich` | Betrieb × Tag × Finanzweg, wo beide Quellen da sind | kein `weicht ab`. Wächst seit 23.09.2026 nicht mehr (88 abgeschaltet, `0119`) |
 | `mart.bericht_hinweis` | Bericht × Betrieb × Zeitraum × Text | LINAs eigene Hinweise, kein Importfehler |
@@ -1513,7 +1513,7 @@ Jede fachliche Sicht trägt `betrieb_key`, `enc_id`, `betrieb`, `marke` und am *
 | `mart.finanzweg_namen` | Finanzweg × Monat × Name | `core.finanzweg_stand` | `namen_im_monat > 1`: die Nummer taugt nicht als Schlüssel |
 | `mart.artikel_nachlass_tag` | Betrieb × Abrufzeitraum (ein Tag) × Finanzweg × Artikel | 92 | `menge` = Artikel auf Nachlass-Bons, **nicht** Verkauf; nur Zeilen mit Artikelnamen |
 | `mart.artikel_nachlass_monat` | Betrieb × Monat × Finanzweg × Artikel | 92 | die Glücksrad-Tabelle |
-| `mart.finanzweg_tag` | Betrieb × Tag × Finanzweg | 97, sonst 88 (88 abgeschaltet 23.09.2026, nur noch Rückfall für schon geladene Tage) | **je Betrieb und Tag eine Quelle** (`quelle_bericht`); ein Monat steht erst ab Monatsende + 7 Tagen da |
+| `mart.finanzweg_tag` | Betrieb × Tag × Finanzweg | 97, sonst 88 (88 abgeschaltet 23.09.2026, nur noch Rückfall für schon geladene Tage) | **je Betrieb und Tag eine Quelle** (`quelle_bericht`); ~~ein Monat steht erst ab Monatsende + 7 Tagen da~~ der laufende Monat jede Nacht bis zum Vortag, vorläufig (`0120`) |
 | `mart.finanzweg_monat` | Betrieb × Monat × Finanzweg | über `…_basis` (materialisiert) | so frisch wie der letzte Lauf |
 | `mart.nachlass_monat` | Betrieb × Monat × Finanzgruppe × Aktion × Prozentsatz | 97 (vorher 88/97) | die zwei 25-%-Wege in **einer** Zeile; vollständiger Betrag |
 | `mart.zahlart_monat` | Betrieb × Monat × Zahlart | 97 (vorher 88/97) | Summe aller Zeilen = Bruttoumsatz; Trinkgeld/Rückgeld negativ |
@@ -1535,7 +1535,7 @@ Jede fachliche Sicht trägt `betrieb_key`, `enc_id`, `betrieb`, `marke` und am *
 | `mart.verkaufsstelle_tag` | Betrieb × Tag × Verkaufsstelle | Konzern-Umsatzbericht (`0112`) | gilt erst, wenn `mart.verkaufsstelle_abdeckung` „ok" sagt |
 | `mart.zeitzone_hauptsparte_monat`, `…_feinsparte_monat` | Betrieb × Monat × Sparte × Zeitzone | 76, 75 | ohne Kopfzeilen; nie beide zusammen summieren |
 | `mart.unbar_zahlung_monat` | Betrieb × Monat × Betriebsstelle × Zahlart | 99 | `zahlbetrag` positiv |
-| `mart.betriebsbericht_ladestand_monat` | Bericht × Monat | Abrufe + Warteschlange | über `…_basis` (materialisiert); **ohne 88** seit `0119` — für die Finanzwege gilt der Stand von 97 |
+| `mart.betriebsbericht_ladestand_monat` | Bericht × Monat | Abrufe + Warteschlange | über `…_basis` (materialisiert); **ohne 88** seit `0119` — für die Finanzwege gilt der Stand von 97. Seit `0120` `betriebe_vorlaeufig` am Ende: ein Monat mit vorläufigem Abruf ist „teilweise", live gelesen |
 | `mart.betriebsbericht_ladestand` | ein Bericht | darüber | `aussage` hängt der MCP-Server an jede Kassenantwort |
 
 **Jede core-Tabelle aus `0112`–`0115` hat damit mindestens eine lesbare Sicht** (Vollständigkeitsliste

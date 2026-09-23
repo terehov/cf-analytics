@@ -1628,16 +1628,52 @@ Erstmals an 88 durchgespielt. Was `aktiv: false` bewirkt und was nicht:
   gerade dann sagen muss, was fehlt. Wer einen weiteren Bericht abschaltet, dessen Sichten aus
   einer anderen Quelle lesen, ergänzt dort die Bedingung.
 
+### Der laufende Monat aus 97 (seit `0120`, 23.09.2026)
+
+Seit 88 abgeschaltet ist, kommen die Finanzwege nur aus 97, einem Monatsbericht. Der Erstabruf holt
+einen Monat erst ab Monatsende + `BETRIEBSBERICHT_REIFE_TAGE` (7) — bis zu fünf Wochen hinter dem
+Tag. Deshalb holt der Einreihweg 97 (Registerflag `laufenderMonat`) jede Nacht zusätzlich:
+
+* **Schritt 0a — Teilmonat.** Zeitraum Monatserster bis `heute − 1` (`heute` ist der Geschäftstag
+  des Laufs, `heute − 1` der letzte abgeschlossene), je Betrieb mit Umsatz darin (Umsatzbericht
+  ODER Artikelverkauf), `nachladen = false` → Phase A. Einmal je Schlüssel. Am Monatsersten ist
+  `heute − 1` der Monatsletzte: der Posten ist dann der ganze Vormonat.
+* **Schritt 0b — vorläufige nachziehen.** Jede Abrufzeile mit `vorlaeufig = true`, die kein offener
+  Posten enthält, wird jede Nacht neu eingereiht, bis ein Abruf ab Monatsende + 7 sie endgültig
+  macht. Nicht erneut, wenn seit dem letzten Laden schon ein Posten dafür lief (`keine_daten`,
+  Fehler — sonst liefe ein leerer Monat 60 Nächte) oder in den letzten 20 Stunden einer
+  angelegt wurde.
+* **Der Lader** (`src/sync/betriebsbericht_laden.ts`) setzt `core.betriebsbericht_abruf.vorlaeufig`
+  (`abrufVorlaeufig()`: Ende weniger als 7 Tage vor dem Geschäftstag des Abrufs), schreibt bei 97
+  nur Blöcke im angefragten Zeitraum (andere → `sync.schema_abweichung`, `zeilen_ausserhalb`) und
+  **löscht jede Abrufzeile und jeden LINA-Hinweis, deren Zeitraum der neue Abruf ganz enthält**.
+  Die Daten löscht er ohnehin je von..bis. So ersetzt 1.–21. den Teilmonat 1.–20., der Vollmonat
+  beide, und `mart.finanzweg_tag` sieht jeden Tag genau einmal.
+* **Die Prüfsichten** sehen es: `mart.betriebsbericht_gegenprobe.befund = 'vorlaeufig'` (nicht
+  gegen den Umsatzbericht gestellt, kein Nachholen), `mart.betriebsbericht_ladestand_monat`
+  „teilweise" mit `betriebe_vorlaeufig`, live gelesen statt aus der Materialisierung.
+  `mart.betriebsbericht_luecke` fragt 97 ohnehin erst ab Monatsende + 9.
+* **Erstabruf und Nachlauf:** der Erstabruf reiht einen Vormonat, der über 0a schon geholt wurde,
+  nicht noch einmal ein (derselbe Schlüssel hatte einen Posten) — 0b macht ihn endgültig. Der
+  Nachlauf fragt seit `0120` nach dem **letzten** Abruf vor Ende + 14 statt nach „genau einem";
+  sonst bekäme ein siebenmal vorläufig geholter Monat nie seinen Nachlauf.
+* **Zulauf:** `sync.quelle` erwartet 97 täglich (36 h), nicht mehr monatlich.
+
+Kosten: ≈ 62 Aufrufe je Nacht, in den ersten sieben Tagen eines Monats ≈ 124. Tests:
+„laufender Monat: …" und „Einreihen: laufender Monat am Monatsersten …" in
+`src/sync/betriebsbericht.test.ts`, die Grenze von `abrufVorlaeufig()` in `src/sync/waechter.test.ts`.
+
 ### Der Einreihweg: `betriebsberichteNachfuellen()` (`src/sync/nachfuellen.ts`)
 
 Der **einzige** Schreiber von `betrieb_enc_id` außer dem Fensterteilen im Worker (der Wächtertest
-prüft das am Quelltext). Drei Quellen, in dieser Reihenfolge:
+prüft das am Quelltext). ~~Drei~~ Fünf Quellen, in dieser Reihenfolge — 0a und 0b (laufender
+Monat, vorläufige nachziehen) siehe oben, seit `0120`:
 
 1. **Gegenprobe nachholen** — `mart.betriebsbericht_gegenprobe.nachholen = 'faellig'`: LINAs
    Summe traf den Umsatzbericht nicht, der letzte Abruf ist über eine Woche her, weniger als
    dreimal nachgeholt, Zeitraum jünger als 60 Tage. Priorität 50, `nachgeholt + 1`.
-2. **Nachlauf** — ein Zeitraum, dessen erster Abruf vor Ende + `BETRIEBSBERICHT_NACHLAUF_TAGE`
-   (14) lag, wird einmal neu geholt. Das ist das Nachzügler-Fenster der Betriebsberichte; für
+2. **Nachlauf** — ein Zeitraum, dessen ~~erster~~ **letzter** (seit `0120`) Abruf vor Ende +
+   `BETRIEBSBERICHT_NACHLAUF_TAGE` (14) lag, wird einmal neu geholt. Das ist das Nachzügler-Fenster der Betriebsberichte; für
    den Backfill fällt es weg.
 3. **Erstabruf** — Monat für Monat rückwärts bis `HISTORIE_AB`. Treiber sind Betrieb-Tage mit
    Umsatz aus **Umsatzbericht ODER Artikelverkauf** (die Vereinigung, Plan 5.2). Daraus je

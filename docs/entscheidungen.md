@@ -3725,12 +3725,66 @@ geladenen 88-Tage bleiben Rückfall, eine Doppelzählung entsteht nicht; ein Tes
 `quelle_bericht = 97` und 4.281,50 € / 600 Vorgänge für 50 % Glücksrad) und
 `mart.finanzweg_88_97_abgleich` (vergleicht weiter, was beide haben; wächst nicht mehr).
 
-**Der Preis, und warum er tragbar ist.** 97 ist ein Monatsbericht (Klasse M-Tag). Die Finanzwege
+**Der Preis, und warum er tragbar ist.** ~~97 ist ein Monatsbericht (Klasse M-Tag). Die Finanzwege
 eines Monats stehen damit erst ab Monatsende + `BETRIEBSBERICHT_REIFE_TAGE` (7) da, nicht mehr
 sieben Tage nach jedem Tag; so lange trägt auch der Rabattbericht (92) keine Finanzwegnummer.
 Für die Glücksrad-Frage ändert das nichts — sie läuft über 92 und `aktion`/`prozentsatz`, nicht
 über die Nummer. Wer die Nachlass**summe** oder den Zahlungsmix des laufenden Monats braucht,
 wartet bis zum 7. des Folgemonats. **Nicht mitentschieden:** 97 zusätzlich für den laufenden
 Monat zu holen (ein Teilmonat, der beim Nachlauf ersetzt wird) — das wäre ein neuer Einreihzweig
-und steht in `offene-punkte.md`.
+und steht in `offene-punkte.md`.~~ **Noch am selben Tag gebaut** (`0120`, Abschnitt „Der laufende
+Monat aus 97" unten): der Preis entfällt, die Finanzwege kommen jede Nacht bis zum Vortag.
+
+## 23.09.2026 — Der laufende Monat aus 97: jede Nacht bis zum Vortag, vorläufig (Migration `0120`)
+
+**Anlass.** Mit 88 abgeschaltet (`0119`) kamen die Finanzwege nur noch aus 97, einem Monatsbericht
+— und damit erst ab Monatsende + 7 Tagen, bis zu fünf Wochen hinter dem Tag. Auftrag des
+Koordinators nach Eugenes Entscheidung: 97 jede Nacht zusätzlich für den laufenden Monat bis
+gestern holen, als Tagesgeschäft.
+
+**Fünf Entscheidungen im Bau:**
+
+1. **Der Zeitraum ist „Monatserster bis Vortag", und der Vortag ist `heute − 1`.** `heute` ist der
+   Geschäftstag des Laufs (um 05:02 noch der gestrige Kalendertag, der Geschäftstag endet um
+   08:00); `heute − 1` ist der letzte abgeschlossene. Am Monatsersten ist der Vortag der
+   Monatsletzte — dann ist der Posten der **ganze Vormonat**, mit genau dem Schlüssel des späteren
+   Erstabrufs. Das ist Absicht: es gibt keinen Sonderfall „erste Tage des Monats".
+2. **„Vorläufig" ist eine Spalte, keine Zeitrechnung in jeder Sicht.**
+   `core.betriebsbericht_abruf.vorlaeufig` setzt der Lader: Ende des Zeitraums weniger als
+   `BETRIEBSBERICHT_REIFE_TAGE` vor dem Geschäftstag des Abrufs (`abrufVorlaeufig()`). Die
+   Gegenprobe prüft einen vorläufigen Abruf nicht (`befund = 'vorlaeufig'`), der Ladestand macht
+   den Monat zu „teilweise". **Verworfen:** die Vorläufigkeit in jeder Sicht aus
+   `zuletzt_abgerufen_am` gegen `zeitraum_bis` abzuleiten — der Geschäftstag beginnt um 08:00,
+   der Lauf um 05:02, und jede Sicht hätte diese Grenze selbst richtig treffen müssen. Ein
+   Merker in `sync.warteschlange.parameter` wäre an LINA mitgeschickt worden (der Worker reicht
+   `parameter` an Konzern-Endpunkte weiter).
+3. **Ein Abruf ersetzt, was er enthält — auch die Abrufzeile.** Der Lader löschte schon immer die
+   Daten von..bis des Betriebs vor dem Schreiben. Neu löscht er auch jede Abrufzeile (und jeden
+   LINA-Hinweis), deren Zeitraum ganz im neuen liegt. Ohne das stünden nach einem Monat 30
+   überlappende Teilmonatszeilen je Betrieb da, jede mit eigener Gegenprobe. Zusätzlich schreibt
+   97 nur Tage im angefragten Zeitraum; ein Block außerhalb wird gemeldet, nicht geschrieben —
+   sonst stünde er neben einem Abruf, den kein DELETE dieses Postens trifft.
+4. **Der Vormonat wird nachgezogen, bis er endgültig ist — nicht vom Erstabruf.** Der Erstabruf
+   fragt „gab es für genau diesen Zeitraum je einen Posten?" und sieht den Posten vom
+   Monatsersten; er reiht also nichts ein. Stattdessen holt Schritt 0b jede vorläufige Abrufzeile
+   jede Nacht neu, bis der Abruf nach der Reife (Monatsende + 7) sie endgültig macht — derselbe
+   Tag, an dem der Erstabruf sie für reif hielte. **Verworfen:** den Erstabruf Posten ignorieren
+   zu lassen, die vor der Reife angelegt wurden — dieselbe 05:02/08:00-Grenze, und ein Vormonat,
+   dessen Nachzug ausfällt, stünde für immer vorläufig. Ein Nachzug, der nach dem letzten Laden
+   schon einmal lief (`keine_daten`, Fehler), wird nicht wiederholt; sonst liefe ein leerer Monat
+   60 Nächte lang.
+5. **Der Nachlauf fragt nach dem letzten Abruf, nicht nach genau einem.** Die Bedingung war
+   „`abrufe = 1` und der erste vor Ende + 14". Ein Monat, den 0a/0b sieben Mal vorläufig geholt
+   haben, bekäme damit nie seinen Nachlauf am Tag 14. Jetzt: „der **letzte** Abruf lag vor
+   Ende + 14" — für jeden bisherigen Fall dieselbe Bedingung.
+
+**Kosten:** je Nacht so viele Aufrufe wie Betriebe mit Umsatz im laufenden Monat (rund 62), in den
+ersten sieben Tagen eines Monats das Doppelte (Vormonat im Nachzug). Tagesgeschäft
+(`nachladen = false`, Phase A) — die Zahlen sollen in der Nacht in den Auswertungen stehen, nicht
+nach dem Backfill. `sync.quelle` erwartet 97 deshalb täglich (36 h) statt monatlich.
+
+**Was „vorläufig" für den Leser heißt:** die letzten fünf bis sieben Tage eines Teilmonats können
+noch wachsen, weil LINA sie noch füllt (0101). Eine Monatssumme des laufenden Monats ist ein
+Zwischenstand; `mart.betriebsbericht_ladestand_monat` sagt „teilweise" und nennt
+`betriebe_vorlaeufig`.
 

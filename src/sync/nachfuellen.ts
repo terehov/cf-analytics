@@ -272,18 +272,40 @@ export async function historieNachziehen(): Promise<number> {
  * Worker liest sie, und bis zum 22.09.2026 setzte sie kein einziger INSERT
  * (Waechter-Befund 13.08.2026). Hier wird sie gesetzt — sonst nirgends.
  *
- * DREI QUELLEN FUER POSTEN, in dieser Reihenfolge:
+ * FUENF QUELLEN FUER POSTEN, in dieser Reihenfolge:
  *
+ *   0a. LAUFENDER MONAT (0120, 23.09.2026) — nur Berichte mit
+ *      `laufenderMonat` (heute: 97). Jede Nacht der Zeitraum vom Monatsersten
+ *      bis zum Vortag (`heute - 1`, der letzte abgeschlossene Geschaeftstag),
+ *      fuer jeden Betrieb mit Umsatz in diesem Zeitraum. Tagesgeschaeft
+ *      (`nachladen = false`), rund 62 Aufrufe je Nacht. Der Abruf ist
+ *      VORLAEUFIG (`abrufVorlaeufig()`), und der naechste ersetzt ihn: der
+ *      Lader loescht von..bis und die enthaltenen Abrufzeilen. Am Monatsersten
+ *      ist der Vortag der Monatsletzte — dann ist dieser Posten der ganze
+ *      Vormonat, mit genau dem Schluessel des spaeteren Erstabrufs.
+ *   0b. VORLAEUFIGE NACHZIEHEN — jede vorlaeufige Abrufzeile, die kein offener
+ *      Posten enthaelt, wird jede Nacht neu geholt, bis ein Abruf nach der
+ *      Reife sie endgueltig macht. So wird der Vormonat bis Monatsende + 7
+ *      jede Nacht aufgefrischt, und der Abruf an diesem Tag ist endgueltig —
+ *      derselbe Tag, an dem der Erstabruf ihn fuer reif hielte — ohne dass
+ *      der Erstabruf ihn kennen muss (der sieht einen Posten mit demselben
+ *      Schluessel und reiht nichts ein; das ist hier richtig). Nicht erneut,
+ *      wenn seit dem letzten Laden schon ein Posten dafuer lief (keine_daten,
+ *      Fehler) oder in den letzten 20 Stunden einer angelegt wurde.
  *   1. GEGENPROBE (`mart.betriebsbericht_gegenprobe`, nachholen = 'faellig'):
  *      LINAs Summe traf den Umsatzbericht nicht. Neu eingereiht mit Nacharbeit-
  *      Prioritaet, hoechstens dreimal, fruehestens eine Woche nach dem letzten
  *      Abruf, nur fuer die letzten 60 Tage — wie die Nulltage aus 0100. Kein
  *      Fehler im Posten, der in Minuten wiederholt wuerde: ein zu frueh
  *      geholter Tag wird in Minuten nicht voller.
- *   2. NACHLAUF: ein Zeitraum, dessen erster Abruf vor Ende + NACHLAUF_TAGE
- *      lag, wird danach genau einmal neu geholt — das Nachzuegler-Fenster der
- *      Betriebsberichte. Fuer den Backfill faellt das weg (sein erster Abruf
- *      liegt ohnehin Monate nach dem Zeitraum).
+ *   2. NACHLAUF: ein Zeitraum, dessen LETZTER (bis 0120: erster) Abruf vor Ende +
+ *      NACHLAUF_TAGE lag, wird danach genau einmal neu geholt — das
+ *      Nachzuegler-Fenster der Betriebsberichte. Fuer den Backfill faellt das
+ *      weg (sein erster Abruf liegt ohnehin Monate nach dem Zeitraum). Bis
+ *      0120 hiess die Bedingung „genau ein Abruf, und der vor Ende + N"; ein
+ *      Monat, der ueber 0a/0b sieben Mal vorlaeufig geholt wurde, bekaeme
+ *      damit nie seinen Nachlauf. „Der letzte Abruf lag vor Ende + N" ist fuer
+ *      den bisherigen Fall dieselbe Bedingung.
  *   3. ERSTABRUF, getrieben von Betrieb-Tagen MIT UMSATZ — und zwar der
  *      VEREINIGUNG aus Umsatzbericht und Artikelverkauf (Plan 5.2, die Falle
  *      darin: ein Tag, den der Umsatzbericht nicht kennt, wuerde sonst nie
@@ -322,7 +344,7 @@ export async function betriebsberichteNachfuellen(
     })
     return 0
   }
-  let gegenprobe = 0, nachlauf = 0, erst = 0
+  let gegenprobe = 0, nachlauf = 0, erst = 0, laufenderMonat = 0, vorlaeufig = 0
 
   /*
    * TAGESGESCHÄFT ODER NACHLADEN (0116, Entscheidung 23.09.2026). Laufend
@@ -338,6 +360,78 @@ export async function betriebsberichteNachfuellen(
   const laufendAbDatum = new Date(`${heute}T00:00:00Z`)
   laufendAbDatum.setUTCDate(laufendAbDatum.getUTCDate() - config.BETRIEBSBERICHT_LAUFEND_TAGE)
   const laufendAb = laufendAbDatum.toISOString().slice(0, 10)
+
+  // 0a. Laufender Monat bis zum Vortag, vorlaeufig
+  const monatKeys = AKTIVE_BETRIEBSBERICHTE.filter(b => b.laufenderMonat).map(b => b.key)
+  const vortagD = new Date(`${heute}T00:00:00Z`)
+  vortagD.setUTCDate(vortagD.getUTCDate() - 1)
+  const vortag = vortagD.toISOString().slice(0, 10)
+  const monatsErster = `${vortag.slice(0, 7)}-01`
+  if (monatKeys.length > 0) {
+    // Einmal je Schluessel, wie der Erstabruf: laeuft der Sync zweimal an
+    // einem Geschaeftstag, bleibt es bei einem Abruf; und ein keine_daten
+    // wird nicht jede Stunde wiederholt.
+    const r = await query<{ posten_id: string }>(
+      `WITH tage AS (
+         SELECT u.betrieb_key
+           FROM core.umsatzbericht_tag u
+          WHERE u.geschaeftstag BETWEEN $2::date AND $3::date
+            AND u.hauptsparte_key IS NULL AND u.verkaufsstelle_key IS NULL
+            AND (coalesce(u.umsatz_netto, 0) <> 0 OR coalesce(u.rechnungen, 0) > 0)
+         UNION
+         SELECT a.betrieb_key
+           FROM core.artikelverkauf_tag a
+          WHERE a.geschaeftstag BETWEEN $2::date AND $3::date
+            AND (coalesce(a.umsatz_netto, 0) <> 0 OR coalesce(a.menge, 0) <> 0)
+       )
+       INSERT INTO sync.warteschlange (endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis, prioritaet, nachladen)
+       SELECT e.key, b.enc_id, $2::date, $3::date, $5, false
+         FROM (SELECT DISTINCT betrieb_key FROM tage) t
+         JOIN core.betrieb b ON b.betrieb_key = t.betrieb_key
+        CROSS JOIN unnest($1::text[]) AS e(key)
+        WHERE b.enc_id IS NOT NULL
+          AND NOT EXISTS (
+              SELECT 1 FROM sync.warteschlange w
+               WHERE w.endpunkt = e.key AND w.betrieb_enc_id = b.enc_id
+                 AND w.zeitraum_von = $2::date AND w.zeitraum_bis = $3::date)
+        ORDER BY b.enc_id, e.key
+        LIMIT $4
+       RETURNING posten_id`,
+      [monatKeys, monatsErster, vortag, uebrig, PRIORITAET.betriebsbericht])
+    laufenderMonat = r.length
+    uebrig -= laufenderMonat
+  }
+
+  // 0b. Vorlaeufige Abrufe nachziehen, bis sie endgueltig sind
+  if (uebrig > 0) {
+    const r = await query<{ posten_id: string }>(
+      `INSERT INTO sync.warteschlange (endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis, prioritaet, nachladen)
+       SELECT a.endpunkt, b.enc_id, a.zeitraum_von, a.zeitraum_bis, $3, false
+         FROM core.betriebsbericht_abruf a
+         JOIN core.betrieb b ON b.betrieb_key = a.betrieb_key
+        WHERE a.vorlaeufig
+          AND a.endpunkt = ANY($1::text[])
+          AND a.zeitraum_bis >= $4::date - 60
+          AND b.enc_id IS NOT NULL
+          AND NOT EXISTS (
+              SELECT 1 FROM sync.warteschlange w
+               WHERE w.endpunkt = a.endpunkt AND w.betrieb_enc_id = b.enc_id
+                 AND (
+                      -- ein offener Posten, der den Zeitraum enthaelt (0a von heute)
+                      (w.erledigt_am IS NULL
+                       AND w.zeitraum_von <= a.zeitraum_von AND w.zeitraum_bis >= a.zeitraum_bis)
+                   OR (w.zeitraum_von = a.zeitraum_von AND w.zeitraum_bis = a.zeitraum_bis
+                       -- seit dem letzten Laden schon versucht, oder heute schon angelegt
+                       AND (w.erstellt_am > a.zuletzt_abgerufen_am
+                            OR w.erstellt_am > now() - interval '20 hours'))))
+        ORDER BY a.zeitraum_bis DESC, a.endpunkt, b.enc_id
+        LIMIT $2
+       ON CONFLICT DO NOTHING
+       RETURNING posten_id`,
+      [keys, uebrig, PRIORITAET.betriebsbericht, heute])
+    vorlaeufig = r.length
+    uebrig -= vorlaeufig
+  }
 
   // 1. Gegenprobe nachholen
   const g = await query<{ endpunkt: string }>(
@@ -373,10 +467,12 @@ export async function betriebsberichteNachfuellen(
          FROM core.betriebsbericht_abruf a
          JOIN core.betrieb b ON b.betrieb_key = a.betrieb_key
         WHERE a.endpunkt = ANY($1::text[])
-          AND a.abrufe = 1
+          AND NOT a.vorlaeufig
           AND a.zeitraum_bis >= $5::date - 60
           AND a.zeitraum_bis + $2::int <= $5::date
-          AND a.erstmals_abgerufen_am < (a.zeitraum_bis + $2::int)::timestamptz
+          -- Der LETZTE Abruf lag vor Ende + N (0120; vorher: genau einer, und
+          -- der erste davor — fuer diesen Fall dieselbe Bedingung).
+          AND a.zuletzt_abgerufen_am < (a.zeitraum_bis + $2::int)::timestamptz
         ORDER BY a.zeitraum_bis DESC, a.endpunkt
         LIMIT $3
        ON CONFLICT DO NOTHING
@@ -445,9 +541,10 @@ export async function betriebsberichteNachfuellen(
     monat.setUTCMonth(monat.getUTCMonth() - 1)
   }
 
-  const n = gegenprobe + nachlauf + erst
+  const n = laufenderMonat + vorlaeufig + gegenprobe + nachlauf + erst
   if (n > 0) {
     log.info('betriebsberichte eingereiht', {
+      laufender_monat: laufenderMonat, vorlaeufig_nachgezogen: vorlaeufig,
       gegenprobe, nachlauf, erstabruf: erst, bis_monat: monat.toISOString().slice(0, 7),
       grenze, sicht: 'mart.backfill_fortschritt',
     })
