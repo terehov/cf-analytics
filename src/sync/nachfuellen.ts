@@ -38,7 +38,7 @@ import { log } from '../lib/log'
 import { AKTIVE_ENDPUNKTE, istMomentaufnahme, einreihPrioritaet, PRIORITAET } from '../lina/endpunkte'
 import { geschaeftstag } from '../lib/time'
 import { istLadenakte } from '../ladenakte/endpunkte'
-import { AKTIVE_BETRIEBSBERICHTE } from '../lina/betriebsberichte'
+import { AKTIVE_BETRIEBSBERICHTE, BETRIEBSBERICHTE } from '../lina/betriebsberichte'
 import { endpunkteZusichern } from './waechter'
 import { quellenSpiegeln } from './quellen'
 
@@ -307,6 +307,7 @@ export async function historieNachziehen(): Promise<number> {
 export async function betriebsberichteNachfuellen(
   heute: string = geschaeftstag(new Date()),
 ): Promise<number> {
+  await abgeschalteteBetriebsberichteSchliessen()
   const grenze = config.BETRIEBSBERICHT_JE_LAUF
   if (grenze === 0 || AKTIVE_BETRIEBSBERICHTE.length === 0) return 0
   const keys = AKTIVE_BETRIEBSBERICHTE.map(b => b.key)
@@ -452,6 +453,44 @@ export async function betriebsberichteNachfuellen(
     })
   }
   return n
+}
+
+/**
+ * Offene Posten abgeschalteter Betriebsberichte schliessen (0119, 23.09.2026).
+ *
+ * ANLASS. Bericht 88 wurde abgeschaltet (`aktiv: false`), die Finanzwege
+ * kommen nur noch aus 97. `aktiv: false` verhindert das Einreihen — nicht
+ * aber, dass ein schon eingereihter Posten gezogen wird: der Worker findet
+ * den Endpunkt ueber das Register, und das behaelt den Eintrag, weil der
+ * Lader alte Rohantworten weiter verarbeiten muss (harte Regel 4). Die
+ * Migration 0119 schliesst die offenen 88-Posten einmal; dieser Schritt
+ * haelt es so fuer jeden Posten, der danach noch auftaucht — etwa einen, der
+ * beim Deploy `in_arbeit` stand und eine Stunde spaeter freigegeben wird.
+ * Wer kuenftig einen Betriebsbericht abschaltet, braucht dafuer keine
+ * Migration mehr.
+ *
+ * `ergebnis = 'abgeschaltet'` und nicht `aufgegeben`: ein aufgegebener Posten
+ * wird wiederbelebt und steht in `mart.posten_aufgegeben` — beides waere hier
+ * falsch. Nicht angefasst werden Posten in Arbeit: den schliesst der Worker
+ * selbst, und ein zweiter Schreiber auf derselben Zeile waere ein Wettlauf.
+ * Wirft nicht nach oben ab — der Aufrufer faengt, wie alle Nachfuellschritte.
+ */
+export async function abgeschalteteBetriebsberichteSchliessen(): Promise<number> {
+  const aus = BETRIEBSBERICHTE.filter(b => !b.aktiv).map(b => b.key)
+  if (aus.length === 0) return 0
+  const r = await query<{ endpunkt: string }>(
+    `UPDATE sync.warteschlange
+        SET erledigt_am = now(), ergebnis = 'abgeschaltet'
+      WHERE endpunkt = ANY($1::text[])
+        AND erledigt_am IS NULL AND in_arbeit_seit IS NULL
+     RETURNING endpunkt`,
+    [aus])
+  if (r.length > 0) {
+    const jeEndpunkt: Record<string, number> = {}
+    for (const z of r) jeEndpunkt[z.endpunkt] = (jeEndpunkt[z.endpunkt] ?? 0) + 1
+    log.info('posten abgeschalteter betriebsberichte geschlossen', { jeEndpunkt })
+  }
+  return r.length
 }
 
 /**

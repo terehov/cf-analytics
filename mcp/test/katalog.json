@@ -279,7 +279,7 @@
    "koernung": "Betrieb × Abrufzeitraum (ein Tag) × Finanzweg × Artikel — Nachlassmenge aus dem Rabattbericht 92",
    "thema": "aktion",
    "summen_erlaubt": true,
-   "kommentar": "Koernung: Betrieb × Abrufzeitraum × Finanzweg × Artikel aus dem Rabattbericht (92). Im\nRegelbetrieb ist der Abrufzeitraum EIN TAG (tage = 1). Ein Mehrtagesabruf (tage > 1) steht nur\nda, wo es fuer diesen Betrieb im Zeitraum keinen Tagesabruf gibt. Fuer einen Zeitraum von..bis\nalso filtern: geschaeftstag >= von AND zeitraum_bis <= bis (und geschaeftstag <= bis, damit\nPostgres nur die betroffenen Monate liest).\n\nmenge ist die Zahl der ARTIKEL auf Bons, auf die dieser Nachlass gebucht wurde — NICHT die\nVerkaufsmenge und NICHT die Zahl der Nachlass-Vorgaenge. Der Nachlass gilt fuer den ganzen Bon:\nim August 2026 trugen 327 verschiedene Artikel einen Gluecksrad-Nachlass, auch Getraenke.\nnachlass_brutto/-netto sind der GEWAEHRTE Nachlass, positiv (LINA fuehrt ihn negativ).\n\nNur Zeilen MIT Artikelnamen: 28 von 8.533 Zeilen im August 2026 trugen keinen Namen, wohl aber\neinen Betrag — die Gluecksrad-Auswertung vom 22.09.2026 zaehlt sie nicht mit, diese Sicht auch\nnicht. Den vollstaendigen Nachlassbetrag je Finanzweg fuehrt mart.finanzweg_tag (88/97).\n\nEine Aktion buendelt man ueber aktion und prozentsatz, nie ueber finanzweg_nummer: zwei Wege\nheissen \"25 % Gluecksrad\" (3501, 3168), und die Nummer ist NULL, solange 88/97 fuer den Tag\nfehlt. artikel_key/artikelnummer sind ueber den NAMEN zugeordnet (92 liefert keine Nummer),\nnur bei genau einem Treffer im selben Betrieb und Zeitraum; die Luecken zeigt\nmart.rabatt_artikel_unaufgeloest.",
+   "kommentar": "Koernung: Betrieb × Abrufzeitraum × Finanzweg × Artikel aus dem Rabattbericht (92). Im\nRegelbetrieb ist der Abrufzeitraum EIN TAG (tage = 1). Ein Mehrtagesabruf (tage > 1) steht nur\nda, wo es fuer diesen Betrieb im Zeitraum keinen Tagesabruf gibt. Fuer einen Zeitraum von..bis\nalso filtern: geschaeftstag >= von AND zeitraum_bis <= bis (und geschaeftstag <= bis, damit\nPostgres nur die betroffenen Monate liest).\n\nmenge ist die Zahl der ARTIKEL auf Bons, auf die dieser Nachlass gebucht wurde — NICHT die\nVerkaufsmenge und NICHT die Zahl der Nachlass-Vorgaenge. Der Nachlass gilt fuer den ganzen Bon:\nim August 2026 trugen 327 verschiedene Artikel einen Gluecksrad-Nachlass, auch Getraenke.\nnachlass_brutto/-netto sind der GEWAEHRTE Nachlass, positiv (LINA fuehrt ihn negativ).\n\nNur Zeilen MIT Artikelnamen: 28 von 8.533 Zeilen im August 2026 trugen keinen Namen, wohl aber\neinen Betrag — die Gluecksrad-Auswertung vom 22.09.2026 zaehlt sie nicht mit, diese Sicht auch\nnicht. Den vollstaendigen Nachlassbetrag je Finanzweg fuehrt mart.finanzweg_tag (aus 97).\n\nEine Aktion buendelt man ueber aktion und prozentsatz, nie ueber finanzweg_nummer: zwei Wege\nheissen \"25 % Gluecksrad\" (3501, 3168), und die Nummer ist NULL, solange der Tagesabschluss (97)\nfuer den Tag fehlt — seit 88 abgeschaltet ist (23.09.2026), also fuer den laufenden Monat bis etwa\nzum 7. des Folgemonats. artikel_key/artikelnummer sind ueber den NAMEN zugeordnet (92 liefert\nkeine Nummer), nur bei genau einem Treffer im selben Betrieb und Zeitraum; die Luecken zeigt\nmart.rabatt_artikel_unaufgeloest.",
    "spalten": [
     "geschaeftstag",
     "zeitraum_bis",
@@ -819,7 +819,7 @@
    "koernung": "Betriebsbericht × Betrieb × Abrufzeitraum — Gegenprobe gegen den Umsatzbericht",
    "thema": "import",
    "summen_erlaubt": null,
-   "kommentar": "Koernung: Betriebsbericht × Betrieb × Abrufzeitraum. Trifft LINAs eigene Summe\n(balanceSumBrutto) den Konzern-Umsatzbericht desselben Betriebs und Zeitraums?\n\nbefund: ok | abweichung | leer trotz Umsatz (nBillsGesamt 0, der Umsatzbericht kennt Umsatz)\n| ohne Konzernzahl (kein Umsatzbericht fuer den Zeitraum — dann ist nichts zu pruefen).\nnachholen: faellig (wird von betriebsberichteNachfuellen() erneut eingereiht, hoechstens\ndreimal, frühestens eine Woche nach dem letzten Abruf) | wartet | aufgegeben | historisch\n(aelter als 60 Tage: nicht mehr nachgeholt, sichtbar bleibt es trotzdem).\n\nAnlass: der falsche Endpunkt lieferte zwei Monate lang leere Gerueste mit plausibler\nGroesse (fehlerkatalog.md, 22.09.2026). Eine Antwort beweist nichts, ihre Summe schon.\nWer die Sicht ueber viele Monate liest, filtert zeitraum_bis — sonst rechnet sie jeden\nAbruf seit 2018 gegen den Umsatzbericht.",
+   "kommentar": "Koernung: Betriebsbericht × Betrieb × Abrufzeitraum. Trifft LINAs eigene Summe\n(balanceSumBrutto) den Konzern-Umsatzbericht desselben Betriebs und Zeitraums?\n\nbefund: ok | abweichung | leer trotz Umsatz (nBillsGesamt 0, der Umsatzbericht kennt Umsatz)\n| ohne Konzernzahl (kein Umsatzbericht fuer den Zeitraum — dann ist nichts zu pruefen).\nnachholen: faellig (wird von betriebsberichteNachfuellen() erneut eingereiht, hoechstens\ndreimal, frühestens eine Woche nach dem letzten Abruf) | wartet | aufgegeben | abgeschaltet\n(der Bericht wird nicht mehr geholt — sync.quelle.erwartet = false, etwa 88 seit 23.09.2026\noder alle unter der Notbremse; es wird nichts nachgeholt) | historisch (aelter als 60 Tage:\nnicht mehr nachgeholt, sichtbar bleibt es trotzdem).\n\nAnlass: der falsche Endpunkt lieferte zwei Monate lang leere Gerueste mit plausibler\nGroesse (fehlerkatalog.md, 22.09.2026). Eine Antwort beweist nichts, ihre Summe schon.\nWer die Sicht ueber viele Monate liest, filtert zeitraum_bis — sonst rechnet sie jeden\nAbruf seit 2018 gegen den Umsatzbericht.",
    "spalten": [
     "endpunkt",
     "bericht",
@@ -907,7 +907,7 @@
    "koernung": "Betriebsbericht × Monat — wie viel geladen ist",
    "thema": "import",
    "summen_erlaubt": false,
-   "kommentar": "Koernung: Betriebsbericht × Monat seit Januar 2018 (materialisiert in\nmart.betriebsbericht_ladestand_basis, Stand des letzten Laufs). Wie viel von einem Monat ist fuer diesen\nBericht geladen — gemessen an den Betrieben bzw. Betrieb-Tagen mit Umsatz (Umsatzbericht, nur\nreife Tage: aelter als 9 Tage). Tagesberichte (T, W) zaehlen Betrieb-Tage, Monatsberichte (M,\nM-Tag) Betriebe. Ein Abruf mit null Zeilen zaehlt als geladen, ebenso ein Posten, fuer den LINA\n\"keine Daten\" gemeldet hat (betriebe_leer).\n\nzustand: vollstaendig | teilweise | nicht geladen | kein Umsatz. \"nicht geladen\" ist der Fall,\num den es geht: eine Auswertung ueber diesen Monat liefert dann KEINE Zeile, und das heisst\nnicht null. sichten nennt die mart-Sichten, die aus dem Bericht lesen.",
+   "kommentar": "Koernung: Betriebsbericht × Monat seit Januar 2018 (materialisiert in\nmart.betriebsbericht_ladestand_basis, Stand des letzten Laufs). Wie viel von einem Monat ist fuer diesen\nBericht geladen — gemessen an den Betrieben bzw. Betrieb-Tagen mit Umsatz (Umsatzbericht, nur\nreife Tage: aelter als 9 Tage). Tagesberichte (T, W) zaehlen Betrieb-Tage, Monatsberichte (M,\nM-Tag) Betriebe. Ein Abruf mit null Zeilen zaehlt als geladen, ebenso ein Posten, fuer den LINA\n\"keine Daten\" gemeldet hat (betriebe_leer).\n\nzustand: vollstaendig | teilweise | nicht geladen | kein Umsatz. \"nicht geladen\" ist der Fall,\num den es geht: eine Auswertung ueber diesen Monat liefert dann KEINE Zeile, und das heisst\nnicht null. sichten nennt die mart-Sichten, die aus dem Bericht lesen.\n\nBericht 88 (Finanzwege) steht seit 0119 NICHT hier: abgeschaltet am 23.09.2026, die\nFinanzwegsichten lesen aus 97 (Tagesabschluss) — dessen Zeile ist der Stand der Finanzwege.",
    "spalten": [
     "endpunkt",
     "bericht",
@@ -2915,10 +2915,10 @@
   },
   {
    "sicht": "mart.finanzweg_88_97_abgleich",
-   "koernung": "Betrieb × Tag × Finanzweg — Bericht 88 gegen 97; ERWARTUNG: kein weicht ab",
+   "koernung": "Betrieb × Tag × Finanzweg — Bericht 88 gegen 97, nur bis 23.09.2026 geladene 88-Tage (88 abgeschaltet); ERWARTUNG: kein weicht ab",
    "thema": "import",
    "summen_erlaubt": null,
-   "kommentar": "Koernung: Betrieb × Tag × Finanzweg — nur Tage, fuer die BEIDE Quellen geladen sind.\nBericht 88 (ein Tagesaufruf je Betrieb-Tag, 152.840 Aufrufe Historie) und Bericht 97 (je Tag\nderselbe Finanzwegblock aus EINEM Monatsaufruf, 5.115 Aufrufe) liefern dieselben Zahlen —\ngemessen einmal, Wilma Wunder Duesseldorf August 2026, alle 34 Finanzwege gleich. Steht hier\nueber viele Betriebe und Monate nur \"gleich\", ist der Tagesabruf von 88 verzichtbar\n(offene-punkte.md). ERWARTUNG: kein \"weicht ab\".",
+   "kommentar": "Koernung: Betrieb × Tag × Finanzweg — nur Tage, fuer die BEIDE Quellen geladen sind.\nBericht 88 (ein Tagesaufruf je Betrieb-Tag, 152.840 Aufrufe Historie) und Bericht 97 (je Tag\nderselbe Finanzwegblock aus EINEM Monatsaufruf, 5.115 Aufrufe) liefern dieselben Zahlen —\ngemessen an drei Stichproben (Wilma Wunder Duesseldorf August 2026 und Januar 2019, Markt Mainz\n15.08.2026), jede auf den Cent gleich. Deshalb ist 88 seit dem 23.09.2026 ABGESCHALTET (0119):\ndie Sicht vergleicht nur noch die bis dahin geladenen 88-Tage und waechst nicht mehr.\nERWARTUNG: kein \"weicht ab\".",
    "spalten": [
     "betrieb_key",
     "betrieb",
@@ -3058,10 +3058,10 @@
   },
   {
    "sicht": "mart.finanzweg_tag",
-   "koernung": "Betrieb × Tag × Finanzweg — je Tag EINE Quelle (97, sonst 88)",
+   "koernung": "Betrieb × Tag × Finanzweg — je Tag EINE Quelle (97; 88 nur fuer bis 23.09.2026 geladene Tage ohne 97)",
    "thema": "kasse",
    "summen_erlaubt": true,
-   "kommentar": "Koernung: Betrieb × Tag × Finanzweg — aus GENAU EINER Quelle je Betrieb und Tag: Bericht 97\n(Tagesabschluss), wo es ihn gibt, sonst 88 (quelle_bericht). core.finanzweg_tag fuehrt beide,\nund eine Summe darueber waere doppelt (0114, gemessen auf den Cent gleich). Ein Mehrtagesabruf\nvon 88 (tage > 1) steht nur da, wo der Betrieb im Zeitraum keinen Tageswert hat.\n\nbetrag: Zahlungen und Nachlaesse POSITIV (LINA fuehrt sie negativ). Die Zahlarten eines Tages\nsummieren sich zum Bruttoumsatz — Trinkgeld und Rueckgeld stehen dabei negativ, weil sie in den\nZahlbetraegen darueber enthalten sind (Wilma Wunder Duesseldorf, August 2026: 369.841,09 EUR,\nnachgerechnet am 23.09.2026). Umsatzzeilen (Boniert, Sofortstorno, Storno) behalten LINAs\nVorzeichen.\n\nanzahl_vorgaenge zaehlt VORGAENGE (50 % Gluecksrad: 600 in Duesseldorf), nicht Artikel — der\nRabattbericht zaehlt fuer denselben Finanzweg 712 Artikel. Nie gegen mart.artikel_nachlass_*\naddieren. Eine Aktion buendelt man ueber aktion + prozentsatz, nicht ueber die Nummer.",
+   "kommentar": "Koernung: Betrieb × Tag × Finanzweg — aus GENAU EINER Quelle je Betrieb und Tag: Bericht 97\n(Tagesabschluss), wo es ihn gibt, sonst 88 (quelle_bericht). 97 ist seit dem 23.09.2026 die\nEINZIGE laufende Quelle; 88 ist abgeschaltet und steht nur noch fuer Tage, die bis dahin geladen\nwurden und fuer die 97 fehlt. 97 ist ein Monatsbericht: ein Monat steht erst ab etwa dem 7. des\nFolgemonats da (mart.betriebsbericht_ladestand, Bericht 97). core.finanzweg_tag fuehrt beide\nQuellen, und eine Summe darueber waere doppelt (0114, gemessen auf den Cent gleich). Ein\nMehrtagesabruf von 88 (tage > 1) steht nur da, wo der Betrieb im Zeitraum keinen Tageswert hat.\n\nbetrag: Zahlungen und Nachlaesse POSITIV (LINA fuehrt sie negativ). Die Zahlarten eines Tages\nsummieren sich zum Bruttoumsatz — Trinkgeld und Rueckgeld stehen dabei negativ, weil sie in den\nZahlbetraegen darueber enthalten sind (Wilma Wunder Duesseldorf, August 2026: 369.841,09 EUR,\nnachgerechnet am 23.09.2026). Umsatzzeilen (Boniert, Sofortstorno, Storno) behalten LINAs\nVorzeichen.\n\nanzahl_vorgaenge zaehlt VORGAENGE (50 % Gluecksrad: 600 in Duesseldorf), nicht Artikel — der\nRabattbericht zaehlt fuer denselben Finanzweg 712 Artikel. Nie gegen mart.artikel_nachlass_*\naddieren. Eine Aktion buendelt man ueber aktion + prozentsatz, nicht ueber die Nummer.",
    "spalten": [
     "geschaeftstag",
     "zeitraum_bis",
@@ -6912,7 +6912,7 @@
      "mart.nachlass_monat"
     ]
    },
-   "hinweis": "Der Rabattbericht (92) zaehlt ARTIKEL auf Nachlass-Bons, 88/97 zaehlen VORGAENGE (50 % Gluecksrad in Duesseldorf, August 2026: 712 Artikel gegen 600 Vorgaenge). Eine Summe ueber beide ist keine Zahl; ein Verhaeltnis (Artikel je Vorgang) ist dagegen zulaessig.",
+   "hinweis": "Der Rabattbericht (92) zaehlt ARTIKEL auf Nachlass-Bons, die Finanzwege (97, frueher 88) zaehlen VORGAENGE (50 % Gluecksrad in Duesseldorf, August 2026: 712 Artikel gegen 600 Vorgaenge). Eine Summe ueber beide ist keine Zahl; ein Verhaeltnis (Artikel je Vorgang) ist dagegen zulaessig.",
    "berichtigung": "Nie menge und anzahl_vorgaenge addieren. Betraege: mart.nachlass_monat ist vollstaendig, der Rabattbericht verteilt sie auf Artikel und laesst namenlose Zeilen weg.",
    "quelle": "docs/metabase.md, Abschnitt zu 0117"
   },
@@ -6986,7 +6986,7 @@
    "schwere": "warnung",
    "sicht": "mart.finanzweg_88_97_abgleich",
    "parameter": {},
-   "hinweis": "Pruefsicht: dieselbe Finanzwegzahl aus ZWEI Berichten (88 und 97) nebeneinander. Wer daraus summiert, zaehlt doppelt.",
+   "hinweis": "Pruefsicht: dieselbe Finanzwegzahl aus ZWEI Berichten (88 und 97) nebeneinander — nur fuer die bis 23.09.2026 geladenen 88-Tage, 88 ist seitdem abgeschaltet. Wer daraus summiert, zaehlt doppelt.",
    "berichtigung": "Finanzwege summieren: mart.finanzweg_tag bzw. mart.finanzweg_monat (je Betrieb und Tag genau eine Quelle).",
    "quelle": "migrations/0114_betriebsberichte_stufe_a.sql"
   },
@@ -7103,7 +7103,7 @@
    "parameter": {
     "spalte": "finanzweg_nummer"
    },
-   "hinweis": "Filter ueber finanzweg_nummer verliert still Zeilen. Eine Aktion laeuft oft ueber MEHRERE Finanzwege: die 25-%-Stufe des Gluecksrads ueber 3501 (\"25% Gluecksrad'\") UND 3168 (\"25% Gluecksrad\") — wer nach 3500/3501/3502 filterte, verlor in einem Betrieb 31 Vorgaenge. Dazu ist die Nummer im Rabattbericht NULL, solange 88/97 fuer den Tag fehlt.",
+   "hinweis": "Filter ueber finanzweg_nummer verliert still Zeilen. Eine Aktion laeuft oft ueber MEHRERE Finanzwege: die 25-%-Stufe des Gluecksrads ueber 3501 (\"25% Gluecksrad'\") UND 3168 (\"25% Gluecksrad\") — wer nach 3500/3501/3502 filterte, verlor in einem Betrieb 31 Vorgaenge. Dazu ist die Nummer im Rabattbericht NULL, solange der Tagesabschluss (97) fuer den Tag fehlt — fuer den laufenden Monat bis etwa zum 7. des Folgemonats (88 ist seit 23.09.2026 abgeschaltet).",
    "berichtigung": "Ueber aktion und prozentsatz filtern: WHERE aktion = 'Glücksrad' (optional AND prozentsatz = 25). Welche Aktionen es gibt, steht in mart.finanzweg (Spalte aktion).",
    "quelle": "docs/metabase.md, Abschnitt zu 0117"
   },
@@ -7115,7 +7115,7 @@
    "parameter": {
     "spalte": "finanzweg_nummer"
    },
-   "hinweis": "Filter ueber finanzweg_nummer verliert still Zeilen. Eine Aktion laeuft oft ueber MEHRERE Finanzwege: die 25-%-Stufe des Gluecksrads ueber 3501 (\"25% Gluecksrad'\") UND 3168 (\"25% Gluecksrad\") — wer nach 3500/3501/3502 filterte, verlor in einem Betrieb 31 Vorgaenge. Dazu ist die Nummer im Rabattbericht NULL, solange 88/97 fuer den Tag fehlt.",
+   "hinweis": "Filter ueber finanzweg_nummer verliert still Zeilen. Eine Aktion laeuft oft ueber MEHRERE Finanzwege: die 25-%-Stufe des Gluecksrads ueber 3501 (\"25% Gluecksrad'\") UND 3168 (\"25% Gluecksrad\") — wer nach 3500/3501/3502 filterte, verlor in einem Betrieb 31 Vorgaenge. Dazu ist die Nummer im Rabattbericht NULL, solange der Tagesabschluss (97) fuer den Tag fehlt — fuer den laufenden Monat bis etwa zum 7. des Folgemonats (88 ist seit 23.09.2026 abgeschaltet).",
    "berichtigung": "Ueber aktion und prozentsatz filtern: WHERE aktion = 'Glücksrad' (optional AND prozentsatz = 25). Welche Aktionen es gibt, steht in mart.finanzweg (Spalte aktion).",
    "quelle": "docs/metabase.md, Abschnitt zu 0117"
   },

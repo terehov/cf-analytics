@@ -1067,7 +1067,9 @@ Finanzwegtabelle wie 88 (gemessen: alle 34 Finanzwege über August auf den Cent 
 Quellen stehen in einer Tabelle mit `bericht` im Schlüssel — damit der Abgleich
 (`mart.finanzweg_88_97_abgleich`) eine Abfrage ist und ein späterer Verzicht auf den Tagesabruf
 von 88 keine Umbauten braucht. Der Preis: `sum()` über beide `bericht`-Werte zählt doppelt. Das
-steht im Tabellenkommentar.
+steht im Tabellenkommentar. **Der Verzicht kam am 23.09.2026** (`0119`): 88 wird nicht mehr geholt,
+und tatsächlich brauchte es keinen Umbau der Tabelle — `bericht = 88` bleibt für die bis dahin
+geladenen Tage stehen, neue Zeilen kommen nur noch mit `bericht = 97`.
 
 **`core.rabatt_artikel_tag` Zeile für Zeile, nicht verdichtet.** Gewährt und zurückgenommen
 stehen als zwei Zeilen (−3,50 mit Anzahl 1, +3,50 mit Anzahl 1). Die Auswertung vom 22.09.2026
@@ -1118,6 +1120,10 @@ eigene Entscheidung.
 
 * `sync.warteschlange.ergebnis` kennt `fenster_zu_gross` (geteilter Posten; wird nicht
   wiederbelebt).
+* Seit `0119` (23.09.2026) auch `abgeschaltet`: der Posten wurde **nicht** geholt, weil sein
+  Betriebsbericht abgeschaltet ist (`aktiv: false`, erstmals 88). Wird nicht wiederbelebt, zählt
+  im Ladestand nicht als geladen (anders als `keine_daten`), steht nicht in
+  `mart.posten_aufgegeben`.
 * `sync.posten_holen(lauf, anbieter)` kennt `lina_br` und `lina_sonst` — die beiden Hälften der
   LINA-Spur, mit je einem Teilindex.
 * `warteschlange_betrieb_einheit`: `(endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis)` für

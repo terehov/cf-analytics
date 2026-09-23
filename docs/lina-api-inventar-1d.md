@@ -718,3 +718,27 @@ Sitzung; anonymisierte Auszüge als Test-Fixtures unter `src/transform/fixtures/
   `Rechnung/Gutschrift` statt `Rechnung/Butschrift`.
 * **Eingerutschte Spaltenbeschriftungen** stehen auch in 57 (`Anzahl_Artikel` = „Anzahl
   Artikel"), 39 (`Artikel` = „Artikel") und 113 (`Status` = „Status", `Versuche` = „Versuche").
+
+## Nachtrag: 97 gegen 88 an drei Stichproben — 88 abgeschaltet (23.09.2026)
+
+Lesende Aufrufe über `/intranet/storeanalytics/getReport?…&laden=<encId>` (88 mit `interval=8`,
+97 mit `interval=3`). Anlass: Eugenes Entscheidung, 88 abzuschalten, *„wenn du dir sicher bist,
+dass 97 die Werte genauso liefert"*.
+
+| Stichprobe | Aufrufe | Vergleich | Ergebnis |
+|---|---|---|---|
+| Wilma Wunder Düsseldorf, August 2026 | 88 Monat, 97 Monat (vom 22.09.2026, Fixtures `src/transform/fixtures/betriebsbericht/report88-duesseldorf-2026-08.json` und `report97-duesseldorf-2026-08.json`) | 88 gegen die Summe der 31 Tagesblöcke von 97 | **34 von 34** Finanzwegen gleich in Nummer, Name, Finanzgruppe, Umsatz und Anzahl |
+| Markt Mainz (LINA: „Gastronomie am Markt Mainz GmbH"), 15.08.2026 | 88 Tagesaufruf 15.8.2026, 97 Monat August | 88 gegen den Block 15.08.2026 aus 97 | **25 von 25** gleich in Umsatz und Anzahl |
+| Wilma Wunder Düsseldorf, Januar 2019 | 88 Monat, 97 Monat | 88 gegen die Summe der 30 Tagesblöcke von 97 (erster Block 02.01.2019 — der 01.01. war geschlossen, 97 führt für ihn keinen Block) | **22 von 22** gleich, `balanceSumBrutto` beider **315.456,17** |
+
+Was daraus folgt:
+
+* **97 reicht mindestens bis 2019 zurück** und liefert dort dieselben Finanzwege wie 88. Ein
+  geschlossener Tag hat in 97 keinen Block (nicht: einen Block mit Nullen).
+* Die Gleichheit hängt weder am Betrieb noch an der Monatssumme: Mainz ist ein anderer Betrieb
+  einer anderen Marke, und dort wurde ein **Tagesaufruf** von 88 gegen einen einzelnen Tagesblock
+  von 97 gelegt.
+* **88 ist seit dem 23.09.2026 abgeschaltet** (Migration `0119`, `entscheidungen.md`). Ersparnis
+  rund 153.000 Aufrufe Historie (am Klon 153.363 Posten) plus die laufenden Tagesaufrufe. Die
+  Finanzwege (Stamm, Nachlässe, Zahlarten) kommen nur noch aus 97 — und damit für einen Monat
+  erst ab Monatsende + 7 Tagen.

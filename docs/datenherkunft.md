@@ -78,9 +78,9 @@ Umsatzbericht (`core.betrieb.enc_id`), alle 141 Betriebe mit einer Sitzung. Regi
 | Bericht | Raster | landet in | was es trägt |
 |---|---|---|---|
 | 92 Rabattbericht | Tag | `core.rabatt_artikel_tag` | Nachlass je Finanzweg (Hausbon/Rabatt) und Artikel**name** |
-| 88 Finanzwege | Tag | `core.finanzweg_tag` (`bericht = 88`), `core.finanzweg`, `core.finanzweg_stand` | Umsatz und Vorgänge je Finanzweg |
+| ~~88 Finanzwege~~ | ~~Tag~~ | `core.finanzweg_tag` (`bericht = 88`), `core.finanzweg`, `core.finanzweg_stand` | ~~Umsatz und Vorgänge je Finanzweg~~ **Abgeschaltet 23.09.2026** (`0119`): dieselbe Tabelle kommt aus 97. Was bis dahin geladen war, bleibt in `core` und ist Rückfall in `mart.finanzweg_tag` |
 | 96 Rechnungsausgangsbuch | Woche | `core.bon` | eine Zeile je Bon: Art, Artikelzahl, Zahlarten, Brutto, Debitor |
-| 97 Tagesabschluss | Monat, Tageszeilen | `core.tagesabschluss_tag`, `core.finanzweg_tag` (`bericht = 97`) | je Tag Hauptsparte × Steuersatz **und** die volle Finanzwegtabelle |
+| 97 Tagesabschluss | Monat, Tageszeilen | `core.tagesabschluss_tag`, `core.finanzweg_tag` (`bericht = 97`), `core.finanzweg`, `core.finanzweg_stand` | je Tag Hauptsparte × Steuersatz **und** die volle Finanzwegtabelle — **seit 23.09.2026 die einzige laufende Quelle der Finanzwege**. Ein Monat steht erst ab Monatsende + 7 Tagen da |
 | 39, 90, 108, 99, 60, 61, 53, 57, 68, 69, 112, 71, 75, 76 | Monat | je eine Tabelle, `datenmodell.md` | Stufe B |
 | 86, 113 | Woche | `core.debitor_bon`, `core.tischtransfer_bon` | Bons mit Debitor- bzw. Tischfeldern |
 
@@ -89,7 +89,7 @@ Umsatzbericht (`core.betrieb.enc_id`), alle 141 Betriebe mit einer Sitzung. Regi
 * **Betrieb:** über den Posten (`sync.warteschlange.betrieb_enc_id` → `core.betrieb.enc_id`). Die
   Antworten selbst nennen keinen Betrieb — Ausnahme 108 (`Betrieb`, in
   `core.verkaufszahlen_tag.betrieb_name_lina`), eine Gegenprobe der Adressierung.
-* **Finanzweg:** Nummer ↔ Name je Betrieb und Zeitraum aus 88/97. 92 kennt nur den Namen; die
+* **Finanzweg:** Nummer ↔ Name je Betrieb und Zeitraum aus 97 (bis 23.09.2026 auch 88). 92 kennt nur den Namen; die
   Nummer an `core.rabatt_artikel_tag` ist daraus abgeleitet. **Nie über eine Nummernliste
   filtern** — zwei „25 % Glücksrad" (3501 mit Apostroph, 3168 ohne).
 * **Artikel:** 92 und 53 tragen Namen bzw. Nummern. 92 wird über `core.artikel_name_norm()`
@@ -102,10 +102,15 @@ Umsatzbericht (`core.betrieb.enc_id`), alle 141 Betriebe mit einer Sitzung. Regi
 
 * 92: der Nachlass gilt für den **ganzen Bon**. „Menge X über 50 % Glücksrad" ist die Menge auf
   Bons mit diesem Nachlass, nicht die Verkaufsmenge.
-* 88 vs. 92: `anzahl` zählt in 88 **Vorgänge**, in 92 **Artikel** — nie addieren.
+* 88/97 vs. 92: `anzahl` zählt in den Finanzwegen **Vorgänge**, in 92 **Artikel** — nie addieren.
 * 96: keine Uhrzeit, keine Artikel, **keine Nachlass-Finanzwege**. „Bons mit Aktion" ist damit
   nicht beantwortbar.
-* 88 und 97 liefern dieselbe Finanzwegzahl aus zwei Berichten — wer summiert, wählt einen.
+* 88 und 97 liefern dieselbe Finanzwegzahl aus zwei Berichten — wer summiert, wählt einen
+  (`mart.finanzweg_tag` tut es: 97, sonst 88). Nachgewiesen an drei Stichproben bis Januar 2019
+  (`lina-api-inventar-1d.md`, Nachtrag 23.09.2026); deshalb ist 88 seitdem abgeschaltet.
+* Die Finanzwege eines Monats (Nachlasssummen, Zahlungsmix) fehlen bis etwa zum 7. des
+  Folgemonats — 97 ist ein Monatsbericht. Das ist nicht null, sondern noch nicht geladen
+  (`mart.betriebsbericht_ladestand`, Bericht 97).
 
 **Die Gegenprobe:** jeder Abruf trägt LINAs `balanceSumBrutto`, und die muss den Umsatzbericht
 desselben Betriebs und Zeitraums treffen (`mart.betriebsbericht_gegenprobe`). Der Weg über
@@ -144,7 +149,8 @@ Größe — eine Antwort beweist nichts, ihre Summe schon.
   Namen: „Markt Mainz" heißt in LINA „Gastronomie am Markt Mainz GmbH".
 * **Aktion** über `aktion` (Finanzwegname ohne Prozentzahl und Apostroph) und `prozentsatz` —
   in `mart.finanzweg`, `mart.artikel_nachlass_*`, `mart.finanzweg_*`, `mart.nachlass_monat`.
-  Die Nummer ist im Rabattbericht NULL, solange 88/97 für den Tag fehlt.
+  Die Nummer ist im Rabattbericht NULL, solange 97 (bis 23.09.2026 auch 88) für den Tag fehlt —
+  für den laufenden Monat also bis etwa zum 7. des Folgemonats.
 * **Artikel** aus 92: `artikel` ist der Kassenname, `artikel_key`/`artikelnummer` nur, wo der Name
   eindeutig einem im selben Betrieb und Zeitraum **verkauften** Artikel entspricht. Wer
   `mart.artikel_nachlass_*` mit `mart.artikel_monat` verbindet, tut es über `artikel_key` und

@@ -181,7 +181,12 @@ lauf('Betriebsberichte mit Datenbank', () => {
         WHERE betrieb_key = $1`, [betrieb.get(enc)])
     expect(vor.rows[0].n).toBe(0)
 
-    await ladenMit('getReport:88', enc, '2026-08-01', '2026-08-31', fixture('report88-duesseldorf-2026-08.json').antwort)
+    // 88 ist seit 23.09.2026 abgeschaltet (aktiv: false) — eine alte Rohantwort
+    // laedt der Lader trotzdem: core muss aus raw neu aufbaubar sein (Regel 4).
+    const { betriebsbericht } = await import('../lina/betriebsberichte')
+    expect(betriebsbericht('getReport:88')!.aktiv).toBe(false)
+    expect(await ladenMit('getReport:88', enc, '2026-08-01', '2026-08-31',
+      fixture('report88-duesseldorf-2026-08.json').antwort)).toBeGreaterThan(0)
     await ladenMit('getReport:97', enc, '2026-08-01', '2026-08-31', fixture('report97-duesseldorf-2026-08.json').antwort)
 
     const { rows: stamm } = await db.query(
@@ -204,6 +209,14 @@ lauf('Betriebsberichte mit Datenbank', () => {
       `SELECT round(sum(brutto), 2)::float AS s FROM core.tagesabschluss_tag WHERE betrieb_key = $1`,
       [betrieb.get(enc)])
     expect(sp.s).toBe(369841.09)
+    // mart nimmt je Betrieb und Tag EINE Quelle: 97. Der Monatsabruf von 88
+    // (zeitraum_bis > geschaeftstag) zaehlt nicht mit — keine Doppelzaehlung.
+    const { rows: [m] } = await db.query(
+      `SELECT string_agg(DISTINCT quelle_bericht::text, '+') AS quellen,
+              round(sum(betrag) FILTER (WHERE finanzweg_nummer = 3502), 2)::float AS b3502,
+              sum(anzahl_vorgaenge) FILTER (WHERE finanzweg_nummer = 3502)::int AS a3502
+         FROM mart.finanzweg_tag WHERE betrieb_key = $1`, [betrieb.get(enc)])
+    expect(m).toEqual({ quellen: '97', b3502: 4281.5, a3502: 600 })
     // Die Nummern an den Rabattzeilen, ueber den Namen — beide 25-%-Wege getrennt.
     const { rows: nr } = await db.query(
       `SELECT DISTINCT finanzweg_name, finanzweg_nummer FROM core.rabatt_artikel_tag
@@ -225,7 +238,7 @@ lauf('Betriebsberichte mit Datenbank', () => {
     const bk = betrieb.get(enc)!
     const befund = async () => (await db.query(
       `SELECT befund, nachholen FROM mart.betriebsbericht_gegenprobe
-        WHERE endpunkt = 'getReport:88' AND betrieb_key = $1`, [bk])).rows[0]
+        WHERE endpunkt = 'getReport:97' AND betrieb_key = $1`, [bk])).rows[0]
     expect((await befund()).befund).toBe('ohne Konzernzahl')
 
     // Der Umsatzbericht des Monats: 31 Tage, zusammen genau LINAs Summe.
@@ -242,13 +255,14 @@ lauf('Betriebsberichte mit Datenbank', () => {
     }
     expect(await befund()).toEqual({ befund: 'ok', nachholen: null })
 
-    // Ein Tag fehlt im Bericht (zu früh geholt) → Abweichung. Frisch geholt
+    // Ein Tag fehlt im Bericht (zu früh geholt) → Abweichung. Geprueft an 97:
+    // 88 ist abgeschaltet und wird nicht mehr nachgeholt (Test darunter). Frisch geholt
     // wartet sie eine Woche, danach ist sie fällig und wird neu eingereiht.
     await db.query(`UPDATE core.betriebsbericht_abruf SET balance_brutto = balance_brutto - 22282.34
-                     WHERE endpunkt = 'getReport:88' AND betrieb_key = $1`, [bk])
+                     WHERE endpunkt = 'getReport:97' AND betrieb_key = $1`, [bk])
     expect(await befund()).toEqual({ befund: 'abweichung', nachholen: 'wartet' })
     await db.query(`UPDATE core.betriebsbericht_abruf SET zuletzt_abgerufen_am = now() - interval '8 days'
-                     WHERE endpunkt = 'getReport:88' AND betrieb_key = $1`, [bk])
+                     WHERE endpunkt = 'getReport:97' AND betrieb_key = $1`, [bk])
     expect(await befund()).toEqual({ befund: 'abweichung', nachholen: 'faellig' })
 
     const { betriebsberichteNachfuellen } = await import('./nachfuellen')
@@ -259,15 +273,42 @@ lauf('Betriebsberichte mit Datenbank', () => {
     // Umsatzbericht oben macht sie zu Tagen mit Umsatz.)
     const { rows: [p] } = await db.query(
       `SELECT prioritaet, zeitraum_von::text, zeitraum_bis::text FROM sync.warteschlange
-        WHERE endpunkt = 'getReport:88' AND betrieb_enc_id = $1 AND zeitraum_bis = '2026-08-31'`, [enc])
+        WHERE endpunkt = 'getReport:97' AND betrieb_enc_id = $1 AND zeitraum_bis = '2026-08-31'`, [enc])
     expect(p).toEqual({ prioritaet: 50, zeitraum_von: '2026-08-01', zeitraum_bis: '2026-08-31' })
     const { rows: [n] } = await db.query(
-      `SELECT nachgeholt FROM core.betriebsbericht_abruf WHERE endpunkt = 'getReport:88' AND betrieb_key = $1`, [bk])
+      `SELECT nachgeholt FROM core.betriebsbericht_abruf WHERE endpunkt = 'getReport:97' AND betrieb_key = $1`, [bk])
     expect(n.nachgeholt).toBe(1)
     // Dreimal nachgeholt → aufgegeben, sichtbar.
     await db.query(`UPDATE core.betriebsbericht_abruf SET nachgeholt = 3
-                     WHERE endpunkt = 'getReport:88' AND betrieb_key = $1`, [bk])
+                     WHERE endpunkt = 'getReport:97' AND betrieb_key = $1`, [bk])
     expect((await befund()).nachholen).toBe('aufgegeben')
+  })
+
+  /**
+   * 88 ist abgeschaltet (0119, 23.09.2026). Seine Gegenprobe sagt das, statt
+   * ewig "faellig" zu melden — und der Einreihweg holt nichts nach.
+   */
+  test('Gegenprobe: ein abgeschalteter Bericht (88) wird nicht nachgeholt und sagt es', async () => {
+    const enc = 'test-duesseldorf'
+    const bk = betrieb.get(enc)!
+    const { quellenSpiegeln } = await import('./quellen')
+    await quellenSpiegeln()
+    const { rows: [q] } = await db.query(`SELECT erwartet FROM sync.quelle WHERE quelle = 'getReport:88'`)
+    expect(q.erwartet).toBe(false)
+    await db.query(`UPDATE core.betriebsbericht_abruf
+                       SET balance_brutto = balance_brutto - 22282.34, nachgeholt = 0,
+                           zuletzt_abgerufen_am = now() - interval '8 days'
+                     WHERE endpunkt = 'getReport:88' AND betrieb_key = $1`, [bk])
+    const { rows: [g] } = await db.query(
+      `SELECT befund, nachholen FROM mart.betriebsbericht_gegenprobe
+        WHERE endpunkt = 'getReport:88' AND betrieb_key = $1`, [bk])
+    expect(g).toEqual({ befund: 'abweichung', nachholen: 'abgeschaltet' })
+    const { betriebsberichteNachfuellen } = await import('./nachfuellen')
+    await db.query(`TRUNCATE sync.warteschlange`)
+    await betriebsberichteNachfuellen('2026-09-22')
+    const { rows: [n] } = await db.query(
+      `SELECT count(*)::int AS n FROM sync.warteschlange WHERE endpunkt = 'getReport:88'`)
+    expect(n.n).toBe(0)
   })
 
   // -----------------------------------------------------------------------
@@ -311,6 +352,8 @@ lauf('Betriebsberichte mit Datenbank', () => {
     expect(await einheiten('getReport:97')).toEqual([
       { b: 'test-a', von: '2026-07-01', bis: '2026-07-31' },
     ])
+    // 88 ist abgeschaltet (0119): kein einziger Posten, obwohl er Klasse T ist.
+    expect(await einheiten('getReport:88')).toEqual([])
 
     // Eine Woche spaeter: der Rest ist reif — auch der Tag, den nur der Artikelverkauf kennt.
     await betriebsberichteNachfuellen('2026-09-22')
@@ -361,6 +404,27 @@ lauf('Betriebsberichte mit Datenbank', () => {
         WHERE betrieb_enc_id = 'test-b' ORDER BY endpunkt, zeitraum_von`)
     expect(l.filter(r => r.endpunkt === 'getReport:92').every(r => r.nachladen === false)).toBe(true)
     expect(l.filter(r => r.endpunkt === 'getReport:97').every(r => r.nachladen === true)).toBe(true)
+  })
+
+  test('abgeschaltet: offene 88-Posten schliesst der Einreihweg, einen in Arbeit laesst er stehen', async () => {
+    const { betriebsberichteNachfuellen } = await import('./nachfuellen')
+    await db.query(`TRUNCATE sync.warteschlange`)
+    await db.query(`
+      INSERT INTO sync.warteschlange (endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis, prioritaet, in_arbeit_seit) VALUES
+        ('getReport:88', 'test-a', '2026-08-10', '2026-08-10', 85, NULL),
+        ('getReport:88', 'test-a', '2026-08-11', '2026-08-11', 85, now()),
+        ('getReport:92', 'test-a', '2026-08-10', '2026-08-10', 85, NULL)`)
+    cfg.BETRIEBSBERICHT_JE_LAUF = 0   // auch unter der Notbremse
+    await betriebsberichteNachfuellen('2026-09-22')
+    cfg.BETRIEBSBERICHT_JE_LAUF = 100000
+    const { rows } = await db.query(
+      `SELECT endpunkt, zeitraum_von::text AS von, ergebnis, erledigt_am IS NOT NULL AS zu
+         FROM sync.warteschlange ORDER BY endpunkt, zeitraum_von`)
+    expect(rows).toEqual([
+      { endpunkt: 'getReport:88', von: '2026-08-10', ergebnis: 'abgeschaltet', zu: true },
+      { endpunkt: 'getReport:88', von: '2026-08-11', ergebnis: null, zu: false },
+      { endpunkt: 'getReport:92', von: '2026-08-10', ergebnis: null, zu: false },
+    ])
   })
 
   test('neueste zuerst: bei knapper Obergrenze kommt der juengste Zeitraum fuer ALLE Betriebe', async () => {
@@ -441,9 +505,9 @@ lauf('Betriebsberichte mit Datenbank', () => {
     cfg.TAGESBUDGET = 10000
     await db.query(`
       INSERT INTO sync.warteschlange (endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis, prioritaet) VALUES
-        ('getReport:88', 'test-duesseldorf', '2026-08-01', '2026-08-01', 85),
-        ('getReport:88', 'test-duesseldorf', '2026-08-02', '2026-08-02', 85),
-        ('getReport:88', 'test-duesseldorf', '2026-08-03', '2026-08-03', 85),
+        ('getReport:92', 'test-duesseldorf', '2026-08-01', '2026-08-01', 85),
+        ('getReport:92', 'test-duesseldorf', '2026-08-02', '2026-08-02', 85),
+        ('getReport:92', 'test-duesseldorf', '2026-08-03', '2026-08-03', 85),
         ('getUmsatzbericht', NULL, '2026-08-01', '2026-08-01', 10),
         ('getUmsatzbericht', NULL, '2026-08-02', '2026-08-02', 10),
         ('getUmsatzbericht', NULL, '2026-08-03', '2026-08-03', 10)`)
@@ -460,9 +524,9 @@ lauf('Betriebsberichte mit Datenbank', () => {
     cfg.TAGESBUDGET = 5
     await db.query(`
       INSERT INTO sync.warteschlange (endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis, prioritaet) VALUES
-        ('getReport:88', 'test-duesseldorf', '2026-08-01', '2026-08-01', 85),
-        ('getReport:88', 'test-duesseldorf', '2026-08-02', '2026-08-02', 85),
-        ('getReport:88', 'test-duesseldorf', '2026-08-03', '2026-08-03', 85),
+        ('getReport:92', 'test-duesseldorf', '2026-08-01', '2026-08-01', 85),
+        ('getReport:92', 'test-duesseldorf', '2026-08-02', '2026-08-02', 85),
+        ('getReport:92', 'test-duesseldorf', '2026-08-03', '2026-08-03', 85),
         ('getUmsatzbericht', NULL, '2026-08-01', '2026-08-01', 10),
         ('getUmsatzbericht', NULL, '2026-08-02', '2026-08-02', 10),
         ('getUmsatzbericht', NULL, '2026-08-03', '2026-08-03', 10),
@@ -481,7 +545,7 @@ lauf('Betriebsberichte mit Datenbank', () => {
     cfg.BETRIEBSBERICHT_JE_LAUF = 0
     await db.query(`
       INSERT INTO sync.warteschlange (endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis, prioritaet) VALUES
-        ('getReport:88', 'test-duesseldorf', '2026-08-01', '2026-08-01', 85),
+        ('getReport:92', 'test-duesseldorf', '2026-08-01', '2026-08-01', 85),
         ('getUmsatzbericht', NULL, '2026-08-01', '2026-08-01', 10)`)
     await workerLauf('manuell')
     const { rows } = await db.query(`SELECT endpunkt FROM sync.aufgabe`)

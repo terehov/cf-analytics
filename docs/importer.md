@@ -1594,13 +1594,39 @@ wirft — er liefe sonst gegen den Sitzungsbetrieb.
 
 | Klasse | Zeitraum eines Postens | Berichte |
 |---|---|---|
-| T | ein Tag | 92, 88 |
+| T | ein Tag | 92 (~~88~~ abgeschaltet 23.09.2026) |
 | W | eine ISO-Woche (Mo–So), nie länger | 96, 86, 113 |
 | M-Tag | ein Kalendermonat, Zeilen tragen ihr Datum | 97 (`interval=3`), 90, 108, 61 |
 | M | ein Kalendermonat | 39, 99, 60, 53, 57, 68, 69, 112, 71, 75, 76 |
 
 Registriert, aber aus: 38 (steckt in 39), 114 (für Düsseldorf echt leer), 81/82 (Gutscheine, 0
-Zeilen — mit `sync.quelle` `erwartet: false`), 107/23 (500 mit leerem Rumpf, auch über `laden=`).
+Zeilen — mit `sync.quelle` `erwartet: false`), 107/23 (500 mit leerem Rumpf, auch über `laden=`),
+**88 (Finanzwege, abgeschaltet 23.09.2026 — 97 liefert dieselbe Tabelle je Tag; `sync.quelle`
+`erwartet: false` mit Begründung, Lader bleibt).**
+
+### Einen Betriebsbericht abschalten (seit `0119`, 23.09.2026)
+
+Erstmals an 88 durchgespielt. Was `aktiv: false` bewirkt und was nicht:
+
+* **Einreihen:** `betriebsberichteNachfuellen()` liest nur `AKTIVE_BETRIEBSBERICHTE` — kein
+  Erstabruf, kein Nachlauf, keine Gegenprobe mehr.
+* **Schon eingereihte Posten** würde der Worker trotzdem ziehen: er findet den Endpunkt über
+  `endpunkt()` im ganzen Register. Deshalb schließt `abgeschalteteBetriebsberichteSchliessen()`
+  (am Anfang von `betriebsberichteNachfuellen()`, auch unter der Notbremse) jeden offenen,
+  nicht in Arbeit befindlichen Posten eines inaktiven Betriebsberichts mit
+  `ergebnis = 'abgeschaltet'`. Das Ergebnis wird nicht wiederbelebt und steht nicht in
+  `mart.posten_aufgegeben`. Einen Posten in Arbeit fasst es nicht an; wird er nach einem Abbruch
+  freigegeben, schließt ihn der nächste Lauf.
+* **Laden** bleibt: der Registereintrag und der Lader stehen weiter, damit `core` aus den
+  vorhandenen Rohantworten neu aufbaubar ist (harte Regel 4). Test: „88 und 97" in
+  `src/sync/betriebsbericht.test.ts` lädt eine 88-Rohantwort durch den abgeschalteten Eintrag.
+* **Sichtbar** bleibt es über `sync.quelle` (`erwartet: false` mit Bemerkung, Eintrag in
+  `src/sync/quellen.ts`): `mart.betriebsbericht_luecke` meldet den Bericht nicht mehr,
+  `mart.betriebsbericht_gegenprobe.nachholen` sagt `abgeschaltet` statt `faellig`. Den Ladestand
+  (`mart.betriebsbericht_ladestand*`) nimmt `0119` für 88 ausdrücklich heraus — nicht über
+  `erwartet`, weil unter der Notbremse jeder Bericht auf nicht erwartet steht und der Ladestand
+  gerade dann sagen muss, was fehlt. Wer einen weiteren Bericht abschaltet, dessen Sichten aus
+  einer anderen Quelle lesen, ergänzt dort die Bedingung.
 
 ### Der Einreihweg: `betriebsberichteNachfuellen()` (`src/sync/nachfuellen.ts`)
 
@@ -1630,6 +1656,7 @@ das, was der Lauf nicht geschafft hat.
 
 **Gemessen am lokalen Klon (22.09.2026, Daten bis 12.08.2026):** 455.919 Posten für die ganze
 Historie seit 2018 (92 und 88 je 153.363, 96/86/113 je 22.821, 15 Monatsberichte je 5.382).
+**Ohne 88 (abgeschaltet 23.09.2026) sind es 302.556.**
 Eine Nacht mit 10.500 Posten einzureihen dauert 0,3 s. Ist alles eingereiht, prüft jeder Lauf
 alle Monate erneut und findet nichts — **27 s je Nacht**. Das ist der Preis dafür, dass ein
 nachträglich auftauchender Umsatztag auch in einem alten Monat noch gefunden wird.

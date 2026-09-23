@@ -1946,11 +1946,20 @@ nächste Nachtlauf nach dem Deploy.
 
 ### Eugene entscheidet
 
-* **Bericht 88 im Tagesraster verzichtbar?** 97 liefert je Tag dieselbe Finanzwegtabelle aus
+* ~~**Bericht 88 im Tagesraster verzichtbar?** 97 liefert je Tag dieselbe Finanzwegtabelle aus
   einem Monatsaufruf — gemessen an einem Betrieb und Monat, auf den Cent (KORREKTUR 8). 88 kostet
   152.840 Aufrufe Historie, 97 5.115. Vorschlag: einige Wochen laufen lassen, dann
   `SELECT befund, count(*) FROM mart.finanzweg_88_97_abgleich GROUP BY 1;` — steht dort über
-  viele Betriebe nur „gleich", 88 auf `aktiv: false`. Spart rund sechs Wochen Backfill.
+  viele Betriebe nur „gleich", 88 auf `aktiv: false`. Spart rund sechs Wochen Backfill.~~
+  **Entschieden 23.09.2026: 88 ist abgeschaltet** (Migration `0119`), nach drei Stichproben statt
+  einiger Wochen Abgleich — Düsseldorf August 2026, Markt Mainz 15.08.2026, Düsseldorf Januar
+  2019, jede identisch (`entscheidungen.md`, 23.09.2026).
+* **Finanzwege des laufenden Monats (Folge aus `0119`).** Seit 88 abgeschaltet ist, kommen die
+  Finanzwege nur aus 97, einem Monatsbericht: Nachlasssummen und Zahlungsmix eines Monats stehen
+  erst ab dem 7. des Folgemonats da, und so lange trägt der Rabattbericht (92) keine
+  Finanzwegnummer. Möglich wäre, 97 zusätzlich für den laufenden Monat zu holen (ein Teilmonat,
+  den der Erstabruf nach Monatsende ersetzt; ~62 Aufrufe je Nacht, ein neuer Einreihzweig). Nicht
+  gebaut — erst, wenn jemand die Monatssumme vor dem 7. braucht.
 * **86 ein Duplikat von 96?** Am 15.08. lieferte die Debitorenauswertung dieselben 519 Bons wie
   96. Ob sie bei Betrieben MIT Debitoren nur deren Bons führt, ist nicht gemessen. Kostet
   22.821 Aufrufe Historie.

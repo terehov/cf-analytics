@@ -1465,14 +1465,16 @@ nächste Schritt (M5 in `plan-lina-vollabzug.md`). Alle stehen im Katalog mit K�
 
 | Sicht | Körnung | Erwartung |
 |---|---|---|
-| `mart.betriebsbericht_gegenprobe` | Bericht × Betrieb × Abrufzeitraum | `befund` ok; `nachholen` sagt, was der Lauf damit tut |
+| `mart.betriebsbericht_gegenprobe` | Bericht × Betrieb × Abrufzeitraum | `befund` ok; `nachholen` sagt, was der Lauf damit tut — seit `0119` auch `abgeschaltet` (Bericht wird nicht mehr geholt, etwa 88) |
 | `mart.betriebsbericht_luecke` | Bericht × Betrieb × Tag (9–60 Tage alt) | **leer** ab der zweiten Nacht |
-| `mart.finanzweg_88_97_abgleich` | Betrieb × Tag × Finanzweg, wo beide Quellen da sind | kein `weicht ab` |
+| `mart.finanzweg_88_97_abgleich` | Betrieb × Tag × Finanzweg, wo beide Quellen da sind | kein `weicht ab`. Wächst seit 23.09.2026 nicht mehr (88 abgeschaltet, `0119`) |
 | `mart.bericht_hinweis` | Bericht × Betrieb × Zeitraum × Text | LINAs eigene Hinweise, kein Importfehler |
 | `mart.rabatt_artikel_unaufgeloest` | Betrieb × Monat × Artikelname | so klein wie möglich — die Auflösungsquote |
 
 Drei Zeilen in `mart.pruefung_uebersicht`: Lücken (9–60 Tage), aufgegebene Gegenproben (60 Tage),
-88 gegen 97 (60 Tage).
+88 gegen 97 (60 Tage). Die dritte läuft seit der Abschaltung von 88 (23.09.2026) mit ihrem
+60-Tage-Fenster aus: `geprueft` fällt auf 0 — das ist dort kein Ausfall, sondern das Ende der
+zweiten Quelle.
 
 **Zwei Fallen für jede spätere Auswertung auf den neuen `core`-Tabellen:**
 
@@ -1507,14 +1509,14 @@ Jede fachliche Sicht trägt `betrieb_key`, `enc_id`, `betrieb`, `marke` und am *
 
 | Sicht | Körnung | Quelle | worauf man achten muss |
 |---|---|---|---|
-| `mart.finanzweg` | ein Finanzweg | Stamm aus 88/97 | `aktion` = Name ohne Prozentzahl, nur bei Nachlässen |
+| `mart.finanzweg` | ein Finanzweg | Stamm aus 97 (bis 23.09.2026 auch 88) | `aktion` = Name ohne Prozentzahl, nur bei Nachlässen |
 | `mart.finanzweg_namen` | Finanzweg × Monat × Name | `core.finanzweg_stand` | `namen_im_monat > 1`: die Nummer taugt nicht als Schlüssel |
 | `mart.artikel_nachlass_tag` | Betrieb × Abrufzeitraum (ein Tag) × Finanzweg × Artikel | 92 | `menge` = Artikel auf Nachlass-Bons, **nicht** Verkauf; nur Zeilen mit Artikelnamen |
 | `mart.artikel_nachlass_monat` | Betrieb × Monat × Finanzweg × Artikel | 92 | die Glücksrad-Tabelle |
-| `mart.finanzweg_tag` | Betrieb × Tag × Finanzweg | 97, sonst 88 | **je Betrieb und Tag eine Quelle** (`quelle_bericht`) |
+| `mart.finanzweg_tag` | Betrieb × Tag × Finanzweg | 97, sonst 88 (88 abgeschaltet 23.09.2026, nur noch Rückfall für schon geladene Tage) | **je Betrieb und Tag eine Quelle** (`quelle_bericht`); ein Monat steht erst ab Monatsende + 7 Tagen da |
 | `mart.finanzweg_monat` | Betrieb × Monat × Finanzweg | über `…_basis` (materialisiert) | so frisch wie der letzte Lauf |
-| `mart.nachlass_monat` | Betrieb × Monat × Finanzgruppe × Aktion × Prozentsatz | 88/97 | die zwei 25-%-Wege in **einer** Zeile; vollständiger Betrag |
-| `mart.zahlart_monat` | Betrieb × Monat × Zahlart | 88/97 | Summe aller Zeilen = Bruttoumsatz; Trinkgeld/Rückgeld negativ |
+| `mart.nachlass_monat` | Betrieb × Monat × Finanzgruppe × Aktion × Prozentsatz | 97 (vorher 88/97) | die zwei 25-%-Wege in **einer** Zeile; vollständiger Betrag |
+| `mart.zahlart_monat` | Betrieb × Monat × Zahlart | 97 (vorher 88/97) | Summe aller Zeilen = Bruttoumsatz; Trinkgeld/Rückgeld negativ |
 | `mart.bon_tag` | Betrieb × Tag | 96 | keine Uhrzeit, keine Nachlässe; Ø-Bon aus Summen neu rechnen |
 | `mart.bon_zahlart_tag` | Betrieb × Tag × Zahlart | 96 | über Zahlarten **nicht** summierbar (ein Bon, mehrere Zahlarten) |
 | `mart.debitor_monat` | Betrieb × Monat × Debitor | 96 | Partialindex auf `core.bon` |
@@ -1533,7 +1535,7 @@ Jede fachliche Sicht trägt `betrieb_key`, `enc_id`, `betrieb`, `marke` und am *
 | `mart.verkaufsstelle_tag` | Betrieb × Tag × Verkaufsstelle | Konzern-Umsatzbericht (`0112`) | gilt erst, wenn `mart.verkaufsstelle_abdeckung` „ok" sagt |
 | `mart.zeitzone_hauptsparte_monat`, `…_feinsparte_monat` | Betrieb × Monat × Sparte × Zeitzone | 76, 75 | ohne Kopfzeilen; nie beide zusammen summieren |
 | `mart.unbar_zahlung_monat` | Betrieb × Monat × Betriebsstelle × Zahlart | 99 | `zahlbetrag` positiv |
-| `mart.betriebsbericht_ladestand_monat` | Bericht × Monat | Abrufe + Warteschlange | über `…_basis` (materialisiert) |
+| `mart.betriebsbericht_ladestand_monat` | Bericht × Monat | Abrufe + Warteschlange | über `…_basis` (materialisiert); **ohne 88** seit `0119` — für die Finanzwege gilt der Stand von 97 |
 | `mart.betriebsbericht_ladestand` | ein Bericht | darüber | `aussage` hängt der MCP-Server an jede Kassenantwort |
 
 **Jede core-Tabelle aus `0112`–`0115` hat damit mindestens eine lesbare Sicht** (Vollständigkeitsliste
@@ -1542,7 +1544,8 @@ Tabelle → Sicht → Bericht in `datenherkunft.md`, Abschnitt „Betriebsberich
 ### Sechs Regeln, die in den Sichten stecken
 
 1. **Eine Quelle je Betrieb und Tag.** `core.finanzweg_tag` führt 88 und 97 mit denselben Zahlen.
-   `mart.finanzweg_tag` nimmt 97, wo es ihn gibt, sonst 88. Die Prüfsicht
+   `mart.finanzweg_tag` nimmt 97, wo es ihn gibt, sonst 88. Seit dem 23.09.2026 wird nur noch 97
+   geholt (`0119`); die Regel bleibt, 88 ist Rückfall für die bis dahin geladenen Tage. Die Prüfsicht
    `mart.finanzweg_88_97_abgleich` führt beide nebeneinander und ist im MCP-Katalog gegen `sum()`
    gesperrt.
 2. **Der Abrufzeitraum.** 88 und 92 sind Tagesberichte; ein Mehrtagesabruf (Abnahme, Handabruf)

@@ -257,11 +257,11 @@ mitDb('Worker: Tagesgeschäft, dann Nachladen (mit Datenbank)', () => {
         ('getUmsatzbericht', NULL, '2026-09-20', '2026-09-20', 10, false),
         ('getUmsatzbericht', NULL, '2026-09-21', '2026-09-21', 10, false),
         ('getUmsatzbericht', NULL, '2026-09-22', '2026-09-22', 10, false),
-        ('getReport:88', 'test-duesseldorf', '2026-09-14', '2026-09-14', 85, false),
+        ('getReport:92', 'test-duesseldorf', '2026-09-14', '2026-09-14', 85, false),
         ('getUmsatzbericht', NULL, '2019-03-01', '2019-03-01', 90, true),
         ('getUmsatzbericht', NULL, '2019-03-02', '2019-03-02', 90, true),
         ('getUmsatzbericht', NULL, '2019-03-03', '2019-03-03', 90, true),
-        ('getReport:88', 'test-duesseldorf', '2019-03-01', '2019-03-01', 85, true)`)
+        ('getReport:92', 'test-duesseldorf', '2019-03-01', '2019-03-01', 85, true)`)
   }
 
   const aufgaben = async (): Promise<string[]> =>

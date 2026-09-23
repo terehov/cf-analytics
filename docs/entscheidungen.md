@@ -3552,14 +3552,16 @@ still wiederholen" heißt hier: das Ergebnis steht in der Warteschlange und in `
 jeder 504 zählt als Fehler in Folge (eine Serie stoppt die Spur). **Verworfen:** den Posten
 aufzugeben — dann bliebe die Woche für immer leer, obwohl zwei halbe Wochen gingen.
 
-**5. 88 bleibt im Tagesraster, obwohl 97 dieselben Zahlen liefert — vorerst.** Beim Bau gemessen
+**5. ~~88 bleibt im Tagesraster, obwohl 97 dieselben Zahlen liefert — vorerst.~~** **Revidiert am
+23.09.2026: 88 ist abgeschaltet** (Abschnitt „Bericht 88 abgeschaltet" weiter unten). ~~Beim Bau gemessen
 (Wilma Wunder Düsseldorf, August 2026): die 31 Tagesblöcke von 97 summieren sich für alle 34
 Finanzwege auf den Cent und die Anzahl genau zum Monatsaufruf von 88. 97 kostet 5.115 Aufrufe
 Historie, 88 im Tagesraster 152.840. E1 hat 88 im Tagesraster entschieden, ohne diesen Befund zu
 kennen — deshalb wird hier nichts umgestoßen, sondern die Umstellung vorbereitet: beide Quellen
 schreiben in `core.finanzweg_tag` (mit `bericht`), `mart.finanzweg_88_97_abgleich` vergleicht
 sie Tag für Tag, und der Verzicht auf 88 ist danach ein `aktiv: false`. Die Frage steht in
-`offene-punkte.md` bei Eugene.
+`offene-punkte.md` bei Eugene.~~ Die Vorbereitung hat getragen: der Verzicht war tatsächlich ein
+`aktiv: false` plus eine Migration für die Schlange und die Prüfsichten.
 
 **6. 99 wird in `core` verdichtet, 53 nicht.** 99 liefert eine Zeile je Zahlung ohne Datum und
 ohne Kennung — Zeilen, die niemand einzeln adressieren kann. `core.unbar_zahlung_monat` fasst je
@@ -3571,7 +3573,8 @@ Zeile, nach `monat` partitioniert.
 Tagen fällig, dazu ein Nachlauf nach 14 Tagen. Den laufenden Monat täglich neu zu holen, kostete
 je Monatsbericht 62 Aufrufe je Nacht statt zwei im Monat; für Stufe B (Kellner, Stellen,
 Storno) ist ein Monat Verzug vertretbar. Für 97 heißt das: die Tageswerte eines Monats stehen
-erst ab dem 7. des Folgemonats da — die Finanzwege der letzten Tage kommen bis dahin aus 88.
+erst ab dem 7. des Folgemonats da — ~~die Finanzwege der letzten Tage kommen bis dahin aus 88.~~
+seit 23.09.2026 (88 abgeschaltet) fehlen die Finanzwege des laufenden Monats bis dahin ganz.
 
 ## 23.09.2026 — Erst Tagesgeschäft, dann Auswertungen, dann Nachladen (Migration `0116`)
 
@@ -3633,6 +3636,8 @@ zugänglich und schnell". Fünf Entscheidungen beim Bau:
 **1. 97 vor 88, je Betrieb und Tag.** Beide Berichte tragen dieselbe Finanzwegzahl. 97 kommt aus
 einem Monatsaufruf und ist damit für einen ganzen Monat vollständig, 88 kommt früher (Tagesraster,
 Reife 7 Tage). Die Sicht nimmt je Betrieb und Tag 97, wo es ihn gibt, sonst 88 — nie beide.
+*(Seit 23.09.2026 ist 88 abgeschaltet; die Regel bleibt, 88 ist nur noch Rückfall für die bis
+dahin geladenen Tage.)*
 **Verworfen:** 88 als einzige Quelle (dann fehlten Monate, in denen nur 97 geladen ist) und eine
 Summe mit Filter auf `bericht` (eine Falle, die jede Abfrage neu stellen müsste).
 
@@ -3665,3 +3670,67 @@ zu viel kostet 47 s, einer zu wenig einen Tag falschen Ladestand.
 nicht auf die Hilfstabellen der Nachbarkarten zugreift, sondern die Artikelliste nur markiert
 („auf der Liste" ja/nein/nicht zuordenbar) — ein Filter hätte nicht zuordenbare Kassennamen still
 verloren.
+
+## 23.09.2026 — Bericht 88 abgeschaltet, die Finanzwege kommen nur noch aus 97 (Migration `0119`)
+
+**Die Entscheidung.** Eugene, wörtlich: *„Wenn du dir sicher bist, dass 97 die Werte genauso
+liefert, dann schalte 88 ganz ab."* Die Frage stand seit dem 22.09.2026 offen (Punkt 5 oben,
+`offene-punkte.md`).
+
+**Warum wir sicher sind.** Drei Stichproben, lesend über `/intranet/storeanalytics/getReport?…&laden=`,
+jede ohne eine einzige Abweichung (Einzelheiten `lina-api-inventar-1d.md`, Nachtrag 23.09.2026):
+
+| Stichprobe | Vergleich | Ergebnis |
+|---|---|---|
+| Wilma Wunder Düsseldorf, August 2026 (22.09.2026, Fixtures `report88-…`/`report97-duesseldorf-2026-08.json`) | 88 Monat gegen Summe der 31 Tagesblöcke von 97 | 34 von 34 Finanzwegen gleich in Nummer, Name, Finanzgruppe, Umsatz und Anzahl |
+| Markt Mainz (LINA: „Gastronomie am Markt Mainz GmbH"), 15.08.2026 | 88 Tagesaufruf gegen den Block 15.08. aus dem Monatsaufruf 97 August | 25 von 25 gleich in Umsatz und Anzahl |
+| Wilma Wunder Düsseldorf, Januar 2019 | 88 Monat gegen Summe der 30 Tagesblöcke 97 (erster Block 02.01.2019, der 01.01. war geschlossen) | 22 von 22 gleich, `balanceSumBrutto` beider 315.456,17 |
+
+Die dritte Stichprobe war die, auf die es ankam: ohne sie hätte 97 für die Historie vor 2026 als
+ungeprüft gelten müssen. **97 reicht mindestens bis 2019 zurück** und liefert dort dieselben Zahlen.
+Ein anderer Betrieb (Mainz) und ein Tagesaufruf statt eines Monatsaufrufs schließen aus, dass die
+Gleichheit eine Eigenheit von Düsseldorf oder der Monatssumme ist.
+
+**Was es spart.** Rund 153.000 Aufrufe Historie (am Klon gezählt: 153.363 Posten für 88) und 62
+(+62 Nachlauf) Aufrufe je Nacht. Bei ~5,3 s je Aufruf sind das rund 225 Stunden LINA-Last, die
+nichts Neues brachten.
+
+**Wie abgeschaltet wird — vier Entscheidungen im Bau:**
+
+1. **`aktiv: false`, nicht löschen.** Der Registereintrag und der Lader für 88 bleiben: die bis
+   zum 23.09.2026 geladenen 88-Antworten stehen in `raw.api_antwort`, und `core` muss daraus neu
+   aufbaubar sein (harte Regel 4). Ein Test lädt eine 88-Rohantwort durch den abgeschalteten
+   Eintrag. **Verworfen:** den Eintrag zu entfernen — dann würfe der Lader bei einem Neuaufbau
+   „nicht im Register".
+2. **Ein eigenes Ergebnis `abgeschaltet` für die offenen Posten.** **Verworfen:** `aufgegeben`
+   (wird wiederbelebt, solange 88 in den letzten 24 Stunden ein `ok` hatte — also genau in der
+   ersten Nacht danach — und stünde in `mart.posten_aufgegeben`), `keine_daten` (der Ladestand
+   zählte den Monat dann als geladen) und Löschen (der Posten ist eine Aussage: „war eingereiht,
+   wurde bewusst nicht geholt"). In Arbeit befindliche Posten fasst die Migration nicht an;
+   `abgeschalteteBetriebsberichteSchliessen()` schließt jeden offenen Posten eines inaktiven
+   Betriebsberichts bei jedem Lauf — damit braucht die nächste Abschaltung keine Migration mehr.
+3. **`sync.quelle`: `erwartet = false` mit Begründung, nicht weg.** Harte Regel 10: eine gewollt
+   stille Quelle muss als gewollt dastehen, sonst hält die nächste Person die fehlenden 88-Aufgaben
+   für einen Ausfall. `mart.betriebsbericht_luecke` meldet 88 damit nicht mehr;
+   `mart.betriebsbericht_gegenprobe` sagt `abgeschaltet` statt ewig `faellig`.
+4. **Der Ladestand zeigt 88 nicht mehr — ausdrücklich 88, nicht „alles Nicht-Erwartete".** Der
+   MCP-Server hängt den Ladestand jedes Berichts an jede Antwort auf dessen Sichten; für 88 wären
+   das die Finanzwegsichten mit dem Satz „Bericht 88: … Monate nicht geladen" — eine Lücke, die
+   keine ist. Unter der Notbremse steht dagegen JEDER Bericht auf nicht erwartet, und gerade dann
+   muss der Ladestand sagen, was fehlt. **Verworfen:** die materialisierte Basis neu zu bauen —
+   ein Filter in der Sicht darüber reicht und braucht keinen Refresh.
+
+**Nicht geändert:** `mart.finanzweg_tag` (97 vor 88, je Betrieb und Tag eine Quelle — die bis heute
+geladenen 88-Tage bleiben Rückfall, eine Doppelzählung entsteht nicht; ein Test prüft
+`quelle_bericht = 97` und 4.281,50 € / 600 Vorgänge für 50 % Glücksrad) und
+`mart.finanzweg_88_97_abgleich` (vergleicht weiter, was beide haben; wächst nicht mehr).
+
+**Der Preis, und warum er tragbar ist.** 97 ist ein Monatsbericht (Klasse M-Tag). Die Finanzwege
+eines Monats stehen damit erst ab Monatsende + `BETRIEBSBERICHT_REIFE_TAGE` (7) da, nicht mehr
+sieben Tage nach jedem Tag; so lange trägt auch der Rabattbericht (92) keine Finanzwegnummer.
+Für die Glücksrad-Frage ändert das nichts — sie läuft über 92 und `aktion`/`prozentsatz`, nicht
+über die Nummer. Wer die Nachlass**summe** oder den Zahlungsmix des laufenden Monats braucht,
+wartet bis zum 7. des Folgemonats. **Nicht mitentschieden:** 97 zusätzlich für den laufenden
+Monat zu holen (ein Teilmonat, der beim Nachlauf ersetzt wird) — das wäre ein neuer Einreihzweig
+und steht in `offene-punkte.md`.
+

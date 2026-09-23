@@ -97,8 +97,8 @@ Spalte *Stufe*: A = täglich holen, B = monatlich, C = einmalig/selten/gar nicht
 | # | Frage des Fachbereichs | Quelle | Stufe | Körnung | was es **nicht** beantwortet | `core` | `mart` | Karte / MCP-Bericht |
 |---|---|---|---|---|---|---|---|---|
 | **F1** | *„Wie viel Durchstarter lief über 50 % Glücksrad, je Standort?"* — Aktionsauswertung je Artikel und Nachlass | **92** Rabattbericht | A | Betrieb × Tag × Finanzweg × Artikel**name** | **Kein Bonbezug.** Der Nachlass gilt für den ganzen Bon (327 Artikel trugen ihn im August, auch Getränke) — „Menge dieses Artikels je Finanzweg" ist damit die Nachlassmenge, nicht die Verkaufsmenge | `core.rabatt_artikel_tag` | `mart.artikel_nachlass_monat` | `db_artikelaktion` (neuer Reiter), MCP `aa_nachlass` |
-| **F2** | *„Was kosten uns die Nachlässe insgesamt, je Betrieb und Monat?"* | **88** Finanzwege | A | Betrieb × Tag × Finanzweg | Welche Artikel — dafür F1 | `core.finanzweg_tag`, `core.finanzweg` | `mart.finanzweg_tag`, `mart.nachlass_monat` | neue Karte auf ③ Betrieb |
-| **F3** | *„Karte gegen bar, Trinkgeld, Lieferdienste — wie zahlen unsere Gäste?"* | **88** (Summen), **96** (je Bon), **99** (je Betriebsstelle), **97** (Z-Bon) | A / B | 88: Betrieb × Tag × Finanzweg; 96: je Bon | 88 kennt keine Bon-Zuordnung; 96 führt in `Finanzwege` **nur Zahlarten**, keine Hausbon-/Rabattwege (nachgemessen am 15.08.2026: 32 Glücksrad-Vorgänge in 88, null in 96) | `core.finanzweg_tag`, `core.bon` | `mart.zahlart_monat` | neue Karte, MCP `zahlart_*` |
+| **F2** | *„Was kosten uns die Nachlässe insgesamt, je Betrieb und Monat?"* | ~~**88** Finanzwege~~ **97** Tagesabschluss (Finanzwegblock je Tag; 88 abgeschaltet 23.09.2026) | A | Betrieb × Tag × Finanzweg | Welche Artikel — dafür F1 | `core.finanzweg_tag`, `core.finanzweg` | `mart.finanzweg_tag`, `mart.nachlass_monat` | neue Karte auf ③ Betrieb |
+| **F3** | *„Karte gegen bar, Trinkgeld, Lieferdienste — wie zahlen unsere Gäste?"* | ~~**88** (Summen)~~ **97** (Summen je Tag; 88 abgeschaltet 23.09.2026), **96** (je Bon), **99** (je Betriebsstelle) | A / B | 88: Betrieb × Tag × Finanzweg; 96: je Bon | 88 kennt keine Bon-Zuordnung; 96 führt in `Finanzwege` **nur Zahlarten**, keine Hausbon-/Rabattwege (nachgemessen am 15.08.2026: 32 Glücksrad-Vorgänge in 88, null in 96) | `core.finanzweg_tag`, `core.bon` | `mart.zahlart_monat` | neue Karte, MCP `zahlart_*` |
 | **F4** | *„Personalverzehr und Bruch — wie viel und woran?"* | **92** (Gruppen `100% intern`, `Bruch`, `50% Perso`), **114** Kost-Sach-Bezug | A / B | 92: Tag × Artikel; 114: Monat | 114 war für Wilma Wunder Düsseldorf/August **echt leer** (0 Buchungen, kein Endpunktfehler) — die Zahl steckt bei CF offenbar in 92 | `core.rabatt_artikel_tag`, `core.personalverzehr_monat` | `mart.eigenverbrauch_monat` | Reiter auf ⑥ Wareneinsatz |
 | **F5** | *„Gutscheine: verkauft, eingelöst, im Umlauf"* | **82** Transaktionen, **81** im Umlauf, **12** Gutscheinumsatz | B | 82: Betrieb × Monat × Transaktion; 81: Bestand **heute** | 81 ist ein **Bestand**, keine Historie — rückwirkend nicht holbar, deshalb Momentaufnahme ab sofort (`datensicherung.md`, Grundsatz) | `core.gutschein_transaktion`, `core.gutschein_umlauf_stand` | `mart.gutschein_monat` | neue Karte |
 | **F6** | *„Wer verkauft mit, wer nicht?"* — Kellnerleistung, Zusatzverkauf (Map 4.2) | **60** Umsatz pro Kellner, **61** je Tag, **53** Artikel je Kellner, **56** Finanzwege je Kellner, **57** Gutschriften | B | Betrieb × Monat × Kellner**name** | **Keine Personen-ID gemessen**, nur Namen — eine Zuordnung zu Bounti-Konten ist damit unsicher. Und: ein Bon kann mehreren Kellnern zugeschlagen werden (Ø-Bon in 60 weicht deshalb vom Betriebs-Ø ab) | `core.kellner_umsatz_monat`, `core.kellner_artikel_monat` | `mart.kellner_monat` | neue Karte; Verzahnung mit `mart.bounti_schulung_person` erst nach E5 |
@@ -191,23 +191,24 @@ Tabelle unten mit beiden Zahlen.
 | # | Bericht | Klasse | Aufrufe Historie | je Nacht laufend | warum Stufe A |
 |---|---|---|---|---|---|
 | **92** | Rabattbericht | T | **152.840** | 62 (+62 Nachlauf) | Die einzige Quelle für Nachlass × Artikel. Aktionen halten sich nicht an Monatsgrenzen (`plan-lina-kassendaten.md`, §4.5) |
-| **88** | Finanzwege | T | **152.840** | 62 (+62) | Trägt die Gegenprobe (`balanceSumBrutto` trifft `getUmsatzbericht` auf den Cent) und die Finanzweg-Stammdaten, die es sonst nirgends gibt |
+| ~~**88**~~ | ~~Finanzwege~~ | ~~T~~ | ~~**152.840**~~ | ~~62 (+62)~~ | ~~Trägt die Gegenprobe (`balanceSumBrutto` trifft `getUmsatzbericht` auf den Cent) und die Finanzweg-Stammdaten, die es sonst nirgends gibt~~ **Abgeschaltet 23.09.2026** (Migration `0119`): 97 liefert dieselbe Finanzwegtabelle je Tag aus einem Monatsaufruf — drei Stichproben identisch, zuletzt Januar 2019 (`lina-api-inventar-1d.md`, Nachtrag 23.09.2026). Stamm und Gegenprobe trägt jetzt 97 |
 | **96** | Rechnungsausgangsbuch | **W** (gemessen 22.09.2026) | **≈ 22.000** | 62/Woche ≈ 9 | Bonebene, so weit sie erreichbar ist: Bongröße, Zahlartenmix je Bon, Gutschriftenquote |
-| **97** | Tagesabschluss | M-Tag (gesichert) | **5.115** | 62/Monat ≈ 2 | Tageszeilen aus einem Monatsaufruf — der billigste Tagesbericht im Katalog. Gegenprobe der Zahlarten |
+| **97** | Tagesabschluss | M-Tag (gesichert) | **5.115** | 62/Monat ≈ 2 | Tageszeilen aus einem Monatsaufruf — der billigste Tagesbericht im Katalog. ~~Gegenprobe der Zahlarten~~ **Seit 23.09.2026 die einzige Quelle der Finanzwege** (Stamm, Zahlarten, Nachlässe) |
 | **F15** | `getUmsatzbericht`+`verkaufsstellen` | Konzern | 7 × Kalendertage ≈ **22.000** | **7** | Konzernebene: ein Aufruf deckt alle 141 Betriebe |
 
-**Summe Stufe A, Historie: rund 332.800 Aufrufe** (96 als W, gemessen). ~~315.910 (mit 96 als M-Tag) bzw. 463.635 (mit 96 als T)~~.
+**Summe Stufe A, Historie: rund 180.000 Aufrufe** (96 als W, ohne 88). ~~332.800 mit 88 im Tagesraster~~ (bis 23.09.2026), ~~315.910 (mit 96 als M-Tag) bzw. 463.635 (mit 96 als T)~~.
 Ohne F15, das über `HISTORIE_JE_LAUF` läuft und nicht über das neue Kontingent.
 
 ### Was in 4.000 Aufrufe je Nacht passt — die ehrliche Rechnung
 
 | Zusammenstellung | Aufrufe | Nächte bei 4.000 | Dauer |
 |---|---|---|---|
-| 92 + 88, Tagesraster | 305.680 | 77 | **rund 11 Wochen** |
-| + 96 als **W** (gemessen), + 97 | ≈ 332.800 | 83 | rund 11,9 Wochen |
+| ~~92 + 88, Tagesraster~~ | ~~305.680~~ | ~~77~~ | ~~rund 11 Wochen~~ |
+| **92 allein, Tagesraster** (88 abgeschaltet 23.09.2026) | 152.840 | 38 | **rund 5,5 Wochen** |
+| + 96 als **W** (gemessen), + 97 | ≈ 180.000 ~~332.800~~ | 45 ~~83~~ | rund 6,4 ~~11,9~~ Wochen |
 | **ein dritter Bericht im Tagesraster** | +152.840 | +38 | **+5,5 Wochen** |
 | Stufe B vollständig (13 Berichte × 5.115) | 66.495 | 17 | 2,4 Wochen |
-| **A + B zusammen, 96 als W** | **≈ 399.300** | **100** | **rund 14,3 Wochen** |
+| **A + B zusammen, 96 als W** | **≈ 246.500** ~~399.300~~ | **62** ~~100~~ | **rund 8,8** ~~14,3~~ **Wochen** |
 
 Die Spalte „Nächte bei 4.000" ist seit E8 (22.09.2026) nur noch eine Obergrenze der Dauer: die
 feste 4.000er-Grenze ist gefallen, Betriebsberichte bekommen, was vom Tagesbudget übrig ist.
@@ -216,10 +217,12 @@ feste 4.000er-Grenze ist gefallen, Betriebsberichte bekommen, was vom Tagesbudge
 Berichte im Tagesraster belegen das Kontingent elf Wochen lang vollständig. Jeder weitere kostet
 fünfeinhalb Wochen, in denen alles andere wartet. Die Reihenfolge ist deshalb:
 
-1. **92 und 88 im Tagesraster** (entschieden, §4.5 des Vorgängerplans) — 11 Wochen.
+1. ~~**92 und 88 im Tagesraster** (entschieden, §4.5 des Vorgängerplans) — 11 Wochen.~~
+   **92 im Tagesraster** — 5,5 Wochen. 88 ist seit dem 23.09.2026 abgeschaltet; seine Zahlen
+   kommen aus 97 (siehe „Revidiert am 23.09.2026" unten).
 2. **97 und 96 als Monatsaufrufe mit Tageszeilen** — 2,5 Wochen, laufen **parallel** mit, weil sie
    zusammen nur 10.230 Aufrufe sind: sie sind nach zwei bis drei Nächten durch und verzögern
-   92/88 um weniger als einen Prozentpunkt.
+   ~~92/88~~ 92 um weniger als einen Prozentpunkt.
 3. **Stufe B danach**, in der Reihenfolge des Fragenkatalogs (F5 Gutscheine, F6 Kellner, F7 Stellen,
    F10 Debitoren, F4 Personalverzehr, F8 Zeitzonen×Sparte).
 4. **Stufe C nur nach einer Messung**, nie auf Verdacht.
@@ -592,7 +595,7 @@ Absichtserklärung.
 
 | | Entscheid | Folge für den Bau |
 |---|---|---|
-| **E1** | **Nur 92 und 88 im Tagesraster**, alles andere monatlich | Kostentabelle Abschnitt 3 gilt wie gerechnet |
+| **E1** | **Nur 92 und 88 im Tagesraster**, alles andere monatlich. **Für 88 revidiert am 23.09.2026** (unten) | Kostentabelle Abschnitt 3 gilt wie gerechnet — ~~mit 88~~ seit 23.09.2026 ohne 88 |
 | **E2** | **Eine Zeile je Bon** aus 96 | `core.bon` wie in 4.3, Aggregate als `mart`-Sicht |
 | **E3** | **Storno 38/39 neu messen** über `laden=` | Teil der Vermessung; danach neu entscheiden, ob gebaut wird |
 | **E4** | **Die neun „gesperrten" Berichte neu messen** über `laden=` | Teil der Vermessung; antworten 107/118, wandern sie in Stufe B |
@@ -600,6 +603,20 @@ Absichtserklärung.
 | **E6** | **Bericht 99 laden** (~10,8 GB Raw) | Monatsraster, Stufe B; Plattenplatz vor dem Backfill prüfen |
 | **E7** | **87 erst inhaltlich prüfen**, dann entscheiden | Teil der Vermessung: was steht in 87, das kein JSON-Bericht hat? |
 | **E8** | **Keine feste 4.000er-Grenze.** Die 4.000 stammten aus der ersten Rückfrage dieses Vorhabens (Budgetwahl, nicht gemessen). Eugene: *„Es kann gerne auch länger laden, solange wir das System nicht zuballern und sich über alle API-Aufrufe des gleichen Systems verteilen."* | Der Takt bleibt unverändert (Regel 3), `TAGESBUDGET` bleibt die Obergrenze für **alle** LINA-Aufrufe zusammen. Betriebsberichte bekommen, was nach dem Tagesgeschäft übrig bleibt, und werden **mit den übrigen LINA-Posten verschränkt** statt als Block am Stück — die Nacht wird länger, nicht dichter. `BETRIEBSBERICHT_JE_LAUF` bleibt als Notbremse (0 = aus). **Ergänzt am 23.09.2026 (`0116`):** das Nachladen läuft NACH den Auswertungen (Phase C); vor ihnen nur die laufenden Tages- und Wochenberichte der letzten 21 Tage |
+
+### Revidiert am 23.09.2026 (Eugene): 88 ist abgeschaltet
+
+Wörtlich: *„Wenn du dir sicher bist, dass 97 die Werte genauso liefert, dann schalte 88 ganz ab."*
+
+| | Entscheid | Folge für den Bau |
+|---|---|---|
+| **E1 für 88** | **88 wird nicht mehr geholt**, weder laufend noch als Historie. Die Finanzwege kommen nur aus **97** (Tagesabschluss, M-Tag, `interval=3`). Nachweis: drei Stichproben, jede identisch — Düsseldorf August 2026 (34/34), Markt Mainz 15.08.2026 (25/25), Düsseldorf Januar 2019 (22/22, `balanceSumBrutto` 315.456,17) | Migration `0119`: `aktiv: false` im Register, `sync.quelle` `erwartet = false` mit Begründung, offene 88-Posten mit dem neuen Ergebnis `abgeschaltet` geschlossen. Lader und Rohantworten bleiben (Regel 4); `mart.finanzweg_tag` nimmt 97 vor 88, die schon geladenen 88-Tage bleiben Rückfall. **Ersparnis ≈ 153.000 Aufrufe Historie** (am Klon 153.363) plus 62 (+62) je Nacht |
+
+**Der Preis:** 97 ist ein Monatsbericht. Die Finanzwege (Nachlässe, Zahlarten) eines Monats stehen
+erst ab Monatsende + 7 Tagen da, nicht mehr sieben Tage nach jedem Tag; ebenso lange trägt der
+Rabattbericht (92) keine Finanzwegnummer. Wer eine Aktion im laufenden Monat auswerten will,
+nimmt dafür 92 über `aktion`/`prozentsatz` — der braucht die Nummer nicht. Begründung in
+`entscheidungen.md`, 23.09.2026.
 
 ### Ergebnis der Vermessung vom 22.09.2026
 

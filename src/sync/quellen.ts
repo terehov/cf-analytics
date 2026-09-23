@@ -325,6 +325,23 @@ export const QUELLEN: readonly Quelle[] = [
       bemerkung: 'Registriert, nicht aktiv: an Duesseldorf 0 Zeilen. Erst an einem Betrieb mit '
                + 'Gutscheinumsatz messen (offene-punkte.md).',
     })),
+  /*
+   * Finanzwege (88): ABGESCHALTET am 23.09.2026, nicht stumm (harte Regel 10).
+   * 97 liefert dieselbe Finanzwegtabelle je Tag aus einem Monatsaufruf —
+   * drei Stichproben identisch, zuletzt Januar 2019. Die Zeile steht hier,
+   * damit niemand die fehlenden 88-Aufgaben für einen Ausfall hält, und
+   * damit `mart.betriebsbericht_luecke` 88 nicht mehr als fehlend meldet.
+   */
+  ...BETRIEBSBERICHTE
+    .filter(b => b.bericht === 88)
+    .map((b): Quelle => ({
+      quelle: b.key, bezeichnung: `Betriebsbericht ${b.bericht}: ${b.zweck}`,
+      system: 'lina', endpunkt: b.key, kadenz_stunden: TAEGLICH, erwartet: false,
+      fensterklasse: b.klasse,
+      bemerkung: 'Abgeschaltet 23.09.2026 (Entscheidung Eugene): die Finanzwege kommen nur noch aus '
+               + 'Bericht 97 (Tagesabschluss), der dieselbe Tabelle je Tag liefert. Bereits geladene '
+               + '88-Tage bleiben als Rueckfall in mart.finanzweg_tag (entscheidungen.md, 23.09.2026).',
+    })),
 
   // --- Bewusst still: sie stehen hier, damit sie sichtbar sind ----------
   /*

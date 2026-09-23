@@ -25,7 +25,7 @@
  * Zeitraum eines Postens — und damit Faktor 30 in den Kosten:
  *
  *   T      Tagesaufruf (von = bis). Bericht kennt nur „Kumuliert" und hat keine
- *          Datumsspalte: 92, 88.
+ *          Datumsspalte: 92 (und 88, seit 23.09.2026 abgeschaltet).
  *   W      sieben Tage, NIE länger. Ein Monatsaufruf läuft in 504 Gateway
  *          Timeout (970-kB-HTML-Fehlerseite), sieben Tage in 2,9 s: 96, 86, 113.
  *          Wird es trotzdem zu groß, halbiert der Worker das Fenster.
@@ -116,14 +116,28 @@ export const BETRIEBSBERICHTE: Betriebsbericht[] = [
     hinweis: 'Artikel nur mit NAMEN, keine Nummer. Brutto/Netto sind der gewaehrte Nachlass '
            + '(negativ). Der Nachlass gilt fuer den ganzen Bon, nicht fuer den Artikel.',
   }),
+  /*
+   * 88 IST ABGESCHALTET (Entscheidung Eugene, 23.09.2026). Die Finanzwege
+   * kommen nur noch aus 97: dieselbe Tabelle je Tag aus EINEM Monatsaufruf,
+   * nachgewiesen an drei Stichproben (Düsseldorf August 2026 34/34, Markt
+   * Mainz 15.08.2026 25/25, Düsseldorf Januar 2019 22/22 —
+   * docs/lina-api-inventar-1d.md). Ersparnis rund 153.000 Aufrufe Historie.
+   *
+   * Der Eintrag bleibt im Register und der Lader in betriebsbericht_laden.ts:
+   * core muss aus raw neu aufbaubar bleiben (harte Regel 4), und die bis
+   * zum 23.09.2026 geladenen 88-Antworten stehen in raw. `aktiv: false`
+   * heißt: kein Posten, kein Backfill; offene Posten schließt
+   * betriebsberichteNachfuellen() mit ergebnis 'abgeschaltet' (0119).
+   */
   bb({
-    bericht: 88, klasse: 'T', stufe: 'A',
+    bericht: 88, klasse: 'T', stufe: 'A', aktiv: false,
     zweck: 'Finanzwege je Betrieb und Tag, dazu der Finanzweg-Stamm',
     felder: ['Nummer', 'Finanzweg', 'Finanzgruppe', 'Umsatz', 'Anzahl'],
     tabellen: ['core.finanzweg_tag', 'core.finanzweg', 'core.finanzweg_stand'],
-    hinweis: 'Anzahl zaehlt VORGAENGE (600 bei 50 % Gluecksrad), in 92 zaehlt sie ARTIKEL (712). '
-           + 'Bericht 97 liefert dieselbe Tabelle je Tag aus einem Monatsaufruf — gemessen '
-           + '22.09.2026, alle 34 Finanzwege auf den Cent gleich (docs/lina-api-korrekturen.md).',
+    hinweis: 'ABGESCHALTET 23.09.2026: Bericht 97 liefert dieselbe Tabelle je Tag aus einem '
+           + 'Monatsaufruf (drei Stichproben identisch, zuletzt Januar 2019). Bereits geladene '
+           + '88-Antworten laedt der Lader weiter; mart.finanzweg_tag nimmt 97 vor 88. '
+           + 'Anzahl zaehlt VORGAENGE (600 bei 50 % Gluecksrad), in 92 zaehlt sie ARTIKEL (712).',
   }),
   bb({
     bericht: 96, klasse: 'W', stufe: 'A',
@@ -139,7 +153,9 @@ export const BETRIEBSBERICHTE: Betriebsbericht[] = [
     dynamisch: STEUERSPALTEN,
     tabellen: ['core.tagesabschluss_tag', 'core.finanzweg_tag'],
     hinweis: 'possibleIntervals fuehrt nur 3 "pro Tag". Je Tag zwei Bloecke: Hauptsparte × '
-           + 'Steuersatz (brutto) und die Finanzwegtabelle wie in Bericht 88.',
+           + 'Steuersatz (brutto) und die Finanzwegtabelle wie in Bericht 88. Seit 23.09.2026 die '
+           + 'EINZIGE laufende Quelle der Finanzwege (88 abgeschaltet) — ein Monat steht damit '
+           + 'erst ab Monatsende + REIFE_TAGE da.',
   }),
 
   // --- Stufe B: monatlich, soweit nicht anders gemessen ---------------------

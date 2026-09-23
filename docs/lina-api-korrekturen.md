@@ -431,9 +431,14 @@ zwei Blöcke — Hauptsparte × Steuersatz **und die vollständige Finanzwegtabe
 Summenzeilen). Über die 31 Tage summiert treffen alle 34 Finanzwege den Monatsaufruf von 88 auf
 den Cent, die Anzahl genau — auch 3168, 3500, 3501, 3502. Die Hauptsparten-Blöcke summieren sich
 zu `balanceSumBrutto` (369.841,09). Damit kostet die Finanzwegtabelle je Betrieb-Tag 5.115 statt
-152.840 Aufrufe. Gemessen an EINEM Betrieb und EINEM Monat; der Importer lädt beide und
+152.840 Aufrufe. ~~Gemessen an EINEM Betrieb und EINEM Monat; der Importer lädt beide und
 vergleicht sie laufend (`mart.finanzweg_88_97_abgleich`). Ob 88 im Tagesraster entfallen kann,
-entscheidet Eugene (`offene-punkte.md`, `entscheidungen.md` 22.09.2026 Punkt 5).
+entscheidet Eugene (`offene-punkte.md`, `entscheidungen.md` 22.09.2026 Punkt 5).~~
+**Nachtrag 23.09.2026:** an zwei weiteren Stichproben bestätigt — Markt Mainz, Tagesaufruf
+15.08.2026 (25 von 25 gleich), und Düsseldorf Januar 2019 (22 von 22 gleich, `balanceSumBrutto`
+315.456,17; 97 reicht also mindestens bis 2019). **88 ist daraufhin abgeschaltet** (Migration
+`0119`, `entscheidungen.md` 23.09.2026); die Finanzwege kommen nur noch aus 97.
+`mart.finanzweg_88_97_abgleich` vergleicht nur noch die bis dahin geladenen 88-Tage.
 
 **Falsch war (stillschweigend angenommen):** ~~`table[].businessDate` nennt den Zeitraum des
 Blocks.~~

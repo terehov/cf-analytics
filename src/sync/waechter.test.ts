@@ -19,6 +19,7 @@ import { BETRIEBSBERICHTE, AKTIVE_BETRIEBSBERICHTE } from '../lina/betriebsberic
 import { LADENAKTE_ENDPUNKTE } from '../ladenakte/endpunkte'
 import { FN_ENDPUNKTE } from '../foodnotify/endpunkte'
 import { QUELLEN } from './quellen'
+import { GELADENE_BETRIEBSBERICHTE } from './betriebsbericht_laden'
 
 /**
  * Alle drei Register zusammen — LINA, Ladenakte und FoodNotify.
@@ -306,12 +307,26 @@ describe('Betriebsberichte', () => {
     expect(BETRIEBSBERICHTE.find(b => b.bericht === 97)!.intervall).toBe(3)
   })
 
-  test('nicht geladen: 38, 114, 81, 82 und die gesperrten', () => {
-    for (const n of [38, 114, 81, 82, 107, 23]) {
+  test('nicht geladen: 38, 114, 81, 82, 88 und die gesperrten', () => {
+    // 88 seit 23.09.2026: die Finanzwege kommen aus 97 (Entscheidung Eugene).
+    for (const n of [38, 114, 81, 82, 88, 107, 23]) {
       expect({ n, aktiv: BETRIEBSBERICHTE.find(b => b.bericht === n)!.aktiv }).toEqual({ n, aktiv: false })
     }
     const aktiv = new Set(AKTIVE_BETRIEBSBERICHTE.map(b => b.bericht))
     for (const n of [87, 64, 18, 12, 2, 3, 7, 8, 9, 24, 118]) expect(aktiv.has(n)).toBe(false)
+  })
+
+  /**
+   * 88 ist abgeschaltet, nicht stumm (harte Regel 10): das Quellenregister
+   * fuehrt ihn als nicht erwartet MIT Begruendung, und der Lader behaelt
+   * seinen Weg — alte Rohantworten muessen sich weiter laden lassen (Regel 4).
+   */
+  test('88 abgeschaltet: nicht erwartet im Register, Ladeweg bleibt, 97 aktiv', () => {
+    const q = QUELLEN.find(x => x.endpunkt === 'getReport:88')
+    expect(q?.erwartet).toBe(false)
+    expect(q?.bemerkung).toContain('97')
+    expect(GELADENE_BETRIEBSBERICHTE.has('getReport:88')).toBe(true)
+    expect(AKTIVE_BETRIEBSBERICHTE.some(b => b.bericht === 97)).toBe(true)
   })
 
   test('Parameter: Datum ohne fuehrende Null, reltime custom, das Intervall der Klasse', () => {

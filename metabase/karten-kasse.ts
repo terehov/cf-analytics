@@ -131,7 +131,7 @@ SELECT n.betrieb                                   AS "Betrieb",
   },
 
   // -------------------------------------------------------------------
-  // F2: was die Nachlaesse kosten — vollstaendig, aus 88/97
+  // F2: was die Nachlaesse kosten — vollstaendig, aus 97 (88 bis 23.09.2026)
   // -------------------------------------------------------------------
   {
     schluessel: 'ka_nachlass_kosten',
