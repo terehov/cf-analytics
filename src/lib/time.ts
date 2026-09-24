@@ -33,6 +33,12 @@ function wanduhr(d: Date) {
   return { y: g('year'), m: g('month'), d: g('day'), h: g('hour') % 24 }
 }
 
+/** Der Kalendertag (YYYY-MM-DD) eines Zeitpunkts in der Geschäftszeitzone — nicht der Geschäftstag. */
+export function kalendertagInGeschaeftszeitzone(d: Date): string {
+  const { y, m, d: tag } = wanduhr(d)
+  return `${y}-${String(m).padStart(2, '0')}-${String(tag).padStart(2, '0')}`
+}
+
 /** Der Geschäftstag, zu dem ein Zeitpunkt gehört. */
 export function geschaeftstag(at: Date): string {
   const { y, m, d, h } = wanduhr(at)

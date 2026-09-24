@@ -4715,3 +4715,20 @@ vollständigem Backfill) 10,9 s. Gegen die leeren Tabellen des Abnahmeklons: 0,1
 *Verhindert durch:* `mart.betriebsbericht_ladestand_basis` (materialisiert, 3 ms). **Regel:** was an
 JEDER Antwort hängt, wird in Produktionsgröße gemessen, bevor es an jede Antwort gehängt wird —
 dieselbe Lehre wie `0106` (`mart.datenstand`).
+
+## Das Nachladen lief über Mitternacht und verdrängte den nächsten Lauf (24.09.2026)
+
+**Symptom.** Lauf 135 (Handstart 23.09. 10:29) endete erst am 24.09. um 12:03. Der reguläre
+05:02-Lauf 136 stand in `mart.sync_status` als `uebersprungen` mit 0 Aufgaben: an diesem Tag lief
+kein Tagesgeschäft, die Dashboards zeigten den Vortag.
+
+**Ursache.** Phase C (Nachladen, seit `0116`) endete nur an Budget, Arbeitsfenster (0–24) oder
+Notbremse. Das Tagesbudget zählt je UTC-Tag und wurde um 02:00 Ortszeit frisch — Phase C lief mit
+dem Budget des Folgetags weiter und hielt die Laufsperre. Keine Prüfung hatte den Fall eines Laufs
+über den nächsten Start hinweg: die Phasentests prüften Reihenfolge und Budget, nicht die Uhr.
+
+**Was es künftig verhindert.** `NACHLADEN_BIS_STUNDE` (Voreinstellung 23 Uhr Ortszeit) und das
+harte Ende am Tageswechsel (`nachladenVorbei()`, `src/sync/worker.ts`), getestet in
+`src/sync/nachladen_ende.test.ts`. Sichtbar bleibt der Fall über `sync.lauf.status =
+'uebersprungen'` — eine Zeile, die man nach jeder langen Nacht ansehen sollte.
+

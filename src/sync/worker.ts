@@ -36,7 +36,7 @@ import { FnClient } from '../foodnotify/client'
 import { fnEndpunkt } from '../foodnotify/endpunkte'
 import { fnLaden } from '../foodnotify/laden'
 import { laden } from './laden'
-import { alsIsoDatum } from '../lib/time'
+import { alsIsoDatum, kalendertagInGeschaeftszeitzone, stundeInGeschaeftszeitzone } from '../lib/time'
 
 const schlaf = (ms: number) => new Promise(r => setTimeout(r, ms))
 
@@ -45,6 +45,16 @@ const schlaf = (ms: number) => new Promise(r => setTimeout(r, ms))
  * keine Worker-Phase — sie läuft in src/sync.ts zwischen den beiden.
  */
 type Phase = 'tagesgeschaeft' | 'nachladen'
+
+/**
+ * Ist das Nachladen (Phase C) vorbei? Ja ab der vollen Stunde `bisStunde`
+ * Ortszeit und an jedem späteren Ortstag als dem Starttag. Rein, damit es
+ * ohne Uhr testbar ist. Begründung an `NACHLADEN_BIS_STUNDE` in config.ts.
+ */
+export function nachladenVorbei(jetzt: Date, starttag: string, bisStunde: number): boolean {
+  if (kalendertagInGeschaeftszeitzone(jetzt) !== starttag) return true
+  return stundeInGeschaeftszeitzone(jetzt) >= bisStunde
+}
 
 /** Exponentiell mit Jitter — nie im festen Takt nachfassen. */
 function wiedervorlage(versuche: number): string {
@@ -973,6 +983,11 @@ async function sitzungOeffnen(
     return null
   }
 
+  /** Ortstag, an dem Phase C begann — gesetzt in `nachladen()`, gelesen in der Schleife. */
+  let nachladenStarttag: string | null = null
+  const nachladenEndeErreicht = (jetzt: Date): boolean =>
+    nachladenVorbei(jetzt, nachladenStarttag ?? kalendertagInGeschaeftszeitzone(jetzt), config.NACHLADEN_BIS_STUNDE)
+
   const schleife = async (anbieter: Anbieter, phase: Phase, stand: Anbieterstand): Promise<void> => {
     aktiv[anbieter] = stand
     const eigenerClient = anbieter === 'fn' ? fnClient : client
@@ -1010,6 +1025,17 @@ async function sitzungOeffnen(
        */
       if (!client.imFenster()) {
         stand.notiz = 'Arbeitsfenster beendet'; break
+      }
+      /**
+       * DAS NACHLADEN HAT EIN ENDE, das Tagesgeschäft nicht (seit 24.09.2026).
+       * Lauf 135 lud bis zum nächsten Mittag nach, weil das Tagesbudget um
+       * 00:00 UTC frisch wurde — und der 05:02-Lauf fiel aus. Phase C endet
+       * deshalb zur Stunde `NACHLADEN_BIS_STUNDE` und nie nach Mitternacht
+       * des Tages, an dem sie begann (Ortszeit). Was übrig bleibt, holt die
+       * nächste Nacht; die Notiz sagt es (harte Regel 10).
+       */
+      if (phase === 'nachladen' && nachladenEndeErreicht(new Date())) {
+        stand.notiz = `Nachladen-Ende erreicht (${config.NACHLADEN_BIS_STUNDE} Uhr bzw. Tageswechsel, Ortszeit)`; break
       }
       /**
        * Die Budgets sind JE ANBIETER getrennt (seit 02.08.2026) — und jetzt
@@ -1816,6 +1842,7 @@ async function sitzungOeffnen(
     if (!tagesgeschaeftGelaufen) throw new Error('Phase C erst nach Phase A')
     if (nachladenGelaufen) throw new Error('Phase C läuft je Lauf genau einmal')
     nachladenGelaufen = true
+    nachladenStarttag = kalendertagInGeschaeftszeitzone(new Date())
     const nichtGestartet = abbruchSignal ? `Signal ${abbruchSignal}`
       : laufAbbruch ? laufAbbruch
       : jeAnbieter.lina.status === 'abgebrochen' ? 'die LINA-Spur ist im Tagesgeschaeft abgebrochen'

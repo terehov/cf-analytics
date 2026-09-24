@@ -399,6 +399,18 @@ const Schema = z.object({
    */
   FENSTER_VON_STUNDE: z.coerce.number().int().min(0).max(23).default(0),
   FENSTER_BIS_STUNDE: z.coerce.number().int().min(1).max(24).default(24),
+  /**
+   * Phase C (Nachladen) endet spätestens zu dieser vollen Stunde, Ortszeit —
+   * und nie nach Mitternacht des Tages, an dem sie begonnen hat.
+   *
+   * Anlass (24.09.2026): Lauf 135 lud von 15:30 bis zum nächsten Mittag nach.
+   * Das Tagesbudget wechselt um 00:00 UTC, also 02:00 Ortszeit; danach bekam
+   * das Nachladen ein frisches Budget und verbrauchte das des Folgetags. Der
+   * 05:02-Lauf 136 fand die Sperre belegt und fiel aus — kein Tagesgeschäft,
+   * die Dashboards blieben einen Tag stehen. Das Nachladen darf nie den
+   * nächsten Lauf verdrängen; es hat keine Frist, das Tagesgeschäft schon.
+   */
+  NACHLADEN_BIS_STUNDE: z.coerce.number().int().min(1).max(24).default(23),
 
   // --- Fehlerverhalten ---------------------------------------------------
   /**

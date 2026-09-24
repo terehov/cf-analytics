@@ -18,6 +18,17 @@ Aufruf füllt eine Nacht das Tagesbudget (10.500) in rund 15,5 Stunden; Phase B 
 Materialisierungen, Round Table, Zulaufprüfung) wäre erst gegen 20:30 gelaufen, die Dashboards
 hätten den ganzen Tag den Vortag gezeigt.
 
+**Das Nachladen hat eine Frist (24.09.2026).** Die erste Nacht mit Phase C lief anders als gedacht:
+Lauf 135 (Start 23.09. 10:29, Handstart) war um 15:30 mit A und B fertig und lud dann bis zum
+**24.09. 12:03** nach — 25,5 Stunden. Der Grund: das Tagesbudget zählt je **UTC-Tag**
+(`budgetTagWechseln()` in `src/lina/client.ts`), wurde also um 02:00 Ortszeit frisch, und Phase C
+kannte keine andere Grenze. Sie verbrauchte das Budget des Folgetags, der 05:02-Lauf 136 fand die
+Laufsperre belegt und endete `uebersprungen` — kein Tagesgeschäft, die Dashboards standen einen
+Tag. Seitdem endet Phase C zur vollen Stunde `NACHLADEN_BIS_STUNDE` (Voreinstellung 23, Ortszeit)
+und **nie nach Mitternacht des Tages, an dem sie begann** (`nachladenVorbei()` in
+`src/sync/worker.ts`, Test `src/sync/nachladen_ende.test.ts`). Das Tagesgeschäft hat keine Frist;
+das Nachladen darf den nächsten Lauf nie verdrängen. Die Notiz des Laufs nennt das Ende.
+
 ```text
   nachfuellen()                     Vorlauf: die Schlange füllen (setzt nachladen je Posten)
 
@@ -34,6 +45,7 @@ hätten den ganzen Tag den Vortag gezeigt.
 
   ── Phase C ── das Nachladen, nur die LINA-Spur ──────────
      sitzung.nachladen()            alles Fällige, verschränkt, bis Budget/Fenster/Notbremse
+                                    und spätestens NACHLADEN_BIS_STUNDE (23 Uhr) bzw. Tageswechsel
      wenn Konzern-Historie geladen: deckungsbeitrag · roundTable · vergleichstag
   ── sitzung.abschliessen() ── Status, Notiz, nachladen_posten/_offen, Sperre frei ──
 ```
