@@ -1465,7 +1465,7 @@ nächste Schritt (M5 in `plan-lina-vollabzug.md`). Alle stehen im Katalog mit K�
 
 | Sicht | Körnung | Erwartung |
 |---|---|---|
-| `mart.betriebsbericht_gegenprobe` | Bericht × Betrieb × Abrufzeitraum | `befund` ok; `nachholen` sagt, was der Lauf damit tut — seit `0119` auch `abgeschaltet` (Bericht wird nicht mehr geholt, etwa 88). Seit `0120` `befund = 'vorlaeufig'`: vor der Reife geholt, nicht geprüft |
+| `mart.betriebsbericht_gegenprobe` | Bericht × Betrieb × Abrufzeitraum | `befund` ok; `nachholen` sagt, was der Lauf damit tut — seit `0119` auch `abgeschaltet` (Bericht wird nicht mehr geholt, etwa 88). Seit `0120` `befund = 'vorlaeufig'`: vor der Reife geholt, nicht geprüft. Seit `0121` `befund = 'umsatzbericht lueckenhaft'`: LINAs Summe liegt über unserem Umsatzbericht, und der hat im Zeitraum einen Lochtag oder Nulltag — der Fehler liegt bei uns, kein Nachholen; die Tage stehen in `umsatzbericht_luecke` (letzte Spalte). Eigene Zeile in `mart.pruefung_uebersicht` („Gegenprobe ausgesetzt, Umsatzbericht lueckenhaft"), Erwartung 0, solange kein Lochtag/Nulltag in 60 Tagen liegt |
 | `mart.betriebsbericht_luecke` | Bericht × Betrieb × Tag (9–60 Tage alt) | **leer** ab der zweiten Nacht |
 | `mart.finanzweg_88_97_abgleich` | Betrieb × Tag × Finanzweg, wo beide Quellen da sind | kein `weicht ab`. Wächst seit 23.09.2026 nicht mehr (88 abgeschaltet, `0119`) |
 | `mart.bericht_hinweis` | Bericht × Betrieb × Zeitraum × Text | LINAs eigene Hinweise, kein Importfehler |
@@ -1536,7 +1536,7 @@ Jede fachliche Sicht trägt `betrieb_key`, `enc_id`, `betrieb`, `marke` und am *
 | `mart.zeitzone_hauptsparte_monat`, `…_feinsparte_monat` | Betrieb × Monat × Sparte × Zeitzone | 76, 75 | ohne Kopfzeilen; nie beide zusammen summieren |
 | `mart.unbar_zahlung_monat` | Betrieb × Monat × Betriebsstelle × Zahlart | 99 | `zahlbetrag` positiv |
 | `mart.betriebsbericht_ladestand_monat` | Bericht × Monat | Abrufe + Warteschlange | über `…_basis` (materialisiert); **ohne 88** seit `0119` — für die Finanzwege gilt der Stand von 97. Seit `0120` `betriebe_vorlaeufig` am Ende: ein Monat mit vorläufigem Abruf ist „teilweise", live gelesen |
-| `mart.betriebsbericht_ladestand` | ein Bericht | darüber | `aussage` hängt der MCP-Server an jede Kassenantwort |
+| `mart.betriebsbericht_ladestand` | ein Bericht | darüber | `aussage` hängt der MCP-Server an jede Kassenantwort. Seit `0121` nennen Tagesberichte (T, W) den **Tag** („vollstaendig vom 20.08.2026 bis 16.09.2026"), Monatsberichte Monate; getrennt „vorlaeufig vom … bis …" (97, live), „teilweise geladen: Monate …", „nicht geladen: N Monate … zwischen … und …", am Ende „Stand: …" (Refresh der Basis). Neue Spalten am Ende: `vollstaendig_ab_tag`, `vollstaendig_bis_tag`, `vorlaeufig_von`, `vorlaeufig_bis`, `stand`. `vollstaendig_ab` ist seit `0121` der Anfang der Strecke, die in `vollstaendig_bis` endet (vorher NULL, sobald danach noch eine Lücke kam); Monatsberichte sind erst reif, wenn ihr letzter Tag 9 Tage zurückliegt |
 
 **Jede core-Tabelle aus `0112`–`0115` hat damit mindestens eine lesbare Sicht** (Vollständigkeitsliste
 Tabelle → Sicht → Bericht in `datenherkunft.md`, Abschnitt „Betriebsberichte").

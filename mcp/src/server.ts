@@ -577,10 +577,14 @@ export const app = new Skybridge({
        * seit 2018 geladen, die Betriebsberichte fuellen sich ab dem Deploy
        * rueckwaerts — eine Frage nach 2019 trifft dort lange auf nichts. Eine
        * Zeile je Bericht, fertig als Satz; ein Fehler kostet nur diesen Teil.
+       * Seit 0121 mit dem Tag fuer Tagesberichte (vollstaendig_*_tag), dem
+       * vorlaeufigen laufenden Monat (97) und dem Stand der Materialisierung.
        */
       const betriebsberichte = await abfragen(
         `SELECT bericht, bezeichnung, erster_monat::text, letzter_monat::text,
-                vollstaendig_ab::text, vollstaendig_bis::text, aussage
+                vollstaendig_ab::text, vollstaendig_bis::text,
+                vollstaendig_ab_tag::text, vollstaendig_bis_tag::text,
+                vorlaeufig_bis::text, stand::text, aussage
            FROM mart.betriebsbericht_ladestand ORDER BY bericht`).catch(() => [])
       // Mit Dauer: am 15.09.2026 lief genau diese Abfrage in die 20-s-Grenze,
       // und niemand konnte hinterher sagen, wie lange sie sonst braucht.

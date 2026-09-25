@@ -819,7 +819,7 @@
    "koernung": "Betriebsbericht × Betrieb × Abrufzeitraum — Gegenprobe gegen den Umsatzbericht",
    "thema": "import",
    "summen_erlaubt": null,
-   "kommentar": "Koernung: Betriebsbericht × Betrieb × Abrufzeitraum. Trifft LINAs eigene Summe\n(balanceSumBrutto) den Konzern-Umsatzbericht desselben Betriebs und Zeitraums?\n\nbefund: ok | abweichung | leer trotz Umsatz (nBillsGesamt 0, der Umsatzbericht kennt Umsatz)\n| ohne Konzernzahl (kein Umsatzbericht fuer den Zeitraum — dann ist nichts zu pruefen)\n| vorlaeufig (0120: vor der Reife geholt, etwa der laufende Monat von 97 — nicht geprueft,\nweil LINA die letzten Tage noch fuellt; geprueft wird der Abruf, der ihn nach der Reife ersetzt).\nnachholen: faellig (wird von betriebsberichteNachfuellen() erneut eingereiht, hoechstens\ndreimal, frühestens eine Woche nach dem letzten Abruf) | wartet | aufgegeben | abgeschaltet\n(der Bericht wird nicht mehr geholt — sync.quelle.erwartet = false, etwa 88 seit 23.09.2026\noder alle unter der Notbremse; es wird nichts nachgeholt) | historisch (aelter als 60 Tage:\nnicht mehr nachgeholt, sichtbar bleibt es trotzdem).\n\nAnlass: der falsche Endpunkt lieferte zwei Monate lang leere Gerueste mit plausibler\nGroesse (fehlerkatalog.md, 22.09.2026). Eine Antwort beweist nichts, ihre Summe schon.\nWer die Sicht ueber viele Monate liest, filtert zeitraum_bis — sonst rechnet sie jeden\nAbruf seit 2018 gegen den Umsatzbericht.",
+   "kommentar": "Koernung: Betriebsbericht × Betrieb × Abrufzeitraum. Trifft LINAs eigene Summe\n(balanceSumBrutto) den Konzern-Umsatzbericht desselben Betriebs und Zeitraums?\n\nbefund: ok | abweichung | leer trotz Umsatz (nBillsGesamt 0, der Umsatzbericht kennt Umsatz)\n| ohne Konzernzahl (kein Umsatzbericht fuer den Zeitraum — dann ist nichts zu pruefen)\n| vorlaeufig (0120: vor der Reife geholt, etwa der laufende Monat von 97 — nicht geprueft,\nweil LINA die letzten Tage noch fuellt; geprueft wird der Abruf, der ihn nach der Reife ersetzt)\n| umsatzbericht lueckenhaft (0121: LINAs Summe liegt UEBER unserem Umsatzbericht, und der hat im\nZeitraum einen Lochtag — mart.umsatz_lochtag, gilt fuer alle Betriebe — oder einen Nulltag dieses\nBetriebs — mart.umsatztag_luecke. Der Fehler liegt dann bei uns, nicht im Betriebsbericht: kein\nNachholen. Welche Tage, steht in umsatzbericht_luecke. Anlass: 21./22.07.2026, rund 1.100 Abrufe).\nnachholen: faellig (wird von betriebsberichteNachfuellen() erneut eingereiht, hoechstens\ndreimal, frühestens eine Woche nach dem letzten Abruf) | wartet | aufgegeben | abgeschaltet\n(der Bericht wird nicht mehr geholt — sync.quelle.erwartet = false, etwa 88 seit 23.09.2026\noder alle unter der Notbremse; es wird nichts nachgeholt) | historisch (aelter als 60 Tage:\nnicht mehr nachgeholt, sichtbar bleibt es trotzdem) | NULL (nichts nachzuholen).\n\nLochtage und Nulltage reichen 120 Tage zurueck — ein aelteres Loch im Umsatzbericht steht hier\nals abweichung/historisch.\n\nAnlass: der falsche Endpunkt lieferte zwei Monate lang leere Gerueste mit plausibler\nGroesse (fehlerkatalog.md, 22.09.2026). Eine Antwort beweist nichts, ihre Summe schon.\nWer die Sicht ueber viele Monate liest, filtert zeitraum_bis — sonst rechnet sie jeden\nAbruf seit 2018 gegen den Umsatzbericht.",
    "spalten": [
     "endpunkt",
     "bericht",
@@ -839,7 +839,8 @@
     "konzern_tage",
     "abweichung_brutto",
     "befund",
-    "nachholen"
+    "nachholen",
+    "umsatzbericht_luecke"
    ],
    "achsen": [
     "betrieb_key",
@@ -853,7 +854,7 @@
    "koernung": "ein Betriebsbericht — geladener Zeitraum als Satz",
    "thema": "import",
    "summen_erlaubt": false,
-   "kommentar": "Koernung: ein Betriebsbericht. Fuer welchen Zeitraum er geladen ist: erster und letzter\ngeladener Monat, vollstaendig_ab/-bis (die juengste lueckenlose Strecke reifer Monate), wie\nviele reife Monate mit Umsatz fehlen, und die Aussage als Satz. Der MCP-Server haengt aussage an\njede Antwort, die eine der sichten liest — damit eine Auswertung ueber 2019 \"fuer 2019 nicht\ngeladen\" sagt statt 0 (harte Regel 10). Der Backfill laeuft rueckwaerts: waehrend er laeuft,\nsteht hier eine wachsende Strecke, und davor \"nicht geladen\".",
+   "kommentar": "Koernung: ein Betriebsbericht. Fuer welchen Zeitraum er geladen ist, und die Aussage als Satz.\nDer MCP-Server haengt aussage an jede Antwort, die eine der sichten liest — damit eine\nAuswertung ueber 2019 \"nicht geladen\" sagt statt 0 (harte Regel 10).\n\nSeit 0121: Tagesberichte (fensterklasse T, W) nennen den TAG — vollstaendig_ab_tag bis\nvollstaendig_bis_tag ist die juengste lueckenlose Strecke (jeder Betrieb mit Umsatz an jedem\nTag abgedeckt). Monatsberichte nennen Monate: vollstaendig_bis ist der juengste vollstaendige\nreife Monat, vollstaendig_ab der Anfang der lueckenlosen Strecke, die dort endet (bis 0121 NULL,\nsobald danach noch eine Luecke kam); ein Monatsbericht ist reif, wenn sein letzter Tag 9 Tage\nzurueckliegt, ein Tagesbericht, sobald sein erster Tag es tut.\nvorlaeufig_von/-bis: der laufende Monat von 97, vor der Reife geholt — live gelesen, bis = so\nweit ist er fuer jeden Betrieb da. monate_teilweise / monate_nicht_geladen zaehlen reife Monate\nmit Umsatz. stand: wann die Materialisierung zuletzt aufgefrischt wurde (Phase B und nach\nPhase C) — waehrend Phase C und am Morgen vor Phase B ist alles ausser vorlaeufig_* so alt.\n\nDer Backfill laeuft rueckwaerts: waehrend er laeuft, steht hier eine wachsende Strecke, und\ndavor \"nicht geladen\".",
    "spalten": [
     "endpunkt",
     "bericht",
@@ -867,7 +868,12 @@
     "monate_teilweise",
     "monate_nicht_geladen",
     "aussage",
-    "sichten"
+    "sichten",
+    "vollstaendig_ab_tag",
+    "vollstaendig_bis_tag",
+    "vorlaeufig_von",
+    "vorlaeufig_bis",
+    "stand"
    ],
    "achsen": [
     "endpunkt"
@@ -880,7 +886,7 @@
    "koernung": "Betriebsbericht × Monat — materialisierte Fassung von mart.betriebsbericht_ladestand_monat",
    "thema": "import",
    "summen_erlaubt": false,
-   "kommentar": "Koernung: Betriebsbericht × Monat — die materialisierte Fassung von\nmart.betriebsbericht_ladestand_monat. Reife und Zustand gelten zum Zeitpunkt des Refresh (Phase B\nund nach Phase C, src/sync/betriebsbericht_sichten.ts). Gelesen wird die Sicht gleichen Namens\nohne _basis.",
+   "kommentar": "Koernung: Betriebsbericht × Monat — die materialisierte Fassung von\nmart.betriebsbericht_ladestand_monat. Reife und Zustand gelten zum Zeitpunkt des Refresh (Phase B\nund nach Phase C, src/sync/betriebsbericht_sichten.ts) — der steht in stand. Gelesen wird die\nSicht gleichen Namens ohne _basis.\n\nSeit 0121 fuer Tagesberichte (T, W) exakt: betrieb_tage_abgedeckt zaehlt nur Betrieb-Tage MIT\nUmsatz, die ein Abruf (oder \"keine Daten\") abdeckt. vollstaendig_ab_tag/vollstaendig_bis_tag\ngelten je Bericht (in jeder Monatszeile gleich): die juengste lueckenlose Strecke von Tagen, an\ndenen jeder Betrieb mit Umsatz abgedeckt ist — auch ueber noch nicht reife Tage hinweg. Fuer\nMonatsberichte NULL.",
    "spalten": [
     "endpunkt",
     "bericht",
@@ -893,7 +899,10 @@
     "betrieb_tage_mit_umsatz",
     "betrieb_tage_abgedeckt",
     "zustand",
-    "sichten"
+    "sichten",
+    "vollstaendig_ab_tag",
+    "vollstaendig_bis_tag",
+    "stand"
    ],
    "achsen": [
     "endpunkt",
@@ -907,7 +916,7 @@
    "koernung": "Betriebsbericht × Monat — wie viel geladen ist",
    "thema": "import",
    "summen_erlaubt": false,
-   "kommentar": "Koernung: Betriebsbericht × Monat seit Januar 2018 (materialisiert in\nmart.betriebsbericht_ladestand_basis, Stand des letzten Laufs). Wie viel von einem Monat ist fuer diesen\nBericht geladen — gemessen an den Betrieben bzw. Betrieb-Tagen mit Umsatz (Umsatzbericht, nur\nreife Tage: aelter als 9 Tage). Tagesberichte (T, W) zaehlen Betrieb-Tage, Monatsberichte (M,\nM-Tag) Betriebe. Ein Abruf mit null Zeilen zaehlt als geladen, ebenso ein Posten, fuer den LINA\n\"keine Daten\" gemeldet hat (betriebe_leer).\n\nzustand: vollstaendig | teilweise | nicht geladen | kein Umsatz. \"nicht geladen\" ist der Fall,\num den es geht: eine Auswertung ueber diesen Monat liefert dann KEINE Zeile, und das heisst\nnicht null. sichten nennt die mart-Sichten, die aus dem Bericht lesen.\n\nbetriebe_vorlaeufig (0120): Betriebe, deren Abruf fuer diesen Monat vor der Reife geholt wurde\n(laufender Monat von 97, bis zum Vortag). Solange es sie gibt, ist der Monat \"teilweise\" — live\ngelesen, nicht aus der Materialisierung: die letzten Tage koennen noch wachsen.\n\nBericht 88 (Finanzwege) steht seit 0119 NICHT hier: abgeschaltet am 23.09.2026, die\nFinanzwegsichten lesen aus 97 (Tagesabschluss) — dessen Zeile ist der Stand der Finanzwege.",
+   "kommentar": "Koernung: Betriebsbericht × Monat seit Januar 2018 (materialisiert in\nmart.betriebsbericht_ladestand_basis, Stand des letzten Laufs). Wie viel von einem Monat ist fuer diesen\nBericht geladen — gemessen an den Betrieben bzw. Betrieb-Tagen mit Umsatz (Umsatzbericht, nur\nreife Tage: aelter als 9 Tage). Tagesberichte (T, W) zaehlen Betrieb-Tage mit Umsatz, die ein\nAbruf abdeckt (seit 0121 exakt), Monatsberichte (M, M-Tag) Betriebe. Ein Abruf mit null Zeilen\nzaehlt als geladen, ebenso ein Posten, fuer den LINA \"keine Daten\" gemeldet hat (betriebe_leer).\n\nzustand: vollstaendig | teilweise | nicht geladen | kein Umsatz. \"nicht geladen\" ist der Fall,\num den es geht: eine Auswertung ueber diesen Monat liefert dann KEINE Zeile, und das heisst\nnicht null. sichten nennt die mart-Sichten, die aus dem Bericht lesen. Fuer den laufenden Monat\neines Tagesberichts heisst \"vollstaendig\" nur: bis heute − 9 abgedeckt — den Tag nennt\nmart.betriebsbericht_ladestand (vollstaendig_bis_tag).\n\nbetriebe_vorlaeufig (0120): Betriebe, deren Abruf fuer diesen Monat vor der Reife geholt wurde\n(laufender Monat von 97, bis zum Vortag). Solange es sie gibt, ist der Monat \"teilweise\" — live\ngelesen, nicht aus der Materialisierung: die letzten Tage koennen noch wachsen.\n\nBericht 88 (Finanzwege) steht seit 0119 NICHT hier: abgeschaltet am 23.09.2026, die\nFinanzwegsichten lesen aus 97 (Tagesabschluss) — dessen Zeile ist der Stand der Finanzwege.",
    "spalten": [
     "endpunkt",
     "bericht",

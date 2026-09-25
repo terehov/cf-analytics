@@ -311,6 +311,149 @@ lauf('Betriebsberichte mit Datenbank', () => {
     expect(n.n).toBe(0)
   })
 
+  /**
+   * 0121: Der Fehler liegt in UNSEREM Umsatzbericht. Anlass 21./22.07.2026 —
+   * die Betriebsberichte kannten den Umsatz, unser Umsatzbericht hatte ein
+   * Loch, und der Nachholzweig haette ~2.800 Aufrufe fuer nichts gemacht.
+   * Die Daten liegen relativ zu heute: die Pruefsichten rechnen mit current_date.
+   */
+  test('Gegenprobe: ein Loch im Umsatzbericht wird benannt, nicht nachgeholt — Lochtag und Nulltag', async () => {
+    const { betriebsberichteNachfuellen } = await import('./nachfuellen')
+    await db.query(`TRUNCATE sync.warteschlange, core.umsatzbericht_tag, core.artikelverkauf_tag, core.betriebsbericht_abruf`)
+    const a = betrieb.get('test-a')!, b = betrieb.get('test-b')!
+    const { rows: [d] } = await db.query(
+      `SELECT current_date::text AS heute, (current_date - 20)::text AS h, (current_date - 15)::text AS n,
+              date_trunc('week', current_date - 20)::date::text AS wv,
+              (date_trunc('week', current_date - 20)::date + 6)::text AS wb`)
+    // Umsatz fuer ALLE Testbetriebe an 36 Tagen — ein fehlender Betrieb ist
+    // dann ein Nulltag, kein Lochtag (der braucht weniger als 60 %).
+    // Am Tag h steht der Umsatzbericht bei allen auf null: ein Lochtag.
+    // Am Tag n steht nur B auf null, der Artikelverkauf kennt B: ein Nulltag.
+    await db.query(
+      `INSERT INTO core.umsatzbericht_tag (betrieb_key, geschaeftstag, umsatz_brutto, umsatz_netto, rechnungen)
+       SELECT k, t::date,
+              CASE WHEN t::date = $2::date OR (t::date = $3::date AND k = $4) THEN 0 ELSE 1000 END,
+              CASE WHEN t::date = $2::date OR (t::date = $3::date AND k = $4) THEN 0 ELSE 900 END,
+              CASE WHEN t::date = $2::date OR (t::date = $3::date AND k = $4) THEN 0 ELSE 50 END
+         FROM unnest($1::int[]) k, generate_series(current_date - 45, current_date - 10, interval '1 day') t`,
+      [[...betrieb.values()], d.h, d.n, b])
+    const art = await db.query(`SELECT artikel_key FROM core.artikel LIMIT 1`)
+    let artikelKey = art.rows[0]?.artikel_key
+    if (!artikelKey) {
+      artikelKey = (await db.query(
+        `INSERT INTO core.artikel (artikelnummer, name) VALUES (999999, 'Testartikel') RETURNING artikel_key`)).rows[0].artikel_key
+    }
+    await db.query(`SELECT core.partition_anlegen('core.artikelverkauf_tag', date_trunc('month', $1::date)::date)`, [d.n])
+    await db.query(
+      `INSERT INTO core.artikelverkauf_tag (betrieb_key, geschaeftstag, artikel_key, menge, umsatz_netto)
+       VALUES ($1, $2, $3, 3, 800)`, [b, d.n, artikelKey])
+
+    const abruf = async (key: string, bk: number, von: string, bis: string, brutto: number) => db.query(
+      `INSERT INTO core.betriebsbericht_abruf (endpunkt, bericht, betrieb_key, zeitraum_von, zeitraum_bis,
+              n_bills, balance_brutto, zeilen, erstmals_abgerufen_am, zuletzt_abgerufen_am)
+       VALUES ($1, split_part($1, ':', 2)::int, $2, $3, $4, 50, $5, 5, now() - interval '8 days', now() - interval '8 days')`,
+      [key, bk, von, bis, brutto])
+    await abruf('getReport:92', a, d.h, d.h, 1000)        // Lochtag: LINA kennt den Tag
+    await abruf('getReport:96', a, d.wv, d.wb, 7000)      // Woche mit Lochtag, LINA hoeher
+    await abruf('getReport:96', b, d.wv, d.wb, 4000)      // dieselbe Woche, LINA NIEDRIGER: kein Loch erklaert das
+    await abruf('getReport:92', b, d.n, d.n, 1000)        // Nulltag von B
+    await abruf('getReport:92', a, d.n, d.n, 1000)        // A am selben Tag: stimmt
+
+    const { rows } = await db.query(
+      `SELECT endpunkt, betrieb_key AS bk, befund, nachholen, umsatzbericht_luecke::text[] AS luecke
+         FROM mart.betriebsbericht_gegenprobe ORDER BY endpunkt, zeitraum_von, betrieb_key`)
+    const befund = (key: string, bk: number) => rows.filter(r => r.endpunkt === key && r.bk === bk)
+    expect(befund('getReport:92', a)).toEqual([
+      { endpunkt: 'getReport:92', bk: a, befund: 'umsatzbericht lueckenhaft', nachholen: null, luecke: [d.h] },
+      { endpunkt: 'getReport:92', bk: a, befund: 'ok', nachholen: null, luecke: null },
+    ])
+    expect(befund('getReport:92', b)).toEqual([
+      { endpunkt: 'getReport:92', bk: b, befund: 'umsatzbericht lueckenhaft', nachholen: null, luecke: [d.n] },
+    ])
+    expect(befund('getReport:96', a)).toEqual([
+      { endpunkt: 'getReport:96', bk: a, befund: 'umsatzbericht lueckenhaft', nachholen: null, luecke: [d.h] },
+    ])
+    expect(befund('getReport:96', b)).toEqual([
+      { endpunkt: 'getReport:96', bk: b, befund: 'abweichung', nachholen: 'faellig', luecke: null },
+    ])
+
+    // Nachgeholt wird NUR die echte Abweichung.
+    cfg.BETRIEBSBERICHT_JE_LAUF = 100000
+    await betriebsberichteNachfuellen(d.heute)
+    const { rows: nach } = await db.query(
+      `SELECT endpunkt, betrieb_enc_id AS b FROM sync.warteschlange WHERE prioritaet = 50 ORDER BY 1, 2`)
+    expect(nach).toEqual([{ endpunkt: 'getReport:96', b: 'test-b' }])
+    const { rows: [z] } = await db.query(
+      `SELECT sum(nachgeholt)::int AS n FROM core.betriebsbericht_abruf`)
+    expect(z.n).toBe(1)
+
+    // Sichtbar in der Pruefuebersicht — als eigene Zeile, nicht als "aufgegeben".
+    const { rows: [p] } = await db.query(
+      `SELECT auffaellig::int AS n FROM mart.pruefung_uebersicht
+        WHERE pruefung = 'Betriebsberichte: Gegenprobe ausgesetzt, Umsatzbericht lueckenhaft (60 Tage)'`)
+    expect(p.n).toBe(3)
+  })
+
+  /**
+   * 0121: Der Satz, den der MCP-Zugang an jede Kassen-Antwort haengt, nennt
+   * bei Tagesberichten den Tag, bei Monatsberichten den Monat, den laufenden
+   * Monat von 97 als vorlaeufig — und wann der Stand aufgefrischt wurde.
+   */
+  test('Ladestand: Tagesberichte auf den Tag, Monatsberichte auf den Monat, vorlaeufig und Stand', async () => {
+    await db.query(`TRUNCATE sync.warteschlange, core.umsatzbericht_tag, core.artikelverkauf_tag, core.betriebsbericht_abruf`)
+    const a = betrieb.get('test-a')!
+    // m = der juengste Monat, den ein Monatsbericht schon haben muesste (Ende + 9 Tage).
+    const { rows: [d] } = await db.query(
+      `SELECT (date_trunc('month', current_date - 8) - interval '1 month')::date::text AS m,
+              (current_date - 25)::text AS g, (current_date - 8)::text AS bis`)
+    const { rows: [t] } = await db.query(
+      `SELECT $1::date::text AS m, to_char($1::date, 'MM/YYYY') AS m_text,
+              to_char($2::date, 'MM/YYYY') AS g_monat,
+              to_char($2::date + 1, 'DD.MM.YYYY') AS ab_text, to_char($3::date, 'DD.MM.YYYY') AS bis_text,
+              to_char(now() AT TIME ZONE 'Europe/Berlin', 'DD.MM.YYYY') AS heute_text,
+              to_char(date_trunc('month', current_date - 1), 'DD.MM.YYYY') AS vl_von,
+              to_char(current_date - 1, 'DD.MM.YYYY') AS vl_bis`, [d.m, d.g, d.bis])
+    // Umsatz vom Monatsersten m bis vor fuenf Tagen.
+    await db.query(
+      `INSERT INTO core.umsatzbericht_tag (betrieb_key, geschaeftstag, umsatz_brutto, umsatz_netto, rechnungen)
+       SELECT $1, t::date, 1000, 900, 50 FROM generate_series($2::date, current_date - 5, interval '1 day') t`,
+      [a, d.m])
+    // 92 (T): jeder Tag bis heute − 8, nur der Tag g fehlt.
+    await db.query(
+      `INSERT INTO core.betriebsbericht_abruf (endpunkt, bericht, betrieb_key, zeitraum_von, zeitraum_bis, n_bills, balance_brutto)
+       SELECT 'getReport:92', 92, $1, t::date, t::date, 50, 1000
+         FROM generate_series($2::date, $3::date, interval '1 day') t WHERE t::date <> $4::date`,
+      [a, d.m, d.bis, d.g])
+    // 39 (M): der Monat m. 97 (M-Tag): m, dazu der laufende Monat bis gestern, vorlaeufig.
+    await db.query(
+      `INSERT INTO core.betriebsbericht_abruf (endpunkt, bericht, betrieb_key, zeitraum_von, zeitraum_bis, n_bills, balance_brutto, vorlaeufig)
+       VALUES ('getReport:39', 39, $1, $2::date, ($2::date + interval '1 month')::date - 1, 50, 1, false),
+              ('getReport:97', 97, $1, $2::date, ($2::date + interval '1 month')::date - 1, 50, 1, false),
+              ('getReport:97', 97, $1, date_trunc('month', current_date - 1)::date, current_date - 1, 50, 1, true)
+       ON CONFLICT DO NOTHING`, [a, d.m])
+    await db.query(`REFRESH MATERIALIZED VIEW mart.betriebsbericht_ladestand_basis`)
+    const satz = async (bericht: number) => (await db.query(
+      `SELECT aussage, vollstaendig_ab_tag::text AS ab, vollstaendig_bis_tag::text AS bis
+         FROM mart.betriebsbericht_ladestand WHERE bericht = $1`, [bericht])).rows[0]
+
+    const s92 = await satz(92)
+    // Der Tag, nicht der Monat: die Strecke beginnt nach der Luecke und endet am letzten Tag.
+    expect(s92.aussage).toContain(`vollstaendig vom ${t.ab_text} bis ${t.bis_text}`)
+    expect(s92.aussage).toContain(`teilweise geladen: ${t.g_monat}`)
+    expect(s92.aussage).not.toContain('nicht geladen:')
+    expect(s92.aussage).toContain(`Stand: ${t.heute_text}`)
+
+    // Monatsbericht: der Monat m ist da, der laufende ist noch nicht faellig
+    // und steht NICHT als Luecke da (bis 0121 zaehlte er ab dem 10. mit).
+    const s39 = await satz(39)
+    expect(s39.aussage).toContain(`vollstaendig von ${t.m_text} bis ${t.m_text}`)
+    expect(s39.aussage).not.toContain('nicht geladen:')
+    expect(s39.ab).toBeNull()
+
+    const s97 = await satz(97)
+    expect(s97.aussage).toContain(`vorlaeufig vom ${t.vl_von} bis ${t.vl_bis}`)
+  })
+
   // -----------------------------------------------------------------------
   // Der Einreihweg
   // -----------------------------------------------------------------------

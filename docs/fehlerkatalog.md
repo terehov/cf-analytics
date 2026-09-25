@@ -4732,3 +4732,54 @@ harte Ende am Tageswechsel (`nachladenVorbei()`, `src/sync/worker.ts`), getestet
 `src/sync/nachladen_ende.test.ts`. Sichtbar bleibt der Fall über `sync.lauf.status =
 'uebersprungen'` — eine Zeile, die man nach jeder langen Nacht ansehen sollte.
 
+
+## Die Gegenprobe holte nach, obwohl das Loch in UNSEREM Umsatzbericht lag (25.09.2026)
+
+**Symptom.** Über den MCP-Zugang gemessen: `mart.betriebsbericht_gegenprobe` zeigte 952
+`abweichung / wartet`, 190 `abweichung / historisch` und einige `leer trotz Umsatz`. Fast alle
+betrafen Zeiträume mit dem 21.07. oder 22.07.2026 — 97 Juli bei 57 Betrieben, 96/86/113 in der
+Woche 20.–26.07. bei 56, 92/88 am 21.07. bei 21, jeder Monatsbericht der Stufe B im Juli bei 62.
+Die „wartet"-Zeilen wären eine Woche nach ihrem letzten Abruf `faellig` geworden, und
+`betriebsberichteNachfuellen()` hätte jede bis zu dreimal neu geholt: rund 2.800 Aufrufe gegen
+LINA, die nichts ändern können (harte Regel 3).
+
+**Ursache.** Die Gegenprobe stellt LINAs Summe gegen **unseren** Konzern-Umsatzbericht und nahm
+stillschweigend an, dass dieser stimmt. Genau diese beiden Tage führt `mart.umsatz_lochtag` (`0101`):
+der 21.07. „lückenhaft" (21 von 55 Betrieben), der 22.07. „komplett leer", dreimal nachgeholt, LINA
+liefert den Konzernbericht für diese Tage nicht mehr. Die Betriebsberichte hatten recht. Dass auch
+die 21 Betriebe mit Umsatz am 21.07. abwichen, zeigt: ihr Umsatz war dort ebenfalls zu klein, ein
+Lochtag gilt also für alle Betriebe, nicht nur für die mit null.
+
+**Was es künftig verhindert.** `0121`: `befund = 'umsatzbericht lueckenhaft'`, wenn LINAs Summe
+**über** dem Umsatzbericht liegt und der Zeitraum einen Lochtag (`mart.umsatz_lochtag`, alle
+Betriebe) oder einen Nulltag dieses Betriebs (`mart.umsatztag_luecke`) enthält. Kein Nachholen, die
+Zeile bleibt stehen und nennt die Tage in `umsatzbericht_luecke`; die Prüfübersicht zählt sie in
+einer eigenen Zeile. Die Richtung ist Absicht: ein Loch macht den Umsatzbericht nur kleiner — liegt
+der Betriebsbericht darunter oder ist er leer, erklärt das Loch nichts, und es bleibt beim
+Nachholen. Test: „Gegenprobe: ein Loch im Umsatzbericht wird benannt, nicht nachgeholt" in
+`src/sync/betriebsbericht.test.ts`. **Regel:** eine Gegenprobe braucht zwei Seiten, und jede kann
+die falsche sein — bevor eine Abweichung Arbeit auslöst, fragt sie, ob die eigene Seite ein
+bekanntes Loch hat.
+
+## Der Ladestand-Satz sagte „vollständig bis 09/2026" — geladen war bis zum 16.09. (24.09.2026)
+
+**Symptom.** Der Hinweis, den der MCP-Server jeder Kassen-Antwort anhängt, lautete für 92: „geladen
+09/2026 bis 09/2026, vollstaendig bis 09/2026". Geladen und reif waren die Tagesberichte bis zum
+16.09., und der August war zu dem Zeitpunkt schon teilweise da.
+
+**Ursache, dreifach.** (1) Monate sind für Tagesberichte zu grob: „vollständig 09/2026" hieß „jeder
+Tag bis heute − 9 ist abgedeckt". (2) Die Basis zählte für T/W jeden abgedeckten Betrieb-Tag, auch
+Tage ohne Umsatz — ein fehlender Umsatztag konnte durch einen geladenen Tag ohne Umsatz aufgewogen
+werden. (3) Die Basis ist materialisiert und wird in Phase B und nach Phase C aufgefrischt. Während
+Phase C (bis 23 Uhr) und am nächsten Morgen bis Phase B steht dort der Stand davor — der geladene
+August war schlicht noch nicht aufgefrischt, und nichts im Satz verriet das. Dazu für Monatsberichte:
+ein Monat galt ab dem 10. als „reif", der laufende stand damit als „nicht geladen" in der Zählung,
+obwohl ihn der Erstabruf erst ab Monatsende + 7 holt.
+
+**Was es künftig verhindert.** `0121`: Tagesberichte nennen den Tag („vollstaendig vom 20.08.2026
+bis 16.09.2026", die jüngste lückenlose Strecke je Betrieb-Tag mit Umsatz), Monatsberichte Monate,
+dazu getrennt „vorlaeufig vom … bis …" (97), „teilweise geladen: Monate …" und „nicht geladen: N
+Monate … zwischen … und …", und am Ende „Stand: TT.MM.JJJJ HH:MM Uhr" (Zeitpunkt des Refresh, älter
+als 36 Stunden mit Warnung). Ein Monatsbericht ist reif, wenn sein **letzter** Tag 9 Tage
+zurückliegt. Test: „Ladestand: Tagesberichte auf den Tag …" in `src/sync/betriebsbericht.test.ts`,
+dazu `mcp/test/ausfuehren.test.ts` als `mcp_leser`.

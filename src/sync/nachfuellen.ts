@@ -297,7 +297,11 @@ export async function historieNachziehen(): Promise<number> {
  *      Prioritaet, hoechstens dreimal, fruehestens eine Woche nach dem letzten
  *      Abruf, nur fuer die letzten 60 Tage — wie die Nulltage aus 0100. Kein
  *      Fehler im Posten, der in Minuten wiederholt wuerde: ein zu frueh
- *      geholter Tag wird in Minuten nicht voller.
+ *      geholter Tag wird in Minuten nicht voller. Seit 0121 NICHT, wenn der
+ *      Fehler in unserem Umsatzbericht liegt (Lochtag oder Nulltag im
+ *      Zeitraum, LINAs Summe hoeher): die Sicht sagt dann
+ *      'umsatzbericht lueckenhaft' und nachholen NULL — 21./22.07.2026 haetten
+ *      sonst ~2.800 Aufrufe ohne Ertrag gekostet.
  *   2. NACHLAUF: ein Zeitraum, dessen LETZTER (bis 0120: erster) Abruf vor Ende +
  *      NACHLAUF_TAGE lag, wird danach genau einmal neu geholt — das
  *      Nachzuegler-Fenster der Betriebsberichte. Fuer den Backfill faellt das

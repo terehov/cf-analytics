@@ -2019,6 +2019,58 @@ nächste Nachtlauf nach dem Deploy.
   `0118`: nur die Sichten, Kennzahlen und Fallstricke aus `0117`/`0118` kamen dazu.
 
 
+## Gegenprobe und Ladestand genauer: was nach `0121` offen ist (seit 25.09.2026)
+
+### Möglichkeit, nicht gebaut: die Lochtage 21./22.07.2026 aus den Betriebsberichten füllen
+
+Der Konzern-Umsatzbericht hat den 21. und 22.07.2026 nicht (dreimal nachgeholt, LINA liefert
+byte-gleich leer, siehe „Artikelverkaufsbericht: 21. und 22.07.2026" oben). Die Betriebsberichte
+**haben** diese Tage je Betrieb — genau deshalb wich die Gegenprobe ab (`fehlerkatalog.md`,
+25.09.2026). Zwei tragen sie tagesgenau:
+
+* **97 (Tagesabschluss)**: je Tag ein Block, Hauptsparte × Steuersatz, brutto; über einen Monat
+  summiert genau `balanceSumBrutto` (Wilma Wunder Düsseldorf, August 2026, auf den Cent). Der Umsatz
+  eines Betrieb-Tags steht damit in `core.tagesabschluss_tag`.
+* **90 (Monatsaufstellung)**: je Tag Zeilen mit Anzahl, Brutto, Netto und USt
+  (`core.monatsaufstellung_tag`) — damit auch Netto ohne Umrechnung.
+
+Man könnte `core.umsatzbericht_tag` für die Lochtage aus 97 (Brutto, Netto über die Steuersätze)
+oder 90 (Netto direkt) ergänzen, mit einer Quellenmarke. **Nicht gebaut**, weil (1) der Umsatzbericht mehr trägt als
+den Umsatz (Rechnungen, Gäste, Hauptsparten, Verkaufsstellen — 90/97 liefern nicht alles davon),
+(2) eine zweite Quelle für dieselbe Zeile genau die Doppelzählung öffnet, die `mart.finanzweg_tag`
+mit „je Tag eine Quelle" ausräumt, und (3) das Round Table und der Vergleichstag dann für zwei Tage
+auf einer anderen Definition stünden. Wer es baut: erst in Produktion messen, wie weit 97 und der
+Umsatzbericht an vollständigen Tagen übereinstimmen (Brutto je Betrieb-Tag, Juni 2026), dann als
+eigene Quelle mit Vorrang Umsatzbericht, nie überschreibend. Bis dahin sagt die Gegenprobe
+`umsatzbericht lueckenhaft` und holt nichts nach.
+
+### Nach dem Deploy nachsehen
+
+* `SELECT befund, nachholen, count(*) FROM mart.betriebsbericht_gegenprobe WHERE zeitraum_bis >=
+  current_date - 120 GROUP BY 1, 2` — Erwartung: die rund 1.100 Juli-Zeilen stehen auf
+  `umsatzbericht lueckenhaft` / NULL; was auf `abweichung` bleibt, ist echt. Die „einigen
+  `leer trotz Umsatz`" bleiben dort mit Absicht (ein Loch im Umsatzbericht erklärt keinen leeren
+  Bericht) — ansehen, ob es 92 an Tagen ohne Nachlass ist (dann wäre der Befund dort zu streng).
+* `SELECT bericht, aussage FROM mart.betriebsbericht_ladestand` — Erwartung: 92/96/86/113 nennen
+  einen Tag (etwa „vollstaendig vom … bis <heute − 8>"), 97 „vorlaeufig vom 01.09.2026 bis …",
+  jeder Satz endet mit „Stand: …".
+* Die Refresh-Dauer in `mart.materialisierung_stand` (`betriebsbericht_sichten_refresh`,
+  `dauer_s`). Gemessen auf einem Klon von `lina_m5_0923` mit 454.904 synthetischen Abrufzeilen
+  (`lina_gp_0925`, danach gelöscht): die Basis 24,0 s vorher, 32,2 s nachher (sperrend), 40–55 s
+  nebenläufig — nebenläufig schreibt jeder Refresh alle ~2.100 Zeilen neu, weil `stand` sich ändert.
+
+### Offen, bewusst nicht gebaut
+
+* **Der Stand kann während Phase C bis zu einem halben Tag alt sein.** Die Basis wird nur in Phase B
+  und nach Phase C aufgefrischt; der Satz sagt es jetzt („Stand: …"). Ein Refresh alle paar Stunden
+  in Phase C würde das schließen, kostet aber je ~40 s auf der Datenbank neben dem laufenden Import.
+  Erst entscheiden, wenn jemand über den veralteten Stand stolpert.
+* **Die Karte `ka_ladestand` zeigt weiter Monate.** Die neuen Spalten (`vollstaendig_ab_tag`,
+  `vollstaendig_bis_tag`, `vorlaeufig_bis`, `stand`) stehen in der Sicht, nicht in der Karte — ein
+  Umbau wäre `metabase/karten-kasse.ts` plus `uebernehmen.ts`, das sofort in Produktion schreibt.
+* **Lochtage und Nulltage reichen 120 Tage zurück.** Ein älteres Loch im Umsatzbericht steht in der
+  Gegenprobe weiter als `abweichung`/`historisch` — nachgeholt wird dort ohnehin nicht mehr.
+
 ## Kassensichten und MCP (M5): was nach dem Bau offen ist (seit 23.09.2026, `0117`/`0118`)
 
 ### Nach dem Deploy, in dieser Reihenfolge
@@ -2064,5 +2116,5 @@ nächste Nachtlauf nach dem Deploy.
 * **Klone:** `lina_m5_last` (24 GB, synthetischer Vollbestand der Leistungsmessung) ist am
   23.09.2026 gelöscht. Stehen geblieben: `lina_m5_0923` (Abnahmeklon, Stand `0118`, mit den echten
   Fixtures der Abnahme auf den echten Wilma-Wunder-Betrieben — damit lässt sich die Abnahme
-  wiederholen) und `lina_br_0922` (Testklon, von `betriebsbericht.test.ts` geleert, Stand `0118`).
+  wiederholen) und `lina_br_0922` (Testklon, von `betriebsbericht.test.ts` geleert, Stand `0121` seit 25.09.2026).
   Beide können weg, sobald niemand mehr nachmessen will: `dropdb lina_m5_0923 lina_br_0922`.

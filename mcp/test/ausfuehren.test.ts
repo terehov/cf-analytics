@@ -337,4 +337,25 @@ lauf('Ausfuehrung', () => {
     // Leere Datenbank: kein Datenstand. Mit Daten muss er da sein.
     if (e.zeilen.length > 0) expect(e.datenstand).not.toBeNull()
   })
+
+  /**
+   * 0121: Am 24.09.2026 sagte der Hinweis fuer 92 "vollstaendig bis 09/2026",
+   * geladen war bis zum 16.09. Ein Tagesbericht nennt jetzt den Tag, und jeder
+   * Satz den Stand der Materialisierung — sie wird nur in Phase B und nach
+   * Phase C aufgefrischt und kann einen halben Tag alt sein.
+   */
+  test('eine Kassen-Antwort traegt den Ladestand — auf den Tag und mit Stand', async () => {
+    const e = await abfrageAusfuehren(`
+      SELECT monat, sum(menge) AS menge
+        FROM mart.artikel_nachlass_monat
+       WHERE monat >= '2026-01-01'
+       GROUP BY monat`, katalog, nutzer)
+    const h = e.hinweise.find(x => x.schluessel === 'ladestand_getReport_92')
+    expect(h).toBeDefined()
+    expect(h!.hinweis).toMatch(/^Bericht 92/)
+    expect(h!.hinweis).toMatch(
+      /vollstaendig vom \d\d\.\d\d\.\d{4} bis \d\d\.\d\d\.\d{4}|kein Tag lueckenlos geladen|fuer keinen Monat geladen/)
+    expect(h!.hinweis).not.toMatch(/vollstaendig bis \d\d\/\d{4}/)
+    expect(h!.hinweis).toMatch(/Stand: \d\d\.\d\d\.\d{4} \d\d:\d\d Uhr/)
+  })
 })

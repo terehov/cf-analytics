@@ -103,6 +103,13 @@ nach dem Round Table — und **nach Phase C noch einmal, sobald C überhaupt Pos
 zählt nur Posten ohne `getReport:`. Ohne den zweiten Refresh stünde der Backfill einer Nacht erst
 am nächsten Morgen im Ladestand, und jede MCP-Antwort meldete einen Monat als „nicht geladen", der
 längst da ist. Gemessen auf einem Klon in Produktionsgröße: 32,9 s + 13,9 s nebenläufig.
+**Wie alt der Ladestand sein kann (0121):** zwischen zwei Refreshs — also während Phase C (bis
+23 Uhr) und am Morgen bis zum Ende von Phase B — zeigt er den Stand davor. Am 24.09.2026 stand
+deshalb der August als nicht geladen da, während er längst lud. Seit `0121` trägt die Basis
+`stand` (`now()` beim Refresh), und der Satz endet mit „Stand: TT.MM.JJJJ HH:MM Uhr" (Ortszeit),
+ab 36 Stunden mit dem Zusatz, dass er veraltet sein kann. Nur der vorläufige laufende Monat
+(97) wird live gelesen. Die Basis rechnet seit `0121` für Tagesberichte je Betrieb-Tag (die
+jüngste lückenlose Strecke als Tag) — Refresh mit 454.904 Abrufzeilen 32,2 s statt 24,0 s.
 `src/sync/phasen.test.ts` prüft beide Aufrufe. Übrige Aussage unverändert: Die Konzern-Historie schreibt `core.umsatzbericht_tag` und
 `core.artikelverkauf_tag`; daraus lesen `mart.deckungsbeitrag_warengruppe`, der Round Table
 (`round_table_monat`, `_trend`, `artikel_monat_basis`, `artikeltage_basis`) und
@@ -1684,6 +1691,15 @@ Monat, vorläufige nachziehen) siehe oben, seit `0120`:
 1. **Gegenprobe nachholen** — `mart.betriebsbericht_gegenprobe.nachholen = 'faellig'`: LINAs
    Summe traf den Umsatzbericht nicht, der letzte Abruf ist über eine Woche her, weniger als
    dreimal nachgeholt, Zeitraum jünger als 60 Tage. Priorität 50, `nachgeholt + 1`.
+   **Seit `0121` nicht, wenn der Fehler bei uns liegt:** liegt LINAs Summe über dem
+   Umsatzbericht und enthält der Zeitraum einen Lochtag (`mart.umsatz_lochtag`) oder einen
+   Nulltag des Betriebs (`mart.umsatztag_luecke`), sagt die Sicht `befund = 'umsatzbericht
+   lueckenhaft'` und `nachholen` NULL — der Code hier ist unverändert, er liest nur `faellig`.
+   Anlass: 21./22.07.2026, ~1.100 Abrufe, ~2.800 Aufrufe ohne Ertrag (`fehlerkatalog.md`,
+   25.09.2026). Gemessen auf dem Klon mit ~16.300 Abrufzeilen: die ganze Sicht 0,28–0,38 s
+   (vorher 0,07 s — der Aufschlag ist `mart.umsatztag_luecke`, einmal je Abfrage und nur, wenn
+   eine Zeile überhaupt abweicht), der Filter dieses Schritts 49 ms (vorher 40 ms); mit 454.904
+   Zeilen beide ~2,1 s.
 2. **Nachlauf** — ein Zeitraum, dessen ~~erster~~ **letzter** (seit `0120`) Abruf vor Ende +
    `BETRIEBSBERICHT_NACHLAUF_TAGE` (14) lag, wird einmal neu geholt. Das ist das Nachzügler-Fenster der Betriebsberichte; für
    den Backfill fällt es weg.

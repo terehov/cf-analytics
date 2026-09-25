@@ -1129,6 +1129,13 @@ eigene Entscheidung.
   jedem Abruf. Teilindex `WHERE vorlaeufig` (höchstens zwei Zeilen je Betrieb). Und: ein Abruf
   **löscht jede Abrufzeile, deren Zeitraum er ganz enthält** — die Tabelle führt je Betrieb nur
   noch die jüngste Teilmonatszeile, bis der Vollmonat sie ersetzt.
+* Seit `0121`: `mart.betriebsbericht_ladestand_basis` neu angelegt (DROP/CREATE samt
+  `…_monat` und `mart.betriebsbericht_ladestand`), weil eine Materialisierung keine Spalte
+  anhängen kann. Neu am Ende: `vollstaendig_ab_tag`, `vollstaendig_bis_tag` (je Bericht, in jeder
+  Monatszeile gleich — die jüngste lückenlose Tagesstrecke der T/W-Berichte) und `stand`
+  (`now()` beim Refresh). `betrieb_tage_abgedeckt` zählt für T/W nur noch Betrieb-Tage **mit**
+  Umsatz. Die Denormalisierung ist Absicht: eine zweite Materialisierung mit Körnung „Bericht"
+  bräuchte einen eigenen Eintrag in `mart.materialisierung_stand` und könnte getrennt veralten.
 * `sync.posten_holen(lauf, anbieter)` kennt `lina_br` und `lina_sonst` — die beiden Hälften der
   LINA-Spur, mit je einem Teilindex.
 * `warteschlange_betrieb_einheit`: `(endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis)` für
