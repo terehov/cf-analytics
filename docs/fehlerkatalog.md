@@ -4838,3 +4838,44 @@ liest die jüngste Partition per Index und hört nach der ersten Zeile auf (0,12
 Kostenstellen), ältere Partitionen „never executed". **Regel:** eine Abfrage, die in `raw` nach
 einem Wert IM `parameter`-JSON sucht, braucht einen Ausdrucksindex — `raw` wächst unbegrenzt
 (Regel 4), und was heute eine Sekunde kostet, kostet im nächsten Jahr zehn.
+
+## `mart.artikelverkauf` rechnete die Artikelhistorie je Betrieb neu (28.09.2026)
+
+**Symptom.** Die zwölf langsamsten MCP-Abfragen der letzten 30 Tage standen alle an der
+20-s-Grenze, elf davon auf `mart.artikelverkauf` — Preisvergleiche einer Woche für eine Marke,
+also wenige tausend Zeilen. Mehr Speicher nach dem Wechsel auf CX43 änderte nichts.
+
+**Ursache.** Die Sicht holte den Stand eines Artikels (Name, `fixer_we`) per Bereichsjoin auf
+`core.artikel_stand_zeitraum`, und diese Sicht rechnet ihre Zeiträume mit `lead()` über alle
+591.665 Zeilen von `core.artikel_stand`. Der Planer schätzte „ein Betrieb" (22 waren es: die
+Filter auf Marke und Kategorie laufen durch zwei weitere Sichten, und die Schätzung fiel dabei auf
+1 Zeile) und legte die Fensterfunktion auf die Innenseite einer Nested Loop. `EXPLAIN ANALYZE`
+in Produktion (`mcp.zugriff` 615): 26,7 s, davon 22 × 1,0 s dieselbe WindowAgg. JIT war es nicht,
+Speicher auch nicht — der Plan war falsch, und er wäre auf jedem Server falsch gewesen.
+
+**Was es künftig verhindert.** `0124`: der Stand eines Tages ist der jüngste, dessen Monat nicht
+danach liegt — `LATERAL … ORDER BY monat DESC LIMIT 1` über den Primärschlüssel, ohne
+Fensterfunktion; die Warengruppe genauso (vor dem ältesten Stand gilt der älteste). 26,7 s →
+0,27 s; ein Monat aller Betriebe 4,7 → 3,6 s, das Jahr 2025 33,9 → 30,3 s. Ergebnis in beiden
+Richtungen zeilengleich (Produktion: die Preisabfrage; Klon: Juli 2026 und März 2019, 533.776
+Zeilen). Der Kommentar an `core.artikel_stand_zeitraum` warnt jetzt davor, sie unter einer großen
+Sicht zu joinen. **Regel:** eine Sicht mit Fensterfunktion gehört nicht auf die rechte Seite eines
+Joins in einer Sicht, die über Millionen Zeilen gefiltert wird — der Planer wiederholt sie, sobald
+er die linke Seite unterschätzt, und er unterschätzt sie, sobald der Filter durch andere Sichten läuft.
+
+## `datenstand` gruppierte je Betrieb die ganze BWA-Historie (28.09.2026)
+
+**Symptom.** Das MCP-Werkzeug `datenstand` brauchte im Median 2,8 s, bis zu 9,3 s; dieselbe Sicht
+hängt `datenstandHolen()` an jede Abfrageantwort.
+
+**Ursache.** Der letzte gebuchte BWA-Monat kam aus `max(monat)` über `mart.kennzahlen_aktuell` —
+und die gruppiert für jeden der 141 Betriebe alle ~17.000 Zeilen aus `core.kennzahlen_monat`
+nach Monat und Kennzahl, um den jüngsten Abruf je Kennzahl zu finden: 1,73 von 2,07 s, 2,4 Mio.
+Puffer. Weitere 0,31 s JIT, weil die Schätzkosten über `jit_above_cost` lagen.
+
+**Was es künftig verhindert.** `0124`: rückwärts über die Monate, die überhaupt einen Wert ungleich
+0 haben (Teilindex `kennzahlen_monat_gebucht_idx`), und der erste, in dem der jüngste Abruf einer
+Kennzahl einen trägt. Dieselbe Regel, zeilengleich nachgeprüft (Produktion und Klon, beide
+Richtungen). Ohne den Teilindex war die Rückwärtssuche in Produktion nur halb so schnell (1,0 s) —
+die 36 Betriebe ohne gebuchte BWA gingen jeden Monat einzeln durch. Mit ihm auf dem Klon 1,7 ms,
+Schätzkosten unter der JIT-Schwelle.

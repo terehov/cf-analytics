@@ -3867,6 +3867,72 @@ danach Neustart der Datenbank — nachgeprüft am 28.09.2026, 16:41, `pending_re
 | `effective_io_concurrency` | 16 | 200 | SSD |
 | `max_wal_size` | 1 GB | 4 GB | weniger Checkpoints beim Nachladen |
 
-**Bewusst nicht erhöht:** `max_parallel_workers_per_gather` (2). Parallele Abfragen legen ihren
+~~**Bewusst nicht erhöht:** `max_parallel_workers_per_gather` (2). Parallele Abfragen legen ihren
 gemeinsamen Speicher in `/dev/shm`, und Docker gibt dem Container davon standardmäßig 64 MB — mehr
-Parallelität meldete sich als „could not resize shared memory segment".
+Parallelität meldete sich als „could not resize shared memory segment".~~ Noch am selben Tag
+revidiert, siehe den nächsten Abschnitt: `/dev/shm` braucht es nicht, wenn Postgres den Speicher
+für parallele Abfragen beim Start selbst reserviert. Und die Begründung war schon für 2 Worker
+zu knapp — mit `work_mem` 32 MB und `hash_mem_multiplier` 2 kann ein paralleler Hash-Join mit
+drei Beteiligten bis ~192 MB gemeinsamen Speicher verlangen, dreimal so viel wie `/dev/shm` hat.
+„Meldete sich" war eine Erwartung, keine Beobachtung.
+
+## 28.09.2026 — Schneller durch Pläne, nicht durch Erweiterungen
+
+**Anlass.** Frage von Eugene nach dem Serverwechsel: ob Dashboards und MCP-Antworten jetzt schneller
+werden können, und ob dafür **TimescaleDB** oder **pg_duckdb** helfen. Gemessen in `mcp.zugriff`
+über 30 Tage: `abfrage_ausfuehren` im Median 87 ms, aber jede zehnte Antwort 7,8 s und die zwölf
+langsamsten an der 20-s-Grenze — elf davon auf `mart.artikelverkauf`. Das Werkzeug `datenstand`
+im Median 2,8 s.
+
+**Entschieden: keine der beiden Erweiterungen.**
+
+* **Beide brauchen ein anderes Postgres-Image** und einen Eintrag in `shared_preload_libraries` —
+  also die von Dokploy verwaltete Datenbank (21 GB) auf ein Fremd-Image umziehen. Ob sie Postgres 18
+  schon tragen, wäre erst zu prüfen gewesen.
+* **TimescaleDB** bringt Zeitpartitionierung (haben wir, je Monat), Kompression (Rohantworten sind
+  JSON, das Postgres ohnehin per TOAST packt) und inkrementelle Sichten, die nur einfache
+  Zeitsummen über **eine** Tabelle können. Die langsamen Sichten hier sind Joins mit
+  Stand-Historien.
+* **pg_duckdb** beschleunigt große Summen über viele Zeilen. Die langsamste Abfrage las 8.759
+  Zeilen — nur rechnete sie eine Fensterfunktion über 591.665 Zeilen 22-mal. Dagegen hilft keine
+  schnellere Engine.
+
+**Stattdessen**, alles in `0124` und per `ALTER SYSTEM`:
+
+1. `mart.artikelverkauf`: Stand und Warengruppe per `LATERAL … LIMIT 1` statt Bereichsjoin auf die
+   `lead()`-Sichten — 26,7 s → 0,27 s, Vollscan nicht langsamer (`docs/fehlerkatalog.md`).
+2. `mart.datenstand`: letzter gebuchter BWA-Monat rückwärts über einen Teilindex — 2,07 s → ms.
+3. **`pg_stat_statements`**, damit die nächste langsame Karte gemessen statt geraten wird: je
+   Abfrageform Aufrufe, Zeit, Puffer, JIT-Anteil — auch Metabase. Dazu `track_io_timing = on`.
+4. **Parallelität 4 statt 2 je Abfrage**, und dafür `min_dynamic_shared_memory = 1GB`: Postgres
+   reserviert den gemeinsamen Speicher für parallele Abfragen beim Start im Hauptspeichersegment,
+   nicht in `/dev/shm`. **Verworfen: `shm_size` am Container** — die Datenbank verwaltet Dokploy,
+   und eine Docker-Einstellung neben dessen Oberfläche geht beim nächsten Neuaufsetzen still
+   verloren (dieselbe Falle wie `pg-bruecke` ohne Restart-Regel). `postgresql.auto.conf` liegt im
+   Datenvolume und überlebt Neustart und Neuaufsetzen.
+
+| Einstellung | vorher | jetzt | Neustart nötig |
+|---|---|---|---|
+| `shared_preload_libraries` | leer | `pg_stat_statements` | ja |
+| `min_dynamic_shared_memory` | 0 | 1 GB | ja |
+| `max_worker_processes` | 8 | 12 | ja |
+| `max_parallel_workers` | 8 | 8 | nein |
+| `max_parallel_workers_per_gather` | 2 | 4 | nein (wirkt aber erst mit dem Neustart, weil nicht neu geladen wurde) |
+| `max_parallel_maintenance_workers` | 2 | 4 | nein |
+| `track_io_timing` | off | on | nein |
+
+Eingetragen am 28.09.2026 abends, `pg_file_settings` ohne Fehler. **Wirksam erst nach dem nächsten
+Neustart der Datenbank** — mit Absicht nicht neu geladen, damit 4 Worker nicht vor dem reservierten
+Speicher kommen. Ebenfalls offen: ob JIT (`jit_above_cost` 100.000) den MCP-Abfragen mehr kostet
+als bringt — bei `mart.datenstand` waren es 0,31 von 2,07 s. Das entscheidet
+`pg_stat_statements` (`jit_generation_time` & Co.), nicht eine Einzelmessung.
+
+**Nachprüfen nach dem Neustart:**
+
+```sql
+SELECT name, setting, pending_restart FROM pg_settings
+ WHERE name IN ('shared_preload_libraries','min_dynamic_shared_memory','max_worker_processes',
+                'max_parallel_workers_per_gather','track_io_timing');
+SELECT calls, round(total_exec_time) AS ms, round(mean_exec_time) AS mittel_ms, left(query, 120)
+  FROM pg_stat_statements ORDER BY total_exec_time DESC LIMIT 20;
+```

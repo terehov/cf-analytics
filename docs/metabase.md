@@ -1657,3 +1657,19 @@ Drei Regeln, die in der Sicht stecken:
 
 Leistung auf dem lokalen Stand (173.823 Einzelbewertungen, Klon am 28.09.2026): ein Monat über
 alle Betriebe 79 ms, ein Quartal je Marke 18 ms — keine Materialisierung nötig.
+
+## `mart.artikelverkauf` und `mart.datenstand` schneller (Migration `0124`, 28.09.2026)
+
+Spalten und Zahlen unverändert — nur der Weg dahin. Deshalb auch kein neuer MCP-Katalogabzug:
+`test/katalog.json` beschreibt Spalten, und die sind gleich geblieben.
+
+| Abfrage (Produktion, 28.09.2026) | vorher | nachher |
+|---|---|---|
+| Preise einer Marke, eine Woche (`mcp.zugriff` 615) | 26,7 s | 0,27 s |
+| `mart.artikelverkauf`, August 2026, alle Betriebe | 4,7 s | 3,6 s |
+| `mart.artikelverkauf`, Jahr 2025, alle Betriebe | 33,9 s | 30,3 s |
+| `mart.datenstand` nach Befund | 2,07 s | 1,7 ms (Klon; Produktion nach dem Deploy nachmessen) |
+
+`mart.artikelverkauf` bleibt eine Sicht über 27,7 Mio. Zeilen: ohne Zeitraum ist sie weiter
+langsam, und die Warnung `zeitraum_noetig` im MCP-Prüfer bleibt richtig. Für Monate und Artikel
+ist `mart.artikel_monat` der schnellere Weg.

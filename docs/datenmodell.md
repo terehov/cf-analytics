@@ -1204,3 +1204,28 @@ Seit `0123` gibt es deshalb zwei **Teilindizes** genau für die beiden Suchen, d
 
 Die Prädikate sind Wort für Wort die Bedingungen der Abfragen — ändert sich eine Abfrage, greift
 der Index still nicht mehr. Wer dort etwas umbaut, prüft den Plan (`EXPLAIN`), nicht nur das Ergebnis.
+
+## Stände per `LATERAL`, BWA-Monat per Teilindex (`0124`, 28.09.2026)
+
+**`mart.artikelverkauf`** holt Artikelstand und Warengruppe nicht mehr über die Zeitraum-Sichten
+(`core.artikel_stand_zeitraum`, `core.artikel_warengruppe_zeitraum`), sondern je Zeile per
+`LATERAL … ORDER BY monat DESC LIMIT 1` über den Primärschlüssel `(artikel_key, monat)`. Die
+Zeitraum-Sichten bleiben — für Handabfragen und kleine Joins sind sie richtig; unter einer Sicht
+mit Millionen Zeilen rechnet ihr `lead()` im falschen Plan je äußere Zeile neu
+(`docs/fehlerkatalog.md`, 28.09.2026). Die Warengruppe folgt der Regel aus `0002`: vor dem
+ältesten Stand gilt der älteste, `erfasst_ab` ist dessen Monat.
+
+**`mart.datenstand`** sucht den letzten gebuchten BWA-Monat rückwärts über den Teilindex
+
+```sql
+CREATE INDEX kennzahlen_monat_gebucht_idx ON core.kennzahlen_monat (betrieb_key, monat)
+ WHERE wert_absolut::numeric(14,2) <> 0;
+```
+
+(444.154 von 2,4 Mio. Zeilen). Die Bedingung muss wörtlich der in der Sicht entsprechen, sonst
+nimmt der Planer den Index nicht. Die Regel ist die von `mart.kennzahlen_aktuell` — jüngster
+Nicht-NULL-Abruf je Kennzahl, auf zwei Stellen gerundet, ungleich 0 —, nur ohne jeden Monat
+jedes Betriebs zu gruppieren.
+
+**`pg_stat_statements`** legt `0124` als Erweiterung an, wo das Paket vorhanden ist. Lesbar ist
+sie erst, wenn `shared_preload_libraries` sie lädt (`docs/entscheidungen.md`, 28.09.2026).
