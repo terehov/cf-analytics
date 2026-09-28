@@ -376,7 +376,7 @@ Ebenfalls im Nachtlauf, ohne Befehl: der Yext-Vollabgleich und der
 Zuordnungsabgleich (monatlich), die Handpflege aus `pflege/` (bei jedem Lauf)
 und die Feiertage/Schulferien (monatlich, `openholidaysapi.org`).
 
-Der Sync läuft **tagsüber** (Fenster 7–23 Uhr, konfigurierbar). Das ist Absicht: ein einzelner Client um drei Uhr früh ist im Log ein Ausreißer, dieselben Anfragen im Tagesverkehr von 141 Betrieben fallen nicht auf.
+~~Der Sync läuft **tagsüber** (Fenster 7–23 Uhr, konfigurierbar).~~ Seit dem 25.07.2026 ohne Fenster (`FENSTER_*` 0–24, Begründung in `src/config.ts`), und seit dem 28.09.2026 lädt Phase C bis 04:30 nach (`NACHLADEN_BIS`, `TAGESBUDGET` 15.000 — `docs/importer.md`). Die alte Begründung: Das ist Absicht: ein einzelner Client um drei Uhr früh ist im Log ein Ausreißer, dieselben Anfragen im Tagesverkehr von 141 Betrieben fallen nicht auf.
 
 **Postgres nie ins Internet exponieren** — Postico über SSH-Tunnel.
 

@@ -3821,3 +3821,26 @@ selbst 4,59 und 4,40 hatten.
 **Verworfen:** den Monat über alle Portale gegen den Google-Stand stellen (Spalte „Abstand zum
 Stand" in `bw_rangliste`, entfernt). TripAdvisor bewertet rund 0,9 Sterne strenger; die
 Differenz wäre systematisch negativ und sähe aus wie eine Verschlechterung.
+
+## 28.09.2026 — Das Nachladen läuft bis 04:30 statt bis 23 Uhr, Tagesbudget 15.000
+
+**Anlass.** Eugene sah die Laufzeiten (1.084–1.089 Minuten je Lauf) und fragte, warum; die Antwort
+war Phase C, die Historie der Betriebsberichte (~456.000 Posten, Stand 28.09. bis Dezember 2025
+zurück, rund 9.000–10.000 Posten je Nacht). Entscheidung: **bis kurz vor dem neuen Lauf laden.**
+
+**Umsetzung.** `NACHLADEN_BIS = 04:30` statt `NACHLADEN_BIS_STUNDE = 23` — die Frist ist jetzt das
+nächste Erreichen der Uhrzeit nach Beginn von Phase C, nicht mehr „diese Stunde, nie nach
+Mitternacht". `TAGESBUDGET` 15.000 statt 10.500, weil sonst das Budget statt der Uhr das Nachladen
+beendet hätte (Lauf 141 endete am 27.09. schon so). Rechnung an beiden Werten in `src/config.ts`.
+
+**Was sich für LINA ändert:** nicht das Tempo (Takt 4–6 s unverändert, harte Regel 3), sondern die
+Dauer — rund 20 statt 15,5 Stunden Nachladen, also ~30 % mehr Aufrufe je Tag (~13.300 statt ~10.300). Die nächtlichen
+Aufrufe widersprechen nicht der Tarnungsüberlegung: seit dem 25.07.2026 gilt ein gleichmäßiger
+Strom rund um die Uhr als unauffälliger als eine Kante am Abend (`FENSTER_*`).
+
+**Verworfen:** 05:00 wörtlich. Nach Phase C frischt der Lauf noch Sichten auf (26.09.: 9 Minuten);
+ein Ende um 05:00 hätte den 05:02-Lauf an die Sperre laufen lassen — genau der Ausfall von Lauf 136.
+
+**Voraussetzung in Produktion:** `TAGESBUDGET` steht dort als Umgebungsvariable (10.500) und
+schlägt die Voreinstellung. Sie muss in Dokploy auf 15.000 gesetzt oder entfernt werden; eine
+dort gesetzte `NACHLADEN_BIS_STUNDE` wird nicht mehr gelesen.

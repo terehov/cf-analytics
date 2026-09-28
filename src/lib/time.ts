@@ -30,7 +30,7 @@ function wanduhr(d: Date) {
     hour12: false,
   }).formatToParts(d)
   const g = (t: string) => Number(p.find(x => x.type === t)!.value)
-  return { y: g('year'), m: g('month'), d: g('day'), h: g('hour') % 24 }
+  return { y: g('year'), m: g('month'), d: g('day'), h: g('hour') % 24, min: g('minute') }
 }
 
 /** Der Kalendertag (YYYY-MM-DD) eines Zeitpunkts in der Geschäftszeitzone — nicht der Geschäftstag. */
@@ -121,6 +121,22 @@ export function epochIstBerlinerMitternacht(epochSeconds: number, expectedIsoDat
   const { y, m, d, h } = wanduhr(new Date(epochSeconds * 1000))
   const iso = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
   return iso === expectedIsoDate && h === 0
+}
+
+/** Minute des Tages (0–1439) in der Geschäftszeitzone — für Fristen auf die Minute. */
+export function minuteDesTagesInGeschaeftszeitzone(zeitpunkt: Date): number {
+  const { h, min } = wanduhr(zeitpunkt)
+  if (!Number.isFinite(h) || !Number.isFinite(min)) {
+    throw new Error('Uhrzeit nicht ermittelbar — Zeitzonenkonfiguration prüfen')
+  }
+  return h * 60 + min
+}
+
+/** Der Kalendertag nach `tag` (YYYY-MM-DD) — reine Datumsrechnung, ohne Zeitzone. */
+export function tagDanach(tag: string): string {
+  const d = new Date(`${tag}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + 1)
+  return d.toISOString().slice(0, 10)
 }
 
 /**

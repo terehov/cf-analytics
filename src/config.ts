@@ -380,8 +380,22 @@ const Schema = z.object({
    * TAKT_MIN_MS/TAKT_MAX_MS — die bleiben unangetastet. Das Budget entscheidet
    * nur, wann der Tag vorzeitig endet. Wer den Takt wieder ändert, muss diesen
    * Wert nachziehen; sonst wiederholt sich derselbe Fehler.
+   *
+   * 15.000 SEIT 28.09.2026 (vorher 6.000 hier, 10.500 in der Umgebung von
+   * Produktion). Eugene: das Nachladen soll bis kurz vor dem naechsten Lauf
+   * laufen statt um 23 Uhr aufzuhoeren (NACHLADEN_BIS). Derselbe Fehler wie
+   * am 26.07. stand wieder da: die 10.500 waren zur Alltagsbremse geworden —
+   * Lauf 141 endete am 27.09. um 23:04 mit „Tagesbudget aufgebraucht",
+   * Lauf 139 und 140 um 23 Uhr an der Frist, beide Grenzen banden also
+   * gleichzeitig. Gemessen in Phase C: Lauf 140 9.076 Posten in 15,6 h,
+   * Lauf 141 9.051 in 15,4 h — 6,1–6,2 s je Posten beim Takt 4–6 s. Das sind
+   * hoechstens ~14.100 Aufrufe in 24 Stunden. Ein UTC-Tag (02:00 bis 02:00
+   * Ortszeit) traegt kuenftig den Rest des Vorlaufs (02:00–04:30, ~1.450)
+   * plus Tagesgeschaeft und Nachladen bis 02:00 (~11.800), zusammen ~13.300.
+   * 15.000 liegt knapp ueber dem, was der Takt zulaesst — wieder das
+   * Notfallnetz und keine Bremse.
    */
-  TAGESBUDGET: z.coerce.number().int().min(1).default(6_000),
+  TAGESBUDGET: z.coerce.number().int().min(1).default(15_000),
   /**
    * Arbeitsfenster in Ortszeit. **Voreinstellung 0–24: durchgehend.**
    *
@@ -400,17 +414,33 @@ const Schema = z.object({
   FENSTER_VON_STUNDE: z.coerce.number().int().min(0).max(23).default(0),
   FENSTER_BIS_STUNDE: z.coerce.number().int().min(1).max(24).default(24),
   /**
-   * Phase C (Nachladen) endet spätestens zu dieser vollen Stunde, Ortszeit —
-   * und nie nach Mitternacht des Tages, an dem sie begonnen hat.
+   * Phase C (Nachladen) endet beim NÄCHSTEN Erreichen dieser Uhrzeit (Ortszeit,
+   * "HH:MM") nach ihrem Beginn. Beginnt sie um 08:20, ist das 04:30 am
+   * Folgetag; beginnt ein Handlauf um 03:00, ist es 04:30 desselben Tages.
+   * Beides endet vor dem 05:02-Lauf — genau das ist die Bedingung.
    *
-   * Anlass (24.09.2026): Lauf 135 lud von 15:30 bis zum nächsten Mittag nach.
-   * Das Tagesbudget wechselt um 00:00 UTC, also 02:00 Ortszeit; danach bekam
-   * das Nachladen ein frisches Budget und verbrauchte das des Folgetags. Der
+   * Anlass der Frist (24.09.2026): Lauf 135 lud von 15:30 bis zum nächsten
+   * Mittag nach. Das Tagesbudget wechselt um 00:00 UTC, also 02:00 Ortszeit;
+   * danach bekam das Nachladen ein frisches Budget und lief einfach weiter. Der
    * 05:02-Lauf 136 fand die Sperre belegt und fiel aus — kein Tagesgeschäft,
    * die Dashboards blieben einen Tag stehen. Das Nachladen darf nie den
-   * nächsten Lauf verdrängen; es hat keine Frist, das Tagesgeschäft schon.
+   * nächsten Lauf verdrängen.
+   *
+   * ~~NACHLADEN_BIS_STUNDE = 23, und nie nach Mitternacht~~ (24.–28.09.2026).
+   * Das hielt den nächsten Lauf sicher frei, verschenkte aber sechs Stunden
+   * je Nacht: bei ~456.000 Posten Historie der Betriebsberichte heisst das
+   * Wochen. Eugene, 28.09.2026: bis kurz vor dem neuen Lauf laden. Der
+   * Mitternachtsschutz ist dafuer nicht mehr noetig — die Frist liegt jetzt
+   * selbst vor 05:02, und das Budget des neuen UTC-Tags ist gross genug
+   * (TAGESBUDGET), dass der Rest zwischen 02:00 und 04:30 dem Tagesgeschaeft
+   * des Folgelaufs nichts wegnimmt.
+   *
+   * WARUM 04:30 UND NICHT 05:00. Nach Phase C frischt der Lauf noch die
+   * Sichten auf, die aus der Konzern-Historie lesen; am 26.09. endete Phase C
+   * um 23:00 und der Lauf um 23:09. Eine halbe Stunde Abstand zum 05:02-Lauf
+   * sind diese neun Minuten mit Reserve fuer eine langsame Nacht.
    */
-  NACHLADEN_BIS_STUNDE: z.coerce.number().int().min(1).max(24).default(23),
+  NACHLADEN_BIS: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Format HH:MM').default('04:30'),
 
   // --- Fehlerverhalten ---------------------------------------------------
   /**

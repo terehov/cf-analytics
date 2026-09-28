@@ -24,10 +24,27 @@ Lauf 135 (Start 23.09. 10:29, Handstart) war um 15:30 mit A und B fertig und lud
 (`budgetTagWechseln()` in `src/lina/client.ts`), wurde also um 02:00 Ortszeit frisch, und Phase C
 kannte keine andere Grenze. Sie verbrauchte das Budget des Folgetags, der 05:02-Lauf 136 fand die
 Laufsperre belegt und endete `uebersprungen` — kein Tagesgeschäft, die Dashboards standen einen
-Tag. Seitdem endet Phase C zur vollen Stunde `NACHLADEN_BIS_STUNDE` (Voreinstellung 23, Ortszeit)
-und **nie nach Mitternacht des Tages, an dem sie begann** (`nachladenVorbei()` in
-`src/sync/worker.ts`, Test `src/sync/nachladen_ende.test.ts`). Das Tagesgeschäft hat keine Frist;
-das Nachladen darf den nächsten Lauf nie verdrängen. Die Notiz des Laufs nennt das Ende.
+Tag. ~~Seitdem endet Phase C zur vollen Stunde `NACHLADEN_BIS_STUNDE` (Voreinstellung 23, Ortszeit)
+und **nie nach Mitternacht des Tages, an dem sie begann**.~~ (24.–28.09.2026)
+
+**Seit dem 28.09.2026 lädt Phase C bis kurz vor dem nächsten Lauf.** Sie endet beim **nächsten
+Erreichen** von `NACHLADEN_BIS` (Voreinstellung `04:30`, Ortszeit) nach ihrem Beginn — um 08:20
+begonnen also um 04:30 am Folgetag, ein Handlauf ab 03:00 um 04:30 desselben Morgens
+(`nachladenVorbei()` in `src/sync/worker.ts`, Test `src/sync/nachladen_ende.test.ts`, auch für die
+Zeitumstellung). Anlass: zwischen 23:00 und 05:02 stand der Zugang sechs Stunden je Nacht still,
+während ~456.000 Posten Historie warten; Lauf 139–141 endeten alle um 23 Uhr, an der Frist oder am
+Budget. Die Bedingung aus Lauf 135 gilt unverändert — **das Nachladen darf den nächsten Lauf nie
+verdrängen** —, nur sichert sie jetzt die Uhrzeit selbst: 04:30 liegt vor 05:02, und die halbe
+Stunde deckt den Refresh nach Phase C (am 26.09. neun Minuten, 23:00 → 23:09).
+
+**Das Budget musste mit.** Es zählt je UTC-Tag, also 02:00 bis 02:00 Ortszeit. Ein UTC-Tag trägt
+jetzt den Rest des Vorlaufs (02:00–04:30, ~1.450 Posten) und den eigenen Lauf bis 02:00 (~11.800),
+zusammen ~13.300; gemessen sind 6,1–6,2 s je Posten, also höchstens ~14.100 in 24 Stunden.
+`TAGESBUDGET` steht deshalb auf **15.000** (vorher 10.500 in der Umgebung von Produktion) — wieder
+knapp über dem Takt, als Notfallnetz. Der Takt selbst (`TAKT_MIN_MS`/`TAKT_MAX_MS`) ist
+unverändert; was LINA je Minute sieht, bleibt gleich, es läuft nur sechs Stunden länger. Das
+Tagesgeschäft des Folgelaufs kann dabei nicht zu kurz kommen: der Rest nach 02:00 verbraucht
+~1.450 von 15.000, und das Tagesgeschäft läuft vor jedem Nachladen.
 
 ```text
   nachfuellen()                     Vorlauf: die Schlange füllen (setzt nachladen je Posten)
@@ -45,7 +62,7 @@ das Nachladen darf den nächsten Lauf nie verdrängen. Die Notiz des Laufs nennt
 
   ── Phase C ── das Nachladen, nur die LINA-Spur ──────────
      sitzung.nachladen()            alles Fällige, verschränkt, bis Budget/Fenster/Notbremse
-                                    und spätestens NACHLADEN_BIS_STUNDE (23 Uhr) bzw. Tageswechsel
+                                    und spätestens NACHLADEN_BIS (04:30 am Folgetag)
      wenn Konzern-Historie geladen: deckungsbeitrag · roundTable · vergleichstag
   ── sitzung.abschliessen() ── Status, Notiz, nachladen_posten/_offen, Sperre frei ──
 ```
@@ -104,7 +121,7 @@ zählt nur Posten ohne `getReport:`. Ohne den zweiten Refresh stünde der Backfi
 am nächsten Morgen im Ladestand, und jede MCP-Antwort meldete einen Monat als „nicht geladen", der
 längst da ist. Gemessen auf einem Klon in Produktionsgröße: 32,9 s + 13,9 s nebenläufig.
 **Wie alt der Ladestand sein kann (0121):** zwischen zwei Refreshs — also während Phase C (bis
-23 Uhr) und am Morgen bis zum Ende von Phase B — zeigt er den Stand davor. Am 24.09.2026 stand
+04:30) und am Morgen bis zum Ende von Phase B — zeigt er den Stand davor. Am 24.09.2026 stand
 deshalb der August als nicht geladen da, während er längst lud. Seit `0121` trägt die Basis
 `stand` (`now()` beim Refresh), und der Satz endet mit „Stand: TT.MM.JJJJ HH:MM Uhr" (Ortszeit),
 ab 36 Stunden mit dem Zusatz, dass er veraltet sein kann. Nur der vorläufige laufende Monat
