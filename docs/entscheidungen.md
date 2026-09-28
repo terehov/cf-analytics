@@ -3844,3 +3844,29 @@ ein Ende um 05:00 hätte den 05:02-Lauf an die Sperre laufen lassen — genau de
 **Voraussetzung in Produktion:** `TAGESBUDGET` steht dort als Umgebungsvariable (10.500) und
 schlägt die Voreinstellung. Sie muss in Dokploy auf 15.000 gesetzt oder entfernt werden; eine
 dort gesetzte `NACHLADEN_BIS_STUNDE` wird nicht mehr gelesen.
+
+## 28.09.2026 — Server CX43, Postgres auf 16 GB eingestellt
+
+**Anlass.** Die Platte stand bei 29,5 von 37,2 GB (79 %), die Datenbank bei 21 GB und wuchs mit dem
+Nachladen der Betriebsberichte um ~0,5 GB am Tag; hochgerechnet ~45–50 GB bis Mitte November.
+Eugene hat auf **CX43** skaliert (8 Kerne, 16 GB, 160 GB Platte). Verworfen: CX33 (80 GB wären im
+November zu ~75 % voll), CX53 (Kerne und Speicher auf Jahre ungenutzt; hochskalieren geht später
+jederzeit, zurück nicht).
+
+**Postgres stand auf Voreinstellung** (`shared_buffers` 128 MB, `work_mem` 4 MB). Gesetzt per
+`ALTER SYSTEM` (liegt in `postgresql.auto.conf` im Datenvolume, übersteht Neustart und Deploy),
+danach Neustart der Datenbank — nachgeprüft am 28.09.2026, 16:41, `pending_restart` überall `f`:
+
+| Einstellung | vorher | jetzt | Warum |
+|---|---|---|---|
+| `shared_buffers` | 128 MB | 4 GB | ein Viertel des Speichers; Importer, MCP und Dokploy teilen den Rest |
+| `effective_cache_size` | 4 GB | 10 GB | was der Dateicache realistisch hält |
+| `work_mem` | 4 MB | 32 MB | Sortierungen und Hashes der Refreshs und Metabase-Abfragen |
+| `maintenance_work_mem` | 64 MB | 1 GB | Indexbau, VACUUM, Refresh |
+| `random_page_cost` | 4 | 1,1 | SSD |
+| `effective_io_concurrency` | 16 | 200 | SSD |
+| `max_wal_size` | 1 GB | 4 GB | weniger Checkpoints beim Nachladen |
+
+**Bewusst nicht erhöht:** `max_parallel_workers_per_gather` (2). Parallele Abfragen legen ihren
+gemeinsamen Speicher in `/dev/shm`, und Docker gibt dem Container davon standardmäßig 64 MB — mehr
+Parallelität meldete sich als „could not resize shared memory segment".

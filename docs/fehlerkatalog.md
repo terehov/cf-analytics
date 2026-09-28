@@ -4803,3 +4803,17 @@ Kacheln, die Rangliste und der Markenbalken zeigen den Monat, über alle Portale
 heißt „Google-Stand (Ampel)". **Regel:** eine kumulierte Zahl trägt ihr „seit Beginn" oder
 „Stand" im Namen. Wer unter einem Monatsfilter eine Zahl zeigt, die sich von Monat zu Monat
 nicht bewegen kann, zeigt nicht den Monat.
+
+## Nach dem Serverneustart erreichte Metabase die Datenbank nicht (28.09.2026)
+
+**Symptom.** Nach dem Hochskalieren auf CX43 meldete jede Metabase-Abfrage „The connection attempt
+failed". Importer und MCP liefen weiter, Postgres auch.
+
+**Ursache.** Metabase (auf Cloudron) kommt per SSH-Tunnel an `127.0.0.1:55432` auf dem Server. Diesen
+Port veröffentlicht der Container **`pg-bruecke`**, nicht der Postgres-Container (der gibt nur intern
+5432 frei). `pg-bruecke` hatte keine Neustartregel und stand nach dem Neustart auf `Exited (255)`.
+Importer und MCP sprechen Postgres im Docker-Netz direkt an und merkten nichts.
+
+**Was es künftig verhindert.** `docker update --restart unless-stopped pg-bruecke`. **Regel:** nach
+jedem Serverneustart `ss -ltnp | grep 55432` prüfen — ein Dienst, der nur für Metabase und Postico
+existiert, fällt keinem Lauf und keiner Prüfsicht auf.
