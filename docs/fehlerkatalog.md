@@ -4783,3 +4783,23 @@ Monate … zwischen … und …", und am Ende „Stand: TT.MM.JJJJ HH:MM Uhr" (Z
 als 36 Stunden mit Warnung). Ein Monatsbericht ist reif, wenn sein **letzter** Tag 9 Tage
 zurückliegt. Test: „Ladestand: Tagesberichte auf den Tag …" in `src/sync/betriebsbericht.test.ts`,
 dazu `mcp/test/ausfuehren.test.ts` als `mcp_leser`.
+
+## „Ø Bewertung" war der Stand seit 2010, nicht der gewählte Monat (28.09.2026)
+
+**Symptom.** Gemeldet von Eugene: die Bewertungszahlen weichen von den Werkzeugen ab, mit denen
+bisher gearbeitet wurde, und zwei Monate lassen sich nicht vergleichen. Auf *Online-Bewertungen*
+stand bei „Mai 2026" als erste Kachel „Ø Bewertung 4,27", bei „April 2026" ebenfalls 4,27. Die
+Bewertungen des Monats lagen bei 4,40 und 4,59.
+
+**Ursache.** Die Kachel, die Rangliste und der Markenbalken lasen
+`mart.bewertung_verlauf.schnitt_stand` — den kumulierten Google-Schnitt aller Bewertungen bis
+Monatsende, rund 137.000 Stimmen. Der Monatsfilter wählte also den **Stichtag** eines Stands,
+nicht den Monat. Die Monatszahl gab es, als zweite Kachel „Ø der neuen Bewertungen" — neben
+einer größeren, die „Ø Bewertung" hieß und damit wie die Antwort aussah. Kein Fehler im SQL,
+eine richtige Zahl unter einem Namen, der eine andere versprach.
+
+**Was es künftig verhindert.** `0122` (`mart.bewertung_tag`) und die umgebauten Karten: die
+Kacheln, die Rangliste und der Markenbalken zeigen den Monat, über alle Portale; der Stand
+heißt „Google-Stand (Ampel)". **Regel:** eine kumulierte Zahl trägt ihr „seit Beginn" oder
+„Stand" im Namen. Wer unter einem Monatsfilter eine Zahl zeigt, die sich von Monat zu Monat
+nicht bewegen kann, zeigt nicht den Monat.

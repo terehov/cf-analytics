@@ -230,9 +230,33 @@ kommt seit dem 03.08.2026 `core.bewertung` dazu — einzelne Bewertungen mit Not
 Autorenname und Link zur Quelle (`mart.bewertung_einzel`), weil eine Zahl zwar sagt, dass
 ein Betrieb abrutscht, aber nicht woran.
 
-Aus `core.bewertung` wird **nicht gerechnet**: eine gelöschte Bewertung verschwindet bei
+~~Aus `core.bewertung` wird **nicht gerechnet**: eine gelöschte Bewertung verschwindet bei
 Yext sofort aus dem Durchschnitt, unsere Kopie bliebe stehen. Wer daraus einen Schnitt
-bildet, bekommt eine andere Zahl als der Round Table — und die falsche.
+bildet, bekommt eine andere Zahl als der Round Table — und die falsche.~~
+
+**Seit `0122` (28.09.2026) wird aus `core.bewertung` gerechnet — aber nicht die Ampel.**
+`mart.bewertung_tag` zählt die Einzelbewertungen je Betrieb, deutschem Kalendertag und Portal;
+daraus kommen alle Kacheln und Listen „im Monat" auf *Online-Bewertungen*, ② und ③. Die
+befürchtete Drift ist nachgemessen null: Google-Stand Ende Juli 2026 über 60 Betriebe 137.110
+Bewertungen und Schnitt 4,272 — in `core.bewertung_stand` wie in den Einzelbewertungen; je
+Betrieb und Monat über 24 Monate ist die Anzahl in UTC-Monaten exakt gleich. Über alle Portale
+gegen Yexts `publisher = 'ALLE'`: April 2026 2.008 gegen 2.010 Bewertungen (Schnitt 4,588
+gegen 4,592), Mai 1.313 gegen 1.312 (4,395 gegen 4,394). Der Rest ist die Monatsgrenze —
+`bewertung_tag` schneidet in deutscher Zeit, Yext in UTC. Die **Ampel** bleibt auf dem
+Google-Stand aus `core.bewertung_stand` (Entscheidung Eugene, 28.09.2026).
+
+Drei Zahlen, die man nicht nebeneinanderstellen darf, weil sie Verschiedenes zählen:
+
+| Zahl | Quelle | Was sie ist |
+|---|---|---|
+| Google-Stand | `mart.bewertung_verlauf.schnitt_stand` | alle Google-Bewertungen seit Beginn, bis Monatsende — die Ampel |
+| Im Monat | `mart.bewertung_tag` | nur die Bewertungen des Monats, **alle Portale**; Schnitt = `sum(sterne_summe) / sum(bewertet)` |
+| Analytics-Anzahl | `mart.bewertung_note`, `mart.bewertung_antwort` | Yexts Berichtszahl — 2–3 % über den Einzelbewertungen (September 2025: 1.740 gegen 1.698) |
+
+Der Monatsschnitt über alle Portale liegt systematisch **unter** dem Google-Stand, weil
+TripAdvisor rund 0,9 Sterne strenger bewertet. Eine Differenz „Monat minus Stand" ist deshalb
+nur auf einem Portal eine Aussage — die Frühwarnung `bw_bewegung` und die Tendenz in
+`bw_verlauf` rechnen weiter auf Google.
 
 #### Yext Analytics — seit 10.08.2026, ein zweiter Weg zu denselben Bewertungen
 

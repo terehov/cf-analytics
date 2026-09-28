@@ -3788,3 +3788,36 @@ noch wachsen, weil LINA sie noch füllt (0101). Eine Monatssumme des laufenden M
 Zwischenstand; `mart.betriebsbericht_ladestand_monat` sagt „teilweise" und nennt
 `betriebe_vorlaeufig`.
 
+
+## 28.09.2026 — Online-Bewertungen: der Monat statt des Stands bis zum Monat (Migration `0122`)
+
+**Anlass.** Eugene: „Wenn ich einen Monat wähle, will ich die Bewertungen und den Schnitt
+**dieses** Monats sehen und nicht alles bis zu diesem Monat — um etwa zu sehen, ob der Mai
+besser lief als der April. Die Zahlen weichen von den Werkzeugen ab, mit denen sie bisher
+gearbeitet haben." Die erste Kachel „Ø Bewertung", die Rangliste und der Markenbalken zeigten
+den Google-**Stand** bis Monatsende — von April auf Mai 2026 4,268 → 4,269, während die Monate
+selbst 4,59 und 4,40 hatten.
+
+**Vier Festlegungen:**
+
+1. **Die Ampel bleibt beim Google-Stand.** Wie im Excel. Die Kachel dazu heißt jetzt
+   „Google-Stand (Ampel)" und steht hinter den Monatszahlen, nicht mehr vorn.
+2. **Monatszahlen über alle Portale** (Google, OpenTable, TripAdvisor, die kleinen). Anzahl =
+   jede Bewertung, auch Facebook-Empfehlungen ohne Sterne; Schnitt nur über Bewertungen mit
+   Sternen. ~~Gerechnet wird auf Google, weil ein Schnitt über alle Portale zwei Skalen
+   mischt~~ — gilt weiter für Ampel, Frühwarnung und Tendenz, nicht mehr für die Monatszahlen.
+3. **Nur der Monat, kein freier Zeitraum auf „Online-Bewertungen".** Themen, Antworten und
+   Sichtbarkeit liefert Yext nur je Monat; ein Von/Bis-Filter hätte etwa 20 Karten umbauen oder
+   auf der halben Seite wirkungslos bleiben müssen (die Filterprüfung in `uebernehmen.ts`
+   nennt das „taub"). Zum Vergleichen gibt es stattdessen **Monat für Monat** (`bw_monate`,
+   gewählter Monat und zwölf davor). Auf ③ Betrieb, wo es den Zeitraumfilter schon gibt, folgt
+   `bw_monate_zeitraum` ihm.
+4. **Aus den Einzelbewertungen, nicht aus der Differenz zweier Stände.** Die Stände gibt es
+   nur für Google und `ALLE` und nur je Monatsende; `core.bewertung` kennt Portal und Tag. Die
+   Drift, derentwegen 0037 das ausschloss, ist nachgemessen null (`docs/datenherkunft.md`).
+   Der Tag ist der deutsche Kalendertag, nicht UTC wie bei Yexts Ständen — wer „Juli" wählt,
+   meint den Juli in Deutschland (Unterschied 0–4 Bewertungen je Monat von rund 1.300).
+
+**Verworfen:** den Monat über alle Portale gegen den Google-Stand stellen (Spalte „Abstand zum
+Stand" in `bw_rangliste`, entfernt). TripAdvisor bewertet rund 0,9 Sterne strenger; die
+Differenz wäre systematisch negativ und sähe aus wie eine Verschlechterung.

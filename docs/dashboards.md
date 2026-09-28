@@ -1538,3 +1538,44 @@ Produktivinstanz) — erst, wenn `0117` dort angewendet ist, sonst scheitern die
 fehlenden Sichten. Bis dahin existieren die Seiten nur hier. Geprüft ist bisher: `bun test
 metabase/karten.test.ts` gegen einen Klon auf Stand `0118` (562 grün) und die statischen Prüfungen
 aus `uebernehmen.ts` (Filterwirkung, Kacheln, Raster) in einer Abschrift ohne Metabase-Zugriff.
+
+## Online-Bewertungen: der Monat, nicht der Stand bis zum Monat (28.09.2026)
+
+**Anlass.** Eugene: bei gewähltem Monat sollen Bewertungen und Schnitt **dieses** Monats stehen,
+damit man etwa April und Mai vergleichen kann — die bisherige erste Kachel „Ø Bewertung" war der
+Google-Stand seit Beginn und bewegte sich von Monat zu Monat um Hundertstel
+(`fehlerkatalog.md`, 28.09.2026). Grundlage ist `mart.bewertung_tag` (`0122`), gerechnet über
+**alle Portale**. Die Ampel bleibt beim Google-Stand.
+
+| Karte | Vorher | Jetzt |
+|---|---|---|
+| `bw_kachel_schnitt` | „Ø Bewertung" = Google-Stand | „Ø Bewertung im Monat", alle Portale |
+| `bw_kachel_neue` | neue Google-Bewertungen (Differenz zweier Stände) | „Bewertungen im Monat", alle Portale, auch ohne Sterne |
+| `bw_kachel_monatswert` | „Ø der neuen Bewertungen" (Google) | **entfällt** — ist jetzt `bw_kachel_schnitt`. Die alte Karte bleibt in Metabase in der Sammlung „Betrieb" liegen (`uebernehmen.ts` archiviert keine Karten) und steht auf keinem Dashboard mehr |
+| `bw_kachel_stand` | — | „Google-Stand (Ampel)", die frühere erste Kachel, jetzt an dritter Stelle |
+| `bw_rangliste` | nach Stand sortiert, Monat als Google-Differenz | nach Monatsschnitt sortiert; Google-Stand als Spalte daneben; „Abstand zum Stand" entfernt; **Stadt** aus `mart.nachbarschaft` statt aus der immer leeren `core.betrieb.stadt` — leer, wo kein Standort gepflegt ist |
+| `bw_marke` | Google-Stand je Marke, ungewichtet | Monatsschnitt je Marke, über die Bewertungen gewichtet, mit Anzahl |
+| `bw_monate` | — | **Monat für Monat** auf *Online-Bewertungen*: gewählter Monat und zwölf davor, Klick setzt den Monat |
+| `bw_monate_zeitraum` | — | dasselbe auf ③ Betrieb, folgt dem Zeitraumfilter der Seite |
+| `bw_bewegung`, `bw_verlauf` | Google | **unverändert Google** — beide stellen den Monat gegen den Stand |
+
+**Warum diese Darstellung für „Monat für Monat".** Kombination wie bei `bw_verlauf`: der Schnitt
+als Linie auf der Sternachse (3 bis 5 — zwischen 4,2 und 4,6 entscheidet sich alles), die Anzahl
+als graue Balken auf eigener Achse. Die Balken sind kein Schmuck: ein Monat mit 4 Bewertungen
+springt so weit wie einer mit 400, und nur die Balkenhöhe sagt, welcher Punkt zählt. **Eine eigene
+Karte statt einer Linie in `bw_verlauf`**, weil dort die Tendenz gegen den Google-Stand steht; eine
+Linie über alle Portale läge wegen TripAdvisor immer darunter und sähe aus wie ein Absturz.
+
+**Warum zwei Karten statt einer.** Auf *Online-Bewertungen* gibt es nur den Monatsfilter, auf ③
+Betrieb zusätzlich den Zeitraum (Feldfilter). Ein Feldfilter schneidet nur zu — mit einem festen
+13-Monats-Fenster in derselben Karte bliebe ein Zeitraum aus 2024 leer. Beide Karten kommen aus
+`monateSql()` in `karten-bewertung.ts`.
+
+**Operativ.** Wie die Kacheln zählt `bw_monate` nur heute operative Betriebe, damit der Balken für
+den gewählten Monat dieselbe Zahl trägt wie die Kachel darüber — außer ein Betrieb ist gewählt,
+dann zählt er auch geschlossen (sonst bliebe ③ bei einem geschlossenen Betrieb leer).
+
+**Vor dem ersten `uebernehmen.ts`:** Metabase muss `mart.bewertung_tag` synchronisiert haben,
+sonst bricht `bw_monate_zeitraum` mit „Feld nicht gefunden" ab (der Zeitraum ist ein Feldfilter
+auf `bewertung_tag.tag`). Metabase synchronisiert stündlich; sonst in der Verwaltung „Sync
+database schema now".

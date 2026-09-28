@@ -587,8 +587,12 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
     monat: 'Verlauf ueber alle Monate -- ein Stichmonat liesse genau einen Punkt uebrig.',
     zeitraum: 'Aggregiert je Monat, nicht je Tag.',
   },
+  bw_monate_zeitraum: {
+    monat: 'Zeigt die Monate im gewaehlten Zeitraum nebeneinander -- ein Stichmonat '
+         + 'liesse einen einzigen Balken uebrig, und der Vergleich ist die Karte.',
+  },
   bw_marke: {
-    marke: 'Die Karte VERGLEICHT die Marken. Ein Markenfilter liesse einen '
+    marke:'Die Karte VERGLEICHT die Marken. Ein Markenfilter liesse einen '
          + 'einzigen Balken stehen, und ein Balken ist kein Vergleich.',
   },
   bw_ladestand: {

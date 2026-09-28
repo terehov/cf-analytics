@@ -30,6 +30,21 @@
 // (docs/entscheidungen.md). Die Karte "Portale nebeneinander" zeigt, was
 // die Wahl ausmacht -- gespeichert ist beides.
 //
+// DER MONAT IST DER MONAT, NICHT DER STAND BIS ZUM MONAT (28.09.2026).
+// Kacheln, Rangliste und Markenbalken zeigten bis dahin den STAND: wer Juli
+// waehlte, sah den Schnitt aller Bewertungen seit 2010 bis Ende Juli. Damit
+// liess sich weder ein Monat mit Yext vergleichen noch der Mai mit dem April
+// — der Stand bewegt sich von Monat zu Monat um Hundertstel. Seit 0122
+// zaehlen diese Karten die Bewertungen DES Monats aus mart.bewertung_tag,
+// und zwar ueber ALLE Portale (Entscheidung Eugene). Der Google-Stand bleibt
+// als eigene Kachel stehen, weil die Ampel an ihm haengt.
+//
+// ALLE PORTALE GEGEN GOOGLE-STAND NIE IN EINE DIFFERENZ. TripAdvisor bewertet
+// rund 0,9 Sterne strenger; ein Monatswert ueber alle Portale liegt deshalb
+// systematisch unter dem Google-Stand. Die Fruehwarnung (bw_bewegung) und
+// die Tendenz in bw_verlauf rechnen deshalb weiter auf Google — beide
+// stellen den Monat GEGEN den Stand.
+//
 // OPERATIV. Seit dem Review vom 03.08.2026 (Migration 0039) standen
 // geschlossene und verwaltende Betriebe in Fruehwarnung und Rangliste --
 // "GESCHLOSSEN Enchilada Dresden" als Handlungsempfehlung. Kacheln,
@@ -68,6 +83,84 @@ const SCHWELLE_GRUEN = `(SELECT ar.schwelle_gruen FROM ampel.regel ar
  */
 const GRUEN_ZIEL = 4.4
 const GRUEN_ZIEL_TEXT = 'Grün ab 4,40'
+
+/**
+ * Die Bewertungen des gewaehlten Monats je Betrieb, ueber alle Portale.
+ * Haengt an MONAT_CTE (bringt `gewaehlt` mit), also mit Komma anschliessen.
+ *
+ * Der Schnitt teilt durch `bewertet`, nicht durch `bewertungen`: Facebook
+ * zaehlt als Bewertung, vergibt aber keine Sterne, und wuerde den Schnitt
+ * sonst verduennen.
+ */
+const IM_MONAT_CTE = `
+, im_monat AS (
+    SELECT t.betrieb_key,
+           sum(t.bewertungen)                                           AS bewertungen,
+           sum(t.schlecht)                                              AS schlecht,
+           round(sum(t.sterne_summe) / nullif(sum(t.bewertet), 0), 2)   AS schnitt
+      FROM mart.bewertung_tag t
+      CROSS JOIN gewaehlt g
+     WHERE t.monat = g.monat
+     GROUP BY t.betrieb_key
+)`
+
+/**
+ * "Bewertungen Monat fuer Monat" — gebaut fuer die Frage vom 28.09.2026:
+ * "lief der Mai besser als der April?"
+ *
+ * WARUM NEBEN bw_verlauf UND NICHT DARIN. bw_verlauf stellt die Tendenz
+ * GEGEN den Google-Stand -- das geht nur auf einem Portal. Diese Karte
+ * rechnet ueber alle Portale; in einem Diagramm mit dem Google-Stand laege
+ * ihre Linie wegen TripAdvisor immer darunter und saehe aus wie ein Absturz.
+ *
+ * OPERATIV wie die Kacheln, damit "Juli" hier dieselbe Zahl traegt wie die
+ * Kachel darueber -- ausser ein Betrieb ist gewaehlt: dann zaehlt er, auch
+ * wenn er heute geschlossen ist (sonst bliebe die Karte auf dem
+ * Betriebsblatt eines geschlossenen Betriebs leer).
+ *
+ * Voller Tabellenname statt Alias, weil die Fassung fuer ③ Betrieb einen
+ * Feldfilter auf mart.bewertung_tag traegt (docs/fehlerkatalog.md, "Ein
+ * Feldfilter auf eine Tabelle mit Alias").
+ */
+function monateSql(fenster: string, mit: { marke?: boolean, zeitraum?: boolean } = {}): string {
+  return `
+SELECT mart.bewertung_tag.monat                                           AS "Monat",
+       sum(mart.bewertung_tag.bewertungen)::integer                       AS "Bewertungen",
+       round(sum(mart.bewertung_tag.sterne_summe)
+             / nullif(sum(mart.bewertung_tag.bewertet), 0), 2)            AS "Ø im Monat",
+       round(100.0 * sum(mart.bewertung_tag.schlecht)
+             / nullif(sum(mart.bewertung_tag.bewertet), 0), 1)            AS "Anteil 1–2★ %"
+  FROM mart.bewertung_tag
+  JOIN mart.betrieb_status bs ON bs.betrieb_key = mart.bewertung_tag.betrieb_key
+ WHERE ${fenster}
+   AND (bs.status = 'operativ' [[OR mart.bewertung_tag.betrieb = {{betrieb}}]])
+   [[AND mart.bewertung_tag.betrieb = {{betrieb}}]]${mit.marke ? `
+   [[AND mart.bewertung_tag.konzept = {{marke}}]]` : ''}${mit.zeitraum ? `
+   [[AND {{zeitraum}}]]` : ''}
+ GROUP BY 1
+ ORDER BY 1`
+}
+
+const MONATE_BESCHREIBUNG =
+  'Jeder Monat für sich: wie viele Bewertungen kamen (Balken) und wie sie ausfielen '
+  + '(Linie) — über alle Portale, **ohne** die Bewertungen der Vormonate. Hier sieht man, '
+  + 'ob der Mai besser lief als der April. Ein Monat mit wenigen Bewertungen springt stark; '
+  + 'erst die Balkenhöhe sagt, wie viel Gewicht ein Punkt hat.'
+
+const MONATE_ANZEIGE = {
+  'graph.dimensions': ['Monat'],
+  'graph.metrics': ['Ø im Monat', 'Bewertungen'],
+  // Linke Achse Sterne ab 3, nicht ab 0: zwischen 4,2 und 4,6 entscheidet
+  // sich alles. Die Balken rechts und grau -- Kontext, nicht Kennzahl (wie
+  // in bw_verlauf).
+  'graph.y_axis.auto_range': false,
+  'graph.y_axis.min': 3,
+  'graph.y_axis.max': 5,
+  series_settings: {
+    'Ø im Monat': { display: 'line' },
+    Bewertungen: { display: 'bar', axis: 'right', color: '#C7CFD4' },
+  },
+}
 
 /**
  * Lesbare Portalnamen. Yext liefert Publisher-Codes; "TRIPADVISORREVIEWS"
@@ -190,25 +283,76 @@ export const karten: Karte[] = [
   // -------------------------------------------------------------------
   {
     schluessel: 'bw_kachel_schnitt',
-    name: 'Ø Bewertung',
+    name: 'Ø Bewertung im Monat',
     beschreibung:
-      'Durchschnittlicher Bewertungsstand über die gewählten Betriebe im gewählten Monat, '
-      + 'gewichtet mit der Zahl der Bewertungen — also der Schnitt, den ein Gast über alle '
-      + 'Bewertungen der Gruppe sähe, nicht der Mittelwert der Betriebs-Schnitte.',
+      'Wie die Bewertungen ausfielen, die **im gewählten Monat** kamen — über alle Portale '
+      + '(Google, OpenTable, TripAdvisor …), nicht der Schnitt aller Bewertungen seit Beginn. '
+      + 'Damit lassen sich Monate vergleichen: einmal April wählen, einmal Mai.\n\n'
+      + 'Liegt meist etwas unter dem Google-Stand daneben, weil TripAdvisor strenger bewertet.',
     anzeige: 'scalar',
     parameter: [MONAT, MARKE, BETRIEB],
+    // Bis zum 28.09.2026 stand hier der STAND (Schnitt aller Google-
+    // Bewertungen bis Monatsende) -- und wurde mit Yexts Monatszahl
+    // verglichen. Der Stand hat jetzt seine eigene Kachel (bw_kachel_stand).
+    //
     // Nur operative Betriebe (heutiger Status): geschlossene Betriebe
     // sammeln weiter Bewertungen, aber ihr Schnitt ist keine Aussage
     // ueber die Flotte, die heute am Tisch besprochen wird.
     //
+    // Gewichtet ueber die Bewertungen, nicht als Mittel der Betriebs-
+    // Schnitte: ein Betrieb mit einer einzigen Bewertung waehlte sonst so
+    // schwer wie einer mit vierzig.
+    sql: `${MONAT_CTE}
+SELECT coalesce(to_char(round(sum(t.sterne_summe) / nullif(sum(t.bewertet), 0), 2), 'FM0.00'),
+                '– keine Bewertungen')
+         AS "Ø Bewertung im Monat"
+  FROM mart.bewertung_tag t
+  CROSS JOIN gewaehlt g
+  JOIN mart.betrieb_status bs
+    ON bs.betrieb_key = t.betrieb_key AND bs.status = 'operativ'
+ WHERE t.monat = g.monat
+   [[AND t.konzept = {{marke}}]]
+   [[AND t.betrieb = {{betrieb}}]]`,
+  },
+  {
+    schluessel: 'bw_kachel_neue',
+    name: 'Bewertungen im Monat',
+    beschreibung:
+      'Wie viele Bewertungen im gewählten Monat dazugekommen sind, über alle Portale. Sagt, '
+      + 'wie belastbar der Schnitt daneben ist — bei drei Bewertungen ist ein Ausreißer eine '
+      + 'halbe Note.',
+    anzeige: 'scalar',
+    parameter: [MONAT, MARKE, BETRIEB],
+    // `bewertungen`, nicht `bewertet`: eine Facebook-Empfehlung ist eine
+    // neue Bewertung, auch wenn sie keine Sterne traegt.
+    sql: `${MONAT_CTE}
+SELECT coalesce(sum(t.bewertungen), 0) AS "Bewertungen im Monat"
+  FROM mart.bewertung_tag t
+  CROSS JOIN gewaehlt g
+  JOIN mart.betrieb_status bs
+    ON bs.betrieb_key = t.betrieb_key AND bs.status = 'operativ'
+ WHERE t.monat = g.monat
+   [[AND t.konzept = {{marke}}]]
+   [[AND t.betrieb = {{betrieb}}]]`,
+  },
+  {
+    schluessel: 'bw_kachel_stand',
+    name: 'Google-Stand (Ampel)',
+    beschreibung:
+      'Der Schnitt über **alle Google-Bewertungen seit Beginn**, Stand Ende des gewählten '
+      + 'Monats — das, was ein Gast auf Google sieht, und die Zahl, an der die Ampel hängt. '
+      + 'Bewegt sich von Monat zu Monat kaum, weil tausende Bewertungen darin stecken. '
+      + 'Für den Vergleich zweier Monate ist der Wert daneben gedacht.',
+    anzeige: 'scalar',
+    parameter: [MONAT, MARKE, BETRIEB],
+    // Die fruehere Kachel "Ø Bewertung" (bw_kachel_schnitt bis 28.09.2026).
+    //
     // GEWICHTET mit anzahl_stand: ungewichtet zog ein kleiner Betrieb
-    // mit 40 Bewertungen den Schnitt so stark wie einer mit 4.000 —
-    // die Nachbarkachel gewichtet ausdruecklich, und zwei Kacheln mit
-    // zwei Rechenwegen lasen sich als Widerspruch.
+    // mit 40 Bewertungen den Schnitt so stark wie einer mit 4.000.
     sql: `${MONAT_CTE}
 SELECT coalesce(to_char(round(sum(v.schnitt_stand * v.anzahl_stand)
                               / nullif(sum(v.anzahl_stand), 0), 2), 'FM0.00'), '– keine Daten')
-         AS "Ø Bewertung"
+         AS "Google-Stand"
   FROM mart.bewertung_verlauf v
   CROSS JOIN gewaehlt g
   JOIN mart.betrieb_status bs
@@ -216,51 +360,6 @@ SELECT coalesce(to_char(round(sum(v.schnitt_stand * v.anzahl_stand)
  WHERE v.monat = g.monat
    AND v.publisher = ${GOOGLE}
    AND v.schnitt_stand IS NOT NULL
-   [[AND v.konzept = {{marke}}]]
-   [[AND v.betrieb = {{betrieb}}]]`,
-  },
-  {
-    schluessel: 'bw_kachel_neue',
-    name: 'Neue Bewertungen im Monat',
-    beschreibung:
-      'Wie viele Bewertungen im gewählten Monat dazugekommen sind. Sagt, wie belastbar der '
-      + 'Monatswert daneben ist — bei drei Bewertungen ist ein Ausreißer eine halbe Note.',
-    anzeige: 'scalar',
-    parameter: [MONAT, MARKE, BETRIEB],
-    sql: `${MONAT_CTE}
-SELECT coalesce(sum(v.anzahl_monat), 0) AS "Neue Bewertungen"
-  FROM mart.bewertung_verlauf v
-  CROSS JOIN gewaehlt g
-  JOIN mart.betrieb_status bs
-    ON bs.betrieb_key = v.betrieb_key AND bs.status = 'operativ'
- WHERE v.monat = g.monat
-   AND v.publisher = ${GOOGLE}
-   [[AND v.konzept = {{marke}}]]
-   [[AND v.betrieb = {{betrieb}}]]`,
-  },
-  {
-    schluessel: 'bw_kachel_monatswert',
-    name: 'Ø der neuen Bewertungen',
-    beschreibung:
-      'Wie die Bewertungen ausfielen, die **in diesem Monat** kamen — nicht der Stand. '
-      + 'Liegt dieser Wert dauerhaft unter dem Stand, sinkt der Stand irgendwann nach.',
-    anzeige: 'scalar',
-    parameter: [MONAT, MARKE, BETRIEB],
-    // Gewichtet mit der Anzahl, nicht als Mittel der Mittel: ein Betrieb
-    // mit einer einzigen Bewertung waehlte sonst genauso schwer wie einer
-    // mit vierzig.
-    sql: `${MONAT_CTE}
-SELECT coalesce(to_char(
-         round(sum(v.schnitt_monat * v.anzahl_monat) / nullif(sum(v.anzahl_monat), 0), 2),
-         'FM0.00'), '– keine neuen')
-         AS "Ø der neuen Bewertungen"
-  FROM mart.bewertung_verlauf v
-  CROSS JOIN gewaehlt g
-  JOIN mart.betrieb_status bs
-    ON bs.betrieb_key = v.betrieb_key AND bs.status = 'operativ'
- WHERE v.monat = g.monat
-   AND v.publisher = ${GOOGLE}
-   AND v.schnitt_monat IS NOT NULL
    [[AND v.konzept = {{marke}}]]
    [[AND v.betrieb = {{betrieb}}]]`,
   },
@@ -272,34 +371,48 @@ SELECT coalesce(to_char(
     schluessel: 'bw_rangliste',
     name: 'Bewertungen je Betrieb',
     beschreibung:
-      'Alle Betriebe nach Bewertungsstand, schlechteste zuerst. Die Ampel stammt aus dem '
-      + 'Regelwerk (grün ab 4,40, orange ab 4,00), nicht aus dieser Karte. '
-      + 'Ein Klick auf den Namen öffnet den Betrieb.',
+      'Alle Betriebe mit den Bewertungen **des gewählten Monats** über alle Portale, '
+      + 'schlechtester Monatsschnitt zuerst. **Bewertungen** daneben sagt, wie belastbar er ist — '
+      + 'bei zwei Bewertungen entscheidet ein einzelner Gast.\n\n'
+      + '**Google-Stand** ist der Schnitt aller Google-Bewertungen seit Beginn; daran hängt die '
+      + 'Ampel (grün ab 4,40, orange ab 4,00). Ein Klick auf den Namen öffnet den Betrieb.',
     anzeige: 'table',
     parameter: [MONAT, MARKE, BETRIEB],
     // Die Ampel kommt aus mart.round_table_monat und damit aus
-    // ampel.regelwerk. Die Bewegungsspalten kommen aus dem Verlauf --
-    // beide Seiten sind ueber (betrieb_key, monat) dieselbe Zeile.
+    // ampel.regelwerk, der Google-Stand aus dem Verlauf -- beide ueber
+    // (betrieb_key, monat) dieselbe Zeile. Die Monatsspalten kommen seit
+    // 28.09.2026 aus mart.bewertung_tag (alle Portale); vorher sortierte die
+    // Karte nach dem Stand, und "Juli" zeigte den Schnitt seit 2010.
+    //
+    // KEIN "Abstand zum Stand" mehr: Monat ueber alle Portale gegen den
+    // Google-Stand waere ein systematischer Abstand (TripAdvisor bewertet
+    // strenger), kein Signal. Die Fruehwarnung bw_bewegung rechnet das
+    // sauber auf Google.
+    //
+    // STADT aus mart.nachbarschaft (manual.betrieb_standort). Hier stand
+    // v.stadt aus core.betrieb.stadt -- die ist bei allen Betrieben NULL,
+    // die Spalte war also immer leer. Wo kein Standort gepflegt ist, bleibt
+    // sie leer; geraten wird nichts.
     //
     // r.operativ (monatsgenau, Migration 0039) statt LEFT-JOIN-Toleranz:
     // "GESCHLOSSEN Enchilada Dresden" stand hier als schlechtester
     // Betrieb der Gruppe. Ein Betrieb, der im gewaehlten Monat Umsatz hatte
     // und heute zu ist, bleibt in seiner Historie drin -- die damalige
     // Flotte soll die damalige bleiben.
-    sql: `${MONAT_CTE}
+    sql: `${MONAT_CTE}${IM_MONAT_CTE}
 SELECT v.betrieb                                  AS "Betrieb",
        v.konzept                                  AS "Marke",
-       v.stadt                                    AS "Stadt",
+       n.ort                                      AS "Stadt",
        coalesce(ab.emoji, '⚪')                    AS "●",
-       v.schnitt_stand                            AS "Stand",
-       v.anzahl_stand                             AS "Bewertungen",
-       v.anzahl_monat                             AS "Neu im Monat",
-       v.schnitt_monat                            AS "Ø neu",
-       CASE WHEN v.schnitt_monat IS NULL THEN NULL
-            ELSE round(v.schnitt_monat - v.schnitt_stand, 2) END
-                                                  AS "Abstand zum Stand"
+       m.schnitt                                  AS "Ø im Monat",
+       coalesce(m.bewertungen, 0)                 AS "Bewertungen im Monat",
+       coalesce(m.schlecht, 0)                    AS "davon 1–2★",
+       v.schnitt_stand                            AS "Google-Stand",
+       v.anzahl_stand                             AS "Google gesamt"
   FROM mart.bewertung_verlauf v
   CROSS JOIN gewaehlt g
+  LEFT JOIN im_monat m ON m.betrieb_key = v.betrieb_key
+  LEFT JOIN mart.nachbarschaft n ON n.betrieb_key = v.betrieb_key
   LEFT JOIN mart.round_table_monat r
          ON r.betrieb_key = v.betrieb_key AND r.monat = v.monat
   LEFT JOIN ampel.beschriftung ab ON ab.status = r.ampel_bewertung
@@ -309,7 +422,7 @@ SELECT v.betrieb                                  AS "Betrieb",
    AND r.operativ
    [[AND v.konzept = {{marke}}]]
    [[AND v.betrieb = {{betrieb}}]]
- ORDER BY v.schnitt_stand, v.betrieb`,
+ ORDER BY m.schnitt NULLS LAST, v.betrieb`,
   },
 
   // -------------------------------------------------------------------
@@ -328,7 +441,8 @@ SELECT v.betrieb                                  AS "Betrieb",
       + 'Das ist die Frühwarnung, die die Ampel nicht geben kann: bei mehreren tausend '
       + 'Bewertungen bewegt ein schlechter Monat den Stand nur um Hundertstel — die Ampel '
       + 'bleibt grün, während sich vor Ort etwas ändert.\n\n'
-      + 'Mindestens drei neue Bewertungen, sonst ist es Zufall.',
+      + 'Mindestens drei neue Bewertungen, sonst ist es Zufall. Gerechnet **nur auf Google** — '
+      + 'der Stand ist ein Google-Wert, und andere Portale bewerten strenger.',
     anzeige: 'table',
     parameter: [MONAT, MARKE],
     sql: `${MONAT_CTE}
@@ -509,32 +623,70 @@ WINDOW w AS (ORDER BY monat ROWS BETWEEN 5 PRECEDING AND CURRENT ROW)
   },
 
   {
+    schluessel: 'bw_monate',
+    name: 'Bewertungen Monat für Monat',
+    beschreibung: `${MONATE_BESCHREIBUNG}\n\n`
+      + 'Gezeigt werden der gewählte Monat und die zwölf davor — der Vorjahresmonat steht also '
+      + 'immer mit drin.',
+    anzeige: 'combo',
+    parameter: [MONAT, MARKE, BETRIEB],
+    // Das Fenster haengt am Monatsfilter: wer Mai waehlt, sieht Mai und die
+    // zwoelf Monate davor. So steht der gewaehlte Monat immer rechts aussen,
+    // und der Balken darunter ist dieselbe Zahl wie die Kachel oben.
+    sql: `${MONAT_CTE}
+${monateSql(`mart.bewertung_tag.monat BETWEEN (SELECT (monat - interval '12 months')::date FROM gewaehlt)
+                                     AND (SELECT monat FROM gewaehlt)`, { marke: true })}`,
+    visualisierung: MONATE_ANZEIGE,
+  },
+  {
+    schluessel: 'bw_monate_zeitraum',
+    name: 'Bewertungen Monat für Monat',
+    beschreibung: `${MONATE_BESCHREIBUNG}\n\n`
+      + 'Gezeigt werden die Monate im oben gewählten **Zeitraum**.',
+    anzeige: 'combo',
+    parameter: [BETRIEB, ZEITRAUM],
+    // Die Fassung fuer ③ Betrieb: dort waehlt der Zeitraumfilter der Seite
+    // die Monate ({{zeitraum}}, Feldfilter auf mart.bewertung_tag.tag).
+    // Eine eigene Karte statt eines festen Fensters in bw_monate: ein
+    // Feldfilter schneidet nur ZU, und ein Zeitraum aus 2024 bliebe gegen
+    // ein 13-Monats-Fenster leer.
+    sql: monateSql('true', { zeitraum: true }),
+    template_tag_dimension: { zeitraum: ['mart', 'bewertung_tag', 'tag'] },
+    visualisierung: MONATE_ANZEIGE,
+  },
+
+  {
     schluessel: 'bw_marke',
     name: 'Bewertung je Marke',
     beschreibung:
-      'Durchschnittlicher Stand je Marke im gewählten Monat, mit der Zahl der Betriebe, '
-      + 'die dahintersteht. Ein Klick führt auf die Betriebe der Marke.',
+      'Schnitt der Bewertungen **des gewählten Monats** je Marke, über alle Portale, mit der '
+      + 'Zahl der Bewertungen und Betriebe dahinter. Ein Klick führt auf die Betriebe der Marke.',
     anzeige: 'bar',
     parameter: [MONAT],
+    // Bis zum 28.09.2026 der Google-Stand je Marke, ungewichtet gemittelt.
+    // Jetzt der Monat, gewichtet ueber die Bewertungen: eine Marke ist so
+    // gut, wie ihre Gaeste in diesem Monat urteilten, nicht wie ihr
+    // kleinster Betrieb.
+    //
     // Nur operative Betriebe: vor dem 03.08.2026 zogen geschlossene
     // Betriebe den Markenschnitt -- eine Marke sah schlecht aus wegen
     // Bewertungen an Standorten, die es nicht mehr gibt.
     sql: `${MONAT_CTE}
-SELECT coalesce(v.konzept, '(ohne Marke)') AS "Marke",
-       round(avg(v.schnitt_stand), 2)      AS "Ø Stand",
-       count(*)                            AS "Betriebe"
-  FROM mart.bewertung_verlauf v
+SELECT coalesce(t.konzept, '(ohne Marke)')                               AS "Marke",
+       round(sum(t.sterne_summe) / nullif(sum(t.bewertet), 0), 2)        AS "Ø im Monat",
+       sum(t.bewertungen)::integer                                       AS "Bewertungen",
+       count(DISTINCT t.betrieb_key)::integer                            AS "Betriebe"
+  FROM mart.bewertung_tag t
   CROSS JOIN gewaehlt g
   JOIN mart.betrieb_status bs
-    ON bs.betrieb_key = v.betrieb_key AND bs.status = 'operativ'
- WHERE v.monat = g.monat
-   AND v.publisher = ${GOOGLE}
-   AND v.schnitt_stand IS NOT NULL
+    ON bs.betrieb_key = t.betrieb_key AND bs.status = 'operativ'
+ WHERE t.monat = g.monat
  GROUP BY 1
+ HAVING sum(t.bewertet) > 0
  ORDER BY 2 DESC`,
     visualisierung: {
       'graph.dimensions': ['Marke'],
-      'graph.metrics': ['Ø Stand'],
+      'graph.metrics': ['Ø im Monat'],
       'graph.y_axis.auto_range': false,
       'graph.y_axis.min': 3,
       'graph.y_axis.max': 5,

@@ -295,7 +295,7 @@ export const dashboards: Dashboard[] = [
       // und sich nur in der Sortierrichtung unterscheiden. Metabase
       // sortiert eine Tabelle auf Klick — die zweite Karte war nur eine
       // vorweggenommene Kopfbewegung.
-      { teile: [{ text: '## Online-Bewertungen\n\nSchlechteste zuerst — auf jede Spaltenüberschrift klicken dreht die Reihenfolge. Der **Stand** ist der Schnitt über alle Bewertungen, das was ein Gast auf Google sieht; **Ø neu** sind die des oben gewählten Monats — ohne Auswahl der jüngste abgeschlossene.' }] },
+      { teile: [{ text: '## Online-Bewertungen\n\nSchlechteste zuerst — auf jede Spaltenüberschrift klicken dreht die Reihenfolge. **Ø im Monat** und **Bewertungen im Monat** zählen nur die Bewertungen des oben gewählten Monats, über alle Portale — ohne Auswahl der jüngste abgeschlossene. Der **Google-Stand** ist der Schnitt aller Google-Bewertungen seit Beginn; daran hängt die Ampel.' }] },
       { teile: [{ karte: 'bw_rangliste', hoehe: 12,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       // Das Themenprofil direkt unter der Bewertungs-Rangliste: die
@@ -456,6 +456,10 @@ export const dashboards: Dashboard[] = [
       // instabilen Betrieb aus, statt nach einer Fruehwarnung.
       { teile: [{ text: '## Was Gäste sagen\n\n**Stand** = Schnitt über alle Bewertungen, das was auf Google steht und woran die Ampel hängt. Er bewegt sich träge, weil tausende Stimmen darin stecken.\n\n**Tendenz** = gleitender Schnitt der neuen Bewertungen über sechs Monate. Sie läuft dem Stand voraus: fällt sie darunter, sinkt der Stand irgendwann nach. Die Balken zählen die neuen Bewertungen — eine Tendenz aus drei Stimmen ist keine.' }] },
       { teile: [{ karte: 'bw_verlauf', hoehe: 9 }] },
+      // Monat fuer Monat ueber alle Portale, im Zeitraum der Seite -- die
+      // Monate einzeln statt kumuliert (28.09.2026).
+      { teile: [{ text: '### Monat für Monat\n\nJeder Monat im oben gewählten **Zeitraum** für sich, über alle Portale: wie viele Bewertungen kamen und wie sie ausfielen — ohne die Bewertungen davor. So lässt sich ein Monat mit dem nächsten vergleichen.' }] },
+      { teile: [{ karte: 'bw_monate_zeitraum', hoehe: 9 }] },
       // Die Themen ZWISCHEN Kurve und Wortlaut, und zwar genau hier: die
       // Kurve sagt, dass es kippt, der Wortlaut sagt es in Saetzen, und
       // dazwischen fehlte bisher die Zwischenstufe -- welches Thema es
@@ -1875,17 +1879,27 @@ export const dashboards: Dashboard[] = [
     // es gerade? Und kann ich den Zahlen trauen?
     tabs: [
       { name: 'Stand', reihen: [
-      { teile: [{ text: '# Online-Bewertungen\n\nQuelle ist Yext, geladen einmal täglich. **Stand** = Schnitt über alle Bewertungen bis Monatsende, das was ein Gast auf Google sieht — daran hängt die Ampel (grün ab 4,40, orange ab 4,00). **Ø neu** = wie die Bewertungen ausfielen, die in diesem Monat kamen; die Kurve darunter glättet das über sechs Monate zur **Tendenz**.\n\nGerechnet wird auf Google: Facebook führt Bewertungen ohne Sternewertung, ein Schnitt über alle Portale mischt zwei Skalen.' }] },
+      { teile: [{ text: '# Online-Bewertungen\n\nQuelle ist Yext, geladen einmal täglich.\n\n**Im Monat** = nur die Bewertungen, die im gewählten Monat kamen, über alle Portale (Google, OpenTable, TripAdvisor …). Damit vergleicht man Monate: einmal April wählen, einmal Mai — oder unten im Diagramm **Monat für Monat** nebeneinander.\n\n**Google-Stand** = Schnitt aller Google-Bewertungen seit Beginn, das was ein Gast auf Google sieht — daran hängt die Ampel (grün ab 4,40, orange ab 4,00). Er bewegt sich von Monat zu Monat kaum. Die Kurve **Bewertung im Verlauf** stellt ihm die Tendenz der neuen Google-Bewertungen gegenüber.' }] },
       // Das schwaechste Thema mit in der Kachelreihe (angefragt
       // 13.08.2026): der Stand-Reiter beantwortete nur "wie stehen wir
       // da" — die naechste Frage "woran liegt es" musste man auf dem
       // Themen-Reiter suchen, und wer sie nicht suchte, sah sie nie.
       { teile: [
+        // Seit 28.09.2026 zuerst der MONAT, dann der Stand. Vorher stand
+        // der Stand vorn und hiess "Ø Bewertung" -- und wurde mit Yexts
+        // Monatszahl verglichen.
         { karte: 'bw_kachel_schnitt' },
-        { karte: 'bw_kachel_monatswert' },
         { karte: 'bw_kachel_neue' },
+        { karte: 'bw_kachel_stand' },
         { karte: 'yx_kachel_schwaechstes_thema' },
       ] },
+      // Monat fuer Monat, ueber alle Portale -- die Frage vom 28.09.2026
+      // ("lief der Mai besser als der April?"). VOR dem Verlauf, weil sie
+      // die Kacheln darueber fortsetzt: derselbe Monat, dieselbe Zahl, nur
+      // mit den zwoelf Monaten davor. Klick auf einen Monat setzt den
+      // Monatsfilter der Seite.
+      { teile: [{ karte: 'bw_monate', hoehe: 10,
+        klick: [{ ziel: 'db_bewertung', uebergabe: { monat: 'Monat' } }] }] },
       // Klick auf einen Monat setzt den Monatsfilter der Seite.
       { teile: [{ karte: 'bw_verlauf', hoehe: 10,
         klick: [{ ziel: 'db_bewertung', uebergabe: { monat: 'Monat' } }] }] },
@@ -1895,7 +1909,7 @@ export const dashboards: Dashboard[] = [
       // Reiter: dieselbe Karte, zweite Platzierung (wie yx_kachel_offen).
       { teile: [{ text: '## Woran es liegt — die Themen\n\nYexts Klusterung der Bewertungstexte im gewählten Monat: die **Note je Thema** als Balken, die Nennungen als Linie. „Bestellung 2,1" heißt: wer über die Bestellung schrieb, vergab im Schnitt 2,1 Sterne. Erst ab April 2026. Verlauf, Themenprofil je Betrieb und Ausreißer stehen auf dem Reiter **Themen**.' }] },
       { teile: [{ karte: 'yx_themen', hoehe: 9 }] },
-      { teile: [{ text: '## Alle Betriebe\n\nSchlechteste zuerst. Jede Spaltenüberschrift sortiert — für die Bestenliste einmal auf **Stand** klicken. Nur operative Betriebe.' }] },
+      { teile: [{ text: '## Alle Betriebe\n\nSchlechtester Monatsschnitt zuerst — die Spalte **Bewertungen im Monat** daneben sagt, wie belastbar er ist. Jede Spaltenüberschrift sortiert; nach **Google-Stand** sortiert steht die Reihenfolge der Ampel. Nur operative Betriebe.' }] },
       { teile: [{ karte: 'bw_rangliste', hoehe: 12,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       ] },

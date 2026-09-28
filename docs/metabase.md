@@ -1639,3 +1639,21 @@ scheitert im Chat mit „permission denied". Die neuen Karten (`ka_*`, `aa_nachl
 nur `mart`; `mcp/test/berichte.test.ts` prüft das. Die älteren Artikelaktion-Karten
 (`aa_kopf` … `aa_liste_pruefung`) lesen `core.artikelverkauf_tag` und laufen im Chat **nicht**
 (`offene-punkte.md`).
+
+## `mart.bewertung_tag` — Bewertungen je Tag (Migration `0122`, 28.09.2026)
+
+Eine Zeile je Betrieb, deutschem Kalendertag und Portal, gezählt aus den Einzelbewertungen.
+Wofür: alles, was „im Monat" oder „im Zeitraum" heißt — die Kacheln, Rangliste und Markenbalken
+auf *Online-Bewertungen*, `bw_monate` und `bw_monate_zeitraum`. **Nicht** für die Ampel; die
+bleibt auf `mart.bewertung_verlauf.schnitt_stand` (Google, kumuliert).
+
+Drei Regeln, die in der Sicht stecken:
+
+* **Schnitt = `sum(sterne_summe) / sum(bewertet)`**, nicht durch `bewertungen`. `bewertungen`
+  zählt auch Facebook-Empfehlungen ohne Sterne; sie wären sonst eine Null-Sterne-Stimme.
+* **Nie Tagesschnitte mitteln** — die Sicht führt deshalb gar keinen.
+* **Über alle Portale nicht gegen den Google-Stand rechnen.** TripAdvisor bewertet rund 0,9
+  Sterne strenger; der Monatsschnitt über alle Portale liegt systematisch unter dem Google-Stand.
+
+Leistung auf dem lokalen Stand (173.823 Einzelbewertungen, Klon am 28.09.2026): ein Monat über
+alle Betriebe 79 ms, ein Quartal je Marke 18 ms — keine Materialisierung nötig.

@@ -1159,6 +1159,64 @@
    "fallstricke": []
   },
   {
+   "sicht": "mart.bewertung_tag",
+   "koernung": "Betrieb × deutschem Kalendertag × Portal — gezaehlte Einzelbewertungen; Schnitt eines Zeitraums = sum(sterne_summe) / sum(bewertet), NICHT der Stand",
+   "thema": "bewertung",
+   "summen_erlaubt": true,
+   "kommentar": "Online-Bewertungen je Betrieb, deutschem Kalendertag und Portal, gezaehlt aus den\nEinzelbewertungen (Yext). Fuer Monat und Zeitraum: Schnitt = sum(sterne_summe) /\nsum(bewertet) — nie Tagesschnitte mitteln, nie durch bewertungen teilen. NICHT der\nStand, den ein Gast auf Google sieht (der steht kumuliert in\nmart.bewertung_verlauf.schnitt_stand und traegt die Ampel). Ueber alle Portale liegt\nder Schnitt systematisch unter dem Google-Stand (TripAdvisor bewertet strenger).",
+   "spalten": [
+    "betrieb_key",
+    "betrieb",
+    "konzept",
+    "publisher",
+    "tag",
+    "monat",
+    "bewertungen",
+    "bewertet",
+    "sterne_summe",
+    "schlecht",
+    "gut"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "konzept",
+    "monat"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "summe",
+     "spalte": "bewertet",
+     "einheit": "anzahl",
+     "hinweis": "Bewertungen mit Sternen — Nenner des Schnitts."
+    },
+    {
+     "regel": "summe",
+     "spalte": "bewertungen",
+     "einheit": "anzahl",
+     "hinweis": "Alle Bewertungen des Tages, auch ohne Sterne. Nicht der Nenner des Schnitts."
+    },
+    {
+     "regel": "summe",
+     "spalte": "gut",
+     "einheit": "anzahl",
+     "hinweis": "4–5 Sterne."
+    },
+    {
+     "regel": "summe",
+     "spalte": "schlecht",
+     "einheit": "anzahl",
+     "hinweis": "1–2 Sterne."
+    },
+    {
+     "regel": "summe",
+     "spalte": "sterne_summe",
+     "einheit": null,
+     "hinweis": "Nur als Zaehler des Schnitts: sum(sterne_summe) / sum(bewertet)."
+    }
+   ],
+   "fallstricke": []
+  },
+  {
    "sicht": "mart.bewertung_thema",
    "koernung": "Bewertung und erkanntem Thema",
    "thema": "bewertung",
