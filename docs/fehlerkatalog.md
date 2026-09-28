@@ -4817,3 +4817,24 @@ Importer und MCP sprechen Postgres im Docker-Netz direkt an und merkten nichts.
 **Was es künftig verhindert.** `docker update --restart unless-stopped pg-bruecke`. **Regel:** nach
 jedem Serverneustart `ss -ltnp | grep 55432` prüfen — ein Dienst, der nur für Metabase und Postico
 existiert, fällt keinem Lauf und keiner Prüfsicht auf.
+
+## Die FoodNotify-Vorbereitung las jeden Morgen 9 GB Rohdaten (28.09.2026)
+
+**Symptom.** Die Läufe begannen um 05:14 statt 05:02 — zwölf Minuten, bevor `sync.lauf` überhaupt
+eine Zeile bekam. Nach dem Serverneustart am 28.09. stand ein Handlauf noch länger in dieser Phase.
+
+**Ursache.** `bestellungenNachfuellen()` sucht je Kostenstelle die jüngste `fn:bestellungen`-Antwort
+in `raw.api_antwort`, um die letzte Bestellseite zu kennen. Kein Index trifft `parameter->>'erpId'`:
+Postgres las je Kostenstelle alle Monatspartitionen und entpackte die Antworten, um `page_count` zu
+prüfen. In Produktion gemessen: 84,7 s für die 27 Kostenstellen einer Marke, 3,1 s je Kostenstelle,
+4,3 Mio. Puffer — für 152 Kostenstellen rund 8 Minuten. Gesucht waren 18.218 von mehreren
+Hunderttausend Zeilen. Die Abfrage war beim Bau schnell, weil `raw` damals klein war; sie wurde mit
+jedem Monat Rohdaten langsamer, ohne dass sich etwas meldete.
+
+**Was es künftig verhindert.** `0123`: zwei Teilindizes nur über die FoodNotify-Seitenantworten
+(`fn:bestellungen` je `erpId`, `fn:inventuren` je `markeKey`), mit den Bedingungen der Abfragen als
+Prädikat. Auf einer Kopie mit künstlichen Daten über neun Monatspartitionen nachgeprüft: der Planer
+liest die jüngste Partition per Index und hört nach der ersten Zeile auf (0,12 ms für 27
+Kostenstellen), ältere Partitionen „never executed". **Regel:** eine Abfrage, die in `raw` nach
+einem Wert IM `parameter`-JSON sucht, braucht einen Ausdrucksindex — `raw` wächst unbegrenzt
+(Regel 4), und was heute eine Sekunde kostet, kostet im nächsten Jahr zehn.

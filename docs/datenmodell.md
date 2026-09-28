@@ -1189,3 +1189,18 @@ das Schema darüber hinaus trägt:
   `mcp.kennzahl` gegen `sum()`/`avg()` gesperrt. `0118` trägt 14 Fallstricke ein, drei davon mit
   neuen Regelarten (`filter_ueber_spalte`, `wert_muster`, `sichten_mischen`, umgesetzt in
   `mcp/src/pruefen.ts`).
+
+
+## Teilindizes auf `raw.api_antwort` für die FoodNotify-Seitenstände (`0123`, 28.09.2026)
+
+`raw.api_antwort` hat drei allgemeine Indizes (Endpunkt/Zeitraum, Betrieb/Endpunkt, Primärschlüssel).
+Wer nach einem Wert **im** `parameter`-JSON sucht, trifft keinen davon und liest alle Partitionen.
+Seit `0123` gibt es deshalb zwei **Teilindizes** genau für die beiden Suchen, die jeder Lauf macht:
+
+| Index | Prädikat | Schlüssel | Leser |
+|---|---|---|---|
+| `api_antwort_fn_bestellseite_idx` | `endpunkt = 'fn:bestellungen'` und `page_count` vorhanden | `parameter->>'erpId'`, `abgerufen_am DESC` | `bestellungenNachfuellen()` |
+| `api_antwort_fn_inventurseite_idx` | `endpunkt = 'fn:inventuren'` und `totalPages` vorhanden | `(parameter->>'markeKey')::int`, `abgerufen_am DESC` | `inventurenNachfuellen()` |
+
+Die Prädikate sind Wort für Wort die Bedingungen der Abfragen — ändert sich eine Abfrage, greift
+der Index still nicht mehr. Wer dort etwas umbaut, prüft den Plan (`EXPLAIN`), nicht nur das Ergebnis.
