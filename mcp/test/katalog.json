@@ -754,7 +754,7 @@
    "koernung": "Betrieb, mit der Unterscheidung laufendes Geschaeft / kein Geschaeft",
    "thema": "stammdaten",
    "summen_erlaubt": false,
-   "kommentar": "Heutiger Status je Betrieb, abgeleitet aus Konzept, Namensmuster und letztem Umsatztag. operativ | inaktiv (60 Tage ohne Umsatz) | geschlossen | verwaltend | test | ohne_geschaeft. Für Monatsurteile gilt nicht dieser Status, sondern round_table_monat.operativ.\n\nKoernung: Betrieb, mit der Unterscheidung laufendes Geschaeft / kein Geschaeft",
+   "kommentar": "Betriebsstatus aus Namen, Konzept und Umsatz: test | verwaltend | geschlossen | fremdkasse |\nohne_geschaeft | inaktiv | operativ. fremdkasse (0125): nie Umsatz in LINA, aber FoodNotify-\nBestellung in 60 Tagen oder gebuchte BWA in den letzten vier Monaten — die Kasse laeuft nicht\nueber LINA. Solche Betriebe zaehlen in Bewertungs- und BWA-Sichten, nicht in Umsatzvergleichen.\noperativ heisst: Umsatz in LINA in den letzten 60 Tagen.",
    "spalten": [
     "betrieb_key",
     "betrieb",
@@ -2268,7 +2268,9 @@
     "letzter_artikeltag",
     "letzter_personaltag",
     "befund",
-    "betrieb_key"
+    "betrieb_key",
+    "letzter_geladener_tag",
+    "status"
    ],
    "achsen": [
     "betrieb_key",
@@ -2824,7 +2826,7 @@
    "koernung": "Ware, Marke und Monat, mit dem Vormonatsvergleich",
    "thema": "einkauf",
    "summen_erlaubt": false,
-   "kommentar": "Koernung: Ware, Marke und Monat, mit dem Vormonatsvergleich",
+   "kommentar": "Preisveraenderung je Ware und Gebinde gegenueber dem VORMONAT.\nveraenderung_pct ist NULL, wenn der letzte Einkauf laenger her ist als einen\nMonat — ein Halbjahressprung als Monatsveraenderung waere eine erfundene Zahl.\n\nKoernung: Ware, Marke und Monat, mit dem Vormonatsvergleich",
    "spalten": [
     "ware",
     "marke",
@@ -4136,6 +4138,37 @@
     "warengruppe"
    ],
    "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.luecke_monat",
+   "koernung": "Quelle × Pruefung × Betrieb (bei Betriebsberichten: Bericht) × Monat — eine Zeile je Luecke, 24 Monate zurueck",
+   "thema": "pruefung",
+   "summen_erlaubt": false,
+   "kommentar": "Was fehlt, je Quelle, Betrieb und Monat, 24 Monate zurueck (0127). Eine Zeile je Luecke:\nquelle, pruefung, betrieb (bei Betriebsberichten der Bericht), monat, fehlend + einheit, hinweis.\nBetrachtet werden Betriebe im Geschaeft (operativ, inaktiv, fremdkasse). ERWARTUNG: leer bis auf\nden Rueckstand des Betriebsbericht-Nachladens und die noch nicht gebuchte BWA der letzten Monate.\nEine Zeile unter Umsatz oder Wetter ist ein Fehler. Zusammengefasst in mart.pruefung_uebersicht\n(Zeilen \"Luecke: …\") und in /status.",
+   "spalten": [
+    "quelle",
+    "pruefung",
+    "betrieb_key",
+    "betrieb",
+    "status",
+    "monat",
+    "fehlend",
+    "einheit",
+    "hinweis"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "monat"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "fehlend",
+     "einheit": null,
+     "hinweis": "Einheit steht in der Spalte einheit (Tage, Betrieb-Tage, Betriebe, Monat) — nie ueber Einheiten summieren."
+    }
+   ],
    "fallstricke": []
   },
   {
@@ -6513,13 +6546,14 @@
    "koernung": "Gitterpunkt und Jahr — die Arbeitsliste des Wetter-Backfills",
    "thema": "pruefung",
    "summen_erlaubt": false,
-   "kommentar": "Eine Zeile je Gitterpunkt und Jahr — die Arbeitsliste des Wetter-Backfills. Die Zahl der Zeilen mit zustand = fehlt MUSS von Nacht zu Nacht fallen und 0 erreichen; tut sie das nicht, laeuft der Nachlauf nicht mehr. Unter 8.000 Stunden heisst unvollstaendig — ein volles Jahr sind rund 8.760.\n\nKoernung: Gitterpunkt und Jahr — die Arbeitsliste des Wetter-Backfills",
+   "kommentar": "Arbeitsliste des Wetter-Backfills: eine Zeile je Gitterpunkt und Jahr. zustand fehlt |\nunvollstaendig | laufendes Jahr | vollstaendig. Der Nachlauf holt fehlt und unvollstaendig,\nein Ortsjahr je Aufruf. Seit 0125 ist ein Jahr auch dann unvollstaendig, wenn in den letzten\n24 Monaten bis vorgestern ein ganzer Tag fehlt (fehlende_tage) — vorher galt das laufende Jahr\nnie als Rueckstand, und Jan–Jul 2026 fehlten sieben Monate lang unbemerkt.",
    "spalten": [
     "breite",
     "laenge",
     "jahr",
     "stunden",
-    "zustand"
+    "zustand",
+    "fehlende_tage"
    ],
    "achsen": [],
    "kennzahlen": [],
