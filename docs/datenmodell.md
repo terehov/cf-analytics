@@ -1229,3 +1229,38 @@ jedes Betriebs zu gruppieren.
 
 **`pg_stat_statements`** legt `0124` als Erweiterung an, wo das Paket vorhanden ist. Lesbar ist
 sie erst, wenn `shared_preload_libraries` sie lädt (`docs/entscheidungen.md`, 28.09.2026).
+
+## Lücken sichtbar machen (`0125`–`0127`, 29.09.2026)
+
+**`core.betrieb_adresse`** — eine Zeile je Betrieb, die Anschrift aus dem jüngsten
+Stammdatenblatt (`la:stammdaten`) in `raw`: `name_zeile`, `strasse`, `plz`, `ort`, `roh` (alle
+Zeilen), `abgerufen_am`, `raw_id`. Aus `raw` aufbaubar; geschrieben von
+`src/standort/adresse.ts` im Nachtlauf, nur wenn der Rohabruf jünger ist als die Zeile. Keine
+Koordinate.
+
+**`manual.betrieb_standort`** bekommt Zeilen mit `herkunft = 'geocoding'` (Koordinate aus
+Nominatim) und `'lina'` (ohne Koordinate, `genauigkeit = 'unbekannt'`). Beide darf nur
+`src/standort/ergaenzen.ts` überschreiben — und Yext (`zuordnen.ts`, seit 0125 `WHERE herkunft IN
+('concept_family','lina','geocoding')`). Handgepflegte Zeilen bleiben unberührt.
+
+**`mart.betrieb_status`** kennt `fremdkasse` (nie LINA-Umsatz, aber FoodNotify-Bestellung in 60
+Tagen oder gebuchte BWA in vier Monaten), vor `ohne_geschaeft` geprüft. Zehn Bewertungs- und
+BWA-Sichten zählen `fremdkasse` als operativ mit; umgeschrieben wurde die gespeicherte
+Definition (`replace` auf `status = 'operativ'::text`, mit Probe „genau eine Fundstelle").
+
+**`mart.datenstand`**: `letzter_tag`/`erster_tag`/`umsatztage` nur aus Tagen mit Umsatz > 0;
+angehängt `letzter_geladener_tag` und `status`. Befund zusätzlich `kein laufender Betrieb` und
+`fremde Kasse`.
+
+**`mart.wetter_rueckstand`**: angehängt `fehlende_tage` (Tage ohne eine einzige Stunde, 24 Monate
+bis vorgestern); ein Ortsjahr mit fehlenden Tagen ist `unvollstaendig`, auch das laufende.
+
+**`mart.betriebsbericht_historie_ab()`** — der erste Monat, bis zu dem Betriebsberichte
+zurückgeladen werden (24 Monate). In `mart`, nicht in `sync`: `mart.betriebsbericht_ladestand`
+ruft sie, und die liest `mcp_leser` — ein Funktionsrumpf läuft mit den Rechten des Aufrufers.
+
+**`mart.luecke_monat`** — eine Zeile je Lücke: `quelle` (Umsatz, Wetter, Kalender, BWA,
+Betriebsberichte), `pruefung`, `betrieb_key`/`betrieb` (bei Betriebsberichten der Bericht),
+`status`, `monat`, `fehlend` + `einheit`, `hinweis`. 24 Monate, nur Betriebe im Geschäft.
+Zusammengefasst als sieben Zeilen „Luecke: …" in `mart.pruefung_uebersicht` (auch bei null) und
+als Prüfung `luecken` in `/status`. Auf dem Klon 127 ms.

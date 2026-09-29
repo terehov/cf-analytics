@@ -785,6 +785,24 @@ const Schema = z.object({
   WETTER_FENSTER_TAGE: z.coerce.number().int().min(1).default(14),
 
   /**
+   * Wie viele Betriebsadressen je Nacht geokodiert werden (0125, 29.09.2026).
+   *
+   * Quelle ist OpenStreetMap/Nominatim (Entscheidung Eugene, 29.09.2026). Die
+   * Nutzungsregeln dort: höchstens eine Anfrage je Sekunde, eine Kennung im
+   * User-Agent, keine Massenabfragen. Eine Adresse kostet ein bis zwei
+   * Anfragen (Straße, sonst nur PLZ und Ort) — beim ersten Lauf sind es rund
+   * zehn Betriebe im Geschäft ohne Yext-Standort, danach nur neue oder
+   * umgezogene. 25 deckt das mit Reserve und bleibt unter einer Minute.
+   *
+   * Auf 0 gesetzt wird nichts mehr geokodiert; die Adressen aus LINA kommen
+   * trotzdem in `core.betrieb_adresse`.
+   */
+  GEOCODING_JE_LAUF: z.coerce.number().int().min(0).default(25),
+
+  /** Nominatim-Endpunkt. Ein eigener Server wäre hier einzutragen. */
+  NOMINATIM_URL: z.string().url().default('https://nominatim.openstreetmap.org'),
+
+  /**
    * ~~BESTELLDETAIL_FENSTER_TAGE~~ — ENTFALLEN mit Migration `0098`.
    *
    * Das rollierende Fenster holte jede Bestellung der letzten 45 Tage jede

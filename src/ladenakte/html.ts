@@ -274,6 +274,53 @@ export type Stammdaten = {
   tagesbudget: Tagesbudget[]
 }
 
+export type Adresse = {
+  /** Alle Zeilen der Anschrift, wie LINA sie mit `<br>` trennt. */
+  zeilen: string[]
+  /** Die Zeile vor der Straße — meist die Gesellschaft. */
+  nameZeile: string | null
+  strasse: string | null
+  plz: string | null
+  ort: string | null
+}
+
+/**
+ * Die Anschrift aus dem Stammdatenblatt (Zeile „Adresse" der Schlüssel-Wert-
+ * Tabelle) — seit 0125, 29.09.2026.
+ *
+ * WARUM ERST JETZT. Die Positivliste in `stammdatenLesen` nahm drei Tabellen
+ * und ließ die Schlüssel-Wert-Tabelle bewusst liegen. Dabei steht dort die
+ * einzige Betriebsanschrift, die LINA liefert — für alle 141 Betriebe,
+ * während `manual.betrieb_standort` nur 60 aus Yext hatte. Gelesen wird
+ * weiterhin nur, was gebraucht wird: diese eine Zeile. Telefon, E-Mail,
+ * Gesellschafter bleiben im Rohlayer.
+ *
+ * Die Zerlegung sucht die Zeile „PLZ Ort" (fünf Ziffern) und nimmt die Zeile
+ * davor als Straße. Ohne PLZ-Zeile bleiben Straße, PLZ und Ort leer und nur
+ * `zeilen` gefüllt — lieber keine Adresse als eine geratene.
+ */
+export function adresseLesen(html: string): Adresse | null {
+  for (const t of tabellen(html)) {
+    for (const z of zeilen(t)) {
+      const roh = [...z.matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)].map(m => m[1])
+      if (roh.length < 2 || text(roh[0]) !== 'Adresse') continue
+      const teile = roh[1].split(/<br\s*\/?>/i).map(text).filter(s => s !== '')
+      if (teile.length === 0) return null
+      const i = teile.findIndex(s => /^\d{5}\s+\S/.test(s))
+      if (i < 0) return { zeilen: teile, nameZeile: null, strasse: null, plz: null, ort: null }
+      const m = teile[i].match(/^(\d{5})\s+(.+)$/)!
+      return {
+        zeilen: teile,
+        nameZeile: i >= 2 ? teile[i - 2] : null,
+        strasse: i >= 1 ? teile[i - 1] : null,
+        plz: m[1],
+        ort: m[2].trim(),
+      }
+    }
+  }
+  return null
+}
+
 /**
  * Die drei gewünschten Tabellen des Stammdatenblatts.
  *

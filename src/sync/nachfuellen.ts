@@ -487,62 +487,85 @@ export async function betriebsberichteNachfuellen(
     uebrig -= nachlauf
   }
 
-  // 3. Erstabruf, Monat fuer Monat rueckwaerts
+  // 3. Erstabruf, Monat fuer Monat rueckwaerts — je Rang (0126).
+  //
+  // ZUERST RANG 1 BIS ZUR GRENZE, DANN RANG 2, DANN 3. Vorher liefen alle
+  // Berichte gemeinsam Monat fuer Monat zurueck; die Vorgabe vom 29.09.2026
+  // ist eine Reihenfolge der Berichte. Weil `uebrig` die offenen Posten
+  // abzieht, kommt Rang 2 erst in die Schlange, wenn fuer Rang 1 Platz war —
+  // und der Worker zieht nach Prioritaet (85/86/87), also Rang 1 zuerst.
+  //
+  // DIE GRENZE KOMMT AUS DER DATENBANK (mart.betriebsbericht_historie_ab,
+  // 24 Monate), nicht aus HISTORIE_AB: dieselbe Funktion liest die
+  // Ladestand-Sicht. Zwei Zahlen fuer eine Grenze laufen auseinander.
   const reif = new Date(`${heute}T00:00:00Z`)
   reif.setUTCDate(reif.getUTCDate() - config.BETRIEBSBERICHT_REIFE_TAGE)
   const reifBis = reif.toISOString().slice(0, 10)
-  const endpunkte = JSON.stringify(AKTIVE_BETRIEBSBERICHTE.map(b => ({ key: b.key, klasse: b.klasse })))
+  const grenzeDb = await eine<{ ab: string }>(
+    `SELECT to_char(greatest(mart.betriebsbericht_historie_ab(), $1::date), 'YYYY-MM-DD') AS ab`,
+    [`${config.HISTORIE_AB.slice(0, 7)}-01`])
+  const ab = grenzeDb?.ab ?? `${config.HISTORIE_AB.slice(0, 7)}-01`
   const monat = new Date(`${reifBis.slice(0, 7)}-01T00:00:00Z`)
-  const ab = `${config.HISTORIE_AB.slice(0, 7)}-01`
-  while (uebrig > 0 && monat.toISOString().slice(0, 10) >= ab) {
-    const m = monat.toISOString().slice(0, 10)
-    const r = await query<{ posten_id: string }>(
-      `WITH tage AS (
-         SELECT u.betrieb_key, u.geschaeftstag
-           FROM core.umsatzbericht_tag u
-          WHERE u.geschaeftstag >= $1::date AND u.geschaeftstag < ($1::date + interval '1 month')
-            AND u.hauptsparte_key IS NULL AND u.verkaufsstelle_key IS NULL
-            AND (coalesce(u.umsatz_netto, 0) <> 0 OR coalesce(u.rechnungen, 0) > 0)
-         UNION
-         SELECT a.betrieb_key, a.geschaeftstag
-           FROM core.artikelverkauf_tag a
-          WHERE a.geschaeftstag >= $1::date AND a.geschaeftstag < ($1::date + interval '1 month')
-            AND (coalesce(a.umsatz_netto, 0) <> 0 OR coalesce(a.menge, 0) <> 0)
-       ), ep AS (
-         SELECT * FROM jsonb_to_recordset($2::jsonb) AS e(key text, klasse text)
-       ), einheit AS (
-         SELECT DISTINCT e.key, b.enc_id,
-                CASE e.klasse
-                  WHEN 'T' THEN t.geschaeftstag
-                  WHEN 'W' THEN date_trunc('week', t.geschaeftstag)::date
-                  ELSE date_trunc('month', t.geschaeftstag)::date
-                END AS von,
-                CASE e.klasse
-                  WHEN 'T' THEN t.geschaeftstag
-                  WHEN 'W' THEN (date_trunc('week', t.geschaeftstag) + interval '6 days')::date
-                  ELSE (date_trunc('month', t.geschaeftstag) + interval '1 month - 1 day')::date
-                END AS bis
-           FROM tage t
-           JOIN core.betrieb b ON b.betrieb_key = t.betrieb_key
-          CROSS JOIN ep e
-          WHERE b.enc_id IS NOT NULL
-       )
-       INSERT INTO sync.warteschlange (endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis, prioritaet, nachladen)
-       SELECT x.key, x.enc_id, x.von, x.bis, $5,
-              NOT (x.key = ANY($6::text[]) AND x.bis >= $7::date)
-         FROM einheit x
-        WHERE x.bis <= $3::date
-          AND NOT EXISTS (
-              SELECT 1 FROM sync.warteschlange w
-               WHERE w.endpunkt = x.key AND w.betrieb_enc_id = x.enc_id
-                 AND w.zeitraum_von = x.von AND w.zeitraum_bis = x.bis)
-        ORDER BY x.von DESC, x.key, x.enc_id
-        LIMIT $4
-       RETURNING posten_id`,
-      [m, endpunkte, reifBis, uebrig, PRIORITAET.betriebsbericht, laufendKeys, laufendAb])
-    erst += r.length
-    uebrig -= r.length
-    monat.setUTCMonth(monat.getUTCMonth() - 1)
+  for (const rang of [1, 2, 3] as const) {
+    const imRang = AKTIVE_BETRIEBSBERICHTE.filter(b => b.historieRang === rang)
+    if (imRang.length === 0) continue
+    const endpunkte = JSON.stringify(imRang.map(b => ({ key: b.key, klasse: b.klasse })))
+    const prioritaet = PRIORITAET.betriebsbericht + rang - 1
+    monat.setTime(Date.parse(`${reifBis.slice(0, 7)}-01T00:00:00Z`))
+    while (uebrig > 0 && monat.toISOString().slice(0, 10) >= ab) {
+      const m = monat.toISOString().slice(0, 10)
+      const r = await query<{ posten_id: string }>(
+        `WITH tage AS (
+           SELECT u.betrieb_key, u.geschaeftstag
+             FROM core.umsatzbericht_tag u
+            WHERE u.geschaeftstag >= $1::date AND u.geschaeftstag < ($1::date + interval '1 month')
+              AND u.hauptsparte_key IS NULL AND u.verkaufsstelle_key IS NULL
+              AND (coalesce(u.umsatz_netto, 0) <> 0 OR coalesce(u.rechnungen, 0) > 0)
+           UNION
+           SELECT a.betrieb_key, a.geschaeftstag
+             FROM core.artikelverkauf_tag a
+            WHERE a.geschaeftstag >= $1::date AND a.geschaeftstag < ($1::date + interval '1 month')
+              AND (coalesce(a.umsatz_netto, 0) <> 0 OR coalesce(a.menge, 0) <> 0)
+         ), ep AS (
+           SELECT * FROM jsonb_to_recordset($2::jsonb) AS e(key text, klasse text)
+         ), einheit AS (
+           SELECT DISTINCT e.key, b.enc_id,
+                  CASE e.klasse
+                    WHEN 'T' THEN t.geschaeftstag
+                    WHEN 'W' THEN date_trunc('week', t.geschaeftstag)::date
+                    ELSE date_trunc('month', t.geschaeftstag)::date
+                  END AS von,
+                  CASE e.klasse
+                    WHEN 'T' THEN t.geschaeftstag
+                    WHEN 'W' THEN (date_trunc('week', t.geschaeftstag) + interval '6 days')::date
+                    ELSE (date_trunc('month', t.geschaeftstag) + interval '1 month - 1 day')::date
+                  END AS bis
+             FROM tage t
+             JOIN core.betrieb b ON b.betrieb_key = t.betrieb_key
+            CROSS JOIN ep e
+            WHERE b.enc_id IS NOT NULL
+         )
+         INSERT INTO sync.warteschlange (endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis, prioritaet, nachladen)
+         SELECT x.key, x.enc_id, x.von, x.bis,
+                -- Laufende T/W-Posten sind Tagesgeschaeft: Prioritaet 85,
+                -- der Rang gilt nur fuer die Historie.
+                CASE WHEN x.key = ANY($6::text[]) AND x.bis >= $7::date THEN $8::smallint ELSE $5 END,
+                NOT (x.key = ANY($6::text[]) AND x.bis >= $7::date)
+           FROM einheit x
+          WHERE x.bis <= $3::date
+            AND NOT EXISTS (
+                SELECT 1 FROM sync.warteschlange w
+                 WHERE w.endpunkt = x.key AND w.betrieb_enc_id = x.enc_id
+                   AND w.zeitraum_von = x.von AND w.zeitraum_bis = x.bis)
+          ORDER BY x.von DESC, x.key, x.enc_id
+          LIMIT $4
+         RETURNING posten_id`,
+        [m, endpunkte, reifBis, uebrig, prioritaet, laufendKeys, laufendAb,
+         PRIORITAET.betriebsbericht])
+      erst += r.length
+      uebrig -= r.length
+      monat.setUTCMonth(monat.getUTCMonth() - 1)
+    }
   }
 
   const n = laufenderMonat + vorlaeufig + gegenprobe + nachlauf + erst

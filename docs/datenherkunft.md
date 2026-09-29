@@ -303,9 +303,10 @@ Nicht geholt werden `KEYWORD_SENTIMENT` (85 % Nullen), `REVIEW_TOPICS` (ungefilt
 n-Gramme) und `REVIEW_CONTENT` (die Texte haben wir bereits, begründet und begrenzt).
 Vollständiger Befund: [`yext-analytics-inventar.md`](yext-analytics-inventar.md).
 
-**Dazu Adressen und Koordinaten der Betriebe.** Am 26.07.2026 wurden alle 489 archivierten
+**Dazu Adressen und Koordinaten der Betriebe.** ~~Am 26.07.2026 wurden alle 489 archivierten
 API-Antworten rekursiv nach Adress- und Geofeldern durchsucht — kein einziger Treffer für
-Betriebe. `analyticsFilterOptions` liefert `{id, name}`, die Berichtsendpunkte
+Betriebe.~~ Das galt für die Berichtsendpunkte; das Stammdatenblatt der Ladenakte führt die
+Anschrift doch — siehe „Betriebsadresse und Koordinate" unten (29.09.2026). `analyticsFilterOptions` liefert `{id, name}`, die Berichtsendpunkte
 `{name, encId}` plus Kennzahlen. `core.betrieb.stadt` existiert im Schema und bleibt bei
 allen 141 Betrieben `NULL`.
 
@@ -873,3 +874,23 @@ ist eine Annahme über die Arbeitsweise, keine Zusage der Schnittstelle, und des
 | Fehlt ein Betrieb ganz? | `mart.bounti_ohne_betrieb` |
 | Stimmt unsere Rechnung mit Bountis eigener? | `mart.bounti_fortschritt_gegenprobe` |
 | Alles zusammen | `mart.pruefung_bounti`, dazu die Prüfung `bounti` in `/status` |
+
+## Betriebsadresse und Koordinate (seit `0125`, 29.09.2026)
+
+| Was | Woher | Wo |
+|---|---|---|
+| Anschrift laut LINA | Stammdatenblatt der Ladenakte, Zeile „Adresse" (`la:stammdaten`, monatlich) | `core.betrieb_adresse` |
+| Standort mit Koordinate | 1. Handpflege `pflege/betrieb_standort.csv` · 2. Yext-Entitäten · 3. LINA-Anschrift + OpenStreetMap/Nominatim | `manual.betrieb_standort` (`herkunft`: `manuell` · `concept_family` · `geocoding`/`lina`) |
+| Bundesland zur PLZ | `manual.plz_bundesland`; neue PLZ trägt das Geocoding aus Nominatims `state` nach | Feiertage, Schulferien |
+
+`herkunft = 'lina'` heißt: Adresse aus LINA, Koordinate **nicht** gefunden (`genauigkeit =
+'unbekannt'`) — steht in `mart.luecke_monat` als „Betrieb ohne Koordinate". Erneut versucht wird
+erst, wenn LINA eine andere Adresse meldet. **Namensnennung:** Koordinaten mit `herkunft =
+'geocoding'` stammen aus OpenStreetMap, © OpenStreetMap-Mitwirkende, ODbL.
+
+LINAs Anschrift ist nicht fehlerfrei: 58 von 60 PLZ stimmten mit Yext überein, die zwei
+Abweichungen und ein Tippfehler stehen in `lina-api-korrekturen.md` (KORREKTUR 9).
+
+**Betriebe mit fremder Kasse** (`mart.betrieb_status.status = 'fremdkasse'`): nie Umsatz in
+LINA, aber FoodNotify-Bestellungen oder gebuchte BWA. Für sie gibt es aus LINA keinen Umsatz und
+keine Artikel — das ist kein Ladefehler. BWA und Bewertungen gibt es.

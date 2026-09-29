@@ -51,6 +51,13 @@
 // Ranglisten und Marken-Schnitte filtern deshalb auf operative Betriebe:
 // wo mart.round_table_monat schon am Tisch sitzt, ueber dessen
 // monatsgenaues `operativ`, sonst ueber mart.betrieb_status.
+//
+// Seit 0125 (29.09.2026) zaehlt dort auch 'fremdkasse': Bremen, Leipzig,
+// Minden, Aposto Wuppertal, Ratskeller Augsburg, Ballplatz Mainz arbeiten
+// und werden bewertet, kassieren aber nicht ueber LINA — als
+// 'ohne_geschaeft' fielen sie aus jeder Bewertungskarte, obwohl ihre
+// Bewertungen vollstaendig da sind. Die Round-Table-Karten (r.operativ)
+// bleiben unveraendert: die Ampel braucht LINA-Umsatz.
 // =====================================================================
 
 import type { Karte, Parameter } from './typen'
@@ -133,7 +140,7 @@ SELECT mart.bewertung_tag.monat                                           AS "Mo
   FROM mart.bewertung_tag
   JOIN mart.betrieb_status bs ON bs.betrieb_key = mart.bewertung_tag.betrieb_key
  WHERE ${fenster}
-   AND (bs.status = 'operativ' [[OR mart.bewertung_tag.betrieb = {{betrieb}}]])
+   AND (bs.status IN ('operativ', 'fremdkasse') [[OR mart.bewertung_tag.betrieb = {{betrieb}}]])
    [[AND mart.bewertung_tag.betrieb = {{betrieb}}]]${mit.marke ? `
    [[AND mart.bewertung_tag.konzept = {{marke}}]]` : ''}${mit.zeitraum ? `
    [[AND {{zeitraum}}]]` : ''}
@@ -309,7 +316,7 @@ SELECT coalesce(to_char(round(sum(t.sterne_summe) / nullif(sum(t.bewertet), 0), 
   FROM mart.bewertung_tag t
   CROSS JOIN gewaehlt g
   JOIN mart.betrieb_status bs
-    ON bs.betrieb_key = t.betrieb_key AND bs.status = 'operativ'
+    ON bs.betrieb_key = t.betrieb_key AND bs.status IN ('operativ', 'fremdkasse')
  WHERE t.monat = g.monat
    [[AND t.konzept = {{marke}}]]
    [[AND t.betrieb = {{betrieb}}]]`,
@@ -330,7 +337,7 @@ SELECT coalesce(sum(t.bewertungen), 0) AS "Bewertungen im Monat"
   FROM mart.bewertung_tag t
   CROSS JOIN gewaehlt g
   JOIN mart.betrieb_status bs
-    ON bs.betrieb_key = t.betrieb_key AND bs.status = 'operativ'
+    ON bs.betrieb_key = t.betrieb_key AND bs.status IN ('operativ', 'fremdkasse')
  WHERE t.monat = g.monat
    [[AND t.konzept = {{marke}}]]
    [[AND t.betrieb = {{betrieb}}]]`,
@@ -356,7 +363,7 @@ SELECT coalesce(to_char(round(sum(v.schnitt_stand * v.anzahl_stand)
   FROM mart.bewertung_verlauf v
   CROSS JOIN gewaehlt g
   JOIN mart.betrieb_status bs
-    ON bs.betrieb_key = v.betrieb_key AND bs.status = 'operativ'
+    ON bs.betrieb_key = v.betrieb_key AND bs.status IN ('operativ', 'fremdkasse')
  WHERE v.monat = g.monat
    AND v.publisher = ${GOOGLE}
    AND v.schnitt_stand IS NOT NULL
@@ -527,7 +534,7 @@ SELECT bs.betrieb                                                    AS "Betrieb
        f.n_90                                                        AS "n (90 Tage)"
   FROM fenster f
   JOIN mart.betrieb_status bs
-    ON bs.betrieb_key = f.betrieb_key AND bs.status = 'operativ'
+    ON bs.betrieb_key = f.betrieb_key AND bs.status IN ('operativ', 'fremdkasse')
  WHERE f.n_90 >= 10
    [[AND bs.konzept = {{marke}}]]
  ORDER BY round(100.0 * f.schlecht_90 / f.n_90
@@ -679,7 +686,7 @@ SELECT coalesce(t.konzept, '(ohne Marke)')                               AS "Mar
   FROM mart.bewertung_tag t
   CROSS JOIN gewaehlt g
   JOIN mart.betrieb_status bs
-    ON bs.betrieb_key = t.betrieb_key AND bs.status = 'operativ'
+    ON bs.betrieb_key = t.betrieb_key AND bs.status IN ('operativ', 'fremdkasse')
  WHERE t.monat = g.monat
  GROUP BY 1
  HAVING sum(t.bewertet) > 0
@@ -736,7 +743,7 @@ SELECT v.betrieb                                        AS "Betrieb",
   -- sich nur fuer Betriebe, die eine Ampel haben. Vorher standen 10 von
   -- 60 Zeilen fuer geschlossene und Testbetriebe.
   JOIN mart.betrieb_status bs
-    ON bs.betrieb_key = v.betrieb_key AND bs.status = 'operativ'
+    ON bs.betrieb_key = v.betrieb_key AND bs.status IN ('operativ', 'fremdkasse')
  WHERE v.monat = g.monat
    AND v.schnitt_stand IS NOT NULL
    [[AND v.konzept = {{marke}}]]

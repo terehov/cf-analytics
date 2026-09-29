@@ -347,7 +347,10 @@ export async function zuordnungAbgleichen(
      -- taeglich — ohne diese Zeile ueberschriebe er sie jede Nacht neu.
      -- In Produktion stehen heute 60 Zeilen, alle von Yext; die Bedingung
      -- kostet also nichts und verhindert den Fall, bevor er eintritt.
-     WHERE betrieb_standort.herkunft = 'concept_family'`,
+     -- Seit 0125 auch 'lina' und 'geocoding' (src/standort/ergaenzen.ts):
+     -- Yext geht der LINA-Adresse vor — 58 von 60 PLZ gleich, die zwei
+     -- Abweichungen waren Fehler in LINA.
+     WHERE betrieb_standort.herkunft IN ('concept_family', 'lina', 'geocoding')`,
     [mitGeo.map(t => t.betriebKey), mitGeo.map(t => t.e.address?.line1 || null),
      mitGeo.map(t => t.e.address?.postalCode || null), mitGeo.map(t => t.e.address?.city || null),
      mitGeo.map(t => koordinate(t.e)!.latitude), mitGeo.map(t => koordinate(t.e)!.longitude)])

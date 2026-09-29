@@ -2118,3 +2118,24 @@ eigene Quelle mit Vorrang Umsatzbericht, nie überschreibend. Bis dahin sagt die
   Fixtures der Abnahme auf den echten Wilma-Wunder-Betrieben — damit lässt sich die Abnahme
   wiederholen) und `lina_br_0922` (Testklon, von `betriebsbericht.test.ts` geleert, Stand `0121` seit 25.09.2026).
   Beide können weg, sobald niemand mehr nachmessen will: `dropdb lina_m5_0923 lina_br_0922`.
+
+## Aus der Lückenprüfung vom 29.09.2026 — was ein Mensch klären muss
+
+* **Enchilada Aalen: seit 02.08.2026 kein Umsatz**, in LINA weiter täglich 0,00 €. Geschlossen,
+  Umbau, Kassenwechsel? Wird am 01.10. von selbst `inaktiv` (60 Tage). **Aposto Augsburg** seit
+  13.09.2026 ebenso. Beide stehen in `mart.luecke_monat` („operativer Betrieb seit mehr als 8
+  Tagen ohne Umsatz").
+* **Wilma Wunder Bochum: keine BWA gebucht.** Die Zuordnung stimmt (LINA-ID 5721, LINA liefert
+  jeden Monat die BWA-Struktur), alle Werte sind 0 — seit Eröffnung am 28.05.2026 bei 510.780 €
+  Umsatz. Frage an die Buchhaltung: wird Bochum in LINA gebucht, oder unter einem anderen
+  Mandanten?
+* **Adressfehler in LINA** (Stammdatenblatt): Aposto Wuppertal trägt die Adresse von Enchilada
+  Wuppertal, Viernheim eine Heidelberger, GSF Gastro „Karmeltenstr." (vermutlich
+  Karmelitenstraße). Für uns unschädlich — Yext geht vor, GSF liegt auf Ortsgenauigkeit —, aber
+  in LINA falsch.
+* **Betriebe mit fremder Kasse** (6, `status = 'fremdkasse'`): Umsatz und Artikel gibt es für sie
+  nicht, solange ihre Kasse nicht an LINA hängt. Ob es dafür eine andere Quelle gibt (ikentoo
+  u. a.), ist offen.
+* ~~Sieben operative Betriebe ohne Standort~~ — erledigt mit `0125`: der Nachtlauf ergänzt sie aus
+  der LINA-Anschrift und OpenStreetMap. Prüfen nach dem ersten Lauf:
+  `SELECT * FROM mart.luecke_monat WHERE quelle IN ('Wetter','Kalender');`

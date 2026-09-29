@@ -534,7 +534,9 @@ export const app = new Skybridge({
         'OHNE PARAMETER: die Uebersicht nach Befund (wie viele Betriebe vollstaendig sind, wie ' +
         'viele ohne BWA, wie viele ohne Artikeldaten) UND dazu jeder Betrieb, der NICHT ' +
         'vollstaendig ist, einzeln — die vollstaendigen bleiben ungenannt, sonst waeren es 141 ' +
-        'Zeilen ohne Aussage. MIT NAMEN: die Zeile dieses Betriebs, gleich ob vollstaendig ' +
+        'Zeilen ohne Aussage. "kein laufender Betrieb" (geschlossen, verwaltend, Test) zaehlt ' +
+        'nicht als Rueckstand; "fremde Kasse" heisst: der Betrieb arbeitet, kassiert aber nicht ' +
+        'ueber LINA — Umsatz und Artikel gibt es fuer ihn nicht, die BWA schon. MIT NAMEN: die Zeile dieses Betriebs, gleich ob vollstaendig ' +
         'oder nicht. IMMER dazu: je Betriebsbericht (Nachlaesse, Finanzwege, Bons, Storno, ' +
         'Kellner, Stellen, Zeitzonen) der geladene Zeitraum — ein Monat ausserhalb ist NICHT ' +
         'null, sondern nicht geladen.',
@@ -569,7 +571,9 @@ export const app = new Skybridge({
                                  max(letzter_tag)::text AS umsatz_bis, max(bwa_monat)::text AS bwa_bis
                             FROM mart.datenstand GROUP BY befund ORDER BY 2 DESC`)
       const rueckstand = betrieb ? [] : await abfragen(
-        `${JE_BETRIEB} WHERE befund <> 'vollstaendig'
+        // 0125: geschlossene, verwaltende und Testbetriebe sind kein
+        // Rueckstand — sie stehen in der Uebersicht als eigener Befund.
+        `${JE_BETRIEB} WHERE befund NOT IN ('vollstaendig', 'kein laufender Betrieb')
           ORDER BY bwa_verzug_monate DESC NULLS LAST, umsatz_alter_tage DESC NULLS LAST,
                    betrieb LIMIT 200`)
       /**

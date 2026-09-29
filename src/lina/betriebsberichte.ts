@@ -54,6 +54,12 @@ export type Betriebsbericht = Endpunkt & {
   /** Zusätzliche Felder, die erlaubt sind — die Steuersatzspalten wechseln je Betrieb. */
   dynamisch?: RegExp
   stufe: 'A' | 'B'
+  /**
+   * Rang beim Zurückladen der Historie (0126, Vorgabe Eugene 29.09.2026):
+   * 1 zuerst, 3 zuletzt. Wird zur Priorität der Historienposten (85/86/87);
+   * das Tagesgeschäft behält 85. Festgelegt in `HISTORIE_RANG` unten.
+   */
+  historieRang: 1 | 2 | 3
   /** Wohin der Lader schreibt — für Wächter, Doku und die nächste Person. */
   tabellen: readonly string[]
   /**
@@ -77,6 +83,14 @@ const berichtParameter = (bericht: number, intervall: number) =>
     reltime: 'custom',
     interval: String(intervall),
   })
+
+/**
+ * Welche Historie zuerst (Vorgabe Eugene, 29.09.2026). 75 und 76 sind die
+ * Zeitzonenberichte — für die Prognose am wichtigsten und mit 59 Abrufen je
+ * Monat billig. Danach die Tages- und Wochenberichte 86, 92, 96, 113 (92
+ * allein 1.763 Abrufe je Monat). Alle übrigen danach. 88 ist abgeschaltet.
+ */
+const HISTORIE_RANG: Record<number, 1 | 2> = { 75: 1, 76: 1, 86: 2, 92: 2, 96: 2, 113: 2 }
 
 const SCHRITT: Record<Fensterklasse, Endpunkt['schrittweite']> = {
   T: 'tag', W: 'woche', 'M-Tag': 'monat', M: 'monat',
@@ -110,6 +124,7 @@ function bb(e: Eintrag): Betriebsbericht {
     felder: e.felder,
     dynamisch: e.dynamisch,
     stufe: e.stufe,
+    historieRang: HISTORIE_RANG[e.bericht] ?? 3,
     tabellen: e.tabellen,
     laufenderMonat: e.laufenderMonat ?? false,
   }

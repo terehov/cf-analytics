@@ -145,6 +145,12 @@ sie greift nur der Namensabgleich. Wer die Nummer kennt, trägt sie in
 
 ## `betrieb_standort.csv` — sieben Adressen fehlen, darunter der größte Betrieb
 
+> **Seit 29.09.2026 (`0125`) meist nicht mehr nötig.** Der Nachtlauf liest die Anschrift aus dem
+> LINA-Stammdatenblatt und holt die Koordinate aus OpenStreetMap (`src/standort/ergaenzen.ts`).
+> Diese Datei braucht es nur noch, um etwas **zu korrigieren** — eine Zeile hier geht allem vor,
+> auch Yext. `arbeitsliste_betrieb_standort.csv` in diesem Ordner zeigt die zehn Betriebe vom
+> 29.09. mit vorbefüllter Adresse und Koordinate; der Import liest sie nicht.
+
 **Noch nicht angelegt.** Die Datei gibt es hier nicht, und eine fehlende Datei ist kein
 Fehler — sie wird übersprungen. Angelegt gehört sie, sobald jemand die sieben Adressen
 nachgesehen hat.

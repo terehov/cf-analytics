@@ -4879,3 +4879,73 @@ Kennzahl einen trägt. Dieselbe Regel, zeilengleich nachgeprüft (Produktion und
 Richtungen). Ohne den Teilindex war die Rückwärtssuche in Produktion nur halb so schnell (1,0 s) —
 die 36 Betriebe ohne gebuchte BWA gingen jeden Monat einzeln durch. Mit ihm auf dem Klon 1,7 ms,
 Schätzkosten unter der JIT-Schwelle.
+
+## Sieben Monate Wetter fehlten, und die Rückstandsprüfung stand auf 0 (29.09.2026)
+
+**Symptom.** Eine Auswertung über den MCP-Zugang (Stand 23.09.2026) fand `mart.betrieb_wetter_tag`
+leer für Januar bis Juli 2026. Nachgezählt in `manual.wetter_stunde`: alle 48 Gitterpunkte
+vollständig von 2018-01 bis 2025-12, im Januar 2026 nur 96 Stunden, dann nichts bis zum 06.08.
+Die Prüfzeile „Wetter: Backfill-Rueckstand in Ortsjahren" stand auf **0**.
+
+**Ursache.** `mart.wetter_rueckstand` gab dem laufenden Jahr den eigenen Zustand
+`laufendes Jahr`, und `wetterHolen()` holt nur `fehlt` und `unvollstaendig`. Beim ersten Lauf
+am 20.08.2026 hatte 2026 schon Stunden aus dem 14-Tage-Fenster — es war nie `fehlt` und wurde
+nie als Ganzes geholt. Dazu: ein vergangenes Jahr galt ab 8.000 Stunden als vollständig; eine
+fehlende Woche (168 Stunden) wäre nie aufgefallen.
+
+**Was es künftig verhindert.** `0125`: die Sicht zählt fehlende **Tage** je Gitterpunkt über
+24 Monate bis vorgestern, auch im laufenden Jahr (`fehlende_tage`). Ein Ortsjahr mit einem
+fehlenden Tag ist `unvollstaendig` und wird neu geholt — das laufende Jahr bis heute, nicht bis
+Silvester (danach lieferte Bright Sky Vorhersagen). Fehlend heißt: keine einzige Stunde; einzelne
+fehlende Stunden sind Messlücken des DWD und kämen auch beim nächsten Abruf nicht. Dazu
+`mart.luecke_monat` (`0127`). **Regel:** eine Rückstandsprüfung, die einen Zeitraum per Zustand
+ausnimmt, prüft ihn nicht. „Laufend" ist kein Grund, nicht nachzusehen, ob etwas fehlt.
+
+## Geschlossene Betriebe standen auf „geladen bis gestern" — und verdeckten zwei operative (29.09.2026)
+
+**Symptom.** In `mart.datenstand` hatte jeder geschlossene Betrieb `letzter_tag` = gestern.
+Dieselbe Signatur verdeckte zwei operative Fälle: **Enchilada Aalen ohne Umsatz seit
+02.08.2026**, Aposto Augsburg seit 13.09.2026 — beide „bis gestern".
+
+**Ursache.** LINAs Konzern-Umsatzbericht führt alle 141 Betriebe jeden Tag, auch mit 0,00 €
+(in 30 Tagen 1.131 solche Zeilen, alle genau null, keine NULL). `mart.datenstand` nahm
+`max(geschaeftstag)` über alle Zeilen. `mart.betrieb_status` rechnete schon seit `0039` mit
+`umsatz_netto > 0` — die beiden Sichten sagten Verschiedenes über dieselbe Frage.
+
+**Was es künftig verhindert.** `0125`: `letzter_tag`, `erster_tag` und `umsatztage` nur aus
+Tagen mit Umsatz > 0; der Ladestand steht daneben als `letzter_geladener_tag`. Der Befund kennt
+den Status (`kein laufender Betrieb`, `fremde Kasse`). `mart.luecke_monat` führt „operativer
+Betrieb seit mehr als 8 Tagen ohne Umsatz" als eigene Zeile. **Regel:** „geladen" und „hatte
+Umsatz" sind zwei Fragen. Eine Quelle, die für jeden Schlüssel jeden Tag eine Zeile liefert,
+beantwortet die zweite nie.
+
+## Sechs arbeitende Betriebe hießen „ohne Geschäft" (29.09.2026)
+
+**Symptom.** Enchilada Bremen, Leipzig, Minden, Aposto Wuppertal, Ratskeller Augsburg und
+Wilma Wunder Ballplatz Mainz standen in `mart.datenstand` als „keine Artikeldaten" und in
+`mart.betrieb_status` als `ohne_geschaeft`. Die Frage war, ob unser Importer ihre Artikel
+nicht lädt.
+
+**Ursache.** Nein — sie haben in LINA **nie** Umsatz gemeldet, auch keinen Umsatzbericht. Sie
+arbeiten aber: FoodNotify-Bestellungen bis in die letzte Woche, gebuchte BWA bis 07/08-2026,
+aktuelle Bewertungen. Ihre Kasse läuft nicht über LINA/Amadeus (Wuppertal: ikentoo).
+`mart.betrieb_status` kannte nur LINA-Umsatz als Lebenszeichen.
+
+**Was es künftig verhindert.** `0125`: Status `fremdkasse` — kein LINA-Umsatz je, aber
+FoodNotify-Bestellung in 60 Tagen oder gebuchte BWA in vier Monaten. Vorab in Produktion
+geprüft: trifft genau diese sechs. Sie zählen in Bewertungs- und BWA-Sichten und -Karten, nicht
+in Umsatzvergleichen. Die übrigen 24 Betriebe mit „keine Artikeldaten" waren geschlossen,
+verwaltend oder ohne jedes Geschäft — kein Importfehler.
+
+## Ein Zeitstempel durch JavaScript verlor die Mikrosekunden — und traf nie mehr (29.09.2026, beim Bau gefunden)
+
+**Symptom.** Auf dem Klon schrieb `adressenAusRawLaden()` beim ersten Versuch nichts, obwohl der
+Rohabruf da war — und hätte in Produktion jede Nacht alle 141 Stammdatenblätter neu gelesen.
+
+**Ursache.** Der Abrufzeitpunkt ging als JavaScript-`Date` zurück in die Abfrage. Ein `Date`
+kennt Millisekunden, `timestamptz` Mikrosekunden — `abgerufen_am = $2` traf nie, und „jünger
+als gespeichert" war immer wahr.
+
+**Was es künftig verhindert.** Der Zeitpunkt wird als Text (`::text`) gelesen und als
+`::timestamptz` zurückgegeben. **Regel:** einen Zeitstempel, der wieder als Schlüssel in
+Postgres dient, nicht durch ein JS-`Date` schleusen.

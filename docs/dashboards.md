@@ -1579,3 +1579,13 @@ dann zählt er auch geschlossen (sonst bliebe ③ bei einem geschlossenen Betrie
 sonst bricht `bw_monate_zeitraum` mit „Feld nicht gefunden" ab (der Zeitraum ist ein Feldfilter
 auf `bewertung_tag.tag`). Metabase synchronisiert stündlich; sonst in der Verwaltung „Sync
 database schema now".
+
+## Bewertungskarten und Standortkarte zählen „fremde Kasse" mit (29.09.2026)
+
+Die sieben Stellen in `metabase/karten-bewertung.ts`, die auf operative Betriebe filtern, und
+die Karte „Standort fehlt" (`karten-standort.ts`) nehmen seit `0125` auch Betriebe mit Status
+`fremdkasse`: Bremen, Leipzig, Minden, Aposto Wuppertal, Ratskeller Augsburg, Ballplatz Mainz.
+Warum: sie arbeiten und werden bewertet, ihre Bewertungen sind vollständig — nur ihr Umsatz kommt
+nicht aus LINA. Als `ohne_geschaeft` fielen sie aus jeder Rangliste, obwohl nichts an ihren
+Bewertungen fehlte. **Nicht** geändert sind die Round-Table-Karten (`r.operativ`) und alle
+Umsatzkarten: dort hätten sie 0 € und drückten jeden Schnitt.

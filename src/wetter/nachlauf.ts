@@ -53,6 +53,7 @@ import { log } from '../lib/log'
 import { pool, query } from '../db/pool'
 import { sichtAuffrischen } from '../sync/auffrischen'
 import { BrightSky, type Ort, type Stundenwert, type Wetterquelle } from './quelle'
+import { standortNachlauf } from '../standort/ergaenzen'
 
 /**
  * Pause zwischen zwei Aufrufen. Bright Sky ist ein frei zugänglicher Dienst
@@ -171,10 +172,15 @@ export async function wetterHolen(quelle: Wetterquelle = new BrightSky()): Promi
     await warte(PAUSE_MS)
   }
 
-  // 2. Backfill, bis die Obergrenze erreicht ist.
+  // 2. Backfill, bis die Obergrenze erreicht ist. Seit 0125 kommt auch das
+  //    laufende Jahr hierher, sobald ihm ein Tag fehlt (Jan–Jul 2026 fehlten
+  //    sieben Monate, weil es nie als Rückstand galt) — geholt wird es dann
+  //    bis heute, nicht bis Silvester: danach lieferte Bright Sky Vorhersagen.
+  const heute = alsDatum(bis)
   for (const { ort, jahr } of await offeneOrtsjahre(config.WETTER_BACKFILL_JE_LAUF)) {
     try {
-      const a = await quelle.hole(ort, `${jahr}-01-01`, `${jahr}-12-31`)
+      const ende = `${jahr}-12-31` < heute ? `${jahr}-12-31` : heute
+      const a = await quelle.hole(ort, `${jahr}-01-01`, ende)
       raus.zeilen += await schreiben(ort, a.werte)
       raus.backfill++
     } catch (e) {
@@ -257,6 +263,14 @@ export async function wetterMaterialisierungAuffrischen(): Promise<Auffrischung>
 
 /** Der Aufruf für den Nachlauf: holt und protokolliert, ohne je zu werfen. */
 export async function wetterNachlauf(): Promise<void> {
+  /*
+   * ZUERST DIE STANDORTE (0125). Ein Betrieb, der heute Nacht eine
+   * Koordinate bekommt, bekommt damit heute Nacht einen Gitterpunkt — und
+   * mart.wetter_rueckstand führt dessen Jahre sofort als 'fehlt'. Stünde
+   * das Ergänzen woanders, käme sein Wetter eine Nacht später.
+   */
+  await standortNachlauf()
+
   try {
     const r = await wetterHolen()
     const [stand] = await query<{ offen: number }>(

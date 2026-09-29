@@ -13,7 +13,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
   bwaLongtermLesen, stammdatenLesen, deutscheZahl, monatsspalte, tabellen,
-  ParseFehler, BWA_ZEILEN_ERWARTET,
+  ParseFehler, BWA_ZEILEN_ERWARTET, adresseLesen,
 } from './html'
 
 const lies = (name: string) => Bun.file(`src/transform/fixtures/${name}`).text()
@@ -266,5 +266,39 @@ describe('der Parser scheitert laut statt still', () => {
   test('fremdes HTML im Stammdatenleser wirft', () => {
     expect(() => stammdatenLesen('<table><tr><th>Etwas</th></tr></table>'))
       .toThrow(/keine der drei erwarteten Tabellen/)
+  })
+})
+
+/**
+ * Die Anschrift (0125). Das Fixture ist Enchilada Karlsruhe; die beiden
+ * handgeschriebenen Fälle sind die, an denen eine Zerlegung raten würde.
+ */
+describe('adresseLesen', () => {
+  test('Stammdatenblatt: Gesellschaft, Straße, PLZ und Ort getrennt', () => {
+    expect(adresseLesen(STAMM)).toEqual({
+      zeilen: ['Enchilada Karlsruhe GmbH', 'Waldstraße 63', '76133 Karlsruhe'],
+      nameZeile: 'Enchilada Karlsruhe GmbH',
+      strasse: 'Waldstraße 63',
+      plz: '76133',
+      ort: 'Karlsruhe',
+    })
+  })
+
+  test('ohne PLZ-Zeile wird nichts geraten', () => {
+    const html = '<table><tr><td>Adresse</td><td>Irgendwo<br>am Markt</td></tr></table>'
+    expect(adresseLesen(html)).toEqual({
+      zeilen: ['Irgendwo', 'am Markt'], nameZeile: null, strasse: null, plz: null, ort: null,
+    })
+  })
+
+  test('Entitäten werden aufgelöst, und ohne Namenszeile bleibt sie leer', () => {
+    const html = '<table><tr><td valign="top">Adresse</td><td>Stra&szlig;e 1 <br> 01067 Dresden <br></td></tr></table>'
+    expect(adresseLesen(html)).toEqual({
+      zeilen: ['Straße 1', '01067 Dresden'], nameZeile: null, strasse: 'Straße 1', plz: '01067', ort: 'Dresden',
+    })
+  })
+
+  test('kein Adressfeld: null, kein Fehler', () => {
+    expect(adresseLesen('<table><tr><td>Email</td><td>x@y.de</td></tr></table>')).toBeNull()
   })
 })

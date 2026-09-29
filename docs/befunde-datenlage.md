@@ -145,7 +145,13 @@ eines Fehlers. Welche das sind, zeigt die Karte *Befunde* auf dem Dashboard
 
 ---
 
-## 8. LINA liefert für Betriebe keine Adresse und keine Koordinaten
+## 8. ~~LINA liefert für Betriebe keine Adresse und keine Koordinaten~~
+
+> **Korrigiert am 29.09.2026** (`lina-api-korrekturen.md`, KORREKTUR 9): die **Berichtsendpunkte**
+> liefern keine Adresse, das stimmt weiter. Das **Stammdatenblatt der Ladenakte** (`la:stammdaten`,
+> seit `0053` in `raw`) hat aber eine Zeile „Adresse" — für alle 141 Betriebe. Seit `0125` in
+> `core.betrieb_adresse`. Koordinaten liefert LINA weiterhin nicht.
+
 
 Nachgemessen am 26.07.2026 über **alle 489 archivierten API-Antworten**, rekursiv auf jeder
 Verschachtelungsebene durchsucht (`payload` in `raw.api_antwort`, Muster

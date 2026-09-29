@@ -3936,3 +3936,33 @@ SELECT name, setting, pending_restart FROM pg_settings
 SELECT calls, round(total_exec_time) AS ms, round(mean_exec_time) AS mittel_ms, left(query, 120)
   FROM pg_stat_statements ORDER BY total_exec_time DESC LIMIT 20;
 ```
+
+## 29.09.2026 — Lücken schließen: Koordinaten aus OpenStreetMap, Status „fremde Kasse", Betriebsberichte 24 Monate mit Rang
+
+**Anlass.** Eine Auswertung über den MCP-Zugang (Stand 23.09.2026) zeigte Lücken in Wetter,
+Standorten, Betriebsberichten und Datenstand. Jede ist am Code und an der Produktion nachgeprüft
+(`docs/fehlerkatalog.md`, 29.09.2026). Vier Entscheidungen von Eugene:
+
+1. **Koordinaten aus OpenStreetMap/Nominatim**, nicht nur von Hand. Die Adresse kommt aus dem
+   LINA-Stammdatenblatt (`core.betrieb_adresse`), die Koordinate per Nominatim — höchstens eine
+   Anfrage je Sekunde, eine Anfrage oder zwei je Adresse, nur für Betriebe im Geschäft
+   (`GEOCODING_JE_LAUF`, 25). Namensnennung „© OpenStreetMap-Mitwirkende" (ODbL) steht in der
+   `notiz` jeder Zeile. Verworfen: nur Handpflege — sieben Adressen sind wenig, aber jeder neue
+   Betrieb wäre wieder eine stille Lücke. **Rangfolge:** Handpflege vor Yext vor LINA+Geocoding.
+   Live geprüft am 29.09.2026: 7 von 8 Adressen auf die Hausnummer, eine (Tippfehler in LINA) auf
+   den Ort.
+2. **Eigener Status `fremdkasse`** statt `ohne_geschaeft` für Betriebe, die arbeiten, aber nicht
+   über LINA kassieren. Verworfen: „als operativ zählen" — sie stünden in jeder Umsatzrangliste
+   mit 0 € und drückten Markenschnitte. Sie zählen in Bewertungs- und BWA-Sichten und -Karten
+   (zehn Sichten, sieben Bewertungskarten, die Standortkarte), nicht in Umsatz-, Kassen- und
+   Einkaufsvergleichen und nicht am Round Table (die Ampel braucht LINA-Umsatz).
+3. **Betriebsberichte nur 24 Monate zurück, mit Rang.** Rang 1: 75, 76 (Zeitzonen, für die
+   Prognose). Rang 2: 86, 92, 96, 113. Rang 3: die übrigen 13, **automatisch danach** (nicht
+   pausiert). Die Grenze steht in `mart.betriebsbericht_historie_ab()` — Einreihweg und
+   Ladestand-Sicht lesen dieselbe Funktion. Der Rang ist die Priorität der Historienposten
+   (85/86/87); das Tagesgeschäft bleibt bei 85. Geschätzt aus 5,6 s je Abruf und rund 7.000
+   Berichtsabrufen je Nacht: Rang 1 eine Nacht, Rang 2 fünf bis sechs, Rang 3 ein bis zwei.
+4. **Bericht 88 bleibt aus** (0119): 97 liefert dieselben Finanzwege.
+
+Nicht entschieden, nur geprüft: Wilma Wunder Bochum hat keine BWA, weil in LINA nichts gebucht
+ist (Zuordnung stimmt, alle Werte 0) — Buchhaltung, `docs/offene-punkte.md`.

@@ -452,3 +452,26 @@ Datumsspalte der Zeile.
 
 **Offen bleibt:** Ob die Leitung die Antwort doppelt JSON-kodiert, lässt sich aus den Dateien
 nicht sicher sagen — sie wurden teils als JSON-String gespeichert. Der Client packt beides aus.
+
+## KORREKTUR 9 — LINA liefert die Betriebsadresse doch, im Stammdatenblatt (29.09.2026)
+
+~~LINA liefert für Betriebe keine Adresse~~ (`befunde-datenlage.md` Abschnitt 8, 26.07.2026). Das
+galt für die 489 damals archivierten Antworten — die Berichtsendpunkte. Das **Stammdatenblatt der
+Ladenakte** (`/intranet/ladenakte/ladenstamm/laden/<hash>/admin/1/`, Endpunkt `la:stammdaten`,
+seit `0053` monatlich in `raw.api_antwort`) hat in seiner Schlüssel-Wert-Tabelle eine Zeile
+**„Adresse"**: Gesellschaft, Straße, PLZ und Ort, mit `<br>` getrennt. Nachgezählt am 29.09.2026:
+für **alle 141 Betriebe** vorhanden, bei 140 mit fünfstelliger PLZ.
+
+**Gegen Yext geprüft:** bei 58 von 60 Betrieben dieselbe PLZ. Die zwei Abweichungen sind Fehler
+in LINA, nicht in Yext:
+
+| Betrieb | LINA | Yext |
+|---|---|---|
+| Aposto Wuppertal GmbH | Friedrich-Ebert-Straße 130, 42117 Wuppertal (= Adresse von Enchilada Wuppertal) | Mohrenstraße 3, 42289 Wuppertal |
+| Wilma Wunder Viernheim GmbH | Hauptstraße 190, 69117 Heidelberg | Robert-Schuman-Straße 8a, 68519 Viernheim |
+
+Dazu ein Tippfehler: GSF Gastro „Karmeltenstr. 20" (vermutlich Karmelitenstraße) — Nominatim
+findet die Straße nicht und fällt auf den Ort zurück.
+
+**Folge:** Yext geht vor, LINA füllt die Lücken (`core.betrieb_adresse`, `src/standort/`). Die
+Koordinaten kommen aus OpenStreetMap, nicht aus LINA — dort gibt es keine.

@@ -667,6 +667,40 @@ export async function statusErheben(): Promise<Statusbericht> {
     }
   }
 
+  // --- Lücken je Quelle, Betrieb und Monat (0127) ---------------------------
+  //
+  // Anlass 29.09.2026: sieben Monate Wetter, sieben operative Betriebe ohne
+  // Standort, Enchilada Aalen seit 02.08. ohne Umsatz — alles ohne Meldung,
+  // weil jede Prüfung nur die Frische maß. Umsatz, Wetter und Kalender sind
+  // eine Warnung: dort ist jede Lücke ein Fehler. BWA und Betriebsberichte
+  // stehen als Zahl daneben — ihr Rückstand ist erwartet (Buchhaltung,
+  // Nachladen) und fällt, solange alles läuft.
+  try {
+    const l = await query<{ quelle: string; zeilen: number; betriebe: number }>(
+      `SELECT quelle, count(*)::int AS zeilen, count(DISTINCT coalesce(betrieb_key::text, betrieb))::int AS betriebe
+         FROM mart.luecke_monat GROUP BY quelle`)
+    const je = Object.fromEntries(l.map(x => [x.quelle, x]))
+    const fehler = ['Umsatz', 'Wetter', 'Kalender'].filter(q => je[q])
+    const werte = Object.fromEntries(l.map(x => [x.quelle.toLowerCase(), x.zeilen]))
+    p.push(fehler.length > 0
+      ? {
+          name: 'luecken', stufe: 'warnung',
+          meldung: `Lücken bei ${fehler.map(q => `${q} (${je[q].betriebe} Betriebe)`).join(', ')}`,
+          naechster_schritt:
+            `SELECT * FROM mart.luecke_monat WHERE quelle IN ('Umsatz','Wetter','Kalender') ORDER BY quelle, monat DESC;`,
+          werte,
+        }
+      : {
+          name: 'luecken', stufe: 'ok',
+          meldung: 'Umsatz, Wetter und Kalender ohne Lücken'
+                 + (je['BWA'] ? `; BWA: ${je['BWA'].zeilen} Monate ungebucht` : '')
+                 + (je['Betriebsberichte'] ? `; Betriebsberichte: ${je['Betriebsberichte'].zeilen} Bericht-Monate im Rückstand` : ''),
+          werte,
+        })
+  } catch (e) {
+    p.push({ name: 'luecken', stufe: 'warnung', meldung: `mart.luecke_monat nicht lesbar: ${String(e).slice(0, 120)}` })
+  }
+
   return {
     status: schlimmste(p.map(x => x.stufe)),
     geprueft_am: new Date().toISOString(),

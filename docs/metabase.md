@@ -1673,3 +1673,18 @@ Spalten und Zahlen unverändert — nur der Weg dahin. Deshalb auch kein neuer M
 `mart.artikelverkauf` bleibt eine Sicht über 27,7 Mio. Zeilen: ohne Zeitraum ist sie weiter
 langsam, und die Warnung `zeitraum_noetig` im MCP-Prüfer bleibt richtig. Für Monate und Artikel
 ist `mart.artikel_monat` der schnellere Weg.
+
+## Neu und geändert in `mart` (Migrationen `0125`–`0127`, 29.09.2026)
+
+* **`mart.luecke_monat`** — neu: was je Quelle, Betrieb und Monat fehlt. `thema = 'pruefung'`,
+  `fehlend` nie über Einheiten summieren (`nicht_aggregieren`).
+* **`mart.betrieb_status`** — neuer Wert `fremdkasse`. Karten, die auf `status = 'operativ'`
+  filtern, lassen diese Betriebe weiter weg; wo sie hingehören (Bewertungen, BWA, Standort),
+  steht jetzt `IN ('operativ', 'fremdkasse')`.
+* **`mart.datenstand`** — `letzter_tag` ist der letzte Tag **mit Umsatz**; zwei Spalten angehängt
+  (`letzter_geladener_tag`, `status`), zwei Befunde dazu.
+* **`mart.wetter_rueckstand`** — Spalte `fehlende_tage` angehängt.
+* **`mart.betriebsbericht_ladestand`** — zählt nur Monate ab `mart.betriebsbericht_historie_ab()`.
+
+Katalogabzug (`cd mcp && bun run katalog:abzug`) **nach dem Deploy** gegen Produktion ziehen:
+neue Sicht und neue Spalten.

@@ -1819,3 +1819,29 @@ Lader nimmt beides an; die Attrappe liefert standardmäßig doppelt kodiert.
 einer Fenstergröße (`zuGrossAbTagen`) und liefert auf dem alten Weg ein leeres Gerüst.
 `src/transform/betriebsbericht.test.ts` (ohne Datenbank, inkl. Abnahme M1) und
 `src/sync/betriebsbericht.test.ts` (mit `TEST_DATABASE_URL`, eigene Testdatenbank, nie mit `-t`).
+
+## Standorte, Wetterlücken und der Rang der Betriebsberichte (29.09.2026)
+
+**`wetterNachlauf()` ergänzt zuerst die Standorte** (`src/standort/ergaenzen.ts`,
+`standortNachlauf()`), dann holt es das Wetter. Reihenfolge mit Absicht: eine Koordinate, die
+heute Nacht dazukommt, ist heute Nacht ein Gitterpunkt, und `mart.wetter_rueckstand` führt seine
+Jahre sofort als `fehlt`.
+
+1. `adressenAusRawLaden()` — liest je Betrieb das jüngste Stammdatenblatt aus `raw`, wenn es
+   jünger ist als `core.betrieb_adresse`. Kein Aufruf gegen LINA.
+2. `standortErgaenzen()` — für Betriebe im Geschäft (operativ, inaktiv, fremdkasse) ohne
+   Standort, oder mit eigenem (`lina`/`geocoding`) und inzwischen anderer LINA-Adresse:
+   Nominatim, höchstens 1 Anfrage/s, `GEOCODING_JE_LAUF` (25) je Nacht. Ein Netzfehler schreibt
+   nichts (nächste Nacht erneut); „nicht gefunden" schreibt die Adresse ohne Koordinate und wird
+   nicht wiederholt. Trägt die PLZ mit Bundesland in `manual.plz_bundesland` nach, falls neu.
+
+**Wetter-Backfill im laufenden Jahr:** seit `0125` kommt das laufende Jahr in den Backfill,
+sobald ihm ein Tag fehlt, und wird bis **heute** geholt (nicht bis 31.12. — dahinter lieferte
+Bright Sky Vorhersagen). Erste Nacht nach dem Deploy: 48 Aufrufe für 2026, dann die neuen
+Gitterpunkte, neueste Jahre zuerst, innerhalb von `WETTER_BACKFILL_JE_LAUF` (60).
+
+**Betriebsberichte: Rang und Grenze** (`0126`). `betriebsberichteNachfuellen()` reiht den
+Erstabruf je Rang ein — erst Rang 1 (75, 76) bis zur Grenze, dann Rang 2 (86, 92, 96, 113), dann
+Rang 3 — mit Priorität 85/86/87. `HISTORIE_RANG` in `src/lina/betriebsberichte.ts`. Die Grenze
+kommt aus `mart.betriebsbericht_historie_ab()` (24 Monate), `HISTORIE_AB` bleibt als untere
+Schranke. Tagesgeschäft, laufender Monat von 97, Nachlauf und Gegenprobe sind unverändert.

@@ -500,15 +500,15 @@ SELECT ${INTENSITAET_EMOJI} || ' ' || s.betrieb AS "Standort",
     sql: `
 SELECT f.betrieb                                     AS "Betrieb",
        f.konzept                                     AS "Marke",
-       -- Konstant 'operativ', solange der Filter unten steht -- die
-       -- Spalte macht das Auswahlkriterium in der Karte selbst sichtbar,
-       -- statt es nur in der Beschreibung zu behaupten.
+       -- 'operativ' oder 'fremdkasse' (0125: arbeitet, kassiert nicht ueber
+       -- LINA) -- die Spalte macht das Auswahlkriterium in der Karte selbst
+       -- sichtbar, statt es nur in der Beschreibung zu behaupten.
        bs.status                                     AS "Status",
        bs.letzter_umsatztag                          AS "Letzter Umsatztag",
        round(f.umsatz_gesamt)                        AS "Umsatz gesamt"
   FROM mart.standort_fehlend f
   JOIN mart.betrieb_status bs ON bs.betrieb_key = f.betrieb_key
- WHERE bs.status = 'operativ'
+ WHERE bs.status IN ('operativ', 'fremdkasse')
  ORDER BY f.umsatz_gesamt DESC NULLS LAST, f.betrieb`,
     visualisierung: {
       column_settings: {

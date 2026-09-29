@@ -184,6 +184,9 @@ Handgeschriebenes SQL, nummeriert, wird der Reihe nach angewendet. Bewusst handg
 | `0122_bewertung_tag.sql` | **Der Monat, nicht der Stand bis zum Monat.** `mart.bewertung_tag` zählt die Einzelbewertungen je Betrieb, deutschem Kalendertag und Portal. Die Monatszahlen auf *Online-Bewertungen*, ② und ③ rechnen daraus, **über alle Portale** — vorher zeigte „Ø Bewertung“ bei jedem Monat den Google-Stand seit 2010 (April → Mai 2026: 4,268 → 4,269, die Monate selbst 4,59 und 4,40). Die Ampel bleibt beim Google-Stand. Drift gegen Yexts Aggregat nachgemessen null |
 | `0123_fn_seitenstand_index.sql` | Zwei Teilindizes auf `raw.api_antwort` für die FoodNotify-Seitenstände: die Vorbereitung jedes Laufs las je Kostenstelle alle Monatspartitionen (84,7 s je Marke, ~8 Minuten je Lauf) |
 | `0124_artikelverkauf_und_datenstand_schneller.sql` | **Der Plan war falsch, nicht der Server zu klein.** `mart.artikelverkauf` holt Artikelstand und Warengruppe per `LATERAL … LIMIT 1` statt über die `lead()`-Sichten, die der Planer je Betrieb neu rechnete (26,7 s → 0,27 s, Vollscan nicht langsamer). `mart.datenstand` sucht den BWA-Monat rückwärts über einen Teilindex (2,07 s → ms). Dazu `pg_stat_statements`. TimescaleDB und pg_duckdb verworfen, Begründung in `docs/entscheidungen.md` |
+| `0125_wetter_luecke_standort_fremdkasse.sql` | **Lücken, die keine Prüfung sah.** `mart.wetter_rueckstand` zählt fehlende Tage auch im laufenden Jahr (Jan–Jul 2026 fehlten, weil 'laufendes Jahr' nie Rückstand war). `core.betrieb_adresse` aus dem LINA-Stammdatenblatt — LINA liefert die Anschrift doch (KORREKTUR 9); Koordinaten per OpenStreetMap (`src/standort/`). `mart.betrieb_status` kennt `fremdkasse` (arbeitet, kassiert nicht über LINA). `mart.datenstand.letzter_tag` nur aus Tagen mit Umsatz — LINA liefert jedem Betrieb täglich 0,00 € |
+| `0126_betriebsberichte_24_monate_mit_rang.sql` | Betriebsberichte nur 24 Monate zurück (`mart.betriebsbericht_historie_ab()`, gelesen von Einreihweg UND Ladestand), mit Rang: 75/76, dann 86/92/96/113, dann der Rest (Priorität 85/86/87) |
+| `0127_lueckenmonitor.sql` | **`mart.luecke_monat`**: je Quelle (Umsatz, Wetter, Kalender, BWA, Betriebsberichte), Betrieb und Monat, was fehlt. Sieben Zeilen in `mart.pruefung_uebersicht`, Prüfung `luecken` in `/status`. Frische ist nicht Vollständigkeit |
 | `pruefung.sql` | Verifikation gegen den Bayreuth-Fall aus dem Excel (kein Migrationsschritt) |
 
 Die Tabelle nennt die tragenden Migrationen, nicht jede einzelne. Der verbindliche Stand steht in `public.schema_migration`.
@@ -424,6 +427,10 @@ SELECT zustand, count(*) FROM mart.posten_aufgegeben GROUP BY 1;
 SELECT * FROM mart.posten_ohne_zugriff;
 -- Einkauf: laufende Arbeit vs. echter Rueckstand vs. fehlender Zugriff
 SELECT zustand, count(*) FROM mart.einkauf_ladestand GROUP BY 1;
+-- Was fehlt, je Quelle, Betrieb und Monat (seit 0127). ERWARTUNG: nur BWA-Monate,
+-- die die Buchhaltung noch nicht gebucht hat, und der Betriebsbericht-Rueckstand.
+-- Jede Zeile unter Umsatz, Wetter oder Kalender ist ein Fehler.
+SELECT quelle, pruefung, count(*) FROM mart.luecke_monat GROUP BY 1, 2;
 ```
 
 **Nichts davon braucht einen Befehl — und seit dem 14.08.2026 gilt das ohne Ausnahme.**
