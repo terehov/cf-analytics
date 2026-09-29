@@ -264,7 +264,9 @@ sync/worker.ts         die Schleife
 sync/laden.ts          raw → core
 transform/index.ts     reine Transformationsfunktionen
 health.ts              /health und /status, hält den Container oben
-status.ts              Statusbericht fürs Monitoring — acht Prüfungen
+status.ts              Statusbericht fürs Monitoring — seit 0127 mit der Lückenprüfung
+standort/              Betriebsadresse aus dem LINA-Stammdatenblatt, Koordinate per
+                       OpenStreetMap (0125) — läuft vor dem Wetter
 sync.ts / einreihen.ts Einstiegspunkte
 ```
 

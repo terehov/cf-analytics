@@ -2161,3 +2161,58 @@ Die zwölf operativen Deutschen Konzepte mit Getränkeeinsatzzahl, August 2026:
 liegen die drei Sätze, die Eugene gesetzt hat, zwischen 17 und 22 Prozent grün. Jede
 einheitliche Grenze schnitte diese Spanne mitten durch, und zwar nicht nach Leistung,
 sondern nach Brauereivertrag.
+
+## Jeder Betrieb hat jeden Tag eine Umsatzzeile — auch die geschlossenen (29.09.2026)
+
+LINAs Konzern-Umsatzbericht führt **alle 141 Betriebe an jedem Tag**, mit 0,00 € für die, die
+nichts verkauft haben. Nachgezählt am 29.09.2026 in Produktion, letzte 30 Tage, Gesamtzeilen:
+
+| Status | Zeilen | davon 0,00 € | davon NULL |
+|---|---|---|---|
+| geschlossen | 1.131 | 1.131 | 0 |
+| verwaltend | 493 | 493 | 0 |
+| ohne_geschaeft | 522 | 522 | 0 |
+| inaktiv | 174 | 174 | 0 |
+| operativ | 1.653 | 84 | 0 |
+
+```sql
+SELECT s.status, count(*), count(*) FILTER (WHERE t.umsatz_netto = 0), count(*) FILTER (WHERE t.umsatz_netto IS NULL)
+  FROM core.umsatzbericht_tag t JOIN mart.betrieb_status s USING (betrieb_key)
+ WHERE t.hauptsparte_key IS NULL AND t.verkaufsstelle_key IS NULL AND t.geschaeftstag > current_date - 30
+ GROUP BY 1;
+```
+
+**Was das relativiert:** „Für Tag X geladen" sagt nichts darüber, ob der Betrieb an Tag X Umsatz
+hatte. `max(geschaeftstag)` über den Umsatzbericht ist für jeden Betrieb gestern. Wer „bis wann
+hatte der Betrieb Umsatz" fragt, filtert `umsatz_netto > 0` — `mart.datenstand.letzter_tag` tut
+das seit `0125`. Damit sichtbar geworden: **Enchilada Aalen ohne Umsatz seit 02.08.2026**,
+Aposto Augsburg seit 13.09.2026, beide mit täglichen Nullzeilen.
+
+## Sechs Betriebe arbeiten, ohne je in LINA zu kassieren (29.09.2026)
+
+Enchilada Bremen, Enchilada Leipzig, Enchilada Minden, Aposto Wuppertal, Ratskeller Augsburg und
+Wilma Wunder Ballplatz Mainz haben **keinen einzigen Tag mit Umsatz** in LINA — aber
+FoodNotify-Bestellungen bis in die letzte Septemberwoche (außer Ratskeller und Ballplatz),
+gebuchte BWA bis 07/2026 bzw. 08/2026 (außer Aposto Wuppertal: 2019) und — außer Ballplatz Mainz —
+laufende Bewertungen (13 bis 134 in 90 Tagen). Aposto Wuppertals Kostenstellen führen `kassensystem = 'ikentoo'`.
+Nachgemessen mit:
+
+```sql
+SELECT s.betrieb_key, s.betrieb,
+       EXISTS (SELECT 1 FROM core.bestellung be JOIN core.kostenstelle ks USING (kostenstelle_key)
+                WHERE ks.betrieb_key = s.betrieb_key AND be.bestellt_am >= current_date - 60) AS fn_60t,
+       (SELECT max(km.monat) FROM core.kennzahlen_monat km
+         WHERE km.betrieb_key = s.betrieb_key AND km.wert_absolut::numeric(14,2) <> 0) AS bwa_letzter
+  FROM mart.betrieb_status s WHERE s.status = 'ohne_geschaeft';
+```
+
+**Was das relativiert:** Umsatzsummen „der Gruppe" aus LINA fehlen diese sechs ganz — nicht als
+Null, sondern gar nicht. Ein Markenschnitt Enchilada über LINA-Umsatz ist ein Schnitt ohne
+Bremen, Leipzig und Minden. Seit `0125` führt `mart.betrieb_status` sie als `fremdkasse`.
+
+## Wilma Wunder Bochum: Umsatz ja, BWA null (29.09.2026)
+
+Seit Eröffnung am 28.05.2026 510.780 € Umsatz in LINA, aber in `core.kennzahlen_monat` für jeden
+Monat nur Nullen (911 Zeilen je Monat, 458 mit Wert, 0 ungleich null), zuletzt abgerufen am
+29.09.2026. Die Zuordnung stimmt — LINA liefert Bochums BWA-Struktur unter LINA-ID 5721 —, es ist
+nichts gebucht. Frage an die Buchhaltung steht in `offene-punkte.md`.

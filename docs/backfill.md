@@ -103,3 +103,12 @@ Bei ~7.500 Betriebsbericht-Aufrufen je Nacht (10.500 Budget minus Tagesgeschäft
 Konzern-Historie) sind das rund **61 Nächte**. Ohne den Tagesabruf von 88 (siehe KORREKTUR 8 —
 97 trägt dieselben Zahlen) wären es 302.556 Posten, rund 40 Nächte. Die Schätzung gilt für den
 Takt der Produktion (~5,3 s); langsamer heißt länger, nicht dichter.
+
+> **Seit 29.09.2026 (`0126`) nicht mehr bis 2018, sondern 24 Monate** (Vorgabe Eugene), und
+> mit Rang statt gemeinsam nach Datum: 75/76 → 86/92/96/113 → die übrigen 13. Die Grenze steht
+> in `mart.betriebsbericht_historie_ab()`. Nachgerechnet am 29.09.2026 in Produktion (5,6 s je
+> Abruf, rund 7.000 Berichtsabrufe je Nacht, vollständig waren 12/2025–08/2026): je Monat rund
+> 3.500 Abrufe (92: 1.763; 86/96/113: je 294; je Monatsbericht 59), für die 14 fehlenden Monate bis
+> 10/2024 **Rang 1 eine Nacht, Rang 2 fünf bis sechs, Rang 3 ein bis zwei**. Die Rechnung oben
+> (455.919 Posten, ~61 Nächte bis 2018) gilt damit nicht mehr; wer weiter zurück will, ändert die
+> Funktion.

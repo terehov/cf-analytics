@@ -176,7 +176,7 @@ stabil — aber es bleibt DOM-Auswertung und braucht eine Schemaprüfung: Zeilen
 
 ---
 
-## 4. Stammdaten — vier Tabellen, die es sonst nirgends gibt
+## 4. Stammdaten — ~~vier~~ fünf Tabellen, die es sonst nirgends gibt
 
 `/intranet/ladenakte/ladenstamm/laden/<hash>/admin/1/` (≈ 317 KB).
 
@@ -199,6 +199,15 @@ BWA-Longterm. Das ist die Grundlage jeder Abweichungsanalyse.
 → **Plan-Stunden je Tag und Bereich.** Unser Bestand kennt bisher nur die
 Ist-Stunden aus `core.personalkosten`. Damit wird die Personaleffizienz erstmals
 gegen eine Planung messbar statt nur gegen den Vormonat.
+
+**f) Schlüssel-Wert-Tabelle mit der Anschrift** (nachgetragen 29.09.2026) — Zeilen „Adresse",
+„Email", „Telefon", „Konzept/Gruppe", „Eröffnung", Gesellschafter, Geschäftsführer. Die
+Zeile **„Adresse"** trägt Gesellschaft, Straße und „PLZ Ort", mit `<br>` getrennt — die
+einzige Betriebsanschrift in LINA, gemessen für alle 141 Betriebe. Hier bei der Erhebung
+übersehen, weil nur nach Tabellen mit Kopfzeile gesucht wurde; seit `0125` gelesen
+(`adresseLesen`, `core.betrieb_adresse`). Gegen Yext: 58 von 60 PLZ gleich
+(`lina-api-korrekturen.md`, KORREKTUR 9). **Eröffnung** steht bei Aposto Augsburg auf
+`1970-01-01` — ein Platzhalter, kein Datum.
 
 **e) API-Keys** — `Name | API-Key | IP-Adressen | Drittanbieter | Läuft ab | Rechte (Scopes) | Erzeugt von | Ebene`
 

@@ -58,7 +58,8 @@ Ergebnis liefert, und bringt die Namen schon mit.
 | `kennzahlen_aktuell` | Jüngster BWA-Stand, Euro und Prozent getrennt aufgelöst |
 | `betrieb`, `konzept_zuordnung` | Betriebsübersicht und Markenzuordnung |
 | `betrieb_ohne_lina_id` | Arbeitsliste — **Erwartung: leer** |
-| `datenstand` | Je Betrieb: bis wann Umsatz, bis wann BWA. Vor jeder Auswertung |
+| `datenstand` | Je Betrieb: bis wann Umsatz, bis wann BWA. Vor jeder Auswertung. Seit `0125`: `letzter_tag` = letzter Tag **mit Umsatz** (LINA liefert täglich 0,00 € auch für Geschlossene) |
+| `luecke_monat` | **Was fehlt**, je Quelle (Umsatz, Wetter, Kalender, BWA, Betriebsberichte), Betrieb und Monat, 24 Monate (seit `0127`). Erwartung: nur ungebuchte BWA und Betriebsbericht-Rückstand |
 | `standort`, `standort_fehlend` | Grundlage der Karte, derzeit leer (siehe unten) |
 | `pruefung_umsatz`, `pruefung_bon`, `pruefung_uebersicht` | Gegenrechnungen gegen LINAs Aggregate. `pruefung_wareneinsatz` ist seit `0029` stillgelegt |
 | `sync_status`, `backfill_fortschritt` | Läuft der Import? |
@@ -117,6 +118,7 @@ Fallen** — genau die, die `mart` ausräumt:
 | Tabelle | In `mart` als | Die Falle beim Direktzugriff |
 |---|---|---|
 | `umsatzbericht_tag` | `umsatz_tag` + `umsatz_tag_sparte` | Enthält Gesamt- **und** Hauptspartenzeilen. Eine Summe über alles ergibt den **doppelten Umsatz** |
+| `betrieb_adresse` | `standort` (über `manual.betrieb_standort`) | Anschrift, wie LINA sie im Stammdatenblatt führt (seit `0125`) — **ungeprüft**: zwei von 60 PLZ wichen von Yext ab, und Yext geht vor. Keine Koordinate |
 | `kennzahlen_monat` | `kennzahlen_aktuell` | Append-only mit `abgerufen_am` im Schlüssel. Ohne `DISTINCT ON` zählt jede Nachbuchung mit |
 | `artikelverkauf_tag` | `artikelverkauf` | Ohne die Zeitraum-Sichten rechnet man die Vergangenheit mit **heutiger** Kalkulation |
 | `artikel` | `artikelverkauf` | Ist der Verkaufs**katalog**, nicht die Verkäufe — die ähnlichen Namen stehen im Verzeichnis direkt untereinander |

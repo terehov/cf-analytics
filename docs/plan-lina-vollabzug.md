@@ -186,7 +186,10 @@ oder abschneidet, ist **zu messen** (Meilenstein M2). Der Unterschied: **5.115 s
 Aufrufe** und rund 5,8 MB je Antwort statt 186 kB. Solange es ungemessen ist, steht 96 in der
 Tabelle unten mit beiden Zahlen.
 
-### Stufe A — täglich holen, rückwärts bis 2018
+### Stufe A — täglich holen, rückwärts ~~bis 2018~~
+
+> **29.09.2026:** die Historie reicht nur noch 24 Monate zurück, mit Rang (75/76 → 86/92/96/113 →
+> Rest) — `0126`, `docs/entscheidungen.md`. Die Aufrufzahlen unten sind die für die ganze Historie.
 
 | # | Bericht | Klasse | Aufrufe Historie | je Nacht laufend | warum Stufe A |
 |---|---|---|---|---|---|
