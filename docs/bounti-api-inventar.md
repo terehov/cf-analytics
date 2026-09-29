@@ -197,13 +197,13 @@ bun run lina-fragen d10
 
 Ein lesender Aufruf, im Terminal des Nutzers oder im Container (Regel 7a). Er entscheidet, ob
 die Kennzahl eine Aufwandsfrage ist oder eine Rechtefrage — und die ginge dann an **Concept
-Family**, deren Administrator die API-Schlüssel selbst anlegt, nicht an LINA.
+Family**, deren Administrator die API-Schlüssel selbst anlegt, nicht an LINA. **Beantwortet am 29.09.2026 im Browser: eine Rechtefrage** (Korrektur 10).
 
 **c) Kapitel 4.2 bleibt halb.** *Kurswirkung* heißt: Kursabschluss gegen Durchschnittsbon und
 Zusatzverkäufe **je Person**. Bounti liefert seine Hälfte vollständig — die andere fehlt
-weiterhin an LINA: die Mitarbeiterstammdaten sind ~~für unseren Zugang gesperrt~~ seit der
-Messung vom 24.08.2026 freigegeben, aber noch nicht abgeholt (`lina-api-korrekturen.md`,
-Korrektur 6); das Kassenjournal ist gesperrt (`offene-punkte.md`). Ohne einen Schlüssel, den beide Systeme kennen,
+weiterhin an LINA: die Mitarbeiterstammdaten sind ~~für unseren Zugang gesperrt~~ ~~seit der
+Messung vom 24.08.2026 freigegeben, aber noch nicht abgeholt (Korrektur 6)~~ **weiter
+gesperrt, nachgemessen 29.09.2026** (`lina-api-korrekturen.md`, Korrektur 10); das Kassenjournal ist gesperrt (`offene-punkte.md`). Ohne einen Schlüssel, den beide Systeme kennen,
 gibt es keinen Join.
 
 **Ein möglicher Ersatzweg steht in `customFields`.** `GET /employees` liefert frei

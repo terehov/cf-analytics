@@ -832,9 +832,14 @@ Koordinate und bekommen bauartbedingt kein Wetter** (`mart.kalender_fehlend`).
 Die **fünfte** externe Quelle nach LINA, FoodNotify, Yext und Bright Sky. Sie beantwortet den
 Bericht **„E-Learning erfolgreiche Kurse"** aus `examples/Umsetzung Berichte (1).xlsx`.
 
-**Nicht** die „Fluktuationsraten" aus derselben Liste: die gehört zu LINA, *Team > Mitarbeiter
-> Stammdaten* (`/personal/mitarbeiter/manageusers`), wo Eintritt und Austritt stehen. Sie wird
-hier auch **nicht genähert** — Begründung unten unter Punkt 3.
+**Nicht** die „Fluktuationsraten“ aus derselben Liste: die gehört zu LINA, *Team > Mitarbeiter
+> Stammdaten* (`/personal/mitarbeiter/manageusers`), wo Eintritt und Austritt stehen — **und das
+Blatt ist für unseren Zugang gesperrt** (`type: denied`, nachgemessen im Browser am 29.09.2026,
+`lina-api-korrekturen.md`, Korrektur 10). Sie wird hier auch **nicht genähert** — Begründung
+unten unter Punkt 3. Was LINA offen liefert, ist die **Kopfzahl** je Betrieb, Monat und
+Anstellungsart (*Personalstruktur*, `/intranet/auswertung/persozahl`, HTML, Schlüssel ist der
+Betriebsname, Monate nach dem laufenden sind mitgeführt): ein Bestand, kein Ein- und Austritt.
+Nicht importiert.
 
 Vollständiges Inventar, alle Fallen und der Abgleich gegen die Anforderung:
 `docs/bounti-api-inventar.md`. Hier nur, was man zum Deuten der Zahlen wissen muss.

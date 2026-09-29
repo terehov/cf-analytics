@@ -264,157 +264,128 @@ const MESSUNGEN: Messung[] = [
   // nicht: er kann "kein Zugriff, still abgewiesen" heissen oder "falscher
   // Kontext, nichts zu rendern". Diese Fassung fragt deshalb drei Dinge
   // nacheinander und laesst jede Antwort fuer sich stehen.
+  //
+  // DRITTE FASSUNG, 29.09.2026, nach der Messung im Browser (Korrektur 10
+  // in docs/lina-api-korrekturen.md). Was sie ergeben hat:
+  //   * `manageusers` ist im Menue `type: "denied"`, `access: false` -- die
+  //     0 Bytes sind eine stille Abweisung, keine Huelle. KORREKTUR 6 hatte
+  //     den ORDNER "Mitarbeiter" (`access: true`) fuer das Blatt gehalten.
+  //   * Die Route steht in `data`, nicht in `route`/`url`/`link`/`href`.
+  //   * Offen ist `Personalstruktur`: /intranet/auswertung/persozahl, HTML,
+  //     Kopfzahl je Betrieb, Monat und Anstellungsart.
+  // Die Messung unterscheidet deshalb jetzt Ordner von Blatt und ruft NUR
+  // die beiden Adressen ab, um die es geht. Die Lohn-Blaetter (Vorschuesse,
+  // Stundenzettel, Upload Lohndateien) werden bewusst NICHT geholt: sie
+  // fuehren Einzelpersonen und sind fuer die Frage nicht noetig.
   // ---------------------------------------------------------------------
   {
     id: 'd10',
-    frage: 'Personalstammdaten — kommt die Fluktuationsrate aus LINA, und ueber welchen Weg?',
-    aufruf: 'Drei Schritte: Rechtelage im Menue, die Seite als HTML, und der Betriebsweg der Ladenakte.',
+    frage: 'Personalstammdaten — ist das Blatt Stammdaten noch gesperrt, und was liefert die Personalstruktur?',
+    aufruf: 'Drei Schritte: das Menue (Ordner und Blaetter getrennt), die Personalstruktur als HTML, '
+          + 'und manageusers zum Vergleich.',
     deutung: [
-      ['Schritt 2: eine der Adressen liefert HTML mit einer Nachlade-Adresse',
-       'DER WEG IST GEFUNDEN. Diese zweite Adresse holen und ansehen: welche Felder, haengt '
-       + 'der Betrieb am Datensatz oder am Aufruf, und werden AUSGESCHIEDENE mitgeliefert. '
-       + 'Ohne die letzten sieht jeder Austritt aus wie ein Verschwinden, und die Rate ist '
-       + 'wieder nur halb.'],
-      ['Schritt 2: alle Adressen liefern 0 Bytes, Schritt 1 meldet access=true',
-       'Die Seiten rendern serverseitig nichts fuer diesen Kontext — moeglicherweise fehlt '
-       + 'ein Betriebs- oder Mandantenparameter, den nur der Browser mitschickt. Dann ist der '
-       + 'naechste Schritt EINMAL das Netzwerkprotokoll im Browser (welche Adresse laedt die '
-       + 'Liste?), nicht ein weiterer Rateversuch von hier.'],
-      ['Schritt 1 meldet fuer die Personal-Eintraege access=false',
-       'RECHTEFRAGE, und sie geht an CONCEPT FAMILY, nicht an LINA: der eigene Administrator '
-       + 'hat auch die API-Schluessel angelegt, darunter den von Bounti mit dem Scope '
-       + '"Personalstammdaten und Kosten". Bis zur Freigabe hat die Kennzahl keine Quelle — '
-       + 'und bekommt auch keine geschaetzte.'],
-      ['Schritt 3 zeigt einen Personal- oder Mitarbeiterknoten je Betrieb',
-       'Der Betriebsweg traegt. Dann dort weiter, wie beim Belegarchiv (Weg A): Knoten holen, '
-       + 'Ordnerseite lesen, Token aus dem HTML ziehen.'],
-      ['Schritt 3 zeigt nur die neun bekannten Rubriken',
-       'Die Ladenakte kennt keine Personaldaten. Dann fuehrt der Weg ueber die Menue-Adressen '
-       + 'aus Schritt 1, nicht ueber den Betriebsbaum.'],
+      ['Schritt 1: Stammdaten steht auf denied / access=false',
+       'Wie am 29.09.2026 im Browser. RECHTEFRAGE an CONCEPT FAMILY, nicht an LINA: deren '
+       + 'Administrator hat den Bounti-Schluessel mit Scope "Personalstammdaten und Kosten" angelegt '
+       + 'und kann pruefen, welche Nutzerrolle dem Zugang das Blatt sperrt. Bis dahin hat die '
+       + 'Fluktuationsrate KEINE Quelle — und bekommt auch keine geschaetzte.'],
+      ['Schritt 1: Stammdaten steht auf access=true, Schritt 2 liefert danach Bytes',
+       'Die Rolle ist freigegeben. Dann die Seite ansehen: Eintritts- und Austrittsdatum? Werden '
+       + 'AUSGESCHIEDENE mitgeliefert? Ohne die letzten sieht jeder Austritt aus wie ein '
+       + 'Verschwinden, und die Rate ist wieder nur halb. Nicht bauen, bevor das geklaert ist.'],
+      ['Schritt 1: Stammdaten access=true, manageusers liefert 0 Bytes',
+       'Dann ist die Menue-Aussage NICHT die Rechtelage. Nicht raten: einmal das Netzwerkprotokoll '
+       + 'im Browser, welche Adresse die Liste laedt (so wurde am 29.09.2026 vorgegangen).'],
+      ['Schritt 2: persozahl liefert HTML mit "<table" und Betriebszeilen',
+       'Kopfzahl je Betrieb, Monat und Anstellungsart (ein BESTAND, keine Rate). Zaehlen: Tabellen '
+       + 'und Betriebszeilen je Seite (verschachtelt: 141 Tabellen heissen nur 10 Betriebe), '
+       + 'Pager. Blaettern laeuft ueber POST persozahlSlice; Zukunftsmonate sind mitgefuehrt.'],
+      ['Schritt 2: persozahl liefert 0 Bytes oder eine Weiterleitung',
+       'Anderer Zugang als im Browser: der Importer-Weg hat die Berechtigung nicht, obwohl das '
+       + 'Menue sie meldet. Dann ist es doch eine Rechtefrage — und wichtig zu wissen, BEVOR '
+       + 'ein Lader gebaut wird.'],
     ],
     lauf: async (client) => {
       const zeilen: string[] = []
 
       /*
-       * SCHRITT 1 — die Rechtelage, und diesmal MIT der Route.
+       * SCHRITT 1 — das Menue, Ordner und Blatt GETRENNT.
        *
-       * Die erste Fassung hat die Namen gefunden und die Route leer
-       * gelassen: sie suchte nach `route|url|link|href`, und LINAs Menue
-       * benennt das Feld offenbar anders. Am 24.08.2026 stand da fuenfmal
-       * `access=true` und fuenfmal eine leere Adresse — die Rechtefrage war
-       * beantwortet, der Weg dorthin nicht.
-       *
-       * Deshalb wird hier nicht mehr geraten, welches Feld die Adresse
-       * traegt, sondern der ganze Knoten ausgegeben. Was man nicht kennt,
-       * druckt man aus, statt es zu erraten.
+       * Ein Knoten ist ein Ordner, wenn er `children` traegt. KORREKTUR 6
+       * (24.08.2026) hat den Ordner "Mitarbeiter" (`access: true`) gelesen
+       * und das Blatt darunter (`denied`) uebersehen; die Ausgabe war auf 25
+       * Treffer gekuerzt und mischte beides. Hier steht je Knoten `Ordner`
+       * oder `Blatt`, dazu `type`, `data` (die Route) und `access`.
        */
-      const kandidaten = new Set<string>()
-      zeilen.push('1) Menue — die Personal-Eintraege mit ALLEN Feldern')
+      zeilen.push('1) Menue — Personal-Knoten, Ordner und Blatt getrennt (Route steht in `data`)')
       try {
         const m = await client.holen(adhoc('menu', '/common/api/menu', 'json'), {})
         if (m.art !== 'ok') {
           zeilen.push(`   ${m.art}: ${'fehler' in m ? m.fehler : ''}`)
         } else {
-          const gefunden: Record<string, unknown>[] = []
-          const gehe = (k: unknown, tiefe = 0): void => {
+          const treffer: string[] = []
+          const gehe = (k: unknown, pfad: string[], tiefe = 0): void => {
             if (tiefe > 10 || k === null || typeof k !== 'object') return
-            if (Array.isArray(k)) { for (const x of k) gehe(x, tiefe + 1); return }
+            if (Array.isArray(k)) { for (const x of k) gehe(x, pfad, tiefe + 1); return }
             const o = k as Record<string, unknown>
-            const text = Object.entries(o)
-              .filter(([, v]) => typeof v === 'string' || typeof v === 'number')
-              .map(([kk, v]) => `${kk}=${v}`).join(' ')
-            if (/personal|mitarbeiter|zeitkonto|lohn|dienstplan|struktur/i.test(text)) {
-              gefunden.push(o)
+            const label = typeof o.label === 'string' ? o.label : ''
+            const kinder = Array.isArray(o.children) ? o.children : []
+            const weg = label ? [...pfad, label] : pfad
+            if (label && /personal|mitarbeiter|lohn|struktur|vorgesetzte|stammdaten/i.test(
+              `${weg.join('/')} ${String(o.alias ?? '')}`) && /team|lohn|personal|stores/i.test(weg[0] ?? '')) {
+              const art = kinder.length > 0 ? 'Ordner' : 'Blatt '
+              treffer.push(`   ${art}  ${weg.join(' > ').padEnd(58)} `
+                + `access=${String(o.access).padEnd(5)} type=${String(o.type ?? '').padEnd(8)} `
+                + `data=${String(o.data ?? '')}`)
             }
-            for (const v of Object.values(o)) gehe(v, tiefe + 1)
+            for (const kind of kinder) gehe(kind, weg, tiefe + 1)
           }
-          gehe(m.daten)
-
-          for (const o of gefunden.slice(0, 25)) {
-            const felder = Object.entries(o)
-              .filter(([, v]) => v === null || ['string', 'number', 'boolean'].includes(typeof v))
-              .map(([kk, v]) => `${kk}=${String(v).slice(0, 70)}`)
-            zeilen.push(`   • ${felder.join('  ')}`)
-            // Alles, was wie ein Pfad aussieht, ist ein Kandidat fuer
-            // Schritt 2 -- egal, in welchem Feld es steht.
-            for (const v of Object.values(o)) {
-              if (typeof v === 'string' && /^\/[a-z0-9/_.-]{3,}$/i.test(v)) kandidaten.add(v)
-            }
-          }
-          if (gefunden.length === 0) zeilen.push('   kein Eintrag mit Personalbezug gefunden')
-          if (gefunden.length > 25) zeilen.push(`   … und ${gefunden.length - 25} weitere`)
+          gehe(m.daten, [])
+          zeilen.push(...treffer.slice(0, 60))
+          if (treffer.length === 0) zeilen.push('   kein Personal-Knoten gefunden')
+          if (treffer.length > 60) zeilen.push(`   … und ${treffer.length - 60} weitere`)
+          const gesperrt = treffer.filter(t => t.includes('type=denied'))
+          zeilen.push(`   → gesperrte Blaetter (type=denied): ${gesperrt.length}`)
         }
       } catch (e) {
         zeilen.push(`   Abgebrochen: ${(e as Error).message}`)
       }
 
       /*
-       * SCHRITT 2 — die gefundenen Adressen abrufen, nicht die geratene.
+       * SCHRITT 2 — genau zwei Adressen, keine Schleife ueber das Menue.
        *
-       * `/personal/mitarbeiter/manageusers` kam am 24.08.2026 zweimal mit
-       * HTTP 200 und 0 Bytes zurueck, obwohl das Menue Rechte meldet. Ein
-       * leerer 200er heisst bei dieser Bauart meistens: die Seite ist eine
-       * Huelle, und die Daten kommen aus einem zweiten Aufruf. Genau danach
-       * wird hier gesucht -- im HTML, so wie beim Belegarchiv (getFilesUrl).
+       * persozahl: die Kopfzahl (serverseitig gerendertes HTML). manageusers:
+       * der Vergleich, ob die Abweisung von 24.08.2026 (200, 0 Bytes) auch
+       * aus dem Importer-Zugang noch so aussieht. Die Lohn-Blaetter werden
+       * nicht geholt.
        */
       zeilen.push('')
-      zeilen.push('2) Die gefundenen Adressen abrufen (HTML), plus die bekannte als Vergleich')
-      const pfade = [...kandidaten].filter(x => /personal|mitarbeiter|lohn/i.test(x)).slice(0, 6)
-      if (!pfade.includes('/personal/mitarbeiter/manageusers')) {
-        pfade.push('/personal/mitarbeiter/manageusers')
-      }
-      for (const pfad of pfade) {
+      zeilen.push('2) Personalstruktur (HTML) und manageusers (Vergleich)')
+      const ziele: Array<{ pfad: string; parameter: Record<string, string> }> = [
+        { pfad: '/intranet/auswertung/persozahl', parameter: { admin: '1', franchise: '1' } },
+        { pfad: '/personal/mitarbeiter/manageusers', parameter: { admin: '1' } },
+      ]
+      for (const { pfad, parameter } of ziele) {
         try {
-          const r = await client.holen(adhoc('personal', pfad, 'html'), { admin: '1' })
+          const r = await client.holen(adhoc('personal', pfad, 'html'), parameter)
           if (r.art !== 'ok') {
-            zeilen.push(`   ${pfad.padEnd(44)} ${r.art}: ${'fehler' in r ? String(r.fehler).slice(0, 60) : ''}`)
+            zeilen.push(`   ${pfad.padEnd(40)} ${r.art}: ${'fehler' in r ? String(r.fehler).slice(0, 60) : ''}`)
             continue
           }
           const html = String(r.daten ?? '')
-          zeilen.push(`   ${pfad.padEnd(44)} ${String(html.length).padStart(7)} Bytes`)
-          if (html.length > 0) {
-            zeilen.push(`      Anfang: ${html.slice(0, 140).replace(/\s+/g, ' ')}`)
-            // Der Anker, der beim Belegarchiv den Datenpfad verraten hat.
-            for (const t of new Set(html.match(/\b\w*[Uu]rl\s*=\s*['"][^'"]+['"]/g) ?? [])) {
-              zeilen.push(`      -> ${t}`)
-            }
-            for (const t of new Set(html.match(/(?:data-)?(?:ajax|source|action)=['"][^'"]+['"]/gi) ?? [])) {
-              zeilen.push(`      -> ${t}`)
-            }
-          }
+          zeilen.push(`   ${pfad.padEnd(40)} ${String(html.length).padStart(7)} Bytes`)
+          if (html.length === 0) continue
+          zeilen.push(`      <table: ${(html.match(/<table/g) ?? []).length}`
+            + `   Blaetter-Hinweis: ${/persozahlSlice|pagination/i.test(html) ? 'ja' : 'nein'}`)
+          // Betriebszeilen der AEUSSEREN Tabelle: Zellen mit Klartext-Namen, nicht zaehlbar
+          // ohne Parser — deshalb nur das Jahr und die Anstellungsarten als Stichprobe.
+          const jahr = html.match(/Personaldaten\s+(\d{4})/)
+          zeilen.push(`      Jahr: ${jahr?.[1] ?? '?'}`)
+          const arten = ['Azubi', 'Minijob', 'Fest- Teilzeitangestellter', 'Student', 'Praktikant']
+          zeilen.push(`      Anstellungsarten gefunden: ${arten.filter(a => html.includes(a)).join(', ') || 'keine'}`)
+          zeilen.push('      Anfang: ' + html.replace(/\s+/g, ' ').slice(0, 140))
         } catch (e) {
-          zeilen.push(`   ${pfad.padEnd(44)} Abgebrochen: ${(e as Error).message}`)
-        }
-      }
-
-      /*
-       * SCHRITT 3 — der Ladenakte-Baum. Die erste Fassung nahm an, die
-       * Antwort sei ein Array, und starb an "{} is not iterable". Was
-       * wirklich zurueckkommt, wird jetzt ausgegeben statt vorausgesetzt.
-       */
-      zeilen.push('')
-      zeilen.push(`3) Ladenakte-Baum fuer Betrieb ${MESS_BETRIEB} — welche Rubriken gibt es?`)
-      for (const knotenId of [`laden_${MESS_BETRIEB}`, '#', 'root']) {
-        try {
-          const baum = await client.holen(
-            adhoc('la_baum', '/intranet/ladenakte/baum/admin/1', 'json'), { id: knotenId })
-          if (baum.art !== 'ok') {
-            zeilen.push(`   id=${knotenId}: ${baum.art}`)
-            continue
-          }
-          const d = baum.daten
-          if (Array.isArray(d)) {
-            zeilen.push(`   id=${knotenId}: ${d.length} Knoten`)
-            for (const k of d as Array<{ text?: string; a_attr?: Record<string, string> }>) {
-              zeilen.push(`      ${String(k.text ?? '').padEnd(26)} `
-                + `${k.a_attr?.['data-link'] ?? k.a_attr?.href ?? ''}`)
-            }
-            if (d.length > 0) break
-          } else {
-            zeilen.push(`   id=${knotenId}: kein Array — ${JSON.stringify(d).slice(0, 300)}`)
-          }
-        } catch (e) {
-          zeilen.push(`   id=${knotenId}: Abgebrochen: ${(e as Error).message}`)
+          zeilen.push(`   ${pfad.padEnd(40)} Abgebrochen: ${(e as Error).message}`)
         }
       }
 

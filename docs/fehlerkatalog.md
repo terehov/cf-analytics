@@ -2270,6 +2270,17 @@ die Kumulation ausdrücklich mitrechnet — `pek(d)/100 × Umsatz(d)` ergibt die
 Personalkosten des Monats, mit rund 15 % Streuung gegen die BWA. `eff_*` ist von alldem
 nicht betroffen und trägt die Stundenrechnung.
 
+**Nachtrag 29.09.2026 — der Befund stand hier, die Karten zeigten ihn trotzdem.** Zwei Karten
+lasen die Tageszeilen weiter als Quote: `pe_bereich` auf *Personal — Kosten und Effektivität*
+roh (im Klon `lina_mgmt`, 177.913 Tageszeilen: „Service %" im Mittel **206**, Maximum 20 Mio.),
+und `dd_betrieb_personal` auf ③ Betrieb als Median über Tage mit `pek_gesamt <= 200`. Der
+Filter ließ bei aufgelaufenem Zähler praktisch nur die ersten Monatstage durch — der Median
+war der des Monatsanfangs, und der Kommentar darüber nannte noch die widerlegte Ursache
+(„Tagesumsatz im Nenner"). Beide lesen jetzt `mart.personal_bereich_monat` (Monatsabruf,
+`0129`), die Ampeln fertig aus `round_table_monat`. **Lehre:** Ein Befund über eine Spalte ist
+erst erledigt, wenn `grep -rn "<spalte>" metabase/ mcp/src` keine Karte mehr zeigt, die sie
+anders liest. Aufgefallen beim Suchen nach direkten `ampel.bewerte()`-Aufrufen nach `0129`.
+
 ### Vierzehn Gästezahlen sind keine Gästezahlen
 
 **Symptom.** „Umsatz je Gast" und jede Bewertungsquote lagen konzernweit um Größenordnungen
@@ -5010,3 +5021,38 @@ die Aussage aus `kennzahlen-mapping.md` — der Datei, die man für eine Kennzah
 Korrektur 6. **Lehre:** wer eine Annahme in `lina-api-korrekturen.md` widerlegt, sucht im
 selben Commit alle Dateien nach der alten Aussage (`grep -rn "access:false" docs/`) — eine
 Korrektur, die nur an einer Stelle steht, wird an der anderen wieder abgeschrieben.
+
+> **Nachtrag 29.09.2026, später am Tag:** auch Korrektur 6 selbst war falsch — `access=true` galt dem
+> Ordner, das Blatt ist `denied`. Der nächste Eintrag erklärt, wie das zustande kam.
+
+
+## Ein Ordner wurde für sein Blatt gehalten — Korrektur 6 war selbst falsch (29.09.2026)
+
+**Symptom.** Am 24.08.2026 stand in `lina-api-korrekturen.md`, alle fünf Personal-Einträge
+seien `access=true`; daraus wurde „keine Rechtefrage, sondern der Datenweg", und der Satz wanderte in
+`kennzahlen-mapping.md`, `datensicherung.md`, `bounti-api-inventar.md`, `offene-punkte.md`,
+`entscheidungen.md`, die Migration `0129` und (am 29.09.) in die Nachzieh-Runde dazu. Im Browser
+nachgemessen: das Blatt *Team > Mitarbeiter > Stammdaten* ist **`type: denied`, `access: false`**;
+`true` war der **Ordner** *Mitarbeiter*. Die ursprüngliche Aussage vom 25.07.2026 war richtig.
+
+**Ursache.** Zwei Fehler in einem. (1) `d10` suchte im Menübaum nach einem Namensmuster und
+druckte **Ordner und Blätter gleichrangig**, gekürzt auf 25 Treffer; die Korrektur las die
+Zeile mit dem Namen „Mitarbeiter" und nicht die mit der Route `manageusers`. (2) Die
+0-Byte-Antwort passte nicht zu `access=true` und wurde stattdessen mit einer Hypothese erklärt
+(„Hülle wie beim Belegarchiv"), statt sie als Beleg gegen die eigene Aussage zu nehmen. Die
+Korrektur selbst hatte den Zweifel notiert (Punkt 3: „ob Mitarbeiter derselbe Knoten ist wie
+manageusers — nicht gemessen") und ihn trotzdem in der Überschrift nicht vorbehalten.
+
+**Was es verhindert.** Korrektur 6 ist durchgestrichen und verweist auf Korrektur 10; alle
+Fundstellen sind nachgezogen. `d10` gibt jetzt **jedes Personalblatt einzeln mit `type`,
+`data` und `access`** aus und nennt Ordner ausdrücklich als solche. **Lehre:** ein Menüknoten
+mit `access=true` ist erst dann ein Recht, wenn es der Knoten mit der Route ist; und eine
+Antwort, die nicht zur eigenen Aussage passt, ist ein Befund gegen die Aussage — keine Lücke im
+Wissen, die man mit einer plausiblen Hypothese füllt.
+
+**Fundstellen nachgezogen** (`grep -rn "Korrektur 6\|access=true" docs/ migrations/0129* metabase/
+src/`): `lina-api-korrekturen.md`, `lina-api-inventar.md`, `lina-api-inventar-1b.md`,
+`lina-api-inventar-1c.md`, `datenherkunft.md`, `datensicherung.md`, `kennzahlen-mapping.md`,
+`bounti-api-inventar.md`, `offene-punkte.md`, `entscheidungen.md`, `metabase.md`, `dashboards.md`,
+`migrations/0129_management_regelwerk.sql`. Frühere Einträge dieser Datei über Korrektur 6
+(24.08. und 29.09.) bleiben stehen: sie beschreiben, wie es zu dem Zustand kam.

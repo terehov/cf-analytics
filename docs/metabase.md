@@ -1198,7 +1198,9 @@ zwischen einer Zahl und einer belastbaren Zahl:
 2. **Es gibt hier keine Fluktuationszahl, und das ist kein Versehen.** Die Kennzahl der
    Berichtsliste kommt aus LINA; eine aus Bounti-Konten gerechnete Näherung stand kurz im
    Entwurf und ist wieder entfernt worden (`entscheidungen.md`, B4). Wer eine Karte
-   „Fluktuation" baut, baut sie auf der LINA-Quelle — sobald `lina-fragen d10` gelaufen ist.
+   „Fluktuation“ baut, baut sie auf der LINA-Quelle — ~~sobald `lina-fragen d10` gelaufen ist~~
+   und die ist seit 29.09.2026 als **gesperrt** gemessen (`lina-api-korrekturen.md`, Korrektur 10);
+   die Kopfzahl je Monat (`persozahl`) gibt es, Ein- und Austritte nicht.
 3. **Zuweisungen ohne Frist sind keine Pflichtschulungen.** Die Spalte `ohne_frist` steht
    daneben, weil die Schnittstelle kein Pflichtkennzeichen kennt; ist sie groß, ist
    „überfällig" wertlos.

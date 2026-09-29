@@ -307,7 +307,15 @@ sagt kein Name. Wer hier raten lässt, ordnet 246 Bestellungen lautlos dem falsc
 
 ---
 
-## KORREKTUR 6 — Die Personalrechte sind **da** (24.08.2026)
+## ~~KORREKTUR 6 — Die Personalrechte sind **da** (24.08.2026)~~ — **widerrufen am 29.09.2026, siehe KORREKTUR 10**
+
+> **Widerruf 29.09.2026.** Im Browser nachgemessen: die fünf Einträge unten sind **Ordner**
+> und andere Blätter. Das Blatt, das `manageusers` trägt — `Team > Mitarbeiter > Stammdaten` —
+> steht in `/common/api/menu` auf `type: "denied"`, `access: false`, ebenso `Vorgesetzte`. Die
+> Aussage vom 25.07.2026 war für dieses Blatt **richtig**, und der 0-Byte-Antwort liegt keine
+> Hülle zugrunde, sondern eine Abweisung. Punkt 3 unten („ob Mitarbeiter derselbe Knoten ist
+> wie `manageusers`") ist damit beantwortet: **nein**. Was stimmt und was nicht, steht in
+> Korrektur 10. Der Text darunter bleibt stehen, damit man sieht, dass er einmal galt.
 
 **Die alte Aussage**, seit dem 25.07.2026 in `lina-api-inventar.md` §5 und seither in jeder
 Aufwandsschätzung mitgeschleppt:
@@ -328,9 +336,10 @@ Personalstruktur       access=true
 
 **Fünfmal `true`.** Ob sich die Rechte seit Juli geändert haben oder ob damals ein anderer
 Knoten gelesen wurde, lässt sich nicht mehr feststellen — beides ist möglich, und für die
-Folge ist es gleichgültig: **die Personaldaten sind für diesen Zugang keine Rechtefrage
+Folge ist es gleichgültig: ~~**die Personaldaten sind für diesen Zugang keine Rechtefrage
 mehr.** Damit fällt der Punkt „Mitarbeiter-Stammdaten" aus der Rechteliste an Concept Family
-heraus und wird zu einer Aufwandsfrage.
+heraus und wird zu einer Aufwandsfrage.~~ *(widerrufen, Korrektur 10: die Mitarbeiter-
+Stammdaten sind weiter eine Rechtefrage; `Personalstruktur` ist dagegen wirklich offen.)*
 
 **Was damit NOCH NICHT geklärt ist — und was man deshalb nicht behaupten darf:**
 
@@ -475,3 +484,146 @@ findet die Straße nicht und fällt auf den Ort zurück.
 
 **Folge:** Yext geht vor, LINA füllt die Lücken (`core.betrieb_adresse`, `src/standort/`). Die
 Koordinaten kommen aus OpenStreetMap, nicht aus LINA — dort gibt es keine.
+
+## KORREKTUR 10 — Die Mitarbeiter-Stammdaten sind gesperrt, die Kopfzahl ist es nicht; und der Monatsabruf der Personalkosten stimmt (29.09.2026)
+
+**Im Browser erhoben** (angemeldete Sitzung des Nutzers, Mandant *CONCEPT FAMILY Franchise AG*,
+nur lesend, kein Mandantenwechsel, kein Export). Anlass: `d10` sollte den Datenweg der
+Fluktuationsrate finden, und der Monatsabruf von `getPersonalkosten` war nie gegen LINA gelaufen.
+Die Einzelheiten der Aufrufe stehen in [`lina-api-inventar-1c.md`](lina-api-inventar-1c.md),
+Abschnitt „Personal, Stunden und Kopfzahl".
+
+### a) KORREKTUR 6 war falsch — für das Blatt, auf das es ankam
+
+~~„`access=true` für Mitarbeiter … die Personaldaten sind keine Rechtefrage mehr."~~
+
+Nachgemessen am 29.09.2026 in `/common/api/menu` (Antwort im Browser mitgeschnitten, je Knoten
+`type`, `data`, `access`):
+
+| Knoten | `data` | `type` | `access` |
+|---|---|---|---|
+| Team > **Mitarbeiter** (Ordner) | — | — | `true` |
+| Team > Mitarbeiter > **Stammdaten** | `/personal/mitarbeiter/manageusers` | **`denied`** | **`false`** |
+| Team > Mitarbeiter > **Vorgesetzte** | `/personal/mitarbeiter/vorgesetzte` | **`denied`** | **`false`** |
+| Team > Lohnbuchhaltung > Lohnrechner | `/personal/mitarbeiter/lohnrechner` | `url` | `true` |
+| Finance > Steuerberater > Upload Lohndateien | `/finanzen/stb/lohnup` | `url` | `true` |
+| Stores > Auswertungen > Sonstige > **Personalstruktur** | `/intranet/auswertung/persozahl?admin=1&franchise=1` | `url` | `true` |
+
+In der Oberfläche trägt *Stammdaten* ein Schloss; ein Klick lädt nichts (kein einziger
+Netzwerkaufruf). **Der Ordner „Mitarbeiter" ist `true`, das Blatt darunter nicht** — die
+KORREKTUR-6-Liste hat den Ordner mitgezählt.
+
+**Was sich nicht mehr klären lässt:** ob sich die Rechte seit dem 24.08.2026 geändert haben oder
+`d10` den Kindknoten übersehen hat. `d10` durchsuchte den Baum nach dem Muster
+`personal|mitarbeiter|zeitkonto|lohn|dienstplan|struktur` und **kürzte auf 25 Treffer**
+(`gefunden.slice(0, 25)`); das Blatt hätte über seinen Alias „Personalakte" trotzdem
+getroffen. Beides ist möglich, für die Folge gleichgültig: **heute ist es gesperrt.**
+
+**Die 0-Byte-Antwort von `manageusers`** (zweimal gemessen am 24.08.2026) ist damit erklärt:
+keine Hülle, die ihre Daten nachlädt, sondern eine stille Abweisung eines `denied`-Blatts.
+~~„spricht für eine Hülle wie beim Belegarchiv"~~ — verworfen.
+
+**Folge:** Die Fluktuationsrate (Eintritt und Austritt je Person) ist wieder eine
+**Rechtefrage an Concept Family** — nicht an LINA. Deren Administrator hat den Bounti-Schlüssel
+mit Scope *Personalstammdaten und Kosten* angelegt; **vermutlich** hängt die Sperre an der
+Nutzerrolle des Zugangs (`Team > Mitarbeiter > Nutzerrollen` ist für uns `true` und erreichbar,
+wurde aber nicht geöffnet) — das ist eine Annahme, keine Messung. Keine Anfrage an LINA (`kein Kontakt zu LINA`).
+
+### b) Neu: „Personalstruktur" liefert die Kopfzahl je Betrieb und Monat
+
+`/intranet/auswertung/persozahl` — serverseitig gerendertes HTML, kein JSON. Je Betrieb eine
+Zeile, je **Anstellungsverhältnis** (neun Arten plus zwei Summenzeilen) die Kopfzahl für die
+Monate 1–12 und einen Durchschnitt; Jahr wählbar ab 2008. Blättern per `POST persozahlSlice`
+(`limit=10&offset=…&refyear=…`), rund 310 Zeilen in 31 Seiten (mehr als die 141 Betriebe der
+Berichte). **Das ist ein Bestand, keine Bewegung:** Eintritte und Austritte, die sich im
+selben Monat aufheben, sind darin unsichtbar, und Personen kommen nicht vor. Eine Fluktuations-
+**rate** lässt sich daraus **nicht** rechnen; als Nenner (Ø Kopfzahl) taugt sie.
+
+Nachgemessen am 29.09.2026, Jahr 2025, die ersten 10 Betriebe: Summe der neun Arten je Monat
+zwischen 395 und 453. **Zukunftsmonate sind befüllt, und man sieht nicht, womit:** in der
+Ansicht 2026 stehen Oktober bis Dezember, obwohl der Oktober noch nicht begonnen hat. Bei
+fünf von sechs geprüften Betrieben sind sie identisch mit dem September (Fortschreibung des
+Bestands); bei einem (Aposto Mainz) weichen sie ab — 46 im September, dann 51, 53, 53 —, was
+Eintritte mit künftigem Datum sein können oder etwas anderes. Beides sieht aus wie Kopfzahl.
+**Ein Import darf Monate nach dem laufenden nicht als Messung führen.**
+
+**Nicht enthalten:** Bereich (Service/Küche/Bar) — nur das Anstellungsverhältnis. Die
+Personalquote je Bereich bleibt an `getPersonalkosten`.
+
+### c) `getPersonalkosten` über einen Monat: bestätigt, mit Einschränkung
+
+Aufruf, wie die Oberfläche ihn schickt (Stores > Auswertungen > Report Center > Personalkosten):
+
+```
+GET /intranet/analytics/getPersonalkosten
+    ?report=intranet-personalkosten&von=01.08.2026&bis=31.08.2026
+    &reltime=custom&brutto=0&preExistingRevenue=0
+```
+
+Antwort `{timeframe, stores[141]}`; je Betrieb `name`, `encId`, `effService/Bar/Kueche/Gesamt`,
+`thresholds`, `pekService/Bar/Kueche/Gesamt`, `pekThreshold`, `persoogBwa` — dieselben Felder
+wie im archivierten Payload. **Nachgemessen am 29.09.2026** (August 2026, ein Aufruf, lokal
+ausgewertet):
+
+| Frage | Ergebnis |
+|---|---|
+| Betriebe mit Wert | `eff` bei **56 von 141**, `persoogBwa` bei **20** (August noch nicht gebucht), beide bei **18** |
+| `pekGesamt` gegen `persoogBwa` | Median **−0,18 pp**; p10 −6,15, p90 +3,34, größte Abweichung 9,87 pp. **Nur 4 von 18 innerhalb 1 pp, 11 von 18 innerhalb 3 pp** |
+| Stundensatz aus `pek × eff` | Service **17,8**, Küche **18,8**, Bar **18,6** €/h (Median, 18/18/17 Betriebe) — untereinander gleich, im Band 15–30 |
+| `pekGesamt` als Stundensatz | 22,6 €/h — **höher** als die drei Bereiche (siehe unten) |
+| Ausreißer | Enchilada Aalen `pekGesamt` 187,1 %; Domhof 67,9 % (Bereiche 88–119 %) |
+
+**Bewertung.** Die Bereichsquoten sind Quoten und plausibel: gleiche Stundensätze bestätigen
+die Nenner **indirekt** (Küche gegen Speisen, Bar gegen Getränke) — der Bericht nennt seine
+Nenner nirgends (Tabelle ohne Fußnote, Spaltenköpfe ohne Erläuterung). `pekGesamt` liegt im Median
+nahe an `persoogBwa`, streut aber breit; **„nahe" gilt für den Median, nicht für den
+einzelnen Betrieb.** Der Vergleich stützt sich auf **einen** Monat mit unvollständiger BWA — ein
+zweiter, vollständig gebuchter Monat (Juli) steht aus. Der höhere Gesamt-Stundensatz sagt, dass
+`pekGesamt` mehr enthält als die drei Bereiche (vermutlich Verwaltung/Geschäftsführung); was,
+ist ungeklärt.
+
+### d) Der Tageswert ist aufgelaufen, keine Quote — bestätigt
+
+Gleicher Aufruf für **einen Tag** (`von=28.09.2026&bis=28.09.2026`), 32 Betriebe mit `eff`:
+`pekGesamt` Median **879,5 %** (Spanne 501,6–2.314,8) — der September seit dem 1., geteilt
+durch den Umsatz eines Tages. Gegen den Monatsabruf der Betriebe, die in beiden stehen:
+`pekGesamt` Tag/Monat Median **21,4**, `effGesamt` Tag/Monat Median **0,83** (flach).
+`persoogBwa` steht am Tag bei **0** Betrieben. Korrektur 4, Nachtrag, ist damit belegt.
+
+### e) Nebenbefund: Bericht 107 läuft — über einen anderen Endpunkt
+
+~~„107 Gearbeitete Stunden: HTTP 500, gesperrt oder nicht lizenziert."~~ (`lina-api-inventar-1c.md`
+Abschnitt 2, 25.07.2026.) Das Report Center des Mandanten (`/finanzen/analytics/reports`) ruft ihn
+so auf:
+
+```
+GET /finanzen/analytics/getHoursWorked?report=107&von=1.8.2026&bis=1.8.2026&reltime=lastMonth&interval=8
+```
+
+Antwort `{from, to, rows:[{name, anstellung, stunden_soll, stunden_ist, abweichung, state}]}` —
+**je Person**, nicht je Betrieb. Im Mandanten *Franchise AG* liefert er genau eine Person (deren
+eigenes Personal). `reportList` desselben Mandanten führt 107 und 24 ohne `missingModule`,
+dagegen **8 (Personalkosten) und 23 (Personalkostenschätzung) mit `missingModule: [67]`** — das
+erklärt deren 500er als **nicht gebuchtes Modul**, nicht als Rechtemangel. Die 500er vom
+25.07.2026 für 107 kamen über `getReport` (Korrektur 7: falscher Endpunkt); **ob 107 für
+einen einzelnen Betrieb geht, ist damit nicht gemessen**, nur dass der Bericht existiert und
+antwortet. Dieser Zugang liefert Stunden **mit Personenbezug** — wer ihn je Betrieb holt, holt
+Namen. Sie gehören nicht in `docs/` und nicht in `docs/payloads/`; ob und wie das je
+importiert wird, ist eine Entscheidung vor dem Bau, nicht danach.
+
+### f) Nebenbefund: Stunden je Wochentag und Stunde — auf dem Konzern-Dashboard
+
+`GET /finanzen/api/chartjson?von=<epoch>&bis=<epoch>&charts=umsatzperso` liefert je Wochentag
+und Stunde (08:00–07:00) Umsatz, Personalkosten und **Effektivität in €/h** — im Mandanten
+*Franchise AG* überall 0, weil dort nichts kassiert wird. Ob der Aufruf mit Betriebskontext
+Daten liefert, ist **nicht gemessen**. Er wäre die einzige Quelle für Personalkosten *je Stunde*
+(Korrektur 4: „Personalstunden je Zeitzone gibt es nicht").
+
+### Folgen
+
+* `d10` ist umgebaut: Schritt 1 wertet **jedes** Personalblatt einzeln aus (Ordner und Blatt
+  getrennt), Schritt 2 ruft `persozahl` statt `manageusers`. Kommando siehe `offene-punkte.md`.
+* `docs/offene-punkte.md` Punkt 4, `kennzahlen-mapping.md` (Fluktuationsraten),
+  `lina-api-inventar-1b.md`, `lina-api-inventar.md`, `datensicherung.md`, `entscheidungen.md`,
+  `metabase/karten-management.ts` und `migrations/0129_management_regelwerk.sql` führten die
+  Aussage aus Korrektur 6 — alle nachgezogen (`grep` siehe `fehlerkatalog.md`, 29.09.2026, zweiter Eintrag).

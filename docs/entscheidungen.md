@@ -4017,9 +4017,10 @@ Die sieben Antworten (Daniel, 29.09.2026):
    Daniel wollte „begonnen"; Bounti kennt nur zugewiesen und abgeschlossen. Den gewünschten
    Abgleich gegen den Personalstand laut LINA gibt es noch nicht. ~~`Team > Mitarbeiter >
    Stammdaten` ist für unseren Zugang gesperrt~~ — so stand es hier zuerst, übernommen aus
-   dem Stand vom 25.07.2026. Seit der Messung vom 24.08.2026 ist das widerlegt: die Rechte
-   sind da (`lina-api-korrekturen.md`, Korrektur 6), offen ist nur der Datenweg
-   (`offene-punkte.md`, Fluktuation).
+   dem Stand vom 25.07.2026. ~~Seit der Messung vom 24.08.2026 ist das widerlegt: die Rechte
+   sind da (Korrektur 6), offen ist nur der Datenweg.~~ **Am 29.09.2026 wiederum
+   widerlegt, im Browser:** das Blatt ist `denied` (`lina-api-korrekturen.md`, Korrektur 10);
+   die Aussage „gesperrt“ war für dieses Blatt richtig.
 6. **Gesamturteil nur aus den Zahlen, ohne Rendite, Bounti und OM.** Umsatz, Personal o. GF,
    Personal je Bereich, Wareneinsatz, Bewertung. Rendite und Bounti stehen daneben. Als Daten
    in `ampel.regel.im_gesamturteil`, nicht als Liste in den Sichten.
@@ -4054,3 +4055,29 @@ Daniel danach gefragt hat. Warum die Ampelspalten zählen statt zu färben: `das
 
 **„Gelb" heißt weiter „Orange"** in Daten und Karten (Entscheidung vom 20.09.2026); die neue
 Seite erklärt 🟠 als „gelb".
+
+## 29.09.2026 — Personalquelle: nichts gebaut, der Befund steht, die Wahl ist Eugenes
+
+**Anlass.** Browser-Erkundung zu Fluktuation und Personalkosten (`lina-api-korrekturen.md`,
+Korrektur 10). **Es wurde kein Registereintrag, keine Migration und kein Importerumbau
+angelegt** — das war der Auftrag. Was zu entscheiden bleibt:
+
+1. **Fluktuationsrate.** Die Personenliste ist gesperrt (`denied`). Weg A: Concept Family bitten,
+   dem LINA-Zugang die Rolle für *Team > Mitarbeiter > Stammdaten* zu geben — dann `d10` erneut,
+   und erst danach klärt sich, ob Eintritt, Austritt und Ausgeschiedene mitkommen. Weg B: keine
+   Fluktuationskennzahl. **Nicht** möglich ist eine Näherung aus `persozahl` oder Bounti (Regel
+   vom 24.08.2026: eine fast richtige Zahl ist teurer als eine fehlende).
+   **Empfehlung: Weg A anstoßen, bis dahin keine Karte.**
+2. **Kopfzahl als Nenner.** `persozahl` ist offen, aber HTML mit verschachtelten Tabellen, der
+   Schlüssel ist der Betriebsname, Zukunftsmonate sind mitgeführt, und es enthält
+   Personalstrukturen von bis zu 310 Zeilen. Der Nutzen ist die Teilnahmequote der Bounti-Ampel
+   (heute gegen Bounti-Konten). **Empfehlung: erst bauen, wenn Daniel die Quote gegen den
+   echten Personalstand wirklich will** — ein HTML-Lader mit Namenszuordnung ist der
+   wartungsintensivste Weg des Repos.
+3. **Bericht 107 je Betrieb.** `getHoursWorked` antwortet, liefert aber Namen je Person. Ob er mit
+   Betriebskontext Betriebe liefert, ist ungemessen; `d2` in `src/messen.ts` fragt genau das,
+   aber über den falschen Endpunkt (`getReport`). **Vor jedem Bau die Datenschutzfrage
+   klären** (Stunden je Person sind Beschäftigtendaten).
+
+**Verworfen bzw. widerrufen an diesem Tag:** „Die Personalrechte sind da" (Korrektur 6) —
+`access=true` galt dem Ordner *Mitarbeiter*, nicht dem Blatt *Stammdaten*.

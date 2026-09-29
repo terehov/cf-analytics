@@ -824,7 +824,7 @@ nicht gebucht hat.
 Sparten (`0052`). Personal gibt es je Tag (`eff_gesamt`), Ware je Monat. Eine „Effektivität
 je Stunde" wäre eine flache Linie aus Tageswerten in feinerem Raster: erfundene Präzision.
 Sollte Bericht 107 („Gearbeitete Stunden", Messpunkt `d2` in `src/messen.ts`) je Schicht
-liefern, wird die Stundenebene möglich — vorher nicht.
+liefern, wird die Stundenebene möglich — vorher nicht. *(29.09.2026: 107 liefert je **Person** Soll und Ist des Monats, nicht je Schicht; für einen Betrieb ungemessen — `lina-api-korrekturen.md`, Korrektur 10 e.)*
 
 **Die Farben meiden die Ampel.** Rot, Gelb und Grün sind auf diesen Seiten Urteile; ein
 roter Feiertagsbalken läse sich als Warnung. Stattdessen: Werktage grau (sie sind der
@@ -1371,7 +1371,7 @@ sich still ändert, ist schlimmer als eine graue. Genau deshalb steht der
 Bounti-Block auf ① **unter** der Betriebstabelle und mit eigener Überschrift und
 nicht zwischen den Ampelkacheln.
 
-**Keine Fluktuation.** Eintritt und Austritt stehen in LINA, nicht in Bounti;
+**Keine Fluktuation.** Eintritt und Austritt stehen in LINA, nicht in Bounti — und das Blatt dazu ist für unseren Zugang gesperrt (Korrektur 10);
 das Archivierungskennzeichen ist kein Austrittsdatum. Gemessen: von den
 überfälligen Zuweisungen in operativen Betrieben hängt **genau eine** an einem
 archivierten Konto — Bounti schließt Zuweisungen beim Archivieren offenbar mit.

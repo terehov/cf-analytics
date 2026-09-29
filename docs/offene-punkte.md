@@ -374,11 +374,12 @@ solange sie nicht gelaufen sind, ist jede Aufwandsschätzung geraten.
 * **Dienstplan freigeben** — Bedarf ist deutlich kleiner geworden: die Ist-Stunden haben wir,
   die **Soll**-Stunden je Tag und Bereich stehen im Tagesbudget der Ladenakte. Der Dienstplan
   bringt nur noch die **Schicht- und Personenzuordnung** für 2.3.
-* ~~**Mitarbeiter-Stammdaten** — für 4.2 auf Personenebene~~ → **erledigt am 24.08.2026, es
-  war nie eine Rechtefrage** (oder ist es seit Juli nicht mehr): das Menü meldet für alle fünf
+* **Mitarbeiter-Stammdaten** — für 4.2 auf Personenebene und die Fluktuationsrate.
+  **Wieder offen seit 29.09.2026, Rechtefrage an Concept Family** (Korrektur 10).
+  ~~→ **erledigt am 24.08.2026, es war nie eine Rechtefrage** (oder ist es seit Juli nicht mehr): das Menü meldet für alle fünf
   Personal-Einträge `access=true`, siehe `lina-api-korrekturen.md`, Korrektur 6. Der Punkt
   verlässt diese Liste und steht ab jetzt unter *Bounti → Punkt 4* als **Aufwandsfrage**: die
-  Adresse der Datenquelle ist noch zu finden. Betrifft zwei Kennzahlen — „Fluktuationsraten"
+  Adresse der Datenquelle ist noch zu finden.~~ Betrifft zwei Kennzahlen — „Fluktuationsraten“
   (Ebene Laden) und Kapitel 4.2 auf Personenebene.
 * **Bericht 118** — inzwischen der *vierte* Weg zum Wareneinsatz und damit der am wenigsten
   dringende.
@@ -1418,15 +1419,16 @@ danach offen geblieben sind.
 
 **Die letzte Zeile ist die teure:** ohne diesen Schlüssel bleibt Kapitel 4.2 (Kurswirkung je
 Person) unerreichbar — es sei denn, die LINA-Personalstammdaten öffnen sich, und dort ist die
-Rechtefrage seit dem 24.08.2026 **beantwortet** (`lina-api-korrekturen.md`, Korrektur 6). Der
-Weg dorthin wird noch gesucht.
+~~Rechtefrage seit dem 24.08.2026 **beantwortet** (Korrektur 6). Der
+Weg dorthin wird noch gesucht.~~ Die Rechtefrage ist am 29.09.2026 **wieder offen**: das Blatt
+*Stammdaten* ist `denied` (`lina-api-korrekturen.md`, Korrektur 10).
 
 ### Die Fragen, die `bun run bounti:pruefen` weiterhin beantwortet
 
 | | entscheidet |
 |---|---|
 | **Sind Rollen als BEREICH gepflegt** (Küche, Service, Bar) — oder stehen dort nur Rechte-Rollen wie „Admin"? | `datenlage-round-table.html` nennt den Bereich den *wichtigsten* Punkt an Bounti: welchem Bereich ein Mensch zugeordnet ist, weiß sonst kein System. Stehen dort nur Rechte, ist die Auswertung je Bereich nicht möglich — und das ist eine Meldung an den Fachbereich, keine Codeänderung |
-| **Gibt es in `customFields` eine Personalnummer, die auch LINA führt?** | Ob Kapitel 4.2 (Kurswirkung je Person) überhaupt erreichbar wird. LINAs Mitarbeiterstammdaten sind ~~für unseren Zugang gesperrt~~ seit 24.08.2026 freigegeben, aber noch nicht abgeholt (Korrektur 6); ohne einen gemeinsamen Schlüssel gibt es keinen Join zwischen Kursabschluss und Verkaufsverhalten |
+| **Gibt es in `customFields` eine Personalnummer, die auch LINA führt?** | Ob Kapitel 4.2 (Kurswirkung je Person) überhaupt erreichbar wird. LINAs Mitarbeiterstammdaten sind ~~für unseren Zugang gesperrt~~ ~~seit 24.08.2026 freigegeben, aber noch nicht abgeholt (Korrektur 6)~~ **weiter gesperrt, nachgemessen 29.09.2026 (Korrektur 10)**; ohne einen gemeinsamen Schlüssel gibt es keinen Join zwischen Kursabschluss und Verkaufsverhalten |
 | Nimmt Bounti `limit=100`? | nur Aufrufzahlen |
 | Ist `assessmentScore` ein Bruch? | eine Quote, die um den Faktor 100 danebenliegt |
 | Wie viele Kurse und Pfade gibt es? | ob `BOUNTI_LERNEINHEITEN_JE_LAUF = 40` passt |
@@ -1531,38 +1533,44 @@ Korrigiert am 24.08.2026 auf Eugenes Rückfrage (Hergang in `entscheidungen.md`,
 Bounti-Konten gerechnete Näherung ist **wieder entfernt**, nicht nur umbenannt: eine fast
 richtige Zahl ist teurer als eine fehlende.
 
-**Der nächste Schritt ist eine Messung, keine Anfrage:**
+**Stand 29.09.2026 — im Browser gemessen, `d10` ist damit beantwortet** (`lina-api-korrekturen.md`,
+Korrektur 10; Aufrufe in `lina-api-inventar-1c.md` §8):
 
-```
-bun run lina-fragen d10
-```
+* **Die Personenliste ist gesperrt.** `Team > Mitarbeiter > Stammdaten`
+  (`/personal/mitarbeiter/manageusers`) steht in `/common/api/menu` auf `type: denied`,
+  `access: false`, ebenso `Vorgesetzte`. Die 0-Byte-Antwort ist eine stille Abweisung, keine Hülle.
+  Nur der **Ordner** *Mitarbeiter* ist `true`. **Damit ist es wieder eine Rechtefrage an Concept
+  Family** (deren Administrator hat den Bounti-Schlüssel mit Scope *Personalstammdaten und
+  Kosten* angelegt) — nicht an LINA. Eintritts- und Austrittsdatum und ob Ausgeschiedene
+  mitkommen: **ungemessen, solange das Blatt zu ist.**
+* **Die Kopfzahl ist offen.** `Stores > Auswertungen > Sonstige > Personalstruktur`
+  (`/intranet/auswertung/persozahl`): je Betrieb, Monat und Anstellungsverhältnis der Bestand,
+  Jahr wählbar ab 2008. Das ist der **Nenner** für eine Fluktuationsrate, nicht die Rate: der
+  Bestand zeigt keine Bewegung, und im selben Monat ein- und ausgetretene Personen heben sich auf.
+* **Fluktuation ohne Personenliste ist nicht ableitbar** — auch nicht näherungsweise. Die Regel
+  von 24.08.2026 gilt weiter: eine fast richtige Zahl ist teurer als eine fehlende.
 
-**Stand 24.08.2026, zweite Messung: es ist KEINE Rechtefrage mehr.** `/common/api/menu`
+~~**Der nächste Schritt ist eine Messung, keine Anfrage: `bun run lina-fragen d10`**~~ — die Messung
+ist im Browser gelaufen. `d10` ist auf den neuen Stand umgebaut (Blätter einzeln, `persozahl`
+statt `manageusers`). **Nächster Schritt in Eugenes Terminal (nicht aus der Agentenumgebung,
+Regel 7a):** `bun run lina-fragen d10` — bestätigt die Rechtelage aus dem Zugang des Importers
+(gleicher Benutzer, anderer Netzwerkweg — Regel 7a) und holt
+`persozahl` einmal als HTML.
+
+~~**Stand 24.08.2026, zweite Messung: es ist KEINE Rechtefrage mehr.** `/common/api/menu`
 meldet für *Mitarbeiter, Lohnbuchhaltung, Lohnrechner, Upload Lohndateien* und
 **Personalstruktur** durchgängig `access=true` — die Aussage `access:false` vom 25.07.2026 ist
-damit widerlegt (`lina-api-korrekturen.md`, Korrektur 6). **Der Punkt verlässt die
-Rechteliste an Concept Family und wird eine Aufwandsfrage.**
+damit widerlegt (Korrektur 6). Der Punkt verlässt die Rechteliste an Concept Family und wird
+eine Aufwandsfrage.~~ *(Widerrufen 29.09.2026: `access=true` galt dem Ordner, nicht dem Blatt.)*
 
-Offen ist jetzt der **Weg**, und das ist eine kleinere Frage:
+~~Offen ist jetzt der **Weg**: `manageusers` antwortet HTTP 200 mit 0 Bytes — Hülle, die ihre
+Daten per zweitem Aufruf holt; das Menü nennt die Adresse ohne Route; der Ladenakte-Baum lieferte
+kein Array.~~ *(Beantwortet: die Route steht in `data`; 0 Bytes = `denied`; der Baum ist für
+Personal nicht der Weg.)*
 
-* `/personal/mitarbeiter/manageusers` antwortet weiterhin **HTTP 200 mit 0 Bytes** — zweimal
-  gemessen, als JSON und als HTML. Bei `access=true` spricht das für eine **Hülle, die ihre
-  Daten per zweitem Aufruf holt**, wie das Belegarchiv mit `getFilesUrl` (Korrektur 5).
-* Das Menü nennt die fünf Einträge **ohne Route** — LINA führt die Adresse in einem anderen
-  Feld als `route`/`url`/`link`/`href`. `d10` gibt seit dem 24.08. den **ganzen Knoten** aus,
-  statt das Feld zu erraten, und ruft jede gefundene Adresse gleich ab.
-* Der Ladenakte-Baum für `laden_15` lieferte kein Array — die erste Fassung starb daran
-  (`{} is not iterable`). `d10` druckt jetzt aus, was wirklich kommt, und probiert zusätzlich
-  die Wurzelknoten.
-
-**Nächster Schritt:** `bun run lina-fragen d10` erneut (nicht aus der Agentenumgebung,
-Regel 7a). Bringt auch die neue Fassung nur leere Antworten, ist der billigste nächste Schritt
-**einmal das Netzwerkprotokoll im Browser**: welche Adresse lädt die Mitarbeiterliste? Eine
-Adresse aus dem Protokoll ist in fünf Minuten geholt; weiter zu raten kostet mehr.
-
-**Was danach noch zu prüfen ist, bevor eine Zahl entsteht:** ob Eintritts- und Austrittsdatum
-dabei sind, und ob **ausgeschiedene** Personen mitgeliefert werden. Ohne die letzten sieht
-jeder Austritt aus wie ein Verschwinden — dieselbe Falle wie bei Bounti, nur an einer anderen
+**Was noch zu prüfen ist, sobald Concept Family die Rolle freigibt:** ob Eintritts- und
+Austrittsdatum dabei sind, und ob **ausgeschiedene** Personen mitgeliefert werden. Ohne die letzten
+sieht jeder Austritt aus wie ein Verschwinden — dieselbe Falle wie bei Bounti, nur an einer anderen
 Quelle.
 
 Die drei möglichen Ausgänge stehen in der Messung selbst. Der ungünstigste — `access: false`
@@ -2160,6 +2168,25 @@ SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY pk_service_eur / stunden_serv
   FROM mart.personal_bereich_monat WHERE stunden_service > 0 AND stunden_kueche > 0 AND stunden_bar > 0;
 ```
 
+**Nachgemessen am 29.09.2026 im Browser, vor dem ersten Lauf** (ein Monatsabruf August 2026 und
+ein Tagesabruf 28.09.2026, lokal ausgewertet; Einzelheiten `lina-api-korrekturen.md`, Korrektur 10 c/d):
+
+* **(1) Betriebe:** August liefert `eff` für **56 von 141**, `persoogBwa` für **20** (August ist
+  noch nicht gebucht), beides für **18**. „Gut 50 Betriebe je Monat" stimmt für `eff`; für den
+  Vergleich gegen die BWA stehen im laufenden und im Vormonat **weniger als 20** zur Verfügung.
+* **(2) `pek_gesamt` gegen `persoog_bwa`:** Median der Differenz **−0,18 pp** — der Erwartung
+  „nahe" genügt der **Median**. Der einzelne Betrieb nicht: p10 −6,15, p90 +3,34, größte
+  Abweichung 9,87 pp; **nur 4 von 18 innerhalb 1 pp**, 11 von 18 innerhalb 3 pp. Auf **einem**
+  Monat mit unvollständiger BWA; ein vollständig gebuchter Monat (Juli) steht aus und ist die
+  eigentliche Probe, sobald `core.personalkosten_monat` gefüllt ist.
+* **(3) Stundensätze** (`pek × eff`): Service **17,8**, Küche **18,8**, Bar **18,6** €/h,
+  untereinander gleich. Das stützt die Nenner *indirekt*; der Bericht nennt sie nicht. **Die
+  Gesamt-Quote entspricht 22,6 €/h** und enthält also mehr als die drei Bereiche — ungeklärt,
+  was.
+* **Der Tageswert ist aufgelaufen** — bestätigt: `pekGesamt` am 28.09. im Median **879,5 %**.
+* **Ausreißer**, die eine Ampel sofort rot färben: Enchilada Aalen `pekGesamt` 187,1 % im
+  August, Domhof 67,9 % (Bereiche 88–119 %). Vor der Abnahme ansehen, nicht wegfiltern.
+
 Liegt (2) weit daneben, ist der Monatsabruf auch keine Quote — dann die Personalampeln je
 Bereich über `ampel.regel.im_gesamturteil = false` aus dem Urteil nehmen, bis es geklärt ist.
 Bis zur ersten Nacht sind sie leer, und jedes Gesamturteil ist `unvollstaendig`.
@@ -2172,14 +2199,20 @@ kein Deploy.
 
 **An die Buchhaltung: Plan-BWA 2026.** Für 2026 hat kein Betrieb einen Plan (2025: 38). Sobald
 er in LINA steht, misst die Personalampel automatisch gegen ihn.
+Am 29.09.2026 **nicht weiter untersucht**: die Ladenakte führt den Plan im Stammdatenblatt
+(`getplanbwa`, `lina-api-inventar-ladenakte.md`), eine Pflegestelle für 2026 wurde bei dieser
+Erkundung nicht gesucht.
 
-**Personalstand laut LINA — keine Rechtefrage, sondern der Datenweg.** Daniel möchte die
+**Personalstand laut LINA — die Personenliste ist gesperrt, die Kopfzahl nicht.** Daniel möchte die
 Bounti-Teilnahme gegen den Personalstand aus LINA halten. ~~`Team > Mitarbeiter > Stammdaten`
-liefert für unseren Zugang `access:false`~~ — so stand es hier zuerst, abgeschrieben aus
-`kennzahlen-mapping.md`, das den Stand vom 25.07.2026 führte. Seit dem 24.08.2026 widerlegt:
-`access=true` für Mitarbeiter, Lohnbuchhaltung und Personalstruktur (Korrektur 6). Es ist
-derselbe offene Schritt wie bei der Fluktuationsrate weiter oben (Punkt 4): `bun run
-lina-fragen d10` im Terminal des Nutzers, sonst einmal das Netzwerkprotokoll im Browser.
+liefert für unseren Zugang `access:false`~~ — so stand es hier zuerst, dann am 24.08.2026 als
+widerlegt vermerkt, **am 29.09.2026 wiederum widerlegt** (`lina-api-korrekturen.md`, Korrektur 10):
+das Blatt ist `denied`. Aber `Stores > Auswertungen > Personalstruktur` liefert je Betrieb und
+Monat die **Kopfzahl** nach Anstellungsverhältnis — der Nenner für die Teilnahmequote, mit
+zwei Vorbehalten: der Schlüssel ist der Betriebsname (keine `encId`), und die Ansicht führt
+Monate nach dem laufenden mit. Ob sie mit den Bounti-Konten zusammenpasst (Bounti: 1.754 von 2.346
+aktiven Personen erreichen einen Betrieb), ist ungemessen. Bau erst nach Eugenes Entscheidung —
+Registereintrag, Migration und Zuordnung über den Namen sind jeweils eine Aufgabe für sich.
 Bis dahin ist der Nenner die Zahl der aktiven Konten in Bounti — und das steht in der Karte.
 
 **Nicht gebaut: „Umsatz Mittagsgeschäft" als Handlungsfeld** (stand in Daniels Entwurf als
