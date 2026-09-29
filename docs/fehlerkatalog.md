@@ -4949,3 +4949,21 @@ als gespeichert" war immer wahr.
 **Was es künftig verhindert.** Der Zeitpunkt wird als Text (`::text`) gelesen und als
 `::timestamptz` zurückgegeben. **Regel:** einen Zeitstempel, der wieder als Schlüssel in
 Postgres dient, nicht durch ein JS-`Date` schleusen.
+
+## `datenstand` wurde durch 0125 wieder langsam — erst JIT, dann eine Aggregation zu viel (29.09.2026)
+
+**Symptom.** Gleich nach dem Deploy von `0125` brauchte `mart.datenstand` nach Befund 2,6 s statt
+der 0,09 s aus `0124`.
+
+**Ursache.** Zwei, übereinander. (1) Der neue Join auf `mart.betrieb_status` hob die Schätzkosten
+auf 2,9 Mio. — Postgres übersetzte die Abfrage per JIT, 1,8 s. (2) Ohne JIT blieben 1,4 s: die neue
+Umsatz-Unterabfrage aggregierte je Betrieb die ganze Historie mit `FILTER (umsatz_netto > 0)`,
+~3.200 Zeilen × 141, auch wenn nur `letzter_tag` gefragt war. Auf dem Klon fiel beides nicht auf
+(1,7 ms): wenig Daten, andere Schätzung. Um 14:57 in Produktion ohne laufenden Import 66 ms, mit
+Import 1,4 s.
+
+**Was es künftig verhindert.** JIT aus (`entscheidungen.md`, 29.09.2026). `0128`: skalare
+Unterabfragen über den Index statt einer Aggregation — 0,26 s mit laufendem Import, zeilengleich.
+**Regel:** eine Sicht, die an jeder MCP-Antwort hängt, in Produktion nachmessen, nicht auf dem
+Klon — und eine Spalte, die niemand liest, soll nichts kosten: skalare Unterabfrage statt
+Aggregation in einem LATERAL.

@@ -3966,3 +3966,23 @@ Standorten, Betriebsberichten und Datenstand. Jede ist am Code und an der Produk
 
 Nicht entschieden, nur geprüft: Wilma Wunder Bochum hat keine BWA, weil in LINA nichts gebucht
 ist (Zuordnung stimmt, alle Werte 0) — Buchhaltung, `docs/offene-punkte.md`.
+
+## 29.09.2026 — JIT aus
+
+Nach dem Neustart (15:55 Ortszeit; damit wirksam: `pg_stat_statements`, 4 Worker je Abfrage,
+`min_dynamic_shared_memory` 1 GB, `max_worker_processes` 12, `track_io_timing`) zeigte die erste
+Messung zwei Befunde:
+
+* `mart.datenstand` nach Befund: **2,6 s, davon 1,8 s JIT** (Inlining 552 ms, Optimierung 676 ms,
+  Emission 558 ms). Ohne JIT 66 ms. Schwellen für Inlining und Optimierung auf 10 Mio. angehoben:
+  immer noch 1,76 s.
+* `pg_stat_statements` nach wenigen Minuten: **13,4 von 73,1 s Ausführungszeit JIT** (18 %),
+  in 66 von 262 Abfrageformen.
+
+Entschieden (Eugene): `ALTER SYSTEM SET jit = off`, neu geladen ohne Neustart — von Eugene selbst
+ausgeführt, weil die Agentenumgebung Änderungen an der Produktionsdatenbank nicht ausführen darf.
+Warum ganz aus und nicht höhere Schwellen: die Schätzkosten der Sichten hier sind nicht die
+Laufzeit — ein Join über 141 Betriebe schätzt sich auf Millionen und läuft in Millisekunden. JIT
+lohnt sich bei langen Scans über viele Zeilen; das sind hier die nächtlichen Refreshs, und die
+laufen ohne Nutzer, der wartet. **Zurück:** `ALTER SYSTEM RESET jit; SELECT pg_reload_conf();`.
+Nachprüfen über `pg_stat_statements` (Spalten `jit_*` bleiben jetzt 0).
