@@ -57,7 +57,10 @@ const F_AMPEL: Parameter = {
 // genau ein Segment eines gestapelten Balkens -- "Personal / rot".
 const F_BEREICH: Parameter = {
   id: 'd-bereich', name: 'bereich', 'display-name': 'Bereich', type: 'string/=',
-  festeWerte: ['Umsatz', 'Personal', 'WE Bar', 'WE Küche', 'Online-Bewertung', 'OM vor Ort'],
+  // Seit 0129 die Bereiche des Management-Regelwerks (mart.ampel_bereich);
+  // OM vor Ort entfaellt.
+  festeWerte: ['Umsatz', 'Personal', 'Personal Service', 'Personal Küche', 'Personal Bar',
+               'WE Küche', 'WE Bar', 'Online-Bewertung', 'Rendite YTD'],
 }
 // Welche der vier Sperren eine Ware vom Preisvergleich ausschliesst.
 // Feste Liste statt Datenquelle: es gibt genau diese fuenf Werte, sie
@@ -246,6 +249,63 @@ const F_VON: Parameter = { id: 'd-von', name: 'von', 'display-name': 'Aktion von
 const F_BIS: Parameter = { id: 'd-bis', name: 'bis', 'display-name': 'Aktion bis', type: 'date/single', default: '2026-08-31' }
 
 export const dashboards: Dashboard[] = [
+  // ===================================================================
+  // MANAGEMENT — die eine Seite (Daniel, 29.09.2026)
+  //
+  // Die Round-Table-Seiten waren zu kompliziert. Diese Seite folgt Daniels
+  // Entwurf Block fuer Block und in seiner Reihenfolge: sechs Zahlen oben,
+  // dann Umsatz, Personal, Wareneinsatz, Gaeste, Schulung, und am Ende die
+  // fuenf Handlungsfelder. Darunter die vollstaendige Ampeltabelle — sie
+  // stand im Entwurf als Regeltabelle und ist hier mit Zahlen gefuellt.
+  //
+  // Keine Reiter: eine Seite, die man von oben nach unten liest. Ohne
+  // Betriebsfilter zeigt sie die Gruppe, mit Filter den Betrieb — dieselben
+  // Karten, deshalb zaehlen die Ampelspalten statt zu faerben.
+  // ===================================================================
+  {
+    schluessel: 'db_management',
+    name: 'Management',
+    beschreibung:
+      'Die eine Seite für die Geschäftsführung: Umsatz, Rendite, Personal, Wareneinsatz, Gäste und Schulung mit Ampel, dazu die fünf dringendsten Handlungsfelder. Ohne Auswahl alle operativen Betriebe, mit Auswahl ein Betrieb.',
+    sammlung: 'Management',
+    filter: [F_MONAT, F_BETRIEB, F_MARKE],
+    reihen: [
+      { teile: [{ text: '# Management\n\n🟢 im Plan · 🟠 gelb, beobachten · 🔴 handeln · ⚪ keine Zahl.\n\n**Ohne Betrieb oben** zeigt jede Kachel alle operativen Betriebe zusammen, und die Ampelspalten zählen, wie viele wo stehen. **Mit Betrieb** steht dort seine eine Ampel. Ohne Monat gilt der letzte abgeschlossene.\n\nPersonal, Wareneinsatz und Rendite kommen aus der BWA und stehen deshalb auf dem **letzten gebuchten Monat** — der kann ein, zwei Monate hinter dem gewählten liegen.' }] },
+      { teile: [
+        { karte: 'mg_umsatz' },
+        { karte: 'mg_umsatz_vj' },
+        { karte: 'mg_umsatz_delta' },
+        { karte: 'mg_rendite' },
+        { karte: 'mg_yext' },
+        { karte: 'mg_bounti' },
+      ] },
+      { teile: [{ text: '## Umsatzentwicklung' }] },
+      { teile: [{ karte: 'mg_umsatz_verlauf', hoehe: 9 }] },
+      { teile: [{ text: '## Personalkosten\n\nService, Küche und Bar aus der Kasse, gegen das **Vorjahr**; „Ohne GF" aus der BWA, gegen das **Budget**. Solange keine Plan-BWA gepflegt ist, ist das Budget die Sollquote von 34 %.' }] },
+      { teile: [
+        { karte: 'mg_personal', breite: 15, hoehe: 9 },
+        { karte: 'mg_effektivitaet', breite: 9, hoehe: 9 },
+      ] },
+      { teile: [{ text: '## Wareneinsatz\n\nGegen das **Soll der Marke**: grün bis +0,5 Punkte darüber, gelb bis +1,0, rot darüber.' }] },
+      { teile: [{ karte: 'mg_wareneinsatz', hoehe: 9 }] },
+      { teile: [{ text: '## Gästefeedback' }] },
+      { teile: [
+        { karte: 'mg_yext_monat', breite: 8, hoehe: 9 },
+        { karte: 'mg_yext_themen', breite: 16, hoehe: 9 },
+      ] },
+      { teile: [{ text: '## Schulung (Bounti)\n\nStand heute — der Monatsfilter wirkt hier nicht.' }] },
+      { teile: [
+        { karte: 'mg_bounti_gesamt', breite: 9, hoehe: 9 },
+        { karte: 'mg_bounti_kurse', breite: 15, hoehe: 9 },
+      ] },
+      { teile: [{ text: '## Top 5 Handlungsfelder\n\nErst Rot, dann Gelb, jeweils das am weitesten vom Grün entfernte zuerst. Ein Klick auf den Betrieb stellt diese Seite auf ihn ein.' }] },
+      { teile: [{ karte: 'mg_handlungsfelder', hoehe: 9,
+        klick: [{ ziel: 'db_management', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      { teile: [{ text: '## Alle Kennzahlen mit Ampel\n\nDas Regelwerk, gefüllt. „Maßstab" sagt, wogegen gemessen wird; die Spalte „Regel" nennt die Grenzen.' }] },
+      { teile: [{ karte: 'mg_ampeln', hoehe: 10 }] },
+    ],
+  },
+
   // ===================================================================
   // DIE DRILL-DOWN-KETTE — Marke → Filiale → Betrieb
   // ===================================================================
@@ -1071,13 +1131,13 @@ export const dashboards: Dashboard[] = [
     schluessel: 'db_rt_regelwerk',
     name: 'Round Table — Regelwerk-Vergleich',
     beschreibung:
-      'Das gültige Regelwerk — welche Schwelle in welchem Bereich für welche Marke gilt — und die offene Grundsatzfrage daneben: Der Round Table misst alle Betriebe an denselben Personalschwellen (34/38 %), LINA führt je Betrieb eigene. Unten stehen beide Urteile nebeneinander, aber nur für die Betriebe, bei denen sie auseinandergehen.',
+      'Das gültige Regelwerk — welche Grenze in welchem Bereich für welche Marke gilt, und wogegen gemessen wird. Darunter, zur Einordnung, die zwei früheren Regelwerke gegeneinander.',
     sammlung: 'Round Table',
     filter: [F_MONAT],
     reihen: [
-      { teile: [{ text: '# Welche Schwellen gelten?\n\nDie Tabelle darunter ist das **gültige Regelwerk**, aus der Datenbank gelesen. Stand **20.09.2026**: Umsatz grün ab **+5 %**, Personal o. GF grün bis **34 %** / orange bis **38 %**, Wareneinsatz **je Marke**, Online-Bewertung grün ab **4,40**.\n\n**„kein Urteil"** heißt: hier wird bewusst nicht bewertet. Das betrifft den Getränkeeinsatz der Deutschen Konzepte — die Brauereibindungen machen ihn zwischen diesen Betrieben unvergleichbar. Die Zahl steht weiter in jeder Tabelle, nur ohne Farbe.' }] },
+      { teile: [{ text: '# Welche Schwellen gelten?\n\nDie Tabelle darunter ist das **gültige Regelwerk**, aus der Datenbank gelesen. Seit **29.09.2026** gilt das Management-Regelwerk: Umsatz grün über **+2 %**, gelb ab **−2 %**. Personal o. GF gegen das **Budget**, Personal Service, Küche und Bar gegen das **Vorjahr** — jeweils grün bis ±0, gelb bis +1 Punkt. Wareneinsatz gegen das **Soll der Marke** — grün bis +0,5, gelb bis +1,0 Punkte. Online-Bewertung grün ab **4,30**. Rendite und Bounti stehen neben dem Gesamturteil, die OM-Einschätzung entfällt.\n\n**„kein Urteil"** heißt: hier wird bewusst nicht bewertet. Das betrifft den Getränkeeinsatz der Deutschen Konzepte — die Brauereibindungen machen ihn zwischen diesen Betrieben unvergleichbar. Die Zahl steht weiter in jeder Tabelle, nur ohne Farbe.' }] },
       { teile: [{ karte: 'rt_schwellen', hoehe: 12 }] },
-      { teile: [{ text: '# Round Table gegen LINA\n\nBeim Personal führt LINA **eigene Grenzen je Betrieb**, der Round Table misst alle an **34 / 38 %**.\n\nUnten nur die Betriebe, bei denen das zu **unterschiedlichen Urteilen** führt.' }] },
+      { teile: [{ text: '# Frühere Regelwerke: Round Table gegen LINA\n\nBis zum 29.09.2026 maß der Round Table alle Betriebe beim Personal an **34 / 38 %**, LINA führt je Betrieb **eigene Grenzen**. Unten die Betriebe, bei denen diese beiden früheren Regelwerke zu **unterschiedlichen Urteilen** kommen — nur noch zur Einordnung. Geurteilt wird nach dem Regelwerk oben.' }] },
       { teile: [{ karte: 'rt_regelwerk_vergleich', hoehe: 13, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
     ],
   },
@@ -1879,7 +1939,7 @@ export const dashboards: Dashboard[] = [
     // es gerade? Und kann ich den Zahlen trauen?
     tabs: [
       { name: 'Stand', reihen: [
-      { teile: [{ text: '# Online-Bewertungen\n\nQuelle ist Yext, geladen einmal täglich.\n\n**Im Monat** = nur die Bewertungen, die im gewählten Monat kamen, über alle Portale (Google, OpenTable, TripAdvisor …). Damit vergleicht man Monate: einmal April wählen, einmal Mai — oder unten im Diagramm **Monat für Monat** nebeneinander.\n\n**Google-Stand** = Schnitt aller Google-Bewertungen seit Beginn, das was ein Gast auf Google sieht — daran hängt die Ampel (grün ab 4,40, orange ab 4,00). Er bewegt sich von Monat zu Monat kaum. Die Kurve **Bewertung im Verlauf** stellt ihm die Tendenz der neuen Google-Bewertungen gegenüber.' }] },
+      { teile: [{ text: '# Online-Bewertungen\n\nQuelle ist Yext, geladen einmal täglich.\n\n**Im Monat** = nur die Bewertungen, die im gewählten Monat kamen, über alle Portale (Google, OpenTable, TripAdvisor …). Damit vergleicht man Monate: einmal April wählen, einmal Mai — oder unten im Diagramm **Monat für Monat** nebeneinander.\n\n**Google-Stand** = Schnitt aller Google-Bewertungen seit Beginn, das was ein Gast auf Google sieht — daran hängt die Ampel (grün ab 4,30, orange ab 4,00). Er bewegt sich von Monat zu Monat kaum. Die Kurve **Bewertung im Verlauf** stellt ihm die Tendenz der neuen Google-Bewertungen gegenüber.' }] },
       // Das schwaechste Thema mit in der Kachelreihe (angefragt
       // 13.08.2026): der Stand-Reiter beantwortete nur "wie stehen wir
       // da" — die naechste Frage "woran liegt es" musste man auf dem

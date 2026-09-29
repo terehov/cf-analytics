@@ -1688,3 +1688,37 @@ ist `mart.artikel_monat` der schnellere Weg.
 
 Katalogabzug (`cd mcp && bun run katalog:abzug`) **nach dem Deploy** gegen Produktion ziehen:
 neue Sicht und neue Spalten.
+
+## Das Management-Regelwerk in `mart` (Migration `0129`, 29.09.2026)
+
+Seit `0129` urteilt das Regelwerk `management` (Entscheidungen: `entscheidungen.md`). Für jede
+Sicht, die Ampeln zeigt, heißt das: **Personal und Wareneinsatz werden als Abweichung
+bewertet**, nicht als Quote. Wer eine Ampel nachvollziehen will, liest die Abweichung, nicht
+den Wert.
+
+| Sicht | neu / geändert | Körnung | Was man wissen muss |
+|---|---|---|---|
+| `mart.round_table_monat` | neu angelegt (materialisiert) | Betrieb × Monat | Hinten angehängt: `personal_budget_pct`/`_quelle`/`personal_abw_pp`, `we_*_soll_pct`/`we_*_abw_pp`, `pk_service/kueche/bar_pct`/`_vj_pct`/`_abw_pp` mit `ampel_pk_*`, `rendite_monat_pct`, `rendite_ytd_pct`, `ampel_rendite`. `ampel_om` bleibt als Spalte und ist leer. `gesamt` zählt nur Ampeln mit `im_gesamturteil`. |
+| `mart.round_table_basis` | Spalten angehängt | Betrieb × Monat | Dieselben Bezugsgrößen, ohne Ampel |
+| `mart.ampel_bereich` | neu definiert | Betrieb × Monat × Bereich | Neun Bereiche statt sechs (drei Personalbereiche und die Rendite dazu, OM raus); dahinter `bezugswert`, `bezug_art` (Budget / Soll / Vorjahr), `abweichung`, `im_gesamturteil` |
+| `mart.round_table_unvollstaendig` | geändert | Betrieb × Monat | `fehlt_om` immer false; `fehlt_pk_service/kueche/bar` hinten angehängt |
+| `mart.ampel_schwelle` | geändert | Regelwerk × Bereich × Marke | Zeilen je Marke jetzt auch für ein eigenes Soll; hinten `bezug`, `soll`, `im_gesamturteil` |
+| `mart.personal_bereich_monat` | **neu** (materialisiert) | Betrieb × Monat | Personalkosten je Bereich aus dem Monatsabruf: Quote, Euro, Stunden, Effektivität. Drei verschiedene Nenner — **nie addieren** |
+| `mart.rendite_monat` | **neu** | Betrieb × BWA-Monat | EBIT ÷ Umsatz, Monat und YTD, aus `getKennzahlen` |
+| `mart.bounti_quote_betrieb` | **neu** | Betrieb, Stand heute | Abschluss- und Teilnahmequote mit Ampel, nur bei `datenbasis = belastbar` |
+
+**Die Sichten, die an `round_table_monat` hängen** (`konzept_schnitt_monat`, `standort`,
+`round_table_gesamt_wechsel`, `stadt_schnitt_monat`, `round_table_trend`, `ursachen_analyse`,
+`marke_vergleich`, `stadt_vergleich`) hat `0129` aus ihrer eigenen Definition in der
+Zieldatenbank neu angelegt — mit Kommentaren, Rechten und Indizes. Hängt dort eines Tages eine
+weitere, bricht die Migration ab, statt sie still mitzunehmen.
+
+**Refresh:** `personal_bereich_monat` im Round-Table-Nachlauf VOR `round_table_monat`
+(`src/sync/round_table.ts`), eingetragen in `mart.materialisierung_stand`. Der Refresh von
+`round_table_monat` dauert auf dem lokalen Klon 7,5 s statt 3,9 s (zehn statt sechs
+Bewertungen je Zeile).
+
+**MCP:** alle drei neuen Sichten stehen in `mcp.sicht`, dazu zwei Fallstricke
+(`schwellen_seit_0129`, `personal_bereich_nenner`); `schwellen_seit_0107` ist abgeschaltet.
+Katalogabzug neu gezogen. Als `mcp_leser` jede Spalte gelesen (nicht nur `count(*)`, siehe
+`0109`), dazu `mart.round_table(monat)`.

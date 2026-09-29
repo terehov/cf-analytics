@@ -91,13 +91,14 @@ export function betriebsberichtVerstoesse(b: Betriebsbericht): string[] {
  * Für welche Schrittweiten `linaNachfuellen()` einen Einreihzweig hat.
  *
  * SIE MUSS MIT `linaNachfuellen()` ÜBEREINSTIMMEN und tut es heute:
- * `schrittweite === 'tag'`, `=== 'jahr'` und `istMomentaufnahme`. `monat`
- * fehlt dort bewusst — es gibt keinen einzigen aktiven Monatsendpunkt, und
- * ein Zweig ohne Nutzer wäre ungetesteter Code. Wer den ersten aktiviert,
- * baut ihn; bis dahin sagt dieser Wächter, dass er fehlt.
+ * `schrittweite === 'tag'`, `=== 'jahr'`, `istMomentaufnahme` und seit 0129
+ * `=== 'monat'` — letzteres nur für `ebene: 'konzern'`, und nur Konzern-
+ * endpunkte stehen in diesem Register (Betriebsberichte haben ihr eigenes).
+ * Bis zum 29.09.2026 stand `monat` hier nicht, weil es keinen aktiven
+ * Monatsendpunkt gab; der erste war `getPersonalkosten:monat`.
  */
 const EINREIHBARE_SCHRITTWEITEN: ReadonlySet<Schrittweite> =
-  new Set<Schrittweite>(['tag', 'jahr', 'momentaufnahme'])
+  new Set<Schrittweite>(['tag', 'jahr', 'monat', 'momentaufnahme'])
 
 /**
  * Endpunkte, die absichtlich nur `raw` schreiben.

@@ -172,8 +172,10 @@ SELECT r.betrieb                                            AS "Betrieb",
        coalesce(ak.emoji, '⚪')                              AS "◐ WE Küche",
        r.online_bewertung                                   AS "Bewertung",
        coalesce(ao.emoji, '⚪')                              AS "◐ Bewertung",
-       r.om_score                                           AS "OM",
-       coalesce(am.emoji, '⚪')                              AS "◐ OM",
+       -- Seit 0129 statt OM (entfaellt): Personal je Bereich gegen Vorjahr.
+       coalesce(as1.emoji, '⚪')                             AS "◐ Pers. Service",
+       coalesce(as2.emoji, '⚪')                             AS "◐ Pers. Küche",
+       coalesce(as3.emoji, '⚪')                             AS "◐ Pers. Bar",
        r.prioritaet                                         AS "Priorität",
        r.bwa_monat                                          AS "BWA-Stand"
   FROM mart.round_table_monat r
@@ -183,7 +185,9 @@ SELECT r.betrieb                                            AS "Betrieb",
   LEFT JOIN ampel.beschriftung ab ON ab.status = r.ampel_we_bar
   LEFT JOIN ampel.beschriftung ak ON ak.status = r.ampel_we_kueche
   LEFT JOIN ampel.beschriftung ao ON ao.status = r.ampel_bewertung
-  LEFT JOIN ampel.beschriftung am ON am.status = r.ampel_om
+  LEFT JOIN ampel.beschriftung as1 ON as1.status = r.ampel_pk_service
+  LEFT JOIN ampel.beschriftung as2 ON as2.status = r.ampel_pk_kueche
+  LEFT JOIN ampel.beschriftung as3 ON as3.status = r.ampel_pk_bar
   LEFT JOIN ampel.beschriftung ag ON ag.status = r.gesamt
  WHERE r.monat = g.monat
    -- Nur operative Betriebe: geschlossene, verwaltende und Test-Betriebe

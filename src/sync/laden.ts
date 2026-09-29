@@ -332,6 +332,35 @@ export async function laden(k: Kontext): Promise<number> {
         break
       }
 
+      // Derselbe Bericht über einen ganzen Monat (0129). Eigene Tabelle,
+      // weil nur hier pek* eine Quote ist; die Schwellen kommen weiter aus
+      // dem Tagesabruf.
+      case 'getPersonalkosten:monat': {
+        const { kosten } = t.personalkosten(k.daten, k.von, k.bis)
+        const sM = ['betrieb_key','monat','zeitraum_bis','eff_service','eff_bar','eff_kueche','eff_gesamt',
+                    'pek_service','pek_bar','pek_kueche','pek_gesamt','persoog_bwa','raw_id'] as const
+        const mz = kosten.filter(z => bk(z.encId)).map(z => ({
+          betrieb_key: bk(z.encId)!, monat: z.zeitraumVon, zeitraum_bis: z.zeitraumBis,
+          eff_service: z.effService, eff_bar: z.effBar, eff_kueche: z.effKueche, eff_gesamt: z.effGesamt,
+          pek_service: z.pekService, pek_bar: z.pekBar, pek_kueche: z.pekKueche, pek_gesamt: z.pekGesamt,
+          persoog_bwa: z.persoogBwa, raw_id: rawId,
+        }))
+        await inBloecken(mz, 500, async b => {
+          const { platzhalter, werte } = mehrzeilig(sM, b)
+          await c.query(
+            `INSERT INTO core.personalkosten_monat (${sM.join(',')}) VALUES ${platzhalter}
+             ON CONFLICT (betrieb_key, monat) DO UPDATE SET
+               zeitraum_bis = EXCLUDED.zeitraum_bis,
+               eff_service = EXCLUDED.eff_service, eff_bar = EXCLUDED.eff_bar,
+               eff_kueche = EXCLUDED.eff_kueche, eff_gesamt = EXCLUDED.eff_gesamt,
+               pek_service = EXCLUDED.pek_service, pek_bar = EXCLUDED.pek_bar,
+               pek_kueche = EXCLUDED.pek_kueche, pek_gesamt = EXCLUDED.pek_gesamt,
+               persoog_bwa = EXCLUDED.persoog_bwa, raw_id = EXCLUDED.raw_id, geladen_am = now()`, werte)
+        })
+        geschrieben = mz.length
+        break
+      }
+
       case 'getKennzahlen:absolut':
       case 'getKennzahlen:relativ': {
         const relativ = k.ep.key.endsWith('relativ')
@@ -872,6 +901,7 @@ export const TRANSFORMIERTE_ENDPUNKTE: ReadonlySet<string> = new Set([
   'getUmsatzbericht:vs_to_go_lehners',
   'getUmsatzbericht:vs_to_go_aktionspreis',
   'getPersonalkosten',
+  'getPersonalkosten:monat',
   'getKennzahlen:absolut',
   'getKennzahlen:relativ',
   'getAktionsbericht',

@@ -1264,3 +1264,35 @@ Betriebsberichte), `pruefung`, `betrieb_key`/`betrieb` (bei Betriebsberichten de
 `status`, `monat`, `fehlend` + `einheit`, `hinweis`. 24 Monate, nur Betriebe im Geschäft.
 Zusammengefasst als sieben Zeilen „Luecke: …" in `mart.pruefung_uebersicht` (auch bei null) und
 als Prüfung `luecken` in `/status`. Auf dem Klon 127 ms.
+
+## Das Regelwerk misst Abweichungen (`0129`, 29.09.2026)
+
+Begründung in `entscheidungen.md`, Sichten in `metabase.md`.
+
+**`ampel.regel`** bekommt drei Spalten:
+
+* `bezug` — `wert` (die Regel bewertet die Kennzahl) oder `abweichung` (sie bewertet den
+  Abstand zum Bezug: Budget, Soll, Vorjahr). Welches von beiden an `ampel.bewerte()` geht,
+  entscheidet **`ampel.urteil(bereich, wert, abweichung, …)`** — der Einstieg für jede Sicht,
+  die mehr als ein Regelwerk kennt. Wer `ampel.bewerte()` direkt ruft, muss es selbst wissen.
+* `gruen_ausschliesslich` — grün erst über der Schwelle („> +2 %"), nicht auf ihr.
+* `im_gesamturteil` — zählt diese Ampel in `gesamt` und `intensitaet`?
+  **`ampel.signale(regelwerk, bereiche[], ampeln[])`** filtert danach; ein Bereich, den das
+  Regelwerk gar nicht kennt, fällt heraus (so verlässt OM das Urteil).
+
+**`ampel.soll`** — das Soll je Bereich und Marke (`konzept_key` NULL = Rückfall), mit
+`UNIQUE NULLS NOT DISTINCT`. `soll IS NULL` heißt „bewusst kein Soll" und braucht einen
+`hinweis`. Aufgelöst je Betrieb in der Sicht **`ampel.soll_je_betrieb`** — eine Sicht und keine
+Funktion, weil ein Funktionsrumpf die Rechte des Aufrufers erbt (`0109`). Beim Personal ist
+das Soll das Budget, bis eine Plan-BWA gepflegt ist; die Planquote rechnet
+`mart.round_table_basis` aus `core.bwa_plan` mit demselben Nenner wie LINAs Ist-Quote.
+
+**`core.personalkosten_monat`** — `getPersonalkosten` über einen Kalendermonat, Schlüssel
+(`betrieb_key`, `monat`), `monat` auf den Monatsersten geprüft. Getrennt von
+`core.personalkosten`, weil dort Tageszeilen stehen und die Quoten nur hier Quoten sind.
+
+**`mart.round_table_monat` neu angelegt**, weil eine materialisierte Sicht keine Spalten
+anhängen kann. Die abhängigen Sichten werden aus ihrer Definition **in der Zieldatenbank**
+neu erzeugt (Kommentare, Spaltenkommentare, Rechte, Indizes eingeschlossen), nicht aus einer
+Abschrift in der Migration: die Dateien geben den Stand einer Bank nicht zuverlässig wieder.
+Eine unbekannte Abhängigkeit lässt die Migration scheitern.

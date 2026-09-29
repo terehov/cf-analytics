@@ -10,7 +10,7 @@
 //
 //   STAND   Der Schnitt ueber ALLE Bewertungen bis zum Monatsende. Das
 //           ist die Zahl, die ein Gast auf Google sieht, und die, an der
-//           die Ampel haengt (gruen ab 4,40, orange ab 4,00).
+//           die Ampel haengt (gruen ab 4,30, orange ab 4,00 — seit 0129).
 //   MONAT   Der Schnitt der Bewertungen, die IN diesem Monat kamen.
 //           Bewegt sich viel staerker -- Enchilada Hamm hatte im Juli
 //           2026 neun Stueck. Als Ampel waere das Rauschen mit Farbe, als
@@ -79,8 +79,12 @@ const GOOGLE = `'GOOGLEMYBUSINESS'`
  * kippt", und niemand haette gewusst, welche Zahl gilt. Genau davor
  * warnt der Kommentar am Dateikopf; jetzt haelt er sich selbst daran.
  */
+// Aus dem STANDARDregelwerk, nicht aus einem benannten: bis 0129 stand hier
+// 'round_table_global', und nach der Umstellung auf das Management-
+// Regelwerk haette die Karte still gegen die alte Schwelle gerechnet.
 const SCHWELLE_GRUEN = `(SELECT ar.schwelle_gruen FROM ampel.regel ar
-        WHERE ar.regelwerk_key = 'round_table_global' AND ar.bereich = 'bewertung')`
+        JOIN ampel.regelwerk aw ON aw.regelwerk_key = ar.regelwerk_key AND aw.ist_standard
+        WHERE ar.bereich = 'bewertung')`
 
 /**
  * Dieselbe Schwelle fuer die ZIELLINIE der Diagramme. Eine
@@ -88,8 +92,8 @@ const SCHWELLE_GRUEN = `(SELECT ar.schwelle_gruen FROM ampel.regel ar
  * deshalb hier EINMAL als Zahl, mit der Pflicht, ampel.regel zu folgen,
  * statt zweimal anonym in goal_value-Zeilen.
  */
-const GRUEN_ZIEL = 4.4
-const GRUEN_ZIEL_TEXT = 'Grün ab 4,40'
+const GRUEN_ZIEL = 4.3
+const GRUEN_ZIEL_TEXT = 'Grün ab 4,30'
 
 /**
  * Die Bewertungen des gewaehlten Monats je Betrieb, ueber alle Portale.
@@ -382,7 +386,7 @@ SELECT coalesce(to_char(round(sum(v.schnitt_stand * v.anzahl_stand)
       + 'schlechtester Monatsschnitt zuerst. **Bewertungen** daneben sagt, wie belastbar er ist — '
       + 'bei zwei Bewertungen entscheidet ein einzelner Gast.\n\n'
       + '**Google-Stand** ist der Schnitt aller Google-Bewertungen seit Beginn; daran hängt die '
-      + 'Ampel (grün ab 4,40, orange ab 4,00). Ein Klick auf den Namen öffnet den Betrieb.',
+      + 'Ampel (grün ab 4,30, orange ab 4,00). Ein Klick auf den Namen öffnet den Betrieb.',
     anzeige: 'table',
     parameter: [MONAT, MARKE, BETRIEB],
     // Die Ampel kommt aus mart.round_table_monat und damit aus

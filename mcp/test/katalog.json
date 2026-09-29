@@ -84,7 +84,7 @@
    "koernung": "Betrieb, Monat und Bereich — die sechs Ampeln im Langformat",
    "thema": "round_table",
    "summen_erlaubt": false,
-   "kommentar": "Die sechs Ampeln des Round Table im Langformat: eine Zeile je Betrieb, Monat und Bereich,\nmit dem zugrunde liegenden Wert und der erfassten Ursache.\nFuer alles, was ueber Bereiche hinweg zaehlt oder gruppiert — \"Rot-Treiber nach Bereich\",\nAmpelhistorie, Ursachenzuordnung. Fuer die klassische Round-Table-Tabelle bleibt\nmart.round_table_monat die richtige Sicht.\nACHTUNG: eine Summe ueber wert ist sinnlos, die Spalte mischt Prozente mit Schulnoten.\nampel IS NULL hat seit 0107 ZWEI Ursachen: keine Daten, oder ohne_schwelle = true —\nfuer diese Marke wird in diesem Bereich bewusst nicht bewertet (Grund in\nohne_schwelle_hinweis). In keinem der beiden Faelle heisst es \"in Ordnung\".\n\nKoernung: Betrieb, Monat und Bereich — die sechs Ampeln im Langformat",
+   "kommentar": "Koernung: Betrieb, Monat und Bereich — die Ampeln des Round Table im Langformat, mit dem\nzugrunde liegenden Wert, seinem Bezug und der erfassten Ursache.\n\nSEIT 0129 neun Bereiche: Umsatz, Personal (o. GF, gegen Budget), Personal Service /\nKueche / Bar (gegen Vorjahr), WE Kueche und WE Bar (gegen Soll der Marke), Bewertung,\nRendite YTD. OM vor Ort entfaellt. wert ist die Kennzahl selbst (Quote, Sterne,\nProzent), bezugswert das Budget / Soll / Vorjahr, abweichung der Abstand in Pkt. —\nbeim Management-Regelwerk wird die Abweichung bewertet, nicht der Wert.\nim_gesamturteil = false (Rendite): die Ampel faerbt den Betrieb nicht.\n\nFuer alles, was ueber Bereiche hinweg zaehlt oder gruppiert. Fuer die klassische\nRound-Table-Tabelle bleibt mart.round_table_monat die richtige Sicht.\nACHTUNG: eine Summe ueber wert ist sinnlos, die Spalte mischt Prozente mit Schulnoten.\nampel IS NULL hat zwei Ursachen: keine Daten, oder ohne_schwelle = true (Grund in\nohne_schwelle_hinweis). In keinem der beiden Faelle heisst es \"in Ordnung\".",
    "spalten": [
     "monat",
     "betrieb_key",
@@ -109,7 +109,11 @@
     "status",
     "operativ",
     "ohne_schwelle",
-    "ohne_schwelle_hinweis"
+    "ohne_schwelle_hinweis",
+    "bezugswert",
+    "bezug_art",
+    "abweichung",
+    "im_gesamturteil"
    ],
    "achsen": [
     "bereich",
@@ -132,7 +136,7 @@
    "koernung": "Regelwerk, Bereich und Marke — welche Schwelle fuer wen gilt",
    "thema": "round_table",
    "summen_erlaubt": false,
-   "kommentar": "DAS REGELWERK ZUM NACHLESEN: welche Schwelle in welchem Bereich fuer welche Marke\ngilt, und wie viele operative Betriebe daran haengen.\n\nEine Zeile je Regelwerk, Bereich und Marke, dazu je Bereich die Zeile\n\"(alle übrigen Marken)\" — der Rueckfall aus ampel.regel, an dem gemessen wird,\nwer keinen eigenen Satz hat.\n\nohne_urteil = true heisst: hier wird BEWUSST nicht bewertet. Der Grund steht in\nhinweis. Das ist kein fehlender Wert — welche Betriebe es trifft, zeigt\nmart.round_table_unvollstaendig.ohne_schwelle_*.\n\nDas Standardregelwerk ist die Zeile mit ist_standard; nur danach urteilt\nmart.round_table_monat.\n\nKoernung: Regelwerk, Bereich und Marke — welche Schwelle fuer wen gilt",
+   "kommentar": "Koernung: Regelwerk, Bereich und Marke — welche Schwelle fuer wen gilt, und wie viele\noperative Betriebe daran haengen.\n\nJe Bereich die Zeile \"(alle übrigen Marken)\" (der Rueckfall) und je Marke eine Zeile,\nwenn sie eigene Schwellen, ein ausgesetztes Urteil oder (seit 0129) ein eigenes Soll hat.\nbezug = abweichung: bewertet wird der Abstand zu soll (beim Personal: zum Budget —\nPlan-BWA, sonst dieses Soll; bei Personal je Bereich: zum Vorjahr, soll ist dann leer).\nim_gesamturteil = false: die Ampel steht neben dem Gesamturteil (Rendite, Bounti).\nDas Standardregelwerk ist die Zeile mit ist_standard; seit 0129 ist es `management`.",
    "spalten": [
     "regelwerk_key",
     "regelwerk",
@@ -149,7 +153,10 @@
     "schwelle_orange",
     "gilt",
     "betriebe_operativ",
-    "hinweis"
+    "hinweis",
+    "bezug",
+    "soll",
+    "im_gesamturteil"
    ],
    "achsen": [
     "bereich",
@@ -1673,6 +1680,36 @@
     "betrieb_key",
     "konzept",
     "mitarbeiter_id"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.bounti_quote_betrieb",
+   "koernung": "Betrieb, Stand heute — Bounti-Abschluss- und Teilnahmequote mit Ampel",
+   "thema": "schulung",
+   "summen_erlaubt": false,
+   "kommentar": "Koernung: Betrieb, Stand heute. Die zwei Bounti-Ampeln des Management-Regelwerks.\nabschluss_pct = abgeschlossene / alle Zuweisungen. teilnahme_pct = aktive Mitarbeitende\nmit mindestens einem Abschluss / aktive Mitarbeitende in Bounti — Bounti kennt keinen\nZustand \"begonnen\", und den Personalstand laut LINA koennen wir nicht lesen (gesperrt).\nAmpeln nur bei datenbasis = belastbar. Beide stehen NEBEN dem Gesamturteil, nicht darin.\nEine Person an mehreren Standorten zaehlt an jedem (mart.bounti_mehrfachzuordnung).\nProzentzahlen, nie Brueche.",
+   "spalten": [
+    "betrieb_key",
+    "betrieb",
+    "konzept",
+    "operativ",
+    "in_bounti",
+    "datenbasis",
+    "koepfe_aktiv",
+    "koepfe_mit_abschluss",
+    "zuweisungen",
+    "abgeschlossen",
+    "abschluss_pct",
+    "teilnahme_pct",
+    "punkte_schnitt_pct",
+    "ampel_abschluss",
+    "ampel_teilnahme"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "konzept"
    ],
    "kennzahlen": [],
    "fallstricke": []
@@ -4498,6 +4535,45 @@
    "fallstricke": []
   },
   {
+   "sicht": "mart.personal_bereich_monat",
+   "koernung": "Betrieb und Monat — Personalkosten und Effektivitaet je Bereich aus der Kasse",
+   "thema": "personal",
+   "summen_erlaubt": false,
+   "kommentar": "Koernung: Betrieb und Monat. Personalkosten und Effektivitaet je Bereich (Service,\nKueche, Bar) aus der KASSE (LINA, getPersonalkosten im Monatsabruf) — als Quote, in Euro\nund in Stunden.\n\nJEDER BEREICH HAT SEINEN EIGENEN NENNER, wie in LINA: Service den Gesamtumsatz, Kueche\nden Speisenumsatz, Bar den Getraenkeumsatz. Die drei Quoten addieren sich deshalb NICHT\nzur Gesamtquote. Euro = Quote x eigener Nenner; auch die drei Euro-Betraege ergeben nicht\npk_gesamt_eur (Personal ausserhalb der drei Bereiche).\neff_* ist Umsatz je Personalstunde im Bereich, stunden_* daraus zurueckgerechnet.\n\nDas ist NICHT die BWA. Die Round-Table-Ampel \"Personal o. GF\" haengt weiter an der BWA\n(persoog_bwa steht zum Vergleich daneben).\nLeer, solange der Monatsabruf noch nicht gelaufen ist — der erste Nachtlauf nach 0129\nholt 25 Monate. Aufgefrischt im Round-Table-Nachlauf VOR mart.round_table_monat.",
+   "spalten": [
+    "betrieb_key",
+    "monat",
+    "umsatz_gesamt",
+    "umsatz_speisen",
+    "umsatz_getraenke",
+    "pk_gesamt_pct",
+    "pk_service_pct",
+    "pk_kueche_pct",
+    "pk_bar_pct",
+    "pk_gesamt_eur",
+    "pk_service_eur",
+    "pk_kueche_eur",
+    "pk_bar_eur",
+    "eff_gesamt",
+    "eff_service",
+    "eff_kueche",
+    "eff_bar",
+    "stunden_gesamt",
+    "stunden_service",
+    "stunden_kueche",
+    "stunden_bar",
+    "persoog_bwa",
+    "zeitraum_bis",
+    "geladen_am"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
    "sicht": "mart.personalkosten",
    "koernung": "Betrieb und Abrechnungszeitraum (TAGESzeilen) — die Quoten haben den Tagesumsatz im Nenner und sind nur als Median und mit Plausibilitaetsfilter zu gebrauchen",
    "thema": "personal",
@@ -5211,11 +5287,35 @@
    "fallstricke": []
   },
   {
+   "sicht": "mart.rendite_monat",
+   "koernung": "Betrieb und BWA-Monat — Rendite (EBIT / Umsatz), Monat und YTD",
+   "thema": "bwa",
+   "summen_erlaubt": false,
+   "kommentar": "Koernung: Betrieb und BWA-Monat. Rendite = EBIT / Umsatz laut BWA (getKennzahlen), fuer\nden Monat und kumuliert ab Januar (YTD).\nAus getKennzahlen und nicht aus der BWA-Langzeitreihe der Ladenakte, weil der Round Table\nseinen BWA-Monat aus derselben Quelle nimmt. Gegenprobe am 29.09.2026 (Januar bis Juli\n2026, 434 Betriebsmonate): Umsatz in 413 identisch, EBIT im Median 8 EUR auseinander.\nNur gebuchte Monate: ein Monat ohne Umsatz fehlt, statt mit 0 in die YTD zu laufen.\nmonate_ytd sagt, wie viele Monate in der YTD stecken.\nEin Einzelmonat schwankt mit jeder Einmalbuchung; die Ampel steht deshalb auf der YTD\n(Entscheidung Daniel 29.09.2026). Prozentzahlen, nie Brueche.",
+   "spalten": [
+    "betrieb_key",
+    "monat",
+    "umsatz_bwa",
+    "ebit",
+    "rendite_pct",
+    "umsatz_bwa_ytd",
+    "ebit_ytd",
+    "rendite_ytd_pct",
+    "monate_ytd"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
    "sicht": "mart.round_table_basis",
    "koernung": "aktivem Betrieb und Monat, ohne Ampelbewertung",
    "thema": "round_table",
    "summen_erlaubt": false,
-   "kommentar": "Die Zahlen des Round Table, noch ohne Ampel: eine Zeile je aktivem Betrieb und Monat.\nWICHTIG: bwa_monat weist aus, aus welchem Monat Personal- und Wareneinsatzwerte stammen.\nWeil die BWA vom Steuerberater importiert wird und 1-2 Monate nachhinkt, ist das oft NICHT\nder Berichtsmonat - im Excel wurde derselbe Versatz stillschweigend gepflegt (Juli-Report\nmit Mai-Werten, erkennbar nur an einer Kopfzeile).\nBewertet in mart.round_table_monat bzw. mart.round_table().\n\nKoernung: aktivem Betrieb und Monat, ohne Ampelbewertung",
+   "kommentar": "Koernung: aktiver Betrieb und Monat, ohne Ampelbewertung — alle Zahlen, die der Round\nTable beurteilt, mit ihrem Bezug.\nSeit 0129 zusaetzlich die Bezugsgroessen des Management-Regelwerks: Budget (Plan-BWA,\nsonst Soll) und Abweichung beim Personal o. GF, Soll und Abweichung beim Wareneinsatz,\nPersonal je Bereich gegen den Vorjahresmonat (aus der Kasse, mart.personal_bereich_monat)\nund die Rendite des BWA-Monats und YTD (mart.rendite_monat).\n*_abw_pp sind Prozentpunkte; positiv heisst beim Personal und Wareneinsatz: teurer als\nBezug. Personal, Wareneinsatz und Rendite stehen auf dem BWA-Monat (bwa_monat), Umsatz und\nPersonal je Bereich auf dem Berichtsmonat.",
    "spalten": [
     "betrieb_key",
     "betrieb",
@@ -5232,7 +5332,25 @@
     "online_bewertung",
     "om_score",
     "status",
-    "operativ"
+    "operativ",
+    "personal_budget_pct",
+    "personal_budget_quelle",
+    "personal_abw_pp",
+    "we_bar_soll_pct",
+    "we_bar_abw_pp",
+    "we_kueche_soll_pct",
+    "we_kueche_abw_pp",
+    "pk_service_pct",
+    "pk_service_vj_pct",
+    "pk_service_abw_pp",
+    "pk_kueche_pct",
+    "pk_kueche_vj_pct",
+    "pk_kueche_abw_pp",
+    "pk_bar_pct",
+    "pk_bar_vj_pct",
+    "pk_bar_abw_pp",
+    "rendite_monat_pct",
+    "rendite_ytd_pct"
    ],
    "achsen": [
     "betrieb_key",
@@ -5273,7 +5391,7 @@
    "koernung": "Betrieb und Monat, fertig bewertet mit dem Standardregelwerk",
    "thema": "round_table",
    "summen_erlaubt": false,
-   "kommentar": "Round-Table-Urteile je Betrieb und Monat, materialisiert (Refresh im Sync-Nachlauf). operativ = Umsatz im Monat und weder Test noch Verwaltung — Zähler, Ranglisten und Mediane filtern darauf. bwa_alter_monate zeigt, wie alt die zugrunde liegende BWA ist (höchstens 3 Monate Nachtrag, ältere BWA ⇒ kein Personal-/WE-Urteil).\n\nKoernung: Betrieb und Monat, fertig bewertet mit dem Standardregelwerk",
+   "kommentar": "Koernung: Betrieb und Monat, fertig bewertet mit dem Standardregelwerk.\n\nSEIT 0129 IST DAS DAS MANAGEMENT-REGELWERK: Personal und Wareneinsatz werden als\nABWEICHUNG bewertet (vom Budget, vom Soll der Marke, beim Personal je Bereich vom\nVorjahr), nicht als feste Quote. Die Werte stehen in *_pct, der Bezug in\n*_budget_pct / *_soll_pct / *_vj_pct, die bewertete Abweichung in *_abw_pp.\n\ngesamt und intensitaet zaehlen nur die Ampeln mit ampel.regel.im_gesamturteil: Umsatz,\nPersonal o. GF, Personal Service/Kueche/Bar, WE Bar, WE Kueche, Bewertung. ampel_rendite\nsteht daneben und faerbt den Betrieb nicht; ampel_om ist leer (OM entfaellt,\nEntscheidung Daniel 29.09.2026). Eine fehlende Ampel macht das Urteil unvollstaendig\n(0080) — auch eine fehlende Personalampel je Bereich.\n\nPersonal, Wareneinsatz und Rendite stehen auf dem BWA-Monat (bwa_monat), Umsatz und\nPersonal je Bereich auf dem Berichtsmonat.\nAufgefrischt im Round-Table-Nachlauf (src/sync/round_table.ts).",
    "spalten": [
     "monat",
     "betrieb",
@@ -5301,7 +5419,29 @@
     "betrieb_key",
     "status",
     "operativ",
-    "bwa_alter_monate"
+    "bwa_alter_monate",
+    "personal_budget_pct",
+    "personal_budget_quelle",
+    "personal_abw_pp",
+    "we_bar_soll_pct",
+    "we_bar_abw_pp",
+    "we_kueche_soll_pct",
+    "we_kueche_abw_pp",
+    "pk_service_pct",
+    "pk_service_vj_pct",
+    "pk_service_abw_pp",
+    "ampel_pk_service",
+    "pk_kueche_pct",
+    "pk_kueche_vj_pct",
+    "pk_kueche_abw_pp",
+    "ampel_pk_kueche",
+    "pk_bar_pct",
+    "pk_bar_vj_pct",
+    "pk_bar_abw_pp",
+    "ampel_pk_bar",
+    "rendite_monat_pct",
+    "rendite_ytd_pct",
+    "ampel_rendite"
    ],
    "achsen": [
     "betrieb_key",
@@ -5394,7 +5534,7 @@
    "koernung": "Betrieb und Monat, dem mindestens eine Ampel fehlt",
    "thema": "round_table",
    "summen_erlaubt": false,
-   "kommentar": "Warum ein Round-Table-Urteil nicht vollstaendig ist, je Betrieb und Monat.\n\nZWEI VERSCHIEDENE URSACHEN, und sie stehen mit Absicht in getrennten Spalten:\n  fehlt_*          die Zahl fehlt. Jemand muss etwas nachtragen.\n  ohne_schwelle_*  die Zahl ist da, aber fuer diese Marke wird in diesem Bereich\n                   bewusst nicht bewertet (ampel.regel_konzept.ohne_urteil).\n                   Nachtragen hilft hier nicht — nur entscheiden.\n                   Seit 0107 belegt: WE Bar bei den Deutschen Konzepten,\n                   Begruendung in grund_ohne_schwelle.\n\nBeides fuehrt in mart.round_table_monat zu gesamt = unvollstaendig. Ohne die\nTrennung waere das wieder nur ein anderes Wort fuer \"keine Ahnung\" — genau das,\nwovor 0080 warnt.\n\nDie haeufigste Spalte ist seit Juli 2026 fehlt_om: manual.om_einschaetzung endet\nim Juni. Nachgetragen wird sie ueber pflege/om_einschaetzung.csv (0079).\n\nKoernung: Betrieb und Monat, dem mindestens eine Ampel fehlt",
+   "kommentar": "Koernung: Betrieb und Monat — warum ein Round-Table-Urteil nicht vollstaendig ist.\n\nZWEI VERSCHIEDENE URSACHEN, und sie stehen mit Absicht in getrennten Spalten:\n  fehlt_*          die Zahl fehlt. Jemand muss etwas nachtragen.\n  ohne_schwelle_*  die Zahl ist da, aber fuer diese Marke wird in diesem Bereich\n                   bewusst nicht bewertet (ampel.regel_konzept.ohne_urteil).\n                   Seit 0107 belegt: WE Bar bei den Deutschen Konzepten.\n\nSEIT 0129 (Management-Regelwerk): fehlt_om ist immer false — OM gehoert nicht mehr zum\nUrteil. Dazu fehlt_pk_service / fehlt_pk_kueche / fehlt_pk_bar: die Personalampel je\nBereich fehlt, wenn die Kasse fuer den Monat ODER fuer den Vorjahresmonat keine\nPersonalkosten fuehrt. Ein Betrieb ohne Zeiterfassung in LINA bleibt damit dauerhaft\nunvollstaendig — das ist gewollt, nicht gruen.",
    "spalten": [
     "monat",
     "betrieb_key",
@@ -5416,7 +5556,10 @@
     "ohne_schwelle_bewertung",
     "ohne_schwelle_om",
     "signale_ohne_schwelle",
-    "grund_ohne_schwelle"
+    "grund_ohne_schwelle",
+    "fehlt_pk_service",
+    "fehlt_pk_kueche",
+    "fehlt_pk_bar"
    ],
    "achsen": [
     "betrieb_key",
@@ -7246,6 +7389,16 @@
    "quelle": "docs/metabase.md"
   },
   {
+   "schluessel": "personal_bereich_nenner",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.personal_bereich_monat",
+   "parameter": {},
+   "hinweis": "Die drei Bereichsquoten haben DREI NENNER: Service den Gesamtumsatz, Kueche den Speisenumsatz, Bar den Getraenkeumsatz. Sie addieren sich nicht zur Gesamtquote, und die drei Euro-Betraege nicht zu pk_gesamt_eur (Personal ausserhalb der drei Bereiche). Das ist die Kasse, nicht die BWA.",
+   "berichtigung": "Quoten nie addieren. Fuer eine Summe die Euro-Spalten nehmen und dazusagen, dass der Rest fehlt; fuer die BWA-Quote mart.round_table_monat.personalkosten_ogf_pct.",
+   "quelle": "migrations/0129_management_regelwerk.sql"
+  },
+  {
    "schluessel": "personalquote_ungefiltert",
    "art": "filter_noetig",
    "schwere": "warnung",
@@ -7269,14 +7422,14 @@
    "quelle": "AGENTS.md, harte Regel 6"
   },
   {
-   "schluessel": "schwellen_seit_0107",
+   "schluessel": "schwellen_seit_0129",
    "art": "deutung",
    "schwere": "warnung",
    "sicht": "mart.ampel_bereich",
    "parameter": {},
-   "hinweis": "Die Ampelschwellen wurden am 20.09.2026 neu gesetzt: Umsatz gruen ab +5 % (davor +10 %), Personal o. GF gruen bis 34 % / orange bis 38 % (davor 28 / 32), Wareneinsatz seither JE MARKE. Ein Vergleich von Ampeln ueber dieses Datum hinweg vergleicht zwei Regelwerke.",
-   "berichtigung": "Fuer Zeitreihen ueber den 20.09.2026 hinaus die WERTE vergleichen (umsatz_pct, personalkosten_ogf_pct, we_bar_pct, we_kueche_pct), nicht die Ampeln.",
-   "quelle": "migrations/0107_schwellen_je_marke.sql"
+   "hinweis": "Seit dem 29.09.2026 urteilt das Management-Regelwerk: Personal und Wareneinsatz werden als ABWEICHUNG bewertet (vom Budget, vom Soll der Marke, beim Personal je Bereich vom Vorjahr), Umsatz gruen erst ueber +2 %, Bewertung ab 4,30. OM zaehlt nicht mehr, Rendite und Bounti stehen neben dem Gesamturteil. Die Materialisierung rechnet ALLE Monate mit dem geltenden Regelwerk neu — eine Ampel von Juli 2026 heisst heute etwas anderes als im Juli-Round-Table.",
+   "berichtigung": "Fuer Zeitreihen die Werte und Abweichungen vergleichen (wert, bezugswert, abweichung), nicht die Ampeln. Was gilt: mart.ampel_schwelle WHERE ist_standard.",
+   "quelle": "migrations/0129_management_regelwerk.sql"
   },
   {
    "schluessel": "stadt_immer_null",

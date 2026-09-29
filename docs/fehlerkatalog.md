@@ -4967,3 +4967,29 @@ Unterabfragen über den Index statt einer Aggregation — 0,26 s mit laufendem I
 **Regel:** eine Sicht, die an jeder MCP-Antwort hängt, in Produktion nachmessen, nicht auf dem
 Klon — und eine Spalte, die niemand liest, soll nichts kosten: skalare Unterabfrage statt
 Aggregation in einem LATERAL.
+
+## Zwei Fallen beim Umstellen des Regelwerks, vor dem ersten Lauf gefunden (29.09.2026)
+
+Beide hätten keinen Fehler geworfen, sondern still falsche Ampeln gezeigt.
+
+**1. Ein Aufrufer, der den Wert übergibt, wo die Regel die Abweichung erwartet.** Mit `0129`
+bewerten Personal- und Wareneinsatzregeln den Abstand zu Budget, Soll oder Vorjahr.
+`mart.round_table(monat)` und `mart.round_table_monat` riefen `ampel.bewerte()` mit der Quote
+selbst — ein Getränkeeinsatz von 21,4 gegen die Schwelle +0,5 wäre bei jedem Betrieb rot.
+**Was es heute verhindert:** `ampel.urteil()` bekommt Wert und Abweichung und wählt nach
+`ampel.regel.bezug`; alle Sichten und die Funktion rufen nur noch sie. `ampel.bewerte()` sagt
+es in ihrem Kommentar.
+
+**2. Kartenhelfer mit fest verdrahtetem Regelwerk.** `SCHWELLE()` in `metabase/gemeinsam.ts` und
+`SCHWELLE_GRUEN` in `karten-bewertung.ts` lasen `ampel.regel WHERE regelwerk_key =
+'round_table_global'`. Nach dem Umschalten des Standards hätten die Karten „Δ Schwelle" und
+„Ampel kippt" gegen ein Regelwerk gerechnet, das nicht mehr urteilt — die Karte hätte etwas
+anderes gesagt als die Ampel daneben. **Was es heute verhindert:** `SCHWELLE()` ist entfernt
+(die Karte liest `personal_abw_pp` aus der Sicht), `SCHWELLE_GRUEN` liest das Regelwerk mit
+`ist_standard`. Wer eine Schwelle braucht, liest `mart.ampel_schwelle WHERE ist_standard`.
+
+**Und eine, in die der Bau beinahe gelaufen wäre:** die Personalquoten je Bereich zunächst aus
+`core.personalkosten` gerechnet — also aus den Tageswerten, die dieser Katalog seit August als
+unbrauchbar führt. Aufgefallen erst an Monatsquoten um 400 %. **Lehre:** bevor eine Spalte
+aus `core` in eine neue Rechnung geht, im Katalog nach ihrem Namen suchen. Heute kommen die
+Bereichsquoten aus dem Monatsabruf (`core.personalkosten_monat`).

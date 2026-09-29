@@ -67,9 +67,9 @@ Die vorliegende `JULI_Round_Table_Ampelsystem.xlsx` enthält kaputte Referenzen,
 |---|---|---|---|
 | Umsatz pro Verkaufsstelle | 1 | `getUmsatzbericht` + `verkaufsstellen` | ~~✅~~ 🟡 **bis 22.09.2026 nie geholt** (`verkaufsstelle_key` war immer NULL). Seit `0112` geholt; Parameterformat ungeprüft — Gegenprobe `mart.verkaufsstelle_abdeckung` |
 | Personalkosten/Effektivität | 1 | `getPersonalkosten` (`pekGesamt`, `effGesamt`) | ✅ |
-| Personalkosten/Effektivität pro Bereich | 1 | `getPersonalkosten` (`…Service/Bar/Kueche`) | ✅ |
+| Personalkosten/Effektivität pro Bereich | 1 | `getPersonalkosten` (`…Service/Bar/Kueche`) | ~~✅~~ 🟡 **seit `0129` im Monatsabruf** (`getPersonalkosten:monat` → `mart.personal_bereich_monat`) — die Tageswerte sind als Quote unbrauchbar. Effektivität (`eff_*`) war immer richtig. Ampel gegen Vorjahr im Management-Regelwerk; gegen echtes LINA noch nicht gelaufen |
 | Wareneinsatz | 0,2 | `getKennzahlen` (`WE Bar`, `WE Küche`) | 🟡 nur monatlich, BWA-Lag |
-| Rendite | 0,2 | `getKennzahlen` (`EBIT`) | 🟡 |
+| Rendite | 0,2 | `getKennzahlen` (`EBIT`) | ✅ seit `0129`: `mart.rendite_monat` (EBIT ÷ Umsatz, Monat und YTD), Ampel auf YTD |
 | Abverkaufszahlen pro Artikel | 1 | `getArtikelverkaufsbericht` (`counts`) | ✅ |
 | Durchschnittsbon, Umsatz pro Kopf | 1 | `getUmsatzbericht` (`avgTicket`, `avgGuest`) | ✅ |
 | Lohnniveau, Krankenstand | 0,5 | Team > Zeitkonten | 🔴 nicht erschlossen |

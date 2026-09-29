@@ -16,7 +16,7 @@
 // =====================================================================
 
 import type { Karte, Parameter } from './typen'
-import { MONAT_CTE, MONAT_CTE_UMSATZ, MONAT_CTE_BWA, P_MONAT, P_BETRIEB, P_ZEITRAUM, P_MARKE, P_ARTIKEL, WOCHENTAGE, SCHWELLE, ZIEL_PERSONAL_GRUEN, ZIEL_PERSONAL_GRUEN_TEXT } from './gemeinsam'
+import { MONAT_CTE, MONAT_CTE_UMSATZ, MONAT_CTE_BWA, P_MONAT, P_BETRIEB, P_ZEITRAUM, P_MARKE, P_ARTIKEL, WOCHENTAGE, ZIEL_PERSONAL_GRUEN, ZIEL_PERSONAL_GRUEN_TEXT } from './gemeinsam'
 
 // Der Monat ist bewusst kein Pflichtfeld — siehe gemeinsam.ts.
 const ZEITRAUM = P_ZEITRAUM
@@ -489,9 +489,10 @@ SELECT r.betrieb                AS "Betrieb",
     schluessel: 'pe_quote_tabelle',
     name: 'Personalkostenquote — alle Betriebe',
     beschreibung:
-      'Alle Betriebe mit Ampel und Abstand zur Grün-Schwelle (34 %), gerechnet auf den Personalkosten ohne '
-      + 'Geschäftsführung aus der BWA. Ein positiver Wert in „Δ Schwelle" heißt: um so viele '
-      + 'Prozentpunkte liegt der Betrieb über der Grenze. „BWA-Alter" sagt, wie alt die zugrunde '
+      'Alle Betriebe mit Ampel und Abstand zum Budget, gerechnet auf den Personalkosten ohne '
+      + 'Geschäftsführung aus der BWA. Das Budget ist die Plan-BWA, solange keine gepflegt ist die '
+      + 'Sollquote (34 %). Ein positiver Wert in „Δ Budget" heißt: um so viele Prozentpunkte liegt '
+      + 'der Betrieb darüber — grün bis ±0, gelb bis +1. „BWA-Alter" sagt, wie alt die zugrunde '
       + 'liegende Buchung ist — bei mehreren Monaten ist das Urteil entsprechend alt.',
     anzeige: 'table',
     parameter: [MONAT, BETRIEB],
@@ -500,7 +501,10 @@ SELECT r.betrieb                            AS "Betrieb",
        r.konzept                            AS "Marke",
        coalesce(ap.emoji, '⚪')              AS "●",
        r.personalkosten_ogf_pct             AS "Personal o. GF %",
-       round(r.personalkosten_ogf_pct - ${SCHWELLE('personal', 'gruen')}, 1) AS "Δ Schwelle",
+       -- Seit 0129 misst die Ampel gegen das Budget; die Abweichung steht
+       -- fertig in der Sicht (Plan-BWA vor Soll), hier wird nicht nachgerechnet.
+       r.personal_budget_pct                AS "Budget %",
+       round(r.personal_abw_pp, 1)          AS "Δ Budget",
        r.bwa_monat                          AS "BWA-Stand",
        r.bwa_alter_monate                   AS "BWA-Alter (Monate)"
   FROM mart.round_table_monat r
@@ -602,7 +606,7 @@ SELECT monat                                                     AS "Monat",
       'graph.metrics': ['Ø Personal o. GF %', 'Median'],
       'graph.goal_value': ZIEL_PERSONAL_GRUEN,
       'graph.show_goal': true,
-      'graph.goal_label': 'Grün-Schwelle',
+      'graph.goal_label': ZIEL_PERSONAL_GRUEN_TEXT,
     },
   },
 

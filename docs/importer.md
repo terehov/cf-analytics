@@ -1845,3 +1845,32 @@ Erstabruf je Rang ein — erst Rang 1 (75, 76) bis zur Grenze, dann Rang 2 (86, 
 Rang 3 — mit Priorität 85/86/87. `HISTORIE_RANG` in `src/lina/betriebsberichte.ts`. Die Grenze
 kommt aus `mart.betriebsbericht_historie_ab()` (24 Monate), `HISTORIE_AB` bleibt als untere
 Schranke. Tagesgeschäft, laufender Monat von 97, Nachlauf und Gegenprobe sind unverändert.
+
+## Konzernberichte im Monatsschritt (`0129`, 29.09.2026)
+
+Bis `0129` kannte `linaNachfuellen()` Zweige für `tag`, `jahr` und Momentaufnahmen, aber
+keinen für `monat` — der Registerwächter (`src/sync/waechter.ts`) meldete jeden aktiven
+Monatsendpunkt als Baufehler, und das war Absicht: „Wer den ersten aktiviert, baut ihn."
+
+Der erste ist **`getPersonalkosten:monat`** — derselbe Bericht wie `getPersonalkosten`, nur
+über einen ganzen Kalendermonat, weil nur dann `pek_*` Quoten sind (`datenherkunft.md`). Der
+Zweig (nur `ebene: 'konzern'`):
+
+* **die drei zuletzt abgeschlossenen Monate jede Nacht**, mit `ON CONFLICT DO NOTHING` — der
+  Eindeutigkeitsindex sperrt nur offene Posten, ein erledigter Monat wird also neu geholt. Lohn
+  schließt spät ab; der Tagesbericht braucht dafür `nachlese_tage: 62`.
+* **ältere Monate bis 25 zurück einmal**: nur, wenn es für den Monatsersten noch gar keinen
+  Posten gibt (dieselbe Sperre wie bei den Momentaufnahmen). 25, weil der Vorjahresvergleich
+  zwölf Monate Verlauf braucht und jeder davon seinen Vorjahresmonat.
+* **der laufende Monat nicht**: ein halber Monat ist gegen den Vorjahresmonat kein Urteil.
+
+Kosten: ein Konzernaufruf deckt alle Betriebe — drei Aufrufe je Nacht, einmalig 25.
+
+`laden.ts` schreibt in `core.personalkosten_monat` (eigener `case`, in
+`TRANSFORMIERTE_ENDPUNKTE`), Schema wie der Tagesbericht, Zulauf-Eintrag in `quellen.ts`
+(täglich, weil jede Nacht drei Monate kommen). `mart.personal_bereich_monat` wird im
+Round-Table-Nachlauf vor `mart.round_table_monat` aufgefrischt.
+
+Getestet gegen die Attrappe (`e2e.test.ts`: ein Monatsposten schreibt in die Monatstabelle und
+keine Monatszeile in `core.personalkosten`). **Gegen das echte LINA noch nicht gelaufen** —
+Gegenprobe nach der ersten Nacht in `offene-punkte.md`.

@@ -382,6 +382,7 @@ export const SCHEMATA: Record<string, z.ZodTypeAny> = {
   'getUmsatzbericht:vs_to_go_lehners':      UmsatzberichtSchema,
   'getUmsatzbericht:vs_to_go_aktionspreis': UmsatzberichtSchema,
   'getPersonalkosten':                PersonalkostenSchema,
+  'getPersonalkosten:monat':          PersonalkostenSchema,
   'getKennzahlen:absolut':            KennzahlenSchema,
   'getKennzahlen:relativ':            KennzahlenSchema,
   'getZeitzonenbericht':              ZeitzonenberichtSchema,

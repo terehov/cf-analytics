@@ -44,6 +44,7 @@ Backfill so billig ist — acht Aufrufe je Kalendertag, nicht 8 × 141.
 | `getVordefinierteZeitzonenBericht` | `/intranet/analytics/getVordefinierteZeitzonenBericht` | Tag | `core.zeitzonenbericht_zone` |
 | `getArtikelverkaufsbericht` | `/intranet/analytics/getArtikelverkaufsbericht` | Tag | `core.artikelverkauf_tag` **+ `core.artikel` + `core.artikel_stand`** |
 | `getPersonalkosten` | `/intranet/analytics/getPersonalkosten` | Tag | `core.personalkosten` **+ `core.schwellenwert_betrieb`** |
+| `getPersonalkosten:monat` (seit `0129`) | derselbe, Zeitraum = ein Kalendermonat | **Monat** | `core.personalkosten_monat` — nur hier sind `pek_*` Quoten |
 | `getAktionsbericht` | `/intranet/analytics/getAktionsbericht` | Tag | `core.aktionsumsatz_tag` **+ `core.aktion`** |
 | `getKennzahlen:absolut` | `/intranet/analytics/getKennzahlen`, `mode=absolut` | **Jahr** | `core.kennzahlen_monat.wert_absolut` **+ `core.betrieb_konzept` + `core.bwa_buchungsstand`** |
 | `getKennzahlen:relativ` | derselbe, `mode=relativ` | **Jahr** | `core.kennzahlen_monat.wert_prozent` |
@@ -663,6 +664,33 @@ SELECT u.betrieb_key, u.geschaeftstag, u.umsatz_netto / p.eff_gesamt AS stunden
 Abdeckung: 48 der 62 Betriebe mit Umsatz haben an ≥95 % ihrer Umsatztage einen Wert,
 konzernweit rund 87 %. Zehn Betriebe haben gar keinen. **Das ist echte Abdeckung, nicht wie
 `fixer_we` mit Nullen getarnt** — geprüft.
+
+### `core.personalkosten_monat`: derselbe Bericht über einen Monat (seit `0129`, 29.09.2026)
+
+Über einen ganzen Kalendermonat abgerufen sind `pek_*` **Quoten in Prozent** — mit denselben
+Nennern wie die Effektivität: Service gegen den Gesamtumsatz, Küche gegen Speisen, Bar gegen
+Getränke, gesamt gegen den Gesamtumsatz. Beleg bisher nur der archivierte Payload: mit diesen
+Nennern ergeben sich gleiche Stundensätze je Bereich (18,8 / 22,8 / 19,4 €/h), und
+`pekGesamt` liegt neben `persoogBwa` (38,10 gegen 38,27). Gegenprobe nach der ersten Nacht:
+`offene-punkte.md`.
+
+Eigene Tabelle, damit keine Tagesauswertung auf `core.personalkosten` eine Monatszeile
+mitzählt. Eingereiht werden die drei zuletzt abgeschlossenen Monate jede Nacht (Lohn schließt
+spät ab) und ältere bis 25 Monate zurück einmal (`linaNachfuellen()`).
+
+Gelesen wird sie über **`mart.personal_bereich_monat`**: Quote, Euro (Quote × eigener Nenner
+aus `core.umsatzbericht_tag`, Hauptsparten 10001/10002) und Stunden (Nenner ÷ Effektivität)
+je Bereich. Die Euro der drei Bereiche ergeben **nicht** die Gesamtkosten — der Rest ist
+Personal außerhalb von Service, Küche und Bar. Das ist die Kasse, nicht die BWA; die Ampel
+„Personal o. GF" hängt weiter an der BWA.
+
+### Rendite: `mart.rendite_monat` (seit `0129`)
+
+EBIT ÷ Umsatz aus `getKennzahlen` (`mart.kennzahlen_aktuell`), je Monat und kumuliert ab
+Januar. Aus `getKennzahlen` und nicht aus der BWA-Langzeitreihe der Ladenakte, weil der Round
+Table seinen BWA-Monat aus derselben Quelle nimmt. Nachgemessen am 29.09.2026 (Januar bis Juli
+2026, 434 Betriebsmonate): Umsatz in 413 identisch, EBIT im Median 8 € auseinander. Monate mit
+Umsatz 0 zählen nicht — `getKennzahlen` führt ungebuchte Monate mit Nullen.
 
 ### `core.umsatzbericht_tag` hat drei Zeilen je Tag, nicht eine
 

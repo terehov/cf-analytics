@@ -3986,3 +3986,68 @@ Laufzeit — ein Join über 141 Betriebe schätzt sich auf Millionen und läuft 
 lohnt sich bei langen Scans über viele Zeilen; das sind hier die nächtlichen Refreshs, und die
 laufen ohne Nutzer, der wartet. **Zurück:** `ALTER SYSTEM RESET jit; SELECT pg_reload_conf();`.
 Nachprüfen über `pg_stat_statements` (Spalten `jit_*` bleiben jetzt 0).
+
+## 29.09.2026 — Das Management-Regelwerk und eine zentrale Seite (Migration `0129`)
+
+**Anlass.** Die Round-Table-Seiten waren der Geschäftsführung zu kompliziert. Daniel hat mit
+einem eigenen Entwurf ein zentrales Dashboard und ein neues Regelwerk vorgelegt; Eugene hat
+die offenen Fragen an ihn zurückgegeben. Seine Antworten sind die Entscheidungen hier.
+
+**Das Regelwerk misst Abweichungen, nicht Quoten.** Personal o. GF gegen das **Budget**,
+Personal Service / Küche / Bar gegen das **Vorjahr**, Wareneinsatz gegen das **Soll der
+Marke**. Umsatz grün über +2 %, gelb ab −2 %; Bewertung grün ab 4,30; Rendite grün über 10 %,
+gelb ab 5 %; Bounti Abschluss grün über 90 %, gelb ab 75 %; Teilnahme grün über 95 %, gelb
+ab 85 %. Tabelle und Rechenwege stehen im Kopf von `0129`.
+
+Die sieben Antworten (Daniel, 29.09.2026):
+
+1. **Budget beim Personal = Sollquote 34 %**, bis in LINA eine Plan-BWA für 2026 steht. Die
+   Planquote gewinnt dann automatisch (`mart.round_table_basis.personal_budget_quelle`).
+   Verworfen: LINAs `pekThreshold` (eine Ampelgrenze, kein Budget) und „ohne Urteil bis zum
+   Plan" (Personal wäre für alle grau).
+2. **Überall**, nicht nur im neuen Dashboard: `management` ist das Standardregelwerk, der
+   Round Table, `mart.ampel_bereich` und der MCP-Zugang urteilen danach. Die alten Regelwerke
+   bleiben stehen und sind über `mart.round_table(monat, regelwerk)` weiter abrufbar.
+3. **Wareneinsatz: grün bis +0,5, gelb bis +1,0 Punkte über Soll** (sein Wareneinsatz-Block,
+   nicht seine Tabelle, die gelb nur bis +0,5 kannte). Das Soll sind die Grünschwellen aus
+   `0107` — sie waren fachlich schon immer ein Soll.
+4. **Rendite: Ampel auf YTD, der Monat nur als Zahl.** Ein Monat schwankt mit jeder
+   Einmalbuchung.
+5. **Bounti-Teilnahme = aktive Mitarbeitende mit mindestens einer abgeschlossenen Schulung.**
+   Daniel wollte „begonnen"; Bounti kennt nur zugewiesen und abgeschlossen. Den gewünschten
+   Abgleich gegen den Personalstand laut LINA gibt es nicht: `Team > Mitarbeiter > Stammdaten`
+   ist für unseren Zugang gesperrt (`docs/offene-punkte.md`).
+6. **Gesamturteil nur aus den Zahlen, ohne Rendite, Bounti und OM.** Umsatz, Personal o. GF,
+   Personal je Bereich, Wareneinsatz, Bewertung. Rendite und Bounti stehen daneben. Als Daten
+   in `ampel.regel.im_gesamturteil`, nicht als Liste in den Sichten.
+7. **Personal je Bereich kommt aus der Kasse**, nicht aus der BWA — die Summe der Bereiche
+   trifft deshalb nicht die BWA-Quote. Daniel: passt.
+
+**Warum `bezug = abweichung` als Eigenschaft der Regel und nicht als Rechnung in jeder Sicht.**
+`ampel.bewerte()` hält einen Wert gegen zwei Schwellen, und jede Stelle, die sie ruft, gab
+bisher den Wert. Bei einer Abweichungsregel ist das falsch und still falsch: ein
+Getränkeeinsatz von 21,4 gegen die Schwelle +0,5 ist immer rot. `ampel.urteil()` entscheidet
+an EINER Stelle, was bewertet wird. Verworfen: die Soll-Schwellen je Marke als absolute
+Zahlen in `ampel.regel_konzept` (17,5 / 18,0 …) — gleiche Ampeln, aber das Soll wäre nirgends
+mehr als Soll lesbar, und das Budget je Betrieb aus der Plan-BWA ginge so gar nicht.
+
+**Personal je Bereich im Monatsabruf, nicht aus den Tageswerten.** Die Tageswerte von
+`getPersonalkosten` sind als Quote unbrauchbar (`fehlerkatalog.md`), und zurückgerechnet
+streuen sie rund 15 % gegen die BWA — bei einem Punkt Toleranz ist die Ampel Zufall. Neuer
+Registereintrag `getPersonalkosten:monat` mit eigener Zieltabelle; kostet drei Aufrufe je
+Nacht und einmalig 25 für die Historie. Verworfen, nachgemessen: „kumuliert ÷ Tagesumsatz"
+und „Quote × Monatstag" (Befunde in `befunde-datenlage.md`).
+
+**Rendite aus `getKennzahlen`, nicht aus der BWA-Langzeitreihe der Ladenakte.** Der Round
+Table nimmt seinen BWA-Monat aus `getKennzahlen`; eine Rendite aus einer zweiten Quelle hätte
+für manche Betriebe einen anderen Monat. Gegenprobe: Umsatz in 413 von 434 Betriebsmonaten
+gleich, EBIT im Median 8 € auseinander.
+
+**Die Seite folgt Daniels Entwurf, mit drei Abweichungen:** eine Rangliste statt der
+Wortwolke (Metabase kann keine, und eine Wolke zeigt Häufigkeit, aber nicht, ob gelobt oder
+beklagt wird); keine Zeile „Umsatz Mittagsgeschäft" unter den Handlungsfeldern (es gibt dafür
+keine Regel und damit keinen Maßstab); dazu eine Tabelle „Umsatz je Personalstunde", weil
+Daniel danach gefragt hat. Warum die Ampelspalten zählen statt zu färben: `dashboards.md`.
+
+**„Gelb" heißt weiter „Orange"** in Daten und Karten (Entscheidung vom 20.09.2026); die neue
+Seite erklärt 🟠 als „gelb".

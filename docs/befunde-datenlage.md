@@ -2216,3 +2216,54 @@ Seit Eröffnung am 28.05.2026 510.780 € Umsatz in LINA, aber in `core.kennzahl
 Monat nur Nullen (911 Zeilen je Monat, 458 mit Wert, 0 ungleich null), zuletzt abgerufen am
 29.09.2026. Die Zuordnung stimmt — LINA liefert Bochums BWA-Struktur unter LINA-ID 5721 —, es ist
 nichts gebucht. Frage an die Buchhaltung steht in `offene-punkte.md`.
+
+## Was das Management-Regelwerk an den Urteilen ändert (29.09.2026)
+
+Vier Messungen zu `0129`. Die ersten drei gegen Produktion (MCP-Zugang, Stand 29.09.2026),
+die vierte auf einem Klon der lokalen Datenbank mit `0129` (Daten bis 12.08.2026).
+
+**1. Für 2026 ist keine Plan-BWA gepflegt.** 0 von 62 operativen Betrieben haben einen Planwert
+2026, 38 hatten einen für 2025. Das Budget beim Personal ist deshalb überall die Sollquote 34 %.
+Die Planquote 2025 lag im Median bei **36,5 %** (p10 33 %, p90 40 %, 454 Betriebsmonate) —
+das Budget, das die Betriebe selbst geplant hatten, lag also im Median 2,5 Punkte über dem
+heutigen Soll.
+
+```sql
+SELECT extract(year FROM monat)::int, count(DISTINCT betrieb_key)
+  FROM mart.bwa_plan_ist WHERE betrag_plan IS NOT NULL AND betrag_plan <> 0 GROUP BY 1;
+```
+
+**2. Mit Budget 34 % und einem Punkt Toleranz steht das Personal fast überall auf Rot.** Juni
+2026, operative Betriebe: **40 rot, 5 gelb, 8 grün**; Median 4,6 Punkte über Budget. Weil eine
+rote Ampel den Betrieb rot färbt, stehen im Gesamturteil **46 von 57 rot**. Unter `0107` (grün
+bis 34, orange bis 38) war der gelbe Streifen vier Punkte breit, jetzt einer.
+
+```sql
+SELECT bereich_name, count(*) FILTER (WHERE ampel='rot'), count(*) FILTER (WHERE ampel='orange'),
+       count(*) FILTER (WHERE ampel='gruen'),
+       percentile_cont(0.5) WITHIN GROUP (ORDER BY abweichung)
+  FROM mart.ampel_bereich WHERE monat = '2026-06-01' AND operativ GROUP BY 1;
+```
+
+**3. Die Rendite YTD ist bei zwei Dritteln der Betriebe rot.** Januar bis Juli 2026 aus der
+BWA-Langzeitreihe: Median **0,18 %**, 10 Betriebe über 10 %, 9 zwischen 5 und 10 %, 40 darunter.
+Kein Rechenfehler: im Juli allein lag die Gruppe bei **10,4 %** (EBIT 781.024 € auf 7,54 Mio. €
+Erlöse), die Wintermonate sind Verlustmonate. Der Einzelmonat Juli lag im Median bei 2,8 %.
+`getKennzahlen` und Langzeitreihe stimmen dabei überein: Umsatz in 413 von 434
+Betriebsmonaten gleich, EBIT im Median 8 € auseinander.
+
+**4. Die Tageswerte von `getPersonalkosten` lassen sich nicht in Monatsquoten zurückrechnen.**
+Bekannt war, dass `pek_*` je Tag kumuliert ist (Befund 3 oben). Zwei Rückrechnungen versucht,
+beide verworfen, an 3.120 bzw. 1.099 Betriebstagen/-monaten 2025/2026:
+
+| Hypothese | Prüfung | Ergebnis |
+|---|---|---|
+| `pek × Tagesnenner` = aufgelaufene Kosten | müsste von Tag zu Tag steigen | steigt nur an 61–66 % der Folgetage, je nach Nenner |
+| `pek ÷ Monatstag` = Quote bis zum Tag | Verhältnis zur BWA-Quote am Monatsletzten | Median 0,62, p10 0,31, p90 1,07 |
+
+Bestätigt hat sich dagegen, gegen welchen Umsatz LINA die Bereiche rechnet: mit Service →
+Gesamtumsatz, Küche → Speisen, Bar → Getränke ergeben die **Monats**werte aus dem archivierten
+Payload gleiche Stundensätze (18,8 / 22,8 / 19,4 €/h und 17,7 / 17,2 / 19,3 €/h). Mit dem
+Gesamtumsatz als Nenner für alle drei kämen Küche und Bar auf ein Vielfaches des Service-
+Stundensatzes, weil ihre Stunden aus dem Sparten-, ihre Kosten dann aus dem Gesamtumsatz
+stammten. Deshalb der Monatsabruf in `0129`.

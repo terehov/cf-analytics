@@ -35,6 +35,9 @@ import { sichtAuffrischen } from './auffrischen'
  * 20.08.2026 in sync/auffrischen.ts.
  */
 const SICHTEN = [
+  // Migration 0129: Personal je Bereich aus dem Monatsabruf. VOR
+  // round_table_monat — die Basis liest daraus die Personalampeln je Bereich.
+  'mart.personal_bereich_monat',
   'mart.round_table_monat',
   'mart.round_table_trend',
   // Migration 0068: der Artikel-Drill-Down. LINA-Ware wie die beiden

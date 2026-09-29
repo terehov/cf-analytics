@@ -83,7 +83,7 @@ SELECT '🟠 ' || count(*) AS "Orange"
   {
     schluessel: 'rt_kachel_gruen',
     name: 'Grün',
-    beschreibung: 'Betriebe, bei denen ALLE SECHS Kennzahlen vorlagen und keine auffällig war. Seit dem 14.08.2026 zählt hier nicht mehr mit, wem ein Signal fehlt — vorher wurde ein Urteil grün, WEIL etwas fehlte. Wem was fehlt, steht in der Kachel „Unvollständig" daneben.',
+    beschreibung: 'Betriebe, bei denen ALLE Kennzahlen des Gesamturteils vorlagen (Umsatz, Personal o. GF und je Bereich, Wareneinsatz, Bewertung) und keine auffällig war. Seit dem 14.08.2026 zählt hier nicht mehr mit, wem ein Signal fehlt — vorher wurde ein Urteil grün, WEIL etwas fehlte. Wem was fehlt, steht in der Kachel „Unvollständig" daneben.',
     anzeige: 'scalar',
     parameter: [MONAT.monat, KONZEPT.marke],
     sql: `${MONAT_CTE}
@@ -107,7 +107,7 @@ SELECT '🟢 ' || count(*) AS "Grün"
   {
     schluessel: 'rt_unvollstaendig',
     name: 'Unvollständig',
-    beschreibung: 'Betriebe, bei denen mindestens eine der sechs Ampeln nicht gestellt werden konnte und keine der übrigen auffällig ist. Das ist KEIN gutes Urteil, sondern ein unvollständiges — und bis zum 14.08.2026 stand es unter „Grün". Zwei Ursachen: die Zahl fehlt, oder für diese Marke wird in diesem Bereich bewusst nicht bewertet. Welche wo, sagt die Tabelle „Was fehlt für ein vollständiges Urteil?".',
+    beschreibung: 'Betriebe, bei denen mindestens eine Ampel des Gesamturteils nicht gestellt werden konnte und keine der übrigen auffällig ist. Das ist KEIN gutes Urteil, sondern ein unvollständiges — und bis zum 14.08.2026 stand es unter „Grün". Zwei Ursachen: die Zahl fehlt, oder für diese Marke wird in diesem Bereich bewusst nicht bewertet. Welche wo, sagt die Tabelle „Was fehlt für ein vollständiges Urteil?".',
     anzeige: 'scalar',
     parameter: [MONAT.monat, KONZEPT.marke],
     sql: `${MONAT_CTE}
@@ -126,8 +126,8 @@ SELECT '⚪ ' || count(*) AS "Unvollständig"
     schluessel: 'rt_fehlende_signale',
     name: 'Was fehlt für ein vollständiges Urteil?',
     beschreibung: 'Je Betrieb: warum das Urteil im gewählten Monat nicht vollständig ist. '
-      + '✗ heißt „die Zahl fehlt" — da muss jemand etwas nachtragen; die häufigste ist seit '
-      + 'Juli 2026 die Vor-Ort-Note aus „pflege/om_einschaetzung.csv". ⊘ heißt „die Zahl ist da, '
+      + '✗ heißt „die Zahl fehlt" — da muss jemand etwas nachtragen. Bei Personal Service, Küche '
+      + 'und Bar fehlt meist der Vorjahresmonat oder die Zeiterfassung in der Kasse. ⊘ heißt „die Zahl ist da, '
       + 'aber für diese Marke wird hier bewusst nicht bewertet" — nachtragen hilft dann nicht, '
       + 'nur entscheiden. Seit dem 20.09.2026 betrifft das den Getränkeeinsatz der Deutschen '
       + 'Konzepte (Brauereibindung); die Spalte „Warum ⊘" nennt den Grund.',
@@ -152,8 +152,12 @@ SELECT u.betrieb                                   AS "Betrieb",
             WHEN u.ohne_schwelle_we_kueche THEN '⊘' END AS "WE Küche",
        CASE WHEN u.fehlt_bewertung  THEN '✗'
             WHEN u.ohne_schwelle_bewertung THEN '⊘' END AS "Bewertung",
-       CASE WHEN u.fehlt_om         THEN '✗'
-            WHEN u.ohne_schwelle_om        THEN '⊘' END AS "Vor Ort",
+       -- Seit 0129: die Personalbereiche statt der Vor-Ort-Note (entfaellt).
+       -- Fehlt hier eine Zahl, fehlt meist der Vorjahresmonat oder die
+       -- Zeiterfassung in der Kasse.
+       CASE WHEN u.fehlt_pk_service THEN '✗' END   AS "Personal Service",
+       CASE WHEN u.fehlt_pk_kueche  THEN '✗' END   AS "Personal Küche",
+       CASE WHEN u.fehlt_pk_bar     THEN '✗' END   AS "Personal Bar",
        u.grund_ohne_schwelle                       AS "Warum ⊘"
   FROM mart.round_table_unvollstaendig u
   CROSS JOIN gewaehlt g
@@ -254,7 +258,7 @@ SELECT coalesce(to_char(round(avg(r.online_bewertung), 2), 'FM0.00'), '– nicht
     schluessel: 'rt_treiber',
     name: 'Ampeln nach Bereich',
     beschreibung:
-      'Wie viele operative Betriebe je Bereich auf rot, orange oder grün stehen — und für wie viele die Daten fehlen. Zeigt, woran die roten Ampeln insgesamt hängen. „OM vor Ort" wird erst seit Juni 2026 erfasst; ⚪ heißt in diesem Bereich meist: nicht erhoben.',
+      'Wie viele operative Betriebe je Bereich auf rot, orange oder grün stehen — und für wie viele die Daten fehlen. Zeigt, woran die roten Ampeln insgesamt hängen. Die Rendite steht mit dabei, zählt aber nicht ins Gesamturteil.',
     anzeige: 'bar',
     parameter: [MONAT.monat, KONZEPT.marke],
     // LANGFORM, und das ist kein Schoenheitsentscheid.
@@ -338,7 +342,7 @@ SELECT r.intensitaet AS "Intensität",
     schluessel: 'rt_tabelle',
     name: 'Round Table — Betriebstabelle',
     beschreibung:
-      'Eine Zeile je operativem Betrieb mit allem, was für den Round Table zählt: Umsatz mit Vorjahr und Jahressumme, Personal- und Wareneinsatzquoten, Bewertung, Vor-Ort-Score, alle sechs Ampeln, Gesamturteil und Priorität. Sortiert nach Handlungsdruck — oben steht, was zuerst besprochen gehört. „BWA-Alter" sagt, wie viele Monate die zugrunde liegende BWA hinter dem Berichtsmonat liegt (0–3): bei 2–3 Monaten beruhen Personal- und Wareneinsatzampeln auf entsprechend alten Zahlen und sind mit Vorsicht zu lesen; ältere BWA werden gar nicht mehr nachgetragen, der Betrieb fällt dann unter „ohne Urteil".',
+      'Eine Zeile je operativem Betrieb mit allem, was für den Round Table zählt: Umsatz mit Vorjahr und Jahressumme, Personal- und Wareneinsatzquoten, Bewertung, alle Ampeln des Gesamturteils, die Rendite, Gesamturteil und Priorität. Sortiert nach Handlungsdruck — oben steht, was zuerst besprochen gehört. „BWA-Alter" sagt, wie viele Monate die zugrunde liegende BWA hinter dem Berichtsmonat liegt (0–3): bei 2–3 Monaten beruhen Personal- und Wareneinsatzampeln auf entsprechend alten Zahlen und sind mit Vorsicht zu lesen; ältere BWA werden gar nicht mehr nachgetragen, der Betrieb fällt dann unter „ohne Urteil".',
     anzeige: 'table',
     parameter: [MONAT.monat, KONZEPT.marke],
     sql: `${MONAT_CTE}
@@ -360,8 +364,12 @@ SELECT r.betrieb                                            AS "Betrieb",
        coalesce(ak.emoji, '–')                              AS "Ampel WE Küche",
        r.online_bewertung                                   AS "Online-Bewertung",
        coalesce(ao.emoji, '–')                              AS "Ampel Bewertung",
-       r.om_score                                           AS "OM Score",
-       coalesce(am.emoji, '–')                              AS "Ampel OM",
+       -- Seit 0129 statt OM (entfaellt): die Personalampeln je Bereich,
+       -- gemessen gegen das Vorjahr, und die Rendite neben dem Urteil.
+       coalesce(as1.emoji, '–')                             AS "Ampel Personal Service",
+       coalesce(as2.emoji, '–')                             AS "Ampel Personal Küche",
+       coalesce(as3.emoji, '–')                             AS "Ampel Personal Bar",
+       r.rendite_ytd_pct                                    AS "Rendite YTD %",
        coalesce(ag.emoji || ' ' || ag.bezeichnung, '– kein Urteil') AS "Gesamtstatus",
        r.intensitaet                                        AS "Intensität",
        r.massnahme                                          AS "Maßnahme?",
@@ -379,7 +387,9 @@ SELECT r.betrieb                                            AS "Betrieb",
   LEFT JOIN ampel.beschriftung ab ON ab.status = r.ampel_we_bar
   LEFT JOIN ampel.beschriftung ak ON ak.status = r.ampel_we_kueche
   LEFT JOIN ampel.beschriftung ao ON ao.status = r.ampel_bewertung
-  LEFT JOIN ampel.beschriftung am ON am.status = r.ampel_om
+  LEFT JOIN ampel.beschriftung as1 ON as1.status = r.ampel_pk_service
+  LEFT JOIN ampel.beschriftung as2 ON as2.status = r.ampel_pk_kueche
+  LEFT JOIN ampel.beschriftung as3 ON as3.status = r.ampel_pk_bar
   LEFT JOIN ampel.beschriftung ag ON ag.status = r.gesamt
   LEFT JOIN LATERAL (
         SELECT string_agg(DISTINCT a.bereich_name || ': ' || a.ursache, ', ') AS ursachen
@@ -743,7 +753,7 @@ SELECT betrieb                AS "Betrieb",
     schluessel: 'rt_regelwerk_vergleich',
     name: 'Vergleich der Schwellenwerte',
     beschreibung:
-      'Betriebe, bei denen die einheitlichen Round-Table-Schwellen (34/38 %) zu einem anderen Urteil führen als die betriebsindividuellen Schwellen aus LINA. Nur diese Fälle sind strittig — bei allen übrigen erübrigt sich die Diskussion.',
+      'Nur zur Einordnung: Betriebe, bei denen die zwei FRÜHEREN Regelwerke — die einheitlichen Round-Table-Schwellen (34/38 %) und die betriebsindividuellen Schwellen aus LINA — zu verschiedenen Urteilen kommen. Geurteilt wird seit dem 29.09.2026 nach dem Management-Regelwerk.',
     anzeige: 'table',
     parameter: [MONAT.monat],
     sql: `${MONAT_CTE}
@@ -785,15 +795,18 @@ SELECT betrieb                AS "Betrieb",
     schluessel: 'rt_schwellen',
     name: 'Welche Schwelle gilt für wen?',
     beschreibung:
-      'Das Regelwerk, nach dem die sechs Ampeln urteilen — direkt aus der Datenbank gelesen, '
-      + 'nicht abgeschrieben. Seit dem 20.09.2026 gilt der Wareneinsatz JE MARKE; wer keinen '
-      + 'eigenen Satz hat, wird an der Zeile „(alle übrigen Marken)" gemessen. „kein Urteil" '
+      'Das Regelwerk, nach dem die Ampeln urteilen — direkt aus der Datenbank gelesen, '
+      + 'nicht abgeschrieben. Seit dem 29.09.2026 werden Personal und Wareneinsatz als Abweichung '
+      + 'gemessen: vom Budget, vom Vorjahr oder vom Soll der Marke — die Spalte „Soll" nennt es. '
+      + 'Wer kein eigenes Soll hat, wird an der Zeile „(alle übrigen Marken)" gemessen. „kein Urteil" '
       + 'heißt: hier wird bewusst nicht bewertet — der Grund steht in der Spalte „Warum".',
     anzeige: 'table',
     sql: `
 SELECT s.bereich_name      AS "Bereich",
        s.konzept           AS "Marke",
+       s.soll              AS "Soll",
        s.gilt              AS "Schwelle",
+       CASE WHEN s.im_gesamturteil THEN 'ja' ELSE 'nein' END AS "Im Gesamturteil",
        s.betriebe_operativ AS "operative Betriebe",
        s.hinweis           AS "Warum"
   FROM mart.ampel_schwelle s

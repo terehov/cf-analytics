@@ -111,7 +111,7 @@ lauf('Ende-zu-Ende', () => {
     await db.query(`TRUNCATE sync.warteschlange, sync.aufgabe, sync.lauf, sync.schema_abweichung,
                        raw.api_antwort, core.umsatzbericht_tag, core.zeitzonenbericht_stunde,
                        core.zeitzonenbericht_zone, core.artikelverkauf_tag, core.personalkosten,
-                       core.schwellenwert_betrieb, core.kennzahlen_monat,
+                       core.personalkosten_monat, core.schwellenwert_betrieb, core.kennzahlen_monat,
                        core.artikel, core.betrieb RESTART IDENTITY CASCADE`)
   })
 
@@ -125,6 +125,7 @@ lauf('Ende-zu-Ende', () => {
         ('getUmsatzbericht',          '2026-06-15','2026-06-15', 10),
         ('getUmsatzbericht:speisen',  '2026-06-15','2026-06-15', 10),
         ('getPersonalkosten',         '2026-06-15','2026-06-15', 10),
+        ('getPersonalkosten:monat',   '2026-06-01','2026-06-30', 10),
         ('getZeitzonenbericht',       '2026-06-15','2026-06-15', 10),
         ('getArtikelverkaufsbericht', '2026-06-15','2026-06-15', 10),
         ('getAktionsbericht',         '2026-06-15','2026-06-15', 10)
@@ -132,7 +133,7 @@ lauf('Ende-zu-Ende', () => {
 
     const r = await workerLauf('manuell')
 
-    expect(r.ok).toBe(5)
+    expect(r.ok).toBe(6)
     // getAktionsbericht liefert 500 mit leerem Body — das ist KEIN Fehler.
     expect(r.keineDaten).toBe(1)
     expect(r.fehler).toBe(0)
@@ -158,6 +159,19 @@ lauf('Ende-zu-Ende', () => {
     // Betriebsindividuelle Schwellen aus pekThreshold
     const { rows: [{ n: schwellen }] } = await db.query(`SELECT count(*)::int AS n FROM core.schwellenwert_betrieb`)
     expect(schwellen).toBeGreaterThan(0)
+
+    // Der Monatsabruf (0129) schreibt in seine EIGENE Tabelle, auf den
+    // Monatsersten — und nicht als Monatszeile in core.personalkosten, wo
+    // jede Tagesauswertung sie mitzaehlen wuerde.
+    const { rows: [m] } = await db.query(`
+      SELECT count(*)::int AS n, min(monat)::text AS monat, count(pek_service)::int AS mit_quote
+        FROM core.personalkosten_monat`)
+    expect(m.n).toBeGreaterThan(0)
+    expect(m.monat).toBe('2026-06-01')
+    expect(m.mit_quote).toBe(m.n)
+    const { rows: [{ n: monatszeilen }] } = await db.query(
+      `SELECT count(*)::int AS n FROM core.personalkosten WHERE zeitraum_von <> zeitraum_bis`)
+    expect(monatszeilen).toBe(0)
   }, 60_000)
 
   /**
@@ -202,11 +216,14 @@ lauf('Ende-zu-Ende', () => {
   })
 
   test('jeder Aufruf liegt im Raw-Layer', async () => {
+    // Sechs erfolgreiche Aufrufe im ersten Test (seit 0129 mit dem
+    // Monatsabruf der Personalkosten); der Aktionsbericht ohne Daten
+    // schreibt keinen Rohdatensatz.
     const { rows: [{ n }] } = await db.query(`SELECT count(*)::int AS n FROM raw.api_antwort`)
-    expect(n).toBe(5)
+    expect(n).toBe(6)
     const { rows: [{ n: mitHash }] } = await db.query(`
       SELECT count(*)::int AS n FROM raw.api_antwort WHERE payload_hash <> '' AND payload_bytes > 0`)
-    expect(mitHash).toBe(5)
+    expect(mitHash).toBe(6)
   })
 
   test('der Artikelstand wird als Historie fortgeschrieben', async () => {

@@ -2139,3 +2139,49 @@ eigene Quelle mit Vorrang Umsatzbericht, nie überschreibend. Bis dahin sagt die
 * ~~Sieben operative Betriebe ohne Standort~~ — erledigt mit `0125`: der Nachtlauf ergänzt sie aus
   der LINA-Anschrift und OpenStreetMap. Prüfen nach dem ersten Lauf:
   `SELECT * FROM mart.luecke_monat WHERE quelle IN ('Wetter','Kalender');`
+
+## Management-Regelwerk (`0129`): was nach dem Bau offen ist (29.09.2026)
+
+**Nach der ersten Nacht prüfen — der Monatsabruf der Personalkosten ist nie gegen LINA
+gelaufen.** `getPersonalkosten:monat` ist gegen die Attrappe getestet (Regel 7a). Dass der
+Monatsaufruf echte Quoten liefert, stützt sich auf den einen archivierten Payload. Nach dem
+ersten Lauf:
+
+```sql
+-- 1. Kommt etwas an? Erwartung: 25 Monate, gut 50 Betriebe je Monat.
+SELECT monat, count(*), count(pek_service) FROM core.personalkosten_monat GROUP BY 1 ORDER BY 1;
+-- 2. Ist pek_gesamt eine Quote? Erwartung: nahe persoog_bwa (Payload: 38,10 gegen 38,27).
+SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY pek_gesamt - persoog_bwa)
+  FROM core.personalkosten_monat WHERE persoog_bwa > 0;
+-- 3. Stimmen die Nenner? Erwartung: Stundensaetze 15-30 EUR/h, Service/Kueche/Bar aehnlich.
+SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY pk_service_eur / stunden_service),
+       percentile_cont(0.5) WITHIN GROUP (ORDER BY pk_kueche_eur  / stunden_kueche),
+       percentile_cont(0.5) WITHIN GROUP (ORDER BY pk_bar_eur     / stunden_bar)
+  FROM mart.personal_bereich_monat WHERE stunden_service > 0 AND stunden_kueche > 0 AND stunden_bar > 0;
+```
+
+Liegt (2) weit daneben, ist der Monatsabruf auch keine Quote — dann die Personalampeln je
+Bereich über `ampel.regel.im_gesamturteil = false` aus dem Urteil nehmen, bis es geklärt ist.
+Bis zur ersten Nacht sind sie leer, und jedes Gesamturteil ist `unvollstaendig`.
+
+**Für Daniel zu entscheiden: das Personal ist fast überall rot.** Mit Budget 34 % und einem
+Punkt Toleranz stehen im Juni 40 von 53 Betrieben rot, im Gesamturteil 46 von 57
+(`befunde-datenlage.md`). Das Regelwerk tut, was es soll; ob die Toleranz oder das Soll so
+gemeint sind, ist eine fachliche Frage. Beides ist ein `UPDATE` (`ampel.soll`, `ampel.regel`),
+kein Deploy.
+
+**An die Buchhaltung: Plan-BWA 2026.** Für 2026 hat kein Betrieb einen Plan (2025: 38). Sobald
+er in LINA steht, misst die Personalampel automatisch gegen ihn.
+
+**An Concept Family (Rechte): Personalstand laut LINA.** Daniel möchte die Bounti-Teilnahme
+gegen den Personalstand aus LINA halten. `Team > Mitarbeiter > Stammdaten` liefert für unseren
+Zugang `access:false` (`kennzahlen-mapping.md`, Fluktuation). Bis dahin ist der Nenner die Zahl
+der aktiven Konten in Bounti — und das steht in der Karte.
+
+**Nicht gebaut: „Umsatz Mittagsgeschäft" als Handlungsfeld** (stand in Daniels Entwurf als
+Beispiel). Die Zeitfenster gibt es (`mart.umsatz_zeitfenster`), aber keine Regel, ab wann ein
+Rückgang ein Handlungsfeld ist. Braucht eine Schwelle von Daniel.
+
+**Das Dashboard „Round Table — Regelwerk-Vergleich"** vergleicht seit `0129` zwei Regelwerke,
+nach denen nicht mehr geurteilt wird. Die Seite ist entsprechend beschriftet; ob sie bleiben
+soll, entscheidet Eugene.

@@ -478,6 +478,35 @@ export const ENDPUNKTE: Endpunkt[] = [
     nachlese_tage: 62,
     parameter: (von, bis) => ({ report: 'intranet-personalkosten', ...konzernZeitraum(von, bis) }),
   },
+  /*
+   * DERSELBE BERICHT, ÜBER EINEN GANZEN MONAT (0129, 29.09.2026).
+   *
+   * Je Tag abgerufen sind `pek*` keine Quoten — der Zähler läuft seit
+   * Monatsanfang auf, der Nenner ist der Tag (fehlerkatalog.md). Zurück-
+   * gerechnet streuen sie rund 15 % gegen die BWA, und das sind bei 35 %
+   * Personalquote gut fünf Punkte: für eine Ampel mit einem Punkt Toleranz
+   * („Personal Service bis +1 Pkt. über Vorjahr") ist das Zufall. Über
+   * einen Monat abgerufen stimmen sie: der archivierte Payload ergibt mit
+   * den Nennern der Effektivität plausible, untereinander gleiche
+   * Stundensätze (Service 18,81, Küche 22,76, Bar 19,43 €/h), und
+   * `pekGesamt` liegt neben `persoogBwa` (38,10 gegen 38,27).
+   *
+   * Eigene Zieltabelle `core.personalkosten_monat`, damit keine Tages-
+   * auswertung eine Monatszeile mitzählt.
+   *
+   * Kosten: ein Konzernaufruf deckt alle Betriebe. Drei Monate je Nacht
+   * (Lohn schließt spät ab, siehe `nachlese_tage` oben), die Historie für
+   * den Vorjahresvergleich einmalig 25 Aufrufe.
+   */
+  {
+    key: 'getPersonalkosten:monat',
+    ebene: 'konzern',
+    pfad: '/intranet/analytics/getPersonalkosten',
+    schrittweite: 'monat',
+    zweck: 'Personalkostenquoten je Bereich über einen ganzen Monat — die einzige Form, in der pek* eine Quote ist',
+    aktiv: true,
+    parameter: (von, bis) => ({ report: 'intranet-personalkosten', ...konzernZeitraum(von, bis) }),
+  },
   {
     key: 'getZeitzonenbericht',
     ebene: 'konzern',

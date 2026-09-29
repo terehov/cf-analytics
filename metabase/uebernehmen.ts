@@ -104,6 +104,18 @@ for (const d of dashboards) {
  * Jeder Eintrag braucht einen fachlichen Grund.
  */
 const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
+  // --- Management (0129) ------------------------------------------------
+  // Bounti kennt keinen Monat: "abgeschlossen" und "ueberfaellig" sind
+  // Aussagen ueber heute (0097). Ein Stichmonat haette nichts zu filtern.
+  mg_bounti: {
+    monat: 'Bounti ist Stand heute und kennt keinen Monat (0097).',
+  },
+  mg_bounti_gesamt: {
+    monat: 'Bounti ist Stand heute und kennt keinen Monat (0097).',
+  },
+  mg_bounti_kurse: {
+    monat: 'Bounti ist Stand heute und kennt keinen Monat (0097).',
+  },
   // --- Kasse, Reiter "Geladen" (0117) ---------------------------------
   // Der Ladestand ist je BERICHT, nicht je Betrieb: ein Betriebsfilter
   // haette keine Zeile, auf die er wirken koennte. Der Zeitraum wirkt
@@ -1192,6 +1204,11 @@ const definitionen = {
     tabs: d.tabs?.map(t => t.name) ?? null,
   })),
   sammlungen: [
+    {
+      name: 'Management',
+      beschreibung:
+        'Die eine Seite für die Geschäftsführung: alle Kennzahlen mit Ampel und die fünf dringendsten Handlungsfelder. Hier fängt man an.',
+    },
     {
       name: 'Drill-Down',
       beschreibung:

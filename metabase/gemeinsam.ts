@@ -339,24 +339,25 @@ export const P_ARTIKEL_TEXT: Parameter = {
 // passiert: die Personalschwelle wanderte von 28/32 auf 34/38, und in
 // sechs Dateien stand weiter 28.
 //
-// Deshalb zwei Wege, und beide fuehren zurueck auf `ampel.regel`:
-//   SCHWELLE(...)  fuer SQL. Die Karte liest dieselbe Zeile wie die Ampel.
-//   ZIEL_*         fuer Ziellinien. Eine Visualisierungseinstellung kann
-//                  kein SQL lesen; die Zahl steht deshalb EINMAL hier,
-//                  mit der Pflicht, ampel.regel zu folgen.
+// Seit 0129 (Management-Regelwerk) misst die Ampel Personal und
+// Wareneinsatz als ABWEICHUNG von Budget und Soll. Die Gruenschwelle der
+// Regel ist dort 0 bzw. 0,5 Punkte — als Ziellinie unter eine Quote
+// gelegt waere sie Unsinn. Hier stand bis dahin `SCHWELLE(bereich,
+// stufe)`, eine Unterabfrage auf `ampel.regel` des FEST verdrahteten
+// Regelwerks `round_table_global`; nach der Umstellung haette sie still
+// gegen ein Regelwerk gerechnet, das nicht mehr urteilt. Sie ist entfernt.
+// Was eine Karte braucht, steht fertig in der Sicht:
+//   mart.round_table_monat.personal_budget_pct / personal_abw_pp
+//   mart.round_table_monat.we_*_soll_pct / we_*_abw_pp
+//   mart.ampel_schwelle (welche Grenze fuer wen gilt)
 //
-// Der Wareneinsatz fehlt hier mit Absicht: seine Schwellen gelten seit
-// 0107 je Marke (ampel.regel_konzept), eine einzelne Zahl waere dort
-// schlicht falsch. Wer sie braucht, liest mart.ampel_schwelle.
+// Fuer Ziellinien bleibt eine Zahl, weil eine Visualisierungseinstellung
+// kein SQL lesen kann. Sie steht EINMAL hier, mit der Pflicht, ampel.soll
+// zu folgen.
 // ---------------------------------------------------------------------
 
-/** Die Schwelle als Unterabfrage — fuer SQL in Karten. */
-export const SCHWELLE = (bereich: string, stufe: 'gruen' | 'orange') =>
-  `(SELECT ar.schwelle_${stufe} FROM ampel.regel ar
-        WHERE ar.regelwerk_key = 'round_table_global' AND ar.bereich = '${bereich}')`
-
-/** Personalkosten ohne GF: gruen bis 34 %, orange bis 38 % (Stand 20.09.2026). */
+/** Personalkosten ohne GF: das Budget, solange keine Plan-BWA gepflegt ist
+ *  (ampel.soll, Bereich personal — Stand 29.09.2026). Gruen bis Budget,
+ *  gelb bis +1 Punkt. */
 export const ZIEL_PERSONAL_GRUEN = 34
-export const ZIEL_PERSONAL_GRUEN_TEXT = 'Grün bis 34 %'
-/** Der Satz, der in Kartenbeschreibungen erklaert, was die Ampel Personal misst. */
-export const PERSONAL_SCHWELLEN_TEXT = '34 / 38 %'
+export const ZIEL_PERSONAL_GRUEN_TEXT = 'Budget 34 %'

@@ -105,6 +105,10 @@ export const QUELLEN: readonly Quelle[] = [
     })),
   { quelle: 'getPersonalkosten', bezeichnung: 'Personalkosten je Betrieb und Tag',
     system: 'lina', endpunkt: 'getPersonalkosten', kadenz_stunden: TAEGLICH },
+  // Jede Nacht die drei zuletzt abgeschlossenen Monate (0129) — also
+  // taeglicher Zulauf, obwohl der Bericht monatlich ist.
+  { quelle: 'getPersonalkosten:monat', bezeichnung: 'Personalkosten je Betrieb und Monat (Bereichsquoten)',
+    system: 'lina', endpunkt: 'getPersonalkosten:monat', kadenz_stunden: TAEGLICH },
   { quelle: 'getZeitzonenbericht', bezeichnung: 'Umsatz je Stunde',
     system: 'lina', endpunkt: 'getZeitzonenbericht', kadenz_stunden: TAEGLICH },
   { quelle: 'getVordefinierteZeitzonenBericht', bezeichnung: 'Umsatz je vordefinierter Zeitzone',

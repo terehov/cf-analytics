@@ -30,7 +30,8 @@ metabase/
 ```
 
 ~~Stand 26.07.2026: **98 Karten, 17 Dashboards, drei Sammlungen.**~~
-Stand 24.08.2026: **285 Karten, 34 Dashboards, vier Sammlungen.**
+~~Stand 24.08.2026: **285 Karten, 34 Dashboards, vier Sammlungen.**~~
+Stand 29.09.2026: **324 Karten, 38 Dashboards, fünf Sammlungen** (gezählt von `uebernehmen.ts`).
 
 ### Übernehmen
 
@@ -79,9 +80,50 @@ API-Schlüssel, den jemand später wieder aufräumen müsste.
 
 ---
 
-## Die drei Sammlungen
+## Die Sammlungen
 
-### Drill-Down — hier fängt man an
+### Management — die eine Seite (seit 29.09.2026)
+
+**`db_management`, Karten in `metabase/karten-management.ts`.** Die Round-Table-Seiten waren
+der Geschäftsführung zu kompliziert; Daniel hat einen Entwurf für eine einzige Seite vorgelegt,
+und die Seite folgt ihm Block für Block: sechs Zahlen oben (Umsatz, Vorjahr, Δ, Rendite YTD,
+Yext, Bounti), dann Umsatzentwicklung, Personalkosten, Wareneinsatz, Gästefeedback, Schulung
+und die fünf Handlungsfelder. Darunter die vollständige Ampeltabelle.
+
+Die Ampeln kommen fertig aus der Datenbank, nach dem Management-Regelwerk (`0129`,
+`entscheidungen.md`). Keine Karte rechnet eine Schwelle nach.
+
+Warum sie so aussieht:
+
+* **Dieselben Karten für Gruppe und Betrieb.** Ohne Betriebsfilter zeigen sie alle operativen
+  Betriebe (oder die der Marke), mit Filter den einen. Daniels Entwurf war für einen Betrieb
+  gezeichnet; eine zweite Seite für die Gruppe wäre eine zweite Wahrheit gewesen.
+* **Deshalb zählen die Ampelspalten, statt zu färben** („🔴 12 · 🟠 3 · 🟢 20"). Für einen
+  Betrieb steht dort eine 1 — für die Gruppe die Verteilung. Ampeln werden nie gemittelt.
+* **Werte der Gruppe sind Summen, wo sie sich summieren lassen, sonst Mediane.** Umsatz,
+  Personalkosten in Euro und die Rendite (EBIT durch Umsatz) werden summiert und dann geteilt;
+  Wareneinsatz und Bewertung sind der Median der Betriebe. Beim Personal zählen nur Betriebe
+  mit Zahlen in beiden Jahren — sonst wäre jede Neueröffnung ein Kostenanstieg der Gruppe.
+* **Umsatz gegen Vorjahr als zwei Linien in Euro**, eine Achse. Die Veränderung in Prozent
+  steht in der Kachel darüber — nicht als zweite Achse.
+* **Eine Rangliste statt der Wortwolke.** Daniel wollte eine; Metabase kann keine, und sie
+  wäre auch die schwächere Form: eine Wolke zeigt, wie oft ein Thema vorkommt, nicht, ob es
+  gelobt oder beklagt wird. Die Tabelle zeigt beides (Nennungen, Ø Sterne, 👍/👎 gegen den
+  Schnitt aller Themen) — drei Monate, weil ein Betrieb in einem Monat oft nur eine Handvoll
+  Nennungen je Thema hat.
+* **Top 5 Handlungsfelder:** erst rot, dann gelb, innerhalb derselben Farbe nach dem Abstand
+  zur Grünschwelle in Breiten des gelben Bandes. So sind Personal (Band 1 Punkt) und Umsatz
+  (Band 4 %) vergleichbar. Bounti zählt mit, das schwächste Yext-Thema nicht (keine Schwelle).
+  Ein Klick auf den Betrieb stellt die Seite auf ihn ein.
+* **Bounti-Karten ohne Monatsfilter** (`FILTER_AUSNAHME`): Bounti ist Stand heute.
+* **„Umsatz je Personalstunde"** steht zusätzlich neben der Personaltabelle — Daniels
+  Rückfrage nach der Effektivität. Die Werte kommen aus LINA (`eff_*`), je Bereich mit dem
+  eigenen Umsatz als Nenner; für die Gruppe Umsatz durch Stunden, nicht gemittelt.
+
+Die alten Seiten bleiben. Seit `0129` zeigen sie statt „OM vor Ort" die drei
+Personalampeln je Bereich, und ihre Texte nennen das neue Regelwerk.
+
+### Drill-Down
 
 Eine Kette, in der jeder Klick eine Ebene tiefer führt **und den Filter mitnimmt**. Der
 Rückweg ist immer, den Filter oben zu löschen.

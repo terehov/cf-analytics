@@ -56,7 +56,7 @@ const ZEITRAUM = P_ZEITRAUM
  * und uebernehmen.ts prueft es -- die Verlaufskarten unten laufen deshalb
  * ohne Alias.
  */
-const themaDeutsch = (q = 't.') => `
+export const themaDeutsch = (q = 't.') => `
     CASE ${q}thema
         WHEN 'Food'                   THEN 'Küche'
         WHEN 'Service and Staff'      THEN 'Service & Personal'

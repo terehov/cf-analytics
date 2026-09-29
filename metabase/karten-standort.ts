@@ -204,7 +204,9 @@ SELECT ${INTENSITAET_EMOJI} || ' ' || s.betrieb AS "Standort",
        coalesce(ab.emoji, '–')  AS "WE Bar ●",
        coalesce(ak.emoji, '–')  AS "WE Küche ●",
        coalesce(aw.emoji, '–')  AS "Bewertung ●",
-       coalesce(ao.emoji, '–')  AS "OM vor Ort ●",
+       coalesce(as1.emoji, '–') AS "Personal Service ●",
+       coalesce(as2.emoji, '–') AS "Personal Küche ●",
+       coalesce(as3.emoji, '–') AS "Personal Bar ●",
        -- Warum ein Punkt schwarz ist: der heutige Betriebsstatus aus
        -- mart.betrieb_status (via round_table_monat). 'ohne_geschaeft'
        -- lesbar gemacht; die uebrigen Werte sind selbsterklaerend.
@@ -221,7 +223,9 @@ SELECT ${INTENSITAET_EMOJI} || ' ' || s.betrieb AS "Standort",
   LEFT JOIN ampel.beschriftung ab ON ab.status = r.ampel_we_bar
   LEFT JOIN ampel.beschriftung ak ON ak.status = r.ampel_we_kueche
   LEFT JOIN ampel.beschriftung aw ON aw.status = r.ampel_bewertung
-  LEFT JOIN ampel.beschriftung ao ON ao.status = r.ampel_om
+  LEFT JOIN ampel.beschriftung as1 ON as1.status = r.ampel_pk_service
+  LEFT JOIN ampel.beschriftung as2 ON as2.status = r.ampel_pk_kueche
+  LEFT JOIN ampel.beschriftung as3 ON as3.status = r.ampel_pk_bar
  WHERE s.monat = g.monat
    AND s.breitengrad IS NOT NULL
    [[AND s.konzept = {{marke}}]]
@@ -293,7 +297,10 @@ SELECT b.bereich AS "Bereich",
         ('WE Küche',         m.ampel_we_kueche, 3),
         ('WE Bar',           m.ampel_we_bar,    4),
         ('Online-Bewertung', m.ampel_bewertung, 5),
-        ('OM vor Ort',       m.ampel_om,        6)
+        -- Seit 0129 statt OM vor Ort (entfaellt): Personal je Bereich.
+        ('Personal Service', m.ampel_pk_service, 6),
+        ('Personal Küche',   m.ampel_pk_kueche,  7),
+        ('Personal Bar',     m.ampel_pk_bar,     8)
        ) AS b(bereich, ampel, sortier)
  GROUP BY b.bereich, b.sortier
  ORDER BY b.sortier`,

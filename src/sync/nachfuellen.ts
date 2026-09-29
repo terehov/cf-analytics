@@ -147,6 +147,54 @@ export async function linaNachfuellen(): Promise<number> {
   }
 
   /**
+   * Konzernberichte im Monatsschritt (0129: `getPersonalkosten:monat`).
+   *
+   * ZWEI ARTEN MONAT. Die drei zuletzt ABGESCHLOSSENEN Monate kommen jede
+   * Nacht erneut — Lohn schließt monatlich und spät ab (`nachlese_tage` am
+   * Tagesbericht: am 62. Tag änderten sich noch 24 von 30 Abrufen), und die
+   * Zieltabelle ist ein Upsert, der zweite Abruf korrigiert den ersten.
+   * `ON CONFLICT DO NOTHING` sperrt dabei nur OFFENE Posten, genau wie bei
+   * den Jahresberichten darüber.
+   *
+   * Ältere Monate bis `MONATE_HISTORIE` zurück kommen einmal: nur, wenn es
+   * für den Monat noch gar keinen Posten gibt, erledigt eingeschlossen
+   * (dieselbe Sperre wie bei den Momentaufnahmen darunter). 25 Monate, weil
+   * der Vorjahresvergleich zwölf Monate Verlauf braucht und jeder davon
+   * seinen Vorjahresmonat.
+   *
+   * Der laufende Monat fehlt absichtlich: ein halber Monat ist für einen
+   * Vorjahresvergleich kein Urteil, und der Round Table urteilt über ihn
+   * ohnehin nicht.
+   */
+  const MONATE_NACHLESE = 3
+  const MONATE_HISTORIE = 25
+  const monatsgrenzen = (zurueck: number): [string, string] => {
+    const [j, m] = [Number(gestern.slice(0, 4)), Number(gestern.slice(5, 7))]
+    const erster = new Date(Date.UTC(j, m - 1 - zurueck, 1))
+    const letzter = new Date(Date.UTC(j, m - zurueck, 0))
+    return [erster.toISOString().slice(0, 10), letzter.toISOString().slice(0, 10)]
+  }
+  for (const ep of AKTIVE_ENDPUNKTE.filter(e => e.schrittweite === 'monat' && e.ebene === 'konzern')) {
+    for (let i = 1; i <= MONATE_HISTORIE; i++) {
+      const [von, bis] = monatsgrenzen(i)
+      const r = i <= MONATE_NACHLESE
+        ? await query(
+            `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet)
+             VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING RETURNING posten_id`,
+            [ep.key, von, bis, einreihPrioritaet(ep.key)])
+        : await query(
+            `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet)
+             SELECT $1, $2::date, $3::date, $4
+              WHERE NOT EXISTS (
+                    SELECT 1 FROM sync.warteschlange
+                     WHERE endpunkt = $1 AND zeitraum_von = $2::date)
+             RETURNING posten_id`,
+            [ep.key, von, bis, einreihPrioritaet(ep.key)])
+      n += r.length
+    }
+  }
+
+  /**
    * Stammdaten-Momentaufnahmen: eine je Kalendermonat, auf den
    * Monatsersten gesetzt.
    *
