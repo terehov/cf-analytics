@@ -451,7 +451,7 @@ SELECT CASE WHEN th.sterne >= ge.schnitt THEN '👍' ELSE '👎' END AS " ",
   {
     schluessel: 'mg_bounti_gesamt',
     name: 'Schulung gesamt',
-    beschreibung: 'Aus Bounti, Stand heute. „Teilnahme" zählt die aktiven Mitarbeitenden mit mindestens einer abgeschlossenen Schulung — Bounti kennt keinen Zustand „begonnen". Der Personalstand laut LINA ist für uns nicht lesbar; der Maßstab sind die Konten in Bounti. Ampeln nur für Betriebe mit genügend Zuweisungen.',
+    beschreibung: 'Aus Bounti, Stand heute. „Teilnahme" zählt die aktiven Mitarbeitenden mit mindestens einer abgeschlossenen Schulung — Bounti kennt keinen Zustand „begonnen". Den Personalstand laut LINA holen wir noch nicht ab; bis dahin sind der Maßstab die Konten in Bounti. Ampeln nur für Betriebe mit genügend Zuweisungen.',
     anzeige: 'table',
     parameter: BOUNTI_FILTER,
     sql: `

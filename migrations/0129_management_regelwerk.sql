@@ -1442,10 +1442,13 @@ Das Standardregelwerk ist die Zeile mit ist_standard; seit 0129 ist es `manageme
 -- keinen Zustand begonnen — eine Zuweisung ist offen oder abgeschlossen,
 -- und zugewiesen wird von der Betriebsleitung, nicht vom Mitarbeitenden.
 -- Gezaehlt wird deshalb, wer mindestens EINE Schulung abgeschlossen hat.
--- Der Abgleich gegen den Personalstand laut LINA fehlt: der Bericht
--- Team > Mitarbeiter > Stammdaten ist fuer unseren Zugang gesperrt
--- (access:false, kennzahlen-mapping.md). Der Nenner sind die aktiven
--- Koepfe in Bounti, und das steht in der Karte.
+-- Der Abgleich gegen den Personalstand laut LINA fehlt noch. Gesperrt ist
+-- er NICHT — das Menue meldet seit der Messung vom 24.08.2026 access=true
+-- fuer Mitarbeiter und Personalstruktur (lina-api-korrekturen.md,
+-- Korrektur 6) —, aber die Adresse, unter der LINA die Liste liefert, ist
+-- nicht gefunden: /personal/mitarbeiter/manageusers antwortet mit 0 Bytes.
+-- Bis dahin sind der Nenner die aktiven Koepfe in Bounti, und das steht in
+-- der Karte.
 -- ---------------------------------------------------------------------
 
 CREATE VIEW mart.bounti_quote_betrieb AS
@@ -1488,7 +1491,8 @@ COMMENT ON VIEW mart.bounti_quote_betrieb IS
 'Koernung: Betrieb, Stand heute. Die zwei Bounti-Ampeln des Management-Regelwerks.
 abschluss_pct = abgeschlossene / alle Zuweisungen. teilnahme_pct = aktive Mitarbeitende
 mit mindestens einem Abschluss / aktive Mitarbeitende in Bounti — Bounti kennt keinen
-Zustand "begonnen", und den Personalstand laut LINA koennen wir nicht lesen (gesperrt).
+Zustand "begonnen", und den Personalstand laut LINA holen wir (noch) nicht — die Rechte
+sind da, der Datenweg ist ungemessen (offene-punkte.md, Fluktuation).
 Ampeln nur bei datenbasis = belastbar. Beide stehen NEBEN dem Gesamturteil, nicht darin.
 Eine Person an mehreren Standorten zaehlt an jedem (mart.bounti_mehrfachzuordnung).
 Prozentzahlen, nie Brueche.';

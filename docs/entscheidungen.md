@@ -4015,8 +4015,11 @@ Die sieben Antworten (Daniel, 29.09.2026):
    Einmalbuchung.
 5. **Bounti-Teilnahme = aktive Mitarbeitende mit mindestens einer abgeschlossenen Schulung.**
    Daniel wollte „begonnen"; Bounti kennt nur zugewiesen und abgeschlossen. Den gewünschten
-   Abgleich gegen den Personalstand laut LINA gibt es nicht: `Team > Mitarbeiter > Stammdaten`
-   ist für unseren Zugang gesperrt (`docs/offene-punkte.md`).
+   Abgleich gegen den Personalstand laut LINA gibt es noch nicht. ~~`Team > Mitarbeiter >
+   Stammdaten` ist für unseren Zugang gesperrt~~ — so stand es hier zuerst, übernommen aus
+   dem Stand vom 25.07.2026. Seit der Messung vom 24.08.2026 ist das widerlegt: die Rechte
+   sind da (`lina-api-korrekturen.md`, Korrektur 6), offen ist nur der Datenweg
+   (`offene-punkte.md`, Fluktuation).
 6. **Gesamturteil nur aus den Zahlen, ohne Rendite, Bounti und OM.** Umsatz, Personal o. GF,
    Personal je Bereich, Wareneinsatz, Bewertung. Rendite und Bounti stehen daneben. Als Daten
    in `ampel.regel.im_gesamturteil`, nicht als Liste in den Sichten.

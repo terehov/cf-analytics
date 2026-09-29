@@ -201,8 +201,9 @@ Family**, deren Administrator die API-Schlüssel selbst anlegt, nicht an LINA.
 
 **c) Kapitel 4.2 bleibt halb.** *Kurswirkung* heißt: Kursabschluss gegen Durchschnittsbon und
 Zusatzverkäufe **je Person**. Bounti liefert seine Hälfte vollständig — die andere fehlt
-weiterhin an LINA: die Mitarbeiterstammdaten sind für unseren Zugang gesperrt, das
-Kassenjournal ebenfalls (`offene-punkte.md`). Ohne einen Schlüssel, den beide Systeme kennen,
+weiterhin an LINA: die Mitarbeiterstammdaten sind ~~für unseren Zugang gesperrt~~ seit der
+Messung vom 24.08.2026 freigegeben, aber noch nicht abgeholt (`lina-api-korrekturen.md`,
+Korrektur 6); das Kassenjournal ist gesperrt (`offene-punkte.md`). Ohne einen Schlüssel, den beide Systeme kennen,
 gibt es keinen Join.
 
 **Ein möglicher Ersatzweg steht in `customFields`.** `GET /employees` liefert frei

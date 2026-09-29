@@ -1426,7 +1426,7 @@ Weg dorthin wird noch gesucht.
 | | entscheidet |
 |---|---|
 | **Sind Rollen als BEREICH gepflegt** (Küche, Service, Bar) — oder stehen dort nur Rechte-Rollen wie „Admin"? | `datenlage-round-table.html` nennt den Bereich den *wichtigsten* Punkt an Bounti: welchem Bereich ein Mensch zugeordnet ist, weiß sonst kein System. Stehen dort nur Rechte, ist die Auswertung je Bereich nicht möglich — und das ist eine Meldung an den Fachbereich, keine Codeänderung |
-| **Gibt es in `customFields` eine Personalnummer, die auch LINA führt?** | Ob Kapitel 4.2 (Kurswirkung je Person) überhaupt erreichbar wird. LINAs Mitarbeiterstammdaten sind für unseren Zugang gesperrt; ohne einen gemeinsamen Schlüssel gibt es keinen Join zwischen Kursabschluss und Verkaufsverhalten |
+| **Gibt es in `customFields` eine Personalnummer, die auch LINA führt?** | Ob Kapitel 4.2 (Kurswirkung je Person) überhaupt erreichbar wird. LINAs Mitarbeiterstammdaten sind ~~für unseren Zugang gesperrt~~ seit 24.08.2026 freigegeben, aber noch nicht abgeholt (Korrektur 6); ohne einen gemeinsamen Schlüssel gibt es keinen Join zwischen Kursabschluss und Verkaufsverhalten |
 | Nimmt Bounti `limit=100`? | nur Aufrufzahlen |
 | Ist `assessmentScore` ein Bruch? | eine Quote, die um den Faktor 100 danebenliegt |
 | Wie viele Kurse und Pfade gibt es? | ob `BOUNTI_LERNEINHEITEN_JE_LAUF = 40` passt |
@@ -2173,10 +2173,14 @@ kein Deploy.
 **An die Buchhaltung: Plan-BWA 2026.** Für 2026 hat kein Betrieb einen Plan (2025: 38). Sobald
 er in LINA steht, misst die Personalampel automatisch gegen ihn.
 
-**An Concept Family (Rechte): Personalstand laut LINA.** Daniel möchte die Bounti-Teilnahme
-gegen den Personalstand aus LINA halten. `Team > Mitarbeiter > Stammdaten` liefert für unseren
-Zugang `access:false` (`kennzahlen-mapping.md`, Fluktuation). Bis dahin ist der Nenner die Zahl
-der aktiven Konten in Bounti — und das steht in der Karte.
+**Personalstand laut LINA — keine Rechtefrage, sondern der Datenweg.** Daniel möchte die
+Bounti-Teilnahme gegen den Personalstand aus LINA halten. ~~`Team > Mitarbeiter > Stammdaten`
+liefert für unseren Zugang `access:false`~~ — so stand es hier zuerst, abgeschrieben aus
+`kennzahlen-mapping.md`, das den Stand vom 25.07.2026 führte. Seit dem 24.08.2026 widerlegt:
+`access=true` für Mitarbeiter, Lohnbuchhaltung und Personalstruktur (Korrektur 6). Es ist
+derselbe offene Schritt wie bei der Fluktuationsrate weiter oben (Punkt 4): `bun run
+lina-fragen d10` im Terminal des Nutzers, sonst einmal das Netzwerkprotokoll im Browser.
+Bis dahin ist der Nenner die Zahl der aktiven Konten in Bounti — und das steht in der Karte.
 
 **Nicht gebaut: „Umsatz Mittagsgeschäft" als Handlungsfeld** (stand in Daniels Entwurf als
 Beispiel). Die Zeitfenster gibt es (`mart.umsatz_zeitfenster`), aber keine Regel, ab wann ein

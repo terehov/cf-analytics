@@ -104,7 +104,7 @@ Damit sind aus der Wunschliste `Umsetzung Berichte` zusätzlich abgedeckt: Storn
 | Stundenzettel | `GET /personal/lohn/stundenzettel` | **HTML, kein JSON** ✘ |
 | Zeitkonten | `/personal/zeitkonto/zeitkonto` | HTML (legacy) |
 | Urlaubsplanung | `/personal/zeitkonto/urlaub` | HTML (legacy) |
-| Mitarbeiter-Stammdaten | `/personal/mitarbeiter/manageusers` | **`access: false`** für den genutzten Account |
+| Mitarbeiter-Stammdaten | `/personal/mitarbeiter/manageusers` | ~~**`access: false`** für den genutzten Account~~ — seit 24.08.2026 `access=true`, die Seite liefert aber 0 Bytes (`lina-api-korrekturen.md`, Korrektur 6) |
 
 **`dienstplaene`-Schema:**
 ```json

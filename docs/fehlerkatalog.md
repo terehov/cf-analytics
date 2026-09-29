@@ -4993,3 +4993,20 @@ anderes gesagt als die Ampel daneben. **Was es heute verhindert:** `SCHWELLE()` 
 unbrauchbar führt. Aufgefallen erst an Monatsquoten um 400 %. **Lehre:** bevor eine Spalte
 aus `core` in eine neue Rechnung geht, im Katalog nach ihrem Namen suchen. Heute kommen die
 Bereichsquoten aus dem Monatsabruf (`core.personalkosten_monat`).
+
+## Eine widerlegte Aussage kam über eine nicht nachgezogene Datei zurück (29.09.2026)
+
+**Symptom.** Beim Bau von `0129` stand an vier Stellen (Migration, Karte, Entscheidungsprotokoll,
+offene Punkte) und in einem Mailentwurf an Daniel: „die Mitarbeiter-Stammdaten sind für unseren
+LINA-Zugang gesperrt". Das ist seit dem 24.08.2026 widerlegt (`lina-api-korrekturen.md`,
+Korrektur 6: `access=true` für Mitarbeiter, Lohnbuchhaltung, Personalstruktur).
+
+**Ursache.** Die Korrektur stand in `lina-api-korrekturen.md` und `offene-punkte.md`, aber
+`kennzahlen-mapping.md`, `datensicherung.md`, `bounti-api-inventar.md` und
+`lina-api-inventar-1b.md` führten weiter `access:false` als aktuellen Stand. Übernommen wurde
+die Aussage aus `kennzahlen-mapping.md` — der Datei, die man für eine Kennzahl zuerst liest.
+
+**Was es heute verhindert.** Alle vier Stellen sind durchgestrichen und verweisen auf
+Korrektur 6. **Lehre:** wer eine Annahme in `lina-api-korrekturen.md` widerlegt, sucht im
+selben Commit alle Dateien nach der alten Aussage (`grep -rn "access:false" docs/`) — eine
+Korrektur, die nur an einer Stelle steht, wird an der anderen wieder abgeschrieben.
