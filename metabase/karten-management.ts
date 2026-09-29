@@ -23,8 +23,8 @@ import type { Karte } from './typen'
 import { MONAT_CTE, P_MONAT, P_MARKE, P_BETRIEB } from './gemeinsam'
 import { themaDeutsch } from './karten-yext'
 
-const FILTER = [P_MONAT, P_BETRIEB, P_MARKE]
-const BOUNTI_FILTER = [P_BETRIEB, P_MARKE]
+const FILTER = [P_MONAT, P_MARKE, P_BETRIEB]
+const BOUNTI_FILTER = [P_MARKE, P_BETRIEB]
 
 /** Die operative Auswahl: gewaehlter Monat, Marke, Betrieb. Alias r. */
 const AUSWAHL = `
@@ -158,7 +158,7 @@ SELECT CASE WHEN s.note IS NULL THEN '– keine Bewertung'
   {
     schluessel: 'mg_bounti',
     name: 'Bounti Abschlussquote',
-    beschreibung: 'Anteil der zugewiesenen Schulungen, die abgeschlossen sind — Stand heute, ohne Monatsbezug. Grün über 90 %, gelb 75–90 %, rot darunter. Steht neben dem Gesamturteil.',
+    beschreibung: 'Anteil der zugewiesenen Schulungen, die abgeschlossen sind — Stand heute, der Monatsfilter wirkt hier nicht. Grün über 90 %, gelb 75–90 %, rot darunter. Steht neben dem Gesamturteil.',
     anzeige: 'scalar',
     parameter: BOUNTI_FILTER,
     sql: `
@@ -188,6 +188,8 @@ SELECT CASE WHEN s.pct IS NULL THEN '– nicht in Bounti'
     name: 'Alle Kennzahlen mit Ampel',
     beschreibung: 'Jede Kennzahl des Regelwerks mit ihrem Wert, dem Maßstab (Budget, Soll oder Vorjahr), der Abweichung und der Ampel. Bei mehreren Betrieben sind Wert und Maßstab der mittlere Betrieb (Median), und die Ampelspalte zählt, wie viele Betriebe wo stehen. Personal und Wareneinsatz stehen auf dem letzten gebuchten BWA-Monat. „Im Gesamturteil: nein" heißt: die Ampel steht daneben und färbt den Betrieb nicht.',
     anzeige: 'table',
+    // Eine Zeile je Bereich aus mart.ampel_bereich (9 seit 0129).
+    zeilen_max: 9,
     parameter: FILTER,
     sql: `${MONAT_CTE}
 SELECT a.bereich_name                                                             AS "Kennzahl",
@@ -259,8 +261,10 @@ SELECT r.monat           AS "Monat",
      */
     schluessel: 'mg_personal',
     name: 'Personalkosten',
-    beschreibung: 'Service, Küche und Bar kommen aus der Kasse (LINA), „Ohne GF" aus der BWA. Jeder Bereich hat seinen eigenen Umsatz als Maßstab: Service den Gesamtumsatz, Küche den Speisenumsatz, Bar den Getränkeumsatz — die drei Prozentwerte ergeben deshalb zusammen nicht den Gesamtwert. Bereiche werden gegen das Vorjahr gemessen (grün bis ±0, gelb bis +1 Pkt.), „Ohne GF" gegen das Budget. Gezählt werden nur Betriebe mit Zahlen in beiden Jahren.',
+    beschreibung: 'Service, Küche und Bar kommen aus der Kasse (LINA), „Ohne GF" aus der BWA. Jeder Bereich hat seinen eigenen Umsatz als Maßstab: Service den Gesamtumsatz, Küche den Speisenumsatz, Bar den Getränkeumsatz — die drei Prozentwerte ergeben deshalb zusammen nicht den Gesamtwert. Bereiche werden gegen das Vorjahr gemessen (grün bis ±0, gelb bis +1 Pkt.), „Ohne GF" gegen das Budget — solange keine Plan-BWA gepflegt ist, die Sollquote von 34 %. Gezählt werden nur Betriebe mit Zahlen in beiden Jahren.',
     anzeige: 'table',
+    // Service, Kueche, Bar, Gesamt (Kasse), Ohne GF (BWA) -- fest.
+    zeilen_max: 5,
     parameter: FILTER,
     sql: `${MONAT_CTE}
 , auswahl AS (
@@ -327,6 +331,8 @@ SELECT bereich                                                         AS "Berei
     name: 'Umsatz je Personalstunde',
     beschreibung: 'Die Effektivität aus LINA: Umsatz je Arbeitsstunde im Bereich — Service gegen den Gesamtumsatz, Küche gegen Speisen, Bar gegen Getränke. Bei mehreren Betrieben Umsatz durch Stunden der Gruppe, nicht der Mittelwert der Betriebe.',
     anzeige: 'table',
+    // Service, Kueche, Bar, Gesamt -- fest.
+    zeilen_max: 4,
     parameter: FILTER,
     sql: `${MONAT_CTE}
 SELECT b.bereich                                                                       AS "Bereich",
@@ -361,6 +367,8 @@ SELECT b.bereich                                                                
     name: 'Wareneinsatz',
     beschreibung: 'Wareneinsatz laut BWA gegen das Soll der Marke. Grün bis +0,5 Punkte über Soll, gelb bis +1,0, rot darüber. Bei mehreren Betrieben der mittlere Betrieb (Median). Getränke bei den Deutschen Konzepten ohne Ampel: die Brauereibindungen machen sie untereinander unvergleichbar.',
     anzeige: 'table',
+    // Kueche und Getraenke -- fest.
+    zeilen_max: 2,
     parameter: FILTER,
     sql: `${MONAT_CTE}
 , auswahl AS (
@@ -417,8 +425,10 @@ SELECT sum(t.bewertungen) || ' Bewertungen · Ø '
      */
     schluessel: 'mg_yext_themen',
     name: 'Worüber Gäste schreiben',
-    beschreibung: 'Die Themen, die Yext in den Bewertungstexten erkennt, aus den letzten drei Monaten bis zum gewählten Monat. 👍 heißt: im Schnitt besser bewertet als die Bewertungen insgesamt, 👎 schlechter. Oben steht, was am häufigsten genannt wird.',
+    beschreibung: 'Die Themen, die Yext in den Bewertungstexten erkennt, aus den letzten drei Monaten bis zum gewählten Monat. 👍 heißt: im Schnitt besser bewertet als die Bewertungen insgesamt, 👎 schlechter. Die fünf am häufigsten genannten, das häufigste oben.',
     anzeige: 'table',
+    // LIMIT 5 -- die haeufigsten fuenf reichen fuer die Uebersicht.
+    zeilen_max: 5,
     parameter: FILTER,
     sql: `${MONAT_CTE}
 , betriebe AS (
@@ -442,7 +452,8 @@ SELECT CASE WHEN th.sterne >= ge.schnitt THEN '👍' ELSE '👎' END AS " ",
        th.sterne                                               AS "Ø Sterne"
   FROM themen th
   CROSS JOIN gesamt ge
- ORDER BY th.nennungen DESC`,
+ ORDER BY th.nennungen DESC
+ LIMIT 5`,
   },
 
   // -------------------------------------------------------------------
@@ -451,8 +462,10 @@ SELECT CASE WHEN th.sterne >= ge.schnitt THEN '👍' ELSE '👎' END AS " ",
   {
     schluessel: 'mg_bounti_gesamt',
     name: 'Schulung gesamt',
-    beschreibung: 'Aus Bounti, Stand heute. „Teilnahme" zählt die aktiven Mitarbeitenden mit mindestens einer abgeschlossenen Schulung — Bounti kennt keinen Zustand „begonnen". Den Personalstand laut LINA holen wir noch nicht ab; bis dahin sind der Maßstab die Konten in Bounti. Ampeln nur für Betriebe mit genügend Zuweisungen.',
+    beschreibung: 'Aus Bounti, Stand heute — der Monatsfilter wirkt hier nicht. „Teilnahme" zählt die aktiven Mitarbeitenden mit mindestens einer abgeschlossenen Schulung — Bounti kennt keinen Zustand „begonnen". Den Personalstand laut LINA holen wir noch nicht ab; bis dahin sind der Maßstab die Konten in Bounti. Ampeln nur für Betriebe mit genügend Zuweisungen.',
     anzeige: 'table',
+    // Vier feste Kennzahlzeilen.
+    zeilen_max: 4,
     parameter: BOUNTI_FILTER,
     sql: `
 WITH q AS (
@@ -479,7 +492,7 @@ SELECT 'Durchschnittliche Punkte',
   {
     schluessel: 'mg_bounti_kurse',
     name: 'Kurse',
-    beschreibung: 'Die Kurse und Pfade mit den meisten Teilnehmenden, Stand heute. „Rang" ordnet nach Abschlussquote: 1 ist die am besten abgeschlossene. Ein Kurs, der über alle Betriebe schwach steht, ist eher ein Problem des Kurses als der Betriebe.',
+    beschreibung: 'Die Kurse und Pfade mit den meisten Teilnehmenden, Stand heute — der Monatsfilter wirkt hier nicht. „Rang" ordnet nach Abschlussquote: 1 ist die am besten abgeschlossene. Ein Kurs, der über alle Betriebe schwach steht, ist eher ein Problem des Kurses als der Betriebe.',
     anzeige: 'table',
     parameter: BOUNTI_FILTER,
     sql: `
@@ -522,8 +535,10 @@ SELECT lerneinheit                                                   AS "Kurs",
      */
     schluessel: 'mg_handlungsfelder',
     name: 'Top 5 Handlungsfelder',
-    beschreibung: 'Die fünf dringendsten Abweichungen im gewählten Monat: erst alles Rote, dann Gelbes, jeweils das am weitesten vom Grün entfernte zuerst. Ohne Betriebsauswahl über alle Betriebe — dann steht dabei, welcher Betrieb es ist.',
+    beschreibung: 'Die fünf dringendsten Abweichungen im gewählten Monat: erst alles Rote, dann Gelbes, jeweils das am weitesten vom Grün entfernte zuerst. Ohne Betriebsauswahl über alle Betriebe — dann steht dabei, welcher Betrieb es ist. Ein Klick auf den Betrieb stellt die Seite auf ihn ein.',
     anzeige: 'table',
+    // LIMIT 5.
+    zeilen_max: 5,
     parameter: FILTER,
     sql: `${MONAT_CTE}
 , regel AS (

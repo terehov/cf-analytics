@@ -58,10 +58,15 @@ function fuerPostgres(sql: string, karte: Karte, mitFiltern: boolean): string {
   return sql
     .replace(/\[\[(.*?)\]\]/gs, '$1')
     // Feldfilter (dimension) baut Metabase selbst zu einer Klausel
-    // zusammen — hier steht ersatzweise etwas immer Wahres, denn geprüft
-    // wird der RAHMEN um den Filter, nicht der Filter.
-    .replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_m, name: string) =>
-      karte.template_tag_dimension?.[name] ? 'true' : ersatz(name))
+    // zusammen, und zwar aus dem TABELLENNAMEN: `round_table_monat.monat
+    // BETWEEN ...`. Genau so steht es hier, damit Postgres die Aliasfalle
+    // meldet ("invalid reference to FROM-clause entry"). Bis zum 29.09.2026
+    // stand hier `true` -- damit war der Test fuer diese Falle blind, und
+    // pe_bereich/dd_betrieb_personal fielen erst in uebernehmen.ts auf.
+    .replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_m, name: string) => {
+      const ziel = karte.template_tag_dimension?.[name]
+      return ziel ? `(${ziel[1]}.${ziel[2]} IS NOT NULL OR true)` : ersatz(name)
+    })
 }
 
 lauf('Karten-SQL', () => {

@@ -43,6 +43,24 @@ export const MINDESTHOEHE: Record<Anzeige, number> = {
 }
 
 /**
+ * Mindesthoehe einer Karte. Eine Tabelle mit garantiert wenigen Zeilen
+ * (`zeilen_max`) darf niedriger sein als MINDESTHOEHE.table: Titel und
+ * Spaltenkoepfe brauchen zwei Einheiten, die Fusszeile eine, jede
+ * Datenzeile 0,75. Am 29.09.2026 im Screenshot abgelesen: eine Datenzeile
+ * ist ~36 px hoch, eine Rastereinheit aber je nach Breite verschieden --
+ * ~44 px bei fester Breite, ~57 px bei voller Breite auf 1440 px. 0,75
+ * deckt Einheiten ab ~48 px; bei fester Breite kann die letzte Zeile
+ * knapp werden, dann scrollt die Tabelle, sie schneidet nichts ab.
+ * Nie hoeher als die normale Mindesthoehe.
+ */
+export function mindesthoehe(anzeige: Anzeige, zeilenMax?: number): number {
+  if (anzeige === 'table' && zeilenMax !== undefined) {
+    return Math.min(MINDESTHOEHE.table, Math.max(4, Math.ceil(zeilenMax * 0.75) + 3))
+  }
+  return MINDESTHOEHE[anzeige] ?? 8
+}
+
+/**
  * Wie hoch muss eine Textkachel sein, damit nichts abgeschnitten wird?
  *
  * Grob, aber in die sichere Richtung: rund 95 Zeichen passen bei voller
@@ -74,6 +92,7 @@ export function textHoehe(text: string, breite: number): number {
 export function auslegen(
   reihen: Reihe[],
   typVon: (kartenSchluessel: string) => Anzeige | undefined,
+  zeilenVon: (kartenSchluessel: string) => number | undefined = () => undefined,
 ): Kachel[] {
   const kacheln: Kachel[] = []
   let y = 0
@@ -95,7 +114,7 @@ export function auslegen(
       const b = t.breite ?? grund
       const noetig = t.text !== undefined
         ? textHoehe(t.text, b)
-        : (MINDESTHOEHE[typVon(t.karte!) ?? 'bar'] ?? 8)
+        : mindesthoehe(typVon(t.karte!) ?? 'bar', zeilenVon(t.karte!))
       hoehe = Math.max(hoehe, t.hoehe ?? noetig)
     }
 

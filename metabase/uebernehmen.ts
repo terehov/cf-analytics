@@ -24,7 +24,7 @@
 
 import { alleKarten } from './karten'
 import { dashboards } from './dashboards'
-import { auslegen, MINDESTHOEHE } from './layout'
+import { auslegen, mindesthoehe } from './layout'
 import type { Karte, Kachel, Dashboard, Reihe } from './typen'
 import { config } from '../src/config'
 
@@ -37,6 +37,7 @@ const METABASE = config.METABASE_URL
 // Reihen in Kacheln umrechnen — EINMAL, damit Pruefung und Ausgabe
 // dieselben Zahlen sehen.
 const typVon = (s: string) => alleKarten.find(k => k.schluessel === s)?.anzeige
+const zeilenVon = (s: string) => alleKarten.find(k => k.schluessel === s)?.zeilen_max
 
 /** Alle Reihen eines Dashboards, ueber die Reiter hinweg. Fuer jede
  *  Pruefung, der egal ist, WO eine Karte liegt — Filter, Klicks, Schluessel. */
@@ -54,9 +55,9 @@ function kachelnVon(d: Dashboard): Kachel[] {
     if (d.tabs.length < 2) {
       throw new Error(`Dashboard ${d.schluessel}: ein einzelner Reiter ist keiner — reihen verwenden.`)
     }
-    return d.tabs.flatMap((t, i) => auslegen(t.reihen, typVon).map(k => ({ ...k, tab: i })))
+    return d.tabs.flatMap((t, i) => auslegen(t.reihen, typVon, zeilenVon).map(k => ({ ...k, tab: i })))
   }
-  return auslegen(d.reihen ?? [], typVon)
+  return auslegen(d.reihen ?? [], typVon, zeilenVon)
 }
 
 const layoutVon = new Map<string, Kachel[]>(
@@ -1017,7 +1018,7 @@ for (const d of dashboards) {
   for (const k of layoutVon.get(d.schluessel)!) {
     if (k.text !== undefined) continue
     const typ = typVon(k.karte) ?? 'bar'
-    const noetig = MINDESTHOEHE[typ] ?? 8
+    const noetig = mindesthoehe(typ, zeilenVon(k.karte))
     if (k.hoehe < noetig) {
       throw new Error(
         `${d.schluessel}: Kachel ${k.karte} ist zu niedrig (hoehe=${k.hoehe}, ` +
@@ -1178,6 +1179,9 @@ const definitionen = {
     // Fehler saehe aus wie fehlende Daten. Erkennungsmerkmal ist der
     // Rueckfall aus MONAT_CTE_BWA.
     bwa_monat: bwaDashboard(d),
+    // Volle Breite ist Standard (Eugene, 29.09.2026); `volle_breite: false`
+    // stellt ein Dashboard ausdruecklich auf Metabases feste Breite.
+    breite: d.volle_breite === false ? 'fixed' : 'full',
     payload: {
       name: d.name,
       description: `${d.beschreibung}\n\n[key:${d.schluessel}]`,
@@ -1606,7 +1610,7 @@ async function uebernehmen() {
         });
       }
 
-      await mb('/dashboard/' + id, 'PUT', {parameters: parameter, dashcards, tabs});
+      await mb('/dashboard/' + id, 'PUT', {parameters: parameter, dashcards, tabs, width: d.breite});
       log('  ' + dashcards.length + ' Kacheln gesetzt'
           + (tabs.length ? ' (' + tabs.length + ' Reiter)' : ''), 'ok');
     } catch (e) { log('Dashboard ' + d.payload.name + ' — FEHLER: ' + e.message, 'fehler'); }

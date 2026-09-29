@@ -543,8 +543,8 @@ SELECT r.betrieb                            AS "Betrieb",
     // "Ampel global"/"Ampel LINA" sind weg: sie urteilten nach zwei
     // Regelwerken, die seit 0129 nicht mehr gelten.
     sql: `
-SELECT r.betrieb                  AS "Betrieb",
-       to_char(r.monat, 'MM.YYYY') AS "Monat",
+SELECT round_table_monat.betrieb                  AS "Betrieb",
+       to_char(round_table_monat.monat, 'MM.YYYY') AS "Monat",
        pm.pk_gesamt_pct           AS "Personal gesamt % (Kasse)",
        pm.pk_service_pct          AS "Service %",
        coalesce(sv.emoji, '⚪')     AS "● Service",
@@ -554,15 +554,15 @@ SELECT r.betrieb                  AS "Betrieb",
        coalesce(sb.emoji, '⚪')     AS "● Bar",
        pm.persoog_bwa             AS "Personal o. GF % (BWA)"
   FROM mart.personal_bereich_monat pm
-  JOIN mart.round_table_monat r ON r.betrieb_key = pm.betrieb_key AND r.monat = pm.monat
-  LEFT JOIN ampel.beschriftung sv ON sv.status = r.ampel_pk_service
-  LEFT JOIN ampel.beschriftung sk ON sk.status = r.ampel_pk_kueche
-  LEFT JOIN ampel.beschriftung sb ON sb.status = r.ampel_pk_bar
+  JOIN mart.round_table_monat ON round_table_monat.betrieb_key = pm.betrieb_key AND round_table_monat.monat = pm.monat
+  LEFT JOIN ampel.beschriftung sv ON sv.status = round_table_monat.ampel_pk_service
+  LEFT JOIN ampel.beschriftung sk ON sk.status = round_table_monat.ampel_pk_kueche
+  LEFT JOIN ampel.beschriftung sb ON sb.status = round_table_monat.ampel_pk_bar
  WHERE pm.pk_gesamt_pct IS NOT NULL
-   AND (r.operativ [[ OR r.betrieb = {{betrieb}} ]])
-   [[AND r.betrieb = {{betrieb}}]]
+   AND (round_table_monat.operativ [[ OR round_table_monat.betrieb = {{betrieb}} ]])
+   [[AND round_table_monat.betrieb = {{betrieb}}]]
    [[AND {{zeitraum}}]]
- ORDER BY r.monat DESC, r.betrieb`,
+ ORDER BY round_table_monat.monat DESC, round_table_monat.betrieb`,
     template_tag_dimension: { zeitraum: ['mart', 'round_table_monat', 'monat'] },
   },
   {

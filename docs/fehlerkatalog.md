@@ -3442,6 +3442,15 @@ vor, also gab es auch keinen Alias zu bemängeln. Wer einen Feldfilter setzt,
 prüft **beides**: dass die Tabelle im SQL vorkommt, und dass sie ohne Alias
 dasteht.
 
+**Zum dritten Mal (29.09.2026), und diesmal lag es am Test.** `pe_bereich` und
+`dd_betrieb_personal` bekamen beim Umbau auf die Monatsquoten `JOIN mart.round_table_monat r`
+und einen Feldfilter auf `round_table_monat.monat`. Der Kartentest war grün (598/598), erst
+`uebernehmen.ts` brach ab. Grund: `karten.test.ts` ersetzte jeden Feldfilter durch `true` —
+damit war er für genau diese Falle blind, obwohl sein Kopfkommentar sie als Anlass nennt. Er
+setzt jetzt `tabelle.spalte` ein wie Metabase, und Postgres meldet den Alias selbst
+(„missing FROM-clause entry").
+
+
 ## Eine Division, die nur in Produktion durch null ging (21.08.2026)
 
 **Symptom.** `dd_betrieb_effektivitaet` auf ③ Betrieb meldete in Metabase

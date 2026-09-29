@@ -268,9 +268,17 @@ export const dashboards: Dashboard[] = [
     beschreibung:
       'Die eine Seite für die Geschäftsführung: Umsatz, Rendite, Personal, Wareneinsatz, Gäste und Schulung mit Ampel, dazu die fünf dringendsten Handlungsfelder. Ohne Auswahl alle operativen Betriebe, mit Auswahl ein Betrieb.',
     sammlung: 'Management',
-    filter: [F_MONAT, F_BETRIEB, F_MARKE],
+    filter: [F_MONAT, F_MARKE, F_BETRIEB],
+    // NEBENEINANDER STATT UNTEREINANDER (29.09.2026, Eugene: "weniger
+    // scrollen, mehr auf einen Blick"). Der erste Wurf stand bei fester
+    // Breite und einer Kachel je Zeile, mit einer Textkachel als
+    // Ueberschrift vor jedem Abschnitt: 4.552 px, fuenf Bildschirme. Die
+    // Abschnittstexte sind in die Kartenbeschreibungen (i) gewandert, die
+    // Tabellen tragen `zeilen_max` und sind so hoch wie ihr Inhalt.
+    // Oben, ohne zu scrollen: Ampellegende, Kennzahlen, Umsatzverlauf und
+    // die fuenf dringendsten Handlungsfelder.
     reihen: [
-      { teile: [{ text: '# Management\n\n🟢 im Plan · 🟠 gelb, beobachten · 🔴 handeln · ⚪ keine Zahl.\n\n**Ohne Betrieb oben** zeigt jede Kachel alle operativen Betriebe zusammen, und die Ampelspalten zählen, wie viele wo stehen. **Mit Betrieb** steht dort seine eine Ampel. Ohne Monat gilt der letzte abgeschlossene.\n\nPersonal, Wareneinsatz und Rendite kommen aus der BWA und stehen deshalb auf dem **letzten gebuchten Monat** — der kann ein, zwei Monate hinter dem gewählten liegen.' }] },
+      { teile: [{ hoehe: 2, text: '🟢 im Plan · 🟠 beobachten · 🔴 handeln · ⚪ keine Zahl. **Ohne Betrieb** zeigen die Kacheln alle operativen Betriebe zusammen, und die Ampelspalten zählen, wie viele wo stehen; **mit Betrieb** seine eine Ampel. Ohne Monat gilt der letzte abgeschlossene. Personal, Wareneinsatz und Rendite stehen auf dem **letzten gebuchten BWA-Monat**. Was eine Kachel genau zeigt, steht unter ⓘ.' }] },
       { teile: [
         { karte: 'mg_umsatz' },
         { karte: 'mg_umsatz_vj' },
@@ -279,30 +287,30 @@ export const dashboards: Dashboard[] = [
         { karte: 'mg_yext' },
         { karte: 'mg_bounti' },
       ] },
-      { teile: [{ text: '## Umsatzentwicklung' }] },
-      { teile: [{ karte: 'mg_umsatz_verlauf', hoehe: 9 }] },
-      { teile: [{ text: '## Personalkosten\n\nService, Küche und Bar aus der Kasse, gegen das **Vorjahr**; „Ohne GF" aus der BWA, gegen das **Budget**. Solange keine Plan-BWA gepflegt ist, ist das Budget die Sollquote von 34 %.' }] },
       { teile: [
-        { karte: 'mg_personal', breite: 15, hoehe: 9 },
-        { karte: 'mg_effektivitaet', breite: 9, hoehe: 9 },
+        { karte: 'mg_umsatz_verlauf', breite: 12 },
+        { karte: 'mg_handlungsfelder', breite: 12,
+          klick: [{ ziel: 'db_management', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] },
       ] },
-      { teile: [{ text: '## Wareneinsatz\n\nGegen das **Soll der Marke**: grün bis +0,5 Punkte darüber, gelb bis +1,0, rot darüber.' }] },
-      { teile: [{ karte: 'mg_wareneinsatz', hoehe: 9 }] },
-      { teile: [{ text: '## Gästefeedback' }] },
+      // Personal und Effektivitaet in einer Reihe (ein Thema); die
+      // Breiten so, dass die Ampelspalten nicht abgeschnitten werden --
+      // bei 13/11 fehlten sie im Screenshot vom 29.09.2026.
       { teile: [
-        { karte: 'mg_yext_monat', breite: 8, hoehe: 9 },
-        { karte: 'mg_yext_themen', breite: 16, hoehe: 9 },
+        { karte: 'mg_personal', breite: 15 },
+        { karte: 'mg_effektivitaet', breite: 9 },
       ] },
-      { teile: [{ text: '## Schulung (Bounti)\n\nStand heute — der Monatsfilter wirkt hier nicht.' }] },
+      // Wareneinsatz als eigene Zeile: er gehoert fachlich weder zu den
+      // Bewertungen noch zum Personal (Eugene, 29.09.2026).
+      { teile: [{ karte: 'mg_wareneinsatz' }] },
       { teile: [
-        { karte: 'mg_bounti_gesamt', breite: 9, hoehe: 9 },
-        { karte: 'mg_bounti_kurse', breite: 15, hoehe: 9 },
+        { karte: 'mg_yext_monat', breite: 6 },
+        { karte: 'mg_yext_themen', breite: 18 },
       ] },
-      { teile: [{ text: '## Top 5 Handlungsfelder\n\nErst Rot, dann Gelb, jeweils das am weitesten vom Grün entfernte zuerst. Ein Klick auf den Betrieb stellt diese Seite auf ihn ein.' }] },
-      { teile: [{ karte: 'mg_handlungsfelder', hoehe: 9,
-        klick: [{ ziel: 'db_management', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
-      { teile: [{ text: '## Alle Kennzahlen mit Ampel\n\nDas Regelwerk, gefüllt. „Maßstab" sagt, wogegen gemessen wird; die Spalte „Regel" nennt die Grenzen.' }] },
-      { teile: [{ karte: 'mg_ampeln', hoehe: 10 }] },
+      { teile: [
+        { karte: 'mg_bounti_gesamt', breite: 10 },
+        { karte: 'mg_bounti_kurse', breite: 14 },
+      ] },
+      { teile: [{ karte: 'mg_ampeln' }] },
     ],
   },
 
@@ -732,7 +740,7 @@ export const dashboards: Dashboard[] = [
     // und dem Tagesprofil darunter. Ohne ihn verglich das Tagesprofil
     // dreieinhalb Jahre, waehrend die Tabelle darueber einen Monat zeigte
     // -- zwei Aussagen ueber verschiedene Zeitraeume auf einer Seite.
-    filter: [F_MONAT, F_ZEITRAUM_DREI_MONATE, F_BETRIEB, F_MARKE],
+    filter: [F_MONAT, F_ZEITRAUM_DREI_MONATE, F_MARKE, F_BETRIEB],
     reihen: [
       { teile: [{ text: '# ⑤ Standorte vergleichen\n\nOben Betrieb oder Marke auswählen. Ohne Auswahl stehen hier alle — für einen aussagekräftigen Vergleich zwei bis vier Betriebe wählen.\n\nDer Tagesverlauf zeigt **Prozent vom eigenen Tagesumsatz**. Sonst vergleicht man nur die Größe der Betriebe und nicht ihr Muster.' }] },
       { teile: [{ karte: 'vg_ort_metriken', hoehe: 11,
@@ -869,7 +877,7 @@ export const dashboards: Dashboard[] = [
     beschreibung:
       'Wochenrhythmus, Planbarkeit und die Frage, ob eine Umsatzveränderung von der Gästezahl oder vom Bon kommt. Die Unterscheidung entscheidet darüber, welche Maßnahme überhaupt greift.',
     sammlung: 'Drill-Down',
-    filter: [F_BETRIEB, F_MARKE],
+    filter: [F_MARKE, F_BETRIEB],
     reihen: [
       { teile: [{ text: '# ⑦ Muster im Geschäft\n\nDrei Fragen, die darüber entscheiden, welche Maßnahme überhaupt greift.' }] },
 
@@ -1517,7 +1525,7 @@ export const dashboards: Dashboard[] = [
     // Die Marke gehoert hierher, seit der Drill-Down vom Round Table
     // hierher fuehrt: wer aus "Enchilada" kommt, will die Verbraeuche von
     // Enchilada sehen und nicht die aller 141 Betriebe.
-    filter: [F_BETRIEB, F_MARKE, F_ZEITRAUM_QUARTAL],
+    filter: [F_MARKE, F_BETRIEB, F_ZEITRAUM_QUARTAL],
     reihen: [
       { teile: [{ text: '# Warenwirtschaft\n\n„Abdeckung“ ist der Anteil des Umsatzes, für den Rezepturen hinterlegt sind — bei niedriger Abdeckung sagt der Deckungsbeitrag wenig. Er liegt nur monatsweise vor.\n\nVoreingestellt sind die letzten drei Monate; ein größerer Zeitraum dauert entsprechend länger.' }] },
       // Untereinander statt nebeneinander: sieben Spalten mit Artikel- und
@@ -1567,7 +1575,7 @@ export const dashboards: Dashboard[] = [
     beschreibung:
       'Ein Artikel im Detail: zwölf Monate in Zahlen, der Verlauf über 24 Monate und die Betriebe, die ihn verkaufen. Erreichbar über einen Klick auf einen Artikelnamen in den Rennern, Pennern oder auf dem Betriebsblatt.',
     sammlung: 'Drill-Down',
-    filter: [F_ARTIKEL, F_BETRIEB, F_MARKE],
+    filter: [F_ARTIKEL, F_MARKE, F_BETRIEB],
     reihen: [
       { teile: [{ text: '# Der einzelne Artikel\n\nMonatsraster statt Tagesfilter — feiner führt die schnelle Artikelsicht den Verkauf nicht, und für „läuft er noch, und wo" reicht der Monat.\n\n**Ø Preis netto** ist Umsatz durch Menge, nicht der Kartenpreis: Aktionen und Rabatte stecken darin. Laufen Umsatz und Menge im Verlauf auseinander, hat sich der Preis bewegt, nicht die Nachfrage.' }] },
       { teile: [{ karte: 'ar_kopf', hoehe: 9 }] },
@@ -1589,7 +1597,7 @@ export const dashboards: Dashboard[] = [
     // FOODNOTIFY-MANDANT (vier Werte), nicht das Round-Table-Konzept —
     // acht der zwoelf Konzern-Marken lieferten grundsaetzlich leere
     // Karten, siehe F_MARKE_EINKAUF.
-    filter: [F_BETRIEB, F_MARKE_EINKAUF, F_WARE],
+    filter: [F_MARKE_EINKAUF, F_BETRIEB, F_WARE],
     reihen: [
       { teile: [{ text: '# Einkauf\n\nGrundlage sind **echte Bestellungen bei FoodNotify**, keine Katalogpreise — und damit nur der Teil des Einkaufs, der über das Bestellsystem läuft. Was daran vorbeigeht, steht ganz unten unter „Durfte dort eingekauft werden?".\n\nAlle Preise sind **je Gebinde** — was ein bestellter Karton, Sack oder Eimer gekostet hat. Der Preis je Kilo oder Liter steht als Zusatzspalte daneben, bleibt aber oft leer: FoodNotify pflegt die Angabe, wie viel in einem Gebinde steckt, für dieselbe Ware widersprüchlich. Was auffällt oder fehlt, steht in der letzten Karte.\n\n**Ein Sprung auf genau das Doppelte ist fast nie eine Teuerung.** Dieselbe Ware wird im selben Monat mit verschiedenen Gebindegrößen gebucht — Grana Padano 8,82 € bei Größe 1 und 17,64 € bei Größe 2 —, und der Monatsmedian kippt zwischen beiden. Solche Zeilen sind seit Migration 0062 aus „Was ist teurer geworden?" heraus; die Spalte „Gebindegröße" in der Preistabelle zeigt, worauf sich ein Preis bezieht.\n\n**Wie belastbar ein Zeitraum ist, sagt die Karte direkt darunter.** Sie zählt je Marke und Monat, wie viele Bestellungen mit Positionen geladen sind. Ein dünner Monat ist dort Ladestand und kein Einbruch: geladen wird je Kostenstelle chronologisch aufsteigend, bei einer Marke mit offenen Bestellseiten fehlen also die **jüngsten** Monate zuerst.' }] },
       // Der Ladestand steht GANZ OBEN, nicht unten als Fussnote: er ist
@@ -1672,7 +1680,7 @@ export const dashboards: Dashboard[] = [
     // Das Konzept, nicht der FoodNotify-Mandant: mart.fremdeinkauf und
     // mart.einkaufspreis_betrieb tragen beide konzept aus
     // mart.konzept_zuordnung.
-    filter: [F_BETRIEB, F_MARKE],
+    filter: [F_MARKE, F_BETRIEB],
     reihen: [
       { teile: [{ text: '# Fremdeinkauf\n\n**Die große Zahl links ist noch kein Verstoß.** Sie zählt jeden Wareneinkauf bei einem Lieferanten, der nicht auf der Freigabeliste steht — und die hat heute fünf Einträge. Nachgemessen am 12.08.2026: von 7,93 Mio € trug **kein einziger Euro** den Grund „ausdrücklich gesperrt", und 6,92 Mio entfielen auf 48 Betriebe, für die überhaupt kein GFGH hinterlegt ist. Dahinter stehen regionale Brauereien, Getränkefachgroßhändler, Metzger und Obsthändler. Was davon **entschieden** ist, steht in der Kachel „Bestätigter Fremdeinkauf"; woran der Rest hängt, in „Woran die Zahl oben hängt".\n\n**Die Quelle steht in jeder Tabelle und wird nie summiert.** Dieselbe Rechnung steht in FoodNotify *und* im Belegarchiv. Wer über die Spalte „Quelle" summiert, zählt sie doppelt. Kacheln und Diagramme zeigen deshalb ausschließlich das **Belegarchiv** — dort ist Fremdeinkauf überhaupt erst sichtbar, denn wer außerhalb der Freigabe kauft, bestellt nicht über das Bestellsystem des Konzerns.\n\n**Es zählt nur Wareneinkauf.** Das Belegarchiv führt alle Eingangsrechnungen — Strom, Leasing, Finanzamt, Kartengebühren, Rechnungen zwischen Konzerngesellschaften. Das ist herausgerechnet und steht weiter unten nachprüfbar daneben.\n\n**Die Seite ist eine Arbeitsliste.** Wer berechtigt liefert, gehört in `manual.lieferant_freigabe`, und der Getränkelieferant eines Betriebs in `manual.gfgh_betrieb`; dann verschwinden sie hier. Die Zahl schrumpft, während man die Liste abarbeitet — genau das ist ihr Zweck.' }] },
       // Jede Zaehlkachel fuehrt auf dd_fremdeinkauf und gibt FEST den
@@ -1788,7 +1796,7 @@ export const dashboards: Dashboard[] = [
     beschreibung:
       'Was eine der Zählkacheln auf der Fremdeinkauf-Seite zählt: dieselbe Summe je Monat, je Betrieb und als einzelne Posten. Erreichbar über einen Klick auf eine Kachel, einen Lieferanten oder eine Betriebszeile.',
     sammlung: 'Drill-Down',
-    filter: [F_ZUSTAND, F_LIEFERANT, F_BETRIEB, F_MARKE],
+    filter: [F_ZUSTAND, F_LIEFERANT, F_MARKE, F_BETRIEB],
     reihen: [
       { teile: [{ text: '# Hinter der Fremdeinkaufszahl\n\n**Zustand** oben sagt, welche Kachel diese Seite gerade auflöst: „ohne Freigabe" ist die große Zahl, „bestätigt" der entschiedene Teil davon, „ungeklärt" die Arbeitsliste. Die Kachelsumme steht links zur Kontrolle — weicht sie ab, ist ein Filter im Spiel.\n\nAlles aus dem **Belegarchiv** (nur dort ist Fremdeinkauf sichtbar), nur operative Betriebe, letzte zwölf Monate. Feiner als Betrieb × Lieferant × Monat geht es nicht: das Belegarchiv kennt keine Positionen, und wer am System vorbei kauft, hinterlässt in FoodNotify keine Artikel.' }] },
       { teile: [
@@ -1846,7 +1854,7 @@ export const dashboards: Dashboard[] = [
     // Konzepte, fuer die es keine Liste gibt; wer eines davon waehlt, sieht
     // eine leere Seite. Das ist richtig so und der Grund, aus dem der
     // Textblock oben sagt, welche drei Konzepte ueberhaupt gemessen werden.
-    filter: [F_BETRIEB, F_MARKE],
+    filter: [F_MARKE, F_BETRIEB],
     tabs: [
       { name: 'Wer weicht ab', reihen: [
         { teile: [{ text: '# Einkauf abseits der Pflichtartikel\n\n**Die Leitzahl ist der Anteil, nicht die Erfüllung.** Gemessen wird, welcher Teil der Ausgaben eines Betriebs auf Artikel entfällt, die auf **keiner** Pflichtartikelliste seines Konzepts stehen — auf Euro gerechnet, nicht auf die Artikelzahl.\n\n**Drei Dinge gehören zum Lesen dazu.**\n\n**1. Was die Listen nicht führen, taucht hier zwangsläufig auf — und das ist nicht immer ein Fehler.** Am 22.08.2026 lagen bei Wilma Wunder Kaffee und Fassbier ganz oben im Abseits-Topf, und der Fachbereich hat die beiden gegensätzlich entschieden: **Bier und Wein sind ausdrücklich die Wahl des Betriebs** — die Wilma-Wunder-Liste führt „Individueller Wein & Bier" als leeren Abschnitt —, **J.-Hornig-Kaffee dagegen ist Pflicht** und stand nur nicht auf der Liste; er ist seither nachgetragen. Reinigungsmittel und Verpackung sind weiterhin ungeklärt. **Ein großer Posten hier ist eine Frage, keine Antwort** — deshalb ist der Reiter „Was gekauft wurde" keine Beilage, sondern die Gegenprobe.\n\n**2. „Dünn" heißt: richtig gerechnet, trotzdem keine Aussage.** Ein Betrieb mit drei Bestellungen kommt leicht auf 90 %. Das Balkendiagramm zeigt deshalb nur belastbare Fälle; die Tabelle zeigt alle und sagt, welche das sind.\n\n**3. Der Anteil ist eine Obergrenze, solange „Unklar" groß ist.** Lieferanten vergeben Nachfolgenummern, während die Liste stehen bleibt: „Cheddar / Gouda Mix" wechselte zum 15.11.2025 von Distra 268 auf 500096 — 105.194 € bei 20 Betrieben, die sonst als Abweichung gezählt hätten. Der Reiter „Listenpflege" löst solche Fälle auf.\n\n**Der Zeitraum ist die Laufzeit der Liste** und deshalb nicht wählbar. Wilma Wunder: 13.04.–04.10.2026 (Sommer-Standardkarte). Aposto und Enchilada: ab 01.01.2026, offen.' }] },
@@ -2298,7 +2306,7 @@ export const dashboards: Dashboard[] = [
     // Jede Karte hier verdichtet ueber viele Tage; ein Stichmonat liesse
     // von "190 Christi-Himmelfahrt-Tage" genau einen uebrig, und der
     // Median einer einzigen Beobachtung ist diese Beobachtung.
-    filter: [F_ZEITRAUM, F_BETRIEB, F_MARKE],
+    filter: [F_ZEITRAUM, F_MARKE, F_BETRIEB],
     tabs: [
       { name: 'Feiertage', reihen: [
         { teile: [{ text:

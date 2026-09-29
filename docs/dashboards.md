@@ -220,6 +220,21 @@ Textkacheln rechnet `textHoehe()` aus der Zeichenzahl — rund 95 Zeichen je Zei
 Breite, Überschriften mit Faktor 1,5, Blockzitate mit 1,2. Bewusst großzügig: lieber eine
 Einheit zu viel als ein abgeschnittener Satz.
 
+**Kleine Tabellen dürfen niedriger sein (seit 29.09.2026).** Eine Karte mit `zeilen_max`
+(die Abfrage garantiert höchstens so viele Zeilen — feste Bereiche oder `LIMIT`) bekommt
+`mindesthoehe()` = 3 Einheiten für Titel, Spaltenköpfe und Fußzeile plus 0,85 je Zeile,
+höchstens 9. Abgelesen am Management-Dashboard: Datenzeile ~37 px, Einheit ~44 px. Anlass:
+„Wareneinsatz" hat zwei Zeilen und stand auf neun Einheiten — darunter sieben leere. Wer
+`zeilen_max` setzt und die Abfrage später erweitert, bekommt eine Tabelle mit Scrollbalken,
+keinen Fehler: den Wert mit dem SQL zusammen ändern.
+
+**Volle Breite ist Standard (seit 29.09.2026, Wunsch Eugene).** `uebernehmen.ts` schickt
+jedem Dashboard `width: 'full'`; `volle_breite: false` stellt eines ausdrücklich auf
+Metabases feste Breite (~1.050 px). Anlass war *Management*: bei fester Breite und einer
+Kachel je Zeile 4.552 px hoch, fünf Bildschirme. Achtung: bei voller Breite ist eine
+Rastereinheit höher (~57 px auf 1.440 px statt ~44 px) — Tabellen mit `zeilen_max` sind
+darauf gerechnet, und Kacheln mit fester Höhe wirken auf breiten Bildschirmen luftiger.
+
 ### Die Prüfung bricht ab
 
 `uebernehmen.ts` wirft, bevor irgendetwas angelegt wird, wenn
@@ -912,6 +927,13 @@ Am 26.07.2026 wurden dafür **98 Kartenbeschreibungen, 17 Dashboard-Beschreibung
 ---
 
 ## Filter
+
+### Marke vor Betrieb
+
+In der Filterleiste steht **Marke immer vor Betrieb**, auf jedem Dashboard: vom Abstrakten
+zum Konkreten, so wie man sucht — erst die Marke, dann den Betrieb darin. Zeit- und
+Themenfilter (Monat, Zeitraum, Artikel, Zustand) bleiben davor. Wunsch Eugene, 29.09.2026;
+vorher stand der Betrieb auf den meisten Seiten vorn.
 
 ### Auswahllisten statt Freitext
 

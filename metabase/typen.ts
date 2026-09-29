@@ -58,6 +58,11 @@ export type Karte = {
   /** Fuer Feldfilter (date/range): auf welches Feld sie zeigen.
    *  [schema, tabelle, spalte] — wird beim Provisionieren aufgeloest. */
   template_tag_dimension?: Record<string, [string, string, string]>
+  /** Nur Tabellen: hoechstens so viele Zeilen, von der Abfrage her
+   *  garantiert (feste Bereiche, LIMIT). Dann darf die Kachel niedriger
+   *  sein als MINDESTHOEHE.table -- sonst steht unter zwei Zeilen eine
+   *  leere Flaeche von sieben. layout.ts rechnet die Hoehe daraus. */
+  zeilen_max?: number
 }
 
 /**
@@ -167,4 +172,7 @@ export type Dashboard = {
   /** Dashboard-weite Filter. Werden auf alle Karten verdrahtet, die einen
    *  gleichnamigen Parameter haben. */
   filter?: Parameter[]
+  /** Volle Bildschirmbreite ist Standard (seit 29.09.2026). `false`
+   *  stellt dieses Dashboard auf Metabases feste Breite (~1050 px). */
+  volle_breite?: boolean
 }
