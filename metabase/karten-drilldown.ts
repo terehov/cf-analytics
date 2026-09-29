@@ -20,22 +20,16 @@ import type { Karte } from './typen'
 import { MONAT_CTE, MONAT_CTE_UMSATZ, ZEITRAUM_CTE, P_MONAT, P_MARKE, P_BETRIEB, P_AMPEL, P_BEREICH, P_INTENSITAET, P_ZEITRAUM, P_INVENTUR, P_BESTELLUNG, ZIEL_PERSONAL_GRUEN, ZIEL_PERSONAL_GRUEN_TEXT } from './gemeinsam'
 
 // ---------------------------------------------------------------------
-// Personalquoten sind nur mit Filter und Median zu gebrauchen.
+// ~~Personalquoten sind nur mit Filter und Median zu gebrauchen.~~
 //
-// mart.personalkosten fuehrt Tageszeilen, und die Quoten darin haben den
-// TAGESUMSATZ IM NENNER. An einem Tag mit 6,05 EUR Umsatz ergibt das
-// 316.576 Prozent -- keine Anomalie, sondern die Bauart der Kennzahl.
-// Ueber alle Tageswerte liegt der Median bei 383 Prozent.
-//
-// Der Kommentar der Sicht schreibt deshalb beides vor: Median nehmen UND
-// Tage ohne nennenswerten Umsatz ausschliessen. Beides steht hier an
-// einer Stelle, damit keine Karte nur die Haelfte davon befolgt.
+// Hier standen bis zum 29.09.2026 PLAUSIBEL (pek_gesamt <= 200) und ein
+// Median ueber die Tageszeilen von mart.personalkosten. Die Begruendung
+// ("Tagesumsatz im Nenner") war falsch: im Tagesabruf LAEUFT DER ZAEHLER
+// SEIT MONATSANFANG AUF (fehlerkatalog.md, "pek_* ist auf Tagesebene
+// keine Quote"). Der Filter liess damit fast nur die ersten Monatstage
+// durch, und der Median war der des Monatsanfangs. dd_betrieb_personal
+// liest seitdem die Monatsquoten aus mart.personal_bereich_monat (0129).
 // ---------------------------------------------------------------------
-const PLAUSIBEL = 'pek_gesamt > 0 AND pek_gesamt <= 200'
-
-const MEDIAN = (spalte: string) =>
-  `round(percentile_cont(0.5) WITHIN GROUP (\n             ORDER BY ${spalte}) `
-  + `FILTER (WHERE ${PLAUSIBEL})::numeric, 1)`
 
 export const karten: Karte[] = [
   // ===================================================================
@@ -872,62 +866,43 @@ SELECT lpad(stunde::text, 2, '0') || ':00' AS "Stunde",
     schluessel: 'dd_betrieb_personal',
     name: 'Betrieb — Personal je Bereich',
     beschreibung:
-      'Eine Zeile je Monat. Die belastbare Zahl ist **„Personal o. GF % (BWA · Ampel)“** — die '
-      + 'Personalquote ohne Geschäftsführung aus den Zahlen des Steuerberaters; auf ihr '
-      + 'beruht auch die Ampel im Round Table.\n\n'
-      + 'Die Spalten mit „(Med.)“ sind eine **andere Größe**: die operativen Kosten der '
-      + 'Bereiche Service, Bar und Küche aus dem Kassensystem — ohne Geschäftsführung und '
-      + 'ohne Verwaltung. Sie zeigen, **wo** es klemmt, tragen aber keine Ampel, und ihre '
-      + 'Summe ergibt nicht die BWA-Quote nebenan.\n\n'
-      + 'Sie sind zudem der **Median der Tageswerte** und nur ein '
-      + 'Anhaltspunkt: die Tagesquote hat den Tagesumsatz im Nenner, und der schwankt '
-      + 'stärker als die Personalkosten. „Tage“ sagt, wie viele Tage des Monats '
-      + 'überhaupt eine plausible Quote ergaben — steht dort eine kleine Zahl, ist der '
-      + 'Median wenig wert.\n\n'
+      'Eine Zeile je Monat. **„Personal o. GF % (BWA)“** ist die Personalquote ohne '
+      + 'Geschäftsführung aus den Zahlen des Steuerberaters; an ihr hängt die Ampel '
+      + '„Personal“ (gemessen am Budget).\n\n'
+      + 'Service, Küche und Bar sind eine **andere Größe**: die Kosten der drei Bereiche aus dem '
+      + 'Kassensystem, jeweils am eigenen Umsatz gemessen — Service am Gesamtumsatz, Küche am '
+      + 'Speisenumsatz, Bar am Getränkeumsatz. Sie zeigen, **wo** es klemmt; ihre Summe ergibt '
+      + 'weder „Personal gesamt“ noch die BWA-Quote. Ihre Ampeln vergleichen mit dem Vorjahresmonat.\n\n'
       + '„€/Std“ ist der Umsatz je geleisteter Personalstunde.',
     anzeige: 'table',
     parameter: [P_BETRIEB, P_ZEITRAUM],
-    // JE MONAT, nicht je Tag -- und der Median statt des Rohwerts.
-    //
-    // Gemeldet am 28.07.2026: "einzeltage sind nicht so aussagekraeftig und
-    // warum wird da ein zeitraum angezeigt, wenn es nur ein tag ist?"
-    // Beides zutreffend, und dahinter lag ein groesserer Fehler.
-    //
-    // mart.personalkosten fuehrt AUSSCHLIESSLICH Tageszeilen (233.778
-    // Stueck, zeitraum_bis = zeitraum_von). Die Karte zeigte sie roh --
-    // 91 Zeilen fuer einen Betrieb, jede eine "Von-Bis"-Spanne ueber
-    // genau einen Tag. Das allein waere Kosmetik.
-    //
-    // Der eigentliche Fehler steht im Kommentar der Sicht: diese Quoten
-    // haben den UMSATZ IM NENNER. An einem Tag mit 6 EUR Umsatz ergibt
-    // das 316.576 Prozent, und das ist keine Anomalie, sondern die
-    // Bauart der Kennzahl. Ueber alle Tageswerte liegt der Median bei
-    // 383 Prozent. In der Karte standen Werte wie 777 und 1.262 unter
-    // der Ueberschrift "Personal %" -- neben einem BWA-Wert von 32,6.
-    // Wer die vergleicht, vergleicht Unvergleichbares.
-    //
-    // Deshalb, wie im Sichtkommentar vorgeschrieben: Median UND
-    // Ausschluss der Tage ohne nennenswerten Umsatz. Die Zahl der
-    // verbliebenen Tage steht daneben -- bei Aposto Augsburg sind das
-    // 7 bis 11 von 30, und diese Ehrlichkeit gehoert in die Tabelle.
+    // JE MONAT, aus dem Monatsabruf (0129) -- siehe Kommentar am Dateikopf,
+    // warum nicht mehr der Median der Tageszeilen. Gemeldet am 28.07.2026:
+    // "einzeltage sind nicht so aussagekraeftig" -- deshalb von Anfang an
+    // eine Zeile je Monat; nur die Quelle der Monatszahl war falsch.
+    // Leer, bis der Monatsabruf das erste Mal gelaufen ist.
     sql: `
-SELECT betrieb                   AS "Betrieb",
-       to_char(monat, 'MM.YYYY') AS "Monat",
-       round(max(persoog_bwa), 1) AS "Personal o. GF % (BWA · Ampel)",
-       count(*) FILTER (WHERE ${PLAUSIBEL})           AS "Tage",
-       ${MEDIAN('pek_gesamt')}                        AS "Personal % (Med.)",
-       ${MEDIAN('pek_service')}                       AS "Service % (Med.)",
-       ${MEDIAN('pek_bar')}                           AS "Bar % (Med.)",
-       ${MEDIAN('pek_kueche')}                        AS "Küche % (Med.)",
-       round(percentile_cont(0.5) WITHIN GROUP (
-             ORDER BY eff_gesamt) FILTER (WHERE eff_gesamt > 0)::numeric, 1) AS "€/Std"
-  FROM mart.personalkosten
+SELECT r.betrieb                   AS "Betrieb",
+       to_char(r.monat, 'MM.YYYY') AS "Monat",
+       pm.persoog_bwa              AS "Personal o. GF % (BWA)",
+       pm.pk_gesamt_pct            AS "Personal gesamt % (Kasse)",
+       pm.pk_service_pct           AS "Service %",
+       coalesce(sv.emoji, '⚪')     AS "● Service",
+       pm.pk_kueche_pct            AS "Küche %",
+       coalesce(sk.emoji, '⚪')     AS "● Küche",
+       pm.pk_bar_pct               AS "Bar %",
+       coalesce(sb.emoji, '⚪')     AS "● Bar",
+       pm.eff_gesamt               AS "€/Std"
+  FROM mart.personal_bereich_monat pm
+  JOIN mart.round_table_monat r ON r.betrieb_key = pm.betrieb_key AND r.monat = pm.monat
+  LEFT JOIN ampel.beschriftung sv ON sv.status = r.ampel_pk_service
+  LEFT JOIN ampel.beschriftung sk ON sk.status = r.ampel_pk_kueche
+  LEFT JOIN ampel.beschriftung sb ON sb.status = r.ampel_pk_bar
  WHERE 1 = 1
-   [[AND betrieb = {{betrieb}}]]
+   [[AND r.betrieb = {{betrieb}}]]
    [[AND {{zeitraum}}]]
- GROUP BY betrieb, monat
- ORDER BY monat DESC`,
-    template_tag_dimension: { zeitraum: ['mart', 'personalkosten', 'zeitraum_von'] },
+ ORDER BY r.monat DESC`,
+    template_tag_dimension: { zeitraum: ['mart', 'round_table_monat', 'monat'] },
   },
   {
     schluessel: 'dd_betrieb_artikel',

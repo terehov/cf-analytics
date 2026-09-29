@@ -520,36 +520,50 @@ SELECT r.betrieb                            AS "Betrieb",
     schluessel: 'pe_bereich',
     name: 'Personalkosten je Bereich',
     beschreibung:
-      'Personalkostenquoten für Service, Bar und Küche nebeneinander, in Prozent vom Umsatz. '
-      + '„Personal gesamt (operativ)" ist die Summe dieser drei Bereiche aus dem Kassensystem — '
-      + 'ohne Geschäftsführung und ohne Verwaltung. Die Spalte daneben, „Personal o. GF % '
-      + '(BWA · Ampel)", ist eine '
-      + 'ANDERE Größe: sie kommt aus der BWA des Steuerberaters, und nur an ihr hängt die Ampel im '
-      + 'Round Table. Dass beide abweichen, ist normal — die eine ist der laufende Betrieb, die '
-      + 'andere das gebuchte Ergebnis.',
+      'Personalkostenquoten für Service, Küche und Bar je Monat, aus dem Kassensystem. Jeder '
+      + 'Bereich hat seinen eigenen Umsatz als Maßstab: Service den Gesamtumsatz, Küche den '
+      + 'Speisenumsatz, Bar den Getränkeumsatz — die drei Werte ergeben deshalb zusammen nicht '
+      + '„Personal gesamt". Die Ampeln messen jeden Bereich am selben Monat des Vorjahres '
+      + '(grün bis ±0, gelb bis +1 Punkt, sonst rot; ⚪ ohne Vorjahreswert). „Personal o. GF % (BWA)" ist eine ANDERE Größe: sie '
+      + 'kommt aus der BWA des Steuerberaters und wird am Budget gemessen. Dass beide abweichen, '
+      + 'ist normal — die eine ist der laufende Betrieb, die andere das gebuchte Ergebnis.',
     anzeige: 'table',
     parameter: [BETRIEB, ZEITRAUM],
+    // MONATSQUOTEN, NICHT TAGESZEILEN (29.09.2026). Bis dahin las die
+    // Karte mart.personalkosten, also den Tagesabruf -- und dort ist pek_*
+    // keine Quote: der Zaehler laeuft seit Monatsanfang auf, der Nenner
+    // ist der eine Tag (fehlerkatalog.md, "pek_* ist auf Tagesebene keine
+    // Quote"). Unter "Service %" standen Werte, die mit dem Monatstag
+    // wuchsen, im Klon im Mittel 206. Der Befund war seit August bekannt,
+    // die Karte war nie nachgezogen. Quelle ist jetzt der Monatsabruf aus
+    // 0129; leer, bis er das erste Mal gelaufen ist.
+    //
+    // Die Ampeln kommen fertig aus round_table_monat (ampel.urteil gegen
+    // das Vorjahr) -- hier wird nicht nachbewertet. Die alten Spalten
+    // "Ampel global"/"Ampel LINA" sind weg: sie urteilten nach zwei
+    // Regelwerken, die seit 0129 nicht mehr gelten.
     sql: `
-SELECT betrieb            AS "Betrieb",
-       zeitraum_von::date AS "Von",
-       zeitraum_bis::date AS "Bis",
-       -- Die Spaltennamen tragen die Herkunft, weil die Tabelle sonst zwei
-       -- verschiedene Groessen wie zwei Fassungen derselben aussehen laesst:
-       -- pek_* ist die Kasse (Service+Bar+Kueche, ohne GF und Verwaltung),
-       -- persoog_bwa der Steuerberater -- und nur letztere traegt die Ampel.
-       pek_gesamt         AS "Personal gesamt % (operativ)",
-       pek_service        AS "Service %",
-       pek_bar            AS "Bar %",
-       pek_kueche         AS "Küche %",
-       persoog_bwa        AS "Personal o. GF % (BWA · Ampel)",
-       ampel_global       AS "Ampel global",
-       ampel_lina         AS "Ampel LINA"
-  FROM mart.personalkosten
- WHERE (pek_gesamt <> 0 OR eff_gesamt <> 0)
-   [[AND betrieb = {{betrieb}}]]
+SELECT r.betrieb                  AS "Betrieb",
+       to_char(r.monat, 'MM.YYYY') AS "Monat",
+       pm.pk_gesamt_pct           AS "Personal gesamt % (Kasse)",
+       pm.pk_service_pct          AS "Service %",
+       coalesce(sv.emoji, '⚪')     AS "● Service",
+       pm.pk_kueche_pct           AS "Küche %",
+       coalesce(sk.emoji, '⚪')     AS "● Küche",
+       pm.pk_bar_pct              AS "Bar %",
+       coalesce(sb.emoji, '⚪')     AS "● Bar",
+       pm.persoog_bwa             AS "Personal o. GF % (BWA)"
+  FROM mart.personal_bereich_monat pm
+  JOIN mart.round_table_monat r ON r.betrieb_key = pm.betrieb_key AND r.monat = pm.monat
+  LEFT JOIN ampel.beschriftung sv ON sv.status = r.ampel_pk_service
+  LEFT JOIN ampel.beschriftung sk ON sk.status = r.ampel_pk_kueche
+  LEFT JOIN ampel.beschriftung sb ON sb.status = r.ampel_pk_bar
+ WHERE pm.pk_gesamt_pct IS NOT NULL
+   AND (r.operativ [[ OR r.betrieb = {{betrieb}} ]])
+   [[AND r.betrieb = {{betrieb}}]]
    [[AND {{zeitraum}}]]
- ORDER BY zeitraum_von DESC, betrieb`,
-    template_tag_dimension: { zeitraum: ['mart', 'personalkosten', 'zeitraum_von'] },
+ ORDER BY r.monat DESC, r.betrieb`,
+    template_tag_dimension: { zeitraum: ['mart', 'round_table_monat', 'monat'] },
   },
   {
     schluessel: 'pe_effektivitaet',
@@ -576,7 +590,7 @@ SELECT betrieb            AS "Betrieb",
   {
     schluessel: 'pe_verlauf',
     name: 'Personalkostenquote im Verlauf',
-    beschreibung: 'Die Personalkostenquote über die Monate, aus den Zahlen des Steuerberaters. Die Linie bei 34 % ist die Grenze, ab der die Ampel im Round Table auf Grün steht (seit dem 20.09.2026; davor 28 %).',
+    beschreibung: 'Die Personalkostenquote ohne Geschäftsführung über die Monate, aus den Zahlen des Steuerberaters. Die Linie bei 34 % ist die Sollquote — das Budget, solange keine Plan-BWA gepflegt ist. Die Ampel steht grün bis zum Budget und orange bis einen Punkt darüber.',
     anzeige: 'line',
     parameter: [BETRIEB, ZEITRAUM],
     sql: `

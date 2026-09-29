@@ -768,8 +768,8 @@ irgendwo stand, dass es zwei sind.
 
 | Größe | Herkunft | Was drin ist | Wozu |
 |---|---|---|---|
-| `persoog_bwa` → „Personal o. GF % (BWA · Ampel)" | LINA-Feld `persoogBwa`, aus der **BWA** | Personalkosten **ohne Geschäftsführung**, fertig in % vom Umsatz | **Trägt die Ampel** „Personal" im Round Table (grün bis 28 %); ist Spalte `Eingabe!J` des Excel |
-| `pek_gesamt` → „Personal gesamt % (operativ)" | LINA-Bericht „Personalkosten/Effektivität pro Bereich", aus der **Kasse** | Nur **Service + Bar + Küche**; ohne GF, ohne Verwaltung | Sagt, **wo** es klemmt — trägt keine Ampel |
+| `persoog_bwa` → „Personal o. GF % (BWA · Ampel)" | LINA-Feld `persoogBwa`, aus der **BWA** | Personalkosten **ohne Geschäftsführung**, fertig in % vom Umsatz | **Trägt die Ampel** „Personal" im Round Table — seit `0129` gegen das **Budget** (Plan-BWA, sonst Soll 34 %; ~~grün bis 28 %~~); ist Spalte `Eingabe!J` des Excel |
+| `pek_gesamt` → „Personal gesamt % (Kasse)" | LINA-Bericht „Personalkosten/Effektivität pro Bereich", aus der **Kasse**, **Monatsabruf** (`mart.personal_bereich_monat`, seit `0129`) | Personal der Kasse; ohne GF, ohne Verwaltung | Sagt, **wo** es klemmt. Service, Küche und Bar tragen seit `0129` je eine Ampel gegen den **Vorjahresmonat**, jeder Bereich mit eigenem Nenner (Gesamt-, Speisen-, Getränkeumsatz) |
 
 **Sie sind nicht ineinander umrechenbar, und eine Abweichung ist der Normalfall** — die eine
 ist gebuchtes Ergebnis vom Steuerberater, die andere der laufende Betrieb aus dem
@@ -783,6 +783,20 @@ Beschreibungen von `pe_quote_betrieb`, `pe_quote_tabelle` und `pe_bereich`, in
 `dd_betrieb_personal` auf ③ Betrieb — und in den **Spaltentiteln selbst**. Der Spaltentitel
 ist die einzige Erklärung, die mitwandert, wenn jemand die Tabelle exportiert oder einen
 Screenshot verschickt.
+
+**Seit dem 29.09.2026 lesen `pe_bereich` und `dd_betrieb_personal` Monatsquoten**, nicht mehr
+die Tageszeilen von `mart.personalkosten`. Dort ist `pek_*` keine Quote (der Zähler läuft
+seit Monatsanfang auf) — `pe_bereich` zeigte sie roh, `dd_betrieb_personal` als Median der
+ersten Monatstage (`fehlerkatalog.md`). Beide sind leer, bis der Monatsabruf das erste Mal
+gelaufen ist, und das ist ehrlicher als eine falsche Zahl. Die Spalten „Ampel global" und
+„Ampel LINA" sind aus `pe_bereich` entfernt: sie urteilten nach zwei Regelwerken, die nicht
+mehr gelten. `pe_effektivitaet` bleibt bei den Tageszeilen — `eff_*` ist dort richtig.
+
+Mit derselben Durchsicht nachgezogen: die Schwellenangabe 34/38 % im Einleitungstext von
+*Personal*, in `pe_verlauf`, in `so_karte`/`so_treiber` (dort auch „sechs" → „acht"
+Einzelampeln, OM raus, feste Messwerte raus) und die Klassen von `pf_streuung`: die Grenzen
+liegen jetzt auf 34 und 35 (Budget und +1 Punkt), und **die Farbe steht nicht mehr im
+Klassennamen**, weil ein Betrieb mit Plan-BWA an seinem Plan gemessen wird.
 
 **Die `eff_*`-Spalten sind eine dritte Größe** und heißen im LINA-Bericht ebenfalls
 „Effektivität": Umsatz je geleisteter Personalstunde in **Euro**, keine Quote. Deshalb stehen

@@ -153,15 +153,14 @@ export const karten: Karte[] = [
       + 'trägt oft noch eine nachgetragene Ampel aus alten BWA-Werten; das ist kein '
       + 'Handlungsbedarf. Es bleibt als schwarzer Punkt sichtbar, damit die Karte nicht '
       + 'heimlich schrumpft — die Spalte „Status" im Tooltip sagt, warum.\n\n'
-      + '**Warum nicht nach der Gesamtampel?** Die ist ein Oder über sechs Kennzahlen — eine '
-      + 'einzige rote genügt. Im Juni 2026 wären damit 43 von 48 Standorten rot, und eine '
-      + 'Karte, auf der fast alles gleich aussieht, sagt nichts. Der Handlungsbedarf zählt '
-      + 'stattdessen und trennt diese 43 in 19 zum Eskalieren und 24 zum Handeln.\n\n'
-      + '**Die hohe Rot-Quote ist kein Datenfehler.** Die Personalquote liegt real bei '
-      + '35–45 % gegen eine Schwelle von 34/38 %. Der Vorgängerwert 28/32 stand im Excel-Blatt '
-      + '„Regeln" ausdrücklich als „Default, bei Bedarf Werte anpassen" — genau das ist am '
-      + '20.09.2026 geschehen. Einordnung in `docs/befunde-datenlage.md`.\n\n'
-      + 'Antippen zeigt die sechs Einzelampeln — ohne sie sieht man nur, **dass** es rot ist, '
+      + '**Warum nicht nach der Gesamtampel?** Die ist ein Oder über acht Kennzahlen — eine '
+      + 'einzige rote genügt. Damit wäre fast jeder Standort rot, und eine Karte, auf der '
+      + 'fast alles gleich aussieht, sagt nichts. Der Handlungsbedarf zählt stattdessen und '
+      + 'trennt „eskalieren" von „handeln".\n\n'
+      + '**Die hohe Rot-Quote ist kein Datenfehler.** Die Personalquote liegt bei vielen '
+      + 'Betrieben real bei 35–45 %, gemessen an einem Budget von 34 %; rot ist schon, wer mehr '
+      + 'als einen Punkt darüber liegt.\n\n'
+      + 'Antippen zeigt die acht Einzelampeln — ohne sie sieht man nur, **dass** es rot ist, '
       + 'nicht **woran** es liegt. Die Grafik daneben beantwortet dieselbe Frage für alle '
       + 'Standorte auf einmal.\n\n'
       + 'Zu sehen sind nur Standorte mit hinterlegten Koordinaten; welche fehlen, steht '
@@ -195,10 +194,11 @@ SELECT ${INTENSITAET_EMOJI} || ' ' || s.betrieb AS "Standort",
        s.breitengrad::float             AS "Breitengrad",
        s.laengengrad::float             AS "Längengrad",${INTENSITAET_TEXT} AS "Handlungsbedarf",
        round(s.umsatz)                  AS "Umsatz",
-       -- Die sechs Einzelampeln. Ohne sie sieht man auf der Karte 43-mal
-       -- dieselbe Farbe und weiss nicht, WORAN es liegt. '–' heisst
-       -- "nicht bewertbar", nicht "in Ordnung" -- bei Bewertung und OM ist
-       -- das derzeit der Normalfall, weil dafuer noch keine Daten kommen.
+       -- Die acht Einzelampeln (seit 0129; vorher sechs mit OM). Ohne sie
+       -- sieht man auf der Karte fast ueberall dieselbe Farbe und weiss
+       -- nicht, WORAN es liegt. '–' heisst "nicht bewertbar", nicht "in
+       -- Ordnung" -- bei Personal je Bereich ist das der Normalfall, bis
+       -- der Monatsabruf zwei Jahre gefuellt hat (Vorjahr fehlt sonst).
        coalesce(au.emoji, '–')  AS "Umsatz ●",
        coalesce(ap.emoji, '–')  AS "Personal ●",
        coalesce(ab.emoji, '–')  AS "WE Bar ●",
@@ -261,16 +261,16 @@ SELECT ${INTENSITAET_EMOJI} || ' ' || s.betrieb AS "Standort",
       + 'Nicht operative Betriebe (geschlossen, inaktiv, ohne Umsatz im Monat) zählen nicht '
       + 'mit — ihre nachgetragenen roten Ampeln sind kein Befund, an dem jemand arbeiten '
       + 'könnte.\n\n'
-      + '**Ein niedriger Balken heißt nicht Entwarnung**: OM vor Ort liefert noch gar keine '
-      + 'Daten, die Online-Bewertung erst seit der Yext-Anbindung. Genau deshalb wird hier '
-      + 'gezählt und nicht gemittelt: ein Schnitt wäre stillschweigend einer über die '
-      + 'Kennzahlen mit Daten statt über alle sechs.',
+      + '**Ein niedriger Balken heißt nicht Entwarnung**: Personal je Bereich braucht den '
+      + 'Vorjahresmonat und bleibt ohne ihn ohne Urteil. Genau deshalb wird hier gezählt und '
+      + 'nicht gemittelt: ein Schnitt wäre stillschweigend einer über die Kennzahlen mit Daten '
+      + 'statt über alle acht.',
     anzeige: 'row',
     parameter: [MONAT, MARKE],
     sql: `${MONAT_CTE},
--- Einmal lesen, dann die sechs Ampelspalten in Zeilen kippen. Die
--- Alternative waeren sechs UNION-Zweige, die alle dieselbe Verknuepfung
--- wiederholen -- gleiches Ergebnis, sechsfache Pflege.
+-- Einmal lesen, dann die acht Ampelspalten in Zeilen kippen. Die
+-- Alternative waeren acht UNION-Zweige, die alle dieselbe Verknuepfung
+-- wiederholen -- gleiches Ergebnis, achtfache Pflege.
 mit_ampel AS (
     SELECT r.*
       FROM mart.round_table_monat r
