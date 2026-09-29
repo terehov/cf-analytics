@@ -1552,10 +1552,12 @@ Korrektur 10; Aufrufe in `lina-api-inventar-1c.md` §8):
 
 ~~**Der nächste Schritt ist eine Messung, keine Anfrage: `bun run lina-fragen d10`**~~ — die Messung
 ist im Browser gelaufen. `d10` ist auf den neuen Stand umgebaut (Blätter einzeln, `persozahl`
-statt `manageusers`). **Nächster Schritt in Eugenes Terminal (nicht aus der Agentenumgebung,
-Regel 7a):** `bun run lina-fragen d10` — bestätigt die Rechtelage aus dem Zugang des Importers
-(gleicher Benutzer, anderer Netzwerkweg — Regel 7a) und holt
-`persozahl` einmal als HTML.
+statt `manageusers`). ~~**Nächster Schritt in Eugenes Terminal:** `bun run lina-fragen d10`~~ — **gelaufen am 29.09.2026
+17:51 (Eugenes Terminal, Importer-Zugang), Browserbefund bestätigt:** `Stammdaten` und
+`Vorgesetzte` `denied`/`access=false` (2 gesperrte Blätter im Personalbereich); `manageusers`
+**0 Bytes**; `persozahl` **456.891 Bytes**, 141 `<table`, Jahr 2025, Anstellungsarten gefunden,
+Blätter-Hinweis vorhanden. Der Importer-Zugang sieht also dasselbe wie der Browser —
+die Berechtigung ist keine Frage des Netzwegs. Offen bleibt die Freigabe durch Concept Family.
 
 ~~**Stand 24.08.2026, zweite Messung: es ist KEINE Rechtefrage mehr.** `/common/api/menu`
 meldet für *Mitarbeiter, Lohnbuchhaltung, Lohnrechner, Upload Lohndateien* und

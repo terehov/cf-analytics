@@ -619,6 +619,10 @@ und Stunde (08:00–07:00) Umsatz, Personalkosten und **Effektivität in €/h**
 Daten liefert, ist **nicht gemessen**. Er wäre die einzige Quelle für Personalkosten *je Stunde*
 (Korrektur 4: „Personalstunden je Zeitzone gibt es nicht").
 
+**Bestätigt aus dem Importer-Zugang** (`bun run lina-fragen d10`, Eugenes Terminal, 29.09.2026
+17:51): Menü, `denied`-Blätter, `manageusers` mit 0 Bytes und `persozahl` mit 456.891 Bytes
+(141 `<table`, Jahr 2025) entsprechen dem Browser. Kein Unterschied zwischen beiden Wegen.
+
 ### Folgen
 
 * `d10` ist umgebaut: Schritt 1 wertet **jedes** Personalblatt einzeln aus (Ordner und Blatt

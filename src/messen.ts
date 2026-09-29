@@ -332,7 +332,7 @@ const MESSUNGEN: Messung[] = [
             const kinder = Array.isArray(o.children) ? o.children : []
             const weg = label ? [...pfad, label] : pfad
             if (label && /personal|mitarbeiter|lohn|struktur|vorgesetzte|stammdaten/i.test(
-              `${weg.join('/')} ${String(o.alias ?? '')}`) && /team|lohn|personal|stores/i.test(weg[0] ?? '')) {
+              `${weg.join('/')} ${String(o.alias ?? '')}`) && /team|lohn|personal|stores/i.test(weg[0] ?? '') && !weg.includes('ZAV')) {
               const art = kinder.length > 0 ? 'Ordner' : 'Blatt '
               treffer.push(`   ${art}  ${weg.join(' > ').padEnd(58)} `
                 + `access=${String(o.access).padEnd(5)} type=${String(o.type ?? '').padEnd(8)} `
