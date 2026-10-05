@@ -133,6 +133,15 @@ Warum sie so aussieht:
   große Betriebe unter Soll gleichen viele kleine darüber aus. Die Ampelspalte zählt deshalb
   weiter die Betriebe. Betriebe ohne Soll (Getränke der Deutschen Konzepte) fehlen in Ist
   **und** Soll.
+* **Personalkosten im selben Aufbau** (05.10.2026, Eugene): Ist gegen Maßstab, Monat und YTD,
+  Punkte und Euro. Vorher stand jede Zeile gegen den **Vorjahres**betrag — auch „Ohne GF",
+  dessen Ampel aber am **Budget** urteilt: Tabelle und Ampel maßen Verschiedenes. Jetzt
+  „Ohne GF" gegen Umsatz × Budget, Service/Küche/Bar gegen Bereichsumsatz heute × Quote
+  desselben Monats im Vorjahr, je Betrieb und Monat — volumenbereinigt: mehr Umsatz darf mehr
+  Personal kosten, die Quote nicht. Nur Betrieb-Monate mit beiden Seiten. Gegenprobe in
+  Produktion, September 2026, Aposto Aschaffenburg: Service +0,3 🟠, Küche +1,7 🔴, Bar
+  +0,6 🟠, Ohne GF +7,5 🔴 — jede Abweichung trifft ihre Ampel. „Gesamt (Kasse)" ist nicht
+  die Summe der drei Bereiche (LINAs Gesamt enthält mehr), deshalb ohne Ampel.
 
 Die alten Seiten bleiben. Seit `0129` zeigen sie statt „OM vor Ort" die drei
 Personalampeln je Bereich, und ihre Texte nennen das neue Regelwerk.

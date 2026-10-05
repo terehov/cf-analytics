@@ -249,77 +249,110 @@ SELECT r.monat           AS "Monat",
   // Personalkosten
   // -------------------------------------------------------------------
   {
-    /*
-     * Service, Kueche und Bar aus der Kasse (Monatsabruf, 0129), "ohne GF"
-     * aus der BWA. Die Euro sind je Bereich Quote x eigener Nenner (Service
-     * gegen Gesamtumsatz, Kueche gegen Speisen, Bar gegen Getraenke), die
-     * Quote der Gruppe ist Euro durch Nenner und nicht der Mittelwert der
-     * Quoten.
-     *
-     * Nur Betriebe, die in BEIDEN Jahren Zahlen haben — sonst waere ein
-     * neuer Betrieb ein Kostenanstieg der Gruppe.
-     */
     schluessel: 'mg_personal',
     name: 'Personalkosten',
-    beschreibung: 'Service, Küche und Bar kommen aus der Kasse (LINA), „Ohne GF" aus der BWA. Jeder Bereich hat seinen eigenen Umsatz als Maßstab: Service den Gesamtumsatz, Küche den Speisenumsatz, Bar den Getränkeumsatz — die drei Prozentwerte ergeben deshalb zusammen nicht den Gesamtwert. Bereiche werden gegen das Vorjahr gemessen (grün bis ±0, gelb bis +1 Pkt.), „Ohne GF" gegen das Budget — solange keine Plan-BWA gepflegt ist, die Sollquote von 34 %. Gezählt werden nur Betriebe mit Zahlen in beiden Jahren.',
+    beschreibung: 'Tatsächliche Personalkosten gegen ihren Maßstab — im Monat und kumuliert seit Januar (YTD), wie beim Wareneinsatz. „Ohne GF" kommt aus der BWA und wird am Budget gemessen (solange keine Plan-BWA gepflegt ist, die Sollquote von 34 %); er steht deshalb auf dem letzten gebuchten Monat. Service, Küche und Bar kommen aus der Kasse und werden am selben Monat des Vorjahres gemessen: „Maßstab €" ist, was das Personal beim heutigen Umsatz gekostet hätte, wenn die Quote vom Vorjahr gehalten hätte. Jeder Bereich hat seinen eigenen Umsatz als Bezug (Service den Gesamtumsatz, Küche den Speisenumsatz, Bar den Getränkeumsatz), die drei Prozentwerte ergeben deshalb zusammen nicht „Gesamt". „Abweichung €" über (+) oder unter (−) dem Maßstab. Bei mehreren Betrieben wird summiert, nicht gemittelt. Die Ampeln zählen die Betriebe — grün bis ±0, gelb bis +1 Punkt, rot darüber.',
     anzeige: 'table',
-    // Service, Kueche, Bar, Gesamt (Kasse), Ohne GF (BWA) -- fest.
+    // Ohne GF (BWA), Service, Kueche, Bar, Gesamt (Kasse) -- fest.
     zeilen_max: 5,
     parameter: FILTER,
+    // AUFBAU WIE mg_wareneinsatz (05.10.2026, Eugene: "die Personalkosten
+    // daneben legen wie bei den Wareneinsaetzen"). Vorher: Ist € gegen
+    // Vorjahr € fuer ALLE Zeilen, auch fuer "Ohne GF" -- dessen Ampel aber
+    // am Budget urteilt. Tabelle und Ampel massen also Verschiedenes.
+    //
+    // Massstab in Euro, gewichtet:
+    //   Ohne GF:  Umsatz laut BWA x Budget des Betriebs (Plan-BWA, sonst 34)
+    //   Kasse:    Bereichsumsatz heute x Quote desselben Monats im Vorjahr,
+    //             je Betrieb und Monat -- also volumenbereinigt: mehr Umsatz
+    //             darf mehr Personal kosten, die Quote nicht.
+    // Nur Betrieb-Monate, die beide Seiten haben (Neueroeffnungen fallen
+    // aus der Kasse heraus, statt als Kostenanstieg zu erscheinen).
+    // Budget fuer alle YTD-Monate das des gewaehlten Monats -- wie das
+    // Soll beim Wareneinsatz.
     sql: `${MONAT_CTE}
 , auswahl AS (
     SELECT r.* FROM mart.round_table_monat r CROSS JOIN gewaehlt g WHERE ${AUSWAHL}
 ), kasse AS (
-    SELECT b.bereich, b.nr, b.ist_eur, b.ist_nenner, b.vj_eur, b.vj_nenner, b.ampel
+    SELECT b.bereich, b.nr, 'Vorjahr'::text AS massstab,
+           (pm.monat = g.monat)                    AS ist_monat,
+           b.ist_eur,
+           b.nenner,
+           b.nenner * b.vj_eur / b.vj_nenner       AS massstab_eur
       FROM auswahl r
       CROSS JOIN gewaehlt g
-      JOIN mart.personal_bereich_monat pm ON pm.betrieb_key = r.betrieb_key AND pm.monat = g.monat
-      JOIN mart.personal_bereich_monat pv ON pv.betrieb_key = r.betrieb_key
-                                         AND pv.monat = (g.monat - interval '1 year')::date
+      JOIN mart.personal_bereich_monat pm
+        ON pm.betrieb_key = r.betrieb_key
+       AND pm.monat BETWEEN date_trunc('year', g.monat)::date AND g.monat
+      JOIN mart.personal_bereich_monat pv
+        ON pv.betrieb_key = r.betrieb_key
+       AND pv.monat = (pm.monat - interval '1 year')::date
       CROSS JOIN LATERAL (VALUES
-          ('Service',        1, pm.pk_service_eur, pm.umsatz_gesamt,    pv.pk_service_eur, pv.umsatz_gesamt,    r.ampel_pk_service),
-          ('Küche',          2, pm.pk_kueche_eur,  pm.umsatz_speisen,   pv.pk_kueche_eur,  pv.umsatz_speisen,   r.ampel_pk_kueche),
-          ('Bar',            3, pm.pk_bar_eur,     pm.umsatz_getraenke, pv.pk_bar_eur,     pv.umsatz_getraenke, r.ampel_pk_bar),
-          ('Gesamt (Kasse)', 4, pm.pk_gesamt_eur,  pm.umsatz_gesamt,    pv.pk_gesamt_eur,  pv.umsatz_gesamt,    NULL::text)
-      ) AS b(bereich, nr, ist_eur, ist_nenner, vj_eur, vj_nenner, ampel)
-     WHERE b.ist_eur IS NOT NULL AND b.vj_eur IS NOT NULL
+          ('Service',        2, pm.pk_service_eur, pm.umsatz_gesamt,    pv.pk_service_eur, pv.umsatz_gesamt),
+          ('Küche',          3, pm.pk_kueche_eur,  pm.umsatz_speisen,   pv.pk_kueche_eur,  pv.umsatz_speisen),
+          ('Bar',            4, pm.pk_bar_eur,     pm.umsatz_getraenke, pv.pk_bar_eur,     pv.umsatz_getraenke),
+          ('Gesamt (Kasse)', 5, pm.pk_gesamt_eur,  pm.umsatz_gesamt,    pv.pk_gesamt_eur,  pv.umsatz_gesamt)
+      ) AS b(bereich, nr, ist_eur, nenner, vj_eur, vj_nenner)
+     WHERE b.ist_eur > 0 AND b.nenner > 0 AND b.vj_eur > 0 AND b.vj_nenner > 0
 ), bwa AS (
-    SELECT 'Ohne GF (BWA)'::text AS bereich, 5 AS nr,
-           ki.pk AS ist_eur, ki.umsatz AS ist_nenner, kv.pk AS vj_eur, kv.umsatz AS vj_nenner,
-           r.ampel_personal AS ampel
+    SELECT 'Ohne GF (BWA)'::text AS bereich, 1 AS nr, 'Budget'::text AS massstab,
+           (k.monat = r.bwa_monat)                      AS ist_monat,
+           k.pk                                         AS ist_eur,
+           k.umsatz                                     AS nenner,
+           k.umsatz * r.personal_budget_pct / 100       AS massstab_eur
       FROM auswahl r
       CROSS JOIN LATERAL (
-          SELECT max(k.wert_absolut) FILTER (WHERE k.kennzahl = 'Personalkosten ohne GF') AS pk,
-                 max(k.wert_absolut) FILTER (WHERE k.kennzahl = 'Umsatz')                 AS umsatz
-            FROM mart.kennzahlen_aktuell k
-           WHERE k.betrieb_key = r.betrieb_key AND k.monat = r.bwa_monat) ki
-      CROSS JOIN LATERAL (
-          SELECT max(k.wert_absolut) FILTER (WHERE k.kennzahl = 'Personalkosten ohne GF') AS pk,
+          SELECT k.monat,
+                 max(k.wert_absolut) FILTER (WHERE k.kennzahl = 'Personalkosten ohne GF') AS pk,
                  max(k.wert_absolut) FILTER (WHERE k.kennzahl = 'Umsatz')                 AS umsatz
             FROM mart.kennzahlen_aktuell k
            WHERE k.betrieb_key = r.betrieb_key
-             AND k.monat = (r.bwa_monat - interval '1 year')::date) kv
-     WHERE coalesce(ki.pk, 0) <> 0 AND coalesce(kv.pk, 0) <> 0
+             AND k.monat BETWEEN date_trunc('year', r.bwa_monat)::date AND r.bwa_monat
+           GROUP BY k.monat) k
+     WHERE r.bwa_monat IS NOT NULL
+       AND r.personal_budget_pct IS NOT NULL
+       AND k.pk > 0 AND k.umsatz > 0
 ), alle AS (
-    SELECT * FROM kasse UNION ALL SELECT * FROM bwa
+    SELECT * FROM bwa UNION ALL SELECT * FROM kasse
+), summe AS (
+    SELECT bereich, nr, massstab,
+           sum(ist_eur)      FILTER (WHERE ist_monat) AS ist_m,
+           sum(nenner)       FILTER (WHERE ist_monat) AS nen_m,
+           sum(massstab_eur) FILTER (WHERE ist_monat) AS mas_m,
+           sum(ist_eur)                               AS ist_j,
+           sum(nenner)                                AS nen_j,
+           sum(massstab_eur)                          AS mas_j
+      FROM alle
+     GROUP BY bereich, nr, massstab
+), ampeln AS (
+    SELECT b.bereich, ${verteilung('b.ampel')} AS ampeln
+      FROM auswahl r
+      CROSS JOIN LATERAL (VALUES
+          ('Ohne GF (BWA)', r.ampel_personal),
+          ('Service',       r.ampel_pk_service),
+          ('Küche',         r.ampel_pk_kueche),
+          ('Bar',           r.ampel_pk_bar)
+      ) AS b(bereich, ampel)
+     GROUP BY b.bereich
 )
-SELECT bereich                                                         AS "Bereich",
-       round(sum(ist_eur))                                             AS "Ist €",
-       round(sum(vj_eur))                                              AS "VJ €",
-       round(sum(ist_eur) - sum(vj_eur))                               AS "Δ €",
-       round(100 * sum(ist_eur) / nullif(sum(ist_nenner), 0), 1)       AS "Ist %",
-       round(100 * sum(vj_eur) / nullif(sum(vj_nenner), 0), 1)         AS "VJ %",
-       round(100 * sum(ist_eur) / nullif(sum(ist_nenner), 0)
-           - 100 * sum(vj_eur) / nullif(sum(vj_nenner), 0), 1)         AS "Δ Pkt.",
-       CASE WHEN nr = 5 THEN 'Budget' WHEN nr = 4 THEN '–' ELSE 'Vorjahr' END AS "Ampel gegen",
-       ${verteilung('ampel')}                                          AS "Ampeln",
-       count(*)                                                        AS "Betriebe"
-  FROM alle
- GROUP BY bereich, nr
- ORDER BY nr`,
+SELECT s.bereich                                                AS "Bereich",
+       s.massstab                                               AS "Maßstab",
+       round(s.ist_m / nullif(s.nen_m, 0) * 100, 1)             AS "Ist %",
+       round(s.mas_m / nullif(s.nen_m, 0) * 100, 1)             AS "Maßstab %",
+       round((s.ist_m - s.mas_m) / nullif(s.nen_m, 0) * 100, 1) AS "Abweichung (Pkt.)",
+       round(s.ist_m - s.mas_m)                                 AS "Abweichung €",
+       round(s.ist_j / nullif(s.nen_j, 0) * 100, 1)             AS "Ist YTD %",
+       round(s.mas_j / nullif(s.nen_j, 0) * 100, 1)             AS "Maßstab YTD %",
+       round((s.ist_j - s.mas_j) / nullif(s.nen_j, 0) * 100, 1) AS "Abweichung YTD (Pkt.)",
+       round(s.ist_j - s.mas_j)                                 AS "Abweichung YTD €",
+       coalesce(a.ampeln, '–')                                  AS "Ampeln"
+  FROM summe s
+  LEFT JOIN ampeln a ON a.bereich = s.bereich
+ ORDER BY s.nr`,
     visualisierung: {
       column_settings: {
-        '["name","Ist €"]': EURO, '["name","VJ €"]': EURO, '["name","Δ €"]': EURO,
+        '["name","Abweichung €"]': EURO,
+        '["name","Abweichung YTD €"]': EURO,
       },
     },
   },
