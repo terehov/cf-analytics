@@ -251,7 +251,7 @@ SELECT r.monat           AS "Monat",
   {
     schluessel: 'mg_personal',
     name: 'Personalkosten',
-    beschreibung: 'Tatsächliche Personalkosten gegen ihren Maßstab — im Monat und kumuliert seit Januar (YTD), wie beim Wareneinsatz. „Ohne GF" kommt aus der BWA und wird am Budget gemessen (solange keine Plan-BWA gepflegt ist, die Sollquote von 34 %); er steht deshalb auf dem letzten gebuchten Monat. Service, Küche und Bar kommen aus der Kasse und werden am selben Monat des Vorjahres gemessen: „Maßstab €" ist, was das Personal beim heutigen Umsatz gekostet hätte, wenn die Quote vom Vorjahr gehalten hätte. Jeder Bereich hat seinen eigenen Umsatz als Bezug (Service den Gesamtumsatz, Küche den Speisenumsatz, Bar den Getränkeumsatz), die drei Prozentwerte ergeben deshalb zusammen nicht „Gesamt". „Abweichung €" über (+) oder unter (−) dem Maßstab. Bei mehreren Betrieben wird summiert, nicht gemittelt. Die Ampeln zählen die Betriebe — grün bis ±0, gelb bis +1 Punkt, rot darüber.',
+    beschreibung: 'Tatsächliche Personalkosten gegen ihren Maßstab — im Monat und kumuliert seit Januar (YTD), wie beim Wareneinsatz. „Ohne GF" kommt aus der BWA und wird am Budget gemessen (solange keine Plan-BWA gepflegt ist, die Sollquote von 34 %); er steht deshalb auf dem letzten gebuchten Monat. Service, Küche und Bar kommen aus der Kasse und werden am selben Monat des Vorjahres gemessen: „Maßstab €" ist, was das Personal beim heutigen Umsatz gekostet hätte, wenn die Quote vom Vorjahr gehalten hätte. Jeder Bereich hat seinen eigenen Umsatz als Bezug (Service den Gesamtumsatz, Küche den Speisenumsatz, Bar den Getränkeumsatz), die drei Prozentwerte ergeben deshalb zusammen nicht „Gesamt". „Δ €" und „Δ Pkt." sind die Abweichung über (+) oder unter (−) dem Maßstab. Bei mehreren Betrieben wird summiert, nicht gemittelt. Die Ampeln zählen die Betriebe — grün bis ±0, gelb bis +1 Punkt, rot darüber.',
     anzeige: 'table',
     // Ohne GF (BWA), Service, Kueche, Bar, Gesamt (Kasse) -- fest.
     zeilen_max: 5,
@@ -339,20 +339,20 @@ SELECT s.bereich                                                AS "Bereich",
        s.massstab                                               AS "Maßstab",
        round(s.ist_m / nullif(s.nen_m, 0) * 100, 1)             AS "Ist %",
        round(s.mas_m / nullif(s.nen_m, 0) * 100, 1)             AS "Maßstab %",
-       round((s.ist_m - s.mas_m) / nullif(s.nen_m, 0) * 100, 1) AS "Abweichung (Pkt.)",
-       round(s.ist_m - s.mas_m)                                 AS "Abweichung €",
+       round((s.ist_m - s.mas_m) / nullif(s.nen_m, 0) * 100, 1) AS "Δ Pkt.",
+       round(s.ist_m - s.mas_m)                                 AS "Δ €",
        round(s.ist_j / nullif(s.nen_j, 0) * 100, 1)             AS "Ist YTD %",
-       round(s.mas_j / nullif(s.nen_j, 0) * 100, 1)             AS "Maßstab YTD %",
-       round((s.ist_j - s.mas_j) / nullif(s.nen_j, 0) * 100, 1) AS "Abweichung YTD (Pkt.)",
-       round(s.ist_j - s.mas_j)                                 AS "Abweichung YTD €",
+       round(s.mas_j / nullif(s.nen_j, 0) * 100, 1)             AS "Maßstab YTD",
+       round((s.ist_j - s.mas_j) / nullif(s.nen_j, 0) * 100, 1) AS "Δ YTD Pkt.",
+       round(s.ist_j - s.mas_j)                                 AS "Δ YTD €",
        coalesce(a.ampeln, '–')                                  AS "Ampeln"
   FROM summe s
   LEFT JOIN ampeln a ON a.bereich = s.bereich
  ORDER BY s.nr`,
     visualisierung: {
       column_settings: {
-        '["name","Abweichung €"]': EURO,
-        '["name","Abweichung YTD €"]': EURO,
+        '["name","Δ €"]': EURO,
+        '["name","Δ YTD €"]': EURO,
       },
     },
   },
@@ -398,7 +398,7 @@ SELECT b.bereich                                                                
   {
     schluessel: 'mg_wareneinsatz',
     name: 'Wareneinsatz',
-    beschreibung: 'Tatsächlicher Wareneinsatz laut BWA gegen das Soll — im letzten gebuchten Monat und kumuliert seit Januar (YTD). „Soll (gewichtet)" ist der Wareneinsatz, der beim Soll der jeweiligen Marke erreichbar wäre, gewichtet mit den Erlösen der einzelnen Betriebe. „Abweichung €" ist der Wareneinsatz über (+) oder unter (−) diesem Soll in Euro. Bei mehreren Betrieben wird summiert, nicht gemittelt: große Betriebe zählen entsprechend mehr. Die Ampeln zählen die Betriebe im letzten gebuchten Monat — grün bis +0,5 Punkte über Soll, gelb bis +1,0, rot darüber. Getränke bei den Deutschen Konzepten ohne Soll und deshalb nicht enthalten: die Brauereibindungen machen sie untereinander unvergleichbar.',
+    beschreibung: 'Tatsächlicher Wareneinsatz laut BWA gegen das Soll — im letzten gebuchten Monat und kumuliert seit Januar (YTD). „Soll (gewichtet)" ist der Wareneinsatz, der beim Soll der jeweiligen Marke erreichbar wäre, gewichtet mit den Erlösen der einzelnen Betriebe. „Δ €" ist der Wareneinsatz über (+) oder unter (−) diesem Soll in Euro, „Δ Pkt." dasselbe in Prozentpunkten. Bei mehreren Betrieben wird summiert, nicht gemittelt: große Betriebe zählen entsprechend mehr. Die Ampeln zählen die Betriebe im letzten gebuchten Monat — grün bis +0,5 Punkte über Soll, gelb bis +1,0, rot darüber. Getränke bei den Deutschen Konzepten ohne Soll und deshalb nicht enthalten: die Brauereibindungen machen sie untereinander unvergleichbar.',
     anzeige: 'table',
     // Kueche und Getraenke -- fest.
     zeilen_max: 2,
@@ -460,21 +460,21 @@ SELECT b.bereich                                                                
 )
 SELECT s.bereich                                          AS "Bereich",
        round(s.we_m / nullif(s.erl_m, 0) * 100, 2)              AS "Ist %",
-       round(s.soll_m / nullif(s.erl_m, 0) * 100, 2)            AS "Soll % (gewichtet)",
-       round((s.we_m - s.soll_m) / nullif(s.erl_m, 0) * 100, 2) AS "Abweichung (Pkt.)",
-       round(s.we_m - s.soll_m)                                 AS "Abweichung €",
+       round(s.soll_m / nullif(s.erl_m, 0) * 100, 2)            AS "Soll % gew.",
+       round((s.we_m - s.soll_m) / nullif(s.erl_m, 0) * 100, 2) AS "Δ Pkt.",
+       round(s.we_m - s.soll_m)                                 AS "Δ €",
        round(s.we_j / nullif(s.erl_j, 0) * 100, 2)              AS "Ist YTD %",
-       round(s.soll_j / nullif(s.erl_j, 0) * 100, 2)            AS "Soll YTD %",
-       round((s.we_j - s.soll_j) / nullif(s.erl_j, 0) * 100, 2) AS "Abweichung YTD (Pkt.)",
-       round(s.we_j - s.soll_j)                                 AS "Abweichung YTD €",
+       round(s.soll_j / nullif(s.erl_j, 0) * 100, 2)            AS "Soll YTD",
+       round((s.we_j - s.soll_j) / nullif(s.erl_j, 0) * 100, 2) AS "Δ YTD Pkt.",
+       round(s.we_j - s.soll_j)                                 AS "Δ YTD €",
        a.ampeln                                                 AS "Ampeln"
   FROM summe s
   LEFT JOIN ampeln a ON a.bereich = s.bereich
  ORDER BY s.nr`,
     visualisierung: {
       column_settings: {
-        '["name","Abweichung €"]': EURO,
-        '["name","Abweichung YTD €"]': EURO,
+        '["name","Δ €"]': EURO,
+        '["name","Δ YTD €"]': EURO,
       },
     },
   },

@@ -45,17 +45,17 @@ export const MINDESTHOEHE: Record<Anzeige, number> = {
 /**
  * Mindesthoehe einer Karte. Eine Tabelle mit garantiert wenigen Zeilen
  * (`zeilen_max`) darf niedriger sein als MINDESTHOEHE.table: Titel und
- * Spaltenkoepfe brauchen zwei Einheiten, die Fusszeile eine, jede
- * Datenzeile 0,75. Am 29.09.2026 im Screenshot abgelesen: eine Datenzeile
- * ist ~36 px hoch, eine Rastereinheit aber je nach Breite verschieden --
- * ~44 px bei fester Breite, ~57 px bei voller Breite auf 1440 px. 0,75
- * deckt Einheiten ab ~48 px; bei fester Breite kann die letzte Zeile
- * knapp werden, dann scrollt die Tabelle, sie schneidet nichts ab.
+ * Spaltenkoepfe und Fusszeile zusammen ~125 px, jede Datenzeile ~36 px,
+ * eine Rastereinheit bei voller Breite auf 1.440 px ~55 px (am 05.10.2026
+ * am Management-Dashboard abgelesen) -- also 2,4 Einheiten plus 0,66 je
+ * Zeile. Vorher 3 + 0,75 je Zeile: unter fuenf Zeilen stand ein Drittel
+ * leer. Auf 1.280 px (Einheit ~49 px) kann die letzte Zeile knapp werden;
+ * dann scrollt die Tabelle, sie schneidet nichts ab.
  * Nie hoeher als die normale Mindesthoehe.
  */
 export function mindesthoehe(anzeige: Anzeige, zeilenMax?: number): number {
   if (anzeige === 'table' && zeilenMax !== undefined) {
-    return Math.min(MINDESTHOEHE.table, Math.max(4, Math.ceil(zeilenMax * 0.75) + 3))
+    return Math.min(MINDESTHOEHE.table, Math.max(4, Math.ceil(2.4 + zeilenMax * 0.66)))
   }
   return MINDESTHOEHE[anzeige] ?? 8
 }
