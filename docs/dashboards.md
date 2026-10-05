@@ -255,9 +255,10 @@ Einheiten, der Text füllte zwei; gemeldet am 05.10.2026). Seitdem: 150 Zeichen 
 `mindesthoehe()` = 2,4 Einheiten für Titel, Spaltenköpfe und Fußzeile plus 0,66 je Zeile,
 höchstens 9 (~~3 + 0,85 je Zeile~~ bei fester Breite, ~~3 + 0,75~~ — beides ließ bei voller
 Breite ein Drittel leer). Abgelesen am 05.10.2026 bei voller Breite auf 1.440 px: Kopf und
-Fuß ~125 px, Datenzeile ~36 px, Einheit ~55 px. Spaltenüberschriften kurz halten („Δ YTD €"
+Fuß ~125 px, Datenzeile ~36 px, Einheit ~55 px. Spaltenüberschriften kurz halten („Δ YTD"
 statt „Abweichung YTD €"): Metabase misst die Spaltenbreite auch an der Überschrift, und die
-letzte Spalte — meist die Ampelzählung — wird sonst abgeschnitten. Anlass:
+letzte Spalte — meist die Ampelzählung — wird sonst abgeschnitten. Kein „€" in den Namen
+einer Währungsspalte: Metabase hängt „(€)" selbst an, aus „Δ €" wurde „Δ € (€)". Anlass:
 „Wareneinsatz" hat zwei Zeilen und stand auf neun Einheiten — darunter sieben leere. Wer
 `zeilen_max` setzt und die Abfrage später erweitert, bekommt eine Tabelle mit Scrollbalken,
 keinen Fehler: den Wert mit dem SQL zusammen ändern.
