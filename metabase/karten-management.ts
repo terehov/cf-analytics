@@ -365,31 +365,85 @@ SELECT b.bereich                                                                
   {
     schluessel: 'mg_wareneinsatz',
     name: 'Wareneinsatz',
-    beschreibung: 'Wareneinsatz laut BWA gegen das Soll der Marke. Grün bis +0,5 Punkte über Soll, gelb bis +1,0, rot darüber. Bei mehreren Betrieben der mittlere Betrieb (Median). Getränke bei den Deutschen Konzepten ohne Ampel: die Brauereibindungen machen sie untereinander unvergleichbar.',
+    beschreibung: 'Tatsächlicher Wareneinsatz laut BWA gegen das Soll — im letzten gebuchten Monat und kumuliert seit Januar (YTD). „Soll (gewichtet)" ist der Wareneinsatz, der beim Soll der jeweiligen Marke erreichbar wäre, gewichtet mit den Erlösen der einzelnen Betriebe. „Abweichung €" ist der Wareneinsatz über (+) oder unter (−) diesem Soll in Euro. Bei mehreren Betrieben wird summiert, nicht gemittelt: große Betriebe zählen entsprechend mehr. Die Ampeln zählen die Betriebe im letzten gebuchten Monat — grün bis +0,5 Punkte über Soll, gelb bis +1,0, rot darüber. Getränke bei den Deutschen Konzepten ohne Soll und deshalb nicht enthalten: die Brauereibindungen machen sie untereinander unvergleichbar.',
     anzeige: 'table',
     // Kueche und Getraenke -- fest.
     zeilen_max: 2,
     parameter: FILTER,
+    // SUMMEN STATT MEDIANE (05.10.2026, Eugene: "wir sehen nur den
+    // optimal zu erreichenden Wareneinsatz, nicht die Abweichung zum
+    // tatsaechlichen"). Vorher standen Ist, Soll und Abweichung je als
+    // Median ueber die Betriebe da -- drei Mediane verschiedener Betriebe,
+    // die nicht zueinander passten (Ist 22,88, Soll 24, Abweichung -0,83)
+    // und keinen Euro-Betrag kannten.
+    //
+    // Euro aus der BWA: wert_absolut ist der Wareneinsatz in Euro, der
+    // Nenner (Erloese Speisen bzw. Getraenke) wird aus Euro / Prozent
+    // zurueckgerechnet. Gegenprobe Juni 2026, acht groesste Betriebe:
+    // Erloese Speisen + Getraenke = 99,3 bis 100,6 % des BWA-Umsatzes.
+    // Plausibilitaetsgrenze 150 % wie in mart.round_table_basis.
+    //
+    // Soll je Betrieb aus round_table_monat (das Soll der Marke zum
+    // gewaehlten Monat), fuer alle Monate der YTD dasselbe. Betriebe ohne
+    // Soll (Getraenke der Deutschen Konzepte) fallen aus Ist UND Soll
+    // heraus -- sonst stuende im Ist ein Umsatz, gegen den kein Soll steht.
     sql: `${MONAT_CTE}
 , auswahl AS (
     SELECT r.* FROM mart.round_table_monat r CROSS JOIN gewaehlt g WHERE ${AUSWAHL}
+), bwa AS (
+    SELECT x.bereich, x.nr, (k.monat = a.bwa_monat) AS ist_monat,
+           k.wert_absolut                          AS we_eur,
+           k.wert_absolut / (k.wert_prozent / 100) AS erloes,
+           x.soll
+      FROM auswahl a
+      JOIN mart.kennzahlen_aktuell k
+        ON k.betrieb_key = a.betrieb_key
+       AND k.kennzahl IN ('WE Küche', 'WE Bar')
+       AND k.monat BETWEEN date_trunc('year', a.bwa_monat)::date AND a.bwa_monat
+      CROSS JOIN LATERAL (SELECT
+             CASE k.kennzahl WHEN 'WE Küche' THEN 'Küche' ELSE 'Getränke' END AS bereich,
+             CASE k.kennzahl WHEN 'WE Küche' THEN 1 ELSE 2 END                AS nr,
+             CASE k.kennzahl WHEN 'WE Küche' THEN a.we_kueche_soll_pct
+                                             ELSE a.we_bar_soll_pct END       AS soll) x
+     WHERE a.bwa_monat IS NOT NULL
+       AND x.soll IS NOT NULL
+       AND k.wert_absolut > 0
+       AND k.wert_prozent > 0 AND k.wert_prozent <= 150
+), summe AS (
+    SELECT bereich, nr,
+           sum(we_eur)              FILTER (WHERE ist_monat) AS we_m,
+           sum(erloes)              FILTER (WHERE ist_monat) AS erl_m,
+           sum(erloes * soll / 100) FILTER (WHERE ist_monat) AS soll_m,
+           sum(we_eur)                                       AS we_j,
+           sum(erloes)                                       AS erl_j,
+           sum(erloes * soll / 100)                          AS soll_j
+      FROM bwa
+     GROUP BY bereich, nr
+), ampeln AS (
+    SELECT b.bereich, ${verteilung('b.ampel')} AS ampeln
+      FROM auswahl r
+      CROSS JOIN LATERAL (VALUES ('Küche', r.ampel_we_kueche), ('Getränke', r.ampel_we_bar)) AS b(bereich, ampel)
+     GROUP BY b.bereich
 )
-SELECT b.bereich                                                                   AS "Bereich",
-       round(percentile_cont(0.5) WITHIN GROUP (ORDER BY b.ist)::numeric, 2)      AS "Ist WE %",
-       round(percentile_cont(0.5) WITHIN GROUP (ORDER BY b.vj)::numeric, 2)       AS "Vorjahr %",
-       round(percentile_cont(0.5) WITHIN GROUP (ORDER BY b.soll)::numeric, 2)     AS "Soll %",
-       round(percentile_cont(0.5) WITHIN GROUP (ORDER BY b.abw)::numeric, 2)      AS "Abweichung (Pkt.)",
-       ${verteilung('b.ampel')}                                                   AS "Ampeln"
-  FROM auswahl r
-  LEFT JOIN mart.round_table_monat v ON v.betrieb_key = r.betrieb_key
-                                    AND v.monat = (r.monat - interval '1 year')::date
-  CROSS JOIN LATERAL (VALUES
-      ('Küche',    1, r.we_kueche_pct, v.we_kueche_pct, r.we_kueche_soll_pct, r.we_kueche_abw_pp, r.ampel_we_kueche),
-      ('Getränke', 2, r.we_bar_pct,    v.we_bar_pct,    r.we_bar_soll_pct,    r.we_bar_abw_pp,    r.ampel_we_bar)
-  ) AS b(bereich, nr, ist, vj, soll, abw, ampel)
- WHERE b.ist IS NOT NULL
- GROUP BY b.bereich, b.nr
- ORDER BY b.nr`,
+SELECT s.bereich                                          AS "Bereich",
+       round(s.we_m / nullif(s.erl_m, 0) * 100, 2)              AS "Ist %",
+       round(s.soll_m / nullif(s.erl_m, 0) * 100, 2)            AS "Soll % (gewichtet)",
+       round((s.we_m - s.soll_m) / nullif(s.erl_m, 0) * 100, 2) AS "Abweichung (Pkt.)",
+       round(s.we_m - s.soll_m)                                 AS "Abweichung €",
+       round(s.we_j / nullif(s.erl_j, 0) * 100, 2)              AS "Ist YTD %",
+       round(s.soll_j / nullif(s.erl_j, 0) * 100, 2)            AS "Soll YTD %",
+       round((s.we_j - s.soll_j) / nullif(s.erl_j, 0) * 100, 2) AS "Abweichung YTD (Pkt.)",
+       round(s.we_j - s.soll_j)                                 AS "Abweichung YTD €",
+       a.ampeln                                                 AS "Ampeln"
+  FROM summe s
+  LEFT JOIN ampeln a ON a.bereich = s.bereich
+ ORDER BY s.nr`,
+    visualisierung: {
+      column_settings: {
+        '["name","Abweichung €"]': EURO,
+        '["name","Abweichung YTD €"]': EURO,
+      },
+    },
   },
 
   // -------------------------------------------------------------------

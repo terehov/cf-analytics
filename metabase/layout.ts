@@ -63,22 +63,32 @@ export function mindesthoehe(anzeige: Anzeige, zeilenMax?: number): number {
 /**
  * Wie hoch muss eine Textkachel sein, damit nichts abgeschnitten wird?
  *
- * Grob, aber in die sichere Richtung: rund 95 Zeichen passen bei voller
- * Breite in eine Zeile, eine Ueberschrift braucht mehr Luft als
- * Fliesstext, und in eine Rastereinheit gehen etwa anderthalb Textzeilen.
- * Lieber eine Einheit zu viel als ein abgeschnittener Satz.
+ * Gerechnet fuer VOLLE BREITE (Standard seit 29.09.2026). Am 05.10.2026
+ * nachkalibriert, weil die alte Rechnung (95 Zeichen je Zeile, 1,5
+ * Textzeilen je Einheit -- beides fuer feste Breite und ~40-px-Einheiten)
+ * jeden Beschreibungsblock zwei- bis dreimal zu hoch machte: der Kopf von
+ * ① Round Table stand auf sechs Einheiten, der Text fuellte zwei.
+ *
+ * Abgelesen bei voller Breite auf 1.440 px: rund 175 Zeichen je volle
+ * Zeile, eine Einheit ~57 px, eine Textzeile ~24 px. Gerechnet wird mit
+ * Reserve fuer schmalere Bildschirme (1.280 px): 150 Zeichen je Zeile,
+ * 2,2 Textzeilen je Einheit, dazu gut eine halbe Einheit Innenabstand.
+ * Auf breiten Bildschirmen bleibt Luft -- die Einheit waechst dort mit,
+ * der Text nicht --, auf schmalen wird nichts abgeschnitten.
  */
 export function textHoehe(text: string, breite: number): number {
-  const zeichenProZeile = Math.max(20, Math.round((breite / 24) * 95))
+  const zeichenProZeile = Math.max(20, Math.round((breite / 24) * 150))
   let zeilen = 0
   for (const abschnitt of text.split('\n')) {
     if (!abschnitt.trim()) { zeilen += 0.4; continue }
     const umbrueche = Math.max(1, Math.ceil(abschnitt.length / zeichenProZeile))
     // Ueberschriften und Blockzitate sind hoeher als Fliesstext
-    const faktor = abschnitt.startsWith('#') ? 1.5 : abschnitt.startsWith('>') ? 1.2 : 1
+    const faktor = abschnitt.startsWith('# ') ? 1.8
+      : abschnitt.startsWith('#') ? 1.5
+      : abschnitt.startsWith('>') ? 1.2 : 1
     zeilen += umbrueche * faktor
   }
-  return Math.max(2, Math.ceil(zeilen / 1.5) + 1)
+  return Math.max(1, Math.ceil(zeilen / 2.2 + 0.6))
 }
 
 /**

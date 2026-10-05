@@ -102,7 +102,8 @@ Warum sie so aussieht:
   Betrieb steht dort eine 1 — für die Gruppe die Verteilung. Ampeln werden nie gemittelt.
 * **Werte der Gruppe sind Summen, wo sie sich summieren lassen, sonst Mediane.** Umsatz,
   Personalkosten in Euro und die Rendite (EBIT durch Umsatz) werden summiert und dann geteilt;
-  Wareneinsatz und Bewertung sind der Median der Betriebe. Beim Personal zählen nur Betriebe
+  Bewertung ist der Median der Betriebe. ~~Wareneinsatz ebenfalls Median~~ — seit 05.10.2026
+  summiert, siehe unten. Beim Personal zählen nur Betriebe
   mit Zahlen in beiden Jahren — sonst wäre jede Neueröffnung ein Kostenanstieg der Gruppe.
 * **Umsatz gegen Vorjahr als zwei Linien in Euro**, eine Achse. Die Veränderung in Prozent
   steht in der Kachel darüber — nicht als zweite Achse.
@@ -119,6 +120,19 @@ Warum sie so aussieht:
 * **„Umsatz je Personalstunde"** steht zusätzlich neben der Personaltabelle — Daniels
   Rückfrage nach der Effektivität. Die Werte kommen aus LINA (`eff_*`), je Bereich mit dem
   eigenen Umsatz als Nenner; für die Gruppe Umsatz durch Stunden, nicht gemittelt.
+* **Wareneinsatz: Ist gegen umsatzgewichtetes Soll, Monat und YTD, in Punkten und in Euro**
+  (05.10.2026, Eugene: „wir sehen nur den optimal zu erreichenden Wareneinsatz, nicht die
+  Abweichung zum tatsächlichen"). Vorher standen Ist, Soll und Abweichung je als **Median**
+  da — drei Mediane verschiedener Betriebe, die nicht zueinander passten (August 2026,
+  Produktion: Ist 22,88, Soll 24, Abweichung −0,83) und keinen Euro kannten. Jetzt: Ist = Σ WE €
+  / Σ Erlöse €, Soll = Σ (Erlöse × Soll der Marke) / Σ Erlöse, Abweichung € = Σ WE € − Σ
+  (Erlöse × Soll). Die Erlöse rechnet die Karte aus der BWA zurück (WE € / WE %); Speisen +
+  Getränke ergaben im Juni 2026 bei den acht größten Betrieben 99,3–100,6 % des
+  BWA-Umsatzes. Was die Summe zeigt, was der Median verbarg: im Klon lag die Küche der
+  Gruppe 1,37 Punkte (~72.000 €) **unter** Soll, während 15 Betriebe rot waren — wenige
+  große Betriebe unter Soll gleichen viele kleine darüber aus. Die Ampelspalte zählt deshalb
+  weiter die Betriebe. Betriebe ohne Soll (Getränke der Deutschen Konzepte) fehlen in Ist
+  **und** Soll.
 
 Die alten Seiten bleiben. Seit `0129` zeigen sie statt „OM vor Ort" die drei
 Personalampeln je Bereich, und ihre Texte nennen das neue Regelwerk.
@@ -216,9 +230,13 @@ davon geht bei jeder Karte der Titel ab, bei Diagrammen zusätzlich die Achsenbe
 | `scatter` | 9 | Punktwolke wird sonst ein Strich |
 | `table` | 9 | Kopfzeile + ~6 Datenzeilen; darunter lohnt keine Tabelle |
 
-Textkacheln rechnet `textHoehe()` aus der Zeichenzahl — rund 95 Zeichen je Zeile bei voller
-Breite, Überschriften mit Faktor 1,5, Blockzitate mit 1,2. Bewusst großzügig: lieber eine
-Einheit zu viel als ein abgeschnittener Satz.
+Textkacheln rechnet `textHoehe()` aus der Zeichenzahl. ~~Rund 95 Zeichen je Zeile, 1,5
+Textzeilen je Einheit~~ — das galt für feste Breite und machte nach der Umstellung auf volle
+Breite jeden Beschreibungsblock zwei- bis dreimal zu hoch (Kopf von ① Round Table: sechs
+Einheiten, der Text füllte zwei; gemeldet am 05.10.2026). Seitdem: 150 Zeichen je volle Zeile,
+2,2 Textzeilen je Einheit plus gut eine halbe Einheit Innenabstand, `#` Faktor 1,8, `##`/`###`
+1,5, Blockzitate 1,2. Abgelesen auf 1.440 px (~175 Zeichen, Einheit ~57 px), mit Reserve für
+1.280 px. Alle 146 Textkacheln zusammen: 780 → 480 Einheiten.
 
 **Kleine Tabellen dürfen niedriger sein (seit 29.09.2026).** Eine Karte mit `zeilen_max`
 (die Abfrage garantiert höchstens so viele Zeilen — feste Bereiche oder `LIMIT`) bekommt
