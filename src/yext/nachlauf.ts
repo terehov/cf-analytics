@@ -131,13 +131,22 @@ const ANALYTICS_MONATE = 25
 /** nicht taeglich eine Stunde spaeter rutscht und irgendwann ganz ausfaellt. */
 const ABSTAND_STUNDEN = 20
 
-export async function yextNachlauf(): Promise<void> {
+/**
+ * Wie der Nachlauf ausgegangen ist — fuer die Zusammenfassung in `sync.ts`.
+ *
+ * Bis zum 05.10.2026 gab er nichts zurueck, und `sync.ts` schrieb „yext: ok",
+ * sobald er nicht WARF. Da er nie wirft, stand dort siebzehn Naechte lang
+ * „ok", waehrend die Analytics jede Nacht scheiterten.
+ */
+export type YextAusgang = 'ok' | 'teilweise' | 'fehler' | 'nicht faellig' | 'nicht eingerichtet'
+
+export async function yextNachlauf(): Promise<YextAusgang> {
   try {
     if (!yextKonfiguriert()) {
       // Kein Fehler: Yext ist optional, und wer keinen Schluessel hat, soll
       // keinen Fehler im Log finden, der keiner ist.
       log.debug('yext-nachlauf uebersprungen — kein YEXT_API_KEY')
-      return
+      return 'nicht eingerichtet'
     }
 
     const r = await query<{ faellig: boolean; zuletzt: string | null }>(
@@ -151,7 +160,7 @@ export async function yextNachlauf(): Promise<void> {
     const zeile = r[0]
     if (zeile && !zeile.faellig) {
       log.debug('yext-nachlauf noch nicht faellig', { zuletzt: zeile.zuletzt })
-      return
+      return 'nicht faellig'
     }
 
     /**
@@ -269,20 +278,53 @@ export async function yextNachlauf(): Promise<void> {
      * "yext" in src/status.ts). Der naechste Nachlauf versucht es in 20
      * Stunden erneut — bei sechs Aufrufen ist das billig.
      */
+    /*
+     * ~~"er wird geloggt, und `/status` sieht ihn an den leeren Tabellen"~~
+     * — stimmte nicht. Die Tabellen waren nach dem ersten Lauf nie wieder
+     * leer, `/status` meldete also „Analytics gefuellt", und der Fehler
+     * stand vom 18.09. bis zum 05.10.2026 ausschliesslich im Log (Regel 10).
+     * Seitdem landet der Ausgang im Merker `yext_analytics`: Zeitpunkt,
+     * Erfolg, Fehlertext, ausgeklammerte Entitaeten. `mart.quelle_zulauf`
+     * liest ihn als „gefragt" und zeigt den Fehler daneben, `/status` warnt.
+     */
     try {
       const a = await analyticsLaden({ monateAnzahl: ANALYTICS_MONATE })
+      await analyticsMerken({ ok: true, verworfen: a.verworfen })
       log.info('yext-analytics fertig', {
         aufrufe: a.aufrufe, themen: a.themen, antworten: a.antworten,
-        noten: a.noten, sichtbarkeit: a.sichtbarkeit,
+        noten: a.noten, sichtbarkeit: a.sichtbarkeit, verworfen: a.verworfen,
       })
+      return a.verworfen.length > 0 || erg.fehler.length > 0 ? 'teilweise' : 'ok'
     } catch (e) {
-      log.warn('yext-analytics fehlgeschlagen — Staende und Texte stehen bereits',
-        { fehler: String((e as Error).message ?? e).slice(0, 300) })
+      const fehler = String((e as Error).message ?? e).slice(0, 300)
+      await analyticsMerken({ ok: false, fehler, verworfen: [] })
+      log.warn('yext-analytics fehlgeschlagen — Staende und Texte stehen bereits', { fehler })
+      return 'teilweise'
     }
   } catch (e) {
     // Regel 1. Ein Standort ohne Antwort, ein abgelaufener Schluessel, ein
     // Netzhaenger — nichts davon darf den Import mitnehmen.
     log.warn('yext-nachlauf fehlgeschlagen — der Sync-Lauf bleibt davon unberuehrt',
       { fehler: String((e as Error).message ?? e).slice(0, 300) })
+    return 'fehler'
   }
+}
+
+/**
+ * Der Ausgang der Analytics, fuer `mart.quelle_zulauf` und `/status`.
+ *
+ * `beendet_am` ist der Versuch, nicht der Erfolg: genau diese Trennung
+ * fehlte. An der Tabelle allein sieht „wir fragen nicht mehr" genauso aus wie
+ * „wir fragen, und Yext lehnt ab" — die Sicht meldete deshalb siebzehn Tage
+ * lang einen Baufehler, wo ein abgelehnter Aufruf war. Wirft nie.
+ */
+async function analyticsMerken(a: { ok: boolean; fehler?: string; verworfen: string[] }) {
+  await query(
+    `INSERT INTO sync.merker (schluessel, wert)
+     VALUES ('yext_analytics', jsonb_build_object(
+       'beendet_am', now(), 'ok', $1::boolean, 'fehler', $2::text,
+       'verworfen', to_jsonb($3::text[])))
+     ON CONFLICT (schluessel) DO UPDATE SET wert = excluded.wert, gesetzt_am = now()`,
+    [a.ok, a.fehler ?? null, a.verworfen],
+  ).catch(e => log.warn('merker yext_analytics nicht geschrieben', { fehler: String(e).slice(0, 200) }))
 }

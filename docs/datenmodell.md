@@ -1296,3 +1296,14 @@ anhängen kann. Die abhängigen Sichten werden aus ihrer Definition **in der Zie
 neu erzeugt (Kommentare, Spaltenkommentare, Rechte, Indizes eingeschlossen), nicht aus einer
 Abschrift in der Migration: die Dateien geben den Stand einer Bank nicht zuverlässig wieder.
 Eine unbekannte Abhängigkeit lässt die Migration scheitern.
+
+
+## Gefragt ist nicht geliefert — auch an der Tabelle (`0130`, 05.10.2026)
+
+`sync.quelle.merker` nennt für Quellen, die an ihrer Tabelle gemessen werden, einen Schlüssel in
+`sync.merker`, der den letzten **Versuch** stempelt (`wert->>'beendet_am'`) und seinen Ausgang
+(`ok`, `fehler`). `mart.quelle_zulauf` nimmt dann den jüngeren von Tabelle und Merker als
+`zuletzt_gefragt` und hängt `letzter_fehler` an. Ohne Merker bleibt es wie in `0076`.
+Heute tragen ihn die vier Yext-Analytics-Quellen (`yext_analytics`); `core.bewertung_antwort` und
+`core.bewertung_note` sind dafür neu ins Register gekommen. `mart.sync_status` zeigt zusätzlich
+`notiz`. Anlass und Hergang: `fehlerkatalog.md`, 05.10.2026.

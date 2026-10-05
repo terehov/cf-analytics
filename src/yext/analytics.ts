@@ -26,7 +26,7 @@
  */
 import { query } from '../db/pool'
 import { log } from '../lib/log'
-import { bericht, datenstand, zahl, text, type BerichtZeile, type BerichtFilter } from './client'
+import { bericht, datenstand, zahl, text, YextFehler, type BerichtZeile, type BerichtFilter } from './client'
 import { zuordnungen, type Monat, monate } from './laden'
 
 export type AnalyticsErgebnis = {
@@ -36,6 +36,8 @@ export type AnalyticsErgebnis = {
   noten: number
   sichtbarkeit: number
   metriken: number
+  /** Zugeordnete Entitaeten, die Yext nicht mehr kennt — ausgeklammert, nicht verschwiegen. */
+  verworfen: string[]
 }
 
 /** Der Zeitraum als Filter -- Yext will Kalendertage, nicht Monatserste. */
@@ -311,6 +313,13 @@ async function datenstandLaden() {
   return stand.length
 }
 
+/** Die ID aus Yexts Ablehnung einer unbekannten Entitaet, sonst null. */
+export function unbekannteEntitaet(e: unknown): string | null {
+  if (!(e instanceof YextFehler) || e.status !== 400) return null
+  const m = /entityId "([^"]+)" does not exist/.exec(e.message)
+  return m ? m[1]! : null
+}
+
 /**
  * Alle vier Bloecke plus Datenstand. Sechs Aufrufe insgesamt.
  *
@@ -326,6 +335,7 @@ export async function analyticsLaden(opt: {
   const ziel = await zuordnungen()
   const erg: AnalyticsErgebnis = {
     aufrufe: 0, themen: 0, antworten: 0, noten: 0, sichtbarkeit: 0, metriken: 0,
+    verworfen: [],
   }
   if (ziel.length === 0) {
     log.warn('kein Betrieb hat eine Yext-Zuordnung — Analytics uebersprungen',
@@ -355,10 +365,46 @@ export async function analyticsLaden(opt: {
     return erg
   }
 
-  erg.themen = await themenLaden(karte, ids, f);        erg.aufrufe += 1
-  erg.antworten = await antwortLaden(karte, ids, f);    erg.aufrufe += 3
-  erg.noten = await notenLaden(karte, ids, f);          erg.aufrufe += 1
-  erg.sichtbarkeit = await sichtbarkeitLaden(karte, ids, f); erg.aufrufe += 1
+  /**
+   * EINE GELOESCHTE ENTITAET NAHM ALLE VIER BLOECKE MIT (18.09.–05.10.2026).
+   *
+   * Alle Betriebe stehen in EINEM Filter. Kennt Yext eine davon nicht mehr,
+   * lehnt es den ganzen Bericht ab — HTTP 400, `The entityId "A_03" does not
+   * exist`. So geschehen, nachdem Aposto Augsburg in Yext geloescht worden
+   * war: siebzehn Naechte lang keine Themen, Antworten, Noten, Sichtbarkeit,
+   * fuer keinen der 60 Betriebe.
+   *
+   * Deshalb wird genau dieser Fehler hier beantwortet: die genannte ID
+   * faellt aus dem Filter, der Bericht laeuft neu. Verschwiegen wird sie
+   * nicht — sie steht in `verworfen`, der Nachlauf schreibt sie in den
+   * Merker `yext_analytics`, und `/status` nennt sie. Die Zuordnung in
+   * `manual.betrieb_fremd_id` bleibt stehen: ob der Betrieb geschlossen ist,
+   * entscheidet ein Mensch, nicht ein HTTP-Status.
+   *
+   * Die Bloecke schreiben per Upsert; ein Neubeginn nach einem Teilerfolg
+   * schreibt dieselben Zeilen noch einmal und sonst nichts. Hoechstens fuenf
+   * Runden — verschwinden mehr Entitaeten auf einmal, ist etwas anderes kaputt.
+   */
+  let filterIds = ids
+  for (let runde = 0; ; runde++) {
+    try {
+      erg.themen = await themenLaden(karte, filterIds, f);        erg.aufrufe += 1
+      erg.antworten = await antwortLaden(karte, filterIds, f);    erg.aufrufe += 3
+      erg.noten = await notenLaden(karte, filterIds, f);          erg.aufrufe += 1
+      erg.sichtbarkeit = await sichtbarkeitLaden(karte, filterIds, f); erg.aufrufe += 1
+      break
+    } catch (e) {
+      const weg = unbekannteEntitaet(e)
+      if (weg === null || !filterIds.includes(weg) || runde >= 4) throw e
+      erg.aufrufe += 1
+      erg.verworfen.push(weg)
+      filterIds = filterIds.filter(id => id !== weg)
+      log.warn('yext kennt eine zugeordnete Entitaet nicht mehr — ausgeklammert', {
+        entitaet: weg, betrieb_key: karte.get(weg),
+        hinweis: 'Zuordnung in manual.betrieb_fremd_id pruefen — geschlossen?',
+      })
+    }
+  }
   erg.metriken = await datenstandLaden();               erg.aufrufe += 1
 
   log.info('yext analytics geladen', erg)

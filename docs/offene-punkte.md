@@ -2135,6 +2135,12 @@ eigene Quelle mit Vorrang Umsatzbericht, nie überschreibend. Bis dahin sagt die
   Umbau, Kassenwechsel? Wird am 01.10. von selbst `inaktiv` (60 Tage). **Aposto Augsburg** seit
   13.09.2026 ebenso. Beide stehen in `mart.luecke_monat` („operativer Betrieb seit mehr als 8
   Tagen ohne Umsatz").
+  **Nachtrag 05.10.2026:** Aposto Augsburg ist auch **in Yext gelöscht** (Entität `A_03`, zwischen
+  18. und 19.09.2026), die letzte Bewertung ist vom 06.09. — drei Quellen sagen dasselbe.
+  Das spricht deutlich für eine Schließung. Ein Mensch bestätigt es, dann: Status pflegen und die
+  Yext-Zuordnung in `manual.betrieb_fremd_id` entfernen (bis dahin klammern die Analytics sie
+  selbst aus und `/status` nennt sie, `docs/fehlerkatalog.md` 05.10.2026). Neu dazu: **Wilma
+  Wunder Recklinghausen** seit dem 24.09.2026 ohne Umsatz, in Yext weiter mit Bewertungen.
 * **Wilma Wunder Bochum: keine BWA gebucht.** Die Zuordnung stimmt (LINA-ID 5721, LINA liefert
   jeden Monat die BWA-Struktur), alle Werte sind 0 — seit Eröffnung am 28.05.2026 bei 510.780 €
   Umsatz. Frage an die Buchhaltung: wird Bochum in LINA gebucht, oder unter einem anderen
@@ -2224,3 +2230,20 @@ Rückgang ein Handlungsfeld ist. Braucht eine Schwelle von Daniel.
 **Das Dashboard „Round Table — Regelwerk-Vergleich"** vergleicht seit `0129` zwei Regelwerke,
 nach denen nicht mehr geurteilt wird. Die Seite ist entsprechend beschriftet; ob sie bleiben
 soll, entscheidet Eugene.
+
+
+## Auf `/status` hört niemand zu (05.10.2026)
+
+`docs/importer.md` beschreibt `/status` als Alarm: HTTP 503, wenn ein Mensch hinsehen soll, und
+„einen HTTP-Monitor auf `https://<host>/status` legen". Eingerichtet ist keiner — jedenfalls ist
+nirgends einer dokumentiert. Die Prüfung `zulauf` stand vom 20.09. bis 05.10.2026 auf `stoerung`
+(Yext-Analytics, `fehlerkatalog.md`), und niemand erfuhr es. **Zu entscheiden: Eugene** — Uptime
+Kuma auf dem Hetzner-Server, Better Stack oder eine Dokploy-Benachrichtigung; Hauptsache, ein 503
+erreicht jemanden. Solange das fehlt, ist jede Prüfung in `/status` nur so gut wie der nächste,
+der zufällig nachsieht.
+
+**Zweitens, und damit verwandt:** seit dem 10.09.2026 ist fast jeder Lauf `teilweise`
+(3–13 Postenfehler je Nacht, überwiegend FoodNotify-Bestellpositionen mit HTTP 500). Damit
+trägt `teilweise` keine Information mehr, und die Herabstufung durch stumme Quellen geht darin
+unter. Seit `0130` zeigt `mart.sync_status` die Notiz; ob stumme Quellen einen eigenen Status
+bekommen sollen, ist offen.

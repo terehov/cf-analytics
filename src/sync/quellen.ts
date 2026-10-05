@@ -41,6 +41,13 @@ export type Quelle = {
   /** Gemessen direkt an der Zieltabelle. Für Nachläufe ohne `sync.aufgabe`. */
   tabelle?: { schema: string; name: string; zeitspalte: string }
   kadenz_stunden: number
+  /**
+   * Nur mit `tabelle`: ein Schlüssel in `sync.merker`, der den letzten
+   * VERSUCH stempelt (seit 0130). Ohne ihn ist an der Tabelle „gefragt"
+   * dasselbe wie „geliefert", und ein abgelehnter Aufruf sieht aus wie ein
+   * Importer, der nicht mehr fragt.
+   */
+  merker?: string
   /** `false` = liefert bewusst nichts. Zählt in keiner Prüfzeile mit. */
   erwartet?: boolean
   bemerkung?: string
@@ -223,12 +230,24 @@ export const QUELLEN: readonly Quelle[] = [
   { quelle: 'yext:bewertung', bezeichnung: 'Einzelbewertungen mit Text',
     system: 'yext', tabelle: { schema: 'core', name: 'bewertung', zeitspalte: 'geladen_am' },
     kadenz_stunden: 48 },
+  /*
+   * Die vier Analytics-Tabellen hängen an EINEM Aufruf (`analyticsLaden()`)
+   * und tragen deshalb denselben Merker. Antwort und Note standen bis 0130
+   * nicht im Register — vom 18.09. bis 05.10.2026 standen sie still wie die
+   * beiden anderen, und keine Prüfung hätte es je gemeldet.
+   */
   { quelle: 'yext:bewertung_thema', bezeichnung: 'Themen aus den Bewertungen',
     system: 'yext', tabelle: { schema: 'core', name: 'bewertung_thema', zeitspalte: 'geladen_am' },
-    kadenz_stunden: 48 },
+    merker: 'yext_analytics', kadenz_stunden: 48 },
   { quelle: 'yext:betrieb_sichtbarkeit', bezeichnung: 'Sichtbarkeit je Betrieb',
     system: 'yext', tabelle: { schema: 'core', name: 'betrieb_sichtbarkeit', zeitspalte: 'geladen_am' },
-    kadenz_stunden: 48 },
+    merker: 'yext_analytics', kadenz_stunden: 48 },
+  { quelle: 'yext:bewertung_antwort', bezeichnung: 'Antwortverhalten auf Bewertungen',
+    system: 'yext', tabelle: { schema: 'core', name: 'bewertung_antwort', zeitspalte: 'geladen_am' },
+    merker: 'yext_analytics', kadenz_stunden: 48 },
+  { quelle: 'yext:bewertung_note', bezeichnung: 'Noten je Betrieb und Monat (Analytics)',
+    system: 'yext', tabelle: { schema: 'core', name: 'bewertung_note', zeitspalte: 'geladen_am' },
+    merker: 'yext_analytics', kadenz_stunden: 48 },
 
   // --- Bounti: gemessen an den Tabellen ---------------------------------
   /*
@@ -447,11 +466,11 @@ export async function quellenSpiegeln(): Promise<number> {
     await query(
       `INSERT INTO sync.quelle
          (quelle, bezeichnung, system, endpunkt, schema_name, tabelle, zeitspalte,
-          kadenz_stunden, erwartet, bemerkung, nachzuegler_tage, fensterklasse)
+          kadenz_stunden, erwartet, bemerkung, nachzuegler_tage, fensterklasse, merker)
        SELECT q->>'quelle', q->>'bezeichnung', q->>'system', q->>'endpunkt',
               q->>'schema_name', q->>'tabelle', q->>'zeitspalte',
               (q->>'kadenz_stunden')::int, (q->>'erwartet')::boolean, q->>'bemerkung',
-              (q->>'nachzuegler_tage')::int, q->>'fensterklasse'
+              (q->>'nachzuegler_tage')::int, q->>'fensterklasse', q->>'merker'
          FROM jsonb_array_elements($1::jsonb) AS q
        ON CONFLICT (quelle) DO UPDATE
           SET bezeichnung = excluded.bezeichnung, system = excluded.system,
@@ -460,7 +479,8 @@ export async function quellenSpiegeln(): Promise<number> {
               kadenz_stunden = excluded.kadenz_stunden, erwartet = excluded.erwartet,
               bemerkung = excluded.bemerkung,
               nachzuegler_tage = excluded.nachzuegler_tage,
-              fensterklasse = excluded.fensterklasse`,
+              fensterklasse = excluded.fensterklasse,
+              merker = excluded.merker`,
       [JSON.stringify(QUELLEN.map(q => ({
         quelle: q.quelle, bezeichnung: q.bezeichnung, system: q.system,
         endpunkt: q.endpunkt ?? null,
@@ -472,6 +492,7 @@ export async function quellenSpiegeln(): Promise<number> {
         bemerkung: q.bemerkung ?? null,
         nachzuegler_tage: nachzueglerFenster(q.endpunkt),
         fensterklasse: q.fensterklasse ?? null,
+        merker: q.merker ?? null,
       })))])
 
     const weg = await query<{ quelle: string }>(

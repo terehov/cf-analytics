@@ -25,6 +25,12 @@ import { bountiNachlauf } from './bounti/nachlauf'
 import { zulaufPruefen } from './sync/zulauf'
 import { pflegeNachlauf } from './pflege/nachlauf'
 
+/** „ok" nur, wenn der Dienst nichts anderes sagt — siehe die Liste der Dienste unten. */
+function dienstAusgang(e: PromiseSettledResult<unknown>): string {
+  if (e.status === 'rejected') return 'FEHLER'
+  return typeof e.value === 'string' ? e.value : 'ok'
+}
+
 const ausloeser = process.argv.includes('--backfill') ? 'backfill'
                 : process.argv.includes('--manuell')  ? 'manuell'
                 : 'zeitplan'
@@ -133,7 +139,13 @@ try {
    * Bricht eines doch, steht es als Fehler im Log und der Lauf geht weiter;
    * lautlos verschluckt wird nichts (Regel 10).
    */
-  const dienste: Array<[string, Promise<void>]> = [
+  /*
+   * Ein Dienst darf seinen Ausgang als Text zurueckgeben ('teilweise'). Bis
+   * zum 05.10.2026 hiess hier „ok" nur „hat nicht geworfen" — und da keiner
+   * wirft, stand Yext siebzehn Naechte lang auf „ok", waehrend jeder
+   * Analytics-Aufruf scheiterte.
+   */
+  const dienste: Array<[string, Promise<unknown>]> = [
     ['yext',       yextNachlauf()],
     ['bounti',     bountiNachlauf()],
     ['wetter',     wetterNachlauf()],
@@ -169,7 +181,7 @@ try {
   try {
     log.info('phase a fertig — dienste gelaufen', {
       dienste: dienste.map(([name], i) =>
-        `${name}: ${diensteAusgang[i]!.status === 'fulfilled' ? 'ok' : 'FEHLER'}`).join(' · '),
+        `${name}: ${dienstAusgang(diensteAusgang[i]!)}`).join(' · '),
     })
 
     /**

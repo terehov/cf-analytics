@@ -1874,3 +1874,14 @@ Round-Table-Nachlauf vor `mart.round_table_monat` aufgefrischt.
 Getestet gegen die Attrappe (`e2e.test.ts`: ein Monatsposten schreibt in die Monatstabelle und
 keine Monatszeile in `core.personalkosten`). **Gegen das echte LINA noch nicht gelaufen** —
 Gegenprobe nach der ersten Nacht in `offene-punkte.md`.
+
+
+## Ein Dienst sagt, wie er ausgegangen ist (05.10.2026)
+
+`sync.ts` schrieb bis hierhin „ok" für jeden Dienst, der nicht warf — und keiner wirft. Ein
+Dienst darf jetzt einen Text zurückgeben (`yextNachlauf()`: `ok`, `teilweise`, `fehler`,
+`nicht faellig`, `nicht eingerichtet`), und die Zeile `phase a fertig — dienste gelaufen` druckt
+ihn. Die Yext-Analytics schreiben ihren Ausgang in den Merker `yext_analytics`; `/status` liest
+ihn, statt nur auf leere Tabellen zu prüfen. Eine Entität, die Yext nicht mehr kennt, wird aus
+dem Analytics-Filter ausgeklammert und gemeldet, statt den ganzen Bericht zu kippen.
+Hergang: `fehlerkatalog.md`, 05.10.2026.

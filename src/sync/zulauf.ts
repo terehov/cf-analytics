@@ -32,6 +32,8 @@ export type Stumm = {
   zustand: string
   stunden_ohne_zulauf: number | null
   wird_noch_gefragt: boolean
+  /** Seit 0130: warum die Quelle ablehnt, wenn ihr Merker es weiss. */
+  letzter_fehler: string | null
 }
 
 /**
@@ -46,7 +48,7 @@ export async function stummeQuellen(): Promise<Stumm[]> {
   return await query<Stumm>(
     `SELECT quelle, system, zustand,
             stunden_ohne_zulauf::float AS stunden_ohne_zulauf,
-            wird_noch_gefragt
+            wird_noch_gefragt, letzter_fehler
        FROM mart.quelle_zulauf
       WHERE erwartet AND zustand IN ('stumm','nie')
       ORDER BY wird_noch_gefragt, quelle`)
@@ -79,12 +81,15 @@ export async function zulaufPruefen(laufId: string | number | null): Promise<num
           ? ` — davon ${ungefragt.length} gar nicht mehr abgefragt: `
             + `${ungefragt.map(s => s.quelle).join(', ')}`
           : '')
+      + [...new Set(stumm.map(s => s.letzter_fehler).filter(Boolean))]
+          .map(f => ` — abgelehnt: ${f}`).join('')
 
     log.warn('QUELLEN OHNE ZULAUF — der Lauf meldet nicht mehr ok', {
       quellen: stumm.map(s => ({
         quelle: s.quelle, zustand: s.zustand,
         stundenOhneZulauf: s.stunden_ohne_zulauf,
         wirdNochGefragt: s.wird_noch_gefragt,
+        letzterFehler: s.letzter_fehler,
       })),
       sicht: 'SELECT * FROM mart.quelle_zulauf WHERE zustand <> \'ok\';',
     })

@@ -461,14 +461,24 @@ export async function statusErheben(): Promise<Statusbericht> {
   } else {
     const yext = await eine<{
       alter_stunden: number | null; themen: number; antworten: number; noten: number
+      analytics_ok: boolean | null; analytics_fehler: string | null
+      verworfen: string[] | null; analytics_alter_stunden: number | null
     }>(
       `SELECT round(EXTRACT(epoch FROM (now() - (m.wert->>'beendet_am')::timestamptz)) / 3600, 1)
                 AS alter_stunden,
               (SELECT count(*) FROM core.bewertung_thema)   AS themen,
               (SELECT count(*) FROM core.bewertung_antwort) AS antworten,
-              (SELECT count(*) FROM core.bewertung_note)    AS noten
+              (SELECT count(*) FROM core.bewertung_note)    AS noten,
+              (a.wert->>'ok')::boolean AS analytics_ok,
+              a.wert->>'fehler'        AS analytics_fehler,
+              ARRAY(SELECT jsonb_array_elements_text(coalesce(a.wert->'verworfen', '[]')))
+                AS verworfen,
+              round(EXTRACT(epoch FROM (now() - (SELECT max(geladen_am)
+                                                   FROM core.bewertung_thema))) / 3600, 1)
+                AS analytics_alter_stunden
          FROM (SELECT 1) x
-         LEFT JOIN sync.merker m ON m.schluessel = 'yext_letzter_lauf'`)
+         LEFT JOIN sync.merker m ON m.schluessel = 'yext_letzter_lauf'
+         LEFT JOIN sync.merker a ON a.schluessel = 'yext_analytics'`)
 
     const leer = Number(yext?.themen) === 0
               && Number(yext?.antworten) === 0
@@ -487,6 +497,40 @@ export async function statusErheben(): Promise<Statusbericht> {
         meldung: `Yext-Nachlauf seit ${yext.alter_stunden} h nicht gelaufen`,
         naechster_schritt: 'Läuft der Sync noch? Der Nachlauf hängt an ihm — siehe Prüfung "laeufe".',
         werte: { alterStunden: yext.alter_stunden },
+      })
+    } else if (yext.analytics_ok === false
+               || (!leer && Number(yext.analytics_alter_stunden) > 48)) {
+      /*
+       * SEIT DEM 05.10.2026. Vorher kannte diese Prüfung nur „leer", und die
+       * Tabellen waren nach dem ersten Lauf nie wieder leer. Vom 18.09. bis
+       * zum 05.10.2026 lehnte Yext jeden Analytics-Aufruf ab, und hier stand
+       * siebzehn Tage lang „Analytics gefüllt". Gefüllt ist nicht frisch.
+       */
+      p.push({
+        name: 'yext', stufe: 'warnung',
+        meldung: yext.analytics_ok === false
+          ? `Yext-Analytics scheitern: ${yext.analytics_fehler ?? 'ohne Fehlertext'}`
+          : `Yext-Analytics seit ${yext.analytics_alter_stunden} h ohne neue Zeilen`,
+        naechster_schritt:
+          "SELECT * FROM mart.quelle_zulauf WHERE system = 'yext'; — letzter_fehler nennt den Grund.",
+        werte: {
+          alterStunden: yext.alter_stunden,
+          analyticsAlterStunden: yext.analytics_alter_stunden,
+          fehler: yext.analytics_fehler,
+        },
+      })
+    } else if ((yext.verworfen ?? []).length > 0) {
+      // Die Analytics laufen, aber ohne diese Betriebe: Yext kennt ihre
+      // Entität nicht mehr. Meist geschlossen — das entscheidet ein Mensch.
+      p.push({
+        name: 'yext', stufe: 'warnung',
+        meldung: `Yext kennt zugeordnete Entitäten nicht mehr: ${yext.verworfen!.join(', ')} `
+               + '— sie fehlen in Themen, Antworten, Noten und Sichtbarkeit',
+        naechster_schritt:
+          "SELECT f.fremd_id, b.name FROM manual.betrieb_fremd_id f JOIN core.betrieb b USING (betrieb_key) "
+          + `WHERE f.system = 'yext' AND f.fremd_id = ANY('{${yext.verworfen!.join(',')}}'); `
+          + '— geschlossen? Dann Status pflegen und die Zuordnung entfernen.',
+        werte: { verworfen: yext.verworfen },
       })
     } else if (leer) {
       // Der irrefuehrendste der drei Zustaende: frischer Zeitstempel neben

@@ -5065,3 +5065,54 @@ src/`): `lina-api-korrekturen.md`, `lina-api-inventar.md`, `lina-api-inventar-1b
 `bounti-api-inventar.md`, `offene-punkte.md`, `entscheidungen.md`, `metabase.md`, `dashboards.md`,
 `migrations/0129_management_regelwerk.sql`. Frühere Einträge dieser Datei über Korrektur 6
 (24.08. und 29.09.) bleiben stehen: sie beschreiben, wie es zu dem Zustand kam.
+
+
+## Eine gelöschte Yext-Entität legte alle Analytics still — siebzehn Nächte, und überall stand „ok" (05.10.2026)
+
+**Symptom.** `mart.quelle_zulauf` führte `yext:bewertung_thema` und `yext:betrieb_sichtbarkeit`
+als `stumm`, seit dem 18.09.2026 ohne Zeile, mit `wird_noch_gefragt = false`. Der Lauf meldete
+`yext: ok`, `/status` meldete „Yext aktuell, Analytics gefüllt". Bewertungen und Stände liefen
+normal weiter. Aufgefallen erst bei einer Nachfrage, wie die Läufe stehen.
+
+**Ursache.** Im Log jeder Nacht seit dem 18.09.:
+`yext-analytics fehlgeschlagen — HTTP 400 — 5063 FATAL_ERROR Validation error: The entityId "A_03" does not exist`.
+`A_03` ist **Aposto Augsburg**, in Yext gelöscht (der Betrieb macht seit dem 13.09.2026 keinen
+Umsatz mehr). Die Zuordnung in `manual.betrieb_fremd_id` stand noch. Die Analytics stellen
+**alle Betriebe in einen Filter**, und Yext lehnt den ganzen Bericht ab, wenn eine ID fehlt.
+Weil `themenLaden()` der erste Block ist, fielen Themen, Antworten, Noten und Sichtbarkeit für
+alle 60 Betriebe aus. Die Stände (ein Aufruf je Betrieb) gaben für `A_03` stumm `— (0)` zurück.
+
+**Warum es niemand sah — vier Stellen, jede für sich plausibel:**
+
+1. `yextNachlauf()` fing den Fehler ab und schrieb ihn **nur ins Log**. Der Kommentar daneben
+   versprach, `/status` sehe ihn „an den leeren Tabellen".
+2. `/status` prüfte nur **leer**. Nach dem ersten Lauf waren die Tabellen nie mehr leer.
+   Gefüllt ist nicht frisch.
+3. `sync.ts` schrieb `ok`, wenn ein Dienst **nicht warf**. Kein Dienst wirft.
+4. `mart.quelle_zulauf` setzte bei Tabellenquellen „gefragt = geliefert" und meldete deshalb
+   **„wird nicht mehr gefragt"**, also einen Baufehler, wo ein abgelehnter Aufruf war. Die
+   Herabstufung des Laufs auf `teilweise` änderte nichts, weil seit dem 10.09. **jeder** Lauf
+   `teilweise` ist (Postenfehler bei FoodNotify), und die Notiz mit den Namen zeigte
+   `mart.sync_status` nicht. `core.bewertung_antwort` und `core.bewertung_note` standen gar
+   nicht im Quellenregister.
+
+Die einzigen Stellen, die korrekt anschlugen, waren die Prüfung `zulauf` in `/status`
+(`stoerung`, HTTP 503) und die Kachel „Quellen ohne Zulauf" im Import-Dashboard — und auf
+`/status` ist kein Monitor eingerichtet (`docs/offene-punkte.md`).
+
+**Was es heute verhindert** (Migration `0130`):
+
+* `analyticsLaden()` erkennt genau diese Ablehnung (`unbekannteEntitaet()`, getestet), klammert
+  die ID aus und fragt neu — höchstens fünf Runden. Die ID steht im Ergebnis als `verworfen`.
+* Der Nachlauf schreibt den Ausgang in den Merker `yext_analytics` (Zeitpunkt, `ok`, Fehlertext,
+  ausgeklammerte IDs) und gibt `ok`/`teilweise`/`fehler` zurück. `sync.ts` druckt diesen Ausgang.
+* `sync.quelle.merker`: bei Tabellenquellen stempelt der Merker den **Versuch**.
+  `mart.quelle_zulauf` trennt damit „fragt nicht mehr" von „fragt, wird abgelehnt" und zeigt
+  `letzter_fehler`. Antwort und Note stehen jetzt im Register.
+* `/status` warnt bei gescheitertem Merker, bei Analytics älter als 48 h und bei ausgeklammerten
+  Entitäten — mit dem Betriebsnamen als nächstem Schritt.
+* `mart.sync_status` zeigt die Notiz des Laufs.
+
+**Lehre.** Ein `catch`, das nur loggt, ist ein Ort, an dem Regel 10 still bricht — auch dann,
+wenn der Kommentar daneben eine Prüfung verspricht. Wer einen Fehler auffängt, schreibt ihn in
+die Datenbank. Und: eine Prüfung auf „leer" schützt nur den ersten Lauf.

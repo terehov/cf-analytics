@@ -62,7 +62,7 @@ stellen: Admin → Tabellenmetadaten → Schema `core` → Sichtbarkeit.
 | BWA-Kennzahlen, jüngster Stand | `mart.kennzahlen_aktuell` |
 | Wer hängt bei der BWA hinterher? | `mart.bwa_rueckstand` — „nie gebucht" ist kein Rückstand |
 | Stimmen die Zahlen? | `mart.pruefung_uebersicht` |
-| Läuft der Import? | `mart.sync_status`, `mart.backfill_fortschritt` — seit `0116` mit `ableitungen_bis` (wann die Auswertungen frisch waren) und `nachladen_offen` (was der Backfill noch vor sich hat) |
+| Läuft der Import? | `mart.sync_status`, `mart.backfill_fortschritt` — seit `0116` mit `ableitungen_bis` (wann die Auswertungen frisch waren) und `nachladen_offen` (was der Backfill noch vor sich hat), seit `0130` mit `notiz` (welche Quellen stumm sind — `teilweise` allein ist seit dem 10.09.2026 der Normalfall) |
 | Fehlt einem Betrieb die BWA-Brücke? | `mart.betrieb_ohne_lina_id` — Erwartung: leer |
 | Ampeln über Bereiche hinweg zählen | `mart.ampel_bereich` — Langformat, eine Zeile je Bereich |
 | Umsatz kumuliert, Vorjahresvergleich | `mart.umsatz_ytd` |
@@ -949,6 +949,10 @@ Prüfzeile zählt deshalb **nur die eigenen** — eine Zeile, die nie auf null g
 mehr (dieselbe Überlegung wie bei `0070`, `0071` und `0073`).
 
 ## `mart.quelle_zulauf` — die Sicht zu Regel 10 (Migration `0076`, 14.08.2026)
+
+> **Seit `0130` (05.10.2026):** neue Spalte `letzter_fehler`, und bei Quellen mit Merker ist
+> `wird_noch_gefragt` endlich auch an der Tabelle wahr, wenn gefragt und abgelehnt wurde. Vorher
+> meldete die Sicht die abgelehnten Yext-Analytics 17 Tage lang als „wird nicht mehr gefragt".
 
 Bekommt jede Quelle noch Zulauf? Vier Zustände, und der Unterschied zwischen
 zweien davon ist der ganze Punkt:
