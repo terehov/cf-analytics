@@ -142,6 +142,9 @@ Warum sie so aussieht:
   Produktion, September 2026, Aposto Aschaffenburg: Service +0,3 🟠, Küche +1,7 🔴, Bar
   +0,6 🟠, Ohne GF +7,5 🔴 — jede Abweichung trifft ihre Ampel. „Gesamt (Kasse)" ist nicht
   die Summe der drei Bereiche (LINAs Gesamt enthält mehr), deshalb ohne Ampel.
+  Mit elf Spalten passte die Tabelle nicht mehr neben „Umsatz je Personalstunde" (15 von 24
+  Spalten: YTD € und Ampeln abgeschnitten) — sie hat jetzt eine eigene Zeile, die
+  Effektivität steht direkt darunter.
 
 Die alten Seiten bleiben. Seit `0129` zeigen sie statt „OM vor Ort" die drei
 Personalampeln je Bereich, und ihre Texte nennen das neue Regelwerk.

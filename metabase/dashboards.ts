@@ -292,13 +292,11 @@ export const dashboards: Dashboard[] = [
         { karte: 'mg_handlungsfelder', breite: 12,
           klick: [{ ziel: 'db_management', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] },
       ] },
-      // Personal und Effektivitaet in einer Reihe (ein Thema); die
-      // Breiten so, dass die Ampelspalten nicht abgeschnitten werden --
-      // bei 13/11 fehlten sie im Screenshot vom 29.09.2026.
-      { teile: [
-        { karte: 'mg_personal', breite: 15 },
-        { karte: 'mg_effektivitaet', breite: 9 },
-      ] },
+      // Personal volle Breite, Effektivitaet direkt darunter (ein Thema).
+      // Seit dem Umbau auf Ist/Massstab/YTD (05.10.2026) hat die Tabelle
+      // elf Spalten; bei 15 von 24 fehlten im Screenshot YTD € und Ampeln.
+      { teile: [{ karte: 'mg_personal' }] },
+      { teile: [{ karte: 'mg_effektivitaet' }] },
       // Wareneinsatz als eigene Zeile: er gehoert fachlich weder zu den
       // Bewertungen noch zum Personal (Eugene, 29.09.2026).
       { teile: [{ karte: 'mg_wareneinsatz' }] },
