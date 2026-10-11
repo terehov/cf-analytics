@@ -1728,3 +1728,10 @@ Bewertungen je Zeile).
 (`schwellen_seit_0129`, `personal_bereich_nenner`); `schwellen_seit_0107` ist abgeschaltet.
 Katalogabzug neu gezogen. Als `mcp_leser` jede Spalte gelesen (nicht nur `count(*)`, siehe
 `0109`), dazu `mart.round_table(monat)`.
+
+## `mart.betrieb_schliessung_stand` und `betrieb_status` (Migration `0131`, 11.10.2026)
+
+`mart.betrieb_status` kennt `geschlossen` jetzt auch aus `manual.betrieb_schliessung` — solange es
+keinen Umsatz nach dem letzten offenen Tag gibt. Wer auf `status = 'operativ'` filtert, verliert
+damit geschlossene Betriebe sofort statt erst nach 60 Tagen. Die neue Sicht `mart.betrieb_schliessung_stand`
+(eine Zeile je Handpflegezeile, Spalte `zustand`) ist die Prüfsicht dazu; Erwartung `wirkt`.

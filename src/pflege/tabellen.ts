@@ -82,6 +82,24 @@ export const ZIELE: readonly Ziel[] = [
     zweck: 'Konzepte ohne laufenden Betrieb aus ⑫ heraushalten',
   },
   /**
+   * Geschlossene Betriebe mit ihrem letzten offenen Tag (Migration `0131`).
+   *
+   * Angefragt am 11.10.2026 für Aposto Augsburg und Wilma Wunder
+   * Recklinghausen. `geschlossen` kam in `mart.betrieb_status` bis dahin nur
+   * aus dem Namen oder dem LINA-Konzept — beides liegt in LINA, und dort
+   * ändern wir nichts. Umsatz NACH `letzter_offener_tag` hebt die Schließung
+   * in der Sicht auf; `mart.betrieb_schliessung_stand` sagt, ob eine Zeile
+   * wirkt. Der Betrieb darf als Name stehen (`betrieb`).
+   */
+  {
+    datei: 'betrieb_schliessung.csv',
+    tabelle: 'manual.betrieb_schliessung',
+    schluessel: ['betrieb_key'],
+    spalten: ['betrieb_key', 'letzter_offener_tag', 'notiz'],
+    pflicht: ['letzter_offener_tag'],
+    zweck: 'Geschlossene Betriebe mit letztem offenen Tag, wirkt in mart.betrieb_status',
+  },
+  /**
    * Die Klassengrenzen des Wettereffekts (Migration `0087`).
    *
    * WARUM DAS HIER STEHT UND NICHT IM QUELLTEXT: die Grenzen sind eine

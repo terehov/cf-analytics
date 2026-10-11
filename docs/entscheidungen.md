@@ -4081,3 +4081,27 @@ angelegt** — das war der Auftrag. Was zu entscheiden bleibt:
 
 **Verworfen bzw. widerrufen an diesem Tag:** „Die Personalrechte sind da" (Korrektur 6) —
 `access=true` galt dem Ordner *Mitarbeiter*, nicht dem Blatt *Stammdaten*.
+
+## 11.10.2026 — Geschlossene Betriebe sind Daten, mit dem letzten offenen Tag (`0131`)
+
+**Anlass.** Eugene bestätigte, dass Aposto Augsburg (letzter Umsatz 13.09.2026) und Wilma Wunder
+Recklinghausen (24.09.2026) geschlossen sind. Beide standen auf `operativ` und füllten
+`mart.luecke_monat` („seit mehr als 8 Tagen ohne Umsatz“) — eine Meldung, die nichts mehr zu tun
+hat und die nächste echte verdeckt. `geschlossen` kam bis dahin nur aus dem Namen oder dem
+LINA-Konzept; beides liegt in LINA, und dort ändern wir nichts (Regel 1).
+
+**Entschieden: eine Tabelle `manual.betrieb_schliessung` (Betrieb, `letzter_offener_tag`),
+gepflegt über `pflege/betrieb_schliessung.csv`.** Der Tag ist ein Datum und kein Kennzeichen:
+Umsatz **nach** dem letzten offenen Tag hebt die Schließung in `mart.betrieb_status` auf. Eine
+Wiedereröffnung braucht damit keinen Handgriff in der Tabelle, und ein Betrieb mit Umsatz wird
+nie still als geschlossen geführt. `mart.betrieb_schliessung_stand` sagt je Zeile, ob sie wirkt
+(Erwartung: `wirkt`).
+
+**Verworfen:** die Zeilen in der Migration (jeder weitere Betrieb wäre wieder eine Migration —
+der Weg, den `0079` abgeschafft hat); eine Spalte auf `core.betrieb` (die Tabelle gehört dem
+Importer und wird aus LINA gefüllt); Abwarten bis `inaktiv` (60 Tage, also erst Mitte/Ende November).
+
+**Nachgemessen am 11.10.2026** auf einem Klon: Migration läuft, CSV wird angenommen (2 von 2
+Zeilen), beide Betriebe stehen auf `geschlossen`; ein Schließungstag vor dem letzten Umsatz
+stellt den Betrieb auf `operativ` zurück und die Sicht meldet „wirkt nicht“. Der Klon war
+älter als die Produktion (letzter Umsatz 12.08.), deshalb meldete er dort „weicht ab“.

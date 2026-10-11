@@ -1307,3 +1307,13 @@ Eine unbekannte Abhängigkeit lässt die Migration scheitern.
 Heute tragen ihn die vier Yext-Analytics-Quellen (`yext_analytics`); `core.bewertung_antwort` und
 `core.bewertung_note` sind dafür neu ins Register gekommen. `mart.sync_status` zeigt zusätzlich
 `notiz`. Anlass und Hergang: `fehlerkatalog.md`, 05.10.2026.
+
+## Geschlossene Betriebe als Handpflege (`0131`, 11.10.2026)
+
+`manual.betrieb_schliessung (betrieb_key, letzter_offener_tag, notiz, gepflegt_am)`, gepflegt
+über `pflege/betrieb_schliessung.csv` (Betrieb als Name, Datum ISO). `mart.betrieb_status` bekommt
+den Join und eine dritte Bedingung im Zweig `geschlossen`: Zeile vorhanden **und** kein Umsatz
+nach `letzter_offener_tag`. Spalten der Sicht unverändert. `mart.betrieb_schliessung_stand`
+(neu) nennt je Zeile `wirkt`, `wirkt, aber … weicht vom letzten Umsatztag ab` (kein Fehler: Ruhetag,
+Tag mit 0,00 EUR) oder `wirkt nicht` (Umsatz nach dem Tag — wieder offen?). Entscheidung:
+`entscheidungen.md`, 11.10.2026.
