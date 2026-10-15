@@ -5436,7 +5436,7 @@
    "koernung": "eine Marke — Ladestand der Rezepte",
    "thema": "import",
    "summen_erlaubt": false,
-   "kommentar": "Je Marke: wie viele Rezepte geladen sind, wie viele nur ueber einen Verweis\ngefunden wurden, wie viele noch ohne Zutaten sind, und wann die Rezeptliste\nzuletzt geholt wurde. zustand: ok / zutaten ausstehend (Backfill laeuft) /\nzutaten leer, keine rezepte, liste veraltet, liste nie geholt (Fehler, Regel 10) /\nkein FoodNotify-Zulauf (Marke ohne Zugang, kein Befund). Fortschritt des ersten\nAbzugs: rezepte_fn (FoodNotifys Zahl), rezepte (bekannt), mit_zutaten, ohne_zutaten\n(Rest), abzug_pct (Prozentzahl). archiviert zaehlt archivierte Rezepte (sie bleiben\ndrin). nicht_gefunden: Rezepte,\nauf die FoodNotify mit 404 antwortet (vermutlich geloescht). verweise_ohne_rezept:\nHalbfabrikate, auf die ein Rezept zeigt, die wir aber nicht kennen.\n\nKoernung: eine Marke — Ladestand der Rezepte",
+   "kommentar": "Je Marke: wie viele Rezepte geladen sind, wie viele nur ueber einen Verweis\ngefunden wurden, wie viele noch ohne Zutaten sind, und wann die Rezeptliste\nzuletzt geholt wurde. zustand: ok / zutaten ausstehend (Backfill laeuft) /\nzutaten leer, keine rezepte, liste veraltet, liste nie geholt, zugang ausgefallen,\ntagesgeschaeft gedeckelt (Befunde, Regel 10) / kein FoodNotify-Zulauf (Marke hatte nie\neine FoodNotify-Aufgabe, kein Befund). Fortschritt des ersten\nAbzugs: rezepte_fn (FoodNotifys Zahl), rezepte (bekannt), mit_zutaten, ohne_zutaten\n(Rest), abzug_pct (Prozentzahl). archiviert zaehlt archivierte Rezepte (sie bleiben\ndrin). nicht_gefunden: Rezepte,\nauf die FoodNotify mit 404 antwortet (vermutlich geloescht). verweise_ohne_rezept:\nHalbfabrikate, auf die ein Rezept zeigt, die wir aber nicht kennen.\n\nKoernung: eine Marke — Ladestand der Rezepte",
    "spalten": [
     "marke_key",
     "marke",
@@ -5459,7 +5459,9 @@
     "rezepte_fn",
     "liste_noch_unbekannt",
     "abzug_pct",
-    "volle_runde_am"
+    "volle_runde_am",
+    "volle_runde_abgeschlossen_am",
+    "tagesgeschaeft_gedeckelt_am"
    ],
    "achsen": [
     "marke"
