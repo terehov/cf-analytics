@@ -17,6 +17,7 @@
     "lina-fragen": "bun run src/messen.ts",
     "belege-vorschau": "bun run src/belege.ts",
     "belege-herunterladen": "bun run src/belege.ts --ziehen",
+    "rezepte-probe": "bun run src/rezepte_probe.ts",
     "bounti:pruefen": "bun run src/bounti_pruefen.ts",
     "bounti:zuordnen": "bun run src/bounti_zuordnen.ts"
   },

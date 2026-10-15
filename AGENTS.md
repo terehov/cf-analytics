@@ -329,6 +329,10 @@ bun run einreihen --historie --von 2018-01-01 --bis 2026-07-24
 bun run einreihen --foodnotify               # FoodNotify-Backfill starten
 bun run einreihen --foodnotify-inventuren    # Inventur-Backfill starten (B1, lohnend fast nur bei Wilma Wunder)
 bun run einreihen --rezepte --dry-run        # zählt, was rezepteNachfuellen() einreihen würde (0132), schreibt nichts
+bun run rezepte-probe [--marke wilma_wunder] [--artikel 300203]
+                                             # liest FoodNotify, nur GET: Form von Liste/Kopf/Zutaten/Meta
+                                             # je Marke, ≤ 40 Aufrufe, Rohantworten nach belege/ — keine DB
+                                             # (nur im Terminal des Nutzers)
 bun run health                               # Health-Endpunkt (Container-CMD)
 curl localhost:3000/health                     # lebt der Container?
 curl localhost:3000/status                     # muss jemand hinsehen? (503 = ja)

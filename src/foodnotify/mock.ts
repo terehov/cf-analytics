@@ -38,7 +38,7 @@ const REZEPTE = JSON.parse(readFileSync(
     in_liste: boolean; kopf: Record<string, unknown>; zutaten: unknown[]; meta: unknown }>
 const REZEPTLISTE: Record<number, string[]> = { 1: ['1032008', '1048034'], 2: ['1030679'] }
 
-function rezeptAntwort(pfad: string, url: URL): unknown | null {
+function rezeptAntwort(pfad: string, url: URL, fremd = false): unknown | null {
   if (pfad === '/api/recipes') {
     const seite = Number(url.searchParams.get('page') ?? 1)
     const ids = REZEPTLISTE[seite] ?? []
@@ -52,7 +52,8 @@ function rezeptAntwort(pfad: string, url: URL): unknown | null {
   if (!m) return null
   const r = REZEPTE[m[1]!]
   if (!r) return null
-  if (m[2] === '/ingredients') return { data: r.zutaten }
+  // Fremde Huelle zum Test der Formpruefung: ein Objekt statt der Liste.
+  if (m[2] === '/ingredients') return fremd ? { ingredients: r.zutaten } : { data: r.zutaten }
   if (m[2] === '/meta') return { data: r.meta }
   return { data: r.kopf }
 }
@@ -109,6 +110,8 @@ export function fnMockStarten(opt: FnMockOptionen = {}) {
    * umstellbar, aus demselben Grund wie `verbieten()` unten.
    */
   const kaputt = new Set<string>()
+  /** /ingredients in einer fremden Huelle ({ingredients: [...]}) — zur Laufzeit umstellbar. */
+  let rezeptHuelleFremd = false
 
   const json = (body: unknown, init: ResponseInit = {}) =>
     new Response(JSON.stringify(body), {
@@ -391,7 +394,7 @@ export function fnMockStarten(opt: FnMockOptionen = {}) {
          * nicht löscht, was Seite 1 geschrieben hat.
          */
         default: {
-          const rezept = rezeptAntwort(pfad, url)
+          const rezept = rezeptAntwort(pfad, url, rezeptHuelleFremd)
           if (rezept) return json(rezept)
           const items = pfad.match(/^\/api\/erp\/stocktakings\/([^/]+)\/items$/)
           if (!items) break
@@ -467,6 +470,8 @@ export function fnMockStarten(opt: FnMockOptionen = {}) {
      */
     kaputtMachen: (pfad: string) => { kaputt.add(pfad) },
     reparieren: (pfad: string) => { kaputt.delete(pfad) },
+    /** /ingredients in fremder Huelle antworten lassen (Test der Formpruefung, Rezept-Probe). */
+    rezeptHuelleFremd: (an: boolean) => { rezeptHuelleFremd = an },
     stop: () => server.stop(true),
   }
 }

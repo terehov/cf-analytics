@@ -1954,3 +1954,32 @@ Kette über drei Ebenen (200004 → Sweet & Sour Mix 20 L → Popcorn Shot Basis
 Shot). `src/foodnotify/rezept.test.ts` ohne, `src/foodnotify/rezept_db.test.ts` mit
 `TEST_DATABASE_URL` (Durchstich mit Worker, Idempotenz, Neuaufbau aus `raw`, Umlauf, Obergrenze,
 Zyklus, Regel 10).
+
+### Rezept-Probe vor dem ersten echten Lauf: `bun run rezepte-probe` (15.10.2026)
+
+`src/rezepte_probe.ts` liest FoodNotify — **nur GET**, nur die vier Pfade des Importers (dieselben
+`fnEndpunkt`-Einträge, derselbe `FnClient`, dieselben FN_*-Variablen) — und belegt, dass die
+Antworten die Form haben, die `fnLaden` erwartet. Gedacht für den Schritt vor dem Push von `0132`.
+
+* Je Marke: Listenseite 1 (Rohform, `totalItems`/`totalPages`), Rezept A (erster Listeneintrag:
+  Kopf, Zutaten, Meta) und Rezept B mit Unterrezept — hat A eines, ist B dieses Unterrezept (der
+  Weg über `/api/recipes/{id}`), sonst werden die Zutaten der nächsten höchstens zwei Einträge
+  angesehen. Jede Antwort läuft durch `rezeptStrukturFehler` und die Transformationen des
+  Importers; bei Abweichung stehen die obersten Schlüssel im Bericht. Dazu ein Feldabgleich der
+  Zutaten gegen die gemessenen Felder (`kind, artikelId, supplier, subRecipeId, quantity, unit,
+  cost, group, id, name`).
+* **Anmeldung höchstens einmal je Marke**; scheitert sie, wird die Marke übersprungen und gemeldet.
+  Zugangsdaten werden nie ausgegeben.
+* **Tempo:** mindestens 1 s zwischen zwei Aufrufen (mehr, wenn `FN_TAKT_*` größer ist), höchstens
+  32 Rezeptaufrufe insgesamt, dazu je Marke die Anmeldung samt `/api/profile` — zusammen ≤ 40.
+* **Nichts in die Datenbank.** Die Rohantworten gehen nach `--aus` (Vorgabe
+  `belege/rezepte-probe/<datum>/`); liegt das Verzeichnis nicht unter einem von git ignorierten
+  Pfad, bricht die Probe **vor** dem ersten Aufruf ab (Exit 3).
+* `--artikel 300203` meldet nur, ob die Nummer in den **geprüften** Rezepten vorkommt — ausdrücklich
+  keine vollständige Suche.
+* Exit-Code: 0 alles in Form, 1 mindestens eine Form weicht ab, 2 keine Abweichung, aber eine Marke
+  ließ sich nicht prüfen (Anmeldung, HTTP-Fehler), 3 Ausgabeverzeichnis nicht ignoriert.
+* Test gegen die Attrappe: `src/rezepte_probe.test.ts` (grün, Anmeldefehler, fremde Hülle rot —
+  `mock.rezeptHuelleFremd(true)`).
+* **Nur im Terminal des Nutzers starten**, wie `lina-fragen` (Regel 7a gilt für LINA; für
+  FoodNotify gilt dieselbe Vorsicht: ein Zugang, keine Wiederholung bei Anmeldefehlern).
