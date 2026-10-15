@@ -166,6 +166,53 @@
    "fallstricke": []
   },
   {
+   "sicht": "mart.artikel_in_rezept",
+   "koernung": "Marke × Ware (Lieferanten-Artikelnummer) × Rezept × Weg ueber Halbfabrikate — dieselbe Ware steht je Ebene erneut",
+   "thema": "rezept",
+   "summen_erlaubt": false,
+   "kommentar": "In welchen Rezepten steckt eine Ware -- direkt (ebene 1) oder ueber Halbfabrikate\n(ebene 2, 3, ...). Eine Zeile je Ware, Rezept und Weg. via_rezept ist das\nHalbfabrikat, ueber das die Ware in das Rezept kommt; pfad zeigt den ganzen Weg\nvom Rezept bis zum Halbfabrikat, in dem die Ware direkt steht. menge/einheit ist\ndie Menge im Rezept, in dem die Ware DIREKT steht (direkt_rezept) -- Mengen werden\nueber Ebenen NICHT multipliziert und sind ueber Einheiten nicht summierbar.\nFiltern ueber artikelnummer (Lieferanten-Artikelnummer).\n\nKoernung: Marke × Ware (Lieferanten-Artikelnummer) × Rezept × Weg ueber Halbfabrikate — dieselbe Ware steht je Ebene erneut",
+   "spalten": [
+    "marke",
+    "marke_key",
+    "artikelnummer",
+    "ware",
+    "lieferant",
+    "lieferant_fn_id",
+    "zuordnung",
+    "rezept",
+    "rezept_fn_id",
+    "rezept_key",
+    "ebene",
+    "via_rezept",
+    "via_rezept_fn_id",
+    "via_position",
+    "via_menge",
+    "via_einheit",
+    "direkt_rezept",
+    "direkt_key",
+    "position",
+    "menge",
+    "einheit",
+    "kosten",
+    "pfad",
+    "art"
+   ],
+   "achsen": [
+    "lieferant",
+    "marke",
+    "ware"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "via_menge",
+     "einheit": null,
+     "hinweis": "Menge des Halbfabrikats im Rezept, in via_einheit (Freitext). Nicht ueber Einheiten oder Ebenen summieren."
+    }
+   ],
+   "fallstricke": []
+  },
+  {
    "sicht": "mart.artikel_monat",
    "koernung": "Betrieb, Monat und Artikel",
    "thema": "umsatz",
@@ -723,6 +770,30 @@
    "fallstricke": []
   },
   {
+   "sicht": "mart.betrieb_schliessung_stand",
+   "koernung": null,
+   "thema": null,
+   "summen_erlaubt": null,
+   "kommentar": "Eine Zeile je handgepflegter Schliessung und ob sie wirkt. ERWARTUNG: zustand = wirkt. \"wirkt nicht\" heisst: es gibt Umsatz nach dem letzten offenen Tag, der Betrieb steht wieder auf operativ.",
+   "spalten": [
+    "betrieb_key",
+    "betrieb",
+    "konzept",
+    "letzter_offener_tag",
+    "letzter_umsatztag",
+    "status",
+    "zustand",
+    "notiz",
+    "gepflegt_am"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "konzept"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
    "sicht": "mart.betrieb_sichtbarkeit",
    "koernung": "Betrieb und Monat — Sichtbarkeit in den Portalen aus Yext",
    "thema": "bewertung",
@@ -761,7 +832,7 @@
    "koernung": "Betrieb, mit der Unterscheidung laufendes Geschaeft / kein Geschaeft",
    "thema": "stammdaten",
    "summen_erlaubt": false,
-   "kommentar": "Betriebsstatus aus Namen, Konzept und Umsatz: test | verwaltend | geschlossen | fremdkasse |\nohne_geschaeft | inaktiv | operativ. fremdkasse (0125): nie Umsatz in LINA, aber FoodNotify-\nBestellung in 60 Tagen oder gebuchte BWA in den letzten vier Monaten — die Kasse laeuft nicht\nueber LINA. Solche Betriebe zaehlen in Bewertungs- und BWA-Sichten, nicht in Umsatzvergleichen.\noperativ heisst: Umsatz in LINA in den letzten 60 Tagen.",
+   "kommentar": "Betriebsstatus aus Namen, Konzept, Handpflege und Umsatz: test | verwaltend | geschlossen | fremdkasse |\nohne_geschaeft | inaktiv | operativ. geschlossen (0131) auch ueber manual.betrieb_schliessung — solange\nes keinen Umsatz nach dem letzten offenen Tag gibt. fremdkasse (0125): nie Umsatz in LINA, aber\nFoodNotify-Bestellung in 60 Tagen oder gebuchte BWA in den letzten vier Monaten — die Kasse laeuft\nnicht ueber LINA. Solche Betriebe zaehlen in Bewertungs- und BWA-Sichten, nicht in Umsatzvergleichen.\noperativ heisst: Umsatz in LINA in den letzten 60 Tagen.\n\nKoernung: Betrieb, mit der Unterscheidung laufendes Geschaeft / kein Geschaeft",
    "spalten": [
     "betrieb_key",
     "betrieb",
@@ -1170,7 +1241,7 @@
    "koernung": "Betrieb × deutschem Kalendertag × Portal — gezaehlte Einzelbewertungen; Schnitt eines Zeitraums = sum(sterne_summe) / sum(bewertet), NICHT der Stand",
    "thema": "bewertung",
    "summen_erlaubt": true,
-   "kommentar": "Online-Bewertungen je Betrieb, deutschem Kalendertag und Portal, gezaehlt aus den\nEinzelbewertungen (Yext). Fuer Monat und Zeitraum: Schnitt = sum(sterne_summe) /\nsum(bewertet) — nie Tagesschnitte mitteln, nie durch bewertungen teilen. NICHT der\nStand, den ein Gast auf Google sieht (der steht kumuliert in\nmart.bewertung_verlauf.schnitt_stand und traegt die Ampel). Ueber alle Portale liegt\nder Schnitt systematisch unter dem Google-Stand (TripAdvisor bewertet strenger).",
+   "kommentar": "Online-Bewertungen je Betrieb, deutschem Kalendertag und Portal, gezaehlt aus den\nEinzelbewertungen (Yext). Fuer Monat und Zeitraum: Schnitt = sum(sterne_summe) /\nsum(bewertet) — nie Tagesschnitte mitteln, nie durch bewertungen teilen. NICHT der\nStand, den ein Gast auf Google sieht (der steht kumuliert in\nmart.bewertung_verlauf.schnitt_stand und traegt die Ampel). Ueber alle Portale liegt\nder Schnitt systematisch unter dem Google-Stand (TripAdvisor bewertet strenger).\n\nKoernung: Betrieb × deutschem Kalendertag × Portal — gezaehlte Einzelbewertungen; Schnitt eines Zeitraums = sum(sterne_summe) / sum(bewertet), NICHT der Stand",
    "spalten": [
     "betrieb_key",
     "betrieb",
@@ -2307,7 +2378,9 @@
     "befund",
     "betrieb_key",
     "letzter_geladener_tag",
-    "status"
+    "status",
+    "rezepte_marke",
+    "rezepte_zutaten_seit"
    ],
    "achsen": [
     "betrieb_key",
@@ -4182,7 +4255,7 @@
    "koernung": "Quelle × Pruefung × Betrieb (bei Betriebsberichten: Bericht) × Monat — eine Zeile je Luecke, 24 Monate zurueck",
    "thema": "pruefung",
    "summen_erlaubt": false,
-   "kommentar": "Was fehlt, je Quelle, Betrieb und Monat, 24 Monate zurueck (0127). Eine Zeile je Luecke:\nquelle, pruefung, betrieb (bei Betriebsberichten der Bericht), monat, fehlend + einheit, hinweis.\nBetrachtet werden Betriebe im Geschaeft (operativ, inaktiv, fremdkasse). ERWARTUNG: leer bis auf\nden Rueckstand des Betriebsbericht-Nachladens und die noch nicht gebuchte BWA der letzten Monate.\nEine Zeile unter Umsatz oder Wetter ist ein Fehler. Zusammengefasst in mart.pruefung_uebersicht\n(Zeilen \"Luecke: …\") und in /status.",
+   "kommentar": "Was fehlt, je Quelle, Betrieb und Monat, 24 Monate zurueck (0127). Eine Zeile je Luecke:\nquelle, pruefung, betrieb (bei Betriebsberichten der Bericht), monat, fehlend + einheit, hinweis.\nBetrachtet werden Betriebe im Geschaeft (operativ, inaktiv, fremdkasse). ERWARTUNG: leer bis auf\nden Rueckstand des Betriebsbericht-Nachladens und die noch nicht gebuchte BWA der letzten Monate.\nEine Zeile unter Umsatz oder Wetter ist ein Fehler. Zusammengefasst in mart.pruefung_uebersicht\n(Zeilen \"Luecke: …\") und in /status.\n\nKoernung: Quelle × Pruefung × Betrieb (bei Betriebsberichten: Bericht) × Monat — eine Zeile je Luecke, 24 Monate zurueck",
    "spalten": [
     "quelle",
     "pruefung",
@@ -5230,7 +5303,7 @@
    "koernung": "Quelle und Endpunkt: kommt ueberhaupt etwas an",
    "thema": "import",
    "summen_erlaubt": false,
-   "kommentar": "Bekommt jede Quelle noch Zulauf? Die Sicht zu AGENTS.md Regel 10.\n\n  ok               Zulauf innerhalb der erwarteten Kadenz.\n  stumm            seit laenger als kadenz_stunden keine Zeile mehr. Auf\n                   wird_noch_gefragt sehen: false heisst, der Importer fragt\n                   nicht mehr — ein Baufehler. true heisst, die Quelle liefert\n                   nichts — ein Befund.\n  nie              es ist noch nie eine Zeile entstanden. Der schwerste Fall,\n                   weil er wie ein frisch aufgesetztes System aussieht.\n  nicht erwartet   liefert bewusst nichts. Steht hier MIT Begruendung, damit\n                   die Entscheidung sichtbar bleibt und nicht als Luecke\n                   wiederentdeckt wird.\n\nZWEI ZAHLEN, NICHT EINE: zuletzt_gefragt und zuletzt_zulauf. Am 12.08.2026 fror\ndas Belegarchiv ein, weil nicht mehr gefragt wurde; am 10.08.2026 stand Yext mit\nfrischem Zeitstempel neben leeren Tabellen. Eine Zahl allein haette beide Male\nberuhigt.\n\nKoernung: Quelle und Endpunkt: kommt ueberhaupt etwas an",
+   "kommentar": "Bekommt jede Quelle noch Zulauf? Die Sicht zu AGENTS.md Regel 10.\n\n  ok               Zulauf innerhalb der erwarteten Kadenz.\n  stumm            seit laenger als kadenz_stunden keine Zeile mehr. Auf\n                   wird_noch_gefragt sehen: false heisst, der Importer fragt\n                   nicht mehr — ein Baufehler. true heisst, die Quelle liefert\n                   nichts — ein Befund; steht letzter_fehler daneben, lehnt\n                   sie ab, und dort steht warum.\n  nie              es ist noch nie eine Zeile entstanden.\n  nicht erwartet   liefert bewusst nichts, mit Begruendung in bemerkung.\n\nSEIT 0130: Bei Quellen mit sync.quelle.merker ist zuletzt_gefragt der juengere von\nTabelle und Merker. Vorher galt fuer jede an der Tabelle gemessene Quelle \"gefragt =\ngeliefert\", und Yexts abgelehnte Analytics-Aufrufe erschienen 17 Tage lang als\n\"wird nicht mehr gefragt\".\n\nKoernung: Quelle und Endpunkt: kommt ueberhaupt etwas an",
    "spalten": [
     "quelle",
     "bezeichnung",
@@ -5242,7 +5315,8 @@
     "zuletzt_zulauf",
     "stunden_ohne_zulauf",
     "zustand",
-    "wird_noch_gefragt"
+    "wird_noch_gefragt",
+    "letzter_fehler"
    ],
    "achsen": [],
    "kennzahlen": [],
@@ -5308,6 +5382,106 @@
     "monat"
    ],
    "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.rezept_position",
+   "koernung": "Marke × Rezept × Zutatenposition — eine Zeile je Position, wie FoodNotify sie fuehrt",
+   "thema": "rezept",
+   "summen_erlaubt": false,
+   "kommentar": "Eine Zeile je Rezept und Zutatenposition, so wie FoodNotify sie fuehrt (je Marke,\nnicht je Betrieb). artikelnummer ist die LIEFERANTEN-Artikelnummer -- nicht die\nLINA-Artikelnummer der Kasse. zuordnung sagt, ob die Nummer im Einkauf derselben\nMarke vorkommt: eingekauft / nummer ohne einkauf / ohne nummer / unterrezept.\nkosten ist FoodNotifys Wert und nicht aus Unterrezepten nachrechenbar; bei\nUnterrezept-Zeilen steht dort oft 0. Mengen nur innerhalb einer Einheit\nvergleichen.\n\nKoernung: Marke × Rezept × Zutatenposition — eine Zeile je Position, wie FoodNotify sie fuehrt",
+   "spalten": [
+    "marke",
+    "marke_key",
+    "rezept_key",
+    "rezept_fn_id",
+    "rezept",
+    "position",
+    "art",
+    "artikelnummer",
+    "ware",
+    "lieferant",
+    "lieferant_fn_id",
+    "menge",
+    "einheit",
+    "kosten",
+    "gruppe",
+    "sub_rezept_fn_id",
+    "unterrezept",
+    "zuordnung",
+    "in_liste",
+    "zutaten_geholt_am"
+   ],
+   "achsen": [
+    "lieferant",
+    "marke",
+    "ware"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.rezept_stand",
+   "koernung": "eine Marke — Ladestand der Rezepte",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "Je Marke: wie viele Rezepte geladen sind, wie viele nur ueber einen Verweis\ngefunden wurden, wie viele noch ohne Zutaten sind, und wann die Rezeptliste\nzuletzt geholt wurde. zustand: ok / zutaten ausstehend (Backfill laeuft) /\nkeine rezepte / liste veraltet / liste nie geholt (Fehler, Regel 10) /\nkein FoodNotify-Zulauf (Marke ohne Zugang, kein Befund).\n\nKoernung: eine Marke — Ladestand der Rezepte",
+   "spalten": [
+    "marke_key",
+    "marke",
+    "rezepte",
+    "in_liste",
+    "nur_ueber_verweis",
+    "mit_zutaten",
+    "ohne_zutaten",
+    "zutatenzeilen",
+    "aus_liste_verschwunden",
+    "aeltester_zutatenabruf",
+    "juengster_zutatenabruf",
+    "tage_seit_aeltestem_abruf",
+    "letzte_liste",
+    "letzter_fn_abruf",
+    "zustand"
+   ],
+   "achsen": [
+    "marke"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "tage_seit_aeltestem_abruf",
+     "einheit": "tage",
+     "hinweis": null
+    }
+   ],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.rezept_zuordnung_pruefung",
+   "koernung": "Marke × Zuordnung (eingekauft / nummer ohne einkauf / ohne nummer / unterrezept)",
+   "thema": "pruefung",
+   "summen_erlaubt": false,
+   "kommentar": "Je Marke: wie viele Zutatenpositionen eine Artikelnummer tragen, die im Einkauf\nderselben Marke vorkommt. zuordnung_anteil_pct ist eine Prozentzahl (23.64, nicht\n0.2364) und summiert sich je Marke zu 100. \"nummer ohne einkauf\" ist die Zahl,\nauf die man sieht: Altnummern, andere Lieferanten, Tippfehler.\n\nKoernung: Marke × Zuordnung (eingekauft / nummer ohne einkauf / ohne nummer / unterrezept)",
+   "spalten": [
+    "marke",
+    "marke_key",
+    "zuordnung",
+    "positionen",
+    "rezepte",
+    "artikelnummern",
+    "zuordnung_anteil_pct"
+   ],
+   "achsen": [
+    "marke"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "zuordnung_anteil_pct",
+     "einheit": "prozentzahl",
+     "hinweis": "Anteil je Marke, summiert sich je Marke zu 100. Ueber Marken aus positionen neu rechnen."
+    }
+   ],
    "fallstricke": []
   },
   {
@@ -5881,7 +6055,8 @@
     "tagesgeschaeft_bis",
     "ableitungen_bis",
     "nachladen_posten",
-    "nachladen_offen"
+    "nachladen_offen",
+    "notiz"
    ],
    "achsen": [],
    "kennzahlen": [],
@@ -6689,7 +6864,7 @@
    "koernung": "Gitterpunkt und Jahr — die Arbeitsliste des Wetter-Backfills",
    "thema": "pruefung",
    "summen_erlaubt": false,
-   "kommentar": "Arbeitsliste des Wetter-Backfills: eine Zeile je Gitterpunkt und Jahr. zustand fehlt |\nunvollstaendig | laufendes Jahr | vollstaendig. Der Nachlauf holt fehlt und unvollstaendig,\nein Ortsjahr je Aufruf. Seit 0125 ist ein Jahr auch dann unvollstaendig, wenn in den letzten\n24 Monaten bis vorgestern ein ganzer Tag fehlt (fehlende_tage) — vorher galt das laufende Jahr\nnie als Rueckstand, und Jan–Jul 2026 fehlten sieben Monate lang unbemerkt.",
+   "kommentar": "Arbeitsliste des Wetter-Backfills: eine Zeile je Gitterpunkt und Jahr. zustand fehlt |\nunvollstaendig | laufendes Jahr | vollstaendig. Der Nachlauf holt fehlt und unvollstaendig,\nein Ortsjahr je Aufruf. Seit 0125 ist ein Jahr auch dann unvollstaendig, wenn in den letzten\n24 Monaten bis vorgestern ein ganzer Tag fehlt (fehlende_tage) — vorher galt das laufende Jahr\nnie als Rueckstand, und Jan–Jul 2026 fehlten sieben Monate lang unbemerkt.\n\nKoernung: Gitterpunkt und Jahr — die Arbeitsliste des Wetter-Backfills",
    "spalten": [
     "breite",
     "laenge",
@@ -7420,6 +7595,39 @@
    "hinweis": "Prozentwerte sind in diesem Schema durchgaengig PROZENTZAHLEN (23.64), nie Brueche (0.2364). Das Excel macht es andersherum — das ist die haeufigste Fehlerquelle des Projekts. Eine Multiplikation mit 100 ergibt hier den Faktor-100-Fehler.",
    "berichtigung": "Den Faktor weglassen.",
    "quelle": "AGENTS.md, harte Regel 6"
+  },
+  {
+   "schluessel": "rezept_artikelnummer_lieferant",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.rezept_position",
+   "parameter": {},
+   "hinweis": "artikelnummer ist die Artikelnummer des LIEFERANTEN (wie im Einkauf), nicht die der Kasse. Rezepte gelten je Marke, nicht je Betrieb. kosten ist FoodNotifys Wert; Unterrezept-Zeilen tragen oft 0, die Summe der Zeilen ist deshalb nicht die Rezeptkosten.",
+   "berichtigung": "Ueber artikelnummer gegen den Einkauf (mart.einkauf_position) verbinden, nie gegen Kassenartikel. Fuer einen Betrieb die Marke des Betriebs nehmen.",
+   "quelle": "0132"
+  },
+  {
+   "schluessel": "rezept_ebenen_menge",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.artikel_in_rezept",
+   "parameter": {},
+   "hinweis": "menge/einheit ist die Menge der Ware im Rezept, in dem sie DIREKT steht (direkt_rezept), nicht im Rezept der Zeile. Ueber Ebenen wird nicht multipliziert, und Einheiten sind Freitext (\"cl\", \"g\", \"Limetten 8tel\"). Eine Summe ueber menge ohne Filter auf ebene und einheit zaehlt dieselbe Zutat mehrfach und mischt Einheiten.",
+   "berichtigung": "Fuer \"wie viel steckt direkt drin\" auf ebene = 1 filtern und je einheit gruppieren. Indirekte Verwendung ueber via_rezept und pfad zeigen, nicht verrechnen.",
+   "quelle": "0132"
+  },
+  {
+   "schluessel": "rezept_join_ueber_name",
+   "art": "join_ueber_name",
+   "schwere": "warnung",
+   "sicht": "mart.artikel_in_rezept",
+   "parameter": {
+    "statt": "rezept_key",
+    "spalte": "rezept"
+   },
+   "hinweis": "Rezeptnamen sind nicht eindeutig (\"Sweet & Sour Mix 20 L\" gibt es bei Enchilada mehrfach, aeltere Fassungen bleiben stehen).",
+   "berichtigung": "Ueber rezept_key verbinden.",
+   "quelle": "0132"
   },
   {
    "schluessel": "schwellen_seit_0129",
