@@ -1160,9 +1160,14 @@ export async function rezepteNachfuellen(
           const r = await c.query<{ marke_key: number }>(
             `WITH f AS (
                SELECT x.marke_key, x.fn_id, x.rezept_key, x.zutaten_geholt_am,
+                      -- Kopf für Rezepte außerhalb der Liste: nie darin, oder in der
+                      -- letzten ABGESCHLOSSENEN vollen Runde nicht mehr gesehen.
+                      -- ~~zuletzt_am < now() - 3 days~~ setzte eine täglich ganz
+                      -- gelesene Liste voraus (Review 15.10.2026).
                       (x.zutaten_geholt_am IS NOT NULL
-                       AND (NOT x.in_liste OR x.zuletzt_am < now() - interval '3 days')) AS mit_kopf
+                       AND (NOT x.in_liste OR x.zuletzt_am < ls.volle_runde_fertig_beginn)) AS mit_kopf
                  FROM core.rezept x
+                 LEFT JOIN core.rezept_liste_stand ls ON ls.marke_key = x.marke_key
                 WHERE x.marke_key = ANY($1::int[])
                   AND ${art === 'neu' ? 'x.zutaten_geholt_am IS NULL'
                         : 'x.zutaten_geholt_am < now() - make_interval(days => $2::int)'}

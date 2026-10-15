@@ -916,6 +916,19 @@ const Schema = z.object({
    */
   REZEPT_UMLAUF_TAGE: z.coerce.number().int().min(1).default(14),
 
+  /**
+   * Höchstens so viele Listenseiten blättert das Tagesgeschäft je Marke und
+   * Lauf (Review 15.10.2026). Eine SICHERUNG, keine Steuerung: das
+   * Tagesgeschäft blättert ohnehin nur, solange eine Seite neue Rezepte trägt,
+   * und nur, wenn eine volle Runde die Liste schon einmal ganz gelesen hat.
+   * 10 Seiten sind 250 Rezepte an einem Tag; der größte gemessene Tagesanfall
+   * ist weit darunter. Wird der Deckel erreicht und trug die letzte Seite
+   * noch Neues, steht das in core.rezept_liste_stand.tagesgeschaeft_gedeckelt_am,
+   * in mart.rezept_stand und in mart.pruefung_uebersicht — die volle Runde
+   * holt den Rest innerhalb einer Woche.
+   */
+  REZEPT_TAGESGESCHAEFT_SEITEN: z.coerce.number().int().min(1).default(10),
+
   /** Ab so vielen Fehlern in Folge pausiert der Worker den ganzen Lauf. */
   ABBRUCH_NACH_FEHLERN: z.coerce.number().int().min(1).default(10),
 

@@ -81,7 +81,7 @@ lauf('Rezepturen mit Datenbank', () => {
     await db.query(`DELETE FROM core.bestellung WHERE fn_id = 'rz-test'`)
     await db.query(`DELETE FROM core.kostenstelle WHERE kostenstelle_id = 990001`)
     await db.query(`TRUNCATE sync.warteschlange, sync.aufgabe, sync.lauf, sync.schema_abweichung,
-                       raw.api_antwort, core.zutat, core.rezept RESTART IDENTITY CASCADE`)
+                       raw.api_antwort, core.zutat, core.rezept, core.rezept_liste_stand RESTART IDENTITY CASCADE`)
     const { rows: [m] } = await db.query(`SELECT marke_key FROM core.marke WHERE schluessel = 'enchilada'`)
     enchilada = Number(m.marke_key)
   })
@@ -143,9 +143,11 @@ lauf('Rezepturen mit Datenbank', () => {
       `SELECT basis_menge::float AS m, basis_einheit AS e FROM core.zutat WHERE basis_menge IS NOT NULL`)
     expect(basis).toEqual({ m: 7.5, e: 'g' })
     const { rows: [ls] } = await db.query(
-      `SELECT rezepte_gesamt, seiten, seite1_am IS NOT NULL AS s1, volle_runde_am IS NOT NULL AS voll
+      `SELECT rezepte_gesamt, seiten, seite1_am IS NOT NULL AS s1, volle_runde_am IS NOT NULL AS voll,
+              volle_runde_fertig_ende IS NOT NULL AS fertig, volle_runde_fertig_beginn = volle_runde_am AS gleich
          FROM core.rezept_liste_stand WHERE marke_key = $1`, [enchilada])
-    expect(ls).toEqual({ rezepte_gesamt: 3, seiten: 2, s1: true, voll: true })
+    // Beide Seiten der vollen Runde sind durch — die Runde gilt als abgeschlossen.
+    expect(ls).toEqual({ rezepte_gesamt: 3, seiten: 2, s1: true, voll: true, fertig: true, gleich: true })
 
     // Die drei nur über Verweis erreichbaren Rezepte stehen als in_liste = false.
     const { rows: verweis } = await db.query(
@@ -462,6 +464,123 @@ lauf('Rezepturen mit Datenbank', () => {
    * Prüfzeile stehen — nicht nur im Log. mart.quelle_zulauf sähe es nicht,
    * solange eine andere Marke weiter liefert.
    */
+  /**
+   * Review 15.10.2026, Befund 1: kennt eine Marke nach Nacht 1 nur Seite 1,
+   * darf das Tagesgeschäft ab Nacht 2 nicht den ganzen ersten Abzug in Phase A
+   * durchblättern. Weiterblättern erst nach einer ABGESCHLOSSENEN vollen Runde,
+   * und dann höchstens bis REZEPT_TAGESGESCHAEFT_SEITEN.
+   */
+  test('Tagesgeschäft: ohne abgeschlossene volle Runde keine Seite 2; der Deckel wird sichtbar', async () => {
+    const { fnLaden } = await import('./laden')
+    const { fnEndpunkt } = await import('./endpunkte')
+    const { rows: [l] } = await db.query(`SELECT lauf_id::text FROM sync.lauf ORDER BY lauf_id DESC LIMIT 1`)
+    const seite = (nr: number, id: number) => fnLaden({
+      ep: fnEndpunkt('fn:rezepte'), markeKey: enchilada, von: '2026-10-15', bis: '2026-10-15',
+      parameter: { seite: String(nr) }, nachladen: false, httpStatus: 200, bytes: 1, hash: 'h', laufId: l.lauf_id,
+      daten: { data: [{ id, name: `neu ${id}`, archived: false }, { id: 1032008, name: 'amarga muerte' }],
+               pagination: { currentPage: nr, totalPages: 20, totalItems: 500 } },
+    })
+    const folgeseiten = async () => (await db.query(
+      `SELECT parameter->>'seite' AS s FROM sync.warteschlange
+        WHERE endpunkt = 'fn:rezepte' AND NOT parameter ? 'runde' AND parameter->>'seite' <> '1'
+          AND erledigt_am IS NULL ORDER BY 1`)).rows.map(r => r.s)
+    const stand = await db.query(
+      `SELECT volle_runde_fertig_beginn, volle_runde_fertig_ende, rezepte_gesamt, seiten
+         FROM core.rezept_liste_stand WHERE marke_key = $1`, [enchilada])
+    try {
+      // 1 Seite bekannt, 20 Seiten gesamt, KEINE abgeschlossene Runde, Neues auf Seite 1.
+      await db.query(
+        `UPDATE core.rezept_liste_stand SET volle_runde_fertig_beginn = NULL, volle_runde_fertig_ende = NULL
+          WHERE marke_key = $1`, [enchilada])
+      await seite(1, 777001)
+      expect(await folgeseiten()).toEqual([])
+      // Das neue Rezept selbst wird trotzdem geholt — im Tagesgeschäft.
+      const { rows: neu } = await db.query(
+        `SELECT endpunkt, nachladen FROM sync.warteschlange
+          WHERE parameter->>'rezeptId' = '777001' ORDER BY endpunkt`)
+      expect(neu).toEqual([
+        { endpunkt: 'fn:rezept_meta', nachladen: false }, { endpunkt: 'fn:rezept_zutaten', nachladen: false },
+      ])
+
+      // Mit abgeschlossener Runde: Seite 2 ja …
+      await db.query(
+        `UPDATE core.rezept_liste_stand SET volle_runde_fertig_beginn = now() - interval '2 days',
+                volle_runde_fertig_ende = now() - interval '2 days' WHERE marke_key = $1`, [enchilada])
+      await seite(1, 777002)
+      expect(await folgeseiten()).toEqual(['2'])
+      // … aber am Deckel ist Schluss, und das steht in mart.rezept_stand.
+      const alt = cfg.REZEPT_TAGESGESCHAEFT_SEITEN
+      try {
+        cfg.REZEPT_TAGESGESCHAEFT_SEITEN = 2
+        await seite(2, 777003)
+        expect(await folgeseiten()).toEqual(['2'])
+        const { rows: [rs] } = await db.query(
+          `SELECT zustand, tagesgeschaeft_gedeckelt_am IS NOT NULL AS gedeckelt
+             FROM mart.rezept_stand WHERE marke_key = $1`, [enchilada])
+        expect(rs.gedeckelt).toBe(true)
+        // Steht vor 'zutaten ausstehend', obwohl die neuen Rezepte noch keine Zutaten haben.
+        expect(rs.zustand).toBe('tagesgeschaeft gedeckelt')
+      } finally { cfg.REZEPT_TAGESGESCHAEFT_SEITEN = alt }
+    } finally {
+      await db.query(`DELETE FROM sync.warteschlange WHERE erledigt_am IS NULL`)
+      await db.query(`DELETE FROM core.rezept WHERE fn_id IN (777001, 777002, 777003)`)
+      const v = stand.rows[0]
+      await db.query(
+        `UPDATE core.rezept_liste_stand SET volle_runde_fertig_beginn = $2, volle_runde_fertig_ende = $3,
+                rezepte_gesamt = $4, seiten = $5, tagesgeschaeft_gedeckelt_am = NULL WHERE marke_key = $1`,
+        [enchilada, v.volle_runde_fertig_beginn, v.volle_runde_fertig_ende, v.rezepte_gesamt, v.seiten])
+    }
+  })
+
+  /**
+   * Review 15.10.2026, Befund 2: "aus der Liste verschwunden" und der Kopf im
+   * Umlauf messen gegen den Beginn der letzten ABGESCHLOSSENEN vollen Runde,
+   * nicht gegen drei Tage — die Liste wird nicht mehr täglich ganz gelesen.
+   */
+  test('verschwunden und Kopf im Umlauf: gemessen an der letzten abgeschlossenen vollen Runde', async () => {
+    const verschwunden = async () => (await db.query(
+      `SELECT aus_liste_verschwunden AS n FROM mart.rezept_stand WHERE marke_key = $1`, [enchilada])).rows[0].n
+    const stand = await db.query(
+      `SELECT volle_runde_fertig_beginn, volle_runde_fertig_ende FROM core.rezept_liste_stand WHERE marke_key = $1`,
+      [enchilada])
+    try {
+      // 1030679 wurde vor zehn Tagen zuletzt gesehen.
+      await db.query(`UPDATE core.rezept SET zuletzt_am = now() - interval '10 days' WHERE fn_id = 1030679`)
+      // Keine abgeschlossene Runde → keine Aussage.
+      await db.query(
+        `UPDATE core.rezept_liste_stand SET volle_runde_fertig_beginn = NULL, volle_runde_fertig_ende = NULL
+          WHERE marke_key = $1`, [enchilada])
+      expect(await verschwunden()).toBe(0)
+      // Runde vor 20 Tagen abgeschlossen: damals noch gesehen → nicht verschwunden.
+      await db.query(
+        `UPDATE core.rezept_liste_stand SET volle_runde_fertig_beginn = now() - interval '20 days',
+                volle_runde_fertig_ende = now() - interval '19 days' WHERE marke_key = $1`, [enchilada])
+      expect(await verschwunden()).toBe(0)
+      // Runde vor 2 Tagen abgeschlossen, 1030679 darin nicht gesehen → verschwunden.
+      await db.query(
+        `UPDATE core.rezept_liste_stand SET volle_runde_fertig_beginn = now() - interval '2 days',
+                volle_runde_fertig_ende = now() - interval '1 day' WHERE marke_key = $1`, [enchilada])
+      expect(await verschwunden()).toBe(1)
+
+      // Im Umlauf bekommt es deshalb den Kopf (er trägt archived): Kopf + Zutaten + Meta.
+      await db.query(`UPDATE core.rezept SET zutaten_geholt_am = now() - interval '15 days' WHERE fn_id = 1030679`)
+      await db.query(`UPDATE sync.warteschlange SET erstellt_am = now() - interval '15 days'
+                       WHERE parameter->>'rezeptId' = '1030679'`)
+      const { rezepteNachfuellen } = await import('../sync/nachfuellen')
+      expect((await rezepteNachfuellen(true)).umlauf).toBe(3)
+      // Ohne abgeschlossene Runde nur Zutaten + Meta — ein Listenrezept ohne Beleg.
+      await db.query(
+        `UPDATE core.rezept_liste_stand SET volle_runde_fertig_beginn = NULL WHERE marke_key = $1`, [enchilada])
+      expect((await rezepteNachfuellen(true)).umlauf).toBe(2)
+    } finally {
+      await db.query(`UPDATE core.rezept SET zuletzt_am = now(), zutaten_geholt_am = now() WHERE fn_id = 1030679`)
+      const v = stand.rows[0]
+      await db.query(
+        `UPDATE core.rezept_liste_stand SET volle_runde_fertig_beginn = $2, volle_runde_fertig_ende = $3
+          WHERE marke_key = $1`, [enchilada, v.volle_runde_fertig_beginn, v.volle_runde_fertig_ende])
+    }
+  })
+
   test('Regel 10: Marke mit FoodNotify-Zulauf, aber veralteter Rezeptliste, wird auffällig', async () => {
     const zeile = async () => (await db.query(
       `SELECT auffaellig::int AS n FROM mart.pruefung_uebersicht
@@ -489,6 +608,26 @@ lauf('Rezepturen mit Datenbank', () => {
       `SELECT zustand FROM mart.rezept_stand WHERE marke_key = $1`, [enchilada])
     expect(st.zustand).toBe('liste veraltet')
     expect(await zeile()).toBe(1)
+
+    /*
+     * Review 15.10.2026, Befund 3: fällt der Zugang EINER Marke aus, ist das ein
+     * Befund ('zugang ausgefallen') und kein 'kein FoodNotify-Zulauf' — sonst
+     * fiele die Marke aus der Prüfzeile heraus. 'kein FoodNotify-Zulauf' nur für
+     * eine Marke ohne jede FoodNotify-Aufgabe.
+     */
+    await db.query(
+      `UPDATE sync.aufgabe SET beendet_am = now() - interval '48 hours'
+        WHERE marke_key = $1 AND endpunkt IN ('fn:profil', 'fn:kostenstellen', 'fn:rezepte')`, [enchilada])
+    const { rows: [aus] } = await db.query(
+      `SELECT zustand FROM mart.rezept_stand WHERE marke_key = $1`, [enchilada])
+    expect(aus.zustand).toBe('zugang ausgefallen')
+    expect(await zeile()).toBe(1)
+    const { rows: nie } = await db.query(
+      `SELECT DISTINCT zustand FROM mart.rezept_stand WHERE marke_key <> $1`, [enchilada])
+    expect(nie).toEqual([{ zustand: 'kein FoodNotify-Zulauf' }])
+    const { rows: [g] } = await db.query(
+      `SELECT geprueft::int AS n FROM mart.pruefung_uebersicht WHERE pruefung LIKE 'Rezepte: Marke mit FoodNotify-Zulauf%'`)
+    expect(g.n).toBe(1)
   })
 
   test('Praxislauf: nur Rezeptposten, nur localhost, über dieselben Lader', async () => {

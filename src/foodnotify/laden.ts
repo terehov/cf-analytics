@@ -27,6 +27,7 @@ import * as t from './transform'
 import * as inv from './inventur'
 import * as rz from './rezept'
 import type { FnEndpunkt } from './endpunkte'
+import { config } from '../config'
 
 type FnKontext = {
   ep: FnEndpunkt
@@ -517,9 +518,6 @@ export async function fnLaden(k: FnKontext): Promise<number> {
         const { rezepte, seiten } = rz.rezeptliste(k.daten)
         const voll = k.parameter.runde === 'voll'
         const nachladen = k.nachladen === true || voll
-        const vorher = await c.query<{ n: number }>(
-          `SELECT count(*)::int AS n FROM core.rezept WHERE marke_key = $1 AND in_liste`, [k.markeKey])
-        const bekanntVorher = Number(vorher.rows[0]?.n ?? 0)
         let neue = 0
         for (const r of rezepte) {
           const st = await rezeptSchreiben(c, k.markeKey, r, true)
@@ -552,16 +550,55 @@ export async function fnLaden(k: FnKontext): Promise<number> {
                 { seite: String(n), runde: 'voll' }, k.von, 40, 'offen', true)
             }
           }
-        } else if (neue > 0 && bekanntVorher > 0 && seiten.aktuelleSeite < seiten.gesamtSeiten) {
+          /**
+           * IST DIE RUNDE ABGESCHLOSSEN? Ja, wenn außer dieser Seite (die der
+           * Worker erst nach dem Laden quittiert) keine Seite der Runde mehr
+           * offen ist. Erst dann gilt die Liste als einmal ganz gelesen — daran
+           * hängen „aus der Liste verschwunden", der Kopf im Umlauf und das
+           * Weiterblättern des Tagesgeschäfts (Review 15.10.2026).
+           */
+          const offen = await c.query<{ n: number }>(
+            `SELECT count(*)::int AS n FROM sync.warteschlange
+              WHERE endpunkt = 'fn:rezepte' AND marke_key = $1 AND erledigt_am IS NULL
+                AND parameter->>'runde' = 'voll' AND parameter <> $2::jsonb`,
+            [k.markeKey, JSON.stringify(k.parameter)])
+          if (Number(offen.rows[0]?.n ?? 0) === 0) {
+            await c.query(
+              `UPDATE core.rezept_liste_stand
+                  SET volle_runde_fertig_beginn = volle_runde_am, volle_runde_fertig_ende = now()
+                WHERE marke_key = $1 AND volle_runde_am IS NOT NULL`, [k.markeKey])
+          }
+        } else if (neue > 0 && seiten.aktuelleSeite < seiten.gesamtSeiten) {
           /**
            * Das Tagesgeschäft blättert weiter, solange eine Seite neue Rezepte
-           * trägt. NICHT, solange die Marke noch gar keine Rezepte kennt: dann
-           * wäre jede Seite „neu", und das Tagesgeschäft liefe den ganzen
-           * ersten Abzug in Phase A durch (Wilma Wunder: 507 Seiten, 12.655
-           * Rezepte). Den macht das Nachladen.
+           * trägt — ABER NUR, wenn eine volle Runde die Liste schon einmal ganz
+           * gelesen hat. ~~„solange die Marke noch gar keine Rezepte kennt"~~
+           * reichte nicht (Review 15.10.2026): kennt eine Marke nach Nacht 1
+           * nur Seite 1, wäre ab Nacht 2 jede weitere Seite „neu" gewesen, und
+           * alle 507 Wilma-Wunder-Seiten samt Details liefen in Phase A. Vorher
+           * holt das Tagesgeschäft nur die neuen Rezepte von Seite 1; der Rest
+           * ist der erste Abzug in Phase C.
+           *
+           * Dazu ein harter Deckel (REZEPT_TAGESGESCHAEFT_SEITEN) als Sicherung.
+           * Wird er erreicht, steht es in core.rezept_liste_stand — sichtbar,
+           * nicht nur im Log (Regel 10).
            */
-          await folgepostenEinreihen(c, k.markeKey, 'fn:rezepte',
-            { seite: String(seiten.aktuelleSeite + 1) }, k.von, 40, 'offen', false)
+          const st = await c.query<{ fertig: boolean }>(
+            `SELECT volle_runde_fertig_ende IS NOT NULL AS fertig
+               FROM core.rezept_liste_stand WHERE marke_key = $1`, [k.markeKey])
+          if (st.rows[0]?.fertig === true) {
+            if (seiten.aktuelleSeite < config.REZEPT_TAGESGESCHAEFT_SEITEN) {
+              await folgepostenEinreihen(c, k.markeKey, 'fn:rezepte',
+                { seite: String(seiten.aktuelleSeite + 1) }, k.von, 40, 'offen', false)
+            } else {
+              await c.query(
+                `UPDATE core.rezept_liste_stand SET tagesgeschaeft_gedeckelt_am = now() WHERE marke_key = $1`,
+                [k.markeKey])
+              log.warn('rezepte: tagesgeschaeft am seitendeckel, die volle runde holt den rest', {
+                markeKey: k.markeKey, seite: seiten.aktuelleSeite, deckel: config.REZEPT_TAGESGESCHAEFT_SEITEN,
+              })
+            }
+          }
         }
         return rezepte.length
       }
