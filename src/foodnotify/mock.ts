@@ -16,6 +16,47 @@
  * Nur für Tests. Läuft nie im Container mit.
  */
 
+import { readFileSync } from 'node:fs'
+
+/**
+ * REZEPTUREN (0132) — sechs echte Enchilada-Rezepte aus dem Einzelabzug
+ * (src/foodnotify/fixtures/rezepte.json), dieselbe Lage wie im Original:
+ *
+ *   * die Liste hat ZWEI Seiten (25 je Seite im Original, hier zwei bzw. ein
+ *     Eintrag), Hülle {data, pagination} — gemessen;
+ *   * drei Rezepte stehen in KEINER Listenseite und sind nur über
+ *     subRecipeId erreichbar (983835, 1048035, 984827) — genau die Lücke, an
+ *     der ein Import über ?page=N allein unvollständig wäre;
+ *   * eine Kette über drei Ebenen: 200004 in 984827 → 1048035 → 1048034.
+ *
+ * Kopf, Zutaten und Meta antworten mit der Minimalhülle {data: …}. Die echte
+ * Hülle dieser drei Pfade ist NICHT gemessen (der Abzug speicherte sie
+ * ausgepackt); `auspacken` behandelt alle bekannten Formen gleich.
+ */
+const REZEPTE = JSON.parse(readFileSync(
+  new URL('./fixtures/rezepte.json', import.meta.url), 'utf8')).rezepte as Record<string, {
+    in_liste: boolean; kopf: Record<string, unknown>; zutaten: unknown[]; meta: unknown }>
+const REZEPTLISTE: Record<number, string[]> = { 1: ['1032008', '1048034'], 2: ['1030679'] }
+
+function rezeptAntwort(pfad: string, url: URL): unknown | null {
+  if (pfad === '/api/recipes') {
+    const seite = Number(url.searchParams.get('page') ?? 1)
+    const ids = REZEPTLISTE[seite] ?? []
+    return {
+      data: ids.map(id => REZEPTE[id]!.kopf),
+      pagination: { currentPage: seite, totalPages: Object.keys(REZEPTLISTE).length,
+                    perPage: 25, totalItems: Object.values(REZEPTLISTE).flat().length },
+    }
+  }
+  const m = pfad.match(/^\/api\/recipes\/(\d+)(\/ingredients|\/meta)?$/)
+  if (!m) return null
+  const r = REZEPTE[m[1]!]
+  if (!r) return null
+  if (m[2] === '/ingredients') return { data: r.zutaten }
+  if (m[2] === '/meta') return { data: r.meta }
+  return { data: r.kopf }
+}
+
 export type FnMockOptionen = {
   port?: number
   /**
@@ -350,6 +391,8 @@ export function fnMockStarten(opt: FnMockOptionen = {}) {
          * nicht löscht, was Seite 1 geschrieben hat.
          */
         default: {
+          const rezept = rezeptAntwort(pfad, url)
+          if (rezept) return json(rezept)
           const items = pfad.match(/^\/api\/erp\/stocktakings\/([^/]+)\/items$/)
           if (!items) break
           const seite = Number(url.searchParams.get('page') ?? 1)

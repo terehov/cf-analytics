@@ -1,0 +1,429 @@
+{
+ "_hinweis": "Echte FoodNotify-Antworten (Enchilada, Einzelabzug 14./15.09.2026, src/rezepte.ts), ausgepackt gespeichert; meta auf weight gekuerzt. Liste: 1032008 und 1048034 auf Seite 1, 1030679 auf Seite 2. 983835, 1048035 und 984827 stehen in keiner Listenseite und kommen nur ueber Verweise (subRecipeId). Kette: 984827 (enthaelt 200004) -> 1048035 -> 1048034; 983835 (enthaelt 200004) -> 1032008.",
+ "rezepte": {
+  "1032008": {
+   "in_liste": true,
+   "kopf": {
+    "id": 1032008,
+    "name": "amarga muerte",
+    "imagePath": null,
+    "createdAt": "2023-06-23T14:30:38+02:00",
+    "groups": [],
+    "tags": []
+   },
+   "zutaten": [
+    {
+     "id": 9106825,
+     "kind": "ingredient",
+     "name": "Tequila Patron Blanco 40% 0,7L Flasche 0,7L:flasche 0,7L",
+     "quantity": 3,
+     "unit": "cl",
+     "cost": 1.2709285714285714,
+     "artikelId": "714",
+     "supplier": {
+      "id": 6421,
+      "name": "DISTRA Enchilada_Coyacan"
+     },
+     "subRecipeId": null,
+     "group": null
+    },
+    {
+     "id": 9111585,
+     "kind": "ingredient",
+     "name": "Aperol 11% 1L Karton 6X1L:karton 6X1L",
+     "quantity": 2,
+     "unit": "cl",
+     "cost": 0.24613333999999998,
+     "artikelId": "9501",
+     "supplier": {
+      "id": 6421,
+      "name": "DISTRA Enchilada_Coyacan"
+     },
+     "subRecipeId": null,
+     "group": null
+    },
+    {
+     "id": 9111586,
+     "kind": "ingredient",
+     "name": "Paloma Pink Grape. Ew 0,25L",
+     "quantity": 10,
+     "unit": "cl",
+     "cost": 0,
+     "artikelId": "762652",
+     "supplier": {
+      "id": 585,
+      "name": "Transgourmet DE"
+     },
+     "subRecipeId": null,
+     "group": null
+    },
+    {
+     "id": 9111587,
+     "kind": "sub_recipe",
+     "name": "Sweet & Sour Mix 20 L",
+     "quantity": 2,
+     "unit": "cl",
+     "cost": 0,
+     "artikelId": null,
+     "supplier": null,
+     "subRecipeId": 983835,
+     "group": null
+    },
+    {
+     "id": 9114063,
+     "kind": "product_group",
+     "name": "Pink Grapefruit (EN)",
+     "quantity": 10,
+     "unit": "g",
+     "cost": 0.022000000000000002,
+     "artikelId": "14762710",
+     "supplier": {
+      "id": 747,
+      "name": "CHEFS CULINAR"
+     },
+     "subRecipeId": null,
+     "group": null
+    }
+   ],
+   "meta": {
+    "weight": {
+     "total": 180,
+     "perPerson": 180,
+     "portionSize": null,
+     "portionSizeUnit": "g",
+     "loss": 100
+    },
+    "allergens": [],
+    "additives": [],
+    "nutritions": []
+   }
+  },
+  "1048034": {
+   "in_liste": true,
+   "kopf": {
+    "id": 1048034,
+    "name": "2cl Popcorn Shot",
+    "imagePath": null,
+    "createdAt": "2023-08-17T08:46:27+02:00",
+    "groups": [
+     {
+      "id": 85103,
+      "name": "Extra Spirituosen"
+     }
+    ],
+    "tags": []
+   },
+   "zutaten": [
+    {
+     "id": 9182378,
+     "kind": "sub_recipe",
+     "name": "Popcorn Shot Basisartikel",
+     "quantity": 2,
+     "unit": "cl",
+     "cost": 0.2586325884676695,
+     "artikelId": null,
+     "supplier": null,
+     "subRecipeId": 1048035,
+     "group": null
+    },
+    {
+     "id": 9182379,
+     "kind": "ingredient",
+     "name": "Bunte Popcornmischung Cinemix:eimer 10 L",
+     "quantity": 0.5,
+     "unit": "EL",
+     "cost": 0,
+     "artikelId": "151014",
+     "supplier": {
+      "id": 6421,
+      "name": "DISTRA Enchilada_Coyacan"
+     },
+     "subRecipeId": null,
+     "group": null
+    }
+   ],
+   "meta": {
+    "weight": {
+     "total": 21.5,
+     "perPerson": 21.5,
+     "portionSize": 3.5,
+     "portionSizeUnit": "g",
+     "loss": 83.72093023255813
+    },
+    "allergens": [],
+    "additives": [],
+    "nutritions": []
+   }
+  },
+  "1030679": {
+   "in_liste": true,
+   "kopf": {
+    "id": 1030679,
+    "name": "La Catrina",
+    "imagePath": null,
+    "createdAt": "2023-06-21T14:50:30+02:00",
+    "groups": [],
+    "tags": []
+   },
+   "zutaten": [
+    {
+     "id": 9100461,
+     "kind": "ingredient",
+     "name": "Tequila Patron Reposado 40% 0,7L Flasche 0,7L:flasche 0,7L",
+     "quantity": 3,
+     "unit": "cl",
+     "cost": 1.3600714285714286,
+     "artikelId": "715",
+     "supplier": {
+      "id": 6421,
+      "name": "DISTRA Enchilada_Coyacan"
+     },
+     "subRecipeId": null,
+     "group": null
+    },
+    {
+     "id": 9131967,
+     "kind": "ingredient",
+     "name": "Hausgemachter Hibiskus Sirup 3Kg Kanister 3 Kg:kanister 3 Kg",
+     "quantity": 2,
+     "unit": "cl",
+     "cost": 0,
+     "artikelId": "10956",
+     "supplier": {
+      "id": 6421,
+      "name": "DISTRA Enchilada_Coyacan"
+     },
+     "subRecipeId": null,
+     "group": null
+    },
+    {
+     "id": 9136611,
+     "kind": "product_group",
+     "name": "Limetten (EN)",
+     "quantity": 4,
+     "unit": "Limetten 8tel",
+     "cost": 0.052,
+     "artikelId": "14759369",
+     "supplier": {
+      "id": 747,
+      "name": "CHEFS CULINAR"
+     },
+     "subRecipeId": null,
+     "group": null
+    },
+    {
+     "id": 9100465,
+     "kind": "ingredient",
+     "name": "Schweppes Ginger Beer 6X1,0",
+     "quantity": 15,
+     "unit": "cl",
+     "cost": 0.19975000000000503,
+     "artikelId": "4046505",
+     "supplier": {
+      "id": 6785,
+      "name": "Getränke Kirstein"
+     },
+     "subRecipeId": null,
+     "group": null
+    },
+    {
+     "id": 9100466,
+     "kind": "product_group",
+     "name": "Gurken (EN)",
+     "quantity": 10,
+     "unit": "g",
+     "cost": 0.022285714285714287,
+     "artikelId": "1260",
+     "supplier": {
+      "id": 6317,
+      "name": "FFD - Frisch Fruchtig Delp"
+     },
+     "subRecipeId": null,
+     "group": null
+    }
+   ],
+   "meta": {
+    "weight": {
+     "total": 238,
+     "perPerson": 238,
+     "portionSize": null,
+     "portionSizeUnit": "g",
+     "loss": 100
+    },
+    "allergens": [],
+    "additives": [],
+    "nutritions": []
+   }
+  },
+  "983835": {
+   "in_liste": false,
+   "kopf": {
+    "id": 983835,
+    "name": "Sweet & Sour Mix 20 L",
+    "imagePath": null,
+    "createdAt": "2023-02-09T14:43:29+01:00",
+    "groups": [
+     {
+      "id": 79823,
+      "name": "20. Basisartikel Bar"
+     },
+     {
+      "id": 79823,
+      "name": "20. Basisartikel Bar"
+     }
+    ],
+    "tags": []
+   },
+   "zutaten": [
+    {
+     "id": 8891604,
+     "kind": "ingredient",
+     "name": "Sweet & Sour Mix 17,2 L Box 17,2 L:box 17,2 L",
+     "quantity": 20,
+     "unit": "LT",
+     "cost": 0,
+     "artikelId": "200004",
+     "supplier": {
+      "id": 6421,
+      "name": "DISTRA Enchilada_Coyacan"
+     },
+     "subRecipeId": null,
+     "group": null
+    }
+   ],
+   "meta": {
+    "weight": {
+     "total": 20000,
+     "perPerson": 20000,
+     "portionSize": 20,
+     "portionSizeUnit": "l",
+     "loss": 0
+    },
+    "allergens": [],
+    "additives": [],
+    "nutritions": []
+   }
+  },
+  "1048035": {
+   "in_liste": false,
+   "kopf": {
+    "id": 1048035,
+    "name": "Popcorn Shot Basisartikel",
+    "imagePath": null,
+    "createdAt": "2023-08-17T08:46:27+02:00",
+    "groups": [
+     {
+      "id": 79823,
+      "name": "20. Basisartikel Bar"
+     }
+    ],
+    "tags": []
+   },
+   "zutaten": [
+    {
+     "id": 9182375,
+     "kind": "ingredient",
+     "name": "Monin Sirup Popcorn 0,7L Flasche 0,7L:flasche 0,7L",
+     "quantity": 40,
+     "unit": "cl",
+     "cost": 4.0600000000000005,
+     "artikelId": "108807",
+     "supplier": {
+      "id": 6421,
+      "name": "DISTRA Enchilada_Coyacan"
+     },
+     "subRecipeId": null,
+     "group": null
+    },
+    {
+     "id": 9182376,
+     "kind": "product_group",
+     "name": "Jose Cuervo 1800 Silver Group",
+     "quantity": 20,
+     "unit": "cl",
+     "cost": 3.7028571428571433,
+     "artikelId": "784",
+     "supplier": {
+      "id": 6421,
+      "name": "DISTRA Enchilada_Coyacan"
+     },
+     "subRecipeId": null,
+     "group": null
+    },
+    {
+     "id": 9182377,
+     "kind": "sub_recipe",
+     "name": "Sweet & Sour Mix 20 L",
+     "quantity": 30,
+     "unit": "cl",
+     "cost": 0,
+     "artikelId": null,
+     "supplier": null,
+     "subRecipeId": 984827,
+     "group": null
+    }
+   ],
+   "meta": {
+    "weight": {
+     "total": 900,
+     "perPerson": 900,
+     "portionSize": 600.3,
+     "portionSizeUnit": "g",
+     "loss": 33.300000000000004
+    },
+    "allergens": [],
+    "additives": [],
+    "nutritions": []
+   }
+  },
+  "984827": {
+   "in_liste": false,
+   "kopf": {
+    "id": 984827,
+    "name": "Sweet & Sour Mix 20 L",
+    "imagePath": null,
+    "createdAt": "2023-02-09T17:02:50+01:00",
+    "groups": [
+     {
+      "id": 79823,
+      "name": "20. Basisartikel Bar"
+     },
+     {
+      "id": 79823,
+      "name": "20. Basisartikel Bar"
+     }
+    ],
+    "tags": []
+   },
+   "zutaten": [
+    {
+     "id": 8896053,
+     "kind": "ingredient",
+     "name": "Sweet & Sour Mix 17,2 L Box 17,2 L:box 17,2 L",
+     "quantity": 20,
+     "unit": "LT",
+     "cost": 0,
+     "artikelId": "200004",
+     "supplier": {
+      "id": 6421,
+      "name": "DISTRA Enchilada_Coyacan"
+     },
+     "subRecipeId": null,
+     "group": null
+    }
+   ],
+   "meta": {
+    "weight": {
+     "total": 20000,
+     "perPerson": 20000,
+     "portionSize": 20,
+     "portionSizeUnit": "l",
+     "loss": 0
+    },
+    "allergens": [],
+    "additives": [],
+    "nutritions": []
+   }
+  }
+ }
+}

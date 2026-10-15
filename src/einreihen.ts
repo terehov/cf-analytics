@@ -23,6 +23,9 @@
  *       nicht Teil von --foodnotify: lohnend fast nur bei Wilma Wunder
  *       (275 Stück), bei den anderen drei Marken kaum. Einmalig.
  *
+ *   bun run einreihen --rezepte [--dry-run]
+ *       Rezepturen (0132). Mit --dry-run wird nur gezählt, nichts geschrieben.
+ *
  * SEIT DEM 14.08.2026 BRAUCHT MAN KEINEN DAVON MEHR. Alle vier Schalter haben
  * eine Entsprechung im nächtlichen Lauf:
  *
@@ -72,7 +75,7 @@ import { query, eine, pool } from './db/pool'
 import { log } from './lib/log'
 import { AKTIVE_ENDPUNKTE, istMomentaufnahme } from './lina/endpunkte'
 import { geschaeftstag } from './lib/time'
-import { linaNachfuellen, foodnotifyNachfuellen } from './sync/nachfuellen'
+import { linaNachfuellen, foodnotifyNachfuellen, rezepteNachfuellen } from './sync/nachfuellen'
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`)
@@ -240,6 +243,23 @@ if (process.argv.includes('--foodnotify-inventuren')) {
     marken: zugaenge.map(z => z.schluessel), posten: gesamt,
     hinweis: 'weitere Seiten und Positionen folgen von selbst aus fn:inventuren',
   })
+}
+
+/**
+ *   bun run einreihen --rezepte [--dry-run]
+ *       Rezepturen (0132): dieselbe Funktion, die `bun run sync` als Vorlauf
+ *       ausführt (`rezepteNachfuellen()`) — Seite 1 der Rezeptliste je Marke,
+ *       Verweise auf unbekannte Rezepte, Zutaten/Meta für neue und im Umlauf
+ *       fällige Rezepte bis REZEPTE_JE_LAUF.
+ *
+ *       Gebraucht wird der Schalter nicht (der Nachtlauf macht es selbst).
+ *       `--dry-run` rechnet alles in einer Transaktion und rollt sie zurück:
+ *       er zählt, was eingereiht WÜRDE, und schreibt nichts.
+ */
+if (process.argv.includes('--rezepte')) {
+  const trocken = process.argv.includes('--dry-run')
+  const stand = await rezepteNachfuellen(trocken)
+  console.log(JSON.stringify({ trockenlauf: trocken, ...stand }, null, 2))
 }
 
 await pool.end()

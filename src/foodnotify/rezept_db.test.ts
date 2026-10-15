@@ -1,0 +1,335 @@
+/**
+ * Rezepturen (0132) gegen eine echte Datenbank und die FoodNotify-Attrappe:
+ * Nachfüllen → Worker → raw → core → mart, Idempotenz, Umlauf, Obergrenze,
+ * Zyklusschutz und die Regel-10-Prüfung je Marke.
+ *
+ * Übersprungen ohne TEST_DATABASE_URL. Die Datei macht TRUNCATE über die
+ * Warteschlange, raw und die Rezepttabellen — sie braucht eine EIGENE
+ * Testdatenbank (Schema-Klon, siehe docs/offene-punkte.md), nie die, auf die
+ * DATABASE_URL zeigt. Immer die ganze Datei laufen lassen, nie mit -t (die
+ * Notbremse sitzt im ersten beforeAll).
+ */
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
+import { Client } from 'pg'
+import { mockStarten } from '../lina/mock'
+import { fnMockStarten } from './mock'
+
+const DB = process.env.TEST_DATABASE_URL
+
+if (DB && process.env.DATABASE_URL && DB === process.env.DATABASE_URL) {
+  throw new Error('TEST_DATABASE_URL zeigt auf dieselbe Datenbank wie DATABASE_URL — '
+    + 'diese Datei macht TRUNCATE. Eine eigene Testdatenbank anlegen.')
+}
+
+const lauf = DB ? describe : describe.skip
+
+lauf('Rezepturen mit Datenbank', () => {
+  let db: Client
+  let lina: ReturnType<typeof mockStarten>
+  let fn: ReturnType<typeof fnMockStarten>
+  let cfg: any
+  let enchilada: number
+
+  const zaehlen = async () => {
+    const { rows: [r] } = await db.query(
+      `SELECT (SELECT count(*)::int FROM core.rezept)  AS rezepte,
+              (SELECT count(*)::int FROM core.zutat)   AS zutaten,
+              (SELECT count(*)::int FROM core.rezept WHERE in_liste) AS in_liste,
+              (SELECT count(*)::int FROM core.rezept WHERE zutaten_geholt_am IS NOT NULL) AS mit_zutaten,
+              (SELECT count(*)::int FROM core.rezept WHERE meta_geholt_am IS NOT NULL) AS mit_meta,
+              (SELECT count(*)::int FROM core.zutat WHERE sub_rezept_fn_id IS NOT NULL
+                                                      AND sub_rezept_key IS NULL) AS verweis_ohne_key`)
+    return r
+  }
+
+  beforeAll(async () => {
+    lina = mockStarten({})
+    fn = fnMockStarten()
+    process.env.LINA_BASE_URL = lina.url
+    process.env.LINA_USER = 'testuser'
+    process.env.LINA_PASSWORD = 'geheim'
+    process.env.DATABASE_URL = DB!
+    process.env.TAKT_MIN_MS = '0'
+    process.env.TAKT_MAX_MS = '0'
+    process.env.FN_TAKT_MIN_MS = '0'
+    process.env.FN_TAKT_MAX_MS = '0'
+    process.env.FN_BASE_URL = fn.url
+    // NUR Enchilada, und nur mit dem Attrappen-Benutzer. Die echten Zugaenge
+    // aus der .env werden entfernt, BEVOR config geladen wird.
+    for (const m of ['APOSTO', 'ENCHILADA', 'DEUTSCHE_KONZEPTE', 'WILMA_WUNDER']) {
+      delete process.env[`FN_${m}_USER`]
+      delete process.env[`FN_${m}_PASSWORD`]
+    }
+    process.env.FN_ENCHILADA_USER = 'test@aposto.eu'
+    process.env.FN_ENCHILADA_PASSWORD = 'geheim'
+    process.env.HISTORIE_JE_LAUF = '0'
+    process.env.NULLTAGE_JE_LAUF = '0'
+    process.env.LOCHTAGE_JE_LAUF = '0'
+    process.env.NACHLESE_JE_LAUF = '0'
+    process.env.LOG_LEVEL ??= 'error'
+    const { config } = await import('../config')
+    if (config.DATABASE_URL !== DB || config.FN_BASE_URL !== fn.url) {
+      throw new Error('config wurde vorher mit einer anderen Umgebung geladen — '
+        + 'diese Datei einzeln starten: bun test src/foodnotify/rezept_db.test.ts')
+    }
+    cfg = config
+    db = new Client({ connectionString: DB })
+    await db.connect()
+    await db.query(`DELETE FROM sync.zugangssperre`)
+    await db.query(`DELETE FROM core.bestellposition WHERE bestellung_key IN
+                      (SELECT bestellung_key FROM core.bestellung WHERE fn_id = 'rz-test')`)
+    await db.query(`DELETE FROM core.bestellung WHERE fn_id = 'rz-test'`)
+    await db.query(`DELETE FROM core.kostenstelle WHERE kostenstelle_id = 990001`)
+    await db.query(`TRUNCATE sync.warteschlange, sync.aufgabe, sync.lauf, sync.schema_abweichung,
+                       raw.api_antwort, core.zutat, core.rezept RESTART IDENTITY CASCADE`)
+    const { rows: [m] } = await db.query(`SELECT marke_key FROM core.marke WHERE schluessel = 'enchilada'`)
+    enchilada = Number(m.marke_key)
+  })
+
+  afterAll(async () => { lina?.stop(); fn?.stop(); await db?.end() })
+
+  test('Nachfüllen + Worker: Liste, Verweise einzeln, Zutaten, Meta — alles in einem Lauf', async () => {
+    const { rezepteNachfuellen } = await import('../sync/nachfuellen')
+    const stand = await rezepteNachfuellen()
+    expect(stand).toMatchObject({ listen: 1, neu: 0, verweise: 0, umlauf: 0 })
+
+    const { workerLauf } = await import('../sync/worker')
+    const r = await workerLauf('manuell')
+    expect(r.status).toBe('ok')
+    // 2 Listenseiten + 3 Köpfe über Verweis + 6 × (Zutaten + Meta).
+    expect(r.ok).toBe(17)
+
+    expect(await zaehlen()).toEqual({
+      rezepte: 6, zutaten: 17, in_liste: 3, mit_zutaten: 6, mit_meta: 6, verweis_ohne_key: 0,
+    })
+
+    // Jede Antwort im Raw-Layer, mit Marke im Parameter.
+    const { rows: [raw] } = await db.query(
+      `SELECT count(*)::int AS n,
+              count(*) FILTER (WHERE quelle = 'foodnotify' AND (parameter->>'markeKey')::int = $1)::int AS ok
+         FROM raw.api_antwort WHERE endpunkt LIKE 'fn:rezept%'`, [enchilada])
+    expect(raw).toEqual({ n: 17, ok: 17 })
+
+    // Die drei nur über Verweis erreichbaren Rezepte stehen als in_liste = false.
+    const { rows: verweis } = await db.query(
+      `SELECT fn_id FROM core.rezept WHERE NOT in_liste ORDER BY fn_id`)
+    expect(verweis.map(v => v.fn_id)).toEqual([983835, 984827, 1048035])
+
+    // Meta roh übernommen.
+    const { rows: [meta] } = await db.query(
+      `SELECT gewicht_gesamt::float AS g, portion::float AS p, portion_einheit AS e, verlust_roh::float AS v
+         FROM core.rezept WHERE fn_id = 983835`)
+    expect(meta).toEqual({ g: 20000, p: 20, e: 'l', v: 0 })
+
+    const { rows: abw } = await db.query(`SELECT 1 FROM sync.schema_abweichung`)
+    expect(abw).toHaveLength(0)
+  })
+
+  /**
+   * Abnahme 3 aus docs/plan-rezepturen.md, an der echten Enchilada-Nummer:
+   * 200004 (Sweet & Sour Mix Box, Distra) steht DIREKT in zwei Halbfabrikaten
+   * und kommt über sie in drei weitere Rezepte — eines davon über zwei Stufen.
+   */
+  test('artikel_in_rezept: 200004 auf Ebene 1, 2 und 3, Menge je Ebene, nicht multipliziert', async () => {
+    const { rows } = await db.query(
+      `SELECT rezept, marke, menge::float AS menge, einheit, ebene, via_rezept, via_menge::float AS via_menge,
+              via_einheit, direkt_rezept, pfad
+         FROM mart.artikel_in_rezept WHERE artikelnummer = '200004'
+        ORDER BY ebene, rezept_fn_id`)
+    expect(rows).toEqual([
+      { rezept: 'Sweet & Sour Mix 20 L', marke: 'Enchilada', menge: 20, einheit: 'LT', ebene: 1,
+        via_rezept: null, via_menge: null, via_einheit: null, direkt_rezept: 'Sweet & Sour Mix 20 L',
+        pfad: 'Sweet & Sour Mix 20 L' },
+      { rezept: 'Sweet & Sour Mix 20 L', marke: 'Enchilada', menge: 20, einheit: 'LT', ebene: 1,
+        via_rezept: null, via_menge: null, via_einheit: null, direkt_rezept: 'Sweet & Sour Mix 20 L',
+        pfad: 'Sweet & Sour Mix 20 L' },
+      { rezept: 'amarga muerte', marke: 'Enchilada', menge: 20, einheit: 'LT', ebene: 2,
+        via_rezept: 'Sweet & Sour Mix 20 L', via_menge: 2, via_einheit: 'cl',
+        direkt_rezept: 'Sweet & Sour Mix 20 L', pfad: 'amarga muerte → Sweet & Sour Mix 20 L' },
+      expect.objectContaining({ rezept: 'Popcorn Shot Basisartikel', ebene: 2,
+        via_rezept: 'Sweet & Sour Mix 20 L', menge: 20, einheit: 'LT' }),
+      expect.objectContaining({ rezept: '2cl Popcorn Shot', ebene: 3,
+        via_rezept: 'Popcorn Shot Basisartikel', menge: 20, einheit: 'LT',
+        pfad: '2cl Popcorn Shot → Popcorn Shot Basisartikel → Sweet & Sour Mix 20 L' }),
+    ])
+  })
+
+  test('zweimal laden → identische Zeilenzahlen; core aus raw neu aufbaubar', async () => {
+    const vorher = await zaehlen()
+    const { rows: [inhalt1] } = await db.query(
+      `SELECT md5(string_agg(concat_ws('|', r.fn_id, z.position, z.art, z.artikelnummer, z.menge, z.einheit,
+                                      z.sub_rezept_fn_id, z.lieferant_fn_id), ',' ORDER BY r.fn_id, z.position)) AS h
+         FROM core.zutat z JOIN core.rezept r USING (rezept_key)`)
+
+    // a) Alle Rohantworten noch einmal durch den Lader — ohne vorher zu leeren.
+    const { fnLaden } = await import('./laden')
+    const { fnEndpunkt } = await import('./endpunkte')
+    const { rows: [l] } = await db.query(`SELECT lauf_id::text FROM sync.lauf ORDER BY lauf_id DESC LIMIT 1`)
+    const laufId: string = l.lauf_id
+    const nochmal = async () => {
+      // Je Endpunkt und Parameter die ERSTE Antwort — der Nachspiel-Lauf hängt
+      // selbst neue Rohzeilen an (raw ist append-only).
+      const { rows: roh } = await db.query(
+        `SELECT DISTINCT ON (endpunkt, parameter::text)
+                endpunkt, parameter, payload, http_status, payload_hash, payload_bytes,
+                zeitraum_von::text AS von
+           FROM raw.api_antwort WHERE endpunkt LIKE 'fn:rezept%'
+          ORDER BY endpunkt, parameter::text, abgerufen_am`)
+      expect(roh).toHaveLength(17)
+      // Erst die Köpfe (Liste, Einzelkopf), dann Zutaten und Meta — dieselbe
+      // Reihenfolge, in der der Worker sie geholt hat.
+      const rang = (e: string) => (e === 'fn:rezepte' ? 0 : e === 'fn:rezept' ? 1 : 2)
+      roh.sort((a, b) => rang(a.endpunkt) - rang(b.endpunkt))
+      for (const a of roh) {
+        const { markeKey, ...parameter } = a.parameter
+        await fnLaden({
+          ep: fnEndpunkt(a.endpunkt), markeKey: Number(markeKey), von: a.von, bis: a.von,
+          parameter, daten: a.payload, httpStatus: a.http_status, bytes: a.payload_bytes,
+          hash: a.payload_hash, laufId: laufId,
+        })
+      }
+    }
+    await nochmal()
+    expect(await zaehlen()).toEqual(vorher)
+
+    // b) core leeren und aus raw neu aufbauen (Regel 4).
+    await db.query(`TRUNCATE core.zutat, core.rezept RESTART IDENTITY CASCADE`)
+    await nochmal()
+    expect(await zaehlen()).toEqual(vorher)
+    const { rows: [inhalt2] } = await db.query(
+      `SELECT md5(string_agg(concat_ws('|', r.fn_id, z.position, z.art, z.artikelnummer, z.menge, z.einheit,
+                                      z.sub_rezept_fn_id, z.lieferant_fn_id), ',' ORDER BY r.fn_id, z.position)) AS h
+         FROM core.zutat z JOIN core.rezept r USING (rezept_key)`)
+    expect(inhalt2.h).toBe(inhalt1.h)
+
+    // Das Nachspielen reiht beim Laden Folgeposten ein (neue Rezepte ohne
+    // Zutaten) — im echten Betrieb richtig, hier Rauschen für die Tests danach.
+    await db.query(`DELETE FROM sync.warteschlange WHERE erledigt_am IS NULL`)
+  })
+
+  test('zweites Nachfüllen am selben Tag reiht nichts ein; der Umlauf greift erst nach REZEPT_UMLAUF_TAGE', async () => {
+    const { rezepteNachfuellen } = await import('../sync/nachfuellen')
+    // raw wurde im Test davor zweimal nachgespielt — die Warteschlange ist unberührt.
+    expect(await rezepteNachfuellen()).toMatchObject({ gesamt: 0, liegenGeblieben: 0 })
+
+    // Zwei Rezepte altern über den Umlauf: eines aus der Liste, eines nur über Verweis.
+    await db.query(
+      `UPDATE core.rezept SET zutaten_geholt_am = now() - interval '15 days'
+        WHERE fn_id IN (1032008, 983835)`)
+    await db.query(
+      `UPDATE sync.warteschlange SET erstellt_am = now() - interval '15 days'
+        WHERE parameter->>'rezeptId' IN ('1032008', '983835')`)
+
+    // Trockenlauf: zählt, schreibt nichts.
+    const vorher = await db.query(`SELECT count(*)::int AS n FROM sync.warteschlange`)
+    const trocken = await rezepteNachfuellen(true)
+    // 1032008: Zutaten + Meta; 983835 (nur über Verweis): Kopf + Zutaten + Meta.
+    expect(trocken).toMatchObject({ umlauf: 5, neu: 0, verweise: 0, liegenGeblieben: 0 })
+    const nachher = await db.query(`SELECT count(*)::int AS n FROM sync.warteschlange`)
+    expect(nachher.rows[0].n).toBe(vorher.rows[0].n)
+
+    // Die Obergrenze: drei Aufrufe reichen nur für eines der beiden Rezepte.
+    // Heute Verbrauchtes zählt mit — die Grenze gilt je Kalendertag.
+    const { rezeptBudgetRest } = await import('./laden')
+    const alt = cfg.REZEPTE_JE_LAUF
+    try {
+      cfg.REZEPTE_JE_LAUF = 1_000_000
+      const verbraucht = 1_000_000 - await rezeptBudgetRest(db as any)
+      cfg.REZEPTE_JE_LAUF = verbraucht + 3
+      const knapp = await rezepteNachfuellen()
+      // Das erste fällige Rezept passt (2 oder 3 Aufrufe), das zweite nicht mehr
+      // ganz — und wird nicht halb eingereiht, sondern bleibt liegen.
+      expect(knapp.liegenGeblieben).toBe(1)
+      expect([2, 3]).toContain(knapp.umlauf)
+      expect(knapp.budgetRest).toBe(3 - knapp.umlauf)
+      // Die Lader sehen dieselbe Grenze: sie zählen an der Warteschlange.
+      expect(await rezeptBudgetRest(db as any)).toBe(3 - knapp.umlauf)
+    } finally { cfg.REZEPTE_JE_LAUF = alt }
+  })
+
+  test('mart: Ladestand je Marke, Zuordnung in Prozentzahlen, Prüfzeilen vorhanden', async () => {
+    const { rows: [st] } = await db.query(
+      `SELECT rezepte, in_liste, nur_ueber_verweis, ohne_zutaten, zutatenzeilen
+         FROM mart.rezept_stand WHERE marke_key = $1`, [enchilada])
+    expect(st).toEqual({ rezepte: 6, in_liste: 3, nur_ueber_verweis: 3, ohne_zutaten: 0, zutatenzeilen: 17 })
+
+    const { rows: zu } = await db.query(
+      `SELECT zuordnung, positionen, zuordnung_anteil_pct::float AS pct
+         FROM mart.rezept_zuordnung_pruefung WHERE marke_key = $1 ORDER BY zuordnung`, [enchilada])
+    // Ohne Bestellungen im Testbestand ist jede Nummer "ohne Einkauf".
+    expect(zu.map(z => z.zuordnung)).toEqual(['nummer ohne einkauf', 'unterrezept'])
+    expect(zu.find(z => z.zuordnung === 'unterrezept')).toMatchObject({ positionen: 3 })
+    // Prozentzahl, nicht Bruch: 3 von 17 = 17.65, und die Summe ist 100.
+    expect(zu.find(z => z.zuordnung === 'unterrezept')!.pct).toBe(17.65)
+    expect(Math.round(zu.reduce((s, z) => s + z.pct, 0))).toBe(100)
+
+    const { rows: pr } = await db.query(
+      `SELECT pruefung FROM mart.pruefung_uebersicht WHERE pruefung LIKE 'Rezepte:%' ORDER BY 1`)
+    expect(pr).toHaveLength(2)
+  })
+
+  test('eine eingekaufte Nummer wird als eingekauft erkannt — je Marke', async () => {
+    const { rows: [ks] } = await db.query(
+      `INSERT INTO core.kostenstelle (marke_key, kostenstelle_id, restaurant_id, erp_id, name, restaurant_name)
+       VALUES ($1, 990001, 990001, 990001, 'Testküche', 'Testbetrieb') RETURNING kostenstelle_key`, [enchilada])
+    const { rows: [b] } = await db.query(
+      `INSERT INTO core.bestellung (kostenstelle_key, fn_id) VALUES ($1, 'rz-test') RETURNING bestellung_key`,
+      [ks.kostenstelle_key])
+    await db.query(
+      `INSERT INTO core.bestellposition (bestellung_key, name, lieferanten_nr) VALUES ($1, 'S&S Box', '200004')`,
+      [b.bestellung_key])
+    const { rows } = await db.query(
+      `SELECT DISTINCT zuordnung FROM mart.rezept_position WHERE artikelnummer = '200004'`)
+    expect(rows.map(r => r.zuordnung)).toEqual(['eingekauft'])
+    // Dieselbe Nummer in einer anderen Marke zählt nicht.
+    await db.query(`UPDATE core.kostenstelle SET marke_key = $1 WHERE kostenstelle_key = $2`,
+      [enchilada === 1 ? 2 : 1, ks.kostenstelle_key])
+    const { rows: fremd } = await db.query(
+      `SELECT DISTINCT zuordnung FROM mart.rezept_position WHERE artikelnummer = '200004'`)
+    expect(fremd.map(r => r.zuordnung)).toEqual(['nummer ohne einkauf'])
+    await db.query(`DELETE FROM core.bestellposition WHERE bestellung_key = $1`, [b.bestellung_key])
+    await db.query(`DELETE FROM core.bestellung WHERE bestellung_key = $1`, [b.bestellung_key])
+    await db.query(`DELETE FROM core.kostenstelle WHERE kostenstelle_key = $1`, [ks.kostenstelle_key])
+  })
+
+  test('ein Zyklus zwischen Rezepten terminiert', async () => {
+    const { rows: [a] } = await db.query(
+      `INSERT INTO core.rezept (marke_key, fn_id, name) VALUES ($1, 1, 'Zyklus A') RETURNING rezept_key`, [enchilada])
+    const { rows: [b] } = await db.query(
+      `INSERT INTO core.rezept (marke_key, fn_id, name) VALUES ($1, 2, 'Zyklus B') RETURNING rezept_key`, [enchilada])
+    await db.query(
+      `INSERT INTO core.zutat (rezept_key, position, art, name, sub_rezept_fn_id) VALUES
+         ($1, 1, 'sub_recipe', 'B', 2), ($2, 1, 'sub_recipe', 'A', 1)`, [a.rezept_key, b.rezept_key])
+    await db.query(
+      `INSERT INTO core.zutat (rezept_key, position, art, name, artikelnummer) VALUES ($1, 2, 'ingredient', 'X', 'zyklus-x')`,
+      [a.rezept_key])
+    const { rows } = await db.query(
+      `SELECT rezept, ebene FROM mart.artikel_in_rezept WHERE artikelnummer = 'zyklus-x' ORDER BY ebene`)
+    // X steht in A (1), über A in B (2) — und B → A wird nicht noch einmal betreten.
+    expect(rows).toEqual([{ rezept: 'Zyklus A', ebene: 1 }, { rezept: 'Zyklus B', ebene: 2 }])
+    await db.query(`DELETE FROM core.rezept WHERE rezept_key IN ($1, $2)`, [a.rezept_key, b.rezept_key])
+  })
+
+  /**
+   * Regel 10: eine Marke, deren Rezeptliste nicht mehr kommt, muss in einer
+   * Prüfzeile stehen — nicht nur im Log. mart.quelle_zulauf sähe es nicht,
+   * solange eine andere Marke weiter liefert.
+   */
+  test('Regel 10: Marke mit FoodNotify-Zulauf, aber veralteter Rezeptliste, wird auffällig', async () => {
+    const zeile = async () => (await db.query(
+      `SELECT auffaellig::int AS n FROM mart.pruefung_uebersicht
+        WHERE pruefung LIKE 'Rezepte: Marke mit FoodNotify-Zulauf%'`)).rows[0].n
+    // Zulauf der Marke überhaupt: ein fn:profil-Abruf in den letzten sieben Tagen.
+    const { rows: [l] } = await db.query(`SELECT lauf_id FROM sync.lauf ORDER BY lauf_id LIMIT 1`)
+    await db.query(
+      `INSERT INTO sync.aufgabe (lauf_id, endpunkt, status, marke_key, parameter)
+       VALUES ($1, 'fn:profil', 'ok', $2, '{}')`, [l.lauf_id, enchilada])
+    expect(await zeile()).toBe(0)
+    await db.query(
+      `UPDATE sync.aufgabe SET beendet_am = now() - interval '48 hours' WHERE endpunkt = 'fn:rezepte'`)
+    const { rows: [st] } = await db.query(
+      `SELECT zustand FROM mart.rezept_stand WHERE marke_key = $1`, [enchilada])
+    expect(st.zustand).toBe('liste veraltet')
+    expect(await zeile()).toBe(1)
+  })
+})

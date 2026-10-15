@@ -173,7 +173,60 @@ export const FN_ENDPUNKTE: FnEndpunkt[] = [
       + 'PAGINIERT mit perPage 800; die Hülle ist {data, pagination} (die recipes-Form), '
       + 'nicht die erp-Form {payload:{data,pagination}} — am Rohbestand geprüft, 358 von 358.',
   },
+
+  // --- Rezepturen (0132, docs/plan-rezepturen.md) -----------------------
+  /*
+   * Vier Pfade, alle aus dem beaufsichtigten Einzelabzug src/rezepte.ts
+   * (Enchilada, 14./15.09.2026, 8.304 GETs ohne Sperre) uebernommen. Die
+   * Rezept-ID ist bei allen vier Marken eine Zahl; `rezeptId` wird hier gegen
+   * /^\d+$/ geprueft, damit ein verrutschter Parameter nicht als
+   * `/api/recipes/batch` (Methode ungeprueft, vermutlich POST) endet.
+   */
+  {
+    key: 'fn:rezepte',
+    zweck: 'Rezeptliste einer Marke, seitenweise (25 je Seite, fest)',
+    prioritaet: 40,
+    pfad: p => `/api/recipes?${new URLSearchParams({ page: pflicht(p, 'seite') })}`,
+    hinweis: 'NICHT STABIL SORTIERT (createdAt-Gleichstaende: 21 Doppelte an Seitengrenzen) und '
+      + 'KEINE VOLLSTAENDIGE AUFZAEHLUNG (56 Enchilada-Rezepte nur ueber Verweise). perPage wird '
+      + 'ignoriert. Huelle {data, pagination}. Deshalb taeglich alle Seiten plus Verweise einzeln '
+      + '(fn:rezept) — foodnotify-api-inventar.md §3.',
+  },
+  {
+    key: 'fn:rezept',
+    zweck: 'Rezeptkopf einzeln — fuer Rezepte, die nur ueber einen Verweis (subRecipeId) bekannt sind',
+    prioritaet: 41,
+    pfad: p => `/api/recipes/${rezeptId(p)}`,
+    hinweis: 'Dieselbe Form wie ein Listeneintrag: id, name, imagePath, createdAt, groups[], tags[].',
+  },
+  {
+    key: 'fn:rezept_zutaten',
+    zweck: 'Zutaten eines Rezepts — Lieferanten-Artikelnummer, Menge, Einheit, Unterrezept',
+    prioritaet: 41,
+    pfad: p => `/api/recipes/${rezeptId(p)}/ingredients`,
+    hinweis: 'artikelId ist die LIEFERANTEN-Artikelnummer (= core.bestellposition.lieferanten_nr), '
+      + 'nicht core.ware.fn_id und nicht die LINA-Artikelnummer. kind: ingredient / sub_recipe / '
+      + 'product_group. Hoechstens 13 Zeilen je Rezept gemessen — eine zweite Seite waere neu und '
+      + 'laesst das Laden scheitern statt still abzuschneiden.',
+  },
+  {
+    key: 'fn:rezept_meta',
+    zweck: 'Gewicht, Portion, Verlust (roh) eines Rezepts',
+    prioritaet: 41,
+    pfad: p => `/api/recipes/${rezeptId(p)}/meta`,
+    hinweis: 'weight.loss ist ungedeutet (0, 100, krumme Werte) und wird roh abgelegt.',
+  },
 ]
+
+/** Rezept-ID aus dem Posten — nur Ziffern, sonst wirft der Pfadbau. */
+function rezeptId(p: Record<string, string>): string {
+  const id = pflicht(p, 'rezeptId')
+  if (!/^\d+$/.test(id)) throw new Error(`rezeptId "${id}" ist keine Zahl`)
+  return id
+}
+
+/** Die Rezeptaufrufe, die REZEPTE_JE_LAUF begrenzt — die Listenseiten zählen nicht mit. */
+export const REZEPT_DETAIL_ENDPUNKTE = ['fn:rezept', 'fn:rezept_zutaten', 'fn:rezept_meta'] as const
 
 const register = new Map(FN_ENDPUNKTE.map(e => [e.key, e]))
 

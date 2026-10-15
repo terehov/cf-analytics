@@ -335,6 +335,14 @@ lauf('Ende-zu-Ende', () => {
        */
       'Nachzuegler: Aenderungen am Rand des Fensters',
       /**
+       * Beide seit 0132. Die erste ist Regel 10 je MARKE: mart.quelle_zulauf
+       * bliebe gruen, solange eine andere Marke Rezepte liefert. Die zweite
+       * hat KEINE Erwartung null — Altnummern und fremde Lieferanten gibt es
+       * immer; sie soll nicht wachsen.
+       */
+      'Rezepte: Marke mit FoodNotify-Zulauf, aber ohne frische Rezeptliste (36 h)',
+      'Rezepte: Zutat mit Artikelnummer, die im Einkauf der Marke nie vorkommt',
+      /**
        * Seit 0080. Gezaehlt wird der VORVORMONAT und nicht der laufende:
        * im laufenden fehlt der Umsatzvergleich bei ALLEN 141 Betrieben,
        * weil die BWA noch nicht gebucht ist. Eine Zeile, die deshalb

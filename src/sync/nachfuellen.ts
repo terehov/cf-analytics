@@ -991,7 +991,189 @@ export async function foodnotifyNachfuellen(): Promise<number> {
     n += await bestelldetailsAuffrischen(marke.marke_key)
   }
 
+  /**
+   * Rezepturen ZULETZT und mit eigenem Fang: ein Fehler hier soll Bestellungen
+   * und Inventuren nicht mitreissen, die oben schon eingereiht sind.
+   */
+  try {
+    n += (await rezepteNachfuellen()).gesamt
+  } catch (e) {
+    log.error('nachfüllen rezepte gescheitert — der Lauf geht weiter', { fehler: String(e) })
+  }
+
   return n
+}
+
+export type RezeptNachfuellStand = {
+  /** Seite 1 je Marke — die übrigen Seiten reiht Seite 1 selbst ein. */
+  listen: number
+  /** Kopf/Zutaten/Meta für Rezepte, die noch nie Zutaten hatten. */
+  neu: number
+  /** Kopf für Verweise auf Rezepte, die wir gar nicht kennen. */
+  verweise: number
+  /** Zutaten/Meta (und Kopf) für Rezepte, deren letzter Abruf älter als der Umlauf ist. */
+  umlauf: number
+  gesamt: number
+  /** Was REZEPTE_JE_LAUF danach noch hergibt. */
+  budgetRest: number
+  /** Rezepte, die fällig wären, aber heute nicht mehr ins Budget passten. */
+  liegenGeblieben: number
+  jeMarke: Record<string, { listen: number; neu: number; verweise: number; umlauf: number }>
+}
+
+/** Sentinel für den Trockenlauf — die Transaktion wird damit zurückgerollt. */
+class Trockenlauf extends Error {
+  constructor(readonly stand: RezeptNachfuellStand) { super('trockenlauf') }
+}
+
+/**
+ * Rezepturen nachfüllen (0132, docs/plan-rezepturen.md §5).
+ *
+ * DREI DINGE, IN DIESER REIHENFOLGE:
+ *
+ *   1. Seite 1 der Rezeptliste je Marke, jeden Tag. Sie reiht beim Laden die
+ *      übrigen Seiten selbst ein (die Seitenzahl kommt aus der heutigen
+ *      Antwort, nicht aus einer gestrigen). Die Listen zählen nicht gegen
+ *      REZEPTE_JE_LAUF — sie sind das Auge, siehe config.ts.
+ *   2. Verweise auf unbekannte Rezepte (subRecipeId ohne core.rezept): der
+ *      Kopf einzeln. Die Liste zählt nicht alle Rezepte auf.
+ *   3. Zutaten und Meta: zuerst Rezepte, die noch nie Zutaten hatten, dann
+ *      die, deren letzter Abruf älter als REZEPT_UMLAUF_TAGE ist — ÄLTESTE
+ *      ZUERST und die Marken im Wechsel, damit eine große Marke eine kleine
+ *      nicht verdrängt. Bis REZEPTE_JE_LAUF erreicht ist.
+ *
+ * WARUM DER UMLAUF: FoodNotify hat kein Änderungsdatum an Rezepten. Ohne ihn
+ * stünde jedes Rezept für immer auf dem Stand des ersten Abrufs — derselbe
+ * Fehler, den 0072 bei den Bestelldetails gefunden hat.
+ *
+ * GESPERRT wird gegen einen OFFENEN Zwilling (derselbe Abruf zweimal in der
+ * Schlange) und gegen einen, der in den letzten REZEPT_UMLAUF_TAGEN schon
+ * eingereiht wurde: ein Rezept, das mit 404 antwortet (gelöscht), wird so
+ * höchstens einmal je Umlauf gefragt, nicht jede Nacht.
+ *
+ * `trocken`: alles wird in EINER Transaktion gerechnet und am Ende
+ * zurückgerollt — dieselbe Logik, nichts geschrieben
+ * (`bun run einreihen --rezepte --dry-run`).
+ */
+export async function rezepteNachfuellen(trocken = false): Promise<RezeptNachfuellStand> {
+  const zugaenge = fnZugaenge()
+  const stand: RezeptNachfuellStand = {
+    listen: 0, neu: 0, verweise: 0, umlauf: 0, gesamt: 0, budgetRest: 0, liegenGeblieben: 0, jeMarke: {},
+  }
+  if (zugaenge.length === 0) return stand
+
+  const { inTransaktion } = await import('../db/pool')
+  const { rezeptBudgetRest } = await import('../foodnotify/laden')
+  const heute = geschaeftstag(new Date())
+
+  try {
+    return await inTransaktion(async c => {
+      const marken = new Map<number, string>()
+      for (const z of zugaenge) {
+        const m = await c.query<{ marke_key: number }>(
+          `SELECT marke_key FROM core.marke WHERE schluessel = $1`, [z.schluessel])
+        if (m.rows[0]) marken.set(Number(m.rows[0].marke_key), z.schluessel)
+      }
+      const keys = [...marken.keys()]
+      for (const s of marken.values()) stand.jeMarke[s] = { listen: 0, neu: 0, verweise: 0, umlauf: 0 }
+      const zaehle = (markeKey: number, feld: 'listen' | 'neu' | 'verweise' | 'umlauf', n: number) => {
+        stand[feld] += n
+        stand.jeMarke[marken.get(markeKey)!]![feld] += n
+      }
+
+      // 1. Seite 1 je Marke, einmal am Tag (Takt am ZEITRAUM, wie die A1-Posten).
+      for (const markeKey of keys) {
+        const r = await c.query(
+          `INSERT INTO sync.warteschlange
+             (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter)
+           SELECT 'fn:rezepte', $1::date, $1::date, 40, $2, '{"seite": "1"}'::jsonb
+            WHERE NOT EXISTS (
+                  SELECT 1 FROM sync.warteschlange w
+                   WHERE w.endpunkt = 'fn:rezepte' AND w.marke_key = $2
+                     AND w.parameter = '{"seite": "1"}'::jsonb
+                     AND (w.erledigt_am IS NULL OR w.zeitraum_von = $1::date))`,
+          [heute, markeKey])
+        zaehle(markeKey, 'listen', r.rowCount ?? 0)
+      }
+
+      let budget = await rezeptBudgetRest(c)
+
+      // Gemeinsame Sperre: offen, oder innerhalb des Umlaufs schon einmal eingereiht.
+      const gesperrt = `EXISTS (SELECT 1 FROM sync.warteschlange w
+                                 WHERE w.endpunkt = $ENDPUNKT AND w.marke_key = x.marke_key
+                                   AND w.parameter = jsonb_build_object('rezeptId', x.fn_id::text)
+                                   AND (w.erledigt_am IS NULL
+                                        OR w.erstellt_am > now() - make_interval(days => $UMLAUF)))`
+
+      // 2. Verweise auf unbekannte Rezepte.
+      const verweise = await c.query<{ marke_key: number; fn_id: number }>(
+        `SELECT DISTINCT p.marke_key, z.sub_rezept_fn_id AS fn_id
+           FROM core.zutat z
+           JOIN core.rezept p ON p.rezept_key = z.rezept_key
+          WHERE p.marke_key = ANY($1::int[]) AND z.sub_rezept_fn_id IS NOT NULL
+            AND NOT EXISTS (SELECT 1 FROM core.rezept u
+                             WHERE u.marke_key = p.marke_key AND u.fn_id = z.sub_rezept_fn_id)`,
+        [keys])
+      for (const v of verweise.rows) {
+        if (budget <= 0) { stand.liegenGeblieben++; continue }
+        const r = await c.query(
+          `INSERT INTO sync.warteschlange
+             (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter)
+           SELECT 'fn:rezept', $1::date, $1::date, 41, x.marke_key, jsonb_build_object('rezeptId', x.fn_id::text)
+             FROM (SELECT $2::int AS marke_key, $3::int AS fn_id) x
+            WHERE NOT ${gesperrt.replaceAll('$ENDPUNKT', `'fn:rezept'`).replaceAll('$UMLAUF', '$4::int')}`,
+          [heute, v.marke_key, v.fn_id, config.REZEPT_UMLAUF_TAGE])
+        const n = r.rowCount ?? 0
+        budget -= n
+        zaehle(Number(v.marke_key), 'verweise', n)
+      }
+
+      // 3. Zutaten und Meta: nie geholt zuerst, dann die ältesten über dem Umlauf.
+      const faellig = await c.query<{ marke_key: number; fn_id: number; in_liste: boolean; neu: boolean }>(
+        `SELECT x.marke_key, x.fn_id, x.in_liste, x.zutaten_geholt_am IS NULL AS neu
+           FROM (SELECT r.*, row_number() OVER (PARTITION BY r.marke_key
+                                                ORDER BY r.zutaten_geholt_am NULLS FIRST, r.rezept_key) AS rang
+                   FROM core.rezept r
+                  WHERE r.marke_key = ANY($1::int[])
+                    AND (r.zutaten_geholt_am IS NULL
+                         OR r.zutaten_geholt_am < now() - make_interval(days => $2::int))) x
+          WHERE NOT ${gesperrt.replaceAll('$ENDPUNKT', `'fn:rezept_zutaten'`).replaceAll('$UMLAUF', '$2::int')}
+          ORDER BY (x.zutaten_geholt_am IS NOT NULL), x.rang, x.marke_key`,
+        [keys, config.REZEPT_UMLAUF_TAGE])
+
+      for (const f of faellig.rows) {
+        // Im Umlauf wird bei Verweisrezepten auch der Kopf neu gelesen — sonst
+        // bliebe ihr Name (und zuletzt_am) auf dem Stand des ersten Abrufs.
+        const mitKopf = !f.neu && !f.in_liste
+        const bedarf = mitKopf ? 3 : 2
+        if (budget < bedarf) { stand.liegenGeblieben++; continue }
+        const p = JSON.stringify({ rezeptId: String(f.fn_id) })
+        let n = 0
+        for (const ep of [...(mitKopf ? ['fn:rezept'] : []), 'fn:rezept_zutaten', 'fn:rezept_meta']) {
+          const r = await c.query(
+            `INSERT INTO sync.warteschlange
+               (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter)
+             SELECT $1, $2::date, $2::date, 41, $3, $4::jsonb
+              WHERE NOT EXISTS (SELECT 1 FROM sync.warteschlange w
+                                 WHERE w.endpunkt = $1 AND w.marke_key = $3
+                                   AND w.parameter = $4::jsonb AND w.erledigt_am IS NULL)`,
+            [ep, heute, f.marke_key, p])
+          n += r.rowCount ?? 0
+        }
+        budget -= n
+        zaehle(Number(f.marke_key), f.neu ? 'neu' : 'umlauf', n)
+      }
+
+      stand.budgetRest = Math.max(0, budget)
+      stand.gesamt = stand.listen + stand.neu + stand.verweise + stand.umlauf
+      if (trocken) throw new Trockenlauf(stand)
+      if (stand.gesamt > 0 || stand.liegenGeblieben > 0) log.info('rezepte eingereiht', stand)
+      return stand
+    })
+  } catch (e) {
+    if (e instanceof Trockenlauf) return e.stand
+    throw e
+  }
 }
 
 /**

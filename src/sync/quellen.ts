@@ -213,6 +213,38 @@ export const QUELLEN: readonly Quelle[] = [
     system: 'foodnotify', endpunkt: 'fn:inventuren', kadenz_stunden: WOECHENTLICH },
   { quelle: 'fn:inventurpositionen', bezeichnung: 'Inventurpositionen',
     system: 'foodnotify', endpunkt: 'fn:inventurpositionen', kadenz_stunden: WOECHENTLICH },
+  /*
+   * REZEPTUREN (0132). Die Liste wird jede Nacht ganz gelesen, Zutaten und
+   * Meta laufen im Umlauf (REZEPT_UMLAUF_TAGE) — beide haben also jeden Tag
+   * Zulauf, solange es Rezepte gibt. Der Kopf einzeln kommt nur für Rezepte,
+   * die nicht in der Liste stehen (56 bei Enchilada) und im Umlauf: an
+   * manchen Tagen keiner, deshalb eine Woche.
+   *
+   * `erwartet` HÄNGT AN DER NOTBREMSE, wie bei den Betriebsberichten: mit
+   * REZEPTE_JE_LAUF = 0 holt der Lauf absichtlich keine Zutaten, und eine
+   * Zeile, die dann jede Nacht „stumm" meldet, ist ein Alarm, der immer
+   * schlägt. Die Liste bleibt erwartet — sie läuft auch mit 0 weiter.
+   *
+   * JE MARKE misst das nicht: fällt EINE Marke aus, hält der Zulauf der
+   * anderen drei diese Zeilen grün. Die Prüfung je Marke steht in
+   * mart.rezept_stand und als Zeile in mart.pruefung_uebersicht.
+   */
+  { quelle: 'fn:rezepte', bezeichnung: 'Rezeptliste je Marke',
+    system: 'foodnotify', endpunkt: 'fn:rezepte', kadenz_stunden: TAEGLICH },
+  { quelle: 'fn:rezept_zutaten', bezeichnung: 'Rezeptzutaten',
+    system: 'foodnotify', endpunkt: 'fn:rezept_zutaten', kadenz_stunden: TAEGLICH,
+    erwartet: config.REZEPTE_JE_LAUF > 0,
+    bemerkung: config.REZEPTE_JE_LAUF > 0 ? 'Umlauf REZEPT_UMLAUF_TAGE, Obergrenze REZEPTE_JE_LAUF.'
+      : 'REZEPTE_JE_LAUF = 0: Rezeptzutaten per Notbremse abgeschaltet.' },
+  { quelle: 'fn:rezept_meta', bezeichnung: 'Rezeptgewicht und Portion',
+    system: 'foodnotify', endpunkt: 'fn:rezept_meta', kadenz_stunden: TAEGLICH,
+    erwartet: config.REZEPTE_JE_LAUF > 0,
+    bemerkung: config.REZEPTE_JE_LAUF > 0 ? undefined
+      : 'REZEPTE_JE_LAUF = 0: Rezeptmeta per Notbremse abgeschaltet.' },
+  { quelle: 'fn:rezept', bezeichnung: 'Rezeptkopf einzeln (nur ueber Verweis bekannte Rezepte)',
+    system: 'foodnotify', endpunkt: 'fn:rezept', kadenz_stunden: WOECHENTLICH,
+    erwartet: config.REZEPTE_JE_LAUF > 0,
+    bemerkung: 'Nur fuer Rezepte, die in keiner Listenseite stehen — an manchen Tagen keiner.' },
 
   // --- Yext: gemessen an der Tabelle ------------------------------------
   /*
@@ -384,11 +416,14 @@ export const QUELLEN: readonly Quelle[] = [
     bemerkung: 'Demodaten (Regel 5). Die fuenf wawi:*-Posten wurden am 26.07.2026 einmal '
              + 'erhoben, seither bewusst nicht mehr. Einkauf und Waren kommen aus FoodNotify.' },
   /*
-   * DREI CORE-TABELLEN MIT NULL ZEILEN UND KEINEM SCHREIBER — am
+   * ~~DREI~~ ZWEI CORE-TABELLEN MIT NULL ZEILEN UND KEINEM SCHREIBER — am
    * 14.08.2026 in Produktion nachgezählt und im Repo gegengeprüft:
-   * `core.rezept`, `core.pos_artikel` und `core.ware_stand` haben
-   * keinerlei `INSERT` in `src/`, und FoodNotify hat für Rezepte keinen
-   * Endpunkt (`src/foodnotify/endpunkte.ts` führt neun, keiner davon).
+   * ~~`core.rezept`,~~ `core.pos_artikel` und `core.ware_stand` haben
+   * keinerlei `INSERT` in `src/`. ~~FoodNotify hat für Rezepte keinen
+   * Endpunkt.~~ Seit 0132 (15.10.2026) gibt es ihn: `core.rezept` wird über
+   * fn:rezepte/fn:rezept befüllt und ist erwartet, gemessen an `zuletzt_am`
+   * (jeder Listenabruf setzt ihn) — NICHT an `erstellt_am`, das ist
+   * FoodNotifys Anlagedatum und sagt nichts über unseren Zulauf.
    *
    * `core.pos_artikel` ist dabei der unangenehmste Fall: `AGENTS.md`
    * beschreibt ihn als die Brücke zwischen LINA-Artikel und
@@ -400,10 +435,10 @@ export const QUELLEN: readonly Quelle[] = [
    * steht in `docs/offene-punkte.md`.
    */
   { quelle: 'core:rezept', bezeichnung: 'Rezepte (FoodNotify)',
-    system: 'foodnotify', tabelle: { schema: 'core', name: 'rezept', zeitspalte: 'erstellt_am' },
-    kadenz_stunden: MONATLICH, erwartet: false,
-    bemerkung: 'Kein Endpunkt und kein Schreiber, Stand 14.08.2026. 0 Zeilen. '
-             + 'Siehe docs/offene-punkte.md.' },
+    system: 'foodnotify', tabelle: { schema: 'core', name: 'rezept', zeitspalte: 'zuletzt_am' },
+    kadenz_stunden: TAEGLICH,
+    bemerkung: 'Seit 0132 befuellt (fn:rezepte, fn:rezept). Gemessen an zuletzt_am. '
+             + 'Je Marke: mart.rezept_stand.' },
   { quelle: 'core:pos_artikel', bezeichnung: 'Bruecke LINA-Artikel → FoodNotify-Rezept',
     system: 'foodnotify', tabelle: { schema: 'core', name: 'pos_artikel', zeitspalte: 'geladen_am' },
     kadenz_stunden: MONATLICH, erwartet: false,
