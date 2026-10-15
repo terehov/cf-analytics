@@ -26,6 +26,25 @@
 > Wiedervorlage je Nacht, `FN_POSITIONEN_MAX_NAECHTE = 10` Nächte lang
 > (`entscheidungen.md`, E3 vom 10.09.2026).
 
+> **Nachtrag 15.10.2026 — seit dem 31.08. ist es eine Kostenstelle, nicht einzelne Bestellungen.**
+> Gemessen über MCP auf `mart.einkauf_beleg` (Bestellungen 15.08.–10.10.2026, nicht storniert,
+> `positionen = 0`): **genau eine** Kombination im ganzen Konzern ist betroffen — Enchilada Augsburg,
+> Bereich Bar, DISTRA Enchilada_Coyacan (erpId `10262`). Dort kamen die Bestellungen 434–450
+> (01.07.–25.08.) mit 37–66 Positionen, ab 451 (31.08.) **zwölf von dreizehn ohne eine einzige**
+> (451–461 und 463). Nur 462 vom 12.10. lief durch (47 Positionen). Jede andere Kostenstelle,
+> auch Küche und die übrigen Lieferanten derselben Bar, lädt normal.
+>
+> Die Wiederholungen helfen hier nicht: Bestellung 451 steht nach sechs Wochen weiter ohne Positionen,
+> anders als 2026-08, wo die Fehler nach 9–11 Tagen verschwanden.
+>
+> **`mart.posten_aufgegeben` zählt zu viel.** Zehn der fünfzehn aufgegebenen Posten (orderId
+> 612264 … 630950) gehören zu den Bestellungen 439–448. Deren Positionen sind **vorhanden**, aus
+> einem früheren, erfolgreichen Abruf. Gescheitert ist ein späterer Abruf derselben Bestellung,
+> aufgegeben am 06.09. Das passt zur Lesart „die Kostenstelle antwortet seit Ende August mit 500,
+> egal welche Bestellung“. Nicht nachgemessen: `sync.warteschlange` und `raw.api_antwort` sind über
+> MCP nicht lesbar, deshalb ist ungeprüft, ob diese zehn tatsächlich Nachabrufe waren. Offen in
+> `offene-punkte.md`.
+
 **Stand 04.08.2026.** Daten: `docs/foodnotify-http500.csv` (282 Zeilen, eine je betroffener
 Bestellung).
 

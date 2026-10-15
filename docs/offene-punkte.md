@@ -112,6 +112,21 @@ Arbeitsliste: Karte *Betriebe ohne laufendes Geschäft* auf Dashboard ⑥, bzw.
 
 **`Stornotyp`-Ausprägungen** bleiben unverifiziert, weil kein Betrieb Stornodaten liefert. Struktur ist dokumentiert, Bericht deaktiviert.
 
+### FoodNotify: Bar Enchilada Augsburg / DISTRA lädt seit 31.08.2026 keine Positionen (gefunden 15.10.2026)
+
+Zwölf der dreizehn DISTRA-Bestellungen der Bar seit dem 31.08. (Bestellnummern 451–461, 463)
+stehen ohne Positionen da. Der Abruf `/api/10262/shop-order/{id}/change` antwortet mit HTTP 500,
+der Bestellkopf lädt. Sonst ist keine Kostenstelle betroffen. Messung und Verlauf:
+`foodnotify-http500.md`, Nachtrag 15.10.2026.
+
+* **Zu klären, von jemandem mit FoodNotify-Zugang:** Lassen sich diese Bestellungen in der
+  FoodNotify-Oberfläche öffnen? Wenn sie dort auch scheitern, ist es ein Datenfehler bei
+  FoodNotify, vermutlich an einem Artikel, der seit Ende August im DISTRA-Bar-Sortiment steht
+  und in 462 fehlt. Dann hilft nur eine Meldung an FoodNotify oder eine Korrektur des Artikels.
+* **Auf unserer Seite:** `mart.posten_aufgegeben` sollte Posten, deren Bestellung längst
+  Positionen hat, gesondert führen. Zehn von fünfzehn sind solche Nachabrufe; sie sind
+  kein Datenverlust. Vorher an `sync.warteschlange` bestätigen.
+
 ## Strategisch
 
 **Amadeus 360 ist das führende System, nicht LINA.** Die Oberfläche sagt es selbst („Die Daten sind nur eingeschränkt änderbar, weil Amadeus 360 nicht führendes System ist"), dazu passen `a360isMaster`, `isSynced` und `syncGroups` im Code. Ein Teil dessen, was wir aus LINA ziehen, ist dort selbst nur eine Kopie. Falls die Datenqualitätsprobleme — Stichwort „Doppelte Artikelnummern, unbedingt korrigieren" aus dem `errors`-Feld — aus dieser Synchronisation stammen, wäre das Vorsystem der bessere Anknüpfungspunkt.
