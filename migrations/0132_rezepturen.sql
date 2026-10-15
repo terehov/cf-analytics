@@ -177,7 +177,10 @@ CREATE TABLE core.rezept_liste_stand (
     rezepte_gesamt   integer,
     seiten           integer,
     seite1_am        timestamptz,
-    volle_runde_am   timestamptz
+    volle_runde_am   timestamptz,
+    volle_runde_fertig_beginn timestamptz,
+    volle_runde_fertig_ende   timestamptz,
+    tagesgeschaeft_gedeckelt_am timestamptz
 );
 COMMENT ON TABLE core.rezept_liste_stand IS
 'Je Marke der Stand der Rezeptliste, geschrieben bei jeder Seite 1 (fn:rezepte).
@@ -185,6 +188,20 @@ rezepte_gesamt ist FoodNotifys eigene Zahl (pagination.totalItems) -- der Nenner
 fuer den Fortschritt des ersten Abzugs. seite1_am stempelt das Tagesgeschaeft
 (Regel 10: bleibt es aus, steht es in mart.rezept_stand), volle_runde_am die
 woechentliche volle Listenrunde im Nachladen.';
+COMMENT ON COLUMN core.rezept_liste_stand.volle_runde_am IS
+'Beginn der zuletzt BEGONNENEN vollen Listenrunde (Seite 1 mit runde = voll).';
+COMMENT ON COLUMN core.rezept_liste_stand.volle_runde_fertig_beginn IS
+'Beginn der letzten ABGESCHLOSSENEN vollen Runde. Nur sie belegt, dass die Liste
+einmal ganz gelesen wurde: daran misst "aus der Liste verschwunden" (ein Rezept, das
+seit diesem Zeitpunkt nicht mehr gesehen wurde), und erst danach blaettert das
+Tagesgeschaeft ueber Seite 1 hinaus (Review 15.10.2026). Eine begonnene Runde, die
+noch laeuft, zaehlt nicht — sonst galte alles hinter ihrem Fortschritt als verschwunden.';
+COMMENT ON COLUMN core.rezept_liste_stand.volle_runde_fertig_ende IS
+'Wann die letzte volle Runde abgeschlossen wurde: keine Seite dieser Runde mehr offen.';
+COMMENT ON COLUMN core.rezept_liste_stand.tagesgeschaeft_gedeckelt_am IS
+'Das Tagesgeschaeft hat REZEPT_TAGESGESCHAEFT_SEITEN erreicht und trug auf der letzten
+Seite noch neue Rezepte — es hat aufgehoert, die volle Runde holt den Rest. Sichtbar in
+mart.rezept_stand (zustand) und mart.pruefung_uebersicht.';
 
 
 -- ---------------------------------------------------------------------
@@ -478,14 +495,15 @@ WITH r AS (
       FROM core.rezept
      GROUP BY marke_key
 ), weg AS (
-    -- In der Liste gewesen, aber seit mehr als drei Tagen nicht mehr gesehen,
-    -- waehrend die Liste der Marke weiter geholt wurde. Drei Tage, weil die
-    -- Liste instabil sortiert ist und an Seitengrenzen einzelne Rezepte an
-    -- einem Tag verschluckt (foodnotify-api-inventar.md §3).
+    -- In der Liste gewesen, aber in der letzten ABGESCHLOSSENEN vollen Runde
+    -- nicht mehr gesehen. ~~Drei Tage gegen das zuletzt gesehene Rezept~~ —
+    -- das setzte eine taeglich ganz gelesene Liste voraus; seit 15.10.2026
+    -- liest das Tagesgeschaeft nur Seite 1 und die volle Runde einmal je Woche
+    -- (Review 15.10.2026). Ohne abgeschlossene Runde: keine Aussage, 0.
     SELECT x.marke_key, count(*)::int AS aus_liste_verschwunden
       FROM core.rezept x
-      JOIN r ON r.marke_key = x.marke_key
-     WHERE x.in_liste AND x.zuletzt_am < r.zuletzt_gesehen - interval '3 days'
+      JOIN core.rezept_liste_stand ls ON ls.marke_key = x.marke_key
+     WHERE x.in_liste AND x.zuletzt_am < ls.volle_runde_fertig_beginn
      GROUP BY x.marke_key
 ), z AS (
     SELECT r2.marke_key, count(*)::int AS zutatenzeilen
@@ -502,14 +520,20 @@ WITH r AS (
                         WHERE u.marke_key = p.marke_key AND u.fn_id = zz.sub_rezept_fn_id)
      GROUP BY p.marke_key
 ), liste AS (
-    SELECT ls.marke_key, ls.seite1_am AS letzte_liste, ls.rezepte_gesamt, ls.seiten, ls.volle_runde_am
+    SELECT ls.marke_key, ls.seite1_am AS letzte_liste, ls.rezepte_gesamt, ls.seiten, ls.volle_runde_am,
+           ls.volle_runde_fertig_ende, ls.tagesgeschaeft_gedeckelt_am
       FROM core.rezept_liste_stand ls
 ), fn AS (
-    -- Hat die Marke ueberhaupt FoodNotify-Zulauf? Ohne Zugang (keine
-    -- FN_*_USER) ist "keine Rezepte" kein Befund, sondern Konfiguration.
-    SELECT a.marke_key, max(a.beendet_am) AS letzter_fn_abruf
+    -- Hatte die Marke JE FoodNotify-Zulauf, und wann zuletzt einen
+    -- erfolgreichen? "kein FoodNotify-Zulauf" gilt nur fuer eine Marke ohne
+    -- jede Aufgabe (nie ein Zugang) — faellt der Zugang EINER Marke aus, ist
+    -- das ein Befund ('zugang ausgefallen'), kein Grund, sie aus der Pruefung
+    -- zu nehmen (Review 15.10.2026; vorher fiel sie nach sieben Tagen heraus).
+    SELECT a.marke_key,
+           max(a.beendet_am) FILTER (WHERE a.status = 'ok') AS letzter_fn_abruf,
+           count(*) > 0                                     AS je_gefragt
       FROM sync.aufgabe a
-     WHERE a.endpunkt IN ('fn:profil', 'fn:kostenstellen') AND a.beendet_am > now() - interval '7 days'
+     WHERE a.endpunkt IN ('fn:profil', 'fn:kostenstellen', 'fn:rezepte')
      GROUP BY a.marke_key
 )
 SELECT m.marke_key,
@@ -527,7 +551,9 @@ SELECT m.marke_key,
        liste.letzte_liste,
        fn.letzter_fn_abruf,
        CASE
-           WHEN fn.letzter_fn_abruf IS NULL THEN 'kein FoodNotify-Zulauf'
+           WHEN fn.je_gefragt IS NOT TRUE THEN 'kein FoodNotify-Zulauf'
+           WHEN fn.letzter_fn_abruf IS NULL
+             OR fn.letzter_fn_abruf < now() - interval '36 hours' THEN 'zugang ausgefallen'
            WHEN liste.letzte_liste IS NULL THEN 'liste nie geholt'
            -- Seite 1 kommt jede Nacht im Tagesgeschaeft. Bleibt sie aus, sind
            -- neue Rezepte nicht mehr gesehen worden (Regel 10).
@@ -536,6 +562,8 @@ SELECT m.marke_key,
            -- Zutaten wurden abgerufen, aber KEINE einzige Zeile kam an: eine
            -- Antwortform, die der Lader nicht als Fehler erkannt hat.
            WHEN r.mit_zutaten > 0 AND coalesce(z.zutatenzeilen, 0) = 0 THEN 'zutaten leer'
+           -- Das Tagesgeschaeft stiess an seinen Seitendeckel und trug dort noch Neues.
+           WHEN liste.tagesgeschaeft_gedeckelt_am > now() - interval '36 hours' THEN 'tagesgeschaeft gedeckelt'
            WHEN r.ohne_zutaten > 0 THEN 'zutaten ausstehend'
            ELSE 'ok'
        END                                  AS zustand,
@@ -551,7 +579,9 @@ SELECT m.marke_key,
             THEN round(100.0 * coalesce(r.mit_zutaten, 0)
                        / greatest(coalesce(liste.rezepte_gesamt, 0), coalesce(r.rezepte, 0)), 2)
        END                                  AS abzug_pct,
-       liste.volle_runde_am
+       liste.volle_runde_am,
+       liste.volle_runde_fertig_ende        AS volle_runde_abgeschlossen_am,
+       liste.tagesgeschaeft_gedeckelt_am
   FROM core.marke m
   LEFT JOIN r     ON r.marke_key = m.marke_key
   LEFT JOIN z     ON z.marke_key = m.marke_key
@@ -564,8 +594,9 @@ COMMENT ON VIEW mart.rezept_stand IS
 'Je Marke: wie viele Rezepte geladen sind, wie viele nur ueber einen Verweis
 gefunden wurden, wie viele noch ohne Zutaten sind, und wann die Rezeptliste
 zuletzt geholt wurde. zustand: ok / zutaten ausstehend (Backfill laeuft) /
-zutaten leer, keine rezepte, liste veraltet, liste nie geholt (Fehler, Regel 10) /
-kein FoodNotify-Zulauf (Marke ohne Zugang, kein Befund). Fortschritt des ersten
+zutaten leer, keine rezepte, liste veraltet, liste nie geholt, zugang ausgefallen,
+tagesgeschaeft gedeckelt (Befunde, Regel 10) / kein FoodNotify-Zulauf (Marke hatte nie
+eine FoodNotify-Aufgabe, kein Befund). Fortschritt des ersten
 Abzugs: rezepte_fn (FoodNotifys Zahl), rezepte (bekannt), mit_zutaten, ohne_zutaten
 (Rest), abzug_pct (Prozentzahl). archiviert zaehlt archivierte Rezepte (sie bleiben
 drin). nicht_gefunden: Rezepte,
@@ -731,7 +762,8 @@ BEGIN
 UNION ALL
  SELECT 'Rezepte: Marke mit FoodNotify-Zulauf, aber ohne frische Rezeptliste oder ohne Zutaten'::text AS pruefung,
     count(*) FILTER (WHERE rs.zustand <> 'kein FoodNotify-Zulauf') AS geprueft,
-    count(*) FILTER (WHERE rs.zustand IN ('liste nie geholt', 'liste veraltet', 'keine rezepte', 'zutaten leer')) AS auffaellig,
+    count(*) FILTER (WHERE rs.zustand IN ('liste nie geholt', 'liste veraltet', 'keine rezepte', 'zutaten leer',
+                                          'zugang ausgefallen', 'tagesgeschaeft gedeckelt')) AS auffaellig,
     'mart.rezept_stand'::text AS sicht
    FROM mart.rezept_stand rs
 UNION ALL
