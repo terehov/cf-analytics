@@ -167,10 +167,10 @@
   },
   {
    "sicht": "mart.artikel_in_rezept",
-   "koernung": "Marke × Ware (Lieferanten-Artikelnummer) × Rezept × Weg ueber Halbfabrikate — dieselbe Ware steht je Ebene erneut",
+   "koernung": "Marke × Ware (Lieferanten-Artikelnummer) × Rezept (rezept_fn_id) × Weg ueber Halbfabrikate — dieselbe Ware steht je Ebene erneut; Rezeptnamen sind nicht eindeutig, nach rezept_fn_id gruppieren oder zaehlen",
    "thema": "rezept",
    "summen_erlaubt": false,
-   "kommentar": "In welchen Rezepten steckt eine Ware -- direkt (ebene 1) oder ueber Halbfabrikate\n(ebene 2, 3, ...). Eine Zeile je Ware, Rezept und Weg. via_rezept ist das\nHalbfabrikat, ueber das die Ware in das Rezept kommt; pfad zeigt den ganzen Weg\nvom Rezept bis zum Halbfabrikat, in dem die Ware direkt steht. menge/einheit ist\ndie Menge im Rezept, in dem die Ware DIREKT steht (direkt_rezept) -- Mengen werden\nueber Ebenen NICHT multipliziert und sind ueber Einheiten nicht summierbar.\nFiltern ueber artikelnummer (Lieferanten-Artikelnummer).\n\nKoernung: Marke × Ware (Lieferanten-Artikelnummer) × Rezept × Weg ueber Halbfabrikate — dieselbe Ware steht je Ebene erneut",
+   "kommentar": "In welchen Rezepten steckt eine Ware -- direkt (ebene 1) oder ueber Halbfabrikate\n(ebene 2, 3, ...). Eine Zeile je Ware, Rezept und Weg. via_rezept ist das\nHalbfabrikat, ueber das die Ware in das Rezept kommt; pfad zeigt den ganzen Weg\nvom Rezept bis zum Halbfabrikat, in dem die Ware direkt steht. menge/einheit ist\ndie Menge im Rezept, in dem die Ware DIREKT steht (direkt_rezept) -- Mengen werden\nueber Ebenen NICHT multipliziert und sind ueber Einheiten nicht summierbar.\nFiltern ueber artikelnummer (Lieferanten-Artikelnummer). REZEPTNAMEN SIND NICHT\nEINDEUTIG: Wilma Wunder fuehrt viele Rezepte mehrfach unter gleichem Namen (300203:\n26 Rezepte unter 3 Namen) -- nach rezept_fn_id gruppieren oder zaehlen, nicht nach\nrezept; rezept_erstellt_am unterscheidet die Fassungen.\n\nKoernung: Marke × Ware (Lieferanten-Artikelnummer) × Rezept (rezept_fn_id) × Weg ueber Halbfabrikate — dieselbe Ware steht je Ebene erneut; Rezeptnamen sind nicht eindeutig, nach rezept_fn_id gruppieren oder zaehlen",
    "spalten": [
     "marke",
     "marke_key",
@@ -200,7 +200,9 @@
     "rezept_archiviert",
     "basis_menge",
     "basis_einheit",
-    "via_archiviert"
+    "via_archiviert",
+    "rezept_erstellt_am",
+    "direkt_rezept_fn_id"
    ],
    "achsen": [
     "lieferant",
@@ -5391,10 +5393,10 @@
   },
   {
    "sicht": "mart.rezept_position",
-   "koernung": "Marke × Rezept × Zutatenposition — eine Zeile je Position, wie FoodNotify sie fuehrt",
+   "koernung": "Marke × Rezept (rezept_fn_id) × Zutatenposition — eine Zeile je Position, wie FoodNotify sie fuehrt. Rezeptnamen sind nicht eindeutig: nach rezept_fn_id gruppieren oder zaehlen",
    "thema": "rezept",
    "summen_erlaubt": false,
-   "kommentar": "Eine Zeile je Rezept und Zutatenposition, so wie FoodNotify sie fuehrt (je Marke,\nnicht je Betrieb). artikelnummer ist die LIEFERANTEN-Artikelnummer -- nicht die\nLINA-Artikelnummer der Kasse. zuordnung sagt, ob die Nummer im Einkauf derselben\nMarke vorkommt: eingekauft / nummer ohne einkauf / ohne nummer / unterrezept.\nkosten ist FoodNotifys Wert und nicht aus Unterrezepten nachrechenbar; bei\nUnterrezept-Zeilen steht dort oft 0. Mengen nur innerhalb einer Einheit\nvergleichen.\n\nKoernung: Marke × Rezept × Zutatenposition — eine Zeile je Position, wie FoodNotify sie fuehrt",
+   "kommentar": "Eine Zeile je Rezept und Zutatenposition, so wie FoodNotify sie fuehrt (je Marke,\nnicht je Betrieb). artikelnummer ist die LIEFERANTEN-Artikelnummer -- nicht die\nLINA-Artikelnummer der Kasse. zuordnung sagt, ob die Nummer im Einkauf derselben\nMarke vorkommt: eingekauft / nummer ohne einkauf / ohne nummer / unterrezept.\nkosten ist FoodNotifys Wert und nicht aus Unterrezepten nachrechenbar; bei\nUnterrezept-Zeilen steht dort oft 0. Mengen nur innerhalb einer Einheit\nvergleichen.\n\nKoernung: Marke × Rezept (rezept_fn_id) × Zutatenposition — eine Zeile je Position, wie FoodNotify sie fuehrt. Rezeptnamen sind nicht eindeutig: nach rezept_fn_id gruppieren oder zaehlen",
    "spalten": [
     "marke",
     "marke_key",
@@ -5421,7 +5423,8 @@
     "archiviert",
     "basis_menge",
     "basis_einheit",
-    "unterrezept_archiviert"
+    "unterrezept_archiviert",
+    "rezept_erstellt_am"
    ],
    "achsen": [
     "lieferant",
@@ -7653,6 +7656,26 @@
    },
    "hinweis": "Rezeptnamen sind nicht eindeutig (\"Sweet & Sour Mix 20 L\" gibt es bei Enchilada mehrfach, aeltere Fassungen bleiben stehen).",
    "berichtigung": "Ueber rezept_key verbinden.",
+   "quelle": "0132"
+  },
+  {
+   "schluessel": "rezept_namen_zaehlen_artikel",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.artikel_in_rezept",
+   "parameter": {},
+   "hinweis": "count(distinct rezept) zaehlt Namen, nicht Rezepte: Wilma Wunder fuehrt viele Rezepte mehrfach unter gleichem Namen (300203: 26 Rezepte unter 3 Namen, gemessen 15.10.2026). Gleichnamige Zeilen sind keine Duplikate.",
+   "berichtigung": "Nach rezept_fn_id gruppieren oder zaehlen; rezept_erstellt_am zeigt, welche Fassung welche ist.",
+   "quelle": "0132"
+  },
+  {
+   "schluessel": "rezept_namen_zaehlen_position",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.rezept_position",
+   "parameter": {},
+   "hinweis": "count(distinct rezept) zaehlt Namen, nicht Rezepte: Rezeptnamen sind nicht eindeutig, Wilma Wunder fuehrt viele Rezepte mehrfach unter gleichem Namen.",
+   "berichtigung": "Nach rezept_fn_id gruppieren oder zaehlen.",
    "quelle": "0132"
   },
   {

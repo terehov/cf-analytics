@@ -319,7 +319,8 @@ SELECT m.name                    AS marke,
        r.archiviert,
        z.basis_menge,
        z.basis_einheit,
-       u.archiviert AS unterrezept_archiviert
+       u.archiviert AS unterrezept_archiviert,
+       r.erstellt_am AS rezept_erstellt_am
   FROM core.zutat z
   JOIN core.rezept r ON r.rezept_key = z.rezept_key
   JOIN core.marke m  ON m.marke_key = r.marke_key
@@ -341,6 +342,12 @@ COMMENT ON COLUMN mart.rezept_position.zuordnung IS
 nummer ohne einkauf: Nummer da, aber nie bestellt (Altnummer, anderer Lieferant, Tippfehler).
 ohne nummer: Freitextzutat ohne Artikelnummer.
 unterrezept: Verweis auf ein Halbfabrikat -- keine Ware.';
+COMMENT ON COLUMN mart.rezept_position.rezept_fn_id IS
+'FoodNotifys Rezept-ID -- der Schluessel des Rezepts. Rezeptnamen sind nicht eindeutig
+(Wilma Wunder fuehrt viele Rezepte mehrfach unter gleichem Namen): nach rezept_fn_id
+gruppieren oder zaehlen.';
+COMMENT ON COLUMN mart.rezept_position.rezept_erstellt_am IS
+'Wann das Rezept in FoodNotify angelegt wurde -- unterscheidet gleichnamige Fassungen.';
 COMMENT ON COLUMN mart.rezept_position.fehlt_seit IS
 'Gesetzt, wenn FoodNotify das Rezept nicht mehr findet (HTTP 404) -- vermutlich geloescht.
 Die Zeilen zeigen den letzten gelesenen Stand.';
@@ -384,6 +391,7 @@ WITH RECURSIVE kante AS (
            rp.lieferant_fn_id, rp.zuordnung, rp.art,
            rp.rezept_key        AS direkt_key,
            rp.rezept            AS direkt_rezept,
+           rp.rezept_fn_id      AS direkt_fn_id,
            rp.position,
            rp.menge, rp.einheit, rp.kosten,
            rp.basis_menge, rp.basis_einheit,
@@ -400,7 +408,7 @@ WITH RECURSIVE kante AS (
     UNION ALL
     SELECT w.marke, w.marke_key, w.artikelnummer, w.ware, w.lieferant,
            w.lieferant_fn_id, w.zuordnung, w.art,
-           w.direkt_key, w.direkt_rezept, w.position,
+           w.direkt_key, w.direkt_rezept, w.direkt_fn_id, w.position,
            w.menge, w.einheit, w.kosten,
            w.basis_menge, w.basis_einheit,
            k.eltern_key,
@@ -445,7 +453,9 @@ SELECT w.marke,
        r.archiviert AS rezept_archiviert,
        w.basis_menge,
        w.basis_einheit,
-       v.archiviert AS via_archiviert
+       v.archiviert AS via_archiviert,
+       r.erstellt_am AS rezept_erstellt_am,
+       w.direkt_fn_id AS direkt_rezept_fn_id
   FROM weg w
   JOIN core.rezept r      ON r.rezept_key = w.rezept_key
   LEFT JOIN core.rezept v ON v.rezept_key = w.via_key;
@@ -457,7 +467,16 @@ Halbfabrikat, ueber das die Ware in das Rezept kommt; pfad zeigt den ganzen Weg
 vom Rezept bis zum Halbfabrikat, in dem die Ware direkt steht. menge/einheit ist
 die Menge im Rezept, in dem die Ware DIREKT steht (direkt_rezept) -- Mengen werden
 ueber Ebenen NICHT multipliziert und sind ueber Einheiten nicht summierbar.
-Filtern ueber artikelnummer (Lieferanten-Artikelnummer).';
+Filtern ueber artikelnummer (Lieferanten-Artikelnummer). REZEPTNAMEN SIND NICHT
+EINDEUTIG: Wilma Wunder fuehrt viele Rezepte mehrfach unter gleichem Namen (300203:
+26 Rezepte unter 3 Namen) -- nach rezept_fn_id gruppieren oder zaehlen, nicht nach
+rezept; rezept_erstellt_am unterscheidet die Fassungen.';
+COMMENT ON COLUMN mart.artikel_in_rezept.rezept_fn_id IS
+'FoodNotifys Rezept-ID -- der Schluessel des Rezepts. Gleichnamige Rezepte sind verschiedene Rezepte.';
+COMMENT ON COLUMN mart.artikel_in_rezept.rezept_erstellt_am IS
+'Wann das Rezept in FoodNotify angelegt wurde -- unterscheidet gleichnamige Fassungen.';
+COMMENT ON COLUMN mart.artikel_in_rezept.direkt_rezept_fn_id IS
+'Rezept-ID des Rezepts, in dem die Ware direkt steht (bei ebene 1 = rezept_fn_id).';
 COMMENT ON COLUMN mart.artikel_in_rezept.menge IS
 'Menge der Ware im Rezept, in dem sie direkt steht (direkt_rezept) -- NICHT die
 Menge im Rezept dieser Zeile, sobald ebene > 1. Nicht ueber Ebenen multiplizieren.';
@@ -800,10 +819,10 @@ SELECT mcp.achsen_ableiten();
 UPDATE mcp.sicht s SET koernung = v.koernung, thema = v.thema, summen_erlaubt = v.summen
   FROM (VALUES
     ('mart.rezept_position',
-     'Marke × Rezept × Zutatenposition — eine Zeile je Position, wie FoodNotify sie fuehrt',
+     'Marke × Rezept (rezept_fn_id) × Zutatenposition — eine Zeile je Position, wie FoodNotify sie fuehrt. Rezeptnamen sind nicht eindeutig: nach rezept_fn_id gruppieren oder zaehlen',
      'rezept', false),
     ('mart.artikel_in_rezept',
-     'Marke × Ware (Lieferanten-Artikelnummer) × Rezept × Weg ueber Halbfabrikate — dieselbe Ware steht je Ebene erneut',
+     'Marke × Ware (Lieferanten-Artikelnummer) × Rezept (rezept_fn_id) × Weg ueber Halbfabrikate — dieselbe Ware steht je Ebene erneut; Rezeptnamen sind nicht eindeutig, nach rezept_fn_id gruppieren oder zaehlen',
      'rezept', false),
     ('mart.rezept_stand',
      'eine Marke — Ladestand der Rezepte',
@@ -848,6 +867,17 @@ INSERT INTO mcp.fallstrick (schluessel, art, schwere, sicht, parameter, hinweis,
    'Rezeptnamen sind nicht eindeutig ("Sweet & Sour Mix 20 L" gibt es bei Enchilada mehrfach, '
    'aeltere Fassungen bleiben stehen).',
    'Ueber rezept_key verbinden.',
+   '0132'),
+  ('rezept_namen_zaehlen_artikel', 'deutung', 'warnung', 'mart.artikel_in_rezept', '{}',
+   'count(distinct rezept) zaehlt Namen, nicht Rezepte: Wilma Wunder fuehrt viele Rezepte mehrfach '
+   'unter gleichem Namen (300203: 26 Rezepte unter 3 Namen, gemessen 15.10.2026). Gleichnamige Zeilen '
+   'sind keine Duplikate.',
+   'Nach rezept_fn_id gruppieren oder zaehlen; rezept_erstellt_am zeigt, welche Fassung welche ist.',
+   '0132'),
+  ('rezept_namen_zaehlen_position', 'deutung', 'warnung', 'mart.rezept_position', '{}',
+   'count(distinct rezept) zaehlt Namen, nicht Rezepte: Rezeptnamen sind nicht eindeutig, Wilma Wunder '
+   'fuehrt viele Rezepte mehrfach unter gleichem Namen.',
+   'Nach rezept_fn_id gruppieren oder zaehlen.',
    '0132')
 ON CONFLICT (schluessel) DO UPDATE
    SET art = excluded.art, schwere = excluded.schwere, sicht = excluded.sicht,

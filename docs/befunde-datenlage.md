@@ -2267,3 +2267,17 @@ Payload gleiche Stundensätze (18,8 / 22,8 / 19,4 €/h und 17,7 / 17,2 / 19,3 �
 Gesamtumsatz als Nenner für alle drei kämen Küche und Bar auf ein Vielfaches des Service-
 Stundensatzes, weil ihre Stunden aus dem Sparten-, ihre Kosten dann aus dem Gesamtumsatz
 stammten. Deshalb der Monatsabruf in `0129`.
+
+## Wilma Wunder führt viele Rezepte mehrfach unter gleichem Namen (15.10.2026)
+
+Gemessen am 15.10.2026 im Klon `lina_rezept_1015` nach dem Praxislauf (`rezepte-praxis`): Die
+Lieferanten-Artikelnummer 300203 (Erdbeersauce, Distra) steckt bei Wilma Wunder in **26
+verschiedenen Rezepten unter nur drei Namen** — „m. Erdbeersoße" 13×, „o. Erdbeersoße" 7×,
+„Wunder Erdbeere" 6×, mit verschiedenen FoodNotify-IDs und Anlagedaten zwischen 07/2025 und
+09/2026 (mehrere am selben Tag). Wer Rezepte nach Namen zählt oder gruppiert, zählt Namen; die
+Zeilen sind keine Duplikate. Gezählt wird nach `rezept_fn_id`.
+
+```sql
+SELECT rezept, count(DISTINCT rezept_fn_id) FROM mart.artikel_in_rezept
+ WHERE artikelnummer = '300203' GROUP BY 1;
+```

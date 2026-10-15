@@ -441,6 +441,40 @@ lauf('Rezepturen mit Datenbank', () => {
     await db.query(`DELETE FROM core.rezept WHERE fn_id = 999998`)
   })
 
+  /**
+   * Echter Lauf 15.10.2026: 300203 traf bei Wilma Wunder 26 Rezepte unter nur
+   * drei Namen und sah in mart.artikel_in_rezept aus wie Duplikate. Die
+   * Rezept-ID und das Anlagedatum machen sie unterscheidbar.
+   */
+  test('gleichnamige Rezepte: zwei unterscheidbare Zeilen über rezept_fn_id und rezept_erstellt_am', async () => {
+    const neu = async (fnId: number, erstellt: string) => (await db.query(
+      `INSERT INTO core.rezept (marke_key, fn_id, name, erstellt_am, in_liste)
+       VALUES ($1, $2, 'm. Erdbeersoße', $3, true) RETURNING rezept_key`, [enchilada, fnId, erstellt])).rows[0].rezept_key
+    const a = await neu(888001, '2025-07-29T10:00:00Z')
+    const b = await neu(888002, '2026-07-31T10:00:00Z')
+    try {
+      await db.query(
+        `INSERT INTO core.zutat (rezept_key, position, art, name, artikelnummer, menge, einheit) VALUES
+           ($1, 1, 'ingredient', 'Erdbeersauce', 'gleich-x', 15, 'g'),
+           ($2, 1, 'ingredient', 'Erdbeersauce', 'gleich-x', 15, 'g')`, [a, b])
+      const { rows } = await db.query(
+        `SELECT rezept, rezept_fn_id, rezept_erstellt_am::date::text AS erstellt, direkt_rezept_fn_id
+           FROM mart.artikel_in_rezept WHERE artikelnummer = 'gleich-x' ORDER BY rezept_erstellt_am`)
+      expect(rows).toEqual([
+        { rezept: 'm. Erdbeersoße', rezept_fn_id: 888001, erstellt: '2025-07-29', direkt_rezept_fn_id: 888001 },
+        { rezept: 'm. Erdbeersoße', rezept_fn_id: 888002, erstellt: '2026-07-31', direkt_rezept_fn_id: 888002 },
+      ])
+      const { rows: [z] } = await db.query(
+        `SELECT count(DISTINCT rezept)::int AS namen, count(DISTINCT rezept_fn_id)::int AS rezepte,
+                count(DISTINCT rezept_erstellt_am)::int AS fassungen
+           FROM mart.rezept_position WHERE artikelnummer = 'gleich-x'`)
+      // Der Fallstrick in Zahlen: ein Name, zwei Rezepte.
+      expect(z).toEqual({ namen: 1, rezepte: 2, fassungen: 2 })
+    } finally {
+      await db.query(`DELETE FROM core.rezept WHERE fn_id IN (888001, 888002)`)
+    }
+  })
+
   test('ein Zyklus zwischen Rezepten terminiert', async () => {
     const { rows: [a] } = await db.query(
       `INSERT INTO core.rezept (marke_key, fn_id, name) VALUES ($1, 1, 'Zyklus A') RETURNING rezept_key`, [enchilada])

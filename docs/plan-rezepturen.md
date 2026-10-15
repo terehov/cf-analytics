@@ -187,6 +187,9 @@ Phase A ohne Grenze, erster Abzug, Umlauf und volle Listenrunde (wöchentlich) i
 Notschalter `REZEPTE_NACHLADEN`. Nach dem Review vom selben Tag blättert das Tagesgeschäft erst nach
 einer abgeschlossenen vollen Runde und höchstens zehn Seiten weit; „verschwunden" und der Kopf im
 Umlauf messen an der abgeschlossenen Runde; ein ausgefallener Zugang heißt `zugang ausgefallen`.
+Rezeptnamen sind nicht eindeutig (300203 bei Wilma Wunder: 26 Rezepte unter drei Namen, Praxislauf
+15.10.2026) — `rezept_position` und `artikel_in_rezept` führen deshalb `rezept_fn_id` und
+`rezept_erstellt_am`, gezählt wird nach `rezept_fn_id`.
 Eine Runde ohne offene Seite schließt das Nachfüllen auch dann ab, wenn eine Seite aufgegeben wurde
 (Lücke sichtbar in `liste_noch_unbekannt`); hängt sie länger als drei Tage, heißt der Zustand
 `volle runde nicht abgeschlossen`.

@@ -1770,7 +1770,13 @@ vorkommt" — Erwartung **konstant**, nicht 0).
 * **`kosten`** ist FoodNotifys Wert; Unterrezept-Zeilen tragen oft 0. Die Summe der Zeilen ist
   nicht die Rezeptkosten. Kein Wareneinsatz aus Rezepten in diesem Schritt.
 * **Rezeptnamen sind nicht eindeutig** („Sweet & Sour Mix 20 L" zweimal, ältere Fassungen
-  bleiben stehen) — über `rezept_key` verbinden (Fallstrick `rezept_join_ueber_name`).
+  bleiben stehen) — über `rezept_key` verbinden (Fallstrick `rezept_join_ueber_name`). Bei Wilma
+  Wunder massiv: 300203 trifft 26 Rezepte unter nur drei Namen („m. Erdbeersoße" 13×,
+  „o. Erdbeersoße" 7×, „Wunder Erdbeere" 6×; gemessen 15.10.2026 im Klon `lina_rezept_1015`). In
+  einer Liste sehen sie aus wie Duplikate. Deshalb führen `rezept_position` und
+  `artikel_in_rezept` `rezept_fn_id` und `rezept_erstellt_am` (`artikel_in_rezept` dazu
+  `via_rezept_fn_id` und `direkt_rezept_fn_id`); gezählt und gruppiert wird nach `rezept_fn_id`.
+  `count(distinct rezept)` zählt Namen, nicht Rezepte (Fallstricke `rezept_namen_zaehlen_*`).
 
 **Gemessen am Einzelabzug Enchilada (2.111 Rezepte, 7.452 Zutaten), geladen über den echten
 Ladepfad in einen Vollklon, 15.10.2026:** eingekauft 64,24 % der Positionen, nummer ohne
