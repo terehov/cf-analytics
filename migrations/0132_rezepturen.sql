@@ -20,8 +20,12 @@
 --                menge ohne feste Nachkommastellen.
 --   core.rezept  gewicht_gesamt, gewicht_person, portion, portion_einheit,
 --                verlust_roh, in_liste, zutaten_geholt_am, meta_geholt_am.
+--   core.rezept  dazu fehlt_seit: FoodNotify antwortete mit HTTP 404.
+--   sync         Warteschlangen-Ergebnis 'nicht_gefunden' (404 auf einen
+--                Rezeptabruf) — NICHT 'aufgegeben', das wuerde dreimal
+--                wiederbelebt und stuende fuer immer in mart.posten_aufgegeben.
 --   mart         rezept_position, artikel_in_rezept, rezept_stand,
---                rezept_zuordnung_pruefung; je eine Spalte in
+--                rezept_zuordnung_pruefung; zwei Spalten in
 --                mart.datenstand, zwei Zeilen in mart.pruefung_uebersicht.
 --
 -- Bestehende Kennzahlen (deckungsbeitrag_warengruppe, round_table, fixer_we)
@@ -97,7 +101,8 @@ ALTER TABLE core.rezept
     ADD COLUMN verlust_roh       numeric,
     ADD COLUMN in_liste          boolean NOT NULL DEFAULT false,
     ADD COLUMN zutaten_geholt_am timestamptz,
-    ADD COLUMN meta_geholt_am    timestamptz;
+    ADD COLUMN meta_geholt_am    timestamptz,
+    ADD COLUMN fehlt_seit        timestamptz;
 
 CREATE INDEX rezept_umlauf ON core.rezept (zutaten_geholt_am NULLS FIRST, marke_key);
 
@@ -133,6 +138,30 @@ COMMENT ON COLUMN core.rezept.zutaten_geholt_am IS
 Umlauf (REZEPT_UMLAUF_TAGE): FoodNotify hat kein Aenderungsdatum, also wird
 jedes Rezept spaetestens nach N Tagen neu gelesen.';
 COMMENT ON COLUMN core.rezept.meta_geholt_am IS 'Letzter erfolgreicher Abruf von /meta.';
+COMMENT ON COLUMN core.rezept.fehlt_seit IS
+'Seit wann FoodNotify auf einen Abruf dieses Rezepts (Kopf, Zutaten, Meta) mit
+HTTP 404 antwortet -- vermutlich geloescht. NULL = zuletzt gefunden. Ein
+spaeterer erfolgreicher Abruf setzt es zurueck. Die Zutaten bleiben auf dem
+letzten gelesenen Stand stehen; der Umlauf fragt hoechstens einmal je
+REZEPT_UMLAUF_TAGE nach.';
+
+
+-- ---------------------------------------------------------------------
+-- 2a. Warteschlange: Ergebnis 'nicht_gefunden'
+--
+-- Ein Rezept, das mit 404 antwortet, ist kein Fehler des Abrufs, sondern
+-- eine Aussage ueber das Rezept. Als 'aufgegeben' holte
+-- aufgegebeneWiederbeleben() den Posten dreimal zurueck (bis zu acht
+-- Aufrufe je Umlauf), und er stuende dauerhaft in mart.posten_aufgegeben —
+-- eine Pruefzeile, die nie auf null geht. Dieselbe Ueberlegung wie bei
+-- 'kein_zugriff' (0075) und 'abgeschaltet' (0119). Sichtbar bleibt es am
+-- Rezept: core.rezept.fehlt_seit, mart.rezept_stand.nicht_gefunden.
+-- ---------------------------------------------------------------------
+
+ALTER TABLE sync.warteschlange DROP CONSTRAINT IF EXISTS warteschlange_ergebnis_check;
+ALTER TABLE sync.warteschlange ADD CONSTRAINT warteschlange_ergebnis_check
+    CHECK (ergebnis IN ('ok', 'keine_daten', 'aufgegeben', 'kein_zugriff',
+                        'fenster_zu_gross', 'abgeschaltet', 'nicht_gefunden'));
 
 
 -- ---------------------------------------------------------------------
@@ -182,7 +211,9 @@ SELECT m.name                    AS marke,
            ELSE 'nummer ohne einkauf'
        END                       AS zuordnung,
        r.in_liste,
-       r.zutaten_geholt_am
+       r.zutaten_geholt_am,
+       r.fehlt_seit,
+       (z.art = 'sub_recipe' AND u.rezept_key IS NULL) AS unterrezept_unbekannt
   FROM core.zutat z
   JOIN core.rezept r ON r.rezept_key = z.rezept_key
   JOIN core.marke m  ON m.marke_key = r.marke_key
@@ -204,6 +235,12 @@ COMMENT ON COLUMN mart.rezept_position.zuordnung IS
 nummer ohne einkauf: Nummer da, aber nie bestellt (Altnummer, anderer Lieferant, Tippfehler).
 ohne nummer: Freitextzutat ohne Artikelnummer.
 unterrezept: Verweis auf ein Halbfabrikat -- keine Ware.';
+COMMENT ON COLUMN mart.rezept_position.fehlt_seit IS
+'Gesetzt, wenn FoodNotify das Rezept nicht mehr findet (HTTP 404) -- vermutlich geloescht.
+Die Zeilen zeigen den letzten gelesenen Stand.';
+COMMENT ON COLUMN mart.rezept_position.unterrezept_unbekannt IS
+'Unterrezept-Zeile, deren Halbfabrikat wir nicht kennen (noch nicht geholt oder bei
+FoodNotify nicht gefunden). Was darin steckt, fehlt in mart.artikel_in_rezept.';
 
 
 -- ---------------------------------------------------------------------
@@ -295,7 +332,8 @@ SELECT w.marke,
        w.einheit,
        w.kosten,
        w.pfad,
-       w.art
+       w.art,
+       r.fehlt_seit AS rezept_fehlt_seit
   FROM weg w
   JOIN core.rezept r      ON r.rezept_key = w.rezept_key
   LEFT JOIN core.rezept v ON v.rezept_key = w.via_key;
@@ -339,7 +377,8 @@ WITH r AS (
            count(*) FILTER (WHERE zutaten_geholt_am IS NULL)::int     AS ohne_zutaten,
            min(zutaten_geholt_am)                                AS aeltester_zutatenabruf,
            max(zutaten_geholt_am)                                AS juengster_zutatenabruf,
-           max(zuletzt_am)                                       AS zuletzt_gesehen
+           max(zuletzt_am)                                       AS zuletzt_gesehen,
+           count(*) FILTER (WHERE fehlt_seit IS NOT NULL)::int   AS nicht_gefunden
       FROM core.rezept
      GROUP BY marke_key
 ), weg AS (
@@ -356,6 +395,16 @@ WITH r AS (
     SELECT r2.marke_key, count(*)::int AS zutatenzeilen
       FROM core.zutat zz JOIN core.rezept r2 ON r2.rezept_key = zz.rezept_key
      GROUP BY r2.marke_key
+), verweis AS (
+    -- Unterrezept-Verweise, deren Rezept wir nicht kennen (noch nicht geholt
+    -- oder 404). Zaehlt verschiedene Rezept-IDs.
+    SELECT p.marke_key, count(DISTINCT zz.sub_rezept_fn_id)::int AS verweise_ohne_rezept
+      FROM core.zutat zz
+      JOIN core.rezept p ON p.rezept_key = zz.rezept_key
+     WHERE zz.sub_rezept_fn_id IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM core.rezept u
+                        WHERE u.marke_key = p.marke_key AND u.fn_id = zz.sub_rezept_fn_id)
+     GROUP BY p.marke_key
 ), liste AS (
     SELECT a.marke_key, max(a.beendet_am) AS letzte_liste
       FROM sync.aufgabe a
@@ -388,22 +437,30 @@ SELECT m.marke_key,
            WHEN liste.letzte_liste IS NULL THEN 'liste nie geholt'
            WHEN liste.letzte_liste < now() - interval '36 hours' THEN 'liste veraltet'
            WHEN coalesce(r.rezepte, 0) = 0 THEN 'keine rezepte'
+           -- Zutaten wurden abgerufen, aber KEINE einzige Zeile kam an: eine
+           -- Antwortform, die der Lader nicht als Fehler erkannt hat.
+           WHEN r.mit_zutaten > 0 AND coalesce(z.zutatenzeilen, 0) = 0 THEN 'zutaten leer'
            WHEN r.ohne_zutaten > 0 THEN 'zutaten ausstehend'
            ELSE 'ok'
-       END                                  AS zustand
+       END                                  AS zustand,
+       coalesce(r.nicht_gefunden, 0)        AS nicht_gefunden,
+       coalesce(verweis.verweise_ohne_rezept, 0) AS verweise_ohne_rezept
   FROM core.marke m
   LEFT JOIN r     ON r.marke_key = m.marke_key
   LEFT JOIN z     ON z.marke_key = m.marke_key
   LEFT JOIN weg   ON weg.marke_key = m.marke_key
   LEFT JOIN liste ON liste.marke_key = m.marke_key
-  LEFT JOIN fn    ON fn.marke_key = m.marke_key;
+  LEFT JOIN fn    ON fn.marke_key = m.marke_key
+  LEFT JOIN verweis ON verweis.marke_key = m.marke_key;
 
 COMMENT ON VIEW mart.rezept_stand IS
 'Je Marke: wie viele Rezepte geladen sind, wie viele nur ueber einen Verweis
 gefunden wurden, wie viele noch ohne Zutaten sind, und wann die Rezeptliste
 zuletzt geholt wurde. zustand: ok / zutaten ausstehend (Backfill laeuft) /
-keine rezepte / liste veraltet / liste nie geholt (Fehler, Regel 10) /
-kein FoodNotify-Zulauf (Marke ohne Zugang, kein Befund).';
+zutaten leer, keine rezepte, liste veraltet, liste nie geholt (Fehler, Regel 10) /
+kein FoodNotify-Zulauf (Marke ohne Zugang, kein Befund). nicht_gefunden: Rezepte,
+auf die FoodNotify mit 404 antwortet (vermutlich geloescht). verweise_ohne_rezept:
+Halbfabrikate, auf die ein Rezept zeigt, die wir aber nicht kennen.';
 
 
 -- ---------------------------------------------------------------------
@@ -562,9 +619,9 @@ BEGIN
     v_def := rtrim(v_def, E'; \n');
     EXECUTE 'CREATE OR REPLACE VIEW mart.pruefung_uebersicht AS ' || v_def || $zweig$
 UNION ALL
- SELECT 'Rezepte: Marke mit FoodNotify-Zulauf, aber ohne frische Rezeptliste (36 h)'::text AS pruefung,
+ SELECT 'Rezepte: Marke mit FoodNotify-Zulauf, aber ohne frische Rezeptliste oder ohne Zutaten'::text AS pruefung,
     count(*) FILTER (WHERE rs.zustand <> 'kein FoodNotify-Zulauf') AS geprueft,
-    count(*) FILTER (WHERE rs.zustand IN ('liste nie geholt', 'liste veraltet', 'keine rezepte')) AS auffaellig,
+    count(*) FILTER (WHERE rs.zustand IN ('liste nie geholt', 'liste veraltet', 'keine rezepte', 'zutaten leer')) AS auffaellig,
     'mart.rezept_stand'::text AS sicht
    FROM mart.rezept_stand rs
 UNION ALL
