@@ -196,7 +196,11 @@
     "kosten",
     "pfad",
     "art",
-    "rezept_fehlt_seit"
+    "rezept_fehlt_seit",
+    "rezept_archiviert",
+    "basis_menge",
+    "basis_einheit",
+    "via_archiviert"
    ],
    "achsen": [
     "lieferant",
@@ -5413,7 +5417,11 @@
     "in_liste",
     "zutaten_geholt_am",
     "fehlt_seit",
-    "unterrezept_unbekannt"
+    "unterrezept_unbekannt",
+    "archiviert",
+    "basis_menge",
+    "basis_einheit",
+    "unterrezept_archiviert"
    ],
    "achsen": [
     "lieferant",
@@ -5428,7 +5436,7 @@
    "koernung": "eine Marke — Ladestand der Rezepte",
    "thema": "import",
    "summen_erlaubt": false,
-   "kommentar": "Je Marke: wie viele Rezepte geladen sind, wie viele nur ueber einen Verweis\ngefunden wurden, wie viele noch ohne Zutaten sind, und wann die Rezeptliste\nzuletzt geholt wurde. zustand: ok / zutaten ausstehend (Backfill laeuft) /\nzutaten leer, keine rezepte, liste veraltet, liste nie geholt (Fehler, Regel 10) /\nkein FoodNotify-Zulauf (Marke ohne Zugang, kein Befund). nicht_gefunden: Rezepte,\nauf die FoodNotify mit 404 antwortet (vermutlich geloescht). verweise_ohne_rezept:\nHalbfabrikate, auf die ein Rezept zeigt, die wir aber nicht kennen.\n\nKoernung: eine Marke — Ladestand der Rezepte",
+   "kommentar": "Je Marke: wie viele Rezepte geladen sind, wie viele nur ueber einen Verweis\ngefunden wurden, wie viele noch ohne Zutaten sind, und wann die Rezeptliste\nzuletzt geholt wurde. zustand: ok / zutaten ausstehend (Backfill laeuft) /\nzutaten leer, keine rezepte, liste veraltet, liste nie geholt (Fehler, Regel 10) /\nkein FoodNotify-Zulauf (Marke ohne Zugang, kein Befund). Fortschritt des ersten\nAbzugs: rezepte_fn (FoodNotifys Zahl), rezepte (bekannt), mit_zutaten, ohne_zutaten\n(Rest), abzug_pct (Prozentzahl). archiviert zaehlt archivierte Rezepte (sie bleiben\ndrin). nicht_gefunden: Rezepte,\nauf die FoodNotify mit 404 antwortet (vermutlich geloescht). verweise_ohne_rezept:\nHalbfabrikate, auf die ein Rezept zeigt, die wir aber nicht kennen.\n\nKoernung: eine Marke — Ladestand der Rezepte",
    "spalten": [
     "marke_key",
     "marke",
@@ -5446,12 +5454,23 @@
     "letzter_fn_abruf",
     "zustand",
     "nicht_gefunden",
-    "verweise_ohne_rezept"
+    "verweise_ohne_rezept",
+    "archiviert",
+    "rezepte_fn",
+    "liste_noch_unbekannt",
+    "abzug_pct",
+    "volle_runde_am"
    ],
    "achsen": [
     "marke"
    ],
    "kennzahlen": [
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "abzug_pct",
+     "einheit": "prozentzahl",
+     "hinweis": "Anteil der Rezepte einer Marke mit Zutaten, in Prozent. Ueber Marken aus mit_zutaten und rezepte_fn neu rechnen."
+    },
     {
      "regel": "nicht_aggregieren",
      "spalte": "tage_seit_aeltestem_abruf",
