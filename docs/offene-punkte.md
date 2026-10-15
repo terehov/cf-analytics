@@ -1157,7 +1157,12 @@ Nachtlauf mit `0132`:
    FoodNotify-Oberfläche gegen `mart.rezept_position` halten.
 3. **Die Hülle von `/ingredients`, `/meta` und `/api/recipes/{id}` ist nicht gemessen** —
    der Einzelabzug hat sie ausgepackt gespeichert. `auspacken` kennt alle vier Formen;
-   eine fünfte fiele als Leere-200er in `sync.schema_abweichung` auf. Einmal in
+   ~~eine fünfte fiele als Leere-200er in `sync.schema_abweichung` auf~~ — **falsch**
+   (Review 15.10.2026): `zeilenZaehlen` zählte ein fremdes Objekt als eine Zeile, die
+   Leere-Regel griff nicht, und der Lader hätte die Zutaten gelöscht. Seitdem prüft
+   `rezeptStrukturFehler()` die gemessene Form (Zutaten: Liste, Meta: Objekt mit `weight`,
+   Kopf: Objekt mit `id`) VOR dem Laden; ein Befund steht in `sync.schema_abweichung`, der
+   Posten scheitert, `core` bleibt unberührt. Einmal in
    `raw.api_antwort` nachsehen: `SELECT endpunkt, left(payload::text, 120) FROM raw.api_antwort
    WHERE endpunkt LIKE 'fn:rezept%' ORDER BY abgerufen_am DESC LIMIT 8;`
 4. **Wie viele Rezepte haben Wilma Wunder und Deutsche Konzepte?** Nicht gemessen. Die

@@ -1744,12 +1744,13 @@ Vier Sichten, alle für `mcp_leser` lesbar, Thema `rezept` bzw. `import`/`pruefu
 |---|---|---|
 | `mart.rezept_position` | Marke × Rezept × Zutatenposition | Was steht in einem Rezept, mit `zuordnung` |
 | `mart.artikel_in_rezept` | Marke × Ware × Rezept × Weg | „In welchen Rezepten steckt Artikelnummer X?" — direkt (`ebene` 1) und über Halbfabrikate (`ebene` 2, 3, …), mit `via_rezept` und `pfad` |
-| `mart.rezept_stand` | eine Marke | Ladestand und Zustand je Marke (Regel 10) |
+| `mart.rezept_stand` | eine Marke | Ladestand und Zustand je Marke (Regel 10), dazu `nicht_gefunden` (HTTP 404, `fehlt_seit`) und `verweise_ohne_rezept` |
 | `mart.rezept_zuordnung_pruefung` | Marke × Zuordnung | Anteil der Zutatenpositionen je Zuordnung, Prozentzahl |
 
 Dazu zwei Spalten am Ende von `mart.datenstand` (`rezepte_marke`, `rezepte_zutaten_seit`) und zwei
 Zeilen in `mart.pruefung_uebersicht` („Rezepte: Marke mit FoodNotify-Zulauf, aber ohne frische
-Rezeptliste (36 h)" — Erwartung 0; „Rezepte: Zutat mit Artikelnummer, die im Einkauf der Marke nie
+Rezeptliste oder ohne Zutaten" — Liste älter als 36 h, keine Rezepte oder Zustand `zutaten leer`;
+Erwartung 0; „Rezepte: Zutat mit Artikelnummer, die im Einkauf der Marke nie
 vorkommt" — Erwartung **konstant**, nicht 0).
 
 **Fallen, die in den Sichten stecken:**

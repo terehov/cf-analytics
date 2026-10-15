@@ -277,7 +277,15 @@ Kassenzuordnung. Was der Import aus den Messungen oben macht:
 * **Kein Änderungsdatum → Umlauf.** Zutaten und Meta jedes Rezepts spätestens alle 14 Tage neu.
 * **Die Hülle der Liste ist `{data, pagination}` (gemessen); die von Kopf, Zutaten und Meta ist
   NICHT gemessen** — der Einzelabzug hat sie ausgepackt gespeichert. `auspacken` erkennt alle
-  bekannten Formen; nach dem ersten Lauf in `raw.api_antwort` nachsehen (`offene-punkte.md`).
+  bekannten Hüllen; ~~eine unbekannte fiele als leere Antwort auf~~ — **falsch** (Review
+  15.10.2026): ein fremdes Objekt zählte als eine Zeile, und Zutaten wären still gelöscht
+  worden. Deshalb ist die gemessene **Form** Pflicht (`rezeptStrukturFehler()`): Zutaten eine
+  Liste, Meta ein Objekt mit `weight`, Kopf ein Objekt mit `id`. Abweichung →
+  `sync.schema_abweichung`, Posten scheitert, `core` unberührt. Nach dem ersten Lauf in
+  `raw.api_antwort` nachsehen (`offene-punkte.md`).
+* **HTTP 404 auf einen Rezeptabruf** heißt „Rezept gelöscht", nicht „Abruf kaputt": Ergebnis
+  `nicht_gefunden` (nicht wiederbelebt), `core.rezept.fehlt_seit` gesetzt, ein späterer Erfolg
+  setzt es zurück.
 * **`/ingredients` mit mehr als einer Seite wirft.** Gemessen: höchstens 13 Zutaten bei 25 je Seite.
 * **`kind = product_group`** wird wie eine Ware behandelt (trägt `artikelId` und `supplier`).
 * Nachgezählt beim Laden des Einzelabzugs über den echten Ladepfad: 2.111 Rezepte (2.055 aus der

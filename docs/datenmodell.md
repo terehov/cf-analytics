@@ -1334,7 +1334,10 @@ befüllbar (Plan und Entscheidungen A–D: `plan-rezepturen.md`):
   (`subRecipeId`); `menge` ohne feste Nachkommastellen (FoodNotify liefert 4,5 ebenso wie 0,448).
 * Neu in `core.rezept`: `gewicht_gesamt`, `gewicht_person`, `portion`, `portion_einheit`,
   `verlust_roh` (`meta.weight.loss` **ungedeutet**), `in_liste` (false = nur über einen Verweis
-  gefunden), `zutaten_geholt_am`, `meta_geholt_am`.
+  gefunden), `zutaten_geholt_am`, `meta_geholt_am`, `fehlt_seit` (FoodNotify antwortet mit
+  HTTP 404; ein späterer Erfolg setzt es zurück).
+* `sync.warteschlange.ergebnis` kennt `nicht_gefunden`: 404 auf einen Rezeptabruf — nicht
+  `aufgegeben`, das würde wiederbelebt und stünde dauerhaft in `mart.posten_aufgegeben`.
 * **Unterrezepte werden über `(marke_key, sub_rezept_fn_id)` aufgelöst, nicht über
   `sub_rezept_key`.** Das Unterrezept kann später ankommen als der Verweis (56 Enchilada-Rezepte
   stehen in keiner Listenseite). `sub_rezept_key` wird nachgezogen, sobald es da ist, und dient

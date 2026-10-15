@@ -1911,7 +1911,25 @@ im Log und kommt in der nächsten Nacht zuerst. `REZEPTE_JE_LAUF = 0` ist die No
 läuft weiter, die Detailquellen stehen in `sync.quelle` als „nicht erwartet".
 
 **Sperren.** Gegen einen offenen Zwilling und gegen einen, der innerhalb des Umlaufs schon einmal
-eingereiht wurde — ein gelöschtes Rezept (HTTP 404) wird so höchstens einmal je Umlauf gefragt.
+eingereiht wurde. ~~Ein gelöschtes Rezept (HTTP 404) wird so höchstens einmal je Umlauf gefragt.~~
+Das stimmte nicht (Review 15.10.2026): ein 404 war `aufgegeben`, `aufgegebeneWiederbeleben()` holte
+ihn dreimal zurück (bis zu acht Aufrufe je Umlauf), und er stand für immer in
+`mart.posten_aufgegeben`.
+
+**HTTP 404 auf `fn:rezept`, `fn:rezept_zutaten`, `fn:rezept_meta`** schließt der Worker jetzt mit
+`ergebnis = 'nicht_gefunden'` (neu in `0132`, nicht wiederbelebbar, zählt nicht als Erstfehler) und
+setzt `core.rezept.fehlt_seit`. Ein späterer erfolgreicher Abruf (Liste, Kopf, Zutaten, Meta) setzt
+es zurück. Damit wird ein gelöschtes Rezept wirklich höchstens einmal je Umlauf gefragt. Sichtbar:
+`mart.rezept_stand.nicht_gefunden`, `mart.rezept_position.fehlt_seit`,
+`mart.artikel_in_rezept.rezept_fehlt_seit`; Verweise auf Rezepte, die wir gar nicht kennen, zählt
+`mart.rezept_stand.verweise_ohne_rezept`.
+
+**Antwortform.** `rezeptStrukturFehler()` prüft vor dem Laden die gemessene Form (Zutaten: Liste,
+Meta: Objekt mit `weight`, Kopf: Objekt mit `id`, Liste: Liste). Bei einem Befund sichert `fnLaden`
+die Rohantwort, schreibt `sync.schema_abweichung` und wirft — der Posten scheitert sichtbar, `core`
+bleibt unberührt. Vorher hätte eine fremde Hülle still `[]` geliefert, die Zutaten gelöscht und
+`zutaten_geholt_am` gestempelt. Für den Fall, dass doch einmal eine ganze Marke leer läuft, kennt
+`mart.rezept_stand` den Zustand `zutaten leer` (Teil der Prüfzeile).
 
 **Laden.** Liste und Einzelkopf: Upsert auf `(marke_key, fn_id)`, `in_liste` wird nur gesetzt, nie
 zurückgenommen. Neue Rezepte reihen ihre Zutaten im selben Lauf ein, solange das Budget reicht.
@@ -1921,7 +1939,8 @@ sind höchstens 13 Zutaten je Rezept bei 25 je Seite, und ein stilles Abschneide
 kurzes Rezept (die 800er-Inventuren vom 13.08.2026).
 
 **Regel 10.** `sync.quelle`: `fn:rezepte`, `fn:rezept_zutaten`, `fn:rezept_meta` (täglich),
-`fn:rezept` (wöchentlich) und `core:rezept` (jetzt erwartet, gemessen an `zuletzt_am` — vorher
+~~`fn:rezept` (wöchentlich)~~ `fn:rezept` (seit dem Review **nicht erwartet**: er läuft nur für
+Verweise und im Umlauf, eine Wochenkadenz schlüge dauernd falsch an) und `core:rezept` (jetzt erwartet, gemessen an `zuletzt_am` — vorher
 `erstellt_am`, das ist FoodNotifys Anlagedatum). Je **Marke** misst `mart.rezept_stand`; eine
 Marke mit FoodNotify-Zulauf und einer Rezeptliste älter als 36 Stunden steht in
 `mart.pruefung_uebersicht`.
