@@ -1889,7 +1889,8 @@ Hergang: `fehlerkatalog.md`, 05.10.2026.
 ## Rezepturen (`0132`, 15.10.2026)
 
 Vier FoodNotify-Endpunkte (`src/foodnotify/endpunkte.ts`), dieselbe FN-Spur, derselbe Client und
-Takt, Phase A. Transformation in `src/foodnotify/rezept.ts`, Laden in `src/foodnotify/laden.ts`,
+Takt — ~~Phase A~~ seit dem 15.10.2026 Phase A (Tagesgeschäft) **und** Phase C (Nachladen), siehe
+„Zwei Wege" unten. Transformation in `src/foodnotify/rezept.ts`, Laden in `src/foodnotify/laden.ts`,
 Einreihen in `rezepteNachfuellen()` (`src/sync/nachfuellen.ts`, aufgerufen am Ende von
 `foodnotifyNachfuellen()`).
 
@@ -1900,7 +1901,7 @@ Einreihen in `rezepteNachfuellen()` (`src/sync/nachfuellen.ts`, aufgerufen am En
 | `fn:rezept_zutaten` | `/api/recipes/{id}/ingredients` | 41 | neue Rezepte sofort, bekannte im Umlauf |
 | `fn:rezept_meta` | `/api/recipes/{id}/meta` | 41 | immer zusammen mit den Zutaten |
 
-**Obergrenze und Umlauf, kein Handbefehl.** `REZEPTE_JE_LAUF` (1.500) deckelt Kopf, Zutaten und
+~~**Obergrenze und Umlauf, kein Handbefehl.** `REZEPTE_JE_LAUF` (1.500) deckelt Kopf, Zutaten und
 Meta je **Kalendertag** über alle Marken; gezählt wird an `sync.warteschlange` (`rezeptBudgetRest()`),
 weil an drei Stellen eingereiht wird. Die Listenseiten zählen nicht mit (`entscheidungen.md`,
 15.10.2026). `REZEPT_UMLAUF_TAGE` (14): ein Rezept, dessen `zutaten_geholt_am` älter ist, wird neu
@@ -1908,7 +1909,34 @@ gelesen — FoodNotify hat kein Änderungsdatum. Reihenfolge im Nachfüllen: Ver
 Rezepte, dann die ältesten; die Marken im Wechsel (`row_number() OVER (PARTITION BY marke_key)`).
 Zutaten und Meta werden nur als Paar eingereiht; was nicht mehr passt, steht als `liegenGeblieben`
 im Log und kommt in der nächsten Nacht zuerst. `REZEPTE_JE_LAUF = 0` ist die Notbremse: die Liste
-läuft weiter, die Detailquellen stehen in `sync.quelle` als „nicht erwartet".
+läuft weiter, die Detailquellen stehen in `sync.quelle` als „nicht erwartet".~~ Ersetzt am 15.10.2026:
+
+**Zwei Wege, keine Obergrenze je Nacht** (Entscheidung Eugene, `entscheidungen.md` 15.10.2026 —
+nach der Probe: rund 17.700 Rezepte, davon 12.655 bei Wilma Wunder). Der Posten entscheidet
+(`sync.warteschlange.nachladen`), nicht die Uhr — wie bei LINA seit `0116`.
+
+* **Tagesgeschäft** (`nachladen = false`, Phase A, `sync.posten_holen(…, 'fn_laufend')`):
+  `rezepteNachfuellen()` reiht je Marke Seite 1 ein. Die Liste ist nach `createdAt` **absteigend**
+  sortiert (Neuestes vorn). Trägt eine Seite ein neues Rezept, holt der Lader die nächste Seite —
+  bis eine Seite nur Bekanntes trägt. Ausnahme: kennt die Marke noch kein Rezept, blättert das
+  Tagesgeschäft nicht (sonst liefe der ganze erste Abzug in Phase A). Neue Rezepte reihen Zutaten
+  und Meta sofort ein, Verweise ihren Kopf — alles im Tagesgeschäft, ohne Grenze. Seite 1 stempelt
+  `core.rezept_liste_stand.seite1_am` und die Gesamtzahl (`totalItems`).
+* **Nachladen** (`nachladen = true`, Phase C — die FoodNotify-Spur läuft dort seit `0132` mit,
+  derselbe `FnClient`, kein zweiter, Regel 3): die **volle Listenrunde** einmal je Woche
+  (`{seite, runde: 'voll'}`; Seite 1 reiht alle übrigen ein), Verweise auf unbekannte Rezepte, der
+  **erste Abzug** (alle Rezepte ohne Zutaten, mengenbasiert in einer Anweisung eingereiht) und der
+  **Umlauf** (`REZEPT_UMLAUF_TAGE` = 14; Rezepte, die nicht oder seit drei Tagen nicht mehr in der
+  Liste stehen, mit Kopf — er trägt `archived`). Begrenzt nur durch `FN_TAGESBUDGET` und
+  `NACHLADEN_BIS`; was eine Nacht nicht schafft, bleibt offen und wird nicht doppelt eingereiht.
+* **Notschalter `REZEPTE_NACHLADEN`** (1/0): 0 reiht kein Nachladen mehr ein und startet die
+  FoodNotify-Spur in Phase C nicht; das Tagesgeschäft läuft weiter. `sync.quelle` führt Zutaten
+  und Meta dann als „nicht erwartet".
+* **Regel 10:** Phase C meldet die FoodNotify-Spur als `teilweise`, wenn sie nichts schafft, obwohl
+  Nachlade-Posten fällig sind, und nennt die offenen in der Notiz („Nachladen FoodNotify: …").
+  `mart.rezept_stand` zeigt je Marke den Fortschritt (`rezepte_fn`, `rezepte`, `mit_zutaten`,
+  `ohne_zutaten`, `abzug_pct`) und `liste veraltet`, wenn Seite 1 länger als 36 h nicht kam.
+  `sync.lauf.nachladen_posten/_offen` bleiben LINA-Zahlen.
 
 **Sperren.** Gegen einen offenen Zwilling und gegen einen, der innerhalb des Umlaufs schon einmal
 eingereiht wurde. ~~Ein gelöschtes Rezept (HTTP 404) wird so höchstens einmal je Umlauf gefragt.~~
@@ -1983,3 +2011,27 @@ Antworten die Form haben, die `fnLaden` erwartet. Gedacht für den Schritt vor d
   `mock.rezeptHuelleFremd(true)`).
 * **Nur im Terminal des Nutzers starten**, wie `lina-fragen` (Regel 7a gilt für LINA; für
   FoodNotify gilt dieselbe Vorsicht: ein Zugang, keine Wiederholung bei Anmeldefehlern).
+
+### Praxislauf: `bun run rezepte-praxis` (15.10.2026)
+
+`src/rezepte_praxis.ts` lässt den **echten Ladepfad** (FnClient → `fnLaden` → raw → core, dieselben
+Lader und dieselbe Einreihfunktion `rezepteNachfuellen()`) NUR für FoodNotify-Rezepte gegen eine
+**lokale** Datenbank laufen — vor dem Push, mit FoodNotifys echten Antworten, ohne Nachtlauf.
+
+```bash
+bun run rezepte-praxis --datenbank postgresql://localhost/lina_rezept_1015 [--marke wilma_wunder] [--max-rezepte 200]
+```
+
+* `--datenbank` ist Pflicht und muss auf localhost/127.0.0.1/::1 zeigen; der Server muss es
+  bestätigen (`inet_server_addr()`). `DATABASE_URL` aus der `.env` wird nie genommen.
+* Gezogen werden nur `fn:rezept*`-Posten der gewählten Marken (erst Tagesgeschäft, dann Nachladen);
+  andere Posten der Schlange — LINA, Bestellungen — bleiben liegen. Kein LINA-, Yext-, Bounti- oder
+  Wetterclient.
+* Dieselbe Laufsperre wie der Worker; ein Anmeldefehler oder eine Sperre (403/429) beendet den Lauf
+  ohne zweiten Versuch; nach `ABBRUCH_NACH_FEHLERN` Fehlern in Folge ist Schluss. 404 →
+  `nicht_gefunden` wie im Worker (`rezeptNichtGefunden()`).
+* `--max-rezepte N` hört nach N Zutatenlisten auf; der Rest bleibt in der lokalen Schlange, ein
+  zweiter Aufruf setzt fort. Ein Eintrag in `sync.lauf` (`manuell`, Notiz „Praxislauf Rezepturen")
+  und je Aufruf eine Zeile in `sync.aufgabe`.
+* Exit 0 ok, 1 Fehler oder Sperre, 3 Abbruch vor dem Start (Datenbank, Zugang, Sperre).
+* Getestet gegen die Attrappe in `src/foodnotify/rezept_db.test.ts`.

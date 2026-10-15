@@ -1353,3 +1353,21 @@ befüllbar (Plan und Entscheidungen A–D: `plan-rezepturen.md`):
   Zutat → Einkauf fragt je Zutat danach.
 
 `core.pos_artikel` (Kassenzuordnung, Betriebsbezug) ist **nicht** Teil dieses Schritts und bleibt leer.
+
+### Nachtrag `0132` nach der Probe vom 15.10.2026
+
+* `core.rezept.archiviert` (`archived` aus Liste und Kopf; NULL = unbekannt — der Septemberabzug
+  kannte das Feld nicht). Archivierte Rezepte bleiben drin und zählen; sie können in aktiven
+  stecken (BA_Horchata-Mix 984639 in Frozen Oreo Dream).
+* `core.zutat.basis_menge` / `basis_einheit` (`baseQuantity`/`baseUnit`, meist NULL; 2 Stück Oreo →
+  22 g) — neben `menge`/`einheit`, nicht statt ihrer.
+* `core.rezept_liste_stand` (marke_key, rezepte_gesamt, seiten, seite1_am, volle_runde_am): was die
+  Liste über sich sagt — der Nenner für den Fortschritt des ersten Abzugs und der Stempel des
+  Tagesgeschäfts.
+* `sync.posten_holen(…, 'fn_laufend')` (Zweig ergänzt, Definition aus der Zieldatenbank gelesen)
+  und Teilindex `warteschlange_naechster_fn_laufend`: die FoodNotify-Spur zieht im Tagesgeschäft nur
+  `nachladen = false`.
+* In den Sichten: `rezept_position.archiviert`, `.basis_menge`, `.basis_einheit`,
+  `.unterrezept_archiviert`; `artikel_in_rezept.rezept_archiviert`, `.via_archiviert`,
+  `.basis_menge`, `.basis_einheit`; `rezept_stand.archiviert`, `.rezepte_fn`,
+  `.liste_noch_unbekannt`, `.abzug_pct` (Prozentzahl), `.volle_runde_am`.

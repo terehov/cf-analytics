@@ -1180,10 +1180,20 @@ Nachtlauf mit `0132`:
    Posten scheitert, `core` bleibt unberührt. Einmal in
    `raw.api_antwort` nachsehen: `SELECT endpunkt, left(payload::text, 120) FROM raw.api_antwort
    WHERE endpunkt LIKE 'fn:rezept%' ORDER BY abgerufen_am DESC LIMIT 8;`
-4. **Wie viele Rezepte haben Wilma Wunder und Deutsche Konzepte?** Nicht gemessen. Die
+4. ~~**Wie viele Rezepte haben Wilma Wunder und Deutsche Konzepte?** Nicht gemessen. Die
    Obergrenze (1.500 Aufrufe je Tag, Listenseiten nicht mitgezählt) trägt bis rund 10.000
-   Rezepte im 14-Tage-Umlauf. `mart.rezept_stand.tage_seit_aeltestem_abruf` darf nach dem
-   Backfill nicht über 14 steigen.
+   Rezepte im 14-Tage-Umlauf.~~ **Beantwortet 15.10.2026** (Rezept-Probe, `totalItems`):
+   aposto 942, enchilada 2.076, deutsche_konzepte 1.999, wilma_wunder 12.655. Die Obergrenze
+   ist daraufhin entfallen (`entscheidungen.md`). `mart.rezept_stand.tage_seit_aeltestem_abruf`
+   darf nach dem ersten Abzug nicht über 14 steigen, `abzug_pct` muss Nacht für Nacht steigen.
+4a. **Zeigt die Liste archivierte Rezepte nicht?** HYPOTHESE, nicht bewiesen: Liste und Kopf tragen
+   seit der Probe `archived`; das archivierte BA_Horchata-Mix 984639 wird vom aktiven Frozen Oreo
+   Dream verwendet, ist einer der 56 Rezepte, die im Septemberabzug nur über Verweise zu finden
+   waren, und steht nicht in der Septemberliste. Auf den vier Probeseiten 1 (100 Einträge) war
+   kein einziger Eintrag archiviert. Mehr lässt sich ohne neue Aufrufe nicht prüfen: der
+   Septemberabzug kannte das Feld nicht. Nach dem ersten vollen Abzug beantwortbar:
+   `SELECT in_liste, archiviert, count(*) FROM core.rezept GROUP BY 1, 2;` — stimmt die
+   Hypothese, gibt es keine Zeile `in_liste = true, archiviert = true`.
 5. **`zuordnung = 'nummer ohne einkauf'`:** bei Enchilada 446 von 5.233 Positionen mit
    Nummer (8,5 %), 49 verschiedene Nummern, gemessen am Einzelabzug gegen den Einkauf des
    Vollklons. Ob das Altnummern, andere Lieferanten oder Tippfehler sind, ist nicht

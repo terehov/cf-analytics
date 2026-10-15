@@ -250,7 +250,8 @@ if (process.argv.includes('--foodnotify-inventuren')) {
  *       Rezepturen (0132): dieselbe Funktion, die `bun run sync` als Vorlauf
  *       ausführt (`rezepteNachfuellen()`) — Seite 1 der Rezeptliste je Marke,
  *       Verweise auf unbekannte Rezepte, Zutaten/Meta für neue und im Umlauf
- *       fällige Rezepte bis REZEPTE_JE_LAUF.
+ *       fällige Rezepte (Tagesgeschäft und Nachladen; REZEPTE_NACHLADEN = 0
+ *       schaltet das Nachladen ab).
  *
  *       Gebraucht wird der Schalter nicht (der Nachtlauf macht es selbst).
  *       `--dry-run` rechnet alles in einer Transaktion und rollt sie zurück:

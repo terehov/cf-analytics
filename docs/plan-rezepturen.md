@@ -141,7 +141,7 @@ Wunder und Deutsche Konzepte sind nicht gemessen.
 - **A — Marken:** alle vier.
 - **B — raw:** `raw.api_antwort`, keine eigenen `raw.foodnotify_rezept*`-Tabellen.
 - **C — core:** `core.rezept`/`core.zutat` aus `0030` erweitern; die Sicht heißt trotzdem `mart.rezept_position`.
-- **D — Takt:** höchstens 1.500 Rezeptaufrufe je Nacht (`REZEPTE_JE_LAUF`), Umlauf 14 Tage (`REZEPT_UMLAUF_TAGE`).
+- **D — Takt:** ~~höchstens 1.500 Rezeptaufrufe je Nacht (`REZEPTE_JE_LAUF`)~~, Umlauf 14 Tage (`REZEPT_UMLAUF_TAGE`). Ersetzt am 15.10.2026: durchgehend laden, Tagesgeschäft täglich (Abschnitt 8, Nachtrag).
 
 Ausdrücklich **nicht** in diesem Schritt: die Kassenzuordnung (`core.pos_artikel`, Betriebsbezug),
 ein theoretischer Wareneinsatz aus Rezepten und die Historie von Rezeptfassungen (FoodNotify führt
@@ -179,3 +179,11 @@ Gebaut wie in Abschnitt 3–5 beschrieben, mit diesen Abweichungen und Ergänzun
 4. `mart.rezept_zuordnung_pruefung` steht; Enchilada: eingekauft 64,24 %, nummer ohne einkauf
    5,98 %, ohne nummer 3,17 %, unterrezept 26,61 %.
 5. Tests, MCP-Katalogabzug, Doku: erledigt.
+
+**Nachtrag 15.10.2026, nach der Probe gegen das echte FoodNotify** (`foodnotify-api-inventar.md` §3):
+~~Entscheidung D (1.500 Rezeptaufrufe je Nacht)~~ ist ersetzt durch „durchgehend laden, bis alles
+geladen ist; einmal am Tag den aktuellen Tag nachziehen" (`entscheidungen.md`): Tagesgeschäft in
+Phase A ohne Grenze, erster Abzug, Umlauf und volle Listenrunde (wöchentlich) im Nachladen,
+Notschalter `REZEPTE_NACHLADEN`. Dazu `archiviert`, `basis_menge`/`basis_einheit`,
+`core.rezept_liste_stand` und der Fortschritt in `mart.rezept_stand`. Für den ersten echten Lauf
+vor dem Push: `bun run rezepte-praxis` (`importer.md`) gegen eine lokale Datenbank.

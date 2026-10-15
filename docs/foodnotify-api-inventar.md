@@ -291,6 +291,31 @@ Kassenzuordnung. Was der Import aus den Messungen oben macht:
 * Nachgezählt beim Laden des Einzelabzugs über den echten Ladepfad: 2.111 Rezepte (2.055 aus der
   Liste, 56 nur über Verweise), 7.452 Zutaten — dieselben Zahlen wie oben.
 
+### Probe gegen das echte FoodNotify, 15.10.2026 (`bun run rezepte-probe`, nur GET)
+
+Rohantworten lokal unter `belege/rezepte-probe/2026-10-15/` (nicht im Git). Die Form ist bei allen
+vier Marken so, wie der Importer sie erwartet. Neu gegenüber dem Septemberabzug:
+
+* **Rezeptzahlen je Marke** (`pagination.totalItems`, Seite 1, 25 je Seite):
+
+  | Marke | Rezepte | Seiten |
+  |---|---|---|
+  | aposto | 942 | 38 |
+  | enchilada | 2.076 | 84 |
+  | deutsche_konzepte | 1.999 | 80 |
+  | wilma_wunder | **12.655** | 507 |
+
+  Zusammen rund 17.700 — der Anlass, die Obergrenze von 1.500 Aufrufen je Nacht aufzugeben
+  (`entscheidungen.md`, 15.10.2026).
+* **`archived`** (bool) in Liste und Kopf. Das archivierte BA_Horchata-Mix 984639 steckt im aktiven
+  Frozen Oreo Dream. Hypothese: die Liste zeigt archivierte Rezepte nicht, und das sind die 56 nur
+  über Verweise gefundenen (984639 ist einer davon; `offene-punkte.md`). → `core.rezept.archiviert`.
+* **`baseQuantity` / `baseUnit`** in den Zutaten, meist `null`; z. B. 2 Stück Oreo → 22 g.
+  → `core.zutat.basis_menge` / `basis_einheit`.
+* **Die Liste ist nach `createdAt` absteigend sortiert**, das Neueste vorn (der Septemberabzug zeigt
+  dasselbe: Frozen Oreo Dream, 21.08.2026, als erster Eintrag). Das Tagesgeschäft nutzt das: es
+  blättert, bis eine Seite nur Bekanntes trägt.
+
 ---
 
 ## 4. Warenwirtschaft

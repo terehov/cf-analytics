@@ -4110,14 +4110,14 @@ stellt den Betrieb auf `operativ` zurück und die Sicht meldet „wirkt nicht“
 
 Entscheidungen A–D von Eugene stehen in `plan-rezepturen.md` §7 (alle vier Marken;
 `raw.api_antwort` statt eigener Rohtabellen; `core.rezept`/`core.zutat` aus `0030` erweitern;
-1.500 Rezeptaufrufe je Nacht, Umlauf 14 Tage). Beim Bau dazugekommen:
+~~1.500 Rezeptaufrufe je Nacht~~, Umlauf 14 Tage). Beim Bau dazugekommen:
 
-1. **Die Listenseiten zählen nicht gegen `REZEPTE_JE_LAUF`.** Sie sind das Auge: nur über sie
+1. ~~**Die Listenseiten zählen nicht gegen `REZEPTE_JE_LAUF`.**~~ (entfallen mit der Obergrenze, siehe unten) Sie sind das Auge: nur über sie
    werden neue Rezepte gefunden, und eine Liste, die wegen der Obergrenze auf halber Strecke
    aufhört, sähe aus wie eine kurze Liste. Gedeckelt sind Kopf, Zutaten und Meta. Das liest
    sich aus §5 des Plans („Der Backfill ist eine Obergrenze … Die Listenseiten werden täglich
    geholt"); ausdrücklich entschieden war es nicht.
-2. **Gezählt wird an der Warteschlange, je Kalendertag**, nicht an einem Zähler im Speicher:
+2. ~~**Gezählt wird an der Warteschlange, je Kalendertag**, nicht an einem Zähler im Speicher:~~
    eingereiht wird an drei Stellen (Nachfüllen, Listenseite für neue Rezepte, Zutaten für
    Verweise), in verschiedenen Transaktionen.
 3. **`core.zutat.ware_fn_id` heißt `artikelnummer`.** Die Tabelle war leer; der alte Name lud
@@ -4127,3 +4127,29 @@ Entscheidungen A–D von Eugene stehen in `plan-rezepturen.md` §7 (alle vier Ma
    eine andere Marke liefert.
 5. **Keine Kennzahlregel auf `menge`** im MCP-Katalog, sondern ein Fallstrick: die Regeln in
    `mcp.kennzahl` gelten für den Spaltennamen über alle Sichten.
+
+## 15.10.2026 (nachmittags) — Rezepte: durchgehend laden statt 1.500 je Nacht
+
+~~Entscheidung D: höchstens 1.500 Rezeptaufrufe je Nacht (`REZEPTE_JE_LAUF`).~~
+
+Die Probe gegen das echte FoodNotify (`bun run rezepte-probe`, 15.10.2026, nur GET) zählte
+**rund 17.700 Rezepte**: aposto 942, enchilada 2.076, deutsche_konzepte 1.999, **wilma_wunder
+12.655**. Mit 1.500 Aufrufen je Nacht hätte der erste Abzug gut drei Wochen gedauert, und der
+14-Tage-Umlauf (~2.500 Aufrufe je Nacht) hätte nicht einmal hineingepasst.
+
+**Eugene:** „Durchgehend laden, bis alles geladen ist. Einmal am Tag muss aber der aktuelle Tag
+nachgezogen werden." Umgesetzt als zwei Wege (`importer.md`, „Rezepturen"):
+
+1. **Tagesgeschäft** (Phase A, ohne Grenze): Seite 1 je Marke, weiter, solange eine Seite neue
+   Rezepte trägt; neue Rezepte sofort vollständig.
+2. **Nachladen** (Phase C): erster Abzug, Umlauf (14 Tage bleibt), volle Listenrunde einmal je
+   Woche. Keine eigene Obergrenze — gedeckelt nur durch `FN_TAGESBUDGET` und `NACHLADEN_BIS`.
+   Die FoodNotify-Spur läuft dafür in Phase C mit, **mit demselben Client und Takt** (Regel 3 —
+   keine zweite Spur).
+3. `REZEPTE_JE_LAUF` entfällt; **`REZEPTE_NACHLADEN`** ist der Notschalter (0 = Nachladen aus, das
+   Tagesgeschäft läuft weiter).
+
+Warum der Posten und nicht die Uhr entscheidet: dieselbe Lehre wie `0116` — „Nachladen" ist eine
+Eigenschaft der Arbeit, nicht der Tageszeit. Und warum das Tagesgeschäft nicht blättert, solange
+eine Marke noch kein Rezept kennt: sonst wäre jede Seite „neu", und der ganze erste Abzug liefe
+in Phase A vor den Ableitungen — genau das, was `0116` für LINA verhindert hat.

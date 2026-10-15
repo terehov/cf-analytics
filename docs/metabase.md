@@ -1779,4 +1779,10 @@ einkauf 5,98 %, ohne nummer 3,17 %, unterrezept 26,61 %. Wege bis Ebene 5 (5.469
 `mart.rezept_zuordnung_pruefung` 0,19 s, `mart.datenstand` unverändert (~0,05 s für die Spalten,
 die der MCP-Zugang liest; ~0,35 s für alle Spalten, vor und nach `0132` gleich).
 
+**Nachtrag nach der Probe (15.10.2026):** `archiviert` (Rezept, Unterrezept, `via`) und
+`basis_menge`/`basis_einheit` stehen in `rezept_position` und `artikel_in_rezept`; archivierte
+Rezepte zählen mit — sie können in aktiven stecken. `mart.rezept_stand` zeigt den Fortschritt des
+ersten Abzugs: `rezepte_fn` (FoodNotifys Zahl aus der Liste), `rezepte` (bekannt, mit Verweisen),
+`mit_zutaten`, `ohne_zutaten` (Rest), `abzug_pct` (Prozentzahl, nicht über Marken mitteln).
+
 Noch **keine Dashboard-Karte** — die Sichten sind für Postico und den MCP-Zugang gebaut.
