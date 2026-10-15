@@ -20,7 +20,14 @@
 --                menge ohne feste Nachkommastellen.
 --   core.rezept  gewicht_gesamt, gewicht_person, portion, portion_einheit,
 --                verlust_roh, in_liste, zutaten_geholt_am, meta_geholt_am.
---   core.rezept  dazu fehlt_seit: FoodNotify antwortete mit HTTP 404.
+--   core.rezept  dazu fehlt_seit (FoodNotify antwortete mit HTTP 404) und
+--                archiviert (archived, seit der Probe vom 15.10.2026 bekannt).
+--   core.zutat   dazu basis_menge / basis_einheit (baseQuantity/baseUnit).
+--   core.rezept_liste_stand  je Marke: was die Liste ueber sich sagt
+--                (totalItems, totalPages) und wann Seite 1 zuletzt kam.
+--   sync         posten_holen(…, 'fn_laufend'): die FoodNotify-Spur zieht
+--                im Tagesgeschaeft nur nachladen = false — der erste Abzug
+--                und der Umlauf der Rezepte laufen in Phase C.
 --   sync         Warteschlangen-Ergebnis 'nicht_gefunden' (404 auf einen
 --                Rezeptabruf) — NICHT 'aufgegeben', das wuerde dreimal
 --                wiederbelebt und stuende fuer immer in mart.posten_aufgegeben.
@@ -51,7 +58,9 @@ ALTER TABLE core.zutat
     ALTER COLUMN menge TYPE numeric,
     ADD COLUMN lieferant_fn_id  integer,
     ADD COLUMN gruppe           text,
-    ADD COLUMN sub_rezept_fn_id integer;
+    ADD COLUMN sub_rezept_fn_id integer,
+    ADD COLUMN basis_menge      numeric,
+    ADD COLUMN basis_einheit    text;
 
 CREATE INDEX zutat_sub_rezept_fn ON core.zutat (sub_rezept_fn_id) WHERE sub_rezept_fn_id IS NOT NULL;
 
@@ -82,6 +91,11 @@ mart.artikel_in_rezept laeuft ueber (marke_key, sub_rezept_fn_id), NICHT ueber
 sub_rezept_key: das Unterrezept kann spaeter geladen werden als der Verweis
 (56 Enchilada-Rezepte stehen in keiner Listenseite und kommen nur ueber den
 Verweis). sub_rezept_key wird nachgezogen, sobald das Rezept da ist.';
+COMMENT ON COLUMN core.zutat.basis_menge IS
+'baseQuantity -- die Menge in einer Basiseinheit, wo FoodNotify sie kennt
+(2 Stueck Oreo -> 22 g). Meist NULL (Probe 15.10.2026). Neben menge/einheit,
+nicht statt ihrer: menge ist, was im Rezept steht.';
+COMMENT ON COLUMN core.zutat.basis_einheit IS 'baseUnit -- Einheit zu basis_menge.';
 COMMENT ON COLUMN core.zutat.menge IS
 'quantity -- in der Einheit der Zeile (einheit). Einheiten sind Freitext
 ("cl", "g", "Limetten 8tel", "Portionierer Silber (60g)"): Mengen sind NUR
@@ -102,7 +116,8 @@ ALTER TABLE core.rezept
     ADD COLUMN in_liste          boolean NOT NULL DEFAULT false,
     ADD COLUMN zutaten_geholt_am timestamptz,
     ADD COLUMN meta_geholt_am    timestamptz,
-    ADD COLUMN fehlt_seit        timestamptz;
+    ADD COLUMN fehlt_seit        timestamptz,
+    ADD COLUMN archiviert        boolean;
 
 CREATE INDEX rezept_umlauf ON core.rezept (zutaten_geholt_am NULLS FIRST, marke_key);
 
@@ -138,6 +153,13 @@ COMMENT ON COLUMN core.rezept.zutaten_geholt_am IS
 Umlauf (REZEPT_UMLAUF_TAGE): FoodNotify hat kein Aenderungsdatum, also wird
 jedes Rezept spaetestens nach N Tagen neu gelesen.';
 COMMENT ON COLUMN core.rezept.meta_geholt_am IS 'Letzter erfolgreicher Abruf von /meta.';
+COMMENT ON COLUMN core.rezept.archiviert IS
+'archived aus Liste und Kopf (seit der Probe vom 15.10.2026 bekannt; im
+Septemberabzug fehlte das Feld). NULL = unbekannt. Ein archiviertes Rezept
+kann weiter in aktiven Rezepten stecken (BA_Horchata-Mix 984639 in Frozen
+Oreo Dream). HYPOTHESE, nicht gemessen: die Liste zeigt archivierte Rezepte
+nicht — das waeren die 56 nur ueber Verweise gefundenen (984639 ist einer
+davon und archiviert).';
 COMMENT ON COLUMN core.rezept.fehlt_seit IS
 'Seit wann FoodNotify auf einen Abruf dieses Rezepts (Kopf, Zutaten, Meta) mit
 HTTP 404 antwortet -- vermutlich geloescht. NULL = zuletzt gefunden. Ein
@@ -147,7 +169,70 @@ REZEPT_UMLAUF_TAGE nach.';
 
 
 -- ---------------------------------------------------------------------
--- 2a. Warteschlange: Ergebnis 'nicht_gefunden'
+-- 2a. core.rezept_liste_stand — was die Rezeptliste ueber sich sagt
+-- ---------------------------------------------------------------------
+
+CREATE TABLE core.rezept_liste_stand (
+    marke_key        integer PRIMARY KEY REFERENCES core.marke(marke_key),
+    rezepte_gesamt   integer,
+    seiten           integer,
+    seite1_am        timestamptz,
+    volle_runde_am   timestamptz
+);
+COMMENT ON TABLE core.rezept_liste_stand IS
+'Je Marke der Stand der Rezeptliste, geschrieben bei jeder Seite 1 (fn:rezepte).
+rezepte_gesamt ist FoodNotifys eigene Zahl (pagination.totalItems) -- der Nenner
+fuer den Fortschritt des ersten Abzugs. seite1_am stempelt das Tagesgeschaeft
+(Regel 10: bleibt es aus, steht es in mart.rezept_stand), volle_runde_am die
+woechentliche volle Listenrunde im Nachladen.';
+
+
+-- ---------------------------------------------------------------------
+-- 2b. posten_holen: die FoodNotify-Spur im Tagesgeschaeft
+--
+-- Eugenes Entscheidung vom 15.10.2026 ersetzt die Obergrenze je Nacht:
+-- "durchgehend laden, bis alles geladen ist; einmal am Tag den aktuellen Tag
+-- nachziehen". Der erste Abzug (Wilma Wunder allein 12.655 Rezepte) und der
+-- Umlauf laufen deshalb als nachladen = true in Phase C, das Tagesgeschaeft
+-- (neue Rezepte) in Phase A. Wie bei LINA (0116) entscheidet der Posten,
+-- nicht die Uhr. Die Definition wird aus der Zieldatenbank gelesen und nur
+-- um den Zweig 'fn_laufend' ergaenzt.
+-- ---------------------------------------------------------------------
+
+DO $aussen$
+DECLARE
+    v_def text := pg_get_functiondef('sync.posten_holen(bigint, text)'::regprocedure);
+    v_neu text;
+BEGIN
+    v_neu := replace(v_def, $alt$    ELSE
+        RAISE EXCEPTION$alt$, $zweig$    ELSIF p_anbieter = 'fn_laufend' THEN
+        SELECT * INTO p
+          FROM sync.warteschlange
+         WHERE erledigt_am IS NULL
+           AND in_arbeit_seit IS NULL
+           AND faellig_ab <= now()
+           AND marke_key IS NOT NULL
+           AND NOT nachladen
+         ORDER BY prioritaet, zeitraum_von DESC, endpunkt, posten_id
+         FOR UPDATE SKIP LOCKED
+         LIMIT 1;
+
+    ELSE
+        RAISE EXCEPTION$zweig$);
+    v_neu := replace(v_neu, 'lina_sonst_laufend, fn, NULL.', 'lina_sonst_laufend, fn, fn_laufend, NULL.');
+    IF v_neu = v_def OR position('fn_laufend, NULL' IN v_neu) = 0 THEN
+        RAISE EXCEPTION '0132: sync.posten_holen hat nicht die erwartete Form — Zweig fn_laufend nicht eingefuegt';
+    END IF;
+    EXECUTE v_neu;
+END $aussen$;
+
+CREATE INDEX IF NOT EXISTS warteschlange_naechster_fn_laufend
+    ON sync.warteschlange (prioritaet, zeitraum_von DESC, endpunkt)
+ WHERE erledigt_am IS NULL AND in_arbeit_seit IS NULL AND marke_key IS NOT NULL AND NOT nachladen;
+
+
+-- ---------------------------------------------------------------------
+-- 2d. Warteschlange: Ergebnis 'nicht_gefunden'
 --
 -- Ein Rezept, das mit 404 antwortet, ist kein Fehler des Abrufs, sondern
 -- eine Aussage ueber das Rezept. Als 'aufgegeben' holte
@@ -213,7 +298,11 @@ SELECT m.name                    AS marke,
        r.in_liste,
        r.zutaten_geholt_am,
        r.fehlt_seit,
-       (z.art = 'sub_recipe' AND u.rezept_key IS NULL) AS unterrezept_unbekannt
+       (z.art = 'sub_recipe' AND u.rezept_key IS NULL) AS unterrezept_unbekannt,
+       r.archiviert,
+       z.basis_menge,
+       z.basis_einheit,
+       u.archiviert AS unterrezept_archiviert
   FROM core.zutat z
   JOIN core.rezept r ON r.rezept_key = z.rezept_key
   JOIN core.marke m  ON m.marke_key = r.marke_key
@@ -280,6 +369,7 @@ WITH RECURSIVE kante AS (
            rp.rezept            AS direkt_rezept,
            rp.position,
            rp.menge, rp.einheit, rp.kosten,
+           rp.basis_menge, rp.basis_einheit,
            rp.rezept_key        AS rezept_key,
            1                    AS ebene,
            NULL::integer        AS via_key,
@@ -295,6 +385,7 @@ WITH RECURSIVE kante AS (
            w.lieferant_fn_id, w.zuordnung, w.art,
            w.direkt_key, w.direkt_rezept, w.position,
            w.menge, w.einheit, w.kosten,
+           w.basis_menge, w.basis_einheit,
            k.eltern_key,
            w.ebene + 1,
            k.kind_key,
@@ -333,7 +424,11 @@ SELECT w.marke,
        w.kosten,
        w.pfad,
        w.art,
-       r.fehlt_seit AS rezept_fehlt_seit
+       r.fehlt_seit AS rezept_fehlt_seit,
+       r.archiviert AS rezept_archiviert,
+       w.basis_menge,
+       w.basis_einheit,
+       v.archiviert AS via_archiviert
   FROM weg w
   JOIN core.rezept r      ON r.rezept_key = w.rezept_key
   LEFT JOIN core.rezept v ON v.rezept_key = w.via_key;
@@ -378,7 +473,8 @@ WITH r AS (
            min(zutaten_geholt_am)                                AS aeltester_zutatenabruf,
            max(zutaten_geholt_am)                                AS juengster_zutatenabruf,
            max(zuletzt_am)                                       AS zuletzt_gesehen,
-           count(*) FILTER (WHERE fehlt_seit IS NOT NULL)::int   AS nicht_gefunden
+           count(*) FILTER (WHERE fehlt_seit IS NOT NULL)::int   AS nicht_gefunden,
+           count(*) FILTER (WHERE archiviert)::int               AS archiviert
       FROM core.rezept
      GROUP BY marke_key
 ), weg AS (
@@ -406,10 +502,8 @@ WITH r AS (
                         WHERE u.marke_key = p.marke_key AND u.fn_id = zz.sub_rezept_fn_id)
      GROUP BY p.marke_key
 ), liste AS (
-    SELECT a.marke_key, max(a.beendet_am) AS letzte_liste
-      FROM sync.aufgabe a
-     WHERE a.endpunkt = 'fn:rezepte' AND a.status = 'ok'
-     GROUP BY a.marke_key
+    SELECT ls.marke_key, ls.seite1_am AS letzte_liste, ls.rezepte_gesamt, ls.seiten, ls.volle_runde_am
+      FROM core.rezept_liste_stand ls
 ), fn AS (
     -- Hat die Marke ueberhaupt FoodNotify-Zulauf? Ohne Zugang (keine
     -- FN_*_USER) ist "keine Rezepte" kein Befund, sondern Konfiguration.
@@ -435,6 +529,8 @@ SELECT m.marke_key,
        CASE
            WHEN fn.letzter_fn_abruf IS NULL THEN 'kein FoodNotify-Zulauf'
            WHEN liste.letzte_liste IS NULL THEN 'liste nie geholt'
+           -- Seite 1 kommt jede Nacht im Tagesgeschaeft. Bleibt sie aus, sind
+           -- neue Rezepte nicht mehr gesehen worden (Regel 10).
            WHEN liste.letzte_liste < now() - interval '36 hours' THEN 'liste veraltet'
            WHEN coalesce(r.rezepte, 0) = 0 THEN 'keine rezepte'
            -- Zutaten wurden abgerufen, aber KEINE einzige Zeile kam an: eine
@@ -444,7 +540,18 @@ SELECT m.marke_key,
            ELSE 'ok'
        END                                  AS zustand,
        coalesce(r.nicht_gefunden, 0)        AS nicht_gefunden,
-       coalesce(verweis.verweise_ohne_rezept, 0) AS verweise_ohne_rezept
+       coalesce(verweis.verweise_ohne_rezept, 0) AS verweise_ohne_rezept,
+       coalesce(r.archiviert, 0)            AS archiviert,
+       -- Fortschritt des ersten Abzugs: FoodNotifys eigene Zahl gegen das,
+       -- was wir kennen und was Zutaten hat. rezepte_fn zaehlt nur die Liste
+       -- (archivierte vermutlich nicht), rezepte auch Verweise.
+       liste.rezepte_gesamt                 AS rezepte_fn,
+       greatest(coalesce(liste.rezepte_gesamt, 0) - coalesce(r.in_liste, 0), 0) AS liste_noch_unbekannt,
+       CASE WHEN greatest(coalesce(liste.rezepte_gesamt, 0), coalesce(r.rezepte, 0)) > 0
+            THEN round(100.0 * coalesce(r.mit_zutaten, 0)
+                       / greatest(coalesce(liste.rezepte_gesamt, 0), coalesce(r.rezepte, 0)), 2)
+       END                                  AS abzug_pct,
+       liste.volle_runde_am
   FROM core.marke m
   LEFT JOIN r     ON r.marke_key = m.marke_key
   LEFT JOIN z     ON z.marke_key = m.marke_key
@@ -458,7 +565,10 @@ COMMENT ON VIEW mart.rezept_stand IS
 gefunden wurden, wie viele noch ohne Zutaten sind, und wann die Rezeptliste
 zuletzt geholt wurde. zustand: ok / zutaten ausstehend (Backfill laeuft) /
 zutaten leer, keine rezepte, liste veraltet, liste nie geholt (Fehler, Regel 10) /
-kein FoodNotify-Zulauf (Marke ohne Zugang, kein Befund). nicht_gefunden: Rezepte,
+kein FoodNotify-Zulauf (Marke ohne Zugang, kein Befund). Fortschritt des ersten
+Abzugs: rezepte_fn (FoodNotifys Zahl), rezepte (bekannt), mit_zutaten, ohne_zutaten
+(Rest), abzug_pct (Prozentzahl). archiviert zaehlt archivierte Rezepte (sie bleiben
+drin). nicht_gefunden: Rezepte,
 auf die FoodNotify mit 404 antwortet (vermutlich geloescht). verweise_ohne_rezept:
 Halbfabrikate, auf die ein Rezept zeigt, die wir aber nicht kennen.';
 
@@ -668,7 +778,9 @@ INSERT INTO mcp.kennzahl (sicht, spalte, regel, einheit, hinweis) VALUES
    'Anteil je Marke, summiert sich je Marke zu 100. Ueber Marken aus positionen neu rechnen.'),
   ('mart.artikel_in_rezept', 'via_menge', 'nicht_aggregieren', NULL,
    'Menge des Halbfabrikats im Rezept, in via_einheit (Freitext). Nicht ueber Einheiten oder Ebenen summieren.'),
-  ('mart.rezept_stand', 'tage_seit_aeltestem_abruf', 'nicht_aggregieren', 'tage', NULL)
+  ('mart.rezept_stand', 'tage_seit_aeltestem_abruf', 'nicht_aggregieren', 'tage', NULL),
+  ('mart.rezept_stand', 'abzug_pct', 'nicht_aggregieren', 'prozentzahl',
+   'Anteil der Rezepte einer Marke mit Zutaten, in Prozent. Ueber Marken aus mit_zutaten und rezepte_fn neu rechnen.')
 ON CONFLICT (sicht, spalte) DO UPDATE
    SET regel = excluded.regel, einheit = excluded.einheit, hinweis = excluded.hinweis;
 
