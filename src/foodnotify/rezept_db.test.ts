@@ -541,8 +541,8 @@ lauf('Rezepturen mit Datenbank', () => {
     const verschwunden = async () => (await db.query(
       `SELECT aus_liste_verschwunden AS n FROM mart.rezept_stand WHERE marke_key = $1`, [enchilada])).rows[0].n
     const stand = await db.query(
-      `SELECT volle_runde_fertig_beginn, volle_runde_fertig_ende FROM core.rezept_liste_stand WHERE marke_key = $1`,
-      [enchilada])
+      `SELECT volle_runde_am, volle_runde_fertig_beginn, volle_runde_fertig_ende FROM core.rezept_liste_stand
+        WHERE marke_key = $1`, [enchilada])
     try {
       // 1030679 wurde vor zehn Tagen zuletzt gesehen.
       await db.query(`UPDATE core.rezept SET zuletzt_am = now() - interval '10 days' WHERE fn_id = 1030679`)
@@ -569,15 +569,70 @@ lauf('Rezepturen mit Datenbank', () => {
       const { rezepteNachfuellen } = await import('../sync/nachfuellen')
       expect((await rezepteNachfuellen(true)).umlauf).toBe(3)
       // Ohne abgeschlossene Runde nur Zutaten + Meta — ein Listenrezept ohne Beleg.
+      // (Nie eine Runde begonnen: eine begonnene ohne offene Seite schlösse das
+      // Nachfüllen selbst ab, siehe den Test zur hängenden Runde.)
       await db.query(
-        `UPDATE core.rezept_liste_stand SET volle_runde_fertig_beginn = NULL WHERE marke_key = $1`, [enchilada])
+        `UPDATE core.rezept_liste_stand SET volle_runde_am = NULL, volle_runde_fertig_beginn = NULL
+          WHERE marke_key = $1`, [enchilada])
       expect((await rezepteNachfuellen(true)).umlauf).toBe(2)
     } finally {
       await db.query(`UPDATE core.rezept SET zuletzt_am = now(), zutaten_geholt_am = now() WHERE fn_id = 1030679`)
       const v = stand.rows[0]
       await db.query(
-        `UPDATE core.rezept_liste_stand SET volle_runde_fertig_beginn = $2, volle_runde_fertig_ende = $3
-          WHERE marke_key = $1`, [enchilada, v.volle_runde_fertig_beginn, v.volle_runde_fertig_ende])
+        `UPDATE core.rezept_liste_stand SET volle_runde_fertig_beginn = $2, volle_runde_fertig_ende = $3,
+                volle_runde_am = $4 WHERE marke_key = $1`,
+        [enchilada, v.volle_runde_fertig_beginn, v.volle_runde_fertig_ende, v.volle_runde_am])
+    }
+  })
+
+  /**
+   * Regel 10, Nachprüfung 15.10.2026: scheitert die letzte offene Seite einer
+   * vollen Runde dauerhaft, schließt der Lader die Runde nie ab. Das Nachfüllen
+   * schließt sie mit Lücke ab, sobald keine Seite mehr offen ist; hängt eine
+   * Seite länger als drei Tage, zeigt rezept_stand das als Befund.
+   */
+  test('volle Runde: hängt sie, ist das ein Befund; ist keine Seite mehr offen, schließt das Nachfüllen sie ab', async () => {
+    const zustand = async () => (await db.query(
+      `SELECT zustand FROM mart.rezept_stand WHERE marke_key = $1`, [enchilada])).rows[0].zustand
+    const stand = (await db.query(
+      `SELECT volle_runde_am, volle_runde_fertig_beginn, volle_runde_fertig_ende
+         FROM core.rezept_liste_stand WHERE marke_key = $1`, [enchilada])).rows[0]
+    const { rows: [m] } = await db.query(`SELECT coalesce(max(posten_id), 0)::int AS n FROM sync.warteschlange`)
+    try {
+      // Eine Runde vor vier Tagen begonnen, Seite 7 hängt noch offen (Wiedervorlage).
+      await db.query(
+        `UPDATE core.rezept_liste_stand SET volle_runde_am = now() - interval '4 days' WHERE marke_key = $1`, [enchilada])
+      await db.query(
+        `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter,
+                                         nachladen, faellig_ab)
+         VALUES ('fn:rezepte', current_date, current_date, 40, $1, '{"seite": "7", "runde": "voll"}', true,
+                 now() + interval '1 day')`, [enchilada])
+      expect(await zustand()).toBe('volle runde nicht abgeschlossen')
+      const { rows: [pz] } = await db.query(
+        `SELECT auffaellig::int AS n FROM mart.pruefung_uebersicht
+          WHERE pruefung LIKE 'Rezepte: Marke mit FoodNotify-Zulauf%'`)
+      expect(pz.n).toBe(1)
+      // Solange die Seite offen ist, schließt auch das Nachfüllen nicht ab.
+      const { rezepteNachfuellen } = await import('../sync/nachfuellen')
+      await rezepteNachfuellen()
+      expect(await zustand()).toBe('volle runde nicht abgeschlossen')
+
+      // Die Seite wird aufgegeben (endgültig) — keine Seite der Runde mehr offen.
+      await db.query(
+        `UPDATE sync.warteschlange SET erledigt_am = now(), ergebnis = 'aufgegeben'
+          WHERE posten_id > $1 AND parameter->>'seite' = '7'`, [m.n])
+      await rezepteNachfuellen()
+      const { rows: [ls] } = await db.query(
+        `SELECT volle_runde_fertig_beginn = volle_runde_am AS gleich, volle_runde_fertig_ende > now() - interval '1 minute' AS jetzt
+           FROM core.rezept_liste_stand WHERE marke_key = $1`, [enchilada])
+      expect(ls).toEqual({ gleich: true, jetzt: true })
+      expect(await zustand()).not.toBe('volle runde nicht abgeschlossen')
+    } finally {
+      await db.query(`DELETE FROM sync.warteschlange WHERE posten_id > $1`, [m.n])
+      await db.query(
+        `UPDATE core.rezept_liste_stand SET volle_runde_am = $2, volle_runde_fertig_beginn = $3,
+                volle_runde_fertig_ende = $4 WHERE marke_key = $1`,
+        [enchilada, stand.volle_runde_am, stand.volle_runde_fertig_beginn, stand.volle_runde_fertig_ende])
     }
   })
 

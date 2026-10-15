@@ -521,7 +521,7 @@ WITH r AS (
      GROUP BY p.marke_key
 ), liste AS (
     SELECT ls.marke_key, ls.seite1_am AS letzte_liste, ls.rezepte_gesamt, ls.seiten, ls.volle_runde_am,
-           ls.volle_runde_fertig_ende, ls.tagesgeschaeft_gedeckelt_am
+           ls.volle_runde_fertig_ende, ls.tagesgeschaeft_gedeckelt_am, ls.volle_runde_fertig_beginn
       FROM core.rezept_liste_stand ls
 ), fn AS (
     -- Hatte die Marke JE FoodNotify-Zulauf, und wann zuletzt einen
@@ -562,6 +562,14 @@ SELECT m.marke_key,
            -- Zutaten wurden abgerufen, aber KEINE einzige Zeile kam an: eine
            -- Antwortform, die der Lader nicht als Fehler erkannt hat.
            WHEN r.mit_zutaten > 0 AND coalesce(z.zutatenzeilen, 0) = 0 THEN 'zutaten leer'
+           -- Eine begonnene volle Runde, die nach drei Tagen nicht abgeschlossen
+           -- ist (eine Seite haengt in der Wiedervorlage, Nachladen aus, Budget
+           -- leer). Solange gilt die Liste nicht als ganz gelesen: kein
+           -- Weiterblaettern, kein "verschwunden", kein Kopf im Umlauf — das
+           -- muss jemand sehen, nicht nur mart.posten_aufgegeben (Regel 10).
+           WHEN liste.volle_runde_am < now() - interval '3 days'
+            AND (liste.volle_runde_fertig_beginn IS NULL
+                 OR liste.volle_runde_fertig_beginn <> liste.volle_runde_am) THEN 'volle runde nicht abgeschlossen'
            -- Das Tagesgeschaeft stiess an seinen Seitendeckel und trug dort noch Neues.
            WHEN liste.tagesgeschaeft_gedeckelt_am > now() - interval '36 hours' THEN 'tagesgeschaeft gedeckelt'
            WHEN r.ohne_zutaten > 0 THEN 'zutaten ausstehend'
@@ -595,7 +603,7 @@ COMMENT ON VIEW mart.rezept_stand IS
 gefunden wurden, wie viele noch ohne Zutaten sind, und wann die Rezeptliste
 zuletzt geholt wurde. zustand: ok / zutaten ausstehend (Backfill laeuft) /
 zutaten leer, keine rezepte, liste veraltet, liste nie geholt, zugang ausgefallen,
-tagesgeschaeft gedeckelt (Befunde, Regel 10) / kein FoodNotify-Zulauf (Marke hatte nie
+tagesgeschaeft gedeckelt, volle runde nicht abgeschlossen (Befunde, Regel 10) / kein FoodNotify-Zulauf (Marke hatte nie
 eine FoodNotify-Aufgabe, kein Befund). Fortschritt des ersten
 Abzugs: rezepte_fn (FoodNotifys Zahl), rezepte (bekannt), mit_zutaten, ohne_zutaten
 (Rest), abzug_pct (Prozentzahl). archiviert zaehlt archivierte Rezepte (sie bleiben
@@ -763,7 +771,8 @@ UNION ALL
  SELECT 'Rezepte: Marke mit FoodNotify-Zulauf, aber ohne frische Rezeptliste oder ohne Zutaten'::text AS pruefung,
     count(*) FILTER (WHERE rs.zustand <> 'kein FoodNotify-Zulauf') AS geprueft,
     count(*) FILTER (WHERE rs.zustand IN ('liste nie geholt', 'liste veraltet', 'keine rezepte', 'zutaten leer',
-                                          'zugang ausgefallen', 'tagesgeschaeft gedeckelt')) AS auffaellig,
+                                          'zugang ausgefallen', 'tagesgeschaeft gedeckelt',
+                                          'volle runde nicht abgeschlossen')) AS auffaellig,
     'mart.rezept_stand'::text AS sicht
    FROM mart.rezept_stand rs
 UNION ALL

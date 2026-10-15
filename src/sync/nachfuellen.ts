@@ -1095,6 +1095,28 @@ export async function rezepteNachfuellen(
         return r.rowCount ?? 0
       }
 
+      /**
+       * 0. EINE VOLLE RUNDE MIT LÜCKE ABSCHLIESSEN (Regel 10, Nachprüfung
+       * 15.10.2026). Der Lader stempelt den Abschluss, wenn er die letzte offene
+       * Seite lädt. Scheitert genau diese Seite dauerhaft (aufgegeben), käme der
+       * Stempel nie — und ohne ihn blättert das Tagesgeschäft nie weiter, gilt
+       * nichts als verschwunden und liest der Umlauf keinen Kopf. Deshalb hier:
+       * ist keine Seite der begonnenen Runde mehr offen, gilt sie als
+       * abgeschlossen, auch wenn einzelne Seiten aufgegeben sind. Die Lücke
+       * bleibt sichtbar — in mart.rezept_stand.liste_noch_unbekannt und in
+       * mart.posten_aufgegeben.
+       */
+      await c.query(
+        `UPDATE core.rezept_liste_stand ls
+            SET volle_runde_fertig_beginn = ls.volle_runde_am, volle_runde_fertig_ende = now()
+          WHERE ls.marke_key = ANY($1::int[])
+            AND ls.volle_runde_am IS NOT NULL
+            AND ls.volle_runde_fertig_beginn IS DISTINCT FROM ls.volle_runde_am
+            AND NOT EXISTS (SELECT 1 FROM sync.warteschlange w
+                             WHERE w.endpunkt = 'fn:rezepte' AND w.marke_key = ls.marke_key
+                               AND w.parameter->>'runde' = 'voll' AND w.erledigt_am IS NULL)`,
+        [keys])
+
       // 1. Tagesgeschäft: Seite 1 je Marke, einmal am Tag (Takt am ZEITRAUM).
       for (const markeKey of keys) {
         const r = await c.query(

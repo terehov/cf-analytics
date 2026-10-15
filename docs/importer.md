@@ -1938,7 +1938,14 @@ nach der Probe: rund 17.700 Rezepte, davon 12.655 bei Wilma Wunder). Der Posten 
   trägt `archived`). Eine Runde gilt als abgeschlossen, wenn keine ihrer Seiten mehr offen ist; der
   Lader stempelt dann `volle_runde_fertig_beginn` (= Beginn der Runde) und `_ende`. Die
   Drei-Tage-Regel setzte eine täglich ganz gelesene Liste voraus, die es seit dem Tagesgeschäft
-  nicht mehr gibt (Review 15.10.2026). Begrenzt nur durch `FN_TAGESBUDGET` und
+  nicht mehr gibt (Review 15.10.2026).
+  **Runde mit Lücke** (Nachprüfung 15.10.2026, Regel 10): scheitert die letzte offene Seite einer
+  Runde dauerhaft, käme der Stempel des Laders nie. `rezepteNachfuellen()` schließt deshalb jede
+  begonnene Runde ab, von der keine Seite mehr offen ist — auch wenn einzelne aufgegeben sind; die
+  Lücke bleibt in `mart.rezept_stand.liste_noch_unbekannt` und `mart.posten_aufgegeben` sichtbar.
+  Hängt eine Seite dagegen offen (Wiedervorlage, Nachladen aus, Budget leer) und ist die Runde
+  älter als drei Tage, zeigt `mart.rezept_stand` den Zustand `volle runde nicht abgeschlossen`,
+  auffällig in der Prüfzeile. Begrenzt nur durch `FN_TAGESBUDGET` und
   `NACHLADEN_BIS`; was eine Nacht nicht schafft, bleibt offen und wird nicht doppelt eingereiht.
 * **Notschalter `REZEPTE_NACHLADEN`** (1/0): 0 reiht kein Nachladen mehr ein und startet die
   FoodNotify-Spur in Phase C nicht; das Tagesgeschäft läuft weiter. `sync.quelle` führt Zutaten
