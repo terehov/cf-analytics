@@ -1,5 +1,5 @@
 {
- "_hinweis": "Echte FoodNotify-Antworten (Enchilada, Einzelabzug 14./15.09.2026, src/rezepte.ts), ausgepackt gespeichert; meta auf weight gekuerzt. Liste: 1032008 und 1048034 auf Seite 1, 1030679 auf Seite 2. 983835, 1048035 und 984827 stehen in keiner Listenseite und kommen nur ueber Verweise (subRecipeId). Kette: 984827 (enthaelt 200004) -> 1048035 -> 1048034; 983835 (enthaelt 200004) -> 1032008.",
+ "_hinweis": "Echte FoodNotify-Antworten (Enchilada, Einzelabzug 14./15.09.2026, src/rezepte.ts), ausgepackt gespeichert; meta auf weight gekuerzt. Liste: 1032008 und 1048034 auf Seite 1, 1030679 auf Seite 2. 983835, 1048035 und 984827 stehen in keiner Listenseite und kommen nur ueber Verweise (subRecipeId). Kette: 984827 (enthaelt 200004) -> 1048035 -> 1048034; 983835 (enthaelt 200004) -> 1032008. ERGAENZT 15.10.2026 nach der Probe gegen das echte FoodNotify: archived (Liste/Kopf; die drei Verweisrezepte als archiviert, wie 984639 in der Probe) und baseQuantity/baseUnit (meist null; bei 1048034 Position 2 von Hand 7.5 g gesetzt, um den Wert durch die Kette zu pruefen). Der Septemberabzug kannte die Felder nicht.",
  "rezepte": {
   "1032008": {
    "in_liste": true,
@@ -9,7 +9,8 @@
     "imagePath": null,
     "createdAt": "2023-06-23T14:30:38+02:00",
     "groups": [],
-    "tags": []
+    "tags": [],
+    "archived": false
    },
    "zutaten": [
     {
@@ -18,6 +19,8 @@
      "name": "Tequila Patron Blanco 40% 0,7L Flasche 0,7L:flasche 0,7L",
      "quantity": 3,
      "unit": "cl",
+     "baseQuantity": null,
+     "baseUnit": null,
      "cost": 1.2709285714285714,
      "artikelId": "714",
      "supplier": {
@@ -33,6 +36,8 @@
      "name": "Aperol 11% 1L Karton 6X1L:karton 6X1L",
      "quantity": 2,
      "unit": "cl",
+     "baseQuantity": null,
+     "baseUnit": null,
      "cost": 0.24613333999999998,
      "artikelId": "9501",
      "supplier": {
@@ -48,6 +53,8 @@
      "name": "Paloma Pink Grape. Ew 0,25L",
      "quantity": 10,
      "unit": "cl",
+     "baseQuantity": null,
+     "baseUnit": null,
      "cost": 0,
      "artikelId": "762652",
      "supplier": {
@@ -63,6 +70,8 @@
      "name": "Sweet & Sour Mix 20 L",
      "quantity": 2,
      "unit": "cl",
+     "baseQuantity": null,
+     "baseUnit": null,
      "cost": 0,
      "artikelId": null,
      "supplier": null,
@@ -75,6 +84,8 @@
      "name": "Pink Grapefruit (EN)",
      "quantity": 10,
      "unit": "g",
+     "baseQuantity": null,
+     "baseUnit": null,
      "cost": 0.022000000000000002,
      "artikelId": "14762710",
      "supplier": {
@@ -111,7 +122,8 @@
       "name": "Extra Spirituosen"
      }
     ],
-    "tags": []
+    "tags": [],
+    "archived": false
    },
    "zutaten": [
     {
@@ -120,6 +132,8 @@
      "name": "Popcorn Shot Basisartikel",
      "quantity": 2,
      "unit": "cl",
+     "baseQuantity": null,
+     "baseUnit": null,
      "cost": 0.2586325884676695,
      "artikelId": null,
      "supplier": null,
@@ -132,6 +146,8 @@
      "name": "Bunte Popcornmischung Cinemix:eimer 10 L",
      "quantity": 0.5,
      "unit": "EL",
+     "baseQuantity": 7.5,
+     "baseUnit": "g",
      "cost": 0,
      "artikelId": "151014",
      "supplier": {
@@ -163,7 +179,8 @@
     "imagePath": null,
     "createdAt": "2023-06-21T14:50:30+02:00",
     "groups": [],
-    "tags": []
+    "tags": [],
+    "archived": false
    },
    "zutaten": [
     {
@@ -172,6 +189,8 @@
      "name": "Tequila Patron Reposado 40% 0,7L Flasche 0,7L:flasche 0,7L",
      "quantity": 3,
      "unit": "cl",
+     "baseQuantity": null,
+     "baseUnit": null,
      "cost": 1.3600714285714286,
      "artikelId": "715",
      "supplier": {
@@ -187,6 +206,8 @@
      "name": "Hausgemachter Hibiskus Sirup 3Kg Kanister 3 Kg:kanister 3 Kg",
      "quantity": 2,
      "unit": "cl",
+     "baseQuantity": null,
+     "baseUnit": null,
      "cost": 0,
      "artikelId": "10956",
      "supplier": {
@@ -202,6 +223,8 @@
      "name": "Limetten (EN)",
      "quantity": 4,
      "unit": "Limetten 8tel",
+     "baseQuantity": null,
+     "baseUnit": null,
      "cost": 0.052,
      "artikelId": "14759369",
      "supplier": {
@@ -217,6 +240,8 @@
      "name": "Schweppes Ginger Beer 6X1,0",
      "quantity": 15,
      "unit": "cl",
+     "baseQuantity": null,
+     "baseUnit": null,
      "cost": 0.19975000000000503,
      "artikelId": "4046505",
      "supplier": {
@@ -232,6 +257,8 @@
      "name": "Gurken (EN)",
      "quantity": 10,
      "unit": "g",
+     "baseQuantity": null,
+     "baseUnit": null,
      "cost": 0.022285714285714287,
      "artikelId": "1260",
      "supplier": {
@@ -272,7 +299,8 @@
       "name": "20. Basisartikel Bar"
      }
     ],
-    "tags": []
+    "tags": [],
+    "archived": true
    },
    "zutaten": [
     {
@@ -281,6 +309,8 @@
      "name": "Sweet & Sour Mix 17,2 L Box 17,2 L:box 17,2 L",
      "quantity": 20,
      "unit": "LT",
+     "baseQuantity": null,
+     "baseUnit": null,
      "cost": 0,
      "artikelId": "200004",
      "supplier": {
@@ -317,7 +347,8 @@
       "name": "20. Basisartikel Bar"
      }
     ],
-    "tags": []
+    "tags": [],
+    "archived": true
    },
    "zutaten": [
     {
@@ -326,6 +357,8 @@
      "name": "Monin Sirup Popcorn 0,7L Flasche 0,7L:flasche 0,7L",
      "quantity": 40,
      "unit": "cl",
+     "baseQuantity": null,
+     "baseUnit": null,
      "cost": 4.0600000000000005,
      "artikelId": "108807",
      "supplier": {
@@ -341,6 +374,8 @@
      "name": "Jose Cuervo 1800 Silver Group",
      "quantity": 20,
      "unit": "cl",
+     "baseQuantity": null,
+     "baseUnit": null,
      "cost": 3.7028571428571433,
      "artikelId": "784",
      "supplier": {
@@ -356,6 +391,8 @@
      "name": "Sweet & Sour Mix 20 L",
      "quantity": 30,
      "unit": "cl",
+     "baseQuantity": null,
+     "baseUnit": null,
      "cost": 0,
      "artikelId": null,
      "supplier": null,
@@ -393,7 +430,8 @@
       "name": "20. Basisartikel Bar"
      }
     ],
-    "tags": []
+    "tags": [],
+    "archived": true
    },
    "zutaten": [
     {
@@ -402,6 +440,8 @@
      "name": "Sweet & Sour Mix 17,2 L Box 17,2 L:box 17,2 L",
      "quantity": 20,
      "unit": "LT",
+     "baseQuantity": null,
+     "baseUnit": null,
      "cost": 0,
      "artikelId": "200004",
      "supplier": {

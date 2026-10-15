@@ -225,7 +225,7 @@ function rezeptId(p: Record<string, string>): string {
   return id
 }
 
-/** Die Rezeptaufrufe, die REZEPTE_JE_LAUF begrenzt — die Listenseiten zählen nicht mit. */
+/** Die Einzelabrufe je Rezept (ohne die Liste) — bei HTTP 404 wird daraus 'nicht_gefunden'. */
 export const REZEPT_DETAIL_ENDPUNKTE = ['fn:rezept', 'fn:rezept_zutaten', 'fn:rezept_meta'] as const
 
 const register = new Map(FN_ENDPUNKTE.map(e => [e.key, e]))

@@ -27,7 +27,7 @@ describe('Rezept-Endpunkte', () => {
     expect(() => fnEndpunkt('fn:rezept_zutaten').pfad({}, null)).toThrow('"rezeptId"')
   })
 
-  test('die Listenseiten zählen nicht gegen REZEPTE_JE_LAUF', () => {
+  test('die Einzelabrufe je Rezept — dort wird ein 404 zu nicht_gefunden', () => {
     expect([...REZEPT_DETAIL_ENDPUNKTE]).toEqual(['fn:rezept', 'fn:rezept_zutaten', 'fn:rezept_meta'])
   })
 })
@@ -72,6 +72,15 @@ describe('Transformation', () => {
   test('eine leere Artikelnummer ist keine Artikelnummer', () => {
     const [z] = rezeptZutaten([{ id: 1, kind: 'ingredient', name: 'Freitext', artikelId: '  ', quantity: 1 }])
     expect(z!.artikelnummer).toBeNull()
+  })
+
+  test('archived und baseQuantity/baseUnit (Probe 15.10.2026) kommen an', () => {
+    expect(rezeptKopf({ data: FIX['983835'].kopf })!.archiviert).toBe(true)
+    expect(rezeptKopf({ data: FIX['1032008'].kopf })!.archiviert).toBe(false)
+    expect(rezeptKopf({ data: { id: 1, name: 'alt' } })!.archiviert).toBeNull()
+    const z = rezeptZutaten({ data: FIX['1048034'].zutaten })
+    expect(z[1]).toMatchObject({ basisMenge: 7.5, basisEinheit: 'g' })
+    expect(z[0]).toMatchObject({ basisMenge: null, basisEinheit: null })
   })
 
   test('Meta: Gewicht und der ungedeutete Verlust, roh', () => {

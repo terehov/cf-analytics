@@ -48,9 +48,12 @@ import { rezeptKopf, rezeptliste, rezeptMeta, rezeptStrukturFehler, rezeptZutate
 export const PAUSE_MS = 1_000
 export const HOECHSTENS_AUFRUFE = 32
 
-/** Die Zutatenfelder, gemessen an 7.452 Enchilada-Zeilen (foodnotify-api-inventar.md §3). */
-export const ZUTATENFELDER = ['id', 'kind', 'name', 'quantity', 'unit', 'cost', 'artikelId',
-  'supplier', 'subRecipeId', 'group'] as const
+/**
+ * Die Zutatenfelder, gemessen an 7.452 Enchilada-Zeilen (foodnotify-api-inventar.md §3);
+ * baseQuantity/baseUnit seit der Probe vom 15.10.2026 bekannt (core.zutat.basis_*).
+ */
+export const ZUTATENFELDER = ['id', 'kind', 'name', 'quantity', 'unit', 'baseQuantity', 'baseUnit',
+  'cost', 'artikelId', 'supplier', 'subRecipeId', 'group'] as const
 
 type Form = 'ok' | 'abweichend' | 'nicht geholt'
 

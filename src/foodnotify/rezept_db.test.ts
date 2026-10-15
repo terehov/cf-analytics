@@ -88,16 +88,40 @@ lauf('Rezepturen mit Datenbank', () => {
 
   afterAll(async () => { lina?.stop(); fn?.stop(); await db?.end() })
 
-  test('Nachfüllen + Worker: Liste, Verweise einzeln, Zutaten, Meta — alles in einem Lauf', async () => {
+  test('Nachfüllen + Worker: Tagesgeschäft in Phase A, volle Runde und erster Abzug in Phase C', async () => {
     const { rezepteNachfuellen } = await import('../sync/nachfuellen')
     const stand = await rezepteNachfuellen()
-    expect(stand).toMatchObject({ listen: 1, neu: 0, verweise: 0, umlauf: 0 })
+    expect(stand).toMatchObject({ listen: 1, volleRunde: 1, neu: 0, verweise: 0, umlauf: 0, nachladen: true })
 
-    const { workerLauf } = await import('../sync/worker')
-    const r = await workerLauf('manuell')
+    const { workerOeffnen } = await import('../sync/worker')
+    const s = await workerOeffnen('manuell')
+    const a = await s.tagesgeschaeft()
+    /*
+     * Phase A: Seite 1 (Tagesgeschäft), Zutaten+Meta der zwei neuen Rezepte,
+     * dann über die Verweise drei Köpfe mit Zutaten+Meta = 1 + 4 + 9 = 14.
+     * Seite 2 NICHT: die Marke kannte vorher kein Rezept, das Tagesgeschäft
+     * blättert dann nicht weiter — den ersten Abzug macht Phase C.
+     */
+    expect(a.posten).toBe(14)
+    const { rows: tg2 } = await db.query(
+      `SELECT 1 FROM sync.warteschlange WHERE endpunkt = 'fn:rezepte' AND parameter = '{"seite": "2"}'`)
+    expect(tg2).toHaveLength(0)
+    await s.ableitungenFertig()
+    // Phase C: volle Runde Seite 1 und 2, das neue Rezept 1030679 mit Zutaten+Meta = 4.
+    const c = await s.nachladen()
+    expect(c.posten).toBe(4)
+    const r = await s.abschliessen()
     expect(r.status).toBe('ok')
-    // 2 Listenseiten + 3 Köpfe über Verweis + 6 × (Zutaten + Meta).
-    expect(r.ok).toBe(17)
+    expect(r.ok).toBe(18)
+
+    const { rows: weg } = await db.query(
+      `SELECT parameter->>'rezeptId' AS id, nachladen FROM sync.warteschlange
+        WHERE endpunkt = 'fn:rezept_zutaten' ORDER BY 1`)
+    expect(weg).toEqual([
+      { id: '1030679', nachladen: true }, { id: '1032008', nachladen: false },
+      { id: '1048034', nachladen: false }, { id: '1048035', nachladen: false },
+      { id: '983835', nachladen: false }, { id: '984827', nachladen: false },
+    ])
 
     expect(await zaehlen()).toEqual({
       rezepte: 6, zutaten: 17, in_liste: 3, mit_zutaten: 6, mit_meta: 6, verweis_ohne_key: 0,
@@ -108,7 +132,20 @@ lauf('Rezepturen mit Datenbank', () => {
       `SELECT count(*)::int AS n,
               count(*) FILTER (WHERE quelle = 'foodnotify' AND (parameter->>'markeKey')::int = $1)::int AS ok
          FROM raw.api_antwort WHERE endpunkt LIKE 'fn:rezept%'`, [enchilada])
-    expect(raw).toEqual({ n: 17, ok: 17 })
+    expect(raw).toEqual({ n: 18, ok: 18 })
+
+    // archived, baseQuantity/baseUnit und der Listenstand (Probe 15.10.2026).
+    const { rows: [ar] } = await db.query(
+      `SELECT count(*) FILTER (WHERE archiviert)::int AS ja, count(*) FILTER (WHERE NOT archiviert)::int AS nein
+         FROM core.rezept`)
+    expect(ar).toEqual({ ja: 3, nein: 3 })
+    const { rows: [basis] } = await db.query(
+      `SELECT basis_menge::float AS m, basis_einheit AS e FROM core.zutat WHERE basis_menge IS NOT NULL`)
+    expect(basis).toEqual({ m: 7.5, e: 'g' })
+    const { rows: [ls] } = await db.query(
+      `SELECT rezepte_gesamt, seiten, seite1_am IS NOT NULL AS s1, volle_runde_am IS NOT NULL AS voll
+         FROM core.rezept_liste_stand WHERE marke_key = $1`, [enchilada])
+    expect(ls).toEqual({ rezepte_gesamt: 3, seiten: 2, s1: true, voll: true })
 
     // Die drei nur über Verweis erreichbaren Rezepte stehen als in_liste = false.
     const { rows: verweis } = await db.query(
@@ -175,7 +212,8 @@ lauf('Rezepturen mit Datenbank', () => {
                 zeitraum_von::text AS von
            FROM raw.api_antwort WHERE endpunkt LIKE 'fn:rezept%'
           ORDER BY endpunkt, parameter::text, abgerufen_am`)
-      expect(roh).toHaveLength(17)
+      // 3 Listenseiten (Tagesgeschäft 1, volle Runde 1 und 2) + 3 Köpfe + 6 × 2.
+      expect(roh).toHaveLength(18)
       // Erst die Köpfe (Liste, Einzelkopf), dann Zutaten und Meta — dieselbe
       // Reihenfolge, in der der Worker sie geholt hat.
       const rang = (e: string) => (e === 'fn:rezepte' ? 0 : e === 'fn:rezept' ? 1 : 2)
@@ -210,7 +248,7 @@ lauf('Rezepturen mit Datenbank', () => {
   test('zweites Nachfüllen am selben Tag reiht nichts ein; der Umlauf greift erst nach REZEPT_UMLAUF_TAGE', async () => {
     const { rezepteNachfuellen } = await import('../sync/nachfuellen')
     // raw wurde im Test davor zweimal nachgespielt — die Warteschlange ist unberührt.
-    expect(await rezepteNachfuellen()).toMatchObject({ gesamt: 0, liegenGeblieben: 0 })
+    expect(await rezepteNachfuellen()).toMatchObject({ gesamt: 0 })
 
     // Zwei Rezepte altern über den Umlauf: eines aus der Liste, eines nur über Verweis.
     await db.query(
@@ -224,27 +262,51 @@ lauf('Rezepturen mit Datenbank', () => {
     const vorher = await db.query(`SELECT count(*)::int AS n FROM sync.warteschlange`)
     const trocken = await rezepteNachfuellen(true)
     // 1032008: Zutaten + Meta; 983835 (nur über Verweis): Kopf + Zutaten + Meta.
-    expect(trocken).toMatchObject({ umlauf: 5, neu: 0, verweise: 0, liegenGeblieben: 0 })
+    expect(trocken).toMatchObject({ umlauf: 5, neu: 0, verweise: 0 })
     const nachher = await db.query(`SELECT count(*)::int AS n FROM sync.warteschlange`)
     expect(nachher.rows[0].n).toBe(vorher.rows[0].n)
 
-    // Die Obergrenze: drei Aufrufe reichen nur für eines der beiden Rezepte.
-    // Heute Verbrauchtes zählt mit — die Grenze gilt je Kalendertag.
-    const { rezeptBudgetRest } = await import('./laden')
-    const alt = cfg.REZEPTE_JE_LAUF
+    // Und wirklich: im Nachladen, nicht im Tagesgeschäft.
+    const echt = await rezepteNachfuellen()
+    expect(echt).toMatchObject({ umlauf: 5, neu: 0, listen: 0, volleRunde: 0 })
+    const { rows: nl } = await db.query(
+      `SELECT DISTINCT nachladen FROM sync.warteschlange WHERE erledigt_am IS NULL`)
+    expect(nl).toEqual([{ nachladen: true }])
+
+    // Der Notschalter: REZEPTE_NACHLADEN = 0 reiht nur noch das Tagesgeschäft ein.
+    await db.query(`DELETE FROM sync.warteschlange WHERE erledigt_am IS NULL`)
+    const alt = cfg.REZEPTE_NACHLADEN
     try {
-      cfg.REZEPTE_JE_LAUF = 1_000_000
-      const verbraucht = 1_000_000 - await rezeptBudgetRest(db as any)
-      cfg.REZEPTE_JE_LAUF = verbraucht + 3
-      const knapp = await rezepteNachfuellen()
-      // Das erste fällige Rezept passt (2 oder 3 Aufrufe), das zweite nicht mehr
-      // ganz — und wird nicht halb eingereiht, sondern bleibt liegen.
-      expect(knapp.liegenGeblieben).toBe(1)
-      expect([2, 3]).toContain(knapp.umlauf)
-      expect(knapp.budgetRest).toBe(3 - knapp.umlauf)
-      // Die Lader sehen dieselbe Grenze: sie zählen an der Warteschlange.
-      expect(await rezeptBudgetRest(db as any)).toBe(3 - knapp.umlauf)
-    } finally { cfg.REZEPTE_JE_LAUF = alt }
+      cfg.REZEPTE_NACHLADEN = 0
+      expect(await rezepteNachfuellen()).toMatchObject({ gesamt: 0, nachladen: false })
+    } finally { cfg.REZEPTE_NACHLADEN = alt }
+    await db.query(`UPDATE core.rezept SET zutaten_geholt_am = now() WHERE fn_id IN (1032008, 983835)`)
+  })
+
+  test('das Tagesgeschäft blättert weiter, solange eine Seite neue Rezepte trägt', async () => {
+    // 1048034 (Seite 1) verschwindet aus core — am nächsten Tag ist es "neu".
+    await db.query(`DELETE FROM core.rezept WHERE fn_id = 1048034`)
+    const { rows: [m] } = await db.query(`SELECT coalesce(max(posten_id), 0)::int AS n FROM sync.warteschlange`)
+    await db.query(
+      `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter)
+       VALUES ('fn:rezepte', current_date, current_date, 40, $1, '{"seite": "1"}')`, [enchilada])
+    const { workerOeffnen } = await import('../sync/worker')
+    const s = await workerOeffnen('manuell')
+    await s.tagesgeschaeft()
+    await s.ableitungenFertig()
+    await s.nachladen()
+    await s.abschliessen()
+    // Seite 1 trug ein neues Rezept → Seite 2 im Tagesgeschäft; Seite 2 nur Bekanntes → Schluss.
+    const { rows } = await db.query(
+      `SELECT parameter->>'seite' AS seite, nachladen, ergebnis FROM sync.warteschlange
+        WHERE endpunkt = 'fn:rezepte' AND NOT parameter ? 'runde' AND posten_id > $1
+        ORDER BY posten_id`, [m.n])
+    expect(rows).toEqual([
+      { seite: '1', nachladen: false, ergebnis: 'ok' }, { seite: '2', nachladen: false, ergebnis: 'ok' },
+    ])
+    const { rows: [z] } = await db.query(
+      `SELECT zutaten_geholt_am IS NOT NULL AS da FROM core.rezept WHERE fn_id = 1048034`)
+    expect(z.da).toBe(true)
   })
 
   test('mart: Ladestand je Marke, Zuordnung in Prozentzahlen, Prüfzeilen vorhanden', async () => {
@@ -422,10 +484,42 @@ lauf('Rezepturen mit Datenbank', () => {
     } finally { await db.query('ROLLBACK') }
 
     await db.query(
-      `UPDATE sync.aufgabe SET beendet_am = now() - interval '48 hours' WHERE endpunkt = 'fn:rezepte'`)
+      `UPDATE core.rezept_liste_stand SET seite1_am = now() - interval '48 hours' WHERE marke_key = $1`, [enchilada])
     const { rows: [st] } = await db.query(
       `SELECT zustand FROM mart.rezept_stand WHERE marke_key = $1`, [enchilada])
     expect(st.zustand).toBe('liste veraltet')
     expect(await zeile()).toBe(1)
+  })
+
+  test('Praxislauf: nur Rezeptposten, nur localhost, über dieselben Lader', async () => {
+    const { datenbankPruefen, rezeptePraxis } = await import('../rezepte_praxis')
+    expect(() => datenbankPruefen('postgresql://db.example.com/lina')).toThrow('nicht auf localhost')
+    expect(() => datenbankPruefen(undefined)).toThrow('--datenbank fehlt')
+    expect(() => datenbankPruefen('postgresql://localhost/x?host=10.0.0.1')).toThrow('host=')
+    expect(datenbankPruefen('postgresql://127.0.0.1/x')).toBe('postgresql://127.0.0.1/x')
+    // Eine fremde URL bricht ab, bevor irgendetwas passiert.
+    await expect(rezeptePraxis({ datenbank: 'postgresql://localhost/gibts_nicht_123' }))
+      .rejects.toThrow('weicht von --datenbank ab')
+
+    await db.query(`TRUNCATE sync.warteschlange, core.zutat, core.rezept, core.rezept_liste_stand RESTART IDENTITY CASCADE`)
+    // Fremde Posten in der Schlange — sie müssen liegen bleiben.
+    await db.query(
+      `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter) VALUES
+         ('getUmsatzbericht', current_date, current_date, 10, NULL, '{}'),
+         ('fn:kostenstellen', current_date, current_date, 5, $1, '{}')`, [enchilada])
+    const zeilen: string[] = []
+    const e = await rezeptePraxis({ datenbank: DB!, marken: ['enchilada'], maxRezepte: 2, ausgabe: z => zeilen.push(z) })
+    expect(e.grund).toBe('--max-rezepte 2 erreicht')
+    expect(e.zutatenGeladen).toBe(2)
+    expect(e.fehler).toBe(0)
+    const zweiter = await rezeptePraxis({ datenbank: DB!, marken: ['enchilada'], ausgabe: z => zeilen.push(z) })
+    expect(zweiter.grund).toBe('Schlange der Rezeptposten leer')
+    expect(await zaehlen()).toMatchObject({ rezepte: 6, zutaten: 17, mit_zutaten: 6 })
+    const { rows: fremd } = await db.query(
+      `SELECT endpunkt FROM sync.warteschlange WHERE endpunkt NOT LIKE 'fn:rezept%' AND erledigt_am IS NULL ORDER BY 1`)
+    expect(fremd.map(f => f.endpunkt)).toEqual(['fn:kostenstellen', 'getUmsatzbericht'])
+    const { rows: [l] } = await db.query(`SELECT status, notiz FROM sync.lauf WHERE lauf_id = $1`, [zweiter.laufId])
+    expect(l.status).toBe('ok')
+    expect(l.notiz).toContain('Praxislauf Rezepturen')
   })
 })

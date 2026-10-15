@@ -26,8 +26,7 @@ import { auspacken, istLeer } from './huelle'
 import * as t from './transform'
 import * as inv from './inventur'
 import * as rz from './rezept'
-import { REZEPT_DETAIL_ENDPUNKTE, type FnEndpunkt } from './endpunkte'
-import { config } from '../config'
+import type { FnEndpunkt } from './endpunkte'
 
 type FnKontext = {
   ep: FnEndpunkt
@@ -40,6 +39,8 @@ type FnKontext = {
   bytes: number
   hash: string
   laufId: string
+  /** sync.warteschlange.nachladen des Postens — Rezepturen reihen ihre Folgeposten im selben Weg ein. */
+  nachladen?: boolean
 }
 
 /** Wie viele fachliche Zeilen stecken in der Antwort? */
@@ -500,35 +501,67 @@ export async function fnLaden(k: FnKontext): Promise<number> {
       }
 
       /**
-       * Rezepturen (0132, docs/plan-rezepturen.md). Vier Endpunkte, ein Muster:
-       * die Liste ist das Auge (täglich alle Seiten), Kopf/Zutaten/Meta sind
-       * die Arbeit (gedeckelt durch REZEPTE_JE_LAUF, Umlauf REZEPT_UMLAUF_TAGE).
+       * Rezepturen (0132, docs/plan-rezepturen.md). ZWEI WEGE, unterschieden
+       * am Posten (`k.nachladen`), nicht an der Uhr — Entscheidung Eugene,
+       * 15.10.2026:
+       *
+       *   Tagesgeschäft (nachladen = false, Phase A): Seite 1 jeden Tag, dann
+       *     die nächste Seite, solange eine Seite NEUE Rezepte trägt (die Liste
+       *     ist nach createdAt absteigend sortiert, das Neueste vorn). Für neue
+       *     Rezepte Zutaten und Meta, sofort, ohne Grenze.
+       *   Nachladen (nachladen = true, Phase C): die volle Listenrunde einmal
+       *     je Woche (`runde: 'voll'`, Seite 1 reiht alle übrigen ein), der
+       *     erste Abzug und der Umlauf (rezepteNachfuellen()).
        */
       case 'fn:rezepte': {
         const { rezepte, seiten } = rz.rezeptliste(k.daten)
-        const budget = { rest: await rezeptBudgetRest(c) }
+        const voll = k.parameter.runde === 'voll'
+        const nachladen = k.nachladen === true || voll
+        const vorher = await c.query<{ n: number }>(
+          `SELECT count(*)::int AS n FROM core.rezept WHERE marke_key = $1 AND in_liste`, [k.markeKey])
+        const bekanntVorher = Number(vorher.rows[0]?.n ?? 0)
+        let neue = 0
         for (const r of rezepte) {
-          const neu = await rezeptSchreiben(c, k.markeKey, r, true)
-          /**
-           * NEUE REZEPTE SOFORT, im selben Lauf — soweit das Tagesbudget
-           * reicht. Was nicht mehr passt, holt `rezepteNachfuellen()` in der
-           * nächsten Nacht zuerst (zutaten_geholt_am IS NULL steht dort vorn).
-           */
-          if (neu.ohneZutaten) await rezeptDetailsEinreihen(c, k.markeKey, r.fnId, false, k.von, budget)
+          const st = await rezeptSchreiben(c, k.markeKey, r, true)
+          if (st.neu) neue++
+          // Neue Rezepte sofort vollständig — im Weg, auf dem sie gefunden wurden.
+          if (st.neu) await rezeptDetailsEinreihen(c, k.markeKey, r.fnId, false, k.von, nachladen)
         }
         await unterrezeptKeysNachziehen(c, k.markeKey, rezepte.map(r => r.fnId))
 
-        /**
-         * Seite 1 reiht die übrigen Seiten ein. SPERRE 'offen', nicht 'alle':
-         * die Liste wird JEDEN Tag neu gelesen, ein erledigter Posten von
-         * gestern darf die Seite von heute nicht sperren — genau der
-         * Einmalabruf-Fehler aus 0098 und vom 12.08.2026.
-         */
         if (seiten.aktuelleSeite === 1) {
-          for (let n = 2; n <= seiten.gesamtSeiten; n++) {
-            await folgepostenEinreihen(c, k.markeKey, 'fn:rezepte',
-              { seite: String(n) }, k.von, 40, 'offen')
+          await c.query(
+            `INSERT INTO core.rezept_liste_stand (marke_key, rezepte_gesamt, seiten, seite1_am, volle_runde_am)
+             VALUES ($1, $2, $3, now(), CASE WHEN $4 THEN now() END)
+             ON CONFLICT (marke_key) DO UPDATE SET
+               rezepte_gesamt = EXCLUDED.rezepte_gesamt, seiten = EXCLUDED.seiten,
+               seite1_am = now(),
+               volle_runde_am = coalesce(EXCLUDED.volle_runde_am, core.rezept_liste_stand.volle_runde_am)`,
+            [k.markeKey, seiten.gesamt, seiten.gesamtSeiten, voll])
+        }
+
+        if (voll) {
+          /**
+           * Die volle Runde: Seite 1 reiht alle übrigen ein. SPERRE 'offen':
+           * die Runde kommt jede Woche wieder, ein erledigter Posten der
+           * Vorwoche darf sie nicht sperren (der Einmalabruf-Fehler aus 0098).
+           */
+          if (seiten.aktuelleSeite === 1) {
+            for (let n = 2; n <= seiten.gesamtSeiten; n++) {
+              await folgepostenEinreihen(c, k.markeKey, 'fn:rezepte',
+                { seite: String(n), runde: 'voll' }, k.von, 40, 'offen', true)
+            }
           }
+        } else if (neue > 0 && bekanntVorher > 0 && seiten.aktuelleSeite < seiten.gesamtSeiten) {
+          /**
+           * Das Tagesgeschäft blättert weiter, solange eine Seite neue Rezepte
+           * trägt. NICHT, solange die Marke noch gar keine Rezepte kennt: dann
+           * wäre jede Seite „neu", und das Tagesgeschäft liefe den ganzen
+           * ersten Abzug in Phase A durch (Wilma Wunder: 507 Seiten, 12.655
+           * Rezepte). Den macht das Nachladen.
+           */
+          await folgepostenEinreihen(c, k.markeKey, 'fn:rezepte',
+            { seite: String(seiten.aktuelleSeite + 1) }, k.von, 40, 'offen', false)
         }
         return rezepte.length
       }
@@ -541,10 +574,9 @@ export async function fnLaden(k: FnKontext): Promise<number> {
         }
         // in_liste bleibt, was es war: ein Listenrezept, das auch über einen
         // Verweis kommt, wird dadurch nicht zum "nur über Verweis".
-        const neu = await rezeptSchreiben(c, k.markeKey, kopf, false)
-        if (neu.ohneZutaten) {
-          await rezeptDetailsEinreihen(c, k.markeKey, kopf.fnId, false, k.von,
-            { rest: await rezeptBudgetRest(c) })
+        const st = await rezeptSchreiben(c, k.markeKey, kopf, false)
+        if (st.ohneZutaten) {
+          await rezeptDetailsEinreihen(c, k.markeKey, kopf.fnId, false, k.von, k.nachladen === true)
         }
         await unterrezeptKeysNachziehen(c, k.markeKey, [kopf.fnId])
         return 1
@@ -564,22 +596,23 @@ export async function fnLaden(k: FnKontext): Promise<number> {
           await c.query(
             `INSERT INTO core.zutat
                (rezept_key, fn_id, position, art, name, artikelnummer, sub_rezept_key,
-                sub_rezept_fn_id, menge, einheit, kosten, lieferant_name, lieferant_fn_id, gruppe)
+                sub_rezept_fn_id, menge, einheit, kosten, lieferant_name, lieferant_fn_id, gruppe,
+                basis_menge, basis_einheit)
              VALUES ($1,$2,$3,$4,$5,$6,
                      (SELECT u.rezept_key FROM core.rezept u WHERE u.marke_key = $13 AND u.fn_id = $7),
-                     $7,$8,$9,$10,$11,$12,$14)`,
+                     $7,$8,$9,$10,$11,$12,$14,$15,$16)`,
             [rezeptKey, z.fnId, z.position, z.art, z.name, z.artikelnummer, z.subRezeptFnId,
-             z.menge, z.einheit, z.kosten, z.lieferantName, z.lieferantFnId, k.markeKey, z.gruppe])
+             z.menge, z.einheit, z.kosten, z.lieferantName, z.lieferantFnId, k.markeKey, z.gruppe,
+             z.basisMenge, z.basisEinheit])
         }
         await c.query(
           `UPDATE core.rezept SET zutaten_geholt_am = now(), fehlt_seit = NULL WHERE rezept_key = $1`, [rezeptKey])
 
         /**
-         * VERWEISE OHNE REZEPT EINZELN NACHHOLEN. Die Liste zählt nicht alle
-         * Rezepte auf (56 Enchilada-Rezepte nur über Verweise, 15.09.2026).
-         * Was das Budget heute nicht mehr hergibt, findet
-         * `rezepteNachfuellen()` beim nächsten Lauf wieder — die Lücke steht in
-         * core.zutat und geht nicht verloren.
+         * VERWEISE OHNE REZEPT EINZELN NACHHOLEN, im Weg des Rezepts, das auf
+         * sie zeigt (ein neues Rezept im Tagesgeschäft soll vollständig sein).
+         * Die Liste zählt nicht alle Rezepte auf (56 Enchilada-Rezepte nur über
+         * Verweise — vermutlich die archivierten, siehe core.rezept.archiviert).
          */
         const fehlend = await c.query<{ fn_id: number }>(
           `SELECT DISTINCT z.sub_rezept_fn_id AS fn_id
@@ -588,13 +621,9 @@ export async function fnLaden(k: FnKontext): Promise<number> {
               AND NOT EXISTS (SELECT 1 FROM core.rezept u
                                WHERE u.marke_key = $2 AND u.fn_id = z.sub_rezept_fn_id)`,
           [rezeptKey, k.markeKey])
-        if (fehlend.rows.length > 0) {
-          const budget = { rest: await rezeptBudgetRest(c) }
-          for (const f of fehlend.rows) {
-            if (budget.rest <= 0) break
-            budget.rest -= await folgepostenEinreihen(c, k.markeKey, 'fn:rezept',
-              { rezeptId: String(f.fn_id) }, k.von, 41, 'offen')
-          }
+        for (const f of fehlend.rows) {
+          await folgepostenEinreihen(c, k.markeKey, 'fn:rezept',
+            { rezeptId: String(f.fn_id) }, k.von, 41, 'offen', k.nachladen === true)
         }
         return zutaten.length
       }
@@ -675,17 +704,17 @@ type Sperrmodus = 'alle' | 'offen'
 async function folgepostenEinreihen(
   c: PoolClient, markeKey: number, endpunkt: string,
   parameter: Record<string, string>, zeitraum: string, prioritaet: number,
-  sperre: Sperrmodus = 'alle',
+  sperre: Sperrmodus = 'alle', nachladen = false,
 ): Promise<number> {
   const r = await c.query(
     `INSERT INTO sync.warteschlange
-       (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter)
-     SELECT $1, $2::date, $2::date, $3, $4, $5::jsonb
+       (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter, nachladen)
+     SELECT $1, $2::date, $2::date, $3, $4, $5::jsonb, $7
       WHERE NOT EXISTS (
             SELECT 1 FROM sync.warteschlange w
              WHERE w.endpunkt = $1 AND w.marke_key = $4 AND w.parameter = $5::jsonb
                AND ($6 = 'alle' OR w.erledigt_am IS NULL))`,
-    [endpunkt, zeitraum, prioritaet, markeKey, JSON.stringify(parameter), sperre])
+    [endpunkt, zeitraum, prioritaet, markeKey, JSON.stringify(parameter), sperre, nachladen])
   return r.rowCount ?? 0
 }
 
@@ -745,42 +774,42 @@ async function kamFrueherEtwas(k: FnKontext): Promise<boolean> {
 // ---------------------------------------------------------------------------
 
 /**
- * Wie viele Rezeptaufrufe (Kopf, Zutaten, Meta) heute noch eingereiht werden
- * dürfen — REZEPTE_JE_LAUF minus das, was seit Mitternacht schon in der
- * Schlange gelandet ist, gleich ob erledigt oder offen. Über alle Marken.
- *
- * Gezählt wird an der Warteschlange und nicht an einem Zähler im Speicher:
- * das Einreihen geschieht an drei Stellen (Nachfüllen, Liste, Zutaten) und in
- * verschiedenen Transaktionen. Nur die Schlange sieht alle drei.
- */
-export async function rezeptBudgetRest(c: Pick<PoolClient, 'query'>): Promise<number> {
-  const r = await c.query<{ n: number }>(
-    `SELECT count(*)::int AS n FROM sync.warteschlange
-      WHERE endpunkt = ANY($1::text[])
-        AND zeitraum_von >= current_date - 1
-        AND erstellt_am >= date_trunc('day', now())`,
-    [REZEPT_DETAIL_ENDPUNKTE])
-  return Math.max(0, config.REZEPTE_JE_LAUF - Number(r.rows[0]?.n ?? 0))
-}
-
-/**
- * Zutaten und Meta eines Rezepts einreihen (und den Kopf, wenn das Rezept nur
- * über einen Verweis bekannt ist) — nur, solange das Budget reicht, und nur
- * als Paar: ein Rezept mit Zutaten, aber ohne Meta, wäre ein halber Stand.
+ * Zutaten und Meta eines Rezepts einreihen (und den Kopf, wenn gewünscht) —
+ * immer als Paar: ein Rezept mit Zutaten, aber ohne Meta, wäre ein halber
+ * Stand. `nachladen` entscheidet die Phase (Tagesgeschäft oder Phase C).
+ * Seit dem 15.10.2026 ohne Obergrenze (Entscheidung Eugene).
  */
 export async function rezeptDetailsEinreihen(
   c: PoolClient, markeKey: number, fnId: number, mitKopf: boolean,
-  zeitraum: string, budget: { rest: number },
+  zeitraum: string, nachladen: boolean,
 ): Promise<number> {
-  const bedarf = mitKopf ? 3 : 2
-  if (budget.rest < bedarf) return 0
   const p = { rezeptId: String(fnId) }
   let n = 0
-  if (mitKopf) n += await folgepostenEinreihen(c, markeKey, 'fn:rezept', p, zeitraum, 41, 'offen')
-  n += await folgepostenEinreihen(c, markeKey, 'fn:rezept_zutaten', p, zeitraum, 41, 'offen')
-  n += await folgepostenEinreihen(c, markeKey, 'fn:rezept_meta', p, zeitraum, 41, 'offen')
-  budget.rest -= n
+  if (mitKopf) n += await folgepostenEinreihen(c, markeKey, 'fn:rezept', p, zeitraum, 41, 'offen', nachladen)
+  n += await folgepostenEinreihen(c, markeKey, 'fn:rezept_zutaten', p, zeitraum, 41, 'offen', nachladen)
+  n += await folgepostenEinreihen(c, markeKey, 'fn:rezept_meta', p, zeitraum, 41, 'offen', nachladen)
   return n
+}
+
+/**
+ * HTTP 404 auf einen Rezeptabruf (Worker und Praxislauf, dieselbe Stelle):
+ * Posten als 'nicht_gefunden' schließen — nicht 'aufgegeben', das würde
+ * wiederbelebt — und am Rezept fehlt_seit setzen.
+ */
+export async function rezeptNichtGefunden(
+  postenId: number | string, markeKey: number, rezeptId: string | undefined, fehler: string,
+): Promise<void> {
+  await inTransaktion(async c => {
+    await c.query(
+      `UPDATE sync.warteschlange
+          SET erledigt_am = now(), in_arbeit_seit = NULL, ergebnis = 'nicht_gefunden', letzter_fehler = $1
+        WHERE posten_id = $2`, [fehler.slice(0, 2000), postenId])
+    if (/^\d+$/.test(rezeptId ?? '')) {
+      await c.query(
+        `UPDATE core.rezept SET fehlt_seit = coalesce(fehlt_seit, now())
+          WHERE marke_key = $1 AND fn_id = $2`, [markeKey, Number(rezeptId)])
+    }
+  })
 }
 
 /**
@@ -791,20 +820,21 @@ export async function rezeptDetailsEinreihen(
  */
 async function rezeptSchreiben(
   c: PoolClient, markeKey: number, r: rz.RezeptKopf, ausListe: boolean,
-): Promise<{ ohneZutaten: boolean }> {
-  const res = await c.query<{ ohne_zutaten: boolean }>(
-    `INSERT INTO core.rezept (marke_key, fn_id, name, erstellt_am, gruppen, in_liste)
-     VALUES ($1,$2,$3,$4,$5,$6)
+): Promise<{ ohneZutaten: boolean; neu: boolean }> {
+  const res = await c.query<{ ohne_zutaten: boolean; neu: boolean }>(
+    `INSERT INTO core.rezept (marke_key, fn_id, name, erstellt_am, gruppen, in_liste, archiviert)
+     VALUES ($1,$2,$3,$4,$5,$6,$7)
      ON CONFLICT (marke_key, fn_id) DO UPDATE SET
        name = EXCLUDED.name,
        erstellt_am = EXCLUDED.erstellt_am,
        gruppen = EXCLUDED.gruppen,
        in_liste = core.rezept.in_liste OR EXCLUDED.in_liste,
+       archiviert = coalesce(EXCLUDED.archiviert, core.rezept.archiviert),
        zuletzt_am = now(),
        fehlt_seit = NULL
-     RETURNING zutaten_geholt_am IS NULL AS ohne_zutaten`,
-    [markeKey, r.fnId, r.name, r.erstelltAm, r.gruppen, ausListe])
-  return { ohneZutaten: res.rows[0]?.ohne_zutaten === true }
+     RETURNING zutaten_geholt_am IS NULL AS ohne_zutaten, (xmax = 0) AS neu`,
+    [markeKey, r.fnId, r.name, r.erstelltAm, r.gruppen, ausListe, r.archiviert])
+  return { ohneZutaten: res.rows[0]?.ohne_zutaten === true, neu: res.rows[0]?.neu === true }
 }
 
 /**

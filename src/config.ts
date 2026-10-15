@@ -877,40 +877,42 @@ const Schema = z.object({
   BESTELLDETAIL_JE_LAUF: z.coerce.number().int().min(0).default(11_000),
 
   /**
-   * Rezepturen (0132): höchstens so viele REZEPTAUFRUFE je Kalendertag —
-   * Kopf (`fn:rezept`), Zutaten (`fn:rezept_zutaten`) und Meta
-   * (`fn:rezept_meta`), über alle Marken zusammen. Entscheidung D,
-   * Eugene 15.10.2026 (docs/plan-rezepturen.md §7).
+   * Rezepturen (0132): der NOTSCHALTER für das Nachladen. 1 = an (Vorgabe),
+   * 0 = aus.
    *
-   * DIE LISTENSEITEN ZÄHLEN NICHT MIT. Sie sind das Auge: nur über sie
-   * werden neue Rezepte gefunden, und sie werden jeden Tag vollständig
-   * geholt (Enchilada 2.076 Rezepte = 84 Seiten, gemessen 14.09.2026; die
-   * übrigen Marken sind nicht gezählt). Eine Obergrenze, die sie mitzählte,
-   * verdrängte an Tagen mit vielen Seiten die Zutaten — und eine Liste, die
-   * auf halber Strecke aufhört, sieht aus wie eine kurze Liste.
+   * ~~Entscheidung D: höchstens 1.500 Rezeptaufrufe je Nacht
+   * (`REZEPTE_JE_LAUF`).~~ ERSETZT am 15.10.2026 (Eugene, nach der Probe
+   * gegen das echte FoodNotify: Wilma Wunder hat 12.655 Rezepte, alle vier
+   * Marken rund 17.700): „durchgehend laden, bis alles geladen ist. Einmal am
+   * Tag muss aber der aktuelle Tag nachgezogen werden." Bei 1.500 je Nacht
+   * hätte der erste Abzug drei Wochen gebraucht.
    *
-   * Kein Handbefehl: der Backfill ist diese Zahl. Zwei Aufrufe je Rezept
-   * (Zutaten, Meta) heisst 750 Rezepte je Nacht; Enchilada (mindestens
-   * 2.111) ist damit in drei Nächten durch, alle vier Marken in rund einer
-   * Woche — die Rezeptzahlen von Wilma Wunder und Deutsche Konzepte sind nicht
-   * gemessen. Danach fällt der Verbrauch auf den Umlauf zurück (darunter).
-   * Beim gemessenen FoodNotify-Takt von 200–500 ms sind 1.500 Aufrufe rund
-   * zehn Minuten, gegen ein Tagesbudget von 140.000. 0 = Notbremse: die
-   * Listen laufen weiter, Zutaten nicht, und sync.quelle meldet die
-   * Rezeptquellen als „nicht erwartet" statt stumm.
+   * Seitdem zwei Wege (docs/importer.md, „Rezepturen"):
+   *   Tagesgeschäft (Phase A, nachladen = false): Listenseiten ab Seite 1, bis
+   *     eine Seite nur bekannte Rezepte trägt, und für neue Rezepte Kopf,
+   *     Zutaten, Meta. Ohne Grenze, jeden Tag, von diesem Schalter unberührt.
+   *   Nachladen (Phase C, nachladen = true): erster Abzug, Umlauf
+   *     (REZEPT_UMLAUF_TAGE) und die volle Listenrunde einmal je Woche.
+   *     Keine eigene Obergrenze — begrenzt nur durch FN_TAGESBUDGET und
+   *     NACHLADEN_BIS, mit demselben Client und Takt (Regel 3).
+   *
+   * 0 schaltet NUR das Nachladen ab: es wird nichts mehr eingereiht, und die
+   * FoodNotify-Spur startet in Phase C nicht. sync.quelle meldet Zutaten und
+   * Meta dann als „nicht erwartet" statt stumm.
    */
-  REZEPTE_JE_LAUF: z.coerce.number().int().min(0).default(1_500),
+  REZEPTE_NACHLADEN: z.coerce.number().int().min(0).max(1).default(1),
 
   /**
    * Nach wie vielen Tagen ein bekanntes Rezept neu gelesen wird (Zutaten und
    * Meta). FoodNotify führt KEIN Änderungsdatum an Rezepten (an 2.111
    * Dateien geprüft) — ohne Umlauf bliebe ein einmal geholtes Rezept für
    * immer auf dem Stand des ersten Abrufs, genau der Fehler, den 0072 bei
-   * den Bestelldetails gefunden hat. Entscheidung D: 14 Tage. Gemessen sind
-   * nur Enchilada (2.111) und Aposto (672); bei angenommen 6.000 Rezepten
-   * über alle Marken wären es ~430 Rezepte bzw. ~860 Aufrufe je Nacht, also
-   * innerhalb von REZEPTE_JE_LAUF. Was liegen bleibt, zeigt
-   * mart.rezept_stand (tage_seit_aeltestem_abruf).
+   * den Bestelldetails gefunden hat. Entscheidung D: 14 Tage. Nachgemessen am
+   * 15.10.2026 (Rezept-Probe, pagination.totalItems): aposto 942, enchilada
+   * 2.076, deutsche_konzepte 1.999, wilma_wunder 12.655 — zusammen ~17.700,
+   * also ~1.260 Rezepte bzw. ~2.500 Aufrufe (Zutaten + Meta) je Nacht im
+   * Nachladen, gegen ein FoodNotify-Tagesbudget von 140.000. Was liegen
+   * bleibt, zeigt mart.rezept_stand (tage_seit_aeltestem_abruf).
    */
   REZEPT_UMLAUF_TAGE: z.coerce.number().int().min(1).default(14),
 

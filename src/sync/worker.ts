@@ -34,7 +34,7 @@ import { endpunkt } from '../lina/endpunkte'
 import { istBetriebsbericht } from '../lina/betriebsberichte'
 import { FnClient } from '../foodnotify/client'
 import { fnEndpunkt, REZEPT_DETAIL_ENDPUNKTE } from '../foodnotify/endpunkte'
-import { fnLaden } from '../foodnotify/laden'
+import { fnLaden, rezeptNichtGefunden } from '../foodnotify/laden'
 import { laden } from './laden'
 import { alsIsoDatum, kalendertagInGeschaeftszeitzone, minuteDesTagesInGeschaeftszeitzone, tagDanach } from '../lib/time'
 
@@ -165,7 +165,7 @@ const SPERRE = 8_142_026
  * gehaltene aus dem Pool lässt jeden Lauf am Ende hängen. Genau das ist beim
  * ersten Versuch passiert (60 s Timeout im Ende-zu-Ende-Test, 25.07.2026).
  */
-async function sperreHolen(): Promise<{ frei: boolean; freigeben: () => Promise<void> }> {
+export async function sperreHolen(): Promise<{ frei: boolean; freigeben: () => Promise<void> }> {
   const verbindung = new pg.Client({ connectionString: config.DATABASE_URL })
   /**
    * Auch diese Verbindung kann wegbrechen — und ein `pg.Client` ohne
@@ -563,6 +563,13 @@ async function sitzungOeffnen(
    * Fortschrittszeile liest ihn dort.
    */
   const nachladeStand = neuerStand()
+  /**
+   * Seit 0132 läuft in Phase C AUCH die FoodNotify-Spur — derselbe FnClient,
+   * derselbe Takt, keine zweite Spur (Regel 3) —, für den ersten Abzug und
+   * den Umlauf der Rezepte (nachladen = true). Eigener Stand aus denselben
+   * Gründen wie oben.
+   */
+  const fnNachladeStand = neuerStand()
   const aktiv: Record<Anbieter, Anbieterstand> = { lina: jeAnbieter.lina, fn: jeAnbieter.fn }
   let nachladenGelaufen = false
   let nachladenPosten: number | null = null
@@ -638,7 +645,7 @@ async function sitzungOeffnen(
      * arbeitet — und Docker schickt beim Stoppen SIGTERM und zehn Sekunden
      * spaeter SIGKILL, das passiert also bei jedem Containerstopp.
      */
-    const reserviert = [...ANBIETER.map(a => jeAnbieter[a]), nachladeStand]
+    const reserviert = [...ANBIETER.map(a => jeAnbieter[a]), nachladeStand, fnNachladeStand]
       .map(st => st.reserviert).filter(Boolean)
     if (reserviert.length > 0) {
       await query(
@@ -1118,7 +1125,10 @@ async function sitzungOeffnen(
       try {
         posten = anbieter === 'lina'
           ? await linaPostenHolen(phase)
-          : await eine<any>(`SELECT * FROM sync.posten_holen($1, $2)`, [laufId, anbieter])
+          // FoodNotify im Tagesgeschäft nur nachladen = false (0132): der erste
+          // Rezeptabzug und der Umlauf gehören in Phase C.
+          : await eine<any>(`SELECT * FROM sync.posten_holen($1, $2)`,
+              [laufId, phase === 'tagesgeschaeft' ? 'fn_laufend' : 'fn'])
         dbFehlerInFolge = 0
       } catch (e) {
         dbFehlerInFolge++
@@ -1148,7 +1158,7 @@ async function sitzungOeffnen(
              FROM sync.warteschlange
             WHERE erledigt_am IS NULL AND faellig_ab > now()
               AND marke_key IS ${anbieter === 'fn' ? 'NOT NULL' : 'NULL'}
-              ${anbieter === 'lina' && phase === 'tagesgeschaeft' ? 'AND NOT nachladen' : ''}`).catch(() => null)
+              ${phase === 'tagesgeschaeft' ? 'AND NOT nachladen' : ''}`).catch(() => null)
         const vertagt = w ? Number(w.vertagt) : 0
         /*
          * In Phase A heißt „leer": das Tagesgeschäft ist abgearbeitet. Das
@@ -1285,6 +1295,7 @@ async function sitzungOeffnen(
             ? await fnLaden({
                 ep: quelle.ep, markeKey: quelle.markeKey, von, bis, parameter: extra,
                 daten: res.daten, httpStatus: res.status, bytes: res.bytes, hash: res.hash, laufId,
+                nachladen: posten.nachladen === true,
               })
             : await laden({
                 ep: quelle.ep, von, bis, parameter, daten: res.daten,
@@ -1647,16 +1658,7 @@ async function sitzungOeffnen(
       if (quelle.art === 'fn' && res.status === 404
           && (REZEPT_DETAIL_ENDPUNKTE as readonly string[]).includes(epKey)) {
         uebersprungen++
-        await query(
-          `UPDATE sync.warteschlange
-              SET erledigt_am = now(), in_arbeit_seit = NULL, ergebnis = 'nicht_gefunden',
-                  letzter_fehler = $1
-            WHERE posten_id = $2`, [res.fehler.slice(0, 2000), posten.posten_id])
-        if (/^\d+$/.test(extra.rezeptId ?? '')) {
-          await query(
-            `UPDATE core.rezept SET fehlt_seit = coalesce(fehlt_seit, now())
-              WHERE marke_key = $1 AND fn_id = $2`, [quelle.markeKey, Number(extra.rezeptId)])
-        }
+        await rezeptNichtGefunden(posten.posten_id, quelle.markeKey, extra.rezeptId, res.fehler)
         log.warn('rezept bei foodnotify nicht gefunden (404) — posten geschlossen', {
           endpunkt: epKey, rezeptId: extra.rezeptId, markeKey: quelle.markeKey,
         })
@@ -1867,10 +1869,10 @@ async function sitzungOeffnen(
    * Takt (harte Regel 3), dasselbe Tagesbudget: Phase A hat es zuerst
    * bekommen, hier läuft, was übrig ist.
    *
-   * FoodNotify läuft hier NICHT noch einmal. Seine Spur war in Phase A zu
-   * Ende (leer oder vertagt), genau wie vor 0116 am Ende des Imports; einen
-   * FoodNotify-Backfill als Nachladen zu führen wäre eine eigene
-   * Entscheidung (docs/offene-punkte.md).
+   * ~~FoodNotify läuft hier NICHT noch einmal.~~ Seit 0132 (Entscheidung
+   * Eugene, 15.10.2026) läuft die FoodNotify-Spur hier mit, für alles mit
+   * nachladen = true — heute nur der erste Abzug und der Umlauf der
+   * Rezepte. Derselbe FnClient, derselbe Takt, dasselbe FN_TAGESBUDGET.
    *
    * NICHT GESTARTET wird Phase C, wenn die LINA-Spur in Phase A abgebrochen
    * ist (Signal, Zugangssperre, Fehlerserie): eine Fehlerserie von vor
@@ -1887,15 +1889,31 @@ async function sitzungOeffnen(
       : laufAbbruch ? laufAbbruch
       : jeAnbieter.lina.status === 'abgebrochen' ? 'die LINA-Spur ist im Tagesgeschaeft abgebrochen'
       : null
-    if (nichtGestartet) {
-      nachladeStand.notiz = `nicht gestartet, weil ${nichtGestartet}`
-    } else {
-      const ausgang = await Promise.allSettled([schleife('lina', 'nachladen', nachladeStand)])
+    /*
+     * FoodNotify (seit 0132): nur, wenn der Notschalter an ist und die Spur
+     * im Tagesgeschäft nicht abgebrochen ist. Sie startet unabhängig von
+     * LINA — eine LINA-Fehlerserie ist kein Grund, FoodNotify anzuhalten.
+     */
+    const fnNichtGestartet = abbruchSignal ? `Signal ${abbruchSignal}`
+      : laufAbbruch ? laufAbbruch
+      : config.REZEPTE_NACHLADEN === 0 ? 'REZEPTE_NACHLADEN = 0 (Notschalter)'
+      : jeAnbieter.fn.status === 'abgebrochen' ? 'die FoodNotify-Spur ist im Tagesgeschaeft abgebrochen'
+      : null
+    if (nichtGestartet) nachladeStand.notiz = `nicht gestartet, weil ${nichtGestartet}`
+    if (fnNichtGestartet) fnNachladeStand.notiz = `nicht gestartet, weil ${fnNichtGestartet}`
+    const schleifen: Promise<void>[] = []
+    if (!nichtGestartet) schleifen.push(schleife('lina', 'nachladen', nachladeStand))
+    if (!fnNichtGestartet) schleifen.push(schleife('fn', 'nachladen', fnNachladeStand))
+    if (schleifen.length > 0) {
+      const ausgang = await Promise.allSettled(schleifen)
       await zusammenfuehren(ausgang)
     }
-    const e = phasenErgebnis([nachladeStand])
+    const e = phasenErgebnis([nachladeStand, fnNachladeStand])
     const stand = await nachladenMessen().catch(() => null)
-    nachladenPosten = e.posten
+    // nachladen_posten/_offen in sync.lauf bleiben LINA-Zahlen (0116); die
+    // FoodNotify-Seite steht in der Notiz und in mart.rezept_stand.
+    const linaPosten = nachladeStand.ok + nachladeStand.keineDaten + nachladeStand.fehler
+    nachladenPosten = linaPosten
     nachladenOffen = stand?.offen ?? null
     /*
      * HARTE REGEL 10. Ein Nachladen, das nichts tut, obwohl Fälliges
@@ -1904,7 +1922,22 @@ async function sitzungOeffnen(
      * Postenobergrenze), aber jeder davon will gelesen werden. Deshalb
      * `teilweise` mit Notiz, nicht `ok`.
      */
-    if (!nichtGestartet && e.posten === 0 && (stand?.faellig ?? 0) > 0 && nachladeStand.status === 'ok') {
+    if (!fnNichtGestartet) {
+      const fnPosten = fnNachladeStand.ok + fnNachladeStand.keineDaten + fnNachladeStand.fehler
+      const fnFaellig = await eine<{ n: number }>(
+        `SELECT count(*)::int AS n FROM sync.warteschlange
+          WHERE erledigt_am IS NULL AND marke_key IS NOT NULL AND nachladen AND faellig_ab <= now()`)
+        .catch(() => null)
+      // Regel 10, wie bei LINA darunter: nichts geschafft, obwohl etwas fällig ist.
+      if (fnPosten === 0 && Number(fnFaellig?.n ?? 0) > 0 && fnNachladeStand.status === 'ok') {
+        fnNachladeStand.status = 'teilweise'
+        fnNachladeStand.notiz = `NICHTS nachgeladen, obwohl ${fnFaellig!.n} faellig — `
+          + (fnNachladeStand.notiz ?? 'ohne Grund')
+      } else if (fnFaellig && Number(fnFaellig.n) > 0) {
+        fnNachladeStand.notiz = `${fnNachladeStand.notiz ?? 'ohne Befund'}, ${fnFaellig.n} offen`
+      }
+    }
+    if (!nichtGestartet && linaPosten === 0 && (stand?.faellig ?? 0) > 0 && nachladeStand.status === 'ok') {
       nachladeStand.status = 'teilweise'
       nachladeStand.notiz = `NICHTS nachgeladen, obwohl ${stand!.faellig} faellig — `
         + (nachladeStand.notiz ?? 'ohne Grund')
@@ -1949,7 +1982,8 @@ async function sitzungOeffnen(
        */
       const staende: Array<[string, Anbieterstand]> = [
         ...ANBIETER.map(a => [NAME[a], jeAnbieter[a]] as [string, Anbieterstand]),
-        ...(nachladenGelaufen ? [['Nachladen', nachladeStand] as [string, Anbieterstand]] : []),
+        ...(nachladenGelaufen ? [['Nachladen', nachladeStand] as [string, Anbieterstand],
+                                 ['Nachladen FoodNotify', fnNachladeStand] as [string, Anbieterstand]] : []),
       ]
       for (const [, st] of staende) {
         if (st.erstfehler > 0 && st.status === 'ok') st.status = 'teilweise'

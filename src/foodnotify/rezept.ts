@@ -65,6 +65,8 @@ export type RezeptKopf = {
   erstelltAm: string | null
   /** groups[].name, ohne Doppelte (983835 fuehrt "20. Basisartikel Bar" zweimal). */
   gruppen: string[]
+  /** archived — seit der Probe vom 15.10.2026 bekannt; null = Feld fehlt. */
+  archiviert: boolean | null
 }
 
 function kopfAusObjekt(o: Record<string, any> | null): RezeptKopf | null {
@@ -77,6 +79,7 @@ function kopfAusObjekt(o: Record<string, any> | null): RezeptKopf | null {
     name: alsText(o.name) ?? '',
     erstelltAm: alsZeit(o.createdAt),
     gruppen,
+    archiviert: typeof o.archived === 'boolean' ? o.archived : null,
   }
 }
 
@@ -144,6 +147,9 @@ export type Zutat = {
   einheit: string | null
   kosten: number | null
   gruppe: string | null
+  /** baseQuantity/baseUnit — meist null (Probe 15.10.2026: 2 Stück Oreo → 22 g). */
+  basisMenge: number | null
+  basisEinheit: string | null
 }
 
 /**
@@ -179,6 +185,8 @@ export function rezeptZutaten(antwort: unknown): Zutat[] {
       einheit: alsText(z.unit),
       kosten: alsZahl(z.cost),
       gruppe: alsBezeichnung(z.group),
+      basisMenge: alsZahl(z.baseQuantity),
+      basisEinheit: alsText(z.baseUnit),
     }
   })
 }

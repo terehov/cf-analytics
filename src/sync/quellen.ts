@@ -214,16 +214,17 @@ export const QUELLEN: readonly Quelle[] = [
   { quelle: 'fn:inventurpositionen', bezeichnung: 'Inventurpositionen',
     system: 'foodnotify', endpunkt: 'fn:inventurpositionen', kadenz_stunden: WOECHENTLICH },
   /*
-   * REZEPTUREN (0132). Die Liste wird jede Nacht ganz gelesen, Zutaten und
-   * Meta laufen im Umlauf (REZEPT_UMLAUF_TAGE) — beide haben also jeden Tag
-   * Zulauf, solange es Rezepte gibt. Der Kopf einzeln kommt nur für Rezepte,
+   * REZEPTUREN (0132). Seite 1 der Liste kommt jede Nacht im Tagesgeschäft,
+   * Zutaten und Meta im Umlauf (REZEPT_UMLAUF_TAGE, Phase C) — beide haben
+   * also jeden Tag Zulauf, solange es Rezepte gibt. Der Kopf einzeln kommt nur für Rezepte,
    * die nicht in der Liste stehen (56 bei Enchilada) und im Umlauf: an
    * manchen Tagen keiner, deshalb eine Woche.
    *
-   * `erwartet` HÄNGT AN DER NOTBREMSE, wie bei den Betriebsberichten: mit
-   * REZEPTE_JE_LAUF = 0 holt der Lauf absichtlich keine Zutaten, und eine
-   * Zeile, die dann jede Nacht „stumm" meldet, ist ein Alarm, der immer
-   * schlägt. Die Liste bleibt erwartet — sie läuft auch mit 0 weiter.
+   * `erwartet` HÄNGT AM NOTSCHALTER, wie bei den Betriebsberichten: mit
+   * REZEPTE_NACHLADEN = 0 laufen Umlauf und erster Abzug nicht, Zutaten
+   * kommen dann nur für neue Rezepte — an vielen Tagen keine. Eine Zeile, die
+   * dann jede Nacht „stumm" meldet, ist ein Alarm, der immer schlägt. Die
+   * Liste bleibt erwartet — Seite 1 läuft im Tagesgeschäft immer.
    *
    * JE MARKE misst das nicht: fällt EINE Marke aus, hält der Zulauf der
    * anderen drei diese Zeilen grün. Die Prüfung je Marke steht in
@@ -233,14 +234,14 @@ export const QUELLEN: readonly Quelle[] = [
     system: 'foodnotify', endpunkt: 'fn:rezepte', kadenz_stunden: TAEGLICH },
   { quelle: 'fn:rezept_zutaten', bezeichnung: 'Rezeptzutaten',
     system: 'foodnotify', endpunkt: 'fn:rezept_zutaten', kadenz_stunden: TAEGLICH,
-    erwartet: config.REZEPTE_JE_LAUF > 0,
-    bemerkung: config.REZEPTE_JE_LAUF > 0 ? 'Umlauf REZEPT_UMLAUF_TAGE, Obergrenze REZEPTE_JE_LAUF.'
-      : 'REZEPTE_JE_LAUF = 0: Rezeptzutaten per Notbremse abgeschaltet.' },
+    erwartet: config.REZEPTE_NACHLADEN > 0,
+    bemerkung: config.REZEPTE_NACHLADEN > 0 ? 'Neue Rezepte im Tagesgeschaeft, Umlauf REZEPT_UMLAUF_TAGE im Nachladen.'
+      : 'REZEPTE_NACHLADEN = 0: Nachladen per Notschalter aus, Zutaten nur fuer neue Rezepte.' },
   { quelle: 'fn:rezept_meta', bezeichnung: 'Rezeptgewicht und Portion',
     system: 'foodnotify', endpunkt: 'fn:rezept_meta', kadenz_stunden: TAEGLICH,
-    erwartet: config.REZEPTE_JE_LAUF > 0,
-    bemerkung: config.REZEPTE_JE_LAUF > 0 ? undefined
-      : 'REZEPTE_JE_LAUF = 0: Rezeptmeta per Notbremse abgeschaltet.' },
+    erwartet: config.REZEPTE_NACHLADEN > 0,
+    bemerkung: config.REZEPTE_NACHLADEN > 0 ? undefined
+      : 'REZEPTE_NACHLADEN = 0: Nachladen per Notschalter aus, Meta nur fuer neue Rezepte.' },
   /*
    * `fn:rezept` ist NICHT erwartet (Review 15.10.2026). Er laeuft nur fuer
    * Verweise auf unbekannte Rezepte und im Umlauf fuer in_liste = false —
