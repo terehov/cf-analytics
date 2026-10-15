@@ -1735,3 +1735,47 @@ Katalogabzug neu gezogen. Als `mcp_leser` jede Spalte gelesen (nicht nur `count(
 keinen Umsatz nach dem letzten offenen Tag gibt. Wer auf `status = 'operativ'` filtert, verliert
 damit geschlossene Betriebe sofort statt erst nach 60 Tagen. Die neue Sicht `mart.betrieb_schliessung_stand`
 (eine Zeile je Handpflegezeile, Spalte `zustand`) ist die Prüfsicht dazu; Erwartung `wirkt`.
+
+## Rezepturen in `mart` (Migration `0132`, 15.10.2026)
+
+Vier Sichten, alle für `mcp_leser` lesbar, Thema `rezept` bzw. `import`/`pruefung` im MCP-Katalog:
+
+| Sicht | Körnung | Wofür |
+|---|---|---|
+| `mart.rezept_position` | Marke × Rezept × Zutatenposition | Was steht in einem Rezept, mit `zuordnung` |
+| `mart.artikel_in_rezept` | Marke × Ware × Rezept × Weg | „In welchen Rezepten steckt Artikelnummer X?" — direkt (`ebene` 1) und über Halbfabrikate (`ebene` 2, 3, …), mit `via_rezept` und `pfad` |
+| `mart.rezept_stand` | eine Marke | Ladestand und Zustand je Marke (Regel 10) |
+| `mart.rezept_zuordnung_pruefung` | Marke × Zuordnung | Anteil der Zutatenpositionen je Zuordnung, Prozentzahl |
+
+Dazu zwei Spalten am Ende von `mart.datenstand` (`rezepte_marke`, `rezepte_zutaten_seit`) und zwei
+Zeilen in `mart.pruefung_uebersicht` („Rezepte: Marke mit FoodNotify-Zulauf, aber ohne frische
+Rezeptliste (36 h)" — Erwartung 0; „Rezepte: Zutat mit Artikelnummer, die im Einkauf der Marke nie
+vorkommt" — Erwartung **konstant**, nicht 0).
+
+**Fallen, die in den Sichten stecken:**
+
+* **`artikelnummer` ist die Lieferanten-Artikelnummer**, nicht die der Kasse. Gegen den Einkauf
+  (`mart.einkauf_position`) verbinden, nie gegen Kassenartikel.
+* **Rezepte gelten je Marke, nicht je Betrieb.** Den Betriebsbezug gäbe es nur über die
+  Kassenzuordnung (`core.pos_artikel`), die leer ist.
+* **Mengen werden über Ebenen nicht multipliziert.** In `mart.artikel_in_rezept` ist
+  `menge`/`einheit` die Menge im Rezept, in dem die Ware **direkt** steht (`direkt_rezept`);
+  `via_menge`/`via_einheit` sagt, wie viel vom Halbfabrikat im Rezept der Zeile steht. Einheiten
+  sind Freitext („cl", „LT", „Schwarzer Portionierer"). Keine Summe über `menge` ohne Filter auf
+  `ebene` und `einheit` — als Fallstrick `rezept_ebenen_menge` im MCP-Katalog.
+* **Keine Kennzahlregel auf `menge`, `einheit`, `kosten`:** `mcp.kennzahl` gilt im Prüfer für den
+  Spaltennamen über alle Sichten, und `menge` ist in `mart.artikel_nachlass_monat` ausdrücklich
+  summierbar. Die Ebenenfalle steht deshalb als Fallstrick und über `summen_erlaubt = false`.
+* **`kosten`** ist FoodNotifys Wert; Unterrezept-Zeilen tragen oft 0. Die Summe der Zeilen ist
+  nicht die Rezeptkosten. Kein Wareneinsatz aus Rezepten in diesem Schritt.
+* **Rezeptnamen sind nicht eindeutig** („Sweet & Sour Mix 20 L" zweimal, ältere Fassungen
+  bleiben stehen) — über `rezept_key` verbinden (Fallstrick `rezept_join_ueber_name`).
+
+**Gemessen am Einzelabzug Enchilada (2.111 Rezepte, 7.452 Zutaten), geladen über den echten
+Ladepfad in einen Vollklon, 15.10.2026:** eingekauft 64,24 % der Positionen, nummer ohne
+einkauf 5,98 %, ohne nummer 3,17 %, unterrezept 26,61 %. Wege bis Ebene 5 (5.469 / 5.109 / 3.044
+/ 2.125 / 688 Zeilen). `mart.artikel_in_rezept` mit Filter auf eine Nummer 0,22 s,
+`mart.rezept_zuordnung_pruefung` 0,19 s, `mart.datenstand` unverändert (~0,05 s für die Spalten,
+die der MCP-Zugang liest; ~0,35 s für alle Spalten, vor und nach `0132` gleich).
+
+Noch **keine Dashboard-Karte** — die Sichten sind für Postico und den MCP-Zugang gebaut.

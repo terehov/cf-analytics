@@ -1317,3 +1317,36 @@ nach `letzter_offener_tag`. Spalten der Sicht unverändert. `mart.betrieb_schlie
 (neu) nennt je Zeile `wirkt`, `wirkt, aber … weicht vom letzten Umsatztag ab` (kein Fehler: Ruhetag,
 Tag mit 0,00 EUR) oder `wirkt nicht` (Umsatz nach dem Tag — wieder offen?). Entscheidung:
 `entscheidungen.md`, 11.10.2026.
+
+## Rezepturen: `core.rezept` und `core.zutat` befüllt (`0132`, 15.10.2026)
+
+Beide Tabellen stehen seit `0030` im Schema und waren bis hierher leer. `0132` macht sie
+befüllbar (Plan und Entscheidungen A–D: `plan-rezepturen.md`):
+
+* **`core.zutat.art`** lässt `product_group` zu. Der alte CHECK hätte 1.855 der 7.452
+  Enchilada-Zeilen abgewiesen. Ein vierter Wert scheitert weiter laut am CHECK.
+* **`core.zutat.ware_fn_id` heißt jetzt `artikelnummer`.** Die Spalte hält die
+  **Lieferanten-Artikelnummer** (`artikelId`) — dieselbe Nummer wie
+  `core.bestellposition.lieferanten_nr` — und **nicht** `core.ware.fn_id` (FoodNotifys interne
+  Warennummer, 866 IDs auf 428 Namen; in `0094` trafen darüber 10,1 %). Der alte Name lud genau
+  zu diesem Join ein. Die Tabelle war leer, nichts las die Spalte.
+* Neu in `core.zutat`: `lieferant_fn_id` (`supplier.id`), `gruppe`, `sub_rezept_fn_id`
+  (`subRecipeId`); `menge` ohne feste Nachkommastellen (FoodNotify liefert 4,5 ebenso wie 0,448).
+* Neu in `core.rezept`: `gewicht_gesamt`, `gewicht_person`, `portion`, `portion_einheit`,
+  `verlust_roh` (`meta.weight.loss` **ungedeutet**), `in_liste` (false = nur über einen Verweis
+  gefunden), `zutaten_geholt_am`, `meta_geholt_am`.
+* **Unterrezepte werden über `(marke_key, sub_rezept_fn_id)` aufgelöst, nicht über
+  `sub_rezept_key`.** Das Unterrezept kann später ankommen als der Verweis (56 Enchilada-Rezepte
+  stehen in keiner Listenseite). `sub_rezept_key` wird nachgezogen, sobald es da ist, und dient
+  Postico und dem Fremdschlüssel.
+* **Schreiben:** Rezept per Upsert auf `(marke_key, fn_id)`; die Zutaten eines Rezepts werden in
+  derselben Transaktion wie die Rohantwort ersetzt (`DELETE … WHERE rezept_key` + `INSERT`). Aus
+  `raw` jederzeit neu aufbaubar — der Test `src/foodnotify/rezept_db.test.ts` leert `core` und
+  baut es aus `raw` wieder auf, mit identischem Inhalt.
+* **Gültigkeit gibt es nicht.** FoodNotify führt an Rezepten weder Änderungsdatum noch Status noch
+  Fassungen. `erstmals_am`/`zuletzt_am` sind der beobachtete Zeitraum; was im März im Rezept stand,
+  ist erst ab dem ersten Abruf beantwortbar.
+* Index `bestellposition_lieferanten_nr` (Teilindex, `lieferanten_nr IS NOT NULL`): die Zuordnung
+  Zutat → Einkauf fragt je Zutat danach.
+
+`core.pos_artikel` (Kassenzuordnung, Betriebsbezug) ist **nicht** Teil dieses Schritts und bleibt leer.

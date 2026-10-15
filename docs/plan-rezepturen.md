@@ -1,6 +1,7 @@
 # Plan: Rezepturen aus FoodNotify
 
-Stand 15.10.2026. Fragen A–D von Eugene am 15.10.2026 entschieden (Abschnitt 7).
+Stand 15.10.2026. Fragen A–D von Eugene am 15.10.2026 entschieden (Abschnitt 7). **Umgesetzt
+mit Migration `0132`** — Ist-Stand in Abschnitt 8.
 
 Ziel: die Frage „In welchen Rezepten steckt Artikelnummer X (z. B. 300203)?" aus der Datenbank
 beantworten, auch indirekt über Halbfabrikate („300203 steckt in Pizza X über Teig Y"). Quelle ist
@@ -145,3 +146,36 @@ Wunder und Deutsche Konzepte sind nicht gemessen.
 Ausdrücklich **nicht** in diesem Schritt: die Kassenzuordnung (`core.pos_artikel`, Betriebsbezug),
 ein theoretischer Wareneinsatz aus Rezepten und die Historie von Rezeptfassungen (FoodNotify führt
 keine Versionen; „was stand im März im Rezept" lässt sich erst ab dem ersten Abruf beantworten).
+
+## 8. Ist-Stand (15.10.2026, Migration `0132`)
+
+Gebaut wie in Abschnitt 3–5 beschrieben, mit diesen Abweichungen und Ergänzungen:
+
+* **`core.zutat.ware_fn_id` heißt jetzt `artikelnummer`** (Tabelle war leer). Neu zusätzlich
+  `sub_rezept_fn_id`: Unterrezepte werden über `(marke_key, sub_rezept_fn_id)` aufgelöst, weil ein
+  Unterrezept später ankommen kann als sein Verweis. In `core.rezept` zusätzlich `gewicht_person`
+  und `meta_geholt_am`.
+* **Die Listenseiten zählen nicht gegen `REZEPTE_JE_LAUF`** — gedeckelt sind Kopf, Zutaten und Meta,
+  je Kalendertag, gezählt an der Warteschlange (`entscheidungen.md`, 15.10.2026).
+* **`mart.datenstand`** bekommt keine Zeile (die Sicht hat eine Zeile je Betrieb), sondern zwei
+  Spalten: `rezepte_marke`, `rezepte_zutaten_seit` — über die Marke des Betriebs.
+* **Regel 10 je Marke:** `mart.rezept_stand.zustand` und eine Zeile in `mart.pruefung_uebersicht`.
+* `mart.artikel_in_rezept` führt zusätzlich `direkt_rezept`, `via_menge`/`via_einheit` (Menge des
+  Halbfabrikats im Rezept der Zeile) und `position`/`via_position`.
+
+**Abnahme, Stand 15.10.2026:**
+
+1. Zweimal laden ergibt dieselben Zeilenzahlen, und `core` lässt sich aus `raw` mit identischem
+   Inhalt neu aufbauen — `src/foodnotify/rezept_db.test.ts` (gegen die Attrappe und eine Testdatenbank).
+2. Stichprobe Enchilada: fünf Rezepte (amarga muerte, Sweet & Sour Mix 20 L, Frozen Strawberry
+   Margarita, Pico de Gallo (Basisartikel), VP_Burrito Chimichurri - 2025 — vier davon mit
+   Unterrezept) über den echten Ladepfad, gegen die JSON-Dateien verglichen: 0 Abweichungen in
+   Art, Artikelnummer, Name, Menge, Einheit, Unterrezept und Gewicht. **Wilma Wunder: offen bis
+   nach dem ersten Lauf.**
+3. `200004` liefert am Einzelabzug Ebene 1 (acht Rezepte, darunter beide „Sweet & Sour Mix 20 L"),
+   Ebene 2 (u. a. amarga muerte über Sweet & Sour Mix 20 L) und Ebene 3 (2cl Popcorn Shot über
+   Popcorn Shot Basisartikel). **`300203` (Wilma Wunder): offen bis nach dem ersten Lauf**
+   (`offene-punkte.md`).
+4. `mart.rezept_zuordnung_pruefung` steht; Enchilada: eingekauft 64,24 %, nummer ohne einkauf
+   5,98 %, ohne nummer 3,17 %, unterrezept 26,61 %.
+5. Tests, MCP-Katalogabzug, Doku: erledigt.

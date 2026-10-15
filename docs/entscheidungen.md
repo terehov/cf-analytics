@@ -4105,3 +4105,25 @@ Importer und wird aus LINA gefüllt); Abwarten bis `inaktiv` (60 Tage, also erst
 Zeilen), beide Betriebe stehen auf `geschlossen`; ein Schließungstag vor dem letzten Umsatz
 stellt den Betrieb auf `operativ` zurück und die Sicht meldet „wirkt nicht“. Der Klon war
 älter als die Produktion (letzter Umsatz 12.08.), deshalb meldete er dort „weicht ab“.
+
+## 15.10.2026 — Rezepturen aus FoodNotify (`0132`)
+
+Entscheidungen A–D von Eugene stehen in `plan-rezepturen.md` §7 (alle vier Marken;
+`raw.api_antwort` statt eigener Rohtabellen; `core.rezept`/`core.zutat` aus `0030` erweitern;
+1.500 Rezeptaufrufe je Nacht, Umlauf 14 Tage). Beim Bau dazugekommen:
+
+1. **Die Listenseiten zählen nicht gegen `REZEPTE_JE_LAUF`.** Sie sind das Auge: nur über sie
+   werden neue Rezepte gefunden, und eine Liste, die wegen der Obergrenze auf halber Strecke
+   aufhört, sähe aus wie eine kurze Liste. Gedeckelt sind Kopf, Zutaten und Meta. Das liest
+   sich aus §5 des Plans („Der Backfill ist eine Obergrenze … Die Listenseiten werden täglich
+   geholt"); ausdrücklich entschieden war es nicht.
+2. **Gezählt wird an der Warteschlange, je Kalendertag**, nicht an einem Zähler im Speicher:
+   eingereiht wird an drei Stellen (Nachfüllen, Listenseite für neue Rezepte, Zutaten für
+   Verweise), in verschiedenen Transaktionen.
+3. **`core.zutat.ware_fn_id` heißt `artikelnummer`.** Die Tabelle war leer; der alte Name lud
+   zum falschen Join auf `core.ware.fn_id` ein (`0094`: 10,1 % Treffer).
+4. **Die Prüfung „Rezeptliste frisch" ist je Marke** (`mart.rezept_stand`,
+   `mart.pruefung_uebersicht`), nicht nur je Quelle: `mart.quelle_zulauf` bliebe grün, solange
+   eine andere Marke liefert.
+5. **Keine Kennzahlregel auf `menge`** im MCP-Katalog, sondern ein Fallstrick: die Regeln in
+   `mcp.kennzahl` gelten für den Spaltennamen über alle Sichten.

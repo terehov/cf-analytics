@@ -398,6 +398,10 @@ Fehler an dieser Stelle — es gibt einen eigenen Test dagegen.
 Zwischen Artikel und Ware gibt es **keine** Verbindung in den Daten. Die Brücke wäre die Rezeptur;
 statt sie aufzulösen, benutzen wir LINAs fertigen `fixed_we` je Artikel.
 
+> **Seit `0132` (15.10.2026)** sind die Rezepturen aus FoodNotify da — Rezept → Zutat → Ware über
+> die Lieferanten-Artikelnummer (Abschnitt „FoodNotify: Rezepturen" unten). Die Brücke **Kassenartikel
+> → Rezept** fehlt weiter (`core.pos_artikel` leer); `fixed_we` bleibt deshalb unberührt.
+
 ### Die Stände — über Zeiträume, nie über Monatsgleichheit
 
 `core.artikel_stand` und `core.artikel_warengruppe_stand` bekommen **nur bei Änderung** eine Zeile.
@@ -927,3 +931,47 @@ Abweichungen und ein Tippfehler stehen in `lina-api-korrekturen.md` (KORREKTUR 9
 **Betriebe mit fremder Kasse** (`mart.betrieb_status.status = 'fremdkasse'`): nie Umsatz in
 LINA, aber FoodNotify-Bestellungen oder gebuchte BWA. Für sie gibt es aus LINA keinen Umsatz und
 keine Artikel — das ist kein Ladefehler. BWA und Bewertungen gibt es.
+
+
+## FoodNotify: Rezepturen (seit `0132`, 15.10.2026)
+
+**Quelle:** `/api/recipes?page=N` (Liste), `/api/recipes/{id}` (Kopf), `/ingredients`, `/meta` —
+je Marke ein FoodNotify-Mandant, also **Rezepte je Marke, nicht je Betrieb**. Geholt im Nachtlauf
+(`importer.md`, „Rezepturen"), Rohantwort in `raw.api_antwort` (`quelle = 'foodnotify'`, Marke in
+`parameter->>'markeKey'`), dann `core.rezept` / `core.zutat`, ausgewertet in
+`mart.rezept_position`, `mart.artikel_in_rezept`, `mart.rezept_stand`,
+`mart.rezept_zuordnung_pruefung`.
+
+**Der Schlüssel ist die Lieferanten-Artikelnummer.** `zutaten[].artikelId` → `core.zutat.artikelnummer`
+= `core.bestellposition.lieferanten_nr` (je Marke) = `SellerAssignedID` in ZUGFeRD-Rechnungen. Sie ist
+**nicht** `core.ware.fn_id` (FoodNotifys interne Warennummer, `concrete_product`, 866 IDs auf 428
+Namen) und **nicht** `core.artikel.artikelnummer` (LINA, das, was verkauft wird).
+
+```
+core.rezept (marke_key, fn_id)
+  └─ core.zutat.rezept_key
+       ├─ art = 'sub_recipe'  → core.rezept über (marke_key, sub_rezept_fn_id)   — Halbfabrikat
+       └─ artikelnummer       → core.bestellposition.lieferanten_nr, Bestellung derselben Marke
+```
+
+`mart.rezept_position.zuordnung` sagt, ob die Brücke trägt: `eingekauft` (Nummer in einer
+Bestellung derselben Marke), `nummer ohne einkauf`, `ohne nummer`, `unterrezept`. Gemessen am
+Enchilada-Einzelabzug gegen den Einkauf eines Vollklons (15.10.2026): 4.787 / 446 / 236 / 1.983
+der 7.452 Positionen — also 91,5 % der Positionen mit Nummer treffen den Einkauf.
+
+**Was die Zahlen nicht sagen:**
+
+* **Kein Betriebsbezug.** Welcher Betrieb ein Rezept verkauft, steht in der Kassenzuordnung
+  (`/api/pos/mapping/…`, `core.pos_artikel`) — nicht geladen.
+* **Keine Effektivmenge.** Mengen gelten je Ebene; über Halbfabrikate wird nicht multipliziert
+  (Einheiten Freitext, Ausbeute ungeklärt). `meta.weight.loss` steht roh in `verlust_roh`.
+* **Keine Historie vor dem ersten Abruf.** FoodNotify führt keine Fassungen und kein
+  Änderungsdatum; der Umlauf (14 Tage) liest jedes Rezept neu, `erstmals_am`/`zuletzt_am` sind
+  der beobachtete Zeitraum.
+* **Die Liste zählt nicht alle Rezepte auf** (56 Enchilada-Rezepte nur über Verweise,
+  `in_liste = false`). Was weder in der Liste steht noch verwiesen wird, sehen wir nicht.
+* **Lieferant:** `supplier.id` steht in `lieferant_fn_id`, ist aber nicht gegen
+  `core.lieferant.fn_id` gemessen. Dieselbe Nummer bei zwei Lieferanten wird nicht unterschieden.
+
+**Wo man nachsieht, ob es noch läuft:** `SELECT * FROM mart.rezept_stand;` (Zustand je Marke),
+`SELECT * FROM mart.quelle_zulauf WHERE quelle LIKE 'fn:rezept%' OR quelle = 'core:rezept';`.

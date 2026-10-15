@@ -260,6 +260,29 @@ nicht im Git). Was davon über den Abzug hinaus gilt:
   `isSyncing, isIgnored, remoteProductId, externalId`. 164 von 1.046
   Kassenartikeln haben ein Rezept — dieselbe dünne Pflege wie in Gera.
 
+### Im Nachtlauf seit `0132` (15.10.2026)
+
+Vier der Pfade sind als Endpunkte registriert (`src/foodnotify/endpunkte.ts`): `fn:rezepte`
+(`/api/recipes?page=N`), `fn:rezept` (`/api/recipes/{id}`), `fn:rezept_zutaten` (`/ingredients`),
+`fn:rezept_meta` (`/meta`). **Nicht** geholt: `/steps`, Bilder, `/batch` (Methode ungeprüft), die
+Kassenzuordnung. Was der Import aus den Messungen oben macht:
+
+* **Liste jeden Tag ganz, Verweise einzeln.** Weil die Liste instabil sortiert ist und nicht alle
+  Rezepte aufzählt, wird sie täglich vollständig gelesen, und jede `subRecipeId` ohne bekanntes
+  Rezept wird über `/api/recipes/{id}` nachgeholt (`in_liste = false`). Ein Rezept, das an einem
+  Tag an einer Seitengrenze verschluckt wird, ist am nächsten wieder da;
+  `mart.rezept_stand.aus_liste_verschwunden` zählt erst nach drei Tagen.
+* **`perPage` wird nicht gesetzt** — 25 sind fest, die Seitenzahl kommt aus `pagination.totalPages`
+  der heutigen Seite 1.
+* **Kein Änderungsdatum → Umlauf.** Zutaten und Meta jedes Rezepts spätestens alle 14 Tage neu.
+* **Die Hülle der Liste ist `{data, pagination}` (gemessen); die von Kopf, Zutaten und Meta ist
+  NICHT gemessen** — der Einzelabzug hat sie ausgepackt gespeichert. `auspacken` erkennt alle
+  bekannten Formen; nach dem ersten Lauf in `raw.api_antwort` nachsehen (`offene-punkte.md`).
+* **`/ingredients` mit mehr als einer Seite wirft.** Gemessen: höchstens 13 Zutaten bei 25 je Seite.
+* **`kind = product_group`** wird wie eine Ware behandelt (trägt `artikelId` und `supplier`).
+* Nachgezählt beim Laden des Einzelabzugs über den echten Ladepfad: 2.111 Rezepte (2.055 aus der
+  Liste, 56 nur über Verweise), 7.452 Zutaten — dieselben Zahlen wie oben.
+
 ---
 
 ## 4. Warenwirtschaft

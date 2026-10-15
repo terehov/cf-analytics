@@ -1108,7 +1108,7 @@ nirgends, weil eine Tabelle ohne Eintrag in keiner Sicht auftaucht.
 
 | Tabelle | Zeilen | Schreiber im Repo | Endpunkt |
 |---|---|---|---|
-| `core.rezept` | 0 | keiner | keiner (`src/foodnotify/endpunkte.ts` führt neun, keiner davon) |
+| ~~`core.rezept`~~ | ~~0~~ | ~~keiner~~ | ~~keiner (`src/foodnotify/endpunkte.ts` führt neun, keiner davon)~~ — **seit `0132` (15.10.2026) befüllt**, siehe unten |
 | `core.pos_artikel` | 0 | keiner | keiner |
 | `core.ware_stand` | 0 | keiner | keiner |
 
@@ -1123,18 +1123,56 @@ keinen Fehler.
 
 **Wer muss was klären:**
 
-1. **Gibt es bei FoodNotify einen Rezept-Endpunkt?** `docs/foodnotify-api-inventar.md`
+1. ~~**Gibt es bei FoodNotify einen Rezept-Endpunkt?** `docs/foodnotify-api-inventar.md`
    führt 126 Pfade; unser Register nutzt neun. Wenn ja, ist es Stufe 4 desselben
    Plans und keine große Sache. Wenn nein, ist es eine Quellengrenze wie bei
-   Warengruppen und Lieferanten (`plan-datenvollstaendigkeit.md`, Abschnitt 5).
+   Warengruppen und Lieferanten (`plan-datenvollstaendigkeit.md`, Abschnitt 5).~~
+   **Beantwortet 15.10.2026: ja.** `/api/recipes?page=N`, `/api/recipes/{id}`,
+   `/api/recipes/{id}/ingredients` und `/meta`, im Einzelabzug vom 14./15.09.2026
+   an 2.111 Enchilada-Rezepten gelesen (`foodnotify-api-inventar.md` §3). Seit
+   Migration `0132` holt der Nachtlauf sie für alle vier Marken
+   (`docs/plan-rezepturen.md`); `core:rezept` steht im Register als erwartet.
+   `core.pos_artikel` (Kassenzuordnung) und `core.ware_stand` bleiben leer und
+   `erwartet: false`.
 2. **Braucht die Auswertung sie überhaupt?** Der theoretische Wareneinsatz läuft
    heute über `core.artikel.fixer_we`, dessen Herkunft ungeklärt ist (Regel 5).
    Ein echter Rezeptbezug wäre die Ablösung dafür — das ist eine fachliche
    Entscheidung und keine technische.
 
-Bis dahin stehen alle drei im Register als `erwartet: false` **mit Begründung**.
+Bis dahin stehen ~~alle drei~~ die beiden übrigen im Register als `erwartet: false` **mit Begründung**.
 Das ist der Unterschied zu vorher: eine leere Tabelle ohne Eintrag ist
 unsichtbar, eine leere Tabelle mit Eintrag ist eine Entscheidung.
+
+## Rezepturen (`0132`): was nach dem ersten echten Lauf zu prüfen ist (15.10.2026)
+
+Gebaut und gegen die Attrappe sowie an 2.111 echten Enchilada-Rezepten aus dem
+Einzelabzug geprüft — **nie gegen das echte FoodNotify gelaufen**. Nach dem ersten
+Nachtlauf mit `0132`:
+
+1. **Abnahme 3 aus `plan-rezepturen.md`:** `select rezept, marke, menge, einheit, ebene,
+   via_rezept from mart.artikel_in_rezept where artikelnummer = '300203'` — 300203 ist
+   Wilma Wunder und kommt in den Enchilada-Rezepten nicht vor. Erwartung: mindestens eine
+   Zeile bei Wilma Wunder.
+2. **Stichprobe Wilma Wunder** (Abnahme 2, zweite Hälfte): fünf Rezepte in der
+   FoodNotify-Oberfläche gegen `mart.rezept_position` halten.
+3. **Die Hülle von `/ingredients`, `/meta` und `/api/recipes/{id}` ist nicht gemessen** —
+   der Einzelabzug hat sie ausgepackt gespeichert. `auspacken` kennt alle vier Formen;
+   eine fünfte fiele als Leere-200er in `sync.schema_abweichung` auf. Einmal in
+   `raw.api_antwort` nachsehen: `SELECT endpunkt, left(payload::text, 120) FROM raw.api_antwort
+   WHERE endpunkt LIKE 'fn:rezept%' ORDER BY abgerufen_am DESC LIMIT 8;`
+4. **Wie viele Rezepte haben Wilma Wunder und Deutsche Konzepte?** Nicht gemessen. Die
+   Obergrenze (1.500 Aufrufe je Tag, Listenseiten nicht mitgezählt) trägt bis rund 10.000
+   Rezepte im 14-Tage-Umlauf. `mart.rezept_stand.tage_seit_aeltestem_abruf` darf nach dem
+   Backfill nicht über 14 steigen.
+5. **`zuordnung = 'nummer ohne einkauf'`:** bei Enchilada 446 von 5.233 Positionen mit
+   Nummer (8,5 %), 49 verschiedene Nummern, gemessen am Einzelabzug gegen den Einkauf des
+   Vollklons. Ob das Altnummern, andere Lieferanten oder Tippfehler sind, ist nicht
+   untersucht — eine Liste für jemanden mit Sortimentskenntnis.
+6. **`supplier.id` gegen `core.lieferant.fn_id`:** nicht gemessen. Bis dahin verbindet
+   die Zuordnung nur über (Marke, Nummer); dieselbe Nummer bei zwei Lieferanten (715,
+   200004, 10956) wird nicht unterschieden.
+7. **`meta.weight.loss`:** Bedeutung offen (0, 100, 4,42, 60,01 …), steht roh in
+   `core.rezept.verlust_roh`. Nicht damit rechnen, bis jemand bei FoodNotify nachsieht.
 
 ## Nachprüfung nach dem Deploy von `0076` (Phase 4)
 

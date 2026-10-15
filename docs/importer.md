@@ -1885,3 +1885,53 @@ ihn. Die Yext-Analytics schreiben ihren Ausgang in den Merker `yext_analytics`; 
 ihn, statt nur auf leere Tabellen zu prüfen. Eine Entität, die Yext nicht mehr kennt, wird aus
 dem Analytics-Filter ausgeklammert und gemeldet, statt den ganzen Bericht zu kippen.
 Hergang: `fehlerkatalog.md`, 05.10.2026.
+
+## Rezepturen (`0132`, 15.10.2026)
+
+Vier FoodNotify-Endpunkte (`src/foodnotify/endpunkte.ts`), dieselbe FN-Spur, derselbe Client und
+Takt, Phase A. Transformation in `src/foodnotify/rezept.ts`, Laden in `src/foodnotify/laden.ts`,
+Einreihen in `rezepteNachfuellen()` (`src/sync/nachfuellen.ts`, aufgerufen am Ende von
+`foodnotifyNachfuellen()`).
+
+| Endpunkt | Pfad | Priorität | Wann |
+|---|---|---|---|
+| `fn:rezepte` | `/api/recipes?page=N` | 40 | Seite 1 je Marke jeden Tag; Seite 1 reiht 2…N ein (Sperre `offen`) |
+| `fn:rezept` | `/api/recipes/{id}` | 41 | Verweise (`subRecipeId`) auf Rezepte, die wir nicht kennen; im Umlauf für `in_liste = false` |
+| `fn:rezept_zutaten` | `/api/recipes/{id}/ingredients` | 41 | neue Rezepte sofort, bekannte im Umlauf |
+| `fn:rezept_meta` | `/api/recipes/{id}/meta` | 41 | immer zusammen mit den Zutaten |
+
+**Obergrenze und Umlauf, kein Handbefehl.** `REZEPTE_JE_LAUF` (1.500) deckelt Kopf, Zutaten und
+Meta je **Kalendertag** über alle Marken; gezählt wird an `sync.warteschlange` (`rezeptBudgetRest()`),
+weil an drei Stellen eingereiht wird. Die Listenseiten zählen nicht mit (`entscheidungen.md`,
+15.10.2026). `REZEPT_UMLAUF_TAGE` (14): ein Rezept, dessen `zutaten_geholt_am` älter ist, wird neu
+gelesen — FoodNotify hat kein Änderungsdatum. Reihenfolge im Nachfüllen: Verweise, dann nie geholte
+Rezepte, dann die ältesten; die Marken im Wechsel (`row_number() OVER (PARTITION BY marke_key)`).
+Zutaten und Meta werden nur als Paar eingereiht; was nicht mehr passt, steht als `liegenGeblieben`
+im Log und kommt in der nächsten Nacht zuerst. `REZEPTE_JE_LAUF = 0` ist die Notbremse: die Liste
+läuft weiter, die Detailquellen stehen in `sync.quelle` als „nicht erwartet".
+
+**Sperren.** Gegen einen offenen Zwilling und gegen einen, der innerhalb des Umlaufs schon einmal
+eingereiht wurde — ein gelöschtes Rezept (HTTP 404) wird so höchstens einmal je Umlauf gefragt.
+
+**Laden.** Liste und Einzelkopf: Upsert auf `(marke_key, fn_id)`, `in_liste` wird nur gesetzt, nie
+zurückgenommen. Neue Rezepte reihen ihre Zutaten im selben Lauf ein, solange das Budget reicht.
+Zutaten: je Rezept `DELETE` + `INSERT` in der Transaktion der Rohantwort; danach Verweise auf
+unbekannte Rezepte als `fn:rezept` (Budget). Eine **zweite Seite** bei `/ingredients` wirft — gemessen
+sind höchstens 13 Zutaten je Rezept bei 25 je Seite, und ein stilles Abschneiden sähe aus wie ein
+kurzes Rezept (die 800er-Inventuren vom 13.08.2026).
+
+**Regel 10.** `sync.quelle`: `fn:rezepte`, `fn:rezept_zutaten`, `fn:rezept_meta` (täglich),
+`fn:rezept` (wöchentlich) und `core:rezept` (jetzt erwartet, gemessen an `zuletzt_am` — vorher
+`erstellt_am`, das ist FoodNotifys Anlagedatum). Je **Marke** misst `mart.rezept_stand`; eine
+Marke mit FoodNotify-Zulauf und einer Rezeptliste älter als 36 Stunden steht in
+`mart.pruefung_uebersicht`.
+
+**Trockenlauf:** `bun run einreihen --rezepte --dry-run` rechnet `rezepteNachfuellen()` in einer
+Transaktion und rollt sie zurück; er gibt die Zahlen je Marke aus und schreibt nichts.
+
+**Attrappe und Tests.** `src/foodnotify/mock.ts` liefert sechs echte Enchilada-Rezepte
+(`src/foodnotify/fixtures/rezepte.json`): zwei Listenseiten, drei Rezepte nur über Verweise, eine
+Kette über drei Ebenen (200004 → Sweet & Sour Mix 20 L → Popcorn Shot Basisartikel → 2cl Popcorn
+Shot). `src/foodnotify/rezept.test.ts` ohne, `src/foodnotify/rezept_db.test.ts` mit
+`TEST_DATABASE_URL` (Durchstich mit Worker, Idempotenz, Neuaufbau aus `raw`, Umlauf, Obergrenze,
+Zyklus, Regel 10).
