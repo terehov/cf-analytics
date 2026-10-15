@@ -1,6 +1,6 @@
 # Plan: Rezepturen aus FoodNotify
 
-Stand 15.10.2026, **Entwurf — wartet auf Eugenes Entscheidung zu den offenen Fragen unten.**
+Stand 15.10.2026. Fragen A–D von Eugene am 15.10.2026 entschieden (Abschnitt 7).
 
 Ziel: die Frage „In welchen Rezepten steckt Artikelnummer X (z. B. 300203)?" aus der Datenbank
 beantworten, auch indirekt über Halbfabrikate („300203 steckt in Pizza X über Teig Y"). Quelle ist
@@ -135,13 +135,12 @@ Wunder und Deutsche Konzepte sind nicht gemessen.
 5. Tests, MCP-Katalogabzug, `datenmodell.md`, `importer.md`, `datenherkunft.md`, `metabase.md`.
    Bei `offene-punkte.md` die Frage „gibt es einen Rezept-Endpunkt?" schließen.
 
-## 7. Offene Fragen an Eugene
+## 7. Entscheidungen (Eugene, 15.10.2026)
 
-- **A — Marken:** alle vier, oder zuerst Wilma Wunder (dort steckt 300203)?
-- **B — raw:** `raw.api_antwort` (Vorschlag) statt eigener `raw.foodnotify_rezept*`-Tabellen?
-- **C — core:** die vorhandenen `core.rezept`/`core.zutat` erweitern (Vorschlag) statt eines neuen
-  `core.rezept_position`? Der Name `mart.rezept_position` bleibt in jedem Fall.
-- **D — Takt:** Obergrenze je Nacht und Umlaufdauer für die Neulesung.
+- **A — Marken:** alle vier.
+- **B — raw:** `raw.api_antwort`, keine eigenen `raw.foodnotify_rezept*`-Tabellen.
+- **C — core:** `core.rezept`/`core.zutat` aus `0030` erweitern; die Sicht heißt trotzdem `mart.rezept_position`.
+- **D — Takt:** höchstens 1.500 Rezeptaufrufe je Nacht (`REZEPTE_JE_LAUF`), Umlauf 14 Tage (`REZEPT_UMLAUF_TAGE`).
 
 Ausdrücklich **nicht** in diesem Schritt: die Kassenzuordnung (`core.pos_artikel`, Betriebsbezug),
 ein theoretischer Wareneinsatz aus Rezepten und die Historie von Rezeptfassungen (FoodNotify führt
