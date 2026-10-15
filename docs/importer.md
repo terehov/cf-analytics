@@ -1918,16 +1918,27 @@ nach der Probe: rund 17.700 Rezepte, davon 12.655 bei Wilma Wunder). Der Posten 
 * **Tagesgeschäft** (`nachladen = false`, Phase A, `sync.posten_holen(…, 'fn_laufend')`):
   `rezepteNachfuellen()` reiht je Marke Seite 1 ein. Die Liste ist nach `createdAt` **absteigend**
   sortiert (Neuestes vorn). Trägt eine Seite ein neues Rezept, holt der Lader die nächste Seite —
-  bis eine Seite nur Bekanntes trägt. Ausnahme: kennt die Marke noch kein Rezept, blättert das
-  Tagesgeschäft nicht (sonst liefe der ganze erste Abzug in Phase A). Neue Rezepte reihen Zutaten
+  bis eine Seite nur Bekanntes trägt. ~~Ausnahme: kennt die Marke noch kein Rezept, blättert das
+  Tagesgeschäft nicht (sonst liefe der ganze erste Abzug in Phase A).~~ **Falsch (Review
+  15.10.2026):** kennt eine Marke nach Nacht 1 nur Seite 1, wäre ab Nacht 2 jede Seite „neu" — alle
+  507 Wilma-Wunder-Seiten samt Details liefen in Phase A. Seitdem blättert das Tagesgeschäft **nur,
+  wenn eine volle Runde die Liste schon einmal ganz gelesen hat** (`rezept_liste_stand.
+  volle_runde_fertig_ende`), und höchstens bis `REZEPT_TAGESGESCHAEFT_SEITEN` (10). Vorher holt es
+  nur die neuen Rezepte von Seite 1. Wird der Deckel erreicht und trug die Seite noch Neues, steht
+  das in `rezept_liste_stand.tagesgeschaeft_gedeckelt_am` und als Zustand `tagesgeschaeft
+  gedeckelt` in `mart.rezept_stand` (Prüfzeile). Neue Rezepte reihen Zutaten
   und Meta sofort ein, Verweise ihren Kopf — alles im Tagesgeschäft, ohne Grenze. Seite 1 stempelt
   `core.rezept_liste_stand.seite1_am` und die Gesamtzahl (`totalItems`).
 * **Nachladen** (`nachladen = true`, Phase C — die FoodNotify-Spur läuft dort seit `0132` mit,
   derselbe `FnClient`, kein zweiter, Regel 3): die **volle Listenrunde** einmal je Woche
   (`{seite, runde: 'voll'}`; Seite 1 reiht alle übrigen ein), Verweise auf unbekannte Rezepte, der
   **erste Abzug** (alle Rezepte ohne Zutaten, mengenbasiert in einer Anweisung eingereiht) und der
-  **Umlauf** (`REZEPT_UMLAUF_TAGE` = 14; Rezepte, die nicht oder seit drei Tagen nicht mehr in der
-  Liste stehen, mit Kopf — er trägt `archived`). Begrenzt nur durch `FN_TAGESBUDGET` und
+  **Umlauf** (`REZEPT_UMLAUF_TAGE` = 14; Rezepte, die nie in der Liste standen oder ~~seit drei
+  Tagen~~ in der letzten **abgeschlossenen** vollen Runde nicht mehr gesehen wurden, mit Kopf — er
+  trägt `archived`). Eine Runde gilt als abgeschlossen, wenn keine ihrer Seiten mehr offen ist; der
+  Lader stempelt dann `volle_runde_fertig_beginn` (= Beginn der Runde) und `_ende`. Die
+  Drei-Tage-Regel setzte eine täglich ganz gelesene Liste voraus, die es seit dem Tagesgeschäft
+  nicht mehr gibt (Review 15.10.2026). Begrenzt nur durch `FN_TAGESBUDGET` und
   `NACHLADEN_BIS`; was eine Nacht nicht schafft, bleibt offen und wird nicht doppelt eingereiht.
 * **Notschalter `REZEPTE_NACHLADEN`** (1/0): 0 reiht kein Nachladen mehr ein und startet die
   FoodNotify-Spur in Phase C nicht; das Tagesgeschäft läuft weiter. `sync.quelle` führt Zutaten
@@ -1936,6 +1947,11 @@ nach der Probe: rund 17.700 Rezepte, davon 12.655 bei Wilma Wunder). Der Posten 
   Nachlade-Posten fällig sind, und nennt die offenen in der Notiz („Nachladen FoodNotify: …").
   `mart.rezept_stand` zeigt je Marke den Fortschritt (`rezepte_fn`, `rezepte`, `mit_zutaten`,
   `ohne_zutaten`, `abzug_pct`) und `liste veraltet`, wenn Seite 1 länger als 36 h nicht kam.
+  ~~„kein FoodNotify-Zulauf" für jede Marke ohne `fn:profil`/`fn:kostenstellen` in sieben Tagen~~ —
+  damit fiel eine Marke mit ausgefallenem Zugang aus der Prüfzeile (Review 15.10.2026). Jetzt:
+  „kein FoodNotify-Zulauf" nur, wenn die Marke **nie** eine FoodNotify-Aufgabe hatte; liegt der
+  letzte erfolgreiche Abruf von `fn:profil`, `fn:kostenstellen` oder `fn:rezepte` länger als 36 h
+  zurück, heißt der Zustand `zugang ausgefallen` und zählt als auffällig.
   `sync.lauf.nachladen_posten/_offen` bleiben LINA-Zahlen.
 
 **Sperren.** Gegen einen offenen Zwilling und gegen einen, der innerhalb des Umlaufs schon einmal

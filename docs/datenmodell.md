@@ -1361,7 +1361,10 @@ befüllbar (Plan und Entscheidungen A–D: `plan-rezepturen.md`):
   stecken (BA_Horchata-Mix 984639 in Frozen Oreo Dream).
 * `core.zutat.basis_menge` / `basis_einheit` (`baseQuantity`/`baseUnit`, meist NULL; 2 Stück Oreo →
   22 g) — neben `menge`/`einheit`, nicht statt ihrer.
-* `core.rezept_liste_stand` (marke_key, rezepte_gesamt, seiten, seite1_am, volle_runde_am): was die
+* `core.rezept_liste_stand` (marke_key, rezepte_gesamt, seiten, seite1_am, volle_runde_am, dazu nach
+  dem Review `volle_runde_fertig_beginn`/`_ende` — die letzte ABGESCHLOSSENE volle Runde, an der
+  „verschwunden", der Kopf im Umlauf und das Weiterblättern des Tagesgeschäfts hängen — und
+  `tagesgeschaeft_gedeckelt_am`): was die
   Liste über sich sagt — der Nenner für den Fortschritt des ersten Abzugs und der Stempel des
   Tagesgeschäfts.
 * `sync.posten_holen(…, 'fn_laufend')` (Zweig ergänzt, Definition aus der Zieldatenbank gelesen)
@@ -1371,3 +1374,9 @@ befüllbar (Plan und Entscheidungen A–D: `plan-rezepturen.md`):
   `.unterrezept_archiviert`; `artikel_in_rezept.rezept_archiviert`, `.via_archiviert`,
   `.basis_menge`, `.basis_einheit`; `rezept_stand.archiviert`, `.rezepte_fn`,
   `.liste_noch_unbekannt`, `.abzug_pct` (Prozentzahl), `.volle_runde_am`.
+* Nach dem Review vom 15.10.2026: `mart.rezept_stand` hängt `volle_runde_abgeschlossen_am` und
+  `tagesgeschaeft_gedeckelt_am` an; neue Zustände `zugang ausgefallen` und `tagesgeschaeft
+  gedeckelt` (beide in der Prüfzeile). ~~`aus_liste_verschwunden`: drei Tage gegen das zuletzt
+  gesehene Rezept~~ → gegen den Beginn der letzten abgeschlossenen vollen Runde. ~~`letzter_fn_abruf`:
+  Profil/Kostenstellen in sieben Tagen~~ → letzter erfolgreicher Abruf von Profil, Kostenstellen
+  oder Rezeptliste, ohne Zeitfenster.

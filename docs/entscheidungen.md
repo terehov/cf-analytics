@@ -4150,6 +4150,15 @@ nachgezogen werden." Umgesetzt als zwei Wege (`importer.md`, „Rezepturen"):
    Tagesgeschäft läuft weiter).
 
 Warum der Posten und nicht die Uhr entscheidet: dieselbe Lehre wie `0116` — „Nachladen" ist eine
-Eigenschaft der Arbeit, nicht der Tageszeit. Und warum das Tagesgeschäft nicht blättert, solange
-eine Marke noch kein Rezept kennt: sonst wäre jede Seite „neu", und der ganze erste Abzug liefe
-in Phase A vor den Ableitungen — genau das, was `0116` für LINA verhindert hat.
+Eigenschaft der Arbeit, nicht der Tageszeit. Und warum das Tagesgeschäft nicht blättert, ~~solange
+eine Marke noch kein Rezept kennt~~ **solange keine volle Runde die Liste einmal ganz gelesen hat**
+(Review 15.10.2026 — „kein Rezept kennen" griff nur in Nacht 1, ab Nacht 2 wäre der ganze Rest
+durchgeblättert worden): sonst wäre jede Seite „neu", und der ganze erste Abzug liefe in Phase A
+vor den Ableitungen — genau das, was `0116` für LINA verhindert hat. Dazu ein harter Deckel von
+`REZEPT_TAGESGESCHAEFT_SEITEN` (10) Seiten je Marke als Sicherung, sichtbar, wenn er greift.
+
+**Nachtrag Review 15.10.2026, zwei weitere Korrekturen:** „aus der Liste verschwunden" und der Kopf
+im Umlauf messen gegen den Beginn der letzten **abgeschlossenen** vollen Runde statt gegen drei Tage
+(eine täglich ganz gelesene Liste gibt es nicht mehr). Und „kein FoodNotify-Zulauf" gilt nur für
+eine Marke, die **nie** eine FoodNotify-Aufgabe hatte — ein ausgefallener Zugang ist der Befund
+`zugang ausgefallen`, nicht ein Grund, die Marke aus der Prüfung zu nehmen.

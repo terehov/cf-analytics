@@ -271,7 +271,9 @@ Kassenzuordnung. Was der Import aus den Messungen oben macht:
   Rezepte aufzählt, wird sie täglich vollständig gelesen, und jede `subRecipeId` ohne bekanntes
   Rezept wird über `/api/recipes/{id}` nachgeholt (`in_liste = false`). Ein Rezept, das an einem
   Tag an einer Seitengrenze verschluckt wird, ist am nächsten wieder da;
-  `mart.rezept_stand.aus_liste_verschwunden` zählt erst nach drei Tagen.
+  ~~`mart.rezept_stand.aus_liste_verschwunden` zählt erst nach drei Tagen.~~ ~~Täglich ganz gelesen~~
+  — seit dem 15.10.2026 einmal je Woche als volle Runde, täglich nur Seite 1 (Tagesgeschäft);
+  `aus_liste_verschwunden` misst gegen die letzte abgeschlossene volle Runde.
 * **`perPage` wird nicht gesetzt** — 25 sind fest, die Seitenzahl kommt aus `pagination.totalPages`
   der heutigen Seite 1.
 * **Kein Änderungsdatum → Umlauf.** Zutaten und Meta jedes Rezepts spätestens alle 14 Tage neu.
@@ -314,7 +316,8 @@ vier Marken so, wie der Importer sie erwartet. Neu gegenüber dem Septemberabzug
   → `core.zutat.basis_menge` / `basis_einheit`.
 * **Die Liste ist nach `createdAt` absteigend sortiert**, das Neueste vorn (der Septemberabzug zeigt
   dasselbe: Frozen Oreo Dream, 21.08.2026, als erster Eintrag). Das Tagesgeschäft nutzt das: es
-  blättert, bis eine Seite nur Bekanntes trägt.
+  blättert, bis eine Seite nur Bekanntes trägt — erst nach einer abgeschlossenen vollen Runde und
+  höchstens zehn Seiten (`importer.md`).
 
 ---
 

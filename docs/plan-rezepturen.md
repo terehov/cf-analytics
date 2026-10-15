@@ -184,6 +184,9 @@ Gebaut wie in Abschnitt 3–5 beschrieben, mit diesen Abweichungen und Ergänzun
 ~~Entscheidung D (1.500 Rezeptaufrufe je Nacht)~~ ist ersetzt durch „durchgehend laden, bis alles
 geladen ist; einmal am Tag den aktuellen Tag nachziehen" (`entscheidungen.md`): Tagesgeschäft in
 Phase A ohne Grenze, erster Abzug, Umlauf und volle Listenrunde (wöchentlich) im Nachladen,
-Notschalter `REZEPTE_NACHLADEN`. Dazu `archiviert`, `basis_menge`/`basis_einheit`,
+Notschalter `REZEPTE_NACHLADEN`. Nach dem Review vom selben Tag blättert das Tagesgeschäft erst nach
+einer abgeschlossenen vollen Runde und höchstens zehn Seiten weit; „verschwunden" und der Kopf im
+Umlauf messen an der abgeschlossenen Runde; ein ausgefallener Zugang heißt `zugang ausgefallen`.
+Dazu `archiviert`, `basis_menge`/`basis_einheit`,
 `core.rezept_liste_stand` und der Fortschritt in `mart.rezept_stand`. Für den ersten echten Lauf
 vor dem Push: `bun run rezepte-praxis` (`importer.md`) gegen eine lokale Datenbank.
