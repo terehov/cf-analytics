@@ -241,10 +241,19 @@ export const QUELLEN: readonly Quelle[] = [
     erwartet: config.REZEPTE_JE_LAUF > 0,
     bemerkung: config.REZEPTE_JE_LAUF > 0 ? undefined
       : 'REZEPTE_JE_LAUF = 0: Rezeptmeta per Notbremse abgeschaltet.' },
+  /*
+   * `fn:rezept` ist NICHT erwartet (Review 15.10.2026). Er laeuft nur fuer
+   * Verweise auf unbekannte Rezepte und im Umlauf fuer in_liste = false —
+   * im Dauerbetrieb also ein paar Aufrufe alle 14 Tage, und in der ersten
+   * Nacht verbraucht der Backfill das Budget, bevor ein Kopf drankommt.
+   * Eine Wochenkadenz schluege dauernd falsch an. Ob Verweise liegen
+   * bleiben, misst mart.rezept_stand.verweise_ohne_rezept je Marke.
+   */
   { quelle: 'fn:rezept', bezeichnung: 'Rezeptkopf einzeln (nur ueber Verweis bekannte Rezepte)',
     system: 'foodnotify', endpunkt: 'fn:rezept', kadenz_stunden: WOECHENTLICH,
-    erwartet: config.REZEPTE_JE_LAUF > 0,
-    bemerkung: 'Nur fuer Rezepte, die in keiner Listenseite stehen — an manchen Tagen keiner.' },
+    erwartet: false,
+    bemerkung: 'Nur fuer Verweise und im 14-Tage-Umlauf — kein fester Takt. '
+             + 'Pruefung je Marke: mart.rezept_stand (verweise_ohne_rezept, nicht_gefunden).' },
 
   // --- Yext: gemessen an der Tabelle ------------------------------------
   /*

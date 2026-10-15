@@ -60,7 +60,17 @@ export async function fnLaden(k: FnKontext): Promise<number> {
    */
   const verdaechtig = zeilen === 0 && await kamFrueherEtwas(k)
 
-  return inTransaktion(async c => {
+  /**
+   * DIE FORM VOR DEM LADEN PRÜFEN — bisher nur für Rezepturen (Review
+   * 15.10.2026). Eine unbekannte Hülle ergäbe dort still [] bzw. null, der
+   * Lader löschte die Zutaten und stempelte zutaten_geholt_am. Bei einem
+   * Befund: raw sichern, sync.schema_abweichung schreiben, dann werfen — der
+   * Posten scheitert sichtbar (Wiedervorlage, später mart.posten_aufgegeben),
+   * core bleibt unberührt.
+   */
+  const struktur = k.ep.key.startsWith('fn:rezept') ? rz.rezeptStrukturFehler(k.ep.key, k.daten) : null
+
+  const ergebnis = await inTransaktion(async c => {
     await c.query(
       `SELECT core.partition_anlegen('raw.api_antwort', d)
          FROM unnest(ARRAY[current_date, current_date + 1]) AS d`)
@@ -75,6 +85,15 @@ export async function fnLaden(k: FnKontext): Promise<number> {
       [k.ep.key, null, k.von, k.bis,
        JSON.stringify({ ...k.parameter, markeKey: k.markeKey }),
        k.httpStatus, JSON.stringify(k.daten), k.hash, k.bytes, k.laufId])
+
+    if (struktur) {
+      await c.query(
+        `INSERT INTO sync.schema_abweichung (endpunkt, erwartet, tatsaechlich)
+         VALUES ($1, $2, $3)`,
+        [k.ep.key, JSON.stringify({ endpunkt: k.ep.key, hinweis: 'gemessene Antwortform' }),
+         JSON.stringify({ probleme: [{ pfad: '', problem: `${struktur}. Parameter: ${JSON.stringify(k.parameter)}` }] })])
+      return null
+    }
 
     if (verdaechtig) {
       await c.query(
@@ -552,7 +571,8 @@ export async function fnLaden(k: FnKontext): Promise<number> {
             [rezeptKey, z.fnId, z.position, z.art, z.name, z.artikelnummer, z.subRezeptFnId,
              z.menge, z.einheit, z.kosten, z.lieferantName, z.lieferantFnId, k.markeKey, z.gruppe])
         }
-        await c.query(`UPDATE core.rezept SET zutaten_geholt_am = now() WHERE rezept_key = $1`, [rezeptKey])
+        await c.query(
+          `UPDATE core.rezept SET zutaten_geholt_am = now(), fehlt_seit = NULL WHERE rezept_key = $1`, [rezeptKey])
 
         /**
          * VERWEISE OHNE REZEPT EINZELN NACHHOLEN. Die Liste zählt nicht alle
@@ -585,7 +605,7 @@ export async function fnLaden(k: FnKontext): Promise<number> {
         await c.query(
           `UPDATE core.rezept
               SET gewicht_gesamt = $2, gewicht_person = $3, portion = $4,
-                  portion_einheit = $5, verlust_roh = $6, meta_geholt_am = now()
+                  portion_einheit = $5, verlust_roh = $6, meta_geholt_am = now(), fehlt_seit = NULL
             WHERE rezept_key = $1`,
           [rezeptKey, m.gewichtGesamt, m.gewichtPerson, m.portion, m.portionEinheit, m.verlustRoh])
         return 1
@@ -597,6 +617,10 @@ export async function fnLaden(k: FnKontext): Promise<number> {
         return zeilen
     }
   })
+  if (ergebnis === null) {
+    throw new Error(`Antwortform unbekannt — Rohantwort gesichert, core unverändert: ${struktur}`)
+  }
+  return ergebnis
 }
 
 /**
@@ -776,7 +800,8 @@ async function rezeptSchreiben(
        erstellt_am = EXCLUDED.erstellt_am,
        gruppen = EXCLUDED.gruppen,
        in_liste = core.rezept.in_liste OR EXCLUDED.in_liste,
-       zuletzt_am = now()
+       zuletzt_am = now(),
+       fehlt_seit = NULL
      RETURNING zutaten_geholt_am IS NULL AS ohne_zutaten`,
     [markeKey, r.fnId, r.name, r.erstelltAm, r.gruppen, ausListe])
   return { ohneZutaten: res.rows[0]?.ohne_zutaten === true }

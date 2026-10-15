@@ -292,6 +292,91 @@ lauf('Rezepturen mit Datenbank', () => {
     await db.query(`DELETE FROM core.kostenstelle WHERE kostenstelle_key = $1`, [ks.kostenstelle_key])
   })
 
+  test('eine unbekannte Antwortform: raw gesichert, schema_abweichung, core unberührt, Posten scheitert', async () => {
+    const { fnLaden } = await import('./laden')
+    const { fnEndpunkt } = await import('./endpunkte')
+    const { rows: [l] } = await db.query(`SELECT lauf_id::text FROM sync.lauf ORDER BY lauf_id DESC LIMIT 1`)
+    const vorher = await zaehlen()
+    const { rows: [st0] } = await db.query(
+      `SELECT zutaten_geholt_am::text AS t FROM core.rezept WHERE fn_id = 1032008`)
+    const { rows: [raw0] } = await db.query(`SELECT count(*)::int AS n FROM raw.api_antwort`)
+    const laden = (ep: string, daten: unknown) => fnLaden({
+      ep: fnEndpunkt(ep), markeKey: enchilada, von: '2026-10-15', bis: '2026-10-15',
+      parameter: { rezeptId: '1032008' }, daten, httpStatus: 200, bytes: 1, hash: 'h', laufId: l.lauf_id,
+    })
+    await expect(laden('fn:rezept_zutaten', { ingredients: [{ id: 1, kind: 'ingredient' }] }))
+      .rejects.toThrow('Antwortform unbekannt')
+    await expect(laden('fn:rezept_meta', { meta: { weight: { total: 1 } } }))
+      .rejects.toThrow('Antwortform unbekannt')
+
+    expect(await zaehlen()).toEqual(vorher)
+    const { rows: [st1] } = await db.query(
+      `SELECT zutaten_geholt_am::text AS t FROM core.rezept WHERE fn_id = 1032008`)
+    expect(st1.t).toBe(st0.t)
+    const { rows: [raw1] } = await db.query(`SELECT count(*)::int AS n FROM raw.api_antwort`)
+    expect(raw1.n).toBe(raw0.n + 2)
+    const { rows: abw } = await db.query(
+      `SELECT endpunkt FROM sync.schema_abweichung WHERE endpunkt LIKE 'fn:rezept%' ORDER BY 1`)
+    expect(abw.map(a => a.endpunkt)).toEqual(['fn:rezept_meta', 'fn:rezept_zutaten'])
+    await db.query(`DELETE FROM sync.schema_abweichung`)
+  })
+
+  /**
+   * Review 15.10.2026: 404 war 'aufgegeben', wurde dreimal wiederbelebt und
+   * stand fuer immer in mart.posten_aufgegeben. Jetzt 'nicht_gefunden' und
+   * fehlt_seit am Rezept; ein spaeterer Erfolg setzt es zurueck.
+   */
+  test('404 auf einen Rezeptabruf: nicht_gefunden, fehlt_seit, nicht wiederbelebbar, Erfolg setzt zurück', async () => {
+    await db.query(
+      `INSERT INTO core.rezept (marke_key, fn_id, name, in_liste, zutaten_geholt_am)
+       VALUES ($1, 999998, 'Geloescht', true, now() - interval '20 days')`, [enchilada])
+    await db.query(
+      `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter)
+       VALUES ('fn:rezept_zutaten', current_date, current_date, 41, $1, '{"rezeptId": "999998"}'),
+              ('fn:rezept',         current_date, current_date, 41, $1, '{"rezeptId": "999997"}')`,
+      [enchilada])
+    const { workerLauf } = await import('../sync/worker')
+    const r = await workerLauf('manuell')
+    expect(r.status).toBe('ok')
+
+    const { rows: w } = await db.query(
+      `SELECT endpunkt, ergebnis FROM sync.warteschlange
+        WHERE parameter->>'rezeptId' IN ('999998', '999997') ORDER BY endpunkt`)
+    expect(w).toEqual([
+      { endpunkt: 'fn:rezept', ergebnis: 'nicht_gefunden' },
+      { endpunkt: 'fn:rezept_zutaten', ergebnis: 'nicht_gefunden' },
+    ])
+    const { rows: [rz] } = await db.query(
+      `SELECT fehlt_seit IS NOT NULL AS fehlt FROM core.rezept WHERE fn_id = 999998`)
+    expect(rz.fehlt).toBe(true)
+    const { rows: [st] } = await db.query(
+      `SELECT nicht_gefunden FROM mart.rezept_stand WHERE marke_key = $1`, [enchilada])
+    expect(st.nicht_gefunden).toBe(1)
+    const { rows: auf } = await db.query(
+      `SELECT 1 FROM mart.posten_aufgegeben WHERE endpunkt LIKE 'fn:rezept%'`)
+    expect(auf).toHaveLength(0)
+    const { aufgegebeneWiederbeleben } = await import('../sync/nachfuellen')
+    await aufgegebeneWiederbeleben()
+    const { rows: [offen] } = await db.query(
+      `SELECT count(*)::int AS n FROM sync.warteschlange
+        WHERE parameter->>'rezeptId' IN ('999998', '999997') AND erledigt_am IS NULL`)
+    expect(offen.n).toBe(0)
+
+    // Ein spaeterer Erfolg (das Rezept steht wieder in der Liste) setzt fehlt_seit zurueck.
+    const { fnLaden } = await import('./laden')
+    const { fnEndpunkt } = await import('./endpunkte')
+    const { rows: [l] } = await db.query(`SELECT lauf_id::text FROM sync.lauf ORDER BY lauf_id DESC LIMIT 1`)
+    await fnLaden({
+      ep: fnEndpunkt('fn:rezepte'), markeKey: enchilada, von: '2026-10-15', bis: '2026-10-15',
+      parameter: { seite: 'test' }, daten: { data: [{ id: 999998, name: 'Wieder da' }] },
+      httpStatus: 200, bytes: 1, hash: 'h', laufId: l.lauf_id,
+    })
+    const { rows: [rz2] } = await db.query(`SELECT fehlt_seit FROM core.rezept WHERE fn_id = 999998`)
+    expect(rz2.fehlt_seit).toBeNull()
+    await db.query(`DELETE FROM sync.warteschlange WHERE parameter->>'rezeptId' IN ('999998', '999997')`)
+    await db.query(`DELETE FROM core.rezept WHERE fn_id = 999998`)
+  })
+
   test('ein Zyklus zwischen Rezepten terminiert', async () => {
     const { rows: [a] } = await db.query(
       `INSERT INTO core.rezept (marke_key, fn_id, name) VALUES ($1, 1, 'Zyklus A') RETURNING rezept_key`, [enchilada])
@@ -325,6 +410,17 @@ lauf('Rezepturen mit Datenbank', () => {
       `INSERT INTO sync.aufgabe (lauf_id, endpunkt, status, marke_key, parameter)
        VALUES ($1, 'fn:profil', 'ok', $2, '{}')`, [l.lauf_id, enchilada])
     expect(await zeile()).toBe(0)
+
+    // Zutaten abgerufen, aber keine einzige Zeile da: 'zutaten leer' (Review 15.10.2026).
+    await db.query('BEGIN')
+    try {
+      await db.query(`DELETE FROM core.zutat`)
+      const { rows: [leer] } = await db.query(
+        `SELECT zustand FROM mart.rezept_stand WHERE marke_key = $1`, [enchilada])
+      expect(leer.zustand).toBe('zutaten leer')
+      expect(await zeile()).toBe(1)
+    } finally { await db.query('ROLLBACK') }
+
     await db.query(
       `UPDATE sync.aufgabe SET beendet_am = now() - interval '48 hours' WHERE endpunkt = 'fn:rezepte'`)
     const { rows: [st] } = await db.query(

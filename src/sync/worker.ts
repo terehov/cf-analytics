@@ -33,7 +33,7 @@ import { LinaClient, strukturPruefen } from '../lina/client'
 import { endpunkt } from '../lina/endpunkte'
 import { istBetriebsbericht } from '../lina/betriebsberichte'
 import { FnClient } from '../foodnotify/client'
-import { fnEndpunkt } from '../foodnotify/endpunkte'
+import { fnEndpunkt, REZEPT_DETAIL_ENDPUNKTE } from '../foodnotify/endpunkte'
 import { fnLaden } from '../foodnotify/laden'
 import { laden } from './laden'
 import { alsIsoDatum, kalendertagInGeschaeftszeitzone, minuteDesTagesInGeschaeftszeitzone, tagDanach } from '../lib/time'
@@ -1632,6 +1632,38 @@ async function sitzungOeffnen(
        *     `versuche` nicht zurueck, und der Catch-all unten verbraucht
        *     bei einem Datenbankfehler einen Versuch.
        */
+      /**
+       * HTTP 404 AUF EINEN REZEPTABRUF (0132, Review 15.10.2026): eine Aussage
+       * ueber das Rezept (vermutlich in FoodNotify geloescht), kein Fehler des
+       * Abrufs. Als 'aufgegeben' holte aufgegebeneWiederbeleben() den Posten
+       * dreimal zurueck — bis zu acht Aufrufe je Umlauf —, und er stuende fuer
+       * immer in mart.posten_aufgegeben. Stattdessen: 'nicht_gefunden', nicht
+       * wiederbelebbar, und am Rezept core.rezept.fehlt_seit (sichtbar in
+       * mart.rezept_stand und mart.rezept_position). Ein spaeterer Erfolg setzt
+       * fehlt_seit zurueck; der Umlauf fragt hoechstens einmal je
+       * REZEPT_UMLAUF_TAGE nach. Zaehlt NICHT als Erstfehler: ein geloeschtes
+       * Rezept sagt nichts ueber den Anbieter.
+       */
+      if (quelle.art === 'fn' && res.status === 404
+          && (REZEPT_DETAIL_ENDPUNKTE as readonly string[]).includes(epKey)) {
+        uebersprungen++
+        await query(
+          `UPDATE sync.warteschlange
+              SET erledigt_am = now(), in_arbeit_seit = NULL, ergebnis = 'nicht_gefunden',
+                  letzter_fehler = $1
+            WHERE posten_id = $2`, [res.fehler.slice(0, 2000), posten.posten_id])
+        if (/^\d+$/.test(extra.rezeptId ?? '')) {
+          await query(
+            `UPDATE core.rezept SET fehlt_seit = coalesce(fehlt_seit, now())
+              WHERE marke_key = $1 AND fn_id = $2`, [quelle.markeKey, Number(extra.rezeptId)])
+        }
+        log.warn('rezept bei foodnotify nicht gefunden (404) — posten geschlossen', {
+          endpunkt: epKey, rezeptId: extra.rezeptId, markeKey: quelle.markeKey,
+        })
+        await protokoll(laufId, epKey, posten, 'uebersprungen', res, quellClient, res.fehler)
+        continue
+      }
+
       const bekanntKaputt = posten.versuche > 1 || posten.wiederbelebt > 0
       if (bekanntKaputt) stand.wiederholer++
       else { stand.fehlerInFolge++; stand.erstfehler++ }

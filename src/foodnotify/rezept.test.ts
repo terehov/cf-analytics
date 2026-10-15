@@ -5,7 +5,7 @@
 import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { fnEndpunkt, REZEPT_DETAIL_ENDPUNKTE } from './endpunkte'
-import { rezeptliste, rezeptKopf, rezeptZutaten, rezeptMeta } from './rezept'
+import { rezeptliste, rezeptKopf, rezeptZutaten, rezeptMeta, rezeptStrukturFehler } from './rezept'
 
 const FIX = JSON.parse(readFileSync(new URL('./fixtures/rezepte.json', import.meta.url), 'utf8')).rezepte
 
@@ -78,6 +78,37 @@ describe('Transformation', () => {
     expect(rezeptMeta({ data: FIX['983835'].meta })).toEqual({
       gewichtGesamt: 20000, gewichtPerson: 20000, portion: 20, portionEinheit: 'l', verlustRoh: 0,
     })
+  })
+})
+
+/**
+ * Review 15.10.2026: eine unbekannte Hülle ergab still [] bzw. null — der Lader
+ * hätte die Zutaten gelöscht und zutaten_geholt_am gestempelt. Die gemessene
+ * Form ist Pflicht; alles andere wirft bzw. wird als Befund gemeldet.
+ */
+describe('Antwortform', () => {
+  test('gemessene Formen gehen durch, in jeder bekannten Hülle', () => {
+    expect(rezeptStrukturFehler('fn:rezept_zutaten', FIX['1032008'].zutaten)).toBeNull()
+    expect(rezeptStrukturFehler('fn:rezept_zutaten', { data: FIX['1032008'].zutaten })).toBeNull()
+    expect(rezeptStrukturFehler('fn:rezept_zutaten', { data: [] })).toBeNull()
+    expect(rezeptStrukturFehler('fn:rezept_meta', { data: FIX['983835'].meta })).toBeNull()
+    expect(rezeptStrukturFehler('fn:rezept', { data: FIX['983835'].kopf })).toBeNull()
+    expect(rezeptStrukturFehler('fn:rezepte', { data: [], pagination: { totalPages: 1 } })).toBeNull()
+  })
+
+  test('eine fremde Hülle ist ein Befund, keine leere Antwort', () => {
+    expect(rezeptStrukturFehler('fn:rezept_zutaten', { ingredients: FIX['1032008'].zutaten }))
+      .toContain('erwartet eine Liste, bekommen object mit Schlüsseln ingredients')
+    expect(rezeptStrukturFehler('fn:rezept_meta', { meta: FIX['983835'].meta }))
+      .toContain('erwartet ein Objekt mit weight')
+    expect(rezeptStrukturFehler('fn:rezept', { data: { name: 'ohne id' } })).toContain('mit id')
+    expect(rezeptStrukturFehler('fn:rezept_zutaten', { errors: ['kaputt'], isError: true, code: 500, payload: null }))
+      .toContain('Hüllenfehler')
+  })
+
+  test('die Transformationen werfen selbst, statt [] oder null zu liefern', () => {
+    expect(() => rezeptZutaten({ ingredients: FIX['1032008'].zutaten })).toThrow('erwartet eine Liste')
+    expect(() => rezeptMeta({ meta: FIX['983835'].meta })).toThrow('weight')
   })
 })
 

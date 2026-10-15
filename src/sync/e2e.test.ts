@@ -340,7 +340,7 @@ lauf('Ende-zu-Ende', () => {
        * hat KEINE Erwartung null — Altnummern und fremde Lieferanten gibt es
        * immer; sie soll nicht wachsen.
        */
-      'Rezepte: Marke mit FoodNotify-Zulauf, aber ohne frische Rezeptliste (36 h)',
+      'Rezepte: Marke mit FoodNotify-Zulauf, aber ohne frische Rezeptliste oder ohne Zutaten',
       'Rezepte: Zutat mit Artikelnummer, die im Einkauf der Marke nie vorkommt',
       /**
        * Seit 0080. Gezaehlt wird der VORVORMONAT und nicht der laufende:

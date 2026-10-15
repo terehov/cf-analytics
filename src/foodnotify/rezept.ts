@@ -2,15 +2,19 @@
  * Rezepturen (0132, docs/plan-rezepturen.md) — reine Transformation.
  *
  * Dieselbe Regel wie transform.ts und inventur.ts: keine Datenbank, kein Netz,
- * keine Uhr. Fehlende Felder werden zu null, nie zu einem Wurf — mit EINER
- * Ausnahme: eine zweite Seite bei den Zutaten wirft (unten, `rezeptZutaten`).
+ * keine Uhr. Fehlende FELDER werden zu null, nie zu einem Wurf. Eine fehlende
+ * oder fremde FORM dagegen wirft (`rezeptStrukturFehler`): ein leeres Ergebnis
+ * aus einer unbekannten Hülle sähe aus wie ein Rezept ohne Zutaten.
  *
  * Die Feldnamen stammen aus dem Enchilada-Abzug vom 14./15.09.2026
  * (src/rezepte.ts, 2.111 Rezepte, 7.452 Zutatenzeilen). Die Hülle der Liste
  * ist gemessen ({data, pagination}); die von Kopf, Zutaten und Meta nicht —
- * der Abzug hat sie ausgepackt gespeichert. `auspacken` erkennt jede der vier
- * bekannten Formen, und eine unbekannte fiele über die Leere-200er-Regel in
- * fnLaden auf.
+ * der Abzug hat sie ausgepackt gespeichert. `auspacken` erkennt die vier
+ * bekannten Hüllen. ~~Eine unbekannte fiele über die Leere-200er-Regel in
+ * fnLaden auf~~ — FALSCH (Review 15.10.2026): `zeilenZaehlen` zählt ein
+ * unbekanntes Objekt als eine Zeile, die Leere-Regel greift dann nicht, und der
+ * Lader hätte die Zutaten gelöscht und `zutaten_geholt_am` gestempelt.
+ * Deshalb prüft `rezeptStrukturFehler` die gemessene Form, bevor geladen wird.
  *
  * Die kleinen Helfer sind aus inventur.ts dupliziert, aus demselben Grund, der
  * dort steht: sie sind in transform.ts nicht exportiert.
@@ -89,6 +93,42 @@ export function rezeptKopf(antwort: unknown): RezeptKopf | null {
   return kopfAusObjekt(alsObjekt(daten))
 }
 
+/**
+ * Passt die Antwort auf die gemessene Form? Gibt den Grund zurück, sonst null.
+ *
+ *   fn:rezepte          ausgepackt eine Liste (gemessen: {data, pagination})
+ *   fn:rezept           ausgepackt ein Objekt mit ganzzahliger id
+ *   fn:rezept_zutaten   ausgepackt eine Liste — die einzige gemessene Form
+ *                       (2.111 von 2.111 Dateien des Einzelabzugs)
+ *   fn:rezept_meta      ausgepackt ein Objekt mit einem Objekt `weight`
+ *                       (2.111 von 2.111)
+ *
+ * fnLaden ruft das VOR dem Laden auf: bei einem Befund wird die Rohantwort
+ * gesichert, eine Zeile in sync.schema_abweichung geschrieben und der Posten
+ * als Fehler gemeldet — core bleibt unberührt.
+ */
+export function rezeptStrukturFehler(endpunkt: string, antwort: unknown): string | null {
+  const { daten, fehler } = auspacken(antwort)
+  if (fehler) return `Hüllenfehler: ${fehler}`
+  const form = Array.isArray(daten) ? 'Liste' : daten === null ? 'null' : typeof daten
+  switch (endpunkt) {
+    case 'fn:rezepte':
+    case 'fn:rezept_zutaten':
+      return Array.isArray(daten) ? null
+        : `${endpunkt}: erwartet eine Liste, bekommen ${form}`
+          + (alsObjekt(daten) ? ` mit Schlüsseln ${Object.keys(daten as object).slice(0, 8).join(', ')}` : '')
+    case 'fn:rezept':
+      return alsId(alsObjekt(daten)?.id) !== null ? null
+        : `fn:rezept: erwartet ein Objekt mit id, bekommen ${form}`
+    case 'fn:rezept_meta':
+      return alsObjekt(alsObjekt(daten)?.weight) ? null
+        : `fn:rezept_meta: erwartet ein Objekt mit weight, bekommen ${form}`
+          + (alsObjekt(daten) ? ` mit Schlüsseln ${Object.keys(daten as object).slice(0, 8).join(', ')}` : '')
+    default:
+      return null
+  }
+}
+
 export type Zutat = {
   fnId: number | null
   /** 1-basiert, in der Reihenfolge der Antwort — FoodNotify liefert keine eigene Position. */
@@ -121,6 +161,7 @@ export function rezeptZutaten(antwort: unknown): Zutat[] {
     throw new Error(`Zutaten über ${seiten.gesamtSeiten} Seiten — der Lader holt nur eine. `
       + 'Paging für /ingredients nachrüsten, bevor dieses Rezept geladen wird.')
   }
+  if (!Array.isArray(daten)) throw new Error(rezeptStrukturFehler('fn:rezept_zutaten', antwort)!)
   return alsListe(daten).map((roh, i): Zutat => {
     const z = alsObjekt(roh) ?? {}
     const lieferant = alsObjekt(z.supplier)
@@ -153,7 +194,8 @@ export type RezeptMeta = {
 /** /api/recipes/{id}/meta — nur das Gewicht; Allergene und Nährwerte bleiben in raw. */
 export function rezeptMeta(antwort: unknown): RezeptMeta {
   const { daten } = auspacken(antwort)
-  const w = alsObjekt(alsObjekt(daten)?.weight) ?? {}
+  const w = alsObjekt(alsObjekt(daten)?.weight)
+  if (!w) throw new Error(rezeptStrukturFehler('fn:rezept_meta', antwort)!)
   return {
     gewichtGesamt: alsZahl(w.total),
     gewichtPerson: alsZahl(w.perPerson),
