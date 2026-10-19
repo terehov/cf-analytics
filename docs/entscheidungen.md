@@ -4191,3 +4191,56 @@ in einen eigenen Schritt (`offene-punkte.md`).
 (3 von 3 Zeilen), ein offener `la:belegzahl`-Posten für 861 und ein aufgegebener `getReport:92`
 werden `abgeschaltet`, der Posten eines anderen Betriebs bleibt offen; danach reiht die Ladenakte
 für 140 Betriebe ein und keinen für 861, die Betriebsberichte (10.500 Posten) keinen für 861.
+
+## 19.10.2026 — Der Rezept-Umlauf wird über den Zyklus verteilt (`0134`)
+
+**Anlass.** Alle ~17.700 Rezepte kamen im ersten Abzug am 15./16.10.2026. Die Umlaufregel aus
+`0132` („Zutaten älter als `REZEPT_UMLAUF_TAGE`“) hätte sie um den 29./30.10. alle gleichzeitig
+fällig gemacht, rund 35.000 Aufrufe in einer Nacht und dreizehn Nächte nichts. Danach wäre es alle
+14 Tage genauso gekommen: die Regel hält den Gleichstand des ersten Abzugs für immer fest.
+
+**Entschieden:** Jedes Rezept hat einen festen Tag im Zyklus,
+`fn_id mod 14 = (Kalendertag in Berlin − 2000-01-01) mod 14`. Es ist an seinem Tag fällig, wenn
+der letzte Abruf **mindestens einen Tag** alt ist, und **immer**, sobald er älter als der Umlauf
+ist (`sync.rezept_umlauf_faellig`). Fällt eine Nacht aus, ist ihre Gruppe am nächsten Tag
+überfällig und wird gelesen. Sie wird nicht einen ganzen Zyklus geschoben. Kein Rezept wird
+älter als Umlauf + 1 Tage, solange höchstens eine Nacht ausfällt. Neue Rezepte und das
+Tagesgeschäft bleiben, wie sie waren. `fn_id` ist FoodNotifys fortlaufende ID. Gemessen an den
+2.111 echten Enchilada-IDs liegen je Rest zwischen 139 und 163 Rezepte, also höchstens 8 % neben
+dem Schnitt von 151.
+
+**Einen Tag Mindestalter statt eines halben Zyklus**, wie es der Auftrag vorschlug. Ein Rezept,
+das außer Takt gelesen wird (neu, überfällig nachgeholt, erster Abzug), muss an seinem nächsten
+Tag einrasten. Liegt dieser Tag näher als die Mindestgrenze, fällt das Rezept in die Regel
+„älter als der Umlauf“. Dann wird es wieder außer Takt gelesen, einen Tag früher im Zyklus.
+Bei sieben Tagen blieben so bis zu sechs Tagesgruppen über sechs Zyklen zusammengeklumpt (rund
+80 Tage). Bei einem Tag rastet jede Gruppe nach höchstens einem Zyklus ein. Allgemein: nur
+Grenzen bis zwei Tage klumpen nicht, weil „älter als 14 Tage“ dann mit dem Tag der Gruppe
+zusammenfällt. Der Test mit 140 gleich alten Rezepten zeigt das (`umlauf.test.ts`): bei einem
+Tag Mindestalter sind es an Tag 2–15 je 10. Bei sieben Tagen wären es an Tag 0–6 null, an Tag
+7–14 je 10 und an Tag 15 sechzig. Ein Tag kostet einen zusätzlichen Abruf je außer Takt
+gelesenem Rezept, und zwar einmal. Das sind die neuen Rezepte eines Tages (Dutzende), nicht der
+Bestand.
+
+**Mitgeändert:** Bisher sperrte im Umlauf jeder Posten, der in den letzten 14 Tagen angelegt wurde.
+Jetzt sperrt nur einer, nach dem keine Zutaten mehr ankamen. Ein gelöschtes Rezept (404) wird
+damit weiter höchstens einmal je Umlauf gefragt. Ein erfolgreich gelesenes Rezept sperrt seinen
+nächsten Tag nicht. Sonst wäre jedes Rezept einen Tag zu spät gekommen, dessen Posten vor 14
+Tagen ein paar Sekunden später angelegt wurde als heute.
+
+**Übergang, gerechnet.** Am 29.10.2026 ist nach der neuen Regel nur die Gruppe mit Rest 12
+fällig: rund 1.260 Rezepte, etwa 2.500 Aufrufe. Überfällig ist an dem Tag noch keins, weil der
+erste Abzug höchstens 14 Tage zurückliegt. Läuft die neue Regel ab dem 20.10., kommen am
+30./31.10. einmalig bis zu drei weitere Gruppen dazu. Das sind die Gruppen, deren Tag zwischen
+dem ersten Abzug und dem ersten Lauf lag (16.–19.10.): bis zu ~5.000 Rezepte, ~10.000 Aufrufe
+statt ~35.000. Zwei davon werden an ihrem eigenen Tag kurz darauf noch einmal gelesen. Ab dem
+zweiten Zyklus sind es ~1.260 je Nacht. Jeder Tag späterer Inbetriebnahme legt eine Gruppe auf
+den 30./31.10.
+
+**Sichtbar (Regel 10):** `mart.rezept_stand.ueberfaellig` (älter als Umlauf + 2 Tage, ohne
+404) und der Zustand `umlauf ueberfaellig` in der Prüfzeile.
+
+**Verworfen:** Fällig, „wenn sein Tag seit dem letzten Abruf vorbeigekommen ist“, also ohne
+genauen Tag. Das holt ausgefallene Tage auch im ersten Zyklus nach. Es legt aber beim ersten Lauf
+alle Gruppen zusammen, deren Tag seit dem Abzug schon vorbei war, und verschiebt die Spitze damit
+nur nach vorn.

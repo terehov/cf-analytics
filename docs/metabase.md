@@ -1793,6 +1793,38 @@ ersten Abzugs: `rezepte_fn` (FoodNotifys Zahl aus der Liste), `rezepte` (bekannt
 
 Noch **keine Dashboard-Karte** — die Sichten sind für Postico und den MCP-Zugang gebaut.
 
+## Rezepte: Datenstand je Rezept (Migration `0134`, 19.10.2026)
+
+**Anlass:** Über den MCP-Zugang beantwortete Claude „in welchen Rezepten steckt 300203" und nannte
+als Datenstand den 15.10.2026. Es nahm `mart.rezept_stand.aeltester_zutatenabruf`, weil
+`mart.artikel_in_rezept` je Rezept keinen Zeitstempel führte. Diese Zahl ist das Minimum über
+**alle** Rezepte der Marke. Die Liste wird täglich geprüft, die Zusammensetzung je Rezept im Umlauf
+neu gelesen.
+
+Neue letzte Spalten:
+
+| Sicht | Spalten |
+|---|---|
+| `mart.rezept_position` | `rezept_zuletzt_gesehen` (`zutaten_geholt_am` gab es schon) |
+| `mart.artikel_in_rezept` | `zutaten_geholt_am` (Rezept der Zeile), `rezept_zuletzt_gesehen`, `via_zutaten_geholt_am` (Halbfabrikat), `weg_zutaten_geholt_am` (ältester Abruf über den ganzen Weg: **der Datenstand der Zeile**) |
+| `mart.rezept_stand` | `ueberfaellig` (Zusammensetzung älter als Umlauf + 2 Tage, ohne 404) |
+
+**Regel für Antworten:** Wer einen Datenstand nennt, nennt `zutaten_geholt_am` der betroffenen
+Rezepte. In `mart.artikel_in_rezept` ist das das Minimum von `weg_zutaten_geholt_am` über die
+gezeigten Zeilen. `rezept_zuletzt_gesehen` belegt nur, dass das Rezept noch existiert, nicht die
+Zusammensetzung. Das steht in den Sichtkommentaren, in der Körnung des MCP-Katalogs und als
+Fallstrick `rezept_stand_kein_rezeptstand` (`deutung`, Warnung bei jeder Abfrage auf
+`mart.rezept_stand`). Der Kommentar von `mart.datenstand.rezepte_zutaten_seit` sagt dasselbe.
+
+**Prüfzeile:** Die Rezept-Zeile in `mart.pruefung_uebersicht` zählt den neuen Zustand
+`umlauf ueberfaellig` mit. Erwartung 0. Mehr als 0 heißt, dass der Umlauf nicht nachkommt
+(Notschalter, Budget, Phase C bricht ab).
+
+**Nicht nachgemessen mit Daten:** Der Klon (`lina_mgmt` + `0130`–`0134`) hat keine Rezepte. Die
+Rekursion in `mart.artikel_in_rezept` trägt eine Spalte mehr (`LEAST` je Schritt) und keinen
+zusätzlichen Join. Die Laufzeit aus `0132` (0,22 s mit Filter auf eine Nummer) sollte deshalb
+bleiben. Nach dem ersten Lauf in Produktion gegenprüfen.
+
 ## `mart.betrieb_schliessung_stand.abgegeben` (Migration `0133`, 19.10.2026)
 
 Neue letzte Spalte: der Betrieb gehört nicht mehr zur Gruppe und wird nicht mehr abgefragt. Seine

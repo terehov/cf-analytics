@@ -1038,7 +1038,7 @@ export type RezeptNachfuellStand = {
   neu: number
   /** Kopf für Verweise auf Rezepte, die wir gar nicht kennen (Nachladen). */
   verweise: number
-  /** Zutaten/Meta (und Kopf) für Rezepte, deren letzter Abruf älter als der Umlauf ist (Nachladen). */
+  /** Zutaten/Meta (und Kopf) für Rezepte, deren Tag im Umlauf gekommen ist oder die älter als der Umlauf sind (Nachladen, 0134). */
   umlauf: number
   gesamt: number
   /** false = REZEPTE_NACHLADEN = 0: nur das Tagesgeschäft wurde eingereiht. */
@@ -1067,15 +1067,24 @@ class Trockenlauf extends Error {
  *      Archivierungen, Löschungen.
  *   3. Verweise auf unbekannte Rezepte (subRecipeId ohne core.rezept): Kopf.
  *   4. Zutaten und Meta: zuerst Rezepte ohne Zutaten (der erste Abzug), dann
- *      die, deren letzter Abruf älter als REZEPT_UMLAUF_TAGE ist; Rezepte, die
- *      nicht (mehr) in der Liste gesehen wurden, mit Kopf — er trägt
- *      `archived`. KEINE Obergrenze: begrenzt nur durch FN_TAGESBUDGET und
- *      NACHLADEN_BIS. Was eine Nacht nicht schafft, bleibt offen in der
+ *      der Umlauf — VERTEILT (0134): jedes Rezept hat einen festen Tag im
+ *      Zyklus von REZEPT_UMLAUF_TAGE und wird an diesem Tag gelesen, wenn
+ *      der letzte Abruf mindestens einen Tag alt ist, und immer, sobald er
+ *      älter als der Umlauf ist (sync.rezept_umlauf_faellig). ~~älter als
+ *      REZEPT_UMLAUF_TAGE~~ allein hätte die ~17.700 Rezepte des ersten
+ *      Abzugs (15./16.10.2026) für immer im selben 14-Tage-Takt gehalten:
+ *      ~35.000 Aufrufe in einer Nacht, dann dreizehn Nächte nichts.
+ *      Rezepte, die nicht (mehr) in der Liste gesehen wurden, mit Kopf — er
+ *      trägt `archived`. KEINE Obergrenze: begrenzt nur durch FN_TAGESBUDGET
+ *      und NACHLADEN_BIS. Was eine Nacht nicht schafft, bleibt offen in der
  *      Schlange und wird nicht doppelt eingereiht.
  *
  * GESPERRT wird gegen einen OFFENEN Zwilling und gegen einen, der innerhalb
- * des Umlaufs schon einmal eingereiht wurde — ein gelöschtes Rezept (404,
- * nicht_gefunden) wird so höchstens einmal je Umlauf gefragt.
+ * des Umlaufs schon einmal eingereiht wurde, OHNE dass seither Zutaten
+ * ankamen — ein gelöschtes Rezept (404, nicht_gefunden) wird so höchstens
+ * einmal je Umlauf gefragt. Ein erfolgreich gelesenes sperrt nicht: sonst
+ * rutschte jedes Rezept, dessen Posten vor 14 Tagen ein paar Sekunden später
+ * angelegt wurde als heute, aus seinem Tag (0134).
  *
  * `trocken`: alles in EINER Transaktion, am Ende zurückgerollt
  * (`bun run einreihen --rezepte --dry-run`). `marken`: nur diese (Praxislauf).
@@ -1174,11 +1183,15 @@ export async function rezepteNachfuellen(
         }
 
         // Gemeinsame Sperre: offen, oder innerhalb des Umlaufs schon einmal eingereiht.
-        const gesperrt = (ep: string) => `EXISTS (SELECT 1 FROM sync.warteschlange w
+        // `seitAbruf`: nur Posten, nach denen keine Zutaten mehr ankamen — ein
+        // gelesenes Rezept sperrt seinen nächsten Tag nicht (0134).
+        const gesperrt = (ep: string, seitAbruf = false) => `EXISTS (SELECT 1 FROM sync.warteschlange w
                                  WHERE w.endpunkt = '${ep}' AND w.marke_key = x.marke_key
                                    AND w.parameter = jsonb_build_object('rezeptId', x.fn_id::text)
                                    AND (w.erledigt_am IS NULL
-                                        OR w.erstellt_am > now() - make_interval(days => $2::int)))`
+                                        OR (w.erstellt_am > now() - make_interval(days => $2::int)${seitAbruf
+                                          ? `
+                                            AND w.erstellt_am > coalesce(x.zutaten_geholt_am, '-infinity')` : ''})))`
 
         // 3. Verweise auf unbekannte Rezepte.
         const verweise = await c.query<{ marke_key: number; fn_id: number }>(
@@ -1217,8 +1230,9 @@ export async function rezepteNachfuellen(
                  LEFT JOIN core.rezept_liste_stand ls ON ls.marke_key = x.marke_key
                 WHERE x.marke_key = ANY($1::int[])
                   AND ${art === 'neu' ? 'x.zutaten_geholt_am IS NULL'
-                        : 'x.zutaten_geholt_am < now() - make_interval(days => $2::int)'}
-                  AND NOT ${gesperrt('fn:rezept_zutaten')}
+                        // Sein Tag im Zyklus, oder älter als der Umlauf (0134).
+                        : 'sync.rezept_umlauf_faellig(x.fn_id, x.zutaten_geholt_am, now(), $2::int)'}
+                  AND NOT ${gesperrt('fn:rezept_zutaten', true)}
              ), p AS (
                SELECT f.marke_key, ep.endpunkt, ep.nr,
                       jsonb_build_object('rezeptId', f.fn_id::text) AS parameter,

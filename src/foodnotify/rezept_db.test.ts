@@ -285,6 +285,52 @@ lauf('Rezepturen mit Datenbank', () => {
     await db.query(`UPDATE core.rezept SET zutaten_geholt_am = now() WHERE fn_id IN (1032008, 983835)`)
   })
 
+  /**
+   * 0134: der Umlauf ist verteilt — ein Rezept wird an SEINEM Tag im Zyklus
+   * gelesen (fn_id mod REZEPT_UMLAUF_TAGE), nicht erst, wenn es älter als der
+   * Umlauf ist. Ein erfolgreich gelesenes sperrt seinen Tag nicht, ein
+   * unbeantworteter Posten (404) schon.
+   */
+  test('Umlauf verteilt: sein Tag reiht ein, ein anderer nicht; nur unbeantwortete Posten sperren', async () => {
+    const { rezepteNachfuellen } = await import('../sync/nachfuellen')
+    const { rows: [t] } = await db.query<{ heute: number; anders: number; gesperrt: number }>(
+      `WITH s AS (SELECT ((now() AT TIME ZONE 'Europe/Berlin')::date - DATE '2000-01-01') % $1::int AS rest)
+       SELECT 990000 + ((s.rest - 990000 % $1::int) + $1::int) % $1::int        AS heute,
+              990000 + ((s.rest - 990000 % $1::int) + $1::int) % $1::int + 1    AS anders,
+              990000 + ((s.rest - 990000 % $1::int) + $1::int) % $1::int + $1::int AS gesperrt
+         FROM s`, [cfg.REZEPT_UMLAUF_TAGE])
+    await db.query(
+      `INSERT INTO core.rezept (marke_key, fn_id, name, in_liste, zuletzt_am, zutaten_geholt_am)
+       SELECT $1, f, 'Umlauf ' || f, true, now(), now() - interval '3 days'
+         FROM unnest($2::int[]) f`, [enchilada, [t.heute, t.anders, t.gesperrt]])
+    // „heute": ein erledigter Posten von VOR dem letzten Abruf — sperrt nicht.
+    // „gesperrt": ein erledigter Posten NACH dem letzten Abruf (404, Antwort ohne Zutaten) — sperrt.
+    await db.query(
+      `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter,
+                                       nachladen, erstellt_am, erledigt_am, ergebnis)
+       VALUES ('fn:rezept_zutaten', current_date - 4, current_date - 4, 41, $1, jsonb_build_object('rezeptId', $2::text),
+               true, now() - interval '4 days', now() - interval '3 days 1 hour', 'ok'),
+              ('fn:rezept_zutaten', current_date - 1, current_date - 1, 41, $1, jsonb_build_object('rezeptId', $3::text),
+               true, now() - interval '1 day', now() - interval '1 day', 'nicht_gefunden')`,
+      [enchilada, String(t.heute), String(t.gesperrt)])
+    try {
+      const s = await rezepteNachfuellen(true)
+      // Nur „heute": Zutaten + Meta (in der Liste gesehen, also ohne Kopf).
+      // „anders" ist drei Tage alt und hat heute nicht seinen Tag — nicht fällig.
+      expect(s).toMatchObject({ umlauf: 2, neu: 0 })
+      // „anders" wird älter als der Umlauf (sein Tag ist ausgefallen) …
+      await db.query(`UPDATE core.rezept SET zutaten_geholt_am = now() - make_interval(days => $2::int)
+                                                                  - interval '1 hour'
+                       WHERE fn_id = $1`, [t.anders, cfg.REZEPT_UMLAUF_TAGE])
+      // … außer er ist überfällig: dann immer.
+      expect(await rezepteNachfuellen(true)).toMatchObject({ umlauf: 4 })
+    } finally {
+      await db.query(`DELETE FROM sync.warteschlange WHERE parameter->>'rezeptId' = ANY($1::text[])`,
+        [[t.heute, t.anders, t.gesperrt].map(String)])
+      await db.query(`DELETE FROM core.rezept WHERE fn_id = ANY($1::int[])`, [[t.heute, t.anders, t.gesperrt]])
+    }
+  })
+
   test('das Tagesgeschäft blättert weiter, solange eine Seite neue Rezepte trägt', async () => {
     // 1048034 (Seite 1) verschwindet aus core — am nächsten Tag ist es "neu".
     await db.query(`DELETE FROM core.rezept WHERE fn_id = 1048034`)

@@ -1206,16 +1206,10 @@ Nachtlauf mit `0132`:
    Obergrenze (1.500 Aufrufe je Tag, Listenseiten nicht mitgezählt) trägt bis rund 10.000
    Rezepte im 14-Tage-Umlauf.~~ **Beantwortet 15.10.2026** (Rezept-Probe, `totalItems`):
    aposto 942, enchilada 2.076, deutsche_konzepte 1.999, wilma_wunder 12.655. Die Obergrenze
-   ist daraufhin entfallen (`entscheidungen.md`). `mart.rezept_stand.tage_seit_aeltestem_abruf`
-   darf nach dem ersten Abzug nicht über 14 steigen, `abzug_pct` muss Nacht für Nacht steigen.
-4a. **Zeigt die Liste archivierte Rezepte nicht?** HYPOTHESE, nicht bewiesen: Liste und Kopf tragen
-   seit der Probe `archived`; das archivierte BA_Horchata-Mix 984639 wird vom aktiven Frozen Oreo
-   Dream verwendet, ist einer der 56 Rezepte, die im Septemberabzug nur über Verweise zu finden
-   waren, und steht nicht in der Septemberliste. Auf den vier Probeseiten 1 (100 Einträge) war
-   kein einziger Eintrag archiviert. Mehr lässt sich ohne neue Aufrufe nicht prüfen: der
-   Septemberabzug kannte das Feld nicht. Nach dem ersten vollen Abzug beantwortbar:
-   `SELECT in_liste, archiviert, count(*) FROM core.rezept GROUP BY 1, 2;` — stimmt die
-   Hypothese, gibt es keine Zeile `in_liste = true, archiviert = true`.
+   ist daraufhin entfallen (`entscheidungen.md`). ~~`mart.rezept_stand.tage_seit_aeltestem_abruf`
+   darf nach dem ersten Abzug nicht über 14 steigen~~ — seit `0134` (verteilter Umlauf) darf
+   er bis 15 gehen; was zählt, ist `mart.rezept_stand.ueberfaellig = 0` (Zustand nicht
+   `umlauf ueberfaellig`). `abzug_pct` muss Nacht für Nacht steigen.
 5. **`zuordnung = 'nummer ohne einkauf'`:** bei Enchilada 446 von 5.233 Positionen mit
    Nummer (8,5 %), 49 verschiedene Nummern, gemessen am Einzelabzug gegen den Einkauf des
    Vollklons. Ob das Altnummern, andere Lieferanten oder Tippfehler sind, ist nicht
@@ -1225,6 +1219,22 @@ Nachtlauf mit `0132`:
    200004, 10956) wird nicht unterschieden.
 7. **`meta.weight.loss`:** Bedeutung offen (0, 100, 4,42, 60,01 …), steht roh in
    `core.rezept.verlust_roh`. Nicht damit rechnen, bis jemand bei FoodNotify nachsieht.
+8. **Verteilter Umlauf nach dem ersten Lauf gegenprüfen (`0134`, 19.10.2026).** Gerechnet: ~1.260
+   Rezepte bzw. ~2.500 Aufrufe je Nacht, einmalig bis ~5.000 Rezepte am 30./31.10. (die
+   Tagesgruppen, deren Tag zwischen erstem Abzug und Inbetriebnahme lag — jede Nacht spätere
+   Inbetriebnahme ab dem 20.10. legt eine Gruppe dazu). Nachsehen:
+   `SELECT zeitraum_von, count(*) FROM sync.warteschlange WHERE endpunkt = 'fn:rezept_zutaten'
+   AND nachladen GROUP BY 1 ORDER BY 1 DESC LIMIT 20;` — ab Mitte November eine flache Reihe um
+   1.260. Dazu `mart.artikel_in_rezept` mit Filter auf eine Nummer einmal timen (mit Daten nicht
+   gemessen, der Klon hatte keine Rezepte).
+4a. **Zeigt die Liste archivierte Rezepte nicht?** HYPOTHESE, nicht bewiesen: Liste und Kopf tragen
+   seit der Probe `archived`; das archivierte BA_Horchata-Mix 984639 wird vom aktiven Frozen Oreo
+   Dream verwendet, ist einer der 56 Rezepte, die im Septemberabzug nur über Verweise zu finden
+   waren, und steht nicht in der Septemberliste. Auf den vier Probeseiten 1 (100 Einträge) war
+   kein einziger Eintrag archiviert. Mehr lässt sich ohne neue Aufrufe nicht prüfen: der
+   Septemberabzug kannte das Feld nicht. Nach dem ersten vollen Abzug beantwortbar:
+   `SELECT in_liste, archiviert, count(*) FROM core.rezept GROUP BY 1, 2;` — stimmt die
+   Hypothese, gibt es keine Zeile `in_liste = true, archiviert = true`.
 
 ## Nachprüfung nach dem Deploy von `0076` (Phase 4)
 

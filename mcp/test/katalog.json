@@ -167,10 +167,10 @@
   },
   {
    "sicht": "mart.artikel_in_rezept",
-   "koernung": "Marke × Ware (Lieferanten-Artikelnummer) × Rezept (rezept_fn_id) × Weg ueber Halbfabrikate — dieselbe Ware steht je Ebene erneut; Rezeptnamen sind nicht eindeutig, nach rezept_fn_id gruppieren oder zaehlen",
+   "koernung": "Marke × Ware (Lieferanten-Artikelnummer) × Rezept (rezept_fn_id) × Weg ueber Halbfabrikate — dieselbe Ware steht je Ebene erneut; Rezeptnamen sind nicht eindeutig, nach rezept_fn_id gruppieren oder zaehlen. Zusammensetzung Stand zutaten_geholt_am (ueber Halbfabrikate: weg_zutaten_geholt_am); die Rezeptliste wird taeglich geprueft (rezept_zuletzt_gesehen); wer einen Datenstand nennt, nennt zutaten_geholt_am der betroffenen Rezepte, nicht den aeltesten Abruf der Marke",
    "thema": "rezept",
    "summen_erlaubt": false,
-   "kommentar": "In welchen Rezepten steckt eine Ware -- direkt (ebene 1) oder ueber Halbfabrikate\n(ebene 2, 3, ...). Eine Zeile je Ware, Rezept und Weg. via_rezept ist das\nHalbfabrikat, ueber das die Ware in das Rezept kommt; pfad zeigt den ganzen Weg\nvom Rezept bis zum Halbfabrikat, in dem die Ware direkt steht. menge/einheit ist\ndie Menge im Rezept, in dem die Ware DIREKT steht (direkt_rezept) -- Mengen werden\nueber Ebenen NICHT multipliziert und sind ueber Einheiten nicht summierbar.\nFiltern ueber artikelnummer (Lieferanten-Artikelnummer). REZEPTNAMEN SIND NICHT\nEINDEUTIG: Wilma Wunder fuehrt viele Rezepte mehrfach unter gleichem Namen (300203:\n26 Rezepte unter 3 Namen) -- nach rezept_fn_id gruppieren oder zaehlen, nicht nach\nrezept; rezept_erstellt_am unterscheidet die Fassungen.\n\nKoernung: Marke × Ware (Lieferanten-Artikelnummer) × Rezept (rezept_fn_id) × Weg ueber Halbfabrikate — dieselbe Ware steht je Ebene erneut; Rezeptnamen sind nicht eindeutig, nach rezept_fn_id gruppieren oder zaehlen",
+   "kommentar": "In welchen Rezepten steckt eine Ware -- direkt (ebene 1) oder ueber Halbfabrikate\n(ebene 2, 3, ...). Eine Zeile je Ware, Rezept und Weg. via_rezept ist das\nHalbfabrikat, ueber das die Ware in das Rezept kommt; pfad zeigt den ganzen Weg\nvom Rezept bis zum Halbfabrikat, in dem die Ware direkt steht. menge/einheit ist\ndie Menge im Rezept, in dem die Ware DIREKT steht (direkt_rezept) -- Mengen werden\nueber Ebenen NICHT multipliziert und sind ueber Einheiten nicht summierbar.\nFiltern ueber artikelnummer (Lieferanten-Artikelnummer). REZEPTNAMEN SIND NICHT\nEINDEUTIG: Wilma Wunder fuehrt viele Rezepte mehrfach unter gleichem Namen (300203:\n26 Rezepte unter 3 Namen) -- nach rezept_fn_id gruppieren oder zaehlen, nicht nach\nrezept; rezept_erstellt_am unterscheidet die Fassungen.\n\nDATENSTAND: zutaten_geholt_am ist der Stand des Rezepts der Zeile, via_zutaten_geholt_am der des Halbfabrikats, weg_zutaten_geholt_am der aelteste ueber den ganzen Weg -- das ist der Datenstand der Zeile. Die Rezeptliste wird taeglich geprueft (rezept_zuletzt_gesehen), die Zusammensetzung alle 14 Tage neu gelesen. Wer einen Datenstand nennt, nennt den der betroffenen Rezepte (Minimum von weg_zutaten_geholt_am ueber die gezeigten Zeilen) -- nicht den aeltesten Abruf der Marke (mart.rezept_stand.aeltester_zutatenabruf).\n\nKoernung: Marke × Ware (Lieferanten-Artikelnummer) × Rezept (rezept_fn_id) × Weg ueber Halbfabrikate — dieselbe Ware steht je Ebene erneut; Rezeptnamen sind nicht eindeutig, nach rezept_fn_id gruppieren oder zaehlen. Zusammensetzung Stand zutaten_geholt_am (ueber Halbfabrikate: weg_zutaten_geholt_am); die Rezeptliste wird taeglich geprueft (rezept_zuletzt_gesehen); wer einen Datenstand nennt, nennt zutaten_geholt_am der betroffenen Rezepte, nicht den aeltesten Abruf der Marke",
    "spalten": [
     "marke",
     "marke_key",
@@ -202,7 +202,11 @@
     "basis_einheit",
     "via_archiviert",
     "rezept_erstellt_am",
-    "direkt_rezept_fn_id"
+    "direkt_rezept_fn_id",
+    "zutaten_geholt_am",
+    "rezept_zuletzt_gesehen",
+    "via_zutaten_geholt_am",
+    "weg_zutaten_geholt_am"
    ],
    "achsen": [
     "lieferant",
@@ -781,7 +785,7 @@
    "koernung": null,
    "thema": null,
    "summen_erlaubt": null,
-   "kommentar": "Eine Zeile je handgepflegter Schliessung und ob sie wirkt. ERWARTUNG: zustand = wirkt. \"wirkt nicht\" heisst: es gibt Umsatz nach dem letzten offenen Tag, der Betrieb steht wieder auf operativ.",
+   "kommentar": "Eine Zeile je handgepflegter Schliessung und ob sie wirkt. ERWARTUNG: zustand = wirkt. \"wirkt nicht\" heisst: es gibt Umsatz nach dem letzten offenen Tag, der Betrieb steht wieder auf operativ. abgegeben (0133): der Betrieb gehoert nicht mehr zur Gruppe, der Importer fragt ihn nicht mehr ab.",
    "spalten": [
     "betrieb_key",
     "betrieb",
@@ -791,7 +795,8 @@
     "status",
     "zustand",
     "notiz",
-    "gepflegt_am"
+    "gepflegt_am",
+    "abgegeben"
    ],
    "achsen": [
     "betrieb_key",
@@ -5393,10 +5398,10 @@
   },
   {
    "sicht": "mart.rezept_position",
-   "koernung": "Marke × Rezept (rezept_fn_id) × Zutatenposition — eine Zeile je Position, wie FoodNotify sie fuehrt. Rezeptnamen sind nicht eindeutig: nach rezept_fn_id gruppieren oder zaehlen",
+   "koernung": "Marke × Rezept (rezept_fn_id) × Zutatenposition — eine Zeile je Position, wie FoodNotify sie fuehrt. Rezeptnamen sind nicht eindeutig: nach rezept_fn_id gruppieren oder zaehlen. Zusammensetzung Stand zutaten_geholt_am; die Rezeptliste wird taeglich geprueft (rezept_zuletzt_gesehen); wer einen Datenstand nennt, nennt zutaten_geholt_am der betroffenen Rezepte, nicht den aeltesten Abruf der Marke",
    "thema": "rezept",
    "summen_erlaubt": false,
-   "kommentar": "Eine Zeile je Rezept und Zutatenposition, so wie FoodNotify sie fuehrt (je Marke,\nnicht je Betrieb). artikelnummer ist die LIEFERANTEN-Artikelnummer -- nicht die\nLINA-Artikelnummer der Kasse. zuordnung sagt, ob die Nummer im Einkauf derselben\nMarke vorkommt: eingekauft / nummer ohne einkauf / ohne nummer / unterrezept.\nkosten ist FoodNotifys Wert und nicht aus Unterrezepten nachrechenbar; bei\nUnterrezept-Zeilen steht dort oft 0. Mengen nur innerhalb einer Einheit\nvergleichen.\n\nKoernung: Marke × Rezept (rezept_fn_id) × Zutatenposition — eine Zeile je Position, wie FoodNotify sie fuehrt. Rezeptnamen sind nicht eindeutig: nach rezept_fn_id gruppieren oder zaehlen",
+   "kommentar": "Eine Zeile je Rezept und Zutatenposition, so wie FoodNotify sie fuehrt (je Marke,\nnicht je Betrieb). artikelnummer ist die LIEFERANTEN-Artikelnummer -- nicht die\nLINA-Artikelnummer der Kasse. zuordnung sagt, ob die Nummer im Einkauf derselben\nMarke vorkommt: eingekauft / nummer ohne einkauf / ohne nummer / unterrezept.\nkosten ist FoodNotifys Wert und nicht aus Unterrezepten nachrechenbar; bei\nUnterrezept-Zeilen steht dort oft 0. Mengen nur innerhalb einer Einheit\nvergleichen.\n\nDATENSTAND: zutaten_geholt_am ist der Stand der Zusammensetzung DIESES Rezepts. Die Rezeptliste wird taeglich geprueft (rezept_zuletzt_gesehen), die Zusammensetzung bekannter Rezepte alle 14 Tage neu gelesen, je Rezept an einem festen Tag. Wer einen Datenstand nennt, nennt zutaten_geholt_am der betroffenen Rezepte -- nicht den aeltesten Abruf der Marke (mart.rezept_stand.aeltester_zutatenabruf).\n\nKoernung: Marke × Rezept (rezept_fn_id) × Zutatenposition — eine Zeile je Position, wie FoodNotify sie fuehrt. Rezeptnamen sind nicht eindeutig: nach rezept_fn_id gruppieren oder zaehlen. Zusammensetzung Stand zutaten_geholt_am; die Rezeptliste wird taeglich geprueft (rezept_zuletzt_gesehen); wer einen Datenstand nennt, nennt zutaten_geholt_am der betroffenen Rezepte, nicht den aeltesten Abruf der Marke",
    "spalten": [
     "marke",
     "marke_key",
@@ -5424,7 +5429,8 @@
     "basis_menge",
     "basis_einheit",
     "unterrezept_archiviert",
-    "rezept_erstellt_am"
+    "rezept_erstellt_am",
+    "rezept_zuletzt_gesehen"
    ],
    "achsen": [
     "lieferant",
@@ -5436,10 +5442,10 @@
   },
   {
    "sicht": "mart.rezept_stand",
-   "koernung": "eine Marke — Ladestand der Rezepte",
+   "koernung": "eine Marke — Ladestand der Rezepte; aeltester_zutatenabruf ist kein Datenstand einzelner Rezepte",
    "thema": "import",
    "summen_erlaubt": false,
-   "kommentar": "Je Marke: wie viele Rezepte geladen sind, wie viele nur ueber einen Verweis\ngefunden wurden, wie viele noch ohne Zutaten sind, und wann die Rezeptliste\nzuletzt geholt wurde. zustand: ok / zutaten ausstehend (Backfill laeuft) /\nzutaten leer, keine rezepte, liste veraltet, liste nie geholt, zugang ausgefallen,\ntagesgeschaeft gedeckelt, volle runde nicht abgeschlossen (Befunde, Regel 10) / kein FoodNotify-Zulauf (Marke hatte nie\neine FoodNotify-Aufgabe, kein Befund). Fortschritt des ersten\nAbzugs: rezepte_fn (FoodNotifys Zahl), rezepte (bekannt), mit_zutaten, ohne_zutaten\n(Rest), abzug_pct (Prozentzahl). archiviert zaehlt archivierte Rezepte (sie bleiben\ndrin). nicht_gefunden: Rezepte,\nauf die FoodNotify mit 404 antwortet (vermutlich geloescht). verweise_ohne_rezept:\nHalbfabrikate, auf die ein Rezept zeigt, die wir aber nicht kennen.\n\nKoernung: eine Marke — Ladestand der Rezepte",
+   "kommentar": "Je Marke: wie viele Rezepte geladen sind, wie viele nur ueber einen Verweis\ngefunden wurden, wie viele noch ohne Zutaten sind, und wann die Rezeptliste\nzuletzt geholt wurde. zustand: ok / zutaten ausstehend (Backfill laeuft) /\nzutaten leer, keine rezepte, liste veraltet, liste nie geholt, zugang ausgefallen,\ntagesgeschaeft gedeckelt, volle runde nicht abgeschlossen (Befunde, Regel 10) / kein FoodNotify-Zulauf (Marke hatte nie\neine FoodNotify-Aufgabe, kein Befund). Fortschritt des ersten\nAbzugs: rezepte_fn (FoodNotifys Zahl), rezepte (bekannt), mit_zutaten, ohne_zutaten\n(Rest), abzug_pct (Prozentzahl). archiviert zaehlt archivierte Rezepte (sie bleiben\ndrin). nicht_gefunden: Rezepte,\nauf die FoodNotify mit 404 antwortet (vermutlich geloescht). verweise_ohne_rezept:\nHalbfabrikate, auf die ein Rezept zeigt, die wir aber nicht kennen.\n\naeltester_zutatenabruf ist das Minimum ueber ALLE Rezepte der Marke und KEIN Datenstand fuer ein einzelnes Rezept. ueberfaellig: Rezepte, deren Zusammensetzung laenger als Umlauf + 2 Tage nicht gelesen wurde (Zustand umlauf ueberfaellig, Befund).\n\nKoernung: eine Marke — Ladestand der Rezepte; aeltester_zutatenabruf ist kein Datenstand einzelner Rezepte",
    "spalten": [
     "marke_key",
     "marke",
@@ -5464,7 +5470,8 @@
     "abzug_pct",
     "volle_runde_am",
     "volle_runde_abgeschlossen_am",
-    "tagesgeschaeft_gedeckelt_am"
+    "tagesgeschaeft_gedeckelt_am",
+    "ueberfaellig"
    ],
    "achsen": [
     "marke"
@@ -7677,6 +7684,21 @@
    "hinweis": "count(distinct rezept) zaehlt Namen, nicht Rezepte: Rezeptnamen sind nicht eindeutig, Wilma Wunder fuehrt viele Rezepte mehrfach unter gleichem Namen.",
    "berichtigung": "Nach rezept_fn_id gruppieren oder zaehlen.",
    "quelle": "0132"
+  },
+  {
+   "schluessel": "rezept_stand_kein_rezeptstand",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.rezept_stand",
+   "parameter": {
+    "spalten": [
+     "aeltester_zutatenabruf",
+     "tage_seit_aeltestem_abruf"
+    ]
+   },
+   "hinweis": "aeltester_zutatenabruf ist das Minimum ueber ALLE Rezepte der Marke -- kein Datenstand fuer einzelne Rezepte. Die Zusammensetzung wird je Rezept an einem festen Tag im 14-Tage-Umlauf neu gelesen, die Rezeptliste taeglich; ein einzelnes Rezept ist meist viel frischer.",
+   "berichtigung": "Fuer den Datenstand einer Rezeptantwort zutaten_geholt_am der betroffenen Rezepte nennen (mart.rezept_position, mart.artikel_in_rezept; ueber Halbfabrikate weg_zutaten_geholt_am).",
+   "quelle": "0134"
   },
   {
    "schluessel": "schwellen_seit_0129",

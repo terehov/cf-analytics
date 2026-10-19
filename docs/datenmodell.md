@@ -1388,3 +1388,24 @@ Gruppe; der Importer fragt den Betrieb nicht mehr ab (`NICHT_ABGEGEBEN` in
 `src/sync/nachfuellen.ts`). `mart.betrieb_schliessung_stand` führt die Spalte am Ende. Der
 Betriebsstatus bleibt `geschlossen` — ein eigener Statuswert hätte jede Karte mit
 `status = 'geschlossen'` still verfehlt. Entscheidung: `entscheidungen.md`, 19.10.2026.
+
+## Rezepte: Frische je Rezept, verteilter Umlauf (`0134`, 19.10.2026)
+
+* `mart.rezept_position` hängt `rezept_zuletzt_gesehen` an (`core.rezept.zuletzt_am`: Liste oder
+  Kopf). `zutaten_geholt_am` führte die Sicht schon; der Spaltenkommentar sagt jetzt, dass das
+  der Datenstand der Zeile ist.
+* `mart.artikel_in_rezept` hängt vier Zeitstempel an: `zutaten_geholt_am` (Rezept der Zeile),
+  `rezept_zuletzt_gesehen`, `via_zutaten_geholt_am` (das Halbfabrikat `via_rezept`) und
+  `weg_zutaten_geholt_am` — das Minimum über alle Rezepte des Wegs, in der Rekursion
+  mitgetragen. Bei Ebene 3 stünde sonst für das Rezept, in dem die Ware direkt steht, gar kein
+  Stempel in der Zeile.
+* `mart.rezept_stand` hängt `ueberfaellig` an (Zusammensetzung älter als Umlauf + 2 = 16 Tage,
+  ohne `fehlt_seit`), neuer Zustand `umlauf ueberfaellig` (in der Prüfzeile von
+  `mart.pruefung_uebersicht`). Die 16 Tage stehen als Zahl in der Sicht; `src/foodnotify/umlauf.test.ts`
+  hält sie gegen den Standardwert von `REZEPT_UMLAUF_TAGE`.
+* `sync.rezept_umlauf_faellig(fn_id, zutaten_geholt_am, jetzt, umlauf)` — die Auswahl im Umlauf
+  als Funktion, damit Nachfüllen, Test und Vorausrechnung dieselbe Regel lesen
+  (`entscheidungen.md`, 19.10.2026).
+* Abschnitt 0 der Migration vergleicht die Spaltenlisten der drei Sichten in der Zieldatenbank mit
+  dem Stand `0133` und bricht bei Abweichung ab — `0132` wurde nach dem ersten Anlegen mehrfach
+  nachgebessert, und eine fremde Fassung soll nicht still überschrieben werden.

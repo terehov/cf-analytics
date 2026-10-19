@@ -1933,7 +1933,8 @@ nach der Probe: rund 17.700 Rezepte, davon 12.655 bei Wilma Wunder). Der Posten 
   derselbe `FnClient`, kein zweiter, Regel 3): die **volle Listenrunde** einmal je Woche
   (`{seite, runde: 'voll'}`; Seite 1 reiht alle übrigen ein), Verweise auf unbekannte Rezepte, der
   **erste Abzug** (alle Rezepte ohne Zutaten, mengenbasiert in einer Anweisung eingereiht) und der
-  **Umlauf** (`REZEPT_UMLAUF_TAGE` = 14; Rezepte, die nie in der Liste standen oder ~~seit drei
+  **Umlauf** (`REZEPT_UMLAUF_TAGE` = 14, **verteilt seit `0134`**, Absatz „Umlauf verteilt" unten;
+  Rezepte, die nie in der Liste standen oder ~~seit drei
   Tagen~~ in der letzten **abgeschlossenen** vollen Runde nicht mehr gesehen wurden, mit Kopf — er
   trägt `archived`). Eine Runde gilt als abgeschlossen, wenn keine ihrer Seiten mehr offen ist; der
   Lader stempelt dann `volle_runde_fertig_beginn` (= Beginn der Runde) und `_ende`. Die
@@ -1961,8 +1962,24 @@ nach der Probe: rund 17.700 Rezepte, davon 12.655 bei Wilma Wunder). Der Posten 
   zurück, heißt der Zustand `zugang ausgefallen` und zählt als auffällig.
   `sync.lauf.nachladen_posten/_offen` bleiben LINA-Zahlen.
 
+**Umlauf verteilt (`0134`, 19.10.2026).** ~~Fällig ist, wessen Zutaten älter als
+`REZEPT_UMLAUF_TAGE` sind.~~ Diese Regel hätte die ~17.700 Rezepte des ersten Abzugs (15./16.10.2026)
+um den 29./30.10. alle in einer Nacht fällig gemacht (~35.000 Aufrufe) und danach alle 14 Tage wieder.
+Jetzt entscheidet `sync.rezept_umlauf_faellig(fn_id, zutaten_geholt_am, now(), REZEPT_UMLAUF_TAGE)`:
+Jedes Rezept hat einen festen Tag (`fn_id mod 14 = Tageszahl mod 14`, Kalendertag in Berlin). An
+diesem Tag ist es fällig, wenn der letzte Abruf mindestens einen Tag alt ist. Älter als der Umlauf
+ist es immer fällig, damit eine ausgefallene Nacht am nächsten Tag nachgeholt wird. Kein Rezept wird
+älter als Umlauf + 1 Tage, solange höchstens eine Nacht ausfällt. In Ruhe sind es ~1.260 Rezepte bzw.
+~2.500 Aufrufe je Nacht. Warum ein Tag und nicht ein halber Zyklus: `entscheidungen.md`, 19.10.2026.
+Bleibt der Umlauf zurück, zählt `mart.rezept_stand.ueberfaellig` die Rezepte, die älter als Umlauf +
+2 Tage sind. Der Zustand heißt dann `umlauf ueberfaellig` und ist in der Prüfzeile auffällig.
+Erster Abzug, neue Rezepte und Tagesgeschäft sind unverändert.
+
 **Sperren.** Gegen einen offenen Zwilling und gegen einen, der innerhalb des Umlaufs schon einmal
-eingereiht wurde. ~~Ein gelöschtes Rezept (HTTP 404) wird so höchstens einmal je Umlauf gefragt.~~
+eingereiht wurde. Für Zutaten im Umlauf gilt das seit `0134` nur, wenn **nach** diesem Posten keine
+Zutaten mehr ankamen (`erstellt_am > zutaten_geholt_am`). Ein erfolgreich gelesenes Rezept sperrt
+seinen nächsten Tag also nicht. Sonst fiele es aus seinem Tag, sobald der Posten vor 14 Tagen ein paar
+Sekunden später angelegt wurde als heute. Ein 404 sperrt weiter für einen Umlauf. ~~Ein gelöschtes Rezept (HTTP 404) wird so höchstens einmal je Umlauf gefragt.~~
 Das stimmte nicht (Review 15.10.2026): ein 404 war `aufgegeben`, `aufgegebeneWiederbeleben()` holte
 ihn dreimal zurück (bis zu acht Aufrufe je Umlauf), und er stand für immer in
 `mart.posten_aufgegeben`.

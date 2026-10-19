@@ -196,3 +196,19 @@ Eine Runde ohne offene Seite schließt das Nachfüllen auch dann ab, wenn eine S
 Dazu `archiviert`, `basis_menge`/`basis_einheit`,
 `core.rezept_liste_stand` und der Fortschritt in `mart.rezept_stand`. Für den ersten echten Lauf
 vor dem Push: `bun run rezepte-praxis` (`importer.md`) gegen eine lokale Datenbank.
+
+**Nachtrag 19.10.2026, Migration `0134`:**
+
+* **Datenstand je Rezept.** `mart.artikel_in_rezept` führt `zutaten_geholt_am`, `via_zutaten_geholt_am`,
+  `weg_zutaten_geholt_am` (ältester Abruf über den Weg, der Datenstand der Zeile) und
+  `rezept_zuletzt_gesehen`, `mart.rezept_position` dazu `rezept_zuletzt_gesehen`. Anlass: Eine
+  MCP-Antwort zu 300203 nannte `rezept_stand.aeltester_zutatenabruf` (Minimum der Marke) als
+  Datenstand. Seitdem gibt es dafür einen Fallstrick.
+* **Umlauf verteilt** (Abschnitt 5 und Entscheidung D gelten weiter, 14 Tage): Jedes Rezept hat
+  einen festen Tag im Zyklus (`fn_id mod 14`). Es ist an seinem Tag fällig ab einem Tag Alter und
+  immer, sobald es älter als 14 Tage ist (`sync.rezept_umlauf_faellig`). Ohne diese Regel wären
+  die ~17.700 Rezepte des ersten Abzugs um den 29./30.10. in einer Nacht fällig geworden. Am
+  29.10. sind nach der neuen Regel ~1.260 fällig (~2.500 Aufrufe). Einmalig am 30./31.10. sind es
+  bis ~5.000, danach ~1.260 je Nacht. Begründung: `entscheidungen.md`, 19.10.2026.
+* **Regel 10:** `mart.rezept_stand.ueberfaellig` (älter als 16 Tage, ohne 404) und Zustand
+  `umlauf ueberfaellig` in der Prüfzeile.

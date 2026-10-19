@@ -5176,3 +5176,38 @@ garantiert. Hier garantiert er sie nicht — also darf kein Stand, der aus der D
 nur beim Start gelesen werden. Die übrigen Startwerte des Servers sind Code (`alleKarten` aus
 `metabase/karten-*.ts`) und kommen mit dem Container; der Gesundheitsstand hat seit dem
 21.09.2026 seine Nachprobe, der Katalog seit heute seinen Takt.
+
+## Ein Datenstand der Marke wurde als Datenstand eines Rezepts genannt (19.10.2026)
+
+**Symptom.** Claude beantwortete über den MCP-Zugang „in welchen Rezepten steckt 300203“ und
+nannte als Datenstand den 15.10.2026. Die Rezeptliste wird aber täglich geprüft, und die
+Zusammensetzung jedes Rezepts wird im 14-Tage-Umlauf neu gelesen. Der genannte Tag war der
+älteste Zutatenabruf aller Wilma-Wunder-Rezepte, nicht der Stand der gezeigten Rezepte.
+
+**Ursache.** `mart.artikel_in_rezept` führte je Zeile keinen Zeitstempel. Die einzige Zeitangabe,
+die das Modell fand, war `mart.rezept_stand.aeltester_zutatenabruf`, ein Minimum je Marke, das zum
+Umlauf gehört. Kein Kommentar und kein Fallstrick sagte, dass sie nicht als Datenstand taugt.
+
+**Was es künftig verhindert (`0134`).** `artikel_in_rezept` führt `zutaten_geholt_am`,
+`via_zutaten_geholt_am`, `weg_zutaten_geholt_am` (ältester Abruf über den Weg) und
+`rezept_zuletzt_gesehen`, `rezept_position` dazu `rezept_zuletzt_gesehen`. Kommentare und Körnung
+sagen, welcher Wert der Datenstand ist. Der Fallstrick `rezept_stand_kein_rezeptstand` (`deutung`)
+warnt bei jeder Abfrage auf `mart.rezept_stand`.
+
+## Der Rezept-Umlauf hätte den ersten Abzug für immer im Gleichschritt gehalten (19.10.2026, vor dem Eintreten)
+
+**Symptom (gerechnet, nicht eingetreten).** Alle ~17.700 Rezepte kamen am 15./16.10.2026. Mit der
+Regel „Zutaten älter als 14 Tage“ wären sie um den 29./30.10. alle in einer Nacht fällig geworden
+(~35.000 Aufrufe), danach dreizehn Nächte nichts, und das alle 14 Tage wieder.
+
+**Ursache.** Eine reine Altersgrenze verteilt nichts. Sie behält die Verteilung des ersten Abrufs
+bei, und der erste Abzug war ein Block.
+
+**Was es künftig verhindert (`0134`).** Jedes Rezept hat einen festen Tag im Zyklus
+(`sync.rezept_umlauf_faellig`). Die Altersgrenze dient nur noch als Netz für ausgefallene Nächte.
+`src/foodnotify/umlauf.test.ts` simuliert 140 gleich alte Rezepte (je Nacht 10, keines älter als
+Umlauf + 1) und eine ausgefallene Nacht (am Folgetag nachgeholt). Bleibt der Umlauf zurück, zeigt
+`mart.rezept_stand` den Zustand `umlauf ueberfaellig`, und die Prüfzeile schlägt an. Nebenbei
+gefunden: Die Sperre „innerhalb des Umlaufs schon einmal eingereiht“ hätte jedes Rezept einen Tag
+verschoben, dessen Posten vor 14 Tagen ein paar Sekunden später angelegt wurde. Seit `0134` sperrt
+sie nur noch Posten, nach denen keine Zutaten ankamen.

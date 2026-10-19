@@ -912,7 +912,14 @@ const Schema = z.object({
    * 2.076, deutsche_konzepte 1.999, wilma_wunder 12.655 — zusammen ~17.700,
    * also ~1.260 Rezepte bzw. ~2.500 Aufrufe (Zutaten + Meta) je Nacht im
    * Nachladen, gegen ein FoodNotify-Tagesbudget von 140.000. Was liegen
-   * bleibt, zeigt mart.rezept_stand (tage_seit_aeltestem_abruf).
+   * bleibt, zeigt mart.rezept_stand (~~tage_seit_aeltestem_abruf~~
+   * ueberfaellig, Zustand 'umlauf ueberfaellig', seit 0134).
+   *
+   * VERTEILT seit 0134 (sync.rezept_umlauf_faellig): jedes Rezept hat einen
+   * festen Tag im Zyklus (fn_id mod N), faellig an diesem Tag ab einem Tag
+   * Alter und immer, sobald es aelter als N Tage ist. Wer N aendert, aendert
+   * die 16 Tage (N + 2) in mart.rezept_stand.ueberfaellig mit —
+   * src/foodnotify/umlauf.test.ts prueft beides gegeneinander.
    */
   REZEPT_UMLAUF_TAGE: z.coerce.number().int().min(1).default(14),
 
