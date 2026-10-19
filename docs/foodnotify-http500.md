@@ -26,6 +26,30 @@
 > Wiedervorlage je Nacht, `FN_POSITIONEN_MAX_NAECHTE = 10` Nächte lang
 > (`entscheidungen.md`, E3 vom 10.09.2026).
 
+> **Nachtrag 19.10.2026 — die Ursache ist gefunden: ein Artikel, „Pickled Onions Gelb 3Kg Eimer“.**
+> Im Browser mit Eugenes Enchilada-Zugang nachgesehen, nur lesend:
+>
+> * Unser `orderId` ist die ID des Bestellvorgangs, die Oberfläche zeigt die Nummer der
+>   Lieferantenbestellung (`markedShopOrder.orderId`). Bestellnummer 451 ist bei uns 638090,
+>   in der Oberfläche 645599. Unter dieser Nummer öffnet sich die Bestellung **vollständig**,
+>   mit 44 Artikeln und 1.587,37 €.
+> * Derselbe Abruf, den der Importer macht (`/api/10262/shop-order/638090/change`), scheitert
+>   auch in der Browser-Sitzung, mit Fehlertext:
+>   `{"statusCode":500,"title":"NonUniqueResultException","message":"More than one result was
+>   found for query although one row or none was expected."}` — FoodNotify findet zu einem
+>   Datensatz zwei Treffer, wo einer erwartet ist. Ein Datenfehler bei FoodNotify, nicht bei uns.
+> * Die 17 DISTRA-Bestellungen der Bar auf der ersten Listenseite (447–463) einzeln geprüft:
+>   14 antworten mit 500, 3 mit 200 (449, 450, 462). **Genau ein Artikel steckt in allen 14
+>   kaputten und in keiner der 3 guten: `productId` 27826673 = Pickled Onions Gelb 3Kg Eimer,
+>   DISTRA-Artikelnummer 500081, 15,51 €.** Vermutlich ist er in der Kostenstelle 10262 doppelt
+>   zugeordnet; andere Betriebe bestellen dieselbe Nummer ohne Fehler.
+> * Auch 447 und 448 scheitern inzwischen. Ihre Positionen haben wir aus dem ersten Abruf; jeder
+>   spätere Nachabruf läuft auf den Fehler. Das bestätigt die Lesart vom 15.10.: der Artikel
+>   macht jede Bestellung kaputt, in der er steht, auch rückwirkend.
+>
+> Abhilfe kann nur bei FoodNotify oder in der Artikelzuordnung der Bar liegen. Danach holt der
+> Importer die Positionen von selbst nach (Wiederbelebung, Fingerabdruck). Offen in `offene-punkte.md`.
+
 > **Nachtrag 15.10.2026 — seit dem 31.08. ist es eine Kostenstelle, nicht einzelne Bestellungen.**
 > Gemessen über MCP auf `mart.einkauf_beleg` (Bestellungen 15.08.–10.10.2026, nicht storniert,
 > `positionen = 0`): **genau eine** Kombination im ganzen Konzern ist betroffen — Enchilada Augsburg,

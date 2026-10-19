@@ -114,6 +114,14 @@ Arbeitsliste: Karte *Betriebe ohne laufendes Geschäft* auf Dashboard ⑥, bzw.
 
 ### FoodNotify: Bar Enchilada Augsburg / DISTRA lädt seit 31.08.2026 keine Positionen (gefunden 15.10.2026)
 
+> **Stand 19.10.2026: Ursache gefunden.** Der Artikel „Pickled Onions Gelb 3Kg Eimer“ (DISTRA 500081,
+> FoodNotify-`productId` 27826673) steckt in allen 14 kaputten Bestellungen und in keiner der
+> funktionierenden; FoodNotify meldet `NonUniqueResultException`. Zu tun: jemand mit FoodNotify-Zugang
+> prüft die Artikelzuordnung dieses Artikels in der Bar Enchilada Augsburg (doppelt angelegt?) oder
+> meldet es FoodNotify mit der Fehlermeldung und einer Bestell-ID (Oberfläche: 645599).
+> Messung in `foodnotify-http500.md`, Nachtrag 19.10.2026. Die beiden Absätze darunter sind damit
+> beantwortet.
+
 Zwölf der dreizehn DISTRA-Bestellungen der Bar seit dem 31.08. (Bestellnummern 451–461, 463)
 stehen ohne Positionen da. Der Abruf `/api/10262/shop-order/{id}/change` antwortet mit HTTP 500,
 der Bestellkopf lädt. Sonst ist keine Kostenstelle betroffen. Messung und Verlauf:
