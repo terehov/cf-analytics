@@ -47,6 +47,29 @@
 >   spätere Nachabruf läuft auf den Fehler. Das bestätigt die Lesart vom 15.10.: der Artikel
 >   macht jede Bestellung kaputt, in der er steht, auch rückwirkend.
 >
+> **Nachgesehen in der Bar selbst (19.10.2026, Kostenstelle in der Oberfläche auf „Bar Enchilada
+> Augsburg“, nur lesend):**
+>
+> * Der Marktartikel ist sauber: ein Eintrag, ein Gebinde (`/api/shop/products/27826673/packagings`
+>   → `EI`, 1), Artikelseite ohne Auffälligkeit.
+> * In keiner Bestellung steht er doppelt: in jeder der 14 kaputten genau einmal.
+> * Im Warenstamm der Kostenstelle (`/api/10262/products`) stehen nur 8 Artikel, Pickled Onions ist
+>   nicht dabei. In „Meine Produkte“ (`/shop/6421/favorites`) auch nicht.
+> * **Die Listen-Seite der Bar (`/shop/6421/lists`) bricht selbst mit HTTP 500 ab.** Die Artikelseite
+>   bietet „Favoriten – Listenprodukt“ (`/shop/6421/lists/27826673/toggle`) an, und die Artikel im
+>   Warenstamm tragen ein Feld `isInProductLists`. Naheliegend ist deshalb: der Artikel hängt in den
+>   Produktlisten der Bar doppelt, und sowohl die Listen-Seite als auch der Positionsabruf laufen auf
+>   denselben doppelten Eintrag. **Nicht bewiesen** — die Listen-Seite liefert nur „Internal Server
+>   Error“ ohne Grund, und der Vergleich mit einer anderen Bar hätte einen Wechsel der Kostenstelle
+>   verlangt (der Wechsel läuft über `/shop/6421/cart/update/restaurant/…` und schreibt in einen
+>   Warenkorb).
+> * Zeitpunkt: 447 und 448 (Juli/August) liefen beim ersten Abruf durch und scheitern seit dem
+>   Nachabruf Anfang September (aufgegeben am 06.09.). Die Dopplung ist also um den 31.08. entstanden,
+>   nicht mit dem Artikel.
+>
+> Weil die Listen-Seite selbst abstürzt, lässt sich der doppelte Eintrag in der Oberfläche
+> vermutlich nicht entfernen — das braucht den FoodNotify-Support.
+>
 > Abhilfe kann nur bei FoodNotify oder in der Artikelzuordnung der Bar liegen. Danach holt der
 > Importer die Positionen von selbst nach (Wiederbelebung, Fingerabdruck). Offen in `offene-punkte.md`.
 

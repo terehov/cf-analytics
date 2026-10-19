@@ -121,6 +121,10 @@ Arbeitsliste: Karte *Betriebe ohne laufendes Geschäft* auf Dashboard ⑥, bzw.
 > meldet es FoodNotify mit der Fehlermeldung und einer Bestell-ID (Oberfläche: 645599).
 > Messung in `foodnotify-http500.md`, Nachtrag 19.10.2026. Die beiden Absätze darunter sind damit
 > beantwortet.
+> **Nachtrag 19.10.2026, nachmittags:** In der Bar nachgesehen. Auch die Listen-Seite der Bar
+> (`/shop/6421/lists`) stürzt mit HTTP 500 ab; der Artikel steht nicht im Warenstamm und nicht unter
+> „Meine Produkte“. Vermutlich hängt er in den Produktlisten der Bar doppelt. Weil die Listen-Seite
+> nicht aufgeht, ist das ein Fall für den FoodNotify-Support, nicht für jemanden in Augsburg.
 
 Zwölf der dreizehn DISTRA-Bestellungen der Bar seit dem 31.08. (Bestellnummern 451–461, 463)
 stehen ohne Positionen da. Der Abruf `/api/10262/shop-order/{id}/change` antwortet mit HTTP 500,
