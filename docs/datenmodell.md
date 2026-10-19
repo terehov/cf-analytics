@@ -1409,3 +1409,13 @@ Betriebsstatus bleibt `geschlossen` — ein eigener Statuswert hätte jede Karte
 * Abschnitt 0 der Migration vergleicht die Spaltenlisten der drei Sichten in der Zieldatenbank mit
   dem Stand `0133` und bricht bei Abweichung ab — `0132` wurde nach dem ersten Anlegen mehrfach
   nachgebessert, und eine fremde Fassung soll nicht still überschrieben werden.
+
+## Bestellansicht als Ersatzweg (`0135`, 19.10.2026)
+
+`core.bestellung`: `ansicht_nr` (Nummer der Oberfläche), `artikel_anzahl` (Artikel laut Kopf, die
+Gegenprobe), `ansicht_fingerabdruck` (für welchen Listenstand die Ansicht-Positionen gelten).
+`core.bestellposition`: `quelle` (`schnittstelle` | `ansicht`, Standard `schnittstelle`) und
+`inhalt_entlehnt`. Ansicht-Positionen haben keine `fn_id`, kein `neuer_preis`, `preis_abweichend`
+und `ersetzt` stehen auf false — die Seite nennt sie nicht. Ohne Vorbild für den Inhalt bleiben
+`einheit`, `gesamt_menge` und `preis_je_einheit` leer und `menge_unstimmig` true; die Preissichten
+lassen solche Zeilen schon heute aus. `sync.warteschlange.ergebnis` kennt `ersatzweg`.

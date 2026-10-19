@@ -27,6 +27,12 @@ export type FnEndpunkt = {
   /** Vorschlag beim Einreihen; dieselbe Skala wie bei LINA (klein gewinnt). */
   prioritaet: number
   hinweis?: string
+  /**
+   * 'html': die Antwort ist eine Seite der Oberfläche, kein JSON (seit 0135
+   * nur fn:bestellansicht). Der Client reicht den Text durch, statt ihn als
+   * JSON zu lesen; geprüft wird das Ergebnis des Parsers, nicht das HTML.
+   */
+  form?: 'html'
 }
 
 /** Pflichtparameter holen oder werfen — mit dem Namen im Fehlertext. */
@@ -112,6 +118,25 @@ export const FN_ENDPUNKTE: FnEndpunkt[] = [
     },
     hinweis: 'shopOrderMappingProduct.concreteProduct.id ist die Ware — dieselbe '
       + 'Nummer wie zutat.artikelId. Echte Belegpreise, keine Katalogpreise.',
+  },
+  {
+    key: 'fn:bestellansicht',
+    zweck: 'Ersatzweg fuer Bestellpositionen: die Bestellansicht der Oberflaeche, wenn /change mit HTTP 500 scheitert',
+    prioritaet: 89,
+    form: 'html',
+    pfad: p => {
+      // Beide Nummern sind Zahlen — alles andere waere ein Einreihungsfehler
+      // und darf nicht als Pfad an FoodNotify gehen.
+      const shopId = pflicht(p, 'shopId')
+      const nr = pflicht(p, 'ansichtNr')
+      if (!/^\d+$/.test(shopId) || !/^\d+$/.test(nr)) {
+        throw new Error(`fn:bestellansicht: shopId "${shopId}" / ansichtNr "${nr}" sind keine Zahlen`)
+      }
+      return `/shop/${shopId}/orders/${nr}`
+    },
+    hinweis: 'ansichtNr ist markedShopOrder.orderId (core.bestellung.ansicht_nr), NICHT die fn_id der '
+      + 'Bestellung; shopId ist der Lieferant (core.lieferant.fn_id). erpId und orderId stehen nur fuer '
+      + 'den Lader im Posten. Nur eingereiht von bestellansichtenNachziehen() (0135).',
   },
 
   // --- B1 · Inventuren — lohnend fast nur bei Wilma Wunder (275) --------

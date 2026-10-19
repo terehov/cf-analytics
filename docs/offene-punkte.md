@@ -121,6 +121,10 @@ Arbeitsliste: Karte *Betriebe ohne laufendes Geschäft* auf Dashboard ⑥, bzw.
 > meldet es FoodNotify mit der Fehlermeldung und einer Bestell-ID (Oberfläche: 645599).
 > Messung in `foodnotify-http500.md`, Nachtrag 19.10.2026. Die beiden Absätze darunter sind damit
 > beantwortet.
+> **Nachtrag 19.10.2026, abends:** Nicht gemeldet (Eugene: FoodNotify soll die Nutzung der internen
+> Schnittstelle nicht erfahren). Stattdessen lädt der Importer diese Bestellungen seit `0135` über die
+> Bestellansicht. Nach zwei Nächten prüfen: `SELECT * FROM mart.bestellansicht_stand`.
+>
 > **Nachtrag 19.10.2026, nachmittags:** In der Bar nachgesehen. Auch die Listen-Seite der Bar
 > (`/shop/6421/lists`) stürzt mit HTTP 500 ab; der Artikel steht nicht im Warenstamm und nicht unter
 > „Meine Produkte“. Vermutlich hängt er in den Produktlisten der Bar doppelt. Weil die Listen-Seite

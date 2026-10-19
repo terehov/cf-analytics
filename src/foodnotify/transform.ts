@@ -223,6 +223,10 @@ export type Bestellkopf = {
   lieferant: { fnId: string; name: string } | null
   belegNummer: string | null
   belegDatum: string | null
+  /** markedShopOrder.orderId — die Nummer der Oberfläche („Bestellung#"), nicht fn_id. */
+  ansichtNr: string | null
+  /** markedShopOrder.products.length — Gegenprobe für die Bestellansicht. */
+  artikelAnzahl: number | null
 }
 
 /** /api/{erpId}/shop-order/{orderId} — der Kopf mit Beleg und Lieferant. */
@@ -245,6 +249,10 @@ export function bestellkopf(daten: unknown): Bestellkopf {
       : null,
     belegNummer: alsText(rechnung?.invoiceNumber),
     belegDatum: alsDatum(rechnung?.invoiceDate),
+    // Fuer den Ersatzweg ueber die Bestellansicht (0135): deren Nummer und
+    // die Artikelzahl, gegen die die Seite geprueft wird.
+    ansichtNr: alsText(shopOrder?.orderId),
+    artikelAnzahl: Array.isArray(shopOrder?.products) ? (shopOrder.products as unknown[]).length : null,
   }
 }
 

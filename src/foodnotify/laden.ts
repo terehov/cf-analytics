@@ -26,6 +26,7 @@ import { auspacken, istLeer } from './huelle'
 import * as t from './transform'
 import * as inv from './inventur'
 import * as rz from './rezept'
+import { bestellansichtLesen } from './bestellansicht'
 import type { FnEndpunkt } from './endpunkte'
 import { config } from '../config'
 
@@ -46,6 +47,9 @@ type FnKontext = {
 
 /** Wie viele fachliche Zeilen stecken in der Antwort? */
 export function zeilenZaehlen(daten: unknown): number {
+  // Eine Seite der Oberflaeche (fn:bestellansicht, 0135): ob sie Zeilen hat,
+  // entscheidet der Parser im Lader, nicht die Huelle.
+  if (typeof daten === 'string') return daten.length > 0 ? 1 : 0
   const { daten: inhalt } = auspacken(daten)
   if (Array.isArray(inhalt)) return inhalt.length
   if (inhalt === null || inhalt === undefined) return 0
@@ -276,8 +280,8 @@ export async function fnLaden(k: FnKontext): Promise<number> {
           `INSERT INTO core.bestellung
              (kostenstelle_key, fn_id, bestellnummer, lieferant_key, bestellt_am,
               geliefert_am, status, summe, beleg_nummer, beleg_datum, kommentar,
-              detail_geholt_am)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now())
+              ansicht_nr, artikel_anzahl, detail_geholt_am)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, now())
            ON CONFLICT (kostenstelle_key, fn_id) DO UPDATE SET
              bestellnummer = coalesce(EXCLUDED.bestellnummer, core.bestellung.bestellnummer),
              lieferant_key = coalesce(EXCLUDED.lieferant_key, core.bestellung.lieferant_key),
@@ -288,6 +292,9 @@ export async function fnLaden(k: FnKontext): Promise<number> {
              beleg_nummer  = EXCLUDED.beleg_nummer,
              beleg_datum   = EXCLUDED.beleg_datum,
              kommentar     = EXCLUDED.kommentar,
+             -- Fuer den Ersatzweg ueber die Bestellansicht (0135).
+             ansicht_nr     = coalesce(EXCLUDED.ansicht_nr, core.bestellung.ansicht_nr),
+             artikel_anzahl = EXCLUDED.artikel_anzahl,
              -- Der Stempel des Auffrischens (0072). Er steht NUR hier, weil nur
              -- dieser Endpunkt Liefermenge, Lieferdatum und Preisstand bringt —
              -- der Listen-Upsert bei fn:bestellungen frischt allein den Status
@@ -306,7 +313,7 @@ export async function fnLaden(k: FnKontext): Promise<number> {
              detail_fingerabdruck = core.bestellung.listen_fingerabdruck`,
           [ksKey, orderId, kopf.bestellnummer, lieferantKey, kopf.bestelltAm,
            kopf.geliefertAm, kopf.status, kopf.summe, kopf.belegNummer,
-           kopf.belegDatum, kopf.kommentar])
+           kopf.belegDatum, kopf.kommentar, kopf.ansichtNr, kopf.artikelAnzahl])
         return 1
       }
 
@@ -361,6 +368,112 @@ export async function fnLaden(k: FnKontext): Promise<number> {
              p.preisAbweichend, p.ersetzt])
         }
         return positionen.length
+      }
+
+      /**
+       * Der Ersatzweg (0135): die Bestellansicht der Oberflaeche, wenn
+       * /change mit HTTP 500 scheitert. Eingereiht nur von
+       * bestellansichtenNachziehen() (src/sync/nachfuellen.ts).
+       *
+       * DREI SPERREN, BEVOR ETWAS GESCHRIEBEN WIRD:
+       *   1. Die Seite muss genau so viele Zeilen haben wie der Bestellkopf
+       *      Artikel (artikel_anzahl). Die Seitensumme taugt nicht — sie ist
+       *      brutto und enthaelt Pfand.
+       *   2. Hat die Bestellung inzwischen Schnittstellen-Positionen, gewinnen
+       *      die: sie tragen fn_id, Ware und Inhalt. Die Ansicht wird dann
+       *      verworfen, nicht gemischt.
+       *   3. Ohne Bestellkopf kein Laden — wie bei /change.
+       */
+      case 'fn:bestellansicht': {
+        if (typeof k.daten !== 'string') throw new Error('fn:bestellansicht: Antwort ist kein HTML-Text')
+        const ansicht = bestellansichtLesen(k.daten)
+        const erpId = k.parameter.erpId
+        const orderId = k.parameter.orderId
+        if (!erpId || !orderId) throw new Error('fn:bestellansicht ohne erpId/orderId im Posten')
+        const ksKey = await kostenstelleKey(c, k.markeKey, Number(erpId))
+
+        const kopf = await c.query(
+          `SELECT b.bestellung_key, b.artikel_anzahl, b.listen_fingerabdruck,
+                  EXISTS (SELECT 1 FROM core.bestellposition p
+                           WHERE p.bestellung_key = b.bestellung_key
+                             AND p.quelle = 'schnittstelle') AS hat_schnittstelle
+             FROM core.bestellung b
+            WHERE b.kostenstelle_key = $1 AND b.fn_id = $2`, [ksKey, orderId])
+        if (kopf.rows.length === 0) throw new Error(`Bestellung ${orderId} (erpId ${erpId}) nicht in core.bestellung`)
+        const b = kopf.rows[0]
+        if (b.hat_schnittstelle) {
+          log.info('bestellansicht verworfen — die schnittstelle hat inzwischen geliefert', { erpId, orderId })
+          return 0
+        }
+        if (b.artikel_anzahl === null) {
+          throw new Error(`fn:bestellansicht ${orderId}: artikel_anzahl im Bestellkopf fehlt — ohne sie ist die Seite nicht pruefbar`)
+        }
+        if (Number(b.artikel_anzahl) !== ansicht.positionen.length) {
+          throw new Error(`fn:bestellansicht ${orderId}: Seite hat ${ansicht.positionen.length} Zeilen, `
+            + `der Bestellkopf ${b.artikel_anzahl} Artikel — nichts geladen`)
+        }
+        const bestellungKey = Number(b.bestellung_key)
+
+        await c.query(`DELETE FROM core.bestellposition WHERE bestellung_key = $1`, [bestellungKey])
+        for (const p of ansicht.positionen) {
+          /**
+           * INHALT UND BASISEINHEIT ENTLEHNEN. Die Seite nennt „3 EIM (1 x
+           * EIM / Art.)", aber nicht, dass ein Eimer 3 kg sind. Die juengste
+           * Schnittstellen-Position derselben Marke, Artikelnummer und
+           * Gebindegroesse weiss es — und ihre Ware ist die richtige, auch
+           * wenn sie ueber FoodNotifys eigene Nummer (concrete_product)
+           * angelegt wurde. Nur belastbare Vorbilder (menge_unstimmig = false).
+           */
+          const vorbild = p.lieferantenNr ? await c.query(
+            `SELECT bp.ware_key, bp.einheit,
+                    bp.gesamt_menge / (bp.menge * bp.gebinde_menge) AS inhalt
+               FROM core.bestellposition bp
+               JOIN core.bestellung bb    ON bb.bestellung_key = bp.bestellung_key
+               JOIN core.kostenstelle kk  ON kk.kostenstelle_key = bb.kostenstelle_key
+              WHERE kk.marke_key = $1 AND bp.lieferanten_nr = $2 AND bp.gebinde_menge = $3
+                AND bp.quelle = 'schnittstelle' AND NOT bp.menge_unstimmig
+                AND bp.menge > 0 AND bp.gebinde_menge > 0 AND bp.gesamt_menge > 0
+              ORDER BY bb.bestellt_am DESC NULLS LAST
+              LIMIT 1`, [k.markeKey, p.lieferantenNr, p.gebindeMenge]) : { rows: [] as any[] }
+          const v = vorbild.rows[0]
+          const inhalt = v ? Number(v.inhalt) : null
+          const gesamt = inhalt !== null && Number.isFinite(inhalt)
+            ? Math.round(p.menge * p.gebindeMenge * inhalt * 1e6) / 1e6 : null
+          const ware = v?.ware_key != null ? Number(v.ware_key)
+            : p.lieferantenNr ? await wareKey(c, k.markeKey, 'lieferant', p.lieferantenNr, p.name) : null
+          await c.query(
+            `INSERT INTO core.bestellposition
+               (bestellung_key, fn_id, ware_key, name, menge, gebinde_menge, einheit,
+                gesamt_menge, einzelpreis, preis_je_einheit, menge_unstimmig,
+                lieferanten_nr, summe_preis, neuer_preis, preis_abweichend, ersetzt,
+                quelle, inhalt_entlehnt)
+             VALUES ($1,NULL,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NULL,false,false,'ansicht',$13)`,
+            [bestellungKey, ware, p.name, p.menge, p.gebindeMenge, v?.einheit ?? null,
+             gesamt, p.menge > 0 ? Math.round(p.summe / p.menge * 1e6) / 1e6 : null,
+             gesamt && gesamt > 0 ? Math.round(p.summe / gesamt * 1e6) / 1e6 : null,
+             !(gesamt && gesamt > 0),
+             p.lieferantenNr, p.summe, v != null])
+        }
+
+        await c.query(
+          `UPDATE core.bestellung SET ansicht_fingerabdruck = listen_fingerabdruck
+            WHERE bestellung_key = $1`, [bestellungKey])
+        /**
+         * Der gescheiterte Positionsabruf ist damit kein offener Fehler mehr:
+         * 'ersatzweg' — nicht wiederbelebt, nicht in mart.posten_aufgegeben.
+         * Posten in Arbeit bleiben unberuehrt. Aendert sich die Bestellung,
+         * reiht fn:bestellungen einen neuen /change-Posten ein; scheitert der
+         * wieder, kommt die Ansicht erneut.
+         */
+        await c.query(
+          `UPDATE sync.warteschlange
+              SET erledigt_am = coalesce(erledigt_am, now()), ergebnis = 'ersatzweg'
+            WHERE endpunkt = 'fn:bestellpositionen' AND marke_key = $1
+              AND parameter->>'erpId' = $2 AND parameter->>'orderId' = $3
+              AND in_arbeit_seit IS NULL
+              AND (erledigt_am IS NULL OR ergebnis = 'aufgegeben')`,
+          [k.markeKey, String(erpId), String(orderId)])
+        return ansicht.positionen.length
       }
 
       /**

@@ -1830,3 +1830,11 @@ bleiben. Nach dem ersten Lauf in Produktion gegenprüfen.
 Neue letzte Spalte: der Betrieb gehört nicht mehr zur Gruppe und wird nicht mehr abgefragt. Seine
 Daten bis zum letzten offenen Tag bleiben in allen Sichten; was LINA davor schon nicht mehr
 geliefert hat, fehlt dauerhaft (Lautenschlager: Betriebsberichte ab etwa 05.10.2026).
+
+## `mart.bestellansicht_stand` (Migration `0135`, 19.10.2026)
+
+Je Kostenstelle: Bestellungen mit gescheitertem Positionsabruf (HTTP 500), davon über die
+Bestellansicht geladen, ohne Positionen, ohne Ansichtsnummer, und wie viele Ansicht-Positionen ihren
+Inhalt entlehnt haben. Erwartung: `ohne_positionen = 0`. Wer Einkaufsmengen in Kilo oder Liter
+auswertet: Ansicht-Positionen ohne Vorbild haben keine Gesamtmenge (`menge_unstimmig`), ihre Summe
+in Euro ist aber vollständig.

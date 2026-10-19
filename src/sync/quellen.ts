@@ -189,6 +189,16 @@ export const QUELLEN: readonly Quelle[] = [
   { quelle: 'fn:bestellpositionen', bezeichnung: 'Bestellpositionen',
     system: 'foodnotify', endpunkt: 'fn:bestellpositionen', kadenz_stunden: TAEGLICH },
   /*
+   * Der Ersatzweg aus 0135 hat keinen Takt: er laeuft nur fuer Bestellungen,
+   * deren /change mit HTTP 500 scheitert. Eine Kadenz schluege in jeder
+   * ruhigen Woche falsch an. Ob er traegt, misst mart.bestellansicht_stand
+   * (ohne_positionen, Erwartung 0).
+   */
+  { quelle: 'fn:bestellansicht', bezeichnung: 'Bestellansicht (Ersatzweg fuer Positionen)',
+    system: 'foodnotify', endpunkt: 'fn:bestellansicht', kadenz_stunden: WOECHENTLICH,
+    erwartet: false,
+    bemerkung: 'Nur wenn /change mit HTTP 500 scheitert. Pruefung: mart.bestellansicht_stand.' },
+  /*
    * War bis zum 14.08.2026 ein Einmalposten: vier Aufgaben, alle vom
    * 02.08.2026. Es liefert die Benutzer-ID, aus der alle anderen
    * FoodNotify-Pfade gebaut werden — ändert sie sich, laufen die anderen

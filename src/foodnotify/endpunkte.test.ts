@@ -46,6 +46,16 @@ describe('Pfadbau', () => {
       .toBe('/api/10483/shop-order/777/change?order_by=name')
   })
 
+  test('fn:bestellansicht baut den Pfad der Oberfläche aus Lieferant und Ansichtsnummer (0135)', () => {
+    const ep = fnEndpunkt('fn:bestellansicht')
+    expect(ep.form).toBe('html')
+    expect(ep.pfad({ erpId: '10262', orderId: '638090', shopId: '6421', ansichtNr: '645599' }, null))
+      .toBe('/shop/6421/orders/645599')
+    // Die fn_id der Bestellung ist NICHT die Nummer der Oberfläche — ohne ansichtNr kein Pfad.
+    expect(() => ep.pfad({ erpId: '10262', orderId: '638090', shopId: '6421' }, null)).toThrow('"ansichtNr"')
+    expect(() => ep.pfad({ shopId: '6421', ansichtNr: '../x' }, null)).toThrow(/keine Zahlen/)
+  })
+
   test('fn:inventuren bündelt mehrere erpIds als Array-Parameter', () => {
     const p = fnEndpunkt('fn:inventuren').pfad({ erpIds: '10483,10484', seite: '2' }, null)
     expect(p.startsWith('/api/erp/stocktakings?')).toBe(true)

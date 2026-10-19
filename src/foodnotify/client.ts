@@ -188,6 +188,19 @@ export class FnClient {
         }
       }
 
+      /**
+       * Eine Seite der Oberflaeche (0135): der Text geht unveraendert durch.
+       * Eine Fehlerseite kaeme hier mit 200 nur dann an, wenn FoodNotify sie
+       * so ausliefert — gemessen kam sie mit 500 ("Diese Bestellung ist nicht
+       * vorhanden"), und was der Parser nicht als Bestellung erkennt, wirft
+       * beim Laden.
+       */
+      if (ep.form === 'html') {
+        const bytes = new TextEncoder().encode(text).length
+        return { art: 'ok', daten: text, form: 'html', status: res.status, bytes,
+                 hash: Bun.SHA256.hash(text, 'hex'), dauerMs }
+      }
+
       let daten: unknown
       try {
         daten = jsonOhneNullzeichen(text, ep.key)
@@ -219,7 +232,7 @@ export class FnClient {
       // beim Laden (src/foodnotify/laden.ts).
       const bytes = new TextEncoder().encode(text).length
       const hash = Bun.SHA256.hash(text, 'hex')
-      // FoodNotify liefert ausschliesslich JSON — die Form ist hier fest.
+      // Alles ausser fn:bestellansicht ist JSON.
       return { art: 'ok', daten, form: 'json', status: res.status, bytes, hash, dauerMs }
 
     } catch (e) {

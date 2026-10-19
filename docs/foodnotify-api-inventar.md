@@ -392,6 +392,16 @@ GET /api/shop/multi-cost-center-ordering            + /{id}/products /quantities
 GET /api/shop/shopping-list/{id}/export.pdf
 ```
 
+> **Nachtrag 19.10.2026 — drei IDs je Bestellung, und die Oberfläche.** `id` (bei uns `fn_id`, Pfad
+> der API), `orderNumber` (die laufende Bestellnummer der Kostenstelle) und
+> `markedShopOrder.orderId` — die Nummer, die die Oberfläche als „Bestellung#" zeigt
+> (`/shop/{markedShop.shopId}/orders/{orderId}`, serverseitig gerendertes HTML). Beispiel Bar
+> Enchilada Augsburg: 638090 / 451 / 645599. Unter der `id` antwortet die Oberfläche mit 500
+> „Diese Bestellung ist nicht vorhanden". Die Seite zeigt je Zeile Marktartikel-ID, Name,
+> Lieferanten-Artikelnummer, Preis, „N KÜRZEL (M x …)" und Summe netto; die Gesamtsumme darunter ist
+> brutto mit Pfand. `/change/paginate/checked` liefert auch bei funktionierenden Bestellungen eine
+> leere Liste. Genutzt seit `0135` als Ersatzweg (`fn:bestellansicht`).
+
 **Kopf:** `orderNumber, shopOrderStatus, markedShop{shopId,name}, comment,
 timeCreated, extDeliveryNoteId, billingSyncStatus, cartId, createdByUser,
 updatedByUser` sowie

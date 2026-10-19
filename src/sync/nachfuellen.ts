@@ -1878,6 +1878,102 @@ export async function abgegebeneBetriebePostenSchliessen(): Promise<number> {
   return r.length
 }
 
+/**
+ * Der Ersatzweg fuer Bestellpositionen einreihen (Migration `0135`, 19.10.2026).
+ *
+ * WANN. Der letzte Positionsabruf (/change) einer Bestellung endete mit HTTP
+ * 500, und die Bestellung hat keine Schnittstellen-Positionen. Anlass: die Bar
+ * Enchilada Augsburg, deren /change seit dem 31.08.2026 an einem doppelt
+ * zugeordneten Artikel scheitert (docs/foodnotify-http500.md). Bestellungen,
+ * die frueher Schnittstellen-Positionen bekommen haben und nur im Nachabruf
+ * scheitern (447, 448), bleiben beim alten, reicheren Stand.
+ *
+ * WAS. Je Bestellung genau eines von beidem:
+ *   - fn:bestellansicht, wenn der Kopf Ansichtsnummer und Artikelzahl kennt;
+ *   - sonst fn:bestellung, damit er sie kennt — die Ansicht folgt in der
+ *     naechsten Nacht. Kopfdaten von vor 0135 tragen beides noch nicht.
+ *
+ * DIE SPERREN gegen eine Schleife, die jede Nacht dasselbe fragt:
+ *   - keine Ansicht, solange eine fuer dieselbe Bestellung offen oder
+ *     aufgegeben ist — eine Seite, die der Parser nicht liest, wird nicht
+ *     nachts neu geholt, sondern steht in mart.posten_aufgegeben;
+ *   - erneut nur, wenn sich die Bestellung seit der letzten Ansicht geaendert
+ *     hat (ansicht_fingerabdruck gegen listen_fingerabdruck, wie 0098);
+ *   - ein Kopf ohne Ansichtsnummer hoechstens einmal je Woche.
+ * Hoechstens BESTELLANSICHT_JE_LAUF Posten je Nacht.
+ */
+const BESTELLANSICHT_JE_LAUF = 200
+
+export async function bestellansichtenNachziehen(): Promise<number> {
+  const kandidaten = await query<{
+    marke_key: number; erp_id: string; order_id: string; tag: string
+    shop_id: string | null; ansicht_nr: string | null; artikel_anzahl: number | null
+  }>(
+    `WITH fehlschlag AS (
+       SELECT DISTINCT w.marke_key, w.parameter->>'erpId' AS erp_id, w.parameter->>'orderId' AS order_id
+         FROM sync.warteschlange w
+        WHERE w.endpunkt = 'fn:bestellpositionen'
+          AND w.letzter_fehler LIKE 'HTTP 500%'
+          AND coalesce(w.ergebnis, '') <> 'ok'
+     )
+     SELECT f.marke_key, f.erp_id, f.order_id,
+            to_char(coalesce(b.bestellt_am, now())::date, 'YYYY-MM-DD') AS tag,
+            lf.fn_id AS shop_id, b.ansicht_nr, b.artikel_anzahl
+       FROM fehlschlag f
+       JOIN core.kostenstelle ks ON ks.marke_key = f.marke_key AND ks.erp_id::text = f.erp_id
+       JOIN core.bestellung b    ON b.kostenstelle_key = ks.kostenstelle_key AND b.fn_id = f.order_id
+       LEFT JOIN core.lieferant lf ON lf.lieferant_key = b.lieferant_key
+      WHERE NOT EXISTS (SELECT 1 FROM core.bestellposition p
+                         WHERE p.bestellung_key = b.bestellung_key AND p.quelle = 'schnittstelle')
+        AND (NOT EXISTS (SELECT 1 FROM core.bestellposition p WHERE p.bestellung_key = b.bestellung_key)
+             OR b.ansicht_fingerabdruck IS DISTINCT FROM b.listen_fingerabdruck)
+        -- eine neuere erfolgreiche Antwort der Schnittstelle schlaegt den alten 500
+        AND NOT EXISTS (SELECT 1 FROM sync.warteschlange o
+                         WHERE o.endpunkt = 'fn:bestellpositionen' AND o.marke_key = f.marke_key
+                           AND o.parameter->>'erpId' = f.erp_id AND o.parameter->>'orderId' = f.order_id
+                           AND o.ergebnis = 'ok')
+      ORDER BY b.bestellt_am DESC NULLS LAST
+      LIMIT $1`, [BESTELLANSICHT_JE_LAUF])
+
+  let ansicht = 0, kopf = 0
+  for (const k of kandidaten) {
+    if (k.ansicht_nr && k.artikel_anzahl !== null && k.shop_id) {
+      const parameter = { erpId: k.erp_id, orderId: k.order_id, shopId: k.shop_id, ansichtNr: k.ansicht_nr }
+      const r = await query(
+        `INSERT INTO sync.warteschlange
+           (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter)
+         SELECT 'fn:bestellansicht', $1::date, $1::date, 89, $2, $3::jsonb
+          WHERE NOT EXISTS (
+                SELECT 1 FROM sync.warteschlange w
+                 WHERE w.endpunkt = 'fn:bestellansicht' AND w.marke_key = $2
+                   AND w.parameter->>'erpId' = $4 AND w.parameter->>'orderId' = $5
+                   AND (w.erledigt_am IS NULL OR w.ergebnis = 'aufgegeben'))
+         RETURNING posten_id`,
+        [k.tag, k.marke_key, JSON.stringify(parameter), k.erp_id, k.order_id])
+      ansicht += r.length
+    } else {
+      const r = await query(
+        `INSERT INTO sync.warteschlange
+           (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter)
+         SELECT 'fn:bestellung', $1::date, $1::date, 89, $2, $3::jsonb
+          WHERE NOT EXISTS (
+                SELECT 1 FROM sync.warteschlange w
+                 WHERE w.endpunkt = 'fn:bestellung' AND w.marke_key = $2
+                   AND w.parameter = $3::jsonb
+                   AND (w.erledigt_am IS NULL OR w.erstellt_am > now() - interval '7 days'))
+         RETURNING posten_id`,
+        [k.tag, k.marke_key, JSON.stringify({ erpId: k.erp_id, orderId: k.order_id })])
+      kopf += r.length
+    }
+  }
+  if (ansicht + kopf > 0) {
+    log.info('bestellansichten eingereiht (ersatzweg fuer /change mit http 500)', {
+      ansicht, kopf_nachgeholt: kopf, kandidaten: kandidaten.length, sicht: 'mart.bestellansicht_stand',
+    })
+  }
+  return ansicht + kopf
+}
+
 export async function aufgegebeneWiederbeleben(): Promise<number> {
   /**
    * HOECHSTENS `WIEDERBELEBUNGEN_JE_LAUF` AUF EINMAL (01.09.2026).
@@ -2014,6 +2110,12 @@ export async function nachfuellen(): Promise<NachfuellStand> {
     stand.foodnotify = await foodnotifyNachfuellen()
   } catch (e) {
     log.error('nachfüllen foodnotify gescheitert — der Lauf geht weiter', { fehler: String(e) })
+  }
+
+  try {
+    stand.foodnotify += await bestellansichtenNachziehen()
+  } catch (e) {
+    log.error('bestellansichten nachziehen gescheitert — der Lauf geht weiter', { fehler: String(e) })
   }
 
   try {

@@ -2089,3 +2089,27 @@ Konzernberichte sind nicht betroffen: sie fragen alle Betriebe in einem Aufruf.
 
 Die Pflegedatei wird in Phase A eingelesen, das Nachfüllen läuft davor. Ein neu eingetragener
 Betrieb wirkt deshalb erst im **zweiten** Lauf nach dem Commit.
+
+## Der Ersatzweg für Bestellpositionen (`0135`, 19.10.2026)
+
+`fn:bestellansicht` ist der erste HTML-Endpunkt von FoodNotify (`form: 'html'` im Register; der
+Client reicht den Text durch). Pfad `/shop/{shopId}/orders/{ansichtNr}` — `ansichtNr` ist
+`markedShopOrder.orderId` aus dem Bestellkopf, **nicht** die `fn_id` der Bestellung (451 = fn_id
+638090 = Oberfläche 645599). `shopId` ist `core.lieferant.fn_id`. Die Sitzung ist dieselbe
+Cookie-Sitzung wie für `/api`, `accept: application/json` stört die Seite nicht (gemessen).
+
+Ablauf:
+1. `fn:bestellung` schreibt seit 0135 `ansicht_nr` und `artikel_anzahl` in `core.bestellung`.
+2. `bestellansichtenNachziehen()` (in `nachfuellen()`, vor der Ladenakte) sucht Bestellungen, deren
+   letzter `fn:bestellpositionen`-Posten mit `HTTP 500` endete und die keine
+   Schnittstellen-Positionen haben. Kennt der Kopf die Ansichtsnummer, wird `fn:bestellansicht`
+   eingereiht, sonst `fn:bestellung` (höchstens einmal je Woche) — die Ansicht folgt dann eine
+   Nacht später. Keine neue Ansicht, solange eine offen oder aufgegeben ist; erneut nur bei
+   geändertem Listen-Fingerabdruck.
+3. Der Lader (`src/foodnotify/bestellansicht.ts` + Fall in `laden.ts`) prüft die Zeilenzahl gegen
+   `artikel_anzahl`, verwirft die Seite, wenn inzwischen Schnittstellen-Positionen da sind, ersetzt
+   sonst die Positionen (`quelle = 'ansicht'`), entlehnt Inhalt und Basiseinheit und setzt den
+   gescheiterten `/change`-Posten auf `ersatzweg`.
+
+Die Bestellköpfe von vor 0135 tragen keine Ansichtsnummer. Die erste Nacht holt deshalb die Köpfe
+neu, die zweite die Ansichten.

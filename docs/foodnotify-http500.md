@@ -26,6 +26,17 @@
 > Wiedervorlage je Nacht, `FN_POSITIONEN_MAX_NAECHTE = 10` Nächte lang
 > (`entscheidungen.md`, E3 vom 10.09.2026).
 
+> **Nachtrag 19.10.2026, abends — der Ersatzweg ist gebaut (Migration `0135`).** Melden geht nicht:
+> FoodNotify wüsste dann, dass wir die interne Schnittstelle nutzen (Eugene). Deshalb liest der Importer
+> für Bestellungen, deren `/change` mit HTTP 500 scheitert, die Bestellansicht der Oberfläche
+> (`/shop/{shopId}/orders/{ansicht_nr}`, Endpunkt `fn:bestellansicht`). Gemessen an Bestellung 450:
+> Artikelnummer, Menge, Gebinde und Summe in **53 von 53** Positionen gleich wie `/change`; es fehlen
+> nur Inhalt je Gebindestück und Basiseinheit — die übernimmt der Lader aus der jüngsten
+> Schnittstellen-Position derselben Marke, Artikelnummer und Gebindegröße. Aufbau, Sperren und
+> Prüfsicht: `importer.md` und `datenmodell.md`, Abschnitt 0135. Ob er trägt:
+> `SELECT * FROM mart.bestellansicht_stand` — Erwartung `ohne_positionen = 0` nach zwei Nächten
+> (die erste holt die Bestellköpfe neu, die vor 0135 keine Ansichtsnummer trugen).
+>
 > **Nachtrag 19.10.2026 — die Ursache ist gefunden: ein Artikel, „Pickled Onions Gelb 3Kg Eimer“.**
 > Im Browser mit Eugenes Enchilada-Zugang nachgesehen, nur lesend:
 >

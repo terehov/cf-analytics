@@ -4244,3 +4244,28 @@ den 30./31.10.
 genauen Tag. Das holt ausgefallene Tage auch im ersten Zyklus nach. Es legt aber beim ersten Lauf
 alle Gruppen zusammen, deren Tag seit dem Abzug schon vorbei war, und verschiebt die Spitze damit
 nur nach vorn.
+
+## 19.10.2026 — Positionen aus der Bestellansicht, wenn `/change` bricht (`0135`)
+
+**Anlass.** 14 von 17 DISTRA-Bestellungen der Bar Enchilada Augsburg seit 31.08.2026 ohne eine
+einzige Position: `/change` scheitert mit `NonUniqueResultException` an einem doppelt zugeordneten
+Artikel (`foodnotify-http500.md`). Die Oberfläche zeigt die Bestellungen vollständig.
+
+**Entschieden: die Bestellansicht als Ersatzweg lesen**, statt den Fehler an FoodNotify zu melden —
+eine Meldung legte offen, dass wir die interne Schnittstelle nutzen (Eugene). Leitsatz von Eugene:
+*eine ganze fehlende Bestellung ist schlimmer als ein einzelnes fehlendes Produkt.*
+
+**Wie:** nur für Bestellungen, deren letzter `/change` mit HTTP 500 endete und die keine
+Schnittstellen-Positionen haben (`bestellansichtenNachziehen()`, höchstens 200 je Nacht). Die
+Schnittstelle bleibt der erste Weg und ersetzt die Ansicht, sobald sie wieder liefert. Jede Position
+trägt `quelle`; fehlender Inhalt wird entlehnt (`inhalt_entlehnt`), nicht geraten. Gegenprobe ist
+die Artikelzahl des Bestellkopfs — die Seitensumme ist brutto mit Pfand und traf an zwei Bestellungen
+weder Netto- noch Bruttosumme der Zeilen.
+
+**Verworfen:** andere Schnittstellenwege — `/change` scheitert mit jeder Sortierung und Seitengröße,
+`/change/paginate/checked` liefert auch bei funktionierenden Bestellungen nichts. Echte Antworten als
+Testvorlage — die Vorlage ist synthetisch, im echten Markup.
+
+**Nachgemessen am 19.10.2026:** Parser gegen zwei echte Antworten (44 und 53 Zeilen, 53/53 gleich
+`/change`); auf einem Klon (`lina_mgmt` + 0130–0135) Einreihen, Laden, Entlehnen (12,96 kg Tortillas
+aus Vorbild), `ersatzweg` am gescheiterten Posten und der Wurf bei falscher Zeilenzahl.

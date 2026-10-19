@@ -154,6 +154,15 @@ describe('bestellkopf (/{orderId})', () => {
     expect(k.belegNummer).toBeNull()
     expect(k.geliefertAm).toBeNull()
     expect(k.lieferant).toBeNull()
+    expect(k.ansichtNr).toBeNull()
+    expect(k.artikelAnzahl).toBeNull()
+  })
+  test('Ansichtsnummer und Artikelzahl fuer den Ersatzweg (0135) — die Ansichtsnummer ist NICHT die id', () => {
+    const k = bestellkopf({ data: { id: '638090', markedShopOrder: {
+      total: 1587.37, deliveryDate: null, orderId: 645599,
+      products: [{ price: 1, productId: 11 }, { price: 2, productId: 12 }] } } })
+    expect(k.ansichtNr).toBe('645599')
+    expect(k.artikelAnzahl).toBe(2)
   })
 
   /**
