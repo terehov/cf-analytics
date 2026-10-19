@@ -127,6 +127,20 @@ der Bestellkopf lädt. Sonst ist keine Kostenstelle betroffen. Messung und Verla
   Positionen hat, gesondert führen. Zehn von fünfzehn sind solche Nachabrufe; sie sind
   kein Datenverlust. Vorher an `sync.warteschlange` bestätigen.
 
+### Ladestand: Lücken abgegebener Betriebe zählen weiter mit (gefunden 19.10.2026)
+
+Wirtshaus Lautenschlager ist seit `0133` abgegeben und wird nicht mehr abgefragt. Seine Betriebsberichte
+für etwa 05.–14.10.2026 hat LINA vor dem Wechsel nicht mehr geliefert; sie sind nicht mehr zu
+bekommen. `mart.betriebsbericht_ladestand_basis` zählt die Umsatztage trotzdem als „mit Umsatz,
+nicht abgedeckt“ — Oktober 2026 bleibt bei 86, 92, 96, 113 und den Monatsberichten auf
+„teilweise“ und steht dauerhaft in `mart.luecke_monat`.
+
+Zu tun: die Basis lässt Betrieb-Tage nach dem letzten erreichbaren Tag eines abgegebenen Betriebs
+weg oder führt sie als eigenen Zustand („nicht mehr erreichbar“). Die Sicht ist materialisiert und
+trägt `mart.betriebsbericht_ladestand_monat`, `mart.betriebsbericht_ladestand`, `mart.luecke_monat`
+und `mart.pruefung_uebersicht` — der Neuaufbau muss diese vier wortgleich aus der Zieldatenbank
+wiederherstellen (`pg_get_viewdef`), nicht aus alten Migrationen.
+
 ## Strategisch
 
 **Amadeus 360 ist das führende System, nicht LINA.** Die Oberfläche sagt es selbst („Die Daten sind nur eingeschränkt änderbar, weil Amadeus 360 nicht führendes System ist"), dazu passen `a360isMaster`, `isSynced` und `syncGroups` im Code. Ein Teil dessen, was wir aus LINA ziehen, ist dort selbst nur eine Kopie. Falls die Datenqualitätsprobleme — Stichwort „Doppelte Artikelnummern, unbedingt korrigieren" aus dem `errors`-Feld — aus dieser Synchronisation stammen, wäre das Vorsystem der bessere Anknüpfungspunkt.

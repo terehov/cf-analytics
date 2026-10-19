@@ -1,3 +1,4 @@
-betrieb;letzter_offener_tag;notiz
-Aposto Augsburg;2026-09-13;"geschlossen, bestaetigt von Eugene am 11.10.2026; letzter offener Tag = letzter Umsatztag"
-Wilma Wunder Recklinghausen GmbH;2026-09-24;"geschlossen, bestaetigt von Eugene am 11.10.2026; letzter offener Tag = letzter Umsatztag"
+betrieb;letzter_offener_tag;notiz;abgegeben
+Aposto Augsburg;2026-09-13;"geschlossen, bestaetigt von Eugene am 11.10.2026; letzter offener Tag = letzter Umsatztag";false
+Wilma Wunder Recklinghausen GmbH;2026-09-24;"geschlossen, bestaetigt von Eugene am 11.10.2026; letzter offener Tag = letzter Umsatztag";false
+Wirtshaus Lautenschlager GmbH;2026-10-14;"zu Waldbacher gegangen, nicht mehr in der Gruppe (Eugene, 19.10.2026); LINA verweigert seit 15.10. jeden Abruf; letzter offener Tag = letzter Umsatztag";true

@@ -4162,3 +4162,32 @@ im Umlauf messen gegen den Beginn der letzten **abgeschlossenen** vollen Runde s
 (eine täglich ganz gelesene Liste gibt es nicht mehr). Und „kein FoodNotify-Zulauf" gilt nur für
 eine Marke, die **nie** eine FoodNotify-Aufgabe hatte — ein ausgefallener Zugang ist der Befund
 `zugang ausgefallen`, nicht ein Grund, die Marke aus der Prüfung zu nehmen.
+
+## 19.10.2026 — Abgegebene Betriebe werden nicht mehr abgefragt (`0133`)
+
+**Anlass.** Wirtshaus Lautenschlager (LINA 861) ist zu Waldbacher gegangen und gehört nicht mehr
+zur Gruppe (Eugene). Seit dem 15.10.2026 verweigert LINA für ihn jeden betriebsbezogenen Abruf:
+Belegzählung („getFilesUrl fehlt in der Ordnerseite“), alle Betriebsberichte („Dieser Punkt sollte
+eigentlich nicht erreicht werden“, 110 Bytes Text statt JSON), auch für August. Lauf 170 meldete
+34 Fehler statt 9.
+
+**Entschieden: ein Kennzeichen `abgegeben` an `manual.betrieb_schliessung`**, gepflegt in
+`pflege/betrieb_schliessung.csv`. Es stellt jeden betriebsbezogenen LINA-Abruf ein (Belegzählung,
+BWA-Longterm, Stammdaten, Betriebsberichte in allen fünf Einreihwegen) und schließt offene und
+aufgegebene Posten als `abgeschaltet` (`abgegebeneBetriebePostenSchliessen()`, vor der
+Wiederbelebung). Der Betriebsstatus ist `geschlossen` wie in `0131`.
+
+**Warum nicht einfach „geschlossen“ ausreichen lassen:** Ein geschlossener Betrieb, der uns noch
+gehört, liefert weiter — Aposto Augsburg zählte am 09.10. noch Belege, Schlussrechnungen und BWA
+kommen nach. Ihn nicht mehr zu fragen, wäre ein stiller Verlust. Nur der abgegebene ist für LINA
+nicht mehr unserer.
+
+**Verworfen:** die Ladestand-Sicht im selben Schritt neu zu bauen, damit Lautenschlagers fehlende
+Oktobertage nicht mehr als Lücke zählen. `mart.betriebsbericht_ladestand_basis` ist materialisiert;
+ein Neuaufbau reißt `mart.luecke_monat` und `mart.pruefung_uebersicht` per CASCADE mit. Das gehört
+in einen eigenen Schritt (`offene-punkte.md`).
+
+**Nachgemessen am 19.10.2026** auf einem Klon (`lina_mgmt` + 0130–0133): die CSV wird angenommen
+(3 von 3 Zeilen), ein offener `la:belegzahl`-Posten für 861 und ein aufgegebener `getReport:92`
+werden `abgeschaltet`, der Posten eines anderen Betriebs bleibt offen; danach reiht die Ladenakte
+für 140 Betriebe ein und keinen für 861, die Betriebsberichte (10.500 Posten) keinen für 861.

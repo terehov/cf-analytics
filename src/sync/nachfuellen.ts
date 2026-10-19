@@ -42,6 +42,26 @@ import { AKTIVE_BETRIEBSBERICHTE, BETRIEBSBERICHTE } from '../lina/betriebsberic
 import { endpunkteZusichern } from './waechter'
 import { quellenSpiegeln } from './quellen'
 
+/**
+ * Betriebe, die nicht mehr zur Gruppe gehoeren (Migration `0133`).
+ *
+ * `manual.betrieb_schliessung.abgegeben` heisst: der Betrieb ist an einen
+ * anderen Betreiber gegangen, und LINA verweigert fuer ihn seitdem JEDEN
+ * betriebsbezogenen Abruf, auch fuer die Vergangenheit. Anlass: Wirtshaus
+ * Lautenschlager (LINA 861), seit 15.10.2026 bei Waldbacher. Danach scheiterte
+ * jede Belegzaehlung an der Ordnerseite ("getFilesUrl fehlt") und jeder
+ * Betriebsbericht mit "Dieser Punkt sollte eigentlich nicht erreicht werden",
+ * auch die Nachlaeufe fuer August. Ein geschlossener Betrieb, der uns noch
+ * gehoert (Aposto Augsburg), bleibt davon unberuehrt: dort kommen weiter
+ * Belege und BWA.
+ *
+ * Als SQL-Fragment, weil es in sieben Einreihwegen dieselbe Bedingung ist —
+ * sieben Abschriften laufen auseinander. `b` ist der Alias von core.betrieb.
+ */
+const NICHT_ABGEGEBEN = (b: string) =>
+  `NOT EXISTS (SELECT 1 FROM manual.betrieb_schliessung s_ab
+                WHERE s_ab.betrieb_key = ${b}.betrieb_key AND s_ab.abgegeben)`
+
 export type NachfuellStand = {
   lina: number; foodnotify: number; ladenakte: number
   /** Aufgegebene Posten, die dieser Lauf zurueckgeholt hat. */
@@ -442,6 +462,7 @@ export async function betriebsberichteNachfuellen(
          JOIN core.betrieb b ON b.betrieb_key = t.betrieb_key
         CROSS JOIN unnest($1::text[]) AS e(key)
         WHERE b.enc_id IS NOT NULL
+          AND ${NICHT_ABGEGEBEN('b')}
           AND NOT EXISTS (
               SELECT 1 FROM sync.warteschlange w
                WHERE w.endpunkt = e.key AND w.betrieb_enc_id = b.enc_id
@@ -465,6 +486,7 @@ export async function betriebsberichteNachfuellen(
           AND a.endpunkt = ANY($1::text[])
           AND a.zeitraum_bis >= $4::date - 60
           AND b.enc_id IS NOT NULL
+          AND ${NICHT_ABGEGEBEN('b')}
           AND NOT EXISTS (
               SELECT 1 FROM sync.warteschlange w
                WHERE w.endpunkt = a.endpunkt AND w.betrieb_enc_id = b.enc_id
@@ -498,6 +520,7 @@ export async function betriebsberichteNachfuellen(
        INSERT INTO sync.warteschlange (endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis, prioritaet)
        SELECT f.endpunkt, b.enc_id, f.zeitraum_von, f.zeitraum_bis, $3
          FROM f JOIN core.betrieb b ON b.betrieb_key = f.betrieb_key
+        WHERE ${NICHT_ABGEGEBEN('b')}
        ON CONFLICT DO NOTHING
        RETURNING endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis)
      UPDATE core.betriebsbericht_abruf a
@@ -520,6 +543,7 @@ export async function betriebsberichteNachfuellen(
          JOIN core.betrieb b ON b.betrieb_key = a.betrieb_key
         WHERE a.endpunkt = ANY($1::text[])
           AND NOT a.vorlaeufig
+          AND ${NICHT_ABGEGEBEN('b')}
           AND a.zeitraum_bis >= $5::date - 60
           AND a.zeitraum_bis + $2::int <= $5::date
           -- Der LETZTE Abruf lag vor Ende + N (0120; vorher: genau einer, und
@@ -592,6 +616,7 @@ export async function betriebsberichteNachfuellen(
              JOIN core.betrieb b ON b.betrieb_key = t.betrieb_key
             CROSS JOIN ep e
             WHERE b.enc_id IS NOT NULL
+              AND ${NICHT_ABGEGEBEN('b')}
          )
          INSERT INTO sync.warteschlange (endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis, prioritaet, nachladen)
          SELECT x.key, x.enc_id, x.von, x.bis,
@@ -1525,6 +1550,7 @@ export async function ladenakteNachfuellen(heute: string): Promise<number> {
     `SELECT b.lina_betrieb_id
        FROM core.betrieb b
       WHERE b.lina_betrieb_id IS NOT NULL
+        AND ${NICHT_ABGEGEBEN('b')}
       ORDER BY b.lina_betrieb_id`)
 
   const monatsErster = `${heute.slice(0, 7)}-01`
@@ -1672,6 +1698,7 @@ async function belegzaehlungEinreihen(heute: string): Promise<number> {
                              AND k.beendet_am >= $1::date - interval '14 days') kd
                       ON kd.lb = b.lina_betrieb_id::text
               WHERE b.lina_betrieb_id IS NOT NULL
+                AND ${NICHT_ABGEGEBEN('b')}
                 -- Der Lohn-Zweig steht gar nicht erst in core.belegart
                 -- (Migration 0053, Falle 1). Die Bedingung ist der zweite
                 -- Guertel: wer dort je eine Zeile ergaenzt, holt damit nicht
@@ -1798,6 +1825,45 @@ async function einreihenJeMonat(
  * fuenf Laeufe). 20 statt 24: der Zeitplan steht auf 05:02, und zwei Laeufe
  * an aufeinanderfolgenden Tagen liegen nie exakt 24 Stunden auseinander.
  */
+/**
+ * Posten abgegebener Betriebe schliessen (Migration `0133`, 19.10.2026).
+ *
+ * Die Einreihwege nehmen einen abgegebenen Betrieb nicht mehr auf
+ * (`NICHT_ABGEGEBEN`). Was VORHER schon in der Schlange stand, liefe aber
+ * weiter gegen eine Quelle, die nicht mehr antwortet — und was schon
+ * aufgegeben ist, holte `aufgegebeneWiederbeleben()` dreimal zurueck. Beides
+ * schliesst dieser Schritt als `abgeschaltet`, dieselbe Bedeutung wie bei
+ * Bericht 88 (0119): nicht „gescheitert", sondern „nicht mehr gefragt". Damit
+ * verschwinden die Posten auch aus `mart.posten_aufgegeben`, wo sie wie ein
+ * offener Fehler aussahen.
+ *
+ * Erkannt wird der Betrieb an `betrieb_enc_id` (Betriebsberichte) oder an
+ * `parameter->>'linaBetriebId'` (Ladenakte). Posten in Arbeit bleiben
+ * unberuehrt — den schliesst der Worker selbst. Laeuft VOR der Wiederbelebung,
+ * sonst weckte sie, was hier gleich geschlossen wird.
+ */
+export async function abgegebeneBetriebePostenSchliessen(): Promise<number> {
+  const r = await query<{ endpunkt: string }>(
+    `UPDATE sync.warteschlange w
+        SET erledigt_am = coalesce(w.erledigt_am, now()),
+            ergebnis = 'abgeschaltet'
+       FROM manual.betrieb_schliessung s
+       JOIN core.betrieb b ON b.betrieb_key = s.betrieb_key
+      WHERE s.abgegeben
+        AND w.in_arbeit_seit IS NULL
+        AND (w.erledigt_am IS NULL OR w.ergebnis = 'aufgegeben')
+        AND (w.betrieb_enc_id = b.enc_id
+             OR (w.endpunkt LIKE 'la:%'
+                 AND w.parameter->>'linaBetriebId' = b.lina_betrieb_id::text))
+     RETURNING w.endpunkt`)
+  if (r.length > 0) {
+    const jeEndpunkt: Record<string, number> = {}
+    for (const z of r) jeEndpunkt[z.endpunkt] = (jeEndpunkt[z.endpunkt] ?? 0) + 1
+    log.info('posten abgegebener betriebe geschlossen', { jeEndpunkt, sicht: 'mart.betrieb_schliessung_stand' })
+  }
+  return r.length
+}
+
 export async function aufgegebeneWiederbeleben(): Promise<number> {
   /**
    * HOECHSTENS `WIEDERBELEBUNGEN_JE_LAUF` AUF EINMAL (01.09.2026).
@@ -1946,6 +2012,12 @@ export async function nachfuellen(): Promise<NachfuellStand> {
     stand.betriebsberichte = await betriebsberichteNachfuellen()
   } catch (e) {
     log.error('nachfüllen betriebsberichte gescheitert — der Lauf geht weiter', { fehler: String(e) })
+  }
+
+  try {
+    await abgegebeneBetriebePostenSchliessen()
+  } catch (e) {
+    log.error('posten abgegebener betriebe schliessen gescheitert — der Lauf geht weiter', { fehler: String(e) })
   }
 
   try {

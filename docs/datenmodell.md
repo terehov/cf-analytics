@@ -1380,3 +1380,11 @@ befüllbar (Plan und Entscheidungen A–D: `plan-rezepturen.md`):
   gesehene Rezept~~ → gegen den Beginn der letzten abgeschlossenen vollen Runde. ~~`letzter_fn_abruf`:
   Profil/Kostenstellen in sieben Tagen~~ → letzter erfolgreicher Abruf von Profil, Kostenstellen
   oder Rezeptliste, ohne Zeitfenster.
+
+## Abgegebene Betriebe (`0133`, 19.10.2026)
+
+`manual.betrieb_schliessung.abgegeben boolean NOT NULL DEFAULT false`. `true` heißt: nicht mehr in der
+Gruppe; der Importer fragt den Betrieb nicht mehr ab (`NICHT_ABGEGEBEN` in
+`src/sync/nachfuellen.ts`). `mart.betrieb_schliessung_stand` führt die Spalte am Ende. Der
+Betriebsstatus bleibt `geschlossen` — ein eigener Statuswert hätte jede Karte mit
+`status = 'geschlossen'` still verfehlt. Entscheidung: `entscheidungen.md`, 19.10.2026.

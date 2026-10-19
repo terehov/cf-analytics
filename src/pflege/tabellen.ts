@@ -90,14 +90,19 @@ export const ZIELE: readonly Ziel[] = [
    * ändern wir nichts. Umsatz NACH `letzter_offener_tag` hebt die Schließung
    * in der Sicht auf; `mart.betrieb_schliessung_stand` sagt, ob eine Zeile
    * wirkt. Der Betrieb darf als Name stehen (`betrieb`).
+   *
+   * `abgegeben` (Migration `0133`, 19.10.2026): der Betrieb gehoert nicht mehr
+   * zur Gruppe. Dann stellt der Importer jeden betriebsbezogenen LINA-Abruf
+   * ein — ein nur geschlossener Betrieb liefert dagegen weiter Belege und BWA.
    */
   {
     datei: 'betrieb_schliessung.csv',
     tabelle: 'manual.betrieb_schliessung',
     schluessel: ['betrieb_key'],
-    spalten: ['betrieb_key', 'letzter_offener_tag', 'notiz'],
+    spalten: ['betrieb_key', 'letzter_offener_tag', 'notiz', 'abgegeben'],
     pflicht: ['letzter_offener_tag'],
-    zweck: 'Geschlossene Betriebe mit letztem offenen Tag, wirkt in mart.betrieb_status',
+    zweck: 'Geschlossene Betriebe mit letztem offenen Tag, wirkt in mart.betrieb_status; '
+      + 'abgegeben = nicht mehr unserer, der Importer fragt ihn nicht mehr ab (0133)',
   },
   /**
    * Die Klassengrenzen des Wettereffekts (Migration `0087`).

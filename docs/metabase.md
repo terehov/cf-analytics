@@ -1792,3 +1792,9 @@ ersten Abzugs: `rezepte_fn` (FoodNotifys Zahl aus der Liste), `rezepte` (bekannt
 `mit_zutaten`, `ohne_zutaten` (Rest), `abzug_pct` (Prozentzahl, nicht über Marken mitteln).
 
 Noch **keine Dashboard-Karte** — die Sichten sind für Postico und den MCP-Zugang gebaut.
+
+## `mart.betrieb_schliessung_stand.abgegeben` (Migration `0133`, 19.10.2026)
+
+Neue letzte Spalte: der Betrieb gehört nicht mehr zur Gruppe und wird nicht mehr abgefragt. Seine
+Daten bis zum letzten offenen Tag bleiben in allen Sichten; was LINA davor schon nicht mehr
+geliefert hat, fehlt dauerhaft (Lautenschlager: Betriebsberichte ab etwa 05.10.2026).

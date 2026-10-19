@@ -2058,3 +2058,17 @@ bun run rezepte-praxis --datenbank postgresql://localhost/lina_rezept_1015 [--ma
   und je Aufruf eine Zeile in `sync.aufgabe`.
 * Exit 0 ok, 1 Fehler oder Sperre, 3 Abbruch vor dem Start (Datenbank, Zugang, Sperre).
 * Getestet gegen die Attrappe in `src/foodnotify/rezept_db.test.ts`.
+
+## Abgegebene Betriebe (`0133`, 19.10.2026)
+
+Ein Betrieb mit `manual.betrieb_schliessung.abgegeben = true` fällt aus allen betriebsbezogenen
+LINA-Einreihwegen heraus: `belegzaehlungEinreihen`, die monatliche Ladenakte (`la:bwa_longterm`,
+`la:stammdaten`) und die fünf Wege in `betriebsberichteNachfuellen` (laufender Monat, vorläufig,
+Gegenprobe, Nachlauf, Erstabruf). Die Bedingung steht einmal als `NICHT_ABGEGEBEN(alias)`.
+`abgegebeneBetriebePostenSchliessen()` läuft in `nachfuellen()` direkt vor
+`aufgegebeneWiederbeleben()` und schließt offene und aufgegebene Posten des Betriebs als
+`abgeschaltet` — erkannt an `betrieb_enc_id` oder `parameter->>'linaBetriebId'`. Die
+Konzernberichte sind nicht betroffen: sie fragen alle Betriebe in einem Aufruf.
+
+Die Pflegedatei wird in Phase A eingelesen, das Nachfüllen läuft davor. Ein neu eingetragener
+Betrieb wirkt deshalb erst im **zweiten** Lauf nach dem Commit.
