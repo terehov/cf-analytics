@@ -28,8 +28,8 @@ import { abfragen } from './db'
 import { umlauteFalten } from './berichte'
 import { defekteSichten, gesundheitBeobachten, gesundheitGemessenAm,
          standLaden, unklareSichten } from './gesundheit'
-import { katalogLaden } from './katalog_laden'
-import type { Katalog } from './katalog'
+import { aktuellerKatalog, katalogBeobachten, katalogErstladen, katalogFehltreffer, katalogFuer,
+         katalogStoerung, katalogZustand } from './katalog_nachladen'
 import { anmeldungMontieren, metadaten } from './anmeldung/endpunkte'
 import { anmeldungAbfragen, anmeldungEingerichtet } from './anmeldung/db'
 import { zugangstokenPruefen } from './anmeldung/schluessel'
@@ -126,6 +126,17 @@ function sichtenImText(sql: string): string[] {
   return [...new Set([...sql.matchAll(/\bmart\.[a-z_0-9]+/g)].map(m => m[0]))]
 }
 
+/**
+ * Dieselben Namen, ohne Funktionsaufrufe (`mart.round_table(...)` steht
+ * nicht im Sichtkatalog) — fuer die Frage, ob der Katalog eine Sicht noch
+ * nicht kennt (katalog_nachladen.ts). Ein Name zu viel kostet hier hoechstens
+ * eine gedrosselte Fingerabdruck-Abfrage.
+ */
+function katalogsichtenImText(sql: string): string[] {
+  return [...new Set([...sql.toLowerCase().matchAll(/\bmart\.([a-z_0-9]+)\b(?!\s*\()/g)]
+    .map(m => `mart.${m[1]}`))]
+}
+
 export const app = new Skybridge({
   name: 'cf-analytics',
   title: 'Concept Family Analytics',
@@ -157,14 +168,25 @@ export const app = new Skybridge({
     'umformulieren, sondern nach der genannten Berichtigung neu stellen.',
 
   /**
-   * Einmal beim Start: Parser laden und den Katalog holen. `katalogLaden`
+   * Beim Start: Parser laden und den Katalog holen. `katalogErstladen`
    * wirft, wenn mcp.fallstrick eine Regelart nennt, die dieser Server nicht
    * umsetzt — dann faehrt er gar nicht erst hoch. Ein Dienst mit halben
    * Wachen waere schlimmer als keiner.
+   *
+   * SEIT DEM 19.10.2026 NICHT MEHR NUR BEIM START. Der Katalog von hier
+   * hielt bis zum naechsten Neustart, und der Server startete beim Deploy
+   * VOR der Migration im Importer-Container — 0132 kam nie an, und Claude
+   * sagte Nutzern, es gebe keine Rezeptdaten. Jetzt prueft `katalogBeobachten`
+   * jede Minute den Fingerabdruck und laedt bei Aenderung nach
+   * (katalog_nachladen.ts). Darum gibt `setup` den Katalog auch nicht mehr
+   * an den Handler weiter: eine Kopie aus dem Start waere genau der
+   * veraltete Stand, um den es ging. Jedes Werkzeug holt sich
+   * `aktuellerKatalog()` selbst.
    */
   setup: async () => {
     await parserBereitstellen()
-    const katalog = await katalogLaden()
+    const katalog = await katalogErstladen()
+    katalogBeobachten()
     const offen = await abfragen<{ punkt: string; meldung: string }>(
       `SELECT punkt, meldung FROM mcp.einrichtung_offen`)
     for (const o of offen) {
@@ -187,12 +209,11 @@ export const app = new Skybridge({
     await standLaden()
     gesundheitBeobachten()
     console.log(JSON.stringify({ t: new Date().toISOString(), stufe: 'info',
-      msg: 'Katalog geladen', sichten: katalog.sichten.size,
+      msg: 'Server bereit', sichten: katalog.sichten.size,
       mit_koernung: [...katalog.sichten.values()].filter(s => s.koernung).length,
       fallstricke: katalog.fallstricke.length, berichte: alleKarten.length,
       defekte_sichten: defekteSichten().size, unklare_sichten: unklareSichten().size,
       gesundheit_gemessen_am: gesundheitGemessenAm()?.toISOString() ?? null }))
-    return { katalog }
   },
 
   /**
@@ -250,7 +271,7 @@ export const app = new Skybridge({
     }
   },
 
-  handler: (server, { katalog }: { katalog: Katalog }) => server
+  handler: (server) => server
 
     // Jeder gescheiterte Aufruf steht im Protokoll — auch der, dessen
     // Werkzeug vor dem eigenen protokollieren() abbrach (zugriff_protokoll.ts).
@@ -315,6 +336,7 @@ export const app = new Skybridge({
           (nah.length ? ` Gemeint sein koennte: ${nah.join(', ')}.` : ' berichte_suchen hilft weiter.'))
       }
       const { sql, parameter: werte } = uebersetzen(karte, parameter ?? {})
+      const katalog = await katalogFuer(katalogsichtenImText(karte.sql), 'bericht_ausfuehren')
       let e
       try {
         e = await berichtAusfuehren(schluessel, sql, werte, sichtenImText(karte.sql),
@@ -370,9 +392,19 @@ export const app = new Skybridge({
       // der Nutzer fragt nach "Glücksrad" — ohne Faltung fand die Suche die
       // Nachlass-Sichten nicht.
       const wf = umlauteFalten(w)
-      const treffer = [...katalog.sichten.values()]
+      const suchen = () => [...aktuellerKatalog().sichten.values()]
         .filter(s => [s.sicht, s.thema ?? '', s.koernung ?? '', s.kommentar ?? '']
                        .some(t => umlauteFalten(t).includes(wf)))
+      /**
+       * Nichts gefunden: einmal nachsehen, ob der Katalog inzwischen mehr
+       * weiss (19.10.2026 — „rezept" fand nach 0132 nur eine Sicht, weil der
+       * Server den Katalog von vor der Migration hielt). Nur bei NULL
+       * Treffern: ein einzelner Treffer haette den Fall nicht ausgeloest.
+       * Der Takt holt jede Aenderung ohnehin binnen einer Minute.
+       */
+      let gefunden = suchen()
+      if (!gefunden.length && await katalogFehltreffer('sichten_suchen')) gefunden = suchen()
+      const treffer = gefunden
         .slice(0, 30)
         .map(s => ({
           sicht: s.sicht, thema: s.thema, koernung: s.koernung, achsen: s.achsen,
@@ -411,6 +443,8 @@ export const app = new Skybridge({
     }, async ({ sicht }, extra) => {
       const nutzer = await anmelden(extra)
       const name = sicht.includes('.') ? sicht : `mart.${sicht}`
+      // Fehlt die Sicht, einmal nachsehen (katalog_nachladen.ts, 19.10.2026).
+      const katalog = await katalogFuer([name], 'sicht_beschreiben')
       const s = katalog.sichten.get(name)
       if (!s) {
         const nah = [...katalog.sichten.keys()].filter(k => k.includes(name.split('.').pop()!)).slice(0, 5)
@@ -464,6 +498,7 @@ export const app = new Skybridge({
     }, async ({ sicht, andere }, extra) => {
       const nutzer = await anmelden(extra)
       const voll = (n: string) => (n.includes('.') ? n : `mart.${n}`)
+      const katalog = await katalogFuer([voll(sicht), ...(andere ? [voll(andere)] : [])], 'achsen_zeigen')
       const a = katalog.sichten.get(voll(sicht))
       if (!a) throw new Error(`${voll(sicht)} steht nicht im Katalog.`)
       const beschreiben = (namen: string[]) => namen.map(n => {
@@ -626,6 +661,7 @@ export const app = new Skybridge({
     }, async ({ sql }, extra) => {
       const nutzer = await anmelden(extra)
       fragenDuerfen(nutzer)
+      const katalog = await katalogFuer(katalogsichtenImText(sql), 'abfrage_pruefen')
       const e = await pruefenMitNachprobe(sql, katalog)
 
       /**
@@ -703,6 +739,7 @@ export const app = new Skybridge({
     }, async ({ sql }, extra) => {
       const nutzer = await anmelden(extra)
       fragenDuerfen(nutzer)
+      const katalog = await katalogFuer(katalogsichtenImText(sql), 'abfrage_ausfuehren')
       let e
       try {
         e = await abfrageAusfuehren(sql, katalog, nutzerAus(nutzer))
@@ -783,7 +820,8 @@ export const app = new Skybridge({
       let e
       try {
         e = await berichtAusfuehren(karte.schluessel, sql, werte,
-          ['mart.round_table_monat'], katalog, nutzerAus(nutzer), { monat, marke })
+          ['mart.round_table_monat'], await katalogFuer(['mart.round_table_monat'], 'round_table'),
+          nutzerAus(nutzer), { monat, marke })
       } catch (f) {
         if (f instanceof Abfragefehler) return sqlFehlerAntwort(f, 'Der Round Table')
         throw f
@@ -843,12 +881,18 @@ app.express.get('/status', async (_req: any, antwort: any) => {
       `SELECT (SELECT count(*)::int FROM mcp.nutzer WHERE aktiv)              AS nutzer,
               (SELECT count(*)::int FROM mcp.anmeldung_protokoll
                 WHERE NOT erfolg AND zeitpunkt > now() - interval '24 hours') AS gescheitert_24h`)
-    const stufe = offen.length ? 'stoerung' : 'ok'
+    // Der Katalog im Speicher (katalog_nachladen.ts): ein abgelehnter neuer
+    // Katalog oder ein Takt, der nicht mehr prueft, ist eine Stoerung — der
+    // Server arbeitet dann mit einem alten Stand, und das muss man sehen.
+    const katalogFehler = katalogStoerung()
+    const stufe = offen.length || katalogFehler ? 'stoerung' : 'ok'
     // `gestartet`: seit wann DIESER Container laeuft. Nach einem Push die
     // einzige Auskunft von aussen, ob der neue Stand schon antwortet.
     antwort.status(stufe === 'ok' ? 200 : 503).json({
-      status: stufe, gestartet: GESTARTET, einrichtung_offen: offen, ...nutzung[0], ...anmeldung })
+      status: stufe, gestartet: GESTARTET, einrichtung_offen: offen,
+      katalog: { ...katalogZustand(), stoerung: katalogFehler }, ...nutzung[0], ...anmeldung })
   } catch (e) {
-    antwort.status(503).json({ status: 'stoerung', fehler: String(e).slice(0, 300) })
+    antwort.status(503).json({ status: 'stoerung', fehler: String(e).slice(0, 300),
+      katalog: { ...katalogZustand(), stoerung: katalogStoerung() } })
   }
 })

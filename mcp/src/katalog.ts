@@ -1,10 +1,16 @@
 /**
  * Der semantische Katalog, wie der Server ihn im Speicher haelt.
  *
- * Einmal beim Start gelesen und danach im Speicher: der Katalog aendert sich
- * nur mit einer Migration, und eine Abfrage je Pruefung waere ein Umlauf zur
- * Datenbank fuer etwas, das seit Stunden gleich ist. Ein Neustart nach einer
- * Migration ist ohnehin faellig — Dokploy macht ihn beim Deploy.
+ * Im Speicher gehalten: der Katalog aendert sich nur mit einer Migration, und
+ * eine Abfrage je Pruefung waere ein Umlauf zur Datenbank fuer etwas, das seit
+ * Stunden gleich ist.
+ *
+ * ~~Einmal beim Start gelesen. Ein Neustart nach einer Migration ist ohnehin
+ * faellig — Dokploy macht ihn beim Deploy.~~ WIDERLEGT am 19.10.2026: Importer
+ * und MCP-Dienst deployen gleichzeitig, die Migration laeuft im Importer, und
+ * der MCP-Server war vor ihr oben. Er hielt den Katalog von vor 0132 bis zum
+ * naechsten Neustart. Seitdem wird nachgeladen, sobald sich der Fingerabdruck
+ * aendert — katalog_nachladen.ts.
  */
 
 export type Regel = 'summe' | 'median' | 'mittel' | 'letzter_stand' | 'nicht_aggregieren'

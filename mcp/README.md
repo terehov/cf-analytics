@@ -137,13 +137,25 @@ kein Deploy (dieselbe Begründung wie bei den Ampelregelwerken).
 |---|---|
 | Körnung einer Sicht („eine Zeile je …") | `mcp.sicht.koernung`; fehlende stehen in `mcp.koernung_fehlend` |
 | Wie eine Spalte aggregiert werden darf | `mcp.kennzahl` |
-| Eine neue Falle | `mcp.fallstrick` — `art` muss in `src/pruefen.ts` umgesetzt sein, **sonst startet der Server nicht** |
+| Eine neue Falle | `mcp.fallstrick` — `art` muss in `src/pruefen.ts` umgesetzt sein, **sonst startet der Server nicht** (und ein laufender übernimmt den neuen Katalog nicht, siehe unten) |
 | Beziehungen | `mcp.achse`; `metabase/beziehungen.ts` liest von dort |
 
 **Rechte im Schema `mcp` werden namentlich vergeben.** Wer eine Katalogtabelle
 ergänzt, trägt sie in `mcp.rechte_auffrischen()` ein (Migration `0105`); eine
 neue Tabelle ist sonst für keine Rolle lesbar — absichtlich. `mart.mcp_rechte_pruefung`
 muss leer sein.
+
+**Der laufende Server übernimmt Katalogänderungen ohne Neustart** (seit 19.10.2026,
+`src/katalog_nachladen.ts`): jede Minute ein Fingerabdruck über `mcp.sicht_katalog`,
+`mcp.achse` und `mcp.fallstrick`, bei Änderung neu laden; bei einer unbekannten Sicht in
+`sichten_suchen`, `sicht_beschreiben`, `achsen_zeigen`, den Abfragen und Berichten einmal
+sofort (höchstens alle 30 s). Jedes Nachladen steht im Log (`Katalog nachgeladen`, mit
+`sichten`, `mit_koernung`, `fallstricke`, `neue_sichten`). Nennt der neue Katalog eine
+Regelart, die `src/pruefen.ts` nicht umsetzt, **bleibt der alte in Kraft**: Log mit
+`stufe: 'error'` bei jedem Versuch, `/status` auf 503 mit `katalog.gesperrt.grund`. Das passiert
+kurz auch beim Deploy, wenn die Migration vor dem neuen Server-Container ankommt — und hört
+auf, sobald der neue Container läuft. Steht es länger da, fehlt die Umsetzung.
+Ebenso 503: zehn Minuten ohne gelungene Prüfung (`katalog.geprueft_am`).
 
 Nach jeder Migration, die eine `mart`-Sicht anlegt:
 

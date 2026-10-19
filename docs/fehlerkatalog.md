@@ -5116,3 +5116,63 @@ Die einzigen Stellen, die korrekt anschlugen, waren die Prüfung `zulauf` in `/s
 **Lehre.** Ein `catch`, das nur loggt, ist ein Ort, an dem Regel 10 still bricht — auch dann,
 wenn der Kommentar daneben eine Prüfung verspricht. Wer einen Fehler auffängt, schreibt ihn in
 die Datenbank. Und: eine Prüfung auf „leer" schützt nur den ersten Lauf.
+
+## Der MCP-Server kannte die Rezeptur-Sichten nicht — er hielt den Katalog von vor der Migration (19.10.2026)
+
+**Symptom.** Nach dem Deploy von `0132` standen `mart.rezept_position`, `mart.artikel_in_rezept`,
+`mart.rezept_stand` und `mart.rezept_zuordnung_pruefung` in Produktion korrekt in `mcp.sicht`, mit
+Körnung. Der laufende MCP-Server kannte sie nicht: `sichten_suchen("rezept")` fand nur
+`deckungsbeitrag_warengruppe`, `sicht_beschreiben("mart.artikel_in_rezept")` meldete „steht nicht
+im Katalog", und in Antworten von `abfrage_ausfuehren` blieb `koernung` leer, die Fallstricke
+fehlten. Claude antwortete Nutzern, es gebe keine Rezeptdaten — bei 17.638 geladenen Rezepten.
+Kein Fehler, kein Log, `/status` auf `ok`.
+
+**Ursache.** `katalogLaden()` lief genau einmal, in `setup` beim Start (`mcp/src/server.ts`), und
+`setup` reichte den Katalog an den Handler weiter, wo jedes Werkzeug ihn bis zum Ende des
+Prozesses benutzte. Der Kommentar in `katalog.ts` begründete das: „Ein Neustart nach einer
+Migration ist ohnehin fällig — Dokploy macht ihn beim Deploy." Der Neustart kommt, nur in der
+falschen Reihenfolge: Importer und MCP-Dienst deployen aus demselben Push **gleichzeitig**, die
+Migration läuft im Importer-Container, und der MCP-Server war vorher oben. Dieselbe Signatur wie
+der Deploy-Fall vom 21.09.2026 beim Gesundheitsstand (Eintrag „Der Prüfer sperrte nach dem
+Deploy gesunde Sichten"): ein Stand von vor der Migration, der danach weiter galt. Damals wurde
+der Gesundheitsstand repariert, der Katalog daneben nicht.
+
+**Behoben** in `mcp/src/katalog_nachladen.ts`:
+
+* **Fingerabdruck jede Minute.** `md5` über die ganzen Zeilen von `mcp.sicht_katalog`,
+  `mcp.achse` und `mcp.fallstrick` — genau die drei Relationen, die geladen werden, also auch
+  Spalten (aus `pg_attribute`), Kommentare, Achsen und Kennzahlen. Eine Zeile statt ~200 kB,
+  nachgemessen am 19.10.2026 an zwei lokalen Klonen: 30–35 ms kalt, 3–4 ms warm. Nur bei
+  Änderung wird voll geladen.
+* **Fehltreffer.** Findet `sichten_suchen` nichts oder kennen `sicht_beschreiben`,
+  `achsen_zeigen`, `abfrage_pruefen`, `abfrage_ausfuehren`, `bericht_ausfuehren` oder
+  `round_table` eine angesprochene `mart`-Sicht nicht, wird einmal sofort nachgesehen —
+  höchstens alle 30 s, damit ein Modell, das Namen rät, keine Abfrageflut auslöst.
+* **Ein Halter statt einer Kopie.** `setup` gibt den Katalog nicht mehr an den Handler weiter.
+  Jedes Werkzeug holt `aktuellerKatalog()` (bzw. `katalogFuer()`) zu Beginn seines Aufrufs und
+  reicht diesen Stand an Prüfer, Ausführung, Befund-Anhang und Spalteninfo weiter. Der Austausch
+  ist eine Zuweisung, kein Umbau in place: ein laufender Aufruf sieht nie die Sichten des neuen
+  Katalogs mit den Fallstricken des alten.
+* **Die harte Regel gilt auch beim Nachladen.** Nennt der neue Katalog eine Regelart, die
+  `pruefen.ts` nicht umsetzt, wird er **nicht** übernommen — der alte bleibt vollständig in
+  Kraft. Log mit `stufe: 'error'` bei jedem Versuch, `/status` auf 503 mit `katalog.gesperrt`,
+  und jeder Takt versucht es erneut. Beim Start bleibt es beim harten Abbruch. Ebenfalls 503:
+  zehn Minuten ohne gelungene Fingerabdruck-Prüfung — ein Wächter, der nicht mehr wacht, sieht
+  sonst aus wie ein ruhiger (harte Regel 10).
+* Jedes Nachladen steht im Log (`Katalog nachgeladen`, mit `anlass`, `sichten`, `mit_koernung`,
+  `fallstricke`, `neue_sichten`, `entfallene_sichten`).
+
+**Sofortmaßnahme in Produktion**, ohne Deploy: MCP-Container neu starten.
+
+**Was es künftig verhindert:** `mcp/test/katalog_nachladen.test.ts` — eine Katalogänderung wird
+übernommen (vom Takt und vom Aufruf), ein Fehltreffer lädt nach und ist gedrosselt, eine
+unbekannte Regelart lässt den alten Katalog stehen und meldet, der Start bricht dabei weiter
+hart ab. Ohne Datenbank gegen eine Attrappe (läuft bei jedem `bun test`), dazu derselbe Ablauf
+gegen einen lokalen Klon als `mcp_leser` (`MCP_DATABASE_URL` + `MCP_TEST_SCHREIB_URL`; der Test
+bricht ab, wenn die Schreibadresse nicht auf einen lokalen Klon zeigt).
+
+**Lehre.** „Ist nach dem Deploy ohnehin neu" gilt nur, wenn der Deploy die Reihenfolge
+garantiert. Hier garantiert er sie nicht — also darf kein Stand, der aus der Datenbank kommt,
+nur beim Start gelesen werden. Die übrigen Startwerte des Servers sind Code (`alleKarten` aus
+`metabase/karten-*.ts`) und kommen mit dem Container; der Gesundheitsstand hat seit dem
+21.09.2026 seine Nachprobe, der Katalog seit heute seinen Takt.

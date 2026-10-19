@@ -235,6 +235,18 @@ geht nicht nur an den MCP-Server: dieselbe Zeile gehört in den Tabellenkommenta
 hat das BI-Tool sie auch. Regel für neue Sichten in `metabase.md`: *ohne Körnung im
 Kommentar keine Sicht.*
 
+**Der Server hält den Katalog im Speicher und lädt ihn nach, sobald er sich ändert** (seit
+19.10.2026, `mcp/src/katalog_nachladen.ts`). ~~Einmal beim Start gelesen — ein Neustart nach
+einer Migration ist ohnehin fällig.~~ Widerlegt durch `0132`: Importer und MCP-Dienst deployen
+aus demselben Push gleichzeitig, die Migration läuft im Importer, und der Server war vorher
+oben — die vier Rezeptur-Sichten fehlten ihm bis zum nächsten Neustart. Jetzt prüft er jede
+Minute einen Fingerabdruck über `mcp.sicht_katalog`, `mcp.achse` und `mcp.fallstrick` (eine
+Zeile, 3–4 ms) und lädt bei Änderung neu; findet ein Werkzeug eine Sicht nicht, sieht er
+einmal sofort nach (höchstens alle 30 s). Ein neu geladener Katalog mit einer Regelart, die
+`pruefen.ts` nicht kennt, wird **nicht** übernommen: der alte bleibt in Kraft, das Log meldet
+es mit `stufe: 'error'`, `/status` steht auf 503 mit dem Grund, und der nächste Takt versucht
+es erneut. Hergang in `fehlerkatalog.md` (19.10.2026).
+
 ### 5.1 Körnung ist die halbe Sicherheit
 
 Der häufigste stille Fehler ist eine Summe über die falsche Körnung: `mart.umsatz_tag`

@@ -250,7 +250,7 @@ Ein eigener Dienst mit eigener `package.json`, eigenem Dockerfile und eigener Da
 
 **Zwei Regeln, die hier nicht verhandelbar sind:**
 
-1. **Eine Regelart in `mcp.fallstrick` ohne Umsetzung in `src/pruefen.ts` laesst den Server nicht starten.** Eine Wache, die nicht wacht, ist schlimmer als keine — dieselbe Begruendung wie harte Regel 10.
+1. **Eine Regelart in `mcp.fallstrick` ohne Umsetzung in `src/pruefen.ts` laesst den Server nicht starten.** Eine Wache, die nicht wacht, ist schlimmer als keine — dieselbe Begruendung wie harte Regel 10. Ein **laufender** Server laedt den Katalog seit 19.10.2026 selbst nach (`src/katalog_nachladen.ts`, Fingerabdruck jede Minute) und uebernimmt einen solchen Katalog nicht: der alte bleibt, `/status` steht auf 503. Werkzeuge holen den Katalog ueber `aktuellerKatalog()`/`katalogFuer()` — nie eine Kopie aus dem Start halten.
 1a. **Die Anmeldetabellen gehoeren `mcp_anmeldung`, nicht `mcp_leser`.** `mcp_leser` fuehrt Nutzereingaben als SQL aus; haette sie Zugriff, waere `SELECT privat_jwk FROM mcp.oauth_schluessel` eine gueltige Abfrage — und damit die Anmeldung umgangen. Wer eine Tabelle in `mcp` ergaenzt, entscheidet zuerst, welcher der beiden Rollen sie gehoert.
 2. **Jedes Werkzeug muss ohne seine Ansicht brauchbar sein.** In Copilot gibt es keine gerenderte Ansicht; das Ergebnis steht deshalb immer auch in `structuredContent`.
 
@@ -310,7 +310,7 @@ Priorität.
 
 ```bash
 # Der MCP-Zugang (mcp/, eigene package.json — dort `bun install` laufen lassen)
-cd mcp && bun test          # 386 Tests: Fallenfragen, Umgehungen aus dem Review, Anmeldeablauf, Spaltenprofil, Zugriffsprotokoll
+cd mcp && bun test          # nachgemessen 19.10.2026: 441 pass, 54 skip ohne Datenbank — Fallenfragen, Umgehungen aus dem Review, Anmeldeablauf, Spaltenprofil, Zugriffsprotokoll
 cd mcp && bun run nutzer liste    # Nutzer verwalten (anlegen, stufe, passwort, sperren)
 cd mcp && bun run start     # braucht MCP_DATABASE_URL, MCP_AUTH_DATABASE_URL und MCP_OEFFENTLICHE_URL (mit https://)
 cd mcp && bun run katalog:abzug   # test/katalog.json neu aus der Datenbank ziehen
