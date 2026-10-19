@@ -2113,3 +2113,10 @@ Ablauf:
 
 Die Bestellköpfe von vor 0135 tragen keine Ansichtsnummer. Die erste Nacht holt deshalb die Köpfe
 neu, die zweite die Ansichten.
+
+**Probe mit dem Importer-Zugang: `bun run bestellansicht-probe`** (`src/bestellansicht_probe.ts`).
+Drei GET-Aufrufe über `FnClient` mit `FN_ENCHILADA_USER`, keine Datenbank, nichts gespeichert; nur im
+Terminal des Nutzers. **Nachgemessen am 19.10.2026, 16:58:** Bestellkopf 638090 liefert
+Ansichtsnummer 645599 und 44 Artikel, `/change` weiter HTTP 500, die Ansicht `/shop/6421/orders/645599`
+kommt mit der Importer-Sitzung und ergibt 44 Zeilen — Exit 0. Der Ersatzweg trägt also auch ohne den
+Admin-Zugang, mit dem er im Browser gemessen wurde.

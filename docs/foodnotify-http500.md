@@ -36,6 +36,8 @@
 > Prüfsicht: `importer.md` und `datenmodell.md`, Abschnitt 0135. Ob er trägt:
 > `SELECT * FROM mart.bestellansicht_stand` — Erwartung `ohne_positionen = 0` nach zwei Nächten
 > (die erste holt die Bestellköpfe neu, die vor 0135 keine Ansichtsnummer trugen).
+> Mit dem Importer-Zugang (nicht nur dem Admin-Zugang) nachgemessen am 19.10.2026: 44 von 44 Zeilen
+> (`bun run bestellansicht-probe`, Exit 0).
 >
 > **Nachtrag 19.10.2026 — die Ursache ist gefunden: ein Artikel, „Pickled Onions Gelb 3Kg Eimer“.**
 > Im Browser mit Eugenes Enchilada-Zugang nachgesehen, nur lesend:

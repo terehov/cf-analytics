@@ -339,6 +339,8 @@ bun run rezepte-probe [--marke wilma_wunder] [--artikel 300203]
 bun run rezepte-praxis --datenbank postgresql://localhost/<db> [--marke x] [--max-rezepte N]
                                              # echter Ladepfad NUR fuer FoodNotify-Rezepte gegen eine
                                              # LOKALE Datenbank (Abbruch sonst); liest FoodNotify, nur GET
+bun run bestellansicht-probe                 # sieht der Importer-Zugang die FoodNotify-Bestellansicht (0135)?
+                                             # drei GET, keine DB (nur im Terminal des Nutzers)
 bun run health                               # Health-Endpunkt (Container-CMD)
 curl localhost:3000/health                     # lebt der Container?
 curl localhost:3000/status                     # muss jemand hinsehen? (503 = ja)
