@@ -917,9 +917,11 @@ const Schema = z.object({
    *
    * VERTEILT seit 0134 (sync.rezept_umlauf_faellig): jedes Rezept hat einen
    * festen Tag im Zyklus (fn_id mod N), faellig an diesem Tag ab einem Tag
-   * Alter und immer, sobald es aelter als N Tage ist. Wer N aendert, aendert
-   * die 16 Tage (N + 2) in mart.rezept_stand.ueberfaellig mit —
-   * src/foodnotify/umlauf.test.ts prueft beides gegeneinander.
+   * Alter und immer, sobald es aelter als N Tage ist. rezepteNachfuellen()
+   * meldet N bei jedem Lauf nach sync.merker (rezept_umlauf_tage);
+   * mart.rezept_stand.ueberfaellig misst gegen N + 2 und zeigt N in
+   * umlauf_tage. ~~Wer N aendert, aendert die 16 Tage in der Sicht mit~~
+   * (bis zur Review-Korrektur vom 19.10.2026 fest verdrahtet).
    */
   REZEPT_UMLAUF_TAGE: z.coerce.number().int().min(1).default(14),
 

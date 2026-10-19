@@ -1104,6 +1104,13 @@ export async function rezepteNachfuellen(
 
   try {
     return await inTransaktion(async c => {
+      // Der wirksame Umlauf für mart.rezept_stand.ueberfaellig (0134): die Sicht
+      // kennt die Umgebung nicht und misst gegen diesen Wert + 2 Tage.
+      await c.query(
+        `INSERT INTO sync.merker (schluessel, wert)
+         VALUES ('rezept_umlauf_tage', jsonb_build_object('tage', $1::int))
+         ON CONFLICT (schluessel) DO UPDATE SET wert = EXCLUDED.wert, gesetzt_am = now()`,
+        [config.REZEPT_UMLAUF_TAGE])
       const marken = new Map<number, string>()
       for (const z of zugaenge) {
         const m = await c.query<{ marke_key: number }>(

@@ -4217,8 +4217,12 @@ Bei sieben Tagen blieben so bis zu sechs Tagesgruppen über sechs Zyklen zusamme
 80 Tage). Bei einem Tag rastet jede Gruppe nach höchstens einem Zyklus ein. Allgemein: nur
 Grenzen bis zwei Tage klumpen nicht, weil „älter als 14 Tage“ dann mit dem Tag der Gruppe
 zusammenfällt. Der Test mit 140 gleich alten Rezepten zeigt das (`umlauf.test.ts`): bei einem
-Tag Mindestalter sind es an Tag 2–15 je 10. Bei sieben Tagen wären es an Tag 0–6 null, an Tag
-7–14 je 10 und an Tag 15 sechzig. Ein Tag kostet einen zusätzlichen Abruf je außer Takt
+Tag Mindestalter sind es an Tag 2–15 je 10. ~~Bei sieben Tagen wären es an Tag 0–6 null, an Tag
+7–14 je 10 und an Tag 15 sechzig.~~ Bei sieben Tagen sind es an Tag 1–7 null, an Tag 8–14 je 10,
+an Tag 15 siebzig und danach sechs Nächte null (nachgemessen 19.10.2026 mit der zeitzonenfesten
+Fassung, unter UTC und Europe/Berlin gleich; die alte Angabe ließ sich mit keiner Fassung
+nachmessen — die alte unter Europe/Berlin ergibt dieselben Zahlen wie die neue, unter UTC 80 an
+Tag 14 und null an Tag 15). Ein Tag kostet einen zusätzlichen Abruf je außer Takt
 gelesenem Rezept, und zwar einmal. Das sind die neuen Rezepte eines Tages (Dutzende), nicht der
 Bestand.
 
@@ -4239,6 +4243,24 @@ den 30./31.10.
 
 **Sichtbar (Regel 10):** `mart.rezept_stand.ueberfaellig` (älter als Umlauf + 2 Tage, ohne
 404) und der Zustand `umlauf ueberfaellig` in der Prüfzeile.
+
+**Nachtrag aus dem Review (19.10.2026, vor dem ersten Anwenden von `0134`):**
+
+* **Gerechnet wird in Berliner Ortszeit, nicht in der Sitzungszeitzone.** „Älter als 14 Tage“
+  und „mindestens einen Tag alt“ vergleichen `x AT TIME ZONE 'Europe/Berlin'`. Vorher rechnete
+  die Funktion auf `timestamptz` — unter UTC (Produktion, `0001`) sind 14 Tage dann 14 × 24 h,
+  und über das Ende der Sommerzeit wurde eine Tagesgruppe einen Tag zu früh überfällig (20 statt
+  10 am 29.10., null am 30.10.). Der Test lief nur lokal unter Europe/Berlin und war grün; er
+  läuft jetzt unter beiden Zeitzonen. Berliner Ortszeit und nicht UTC-Tage, weil der feste Tag
+  im Zyklus schon ein Berliner Kalendertag ist und der Lauf um 05:02 Berliner Zeit startet.
+* **Die Grenze für `ueberfaellig` richtet sich an der Umgebung aus** (Entscheidung Eugene: „richte
+  es an der ENV aus“). `rezepteNachfuellen()` schreibt den wirksamen `REZEPT_UMLAUF_TAGE` bei
+  jedem Lauf nach `sync.merker` (`rezept_umlauf_tage`), die Sicht misst gegen ihn + 2 und zeigt
+  ihn in `umlauf_tage`. Fehlt der Merker, gilt 14, gekennzeichnet in `umlauf_tage_quelle`.
+  Verworfen: eine Spalte in `core.rezept_liste_stand` — der Umlauf ist eine Einstellung des
+  Importers, nicht der Marke, und die Zeile entsteht erst, wenn eine Liste geladen wurde.
+  ~~16 Tage fest in der Sicht, ein Test hielt sie gegen den Standardwert aus `src/config.ts`~~ —
+  der prüfte genau den Fall, der nicht schiefgeht.
 
 **Verworfen:** Fällig, „wenn sein Tag seit dem letzten Abruf vorbeigekommen ist“, also ohne
 genauen Tag. Das holt ausgefallene Tage auch im ersten Zyklus nach. Es legt aber beim ersten Lauf

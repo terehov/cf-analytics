@@ -30,7 +30,9 @@
 --          hatte sie schon).
 --   mart   artikel_in_rezept + zutaten_geholt_am, rezept_zuletzt_gesehen,
 --          via_zutaten_geholt_am, weg_zutaten_geholt_am.
---   mart   rezept_stand + ueberfaellig, Zustand 'umlauf ueberfaellig'.
+--   mart   rezept_stand + ueberfaellig, umlauf_tage, umlauf_tage_quelle,
+--          Zustand 'umlauf ueberfaellig'. Der Umlauf kommt aus sync.merker
+--          (rezept_umlauf_tage), geschrieben von rezepteNachfuellen().
 --   mart   pruefung_uebersicht: der neue Zustand faellt in der Rezept-Zeile auf.
 --   mcp    Koernung, Kommentare, Fallstrick rezept_stand_kein_rezeptstand.
 --
@@ -109,8 +111,19 @@ END $pruefung$;
 -- Zyklus. Mit einem halben Zyklus (7 Tage) blieben so bis zu sechs
 -- Tagesgruppen ueber mehrere Zyklen zusammengeklumpt; mit einem Tag rastet
 -- jedes Rezept spaetestens nach einem Zyklus ein. Gemessen am Test mit 140
--- gleich alten Rezepten: ein Tag -> je Tag 10; sieben Tage -> 0 an Tag 0–6,
--- 10 an Tag 7–14, 60 an Tag 15.
+-- gleich alten Rezepten (nachgemessen 19.10.2026 mit der zeitzonenfesten
+-- Fassung, unter Sitzungszeitzone UTC und Europe/Berlin gleich): ein Tag ->
+-- 0 an Tag 1, je 10 an Tag 2–15 und danach; sieben Tage -> 0 an Tag 1–7,
+-- 10 an Tag 8–14, 70 an Tag 15, danach sechs Naechte 0.
+--
+-- ZEITZONE: alle Vergleiche auf Berliner Ortszeit (AT TIME ZONE
+-- 'Europe/Berlin'), nicht auf timestamptz. p_jetzt - interval 'N days' ist
+-- Kalenderarithmetik in der SITZUNGSzeitzone — die Produktion steht auf UTC
+-- (0001), lokale Klone erben das per createdb -T nicht. Unter UTC sind N Tage
+-- N x 24 h; ueber das Ende der Sommerzeit galt der Abzug vom 15.10. 06:00
+-- MESZ am 29.10. um 05:02 MEZ schon als aelter als der Umlauf (20 statt 10
+-- an Tag 14, 0 an Tag 15). Gefunden im Review vom 19.10.2026, vor dem
+-- ersten Anwenden.
 --
 -- Garantie: kein Rezept wird aelter als umlauf + 1 Tage, solange hoechstens
 -- eine Nacht ausfaellt — am Tag nach dem ausgefallenen ist es ueberfaellig
@@ -126,10 +139,12 @@ CREATE FUNCTION sync.rezept_umlauf_faellig(
 LANGUAGE sql STABLE
 AS $$
     SELECT p_geholt IS NOT NULL
-       AND (p_geholt < p_jetzt - make_interval(days => p_umlauf)
+       AND ((p_geholt AT TIME ZONE 'Europe/Berlin')
+              < (p_jetzt AT TIME ZONE 'Europe/Berlin') - make_interval(days => p_umlauf)
             OR (p_fn_id % p_umlauf
                   = (((p_jetzt AT TIME ZONE 'Europe/Berlin')::date - DATE '2000-01-01') % p_umlauf)
-                AND p_geholt < p_jetzt - interval '1 day'))
+                AND (p_geholt AT TIME ZONE 'Europe/Berlin')
+                      < (p_jetzt AT TIME ZONE 'Europe/Berlin') - interval '1 day'))
 $$;
 
 COMMENT ON FUNCTION sync.rezept_umlauf_faellig(bigint, timestamptz, timestamptz, integer) IS
@@ -339,7 +354,8 @@ Minimum DIESER Spalte ueber die gezeigten Zeilen.';
 
 
 -- ---------------------------------------------------------------------
--- 4. mart.rezept_stand — ueberfaellig am Ende, Zustand 'umlauf ueberfaellig'
+-- 4. mart.rezept_stand — ueberfaellig, umlauf_tage, umlauf_tage_quelle am
+--    Ende, Zustand 'umlauf ueberfaellig'
 --
 -- Regel 10: ein Umlauf, der nicht mehr nachkommt (Notschalter
 -- REZEPTE_NACHLADEN = 0, Phase C ohne Budget, ein Fehler in der Auswahl),
@@ -348,15 +364,34 @@ Minimum DIESER Spalte ueber die gezeigten Zeilen.';
 -- Umlauf + 2 Tage ist: ein Tag fuer die Garantie (Umlauf + 1), einer fuer
 -- einen Lauf, der seine Posten nicht in derselben Nacht schafft.
 --
--- 16 TAGE = REZEPT_UMLAUF_TAGE (14) + 2. Wer den Umlauf aendert, aendert
--- diese Zahl mit — src/foodnotify/umlauf.test.ts prueft beides gegeneinander.
+-- DER UMLAUF KOMMT AUS DER UMGEBUNG, nicht aus dieser Datei: REZEPT_UMLAUF_TAGE
+-- ist per Umgebung aenderbar, die Sicht kennt die Umgebung nicht.
+-- rezepteNachfuellen() schreibt den wirksamen Wert bei jedem Lauf nach
+-- sync.merker (Schluessel rezept_umlauf_tage, wert {"tage": N}); die Sicht
+-- misst gegen N + 2 und zeigt N in umlauf_tage. Hat der Importer nie
+-- gemeldet, gilt 14 — umlauf_tage_quelle sagt dann „rueckfall 14". Bis zur
+-- Review-Korrektur vom 19.10.2026 standen hier fest 16 Tage, und ein Test
+-- verglich sie mit dem STANDARDWERT aus src/config.ts — ein per Umgebung
+-- geaenderter Umlauf waere daran vorbeigegangen.
+--
+-- Gezaehlt in Berliner Kalendertagen (AT TIME ZONE), wie
+-- sync.rezept_umlauf_faellig: die Produktion rechnet in UTC (0001), und
+-- now() - interval 'N days' ist Kalenderarithmetik in der Sitzungszeitzone.
+--
 -- Rezepte mit fehlt_seit (HTTP 404) zaehlen NICHT: ihr Stempel steht
 -- dauerhaft, sie stehen in nicht_gefunden. Eine Pruefzeile, die nie auf
 -- null geht, liest niemand (0071).
 -- ---------------------------------------------------------------------
 
 CREATE OR REPLACE VIEW mart.rezept_stand AS
- WITH r AS (
+ WITH umlauf AS (
+         SELECT COALESCE(( SELECT (mk.wert ->> 'tage'::text)::integer
+                   FROM sync.merker mk
+                  WHERE mk.schluessel = 'rezept_umlauf_tage'::text), 14) AS tage,
+            (EXISTS ( SELECT 1
+                   FROM sync.merker mk
+                  WHERE mk.schluessel = 'rezept_umlauf_tage'::text)) AS gemeldet
+        ), r AS (
          SELECT rezept.marke_key,
             count(*)::integer AS rezepte,
             count(*) FILTER (WHERE rezept.in_liste)::integer AS in_liste,
@@ -368,10 +403,12 @@ CREATE OR REPLACE VIEW mart.rezept_stand AS
             max(rezept.zuletzt_am) AS zuletzt_gesehen,
             count(*) FILTER (WHERE rezept.fehlt_seit IS NOT NULL)::integer AS nicht_gefunden,
             count(*) FILTER (WHERE rezept.archiviert)::integer AS archiviert,
-            count(*) FILTER (WHERE rezept.zutaten_geholt_am < (now() - '16 days'::interval)
+            count(*) FILTER (WHERE (rezept.zutaten_geholt_am AT TIME ZONE 'Europe/Berlin'::text)
+                                     < ((now() AT TIME ZONE 'Europe/Berlin'::text) - make_interval(days => u.tage + 2))
                                AND rezept.fehlt_seit IS NULL)::integer AS ueberfaellig
            FROM core.rezept
-          GROUP BY rezept.marke_key
+             CROSS JOIN umlauf u
+          GROUP BY rezept.marke_key, u.tage
         ), weg AS (
          SELECT x.marke_key,
             count(*)::integer AS aus_liste_verschwunden
@@ -451,8 +488,14 @@ CREATE OR REPLACE VIEW mart.rezept_stand AS
     liste.volle_runde_am,
     liste.volle_runde_fertig_ende AS volle_runde_abgeschlossen_am,
     liste.tagesgeschaeft_gedeckelt_am,
-    COALESCE(r.ueberfaellig, 0) AS ueberfaellig
+    COALESCE(r.ueberfaellig, 0) AS ueberfaellig,
+    umlauf.tage AS umlauf_tage,
+        CASE
+            WHEN umlauf.gemeldet THEN 'REZEPT_UMLAUF_TAGE'::text
+            ELSE 'rueckfall 14 (vom importer nie gemeldet)'::text
+        END AS umlauf_tage_quelle
    FROM core.marke m
+     CROSS JOIN umlauf
      LEFT JOIN r ON r.marke_key = m.marke_key
      LEFT JOIN z ON z.marke_key = m.marke_key
      LEFT JOIN weg ON weg.marke_key = m.marke_key
@@ -466,9 +509,17 @@ KEIN Datenstand fuer ein einzelnes Rezept oder eine Antwort. Der Datenstand eine
 ist sein zutaten_geholt_am (mart.rezept_position, mart.artikel_in_rezept; dort auch
 weg_zutaten_geholt_am fuer Halbfabrikate).';
 COMMENT ON COLUMN mart.rezept_stand.ueberfaellig IS
-'Rezepte, deren Zusammensetzung laenger als Umlauf + 2 Tage (16 Tage) nicht gelesen wurde
--- ohne die, die FoodNotify nicht mehr findet (nicht_gefunden). Erwartung: 0. Mehr als 0
-setzt den Zustand auf "umlauf ueberfaellig" und faellt in mart.pruefung_uebersicht auf.';
+'Rezepte, deren Zusammensetzung laenger als umlauf_tage + 2 Tage nicht gelesen wurde (bei
+REZEPT_UMLAUF_TAGE = 14 also 16 Tage, gezaehlt in Berliner Kalendertagen) -- ohne die, die
+FoodNotify nicht mehr findet (nicht_gefunden). Erwartung: 0. Mehr als 0 setzt den Zustand
+auf "umlauf ueberfaellig" und faellt in mart.pruefung_uebersicht auf.';
+COMMENT ON COLUMN mart.rezept_stand.umlauf_tage IS
+'Der Umlauf in Tagen, gegen den ueberfaellig misst: REZEPT_UMLAUF_TAGE, wie der Importer ihn
+beim letzten Nachfuellen gemeldet hat (sync.merker rezept_umlauf_tage). Hat er nie gemeldet,
+steht hier der Standardwert 14 -- dann sagt es umlauf_tage_quelle.';
+COMMENT ON COLUMN mart.rezept_stand.umlauf_tage_quelle IS
+'Woher umlauf_tage stammt: REZEPT_UMLAUF_TAGE (vom Importer gemeldet) oder der Rueckfall 14,
+solange rezepteNachfuellen() noch nie gelaufen ist.';
 COMMENT ON COLUMN mart.datenstand.rezepte_zutaten_seit IS
 'Aeltester Zutatenabruf der Marke: die Rezeptinhalte sind mindestens so frisch.
 NULL = mindestens ein Rezept der Marke hat noch keine Zutaten (oder keine Rezepte).
@@ -549,7 +600,8 @@ BEGIN
         ('mart.rezept_stand',
          'aeltester_zutatenabruf ist das Minimum ueber ALLE Rezepte der Marke und KEIN Datenstand '
          'fuer ein einzelnes Rezept. ueberfaellig: Rezepte, deren Zusammensetzung laenger als '
-         'Umlauf + 2 Tage nicht gelesen wurde (Zustand umlauf ueberfaellig, Befund).')
+         'Umlauf + 2 Tage nicht gelesen wurde (Zustand umlauf ueberfaellig, Befund); der Umlauf '
+         'steht in umlauf_tage, so wie der Importer ihn meldet.')
     ) AS v(sicht, absatz)
     LOOP
         v_alt := coalesce(obj_description(r.sicht::regclass, 'pg_class'), '');

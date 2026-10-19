@@ -1399,13 +1399,20 @@ Betriebsstatus bleibt `geschlossen` — ein eigener Statuswert hätte jede Karte
   `weg_zutaten_geholt_am` — das Minimum über alle Rezepte des Wegs, in der Rekursion
   mitgetragen. Bei Ebene 3 stünde sonst für das Rezept, in dem die Ware direkt steht, gar kein
   Stempel in der Zeile.
-* `mart.rezept_stand` hängt `ueberfaellig` an (Zusammensetzung älter als Umlauf + 2 = 16 Tage,
-  ohne `fehlt_seit`), neuer Zustand `umlauf ueberfaellig` (in der Prüfzeile von
-  `mart.pruefung_uebersicht`). Die 16 Tage stehen als Zahl in der Sicht; `src/foodnotify/umlauf.test.ts`
-  hält sie gegen den Standardwert von `REZEPT_UMLAUF_TAGE`.
+* `mart.rezept_stand` hängt `ueberfaellig` an (Zusammensetzung älter als Umlauf + 2 Tage, in
+  Berliner Kalendertagen, ohne `fehlt_seit`), dazu `umlauf_tage` und `umlauf_tage_quelle`; neuer
+  Zustand `umlauf ueberfaellig` (in der Prüfzeile von `mart.pruefung_uebersicht`). ~~Die 16 Tage
+  stehen als Zahl in der Sicht; `src/foodnotify/umlauf.test.ts` hält sie gegen den Standardwert
+  von `REZEPT_UMLAUF_TAGE`.~~ Der Umlauf kommt aus `sync.merker` (Schlüssel `rezept_umlauf_tage`,
+  `wert = {"tage": N}`), den `rezepteNachfuellen()` bei jedem Lauf mit dem wirksamen
+  `REZEPT_UMLAUF_TAGE` schreibt — die Sicht kennt die Umgebung nicht, und der alte Test verglich
+  nur den Standardwert, nicht den per Umgebung gesetzten. Fehlt der Merker, gilt 14 und
+  `umlauf_tage_quelle` sagt „rueckfall 14 (vom importer nie gemeldet)" (Review 19.10.2026).
 * `sync.rezept_umlauf_faellig(fn_id, zutaten_geholt_am, jetzt, umlauf)` — die Auswahl im Umlauf
   als Funktion, damit Nachfüllen, Test und Vorausrechnung dieselbe Regel lesen
-  (`entscheidungen.md`, 19.10.2026).
+  (`entscheidungen.md`, 19.10.2026). Alle Vergleiche laufen auf Berliner Ortszeit
+  (`AT TIME ZONE 'Europe/Berlin'`) und sind damit unabhängig von der Sitzungszeitzone — die
+  Produktion rechnet in UTC (`0001`), lokale Klone erben das per `createdb -T` nicht.
 * Abschnitt 0 der Migration vergleicht die Spaltenlisten der drei Sichten in der Zieldatenbank mit
   dem Stand `0133` und bricht bei Abweichung ab — `0132` wurde nach dem ersten Anlegen mehrfach
   nachgebessert, und eine fremde Fassung soll nicht still überschrieben werden.

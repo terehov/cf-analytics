@@ -5211,3 +5211,40 @@ Umlauf + 1) und eine ausgefallene Nacht (am Folgetag nachgeholt). Bleibt der Uml
 gefunden: Die Sperre „innerhalb des Umlaufs schon einmal eingereiht“ hätte jedes Rezept einen Tag
 verschoben, dessen Posten vor 14 Tagen ein paar Sekunden später angelegt wurde. Seit `0134` sperrt
 sie nur noch Posten, nach denen keine Zutaten ankamen.
+
+## Der Umlauf rechnete in der Sitzungszeitzone, und sein Test lief nur dort, wo er grün war (19.10.2026, vor dem Deploy)
+
+**Symptom (im Review gefunden, nicht eingetreten).** `src/foodnotify/umlauf.test.ts` war auf der
+lokalen Datenbank grün. Unter Sitzungszeitzone UTC — so steht die Produktion — fielen zwei der
+vier Tests durch: an Tag 14 (29.10., nach dem Ende der Sommerzeit) 20 statt 10 fällige Rezepte und
+an Tag 15 null. Der zweite Test meldete danach 140 statt 20 — eine Folge: er läuft auf dem Stand
+weiter, an dem der erste abbrach (nachgemessen 19.10.2026: für sich simuliert holt auch die alte
+Fassung die ausgefallene Nacht mit 20 nach).
+
+**Ursache.** `sync.rezept_umlauf_faellig` rechnete `p_jetzt - make_interval(days => N)` auf
+`timestamptz`. Das ist Kalenderarithmetik in der Sitzungszeitzone: unter Europe/Berlin
+14 Kalendertage, unter UTC 14 × 24 Stunden. Über die Zeitumstellung liegt dazwischen eine
+Stunde, und der Abzug um 06:00 MESZ galt am 29.10. um 05:02 MEZ schon als „älter als der
+Umlauf“. Die Produktion steht auf UTC (`0001`), lokale Klone erben das per `createdb -T` nicht —
+der Test lief also genau in der Zeitzone, in der der Fehler nicht auftritt.
+
+**Was es künftig verhindert (`0134`, vor dem ersten Anwenden berichtigt).** Funktion und
+`mart.rezept_stand.ueberfaellig` vergleichen auf Berliner Ortszeit (`AT TIME ZONE
+'Europe/Berlin'`), das Ergebnis hängt nicht mehr an der Sitzung. Der Test läuft jeden Block
+zweimal, unter `SET TIME ZONE 'UTC'` und `'Europe/Berlin'`. Wer einen Testklon baut, setzt
+`ALTER DATABASE … SET timezone TO 'UTC'` wie in Produktion.
+
+## Die Grenze für „überfällig“ war fest verdrahtet, obwohl der Umlauf per Umgebung änderbar ist (19.10.2026, vor dem Deploy)
+
+**Symptom (im Review gefunden).** `mart.rezept_stand.ueberfaellig` zählte fest gegen 16 Tage.
+`REZEPT_UMLAUF_TAGE` ist eine Umgebungsvariable; mit 28 wäre jede Marke dauerhaft „umlauf
+ueberfaellig“ gewesen, mit 7 hätte die Prüfung erst nach dem Doppelten angeschlagen. Der Test
+verglich die 16 mit dem **Standardwert** in `src/config.ts` — also genau den Fall, der nicht
+schiefgeht.
+
+**Ursache.** Die Sicht kennt die Umgebung nicht, und niemand gab sie ihr.
+
+**Was es künftig verhindert (`0134`).** `rezepteNachfuellen()` schreibt den wirksamen Wert bei
+jedem Lauf nach `sync.merker` (`rezept_umlauf_tage`), die Sicht misst gegen ihn + 2 und zeigt ihn
+in `umlauf_tage`; fehlt er, gilt 14 und `umlauf_tage_quelle` sagt es. Der Test prüft das
+Verhalten: gemeldet 7 → ein zehn Tage altes Rezept ist überfällig, gemeldet 28 → nicht.

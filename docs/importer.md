@@ -1973,6 +1973,13 @@ ist es immer fällig, damit eine ausgefallene Nacht am nächsten Tag nachgeholt 
 ~2.500 Aufrufe je Nacht. Warum ein Tag und nicht ein halber Zyklus: `entscheidungen.md`, 19.10.2026.
 Bleibt der Umlauf zurück, zählt `mart.rezept_stand.ueberfaellig` die Rezepte, die älter als Umlauf +
 2 Tage sind. Der Zustand heißt dann `umlauf ueberfaellig` und ist in der Prüfzeile auffällig.
+Den Umlauf kennt die Sicht nur, weil `rezepteNachfuellen()` den wirksamen `REZEPT_UMLAUF_TAGE` bei
+jedem Lauf (auch im Trockenlauf, dort zurückgerollt) nach `sync.merker` schreibt
+(`rezept_umlauf_tage`); ohne Merker gilt 14, sichtbar in `umlauf_tage_quelle`. Die Funktion und die
+Sicht rechnen in Berliner Ortszeit, nicht in der Sitzungszeitzone: die Verbindungen des Importers
+laufen in Produktion unter UTC, und `now() - interval '14 days'` wäre dort um die Zeitumstellung
+eine Stunde verschoben — genug, um eine Tagesgruppe einen Tag zu früh „älter als der Umlauf"
+werden zu lassen (Review 19.10.2026).
 Erster Abzug, neue Rezepte und Tagesgeschäft sind unverändert.
 
 **Sperren.** Gegen einen offenen Zwilling und gegen einen, der innerhalb des Umlaufs schon einmal

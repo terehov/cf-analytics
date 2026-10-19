@@ -210,5 +210,6 @@ vor dem Push: `bun run rezepte-praxis` (`importer.md`) gegen eine lokale Datenba
   die ~17.700 Rezepte des ersten Abzugs um den 29./30.10. in einer Nacht fällig geworden. Am
   29.10. sind nach der neuen Regel ~1.260 fällig (~2.500 Aufrufe). Einmalig am 30./31.10. sind es
   bis ~5.000, danach ~1.260 je Nacht. Begründung: `entscheidungen.md`, 19.10.2026.
-* **Regel 10:** `mart.rezept_stand.ueberfaellig` (älter als 16 Tage, ohne 404) und Zustand
-  `umlauf ueberfaellig` in der Prüfzeile.
+* **Regel 10:** `mart.rezept_stand.ueberfaellig` (älter als ~~16 Tage~~ `REZEPT_UMLAUF_TAGE` + 2
+  Tage, ohne 404 — der Importer meldet den Umlauf nach `sync.merker`, die Sicht zeigt ihn in
+  `umlauf_tage`) und Zustand `umlauf ueberfaellig` in der Prüfzeile.

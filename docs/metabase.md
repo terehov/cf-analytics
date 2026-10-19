@@ -1781,7 +1781,10 @@ vorkommt" — Erwartung **konstant**, nicht 0).
 **Gemessen am Einzelabzug Enchilada (2.111 Rezepte, 7.452 Zutaten), geladen über den echten
 Ladepfad in einen Vollklon, 15.10.2026:** eingekauft 64,24 % der Positionen, nummer ohne
 einkauf 5,98 %, ohne nummer 3,17 %, unterrezept 26,61 %. Wege bis Ebene 5 (5.469 / 5.109 / 3.044
-/ 2.125 / 688 Zeilen). `mart.artikel_in_rezept` mit Filter auf eine Nummer 0,22 s,
+/ 2.125 / 688 Zeilen). `mart.artikel_in_rezept` mit Filter auf eine Nummer ~~0,22 s~~ — gemessen
+ohne Bestellpositionen im Klon; **nachgemessen 19.10.2026, synthetisch in Produktionsgröße mit
+echten Bestellpositionen, ~1,5–1,9 s** (97 % im `EXISTS` der Spalte `zuordnung` gegen
+`core.bestellposition`; der Filter auf `artikelnummer` greift erst nach der Rekursion),
 `mart.rezept_zuordnung_pruefung` 0,19 s, `mart.datenstand` unverändert (~0,05 s für die Spalten,
 die der MCP-Zugang liest; ~0,35 s für alle Spalten, vor und nach `0132` gleich).
 
@@ -1807,7 +1810,7 @@ Neue letzte Spalten:
 |---|---|
 | `mart.rezept_position` | `rezept_zuletzt_gesehen` (`zutaten_geholt_am` gab es schon) |
 | `mart.artikel_in_rezept` | `zutaten_geholt_am` (Rezept der Zeile), `rezept_zuletzt_gesehen`, `via_zutaten_geholt_am` (Halbfabrikat), `weg_zutaten_geholt_am` (ältester Abruf über den ganzen Weg: **der Datenstand der Zeile**) |
-| `mart.rezept_stand` | `ueberfaellig` (Zusammensetzung älter als Umlauf + 2 Tage, ohne 404) |
+| `mart.rezept_stand` | `ueberfaellig` (Zusammensetzung älter als Umlauf + 2 Tage, ohne 404), `umlauf_tage`, `umlauf_tage_quelle` |
 
 **Regel für Antworten:** Wer einen Datenstand nennt, nennt `zutaten_geholt_am` der betroffenen
 Rezepte. In `mart.artikel_in_rezept` ist das das Minimum von `weg_zutaten_geholt_am` über die
@@ -1820,10 +1823,18 @@ Fallstrick `rezept_stand_kein_rezeptstand` (`deutung`, Warnung bei jeder Abfrage
 `umlauf ueberfaellig` mit. Erwartung 0. Mehr als 0 heißt, dass der Umlauf nicht nachkommt
 (Notschalter, Budget, Phase C bricht ab).
 
-**Nicht nachgemessen mit Daten:** Der Klon (`lina_mgmt` + `0130`–`0134`) hat keine Rezepte. Die
-Rekursion in `mart.artikel_in_rezept` trägt eine Spalte mehr (`LEAST` je Schritt) und keinen
-zusätzlichen Join. Die Laufzeit aus `0132` (0,22 s mit Filter auf eine Nummer) sollte deshalb
-bleiben. Nach dem ersten Lauf in Produktion gegenprüfen.
+**Laufzeit:** Die Rekursion in `mart.artikel_in_rezept` trägt eine Spalte mehr (`LEAST` je
+Schritt) und keinen zusätzlichen Join. ~~Die Laufzeit aus `0132` (0,22 s mit Filter auf eine
+Nummer) sollte deshalb bleiben.~~ Die 0,22 s waren ohne Bestellpositionen gemessen.
+**Nachgemessen 19.10.2026, synthetisch in Produktionsgröße, ~1,5–1,9 s** mit Filter auf eine
+Nummer — 97 % davon im `EXISTS` der Spalte `zuordnung` gegen `core.bestellposition`, weil der
+Filter auf `artikelnummer` erst nach der Rekursion greift. Bewusst nicht optimiert (Review
+19.10.2026); für den MCP-Zugang liegt das unter der 20-s-Grenze.
+
+`ueberfaellig` misst gegen den Umlauf, den der Importer meldet (`umlauf_tage`, aus
+`sync.merker` `rezept_umlauf_tage`, von `rezepteNachfuellen()` bei jedem Lauf geschrieben), plus
+zwei Tage, in Berliner Kalendertagen. Hat der Importer nie gemeldet, gilt 14, und
+`umlauf_tage_quelle` sagt „rueckfall 14". ~~Fest 16 Tage in der Sicht.~~
 
 ## `mart.betrieb_schliessung_stand.abgegeben` (Migration `0133`, 19.10.2026)
 

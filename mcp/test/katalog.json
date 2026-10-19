@@ -5445,7 +5445,7 @@
    "koernung": "eine Marke — Ladestand der Rezepte; aeltester_zutatenabruf ist kein Datenstand einzelner Rezepte",
    "thema": "import",
    "summen_erlaubt": false,
-   "kommentar": "Je Marke: wie viele Rezepte geladen sind, wie viele nur ueber einen Verweis\ngefunden wurden, wie viele noch ohne Zutaten sind, und wann die Rezeptliste\nzuletzt geholt wurde. zustand: ok / zutaten ausstehend (Backfill laeuft) /\nzutaten leer, keine rezepte, liste veraltet, liste nie geholt, zugang ausgefallen,\ntagesgeschaeft gedeckelt, volle runde nicht abgeschlossen (Befunde, Regel 10) / kein FoodNotify-Zulauf (Marke hatte nie\neine FoodNotify-Aufgabe, kein Befund). Fortschritt des ersten\nAbzugs: rezepte_fn (FoodNotifys Zahl), rezepte (bekannt), mit_zutaten, ohne_zutaten\n(Rest), abzug_pct (Prozentzahl). archiviert zaehlt archivierte Rezepte (sie bleiben\ndrin). nicht_gefunden: Rezepte,\nauf die FoodNotify mit 404 antwortet (vermutlich geloescht). verweise_ohne_rezept:\nHalbfabrikate, auf die ein Rezept zeigt, die wir aber nicht kennen.\n\naeltester_zutatenabruf ist das Minimum ueber ALLE Rezepte der Marke und KEIN Datenstand fuer ein einzelnes Rezept. ueberfaellig: Rezepte, deren Zusammensetzung laenger als Umlauf + 2 Tage nicht gelesen wurde (Zustand umlauf ueberfaellig, Befund).\n\nKoernung: eine Marke — Ladestand der Rezepte; aeltester_zutatenabruf ist kein Datenstand einzelner Rezepte",
+   "kommentar": "Je Marke: wie viele Rezepte geladen sind, wie viele nur ueber einen Verweis\ngefunden wurden, wie viele noch ohne Zutaten sind, und wann die Rezeptliste\nzuletzt geholt wurde. zustand: ok / zutaten ausstehend (Backfill laeuft) /\nzutaten leer, keine rezepte, liste veraltet, liste nie geholt, zugang ausgefallen,\ntagesgeschaeft gedeckelt, volle runde nicht abgeschlossen (Befunde, Regel 10) / kein FoodNotify-Zulauf (Marke hatte nie\neine FoodNotify-Aufgabe, kein Befund). Fortschritt des ersten\nAbzugs: rezepte_fn (FoodNotifys Zahl), rezepte (bekannt), mit_zutaten, ohne_zutaten\n(Rest), abzug_pct (Prozentzahl). archiviert zaehlt archivierte Rezepte (sie bleiben\ndrin). nicht_gefunden: Rezepte,\nauf die FoodNotify mit 404 antwortet (vermutlich geloescht). verweise_ohne_rezept:\nHalbfabrikate, auf die ein Rezept zeigt, die wir aber nicht kennen.\n\naeltester_zutatenabruf ist das Minimum ueber ALLE Rezepte der Marke und KEIN Datenstand fuer ein einzelnes Rezept. ueberfaellig: Rezepte, deren Zusammensetzung laenger als Umlauf + 2 Tage nicht gelesen wurde (Zustand umlauf ueberfaellig, Befund); der Umlauf steht in umlauf_tage, so wie der Importer ihn meldet.\n\nKoernung: eine Marke — Ladestand der Rezepte; aeltester_zutatenabruf ist kein Datenstand einzelner Rezepte",
    "spalten": [
     "marke_key",
     "marke",
@@ -5471,7 +5471,9 @@
     "volle_runde_am",
     "volle_runde_abgeschlossen_am",
     "tagesgeschaeft_gedeckelt_am",
-    "ueberfaellig"
+    "ueberfaellig",
+    "umlauf_tage",
+    "umlauf_tage_quelle"
    ],
    "achsen": [
     "marke"
