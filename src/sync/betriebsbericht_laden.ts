@@ -403,14 +403,39 @@ async function finanzwegeSchreiben(
     await abweichungMelden(c, key, { hinweis: 'eine Finanzwegnummer je Tag und Antwort' },
       { betrieb_key: betriebKey, von, bis, doppelt, raw_id: rawId })
   }
+  /*
+   * ERST NACH DEM ZUSAMMENFASSEN TRENNEN (0136). Ein Wert über der Spalte ist
+   * eine Fehleingabe an der Kasse; er steht dann in *_ueberlauf und die Spalte
+   * ist NULL, statt dass der ganze Abruf an „numeric field overflow" scheitert.
+   */
+  const reihen = [...je.values()].map(r => {
+    const u = bt.ueberlaufTrennen(r.umsatz as number | null, bt.UMSATZ_GRENZE)
+    const a = bt.ueberlaufTrennen(r.anzahl as number | null, bt.ANZAHL_GRENZE)
+    return { ...r, umsatz: u.wert, umsatz_ueberlauf: u.ueberlauf, anzahl: a.wert, anzahl_ueberlauf: a.ueberlauf }
+  })
   const n = await einfuegen(c, 'core.finanzweg_tag',
     { betrieb_key: betriebKey, bericht, raw_id: rawId },
     [['geschaeftstag', 'date'], ['zeitraum_bis', 'date'], ['finanzweg_nummer', 'integer'],
      ['finanzweg_name', 'text'], ['finanzgruppe', 'text'], ['abschnitt', 'text'],
-     ['umsatz', 'numeric'], ['anzahl', 'numeric']],
-    [...je.values()])
+     ['umsatz', 'numeric'], ['anzahl', 'numeric'],
+     ['umsatz_ueberlauf', 'numeric'], ['anzahl_ueberlauf', 'numeric']],
+    reihen)
   await finanzwegStamm(c, zeilen, von)
   await rabattNummernAufloesen(c, betriebKey, von, bis)
+  /*
+   * Kassen-Fehleingaben für genau diesen Abruf neu erkennen (0136). In
+   * derselben Transaktion: ein Abruf, der den Unsinn nicht mehr enthält,
+   * räumt seine Markierung mit ab. Sichtbar in mart.finanzweg_fehleingabe.
+   */
+  const fe = await c.query<{ n: number }>(
+    `SELECT core.finanzweg_fehleingabe_pruefen($1, $2, $3::date, $4::date) AS n`,
+    [betriebKey, bericht, von, bis])
+  if (Number(fe.rows[0]?.n ?? 0) > 0) {
+    log.info('kassen-fehleingabe erkannt, zahlarten des tages ausgeblendet', {
+      endpunkt: key, betrieb_key: betriebKey, von, bis, zeilen: Number(fe.rows[0].n),
+      sicht: 'mart.finanzweg_fehleingabe',
+    })
+  }
   return n
 }
 

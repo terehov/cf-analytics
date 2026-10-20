@@ -74,7 +74,8 @@ lauf('Betriebsberichte mit Datenbank', () => {
     // Testbetriebe: die 15 Wilma-Wunder-Antworten aus 92 und Duesseldorf fuer den Rest.
     const r92 = fixture('report92-wilma-2026-08.json') as { betriebe: { encId: string; name: string }[] }
     for (const b of [...r92.betriebe, { encId: 'test-duesseldorf', name: 'Test Duesseldorf' },
-                     { encId: 'test-a', name: 'Test A' }, { encId: 'test-b', name: 'Test B' }]) {
+                     { encId: 'test-a', name: 'Test A' }, { encId: 'test-b', name: 'Test B' },
+                     { encId: 'test-kasse', name: 'Test Kasse' }]) {
       const r = await db.query(
         `INSERT INTO core.betrieb (enc_id, name) VALUES ($1, $2)
          ON CONFLICT (enc_id) DO UPDATE SET name = excluded.name RETURNING betrieb_key`,
@@ -876,6 +877,153 @@ lauf('Betriebsberichte mit Datenbank', () => {
     const { rows: [l] } = await db.query(`SELECT notiz FROM sync.lauf ORDER BY lauf_id DESC LIMIT 1`)
     expect(l.notiz).toContain('Notbremse')
     cfg.BETRIEBSBERICHT_JE_LAUF = 100000
+  })
+
+  // -----------------------------------------------------------------------
+  // Kassen-Fehleingaben (0136)
+  // -----------------------------------------------------------------------
+
+  /**
+   * Der Aalener Fall auf die Düsseldorfer Antwort gelegt: am 01.08. hat jemand
+   * „Bar gegeben" mit 2^63 / 10^6 abgeschlossen, die Kasse buchte den Rest als
+   * Trinkgeld. Beide Beträge sprengen numeric(16,4), ihre Summe stimmt.
+   */
+  const mitFehleingabe = () => {
+    const a = structuredClone(fixture('report97-duesseldorf-2026-08.json').antwort)
+    const block = a.table[1]
+    expect(block.businessDate).toBe('01.08.2026')
+    const unsinn = 9223372036854.775
+    for (const k of Object.keys(block).filter(k => /^\d+$/.test(k))) {
+      const z = block[k]
+      if (z.Finanzweg?.value === 'Bar gegeben') z.Umsatz.value -= unsinn
+      if (z.Finanzweg?.value === 'Trinkgeld') z.Umsatz.value += unsinn
+    }
+    return a
+  }
+
+  test('Fehleingabe: der Abruf lädt, der Überlauf steht daneben, der Tag verliert in mart seine Zahlarten', async () => {
+    const enc = 'test-kasse'
+    const bk = betrieb.get(enc)!
+    await ladenMit('getReport:97', enc, '2026-08-01', '2026-08-31', mitFehleingabe())
+
+    // Die Spalte ist leer, der Wert steht im Ueberlauf — und die Summe beider ist
+    // der echte Bargeldbetrag des Tages (-4.592,49 + 960,94 = -3.631,55).
+    const { rows: core } = await db.query(
+      `SELECT finanzweg_name, umsatz, abs(umsatz_ueberlauf) > 1e12 AS ueberlauf
+         FROM core.finanzweg_tag
+        WHERE betrieb_key = $1 AND geschaeftstag = '2026-08-01' AND finanzweg_name IN ('Bar gegeben', 'Trinkgeld')
+        ORDER BY 1`, [bk])
+    expect(core).toEqual([
+      { finanzweg_name: 'Bar gegeben', umsatz: null, ueberlauf: true },
+      { finanzweg_name: 'Trinkgeld', umsatz: null, ueberlauf: true },
+    ])
+    const { rows: [paar] } = await db.query(
+      `SELECT round(sum(umsatz_ueberlauf), 1)::float AS s FROM core.finanzweg_tag
+        WHERE betrieb_key = $1 AND geschaeftstag = '2026-08-01'`, [bk])
+    expect(paar.s).toBeCloseTo(-3631.55, 0)
+    const { rows: fe } = await db.query(
+      `SELECT geschaeftstag::text AS tag, finanzweg_name, regel FROM core.finanzweg_fehleingabe
+        WHERE betrieb_key = $1 ORDER BY 2`, [bk])
+    expect(fe).toEqual([
+      { tag: '2026-08-01', finanzweg_name: 'Bar gegeben', regel: 'betrag absurd' },
+      { tag: '2026-08-01', finanzweg_name: 'Trinkgeld', regel: 'ausgleich ueber einnahmen' },
+    ])
+    // Der 01.08. hat keine Zahlart mehr, aber seine Nachlaesse; der 02.08. ist unberuehrt.
+    const { rows: m } = await db.query(
+      `SELECT geschaeftstag::text AS tag, count(*) FILTER (WHERE art = 'zahlart')::int AS zahlart,
+              count(*) FILTER (WHERE art = 'nachlass')::int AS nachlass
+         FROM mart.finanzweg_tag WHERE betrieb_key = $1 AND geschaeftstag IN ('2026-08-01', '2026-08-02')
+        GROUP BY 1 ORDER BY 1`, [bk])
+    expect(m[0]).toEqual({ tag: '2026-08-01', zahlart: 0, nachlass: m[0].nachlass })
+    expect(m[0].nachlass).toBeGreaterThan(0)
+    expect(m[1].zahlart).toBeGreaterThan(0)
+    // Sichtbar, nicht still: die Pruefsicht und die Monatszeile sagen es.
+    const { rows: [s] } = await db.query(
+      `SELECT count(*)::int AS n, bool_and(in_auswertung) AS gezaehlt FROM mart.finanzweg_fehleingabe
+        WHERE betrieb_key = $1`, [bk])
+    expect(s).toEqual({ n: 2, gezaehlt: true })
+    await db.query(`REFRESH MATERIALIZED VIEW mart.finanzweg_monat_basis`)
+    const { rows: [z] } = await db.query(
+      `SELECT min(tage_fehleingabe) AS a, max(tage_fehleingabe) AS b,
+              max(abs(zahlbetrag)) < 1e6 AS plausibel
+         FROM mart.zahlart_monat WHERE betrieb_key = $1 AND monat = '2026-08-01'`, [bk])
+    expect(z).toEqual({ a: 1, b: 1, plausibel: true })
+
+    // Kommt derselbe Monat sauber, raeumt der Abruf seine Markierung mit ab.
+    await ladenMit('getReport:97', enc, '2026-08-01', '2026-08-31', fixture('report97-duesseldorf-2026-08.json').antwort)
+    const { rows: [rest] } = await db.query(
+      `SELECT count(*)::int AS n FROM core.finanzweg_fehleingabe WHERE betrieb_key = $1`, [bk])
+    expect(rest.n).toBe(0)
+  })
+
+  test('Fehleingabe: eine Gegenbuchung, die die Tagessumme drueckt, ist keine', async () => {
+    // Ratskeller Ludwigsburg, 03.05.2026: Gastrechnung +2.703 EUR, Zahlungen 2.781 EUR,
+    // Summe 80 EUR — und 158 EUR Trinkgeld. Gegen die Summe allein waere das Trinkgeld
+    // „groesser als der Tag"; gegen die Zahlungen ohne die groesste ist es das nicht.
+    const bk = betrieb.get('test-kasse')!
+    await db.query(`DELETE FROM core.finanzweg_tag WHERE betrieb_key = $1`, [bk])
+    await db.query(`SELECT core.partition_anlegen('core.finanzweg_tag', DATE '2026-05-01')`)
+    await db.query(
+      `INSERT INTO core.finanzweg_tag (geschaeftstag, zeitraum_bis, betrieb_key, bericht, finanzweg_nummer,
+                                       finanzweg_name, finanzgruppe, umsatz, anzahl)
+       SELECT '2026-05-03', '2026-05-03', $1, 97, n, name, gruppe, umsatz, 1
+         FROM (VALUES (60, 'Gastrechnung', 'Rechnung', 2703), (41, 'Giro direkt', 'Unbar', -1660),
+                      (20, 'Bar gegeben', 'Bargeld', -549), (42, 'Visa direkt', 'Unbar', -428),
+                      (44, 'Mastercard direkt', 'Unbar', -144), (2700, 'Trinkgeld', 'Bargeld', 158))
+              v(n, name, gruppe, umsatz)`, [bk])
+    const { rows: [r] } = await db.query(
+      `SELECT core.finanzweg_fehleingabe_pruefen($1, 97, '2026-05-01', '2026-05-31') AS n`, [bk])
+    expect(r.n).toBe(0)
+  })
+
+  test('Worker: scheitert das Laden, bleibt die Rohantwort — einmal je Fehler, nicht je Versuch', async () => {
+    const { workerLauf } = await import('./worker')
+    await db.query(`TRUNCATE sync.warteschlange, sync.aufgabe, sync.lauf`)
+    await db.query(`DELETE FROM raw.api_antwort WHERE ladefehler IS NOT NULL`)
+    cfg.TAGESBUDGET = 10000
+    // Ein Betrieb, den core.betrieb nicht kennt: LINA antwortet, der Lader wirft.
+    await db.query(`INSERT INTO sync.warteschlange (endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis, prioritaet)
+                    VALUES ('getReport:97', 'test-unbekannt', '2026-08-01', '2026-08-31', 85)`)
+    await workerLauf('manuell')
+    const roh = async () => (await db.query(
+      `SELECT count(*)::int AS n, min(ladefehler) AS fehler, bool_and(payload IS NOT NULL) AS mit_antwort
+         FROM raw.api_antwort WHERE ladefehler IS NOT NULL AND betrieb_enc_id = 'test-unbekannt'`)).rows[0]
+    const erst = await roh()
+    expect(erst.n).toBe(1)
+    expect(erst.fehler).toContain('fehlt in core.betrieb')
+    expect(erst.mit_antwort).toBe(true)
+    const { rows: [p] } = await db.query(
+      `SELECT erledigt_am IS NULL AS offen, letzter_fehler FROM sync.warteschlange WHERE betrieb_enc_id = 'test-unbekannt'`)
+    expect(p.offen).toBe(true)
+    expect(p.letzter_fehler).toBe(erst.fehler)
+
+    // Derselbe Fehler beim naechsten Versuch: keine zweite Kopie.
+    await db.query(`UPDATE sync.warteschlange SET faellig_ab = now() WHERE betrieb_enc_id = 'test-unbekannt'`)
+    await workerLauf('manuell')
+    const { rows: [zwei] } = await db.query(
+      `SELECT versuche, faellig_ab::date > current_date AS naechste_nacht, ergebnis
+         FROM sync.warteschlange WHERE betrieb_enc_id = 'test-unbekannt'`)
+    // Ab dem zweiten Fehlschlag erst in der naechsten Nacht — nicht nach Minuten.
+    expect(zwei).toEqual({ versuche: 2, naechste_nacht: true, ergebnis: null })
+    expect((await roh()).n).toBe(1)
+
+    // Der zehnte Versuch bricht ab: endgueltig, nicht wiederbelebbar, sichtbar.
+    await db.query(`UPDATE sync.warteschlange SET faellig_ab = now(), versuche = $1 - 1
+                      WHERE betrieb_enc_id = 'test-unbekannt'`, [cfg.LADEFEHLER_MAX_VERSUCHE])
+    await workerLauf('manuell')
+    const { rows: [ende] } = await db.query(
+      `SELECT ergebnis, erledigt_am IS NOT NULL AS erledigt FROM sync.warteschlange
+        WHERE betrieb_enc_id = 'test-unbekannt'`)
+    expect(ende).toEqual({ ergebnis: 'ladefehler', erledigt: true })
+    const { rows: sicht } = await db.query(
+      `SELECT zustand, fehler LIKE '%fehlt in core.betrieb%' AS grund FROM mart.posten_aufgegeben
+        WHERE posten_id = (SELECT posten_id FROM sync.warteschlange WHERE betrieb_enc_id = 'test-unbekannt')`)
+    expect(sicht).toEqual([{ zustand: 'endgueltig', grund: true }])
+    const { aufgegebeneWiederbeleben } = await import('./nachfuellen')
+    await aufgegebeneWiederbeleben()
+    const { rows: [danach] } = await db.query(
+      `SELECT ergebnis FROM sync.warteschlange WHERE betrieb_enc_id = 'test-unbekannt'`)
+    expect(danach.ergebnis).toBe('ladefehler')
   })
 
   // -----------------------------------------------------------------------

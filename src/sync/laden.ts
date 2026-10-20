@@ -11,7 +11,7 @@
  * die Warteschlange versucht es dann erneut.
  */
 import type { PoolClient } from 'pg'
-import { inTransaktion, mehrzeilig, inBloecken } from '../db/pool'
+import { inTransaktion, mehrzeilig, inBloecken, query } from '../db/pool'
 import * as t from '../transform'
 import type { Endpunkt } from '../lina/endpunkte'
 import { log } from '../lib/log'
@@ -130,6 +130,64 @@ async function artikelSichern(c: PoolClient, stamm: t.ArtikelStamm[]) {
     [eindeutig.map(a => a.artikelnummer)])
   for (const z of r.rows) map.set(Number(z.artikelnummer), Number(z.artikel_key))
   return map
+}
+
+/**
+ * Die Rohantwort sichern, wenn das Laden gescheitert ist (Migration 0136).
+ *
+ * `laden()` schreibt raw und core in EINER Transaktion — scheitert core, ist
+ * auch die Rohantwort weg. Bei Aposto Aalen (Bericht 97, Juli 2025) hieß das:
+ * 27 Nächte „numeric field overflow", 27 Abrufe, keine einzige Antwort, an der
+ * man den Grund hätte ablesen können. Der Worker ruft diese Funktion deshalb
+ * NACH dem Rollback auf, in einer eigenen Anweisung.
+ *
+ * NUR BEIM ERSTEN AUFTRETEN EINES FEHLERS je Posten: steht derselbe Text schon
+ * in `letzter_fehler`, liegt die Antwort bereits da. Sonst wüchse raw jede
+ * Nacht um dieselbe Antwort (Aalen: 300 KB).
+ *
+ * NICHT FÜR DIE LADENAKTE. Ihr Lader bereinigt das Stammdatenblatt vor der
+ * Rohablage (Ausweis- und Krankmeldungsdaten im Lohn-Zweig) — eine Sicherung
+ * am Lader vorbei würde genau das umgehen.
+ *
+ * Scheitert die Sicherung selbst, wird das gemeldet und nicht geworfen: der
+ * Posten ist ohnehin gescheitert, und die Fehlerbehandlung des Workers darf
+ * daran nicht abbrechen.
+ */
+export async function rohNachLadefehlerSichern(k: {
+  quelle: 'lina' | 'foodnotify'
+  endpunkt: string
+  betriebEncId: string | null
+  von: string
+  bis: string
+  parameter: Record<string, unknown>
+  httpStatus: number
+  daten: unknown
+  hash: string
+  bytes: number
+  laufId: string
+  postenId: number | string
+  fehler: string
+}): Promise<boolean> {
+  if (istLadenakte(k.endpunkt)) return false
+  try {
+    const [alt] = await query<{ letzter_fehler: string | null }>(
+      `SELECT letzter_fehler FROM sync.warteschlange WHERE posten_id = $1`, [k.postenId])
+    if (alt?.letzter_fehler === k.fehler) return false
+    await query(
+      `SELECT core.partition_anlegen('raw.api_antwort', d)
+         FROM unnest(ARRAY[current_date, current_date + 1]) AS d`)
+    await query(
+      `INSERT INTO raw.api_antwort
+         (quelle, endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis, parameter,
+          http_status, payload, payload_hash, payload_bytes, lauf_id, ladefehler)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+      [k.quelle, k.endpunkt, k.betriebEncId, k.von, k.bis, JSON.stringify(k.parameter),
+       k.httpStatus, JSON.stringify(k.daten), k.hash, k.bytes, k.laufId, k.fehler])
+    return true
+  } catch (e) {
+    log.warn('rohantwort nach ladefehler nicht gesichert', { endpunkt: k.endpunkt, fehler: String(e) })
+    return false
+  }
 }
 
 export async function laden(k: Kontext): Promise<number> {

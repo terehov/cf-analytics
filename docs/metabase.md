@@ -1849,3 +1849,31 @@ Bestellansicht geladen, ohne Positionen, ohne Ansichtsnummer, und wie viele Ansi
 Inhalt entlehnt haben. Erwartung: `ohne_positionen = 0`. Wer Einkaufsmengen in Kilo oder Liter
 auswertet: Ansicht-Positionen ohne Vorbild haben keine Gesamtmenge (`menge_unstimmig`), ihre Summe
 in Euro ist aber vollständig.
+
+## Kassen-Fehleingaben in den Finanzwegen (Migration `0136`, 20.10.2026)
+
+`mart.finanzweg_tag` lässt an einem Betrieb-Tag mit erkannter Kassen-Fehleingabe **alle
+Zahlart-Zeilen** weg (Nachlässe, Umsatz und Statistik bleiben). Damit fehlen sie auch in
+`mart.finanzweg_monat` und `mart.zahlart_monat`. Die Monatssumme eines Betriebs ist dann um diese
+Tage zu klein, aber nicht falsch verteilt.
+
+- `mart.zahlart_monat.tage_fehleingabe` (angehängt): so viele Tage fehlen in diesem Monat. Der Wert
+  steht an jeder Zeile des Betriebs und Monats gleich, also nicht summieren.
+- `mart.finanzweg_fehleingabe`: welche Tage, welche Zeile, welcher Betrag (LINAs Vorzeichen), gegen
+  welchen Bezug, nach welcher Regel. `in_auswertung` sagt, ob diese Quelle die gezählte ist.
+- `mart.pruefung_uebersicht`: „Finanzwege: Tag mit Kassen-Fehleingabe, Zahlarten ausgeblendet
+  (60 Tage)“. Bewusst nur 60 Tage, weil die Altfälle für immer stehen bleiben.
+
+Vorher standen etwa bei Schlager Cafe Düsseldorf im März 2026 „Bar gegeben“ mit 555,6 Mrd. EUR und
+100 % Anteil in `mart.zahlart_monat`. Regel und Messung: `befunde-datenlage.md`. Der
+MCP-Katalogabzug für die neue Sicht steht noch aus (`offene-punkte.md`).
+
+**Tischübergabe ist keine Zahlart mehr** (ebenfalls `0136`). Wo die Kasse Tischübergabe und
+-übernahme unter „Übernahme / Übergabe“ statt „Statistik“ führt, standen sie in
+`mart.zahlart_monat`, und ihre positive Hälfte zählte im Nenner von `zahlart_anteil_pct` mit
+(2.047 Tage, 5,0 Mio. EUR je Richtung). Jetzt `art = 'statistik'` mit LINAs Vorzeichen. Die
+Anteile der betroffenen Betriebe steigen dadurch leicht, die Summe der Zahlarten bleibt gleich,
+weil sich das Paar aufhob.
+
+`mart.posten_aufgegeben` führt seit `0136` auch Posten mit `ergebnis = 'ladefehler'`, immer als
+`endgueltig`.

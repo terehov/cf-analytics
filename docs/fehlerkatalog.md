@@ -5248,3 +5248,44 @@ schiefgeht.
 jedem Lauf nach `sync.merker` (`rezept_umlauf_tage`), die Sicht misst gegen ihn + 2 und zeigt ihn
 in `umlauf_tage`; fehlt er, gilt 14 und `umlauf_tage_quelle` sagt es. Der Test prüft das
 Verhalten: gemeldet 7 → ein zehn Tage altes Rezept ist überfällig, gemeldet 28 → nicht.
+
+## Ein Monat Finanzwege scheiterte 27 Nächte am Spaltenüberlauf, und keine Antwort blieb liegen (20.10.2026)
+
+**Symptom.** Bericht 97 (Tagesabschluss) für Aposto Aalen, Juli 2025, endete seit dem 02.10.2026
+jede Nacht mit `numeric field overflow`. 27 Versuche, der Posten blieb offen. In `raw.api_antwort`
+lag **keine einzige** dieser Antworten, obwohl LINA jedes Mal sauber geantwortet hatte.
+
+**Ursache, zweiteilig.**
+1. An der Kasse hatte jemand am 19.07.2025 einen Bon über rund 17,98 EUR mit „Bar gegeben“
+   −9.223.372.043.271,11 EUR abgeschlossen (fast genau 2⁶³ / 10⁶). Die Kasse buchte ein Rückgeld
+   derselben Größe. `core.finanzweg_tag.umsatz` ist `numeric(16,4)`, der Insert scheiterte.
+2. `laden()` schreibt Rohantwort und `core` in **einer** Transaktion. Scheitert `core`, wird die
+   Rohantwort mit zurückgerollt. „Der Raw-Layer ist die Versicherung“ galt also genau dann nicht,
+   wenn man ihn gebraucht hätte. Gefunden wurde der Wert erst mit einem eigenen Abruf im
+   Terminal des Nutzers.
+
+**Was es künftig verhindert (`0136`).** Werte über der Spalte stehen in `umsatz_ueberlauf` bzw.
+`anzahl_ueberlauf`, die Spalte ist dann NULL (`ueberlaufTrennen()` in
+`src/transform/betriebsbericht.ts`). Scheitert ein Lader trotzdem, sichert der Worker die Antwort
+danach mit `raw.api_antwort.ladefehler` (`rohNachLadefehlerSichern()`), je Posten beim ersten
+Auftreten eines Fehlers. Getestet in `src/sync/betriebsbericht.test.ts`.
+
+**Und er bricht ab:** nach `LADEFEHLER_MAX_VERSUCHE` (10) mit `ergebnis = 'ladefehler'`, statt
+unbegrenzt vertagt zu werden; sichtbar in `mart.posten_aufgegeben`.
+
+## Kassen-Fehleingaben standen als Milliarden in den Zahlarten (20.10.2026)
+
+**Symptom.** `mart.zahlart_monat` zeigte für Schlager Cafe Düsseldorf im März 2026 „Bar gegeben“
+mit 555,6 Mrd. EUR und 100 % Anteil, für Aposto Gera im August 2026 EC-Karte und Trinkgeld mit je
+11,1 Mrd. EUR, für Wilma Wunder Mainz im Dezember 2025 340.484 EUR Trinkgeld bei 8.245 EUR
+Tagesumsatz. Kein Fehler, keine Prüfung schlug an.
+
+**Ursache.** Dieselbe Art Fehleingabe wie in Aalen (oben), nur klein genug für die Spalte. Wer
+einen absurden Betrag als „gegeben“ eintippt, bekommt den Rest als Rückgeld oder Trinkgeld
+gebucht. Die beiden Hälften heben sich in der Tagessumme auf, deshalb fiel keiner Summenprüfung
+etwas auf. Je Zahlart gelesen ist es Unsinn.
+
+**Was es künftig verhindert (`0136`).** `core.finanzweg_fehleingabe_pruefen()` erkennt solche Tage
+nach jedem Finanzwegabruf. `mart.finanzweg_tag` lässt an diesen Tagen alle Zahlarten des Betriebs
+weg, sichtbar in `mart.finanzweg_fehleingabe`, `mart.zahlart_monat.tage_fehleingabe` und einer
+Zeile in `mart.pruefung_uebersicht`. Regel und Messung: `befunde-datenlage.md`, 20.10.2026.

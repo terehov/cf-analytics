@@ -4291,3 +4291,38 @@ Testvorlage — die Vorlage ist synthetisch, im echten Markup.
 **Nachgemessen am 19.10.2026:** Parser gegen zwei echte Antworten (44 und 53 Zeilen, 53/53 gleich
 `/change`); auf einem Klon (`lina_mgmt` + 0130–0135) Einreihen, Laden, Entlehnen (12,96 kg Tortillas
 aus Vorbild), `ersatzweg` am gescheiterten Posten und der Wurf bei falscher Zeilenzahl.
+
+## 20.10.2026 — Kassen-Fehleingaben: `core` quellentreu, `mart` blendet den Tag aus (`0136`)
+
+**Anlass.** Bericht 97 für Aposto Aalen, Juli 2025, scheiterte 27 Nächte an einem Betrag von
+−9,2 Bio. EUR („Bar gegeben“). Bei der Suche zeigte sich: dieselbe Fehleingabe stand an acht
+weiteren Tagen bereits in `core` und kam bis in `mart.zahlart_monat`
+(`befunde-datenlage.md`, 20.10.2026).
+
+**Entschieden (Eugene, 20.10.2026):**
+1. **`core` speichert, was LINA liefert.** Ein Wert über der Spalte kommt nach
+   `umsatz_ueberlauf`/`anzahl_ueberlauf`, die Spalte ist dann NULL. ~~Die Spalte ohne
+   Größengrenze~~ ging nicht: Postgres ändert keinen Spaltentyp, auf dem Sichten stehen, und auf
+   `core.finanzweg_tag.umsatz` stehen mehrere. Alle abzureißen und neu aufzubauen wäre ein
+   größeres Risiko gewesen als eine Zusatzspalte.
+2. **`mart` lässt an einem erkannten Tag alle Zahlarten des Betriebs weg**, nicht nur die beiden
+   unsinnigen Zeilen. Welcher Teil von „Bar gegeben“ echt war, lässt sich nicht trennen: Die
+   Fehleingabe und die echten Barzahlungen des Tages stehen in derselben Zeile. Ein „zurecht
+   gerechneter“ Tag wäre eine fast richtige Zahl. Der Tag fehlt sichtbar
+   (`tage_fehleingabe`, `mart.finanzweg_fehleingabe`, `mart.pruefung_uebersicht`). Nachlässe,
+   Umsatz- und Statistikzeilen bleiben.
+3. **Die Rohantwort wird auch gesichert, wenn das Laden scheitert** (`raw.api_antwort.ladefehler`),
+   je Posten beim ersten Auftreten eines Fehlers. Ausgenommen ist die Ladenakte: ihr Lader bereinigt
+   das Stammdatenblatt vor der Rohablage.
+
+**Verworfen:** eine feste Grenze („über 1 Mio. EUR ist Unsinn“) übersah 340.484 EUR Trinkgeld bei
+8.245 EUR Tagesumsatz. Ein reines Verhältnis gegen den Tagesumsatz traf echte Gutscheinbuchungen.
+Die Regel und ihre Messung stehen in `befunde-datenlage.md`.
+
+**Nachtrag am selben Tag (Eugene):**
+4. **Ein Ladefehler bricht nach zehn Versuchen ab** (`LADEFEHLER_MAX_VERSUCHE`), ab dem zweiten
+   Versuch einer je Nacht, mit dem endgültigen Ergebnis `ladefehler`. Nicht `aufgegeben`: das
+   würde dreimal wiederbelebt. Begründung: ein Ladefehler hängt an den Daten, nicht an der
+   Gegenstelle. Aalen lief 27 Versuche, ohne dass eine Prüfsicht ihn nannte.
+5. **Tischübergabe und -übernahme sind Statistik**, auch unter der Gruppe „Übernahme / Übergabe“.
+   Eine Regel für Sicht, Erkennung und Lader: `mart.finanzweg_art()` bzw. `finanzwegArt()`.

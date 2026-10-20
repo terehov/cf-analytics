@@ -2127,3 +2127,33 @@ Terminal des Nutzers. **Nachgemessen am 19.10.2026, 16:58:** Bestellkopf 638090 
 Ansichtsnummer 645599 und 44 Artikel, `/change` weiter HTTP 500, die Ansicht `/shop/6421/orders/645599`
 kommt mit der Importer-Sitzung und ergibt 44 Zeilen — Exit 0. Der Ersatzweg trägt also auch ohne den
 Admin-Zugang, mit dem er im Browser gemessen wurde.
+
+## Werte über der Spalte und Rohantworten bei Ladefehlern (`0136`, 20.10.2026)
+
+**Finanzwege (88/97).** `finanzwegeSchreiben()` trennt nach dem Zusammenfassen je Tag und Nummer
+jeden Wert mit `ueberlaufTrennen()`: passt er in `numeric(16,4)` bzw. `numeric(14,3)`, steht er in
+`umsatz`/`anzahl`, sonst in `umsatz_ueberlauf`/`anzahl_ueberlauf`, und die Spalte ist NULL. Danach
+ruft der Lader in derselben Transaktion `core.finanzweg_fehleingabe_pruefen()` für Betrieb, Bericht
+und Zeitraum auf. Ein sauberer Neuabruf räumt so seine alte Markierung mit ab.
+
+**Rohantwort bei Ladefehlern.** `laden()` schreibt `raw` und `core` in einer Transaktion. Scheitert
+`core`, ist die Rohantwort mit dem Rollback weg. Der Worker ruft deshalb im Fehlerzweig
+`rohNachLadefehlerSichern()` auf (`src/sync/laden.ts`): eine eigene Anweisung, Spalte `ladefehler`,
+für LINA und FoodNotify. **Nur beim ersten Auftreten** eines Fehlertexts je Posten (Vergleich mit
+`letzter_fehler` vor dem Update), sonst wüchse `raw` jede Nacht um dieselbe Antwort. **Nicht für die
+Ladenakte**, weil ihr Lader das Stammdatenblatt vor der Rohablage bereinigt. Scheitert die
+Sicherung selbst, wird gewarnt und nicht geworfen.
+
+Gefunden an Aposto Aalen (Bericht 97, Juli 2025): 27 Nächte `numeric field overflow`, keine
+gesicherte Antwort, die Ursache erst mit einem eigenen Abruf sichtbar (`fehlerkatalog.md`).
+
+**Abbruch nach zehn Ladefehlern** (Entscheidung Eugene, 20.10.2026). Scheitert das Laden, wird der
+erste Fehlschlag wie bisher nach Minuten wiederholt (`wiedervorlage()`), jeder weitere erst in der
+nächsten Nacht. Bei `versuche >= LADEFEHLER_MAX_VERSUCHE` (Vorgabe 10, `src/config.ts`) schließt der
+Worker den Posten mit `ergebnis = 'ladefehler'`. Das Ergebnis ist endgültig: nicht `aufgegeben`,
+denn das würde `aufgegebeneWiederbeleben()` dreimal zurückholen, und aus zehn Nächten würden
+vierzig. Sichtbar in `mart.posten_aufgegeben` (`zustand = 'endgueltig'`), in der Prüfzeile
+„Warteschlange: endgueltig aufgegeben“ und in `/status` (`aufgegebene_posten`). Die Einreihwege der
+Betriebsberichte reihen einen so geschlossenen Zeitraum nicht neu ein (sie prüfen jeden Posten,
+gleich welches Ergebnis). Wer den Fehler behoben hat, setzt den Posten von Hand zurück:
+`UPDATE sync.warteschlange SET erledigt_am = NULL, ergebnis = NULL, versuche = 0, faellig_ab = now() WHERE posten_id = …`.

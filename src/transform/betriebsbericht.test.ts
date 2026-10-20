@@ -318,3 +318,33 @@ describe('Schema je Bericht', () => {
     expect(r.success).toBe(false)
   })
 })
+
+describe('Werte über der Spalte (0136)', () => {
+  test('ein Wert unter der Grenze bleibt in der Spalte, darüber wandert er unverändert in den Überlauf', () => {
+    expect(bt.ueberlaufTrennen(-6416.34, bt.UMSATZ_GRENZE)).toEqual({ wert: -6416.34, ueberlauf: null })
+    expect(bt.ueberlaufTrennen(null, bt.UMSATZ_GRENZE)).toEqual({ wert: null, ueberlauf: null })
+    // Aposto Aalen, 19.07.2025: was LINA lieferte, nicht gekappt, nicht gerundet.
+    expect(bt.ueberlaufTrennen(-9223372043271.111, bt.UMSATZ_GRENZE))
+      .toEqual({ wert: null, ueberlauf: -9223372043271.111 })
+    expect(bt.ueberlaufTrennen(9223372036836.8, bt.UMSATZ_GRENZE))
+      .toEqual({ wert: null, ueberlauf: 9223372036836.8 })
+  })
+
+  test('die Grenzen sind die der Spalten: numeric(16,4) und numeric(14,3)', () => {
+    expect(bt.ueberlaufTrennen(999_999_999_999.9999, bt.UMSATZ_GRENZE).ueberlauf).toBeNull()
+    expect(bt.ueberlaufTrennen(1e12, bt.UMSATZ_GRENZE).ueberlauf).toBe(1e12)
+    expect(bt.ueberlaufTrennen(99_999_999_999.999, bt.ANZAHL_GRENZE).ueberlauf).toBeNull()
+    expect(bt.ueberlaufTrennen(-1e11, bt.ANZAHL_GRENZE).ueberlauf).toBe(-1e11)
+  })
+})
+
+describe('finanzwegArt: Tischübergabe ist keine Zahlart (0136)', () => {
+  test('unter „Statistik" wie unter „Übernahme / Übergabe" — beide Schreibweisen', () => {
+    expect(bt.finanzwegArt('Statistik')).toBe('statistik')
+    expect(bt.finanzwegArt('Übernahme / Übergabe')).toBe('statistik')
+    expect(bt.finanzwegArt('Uebergabe/Uebernahme')).toBe('statistik')
+    // Was wie eine Rückgabe klingt, bleibt Zahlart: Pfandrückgabe zahlt der Betrieb wirklich aus.
+    expect(bt.finanzwegArt('Pfand')).toBe('zahlart')
+    expect(bt.finanzwegArt('Bargeld')).toBe('zahlart')
+  })
+})

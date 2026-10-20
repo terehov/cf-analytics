@@ -2355,3 +2355,14 @@ der zufällig nachsieht.
 trägt `teilweise` keine Information mehr, und die Herabstufung durch stumme Quellen geht darin
 unter. Seit `0130` zeigt `mart.sync_status` die Notiz; ob stumme Quellen einen eigenen Status
 bekommen sollen, ist offen.
+
+## Aus den Kassen-Fehleingaben (`0136`, 20.10.2026)
+
+- ~~**Ein Ladefehler gibt nie auf.**~~ **Erledigt in `0136` (Entscheidung Eugene, 20.10.2026):**
+  nach `LADEFEHLER_MAX_VERSUCHE` (10) bricht der Worker mit `ergebnis = 'ladefehler'` ab, ab dem
+  zweiten Fehlschlag ein Versuch je Nacht. Sichtbar in `mart.posten_aufgegeben` (`endgueltig`).
+- ~~**Tischübergabe/Tischübernahme zählen bei manchen Betrieben als Zahlart.**~~ **Erledigt in
+  `0136`:** `mart.finanzweg_art()` führt die Gruppe „Übernahme / Übergabe“ als `statistik`, der
+  Lader (`finanzwegArt()`) ebenso; `core.finanzweg.art` ist nachgezogen.
+- **MCP-Katalogabzug** für `mart.finanzweg_fehleingabe` und `mart.zahlart_monat.tage_fehleingabe`:
+  `cd mcp && bun run katalog:abzug` gegen eine vollständige Datenbank.

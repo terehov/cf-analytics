@@ -2281,3 +2281,47 @@ Zeilen sind keine Duplikate. Gezählt wird nach `rezept_fn_id`.
 SELECT rezept, count(DISTINCT rezept_fn_id) FROM mart.artikel_in_rezept
  WHERE artikelnummer = '300203' GROUP BY 1;
 ```
+
+## Kassen-Fehleingaben: absurde Beträge mit Rückgeld oder Trinkgeld als Gegenbuchung (20.10.2026)
+
+An mindestens neun Betrieb-Tagen seit Januar 2025 hat jemand an der Kasse einen absurden Betrag als
+„Bar gegeben“ oder „EC-Karte“ eingetippt, und die Kasse hat den Rest als Rückgeld oder Trinkgeld
+gebucht. Die Tagessumme stimmt dabei, die einzelnen Zahlarten nicht.
+
+| Betrieb | Tag | Fehleingabe | Gegenbuchung | Tagesbezug |
+|---|---|---|---|---|
+| Aposto Aalen | 19.07.2025 | Bar gegeben −9,2 Bio. | Rückgeld +9,2 Bio. | (nicht ladbar bis 0136) |
+| Wirtshaus am Schlossplatz | 10.01.2025 | Bar gegeben −119.351 | Rückgeld +111.066 | 22.200 |
+| Wirtshaus Lautenschlager | 28.05.2025 | – | Trinkgeld 0% +19.482 | 10.617 |
+| Gastronomie am Markt Mainz | 20.10.2025 | Bar gegeben −83.046 | Trinkgeld +81.120 | 9.357 |
+| Wilma Wunder Ballplatz Mainz | 06.12.2025 | Bar gegeben −341.899 | Trinkgeld +340.484 | 8.245 |
+| Schlager Cafe Düsseldorf | 07.03.2026 | Bar gegeben −555,6 Mrd. | Rückgeld +555,6 Mrd. | 13.714 |
+| Gastronomie am Markt Mainz | 01.08.2026 | Bar gegeben −90.815 | Trinkgeld +86.552 | 21.649 |
+| Wilma Wunder Ballplatz Mainz | 14.08.2026 | Bar gegeben −5,96 Mrd. | Trinkgeld +5,96 Mrd. | 3.454 |
+| Aposto Gera | 23.08.2026 | EC-Karte −11,1 Mrd. | Trinkgeld +11,1 Mrd. | 4.385 |
+
+Beträge in EUR mit LINAs Vorzeichen. Dieselbe Signatur gibt es bei Boniert/Sofortstorno (Enchilada
+Hamm, 16.11.2025: 5,6 Mrd. gebucht und sofort storniert). Dort ist sie aber tatsächlich so
+passiert und bleibt stehen.
+
+**Die Regel (`core.finanzweg_fehleingabe_pruefen()`)**, je Betrieb, Tag und Quellbericht, nur
+Zahlarten:
+- *Bezug* ist das Größere aus dem Betrag der Zahlartensumme (darin heben sich beide Hälften auf, sie
+  ist der Tagesumsatz) und den Zahlungen ohne die größte, mindestens 100 EUR.
+- *Ausgleich über Einnahmen:* Trinkgeld, TIP oder Rückgeld größer als der Bezug.
+- *Betrag absurd:* eine Zahlart über 1 Mio. EUR und über dem 50-Fachen des Bezugs.
+
+**Warum nicht einfacher.** Beim Verhältnis „größte Zahlart gegen Tagesumsatz“ lagen ab dem
+1,5-Fachen 42 Tage über der Grenze, die meisten davon echte Buchungen, etwa Gutscheinverkäufe in
+Ludwigsburg, die über „Gastrechnung“ gegengebucht werden (bis zum 20-Fachen des Tages). Eine feste Grenze von 1 Mio. EUR übersah Mainz mit 340.484 EUR. Nur mit der
+Zahlartensumme als Bezug war Ludwigsburg am 03.05.2026 ein Fehltreffer: die Summe lag bei 80 EUR
+bei 2.781 EUR Zahlungen und 158 EUR Trinkgeld. Deshalb der zweite Bezug.
+
+**Nachgemessen am 20.10.2026** an allen 685.614 Finanzwegzeilen der Produktion: 8 Betrieb-Tage aus
+11 Tagesquellen (drei Tage stehen in 88 und 97), 16 Zeilen, kein Fehltreffer. Aalen kommt mit dem
+ersten Lauf nach `0136` dazu.
+
+```sql
+SELECT betrieb, geschaeftstag, finanzweg_name, regel, betrag_lina, bezug
+  FROM mart.finanzweg_fehleingabe ORDER BY geschaeftstag;
+```

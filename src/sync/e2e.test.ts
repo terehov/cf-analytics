@@ -299,6 +299,8 @@ lauf('Ende-zu-Ende', () => {
        */
       'Feiertag: Jahr mit Umsatz, aber ohne Feiertage',
       'Feiertag: Name endet vor dem Ende der Historie',
+      // Seit 0136: nur 60 Tage — die Altfaelle bleiben fuer immer stehen.
+      'Finanzwege: Tag mit Kassen-Fehleingabe, Zahlarten ausgeblendet (60 Tage)',
       /**
        * Beide seit 0079. Zwei Zeilen, weil es zwei verschiedene Fehler
        * sind: eine abgewiesene Datei ist ein Tippfehler von heute, eine

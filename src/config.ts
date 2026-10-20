@@ -485,6 +485,26 @@ const Schema = z.object({
   FN_POSITIONEN_MAX_NAECHTE: z.coerce.number().int().min(1).default(10),
 
   /**
+   * Nach wie vielen Versuchen ein Posten abgebrochen wird, dessen ANTWORT kam,
+   * dessen LADEN aber scheiterte — mit `ergebnis = 'ladefehler'` (Migration
+   * 0136, Entscheidung Eugene 20.10.2026: zehn).
+   *
+   * Bis dahin gab ein Ladefehler nie auf: der Posten wurde nur vertagt.
+   * Aposto Aalen, Bericht 97, Juli 2025, lief so 27 Versuche in 18 Naechten
+   * gegen „numeric field overflow", und keine Pruefsicht nannte ihn — er war
+   * weder aufgegeben noch erledigt. Ein Ladefehler haengt an den Daten, nicht
+   * an der Gegenstelle; ein elfter Versuch mit derselben Antwort aendert nichts.
+   *
+   * Der erste Fehlschlag wird wie bisher nach Minuten wiederholt (ein
+   * voruebergehender Datenbankfehler soll keinen Tag kosten), jeder weitere
+   * erst in der naechsten Nacht — zehn Versuche sind also rund neun Naechte.
+   * NICHT 'aufgegeben': das holte aufgegebeneWiederbeleben() dreimal zurueck,
+   * und aus zehn Naechten wuerden vierzig. Sichtbar in mart.posten_aufgegeben
+   * als `endgueltig`, die Rohantwort liegt in raw.api_antwort (ladefehler).
+   */
+  LADEFEHLER_MAX_VERSUCHE: z.coerce.number().int().min(1).default(10),
+
+  /**
    * Wie oft ein aufgegebener Posten vom naechtlichen Lauf zurueckgeholt wird.
    *
    * `aufgegeben` setzt `erledigt_am` — bis zum 13.08.2026 sah den Posten

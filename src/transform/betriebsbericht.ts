@@ -228,6 +228,30 @@ export function rabattbericht(h: Huelle): RabattErgebnis {
 // 88 und 97 — Finanzwege
 // --------------------------------------------------------------------------
 
+/**
+ * Was `core.finanzweg_tag` fassen kann: umsatz numeric(16,4), anzahl numeric(14,3).
+ *
+ * Ein Wert darüber ist keine Rechenungenauigkeit, sondern eine Fehleingabe an
+ * der Kasse: Aposto Aalen, 19.07.2025, „Bar gegeben" −9.223.372.043.271,11 EUR
+ * (fast genau 2^63 / 10^6) und ein Rückgeld derselben Größe. Der Insert scheiterte
+ * daran 27 Nächte lang mit „numeric field overflow" (Migration 0136).
+ */
+export const UMSATZ_GRENZE = 1e12
+export const ANZAHL_GRENZE = 1e11
+
+/**
+ * Einen Wert in Spalte und Überlauf aufteilen: passt er, steht er in `wert`;
+ * sonst ist `wert` null und er steht unverändert in `ueberlauf`. Nichts wird
+ * gekappt oder gerundet — `core` bleibt quellentreu, die Erkennung der
+ * Fehleingabe liest beide (core.finanzweg_fehleingabe_pruefen).
+ */
+export function ueberlaufTrennen(
+  v: number | null, grenze: number,
+): { wert: number | null; ueberlauf: number | null } {
+  if (v === null || Math.abs(v) < grenze) return { wert: v, ueberlauf: null }
+  return { wert: null, ueberlauf: v }
+}
+
 export type FinanzwegZeile = {
   /** Der Tag des Blocks (nur 97, interval=3), sonst null — dann gilt der Abrufzeitraum. */
   geschaeftstag: string | null
@@ -295,6 +319,12 @@ export function finanzwegArt(gruppe: string | null): string | null {
   if (g === 'hausbon' || g === 'rabatt') return 'nachlass'
   if (g === 'umsatz') return 'umsatz'
   if (g === 'statistik') return 'statistik'
+  // Tischübergabe/-übernahme: manche Kassen führen sie unter „Übernahme /
+  // Übergabe" statt „Statistik". Sie verschieben einen offenen Tisch, kein
+  // Gast bezahlt damit — als Zahlart blähten sie den Nenner des Zahlart-Anteils
+  // auf (2.047 Tage, 5,0 Mio. EUR je Richtung, 20.10.2026). Dieselbe Regel wie
+  // mart.finanzweg_art() (0136).
+  if (/(ü|ue)bergabe|(ü|ue)bernahme/i.test(g)) return 'statistik'
   return 'zahlart'
 }
 

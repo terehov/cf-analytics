@@ -173,10 +173,12 @@ export async function statusErheben(): Promise<Statusbericht> {
    * und eine Warnung, die zu viel behauptet, wird genauso ignoriert wie eine,
    * die nie ausschlägt.
    */
+  // 'ladefehler' (0136) ist immer endgueltig: nach LADEFEHLER_MAX_VERSUCHEN
+  // abgebrochen und nicht wiederbelebt.
   const aufgegeben = await eine<{ endgueltig: number; offen: number }>(
-    `SELECT count(*) FILTER (WHERE wiederbelebt >= $1)::int AS endgueltig,
-            count(*) FILTER (WHERE wiederbelebt <  $1)::int AS offen
-       FROM sync.warteschlange WHERE ergebnis = 'aufgegeben'`,
+    `SELECT count(*) FILTER (WHERE ergebnis = 'ladefehler' OR wiederbelebt >= $1)::int AS endgueltig,
+            count(*) FILTER (WHERE ergebnis = 'aufgegeben' AND wiederbelebt < $1)::int AS offen
+       FROM sync.warteschlange WHERE ergebnis IN ('aufgegeben', 'ladefehler')`,
     [config.MAX_WIEDERBELEBUNGEN])
   const endgueltig = Number(aufgegeben?.endgueltig ?? 0)
   const nochOffen = Number(aufgegeben?.offen ?? 0)

@@ -1426,3 +1426,25 @@ Gegenprobe), `ansicht_fingerabdruck` (für welchen Listenstand die Ansicht-Posit
 und `ersetzt` stehen auf false — die Seite nennt sie nicht. Ohne Vorbild für den Inhalt bleiben
 `einheit`, `gesamt_menge` und `preis_je_einheit` leer und `menge_unstimmig` true; die Preissichten
 lassen solche Zeilen schon heute aus. `sync.warteschlange.ergebnis` kennt `ersatzweg`.
+
+## Kassen-Fehleingaben (`0136`, 20.10.2026)
+
+`core.finanzweg_tag`: `umsatz_ueberlauf`, `anzahl_ueberlauf`. Gesetzt nur, wenn LINAs Wert
+`numeric(16,4)` bzw. `numeric(14,3)` sprengt; die eigentliche Spalte ist dann NULL. Wer in `core`
+summiert, liest `coalesce(umsatz, umsatz_ueberlauf)` und weiß, dass er damit eine Fehleingabe
+mitzählt.
+
+`core.finanzweg_fehleingabe`: eine Zeile je Finanzwegzeile mit erkannter Kassen-Fehleingabe
+(Schlüssel wie `core.finanzweg_tag`, dazu `regel`, `betrag_lina`, `bezug`). Abgeleitet und jederzeit
+neu rechenbar mit `core.finanzweg_fehleingabe_pruefen(betrieb, bericht, von, bis)`, NULL heißt alle.
+Der Lader ruft die Funktion nach jedem Finanzwegabruf für genau dessen Zeitraum auf.
+
+`raw.api_antwort.ladefehler`: NULL für geladene Antworten. Sonst der Fehler des Laders: die
+Antwort kam, `core` scheiterte, und der Worker hat sie danach gesichert. Ein Neuaufbau aus `raw`
+trifft diese Zeilen und scheitert dort erneut, und das ist richtig so.
+
+`sync.warteschlange.ergebnis` kennt seit `0136` auch `ladefehler`: die Antwort kam, das Laden
+scheiterte zehnmal, der Posten ist endgültig geschlossen und wird nicht wiederbelebt.
+`mart.finanzweg_art(gruppe)` ist die eine Regel für die Art eines Finanzwegs (nachlass, umsatz,
+statistik, zahlart). Sie ist in `mart` angelegt, damit `mcp_leser` sie in Sichten ausführen darf.
+„Übernahme / Übergabe“ (Tischübergabe) zählt dort als `statistik`.

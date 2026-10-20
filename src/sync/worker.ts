@@ -35,7 +35,7 @@ import { istBetriebsbericht } from '../lina/betriebsberichte'
 import { FnClient } from '../foodnotify/client'
 import { fnEndpunkt, REZEPT_DETAIL_ENDPUNKTE } from '../foodnotify/endpunkte'
 import { fnLaden, rezeptNichtGefunden } from '../foodnotify/laden'
-import { laden } from './laden'
+import { laden, rohNachLadefehlerSichern } from './laden'
 import { alsIsoDatum, kalendertagInGeschaeftszeitzone, minuteDesTagesInGeschaeftszeitzone, tagDanach } from '../lib/time'
 
 const schlaf = (ms: number) => new Promise(r => setTimeout(r, ms))
@@ -1304,14 +1304,53 @@ async function sitzungOeffnen(
               })
         } catch (e) {
           fehler++; stand.fehler++; stand.fehlerInFolge++; stand.erstfehler++
+          // Die Antwort kam, nur das Schreiben scheiterte — sie wäre mit dem
+          // Rollback verloren. Vor dem UPDATE, weil die Sicherung am alten
+          // letzter_fehler erkennt, ob sie schon da ist (0136).
+          const meldung = String(e).slice(0, 2000)
+          await rohNachLadefehlerSichern({
+            quelle: quelle.art === 'fn' ? 'foodnotify' : 'lina', endpunkt: epKey,
+            betriebEncId: quelle.art === 'fn' ? null : posten.betrieb_enc_id ?? null,
+            von, bis,
+            parameter: quelle.art === 'fn' ? { ...extra, markeKey: quelle.markeKey } : parameter,
+            httpStatus: res.status, daten: res.daten, hash: res.hash, bytes: res.bytes, laufId,
+            postenId: posten.posten_id, fehler: meldung,
+          })
+          /*
+           * NACH LADEFEHLER_MAX_VERSUCHEN ABBRECHEN (0136). Ein Ladefehler
+           * haengt an den Daten; vorher wurde er unbegrenzt vertagt (Aalen:
+           * 27 Versuche). 'ladefehler' ist endgueltig — nicht 'aufgegeben',
+           * das die Wiederbelebung dreimal zurueckholte.
+           */
+          if (posten.versuche >= config.LADEFEHLER_MAX_VERSUCHE) {
+            await query(
+              `UPDATE sync.warteschlange
+                  SET erledigt_am = now(), in_arbeit_seit = NULL, ergebnis = 'ladefehler',
+                      letzter_fehler = $1
+                WHERE posten_id = $2`, [meldung, posten.posten_id])
+            await protokoll(laufId, epKey, posten, 'fehler', res, quellClient, String(e))
+            log.error('posten nach ladefehlern abgebrochen', {
+              endpunkt: epKey, von, versuche: posten.versuche, fehler: String(e),
+              sicht: 'mart.posten_aufgegeben',
+            })
+            continue
+          }
+          // Der erste Fehlschlag nach Minuten (ein voruebergehender Fehler soll
+          // keinen Tag kosten), jeder weitere erst in der naechsten Nacht.
+          const naechsteNacht = posten.versuche >= 2
           await query(
             `UPDATE sync.warteschlange
                 SET in_arbeit_seit = NULL, letzter_fehler = $1,
-                    faellig_ab = now() + $2::interval
+                    faellig_ab = CASE WHEN $4::boolean
+                                      THEN date_trunc('day', now()) + interval '1 day'
+                                      ELSE now() + $2::interval END
               WHERE posten_id = $3`,
-            [String(e).slice(0, 2000), wiedervorlage(posten.versuche), posten.posten_id])
+            [meldung, wiedervorlage(posten.versuche), posten.posten_id, naechsteNacht])
           await protokoll(laufId, epKey, posten, 'fehler', res, quellClient, String(e))
-          log.error('laden fehlgeschlagen', { endpunkt: epKey, von, fehler: String(e) })
+          log.error('laden fehlgeschlagen', {
+            endpunkt: epKey, von, fehler: String(e),
+            versuch: `${posten.versuche}/${config.LADEFEHLER_MAX_VERSUCHE}`,
+          })
           continue
         }
 
