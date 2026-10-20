@@ -1319,8 +1319,13 @@ async function uebernehmen() {
         tag.dimension = ['field', id, null];
       }
     }
+    // mg_ liegt in der Sammlung des Management-Dashboards: Metabase vergibt
+    // Rechte je Sammlung, und die Gruppe „Management" sieht nur diese eine
+    // (20.10.2026). Laegen die Karten in „Betrieb", zeigte ihr Dashboard 39
+    // sechzehn gesperrte Kacheln — oder sie braeuchte „Betrieb" mit dazu.
     p.collection_id = sammlungId[
-      k.schluessel.startsWith('rt_') ? 'Round Table'
+      k.schluessel.startsWith('mg_') ? 'Management'
+      : k.schluessel.startsWith('rt_') ? 'Round Table'
       : (k.schluessel.startsWith('dd_') || k.schluessel.startsWith('vg_')
          || k.schluessel.startsWith('pf_')) ? 'Drill-Down'
       : 'Betrieb'];

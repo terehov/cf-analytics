@@ -149,6 +149,42 @@ Warum sie so aussieht:
 Die alten Seiten bleiben. Seit `0129` zeigen sie statt „OM vor Ort" die drei
 Personalampeln je Bereich, und ihre Texte nennen das neue Regelwerk.
 
+#### Wer nur diese Seite sieht (seit 20.10.2026)
+
+Acht Konten aus Franchisezentralen und Concept Family sollen in Metabase **nur** das
+Management-Dashboard sehen. Grund ist die Übersicht, nicht der Datenschutz (Eugene,
+20.10.2026: „Wir wollen sie nur nicht verwirren“). Über den MCP-Zugang lesen dieselben Konten
+mit Stufe `lesen` alle Berichte aller Marken, und das ist so gewollt. Die Metabase-Sperre ist
+deshalb kein Sicherheitsmerkmal und muss nicht gegen den MCP-Zugang verteidigt werden.
+
+Metabase vergibt Rechte **je Sammlung**, nicht je Dashboard. Eine Kachel aus einer Sammlung,
+die der Nutzer nicht lesen darf, erscheint auf dem Dashboard als gesperrt. Bis zum 20.10.2026
+lag das Dashboard in „Management“, seine 16 Karten aber in „Betrieb“. Seitdem legt
+`uebernehmen.ts` die `mg_`-Karten nach „Management“. Wer dort eine Karte hinzufügt, die nicht
+`mg_` heißt, sperrt sie für diese Gruppe.
+
+So sind die Gruppen geschnitten:
+
+| Gruppe | Sammlungen | Daten |
+|---|---|---|
+| All Users | keine | ansehen, keine eigenen Abfragen, kein Download |
+| Management | „Management“ lesen | ebenso |
+| Analyse | alle schreiben | SQL und Abfrage-Editor, Download (die Rechte, die All Users bis dahin hatte) |
+| Administrators | alles | alles |
+
+**All Users musste dafür leer werden.** Jedes Konto ist zwangsweise Mitglied dort, und
+Metabase nimmt über alle Gruppen das großzügigste Recht. Hätte All Users weiter alle
+Sammlungen beschrieben, hätte die Gruppe Management nichts begrenzt. Die einzige Person ohne
+Adminrechte, die vorher über All Users gearbeitet hat, ist dafür nach „Analyse“ umgezogen.
+**Ein neues Konto sieht seitdem nichts, bis es einer Gruppe zugeordnet ist.**
+
+Metabase 0.64 verschickt beim Anlegen eines Nutzers über `POST /api/user` immer eine
+Einladungsmail (Ereignis `:user-invited`), auch wenn ein Passwort mitgegeben wird. Und
+`user_group_memberships` ist dort die **vollständige** Liste: fehlt All Users (`id` 1) darin,
+antwortet Metabase mit HTTP 400 („keine Nutzer zur Gruppe 'All Users' hinzufügen oder daraus
+entfernen"). Beim Anlegen am 20.10.2026 ist das passiert. Kein Konto wurde angelegt, keine Mail
+verschickt.
+
 ### Drill-Down
 
 Eine Kette, in der jeder Klick eine Ebene tiefer führt **und den Filter mitnimmt**. Der
