@@ -1448,3 +1448,40 @@ scheiterte zehnmal, der Posten ist endgültig geschlossen und wird nicht wiederb
 `mart.finanzweg_art(gruppe)` ist die eine Regel für die Art eines Finanzwegs (nachlass, umsatz,
 statistik, zahlart). Sie ist in `mart` angelegt, damit `mcp_leser` sie in Sichten ausführen darf.
 „Übernahme / Übergabe“ (Tischübergabe) zählt dort als `statistik`.
+
+## Stunde × Sparte: `core.zeitzonenbericht_stunde_sparte` (`0137`, 23.10.2026)
+
+Eine Tabelle, ein Zweck: Umsatz je Betrieb, Geschäftstag, Stunde **und Hauptsparte**, aus dem
+Stundenbericht mit Spartenfilter. Geholt werden Speisen (`posId` 10001) und Getränke (10002).
+
+**Schlüssel:** `(betrieb_key, geschaeftstag, stunde, hauptsparte_key)`, alle vier `NOT NULL`;
+`hauptsparte_key` verweist auf `core.hauptsparte` und wird im Lader aus dem Parameter
+`hauptsparten` des Postens nachgeschlagen (`core.hauptsparte.pos_id`), nicht aus dem
+Endpunktschlüssel. BRIN auf `geschaeftstag`. `geschaeftstag` ist wie in
+`core.zeitzonenbericht_stunde` bereits umgerechnet: er läuft 08:00 bis 07:59, die Stunden 0–7
+gehören ans Ende des Tages.
+
+**Warum eine eigene Tabelle und keine Spalte an `core.zeitzonenbericht_stunde`.** Die Stundentabelle
+hat 10,6 Mio. Zeilen und einen Primärschlüssel über `(betrieb_key, geschaeftstag, stunde)`; ein
+Primärschlüssel nimmt kein `NULL` für „gesamt" auf. Der Umweg des Umsatzberichts (`UNIQUE NULLS NOT
+DISTINCT` statt Primärschlüssel) hätte bei dieser Größe den Schlüssel beim Deploy neu
+gebaut und jede Sicht darauf angefasst. Die Gesamtzeile bleibt, wo sie ist; die Spartenzeilen stehen
+daneben. Begründung und verworfene Wege: `entscheidungen.md`, 23.10.2026.
+
+**Beziehung zu `core.umsatzbericht_tag`.** Dort steht die Gesamtzeile derselben Tage mit
+`hauptsparte_key` NULL, die Spartenzeilen mit gesetztem Schlüssel — eine Tabelle, drei Zeilenarten
+(Gesamt, Hauptsparte, seit `0112` Verkaufsstelle). Hier ist der Schlüssel `NOT NULL`, weil die
+Gesamtzeile in `core.zeitzonenbericht_stunde` liegt. Wer beide Tabellen summiert, zählt denselben
+Umsatz doppelt; Speisen + Getränke ist außerdem **kleiner** als die Gesamtzeile.
+
+**Gegenprobe:** die Summe der 24 Stunden eines Tages und einer Sparte trifft den Spartenwert in
+`core.umsatzbericht_tag` auf fünf Cent (`mart.umsatz_stunde_sparte_pruefung`). Nachgemessen am
+23.10.2026 an einer Woche: 44 von 44 Betrieben mit Speisenumsatz (`lina-api-inventar.md`).
+
+**Historie.** Der Nachtlauf holt sie über `historieNachziehen()` und `HISTORIE_JE_LAUF` (2.000
+Aufrufe je Nacht, neueste Tage zuerst): ab 2018 rund 6.400 Aufrufe, drei bis vier Nächte. Laufend
+sind es zwei Konzernaufrufe je Tag, rund 700 im Jahr. Bis dahin fehlen Tage; das ist kein
+Datenzustand, sondern ein Ladestand.
+
+**Nicht geholt:** die acht übrigen Hauptsparten. Jede weitere Sparte kostet einen Aufruf je Tag über
+die ganze Historie; Speisen und Getränke sind, was gefragt war.

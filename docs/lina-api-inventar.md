@@ -75,6 +75,22 @@ Aus den Vue-Bundles extrahiert und teilweise verifiziert:
 
 **Verifikation `hauptsparten`:** Juni 2026, alle Betriebe — ohne Filter 8.984.319,71 € netto; `hauptsparten=10001` → 3.439.853,17 €; `hauptsparten=1` (die `number`) → 0,00 €. Der Parameter erwartet also die `posId`.
 
+**`hauptsparten` greift auch im `getZeitzonenbericht` — nachgemessen am 23.10.2026** (Messfrage
+`d5`, `bun run lina-fragen d5 --datei`): Woche 08.–14.06.2026, `hauptsparten=10001`, ein Aufruf,
+140 Betriebe. Bei **44 von 44** Betrieben mit Speisenumsatz ist die Stundensumme der Antwort exakt
+der Speisenumsatz der Woche aus `core.umsatzbericht_tag`, geteilt durch die **offenen Tage** (7, bei
+Enchilada Aalen 5, bei Hamm, Rosenheim, Ulm und Schlager Cafe 6). Betriebe ohne Spartentrennung an
+der Kasse (Fremdkasse, z. B. Alter Kranen, Wirtshaus am Schlossplatz) liefern gefiltert 0,00 €.
+Daraus folgt zweierlei:
+
+* Zwei Konzernaufrufe je Tag (`10001` Speisen, `10002` Getränke) liefern **Umsatz je Stunde und
+  Sparte** für alle Betriebe — die Lücke F8 aus `plan-lina-vollabzug.md`, rund 700 Aufrufe im Jahr.
+* **Ein mehrtägiger Zeitraum liefert im Zeitzonenbericht den Durchschnitt je offenem Tag, keine
+  Summe.** Der Sync ist davon nicht betroffen, er holt den Bericht tagweise; wer aber eine Woche in
+  einem Aufruf misst und gegen `core.zeitzonenbericht_stunde` (Summe von sieben Tagesaufrufen)
+  hält, sieht ein Siebtel und hält den Filter für etwas anderes. Genau das ist am 23.10.2026 beim
+  ersten Vergleich passiert.
+
 ---
 
 ### 3.2 `reportList`

@@ -386,6 +386,8 @@ export const SCHEMATA: Record<string, z.ZodTypeAny> = {
   'getKennzahlen:absolut':            KennzahlenSchema,
   'getKennzahlen:relativ':            KennzahlenSchema,
   'getZeitzonenbericht':              ZeitzonenberichtSchema,
+  'getZeitzonenbericht:speisen':      ZeitzonenberichtSchema,
+  'getZeitzonenbericht:getraenke':    ZeitzonenberichtSchema,
   'getVordefinierteZeitzonenBericht': VordefinierteZeitzonenSchema,
   'getArtikelverkaufsbericht':        ArtikelverkaufSchema,
   'getAktionsbericht':                AktionsberichtSchema,

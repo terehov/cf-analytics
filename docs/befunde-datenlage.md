@@ -2325,3 +2325,38 @@ ersten Lauf nach `0136` dazu.
 SELECT betrieb, geschaeftstag, finanzweg_name, regel, betrag_lina, bezug
   FROM mart.finanzweg_fehleingabe ORDER BY geschaeftstag;
 ```
+
+## Sechs Wilma-Betriebe haben in LINA keine Zeitzonen — und keine hat eine 20-Uhr-Grenze (23.10.2026)
+
+Anlass war eine Fachbereichsfrage (Wilma Wunder): Abendumsatz Januar–September 2026 je Betrieb,
+Fenster 18–20 Uhr und ab 20 Uhr, getrennt nach Speisen und Getränken. Claude über den MCP-Zugang
+fand die richtigen Sichten und konnte trotzdem nicht liefern. Das Zugriffsprotokoll zeigt keine
+Sperre und keinen Fehler — es sind die Daten.
+
+**Bericht 76 (`mart.zeitzone_hauptsparte_monat`) trennt Speisen und Getränke, aber nur in den
+Zonen, die in LINA je Betrieb eingerichtet sind.** Nachgezählt für Januar–September 2026:
+
+| Betriebe | Zonen |
+|---|---|
+| Mainz Markt, Mainz Ballplatz, Dresden, Düsseldorf | 08:30/9–12, 12–17, 17–21, 21–24, 24–01, 01–02 |
+| Köln, Passau | 09–14:59, 15–17:59, **18:00–08:59** als ein Block |
+| Stuttgart | wie Mainz, dazu **15–18 überlappend** mit 12–17 und 17–21 |
+| **Bochum, Freudenstadt, Karlsruhe, Nürnberg, Speyer, Viernheim** | **keine** — der Bericht liefert nur die Kopfzeilen je Sparte |
+
+Kein Wilma-Betrieb bricht um 20 Uhr. Bei Stuttgart zählt, wer alle Zonen summiert, die Stunden
+15–18 doppelt. Und die sechs zonenlosen Betriebe sind in der Sicht unsichtbar, weil sie Kopfzeilen
+(`ist_kopf`) herausfiltert — `mart.betriebsbericht_ladestand` meldet den Bericht trotzdem als
+vollständig geladen, denn geholt wurde er. Das ist die Signatur aus Regel 10: ein Abruf ohne
+Inhalt sieht aus wie ein Abruf mit Inhalt.
+
+```sql
+SELECT betrieb_key, ist_kopf, count(*), string_agg(DISTINCT zeitzone, ' | ')
+  FROM core.zeitzone_hauptsparte_monat
+ WHERE monat BETWEEN DATE '2026-01-01' AND DATE '2026-09-01'
+ GROUP BY 1, 2 ORDER BY 1, 2;
+```
+
+**Der Stundenbericht (`mart.umsatz_stunde`) kann 18–20 und ab 20 Uhr für alle 13 operativen
+Wilma-Betriebe exakt — aber ohne Sparte.** Die Lücke „Stunde × Sparte" schließt Messfrage `d5`:
+`hauptsparten` greift auch im Stundenbericht (gemessen am selben Tag, `lina-api-inventar.md`).
+Der Bau steht in `offene-punkte.md`.

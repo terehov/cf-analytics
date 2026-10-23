@@ -127,13 +127,14 @@ lauf('Ende-zu-Ende', () => {
         ('getPersonalkosten',         '2026-06-15','2026-06-15', 10),
         ('getPersonalkosten:monat',   '2026-06-01','2026-06-30', 10),
         ('getZeitzonenbericht',       '2026-06-15','2026-06-15', 10),
+        ('getZeitzonenbericht:speisen', '2026-06-15','2026-06-15', 10),
         ('getArtikelverkaufsbericht', '2026-06-15','2026-06-15', 10),
         ('getAktionsbericht',         '2026-06-15','2026-06-15', 10)
       ON CONFLICT DO NOTHING`)
 
     const r = await workerLauf('manuell')
 
-    expect(r.ok).toBe(6)
+    expect(r.ok).toBe(7)
     // getAktionsbericht liefert 500 mit leerem Body — das ist KEIN Fehler.
     expect(r.keineDaten).toBe(1)
     expect(r.fehler).toBe(0)
@@ -200,11 +201,23 @@ lauf('Ende-zu-Ende', () => {
       `SELECT endpunkt, letzter_zeitraum, letzter_erfolg_am IS NOT NULL AS hatte_erfolg
          FROM sync.fortschritt
         WHERE endpunkt IN ('getUmsatzbericht','getUmsatzbericht:speisen','getPersonalkosten',
-                           'getZeitzonenbericht','getArtikelverkaufsbericht','getAktionsbericht')
+                           'getZeitzonenbericht','getZeitzonenbericht:speisen',
+                           'getArtikelverkaufsbericht','getAktionsbericht')
         ORDER BY endpunkt`)
-    expect(rows).toHaveLength(6)
+    expect(rows).toHaveLength(7)
     expect(rows.every(r => r.hatte_erfolg)).toBe(true)
     expect(rows.every(r => r.letzter_zeitraum !== null)).toBe(true)
+
+    // 0137: der Spartenfilter landet in der eigenen Tabelle, mit der
+    // hauptsparte_key aus dem Parameter (10001 = Speisen), nicht in der
+    // Gesamtzeile. 24 Stunden eines Tages — 16 am 15.06., 8 (Stunden 0-7)
+    // als Ende des 14.06.
+    const { rows: sparte } = await db.query(
+      `SELECT hs.pos_id, count(*)::int AS n, count(DISTINCT z.geschaeftstag)::int AS tage
+         FROM core.zeitzonenbericht_stunde_sparte z
+         JOIN core.hauptsparte hs ON hs.hauptsparte_key = z.hauptsparte_key
+        GROUP BY hs.pos_id`)
+    expect(sparte).toEqual([{ pos_id: 10001, n: 24, tage: 2 }])
   })
 
   test('der Sessionablauf mitten im Lauf wird abgefangen', async () => {
@@ -216,14 +229,14 @@ lauf('Ende-zu-Ende', () => {
   })
 
   test('jeder Aufruf liegt im Raw-Layer', async () => {
-    // Sechs erfolgreiche Aufrufe im ersten Test (seit 0129 mit dem
-    // Monatsabruf der Personalkosten); der Aktionsbericht ohne Daten
-    // schreibt keinen Rohdatensatz.
+    // Sieben erfolgreiche Aufrufe im ersten Test (seit 0129 mit dem
+    // Monatsabruf der Personalkosten, seit 0137 mit dem Stundenbericht je
+    // Sparte); der Aktionsbericht ohne Daten schreibt keinen Rohdatensatz.
     const { rows: [{ n }] } = await db.query(`SELECT count(*)::int AS n FROM raw.api_antwort`)
-    expect(n).toBe(6)
+    expect(n).toBe(7)
     const { rows: [{ n: mitHash }] } = await db.query(`
       SELECT count(*)::int AS n FROM raw.api_antwort WHERE payload_hash <> '' AND payload_bytes > 0`)
-    expect(mitHash).toBe(6)
+    expect(mitHash).toBe(7)
   })
 
   test('der Artikelstand wird als Historie fortgeschrieben', async () => {

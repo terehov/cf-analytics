@@ -1877,3 +1877,46 @@ weil sich das Paar aufhob.
 
 `mart.posten_aufgegeben` führt seit `0136` auch Posten mit `ergebnis = 'ladefehler'`, immer als
 `endgueltig`.
+
+## Stunde × Sparte in `mart` (Migration `0137`, 23.10.2026)
+
+Drei Sichten, die Spartenkreuzung zu den Stundensichten. Anlass: Abendgeschäft je Betrieb nach
+Speisen und Getränken (Wilma Wunder), das Bericht 76 nicht liefern kann (`befunde-datenlage.md`).
+
+| Sicht | Körnung | Hinweis |
+|---|---|---|
+| `mart.umsatz_stunde_sparte` | Betrieb × Geschäftstag × Stunde × Hauptsparte (Speisen, Getränke) | Spiegel von `mart.umsatz_stunde`, mit Monat, Konzept und Sparte |
+| `mart.umsatz_zeitfenster_sparte` | Betrieb × Geschäftstag × Hauptsparte × Zeitfenster aus `manual.zeitfenster` | Spiegel von `mart.umsatz_zeitfenster`; dieselbe Fensterdefinition, Fenster über Mitternacht mit `OR` geschnitten |
+| `mart.umsatz_stunde_sparte_pruefung` | Betrieb × Geschäftstag × Hauptsparte | Stundensumme gegen Spartenwert des Umsatzberichts; `befund`: `ok`, `weicht ab` (mehr als 5 Cent), `nicht geladen`, `ohne Vergleichswert`. **Immer nach `geschaeftstag` filtern.** Abgegebene Betriebe (`manual.betrieb_schliessung.abgegeben`, `0133`) fehlen: LINA liefert sie mit Spartenfilter auch rückwirkend nicht mehr (Lautenschlager fehlte in der d5-Antwort vom 23.10.2026 als einziger von 141), sie stünden sonst für immer auf `nicht geladen` |
+
+Vier Regeln:
+
+1. **Nicht mit `mart.umsatz_stunde` oder `mart.umsatz_zeitfenster` summieren.** Dort steht der
+   Gesamtumsatz, hier derselbe Umsatz noch einmal nach Sparte. Speisen + Getränke ist zudem kleiner
+   als der Gesamtumsatz (Gutscheine, Pfand, Trinkgeld, Sonstiges fehlen). Anteile als Verhältnis
+   rechnen. Der MCP-Prüfer warnt davor (Fallstrick `stunde_gesamt_plus_sparte`).
+2. **Die Tagesgrenze liegt bei 08:00.** Die Stunden 0–7 gehören ans Ende des Geschäftstags. „Ab 20
+   Uhr" ist `stunde >= 20 OR stunde < 8`, nicht `stunde >= 20`; für einen Verlauf nach
+   `((stunde + 16) % 24)` sortieren, nicht nach `stunde` (Fallstrick `stunde_sparte_tagesgrenze`).
+3. **Vor jeder Zeitreihe den Ladestand ansehen.** Die Historie läuft nachts nach, neueste Tage
+   zuerst. Ein Tag ohne Zeile ist bis dahin nicht null, sondern nicht geladen
+   (`befund = 'nicht geladen'`, Fallstrick `stunde_sparte_unvollstaendig`).
+4. **Eigene Fenster direkt über `stunde` schneiden**, wenn `manual.zeitfenster` die gewünschten
+   Grenzen nicht führt (etwa 18–20 und ab 20 Uhr).
+
+**Zwei Zeilen in `mart.pruefung_uebersicht`**, beide über die letzten 60 Tage, ohne die jüngsten
+acht (der Rand, an dem LINA den Stundenbericht noch füllt und das Nachzüglerfenster nachholt):
+
+* „Stunde x Sparte: Tag weicht vom Umsatzbericht ab (60 Tage)" — Erwartung 0.
+* „Stunde x Sparte: Tag mit Stundenbericht, aber ohne Spartenstunden (60 Tage)" — Erwartung 0.
+  **Während des Backfills bedeutet „nicht geladen" hier nur: noch nicht dran.** Die Historie vor den
+  60 Tagen ist bewusst nicht in der Zeile (eine Zeile, die monatelang auf Hunderte steht, liest
+  niemand mehr, `0071`); sie steht vollständig in `mart.umsatz_stunde_sparte_pruefung`. Bleibt die
+  Zeile im 60-Tage-Fenster dauerhaft über null, ist es kein Rückstand mehr und jemand sieht nach
+  (Regel 10).
+
+Nicht gebaut ist die Karte auf Dashboard ⑪ Zeitfenster (`offene-punkte.md`). Die sechs Wilma-Betriebe
+ohne Zonen in LINA brauchen diese Sichten nicht: der Stundenbericht kennt keine Zonen. Ihre
+fehlende Zoneneinrichtung bleibt eine LINA-Konfiguration des Fachbereichs. Der MCP-Katalogabzug (`mcp/test/katalog.json`) ist wie nach
+jeder neuen `mart`-Sicht nachzuziehen (`cd mcp && bun run katalog:abzug`, gegen eine vollständige
+Datenbank).

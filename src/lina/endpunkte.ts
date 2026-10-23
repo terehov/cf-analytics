@@ -516,6 +516,44 @@ export const ENDPUNKTE: Endpunkt[] = [
     aktiv: true,
     parameter: (von, bis) => ({ report: 'intranet-zeitzonen', ...konzernZeitraum(von, bis) }),
   },
+  /*
+   * STUNDE × SPARTE (0137, 23.10.2026). Messfrage d5 hat ergeben: `hauptsparten`
+   * greift auch im Zeitzonenbericht — bei 44 von 44 Betrieben mit Speisenumsatz
+   * traf die gefilterte Stundensumme den Speisenumsatz des Umsatzberichts
+   * (docs/lina-api-inventar.md). Zwei Aufrufe je Tag, derselbe Pfad, ein
+   * Query-Parameter mehr; der Lader schlaegt daraus die hauptsparte_key nach,
+   * genau wie bei getUmsatzbericht:speisen. Anlass war die Fachbereichsfrage
+   * nach dem Abendgeschaeft je Sparte, die Bericht 76 nicht beantworten kann:
+   * seine Zonen sind je Betrieb verschieden und brechen nirgends um 20 Uhr.
+   *
+   * NUR Speisen und Getraenke, nicht die acht uebrigen Sparten: zusammen
+   * tragen die beiden ueber zwei Drittel des Umsatzes, und jede weitere
+   * Sparte kostet einen Aufruf je Tag ueber die ganze Historie.
+   */
+  {
+    key: 'getZeitzonenbericht:speisen',
+    ebene: 'konzern',
+    pfad: '/intranet/analytics/getZeitzonenbericht',
+    schrittweite: 'tag',
+    zweck: 'Umsatz je Stunde, nur Hauptsparte Speisen',
+    aktiv: true,
+    hinweis: 'hauptsparten erwartet posId (10001). Ein MEHRTAEGIGER Zeitraum liefert hier den '
+      + 'Durchschnitt je offenem Tag, keine Summe — der Sync holt tagweise, Messungen muessen es auch.',
+    parameter: (von, bis) => ({
+      report: 'intranet-zeitzonen', ...konzernZeitraum(von, bis), hauptsparten: '10001',
+    }),
+  },
+  {
+    key: 'getZeitzonenbericht:getraenke',
+    ebene: 'konzern',
+    pfad: '/intranet/analytics/getZeitzonenbericht',
+    schrittweite: 'tag',
+    zweck: 'Umsatz je Stunde, nur Hauptsparte Getränke',
+    aktiv: true,
+    parameter: (von, bis) => ({
+      report: 'intranet-zeitzonen', ...konzernZeitraum(von, bis), hauptsparten: '10002',
+    }),
+  },
   {
     key: 'getVordefinierteZeitzonenBericht',
     ebene: 'konzern',

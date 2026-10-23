@@ -662,6 +662,40 @@ export async function laden(k: Kontext): Promise<number> {
         break
       }
 
+      /*
+       * Stunde × Sparte (0137): derselbe Bericht mit `hauptsparten` im Posten.
+       * Eigene Tabelle statt einer Spalte an core.zeitzonenbericht_stunde — die
+       * hat 10,6 Mio. Zeilen und einen Primaerschluessel ohne Platz fuer NULL;
+       * Begruendung in docs/entscheidungen.md (23.10.2026). Die posId wird wie
+       * beim Umsatzbericht aus dem Parameter nachgeschlagen, nicht aus dem Key:
+       * der Parameter ist, was LINA bekommen hat.
+       */
+      case 'getZeitzonenbericht:speisen':
+      case 'getZeitzonenbericht:getraenke': {
+        const posId = Number(k.parameter.hauptsparten)
+        const r = await c.query(`SELECT hauptsparte_key FROM core.hauptsparte WHERE pos_id = $1`, [posId])
+        if (!r.rows[0]) {
+          throw new Error(`${k.ep.key}: hauptsparten=${k.parameter.hauptsparten} ist keine bekannte posId in core.hauptsparte`)
+        }
+        const hsKey = Number(r.rows[0].hauptsparte_key)
+        const sp = ['betrieb_key','geschaeftstag','stunde','hauptsparte_key','umsatz_netto','raw_id'] as const
+        const zeilen = t.zeitzonenbericht(k.daten, k.von)
+          .filter(z => bk(z.encId))
+          .map(z => ({
+            betrieb_key: bk(z.encId)!, geschaeftstag: z.geschaeftstag,
+            stunde: z.stunde, hauptsparte_key: hsKey, umsatz_netto: z.umsatzNetto, raw_id: rawId,
+          }))
+        await inBloecken(zeilen, 1000, async b => {
+          const { platzhalter, werte } = mehrzeilig(sp, b)
+          await c.query(
+            `INSERT INTO core.zeitzonenbericht_stunde_sparte (${sp.join(',')}) VALUES ${platzhalter}
+             ON CONFLICT (betrieb_key, geschaeftstag, stunde, hauptsparte_key) DO UPDATE SET
+               umsatz_netto = EXCLUDED.umsatz_netto, raw_id = EXCLUDED.raw_id, geladen_am = now()`, werte)
+        })
+        geschrieben = zeilen.length
+        break
+      }
+
       case 'getVordefinierteZeitzonenBericht': {
         const zr = await c.query(`SELECT zeitzone_key, lina_id FROM core.zeitzone`)
         const zmap = new Map(zr.rows.map(z => [Number(z.lina_id), Number(z.zeitzone_key)]))
@@ -963,6 +997,8 @@ export const TRANSFORMIERTE_ENDPUNKTE: ReadonlySet<string> = new Set([
   'getKennzahlen:absolut',
   'getKennzahlen:relativ',
   'getAktionsbericht',
+  'getZeitzonenbericht:speisen',
+  'getZeitzonenbericht:getraenke',
   'getZeitzonenbericht',
   'getVordefinierteZeitzonenBericht',
   'getArtikelverkaufsbericht',

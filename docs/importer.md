@@ -1177,6 +1177,24 @@ Tages mit dem Umsatz einer einzelnen Stelle. Das ist ein Baufehler im Register, 
 `HISTORIE_JE_LAUF` mit. **Ungeprüft** ist das Parameterformat — `mart.verkaufsstelle_abdeckung`
 ist die Gegenprobe, siehe `datenherkunft.md`.
 
+## Stunde × Sparte: zwei Einträge im Register (Migration `0137`, 23.10.2026)
+
+`getZeitzonenbericht:speisen` (`hauptsparten=10001`) und `getZeitzonenbericht:getraenke`
+(`hauptsparten=10002`) sind dieselbe Bauart wie die Spartenendpunkte des Umsatzberichts: derselbe
+Pfad, ein Query-Feld mehr, Schrittweite Tag, `ebene: 'konzern'`. Der Lader (`src/sync/laden.ts`)
+schreibt beide Schlüssel in `core.zeitzonenbericht_stunde_sparte` und schlägt die `hauptsparte_key`
+aus dem Parameter des Postens nach (`core.hauptsparte.pos_id`) — nicht aus dem Endpunktschlüssel,
+genau wie beim Umsatzbericht. Dazu zwei Einträge im Zulaufregister (`src/sync/quellen.ts`, täglich).
+
+* **`hauptsparten` erwartet die `posId`**, hier 10001 und 10002 — dieselbe Falle wie in `0077`.
+* **Ein mehrtägiger Zeitraum liefert den Durchschnitt je offenem Tag.** Der Sync holt tagweise;
+  Messungen von Hand müssen es auch (Hinweis am Eintrag in `src/lina/endpunkte.ts`).
+* **Aufrufe:** zwei Konzernaufrufe je Tag, rund 700 im Jahr. Die Historie seit 2018 sind rund 6.400
+  Aufrufe und läuft ohne Handbefehl über `historieNachziehen()` und `HISTORIE_JE_LAUF`, drei bis vier
+  Nächte, neueste Tage zuerst.
+* Wie jeder Tagesendpunkt läuft er außerdem im Nachzüglerfenster mit; das sind zusätzliche Aufrufe
+  je Nacht, die in den 700 nicht stecken.
+
 ## Yext braucht keinen Befehl mehr (Migration `0078`, 14.08.2026)
 
 Drei Dinge hingen bis dahin an einem Menschen oder an der falschen Stelle:

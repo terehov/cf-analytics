@@ -41,6 +41,8 @@ Backfill so billig ist — acht Aufrufe je Kalendertag, nicht 8 × 141.
 | `getUmsatzbericht:getraenke` | derselbe, `hauptsparten=10002` | Tag | `core.umsatzbericht_tag` (Hauptsparte) |
 | `getUmsatzbericht:vs_*` (7×, seit `0112`) | derselbe, `verkaufsstellen=<number>` | Tag | `core.umsatzbericht_tag` (**Verkaufsstelle**, `verkaufsstelle_key`) |
 | `getZeitzonenbericht` | `/intranet/analytics/getZeitzonenbericht` | Tag | `core.zeitzonenbericht_stunde` |
+| `getZeitzonenbericht:speisen` (seit `0137`) | derselbe, `hauptsparten=10001` | Tag | `core.zeitzonenbericht_stunde_sparte` (Hauptsparte) |
+| `getZeitzonenbericht:getraenke` (seit `0137`) | derselbe, `hauptsparten=10002` | Tag | `core.zeitzonenbericht_stunde_sparte` (Hauptsparte) |
 | `getVordefinierteZeitzonenBericht` | `/intranet/analytics/getVordefinierteZeitzonenBericht` | Tag | `core.zeitzonenbericht_zone` |
 | `getArtikelverkaufsbericht` | `/intranet/analytics/getArtikelverkaufsbericht` | Tag | `core.artikelverkauf_tag` **+ `core.artikel` + `core.artikel_stand`** |
 | `getPersonalkosten` | `/intranet/analytics/getPersonalkosten` | Tag | `core.personalkosten` **+ `core.schwellenwert_betrieb`** |
@@ -717,6 +719,26 @@ Daraus lässt sich jedes Zeitfenster frei schneiden (`mart.umsatz_zeitfenster`, 
 
 **Nicht gegen `core.zeitzonenbericht_zone` rechnen:** LINAs Zonen brechen bei 11:30 und
 17:30. Eigener Schnitt 11–14 liegt 8,4 % über LINAs Mittagszeit, 12–14 liegt 8,4 % darunter.
+
+**Seit `0137` (23.10.2026) gibt es die Spartenkreuzung: Stunde × Hauptsparte.** Anlass war eine
+Fachbereichsfrage nach dem Abendgeschäft (18–20 Uhr, ab 20 Uhr) getrennt nach Speisen und Getränken;
+Bericht 76 konnte sie nicht beantworten, weil seine Zonen je Betrieb verschieden und bei sechs
+Wilma-Betrieben gar nicht eingerichtet sind (`befunde-datenlage.md`). Der Stundenbericht kennt den
+Parameter `hauptsparten` (Messfrage `d5`, `lina-api-inventar.md`); `core.zeitzonenbericht_stunde_sparte`
+trägt ihn als eigene Tabelle, gelesen über `mart.umsatz_stunde_sparte` und
+`mart.umsatz_zeitfenster_sparte`.
+
+* **Speisen + Getränke ist weniger als die Gesamtzeile.** Es sind nur diese beiden von zehn Sparten
+  geholt; Gutscheine, Pfand, Trinkgeld und Sonstiges fehlen.
+* **Nie mit `core.zeitzonenbericht_stunde` (bzw. `mart.umsatz_stunde`, `mart.umsatz_zeitfenster`)
+  addieren.** Dort steht derselbe Umsatz noch einmal ohne Sparte. Anteile als Verhältnis rechnen.
+* **Ein mehrtägiger Zeitraum liefert im Stundenbericht den Durchschnitt je offenem Tag**, keine
+  Summe. Der Sync holt tagweise und ist davon nicht betroffen; wer von Hand eine Woche abruft und
+  gegen die Tabelle hält, sieht ein Siebtel.
+* **Die Historie läuft nach, sie ist nicht da.** Stand 23.10.2026 fängt der Nachtlauf an, neueste
+  Tage zuerst; ein Tag ohne Spartenzeile ist bis dahin „nicht geladen", nicht null. Der Ladestand
+  steht in `mart.umsatz_stunde_sparte_pruefung` (`befund`), und der Befund `ok` heißt zugleich: die
+  Stundensumme trifft den Spartenwert des Umsatzberichts auf fünf Cent.
 
 ### Vier neue Quellen im `manual`-Schema (Migrationen 0051 / 0052)
 

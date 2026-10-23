@@ -591,6 +591,33 @@
    "fallstricke": []
   },
   {
+   "sicht": "mart.bestellansicht_stand",
+   "koernung": "eine Marke — Bestellungen, deren Positionen ueber die Bestellansicht statt die Schnittstelle kamen (0135)",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "Je Kostenstelle: Bestellungen, deren Positionsabruf mit HTTP 500 scheitert, und wie viele davon ueber die Bestellansicht geladen sind (0135). ERWARTUNG: ohne_positionen = 0 nach einer Nacht. ohne_ansicht_nr > 0 heisst: der Bestellkopf ist noch nicht neu geholt — der Nachtlauf reiht ihn selbst ein. mit_aelteren_schnittstellen_positionen: frueher geladen, nur der Nachabruf scheitert — bleibt so.\n\nKoernung: eine Marke — Bestellungen, deren Positionen ueber die Bestellansicht statt die Schnittstelle kamen (0135)",
+   "spalten": [
+    "marke",
+    "kostenstelle",
+    "bestellungen_mit_500",
+    "ueber_ansicht_geladen",
+    "mit_aelteren_schnittstellen_positionen",
+    "ohne_positionen",
+    "ohne_ansicht_nr",
+    "positionen_ansicht",
+    "davon_inhalt_entlehnt",
+    "summe_ansicht",
+    "erste_bestellung",
+    "letzte_bestellung"
+   ],
+   "achsen": [
+    "kostenstelle",
+    "marke"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
    "sicht": "mart.bestelldetail_offen",
    "koernung": null,
    "thema": null,
@@ -3156,6 +3183,39 @@
    "fallstricke": []
   },
   {
+   "sicht": "mart.finanzweg_fehleingabe",
+   "koernung": "Betrieb × Geschaeftstag × Quellbericht × Finanzweg — erkannte Kassen-Fehleingaben (0136); die Zahlarten dieses Tages fehlen in mart.finanzweg_tag",
+   "thema": "kasse",
+   "summen_erlaubt": false,
+   "kommentar": "Koernung: eine Finanzwegzeile, an der eine Kassen-Fehleingabe erkannt ist (0136). Jemand hat an\nder Kasse einen absurden Betrag eingetippt — Bar gegeben 555 Mrd. EUR, EC-Karte 11 Mrd. EUR — und\ndie Kasse hat den Rest als Rueckgeld oder Trinkgeld verbucht. An diesem Betrieb und Tag fehlen\ndeshalb ALLE Zahlarten in mart.finanzweg_tag, mart.finanzweg_monat und mart.zahlart_monat\n(in_auswertung: diese Quelle ist die, die dort gezaehlt wuerde).\n\nbetrag_lina hat LINAs Vorzeichen: Zahlungen negativ, Trinkgeld und Rueckgeld positiv. bezug ist\ndas, womit verglichen wurde (etwa der Tagesumsatz). regel: \"ausgleich ueber einnahmen\" (Trinkgeld\noder Rueckgeld groesser als der Bezug) oder \"betrag absurd\" (ueber 1 Mio. EUR und ueber dem\n50-fachen des Bezugs). Kein Fehler des Imports: die Zahl steht so in der Kasse.",
+   "spalten": [
+    "geschaeftstag",
+    "zeitraum_bis",
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "quelle_bericht",
+    "finanzweg_nummer",
+    "finanzweg_name",
+    "regel",
+    "betrag_lina",
+    "bezug",
+    "in_auswertung",
+    "erkannt_am",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag",
+    "marke",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
    "sicht": "mart.finanzweg_monat",
    "koernung": "Betrieb × Monat × Finanzweg — je Tag eine Quelle",
    "thema": "kasse",
@@ -3253,7 +3313,7 @@
    "koernung": "Betrieb × Tag × Finanzweg — je Tag EINE Quelle (97; 88 nur fuer bis 23.09.2026 geladene Tage ohne 97)",
    "thema": "kasse",
    "summen_erlaubt": true,
-   "kommentar": "Koernung: Betrieb × Tag × Finanzweg — aus GENAU EINER Quelle je Betrieb und Tag: Bericht 97\n(Tagesabschluss), wo es ihn gibt, sonst 88 (quelle_bericht). 97 ist seit dem 23.09.2026 die\nEINZIGE laufende Quelle; 88 ist abgeschaltet und steht nur noch fuer Tage, die bis dahin geladen\nwurden und fuer die 97 fehlt. Der laufende Monat kommt jede Nacht bis zum Vortag (0120) — die\nletzten sieben Tage sind VORLAEUFIG, LINA fuellt sie noch; endgueltig ist ein Monat, wenn\nmart.betriebsbericht_ladestand_monat fuer Bericht 97 \"vollstaendig\" sagt. core.finanzweg_tag\nfuehrt beide Quellen, und eine Summe darueber waere doppelt (0114, gemessen auf den Cent\ngleich). Ein Mehrtagesabruf von 88 (tage > 1) steht nur da, wo der Betrieb im Zeitraum keinen\nTageswert hat.\n\nbetrag: Zahlungen und Nachlaesse POSITIV (LINA fuehrt sie negativ). Die Zahlarten eines Tages\nsummieren sich zum Bruttoumsatz — Trinkgeld und Rueckgeld stehen dabei negativ, weil sie in den\nZahlbetraegen darueber enthalten sind (Wilma Wunder Duesseldorf, August 2026: 369.841,09 EUR,\nnachgerechnet am 23.09.2026). Umsatzzeilen (Boniert, Sofortstorno, Storno) behalten LINAs\nVorzeichen.\n\nanzahl_vorgaenge zaehlt VORGAENGE (50 % Gluecksrad: 600 in Duesseldorf), nicht Artikel — der\nRabattbericht zaehlt fuer denselben Finanzweg 712 Artikel. Nie gegen mart.artikel_nachlass_*\naddieren. Eine Aktion buendelt man ueber aktion + prozentsatz, nicht ueber die Nummer.",
+   "kommentar": "Koernung: Betrieb × Tag × Finanzweg — aus GENAU EINER Quelle je Betrieb und Tag: Bericht 97\n(Tagesabschluss), wo es ihn gibt, sonst 88 (quelle_bericht). 97 ist seit dem 23.09.2026 die\nEINZIGE laufende Quelle; 88 ist abgeschaltet und steht nur noch fuer Tage, die bis dahin geladen\nwurden und fuer die 97 fehlt. Der laufende Monat kommt jede Nacht bis zum Vortag (0120) — die\nletzten sieben Tage sind VORLAEUFIG, LINA fuellt sie noch; endgueltig ist ein Monat, wenn\nmart.betriebsbericht_ladestand_monat fuer Bericht 97 \"vollstaendig\" sagt. core.finanzweg_tag\nfuehrt beide Quellen, und eine Summe darueber waere doppelt (0114, gemessen auf den Cent\ngleich). Ein Mehrtagesabruf von 88 (tage > 1) steht nur da, wo der Betrieb im Zeitraum keinen\nTageswert hat.\n\nTISCHUEBERGABE (0136). Tischuebergabe und -uebernahme sind art = statistik, auch wo die Kasse sie\nunter \"Uebernahme / Uebergabe\" fuehrt — vorher fielen sie dort unter zahlart.\n\nKASSEN-FEHLEINGABEN (0136). An einem Tag, an dem jemand an der Kasse einen absurden Betrag\neingetippt hat (Bar gegeben 555 Mrd. EUR, dazu ein Rueckgeld oder Trinkgeld derselben Groesse),\nfehlen ALLE Zahlart-Zeilen dieses Betriebs und Tages — Nachlaesse, Umsatz- und Statistikzeilen\nbleiben. Welche Tage das sind: mart.finanzweg_fehleingabe.\n\nbetrag: Zahlungen und Nachlaesse POSITIV (LINA fuehrt sie negativ). Die Zahlarten eines Tages\nsummieren sich zum Bruttoumsatz — Trinkgeld und Rueckgeld stehen dabei negativ, weil sie in den\nZahlbetraegen darueber enthalten sind (Wilma Wunder Duesseldorf, August 2026: 369.841,09 EUR,\nnachgerechnet am 23.09.2026). Umsatzzeilen (Boniert, Sofortstorno, Storno) behalten LINAs\nVorzeichen.\n\nanzahl_vorgaenge zaehlt VORGAENGE (50 % Gluecksrad: 600 in Duesseldorf), nicht Artikel — der\nRabattbericht zaehlt fuer denselben Finanzweg 712 Artikel. Nie gegen mart.artikel_nachlass_*\naddieren. Eine Aktion buendelt man ueber aktion + prozentsatz, nicht ueber die Nummer.",
    "spalten": [
     "geschaeftstag",
     "zeitraum_bis",
@@ -5113,7 +5173,7 @@
    "koernung": "endgueltig aufgegebenem Posten",
    "thema": "import",
    "summen_erlaubt": false,
-   "kommentar": "Posten, die der Worker aufgegeben hat. ERWARTUNG: leer, oder nur Zeilen mit\nzustand = endgueltig und einer Begruendung, die jemand gelesen hat.\n\n  wird erneut versucht  der naechtliche Lauf holt ihn zurueck, solange\n                        quelle_antwortet true ist. Hoechstens dreimal.\n  endgueltig            der Vorrat ist aufgebraucht. Das ist die Aussage\n                        \"diese Daten sind aus der Quelle nicht zu bekommen\",\n                        und sie gehoert geprueft, nicht ignoriert.\n\nDIE 3 STEHT HIER FEST VERDRAHTET UND MUSS ZU config.MAX_WIEDERBELEBUNGEN PASSEN.\nEine Sicht kann keine Umgebungsvariable lesen; eine Einstellungstabelle waere mehr\nBau, als das Problem verdient. Wer MAX_WIEDERBELEBUNGEN aendert, aendert damit still\ndie Bedeutung dieser Spalte — und die von src/status.ts, das die Umgebung liest.\nDeshalb haelt src/config.test.ts den Vorgabewert auf 3 fest: der rote Test fuehrt zu\ndieser Zeile. Geaendert wird also beides oder keines.\n\nAm 13.08.2026 standen hier 275 Zeilen, ausnahmslos fn:bestellpositionen mit HTTP 500\naus dem Backfill vom 02. bis 04.08.2026 — und mit ihnen 322 Bestellungen ueber\n686.535,93 EUR, die einen Kopf hatten und keine einzige Position. Nach dem ersten Lauf\nmit der Wiederbelebung (0070) waren es 0 von 66.966; die Bestellungen ohne Position\nsind auf 47 gefallen.\n\nwiederbelebt ist NICHT versuche: versuche zaehlt die Anlaeufe innerhalb eines Lebens\nund faengt nach dem Wiederbeleben bei 0 an, wiederbelebt zaehlt die Leben.\n\nKoernung: endgueltig aufgegebenem Posten",
+   "kommentar": "Posten, die der Worker aufgegeben hat. ERWARTUNG: leer, oder nur Zeilen mit\nzustand = endgueltig und einer Begruendung, die jemand gelesen hat.\n\n  wird erneut versucht  der naechtliche Lauf holt ihn zurueck, solange\n                        quelle_antwortet true ist. Hoechstens dreimal.\n  endgueltig            der Vorrat ist aufgebraucht — oder das Laden ist\n                        LADEFEHLER_MAX_VERSUCHE mal gescheitert (0136): die\n                        Antwort kam, aber sie liess sich nicht nach core\n                        schreiben. Die Antwort steht in raw.api_antwort\n                        (ladefehler). Das ist ein Baufehler oder Unsinn in der\n                        Quelle, und er gehoert geprueft, nicht ignoriert.\n\nDIE 3 STEHT HIER FEST VERDRAHTET UND MUSS ZU config.MAX_WIEDERBELEBUNGEN PASSEN.\nEine Sicht kann keine Umgebungsvariable lesen; eine Einstellungstabelle waere mehr\nBau, als das Problem verdient. Wer MAX_WIEDERBELEBUNGEN aendert, aendert damit still\ndie Bedeutung dieser Spalte — und die von src/status.ts, das die Umgebung liest.\nDeshalb haelt src/config.test.ts den Vorgabewert auf 3 fest: der rote Test fuehrt zu\ndieser Zeile. Geaendert wird also beides oder keines.\n\nAm 13.08.2026 standen hier 275 Zeilen, ausnahmslos fn:bestellpositionen mit HTTP 500\naus dem Backfill vom 02. bis 04.08.2026 — und mit ihnen 322 Bestellungen ueber\n686.535,93 EUR, die einen Kopf hatten und keine einzige Position. Nach dem ersten Lauf\nmit der Wiederbelebung (0070) waren es 0 von 66.966; die Bestellungen ohne Position\nsind auf 47 gefallen.\n\nwiederbelebt ist NICHT versuche: versuche zaehlt die Anlaeufe innerhalb eines Lebens\nund faengt nach dem Wiederbeleben bei 0 an, wiederbelebt zaehlt die Leben.\n\nKoernung: endgueltig aufgegebenem Posten",
    "spalten": [
     "posten_id",
     "endpunkt",
@@ -6266,6 +6326,56 @@
    "fallstricke": []
   },
   {
+   "sicht": "mart.umsatz_stunde_sparte",
+   "koernung": "Betrieb × Geschaeftstag × Stunde × Hauptsparte (Speisen, Getraenke) — Spartenkreuzung zu mart.umsatz_stunde",
+   "thema": "umsatz",
+   "summen_erlaubt": true,
+   "kommentar": "Umsatz je Betrieb, Geschaeftstag, Stunde und Hauptsparte (Speisen, Getraenke) — die\nSpartenkreuzung zu mart.umsatz_stunde (0137). Nur die aufgeteilten Zeilen; der Gesamtwert steht in\nmart.umsatz_stunde und ist hier bewusst NICHT enthalten, damit eine Summe nicht doppelt zaehlt.\nSpeisen + Getraenke ist weniger als der Gesamtumsatz (Gutscheine, Pfand, Trinkgeld fehlen).\nTagesgrenze wie ueberall: der Geschaeftstag laeuft 08:00 bis 07:59, Stunden 0-7 gehoeren ans Ende —\nfuer den Verlauf nach ((stunde + 16) % 24) sortieren. Geladen ab Oktober 2026, die Historie seit\n2018 laeuft im Nachtlauf nach, neueste zuerst; welcher Tag fehlt, sagt\nmart.umsatz_stunde_sparte_pruefung.\n\nKoernung: Betrieb × Geschaeftstag × Stunde × Hauptsparte (Speisen, Getraenke) — Spartenkreuzung zu mart.umsatz_stunde",
+   "spalten": [
+    "geschaeftstag",
+    "monat",
+    "betrieb_key",
+    "betrieb",
+    "konzept",
+    "hauptsparte",
+    "stunde",
+    "umsatz_netto"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag",
+    "hauptsparte",
+    "konzept",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.umsatz_stunde_sparte_pruefung",
+   "koernung": "Betrieb × Geschaeftstag × Hauptsparte — Stundensumme gegen Umsatzbericht; immer nach geschaeftstag filtern",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "Pruefsicht (0137): je Betrieb, Geschaeftstag und Sparte die Stundensumme des Spartenfilters gegen den\nSpartenwert des Umsatzberichts. befund: ok | weicht ab (mehr als 5 Cent) | nicht geladen (der\nGesamt-Stundenbericht kennt den Tag, der Spartenfilter noch nicht — in der Historie der Normalfall,\nbis der Nachtlauf sie geholt hat) | ohne Vergleichswert (der Umsatzbericht fuehrt die Sparte an\ndiesem Tag nicht; Betriebe ohne Spartentrennung an der Kasse). Immer nach geschaeftstag filtern —\ndie Sicht rechnet sonst ueber die ganze Historie. Nur Betriebe mit laufendem oder zuletzt laufendem\nGeschaeft; abgegebene Betriebe (manual.betrieb_schliessung.abgegeben, 0133) fehlen, weil LINA sie\nauch rueckwirkend nicht mehr liefert. Der 5-Cent-Rahmen deckt die Rundung von 24 Stundenwerten auf Cent.\n\nKoernung: Betrieb × Geschaeftstag × Hauptsparte — Stundensumme gegen Umsatzbericht; immer nach geschaeftstag filtern",
+   "spalten": [
+    "betrieb_key",
+    "betrieb",
+    "geschaeftstag",
+    "hauptsparte",
+    "stunden_sparte",
+    "bericht_sparte",
+    "abweichung",
+    "befund"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag",
+    "hauptsparte"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
    "sicht": "mart.umsatz_tag",
    "koernung": "Betrieb und Geschaeftstag — diese Sicht darf man bedenkenlos summieren",
    "thema": "umsatz",
@@ -6422,6 +6532,31 @@
    "achsen": [
     "betrieb_key",
     "geschaeftstag"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.umsatz_zeitfenster_sparte",
+   "koernung": "Betrieb × Geschaeftstag × Hauptsparte × eigenes Zeitfenster (manual.zeitfenster)",
+   "thema": "umsatz",
+   "summen_erlaubt": true,
+   "kommentar": "Umsatz je Betrieb, Geschaeftstag, Hauptsparte und selbst geschnittenem Zeitfenster\n(manual.zeitfenster), aus dem Stundenbericht mit Spartenfilter (0137). Die Fenster sind dieselben\nwie in mart.umsatz_zeitfenster; wer andere Grenzen braucht (etwa 18-20 und ab 20 Uhr), schneidet\nsie direkt in mart.umsatz_stunde_sparte ueber stunde. NICHT mit mart.umsatz_zeitfenster addieren —\ndort steht derselbe Umsatz ohne Sparte.\n\nKoernung: Betrieb × Geschaeftstag × Hauptsparte × eigenes Zeitfenster (manual.zeitfenster)",
+   "spalten": [
+    "betrieb_key",
+    "betrieb",
+    "geschaeftstag",
+    "hauptsparte",
+    "fenster_key",
+    "fenster",
+    "reihenfolge",
+    "ueber_mitternacht",
+    "umsatz_netto"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag",
+    "hauptsparte"
    ],
    "kennzahlen": [],
    "fallstricke": []
@@ -7045,7 +7180,7 @@
    "koernung": "Betrieb × Monat × Zahlart (88/97)",
    "thema": "kasse",
    "summen_erlaubt": true,
-   "kommentar": "Koernung: Betrieb × Monat × Zahlart (F3: Karte gegen bar, Lieferdienste, Gutscheine). Aus\n88/97, je Tag eine Quelle. zahlbetrag positiv; die Summe aller Zeilen eines Betriebs und\nMonats ist der Bruttoumsatz. Trinkgeld und Rueckgeld stehen NEGATIV, weil sie in den\nZahlbetraegen der anderen Zeilen stecken. zahlart_anteil_pct: Prozentzahl von allem, was\nGaeste bezahlt haben (Summe der positiven Zeilen, also einschliesslich Trinkgeld); fuer\nTrinkgeld und Rueckgeld leer. Nicht summieren, nicht mitteln.",
+   "kommentar": "Koernung: Betrieb × Monat × Zahlart (F3: Karte gegen bar, Lieferdienste, Gutscheine). Aus\n88/97, je Tag eine Quelle. zahlbetrag positiv; die Summe aller Zeilen eines Betriebs und\nMonats ist der Bruttoumsatz — ohne die Tage in tage_fehleingabe. Trinkgeld und Rueckgeld stehen\nNEGATIV, weil sie in den Zahlbetraegen der anderen Zeilen stecken. zahlart_anteil_pct:\nProzentzahl von allem, was Gaeste bezahlt haben (Summe der positiven Zeilen, also\neinschliesslich Trinkgeld); fuer Trinkgeld und Rueckgeld leer. Nicht summieren, nicht mitteln.\n\ntage_fehleingabe (0136): an so vielen Tagen des Monats hat jemand an der Kasse einen absurden\nBetrag eingetippt; die Zahlarten dieser Tage fehlen hier ganz (mart.finanzweg_fehleingabe).\nGroesser als 0 heisst: der Monat ist um diese Tage zu klein, nicht falsch verteilt.",
    "spalten": [
     "monat",
     "betrieb_key",
@@ -7059,7 +7194,8 @@
     "anzahl_vorgaenge",
     "zahlart_anteil_pct",
     "quellen",
-    "operativ"
+    "operativ",
+    "tage_fehleingabe"
    ],
    "achsen": [
     "betrieb_key",
@@ -7723,6 +7859,45 @@
    "hinweis": "Die Spalte \"stadt\" ist bei ALLEN 141 Betrieben NULL — LINA liefert fuer Betriebe keine Adresse (nachgemessen 26.07.2026, erneut 10.08.2026). Wer danach gruppiert, bekommt keine Fehlermeldung, sondern EINE Gruppe mit allen Betrieben darin.",
    "berichtigung": "Die gepflegte Stadt steht in mart.nachbarschaft.ort. Statt mart.<sicht>.stadt also ueber betrieb_key auf mart.nachbarschaft verbinden und nach ort gruppieren.",
    "quelle": "docs/metabase.md, Abschnitt \"Die Spalte stadt ist ueberall NULL\""
+  },
+  {
+   "schluessel": "stunde_gesamt_plus_sparte",
+   "art": "sichten_mischen",
+   "schwere": "warnung",
+   "sicht": null,
+   "parameter": {
+    "a": [
+     "mart.umsatz_stunde",
+     "mart.umsatz_zeitfenster"
+    ],
+    "b": [
+     "mart.umsatz_stunde_sparte",
+     "mart.umsatz_zeitfenster_sparte"
+    ]
+   },
+   "hinweis": "Die Stundensichten ohne Sparte fuehren den GESAMTEN Umsatz, die mit Sparte denselben Umsatz noch einmal nach Speisen und Getraenken. Eine Summe ueber beide zaehlt doppelt.",
+   "berichtigung": "Eine der beiden nehmen. Anteile (Speisen am Gesamt) als Verhaeltnis rechnen, nicht addieren.",
+   "quelle": "0137"
+  },
+  {
+   "schluessel": "stunde_sparte_tagesgrenze",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.umsatz_stunde_sparte",
+   "parameter": {},
+   "hinweis": "Der Geschaeftstag laeuft 08:00 bis 07:59 des Folgetags. Die Stunden 0 bis 7 gehoeren ans ENDE des Tages, nicht an den Anfang; \"ab 20 Uhr\" ist stunde >= 20 OR stunde < 8, und nach stunde sortiert ergibt keinen Verlauf.",
+   "berichtigung": "Fuer den Verlauf nach ((stunde + 16) % 24) sortieren; Fenster ueber Mitternacht mit OR schneiden.",
+   "quelle": "0137"
+  },
+  {
+   "schluessel": "stunde_sparte_unvollstaendig",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.umsatz_stunde_sparte",
+   "parameter": {},
+   "hinweis": "Speisen + Getraenke ist NICHT der Gesamtumsatz: Gutscheine, Pfand, Trinkgeld und Sonstiges fehlen hier. Und: die Historie wird nachts rueckwaerts nachgeladen — ein Tag ohne Zeile ist bis dahin nicht null, sondern nicht geladen (mart.umsatz_stunde_sparte_pruefung, befund).",
+   "berichtigung": "Gesamtumsatz aus mart.umsatz_stunde oder mart.umsatz_tag. Vor einer Zeitreihe den Ladestand in mart.umsatz_stunde_sparte_pruefung fuer den Zeitraum ansehen.",
+   "quelle": "0137"
   },
   {
    "schluessel": "umsatz_tag_ohne_zeitraum",

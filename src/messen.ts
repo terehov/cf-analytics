@@ -23,6 +23,10 @@
  *   bun run lina-fragen              # Liste aller Messungen
  *   bun run lina-fragen d1           # eine Messung
  *   bun run lina-fragen d1 --roh     # zusätzlich die ersten 4000 Zeichen der Antwort
+ *   bun run lina-fragen d5 --datei belege/messung-d5.json
+ *                                    # die GANZE Antwort in eine lokale Datei — für
+ *                                    # Gegenproben gegen die eigene Datenbank; LINA
+ *                                    # und die Datenbank bleiben unberührt
  *
  * Jede Messung sagt VORHER, welche Antwort welche Schlussfolgerung erlaubt.
  * Das ist Absicht: wer den Schluss erst nach dem Ergebnis formuliert, findet
@@ -226,8 +230,14 @@ const MESSUNGEN: Messung[] = [
     aufruf: 'Zeitzonenbericht einmal mit hauptsparten=10001 (Speisen) abrufen.',
     pfad: '/intranet/analytics/getZeitzonenbericht',
     parameter: { ...zeitraum, hauptsparten: '10001' },
+    // GEMESSEN AM 23.10.2026: der Filter greift — 44 von 44 Betriebe treffen den
+    // Speisenumsatz der Woche aus core.umsatzbericht_tag, geteilt durch die
+    // offenen Tage. Denn: ein MEHRTAEGIGER Zeitraum liefert hier den Durchschnitt
+    // je offenem Tag, keine Summe. Wer gegen core.zeitzonenbericht_stunde haelt
+    // (Summe von sieben Tagesaufrufen), sieht ein Siebtel und schliesst falsch.
+    // Vergleich deshalb gegen Speisen/Woche ÷ offene Tage. docs/lina-api-inventar.md.
     deutung: [
-      ['Werte, die niedriger sind als ohne Filter',
+      ['Werte, die niedriger sind als ohne Filter — Vorsicht: bei mehreren Tagen ist die Antwort ein Tagesdurchschnitt',
        'Der Filter greift. Dann liefern ZWEI Aufrufe je Tag (10001 Speisen, 10002 Getränke) '
        + 'den Speisen-/Getränke-Anteil je Zeitfenster — eine der sechs Lücken in Kapitel 1.3, '
        + 'für rund 700 zusätzliche Aufrufe im Jahr.'],
@@ -558,12 +568,13 @@ function hilfe() {
   console.log(`
 Einmalige LESENDE Messaufrufe gegen LINA.
 
-  bun run lina-fragen <id> [--roh]
+  bun run lina-fragen <id> [--roh] [--datei <pfad>]
 
 d1-d5 sind je EIN Request. d7-d10 brauchen mehrere und sagen das dazu.
 Der Client drosselt, führt das Tagesbudget und bricht nach EINEM gescheiterten
 Anmeldeversuch ab (AGENTS.md Regel 7).
 Geschrieben wird nirgends — weder in LINA noch in die eigene Datenbank.
+Nur --datei legt die rohe Antwort lokal ab (ganz, nicht nur 4000 Zeichen).
 `)
   for (const m of MESSUNGEN) {
     console.log(`${m.id}  ${m.frage}`)
@@ -581,6 +592,12 @@ Geschrieben wird nirgends — weder in LINA noch in die eigene Datenbank.
 
 const id = process.argv[2]?.toLowerCase()
 const roh = process.argv.includes('--roh')
+const dateiIdx = process.argv.indexOf('--datei')
+const datei = dateiIdx >= 0 ? process.argv[dateiIdx + 1] : undefined
+if (dateiIdx >= 0 && (!datei || datei.startsWith('--'))) {
+  console.error('--datei braucht einen Pfad, z. B. --datei belege/messung-d5.json')
+  process.exit(1)
+}
 
 if (!id || id === '--help' || id === '-h') {
   hilfe()
@@ -653,6 +670,13 @@ if (r.art === 'ok') {
   }
   console.log(`\nErste 400 Zeichen:\n${text.slice(0, 400)}`)
   if (roh) console.log(`\n--- roh (4000 Zeichen) ---\n${text.slice(0, 4000)}`)
+  if (datei) {
+    // Die ganze Antwort, damit eine Gegenprobe (z. B. d5: gefilterte Stunden
+    // gegen core.zeitzonenbericht_stunde) ohne zweiten LINA-Aufruf geht.
+    // Ausgabe-Kuerzungen oben bleiben, wie sie sind.
+    await Bun.write(datei, text)
+    console.log(`\nAntwort vollständig gespeichert: ${datei} (${text.length} Zeichen)`)
+  }
 } else if ('fehler' in r) {
   console.log(`Fehler:   ${r.fehler}`)
 }

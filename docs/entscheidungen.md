@@ -4326,3 +4326,38 @@ Die Regel und ihre Messung stehen in `befunde-datenlage.md`.
    Gegenstelle. Aalen lief 27 Versuche, ohne dass eine Prüfsicht ihn nannte.
 5. **Tischübergabe und -übernahme sind Statistik**, auch unter der Gruppe „Übernahme / Übergabe“.
    Eine Regel für Sicht, Erkennung und Lader: `mart.finanzweg_art()` bzw. `finanzwegArt()`.
+
+## 23.10.2026 — Stunde × Sparte über den Spartenfilter des Stundenberichts (`0137`)
+
+**Anlass.** Fachbereichsfrage (Wilma Wunder): Abendumsatz Januar–September 2026 je Betrieb, Fenster
+18–20 Uhr und ab 20 Uhr, getrennt nach Speisen und Getränken. Bericht 76 trennt die Sparten, aber nur
+in den Zonen, die LINA je Betrieb führt: kein Wilma-Betrieb bricht um 20 Uhr, sechs haben gar keine
+Zonen. Der Stundenbericht kann jedes Fenster schneiden, aber ohne Sparte (`befunde-datenlage.md`,
+23.10.2026).
+
+**Entschieden am 23.10.2026 (Eugene, auf Vorschlag aus der Sitzung, nach der Messung d5):**
+1. **Über den Parameter `hauptsparten` des Stundenberichts, nicht über Bericht 76.** Messfrage `d5`
+   hat gezeigt, dass er greift: bei 44 von 44 Betrieben mit Speisenumsatz trifft die gefilterte
+   Stundensumme den Speisenumsatz des Umsatzberichts (`lina-api-inventar.md`). Zwei Konzernaufrufe
+   je Tag (10001, 10002) liefern alle Betriebe in jeder Stunde. Der andere Weg, Bericht 76 mit
+   nachgepflegten Zonen, hinge an einer LINA-Konfiguration, die dem Fachbereich gehört und nicht
+   uns.
+2. **Eine eigene Tabelle, `core.zeitzonenbericht_stunde_sparte`, statt einer Spalte an
+   `core.zeitzonenbericht_stunde`.** Deren Primärschlüssel über `(betrieb_key, geschaeftstag,
+   stunde)` hat bei 10,6 Mio. Zeilen keinen Platz für ein `NULL` als „gesamt". Der Umweg
+   `UNIQUE NULLS NOT DISTINCT` wie beim Umsatzbericht hätte den Schlüssel dieser Tabelle beim
+   Deploy neu gebaut und jede Sicht darauf berührt. Preis: Gesamt- und Spartenzeile liegen in
+   zwei Tabellen und dürfen nicht addiert werden — dafür sorgt ein Fallstrick im MCP-Prüfer
+   (`stunde_gesamt_plus_sparte`) und der Hinweis an den Sichten.
+3. **Nur Speisen und Getränke**, nicht die acht übrigen Hauptsparten. Jede weitere Sparte kostet
+   einen Aufruf je Tag über die ganze Historie. Wer eine dritte braucht, trägt einen Registereintrag
+   und eine `case`-Zeile nach (`importer.md`) und entscheidet das neu.
+4. **Der Backfill läuft über die Nachtgrenze, kein Handbefehl.** `historieNachziehen()` holt die
+   Historie unter `HISTORIE_JE_LAUF` (2.000 Aufrufe je Nacht, neueste Tage zuerst): ab 2018 rund
+   6.400 Aufrufe, drei bis vier Nächte. Das ist die Regel „Betrieb ohne Handbefehl" vom 14.08.2026:
+   eine Entscheidung, die jemand jedes Mal neu treffen muss, wird irgendwann nicht mehr getroffen.
+   „Neueste zuerst" heißt, dass die erste Nacht für 2026 reicht — die Fachbereichsfrage ist damit
+   früh beantwortbar.
+
+**Nicht entschieden, bewusst offen:** die Metabase-Karte auf ⑪ Zeitfenster und die Zoneneinrichtung
+der sechs Wilma-Betriebe (`offene-punkte.md`).
