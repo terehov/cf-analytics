@@ -1738,3 +1738,44 @@ Warum: sie arbeiten und werden bewertet, ihre Bewertungen sind vollständig — 
 nicht aus LINA. Als `ohne_geschaeft` fielen sie aus jeder Rangliste, obwohl nichts an ihren
 Bewertungen fehlte. **Nicht** geändert sind die Round-Table-Karten (`r.operativ`) und alle
 Umsatzkarten: dort hätten sie 0 € und drückten jeden Schnitt.
+
+## Stunde × Sparte auf „Umsatz — Struktur" (23.10.2026)
+
+Anlass war eine Frage des Fachbereichs: Abendgeschäft je Wilma-Betrieb, Januar bis September
+2026, Fenster 18–20 Uhr und ab 20 Uhr, Speisen und Getränke getrennt. Die Zeitzonen der Kasse
+(`ka_zeitzone_sparte`, Bericht 76) können das nicht — LINA richtet sie je Betrieb ein, und kein
+Wilma-Betrieb bricht um 20 Uhr. Seit `0137` gibt es den Stundenbericht mit Spartenfilter
+(`docs/metabase.md`, Abschnitt „Stunde × Sparte in `mart`"); auf ihm stehen drei neue Karten im
+Abschnitt **Tageszeit**, direkt unter dem Tagesverlauf nach Stunde, und eine Karte auf
+**Datenqualität und Import**. Alle bestehenden Karten bleiben.
+
+| Karte | Darstellung | Warum so |
+|---|---|---|
+| `st_stunde_sparte` — Tagesverlauf nach Stunde und Sparte | gestapelte Balken, volle Breite | Die Balkenhöhe ist der Stundenumsatz beider Sparten, die Teilung der Mix — beides auf einen Blick. Nebeneinander halbierte sich die Breite von 24 Balken, und die Summe müsste man im Kopf bilden. Sortiert wie `st_stunde`: 08:00 bis 07:59 |
+| `st_fenster_sparte` — Zeitfenster × Sparte | Tabelle | Je Fenster zwei Euro-Spalten und ein Anteil in Prozent. Als Diagramm hieße das Euro und Prozent in einem Bild (Regel: keine zwei Y-Achsen); sieben Zeilen liest man ohnehin. Der Speisenanteil ist eine **Prozentzahl, aus den Summen** des Zeitraums gerechnet, nicht als Mittel von Tagesanteilen, und bezogen auf Speisen + Getränke |
+| `st_abend_sparte_betrieb` — Abendgeschäft je Betrieb | Tabelle, Klick auf ③ Betrieb | Die Fachfrage selbst. Eine Zeile je Betrieb, vier Zahlen — ein Diagramm über 60 Betriebe wäre der Balkenwald, den die Regeln verbieten. **Über alle Marken**, weil die Seite keinen Markenfilter hat; einen nur für diese Karte einzuführen, hätte nach „Kein Filter ohne Wirkung" alle übrigen Karten der Seite mitgezogen. Die Spalte Marke vorn und die Sortierung nach Marke, Betrieb machen die Liste trotzdem lesbar. Nur Betriebe mit Umsatz im Zeitraum |
+| `dq_stunde_sparte` — Stunde × Sparte: Ladestand | Tabelle auf „Datenqualität und Import" | Je Monat der letzten 24 die Betriebstage `stimmt` / `weicht ab` / `noch nicht geladen` / `ohne Vergleichswert`. Ein Tag gilt als nicht geladen, sobald **eine** der beiden Sparten fehlt — es sind zwei getrennte Abrufe |
+
+Die drei `st_`-Karten lesen Betrieb und Zeitraum, nicht den Monat (Ausnahmen in `FILTER_AUSNAHME`,
+wie `st_stunde`: Profile über einen Zeitraum, und die Fachfrage war ein Zeitraum). „Ab 20" reicht
+bis zum Ende des Geschäftstags um 07:59 (`stunde >= 20 OR stunde < 8`); „18–20" sind die Stunden
+18 und 19. Die beiden Abendfenster sind in der Karte fest geschnitten, weil `manual.zeitfenster`
+weder 18–20 noch „ab 20" führt.
+
+**Die Falle, die auf der Seite steht und nicht nur in den Beschreibungen: Speisen + Getränke ist
+kleiner als der Gesamtumsatz** im Balken darüber (Gutscheine, Pfand, Trinkgeld fehlen). Deshalb
+gibt es keine Summenspalte, die nach Gesamtumsatz aussähe, und eine Textkachel vor den drei
+Karten sagt es, bevor man liest. „Late Night" endet in `manual.zeitfenster` um 01:00 — was danach
+verkauft wird, liegt in keinem Fenster; auch das steht in der Beschreibung von `st_fenster_sparte`.
+
+**Der Ladestand gehört dazu, nicht daneben** (harte Regel 10). Die Historie kommt nachts rückwärts
+herein, neueste Tage zuerst. Bis sie da ist, ist ein älterer Monat auf den drei Karten **leer,
+nicht umsatzlos** — und eine leere Karte neben gefüllten liest sich als „kein Abendgeschäft".
+Die Textkachel verweist deshalb auf `dq_stunde_sparte`; dort muss „noch nicht geladen" über die
+Nächte nach unten wandern. Bleibt ein Monat stehen, läuft das Nachholen nicht mehr. Nachgemessen
+am 23.10.2026 auf dem Klon `lina_zz_1023`: die Ladestandsabfrage braucht über 24 Monate rund 3–5 s,
+weil die Prüfsicht den Gesamt-Stundenbericht je Tag zusammenrechnet.
+
+**Vor dem ersten `uebernehmen.ts`** muss Metabase `mart.umsatz_stunde_sparte` und
+`mart.umsatz_zeitfenster_sparte` synchronisiert haben: der Zeitraum ist ein Feldfilter auf deren
+`geschaeftstag`, sonst bricht der Lauf mit „Feld nicht gefunden" ab (wie bei `bewertung_tag`).

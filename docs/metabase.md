@@ -1915,7 +1915,7 @@ acht (der Rand, an dem LINA den Stundenbericht noch füllt und das Nachzüglerfe
   Zeile im 60-Tage-Fenster dauerhaft über null, ist es kein Rückstand mehr und jemand sieht nach
   (Regel 10).
 
-Nicht gebaut ist die Karte auf Dashboard ⑪ Zeitfenster (`offene-punkte.md`). Die sechs Wilma-Betriebe
+~~Nicht gebaut ist die Karte auf Dashboard ⑪ Zeitfenster (`offene-punkte.md`).~~ **Gebaut am 23.10.2026**, aber nicht auf einem Dashboard ⑪ — ein solches gibt es in `metabase/dashboards.ts` nicht —, sondern auf „Umsatz — Struktur“ (`db_struktur`), Abschnitt Tageszeit: `st_stunde_sparte`, `st_fenster_sparte`, `st_abend_sparte_betrieb`; dazu der Ladestand `dq_stunde_sparte` auf „Datenqualität und Import“. Begründung der Darstellungen in `dashboards.md`, Abschnitt „Stunde × Sparte auf ‚Umsatz — Struktur‘“. Noch nicht nach Metabase übernommen (`uebernehmen.ts`). Die sechs Wilma-Betriebe
 ohne Zonen in LINA brauchen diese Sichten nicht: der Stundenbericht kennt keine Zonen. Ihre
 fehlende Zoneneinrichtung bleibt eine LINA-Konfiguration des Fachbereichs. Der MCP-Katalogabzug (`mcp/test/katalog.json`) ist wie nach
 jeder neuen `mart`-Sicht nachzuziehen (`cd mcp && bun run katalog:abzug`, gegen eine vollständige

@@ -481,6 +481,52 @@ SELECT geschaeftstag        AS "Geschäftstag",
     },
   },
   {
+    // Der Ladestand zu den Stunde-×-Sparte-Karten auf "Umsatz — Struktur"
+    // (0137). Die Historie kommt nachts rueckwaerts herein, neueste zuerst;
+    // ohne diese Karte saehe ein noch nicht geholter Monat dort aus wie ein
+    // Monat ohne Abendgeschaeft (Regel 10: der Unterschied muss sichtbar
+    // sein, nicht im Log).
+    //
+    // Eine Zeile je Monat, gezaehlt in BETRIEB-TAGEN, nicht in Zeilen der
+    // Pruefsicht (die hat je Tag eine Zeile je Sparte). Ein Tag gilt als
+    // "noch nicht geladen", sobald EINE Sparte fehlt — Speisen und
+    // Getraenke sind zwei getrennte Abrufe und koennen einzeln fehlen.
+    // "weicht ab" geht vor "stimmt"; "ohne Vergleichswert" sind Tage, an
+    // denen der Umsatzbericht keine Sparte fuehrt (Fremdkassen).
+    //
+    // 24 Monate und nicht die ganze Historie: die Pruefsicht rechnet den
+    // Gesamt-Stundenbericht je Tag zusammen — am 23.10.2026 auf dem Klon
+    // lina_zz_1023 rund 5 s fuer 24 Monate. Die Filterung auf
+    // geschaeftstag muss in der Abfrage stehen (Kommentar der Sicht).
+    schluessel: 'dq_stunde_sparte',
+    name: 'Stunde × Sparte: Ladestand',
+    beschreibung:
+      'Wie weit die Umsätze je Stunde und Sparte (Speisen, Getränke) geladen sind, je Monat der letzten 24 Monate, gezählt in Betriebstagen. '
+      + 'Ältere Monate werden nachts nach und nach nachgeholt, vom jüngsten rückwärts. Solange dort „noch nicht geladen“ steht, fehlen diese Tage in den Auswertungen nach Stunde und Sparte auf „Umsatz — Struktur“ — sie sind dort nicht umsatzlos, sondern noch nicht da. '
+      + '„stimmt“ heißt: die Stundenwerte ergeben bis auf Rundungscent den Tagesumsatz der Sparte. „weicht ab“ ist eine Arbeitsliste, kein Alarm. '
+      + '„ohne Vergleichswert“: die Kasse trennt an diesen Tagen nicht nach Sparten.',
+    anzeige: 'table',
+    sql: `
+WITH tag AS (
+    SELECT betrieb_key, geschaeftstag,
+           bool_or(befund = 'nicht geladen') AS fehlt,
+           bool_or(befund = 'weicht ab')     AS weicht,
+           bool_or(befund = 'ok')            AS stimmt
+      FROM mart.umsatz_stunde_sparte_pruefung
+     WHERE geschaeftstag >= (date_trunc('month', current_date) - interval '23 months')::date
+     GROUP BY betrieb_key, geschaeftstag
+)
+SELECT date_trunc('month', geschaeftstag)::date                              AS "Monat",
+       count(*)                                                              AS "Betriebstage",
+       count(*) FILTER (WHERE stimmt AND NOT weicht AND NOT fehlt)           AS "stimmt",
+       count(*) FILTER (WHERE weicht AND NOT fehlt)                          AS "weicht ab",
+       count(*) FILTER (WHERE fehlt)                                         AS "noch nicht geladen",
+       count(*) FILTER (WHERE NOT stimmt AND NOT weicht AND NOT fehlt)       AS "ohne Vergleichswert"
+  FROM tag
+ GROUP BY 1
+ ORDER BY 1 DESC`,
+  },
+  {
     schluessel: 'dq_gaeste',
     name: 'Gästezahlen — wem sie fehlen',
     beschreibung:

@@ -294,6 +294,13 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
                                  + 'Wochentag nur vier Tage, das Muster braucht mehr.' },
   st_stunde:              { monat: 'Tagesprofil ueber die gesamte Historie.' },
   st_zeitzone:            { monat: 'Tagesprofil ueber die gesamte Historie.' },
+  // Stunde × Sparte (0137): Profile ueber den ZEITRAUM wie st_stunde. Die
+  // Fachfrage, die sie ausgeloest hat, war ein Zeitraum (Januar bis
+  // September), kein Stichmonat.
+  st_stunde_sparte:       { monat: 'Tagesprofil ueber den Zeitraum, wie st_stunde.' },
+  st_fenster_sparte:      { monat: 'Zeitfenster ueber den Zeitraum, wie st_zeitzone.' },
+  st_abend_sparte_betrieb: { monat: 'Abendgeschaeft je Betrieb ueber den Zeitraum — die '
+                                 + 'Fachfrage war ein Zeitraum ueber mehrere Monate, kein Stichmonat.' },
   pe_bereich:             { monat: 'Alle Zeitraeume je Betrieb, absichtlich ungefiltert.' },
   pe_effektivitaet:       { monat: 'Alle Zeitraeume je Betrieb, absichtlich ungefiltert.' },
   vg_ort_profil:          { monat: 'Tagesprofil ueber die gesamte Historie.' },

@@ -1394,6 +1394,17 @@ export const dashboards: Dashboard[] = [
       { teile: [
         { karte: 'st_stunde' },
       ] },
+      // Stunde × Sparte (0137). Der Text steht VOR den drei Karten, nicht
+      // in ihren Beschreibungen allein: dass Speisen + Getraenke kleiner
+      // ist als der Balken darueber, und dass ein leerer alter Monat noch
+      // nicht geladen ist, muss man vor dem Lesen wissen. Der Ladestand
+      // steht als dq_stunde_sparte auf "Datenqualitaet und Import".
+      { teile: [{ text: '### Nach Speisen und Getränken\n\nDie drei folgenden Auswertungen teilen den Umsatz je Stunde in **Speisen** und **Getränke**. Beides zusammen ist **weniger als der Gesamtumsatz** im Tagesverlauf darüber — Gutscheine, Pfand und Trinkgeld fehlen. Die Werte deshalb nicht mit dem Gesamtumsatz zusammenzählen.\n\nÄltere Zeiträume werden nachts nach und nach nachgeholt, vom jüngsten Tag rückwärts. Ein leerer älterer Monat ist **noch nicht geladen, nicht umsatzlos** — wie weit das Nachholen ist, steht auf „Datenqualität und Import“ unter „Stunde × Sparte: Ladestand“.' }] },
+      // Volle Breite aus demselben Grund wie st_stunde: 24 Balken.
+      { teile: [{ karte: 'st_stunde_sparte' }] },
+      { teile: [{ karte: 'st_fenster_sparte', hoehe: 10 }] },
+      { teile: [{ karte: 'st_abend_sparte_betrieb', hoehe: 12,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ text: '## Wochenprofil\n\nStunde × Wochentag — das Werkzeug für den Dienstplan. Mit gewähltem Betrieb: Wo liegen DIESE Spitzen? Ohne: das Konzernmuster.' }] },
       { teile: [{ karte: 'st_wochenprofil', hoehe: 13 }] },
       { teile: [{ karte: 'st_zeitzone' }] },
@@ -2122,6 +2133,10 @@ export const dashboards: Dashboard[] = [
       // und keine Karte meldete es. Jeder Verlauf zeigte einen
       // erfundenen Absturz auf null.
       { teile: [{ karte: 'dq_lochtage', hoehe: 9 }] },
+      // 0137: die Spartenkreuzung des Stundenberichts kommt nachts
+      // rueckwaerts herein. Ohne Ladestand saehe ein noch nicht geholter
+      // Monat auf "Umsatz — Struktur" aus wie einer ohne Abendgeschaeft.
+      { teile: [{ karte: 'dq_stunde_sparte', hoehe: 10 }] },
       // Der Klick oeffnet das Betriebsblatt IM MONAT DER ZEILE — der
       // unplausible Wert steht in einem bestimmten Monat, nicht im
       // aktuellen.

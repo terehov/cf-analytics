@@ -446,6 +446,134 @@ SELECT uz.betrieb                                                  AS "Betrieb",
  ORDER BY sum(uz.umsatz_netto) DESC`,
   },
 
+  // -------------------------------------------------------------------
+  // Stunde × Sparte (0137, 23.10.2026). Anlass war die Frage des
+  // Fachbereichs nach dem Abendgeschaeft je Wilma-Betrieb, 18-20 Uhr und
+  // ab 20 Uhr, Speisen und Getraenke getrennt. Bericht 76 (Zeitzone ×
+  // Sparte, ka_zeitzone_sparte) konnte das nicht: seine Zonen richtet LINA
+  // je Betrieb ein, kein Wilma-Betrieb bricht um 20 Uhr. Die drei Karten
+  // lesen deshalb den Stundenbericht mit Spartenfilter.
+  //
+  // Zwei Fallen gelten fuer alle drei, und beide stehen auf der Seite
+  // (Textkachel in dashboards.ts) statt nur hier:
+  //   * Speisen + Getraenke ist KLEINER als der Gesamtumsatz in st_stunde
+  //     (Gutscheine, Pfand, Trinkgeld fehlen). Nie addieren; deshalb steht
+  //     hier auch keine Gesamtspalte, die nach "Summe" aussaehe.
+  //   * Die Historie kommt nachts rueckwaerts herein. Ein leerer alter
+  //     Zeitraum ist "nicht geladen", nicht null — der Ladestand steht als
+  //     dq_stunde_sparte auf "Datenqualitaet und Import".
+  //
+  // Feldfilter ohne Alias (uebernehmen.ts prueft das): Metabase baut die
+  // Klausel aus dem Tabellennamen.
+  // -------------------------------------------------------------------
+  {
+    // Gestapelt und nicht nebeneinander: die Hoehe des Balkens ist der
+    // Stundenumsatz aus beiden Sparten, die Teilung der Mix — beides auf
+    // einen Blick. Nebeneinander halbierte sich die Balkenbreite bei 24
+    // Stunden auf voller Breite, und die Summe muesste man im Kopf bilden.
+    // Dieselbe Sortierung wie st_stunde: Geschaeftstag 08:00 bis 07:59.
+    schluessel: 'st_stunde_sparte',
+    name: 'Tagesverlauf nach Stunde und Sparte',
+    beschreibung:
+      'Umsatz je Stunde, geteilt nach Speisen und Getränken. Der Geschäftstag beginnt um 08:00 und endet um 07:59 des Folgetags — die Nachtstunden stehen am Ende. '
+      + 'Achtung: Speisen und Getränke zusammen sind weniger als der Gesamtumsatz im Tagesverlauf darüber, weil Gutscheine, Pfand und Trinkgeld fehlen. '
+      + 'Ältere Zeiträume werden nach und nach nachgeholt; ein leerer älterer Zeitraum ist noch nicht geladen, nicht umsatzlos.',
+    anzeige: 'bar',
+    parameter: [BETRIEB, ZEITRAUM],
+    sql: `
+SELECT lpad(stunde::text, 2, '0') || ':00' AS "Stunde",
+       hauptsparte                         AS "Sparte",
+       sum(umsatz_netto)                   AS "Umsatz"
+  FROM mart.umsatz_stunde_sparte
+ WHERE hauptsparte IN ('Speisen', 'Getränke')
+   [[AND betrieb = {{betrieb}}]]
+   [[AND {{zeitraum}}]]
+ GROUP BY stunde, hauptsparte
+ ORDER BY ((stunde + 16) % 24), hauptsparte DESC`,
+    template_tag_dimension: { zeitraum: ['mart', 'umsatz_stunde_sparte', 'geschaeftstag'] },
+    visualisierung: {
+      'graph.dimensions': ['Stunde', 'Sparte'],
+      'graph.metrics': ['Umsatz'],
+      'stackable.stack_type': 'stacked',
+      'graph.x_axis.title_text': 'Stunde des Geschäftstags (08:00 → 07:59)',
+    },
+  },
+  {
+    // Tabelle statt Balken: die Frage ist "wie viel Speisen, wie viel
+    // Getraenke, und welcher Anteil" je Fenster — drei Zahlen je Zeile,
+    // davon eine Prozentzahl. Als Diagramm hiesse das Euro und Prozent in
+    // einem Bild (Visualisierungsregel: keine zwei Y-Achsen). Sieben
+    // Zeilen liest man ohnehin.
+    //
+    // Der Anteil wird aus den SUMMEN gerechnet, nicht als Mittel der
+    // Tagesanteile — ein schwacher Tag zaehlt sonst so viel wie ein Samstag.
+    // Nenner ist Speisen + Getraenke, nicht der Gesamtumsatz: der steht in
+    // dieser Sicht nicht, und gegen mart.umsatz_zeitfenster zu teilen
+    // mischte zwei Abrufe (Fallstrick stunde_gesamt_plus_sparte).
+    //
+    // Die Fenster kommen aus manual.zeitfenster; "Late Night" endet um
+    // 01:00, die Stunden 1 bis 7 liegen in keinem Fenster. Das steht in der
+    // Beschreibung, sonst sucht jemand den Rest.
+    schluessel: 'st_fenster_sparte',
+    name: 'Zeitfenster × Sparte',
+    beschreibung:
+      'Umsatz je Zeitfenster des Tages, getrennt nach Speisen und Getränken, dazu der Anteil der Speisen an beiden zusammen — gerechnet aus den Summen des Zeitraums. '
+      + '„Late Night“ läuft über Mitternacht bis 01:00; was danach verkauft wird, liegt in keinem Fenster. '
+      + 'Gutscheine, Pfand und Trinkgeld fehlen hier — die Spalten ergeben deshalb nicht den Gesamtumsatz.',
+    anzeige: 'table',
+    parameter: [BETRIEB, ZEITRAUM],
+    sql: `
+SELECT fenster                                                           AS "Zeitfenster",
+       round(sum(umsatz_netto) FILTER (WHERE hauptsparte = 'Speisen'))   AS "Speisen",
+       round(sum(umsatz_netto) FILTER (WHERE hauptsparte = 'Getränke'))  AS "Getränke",
+       round(100 * sum(umsatz_netto) FILTER (WHERE hauptsparte = 'Speisen')
+             / nullif(sum(umsatz_netto), 0), 1)                          AS "Speisenanteil %"
+  FROM mart.umsatz_zeitfenster_sparte
+ WHERE hauptsparte IN ('Speisen', 'Getränke')
+   [[AND betrieb = {{betrieb}}]]
+   [[AND {{zeitraum}}]]
+ GROUP BY fenster, reihenfolge
+ ORDER BY reihenfolge`,
+    template_tag_dimension: { zeitraum: ['mart', 'umsatz_zeitfenster_sparte', 'geschaeftstag'] },
+  },
+  {
+    // Die Fachfrage selbst, als Tabelle je Betrieb. Die beiden Fenster
+    // sind hier fest geschnitten und NICHT aus manual.zeitfenster: dort
+    // gibt es weder 18-20 noch "ab 20". "Ab 20" heisst bis Geschaeftsschluss
+    // — die Stunden 0 bis 7 gehoeren zum selben Geschaeftstag, deshalb
+    // OR stunde < 8 (Fallstrick stunde_sparte_tagesgrenze).
+    //
+    // Ueber ALLE Betriebe, nicht nur Wilma: db_struktur hat keinen
+    // Markenfilter, und einen nur fuer diese Karte anzulegen hiesse, ihn
+    // an allen anderen Karten der Seite nachzuziehen (Kein Filter ohne
+    // Wirkung). Die Spalte Marke vorn und die Sortierung danach machen die
+    // Tabelle trotzdem lesbar. Nur Betriebe mit Umsatz im Zeitraum: ohne
+    // HAVING stuenden die geschlossenen mit lauter Nullen dazwischen.
+    schluessel: 'st_abend_sparte_betrieb',
+    name: 'Abendgeschäft je Betrieb',
+    beschreibung:
+      'Umsatz je Betrieb im Zeitraum, von 18:00 bis 20:00 und ab 20:00, jeweils getrennt nach Speisen und Getränken. '
+      + '„Ab 20“ reicht bis zum Ende des Geschäftstags um 07:59 — die Nachtstunden zählen mit. '
+      + 'Gutscheine, Pfand und Trinkgeld fehlen. Ein Betrieb ohne Zeile hatte im Zeitraum keinen Umsatz — oder der Zeitraum ist für ihn noch nicht geladen.',
+    anzeige: 'table',
+    parameter: [BETRIEB, ZEITRAUM],
+    sql: `
+SELECT konzept                                                                          AS "Marke",
+       betrieb                                                                          AS "Betrieb",
+       round(sum(umsatz_netto) FILTER (WHERE hauptsparte = 'Speisen'  AND stunde IN (18, 19)))              AS "Speisen 18–20",
+       round(sum(umsatz_netto) FILTER (WHERE hauptsparte = 'Getränke' AND stunde IN (18, 19)))              AS "Getränke 18–20",
+       round(sum(umsatz_netto) FILTER (WHERE hauptsparte = 'Speisen'  AND (stunde >= 20 OR stunde < 8)))    AS "Speisen ab 20",
+       round(sum(umsatz_netto) FILTER (WHERE hauptsparte = 'Getränke' AND (stunde >= 20 OR stunde < 8)))    AS "Getränke ab 20"
+  FROM mart.umsatz_stunde_sparte
+ WHERE hauptsparte IN ('Speisen', 'Getränke')
+   [[AND betrieb = {{betrieb}}]]
+   [[AND {{zeitraum}}]]
+ GROUP BY betrieb_key, konzept, betrieb
+HAVING sum(umsatz_netto) <> 0
+ ORDER BY konzept NULLS LAST, betrieb`,
+    template_tag_dimension: { zeitraum: ['mart', 'umsatz_stunde_sparte', 'geschaeftstag'] },
+  },
+
   // ===================================================================
   // Personal
   // ===================================================================
