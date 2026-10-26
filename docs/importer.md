@@ -617,7 +617,7 @@ Zwei Ebenen mit unterschiedlichem Datumsformat:
 
 Fallstricke, die dort abgefangen werden:
 - **Kennzahlen deduplizieren:** Sicherheitsnetz über den Betriebsschlüssel. Erwartet wird ein Vorkommen je Betrieb; der Name „Karlsruhe" taucht zwar fünfmal auf, das sind aber fünf Restaurants mit fünf Schlüsseln. Käme ein Schlüssel doch doppelt, vervielfachten sich die Werte still.
-- **Stunden 0–7 gehören zum Vortag** (Geschäftstag 08:00–07:59).
+- ~~**Stunden 0–7 gehören zum Vortag** (Geschäftstag 08:00–07:59).~~ **Alle 24 Stunden gehören zum abgefragten Tag** (seit `0138`, 26.10.2026). LINAs Antwort für den Tag D ist schon der Geschäftstag D (08:00–07:59), die Stunden 0–7 sind sein Ende. Die alte Regel rechnete die Tagesgrenze ein zweites Mal ein und stellte die Nacht einen Tag zu früh.
 - **Artikel ohne Verkauf überspringen:** sonst 141 × 6.451 Zeilen pro Tag statt der tatsächlich verkauften.
 - **`avgTicket`/`avgGuest` kommen fertig** — nicht selbst aus Umsatz/Rechnungen rechnen, das weicht bei Nullwerten ab.
 

@@ -148,11 +148,16 @@ lauf('Ende-zu-Ende', () => {
     const { rows: [{ n: stunden }] } = await db.query(`SELECT count(*)::int AS n FROM core.zeitzonenbericht_stunde`)
     expect(stunden).toBeGreaterThan(0)
 
-    // Geschäftstag 08:00–07:59: die Stunden 0–7 liegen auf dem Vortag.
+    // Geschäftstag 08:00–07:59: die Stunden 0–7 sind das Ende des abgefragten
+    // Tages, nicht der Vortag (0138). Kein Tag ausserhalb der Abfrage entsteht.
     const { rows: [{ n: vortag }] } = await db.query(`
       SELECT count(*)::int AS n FROM core.zeitzonenbericht_stunde
        WHERE stunde < 8 AND geschaeftstag = '2026-06-14'`)
-    expect(vortag).toBeGreaterThan(0)
+    expect(vortag).toBe(0)
+    const { rows: [{ n: nacht }] } = await db.query(`
+      SELECT count(*)::int AS n FROM core.zeitzonenbericht_stunde
+       WHERE stunde < 8 AND geschaeftstag = '2026-06-15'`)
+    expect(nacht).toBeGreaterThan(0)
 
     const { rows: [{ n: artikel }] } = await db.query(`SELECT count(*)::int AS n FROM core.artikelverkauf_tag`)
     expect(artikel).toBeGreaterThan(0)
@@ -210,14 +215,14 @@ lauf('Ende-zu-Ende', () => {
 
     // 0137: der Spartenfilter landet in der eigenen Tabelle, mit der
     // hauptsparte_key aus dem Parameter (10001 = Speisen), nicht in der
-    // Gesamtzeile. 24 Stunden eines Tages — 16 am 15.06., 8 (Stunden 0-7)
-    // als Ende des 14.06.
+    // Gesamtzeile. 24 Stunden eines Tages, alle am 15.06. — die Stunden 0-7
+    // sind sein Ende (0138).
     const { rows: sparte } = await db.query(
       `SELECT hs.pos_id, count(*)::int AS n, count(DISTINCT z.geschaeftstag)::int AS tage
          FROM core.zeitzonenbericht_stunde_sparte z
          JOIN core.hauptsparte hs ON hs.hauptsparte_key = z.hauptsparte_key
         GROUP BY hs.pos_id`)
-    expect(sparte).toEqual([{ pos_id: 10001, n: 24, tage: 2 }])
+    expect(sparte).toEqual([{ pos_id: 10001, n: 24, tage: 1 }])
   })
 
   test('der Sessionablauf mitten im Lauf wird abgefangen', async () => {

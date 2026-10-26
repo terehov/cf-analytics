@@ -1458,8 +1458,8 @@ Stundenbericht mit Spartenfilter. Geholt werden Speisen (`posId` 10001) und Getr
 `hauptsparte_key` verweist auf `core.hauptsparte` und wird im Lader aus dem Parameter
 `hauptsparten` des Postens nachgeschlagen (`core.hauptsparte.pos_id`), nicht aus dem
 Endpunktschlüssel. BRIN auf `geschaeftstag`. `geschaeftstag` ist wie in
-`core.zeitzonenbericht_stunde` bereits umgerechnet: er läuft 08:00 bis 07:59, die Stunden 0–7
-gehören ans Ende des Tages.
+`core.zeitzonenbericht_stunde` der abgefragte Tag: er läuft 08:00 bis 07:59, die Stunden 0–7
+gehören ans Ende des Tages (seit `0138` auch tatsächlich — vorher standen sie einen Tag zu früh).
 
 **Warum eine eigene Tabelle und keine Spalte an `core.zeitzonenbericht_stunde`.** Die Stundentabelle
 hat 10,6 Mio. Zeilen und einen Primärschlüssel über `(betrieb_key, geschaeftstag, stunde)`; ein
@@ -1475,8 +1475,11 @@ Gesamtzeile in `core.zeitzonenbericht_stunde` liegt. Wer beide Tabellen summiert
 Umsatz doppelt; Speisen + Getränke ist außerdem **kleiner** als die Gesamtzeile.
 
 **Gegenprobe:** die Summe der 24 Stunden eines Tages und einer Sparte trifft den Spartenwert in
-`core.umsatzbericht_tag` auf fünf Cent (`mart.umsatz_stunde_sparte_pruefung`). Nachgemessen am
-23.10.2026 an einer Woche: 44 von 44 Betrieben mit Speisenumsatz (`lina-api-inventar.md`).
+`core.umsatzbericht_tag` auf fünf Cent (`mart.umsatz_stunde_sparte_pruefung`). ~~Nachgemessen am
+23.10.2026 an einer Woche: 44 von 44 Betrieben mit Speisenumsatz (`lina-api-inventar.md`).~~ Die
+Wochenmessung vom 23.10.2026 (44 von 44) konnte den Fehler nicht sehen: über eine Woche gleicht
+sich eine Nacht, die einen Tag zu früh steht, fast aus. Tageweise wichen am 26.10.2026 29 % der
+Zeilen ab; Ursache und Korrektur in `0138`. Erwartung seither: keine Zeile `weicht ab`.
 
 **Historie.** Der Nachtlauf holt sie über `historieNachziehen()` und `HISTORIE_JE_LAUF` (2.000
 Aufrufe je Nacht, neueste Tage zuerst): ab 2018 rund 6.400 Aufrufe, drei bis vier Nächte. Laufend

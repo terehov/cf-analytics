@@ -127,7 +127,7 @@ Fallen** — genau die, die `mart` ausräumt:
 | `betrieb_konzept` | `konzept_zuordnung` | Ist n:m — ein Markenschnitt darüber zählt mehrfach zugeordnete Betriebe **mehrfach** |
 | `konzept` | ebd. | Reine Dimension; in `mart` überall als `konzept`/`hauptkonzept` aufgelöst |
 | `personalkosten` | `mart.personalkosten` | Posten decken Zeiträume ab, die sich überlappen können — Summieren zählt doppelt |
-| `zeitzonenbericht_stunde`, `_zone` | `umsatz_stunde`, `umsatz_zeitzone` | Geschäftstag läuft 08:00–07:59; Stunden 0–7 gehören ans **Ende** |
+| `zeitzonenbericht_stunde`, `_zone` | `umsatz_stunde`, `umsatz_zeitzone` | Geschäftstag läuft 08:00–07:59; Stunden 0–7 gehören ans **Ende** (in `zeitzonenbericht_stunde` erst seit `0138` richtig — vorher einen Tag zu früh) |
 | `zeitzonenbericht_stunde_sparte` (seit `0137`, 23.10.2026) | `umsatz_stunde_sparte`, `umsatz_zeitfenster_sparte` | Dieselbe Stunde, zusätzlich nach Speisen/Getränke. Nur diese beiden Sparten, und **nie mit `umsatz_stunde` summieren** — derselbe Umsatz, einmal gesamt, einmal nach Sparte. Die Historie läuft nachts nach: ein fehlender Tag ist nicht null (Ladestand in `umsatz_stunde_sparte_pruefung`) |
 | `einkaufspreis_stand` | `preisentwicklung_ware` | Ohne Vormonatsvergleich schwer zu lesen |
 | `ware`, `ware_stand`, `warengruppe`, `einheit`, `lieferant` | `preisentwicklung_ware`, `deckungsbeitrag_warengruppe` | Reine Dimensionen, in den Sichten schon aufgelöst |

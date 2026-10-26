@@ -631,3 +631,41 @@ Daten liefert, ist **nicht gemessen**. Er wäre die einzige Quelle für Personal
   `lina-api-inventar-1b.md`, `lina-api-inventar.md`, `datensicherung.md`, `entscheidungen.md`,
   `metabase/karten-management.ts` und `migrations/0129_management_regelwerk.sql` führten die
   Aussage aus Korrektur 6 — alle nachgezogen (`grep` siehe `fehlerkatalog.md`, 29.09.2026, zweiter Eintrag).
+
+---
+
+## KORREKTUR 11 — Die Stunden 0–7 des Zeitzonenberichts gehören zum abgefragten Tag, nicht zum Vortag (26.10.2026)
+
+**Falsch war:** „Die Stunden 0–7 gehören fachlich zum Vortag" — umgesetzt als: die Antwort für den
+Tag D liefert die Stunden 0–7 des **Kalendertags** D, also die Nacht von D−1, und der Lader schreibt
+sie auf D−1 (`geschaeftstagFuerStunde()`, bis 26.10.2026 in `src/lib/time.ts`).
+
+**Richtig ist:** Die Antwort für den Tag D ist bereits der **Geschäftstag** D, 08:00 bis 07:59. Das
+`hours`-Array `[8,9,…,23,0,…,7]` sagt genau das: es beginnt um 8 und endet mit dem Morgen von D+1.
+Der Lader hat die Tagesgrenze also ein zweites Mal eingerechnet.
+
+Nachgemessen in Produktion, alle Betrieb-Tage 2026 mit Umsatz, Summe der 24 Stunden gegen die
+Gesamtzeile aus `core.umsatzbericht_tag`, Toleranz 5 Cent:
+
+| Lesart | Treffer |
+|---|---|
+| Stunden 0–7 auf D−1 (bis 26.10.2026) | 8.254 von 16.309 |
+| Stunden 0–7 auf D | **16.309 von 16.309** |
+
+Beispiel Aposto Karlsruhe, Samstag 17.10.2026: 1.353,14 EUR nach Mitternacht standen auf dem 16.10.,
+der 17.10. lag genau um diesen Betrag unter dem Umsatzbericht.
+
+**Warum es zwei Monate niemand sah:** Monatssummen stimmen bis auf die Ränder, und jede Prüfung auf
+dem Stundenbericht hat über Wochen oder Monate gemessen. Erst die Tagesgegenprobe aus `0137`
+(`mart.umsatz_stunde_sparte_pruefung`) hat es gezeigt.
+
+### Folgen
+
+* `0138` verschiebt die Stunden 0–7 in `core.zeitzonenbericht_stunde` und
+  `core.zeitzonenbericht_stunde_sparte` um einen Tag nach vorn; der Lader schreibt den abgefragten
+  Tag unverändert. Hergang in `fehlerkatalog.md` (26.10.2026).
+* Tageswerte, Wochentagsvergleiche und Fenster über Mitternacht („ab 20 Uhr") aus `mart.umsatz_stunde`,
+  `mart.umsatz_zeitfenster` und den Spartenspiegeln sind vor dem 26.10.2026 mit der falschen Nacht
+  gerechnet worden.
+* Berichtigt: `datenherkunft.md`, `datenmodell.md`, `importer.md`, `metabase.md`,
+  `metabase-sichtbarkeit.md`, `lina-api-inventar.md`, die Tabellenkommentare.

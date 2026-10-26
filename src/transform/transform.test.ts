@@ -186,16 +186,16 @@ describe('kennzahlen', () => {
 describe('zeitzonenbericht', () => {
   const daten = fixture('getZeitzonenbericht')
 
-  test('Stunden ab 8 gehören zum Kalendertag', () => {
+  // Die Antwort für den 15.06. IST der Geschäftstag 15.06. (08:00–07:59): die
+  // Stunden 0–7 sind der Morgen des 16.06. und gehören ans Ende des 15.06.
+  // Bis 26.10.2026 landeten sie auf dem 14.06. — die Tagessumme traf den
+  // Umsatzbericht nur, wenn nach Mitternacht nichts verkauft wurde (0138).
+  test('alle 24 Stunden gehören zum abgefragten Geschäftstag', () => {
     const zeilen = zeitzonenbericht(daten, '2026-06-15')
-    expect(zeilen.find(z => z.stunde === 14)!.geschaeftstag).toBe('2026-06-15')
-  })
-
-  test('Stunden vor 8 gehören zum Vortag — Geschäftstag 08:00–07:59', () => {
-    const zeilen = zeitzonenbericht(daten, '2026-06-15')
-    expect(zeilen.find(z => z.stunde === 3)!.geschaeftstag).toBe('2026-06-14')
-    expect(zeilen.find(z => z.stunde === 7)!.geschaeftstag).toBe('2026-06-14')
-    expect(zeilen.find(z => z.stunde === 8)!.geschaeftstag).toBe('2026-06-15')
+    for (const h of [3, 7, 8, 14, 23]) {
+      expect(zeilen.find(z => z.stunde === h)!.geschaeftstag).toBe('2026-06-15')
+    }
+    expect(new Set(zeilen.map(z => z.geschaeftstag))).toEqual(new Set(['2026-06-15']))
   })
 
   test('liefert alle 24 Stunden je Betrieb', () => {

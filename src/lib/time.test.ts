@@ -7,7 +7,7 @@
  */
 import { expect, test, describe } from 'bun:test'
 import {
-  geschaeftstag, geschaeftstagFuerStunde, zuLinaDatum,
+  geschaeftstag, zuLinaDatum,
   epochIstBerlinerMitternacht, alsIsoDatum, GESCHAEFTS_ZEITZONE,
 } from './time'
 
@@ -30,12 +30,6 @@ describe('Geschäftstag', () => {
     expect(geschaeftstag(new Date('2026-06-01T07:00:00Z'))).toBe('2026-06-01') // 09:00 Berlin
   })
 
-  test('Stunden aus dem Zeitzonenbericht landen auf dem richtigen Tag', () => {
-    expect(geschaeftstagFuerStunde('2026-06-02', 3)).toBe('2026-06-01')
-    expect(geschaeftstagFuerStunde('2026-06-02', 7)).toBe('2026-06-01')
-    expect(geschaeftstagFuerStunde('2026-06-02', 8)).toBe('2026-06-02')
-    expect(geschaeftstagFuerStunde('2026-06-02', 14)).toBe('2026-06-02')
-  })
 })
 
 describe('LINA-Datumsformate', () => {

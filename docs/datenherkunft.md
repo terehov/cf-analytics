@@ -507,9 +507,13 @@ läuft.
 Uhrzeit.
 
 **Der Geschäftstag läuft 08:00 bis 07:59 des Folgetags.** Belegt durch das `hours`-Array des
-Zeitzonenberichts (`8,9,…,23,0,…,7`). Die Stunden 0–7 gehören fachlich zum **Vortag**;
-`core.zeitzonenbericht_stunde.geschaeftstag` ist bereits umgerechnet. Nach `stunde` zu sortieren
-ergibt deshalb keinen zeitlichen Verlauf.
+Zeitzonenberichts (`8,9,…,23,0,…,7`). ~~Die Stunden 0–7 gehören fachlich zum **Vortag**;
+`core.zeitzonenbericht_stunde.geschaeftstag` ist bereits umgerechnet.~~ **Die Antwort für den Tag D
+ist der Geschäftstag D:** ihre Stunden 0–7 sind der Morgen von D+1 und stehen auf D, an seinem Ende.
+Bis 26.10.2026 zog der Lader sie ein zweites Mal auf D−1 — die Nacht stand einen Tag zu früh
+(`0138`, `fehlerkatalog.md`). Nachgemessen: die 24 Stunden eines Tages treffen den Umsatzbericht auf
+5 Cent, an 16.309 von 16.309 Betrieb-Tagen 2026. Nach `stunde` zu sortieren ergibt keinen zeitlichen
+Verlauf; `(stunde + 16) % 24` tut es.
 
 `Europe/Berlin` steht an genau **zwei** Stellen: `core.geschaefts_zeitzone()` und
 `src/lib/time.ts`. Die Umgebungszeitzone ist bewusst nicht tragend. `core.pruefe_lina_epoch()`

@@ -9,7 +9,7 @@
  * falsch heraus, wird sie korrigiert und alles neu aufgebaut, ohne dass ein
  * einziger Aufruf gegen LINA nötig wäre.
  */
-import { geschaeftstagFuerStunde, ausLinaEpoch, linaEpochAlsDatum } from '../lib/time'
+import { ausLinaEpoch, linaEpochAlsDatum } from '../lib/time'
 
 /** Prozentwerte immer als Prozentzahl. LINAs diff ist bereits Prozent. */
 const z = (v: unknown): number | null =>
@@ -245,17 +245,24 @@ export function kennzahlen(daten: any, jahr: number): KennzahlZeile[] {
 export type StundeZeile = { encId: string; geschaeftstag: string; stunde: number; umsatzNetto: number | null }
 
 /**
- * Der Geschäftstag läuft 08:00–07:59. Die Stunden 0–7 gehören fachlich zum
- * Vortag — genau das sagt LINAs hours-Array [8,9,…,23,0,…,7] aus.
+ * Der Geschäftstag läuft 08:00–07:59. LINAs Antwort für den Tag D IST der
+ * Geschäftstag D: das hours-Array [8,9,…,23,0,…,7] endet mit dem Morgen von
+ * D+1. Alle 24 Stunden gehören deshalb zu D, die Stunden 0–7 an sein Ende.
+ *
+ * ~~Die Stunden 0–7 gehören zum Vortag~~ — bis 26.10.2026 wurden sie hier
+ * noch einmal auf D−1 gezogen, also doppelt umgerechnet. Die Nacht stand
+ * damit einen Tag zu früh; Tagessummen trafen den Umsatzbericht nur an der
+ * Hälfte der Tage, nach der Korrektur an 16.309 von 16.309 (Migration 0138,
+ * docs/fehlerkatalog.md).
  */
-export function zeitzonenbericht(daten: any, kalendertag: string): StundeZeile[] {
+export function zeitzonenbericht(daten: any, geschaeftstag: string): StundeZeile[] {
   const raus: StundeZeile[] = []
   for (const s of daten?.stores ?? []) {
     for (const [stundeStr, wert] of Object.entries(s.hours ?? {})) {
       const stunde = Number(stundeStr)
       raus.push({
         encId: s.encId,
-        geschaeftstag: geschaeftstagFuerStunde(kalendertag, stunde),
+        geschaeftstag,
         stunde,
         umsatzNetto: z(wert),
       })

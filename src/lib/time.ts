@@ -47,14 +47,6 @@ export function geschaeftstag(at: Date): string {
   return day.toISOString().slice(0, 10)
 }
 
-/** Stunde 0–23 aus dem Zeitzonenbericht dem Geschäftstag zuordnen. */
-export function geschaeftstagFuerStunde(kalendertag: string, hour: number): string {
-  if (hour >= GESCHAEFTSTAG_START_STUNDE) return kalendertag
-  const d = new Date(`${kalendertag}T00:00:00Z`)
-  d.setUTCDate(d.getUTCDate() - 1)
-  return d.toISOString().slice(0, 10)
-}
-
 /**
  * Normalisiert auf YYYY-MM-DD.
  *

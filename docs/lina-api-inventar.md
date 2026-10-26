@@ -90,6 +90,10 @@ Daraus folgt zweierlei:
   einem Aufruf misst und gegen `core.zeitzonenbericht_stunde` (Summe von sieben Tagesaufrufen)
   hält, sieht ein Siebtel und hält den Filter für etwas anderes. Genau das ist am 23.10.2026 beim
   ersten Vergleich passiert.
+* **Die Antwort für einen Tag D ist der Geschäftstag D** — die Stunden `0…7` am Ende des
+  `hours`-Arrays sind der Morgen von D+1. Nachgemessen am 26.10.2026 über alle Betrieb-Tage 2026:
+  so gelesen trifft die Stundensumme den Umsatzbericht an 16.309 von 16.309 Tagen. Der Lader las es
+  bis dahin anders (`lina-api-korrekturen.md`, KORREKTUR 11).
 
 ---
 

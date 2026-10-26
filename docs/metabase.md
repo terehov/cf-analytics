@@ -1907,7 +1907,11 @@ Vier Regeln:
 **Zwei Zeilen in `mart.pruefung_uebersicht`**, beide über die letzten 60 Tage, ohne die jüngsten
 acht (der Rand, an dem LINA den Stundenbericht noch füllt und das Nachzüglerfenster nachholt):
 
-* „Stunde x Sparte: Tag weicht vom Umsatzbericht ab (60 Tage)" — Erwartung 0.
+* „Stunde x Sparte: Tag weicht vom Umsatzbericht ab (60 Tage)" — Erwartung 0. Am 26.10.2026 stand
+  sie bei rund einem Drittel der Tage — nicht wegen des Spartenfilters, sondern weil der Lader die
+  Stunden 0–7 seit jeher einen Tag zu früh schrieb, in **beiden** Stundentabellen. Behoben mit
+  `0138`; alle Sichten auf `zeitzonenbericht_stunde` (`umsatz_stunde`, `umsatz_zeitfenster`, die
+  Spartenspiegel) zeigen seitdem andere Tageswerte, Monatswerte bleiben bis auf die Monatsränder gleich.
 * „Stunde x Sparte: Tag mit Stundenbericht, aber ohne Spartenstunden (60 Tage)" — Erwartung 0.
   **Während des Backfills bedeutet „nicht geladen" hier nur: noch nicht dran.** Die Historie vor den
   60 Tagen ist bewusst nicht in der Zeile (eine Zeile, die monatelang auf Hunderte steht, liest

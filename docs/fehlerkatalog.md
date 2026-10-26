@@ -5289,3 +5289,32 @@ etwas auf. Je Zahlart gelesen ist es Unsinn.
 nach jedem Finanzwegabruf. `mart.finanzweg_tag` lässt an diesen Tagen alle Zahlarten des Betriebs
 weg, sichtbar in `mart.finanzweg_fehleingabe`, `mart.zahlart_monat.tage_fehleingabe` und einer
 Zeile in `mart.pruefung_uebersicht`. Regel und Messung: `befunde-datenlage.md`, 20.10.2026.
+
+## Die Nacht stand im Stundenbericht einen Tag zu früh (26.10.2026)
+
+**Symptom.** Die Gegenprobe aus `0137` (`mart.umsatz_stunde_sparte_pruefung`) meldete nach dem
+Backfill 75.950 Zeilen `weicht ab` gegen 186.042 `ok`, im letzten Monat 35 %. Fast nur Abweichungen
+in Höhe der Umsätze nach Mitternacht, gehäuft an Freitagen und Samstagen, mit wechselndem
+Vorzeichen. Über einen Monat fast null.
+
+**Ursache.** Der Lader zog die Stunden 0–7 jeder Antwort auf den Vortag. Die Antwort für den Tag D
+ist aber schon der Geschäftstag D (08:00–07:59), die Stunden 0–7 sind sein Ende. Die Tagesgrenze
+war damit zweimal eingerechnet. Das betraf nicht nur die neue Spartentabelle, sondern seit dem
+ersten Abruf auch `core.zeitzonenbericht_stunde` (10,9 Mio. Zeilen): von 16.309 Betrieb-Tagen 2026
+trafen 8.254 den Umsatzbericht, mit der Nacht am richtigen Tag alle 16.309. Die Regel stand als
+„gehören zum Vortag" in sechs Dokumenten, in zwei Tests und im Tabellenkommentar. Die Tests
+prüften die Regel, nicht das Ergebnis gegen eine zweite Quelle.
+
+**Warum es keiner sah.** Jede frühere Prüfung lief über Wochen oder Monate; dort gleicht sich eine
+verschobene Nacht fast aus. Die Messung `d5` vom 23.10.2026 verglich eine Woche (44 von 44 Treffer)
+und konnte es deshalb nicht sehen.
+
+**Was es künftig verhindert.**
+* `0138` verschiebt die Stunden 0–7 beider Tabellen um einen Tag nach vorn und bricht ab, wenn
+  danach nicht mindestens 99 % der Betrieb-Tage 2026 den Umsatzbericht treffen. Der Lader schreibt
+  den abgefragten Tag unverändert; `geschaeftstagFuerStunde()` ist entfernt.
+* Der Test in `transform.test.ts` prüft, dass alle 24 Stunden auf dem abgefragten Tag landen, der
+  e2e-Test, dass kein Vortag entsteht.
+* Die Prüfzeile „Stunde x Sparte: Tag weicht vom Umsatzbericht ab" misst tageweise und steht ab
+  jetzt auf 0. Eine Gegenprobe gegen eine zweite Quelle muss in der **kleinsten** Körnung messen,
+  die die Daten haben — über eine Woche summiert verschwinden Verschiebungen.
