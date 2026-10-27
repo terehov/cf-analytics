@@ -128,7 +128,9 @@ export type Teil = {
   text?: string
   /** Rastereinheiten. Fehlt sie, teilt sich der Platz gleichmaessig auf. */
   breite?: number
-  /** Nur setzen, wenn mehr als das Mindestmass noetig ist. */
+  /** Uebersteuert die Mindesthoehe — nach oben, wenn der Inhalt mehr
+   *  braucht, nach unten nur, wenn das Mass am gerenderten Dashboard
+   *  abgelesen ist (so beim Management-Dashboard, 27.10.2026). */
   hoehe?: number
   klick?: Klick[]
 }

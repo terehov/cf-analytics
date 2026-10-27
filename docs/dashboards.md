@@ -145,6 +145,17 @@ Warum sie so aussieht:
   Mit elf Spalten passte die Tabelle nicht mehr neben „Umsatz je Personalstunde" (15 von 24
   Spalten: YTD € und Ampeln abgeschnitten) — sie hat jetzt eine eigene Zeile, die
   Effektivität steht direkt darunter.
+* **Das Layout ist von Hand gesetzt und im Code nachgezogen** (27.10.2026). Eugene hat die
+  Seite in Metabase umgestellt: Zahlenkacheln auf zwei statt vier Einheiten Höhe, Rendite
+  breiter (6), Yext und Bounti schmaler (je 3); Personal 5, Effektivität 4, Wareneinsatz 3
+  Einheiten hoch; „Bewertungen im Monat" breit (14) neben „Worüber Gäste schreiben" (10).
+  Abgelesen über `GET /api/dashboard/39` und als `breite`/`hoehe` in `db_management`
+  eingetragen. Gegenprobe: `auslegen()` ergibt für alle 17 Kacheln dieselbe Position und
+  Größe wie live. Mehrere Höhen liegen **unter** der Mindesthöhe aus `layout.ts`, und das ist
+  so gewollt. Ein `hoehe` am Teil übersteuert sie auch nach unten. **Die Regel dahinter:**
+  `uebernehmen.ts` schreibt die Positionen jedes Mal neu. Ein Layout, das nur in der
+  Oberfläche steht, ist beim nächsten Lauf weg. Wer in Metabase umbaut, liest danach das
+  Live-Layout aus und trägt es hier ein.
 
 Die alten Seiten bleiben. Seit `0129` zeigen sie statt „OM vor Ort" die drei
 Personalampeln je Bereich, und ihre Texte nennen das neue Regelwerk.

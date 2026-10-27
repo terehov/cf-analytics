@@ -279,13 +279,20 @@ export const dashboards: Dashboard[] = [
     // die fuenf dringendsten Handlungsfelder.
     reihen: [
       { teile: [{ hoehe: 2, text: '🟢 im Plan · 🟠 beobachten · 🔴 handeln · ⚪ keine Zahl. **Ohne Betrieb** zeigen die Kacheln alle operativen Betriebe zusammen, und die Ampelspalten zählen, wie viele wo stehen; **mit Betrieb** seine eine Ampel. Ohne Monat gilt der letzte abgeschlossene. Personal, Wareneinsatz und Rendite stehen auf dem **letzten gebuchten BWA-Monat**. Was eine Kachel genau zeigt, steht unter ⓘ.' }] },
+      // LAYOUT VON HAND (27.10.2026): Eugene hat die Seite in Metabase
+      // umgestellt, die Hoehen und Breiten hier sind davon abgelesen
+      // (GET /api/dashboard/39). Deshalb liegen etliche Hoehen UNTER der
+      // Mindesthoehe aus layout.ts — Absicht, nicht zurueckdrehen: die
+      // Zahlenkacheln reichen auf zwei Einheiten, die Tabellen sind so hoch
+      // wie ihr Inhalt im Monatsfilter. Wer hier etwas aendert, zuerst das
+      // Live-Layout lesen, sonst schiebt uebernehmen.ts es wieder zurueck.
       { teile: [
-        { karte: 'mg_umsatz' },
-        { karte: 'mg_umsatz_vj' },
-        { karte: 'mg_umsatz_delta' },
-        { karte: 'mg_rendite' },
-        { karte: 'mg_yext' },
-        { karte: 'mg_bounti' },
+        { karte: 'mg_umsatz', breite: 4, hoehe: 2 },
+        { karte: 'mg_umsatz_vj', breite: 4, hoehe: 2 },
+        { karte: 'mg_umsatz_delta', breite: 4, hoehe: 2 },
+        { karte: 'mg_rendite', breite: 6, hoehe: 2 },
+        { karte: 'mg_yext', breite: 3, hoehe: 2 },
+        { karte: 'mg_bounti', breite: 3, hoehe: 2 },
       ] },
       { teile: [
         { karte: 'mg_umsatz_verlauf', breite: 12 },
@@ -295,14 +302,14 @@ export const dashboards: Dashboard[] = [
       // Personal volle Breite, Effektivitaet direkt darunter (ein Thema).
       // Seit dem Umbau auf Ist/Massstab/YTD (05.10.2026) hat die Tabelle
       // elf Spalten; bei 15 von 24 fehlten im Screenshot YTD € und Ampeln.
-      { teile: [{ karte: 'mg_personal' }] },
-      { teile: [{ karte: 'mg_effektivitaet' }] },
+      { teile: [{ karte: 'mg_personal', hoehe: 5 }] },
+      { teile: [{ karte: 'mg_effektivitaet', hoehe: 4 }] },
       // Wareneinsatz als eigene Zeile: er gehoert fachlich weder zu den
       // Bewertungen noch zum Personal (Eugene, 29.09.2026).
-      { teile: [{ karte: 'mg_wareneinsatz' }] },
+      { teile: [{ karte: 'mg_wareneinsatz', hoehe: 3 }] },
       { teile: [
-        { karte: 'mg_yext_monat', breite: 6 },
-        { karte: 'mg_yext_themen', breite: 18 },
+        { karte: 'mg_yext_monat', breite: 14, hoehe: 5 },
+        { karte: 'mg_yext_themen', breite: 10, hoehe: 5 },
       ] },
       { teile: [
         { karte: 'mg_bounti_gesamt', breite: 10 },
