@@ -5350,3 +5350,30 @@ aufgefallen (andere Betriebe halten die Grenze bei 2018), bei einem neuen Bestan
 **Was es heute verhindert.** Die Grenze ist der erste Tag über alle Quellen. Kassenblatt-Zeilen
 entstehen nur ab dieser Grenze und können sie nicht verschieben. Der Durchstich-Test prüft genau
 diesen Fall.
+
+## Ein Status, der an „hat Umsatz" hängt, und Sichten, die aus dem Status auf die Kasse schließen (28.10.2026, vor dem Deploy)
+
+**Symptom.** Am Klon mit 70 simulierten Kassenblatt-Tagen für Enchilada Bremen meldete
+`mart.datenstand` den Betrieb als „keine Artikeldaten", `mart.gaeste_abdeckung` führte ihn mit
+70 Umsatztagen und 0,0 % Gästen, und die Prüfzeile „Betriebsberichte: Betrieb-Tage mit Umsatz
+ohne Bericht" stand auf 60 geprüft bei 0 auffällig. Keine der drei Zahlen war falsch
+gerechnet, alle drei waren falsch gemeint.
+
+**Ursache.** `mart.betrieb_status` leitet `operativ` aus „Umsatz in den letzten 60 Tagen" ab;
+`fremdkasse` (`0125`) gibt es nur **ohne** Umsatz. Mit Kassenblatt-Zeilen hat der Betrieb
+Umsatz, wird `operativ`, und drei Sichten schließen aus `operativ` + Umsatztag, dass LINAs
+Kasse lief — und erwarten Artikel, Gäste und Betriebsberichte, die es dort nie geben kann. Die
+erste Fassung von `0141` hatte vier solche Sichten gefunden und diese drei übersehen, weil sie
+nur die Sichten durchgesehen hatte, die `umsatzbericht_tag` **direkt** lesen und
+Betriebsberichte meinen. `gaeste_abdeckung` meint Gäste, `datenstand` meint den Status.
+
+**Aufgefallen** erst beim Nachstellen am Klon: Kassenblatt-Zeilen für einen Betrieb einspielen
+und **jede** Sicht mit diesem Betrieb vorher/nachher lesen — nicht nur die, die man geändert
+hat. Ein `grep` nach `umsatzbericht_tag` findet die Sichten, die aus dem **Status** auf die
+Kasse schließen, nicht.
+
+**Was es heute verhindert.** `0141` filtert auch `mart.gaeste_abdeckung` und den Nenner der
+Prüfzeile auf `quelle = 'umsatzbericht'`, und `mart.datenstand` hat den Befund `Kassenblatt`
+samt Spalte `umsatz_quelle`. **Wer eine Sicht baut, die aus `status = 'operativ'` ableitet,
+was ein Betrieb liefern müsste, liest `umsatz_quelle` dazu**; `operativ` heißt seit `0141`
+„macht Umsatz", nicht mehr „kassiert über LINA".

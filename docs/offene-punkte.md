@@ -2399,8 +2399,10 @@ SELECT * FROM mart.kassenblatt_stand WHERE zustand = 'abweichung' AND monat >= '
   die der Fachbereich bestätigt, ist das eine Zeile in `GRUPPE_ZU_SPARTE`
   (`src/ladenakte/laden.ts`).
 - **Aposto Wuppertal** (ikentoo) hat auch im Kassenblatt keinen Umsatz und bleibt `fremdkasse`.
-- `mart.pruefung_uebersicht`, Zeile „Betriebsberichte: Betrieb-Tage mit Umsatz ohne Bericht":
+- ~~`mart.pruefung_uebersicht`, Zeile „Betriebsberichte: Betrieb-Tage mit Umsatz ohne Bericht":
   Die Spalte `geprueft` zählt Kassenblatt-Tage mit, `auffaellig` nicht. Nur der Nenner ist
-  etwas zu groß; die Sicht wurde in `0141` unverändert übernommen.
+  etwas zu groß; die Sicht wurde in `0141` unverändert übernommen.~~ Behoben noch vor dem
+  Deploy (Review 28.10.2026): der Nenner liest `quelle = 'umsatzbericht'`, ebenso
+  `mart.gaeste_abdeckung`; `mart.datenstand` kennt den Befund `Kassenblatt`.
 - **`mcp/test/katalog.json`** ist von Hand ergänzt. Nach dem Deploy gegen die Produktion neu
   ziehen (`cd mcp && bun run katalog:abzug`).

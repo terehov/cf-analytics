@@ -965,7 +965,9 @@ der sechs, nicht Aposto Wuppertal. Weg und Messwerte in `lina-api-inventar-laden
 `quelle = 'kassenblatt'` (sichtbar in `mart.umsatz_tag.quelle`). Nur Nettoumsatz; Brutto,
 Rechnungen, Gäste und Bons sind `NULL`. Speisen/Getränke als Hauptsparte, wo die Umsatzgruppe
 exakt so heißt. Welche Monate geholt sind und welche fehlen: `mart.kassenblatt_stand`. Die
-Betriebe stehen danach in `mart.betrieb_status` als `operativ`, nicht mehr als `fremdkasse`.
+Betriebe stehen danach in `mart.betrieb_status` als `operativ`, nicht mehr als `fremdkasse`;
+`mart.datenstand` führt sie mit Befund `Kassenblatt` und `umsatz_quelle = 'kassenblatt'` — das
+ist die Spalte, mit der man sie aus Bon- und Gästekennzahlen nimmt, denn dort haben sie nichts.
 
 
 ## FoodNotify: Rezepturen (seit `0132`, 15.10.2026)

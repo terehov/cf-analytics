@@ -1608,9 +1608,19 @@ export async function ladenakteNachfuellen(heute: string): Promise<number> {
  *
  *   laufend    Der laufende Monat bis zum Vortag, jede Nacht, fuer jeden
  *              Betrieb, der in den letzten zwei Monaten Kassenblatt-Umsatz
- *              hatte oder dort faellig ist; in den ersten zehn Tagen auch
- *              der Vormonat — das Kassenblatt wird von Hand nachgetragen.
- *              Tagesgeschaeft (Phase A).
+ *              hatte oder dort faellig ist — und fuer jeden, den
+ *              mart.betrieb_status als `fremdkasse` fuehrt. Der dritte Weg
+ *              traegt die erste Nacht: die Monatswerte kommen erst in
+ *              derselben Nacht an, mart.kassenblatt_stand ist beim Einreihen
+ *              noch leer, und ohne ihn haette la:tagesumsatz am ersten Morgen
+ *              als "nie gefragt" in mart.quelle_zulauf gestanden (Regel 10,
+ *              aber falsch herum). Danach ist er die Fuehlung: ein
+ *              Fremdkassen-Betrieb, der anfaengt, sein Kassenblatt zu
+ *              pflegen (Aposto Wuppertal), faellt am naechsten Morgen auf,
+ *              nicht erst mit dem naechsten Monatsabruf. Preis: ein Aufruf je
+ *              Nacht und Betrieb ohne Kassenblatt, am 28.10.2026 einer.
+ *              In den ersten zehn Tagen auch der Vormonat — das Kassenblatt
+ *              wird von Hand nachgetragen. Tagesgeschaeft (Phase A).
  *   Historie   Faellige Monate vor dem laufenden, neueste zuerst, hoechstens
  *              KASSENBLATT_JE_LAUF je Nacht. Nachladen (Phase C).
  *
@@ -1644,6 +1654,10 @@ export async function kassenblattNachfuellen(heute: string): Promise<number> {
            FROM mart.kassenblatt_stand k
           WHERE k.zustand = 'faellig'
             AND k.monat >= (date_trunc('month', $1::date) - interval '2 months')::date
+         UNION
+         SELECT s.betrieb_key
+           FROM mart.betrieb_status s
+          WHERE s.status = 'fremdkasse'
        )
        INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, parameter, nachladen)
        SELECT 'la:tagesumsatz', $2::date, $1::date, $3,

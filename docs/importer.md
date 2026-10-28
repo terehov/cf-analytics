@@ -2190,9 +2190,15 @@ kommt aus dem Baumknoten `report_<id>` über die exakte Beschriftung (`berichtTi
 **`kassenblattNachfuellen()`** (aus `ladenakteNachfuellen()`) reiht `la:tagesumsatz` in zwei
 Teilen ein:
 - **laufend** (Prio 12, Tagesgeschäft): der Monat des Vortags für jeden Betrieb mit
-  Kassenblatt-Umsatz in den letzten 62 Tagen oder einem fälligen Monat in den letzten zwei
-  Monaten. In den ersten zehn Tagen eines Monats zusätzlich der Vormonat, weil das Kassenblatt
-  von Hand nachgetragen wird. Einmal je Nacht (`zeitraum_bis = heute`).
+  Kassenblatt-Umsatz in den letzten 62 Tagen, einem fälligen Monat in den letzten zwei
+  Monaten **oder `mart.betrieb_status.status = 'fremdkasse'`**. Der dritte Weg trägt die erste
+  Nacht: die Monatswerte kommen erst in derselben Nacht, `mart.kassenblatt_stand` ist beim
+  Einreihen noch leer, und `la:tagesumsatz` hätte am ersten Morgen als „nie gefragt" in
+  `mart.quelle_zulauf` gestanden. Danach ist er die Fühlung: ein Betrieb, der anfängt, sein
+  Kassenblatt zu pflegen, fällt am nächsten Morgen auf, nicht erst mit dem Monatsabruf. Preis:
+  ein Aufruf je Nacht und Betrieb ohne Kassenblatt (Aposto Wuppertal). In den ersten zehn
+  Tagen eines Monats zusätzlich der Vormonat, weil das Kassenblatt von Hand nachgetragen wird.
+  Einmal je Nacht (`zeitraum_bis = heute`).
 - **Historie** (Prio 91, `nachladen = true`, Phase C): `mart.kassenblatt_stand.zustand =
   'faellig'` vor dem laufenden Monat, neueste zuerst, höchstens `KASSENBLATT_JE_LAUF` (400) je
   Nacht. Nach einem Versuch ist der Monat sieben Tage gesperrt, damit ein Monat, der fällig

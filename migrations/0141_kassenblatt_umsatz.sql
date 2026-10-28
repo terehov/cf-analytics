@@ -31,10 +31,12 @@
 --   2. core.kassenblatt_monat — Monatswerte aus "Die letzten Jahre", die
 --      Messung, an der der Importer entscheidet, was er tageweise holt
 --   3. mart.umsatz_tag / mart.umsatz_tag_sparte fuehren `quelle`
---   4. vier Pruefsichten, die LINAs KASSE meinen, lesen nur noch
+--   4. sechs Pruefsichten, die LINAs KASSE meinen, lesen nur noch
 --      quelle = 'umsatzbericht'
 --   5. mart.kassenblatt_stand — Betrieb × Monat, was fehlt (Regel 10)
---   6. MCP: Koernung, ein Fallstrick, Rechte, Leseprobe
+--   5a. mart.datenstand kennt den Befund 'Kassenblatt' und sagt, woher der
+--       letzte Umsatz kommt (umsatz_quelle)
+--   6. MCP: Koernung, zwei Fallstricke, Rechte, Leseprobe
 -- =====================================================================
 
 
@@ -142,11 +144,19 @@ COMMENT ON COLUMN mart.umsatz_tag.quelle IS
 -- ---------------------------------------------------------------------
 -- 4. Pruefsichten, die LINAs KASSE meinen
 --
--- Vier Sichten schliessen aus "der Betrieb hat an diesem Tag Umsatz", dass
--- LINAs Kasse lief — und erwarten deshalb Betriebsberichte, Verkaufsstellen
--- oder einen vollen Konzernbericht. Fuer einen Kassenblatt-Tag ist das
--- falsch: sie meldeten jeden solchen Tag als Luecke, die kein Abruf je
--- schliessen kann.
+-- Sechs Sichten schliessen aus "der Betrieb hat an diesem Tag Umsatz", dass
+-- LINAs Kasse lief — und erwarten deshalb Betriebsberichte, Verkaufsstellen,
+-- Gaestezahlen oder einen vollen Konzernbericht. Fuer einen Kassenblatt-Tag
+-- ist das falsch: sie meldeten jeden solchen Tag als Luecke, die kein Abruf
+-- je schliessen kann. Am Klon mit simulierten Bremen-Tagen nachgemessen
+-- (28.10.2026): mart.gaeste_abdeckung fuehrte Bremen mit 70 Umsatztagen und
+-- 0,0 % Gaesten, und die Pruefzeile "Betrieb-Tage mit Umsatz ohne Bericht"
+-- zaehlte 60 geprueft bei 0 auffaellig — der Nenner waren Kassenblatt-Tage,
+-- fuer die es keinen Bericht geben kann.
+--
+-- mart.pruefung_uebersicht steht hier im ersten Durchgang, obwohl sie unten
+-- mit der materialisierten Sicht faellt und wieder aufersteht: die Aufnahme
+-- in _kb_abh liest die Definition NACH diesem Durchgang, also mit Filter.
 --
 -- Die Definitionen kommen AUS DER ZIELDATENBANK, nicht aus einer Abschrift
 -- (dasselbe Vorgehen wie 0129, Abschnitt 9): die Migrationsdateien geben den
@@ -178,7 +188,12 @@ BEGIN
     FOR rec IN SELECT * FROM (VALUES
         ('mart.umsatz_lochtag',           'umsatzbericht_tag', 1),
         ('mart.verkaufsstelle_abdeckung', 'u',                 1),
-        ('mart.betriebsbericht_luecke',   'u',                 1)
+        ('mart.betriebsbericht_luecke',   'u',                 1),
+        -- Gaeste zaehlt nur LINAs Kasse; das Kassenblatt kennt keine.
+        ('mart.gaeste_abdeckung',         'u',                 1),
+        -- Nur die Zeile "Betriebsberichte: Betrieb-Tage mit Umsatz ohne
+        -- Bericht" liest die Tabelle direkt; die uebrigen gehen ueber Sichten.
+        ('mart.pruefung_uebersicht',      'umsatzbericht_tag', 1)
     ) AS v(sicht, alias, anzahl)
     LOOP
         EXECUTE format('CREATE OR REPLACE VIEW %s AS %s', rec.sicht,
@@ -438,6 +453,74 @@ CREATE INDEX ON core.umsatzbericht_tag (betrieb_key, geschaeftstag) WHERE quelle
 
 
 -- ---------------------------------------------------------------------
+-- 5a. mart.datenstand: der Befund 'Kassenblatt' und die Umsatzquelle
+--
+-- Mit Kassenblatt-Tagen hat ein Fremdkassen-Betrieb Umsatz, also einen
+-- letzten Umsatztag, also den Status 'operativ' — und fiel damit aus dem
+-- Zweig 'fremde Kasse' (0125) in 'keine Artikeldaten', das dringendste
+-- Problem eines Betriebs, bei dem es nie Artikeldaten geben kann. Am Klon
+-- nachgemessen (28.10.2026, Bremen mit 70 simulierten Tagen).
+--
+-- Die Reihenfolge bleibt: 'Umsatz veraltet' kommt VOR 'Kassenblatt', denn
+-- ein Kassenblatt, das acht Tage nicht gepflegt wurde, ist genau die
+-- Meldung, die jemand lesen soll. Dazu die Spalte umsatz_quelle (angehaengt:
+-- CREATE OR REPLACE VIEW kann nur anhaengen), damit eine Auswertung die
+-- Betriebe ohne Bons und Gaeste ausnehmen kann, auch wo keine quelle-Spalte
+-- mitlaeuft (mart.umsatz_ytd). Definition aus der Zieldatenbank, drei
+-- Textstellen mit fester Anzahl — wie in Abschnitt 4.
+-- ---------------------------------------------------------------------
+
+CREATE FUNCTION pg_temp.einsetzen(p_def text, p_alt text, p_neu text, p_name text)
+RETURNS text LANGUAGE plpgsql AS $$
+DECLARE
+    v_anz integer := (length(p_def) - length(replace(p_def, p_alt, ''))) / length(p_alt);
+BEGIN
+    IF v_anz <> 1 THEN
+        RAISE EXCEPTION '0141: in % steht "%" %-mal, erwartet einmal — Definition hat sich geaendert, '
+                        'bitte von Hand pruefen', p_name, p_alt, v_anz;
+    END IF;
+    RETURN replace(p_def, p_alt, p_neu);
+END $$;
+
+DO $$
+DECLARE
+    v_def text := pg_get_viewdef('mart.datenstand'::regclass);
+BEGIN
+    v_def := pg_temp.einsetzen(v_def,
+        'LIMIT 1) AS letzter_geladener_tag) u',
+        'LIMIT 1) AS letzter_geladener_tag, '
+        || '(SELECT t.quelle FROM core.umsatzbericht_tag t '
+        || ' WHERE t.betrieb_key = b.betrieb_key AND t.hauptsparte_key IS NULL '
+        || '   AND t.verkaufsstelle_key IS NULL AND t.umsatz_netto > 0::numeric '
+        || ' ORDER BY t.geschaeftstag DESC LIMIT 1) AS letzte_quelle) u',
+        'mart.datenstand');
+    v_def := pg_temp.einsetzen(v_def,
+        'WHEN (COALESCE(a.artikeltage, 0) = 0) THEN ''keine Artikeldaten''::text',
+        'WHEN (u.letzte_quelle = ''kassenblatt''::text) THEN ''Kassenblatt''::text '
+        || 'WHEN (COALESCE(a.artikeltage, 0) = 0) THEN ''keine Artikeldaten''::text',
+        'mart.datenstand');
+    v_def := pg_temp.einsetzen(v_def,
+        'AS rezepte_zutaten_seit',
+        'AS rezepte_zutaten_seit, u.letzte_quelle AS umsatz_quelle',
+        'mart.datenstand');
+    EXECUTE 'CREATE OR REPLACE VIEW mart.datenstand AS ' || rtrim(rtrim(v_def), ';');
+
+    EXECUTE format('COMMENT ON VIEW mart.datenstand IS %L',
+        pg_temp.einsetzen(obj_description('mart.datenstand'::regclass, 'pg_class'),
+            'keine BWA gebucht > keine Artikeldaten > vollstaendig.',
+            'keine BWA gebucht > Kassenblatt (Umsatz von Hand aus LINAs Kassenblatt, fremde '
+            || 'Kasse: Artikel, Bons und Gaeste kann es nicht geben, 0141) > keine Artikeldaten '
+            || '> vollstaendig.',
+            'Kommentar mart.datenstand'));
+END $$;
+
+COMMENT ON COLUMN mart.datenstand.umsatz_quelle IS
+'Quelle des letzten Umsatztags: umsatzbericht = LINAs Kasse, kassenblatt = von Hand eingetragen '
+'(fremde Kasse, 0141). Bei kassenblatt gibt es fuer den Betrieb keine Rechnungen, Gaeste, Bons und '
+'Artikel — bei Gruppenwerten solcher Kennzahlen diese Betriebe ausnehmen. NULL = kein Umsatz geladen.';
+
+
+-- ---------------------------------------------------------------------
 -- 6. MCP-Katalog
 -- ---------------------------------------------------------------------
 
@@ -461,6 +544,17 @@ INSERT INTO mcp.fallstrick (schluessel, art, schwere, sicht, parameter, hinweis,
    'Gaestezahl "der Gruppe" enthaelt diese Betriebe nicht, ihr Umsatz aber schon.',
    'Fuer Bon- und Gaestekennzahlen auf quelle = ''umsatzbericht'' einschraenken, damit Zaehler '
    'und Nenner dieselben Betriebe meinen.',
+   '0141'),
+  -- Dieselbe Falle eine Stufe hoeher: mart.umsatz_ytd summiert je Monat und
+  -- fuehrt keine quelle-Spalte. Dort zeigt ein Kassenblatt-Betrieb 0 Gaeste
+  -- bei vollem Umsatz (am Klon: Bremen, gaeste_abdeckung_pct 0,0).
+  ('kassenblatt_ohne_bons_ytd', 'spalte_verwendet', 'warnung', 'mart.umsatz_ytd',
+   '{"spalten":["rechnungen","gaeste","bon_schnitt","umsatz_pro_gast","tage_mit_gaesten","gaeste_abdeckung_pct"]}',
+   'Betriebe mit fremder Kasse melden nur den Nettoumsatz (Kassenblatt, 0141). Rechnungen und '
+   'Gaeste fehlen dort, bon_schnitt und umsatz_pro_gast sind NULL, gaeste_abdeckung_pct ist 0 — '
+   'nicht, weil niemand gezaehlt hat, sondern weil es dort keine Kasse an LINA gibt.',
+   'Diese Betriebe bei Bon- und Gaestekennzahlen ausnehmen: mart.datenstand.umsatz_quelle = '
+   '''kassenblatt'' nennt sie. Der Umsatz selbst ist vollwertig.',
    '0141')
 ON CONFLICT (schluessel) DO UPDATE
    SET art = excluded.art, schwere = excluded.schwere, sicht = excluded.sicht,
@@ -491,6 +585,8 @@ BEGIN
     SET LOCAL ROLE mcp_leser;
     FOREACH v_sicht IN ARRAY ARRAY[
         'SELECT * FROM mart.kassenblatt_stand LIMIT 1',
+        'SELECT befund, umsatz_quelle FROM mart.datenstand LIMIT 1',
+        'SELECT * FROM mart.gaeste_abdeckung LIMIT 1',
         'SELECT quelle FROM mart.umsatz_tag WHERE geschaeftstag >= current_date - 1 LIMIT 1',
         'SELECT quelle FROM mart.umsatz_tag_sparte WHERE geschaeftstag >= current_date - 1 LIMIT 1',
         'SELECT * FROM mart.betriebsbericht_ladestand LIMIT 1',

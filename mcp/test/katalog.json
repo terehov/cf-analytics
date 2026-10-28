@@ -2397,7 +2397,7 @@
    "koernung": "Betrieb: bis wann Umsatz, bis wann BWA. Vor jeder Auswertung lesen",
    "thema": "betrieb",
    "summen_erlaubt": false,
-   "kommentar": "Wie alt die Daten jedes Betriebs je Quelle sind. befund nennt das dringendste\nProblem: kein Umsatz geladen > Umsatz veraltet (aelter als ACHT Tage — LINA\nliefert 5-6 Tage grundsaetzlich nach, erst darueber fehlt wirklich etwas) >\nkeine BWA gebucht > keine Artikeldaten > vollstaendig.\n\nKoernung: Betrieb: bis wann Umsatz, bis wann BWA. Vor jeder Auswertung lesen",
+   "kommentar": "Wie alt die Daten jedes Betriebs je Quelle sind. befund nennt das dringendste\nProblem: kein Umsatz geladen > Umsatz veraltet (aelter als ACHT Tage — LINA\nliefert 5-6 Tage grundsaetzlich nach, erst darueber fehlt wirklich etwas) >\nkeine BWA gebucht > Kassenblatt (Umsatz von Hand aus LINAs Kassenblatt, fremde Kasse: Artikel, Bons und Gaeste kann es nicht geben, 0141) > keine Artikeldaten > vollstaendig.\n\nKoernung: Betrieb: bis wann Umsatz, bis wann BWA. Vor jeder Auswertung lesen",
    "spalten": [
     "betrieb",
     "stadt",
@@ -2419,7 +2419,8 @@
     "letzter_geladener_tag",
     "status",
     "rezepte_marke",
-    "rezepte_zutaten_seit"
+    "rezepte_zutaten_seit",
+    "umsatz_quelle"
    ],
    "achsen": [
     "betrieb_key",
@@ -7702,6 +7703,25 @@
    },
    "hinweis": "Betriebe mit fremder Kasse (quelle = 'kassenblatt') melden nur den Nettoumsatz je Tag. Brutto, Rechnungen, Gaeste und Bons sind dort NULL — ein Durchschnittsbon oder eine Gaestezahl \"der Gruppe\" enthaelt diese Betriebe nicht, ihr Umsatz aber schon.",
    "berichtigung": "Fuer Bon- und Gaestekennzahlen auf quelle = 'umsatzbericht' einschraenken, damit Zaehler und Nenner dieselben Betriebe meinen.",
+   "quelle": "0141"
+  },
+  {
+   "schluessel": "kassenblatt_ohne_bons_ytd",
+   "art": "spalte_verwendet",
+   "schwere": "warnung",
+   "sicht": "mart.umsatz_ytd",
+   "parameter": {
+    "spalten": [
+     "rechnungen",
+     "gaeste",
+     "bon_schnitt",
+     "umsatz_pro_gast",
+     "tage_mit_gaesten",
+     "gaeste_abdeckung_pct"
+    ]
+   },
+   "hinweis": "Betriebe mit fremder Kasse melden nur den Nettoumsatz (Kassenblatt, 0141). Rechnungen und Gaeste fehlen dort, bon_schnitt und umsatz_pro_gast sind NULL, gaeste_abdeckung_pct ist 0 — nicht, weil niemand gezaehlt hat, sondern weil es dort keine Kasse an LINA gibt.",
+   "berichtigung": "Diese Betriebe bei Bon- und Gaestekennzahlen ausnehmen: mart.datenstand.umsatz_quelle = 'kassenblatt' nennt sie. Der Umsatz selbst ist vollwertig.",
    "quelle": "0141"
   },
   {

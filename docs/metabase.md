@@ -1939,12 +1939,28 @@ Datenbank).
   Einreihbedingung des Importers. Erwartung: kein `faellig`, das älter als zwei Nächte ist.
 - Gefiltert auf `quelle = 'umsatzbericht'` (aus der Zieldatenbank neu gelesen, nur der Filter
   eingesetzt): `mart.umsatz_lochtag`, `mart.verkaufsstelle_abdeckung`,
-  `mart.betriebsbericht_luecke`, `mart.betriebsbericht_ladestand_basis`. Zusammen mit der
-  materialisierten Sicht neu angelegt: `betriebsbericht_ladestand`, `…_monat`, `luecke_monat`,
-  `pruefung_uebersicht`, mit Rechten, Kommentaren und Eigentümern.
-- **Nicht gefiltert, mit Absicht:** Datenstand, Round Table, Betriebsstatus, Lückenmonitor,
-  Bewertungs- und Bounti-Abgleiche. Dort soll der Kassenblatt-Umsatz zählen. Die vier Betriebe
-  wechseln damit von `fremdkasse` auf `operativ`.
+  `mart.betriebsbericht_luecke`, `mart.betriebsbericht_ladestand_basis`,
+  `mart.gaeste_abdeckung` (Gäste zählt nur LINAs Kasse; am Klon stand Bremen sonst mit 70
+  Umsatztagen und 0,0 %) und in `mart.pruefung_uebersicht` der Nenner der Zeile
+  „Betriebsberichte: Betrieb-Tage mit Umsatz ohne Bericht" (60 geprüft bei 0 auffällig, alles
+  Kassenblatt-Tage). Zusammen mit der materialisierten Sicht neu angelegt:
+  `betriebsbericht_ladestand`, `…_monat`, `luecke_monat`, `pruefung_uebersicht`, mit Rechten,
+  Kommentaren und Eigentümern.
+- **`mart.datenstand`**: Befund `Kassenblatt` zwischen „keine BWA gebucht" und „keine
+  Artikeldaten", dazu die angehängte Spalte `umsatz_quelle` (`umsatzbericht` / `kassenblatt` /
+  NULL). Ohne den Zweig meldete die Sicht Bremen als „keine Artikeldaten" (am Klon
+  nachgemessen): mit Umsatz wird der Betrieb `operativ`, und der Zweig „fremde Kasse" aus
+  `0125` greift nur ohne Umsatz. „Umsatz veraltet" bleibt davor — ein acht Tage nicht
+  gepflegtes Kassenblatt ist genau die Meldung, die jemand lesen soll. `umsatz_quelle` ist
+  der Weg, Kassenblatt-Betriebe aus Bon- und Gästekennzahlen zu nehmen, wo keine
+  `quelle`-Spalte mitläuft: `mart.umsatz_ytd` (Fallstrick `kassenblatt_ohne_bons_ytd`:
+  `gaeste_abdeckung_pct` steht dort auf 0, `bon_schnitt` auf NULL).
+- **Nicht gefiltert, mit Absicht:** Round Table, Betriebsstatus, Lückenmonitor, Bewertungs-
+  und Bounti-Abgleiche, Umsatzvergleiche. Dort soll der Kassenblatt-Umsatz zählen. Die vier
+  Betriebe wechseln damit von `fremdkasse` auf `operativ` — und tauchen in „Round Table:
+  operativer Betrieb ohne vollständige Signale" und „Yext: operativer Betrieb mit Umsatz, aber
+  ohne Zuordnung" auf, wo sie hingehören. Aposto Wuppertal (ohne Kassenblatt) bleibt
+  `fremdkasse`.
 - **Katalogabzug:** `mcp/test/katalog.json` ist von Hand um die 0141-Einträge ergänzt, nicht neu
   gezogen. Ein Abzug aus dem lokalen Klon hätte fremde Abweichungen der lokalen Daten
   mitgebracht. Nach dem Deploy gegen die Produktion neu ziehen.
