@@ -162,10 +162,20 @@ Personalampeln je Bereich, und ihre Texte nennen das neue Regelwerk.
 
 #### Wer nur diese Seite sieht (seit 20.10.2026)
 
-Acht Konten aus Franchisezentralen und Concept Family sollen in Metabase **nur** das
-Management-Dashboard sehen. Grund ist die Übersicht, nicht der Datenschutz (Eugene,
+**Revidiert am 22.10.2026:** Die acht Konten sehen alle Dashboards, aber nur lesend (Eugene:
+„brauchen doch Zugang zu allen Metabase Boards, aber nur lesend“). Ohne eigene Abfragen und
+ohne Download, wie bisher. Der Rest dieses Abschnitts beschreibt den Stand vom 20.10. und
+bleibt als Herleitung stehen. Die Sammlungsregel für `mg_` und der leere All-Users-Stand gelten
+weiter.
+
+~~Acht Konten aus Franchisezentralen und Concept Family sollen in Metabase **nur** das
+Management-Dashboard sehen.~~ Grund ist die Übersicht, nicht der Datenschutz (Eugene,
 20.10.2026: „Wir wollen sie nur nicht verwirren“). Über den MCP-Zugang lesen dieselben Konten
-mit Stufe `lesen` alle Berichte aller Marken, und das ist so gewollt. Die Metabase-Sperre ist
+alle Berichte aller Marken, und das ist so gewollt. ~~Stufe `lesen`~~. Seit 21.10.2026 haben sie
+die Stufe `fragen` mit freiem SQL, wie Daniel und Eugene (Eugene: „alles in MCP ausführen,
+solange es nur lesend ist“). Nur lesend ist es auf drei Ebenen: Die Rolle `mcp_leser` steht auf
+`default_transaction_read_only`, jede Abfrage läuft in `BEGIN READ ONLY`, und geschrieben werden
+darf nur `mcp.zugriff`. Die Metabase-Sperre ist
 deshalb kein Sicherheitsmerkmal und muss nicht gegen den MCP-Zugang verteidigt werden.
 
 Metabase vergibt Rechte **je Sammlung**, nicht je Dashboard. Eine Kachel aus einer Sammlung,
@@ -179,7 +189,7 @@ So sind die Gruppen geschnitten:
 | Gruppe | Sammlungen | Daten |
 |---|---|---|
 | All Users | keine | ansehen, keine eigenen Abfragen, kein Download |
-| Management | „Management“ lesen | ebenso |
+| Management | ~~„Management“ lesen~~ seit 22.10.2026 alle Sammlungen lesen | ebenso |
 | Analyse | alle schreiben | SQL und Abfrage-Editor, Download (die Rechte, die All Users bis dahin hatte) |
 | Administrators | alles | alles |
 
