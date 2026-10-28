@@ -1,0 +1,610 @@
+<!-- Aus LINA geholt am 28.10.2026, nur GET; gekuerzt auf Filterformular und Datentabelle, Skripte entfernt. -->
+<form action="/cockpit/stat/jahresuebersicht" method="POST" name="showform">
+<div class="row">
+<div class="col-md-4">
+<div class="input-group">
+<div class="input-group-addon" id="jahresuebersicht-table-umsatzgruppe">
+Umsatzgruppe:
+</div>
+<div class="form-group m-n p-n">
+<select name="show" id="show" onchange="load_data()"
+class="form-control m-n p-n">
+<option value="0" selected="selected" >
+Gesamtumsatz
+</option>
+<option value="1">Getränke</option><option value="2">Speisen</option><option value="5">Divers</option><option value="6">Gutschein</option><option value="100006">Miete&Organisation</option><option value="7">Happy Hour 1</option><option value="8">Happy Hour 2</option><option value="9">Tagumsatz</option><option value="10">Barumsatz</option><option value="11">Cocktailcasino </option> </select>
+</div>
+</div>
+</div>
+<div class="col-md-4">
+<div class="input-group">
+<div class="input-group-addon" id="jahresuebersicht-table-umsatzart">
+Umsatzart:
+</div>
+<div class="form-group m-n p-n">
+<select name="show_ges" id="show_ges" onchange="load_data()"
+class="form-control m-n p-n">
+<option value="0" selected="selected" >
+Gesamtumsatz
+</option>
+<option value="1" >
+Tagesschnitt
+</option>
+</select>
+</div>
+</div>
+</div>
+<div class="col-md-4">
+<div class="input-group">
+<div class="input-group-addon">
+Details für:
+</div>
+<div class="form-group m-n p-n">
+<select name="show_mon" id="show_mon" onchange="load_data()"
+class="form-control m-n p-n">
+<option value="0" selected="selected" >
+Keine
+</option>
+<option value="1" >Januar</option><option value="2" >Februar</option><option value="3" >März</option><option value="4" >April</option><option value="5" >Mai</option><option value="6" >Juni</option><option value="7" >Juli</option><option value="8" >August</option><option value="9" >September</option><option value="10" >Oktober</option><option value="11" >November</option><option value="12" >Dezember</option> </select>
+</div>
+</div>
+</div>
+</div>
+</form>
+</div>
+</div>
+</div>
+<div id="mas" class="col-md-12 p-n">
+<div class="card">
+<div class="card-header">Umsatzdaten</div>
+<div class="card-body p-sm" style="overflow:auto">
+<table class="table a360-table-striped table-hover m-n">
+<tr class="text-center">
+<th>&nbsp;</th>
+<th>2010</th><th>2011</th><th>2012</th><th>2013</th><th>2014</th><th>2015</th><th>2016</th><th>2017</th><th>2018</th><th>2019</th><th>2020</th><th>2021</th><th>2022</th><th>2023</th><th>2024</th><th>2025</th><th>2026</th> </tr>
+<tr>
+<td style="font-weight: bold;" align="right">
+Januar:
+</td>
+<td align="right">
+&nbsp;</td>
+<td align="right">
+55.722,02 (+100,00%)</td>
+<td align="right">
+60.323,87 (+8,26%)</td>
+<td align="right">
+62.066,22 (+2,89%)</td>
+<td align="right">
+67.584,72 (+8,89%)</td>
+<td align="right">
+64.972,60 (-3,86%)</td>
+<td class="success" align="right">
+85.161,30 (+31,07%)</td>
+<td align="right">
+60.561,93 (-28,89%)</td>
+<td align="right">
+31.564,87 (-47,88%)</td>
+<td align="right">
+62.483,78 (+97,95%)</td>
+<td align="right">
+77.277,22 (+23,68%)</td>
+<td align="right">
+&nbsp;</td>
+<td class="danger" align="right">
+16.856,52 (+100,00%)</td>
+<td align="right">
+53.120,50 (+215,13%)</td>
+<td align="right">
+50.374,63 (-5,17%)</td>
+<td align="right">
+46.870,74 (-6,96%)</td>
+<td align="right">
+73.660,37 (+57,16%)</td>
+</tr>
+<tr>
+<td style="font-weight: bold;" align="right">
+Februar:
+</td>
+<td align="right">
+&nbsp;</td>
+<td align="right">
+56.579,58 (+100,00%)</td>
+<td align="right">
+53.572,61 (-5,31%)</td>
+<td align="right">
+67.461,11 (+25,92%)</td>
+<td class="success" align="right">
+75.858,82 (+12,45%)</td>
+<td align="right">
+67.575,38 (-10,92%)</td>
+<td align="right">
+70.420,04 (+4,21%)</td>
+<td align="right">
+67.685,46 (-3,88%)</td>
+<td align="right">
+62.565,97 (-7,56%)</td>
+<td align="right">
+72.248,49 (+15,48%)</td>
+<td align="right">
+75.002,76 (+3,81%)</td>
+<td class="danger" align="right">
+1.000,00 (-98,67%)</td>
+<td align="right">
+29.739,93 (+2873,99%)</td>
+<td align="right">
+51.528,74 (+73,26%)</td>
+<td align="right">
+71.903,08 (+39,54%)</td>
+<td align="right">
+61.955,72 (-13,83%)</td>
+<td align="right">
+58.966,89 (-4,82%)</td>
+</tr>
+<tr>
+<td style="font-weight: bold;" align="right">
+März:
+</td>
+<td align="right">
+&nbsp;</td>
+<td align="right">
+53.876,72 (+100,00%)</td>
+<td align="right">
+76.978,74 (+42,88%)</td>
+<td align="right">
+78.409,20 (+1,86%)</td>
+<td align="right">
+97.770,84 (+24,69%)</td>
+<td align="right">
+93.642,61 (-4,22%)</td>
+<td align="right">
+100.331,13 (+7,14%)</td>
+<td align="right">
+86.396,72 (-13,89%)</td>
+<td align="right">
+98.603,45 (+14,13%)</td>
+<td class="success" align="right">
+108.020,08 (+9,55%)</td>
+<td align="right">
+27.901,73 (-74,17%)</td>
+<td class="danger" align="right">
+1.000,00 (-96,42%)</td>
+<td align="right">
+34.875,89 (+3387,59%)</td>
+<td align="right">
+79.624,64 (+128,31%)</td>
+<td align="right">
+58.700,47 (-26,28%)</td>
+<td align="right">
+65.056,41 (+10,83%)</td>
+<td align="right">
+67.250,53 (+3,37%)</td>
+</tr>
+<tr>
+<td style="font-weight: bold;" align="right">
+April:
+</td>
+<td align="right">
+&nbsp;</td>
+<td align="right">
+66.451,26 (+100,00%)</td>
+<td align="right">
+79.614,03 (+19,81%)</td>
+<td align="right">
+90.688,28 (+13,91%)</td>
+<td align="right">
+86.441,55 (-4,68%)</td>
+<td class="success" align="right">
+103.494,12 (+19,73%)</td>
+<td align="right">
+96.108,15 (-7,14%)</td>
+<td align="right">
+80.254,79 (-16,50%)</td>
+<td align="right">
+95.283,71 (+18,73%)</td>
+<td align="right">
+75.564,03 (-20,70%)</td>
+<td align="right">
+&nbsp;</td>
+<td align="right">
+&nbsp;</td>
+<td class="danger" align="right">
+46.979,92 (+100,00%)</td>
+<td align="right">
+62.788,77 (+33,65%)</td>
+<td align="right">
+74.646,96 (+18,89%)</td>
+<td align="right">
+60.451,60 (-19,02%)</td>
+<td align="right">
+76.412,87 (+26,40%)</td>
+</tr>
+<tr>
+<td style="font-weight: bold;" align="right">
+Mai:
+</td>
+<td align="right">
+&nbsp;</td>
+<td align="right">
+72.053,78 (+100,00%)</td>
+<td align="right">
+102.440,16 (+42,17%)</td>
+<td align="right">
+116.767,52 (+13,99%)</td>
+<td class="success" align="right">
+139.175,55 (+19,19%)</td>
+<td align="right">
+104.713,87 (-24,76%)</td>
+<td align="right">
+112.324,16 (+7,27%)</td>
+<td align="right">
+113.951,51 (+1,45%)</td>
+<td align="right">
+106.406,60 (-6,62%)</td>
+<td align="right">
+88.915,92 (-16,44%)</td>
+<td align="right">
+11.228,74 (-87,37%)</td>
+<td class="danger" align="right">
+1.100,00 (-90,20%)</td>
+<td align="right">
+90.536,10 (+8130,55%)</td>
+<td align="right">
+67.507,75 (-25,44%)</td>
+<td align="right">
+68.182,62 (+1,00%)</td>
+<td align="right">
+112.271,96 (+64,66%)</td>
+<td align="right">
+94.529,60 (-15,80%)</td>
+</tr>
+<tr>
+<td style="font-weight: bold;" align="right">
+Juni:
+</td>
+<td class="danger" align="right">
+24.805,46 (+100,00%)</td>
+<td align="right">
+67.031,34 (+170,23%)</td>
+<td align="right">
+136.291,01 (+103,32%)</td>
+<td align="right">
+118.077,23 (-13,36%)</td>
+<td align="right">
+159.728,74 (+35,27%)</td>
+<td align="right">
+153.476,15 (-3,91%)</td>
+<td align="right">
+159.820,76 (+4,13%)</td>
+<td align="right">
+138.247,48 (-13,50%)</td>
+<td class="success" align="right">
+164.868,74 (+19,26%)</td>
+<td align="right">
+113.466,87 (-31,18%)</td>
+<td align="right">
+36.025,83 (-68,25%)</td>
+<td align="right">
+55.125,73 (+53,02%)</td>
+<td align="right">
+89.535,81 (+62,42%)</td>
+<td align="right">
+144.218,79 (+61,07%)</td>
+<td align="right">
+112.419,33 (-22,05%)</td>
+<td align="right">
+99.651,22 (-11,36%)</td>
+<td align="right">
+94.847,06 (-4,82%)</td>
+</tr>
+<tr>
+<td style="font-weight: bold;" align="right">
+Juli:
+</td>
+<td class="danger" align="right">
+22.948,49 (+100,00%)</td>
+<td align="right">
+86.240,97 (+275,80%)</td>
+<td align="right">
+104.834,12 (+21,56%)</td>
+<td align="right">
+120.630,81 (+15,07%)</td>
+<td align="right">
+148.119,92 (+22,79%)</td>
+<td align="right">
+165.971,23 (+12,05%)</td>
+<td class="success" align="right">
+167.248,24 (+0,77%)</td>
+<td align="right">
+137.483,78 (-17,80%)</td>
+<td align="right">
+151.343,70 (+10,08%)</td>
+<td align="right">
+106.757,03 (-29,46%)</td>
+<td align="right">
+108.285,10 (+1,43%)</td>
+<td align="right">
+96.087,03 (-11,26%)</td>
+<td align="right">
+109.193,34 (+13,64%)</td>
+<td align="right">
+112.518,51 (+3,05%)</td>
+<td align="right">
+135.612,12 (+20,52%)</td>
+<td align="right">
+125.737,43 (-7,28%)</td>
+<td align="right">
+139.226,00 (+10,73%)</td>
+</tr>
+<tr>
+<td style="font-weight: bold;" align="right">
+August:
+</td>
+<td align="right">
+&nbsp;</td>
+<td align="right">
+82.490,55 (+100,00%)</td>
+<td align="right">
+89.003,28 (+7,90%)</td>
+<td align="right">
+122.327,82 (+37,44%)</td>
+<td align="right">
+108.054,12 (-11,67%)</td>
+<td class="success" align="right">
+151.789,41 (+40,48%)</td>
+<td align="right">
+114.495,00 (-24,57%)</td>
+<td align="right">
+112.412,92 (-1,82%)</td>
+<td align="right">
+117.677,71 (+4,68%)</td>
+<td align="right">
+95.593,68 (-18,77%)</td>
+<td align="right">
+92.526,51 (-3,21%)</td>
+<td class="danger" align="right">
+59.357,36 (-35,85%)</td>
+<td align="right">
+83.815,24 (+41,20%)</td>
+<td align="right">
+65.117,87 (-22,31%)</td>
+<td align="right">
+103.746,42 (+59,32%)</td>
+<td align="right">
+85.201,26 (-17,88%)</td>
+<td align="right">
+80.494,54 (-5,52%)</td>
+</tr>
+<tr>
+<td style="font-weight: bold;" align="right">
+September:
+</td>
+<td class="danger" align="right">
+16.098,57 (+100,00%)</td>
+<td align="right">
+79.700,42 (+395,08%)</td>
+<td align="right">
+98.432,10 (+23,50%)</td>
+<td align="right">
+91.589,24 (-6,95%)</td>
+<td align="right">
+106.880,02 (+16,69%)</td>
+<td align="right">
+104.027,39 (-2,67%)</td>
+<td align="right">
+109.303,07 (+5,07%)</td>
+<td align="right">
+95.244,62 (-12,86%)</td>
+<td class="success" align="right">
+116.347,63 (+22,16%)</td>
+<td align="right">
+94.866,45 (-18,46%)</td>
+<td align="right">
+73.461,64 (-22,56%)</td>
+<td align="right">
+84.552,90 (+15,10%)</td>
+<td align="right">
+52.097,01 (-38,39%)</td>
+<td align="right">
+87.420,51 (+67,80%)</td>
+<td align="right">
+71.034,98 (-18,74%)</td>
+<td align="right">
+70.906,59 (-0,18%)</td>
+<td align="right">
+95.791,39 (+35,10%)</td>
+</tr>
+<tr>
+<td style="font-weight: bold;" align="right">
+Oktober:
+</td>
+<td align="right">
+52.395,50 (+100,00%)</td>
+<td align="right">
+84.938,82 (+62,11%)</td>
+<td align="right">
+73.602,37 (-13,35%)</td>
+<td align="right">
+100.272,10 (+36,23%)</td>
+<td align="right">
+118.725,89 (+18,40%)</td>
+<td align="right">
+120.688,66 (+1,65%)</td>
+<td align="right">
+116.323,11 (-3,62%)</td>
+<td align="right">
+97.986,89 (-15,76%)</td>
+<td align="right">
+97.263,55 (-0,74%)</td>
+<td align="right">
+78.349,11 (-19,45%)</td>
+<td align="right">
+51.618,91 (-34,12%)</td>
+<td class="danger" align="right">
+39.306,50 (-23,85%)</td>
+<td align="right">
+39.980,08 (+1,71%)</td>
+<td align="right">
+59.883,42 (+49,78%)</td>
+<td align="right">
+78.794,63 (+31,58%)</td>
+<td class="success" align="right">
+120.941,94 (+53,49%)</td>
+<td align="right">
+85.580,42 (-29,24%)</td>
+</tr>
+<tr>
+<td style="font-weight: bold;" align="right">
+November:
+</td>
+<td align="right">
+61.222,44 (+100,00%)</td>
+<td align="right">
+70.880,34 (+15,78%)</td>
+<td align="right">
+89.115,88 (+25,73%)</td>
+<td align="right">
+106.149,77 (+19,11%)</td>
+<td align="right">
+107.105,71 (+0,90%)</td>
+<td align="right">
+118.621,93 (+10,75%)</td>
+<td align="right">
+107.774,24 (-9,14%)</td>
+<td align="right">
+87.501,01 (-18,81%)</td>
+<td align="right">
+95.988,70 (+9,70%)</td>
+<td class="success" align="right">
+120.287,77 (+25,31%)</td>
+<td class="danger" align="right">
+7.016,94 (-94,17%)</td>
+<td align="right">
+35.653,93 (+408,11%)</td>
+<td align="right">
+58.432,18 (+63,89%)</td>
+<td align="right">
+64.811,52 (+10,92%)</td>
+<td align="right">
+82.780,30 (+27,72%)</td>
+<td align="right">
+76.954,84 (-7,04%)</td>
+<td align="right">
+&nbsp;</td>
+</tr>
+<tr>
+<td style="font-weight: bold;" align="right">
+Dezember:
+</td>
+<td align="right">
+102.643,02 (+100,00%)</td>
+<td align="right">
+123.738,35 (+20,55%)</td>
+<td align="right">
+136.524,35 (+10,33%)</td>
+<td align="right">
+180.831,69 (+32,45%)</td>
+<td align="right">
+166.255,70 (-8,06%)</td>
+<td align="right">
+186.164,23 (+11,97%)</td>
+<td class="success" align="right">
+200.136,55 (+7,51%)</td>
+<td align="right">
+164.619,75 (-17,75%)</td>
+<td align="right">
+180.240,46 (+9,49%)</td>
+<td align="right">
+157.281,66 (-12,74%)</td>
+<td class="danger" align="right">
+8.598,28 (-94,53%)</td>
+<td align="right">
+29.296,31 (+240,72%)</td>
+<td align="right">
+80.037,69 (+173,20%)</td>
+<td align="right">
+96.855,36 (+21,01%)</td>
+<td align="right">
+123.670,57 (+27,69%)</td>
+<td align="right">
+141.027,87 (+14,04%)</td>
+<td align="right">
+&nbsp;</td>
+</tr>
+<tr>
+<td colspan="18">&nbsp;</td>
+</tr>
+<tr class="tablecol1">
+<td style="font-weight: bold;" align="right">Gesamt:</td>
+<td align="right">
+280.113,48 (+100,00%) </td>
+<td align="right">
+899.704,15 (+221,19%) </td>
+<td align="right">
+1.100.732,51 (+22,34%) </td>
+<td align="right">
+1.255.270,98 (+14,04%) </td>
+<td align="right">
+1.381.701,58 (+10,07%) </td>
+<td align="right">
+1.435.137,56 (+3,87%) </td>
+<td align="right">
+1.439.445,76 (+0,30%) </td>
+<td align="right">
+1.242.346,87 (-13,69%) </td>
+<td align="right">
+1.318.155,08 (+6,10%) </td>
+<td align="right">
+1.173.834,88 (-10,95%) </td>
+<td align="right">
+568.943,66 (-51,53%) </td>
+<td align="right">
+402.479,76 (-29,26%) </td>
+<td align="right">
+732.079,71 (+81,89%) </td>
+<td align="right">
+945.396,37 (+29,14%) </td>
+<td align="right">
+1.031.866,12 (+9,15%) </td>
+<td align="right">
+1.067.027,57 (+3,41%) </td>
+<td align="right">
+866.759,68 (-18,77%) </td>
+</tr>
+<tr class="tablecol1">
+<td style="font-weight: bold;" align="right">Durchschnitt:</td>
+<td align="right">
+46.685,58 (+100,00%)</td>
+<td align="right">
+74.975,35 (+60,60%)</td>
+<td align="right">
+91.727,71 (+22,34%)</td>
+<td align="right">
+104.605,92 (+14,04%)</td>
+<td align="right">
+115.141,80 (+10,07%)</td>
+<td align="right">
+119.594,80 (+3,87%)</td>
+<td align="right">
+119.953,81 (+0,30%)</td>
+<td align="right">
+103.528,91 (-13,69%)</td>
+<td align="right">
+109.846,26 (+6,10%)</td>
+<td align="right">
+97.819,57 (-10,95%)</td>
+<td align="right">
+51.722,15 (-47,12%)</td>
+<td align="right">
+40.247,98 (-22,18%)</td>
+<td align="right">
+61.006,64 (+51,58%)</td>
+<td align="right">
+78.783,03 (+29,14%)</td>
+<td align="right">
+85.988,84 (+9,15%)</td>
+<td align="right">
+88.918,96 (+3,41%)</td>
+<td align="right">
+86.675,97 (-2,52%)</td>
+</tr>
+</table>

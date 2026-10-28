@@ -416,3 +416,216 @@ export function stammdatenLesen(html: string): Stammdaten {
 
   return { kapazitaet, planBwa, tagesbudget }
 }
+
+// ---------------------------------------------------------------------------
+// Kassenblatt — Umsatz der Betriebe mit fremder Kasse (28.10.2026)
+// ---------------------------------------------------------------------------
+
+/**
+ * Ein Tag aus dem Ladenakte-Bericht „Die letzten Tage".
+ *
+ * `gruppen` sind LINAs UMSATZGRUPPEN des Betriebs, nicht die Hauptsparten des
+ * Konzernberichts: Enchilada Bremen führt „Getränke / Essen /
+ * Biergartenumsatz", Ratskeller Ludwigsburg „Getränke / Speisen / Divers /
+ * Gutschein / Miete&Organisation". Name und Zahl der Gruppen sind je Betrieb
+ * verschieden, deshalb kommen sie aus der Kopfzeile und nicht aus einer Liste.
+ */
+export type KassenblattTag = {
+  datum: string
+  netto: number
+  gruppen: { name: string; netto: number }[]
+}
+
+export type KassenblattMonat = {
+  /** `YYYY-MM-01` — aus der GEWÄHLTEN Option gelesen, nicht aus der Anfrage. */
+  monat: string
+  gruppen: string[]
+  tage: KassenblattTag[]
+  /** Die Monatssummenzeile („August 2026"). */
+  summe: number
+}
+
+const MONATSNAMEN = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli',
+  'August', 'September', 'Oktober', 'November', 'Dezember']
+
+/** `1.624,45 (+0% )` → 1624.45. Die Klammer ist die Forecast-Abweichung. */
+function betragVorKlammer(s: string): number | null {
+  return deutscheZahl(s.replace(/\s*\(.*\)\s*$/, ''))
+}
+
+/** Der Wert der gewählten Option eines `<select name="…">`. */
+function gewaehlt(html: string, name: string): string | null {
+  const sel = html.match(new RegExp(`<select\\b[^>]*name="${name}"[^>]*>([\\s\\S]*?)</select>`, 'i'))
+  if (!sel) return null
+  const opt = sel[1].match(/<option\b[^>]*value="([^"]*)"[^>]*selected/i)
+  return opt ? opt[1] : null
+}
+
+/**
+ * „Die letzten Tage" eines Monats lesen
+ * (`/intranet/report/monatsanalyse/laden/<hash>/admin/1/?monat=MM&jahr=JJJJ`).
+ *
+ * Bei Betrieben mit fremder Kasse ist das der Umsatz, den der Betrieb von Hand
+ * ins Kassenblatt einträgt — kein Konzernbericht liefert ihn. Bei LINA-Kassen
+ * ist es derselbe Nettoumsatz wie `getUmsatzbericht` (nachgemessen 28.10.2026,
+ * drei Betriebe auf den Cent). Messwerte in `docs/lina-api-inventar-ladenakte.md` §2a.
+ *
+ * DREI PRÜFUNGEN, und jede hat einen Grund:
+ *
+ * 1. **Der gewählte Monat muss der angefragte sein.** LINA ignoriert
+ *    unbekannte Parameter still und liefert dann den laufenden Monat — mit
+ *    `from/…/to/…` am 28.10.2026 genau so gemessen. Ohne diese Prüfung
+ *    landete der Oktober unter dem Datum des Augusts, plausibel und falsch.
+ * 2. **Jeder Tag: Gesamt = Summe der Gruppen.** Verrutscht eine Spalte
+ *    (LINA fügt eine Gruppe hinzu, die Kopfzeile wird anders gelesen), stimmt
+ *    diese Gleichung nicht mehr.
+ * 3. **Summe der Tage = Monatssummenzeile.** Fängt eine verlorene Zeile.
+ */
+export function kassenblattTageLesen(
+  html: string, erwartet: { monat: number; jahr: number },
+): KassenblattMonat {
+  const tabelle = tabellen(html).find(t => /Nettoums(ä|&auml;)tze/.test(t))
+  if (!tabelle) throw new ParseFehler('Kassenblatt: keine Tabelle mit "Nettoumsätze" gefunden')
+
+  const monat = Number(gewaehlt(tabelle, 'monat'))
+  const jahr = Number(gewaehlt(tabelle, 'jahr'))
+  if (monat !== erwartet.monat || jahr !== erwartet.jahr) {
+    throw new ParseFehler(
+      `Kassenblatt: angefragt ${erwartet.monat}/${erwartet.jahr}, LINA zeigt ${monat}/${jahr}. `
+      + `Der Monatsparameter wurde nicht angenommen — die Werte gehören zu einem anderen Monat.`)
+  }
+
+  const alle = zeilen(tabelle)
+  // Kopfzeile 1: Spaltengruppen mit colspan. Die Umsatzspalten stehen unter
+  // „Nettoumsätze"; davor stehen zwei Spalten (Kassenbuch, Datum).
+  const kopf1 = [...(alle[0] ?? '').matchAll(/<th\b([^>]*)>([\s\S]*?)<\/th>/gi)]
+  let start = 0
+  let breite = 0
+  for (const m of kopf1) {
+    const span = Number(m[1].match(/colspan="(\d+)"/)?.[1] ?? 1)
+    if (/Nettoums/.test(text(m[2]))) { breite = span; break }
+    start += span
+  }
+  if (breite < 1) throw new ParseFehler('Kassenblatt: Spaltengruppe "Nettoumsätze" nicht gefunden')
+
+  const kopf2 = zellen(alle[1] ?? '')
+  const namen = kopf2.slice(start, start + breite)
+  if (!/^Gesamt\b/.test(namen[0] ?? '')) {
+    throw new ParseFehler(`Kassenblatt: erste Umsatzspalte ist "${namen[0]}", erwartet "Gesamt"`)
+  }
+  const gruppen = namen.slice(1)
+
+  const tage: KassenblattTag[] = []
+  let summe: number | null = null
+  const summenzeile = `${MONATSNAMEN[monat - 1]} ${jahr}`
+  const mm = String(monat).padStart(2, '0')
+
+  for (const z of alle.slice(2)) {
+    const c = zellen(z)
+    const tag = (c[1] ?? '').match(/^\S+, (\d{2})\.(\d{2})\.$/)
+    if (tag) {
+      if (tag[2] !== mm) {
+        throw new ParseFehler(`Kassenblatt: Tag ${tag[1]}.${tag[2]}. in der Tabelle für ${summenzeile}`)
+      }
+      const werte = c.slice(start, start + breite).map(betragVorKlammer)
+      if (werte.length !== breite || werte.some(w => w === null)) {
+        throw new ParseFehler(`Kassenblatt: ${tag[1]}.${mm}. ohne lesbare Umsatzzellen (${c.slice(start, start + breite).join(' | ')})`)
+      }
+      const [netto, ...rest] = werte as number[]
+      const teile = rest.reduce((a, b) => a + b, 0)
+      if (gruppen.length > 0 && Math.abs(netto - teile) > 0.01 * gruppen.length + 0.001) {
+        throw new ParseFehler(
+          `Kassenblatt: ${tag[1]}.${mm}.${jahr} Gesamt ${netto} ist nicht die Summe der Gruppen (${teile.toFixed(2)})`)
+      }
+      tage.push({
+        datum: `${jahr}-${mm}-${tag[1]}`,
+        netto,
+        gruppen: gruppen.map((name, i) => ({ name, netto: rest[i] })),
+      })
+      continue
+    }
+    if (c[0] === summenzeile) summe = betragVorKlammer(c[1] ?? '')
+  }
+
+  if (summe === null) throw new ParseFehler(`Kassenblatt: Summenzeile "${summenzeile}" fehlt`)
+  if (tage.length === 0) throw new ParseFehler(`Kassenblatt: keine Tageszeilen für ${summenzeile}`)
+  const tagessumme = tage.reduce((a, t) => a + t.netto, 0)
+  if (Math.abs(tagessumme - summe) > 0.01 * tage.length + 0.001) {
+    throw new ParseFehler(
+      `Kassenblatt: Summe der Tage ${tagessumme.toFixed(2)} ≠ Monatssumme ${summe} (${summenzeile})`)
+  }
+
+  return { monat: `${jahr}-${mm}-01`, gruppen, tage, summe }
+}
+
+export type KassenblattJahreswert = { monat: string; netto: number }
+
+/**
+ * „Die letzten Jahre" lesen (`/intranet/report/jahresuebersicht/laden/<hash>/admin/1/`):
+ * Nettoumsatz je Monat, alle Jahre seit Beginn in EINEM Aufruf.
+ *
+ * Wozu: der Importer entscheidet daran, welche Monate er tageweise holen muss
+ * — ein Aufruf je Betrieb statt einer je Betrieb und Monat. Eine leere Zelle
+ * heißt „kein Umsatz erfasst" und wird ausgelassen, nicht als 0 geschrieben.
+ *
+ * DIE FILTERAUSWAHL WIRD GEPRÜFT. Das Formular darüber (Umsatzgruppe,
+ * Umsatzart) wird per POST gesetzt; ob LINA die Wahl in der Sitzung behält,
+ * ist nicht gemessen. Stünde dort „Getränke" oder „Tagesschnitt", wären die
+ * Zahlen plausibel und falsch. Deshalb muss beides auf „Gesamtumsatz" stehen.
+ */
+export function kassenblattJahreLesen(html: string): KassenblattJahreswert[] {
+  for (const name of ['show', 'show_ges']) {
+    const w = gewaehlt(html, name)
+    if (w !== '0') {
+      throw new ParseFehler(
+        `Jahresübersicht: Filter "${name}" steht auf "${w}", erwartet "0" (Gesamtumsatz). `
+        + `Die Werte wären dann keine Gesamtumsätze je Monat.`)
+    }
+  }
+
+  const tabelle = tabellen(html).find(t => {
+    const k = zellen(zeilen(t)[0] ?? '')
+    return k.length > 1 && k.slice(1).every(s => /^\d{4}$/.test(s))
+  })
+  if (!tabelle) throw new ParseFehler('Jahresübersicht: keine Tabelle mit Jahreskopfzeile gefunden')
+
+  const alle = zeilen(tabelle)
+  const jahre = zellen(alle[0]).slice(1).map(Number)
+  const werte: KassenblattJahreswert[] = []
+  const jeJahr = new Map<number, number>()
+  let monateGefunden = 0
+  let gesamt: (number | null)[] | null = null
+
+  for (const z of alle.slice(1)) {
+    const c = zellen(z)
+    const i = MONATSNAMEN.findIndex(n => c[0] === `${n}:`)
+    if (i >= 0) {
+      if (c.length !== jahre.length + 1) {
+        throw new ParseFehler(`Jahresübersicht: Zeile ${c[0]} hat ${c.length - 1} Werte für ${jahre.length} Jahre`)
+      }
+      monateGefunden++
+      c.slice(1).forEach((zelle, j) => {
+        const n = betragVorKlammer(zelle)
+        if (zelle !== '' && n === null) {
+          throw new ParseFehler(`Jahresübersicht: unlesbare Zelle "${zelle}" (${c[0]} ${jahre[j]})`)
+        }
+        if (n === null) return
+        werte.push({ monat: `${jahre[j]}-${String(i + 1).padStart(2, '0')}-01`, netto: n })
+        jeJahr.set(jahre[j], (jeJahr.get(jahre[j]) ?? 0) + n)
+      })
+    } else if (c[0] === 'Gesamt:') {
+      gesamt = c.slice(1).map(betragVorKlammer)
+    }
+  }
+
+  if (monateGefunden !== 12) throw new ParseFehler(`Jahresübersicht: ${monateGefunden} Monatszeilen statt 12`)
+  if (!gesamt) throw new ParseFehler('Jahresübersicht: Zeile "Gesamt:" fehlt')
+  jahre.forEach((j, k) => {
+    const soll = gesamt![k] ?? 0
+    const ist = jeJahr.get(j) ?? 0
+    if (Math.abs(soll - ist) > 0.12) {
+      throw new ParseFehler(`Jahresübersicht: ${j} Summe der Monate ${ist.toFixed(2)} ≠ Gesamt ${soll}`)
+    }
+  })
+  return werte
+}

@@ -116,9 +116,45 @@ describe('Loeschsperre', () => {
   })
 })
 
+describe('Kassenblatt-Berichte (0141)', () => {
+  const hash = '05dbf4af482cb1954eb07a5cffb4fafe0d179c5170aeba991d07ac5a85bca48d9e7c99aa3fe3bea60946'
+
+  test('die beiden Berichtspfade mit Laden-Hash sind frei, Monat und Jahr im Query', () => {
+    expect(() => pfadPruefen(`/intranet/report/monatsanalyse/laden/${hash}/admin/1/?monat=08&jahr=2026`)).not.toThrow()
+    expect(() => pfadPruefen(`/intranet/report/jahresuebersicht/laden/${hash}/admin/1/`)).not.toThrow()
+  })
+
+  /**
+   * Die Nachbarn in derselben Rubrik bleiben gesperrt — die Positivliste
+   * nennt zwei Berichte, nicht /intranet/report/ als Ganzes.
+   */
+  test('andere Berichte der Rubrik und Eingeschmuggeltes bleiben gesperrt', () => {
+    for (const p of [
+      `/intranet/report/kasse/laden/${hash}/admin/1/`,
+      `/intranet/report/budget/laden/${hash}/admin/1/`,
+      '/intranet/report/monatsanalyse/laden/../../ladenakte/vertraege/admin/1/',
+      `/intranet/report/monatsanalyse/laden/${hash}/admin/1/delete/1`,
+      '/finanzen/stat/tagesuebersicht/from/1788213600/to/1790805600/',
+    ]) {
+      expect(() => pfadPruefen(p)).toThrow(VerbotenerPfad)
+    }
+  })
+
+  test('beide holen ihren Pfad ueber den Berichtsnamen und behandeln leere 500 als Fehler', () => {
+    for (const key of ['la:tagesumsatz', 'la:jahresumsatz']) {
+      const ep = LADENAKTE_ENDPUNKTE.find(e => e.key === key)!
+      expect(ep.braucht).toBe('bericht_pfad')
+      expect(ep.leerIstFehler).toBe(true)
+    }
+    expect(LADENAKTE_ENDPUNKTE.find(e => e.key === 'la:tagesumsatz')!.berichtTitel).toBe('Die letzten Tage')
+    expect(LADENAKTE_ENDPUNKTE.find(e => e.key === 'la:jahresumsatz')!.berichtTitel).toBe('Die letzten Jahre')
+  })
+})
+
 describe('Register', () => {
-  test('vier Endpunkte, alle mit la:-Praefix und alle inaktiv', () => {
-    expect(LADENAKTE_ENDPUNKTE.length).toBe(4)
+  test('sechs Endpunkte, alle mit la:-Praefix und alle inaktiv', () => {
+    // 0141: la:tagesumsatz und la:jahresumsatz (Kassenblatt) dazu
+    expect(LADENAKTE_ENDPUNKTE.length).toBe(6)
     for (const ep of LADENAKTE_ENDPUNKTE) {
       expect(ep.key.startsWith('la:')).toBe(true)
       expect(istLadenakte(ep.key)).toBe(true)
@@ -154,6 +190,8 @@ describe('Register', () => {
       'la:belegliste': 'json',
       'la:bwa_longterm': 'html',
       'la:stammdaten': 'html',
+      'la:tagesumsatz': 'html',
+      'la:jahresumsatz': 'html',
       // Der Baum liefert JSON und deklariert text/html. Genau deshalb steht es hier.
       'la:baum': 'json',
       'la:ordnerseite': 'html',

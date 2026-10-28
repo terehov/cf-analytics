@@ -24,8 +24,8 @@
  *
  * Seit Migration 0082 laufen zwei Importschleifen nebeneinander. Das ist hier
  * gefahrlos, weil `la:*` ausschließlich Posten ohne `marke_key` sind und
- * damit ausschließlich in der LINA-Schleife laufen — `belegToken`, `bwaHash`
- * und `stammPfad` bekommen den `LinaClient` als `Holer`. Wer die LINA-Seite
+ * damit ausschließlich in der LINA-Schleife laufen — `belegToken`, `bwaHash`,
+ * `stammPfad` und `berichtPfad` bekommen den `LinaClient` als `Holer`. Wer die LINA-Seite
  * später noch einmal teilt, bricht als Erstes hier etwas.
  */
 import type { Endpunkt } from '../lina/endpunkte'
@@ -183,7 +183,37 @@ export async function stammPfad(
   return pfad
 }
 
+/**
+ * Der vollständige Pfad eines Berichts der Rubrik "Reports", mit Laden-Hash
+ * (0141: "Die letzten Tage", "Die letzten Jahre").
+ *
+ * Der Hash ist je Baumabruf neu gesalzen (am 28.10.2026 zweimal hintereinander
+ * geholt, zwei verschiedene Werte). Beschriftung exakt, nicht als Muster:
+ * "Die letzten Tage" und "Die letzten Jahre" stehen nebeneinander.
+ */
+export async function berichtPfad(
+  h: Holer, linaBetriebId: string, bericht: string, jetzt = Date.now(),
+): Promise<string> {
+  const schluessel = `bericht:${bericht}:${linaBetriebId}`
+  const alt = ausCache(schluessel, jetzt)
+  if (alt) return alt
+
+  const knoten = await baumknoten(h, `report_${linaBetriebId}`)
+  const genau = new RegExp(`^${bericht.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`)
+  const link = kindLink(knoten, genau, `Bericht "${bericht}"`)
+  const { pfad } = zerlegen(link)
+  pfadPruefen(pfad)
+
+  cache.set(schluessel, { wert: pfad, geholtAm: jetzt })
+  return pfad
+}
+
 /** Nach einer unbrauchbaren Antwort: den gemerkten Wert wegwerfen. */
 export function verwerfen(art: 'beleg' | 'bwa' | 'stamm', linaBetriebId: string): void {
   cache.delete(`${art}:${linaBetriebId}`)
+}
+
+/** Dasselbe für einen Berichtspfad. */
+export function berichtVerwerfen(bericht: string, linaBetriebId: string): void {
+  cache.delete(`bericht:${bericht}:${linaBetriebId}`)
 }

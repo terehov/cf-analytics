@@ -183,6 +183,19 @@ export const QUELLEN: readonly Quelle[] = [
   { quelle: 'la:stammdaten', bezeichnung: 'Sitzplaetze, Flaeche, Plan-BWA, Tagesbudget',
     system: 'ladenakte', endpunkt: 'la:stammdaten', kadenz_stunden: MONATLICH,
     bemerkung: 'Momentaufnahme je Betrieb und Kalendermonat (einreihenJeMonat).' },
+  /*
+   * 0141: der Umsatz der Betriebe mit fremder Kasse. Die Monatswerte holt
+   * jeder Betrieb einmal im Monat; die Tageswerte laufen jede Nacht fuer den
+   * laufenden Monat, solange es einen Kassenblatt-Betrieb gibt (am
+   * 28.10.2026 vier). Die feine Pruefung je Betrieb und Monat ist
+   * mart.kassenblatt_stand, zustand = faellig.
+   */
+  { quelle: 'la:jahresumsatz', bezeichnung: 'Monatsumsatz je Betrieb aus "Die letzten Jahre"',
+    system: 'ladenakte', endpunkt: 'la:jahresumsatz', kadenz_stunden: MONATLICH,
+    bemerkung: 'Momentaufnahme je Betrieb und Kalendermonat (einreihenJeMonat).' },
+  { quelle: 'la:tagesumsatz', bezeichnung: 'Tagesumsatz aus dem Kassenblatt (fremde Kasse)',
+    system: 'ladenakte', endpunkt: 'la:tagesumsatz', kadenz_stunden: TAEGLICH,
+    bemerkung: 'Laufender Monat jede Nacht (kassenblattNachfuellen), Historie nach mart.kassenblatt_stand.' },
 
   // --- FoodNotify -------------------------------------------------------
   { quelle: 'fn:bestellungen', bezeichnung: 'Bestellliste je Kostenstelle',

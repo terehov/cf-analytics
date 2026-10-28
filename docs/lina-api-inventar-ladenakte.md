@@ -82,15 +82,98 @@ Gemessen an `laden_15` (Enchilada Karlsruhe GmbH) und `laden_196` (GSF Gastro Gm
 Die 14 Reports: Verkaufszahlen, Budget, Personalkosten, Umsatzentwicklung,
 Wareneinsätze, Superkennzahl, Inventurstände, Gutscheinkonten, Kassenblatt/ZE,
 Die letzten Tage, Die letzten Jahre, Ranking, Managementreport, Zeitzonenreport.
-Sie sind **Darstellungen über denselben Daten**, die das Report Center als JSON
+~~Sie sind **Darstellungen über denselben Daten**, die das Report Center als JSON
 liefert — für den Importer uninteressant, mit zwei Ausnahmen (Budget,
-Inventurstände), die aus dem Stammdatenblatt bzw. der Warenwirtschaft stammen.
+Inventurstände), die aus dem Stammdatenblatt bzw. der Warenwirtschaft stammen.~~
+
+**Falsch für Betriebe mit fremder Kasse (28.10.2026).** „Die letzten Tage" und
+„Kassenblatt/ZE" zeigen dort den Umsatz, den der Betrieb von Hand ins Kassenblatt
+einträgt — und den liefert kein Konzernbericht. Abschnitt 2a.
 
 Gegenprobe Inventurstände Karlsruhe: nur 01/2026–05/2026, drei Zeilen,
 überwiegend leer. **Regel 5 aus `AGENTS.md` bleibt hier gültig** — LINAs
 Warenwirtschaft trägt keine belastbaren Inventurdaten. Gegenprobe im Buy-Modul
 (`/wawi/inventory/inventory`, Betrieb 62): 11 Inventurstichtage, **jüngster
 08.02.2017**. Das Modul ist seit neun Jahren tot.
+
+---
+
+## 2a. Umsatz der Fremdkassen-Betriebe — „Die letzten Tage" (28.10.2026)
+
+**Im Browser erhoben, nur GET**, an Enchilada Bremen (`laden_18`). Anlass: Betriebe mit
+eigener Kasse (Vectron u. a.) tragen ihre Tageswerte in LINAs Kassenblatt ein — und haben
+in `getUmsatzbericht` trotzdem **keinen einzigen Tag** (`mart.betrieb_status = 'fremdkasse'`).
+
+**Der Weg:** der Ladenakte-Bericht „Die letzten Tage" mit Monat und Jahr als Query-Parameter.
+
+```
+GET /intranet/report/monatsanalyse/laden/<hash>/admin/1/?monat=09&jahr=2026
+```
+
+`<hash>` ist der `data-link` des Knotens „Die letzten Tage" unter `report_<n>` (Abschnitt 1),
+84 hex, **je Baumabruf neu gesalzen** (zweimal hintereinander geholt, zwei Werte). Einmal
+antwortete ein Hash aus einem früheren Baumabruf mit **HTTP 500 und leerem Rumpf**, ein frisch
+geholter gleich danach mit 72 kB. Für den Importer heißt das: Diese leere 500 ist kein „keine
+Daten", sondern ein veralteter Hash (`leerIstFehler` im Register). Antwort ist
+**serverseitig gerendertes HTML** (rund 250 kB), kein JSON. Je Tag: Nettoumsatz gesamt,
+**Getränke, Essen, Biergarten**, Personalstunden gesamt/Service/Bar/Küche/Biergarten und
+Effektivität; dazu Monatssumme, „Tagesschnitt aus N Tagen mit Umsatz" und Vorjahresmonat.
+
+**Drei Fallen:**
+
+* **Nicht blättern.** Die Pfeile und die Monatsauswahl der Seite rufen
+  `/finanzen/stat/tagesuebersicht/…` und `/finanzen/stat/monatsanalyse/from/<unix>/to/<unix>/`
+  — **ohne Betrieb**. Die antworten mit dem Standardbetrieb der Sitzung („Zentrale",
+  erkennbar an der Spalte `h Zentrale`), alles 0,00 €. Dieselbe Sitzungsbindung wie beim
+  Kassenjournal (`lina-api-inventar-1d.md`). Nur `?monat=&jahr=` an der Ladenakte-URL trägt
+  den Betrieb. `from/…/to/…` als Pfad- oder Query-Teil wird dort ignoriert (liefert den
+  laufenden Monat).
+* **„Kassenblatt/ZE"** (`/intranet/report/kasse/laden/<hash>/…`) zeigt nur den laufenden
+  Monat (Kassenstand, Transit, „Umsatz Vortag" **brutto**, Bargeld) und nimmt keinen
+  Monatsparameter an. Für Umsatz ist „Die letzten Tage" der Weg.
+* **Ein Betrieb kann zweimal im Baum stehen.** „Wilma Wunder Ballplatz Mainz GmbH"
+  (`laden_833`, LINA-Kasse) und „KUZ - Wilma Wunder Ballplatz Mainz GmbH" (`laden_4055`,
+  Fremdkasse); ebenso zwei Einträge für Aposto Wuppertal.
+
+**Gemessen, September 2026 (netto):**
+
+| Betrieb | Kasse | „Die letzten Tage" | `mart.umsatz_tag` |
+|---|---|---|---|
+| Enchilada Bremen | fremd | 125.600,09 € | — |
+| Enchilada Leipzig | fremd | 130.819,69 € (30 Tage) | — |
+| Enchilada Minden | fremd | 75.740,42 € (24 Tage) | — |
+| Ratskeller Augsburg | fremd | 276.048,86 € (30 Tage) | — |
+| KUZ - Wilma Wunder Ballplatz Mainz | fremd | 36.855,88 € (11 Tage) | — |
+| Aposto Wuppertal (beide Einträge) | fremd (ikentoo) | 0,00 € | — |
+| Ratskeller Ludwigsburg | LINA | 95.791,39 € | 95.791,39 € |
+| Ratskeller Saarbrücken | LINA | 46.950,68 € | 46.950,67 € |
+| Wilma Wunder Ballplatz Mainz | LINA | 120.397,43 € | 120.397,46 € |
+
+Bei LINA-Kassen ist es **derselbe Nettoumsatz wie `getUmsatzbericht`** (auf Cent-Rundung).
+Bei Fremdkassen ist es der einzige Umsatz, den LINA hat.
+
+**Gegen die BWA (Enchilada Bremen, Erlöse Getränke + Speisen + sonstige aus `mart.bwa_longterm`):**
+03/2024 129.839,58 € gegen 130.052,02 € (0,16 %), 08/2026 94.044,61 € gegen 94.333,86 €
+(0,31 %). **Historie:** Bremen zurück bis mindestens 06/2012 (170.576,02 €); 01/2019
+(57.408,57 €) stimmt mit „Die letzten Jahre" überein, das Monatssummen ab 2009 zeigt.
+
+**„Die letzten Jahre"** (`/intranet/report/jahresuebersicht/laden/<hash>/admin/1/`): eine
+Tabelle Monat × Jahr (Nettoumsatz, Klammer = Vorjahresvergleich) seit Beginn, dazu die Zeilen
+„Gesamt:" und „Durchschnitt:". Eine leere Zelle (`&nbsp;`) heißt „nichts erfasst", z. B.
+Bremen Januar 2021. Darüber steht ein Filterformular (POST `/cockpit/stat/jahresuebersicht`)
+für Umsatzgruppe und Umsatzart. Die Werte sind nur dann Gesamtumsätze, wenn beide auf
+„Gesamtumsatz" stehen. Ob LINA eine Auswahl in der Sitzung behält, ist nicht gemessen; der
+Parser prüft es deshalb.
+
+**Getränke/Essen gegen die BWA** (Bremen 08/2026): Getränke 37.832,77 gegen Erlöse Getränke
+37.788,15, Essen 42.602,43 gegen Erlöse Speisen 42.652,05. Biergarten 13.609,41 gegen
+sonstige Erlöse 13.893,66. **Rundung:** Die Monatszeile ist getrennt gerundet; die Summe der
+31 Tage war 94.044,60 gegen 94.044,61 in der Monatszeile.
+
+**Nicht geprüft:** wie spät nachgetragene Kassenblatt-Tage eintreffen (Bremen zeigte am 28.10.
+den 19.–21.10. und 24.–27.10. mit 0,00 € — Ruhetag oder noch nicht eingetragen?).
+
+**Importiert seit `0141`** (Entscheidung in `entscheidungen.md`, Bau in `importer.md`).
 
 ---
 

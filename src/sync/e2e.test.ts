@@ -2869,6 +2869,8 @@ lauf('Zwei Schleifen, ein Lauf', () => {
  */
 lauf('e2e Ladenakte', () => {
   let mock: ReturnType<typeof mockStarten>
+  // Als Objekt, damit ein Test die Optionen nachtraeglich setzen kann (0141).
+  const laOpt: NonNullable<Parameters<typeof mockStarten>[0]> = { ohneBelegarchiv: ['99'] }
   let db: Client
 
   beforeAll(async () => {
@@ -2879,7 +2881,7 @@ lauf('e2e Ladenakte', () => {
      * einen von Hand gesetzten Datenbankzustand: nur so laeuft er durch die
      * ganze Kette bis in die Pruefsicht.
      */
-    mock = mockStarten({ ohneBelegarchiv: ['99'] })
+    mock = mockStarten(laOpt)
     process.env.LINA_BASE_URL = mock.url
     process.env.LINA_USER = 'testuser'
     process.env.LINA_PASSWORD = 'geheim'
@@ -3132,6 +3134,143 @@ lauf('e2e Ladenakte', () => {
     const { rows } = await db.query(
       `SELECT count(*)::int AS n FROM sync.warteschlange WHERE endpunkt = 'la:stammdaten'`)
     expect(Number(rows[0].n)).toBe(1)
+  })
+
+  /**
+   * 0141: der Umsatz der Betriebe mit fremder Kasse — "Die letzten Jahre"
+   * entscheidet, "Die letzten Tage" liefert, mart.kassenblatt_stand reiht ein.
+   * Die Attrappe antwortet mit den echten Seiten von Enchilada Bremen.
+   */
+  describe('Kassenblatt', () => {
+    const zahl = async (sql: string, p: unknown[] = []) =>
+      Number((await db.query(sql, p)).rows[0].n)
+
+    test('Monatswerte, faellige Monate, Tageswerte — und LINAs Kasse behaelt Vorrang', async () => {
+      const { workerLauf } = await import('./worker')
+      const { cacheLeeren } = await import('../ladenakte/token')
+      const { kassenblattNachfuellen } = await import('./nachfuellen')
+      cacheLeeren()
+      await db.query(`TRUNCATE sync.warteschlange, core.kassenblatt_monat, core.umsatzbericht_tag
+                      RESTART IDENTITY CASCADE`)
+
+      // 1. Die Monatswerte. Ein veralteter Hash zuerst: leere 500 — das ist
+      //    ein Fehler mit Wiederholung, kein "keine Daten".
+      laOpt.berichtLeer500 = 1
+      await db.query(`INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, parameter)
+                      VALUES ('la:jahresumsatz', current_date, current_date, 95, '{"linaBetriebId":"15"}')`)
+      await workerLauf('manuell')
+      laOpt.berichtLeer500 = 0
+      const { rows: [nach500] } = await db.query(
+        `SELECT erledigt_am, ergebnis, letzter_fehler FROM sync.warteschlange WHERE endpunkt = 'la:jahresumsatz'`)
+      expect(nach500.erledigt_am).toBeNull()
+      expect(nach500.letzter_fehler).toMatch(/veralteter Laden-Hash/)
+      await db.query(`UPDATE sync.warteschlange SET faellig_ab = now() WHERE endpunkt = 'la:jahresumsatz'`)
+      await workerLauf('manuell')
+      expect(await zahl(`SELECT count(*)::int AS n FROM sync.warteschlange
+                          WHERE endpunkt = 'la:jahresumsatz' AND ergebnis = 'ok'`)).toBe(1)
+      expect(await zahl(`SELECT umsatz_netto AS n FROM core.kassenblatt_monat
+                          WHERE monat = '2026-08-01'`)).toBe(94044.61)
+      // Januar 2021 ist in der Vorlage leer — keine Zeile, nicht 0.
+      expect(await zahl(`SELECT count(*)::int AS n FROM core.kassenblatt_monat
+                          WHERE monat = '2021-01-01'`)).toBe(0)
+
+      // 2. LINAs Konzernbericht fuehrt den Betrieb mit 0,00 an jedem Tag —
+      //    so steht es in Produktion fuer Enchilada Bremen.
+      await db.query(
+        `INSERT INTO core.umsatzbericht_tag (betrieb_key, geschaeftstag, umsatz_netto, umsatz_brutto, rechnungen, gaeste)
+         SELECT b.betrieb_key, d::date, 0, 0, 0, 0
+           FROM core.betrieb b, generate_series(DATE '2026-08-01', DATE '2026-10-27', interval '1 day') d
+          WHERE b.lina_betrieb_id = 15`)
+      // ... bis auf einen Tag, an dem die Kasse ueber LINA lief.
+      await db.query(`UPDATE core.umsatzbericht_tag SET umsatz_netto = 999, rechnungen = 10
+                       WHERE geschaeftstag = '2026-10-15'`)
+
+      // 3. Einreihen nach mart.kassenblatt_stand
+      const zustand = async (m: string) => (await db.query(
+        `SELECT zustand FROM mart.kassenblatt_stand WHERE monat = $1`, [m])).rows[0]?.zustand
+      expect(await zustand('2026-08-01')).toBe('faellig')
+      expect(await zustand('2026-07-01')).toBe('vor Historie')   // vor dem ersten LINA-Tag
+      // Oktober laufend; August und September als Historie. Oktober steht in
+      // der Sicht auf "abweichung" (ein echter LINA-Tag), der laufende Monat
+      // wird trotzdem geholt — der Betrieb ist im Kassenblatt.
+      expect(await kassenblattNachfuellen('2026-10-28')).toBe(3)
+      expect(await zustand('2026-10-01')).toBe('abweichung')
+      // Dieselbe Nacht noch einmal: nichts Neues.
+      expect(await kassenblattNachfuellen('2026-10-28')).toBe(0)
+
+      // 4. Laden
+      await workerLauf('manuell')
+      expect(await zahl(`SELECT count(*)::int AS n FROM sync.warteschlange
+                          WHERE endpunkt = 'la:tagesumsatz' AND ergebnis = 'ok'`)).toBe(2)
+      // Fuer September hat die Attrappe keine Vorlage und antwortet wie LINA
+      // mit dem laufenden Monat — der Posten scheitert, statt Oktober unter
+      // September abzulegen.
+      expect(await zahl(`SELECT count(*)::int AS n FROM mart.umsatz_tag
+                          WHERE monat = '2026-09-01' AND quelle = 'kassenblatt'`)).toBe(0)
+
+      // August: alle 31 Tage aus dem Kassenblatt, Summe = Monatswert
+      expect(await zahl(`SELECT sum(umsatz_netto) AS n FROM mart.umsatz_tag
+                          WHERE monat = '2026-08-01' AND quelle = 'kassenblatt'`)).toBe(94044.60)  // Monatszeile 94.044,61 — LINA rundet sie getrennt
+      expect(await zahl(`SELECT count(*)::int AS n FROM mart.umsatz_tag
+                          WHERE monat = '2026-08-01' AND quelle = 'kassenblatt'`)).toBe(31)
+      // Rechnungen und Gaeste sind NULL, nicht 0
+      expect(await zahl(`SELECT count(*)::int AS n FROM mart.umsatz_tag
+                          WHERE quelle = 'kassenblatt' AND (rechnungen IS NOT NULL OR gaeste IS NOT NULL)`)).toBe(0)
+      // Getraenke und Essen als Hauptsparte, Biergarten nicht
+      expect(await zahl(`SELECT round(sum(umsatz_netto), 2) AS n FROM mart.umsatz_tag_sparte
+                          WHERE monat = '2026-08-01' AND hauptsparte = 'Getränke'`)).toBe(37832.77)
+      expect(await zahl(`SELECT round(sum(umsatz_netto), 2) AS n FROM mart.umsatz_tag_sparte
+                          WHERE monat = '2026-08-01' AND hauptsparte = 'Speisen'`)).toBe(42602.42)  // Monatszeile 42.602,43
+      expect(await zustand('2026-08-01')).toBe('geladen')
+
+      // Oktober: der Kassentag bleibt LINAs, die uebrigen kommen aus dem Kassenblatt
+      const { rows: [t15] } = await db.query(
+        `SELECT umsatz_netto::float AS u, quelle, rechnungen FROM mart.umsatz_tag WHERE geschaeftstag = '2026-10-15'`)
+      expect(t15).toEqual({ u: 999, quelle: 'umsatzbericht', rechnungen: 10 })
+      expect(await zahl(`SELECT count(*)::int AS n FROM mart.umsatz_tag
+                          WHERE monat = '2026-10-01' AND quelle = 'kassenblatt'`)).toBe(26)
+
+      // 5. Der Gegenweg: LINAs naechste Null ueberschreibt das Kassenblatt nicht,
+      //    ein echter Kassenwert dagegen schon.
+      const { laden } = await import('./laden')
+      const { ENDPUNKTE } = await import('../lina/endpunkte')
+      const ep = ENDPUNKTE.find(e => e.key === 'getUmsatzbericht')!
+      const konzern = (tag: string, netto: number, bills: number) => laden({
+        ep, von: tag, bis: tag, parameter: {}, httpStatus: 200, bytes: 1, hash: `h${tag}${netto}`,
+        laufId: '0', betriebEncId: null,
+        daten: { stores: [{ name: 'Enchilada Karlsruhe GmbH', encId: 'enc-15', umsatzNetto: netto,
+                            umsatzBrutto: netto, bills, guests: 0, avgTicket: 0, avgGuest: 0 }] },
+      })
+      await konzern('2026-08-02', 0, 0)
+      const { rows: [t2] } = await db.query(
+        `SELECT umsatz_netto::float AS u, quelle FROM mart.umsatz_tag WHERE geschaeftstag = '2026-08-02'`)
+      expect(t2).toEqual({ u: 167.82, quelle: 'kassenblatt' })
+      await konzern('2026-08-03', 50, 2)
+      const { rows: [t3] } = await db.query(
+        `SELECT umsatz_netto::float AS u, quelle FROM mart.umsatz_tag WHERE geschaeftstag = '2026-08-03'`)
+      expect(t3).toEqual({ u: 50, quelle: 'umsatzbericht' })
+    }, 60_000)
+
+    /**
+     * LINA nimmt einen Monatsparameter, den es nicht kennt, still nicht an und
+     * zeigt den laufenden Monat. Die Attrappe tut dasselbe fuer jeden Monat
+     * ohne Vorlage — der Posten muss scheitern, statt Oktober unter dem
+     * Datum des Septembers abzulegen.
+     */
+    test('ein falscher Monat in der Antwort schreibt nichts', async () => {
+      const { workerLauf } = await import('./worker')
+      await db.query(`TRUNCATE sync.warteschlange RESTART IDENTITY`)
+      await db.query(`INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, parameter)
+                      VALUES ('la:tagesumsatz', '2026-09-01', '2026-09-30', 91,
+                              '{"linaBetriebId":"15","monat":"09","jahr":"2026"}')`)
+      await workerLauf('manuell')
+      expect(await zahl(`SELECT count(*)::int AS n FROM sync.warteschlange
+                          WHERE endpunkt = 'la:tagesumsatz' AND ergebnis = 'ok'`)).toBe(0)
+      expect(await zahl(`SELECT count(*)::int AS n FROM mart.umsatz_tag
+                          WHERE monat = '2026-09-01' AND quelle = 'kassenblatt'`)).toBe(0)
+      expect((await db.query(`SELECT letzter_fehler FROM sync.warteschlange`)).rows[0].letzter_fehler)
+        .toMatch(/LINA zeigt 10\/2026/)
+    }, 60_000)
   })
 
   /**

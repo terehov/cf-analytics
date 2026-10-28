@@ -2175,3 +2175,46 @@ vierzig. Sichtbar in `mart.posten_aufgegeben` (`zustand = 'endgueltig'`), in der
 Betriebsberichte reihen einen so geschlossenen Zeitraum nicht neu ein (sie prüfen jeden Posten,
 gleich welches Ergebnis). Wer den Fehler behoben hat, setzt den Posten von Hand zurück:
 `UPDATE sync.warteschlange SET erledigt_am = NULL, ergebnis = NULL, versuche = 0, faellig_ab = now() WHERE posten_id = …`.
+
+## Kassenblatt: Umsatz der Betriebe mit fremder Kasse (`0141`, 28.10.2026)
+
+Zwei Ladenakte-Endpunkte, beide `braucht: 'bericht_pfad'`. Der Pfad mit gesalzenem Laden-Hash
+kommt aus dem Baumknoten `report_<id>` über die exakte Beschriftung (`berichtTitel`), in
+`src/ladenakte/token.ts`, `berichtPfad()`:
+
+| Endpunkt | Bericht | Takt | schreibt |
+|---|---|---|---|
+| `la:jahresumsatz` | „Die letzten Jahre" | je Betrieb einmal im Monat (`einreihenJeMonat`, Prio 95) | `core.kassenblatt_monat` |
+| `la:tagesumsatz` | „Die letzten Tage" `?monat=MM&jahr=JJJJ` | siehe unten | `core.umsatzbericht_tag`, `quelle = 'kassenblatt'` |
+
+**`kassenblattNachfuellen()`** (aus `ladenakteNachfuellen()`) reiht `la:tagesumsatz` in zwei
+Teilen ein:
+- **laufend** (Prio 12, Tagesgeschäft): der Monat des Vortags für jeden Betrieb mit
+  Kassenblatt-Umsatz in den letzten 62 Tagen oder einem fälligen Monat in den letzten zwei
+  Monaten. In den ersten zehn Tagen eines Monats zusätzlich der Vormonat, weil das Kassenblatt
+  von Hand nachgetragen wird. Einmal je Nacht (`zeitraum_bis = heute`).
+- **Historie** (Prio 91, `nachladen = true`, Phase C): `mart.kassenblatt_stand.zustand =
+  'faellig'` vor dem laufenden Monat, neueste zuerst, höchstens `KASSENBLATT_JE_LAUF` (400) je
+  Nacht. Nach einem Versuch ist der Monat sieben Tage gesperrt, damit ein Monat, der fällig
+  bleibt (der Lader warnt dann „kein Tag geschrieben"), nicht jede Nacht wiederkommt. `0`
+  stoppt die Historie, der laufende Monat läuft weiter.
+
+**Leere 500 ist hier ein Fehler** (`leerIstFehler`). Bei Konzernberichten heißt HTTP 500 mit
+leerem Rumpf „keine Daten" und wird nie wiederholt. Bei diesen Berichten war es am 28.10.2026
+ein veralteter Laden-Hash. Der Client wirft den gemerkten Pfad weg und meldet einen
+wiederholbaren Fehler.
+
+**Der Parser prüft den gewählten Monat** (`kassenblattTageLesen`): LINA nimmt einen
+unbekannten Parameter still nicht an und zeigt dann den laufenden Monat. Dazu kommen „Gesamt
+= Summe der Gruppen" je Tag und „Summe der Tage = Monatszeile" (1 Cent je Tag Toleranz; LINA
+rundet die Monatszeile getrennt, gemessen 94.044,60 gegen 94.044,61). Die Jahresübersicht
+prüft, dass das Filterformular auf „Gesamtumsatz" steht.
+
+**Vorrang** steht in beiden Ladern im `ON CONFLICT … WHERE`. Der Kassenblatt-Lader überschreibt
+nur Zeilen mit `quelle = 'kassenblatt'` oder solche ohne Umsatz und ohne Rechnungen. Der
+Konzernlader überschreibt ein Kassenblatt nur mit einem echten Wert. Tage ab heute werden nicht
+geschrieben.
+
+**Attrappe:** `report_<id>` im Baum, beide Berichte aus den echten Bremen-Seiten. Ein Monat
+ohne Vorlage bekommt den laufenden, wie LINA. `berichtLeer500` simuliert den veralteten Hash.
+Durchstich: `e2e Ladenakte > Kassenblatt`.

@@ -2258,8 +2258,13 @@ eigene Quelle mit Vorrang Umsatzbericht, nie überschreibend. Bis dahin sagt die
   Karmelitenstraße). Für uns unschädlich — Yext geht vor, GSF liegt auf Ortsgenauigkeit —, aber
   in LINA falsch.
 * **Betriebe mit fremder Kasse** (6, `status = 'fremdkasse'`): Umsatz und Artikel gibt es für sie
-  nicht, solange ihre Kasse nicht an LINA hängt. Ob es dafür eine andere Quelle gibt (ikentoo
-  u. a.), ist offen.
+  nicht, solange ihre Kasse nicht an LINA hängt. ~~Ob es dafür eine andere Quelle gibt (ikentoo
+  u. a.), ist offen.~~ **Gefunden am 28.10.2026:** der Ladenakte-Bericht „Die letzten Tage"
+  (`?monat=&jahr=`) liefert für vier der sechs den Tagesumsatz aus dem Kassenblatt, netto, nach
+  Getränke/Essen, mit Historie seit mindestens 2012 (`lina-api-inventar-ladenakte.md` §2a).
+  Aposto Wuppertal (ikentoo) steht auch dort auf 0. ~~**Offen:** der Import …~~ **Gebaut mit
+  `0141`** (Entscheidung Eugene: bestehende Tabelle, `quelle = 'kassenblatt'`). Was danach offen
+  ist, steht im Abschnitt „Kassenblatt (`0141`)" unten.
 * ~~Sieben operative Betriebe ohne Standort~~ — erledigt mit `0125`: der Nachtlauf ergänzt sie aus
   der LINA-Anschrift und OpenStreetMap. Prüfen nach dem ersten Lauf:
   `SELECT * FROM mart.luecke_monat WHERE quelle IN ('Wetter','Kalender');`
@@ -2366,3 +2371,36 @@ bekommen sollen, ist offen.
   Lader (`finanzwegArt()`) ebenso; `core.finanzweg.art` ist nachgezogen.
 - **MCP-Katalogabzug** für `mart.finanzweg_fehleingabe` und `mart.zahlart_monat.tage_fehleingabe`:
   `cd mcp && bun run katalog:abzug` gegen eine vollständige Datenbank.
+
+## Kassenblatt (`0141`): was nach dem Bau offen ist (28.10.2026)
+
+**Nach dem ersten Lauf prüfen.** Der Importer ist nur gegen die Attrappe gelaufen (Regel 7a).
+Die Seiten selbst sind echte Antworten vom 28.10.2026.
+```sql
+-- 1. Monatswerte da? Erwartung: rund 120 Betriebe mit Zeilen, die übrigen ohne Umsatz.
+SELECT count(DISTINCT betrieb_key) FROM core.kassenblatt_monat;
+-- 2. Was ist fällig? In der ersten Nacht nach den Monatswerten erwartet, danach abnehmend.
+SELECT zustand, count(*) FROM mart.kassenblatt_stand GROUP BY 1 ORDER BY 2 DESC;
+-- 3. Bremen, Leipzig, Minden, Ratskeller Augsburg, KUZ Mainz: Kassenblatt-Umsatz je Monat
+SELECT betrieb, monat, sum(umsatz_netto) FROM mart.umsatz_tag
+ WHERE quelle = 'kassenblatt' GROUP BY 1, 2 ORDER BY 1, 2 DESC;
+-- 4. "abweichung" ansehen: Kasse und Kassenblatt im selben Monat — Kassenwechsel?
+SELECT * FROM mart.kassenblatt_stand WHERE zustand = 'abweichung' AND monat >= '2025-01-01';
+```
+
+**Nicht gemessen, nur vermutet:**
+- **Wie viele Monate LINA-Kassen-Betriebe vor ihrer Umstellung im Kassenblatt führen.** Diese
+  Monate sind fällig und werden geholt (bis `KASSENBLATT_JE_LAUF` je Nacht). Ist die Liste
+  unerwartet lang, zeigt Abfrage 2 das.
+- **Wann nachgetragene Tage eintreffen.** Bremen zeigte am 28.10. sieben Tage im Oktober mit
+  0,00 €. Ob das Ruhetage oder fehlende Einträge sind, weiß nur der Betrieb. Der laufende Monat
+  wird jede Nacht neu geholt, der Vormonat bis zum Zehnten, danach greift der Monatswert.
+- **Biergarten und andere Umsatzgruppen** bleiben ohne Hauptsparte. Gibt es eine Zuordnung,
+  die der Fachbereich bestätigt, ist das eine Zeile in `GRUPPE_ZU_SPARTE`
+  (`src/ladenakte/laden.ts`).
+- **Aposto Wuppertal** (ikentoo) hat auch im Kassenblatt keinen Umsatz und bleibt `fremdkasse`.
+- `mart.pruefung_uebersicht`, Zeile „Betriebsberichte: Betrieb-Tage mit Umsatz ohne Bericht":
+  Die Spalte `geprueft` zählt Kassenblatt-Tage mit, `auffaellig` nicht. Nur der Nenner ist
+  etwas zu groß; die Sicht wurde in `0141` unverändert übernommen.
+- **`mcp/test/katalog.json`** ist von Hand ergänzt. Nach dem Deploy gegen die Produktion neu
+  ziehen (`cd mcp && bun run katalog:abzug`).

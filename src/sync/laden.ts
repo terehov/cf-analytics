@@ -344,7 +344,15 @@ export async function laden(k: Kontext): Promise<number> {
                rechnungen = EXCLUDED.rechnungen, gaeste = EXCLUDED.gaeste,
                durchschnittsbon = EXCLUDED.durchschnittsbon,
                umsatz_pro_gast = EXCLUDED.umsatz_pro_gast,
-               raw_id = EXCLUDED.raw_id, geladen_am = now()`, werte)
+               quelle = 'umsatzbericht',
+               raw_id = EXCLUDED.raw_id, geladen_am = now()
+             -- 0141: LINAs taegliche 0,00 fuer einen Betrieb mit fremder
+             -- Kasse ueberschreibt dessen Kassenblatt-Umsatz NICHT. Ein echter
+             -- Wert aus der Kasse dagegen schon — er ist der genauere.
+             -- Gegenstueck in src/ladenakte/laden.ts (tagesumsatzSchreiben).
+             WHERE core.umsatzbericht_tag.quelle = 'umsatzbericht'
+                OR coalesce(EXCLUDED.umsatz_netto, 0) <> 0
+                OR coalesce(EXCLUDED.rechnungen, 0) > 0`, werte)
         })
         geschrieben = zeilen.length
         break

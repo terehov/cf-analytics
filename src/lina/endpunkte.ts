@@ -205,7 +205,24 @@ export type Endpunkt = {
    *
    * Der Betrieb kommt dafür als `linaBetriebId` in den Zusatzparametern.
    */
-  braucht?: 'beleg_token' | 'bwa_hash' | 'stamm_pfad'
+  braucht?: 'beleg_token' | 'bwa_hash' | 'stamm_pfad' | 'bericht_pfad'
+  /**
+   * Nur mit `braucht: 'bericht_pfad'`: die Beschriftung des Berichts unter
+   * der Rubrik "Reports" eines Betriebs (Baumknoten `report_<id>`), z. B.
+   * "Die letzten Tage". Daraus kommt der Pfad mit gesalzenem Laden-Hash.
+   */
+  berichtTitel?: string
+  /**
+   * HTTP 500 mit leerem Rumpf ist hier ein FEHLER, nicht `keine_daten`.
+   *
+   * Fuer LINAs Konzernberichte heisst die leere 500 "fuer diesen Betrieb gibt
+   * es nichts" (AGENTS.md) und wird nie wiederholt. Die Ladenakte-Berichte
+   * antworten so auf einen veralteten Laden-Hash — am 28.10.2026 gemessen:
+   * derselbe Bericht lieferte mit dem Hash aus einem frueheren Baumabruf eine
+   * leere 500 und mit frisch geholtem Hash 72 kB. Als `keine_daten` gelesen,
+   * waere ein Monat still und endgueltig ausgefallen.
+   */
+  leerIstFehler?: boolean
   /**
    * Die Antwort ist ein JSON-String, der JSON enthält. So liefern LINAs
    * Betriebsberichte (22.09.2026): `JSON.parse` ergibt einen String, erst das

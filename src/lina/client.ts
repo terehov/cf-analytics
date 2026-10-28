@@ -19,7 +19,7 @@ import { eine } from '../db/pool'
 import { LinaSession, sessionAbgelaufen, AnmeldungFehlgeschlagen } from './auth'
 import { schemaFuer } from './schemas'
 import type { Endpunkt } from './endpunkte'
-import { belegToken, bwaHash, stammPfad, KeinBelegarchiv } from '../ladenakte/token'
+import { belegToken, bwaHash, stammPfad, berichtPfad, berichtVerwerfen, KeinBelegarchiv } from '../ladenakte/token'
 
 export type Ergebnis =
   /**
@@ -229,6 +229,8 @@ export class LinaClient {
        * den Weg durch die Warteschlange nicht.
        */
       let pfad = ep.pfad
+      // Vor dem Aufloesen merken: danach steht er nicht mehr in `parameter`.
+      const linaBetriebId = parameter.linaBetriebId
       if (ep.braucht) {
         /**
          * „Der Betrieb hat gar kein Belegarchiv" ist eine ANTWORT und kein
@@ -266,6 +268,18 @@ export class LinaClient {
 
       // Der dokumentierte Sonderfall aus Phase 1.
       if (res.status >= 500 && text.trim() === '') {
+        /**
+         * Nicht bei den Ladenakte-Berichten: dort heisst die leere 500
+         * "veralteter Laden-Hash" (Begruendung bei `leerIstFehler`). Den
+         * gemerkten Pfad wegwerfen, damit der naechste Versuch neu aufloest.
+         */
+        if (ep.leerIstFehler) {
+          if (ep.berichtTitel && linaBetriebId) berichtVerwerfen(ep.berichtTitel, linaBetriebId)
+          return {
+            art: 'fehler', status: res.status, dauerMs, wiederholbar: true,
+            fehler: `HTTP ${res.status} mit leerem Rumpf — bei ${ep.key} ein veralteter Laden-Hash, kein "keine Daten"`,
+          }
+        }
         return { art: 'keine_daten', status: res.status, dauerMs }
       }
 
@@ -410,6 +424,10 @@ export class LinaClient {
     }
     if (ep.braucht === 'stamm_pfad') {
       return { parameter: rest, pfad: await stammPfad(this, id) }
+    }
+    if (ep.braucht === 'bericht_pfad') {
+      if (!ep.berichtTitel) throw new Error(`${ep.key}: braucht bericht_pfad, aber "berichtTitel" fehlt im Register`)
+      return { parameter: rest, pfad: await berichtPfad(this, id, ep.berichtTitel) }
     }
     throw new Error(`${ep.key}: unbekanntes braucht "${ep.braucht}"`)
   }

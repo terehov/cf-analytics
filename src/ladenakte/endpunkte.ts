@@ -71,6 +71,15 @@ export const ERLAUBTE_PFADE: RegExp[] = [
    * ansprechen.
    */
   /^\/intranet\/ladenakte\/getBeleg$/,
+  /*
+   * Zwei Berichte der Rubrik "Reports" (0141, 28.10.2026): "Die letzten
+   * Tage" und "Die letzten Jahre" — der Umsatz der Betriebe mit fremder
+   * Kasse. Dieselbe Doppelform wie beim Stammdatenblatt: die nackte Basis
+   * fuer den Registertest, die vollstaendige mit Laden-Hash fuer den Aufruf.
+   * Lesend: beide Seiten zeigen nur an; Monat und Jahr kommen als Query.
+   */
+  /^\/intranet\/report\/(monatsanalyse|jahresuebersicht)$/,
+  /^\/intranet\/report\/(monatsanalyse|jahresuebersicht)\/laden\/[0-9a-f]{20,120}\/admin\/1\/?$/,
 ]
 
 /**
@@ -277,6 +286,55 @@ export const LADENAKTE_ENDPUNKTE: Endpunkt[] = [
       + 'deshalb zur Laufzeit zusammengesetzt. ACHTUNG: eine der sieben Tabellen fuehrt die '
       + 'LINA-API-Schluessel im Klartext — der Parser liest ueber eine Positivliste genau '
       + 'drei Kopfzeilen, und das Roh-HTML wird vor der Ablage bereinigt.',
+    parameter: (_von, _bis, extra = {}) => ({ ...extra }),
+  },
+  /**
+   * DER UMSATZ DER BETRIEBE MIT FREMDER KASSE (0141, 28.10.2026).
+   *
+   * Betriebe mit eigener Kasse (Vectron, ikentoo u. a.) tragen ihre
+   * Tageswerte von Hand in LINAs Kassenblatt ein. Kein Konzernbericht
+   * liefert sie — getUmsatzbericht fuehrt diese Betriebe mit 0,00 EUR an
+   * jedem Tag. Der Ladenakte-Bericht "Die letzten Tage" zeigt sie, je Monat.
+   *
+   * NICHT BLAETTERN. Die Pfeile der Seite rufen /finanzen/stat/… OHNE
+   * Betrieb auf und landen auf dem Standardbetrieb der Sitzung ("Zentrale"),
+   * alles 0,00. Nur `?monat=&jahr=` an der Ladenakte-Adresse traegt den
+   * Betrieb; der Parser prueft, dass der gewaehlte Monat der angefragte ist.
+   * Messwerte in docs/lina-api-inventar-ladenakte.md §2a.
+   */
+  {
+    key: 'la:tagesumsatz',
+    ebene: 'betrieb',
+    pfad: '/intranet/report/monatsanalyse',
+    schrittweite: 'momentaufnahme',
+    form: 'html',
+    zweck: 'Nettoumsatz je Tag und Umsatzgruppe eines Monats — fuer Betriebe mit fremder Kasse',
+    aktiv: false,
+    braucht: 'bericht_pfad',
+    berichtTitel: 'Die letzten Tage',
+    leerIstFehler: true,
+    hinweis:
+      'HTML, rund 250 kB. Schreibt nach core.umsatzbericht_tag mit quelle = kassenblatt, aber nur '
+      + 'dort, wo LINAs Konzernbericht 0,00 fuehrt. Eingereiht nur fuer Monate, die '
+      + 'mart.kassenblatt_stand als faellig meldet, und fuer den laufenden Monat der Betriebe, '
+      + 'die ihn brauchen (kassenblattNachfuellen).',
+    parameter: (_von, _bis, extra = {}) => ({ ...extra }),
+  },
+  {
+    key: 'la:jahresumsatz',
+    ebene: 'betrieb',
+    pfad: '/intranet/report/jahresuebersicht',
+    schrittweite: 'momentaufnahme',
+    form: 'html',
+    zweck: 'Nettoumsatz je Monat seit Beginn — entscheidet, welche Monate tageweise geholt werden',
+    aktiv: false,
+    braucht: 'bericht_pfad',
+    berichtTitel: 'Die letzten Jahre',
+    leerIstFehler: true,
+    hinweis:
+      'HTML, rund 70 kB, ein Aufruf je Betrieb und Kalendermonat. Schreibt core.kassenblatt_monat '
+      + '(Momentaufnahme). Fuer ALLE Betriebe: bei LINA-Kassen ist es derselbe Umsatz wie '
+      + 'getUmsatzbericht, und genau daran erkennt mart.kassenblatt_stand, wo er fehlt.',
     parameter: (_von, _bis, extra = {}) => ({ ...extra }),
   },
 ]

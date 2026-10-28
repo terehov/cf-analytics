@@ -449,6 +449,9 @@ export async function betriebsberichteNachfuellen(
            FROM core.umsatzbericht_tag u
           WHERE u.geschaeftstag BETWEEN $2::date AND $3::date
             AND u.hauptsparte_key IS NULL AND u.verkaufsstelle_key IS NULL
+            -- 0141: ein Kassenblatt-Tag ist kein Kassentag; Betriebsberichte
+            -- gibt es dort nicht, jeder Posten liefe ins Leere.
+            AND u.quelle = 'umsatzbericht'
             AND (coalesce(u.umsatz_netto, 0) <> 0 OR coalesce(u.rechnungen, 0) > 0)
          UNION
          SELECT a.betrieb_key
@@ -592,6 +595,7 @@ export async function betriebsberichteNachfuellen(
              FROM core.umsatzbericht_tag u
             WHERE u.geschaeftstag >= $1::date AND u.geschaeftstag < ($1::date + interval '1 month')
               AND u.hauptsparte_key IS NULL AND u.verkaufsstelle_key IS NULL
+              AND u.quelle = 'umsatzbericht'   -- 0141, siehe oben
               AND (coalesce(u.umsatz_netto, 0) <> 0 OR coalesce(u.rechnungen, 0) > 0)
            UNION
            SELECT a.betrieb_key, a.geschaeftstag
@@ -1575,15 +1579,126 @@ export async function ladenakteNachfuellen(heute: string): Promise<number> {
       ORDER BY b.lina_betrieb_id`)
 
   const monatsErster = `${heute.slice(0, 7)}-01`
-  for (const key of ['la:bwa_longterm', 'la:stammdaten'] as const) {
+  // la:jahresumsatz seit 0141: die Monatswerte, an denen kassenblattNachfuellen
+  // entscheidet, welche Monate tageweise geholt werden.
+  for (const key of ['la:bwa_longterm', 'la:stammdaten', 'la:jahresumsatz'] as const) {
     for (const z of betriebe) {
       n += await einreihenJeMonat(key, monatsErster, PRIORITAET_LADENAKTE,
         { linaBetriebId: String(z.lina_betrieb_id) })
     }
   }
 
+  n += await kassenblattNachfuellen(heute)
+
   return n
 }
+
+/**
+ * Der Umsatz der Betriebe mit fremder Kasse (0141, 28.10.2026).
+ *
+ * WELCHE MONATE, ENTSCHEIDET EINE MESSUNG UND KEINE LISTE. `la:jahresumsatz`
+ * holt einmal im Monat je Betrieb alle Monatswerte aus "Die letzten Jahre";
+ * `mart.kassenblatt_stand` vergleicht sie mit LINAs Kasse und mit dem, was an
+ * Kassenblatt-Tagen schon steht. Was dort `faellig` heisst, wird hier
+ * eingereiht — dieselbe Bedingung, die die Pruefsicht zeigt. So kommt ein
+ * fuenfter Fremdkassen-Betrieb ohne Handpflege dazu, und ein Betrieb, der auf
+ * LINA umstellt, faellt von selbst heraus.
+ *
+ * ZWEI TEILE:
+ *
+ *   laufend    Der laufende Monat bis zum Vortag, jede Nacht, fuer jeden
+ *              Betrieb, der in den letzten zwei Monaten Kassenblatt-Umsatz
+ *              hatte oder dort faellig ist; in den ersten zehn Tagen auch
+ *              der Vormonat — das Kassenblatt wird von Hand nachgetragen.
+ *              Tagesgeschaeft (Phase A).
+ *   Historie   Faellige Monate vor dem laufenden, neueste zuerst, hoechstens
+ *              KASSENBLATT_JE_LAUF je Nacht. Nachladen (Phase C).
+ *
+ * GESPERRT WIRD SIEBEN TAGE LANG, nicht nur waehrend ein Posten offen ist.
+ * Ein Monat, der nach dem Abruf weiter faellig ist (LINA-Kasse hat Vorrang,
+ * kein Tag geschrieben — der Lader warnt), kaeme sonst jede Nacht wieder.
+ */
+export async function kassenblattNachfuellen(heute: string): Promise<number> {
+  const vortag = new Date(`${heute}T00:00:00Z`)
+  vortag.setUTCDate(vortag.getUTCDate() - 1)
+  const monate = new Set([vortag.toISOString().slice(0, 7)])
+  if (Number(heute.slice(8, 10)) <= 10) {
+    // Der Vormonat von HEUTE, nicht vom Vortag: am Ersten ist beides derselbe.
+    const vor = new Date(`${heute.slice(0, 7)}-01T00:00:00Z`)
+    vor.setUTCMonth(vor.getUTCMonth() - 1)
+    monate.add(vor.toISOString().slice(0, 7))
+  }
+
+  let n = 0
+  for (const m of monate) {
+    const r = await query<{ posten_id: number }>(
+      `WITH betriebe AS (
+         SELECT DISTINCT u.betrieb_key
+           FROM core.umsatzbericht_tag u
+          WHERE u.quelle = 'kassenblatt'
+            AND u.hauptsparte_key IS NULL AND u.verkaufsstelle_key IS NULL
+            AND u.geschaeftstag >= $1::date - 62
+            AND u.umsatz_netto <> 0
+         UNION
+         SELECT k.betrieb_key
+           FROM mart.kassenblatt_stand k
+          WHERE k.zustand = 'faellig'
+            AND k.monat >= (date_trunc('month', $1::date) - interval '2 months')::date
+       )
+       INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, parameter, nachladen)
+       SELECT 'la:tagesumsatz', $2::date, $1::date, $3,
+              jsonb_build_object('linaBetriebId', b.lina_betrieb_id::text,
+                                 'monat', $4::text, 'jahr', $5::text), false
+         FROM betriebe x
+         JOIN core.betrieb b ON b.betrieb_key = x.betrieb_key
+        WHERE b.lina_betrieb_id IS NOT NULL
+          AND ${NICHT_ABGEGEBEN('b')}
+          AND NOT EXISTS (
+              SELECT 1 FROM sync.warteschlange w
+               WHERE w.endpunkt = 'la:tagesumsatz'
+                 AND w.parameter = jsonb_build_object('linaBetriebId', b.lina_betrieb_id::text,
+                                                      'monat', $4::text, 'jahr', $5::text)
+                 AND w.zeitraum_bis = $1::date)
+       RETURNING posten_id`,
+      [heute, `${m}-01`, PRIORITAET_KASSENBLATT_LAUFEND, m.slice(5, 7), m.slice(0, 4)])
+    n += r.length
+  }
+
+  if (config.KASSENBLATT_JE_LAUF > 0) {
+    const r = await query<{ posten_id: number }>(
+      `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, parameter, nachladen)
+       SELECT 'la:tagesumsatz', k.monat, (k.monat + interval '1 month' - interval '1 day')::date, $3,
+              jsonb_build_object('linaBetriebId', b.lina_betrieb_id::text,
+                                 'monat', to_char(k.monat, 'MM'), 'jahr', to_char(k.monat, 'YYYY')),
+              true
+         FROM mart.kassenblatt_stand k
+         JOIN core.betrieb b ON b.betrieb_key = k.betrieb_key
+        WHERE k.zustand = 'faellig'
+          AND k.monat < date_trunc('month', $1::date)::date
+          AND b.lina_betrieb_id IS NOT NULL
+          AND ${NICHT_ABGEGEBEN('b')}
+          AND NOT EXISTS (
+              SELECT 1 FROM sync.warteschlange w
+               WHERE w.endpunkt = 'la:tagesumsatz'
+                 AND w.parameter = jsonb_build_object('linaBetriebId', b.lina_betrieb_id::text,
+                                                      'monat', to_char(k.monat, 'MM'),
+                                                      'jahr', to_char(k.monat, 'YYYY'))
+                 AND (w.erledigt_am IS NULL OR w.erstellt_am > now() - interval '7 days'))
+        ORDER BY k.monat DESC, b.lina_betrieb_id
+        LIMIT $2
+       RETURNING posten_id`,
+      [heute, config.KASSENBLATT_JE_LAUF, PRIORITAET_KASSENBLATT_HISTORIE])
+    n += r.length
+  }
+
+  if (n > 0) log.info('kassenblatt eingereiht', { posten: n })
+  return n
+}
+
+/** Wie LINAs Tagesgeschaeft: der laufende Monat ist Umsatz von gestern. */
+const PRIORITAET_KASSENBLATT_LAUFEND = 12
+/** Direkt hinter der Konzernhistorie (90). */
+const PRIORITAET_KASSENBLATT_HISTORIE = 91
 
 /**
  * Hinter der Historie (90), vor der Nacharbeit. Die Ladenakte ist wertvoll,

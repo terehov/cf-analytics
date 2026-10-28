@@ -4447,3 +4447,40 @@ ebenso für einen Client, der nach `passwort` noch einen alten Token hatte.
 - Der Test `anmeldung.test.ts` („Getrennt heißt sofort …") prüft jetzt auch, dass ein
   getrennter Client beim Auffrischen die übrige Verbindung stehen lässt.
 
+
+## 28.10.2026 — Umsatz der Betriebe mit fremder Kasse aus dem Kassenblatt (`0141`)
+
+**Anlass.** Einige Betriebe kassieren nicht über LINA (Vectron, ikentoo u. a.), tragen ihre
+Tageswerte aber von Hand in LINAs Kassenblatt ein. Der Konzernbericht kennt diese Werte nicht.
+Der Ladenakte-Bericht „Die letzten Tage" zeigt sie (Messwerte in
+`lina-api-inventar-ladenakte.md` §2a).
+
+**Entschieden (Eugene, 28.10.2026):**
+1. **In die bestehende Tabelle** `core.umsatzbericht_tag`, damit Round Table, Datenstand und
+   MCP die Werte ohne Umweg mitnehmen. Dazu kommt die Spalte `quelle` (`umsatzbericht` /
+   `kassenblatt`).
+2. **So weit zurück wie möglich**, umgesetzt als: bis `HISTORIE_AB` (2018-01-01). LINA führt
+   für Bremen Werte ab 2009. Vor 2018 hätten aber nur diese Betriebe Umsatz, und eine Frage
+   nach der Gruppe 2015 bekäme still eine Antwort über vier Betriebe. Die Grenze ist eine
+   Einstellung, kein Umbau.
+
+**Wie, mit Begründung:**
+- **`quelle` steht nicht im Eindeutigkeitsschlüssel.** Je Betrieb und Tag gibt es einen
+  Umsatz. Zwei Zeilen würden in rund dreißig Sichten Summen und Tageszählungen verdoppeln.
+- **Vorrang:** Ein echter Wert schlägt eine Null (LINAs tägliche 0,00 € überschreiben das
+  Kassenblatt nicht). Bei echten Werten auf beiden Seiten gewinnt LINAs Kasse. Beide Lader
+  setzen das im `ON CONFLICT … WHERE` durch.
+- **Welche Monate geholt werden, entscheidet eine Messung.** „Die letzten Jahre" liefert mit
+  einem Aufruf je Betrieb alle Monatssummen. `mart.kassenblatt_stand` vergleicht sie mit LINAs
+  Kasse, und genau diese Sicht ist zugleich die Einreihbedingung. Ein fünfter
+  Fremdkassen-Betrieb kommt ohne Handpflege dazu.
+- **Ein Monat, in dem Kasse und Kassenblatt beide Umsatz führen** (Kassenwechsel), wird nicht
+  automatisch gefüllt. Er steht als `abweichung` in der Sicht. Gemischte Monate wären Zahlen,
+  denen man ihre Herkunft nicht mehr ansieht.
+- **Sparten nur nach exaktem Namen:** Getränke → Getränke, Essen/Speisen → Speisen. Andere
+  Umsatzgruppen (Biergarten, Divers …) bleiben in der Gesamtzeile. Dass LINAs Konzernbericht
+  sie genauso zuordnet, ist nicht gemessen.
+- **Prüfsichten, die LINAs Kasse meinen**, lesen nur `quelle = 'umsatzbericht'`: Lochtage,
+  Verkaufsstellen-Abdeckung, Betriebsbericht-Lücken und -Ladestand, Einreihen der
+  Betriebsberichte. Für einen Kassenblatt-Tag gibt es keine Betriebsberichte, und jeder
+  solche Tag stünde sonst als Lücke da, die kein Abruf schließen kann.

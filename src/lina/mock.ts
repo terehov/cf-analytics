@@ -94,6 +94,12 @@ export type MockOptionen = {
    */
   ohneBelegarchiv?: string[]
   /**
+   * Ladenakte-Berichte "Die letzten Tage"/"Die letzten Jahre" (0141): so
+   * viele Aufrufe antworten zuerst mit HTTP 500 und leerem Rumpf — so, wie
+   * LINA am 28.10.2026 auf einen veralteten Laden-Hash antwortete.
+   */
+  berichtLeer500?: number
+  /**
    * Betriebsberichte (`/intranet/storeanalytics/getReport`, seit 0113). Die
    * Attrappe antwortet aus ECHTEN, anonymisierten Antworten vom 22.09.2026
    * (src/transform/fixtures/betriebsbericht/) und bildet LINAs gemessene
@@ -328,6 +334,15 @@ export function mockStarten(opt: MockOptionen = {}) {
             a_attr: { 'data-link': `/finanzen/bwa/longterm?module=franchise&laden=${salz.slice(0, 84)}` },
           }] }), { headers: { 'content-type': 'text/html' } })
         }
+        if (id.startsWith('report_')) {
+          // Zwei der vierzehn Berichte, Hash je Aufruf neu gesalzen wie gemessen.
+          const hex = Array.from({ length: 84 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join('')
+          return new Response(JSON.stringify({ id, text: 'Reports', children: [
+            { text: 'Kassenblatt/ZE', a_attr: { 'data-link': `/intranet/report/kasse/laden/${hex}/admin/1/` } },
+            { text: 'Die letzten Tage', a_attr: { 'data-link': `/intranet/report/monatsanalyse/laden/${hex}/admin/1/` } },
+            { text: 'Die letzten Jahre', a_attr: { 'data-link': `/intranet/report/jahresuebersicht/laden/${hex}/admin/1/` } },
+          ] }), { headers: { 'content-type': 'text/html' } })
+        }
         if (id.startsWith('laden_')) {
           return new Response(JSON.stringify({ children: [{
             text: 'Stammdaten',
@@ -416,6 +431,27 @@ export function mockStarten(opt: MockOptionen = {}) {
         if (!url.searchParams.get('laden')) return new Response('laden fehlt', { status: 400 })
         return new Response(fixtureText('bwa_longterm_klein.html'),
           { headers: { 'content-type': 'text/html' } })
+      }
+
+      /**
+       * "Die letzten Tage" und "Die letzten Jahre" (0141), aus den echten
+       * Antworten von Enchilada Bremen. Ein Monat, fuer den es keine Vorlage
+       * gibt, bekommt den LAUFENDEN Monat (Oktober 2026) — genau so verhaelt
+       * sich LINA bei einem Parameter, den es nicht annimmt.
+       */
+      const bericht = pfad.match(/^\/intranet\/report\/(monatsanalyse|jahresuebersicht)\/laden\/[0-9a-f]+\/admin\/1\/$/)
+      if (bericht) {
+        zaehler[`la_${bericht[1]}`] = (zaehler[`la_${bericht[1]}`] ?? 0) + 1
+        if ((opt.berichtLeer500 ?? 0) > (zaehler['la_bericht_500'] ?? 0)) {
+          zaehler['la_bericht_500'] = (zaehler['la_bericht_500'] ?? 0) + 1
+          return new Response('', { status: 500 })
+        }
+        const datei = bericht[1] === 'jahresuebersicht'
+          ? 'kassenblatt_jahre_bremen.html'
+          : `${url.searchParams.get('jahr')}-${url.searchParams.get('monat')}` === '2026-08'
+            ? 'kassenblatt_tage_bremen_2026_08.html'
+            : 'kassenblatt_tage_bremen_2026_10.html'
+        return new Response(fixtureText(datei), { headers: { 'content-type': 'text/html' } })
       }
 
       if (/^\/intranet\/ladenakte\/ladenstamm\//.test(pfad)) {

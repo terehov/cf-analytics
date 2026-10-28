@@ -133,6 +133,34 @@ describe('Die zehn Fallenfragen', () => {
   })
 })
 
+describe('Kassenblatt-Betriebe (0141)', () => {
+
+  /**
+   * Betriebe mit fremder Kasse fuehren in mart.umsatz_tag nur den
+   * Nettoumsatz; Rechnungen und Gaeste sind NULL. Ein Durchschnittsbon "der
+   * Gruppe" teilt dann den Umsatz ALLER durch die Rechnungen eines Teils —
+   * zu hoch, und nichts schlaegt fehl.
+   */
+  test('Durchschnittsbon ueber die Gruppe wird gewarnt', () => {
+    const e = gesperrt(`
+      SELECT monat, sum(umsatz_netto) / nullif(sum(rechnungen), 0) AS bon
+        FROM mart.umsatz_tag
+       WHERE geschaeftstag >= '2026-01-01'
+       GROUP BY monat`)
+    expect(e.schluessel).toContain('kassenblatt_ohne_bons')
+    expect(e.befunde.find(b => b.schluessel === 'kassenblatt_ohne_bons')!.schwere).toBe('warnung')
+  })
+
+  test('reiner Nettoumsatz loest die Warnung nicht aus', () => {
+    const e = gesperrt(`
+      SELECT betrieb, monat, sum(umsatz_netto) AS umsatz
+        FROM mart.umsatz_tag
+       WHERE geschaeftstag >= '2026-01-01'
+       GROUP BY betrieb, monat`)
+    expect(e.schluessel).not.toContain('kassenblatt_ohne_bons')
+  })
+})
+
 describe('Richtige Abfragen kommen durch', () => {
 
   test('Tagesumsatz je Betrieb und Monat — die haeufigste Frage ueberhaupt', () => {

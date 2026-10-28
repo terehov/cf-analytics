@@ -1489,3 +1489,17 @@ Datenzustand, sondern ein Ladestand.
 
 **Nicht geholt:** die acht übrigen Hauptsparten. Jede weitere Sparte kostet einen Aufruf je Tag über
 die ganze Historie; Speisen und Getränke sind, was gefragt war.
+
+## Kassenblatt: `core.umsatzbericht_tag.quelle` und `core.kassenblatt_monat` (`0141`, 28.10.2026)
+
+- **`core.umsatzbericht_tag.quelle`**: `umsatzbericht` (LINAs Konzernbericht, Vorgabe) oder
+  `kassenblatt` (Ladenakte-Bericht „Die letzten Tage", Betriebe mit fremder Kasse). **Nicht im
+  Schlüssel.** Je Tag gibt es einen Umsatz; welche Quelle eine Zeile überschreiben darf,
+  regeln die Lader (echter Wert schlägt Null, Kasse schlägt Kassenblatt). Kassenblatt-Zeilen
+  tragen nur `umsatz_netto`. Brutto, Rechnungen, Gäste und Bons sind `NULL`, nicht 0.
+  Teilindex `(betrieb_key, geschaeftstag) WHERE quelle = 'kassenblatt'`.
+- **`core.kassenblatt_monat`** `(betrieb_key, monat)`: Nettoumsatz je Monat aus „Die letzten
+  Jahre", Momentaufnahme je Betrieb (der Lader ersetzt alle Zeilen). Für alle Betriebe geholt.
+  Eine leere Zelle ergibt keine Zeile.
+- Hauptsparten-Zeilen (`Speisen`, `Getränke`) entstehen aus den Umsatzgruppen `Getränke`,
+  `Essen`, `Speisen`, nur nach exaktem Namen. Alles andere bleibt in der Gesamtzeile.

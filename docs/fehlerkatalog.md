@@ -5318,3 +5318,35 @@ und konnte es deshalb nicht sehen.
 * Die Prüfzeile „Stunde x Sparte: Tag weicht vom Umsatzbericht ab" misst tageweise und steht ab
   jetzt auf 0. Eine Gegenprobe gegen eine zweite Quelle muss in der **kleinsten** Körnung messen,
   die die Daten haben — über eine Woche summiert verschwinden Verschiebungen.
+
+## `DROP … CASCADE` löscht auch, was zwei Ebenen höher steht (28.10.2026, vor dem Deploy)
+
+**Symptom.** Die erste Fassung von `0141` legte `mart.betriebsbericht_ladestand_basis` neu an
+und stellte die beiden direkt abhängigen Sichten wieder her. Danach fehlten
+`mart.luecke_monat` und `mart.pruefung_uebersicht`, ohne Fehlermeldung und ohne Warnung. Die
+Migration lief durch.
+
+**Ursache.** `DROP MATERIALIZED VIEW … CASCADE` nimmt die ganze Kette mit. Die Abhängigkeit
+war aber nur eine Ebene tief erhoben (`pg_depend` direkt), nicht rekursiv.
+
+**Aufgefallen** am Klon, weil die Metabase-Karte `dq_pruefung` scheiterte
+(`bun test metabase` gegen den Klon).
+
+**Was es heute verhindert.** `0141` erhebt die Abhängigen rekursiv, wie `0129`. Die erwartete
+Liste ist eine harte Prüfung in beide Richtungen: Unbekanntes oder Fehlendes bricht ab.
+Eigentümer, Rechte, Kommentare und Indizes werden mitgenommen, und ein Vorher-Nachher-Vergleich
+aller Relationen gehört zur Abnahme. **Wer eine materialisierte Sicht neu anlegt: rekursiv
+erheben, nie nur `pg_depend` eine Ebene.**
+
+## Eine Grenze aus den Daten, die von den eigenen Daten verschoben wird (28.10.2026, vor dem Deploy)
+
+**Symptom.** Im Durchstich-Test stand der gerade aus dem Kassenblatt geladene August in
+`mart.kassenblatt_stand` auf „vor Historie".
+
+**Ursache.** Die Grenze war der erste Tag mit `quelle = 'umsatzbericht'`. Jeder mit
+Kassenblatt-Werten überschriebene Monat zog sie nach vorn. In Produktion wäre das nicht
+aufgefallen (andere Betriebe halten die Grenze bei 2018), bei einem neuen Bestand schon.
+
+**Was es heute verhindert.** Die Grenze ist der erste Tag über alle Quellen. Kassenblatt-Zeilen
+entstehen nur ab dieser Grenze und können sie nicht verschieben. Der Durchstich-Test prüft genau
+diesen Fall.

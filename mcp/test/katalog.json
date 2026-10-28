@@ -3995,6 +3995,33 @@
    "fallstricke": []
   },
   {
+   "sicht": "mart.kassenblatt_stand",
+   "koernung": "Betrieb × Monat — Monatswert aus LINAs Jahresuebersicht gegen Kasse und Kassenblatt (0141)",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "Betrieb x Monat: Monatswert aus \"Die letzten Jahre\" gegen LINAs Kasse und gegen geladene Kassenblatt-Tage (0141). Zugleich die Einreihbedingung des Importers. ERWARTUNG: keine Zeile \"faellig\", die aelter als zwei Naechte ist. \"abweichung\" heisst: Kasse und Kassenblatt fuehren beide Umsatz und treffen sich nicht — Kassenwechsel im Monat oder ein Datenproblem, wird nicht automatisch gefuellt.\n\nKoernung: Betrieb × Monat — Monatswert aus LINAs Jahresuebersicht gegen Kasse und Kassenblatt (0141)",
+   "spalten": [
+    "betrieb_key",
+    "betrieb",
+    "konzept",
+    "monat",
+    "jahresuebersicht",
+    "umsatz_lina",
+    "umsatz_kassenblatt",
+    "tage_kassenblatt",
+    "jahresuebersicht_abgerufen_am",
+    "kassenblatt_geladen_am",
+    "zustand"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "konzept",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
    "sicht": "mart.kellner_artikel_monat",
    "koernung": "Betrieb × Monat × Kellnerblock × Artikel (53) — immer mit monat filtern",
    "thema": "kasse",
@@ -6393,7 +6420,8 @@
     "rechnungen",
     "gaeste",
     "durchschnittsbon",
-    "umsatz_pro_gast"
+    "umsatz_pro_gast",
+    "quelle"
    ],
    "achsen": [
     "betrieb_key",
@@ -6454,7 +6482,8 @@
     "rechnungen",
     "gaeste",
     "durchschnittsbon",
-    "umsatz_pro_gast"
+    "umsatz_pro_gast",
+    "quelle"
    ],
    "achsen": [
     "betrieb_key",
@@ -7656,6 +7685,24 @@
    "hinweis": "Verbindung ueber den Betriebsnamen. Der Name ist NICHT eindeutig: fuenf Betriebe heissen \"Karlsruhe\" (fuenf Restaurants in einer Stadt, kein Restaurant in fuenf Marken). Ein Join darueber mischt sie zusammen.",
    "berichtigung": "Ueber betrieb_key verbinden. Fuer die Anzeige gehoeren Konzept und Name zusammen.",
    "quelle": "docs/datenmodell.md, Abschnitt Markenebene"
+  },
+  {
+   "schluessel": "kassenblatt_ohne_bons",
+   "art": "spalte_verwendet",
+   "schwere": "warnung",
+   "sicht": "mart.umsatz_tag",
+   "parameter": {
+    "spalten": [
+     "rechnungen",
+     "gaeste",
+     "durchschnittsbon",
+     "umsatz_pro_gast",
+     "umsatz_brutto"
+    ]
+   },
+   "hinweis": "Betriebe mit fremder Kasse (quelle = 'kassenblatt') melden nur den Nettoumsatz je Tag. Brutto, Rechnungen, Gaeste und Bons sind dort NULL — ein Durchschnittsbon oder eine Gaestezahl \"der Gruppe\" enthaelt diese Betriebe nicht, ihr Umsatz aber schon.",
+   "berichtigung": "Fuer Bon- und Gaestekennzahlen auf quelle = 'umsatzbericht' einschraenken, damit Zaehler und Nenner dieselben Betriebe meinen.",
+   "quelle": "0141"
   },
   {
    "schluessel": "nachlass_join_artikelname",

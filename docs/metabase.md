@@ -1924,3 +1924,27 @@ ohne Zonen in LINA brauchen diese Sichten nicht: der Stundenbericht kennt keine 
 fehlende Zoneneinrichtung bleibt eine LINA-Konfiguration des Fachbereichs. Der MCP-Katalogabzug (`mcp/test/katalog.json`) ist wie nach
 jeder neuen `mart`-Sicht nachzuziehen (`cd mcp && bun run katalog:abzug`, gegen eine vollständige
 Datenbank).
+
+## Kassenblatt-Umsatz in `mart` (Migration `0141`, 28.10.2026)
+
+- **`mart.umsatz_tag.quelle`** und **`mart.umsatz_tag_sparte.quelle`** (angehängt):
+  `kassenblatt` heißt, der Betrieb kassiert nicht über LINA, und der Tagesumsatz ist von Hand
+  eingetragen. Rechnungen, Gäste, Bons und Brutto sind dort `NULL`. **Für Bon- und
+  Gästekennzahlen auf `quelle = 'umsatzbericht'` einschränken**, sonst stehen Zähler und
+  Nenner für verschiedene Betriebe. Das MCP warnt davor (Fallstrick `kassenblatt_ohne_bons`,
+  Regelart `spalte_verwendet`).
+- **`mart.kassenblatt_stand`** (Betrieb × Monat): Monatswert aus „Die letzten Jahre" gegen
+  LINAs Kasse und gegen geladene Kassenblatt-Tage. Zustände: `lina-kasse`, `abweichung`,
+  `geladen`, `geladen, juenger`, `faellig`, `kein Umsatz`, `vor Historie`. Zugleich die
+  Einreihbedingung des Importers. Erwartung: kein `faellig`, das älter als zwei Nächte ist.
+- Gefiltert auf `quelle = 'umsatzbericht'` (aus der Zieldatenbank neu gelesen, nur der Filter
+  eingesetzt): `mart.umsatz_lochtag`, `mart.verkaufsstelle_abdeckung`,
+  `mart.betriebsbericht_luecke`, `mart.betriebsbericht_ladestand_basis`. Zusammen mit der
+  materialisierten Sicht neu angelegt: `betriebsbericht_ladestand`, `…_monat`, `luecke_monat`,
+  `pruefung_uebersicht`, mit Rechten, Kommentaren und Eigentümern.
+- **Nicht gefiltert, mit Absicht:** Datenstand, Round Table, Betriebsstatus, Lückenmonitor,
+  Bewertungs- und Bounti-Abgleiche. Dort soll der Kassenblatt-Umsatz zählen. Die vier Betriebe
+  wechseln damit von `fremdkasse` auf `operativ`.
+- **Katalogabzug:** `mcp/test/katalog.json` ist von Hand um die 0141-Einträge ergänzt, nicht neu
+  gezogen. Ein Abzug aus dem lokalen Klon hätte fremde Abweichungen der lokalen Daten
+  mitgebracht. Nach dem Deploy gegen die Produktion neu ziehen.

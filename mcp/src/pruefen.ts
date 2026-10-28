@@ -98,6 +98,21 @@ export const REGELARTEN: Record<string, RegelImpl> = {
     betrifftSicht(z, f) && z.spalten.has(f.parameter.spalte),
 
   /**
+   * Eine von mehreren Spalten wird ueberhaupt angefasst. Fuer Spalten, die
+   * nur fuer einen TEIL der Zeilen gefuellt sind — anders als
+   * spalte_immer_null, die ueberall leer ist. Anlass (0141, 28.10.2026): bei
+   * Betrieben mit fremder Kasse fuehrt mart.umsatz_tag den Nettoumsatz aus
+   * dem Kassenblatt, Rechnungen, Gaeste und Bons aber NULL. Ein
+   * Durchschnittsbon "der Gruppe" mischt dann Zaehler und Nenner aus
+   * verschiedenen Betrieben, ohne dass etwas fehlschlaegt.
+   */
+  spalte_verwendet: (z, f) => {
+    if (!betrifftSicht(z, f)) return false
+    const spalten: string[] = f.parameter.spalten ?? []
+    return spalten.some(s => z.spalten.has(s))
+  },
+
+  /**
    * Eine Sicht, die ohne einen bestimmten Filter doppelt zaehlt oder
    * Unvergleichbares vergleicht. Ein blanker Wahrheitswert (`WHERE
    * vergleichbar`) zaehlt wie ein Gleichheitsfilter — sonst meldete die

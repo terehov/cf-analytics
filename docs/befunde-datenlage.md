@@ -2210,6 +2210,13 @@ SELECT s.betrieb_key, s.betrieb,
 Null, sondern gar nicht. Ein Markenschnitt Enchilada über LINA-Umsatz ist ein Schnitt ohne
 Bremen, Leipzig und Minden. Seit `0125` führt `mart.betrieb_status` sie als `fremdkasse`.
 
+**Nachtrag 28.10.2026 (`0141`):** ~~fehlen diese sechs ganz~~ Vier der sechs tragen ihren
+Tagesumsatz von Hand in LINAs Kassenblatt ein, und der kommt seit `0141` mit
+`quelle = 'kassenblatt'` in `mart.umsatz_tag`. September 2026 netto: Bremen 125.600,09 €,
+Leipzig 130.819,69 €, Minden 75.740,42 €, Ratskeller Augsburg 276.048,86 €, KUZ Mainz
+36.855,88 €. Der Markenschnitt Enchilada enthält sie damit. Für Bon- und Gästezahlen gilt das
+nicht, dort sind die Werte `NULL`. Aposto Wuppertal fehlt weiter.
+
 ## Wilma Wunder Bochum: Umsatz ja, BWA null (29.09.2026)
 
 Seit Eröffnung am 28.05.2026 510.780 € Umsatz in LINA, aber in `core.kennzahlen_monat` für jeden

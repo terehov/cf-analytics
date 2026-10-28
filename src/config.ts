@@ -658,6 +658,21 @@ const Schema = z.object({
    */
   HISTORIE_JE_LAUF: z.coerce.number().int().min(0).default(2_000),
   /**
+   * Wie viele Kassenblatt-Monate je Nacht nachgeholt werden (0141,
+   * 28.10.2026) — der Umsatz der Betriebe mit fremder Kasse.
+   *
+   * Ein Aufruf holt einen Betrieb-Monat. Am 28.10.2026 gezaehlt: vier
+   * Fremdkassen-Betriebe mit Werten, seit 2018 rund 400 Monate zusammen —
+   * mit 400 also eine Nacht. Wie viele Monate LINA-Kassen-Betriebe VOR ihrer
+   * Umstellung auf LINA im Kassenblatt fuehren, ist nicht gemessen; diese
+   * Grenze haelt eine unerwartet lange Liste auf mehrere Naechte verteilt.
+   * Welche Monate anstehen, sagt mart.kassenblatt_stand (zustand = faellig).
+   *
+   * NEUESTE ZUERST, wie HISTORIE_JE_LAUF. Auf 0 gesetzt hoert das Nachholen
+   * auf (der laufende Monat wird weiter geholt). Notbremse, kein Handbefehl.
+   */
+  KASSENBLATT_JE_LAUF: z.coerce.number().int().min(0).default(400),
+  /**
    * NOTBREMSE fuer die Betriebsberichte (Plan „Vollabzug", Entscheidung E8,
    * 22.09.2026) — keine Tagesration.
    *

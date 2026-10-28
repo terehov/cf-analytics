@@ -955,8 +955,17 @@ LINAs Anschrift ist nicht fehlerfrei: 58 von 60 PLZ stimmten mit Yext überein, 
 Abweichungen und ein Tippfehler stehen in `lina-api-korrekturen.md` (KORREKTUR 9).
 
 **Betriebe mit fremder Kasse** (`mart.betrieb_status.status = 'fremdkasse'`): nie Umsatz in
-LINA, aber FoodNotify-Bestellungen oder gebuchte BWA. Für sie gibt es aus LINA keinen Umsatz und
-keine Artikel — das ist kein Ladefehler. BWA und Bewertungen gibt es.
+LINA, aber FoodNotify-Bestellungen oder gebuchte BWA. ~~Für sie gibt es aus LINA keinen Umsatz und
+keine Artikel~~ — Artikel gibt es nicht, das ist kein Ladefehler. BWA und Bewertungen gibt es.
+**Umsatz gibt es doch** (28.10.2026): die Betriebe tragen ihn von Hand ins Kassenblatt ein, und
+der Ladenakte-Bericht „Die letzten Tage" liefert ihn je Tag, netto, nach Getränke/Essen — vier
+der sechs, nicht Aposto Wuppertal. Weg und Messwerte in `lina-api-inventar-ladenakte.md` §2a.
+
+**Seit `0141` importiert**, in dieselbe Tabelle wie LINAs Kasse: `core.umsatzbericht_tag` mit
+`quelle = 'kassenblatt'` (sichtbar in `mart.umsatz_tag.quelle`). Nur Nettoumsatz; Brutto,
+Rechnungen, Gäste und Bons sind `NULL`. Speisen/Getränke als Hauptsparte, wo die Umsatzgruppe
+exakt so heißt. Welche Monate geholt sind und welche fehlen: `mart.kassenblatt_stand`. Die
+Betriebe stehen danach in `mart.betrieb_status` als `operativ`, nicht mehr als `fremdkasse`.
 
 
 ## FoodNotify: Rezepturen (seit `0132`, 15.10.2026)

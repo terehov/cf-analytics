@@ -13,7 +13,10 @@
 import type { PoolClient } from 'pg'
 import { inTransaktion, inBloecken, mehrzeilig } from '../db/pool'
 import { log } from '../lib/log'
-import { bwaLongtermLesen, stammdatenLesen, monatsspalte, deutscheZahl } from './html'
+import {
+  bwaLongtermLesen, stammdatenLesen, monatsspalte, deutscheZahl,
+  kassenblattTageLesen, kassenblattJahreLesen,
+} from './html'
 import { SEITENGROESSE, ZAEHLGROESSE } from './endpunkte'
 
 export type LaKontext = {
@@ -196,6 +199,8 @@ export async function laLaden(k: LaKontext): Promise<number> {
       case 'la:belegliste':   return belegeSchreiben(c, k, bk, linaBetriebId, rawId, abgerufenAm)
       case 'la:bwa_longterm': return bwaSchreiben(c, k, bk, rawId, abgerufenAm)
       case 'la:stammdaten':   return stammdatenSchreiben(c, k, bk, rawId, abgerufenAm)
+      case 'la:tagesumsatz':  return tagesumsatzSchreiben(c, k, bk, rawId)
+      case 'la:jahresumsatz': return jahresumsatzSchreiben(c, k, bk, rawId, abgerufenAm)
       default:
         // Kein stiller default-Zweig: genau daran ist der Aktionsbericht einmal
         // vorbeigelaufen und hat monatelang nichts geschrieben.
@@ -730,5 +735,138 @@ async function stammdatenSchreiben(
     })
   }
 
+  return n
+}
+
+// ---------------------------------------------------------------------------
+// Kassenblatt — Umsatz der Betriebe mit fremder Kasse (0141)
+// ---------------------------------------------------------------------------
+
+/**
+ * Umsatzgruppen, die einer Hauptsparte des Konzernberichts entsprechen.
+ *
+ * NUR NACH EXAKTEM NAMEN, und nur diese drei. Bremens BWA bestaetigt die
+ * Zuordnung (08/2026: Getraenke 37.832,77 gegen Erloese Getraenke 37.788,15,
+ * Essen 42.602,43 gegen Erloese Speisen 42.652,05). "Biergartenumsatz
+ * (Getraenke)" ist inhaltlich Getraenke, aber ob LINAs Konzernbericht ihn dort
+ * fuehrt, ist nicht gemessen — er bleibt in der Gesamtzeile und erscheint in
+ * mart.hauptsparte_abdeckung als nicht aufteilbar. Ein geratener Treffer waere
+ * eine Spartenzahl, die niemand mehr hinterfragt.
+ */
+const GRUPPE_ZU_SPARTE: Record<string, 'Speisen' | 'Getränke'> = {
+  'Getränke': 'Getränke',
+  'Essen': 'Speisen',
+  'Speisen': 'Speisen',
+}
+
+/**
+ * Tageswerte eines Monats aus "Die letzten Tage" nach core.umsatzbericht_tag.
+ *
+ * WER WAS UEBERSCHREIBEN DARF. Je Betrieb und Tag gibt es EINE Zeile
+ * (`quelle` steht nicht im Schluessel, Begruendung in 0141). LINAs
+ * Konzernbericht schreibt Fremdkassen-Betrieben jeden Tag 0,00 — die
+ * ueberschreibt das Kassenblatt. Eine Zeile mit echtem LINA-Umsatz oder mit
+ * Rechnungen bleibt stehen: dort laeuft die Kasse ueber LINA, und deren Zahl
+ * ist die genauere. Gegenstueck im Konzernlader (src/sync/laden.ts).
+ *
+ * NUR TAGE VOR HEUTE. Der laufende Monat zeigt den Vortag als letzten; ein
+ * heutiger Teilwert waere ein halber Tag mit vollem Datum.
+ *
+ * Brutto, Rechnungen, Gaeste und Bons werden NULL gesetzt, nicht 0 — das
+ * Kassenblatt fuehrt sie nicht, und 0 Rechnungen bei 3.000 EUR Umsatz waere
+ * eine Aussage.
+ */
+async function tagesumsatzSchreiben(
+  c: PoolClient, k: LaKontext, bk: number, rawId: string,
+): Promise<number> {
+  const monat = Number(k.parameter.monat)
+  const jahr = Number(k.parameter.jahr)
+  if (!Number.isInteger(monat) || !Number.isInteger(jahr)) {
+    throw new Error(`la:tagesumsatz: monat/jahr fehlen im Posten (${JSON.stringify(k.parameter)})`)
+  }
+  const m = kassenblattTageLesen(String(k.daten), { monat, jahr })
+
+  const hs = await c.query<{ hauptsparte_key: number; name: string }>(
+    `SELECT hauptsparte_key, name FROM core.hauptsparte WHERE name IN ('Speisen', 'Getränke')`)
+  const spartenKey = new Map(hs.rows.map(r => [r.name, Number(r.hauptsparte_key)]))
+
+  const reihen: Record<string, unknown>[] = []
+  for (const t of m.tage) {
+    reihen.push({ betrieb_key: bk, geschaeftstag: t.datum, hauptsparte_key: null, umsatz_netto: t.netto })
+    const jeSparte = new Map<number, number>()
+    for (const g of t.gruppen) {
+      const sparte = GRUPPE_ZU_SPARTE[g.name]
+      const key = sparte ? spartenKey.get(sparte) : undefined
+      if (key === undefined) continue
+      jeSparte.set(key, (jeSparte.get(key) ?? 0) + g.netto)
+    }
+    for (const [key, netto] of jeSparte) {
+      reihen.push({ betrieb_key: bk, geschaeftstag: t.datum, hauptsparte_key: key,
+                    umsatz_netto: Math.round(netto * 100) / 100 })
+    }
+  }
+
+  const spalten = ['betrieb_key', 'geschaeftstag', 'hauptsparte_key', 'umsatz_netto']
+  let n = 0
+  await inBloecken(reihen, 500, async block => {
+    const { platzhalter, werte } = mehrzeilig(spalten, block)
+    const r = await c.query(
+      `INSERT INTO core.umsatzbericht_tag
+         (betrieb_key, geschaeftstag, hauptsparte_key, verkaufsstelle_key, umsatz_netto,
+          quelle, raw_id)
+       SELECT v.betrieb_key::integer, v.geschaeftstag::date, v.hauptsparte_key::integer, NULL,
+              v.umsatz_netto::numeric(14,2), 'kassenblatt', $${werte.length + 1}::bigint
+         FROM (VALUES ${platzhalter}) AS v(${spalten.join(', ')})
+        WHERE v.geschaeftstag::date < current_date
+       ON CONFLICT ON CONSTRAINT umsatzbericht_tag_uq DO UPDATE SET
+         umsatz_netto = EXCLUDED.umsatz_netto,
+         umsatz_brutto = NULL, rechnungen = NULL, gaeste = NULL,
+         durchschnittsbon = NULL, umsatz_pro_gast = NULL,
+         quelle = 'kassenblatt', raw_id = EXCLUDED.raw_id, geladen_am = now()
+       WHERE core.umsatzbericht_tag.quelle = 'kassenblatt'
+          OR (coalesce(core.umsatzbericht_tag.umsatz_netto, 0) = 0
+              AND coalesce(core.umsatzbericht_tag.rechnungen, 0) = 0)`,
+      [...werte, rawId])
+    n += r.rowCount ?? 0
+  })
+
+  /**
+   * Nicht still: ein Monat, in dem das Kassenblatt Umsatz kennt und keine
+   * Zeile geschrieben wurde, heisst, LINAs Kasse hat ueberall Vorrang —
+   * dann hat mart.kassenblatt_stand den Monat faelschlich eingereiht.
+   */
+  if (n === 0 && m.summe !== 0) {
+    log.warn('kassenblatt: kein Tag geschrieben', {
+      betriebKey: bk, monat: m.monat, summe: m.summe, tage: m.tage.length })
+  }
+  return n
+}
+
+/**
+ * Monatswerte aus "Die letzten Jahre" nach core.kassenblatt_monat.
+ *
+ * Momentaufnahme je Betrieb: loeschen und neu schreiben wie bei der BWA —
+ * ein Monat, den LINA nicht mehr zeigt, darf nicht stehen bleiben. Ein
+ * Betrieb ohne jeden Wert (Holding, Testladen) schreibt nichts; das ist der
+ * Normalfall und kein Fehler.
+ */
+async function jahresumsatzSchreiben(
+  c: PoolClient, k: LaKontext, bk: number, rawId: string, abgerufenAm: Date,
+): Promise<number> {
+  const werte = kassenblattJahreLesen(String(k.daten))
+  await c.query(`DELETE FROM core.kassenblatt_monat WHERE betrieb_key = $1`, [bk])
+  if (werte.length === 0) return 0
+
+  const spalten = ['betrieb_key', 'monat', 'umsatz_netto', 'abgerufen_am', 'raw_id']
+  let n = 0
+  await inBloecken(werte, 500, async block => {
+    const { platzhalter, werte: w } = mehrzeilig(spalten, block.map(x => ({
+      betrieb_key: bk, monat: x.monat, umsatz_netto: x.netto,
+      abgerufen_am: abgerufenAm, raw_id: rawId,
+    })))
+    const r = await c.query(
+      `INSERT INTO core.kassenblatt_monat (${spalten.join(', ')}) VALUES ${platzhalter}`, w)
+    n += r.rowCount ?? 0
+  })
   return n
 }
