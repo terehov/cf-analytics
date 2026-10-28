@@ -2367,3 +2367,46 @@ SELECT betrieb_key, ist_kopf, count(*), string_agg(DISTINCT zeitzone, ' | ')
 Wilma-Betriebe exakt — aber ohne Sparte.** Die Lücke „Stunde × Sparte" schließt Messfrage `d5`:
 `hauptsparten` greift auch im Stundenbericht (gemessen am selben Tag, `lina-api-inventar.md`).
 Der Bau steht in `offene-punkte.md`.
+
+## LINAs Jahresübersicht gegen den Konzernbericht: 115 Betriebe, 674 Monate Abweichung (28.10.2026)
+
+Mit `0141` holt der Importer je Betrieb „Die letzten Jahre" aus der Ladenakte — den Nettoumsatz je
+Monat seit 2009, auch für Betriebe mit LINA-Kasse. `mart.kassenblatt_stand` hält ihn gegen die
+Summe aus `getUmsatzbericht`. Erster Lauf (182, Phase A bis 18:39 CEST), 140 Betriebe gefragt,
+115 mit Werten:
+
+| Zustand | Monate | Betriebe | Bedeutung |
+|---|---|---|---|
+| `vor Historie` | 5.797 | 77 | vor 2018, wird nicht geholt |
+| `lina-kasse` | 4.756 | 76 | Jahresübersicht und Konzernbericht treffen sich (1 % / 1 EUR) |
+| `faellig` | 1.655 | 61 | Jahresübersicht hat Umsatz, Konzernbericht nichts |
+| `abweichung` | 674 | 74 | beide haben Umsatz und treffen sich nicht |
+| `geladen` | 2 | 2 | Bremen und KUZ Mainz, Oktober 2026 |
+
+**Die Annahme „bei LINA-Kassen auf den Cent gleich" galt für drei Betriebe und einen Monat, nicht
+für alle.** Fünf Betriebe weichen dauerhaft ab, Median des LINA-Anteils an der Jahresübersicht über
+alle Monate mit beiden Werten: Park Cafe München 78,6 % (82 von 90 Monaten abweichend), Schlager
+Cafe Düsseldorf 80,0 %, Enchilada Freiburg 86,9 % (72 von 106), BS Bier & Speisen 94,0 % (60 von
+104), Enchilada Hamm 95,1 % (45 von 65). Die Ladenakte zählt dort mehr als den einen Konzern-Betrieb
+— vermutlich auf GmbH-Ebene mit weiteren Kassen oder Betriebsstellen (Park Cafe Dezember 2025:
+684.493 gegen 233.163 EUR). Diese Monate werden nicht geladen; was das Mehr ist, muss der
+Fachbereich sagen (`offene-punkte.md`).
+
+**Die übrigen 69 Betriebe weichen nur in einzelnen Monaten ab, und die Monate sind unsere
+Lücken:** Juli 2026 bei rund 40 Betrieben (Lochtage 20.–22.07.2026), Münster Februar 2026 mit 65,8 %
+(80.708 gegen 122.662 EUR), Aschaffenburg Juli 2026 mit 5,9 % (6.168 gegen 105.016 EUR), Lehners
+Karlsruhe Januar 2026 mit **−98.177 EUR** im Konzernbericht gegen 205.259 EUR in der Jahresübersicht
+— ein negativer Monat, den bisher keine Prüfung gesehen hat. Der laufende Monat steht ebenfalls auf
+`abweichung`, weil die Jahresübersicht den heutigen Teiltag schon führt. Die Sicht ist damit eine
+Gegenprobe für den Konzernbericht, die es vorher nicht gab.
+
+**`faellig` ist mehr als die vier Fremdkassen-Betriebe** (Bremen 98, Leipzig 106, Minden 101,
+Ratskeller Augsburg 102 Monate seit 2018): dazu kommen rund 1.250 Monate von Betrieben, die vor
+ihrer LINA-Kasse ein Kassenblatt führten (Hamm bis 05/2021, Nürnberg bis 03/2020, Ratskeller
+Ludwigsburg bis 06/2019), von geschlossenen und insolventen Betrieben 2018 bis 2021 (Aposto Münster
+90, Kassel 41, Koblenz 34 …) und von Betrieben, die LINA offenbar wieder verlassen haben: Domhof
+GmbH seit 02/2025 (21 Monate, vorher 67 Monate `lina-kasse`), Heidis Braustüberl seit 04/2024 (31
+Monate, nie LINA). Die Historie lädt sie ab der zweiten Nacht, neueste zuerst, 400 je Nacht.
+
+Abfrage: `SELECT zustand, count(*), count(DISTINCT betrieb_key) FROM mart.kassenblatt_stand GROUP BY 1`
+und je Betrieb `percentile_cont(0.5) WITHIN GROUP (ORDER BY umsatz_lina / jahresuebersicht)`.

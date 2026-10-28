@@ -2406,3 +2406,39 @@ SELECT * FROM mart.kassenblatt_stand WHERE zustand = 'abweichung' AND monat >= '
   `mart.gaeste_abdeckung`; `mart.datenstand` kennt den Befund `Kassenblatt`.
 - **`mcp/test/katalog.json`** ist von Hand ergänzt. Nach dem Deploy gegen die Produktion neu
   ziehen (`cd mcp && bun run katalog:abzug`).
+
+**Erster Lauf (182, 28.10.2026) — Antworten auf die vier Abfragen:**
+1. 115 von 140 gefragten Betrieben haben Monatswerte, 140 von 140 Posten `ok`.
+2. `faellig` 1.655 Monate bei 61 Betrieben, `abweichung` 674 bei 74, `lina-kasse` 4.756 bei 76,
+   `vor Historie` 5.797 bei 77 (Zahlen und Deutung in `befunde-datenlage.md`, 28.10.2026).
+3. Oktober 2026 geladen: Bremen 95.136,23 € (22 Umsatztage), KUZ Mainz 39.369,75 € (7 Tage,
+   letzter Eintrag 17.10. — `mart.datenstand` sagt „Umsatz veraltet", das ist richtig so). Leipzig,
+   Minden, Ratskeller Augsburg und Aposto Wuppertal scheiterten am Parser (Gesamt ≠ Gruppensumme,
+   leere Tabelle; behoben mit Commit `2a0d871`, `fehlerkatalog.md`) und kommen mit dem nächsten
+   Lauf nach dem Deploy.
+4. `abweichung` ab 2025: dauerhaft bei Park Cafe München, Schlager Cafe Düsseldorf, Freiburg, BS
+   Bier & Speisen, Hamm (Ladenakte zählt mehr als den Konzern-Betrieb); punktuell dort, wo unser
+   Konzernbericht lückenhaft ist (Juli 2026, Münster 02/2026, Aschaffenburg 07/2026).
+
+**Entscheidungen für Eugene, aus dem ersten Lauf:**
+- **Vor-LINA-Monate und geschlossene Betriebe** (rund 1.250 der 1.655 fälligen Monate): die
+  Historie lädt sie ab der zweiten Nacht aus dem Kassenblatt — Hamm 2018 bis 05/2021, Aposto Münster
+  (insolvent) 2018 bis 07/2025, Kassel, Koblenz, Subergs, GSF Gastro … Das ist „so weit zurück wie
+  möglich", aber bei Hamm misst das Kassenblatt bis heute rund 5 % mehr als die Kasse, bei Park Cafe
+  und Freiburg deutlich mehr; ihre alten Monate kämen mit dieser Definition. Wer das nicht will:
+  `KASSENBLATT_JE_LAUF=0` in Dokploy hält die Historie an, der laufende Monat läuft weiter. Eine
+  feinere Regel (Betriebe mit dauerhafter Abweichung von der Historie ausnehmen) ist eine Zeile in
+  `mart.kassenblatt_stand`, wenn sie gewünscht ist.
+- **Was die Ladenakte bei Park Cafe München, Freiburg, Hamm, BS Bier & Speisen und Schlager Cafe
+  mehr zählt als der Konzernbericht** — zweite Kasse, Veranstaltungen, Betriebsstelle? Fachfrage an
+  Daniel. Bis dahin bleiben diese Monate `abweichung` und unberührt.
+- **Domhof GmbH seit 02/2025 und Heidis Braustüberl seit 04/2024** führen nur noch bzw. nur ein
+  Kassenblatt, kein LINA — zwei Fremdkassen-Betriebe, die `mart.betrieb_status` nicht als solche
+  kennt. Die Historie holt sie ab der zweiten Nacht; der laufende Monat erst, sobald sie Kassenblatt-
+  Umsatz in den letzten 62 Tagen haben (nach der Historie also von selbst).
+- **Lehners Karlsruhe, Januar 2026: −98.176,81 € im Konzernbericht** bei 205.258,91 € in der
+  Jahresübersicht. Ein negativer Monat, den keine Prüfung meldet — ansehen (`mart.umsatz_tag`,
+  Januar 2026, Tage mit negativem Umsatz).
+- **Juli 2026** (Lochtage 20.–22.07.): rund 40 Betriebe stehen auf `abweichung`. Die Jahresübersicht
+  liefert erstmals einen Sollwert je Monat; eine Prüfzeile „Konzernbericht unter Jahresübersicht
+  bei LINA-Kassen" würde Lochmonate ohne Artikelverkaufs-Orakel finden.

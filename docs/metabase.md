@@ -1937,6 +1937,16 @@ Datenbank).
   LINAs Kasse und gegen geladene Kassenblatt-Tage. Zustände: `lina-kasse`, `abweichung`,
   `geladen`, `geladen, juenger`, `faellig`, `kein Umsatz`, `vor Historie`. Zugleich die
   Einreihbedingung des Importers. Erwartung: kein `faellig`, das älter als zwei Nächte ist.
+  **`abweichung` ist nach dem ersten Lauf (28.10.2026) dreierlei**, nicht nur Kassenwechsel:
+  (a) bei fünf Betrieben liegt die Jahresübersicht **dauerhaft** über dem Konzernbericht
+  (Median des LINA-Anteils: Park Cafe München 78,6 %, Schlager Cafe Düsseldorf 80 %, Enchilada
+  Freiburg 86,9 %, BS Bier & Speisen 94 %, Hamm 95,1 %) — die Ladenakte zählt dort mehr als den
+  einen Konzern-Betrieb, vermutlich auf GmbH-Ebene; (b) einzelne Monate, in denen **unser
+  Konzernbericht lückenhaft** ist — Juli 2026 (Lochtage 20.–22.07.) bei rund 40 Betrieben,
+  Münster Februar 2026 mit 66 %, Aschaffenburg Juli 2026 mit 6 %; (c) der laufende Monat, weil
+  die Jahresübersicht den heutigen Teiltag schon führt. Die Sicht ist damit auch eine
+  **Gegenprobe für den Konzernbericht**: wo der LINA-Anteil deutlich unter 100 % liegt, fehlt
+  bei uns etwas. Nachgemessen in `befunde-datenlage.md`.
 - Gefiltert auf `quelle = 'umsatzbericht'` (aus der Zieldatenbank neu gelesen, nur der Filter
   eingesetzt): `mart.umsatz_lochtag`, `mart.verkaufsstelle_abdeckung`,
   `mart.betriebsbericht_luecke`, `mart.betriebsbericht_ladestand_basis`,
