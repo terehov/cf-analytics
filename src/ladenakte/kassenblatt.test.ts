@@ -63,10 +63,32 @@ describe('kassenblattTageLesen', () => {
     expect(() => kassenblattTageLesen(BREMEN_08, { monat: 8, jahr: 2025 })).toThrow(/2025/)
   })
 
-  test('verrutschte Spalte wirft (Gesamt ≠ Summe der Gruppen)', () => {
-    const kaputt = BREMEN_08.replace('<td>1.624,45</td>', '<td>1.000,00</td>')
-    expect(kaputt).not.toBe(BREMEN_08)
-    expect(() => kassenblattTageLesen(kaputt, { monat: 8, jahr: 2026 })).toThrow(/Summe der Gruppen/)
+  /**
+   * Lauf 182 (28.10.2026): bei drei von sechs Betrieben steht an je einem Tag
+   * im Gesamt ein Betrag, der in keiner angezeigten Gruppe ist. Das ist LINAs
+   * Datenlage, kein Parserfehler — gemeldet, nicht geworfen, Gesamt bleibt.
+   */
+  test('Gesamt ≠ Summe der Gruppen wird gemeldet, nicht geworfen', () => {
+    const anders = BREMEN_08.replace('<td>1.624,45</td>', '<td>1.000,00</td>')
+    expect(anders).not.toBe(BREMEN_08)
+    const m = kassenblattTageLesen(anders, { monat: 8, jahr: 2026 })
+    expect(m.abweichende_tage).toEqual([{ datum: '2026-08-01', netto: 1624.45, gruppen_summe: 1000 }])
+    expect(m.tage[0].netto).toBe(1624.45)
+    expect(kassenblattTageLesen(BREMEN_08, { monat: 8, jahr: 2026 }).abweichende_tage).toEqual([])
+  })
+
+  /** Lauf 182: ein Betrieb ohne Kassenblatt liefert die Tabelle ohne Tageszeilen. */
+  test('Tabelle ohne Tageszeilen ist ein leerer Monat, kein Fehler', () => {
+    const ohneTage = BREMEN_10
+      .replace(/<tr[^>]*>\s*<td class="text-center">\s*<\/td>\s*<td class="text-center">\s*\S+, \d{2}\.10\.[\s\S]*?<\/tr>/g, '')
+      .replace('88.220,21 (', '0,00 (')
+    expect(ohneTage).not.toBe(BREMEN_10)
+    const m = kassenblattTageLesen(ohneTage, { monat: 10, jahr: 2026 })
+    expect(m.tage).toEqual([])
+    expect(m.summe).toBe(0)
+    // Nennt die Monatszeile trotzdem Umsatz, fehlt etwas.
+    const widerspruch = ohneTage.replace('0,00 (', '12,34 (')
+    expect(() => kassenblattTageLesen(widerspruch, { monat: 10, jahr: 2026 })).toThrow(/keine Tageszeilen/)
   })
 
   test('fehlende Tageszeile wirft (Summe der Tage ≠ Monatssumme)', () => {

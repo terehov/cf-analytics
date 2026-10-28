@@ -5377,3 +5377,25 @@ Prüfzeile auf `quelle = 'umsatzbericht'`, und `mart.datenstand` hat den Befund 
 samt Spalte `umsatz_quelle`. **Wer eine Sicht baut, die aus `status = 'operativ'` ableitet,
 was ein Betrieb liefern müsste, liest `umsatz_quelle` dazu**; `operativ` heißt seit `0141`
 „macht Umsatz", nicht mehr „kassiert über LINA".
+
+## Eine Parser-Invariante, die eine Datenannahme war (28.10.2026, Lauf 182)
+
+**Symptom.** Im ersten Produktionslauf von `0141` scheiterten vier der sechs
+`la:tagesumsatz`-Posten mit `ParseFehler`, sichtbar in `mart.import_naechste` und als
+`zustand = 'Fehler'` in `mart.import_bericht`. Drei: „Gesamt 13.130,23 ist nicht die Summe
+der Gruppen (13.050,40)" — an je einem Tag, Differenzen 79,83, 50,01 und 100,00 EUR. Einer:
+„keine Tageszeilen für Oktober 2026". Nur Bremen und KUZ Mainz kamen durch.
+
+**Ursache.** Der Parser hatte „Gesamt = Summe der Umsatzgruppen" je Tag als Wache gegen eine
+verrutschte Spalte eingebaut. Die Gleichung galt an zwei Betrieben und drei Monaten aus dem
+Browser, und sie war plausibel. Sie ist aber keine Eigenschaft der Tabelle, sondern eine der
+Daten: LINAs Gesamt kann einen Betrag führen, den keine angezeigte Gruppe trägt (vermutlich
+eine inaktive oder ausgeblendete Umsatzgruppe). Und ein Betrieb ohne Kassenblatt bekommt eine
+Tabelle ohne Zeilen, kein HTTP 500.
+
+**Was es heute verhindert.** Die Abweichung wird als `abweichende_tage` zurückgegeben, der
+Lader loggt sie, `netto` bleibt das Gesamt. Die Tabelle ohne Tage ist ein leerer Monat,
+solange die Monatszeile keinen Umsatz nennt. Was als Wache bleibt: Kopfzeile „Gesamt" an erster
+Stelle, jede Zelle eine Zahl, Summe der Tage = Monatszeile. **Eine Invariante, die man an drei
+Beispielen gesehen hat, ist eine Beobachtung.** Wer sie zur Abbruchbedingung macht, braucht
+eine Begründung aus der Struktur der Seite, nicht aus den Zahlen darin.

@@ -134,6 +134,12 @@ Effektivität; dazu Monatssumme, „Tagesschnitt aus N Tagen mit Umsatz" und Vor
 * **Ein Betrieb kann zweimal im Baum stehen.** „Wilma Wunder Ballplatz Mainz GmbH"
   (`laden_833`, LINA-Kasse) und „KUZ - Wilma Wunder Ballplatz Mainz GmbH" (`laden_4055`,
   Fremdkasse); ebenso zwei Einträge für Aposto Wuppertal.
+* **Gesamt ist nicht immer die Summe der angezeigten Gruppen** (Lauf 182, 28.10.2026, erster
+  Produktionslauf): bei drei der sechs Fremdkassen-Betriebe stand an je einem Tag im Oktober
+  2026 ein Gesamt um 50,01, 79,83 und 100,00 EUR über der Gruppensumme. Vermutlich eine
+  inaktive oder ausgeblendete Umsatzgruppe. Die Monatszeile trifft das Gesamt, nicht die
+  Gruppensumme. Und **ein Betrieb ohne Kassenblatt** bekommt die Tabelle ohne Tageszeilen, kein
+  HTTP 500.
 
 **Gemessen, September 2026 (netto):**
 

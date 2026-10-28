@@ -441,8 +441,14 @@ export type KassenblattMonat = {
   monat: string
   gruppen: string[]
   tage: KassenblattTag[]
-  /** Die Monatssummenzeile („August 2026"). */
+  /** Die Monatssummenzeile („August 2026"); 0 bei einer Tabelle ohne Tage. */
   summe: number
+  /**
+   * Tage, an denen LINAs Gesamt nicht die Summe der angezeigten Gruppen ist
+   * (Lauf 182, 28.10.2026: drei Betriebe, je ein Tag, 50 bis 100 EUR). Der
+   * Lader meldet sie; `netto` ist trotzdem das Gesamt.
+   */
+  abweichende_tage: { datum: string; netto: number; gruppen_summe: number }[]
 }
 
 const MONATSNAMEN = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli',
@@ -470,16 +476,30 @@ function gewaehlt(html: string, name: string): string | null {
  * ist es derselbe Nettoumsatz wie `getUmsatzbericht` (nachgemessen 28.10.2026,
  * drei Betriebe auf den Cent). Messwerte in `docs/lina-api-inventar-ladenakte.md` §2a.
  *
- * DREI PRÜFUNGEN, und jede hat einen Grund:
+ * ZWEI PRÜFUNGEN, und jede hat einen Grund:
  *
  * 1. **Der gewählte Monat muss der angefragte sein.** LINA ignoriert
  *    unbekannte Parameter still und liefert dann den laufenden Monat — mit
  *    `from/…/to/…` am 28.10.2026 genau so gemessen. Ohne diese Prüfung
  *    landete der Oktober unter dem Datum des Augusts, plausibel und falsch.
- * 2. **Jeder Tag: Gesamt = Summe der Gruppen.** Verrutscht eine Spalte
- *    (LINA fügt eine Gruppe hinzu, die Kopfzeile wird anders gelesen), stimmt
- *    diese Gleichung nicht mehr.
- * 3. **Summe der Tage = Monatssummenzeile.** Fängt eine verlorene Zeile.
+ * 2. **Summe der Tage = Monatssummenzeile.** Fängt eine verlorene Zeile.
+ *
+ * KEINE PRÜFUNG MEHR: „Gesamt = Summe der Gruppen" je Tag. Die erste Fassung
+ * warf dort, als Wache gegen eine verrutschte Spalte. Im ersten Produktionslauf
+ * (28.10.2026, Lauf 182) scheiterten daran drei von sechs Betrieben an je
+ * einem Tag, mit Differenzen von 50,01, 79,83 und 100,00 EUR — LINAs
+ * Gesamtspalte führt dort einen Betrag, der in keiner angezeigten Gruppe
+ * steht (vermutlich eine inaktive oder ausgeblendete Umsatzgruppe). Das ist
+ * eine Eigenschaft der Daten, keine des Parsers. Die Abweichung wird als
+ * `abweichende_tage` zurückgegeben und vom Lader gemeldet, nicht geworfen;
+ * `netto` bleibt LINAs Gesamt (das ist der Wert, der die Monatszeile trifft
+ * und gegen die BWA gemessen wurde). Gegen eine verrutschte Spalte bleiben
+ * die Kopfzeile „Gesamt" an erster Stelle, die Pflicht, dass jede Zelle eine
+ * Zahl ist, und die Monatssumme.
+ *
+ * EINE TABELLE OHNE TAGESZEILEN ist kein Fehler, sondern ein Betrieb ohne
+ * Kassenblatt für diesen Monat (Lauf 182: einer von sechs) — leerer Monat.
+ * Geworfen wird nur, wenn die Monatszeile trotzdem Umsatz nennt.
  */
 export function kassenblattTageLesen(
   html: string, erwartet: { monat: number; jahr: number },
@@ -516,6 +536,7 @@ export function kassenblattTageLesen(
   const gruppen = namen.slice(1)
 
   const tage: KassenblattTag[] = []
+  const abweichendeTage: KassenblattMonat['abweichende_tage'] = []
   let summe: number | null = null
   const summenzeile = `${MONATSNAMEN[monat - 1]} ${jahr}`
   const mm = String(monat).padStart(2, '0')
@@ -532,13 +553,13 @@ export function kassenblattTageLesen(
         throw new ParseFehler(`Kassenblatt: ${tag[1]}.${mm}. ohne lesbare Umsatzzellen (${c.slice(start, start + breite).join(' | ')})`)
       }
       const [netto, ...rest] = werte as number[]
-      const teile = rest.reduce((a, b) => a + b, 0)
+      const datum = `${jahr}-${mm}-${tag[1]}`
+      const teile = Math.round(rest.reduce((a, b) => a + b, 0) * 100) / 100
       if (gruppen.length > 0 && Math.abs(netto - teile) > 0.01 * gruppen.length + 0.001) {
-        throw new ParseFehler(
-          `Kassenblatt: ${tag[1]}.${mm}.${jahr} Gesamt ${netto} ist nicht die Summe der Gruppen (${teile.toFixed(2)})`)
+        abweichendeTage.push({ datum, netto, gruppen_summe: teile })
       }
       tage.push({
-        datum: `${jahr}-${mm}-${tag[1]}`,
+        datum,
         netto,
         gruppen: gruppen.map((name, i) => ({ name, netto: rest[i] })),
       })
@@ -547,15 +568,20 @@ export function kassenblattTageLesen(
     if (c[0] === summenzeile) summe = betragVorKlammer(c[1] ?? '')
   }
 
+  if (tage.length === 0) {
+    if (summe === null || summe === 0) {
+      return { monat: `${jahr}-${mm}-01`, gruppen, tage: [], summe: 0, abweichende_tage: [] }
+    }
+    throw new ParseFehler(`Kassenblatt: keine Tageszeilen für ${summenzeile}, Monatszeile nennt ${summe}`)
+  }
   if (summe === null) throw new ParseFehler(`Kassenblatt: Summenzeile "${summenzeile}" fehlt`)
-  if (tage.length === 0) throw new ParseFehler(`Kassenblatt: keine Tageszeilen für ${summenzeile}`)
   const tagessumme = tage.reduce((a, t) => a + t.netto, 0)
   if (Math.abs(tagessumme - summe) > 0.01 * tage.length + 0.001) {
     throw new ParseFehler(
       `Kassenblatt: Summe der Tage ${tagessumme.toFixed(2)} ≠ Monatssumme ${summe} (${summenzeile})`)
   }
 
-  return { monat: `${jahr}-${mm}-01`, gruppen, tage, summe }
+  return { monat: `${jahr}-${mm}-01`, gruppen, tage, summe, abweichende_tage: abweichendeTage }
 }
 
 export type KassenblattJahreswert = { monat: string; netto: number }

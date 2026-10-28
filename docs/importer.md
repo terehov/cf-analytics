@@ -2211,10 +2211,19 @@ ein veralteter Laden-Hash. Der Client wirft den gemerkten Pfad weg und meldet ei
 wiederholbaren Fehler.
 
 **Der Parser prüft den gewählten Monat** (`kassenblattTageLesen`): LINA nimmt einen
-unbekannten Parameter still nicht an und zeigt dann den laufenden Monat. Dazu kommen „Gesamt
-= Summe der Gruppen" je Tag und „Summe der Tage = Monatszeile" (1 Cent je Tag Toleranz; LINA
+unbekannten Parameter still nicht an und zeigt dann den laufenden Monat. Dazu kommt ~~„Gesamt
+= Summe der Gruppen" je Tag und~~ „Summe der Tage = Monatszeile" (1 Cent je Tag Toleranz; LINA
 rundet die Monatszeile getrennt, gemessen 94.044,60 gegen 94.044,61). Die Jahresübersicht
 prüft, dass das Filterformular auf „Gesamtumsatz" steht.
+
+**„Gesamt = Summe der Gruppen" wird seit Lauf 182 (28.10.2026) nur gemeldet, nicht geworfen.**
+Im ersten Produktionslauf scheiterten daran drei von sechs Betrieben, an je einem Tag, mit
+50,01, 79,83 und 100,00 EUR Differenz: LINAs Gesamt führt dort einen Betrag, den keine
+angezeigte Umsatzgruppe trägt. Der Lader schreibt das Gesamt (es trifft die Monatszeile und
+wurde gegen die BWA gemessen) und loggt `kassenblatt: Gesamt ist nicht die Summe der Gruppen`
+mit den Tagen. Eine Tabelle ohne Tageszeilen (ein Betrieb ohne Kassenblatt, derselbe Lauf) ist
+ein leerer Monat, kein Fehler, solange die Monatszeile keinen Umsatz nennt. Hergang in
+`fehlerkatalog.md`.
 
 **Vorrang** steht in beiden Ladern im `ON CONFLICT … WHERE`. Der Kassenblatt-Lader überschreibt
 nur Zeilen mit `quelle = 'kassenblatt'` oder solche ohne Umsatz und ohne Rechnungen. Der

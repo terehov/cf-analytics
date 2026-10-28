@@ -785,6 +785,12 @@ async function tagesumsatzSchreiben(
     throw new Error(`la:tagesumsatz: monat/jahr fehlen im Posten (${JSON.stringify(k.parameter)})`)
   }
   const m = kassenblattTageLesen(String(k.daten), { monat, jahr })
+  if (m.abweichende_tage.length > 0) {
+    // LINAs Gesamt enthaelt etwas, das keine angezeigte Gruppe fuehrt (Lauf
+    // 182). Geschrieben wird das Gesamt; die Sparten bleiben, was sie sind.
+    log.warn('kassenblatt: Gesamt ist nicht die Summe der Gruppen', {
+      betriebKey: bk, monat: m.monat, tage: m.abweichende_tage })
+  }
 
   const hs = await c.query<{ hauptsparte_key: number; name: string }>(
     `SELECT hauptsparte_key, name FROM core.hauptsparte WHERE name IN ('Speisen', 'Getränke')`)
