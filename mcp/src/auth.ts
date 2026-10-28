@@ -12,10 +12,15 @@
  * drei Nutzern kostet die Abfrage nichts, und sie macht `aktiv = false` zu
  * dem, wonach es aussieht — sofort.
  *
+ * DASSELBE FUER DIE VERBINDUNG (0139). Das Token nennt seine Kette; ist sie
+ * getrennt (`bun run nutzer trennen`), als gestohlen widerrufen oder das
+ * Passwort neu gesetzt, gilt das Token ab dem naechsten Aufruf nicht mehr.
+ * Tokens von vor 0139 tragen keine Kette und laufen binnen einer Stunde aus.
+ *
  * WER NICHT IN `mcp.nutzer` STEHT, BEKOMMT NICHTS. Ein gueltiges Token
  * allein genuegt nicht; das Konto muss es noch geben und aktiv sein.
  */
-import { nutzerNachSubject } from './anmeldung/speicher'
+import { ketteLebt, nutzerNachSubject } from './anmeldung/speicher'
 
 export type Stufe = 'lesen' | 'fragen' | 'gesperrt'
 
@@ -55,6 +60,13 @@ export async function anmelden(extra: any): Promise<Angemeldet> {
     throw new NichtErlaubt(
       'Dieses Konto ist nicht (mehr) freigeschaltet. Ein gueltiges Token allein genuegt nicht — ' +
       'das Konto muss in mcp.nutzer aktiv sein.')
+  }
+
+  const kette = extra?.http?.authInfo?.extra?.kette
+  if (typeof kette === 'string' && !(await ketteLebt(kette))) {
+    throw new NichtErlaubt(
+      'Diese Verbindung wurde getrennt oder ist abgelaufen. Der Zugang ist persoenlich; eine ' +
+      'neue Verbindung gibt der Administrator frei.')
   }
 
   return {

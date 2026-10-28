@@ -69,9 +69,11 @@ export async function jwks(): Promise<{ keys: JWK[] }> {
 export async function zugangstokenAusstellen(o: {
   subject: string; clientId: string; stufe: string; anzeige: string | null
   aussteller: string; publikum: string; gueltigSekunden: number
+  /** Die Verbindung (0139). Damit greift ein Trennen sofort, nicht erst nach der Stunde. */
+  kette: string
 }): Promise<string> {
   const k = await schluesselHolen()
-  return new SignJWT({ stufe: o.stufe, name: o.anzeige ?? undefined, client_id: o.clientId })
+  return new SignJWT({ stufe: o.stufe, name: o.anzeige ?? undefined, client_id: o.clientId, kette: o.kette })
     .setProtectedHeader({ alg: ALGORITHMUS, kid: k.kid })
     .setIssuer(o.aussteller)
     .setAudience(o.publikum)

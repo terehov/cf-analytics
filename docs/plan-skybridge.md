@@ -400,6 +400,13 @@ Rechte in `mcp.nutzer.stufe`:
 **Zwei Datenbankrollen**, weil `mcp_leser` Nutzereingaben als SQL ausführt: die
 Anmeldetabellen liegen außerhalb ihrer Rechte, sonst wäre der Signierschlüssel abfragbar.
 
+**Verbindungsgrenze je Konto (`0139`, 28.10.2026).** `mcp.nutzer.max_verbindungen` begrenzt,
+auf wie vielen Clients ein Konto gleichzeitig verbunden ist. Gezählt wird jede lebende
+Tokenkette. An der Grenze wird **abgelehnt**, nicht verdrängt, und frei wird ein Platz nur
+durch Ablauf oder `bun run nutzer trennen`. Ein Trennen wirkt ab dem nächsten Aufruf, weil das
+Zugangstoken seine Kette trägt. Ablehnungen stehen in `mcp.verbindung_stand`. Begründung und
+die vertagten Wege in `entscheidungen.md` (28.10.2026).
+
 **Was das kostet:** kein zweiter Faktor, keine Passwortrücksetzung per Mail, und kein
 automatischer Entzug beim Austritt — wer geht, wird hier stillgelegt. Das steht in
 `offene-punkte.md`, weil es ein Ablauf ist und keine Einstellung.

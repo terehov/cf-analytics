@@ -19,6 +19,10 @@
  *      ganze Kette.
  *   5. FEHLANMELDUNGEN WERDEN GEBREMST und protokolliert.
  *
+ * Seit 0139 dazu die VERBINDUNGSGRENZE je Konto (mcp.nutzer.max_verbindungen):
+ * ist sie erreicht, endet die Anmeldung mit einer Fehlerseite statt mit
+ * einem Code. Abgelehnt, nicht verdraengt — freigegeben wird von uns.
+ *
  * Und eines, das keine Sicherheitsmassnahme ist, sondern Anstand: es gibt
  * keine Meldung, aus der hervorgeht, ob eine Mailadresse bekannt ist.
  */
@@ -29,9 +33,9 @@ import {
   formulartokenAusstellen, formulartokenPruefen, jwks, zugangstokenAusstellen,
 } from './schluessel'
 import {
-  anmeldungGelungen, anmeldungProtokollieren, auffrischungAusstellen, auffrischungEinloesen,
-  clientAnlegen, clientHolen, codeAusstellen, codeEinloesen, fehlversuchMerken, hash,
-  nutzerNachEmail, tokensWiderrufen,
+  anmeldungGelungen, anmeldungProtokollieren, auffrischungEinloesen,
+  clientAnlegen, clientHolen, codeAusstellen, codeEinloesen, fehlversuchMerken, grenzeErreicht, hash,
+  nutzerNachEmail, tokensWiderrufen, verbindungEroeffnen, verbindungenZaehlen,
 } from './speicher'
 
 /** Gueltigkeit eines Zugangstokens. Kurz, weil die Auffrischung billig ist. */
@@ -340,6 +344,29 @@ export function anmeldungMontieren(app: Express, o: { aussteller: string; publik
         : 'E-Mail oder Passwort stimmt nicht.')
     }
 
+    /**
+     * DIE VERBINDUNGSGRENZE (0139). Nach dem Passwort, nicht davor: wer es
+     * nicht kennt, erfaehrt nichts ueber das Konto. Wer es kennt und an der
+     * Grenze scheitert, bekommt eine Fehlerseite und keinen Code — und die
+     * Ablehnung steht im Protokoll, mit Herkunft. Genau diese Zeile will man
+     * sehen, wenn ein Zugang weitergegeben wurde (mcp.verbindung_stand).
+     *
+     * Keine zweite Chance im Formular: ein erneuter Versuch aendert nichts,
+     * bis wir eine Verbindung trennen. Die verbindliche Pruefung liegt beim
+     * Einloesen des Codes (verbindungEroeffnen); diese ist fuer die Meldung.
+     */
+    const verbindungen = await verbindungenZaehlen(nutzer.subject)
+    if (grenzeErreicht(verbindungen)) {
+      await anmeldungProtokollieren({ email, subject: nutzer.subject, erfolg: false,
+        grund: 'verbindungslimit', herkunft: herkunft(anfrage) })
+      return html(antwort, 403, fehlerseite('Keine weitere Verbindung freigegeben',
+        `Dieses Konto ist bereits ${verbindungen.verbindungen}-mal verbunden; freigegeben ` +
+        `${verbindungen.grenze === 1 ? 'ist eine Verbindung' : `sind ${verbindungen.grenze} Verbindungen`}. ` +
+        'Der Zugang ist persoenlich und kann nicht auf weiteren Geraeten oder von anderen ' +
+        'Personen benutzt werden. Wer den Connector neu angelegt oder das Geraet gewechselt ' +
+        'hat, laesst die alte Verbindung bitte vom Administrator trennen.'))
+    }
+
     await anmeldungGelungen(nutzer.subject)
     await anmeldungProtokollieren({ email, subject: nutzer.subject, erfolg: true,
       herkunft: herkunft(anfrage) })
@@ -387,15 +414,24 @@ export function anmeldungMontieren(app: Express, o: { aussteller: string; publik
       const nutzer = await nutzerNachSubjectSicher(eingeloest.subject)
       if (!nutzer) return fehler('invalid_grant', 'Das Konto ist nicht mehr aktiv.')
 
+      // Die verbindliche Grenze: zaehlen und ausstellen unter einer Sperre.
+      const verbindung = await verbindungEroeffnen(String(k.client_id), nutzer.subject)
+      if ('fehler' in verbindung) {
+        await anmeldungProtokollieren({ subject: nutzer.subject, erfolg: false,
+          grund: 'verbindungslimit', herkunft: herkunft(anfrage) })
+        return fehler('invalid_grant',
+          'Fuer dieses Konto ist keine weitere Verbindung freigegeben.', 403)
+      }
+
       const zugang = await zugangstokenAusstellen({
         subject: nutzer.subject, clientId: String(k.client_id), stufe: nutzer.stufe,
         anzeige: nutzer.anzeige, aussteller, publikum, gueltigSekunden: TOKEN_SEKUNDEN,
+        kette: verbindung.kette,
       })
-      const auffrischung = await auffrischungAusstellen(String(k.client_id), nutzer.subject)
 
       return antwort.json({
         access_token: zugang, token_type: 'Bearer', expires_in: TOKEN_SEKUNDEN,
-        refresh_token: auffrischung, scope: eingeloest.scope ?? undefined,
+        refresh_token: verbindung.token, scope: eingeloest.scope ?? undefined,
       })
     }
 
@@ -419,6 +455,7 @@ export function anmeldungMontieren(app: Express, o: { aussteller: string; publik
       const zugang = await zugangstokenAusstellen({
         subject: nutzer.subject, clientId: String(k.client_id), stufe: nutzer.stufe,
         anzeige: nutzer.anzeige, aussteller, publikum, gueltigSekunden: TOKEN_SEKUNDEN,
+        kette: e.kette!,
       })
       return antwort.json({
         access_token: zugang, token_type: 'Bearer', expires_in: TOKEN_SEKUNDEN,

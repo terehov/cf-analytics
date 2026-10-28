@@ -9,7 +9,7 @@
  *   2. NICHTS DAVON WIRD GELOGGT. Kein Passwort, kein Token, kein Code —
  *      auch nicht in einem Fehlertext (harte Regel 2).
  */
-import { anmeldungAbfragen } from './db'
+import { anmeldungAbfragen, anmeldungTransaktion, type Abfrager } from './db'
 
 /** SHA-256, hex. Fuer Codes und Tokens — sie sind zufaellig und lang, ein
  *  langsamer Passworthash waere hier Aufwand ohne Gewinn. */
@@ -147,15 +147,70 @@ export async function codeEinloesen(code: string, clientId: string, redirectUri:
 
 // --- Auffrischungstokens ---------------------------------------------
 
+/** Eine Kette = eine Verbindung (0139). `seit` ist die Anmeldung, die sie begann. */
+export type Kette = { id: string; seit: string | Date }
+
 export async function auffrischungAusstellen(
-  clientId: string, subject: string, tage = 30,
+  clientId: string, subject: string, kette: Kette, tage = 30, q: Abfrager = anmeldungAbfragen,
 ): Promise<string> {
   const token = zufall(48)
-  await anmeldungAbfragen(
-    `INSERT INTO mcp.oauth_token (token_hash, client_id, subject, laeuft_ab)
-     VALUES ($1,$2,$3, now() + make_interval(days => $4::int))`,
-    [await hash(token), clientId, subject, tage])
+  await q(
+    `INSERT INTO mcp.oauth_token (token_hash, client_id, subject, laeuft_ab, kette_id, verbunden_seit)
+     VALUES ($1,$2,$3, now() + make_interval(days => $4::int), $5, $6)`,
+    [await hash(token), clientId, subject, tage, kette.id, kette.seit])
   return token
+}
+
+// --- Verbindungsgrenze (0139) ----------------------------------------
+
+/**
+ * Lebende Verbindungen eines Kontos und seine Grenze.
+ *
+ * JEDE LEBENDE KETTE ZAEHLT — auch eine, die seit Wochen niemand benutzt.
+ * Entschieden am 28.10.2026: ein Platz wird nicht von selbst frei, sondern
+ * von uns (`bun run nutzer trennen`). Wer ruhende Ketten nicht mitzaehlen
+ * will, aendert es hier UND in mcp.verbindung_stand; die Abwaegung steht in
+ * docs/entscheidungen.md.
+ */
+const LEBENDE_KETTEN = `SELECT count(*)::int AS n FROM mcp.oauth_token
+  WHERE subject = $1 AND widerrufen_am IS NULL AND laeuft_ab > now()`
+
+export async function verbindungenZaehlen(subject: string, q: Abfrager = anmeldungAbfragen) {
+  const [n] = await q<{ grenze: number | null }>(
+    `SELECT max_verbindungen AS grenze FROM mcp.nutzer WHERE subject = $1`, [subject])
+  const [z] = await q<{ n: number }>(LEBENDE_KETTEN, [subject])
+  return { grenze: n?.grenze ?? null, verbindungen: z?.n ?? 0 }
+}
+
+export const grenzeErreicht = (v: { grenze: number | null; verbindungen: number }) =>
+  v.grenze !== null && v.verbindungen >= v.grenze
+
+/**
+ * Eine neue Verbindung beginnen — oder ablehnen, wenn die Grenze erreicht ist.
+ *
+ * Zaehlen und Ausstellen in einer Transaktion unter Sperre der Nutzerzeile.
+ * Die Pruefung auf der Anmeldeseite davor ist nur fuer die verstaendliche
+ * Meldung da; zwei gleichzeitige Anmeldungen kaemen dort beide durch. Hier
+ * nicht.
+ */
+export async function verbindungEroeffnen(clientId: string, subject: string) {
+  return anmeldungTransaktion(async q => {
+    await q(`SELECT 1 FROM mcp.nutzer WHERE subject = $1 FOR UPDATE`, [subject])
+    const v = await verbindungenZaehlen(subject, q)
+    if (grenzeErreicht(v)) return { fehler: 'verbindungslimit' as const, ...v }
+    const kette: Kette = { id: crypto.randomUUID(), seit: new Date() }
+    const token = await auffrischungAusstellen(clientId, subject, kette, 30, q)
+    return { token, kette: kette.id }
+  })
+}
+
+/** Lebt die Verbindung noch? Gefragt bei JEDEM Werkzeugaufruf (src/auth.ts). */
+export async function ketteLebt(kette: string): Promise<boolean> {
+  const [z] = await anmeldungAbfragen<{ lebt: boolean }>(
+    `SELECT EXISTS (SELECT 1 FROM mcp.oauth_token
+                     WHERE kette_id = $1 AND widerrufen_am IS NULL AND laeuft_ab > now()) AS lebt`,
+    [kette])
+  return Boolean(z?.lebt)
 }
 
 /**
@@ -170,10 +225,18 @@ export async function auffrischungEinloesen(token: string, clientId: string) {
   const h = await hash(token)
   const [zeile] = await anmeldungAbfragen<{
     subject: string; widerrufen_am: string | null; laeuft_ab: string; ersetzt_durch: string | null
-  }>(`SELECT subject, widerrufen_am, laeuft_ab, ersetzt_durch FROM mcp.oauth_token
-        WHERE token_hash = $1 AND client_id = $2`, [h, clientId])
+    kette_id: string | null; verbunden_seit: string | null
+  }>(`SELECT subject, widerrufen_am, laeuft_ab, ersetzt_durch, kette_id, verbunden_seit
+        FROM mcp.oauth_token WHERE token_hash = $1 AND client_id = $2`, [h, clientId])
 
   if (!zeile) return { fehler: 'unbekannt' as const }
+
+  // Ketten von vor 0139 hat die Migration nachgetragen; fehlt die Kennung
+  // trotzdem, bekommt die Kette hier eine — die Zaehlung aendert das nicht.
+  const kette: Kette = {
+    id: zeile.kette_id ?? crypto.randomUUID(),
+    seit: zeile.verbunden_seit ?? new Date(),
+  }
 
   if (zeile.widerrufen_am) {
     /**
@@ -204,14 +267,16 @@ export async function auffrischungEinloesen(token: string, clientId: string) {
         [zeile.ersetzt_durch])
       if (nachfolger?.lebt) {
         // Nie zugestellt: bare widerrufen, OHNE Nachfolger — damit er selbst
-        // keine Wiederholung mehr ausloesen kann.
+        // keine Wiederholung mehr ausloesen kann. Den frischen ERST
+        // ausstellen: dazwischen haette die Kette keinen lebenden Token, und
+        // ketteLebt() wiese das noch gueltige Zugangstoken ab.
+        const neu = await auffrischungAusstellen(clientId, zeile.subject, kette)
         await anmeldungAbfragen(
           `UPDATE mcp.oauth_token SET widerrufen_am = now() WHERE token_hash = $1`,
           [zeile.ersetzt_durch])
-        const neu = await auffrischungAusstellen(clientId, zeile.subject)
         await anmeldungAbfragen(
           `UPDATE mcp.oauth_token SET ersetzt_durch = $2 WHERE token_hash = $1`, [h, await hash(neu)])
-        return { subject: zeile.subject, neu }
+        return { subject: zeile.subject, neu, kette: kette.id }
       }
     }
     await anmeldungAbfragen(
@@ -221,11 +286,11 @@ export async function auffrischungEinloesen(token: string, clientId: string) {
   }
   if (new Date(zeile.laeuft_ab) < new Date()) return { fehler: 'abgelaufen' as const }
 
-  const neu = await auffrischungAusstellen(clientId, zeile.subject)
+  const neu = await auffrischungAusstellen(clientId, zeile.subject, kette)
   await anmeldungAbfragen(
     `UPDATE mcp.oauth_token SET widerrufen_am = now(), ersetzt_durch = $2 WHERE token_hash = $1`,
     [h, await hash(neu)])
-  return { subject: zeile.subject, neu }
+  return { subject: zeile.subject, neu, kette: kette.id }
 }
 
 export async function tokensWiderrufen(subject: string): Promise<void> {

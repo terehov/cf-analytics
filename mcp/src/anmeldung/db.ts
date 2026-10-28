@@ -47,3 +47,30 @@ export async function anmeldungAbfragen<T = any>(
 export function anmeldungEingerichtet(): boolean {
   return Boolean(url)
 }
+
+export type Abfrager = <T = any>(sql: string, werte?: readonly unknown[]) => Promise<T[]>
+
+/**
+ * Mehrere Abfragen in EINER Transaktion, auf einer Verbindung.
+ *
+ * Gebraucht fuer die Verbindungsgrenze (0139): zaehlen und ausstellen
+ * muessen zusammen geschehen, sonst kommen zwei gleichzeitige Anmeldungen
+ * beide unter der Grenze durch. Die Sperre ist die Nutzerzeile (FOR UPDATE),
+ * die der Aufrufer als erstes liest.
+ */
+export async function anmeldungTransaktion<T>(arbeit: (q: Abfrager) => Promise<T>): Promise<T> {
+  const verbindung = await anmeldungPool.connect()
+  try {
+    await verbindung.query('BEGIN')
+    const q: Abfrager = async (sql, werte = []) =>
+      (await verbindung.query(sql, werte as unknown[])).rows
+    const ergebnis = await arbeit(q)
+    await verbindung.query('COMMIT')
+    return ergebnis
+  } catch (e) {
+    await verbindung.query('ROLLBACK').catch(() => {})
+    throw e
+  } finally {
+    verbindung.release()
+  }
+}

@@ -4361,3 +4361,61 @@ Zonen. Der Stundenbericht kann jedes Fenster schneiden, aber ohne Sparte (`befun
 
 **Nicht entschieden, bewusst offen:** die Metabase-Karte auf ⑪ Zeitfenster und die Zoneneinrichtung
 der sechs Wilma-Betriebe (`offene-punkte.md`).
+
+## 28.10.2026 — Verbindungsgrenze je MCP-Konto: ablehnen, nicht verdrängen (`0139`)
+
+**Anlass.** Bei einzelnen Konten soll sicher sein, dass der Zugang nicht weitergegeben wird. Bis
+dahin konnte sich ein Konto auf beliebig vielen Geräten verbinden, und drei fremde Rechner sahen
+aus wie Laptop und Handy.
+
+**Was eine Verbindung ist.** Jede gelungene Anmeldung beginnt eine Kette von
+Auffrischungstokens, und je Kette lebt genau ein Token (Rotation, `0104`). Eine Kette ist also ein
+verbundener Client. `mcp.oauth_token.kette_id` macht sie zählbar und trennbar.
+
+**Entschieden am 28.10.2026 (Eugene):**
+1. **Ablehnen.** Ist `mcp.nutzer.max_verbindungen` erreicht, endet die Anmeldung mit einer
+   Fehlerseite (403) und ohne Code, protokolliert als `grund = 'verbindungslimit'` mit Herkunft.
+   Die bestehenden Verbindungen bleiben. Verbindlich geprüft wird beim Einlösen des Codes, unter
+   Sperre der Nutzerzeile. Die Prüfung auf der Anmeldeseite ist nur für die verständliche
+   Meldung da, denn zwei gleichzeitige Anmeldungen kämen dort beide durch.
+2. **Jede lebende Kette zählt, freigegeben wird von uns.** Ein Platz wird erst frei, wenn die Kette
+   abläuft (30 Tage nach der letzten Auffrischung) oder jemand `bun run nutzer trennen` aufruft.
+   Begründung: Der Fehler soll *sofort* kommen, wenn jemand den Zugang weitergibt. Jeder Weg,
+   auf dem ein Platz von selbst frei wird, ist ein Weg, auf dem eine zweite Person
+   hineinkommt.
+3. **Getrennt heißt sofort.** Das Zugangstoken trägt seine Kette (Claim `kette`), und
+   `src/auth.ts` fragt bei jedem Werkzeugaufruf, ob sie noch lebt. Vorher lief ein widerrufenes
+   Token noch bis zu einer Stunde weiter, nach `trennen`, nach `passwort` und nach der
+   Diebstahlserkennung. Tokens von vor `0139` tragen keine Kette und laufen binnen einer Stunde
+   aus.
+4. **Grenze NULL ist der Standard.** Sie gilt nur dort, wo sie jemand setzt
+   (`bun run nutzer limit <email> <n>`). Liegt ein Konto beim Setzen schon darüber, bleiben die
+   bestehenden Verbindungen stehen. Sie zu kappen ist eine eigene Entscheidung und deshalb ein
+   eigener Befehl.
+
+**Der bekannte Preis.** Wer in ChatGPT oder Claude den Connector entfernt und neu anlegt,
+hinterlässt eine Kette, die der Client nicht widerruft. Bei der Grenze 1 steht er danach vor der
+Fehlerseite, bis wir trennen. Die Meldung sagt ihm das. In `mcp.verbindung_stand` erscheint er
+als `abgelehnt_30_tage > 0`, und in `mcp.anmeldung_protokoll` steht, von welchem Netz.
+
+**Was die Grenze nicht kann.** Wer seinen ganzen ChatGPT- oder Claude-Zugang weitergibt, benutzt
+dieselbe Kette. Das sieht keine Grenze, denn es sieht für uns aus wie ein Client.
+
+**Erwogen und vertagt.** Diese Wege stehen hier, damit eine spätere Anpassung nicht bei null
+anfängt:
+- ~~Verdrängen~~: die neue Anmeldung gewinnt, die älteste Kette wird widerrufen. Damit ginge
+  das Neuverbinden ohne uns, und das Teilen wäre lästig, weil sich zwei Personen gegenseitig
+  hinauswerfen. Verworfen für jetzt, weil es Weitergabe nicht verhindert, sondern nur
+  erschwert.
+- **Ruhende Ketten nicht zählen**, etwa nur Ketten, die in den letzten 7 Tagen aufgefrischt
+  wurden. Wacht eine ruhende auf, wird die Grenze neu geprüft. Das entschärft den Preis oben,
+  gibt aber Plätze ohne uns frei. Umsetzung, falls gewünscht: `LEBENDE_KETTEN` in
+  `mcp/src/anmeldung/speicher.ts` und `mcp.verbindung_stand` um die Bedingung auf
+  `angelegt_am` ergänzen, dazu die Prüfung beim Auffrischen einer ruhenden Kette.
+- **Erkennen statt begrenzen**, als Prüfsicht je Nutzer über 30 Tage: verschiedene
+  Anmeldenetze (`anmeldung_protokoll.herkunft`), Verdrängungen (falls je eingeführt) und
+  Zugriffe aus verschiedenen Ketten zur gleichen Zeit (`mcp.zugriff`). Ein einzelner Wert
+  beweist nichts, denn Mobilfunk wechselt die Adresse. Das Muster aus häufigem Wechsel und
+  wechselnden Netzen wäre der Hinweis. Nicht gebaut, weil das Ablehnen die Frage für die
+  begrenzten Konten schon beantwortet.
+

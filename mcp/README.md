@@ -106,7 +106,15 @@ bun run nutzer liste
 bun run nutzer stufe    daniel@brain.food fragen   # wirkt sofort, nicht erst beim nächsten Token
 bun run nutzer passwort daniel@brain.food          # widerruft bestehende Tokens
 bun run nutzer sperren  daniel@brain.food          # stilllegen + alle Tokens widerrufen
+
+# Verbindungsgrenze (0139): an der Grenze wird ABGELEHNT, frei wird ein Platz nur durch trennen
+bun run nutzer limit        daniel@brain.food 1     # oder: aus
+bun run nutzer verbindungen daniel@brain.food       # lebende Verbindungen mit Kennung
+bun run nutzer trennen      daniel@brain.food 3f2a9c1e   # oder: alle — wirkt ab dem nächsten Aufruf
 ```
+
+Wer wegen der Grenze abgewiesen wurde: `SELECT * FROM mcp.verbindung_stand WHERE abgelehnt_30_tage > 0`
+(als Administrator oder `mcp_anmeldung`), das Netz dazu in `mcp.anmeldung_protokoll`.
 
 ## Befehle
 

@@ -19,6 +19,7 @@ import type { Server } from 'node:http'
 import { anmeldungAbfragen, anmeldungPool } from '../src/anmeldung/db'
 import { anmeldungMontieren, sicherheitsrichtlinie } from '../src/anmeldung/endpunkte'
 import { zugangstokenPruefen } from '../src/anmeldung/schluessel'
+import { ketteLebt } from '../src/anmeldung/speicher'
 
 const DB = process.env.MCP_AUTH_DATABASE_URL
 const lauf = DB ? describe : describe.skip
@@ -314,6 +315,121 @@ lauf('Autorisierungsserver', () => {
   // von 127.0.0.1 und loesen damit die Bremse aus — eine Minute lang. Jeder
   // Test danach, der sich anmelden will, bekaeme 429. Beim ersten Lauf
   // genau so passiert.
+  // --- Verbindungsgrenze (0139) --------------------------------------
+  //
+  // Eigene Herkunft je Aufruf (x-forwarded-for), damit die Bremse von
+  // 10 Anmeldungen je Minute und Adresse diese Tests nicht mitzaehlt.
+
+  let netz = 0
+  async function verbinden(): Promise<{ seite: Response; token?: any; code: string; verifier: string }> {
+    const herkunft = { 'x-forwarded-for': `198.51.100.${++netz}` }
+    const { verifier, challenge } = await pkce()
+    const formularseite = await fetch(
+      `${basis}/authorize?response_type=code&client_id=${clientId}` +
+      `&redirect_uri=${encodeURIComponent(RUECK)}&code_challenge=${challenge}` +
+      `&code_challenge_method=S256&state=s`, { headers: herkunft })
+    const seite = await fetch(basis + '/anmelden', {
+      method: 'POST', redirect: 'manual',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...herkunft },
+      body: formular({ anfrage: anfrageFeldAus(await formularseite.text()), email: EMAIL, passwort: PASSWORT }),
+    })
+    const code = new URL(seite.headers.get('location') || 'https://x.invalid').searchParams.get('code') ?? ''
+    return { seite, code, verifier }
+  }
+  const einloesen = (code: string, verifier: string) => postForm('/token', {
+    grant_type: 'authorization_code', code, client_id: clientId, redirect_uri: RUECK, code_verifier: verifier,
+  })
+  const grenzeSetzen = (n: number | null) =>
+    anmeldungAbfragen(`UPDATE mcp.nutzer SET max_verbindungen = $2 WHERE email = $1`, [EMAIL, n])
+  const allesTrennen = () => anmeldungAbfragen(
+    `UPDATE mcp.oauth_token SET widerrufen_am = now()
+      WHERE subject = (SELECT subject FROM mcp.nutzer WHERE email = $1) AND widerrufen_am IS NULL`, [EMAIL])
+
+  test('An der Grenze wird abgelehnt, nicht verdraengt — und die Ablehnung steht im Protokoll', async () => {
+    await allesTrennen()
+    await grenzeSetzen(1)
+    try {
+      const erste = await verbinden()
+      expect(erste.seite.status).toBe(302)
+      const token = await (await einloesen(erste.code, erste.verifier)).json()
+      expect(token.refresh_token).toBeTruthy()
+
+      const zweite = await verbinden()
+      expect(zweite.seite.status).toBe(403)
+      expect(zweite.code).toBe('')
+      expect(await zweite.seite.text()).toContain('Keine weitere Verbindung freigegeben')
+
+      // Die erste Verbindung laeuft weiter — abgelehnt wird die NEUE.
+      const { payload } = await zugangstokenPruefen(token.access_token, basis, basis)
+      expect(await ketteLebt(String(payload.kette))).toBe(true)
+
+      const [p] = await anmeldungAbfragen(
+        `SELECT erfolg, herkunft FROM mcp.anmeldung_protokoll
+          WHERE email = $1 AND grund = 'verbindungslimit' ORDER BY id DESC LIMIT 1`, [EMAIL])
+      expect(p.erfolg).toBe(false)
+      expect(p.herkunft).toBe(`198.51.100.${netz}`)
+
+      const [stand] = await anmeldungAbfragen(
+        `SELECT verbindungen, abgelehnt_30_tage FROM mcp.verbindung_stand WHERE email = $1`, [EMAIL])
+      expect(stand.verbindungen).toBe(1)
+      expect(stand.abgelehnt_30_tage).toBeGreaterThanOrEqual(1)
+    } finally { await grenzeSetzen(null) }
+  })
+
+  test('Die Grenze gilt auch beim Einloesen — ein Code von vorher kommt nicht durch', async () => {
+    // Zwei Anmeldungen gleichzeitig kaemen an der Anmeldeseite beide vorbei;
+    // verbindlich ist das Einloesen. Nachgestellt: zwei Codes ohne Grenze,
+    // dann Grenze 1, dann beide einloesen.
+    await allesTrennen()
+    const a = await verbinden()
+    const b = await verbinden()
+    await grenzeSetzen(1)
+    try {
+      expect((await einloesen(a.code, a.verifier)).status).toBe(200)
+      const r = await einloesen(b.code, b.verifier)
+      expect(r.status).toBe(403)
+      expect((await r.json()).error).toBe('invalid_grant')
+    } finally { await grenzeSetzen(null) }
+  })
+
+  test('Auffrischen bleibt in der Kette und belegt keinen zweiten Platz', async () => {
+    await allesTrennen()
+    await grenzeSetzen(1)
+    try {
+      const v = await verbinden()
+      const erste = await (await einloesen(v.code, v.verifier)).json()
+      const zweite = await (await postForm('/token', {
+        grant_type: 'refresh_token', refresh_token: erste.refresh_token, client_id: clientId,
+      })).json()
+      expect(zweite.access_token).toBeTruthy()
+      const k1 = (await zugangstokenPruefen(erste.access_token, basis, basis)).payload.kette
+      const k2 = (await zugangstokenPruefen(zweite.access_token, basis, basis)).payload.kette
+      expect(k2).toBe(k1)
+      const [stand] = await anmeldungAbfragen(
+        `SELECT verbindungen FROM mcp.verbindung_stand WHERE email = $1`, [EMAIL])
+      expect(stand.verbindungen).toBe(1)
+    } finally { await grenzeSetzen(null) }
+  })
+
+  test('Getrennt heisst sofort: das laufende Zugangstoken verliert seine Kette, und der Platz ist frei', async () => {
+    await allesTrennen()
+    await grenzeSetzen(1)
+    try {
+      const v = await verbinden()
+      const t = await (await einloesen(v.code, v.verifier)).json()
+      const kette = String((await zugangstokenPruefen(t.access_token, basis, basis)).payload.kette)
+      expect(await ketteLebt(kette)).toBe(true)
+
+      // Was `bun run nutzer trennen` tut.
+      await anmeldungAbfragen(
+        `UPDATE mcp.oauth_token SET widerrufen_am = now() WHERE kette_id = $1 AND widerrufen_am IS NULL`, [kette])
+      expect(await ketteLebt(kette)).toBe(false)
+
+      const neu = await verbinden()
+      expect(neu.seite.status).toBe(302)
+    } finally { await grenzeSetzen(null) }
+  })
+
   /**
    * REVIEW 13.09.2026: Die Sperre nach Fehlversuchen hing nur am Konto.
    * Erfundene Adressen trafen keines — und kosteten trotzdem je 120 ms
