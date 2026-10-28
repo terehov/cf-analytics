@@ -4405,8 +4405,8 @@ dieselbe Kette. Das sieht keine Grenze, denn es sieht für uns aus wie ein Clien
 anfängt:
 - ~~Verdrängen~~: die neue Anmeldung gewinnt, die älteste Kette wird widerrufen. Damit ginge
   das Neuverbinden ohne uns, und das Teilen wäre lästig, weil sich zwei Personen gegenseitig
-  hinauswerfen. Verworfen für jetzt, weil es Weitergabe nicht verhindert, sondern nur
-  erschwert.
+  hinauswerfen. ~~Verworfen für jetzt, weil es Weitergabe nicht verhindert, sondern nur
+  erschwert.~~ **Noch am selben Tag als Schalter je Konto gebaut (`0140`, siehe unten).**
 - **Ruhende Ketten nicht zählen**, etwa nur Ketten, die in den letzten 7 Tagen aufgefrischt
   wurden. Wacht eine ruhende auf, wird die Grenze neu geprüft. Das entschärft den Preis oben,
   gibt aber Plätze ohne uns frei. Umsetzung, falls gewünscht: `LEBENDE_KETTEN` in
@@ -4418,4 +4418,32 @@ anfängt:
   beweist nichts, denn Mobilfunk wechselt die Adresse. Das Muster aus häufigem Wechsel und
   wechselnden Netzen wäre der Hinweis. Nicht gebaut, weil das Ablehnen die Frage für die
   begrenzten Konten schon beantwortet.
+
+## 28.10.2026 — Verdrängen als Schalter je Konto, und warum ein Widerruf einen Grund braucht (`0140`)
+
+**Entschieden (Eugene, 28.10.2026):** `mcp.nutzer.verdraengen` wählt je Konto, was an der
+Grenze geschieht. `false` ist der Standard und lehnt ab wie in `0139`. Bei `true` gewinnt die
+neue Anmeldung, und die älteste Verbindung wird getrennt, gemessen am Beginn der Verbindung,
+nicht an der letzten Nutzung. Ein lange verbundener Client ist eher der alte Connector als der,
+der gerade arbeitet. Das Trennen wirkt ab dem nächsten Aufruf der alten Verbindung. Die
+Anmeldung steht mit `grund = 'verdraengt'` und ihrer Herkunft im Protokoll, und
+`mcp.verbindung_stand` zählt `verdraengt_30_tage` und `verdraengt_netze_30_tage`.
+
+**Befund aus dem Test, der auch `0139` betraf.** Die Diebstahlserkennung aus `0104` widerruft
+alle Ketten eines Kontos, sobald ein schon widerrufener Token noch einmal vorgelegt wird. Ein
+getrennter oder verdrängter Client tut genau das, weil er vom Trennen nichts weiß und weiter
+auffrischt. Ohne Gegenmaßnahme hätte jede Verdrängung beim nächsten Auffrischen des alten
+Clients auch die neue Verbindung gerissen. Seit `0139` galt dasselbe für jedes
+`bun run nutzer trennen`: Es hätte alle übrigen Verbindungen des Kontos mitgenommen. Das gilt
+ebenso für einen Client, der nach `passwort` noch einen alten Token hatte.
+
+**Deshalb `mcp.oauth_token.widerruf_grund`:**
+- `getrennt`, `verdraengt` und `konto` (Passwort, Stilllegung) haben wir selbst widerrufen.
+  Legt der Client so einen Token erneut vor, wird er nur abgewiesen und als
+  `grund = 'verbindung_getrennt'` mit Herkunft protokolliert. Bei einer Weitergabe ist das
+  die andere Person.
+- Die Familie fällt weiter nur bei dem, was auf Diebstahl deutet: Ein durch Rotation
+  ersetzter Token taucht wieder auf (`widerruf_grund` NULL).
+- Der Test `anmeldung.test.ts` („Getrennt heißt sofort …") prüft jetzt auch, dass ein
+  getrennter Client beim Auffrischen die übrige Verbindung stehen lässt.
 

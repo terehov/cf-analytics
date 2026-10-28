@@ -19,7 +19,7 @@ import type { Server } from 'node:http'
 import { anmeldungAbfragen, anmeldungPool } from '../src/anmeldung/db'
 import { anmeldungMontieren, sicherheitsrichtlinie } from '../src/anmeldung/endpunkte'
 import { zugangstokenPruefen } from '../src/anmeldung/schluessel'
-import { ketteLebt } from '../src/anmeldung/speicher'
+import { ketteLebt, verbindungenTrennen } from '../src/anmeldung/speicher'
 
 const DB = process.env.MCP_AUTH_DATABASE_URL
 const lauf = DB ? describe : describe.skip
@@ -339,8 +339,9 @@ lauf('Autorisierungsserver', () => {
   const einloesen = (code: string, verifier: string) => postForm('/token', {
     grant_type: 'authorization_code', code, client_id: clientId, redirect_uri: RUECK, code_verifier: verifier,
   })
-  const grenzeSetzen = (n: number | null) =>
-    anmeldungAbfragen(`UPDATE mcp.nutzer SET max_verbindungen = $2 WHERE email = $1`, [EMAIL, n])
+  const grenzeSetzen = (n: number | null, verdraengen = false) =>
+    anmeldungAbfragen(`UPDATE mcp.nutzer SET max_verbindungen = $2, verdraengen = $3 WHERE email = $1`,
+      [EMAIL, n, verdraengen])
   const allesTrennen = () => anmeldungAbfragen(
     `UPDATE mcp.oauth_token SET widerrufen_am = now()
       WHERE subject = (SELECT subject FROM mcp.nutzer WHERE email = $1) AND widerrufen_am IS NULL`, [EMAIL])
@@ -420,13 +421,71 @@ lauf('Autorisierungsserver', () => {
       const kette = String((await zugangstokenPruefen(t.access_token, basis, basis)).payload.kette)
       expect(await ketteLebt(kette)).toBe(true)
 
-      // Was `bun run nutzer trennen` tut.
-      await anmeldungAbfragen(
-        `UPDATE mcp.oauth_token SET widerrufen_am = now() WHERE kette_id = $1 AND widerrufen_am IS NULL`, [kette])
+      expect(await verbindungenTrennen(EMAIL, kette.slice(0, 8))).toBe(1)
       expect(await ketteLebt(kette)).toBe(false)
 
       const neu = await verbinden()
       expect(neu.seite.status).toBe(302)
+      const neuToken = await (await einloesen(neu.code, neu.verifier)).json()
+      const neuKette = String((await zugangstokenPruefen(neuToken.access_token, basis, basis)).payload.kette)
+
+      // Der getrennte Client frischt weiter auf — er weiss vom Trennen nichts.
+      // Das darf NICHT als Diebstahl gelten und die neue Verbindung reissen.
+      const r = await postForm('/token', {
+        grant_type: 'refresh_token', refresh_token: t.refresh_token, client_id: clientId,
+      })
+      expect(r.status).toBe(400)
+      expect(await ketteLebt(neuKette)).toBe(true)
+    } finally { await grenzeSetzen(null) }
+  })
+
+  test('Mit verdraengen gewinnt die neue Anmeldung, und die aelteste Verbindung ist sofort getrennt', async () => {
+    await allesTrennen()
+    await grenzeSetzen(1, true)
+    try {
+      const alt = await verbinden()
+      const altToken = await (await einloesen(alt.code, alt.verifier)).json()
+      const altKette = String((await zugangstokenPruefen(altToken.access_token, basis, basis)).payload.kette)
+
+      const neu = await verbinden()
+      expect(neu.seite.status).toBe(302)
+      const neuToken = await (await einloesen(neu.code, neu.verifier)).json()
+      expect(neuToken.refresh_token).toBeTruthy()
+      const neuKette = String((await zugangstokenPruefen(neuToken.access_token, basis, basis)).payload.kette)
+
+      expect(await ketteLebt(altKette)).toBe(false)
+      expect(await ketteLebt(neuKette)).toBe(true)
+      // Der alte Client kann auch nicht mehr auffrischen.
+      expect((await postForm('/token', {
+        grant_type: 'refresh_token', refresh_token: altToken.refresh_token, client_id: clientId,
+      })).status).toBe(400)
+
+      const [p] = await anmeldungAbfragen(
+        `SELECT erfolg, herkunft FROM mcp.anmeldung_protokoll
+          WHERE email = $1 AND grund = 'verdraengt' ORDER BY id DESC LIMIT 1`, [EMAIL])
+      expect(p.erfolg).toBe(true)
+      expect(p.herkunft).toBe(`198.51.100.${netz}`)
+      const [stand] = await anmeldungAbfragen(
+        `SELECT verbindungen, verdraengt_30_tage FROM mcp.verbindung_stand WHERE email = $1`, [EMAIL])
+      expect(stand.verbindungen).toBe(1)
+      expect(stand.verdraengt_30_tage).toBeGreaterThanOrEqual(1)
+    } finally { await grenzeSetzen(null) }
+  })
+
+  test('Verdraengen gilt auch beim Einloesen — zwei Codes von vorher, die aeltere Kette faellt', async () => {
+    await allesTrennen()
+    const a = await verbinden()
+    const b = await verbinden()
+    await grenzeSetzen(1, true)
+    try {
+      const ta = await (await einloesen(a.code, a.verifier)).json()
+      const tb = await einloesen(b.code, b.verifier)
+      expect(tb.status).toBe(200)
+      const ka = String((await zugangstokenPruefen(ta.access_token, basis, basis)).payload.kette)
+      expect(await ketteLebt(ka)).toBe(false)
+      const [stand] = await anmeldungAbfragen(
+        `SELECT verbindungen FROM mcp.verbindung_stand WHERE email = $1`, [EMAIL])
+      expect(stand.verbindungen).toBe(1)
     } finally { await grenzeSetzen(null) }
   })
 

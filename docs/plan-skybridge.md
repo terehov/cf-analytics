@@ -402,8 +402,10 @@ Anmeldetabellen liegen außerhalb ihrer Rechte, sonst wäre der Signierschlüsse
 
 **Verbindungsgrenze je Konto (`0139`, 28.10.2026).** `mcp.nutzer.max_verbindungen` begrenzt,
 auf wie vielen Clients ein Konto gleichzeitig verbunden ist. Gezählt wird jede lebende
-Tokenkette. An der Grenze wird **abgelehnt**, nicht verdrängt, und frei wird ein Platz nur
-durch Ablauf oder `bun run nutzer trennen`. Ein Trennen wirkt ab dem nächsten Aufruf, weil das
+Tokenkette. An der Grenze wird **abgelehnt**, und frei wird ein Platz nur durch Ablauf oder
+`bun run nutzer trennen`. Seit `0140` lässt sich das je Konto umschalten
+(`mcp.nutzer.verdraengen`): Dann gewinnt die neue Anmeldung, und die älteste Verbindung wird
+getrennt. Ein Trennen wirkt ab dem nächsten Aufruf, weil das
 Zugangstoken seine Kette trägt. Ablehnungen stehen in `mcp.verbindung_stand`. Begründung und
 die vertagten Wege in `entscheidungen.md` (28.10.2026).
 

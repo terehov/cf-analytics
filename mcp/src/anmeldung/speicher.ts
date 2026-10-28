@@ -176,32 +176,69 @@ const LEBENDE_KETTEN = `SELECT count(*)::int AS n FROM mcp.oauth_token
   WHERE subject = $1 AND widerrufen_am IS NULL AND laeuft_ab > now()`
 
 export async function verbindungenZaehlen(subject: string, q: Abfrager = anmeldungAbfragen) {
-  const [n] = await q<{ grenze: number | null }>(
-    `SELECT max_verbindungen AS grenze FROM mcp.nutzer WHERE subject = $1`, [subject])
+  const [n] = await q<{ grenze: number | null; verdraengen: boolean }>(
+    `SELECT max_verbindungen AS grenze, verdraengen FROM mcp.nutzer WHERE subject = $1`, [subject])
   const [z] = await q<{ n: number }>(LEBENDE_KETTEN, [subject])
-  return { grenze: n?.grenze ?? null, verbindungen: z?.n ?? 0 }
+  return { grenze: n?.grenze ?? null, verdraengen: Boolean(n?.verdraengen), verbindungen: z?.n ?? 0 }
 }
 
 export const grenzeErreicht = (v: { grenze: number | null; verbindungen: number }) =>
   v.grenze !== null && v.verbindungen >= v.grenze
 
 /**
- * Eine neue Verbindung beginnen — oder ablehnen, wenn die Grenze erreicht ist.
+ * Eine neue Verbindung beginnen — an der Grenze ablehnen oder verdraengen.
  *
  * Zaehlen und Ausstellen in einer Transaktion unter Sperre der Nutzerzeile.
  * Die Pruefung auf der Anmeldeseite davor ist nur fuer die verstaendliche
  * Meldung da; zwei gleichzeitige Anmeldungen kaemen dort beide durch. Hier
  * nicht.
+ *
+ * VERDRAENGEN (0140, mcp.nutzer.verdraengen): so viele der aeltesten Ketten
+ * trennen, dass die neue Platz hat — meist eine. "Aelteste" nach Beginn der
+ * Verbindung, nicht nach letzter Nutzung: wer seit Wochen verbunden ist, ist
+ * eher der alte Connector als der, der gerade arbeitet. Das Trennen wirkt
+ * ab dem naechsten Aufruf der getrennten Verbindung (ketteLebt).
  */
 export async function verbindungEroeffnen(clientId: string, subject: string) {
   return anmeldungTransaktion(async q => {
     await q(`SELECT 1 FROM mcp.nutzer WHERE subject = $1 FOR UPDATE`, [subject])
     const v = await verbindungenZaehlen(subject, q)
-    if (grenzeErreicht(v)) return { fehler: 'verbindungslimit' as const, ...v }
+    let verdraengt: string[] = []
+    if (grenzeErreicht(v)) {
+      if (!v.verdraengen) return { fehler: 'verbindungslimit' as const, ...v }
+      const zeilen = await q<{ kette_id: string }>(
+        `UPDATE mcp.oauth_token SET widerrufen_am = now(), widerruf_grund = 'verdraengt'
+          WHERE token_hash IN (
+            SELECT token_hash FROM mcp.oauth_token
+             WHERE subject = $1 AND widerrufen_am IS NULL AND laeuft_ab > now()
+             ORDER BY coalesce(verbunden_seit, angelegt_am), angelegt_am
+             LIMIT $2)
+          RETURNING kette_id`, [subject, v.verbindungen - v.grenze! + 1])
+      verdraengt = zeilen.map(z => z.kette_id)
+    }
     const kette: Kette = { id: crypto.randomUUID(), seit: new Date() }
     const token = await auffrischungAusstellen(clientId, subject, kette, 30, q)
-    return { token, kette: kette.id }
+    return { token, kette: kette.id, verdraengt }
   })
+}
+
+/**
+ * Verbindungen trennen — `bun run nutzer trennen`. Mit Grund `getrennt`,
+ * damit der getrennte Client beim naechsten Auffrischen nur abgewiesen wird
+ * und nicht die Diebstahlserkennung ausloest (0140).
+ *
+ * `kette` ist der Anfang einer Kennung (mindestens acht Zeichen, wie
+ * `verbindungen` sie zeigt) oder `alle`.
+ */
+export async function verbindungenTrennen(email: string, kette: string): Promise<number> {
+  const r = await anmeldungAbfragen<{ kette_id: string }>(
+    `UPDATE mcp.oauth_token t SET widerrufen_am = now(), widerruf_grund = 'getrennt'
+       FROM mcp.nutzer n
+      WHERE n.subject = t.subject AND lower(n.email) = lower($1)
+        AND t.widerrufen_am IS NULL
+        AND ($2 = 'alle' OR t.kette_id::text LIKE $2 || '%')
+      RETURNING t.kette_id`, [email, kette])
+  return new Set(r.map(z => z.kette_id)).size
 }
 
 /** Lebt die Verbindung noch? Gefragt bei JEDEM Werkzeugaufruf (src/auth.ts). */
@@ -225,8 +262,8 @@ export async function auffrischungEinloesen(token: string, clientId: string) {
   const h = await hash(token)
   const [zeile] = await anmeldungAbfragen<{
     subject: string; widerrufen_am: string | null; laeuft_ab: string; ersetzt_durch: string | null
-    kette_id: string | null; verbunden_seit: string | null
-  }>(`SELECT subject, widerrufen_am, laeuft_ab, ersetzt_durch, kette_id, verbunden_seit
+    kette_id: string | null; verbunden_seit: string | null; widerruf_grund: string | null
+  }>(`SELECT subject, widerrufen_am, laeuft_ab, ersetzt_durch, kette_id, verbunden_seit, widerruf_grund
         FROM mcp.oauth_token WHERE token_hash = $1 AND client_id = $2`, [h, clientId])
 
   if (!zeile) return { fehler: 'unbekannt' as const }
@@ -236,6 +273,16 @@ export async function auffrischungEinloesen(token: string, clientId: string) {
   const kette: Kette = {
     id: zeile.kette_id ?? crypto.randomUUID(),
     seit: zeile.verbunden_seit ?? new Date(),
+  }
+
+  /**
+   * VON UNS WIDERRUFEN (0140): getrennt, verdraengt, Konto. Der Client weiss
+   * davon nichts und frischt auf — das ist kein Diebstahl, sondern
+   * erwartbar. Abweisen, und die uebrigen Verbindungen stehen lassen. Sonst
+   * risse jeder verdraengte Client die Verbindung mit, die ihn verdraengt hat.
+   */
+  if (zeile.widerrufen_am && zeile.widerruf_grund && zeile.widerruf_grund !== 'wiederverwendet') {
+    return { fehler: 'getrennt' as const, subject: zeile.subject }
   }
 
   if (zeile.widerrufen_am) {
@@ -254,7 +301,8 @@ export async function auffrischungEinloesen(token: string, clientId: string) {
      * zugestellte Nachfolger widerrufen und ein frischer ausgestellt.
      *
      * ALLES ANDERE IST EIN KONFLIKT: ein Token, der ohne Nachfolger
-     * widerrufen wurde (Diebstahlserkennung, Stilllegung), oder dessen
+     * widerrufen wurde (Diebstahlserkennung; Stilllegung und Trennen fangen
+     * seit 0140 schon oben ab), oder dessen
      * Nachfolger schon benutzt ist, oder der aelter als 60 s ist. Dann faellt
      * die Familie. Die erste Fassung der Frist liess JEDEN kuerzlich
      * widerrufenen Token wiederholen — und damit haette ein Dieb mit einem
@@ -280,7 +328,7 @@ export async function auffrischungEinloesen(token: string, clientId: string) {
       }
     }
     await anmeldungAbfragen(
-      `UPDATE mcp.oauth_token SET widerrufen_am = now()
+      `UPDATE mcp.oauth_token SET widerrufen_am = now(), widerruf_grund = 'wiederverwendet'
         WHERE subject = $1 AND widerrufen_am IS NULL`, [zeile.subject])
     return { fehler: 'wiederverwendet' as const, subject: zeile.subject }
   }
@@ -295,6 +343,6 @@ export async function auffrischungEinloesen(token: string, clientId: string) {
 
 export async function tokensWiderrufen(subject: string): Promise<void> {
   await anmeldungAbfragen(
-    `UPDATE mcp.oauth_token SET widerrufen_am = now()
+    `UPDATE mcp.oauth_token SET widerrufen_am = now(), widerruf_grund = 'konto'
       WHERE subject = $1 AND widerrufen_am IS NULL`, [subject])
 }

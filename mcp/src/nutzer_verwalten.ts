@@ -7,12 +7,15 @@
  *   bun run nutzer sperren  daniel@brain.food
  *   bun run nutzer liste
  *   bun run nutzer limit        daniel@brain.food 2      (oder: aus)
+ *   bun run nutzer limit        daniel@brain.food 1 --verdraengen   (oder: --ablehnen)
  *   bun run nutzer verbindungen daniel@brain.food
  *   bun run nutzer trennen      daniel@brain.food 3f2a9c1e   (oder: alle)
  *
  * DIE VERBINDUNGSGRENZE (0139) LEHNT AB, sie verdraengt nicht. Ein Platz
  * wird nur frei, wenn eine Verbindung ablaeuft oder hier getrennt wird —
- * das ist die Freigabe durch uns. Getrennt heisst sofort: auch das noch
+ * das ist die Freigabe durch uns. Mit --verdraengen (0140) gewinnt statt
+ * dessen die neue Anmeldung und die aelteste Verbindung wird getrennt; ohne
+ * Schalter bleibt die Einstellung des Kontos, wie sie ist. Getrennt heisst sofort: auch das noch
  * laufende Zugangstoken der Verbindung gilt ab dem naechsten Aufruf nicht
  * mehr (src/auth.ts).
  *
@@ -22,7 +25,7 @@
  * Datenbank (harte Regel 2).
  */
 import { anmeldungAbfragen, anmeldungEingerichtet, anmeldungPool } from './anmeldung/db'
-import { tokensWiderrufen } from './anmeldung/speicher'
+import { tokensWiderrufen, verbindungenTrennen } from './anmeldung/speicher'
 
 if (!anmeldungEingerichtet()) {
   console.error('MCP_AUTH_DATABASE_URL fehlt — ohne die Anmelderolle geht das nicht.')
@@ -125,24 +128,28 @@ switch (befehl) {
   }
 
   case 'limit': {
-    const [email, wert] = argumente
+    const [email, wert, schalter] = argumente
     const grenze = wert === 'aus' ? null : Number(wert)
-    if (!email || (grenze !== null && !(Number.isInteger(grenze) && grenze >= 1))) {
-      console.error('bun run nutzer limit <email> <anzahl ab 1|aus>'); process.exit(1)
+    const verdraengen = schalter === '--verdraengen' ? true : schalter === '--ablehnen' ? false : null
+    if (!email || (grenze !== null && !(Number.isInteger(grenze) && grenze >= 1))
+        || (schalter !== undefined && verdraengen === null)) {
+      console.error('bun run nutzer limit <email> <anzahl ab 1|aus> [--verdraengen|--ablehnen]'); process.exit(1)
     }
-    const r = await anmeldungAbfragen<{ subject: string }>(
-      `UPDATE mcp.nutzer SET max_verbindungen = $2 WHERE lower(email) = lower($1) RETURNING subject`,
-      [email, grenze])
+    const r = await anmeldungAbfragen<{ subject: string; verdraengen: boolean }>(
+      `UPDATE mcp.nutzer SET max_verbindungen = $2, verdraengen = coalesce($3, verdraengen)
+        WHERE lower(email) = lower($1) RETURNING subject, verdraengen`,
+      [email, grenze, verdraengen])
     if (!r.length) { console.error('Kein Konto mit dieser Adresse.'); process.exit(1) }
     const [z] = await anmeldungAbfragen<{ n: number }>(
       `SELECT count(*)::int AS n FROM mcp.oauth_token
         WHERE subject = $1 AND widerrufen_am IS NULL AND laeuft_ab > now()`, [r[0]!.subject])
     console.log(grenze === null
       ? 'Keine Verbindungsgrenze mehr.'
-      : `Grenze ${grenze}, verbunden ${z!.n}.`)
+      : `Grenze ${grenze}, verbunden ${z!.n}. An der Grenze wird ` +
+        (r[0]!.verdraengen ? 'die aelteste Verbindung VERDRAENGT.' : 'die neue Anmeldung ABGELEHNT.'))
     // Bestehende Verbindungen ueber der neuen Grenze bleiben stehen — sie zu
     // kappen ist eine eigene Entscheidung, also ein eigener Befehl.
-    if (grenze !== null && z!.n > grenze) {
+    if (grenze !== null && z!.n > grenze && !r[0]!.verdraengen) {
       console.log(`Es bestehen mehr Verbindungen als erlaubt. Neue werden abgelehnt; die ` +
         `bestehenden zeigt \`bun run nutzer verbindungen ${email}\`, \`trennen\` beendet sie.`)
     }
@@ -172,16 +179,9 @@ switch (befehl) {
     if (!email || !kette || (kette !== 'alle' && kette.length < 8)) {
       console.error('bun run nutzer trennen <email> <kette (8 Zeichen aus verbindungen)|alle>'); process.exit(1)
     }
-    const r = await anmeldungAbfragen(
-      `UPDATE mcp.oauth_token t SET widerrufen_am = now()
-         FROM mcp.nutzer n
-        WHERE n.subject = t.subject AND lower(n.email) = lower($1)
-          AND t.widerrufen_am IS NULL
-          AND ($2 = 'alle' OR t.kette_id::text LIKE $2 || '%')
-        RETURNING t.kette_id`, [email, kette])
-    const ketten = new Set(r.map((z: any) => z.kette_id))
-    console.log(ketten.size
-      ? `${ketten.size} Verbindung(en) getrennt — wirkt sofort.`
+    const anzahl = await verbindungenTrennen(email, kette)
+    console.log(anzahl
+      ? `${anzahl} Verbindung(en) getrennt — wirkt sofort.`
       : 'Keine passende lebende Verbindung.')
     break
   }
@@ -189,7 +189,7 @@ switch (befehl) {
   case 'liste': {
     const zeilen = await anmeldungAbfragen(
       `SELECT email, anzeige, stufe, aktiv, letzter_login, fehlversuche, gesperrt_bis,
-              max_verbindungen,
+              max_verbindungen, verdraengen,
               (SELECT count(*)::int FROM mcp.oauth_token t
                 WHERE t.subject = n.subject AND t.widerrufen_am IS NULL AND t.laeuft_ab > now())
                 AS verbindungen
@@ -207,12 +207,13 @@ switch (befehl) {
   bun run nutzer stufe    <email> <lesen|fragen|gesperrt>
   bun run nutzer sperren  <email>
   bun run nutzer liste
-  bun run nutzer limit        <email> <anzahl|aus>
+  bun run nutzer limit        <email> <anzahl|aus> [--verdraengen|--ablehnen]
   bun run nutzer verbindungen <email>
   bun run nutzer trennen      <email> <kette|alle>
 
-Die Verbindungsgrenze lehnt neue Anmeldungen ab, sobald sie erreicht ist.
-Frei wird ein Platz nur durch Ablauf oder trennen.
+Die Verbindungsgrenze lehnt neue Anmeldungen ab, sobald sie erreicht ist;
+frei wird ein Platz nur durch Ablauf oder trennen. Mit --verdraengen gewinnt
+statt dessen die neue Anmeldung, und die aelteste Verbindung wird getrennt.
 
 Das Passwort wird abgefragt, nie als Argument uebergeben.`)
 }

@@ -726,9 +726,9 @@ ChatGPT und Copilot befragbar macht.
 | `mcp.sicht_achse` | Sicht × Achse | Abgeleitet aus dem Katalog, nicht von Hand |
 | `mcp.kennzahl` | Sicht × Spalte | Welche Aggregation die Spalte verträgt |
 | `mcp.fallstrick` | Regel | Was vor dem Lauf gesperrt oder gewarnt wird |
-| `mcp.nutzer` | Nutzer | Mailadresse, argon2id-Hash, Stufe (`lesen`/`fragen`/`gesperrt`), aktiv, `max_verbindungen` (`0139`, NULL = keine Grenze) |
+| `mcp.nutzer` | Nutzer | Mailadresse, argon2id-Hash, Stufe (`lesen`/`fragen`/`gesperrt`), aktiv, `max_verbindungen` (`0139`, NULL = keine Grenze), `verdraengen` (`0140`: an der Grenze älteste trennen statt ablehnen) |
 | `mcp.oauth_client` | registriertem Client | ChatGPT, Claude, VS Code — melden sich selbst an |
-| `mcp.oauth_code` · `mcp.oauth_token` | Code bzw. Auffrischungstoken | jeweils als Hash. `oauth_token.kette_id` (`0139`): die Verbindung, über Rotationen gleich, lebend = ein Token je Kette |
+| `mcp.oauth_code` · `mcp.oauth_token` | Code bzw. Auffrischungstoken | jeweils als Hash. `oauth_token.kette_id` (`0139`): die Verbindung, über Rotationen gleich, lebend = ein Token je Kette. `widerruf_grund` (`0140`): was wir selbst widerrufen haben (`getrennt`/`verdraengt`/`konto`), löst beim erneuten Vorlegen keine Diebstahlserkennung aus |
 | `mcp.verbindung_stand` (Sicht) | aktivem Konto | Grenze, lebende Verbindungen, Ablehnungen der letzten 30 Tage — nur für `mcp_anmeldung`, nennt Mailadressen |
 | `mcp.oauth_schluessel` | Schluessel | das RS256-Paar, mit dem Tokens signiert werden |
 | `mcp.anmeldung_protokoll` | Anmeldeversuch | gelungen wie gescheitert |

@@ -21,7 +21,9 @@
  *
  * Seit 0139 dazu die VERBINDUNGSGRENZE je Konto (mcp.nutzer.max_verbindungen):
  * ist sie erreicht, endet die Anmeldung mit einer Fehlerseite statt mit
- * einem Code. Abgelehnt, nicht verdraengt — freigegeben wird von uns.
+ * einem Code. Abgelehnt, nicht verdraengt — freigegeben wird von uns. Seit
+ * 0140 je Konto umschaltbar (mcp.nutzer.verdraengen): dann gewinnt die neue
+ * Anmeldung, und die aelteste Verbindung wird getrennt.
  *
  * Und eines, das keine Sicherheitsmassnahme ist, sondern Anstand: es gibt
  * keine Meldung, aus der hervorgeht, ob eine Mailadresse bekannt ist.
@@ -356,7 +358,8 @@ export function anmeldungMontieren(app: Express, o: { aussteller: string; publik
      * Einloesen des Codes (verbindungEroeffnen); diese ist fuer die Meldung.
      */
     const verbindungen = await verbindungenZaehlen(nutzer.subject)
-    if (grenzeErreicht(verbindungen)) {
+    const verdraengt = grenzeErreicht(verbindungen) && verbindungen.verdraengen
+    if (grenzeErreicht(verbindungen) && !verbindungen.verdraengen) {
       await anmeldungProtokollieren({ email, subject: nutzer.subject, erfolg: false,
         grund: 'verbindungslimit', herkunft: herkunft(anfrage) })
       return html(antwort, 403, fehlerseite('Keine weitere Verbindung freigegeben',
@@ -368,8 +371,11 @@ export function anmeldungMontieren(app: Express, o: { aussteller: string; publik
     }
 
     await anmeldungGelungen(nutzer.subject)
+    // Verdraengt wird erst beim Einloesen des Codes; der Grund steht an der
+    // gelungenen Anmeldung, weil nur sie die Herkunft der NEUEN Verbindung
+    // kennt — und die ist es, die man bei einer Weitergabe sehen will.
     await anmeldungProtokollieren({ email, subject: nutzer.subject, erfolg: true,
-      herkunft: herkunft(anfrage) })
+      grund: verdraengt ? 'verdraengt' : null, herkunft: herkunft(anfrage) })
 
     const code = await codeAusstellen({
       clientId: anliegen.client_id!, subject: nutzer.subject,
@@ -444,6 +450,12 @@ export function anmeldungMontieren(app: Express, o: { aussteller: string; publik
         if (e.fehler === 'wiederverwendet') {
           await anmeldungProtokollieren({ subject: e.subject, erfolg: false,
             grund: 'token_wiederverwendet', herkunft: herkunft(anfrage) })
+        }
+        // Ein getrennter oder verdraengter Client meldet sich: bei einer
+        // Weitergabe ist das die andere Person, mit ihrem Netz.
+        if (e.fehler === 'getrennt') {
+          await anmeldungProtokollieren({ subject: e.subject, erfolg: false,
+            grund: 'verbindung_getrennt', herkunft: herkunft(anfrage) })
         }
         return fehler('invalid_grant', 'Der Auffrischungstoken ist ungueltig. Neu anmelden.')
       }

@@ -109,6 +109,7 @@ bun run nutzer sperren  daniel@brain.food          # stilllegen + alle Tokens wi
 
 # Verbindungsgrenze (0139): an der Grenze wird ABGELEHNT, frei wird ein Platz nur durch trennen
 bun run nutzer limit        daniel@brain.food 1     # oder: aus
+bun run nutzer limit        daniel@brain.food 1 --verdraengen   # an der Grenze älteste trennen (0140); --ablehnen zurück
 bun run nutzer verbindungen daniel@brain.food       # lebende Verbindungen mit Kennung
 bun run nutzer trennen      daniel@brain.food 3f2a9c1e   # oder: alle — wirkt ab dem nächsten Aufruf
 ```
