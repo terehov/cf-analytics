@@ -91,6 +91,7 @@ Kommentare sind deutsch, damit sie in Postico lesbar sind.
 | **`plan-skybridge.md`** | **Der Plan, mit dem andere die Daten selbst befragen** — Daniel mit ChatGPT, Copilot oder Claude, **ohne BI-Tool**: ein eigener MCP-Server (Skybridge), der die 285 Karten als Berichte ausfuehrt, Koernung, Achsen und Fallstricke als Daten in `mcp.*` haelt, freie Abfragen auf dem Syntaxbaum prueft und ueber `mcp_leser` nur `mart`/`manual`/`ampel` sieht. Das BI-Tool liest kuenftig dieselben Karten und Achsen, bis es gehen kann | Bevor du am MCP-Zugang, an `mcp_leser`, an `mcp.*`, an `beziehungen.ts` oder an einer Sicht-Koernung arbeitest |
 | **`offene-punkte.md`** | Was ungeklärt ist und wer es klären muss | Bevor du etwas als fertig meldest |
 | **`datenlage-round-table.html`** / `.pdf` | Was der Round-Table-Map noch fehlt — nach der Messreihe vom 11.08.2026 nur noch Rechte, Bounti/OpenTable, Stammdatenpflege und fachliche Festlegungen | Bevor du einen Punkt als „fehlt" weitergibst |
+| **`ueberblick/`** | Vorlage `20260810 Entwurf_Management_Board_V2` (PDF und PPTX): der Entwurf des Management-Boards vom 10.08.2026, Grundlage für das Management-Dashboard (`0129`). Quelldokument, kein erzeugter Abzug — deshalb gegen die PDF-Regel in `.gitignore` freigestellt | Wenn du am Management-Dashboard arbeitest oder fragst, was das Board ursprünglich sehen sollte |
 | **`payloads/`** | Echte, anonymisierte LINA-Antworten aus der Exploration | Als Referenz; identisch mit den Test-Fixtures |
 
 ### Dokumentationspflicht
