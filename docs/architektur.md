@@ -35,8 +35,8 @@ Metabase läuft **nicht** auf dieser Maschine):
 20-s-Grenze, weitere lagen bei 12–17 s. Beim Abbruch vom 28.10. um 08:50 UTC war die CPU zu 96 %
 frei. Die langsamen Abfragen lasen ausnahmslos `mart.artikelverkauf` über viele Monate einer
 ganzen Marke — dort kostete das Nachschlagen des Artikelstands je Tageszeile ~18 der 22 s.
-Behoben mit `0142`/`0143` (Stand je Artikel und Monat materialisiert, Sicht bleibt live; der Fall
-von 22,3 s braucht jetzt 7,6 s), und die
+Behoben mit `0142`–`0144` (Stand je Artikel und Monat materialisiert, Sicht bleibt live; Betrieb →
+Marke mit Planerstatistik; der Fall von 22,3 s braucht jetzt 5,1 s), und die
 Zeitgrenze je Abfrage steht seitdem bei 45 s (`docs/entscheidungen.md`, 29.10.2026). Ein größerer
 Server hätte daran wenig geändert: es ist eine einzelne Abfrage, keine Konkurrenz um Kerne.
 

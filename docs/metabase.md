@@ -1721,7 +1721,22 @@ Erneut zeilengleich geprüft: dieselben Zeiträume, beide Richtungen, Rückfall 
 
 ~~Was bleibt, ist die Suche je Zeile, die die Markenschätzung erzwingt (`docs/offene-punkte.md`).~~
 Behoben mit `0144` (`mart.konzept_zuordnung_basis`); Klon: Enchilada 13 Monate 2,27 → 1,62 s,
-Taco-AF 1,56 → 1,22 s, `mart.umsatz_tag` Enchilada ab 2025 52 → 19 ms. Produktionswerte unten.
+Taco-AF 1,56 → 1,22 s, `mart.umsatz_tag` Enchilada ab 2025 52 → 19 ms.
+
+**Produktion, 29.10.2026 nach dem Deploy von `0144`** (warm, als `cf`; Schätzung für den
+Markenfilter jetzt 22 Betriebe, Zugriff über den Index auf `hauptkonzept`):
+
+| Abfrage | vor `0142` | nach `0143` | nach `0144` |
+|---|---|---|---|
+| WE-Quote Enchilada ohne Betrieb 39, 08.07.2025–26.10.2026 | 22,3 s | 7,6 s | 5,1 s |
+| Enchilada, `warengruppe = 'Taco-AF'`, ab 02.06.2025 | — | 7,8 s | 5,3 s |
+| `mart.umsatz_tag` Enchilada ab 2025 (14.652 Zeilen) | — | — | 36 ms |
+
+Die Zeile `mart.konzept_zuordnung_basis` steht in `mart.materialisierung_stand` bis zum ersten
+Nachtlauf auf „nie aufgefrischt" — der Merker entsteht erst dort. Was an den 5 s bleibt, ist das
+Lesen von 1,3 Mio. Tageszeilen über 16 Partitionen plus ein Index-Nachschlag je Zeile in der
+Stand-Materialisierung; weniger ginge nur mit einer Verdichtung, die die Tagesfragen nicht mehr
+beantwortet (`mart.artikel_monat` gibt es dafür).
 `mart.sicht_defekt` ist leer, der MCP-Katalog hat die Basis nachgeladen (257 Sichten).
 
 ## Neu und geändert in `mart` (Migrationen `0125`–`0127`, 29.09.2026)
