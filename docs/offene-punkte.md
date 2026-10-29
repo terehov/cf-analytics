@@ -2442,3 +2442,21 @@ SELECT * FROM mart.kassenblatt_stand WHERE zustand = 'abweichung' AND monat >= '
 - **Juli 2026** (Lochtage 20.–22.07.): rund 40 Betriebe stehen auf `abweichung`. Die Jahresübersicht
   liefert erstmals einen Sollwert je Monat; eine Prüfzeile „Konzernbericht unter Jahresübersicht
   bei LINA-Kassen" würde Lochmonate ohne Artikelverkaufs-Orakel finden.
+
+## Der Markenfilter verschätzt sich um den Faktor 20 (29.10.2026)
+
+Gefunden beim Nachmessen von `0142` in Produktion. Wer über `mart.konzept_zuordnung` nach
+Marke filtert (`konzept = 'Enchilada'`), bekommt vom Planer **einen** Betrieb geschätzt,
+tatsächlich sind es 22. Die Tageszeilen von `mart.artikelverkauf` schätzt er dann auf 19.539 statt
+1.489.542 und wählt verschachtelte Schleifen mit einer Indexsuche je Zeile, wo ein Hash-Join
+richtig wäre. Ursache ist der Join auf den Ausdruck `COALESCE(m.konzept_key, CASE …)` in der Sicht:
+Für ihn hat Postgres keine Statistik. `0143` umgeht das nur für die Warengruppe. Der Rest, etwa
+5 s auf 1,3 Mio. Zeilen, geht weiter in die Suche je Zeile.
+
+**Was zu entscheiden ist:** Eine kleine Materialisierung „Betrieb → Hauptkonzept“ (141 Zeilen)
+mit echter Spaltenstatistik würde jede Sicht treffen, die nach Marke filtert. Sie müsste dann
+aber in jedem Nachlauf vor allen anderen aufgefrischt werden, und eine geänderte Markenzuordnung
+käme erst nach dem nächsten Lauf an. Nicht gebaut, bis jemand die Fälle zählt, die es braucht.
+Messabfrage: `EXPLAIN ANALYZE SELECT count(*) FROM mart.artikelverkauf WHERE konzept = 'Enchilada'
+AND geschaeftstag >= '2025-06-01'` und die Zeile `Hash Join … rows=1` unter `konzept kh` ansehen.
+

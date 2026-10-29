@@ -1700,6 +1700,18 @@ derselbe Fall vorher bei 22,3 s. **Nach dem Deploy nachmessen.** Mit der alten S
 rund fünfmal schneller als der Server, deshalb ist das Verhältnis aussagekräftiger als die Sekunden.
 Katalog: Die neue Basis steht in `mcp/test/katalog.json`, `mart.artikelverkauf` ist dort unverändert.
 
+**Nachgemessen in Produktion nach dem Deploy von `0142`:** der WE-Fall 22,3 → 11,0 s, aber
+`warengruppe = 'Taco-AF'` für Enchilada ab Juni 2025 lag weiter bei 18,1 s (Markenfilter
+verschätzt, `docs/offene-punkte.md`). Seit **`0143`** stehen die Warengruppennamen in der Basis:
+
+| Abfrage (Klon) | `0142` | `0143` |
+|---|---|---|
+| Enchilada, `warengruppe = 'Taco-AF'`, ab 02.06.2025 (43.087 Zeilen) | 7,7 s (alte Sicht) | 1,0 s |
+| WE-Quote Enchilada ohne Betrieb 39 | 1,35 s | 1,14 s |
+| Refresh, nebenläufig | 6,5 s | 7,4 s |
+
+Erneut zeilengleich geprüft: dieselben Zeiträume, beide Richtungen, Rückfall eingeschlossen.
+
 ## Neu und geändert in `mart` (Migrationen `0125`–`0127`, 29.09.2026)
 
 * **`mart.luecke_monat`** — neu: was je Quelle, Betrieb und Monat fehlt. `thema = 'pruefung'`,

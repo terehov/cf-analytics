@@ -1250,6 +1250,12 @@ einfügt (`src/sync/laden.ts` schreibt den Stand in den Monat des geladenen Tage
 nächsten Refresh, der nach Phase B und nach Phase C läuft (`src/sync/round_table.ts`, vor
 `artikel_monat_basis` und `artikeltage_basis`).
 
+**Seit `0143`** stehen statt der drei Warengruppenschlüssel ihre **Namen** in der
+Materialisierung (`grosskategorie`, `warengruppe`, `detailkategorie`). Den Rückfall bedienen
+skalare Unterabfragen in einem `CASE`, die nur ohne Treffer laufen. Gebaut wurde unter einem
+Hilfsnamen, dann wurde die Sicht umgehängt, die alte Materialisierung gelöscht und die neue
+umbenannt. Ein `DROP … CASCADE` hätte `mart.artikelverkauf` samt allem darüber mitgenommen.
+
 ## Lücken sichtbar machen (`0125`–`0127`, 29.09.2026)
 
 **`core.betrieb_adresse`** — eine Zeile je Betrieb, die Anschrift aus dem jüngsten

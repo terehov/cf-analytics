@@ -4519,3 +4519,8 @@ drei liefen in die 20-s-Grenze, sechs weitere lagen bei 12–17 s. Alle bis auf 
 - **Frisch gehalten** im Round-Table-Nachlauf nach Phase B und nach Phase C, vor
   `mart.artikel_monat_basis` und `mart.artikeltage_basis` (die beide `mart.artikelverkauf` lesen).
   Ein ausbleibender Refresh steht in `mart.materialisierung_stand`.
+- **Nachtrag `0143` (selber Tag):** Auch die Warengruppennamen sind materialisiert, nicht nur
+  die Schlüssel. Anlass war die Messung in Produktion: Ein Filter auf den Warengruppennamen
+  ließ den Planer die Innenseite je Namenstreffer neu rechnen. Die Markenschätzung dahinter ist
+  nicht repariert (`docs/offene-punkte.md`, 29.10.2026). Sie betrifft jede Sicht mit
+  Markenfilter, und eine Materialisierung der Zuordnung Betrieb → Marke hätte eigene Kosten.

@@ -383,7 +383,7 @@
    "koernung": "Artikel und Monat (Zwischenstufe von mart.artikelverkauf, ohne den laufenden Monat)",
    "thema": "umsatz",
    "summen_erlaubt": false,
-   "kommentar": "Artikelstand (Name, fixer_we) und Warengruppenstand je Artikel und Monat — die\nZwischenstufe von mart.artikelverkauf (Migration 0142). Fuehrt nur Monate VOR dem\nlaufenden; den laufenden schlaegt die Sicht live nach. Aufgefrischt im\nRound-Table-Nachlauf (src/sync/round_table.ts). NICHT direkt abfragen —\nmart.artikelverkauf ist die Schnittstelle.\n\nKoernung: Artikel und Monat (Zwischenstufe von mart.artikelverkauf, ohne den laufenden Monat)",
+   "kommentar": "Artikelstand (Name, fixer_we) und Warengruppe (mit Namen, seit 0143) je Artikel und\nMonat — die Zwischenstufe von mart.artikelverkauf (Migration 0142). Fuehrt nur Monate VOR\ndem laufenden; den laufenden schlaegt die Sicht live nach. Aufgefrischt im\nRound-Table-Nachlauf (src/sync/round_table.ts). NICHT direkt abfragen —\nmart.artikelverkauf ist die Schnittstelle.\n\nKoernung: Artikel und Monat (Zwischenstufe von mart.artikelverkauf, ohne den laufenden Monat)",
    "spalten": [
     "artikel_key",
     "monat",
@@ -391,13 +391,14 @@
     "fixer_we",
     "warengruppe_vorhanden",
     "erfasst_ab",
-    "gross_key",
-    "mec_key",
-    "detail_key"
+    "grosskategorie",
+    "warengruppe",
+    "detailkategorie"
    ],
    "achsen": [
     "artikel_key",
-    "monat"
+    "monat",
+    "warengruppe"
    ],
    "kennzahlen": [],
    "fallstricke": []
