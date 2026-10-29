@@ -1265,8 +1265,11 @@ Join auf `COALESCE(m.konzept_key, CASE …)` hatte keine, jeder Markenfilter wur
 Betrieb geschätzt. Gemessen auf dem Klon für Enchilada, 13 Monate `mart.artikelverkauf`:
 Schätzung 19.539 → 458.296 Zeilen (tatsächlich 1.160.959), Plan von Schleifen auf Hash-Joins,
 2,27 → 1,62 s. `REFRESH` schreibt keine Statistik, deshalb `ANALYZE` im Nachlauf. Wer in Postico
-`manual.betrieb_hauptkonzept` ändert: `REFRESH MATERIALIZED VIEW CONCURRENTLY
-mart.konzept_zuordnung_basis; ANALYZE mart.konzept_zuordnung_basis;`, sonst gilt es ab morgen.
+`manual.betrieb_hauptkonzept` ändert, ~~muss von Hand auffrischen~~ — seit **`0145`** (selber Tag)
+erledigt das ein Statement-Trigger auf der Tabelle: `REFRESH … CONCURRENTLY`, `ANALYZE` und der
+Merker `konzept_zuordnung_refresh`, in derselben Transaktion. Scheitert der Refresh, scheitert die
+Pflege sichtbar. Nur diese Tabelle hat den Trigger: `core.betrieb`/`core.betrieb_konzept` schreibt
+Phase A, und Phase B frischt als Erstes auf — Phase A liest die Sicht nicht.
 
 ## Lücken sichtbar machen (`0125`–`0127`, 29.09.2026)
 

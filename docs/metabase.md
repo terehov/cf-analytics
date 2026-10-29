@@ -1733,7 +1733,8 @@ Markenfilter jetzt 22 Betriebe, Zugriff über den Index auf `hauptkonzept`):
 | `mart.umsatz_tag` Enchilada ab 2025 (14.652 Zeilen) | — | — | 36 ms |
 
 Die Zeile `mart.konzept_zuordnung_basis` steht in `mart.materialisierung_stand` bis zum ersten
-Nachtlauf auf „nie aufgefrischt" — der Merker entsteht erst dort. Was an den 5 s bleibt, ist das
+Nachtlauf auf „nie aufgefrischt" — der Merker entsteht erst dort (oder beim ersten Schreiben in
+`manual.betrieb_hauptkonzept`, seit `0145` frischt ein Trigger sofort auf). Was an den 5 s bleibt, ist das
 Lesen von 1,3 Mio. Tageszeilen über 16 Partitionen plus ein Index-Nachschlag je Zeile in der
 Stand-Materialisierung; weniger ginge nur mit einer Verdichtung, die die Tagesfragen nicht mehr
 beantwortet (`mart.artikel_monat` gibt es dafür).

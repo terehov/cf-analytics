@@ -4533,3 +4533,11 @@ drei liefen in die 20-s-Grenze, sechs weitere lagen bei 12–17 s. Alle bis auf 
   Sichten umschreiben. Der Refresh ist der erste Nachlauf in Phase B mit `ANALYZE` danach; ohne
   `ANALYZE` wäre die Schätzung nach dem ersten Refresh wieder die alte. Preis: Eine Entscheidung
   in `manual.betrieb_hauptkonzept` wirkt erst nach dem nächsten Lauf oder einem Refresh von Hand.
+- **Nachtrag `0145` (selber Tag, Eugene: „Können wir hier nicht einen Trigger bauen?"):** Ja —
+  Statement-Trigger auf `manual.betrieb_hauptkonzept`, der Refresh, `ANALYZE` und Merker in der
+  schreibenden Transaktion ausführt. Vorher gemessen, nicht angenommen: beides läuft in einem
+  Trigger, die Änderung ist in derselben Transaktion sichtbar, ein `ROLLBACK` nimmt sie zurück.
+  **Bewusst nicht** auf `core.betrieb`/`core.betrieb_konzept`: dort schreibt der Importer in
+  Phase A, nichts in Phase A liest die Sicht, und ein scheiternder Refresh dürfte keinen
+  Stammdatenlauf abbrechen. Kein `SECURITY DEFINER`: nur `cf` schreibt die Tabelle und besitzt
+  die Materialisierung. Der Preis aus `0144` ist damit weg.
