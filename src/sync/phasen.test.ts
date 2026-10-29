@@ -51,6 +51,7 @@ const DIENSTE: Array<[string, string]> = [
  * Funktionen MUSS hinter dem Sammelpunkt stehen.
  */
 const PHASE_B = [
+  'konzeptZuordnungNachlauf',
   'zuordnungNachlauf',
   'deckungsbeitragNachlauf',
   'roundTableNachlauf',

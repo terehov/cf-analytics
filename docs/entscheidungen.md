@@ -4524,3 +4524,12 @@ drei liefen in die 20-s-Grenze, sechs weitere lagen bei 12–17 s. Alle bis auf 
   ließ den Planer die Innenseite je Namenstreffer neu rechnen. Die Markenschätzung dahinter ist
   nicht repariert (`docs/offene-punkte.md`, 29.10.2026). Sie betrifft jede Sicht mit
   Markenfilter, und eine Materialisierung der Zuordnung Betrieb → Marke hätte eigene Kosten.
+- **Nachtrag `0144` (selber Tag, Entscheidung Eugene: „baue sie, da oft nach Marke gefiltert
+  wird"):** `mart.konzept_zuordnung_basis`, 141 Zeilen. Nicht die Größe ist der Grund, sondern
+  die Statistik: Der Hauptkonzept-Join stand auf einem `COALESCE`-Ausdruck, und dafür schätzt
+  Postgres aus einem Standardwert — einen Betrieb statt 22. Die Sicht behält Namen und Spalten,
+  50 Abnehmer bleiben unberührt. **Verworfen:** eine erweiterte Statistik (`CREATE STATISTICS`)
+  — sie gilt je Tabelle, nicht über einen Join hinweg. **Verworfen:** den Join in jeder der 50
+  Sichten umschreiben. Der Refresh ist der erste Nachlauf in Phase B mit `ANALYZE` danach; ohne
+  `ANALYZE` wäre die Schätzung nach dem ersten Refresh wieder die alte. Preis: Eine Entscheidung
+  in `manual.betrieb_hauptkonzept` wirkt erst nach dem nächsten Lauf oder einem Refresh von Hand.

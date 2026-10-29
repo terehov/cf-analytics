@@ -1256,6 +1256,18 @@ skalare Unterabfragen in einem `CASE`, die nur ohne Treffer laufen. Gebaut wurde
 Hilfsnamen, dann wurde die Sicht umgehängt, die alte Materialisierung gelöscht und die neue
 umbenannt. Ein `DROP … CASCADE` hätte `mart.artikelverkauf` samt allem darüber mitgenommen.
 
+## Betrieb → Marke materialisiert (`0144`, 29.10.2026)
+
+**`mart.konzept_zuordnung_basis`** ist die Rechnung aus `mart.konzept_zuordnung` (`0002`/`0049`)
+als Tabelle, 141 Zeilen, eindeutig auf `betrieb_key`, Index auf `hauptkonzept`. Die Sicht
+`mart.konzept_zuordnung` liest nur noch daraus. Der Grund ist allein die Planerstatistik: Der
+Join auf `COALESCE(m.konzept_key, CASE …)` hatte keine, jeder Markenfilter wurde auf einen
+Betrieb geschätzt. Gemessen auf dem Klon für Enchilada, 13 Monate `mart.artikelverkauf`:
+Schätzung 19.539 → 458.296 Zeilen (tatsächlich 1.160.959), Plan von Schleifen auf Hash-Joins,
+2,27 → 1,62 s. `REFRESH` schreibt keine Statistik, deshalb `ANALYZE` im Nachlauf. Wer in Postico
+`manual.betrieb_hauptkonzept` ändert: `REFRESH MATERIALIZED VIEW CONCURRENTLY
+mart.konzept_zuordnung_basis; ANALYZE mart.konzept_zuordnung_basis;`, sonst gilt es ab morgen.
+
 ## Lücken sichtbar machen (`0125`–`0127`, 29.09.2026)
 
 **`core.betrieb_adresse`** — eine Zeile je Betrieb, die Anschrift aus dem jüngsten

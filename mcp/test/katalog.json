@@ -4232,6 +4232,29 @@
    "fallstricke": []
   },
   {
+   "sicht": "mart.konzept_zuordnung_basis",
+   "koernung": "Betrieb (Zwischenstufe von mart.konzept_zuordnung, mit Statistik fuer den Planer)",
+   "thema": "stammdaten",
+   "summen_erlaubt": false,
+   "kommentar": "Betrieb → Hauptkonzept als Tabelle (Migration 0144): dieselbe Rechnung wie\nmart.konzept_zuordnung, materialisiert, damit der Planer eine Statistik auf\nhauptkonzept hat — vorher schaetzte er jeden Markenfilter auf einen Betrieb.\nAufgefrischt als erster Nachlauf in Phase B (src/sync/konzept_zuordnung.ts).\nNICHT direkt abfragen — mart.konzept_zuordnung ist die Schnittstelle.\n\nKoernung: Betrieb (Zwischenstufe von mart.konzept_zuordnung, mit Statistik fuer den Planer)",
+   "spalten": [
+    "betrieb_key",
+    "betrieb",
+    "stadt",
+    "aktiv",
+    "anzahl_konzepte",
+    "konzepte",
+    "hauptkonzept",
+    "herkunft"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "hauptkonzept"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
    "sicht": "mart.kostenstelle_ohne_betrieb",
    "koernung": null,
    "thema": null,

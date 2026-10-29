@@ -2443,7 +2443,11 @@ SELECT * FROM mart.kassenblatt_stand WHERE zustand = 'abweichung' AND monat >= '
   liefert erstmals einen Sollwert je Monat; eine Prüfzeile „Konzernbericht unter Jahresübersicht
   bei LINA-Kassen" würde Lochmonate ohne Artikelverkaufs-Orakel finden.
 
-## Der Markenfilter verschätzt sich um den Faktor 20 (29.10.2026)
+## ~~Der Markenfilter verschätzt sich um den Faktor 20~~ (29.10.2026) — erledigt mit `0144`
+
+**Erledigt am selben Tag** (Entscheidung Eugene: bauen, weil oft nach Marke gefiltert wird):
+`mart.konzept_zuordnung_basis`, 141 Zeilen mit Statistik, erster Nachlauf in Phase B.
+Der Absatz darunter bleibt als Herleitung stehen.
 
 Gefunden beim Nachmessen von `0142` in Produktion. Wer über `mart.konzept_zuordnung` nach
 Marke filtert (`konzept = 'Enchilada'`), bekommt vom Planer **einen** Betrieb geschätzt,

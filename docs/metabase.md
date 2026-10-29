@@ -1719,7 +1719,9 @@ Erneut zeilengleich geprüft: dieselben Zeiträume, beide Richtungen, Rückfall 
 | WE-Quote Enchilada ohne Betrieb 39, 08.07.2025–26.10.2026 | 22,3 s | 11,0 s | 7,6 s |
 | Enchilada, `warengruppe = 'Taco-AF'`, ab 02.06.2025 | — | 18,1 s | 7,8 s |
 
-Was bleibt, ist die Suche je Zeile, die die Markenschätzung erzwingt (`docs/offene-punkte.md`).
+~~Was bleibt, ist die Suche je Zeile, die die Markenschätzung erzwingt (`docs/offene-punkte.md`).~~
+Behoben mit `0144` (`mart.konzept_zuordnung_basis`); Klon: Enchilada 13 Monate 2,27 → 1,62 s,
+Taco-AF 1,56 → 1,22 s, `mart.umsatz_tag` Enchilada ab 2025 52 → 19 ms. Produktionswerte unten.
 `mart.sicht_defekt` ist leer, der MCP-Katalog hat die Basis nachgeladen (257 Sichten).
 
 ## Neu und geändert in `mart` (Migrationen `0125`–`0127`, 29.09.2026)

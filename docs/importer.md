@@ -208,6 +208,7 @@ Yext und Bounti warteten bis 15:15, um dann zwanzig Minuten zu arbeiten.
   ── Sammelpunkt: Promise.allSettled ─────────────────────
 
   ── Phase B ── die Ableitungen, seriell ─────────────────
+     konzeptZuordnungNachlauf()     Betrieb → Marke (0144, nur wegen der Planerstatistik)
      zuordnungNachlauf()            Kostenstelle → Betrieb
      deckungsbeitrag · roundTable · auswahllisten · vergleichstag
      einkaufspreis · einkaufSichten · pflichtartikel · zulaufPruefen

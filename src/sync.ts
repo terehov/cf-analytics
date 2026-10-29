@@ -20,6 +20,7 @@ import { einkaufspreisNachlauf } from './sync/einkaufspreis'
 import { einkaufSichtenNachlauf } from './sync/einkauf_sichten'
 import { pflichtartikelSichtenNachlauf } from './sync/pflichtartikel_sichten'
 import { zuordnungNachlauf } from './sync/zuordnung'
+import { konzeptZuordnungNachlauf } from './sync/konzept_zuordnung'
 import { yextNachlauf } from './yext/nachlauf'
 import { bountiNachlauf } from './bounti/nachlauf'
 import { zulaufPruefen } from './sync/zulauf'
@@ -200,6 +201,14 @@ try {
      * sie sind fertig, BEVOR Phase B überhaupt anfängt.
      * ══════════════════════════════════════════════════════════════════
      */
+
+    /**
+     * Noch vor der Kette: Betrieb → Marke (Migration 0144). 141 Zeilen,
+     * materialisiert allein wegen der Planerstatistik — und als Erstes,
+     * weil jeder folgende Nachlauf und die Auswahlliste „Marke" darauf
+     * rechnen. Wirft nie, siehe Kopf von sync/konzept_zuordnung.ts.
+     */
+    await konzeptZuordnungNachlauf()
 
     /**
      * ERSTER Nachlauf der Kette: Kostenstelle → Betrieb.
