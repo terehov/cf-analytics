@@ -4484,3 +4484,38 @@ Der Ladenakte-Bericht „Die letzten Tage" zeigt sie (Messwerte in
   Verkaufsstellen-Abdeckung, Betriebsbericht-Lücken und -Ladestand, Einreihen der
   Betriebsberichte. Für einen Kassenblatt-Tag gibt es keine Betriebsberichte, und jeder
   solche Tag stünde sonst als Lücke da, die kein Abruf schließen kann.
+
+## 29.10.2026 — MCP-Zeitgrenze 45 s statt 20 s, Artikelstand je Monat materialisiert (`0142`)
+
+**Anlass:** Eugene fragte, ob der Server für die neuen MCP-Konten reicht. Er reicht
+(Lastmessung in `docs/architektur.md`). Die einzigen Ausreißer waren einzelne Abfragen:
+drei liefen in die 20-s-Grenze, sechs weitere lagen bei 12–17 s. Alle bis auf zwei lasen
+`mart.artikelverkauf` über viele Monate einer Marke. Entschieden (Eugene): Grenze anheben
+**und** die Ursache materialisieren, frisch gehalten im Nachtlauf.
+
+**Zeitgrenze:**
+- **45 s je Abfrage** (`ZEITGRENZE_S` in `mcp/src/ausfuehren.ts`, als `SET LOCAL` in der
+  Abfragetransaktion). Nicht 60 s oder mehr: Clients geben einen Werkzeugaufruf selbst
+  irgendwann auf, und eine Antwort, die nach dem Aufgeben kommt, sieht niemand. Wo genau
+  Claude und ChatGPT abbrechen, ist **nicht gemessen** — Abfragen von 17 s kamen dort an.
+- **Die Rolleneinstellung von `mcp_leser` bleibt bei 20 s.** Sie gilt nur noch für die
+  Nebenabfragen außerhalb von `laufenLassen` (Datenstand, Katalog), die schnell sein müssen,
+  weil sie an jeder Antwort hängen. Das `SET LOCAL` überschreibt sie je Abfrage.
+- **Was das kostet:** Eine Abfrage hält ihre Poolverbindung jetzt bis zu 45 s (Pool: 8).
+  Je Nutzer laufen höchstens zwei gleichzeitig.
+
+**Materialisiert ist die Zuordnung, nicht die Tageszeilen** (`mart.artikel_stand_monat_basis`):
+- Die Zeit ging fast ganz in zwei LATERAL-Nachschläge je Tageszeile (Artikelstand,
+  Warengruppenstand): 18 von 22 s in Produktion. Beide Standtabellen führen nur
+  Monatsanfänge. Der Nachschlag ist also je Artikel und Monat konstant: 611.423 Paare statt
+  28,6 Mio. Tageszeilen.
+- **Verworfen: `mart.artikelverkauf` ganz materialisieren.** 28,6 Mio. Zeilen jede Nacht neu,
+  mehrere GB zusätzlich, und die Tagesdaten wären erst nach Phase B sichtbar statt sofort.
+- **Verworfen: auf `mart.artikel_monat` verweisen.** Die langsamen Fragen brauchten Wochen,
+  Wochentage und taggenaue Zeiträume. Mit einer Monatsverdichtung sind sie nicht zu beantworten.
+- **Der laufende Monat bleibt live**, und für jedes Paar ohne Zeile greifen die alten
+  LATERALs als Rückfall. Die Sicht liefert damit immer dieselben Zahlen wie vorher; nur die
+  Geschwindigkeit hängt am Refresh.
+- **Frisch gehalten** im Round-Table-Nachlauf nach Phase B und nach Phase C, vor
+  `mart.artikel_monat_basis` und `mart.artikeltage_basis` (die beide `mart.artikelverkauf` lesen).
+  Ein ausbleibender Refresh steht in `mart.materialisierung_stand`.

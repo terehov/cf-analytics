@@ -129,7 +129,8 @@ function deuten(r: Roh): string | null {
       return 'Diese Funktion gibt es nicht — oder nicht mit diesen Argumenttypen. Oft fehlt ' +
              'eine Umwandlung (::numeric, ::date).'
     case ZEITUEBERLAUF:
-      return 'Die Abfrage hat ihre Zeitgrenze erreicht und wurde abgebrochen (20 s je Abfrage, ' +
+      // 45 s = ZEITGRENZE_S in ausfuehren.ts (kein Import: der zoege den Pool mit)
+      return 'Die Abfrage hat ihre Zeitgrenze erreicht und wurde abgebrochen (45 s je Abfrage, ' +
              '5 s fuer eine Planungsprobe). ' +
              'Sie ist nicht falsch, nur zu gross: den Zeitraum enger fassen oder im SQL ' +
              'zusammenfassen statt Einzelzeilen zu ziehen.'

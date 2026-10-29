@@ -1680,6 +1680,26 @@ Spalten und Zahlen unverändert — nur der Weg dahin. Deshalb auch kein neuer M
 langsam, und die Warnung `zeitraum_noetig` im MCP-Prüfer bleibt richtig. Für Monate und Artikel
 ist `mart.artikel_monat` der schnellere Weg.
 
+**Nachtrag 29.10.2026 (`0142`):** Für eine ganze Marke über ein Jahr reichte `0124` nicht.
+Neun MCP-Abfragen lagen zwischen 12 und 20 s; in sieben davon steckte `mart.artikelverkauf`, und dort
+gingen 18 von 22 s in die zwei Stand-Nachschläge je Tageszeile. Seit `0142` kommt der Stand je
+Artikel und Monat aus `mart.artikel_stand_monat_basis`. Die Sicht bleibt live, Spalten und Zahlen
+sind unverändert.
+
+| Abfrage (Klon `lina_av_1029`, Daten bis 12.08.2026) | vorher | nachher |
+|---|---|---|
+| WE-Quote Enchilada ohne Betrieb 39, 13 Monate | 4,7 s | 1,35 s |
+| Menge je Warengruppe Enchilada, 14 Monate | 4,9 s | 2,1 s |
+| ein Betrieb, eine Woche | 26 ms | 16 ms |
+| Refresh `mart.artikel_stand_monat_basis` (597.454 Zeilen, 53 MB), nebenläufig | — | 6,5 s |
+
+Zeilengleich geprüft (`EXCEPT ALL` in beiden Richtungen): 01.07.2025–12.08.2026 alle Betriebe, dazu
+das Jahr 2019, in dem 8.824 Zeilen eine geschätzte Warengruppe tragen. Der Rückfallzweig (Sicht gegen
+eine leere Materialisierung) ist für Juli/August 2026 ebenfalls zeilengleich. In Produktion lag
+derselbe Fall vorher bei 22,3 s. **Nach dem Deploy nachmessen.** Mit der alten Sicht war der Laptop-Klon
+rund fünfmal schneller als der Server, deshalb ist das Verhältnis aussagekräftiger als die Sekunden.
+Katalog: Die neue Basis steht in `mcp/test/katalog.json`, `mart.artikelverkauf` ist dort unverändert.
+
 ## Neu und geändert in `mart` (Migrationen `0125`–`0127`, 29.09.2026)
 
 * **`mart.luecke_monat`** — neu: was je Quelle, Betrieb und Monat fehlt. `thema = 'pruefung'`,

@@ -15,6 +15,38 @@ Bei ~36 Mio. Zeilen im Jahr und einem kleinen Team ist Docker Compose auf einer 
 
 **Kein Docker Compose:** Postgres ist managed, Metabase ist eine eigene App. Compose würde die Backup-Oberfläche kosten und nichts bringen.
 
+### Lastmessung 29.10.2026: reicht der Server für die MCP-Nutzer?
+
+**Ja, mit großem Abstand.** Anlass: Seit dem 21.10.2026 sind 15 MCP-Konten angelegt, bis zu acht
+fragen am selben Tag. Gemessen auf dem Server selbst (Hetzner CX43, 8 Kerne, 16 GB, 150 GB;
+Metabase läuft **nicht** auf dieser Maschine):
+
+| | Messung | Woher |
+|---|---|---|
+| CPU im Tagesmittel | 98 % frei, an jedem Tag vom 22. bis 29.10. | `sar -u -f /var/log/sysstat/saDD` |
+| CPU-Spitze (10-Min.-Mittel) | ~32 %, nur in Phase B des Nachtlaufs (05:10–05:20 UTC) | dito |
+| Arbeitsspeicher | 8,9 GB verfügbar, kein Swap, keine OOM-Meldung in 14 Tagen | `free -h`, `journalctl -k` |
+| Platte | 41 von 150 GB (29 %) | `df -h` |
+| Postgres | 33 GB, Cache-Trefferquote 98,4 %, `shared_buffers` 4 GB, `work_mem` 32 MB | `pg_stat_database`, `pg_settings` |
+| MCP-Container | 118 MB, CPU < 1 % | `docker stats` |
+| MCP-Nutzung | max. 207 Aufrufe/Tag (28.10., 8 Personen), max. 25 in einer Minute; p50 40–600 ms, p95 meist 1–4 s; 21 von 1.061 Aufrufen in 14 Tagen über 5 s | `mcp.zugriff` |
+
+**Die Zeitüberschreitungen waren keine Lastfrage.** Drei Abfragen liefen in die damalige
+20-s-Grenze, weitere lagen bei 12–17 s. Beim Abbruch vom 28.10. um 08:50 UTC war die CPU zu 96 %
+frei. Die langsamen Abfragen lasen ausnahmslos `mart.artikelverkauf` über viele Monate einer
+ganzen Marke — dort kostete das Nachschlagen des Artikelstands je Tageszeile ~18 der 22 s.
+Behoben mit `0142` (Stand je Artikel und Monat materialisiert, Sicht bleibt live), und die
+Zeitgrenze je Abfrage steht seitdem bei 45 s (`docs/entscheidungen.md`, 29.10.2026). Ein größerer
+Server hätte daran wenig geändert: es ist eine einzelne Abfrage, keine Konkurrenz um Kerne.
+
+**Was zuerst eng würde:** der MCP-Pool (`max: 8` in `mcp/src/db.ts`), nicht die Maschine —
+mehrere gleichzeitige Abfragen nahe der Zeitgrenze würden dort warten. Bisher waren in der
+vollsten Minute zwei Personen gleichzeitig aktiv.
+
+**Nachmessen:** `ssh -i ~/.ssh/brainfood-hetzner root@178.104.197.120`, dann die Befehle aus der
+Spalte „Woher"; Postgres lesend per `docker exec -i -e PGOPTIONS='-c default_transaction_read_only=on'
+<cf-analytics-cfanalytics-Container> psql -U cf -d analytics`. Serverzeit ist UTC.
+
 ### Warum Dockerfile statt Nixpacks
 
 Dokploy kann Nixpacks (Default), Railpack, Dockerfile, Buildpacks und Static. Trotzdem Dockerfile:

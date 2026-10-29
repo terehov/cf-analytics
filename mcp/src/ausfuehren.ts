@@ -36,6 +36,15 @@ export const ZEILEN_FUER_ANSICHT = 5_000
 export const ZEILEN_SCHAETZUNG_GRENZE = 5_000_000
 /** Zeichen je Zelle fuer das Modell. Ein Belegtext von 40 kB sprengt den Kontext genauso wie 40.000 Zeilen. */
 export const ZELLE_MAX = 2_000
+/**
+ * Laufzeit je Abfrage. 20 s bis 29.10.2026, dann 45 s: in den zwei Wochen davor
+ * liefen drei Abfragen in die Grenze, alle ueber Monate von mart.artikelverkauf,
+ * waehrend der Server zu 96 % frei war (docs/architektur.md, Lastmessung). Unter
+ * 60 s, weil Clients einen Werkzeugaufruf selbst irgendwann aufgeben. Die
+ * Rolleneinstellung von mcp_leser bleibt bei 20 s — sie greift nur noch fuer
+ * die Nebenabfragen (Datenstand, Katalog), die hier nicht durchlaufen.
+ */
+export const ZEITGRENZE_S = 45
 
 export type Nutzer = { subject: string | null; anzeige: string | null; client: string | null }
 
@@ -350,7 +359,7 @@ async function laufenLassen(
   let r
   try {
     await c.query('BEGIN READ ONLY')
-    await c.query(`SET LOCAL statement_timeout = '20s'`)
+    await c.query(`SET LOCAL statement_timeout = '${ZEITGRENZE_S}s'`)
 
     if (schaetzen) {
       const geschaetzt = await zeilenSchaetzen(c, sql, werte)

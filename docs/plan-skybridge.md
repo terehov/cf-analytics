@@ -346,7 +346,7 @@ Der Importer behält seine Rolle; `MCP_DATABASE_URL` ist eine eigene Variable (R
 |---|---|---|
 | Zeilen an das Modell | 500 | `mart.umsatz_tag` hat 443.304 Zeilen; mehr sprengt den Kontext, bevor es etwas beantwortet |
 | Zeilen an die Ansicht (`_meta`) | 5.000 | Eine Tabelle darf blättern, ein Modell nicht |
-| Laufzeit | 20 s | Ein Modell wartet nicht, es probiert etwas anderes |
+| Laufzeit | ~~20 s~~ 45 s je Abfrage (seit 29.10.2026; die Rolle bleibt bei 20 s für Nebenabfragen) | Ein Modell wartet nicht, es probiert etwas anderes. Angehoben, als drei echte Fachfragen über ein Jahr Artikelverkauf an 20 s scheiterten, während der Server zu 96 % frei war — `docs/entscheidungen.md`, 29.10.2026 |
 | Geschätzte Zeilen (`EXPLAIN`) | 5 Mio. | Vor dem Lauf, nicht nach dem Timeout |
 | Gleichzeitig je Nutzer | 2 | Der Server teilt sich die Maschine mit dem Importer |
 

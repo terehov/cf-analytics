@@ -1231,6 +1231,25 @@ jedes Betriebs zu gruppieren.
 **`pg_stat_statements`** legt `0124` als Erweiterung an, wo das Paket vorhanden ist. Lesbar ist
 sie erst, wenn `shared_preload_libraries` sie lädt (`docs/entscheidungen.md`, 28.09.2026).
 
+## Stand je Artikel und Monat materialisiert (`0142`, 29.10.2026)
+
+**`mart.artikel_stand_monat_basis`** führt je `(artikel_key, monat)` den Artikelstand (`name`,
+`fixer_we`) und den Warengruppenstand (`warengruppe_vorhanden`, `erfasst_ab`, `gross_key`,
+`mec_key`, `detail_key`). Er wird mit genau den LATERALs aus `0124` berechnet, nur mit dem
+Monatsanfang statt des Tages. Das ist gleichwertig, weil `core.artikel_stand` und
+`core.artikel_warengruppe_stand` nur Monatsanfänge führen (nachgezählt 29.10.2026: keine
+Ausnahme). Enthalten sind nur Paare mit Verkäufen und **nur Monate vor dem laufenden**. Der
+eindeutige Index `(artikel_key, monat)` trägt den Join und `REFRESH … CONCURRENTLY`.
+
+**`mart.artikelverkauf`** joint darauf über `date_trunc('month', geschaeftstag)`. Die alten LATERALs
+stehen weiter in der Sicht, gesperrt mit `WHERE sm.artikel_key IS NULL`. Postgres prüft das als
+One-Time Filter vor der Indexsuche: Bei einem Treffer wird der Zweig nie ausgeführt, ohne Treffer
+(laufender Monat, neuer Artikel vor dem Refresh) rechnet er wie bisher. Die Zahlen hängen damit nie
+am Refresh. Veralten kann nur ein Stand für einen vergangenen Monat, den Phase C nach dem Refresh
+einfügt (`src/sync/laden.ts` schreibt den Stand in den Monat des geladenen Tages). Das gilt bis zum
+nächsten Refresh, der nach Phase B und nach Phase C läuft (`src/sync/round_table.ts`, vor
+`artikel_monat_basis` und `artikeltage_basis`).
+
 ## Lücken sichtbar machen (`0125`–`0127`, 29.09.2026)
 
 **`core.betrieb_adresse`** — eine Zeile je Betrieb, die Anschrift aus dem jüngsten

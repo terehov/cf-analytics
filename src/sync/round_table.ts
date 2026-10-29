@@ -40,6 +40,10 @@ const SICHTEN = [
   'mart.personal_bereich_monat',
   'mart.round_table_monat',
   'mart.round_table_trend',
+  // Migration 0142: Artikelstand je Artikel und Monat, die Zwischenstufe von
+  // mart.artikelverkauf. VOR den beiden Artikelsichten darunter — sie lesen
+  // artikelverkauf und brauchen den frischen Stand.
+  'mart.artikel_stand_monat_basis',
   // Migration 0068: der Artikel-Drill-Down. LINA-Ware wie die beiden
   // oben, deshalb hier und nicht in einkauf_sichten.ts (FoodNotify).
   // Unabhaengig von den Round-Table-Sichten, liest nur artikelverkauf.

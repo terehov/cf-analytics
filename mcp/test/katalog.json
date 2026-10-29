@@ -379,6 +379,30 @@
    "fallstricke": []
   },
   {
+   "sicht": "mart.artikel_stand_monat_basis",
+   "koernung": "Artikel und Monat (Zwischenstufe von mart.artikelverkauf, ohne den laufenden Monat)",
+   "thema": "umsatz",
+   "summen_erlaubt": false,
+   "kommentar": "Artikelstand (Name, fixer_we) und Warengruppenstand je Artikel und Monat — die\nZwischenstufe von mart.artikelverkauf (Migration 0142). Fuehrt nur Monate VOR dem\nlaufenden; den laufenden schlaegt die Sicht live nach. Aufgefrischt im\nRound-Table-Nachlauf (src/sync/round_table.ts). NICHT direkt abfragen —\nmart.artikelverkauf ist die Schnittstelle.\n\nKoernung: Artikel und Monat (Zwischenstufe von mart.artikelverkauf, ohne den laufenden Monat)",
+   "spalten": [
+    "artikel_key",
+    "monat",
+    "name",
+    "fixer_we",
+    "warengruppe_vorhanden",
+    "erfasst_ab",
+    "gross_key",
+    "mec_key",
+    "detail_key"
+   ],
+   "achsen": [
+    "artikel_key",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
    "sicht": "mart.artikeltage_basis",
    "koernung": "Betrieb mit Artikelverkaeufen (Zwischenstufe von mart.datenstand)",
    "thema": "betrieb",

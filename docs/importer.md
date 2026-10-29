@@ -129,7 +129,8 @@ ab 36 Stunden mit dem Zusatz, dass er veraltet sein kann. Nur der vorläufige la
 jüngste lückenlose Strecke als Tag) — Refresh mit 454.904 Abrufzeilen 32,2 s statt 24,0 s.
 `src/sync/phasen.test.ts` prüft beide Aufrufe. Übrige Aussage unverändert: Die Konzern-Historie schreibt `core.umsatzbericht_tag` und
 `core.artikelverkauf_tag`; daraus lesen `mart.deckungsbeitrag_warengruppe`, der Round Table
-(`round_table_monat`, `_trend`, `artikel_monat_basis`, `artikeltage_basis`) und
+(`round_table_monat`, `_trend`, seit `0142` `artikel_stand_monat_basis` vor den beiden folgenden,
+`artikel_monat_basis`, `artikeltage_basis`) und
 `mart.vergleichstag_basis`. Nur wenn Phase C mindestens einen Konzern-Posten `ok` geladen hat
 (`PhasenErgebnis.konzernOk`), laufen diese drei Nachläufe noch einmal (gemessen in Produktion am
 22.09.2026: 295 + 310 + 45 s). Einkauf, Pflichtartikel und Wetter lesen nichts, was Phase C
