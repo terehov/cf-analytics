@@ -1824,7 +1824,7 @@
    "koernung": "Betrieb, Stand heute — Bounti-Abschluss- und Teilnahmequote mit Ampel",
    "thema": "schulung",
    "summen_erlaubt": false,
-   "kommentar": "Koernung: Betrieb, Stand heute. Die zwei Bounti-Ampeln des Management-Regelwerks.\nabschluss_pct = abgeschlossene / alle Zuweisungen. teilnahme_pct = aktive Mitarbeitende\nmit mindestens einem Abschluss / aktive Mitarbeitende in Bounti — Bounti kennt keinen\nZustand \"begonnen\", und den Personalstand laut LINA koennen wir nicht lesen (gesperrt).\nAmpeln nur bei datenbasis = belastbar. Beide stehen NEBEN dem Gesamturteil, nicht darin.\nEine Person an mehreren Standorten zaehlt an jedem (mart.bounti_mehrfachzuordnung).\nProzentzahlen, nie Brueche.",
+   "kommentar": "Koernung: Betrieb, Stand heute. Die zwei Bounti-Ampeln des Management-Regelwerks.\nabschluss_pct = abgeschlossene / alle Zuweisungen. teilnahme_pct = aktive Mitarbeitende\nmit mindestens einem Abschluss / aktive Mitarbeitende in Bounti — Bounti kennt keinen\nZustand \"begonnen\", und den Personalstand laut LINA holen wir (noch) nicht — die Personenliste ist\ngesperrt, die Kopfzahl je Monat (Personalstruktur) liegt vor und ist nicht\nangeschlossen (offene-punkte.md, Fluktuation).\nAmpeln nur bei datenbasis = belastbar. Beide stehen NEBEN dem Gesamturteil, nicht darin.\nEine Person an mehreren Standorten zaehlt an jedem (mart.bounti_mehrfachzuordnung).\nProzentzahlen, nie Brueche.",
    "spalten": [
     "betrieb_key",
     "betrieb",
