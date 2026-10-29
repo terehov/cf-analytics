@@ -379,6 +379,31 @@
    "fallstricke": []
   },
   {
+   "sicht": "mart.artikel_stand_monat_basis",
+   "koernung": "Artikel und Monat (Zwischenstufe von mart.artikelverkauf, ohne den laufenden Monat)",
+   "thema": "umsatz",
+   "summen_erlaubt": false,
+   "kommentar": "Artikelstand (Name, fixer_we) und Warengruppe (mit Namen, seit 0143) je Artikel und\nMonat — die Zwischenstufe von mart.artikelverkauf (Migration 0142). Fuehrt nur Monate VOR\ndem laufenden; den laufenden schlaegt die Sicht live nach. Aufgefrischt im\nRound-Table-Nachlauf (src/sync/round_table.ts). NICHT direkt abfragen —\nmart.artikelverkauf ist die Schnittstelle.\n\nKoernung: Artikel und Monat (Zwischenstufe von mart.artikelverkauf, ohne den laufenden Monat)",
+   "spalten": [
+    "artikel_key",
+    "monat",
+    "name",
+    "fixer_we",
+    "warengruppe_vorhanden",
+    "erfasst_ab",
+    "grosskategorie",
+    "warengruppe",
+    "detailkategorie"
+   ],
+   "achsen": [
+    "artikel_key",
+    "monat",
+    "warengruppe"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
    "sicht": "mart.artikeltage_basis",
    "koernung": "Betrieb mit Artikelverkaeufen (Zwischenstufe von mart.datenstand)",
    "thema": "betrieb",
@@ -4189,6 +4214,29 @@
    "thema": "stammdaten",
    "summen_erlaubt": false,
    "kommentar": "Welche Marke gilt fuer welchen Betrieb - und woher das kommt. GENAU EINE ZEILE JE BETRIEB,\ndeshalb in allen anderen Sichten diese hier joinen und nicht core.betrieb_konzept.\nDie Zeilen mit herkunft = 'mehrdeutig - Entscheidung fehlt' sind die Arbeitsliste: solange\nsie offen sind, laufen diese Betriebe in allen Markenauswertungen unter \"(nicht zugeordnet)\".\nErste Frage vor jedem Markenvergleich: SELECT * FROM mart.konzept_zuordnung WHERE hauptkonzept IS NULL;\n\nKoernung: Betrieb, mit der Zahl seiner Konzepte — die Arbeitsliste der Mehrdeutigen",
+   "spalten": [
+    "betrieb_key",
+    "betrieb",
+    "stadt",
+    "aktiv",
+    "anzahl_konzepte",
+    "konzepte",
+    "hauptkonzept",
+    "herkunft"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "hauptkonzept"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.konzept_zuordnung_basis",
+   "koernung": "Betrieb (Zwischenstufe von mart.konzept_zuordnung, mit Statistik fuer den Planer)",
+   "thema": "stammdaten",
+   "summen_erlaubt": false,
+   "kommentar": "Betrieb → Hauptkonzept als Tabelle (Migration 0144): dieselbe Rechnung wie\nmart.konzept_zuordnung, materialisiert, damit der Planer eine Statistik auf\nhauptkonzept hat — vorher schaetzte er jeden Markenfilter auf einen Betrieb.\nAufgefrischt als erster Nachlauf in Phase B (src/sync/konzept_zuordnung.ts).\nNICHT direkt abfragen — mart.konzept_zuordnung ist die Schnittstelle.\n\nKoernung: Betrieb (Zwischenstufe von mart.konzept_zuordnung, mit Statistik fuer den Planer)",
    "spalten": [
     "betrieb_key",
     "betrieb",
