@@ -10,6 +10,7 @@
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "katalog:abzug": "bun run src/katalog_export.ts > test/katalog.json.neu && mv test/katalog.json.neu test/katalog.json || (rm -f test/katalog.json.neu; exit 1)",
+    "katalog:normieren": "bun run src/katalog_normieren.ts",
     "nutzer": "bun run src/nutzer_verwalten.ts"
   },
   "dependencies": {

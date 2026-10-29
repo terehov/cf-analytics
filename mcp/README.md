@@ -134,6 +134,11 @@ dann ziehen — ein Export gegen einen Tunnel, der noch nicht lauscht, scheitert
 seit dem 29.10.2026 laesst er `test/katalog.json` dabei unangetastet (vorher leerte die
 Umleitung die Datei auf null Bytes, `docs/fehlerkatalog.md`).
 
+Ohne Datenbankpasswort im Terminal geht es auch ueber Postico: `src/katalog_abzug.sql`
+dort ausfuehren, die eine Ergebniszelle kopieren, dann `pbpaste | bun run katalog:normieren`.
+Sortierung und Form uebernimmt `abzugText()` in beiden Wegen — nachgemessen am 29.10.2026
+byteweise gleich.
+
 Die Datenbanktests laufen nur mit gesetzter Variable — und zwar bewusst
 **als `mcp_leser`**, nicht als Eigentuemer: die Haelfte dessen, was sie
 pruefen, ist die Rolle selbst.

@@ -34,3 +34,28 @@ export function nachSchluessel<T>(zeilen: readonly T[], schluessel: (z: T) => st
 export function sortiert(werte: readonly string[]): string[] {
   return nachSchluessel(werte, w => w)
 }
+
+/**
+ * Die Abzugsdatei aus den drei Rohlisten — EIN Ort fuer Sortierung und Form,
+ * damit der Weg ueber die Datenbankverbindung (`katalog_export.ts`) und der
+ * Weg ueber eine in Postico gezogene JSON-Zelle (`katalog_normieren.ts`)
+ * dieselbe Datei schreiben, Byte fuer Byte.
+ *
+ * Auch die verschachtelten Listen: `achsen` und `kennzahlen` kamen aus
+ * array_agg/jsonb_agg mit ORDER BY und trugen den Kollationsfehler in sich.
+ * `spalten` bleibt unberuehrt — dort ist die Reihenfolge die der Spalten in
+ * der Sicht und damit eine Aussage, keine Sortierung.
+ */
+export function abzugText(roh: { sichten: any[]; achsen: any[]; fallstricke: any[] }): string {
+  const sichten = nachSchluessel(roh.sichten, s => s.sicht)
+    .map(s => ({
+      ...s,
+      achsen: sortiert(s.achsen ?? []),
+      kennzahlen: nachSchluessel((s.kennzahlen ?? []) as any[], k => k.spalte),
+    }))
+  return JSON.stringify({
+    sichten,
+    achsen:      nachSchluessel(roh.achsen, a => a.achse),
+    fallstricke: nachSchluessel(roh.fallstricke, f => f.schluessel),
+  }, null, 1)
+}

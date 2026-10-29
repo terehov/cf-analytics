@@ -26,7 +26,7 @@
  * gegen den die Tests geschrieben sind.
  */
 import { abfragen, poolBeenden } from './db'
-import { nachSchluessel, sortiert } from './katalog_ordnung'
+import { abzugText } from './katalog_ordnung'
 
 const [sichten, achsen, fallstricke] = await Promise.all([
   abfragen(`SELECT s.sicht, s.koernung, s.thema, s.summen_erlaubt,
@@ -66,23 +66,8 @@ const [sichten, achsen, fallstricke] = await Promise.all([
  * Die ORDER BY oben stehen weiter da, damit die Abfragen fuer sich lesbar
  * bleiben — verlassen darf sich der Abzug nicht auf sie: ihre Reihenfolge
  * haengt an der Kollation der Datenbank, und die ist auf macOS eine andere
- * als auf dem Server. Begruendung und Messung in katalog_ordnung.ts.
- *
- * Auch die verschachtelten Listen: `achsen` und `kennzahlen` kamen aus
- * array_agg/jsonb_agg mit ORDER BY und trugen denselben Fehler in sich.
- * `spalten` bleibt unberuehrt — dort ist die Reihenfolge die der Spalten in
- * der Sicht und damit eine Aussage, keine Sortierung.
+ * als auf dem Server. Begruendung und Messung in katalog_ordnung.ts, die
+ * Form der Datei in abzugText() dort — geteilt mit katalog_normieren.ts.
  */
-const sichtenStabil = nachSchluessel(sichten as any[], s => s.sicht)
-  .map(s => ({
-    ...s,
-    achsen: sortiert(s.achsen ?? []),
-    kennzahlen: nachSchluessel((s.kennzahlen ?? []) as any[], k => k.spalte),
-  }))
-
-console.log(JSON.stringify({
-  sichten:     sichtenStabil,
-  achsen:      nachSchluessel(achsen as any[], a => a.achse),
-  fallstricke: nachSchluessel(fallstricke as any[], f => f.schluessel),
-}, null, 1))
+console.log(abzugText({ sichten: sichten as any[], achsen: achsen as any[], fallstricke: fallstricke as any[] }))
 await poolBeenden()
