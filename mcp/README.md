@@ -128,6 +128,12 @@ bun run dev              # mit Neuladen
 bun run katalog:abzug    # test/katalog.json aus der Datenbank neu ziehen
 ```
 
+Der Katalogabzug braucht eine **vollstaendige** Datenbank, in der Regel die Produktion
+ueber den SSH-Tunnel. Erst pruefen, dass der Tunnel steht (`nc -z 127.0.0.1 55432`),
+dann ziehen — ein Export gegen einen Tunnel, der noch nicht lauscht, scheitert, und
+seit dem 29.10.2026 laesst er `test/katalog.json` dabei unangetastet (vorher leerte die
+Umleitung die Datei auf null Bytes, `docs/fehlerkatalog.md`).
+
 Die Datenbanktests laufen nur mit gesetzter Variable — und zwar bewusst
 **als `mcp_leser`**, nicht als Eigentuemer: die Haelfte dessen, was sie
 pruefen, ist die Rolle selbst.

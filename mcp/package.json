@@ -9,7 +9,7 @@
     "dev": "bun run --watch start.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
-    "katalog:abzug": "bun run src/katalog_export.ts > test/katalog.json",
+    "katalog:abzug": "bun run src/katalog_export.ts > test/katalog.json.neu && mv test/katalog.json.neu test/katalog.json || (rm -f test/katalog.json.neu; exit 1)",
     "nutzer": "bun run src/nutzer_verwalten.ts"
   },
   "dependencies": {

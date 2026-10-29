@@ -7,7 +7,14 @@
  * abdriftet, vergleicht `katalog_abzug.test.ts` sie gegen die echte
  * Datenbank, sobald MCP_DATABASE_URL gesetzt ist.
  *
- *   bun run mcp/src/katalog_export.ts > mcp/test/katalog.json
+ *   cd mcp && bun run katalog:abzug
+ *
+ * NICHT direkt in test/katalog.json umleiten: die Shell leert die Datei, BEVOR
+ * dieses Skript die Datenbank erreicht. Am 29.10.2026 stand der SSH-Tunnel noch
+ * nicht, der Export brach mit ECONNREFUSED ab, und eine Datei mit null Bytes
+ * ging als Katalogabzug nach main (docs/fehlerkatalog.md). Das npm-Skript
+ * schreibt deshalb in test/katalog.json.neu und ersetzt die Datei erst nach
+ * erfolgreichem Lauf.
  *
  * WARUM HIER NICHT mcp.sicht_katalog GELESEN WIRD, obwohl der Server das tut:
  * jene Sicht blendet entfallene Sichten aus, und das ist im Betrieb richtig —

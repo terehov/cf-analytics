@@ -5399,3 +5399,30 @@ solange die Monatszeile keinen Umsatz nennt. Was als Wache bleibt: Kopfzeile „
 Stelle, jede Zelle eine Zahl, Summe der Tage = Monatszeile. **Eine Invariante, die man an drei
 Beispielen gesehen hat, ist eine Beobachtung.** Wer sie zur Abbruchbedingung macht, braucht
 eine Begründung aus der Struktur der Seite, nicht aus den Zahlen darin.
+
+## Ein Katalogabzug mit null Bytes ging nach `main` (29.10.2026)
+
+**Symptom.** Commit `93cb4f1` „MCP: Katalogabzug nach 0141 aus der Produktion" enthielt
+`mcp/test/katalog.json` mit **0 Bytes** — 8.097 Zeilen gelöscht. Im Terminal stand davor
+`connect ECONNREFUSED 127.0.0.1:55432`, und trotzdem lief `git commit && git push` durch.
+
+**Ursache.** Zwei Dinge zusammen. Erstens die Befehlsfolge: `ssh -N -L … &` im Hintergrund,
+unmittelbar danach `bun run katalog:abzug` — der Tunnel lauschte noch nicht, als der Export
+verbinden wollte. Zweitens das npm-Skript `bun run src/katalog_export.ts > test/katalog.json`:
+**die Shell öffnet und leert die Zieldatei, bevor das Skript startet.** Der Fehler des Skripts
+ändert daran nichts; die Datei ist dann leer, `git add` nimmt sie, und der Commit sieht wie ein
+Abzug aus. Weil `&&` nur die Befehle in derselben Zeile verkettet, stoppte der Fehlschlag des
+Abzugs den Commit in der nächsten Zeile nicht.
+
+**Folgen.** Der laufende MCP-Server liest den Katalog aus der Datenbank, nicht aus der Datei
+(`src/katalog_nachladen.ts`); der Deploy war deshalb harmlos. Die Datei brauchen die Tests
+(`gesundheit.test.ts`, `katalog_nachladen.test.ts`, die Fallenfragen) — sie wären beim nächsten
+`bun test` mit einem Parse-Fehler gescheitert, ohne dass jemand die Ursache in `93cb4f1`
+gesucht hätte.
+
+**Was es heute verhindert.** Das Skript schreibt nach `test/katalog.json.neu` und ersetzt die
+Datei erst nach erfolgreichem Export; scheitert er, bleibt der alte Stand und die Hilfsdatei
+wird entfernt. `mcp/README.md` nennt die Tunnelprüfung (`nc -z 127.0.0.1 55432`) vor dem
+Abzug. Was bleibt: **ein Abzug, der nach `main` geht, wird vorher angesehen** —
+`git diff --stat` mit „8.097 Deletionen" an einer Datei, die wachsen sollte, ist die Zahl, die
+den Fehler verraten hätte.
