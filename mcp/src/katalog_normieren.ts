@@ -21,7 +21,11 @@ if (text.trim() === '') {
   console.error('Nichts zu normieren: Datei oder Eingabe ist leer. Aufruf: bun run katalog:normieren <datei> oder pbpaste | bun run katalog:normieren')
   process.exit(2)
 }
-const roh = JSON.parse(text)
+let roh = JSON.parse(text)
+// Postico „Als JSON kopieren" liefert [{"katalog": "<die Zelle als Zeichenkette>"}];
+// die Zelle selbst (Cmd+C) kommt nackt. Beides annehmen.
+if (Array.isArray(roh) && roh.length === 1) roh = roh[0]
+if (roh && typeof roh === 'object' && typeof roh.katalog === 'string') roh = JSON.parse(roh.katalog)
 for (const k of ['sichten', 'achsen', 'fallstricke'] as const) {
   if (!Array.isArray(roh[k])) {
     console.error(`Die Datei traegt kein Feld "${k}" — ist es die Zelle aus katalog_abzug.sql?`)
