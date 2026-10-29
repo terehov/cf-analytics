@@ -1712,6 +1712,16 @@ verschätzt, `docs/offene-punkte.md`). Seit **`0143`** stehen die Warengruppenna
 
 Erneut zeilengleich geprüft: dieselben Zeiträume, beide Richtungen, Rückfall eingeschlossen.
 
+**Produktion, 29.10.2026 nach dem Deploy von `0143`** (warm, als `cf`):
+
+| Abfrage | vor `0142` | nach `0142` | nach `0143` |
+|---|---|---|---|
+| WE-Quote Enchilada ohne Betrieb 39, 08.07.2025–26.10.2026 | 22,3 s | 11,0 s | 7,6 s |
+| Enchilada, `warengruppe = 'Taco-AF'`, ab 02.06.2025 | — | 18,1 s | 7,8 s |
+
+Was bleibt, ist die Suche je Zeile, die die Markenschätzung erzwingt (`docs/offene-punkte.md`).
+`mart.sicht_defekt` ist leer, der MCP-Katalog hat die Basis nachgeladen (257 Sichten).
+
 ## Neu und geändert in `mart` (Migrationen `0125`–`0127`, 29.09.2026)
 
 * **`mart.luecke_monat`** — neu: was je Quelle, Betrieb und Monat fehlt. `thema = 'pruefung'`,
