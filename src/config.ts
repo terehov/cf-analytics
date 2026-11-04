@@ -336,6 +336,29 @@ const Schema = z.object({
    */
   STATUS_STILLSTAND_STUNDEN: z.coerce.number().min(0.1).default(3),
   /**
+   * Eingehender Webhook für die Statusmeldung nach jedem Nachtlauf
+   * (`src/meldung.ts`). kChat von Infomaniak, dahinter Mattermost — das
+   * Format ist Mattermosts `{ text }` mit Markdown. Fehlt die Variable,
+   * wird nichts gesendet und der Lauf läuft wie bisher.
+   *
+   * WARUM EINE NACHRICHT STATT EINES ENDPUNKTS (Eugene, 04.11.2026): einen
+   * Endpunkt muss jemand aufrufen, eine Nachricht kommt von selbst. Und
+   * `/status` von außen erreichbar zu machen hiesse, Betriebszahlen ohne
+   * Anmeldung ins Netz zu stellen.
+   *
+   * Die URL IST das Geheimnis: wer sie kennt, schreibt in den Channel. Sie
+   * wird nie geloggt (konfigZumLoggen meldet nur, ob sie gesetzt ist).
+   */
+  STATUS_WEBHOOK_URL: z.string().url().optional(),
+  /**
+   * Ab wie vielen Stunden ohne abgeschlossenen Lauf der Wächter in
+   * `health.ts` meldet, dass der Nachtlauf ausgeblieben ist. Ein Lauf am
+   * Tag, Start 04:00/05:00, Dauer drei bis fünf Stunden: nach 30 Stunden ist
+   * mindestens einer ausgefallen, und der Fall ist noch am selben Vormittag
+   * gemeldet statt erst am nächsten Morgen.
+   */
+  STATUS_AUSFALL_STUNDEN: z.coerce.number().min(1).default(30),
+  /**
    * Ab wann `/status` meldet, dass die BWA insgesamt stehengeblieben ist —
    * Monate zwischen dem laufenden Monat und dem jüngsten Monat, den irgendein
    * Betrieb gebucht hat.
@@ -1175,6 +1198,8 @@ export function konfigZumLoggen(c: Config = config) {
       : `${c.FENSTER_VON_STUNDE}–${c.FENSTER_BIS_STUNDE} Uhr`,
     hashverfahren: c.LINA_PASSWORD_HASH,
     maxVersuche: c.MAX_VERSUCHE,
+    // Nur ob, nie die URL: sie ist der Schluessel zum Channel.
+    statusWebhook: c.STATUS_WEBHOOK_URL ? 'gesetzt' : 'nicht gesetzt',
     fortschritt: c.FORTSCHRITT_ALLE === 0
       ? 'aus'
       : c.FORTSCHRITT_ALLE === 1 ? 'jeder Posten' : `jeder ${c.FORTSCHRITT_ALLE}. Posten`,

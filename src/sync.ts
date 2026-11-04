@@ -25,6 +25,7 @@ import { yextNachlauf } from './yext/nachlauf'
 import { bountiNachlauf } from './bounti/nachlauf'
 import { zulaufPruefen } from './sync/zulauf'
 import { pflegeNachlauf } from './pflege/nachlauf'
+import { laufMelden } from './meldung'
 
 /** „ok" nur, wenn der Dienst nichts anderes sagt — siehe die Liste der Dienste unten. */
 function dienstAusgang(e: PromiseSettledResult<unknown>): string {
@@ -433,11 +434,19 @@ try {
     throw e
   }
 
+  // Die Statusmeldung in den Channel (src/meldung.ts) — wirft nie, und ohne
+  // STATUS_WEBHOOK_URL tut sie nichts. Nach abschliessen(), damit sie den
+  // endgueltigen Status des Laufs liest.
+  await laufMelden(r.laufId)
+
   await pool.end().catch(() => {})
   // Exitcode 1 nur bei Abbruch - 'teilweise' ist normal (einzelne Betriebe ohne Daten).
   process.exit(r.status === 'abgebrochen' ? 1 : 0)
 } catch (e) {
   log.error('lauf abgebrochen', { fehler: String(e) })
+  // Auch der Abbruch wird gemeldet. Der Lauf ist zu diesem Zeitpunkt als
+  // abgebrochen geschlossen (abschliessen oben), also ist er der juengste.
+  await laufMelden(null, { fehler: e })
   await pool.end().catch(() => {})
   process.exit(1)
 }

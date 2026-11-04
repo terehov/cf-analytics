@@ -4541,3 +4541,19 @@ drei liefen in die 20-s-Grenze, sechs weitere lagen bei 12–17 s. Alle bis auf 
   Phase A, nichts in Phase A liest die Sicht, und ein scheiternder Refresh dürfte keinen
   Stammdatenlauf abbrechen. Kein `SECURITY DEFINER`: nur `cf` schreibt die Tabelle und besitzt
   die Materialisierung. Der Preis aus `0144` ist damit weg.
+
+
+## 04.11.2026 — Statusmeldung als Nachricht in kChat statt eines erreichbaren Endpunkts
+
+**Entschieden (Eugene):** Der Zustand des Systems kommt nach jedem Nachtlauf als Nachricht in einen
+kChat-Channel (Mattermost-Webhook, `src/meldung.ts`), „für Menschen verständlich und schön
+formatiert". Inhalt sind dieselben Prüfungen wie `/status`.
+
+- **Verworfen: `/status` über eine Domain mit Token erreichbar machen.** Man muss ihn aufrufen,
+  und eine Antwort, nach der niemand fragt, meldet nichts.
+- **Verworfen: eine Metabase-Benachrichtigung** (Abfrage, die bei Treffern auslöst). Sie kennt
+  nur, was als SQL formulierbar ist; mehrere Prüfungen in `src/status.ts` sind TypeScript
+  (Zugangssperre, Yext-/Bounti-Merker, Dashboard-Filter). Zwei Fassungen des Zustands wären eine
+  zu viel.
+- **Nach jedem Lauf, nicht nur bei Befund.** Eine Nachricht, die jeden Morgen kommt, fällt auf,
+  wenn sie fehlt. Dazu der stündliche Wächter in `health.ts` für den Lauf, der gar nicht startet.

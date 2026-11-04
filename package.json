@@ -21,7 +21,8 @@
     "rezepte-praxis": "bun run src/rezepte_praxis.ts",
     "bounti:pruefen": "bun run src/bounti_pruefen.ts",
     "bounti:zuordnen": "bun run src/bounti_zuordnen.ts",
-    "bestellansicht-probe": "bun run src/bestellansicht_probe.ts"
+    "bestellansicht-probe": "bun run src/bestellansicht_probe.ts",
+    "status-melden": "bun run src/meldung.ts"
   },
   "dependencies": {
     "pg": "^8.22.0",

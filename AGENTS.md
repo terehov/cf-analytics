@@ -354,6 +354,7 @@ bun run rezepte-praxis --datenbank postgresql://localhost/<db> [--marke x] [--ma
 bun run bestellansicht-probe                 # sieht der Importer-Zugang die FoodNotify-Bestellansicht (0135)?
                                              # drei GET, keine DB (nur im Terminal des Nutzers)
 bun run health                               # Health-Endpunkt (Container-CMD)
+bun run status-melden                        # Testnachricht mit dem Status in den kChat-Channel (braucht STATUS_WEBHOOK_URL)
 curl localhost:3000/health                     # lebt der Container?
 curl localhost:3000/status                     # muss jemand hinsehen? (503 = ja)
 bun run typecheck

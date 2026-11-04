@@ -15,6 +15,7 @@
 import { config } from './config'
 import { eine } from './db/pool'
 import { statusErheben } from './status'
+import { ausfallMelden } from './meldung'
 
 type Zustand = {
   status: 'ok' | 'veraltet' | 'unbekannt' | 'db_nicht_erreichbar'
@@ -105,3 +106,10 @@ Bun.serve({
 
 console.log(JSON.stringify({ t: new Date().toISOString(), stufe: 'info',
   msg: 'health lauscht', port: config.PORT, tz: process.env.TZ }))
+
+/**
+ * Der Waechter fuer den ausgebliebenen Lauf (src/meldung.ts). Stuendlich, weil
+ * nur dieser Prozess dauerhaft laeuft: bleibt der Nachtlauf aus, gibt es keinen
+ * anderen, der es bemerken koennte. Ohne STATUS_WEBHOOK_URL tut er nichts.
+ */
+setInterval(() => { void ausfallMelden() }, 60 * 60 * 1000)

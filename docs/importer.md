@@ -421,6 +421,35 @@ Einrichten: einen HTTP-Monitor auf `https://<host>/status` legen, Intervall 5–
 
 Alle vier Fälle sind im Ende-zu-Ende-Test nachgestellt — die Attrappe kann auf Kommando sperren (`sperreAb`, `sperreArt`, `retryAfter`). Geprüft wird nicht nur, dass der Lauf endet, sondern **wie oft danach noch angeklopft wird**. Die richtige Antwort ist: kein einziges Mal.
 
+## Die Statusmeldung in den Channel (`src/meldung.ts`, 04.11.2026)
+
+Nach jedem Nachtlauf schickt `bun run sync` den `/status`-Bericht als Nachricht in einen
+kChat-Channel (Infomaniak, dahinter Mattermost): Titel mit Ampelzeichen, Laufzeit und ab wann die
+Dashboards aktuell sind, eine Tabelle der Befunde (Störung vor Warnung, 🆕 für alles, was in der
+letzten Meldung noch nicht stand), darunter „Was zu tun ist" mit dem nächsten Schritt je Befund
+und eine Zeile mit allen Prüfungen ohne Befund. Bricht der Lauf ab, kommt die Nachricht trotzdem,
+mit dem Fehlertext.
+
+**Dieselben Prüfungen wie `/status`, keine eigenen.** Die Nachricht formatiert nur
+(`nachrichtBauen()`, rein und getestet in `src/meldung.test.ts`).
+
+**Der ausgebliebene Lauf.** Den kann der Lauf nicht selbst melden. `health.ts` prüft deshalb
+stündlich, ob seit `STATUS_AUSFALL_STUNDEN` (30) kein Lauf abgeschlossen wurde oder einer so lange
+arbeitet, und meldet das einmal je Lauf (Merker `status_meldung_ausfall`).
+
+| Variable | Bedeutung |
+|---|---|
+| `STATUS_WEBHOOK_URL` | Eingehender Webhook des Channels. Fehlt sie, wird nichts gesendet. Wird nie geloggt — wer sie kennt, schreibt in den Channel |
+| `STATUS_AUSFALL_STUNDEN` | Ab wann der Wächter einen ausgebliebenen Lauf meldet (Standard 30) |
+
+Probe von Hand im Container: `bun run status-melden` schickt eine als Test gekennzeichnete
+Nachricht für den jüngsten Lauf, ohne den Merker für 🆕 zu verändern.
+
+**Warum eine Nachricht und kein öffentlicher Endpunkt** (Eugene, 04.11.2026): Einen Endpunkt muss
+jemand aufrufen, eine Nachricht kommt von selbst, und ihr Ausbleiben fällt auf. `/status` von außen
+erreichbar zu machen hieße, Betriebszahlen ohne Anmeldung ins Netz zu stellen. Die Dokploy-Adresse
+`…sslip.io/status` ist es am 04.11.2026 noch.
+
 ## Was ein laufender Import von sich zeigt
 
 Erfolge gingen früher nach `debug`. Zwischen zwei Posten liegen 20 bis 40 Sekunden, ein Backfill war auf `info` also stundenlang vollkommen still und von einem Hänger nicht zu unterscheiden — am 26.07.2026 wurde deshalb ein intakter Lauf für tot gehalten und abgebrochen.
