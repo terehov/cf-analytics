@@ -2057,3 +2057,13 @@ Datenbank).
 `erpId`, `orderId` und `seite` den Posten). `mart.luecke_monat` meldet Betriebe aus
 `manual.betrieb_ohne_regelbetrieb` nicht mehr als „seit mehr als 8 Tagen ohne Umsatz"
 (KUZ Mainz, eine Veranstaltungshalle — Umsatz nur bei Veranstaltungen).
+
+
+## `mart.kassenblatt_stand`: `luecke` und `ergaenzt` (Migration `0147`, 04.11.2026)
+
+Zwei neue Zustände und die Spalte `lina_quote` (am Ende). `luecke`: LINA-Kasse unter der
+Monatsübersicht, der Betrieb trifft sie sonst — der Nachtlauf ergänzt die Tage aus dem Kassenblatt.
+`ergaenzt`: danach getroffen. `abweichung` heißt seither: der Betrieb weicht dauerhaft ab
+(`lina_quote` < 0,75), das wird nicht automatisch gefüllt. In `mart.umsatz_tag` stehen ergänzte
+Tage mit `quelle = 'kassenblatt'` und ohne Rechnungen und Gäste — bei Bon- und Gästekennzahlen auf
+`quelle = 'umsatzbericht'` filtern, wie bei fremden Kassen.

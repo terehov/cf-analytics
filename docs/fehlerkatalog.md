@@ -5447,3 +5447,23 @@ niemand aufgerufen.
   `aa_kopf` 1,2 s und `aa_betrieb` 2,0 s, vorher wie nachher, Ergebnis zeilengleich.
 * `metabase/karten_schema.test.ts` prüft ohne Datenbank, dass keine Karte ein Schema außerhalb von
   `mart`, `manual`, `ampel` liest. Er läuft in jedem `bun test`.
+
+## Lückenmonate im Kassenumsatz blieben stehen, obwohl die Ladenakte den richtigen Wert kannte (04.11.2026)
+
+**Symptom.** `mart.kassenblatt_stand` führte 657 abgeschlossene Monate als `abweichung`: LINAs
+Konzernbericht und die Monatsübersicht der Ladenakte („Die letzten Jahre") trafen sich nicht. Gegen
+die BWA (Umsatz, 628 Monate mit gebuchter BWA) traf die Monatsübersicht in 425 Fällen auf 1 %, der
+Konzernbericht in 29. Unsere Zahlen waren also die falschen — Enchilada Münster Februar 2026 mit
+80.708 statt 122.662 EUR, die Lochtage vom 20.–22.07.2026 bei rund 40 Betrieben.
+
+**Ursache.** `0141` hatte entschieden, dass Kassenblatt und Kasse sich nicht mischen: das Kassenblatt
+durfte nur Tage füllen, an denen LINA 0,00 meldet. Fehlte bei uns ein Teil eines Tages, oder kam ein
+Lochtag nie nach, blieb der Monat zu niedrig — sichtbar in der Prüfsicht, aber ohne Weg zur Korrektur.
+
+**Was es künftig verhindert (`0147`).** Neuer Zustand `luecke`: LINA-Kasse unter der Monatsübersicht
+bei einem Betrieb, der sie sonst trifft (`lina_quote` ≥ 0,75). Der Importer holt dann „Die letzten
+Tage" mit `ergaenzen` und hebt jeden Tag an, an dem das Kassenblatt mehr führt — nie nach unten, und
+nur, wenn die Tage des Kassenblatts selbst den Monatswert treffen. Danach `ergaenzt`. Gemessen: 188 Monate bei
+61 Betrieben, 2,26 Mio. EUR. Zwölf Betriebe mit zu niedriger Quote (402 Monate, 19,2 Mio. EUR)
+bleiben `abweichung`: dort zählt die Ladenakte vermutlich mehr als den einen LINA-Betrieb, und
+Anheben zählte doppelt (`offene-punkte.md`).

@@ -1649,6 +1649,13 @@ export async function kassenblattNachfuellen(heute: string): Promise<number> {
             AND u.hauptsparte_key IS NULL AND u.verkaufsstelle_key IS NULL
             AND u.geschaeftstag >= $1::date - 62
             AND u.umsatz_netto <> 0
+            -- 0147: ein Betrieb mit LINA-Kasse, dessen Luecken ergaenzt wurden,
+            -- ist kein Kassenblatt-Betrieb. Ohne diese Bedingung kaeme er jede
+            -- Nacht, und seine Ruhetage bekaemen die Quelle 'kassenblatt'.
+            AND (SELECT count(*) FROM core.umsatzbericht_tag l
+                  WHERE l.betrieb_key = u.betrieb_key AND l.quelle = 'umsatzbericht'
+                    AND l.hauptsparte_key IS NULL AND l.verkaufsstelle_key IS NULL
+                    AND l.umsatz_netto > 0 AND l.geschaeftstag >= $1::date - 62) < 10
          UNION
          SELECT k.betrieb_key
            FROM mart.kassenblatt_stand k
@@ -1702,6 +1709,42 @@ export async function kassenblattNachfuellen(heute: string): Promise<number> {
         LIMIT $2
        RETURNING posten_id`,
       [heute, config.KASSENBLATT_JE_LAUF, PRIORITAET_KASSENBLATT_HISTORIE])
+    n += r.length
+  }
+
+  /*
+   * LUECKEN IN DER LINA-KASSE (0147): Monate, die unter der Monatsuebersicht
+   * liegen, bei Betrieben, die sie sonst treffen (`luecke` in
+   * mart.kassenblatt_stand). Der Posten traegt `ergaenzen`, und der Lader hebt
+   * die unvollstaendigen Tage an. Einmal je Monatsuebersicht: schreibt der
+   * Abruf nichts (Schutzregel im Lader), steht der Monat weiter auf `luecke`
+   * und kommt erst mit der naechsten Uebersicht (monatlich) wieder.
+   */
+  if (config.KASSENBLATT_JE_LAUF > 0) {
+    const r = await query<{ posten_id: number }>(
+      `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, parameter, nachladen)
+       SELECT 'la:tagesumsatz', k.monat, (k.monat + interval '1 month' - interval '1 day')::date, $2,
+              jsonb_build_object('linaBetriebId', b.lina_betrieb_id::text,
+                                 'monat', to_char(k.monat, 'MM'), 'jahr', to_char(k.monat, 'YYYY'),
+                                 'ergaenzen', 'true'),
+              true
+         FROM mart.kassenblatt_stand k
+         JOIN core.betrieb b ON b.betrieb_key = k.betrieb_key
+        WHERE k.zustand = 'luecke'
+          AND b.lina_betrieb_id IS NOT NULL
+          AND ${NICHT_ABGEGEBEN('b')}
+          AND NOT EXISTS (
+              SELECT 1 FROM sync.warteschlange w
+               WHERE w.endpunkt = 'la:tagesumsatz'
+                 AND w.parameter->>'linaBetriebId' = b.lina_betrieb_id::text
+                 AND w.parameter->>'monat' = to_char(k.monat, 'MM')
+                 AND w.parameter->>'jahr' = to_char(k.monat, 'YYYY')
+                 AND w.parameter->>'ergaenzen' = 'true'
+                 AND (w.erledigt_am IS NULL OR w.erstellt_am > k.jahresuebersicht_abgerufen_am))
+        ORDER BY k.monat DESC, b.lina_betrieb_id
+        LIMIT $1
+       RETURNING posten_id`,
+      [config.KASSENBLATT_JE_LAUF, PRIORITAET_KASSENBLATT_HISTORIE])
     n += r.length
   }
 

@@ -2464,3 +2464,40 @@ käme erst nach dem nächsten Lauf an. Nicht gebaut, bis jemand die Fälle zähl
 Messabfrage: `EXPLAIN ANALYZE SELECT count(*) FROM mart.artikelverkauf WHERE konzept = 'Enchilada'
 AND geschaeftstag >= '2025-06-01'` und die Zeile `Hash Join … rows=1` unter `konzept kh` ansehen.
 
+
+
+## Kassenumsatz unter der Ladenakte: zwölf Betriebe für den Fachbereich (04.11.2026)
+
+Seit `0147` ergänzt der Nachtlauf Lückenmonate aus dem Kassenblatt — aber nur bei Betrieben, deren
+Kasse die Monatsübersicht der Ladenakte sonst trifft (`lina_quote` ≥ 0,75). Bei zwölf Betrieben
+liegt LINA in zu vielen Monaten darunter — 402 Monate, zusammen 19,2 Mio. EUR (gemessen 04.11.2026):
+
+| Betrieb | `lina_quote` | Monate darunter | Differenz EUR |
+|---|---|---|---|
+| Park Cafe München | 0,089 | 82 | 8.037.906 |
+| BS Bier & Speisen Gastro | 0,433 | 58 | 5.393.770 |
+| Enchilada Freiburg | 0,321 | 72 | 2.017.976 |
+| Alter Kranen | 0,641 | 37 | 1.369.304 |
+| Schlager Cafe Düsseldorf | 0,250 | 15 | 828.881 |
+| Enchilada Bayreuth | 0,693 | 31 | 529.849 |
+| Enchilada Münster | 0,585 | 43 | 463.558 |
+| Enchilada Hamm | 0,308 | 45 | 359.439 |
+| Eat Tasty Mainz (geschlossen) | 0,609 | 9 | 166.259 |
+| Heidis Braustüberl | 0 | 8 | 27.612 |
+| Wilma Wunder Viernheim | 0,727 | 1 | 8.800 |
+| SCHAFFERONE | 0,737 | 1 | 4.385 |
+
+Bei Freiburg trifft die Ladenakte die BWA, die Kasse liegt jeden Monat rund 13 % darunter. Bei
+Münster und Bayreuth sind es meist nur 1–3 % — dort könnte die Ladenakte eine Gruppe führen, die der
+Konzernbericht nicht zählt (Gutschein, Divers). Viernheim und SCHAFFERONE liegen knapp unter der
+Schwelle und rutschen mit dem nächsten getroffenen Monat darüber.
+
+**Frage an den Fachbereich:** Was zählt die Ladenakte dort zusätzlich — eine zweite Kasse, eine
+Betriebsstelle, Lieferdienst, eine Schwester-GmbH (bei BS Bier: „Lauterbacher am See" ist ein eigener
+LINA-Betrieb)? Erst dann lässt sich entscheiden, ob der Umsatz dieser Betriebe angehoben werden darf.
+
+```sql
+SELECT betrieb, lina_quote, count(*) AS monate, round(sum(jahresuebersicht - umsatz_lina)) AS differenz
+  FROM mart.kassenblatt_stand WHERE zustand = 'abweichung' AND monat < date_trunc('month', current_date)
+ GROUP BY 1, 2 ORDER BY 4 DESC;
+```

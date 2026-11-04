@@ -768,6 +768,11 @@ const GRUPPE_ZU_SPARTE: Record<string, 'Speisen' | 'Getränke'> = {
  * ueberschreibt das Kassenblatt. Eine Zeile mit echtem LINA-Umsatz oder mit
  * Rechnungen bleibt stehen: dort laeuft die Kasse ueber LINA, und deren Zahl
  * ist die genauere. Gegenstueck im Konzernlader (src/sync/laden.ts).
+ * AUSNAHME seit 0147: im Ergaenzungsmodus (Posten mit `ergaenzen`) hebt das
+ * Kassenblatt einen LINA-Tag an, wenn es mehr fuehrt — siehe unten. Holt der
+ * Konzernlader den Tag spaeter neu, gilt wieder seine Zahl; der Monat steht
+ * dann erneut auf `luecke` und wird mit der naechsten Monatsuebersicht wieder
+ * ergaenzt.
  *
  * NUR TAGE VOR HEUTE. Der laufende Monat zeigt den Vortag als letzten; ein
  * heutiger Teilwert waere ein halber Tag mit vollem Datum.
@@ -785,6 +790,33 @@ async function tagesumsatzSchreiben(
     throw new Error(`la:tagesumsatz: monat/jahr fehlen im Posten (${JSON.stringify(k.parameter)})`)
   }
   const m = kassenblattTageLesen(String(k.daten), { monat, jahr })
+
+  /**
+   * ERGAENZEN (0147): ein Monat mit LINA-Kasse, der unter der Monatsuebersicht
+   * liegt (`mart.kassenblatt_stand`, zustand = luecke). Dann darf das
+   * Kassenblatt auch einen Tag mit echtem LINA-Umsatz ANHEBEN — nie senken.
+   * Fuer LINA-Kassen fuehrt das Kassenblatt denselben Nettoumsatz wie
+   * getUmsatzbericht (lina-api-inventar-ladenakte.md); ein hoeherer Tageswert
+   * heisst, unser Tag ist unvollstaendig.
+   *
+   * DIE SCHUTZREGEL: geschrieben wird nur, wenn die Tage des Kassenblatts den
+   * Monatswert aus "Die letzten Jahre" treffen (1 %). Sonst passen die beiden
+   * LINA-Seiten nicht zusammen, und eine Anhebung waere geraten.
+   */
+  const ergaenzen = k.parameter.ergaenzen === 'true'
+  if (ergaenzen) {
+    const soll = await c.query<{ umsatz_netto: string }>(
+      `SELECT umsatz_netto FROM core.kassenblatt_monat WHERE betrieb_key = $1 AND monat = $2::date`,
+      [bk, m.monat])
+    const monatswert = soll.rows[0] ? Number(soll.rows[0].umsatz_netto) : null
+    const tage = m.tage.reduce((a, t) => a + t.netto, 0)
+    if (monatswert === null || Math.abs(tage - monatswert) > Math.max(1, 0.01 * Math.abs(monatswert))) {
+      log.warn('kassenblatt: ergaenzen abgelehnt — Tage treffen den Monatswert nicht', {
+        betriebKey: bk, monat: m.monat, tage: Math.round(tage * 100) / 100, monatswert })
+      return 0
+    }
+  }
+
   if (m.abweichende_tage.length > 0) {
     // LINAs Gesamt enthaelt etwas, das keine angezeigte Gruppe fuehrt (Lauf
     // 182). Geschrieben wird das Gesamt; die Sparten bleiben, was sie sind.
@@ -831,8 +863,10 @@ async function tagesumsatzSchreiben(
          quelle = 'kassenblatt', raw_id = EXCLUDED.raw_id, geladen_am = now()
        WHERE core.umsatzbericht_tag.quelle = 'kassenblatt'
           OR (coalesce(core.umsatzbericht_tag.umsatz_netto, 0) = 0
-              AND coalesce(core.umsatzbericht_tag.rechnungen, 0) = 0)`,
-      [...werte, rawId])
+              AND coalesce(core.umsatzbericht_tag.rechnungen, 0) = 0)
+          OR ($${werte.length + 2}::boolean
+              AND EXCLUDED.umsatz_netto > coalesce(core.umsatzbericht_tag.umsatz_netto, 0) + 1)`,
+      [...werte, rawId, ergaenzen])
     n += r.rowCount ?? 0
   })
 

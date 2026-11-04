@@ -3271,6 +3271,80 @@ lauf('e2e Ladenakte', () => {
       expect((await db.query(`SELECT letzter_fehler FROM sync.warteschlange`)).rows[0].letzter_fehler)
         .toMatch(/LINA zeigt 10\/2026/)
     }, 60_000)
+
+    /**
+     * 0147: ein Betrieb mit LINA-Kasse, dessen August unter der
+     * Monatsuebersicht liegt — ein Nulltag, ein Teiltag. Das Kassenblatt hebt
+     * genau diese Tage an; ein Tag, an dem LINA MEHR hat, bleibt LINAs.
+     * Monatswerte aus dem ersten Test (Bremen), die LINA-Zeilen hier gesetzt.
+     */
+    test('Luecken einer LINA-Kasse werden aus dem Kassenblatt ergaenzt, nur nach oben', async () => {
+      const { workerLauf } = await import('./worker')
+      const { kassenblattNachfuellen } = await import('./nachfuellen')
+      const { kassenblattTageLesen } = await import('../ladenakte/html')
+      await db.query(`TRUNCATE sync.warteschlange RESTART IDENTITY`)
+      await db.query(`DELETE FROM core.umsatzbericht_tag`)
+      const bk = Number((await db.query(`SELECT betrieb_key FROM core.betrieb WHERE lina_betrieb_id = 15`)).rows[0].betrieb_key)
+      expect(await zahl(`SELECT count(*)::int AS n FROM core.kassenblatt_monat WHERE monat = '2026-08-01'`)).toBe(1)
+
+      // Mai bis Juli: die Kasse trifft die Monatsuebersicht — der Betrieb ist stimmig (lina_quote 1).
+      await db.query(
+        `INSERT INTO core.umsatzbericht_tag (betrieb_key, geschaeftstag, umsatz_netto, rechnungen)
+         SELECT betrieb_key, monat + 14, umsatz_netto, 100 FROM core.kassenblatt_monat
+          WHERE betrieb_key = $1 AND monat BETWEEN '2026-05-01' AND '2026-07-01'`, [bk])
+      // August: jeder Tag wie das Kassenblatt, ausser 05.–09. (0), 10. (halb) und 20. (+50).
+      // Ein einzelner Nulltag laege bei Bremen noch in der 1-%-Toleranz.
+      const html = await Bun.file('src/transform/fixtures/kassenblatt_tage_bremen_2026_08.html').text()
+      const tage = kassenblattTageLesen(html, { monat: 8, jahr: 2026 }).tage
+      const null_ = (d: string) => ['05', '06', '07', '08', '09'].includes(d.slice(8))
+      const wert = (d: string, v: number) =>
+        null_(d) ? 0 : d.endsWith('-10') ? Math.round(v * 50) / 100 : d.endsWith('-20') ? v + 50 : v
+      for (const t of tage) {
+        await db.query(
+          `INSERT INTO core.umsatzbericht_tag (betrieb_key, geschaeftstag, umsatz_netto, rechnungen)
+           VALUES ($1, $2, $3, $4)`, [bk, t.datum, wert(t.datum, t.netto), null_(t.datum) ? 0 : 10])
+      }
+      const zustand = async () => (await db.query(
+        `SELECT zustand, lina_quote::float AS q FROM mart.kassenblatt_stand WHERE betrieb_key = $1 AND monat = '2026-08-01'`,
+        [bk])).rows[0]
+      expect(await zustand()).toEqual({ zustand: 'luecke', q: 0.75 })
+
+      // Einreihen: genau ein Posten mit `ergaenzen`, und kein zweiter in derselben Nacht.
+      await kassenblattNachfuellen('2026-11-04')
+      expect(await zahl(`SELECT count(*)::int AS n FROM sync.warteschlange
+                          WHERE parameter->>'ergaenzen' = 'true' AND parameter->>'monat' = '08'`)).toBe(1)
+      await db.query(`DELETE FROM sync.warteschlange WHERE parameter->>'ergaenzen' IS DISTINCT FROM 'true'`)
+      await kassenblattNachfuellen('2026-11-04')
+      expect(await zahl(`SELECT count(*)::int AS n FROM sync.warteschlange WHERE parameter->>'ergaenzen' = 'true'`)).toBe(1)
+      await db.query(`DELETE FROM sync.warteschlange WHERE parameter->>'ergaenzen' IS DISTINCT FROM 'true'`)
+
+      await workerLauf('manuell')
+      const tag = async (d: string) => (await db.query(
+        `SELECT umsatz_netto::float AS u, quelle, rechnungen FROM core.umsatzbericht_tag
+          WHERE betrieb_key = $1 AND geschaeftstag = $2 AND hauptsparte_key IS NULL`, [bk, d])).rows[0]
+      const soll = (d: string) => tage.find(t => t.datum === d)!.netto
+      expect(await tag('2026-08-05')).toEqual({ u: soll('2026-08-05'), quelle: 'kassenblatt', rechnungen: null })
+      expect(await tag('2026-08-10')).toEqual({ u: soll('2026-08-10'), quelle: 'kassenblatt', rechnungen: null })
+      // LINA hat mehr: bleibt
+      expect(await tag('2026-08-20')).toEqual({ u: soll('2026-08-20') + 50, quelle: 'umsatzbericht', rechnungen: 10 })
+      // gleich: bleibt LINAs, mit Rechnungen
+      expect(await tag('2026-08-15')).toEqual({ u: soll('2026-08-15'), quelle: 'umsatzbericht', rechnungen: 10 })
+      expect((await zustand()).zustand).toBe('ergaenzt')
+
+      // Schutzregel: trifft das Kassenblatt den Monatswert nicht, wird nichts angehoben.
+      await db.query(`UPDATE core.umsatzbericht_tag SET umsatz_netto = 0, quelle = 'umsatzbericht'
+                       WHERE betrieb_key = $1 AND geschaeftstag = '2026-08-05'`, [bk])
+      await db.query(`UPDATE core.kassenblatt_monat SET umsatz_netto = umsatz_netto * 2
+                       WHERE betrieb_key = $1 AND monat = '2026-08-01'`, [bk])
+      await db.query(`TRUNCATE sync.warteschlange RESTART IDENTITY`)
+      await db.query(`INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, parameter)
+                      VALUES ('la:tagesumsatz', '2026-08-01', '2026-08-31', 91,
+                              '{"linaBetriebId":"15","monat":"08","jahr":"2026","ergaenzen":"true"}')`)
+      await workerLauf('manuell')
+      expect((await tag('2026-08-05')).u).toBe(0)
+      await db.query(`UPDATE core.kassenblatt_monat SET umsatz_netto = umsatz_netto / 2
+                       WHERE betrieb_key = $1 AND monat = '2026-08-01'`, [bk])
+    }, 60_000)
   })
 
   /**

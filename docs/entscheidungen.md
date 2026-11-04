@@ -4557,3 +4557,24 @@ formatiert". Inhalt sind dieselben Prüfungen wie `/status`.
   zu viel.
 - **Nach jedem Lauf, nicht nur bei Befund.** Eine Nachricht, die jeden Morgen kommt, fällt auf,
   wenn sie fehlt. Dazu der stündliche Wächter in `health.ts` für den Lauf, der gar nicht startet.
+
+
+## 04.11.2026 — Das Kassenblatt ergänzt Lücken der LINA-Kasse (revidiert 0141)
+
+**Entschieden (Eugene: „fixe es, dass die Werte bei uns stimmen"):** ~~Kassenblatt und Kasse mischen
+sich nicht (0141)~~. Ein Tag, an dem das Kassenblatt mehr Nettoumsatz führt als LINAs
+Konzernbericht, wird angehoben — in Monaten, die unter der Monatsübersicht liegen, bei Betrieben,
+die sie sonst treffen.
+
+- **Warum das Kassenblatt die richtige Zahl hat:** Für LINA-Kassen ist es derselbe Nettoumsatz wie
+  `getUmsatzbericht` (drei Betriebe auf den Cent, 28.10.2026), und die Monatsübersicht trifft die
+  BWA in 425 von 628 Abweichungsmonaten, der Konzernbericht in 29.
+- **Nur nach oben.** Ein höherer LINA-Wert bleibt: dann weiß die Kasse mehr als das Kassenblatt.
+- **Nur, wenn das Kassenblatt in sich stimmt** (Tage = Monatswert auf 1 %).
+- **Nicht bei `lina_quote` < 0,75.** Gemessen: zwölf Betriebe weichen in zu vielen Monaten ab
+  (Park Cafe 0,089, Freiburg 0,321, Münster 0,585); dort umfasst die Ladenakte vermutlich mehr als
+  den einen Konzern-Betrieb. Anheben hieße, eine Schwester doppelt zu zählen. Ergänzt werden damit
+  188 Monate bei 61 Betrieben (2,26 Mio. EUR), offen bleiben 402 Monate (19,2 Mio. EUR).
+- **Preis:** angehobene Tage tragen keine Rechnungen, Gäste und Bons mehr (`quelle = 'kassenblatt'`,
+  wie bei fremden Kassen). Holt der Konzernlader einen solchen Tag später neu, gilt wieder LINAs
+  Zahl, und der Monat wird mit der nächsten Monatsübersicht erneut ergänzt.
