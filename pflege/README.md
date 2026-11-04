@@ -44,6 +44,7 @@ Feldes.
 | `bwa_zeile.csv` | `manual.bwa_zeile` | Zeile | Gliederung der BWA |
 | `sachkonto.csv` | `manual.sachkonto` | Kontonummer | Welche Sachkonten Wareneinsatz sind |
 | `marktindex.csv` | `manual.marktindex` | Monat | Gastronomie-Marktindex (Destatis) |
+| `betrieb_ohne_regelbetrieb.csv` | `manual.betrieb_ohne_regelbetrieb` | Betrieb | Betriebe, die nur bei Veranstaltungen Umsatz machen (KUZ Mainz). Nimmt sie aus der Lückenmeldung „seit mehr als 8 Tagen ohne Umsatz“, sonst wirkt der Eintrag nirgends |
 | `betrieb_schliessung.csv` | `manual.betrieb_schliessung` | Betrieb | Geschlossene Betriebe mit letztem offenen Tag; Umsatz danach hebt es auf. `abgegeben = true`: nicht mehr in der Gruppe, der Importer fragt den Betrieb nicht mehr ab |
 | `betrieb_standort.csv` | `manual.betrieb_standort` | Betrieb | Adresse und Koordinate — Grundlage für Wetter, Bundesland und Karte |
 | `pflichtartikel_liste.csv` | `manual.pflichtartikel_liste` | Konzept + Bereich + gültig ab | Kopfzeile je Pflichtartikelliste: Laufzeit und Quelle |

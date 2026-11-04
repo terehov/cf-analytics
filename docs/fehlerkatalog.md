@@ -5426,3 +5426,24 @@ wird entfernt. `mcp/README.md` nennt die Tunnelprüfung (`nc -z 127.0.0.1 55432`
 Abzug. Was bleibt: **ein Abzug, der nach `main` geht, wird vorher angesehen** —
 `git diff --stat` mit „8.097 Deletionen" an einer Datei, die wachsen sollte, ist die Zahl, die
 den Fehler verraten hätte.
+
+## Dreizehn Karten liefen in Metabase und scheiterten im Chat (04.11.2026)
+
+**Symptom.** Im MCP-Zugriffsprotokoll stand am 01.11.2026 `bericht:yx_datenstand` mit
+„permission denied for schema core". In Metabase lief dieselbe Karte fehlerfrei.
+
+**Ursache.** Der MCP-Zugang führt jede Metabase-Karte als Bericht aus, aber als `mcp_leser` — und
+der sieht nur `mart`, `manual` und `ampel`. Metabase liest mit voller Leserolle, also fiel eine Karte
+auf `core` oder `sync` dort nie auf. Ein Durchgang über alle 328 Karten mit SQL fand 13 davon:
+`yx_datenstand`, `bw_anteil_schlecht`, `bw_portalvergleich`, `pf_stillgelegt`, `im_naechste`,
+`im_yext`, `imf_faelle` und die sechs Karten der Artikelaktion (`aa_*`). Die Artikelaktion las
+`core` mit Absicht (Tempo, siehe `metabase/karten-artikelaktion.ts`) — die Folge für den Chat hatte
+niemand bedacht. Im Protokoll stand nur der eine Fehlschlag; die übrigen Karten hatte im Chat noch
+niemand aufgerufen.
+
+**Was es künftig verhindert.**
+* `0146` legt schlanke `mart`-Sichten an (reine Projektionen, damit die Filter der Karten bis auf
+  die Tabelle durchgehen) und stellt die 13 Karten darauf um. Gemessen in Produktion: Artikelaktion
+  `aa_kopf` 1,2 s und `aa_betrieb` 2,0 s, vorher wie nachher, Ergebnis zeilengleich.
+* `metabase/karten_schema.test.ts` prüft ohne Datenbank, dass keine Karte ein Schema außerhalb von
+  `mart`, `manual`, `ampel` liest. Er läuft in jedem `bun test`.

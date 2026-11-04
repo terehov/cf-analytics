@@ -1359,6 +1359,16 @@ nach `letzter_offener_tag`. Spalten der Sicht unverändert. `mart.betrieb_schlie
 Tag mit 0,00 EUR) oder `wirkt nicht` (Umsatz nach dem Tag — wieder offen?). Entscheidung:
 `entscheidungen.md`, 11.10.2026.
 
+## Betriebe ohne Regelbetrieb (`0146`, 04.11.2026)
+
+`manual.betrieb_ohne_regelbetrieb (betrieb_key, notiz, gepflegt_am)`, gepflegt über
+`pflege/betrieb_ohne_regelbetrieb.csv`. Für Betriebe, die nur bei Gelegenheit Umsatz machen — erster
+Eintrag KUZ Mainz, eine Veranstaltungshalle, in der Wilma Ballplatz catert (Daniel, 04.11.2026).
+Wirkt an genau einer Stelle: `mart.luecke_monat` meldet sie nicht als „operativer Betrieb seit mehr
+als 8 Tagen ohne Umsatz". `mart.betrieb_status` bleibt unberührt — nach 60 Tagen ohne Umsatz wird
+auch ein solcher Betrieb `inaktiv`, mit der nächsten Veranstaltung wieder `operativ`. Eine eigene
+Tabelle statt einer Spalte an `betrieb_schliessung`: der Betrieb ist nicht geschlossen.
+
 ## Rezepturen: `core.rezept` und `core.zutat` befüllt (`0132`, 15.10.2026)
 
 Beide Tabellen stehen seit `0030` im Schema und waren bis hierher leer. `0132` macht sie

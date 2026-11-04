@@ -179,15 +179,14 @@ SELECT s.betrieb                            AS "Betrieb",
   -- Das Volumen der zwoelf Monate VOR dem letzten Umsatztag, nicht vor
   -- heute: bei einem 2023 geschlossenen Betrieb laege das Kalenderjahr vor
   -- heute komplett nach der Schliessung und ergaebe 0 -- der Ausfall
-  -- saehe kostenlos aus. Direkt auf core.umsatzbericht_tag, weil
-  -- mart.umsatz_tag je nach Sicht bereits gefiltert sein kann; die
-  -- NULL-Schluessel waehlen die Gesamtzeile je Tag (wie in
-  -- mart.betrieb_status selbst), sonst zaehlten Sparten doppelt.
+  -- saehe kostenlos aus. mart.umsatz_tag fuehrt nur die Gesamtzeile je
+  -- Tag (wie mart.betrieb_status selbst), Sparten zaehlen nicht doppelt.
+  -- ~~Direkt auf core.umsatzbericht_tag~~ — seit 0146 nicht mehr: die
+  -- Karte laeuft auch im Chat, und der sieht core nicht.
   LEFT JOIN LATERAL (
         SELECT sum(u.umsatz_netto) AS umsatz
-          FROM core.umsatzbericht_tag u
+          FROM mart.umsatz_tag u
          WHERE u.betrieb_key = s.betrieb_key
-           AND u.hauptsparte_key IS NULL AND u.verkaufsstelle_key IS NULL
            AND u.geschaeftstag >  s.letzter_umsatztag - interval '12 months'
            AND u.geschaeftstag <= s.letzter_umsatztag
   ) v ON true

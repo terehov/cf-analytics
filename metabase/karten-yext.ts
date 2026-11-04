@@ -608,7 +608,7 @@ SELECT CASE d.metrik
        END                                                  AS "Zahl",
        d.vollstaendig_bis                                   AS "vollständig bis",
        (current_date - d.vollstaendig_bis)                  AS "Tage Rückstand"
-  FROM core.yext_datenstand d
+  FROM mart.yext_datenstand d
  WHERE d.metrik IN ('NEW_REVIEWS','AVERAGE_RATING','RESPONSE_RATE','LISTINGS_ACCURACY',
                     'TOTAL_LISTINGS_IMPRESSIONS','GOOGLE_LISTINGS_IMPRESSIONS',
                     'SEARCHES','PROFILE_VIEWS','CLICK_COUNT')

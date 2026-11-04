@@ -20,13 +20,15 @@
 //      Deshalb die Pruefkarte am Ende (aa_liste_pruefung), die jede
 //      Nummer ohne Treffer nennt. Regel 10 in Kartenform.
 //
-//   2. Gerechnet wird auf core.artikelverkauf_tag statt auf
+//   2. Gerechnet wird auf mart.artikelverkauf_tag statt auf
 //      mart.artikelverkauf. Die Tagessicht traegt sieben LEFT JOINs fuer
 //      Warengruppen und Wareneinsatz, die hier niemand braucht; gebraucht
 //      werden umsatz_brutto und verkaufspreis, die mart.artikel_monat
-//      nicht fuehrt. Und core.betrieb statt mart.betrieb: die Sicht
-//      rechnet ueber mart.betrieb_status den letzten Umsatztag JEDES
-//      Betriebs ueber die ganze Umsatztabelle nach. Die Zeitraumgrenzen
+//      nicht fuehrt. Und mart.konzept_zuordnung statt mart.betrieb: die
+//      Sicht rechnet ueber mart.betrieb_status den letzten Umsatztag JEDES
+//      Betriebs ueber die ganze Umsatztabelle nach. ~~core.artikelverkauf_tag,
+//      core.artikel, core.betrieb~~ bis 0146 — im Chat (MCP) scheiterte
+//      damit jede dieser Karten, mcp_leser sieht core nicht. Die Zeitraumgrenzen
 //      stehen als faltbarer Ausdruck in jeder WHERE-Klausel — warum das
 //      den Unterschied zwischen 8,4 s und 0,6 s macht, steht an VON/BIS.
 //
@@ -112,12 +114,12 @@ WITH zeitraum AS (
       FROM regexp_split_to_table(coalesce([[ {{artikelnummern}}, ]] ''), '[^0-9]+') AS t
      WHERE t <> ''
 ), aktionsartikel AS (
-    SELECT a.artikel_key, a.artikelnummer, a.name AS artikel
-      FROM core.artikel a
+    SELECT a.artikel_key, a.artikelnummer, a.artikel
+      FROM mart.artikel_stamm a
       JOIN liste l ON l.artikelnummer = a.artikelnummer
 ), betriebe AS (
     SELECT DISTINCT av.betrieb_key
-      FROM core.artikelverkauf_tag av
+      FROM mart.artikelverkauf_tag av
       JOIN aktionsartikel aa ON aa.artikel_key = av.artikel_key
      WHERE av.geschaeftstag BETWEEN ${VON} AND ${BIS}
 ), verkauf AS (
@@ -126,7 +128,7 @@ WITH zeitraum AS (
                 ELSE 'vorjahr' END                 AS periode,
            av.geschaeftstag,
            av.betrieb_key,
-           b.name                                 AS betrieb,
+           kz.betrieb                             AS betrieb,
            kz.hauptkonzept                        AS marke,
            av.artikel_key,
            aa.artikelnummer,
@@ -136,16 +138,15 @@ WITH zeitraum AS (
            av.umsatz_netto,
            av.umsatz_brutto,
            av.menge * av.verkaufspreis            AS listwert
-      FROM core.artikelverkauf_tag av
+      FROM mart.artikelverkauf_tag av
       JOIN betriebe bt                    ON bt.betrieb_key = av.betrieb_key
-      JOIN core.betrieb b                 ON b.betrieb_key  = av.betrieb_key
-      LEFT JOIN mart.konzept_zuordnung kz ON kz.betrieb_key = av.betrieb_key
+      JOIN mart.konzept_zuordnung kz      ON kz.betrieb_key = av.betrieb_key
       LEFT JOIN aktionsartikel aa         ON aa.artikel_key = av.artikel_key
      WHERE (   av.geschaeftstag BETWEEN ${VON} AND ${BIS}
             OR av.geschaeftstag BETWEEN ${VOR_VON} AND ${VOR_BIS}
             OR av.geschaeftstag BETWEEN ${VJ_VON} AND ${VJ_BIS})
        [[AND kz.hauptkonzept = {{marke}}]]
-       [[AND b.name = {{betrieb}}]]
+       [[AND kz.betrieb = {{betrieb}}]]
 )`
 
 /** Verdichtung je Betrieb und Zeitraum — von zwei Karten gebraucht. */

@@ -105,6 +105,25 @@ export const ZIELE: readonly Ziel[] = [
       + 'abgegeben = nicht mehr unserer, der Importer fragt ihn nicht mehr ab (0133)',
   },
   /**
+   * Betriebe ohne Regelbetrieb (Migration `0146`).
+   *
+   * Anlass KUZ – Wilma Wunder Ballplatz Mainz: eine Veranstaltungshalle, in
+   * der Wilma Ballplatz catert — ohne Veranstaltung kein Umsatz (Daniel,
+   * 04.11.2026). `mart.luecke_monat` meldete sie als „operativer Betrieb seit
+   * mehr als 8 Tagen ohne Umsatz", und `/status` stand dadurch auf Warnung.
+   * Der Eintrag nimmt den Betrieb NUR aus dieser einen Prüfung; sein Status
+   * rechnet weiter nach dem letzten Umsatztag.
+   */
+  {
+    datei: 'betrieb_ohne_regelbetrieb.csv',
+    tabelle: 'manual.betrieb_ohne_regelbetrieb',
+    schluessel: ['betrieb_key'],
+    spalten: ['betrieb_key', 'notiz'],
+    pflicht: ['notiz'],
+    zweck: 'Betriebe, die nur bei Gelegenheit Umsatz machen (Veranstaltungen) — '
+      + 'keine Lückenmeldung bei Wochen ohne Umsatz (0146)',
+  },
+  /**
    * Die Klassengrenzen des Wettereffekts (Migration `0087`).
    *
    * WARUM DAS HIER STEHT UND NICHT IM QUELLTEXT: die Grenzen sind eine

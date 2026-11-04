@@ -274,9 +274,9 @@ SELECT n.position           AS "#",
        coalesce(
          n.betrieb,
          nullif(concat_ws(', ',
-           'Kostenstelle ' || (w.parameter ->> 'erpId'),
-           'Bestellung '   || (w.parameter ->> 'orderId'),
-           'Seite '        || (w.parameter ->> 'seite')), ''),
+           'Kostenstelle ' || (n.parameter ->> 'erpId'),
+           'Bestellung '   || (n.parameter ->> 'orderId'),
+           'Seite '        || (n.parameter ->> 'seite')), ''),
          n.endpunkt)        AS "Betrieb",
        n.zeitraum_von       AS "von",
        n.zeitraum_bis       AS "bis",
@@ -285,7 +285,6 @@ SELECT n.position           AS "#",
        n.versuche           AS "Versuche",
        n.laeuft_gerade      AS "läuft gerade"
   FROM mart.import_naechste n
-  LEFT JOIN sync.warteschlange w USING (posten_id)
  ORDER BY n.position
  LIMIT 50`,
   },
@@ -413,16 +412,13 @@ SELECT endpunkt            AS "Endpunkt",
       'Der Yext-Abruf der Online-Bewertungen läuft getrennt vom LINA-Import, einmal täglich. „Std her" sollte unter etwa 28 Stunden liegen — täglicher Lauf plus Puffer. Steht dort mehr, ist der Bewertungsimport hängen geblieben, und die Bewertungsseiten altern stillschweigend weiter.',
     anzeige: 'table',
     sql: `
--- Zwei Quellen, weil keine allein die Frage beantwortet: sync.merker
+-- Zwei Quellen, weil keine allein die Frage beantwortet: mart.yext_lauf
 -- weiss, WANN der letzte Yext-Lauf lief und ob er Fehler hatte;
 -- mart.bewertung_ladestand weiss, WAS danach in der Datenbank liegt.
 -- LEFT JOIN statt CROSS JOIN: fehlt der Merker (noch nie gelaufen),
 -- sollen die Ladestandzeilen trotzdem erscheinen -- mit leerem Lauf.
 WITH lauf AS (
-  SELECT (wert ->> 'beendet_am')::timestamptz AS beendet_am,
-         (wert ->> 'fehler')::int             AS fehler
-    FROM sync.merker
-   WHERE schluessel = 'yext_letzter_lauf'
+  SELECT beendet_am, fehler FROM mart.yext_lauf
 )
 SELECT s.quelle                                  AS "Quelle",
        s.publisher                               AS "Publisher",
@@ -648,7 +644,7 @@ SELECT betrieb      AS "Betrieb",
   // im_fehler fasst gleichartige Fehler der letzten 24 Stunden zusammen;
   // hier stehen die EINZELNEN Aufrufe dahinter, mit rohem Fehlertext und
   // sieben Tagen Rueckblick — genug, um "seit wann" zu beantworten, ohne
-  // sync.aufgabe unbegrenzt zu lesen.
+  // die Fehlerhistorie unbegrenzt zu lesen.
   // -------------------------------------------------------------------
   {
     schluessel: 'imf_faelle',
@@ -665,9 +661,8 @@ SELECT to_char(beendet_am, 'DD.MM. HH24:MI') AS "Zeit",
        coalesce(zeitraum_von::text, '—')     AS "Zeitraum von",
        coalesce(zeitraum_bis::text, '—')     AS "Zeitraum bis",
        coalesce(fehler, 'ohne Meldung')      AS "Fehler"
-  FROM sync.aufgabe
- WHERE status = 'fehler'
-   AND beendet_am >= now() - interval '7 days'
+  FROM mart.import_fehler_fall
+ WHERE beendet_am >= now() - interval '7 days'
    [[AND endpunkt = {{endpunkt}}]]
  ORDER BY beendet_am DESC
  LIMIT 300`,

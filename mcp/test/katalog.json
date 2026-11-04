@@ -379,6 +379,23 @@
    "fallstricke": []
   },
   {
+   "sicht": "mart.artikel_stamm",
+   "koernung": "Artikel (artikel_key) — Nummer und Name aus LINA",
+   "thema": "stammdaten",
+   "summen_erlaubt": false,
+   "kommentar": "Die Artikel aus LINA, eine Zeile je artikel_key: Nummer und Name, wie die Kasse sie fuehrt.\nArtikelnummern sind je Konzept vergeben — dieselbe Nummer kann in einer anderen Marke ein anderer\nArtikel sein. Warengruppe und Stand je Monat: mart.artikelverkauf (0146).\n\nKoernung: Artikel (artikel_key) — Nummer und Name aus LINA",
+   "spalten": [
+    "artikel_key",
+    "artikelnummer",
+    "artikel"
+   ],
+   "achsen": [
+    "artikel_key"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
    "sicht": "mart.artikel_stand_monat_basis",
    "koernung": "Artikel und Monat (Zwischenstufe von mart.artikelverkauf, ohne den laufenden Monat)",
    "thema": "umsatz",
@@ -455,6 +472,29 @@
     "konzept",
     "monat",
     "warengruppe"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.artikelverkauf_tag",
+   "koernung": "Betrieb × Geschaeftstag × Artikel — ohne Namen; nach geschaeftstag filtern",
+   "thema": "umsatz",
+   "summen_erlaubt": true,
+   "kommentar": "Verkauf je Betrieb, Geschaeftstag und Artikel, ohne Namen, Marke oder Warengruppe — die schlanke\nForm von mart.artikelverkauf fuer Abfragen ueber eine Liste von Artikeln (Artikelaktion). Namen\nueber mart.artikel_stamm (artikel_key) und mart.konzept_zuordnung (betrieb_key). verkaufspreis ist\nder Kartenpreis brutto; 1 - umsatz_brutto / (menge * verkaufspreis) ist der Nachlass aus ALLEN\nRabatten. Immer nach geschaeftstag filtern: die Tabelle hat ueber 100 Monatspartitionen (0146).\n\nKoernung: Betrieb × Geschaeftstag × Artikel — ohne Namen; nach geschaeftstag filtern",
+   "spalten": [
+    "geschaeftstag",
+    "betrieb_key",
+    "artikel_key",
+    "menge",
+    "umsatz_netto",
+    "umsatz_brutto",
+    "verkaufspreis"
+   ],
+   "achsen": [
+    "artikel_key",
+    "betrieb_key",
+    "geschaeftstag"
    ],
    "kennzahlen": [],
    "fallstricke": []
@@ -1172,6 +1212,30 @@
      "hinweis": null
     }
    ],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.bewertung_alle",
+   "koernung": "Bewertung (eine Zeile je Bewertung, auch ohne Text und Sterne)",
+   "thema": "bewertung",
+   "summen_erlaubt": true,
+   "kommentar": "Jede Bewertung, eine Zeile je Bewertung — auch ohne Text, ohne Sterne und unabhaengig vom Status.\nZum ZAEHLEN (Anteile, Portalvergleich). Zum Lesen der Texte mart.bewertung_einzel (nur LIVE, mit\nSternen und Text). rating ist NULL, wo das Portal keine Sterne vergibt — avg(rating) ignoriert diese\nZeilen, count(*) nicht. Betrieb und Marke ueber betrieb_key aus mart.betrieb_status (0146).\n\nKoernung: Bewertung (eine Zeile je Bewertung, auch ohne Text und Sterne)",
+   "spalten": [
+    "betrieb_key",
+    "quelle",
+    "publisher",
+    "status",
+    "rating",
+    "publiziert_am",
+    "datum",
+    "monat",
+    "mit_text"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "monat"
+   ],
+   "kennzahlen": [],
    "fallstricke": []
   },
   {
@@ -3586,6 +3650,29 @@
    "fallstricke": []
   },
   {
+   "sicht": "mart.import_fehler_fall",
+   "koernung": "gescheiterter Abruf (eine Zeile je Versuch); nach beendet_am filtern",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "Jeder gescheiterte Abruf des Importers, eine Zeile je Versuch, ueber die ganze Historie — immer\nnach beendet_am filtern. Verdichtet je Fehlerart und nur die letzten 24 Stunden: mart.import_fehler.\nEin einzelner Fehler ist kein Befund: der Worker wiederholt; erst mart.posten_aufgegeben sagt, was\nendgueltig fehlt (0146).\n\nKoernung: gescheiterter Abruf (eine Zeile je Versuch); nach beendet_am filtern",
+   "spalten": [
+    "beendet_am",
+    "lauf_id",
+    "endpunkt",
+    "http_status",
+    "versuch",
+    "zeitraum_von",
+    "zeitraum_bis",
+    "fehler",
+    "betrieb_enc_id"
+   ],
+   "achsen": [
+    "endpunkt"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
    "sicht": "mart.import_gesamt",
    "koernung": "Lauf insgesamt — eine einzige Zeile",
    "thema": "import",
@@ -3655,7 +3742,8 @@
     "versuche",
     "in_arbeit_seit",
     "laeuft_gerade",
-    "letzter_fehler"
+    "letzter_fehler",
+    "parameter"
    ],
    "achsen": [
     "endpunkt"
@@ -7248,6 +7336,39 @@
     "aufgabe",
     "zuletzt",
     "tage_her"
+   ],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.yext_datenstand",
+   "koernung": "Yext-Metrik — bis wann sie vollstaendig ist",
+   "thema": "bewertung",
+   "summen_erlaubt": false,
+   "kommentar": "Bis wann Yext eine Metrik als vollstaendig meldet (GET /analytics/catalog), eine Zeile je Metrik.\nBewertungen und Antworten sind meist bis gestern vollstaendig, Sichtbarkeitsmetriken hinken bis zu\neiner Woche hinterher. Der laufende Monat ist dort IMMER ein Teilmonat — nicht gegen einen\nVollmonat halten. Spiegel von core.yext_datenstand (0146).\n\nKoernung: Yext-Metrik — bis wann sie vollstaendig ist",
+   "spalten": [
+    "metrik",
+    "vollstaendig_bis",
+    "tage_rueckstand",
+    "geladen_am"
+   ],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.yext_lauf",
+   "koernung": "eine Zeile — der letzte Yext-Lauf",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "Der letzte Lauf des Yext-Imports (Bewertungen): wann er endete und wie viele Fehler er hatte.\nHoechstens eine Zeile; keine Zeile heisst, Yext ist noch nie gelaufen. Was danach in der\nDatenbank liegt, steht in mart.bewertung_ladestand (0146).\n\nKoernung: eine Zeile — der letzte Yext-Lauf",
+   "spalten": [
+    "beendet_am",
+    "fehler",
+    "betriebe",
+    "zeilen",
+    "aufrufe"
    ],
    "achsen": [],
    "kennzahlen": [],

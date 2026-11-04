@@ -336,6 +336,12 @@ wirkt nur in der **inneren** Abfrage. Die äußere Sicht aggregiert vorher die g
 und filtert erst danach — 111 Partitionsscans statt der drei gebrauchten. Wer einen Zeitraum
 setzt, muss ihn auf `geschaeftstag` der Basissicht legen. Ausführlich in `fehlerkatalog.md`.
 
+**6. Karten lesen nur `mart`, `manual` und `ampel`.** Der MCP-Zugang führt jede Karte als
+Bericht aus, als `mcp_leser`, und der sieht nichts anderes. Eine Karte auf `core` oder `sync` läuft
+in Metabase und scheitert im Chat — am 04.11.2026 waren es 13 (`fehlerkatalog.md`). Braucht eine
+Karte etwas aus `core`, bekommt sie eine schlanke `mart`-Sicht (reine Projektion, keine Joins: so
+bleibt das Tempo). `metabase/karten_schema.test.ts` prüft es.
+
 Neue Sichten kommen in eine **neue** Migrationsdatei. ~~`0001` bis `0006` sind angewendet und
 werden nicht mehr geändert;~~ der Stand steht in `public.schema_migration`.
 (Nachgemessen am 12.08.2026: angewendet sind ~~**58 Dateien bis einschließlich
@@ -2034,3 +2040,20 @@ Datenbank).
 - **Katalogabzug:** `mcp/test/katalog.json` ist von Hand um die 0141-Einträge ergänzt, nicht neu
   gezogen. Ein Abzug aus dem lokalen Klon hätte fremde Abweichungen der lokalen Daten
   mitgebracht. Nach dem Deploy gegen die Produktion neu ziehen.
+
+
+## Schlanke Sichten für Karten, die `core` lasen (Migration `0146`, 04.11.2026)
+
+| Sicht | Körnung | Wofür |
+|---|---|---|
+| `mart.yext_datenstand` | Yext-Metrik | Bis wann Yext eine Metrik als vollständig meldet, mit `tage_rueckstand` |
+| `mart.yext_lauf` | eine Zeile | Der letzte Yext-Lauf: Ende, Fehler, Betriebe, Zeilen, Aufrufe |
+| `mart.bewertung_alle` | Bewertung | **Alle** Bewertungen, auch ohne Text, ohne Sterne und in jedem Status — zum Zählen. `mart.bewertung_einzel` zeigt nur LIVE mit Sternen und Text, zum Lesen. Wer Anteile auf `bewertung_einzel` rechnet, zählt still zu wenig |
+| `mart.import_fehler_fall` | gescheiterter Abruf | Jeder Fehlversuch des Importers, ganze Historie — immer nach `beendet_am` filtern. Verdichtet: `mart.import_fehler` |
+| `mart.artikelverkauf_tag` | Betrieb × Geschäftstag × Artikel | Ohne Namen und Warengruppe, für Abfragen über eine Artikelliste (Artikelaktion). `mart.artikelverkauf` hängt an jede Zeile Stammdaten und ist dafür zu schwer |
+| `mart.artikel_stamm` | Artikel | Nummer und Name aus LINA |
+
+`mart.import_naechste` hat dazu am Ende die Spalte `parameter` (bei FoodNotify-Posten benennen
+`erpId`, `orderId` und `seite` den Posten). `mart.luecke_monat` meldet Betriebe aus
+`manual.betrieb_ohne_regelbetrieb` nicht mehr als „seit mehr als 8 Tagen ohne Umsatz"
+(KUZ Mainz, eine Veranstaltungshalle — Umsatz nur bei Veranstaltungen).

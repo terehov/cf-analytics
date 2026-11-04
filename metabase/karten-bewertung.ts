@@ -523,7 +523,7 @@ WITH fenster AS (
            count(*) FILTER (WHERE b.publiziert_am >= now() - interval '90 days' AND b.rating <= 2)   AS schlecht_90,
            count(*) FILTER (WHERE b.publiziert_am <  now() - interval '90 days')                     AS n_davor,
            count(*) FILTER (WHERE b.publiziert_am <  now() - interval '90 days' AND b.rating <= 2)   AS schlecht_davor
-      FROM core.bewertung b
+      FROM mart.bewertung_alle b
      WHERE b.publisher = ${GOOGLE}
        AND b.rating IS NOT NULL
        AND b.publiziert_am >= now() - interval '90 days' - interval '12 months'
@@ -782,7 +782,7 @@ SELECT ${PORTAL_NAME('b.publisher')}       AS "Portal",
        count(*)                            AS "Bewertungen",
        count(*) - count(b.rating)          AS "ohne Sterne",
        round(avg(b.rating), 2)             AS "Ø Sterne"
-  FROM core.bewertung b
+  FROM mart.bewertung_alle b
   JOIN mart.betrieb_status bs ON bs.betrieb_key = b.betrieb_key
  WHERE b.publiziert_am >= now() - interval '12 months'
    [[AND bs.konzept = {{marke}}]]
