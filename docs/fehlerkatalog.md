@@ -5492,3 +5492,20 @@ eines optionalen Blocks stand im Kommentar.
   328 Karten), nachher keine.
 * Der Feldfilter-Test nutzt eine abgeleitete Karte, weil heute keine Karte ihren Feldfilter außerhalb
   eines optionalen Blocks führt.
+
+## `letzter_login` sah aus wie „zuletzt aktiv" und war es nicht (06.11.2026)
+
+**Symptom.** In `bun run nutzer liste` stand `letzter_login` bei allen 15 genutzten Konten vor dem
+31.10.2026 (Daniel Gantenberg: 19.10.), obwohl laut `mcp.zugriff` alle bis zum 05.11. Abfragen
+gestellt hatten. Wer die Liste las, um zu entscheiden, wer den Zugang noch braucht, hätte aktive
+Konten für ruhend gehalten — und ein nie benutztes Konto (Stefan Hackl, 0 Aufrufe) nicht von einem
+benutzten unterscheiden können, sobald es sich einmal angemeldet hätte.
+
+**Ursache.** Die Spalte schreibt nur die Passwortanmeldung (`src/anmeldung/speicher.ts`). Ein
+verbundener Client frischt danach bis zu 30 Tage seinen Token auf, ohne sich anzumelden. Die
+Aktivität steht nur im Zugriffsprotokoll, und das darf `mcp_anmeldung` nicht lesen.
+
+**Was es künftig verhindert (`0148`).** `mcp.nutzer_aktivitaet` verdichtet das Protokoll je Konto
+(`zuletzt_aktiv`, Aufrufe und aktive Tage der letzten 30 Tage), ohne SQL oder Parameter. Nur diese
+Sicht ist für `mcp_anmeldung` lesbar, `mart.mcp_rechte_pruefung` wacht darüber. `nutzer liste`
+zeigt `zuletzt_aktiv` vor `letzter_login`, und der Spaltenkommentar sagt, was `letzter_login` misst.

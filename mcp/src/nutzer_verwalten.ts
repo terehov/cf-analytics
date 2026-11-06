@@ -187,13 +187,23 @@ switch (befehl) {
   }
 
   case 'liste': {
+    // `letzter_login` ist die letzte PASSWORTanmeldung, kein Aktivitaetsmass —
+    // ein verbundener Client frischt danach 30 Tage nur seinen Token auf. Wer
+    // den Zugang noch benutzt, sagt `zuletzt_aktiv` aus dem Zugriffsprotokoll
+    // (0148; am 06.11.2026 standen alle Konten mit letzter_login vor dem 31.10.,
+    // aktiv waren alle bis zum 05.11.). Leer heisst: nie benutzt.
     const zeilen = await anmeldungAbfragen(
-      `SELECT email, anzeige, stufe, aktiv, letzter_login, fehlversuche, gesperrt_bis,
-              max_verbindungen, verdraengen,
+      `SELECT n.email, n.anzeige, n.stufe, n.aktiv,
+              to_char(a.zuletzt_aktiv AT TIME ZONE 'Europe/Berlin', 'YYYY-MM-DD HH24:MI') AS zuletzt_aktiv,
+              a.aufrufe_30_tage, a.aktive_tage_30,
+              n.letzter_login, n.fehlversuche, n.gesperrt_bis,
+              n.max_verbindungen, n.verdraengen,
               (SELECT count(*)::int FROM mcp.oauth_token t
                 WHERE t.subject = n.subject AND t.widerrufen_am IS NULL AND t.laeuft_ab > now())
                 AS verbindungen
-         FROM mcp.nutzer n ORDER BY email`)
+         FROM mcp.nutzer n
+         LEFT JOIN mcp.nutzer_aktivitaet a ON a.subject = n.subject
+        ORDER BY n.email`)
     if (!zeilen.length) { console.log('Noch kein Konto angelegt.'); break }
     console.table(zeilen)
     break

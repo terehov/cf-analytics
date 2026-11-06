@@ -730,6 +730,7 @@ ChatGPT und Copilot befragbar macht.
 | `mcp.oauth_client` | registriertem Client | ChatGPT, Claude, VS Code — melden sich selbst an |
 | `mcp.oauth_code` · `mcp.oauth_token` | Code bzw. Auffrischungstoken | jeweils als Hash. `oauth_token.kette_id` (`0139`): die Verbindung, über Rotationen gleich, lebend = ein Token je Kette. `widerruf_grund` (`0140`): was wir selbst widerrufen haben (`getrennt`/`verdraengt`/`konto`), löst beim erneuten Vorlegen keine Diebstahlserkennung aus |
 | `mcp.verbindung_stand` (Sicht) | aktivem Konto | Grenze, lebende Verbindungen, Ablehnungen der letzten 30 Tage — nur für `mcp_anmeldung`, nennt Mailadressen |
+| `mcp.nutzer_aktivitaet` (Sicht, `0148`) | Konto | `zuletzt_aktiv`, Aufrufe und aktive Tage der letzten 30 Tage aus `mcp.zugriff` — nur für `mcp_anmeldung`, die das Protokoll selbst NICHT lesen darf (es führt das SQL aller Nutzer). `mcp.nutzer.letzter_login` ist die letzte Passwortanmeldung, kein Aktivitätsmaß |
 | `mcp.oauth_schluessel` | Schluessel | das RS256-Paar, mit dem Tokens signiert werden |
 | `mcp.anmeldung_protokoll` | Anmeldeversuch | gelungen wie gescheitert |
 | `mcp.zugriff` | Anfrage | Das Protokoll |

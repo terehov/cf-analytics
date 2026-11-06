@@ -102,7 +102,7 @@ bun install && bun run build && bun run start
 ### Nutzer verwalten
 
 ```bash
-bun run nutzer liste
+bun run nutzer liste                               # zuletzt_aktiv = letzter Aufruf (0148); letzter_login ist nur die Passwortanmeldung
 bun run nutzer stufe    daniel@brain.food fragen   # wirkt sofort, nicht erst beim nächsten Token
 bun run nutzer passwort daniel@brain.food          # widerruft bestehende Tokens
 bun run nutzer sperren  daniel@brain.food          # stilllegen + alle Tokens widerrufen
