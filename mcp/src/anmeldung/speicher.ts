@@ -32,17 +32,30 @@ export type Nutzer = {
   passwort_hash: string | null
   fehlversuche: number
   gesperrt_bis: string | null
+  /** Darf die Nutzung des Zugangs auswerten (0148) — sonst sieht das Konto keine anderen Nutzer. */
+  darf_nutzung: boolean
 }
+
+/**
+ * `darf_nutzung` kommt mit 0148 — und der Server startet beim Deploy VOR der
+ * Migration im Importer-Container (server.ts, setup). Haesslich, aber nur
+ * so scheitert in dieser Luecke nicht JEDE Anmeldung an einer Spalte, die es
+ * noch nicht gibt: ueber die Zeile als JSON gelesen, fehlt sie einfach, und
+ * fehlend heisst nein.
+ */
+const DARF_NUTZUNG = `coalesce((to_jsonb(n) ->> 'darf_nutzung')::boolean, false) AS darf_nutzung`
 
 export const nutzerNachEmail = async (email: string): Promise<Nutzer | null> =>
   (await anmeldungAbfragen<Nutzer>(
-    `SELECT subject, email, anzeige, stufe, aktiv, passwort_hash, fehlversuche, gesperrt_bis
-       FROM mcp.nutzer WHERE lower(email) = lower($1)`, [email]))[0] ?? null
+    `SELECT subject, email, anzeige, stufe, aktiv, passwort_hash, fehlversuche, gesperrt_bis,
+            ${DARF_NUTZUNG}
+       FROM mcp.nutzer n WHERE lower(email) = lower($1)`, [email]))[0] ?? null
 
 export const nutzerNachSubject = async (subject: string): Promise<Nutzer | null> =>
   (await anmeldungAbfragen<Nutzer>(
-    `SELECT subject, email, anzeige, stufe, aktiv, passwort_hash, fehlversuche, gesperrt_bis
-       FROM mcp.nutzer WHERE subject = $1`, [subject]))[0] ?? null
+    `SELECT subject, email, anzeige, stufe, aktiv, passwort_hash, fehlversuche, gesperrt_bis,
+            ${DARF_NUTZUNG}
+       FROM mcp.nutzer n WHERE subject = $1`, [subject]))[0] ?? null
 
 /**
  * Wie lange nach wie vielen Fehlversuchen gesperrt wird.

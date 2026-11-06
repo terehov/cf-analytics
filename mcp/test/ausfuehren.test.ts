@@ -14,12 +14,15 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { parserBereitstellen } from '../src/ast'
 import { abfrageAusfuehren, Abfragefehler, Gesperrt, probeplanen } from '../src/ausfuehren'
+import { anmeldungAbfragen } from '../src/anmeldung/db'
 import { abfragen, pool } from '../src/db'
 import { defekteSichten, gesundheitPruefen, standSetzen, unklareSichten } from '../src/gesundheit'
 import { katalogLaden } from '../src/katalog_laden'
 import type { Katalog } from '../src/katalog'
 
-const DB = process.env.MCP_DATABASE_URL
+// Seit 0148 schreibt und liest das Protokoll die Verwaltungsrolle — ohne
+// ihre Verbindung gibt es keinen Eintrag zu pruefen.
+const DB = process.env.MCP_DATABASE_URL && process.env.MCP_AUTH_DATABASE_URL
 const lauf = DB ? describe : describe.skip
 
 let katalog: Katalog
@@ -42,10 +45,12 @@ lauf('Ausfuehrung', () => {
       `SELECT count(*)::int AS n FROM mart.betrieb`, katalog, nutzer)
     expect(e.zeilen).toHaveLength(1)
     expect(e.spalten).toEqual(['n'])
-    expect(e.protokoll_id).toBeGreaterThan(0)
+    // Ein zufaelliger Beleg, keine fortlaufende Nummer: die verriete jedem
+    // Nutzer die Zahl aller Aufrufe (0148).
+    expect(e.protokoll_id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-/)
 
-    const [zeile] = await abfragen(
-      `SELECT werkzeug, gesperrt, zeilen FROM mcp.zugriff WHERE zugriff_id = $1`,
+    const [zeile] = await anmeldungAbfragen(
+      `SELECT werkzeug, gesperrt, zeilen FROM mcp.zugriff WHERE beleg = $1`,
       [e.protokoll_id])
     expect(zeile.werkzeug).toBe('abfrage_ausfuehren')
     expect(zeile.gesperrt).toBe(false)
@@ -58,14 +63,14 @@ lauf('Ausfuehrung', () => {
    * die naechsten mart-Sichten.
    */
   test('eine gesperrte Abfrage laeuft NICHT, steht aber im Protokoll', async () => {
-    const vorher = await abfragen<{ n: number }>(
+    const vorher = await anmeldungAbfragen<{ n: number }>(
       `SELECT count(*)::int AS n FROM mcp.zugriff WHERE gesperrt AND subject = 'test|1'`)
 
     await expect(abfrageAusfuehren(
       `SELECT stadt, count(*) FROM mart.betrieb GROUP BY stadt`, katalog, nutzer))
       .rejects.toBeInstanceOf(Gesperrt)
 
-    const nachher = await abfragen<{ n: number }>(
+    const nachher = await anmeldungAbfragen<{ n: number }>(
       `SELECT count(*)::int AS n FROM mcp.zugriff WHERE gesperrt AND subject = 'test|1'`)
     expect(nachher[0]!.n).toBe(vorher[0]!.n + 1)
   })
@@ -75,6 +80,23 @@ lauf('Ausfuehrung', () => {
     // fragt die Datenbank direkt. Genau darum geht es: die Rechte sind die
     // Sperre, der Pruefer ist die lesbare Meldung davor.
     await expect(abfragen(`SELECT 1 FROM core.betrieb LIMIT 1`)).rejects.toThrow(/permission denied/i)
+  })
+
+  /**
+   * Ein Nutzer sieht keine anderen Nutzer — auch nicht als Zahl (0148). Bis
+   * zum 06.11.2026 lief `SELECT anzeige, sql FROM mcp.zugriff` als freie
+   * Abfrage durch. Hier die Rolle selbst, ohne den Pruefer davor.
+   */
+  test('die Leserolle sieht weder das Protokoll noch die Nutzungssichten noch den Zaehler', async () => {
+    for (const sql of [`SELECT count(*) FROM mcp.zugriff`,
+                       `SELECT count(*) FROM mcp.nutzung_tag`,
+                       `SELECT count(*) FROM mcp.wiederholte_fragen`,
+                       `SELECT count(*) FROM mcp.anmeldung_tag`,
+                       `SELECT count(*) FROM mcp.nutzer_aktivitaet`,
+                       `SELECT currval('mcp.zugriff_zugriff_id_seq')`]) {
+      await expect(abfragen(sql)).rejects.toThrow(/permission denied/i)
+    }
+    expect(await abfragen(`SELECT * FROM mart.mcp_rechte_pruefung`)).toEqual([])
   })
 
   /**
@@ -238,7 +260,7 @@ lauf('Ausfuehrung', () => {
    *  sagen kann, WARUM eine Zahl fehlt (vorher stand dort nur 25P02). */
   test('der echte Fehler landet in mcp.zugriff', async () => {
     await abfrageAusfuehren(`SELECT auchnicht FROM mart.betrieb`, katalog, nutzer).catch(() => {})
-    const [zeile] = await abfragen<{ fehler: string }>(
+    const [zeile] = await anmeldungAbfragen<{ fehler: string }>(
       `SELECT fehler FROM mcp.zugriff
         WHERE subject = 'test|1' AND fehler IS NOT NULL
         ORDER BY zugriff_id DESC LIMIT 1`)

@@ -730,10 +730,11 @@ ChatGPT und Copilot befragbar macht.
 | `mcp.oauth_client` | registriertem Client | ChatGPT, Claude, VS Code — melden sich selbst an |
 | `mcp.oauth_code` · `mcp.oauth_token` | Code bzw. Auffrischungstoken | jeweils als Hash. `oauth_token.kette_id` (`0139`): die Verbindung, über Rotationen gleich, lebend = ein Token je Kette. `widerruf_grund` (`0140`): was wir selbst widerrufen haben (`getrennt`/`verdraengt`/`konto`), löst beim erneuten Vorlegen keine Diebstahlserkennung aus |
 | `mcp.verbindung_stand` (Sicht) | aktivem Konto | Grenze, lebende Verbindungen, Ablehnungen der letzten 30 Tage — nur für `mcp_anmeldung`, nennt Mailadressen |
-| `mcp.nutzer_aktivitaet` (Sicht, `0148`) | Konto | `zuletzt_aktiv`, Aufrufe und aktive Tage der letzten 30 Tage aus `mcp.zugriff` — nur für `mcp_anmeldung`, die das Protokoll selbst NICHT lesen darf (es führt das SQL aller Nutzer). `mcp.nutzer.letzter_login` ist die letzte Passwortanmeldung, kein Aktivitätsmaß |
+| `mcp.nutzer_aktivitaet` (Sicht, `0148`) | Konto | `zuletzt_aktiv`, Aufrufe und aktive Tage der letzten 30 Tage aus `mcp.zugriff` — nur für `mcp_anmeldung`. `mcp.nutzer.letzter_login` ist die letzte Passwortanmeldung, kein Aktivitätsmaß |
+| `mcp.nutzung_tag`, `mcp.wiederholte_fragen`, `mcp.anmeldung_tag` (Sichten) | Tag und Werkzeug / Abfrage / Tag | Bis `0148` als `mart.mcp_nutzung`, `mart.mcp_wiederholte_fragen`, `mart.mcp_anmeldung` — für jeden Nutzer lesbar. Seitdem nur für `mcp_anmeldung` |
 | `mcp.oauth_schluessel` | Schluessel | das RS256-Paar, mit dem Tokens signiert werden |
 | `mcp.anmeldung_protokoll` | Anmeldeversuch | gelungen wie gescheitert |
-| `mcp.zugriff` | Anfrage | Das Protokoll |
+| `mcp.zugriff` | Anfrage | Das Protokoll. Seit `0148` schreibt und liest es **nur** `mcp_anmeldung`; `mcp_leser` hat kein Recht darauf (vorher sah jeder Nutzer die Abfragen aller). `beleg` (uuid) ist, was der Client als `protokoll_id` bekommt — eine fortlaufende Nummer verriete die Zahl aller Aufrufe. Wer die Nutzung sehen darf: `mcp.nutzer.darf_nutzung`, Werkzeug `nutzung_auswerten` |
 | `mcp.einrichtung_offen` | offener Punkt | Was die Migration nicht selbst tun konnte |
 
 ### Die Körnung ist das wichtigste Feld

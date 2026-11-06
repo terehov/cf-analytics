@@ -16,6 +16,13 @@
  * Deshalb: eigene Rolle, eigene Verbindung. `mcp_anmeldung` sieht die
  * Anmeldetabellen und sonst nichts; `mcp_leser` sieht sie nicht. Postgres
  * setzt das durch, nicht dieser Code (Migration 0104).
+ *
+ * SEIT 0148 AUCH DAS ZUGRIFFSPROTOKOLL. Dieselbe Begruendung, eine Stufe
+ * frueher: unter `mcp_leser` war `SELECT anzeige, sql FROM mcp.zugriff` fuer
+ * jeden Nutzer eine gueltige Abfrage — Namen, Uhrzeiten und Fragen aller
+ * Kollegen. Das Protokoll schreibt und liest jetzt diese Rolle; sie fuehrt
+ * nie Nutzer-SQL aus. Damit ist sie die Verwaltungsrolle, nicht mehr nur
+ * die der Anmeldung.
  */
 import pg from 'pg'
 
@@ -23,9 +30,11 @@ const url = process.env.MCP_AUTH_DATABASE_URL
 
 export const anmeldungPool = new pg.Pool({
   connectionString: url,
-  // Drei Nutzer, eine Anmeldung alle paar Stunden. Zwei Verbindungen sind
-  // hier keine Sparsamkeit, sondern die ehrliche Groesse.
-  max: 2,
+  // Bis 0148 zwei: drei Nutzer, eine Anmeldung alle paar Stunden. Seitdem
+  // laeuft JEDER Werkzeugaufruf zweimal hierueber (Konto lesen, Protokoll
+  // schreiben), bei 16 Konten und bis zu 25 Aufrufen in einer Minute
+  // (docs/architektur.md). Vier halten das ohne Warteschlange.
+  max: 4,
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 10_000,
   application_name: 'mcp-anmeldung',

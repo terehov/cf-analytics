@@ -80,6 +80,15 @@ export const KEINE_SICHTLAGE: Sichtlage = { defekt: new Map(), unklar: new Map()
 /** Die Schemata, die der Server ueberhaupt anfassen darf. */
 export const ERLAUBTE_SCHEMATA = new Set(['mart', 'manual', 'ampel', 'mcp'])
 
+/**
+ * Was in `mcp` fuer Abfragen lesbar ist: der Katalog, sonst nichts — genau
+ * die Objekte, auf die 0110 `mcp_leser` SELECT gibt, ohne mcp.zugriff (0148).
+ */
+export const MCP_KATALOG = new Set([
+  'mcp.sicht', 'mcp.achse', 'mcp.sicht_achse', 'mcp.kennzahl', 'mcp.fallstrick',
+  'mcp.sicht_katalog', 'mcp.koernung_fehlend', 'mcp.einrichtung_offen', 'mcp.sicht_gesundheit',
+])
+
 // ---------------------------------------------------------------------
 // Die Regelarten aus mcp.fallstrick
 //
@@ -363,25 +372,29 @@ export function pruefen(
   }
 
   /**
-   * Die Anmeldetabellen sind auch innerhalb von `mcp` tabu.
+   * In `mcp` ist nur der Katalog lesbar — alles andere gehoert der Verwaltung.
    *
-   * Tragend ist der Rechteentzug in Migration 0104 — `mcp_leser` bekommt auf
-   * diese Tabellen gar kein SELECT, Postgres antwortet mit „permission
-   * denied". Diese Regel hier ersetzt das nicht, sie erklaert es: eine
-   * verstaendliche Meldung ist besser als ein Rechtefehler, den das Modell
-   * fuer einen Tippfehler haelt und dreimal umformuliert.
+   * Tragend sind die Rechte (0104 fuer die Anmeldung, 0148 fuer das
+   * Zugriffsprotokoll und die Nutzungssichten): `mcp_leser` bekommt darauf
+   * kein SELECT, Postgres antwortet mit „permission denied". Diese Regel
+   * ersetzt das nicht, sie erklaert es — eine verstaendliche Meldung ist
+   * besser als ein Rechtefehler, den das Modell fuer einen Tippfehler haelt
+   * und dreimal umformuliert.
+   *
+   * EINE POSITIVLISTE, KEINE SPERRLISTE. Bis zum 06.11.2026 stand hier eine
+   * Liste der Anmeldetabellen, und mcp.zugriff war nicht darauf: jeder Nutzer
+   * konnte das Protokoll aller Nutzer lesen (docs/fehlerkatalog.md). Eine
+   * neue Tabelle in `mcp` ist ab jetzt gesperrt, bis jemand sie hier
+   * freigibt — dieselbe Reihenfolge wie bei den Rechten.
    */
-  const ANMELDETABELLEN = new Set([
-    'mcp.nutzer', 'mcp.oauth_client', 'mcp.oauth_code', 'mcp.oauth_token',
-    'mcp.oauth_schluessel', 'mcp.anmeldung_protokoll',
-  ])
   for (const s of z.sichten) {
-    if (ANMELDETABELLEN.has(s)) {
-      sperre('anmeldedaten',
-        `${s} gehoert zur Anmeldung und ist fuer Abfragen gesperrt — dort liegen Passworthashes ` +
-        `und der Signierschluessel. Die Leserolle hat darauf ohnehin kein Recht; diese Meldung ` +
+    if (s.startsWith('mcp.') && !MCP_KATALOG.has(s)) {
+      sperre('verwaltungsdaten',
+        `${s} gehoert zur Verwaltung des Zugangs und ist fuer Abfragen gesperrt — dort liegen ` +
+        `Anmeldedaten und das Zugriffsprotokoll. Wer den Zugang wie nutzt, ist keine Frage, die ` +
+        `dieser Zugang beantwortet. Die Leserolle hat darauf ohnehin kein Recht; diese Meldung ` +
         `sagt nur, warum.`,
-        'Wer wissen will, wer den Zugang benutzt, nimmt mart.mcp_nutzung oder mart.mcp_anmeldung.')
+        `Lesbar in mcp ist nur der Katalog: ${[...MCP_KATALOG].join(', ')}.`)
     }
   }
 

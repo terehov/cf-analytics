@@ -372,7 +372,8 @@ beantwortet werden oder eine Sperre/Warnung tragen:
 `mcp.zugriff(id, zeitpunkt, nutzer, client, werkzeug, parameter jsonb, sql, hinweise
 jsonb, gesperrt bool, zeilen, dauer_ms, fehler)`. Eine Zahl, die im Round Table landet,
 muss rekonstruierbar sein — die Chat-Antwort ist kein Beleg, die Zeile hier ist einer.
-Und: ein Dienst ohne Zulauf ist ein Fehler (Regel 10) — `mart.mcp_nutzung`, eine
+Und: ein Dienst ohne Zulauf ist ein Fehler (Regel 10) — ~~`mart.mcp_nutzung`~~ `mcp.nutzung_tag`
+(seit `0148` nur für die Verwaltungsrolle, siehe `entscheidungen.md` 06.11.2026), eine
 Prüfzeile in `/status`. Wiederholte Fragen und häufige Sperren sind die Anforderungsliste
 für die nächsten `mart`-Sichten.
 

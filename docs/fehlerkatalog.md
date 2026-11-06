@@ -5493,6 +5493,45 @@ eines optionalen Blocks stand im Kommentar.
 * Der Feldfilter-Test nutzt eine abgeleitete Karte, weil heute keine Karte ihren Feldfilter außerhalb
   eines optionalen Blocks führt.
 
+## Jeder MCP-Nutzer konnte das Zugriffsprotokoll aller Nutzer lesen (06.11.2026)
+
+**Symptom.** Gefunden bei der Frage, ob Nutzer über ihren Chat die Nutzungsauswertung sehen
+können: Ja. `mcp_leser`, die Rolle, unter der das SQL der Nutzer läuft, hatte SELECT auf
+`mcp.zugriff`, und der Prüfer ließ das Schema `mcp` zu. Alle 16 Konten stehen auf `fragen`. Ein
+`SELECT anzeige, zeitpunkt, sql FROM mcp.zugriff` lieferte jedem die Namen, Uhrzeiten und Abfragen
+aller Kollegen. Ebenfalls für jeden lesbar: `mart.mcp_nutzung` (Aufrufe und Zahl der Nutzer je
+Tag), `mart.mcp_wiederholte_fragen` (Beispiel-SQL anderer), `mart.mcp_anmeldung`
+(Anmeldeversuche). Benutzt hat das laut Protokoll bis dahin niemand außer Eugene (acht Abfragen,
+zuletzt 26.10.).
+
+**Ursache.** `0105` hat die Rechte der Leserolle in `mcp` „namentlich vergeben" und dabei
+`mcp.zugriff` mit auf die SELECT-Liste gesetzt, `0110` hat die Liste wiederholt. Der Plan sah nur
+das Schreiben vor (`plan-skybridge.md`: „das Einzige, was geschrieben wird"), der Server selbst las
+nie — nur `RETURNING zugriff_id` brauchte eine Spalte. Der Prüfer führte eine **Sperrliste** der
+Anmeldetabellen, und `mcp.zugriff` stand nicht darauf. `mart.mcp_rechte_pruefung` erwartete für
+`mcp.zugriff` ausdrücklich `nur_leser`, prüfte also das Falsche. Und eine fortlaufende
+`protokoll_id` ging in jeder Antwort an den Client: auch die verrät die Zahl aller Aufrufe.
+
+**Was es künftig verhindert (`0148`).**
+* Das Protokoll gehört der Verwaltungsrolle `mcp_anmeldung`: sie schreibt es (`protokollieren()`)
+  und liest es. `mcp_leser` hat **kein** Recht mehr darauf, auch nicht auf die Sequenz. Ein
+  INSERT-Recht hätte nicht gereicht: `RETURNING` braucht SELECT, und mit USAGE auf der Sequenz
+  liefert `currval()` auf einer geteilten Poolverbindung die Nummer des letzten fremden Eintrags.
+* Der Client bekommt einen zufälligen `beleg` statt `zugriff_id`.
+* Die drei `mart.mcp_*`-Sichten liegen jetzt in `mcp` (`mcp.nutzung_tag`,
+  `mcp.wiederholte_fragen`, `mcp.anmeldung_tag`). In `mart` hätte sie jedes künftige
+  `GRANT SELECT ON ALL TABLES IN SCHEMA mart` wieder geöffnet, und `mcp.achsen_ableiten()` hätte
+  sie wieder in den Katalog getragen.
+* Der Prüfer führt für `mcp` eine **Positivliste** (`MCP_KATALOG` in `mcp/src/pruefen.ts`): eine
+  neue Tabelle dort ist gesperrt, bis jemand sie freigibt.
+* `mart.mcp_rechte_pruefung` prüft alle betroffenen Objekte mit `has_any_column_privilege` (ein
+  Spaltenrecht reicht für `count(*)`) und die Sequenz. `/status` des MCP-Servers steht auf 503,
+  sobald dort eine Zeile steht.
+* `mcp/test/nutzung.test.ts` schlägt fehl, wenn eine Migration ab `0148` der Leserolle eines der
+  Objekte wieder gibt — der Weg, auf dem `0110` den Fehler wiederholt hat.
+* Wer die Nutzung sehen darf, steht in `mcp.nutzer.darf_nutzung` (Eugene und Daniel); nur diese
+  Konten bekommen das Werkzeug `nutzung_auswerten`.
+
 ## `letzter_login` sah aus wie „zuletzt aktiv" und war es nicht (06.11.2026)
 
 **Symptom.** In `bun run nutzer liste` stand `letzter_login` bei allen 15 genutzten Konten vor dem
@@ -5503,9 +5542,9 @@ benutzten unterscheiden können, sobald es sich einmal angemeldet hätte.
 
 **Ursache.** Die Spalte schreibt nur die Passwortanmeldung (`src/anmeldung/speicher.ts`). Ein
 verbundener Client frischt danach bis zu 30 Tage seinen Token auf, ohne sich anzumelden. Die
-Aktivität steht nur im Zugriffsprotokoll, und das darf `mcp_anmeldung` nicht lesen.
+Aktivität steht nur im Zugriffsprotokoll.
 
 **Was es künftig verhindert (`0148`).** `mcp.nutzer_aktivitaet` verdichtet das Protokoll je Konto
-(`zuletzt_aktiv`, Aufrufe und aktive Tage der letzten 30 Tage), ohne SQL oder Parameter. Nur diese
-Sicht ist für `mcp_anmeldung` lesbar, `mart.mcp_rechte_pruefung` wacht darüber. `nutzer liste`
-zeigt `zuletzt_aktiv` vor `letzter_login`, und der Spaltenkommentar sagt, was `letzter_login` misst.
+(`zuletzt_aktiv`, Aufrufe und aktive Tage der letzten 30 Tage), lesbar nur für `mcp_anmeldung`.
+`nutzer liste` zeigt `zuletzt_aktiv` vor `letzter_login`, und der Spaltenkommentar sagt, was
+`letzter_login` misst.

@@ -29,6 +29,8 @@ export type Angemeldet = {
   anzeige: string | null
   stufe: Stufe
   client: string | null
+  /** Darf die Nutzung des Zugangs auswerten (0148, `mcp.nutzer.darf_nutzung`). */
+  darfNutzung: boolean
 }
 
 /** Mit Namen, damit der Eintrag in mcp.zugriff "NichtErlaubt: …" heisst und nicht "Error: …". */
@@ -74,6 +76,7 @@ export async function anmelden(extra: any): Promise<Angemeldet> {
     anzeige: nutzer.anzeige ?? anzeigeAus(extra),
     stufe: nutzer.stufe,
     client: extra?.http?.authInfo?.clientId ?? null,
+    darfNutzung: nutzer.darf_nutzung === true,
   }
 }
 
@@ -84,5 +87,22 @@ export function fragenDuerfen(n: Angemeldet): void {
       'Freies SQL ist fuer dieses Konto nicht freigegeben (Stufe "lesen"). Die fertigen ' +
       'Berichte stehen zur Verfuegung — berichte_suchen findet sie. Wer freies SQL braucht, ' +
       'bekommt in mcp.nutzer die Stufe "fragen".')
+  }
+}
+
+/**
+ * Die Nutzungsauswertung braucht `darf_nutzung` (0148).
+ *
+ * Entschieden 06.11.2026 (Eugene): ein Nutzer sieht keine anderen Nutzer und
+ * kann die Nutzung auch nicht als Zahl abfragen. Ausnahmen sind Eugene und
+ * Daniel. Das Werkzeug ist fuer alle anderen ausgeblendet (server.ts,
+ * tools/list) — die Pruefung HIER ist die Sperre, das Ausblenden nur die
+ * Hoeflichkeit: ein Client kann eine alte Werkzeugliste im Speicher halten.
+ */
+export function nutzungDuerfen(n: Angemeldet): void {
+  if (!n.darfNutzung) {
+    throw new NichtErlaubt(
+      'Die Nutzungsauswertung ist fuer dieses Konto nicht freigegeben. Wer den Zugang wie nutzt, ' +
+      'sehen nur die Verantwortlichen des Zugangs.')
   }
 }

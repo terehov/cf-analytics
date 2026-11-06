@@ -115,6 +115,24 @@ switch (befehl) {
     break
   }
 
+  // Wer die Nutzung aller sehen darf (0148). Entschieden 06.11.2026: Eugene
+  // und Daniel. Wirkt beim naechsten Aufruf; die Werkzeugliste eines schon
+  // verbundenen Clients aktualisiert sich erst, wenn er sie neu holt.
+  case 'nutzung': {
+    const [email, schalter] = argumente
+    if (!email || (schalter !== 'an' && schalter !== 'aus')) {
+      console.error('bun run nutzer nutzung <email> <an|aus>'); process.exit(1)
+    }
+    const r = await anmeldungAbfragen(
+      `UPDATE mcp.nutzer SET darf_nutzung = $2 WHERE lower(email) = lower($1) RETURNING subject`,
+      [email, schalter === 'an'])
+    if (!r.length) { console.error('Kein Konto mit dieser Adresse.'); process.exit(1) }
+    console.log(schalter === 'an'
+      ? 'Nutzungsauswertung freigegeben — das Konto sieht ab jetzt, wer den Zugang wie nutzt.'
+      : 'Nutzungsauswertung entzogen — wirkt ab dem naechsten Aufruf.')
+    break
+  }
+
   case 'sperren': {
     const [email] = argumente
     if (!email) { console.error('bun run nutzer sperren <email>'); process.exit(1) }
@@ -197,7 +215,7 @@ switch (befehl) {
               to_char(a.zuletzt_aktiv AT TIME ZONE 'Europe/Berlin', 'YYYY-MM-DD HH24:MI') AS zuletzt_aktiv,
               a.aufrufe_30_tage, a.aktive_tage_30,
               n.letzter_login, n.fehlversuche, n.gesperrt_bis,
-              n.max_verbindungen, n.verdraengen,
+              n.max_verbindungen, n.verdraengen, n.darf_nutzung,
               (SELECT count(*)::int FROM mcp.oauth_token t
                 WHERE t.subject = n.subject AND t.widerrufen_am IS NULL AND t.laeuft_ab > now())
                 AS verbindungen
@@ -220,10 +238,15 @@ switch (befehl) {
   bun run nutzer limit        <email> <anzahl|aus> [--verdraengen|--ablehnen]
   bun run nutzer verbindungen <email>
   bun run nutzer trennen      <email> <kette|alle>
+  bun run nutzer nutzung      <email> <an|aus>
 
 Die Verbindungsgrenze lehnt neue Anmeldungen ab, sobald sie erreicht ist;
 frei wird ein Platz nur durch Ablauf oder trennen. Mit --verdraengen gewinnt
 statt dessen die neue Anmeldung, und die aelteste Verbindung wird getrennt.
+
+Mit nutzung an sieht ein Konto im Chat, wer den Zugang wie nutzt (Werkzeug
+nutzung_auswerten, mit dem SQL der anderen). Alle anderen sehen keine anderen
+Nutzer und keine Nutzungszahlen.
 
 Das Passwort wird abgefragt, nie als Argument uebergeben.`)
 }

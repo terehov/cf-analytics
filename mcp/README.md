@@ -112,6 +112,9 @@ bun run nutzer limit        daniel@brain.food 1     # oder: aus
 bun run nutzer limit        daniel@brain.food 1 --verdraengen   # an der Grenze älteste trennen (0140); --ablehnen zurück
 bun run nutzer verbindungen daniel@brain.food       # lebende Verbindungen mit Kennung
 bun run nutzer trennen      daniel@brain.food 3f2a9c1e   # oder: alle — wirkt ab dem nächsten Aufruf
+
+# Wer die Nutzung aller sehen darf (0148) — Werkzeug nutzung_auswerten. Gesetzt für Eugene und Daniel.
+bun run nutzer nutzung      daniel@brain.food an    # oder: aus
 ```
 
 Wer wegen der Grenze abgewiesen wurde: `SELECT * FROM mcp.verbindung_stand WHERE abgelehnt_30_tage > 0`

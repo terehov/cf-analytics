@@ -4629,44 +4629,6 @@
    "fallstricke": []
   },
   {
-   "sicht": "mart.mcp_anmeldung",
-   "koernung": null,
-   "thema": null,
-   "summen_erlaubt": null,
-   "kommentar": "Anmeldeversuche am MCP-Zugang je Tag. Eine Haeufung gescheiterter Versuche auf mehreren\nKonten ist das Muster, das man sehen will, bevor es jemand anders sieht.\n\nKoernung: eine Zeile je Tag.",
-   "spalten": [
-    "tag",
-    "versuche",
-    "gelungen",
-    "gescheitert",
-    "konten_mit_fehlversuch"
-   ],
-   "achsen": [],
-   "kennzahlen": [],
-   "fallstricke": []
-  },
-  {
-   "sicht": "mart.mcp_nutzung",
-   "koernung": "Tag und Werkzeug des MCP-Zugangs",
-   "thema": "import",
-   "summen_erlaubt": false,
-   "kommentar": "Nutzung des MCP-Zugangs je Tag und Werkzeug. Die Spalte gesperrt ist die\ninteressanteste: sie zaehlt, wie oft eine Falle zugeschnappt haette. Bleibt die Sicht\nleer, benutzt niemand den Zugang — das ist ein Befund, kein Normalzustand (Regel 10).\n\nKoernung: eine Zeile je Tag und Werkzeug.",
-   "spalten": [
-    "tag",
-    "werkzeug",
-    "aufrufe",
-    "nutzer",
-    "gesperrt",
-    "fehler",
-    "dauer_ms_schnitt",
-    "dauer_ms_max",
-    "zeilen"
-   ],
-   "achsen": [],
-   "kennzahlen": [],
-   "fallstricke": []
-  },
-  {
    "sicht": "mart.mcp_rechte_pruefung",
    "koernung": null,
    "thema": null,
@@ -4677,24 +4639,6 @@
     "leser_darf",
     "anmeldung_darf",
     "erwartung"
-   ],
-   "achsen": [],
-   "kennzahlen": [],
-   "fallstricke": []
-  },
-  {
-   "sicht": "mart.mcp_wiederholte_fragen",
-   "koernung": "normalisierter freier Abfrage",
-   "thema": "import",
-   "summen_erlaubt": false,
-   "kommentar": "Freie Abfragen, die mehr als einmal gestellt wurden — die Anforderungsliste fuer die\nnaechsten mart-Sichten und Karten. Was sich wiederholt, gehoert hinterlegt, damit es\nnicht jedes Mal neu erfunden (und jedes Mal neu falsch) wird.\n\nKoernung: eine Zeile je normalisierter Abfrage.",
-   "spalten": [
-    "abfrage_signatur",
-    "beispiel",
-    "mal",
-    "nutzer",
-    "zuletzt",
-    "je_gesperrt"
    ],
    "achsen": [],
    "kennzahlen": [],

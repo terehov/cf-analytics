@@ -4578,3 +4578,30 @@ die sie sonst treffen.
 - **Preis:** angehobene Tage tragen keine Rechnungen, Gäste und Bons mehr (`quelle = 'kassenblatt'`,
   wie bei fremden Kassen). Holt der Konzernlader einen solchen Tag später neu, gilt wieder LINAs
   Zahl, und der Monat wird mit der nächsten Monatsübersicht erneut ergänzt.
+
+## 06.11.2026 — Die Nutzung des MCP-Zugangs sehen nur Eugene und Daniel (`0148`)
+
+- **Entscheidung (Eugene):** Ein Nutzer sieht keine anderen Nutzer und kann die Nutzung auch nicht
+  abfragen — weder Namen noch Zahlen. Eugene und Daniel bekommen eine Auswertung über das Werkzeug
+  `nutzung_auswerten`, freigeschaltet über `mcp.nutzer.darf_nutzung`.
+- **Anlass:** Bis dahin konnte jeder das ganze Zugriffsprotokoll lesen (`fehlerkatalog.md`).
+- **Warum ein Werkzeug und keine Ausnahme in der Leserolle:** Postgres kennt Rollen, keine Konten.
+  Alle Nutzer teilen sich `mcp_leser`; ein Leserecht für zwei wäre eines für alle. Das Werkzeug
+  läuft deshalb mit festen Abfragen über `mcp_anmeldung`, die Werte des Modells werden gebunden,
+  nie SQL.
+- **Warum `mcp_anmeldung` das Protokoll bekommt:** Sie führt nie Nutzereingaben als SQL aus und hält
+  ohnehin Passworthashes und den Signierschlüssel. Die Grenze, die zählt, verläuft zwischen der Rolle
+  mit Nutzer-SQL und allen anderen. Eine dritte Rolle hätte eine dritte Verbindung und ein drittes
+  Passwort gekostet, ohne diese Grenze zu verschieben.
+- **Was Eugene und Daniel sehen:** je Konto, Verlauf, Werkzeuge, Tageszeit, Fehler — und die
+  einzelnen Aufrufe eines Kontos **mit ihrem SQL**. Das ist mehr als eine Zahl: es zeigt, was jemand
+  gefragt hat. Aufgenommen, weil genau das die Frage beantwortet, warum eine Chat-Antwort von einer
+  Auswertung abweicht (16.09.2026). Wer das nicht will, nimmt die Ansicht `aufrufe` aus
+  `mcp/src/nutzung.ts`.
+- **Ausgeblendet, nicht nur gesperrt:** für Konten ohne Freigabe fehlt das Werkzeug in der
+  Werkzeugliste. Die Sperre ist die Prüfung im Werkzeug; das Ausblenden hält die anderen bei zehn
+  Werkzeugen und verhindert, dass ein Modell anbietet, was es nicht darf.
+- **Bewusst offen:** Die öffentlichen Statusendpunkte nennen weiter Summen ohne Namen — der MCP-Server
+  die Aufrufe der letzten sieben Tage, der Importer zusätzlich die Zahl der Nutzer
+  (`src/status.ts`). Sie stehen für den Wechsel auf die kChat-Meldung an (04.11.2026).
+

@@ -14,10 +14,13 @@
 import { afterAll, describe, expect, test } from 'bun:test'
 import { getToolError } from 'skybridge/server'
 import { alsProtokolliert, Gesperrt, istProtokolliert } from '../src/ausfuehren'
-import { abfragen, pool } from '../src/db'
+import { anmeldungAbfragen } from '../src/anmeldung/db'
+import { pool } from '../src/db'
 import { gescheiterteAufrufeProtokollieren } from '../src/zugriff_protokoll'
 
-const DB = process.env.MCP_DATABASE_URL
+// Seit 0148 schreibt und liest das Protokoll die Verwaltungsrolle — ohne
+// ihre Verbindung gibt es keinen Eintrag zu pruefen.
+const DB = process.env.MCP_DATABASE_URL && process.env.MCP_AUTH_DATABASE_URL
 const lauf = DB ? describe : describe.skip
 
 const CLIENT = 'bun-test-middleware'
@@ -34,7 +37,7 @@ const scheiterndMit = (extra: any, fehler: unknown, antwort: unknown = { isError
   async () => { extra[TOOL_ERROR] = fehler; return antwort }
 
 const anzahl = async (where: string, werte: unknown[] = []) =>
-  (await abfragen<{ n: number }>(`SELECT count(*)::int AS n FROM mcp.zugriff WHERE ${where}`, werte))[0]!.n
+  (await anmeldungAbfragen<{ n: number }>(`SELECT count(*)::int AS n FROM mcp.zugriff WHERE ${where}`, werte))[0]!.n
 
 const sperre = () => new Gesperrt({
   erlaubt: false, sichten: ['mart.betrieb'], koernung: [],
@@ -82,7 +85,7 @@ lauf('Middleware fuer gescheiterte Aufrufe', () => {
     expect(getToolError(extra)).toBe(fehler)
     expect(ergebnis).toBe(antwort)
 
-    const [zeile] = await abfragen(
+    const [zeile] = await anmeldungAbfragen(
       `SELECT subject, anzeige, client, werkzeug, parameter, fehler, gesperrt, sql, dauer_ms
          FROM mcp.zugriff WHERE client = $1 ORDER BY zugriff_id DESC LIMIT 1`, [CLIENT])
     expect(zeile.werkzeug).toBe('datenstand')
@@ -131,7 +134,7 @@ lauf('Middleware fuer gescheiterte Aufrufe', () => {
       anfrage('test_ohne_anmeldung'), extra,
       scheiterndMit(extra, new Error('Keine Anmeldung erkannt.')))
     expect(await anzahl(wo)).toBe(vorher + 1)
-    const [zeile] = await abfragen(
+    const [zeile] = await anmeldungAbfragen(
       `SELECT fehler, parameter FROM mcp.zugriff WHERE ${wo} ORDER BY zugriff_id DESC LIMIT 1`)
     expect(zeile.fehler).toBe('Error: Keine Anmeldung erkannt.')
     expect(zeile.parameter).toBeNull()
@@ -141,7 +144,7 @@ lauf('Middleware fuer gescheiterte Aufrufe', () => {
     const extra = extraMit({ sub: 'test|middleware' })
     await gescheiterteAufrufeProtokollieren(
       anfrage('sichten_suchen', { stichwort: 'x' }), extra, scheiterndMit(extra, 'nur ein Text'))
-    const [zeile] = await abfragen(
+    const [zeile] = await anmeldungAbfragen(
       `SELECT fehler, werkzeug FROM mcp.zugriff WHERE client = $1 ORDER BY zugriff_id DESC LIMIT 1`, [CLIENT])
     expect(zeile.werkzeug).toBe('sichten_suchen')
     expect(zeile.fehler).toBe('nur ein Text')

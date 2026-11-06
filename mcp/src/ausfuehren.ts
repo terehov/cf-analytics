@@ -21,6 +21,7 @@
  *      kein Normalzustand.
  */
 import type pg from 'pg'
+import { anmeldungAbfragen } from './anmeldung/db'
 import { pool } from './db'
 import type { Katalog } from './katalog'
 import { nachpruefen, sichtlage } from './gesundheit'
@@ -65,7 +66,8 @@ export type Ergebnis = {
   hinweise: Befund[]
   datenstand: Datenstand | null
   dauer_ms: number
-  protokoll_id: number | null
+  /** Der Beleg in mcp.zugriff (0148) — zufaellig, damit er nichts ueber die Zahl der Aufrufe verraet. */
+  protokoll_id: string | null
   /** Alles ueber ZEILEN_FUER_MODELL hinaus — nur fuer die Ansicht. */
   weitere: Record<string, unknown>[]
   /** Je Spalte: Rolle, Einheit, Wertevielfalt — damit das Modell die Form waehlen kann. */
@@ -125,7 +127,7 @@ export class Abfragefehler extends Error {
  * gescheiterten Werkzeugaufruf ein, der sonst keinen Eintrag bekaeme. Der
  * Abfrageweg hier schreibt seine Eintraege aber selbst — mit SQL, Sichten und
  * Befunden, die die Middleware nicht mehr sieht — und muss das kenntlich
- * machen, sonst stuende jede Sperre zweimal im Protokoll und mart.mcp_nutzung
+ * machen, sonst stuende jede Sperre zweimal im Protokoll und mcp.nutzung_tag
  * zaehlte sie doppelt. Eine Gesperrt ist immer protokolliert (beide Stellen,
  * die sie werfen, schreiben vorher); alles andere wird beim Werfen markiert.
  */
@@ -286,17 +288,24 @@ async function ladestandHolen(sichten: string[]): Promise<Befund[]> {
 }
 
 /**
- * Ins Protokoll schreiben.
+ * Ins Protokoll schreiben — ueber die Verwaltungsrolle, nicht ueber `mcp_leser`.
  *
- * WARUM HIER EINE SCHREIBENDE TRANSAKTION AUSDRUECKLICH ANGEFORDERT WIRD.
- * Die Rolle `mcp_leser` traegt `default_transaction_read_only = on`, damit
- * der Abfrageweg unter keinen Umstaenden schreibt. Das gilt auch fuer
- * diesen INSERT — deshalb wird die eine Transaktion, die schreiben DARF,
- * ausdruecklich umgestellt. Gefaehrlich ist das nicht: die Rolle hat
- * ueberhaupt nur auf mcp.zugriff ein INSERT-Recht, auf alles andere in
- * mart, manual und ampel nur SELECT. Die Rechte sind die Sperre, das
- * Lesezeichen ist der zweite Riegel — und der wird genau hier und nirgends
- * sonst gehoben.
+ * SEIT 0148 (06.11.2026). Vorher schrieb die Leserolle selbst, und dafuer
+ * hatte sie Rechte auf mcp.zugriff, die jedem Nutzer das Protokoll ALLER
+ * Nutzer zeigten: `SELECT anzeige, sql FROM mcp.zugriff` war eine gueltige
+ * freie Abfrage. Ein reines INSERT-Recht haette nicht gereicht — `RETURNING`
+ * braucht SELECT, und mit USAGE auf der Sequenz liefert `currval()` auf einer
+ * geteilten Poolverbindung die Nummer des letzten Eintrags, also die Zahl
+ * aller Aufrufe. Jetzt hat `mcp_leser` auf das Protokoll gar kein Recht mehr.
+ *
+ * Der Client bekommt den zufaelligen `beleg`, nicht `zugriff_id`: auch eine
+ * fortlaufende Nummer ist eine Nutzungsauskunft.
+ *
+ * DER ALTE WEG BLEIBT ALS RUECKFALL FUER DIE DEPLOY-LUECKE. Der Server
+ * startet vor der Migration im Importer-Container (server.ts, setup); bis
+ * 0148 laeuft, darf `mcp_anmeldung` nicht schreiben, `mcp_leser` noch. Nach
+ * der Migration scheitert der Rueckfall an den Rechten — dann ist der erste
+ * Fehler der echte, und er wird gemeldet.
  *
  * Scheitert das Protokoll, scheitert die Antwort NICHT: eine Auswertung
  * wegen eines fehlgeschlagenen Protokolleintrags zu verweigern waere die
@@ -307,28 +316,44 @@ async function protokollieren(e: {
   nutzer: Nutzer; werkzeug: string; parameter?: unknown; sql?: string | null
   sichten?: string[]; hinweise?: Befund[]; gesperrt?: boolean
   zeilen?: number | null; dauer_ms?: number | null; fehler?: string | null
-}): Promise<number | null> {
-  const c = await pool.connect()
+}): Promise<string | null> {
+  const werte = [e.nutzer.subject, e.nutzer.anzeige, e.nutzer.client, e.werkzeug,
+    e.parameter ? JSON.stringify(e.parameter) : null, e.sql ?? null,
+    e.sichten ?? null, e.hinweise ? JSON.stringify(e.hinweise) : null,
+    e.gesperrt ?? false, e.zeilen ?? null, e.dauer_ms ?? null,
+    e.fehler ? e.fehler.slice(0, 2000) : null]
+  const einfuegen =
+    `INSERT INTO mcp.zugriff (subject, anzeige, client, werkzeug, parameter, sql,
+                              sichten, hinweise, gesperrt, zeilen, dauer_ms, fehler)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`
   try {
-    await c.query('BEGIN')
-    await c.query('SET TRANSACTION READ WRITE')
-    const r = await c.query(
-      `INSERT INTO mcp.zugriff (subject, anzeige, client, werkzeug, parameter, sql,
-                                sichten, hinweise, gesperrt, zeilen, dauer_ms, fehler)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING zugriff_id`,
-      [e.nutzer.subject, e.nutzer.anzeige, e.nutzer.client, e.werkzeug,
-       e.parameter ? JSON.stringify(e.parameter) : null, e.sql ?? null,
-       e.sichten ?? null, e.hinweise ? JSON.stringify(e.hinweise) : null,
-       e.gesperrt ?? false, e.zeilen ?? null, e.dauer_ms ?? null,
-       e.fehler ? e.fehler.slice(0, 2000) : null])
-    await c.query('COMMIT')
-    return Number((r.rows[0] as any).zugriff_id)
+    const [zeile] = await anmeldungAbfragen<{ beleg: string }>(`${einfuegen} RETURNING beleg`, werte)
+    return zeile?.beleg ?? null
   } catch (err) {
-    await c.query('ROLLBACK').catch(() => {})
+    if (await vorMigrationSchreiben(einfuegen, werte)) return null
     console.error(JSON.stringify({ t: new Date().toISOString(), stufe: 'error',
       msg: 'Protokolleintrag fehlgeschlagen — mcp.zugriff hat eine Luecke',
       werkzeug: e.werkzeug, fehler: String((err as Error)?.message ?? err).slice(0, 300) }))
     return null
+  }
+}
+
+/**
+ * Der Rueckfall von oben: der Weg vor 0148, ohne RETURNING. `mcp_leser`
+ * traegt `default_transaction_read_only = on`, deshalb die ausdrueckliche
+ * schreibende Transaktion.
+ */
+async function vorMigrationSchreiben(sql: string, werte: unknown[]): Promise<boolean> {
+  const c = await pool.connect()
+  try {
+    await c.query('BEGIN')
+    await c.query('SET TRANSACTION READ WRITE')
+    await c.query(sql, werte)
+    await c.query('COMMIT')
+    return true
+  } catch {
+    await c.query('ROLLBACK').catch(() => {})
+    return false
   } finally {
     c.release()
   }

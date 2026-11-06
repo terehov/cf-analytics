@@ -10,6 +10,10 @@
  * messbar ab etwa 50. Die 285 Karten sind deshalb ein Werkzeug mit 285
  * Schluesseln, nicht 285 Werkzeuge.
  *
+ * Ein elftes, `nutzung_auswerten`, sehen seit 0148 nur Konten mit
+ * `darf_nutzung` (Eugene und Daniel) — fuer alle anderen blendet es
+ * `nutzungAusblenden` aus der Werkzeugliste (nutzung.ts).
+ *
  * JEDES WERKZEUG MUSS OHNE SEINE ANSICHT BRAUCHBAR SEIN. In Copilot gibt es
  * keine gerenderte Ansicht; kaeme die Antwort nur dort an, waere der Server
  * dort wertlos. Deshalb steht das Ergebnis immer auch in
@@ -19,8 +23,8 @@
 import { Skybridge } from 'skybridge/server'
 import { z } from 'zod'
 import { parserBereitstellen } from './ast'
-import { anmelden, fragenDuerfen, NichtErlaubt, type Angemeldet } from './auth'
-import { abfrageAusfuehren, Abfragefehler, berichtAusfuehren, Gesperrt, probeplanen,
+import { anmelden, fragenDuerfen, NichtErlaubt, nutzungDuerfen, type Angemeldet } from './auth'
+import { abfrageAusfuehren, Abfragefehler, alsProtokolliert, berichtAusfuehren, Gesperrt, probeplanen,
          protokollieren, pruefenMitNachprobe, ZEILEN_FUER_MODELL, type Nutzer } from './ausfuehren'
 import { berichtBeschreiben, berichteSuchen, BerichtFehler, alleKarten, karteFinden,
          uebersetzen } from './berichte'
@@ -35,6 +39,8 @@ import { anmeldungAbfragen, anmeldungEingerichtet } from './anmeldung/db'
 import { zugangstokenPruefen } from './anmeldung/schluessel'
 import { gescheiterteAufrufeProtokollieren } from './zugriff_protokoll'
 import { datenAlsTextErgaenzen } from './antwort_text'
+import { ANSICHTEN, GRENZE_MAX, NUTZUNG_WERKZEUG, nutzungAusblenden,
+         nutzungAuswerten, RASTER } from './nutzung'
 
 /**
  * Die Form, in der JEDES Ergebnis zurueckkommt — Bericht wie freie Abfrage.
@@ -281,6 +287,9 @@ export const app = new Skybridge({
     // (16.09.2026), ChatGPTs schon — deshalb nur fuer Hosts ausser ChatGPT
     // (antwort_text.ts).
     .mcpMiddleware('tools/call', datenAlsTextErgaenzen)
+
+    // Die Nutzungsauswertung nur fuer die, die sie nutzen duerfen (0148).
+    .mcpMiddleware('tools/list', nutzungAusblenden)
 
     // =================================================================
     // Berichte — die Metabase-Abloesung
@@ -835,6 +844,55 @@ export const app = new Skybridge({
         content: `Round Table: ${e.zeilen_gesamt} Betriebe.`,
         _meta: { weitere: e.weitere },
       }
+    })
+
+    // =================================================================
+    // Nur fuer die Verwaltung des Zugangs (0148)
+    // =================================================================
+    .registerTool({
+      name: NUTZUNG_WERKZEUG,
+      title: 'Nutzung des Zugangs auswerten',
+      description:
+        'Wer diesen Zugang wie nutzt: je Konto (Aufrufe, aktive Tage, freie Abfragen, Berichte, ' +
+        'Sperren, Fehler, zuletzt aktiv — auch Konten, die ihn nie benutzt haben), im Verlauf, ' +
+        'je Werkzeug, nach Tageszeit, die haeufigsten Fehler und Sperren, und die einzelnen ' +
+        'Aufrufe eines Kontos mit ihrem SQL. Nur fuer die Verantwortlichen des Zugangs. Zeiten ' +
+        'in deutscher Zeit; ein Aufruf ist jeder Werkzeugaufruf, auch Suchen und Beschreiben.',
+      inputSchema: {
+        ansicht: z.enum(ANSICHTEN).describe(
+          'konten | verlauf | werkzeuge | tageszeit | fehler | aufrufe (Einzelaufrufe mit SQL, neueste zuerst)'),
+        von: z.string().optional().describe('Erster Tag, z. B. "2026-10-01"; weglassen = seit Beginn'),
+        bis: z.string().optional().describe('Letzter Tag, einschliesslich; weglassen = bis heute'),
+        konto: z.string().optional().describe('Teil von Name oder Mailadresse, z. B. "Daniel"'),
+        raster: z.enum(RASTER).optional().describe('Nur fuer verlauf: tag | woche (Standard) | monat'),
+        grenze: z.number().int().optional().describe(`Nur fuer fehler und aufrufe: hoechstens so viele Zeilen (Standard 100, hoechstens ${GRENZE_MAX})`),
+      },
+      annotations: { readOnlyHint: true },
+    }, async (auswahl, extra) => {
+      const nutzer = await anmelden(extra)
+      nutzungDuerfen(nutzer)
+      const beginn = Date.now()
+      let r
+      try {
+        r = await nutzungAuswerten(auswahl)
+      } catch (f) {
+        await protokollieren({ nutzer: nutzerAus(nutzer), werkzeug: NUTZUNG_WERKZEUG,
+          parameter: auswahl, fehler: String((f as Error)?.message ?? f), dauer_ms: Date.now() - beginn })
+        // Schon eingetragen — die Middleware fuer gescheiterte Aufrufe soll
+        // ihn nicht ein zweites Mal schreiben (zugriff_protokoll.ts).
+        throw alsProtokolliert(f)
+      }
+      await protokollieren({ nutzer: nutzerAus(nutzer), werkzeug: NUTZUNG_WERKZEUG,
+        parameter: auswahl, zeilen: r.zeilen.length, dauer_ms: Date.now() - beginn })
+      return {
+        structuredContent: { ansicht: auswahl.ansicht, spalten: r.spalten, zeilen: r.zeilen,
+          zeilen_gesamt: r.zeilen.length,
+          zeitraum: { von: auswahl.von ?? null, bis: auswahl.bis ?? null },
+          konto: auswahl.konto ?? null },
+        content: `Nutzung (${auswahl.ansicht}): ${r.zeilen.length} Zeilen. Das Protokoll beginnt am ` +
+                 `15.09.2026. Diese Zahlen sind personenbezogen — nur an die weitergeben, die sie ` +
+                 `sehen duerfen.`,
+      }
     }),
 })
 
@@ -870,10 +928,16 @@ export type AppType = typeof app
 
 app.express.get('/status', async (_req: any, antwort: any) => {
   try {
-    const [offen, nutzung] = await Promise.all([
+    // Die Nutzung ueber die Verwaltungsrolle: mcp_leser darf das Protokoll
+    // seit 0148 nicht mehr lesen. Und die Rechtepruefung gehoert hierher:
+    // liest die Leserolle das Protokoll wieder, sieht jeder Nutzer jeden
+    // anderen — das ist eine Stoerung, keine Fussnote.
+    const [offen, rechte, nutzung] = await Promise.all([
       abfragen(`SELECT punkt, meldung, behebung FROM mcp.einrichtung_offen`),
-      abfragen(`SELECT coalesce(sum(aufrufe), 0)::int AS aufrufe_7t
-                  FROM mart.mcp_nutzung WHERE tag > current_date - 7`),
+      abfragen<{ tabelle: string; erwartung: string }>(
+        `SELECT tabelle, erwartung FROM mart.mcp_rechte_pruefung`),
+      anmeldungAbfragen(`SELECT count(*)::int AS aufrufe_7t
+                           FROM mcp.zugriff WHERE zeitpunkt > now() - interval '7 days'`),
     ])
     // Die Anmeldung laeuft auf der ZWEITEN Verbindung; ihr Zustand gehoert
     // in dieselbe Antwort, sonst prueft der Monitor nur die halbe Miete.
@@ -885,11 +949,11 @@ app.express.get('/status', async (_req: any, antwort: any) => {
     // Katalog oder ein Takt, der nicht mehr prueft, ist eine Stoerung — der
     // Server arbeitet dann mit einem alten Stand, und das muss man sehen.
     const katalogFehler = katalogStoerung()
-    const stufe = offen.length || katalogFehler ? 'stoerung' : 'ok'
+    const stufe = offen.length || rechte.length || katalogFehler ? 'stoerung' : 'ok'
     // `gestartet`: seit wann DIESER Container laeuft. Nach einem Push die
     // einzige Auskunft von aussen, ob der neue Stand schon antwortet.
     antwort.status(stufe === 'ok' ? 200 : 503).json({
-      status: stufe, gestartet: GESTARTET, einrichtung_offen: offen,
+      status: stufe, gestartet: GESTARTET, einrichtung_offen: offen, rechte_falsch: rechte,
       katalog: { ...katalogZustand(), stoerung: katalogFehler }, ...nutzung[0], ...anmeldung })
   } catch (e) {
     antwort.status(503).json({ status: 'stoerung', fehler: String(e).slice(0, 300),
