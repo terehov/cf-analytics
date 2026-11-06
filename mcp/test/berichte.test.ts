@@ -9,7 +9,7 @@
  */
 import { beforeAll, describe, expect, test } from 'bun:test'
 import { parserBereitstellen, zerlegen } from '../src/ast'
-import { alleKarten, berichteSuchen, BerichtFehler, karteFinden, uebersetzen } from '../src/berichte'
+import { alleKarten, berichteSuchen, BerichtFehler, karteFinden, kommentareEntfernen, uebersetzen } from '../src/berichte'
 
 beforeAll(async () => { await parserBereitstellen() })
 
@@ -47,6 +47,30 @@ describe('Berichte', () => {
     })
   }
 
+  /**
+   * Gueltiges SQL reicht nicht: Postgres lehnt die Abfrage auch ab, wenn mehr
+   * Werte kommen, als Platzhalter darin stehen. So scheiterte
+   * dd_betrieb_verlauf im Chat, weil ein Kommentar `{{zeitraum}}` zitierte
+   * (06.11.2026, docs/fehlerkatalog.md).
+   */
+  for (const karte of alleKarten) {
+    test(`${karte.schluessel} uebergibt genau so viele Werte, wie Platzhalter darin stehen`, () => {
+      for (const werte of [{}, werteFuer(karte)]) {
+        const { sql, parameter } = uebersetzen(karte, werte)
+        const nummern = [...sql.matchAll(/\$(\d+)/g)].map(m => Number(m[1]))
+        expect(nummern.length ? Math.max(...nummern) : 0).toBe(parameter.length)
+      }
+    })
+  }
+
+  test('Ein Platzhalter im Kommentar wird nicht ersetzt — in einer Zeichenkette bleibt -- stehen', () => {
+    expect(kommentareEntfernen("SELECT '--x' AS a -- {{zeitraum}}\nFROM t /* a /* b */ c */ WHERE 1 = 1"))
+      .toBe("SELECT '--x' AS a  \nFROM t   WHERE 1 = 1")
+    const { parameter } = uebersetzen(karteFinden('dd_betrieb_verlauf')!,
+      { betrieb: 'Bayreuth', zeitraum: { von: '2026-01-01', bis: '2026-03-31' } })
+    expect(parameter).toEqual(['Bayreuth', '2026-01-01', '2026-03-31'])
+  })
+
   test('Werte werden Parameter, nicht Text — ein Apostroph bleibt harmlos', () => {
     const karte = alleKarten.find(k => k.parameter?.some(p => p.name === 'betrieb'))!
     const { sql, parameter } = uebersetzen(karte, { betrieb: "L'Osteria" })
@@ -66,9 +90,14 @@ describe('Berichte', () => {
   })
 
   test('Ein Feldfilter ohne Wert wird zu true, mit Wert zu einer Klausel', () => {
-    const karte = alleKarten.find(k => k.template_tag_dimension)!
-    const [tag, ziel] = Object.entries(karte.template_tag_dimension!)[0]!
-    expect(uebersetzen(karte, {}).sql).toContain('true')
+    // Den Feldfilter ausserhalb eines optionalen Blocks fuehrt heute keine
+    // Karte — deshalb eine abgeleitete. Bis zum 06.11.2026 griff hier
+    // dd_betrieb_verlauf, und der Test war nur gruen, weil der Platzhalter in
+    // DEREN KOMMENTAR ersetzt wurde: genau der Fehler, den der Test darueber faengt.
+    const vorlage = alleKarten.find(k => k.template_tag_dimension)!
+    const [tag, ziel] = Object.entries(vorlage.template_tag_dimension!)[0]!
+    const karte = { ...vorlage, sql: `SELECT 1 FROM mart.${ziel[1]} WHERE {{${tag}}}` }
+    expect(uebersetzen(karte, {}).sql).toContain('WHERE true')
     const mit = uebersetzen(karte, { [tag]: { von: '2026-01-01', bis: '2026-02-01' } })
     expect(mit.sql).toContain(`${ziel[1]}.${ziel[2]} BETWEEN`)
     // Steht derselbe Filter mehrfach im SQL, bekommt jede Stelle ihre eigenen

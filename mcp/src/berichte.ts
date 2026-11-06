@@ -91,6 +91,59 @@ function zeitraumTeile(wert: unknown): [string, string] | null {
   return null
 }
 
+/**
+ * SQL-Kommentare entfernen, bevor Platzhalter ersetzt werden.
+ *
+ * Gefunden am 06.11.2026 im Zugriffsprotokoll: `dd_betrieb_verlauf` scheiterte
+ * im Chat bei JEDEM Aufruf mit Zeitraum ("bind message supplies 5 parameters,
+ * but prepared statement requires 3") — dreimal, bei drei Nutzern, seit dem
+ * 24.09.2026. Der Kommentar der Karte erklaert einen alten Fehler und zitiert
+ * dabei `{{zeitraum}}`. Die Ersetzung lief auch dort, schob zwei Werte in die
+ * Parameterliste, und deren `$4`/`$5` standen im auskommentierten Rest der
+ * Zeile. Der Parser-Test sah nichts: ein Kommentar ist gueltiges SQL.
+ *
+ * Zeichenweise statt per Regex, weil `--` auch in einer Zeichenkette stehen
+ * kann. Block-Kommentare schachteln in PostgreSQL. Ersetzt wird durch ein
+ * Leerzeichen, damit zwei Woerter nicht zusammenwachsen.
+ */
+export function kommentareEntfernen(sql: string): string {
+  let aus = ''
+  let i = 0
+  while (i < sql.length) {
+    const z = sql[i]!
+    if (z === "'" || z === '"') {
+      // Zeichenkette oder Bezeichner bis zum schliessenden Zeichen; ein
+      // verdoppeltes Zeichen ist das maskierte Zeichen selbst.
+      let j = i + 1
+      while (j < sql.length) {
+        if (sql[j] === z) {
+          if (sql[j + 1] === z) { j += 2; continue }
+          break
+        }
+        j++
+      }
+      aus += sql.slice(i, j + 1)
+      i = j + 1
+    } else if (z === '-' && sql[i + 1] === '-') {
+      while (i < sql.length && sql[i] !== '\n') i++
+      aus += ' '
+    } else if (z === '/' && sql[i + 1] === '*') {
+      let tiefe = 1
+      i += 2
+      while (i < sql.length && tiefe > 0) {
+        if (sql[i] === '/' && sql[i + 1] === '*') { tiefe++; i += 2 }
+        else if (sql[i] === '*' && sql[i + 1] === '/') { tiefe--; i += 2 }
+        else i++
+      }
+      aus += ' '
+    } else {
+      aus += z
+      i++
+    }
+  }
+  return aus
+}
+
 /** Mit Namen, damit der Eintrag in mcp.zugriff "BerichtFehler: …" heisst und nicht "Error: …". */
 export class BerichtFehler extends Error {
   constructor(meldung: string) { super(meldung); this.name = 'BerichtFehler' }
@@ -150,7 +203,7 @@ export function uebersetzen(
     return platz(wert)
   }
 
-  const sql = karte.sql
+  const sql = kommentareEntfernen(karte.sql)
     // Erst die optionalen Bloecke: ein Block ueberlebt nur, wenn JEDER
     // Platzhalter darin einen Wert hat.
     .replace(BLOCK, (_alles, inhalt: string) => {

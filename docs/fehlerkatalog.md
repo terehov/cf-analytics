@@ -5467,3 +5467,28 @@ nur, wenn die Tage des Kassenblatts selbst den Monatswert treffen. Danach `ergae
 61 Betrieben, 2,26 Mio. EUR. Zwölf Betriebe mit zu niedriger Quote (402 Monate, 19,2 Mio. EUR)
 bleiben `abweichung`: dort zählt die Ladenakte vermutlich mehr als den einen LINA-Betrieb, und
 Anheben zählte doppelt (`offene-punkte.md`).
+
+## Ein Platzhalter im Kommentar brach einen Bericht im Chat (06.11.2026)
+
+**Symptom.** `bericht:dd_betrieb_verlauf` (Betrieb — Umsatz je Tag) scheiterte im MCP-Zugang bei
+jedem Aufruf mit Zeitraum: „bind message supplies 5 parameters, but prepared statement "" requires
+3". Im Zugriffsprotokoll dreimal, bei drei Nutzern (24.09., 21.10., 28.10.2026). In Metabase lief die
+Karte fehlerfrei. Gefunden bei einer Auswertung der MCP-Nutzung über `mcp.zugriff`.
+
+**Ursache.** Der Kommentar der Karte erklärt einen alten Fehler und zitiert dabei `{{zeitraum}}`.
+`uebersetzen()` (`mcp/src/berichte.ts`) ersetzte Platzhalter auch in Kommentaren: zwei Werte mehr in
+der Parameterliste, deren `$4`/`$5` im auskommentierten Rest der Zeile standen. Postgres zählt
+übergebene Werte gegen Platzhalter und lehnt ab. Der Test „ergibt gültiges SQL" sah nichts — ein
+Kommentar ist gültiges SQL. Und der Test „Feldfilter ohne Wert wird zu true" war **nur wegen dieses
+Fehlers grün**: er griff die erste Karte mit Feldfilter, und deren einziges `{{zeitraum}}` außerhalb
+eines optionalen Blocks stand im Kommentar.
+
+**Was es künftig verhindert.**
+* `kommentareEntfernen()` entfernt `--`- und `/* */`-Kommentare (geschachtelt, Zeichenketten und
+  Bezeichner unberührt), bevor Platzhalter ersetzt werden. Damit darf ein Kartenkommentar Platzhalter
+  zitieren.
+* `mcp/test/berichte.test.ts` prüft je Karte, ohne und mit Werten, dass der höchste `$n` genau der
+  Zahl der Werte entspricht. Nachgemessen am 06.11.2026: vorher wich nur `dd_betrieb_verlauf` ab (1 von
+  328 Karten), nachher keine.
+* Der Feldfilter-Test nutzt eine abgeleitete Karte, weil heute keine Karte ihren Feldfilter außerhalb
+  eines optionalen Blocks führt.
