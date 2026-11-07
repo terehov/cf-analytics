@@ -53,3 +53,7 @@ belege/
 # MCP-Server: Bauergebnisse
 mcp/dist/
 mcp/.skybridge/
+
+# Die TPAPI-Schluessel je Betrieb (src/tpapi_schluessel.ts). Zugangsdaten — gehoeren
+# nach Dokploy (LINA_API_SCHLUESSEL), nie ins Repository.
+.lina-api-schluessel.json

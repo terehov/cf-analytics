@@ -432,6 +432,51 @@ export class LinaClient {
     throw new Error(`${ep.key}: unbekanntes braucht "${ep.braucht}"`)
   }
 
+  /**
+   * DER EINZIGE SCHREIBENDE AUFRUF GEGEN LINA IN DIESEM REPOSITORY (07.11.2026).
+   *
+   * Legt im Betrieb `laden` einen Schluessel fuer LINAs offizielle Third-Party-API
+   * an — genau das, was der Knopf „API-Key erzeugen" in der Ladenakte tut
+   * (`generateAPiKey()` → `POST /intranet/ladenakte/apikeyadd`). Ein Schluessel
+   * gilt nur fuer EINEN Betrieb (gemessen 07.11.2026, docs/lina-third-party-api.md),
+   * deshalb braucht es das je Betrieb.
+   *
+   * Regel 1 („in LINA wird ausschliesslich gelesen") ist hier bewusst und auf
+   * Entscheidung von Eugene durchbrochen — nur dafuer, nur ueber diesen Pfad,
+   * nur aus `src/tpapi_schluessel.ts`, das der Nutzer selbst startet. Kein
+   * Wiederholen: was scheitert, sieht sich ein Mensch an. Nicht aus dem Sync
+   * aufrufen.
+   */
+  async apiSchluesselAnlegen(laden: string, felder: {
+    name: string; operator: string; ip: string; expires: string; scopes: string[]
+  }): Promise<{ status: number; text: string }> {
+    if (!/^[0-9a-f]{40}$/.test(laden)) throw new Error(`apiSchluesselAnlegen: kein Laden-Hash: ${laden}`)
+    const warten = this.naechsteWartezeit()
+    if (warten > 0) await schlaf(warten)
+    if (!this.session.istAngemeldet) await this.session.anmelden()
+    const body = new URLSearchParams()
+    body.set('name', felder.name)
+    body.set('operator', felder.operator)
+    body.set('ip', felder.ip)
+    body.set('expires', felder.expires)
+    // jQuery kodiert ein Feld als scopes[]=a&scopes[]=b — PHP liest es so als Liste.
+    for (const s of felder.scopes) body.append('scopes[]', s)
+    body.set('laden', laden)
+    const res = await fetch(`${config.LINA_BASE_URL}/intranet/ladenakte/apikeyadd`, {
+      method: 'POST',
+      headers: this.session.header({
+        'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        referer: `${config.LINA_BASE_URL}/intranet/ladenakte/index?admin=1&tab=apikey`,
+      }),
+      body,
+      redirect: 'manual',
+      signal: AbortSignal.timeout(config.ANFRAGE_TIMEOUT_MS),
+    })
+    this.letzterRequest = Date.now()
+    this.heuteVerbraucht++
+    return { status: res.status, text: await res.text() }
+  }
+
   private request(ep: Endpunkt, parameter: Record<string, string>, pfad = ep.pfad) {
     const url = `${config.LINA_BASE_URL}${pfad}?${new URLSearchParams(parameter)}`
     return fetch(url, {

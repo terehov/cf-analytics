@@ -362,6 +362,10 @@ bun run tpapi-probe [--tag 01.11.2026] [--laden <encId>]
                                              # LINAs offizielle API (TPAPI), zehn GET, keine DB; Schlüssel
                                              # LINA_API_KEY ist an die Server-IPv4 gebunden — NUR per docker exec
                                              # im Importer-Container (docs/lina-third-party-api.md)
+bun run tpapi-schluessel [--anlegen [--nur <encId>]]
+                                             # TPAPI-Schluessel je Betrieb anlegen und einsammeln — der EINZIGE
+                                             # schreibende Lauf gegen LINA (Regel 1, Ausnahme 07.11.2026); ohne
+                                             # --anlegen nur Trockenlauf. Nur im Terminal des Nutzers (Regel 7a)
 bun run status-melden                        # Testnachricht mit dem Status in den kChat-Channel (braucht STATUS_WEBHOOK_URL)
 curl localhost:3000/health                     # lebt der Container?
 curl localhost:3000/status                     # muss jemand hinsehen? (503 = ja)

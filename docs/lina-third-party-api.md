@@ -240,3 +240,26 @@ Storno- und Rabattzeilen) — die Überleitung steht noch aus.
 
 `listdays`: 2.507 Geschäftstage, 22.10.2019 bis 06.11.2026 — die Historie reicht bis zum
 Kassenstart des Betriebs zurück.
+
+## Ein Schlüssel je Betrieb: `bun run tpapi-schluessel` (07.11.2026)
+
+Entscheidung Eugene: die Schlüssel werden nicht von Hand in 60–140 Ladenakten angelegt,
+sondern von einem Skript, das der Nutzer **in seinem Terminal** startet (`src/tpapi_schluessel.ts`).
+Das ist der **einzige schreibende Aufruf gegen LINA im Repository** — eine bewusste Ausnahme von
+Regel 1, eingegrenzt auf einen Pfad (`LinaClient.apiSchluesselAnlegen()`, nur
+`POST /intranet/ladenakte/apikeyadd`) und auf genau die Felder, die der Knopf schickt.
+
+Ablauf je Betrieb, über den Ladenakte-Baum (`root` → `konzept_<n>` → `laden_<n>`):
+
+1. Stammdatenblatt lesen. Der Laden-Hash fürs Anlegen steht dort im Knopf
+   (`generateAPiKey('<40 hex>')`, = `core.betrieb.enc_id`), nicht im gesalzenen Pfad.
+2. Steht ein Schlüssel „Concept Family Analytics" schon in der Tabelle → einsammeln, weiter.
+3. Marktplatz lesen (`/intranet/marketplace/show-transfers/storeId/<encId>?admin=1`, gemessen
+   07.11.2026 für Aposto Aalen: Article, Sales, Team Data API „Ja", Webkassen-API, BWA Data API,
+   Tax Import „Nein"). Ist keine der drei Daten-APIs gebucht → kein Schlüssel.
+4. Nur mit `--anlegen`: anlegen, Stammdatenblatt neu lesen, prüfen, dass Name, IP und genau die
+   vier Leserechte dastehen. Jede Abweichung und jeder Fehler bricht den ganzen Lauf ab.
+
+Die Schlüssel werden nie ausgegeben; sie landen in `.lina-api-schluessel.json` (Rechte 600,
+`.gitignore`) und von dort als `LINA_API_SCHLUESSEL` nach Dokploy. Reihenfolge: Trockenlauf,
+dann `--anlegen --nur <encId>` für einen Betrieb, dann alle.
