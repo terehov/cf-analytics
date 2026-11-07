@@ -60,7 +60,8 @@ function marktplatz(encId: string): Endpunkt {
     key: 'la:marktplatz', ebene: 'betrieb', schrittweite: 'momentaufnahme', form: 'html', aktiv: false,
     pfad: `/intranet/marketplace/show-transfers/storeId/${encId}`,
     zweck: 'Welche Module der Betrieb gebucht hat — nur gelesen',
-    parameter: () => ({}),
+    // Ohne admin=1 leitet LINA um (HTTP 302) — gemessen im ersten Trockenlauf, 07.11.2026.
+    parameter: () => ({ admin: '1' }),
   }
 }
 
@@ -140,7 +141,15 @@ async function main(): Promise<number> {
       continue
     }
 
-    const gebucht = buchungen(await html(client, marktplatz(enc), {}))
+    let marktplatzSeite: string
+    try {
+      marktplatzSeite = await html(client, marktplatz(enc), { admin: '1' })
+    } catch (e) {
+      zaehler.unklar++
+      console.log(`?  ${b.name}: Marktplatz nicht lesbar (${String(e).slice(0, 80)}) — uebersprungen`)
+      continue
+    }
+    const gebucht = buchungen(marktplatzSeite)
     const liste = DATEN_APIS.map(a => `${a.split(' ')[0]}:${gebucht[a] === null ? '?' : gebucht[a] ? 'ja' : 'nein'}`).join(' ')
     if (!DATEN_APIS.some(a => gebucht[a])) {
       zaehler.ohneBuchung++
