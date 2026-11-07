@@ -616,8 +616,68 @@ importiert wird, ist eine Entscheidung vor dem Bau, nicht danach.
 `GET /finanzen/api/chartjson?von=<epoch>&bis=<epoch>&charts=umsatzperso` liefert je Wochentag
 und Stunde (08:00–07:00) Umsatz, Personalkosten und **Effektivität in €/h** — im Mandanten
 *Franchise AG* überall 0, weil dort nichts kassiert wird. Ob der Aufruf mit Betriebskontext
-Daten liefert, ist **nicht gemessen**. Er wäre die einzige Quelle für Personalkosten *je Stunde*
+Daten liefert, ist ~~**nicht gemessen**~~ **gemessen am 06.11.2026, siehe unten**. Er wäre die einzige Quelle für Personalkosten *je Stunde*
 (Korrektur 4: „Personalstunden je Zeitzone gibt es nicht").
+
+**Nachgemessen am 06.11.2026** (Browser, Eugenes Sitzung, nur lesend; Anlass: Melanies Frage,
+ob sich Wilma Wunder sonntags bis 21/22 Uhr lohnt). Auf Betriebsebene heißt derselbe Bericht
+**„Tagesverlauf“** (Report Center des Betriebs, Drill-Down aus `/intranet/index/madashboard`):
+
+```
+GET /intranet/storeanalytics/getPerDay?report=20&von=1.10.2026&bis=31.10.2026&reltime=lastMonth&interval=8&laden=<encId>
+```
+
+Antwort `{chartData: "<FusionCharts-JSON als String>"}`, 10 kB, 24 Stundenkategorien 08:00–07:00,
+unter `axis[].dataset[]` je Wochentag drei Reihen. Gemessen an Wilma Wunder Nürnberg, Oktober 2026:
+
+* **`Personalkosten <Wochentag>` ist in allen sieben Reihen und allen Stunden 0.** Personalkosten
+  je Stunde gibt es also auch hier nicht.
+* **`Effektivität <Wochentag>` (€ Umsatz je Personalstunde) ist je Stunde gefüllt.** Damit ist die
+  **Besetzung je Stunde rückrechenbar**: Umsatz ÷ Effektivität. Sonntag ergab das 10–11 Personen
+  mittags, 5,7 um 18 Uhr, 4,9 um 19 Uhr, 4,3 um 20 Uhr; Samstag um 20 Uhr 8,1. Die Kurven sind
+  plausibel (Abfall zum Abend, Samstag über Sonntag).
+* **Die Effektivität kommt als ganze Zahl.** Bei kleinem Umsatz wird die Rückrechnung unbrauchbar:
+  Sonntag 21 Uhr stand bei 9 € Umsatz und Effektivität 2, also „4,5 Personen“ mit ±50 %.
+* Die Kachel im Management-Dashboard heißt „Effektivität (Pos-Daten + **Zeiterfassung**)“. Die
+  Stunden kommen also aus LINAs Zeiterfassung. Betriebe, deren Spalte „Stunden Ist“ dort 0 zeigt,
+  haben vermutlich auch hier nichts — **nicht gemessen**. Für den 05.11.2026 (ein Tag, Abruf am
+  06.11. morgens) stand „Stunden Ist“ bei 7 von 13 Wilma-Betrieben mit Kasse auf 0, „Stunden DP“
+  (Dienstplan) bei **allen** auf 0: die Wilma-Betriebe planen nicht in LINA, oder wir sehen es
+  nicht. Ein Tag beweist nichts — über einen Monat nachsehen, bevor man daraus etwas baut.
+* `/intranet/storeanalytics/getReport` mit 8, 23, 24 und 107 und `von = bis` für einen Tag:
+  HTTP 500 mit leerem Körper. In der Oberfläche liegen 107, 23 und 24 unter „Monatsbezogene
+  Auswertungen“. 107 („Geleistete Stunden“) zeigt je **Person** Soll und Ist des Monats, mit Namen.
+  Bericht 8 steht im Menü des Betriebs nicht.
+
+Nicht importiert. Ob es sich lohnt: je Betrieb und Monat ein Aufruf, und das Ergebnis ist ein
+**Durchschnitt je Wochentag**, kein einzelner Tag.
+
+**Nachgemessen am 06.11.2026 an allen 14 Wilma-Betrieben** (Oktober 2026, ein Aufruf je Betrieb,
+3 s Abstand, Sonntag ausgewertet):
+
+* **`Umsatz <Wochentag>` ist der Durchschnitt je Sonntag**, nicht die Monatssumme. Nürnberg
+  18–21 Uhr: LINA 363/278/137/9 €, `mart.umsatz_stunde` gemittelt über die vier Sonntage
+  363/278/137/9 €. Die Tagessummen liegen bei allen Betrieben innerhalb von 2 % von unseren.
+* **Personalkosten: bei allen 12 erfolgreichen Abrufen in jeder Stunde 0.**
+* **Besetzung (Umsatz ÷ Effektivität) gegen unsere Tagesstunden** (`umsatz / eff_gesamt` aus
+  `mart.personalkosten`, Mittel der Oktobersonntage): Gastronomie am Markt Mainz 179 gegen 217 h,
+  Ballplatz Mainz 91 gegen 85, Dresden 133 gegen 196, Köln 108 gegen 106 (nur zwei Sonntage),
+  Nürnberg 107 gegen 124, Stuttgart 97 gegen 110. Die Stundensumme liegt meist darunter, weil
+  Stunden ohne Umsatz (Aufbau, Abbau) keine Effektivität haben und unsichtbar bleiben. Dresden
+  mit 68 % ist der Ausreißer.
+* **Vier Betriebe haben hier Stunden, aber keine Tageseffektivität in `mart.personalkosten`:**
+  Freudenstadt (93 h), Passau (73), Speyer (90), Viernheim (66). Die Quelle deckt also mehr ab
+  als der Tagesbericht. Warum der Tagesbericht dort leer ist, ist offen.
+* **Keine Stunden:** Bochum (Effektivität überall 0, Zeiterfassung offenbar nicht in LINA) und
+  Recklinghausen (geschlossen).
+* **Sonntag 20 Uhr** ergab bei allen Betrieben mit Stunden zwischen 3,1 und 7,8 Personen,
+  meist 4 bis 6 — plausibel für einen Abend. **Ab 21 Uhr wird es unscharf:** Effektivität unter
+  10 €/h ist durch das Runden auf ganze Zahlen bis zu ±50 % ungenau (Köln 22 Uhr: 7 € Umsatz,
+  Effektivität 1 → „7 Personen“; Passau 22 Uhr: 34 € bei Effektivität 46 → „0,7 Personen“).
+  Werte mit Effektivität unter 10 sind nicht zu verwenden.
+* **Düsseldorf und Karlsruhe: HTTP 504 nach 45 s**, zweimal. Ein Monat ist für große Betriebe
+  zu lang — dasselbe Muster wie Fensterklasse W (`src/lina/betriebsberichte.ts`). Kürzere
+  Zeiträume sind nicht gemessen.
 
 **Bestätigt aus dem Importer-Zugang** (`bun run lina-fragen d10`, Eugenes Terminal, 29.09.2026
 17:51): Menü, `denied`-Blätter, `manageusers` mit 0 Bytes und `persozahl` mit 456.891 Bytes

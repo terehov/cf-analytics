@@ -2501,3 +2501,13 @@ SELECT betrieb, lina_quote, count(*) AS monate, round(sum(jahresuebersicht - ums
   FROM mart.kassenblatt_stand WHERE zustand = 'abweichung' AND monat < date_trunc('month', current_date)
  GROUP BY 1, 2 ORDER BY 4 DESC;
 ```
+
+## LINA-API-Schlüssel von Bounti und Sell & Pick tragen Schreibrechte (06.11.2026)
+
+Gesehen in der Ladenakte der Franchise (`tab=apikey`, Bildschirmfreigabe Daniel). Beide
+Schlüssel, angelegt von Tobias Lindemann, ohne Ablaufdatum, tragen neben Leserechten auch
+*Kommunikation mit Webkasse* (bucht an der Kasse), *Import von Jomosoft-Umsatzdaten* und
+*Schichten und Zertifikate schreiben*; Sell & Pick dazu *Artikelstammdaten schreiben*. Ob die
+Anbieter das brauchen, kann nur der Fachbereich mit den Anbietern klären — für Bounti, das
+nach `bounti-api-inventar.md` Personal liest, ist kein Grund für Kassenbuchungen erkennbar.
+Wer klärt: Daniel / Tobias Lindemann. Details: `lina-third-party-api.md`.

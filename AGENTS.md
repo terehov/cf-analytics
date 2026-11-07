@@ -68,6 +68,7 @@ Kommentare sind deutsch, damit sie in Postico lesbar sind.
 | **`lina-api-inventar-1c.md`** | **Im Browser verifiziert (25.07.2026).** Konzeptzuordnung ist 1:n, Personalberichte sind gesperrt, WAWI ist JSON, Sortimentshierarchie gefunden. Überschreibt 1a und 1b, wo es abweicht. | Bevor du einen Endpunkt aktivierst |
 | **`lina-api-inventar-ladenakte.md`** | **Im Browser erhoben (11.08.2026).** Die Ladenakte: Belegarchiv (**mindestens 593.314 Dokumente** — alle 131 Betriebe gezählt, aber nur acht der vierzehn Belegarten, mit Lieferant, Kreditor, Sachkonto, MwSt-Split), **BWA-Longterm seit 2009 mit 77 Zeilen** inkl. Miete/Energie/Franchisegebühr/EBITDA, Stammdaten (Sitzplätze, Fläche, Plan-BWA, Tagesbudget), Verträge mit Fristen. Enthält zwei Warnungen: **Löschen geschieht per GET**, und der Lohn-Zweig führt Ausweisdokumente und Krankmeldungen. | Bevor du Belege, BWA-Historie oder Kapazitätsdaten anfasst |
 | **`lina-api-korrekturen.md`** | **Wichtig.** Drei widerlegte Annahmen und ein gelöster Blocker. Überschreibt die beiden Dateien darüber, wo es abweicht. | Vor jeder Arbeit an Kennzahlen oder Betriebs-Reports |
+| **`lina-third-party-api.md`** | **Die offizielle Schnittstelle (TPAPI)**, erhoben 06.11.2026 aus der Postman-Doku: API-Key mit IP-Bindung statt Anmeldung, 100 Anfragen je Laden und 15 Minuten, Endpunkte Umsatz/Kassenjournal, Personal (**Personen und Kosten je Stunde**), Artikel, BWA. Bei uns gebucht: Article, Sales, Team Data. Noch kein Schlüssel, nichts gemessen | Bevor du Personal- oder Bondaten aus LINA holst oder über den Ersatz des Scrapers nachdenkst |
 | **`kennzahlen-mapping.md`** / `.csv` | Excel-Kennzahl → LINA-Endpunkt/Feld → offene Fragen. Die eigentliche Zieldefinition. | Wenn du eine Kennzahl baust oder prüfst |
 | **`architektur.md`** | Warum Hetzner + Dokploy + vanilla Postgres. Verworfene Alternativen mit Begründung. | Vor Infrastrukturänderungen |
 | **`datenmodell.md`** | Schema-Entscheidungen und ihre Begründung | Vor Schemaänderungen |
@@ -357,6 +358,10 @@ bun run rezepte-praxis --datenbank postgresql://localhost/<db> [--marke x] [--ma
 bun run bestellansicht-probe                 # sieht der Importer-Zugang die FoodNotify-Bestellansicht (0135)?
                                              # drei GET, keine DB (nur im Terminal des Nutzers)
 bun run health                               # Health-Endpunkt (Container-CMD)
+bun run tpapi-probe [--tag 01.11.2026] [--laden <encId>]
+                                             # LINAs offizielle API (TPAPI), zehn GET, keine DB; Schlüssel
+                                             # LINA_API_KEY ist an die Server-IPv4 gebunden — NUR per docker exec
+                                             # im Importer-Container (docs/lina-third-party-api.md)
 bun run status-melden                        # Testnachricht mit dem Status in den kChat-Channel (braucht STATUS_WEBHOOK_URL)
 curl localhost:3000/health                     # lebt der Container?
 curl localhost:3000/status                     # muss jemand hinsehen? (503 = ja)
