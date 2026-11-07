@@ -2511,3 +2511,8 @@ Schlüssel, angelegt von Tobias Lindemann, ohne Ablaufdatum, tragen neben Lesere
 Anbieter das brauchen, kann nur der Fachbereich mit den Anbietern klären — für Bounti, das
 nach `bounti-api-inventar.md` Personal liest, ist kein Grund für Kassenbuchungen erkennbar.
 Wer klärt: Daniel / Tobias Lindemann. Details: `lina-third-party-api.md`.
+
+**Dazu (07.11.2026):** Die Ladenakte zeigt die Schlüsselwerte aller API-Keys **im Klartext**, in
+jedem Betrieb, für jeden mit Zugriff auf die Ladenakte — auch die mit Schreibrechten auf die Kasse.
+Ein Schlüssel ist zwar an eine IP gebunden, aber wer die IP des Anbieters nutzt oder die Bindung
+ändern darf, braucht nur noch den Wert. Wer klärt: Daniel / Tobias Lindemann, ggf. mit Gastro-MIS.

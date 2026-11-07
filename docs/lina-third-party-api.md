@@ -69,6 +69,25 @@ anlegen**, ohne LINA. Die Rechte, wie sie an den bestehenden Schlüsseln stehen:
 | Kommunikation mit Webkasse | **nein** (bucht an der Kasse) | nie |
 | Schichten und Zertifikate schreiben | **nein** (`saveShift`, `addUserCert`) | nie |
 
+**Angelegt am 07.11.2026** von Eugene (Ladenakte → Aposto Aalen GmbH → Stammdaten → Reiter
+*API-Keys*, Mandant *CONCEPT FAMILY Franchise AG*): Name *Concept Family Analytics*, IP
+178.104.197.120, **ohne Ablauf**, Scopes `merchandisemanagement_read`, `revenuejournal_read`,
+`personal_read`, `bwa_read` — **Ebene Franchise**, also für alle Betriebe, nicht je Standort oder
+Marke. Der Betrieb im Baum ist nur der Einstieg; die Ebene ergibt sich aus dem Mandanten.
+Der Schlüssel liegt nur in Dokploy (`LINA_API_KEY`).
+
+Zwei Dinge, die das Formular nicht sagt:
+
+* **Drittanbieter ist Pflicht.** Ohne Auswahl schickt das Formular `operator=Bitte wählen` an
+  `POST /intranet/ladenakte/apikeyadd`, der Server antwortet mit einem Fehler, und die Seite zeigt
+  nur „Verbindung nicht erfolgreich" — kein Hinweis aufs Feld. Einen neutralen Eintrag gibt es
+  nicht (Foodnotify, sell&pick, SimplyDelivery, paywithdango, sizzly, Elitmind, Luca, billplease,
+  Masero, Apicbase, JOMOsoft, SO'USE, Bounti, Yoordi). Gewählt: **Foodnotify**, weil wir mit
+  Foodnotify ohnehin arbeiten; beim API-Key-Verfahren ist der Anbieter dem Augenschein nach nur
+  Beschriftung, Rechte und IP stehen am Schlüssel. Wer die Liste liest: *dieser* Foodnotify-Eintrag
+  gehört Concept Family Analytics, nicht Foodnotify.
+* Die Rechteliste ist eine Mehrfachauswahl; ein einfacher Klick hebt alle anderen Markierungen auf.
+
 Das Recht, das im Gespräch „Schichten und Zeiterfassung" hieß, heißt in LINA **„Schichten und
 Zertifikate schreiben"** — ein Schreibrecht, das wir nicht brauchen. Die Arbeitszeiten kommen
 über „Personalstammdaten und Kosten lesen".
