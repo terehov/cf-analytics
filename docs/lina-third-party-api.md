@@ -196,3 +196,47 @@ ist das Tempo von LINA vorgegeben und damit eine Messgröße, keine Tarnung.
 
 **Volumen:** die Bonebene hat 30,3 Mio. Bons seit 2018 (`plan-lina-vollabzug.md`), die
 Positionen ein Vielfaches. Partitionierung wie `core.artikelverkauf_tag`.
+
+## Erste Messung, 07.11.2026 (Probe im Importer-Container, Tag 01.11.2026)
+
+**Der Schlüssel trägt.** Ausgang 178.104.197.120 (IPv4, auch bevorzugt), jeder Aufruf HTTP 200.
+`revenue/getlimit` liefert `{"limit": <verbraucht>, "rateLimit": 100}` — der Zähler stand vor
+der Probe auf 1 (nur unser eigener Aufruf davor) und danach auf 8, später 12. **Er zählt nur
+unsere Aufrufe**; Bounti und Sell & Pick erscheinen darin nicht.
+
+**~~Ein Schlüssel für alle Betriebe~~ — widerlegt am selben Tag. Ein Schlüssel gilt für genau
+EINEN Betrieb**, den, in dessen Ladenakte er angelegt wurde. `revenue/store` meldet *Aposto
+Aalen GmbH*, und `laden=`, `storeId=` und `store=` mit der encId von Wilma Wunder Nürnberg
+ändern daran nichts. Gegenprobe in der Oberfläche: unser Schlüssel steht nur in der Ladenakte
+von Aposto Aalen, nicht bei Enchilada Aalen oder Wilma Wunder Nürnberg. Bounti und Sell & Pick
+stehen dagegen bei allen dreien — mit leicht verschiedenen Namen („Sell & Pick" / „Sell&Pick"),
+also **je Betrieb ein eigener Schlüssel**. „Ebene: Franchise" heißt nur: auf Franchise-Ebene
+angelegt, nicht: für alle Betriebe gültig.
+
+**Personal je Stunde** (`personalkostenprostunde`): Aposto Aalen, Sonntag 01.11.2026 —
+Personen und Kosten je Stunde von 8 bis 3 Uhr, z. B. 18 Uhr 12 Personen / 215,30 €, 20 Uhr 10 /
+166,04 €, 22 Uhr 8 / 87,02 €, 23 Uhr 3 / 29,78 €. Die Kosten sind Gleitkomma mit Rundungsrest
+(`16.799999999999997`) — beim Laden auf Cent runden. `personalkostenprotag` liefert **eine Zeile
+je Person** (19), ohne Namen.
+
+**Journal** (`revenue/journal`): 1.834 Zeilen, 37 Felder (mehr als die Postman-Beispiele, u. a.
+`vat_id`, `menucard_id`, `price_per_unit`, `event_number`, `captivesupplyreason`). Das Journal
+ist eine **Buchungsliste mit Saldo null**: `balance` über alle Zeilen = 0,00, Verkäufe positiv,
+Zahlungen negativ. `preis` ist bei vielen Zeilen 0 — der Betrag steht in **`balance`**.
+**Je Finanzweg trifft es Bericht 97 (Tagesabschluss) auf den Cent:** Boniert (1) 7.638,14,
+Bar (20) −2.432,05, Girocard (48) −2.816,60, VISA (42) −1.040,90, MasterCard (43) −933,90,
+Sofortstorno (10) −201,70, Trinkgeld (2700) 235,53, Tischübergabe/-übernahme (22/23) ±620,20,
+Online-Gutschein (3020/3021), Pluxee (3113), Paypal (129), TGTG (3008), City Star (128),
+Systembuchung (−10) — alle gleich. Die **Rabatte** (97: Bruch, 25 %, 10 %, zusammen 12 Vorgänge)
+sind keine Finanzwege, sondern stehen an der Position: 12 Zeilen mit `rabatt_id ≠ 0`.
+Boniert 7.638,14 gegen `getUmsatzbericht` brutto 7.291,64 (Summe der Sparten, ohne Gutschein-,
+Storno- und Rabattzeilen) — die Überleitung steht noch aus.
+
+**Bons** (`revenue/journaltables`): 240 Bons, 27 Felder, **408 Gäste** (`number_adults` +
+`number_kids`).
+
+**BWA:** `403 {"message":"Module 'BWA' not licensed"}` — wie erwartet ohne Buchung.
+**Artikelstamm:** `merchandiseman/grosscategory` 68 Großkategorien.
+
+`listdays`: 2.507 Geschäftstage, 22.10.2019 bis 06.11.2026 — die Historie reicht bis zum
+Kassenstart des Betriebs zurück.
