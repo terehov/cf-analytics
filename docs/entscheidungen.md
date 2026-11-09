@@ -4605,3 +4605,18 @@ die sie sonst treffen.
   die Aufrufe der letzten sieben Tage, der Importer zusätzlich die Zahl der Nutzer
   (`src/status.ts`). Sie stehen für den Wechsel auf die kChat-Meldung an (04.11.2026).
 
+
+## 09.11.2026 — TPAPI-Schlüssel bleiben in der Umgebung, nicht in der Datenbank
+
+- **Entschieden (Eugene):** Die LINA-TPAPI-Schlüssel (einer je Betrieb, 41 Stück) stehen als
+  `LINA_API_SCHLUESSEL` (JSON `encId → Schlüssel`) in Dokploy, als Sicherung in Eugenes lokaler
+  `.env`. Keine Tabelle.
+- **Warum:** Harte Regel 2 (Zugangsdaten nur aus der Umgebung, nie gespeichert). Die Datenbank hat
+  mehr Leser als der Container — Backups bei Bunny Storage, Postico, Metabase, freie MCP-Abfragen;
+  jeder dieser Wege müsste einzeln abgesichert werden (`0148` zeigt, wie leicht einer durchrutscht).
+  Die Schlüssel sind an unsere IP gebunden, `personal_read` liefert aber Kosten je Person.
+  Die Schlüssel ändern sich selten; ein Redeploy je Änderung ist zumutbar.
+- **Verworfen:** Schlüssel in einer Tabelle, auch verschlüsselt mit Schlüssel aus der Umgebung —
+  lohnt erst, wenn sich Schlüssel häufig ändern.
+- **Was trotzdem in die Datenbank gehört:** wer einen Schlüssel hat, welche APIs gebucht sind, letzter
+  Abruf und letzter Fehler — ohne den Schlüssel selbst (Regel 10; kommt mit dem TPAPI-Importer).
