@@ -359,7 +359,8 @@ bun run bestellansicht-probe                 # sieht der Importer-Zugang die Foo
                                              # drei GET, keine DB (nur im Terminal des Nutzers)
 bun run health                               # Health-Endpunkt (Container-CMD)
 bun run tpapi-probe [--tag 01.11.2026] [--laden <encId>]
-                                             # LINAs offizielle API (TPAPI), zehn GET, keine DB; Schlüssel
+                                             # LINAs offizielle API (TPAPI), zehn GET, keine DB; mit --laden
+                                             # der Schlüssel des Betriebs aus LINA_API_SCHLUESSEL; Schlüssel
                                              # LINA_API_KEY ist an die Server-IPv4 gebunden — NUR per docker exec
                                              # im Importer-Container (docs/lina-third-party-api.md)
 bun run tpapi-schluessel [--anlegen [--nur <encId>]]

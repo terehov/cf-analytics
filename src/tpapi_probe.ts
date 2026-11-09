@@ -1,7 +1,7 @@
 /**
  * Erster Kontakt mit LINAs Third-Party-API (TPAPI), 07.11.2026
  *
- *   bun run tpapi-probe [--tag 01.11.2026] [--laden <encId>]
+ *   bun run tpapi-probe [--tag 01.11.2026] [--laden <encId>]   # --laden: Schluessel aus LINA_API_SCHLUESSEL
  *
  * Zweck und Hintergrund: docs/lina-third-party-api.md. Der Schlüssel ist an die
  * IPv4 des Hetzner-Servers gebunden — die Probe laeuft deshalb NUR dort, per
@@ -23,7 +23,6 @@
  *   6. BWA ohne gebuchte BWA Data API: Fehler oder Daten?
  */
 
-const SCHLUESSEL = process.env.LINA_API_KEY
 const BASIS = (process.env.LINA_API_BASIS ?? 'https://api.lina.de').replace(/\/$/, '')
 
 function argument(name: string): string | undefined {
@@ -33,6 +32,19 @@ function argument(name: string): string | undefined {
 
 const TAG = argument('--tag') ?? '01.11.2026' // ein Sonntag
 const LADEN = argument('--laden')
+
+// Mit --laden: der Schluessel dieses Betriebs aus LINA_API_SCHLUESSEL ({ "<encId>": "<Schluessel>" },
+// erzeugt von `bun run tpapi-schluessel`). Ein Schluessel gilt nur fuer seinen eigenen Betrieb —
+// ein Parameter `laden=` waehlt nichts aus (gemessen 07.11.2026). Ohne --laden: LINA_API_KEY.
+function schluesselFuer(laden: string | undefined): string | undefined {
+  if (!laden) return process.env.LINA_API_KEY
+  try {
+    return (JSON.parse(process.env.LINA_API_SCHLUESSEL ?? '{}') as Record<string, string>)[laden]
+  } catch {
+    return undefined
+  }
+}
+const SCHLUESSEL = schluesselFuer(LADEN)
 
 /** Entfernt den Schluessel aus jedem Text, bevor er ausgegeben wird. */
 function sauber(text: string): string {
@@ -44,7 +56,6 @@ type Antwort = { status: number; daten: unknown; roh: string }
 async function holen(pfad: string, parameter: Record<string, string> = {}): Promise<Antwort> {
   const url = new URL(`${BASIS}/extern/${pfad}`)
   for (const [k, v] of Object.entries(parameter)) url.searchParams.set(k, v)
-  if (LADEN) url.searchParams.set('laden', LADEN)
   const res = await fetch(url, {
     headers: { apikey: SCHLUESSEL!, accept: 'application/json' },
     redirect: 'manual',
@@ -84,7 +95,9 @@ async function ausgangsadresse() {
 
 async function main(): Promise<number> {
   if (!SCHLUESSEL) {
-    console.log('LINA_API_KEY fehlt. Der Schluessel gehoert in die Umgebung des Containers (Dokploy), nicht in den Aufruf.')
+    console.log(LADEN
+      ? `Kein Schluessel fuer ${LADEN} in LINA_API_SCHLUESSEL (fehlt, oder kein gueltiges JSON).`
+      : 'LINA_API_KEY fehlt. Der Schluessel gehoert in die Umgebung des Containers (Dokploy), nicht in den Aufruf.')
     return 3
   }
   console.log(`Basis ${BASIS}, Tag ${TAG}${LADEN ? `, laden=${LADEN}` : ''}\n`)

@@ -113,7 +113,9 @@ ausgegeben, `kostUser` (je Person) ebenfalls nicht. Läuft **nur im Importer-Con
 ```bash
 ssh root@178.104.197.120
 docker exec $(docker ps --format '{{.Names}}' | grep cf-analytics-sync) bun run tpapi-probe --tag 01.11.2026
-# optional --laden <encId>, falls der Franchise-Schlüssel einen Betrieb wählen muss
+# ~~optional --laden <encId>, falls der Franchise-Schlüssel einen Betrieb wählen muss~~
+#   (wählt nichts aus, gemessen 07.11.2026). Seit 09.11.2026 heißt --laden <encId>: den
+#   Schlüssel dieses Betriebs aus LINA_API_SCHLUESSEL nehmen statt LINA_API_KEY
 ```
 
 Beantwortet: Ausgangsadresse, welcher Laden verbunden ist, ob sich das Limit mit anderen
