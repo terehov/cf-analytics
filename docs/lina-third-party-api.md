@@ -287,4 +287,5 @@ Was daraus folgt:
   wie die BWA) — wird mit dem ersten Abruf gemessen, nicht angenommen.
 * Geschlossene und insolvente Betriebe bekommen keinen Schlüssel, auch mit Buchung (betrifft
   Besitos MG und Enchilada Bruchsal). Damit legt `--anlegen` **40** Schlüssel an.
-* Warum die sieben Enchilada nicht gebucht haben, ist offen (`docs/offene-punkte.md`).
+* ~~Warum die sieben Enchilada nicht gebucht haben, ist offen.~~ Ihnen fehlt die ISP (Daniel,
+  09.11.2026); er zieht sie nach. Leipzig ist geschlossen. Stand in `docs/offene-punkte.md`.

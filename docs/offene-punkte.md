@@ -2524,3 +2524,9 @@ Sales, Team noch Article Data API gebucht, die übrigen 15 Enchilada alle drei. 
 es dort keinen TPAPI-Schlüssel — also auch kein Personal je Stunde. Ebenso Schlager Cafe
 Düsseldorf und zwölf der 15 Deutschen Konzepte. Zu klären (Daniel): Absicht oder vergessen, und
 ob die Buchung nachgeholt wird. Messung in `docs/lina-third-party-api.md`, Abschnitt „Trockenlauf".
+
+**Antwort Daniel, 09.11.2026:** Den Betrieben ohne Schnittstelle fehlt die ISP (LINAs
+Personalplanung) — ohne sie keine Daten-API. Daniel versucht, das nachzuziehen. Leipzig ist
+geschlossen (steht seit 04.11. in `pflege/betrieb_schliessung.csv`) und fällt damit raus.
+Offen bleibt also: sechs Enchilada, bis die Buchung kommt. Wird nachgebucht, holt ein erneuter
+Lauf von `bun run tpapi-schluessel --anlegen` die Schlüssel ohne weitere Änderung nach.
