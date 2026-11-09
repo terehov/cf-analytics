@@ -72,9 +72,11 @@ anlegen**, ohne LINA. Die Rechte, wie sie an den bestehenden Schlüsseln stehen:
 **Angelegt am 07.11.2026** von Eugene (Ladenakte → Aposto Aalen GmbH → Stammdaten → Reiter
 *API-Keys*, Mandant *CONCEPT FAMILY Franchise AG*): Name *Concept Family Analytics*, IP
 178.104.197.120, **ohne Ablauf**, Scopes `merchandisemanagement_read`, `revenuejournal_read`,
-`personal_read`, `bwa_read` — **Ebene Franchise**, also für alle Betriebe, nicht je Standort oder
-Marke. Der Betrieb im Baum ist nur der Einstieg; die Ebene ergibt sich aus dem Mandanten.
-Der Schlüssel liegt nur in Dokploy (`LINA_API_KEY`).
+`personal_read`, `bwa_read` — **Ebene Franchise**, ~~also für alle Betriebe, nicht je Standort oder
+Marke. Der Betrieb im Baum ist nur der Einstieg; die Ebene ergibt sich aus dem Mandanten.~~
+**Widerlegt am 07.11.2026: der Schlüssel gilt nur für Aposto Aalen** (Abschnitt „Erste Messung").
+~~Der Schlüssel liegt nur in Dokploy (`LINA_API_KEY`).~~ Seit 09.11.2026 stehen alle Schlüssel in
+`LINA_API_SCHLUESSEL` (Abschnitt „Ein Schlüssel je Betrieb"); `LINA_API_KEY` entfällt.
 
 Zwei Dinge, die das Formular nicht sagt:
 
@@ -107,7 +109,7 @@ eingeschaltet, gilt das auch für den Container.
 
 ## Die Probe (`bun run tpapi-probe`, `src/tpapi_probe.ts`)
 
-Zehn GET-Aufrufe, keine Datenbank, kein Wiederholen, der Schlüssel aus `LINA_API_KEY` wird nie
+Zehn GET-Aufrufe, keine Datenbank, kein Wiederholen, der Schlüssel aus `LINA_API_SCHLUESSEL` (~~`LINA_API_KEY`~~) wird nie
 ausgegeben, `kostUser` (je Person) ebenfalls nicht. Läuft **nur im Importer-Container**:
 
 ```bash
@@ -115,7 +117,7 @@ ssh root@178.104.197.120
 docker exec $(docker ps --format '{{.Names}}' | grep cf-analytics-sync) bun run tpapi-probe --tag 01.11.2026
 # ~~optional --laden <encId>, falls der Franchise-Schlüssel einen Betrieb wählen muss~~
 #   (wählt nichts aus, gemessen 07.11.2026). Seit 09.11.2026 heißt --laden <encId>: den
-#   Schlüssel dieses Betriebs aus LINA_API_SCHLUESSEL nehmen statt LINA_API_KEY
+#   Schlüssel dieses Betriebs aus LINA_API_SCHLUESSEL nehmen; ohne --laden der erste der Liste
 ```
 
 Beantwortet: Ausgangsadresse, welcher Laden verbunden ist, ob sich das Limit mit anderen

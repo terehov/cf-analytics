@@ -1,7 +1,7 @@
 /**
  * Erster Kontakt mit LINAs Third-Party-API (TPAPI), 07.11.2026
  *
- *   bun run tpapi-probe [--tag 01.11.2026] [--laden <encId>]   # --laden: Schluessel aus LINA_API_SCHLUESSEL
+ *   bun run tpapi-probe [--tag 01.11.2026] [--laden <encId>]   # Schluessel des Betriebs aus LINA_API_SCHLUESSEL
  *
  * Zweck und Hintergrund: docs/lina-third-party-api.md. Der Schlüssel ist an die
  * IPv4 des Hetzner-Servers gebunden — die Probe laeuft deshalb NUR dort, per
@@ -11,7 +11,7 @@
  * dokumentierten Limit (100 je Laden und 15 Minuten). Kein Wiederholen: ein
  * abgewiesener Schluessel wird durch Wiederholen nicht gueltiger.
  *
- * Der Schluessel kommt aus LINA_API_KEY und wird nie ausgegeben. Personenbezogenes
+ * Der Schluessel kommt aus LINA_API_SCHLUESSEL und wird nie ausgegeben. Personenbezogenes
  * (kostUser, Namen) wird nicht ausgegeben — nur Zaehlungen und Summen je Stunde.
  *
  * WAS DIE PROBE BEANTWORTEN SOLL:
@@ -31,20 +31,20 @@ function argument(name: string): string | undefined {
 }
 
 const TAG = argument('--tag') ?? '01.11.2026' // ein Sonntag
-const LADEN = argument('--laden')
 
-// Mit --laden: der Schluessel dieses Betriebs aus LINA_API_SCHLUESSEL ({ "<encId>": "<Schluessel>" },
-// erzeugt von `bun run tpapi-schluessel`). Ein Schluessel gilt nur fuer seinen eigenen Betrieb —
-// ein Parameter `laden=` waehlt nichts aus (gemessen 07.11.2026). Ohne --laden: LINA_API_KEY.
-function schluesselFuer(laden: string | undefined): string | undefined {
-  if (!laden) return process.env.LINA_API_KEY
+// Der Schluessel kommt aus LINA_API_SCHLUESSEL ({ "<encId>": "<Schluessel>" }, erzeugt von
+// `bun run tpapi-schluessel`). Ein Schluessel gilt nur fuer seinen eigenen Betrieb — ein Parameter
+// `laden=` waehlt nichts aus (gemessen 07.11.2026). Ohne --laden: der erste Betrieb der Liste.
+function schluesselLesen(): Record<string, string> {
   try {
-    return (JSON.parse(process.env.LINA_API_SCHLUESSEL ?? '{}') as Record<string, string>)[laden]
+    return JSON.parse(process.env.LINA_API_SCHLUESSEL ?? '{}') as Record<string, string>
   } catch {
-    return undefined
+    return {}
   }
 }
-const SCHLUESSEL = schluesselFuer(LADEN)
+const ALLE = schluesselLesen()
+const LADEN = argument('--laden') ?? Object.keys(ALLE)[0]
+const SCHLUESSEL = LADEN ? ALLE[LADEN] : undefined
 
 /** Entfernt den Schluessel aus jedem Text, bevor er ausgegeben wird. */
 function sauber(text: string): string {
@@ -96,11 +96,11 @@ async function ausgangsadresse() {
 async function main(): Promise<number> {
   if (!SCHLUESSEL) {
     console.log(LADEN
-      ? `Kein Schluessel fuer ${LADEN} in LINA_API_SCHLUESSEL (fehlt, oder kein gueltiges JSON).`
-      : 'LINA_API_KEY fehlt. Der Schluessel gehoert in die Umgebung des Containers (Dokploy), nicht in den Aufruf.')
+      ? `Kein Schluessel fuer ${LADEN} in LINA_API_SCHLUESSEL.`
+      : 'LINA_API_SCHLUESSEL fehlt oder ist kein gueltiges JSON. Er gehoert in die Umgebung des Containers (Dokploy), nicht in den Aufruf.')
     return 3
   }
-  console.log(`Basis ${BASIS}, Tag ${TAG}${LADEN ? `, laden=${LADEN}` : ''}\n`)
+  console.log(`Basis ${BASIS}, Tag ${TAG}, Betrieb ${LADEN} (${Object.keys(ALLE).length} Schluessel in LINA_API_SCHLUESSEL)\n`)
 
   console.log('0. Ausgangsadresse (gebunden ist die IPv4 des Servers):')
   await ausgangsadresse()
