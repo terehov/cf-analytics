@@ -2530,3 +2530,28 @@ Personalplanung) — ohne sie keine Daten-API. Daniel versucht, das nachzuziehen
 geschlossen (steht seit 04.11. in `pflege/betrieb_schliessung.csv`) und fällt damit raus.
 Offen bleibt also: sechs Enchilada, bis die Buchung kommt. Wird nachgebucht, holt ein erneuter
 Lauf von `bun run tpapi-schluessel --anlegen` die Schlüssel ohne weitere Änderung nach.
+
+
+## TPAPI: drei offene Punkte nach dem Bau von `0149` (09.11.2026)
+
+**1. `personalkostenprotag` — dürfen die Zeilen aggregiert in `raw`?** Der Endpunkt liefert eine
+Zeile je Person (`h_brutto`, `h_zuschl_25/40/50`, `brutto`, `lohnkosten`), ohne Namen — in kleinen
+Teams ist die Person trotzdem rückführbar, und `raw.api_antwort` ist append-only. Stufe 1 holt ihn
+deshalb nicht. Frage an Eugene: eine Zeile je Betrieb und Tag (aggregiert) in `raw`? Dann könnte
+`core.personalkosten_tag` die Zuschlagsstunden tragen — die Zahl, die die Lohnbuchhaltung meint.
+Bis dahin bleibt es bei `personalkostenprostunde`.
+
+**2. Teilt sich das TPAPI-Limit mit Bounti und Sell & Pick?** `getlimit` stand bei Wilma Wunder
+Nürnberg am 09.11.2026 schon vor unserem zweiten Aufruf auf 7 (Details in
+`lina-third-party-api.md`). Der Importer verlässt sich bewusst nicht auf `getlimit` (D6), sondern auf
+Takt und Verteilung: rund 22 Aufrufe je Laden und 15 Minuten gegen dokumentierte 100. **Zu messen
+nach der ersten Nacht:** `SELECT zustand, count(*) FROM sync.tpapi_zugang GROUP BY 1` — steht dort
+`gebremst`, zählt das Limit fremde Anbieter mit, und der Takt muss angepasst werden.
+
+**3. Ratskeller Saarbrücken: Personal-Endpunkt antwortet leer.** Der Betrieb hat nur die Team Data
+API gebucht (BS Bier & Speisen ebenso, dort ist noch nichts gemessen); die Personal-Endpunkte
+antworteten am 08.11.2026 (Sonntag) mit 200 und leeren `eff`/`kost`. Ob die Betriebe an einem Sonntag zu hatten oder ihre Schichten nicht in
+LINA planen, ist offen. **An einem Werktag nachmessen** (`mart.personal_tag`, `stunden_geliefert`
+für diese Betriebe). Bleibt es leer: „plant Schichten nicht in LINA" festhalten — dann gilt für sie,
+was für Betriebe ohne Schlüssel gilt, und `mart.tpapi_zugang` zeigt sie weiter als `ok` mit
+`tage_geladen`, aber ohne Besetzung.

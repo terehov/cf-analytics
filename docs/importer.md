@@ -52,7 +52,7 @@ Tagesgeschäft des Folgelaufs kann dabei nicht zu kurz kommen: der Rest nach 02:
   workerOeffnen()                   Sperre + Lauf + EIN LINA-Client für alle Phasen
   ── Phase A ── Tagesgeschäft, nebeneinander ──────────────
      sitzung.tagesgeschaeft()       LINA-Spur: nur nachladen = false ‖ FoodNotify-Spur: alles
-     yext · bounti · wetter · pflege
+     yext · bounti · wetter · pflege · tpapi
   ── Sammelpunkt: Promise.allSettled ── stempelt sync.lauf.tagesgeschaeft_bis ──
 
   ── Phase B ── die Ableitungen, seriell, unverändert ─────
@@ -249,8 +249,9 @@ in `mart.betrieb_ohne_yext` und `mart.bounti_ohne_betrieb` — beide hängen an
 
 **Die Verbindungen reichen.** Der Pool steht auf `max: 8`; jeder Zweig greift
 seine Abfragen streng nacheinander ab, hält also höchstens eine Verbindung. Zwei
-Worker-Spuren plus vier Dienste sind sechs. Die Verbindung der Laufsperre zählt
-nicht mit, sie liegt außerhalb des Pools.
+Worker-Spuren plus ~~vier~~ fünf Dienste (seit dem TPAPI-Dienst, `0149`) sind ~~sechs~~ sieben —
+eine unter `max`. Ein weiterer Dienst füllt den Pool ganz aus; danach braucht es einen größeren.
+Die Verbindung der Laufsperre zählt nicht mit, sie liegt außerhalb des Pools.
 
 ---
 
@@ -2264,3 +2265,76 @@ geschrieben.
 **Attrappe:** `report_<id>` im Baum, beide Berichte aus den echten Bremen-Seiten. Ein Monat
 ohne Vorlage bekommt den laufenden, wie LINA. `berichtLeer500` simuliert den veralteten Hash.
 Durchstich: `e2e Ladenakte > Kassenblatt`.
+
+
+## TPAPI-Dienst: Personal je Stunde (`0149`, 09.11.2026)
+
+Der fünfte Dienst in Phase A (`yext · bounti · wetter · pflege · tpapi`; „sechs" stimmt nur, wenn
+man den Import mitzählt). Plan und Entscheidungen D1–D8: `plan-tpapi.md`; Quelle:
+`lina-third-party-api.md`; Tabellen: `datenmodell.md`.
+
+**Warum ein eigener Dienst und kein Posten in der Warteschlange.** Anderer Host
+(`api.lina.de`), kein Scraper-Zugang, keine Sitzung: ein Header `apikey` je Betrieb und ein
+dokumentiertes Limit (100 Anfragen je Laden und 15 Minuten). Die Ladenakte bekam keine eigene Spur,
+weil sie **derselbe** Zugang ist wie die Berichte — das hier ist ein anderer. Regel 3 gilt trotzdem.
+
+**Dateien.** `src/tpapi/client.ts` (eigener Client: nur GET, Takt als Pause zwischen zwei
+Aufrufen, `redirect: 'manual'`, **kein Retry für keinen Ausgang**, jede Meldung läuft durch
+`sauber()`, das jeden konfigurierten Schlüssel ersetzt), `form.ts` (reine Funktionen, Antwort →
+Zeilen, Rundung auf Cent; getrennt von `laden.ts`, damit ein Test nicht die `.env` lädt),
+`laden.ts` (raw → core in einer Transaktion), `nachlauf.ts` (`tpapiNachlauf()`), `mock.ts`
+(Attrappe). `src/sync.ts` ruft sie neben Yext, Bounti, Wetter und Handpflege auf.
+
+**Konfiguration.** `LINA_API_SCHLUESSEL` (JSON `encId → Schlüssel`) wird beim Start zu
+`config.TPAPI_SCHLUESSEL` geparst: encId 40 Hex klein, Wert nicht leer; ungültig bricht den Start
+ab. Der Rohtext steht **nicht** im `config`-Objekt, `konfigZumLoggen` nennt nur die Anzahl.
+`TPAPI_FENSTER_TAGE` (14), `TPAPI_BACKFILL_JE_LAUF` (2.000, 0 schaltet den Backfill ab),
+`TPAPI_HISTORIE_TAGE` (365 — die Sicht `mart.personal_rueckstand` trägt die 365 fest und ist
+zusammen mit der Variable zu ändern), `TPAPI_TAKT_MS` (1.000, Untergrenze 250),
+`TPAPI_AUFRUFE_JE_BETRIEB` (80).
+
+**Ablauf.** Ohne Schlüssel: Zugang trotzdem spiegeln (alle auf `ohne_schluessel`), dann
+`uebersprungen`. Sonst: `sync.tpapi_zugang` spiegeln, rollierendes Fenster (die letzten 14 Tage),
+dann der Backfill aus `mart.personal_rueckstand`, neueste Tage zuerst, höchstens 2.000
+Betrieb-Tage je Nacht — auch der Backfill filtert auf heute aktive Betriebe und
+`geschaeftstag >= current_date - TPAPI_HISTORIE_TAGE`. Kein Handbefehl: 41 × 365 sind in rund acht
+Nächten durch, und die Frist ist LINAs Jahr.
+
+**Tag außen, Betrieb innen (D6).** Die Schleife läuft über die Tage, darin über die Betriebe: bei 41
+Betrieben trifft sie jeden Laden nur etwa alle 41 s, rund 22 Aufrufe je 15 Minuten gegen 100 — auch
+wenn Bounti und Sell & Pick am selben Laden mitzählen. Betrieb außen hieße 80 Aufrufe in 80 Sekunden
+gegen einen Laden. **Kein `getlimit`:** bei Team-only-Betrieben ist es nicht aufrufbar (403), und
+es zählt womöglich fremde Anbieter mit (Nürnberg, 09.11.2026: schon 7 vor unserem zweiten Aufruf).
+
+**Die Ausgänge je Betrieb, für diesen Lauf:**
+
+| Antwort | `sync.tpapi_zugang.zustand` | Folge |
+|---|---|---|
+| 200 | `ok` | geladen; leere Antwort = `leer`, Tag gilt als geholt (D5) |
+| 429 | `gebremst` | Betrieb für diesen Lauf aus, nicht der Dienst |
+| 403 „not licensed" | `nicht_lizenziert` | Betrieb aus, sieben Tage nicht gefragt (D7) — **ein Zustand, kein Fehler** |
+| 401/403 sonst | `abgewiesen` | Betrieb aus, **kein zweiter Versuch** (Regel 7) |
+| 5xx, Netz | `fehler` | Betrieb aus, nächste Nacht wieder |
+| 200 in unbekannter Form | `fehler` (`formfehler`) | die Antwort bleibt in `raw`, der Tag wird nicht geladen |
+| `TPAPI_AUFRUFE_JE_BETRIEB` erreicht | — | Betrieb aus, **kein** Zustand: die eigene Obergrenze sagt nichts über LINA |
+
+**`teilweise` und `ok`.** Der Dienst gibt `teilweise` zurück bei gebremst/abgewiesen/fehler, bei
+einem Schlüssel ohne Betrieb (`core.betrieb.enc_id` unbekannt), oder wenn **kein** Betrieb
+erfolgreich war. „not licensed" und die eigene Obergrenze machen den Lauf **nicht** `teilweise`
+(D7): ein Alarm, der jede Nacht schlägt, wird abgeschaltet.
+
+**Was nach `raw` geht und was nicht.** Jede Antwort, auch 403 und 429 (Beleg für den Zustand), nach
+`raw.api_antwort` mit `quelle = 'tpapi'`. **Vor `raw` wird jedes Feld entfernt, dessen Name auf
+`User` endet** (nicht nur `kostUser`); der Hash kommt aus der bereinigten Antwort, damit er sich
+nicht mit Umbuchungen zwischen zwei Personen ändert. Bei Nicht-200 werden `roh` und `daten`
+gesäubert; bei Netzfehler ohne Antwort gibt es keinen `raw`-Satz. Wertebereiche werden **vor** der
+Transaktion geprüft, damit der Rohsatz nicht mit zurückrollt (Lehre aus `0136`).
+
+**Der Merker.** `sync.merker` `tpapi_personal` trägt `{ok, fehler, beendet_am, betriebe, abrufe,
+geladen, leer, ohne_betrieb}` und speist `mart.quelle_zulauf` (Register `tpapi:personalkosten_stunde`,
+Kadenz 48 Stunden, `erwartet` nur mit Schlüsseln). Neuer Logeintrag `tpapi personal geholt` mit
+`sicht: 'mart.tpapi_zugang'`. **Was sichtbar bleibt (Regel 10):** `mart.tpapi_zugang` (jeder Betrieb
+mit Zustand), die Zahl in `mart.personal_rueckstand`, die sinken muss, und drei Zeilen in
+`mart.pruefung_uebersicht`.
+
+**Verbindungen.** Zwei Worker-Spuren plus fünf Dienste = sieben von `max: 8`.

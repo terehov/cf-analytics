@@ -2067,3 +2067,63 @@ Monatsübersicht, der Betrieb trifft sie sonst — der Nachtlauf ergänzt die Ta
 (`lina_quote` < 0,75), das wird nicht automatisch gefüllt. In `mart.umsatz_tag` stehen ergänzte
 Tage mit `quelle = 'kassenblatt'` und ohne Rechnungen und Gäste — bei Bon- und Gästekennzahlen auf
 `quelle = 'umsatzbericht'` filtern, wie bei fremden Kassen.
+
+## Personal je Stunde in `mart` (Migration `0149`, 09.11.2026)
+
+Sechs Sichten auf LINAs Personalplanung (TPAPI), alle live, alle für `mcp_leser` lesbar (Leseprobe
+in der Migration). Quelle und Fallen der Herkunft: `datenherkunft.md`; Plan: `plan-tpapi.md`.
+
+| Sicht | Körnung | Wofür |
+|---|---|---|
+| `mart.personal_stunde` | Betrieb × Geschäftstag × Stunde | Personen, Lohnkosten, daneben der Nettoumsatz derselben Stunde (`umsatz_je_person`, `personalkostenquote_pct`); `wochentag` deutsch, `wochentag_nr` ISO, `stunde_folge` |
+| `mart.personal_zeitfenster` | Betrieb × Geschäftstag × Fenster (`manual.zeitfenster`) | Personenstunden, Lohnkosten, Umsatz je Fenster; geht von den **abgerufenen Tagen** aus — ein Fenster ohne Personal steht mit `stunden_besetzt = 0` da, statt zu fehlen; beide Seiten als `LATERAL` über Primärschlüssel |
+| `mart.personal_tag` | Betrieb × Geschäftstag | Personenstunden, Lohnkosten, `stunden_besetzt`, erste/letzte besetzte Stunde (in Geschäftstag-Reihenfolge), Tagesumsatz aus dem Umsatzbericht, `stunden_geliefert`, `abgerufen_am` |
+| `mart.personal_rueckstand` | Betrieb × fehlender Tag | Die Arbeitsliste des Backfills. **Die Zahl muss von Nacht zu Nacht fallen und 0 erreichen.** `nicht_lizenziert` fehlt hier, sonst ginge sie nie auf 0; `zugang_zustand` erklärt, warum ein Betrieb stehen bleibt. Horizont 365 fest in der Sicht, zusammen mit `TPAPI_HISTORIE_TAGE` zu ändern |
+| `mart.personal_stunde_pruefung` | Betrieb × abgerufener Tag | Zwei Proben (unten) |
+| `mart.tpapi_zugang` | Betrieb (alle 141) | `schluessel`, `zustand`, `zuletzt_gefragt`, `zuletzt_erfolg`, `letzter_fehler`, `tage_geladen`, `rueckstand_tage`, `befund` |
+
+**Die Fallen, die man den Sichten nicht ansieht:**
+
+1. **Quoten aus Summen, nie gemittelt.** `personalkostenquote_pct` und `umsatz_je_person(stunde)`
+   sind Prozentzahlen bzw. Euro je Zeile; über mehrere Stunden, Tage oder Betriebe aus
+   `sum()/sum()` neu rechnen.
+2. **Der Geschäftstag beginnt um 08:00.** „Ab 18 Uhr" ist `stunde >= 18 OR stunde < 8`; sortieren
+   nach `stunde_folge`, nie nach `stunde`. `erste_stunde`/`letzte_stunde` stehen in
+   Geschäftstag-Reihenfolge: `letzte_stunde = 2` heißt 02:00 der Nacht danach.
+3. **Leer ist nicht null.** Eine Stunde ohne Zeile fehlt; `stunden_besetzt = 0` und
+   `stunden_geliefert = 0` heißen „LINA führt dort niemanden", nicht „niemand war da".
+4. **Nur Betriebe mit Schlüssel.** `mart.tpapi_zugang` sagt, wer fehlt und warum
+   (`operativ ohne Schluessel`, `nicht lizenziert`, `abgewiesen`, `gebremst`,
+   `Schluessel ohne Zulauf`, `nicht operativ`). „Nicht lizenziert" ist ein Zustand, kein Fehler.
+5. **Lohnkosten der Personalplanung ≠ Personalkosten der BWA.** Nicht gegen
+   `mart.personal_bereich_monat` oder `mart.round_table_monat` rechnen.
+6. **Ein Jahr Historie.** Vor November 2025 gibt es nichts.
+
+**Zwei Proben in `mart.personal_stunde_pruefung`.** `befund` vergleicht die TPAPI-Lohnkosten
+**vom Monatsersten bis zum Tag** mit `pek_gesamt × Tagesumsatz` — nicht den Tag, weil `pek` im
+Tagesabruf seit Monatsanfang aufgelaufen ist (`fehlerkatalog.md`; Plan §3.5 sah noch den
+Tagesvergleich vor, er wäre an fast jedem Tag `weicht ab` gewesen). Werte: `ok` (≤ 5 %),
+`weicht ab`, `ohne vergleich`, `leer`, und `monat unvollstaendig`, solange ein Tag davor fehlt —
+verschwindet mit dem Backfill. `befund_stunden` setzt die Personenstunden des Tages gegen
+`Umsatz / eff_gesamt` (`eff` ist je Tag nicht aufgelaufen) und ist **die Nachtprobe**, ob die
+Stunden 0–7 am richtigen Tag stehen. Beide Proben können abweichen, ohne dass etwas falsch ist: der
+Scraper holt `getPersonalkosten` 21 Tage nach, die TPAPI 14, Schichten werden nachträglich
+korrigiert.
+
+**Drei Zeilen in `mart.pruefung_uebersicht`:** „TPAPI: operativer Betrieb ohne Schluessel"
+(**konstant, nicht null**, bis die Buchungen nachgezogen sind — `offene-punkte.md`), „TPAPI:
+Schluessel ohne Zulauf (48 h)" (Erwartung 0, `nicht_lizenziert` ausgenommen) und „Personal je
+Stunde: Tageskosten weichen von LINAs Quote ab (60 Tage)" (ohne die jüngsten acht Tage).
+
+**MCP-Katalog.** Körnung und Thema `personal` je Sicht (Prüfsichten `import`,
+`summen_erlaubt = false`). Fallstricke: `personal_nur_mit_schluessel_*`,
+`personal_leer_ist_nicht_null_*`, `personal_historie_ein_jahr_*` (`deutung` gilt je Sicht, daher die
+Endungen `_stunde`/`_zeitfenster`/`_tag`) und `personal_tpapi_gegen_bwa` (`sichten_mischen`). Schwere
+`hinweis` gibt es nicht — `mcp.fallstrick.schwere` erlaubt `sperre`/`warnung`. **Nach dem Deploy
+und der ersten vollen Nacht den Katalogabzug neu ziehen** (`cd mcp && MCP_DATABASE_URL=… bun run
+katalog:abzug`, gegen die Produktion, Weg wie am 29.10.2026).
+
+**Messung** (09.11.2026, synthetisches Jahr, 41 Betriebe, 284.335 Stunden): `personal_stunde` je
+Betrieb und Monat 3,4 ms; Melanies Filter auf `personal_zeitfenster` 5 ms;
+`personal_stunde_pruefung` seit Juli 89 ms; `tpapi_zugang` 33 ms. Deshalb keine Materialisierung
+(Plan D8) — erst, wenn die echten Daten eine Messung verlangen.

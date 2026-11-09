@@ -1429,8 +1429,16 @@ export const dashboards: Dashboard[] = [
     // Zeitraum den Verlaeufen und den Zeitraumtabellen darunter. Ohne ihn
     // zeigten pe_verlauf, pe_bereich und pe_effektivitaet die gesamte
     // Historie, waehrend oben ein Monat eingestellt war.
-    filter: [F_MONAT, F_ZEITRAUM_DREI_MONATE, F_BETRIEB],
-    reihen: [
+    filter: [F_MONAT, F_ZEITRAUM_DREI_MONATE, F_MARKE, F_BETRIEB],
+    // REITER, weil die Seite zwei Fragen beantwortet, die nichts miteinander
+    // rechnen: "was kostet das Personal" (BWA, Monate, Quoten) und "wer steht
+    // wann im Dienst" (Personalplanung, Stunden, Personen). Quelle, Takt und
+    // Filter sind verschieden — die Besetzung kennt nur den Monat, keinen
+    // Zeitraum, und die Kostenseite keine Marke. Nebeneinander auf einer
+    // Rollbahn wuerden zwei Kostengroessen aus zwei Quellen untereinander
+    // stehen. Drill-Downs von aussen landen auf dem ersten Reiter.
+    tabs: [
+    { name: 'Kosten und Effektivität', reihen: [
       // ZWEI PERSONALKOSTENGROESSEN, EINE SEITE. Der Text darunter ist der
       // wichtigste auf diesem Dashboard: pe_bereich stellt "Personal
       // gesamt %" (operativ, aus der Kasse) und "o. GF %" (vom
@@ -1444,6 +1452,14 @@ export const dashboards: Dashboard[] = [
         klick: [{ ziel: 'db_personal', uebergabe: { monat: 'Monat' } }] }] },
       { teile: [{ karte: 'pe_bereich', hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ karte: 'pe_effektivitaet', hoehe: 11, klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+    ] },
+    { name: 'Besetzung je Stunde', reihen: [
+      { teile: [{ text: '# Besetzung je Stunde\n\nWie viele Personen stehen wann im Dienst — aus LINAs **Personalplanung**, Stunde für Stunde. **Monat**, **Marke** und **Betrieb** oben gelten für diesen Reiter; der Zeitraum nicht.\n\n**Der Geschäftstag läuft von 08 bis 07 Uhr**, die Nachtstunden stehen am Ende. Eine Stunde ohne eingeplante Person ist **null Personen**; ein Tag, an dem der Betrieb gar keine Schichten führt, zählt nicht mit. Es gibt nur Betriebe mit Anbindung an die Personalplanung.\n\n**Die Lohnkosten hier sind die der Personalplanung, nicht die Personalkosten der BWA** — die Quoten auf dem anderen Reiter sind eine andere Größe und nicht damit vergleichbar.' }] },
+      { teile: [{ karte: 'pers_stunde_verlauf' }] },
+      { teile: [{ karte: 'pers_wochentag_stunde', hoehe: 13 }] },
+      { teile: [{ karte: 'pers_zeitfenster' }] },
+      { teile: [{ karte: 'pers_tag_verlauf' }] },
+    ] },
     ],
   },
 
@@ -2230,6 +2246,12 @@ export const dashboards: Dashboard[] = [
        */
       { teile: [{ text: '## Bekommt jede Quelle noch Zulauf?\n\n**Ein Importer ohne Arbeit sieht genauso aus wie einer, der fertig ist.** Die Karten darunter messen Arbeit; diese hier misst, ob es überhaupt welche geben müsste. „Wird noch gefragt? **NEIN**" ist der schwerere Fall: dann holt der Importer diese Quelle gar nicht mehr ab.' }] },
       { teile: [{ karte: 'im_quellen', hoehe: 12 }] },
+      // Die Personalplanung (TPAPI) hat einen EIGENEN Zugang je Betrieb: ein
+      // Schluessel, ein Modul, das gebucht sein muss. Wer ohne Schluessel oder
+      // nicht lizenziert ist, fehlt still in allen Besetzungskarten -- Regel 10.
+      { teile: [{ text: '## Personalplanung: Zugang und Probe\n\nJeder Betrieb braucht einen eigenen Schlüssel **und** das gebuchte Modul. Wer beides nicht hat, fehlt in den Besetzungskarten, ohne dass etwas fehlschlägt. „Nicht lizenziert" ist ein Zustand, kein Fehler. Darunter die Probe, ob die Nachtstunden am richtigen Tag stehen.' }] },
+      { teile: [{ karte: 'im_tpapi_zugang', hoehe: 12 }] },
+      { teile: [{ karte: 'im_personal_pruefung', hoehe: 10 }] },
 
       { teile: [{ text: '## Woran hängt es?\n\n**Ruht der Zugang, steht alles still** — dann erübrigt sich die weitere Suche. Sperren laufen von selbst ab; nur ein Anmeldefehler braucht einen Menschen.' }] },
       { teile: [{ karte: 'im_sperre' }] },

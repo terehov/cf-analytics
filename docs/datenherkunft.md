@@ -1012,3 +1012,52 @@ der 7.452 Positionen — also 91,5 % der Positionen mit Nummer treffen den Einka
 
 **Wo man nachsieht, ob es noch läuft:** `SELECT * FROM mart.rezept_stand;` (Zustand je Marke),
 `SELECT * FROM mart.quelle_zulauf WHERE quelle LIKE 'fn:rezept%' OR quelle = 'core:rezept';`.
+
+## Personal je Stunde — LINAs offizielle Schnittstelle (TPAPI, seit `0149`, 09.11.2026)
+
+Die Quelle nach Bounti, und die erste, die LINA selbst liefert, **ohne** dass der Scraper sie
+holt: `api.lina.de`, ein Schlüssel je Betrieb
+(`LINA_API_SCHLUESSEL`), Endpunkt `GET /extern/personal/personalkostenprostunde`. Quelle und
+Messungen: `lina-third-party-api.md`, Plan und Entscheidungen: `plan-tpapi.md`. Anlass war
+Melanies Frage, wie viele Leute sonntags ab 18 Uhr bei Wilma Wunder stehen und was sie je Person
+umsetzen — bis dahin nur als Ableitung aus Umsatz und Effektivität zu beantworten.
+
+**Woher die Zahl kommt.** `eff` = Personen in der Stunde, `kost` = Lohnkosten in EUR, beides
+aus LINAs Personalplanung (ISP). `core.personalkosten_stunde`, eine Zeile je Betrieb,
+Geschäftstag und Stunde; die Lohnkosten je Person (`kostUser`) kommen **nirgends** an, auch nicht
+in `raw`.
+
+**Der Geschäftstag.** `businessdate` ist LINAs Geschäftstag (08:00 bis 07:59 des Folgetags). Die
+Stunden 0–7 der Antwort für Tag D gehören zu D — wie im Stundenbericht seit `0138` (KORREKTUR 11).
+Der Lader **rechnet nichts um**. Ob das für die Personalplanung stimmt, ist eine Annahme, bis die
+Nachtprobe gelaufen ist: `mart.personal_stunde_pruefung.befund_stunden` (Personenstunden gegen
+`Umsatz / eff_gesamt`). Weicht sie bei Betrieben mit Nachtgeschäft systematisch ab, ordnet LINA die
+Nacht anders zu — dann KORREKTUR in `lina-api-korrekturen.md`, nicht raten. Für den Verlauf nach
+`stunde_folge` sortieren (8 Uhr = 0 … 7 Uhr = 23), nie nach der Uhrzeit.
+
+**Wie die Tabellen zusammenfinden.** `(betrieb_key, geschaeftstag, stunde)` gegen
+`core.zeitzonenbericht_stunde` (Umsatz derselben Stunde) — `mart.personal_stunde` tut das schon.
+Den Tagesumsatz holen `mart.personal_tag` und die Prüfsicht aus `core.umsatzbericht_tag`
+(Gesamtzeile: `hauptsparte_key` und `verkaufsstelle_key` NULL).
+
+**Was die Zahl nicht sagt:**
+
+* **Nur Betriebe mit Schlüssel** — 41 am 09.11.2026. Wer fehlt, hat nicht null Personal;
+  `mart.tpapi_zugang` führt alle 141 Betriebe mit Grund (sieben laufende Enchilada, Schlager Cafe
+  und die meisten Deutschen Konzepte haben keine Buchung, `offene-punkte.md`).
+* **Leer ist nicht null.** Eine Stunde, die LINA nicht liefert, hat keine Zeile; ein Tag ohne
+  Stunden (`stunden_geliefert = 0`) heißt „keine Schichten in LINA geplant", nicht „niemand da".
+  Ob ein Tag je gefragt wurde, steht in `core.personalkosten_stunde_abruf`.
+* **Lohnkosten der Personalplanung sind nicht die Personalkosten der BWA** — anderer Zeitpunkt,
+  andere Basis. Quoten nicht gegeneinander rechnen (MCP-Fallstrick `personal_tpapi_gegen_bwa`).
+* **Die Historie ist ein Jahr.** `listdays` reichte am 09.11.2026 bis 03.11.2025; was der Backfill
+  nicht rechtzeitig holt, ist weg.
+* **Schichten werden nachträglich korrigiert.** Ein geholter Tag ist nicht endgültig, deshalb das
+  rollierende Fenster von 14 Tagen; `core.personalkosten_stunde_abruf.abgerufen_am` ist der
+  Datenstand.
+* **`core.personalkosten.pek_gesamt` taugt nicht als Gegenprobe je Tag**: im Tagesabruf ist die
+  „Quote" seit Monatsanfang aufgelaufen (`fehlerkatalog.md`, Eintrag zu `pek_*`; nachgemessen
+  09.11.2026 auf dem Klon, Median `pek_gesamt × umsatz_netto / 100` nach Monatstag: Tag 1
+  2.053 EUR, Tag 8 9.610 EUR, Tag 15 16.664 EUR, Tag 28 31.831 EUR). Deshalb vergleicht die
+  Prüfsicht die TPAPI-Monatssumme bis zum Tag — und hat als eigentliche Nachtprobe
+  `befund_stunden`, denn `eff_*` ist je Tag nicht aufgelaufen.

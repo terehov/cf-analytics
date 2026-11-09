@@ -1800,3 +1800,47 @@ weil die Prüfsicht den Gesamt-Stundenbericht je Tag zusammenrechnet.
 **Vor dem ersten `uebernehmen.ts`** muss Metabase `mart.umsatz_stunde_sparte` und
 `mart.umsatz_zeitfenster_sparte` synchronisiert haben: der Zeitraum ist ein Feldfilter auf deren
 `geschaeftstag`, sonst bricht der Lauf mit „Feld nicht gefunden" ab (wie bei `bewertung_tag`).
+
+## Personal: Reiter „Besetzung je Stunde" und zwei Importkarten (`0149`, 09.11.2026)
+
+Anlass war Melanies Frage: wie viele Leute stehen sonntags ab 18 Uhr bei Wilma Wunder, und was
+setzen sie je Person um. Quelle ist LINAs Personalplanung über die TPAPI (`datenherkunft.md`,
+Sichten in `metabase.md`); Karten in `metabase/karten-personal.ts`.
+
+**Warum Reiter.** `db_personal` hat jetzt zwei: „Kosten und Effektivität" (BWA, Monate, Quoten) und
+„Besetzung je Stunde" (Personalplanung, Stunden, Personen). Die Seite beantwortet zwei Fragen, die
+nichts miteinander rechnen — Quelle, Takt und Filter sind verschieden. Auf einer Rollbahn stünden
+zwei Kostengrößen aus zwei Quellen untereinander und läsen sich als dieselbe Zahl in zwei
+Fassungen. Drill-Downs von außen landen auf dem ersten Reiter. Die Textkachel des neuen Reiters
+sagt es zuerst: Lohnkosten der Personalplanung, **nicht** Personalkosten der BWA.
+
+**Filter.** Monat, Marke und Betrieb wirken auf den neuen Reiter, der Zeitraum nicht — die vier
+Karten zeigen Mittel je Betrieb und Tag für **einen** Monat; die Quote wäre über mehrere Monate
+ungeklärt (`FILTER_AUSNAHME` in `uebernehmen.ts`, je Karte begründet). Umgekehrt filtert die Marke
+den Reiter „Kosten" nicht; die Ausnahmen dort sagen es. Ohne gewählten Monat gilt der jüngste mit
+Personaltagen, nicht der des Round Table — die Personaldaten reichen nur rund ein Jahr zurück.
+
+| Karte | Darstellung | Warum so |
+|---|---|---|
+| `pers_stunde_verlauf` — Besetzung und Umsatz je Stunde | kombiniert: Balken Ø Personen, Linie Ø Umsatz (rechte Achse), x-Achse 08→07 Uhr | Zwei Einheiten (Personen, EUR) im selben Tagesverlauf — das Verhältnis ist die Aussage („zu dünn besetzt, wenn der Umsatz steigt"). Die Reihenfolge ist die des Geschäftstags, nicht der Uhr |
+| `pers_wochentag_stunde` — Stunde × Wochentag | Tabelle mit Farbskala, wie `st_wochenprofil` | Die Fachfrage ist ein Raster: Sonntag × ab 18 Uhr. Metabases Pivot sortiert die Wochentage alphabetisch (Freitag, Montag, …), die Tabelle hält Mo–So. Je dunkler grün, desto mehr Personen. Eine leere Zelle heißt „in dieser Stunde war an diesem Wochentag niemand eingeplant" |
+| `pers_zeitfenster` — Personal je Zeitfenster | Tabelle | Personenstunden, Lohnkosten, Umsatz, Umsatz je Personenstunde, Quote — fünf Zahlen in drei Einheiten (Stunden, EUR, Prozent) je Zeile; als Diagramm hieße das mehrere Einheiten in einem Bild. **Quoten aus Summen**, nicht aus Tageswerten gemittelt |
+| `pers_tag_verlauf` — Personenstunden und Umsatz je Personenstunde je Tag | kombiniert: Balken Personenstunden, Linie Umsatz je Personenstunde | Der Monat als Verlauf: wann wurde viel gearbeitet, und lohnte es sich |
+
+**Der Nenner, und warum er so gewählt ist.** Die Verlaufskarten teilen durch die Zahl der
+**Betrieb-Tage mit Schichten** (`stunden_geliefert > 0`) und füllen Stunden ohne Zeile mit 0.
+Eine Stunde, in der niemand eingeplant ist, zählt damit als „0 Personen" — eine reale Aussage über
+einen Betrieb, der Schichten in LINA führt. Ein Tag, an dem LINA gar nichts liefert, zählt im Nenner
+**nicht** mit: dort plant der Betrieb vermutlich nicht in LINA, und eine 0 würde den Mittelwert
+nach unten ziehen, als wäre niemand da gewesen. Es zählen außerdem nur Betriebe mit Anbindung — die
+Textkachel sagt es, weil sonst ein fehlender Betrieb wie „kein Personal" aussieht.
+
+**Importseite („Datenqualität und Import").** Zwei Karten unter „Bekommt jede Quelle noch Zulauf?"
+(Regel 10): `im_tpapi_zugang` (alle Betriebe mit Zustand der Anbindung, Auffälliges oben) und
+`im_personal_pruefung` (Tabelle, nur `weicht ab`, am stärksten Abweichende zuerst; die Nachtprobe,
+ob die Stunden 0–7 am richtigen Tag stehen). Beide Tabellen, weil es Arbeitslisten sind. „Nicht
+lizenziert" steht dort als Zustand, nicht als Fehler — die Erklärung steht in der Textkachel.
+
+**Vor dem ersten `uebernehmen.ts`:** Metabase die neuen `mart`-Sichten synchronisieren lassen. Die
+Karten lesen nur `mart` (`metabase/karten_schema.test.ts` wacht darüber, der MCP-Zugang führt sie
+als `mcp_leser` aus). `bun test metabase/karten.test.ts` fasst Metabase nicht an.

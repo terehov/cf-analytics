@@ -44,6 +44,7 @@ const DIENSTE: Array<[string, string]> = [
   ['bounti', 'bountiNachlauf'],
   ['wetter', 'wetterNachlauf'],
   ['handpflege', 'pflegeNachlauf'],
+  ['tpapi', 'tpapiNachlauf'],
 ]
 
 /**
@@ -71,7 +72,7 @@ describe('sync.ts — Phase A und Phase B', () => {
     expect(sync.indexOf(SAMMELPUNKT)).toBeGreaterThan(0)
   })
 
-  test('alle vier Dienste stehen in der Liste der Phase A', () => {
+  test('alle fuenf Dienste stehen in der Liste der Phase A', () => {
     const fehlt = DIENSTE.filter(([name, fn]) =>
       !new RegExp(`\\['${name}',\\s*${fn}\\(\\)\\]`).test(sync))
     expect(fehlt.map(([n]) => n)).toEqual([])

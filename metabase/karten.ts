@@ -36,13 +36,14 @@ import { karten as kartenBounti } from './karten-bounti'
 import { karten as kartenArtikelaktion } from './karten-artikelaktion'
 import { karten as kartenKasse } from './karten-kasse'
 import { karten as kartenManagement } from './karten-management'
+import { karten as kartenPersonal } from './karten-personal'
 
 export const alleKarten: Karte[] = [
   ...kartenManagement,
   ...kartenDrilldown, ...kartenPortfolio, ...kartenRoundTable, ...kartenFach, ...kartenImport,
   ...kartenStandort, ...kartenBewertung, ...kartenAktionen, ...kartenYext, ...kartenVergleich,
   ...kartenFremdeinkauf, ...kartenPflichtartikel, ...kartenKalender, ...kartenBounti,
-  ...kartenArtikelaktion, ...kartenKasse,
+  ...kartenArtikelaktion, ...kartenKasse, ...kartenPersonal,
 ]
 
 /** Eine Karte an ihrem Schluessel. */

@@ -23,6 +23,7 @@ import { zuordnungNachlauf } from './sync/zuordnung'
 import { konzeptZuordnungNachlauf } from './sync/konzept_zuordnung'
 import { yextNachlauf } from './yext/nachlauf'
 import { bountiNachlauf } from './bounti/nachlauf'
+import { tpapiNachlauf } from './tpapi/nachlauf'
 import { zulaufPruefen } from './sync/zulauf'
 import { pflegeNachlauf } from './pflege/nachlauf'
 import { laufMelden } from './meldung'
@@ -107,7 +108,9 @@ try {
    *
    * DIE VERBINDUNGEN REICHEN. Der Pool steht auf `max: 8`; jeder Zweig hier
    * greift seine Abfragen streng nacheinander ab, hält also höchstens EINE
-   * Verbindung. Zwei Worker-Spuren plus vier Dienste sind sechs. Die
+   * Verbindung. Zwei Worker-Spuren plus ~~vier~~ fünf Dienste (seit dem TPAPI-
+   * Dienst, 0149) sind sieben — eine unter `max`. Ein weiterer Dienst füllt
+   * den Pool ganz aus; danach braucht es einen größeren. Die
    * Verbindung der Laufsperre zählt nicht mit — sie liegt bewusst außerhalb
    * des Pools (siehe `sperreHolen()` in sync/worker.ts).
    * ══════════════════════════════════════════════════════════════════
@@ -136,7 +139,7 @@ try {
     grund => ({ status: 'abgelehnt' as const, grund }))
 
   /*
-   * Die vier Dienste. Alle vier versprechen in ihrem Kopf, NIE zu werfen —
+   * Die Dienste. Alle versprechen in ihrem Kopf, NIE zu werfen —
    * `allSettled` prüft dieses Versprechen, statt sich darauf zu verlassen.
    * Bricht eines doch, steht es als Fehler im Log und der Lauf geht weiter;
    * lautlos verschluckt wird nichts (Regel 10).
@@ -152,6 +155,16 @@ try {
     ['bounti',     bountiNachlauf()],
     ['wetter',     wetterNachlauf()],
     ['handpflege', pflegeNachlauf()],
+    /*
+     * Der fünfte Eintrag hier seit 0149 (mit dem Import der sechste
+     * Dienst): LINAs offizielle Schnittstelle
+     * (`api.lina.de`, ein Schluessel je Betrieb). Eigener Client, eigener
+     * Takt — NICHT die Spur des Scrapers, das ist ein anderer Zugang mit
+     * eigenem Limit (docs/plan-tpapi.md, D2). Keine materialisierte Sicht
+     * liest seine Tabellen; seine Stelle vor dem Sammelpunkt ist trotzdem
+     * die richtige, weil `zulaufPruefen()` in Phase B seinen Merker liest.
+     */
+    ['tpapi',      tpapiNachlauf()],
   ]
 
   const diensteAusgang = await Promise.allSettled(dienste.map(([, p]) => p))
@@ -166,7 +179,7 @@ try {
   const imp = await importErgebnis
   /*
    * Die Fehlersemantik des Imports bleibt EXAKT wie vorher: wirft er, wirft
-   * dieser Lauf. Nur eben erst, nachdem die vier Dienste zu Ende gekommen
+   * dieser Lauf. Nur eben erst, nachdem die Dienste zu Ende gekommen
    * sind — ihre Arbeit ist getan und soll nicht mit verworfen werden.
    */
   if (imp.status === 'abgelehnt') throw imp.grund

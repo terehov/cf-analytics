@@ -89,6 +89,7 @@ Kommentare sind deutsch, damit sie in Postico lesbar sind.
 | **`plan-lina-kassendaten.md`** | **Finanzwege, Rabatte, Bonebene aus LINA** — Anlass Glücksrad (Menge je Artikel und Finanzweg 3500–3502, mit unserem Bestand nicht beantwortbar). Keiner der 72 Betriebsberichte wird geladen; Erkundung, Importerumbau für `storeId`, Bonebene samt Historie, Kostenrechnung auf 152.840 Betrieb-Tage. Hypothese: CF bucht Nachlässe als Finanzweg, deshalb ist der Rabattbericht leer | Bevor du einen Betriebsbericht (`getReport`), das Kassenjournal oder Zahlungsdaten anfasst |
 | **`plan-rezepturen.md`** | **Rezepturen aus FoodNotify** (`0132`): Quelle, die Artikelnummer-Brücke (Lieferanten-Artikelnummer, nicht `core.ware.fn_id`), Tabellen, Sichten, Takt — Entscheidungen A–D und der Ist-Stand | Bevor du an Rezepten, `core.zutat` oder `mart.artikel_in_rezept` arbeitest |
 | **`plan-lina-vollabzug.md`** | **Alles, was aus LINA noch zu holen ist** — der Ausbau des Kassendaten-Plans auf den ganzen Katalog der 72 Betriebsberichte, damit Fragen wie das Glücksrad im Haus beantwortet werden statt per Auftrag. Enthält den **Fragenkatalog** (welcher Bericht beantwortet welche Fachfrage, in welcher Körnung, und was er ausdrücklich NICHT kann), die Einteilung in Stufe A/B/C mit Aufrufkosten auf 152.840 Betrieb-Tage, das Datenmodell (`core.finanzweg*`, `core.rabatt_artikel_tag` namensgeschlüsselt, `core.bon` mit 30,3 Mio. Zeilen), die drei Lücken im Importer samt Gegenprobe gegen `balanceSumNetto` — und den Weg bis zur Selbstbedienung über den MCP-Zugang. Zwei Berichte im Tagesraster kosten elf Wochen Backfill, jeder weitere fünfeinhalb | Bevor du einen weiteren LINA-Endpunkt aktivierst, den Betriebsbericht-Einreihweg baust oder eine Kassenfrage als „nicht beantwortbar" weitergibst |
+| **`plan-tpapi.md`** | **Personal je Stunde aus LINAs offizieller Schnittstelle (TPAPI)** — Melanies Frage (Besetzung sonntags ab 18 Uhr). Entscheidungen D1–D8, Datenmodell, Importer (Tag außen, Betrieb innen; kein `getlimit`), die Nachtprobe für den Geschäftstag und die Messungen nach der ersten Nacht (§5). **§9 nennt die Abweichungen vom Plan** — vor allem: `pek_gesamt` je Tag ist aufgelaufen, deshalb Monatsvergleich. ⚠️ Gebaut gegen die Attrappe, nie gegen das echte LINA gelaufen | Bevor du an `src/tpapi/`, `mart.personal_*` oder `mart.tpapi_zugang` arbeitest, einen weiteren TPAPI-Endpunkt (Stufe 2) aktivierst oder eine Besetzungszahl deutest |
 | **`plan-skybridge.md`** | **Der Plan, mit dem andere die Daten selbst befragen** — Daniel mit ChatGPT, Copilot oder Claude, **ohne BI-Tool**: ein eigener MCP-Server (Skybridge), der die 285 Karten als Berichte ausfuehrt, Koernung, Achsen und Fallstricke als Daten in `mcp.*` haelt, freie Abfragen auf dem Syntaxbaum prueft und ueber `mcp_leser` nur `mart`/`manual`/`ampel` sieht. Das BI-Tool liest kuenftig dieselben Karten und Achsen, bis es gehen kann | Bevor du am MCP-Zugang, an `mcp_leser`, an `mcp.*`, an `beziehungen.ts` oder an einer Sicht-Koernung arbeitest |
 | **`offene-punkte.md`** | Was ungeklärt ist und wer es klären muss | Bevor du etwas als fertig meldest |
 | **`datenlage-round-table.html`** / `.pdf` | Was der Round-Table-Map noch fehlt — nach der Messreihe vom 11.08.2026 nur noch Rechte, Bounti/OpenTable, Stammdatenpflege und fachliche Festlegungen | Bevor du einen Punkt als „fehlt" weitergibst |
@@ -213,6 +214,7 @@ Handgeschriebenes SQL, nummeriert, wird der Reihe nach angewendet. Bewusst handg
 | `0146_karten_ohne_core.sql` | **Jede Karte läuft auch im Chat.** Der MCP-Zugang führt Karten als `mcp_leser` aus, der nur `mart`/`manual`/`ampel` sieht; 13 von 328 Karten lasen `core` oder `sync` und scheiterten dort still (gefunden über `bericht:yx_datenstand`, 01.11.2026). Schlanke Sichten `mart.yext_datenstand`, `mart.yext_lauf`, `mart.bewertung_alle` (alle Bewertungen — `bewertung_einzel` nur mit Text), `mart.import_fehler_fall`, `mart.artikelverkauf_tag`, `mart.artikel_stamm`, dazu `mart.import_naechste.parameter`; `metabase/karten_schema.test.ts` wacht. Dazu `manual.betrieb_ohne_regelbetrieb` (KUZ Mainz, Umsatz nur bei Veranstaltungen) — nicht mehr in der Lückenmeldung |
 | `0147_kassenblatt_ergaenzt_luecken.sql` | **Lücken im Kassenumsatz kommen aus dem Kassenblatt.** 657 Monate lag LINAs Konzernbericht unter der Monatsübersicht der Ladenakte, und gegen die BWA hatte die Ladenakte recht (425 von 628 Treffern, der Konzernbericht 29). Neuer Zustand `luecke` in `mart.kassenblatt_stand` (Betrieb trifft die Übersicht sonst, `lina_quote` ≥ 0,75): der Importer holt „Die letzten Tage" mit `ergaenzen` und hebt jeden zu niedrigen Tag an — nie nach unten, nur wenn das Kassenblatt selbst den Monatswert trifft. Danach `ergaenzt`. Revidiert „Kassenblatt und Kasse mischen sich nicht" aus `0141`. Gemessen: 188 Monate bei 61 Betrieben werden ergänzt; zwölf Betriebe mit zu niedriger Quote (19,2 Mio. EUR) bleiben `abweichung` — Frage an den Fachbereich |
 | `0148_mcp_nutzung_nur_verwaltung.sql` | **Wer den MCP-Zugang wie nutzt, sehen nur Eugene und Daniel.** Bis dahin konnte jeder Nutzer das Zugriffsprotokoll aller lesen (`mcp_leser` hatte SELECT auf `mcp.zugriff`, dazu drei `mart.mcp_*`-Sichten). Das Protokoll schreibt und liest jetzt `mcp_anmeldung`; die Leserolle hat darauf kein Recht, auch nicht auf die Sequenz (`currval` auf geteilter Verbindung). Der Client bekommt einen zufaelligen `beleg` statt der fortlaufenden Nummer. Die Nutzungssichten liegen in `mcp`, `mcp.nutzer.darf_nutzung` schaltet das Werkzeug `nutzung_auswerten` frei, `mcp.nutzer_aktivitaet` liefert `zuletzt_aktiv` (`letzter_login` ist nur die Passwortanmeldung). `mart.mcp_rechte_pruefung` wacht, `/status` steht bei einem Treffer auf 503 |
+| `0149_tpapi_personal.sql` | **Personal je Stunde aus der TPAPI** (`core.personalkosten_stunde`, `_abruf`, `sync.tpapi_zugang`, sechs `mart`-Sichten `personal_*` und `tpapi_zugang`, drei Prüfzeilen). Drei Dinge, die man den Zahlen nicht ansieht: **Leer ist nicht null** — eine Stunde ohne Zeile und ein Tag mit `stunden_geliefert = 0` heißen „LINA führt dort niemanden“, und nur die **41 Betriebe mit Schlüssel** haben überhaupt Zahlen (`mart.tpapi_zugang` sagt, wer fehlt); **der Geschäftstag beginnt um 08:00**, die Stunden 0–7 stehen am Ende (`stunde_folge`), umgerechnet wird nichts, die Nachtprobe ist `befund_stunden`; und **Lohnkosten der Personalplanung sind nicht die Personalkosten der BWA**. `kostUser` (Lohnkosten je Person) kommt nirgends an, auch nicht in `raw`. Die Prüfsicht vergleicht den **Monat**, weil `pek_gesamt` je Tag aufgelaufen ist. „Not licensed“ ist ein Zustand, kein Fehler (D7) |
 | `pruefung.sql` | Verifikation gegen den Bayreuth-Fall aus dem Excel (kein Migrationsschritt) |
 
 Die Tabelle nennt die tragenden Migrationen, nicht jede einzelne. Der verbindliche Stand steht in `public.schema_migration`.
@@ -294,13 +296,17 @@ health.ts              /health und /status, hält den Container oben
 status.ts              Statusbericht fürs Monitoring — seit 0127 mit der Lückenprüfung
 standort/              Betriebsadresse aus dem LINA-Stammdatenblatt, Koordinate per
                        OpenStreetMap (0125) — läuft vor dem Wetter
+tpapi/                 LINAs offizielle Schnittstelle (api.lina.de, ein Schlüssel je Betrieb):
+                       Personal je Stunde, eigener Client und Takt, Nachlauf in Phase A (0149)
 sync.ts / einreihen.ts Einstiegspunkte
 ```
 
 **`sync.ts` hat seit dem 23.09.2026 drei Phasen** (vorher zwei, seit dem
-24.08.2026). Phase A startet die fünf separaten Dienste **nebeneinander** — LINA
-und FoodNotify über den zweispurigen Worker, dazu Yext, Bounti, Wetter und die
-Handpflege; die LINA-Spur zieht dabei **nur das Tagesgeschäft**
+24.08.2026). Phase A startet ~~die fünf separaten Dienste~~ **sechs** Dienste **nebeneinander**
+— den Import (LINA und FoodNotify über den zweispurigen Worker) und die fünf
+Nachläufe in `dienste` (`src/sync.ts`): Yext, Bounti, Wetter, Handpflege und
+seit `0149` die TPAPI (Personal je Stunde, eigener Client, nicht die Spur des
+Scrapers); die LINA-Spur zieht dabei **nur das Tagesgeschäft**
 (`sync.warteschlange.nachladen = false`). Phase B rechnet danach seriell die
 Ableitungen (Zuordnung, alle materialisierten Sichten, Zulaufprüfung) und
 stempelt `sync.lauf.ableitungen_bis` — ab da zeigen die Dashboards den Vortag.
@@ -468,6 +474,13 @@ SELECT * FROM mart.umsatztag_luecke WHERE zustand <> 'im Fenster';
 SELECT * FROM mart.umsatz_lochtag WHERE zustand <> 'im Fenster';
 -- Inventuren, deren Kopf mehr Positionen meldet als geladen sind (Erwartung: leer)
 SELECT * FROM mart.inventur_abgeschnitten;
+-- Personal je Stunde (TPAPI, seit 0149). ERWARTUNG: 'ok', 'nicht lizenziert' (Zustand, kein
+-- Fehler), 'operativ ohne Schluessel' (konstant, bis Daniel die Buchungen nachzieht) und
+-- 'nicht operativ'. 'Schluessel ohne Zulauf', 'abgewiesen' und 'gebremst' sind Befunde.
+SELECT befund, count(*) FROM mart.tpapi_zugang GROUP BY 1;
+-- Rueckstand des TPAPI-Backfills. ERWARTUNG: faellt jede Nacht um rund 2.000 und erreicht 0
+-- (acht Naechte nach dem ersten Lauf). Bleibt die Zahl stehen, laeuft der Backfill nicht mehr.
+SELECT count(*) FROM mart.personal_rueckstand;
 -- Posten, die der Worker aufgegeben hat. 'endgueltig' heisst: der Lauf versucht
 -- es nicht mehr, und das will jemand gelesen haben.
 SELECT zustand, count(*) FROM mart.posten_aufgegeben GROUP BY 1;

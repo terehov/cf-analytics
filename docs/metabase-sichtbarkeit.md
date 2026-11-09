@@ -240,3 +240,19 @@ wieder, sobald das Schema zurückkommt.
 **Nach einer neuen Migration:** Admin → Datenbanken → *LINA* → „Datenbank jetzt
 synchronisieren", danach `bun run metabase/sichtbarkeit.ts`. Neue Tabellen sind zunächst
 **sichtbar** — das Skript setzt sie auf den Stand, der in `SICHTBAR`/`VERSTECKT` steht.
+
+---
+
+## Nachtrag 09.11.2026 — Personal je Stunde (`0149`)
+
+Die Zählungen oben stammen vom 26.07.2026 und sind seitdem nicht fortgeschrieben; die
+Einordnung neuer Objekte gilt trotzdem. Migration `0149` bringt drei Tabellen:
+
+| Objekt | Stufe | Begründung |
+|---|---|---|
+| `core.personalkosten_stunde`, `core.personalkosten_stunde_abruf` | nur in Detailansichten (ganz `core`, `VERSTECKT` in `metabase/sichtbarkeit.ts`) | In `mart` aufbereitet als `personal_stunde`, `personal_zeitfenster`, `personal_tag`. Die Falle beim Direktzugriff: ein Tag ohne Zeile ist „nicht geliefert", nicht „null Personen" — ob er gefragt wurde, steht nur in `_abruf`; und der Geschäftstag läuft 08:00–07:59 |
+| `sync.tpapi_zugang` | nicht synchronisiert (`sync` steht nicht im Schema-Filter) | Was man davon sehen will, steht in `mart.tpapi_zugang` |
+
+`metabase/sichtbarkeit.ts` braucht dafür keine Änderung: `core` ist dort schemaweit versteckt,
+`sync` kommt nicht vor. Die sechs neuen `mart`-Sichten sind sichtbar (`metabase.md`, Abschnitt
+„Personal je Stunde in `mart`").

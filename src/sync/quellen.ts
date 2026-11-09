@@ -35,7 +35,7 @@ export type Quelle = {
   /** Schlüssel. Bei Endpunkten deren `key`, sonst ein sprechender Name. */
   quelle: string
   bezeichnung: string
-  system: 'lina' | 'ladenakte' | 'foodnotify' | 'yext' | 'intern' | 'wetter' | 'bounti'
+  system: 'lina' | 'ladenakte' | 'foodnotify' | 'yext' | 'intern' | 'wetter' | 'bounti' | 'tpapi'
   /** Gemessen über `sync.aufgabe`. Schließt `tabelle` aus. */
   endpunkt?: string
   /** Gemessen direkt an der Zieltabelle. Für Nachläufe ohne `sync.aufgabe`. */
@@ -502,6 +502,32 @@ export const QUELLEN: readonly Quelle[] = [
     kadenz_stunden: TAEGLICH,
     bemerkung: 'Rollierendes Fenster ueber 14 Tage plus Backfill mit Obergrenze. '
              + 'Rueckstand steht in mart.wetter_rueckstand.' },
+  /**
+   * PERSONAL JE STUNDE — LINAs Third-Party-API, seit Migration `0149`.
+   *
+   * An der Tabelle gemessen wie Wetter und Bounti: der Dienst stellt keine
+   * Posten ein. MIT MERKER wie die Yext-Analytics (0130), weil an der
+   * Tabelle allein „wir fragen nicht mehr" genauso aussieht wie „wir fragen,
+   * und LINA lehnt ab" — `tpapi_personal` stempelt den Versuch und traegt
+   * den Fehlertext.
+   *
+   * KADENZ 48 STUNDEN statt eines Tages: das Fenster schreibt jede Nacht die
+   * letzten 14 Tage neu, `geladen_am` muesste also taeglich frisch sein —
+   * aber ein Lauf, der wegen 429 bei allen Betrieben nichts laedt, ist an
+   * EINEM Tag ein Bremsen und erst am zweiten ein Befund.
+   *
+   * `erwartet` HAENGT AN DEN SCHLUESSELN, dieselbe Ueberlegung wie beim
+   * Bounti-Token: ohne `LINA_API_SCHLUESSEL` ueberspringt sich der Dienst,
+   * und eine Pruefzeile, die dann jede Nacht schlaegt, wird abgeschaltet.
+   */
+  { quelle: 'tpapi:personalkosten_stunde', bezeichnung: 'Personen und Lohnkosten je Betrieb und Stunde (TPAPI)',
+    system: 'tpapi', tabelle: { schema: 'core', name: 'personalkosten_stunde', zeitspalte: 'geladen_am' },
+    merker: 'tpapi_personal', kadenz_stunden: 48,
+    erwartet: Object.keys(config.TPAPI_SCHLUESSEL).length > 0,
+    bemerkung: Object.keys(config.TPAPI_SCHLUESSEL).length > 0
+      ? 'Fenster 14 Tage plus Backfill mit Obergrenze. Zugang je Betrieb in mart.tpapi_zugang, '
+        + 'Rueckstand in mart.personal_rueckstand.'
+      : 'LINA_API_SCHLUESSEL nicht gesetzt: TPAPI nicht eingerichtet.' },
 ] as const
 
 /**

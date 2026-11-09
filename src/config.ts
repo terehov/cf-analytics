@@ -210,6 +210,93 @@ const Schema = z.object({
    */
   BOUNTI_ABSTAND_STUNDEN: z.coerce.number().int().min(1).default(20),
 
+  // --- LINA Third-Party-API (TPAPI) ----------------------------------------
+  /**
+   * Die Schlüssel der offiziellen Schnittstelle, als JSON `{ "<encId>": "<Schlüssel>" }`.
+   *
+   * EIN SCHLÜSSEL JE BETRIEB — gemessen am 07.11.2026: ein Schlüssel gilt nur
+   * für den Betrieb, in dessen Ladenakte er angelegt wurde, ein Parameter
+   * `laden=` wählt nichts aus. Deshalb kein einzelner Wert, sondern eine
+   * Zuordnung, und der Betrieb kommt über `core.betrieb.enc_id`.
+   *
+   * Im Code heißt das Ergebnis `config.TPAPI_SCHLUESSEL` (siehe `laden()`
+   * unten); der Rohtext bleibt NICHT im Konfigurationsobjekt. Ein
+   * `JSON.stringify(config)` irgendwo in einer Fehlermeldung soll nicht 41
+   * Schlüssel auf einmal ausgeben können. `konfigZumLoggen` nennt nur die
+   * Anzahl. Leer oder ungesetzt heißt: TPAPI nicht eingerichtet, der Nachlauf
+   * überspringt sich, `sync.quelle` führt die Quelle als nicht erwartet.
+   */
+  LINA_API_SCHLUESSEL: z.string().optional(),
+  /** Nur ändern, wenn Gastro-MIS die Basis verlegt (alt: https://app.lina.de). */
+  LINA_API_BASIS: z.string().default('https://api.lina.de'),
+
+  /**
+   * Das rollierende Fenster (Tage) — jede Nacht werden die letzten 14 Tage
+   * neu geholt, nicht nur der gestrige.
+   *
+   * Schichten werden nach dem Tag noch genehmigt und korrigiert; ein einmal
+   * geholter Tag ist nicht endgültig (Plan D4). Vierzehn ist dieselbe Zahl
+   * wie beim Wetter und keine Messung: ob nach zwei Wochen noch Änderungen
+   * ankommen, sagt erst `core.personalkosten_stunde_abruf.abrufe` zusammen
+   * mit `raw.payload_hash`. Kosten bei 41 Betrieben: 574 Aufrufe je Nacht.
+   */
+  TPAPI_FENSTER_TAGE: z.coerce.number().int().min(1).default(14),
+
+  /**
+   * Backfill: wie viele Betrieb-Tage eine Nacht höchstens nachholt (Plan D4).
+   *
+   * DIE HISTORIE HAT EINE FRIST. `listdays` reichte am 09.11.2026 vom
+   * 03.11.2025 bis gestern — rund ein Jahr. Jeder Tag, den wir nicht holen,
+   * fällt hinten heraus. 41 × 365 ≈ 15.000 Betrieb-Tage sind mit 2.000 je
+   * Nacht in acht Nächten durch; dazu das Fenster, zusammen rund 2.600
+   * Aufrufe, bei einer Sekunde Takt gut 45 Minuten in Phase A.
+   *
+   * NEUESTE ZUERST, aus demselben Grund wie bei HISTORIE_JE_LAUF: bricht es
+   * ab, fehlt das Älteste, nicht der letzte Monat. 0 schaltet den Backfill ab
+   * — die Notbremse, kein Handbefehl.
+   */
+  TPAPI_BACKFILL_JE_LAUF: z.coerce.number().int().min(0).default(2_000),
+
+  /**
+   * Horizont des Rückstands (Tage). 365, weil LINA rund ein Jahr liefert
+   * (`listdays`, 09.11.2026) — weiter zurück zu fragen kostet Aufrufe für
+   * garantiert leere Antworten, und die wären als „geholt, leer" vermerkt,
+   * also nicht von einem Tag ohne Schichten zu unterscheiden.
+   *
+   * `mart.personal_rueckstand` rechnet mit derselben Zahl; der Nachlauf
+   * schneidet die Arbeitsliste zusätzlich hier ab, damit ein kleinerer Wert
+   * in der Umgebung auch ohne Migration wirkt.
+   */
+  TPAPI_HISTORIE_TAGE: z.coerce.number().int().min(1).default(365),
+
+  /**
+   * Pause zwischen zwei Aufrufen derselben Client-Instanz (ms) — Plan D6.
+   *
+   * Dokumentiert sind 100 Anfragen je Laden und 15 Minuten. Der Backfill
+   * läuft Tag außen, Betrieb innen: bei 41 Betrieben trifft eine Sekunde
+   * Takt jeden Betrieb etwa alle 41 s, also rund 22 Aufrufe je 15 Minuten —
+   * weit unter 100, auch wenn Bounti und Sell & Pick am selben Laden
+   * mitzählen (am 09.11.2026 stand `getlimit` in Nürnberg schon vor unserem
+   * zweiten Aufruf auf 7). Bei wenigen Betrieben wird es enger; deshalb
+   * zusätzlich TPAPI_AUFRUFE_JE_BETRIEB.
+   *
+   * Untergrenze 250: darunter ist es kein Takt mehr, und ein versehentliches
+   * `0` in der Umgebung soll den Start abbrechen, nicht einen fremden Zugang
+   * fluten (Regel 3). Die Tests setzen den Wert am Objekt, nicht hier.
+   */
+  TPAPI_TAKT_MS: z.coerce.number().int().min(250).default(1_000),
+
+  /**
+   * Obergrenze je Betrieb und Lauf (Plan D6).
+   *
+   * Das Fenster braucht 14 Aufrufe je Betrieb; 80 lassen 66 für den Backfill.
+   * Achtzig, weil das unter dem dokumentierten Limit von 100 je 15 Minuten
+   * liegt — selbst wenn der Takt aus irgendeinem Grund alle Aufrufe eines
+   * Betriebs in ein Fenster drückte (etwa wenn nur noch ein Betrieb Rückstand
+   * hat), kann dieser Lauf das Limit allein nicht reißen.
+   */
+  TPAPI_AUFRUFE_JE_BETRIEB: z.coerce.number().int().min(1).default(80),
+
   // --- Metabase ------------------------------------------------------------
   /**
    * Eigener Benutzer für die Dashboard-Provisionierung.
@@ -1117,7 +1204,65 @@ function laden() {
    * Nacht soll nur vom Tagesbudget begrenzt sein (E8). Eine feste Zahl hier
    * wäre die 4.000 von vorher, nur versteckt.
    */
-  return { ...r.data, BETRIEBSBERICHT_JE_LAUF: r.data.BETRIEBSBERICHT_JE_LAUF ?? r.data.TAGESBUDGET }
+  /*
+   * Die TPAPI-Schlüssel: geprüft und geparst, der Rohtext fällt heraus
+   * (Begründung bei LINA_API_SCHLUESSEL oben).
+   */
+  const { LINA_API_SCHLUESSEL, ...rest } = r.data
+  return {
+    ...rest,
+    BETRIEBSBERICHT_JE_LAUF: r.data.BETRIEBSBERICHT_JE_LAUF ?? r.data.TAGESBUDGET,
+    TPAPI_SCHLUESSEL: tpapiSchluesselParsen(LINA_API_SCHLUESSEL),
+  }
+}
+
+/**
+ * `LINA_API_SCHLUESSEL` → `{ encId: Schlüssel }`. Wirft beim Start, nie später.
+ *
+ * KEINE MELDUNG ENTHÄLT EINEN WERT. Auch nicht die von `JSON.parse`: Bun
+ * zitiert dort das Zeichen, an dem es scheitert, samt Umgebung — bei einem
+ * abgeschnittenen Wert wäre das ein Stück Schlüssel im Startprotokoll von
+ * Dokploy. Genannt wird deshalb nur, WAS nicht stimmt, und bei einer
+ * fehlerhaften `encId` die laufende Nummer des Eintrags (die `encId` selbst
+ * ist kein Geheimnis, aber ein vertauschtes Paar hätte dort den Schlüssel).
+ *
+ * Die `encId` muss 40 Hexzeichen klein sein — genau die Form von
+ * `core.betrieb.enc_id` und dem Laden-Hash, den `tpapi_schluessel.ts`
+ * ausliest. Großbuchstaben würden keinen Betrieb treffen, und das fiele erst
+ * in `sync.tpapi_zugang` als „enc_id ohne Betrieb" auf; hier fällt es beim
+ * Start auf. Der Wert muss ein nicht leerer Text ohne Leerraum am Rand sein:
+ * ein Leerzeichen aus dem Kopieren lehnt LINA mit 401 ab, und das sähe dann
+ * aus wie ein gesperrter Schlüssel.
+ */
+export function tpapiSchluesselParsen(roh: string | undefined): Record<string, string> {
+  if (roh === undefined || roh.trim() === '') return {}
+  let daten: unknown
+  try {
+    daten = JSON.parse(roh)
+  } catch {
+    throw new Error('LINA_API_SCHLUESSEL ist kein gültiges JSON — erwartet ein Objekt '
+      + '{ "<encId>": "<Schlüssel>" }, einzeilig in einfachen Anführungszeichen. '
+      + '(Der Wert wird bewusst nicht ausgegeben.)')
+  }
+  if (daten === null || typeof daten !== 'object' || Array.isArray(daten)) {
+    throw new Error('LINA_API_SCHLUESSEL ist JSON, aber kein Objekt — erwartet '
+      + '{ "<encId>": "<Schlüssel>" }. (Der Wert wird bewusst nicht ausgegeben.)')
+  }
+  const aus: Record<string, string> = {}
+  for (const [i, [encId, wert]] of Object.entries(daten as Record<string, unknown>).entries()) {
+    if (!/^[0-9a-f]{40}$/.test(encId)) {
+      throw new Error(`LINA_API_SCHLUESSEL, Eintrag ${i + 1}: der Schlüssel des Eintrags ist keine `
+        + 'encId (40 Hexzeichen, klein). Vertauschte Reihenfolge? Erwartet { "<encId>": "<Schlüssel>" }.')
+    }
+    if (typeof wert !== 'string' || wert.trim() === '') {
+      throw new Error(`LINA_API_SCHLUESSEL, Eintrag ${i + 1} (${encId}): der Wert ist leer oder kein Text.`)
+    }
+    if (wert !== wert.trim()) {
+      throw new Error(`LINA_API_SCHLUESSEL, Eintrag ${i + 1} (${encId}): der Wert hat Leerraum am Rand.`)
+    }
+    aus[encId] = wert
+  }
+  return aus
 }
 
 /**
@@ -1164,7 +1309,11 @@ export function fnZugaenge(c: Config = config): FnZugang[] {
   })
 }
 
-export type Config = z.infer<typeof Schema> & { BETRIEBSBERICHT_JE_LAUF: number }
+export type Config = Omit<z.infer<typeof Schema>, 'LINA_API_SCHLUESSEL'> & {
+  BETRIEBSBERICHT_JE_LAUF: number
+  /** encId → TPAPI-Schlüssel, leer wenn nicht eingerichtet. Nie loggen. */
+  TPAPI_SCHLUESSEL: Record<string, string>
+}
 export const config: Config = laden()
 
 /** Nie das Passwort loggen — diese Sicht ist die einzige, die ausgegeben wird. */
@@ -1223,5 +1372,13 @@ export function konfigZumLoggen(c: Config = config) {
     bounti: c.BOUNTI_API_TOKEN
       ? `konfiguriert (Tokenlänge ${c.BOUNTI_API_TOKEN.length})`
       : 'kein Token',
+    /**
+     * Die ANZAHL, nie ein Wert und nie eine encId-Liste. Eine Zahl, die nicht
+     * zur Zahl in Dokploy passt (41 am 09.11.2026), zeigt einen beim
+     * Einfügen abgeschnittenen JSON-Text sofort.
+     */
+    tpapi: Object.keys(c.TPAPI_SCHLUESSEL).length > 0
+      ? `${Object.keys(c.TPAPI_SCHLUESSEL).length} Schluessel`
+      : 'nicht konfiguriert',
   }
 }

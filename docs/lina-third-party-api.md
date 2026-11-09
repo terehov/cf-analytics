@@ -331,3 +331,21 @@ nachmessen, bevor ein leerer Tag als „kein Personal" gelesen wird.
 Folge für den Importer: der Umfang je Schlüssel ergibt sich aus der Buchung. Ein 403
 „not licensed" ist ein Zustand des Betriebs, kein Fehler — er gehört sichtbar in die Tabelle
 der Zugänge (Entscheidung 09.11.2026), nicht in eine Wiederholung.
+
+## Ist-Stand 09.11.2026: Stufe 1 gebaut
+
+`personalkostenprostunde` wird seit Migration `0149` im Nachtlauf geholt (Plan, Entscheidungen
+D1–D8 und Abweichungen: `plan-tpapi.md`; Importer: `importer.md`, Abschnitt „TPAPI-Dienst";
+Tabellen: `datenmodell.md`; Sichten: `metabase.md`). **Gebaut und gegen die Attrappe getestet, aber
+noch nicht gegen das echte LINA gelaufen** (Regel 7a) — der erste echte Lauf ist der Nachtlauf nach
+dem Deploy, die Messungen danach stehen in Plan §5.
+
+| Endpunkt | Genutzt |
+|---|---|
+| `personal/personalkostenprostunde` | **seit `0149`** — Fenster 14 Tage plus Backfill bis 365 Tage |
+| `personal/personalkostenprotag` | nein — Zeilen je Person ohne Kennung, Frage an Eugene (`offene-punkte.md`) |
+| `revenue/*`, `merchandiseman/*`, `bwa/*` | nein (Stufe 2; BWA nicht lizenziert) |
+
+Was der Client anders macht als der Scraper-Client: ein Schlüssel je Betrieb statt einer Sitzung,
+kein Retry für keinen Ausgang, 429 beendet nur den Betrieb, „not licensed" ist ein Zustand
+(`sync.tpapi_zugang`). Die Lohnkosten je Person (`kostUser`) werden nirgends gespeichert.

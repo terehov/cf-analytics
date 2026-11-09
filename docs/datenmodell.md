@@ -1555,3 +1555,33 @@ die ganze Historie; Speisen und Getränke sind, was gefragt war.
   Eine leere Zelle ergibt keine Zeile.
 - Hauptsparten-Zeilen (`Speisen`, `Getränke`) entstehen aus den Umsatzgruppen `Getränke`,
   `Essen`, `Speisen`, nur nach exaktem Namen. Alles andere bleibt in der Gesamtzeile.
+
+## Personal je Stunde: drei Tabellen (`0149`, 09.11.2026)
+
+**`core.personalkosten_stunde`** — die Fakten. PK `(betrieb_key, geschaeftstag, stunde)`,
+`personen numeric(6,2)`, `personalkosten numeric(10,2)` (auf Cent gerundet: LINA liefert
+`161.42000000000002`), `raw_id`, `geladen_am`, BRIN auf `geschaeftstag`. Eine Stunde, die LINA
+nicht liefert, hat **keine Zeile**; steht sie nur in `eff` oder nur in `kost`, ist die andere
+Seite NULL — nicht erfunden. Ein erneuter Abruf **ersetzt den Tag** (`DELETE` je Betrieb und Tag,
+dann `INSERT`): ein Upsert je Stunde ließe eine Stunde stehen, die LINA nicht mehr führt, und eine
+gestrichene Schicht bliebe für immer eingeplant. `kostUser` (Lohnkosten je Person) wird nicht
+gespeichert und kommt auch nicht nach `raw` — `raw.api_antwort` ist append-only, was dort
+hineinkommt, bleibt.
+
+**`core.personalkosten_stunde_abruf`** — was gefragt wurde. PK `(betrieb_key, geschaeftstag)`,
+`stunden`, `personenstunden`, `personalkosten`, `abgerufen_am`, `abrufe`. **Eigene Tabelle, weil
+ein leerer Tag sonst von einem nie gefragten nicht zu unterscheiden wäre** — und der Backfill
+Saarbrückens leere Tage bis in alle Ewigkeit neu zöge (Plan D5). Im rollierenden Fenster wird ein
+leerer Tag trotzdem neu gefragt. Die Arbeitsliste des Backfills ist `mart.personal_rueckstand`:
+Betrieb mit Schlüssel × Tag im Horizont ohne Abrufzeile.
+
+**`sync.tpapi_zugang`** — wer kann was. PK `(betrieb_key, modul)`; `modul` ist `'personal'`, die
+Werte `'revenue'` und `'artikel'` sind für Stufe 2 vorgesehen und heute ungenutzt. `enc_id` ist
+die Kennung des Betriebs, **nie der Schlüssel**. `zustand` ∈ `ok`, `nicht_lizenziert`,
+`abgewiesen`, `gebremst`, `fehler`, `ohne_schluessel`. Dazu `zuletzt_gefragt_am`,
+`zuletzt_erfolg_am`, `letzter_http`, `letzter_fehler` (gekürzt, ohne Schlüssel). Lesbar in
+`mart.tpapi_zugang`.
+
+Der CHECK `quelle_system_check` auf `sync.quelle` kennt ab hier `'tpapi'`. Die Sichten stehen in `metabase.md`
+(Abschnitt „Personal je Stunde in `mart`"). Alles live, keine Materialisierung (Plan D8): rund
+360.000 Zeilen im Jahr, der Primärschlüssel reicht.

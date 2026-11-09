@@ -4620,3 +4620,64 @@ die sie sonst treffen.
   lohnt erst, wenn sich Schlüssel häufig ändern.
 - **Was trotzdem in die Datenbank gehört:** wer einen Schlüssel hat, welche APIs gebucht sind, letzter
   Abruf und letzter Fehler — ohne den Schlüssel selbst (Regel 10; kommt mit dem TPAPI-Importer).
+
+
+## 09.11.2026 — Personal je Stunde aus der TPAPI (0149)
+
+Plan: `plan-tpapi.md`. Entscheidungen D1–D8 von Eugene am 09.11.2026 freigegeben („Lege mit der
+Implementierung los"). Anlass war Melanies Frage nach der Besetzung je Stunde (Wilma Wunder, sonntags
+ab 18 Uhr).
+
+**Die acht Plan-Entscheidungen, Kurzform:**
+
+* **D1** Stufe 1 holt nur `personalkostenprostunde`. Journal, Tische, Tagesbericht je Person sind
+  Stufe 2 — Journal und Tische überschneiden sich mit den Betriebsberichten 96/97, vorher gehört der
+  Abgleich.
+* **D2** Eigener Dienst in Phase A, eigener Client, eigener Takt. Anderer Host, eigener Zugang je
+  Betrieb mit ausgeschriebenem Limit; die Ladenakte bekam keine eigene Spur, weil sie derselbe
+  Zugang ist wie die Berichte.
+* **D3** Jede Antwort nach `raw.api_antwort`, **ohne `kostUser`**. Regel 4 verlangt, dass `core`
+  aus `raw` neu aufbaubar ist; `raw` ist append-only, was an Lohnkosten je Person hineinkommt, bleibt.
+* **D4** Rollierendes Fenster (14 Tage) jede Nacht und Backfill mit Obergrenze (2.000 Betrieb-Tage,
+  neueste zuerst) bis 365 Tage. Kein Handbefehl: der Backfill hat eine Frist, LINAs Jahr.
+* **D5** Ein leerer Tag gilt als geholt (`core.personalkosten_stunde_abruf`), sonst zöge der Backfill
+  Saarbrückens leere Tage in Ewigkeit; im Fenster wird er trotzdem neu gefragt.
+* **D6** Takt und Verteilung statt `getlimit`: Tag außen, Betrieb innen, höchstens 80 Aufrufe je
+  Betrieb und Lauf, 429 beendet den Betrieb für diesen Lauf. `getlimit` ist bei Team-only-Betrieben
+  gesperrt und zählt womöglich fremde Anbieter mit.
+* **D7** 403 „not licensed" ist ein **Zustand**, kein Fehler (`sync.tpapi_zugang`). Ein Alarm, der
+  jede Nacht schlägt, wird abgeschaltet; ein Betrieb, der still verschwindet, fällt nicht auf.
+* **D8** Alle Sichten live, keine Materialisierung — 360.000 Zeilen im Jahr, der Primärschlüssel
+  reicht.
+
+**Entscheidungen beim Bau, die der Plan nicht kannte:**
+
+1. **Monatsvergleich statt Tagesvergleich in der Prüfsicht.** Der Plan setzte die TPAPI-Kosten des
+   Tages gegen `pek_gesamt × Tagesumsatz`. `pek_gesamt` im Tagesabruf ist aber seit Monatsanfang
+   aufgelaufen (`fehlerkatalog.md`; nachgemessen 09.11.2026 auf dem Klon, Median nach Monatstag:
+   Tag 1 2.053 EUR, Tag 8 9.610 EUR, Tag 15 16.664 EUR, Tag 28 31.831 EUR) — der Tagesvergleich wäre
+   an fast jedem Tag „weicht ab" gewesen. Verglichen wird die TPAPI-Summe vom Monatsersten bis zum
+   Tag; fehlt ein Tag davor, steht dort `monat unvollstaendig`. Die Monatssumme ist für die
+   Nachtfrage stumpf (eine Nacht am falschen Tag verschiebt sie nur um die Nachtstunden des letzten
+   Tages), deshalb die zweite Probe `befund_stunden`: Personenstunden gegen `Umsatz / eff_gesamt`, denn
+   `eff_*` ist je Tag nicht aufgelaufen.
+2. **„Not licensed" und die eigene Obergrenze machen den Lauf nicht `teilweise`.** Dieselbe
+   Begründung wie D7: ein Zustand, der jede Nacht schlägt, wird nicht mehr gelesen. `teilweise` bei gebremst,
+   abgewiesen, fehler, Schlüssel ohne Betrieb, oder wenn kein Betrieb erfolgreich war.
+3. **Kein Feld mit Endung `User` kommt nach `raw`** (nicht nur `kostUser`), und der Hash wird aus
+   der bereinigten Antwort gebildet. `kostUser` ist die bekannte Form (Lohnkosten je Person); die Regel
+   über die Endung schließt gleichartige Felder mit ein.
+4. **Wertebereiche werden vor der Transaktion geprüft**, damit ein Wertefehler den Rohsatz nicht
+   mit zurückrollt (Lehre aus `0136`).
+5. **`mart.personal_rueckstand` lässt `nicht_lizenziert` weg.** Ihr Rückstand ist nicht abzuarbeiten,
+   die Zahl ginge nie auf 0 — und eine Zahl, die nie fällt, liest niemand mehr (`0071`).
+6. **MCP-Fallstricke:** `deutung` gilt je Sicht, deshalb drei Schlüssel mit Endung; Schwere
+   `hinweis` gibt es nicht (CHECK: `sperre`/`warnung`).
+7. **Zählung der Dienste:** `dienste` in `src/sync.ts` hat **fünf** Einträge; der Plan nannte den
+   „sechsten Dienst", gezählt mit dem Import. Der Pool (`max: 8`) trägt zwei Worker-Spuren plus fünf
+   Dienste = sieben.
+8. **Schlüssel bleiben in der Umgebung** (Entscheidung vom selben Tag, oben). Der Parser prüft sie
+   beim Start; der Rohtext steht nicht im `config`-Objekt.
+
+**Verworfen:** `getlimit` vor jedem Block lesen (Team-only-Betriebe: 403; zählt womöglich fremde
+Anbieter mit); `personalkostenprotag` aggregiert in `raw` (offen, `offene-punkte.md`).

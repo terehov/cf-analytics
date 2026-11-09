@@ -117,6 +117,14 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
   mg_bounti_kurse: {
     monat: 'Bounti ist Stand heute und kennt keinen Monat (0097).',
   },
+  // --- Personal, Reiter "Besetzung je Stunde" (0149) --------------------
+  // Die Personalplanung wird je Geschaeftstag und Stunde gelesen; die Karten
+  // vergleichen EINEN Monat (Mittel je Betrieb und Tag). Ein Zeitraum aus dem
+  // Kostenreiter daneben liesse offen, welcher Monat im Mittel steckt.
+  pers_stunde_verlauf:   { zeitraum: 'Mittel je Betrieb und Tag fuer EINEN Monat.' },
+  pers_wochentag_stunde: { zeitraum: 'Mittel je Betrieb und Tag fuer EINEN Monat.' },
+  pers_zeitfenster:      { zeitraum: 'Summen fuer EINEN Monat; die Quote waere ueber mehrere Monate ungeklaert.' },
+  pers_tag_verlauf:      { zeitraum: 'Alle Tage EINES Monats; der Monat ist der Zeitraum.' },
   // --- Kasse, Reiter "Geladen" (0117) ---------------------------------
   // Der Ladestand ist je BERICHT, nicht je Betrieb: ein Betriebsfilter
   // haette keine Zeile, auf die er wirken koennte. Der Zeitraum wirkt
@@ -169,7 +177,8 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
   um_verlauf_tag:         { monat: 'Tagesverlauf; eingegrenzt wird ueber den Zeitraumfilter.' },
   um_verlauf_monat:       { monat: 'Monatsverlauf mit Vorjahr — den Zeitraum liest er als Feldfilter.' },
   um_verlauf_delta:       { monat: 'Monatsverlauf — den Zeitraum liest er als Feldfilter.' },
-  pe_verlauf:             { monat: 'Quotenverlauf ueber alle Monate.' },
+  pe_verlauf:             { monat: 'Quotenverlauf ueber alle Monate.',
+                            marke: 'Quote je Betrieb aus der BWA; die Marke filtert nur den Reiter Besetzung.' },
   bwa_kennzahlen:         { monat: 'BWA-Verlauf ueber alle gebuchten Monate.' },
   bwa_wasserfall:         { zeitraum: 'EIN Monat, EIN Wasserfall — dafuer ist der Monatsfilter da. '
                                     + 'Ueber einen Zeitraum waeren die Bloecke Summen ohne Aussage.' },
@@ -301,8 +310,10 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
   st_fenster_sparte:      { monat: 'Zeitfenster ueber den Zeitraum, wie st_zeitzone.' },
   st_abend_sparte_betrieb: { monat: 'Abendgeschaeft je Betrieb ueber den Zeitraum — die '
                                  + 'Fachfrage war ein Zeitraum ueber mehrere Monate, kein Stichmonat.' },
-  pe_bereich:             { monat: 'Alle Zeitraeume je Betrieb, absichtlich ungefiltert.' },
-  pe_effektivitaet:       { monat: 'Alle Zeitraeume je Betrieb, absichtlich ungefiltert.' },
+  pe_bereich:             { monat: 'Alle Zeitraeume je Betrieb, absichtlich ungefiltert.',
+                            marke: 'Je Betrieb; die Marke filtert nur den Reiter Besetzung.' },
+  pe_effektivitaet:       { monat: 'Alle Zeitraeume je Betrieb, absichtlich ungefiltert.',
+                            marke: 'Je Betrieb; die Marke filtert nur den Reiter Besetzung.' },
   vg_ort_profil:          { monat: 'Tagesprofil ueber die gesamte Historie.' },
   dd_betrieb_zeitzone:    { monat: 'Tagesprofil ueber die gesamte Historie.' },
   dd_betrieb_stunde:      { monat: 'Tagesprofil ueber die gesamte Historie.' },
@@ -404,6 +415,7 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
   // Monat; ein Zeitraum daneben liesse offen, welcher Monat in der Zeile
   // steht.
   pe_quote_betrieb: {
+    marke:    'Rangliste je Betrieb; die Marke filtert nur den Reiter Besetzung.',
     zeitraum: 'Rangliste aller Betriebe zum Stichmonat. Ueber ein Quartal waere '
             + 'unklar, welcher Monat den Rang bestimmt.',
   },
@@ -418,6 +430,7 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
             + 'Monat sie stammt.',
   },
   pe_quote_tabelle: {
+    marke:    'Eine Zeile je Betrieb; die Marke filtert nur den Reiter Besetzung.',
     zeitraum: 'Eine Zeile je Betrieb zum Stichmonat -- dafuer ist der Monatsfilter da.',
   },
   bwa_ebit: {
