@@ -306,3 +306,28 @@ Die 41 Schlüssel stehen als `LINA_API_SCHLUESSEL` in Dokploy, Sicherung in Euge
 Abgedeckt: 10 Aposto, 15 Enchilada (mit COYACAN und Gastronomie Wilsdruffer Straße), 13 Wilma
 Wunder (mit Gastronomie am Markt Mainz), Park Cafe München, BS Bier & Speisen, Ratskeller
 Saarbrücken (die letzten beiden nur Team Data API gebucht).
+
+### Zweite Messung, 09.11.2026 (nach dem Deploy mit `LINA_API_SCHLUESSEL`, Tag 08.11.2026)
+
+**Wilma Wunder Nürnberg — alles wie bei Aalen.** `revenue/store` nennt Nürnberg, 362 Tage in
+`listdays` (03.11.2025–08.11.2026 — die Historie reicht also rund ein Jahr zurück, nicht weiter),
+Personal je Stunde 08–22 Uhr und 07 Uhr (6 bis 14 Personen), 18 Personen im Tagesbericht, Journal
+2.329 Zeilen, `journaltables` 307 Tische mit 420 Gästen, Artikel 62 Großkategorien, BWA 403.
+
+* **`getlimit` stand vor unserem ersten Aufruf nach `revenue/store` schon auf 7**, nach den
+  sieben weiteren auf 14. Bei Aalen am 07.11. zählte es nur unsere Aufrufe. Möglich ist, dass
+  das Limit je Laden über alle Schlüssel zählt (Nürnberg hat auch Bounti und Sell & Pick) — dann
+  teilen wir uns die 100 je 15 Minuten mit anderen Anbietern. **Nicht entschieden**; der
+  Importer muss `getlimit` vor jedem Block lesen, statt mitzuzählen.
+
+**Ratskeller Saarbrücken (nur Team Data API gebucht).** Jeder Endpunkt außerhalb der Buchung
+antwortet 403 mit `Module 'Revenue' not licensed` bzw. `'Artikelstammdaten'` / `'BWA'` —
+**auch `revenue/store` und `revenue/getlimit`**. Das ist keine Abweisung des Schlüssels; die
+Probe bricht seitdem nur noch bei einer echten Abweisung ab. Die Personal-Endpunkte antworten
+200, aber **leer** (`eff`/`kost` ohne Stunden, Tagesbericht `[]`). Ob der Betrieb am 08.11.
+(Sonntag) zu hatte oder seine Schichten nicht in LINA plant, ist offen — mit einem Werktag
+nachmessen, bevor ein leerer Tag als „kein Personal" gelesen wird.
+
+Folge für den Importer: der Umfang je Schlüssel ergibt sich aus der Buchung. Ein 403
+„not licensed" ist ein Zustand des Betriebs, kein Fehler — er gehört sichtbar in die Tabelle
+der Zugänge (Entscheidung 09.11.2026), nicht in eine Wiederholung.
