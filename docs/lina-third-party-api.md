@@ -291,3 +291,16 @@ Was daraus folgt:
   Besitos MG und Enchilada Bruchsal). Damit legt `--anlegen` **40** Schlüssel an.
 * ~~Warum die sieben Enchilada nicht gebucht haben, ist offen.~~ Ihnen fehlt die ISP (Daniel,
   09.11.2026); er zieht sie nach. Leipzig ist geschlossen. Stand in `docs/offene-punkte.md`.
+
+### Angelegt, 09.11.2026
+
+`bun run tpapi-schluessel --anlegen` im Terminal des Nutzers, 09:57–ca. 10:35, Takt 4–8 s:
+**39 angelegt, 2 vorhanden (Aposto Aalen, Wilma Wunder Nürnberg — dieser als Einzeltest mit
+`--nur`), 89 ohne Buchung oder geschlossen, 0 unklar, kein Abbruch.** Jeder neue Schlüssel wurde
+danach in der Ladenakte gelesen und mit Name, IP und genau den vier Leserechten bestätigt.
+Die 41 Schlüssel stehen als `LINA_API_SCHLUESSEL` in Dokploy, Sicherung in Eugenes lokaler `.env`
+(Entscheidung 09.11.2026 in `entscheidungen.md`).
+
+Abgedeckt: 10 Aposto, 15 Enchilada (mit COYACAN und Gastronomie Wilsdruffer Straße), 13 Wilma
+Wunder (mit Gastronomie am Markt Mainz), Park Cafe München, BS Bier & Speisen, Ratskeller
+Saarbrücken (die letzten beiden nur Team Data API gebucht).
