@@ -2516,3 +2516,11 @@ Wer klärt: Daniel / Tobias Lindemann. Details: `lina-third-party-api.md`.
 jedem Betrieb, für jeden mit Zugriff auf die Ladenakte — auch die mit Schreibrechten auf die Kasse.
 Ein Schlüssel ist zwar an eine IP gebunden, aber wer die IP des Anbieters nutzt oder die Bindung
 ändern darf, braucht nur noch den Wert. Wer klärt: Daniel / Tobias Lindemann, ggf. mit Gastro-MIS.
+
+### Sieben laufende Enchilada ohne LINA-Daten-API (07.11.2026)
+
+Bremen, Hamm, Hannover, Karlsruhe, Leipzig, Minden und Münster haben im LINA-Marktplatz weder
+Sales, Team noch Article Data API gebucht, die übrigen 15 Enchilada alle drei. Ohne Buchung gibt
+es dort keinen TPAPI-Schlüssel — also auch kein Personal je Stunde. Ebenso Schlager Cafe
+Düsseldorf und zwölf der 15 Deutschen Konzepte. Zu klären (Daniel): Absicht oder vergessen, und
+ob die Buchung nachgeholt wird. Messung in `docs/lina-third-party-api.md`, Abschnitt „Trockenlauf".

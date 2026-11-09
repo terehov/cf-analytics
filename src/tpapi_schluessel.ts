@@ -157,6 +157,15 @@ async function main(): Promise<number> {
       continue
     }
 
+    // Geschlossene und insolvente Betriebe bekommen keinen Schluessel, auch wenn der
+    // Marktplatz noch eine Buchung fuehrt (Trockenlauf 07.11.2026: Besitos MG, Enchilada
+    // Bruchsal). Jeder Schreibaufruf gegen LINA muss sich lohnen — dort laeuft nichts mehr.
+    if (/geschlossen|insolvent/i.test(`${b.name} ${b.konzept}`)) {
+      zaehler.ohneBuchung++
+      console.log(`–  ${b.name} [${b.konzept}]: geschlossen/insolvent (${liste}) — kein Schluessel`)
+      continue
+    }
+
     if (!ANLEGEN) { zaehler.wuerde++; console.log(`+  ${b.name} [${b.konzept}]: wuerde angelegt (${liste})`); continue }
 
     const r = await client.apiSchluesselAnlegen(enc, { name: NAME, operator: OPERATOR, ip: IP, expires: '', scopes: SCOPES })

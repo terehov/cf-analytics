@@ -263,3 +263,28 @@ Ablauf je Betrieb, über den Ladenakte-Baum (`root` → `konzept_<n>` → `laden
 Die Schlüssel werden nie ausgegeben; sie landen in `.lina-api-schluessel.json` (Rechte 600,
 `.gitignore`) und von dort als `LINA_API_SCHLUESSEL` nach Dokploy. Reihenfolge: Trockenlauf,
 dann `--anlegen --nur <encId>` für einen Betrieb, dann alle.
+
+### Trockenlauf, 07.11.2026: wer die Daten-APIs gebucht hat
+
+130 Betriebe im Baum, alle Marktplätze lesbar (nur mit `?admin=1` — ohne leitet LINA mit
+HTTP 302 um). **43 haben mindestens eine Daten-API gebucht, 87 keine.**
+
+| Bild | Betriebe |
+|---|---|
+| Sales + Team + Article | 39, darunter Aposto Aalen (schon mit Schlüssel): alle laufenden Aposto außer Augsburg, alle Wilma Wunder außer Recklinghausen, 15 von 22 Enchilada, Park Cafe München |
+| nur Team | BS Bier & Speisen, Ratskeller Saarbrücken, INSOLVENT Besitos MG |
+| nur Sales | INSOLVENT Enchilada Bruchsal |
+| keine | alle Franchisegeber- und Beteiligungsgesellschaften, alle geschlossenen, Schlager Cafe Düsseldorf, 12 von 15 Deutsche Konzepte, und **sieben laufende Enchilada: Bremen, Hamm, Hannover, Karlsruhe, Leipzig, Minden, Münster** |
+
+Was daraus folgt:
+
+* **Die TPAPI deckt nicht alle laufenden Betriebe ab.** Für die sieben Enchilada ohne Buchung,
+  das Schlager Cafe und die Deutschen Konzepte bleibt der Scraper die einzige Quelle — auch für
+  Personal je Stunde gibt es dort nichts. Jede Auswertung aus der TPAPI muss sagen, für wen sie
+  gilt; eine Lücke darf nicht als „kein Personal" erscheinen (Regel 10).
+* Bei BS Bier & Speisen und Ratskeller Saarbrücken ist nur die Team Data API gebucht. Ob der
+  Schlüssel mit allen vier Rechten dort Journal oder Artikel liefert oder 403 („not licensed",
+  wie die BWA) — wird mit dem ersten Abruf gemessen, nicht angenommen.
+* Geschlossene und insolvente Betriebe bekommen keinen Schlüssel, auch mit Buchung (betrifft
+  Besitos MG und Enchilada Bruchsal). Damit legt `--anlegen` **40** Schlüssel an.
+* Warum die sieben Enchilada nicht gebucht haben, ist offen (`docs/offene-punkte.md`).
