@@ -1840,9 +1840,14 @@ Textkachel sagt es, weil sonst ein fehlender Betrieb wie „kein Personal" aussi
 
 **Importseite („Datenqualität und Import").** Zwei Karten unter „Bekommt jede Quelle noch Zulauf?"
 (Regel 10): `im_tpapi_zugang` (alle Betriebe mit Zustand der Anbindung, Auffälliges oben) und
-`im_personal_pruefung` (Tabelle, nur `weicht ab`, am stärksten Abweichende zuerst; die Nachtprobe,
-ob die Stunden 0–7 am richtigen Tag stehen). Beide Tabellen, weil es Arbeitslisten sind. „Nicht
-lizenziert" steht dort als Zustand, nicht als Fehler — die Erklärung steht in der Textkachel.
+`im_personal_pruefung` (~~Tabelle, nur `weicht ab`, am stärksten Abweichende zuerst; die Nachtprobe,
+ob die Stunden 0–7 am richtigen Tag stehen~~ seit `0150` eine Zeile je Betrieb: Median und Spanne
+des Aufschlags der Planung gegen LINAs Effektivität, dazu Tage ohne Schichten trotz Umsatz). Die
+Tagesliste war nach dem ersten Lauf mit 500 Zeilen voll, weil die Planung Köpfe je Stunde zählt und
+deshalb immer darüber liegt — eine Liste, die immer voll ist, liest niemand. Der Aufschlag darf
+hoch sein, er soll je Betrieb ruhig bleiben; Betriebe ohne Schichten stehen oben. Beide Tabellen,
+weil es Arbeitslisten sind. „Nicht lizenziert" steht dort als Zustand, nicht als Fehler — die
+Erklärung steht in der Textkachel.
 
 **Vor dem ersten `uebernehmen.ts`:** Metabase die neuen `mart`-Sichten synchronisieren lassen. Die
 Karten lesen nur `mart` (`metabase/karten_schema.test.ts` wacht darüber, der MCP-Zugang führt sie

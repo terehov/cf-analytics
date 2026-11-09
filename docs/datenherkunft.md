@@ -1023,16 +1023,24 @@ Melanies Frage, wie viele Leute sonntags ab 18 Uhr bei Wilma Wunder stehen und w
 umsetzen — bis dahin nur als Ableitung aus Umsatz und Effektivität zu beantworten.
 
 **Woher die Zahl kommt.** `eff` = Personen in der Stunde, `kost` = Lohnkosten in EUR, beides
-aus LINAs Personalplanung (ISP). `core.personalkosten_stunde`, eine Zeile je Betrieb,
+aus LINAs Personalplanung (ISP). **`eff` ist eine Kopfzahl, keine Personenstunde** (nachgemessen
+09.11.2026: 36.586 von 36.586 Stunden ganzzahlig): wer von 11:45 bis 15:15 arbeitet, zählt in fünf
+Stunden als 1. Die Summe über den Tag (`personenstunden` in `mart.personal_tag` und
+`_zeitfenster`) ist deshalb eine **Obergrenze**, im Median 26 % über `Umsatz / eff_gesamt` aus dem
+Personalkostenbericht, je Betrieb +7 bis +57 %; `kost` ist offenbar genauso verteilt (Oktober
+2026: +27 % gegen `pek_gesamt`). Für „wie viele stehen da" richtig, als Arbeitszeit oder Lohnsumme
+nicht (`0150`, Fallstrick `personal_kopfzahl_*`). `core.personalkosten_stunde`, eine Zeile je Betrieb,
 Geschäftstag und Stunde; die Lohnkosten je Person (`kostUser`) kommen **nirgends** an, auch nicht
 in `raw`.
 
 **Der Geschäftstag.** `businessdate` ist LINAs Geschäftstag (08:00 bis 07:59 des Folgetags). Die
 Stunden 0–7 der Antwort für Tag D gehören zu D — wie im Stundenbericht seit `0138` (KORREKTUR 11).
-Der Lader **rechnet nichts um**. Ob das für die Personalplanung stimmt, ist eine Annahme, bis die
-Nachtprobe gelaufen ist: `mart.personal_stunde_pruefung.befund_stunden` (Personenstunden gegen
-`Umsatz / eff_gesamt`). Weicht sie bei Betrieben mit Nachtgeschäft systematisch ab, ordnet LINA die
-Nacht anders zu — dann KORREKTUR in `lina-api-korrekturen.md`, nicht raten. Für den Verlauf nach
+Der Lader **rechnet nichts um**. ~~Ob das für die Personalplanung stimmt, ist eine Annahme, bis die
+Nachtprobe gelaufen ist~~ **Nachtprobe bestanden am 09.11.2026** (Lauf 195, 1.084 Tage mit
+Nachtstunden, 32 Betriebe): die Stunden 0–7 dem Folgetag zugeschlagen passen schlechter zum
+Personalkostenbericht (Korrelation 0,918 gegen 0,925, Streuung des Quotienten 0,323 gegen 0,313).
+`befund_stunden` selbst taugt dafür nicht — er steht wegen der Kopfzahlen fast überall auf
+`weicht ab` (`plan-tpapi.md` §9.1). Für den Verlauf nach
 `stunde_folge` sortieren (8 Uhr = 0 … 7 Uhr = 23), nie nach der Uhrzeit.
 
 **Wie die Tabellen zusammenfinden.** `(betrieb_key, geschaeftstag, stunde)` gegen
@@ -1059,5 +1067,10 @@ Den Tagesumsatz holen `mart.personal_tag` und die Prüfsicht aus `core.umsatzber
   „Quote" seit Monatsanfang aufgelaufen (`fehlerkatalog.md`, Eintrag zu `pek_*`; nachgemessen
   09.11.2026 auf dem Klon, Median `pek_gesamt × umsatz_netto / 100` nach Monatstag: Tag 1
   2.053 EUR, Tag 8 9.610 EUR, Tag 15 16.664 EUR, Tag 28 31.831 EUR). Deshalb vergleicht die
-  Prüfsicht die TPAPI-Monatssumme bis zum Tag — und hat als eigentliche Nachtprobe
-  `befund_stunden`, denn `eff_*` ist je Tag nicht aufgelaufen.
+  Prüfsicht die TPAPI-Monatssumme bis zum Tag — ~~und hat als eigentliche Nachtprobe
+  `befund_stunden`~~ und auch der ist seit dem 09.11.2026 kein Fehlerbefund mehr: Kopfzahlen liegen
+  immer über den Personenstunden, die Sicht misst den Faktor je Betrieb (`0150`).
+* **Ein Schlüssel ohne Schichten ist nicht „ok".** `mart.tpapi_zugang.befund` sagt seit `0150`
+  `Schluessel ohne Schichten`, wenn in 14 Tagen mindestens sieben Umsatztage ohne eine Schicht
+  liegen (am 09.11.2026: Enchilada Rosenheim, Wilma Wunder Bochum). Diese Betriebe fehlen in jeder
+  Besetzungszahl, obwohl sie Umsatz machen.

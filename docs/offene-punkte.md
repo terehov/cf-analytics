@@ -2548,10 +2548,27 @@ Takt und Verteilung: rund 22 Aufrufe je Laden und 15 Minuten gegen dokumentierte
 nach der ersten Nacht:** `SELECT zustand, count(*) FROM sync.tpapi_zugang GROUP BY 1` — steht dort
 `gebremst`, zählt das Limit fremde Anbieter mit, und der Takt muss angepasst werden.
 
-**3. Ratskeller Saarbrücken: Personal-Endpunkt antwortet leer.** Der Betrieb hat nur die Team Data
-API gebucht (BS Bier & Speisen ebenso, dort ist noch nichts gemessen); die Personal-Endpunkte
-antworteten am 08.11.2026 (Sonntag) mit 200 und leeren `eff`/`kost`. Ob die Betriebe an einem Sonntag zu hatten oder ihre Schichten nicht in
-LINA planen, ist offen. **An einem Werktag nachmessen** (`mart.personal_tag`, `stunden_geliefert`
-für diese Betriebe). Bleibt es leer: „plant Schichten nicht in LINA" festhalten — dann gilt für sie,
-was für Betriebe ohne Schlüssel gilt, und `mart.tpapi_zugang` zeigt sie weiter als `ok` mit
-`tage_geladen`, aber ohne Besetzung.
+~~**3. Ratskeller Saarbrücken: Personal-Endpunkt antwortet leer.**~~ **Erledigt 09.11.2026:** werktags
+liefert er (26.10.: 17 besetzte Stunden), sonntags ist zu. BS Bier & Speisen liefert ebenfalls.
+
+## TPAPI nach dem ersten echten Lauf (09.11.2026, Lauf 195, `0150`)
+
+**4. Zwei laufende Betriebe mit Schlüssel planen ihr Personal nicht in LINA — Frage an Daniel.**
+Enchilada Rosenheim: 64 geholte Tage, keine Schicht, 54 davon mit Umsatz. Wilma Wunder Bochum:
+letzte Schicht am 25.09.2026, seitdem 49 Umsatztage ohne. Beide stehen seit `0150` in
+`mart.tpapi_zugang` als `Schluessel ohne Schichten` und in `mart.pruefung_uebersicht`. Was zu klären
+ist: planen die beiden woanders (dann ist der Befund dauerhaft und gehört in eine Ausschlussliste
+wie `manual.kalender_ausschluss`), oder ist die Planung in LINA eingeschlafen (dann ist es eine
+Frage an die Betriebsleitung, keine an den Importer)?
+
+**5. Aposto Wuppertal Alte Papierfabrik: Modul Personal nicht lizenziert.** Der einzige der 41
+Schlüssel mit `Module 'Personal' not licensed`. Wenn das Haus Personal je Stunde haben soll, muss
+Daniel die Buchung ergänzen; sonst bleibt der Zustand, und `mart.personal_rueckstand` lässt ihn aus.
+
+**6. Novemberplanung fehlt bei zwei Betrieben.** Aposto Schweinfurt und Enchilada Marburg liefern
+seit dem 01.11.2026 keine Schichten (letzter Tag mit Schichten 31.10., 6 von 14 Tagen besetzt).
+Sieht nach einem Dienstplan aus, der für den Monat noch nicht erfasst ist — was zugleich die offene
+Frage aus `lina-third-party-api.md` („Zeiterfassung oder Dienstplan?") Richtung Dienstplan
+beantwortet: eine Zeiterfassung wäre nicht leer. Das 14-Tage-Fenster holt es nach, sobald geplant
+ist; bleibt es leer, kippt der Befund von selbst auf `Schluessel ohne Schichten`. **Am 16.11.
+nachsehen**, ob `letzter_tag_mit_schichten` bei beiden weitergewandert ist.

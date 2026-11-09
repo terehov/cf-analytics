@@ -5569,3 +5569,46 @@ von Hand gesetztes `hoehe`, und das ist seit dem 27.10. die dokumentierte Form, 
 Live-Layout festzuhalten. Überlappung und Rasterbreite werfen weiterhin — das sind Fehler, keine
 Entscheidungen. Offen bleibt, dass die Layoutprüfung nur im Übernahmelauf läuft; wer das Layout
 ändert, startet ihn — oder bemerkt den Fehler erst, wenn jemand anderes ihn startet.
+
+## Eine Prüfzeile, die eine Erwartung maß, die die Quelle nicht erfüllen kann (09.11.2026, Lauf 195)
+
+**Symptom.** Nach dem ersten echten TPAPI-Lauf stand „Personal je Stunde: Tageskosten weichen von
+LINAs Quote ab (60 Tage)" in `mart.pruefung_uebersicht` auf **852 von 949**, und
+`mart.personal_stunde_pruefung.befund_stunden` sagte für 1.445 von 2.000 Tagen `weicht ab`. Die
+Karte `im_personal_pruefung` war mit 500 Zeilen voll. Gelesen als Fehler hätte das die Nachtprobe
+(Stunden 0–7 am falschen Tag?) bejaht und eine KORREKTUR ausgelöst, die falsch gewesen wäre.
+
+**Ursache.** LINAs `eff` je Stunde ist die **Kopfzahl** der eingeplanten Personen, keine
+Personenstunde: `personen` ist in allen 36.586 Stunden ganzzahlig, wer eine Viertelstunde da ist,
+zählt 1. Die Summe über den Tag liegt damit im Median 26 % über `Umsatz / eff_gesamt` aus dem
+Personalkostenbericht, je Betrieb zwischen +7 und +57 %, und die Monatskosten ebenso (+27 %). Die
+Probe hatte eine 5-%-Toleranz für eine Größe, die systematisch ein Viertel daneben liegt. Die
+eigentliche Nachtfrage ist mit einem anderen Maß beantwortet: die Nacht dem Folgetag zugeschlagen
+passt **schlechter** (Korrelation 0,918 gegen 0,925) — die Zuordnung stimmt.
+
+**Was es künftig verhindert (`0150`).** Die Prüfzeile ist durch eine ersetzt, die auf null gehen
+kann („Schluessel ohne Schichten trotz Umsatz"); die Messsicht bleibt, ihr Kommentar nennt den
+Normalfall `weicht ab` und den Faktor je Betrieb als das, was zu lesen ist. Spaltenkommentare
+(`personen`, `personenstunden`) und die Fallstricke `personal_kopfzahl_*` sagen „Obergrenze" im
+Katalog, die Karte zeigt Faktor und Spanne je Betrieb. Die Lehre steht schon in `0071`: eine
+Kachel, die nie auf null geht, liest niemand mehr — hier kam sie als Erwartung in einen Plan, der
+die Quelle noch nicht gesehen hatte. Ein Plan, der vor der ersten Messung Toleranzen festlegt,
+braucht nach der ersten Messung einen Termin.
+
+## Ein Schlüssel ohne Schichten stand auf „ok" (09.11.2026, Lauf 195)
+
+**Symptom.** `mart.tpapi_zugang` meldete Enchilada Rosenheim und Wilma Wunder Bochum als `ok`.
+Rosenheim hatte an 64 geholten Tagen keine einzige Schicht, 54 davon mit Umsatz; Bochum seit dem
+25.09.2026 keine mehr (49 Umsatztage). In jeder Besetzungskarte fehlten beide stillschweigend, und
+nichts sagte, dass dort etwas fehlt — die Zugangssicht prüfte nur, ob LINA antwortet.
+
+**Ursache.** Der Befund hing an HTTP 200 innerhalb von 48 Stunden. Eine leere Antwort ist eine
+Antwort. Dieselbe Signatur wie am 12.08.2026 (Belegarchiv „269 von 269 ok, null Belege"): die
+Quelle wird gefragt, liefert nichts, und der Lauf ist zufrieden.
+
+**Was es künftig verhindert (`0150`).** `mart.tpapi_zugang` zählt je Betrieb die Umsatz- und die
+Schichttage der letzten 14 Tage (`tage_mit_umsatz_14`, `tage_mit_schichten_14`,
+`letzter_tag_mit_schichten`); mindestens sieben Umsatztage ohne eine Schicht ergeben den Befund
+`Schluessel ohne Schichten`, dazu die Prüfzeile. Wer keinen Umsatz hat (Aposto Wuppertal GmbH, Park
+Cafe München), bleibt `ok` — dort ist nichts zu erwarten. Was die beiden Betriebe tun sollen, ist
+eine Frage an Daniel (`offene-punkte.md`), keine an den Importer.

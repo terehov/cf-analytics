@@ -4681,3 +4681,33 @@ ab 18 Uhr).
 
 **Verworfen:** `getlimit` vor jedem Block lesen (Team-only-Betriebe: 403; zählt womöglich fremde
 Anbieter mit); `personalkostenprotag` aggregiert in `raw` (offen, `offene-punkte.md`).
+
+## 09.11.2026 — Kopfzahl heißt Kopfzahl, und ein Schlüssel ohne Schichten ist kein „ok" (`0150`)
+
+**Anlass.** Der erste echte TPAPI-Lauf (195). Die Prüfzeile aus `0149` stand auf 852 von 949, und
+zwei Betriebe mit Schlüssel lieferten keine Schichten, während die Zugangssicht `ok` sagte.
+
+**Entschieden.**
+
+1. **Die Zahl wird nicht umgerechnet, sondern benannt.** `personen` bleibt die Kopfzahl je Stunde,
+   `personenstunden` bleibt die Summe darüber — mit Spaltenkommentaren, Fallstricken
+   (`personal_kopfzahl_*`) und Kartentexten, die „Obergrenze" sagen. Eine Umrechnung auf
+   Personenstunden (etwa × 0,79 aus dem Median) wäre eine Schätzung mit einer Streuung von +7 bis
+   +57 % je Betrieb; sie würde eine Genauigkeit vortäuschen, die die Quelle nicht hat. Für die
+   Frage, für die die Quelle angebunden wurde (Besetzung), ist die Kopfzahl die richtige Zahl.
+2. **Die Prüfzeile wird ersetzt, nicht gesenkt.** Eine Toleranz von 30 % hätte die Zeile auf
+   „ein paar hundert" gebracht und nichts bedeutet. Stattdessen eine Zeile, die auf null gehen
+   kann: „Schluessel ohne Schichten trotz Umsatz". Die Messsicht bleibt, mit Kommentar, der
+   `weicht ab` als Normalfall nennt (`0071`: eine Kachel, die nie auf null geht, liest niemand).
+3. **Die Schwelle für „ohne Schichten"** sind sieben Umsatztage ohne eine Schicht in den 14 Tagen
+   des Importerfensters. Sieben, damit Ruhetage und eine Schließwoche nicht auffallen; 14, weil
+   das Fenster jeden dieser Tage jede Nacht neu holt — eine nachträglich erfasste Planung kommt
+   noch an. Betriebe ohne Umsatz bleiben `ok`: dort ist nichts zu erwarten.
+4. **Die Nachtprobe gilt als bestanden** und wird nicht als Prüfzeile weitergeführt. Gemessen über
+   Korrelation und Streuung des Quotienten gegen den Scraper (geladen 0,925 / 0,313, Nacht auf den
+   Folgetag 0,918 / 0,323); das ist eine einmalige Messung, kein Dauerbefund.
+
+**Verworfen:** Spalten umbenennen (`personenstunden` → `kopfzahlstunden`): bricht Karten,
+MCP-Beispiele und die Pläne, für einen Gewinn, den der Kommentar auch bringt. Toleranz je Betrieb
+aus der eigenen Historie: misst Stabilität, nicht Richtigkeit, und hätte nach einem Monat Daten
+keine Grundlage.

@@ -2080,7 +2080,7 @@ in der Migration). Quelle und Fallen der Herkunft: `datenherkunft.md`; Plan: `pl
 | `mart.personal_tag` | Betrieb × Geschäftstag | Personenstunden, Lohnkosten, `stunden_besetzt`, erste/letzte besetzte Stunde (in Geschäftstag-Reihenfolge), Tagesumsatz aus dem Umsatzbericht, `stunden_geliefert`, `abgerufen_am` |
 | `mart.personal_rueckstand` | Betrieb × fehlender Tag | Die Arbeitsliste des Backfills. **Die Zahl muss von Nacht zu Nacht fallen und 0 erreichen.** `nicht_lizenziert` fehlt hier, sonst ginge sie nie auf 0; `zugang_zustand` erklärt, warum ein Betrieb stehen bleibt. Horizont 365 fest in der Sicht, zusammen mit `TPAPI_HISTORIE_TAGE` zu ändern |
 | `mart.personal_stunde_pruefung` | Betrieb × abgerufener Tag | Zwei Proben (unten) |
-| `mart.tpapi_zugang` | Betrieb (alle 141) | `schluessel`, `zustand`, `zuletzt_gefragt`, `zuletzt_erfolg`, `letzter_fehler`, `tage_geladen`, `rueckstand_tage`, `befund` |
+| `mart.tpapi_zugang` | Betrieb (alle 141) | `schluessel`, `zustand`, `zuletzt_gefragt`, `zuletzt_erfolg`, `letzter_fehler`, `tage_geladen`, `rueckstand_tage`, `befund`; seit `0150` `tage_mit_umsatz_14`, `tage_mit_schichten_14`, `letzter_tag_mit_schichten` |
 
 **Die Fallen, die man den Sichten nicht ansieht:**
 
@@ -2094,12 +2094,24 @@ in der Migration). Quelle und Fallen der Herkunft: `datenherkunft.md`; Plan: `pl
    `stunden_geliefert = 0` heißen „LINA führt dort niemanden", nicht „niemand war da".
 4. **Nur Betriebe mit Schlüssel.** `mart.tpapi_zugang` sagt, wer fehlt und warum
    (`operativ ohne Schluessel`, `nicht lizenziert`, `abgewiesen`, `gebremst`,
-   `Schluessel ohne Zulauf`, `nicht operativ`). „Nicht lizenziert" ist ein Zustand, kein Fehler.
+   `Schluessel ohne Zulauf`, `Schluessel ohne Schichten`, `nicht operativ`). „Nicht lizenziert"
+   ist ein Zustand, kein Fehler. `Schluessel ohne Schichten` (seit `0150`: in 14 Tagen mindestens
+   sieben Umsatztage und keine Schicht) heißt: der Betrieb plant nicht in LINA — er fehlt in
+   jeder Besetzungszahl, obwohl er läuft (09.11.2026: Rosenheim, Bochum).
+7. **`personen` ist die Kopfzahl, `personenstunden` eine Obergrenze** (`0150`). Wer eine
+   Viertelstunde in der Stunde arbeitet, zählt 1; die Tagessumme liegt im Median 26 % über LINAs
+   eigener Effektivitätsrechnung. Besetzung und Vergleiche zwischen Betrieben, Tagen, Fenstern sind
+   in Ordnung; `umsatz_je_personenstunde` nur relativ lesen, nie als absolute Produktivität.
 5. **Lohnkosten der Personalplanung ≠ Personalkosten der BWA.** Nicht gegen
    `mart.personal_bereich_monat` oder `mart.round_table_monat` rechnen.
 6. **Ein Jahr Historie.** Vor November 2025 gibt es nichts.
 
-**Zwei Proben in `mart.personal_stunde_pruefung`.** `befund` vergleicht die TPAPI-Lohnkosten
+**Zwei Proben in `mart.personal_stunde_pruefung` — seit `0150` eine Messung, keine Prüfung.**
+Nach dem ersten Lauf (09.11.2026) stand `weicht ab` bei 1.445 von 2.000 Tagen und 23 von 31
+Betrieben im Oktober: die TPAPI liefert Kopfzahlen, die Summe liegt **immer** über den
+Personenstunden des Scrapers (Median +26 %, je Betrieb +7 bis +57 %). Zu lesen ist der **Faktor je
+Betrieb** und ob er ruhig bleibt — nicht `ok`/`weicht ab`. Was die beiden Spalten rechnen, bleibt:
+`befund` vergleicht die TPAPI-Lohnkosten
 **vom Monatsersten bis zum Tag** mit `pek_gesamt × Tagesumsatz` — nicht den Tag, weil `pek` im
 Tagesabruf seit Monatsanfang aufgelaufen ist (`fehlerkatalog.md`; Plan §3.5 sah noch den
 Tagesvergleich vor, er wäre an fast jedem Tag `weicht ab` gewesen). Werte: `ok` (≤ 5 %),
@@ -2112,13 +2124,17 @@ korrigiert.
 
 **Drei Zeilen in `mart.pruefung_uebersicht`:** „TPAPI: operativer Betrieb ohne Schluessel"
 (**konstant, nicht null**, bis die Buchungen nachgezogen sind — `offene-punkte.md`), „TPAPI:
-Schluessel ohne Zulauf (48 h)" (Erwartung 0, `nicht_lizenziert` ausgenommen) und „Personal je
-Stunde: Tageskosten weichen von LINAs Quote ab (60 Tage)" (ohne die jüngsten acht Tage).
+Schluessel ohne Zulauf (48 h)" (Erwartung 0, `nicht_lizenziert` ausgenommen) und ~~„Personal je
+Stunde: Tageskosten weichen von LINAs Quote ab (60 Tage)" (ohne die jüngsten acht Tage)~~ seit
+`0150` „TPAPI: Schluessel ohne Schichten trotz Umsatz (14 Tage)" (Erwartung 0; am 09.11.2026
+zwei). Die Kostenzeile stand nach dem ersten Lauf auf 852 von 949 und wäre nie auf null gegangen
+(`fehlerkatalog.md`).
 
 **MCP-Katalog.** Körnung und Thema `personal` je Sicht (Prüfsichten `import`,
 `summen_erlaubt = false`). Fallstricke: `personal_nur_mit_schluessel_*`,
-`personal_leer_ist_nicht_null_*`, `personal_historie_ein_jahr_*` (`deutung` gilt je Sicht, daher die
-Endungen `_stunde`/`_zeitfenster`/`_tag`) und `personal_tpapi_gegen_bwa` (`sichten_mischen`). Schwere
+`personal_leer_ist_nicht_null_*`, `personal_historie_ein_jahr_*`, seit `0150` `personal_kopfzahl_*`
+(`deutung` gilt je Sicht, daher die Endungen `_stunde`/`_zeitfenster`/`_tag`) und
+`personal_tpapi_gegen_bwa` (`sichten_mischen`). Schwere
 `hinweis` gibt es nicht — `mcp.fallstrick.schwere` erlaubt `sperre`/`warnung`. **Nach dem Deploy
 und der ersten vollen Nacht den Katalogabzug neu ziehen** (`cd mcp && MCP_DATABASE_URL=… bun run
 katalog:abzug`, gegen die Produktion, Weg wie am 29.10.2026).

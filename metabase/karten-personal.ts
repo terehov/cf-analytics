@@ -257,40 +257,44 @@ SELECT z.betrieb                                    AS "Betrieb",
   },
 
   {
+    // Bis 0150 listete die Karte jeden Tag mit "weicht ab" — nach dem ersten
+    // echten Lauf waren das 852 von 949, weil die TPAPI Kopfzahlen je Stunde
+    // liefert und die Summe immer ueber LINAs Effektivitaet liegt. Eine
+    // Liste, die immer voll ist, liest niemand. Jetzt eine Zeile je Betrieb
+    // mit dem Faktor und seiner Streuung: der Faktor darf hoch sein, aber
+    // er soll je Betrieb ruhig bleiben.
     schluessel: 'im_personal_pruefung',
-    name: 'Personalstunden gegen Effektivität',
+    name: 'Personalplanung gegen Effektivität — je Betrieb',
     beschreibung:
-      'Die Probe, ob die Nachtstunden am richtigen Tag stehen: für die letzten 60 Tage die '
-      + 'Personenstunden aus der Personalplanung gegen die, die sich aus LINAs Effektivität '
-      + '(Umsatz je Personenstunde) zurückrechnen lassen. Aufgeführt sind nur die Tage, an denen '
-      + 'beides um mehr als 5 % auseinanderliegt, oder an denen die Lohnkosten des Monats nicht zur '
-      + 'Personalquote passen — am stärksten Abweichenden zuerst.\n\n'
-      + 'Steht ein Betrieb an vielen Tagen hier, ist das ein Hinweis auf einen Fehler in der '
-      + 'Zuordnung der Stunden. Einzelne Tage sind normal: frische Tage sind in beiden Quellen noch '
-      + 'in Bewegung. Die Lohnkosten sind nicht die der BWA.',
+      'Wie weit die Personalplanung über den Stunden liegt, die sich aus LINAs Effektivität '
+      + '(Umsatz je Personalstunde) zurückrechnen lassen — je Betrieb über die letzten 60 Tage. '
+      + 'Die Planung zählt **Köpfe je Stunde**: wer eine Viertelstunde da ist, zählt voll. Deshalb '
+      + 'liegt sie **immer darüber**, meist um ein Viertel; das ist kein Fehler.\n\n'
+      + 'Worauf zu achten ist: ein Betrieb, dessen Aufschlag **stark schwankt** (Spanne), oder der '
+      + 'an vielen Tagen mit Umsatz **keine Schichten** liefert — dort plant jemand nicht oder nicht '
+      + 'mehr in LINA. Die Lohnkosten sind die der Planung, nicht die der BWA.',
     anzeige: 'table',
     sql: `
-SELECT p.betrieb                                    AS "Betrieb",
-       p.geschaeftstag                              AS "Tag",
-       p.personenstunden_tpapi                      AS "Personenstunden (Planung)",
-       p.personenstunden_aus_effektivitaet          AS "Personenstunden (Effektivität)",
-       p.abweichung_stunden_pct                     AS "Abweichung Stunden %",
-       p.befund_stunden                             AS "Befund Stunden",
-       p.personalkosten_tpapi_monat                 AS "Lohnkosten Monat bis hier",
-       p.personalkosten_aus_quote                   AS "Lohnkosten aus Quote",
-       p.abweichung_pct                             AS "Abweichung Kosten %",
-       p.befund                                     AS "Befund Kosten"
+SELECT p.betrieb                                                   AS "Betrieb",
+       p.konzept                                                   AS "Marke",
+       count(*) FILTER (WHERE p.befund_stunden IN ('ok', 'weicht ab'))  AS "Tage verglichen",
+       round(percentile_cont(0.5) WITHIN GROUP (ORDER BY p.abweichung_stunden_pct)::numeric, 1)
+                                                                   AS "Aufschlag Median %",
+       round((percentile_cont(0.75) WITHIN GROUP (ORDER BY p.abweichung_stunden_pct)
+            - percentile_cont(0.25) WITHIN GROUP (ORDER BY p.abweichung_stunden_pct))::numeric, 1)
+                                                                   AS "Spanne %",
+       count(*) FILTER (WHERE p.befund_stunden = 'leer' AND p.umsatz_netto > 0)
+                                                                   AS "Tage ohne Schichten trotz Umsatz",
+       count(*) FILTER (WHERE p.befund_stunden = 'ohne vergleich')  AS "Tage ohne Vergleichswert"
   FROM mart.personal_stunde_pruefung p
  WHERE p.geschaeftstag >= current_date - 60
-   AND (p.befund_stunden = 'weicht ab' OR p.befund = 'weicht ab')
- ORDER BY abs(coalesce(p.abweichung_stunden_pct, 0)) DESC, p.betrieb, p.geschaeftstag
- LIMIT 500`,
+ GROUP BY p.betrieb, p.konzept
+ ORDER BY "Tage ohne Schichten trotz Umsatz" DESC, "Spanne %" DESC NULLS LAST, p.betrieb`,
+    zeilen_max: 60,
     visualisierung: {
       column_settings: {
-        '["name","Abweichung Stunden %"]': PROZENT,
-        '["name","Abweichung Kosten %"]': PROZENT,
-        '["name","Lohnkosten Monat bis hier"]': EURO,
-        '["name","Lohnkosten aus Quote"]': EURO,
+        '["name","Aufschlag Median %"]': PROZENT,
+        '["name","Spanne %"]': PROZENT,
       },
     },
   },

@@ -130,7 +130,12 @@ Buchung, Artikelstamm. Ergebnis gehört danach in diese Datei.
 - **`personalkostenprostunde`** je Geschäftstag: `eff` = **Personen je Stunde** (Schlüssel
   0–23), `kost` = **Personalkosten je Stunde in €**, `kostUser` = dieselben Kosten je Person
   als Liste. Genau die Zahl, die Melanies Auswertung angenommen hat („3 MA"). Achtung: `eff`
-  heißt hier *Köpfe*, nicht €/h wie in der Kachel „Effektivität" im Tagesverlauf.
+  heißt hier *Köpfe*, nicht €/h wie in der Kachel „Effektivität" im Tagesverlauf. **Und Köpfe
+  heißt Köpfe:** nachgemessen am 09.11.2026 über 36.586 Stunden ist `eff` immer ganzzahlig — eine
+  Person, die 15 Minuten der Stunde arbeitet, zählt 1. Die Tagessumme liegt im Median 26 % über
+  den Personenstunden, die LINAs eigener Personalkostenbericht zugrunde legt (`Umsatz /
+  eff_gesamt`), `kost` ist genauso verteilt (Monatssumme +27 % gegen `pek_gesamt`). Als Besetzung
+  exakt, als Arbeitszeit eine Obergrenze (`0150`).
 - **`personalkostenprotag`**: `h_brutto`, `h_zuschl_25/40/50`, `brutto`, `lohnkosten`.
 - **`acceptedworkingtimes`**: genehmigte Zeiten je Person (`von`, `bis`, `von2`, `bis2`,
   `pause`, `bereich`).
@@ -324,9 +329,12 @@ Personal je Stunde 08–22 Uhr und 07 Uhr (6 bis 14 Personen), 18 Personen im Ta
 antwortet 403 mit `Module 'Revenue' not licensed` bzw. `'Artikelstammdaten'` / `'BWA'` —
 **auch `revenue/store` und `revenue/getlimit`**. Das ist keine Abweisung des Schlüssels; die
 Probe bricht seitdem nur noch bei einer echten Abweisung ab. Die Personal-Endpunkte antworten
-200, aber **leer** (`eff`/`kost` ohne Stunden, Tagesbericht `[]`). Ob der Betrieb am 08.11.
-(Sonntag) zu hatte oder seine Schichten nicht in LINA plant, ist offen — mit einem Werktag
-nachmessen, bevor ein leerer Tag als „kein Personal" gelesen wird.
+200, aber **leer** (`eff`/`kost` ohne Stunden, Tagesbericht `[]`). ~~Ob der Betrieb am 08.11.
+(Sonntag) zu hatte oder seine Schichten nicht in LINA plant, ist offen~~ **Geklärt am 09.11.2026
+(Lauf 195):** werktags liefert er (Mo 26.10.: 69 Kopfzahlstunden, 17 besetzte Stunden,
+903,81 EUR), sonntags ist er zu. Der leere Sonntag war ein geschlossener Tag, kein fehlender
+Dienstplan. Personal ist auch bei BS Bier & Speisen lizenziert; nicht lizenziert ist es einzig
+bei Aposto Wuppertal Alte Papierfabrik.
 
 Folge für den Importer: der Umfang je Schlüssel ergibt sich aus der Buchung. Ein 403
 „not licensed" ist ein Zustand des Betriebs, kein Fehler — er gehört sichtbar in die Tabelle
@@ -336,9 +344,11 @@ der Zugänge (Entscheidung 09.11.2026), nicht in eine Wiederholung.
 
 `personalkostenprostunde` wird seit Migration `0149` im Nachtlauf geholt (Plan, Entscheidungen
 D1–D8 und Abweichungen: `plan-tpapi.md`; Importer: `importer.md`, Abschnitt „TPAPI-Dienst";
-Tabellen: `datenmodell.md`; Sichten: `metabase.md`). **Gebaut und gegen die Attrappe getestet, aber
+Tabellen: `datenmodell.md`; Sichten: `metabase.md`). ~~**Gebaut und gegen die Attrappe getestet, aber
 noch nicht gegen das echte LINA gelaufen** (Regel 7a) — der erste echte Lauf ist der Nachtlauf nach
-dem Deploy, die Messungen danach stehen in Plan §5.
+dem Deploy, die Messungen danach stehen in Plan §5.~~ **Erster echter Lauf am 09.11.2026 (Lauf 195,
+manuell):** 2.560 Betrieb-Tage für 40 Betriebe, kein 429, kein `abgewiesen`; die Messungen und die
+zwei Befunde daraus (Kopfzahl, Schlüssel ohne Schichten → `0150`) stehen in Plan §9.1.
 
 | Endpunkt | Genutzt |
 |---|---|

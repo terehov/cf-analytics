@@ -207,6 +207,10 @@ Konfiguration (`src/config.ts`, geprüft beim Start):
 2. `SELECT befund_stunden, count(*) FROM mart.personal_stunde_pruefung WHERE geschaeftstag >= current_date - 14 GROUP BY 1`
    — **die Nachtprobe.** Liegt `weicht ab` systematisch bei Betrieben mit Nachtgeschäft, stehen
    die Stunden 0–7 am falschen Tag; dann KORREKTUR in `lina-api-korrekturen.md`, nicht raten.
+   **Ergebnis 09.11.2026 (Lauf 195):** `weicht ab` liegt bei **allen** Betrieben, nicht bei denen
+   mit Nachtgeschäft — Median +26 %, weil `eff` Kopfzahlen sind (§9). Die Nachtprobe selbst ist
+   bestanden: Stunden 0–7 dem Folgetag zugeschlagen passen schlechter (Korrelation 0,918 gegen
+   0,925, Streuung 0,323 gegen 0,313, 1.084 Tage mit Nachtstunden). Keine KORREKTUR.
    Dazu `befund` (Monatssumme gegen die aufgelaufene Quote) — erst aussagekräftig, wenn der
    Monat vollständig geholt ist (`monat unvollstaendig` verschwindet mit dem Backfill).
 3. `SELECT count(*) FROM mart.personal_rueckstand` — muss jede Nacht um ~2.000 fallen; nach acht
@@ -280,4 +284,41 @@ Lastmessung hält (synthetisches Jahr, 41 Betriebe, 284.335 Stunden, 09.11.2026:
 `mart.personal_stunde` je Betrieb und Monat 3,4 ms, Melanies Filter auf `personal_zeitfenster`
 5 ms, `personal_stunde_pruefung` seit Juli 89 ms, `tpapi_zugang` 33 ms) mit echten Daten gilt.
 Danach den MCP-Katalogabzug neu ziehen (`AGENTS.md`, Dokumentationspflicht).
+
+### 9.1 Nach dem ersten echten Lauf (09.11.2026, Lauf 195, manuell 17:40–20:02)
+
+Deployt mit `58b7aa8`, Migration `0149` im Container angewendet, erster Abruf im selben Lauf.
+Gemessen über den MCP-Zugang (also als `mcp_leser`, gegen die Produktion):
+
+| Messung (§5) | Ergebnis |
+|---|---|
+| 1. Zugang | 40 × `ok`, 1 × `nicht lizenziert` (Aposto Wuppertal Alte Papierfabrik: `Module 'Personal' not licensed` — der Plan hatte Saarbrücken und BS Bier & Speisen als Kandidaten, beide sind lizenziert), 22 × `operativ ohne Schluessel`, 78 × `nicht operativ`. 40 + 1 = 41 Schlüssel |
+| 2. Nachtprobe | bestanden, siehe §5 Punkt 2. `befund_stunden` der letzten 14 Tage: 376 `weicht ab` (32 Betriebe), 100 `leer`, 68 `ohne vergleich`, 16 `ok` |
+| 3. Rückstand | 12.040 = 40 × 365 − 2.560 geladene Betrieb-Tage (06.09.–08.11.2026, Fenster 560 + Backfill 2.000). Muss morgen bei ~10.040 stehen |
+| 4. Saarbrücken werktags | liefert: Mo 26.10. 69 Kopfzahlstunden, 17 besetzte Stunden, 903,81 EUR; sonntags leer (01.11., 08.11.) — der Betrieb hat sonntags zu, er plant in LINA |
+| 5. Zulauf | `tpapi:personalkosten_stunde` `ok`, zuletzt 17:30 UTC |
+| 6. Melanie | Wilma Wunder sonntags, 12 Betriebe, 60 Tage: 18 Uhr 8,2 Personen, 19 Uhr 7,1, 20 Uhr 6,3, 21 Uhr 5,7, 22 Uhr 4,6, 23 Uhr 2,9 (11 Betriebe), 0 Uhr 1,5 (9), 1 Uhr 1,0 (2) |
+
+**Zwei Befunde, die der Plan nicht kannte — Migration `0150`:**
+
+1. **`eff` ist die Kopfzahl je Stunde, keine Personenstunde.** `personen` ist in allen 36.586
+   Stunden ganzzahlig; wer eine Viertelstunde in der Stunde arbeitet, zählt 1. Die Summe über den
+   Tag liegt im Median **26 %** über `Umsatz / eff_gesamt` aus LINAs Personalkostenbericht (p25
+   15 %, p75 44 %, 1.873 Tage), je Betrieb zwischen +7 % (Wilsdruffer Straße, IQR 2,9) und +57 %
+   (Ballplatz Mainz, IQR 34,8); die Oktober-Lohnkosten bei 23 von 31 Betrieben ebenso (Median
+   +27 %, 8 Betriebe innerhalb ±4,5 %). Für die Besetzungsfrage ist die Kopfzahl die richtige Zahl;
+   als Arbeitszeit oder Lohnsumme ist sie eine Obergrenze. **Folge:** die Prüfzeile „Tageskosten
+   weichen von LINAs Quote ab" stand auf 852 von 949 und wäre nie auf null gegangen — ersetzt
+   (`0150`), die Sicht bleibt als Messung des Faktors je Betrieb. Spaltenkommentare und drei
+   Fallstricke `personal_kopfzahl_*` sagen es im Katalog; `im_personal_pruefung` zeigt den Faktor
+   und seine Spanne je Betrieb statt einer immer vollen Tagesliste.
+2. **Schlüssel ohne Schichten.** Enchilada Rosenheim lieferte an 64 Tagen keine Schicht, 54 davon
+   mit Umsatz; Wilma Wunder Bochum seit dem 25.09.2026 nichts mehr (49 Umsatztage). Beide standen in
+   `mart.tpapi_zugang` auf `ok`, weil HTTP 200 kam — Regel 10. Neuer `befund`
+   `Schluessel ohne Schichten` (14 Tage, ≥ 7 Umsatztage, 0 Schichttage) mit Prüfzeile; Aposto
+   Wuppertal GmbH und Park Cafe München liefern ebenfalls nichts, haben aber keinen Umsatz und
+   bleiben `ok`. Nebenbefund: Aposto Schweinfurt und Enchilada Marburg haben seit dem 01.11. keine
+   Schichten (6 von 14 Tagen besetzt, letzter 31.10.) — sieht nach noch nicht erfasster
+   Novemberplanung aus, also Dienstplan, nicht Zeiterfassung; mit dem Fenster von 14 Tagen kommt
+   das nach, sobald geplant ist. Fällt es nicht nach, greift der neue Befund von selbst.
 
