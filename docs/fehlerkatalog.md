@@ -5548,3 +5548,24 @@ Aktivität steht nur im Zugriffsprotokoll.
 (`zuletzt_aktiv`, Aufrufe und aktive Tage der letzten 30 Tage), lesbar nur für `mcp_anmeldung`.
 `nutzer liste` zeigt `zuletzt_aktiv` vor `letzter_login`, und der Spaltenkommentar sagt, was
 `letzter_login` misst.
+
+## `uebernehmen.ts` brach an einem Layout ab, das Absicht war (09.11.2026)
+
+**Symptom.** `bun run metabase/uebernehmen.ts` endete mit `db_management: Kachel mg_umsatz ist
+zu niedrig (hoehe=2, noetig fuer scalar: 4)`, bevor es sich anmeldete. Nichts wurde übertragen —
+weder die sechs neuen Personal-Karten aus `0149` noch irgendeine Änderung seit dem 27.10.2026.
+Dreizehn Tage lang war die Übernahme blockiert, und niemand hat es gemerkt, weil niemand sie in der
+Zeit gestartet hat.
+
+**Ursache.** Am 27.10.2026 wurde das Management-Layout aus der Oberfläche abgelesen und mit zehn
+Höhen **unter** der Mindesthöhe aus `layout.ts` eingetragen — ausdrücklich so gewollt, der Kommentar
+in `dashboards.ts` und an `Teil.hoehe` sagt es. Die Höhenprüfung in `uebernehmen.ts` (seit Juli) kannte
+diese Ausnahme nicht und warf. Zwei Stellen beschrieben dieselbe Regel gegensätzlich, und kein Test
+führt die Layoutprüfung aus: `karten.test.ts` prüft Karten, nicht Dashboards.
+
+**Was es künftig verhindert.** Die Mindesthöhe wird gemeldet, nicht erzwungen (`console.warn` je
+Kachel). Eine gerechnete Höhe liegt durch `auslegen()` nie darunter; unterschreiten kann sie nur ein
+von Hand gesetztes `hoehe`, und das ist seit dem 27.10. die dokumentierte Form, ein abgelesenes
+Live-Layout festzuhalten. Überlappung und Rasterbreite werfen weiterhin — das sind Fehler, keine
+Entscheidungen. Offen bleibt, dass die Layoutprüfung nur im Übernahmelauf läuft; wer das Layout
+ändert, startet ihn — oder bemerkt den Fehler erst, wenn jemand anderes ihn startet.

@@ -1007,8 +1007,8 @@ if (klickFehler.length > 0) {
 // dort sieht er aus wie ein Darstellungsproblem statt wie eine falsche
 // Zahl in der Definition. Deshalb hier, wo er noch billig ist.
 //
-// Ebenso die Mindesthoehen: eine Tabelle auf vier Rastereinheiten zeigt
-// Kopfzeile und zwei Datenzeilen, den Rest schneidet sie ab.
+// Die Mindesthoehen werden gemeldet, nicht erzwungen — Begruendung unten
+// an der Schleife.
 // ---------------------------------------------------------------------
 for (const d of dashboards) {
   const belegt = layoutVon.get(d.schluessel)!.map(k => ({
@@ -1035,14 +1035,21 @@ for (const d of dashboards) {
     }
   }
 
+  // Mindesthoehen: nur noch eine Meldung, kein Abbruch. Gerechnete Hoehen
+  // liegen durch `auslegen` nie darunter; unterschreiten kann sie nur eine
+  // von Hand gesetzte `hoehe` — und die ist seit dem 27.10.2026 ausdruecklich
+  // erlaubt, wenn das Mass am gerenderten Dashboard abgelesen ist (Kommentar
+  // an `Teil.hoehe` in typen.ts, Management-Layout in dashboards.ts). Der
+  // harte Abbruch hier wusste davon nichts und blockierte die Uebernahme
+  // vom 27.10. bis zum 09.11.2026 (docs/fehlerkatalog.md).
   for (const k of layoutVon.get(d.schluessel)!) {
     if (k.text !== undefined) continue
     const typ = typVon(k.karte) ?? 'bar'
     const noetig = mindesthoehe(typ, zeilenVon(k.karte))
     if (k.hoehe < noetig) {
-      throw new Error(
-        `${d.schluessel}: Kachel ${k.karte} ist zu niedrig (hoehe=${k.hoehe}, ` +
-        `noetig fuer ${typ}: ${noetig})`)
+      console.warn(
+        `${d.schluessel}: Kachel ${k.karte} liegt unter der Mindesthoehe ` +
+        `(hoehe=${k.hoehe}, Richtwert fuer ${typ}: ${noetig}) — von Hand gesetzt, bleibt so`)
     }
   }
 }

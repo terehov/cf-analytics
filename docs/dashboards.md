@@ -47,8 +47,9 @@ bun run metabase/uebernehmen.ts
 > klickt.
 >
 > Wer nur wissen will, ob die Definitionen in sich stimmen, braucht den Befehl nicht: die
-> Prüfungen (Überlappung, Mindesthöhe, tote und taube Filter, Klickziele) laufen ganz am
-> Anfang und werfen, bevor irgendetwas angelegt wird — aber sie laufen im selben Prozess,
+> Prüfungen (Überlappung, tote und taube Filter, Klickziele) laufen ganz am
+> Anfang und werfen, bevor irgendetwas angelegt wird — die Mindesthöhe wird seit dem 09.11.2026
+> nur noch gemeldet, nicht erzwungen (Fehlerkatalog) — aber sie laufen im selben Prozess,
 > der danach überträgt. Für einen reinen Test gibt es `bun test metabase/karten.test.ts`;
 > der fasst Metabase nicht an.
 >
@@ -152,7 +153,9 @@ Warum sie so aussieht:
   Abgelesen über `GET /api/dashboard/39` und als `breite`/`hoehe` in `db_management`
   eingetragen. Gegenprobe: `auslegen()` ergibt für alle 17 Kacheln dieselbe Position und
   Größe wie live. Mehrere Höhen liegen **unter** der Mindesthöhe aus `layout.ts`, und das ist
-  so gewollt. Ein `hoehe` am Teil übersteuert sie auch nach unten. **Die Regel dahinter:**
+  so gewollt. Ein `hoehe` am Teil übersteuert sie auch nach unten — seit dem 09.11.2026 auch
+  in `uebernehmen.ts`, das bis dahin an genau diesen Höhen abbrach und dreizehn Tage lang keine
+  Änderung mehr übertrug (Fehlerkatalog). **Die Regel dahinter:**
   `uebernehmen.ts` schreibt die Positionen jedes Mal neu. Ein Layout, das nur in der
   Oberfläche steht, ist beim nächsten Lauf weg. Wer in Metabase umbaut, liest danach das
   Live-Layout aus und trägt es hier ein.
