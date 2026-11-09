@@ -108,7 +108,11 @@ async function main(): Promise<number> {
   const laden = await holen('revenue/store')
   zeile('1.', 'revenue/store (verbundener Laden)', laden)
   if (laden.status === 200) console.log(`   ${sauber(JSON.stringify(laden.daten)).slice(0, 600)}`)
-  if (laden.status === 401 || laden.status === 403) {
+  // „Module '…' not licensed" ist keine Abweisung des Schluessels, sondern eine fehlende Buchung
+  // (Ratskeller Saarbruecken, nur Team Data API: `revenue/store` → 403, gemessen 09.11.2026).
+  // Dann weiter, damit die gebuchten Endpunkte gemessen werden.
+  const nichtGebucht = /not licensed/i.test(laden.roh)
+  if ((laden.status === 401 || laden.status === 403) && !nichtGebucht) {
     console.log('\n→ Abgewiesen. Nicht wiederholen. Pruefen: Schluessel vollstaendig, IP im Schluessel = Ausgang IPv4 oben, Recht gesetzt.')
     return 2
   }
