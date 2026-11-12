@@ -104,4 +104,107 @@ vor `raw`); `src/sync/phasen.test.ts` grün; Typecheck; kein Schlüssel in Log, 
 
 ## 8. Abweichungen und Ist-Stand
 
-*(wird beim Bau gefüllt)*
+### Ist-Stand Schritt 2a (12.11.2026)
+
+**Gebaut und gegen die Attrappe getestet, nie gegen das echte LINA gelaufen** (Regel 7a). Migration
+`0151_tpapi_rohabzug.sql`; Importer `src/tpapi/endpunkte.ts` (Register), `verdichtung.ts`
+(personalkostenprotag, listdays), `roh_laden.ts` (raw + Abrufzeile), `rohabzug.ts` (Phase A und C),
+`zugang.ts` (aus `nachlauf.ts` herausgezogen, jetzt je Modul); Client mit gleitender Grenze;
+Registereinträge in `src/sync/quellen.ts`; Phase C in `src/sync.ts`. Kein `core`-Lader (2b).
+
+Gemessen auf einem Klon mit synthetischen Daten (41 Betriebe, 58.463 Tage in `listdays`, im Mittel
+1.426 je Betrieb, 117.000 Abrufzeilen, ein Drittel fehlend): `mart.tpapi_rueckstand` **0,13 s**,
+die Arbeitsliste von Phase C (`mart.tpapi_rueckstand_tag`, sortiert, `LIMIT 10000`) **0,12 s**.
+
+### Abweichungen vom Plan
+
+1. **Das Fenster von Phase A sind Kalendertage** (gestern bis vor drei Tagen), nicht die jüngsten
+   drei Einträge aus `listdays` (S7: „die letzten 3 Geschäftstage"). Um 05:02 ist der Geschäftstag
+   von gestern noch offen (er endet 07:59) und steht womöglich noch nicht in `listdays`; ein
+   geschlossener Betrieb hätte seine „letzten drei" vor Monaten und holte sie jede Nacht neu; und
+   ein Betrieb ohne `revenue` hat gar keine Liste, braucht das Fenster aber für Personalkosten je
+   Tag. Preis: ein Ruhetag kostet einen Aufruf mit leerer Antwort.
+2. **Arbeitsliste ohne `listdays`.** Betriebe nur mit Team Data (Ratskeller Saarbrücken, BS Bier &
+   Speisen) bekommen auf `revenue/listdays` 403. Für `personalkostenprotag` gilt dort der Horizont
+   aus Stufe 1 (365 Tage bis gestern, `arbeitsliste = 'horizont 365'`). Ob `personalkostenprotag`
+   ältere Tage als ein Jahr liefert, misst die Formprobe (§3); bis dahin fragt der Rückstand bei
+   Betrieben mit tiefer `listdays` auch dort zurück bis zum Kassenstart. Liefert LINA für solche
+   Tage kein 200, bleiben sie im Rückstand und `stockt` schlägt an, sobald sonst nichts mehr fehlt.
+3. **Ein Tag, der hinten aus `listdays` fällt, fällt aus der Arbeitsliste** (`gesehen_am` =
+   jüngste Liste des Betriebs). Gelöscht wird nichts. Sonst fragte das Nachladen jede Nacht Tage,
+   die LINA nicht mehr führt.
+4. **Gleicher Hash, kein neuer Rohsatz** (Tagesendpunkte und Artikelstamm). Das Fenster holt jeden
+   Tag dreimal, ein Journal hat 1–2 MB; dreimal dieselben Bytes wären rund 120 MB je Nacht ohne
+   Information. Die Abrufzeile zählt `abrufe` hoch und zeigt weiter auf den vorhandenen Rohsatz;
+   ein neuer Hash schreibt einen neuen Rohsatz, setzt `geaendert_am` und `core_stand = NULL`.
+   `raw` bleibt append-only. `listdays` wird jede Nacht neu gesichert (ändert sich täglich, rund
+   60 KB je Betrieb).
+5. **Tabellen.** `core.tpapi_abruf` hat zusätzlich `erstmals_am` (misst, ob das Nachladen
+   vorankommt, Punkt 8) und `ladefehler` (für 2b); vermerkt wird nur HTTP 200 — Fehlversuche stehen
+   in `raw` und `sync.tpapi_zugang`, eine Fehlerzeile verdrängte sonst den letzten guten Rohsatz.
+   `core.tpapi_geschaeftstag` hat `erstmals_am` und `raw_id`; `core.tpapi_stammabzug` hat
+   `abzug_id`, `neu` und `core_stand`. Die Zahl der Zeilen bei `personalkostenprotag` ist die
+   Personenzahl.
+6. **`mart.tpapi_zugang` bleibt unverändert**, dazu **`mart.tpapi_zugang_modul`** (Betrieb × Modul,
+   alle Betriebe). Dort ist `befund` der des Personalmoduls mit „Schlüssel ohne Schichten" (0150),
+   und Karten und Prüfzeilen lesen ihn so; Spalten für zwei weitere Module hätten aus einem befund
+   drei gemacht, und `CREATE OR REPLACE` hätte den Rumpf aus 0150 wiederholen müssen. Schwelle für
+   „ohne Zulauf": 48 h für personal/revenue, 192 h für den wöchentlichen Artikelstamm.
+7. **Zwei Rückstandssichten statt einer:** `mart.tpapi_rueckstand_tag` (je fehlendem Tag — die
+   Arbeitsliste, die Phase C liest, damit Nachladen und Prüfzeile dieselbe Zahl meinen) und
+   `mart.tpapi_rueckstand` (je Betrieb und Endpunkt, wie im Plan). Die Endpunktliste steht in beiden
+   als `VALUES`; `src/tpapi/endpunkte.test.ts` prüft sie gegen das Register.
+8. **Prüfzeilen.** „Rückstand fällt nicht" ohne Verlaufstabelle: `stockt` = es fehlt etwas, die
+   Arbeitsliste ist älter als 48 h, und seit 48 h kam kein Tag aus dem Nachladen (erster Abruf
+   eines Tages, der dabei mehr als drei Tage zurücklag). Zweite Zeile: Modul revenue/artikel mit
+   Schlüssel ohne Zulauf. **„Rohsätze ohne `core` älter als 48 h" ist NICHT gebaut** — in 2a stünde
+   sie dauerhaft auf „alles" (0071); sie gehört zu 2b.
+9. **`sync.quelle` misst an einem Teil einer Tabelle** (`filter_spalte`, `filter_werte`,
+   `mart.quelle_messen()` neu, weiter SECURITY DEFINER). Drei Endpunkte schreiben in
+   `core.tpapi_abruf`; an der ganzen Tabelle gemessen sähe ein stummes Journal neben laufenden
+   Personalkosten wie „ok" aus. Register: `tpapi:listdays`, `tpapi:journal`,
+   `tpapi:journaltables`, `tpapi:personalkostenprotag`, `tpapi:artikelstamm` (alle 13 Listen
+   zusammen, Kadenz 8 Tage) und `tpapi:getforecastperday` (`erwartet = false`). Merker je Modul,
+   nicht je Endpunkt: `tpapi_revenue`, `tpapi_personal_tag`, `tpapi_artikel`.
+10. **Ausgänge.** 429 → Betrieb für den ganzen Lauf aus, auch in Phase C und auch, wenn es Stufe 1
+    traf (der Client merkt es sich). 401/403 ohne „not licensed" → der Betrieb ist aus, nicht nur das
+    Modul (der Schlüssel selbst, Regel 7). **5xx/Netz/Formfehler → das Modul ist erst nach drei
+    Fehlern IN FOLGE aus**, nicht nach einem wie in Stufe 1: der Rückstand läuft neueste zuerst, und
+    ein einzelner Tag, an dem LINA dauerhaft 500 liefert, hielte ihn sonst Nacht für Nacht an genau
+    dieser Stelle fest. Ein einzelner Fehler macht den Lauf nicht `teilweise`; der Tag bleibt im
+    Rückstand.
+11. **Gleitende Grenze im Client, eine Instanz je Lauf.** `tpapiNachlauf()` legt den Client an,
+    Stufe 1 und der Rohabzug benutzen ihn nacheinander, Phase C übernimmt ihn (`laufClient()`).
+    Stufe 1 behält ihre feste Grenze je Lauf und nimmt einen Betrieb an der gleitenden Grenze für
+    den Lauf heraus; der Rohabzug überspringt ihn und nimmt ihn wieder auf. `holen()` wartet nur als
+    letzte Sicherung.
+12. **Phase A: kein zweiter Eintrag in `dienste`.** Der Rohabzug hängt in `tpapiNachlauf()` hinter
+    Personal je Stunde, mit demselben Client — zwei parallele Dienste gegen dieselben Läden wären
+    doppeltes Tempo. Stufe 1 zuerst, weil ihre feste Grenze an `client.aufrufe()` hängt.
+13. **Phase C: zweite Spur neben der LINA-Spur**, gestartet nach `ableitungenFertig()`,
+    eingesammelt vor `abschliessen()`; Zeitgrenze `NACHLADEN_BIS` über `nachladenVorbei()` ab dem
+    eigenen Beginn. Nach ihr wird nichts aufgefrischt — keine materialisierte Sicht liest die
+    TPAPI-Rohtabellen.
+14. **Zeitzone von `listdays`**: Berliner Wanduhr (`linaEpochAlsDatum`). Berliner Mitternacht,
+    Mitternacht UTC und 08:00 ergeben denselben Tag; über UTC gerechnet verrutschte Berliner
+    Mitternacht um einen Tag. Nicht gemessen — das Log zählt Werte, die nicht auf Berliner
+    Mitternacht liegen (`listdays_nicht_berliner_mitternacht`). Die Angabe „Aalen ab 22.10.2019"
+    stammt aus der Probe, die über UTC rechnete, und kann einen Tag zu früh sein.
+15. **Verdichtung von `personalkostenprotag`**: Summen als Zahlen mit zwei Stellen, Werte als Zahl,
+    Zahl-Text oder mit Komma; ein unbekanntes Feld erscheint mit NAMEN in `unbekannte_felder`, nie
+    mit Wert. Bei Nicht-200 und Formfehler geht von diesem Endpunkt nur die Meldung nach `raw`, nie
+    der Antworttext.
+16. **Gespeichert wird die Antwort mit sortierten Schlüsseln** (`kanonischerJsonText`, wie Stufe 1
+    und der LINA-Client): einmal serialisiert, daraus Hash, Bytes und der gesendete Text. Ein als
+    `\u0000` maskiertes NUL (Freitext im Journal) wird vorher entfernt, sonst lehnte jsonb den ganzen
+    Rohsatz ab.
+17. Die Partitionen von `raw.api_antwort` werden einmal je Tag und Prozess außerhalb der
+    Datentransaktion geprüft (13 ms je Aufruf, bei 10.000 Aufrufen gut zwei Minuten).
+
+### Offen für 2b und danach
+
+* `getforecastperday` ist im Register, aber `aktiv: false`, bis die Formprobe `from`/`to` misst.
+* Prüfzeile „Rohsätze ohne `core` älter als 48 h", sobald ein Lader `core_stand` setzt.
+* Speicher: das Journal ist der große Posten (Rechnung im Abschlussbericht des Baus) — nach der
+  ersten Woche `mart.tpapi_abruf_stand.bytes` und `pg_total_relation_size` der `raw`-Partitionen
+  ansehen.

@@ -192,6 +192,25 @@ describe('sync.ts — Phase C nach Phase B', () => {
     expect(block.indexOf('await betriebsberichtSichtenNachlauf(', bedingung)).toBeGreaterThan(bedingung)
   })
 
+  /**
+   * Die zweite Spur von Phase C (0151): der TPAPI-Rückstand. Gestartet NACH
+   * dem Stempel von Phase B (sonst rutschte Nachladen vor die Ableitungen,
+   * 0116) und VOR der LINA-Spur (sonst liefe sie nicht neben ihr, sondern
+   * dahinter), eingesammelt vor dem Abschluss — ein Lauf, der geschlossen
+   * wird, während die Spur noch schreibt, meldete einen Stand, den es nicht
+   * gibt. Und ihr Fehlerbehandler hängt sofort daran, wie beim Import.
+   */
+  test('die TPAPI-Spur läuft neben der LINA-Spur: nach Phase B gestartet, vor dem Abschluss eingesammelt', () => {
+    const start = sync.indexOf('const tpapiC = tpapiNachladen()')
+    expect(start).toBeGreaterThan(sync.indexOf(ABLEITUNGEN_FERTIG))
+    expect(start).toBeLessThan(sync.indexOf(NACHLADEN))
+    expect(sync.slice(start, start + 60)).toContain('.catch(')
+    const einsammeln = sync.indexOf('await tpapiC')
+    expect(einsammeln).toBeGreaterThan(sync.indexOf(NACHLADEN))
+    expect(einsammeln).toBeLessThan(sync.indexOf(ABSCHLUSS))
+    expect(sync.split('tpapiNachladen()').length - 1).toBe(1)
+  })
+
   test('der Lauf wird erst nach Phase C geschlossen, mit dem Ergebnis der Zulaufprüfung', () => {
     expect(sync.indexOf(ABSCHLUSS)).toBeGreaterThan(sync.indexOf(NACHLADEN))
     expect(sync).toContain('stumm = await zulaufPruefen(sitzung.laufId)')

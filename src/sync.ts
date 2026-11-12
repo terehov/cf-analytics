@@ -24,6 +24,7 @@ import { konzeptZuordnungNachlauf } from './sync/konzept_zuordnung'
 import { yextNachlauf } from './yext/nachlauf'
 import { bountiNachlauf } from './bounti/nachlauf'
 import { tpapiNachlauf } from './tpapi/nachlauf'
+import { tpapiNachladen } from './tpapi/rohabzug'
 import { zulaufPruefen } from './sync/zulauf'
 import { pflegeNachlauf } from './pflege/nachlauf'
 import { laufMelden } from './meldung'
@@ -163,6 +164,12 @@ try {
      * eigenem Limit (docs/plan-tpapi.md, D2). Keine materialisierte Sicht
      * liest seine Tabellen; seine Stelle vor dem Sammelpunkt ist trotzdem
      * die richtige, weil `zulaufPruefen()` in Phase B seinen Merker liest.
+     *
+     * Seit 0151 holt derselbe Eintrag nach Personal je Stunde auch den
+     * Rohabzug der Stufe 2 (listdays, Dreitagesfenster, Artikelstamm) — im
+     * selben Dienst, mit demselben Client, nicht als zweiter Eintrag: zwei
+     * parallele Dienste gegen dieselben Läden wären doppeltes Tempo
+     * (docs/plan-tpapi-stufe2.md, S8). Den Rückstand lädt Phase C.
      */
     ['tpapi',      tpapiNachlauf()],
   ]
@@ -418,6 +425,30 @@ try {
      * Auswahllisten hängen am jüngsten Monat, und den ändert keine Historie.
      * ══════════════════════════════════════════════════════════════════
      */
+    /*
+     * DIE ZWEITE SPUR VON PHASE C (seit 0151): der TPAPI-Rückstand
+     * (src/tpapi/rohabzug.ts, `tpapiNachladen`). Gestartet VOR der LINA-Spur
+     * und eingesammelt erst vor `abschliessen()` — die beiden teilen sich
+     * nichts als die Datenbank: anderer Host, eigener Client (derselbe wie in
+     * Phase A, mit seiner gleitenden Grenze je Betrieb), eigene Obergrenze
+     * (`TPAPI_NACHLADEN_JE_LAUF`), dieselbe Zeitgrenze (`NACHLADEN_BIS`).
+     * Dieselbe Faustregel wie in Phase A: separate Dienste parallel.
+     *
+     * HIER UND NICHT FRÜHER: nach `ableitungenFertig()`, damit kein Nachladen
+     * vor die Ableitungen rutscht (0116). Keine materialisierte Sicht liest
+     * die TPAPI-Rohtabellen, deshalb frischt danach nichts auf.
+     *
+     * Der Fehlerbehandler hängt SOFORT daran, aus demselben Grund wie beim
+     * Import oben: die Zusage wird erst nach den Refreshes abgewartet, und
+     * eine Ablehnung dazwischen wäre unbehandelt. `tpapiNachladen` wirft
+     * nicht — das hier prüft die Zusage, statt sich darauf zu verlassen.
+     */
+    const tpapiC = tpapiNachladen().catch(e => {
+      log.error('tpapi-nachladen hat entgegen seiner Zusage geworfen — der Lauf geht weiter', {
+        fehler: String(e).slice(0, 300),
+      })
+      return 'FEHLER'
+    })
     const c = await sitzung.nachladen()
     if (c.konzernOk > 0) {
       log.info('phase c hat konzern-historie geladen — die sichten darauf werden aufgefrischt', {
@@ -440,6 +471,9 @@ try {
     if (c.posten > 0) {
       await betriebsberichtSichtenNachlauf()
     }
+
+    // Die TPAPI-Spur endet spätestens an derselben Zeitgrenze wie die LINA-Spur.
+    log.info('phase c: tpapi-nachladen fertig', { ausgang: await tpapiC })
 
     r = await sitzung.abschliessen({ stummeQuellen: stumm })
   } catch (e) {

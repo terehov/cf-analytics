@@ -107,7 +107,13 @@ mitDb('tpapiNachlauf (mit Datenbank und Attrappe)', () => {
     ;(log.settings as any).type = 'hidden'
     loesen = log.attachTransport(o => { logs.push(JSON.stringify(o)) })
 
-    nachlauf = (await import('./nachlauf')).tpapiNachlauf
+    /*
+     * Diese Datei prüft Stufe 1 auf den Aufruf genau — ohne den Rohabzug aus
+     * 0151, der danach mit demselben Client weitere Pfade fragt. Den prüft
+     * src/tpapi/rohabzug.test.ts.
+     */
+    const { tpapiNachlauf } = await import('./nachlauf')
+    nachlauf = (o = {}) => tpapiNachlauf({ ...o, stufe2: false })
     const { Client } = await import('pg')
     db = new Client({ connectionString: DB })
     await db.connect()

@@ -30,6 +30,7 @@ import { log } from '../lib/log'
 import { config } from '../config'
 import { ENDPUNKTE } from '../lina/endpunkte'
 import { BETRIEBSBERICHTE, type Fensterklasse } from '../lina/betriebsberichte'
+import { TPAPI_ENDPUNKTE } from '../tpapi/endpunkte'
 
 export type Quelle = {
   /** Schlüssel. Bei Endpunkten deren `key`, sonst ein sprechender Name. */
@@ -38,8 +39,13 @@ export type Quelle = {
   system: 'lina' | 'ladenakte' | 'foodnotify' | 'yext' | 'intern' | 'wetter' | 'bounti' | 'tpapi'
   /** Gemessen über `sync.aufgabe`. Schließt `tabelle` aus. */
   endpunkt?: string
-  /** Gemessen direkt an der Zieltabelle. Für Nachläufe ohne `sync.aufgabe`. */
-  tabelle?: { schema: string; name: string; zeitspalte: string }
+  /**
+   * Gemessen direkt an der Zieltabelle. Für Nachläufe ohne `sync.aufgabe`.
+   * Mit `filter` nur an den Zeilen, deren `spalte` in `werte` steht (seit
+   * 0151) — wenn mehrere Quellen in DIESELBE Tabelle schreiben und eine
+   * stumme sonst hinter einer lebendigen verschwände.
+   */
+  tabelle?: { schema: string; name: string; zeitspalte: string; filter?: { spalte: string; werte: string[] } }
   kadenz_stunden: number
   /**
    * Nur mit `tabelle`: ein Schlüssel in `sync.merker`, der den letzten
@@ -61,6 +67,48 @@ const TAEGLICH = 36
 const WOECHENTLICH = 8 * 24
 /** Ein Kalendermonat plus Reserve. Für Momentaufnahmen. */
 const MONATLICH = 35 * 24
+
+/** Die Registereinträge der TPAPI-Stufe 2 (0151), aus dem Endpunktregister abgeleitet. */
+function tpapiStufe2Quellen(): Quelle[] {
+  const mitSchluessel = Object.keys(config.TPAPI_SCHLUESSEL).length > 0
+  const ohne = 'LINA_API_SCHLUESSEL nicht gesetzt: TPAPI nicht eingerichtet.'
+  const ep = (name: string) => TPAPI_ENDPUNKTE.find(e => e.name === name)!
+  const artikel = TPAPI_ENDPUNKTE.filter(e => e.aktiv && e.modul === 'artikel' && e.art === 'stamm')
+  const tag = (name: string, bezeichnung: string, merker: string): Quelle => ({
+    quelle: ep(name).endpunkt, bezeichnung, system: 'tpapi',
+    tabelle: { schema: 'core', name: 'tpapi_abruf', zeitspalte: 'abgerufen_am',
+               filter: { spalte: 'endpunkt', werte: [ep(name).endpunkt] } },
+    merker, kadenz_stunden: 48, erwartet: mitSchluessel,
+    bemerkung: mitSchluessel
+      ? 'Fenster 3 Tage in Phase A, Rueckstand in Phase C (mart.tpapi_rueckstand). Roh gesichert, core ab Schritt 2b.'
+      : ohne,
+  })
+  return [
+    { quelle: ENDPUNKT_LISTDAYS_NAME, bezeichnung: 'Geschaeftstage je Betrieb (TPAPI listdays, Arbeitsliste)',
+      system: 'tpapi', tabelle: { schema: 'core', name: 'tpapi_geschaeftstag', zeitspalte: 'gesehen_am' },
+      merker: 'tpapi_revenue', kadenz_stunden: 48, erwartet: mitSchluessel,
+      bemerkung: mitSchluessel ? 'Einmal je Betrieb und Nacht; Arbeitsliste fuer mart.tpapi_rueckstand.' : ohne },
+    tag('journal', 'Kassenjournal je Position (TPAPI, roh)', 'tpapi_revenue'),
+    tag('journaltables', 'Bons je Tisch mit Gaesten (TPAPI, roh)', 'tpapi_revenue'),
+    tag('personalkostenprotag', 'Personalkosten je Betrieb und Tag, verdichtet (TPAPI, roh)', 'tpapi_personal_tag'),
+    { quelle: 'tpapi:artikelstamm', bezeichnung: 'Artikelstamm, 13 Listen je Betrieb (TPAPI, roh)',
+      system: 'tpapi',
+      tabelle: { schema: 'core', name: 'tpapi_stammabzug', zeitspalte: 'abgerufen_am',
+                 filter: { spalte: 'endpunkt', werte: artikel.map(e => e.endpunkt) } },
+      merker: 'tpapi_artikel', kadenz_stunden: WOECHENTLICH, erwartet: mitSchluessel,
+      bemerkung: mitSchluessel ? 'Woechentlich je Betrieb und Liste (TPAPI_STAMM_TAGE).' : ohne },
+    { quelle: ep('getforecastperday').endpunkt, bezeichnung: 'Umsatzprognose je Tag (TPAPI)',
+      system: 'tpapi',
+      tabelle: { schema: 'core', name: 'tpapi_stammabzug', zeitspalte: 'abgerufen_am',
+                 filter: { spalte: 'endpunkt', werte: [ep('getforecastperday').endpunkt] } },
+      kadenz_stunden: WOECHENTLICH, erwartet: false,
+      bemerkung: 'Im Register, aber aus: die Schreibweise von from/to ist nicht gemessen — erst nach der '
+               + 'Formprobe (docs/plan-tpapi-stufe2.md §3).' },
+  ]
+}
+
+/** `tpapi:listdays` — hier als Name, damit das Register nicht an der Reihenfolge haengt. */
+const ENDPUNKT_LISTDAYS_NAME = TPAPI_ENDPUNKTE.find(e => e.art === 'tage')!.endpunkt
 
 export const QUELLEN: readonly Quelle[] = [
   // --- LINA, Konzern-Tagesberichte -------------------------------------
@@ -528,6 +576,33 @@ export const QUELLEN: readonly Quelle[] = [
       ? 'Fenster 14 Tage plus Backfill mit Obergrenze. Zugang je Betrieb in mart.tpapi_zugang, '
         + 'Rueckstand in mart.personal_rueckstand.'
       : 'LINA_API_SCHLUESSEL nicht gesetzt: TPAPI nicht eingerichtet.' },
+  /**
+   * TPAPI STUFE 2 — der Rohabzug, seit Migration `0151` (Plan
+   * docs/plan-tpapi-stufe2.md).
+   *
+   * JE ENDPUNKTGRUPPE EIN EINTRAG, nicht einer für alles. Drei Endpunkte
+   * schreiben in `core.tpapi_abruf`; an der ganzen Tabelle gemessen sähe ein
+   * Journal, das seit Tagen nichts liefert, wie „ok" aus, solange die
+   * Personalkosten je Tag weiterlaufen. Deshalb misst jeder Eintrag nur seine
+   * Zeilen (`filter` auf `endpunkt`). Merker je Modul (`tpapi_revenue`,
+   * `tpapi_personal_tag`, `tpapi_artikel`, geschrieben von
+   * src/tpapi/rohabzug.ts): gefragt ist nicht geliefert (0130).
+   *
+   * GELIEFERT HEISST HIER: eine Antwort mit HTTP 200 wurde gesichert, auch
+   * eine leere oder unveränderte (`abgerufen_am` wird dann trotzdem frisch).
+   * Ob sie in die Auswertungen kam, misst erst Schritt 2b.
+   *
+   * KADENZ 48 STUNDEN für das, was jede Nacht im Fenster neu geholt wird —
+   * dieselbe Überlegung wie beim Personal je Stunde: 429 bei allen ist an
+   * einem Tag ein Bremsen, erst am zweiten ein Befund. Der Artikelstamm wird
+   * je Betrieb und Liste wöchentlich geholt (TPAPI_STAMM_TAGE): eine Woche plus
+   * Reserve.
+   *
+   * `erwartet` hängt an den Schlüsseln wie beim Personal je Stunde. Die
+   * Prognose steht als nicht erwartet da, bis die Formprobe ihre Parameter
+   * gemessen hat — sichtbar als Lücke, nicht vergessen.
+   */
+  ...tpapiStufe2Quellen(),
 ] as const
 
 /**
@@ -564,11 +639,15 @@ export async function quellenSpiegeln(): Promise<number> {
     await query(
       `INSERT INTO sync.quelle
          (quelle, bezeichnung, system, endpunkt, schema_name, tabelle, zeitspalte,
-          kadenz_stunden, erwartet, bemerkung, nachzuegler_tage, fensterklasse, merker)
+          kadenz_stunden, erwartet, bemerkung, nachzuegler_tage, fensterklasse, merker,
+          filter_spalte, filter_werte)
        SELECT q->>'quelle', q->>'bezeichnung', q->>'system', q->>'endpunkt',
               q->>'schema_name', q->>'tabelle', q->>'zeitspalte',
               (q->>'kadenz_stunden')::int, (q->>'erwartet')::boolean, q->>'bemerkung',
-              (q->>'nachzuegler_tage')::int, q->>'fensterklasse', q->>'merker'
+              (q->>'nachzuegler_tage')::int, q->>'fensterklasse', q->>'merker',
+              q->>'filter_spalte',
+              CASE WHEN jsonb_typeof(q->'filter_werte') = 'array'
+                   THEN ARRAY(SELECT jsonb_array_elements_text(q->'filter_werte')) END
          FROM jsonb_array_elements($1::jsonb) AS q
        ON CONFLICT (quelle) DO UPDATE
           SET bezeichnung = excluded.bezeichnung, system = excluded.system,
@@ -578,7 +657,9 @@ export async function quellenSpiegeln(): Promise<number> {
               bemerkung = excluded.bemerkung,
               nachzuegler_tage = excluded.nachzuegler_tage,
               fensterklasse = excluded.fensterklasse,
-              merker = excluded.merker`,
+              merker = excluded.merker,
+              filter_spalte = excluded.filter_spalte,
+              filter_werte = excluded.filter_werte`,
       [JSON.stringify(QUELLEN.map(q => ({
         quelle: q.quelle, bezeichnung: q.bezeichnung, system: q.system,
         endpunkt: q.endpunkt ?? null,
@@ -591,6 +672,8 @@ export async function quellenSpiegeln(): Promise<number> {
         nachzuegler_tage: nachzueglerFenster(q.endpunkt),
         fensterklasse: q.fensterklasse ?? null,
         merker: q.merker ?? null,
+        filter_spalte: q.tabelle?.filter?.spalte ?? null,
+        filter_werte: q.tabelle?.filter?.werte ?? null,
       })))])
 
     const weg = await query<{ quelle: string }>(

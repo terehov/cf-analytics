@@ -45,18 +45,24 @@
  * geliefert, seit 0130), und `mart.personal_rueckstand` — die Zahl, die von
  * Nacht zu Nacht FALLEN muss. Ein abgebrochener Backfill sieht sonst genauso
  * aus wie ein fertiger.
+ *
+ * SEIT 0151 HÄNGT DER ROHABZUG DAHINTER (Stufe 2, `rohabzug.ts`): nach
+ * Personal je Stunde holt derselbe Dienst mit demselben Client `listdays`,
+ * das Dreitagesfenster von Journal, Bons und Personalkosten je Tag und den
+ * fälligen Artikelstamm. Begründung der Reihenfolge an `tpapiNachlauf()`.
+ * Dazu teilt sich Stufe 1 seitdem die gleitende Grenze je Betrieb
+ * (`client.freiIn()`), sonst ändert sich hier nichts.
  */
 import { config } from '../config'
 import { log } from '../lib/log'
 import { eine, query } from '../db/pool'
-import { PFAD_PERSONAL_STUNDE, TpapiClient, type TpapiAntwort } from './client'
+import { laufClientMerken, PFAD_PERSONAL_STUNDE, TpapiClient, type TpapiAntwort } from './client'
 import { alsBusinessdate, tagLaden } from './laden'
+import { LIZENZ_PAUSE_TAGE, zugangSpiegeln } from './zugang'
+import { rohabzugTagesgeschaeft } from './rohabzug'
 
 const MODUL = 'personal'
 const MERKER = 'tpapi_personal'
-
-/** Wie lange ein „not licensed" gilt, bevor wieder gefragt wird (D7). */
-const LIZENZ_PAUSE_TAGE = 7
 
 type Betrieb = { betriebKey: number; encId: string }
 
@@ -74,53 +80,14 @@ export type TpapiZaehler = {
   aus: Record<Aus, number>
 }
 
-export type TpapiNachlaufOptionen = { client?: TpapiClient }
-
-/**
- * Die Schlüssel der Umgebung in `sync.tpapi_zugang` spiegeln (Plan §3.3).
- *
- * Je Schlüssel eine Zeile, Betrieb über `core.betrieb.enc_id`. Eine encId
- * ohne Betrieb wird geloggt und zurückgegeben — sie macht den Lauf
- * `teilweise`, weil ein Schlüssel, der nie benutzt wird, sonst nur im Log
- * stünde. Ein weggefallener Schlüssel setzt `ohne_schluessel`; damit fällt
- * der Betrieb aus `mart.personal_rueckstand`, statt dort für immer als
- * Rückstand zu stehen.
- *
- * Ein Schlüssel, der WIEDERKOMMT, setzt den Zustand auf `ok` zurück — mehr
- * weiß man über ihn nicht, und der erste Aufruf dieser Nacht schreibt den
- * echten Ausgang.
- */
-async function zugangSpiegeln(encIds: string[]): Promise<{ ohneBetrieb: string[] }> {
-  await query(
-    `INSERT INTO sync.tpapi_zugang
-       (betrieb_key, modul, enc_id, schluessel_vorhanden, zustand, aktualisiert_am)
-     SELECT b.betrieb_key, $2, b.enc_id, true, 'ok', now()
-       FROM core.betrieb b
-      WHERE b.enc_id = ANY($1::text[])
-     ON CONFLICT (betrieb_key, modul) DO UPDATE SET
-       enc_id               = excluded.enc_id,
-       schluessel_vorhanden = true,
-       zustand              = CASE WHEN sync.tpapi_zugang.zustand = 'ohne_schluessel'
-                                   THEN 'ok' ELSE sync.tpapi_zugang.zustand END,
-       aktualisiert_am      = CASE WHEN sync.tpapi_zugang.schluessel_vorhanden
-                                    AND sync.tpapi_zugang.enc_id = excluded.enc_id
-                                   THEN sync.tpapi_zugang.aktualisiert_am ELSE now() END`,
-    [encIds, MODUL])
-
-  await query(
-    `UPDATE sync.tpapi_zugang z
-        SET schluessel_vorhanden = false, zustand = 'ohne_schluessel', aktualisiert_am = now()
-      WHERE z.modul = $2
-        AND (z.schluessel_vorhanden OR z.zustand <> 'ohne_schluessel')
-        AND NOT EXISTS (SELECT 1 FROM core.betrieb b
-                         WHERE b.betrieb_key = z.betrieb_key AND b.enc_id = ANY($1::text[]))`,
-    [encIds, MODUL])
-
-  const fehlt = await query<{ enc_id: string }>(
-    `SELECT e AS enc_id FROM unnest($1::text[]) AS e
-      WHERE NOT EXISTS (SELECT 1 FROM core.betrieb b WHERE b.enc_id = e)
-      ORDER BY 1`, [encIds])
-  return { ohneBetrieb: fehlt.map(f => f.enc_id) }
+export type TpapiNachlaufOptionen = {
+  client?: TpapiClient
+  /**
+   * `false` = nur Personal je Stunde (Stufe 1), ohne den Rohabzug aus 0151.
+   * Für die Tests von Stufe 1, die Aufrufe und Merker auf den Aufruf genau
+   * zählen; im Lauf immer `true`.
+   */
+  stufe2?: boolean
 }
 
 /** Die Betriebe, die heute gefragt werden: Schlüssel da, nicht frisch „not licensed". */
@@ -172,13 +139,39 @@ async function merkerSchreiben(w: {
   ).catch(e => log.warn('merker tpapi_personal nicht geschrieben', { fehler: String(e).slice(0, 200) }))
 }
 
+/**
+ * Der TPAPI-Dienst in Phase A: erst Personal je Stunde (Stufe 1), dann der
+ * Rohabzug (Stufe 2, `rohabzug.ts`) — NACHEINANDER, mit DEMSELBEN Client.
+ *
+ * WARUM NICHT ALS ZWEITER EINTRAG IN `dienste` (src/sync.ts). Beide Wege
+ * fragen dieselben Läden. Zwei parallele Dienste hätten zwei Clients mit je
+ * eigenem Takt und eigener gleitender Grenze — doppeltes Tempo gegen jeden
+ * Laden, und keiner wüsste vom 429 des anderen (Plan Stufe 2 S8). Stufe 1
+ * zuerst, weil ihre feste Grenze je Lauf (`TPAPI_AUFRUFE_JE_BETRIEB`) an
+ * `client.aufrufe()` hängt: liefe Stufe 2 vorher, zählten deren Aufrufe dort
+ * mit und nähmen Stufe 1 den Backfill weg.
+ *
+ * Den Client merkt sich `laufClientMerken()` für Phase C (`tpapiNachladen()`),
+ * damit die gleitende Grenze und die 429-Liste über den ganzen Lauf gelten.
+ */
 export async function tpapiNachlauf(opt: TpapiNachlaufOptionen = {}): Promise<'ok' | 'teilweise' | 'uebersprungen'> {
+  const client = opt.client ?? new TpapiClient()
+  laufClientMerken(client)
+  const stufe1 = await personalJeStunde(client)
+  if (opt.stufe2 === false) return stufe1
+  // Auch ohne Schlüssel: der Rohabzug spiegelt dann seine Module auf
+  // `ohne_schluessel` und gibt `uebersprungen` zurück, ohne zu fragen.
+  const stufe2 = await rohabzugTagesgeschaeft(client)
+  if (stufe1 === 'uebersprungen') return 'uebersprungen'
+  return stufe1 === 'ok' && stufe2 !== 'teilweise' ? 'ok' : 'teilweise'
+}
+
+async function personalJeStunde(client: TpapiClient): Promise<'ok' | 'teilweise' | 'uebersprungen'> {
   const encIds = Object.keys(config.TPAPI_SCHLUESSEL)
   const z: TpapiZaehler = {
     betriebe: 0, abrufe: 0, geladen: 0, leer: 0, fenster: 0, backfill: 0, ohneBetrieb: 0,
     aus: { gebremst: 0, nicht_lizenziert: 0, abgewiesen: 0, fehler: 0, grenze: 0 },
   }
-  const client = opt.client ?? new TpapiClient()
 
   try {
     if (encIds.length === 0) {
@@ -213,7 +206,14 @@ export async function tpapiNachlauf(opt: TpapiNachlaufOptionen = {}): Promise<'o
     /** Ein Betrieb, ein Tag. Gibt nie einen Fehler weiter. */
     const einTag = async (b: Betrieb, tag: string): Promise<boolean> => {
       if (aus.has(b.betriebKey)) return false
-      if (client.aufrufe(b.encId) >= config.TPAPI_AUFRUFE_JE_BETRIEB) {
+      /*
+       * Zwei eigene Bremsen, beide ohne Zustand: die feste je Lauf (D6) und
+       * seit 0151 die gleitende je Betrieb (Stufe 2 S8), die sich Stufe 1 mit
+       * dem Rohabzug teilt. Stufe 1 wartet nicht auf einen freien Platz — sie
+       * nimmt den Betrieb für diesen Lauf heraus, wie bei der festen Grenze;
+       * der Rest steht im Rückstand.
+       */
+      if (client.aufrufe(b.encId) >= config.TPAPI_AUFRUFE_JE_BETRIEB || client.freiIn(b.encId) > 0) {
         aus.set(b.betriebKey, 'grenze')
         return false
       }

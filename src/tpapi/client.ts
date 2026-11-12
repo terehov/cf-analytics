@@ -19,6 +19,11 @@
  *     das Limit sogar ausgeschrieben, und es zählt womöglich Bounti und Sell &
  *     Pick am selben Laden mit (`getlimit` stand in Nürnberg am 09.11.2026
  *     schon vor unserem zweiten Aufruf auf 7).
+ *   * GLEITENDE GRENZE JE BETRIEB (seit 0151, Plan Stufe 2 S8): höchstens
+ *     `TPAPI_GRENZE_JE_BETRIEB` Aufrufe in `TPAPI_GRENZE_MINUTEN`, über alle
+ *     Wege, die diese Instanz benutzen. `freiIn()` sagt dem Planer, wann ein
+ *     Laden wieder dran ist; `gebremst()`, ob er in diesem Lauf schon ein 429
+ *     bekam.
  *   * KEIN RETRY, für keinen Ausgang. 429 heißt: dieser Laden ist für diesen
  *     Lauf fertig (D6). 401/403 heißt: der Schlüssel wird beim zweiten Mal
  *     genauso abgelehnt (Regel 7). 5xx und Netz: die nächste Nacht. Ein
@@ -61,6 +66,10 @@ export type TpapiOptionen = {
   schluessel?: Record<string, string>
   taktMs?: number
   timeoutMs?: number
+  /** Gleitende Grenze: höchstens so viele Aufrufe je Betrieb … Vorgabe `config.TPAPI_GRENZE_JE_BETRIEB`. */
+  grenzeJeBetrieb?: number
+  /** … in diesem Fenster (ms). Vorgabe `config.TPAPI_GRENZE_MINUTEN` × 60.000. */
+  grenzeFensterMs?: number
 }
 
 const schlaf = (ms: number) => new Promise(r => setTimeout(r, ms))
@@ -123,6 +132,12 @@ export class TpapiClient {
   /** Ende des letzten Aufrufs dieser Instanz (ms), 0 = noch keiner. */
   private letzterAufruf = 0
   private readonly zaehler = new Map<string, number>()
+  private readonly grenzeJeBetrieb: number
+  private readonly grenzeFensterMs: number
+  /** encId → Startzeitpunkte (ms) der Aufrufe im gleitenden Fenster, aufsteigend. */
+  private readonly fenster = new Map<string, number[]>()
+  /** Betriebe, die in diesem Lauf ein 429 bekommen haben (Plan D6/S8). */
+  private readonly gebremstSet = new Set<string>()
 
   constructor(opt: TpapiOptionen = {}) {
     // Ohne abschließenden Schrägstrich: sonst stünde `//extern/` in der URL,
@@ -134,6 +149,40 @@ export class TpapiClient {
     // spürbar; für die Stundenkosten ist das reichlich, aber eine hängende
     // Verbindung soll den Dienst nicht die ganze Nacht halten.
     this.timeoutMs = opt.timeoutMs ?? 60_000
+    this.grenzeJeBetrieb = opt.grenzeJeBetrieb ?? config.TPAPI_GRENZE_JE_BETRIEB
+    this.grenzeFensterMs = opt.grenzeFensterMs ?? config.TPAPI_GRENZE_MINUTEN * 60_000
+  }
+
+  /**
+   * In wie vielen Millisekunden für diesen Betrieb wieder ein Aufruf frei ist
+   * — 0 heißt: jetzt (Plan S8).
+   *
+   * DIE GRENZE GILT JE INSTANZ, UND DAS IST DER GRUND, WARUM ES JE LAUF NUR
+   * EINE GIBT. `tpapiNachlauf()` legt sie an, Personal je Stunde (Stufe 1)
+   * und der Rohabzug (Stufe 2) benutzen sie nacheinander in Phase A, und
+   * Phase C übernimmt dieselbe Instanz (`laufClient()`). LINA zählt je Laden,
+   * nicht je Weg — zwei Instanzen mit je 60 wären 120 gegen dokumentierte 100.
+   *
+   * Gezählt wird der START eines Aufrufs, nicht sein Ende: eine Antwort, die
+   * 40 Sekunden braucht, ist für LINA ab der Anfrage gezählt.
+   */
+  freiIn(encId: string, jetzt = Date.now()): number {
+    const liste = this.fenster.get(encId)
+    if (!liste) return 0
+    while (liste.length > 0 && liste[0]! <= jetzt - this.grenzeFensterMs) liste.shift()
+    if (liste.length < this.grenzeJeBetrieb) return 0
+    return Math.max(1, liste[liste.length - this.grenzeJeBetrieb]! + this.grenzeFensterMs - jetzt)
+  }
+
+  /**
+   * Hat dieser Betrieb in diesem Lauf schon ein 429 bekommen? Dann ist er für
+   * den Rest des Laufs fertig — auch für die anderen Wege (D6: „dieser Laden
+   * ist für diesen Lauf fertig"). `holen()` verweigert trotzdem nicht: wer
+   * fragt, entscheidet selbst; die Planer in `nachlauf.ts` und `rohabzug.ts`
+   * fragen hier vorher nach.
+   */
+  gebremst(encId: string): boolean {
+    return this.gebremstSet.has(encId)
   }
 
   /** Aufrufe dieser Instanz für einen Betrieb — die Grundlage für TPAPI_AUFRUFE_JE_BETRIEB. */
@@ -163,11 +212,21 @@ export class TpapiClient {
 
     const warten = this.letzterAufruf + this.taktMs - Date.now()
     if (this.letzterAufruf > 0 && warten > 0) await schlaf(warten)
+    /*
+     * Die letzte Sicherung der gleitenden Grenze. Die Planer fragen vorher
+     * `freiIn()` und nehmen einen anderen Betrieb dran, statt zu warten —
+     * hier wird nur gewartet, wenn jemand das vergessen hat. Lieber ein
+     * stehender Dienst als ein 429 für die Kasse eines anderen Anbieters.
+     */
+    for (let w = this.freiIn(encId); w > 0; w = this.freiIn(encId)) await schlaf(w)
 
     const url = new URL(`${this.basis}/extern/${pfad.replace(/^\/+/, '')}`)
     for (const [k, v] of Object.entries(parameter)) url.searchParams.set(k, v)
 
     this.zaehler.set(encId, this.aufrufe(encId) + 1)
+    const fenster = this.fenster.get(encId) ?? []
+    fenster.push(Date.now())
+    this.fenster.set(encId, fenster)
     try {
       const res = await fetch(url, {
         method: 'GET',
@@ -179,6 +238,7 @@ export class TpapiClient {
       let daten: unknown = null
       try { daten = JSON.parse(roh) } catch { /* kein JSON — bleibt null */ }
       const art = einordnen(res.status, daten, roh)
+      if (art === 'gebremst') this.gebremstSet.add(encId)
       if (art === 'ok') return { art, status: res.status, daten, roh, meldung: null }
       /*
        * Jede Nicht-200-Antwort wird VOR der Rückgabe gesäubert, nicht erst
@@ -202,4 +262,23 @@ export class TpapiClient {
       this.letzterAufruf = Date.now()
     }
   }
+}
+
+/*
+ * DIE INSTANZ DES LAUFS. `tpapiNachlauf()` (Phase A) merkt sich seinen
+ * Client hier, `tpapiNachladen()` (Phase C) holt ihn ab — damit die
+ * gleitende Grenze und die 429-Liste über beide Phasen gelten. Ein Modul-
+ * Singleton von Anfang an ginge nicht: die Tests rufen den Nachlauf mehrfach
+ * in einem Prozess, jedes Mal als neuen „Lauf" mit neuer Konfiguration.
+ */
+let laufInstanz: TpapiClient | null = null
+
+/** Den Client dieses Laufs festhalten (Phase A). */
+export function laufClientMerken(c: TpapiClient): void {
+  laufInstanz = c
+}
+
+/** Der Client aus Phase A, sonst null. */
+export function laufClient(): TpapiClient | null {
+  return laufInstanz
 }

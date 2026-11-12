@@ -297,6 +297,71 @@ const Schema = z.object({
    */
   TPAPI_AUFRUFE_JE_BETRIEB: z.coerce.number().int().min(1).default(80),
 
+  /*
+   * --- TPAPI Stufe 2: alles Lesende roh sichern (0151) ---------------------
+   * Plan: docs/plan-tpapi-stufe2.md, Entscheidungen S1–S11. Journal, Bons,
+   * Personalkosten je Tag und der Artikelstamm gehen roh nach
+   * `raw.api_antwort`; `core` baut erst Schritt 2b daraus.
+   */
+
+  /**
+   * Gleitende Grenze je Betrieb: höchstens so viele Aufrufe in
+   * TPAPI_GRENZE_MINUTEN, über ALLE TPAPI-Wege dieses Prozesses zusammen —
+   * Personal je Stunde (Stufe 1), Rohabzug in Phase A und Nachladen in Phase C
+   * teilen sich EINEN Zähler je Laden, weil LINA je Laden zählt (Plan S8).
+   *
+   * WARUM 60 UND NICHT 100. Dokumentiert sind 100 Anfragen je Laden und
+   * 15 Minuten, gleitend. Ob Bounti und Sell & Pick am selben Laden
+   * mitzählen, ist nicht entschieden (Nürnberg, 09.11.2026: `getlimit` stand
+   * vor unserem zweiten Aufruf schon auf 7). 60 lässt den anderen 40 —
+   * ein 429 von uns hielte womöglich deren Kasse an.
+   *
+   * WARUM GLEITEND STATT FEST JE LAUF. Die feste Grenze (TPAPI_AUFRUFE_JE_BETRIEB,
+   * 80 je Lauf) bleibt für Stufe 1, würde aber den Rückstand auf 80 Aufrufe je
+   * Betrieb und Nacht deckeln — Aposto Aalen hat 2.507 Tage × 3 Endpunkte.
+   * Gleitend sind es bis zu 240 je Stunde und Betrieb, und kein
+   * 15-Minuten-Fenster sieht mehr als 60.
+   *
+   * Höchstens 90: darüber wäre es keine Reserve mehr gegen das Limit, und ein
+   * Tippfehler in der Umgebung soll den Start abbrechen (Regel 3).
+   */
+  TPAPI_GRENZE_JE_BETRIEB: z.coerce.number().int().min(1).max(90).default(60),
+  /**
+   * Breite des gleitenden Fensters in Minuten. Mindestens 15 — das ist LINAs
+   * Fenster; ein kürzeres zählte Aufrufe heraus, die LINA noch mitzählt.
+   */
+  TPAPI_GRENZE_MINUTEN: z.coerce.number().int().min(15).default(15),
+
+  /**
+   * Phase C (Nachladen): so viele TPAPI-Aufrufe höchstens je Lauf, für den
+   * Rückstand aus `mart.tpapi_rueckstand_tag` (Plan S7). 0 = aus — die
+   * Notbremse, kein Handbefehl.
+   *
+   * DIE RECHNUNG. 41 Betriebe, Tiefe je Betrieb verschieden (Aalen 2.507
+   * Tage, Nürnberg 362), drei Tagesendpunkte: grob 41 × 1.000 × 3 ≈ 120.000
+   * Aufrufe. Mit 10.000 je Nacht ist das in zwei Wochen durch, solange viele
+   * Betriebe Rückstand haben. Zum Schluss bleiben nur die tiefen Betriebe
+   * übrig; dann bremst die gleitende Grenze (60 je 15 Minuten und Betrieb),
+   * nicht diese Zahl. Bei einem Aufruf je Sekunde sind 10.000 Aufrufe knapp
+   * drei Stunden — Phase C hat bis NACHLADEN_BIS deutlich mehr; die Zeitgrenze
+   * gilt zusätzlich.
+   *
+   * NEUESTE ZUERST, Tag außen, Betrieb innen (Plan S8): bricht es ab, fehlt
+   * das Älteste. Bei Betrieben mit einem Jahr Tiefe fällt jeden Tag einer
+   * hinten aus `listdays` heraus — deshalb läuft das ohne Handbefehl.
+   */
+  TPAPI_NACHLADEN_JE_LAUF: z.coerce.number().int().min(0).default(10_000),
+
+  /**
+   * Artikelstamm (13 Listen `merchandiseman/*`) je Betrieb höchstens alle so
+   * viele Tage (Plan S11: wöchentlich). Stammdaten ohne Tagesbezug; ein
+   * Artikel, der am Mittwoch neu angelegt wird, steht spätestens nach einer
+   * Woche roh da. Die Prüfung in `mart.tpapi_zugang_modul` erwartet einen
+   * Erfolg im Modul `artikel` innerhalb von acht Tagen — wer den Wert über 7
+   * setzt, ändert dort die Schwelle mit (Migration).
+   */
+  TPAPI_STAMM_TAGE: z.coerce.number().int().min(1).default(7),
+
   // --- Metabase ------------------------------------------------------------
   /**
    * Eigener Benutzer für die Dashboard-Provisionierung.
