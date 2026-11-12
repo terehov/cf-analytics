@@ -2534,7 +2534,7 @@ Lauf von `bun run tpapi-schluessel --anlegen` die Schlüssel ohne weitere Änder
 
 ## TPAPI: drei offene Punkte nach dem Bau von `0149` (09.11.2026)
 
-**1. `personalkostenprotag` — dürfen die Zeilen aggregiert in `raw`?** Der Endpunkt liefert eine
+~~**1. `personalkostenprotag` — dürfen die Zeilen aggregiert in `raw`?**~~ **Entschieden am 12.11.2026 (Plan Stufe 2, S5; `0151`): ja, eine Zeile je Betrieb und Tag, die Zeilen je Person kommen nirgends an.** Ursprüngliche Frage: Der Endpunkt liefert eine
 Zeile je Person (`h_brutto`, `h_zuschl_25/40/50`, `brutto`, `lohnkosten`), ohne Namen — in kleinen
 Teams ist die Person trotzdem rückführbar, und `raw.api_antwort` ist append-only. Stufe 1 holt ihn
 deshalb nicht. Frage an Eugene: eine Zeile je Betrieb und Tag (aggregiert) in `raw`? Dann könnte
@@ -2572,3 +2572,58 @@ Frage aus `lina-third-party-api.md` („Zeiterfassung oder Dienstplan?") Richtun
 beantwortet: eine Zeiterfassung wäre nicht leer. Das 14-Tage-Fenster holt es nach, sobald geplant
 ist; bleibt es leer, kippt der Befund von selbst auf `Schluessel ohne Schichten`. **Am 16.11.
 nachsehen**, ob `letzter_tag_mit_schichten` bei beiden weitergewandert ist.
+
+## TPAPI Stufe 2a: was nach dem Deploy zu messen und zu entscheiden ist (12.11.2026, `0151`)
+
+Gebaut und gegen die Attrappe getestet, **nie gegen das echte LINA gelaufen**. Alles Folgende ist
+ungemessen. Plan: `plan-tpapi-stufe2.md`.
+
+**7. Formprobe laufen lassen (Eugene, im Importer-Container).** `bun run tpapi-formprobe --tag
+<Tag>` per `docker exec`, danach einmal mit `--alle` (Befehlszeile und Umfang:
+`lina-third-party-api.md`, Abschnitt „Die Formprobe"). Ohne sie gibt es keinen Lader (Schritt 2b):
+die Feldwerte von Journal, Bons und Artikelstamm sind nicht gemessen. Das Ergebnis gehört in
+`lina-third-party-api.md` und in Plan §8.
+
+**8. Freier Plattenplatz vor dem Vollabzug — nachsehen, bevor die ersten Nächte laufen.** Das
+Journal ist der große Posten: ~1–2 MB je Betrieb und Tag (gemessen an zwei Betrieben am 07./09.11.),
+roh in `raw.api_antwort`, append-only. **Annahme aus synthetischen Daten, nicht gemessen:** auf dem Klon
+(12.11.2026, 41 Betriebe, 58.463 Tage in `listdays`, im Mittel 1.426 je Betrieb) belegte ein
+synthetisches Journal mit 2.329 Zeilen 1,6 MB als Text und **159 KB als `jsonb`** in
+`raw.api_antwort`. Hochgerechnet sind das für Journal und Bons zusammen grob 12–15 GB für den
+Vollabzug und danach rund 3 GB im Jahr. Echte Daten wiederholen sich weniger als synthetische und
+können das Zwei- bis Dreifache brauchen — also mit bis zu 45 GB rechnen, bis die erste Woche es
+misst. Dazu kommen in Schritt 2b die `core`-Tabellen in ähnlicher Größenordnung. Nach der ersten Woche
+`SELECT endpunkt, bytes FROM mart.tpapi_abruf_stand` und `pg_total_relation_size` der
+`raw.api_antwort`-Partitionen ansehen; reicht der Platz nicht, ist `TPAPI_NACHLADEN_JE_LAUF` die
+Bremse (0 hält das Nachladen an, der Rückstand bleibt sichtbar).
+
+**9. Liefert `personalkostenprotag` Tage, die älter als ein Jahr sind?** Stufe 1 hat den Horizont 365
+(LINAs Jahr für `personalkostenprostunde`); für den Rohabzug fragt der Rückstand bei Betrieben mit
+tiefer `listdays` bis zum Kassenstart zurück. Liefert LINA dort kein 200, bleiben die Tage im
+Rückstand, und `stockt` schlägt an, sobald sonst nichts mehr fehlt (Plan §8, Abweichung 2). Die
+Formprobe misst es (Alterstest). Gleiche Frage für `personalkostenprostunde` und `journal`.
+
+**10. Zeitzone von `listdays`.** Gelesen wird `businessdate` über die Berliner Wanduhr; ob die Werte
+auf Berliner Mitternacht liegen, ist nicht gemessen. Das Log zählt die Abweichungen
+(`listdays_nicht_berliner_mitternacht`); die Formprobe zeigt die Lesarten. Die Angabe „Aalen ab
+22.10.2019" stammt aus einer Probe, die über UTC rechnete, und kann einen Tag zu früh sein.
+
+**11. Schlüssel für zwei insolvente Betriebe mit Buchung (Besitos MG, Enchilada Bruchsal).** Das
+Schlüsselskript überspringt geschlossene und insolvente Betriebe bisher; ihre Historie wäre mit einem
+Schlüssel zu haben (Plan §6). Frage an Eugene, ob sie angelegt werden sollen.
+
+**12. 22 laufende Betriebe ohne Daten-API — Frage an Daniel.** Mehr Betriebe gibt es nur über
+Buchungen im Marktplatz, nicht über Code; danach `bun run tpapi-schluessel --anlegen` im Terminal des
+Nutzers (Regel 7a). `mart.tpapi_zugang_modul` zeigt je Betrieb und Modul, wer fehlt
+(`operativ ohne Schluessel`).
+
+**13. Nach der ersten Nacht ansehen:** `SELECT * FROM mart.tpapi_rueckstand WHERE stockt;` (Erwartung:
+leer), die Summe von `tage_fehlend` fällt von Nacht zu Nacht, `SELECT zustand, count(*) FROM
+sync.tpapi_zugang GROUP BY 1` (steht dort `gebremst`, zählt das Limit fremde Anbieter mit — dann
+`TPAPI_GRENZE_JE_BETRIEB` senken), `mart.tpapi_abruf_stand.geaendert` (ändert sich ein Tag nach dem
+Fenster noch, reicht S7 nicht), und die Laufdauer: die TPAPI-Spur hält den Lauf in Phase C auf
+`laeuft` (`importer.md`).
+
+**14. `getforecastperday` bleibt aus,** bis die Formprobe `from`/`to` misst; danach `aktiv: true` im
+Register und die Sicht-Endpunktliste anpassen. Und Schritt 2b (Lader, `mart`, Karten, Abgleich nach
+S10) ist zu planen, sobald die Formprobe vorliegt.

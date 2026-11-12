@@ -1585,3 +1585,74 @@ die Kennung des Betriebs, **nie der Schlüssel**. `zustand` ∈ `ok`, `nicht_liz
 Der CHECK `quelle_system_check` auf `sync.quelle` kennt ab hier `'tpapi'`. Die Sichten stehen in `metabase.md`
 (Abschnitt „Personal je Stunde in `mart`"). Alles live, keine Materialisierung (Plan D8): rund
 360.000 Zeilen im Jahr, der Primärschlüssel reicht.
+
+## TPAPI Stufe 2a: Rohabzug in drei Tabellen (`0151`, 12.11.2026)
+
+Plan und Entscheidungen S1–S11: `plan-tpapi-stufe2.md`. **Gebaut und gegen die Attrappe getestet,
+nie gegen das echte LINA gelaufen** (Regel 7a) — alles, was hier über Inhalte steht, ist die Form
+der Tabellen, keine Messung an echten Daten.
+
+**Warum erst roh und `core` später (S1).** Die Feldwerte von Journal, Bons und Artikelstamm sind
+nicht gemessen, nur ihre Namen (`bun run tpapi-formprobe` misst sie, `lina-third-party-api.md`).
+Ein Lader, der sich irrt, kostet bei „Rohsatz zuerst" einen Neuaufbau aus `raw`, keinen zweiten
+Abruf. Bei Betrieben mit einem Jahr Tiefe fällt außerdem jeden Tag einer hinten aus `listdays`
+heraus: was nicht roh gesichert ist, während die Lader entstehen, ist weg. Regel 4 wird hier der
+normale Weg, nicht der Notfall. **Es gibt deshalb noch kein `core.kassenjournal`, keinen
+`core.kassenbon`, keinen Artikelstamm in `core`** (Schritt 2b, nach der Formprobe).
+
+**`core.tpapi_geschaeftstag`** — die Arbeitsliste aus `revenue/listdays`. PK `(betrieb_key,
+geschaeftstag)`, dazu `erstmals_am`, `gesehen_am`, `raw_id` (die jüngste `listdays`-Antwort, in der
+der Tag stand). „Steht in der jüngsten Liste" heißt `gesehen_am = max(gesehen_am)` des Betriebs.
+**Ein Tag, der hinten aus der Liste fällt, wird nicht gelöscht**, fällt aber aus dem Rückstand —
+sonst fragte das Nachladen jede Nacht Tage, die LINA nicht mehr führt. `geschaeftstag` kommt aus
+`businessdate` (Unix-Sekunden) über die **Berliner Wanduhr**; ob der Wert auf Berliner Mitternacht
+liegt, ist nicht gemessen (die Formprobe misst es, Log:
+`listdays_nicht_berliner_mitternacht`).
+
+**`core.tpapi_abruf`** — was je Betrieb, Endpunkt und Geschäftstag geholt ist (PK
+`(betrieb_key, endpunkt, geschaeftstag)`, `endpunkt` als `tpapi:journal`, `tpapi:journaltables`,
+`tpapi:personalkostenprotag`). Spalten: `zeilen`, `payload_bytes`, `payload_hash`, `raw_id`,
+`erstmals_am`, `abgerufen_am`, `abrufe`, `geaendert_am`, `core_stand`, `ladefehler`. Der Inhalt
+steht **nur in `raw.api_antwort`**.
+
+* **Vermerkt wird nur HTTP 200**, auch mit leerer Antwort (`zeilen = 0` — ein Ruhetag gilt als
+  geholt, wie D5 in Stufe 1). Fehlversuche stehen in `raw` und `sync.tpapi_zugang`: eine
+  Fehlerzeile hier verdrängte sonst den letzten guten Rohsatz.
+* **Gleicher Hash, kein neuer Rohsatz.** Das Dreitagesfenster holt jeden Tag dreimal, ein Journal
+  hat 1–2 MB (gemessen am 07./09.11.2026 an zwei Betrieben). Bleibt der Hash gleich, zählt nur
+  `abrufe` hoch, `abgerufen_am` wird frisch, `raw_id` zeigt weiter auf den vorhandenen Rohsatz.
+  Ändert er sich: neuer Rohsatz, `geaendert_am` gesetzt, `core_stand` zurück auf `NULL`. `raw` bleibt
+  append-only; es wird nur nichts Gleiches angehängt. `geaendert_am` ist die Messung, ob das
+  Dreitagesfenster (S7) reicht — `mart.tpapi_abruf_stand.geaendert`.
+* **`core_stand`** ist die Version des Laders, mit der der Rohsatz nach `core` kam; `NULL` = noch
+  nicht geladen. In 2a immer `NULL`, `ladefehler` immer `NULL` — beide Spalten gehören dem Lader
+  aus 2b und stehen schon da, damit er ohne Migration der Tabelle anfangen kann.
+* `payload_bytes` ist die Größe des **jüngsten** Rohsatzes vor der Kompression, nicht die Summe
+  aller Versionen und nicht der Plattenplatz.
+* **`personalkostenprotag` wird vor `raw` zur Summe verdichtet** (S5): eine Zeile je Betrieb und
+  Tag mit Personenzahl und den Summen von `h_brutto`, `h_zuschl_25/40/50`, `brutto`, `lohnkosten`.
+  `zeilen` ist dort die Zahl der Personen. Die Zeilen je Person (ohne Kennung, aber in kleinen
+  Teams rückführbar) kommen nirgends an.
+
+**`core.tpapi_stammabzug`** — die tagfreien Listen: die dreizehn `merchandiseman/*` je Betrieb,
+wöchentlich (`TPAPI_STAMM_TAGE`); später die Prognose. Eine Zeile je erfolgreichem Abruf
+(`abzug_id`, `abgerufen_am`, `zeilen`, `payload_hash`, `raw_id`, `neu`, `core_stand`); `neu = true`
+heißt: Hash anders als beim vorigen Abzug derselben Liste, neuer Rohsatz. So bleibt sichtbar,
+**wann** gefragt wurde, ohne dreizehn unveränderte Listen je Betrieb und Woche zu verdoppeln.
+
+**`sync.quelle` misst an einem Teil einer Tabelle** (`filter_spalte`, `filter_werte text[]`,
+CHECK: beide oder keine, nur mit `tabelle`). **Warum.** Drei Endpunkte schreiben in
+`core.tpapi_abruf`. An der ganzen Tabelle gemessen sähe ein Journal, das seit Tagen nichts liefert,
+neben laufenden Personalkosten wie „ok" aus — die Signatur von Regel 10. `mart.quelle_messen()`
+(weiter `SECURITY DEFINER`, `search_path` wie `0109`) kennt den Filter: der Bezeichner geht durch
+`format('%I')`, die Werte als Parameter, kein Bedingungstext in einer `SECURITY-DEFINER`-Funktion.
+Registereinträge in `src/sync/quellen.ts`: `tpapi:listdays`, `tpapi:journal`, `tpapi:journaltables`,
+`tpapi:personalkostenprotag`, `tpapi:artikelstamm` (alle 13 Listen zusammen, Kadenz 8 Tage) und
+`tpapi:getforecastperday` (`erwartet = false`). Merker je **Modul**, nicht je Endpunkt:
+`tpapi_revenue`, `tpapi_personal_tag`, `tpapi_artikel`.
+
+**Zustand je Modul.** `sync.tpapi_zugang` führt seit `0149` je Betrieb und Modul eine Zeile
+(`personal`, `revenue`, `artikel`); ab `0151` sind alle drei in Gebrauch. Ein „not licensed" schaltet
+nur das eine Modul ab (S9): Ratskeller Saarbrücken und BS Bier & Speisen haben nur Team Data, ihr
+403 auf `revenue/*` ist ein Zustand, kein Fehler. Die Sichten dazu stehen in `metabase.md`
+(Abschnitt „TPAPI Stufe 2a in `mart`").

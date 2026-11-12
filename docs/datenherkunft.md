@@ -1074,3 +1074,54 @@ Den Tagesumsatz holen `mart.personal_tag` und die Prüfsicht aus `core.umsatzber
   `Schluessel ohne Schichten`, wenn in 14 Tagen mindestens sieben Umsatztage ohne eine Schicht
   liegen (am 09.11.2026: Enchilada Rosenheim, Wilma Wunder Bochum). Diese Betriebe fehlen in jeder
   Besetzungszahl, obwohl sie Umsatz machen.
+
+### TPAPI Stufe 2a: was jetzt roh vorliegt (`0151`, 12.11.2026)
+
+**Gebaut und gegen die Attrappe getestet, nie gegen das echte LINA gelaufen.** Plan:
+`plan-tpapi-stufe2.md`. Was hier steht, sagt, **woher** etwas kommt und **was es noch nicht gibt** —
+keine Zahl daraus ist an echten Daten gemessen.
+
+**Roh gesichert** (`raw.api_antwort`, Verzeichnis je Betrieb/Endpunkt/Tag in `core.tpapi_abruf`),
+für die Betriebe mit Schlüssel, soweit LINA die Tage führt (`revenue/listdays`):
+
+* **Kassenjournal** (`revenue/journal`) — eine Buchungsliste je Betrieb und Geschäftstag, 37 Felder.
+* **Bons** (`revenue/journaltables`) — je Tisch, 27 Felder, mit Gästezahlen.
+* **Personal je Tag** (`personal/personalkostenprotag`) — **nur als Summe je Betrieb und Tag**
+  (Personenzahl und die Summen der sechs Felder). Die Zeilen je Person werden **vor `raw`**
+  verdichtet (S5) und kommen nirgends an.
+* **Artikelstamm** — die dreizehn Listen `merchandiseman/*`, je Betrieb wöchentlich, in
+  `core.tpapi_stammabzug`.
+
+**Dafür gibt es noch keine `core`- und keine `mart`-Tabelle** — nur die Verzeichnis- und
+Zustandssichten (`mart.tpapi_rueckstand*`, `tpapi_abruf_stand`, `tpapi_zugang_modul`). Wer nach
+Kellner, Gästen je Bon, Storno oder Nachlass je Position aus der TPAPI fragt, bekommt
+**keine Zeile und keinen Fehler**. Der Lader (Schritt 2b) wird erst nach der Formprobe gebaut: die
+Feldwerte (Typ, Datumsformat, Vorzeichen, Leerwert) sind nicht gemessen. Die Betriebsberichte des
+Scrapers (Finanzwege 97, Bons 96, Rabatt 92, Storno 39) bleiben, bis ein Abgleich Journal gegen
+Bericht steht (S10); zwei Quellen für dieselbe Zahl sind eine Gegenprobe, solange nicht beide in
+dieselbe Sicht laufen.
+
+**Wie das Journal zu lesen sein wird (Messung 07./09.11.2026 an zwei Betrieben, nicht verallgemeinert):**
+eine Buchungsliste mit Saldo null, der Betrag steht in `balance`, je Finanzweg auf den Cent gleich
+Bericht 97. Daraus folgt die Falle für 2b: nicht über alle Zeilen summieren.
+
+**Bewusst nicht geholt (Plan S4):** `personal/acceptedworkingtimes`, `userdataperday`,
+`userdataperdaydelta`, `getPersonalData` — Zeilen je Person mit Arbeitszeiten und Stundenlohn, ohne
+Auftrag und ohne Zweck in den Auswertungen. `raw` ist append-only; was dort einmal steht, bleibt.
+Wer diese Daten will, entscheidet das eigens. Ebenfalls nicht geholt: `revenue/getforecastperday`
+(im Register, aber `aktiv: false`, bis die Formprobe die Schreibweise von `from`/`to` misst) und
+alles Schreibende.
+
+**Was in `mart` nie erscheinen wird (S6):** `debitor_text`, `addinfo` und `zip_code` aus Journal und
+Bons — Freitext und Postleitzahlen von Gästen gehören nicht in eine Schicht, die Nutzereingaben als
+SQL ausführt. Sie gehen vollständig nach `raw` und, in 2b, nach `core`.
+
+**Die Tiefe ist je Betrieb verschieden** (Aalen ab 2019 mit 2.507 Tagen, Nürnberg 362 Tage, gemessen
+07./09.11.2026) und wird von LINA in `listdays` selbst genannt. „So weit zurück wie möglich" ist
+deshalb eine Zahl je Betrieb, kein fester Horizont. Die Annahme „Aalen ab 22.10.2019" stammt aus
+einer Probe, die `businessdate` über UTC rechnete, und kann einen Tag zu früh sein; der Lader rechnet
+über die Berliner Wanduhr.
+
+**Mehr Betriebe gibt es nur über Buchungen, nicht über Code:** 22 laufende Betriebe ohne
+Daten-API, dazu zwei geschlossene bzw. insolvente mit Buchung (`offene-punkte.md`). **BWA und SuSa**
+brauchen die nicht gebuchte BWA Data API.

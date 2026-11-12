@@ -2338,3 +2338,99 @@ mit Zustand), die Zahl in `mart.personal_rueckstand`, die sinken muss, und drei 
 `mart.pruefung_uebersicht`.
 
 **Verbindungen.** Zwei Worker-Spuren plus fünf Dienste = sieben von `max: 8`.
+
+## TPAPI-Dienst, Stufe 2a: Rohabzug in Phase A und Phase C (`0151`, 12.11.2026)
+
+Plan, Entscheidungen S1–S11 und die Abweichungen des Baus (§8): `plan-tpapi-stufe2.md`. **Gebaut
+und gegen die Attrappe getestet, nie gegen das echte LINA gelaufen** (Regel 7a); der erste echte
+Lauf ist die Formprobe (`lina-third-party-api.md`) und danach der Nachtlauf. Der Abschnitt davor
+beschreibt Stufe 1 und gilt unverändert.
+
+**Dateien.** `src/tpapi/endpunkte.ts` (Register: Pfad, Modul, Art `tage`/`tag`/`stamm`, Fenstertage,
+`verdichten`, `aktiv`; reine Datei, ein Wächter in `endpunkte.test.ts` bricht ab, wenn ein
+schreibender oder personenbezogener Pfad hineinkommt), `verdichtung.ts` (`personalkostenprotag` →
+Summe, `listdays` → Geschäftstage), `roh_laden.ts` (Antwort → `raw.api_antwort` + Abrufzeile in
+**einer** Transaktion; kein `core`-Lader), `rohabzug.ts` (Planer für Phase A und C), `zugang.ts`
+(Zustand je Modul, aus `nachlauf.ts` herausgezogen).
+
+**Phase A.** Kein zweiter Eintrag in `dienste`: der Rohabzug hängt in `tpapiNachlauf()` **hinter**
+Personal je Stunde, mit **demselben Client** — zwei parallele Dienste gegen dieselben Läden wären
+doppeltes Tempo (S8). Stufe 1 läuft zuerst, weil ihre feste Grenze an `client.aufrufe()` hängt.
+Hinzu kommen je Betrieb und Nacht: `revenue/listdays` (die Arbeitsliste, S2) und das **Fenster der
+letzten drei Kalendertage** (gestern bis vor drei Tagen) für Journal, Bons und Personalkosten je Tag
+— höchstens 1 + 3 × 3 Aufrufe je Betrieb; dazu einmal die Woche der Artikelstamm (13 Listen,
+`TPAPI_STAMM_TAGE`, 7). Das Fenster sind Kalendertage und nicht „die jüngsten drei Einträge aus
+`listdays`": um 05:02 steht der gestrige Tag womöglich noch nicht in der Liste, ein geschlossener
+Betrieb hätte seine „letzten drei" vor Monaten, und ein Betrieb ohne `revenue` hat gar keine Liste,
+braucht das Fenster aber für die Personalkosten. Preis: ein Ruhetag kostet einen Aufruf mit leerer
+Antwort (Plan §8, Abweichung 1).
+
+**Phase C: eine zweite Spur neben der LINA-Spur** (`tpapiNachladen()`). Gestartet nach
+`ableitungenFertig()` — nichts rutscht vor die Ableitungen (`0116`) —, eingesammelt vor
+`abschliessen()`, Fehlerbehandler sofort angehängt. Sie liest den Rückstand aus
+`mart.tpapi_rueckstand_tag` (**dieselbe** Sicht, die die Prüfzeile zählt), **neueste Tage zuerst,
+Tag außen, Betrieb innen**, höchstens `TPAPI_NACHLADEN_JE_LAUF` Aufrufe (10.000; 0 = aus) und nie
+über `NACHLADEN_BIS` hinaus (`nachladenVorbei()`, gemessen ab dem eigenen Beginn). Nach ihr wird
+nichts aufgefrischt: keine materialisierte Sicht liest die TPAPI-Rohtabellen. Anderer Host, eigener
+Zugang als der Scraper — das „ein Tempo" aus Regel 3 gilt für LINAs Scraper-Zugang, hier gilt die
+Grenze je Laden.
+
+**Die gleitende Grenze je Betrieb (S8).** Höchstens `TPAPI_GRENZE_JE_BETRIEB` (60) Aufrufe in
+`TPAPI_GRENZE_MINUTEN` (15), gezählt im Client über **alle** TPAPI-Wege zusammen — Personal je
+Stunde, Phase A, Phase C teilen **einen** Zähler, weil LINA je Laden zählt und es deshalb je Lauf
+nur **einen** Client gibt (`tpapiNachlauf()` legt ihn an, Phase C übernimmt ihn per `laufClient()`).
+Dokumentiert sind 100; 60 lässt Reserve für Bounti und Sell & Pick am selben Laden (ob die
+mitzählen, ist nicht entschieden). Die feste Grenze `TPAPI_AUFRUFE_JE_BETRIEB` (80 je Lauf) bleibt
+für Stufe 1, würde aber den Rückstand auf 80 Aufrufe je Betrieb und Nacht deckeln. Ist ein Betrieb
+an der Grenze, wird er übersprungen und kommt wieder dran, sobald sein Fenster einen Platz hat;
+gewartet wird erst, wenn **alle** an der Grenze stehen (höchstens 30 s am Stück), und `holen()` im
+Client wartet nur als letzte Sicherung. Gezählt wird der **Start** eines Aufrufs. Das Tempo
+dazwischen bleibt `TPAPI_TAKT_MS` (1 s).
+
+**Die Ausgänge je Betrieb und Modul** (erweitert die Tabelle aus Stufe 1):
+
+| Antwort | Folge |
+|---|---|
+| 429 | Betrieb für den **ganzen Lauf** aus, alle Module, auch in Phase C und auch, wenn es Stufe 1 traf (der Client merkt es sich, `gebremst()`) |
+| 403 „not licensed" | nur dieses **Modul** aus, sieben Tage nicht gefragt (`LIZENZ_PAUSE_TAGE`), kein `teilweise` |
+| 401/403 sonst | der Betrieb ist aus, kein zweiter Versuch (Regel 7) — der Schlüssel selbst |
+| 5xx, Netz, Formfehler | das Modul bleibt dran, bis **drei Fehler in Folge** (`FEHLER_IN_FOLGE`) — dann für diesen Lauf aus. Anders als Stufe 1 (dort sofort), weil der Rückstand neueste zuerst läuft: ein einzelner Tag, an dem LINA dauerhaft 500 liefert, hielte ihn sonst Nacht für Nacht an dieser Stelle fest (FoodNotify kennt das, `0135`). Ein Einzelfehler macht den Lauf nicht `teilweise`; der Tag bleibt im Rückstand. Kein Retry desselben Tages |
+
+Die Funktionen werfen nie; ein fehlender Rohsatz ist ein Tag, den die nächste Nacht holt.
+
+**Was nach `raw` geht.** Die Antwort mit sortierten Schlüsseln (`kanonischerJsonText`, wie Stufe 1),
+einmal serialisiert, daraus Hash, Bytes und der gesendete Text. Ein als `\u0000` maskiertes NUL
+(Freitext im Journal) wird vorher entfernt, sonst lehnte `jsonb` den ganzen Rohsatz ab. Bei
+Nicht-200 und Formfehler geht bei `personalkostenprotag` nur die **Meldung** nach `raw`, nie der
+Antworttext. Gleicher Hash wie beim letzten Abruf → kein neuer Rohsatz, nur die Abrufzeile
+(`datenmodell.md`). Die Partitionen von `raw.api_antwort` werden einmal je Tag und Prozess
+außerhalb der Datentransaktion geprüft (13 ms je Aufruf; je Aufruf geprüft wären es bei 10.000
+Aufrufen gut zwei Minuten).
+
+**Neue Variablen** (`src/config.ts`, `.env.example`):
+
+| Variable | Vorgabe | Wirkung |
+|---|---|---|
+| `TPAPI_GRENZE_JE_BETRIEB` | 60 (höchstens 90) | Aufrufe je Betrieb im gleitenden Fenster |
+| `TPAPI_GRENZE_MINUTEN` | 15 (mindestens 15) | Breite des Fensters; kürzer zählte Aufrufe heraus, die LINA noch mitzählt |
+| `TPAPI_NACHLADEN_JE_LAUF` | 10.000 | Aufrufe je Lauf für den Rückstand in Phase C; 0 = aus (Notbremse, kein Handbefehl) |
+| `TPAPI_STAMM_TAGE` | 7 | Artikelstamm je Betrieb höchstens alle so viele Tage; `mart.tpapi_zugang_modul` erwartet einen Erfolg binnen 192 h — wer den Wert über 7 setzt, ändert dort die Schwelle mit (Migration) |
+
+**Die Rechnung hinter der Obergrenze** (Annahme, nicht gemessen: `listdays`-Tiefen von zwei
+Betrieben, Aalen 2.507 Tage, Nürnberg 362): 41 Betriebe × rund 1.000 Tage × drei Tagesendpunkte ≈
+120.000 Aufrufe. Mit 10.000 je Nacht wäre das in rund zwei Wochen durch, solange viele Betriebe
+Rückstand haben; zum Schluss bremst für die tiefen Betriebe die gleitende Grenze, nicht die
+Obergrenze. Zehntausend Aufrufe bei einem je Sekunde sind knapp drei Stunden.
+
+**Folge, die man wissen muss: der Lauf bleibt länger auf `laeuft`.** Die TPAPI-Spur gehört zu
+Phase C, und `abschliessen()` wartet auf sie. Solange es Rückstand gibt, endet der Lauf erst an
+`TPAPI_NACHLADEN_JE_LAUF` oder `NACHLADEN_BIS` (04:30), nicht mehr mit dem Ende des
+LINA-Nachladens. **Die Regel „kein Push auf `main`, solange ein Lauf aktiv ist" gilt dann
+entsprechend länger** — auch für den Zeitraum, in dem Phase A, B und die LINA-Spur schon fertig
+sind. Vorher `SELECT lauf_id, status FROM sync.lauf ORDER BY lauf_id DESC LIMIT 1` ansehen.
+
+**Was sichtbar bleibt (Regel 10).** `mart.tpapi_rueckstand` (die Zahl, die fallen muss),
+`mart.tpapi_abruf_stand`, `mart.tpapi_zugang_modul`, drei Merker für `mart.quelle_zulauf` und zwei
+neue Zeilen in `mart.pruefung_uebersicht` (`metabase.md`, Abschnitt „TPAPI Stufe 2a in `mart`").
+`src/sync/phasen.test.ts` prüft am Quelltext, dass die zweite Spur in Phase C steht und nach
+`ableitungenFertig()` startet.

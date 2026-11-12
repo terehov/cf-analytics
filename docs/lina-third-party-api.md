@@ -353,9 +353,53 @@ zwei Befunde daraus (Kopfzahl, Schlüssel ohne Schichten → `0150`) stehen in P
 | Endpunkt | Genutzt |
 |---|---|
 | `personal/personalkostenprostunde` | **seit `0149`** — Fenster 14 Tage plus Backfill bis 365 Tage |
-| `personal/personalkostenprotag` | nein — Zeilen je Person ohne Kennung, Frage an Eugene (`offene-punkte.md`) |
-| `revenue/*`, `merchandiseman/*`, `bwa/*` | nein (Stufe 2; BWA nicht lizenziert) |
+| `personal/personalkostenprotag` | ~~nein — Zeilen je Person ohne Kennung, Frage an Eugene (`offene-punkte.md`)~~ **seit `0151` (Stufe 2a)** — vor `raw` zur Summe je Betrieb und Tag verdichtet (S5), Fenster 3 Tage plus Rückstand |
+| `revenue/listdays` | **seit `0151`** — die Arbeitsliste, einmal je Betrieb und Nacht (`core.tpapi_geschaeftstag`) |
+| `revenue/journal`, `revenue/journaltables` | **seit `0151`** — roh gesichert (Fenster 3 Tage, Rückstand in Phase C); kein `core` vor der Formprobe (Schritt 2b) |
+| `merchandiseman/*` (13 lesende Listen) | **seit `0151`** — wöchentlich je Betrieb, roh (`core.tpapi_stammabzug`) |
+| `revenue/getforecastperday` | im Register, `aktiv: false` — Schreibweise von `from`/`to` ungemessen |
+| ~~`revenue/*`, `merchandiseman/*`, `bwa/*`~~ `bwa/*` | nein (BWA nicht lizenziert) |
+| `revenue/store`, `revenue/getlimit` | nur in Probe und Formprobe, nicht im Nachtlauf |
+| `personal/acceptedworkingtimes`, `userdataperday`, `userdataperdaydelta`, `getPersonalData` | **bewusst nie** (Plan Stufe 2, S4) |
+
+**Stufe 2a ist gebaut und gegen die Attrappe getestet, aber nie gegen das echte LINA gelaufen**
+(Regel 7a). Nichts in der Tabelle ist damit am echten Zugang gemessen, was über die Messungen vom
+07. und 09.11.2026 hinausgeht. Plan und Abweichungen: `plan-tpapi-stufe2.md`.
 
 Was der Client anders macht als der Scraper-Client: ein Schlüssel je Betrieb statt einer Sitzung,
 kein Retry für keinen Ausgang, 429 beendet nur den Betrieb, „not licensed" ist ein Zustand
 (`sync.tpapi_zugang`). Die Lohnkosten je Person (`kostUser`) werden nirgends gespeichert.
+
+## Die Formprobe (`bun run tpapi-formprobe`, `src/tpapi_formprobe.ts`, Stufe 2, 12.11.2026)
+
+**Noch nicht gelaufen.** Sie ist das Messskript vor Schritt 2b: die Werte der TPAPI-Felder sind
+nicht gemessen (Typ, Datumsformat, Vorzeichen, Leerwert), und ohne sie lassen sich die Lader für
+Journal, Bons, Personal und Artikelstamm nicht bauen. Gebaut gegen die Attrappe; das Ergebnis
+gehört danach in diese Datei und in Plan Stufe 2 (§3, §8).
+
+Nur GET, nur Pfade aus einer Erlaubtliste (jeder Aufruf wird dagegen geprüft), keine Datenbank, keine
+Rohantwort in Datei oder Konsole, kein Wiederholen, der Schlüssel erscheint nie. Läuft **nur im
+Importer-Container** (Schlüssel an die IPv4 des Servers gebunden, Regel 7a — **durch Eugene**):
+
+```bash
+ssh root@178.104.197.120
+docker exec $(docker ps --format '{{.Names}}' | grep cf-analytics-sync) bun run tpapi-formprobe --tag 09.11.2026
+docker exec ... bun run tpapi-formprobe --alle          # zusätzlich listdays je Schlüssel
+# weitere Schalter: --laden <encId> (mehrfach), --aus <datei> = Ausgabedatei (Vorgabe
+#   tpapi-formprobe.json); ohne --tag der Tag vor drei Tagen
+```
+
+Je Feld ein Profil (Typ, Anteil leer, Zahl verschiedener Werte, Min/Max bzw. Länge, bis zu fünf
+Beispielwerte) für Journal, Bons und die Artikellisten; für `debitor_text`, `addinfo`, `zip_code`,
+`kellnernr`, `masterkellnernr` **keine Beispielwerte**; `personalkostenprotag` nur Zeilenzahl und
+Feldtypen, `kostUser` wird nicht ausgewertet. Dazu die Fragen, an denen das Datenmodell hängt:
+Journal-Summen je Finanzweg, die Geschäftstagsgrenze, der Schlüssel zwischen Journal und Bons, die
+Tiefe des Verlaufs, ein Alterstest für `personalkostenprostunde`, `personalkostenprotag` und
+`journal` (ältester Tag aus `listdays` und ein Tag vor 400 Tagen), `getforecastperday` in den
+Schreibweisen der Postman-Doku, und mit `--alle` `listdays` je Schlüssel (ältester und jüngster Tag,
+Zahl der Tage — die Rechnung für den Rückstand). Ausgabe als Text und als JSON-Datei.
+
+**Aufrufe und Tempo** (Kopfkommentar des Skripts): 28 bis 29 Aufrufe je Betrieb, Abbruch bei 55, eine
+Pause von mindestens einer Sekunde — rund 35 Sekunden je Betrieb, zwei Betriebe etwa anderthalb
+Minuten, mit `--alle` bei 41 Schlüsseln knapp eine Minute mehr. Die Grenze ist dokumentiert mit 100
+je Laden und 15 Minuten; andere Anbieter lesen am selben Laden mit.

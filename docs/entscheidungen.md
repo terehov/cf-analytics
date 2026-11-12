@@ -4711,3 +4711,95 @@ zwei Betriebe mit Schlüssel lieferten keine Schichten, während die Zugangssich
 MCP-Beispiele und die Pläne, für einen Gewinn, den der Kommentar auch bringt. Toleranz je Betrieb
 aus der eigenen Historie: misst Stabilität, nicht Richtigkeit, und hätte nach einem Monat Daten
 keine Grundlage.
+
+## 12.11.2026 — TPAPI Stufe 2: erst roh sichern, dann laden (`0151`)
+
+**Anlass.** Auftrag Eugene: „alles laden, was uns fehlt, so weit zurück wie möglich, für so viele
+Betriebe wie möglich." LINAs offizielle Schnittstelle (TPAPI) kann mehr als die Personalkosten je
+Stunde aus Stufe 1: Journal, Bons, Personal je Tag, Artikelstamm. **Stand: gebaut und gegen die
+Attrappe getestet, nie gegen das echte LINA gelaufen** (Regel 7a). Plan: `plan-tpapi-stufe2.md`.
+
+**Entschieden (S1–S11, Wortlaut und Begründung im Plan, §2).**
+
+1. **S1 — Zwei Schritte: 2a holt und sichert roh, 2b lädt nach `core`.** Die Feldwerte sind nicht
+   gemessen. Mit dem Rohsatz geht kein Tag verloren, während die Lader entstehen (bei einem Jahr
+   Tiefe fällt jeden Tag einer hinten heraus); ein Lader, der sich irrt, kostet einen Neuaufbau,
+   keinen zweiten Abruf. Regel 4 wird der normale Weg.
+2. **S2 — Die Arbeitsliste ist `listdays`**, je Betrieb und Nacht; kein fester Horizont. „So weit
+   zurück wie möglich" ist je Betrieb eine andere Zahl, LINA nennt sie selbst (Aalen 2.507 Tage,
+   Nürnberg 362).
+3. **S3 — Endpunkte:** Journal, Bons, `personalkostenprotag`, die dreizehn `merchandiseman/*`;
+   `getforecastperday` im Register, aber aus.
+4. **S4 — Nicht geholt:** `acceptedworkingtimes`, `userdataperday(delta)`, `getPersonalData`. Zeilen
+   je Person mit Arbeitszeiten und Stundenlohn, kein Auftrag, kein Zweck; `raw` ist append-only.
+5. **S5 — `personalkostenprotag` wird vor `raw` zur Summe verdichtet.** Ohne Namen, aber in kleinen
+   Teams rückführbar (Stufe 1, D3); die Summe ist die Zahl, die gebraucht wird. Beantwortet damit
+   Punkt 1 aus „TPAPI: drei offene Punkte" in `offene-punkte.md`.
+6. **S6 — Journal und Bons vollständig nach `raw` und `core`, aber `debitor_text`, `addinfo`,
+   `zip_code` nie nach `mart`.** Freitext und Postleitzahlen von Gästen gehören nicht in eine
+   Schicht, die Nutzereingaben als SQL ausführt.
+7. **S7 — Fenster in Phase A, Rückstand in Phase C** mit Obergrenze `TPAPI_NACHLADEN_JE_LAUF`. Ein
+   Rückstand von über 100.000 Aufrufen in Phase A hielte Phase B auf — dieselbe Lehre wie `0116`.
+8. **S8 — Seriell, Tag außen, Betrieb innen, und eine gleitende Grenze je Betrieb** (60 in 15
+   Minuten) statt der festen 80 je Lauf: die feste Grenze deckelte den Rückstand auf 80 Aufrufe je
+   Betrieb und Nacht.
+9. **S9 — Zustand je Modul** in `sync.tpapi_zugang`; „not licensed" schaltet nur das Modul ab.
+10. **S10 — Die Betriebsberichte des Scrapers bleiben**, bis der Abgleich steht. Der Scraper deckt
+    alle Betriebe und reicht bis 2018, die TPAPI 41 Betriebe; zwei Quellen für dieselbe Zahl sind
+    eine Gegenprobe, solange nicht beide in dieselbe Sicht laufen.
+11. **S11 — Artikelstamm als Momentaufnahme**, wöchentlich je Betrieb, vollständig roh; ob die TPAPI
+    mehr weiß als `articleApi:franchise` (Wareneinsatz je Artikel), sagt die Formprobe.
+
+**Abweichungen vom Plan beim Bau** (Plan §8, Punkt für Punkt dort):
+
+* **Fenster sind Kalendertage**, nicht „die letzten 3 Geschäftstage" aus `listdays`: um 05:02 ist
+  der gestrige Tag womöglich noch nicht in der Liste, ein geschlossener Betrieb holte seine
+  „letzten drei" vom letzten Sommer jede Nacht neu, und ein Betrieb ohne `revenue` hat keine Liste.
+  Preis: ein Ruhetag kostet einen Aufruf mit leerer Antwort.
+* **Betriebe nur mit Team Data haben keine `listdays`** (403) — für `personalkostenprotag` gilt dort
+  der Horizont von 365 Tagen.
+* **Ein Tag, der hinten aus `listdays` fällt, fällt aus der Arbeitsliste**; gelöscht wird nichts.
+* **Gleicher Hash, kein neuer Rohsatz** — sonst rund 120 MB je Nacht ohne Information.
+* **Vermerkt wird nur HTTP 200**; Fehlversuche stehen in `raw` und `sync.tpapi_zugang`.
+* **`mart.tpapi_zugang` bleibt unverändert**, dazu `mart.tpapi_zugang_modul`.
+* **Zwei Rückstandssichten statt einer** (je Tag als Arbeitsliste, verdichtet je Betrieb).
+* **Die Prüfzeile „Rohsätze ohne `core` älter als 48 h" ist nicht gebaut** (stünde in 2a dauerhaft
+  auf „alles", `0071`); sie gehört zu 2b. „Rückstand fällt nicht" ohne Verlaufstabelle als `stockt`.
+* **`sync.quelle` misst an einem Teil einer Tabelle** (`filter_spalte`/`filter_werte`), sonst saehe
+  ein stummes Journal neben laufenden Personalkosten wie „ok" aus (Regel 10).
+* **Drei Fehler in Folge statt eines** für 5xx/Netz/Formfehler — der Rückstand läuft neueste zuerst,
+  ein einzelner dauerhaft kaputter Tag hielte ihn sonst fest. 429 beendet den Betrieb für den
+  ganzen Lauf, auch in Phase C.
+* **Eine Client-Instanz je Lauf**, damit die gleitende Grenze über Stufe 1, Phase A und Phase C
+  zählt (LINA zählt je Laden, nicht je Weg).
+* **Kein zweiter Eintrag in `dienste`** für den Rohabzug: derselbe Dienst, derselbe Client, sonst
+  doppeltes Tempo.
+* **Phase C: zweite Spur** neben der LINA-Spur; Zeitgrenze `NACHLADEN_BIS`.
+* **`listdays` über die Berliner Wanduhr** gelesen (nicht gemessen, das Log zählt die Abweichungen).
+
+**Folge für den Betrieb.** Der Lauf bleibt, solange es TPAPI-Rückstand gibt, bis zur Obergrenze oder
+`NACHLADEN_BIS` auf `laeuft`; die Regel „kein Push, solange ein Lauf aktiv ist" gilt entsprechend
+länger (`importer.md`).
+
+**Verworfen** (soweit Plan und Code es nennen):
+
+* **Direkt nach `core` laden.** Geraten wären Typen, Datumsformat, Vorzeichen und Leerwerte; jeder
+  Irrtum hätte Tage gekostet, die hinten aus `listdays` herausfallen.
+* **Ein fester Horizont wie die 365 aus Stufe 1.** LINA sagt die Tiefe je Betrieb selbst.
+* **Die feste Grenze je Lauf (80) auch für Stufe 2.** Deckelt den Rückstand auf 80 Aufrufe je
+  Betrieb und Nacht.
+* **Den Rückstand in Phase A holen.** Hielte Phase B und damit die Dashboards auf.
+* **Einen zweiten Dienst in Phase A.** Zwei parallele Dienste gegen dieselben Läden = doppeltes
+  Tempo.
+* **Jede Antwort jedes Fensterabrufs nach `raw`.** Dreimal dieselben Bytes, rund 120 MB je Nacht.
+* **Spalten für Artikel und Umsatz an `mart.tpapi_zugang`.** Hätte aus einem `befund` drei gemacht
+  und den Rumpf aus `0150` wiederholt.
+* **Eine Bedingung als Text in `sync.quelle`.** Dynamisches SQL aus einer Tabelle in einer
+  `SECURITY-DEFINER`-Funktion; stattdessen Spalte plus Werteliste.
+* **Die Zeilen je Person von `personalkostenprotag` nach `raw`** und die vier Personal-Endpunkte aus
+  S4 (kein Auftrag, `raw` ist append-only).
+* **Die Betriebsberichte des Scrapers jetzt schon abschalten** (S10): erst nach dem Abgleich
+  Journal gegen Bericht 97, 96, 92, 39 und Umsatzbericht; der Scraper deckt alle Betriebe und reicht
+  bis 2018.
+* **`getforecastperday` mit geratenen `from`/`to`.** Im besten Fall ein 400 je Betrieb und Woche, im
+  schlechtesten eine leere Liste, die als „keine Prognose" gespeichert würde.

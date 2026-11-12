@@ -2143,3 +2143,52 @@ katalog:abzug`, gegen die Produktion, Weg wie am 29.10.2026).
 Betrieb und Monat 3,4 ms; Melanies Filter auf `personal_zeitfenster` 5 ms;
 `personal_stunde_pruefung` seit Juli 89 ms; `tpapi_zugang` 33 ms. Deshalb keine Materialisierung
 (Plan D8) — erst, wenn die echten Daten eine Messung verlangen.
+
+## TPAPI Stufe 2a in `mart` (Migration `0151`, 12.11.2026)
+
+Vier Import-Sichten auf den Rohabzug (Journal, Bons, Personal je Tag, Artikelstamm), alle live, alle
+für `mcp_leser` lesbar (Leseprobe in der Migration), im MCP-Katalog mit Körnung und Thema `import`,
+`summen_erlaubt = false`. **Gebaut gegen die Attrappe, nie gegen das echte LINA gelaufen.** Es sind
+Verzeichnis- und Zustandssichten, **keine fachliche Zahl** — den Inhalt von Journal und Bons gibt es
+in `mart` erst mit Schritt 2b (`datenherkunft.md`). Deshalb keine neuen Fallstricke. Plan:
+`plan-tpapi-stufe2.md`.
+
+| Sicht | Körnung | Wofür |
+|---|---|---|
+| `mart.tpapi_rueckstand_tag` | Betrieb × Tagesendpunkt × fehlender Geschäftstag | **Die Arbeitsliste von Phase C** — der Importer liest genau diese Sicht, damit Nachladen und Prüfzeile dieselbe Zahl meinen. Muss auf 0 fallen. Betriebe nur mit Team Data (ohne `listdays`) bekommen für `personalkostenprotag` die letzten 365 Tage (`arbeitsliste = 'horizont 365'`). Nicht lizenzierte Module fehlen, sonst ginge die Zahl nie auf 0 |
+| `mart.tpapi_rueckstand` | Betrieb × Tagesendpunkt | Die verdichtete Fassung: `tage_liste`, `tage_geholt`, `tage_fehlend`, ältester/jüngster Tag, `letzter_nachladen`, `bekannt_seit`, `stockt` |
+| `mart.tpapi_abruf_stand` | TPAPI-Endpunkt (`art` = `tag` oder `stamm`) | Wie viel liegt roh, `in_core` (bis 2b immer 0), `geaendert` (Tage, deren Inhalt sich nach dem ersten Abruf noch änderte — die Messung, ob das Dreitagesfenster reicht), `bytes`, `leer`, `ladefehler` |
+| `mart.tpapi_zugang_modul` | Betrieb (alle) × Modul (`personal`, `revenue`, `artikel`) | Schlüssel, Zustand, letzter Erfolg, `befund`. **Neben** `mart.tpapi_zugang`, nicht an seiner Stelle: dort ist `befund` der des Personalmoduls mit „Schluessel ohne Schichten" (`0150`), und Spalten für zwei weitere Module hätten aus einem `befund` drei gemacht. Schwelle für „ohne Zulauf": 48 h für `personal`/`revenue`, 192 h für den wöchentlichen Artikelstamm |
+
+**Fallen, die man den Sichten nicht ansieht:**
+
+1. **Geholt heißt roh gesichert, nicht ausgewertet.** `tage_geholt` und `eintraege` sagen nichts
+   darüber, ob ein Tag in einer Auswertung steht (`in_core`, bis 2b immer 0).
+2. **`tage_fehlend = 0` kann heißen: nichts gefragt.** Ein Betrieb ohne Schlüssel oder ohne
+   gebuchtes Modul steht gar nicht in `mart.tpapi_rueckstand`; `mart.tpapi_zugang_modul` sagt warum.
+   `arbeitsliste = 'keine liste'` heißt: Sales Data gebucht, `listdays` noch nie erfolgreich.
+3. **`bytes` ist nicht der Plattenplatz** — der JSON-Text vor der Kompression, bei `tag` der jüngste
+   Rohsatz je Tag.
+4. **`stockt`** = es fehlt etwas, die Arbeitsliste ist älter als 48 h, und seit 48 h kam kein Tag
+   aus dem Nachladen dazu (erster Abruf eines Tages, der dabei mehr als drei Tage zurücklag). Das
+   Nachladen läuft nicht (`TPAPI_NACHLADEN_JE_LAUF = 0`, Zeitgrenze, 429) oder hängt an einem Tag,
+   den LINA nicht liefert.
+5. Die Endpunktliste steht in beiden Rückstandssichten als `VALUES` (eine Sicht kann das Register
+   in `src/tpapi/endpunkte.ts` nicht lesen); `endpunkte.test.ts` prüft, dass beide übereinstimmen.
+   Wer einen Tagesendpunkt aktiviert, ändert die Sichten mit.
+
+**Zwei neue Zeilen in `mart.pruefung_uebersicht`**, beide können auf null gehen:
+
+| Zeile | Erwartung |
+|---|---|
+| „TPAPI: Rohabzug-Rueckstand faellt nicht (48 h)" (`mart.tpapi_rueckstand`) | **0.** `geprueft` = Betrieb-Endpunkte mit Rückstand, `auffaellig` = die mit `stockt`. Gebaut ohne Verlaufstabelle: „fällt nicht" heißt „kein Tag aus dem Nachladen seit 48 h" |
+| „TPAPI: Modul Umsatz/Artikel mit Schluessel ohne Zulauf" (`mart.tpapi_zugang_modul`) | **0** (`nicht lizenziert` ausgenommen, das ist ein Zustand). Das Personalmodul steht dort nicht — dafür gibt es seit `0149` „TPAPI: Schluessel ohne Zulauf (48 h)" |
+
+**Nicht gebaut, mit Absicht:** die Zeile „Rohsätze ohne `core` älter als 48 h" aus Plan §4. In 2a
+stünde sie dauerhaft auf „alles" (`0071`: eine Zeile, die nie auf null gehen kann, liest niemand);
+sie kommt mit Schritt 2b. Dasselbe gilt für alles Fachliche (Stunde × Artikel × Sparte, Gäste je
+Bon, Kellner, Storno, Nachlass je Position, Arbeitsstunden und Zuschläge je Tag).
+
+**Nach dem Deploy:** den MCP-Katalogabzug neu ziehen (`cd mcp && MCP_DATABASE_URL=… bun run
+katalog:abzug`, gegen die Produktion), `mcp.achsen_ableiten()` hat die vier Sichten schon
+aufgenommen, die Abzugsdatei nicht.
