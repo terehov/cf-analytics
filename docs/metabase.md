@@ -2331,3 +2331,39 @@ wie die Kasse, Rückstand wird nachgeladen“ umgeschrieben.
 
 **Karten: keine.** Erst, wenn `mart.kassenjournal_abgleich_monat` an echten Daten sagt, ob die Deutung
 trifft. Eine Karte „Umsatz aus dem Journal“ vorher wäre eine plausibel aussehende, ungeprüfte Zahl.
+
+## LINAs Umsatzprognose als Vergleichsbasis in `mart` (Migration `0154`, 12.11.2026)
+
+Sechs neue Sichten auf `core.umsatzprognose_beobachtung` (Verlauf je Betrieb, Tag und Wert). Anlass:
+Brainfood will eigene Prognosen gegen LINAs stellen, je Vorlauf (`entscheidungen.md`, 12.11.2026).
+Alle live (gemessen auf dem Klon mit ~170.000 Verlaufszeilen: Vorlauf für 30 Tage 0,25 s, Güte eines
+Monats 0,95 s), alle für `mcp_leser` lesbar (Leseprobe in der Migration), im MCP-Katalog mit Körnung.
+⚠️ **Gebaut gegen die Attrappe, nie gegen das echte LINA gelaufen.** **Keine Karte** — erst, wenn
+Vorabwerte über einige Wochen vorliegen. **MCP-Katalogabzug** (`mcp/test/katalog.json`) wie bei 0153
+noch aus der Produktion zu ziehen.
+
+| Sicht | Körnung | Falle |
+|---|---|---|
+| `mart.umsatzprognose_vorlauf` | Betrieb × Geschäftstag × Vorlauf | **Jeder Tag steht bis zu achtmal da** (Vorlauf 0, 1, 2, 3, 7, 14, 28 und einmal `nachtraeglich` mit `vorlauf_tage` NULL) — nie ohne Filter auf `vorlauf_tage` bzw. `grundlage` summieren (Fallstrick `umsatzprognose_vorlauf_mehrfach`). Für Fehlermaße **`vergleichbar = true`** (Fallstrick `…_vergleichbar`), `ausschluss_grund` sagt warum nicht. **`fehler_netto = Prognose − Ist`** (positiv = LINA zu hoch) — die umgekehrte Richtung von `mart.umsatzprognose_tag.abweichung_netto`; `fehler_pct` vom Ist. `grundlage = 'nachtraeglich'` ist bis zur Freigabe keine Aussage über LINAs Prognose (Fallstrick `…_nachtraeglich`) |
+| `mart.umsatzprognose_guete` | Betrieb × Monat × Grundlage × Vorlauf | MAE, MAPE, WAPE, Bias über vergleichbare Tage. **Prozente nicht mitteln**: für Marke, Quartal, Gruppe aus `summe_fehler_abs_netto`, `summe_ist_netto`, `summe_fehler_netto`, `summe_ape_pct`, `tage` neu rechnen. WAPE ist das Maß für den Vergleich zweier Prognosen (umsatzgewichtet); MAPE gewichtet jeden Tag gleich und wird von schwachen Tagen getrieben. Über Vorläufe nie summieren (Fallstrick `umsatzprognose_guete_vorlauf`) |
+| `mart.umsatzprognose_nachher` | Betrieb × Geschäftstag | Nur Tage mit Vorabwert **und** Beobachtung nach dem Tag: `unveraendert`, `aenderung_netto`, `aenderung_pct` (vom Vorabwert), `wechsel_ab_beginn` (auch hin und zurück) |
+| **`mart.umsatzprognose_nachher_betrieb`** | Betrieb | **Die Messung, an der die Historie hängt:** `anteil_unveraendert_pct`, mittlere und größte Änderung, `groesster_abstand_tage`, `befund` (noch keine messung / unveraendert / wechselt, kehrt zurueck / aendert nachtraeglich). **Freigabe** der nachträglichen Werte erst, wenn alle Betriebe über einige Wochen (Vorschlag vier) `unveraendert` zeigen, mit `groesster_abstand_tage` über 28 — eine Entscheidung, in `entscheidungen.md`. Misst nur bis gut fünf Wochen nach dem Tag (Fallstrick `umsatzprognose_nachher_freigabe`) |
+| `mart.umsatzprognose_horizont` | Betrieb | Wie weit LINA voraus liefert: `angefragt_bis` gegen `geliefert_bis`, `vorlauf_geliefert_tage`, `groesster_vorlauf_tage`, `tage_mit_vorab`; `befund` |
+| `mart.umsatzprognose_verlauf` | Betrieb × Geschäftstag × Wert | Der Verlauf selbst: `gesehen_ab`, `zuletzt_gesehen_am`, `abgeloest_am`, `vor_beginn`, `vorlauf_tage` (größter Vorlauf, für den der Wert zählt; negativ = erst nach Beginn des Tages gesehen) — für jede Vorlauffrage außerhalb der Stützstellen |
+
+**Warum die Stützstellen 0, 1, 2, 3, 7, 14, 28:** 0 = Stand am Morgen (Tagesplanung, = `vorab_netto`),
+1 = Vortag (kurzfristige Schicht, Frischware), 2/3 = Bestellrhythmus, 7 = Wochendienstplan, 14 = üblicher
+Vorlauf des Dienstplans, 28 = Monatsplanung und sicher innerhalb des 60-Tage-Fensters. Jede weitere
+Stützstelle vervielfacht nur die Zeilen; andere Vorläufe gibt `mart.umsatzprognose_verlauf` her.
+
+**Neue Zeile in `mart.pruefung_uebersicht`:** „TPAPI-Prognose: juengster Abzug (48 h) ohne heute oder
+Zukunft" — **Erwartung 0**. Steht sie, gibt es für diese Betriebe **keine** Vorabprognose: ein Befund
+über LINA, keiner über den Import. **Keine** Zeile für „LINA ändert nachträglich" — das ist eine Messung,
+kein Fehler; sie steht in `mart.umsatzprognose_nachher_betrieb`.
+
+**Fallstricke (6 neue, nur bekannte Regelarten):** `umsatzprognose_vorlauf_nachtraeglich`,
+`umsatzprognose_guete_nachtraeglich`, `umsatzprognose_nachher_freigabe` (deutung, Warnung);
+`umsatzprognose_vorlauf_mehrfach`, `umsatzprognose_guete_vorlauf`, `umsatzprognose_vorlauf_vergleichbar`
+(filter_noetig, Warnung — eine Sperre hätte auch das legitime `GROUP BY vorlauf_tage` gesperrt).
+`umsatzprognose_ist_lina` aus 0153 verweist jetzt auf die neuen Sichten.
+

@@ -109,12 +109,15 @@ export const TPAPI_ENDPUNKTE: readonly TpapiEndpunkt[] = [
      * AN SEIT 0153. Die Formprobe vom 12.11.2026 hat die Schreibweise gemessen:
      * `from`/`to` als dd.mm.yyyy, Antwort `{datum: Unix-Sekunden auf Berliner
      * Mitternacht, forecast: netto EUR}` je Tag. Phase A fragt je Betrieb ein
-     * Fenster um heute (PROGNOSE_FENSTER), Phase C die Historie monatsweise
-     * (`mart.umsatzprognose_rueckstand`). Ob LINA Tage in der Zukunft liefert,
-     * ist NICHT gemessen — `mart.umsatzprognose_tag.tage_voraus_erstmals` misst es.
+     * Fenster um heute (PROGNOSE_FENSTER, nach vorn TPAPI_PROGNOSE_TAGE_VORAUS),
+     * Phase C die Historie monatsweise (`mart.umsatzprognose_rueckstand`) —
+     * seit 0154 VOR dem Tagesrückstand. Ob und wie weit LINA Tage in der
+     * Zukunft liefert, ist NICHT gemessen — `mart.umsatzprognose_horizont`
+     * misst es. Jeder Abzug geht als Beobachtung in den Verlauf
+     * (core.umsatzprognose_beobachtung, 0154).
      */
     aktiv: true,
-    bemerkung: 'Umsatzprognose je Tag (from/to dd.mm.yyyy). Fenster um heute in Phase A, Monate der Historie in Phase C.',
+    bemerkung: 'Umsatzprognose je Tag (from/to dd.mm.yyyy). Fenster um heute in Phase A, Monate der Historie in Phase C zuerst.',
   }),
   eintrag({
     pfad: 'personal/personalkostenprostunde', modul: 'personal', art: 'stunde', fensterTage: 0, aktiv: true,
@@ -150,11 +153,13 @@ export function stundeEndpunkt(): TpapiEndpunkt | null {
 
 /**
  * Das Fenster der Prognose in Phase A, in Tagen um heute: ab dem
- * Monatsersten (oder vor sieben Tagen, wenn das früher ist) bis in 14 Tagen.
- * Der Monatserste, damit der laufende Monat ganz da ist — die Historie holt
- * nur abgeschlossene Monate. Ein Aufruf je Betrieb und Nacht, rund 45 Tage.
+ * Monatsersten (oder vor sieben Tagen, wenn das früher ist) bis in
+ * `TPAPI_PROGNOSE_TAGE_VORAUS` Tagen (seit 0154 aus `config.ts`, Standard 60;
+ * diese Datei liest `config` nicht, siehe oben). Der Monatserste, damit der
+ * laufende Monat ganz da ist — die Historie holt nur abgeschlossene Monate.
+ * Ein Aufruf je Betrieb und Nacht.
  */
-export const PROGNOSE_FENSTER = { zurueck: 7, voraus: 14 } as const
+export const PROGNOSE_FENSTER = { zurueck: 7 } as const
 
 /**
  * Pfade, die nie in dieses Register dürfen — schreibend oder personenbezogen

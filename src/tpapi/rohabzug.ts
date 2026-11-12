@@ -11,10 +11,11 @@
  *            fälligen Artikelstamm (wöchentlich je Betrieb, S11) und seit 0153
  *            die Umsatzprognose (ein Fenster um heute). Begrenzt durch sich
  *            selbst: 1 + 3 × 3 + 1 Aufrufe je Betrieb, dazu 13 einmal die Woche.
- *   Phase C  `tpapiNachladen()` — aus src/sync.ts neben der LINA-Spur. Der
- *            Rückstand aus `mart.tpapi_rueckstand_tag` (seit 0153 dazu Personal
- *            je Stunde aus `mart.personal_rueckstand` und, zuletzt, die Monate
- *            der Prognose aus `mart.umsatzprognose_rueckstand`), neueste Tage zuerst,
+ *   Phase C  `tpapiNachladen()` — aus src/sync.ts neben der LINA-Spur. Seit
+ *            0154 ZUERST die Monate der Prognose aus
+ *            `mart.umsatzprognose_rueckstand`, dann der Rückstand aus
+ *            `mart.tpapi_rueckstand_tag` (seit 0153 dazu Personal je Stunde
+ *            aus `mart.personal_rueckstand`), neueste Tage zuerst,
  *            Tag außen, Betrieb innen, höchstens `TPAPI_NACHLADEN_JE_LAUF`
  *            Aufrufe und nie über `NACHLADEN_BIS` hinaus. Ein Rückstand von
  *            über 100.000 Aufrufen in Phase A hielte Phase B auf — dieselbe
@@ -476,15 +477,16 @@ export async function rohabzugTagesgeschaeft(client: TpapiClient): Promise<'ok' 
     /*
      * Die Umsatzprognose (seit 0153): je Betrieb ein Aufruf für ein Fenster um
      * heute — ab dem Monatsersten (oder vor sieben Tagen, wenn das früher ist)
-     * bis in 14 Tagen. Zuletzt, damit sie keinem Tagesendpunkt Platz an der
-     * gleitenden Grenze nimmt. Ob LINA Tage in der Zukunft liefert, misst
-     * mart.umsatzprognose_tag.tage_voraus_erstmals.
+     * bis in TPAPI_PROGNOSE_TAGE_VORAUS Tagen (seit 0154, Standard 60; vorher
+     * 14). Zuletzt, damit sie keinem Tagesendpunkt Platz an der gleitenden
+     * Grenze nimmt. Wie weit LINA tatsächlich liefert, misst
+     * mart.umsatzprognose_horizont.
      */
     const prognose = prognoseEndpunkt()
     if (prognose) {
       const [f] = await query<{ von: string; bis: string }>(
         `SELECT least(current_date - $1::int, date_trunc('month', current_date)::date)::text AS von,
-                (current_date + $2::int)::text AS bis`, [PROGNOSE_FENSTER.zurueck, PROGNOSE_FENSTER.voraus])
+                (current_date + $2::int)::text AS bis`, [PROGNOSE_FENSTER.zurueck, config.TPAPI_PROGNOSE_TAGE_VORAUS])
       for (const b of betriebe) {
         if (b.module.has(prognose.modul)) auftraege.push({ nr: nr++, betrieb: b, ep: prognose, von: f!.von, bis: f!.bis })
       }
@@ -551,32 +553,38 @@ export async function tpapiNachladen(opt: TpapiNachladenOptionen = {}): Promise<
        * und schneidet, und die Obergrenze geht nicht an Betriebe, die heute
        * ohnehin nicht dran sind (dieselbe Falle wie in Stufe 1).
        *
-       * DREI ARBEITSLISTEN, EINE OBERGRENZE (seit 0153):
-       *   rang 0  die fehlenden Tage von Journal, Bons und Personalkosten je
+       * DREI ARBEITSLISTEN, EINE OBERGRENZE (seit 0153, Rang seit 0154):
+       *   rang 0  die fehlenden Monate der Prognose (mart.umsatzprognose_rueckstand),
+       *           neueste zuerst — VOR allem anderen. Es ist unbekannt, wie
+       *           lange LINA alte Prognosen vorhält; was heute nicht geholt
+       *           wird, ist vielleicht morgen weg, und Brainfood braucht sie als
+       *           Vergleichsbasis für eigene Prognosen (Entscheidung 12.11.2026).
+       *           Der Posten ist klein: rund 3.000 Aufrufe für alle Betriebe,
+       *           ein Aufruf je Betrieb und Monat — gegen 50.000 je Nacht.
+       *           (0153 stellte ihn ans Ende: Tage fallen hinten aus listdays
+       *           heraus, eine Prognose nicht. Das gilt weiter, aber 3.000
+       *           Aufrufe verdrängen dort nichts Nennenswertes.)
+       *   rang 1  die fehlenden Tage von Journal, Bons und Personalkosten je
        *           Tag (mart.tpapi_rueckstand_tag) und von Personal je Stunde
        *           (mart.personal_rueckstand, alles jenseits dessen, was Phase A
        *           holt) — gemeinsam neueste zuerst, Tag außen, Betrieb innen
-       *   rang 1  die fehlenden Monate der Prognose (mart.umsatzprognose_rueckstand)
-       *           — DANACH: Tage fallen hinten aus listdays heraus, eine
-       *           Prognose nicht, und eine nachträglich geholte Prognose ist
-       *           die schwächere Zahl
        */
       const paare = betriebe.flatMap(b => [...b.module].map(m => [b.betriebKey, m] as const))
       const liste = await query<{ betrieb_key: number; endpunkt: string; tag: string | null; von: string | null; bis: string | null }>(
         `WITH p(betrieb_key, modul) AS (SELECT * FROM unnest($2::int[], $3::text[])),
          arbeit AS (
-           SELECT 0 AS rang, r.geschaeftstag AS sortiert, r.betrieb_key, r.endpunkt,
+           SELECT 1 AS rang, r.geschaeftstag AS sortiert, r.betrieb_key, r.endpunkt,
                   r.geschaeftstag::text AS tag, NULL::text AS von, NULL::text AS bis
              FROM mart.tpapi_rueckstand_tag r
              JOIN p ON p.betrieb_key = r.betrieb_key AND p.modul = r.modul
             WHERE r.endpunkt = ANY($4::text[])
            UNION ALL
-           SELECT 0, r.geschaeftstag, r.betrieb_key, $5::text, r.geschaeftstag::text, NULL, NULL
+           SELECT 1, r.geschaeftstag, r.betrieb_key, $5::text, r.geschaeftstag::text, NULL, NULL
              FROM mart.personal_rueckstand r
              JOIN p ON p.betrieb_key = r.betrieb_key AND p.modul = 'personal'
             WHERE $5::text IS NOT NULL
            UNION ALL
-           SELECT 1, r.monat, r.betrieb_key, $6::text, NULL, r.von::text, r.bis::text
+           SELECT 0, r.monat, r.betrieb_key, $6::text, NULL, r.von::text, r.bis::text
              FROM mart.umsatzprognose_rueckstand r
              JOIN p ON p.betrieb_key = r.betrieb_key AND p.modul = 'revenue'
             WHERE $6::text IS NOT NULL

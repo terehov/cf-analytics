@@ -2686,3 +2686,38 @@ Zeitgrenze passt (rund 140.000 Rohsätze, gerechnet 34,8 ms je Journaltag auf de
 Annahme); ob der Lader die dritte Spur in Phase C ohne Lockkonflikt mit dem Rohabzug schafft
 (`FOR UPDATE` an der Abrufzeile); ob `fixedwe` der Kasse fast überall `gleich` `fixer_we` aus den Konzernberichten ist
 (`mart.kassenartikel_fixedwe_abgleich`, Regel 5 — beantwortet die Herkunft, nicht die Pflege).
+
+## LINAs Umsatzprognose als Vergleichsbasis: was nach dem Deploy zu messen ist (12.11.2026, `0154`)
+
+⚠️ **Gebaut und gegen die Attrappe getestet, nie gegen das echte LINA gelaufen.** Anlass und
+Begründung: `entscheidungen.md` (12.11.2026), Plan: `plan-tpapi-stufe2.md` §8 (Nachtrag).
+
+**21. Liefert LINA Zukunftstage — und wie weit?** Nach der ersten Nacht:
+`SELECT befund, vorlauf_angefragt_tage, vorlauf_geliefert_tage, count(*) FROM mart.umsatzprognose_horizont
+GROUP BY 1, 2, 3;`. Erwartung (Annahme): `liefert bis fensterende`. Steht `liefert kein heute`, gibt es
+**keine** Vorabprognose — dann ist LINAs Prognose als Vergleichsbasis nur nachträglich zu haben, und
+Punkt 22 entscheidet alles. Liefert LINA kürzer, `TPAPI_PROGNOSE_TAGE_VORAUS` auf den gelieferten Wert
+setzen (kostet nichts, aber die Zahl soll stimmen).
+
+**22. Ändert LINA ihre Prognose nach dem Tag?** Ab etwa zwei Wochen nach dem Deploy, dann wöchentlich:
+`SELECT * FROM mart.umsatzprognose_nachher_betrieb ORDER BY befund, betrieb;`. **Freigabe** der
+nachträglich geholten Historie als Vergleichsbasis erst, wenn alle Betriebe über einige Wochen
+(Vorschlag vier) `unveraendert` zeigen, mit `groesster_abstand_tage` über 28 — Entscheidung Eugene, in
+`entscheidungen.md`. **Was die Sicht nicht misst:** ob Jahre alte Prognosen so geliefert werden, wie sie
+damals ausgegeben wurden. Vorschlag: nach drei Monaten einige Historienmonate eines Betriebs ein
+zweites Mal holen (ein einmaliger Einreihweg) und gegen den ersten Abzug vergleichen — der Verlauf
+nimmt den zweiten Abzug von selbst auf, `mart.umsatzprognose_verlauf` zeigt dann je Tag zwei
+nachträgliche Werte. Nicht gebaut.
+
+**23. Was genau prognostiziert LINA?** Angenommen: **netto** wie `mart.umsatz_tag.umsatz_netto`, ohne
+Trinkgeld, für den Geschäftstag 08:00–07:59. Nicht belegt — die Formprobe hat nur die Form gemessen.
+Prüfen, sobald es Vorabwerte und Ist gibt: liegt `bias_pct` in `mart.umsatzprognose_guete` (Vorlauf 0)
+bei allen Betrieben deutlich über null, in der Größenordnung der Mehrwertsteuer, ist es eher brutto. Ebenso offen: ob LINA
+für Ruhetage 0 prognostiziert (`tage_geschlossen_mit_prognose`).
+
+**24. Abzug nach 08:00.** Ein Abzug, der nach 08:00 läuft, zählt für den heutigen Tag nicht mehr als
+Vorlauf 0, sondern ist nachträglich. Phase A beginnt um 05:02 und holt die Prognose am Ende des
+Rohabzugs; ob sie bei allen Betrieben vor 08:00 fertig ist, ist nicht gemessen —
+`SELECT min(prognose_gesehen_ab AT TIME ZONE 'Europe/Berlin')::time, max(...)::time FROM
+mart.umsatzprognose_vorlauf WHERE vorlauf_tage = 0 AND geschaeftstag = current_date - 1;`.
+

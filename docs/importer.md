@@ -2557,6 +2557,22 @@ Lader verarbeitet **jeden** Abzug in der Reihenfolge der Abrufe als eine Beobach
 der Zukunft liefert und Prognosen nachträglich ändert, ist **nicht gemessen** (`tage_voraus_erstmals`,
 `aenderungen` messen es).
 
+**Seit `0154` (12.11.2026):** ~~bis in 14 Tagen (`PROGNOSE_FENSTER`)~~ bis in
+`TPAPI_PROGNOSE_TAGE_VORAUS` Tagen (Standard **60**; `PROGNOSE_FENSTER` trägt nur noch `zurueck: 7`,
+weil `endpunkte.ts` `config` nicht liest), und ~~**nach** allen fehlenden Tagen~~ die Monate der
+Historie in Phase C als **Rang 0 vor** dem Tagesrückstand, neueste zuerst — es ist unbekannt, wie lange
+LINA alte Prognosen vorhält, und der Posten ist klein (`entscheidungen.md`, 12.11.2026). Der Lader
+(Laderstand **2**) schreibt im selben Zug den **Verlauf** `core.umsatzprognose_beobachtung`
+(`prognoseAnwenden()`): je Tag des Abzugs eine neue Zeile bei neuem Wert, sonst rücken
+`zuletzt_gesehen_am`/`zuletzt_abzug_id`/`sichtungen` nach. Das setzt voraus, dass der Abzug jünger ist
+als alles, was für den Betrieb schon in `core` steht; sonst (`neuAufbauNoetig()`: neue Laderversion,
+Ladefehler eines älteren Abzugs, derselbe Abzug noch einmal) löscht `prognoseLaden()` Tageswerte und
+Verlauf des Betriebs und schreibt sie aus allen geladenen Abzügen chronologisch neu, in derselben
+Transaktion, aus `raw`. Nach dem Deploy trifft das den ältesten Abzug jedes Betriebs einmal; danach
+hängen sich alle in der Reihe an. `core_laden.test.ts` prüft, dass beide Wege dieselben Zeilen ergeben.
+Zulauf: `sync.quelle` `tpapi:core_prognose_verlauf` (an `aktualisiert_am`, das auch bei
+unverändertem Wert nachrückt).
+
 **Personal je Stunde im Nachladen (B11, Abweichung 20, 21).** `personal/personalkostenprostunde`
 steht jetzt im Register (Art `stunde`). **Phase A bleibt bei Stufe 1** (Fenster, feste Grenze je
 Betrieb, 365 Tage). Den Rest bis zur Tiefe von `listdays` (Aalen bis 2019; rund 65.000 Aufrufe) holt

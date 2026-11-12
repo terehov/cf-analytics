@@ -383,6 +383,21 @@ const Schema = z.object({
    */
   TPAPI_STAMM_TAGE: z.coerce.number().int().min(1).default(7),
 
+  /**
+   * Umsatzprognose (`revenue/getforecastperday`): so viele Tage nach vorn fragt
+   * Phase A je Betrieb und Nacht (seit 0154; vorher fest 14).
+   *
+   * WARUM 60. Brainfood will eigene Prognosen gegen LINAs stellen, und zwar je
+   * Vorlauf — „was stand N Tage vorher da" (`mart.umsatzprognose_vorlauf`,
+   * Stützstellen bis 28 Tage). Dafür muss jeder Tag schon N Tage vorher
+   * mindestens einmal gefragt sein; was nicht gefragt wurde, lässt sich nie
+   * nachholen. Es bleibt EIN Aufruf je Betrieb und Nacht, nur die Antwort wird
+   * länger (rund 90 statt 45 Tage). Wie weit LINA tatsächlich liefert, ist
+   * NICHT gemessen — `mart.umsatzprognose_horizont` zeigt es je Betrieb
+   * (`vorlauf_geliefert_tage`). Liefert LINA weniger, kostet der Rest nichts.
+   */
+  TPAPI_PROGNOSE_TAGE_VORAUS: z.coerce.number().int().min(0).max(366).default(60),
+
   /*
    * --- TPAPI Stufe 2, Schritt 2b: raw → core (0153) ------------------------
    * Plan: docs/plan-tpapi-stufe2.md §5 und §8. Der Lader steht in

@@ -7,7 +7,8 @@
  *   tpapi:journal              → core.kassenjournal + core.kassenjournal_finanzweg_tag
  *   tpapi:journaltables        → core.kassenbon
  *   tpapi:personalkostenprotag → core.personalkosten_tag (der Rohsatz ist schon die Summe, S5)
- *   tpapi:getforecastperday    → core.umsatzprognose_tag (je Abzug, in der Reihenfolge der Abrufe)
+ *   tpapi:getforecastperday    → core.umsatzprognose_tag und, seit 0154, der Verlauf
+ *                                core.umsatzprognose_beobachtung (je Abzug, in der Reihenfolge der Abrufe)
  *   tpapi:recipe               → core.tpapi_artikel        ┐
  *   tpapi:financetype          → core.tpapi_finanzweg      │ jeweils der JÜNGSTE Abzug
  *   tpapi:financecategory      → core.tpapi_finanzkategorie│ je Betrieb und Liste
@@ -61,7 +62,12 @@ export const LADERSTAND: Readonly<Record<string, number>> = {
   'tpapi:journal': 1,
   'tpapi:journaltables': 1,
   'tpapi:personalkostenprotag': 1,
-  'tpapi:getforecastperday': 1,
+  /*
+   * 2 seit 0154: der Lader schreibt zusätzlich den Verlauf
+   * (core.umsatzprognose_beobachtung). Die Erhöhung lädt jeden gesicherten
+   * Abzug noch einmal, chronologisch je Betrieb, aus raw — kein Aufruf.
+   */
+  'tpapi:getforecastperday': 2,
   'tpapi:recipe': 1,
   'tpapi:financetype': 1,
   'tpapi:financecategory': 1,
@@ -122,9 +128,11 @@ export type CoreErgebnis = {
   leer: number
   auffaellig: number
   ladefehler: number
+  /** Prognose: wie oft ein Betrieb neu aufgebaut wurde (0154, `prognoseLaden()`). */
+  neuaufbau: number
 }
 
-const leer = (): CoreErgebnis => ({ geladen: 0, zeilen: 0, leer: 0, auffaellig: 0, ladefehler: 0 })
+const leer = (): CoreErgebnis => ({ geladen: 0, zeilen: 0, leer: 0, auffaellig: 0, ladefehler: 0, neuaufbau: 0 })
 
 // ---------------------------------------------------------------------------
 // Einstellung und Partitionen
@@ -705,10 +713,156 @@ async function stammLaden(seit: string, e: CoreErgebnis): Promise<void> {
 }
 
 /**
+ * Ein Prognoseabzug in `core`: der Tageswert (`core.umsatzprognose_tag`, drei
+ * Werte nebeneinander, 0153) und der Verlauf (`core.umsatzprognose_beobachtung`,
+ * seit 0154). Gibt die Messung des Abzugs zurück. Wirft bei jedem Fehler.
+ *
+ * DER VERLAUF NIMMT AN, DASS DER ABZUG JÜNGER IST ALS ALLES, WAS FÜR DIESEN
+ * BETRIEB SCHON IN CORE STEHT — eine Zeile je Tag bei der ersten Sichtung und
+ * bei jeder Wertänderung, sonst rückt nur `zuletzt_gesehen_am` nach. Ob das
+ * stimmt, prüft `prognoseLaden()` vorher (`neuAufbauNoetig()`); sonst baut es
+ * den Betrieb neu auf.
+ */
+async function prognoseAnwenden(c: pg.PoolClient, a: Abzug, rawZeit: string): Promise<{
+  tage: number; nichtMitternacht: number; ausserhalbBereich: number
+}> {
+  const r = await c.query(
+    `WITH src AS (
+       SELECT (to_timestamp((e->>'datum')::double precision) AT TIME ZONE core.geschaefts_zeitzone())::date AS tag,
+              (e->>'datum')::double precision                AS roh,
+              nullif(e->>'forecast', '')::numeric             AS wert
+         FROM raw.api_antwort r, jsonb_array_elements(
+                CASE WHEN jsonb_typeof(r.payload) = 'array' THEN r.payload ELSE '[]'::jsonb END) AS e
+        WHERE r.id = $2::bigint AND r.abgerufen_am = $3::timestamptz
+     ), ins AS (
+       INSERT INTO core.umsatzprognose_tag AS p
+         (betrieb_key, geschaeftstag, prognose_netto, abgerufen_am, erste_prognose_netto,
+          erstmals_am, vorab_netto, vorab_am, geaendert_am, aenderungen, abzug_id, geladen_am)
+       SELECT $1, s.tag, round(s.wert, 2), $4::timestamptz, round(s.wert, 2), $4::timestamptz,
+              CASE WHEN $4::timestamptz < (s.tag + time '08:00') AT TIME ZONE core.geschaefts_zeitzone()
+                   THEN round(s.wert, 2) END,
+              CASE WHEN $4::timestamptz < (s.tag + time '08:00') AT TIME ZONE core.geschaefts_zeitzone()
+                   THEN $4::timestamptz END,
+              NULL, 0, $5::bigint, now()
+         FROM src s
+       ON CONFLICT (betrieb_key, geschaeftstag) DO UPDATE SET
+         prognose_netto = CASE WHEN excluded.abgerufen_am >= p.abgerufen_am
+                               THEN excluded.prognose_netto ELSE p.prognose_netto END,
+         geaendert_am   = CASE WHEN excluded.abgerufen_am > p.abgerufen_am
+                                AND excluded.prognose_netto IS DISTINCT FROM p.prognose_netto
+                               THEN excluded.abgerufen_am ELSE p.geaendert_am END,
+         aenderungen    = p.aenderungen
+                          + CASE WHEN excluded.abgerufen_am > p.abgerufen_am
+                                  AND excluded.prognose_netto IS DISTINCT FROM p.prognose_netto
+                                 THEN 1 ELSE 0 END,
+         abzug_id       = CASE WHEN excluded.abgerufen_am >= p.abgerufen_am
+                               THEN excluded.abzug_id ELSE p.abzug_id END,
+         abgerufen_am   = greatest(p.abgerufen_am, excluded.abgerufen_am),
+         erste_prognose_netto = CASE WHEN excluded.erstmals_am < p.erstmals_am
+                                     THEN excluded.erste_prognose_netto ELSE p.erste_prognose_netto END,
+         erstmals_am    = least(p.erstmals_am, excluded.erstmals_am),
+         vorab_netto    = CASE WHEN excluded.vorab_am IS NOT NULL
+                                AND (p.vorab_am IS NULL OR excluded.vorab_am >= p.vorab_am)
+                               THEN excluded.vorab_netto ELSE p.vorab_netto END,
+         vorab_am       = CASE WHEN excluded.vorab_am IS NOT NULL
+                                AND (p.vorab_am IS NULL OR excluded.vorab_am >= p.vorab_am)
+                               THEN excluded.vorab_am ELSE p.vorab_am END,
+         geladen_am     = now()
+       RETURNING 1
+     )
+     SELECT (SELECT count(*) FROM ins)::int AS tage,
+            count(*) FILTER (WHERE (to_timestamp(s.roh) AT TIME ZONE core.geschaefts_zeitzone())::time
+                                   <> time '00:00')::int AS nicht_mitternacht,
+            count(*) FILTER (WHERE s.tag < st.von OR s.tag > st.bis)::int AS ausserhalb_bereich
+       FROM src s CROSS JOIN (SELECT von, bis FROM core.tpapi_stammabzug WHERE abzug_id = $5::bigint) st`,
+    [a.betriebKey, a.rawId, rawZeit, a.abgerufen, a.abzugId])
+
+  /*
+   * Der Verlauf (0154). Je Tag des Abzugs: ist der Wert derselbe wie in der
+   * jüngsten Zeile dieses Tages, rückt nur nach, bis wann er gesehen wurde;
+   * sonst (oder beim ersten Mal) eine neue Zeile. Ein Tag, der zweimal in
+   * derselben Antwort steht, zählt mit seinem letzten Eintrag. vor_beginn wird
+   * beim Schreiben festgehalten: gesehen vor 08:00 Berlin des Tages.
+   */
+  await c.query(
+    `WITH src AS (
+       SELECT DISTINCT ON (q.tag) q.tag, q.wert
+         FROM (SELECT (to_timestamp((e->>'datum')::double precision)
+                         AT TIME ZONE core.geschaefts_zeitzone())::date AS tag,
+                      round(nullif(e->>'forecast', '')::numeric, 2)      AS wert,
+                      x.ord
+                 FROM raw.api_antwort r, jsonb_array_elements(
+                        CASE WHEN jsonb_typeof(r.payload) = 'array' THEN r.payload ELSE '[]'::jsonb END)
+                        WITH ORDINALITY AS x(e, ord)
+                WHERE r.id = $2::bigint AND r.abgerufen_am = $3::timestamptz) q
+        ORDER BY q.tag, q.ord DESC
+     ), letzte AS (
+       SELECT DISTINCT ON (o.geschaeftstag) o.geschaeftstag, o.abzug_id, o.wert
+         FROM core.umsatzprognose_beobachtung o
+        WHERE o.betrieb_key = $1 AND o.geschaeftstag IN (SELECT tag FROM src)
+        ORDER BY o.geschaeftstag, o.gesehen_ab DESC, o.abzug_id DESC
+     ), gleich AS (
+       -- Ein schreibender CTE laeuft auch ungelesen, genau einmal.
+       UPDATE core.umsatzprognose_beobachtung o
+          SET zuletzt_gesehen_am = $4::timestamptz, zuletzt_abzug_id = $5::bigint,
+              sichtungen = o.sichtungen + 1, aktualisiert_am = now()
+         FROM src s JOIN letzte l ON l.geschaeftstag = s.tag
+        WHERE o.betrieb_key = $1 AND o.geschaeftstag = l.geschaeftstag AND o.abzug_id = l.abzug_id
+          AND o.wert IS NOT DISTINCT FROM s.wert
+       RETURNING 1
+     )
+     INSERT INTO core.umsatzprognose_beobachtung
+       (betrieb_key, geschaeftstag, abzug_id, gesehen_ab, wert, zuletzt_gesehen_am, zuletzt_abzug_id,
+        sichtungen, vor_beginn, geladen_am, aktualisiert_am)
+     SELECT $1, s.tag, $5::bigint, $4::timestamptz, s.wert, $4::timestamptz, $5::bigint, 1,
+            $4::timestamptz < (s.tag + time '08:00') AT TIME ZONE core.geschaefts_zeitzone(),
+            now(), now()
+       FROM src s LEFT JOIN letzte l ON l.geschaeftstag = s.tag
+      WHERE l.geschaeftstag IS NULL OR l.wert IS DISTINCT FROM s.wert`,
+    [a.betriebKey, a.rawId, rawZeit, a.abgerufen, a.abzugId])
+
+  const x = r.rows[0] ?? {}
+  return {
+    tage: Number(x.tage ?? 0),
+    nichtMitternacht: Number(x.nicht_mitternacht ?? 0),
+    ausserhalbBereich: Number(x.ausserhalb_bereich ?? 0),
+  }
+}
+
+/**
+ * Muss der Betrieb neu aufgebaut werden? Ja, sobald in `core` schon etwas
+ * steht, das zur selben Zeit oder SPÄTER gesehen wurde als dieser Abzug —
+ * dann käme der Abzug außer der Reihe, und der Verlauf („eine Zeile je
+ * Änderung") wäre falsch. Das passiert in drei Fällen: nach einer neuen
+ * Laderversion (der Bestand stammt vom alten Lader), wenn ein älterer Abzug
+ * erst nach einem Ladefehler durchkommt, und wenn derselbe Abzug noch einmal
+ * geladen wird (`>=`).
+ */
+async function neuAufbauNoetig(c: pg.PoolClient, a: Abzug): Promise<boolean> {
+  const r = await c.query<{ neu: boolean }>(
+    `SELECT EXISTS (SELECT 1 FROM core.umsatzprognose_beobachtung
+                     WHERE betrieb_key = $1 AND zuletzt_gesehen_am >= $2::timestamptz)
+         OR EXISTS (SELECT 1 FROM core.umsatzprognose_tag
+                     WHERE betrieb_key = $1 AND abgerufen_am >= $2::timestamptz) AS neu`,
+    [a.betriebKey, a.abgerufen])
+  return r.rows[0]?.neu === true
+}
+
+/**
  * Die Prognose: JEDER offene Abzug, in der Reihenfolge der Abrufe — jeder ist
  * eine Beobachtung (auch ein unveränderter: er sagt, dass der Wert zu diesem
  * Zeitpunkt noch galt). Die Regel, was überschrieben wird, steht am
- * Upsert und in `0153` (core.umsatzprognose_tag).
+ * Upsert und in `0153` (core.umsatzprognose_tag), die des Verlaufs in `0154`.
+ *
+ * DER NEUAUFBAU JE BETRIEB (0154). Der Verlauf hängt an der Reihenfolge. Kommt
+ * ein Abzug außer der Reihe (`neuAufbauNoetig()`), werden Tageswerte und
+ * Verlauf DIESES Betriebs gelöscht und aus allen Abzügen, die mit dem
+ * aktuellen Laderstand geladen sind, plus diesem, chronologisch neu
+ * geschrieben — in derselben Transaktion, aus `raw`, ohne einen Aufruf. Nach
+ * einer neuen Laderversion trifft das den ältesten Abzug jedes Betriebs (er
+ * findet nur Zeilen des alten Laders und baut mit sich allein neu auf); alle
+ * weiteren hängen sich danach in der Reihe an. Dasselbe Ergebnis wie ein
+ * Laden in der Reihe — `core_laden.test.ts` prüft es Zeile für Zeile.
  */
 async function prognoseLaden(seit: string, e: CoreErgebnis, hoechstens: number): Promise<number> {
   const offen = await query<{ abzug_id: string; betrieb_key: number; raw_id: string; abgerufen: string }>(
@@ -731,67 +885,42 @@ async function prognoseLaden(seit: string, e: CoreErgebnis, hoechstens: number):
       const m = await inTransaktion(async c => {
         const raw = await rohsatzFinden(c, a.rawId, await abzugRohzeit(c, a.rawId, a.betriebKey, a.endpunkt))
         listeErwarten(raw, 'getforecastperday')
-        const r = await c.query(
-          `WITH src AS (
-             SELECT (to_timestamp((e->>'datum')::double precision) AT TIME ZONE core.geschaefts_zeitzone())::date AS tag,
-                    (e->>'datum')::double precision                AS roh,
-                    nullif(e->>'forecast', '')::numeric             AS wert
-               FROM raw.api_antwort r, jsonb_array_elements(
-                      CASE WHEN jsonb_typeof(r.payload) = 'array' THEN r.payload ELSE '[]'::jsonb END) AS e
-              WHERE r.id = $2::bigint AND r.abgerufen_am = $3::timestamptz
-           ), ins AS (
-             INSERT INTO core.umsatzprognose_tag AS p
-               (betrieb_key, geschaeftstag, prognose_netto, abgerufen_am, erste_prognose_netto,
-                erstmals_am, vorab_netto, vorab_am, geaendert_am, aenderungen, abzug_id, geladen_am)
-             SELECT $1, s.tag, round(s.wert, 2), $4::timestamptz, round(s.wert, 2), $4::timestamptz,
-                    CASE WHEN $4::timestamptz < (s.tag + time '08:00') AT TIME ZONE core.geschaefts_zeitzone()
-                         THEN round(s.wert, 2) END,
-                    CASE WHEN $4::timestamptz < (s.tag + time '08:00') AT TIME ZONE core.geschaefts_zeitzone()
-                         THEN $4::timestamptz END,
-                    NULL, 0, $5::bigint, now()
-               FROM src s
-             ON CONFLICT (betrieb_key, geschaeftstag) DO UPDATE SET
-               prognose_netto = CASE WHEN excluded.abgerufen_am >= p.abgerufen_am
-                                     THEN excluded.prognose_netto ELSE p.prognose_netto END,
-               geaendert_am   = CASE WHEN excluded.abgerufen_am > p.abgerufen_am
-                                      AND excluded.prognose_netto IS DISTINCT FROM p.prognose_netto
-                                     THEN excluded.abgerufen_am ELSE p.geaendert_am END,
-               aenderungen    = p.aenderungen
-                                + CASE WHEN excluded.abgerufen_am > p.abgerufen_am
-                                        AND excluded.prognose_netto IS DISTINCT FROM p.prognose_netto
-                                       THEN 1 ELSE 0 END,
-               abzug_id       = CASE WHEN excluded.abgerufen_am >= p.abgerufen_am
-                                     THEN excluded.abzug_id ELSE p.abzug_id END,
-               abgerufen_am   = greatest(p.abgerufen_am, excluded.abgerufen_am),
-               erste_prognose_netto = CASE WHEN excluded.erstmals_am < p.erstmals_am
-                                           THEN excluded.erste_prognose_netto ELSE p.erste_prognose_netto END,
-               erstmals_am    = least(p.erstmals_am, excluded.erstmals_am),
-               vorab_netto    = CASE WHEN excluded.vorab_am IS NOT NULL
-                                      AND (p.vorab_am IS NULL OR excluded.vorab_am >= p.vorab_am)
-                                     THEN excluded.vorab_netto ELSE p.vorab_netto END,
-               vorab_am       = CASE WHEN excluded.vorab_am IS NOT NULL
-                                      AND (p.vorab_am IS NULL OR excluded.vorab_am >= p.vorab_am)
-                                     THEN excluded.vorab_am ELSE p.vorab_am END,
-               geladen_am     = now()
-             RETURNING 1
-           )
-           SELECT (SELECT count(*) FROM ins)::int AS tage,
-                  count(*) FILTER (WHERE (to_timestamp(s.roh) AT TIME ZONE core.geschaefts_zeitzone())::time
-                                         <> time '00:00')::int AS nicht_mitternacht,
-                  count(*) FILTER (WHERE s.tag < st.von OR s.tag > st.bis)::int AS ausserhalb_bereich
-             FROM src s CROSS JOIN (SELECT von, bis FROM core.tpapi_stammabzug WHERE abzug_id = $5::bigint) st`,
-          [a.betriebKey, a.rawId, raw.zeit, a.abgerufen, a.abzugId])
-        const x = r.rows[0] ?? {}
+        let x: Awaited<ReturnType<typeof prognoseAnwenden>> | undefined
+        if (await neuAufbauNoetig(c, a)) {
+          await c.query(`DELETE FROM core.umsatzprognose_beobachtung WHERE betrieb_key = $1`, [a.betriebKey])
+          await c.query(`DELETE FROM core.umsatzprognose_tag WHERE betrieb_key = $1`, [a.betriebKey])
+          const reihe = await c.query<{ abzug_id: string; raw_id: string; abgerufen: string }>(
+            `SELECT abzug_id::text AS abzug_id, raw_id::text AS raw_id, abgerufen_am::text AS abgerufen
+               FROM core.tpapi_stammabzug
+              WHERE betrieb_key = $1 AND endpunkt = $2
+                AND (core_stand = $3 OR abzug_id = $4::bigint)
+              ORDER BY abgerufen_am, abzug_id`,
+            [a.betriebKey, PROGNOSE, LADERSTAND[PROGNOSE], a.abzugId])
+          for (const w of reihe.rows) {
+            if (w.abzug_id === a.abzugId) {
+              x = await prognoseAnwenden(c, a, raw.zeit)
+              continue
+            }
+            const fruehere: Abzug = {
+              abzugId: w.abzug_id, betriebKey: a.betriebKey, endpunkt: PROGNOSE, rawId: w.raw_id, abgerufen: w.abgerufen,
+            }
+            const rw = await rohsatzFinden(c, w.raw_id, await abzugRohzeit(c, w.raw_id, a.betriebKey, PROGNOSE))
+            listeErwarten(rw, 'getforecastperday')
+            await prognoseAnwenden(c, fruehere, rw.zeit)
+          }
+          e.neuaufbau++
+        }
+        x ??= await prognoseAnwenden(c, a, raw.zeit)
         const messung = auffaellig({
-          nicht_berliner_mitternacht: Number(x.nicht_mitternacht ?? 0),
-          ausserhalb_bereich: Number(x.ausserhalb_bereich ?? 0),
+          nicht_berliner_mitternacht: x.nichtMitternacht,
+          ausserhalb_bereich: x.ausserhalbBereich,
         })
         await c.query(
           `UPDATE core.tpapi_stammabzug SET core_stand = $2, core_geladen_am = now(), core_auffaellig = $3::jsonb,
                   ladefehler = NULL, ladeversuche = 0, ladefehler_stand = NULL, ladefehler_am = NULL
             WHERE abzug_id = $1::bigint`,
           [a.abzugId, LADERSTAND[PROGNOSE], messung ? JSON.stringify(messung) : null])
-        return { tage: Number(x.tage ?? 0), messung }
+        return { tage: x.tage, messung }
       })
       e.geladen++
       e.zeilen += m.tage

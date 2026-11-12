@@ -296,7 +296,61 @@ die Arbeitslisten und `sync.quelle`).
 * Ob Rabattzeilen der Nachlassbetrag oder die rabattierte Position sind; ob ein Sofortstorno doppelt
   steht (Finanzweg 10 und `cancellationreason`); was `h_brutto` ist (mit oder ohne Pause).
 * Ob LINA Prognosen für Zukunftstage liefert (`tage_voraus_erstmals`) und nachträglich ändert
-  (`aenderungen`).
+  (`aenderungen`). **Seit 0154 gemessen statt geschätzt:** `mart.umsatzprognose_horizont` und
+  `mart.umsatzprognose_nachher_betrieb` (Nachtrag unten).
 * Horizont: Entscheidung Eugene nach den ersten echten Größen.
 * MCP-Katalogabzug (`cd mcp && bun run katalog:abzug`) gegen eine vollständige Datenbank.
 * Karten, sobald der Abgleich trifft.
+
+### Nachtrag 12.11.2026: LINAs Prognose als Vergleichsbasis (Migration `0154`)
+
+**Auftrag Eugene:** Brainfood rechnet künftig eigene Umsatzprognosen und will belegen, dass sie
+genauer sind als LINAs — auch rückwirkend. Dafür reichte 2b nicht: `core.umsatzprognose_tag` hält
+drei Werte je Tag, ein fairer Vergleich braucht aber **denselben Vorlauf auf beiden Seiten** (eine
+eigene 7-Tage-Prognose gegen LINAs Wert vom Morgen des Tages wäre unfair gegen uns, gegen LINAs
+ersten Wert unfair gegen LINA). Begründung in `docs/entscheidungen.md` (12.11.2026).
+
+**Gebaut und gegen die Attrappe getestet, nie gegen das echte LINA gelaufen.**
+
+| Was | Wo |
+|---|---|
+| **Verlauf** — eine Zeile je Betrieb, Tag und neuem Wert (erste Sichtung, jede Änderung), bei gleichem Wert nur `zuletzt_gesehen_am`/`zuletzt_abzug_id`/`sichtungen` nachgeführt; `vor_beginn` = gesehen vor 08:00 des Tages | `core.umsatzprognose_beobachtung`, Lader `prognoseAnwenden()` in `src/tpapi/core_laden.ts` |
+| **Neuaufbau je Betrieb**, wenn ein Abzug außer der Reihe kommt (neue Laderversion, Ladefehler, derselbe Abzug noch einmal): Tageswerte und Verlauf des Betriebs gelöscht und aus allen geladenen Abzügen chronologisch neu geschrieben, in einer Transaktion, aus `raw` | `prognoseLaden()`, `neuAufbauNoetig()`; Laderstand der Prognose **2** |
+| **Fenster nach vorn 60 statt 14 Tage** — ein Aufruf je Betrieb und Nacht bleibt einer | `TPAPI_PROGNOSE_TAGE_VORAUS` (`src/config.ts`) |
+| **Historie zuerst** — die Prognose-Monate in Phase C als Rang 0 vor dem Tagesrückstand, neueste zuerst | `tpapiNachladen()` in `src/tpapi/rohabzug.ts` |
+| Vorlauf 0/1/2/3/7/14/28 gegen das Ist, dazu je Tag eine Zeile `nachtraeglich`; Ausschlussgründe | `mart.umsatzprognose_vorlauf` |
+| MAE, MAPE, WAPE, Bias je Betrieb, Monat, Grundlage, Vorlauf, mit Summen zum Neurechnen | `mart.umsatzprognose_guete` |
+| **Ändert LINA nach dem Tag?** Je Tag und je Betrieb | `mart.umsatzprognose_nachher`, `mart.umsatzprognose_nachher_betrieb` |
+| Wie weit LINA voraus liefert, Tage mit Vorabprognose | `mart.umsatzprognose_horizont`, Prüfzeile „juengster Abzug (48 h) ohne heute oder Zukunft" |
+| Verlauf für die Leserolle | `mart.umsatzprognose_verlauf` |
+| Zulauf des Verlaufs | `sync.quelle` `tpapi:core_prognose_verlauf` an `aktualisiert_am` |
+
+**Abweichungen vom Auftrag:**
+
+26. **Vorlauf 0 kommt dazu** (Stand 08:00 am Tag selbst = `vorab_netto` aus 0153). Ohne ihn fehlte die
+    Zahl, die die Tagesplanung sieht, und der Anschluss an `mart.umsatzprognose_tag`.
+27. **„Nachträglich" ist eine eigene Zeile je Tag** (`vorlauf_tage` NULL), nicht ein Kennzeichen an den
+    Vorlauf-Zeilen: eine Vorlauf-Zeile ist per Definition vor dem Stichtag gesehen, also immer echt
+    vorab. Als Wert dient der **erste**, der nach Ende des Tages (Folgetag 08:00) gesehen wurde — der
+    mit der kürzesten Gelegenheit zur Nachbesserung. `tag_hat_vorab` erlaubt den Vergleich vorab gegen
+    nachträglich über dieselben Tage.
+28. **Fehler = Prognose − Ist** (positiv = LINA zu hoch), die übliche Richtung für Bias — umgekehrt zu
+    `mart.umsatzprognose_tag.abweichung_netto` (Ist − Prognose). Prozent vom Ist, nicht von der
+    Prognose wie in 0153.
+29. **Kein Lochtag-Ausschluss über `mart.umsatz_lochtag`/`mart.umsatztag_luecke`**: beide rechnen über
+    den ganzen Bestand und den Artikelverkauf. Ein Lochtag steht für den Betrieb als Ist 0 und fällt
+    unter „ist null (geschlossen)"; dazu „ist noch offen" für die letzten sieben Tage.
+30. **`mart.umsatzprognose_tag` ist unverändert** — nichts daran war für den Vergleich nötig.
+31. **Keine Prüfzeile für „LINA ändert nachträglich"**: das ist eine Messung, kein Fehler, und eine
+    Zeile, die dauerhaft steht, liest niemand. Die Freigabe der Historie bleibt eine Entscheidung.
+
+**Was die Messung nicht kann:** `mart.umsatzprognose_nachher_betrieb` sieht jeden Tag vorher und bis
+gut fünf Wochen danach (Fenster bis zum Monatsersten, danach der ganze Monat aus dem Nachladen). Ob
+LINA **Jahre alte** Prognosen so liefert, wie sie damals ausgegeben wurden, misst sie nicht — dafür
+müsste die Historie später ein zweites Mal geholt und gegen den ersten Abzug verglichen werden
+(`docs/offene-punkte.md`).
+
+**Gemessen auf dem Klon** (12.11.2026, synthetisch: 41 Betriebe, ~170.000 Verlaufszeilen ab 2015,
+die letzten 120 Tage mit je sechs Werten): `mart.umsatzprognose_vorlauf` für 30 Tage 0,25 s,
+`mart.umsatzprognose_guete` für einen Monat 0,95 s, über alles gruppiert 0,8 s, Horizont und Nachher
+unter 0,1 s. Keine Materialisierung.

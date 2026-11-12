@@ -136,6 +136,17 @@ function tpapiStufe2Quellen(): Quelle[] {
       system: 'tpapi', tabelle: { schema: 'core', name: 'umsatzprognose_tag', zeitspalte: 'geladen_am' },
       merker: 'tpapi_core', kadenz_stunden: 48, erwartet: mitSchluessel,
       bemerkung: mitSchluessel ? 'Jeder Abzug eine Beobachtung (mart.umsatzprognose_tag).' : ohne },
+    /*
+     * Der Verlauf der Prognose (0154) an seiner eigenen Tabelle: Tageswerte
+     * und Verlauf entstehen im selben Zug, aber ein Lader, der nur noch die
+     * Tageswerte schriebe, saehe an core.umsatzprognose_tag frisch aus —
+     * waehrend die Vergleichsbasis fuer eigene Prognosen still stehen bliebe.
+     * aktualisiert_am rueckt auch bei unveraendertem Wert nach.
+     */
+    { quelle: 'tpapi:core_prognose_verlauf', bezeichnung: 'Verlauf der Umsatzprognose in core (TPAPI, 0154)',
+      system: 'tpapi', tabelle: { schema: 'core', name: 'umsatzprognose_beobachtung', zeitspalte: 'aktualisiert_am' },
+      merker: 'tpapi_core', kadenz_stunden: 48, erwartet: mitSchluessel,
+      bemerkung: mitSchluessel ? 'Eine Zeile je neuem Wert, jede Nacht nachgefuehrt (mart.umsatzprognose_horizont).' : ohne },
     { quelle: 'tpapi:core_artikelstamm', bezeichnung: 'Artikelstamm in core (TPAPI, Lader 2b)',
       system: 'tpapi',
       tabelle: { schema: 'core', name: 'tpapi_stammabzug', zeitspalte: 'core_geladen_am',

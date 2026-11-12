@@ -1801,3 +1801,33 @@ Laderversion geladener Rohsatz wartet auf den neuen Lader und ist nicht „in co
 
 Die `mart`-Sichten dazu stehen in `metabase.md` (Abschnitt „TPAPI Stufe 2b in `mart`“). Die Rechte der
 Leserolle repariert `0153` im selben Zug (`docs/fehlerkatalog.md`, 12.11.2026).
+
+## Verlauf der Umsatzprognose: `core.umsatzprognose_beobachtung` (`0154`, 12.11.2026)
+
+**Wozu.** Brainfood will eigene Umsatzprognosen gegen LINAs stellen (Entscheidung 12.11.2026). Fair ist
+nur derselbe Vorlauf auf beiden Seiten — dafür reicht `core.umsatzprognose_tag` (drei Werte je Tag)
+nicht; es braucht den Verlauf: welcher Wert stand wann da.
+
+**Eine Zeile je Betrieb, Geschäftstag und neuem Wert**, nicht je Abzug. Bei der ersten Sichtung und bei
+jeder Wertänderung entsteht eine Zeile (`abzug_id`, `gesehen_ab`, `wert`); bei gleichem Wert rücken nur
+`zuletzt_gesehen_am`, `zuletzt_abzug_id` und `sichtungen` nach. Ein Wert galt damit nachweislich von
+`gesehen_ab` bis `zuletzt_gesehen_am`; die nächste Zeile desselben Tages löst ihn ab. Geht LINA auf
+einen früheren Wert zurück, ist das eine **neue** Zeile (sonst wäre die Reihenfolge verloren).
+`vor_beginn` hält beim Schreiben fest, ob die Zeile vor 08:00 Berlin des Tages gesehen wurde (echte
+Vorabprognose). Schlüssel `(betrieb_key, geschaeftstag, abzug_id)`.
+
+**Warum nicht jede Sichtung als Zeile:** bei 60 Tagen Fenster und einem Abzug je Nacht stünde jeder Tag
+rund 90-mal da, fast immer mit demselben Wert. Was zwischen zwei Sichtungen lag, wüsste man auch dann
+nicht; „zuletzt gesehen" trägt dieselbe Information.
+
+**Neu aufbaubar aus `raw`.** Der Verlauf hängt an der Reihenfolge. Der Lader schreibt in der Reihenfolge
+der Abrufe; kommt ein Abzug außer der Reihe — nach einer neuen Laderversion, nach einem Ladefehler oder
+derselbe Abzug noch einmal —, löscht er Tageswerte **und** Verlauf dieses Betriebs und schreibt sie aus
+allen geladenen Abzügen chronologisch neu (eine Transaktion). Der Laderstand der Prognose steht deshalb
+auf 2: der erste Lauf nach `0154` baut den Verlauf aus den gesicherten Abzügen auf, ohne einen Aufruf.
+`core_laden.test.ts` prüft Zeile für Zeile, dass ein Neuaufbau dieselben Zeilen ergibt wie das Laden in
+der Reihe.
+
+Die Auswertung (`mart.umsatzprognose_vorlauf`, `_guete`, `_nachher`, `_nachher_betrieb`, `_horizont`,
+`_verlauf`) steht in `metabase.md`.
+

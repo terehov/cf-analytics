@@ -23,7 +23,9 @@
  *   * Kassen-Fehleingabe sichtbar
  *   * Ladefehler: drei Versuche, dann endgültig; ein neuer Rohsatz versucht es wieder
  *   * Laderstand: ein alter core_stand wartet und wird neu geladen
- *   * Prognose: Vorabwert, Änderung gezählt, Historie monatsweise
+ *   * Prognose: Vorabwert, Änderung gezählt, Historie monatsweise — seit 0154 vor dem Tagesrückstand
+ *   * Prognose-Verlauf (0154): eine Zeile je neuem Wert, Fenster 60 Tage, Neuaufbau aus raw
+ *     ergibt dieselben Zeilen; Vorlauf, Güte und Nachher an handgebauten Werten
  *   * Personal je Stunde: Phase C bis zur Tiefe von listdays
  *   * kein Schlüssel im Log
  */
@@ -143,10 +145,14 @@ mitDb('TPAPI-Lader raw → core (mit Datenbank und Attrappe)', () => {
     // Betriebe (auf einem Klon gibt es dort sonst nur Reste anderer Testdateien).
     for (const t of ['core.tpapi_abruf', 'core.tpapi_stammabzug', 'core.tpapi_geschaeftstag',
                      'core.kassenjournal', 'core.kassenjournal_finanzweg_tag', 'core.kassenbon',
-                     'core.personalkosten_tag', 'core.umsatzprognose_tag', 'core.tpapi_artikel',
+                     'core.personalkosten_tag', 'core.umsatzprognose_tag', 'core.umsatzprognose_beobachtung',
+                     'core.tpapi_artikel',
                      'core.tpapi_finanzweg', 'core.tpapi_finanzkategorie', 'core.tpapi_stammliste']) {
       await db.query(`DELETE FROM ${t}`)
     }
+    // Der handgebaute Betrieb aus dem Vorlauf-Test (0154), falls ein frueherer Lauf abbrach.
+    await db.query(`DELETE FROM core.umsatzbericht_tag WHERE betrieb_key IN
+                      (SELECT betrieb_key FROM core.betrieb WHERE enc_id = $1)`, ['ad'.repeat(20)])
     for (const t of ['core.personalkosten_stunde', 'core.personalkosten_stunde_abruf',
                      'core.umsatzbericht_tag', 'core.finanzweg_tag', 'core.bon']) {
       await db.query(`DELETE FROM ${t} WHERE betrieb_key IN
@@ -235,15 +241,24 @@ mitDb('TPAPI-Lader raw → core (mit Datenbank und Attrappe)', () => {
               (SELECT ist_trinkgeld FROM core.tpapi_finanzweg WHERE betrieb_key = $1 AND nummer = 2700) AS tip`, [b])
     expect(st).toEqual({ fw: 8, kat: 6, gross: 4, listen: 10, tip: true })
 
-    // Prognose: Fenster ab Monatserstem bzw. vor sieben Tagen bis in 14 Tagen;
-    // für die Tage ab morgen gibt es einen Vorabwert, für gestern nicht.
+    // Prognose: Fenster ab Monatserstem bzw. vor sieben Tagen bis in
+    // TPAPI_PROGNOSE_TAGE_VORAUS (60, seit 0154) Tagen; für die Tage ab morgen
+    // gibt es einen Vorabwert, für gestern nicht.
     const { rows: [pr] } = await db.query(
       `SELECT count(*)::int AS tage, max(geschaeftstag) - current_date AS voraus,
               count(*) FILTER (WHERE geschaeftstag > current_date AND vorab_netto IS NOT NULL)::int AS vorab,
               count(*) FILTER (WHERE geschaeftstag < current_date AND vorab_netto IS NOT NULL)::int AS vorab_alt
          FROM core.umsatzprognose_tag WHERE betrieb_key = $1`, [b])
-    expect(pr.voraus).toBe(14)
-    expect(pr.vorab).toBe(14)
+    expect(cfg.TPAPI_PROGNOSE_TAGE_VORAUS).toBe(60)
+    expect(pr.voraus).toBe(60)
+    expect(pr.vorab).toBe(60)
+    // Der Verlauf im selben Zug: eine Zeile je Tag, zum ersten Mal gesehen.
+    const { rows: [vl] } = await db.query(
+      `SELECT count(*)::int AS n, count(DISTINCT geschaeftstag)::int AS tage, bool_and(sichtungen = 1) AS einmal,
+              bool_and(abzug_id = zuletzt_abzug_id) AS gleich,
+              count(*) FILTER (WHERE geschaeftstag > current_date AND vor_beginn)::int AS vorab
+         FROM core.umsatzprognose_beobachtung WHERE betrieb_key = $1`, [b])
+    expect(vl).toEqual({ n: pr.tage, tage: pr.tage, einmal: true, gleich: true, vorab: 60 })
     expect(pr.vorab_alt).toBe(0)
 
     const { rows: [lader] } = await db.query(`SELECT stand, horizont_monate FROM sync.tpapi_core_lader WHERE endpunkt = 'tpapi:journal'`)
@@ -304,6 +319,12 @@ mitDb('TPAPI-Lader raw → core (mit Datenbank und Attrappe)', () => {
     cfg.TPAPI_CORE_MONATE = 1
     starte()
     expect(await nachladen({ client: client() })).toBe('ok')
+    // Seit 0154: die Monate der Prognose kommen VOR allen fehlenden Tagen.
+    const pfade = mock.aufrufe.map(a => a.pfad).filter(x => x !== '/extern/revenue/listdays')
+    const letztePrognose = pfade.lastIndexOf('/extern/revenue/getforecastperday')
+    const ersterAndrer = pfade.findIndex(x => x !== '/extern/revenue/getforecastperday')
+    expect(letztePrognose).toBeGreaterThan(0)
+    expect(ersterAndrer).toBe(letztePrognose + 1)
     // Die TPAPI-Spur hat geholt, der Lader läuft danach ohne Spur.
     expect(await coreC({ ende: () => null })).toBe('ok')
     for (const n of [4, 10, 12]) expect((await abruf(P, 'tpapi:journal', d[n]!)).core_stand).toBe(1)
@@ -538,6 +559,204 @@ mitDb('TPAPI-Lader raw → core (mit Datenbank und Attrappe)', () => {
     expect(h.abzuege).toBe(1)
   })
 
+  test('Prognose-Verlauf (0154): eine Zeile je neuem Wert, zuletzt gesehen nachgefuehrt, Fenster 60 Tage', async () => {
+    cfg.TPAPI_SCHLUESSEL = { [P]: SCHLUESSEL[P] }
+    const b = await bk(P)
+    const morgen = (await db.query(`SELECT (current_date + 1)::text AS t`)).rows[0].t
+    const zeilen = async () => (await db.query(
+      `SELECT wert::float AS w, sichtungen, vor_beginn, abzug_id = zuletzt_abzug_id AS einmal
+         FROM core.umsatzprognose_beobachtung WHERE betrieb_key = $1 AND geschaeftstag = $2
+        ORDER BY gesehen_ab, abzug_id`, [b, morgen])).rows
+    // Nach dem Prognose-Test: der urspruengliche Wert und der um 100 hoehere.
+    const vorher = await zeilen()
+    expect(vorher.map(z => z.w)).toEqual([vorher[0].w, vorher[0].w + 100])
+    expect(vorher.every(z => z.vor_beginn)).toBe(true)
+
+    // LINA geht zurueck auf den alten Wert: eine NEUE Zeile, nicht die alte wieder.
+    starte()
+    await nachlauf()
+    // Und bleibt dabei: keine Zeile, nur nachgefuehrt.
+    starte()
+    await nachlauf()
+    const nachher = await zeilen()
+    expect(nachher.map(z => z.w)).toEqual([vorher[0].w, vorher[0].w + 100, vorher[0].w])
+    expect(nachher[2]).toMatchObject({ sichtungen: 2, einmal: false, vor_beginn: true })
+    const { rows: [t] } = await db.query(
+      `SELECT aenderungen, prognose_netto::float AS p FROM core.umsatzprognose_tag
+        WHERE betrieb_key = $1 AND geschaeftstag = $2`, [b, morgen])
+    expect(t).toEqual({ aenderungen: 2, p: vorher[0].w })
+
+    // Wie weit LINA voraus liefert: die Attrappe liefert das ganze Fenster.
+    const { rows: [h] } = await db.query(
+      `SELECT befund, angefragt_bis = current_date + 60 AS bis_60,
+              vorlauf_geliefert_tage = vorlauf_angefragt_tage AS ganz, vorlauf_geliefert_tage,
+              tage_mit_vorab, groesster_vorlauf_tage
+         FROM mart.umsatzprognose_horizont WHERE enc_id = $1`, [P])
+    expect(h).toMatchObject({ befund: 'liefert bis fensterende', bis_60: true, ganz: true })
+    expect([59, 60]).toContain(h.vorlauf_geliefert_tage)   // vor 08:00 zaehlt heute als Vorlauf 0
+    expect(h.tage_mit_vorab).toBeGreaterThanOrEqual(60)
+    const { rows: [pz] } = await db.query(
+      `SELECT geprueft, auffaellig FROM mart.pruefung_uebersicht WHERE sicht = 'mart.umsatzprognose_horizont'`)
+    expect(Number(pz.geprueft)).toBeGreaterThanOrEqual(1)
+    expect(Number(pz.auffaellig)).toBe(0)
+  })
+
+  test('Prognose-Verlauf: der Neuaufbau aus raw ergibt dieselben Zeilen (neue Laderversion, Abzug ausser der Reihe)', async () => {
+    const PROG = 'tpapi:getforecastperday'
+    const verlauf = async () => (await db.query(
+      `SELECT betrieb_key, geschaeftstag::text AS tag, abzug_id::text AS abzug, gesehen_ab::text AS ab,
+              wert::text AS wert, zuletzt_gesehen_am::text AS zuletzt, zuletzt_abzug_id::text AS zuletzt_abzug,
+              sichtungen, vor_beginn
+         FROM core.umsatzprognose_beobachtung ORDER BY 1, 2, 3`)).rows
+    const tageswerte = async () => (await db.query(
+      `SELECT betrieb_key, geschaeftstag::text AS tag, prognose_netto::text AS p, abgerufen_am::text AS am,
+              erste_prognose_netto::text AS e, erstmals_am::text AS e_am, vorab_netto::text AS v,
+              vorab_am::text AS v_am, geaendert_am::text AS g_am, aenderungen, abzug_id::text AS abzug
+         FROM core.umsatzprognose_tag ORDER BY 1, 2`)).rows
+    const v0 = await verlauf()
+    const t0 = await tageswerte()
+    expect(v0.length).toBeGreaterThan(100)
+    expect(v0.some(z => !z.vor_beginn)).toBe(true)   // die Historie, nachtraeglich
+    const { rows: [abz] } = await db.query(
+      `SELECT count(*)::int AS n FROM core.tpapi_stammabzug WHERE endpunkt = $1`, [PROG])
+    expect(abz.n).toBeGreaterThan(5)
+
+    // 1. Wie nach dem Deploy von 0154: alle Abzuege mit dem alten Laderstand,
+    //    die Tageswerte vom alten Lader, der Verlauf leer.
+    await db.query(`UPDATE core.tpapi_stammabzug SET core_stand = 1 WHERE endpunkt = $1`, [PROG])
+    await db.query(`DELETE FROM core.umsatzprognose_beobachtung`)
+    expect((await stand(PROG)).wartend).toBe(abz.n)
+    expect(await coreA()).toBe('ok')
+    expect((await stand(PROG)).wartend).toBe(0)
+    expect(await verlauf()).toEqual(v0)
+    expect(await tageswerte()).toEqual(t0)
+
+    // 2. Ein Abzug aus der Mitte kommt ausser der Reihe (etwa nach einem Ladefehler).
+    const { rows: [mitte] } = await db.query(
+      `SELECT abzug_id FROM core.tpapi_stammabzug s JOIN core.betrieb b USING (betrieb_key)
+        WHERE s.endpunkt = $1 AND b.enc_id = $2 ORDER BY s.abgerufen_am OFFSET 1 LIMIT 1`, [PROG, P])
+    await db.query(`UPDATE core.tpapi_stammabzug SET core_stand = NULL WHERE abzug_id = $1`, [mitte.abzug_id])
+    expect(await coreA()).toBe('ok')
+    expect(await verlauf()).toEqual(v0)
+    expect(await tageswerte()).toEqual(t0)
+
+    // 3. Derselbe Abzug noch einmal (der juengste): nichts verdoppelt sich.
+    await db.query(
+      `UPDATE core.tpapi_stammabzug SET core_stand = NULL
+        WHERE abzug_id = (SELECT abzug_id FROM core.tpapi_stammabzug WHERE endpunkt = $1
+                           ORDER BY abgerufen_am DESC LIMIT 1)`, [PROG])
+    expect(await coreA()).toBe('ok')
+    expect(await verlauf()).toEqual(v0)
+    expect(await tageswerte()).toEqual(t0)
+  })
+
+  test('Vorlauf, Guete, Nachher: je Vorlauf der Wert, der vor dem Stichtag dastand; nachtraeglich getrennt', async () => {
+    const V = 'ad'.repeat(20)
+    await db.query(
+      `INSERT INTO core.betrieb (enc_id, name) VALUES ($1, 'Test Core V')
+       ON CONFLICT (enc_id) DO UPDATE SET name = excluded.name`, [V])
+    const v = await bk(V)
+    // A und B: der 10. und 11. eines Monats vor zwei Monaten (gleicher Monat, Ist nicht mehr offen);
+    // C: ein Tag aus der Historie, nur nachtraeglich gesehen.
+    const { rows: [tg] } = await db.query(
+      `SELECT ((date_trunc('month', current_date) - interval '2 months')::date + 9)::text AS a,
+              ((date_trunc('month', current_date) - interval '2 months')::date + 10)::text AS b,
+              date_trunc('month', current_date - interval '2 months')::date::text AS monat`)
+    const C = '2024-03-15'
+    // ab/bis: Tage relativ zum Geschaeftstag, jeweils 05:30 Berlin.
+    await db.query(
+      `INSERT INTO core.umsatzprognose_beobachtung
+         (betrieb_key, geschaeftstag, abzug_id, gesehen_ab, wert, zuletzt_gesehen_am, zuletzt_abzug_id,
+          sichtungen, vor_beginn)
+       SELECT $1, x.tag, x.abzug, ((x.tag + x.ab) + time '05:30') AT TIME ZONE 'Europe/Berlin', x.wert,
+              ((x.tag + x.bis) + time '05:30') AT TIME ZONE 'Europe/Berlin', x.abzug, 1, x.ab <= 0
+         FROM (VALUES ($2::date, 990001::bigint, -30, -10, 1000.00::numeric),
+                      ($2::date, 990002, -9, 5, 1100.00),
+                      ($3::date, 990003, -2, 0, 2000.00),
+                      ($3::date, 990004, 3, 3, 2500.00),
+                      ($4::date, 990005, 30, 30, 3000.00)) AS x(tag, abzug, ab, bis, wert)`,
+      [v, tg.a, tg.b, C])
+    await db.query(
+      `INSERT INTO core.umsatzbericht_tag (betrieb_key, geschaeftstag, umsatz_netto, umsatz_brutto, rechnungen, gaeste, quelle)
+       VALUES ($1, $2, 1200, 1400, 10, 20, 'umsatzbericht'), ($1, $3, 0, 0, 0, 0, 'umsatzbericht'),
+              ($1, $4, 3300, 3900, 30, 60, 'umsatzbericht'), ($1, $5, 500, 600, 5, 9, 'umsatzbericht')`,
+      [v, tg.a, tg.b, C, d[3]])
+    try {
+      const vorlauf = async (tag: string) => (await db.query(
+        `SELECT grundlage, vorlauf_tage AS n, prognose_netto::float AS p, fehler_netto::float AS f,
+                fehler_pct::float AS pct, sichtung_luecke_tage::float AS luecke, tag_hat_vorab AS hat_vorab,
+                ausschluss_grund AS grund, vergleichbar
+           FROM mart.umsatzprognose_vorlauf WHERE enc_id = $1 AND geschaeftstag = $2
+          ORDER BY grundlage DESC, vorlauf_tage`, [V, tag])).rows
+      const va = await vorlauf(tg.a)
+      const z = (n: number | null, p: number, f: number, pct: number, grundlage = 'vorab') => ({
+        grundlage, n, p, f, pct, luecke: grundlage === 'vorab' ? 0 : null, hat_vorab: true, grund: null, vergleichbar: true,
+      })
+      expect(va).toEqual([
+        z(0, 1100, -100, -8.33), z(1, 1100, -100, -8.33), z(2, 1100, -100, -8.33), z(3, 1100, -100, -8.33),
+        z(7, 1100, -100, -8.33), z(14, 1000, -200, -16.67), z(28, 1000, -200, -16.67),
+        z(null, 1100, -100, -8.33, 'nachtraeglich'),
+      ])
+      // B: geschlossen (Ist 0) — sichtbar, aber nicht vergleichbar; nachtraeglich der geaenderte Wert.
+      const vb = await vorlauf(tg.b)
+      expect(vb.map(r => [r.grundlage, r.n, r.p, r.grund])).toEqual([
+        ['vorab', 0, 2000, 'ist null (geschlossen)'], ['vorab', 1, 2000, 'ist null (geschlossen)'],
+        ['vorab', 2, 2000, 'ist null (geschlossen)'], ['nachtraeglich', null, 2500, 'ist null (geschlossen)'],
+      ])
+      // C: nur nachtraeglich.
+      const vc = await vorlauf(C)
+      expect(vc).toEqual([{ grundlage: 'nachtraeglich', n: null, p: 3000, f: -300, pct: -9.09, luecke: null,
+                            hat_vorab: false, grund: null, vergleichbar: true }])
+
+      const guete = async (monat: string) => (await db.query(
+        `SELECT grundlage, vorlauf_tage AS n, tage, tage_geschlossen AS zu, tage_geschlossen_mit_prognose AS zu_p,
+                mae_netto::float AS mae, mape_pct::float AS mape, wape_pct::float AS wape,
+                bias_netto::float AS bias, bias_pct::float AS bias_pct
+           FROM mart.umsatzprognose_guete WHERE enc_id = $1 AND monat = $2
+          ORDER BY grundlage DESC, vorlauf_tage`, [V, monat])).rows
+      const g = await guete(tg.monat)
+      expect(g.find(r => r.n === 0)).toEqual(
+        { grundlage: 'vorab', n: 0, tage: 1, zu: 1, zu_p: 1, mae: 100, mape: 8.33, wape: 8.33, bias: -100, bias_pct: -8.33 })
+      expect(g.find(r => r.n === 14)).toMatchObject({ tage: 1, zu: 0, mae: 200, wape: 16.67, bias_pct: -16.67 })
+      expect(g.find(r => r.grundlage === 'nachtraeglich')).toMatchObject({ n: null, tage: 1, zu: 1, mae: 100 })
+      expect(await guete('2024-03-01')).toEqual([
+        { grundlage: 'nachtraeglich', n: null, tage: 1, zu: 0, zu_p: 0, mae: 300, mape: 9.09, wape: 9.09, bias: -300, bias_pct: -9.09 },
+      ])
+
+      // Aendert LINA nach dem Tag? A nein, B ja; C hat keinen Vorabwert und zaehlt nicht.
+      const { rows: nh } = await db.query(
+        `SELECT geschaeftstag::text AS tag, vorab_netto::float AS vorab, nachher_netto::float AS nachher,
+                unveraendert, aenderung_netto::float AS a, aenderung_pct::float AS pct,
+                beobachtet_tage_danach AS danach, wechsel_ab_beginn AS wechsel
+           FROM mart.umsatzprognose_nachher WHERE enc_id = $1 ORDER BY 1`, [V])
+      expect(nh).toEqual([
+        { tag: tg.a, vorab: 1100, nachher: 1100, unveraendert: true, a: 0, pct: 0, danach: 5, wechsel: 0 },
+        { tag: tg.b, vorab: 2000, nachher: 2500, unveraendert: false, a: 500, pct: 25, danach: 3, wechsel: 1 },
+      ])
+      const { rows: [nb] } = await db.query(
+        `SELECT tage, tage_unveraendert, anteil_unveraendert_pct::float AS anteil, befund,
+                groesste_abs_aenderung_netto::float AS groesste, groesster_abstand_tage AS abstand
+           FROM mart.umsatzprognose_nachher_betrieb WHERE enc_id = $1`, [V])
+      expect(nb).toEqual({ tage: 2, tage_unveraendert: 1, anteil: 50, befund: 'aendert nachtraeglich', groesste: 500, abstand: 5 })
+
+      // Alles fuer mcp_leser lesbar, core nicht.
+      await db.query(`SET ROLE mcp_leser`)
+      try {
+        for (const sicht of ['umsatzprognose_verlauf', 'umsatzprognose_vorlauf', 'umsatzprognose_guete',
+                             'umsatzprognose_nachher', 'umsatzprognose_nachher_betrieb', 'umsatzprognose_horizont']) {
+          const { rows } = await db.query(`SELECT * FROM mart.${sicht} LIMIT 1`)
+          expect(rows.length).toBe(1)
+        }
+        await expect(db.query(`SELECT * FROM core.umsatzprognose_beobachtung LIMIT 1`)).rejects.toThrow(/permission denied/)
+      } finally {
+        await db.query(`RESET ROLE`)
+      }
+    } finally {
+      await db.query(`DELETE FROM core.umsatzprognose_beobachtung WHERE betrieb_key = $1`, [v])
+      await db.query(`DELETE FROM core.umsatzbericht_tag WHERE betrieb_key = $1`, [v])
+    }
+  })
+
   test('Personal je Stunde: Phase C holt bis zur Tiefe von listdays, ohne kostUser', async () => {
     cfg.TPAPI_SCHLUESSEL = { [P]: SCHLUESSEL[P] }
     const { rows: [vor] } = await db.query(
@@ -574,7 +793,7 @@ mitDb('TPAPI-Lader raw → core (mit Datenbank und Attrappe)', () => {
       `SELECT quelle, zustand FROM mart.quelle_zulauf WHERE quelle LIKE 'tpapi:core_%' ORDER BY quelle`)
     expect(Object.fromEntries(rows.map(r => [r.quelle, r.zustand]))).toEqual({
       'tpapi:core_artikelstamm': 'ok', 'tpapi:core_bons': 'ok', 'tpapi:core_journal': 'ok',
-      'tpapi:core_personal_tag': 'ok', 'tpapi:core_prognose': 'ok',
+      'tpapi:core_personal_tag': 'ok', 'tpapi:core_prognose': 'ok', 'tpapi:core_prognose_verlauf': 'ok',
     })
     expect(logs.some(l => l.includes('tpapi core tagesgeschaeft'))).toBe(true)
     expect(logs.some(l => l.includes('tpapi core nachladen'))).toBe(true)

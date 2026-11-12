@@ -4962,3 +4962,60 @@ B1–B16: `plan-tpapi-stufe2.md` §5, Abweichungen 18–25 in §8.
 die Kassenartikelnummer und `finanzweg` die Nummer (nicht die id) ist; dass Rabattzeilen der
 Nachlassbetrag sind; ob ein Sofortstorno doppelt steht; was `h_brutto` ist; ob LINA Zukunftsprognosen
 liefert und ändert.
+
+## 12.11.2026 — LINAs Umsatzprognose als Vergleichsbasis für eigene Prognosen (`0154`)
+
+**Anlass (Eugene).** Brainfood wird eigene Umsatzprognosen rechnen und will belegen, dass sie genauer
+sind als LINAs — für die Zukunft und rückwirkend („wie hätte unser System für die Vergangenheit
+gerechnet"). LINAs Prognose (`revenue/getforecastperday`, netto EUR je Betrieb und Tag) ist damit
+keine Nebenzahl mehr, sondern die Messlatte.
+
+**Entschieden.**
+
+1. **Der Verlauf je Vorlauf wird erfasst, nicht nur drei Werte je Tag.** Eine Prognose wird zu einem
+   bestimmten Vorlauf benutzt (Dienstplan zwei Wochen vorher, Bestellung zwei Tage vorher, Tagesplanung
+   am Morgen), und nur derselbe Vorlauf auf beiden Seiten ist fair: eine eigene 7-Tage-Prognose gegen
+   LINAs Wert vom Morgen des Tages wäre unfair gegen uns, gegen LINAs ersten Wert unfair gegen LINA.
+   `core.umsatzprognose_tag` (0153) kennt nur „erster", „letzter vor 08:00" und „jüngster" Wert — der
+   Wert, der 14 Tage vorher galt, lässt sich daraus nicht zurückgewinnen, und was nicht erfasst wurde,
+   ist für immer weg. Deshalb `core.umsatzprognose_beobachtung`: eine Zeile je neuem Wert, „zuletzt
+   gesehen" nachgeführt.
+2. **Eine Zeile je Wertänderung, nicht je Sichtung.** Bei 60 Tagen Fenster stünde jeder Tag rund 90-mal
+   da, fast immer gleich. „Zuletzt gesehen" trägt dieselbe Information; was zwischen zwei Sichtungen
+   lag, wüsste man auch bei jeder Sichtung als Zeile nicht.
+3. **60 Tage voraus statt 14** (`TPAPI_PROGNOSE_TAGE_VORAUS`). Ein Aufruf je Betrieb und Nacht bleibt
+   einer; nur die Antwort wird länger. Wie weit LINA liefert, ist nicht gemessen —
+   `mart.umsatzprognose_horizont` zeigt es.
+4. **Die Prognose-Historie zuerst** in Phase C (Rang 0, vor dem Tagesrückstand). Es ist unbekannt, wie
+   lange LINA alte Prognosen vorhält; der Posten ist klein (rund 3.000 Aufrufe gegen 50.000 je Nacht).
+   **Revidiert** damit Punkt B6 aus 0153 („nach allen fehlenden Tagen" — Tage fallen hinten aus
+   `listdays`, eine Prognose nicht): das Argument stimmt weiter, aber 3.000 Aufrufe verdrängen dort
+   nichts Nennenswertes, und eine verlorene Prognose-Historie wäre nicht nachholbar.
+5. **Nachträglich geholte Werte sind bis zur Freigabe keine Vergleichsbasis.** Ob LINA für vergangene
+   Tage die damals ausgegebene Prognose liefert oder nachträglich neu rechnet, weiß niemand; die
+   Verzerrung kann in beide Richtungen gehen. Gemessen wird es in `mart.umsatzprognose_nachher_betrieb`
+   (Vorabwert gegen den nach dem Tag gesehenen Wert, je Betrieb). Erst wenn sie über einige Wochen
+   (Vorschlag: vier) bei allen Betrieben „unveraendert" zeigt, mit `groesster_abstand_tage` über 28,
+   darf `grundlage = 'nachtraeglich'` als Vergleichsbasis gelten — als Entscheidung hier eingetragen,
+   nicht still. Auch dann gilt sie nur für die gemessene Spanne (gut fünf Wochen nach dem Tag); ob Jahre
+   alte Prognosen unverändert sind, misst sie nicht.
+6. **Die Fehlermaße sind die üblichen, in der üblichen Richtung:** Fehler = Prognose − Ist, MAE, MAPE,
+   WAPE (Summe |Fehler| / Summe Ist — das Maß für den Vergleich zweier Prognosen, weil umsatzgewichtet),
+   Bias; Prozent vom Ist, als Prozentzahl. Die Summen stehen daneben, damit Gruppen neu gerechnet und
+   nicht gemittelt werden.
+7. **Stützstellen 0, 1, 2, 3, 7, 14, 28 Tage** (Tagesplanung, Vortag, Bestellrhythmus, Wochendienstplan,
+   Dienstplan, Monatsplanung). Jede weitere vervielfacht nur die Zeilen; der Verlauf beantwortet jeden
+   anderen Vorlauf.
+
+**Verworfen.**
+
+* **Jede Sichtung als Zeile** — siehe 2.
+* **Den Lochtag-Ausschluss über `mart.umsatz_lochtag`/`mart.umsatztag_luecke`** — beide rechnen über den
+  ganzen Bestand und den Artikelverkauf; ein Lochtag steht für den Betrieb ohnehin als Ist 0 und fällt
+  aus der Fehlerrechnung.
+* **Eine Prüfzeile „LINA ändert nachträglich"** — eine Messung, kein Fehler; eine dauerhaft stehende
+  Zeile liest niemand.
+
+**Nicht belegt:** ob LINA Zukunftstage liefert und wie weit; ob LINA nachträglich ändert; was LINA
+genau prognostiziert (netto, mit oder ohne Trinkgeld — angenommen: netto wie der Umsatzbericht).
+

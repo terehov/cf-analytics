@@ -1186,6 +1186,7 @@ Saarbrücken und BS Bier & Speisen haben nur Team Data):
 * **Die Prognose ist LINAs Zahl**, keine eigene. Nur Tage mit `prognose_grundlage = 'vorab'` (letzter
   Wert vor 08:00 des Tages) sind eine Trefferquote; Tage aus der Historie sind `nachtraeglich`, und ob
   LINA ihre Prognose nach dem Tag anpasst, weiß niemand.
+  **Seit `0154`** gibt es den Verlauf je Vorlauf (Abschnitt unten).
 * **`personalkosten_tag` sind Lohnkosten der Personalplanung**, nicht die Personalkosten der BWA und
   nicht die Quote des Round Table (Fallstrick `personalkosten_tag_nicht_bwa`). Was `h_brutto` ist (mit
   oder ohne Pause), ist nicht gemessen. `personen = 0` heißt „LINA führt dort niemanden“. Die
@@ -1204,3 +1205,42 @@ Saarbrücken und BS Bier & Speisen haben nur Team Data):
 **Die Betriebsberichte des Scrapers bleiben (S10).** Sie decken alle Betriebe und reichen bis 2018, die
 TPAPI 41 Betriebe. Der Abgleich je Betrieb und Tag (`mart.kassenjournal_*_abgleich`) ist die Gegenprobe;
 erst danach wird über das Abschalten einzelner Berichte entschieden.
+
+### LINAs Umsatzprognose als Vergleichsbasis (`0154`, 12.11.2026)
+
+⚠️ **Gebaut gegen die Attrappe, nie gegen das echte LINA gelaufen.** Wie weit LINA voraus liefert und
+ob LINA nachträglich ändert, ist **nicht gemessen** — die Sichten unten messen es ab dem ersten Lauf.
+
+**Woher.** `revenue/getforecastperday`, netto EUR je Betrieb und Tag (Annahme: netto ohne Trinkgeld —
+`docs/offene-punkte.md`). Phase A fragt je Betrieb und Nacht ein Fenster ab dem Monatsersten (bzw.
+vor sieben Tagen) bis **60 Tage** voraus (`TPAPI_PROGNOSE_TAGE_VORAUS`); Phase C holt jeden
+abgeschlossenen Monat ab dem ersten Tag in `listdays` einmal nach — **seit 0154 vor allem anderen**.
+Jeder Abzug geht als Beobachtung in `core.umsatzprognose_beobachtung` (eine Zeile je neuem Wert).
+
+**Wie die Zahlen zusammenfinden:**
+
+* **Vorlauf N** heißt: der Wert, der vor dem Stichtag **(Tag − N) 08:00 Berlin** zuletzt neu gesehen
+  wurde und bis dahin nicht abgelöst war. N = 0 ist der Stand am Morgen des Tages (= `vorab_netto`
+  aus 0153). Eine Sichtung zum Zeitpunkt t zählt für jeden N ≤ Tag − Datum(t + 16 h) — der Abzug um
+  05:30 am Vortag zählt für N = 1, einer um 09:00 am Vortag nur für N = 0.
+* **Ist** ist `mart.umsatz_tag.umsatz_netto` desselben Betriebs und Geschäftstags (08:00–07:59).
+* **Fehler = Prognose − Ist** (positiv = LINA zu hoch), Prozent vom Ist — umgekehrt zu
+  `mart.umsatzprognose_tag.abweichung_netto`.
+
+**Was die Zahlen NICHT sagen:**
+
+* **„Nachträglich" ist nicht „vorab".** Für die Zeit vor dem ersten Lauf gibt es nur Werte, die nach
+  dem Tag geholt wurden (`grundlage = 'nachtraeglich'`). Ob LINA dann die damals ausgegebene Prognose
+  liefert oder neu rechnet, weiß niemand; die Verzerrung kann in beide Richtungen gehen. Erst wenn
+  `mart.umsatzprognose_nachher_betrieb` über einige Wochen „unveraendert" zeigt, darf die Historie als
+  Vergleichsbasis gelten — und auch dann nur für die Zeitspanne, die gemessen ist (bis gut fünf Wochen
+  nach dem Tag), nicht für Jahre.
+* **Vorabwerte beginnen mit dem ersten Lauf nach 0154.** Für Vorlauf 28 gibt es den ersten Tag 28
+  Tage danach; die Vergleichsbasis wächst jede Nacht um einen Tag je Betrieb
+  (`mart.umsatzprognose_horizont.tage_mit_vorab`).
+* **Ausgeschlossen aus der Fehlerrechnung** (sichtbar, mit `ausschluss_grund`): Tag nicht vorbei,
+  keine Prognose, Betrieb nicht operativ (**Stand heute**, nicht historisch), kein Ist, Ist 0
+  (geschlossen — darunter Datenlöcher, die für den Betrieb als 0 stehen), Kassen-Fehleingabe, Ist
+  jünger als sieben Tage.
+* **Nur Betriebe mit TPAPI-Schlüssel und Sales Data API.**
+
