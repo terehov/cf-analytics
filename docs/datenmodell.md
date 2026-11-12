@@ -1597,8 +1597,9 @@ nicht gemessen, nur ihre Namen (`bun run tpapi-formprobe` misst sie, `lina-third
 Ein Lader, der sich irrt, kostet bei „Rohsatz zuerst" einen Neuaufbau aus `raw`, keinen zweiten
 Abruf. Bei Betrieben mit einem Jahr Tiefe fällt außerdem jeden Tag einer hinten aus `listdays`
 heraus: was nicht roh gesichert ist, während die Lader entstehen, ist weg. Regel 4 wird hier der
-normale Weg, nicht der Notfall. **Es gibt deshalb noch kein `core.kassenjournal`, keinen
-`core.kassenbon`, keinen Artikelstamm in `core`** (Schritt 2b, nach der Formprobe).
+normale Weg, nicht der Notfall. ~~**Es gibt deshalb noch kein `core.kassenjournal`, keinen
+`core.kassenbon`, keinen Artikelstamm in `core`** (Schritt 2b, nach der Formprobe).~~ Seit `0153` gibt es sie
+(Abschnitt „TPAPI Stufe 2b“ weiter unten).
 
 **`core.tpapi_geschaeftstag`** — die Arbeitsliste aus `revenue/listdays`. PK `(betrieb_key,
 geschaeftstag)`, dazu `erstmals_am`, `gesehen_am`, `raw_id` (die jüngste `listdays`-Antwort, in der
@@ -1625,8 +1626,8 @@ steht **nur in `raw.api_antwort`**.
   append-only; es wird nur nichts Gleiches angehängt. `geaendert_am` ist die Messung, ob das
   Dreitagesfenster (S7) reicht — `mart.tpapi_abruf_stand.geaendert`.
 * **`core_stand`** ist die Version des Laders, mit der der Rohsatz nach `core` kam; `NULL` = noch
-  nicht geladen. In 2a immer `NULL`, `ladefehler` immer `NULL` — beide Spalten gehören dem Lader
-  aus 2b und stehen schon da, damit er ohne Migration der Tabelle anfangen kann.
+  nicht geladen. ~~In 2a immer `NULL`, `ladefehler` immer `NULL`~~ — beide Spalten gehören dem Lader
+  aus 2b; seit `0153` setzt er sie (Abschnitt „TPAPI Stufe 2b“).
 * `payload_bytes` ist die Größe des **jüngsten** Rohsatzes vor der Kompression, nicht die Summe
   aller Versionen und nicht der Plattenplatz.
 * **`personalkostenprotag` wird vor `raw` zur Summe verdichtet** (S5): eine Zeile je Betrieb und
@@ -1635,7 +1636,7 @@ steht **nur in `raw.api_antwort`**.
   Teams rückführbar) kommen nirgends an.
 
 **`core.tpapi_stammabzug`** — die tagfreien Listen: die dreizehn `merchandiseman/*` je Betrieb,
-wöchentlich (`TPAPI_STAMM_TAGE`); später die Prognose. Eine Zeile je erfolgreichem Abruf
+wöchentlich (`TPAPI_STAMM_TAGE`); ~~später die Prognose~~ seit `0153` auch die Prognose (Art `bereich`, mit `von`/`bis`). Eine Zeile je erfolgreichem Abruf
 (`abzug_id`, `abgerufen_am`, `zeilen`, `payload_hash`, `raw_id`, `neu`, `core_stand`); `neu = true`
 heißt: Hash anders als beim vorigen Abzug derselben Liste, neuer Rohsatz. So bleibt sichtbar,
 **wann** gefragt wurde, ohne dreizehn unveränderte Listen je Betrieb und Woche zu verdoppeln.
@@ -1648,7 +1649,7 @@ neben laufenden Personalkosten wie „ok" aus — die Signatur von Regel 10. `ma
 `format('%I')`, die Werte als Parameter, kein Bedingungstext in einer `SECURITY-DEFINER`-Funktion.
 Registereinträge in `src/sync/quellen.ts`: `tpapi:listdays`, `tpapi:journal`, `tpapi:journaltables`,
 `tpapi:personalkostenprotag`, `tpapi:artikelstamm` (alle 13 Listen zusammen, Kadenz 8 Tage) und
-`tpapi:getforecastperday` (`erwartet = false`). Merker je **Modul**, nicht je Endpunkt:
+`tpapi:getforecastperday` (~~`erwartet = false`~~ seit `0153` erwartet). Merker je **Modul**, nicht je Endpunkt:
 `tpapi_revenue`, `tpapi_personal_tag`, `tpapi_artikel`.
 
 **Zustand je Modul.** `sync.tpapi_zugang` führt seit `0149` je Betrieb und Modul eine Zeile
@@ -1676,3 +1677,127 @@ Drei Entscheidungen am Schema:
 
 Die Auswertung (`mart.speicher_stand`, `mart.speicher_verlauf`) steht in `metabase.md`.
 
+
+## TPAPI Stufe 2b: Journal, Bons, Personal je Tag, Prognose, Kassenstamm (`0153`, 12.11.2026)
+
+⚠️ **Gebaut gegen die Attrappe, nie gegen das echte LINA gelaufen.** Kein Wert in diesen Tabellen ist
+an echten Journalzeilen gemessen; die Feldtypen stammen aus der Formprobe vom 12.11.2026 an zwei
+Betrieben (`docs/payloads/tpapi-formprobe-2026-11-12.txt`). Plan und Entscheidungen B1–B16:
+`docs/plan-tpapi-stufe2.md` §5 und §8.
+
+**Der Grundsatz.** `core` wird aus `raw` gebaut, nicht aus einem zweiten Abruf (S1, harte Regel 4).
+Welcher Rohsatz schon in `core` ist, steht an `core.tpapi_abruf.core_stand` (Version des Laders); eine
+neue Laderversion lädt den Bestand aus `raw` neu, ohne einen Aufruf gegen LINA.
+
+**`core.kassenjournal`** — eine Zeile je Journalzeile (`ID`), PK `(betrieb_key, geschaeftstag,
+journal_id)`, **monatlich partitioniert nach `geschaeftstag`** (Partition legt der Lader vor dem
+Schreiben an, über `core.partition_anlegen`). Alle gefüllten Felder sind typisiert; Beträge `numeric`
+**ohne Grenze** (eine Kassen-Fehleingabe wie in `0136`, −9,2 Bio. EUR, soll nicht das Laden eines
+Tages sprengen). Bauentscheidungen, jede mit Grund:
+
+* **`geschaeftstag` aus der Abrufzeile, nicht aus `datum`** — der Geschäftstag läuft 08:00 bis 07:59,
+  eine Buchung um 01:30 gehört zum Vortag. Umgerechnet wird nichts: die Formprobe fand keine Zeile
+  außerhalb 08:00–07:59 und `refdate` = Berliner Mitternacht; der Lader **zählt Abweichungen**
+  (`core.tpapi_abruf.core_auffaellig`) statt sie zu korrigieren. Ein stillschweigendes Umrechnen
+  wäre der Fehler von `0138` (Nacht einen Tag zu früh) auf neuer Quelle.
+* **Kein `raw_id`, kein `geladen_am` je Zeile.** Beides steht je Tag in `core.tpapi_abruf`. Bei rund
+  140 Mio. Zeilen für die ganze Historie wären zwei Spalten 2,2 GB für eine Angabe, die je Tag
+  gleich ist.
+* **Sieben Felder sind keine Spalten** (`event_number`, `menucard_id`, `price_per_unit`,
+  `financeextendedinfo_id`, `provision_free`, `course_price_print`, `coursedefentry_id`): in beiden
+  Proben durchgehend leer. Trägt eines einen Wert — oder kommt ein unbekanntes Feld —, steht es in
+  `zusatz` (jsonb) und wird je Tag gezählt. Der Lader vergisst keine Information, aber legt keine
+  Spalte auf Verdacht an.
+* **Ein erneuter Abruf mit neuem Inhalt ersetzt den Tag ganz** (gelöscht und neu geschrieben, eine
+  Transaktion je Betrieb und Tag). Keine Zeilenfortschreibung.
+* **Das Journal ist eine Buchungsliste mit Saldo null** (Verkäufe positiv, Zahlungen negativ,
+  Trinkgeld positiv, Tischübergabe hin und zurück). Was davon Umsatz ist, sagt nicht die Tabelle,
+  sondern `mart.kassenjournal_zeilenart()` — **eine Hypothese aus zwei Stichproben**, an einer
+  Stelle, damit sie sich an einer Stelle korrigieren lässt (B12).
+* `addinfo` (Freitext, zu 98 % leer) steht in `core`, **nie in `mart`** (S6).
+
+**`core.kassenjournal_finanzweg_tag`** — Summen je Betrieb, Tag und Finanzweg (Zeilen, Brutto, Netto,
+Artikelzeilen und -menge, Bons, Rabatt- und Stornozeilen), **vom Lader im selben Zug geschrieben**
+wie das Journal. **Warum eine Tabelle und keine Sicht oder Materialisierung (B2):** die
+Abgleichsichten vergleichen je Betrieb und Tag, über das Journal wären das 1.500 Zeilen je Tag statt
+zwölf; eine Materialisierung könnte still veralten (`0091`), eine Tabelle im selben Zug nicht — was im
+Journal steht, steht auch hier. **Keine Deutung**: Summen je Finanzweg, wie die Kasse sie führt. Ein
+Tag ohne Journalzeilen hat hier keine Zeile; ob er geladen ist, sagt `core.tpapi_abruf`.
+
+**`core.kassenbon`** — ein Bon (Tisch, `journaltables`, `tableheader_id`), PK `(betrieb_key,
+geschaeftstag, tableheader_id)`, partitioniert wie das Journal. `accounting_type = 'EMPTY'` ist ein
+Tisch ohne Journalzeile (26 von 190 in der Formprobe) — wer Bons zählt, filtert auf `BILL`.
+`debitor_text` und `zip_code` (Freitext, Postleitzahl von Gästen) stehen in `core`, **nie in `mart`**.
+`transaction_number` und `tablearea_id` waren in beiden Proben leer und stehen nur in `zusatz`, wenn
+sie einen Wert tragen.
+
+**`core.personalkosten_tag`** — Betrieb × Geschäftstag, aus dem **schon verdichteten** Rohsatz (S5):
+`personen`, `h_brutto`, `h_zuschl_25/40/50`, `brutto`, `lohnkosten`, `unbekannte_felder` (nur Namen).
+**Ohne Horizont.** `personen = 0` heißt „LINA führt an dem Tag niemanden“, nicht „niemand da“. Das sind
+Lohnkosten der **Personalplanung**, nicht die Personalkosten der BWA (Fallstrick
+`personalkosten_tag_nicht_bwa`). Was `h_brutto` ist (mit oder ohne Pause), ist nicht gemessen.
+
+**`core.umsatzprognose_tag`** — LINAs Umsatzprognose (netto) je Betrieb und Tag. **Nichts wird still
+überschrieben (B5).** Eine Prognose kann sich ändern, und ob LINA sie nach dem Tag anpasst, ist nicht
+gemessen; eine Trefferquote aus nachträglichen Werten wäre geschönt. Deshalb stehen drei Werte
+nebeneinander: `erste_prognose_netto` (erster gesehener Wert), `vorab_netto` (letzter Wert **vor
+08:00 des Tages** — die Vergleichszahl), `prognose_netto` (jüngster Wert), dazu `aenderungen` und
+`geaendert_am`. Tage aus dem Nachladen der Historie haben **keinen Vorabwert** und heißen in `mart`
+`nachtraeglich`. Jeder Abzug ist eine Beobachtung, auch ein unveränderter. Die Prognose ist ein
+**Bereichsabruf** (`core.tpapi_stammabzug` mit `von`/`bis`, Art `bereich`, keine eigene Tabelle — B6,
+Abweichung 24): der Hashvergleich vergleicht nur Abzüge desselben Zeitraums.
+
+**Der Kassenstamm (B7)** — jeweils der **jüngste Abzug je Betrieb**, nicht die Geschichte (die liegt in
+`raw`):
+
+* `core.tpapi_artikel` (recipe): `artikel_id` (interne Nummer der Kasse, je Betrieb verschieden),
+  `artikelnummer` (Feld `number`), Name, `funktion`, `fixedwe`, Menge, `warengruppe`/`kategorie`/
+  `hauptgruppe` (nach jedem Stammladen über `detailcategory → category → grosscategory`
+  nachgezogen — der Verweis über `id` ist **aus den Wertebereichen der Formprobe abgeleitet, nicht
+  gemessen**; bei doppelter `id` gilt der erste Eintrag, Abweichung 19). **`prices` und `attributes`
+  kommen nicht nach `core`**: sie sind fast die gesamten 31,6 MB je Betrieb und stehen in `raw`.
+  **Nicht `core.artikel`:** das ist der Artikel der Konzernberichte (eine Zeile je Nummer für alle
+  Betriebe), dies der Stamm der Kasse je Betrieb; verbunden werden beide nur in `mart`, nur zur
+  Messung.
+* `core.tpapi_finanzweg` (financetype): `finanzweg_id`, `nummer`, Kategorie, `ist_trinkgeld`.
+* `core.tpapi_finanzkategorie` (financecategory): `typ` (SALES, NONCASH, CAPTIVE_SUPPLY …).
+* `core.tpapi_stammliste`: die übrigen zehn Listen, **Schlüssel ist die Position in der Antwort, nicht
+  `id`** — `grosscategory` führte 68 Einträge mit 61 verschiedenen `id`.
+
+`UNIQUE (betrieb_key, artikelnummer)` und `UNIQUE (betrieb_key, nummer)` am Finanzweg: **ein doppelter
+Eintrag lässt das Laden scheitern, statt Journalzeilen still zu verdoppeln** — das Journal verbindet
+über die Nummer. `core.tpapi_artikel.fixedwe` ist der Kandidat für die Herkunft von
+`core.artikel.fixer_we` (Regel 5); `mart.kassenartikel_fixedwe_abgleich` **misst nur**, keine Marge.
+
+**`sync.tpapi_core_lader`** — je Endpunkt `stand` (Laderversion) und `horizont_monate` (NULL: ohne
+Horizont, 0: alles). Der Importer schreibt es zu Beginn jedes Laders; die Sichten lesen es, damit
+„wartend“, „in core“ und „ausserhalb horizont“ dieselbe Grenze meinen wie der Lader — eine Sicht kennt
+keine Umgebungsvariable. `mart.tpapi_core_ab(monate)` rechnet die Grenze (Monatserster N Monate vor dem
+laufenden Monat) für beide.
+
+**Der Horizont (B10).** `TPAPI_CORE_MONATE` = 24 gilt für **Journal und Bons**; Personal je Tag,
+Prognose und Stamm haben keinen. Was davor liegt, bleibt roh und ist ein **eigener Zustand**
+(„ausserhalb horizont“ in `mart.tpapi_core_stand`), **kein Rückstand**. Grund: Journal 230 MB je Mio.
+Zeilen inklusive Index (Klon, synthetisch) — 24 Monate rund 9 GB, alles rund 32 GB. Die Entscheidung
+„alles oder 24 Monate“ trifft Eugene nach den ersten echten Größen.
+
+**Neue Spalten.** `core.tpapi_abruf`: `ladeversuche`, `ladefehler_stand`, `ladefehler_am`,
+`core_geladen_am`, `core_zeilen`, `core_auffaellig` (jsonb: unerwartete Felder, Zeitpunkte außerhalb
+des Geschäftstags, `refdate`-Abweichung, Journalsaldo ≠ 0, unbekannte Felder), dazu zwei Indizes für
+die Arbeitslisten und `sync.quelle`. `core.tpapi_stammabzug`: `von`, `bis`, `ladefehler`,
+`ladeversuche`, `ladefehler_stand`, `ladefehler_am`, `core_geladen_am`, `core_auffaellig`.
+**Drei Fehlversuche mit derselben Laderversion, dann ruht der Rohsatz** (`ladefehler endgueltig`),
+bis ein neuer Rohsatz oder eine neue Laderversion kommt — wie `0136`: nicht endlos, aber sichtbar.
+Eine Journalzeile ohne Finanzweg lässt den **ganzen Tag** scheitern (Abweichung 22): sie ist nicht
+deutbar, und der Fehler ist sichtbar.
+
+**Personal je Stunde auf der Tiefe von `listdays` (B11).** Keine neue Tabelle:
+`mart.personal_rueckstand` = Tage aus `listdays` ∪ letzte 365 Tage (Spalte `arbeitsliste`:
+`horizont 365` | `listdays`). Die Vereinigung, nicht nur `listdays`, damit Ruhetage und Betriebe ohne
+Sales Data (nur Team Data) nicht zurückfallen.
+
+**`mart.tpapi_abruf_stand.in_core`** zählt seit `0153` nur den **aktuellen** Laderstand; ein mit alter
+Laderversion geladener Rohsatz wartet auf den neuen Lader und ist nicht „in core“ (Abweichung 23).
+
+Die `mart`-Sichten dazu stehen in `metabase.md` (Abschnitt „TPAPI Stufe 2b in `mart`“). Die Rechte der
+Leserolle repariert `0153` im selben Zug (`docs/fehlerkatalog.md`, 12.11.2026).

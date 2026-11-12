@@ -115,6 +115,9 @@ mitDb('TPAPI-Rohabzug (mit Datenbank und Attrappe)', () => {
     cfg.TPAPI_GRENZE_MINUTEN = 15
     cfg.TPAPI_STAMM_TAGE = 7
     cfg.TPAPI_NACHLADEN_JE_LAUF = 10_000
+    // Personal je Stunde im Nachladen (0153) zählt die Aufrufe dieser Datei
+    // nicht mit — eigene Prüfung in core_laden.test.ts.
+    cfg.TPAPI_STUNDE_NACHLADEN = 0
 
     const { log } = await import('../lib/log')
     ;(log.settings as any).minLevel = 0
@@ -158,8 +161,9 @@ mitDb('TPAPI-Rohabzug (mit Datenbank und Attrappe)', () => {
     starte()
     expect(await nachlauf()).toBe('ok')   // „not licensed" macht nicht teilweise (D7)
 
-    // A: listdays + 3 Tage × 3 Endpunkte + 13 Listen.
-    expect(von(A)).toHaveLength(1 + 9 + 13)
+    // A: listdays + 3 Tage × 3 Endpunkte + 13 Listen + die Prognose (seit 0153).
+    expect(von(A)).toHaveLength(1 + 9 + 13 + 1)
+    expect(von(A).at(-1)!.pfad).toBe('/extern/revenue/getforecastperday')
     // S: listdays (403 Revenue), dann nur Personalkosten je Tag, Artikel einmal (403).
     expect(von(S).map(a => a.pfad.replace('/extern/', ''))).toEqual([
       'revenue/listdays',
@@ -180,7 +184,7 @@ mitDb('TPAPI-Rohabzug (mit Datenbank und Attrappe)', () => {
               (SELECT count(*) FROM core.tpapi_abruf x JOIN core.betrieb b USING (betrieb_key) WHERE b.enc_id = $2)::int AS abruf_s,
               (SELECT count(*) FROM core.tpapi_stammabzug x JOIN core.betrieb b USING (betrieb_key) WHERE b.enc_id = $1 AND x.neu)::int AS stamm_a`,
       [A, S])
-    expect(n).toEqual({ liste_a: 6, liste_s: 0, abruf_a: 9, abruf_s: 3, stamm_a: 13 })
+    expect(n).toEqual({ liste_a: 6, liste_s: 0, abruf_a: 9, abruf_s: 3, stamm_a: 13 + 1 })
 
     const za = await zugang(A)
     for (const m of ['personal', 'revenue', 'artikel']) expect(za[m]).toMatchObject({ zustand: 'ok', erfolg: true })
@@ -239,7 +243,10 @@ mitDb('TPAPI-Rohabzug (mit Datenbank und Attrappe)', () => {
     const z = Object.fromEntries(rows.map(r => [r.quelle, r.zustand]))
     expect(z).toMatchObject({
       'tpapi:listdays': 'ok', 'tpapi:journal': 'ok', 'tpapi:journaltables': 'ok',
-      'tpapi:personalkostenprotag': 'ok', 'tpapi:artikelstamm': 'ok', 'tpapi:getforecastperday': 'nicht erwartet',
+      'tpapi:personalkostenprotag': 'ok', 'tpapi:artikelstamm': 'ok', 'tpapi:getforecastperday': 'ok',
+      // Schritt 2b (0153): der Lader lief in Phase A mit.
+      'tpapi:core_journal': 'ok', 'tpapi:core_bons': 'ok', 'tpapi:core_personal_tag': 'ok',
+      'tpapi:core_prognose': 'ok', 'tpapi:core_artikelstamm': 'ok',
     })
     // Der Filter wirkt: ohne Journalzeilen wäre das Journal stumm, obwohl die
     // Tabelle dank der Personalkosten frisch ist.
@@ -256,8 +263,9 @@ mitDb('TPAPI-Rohabzug (mit Datenbank und Attrappe)', () => {
 
     starte()
     expect(await nachlauf()).toBe('ok')
-    // Zweite Nacht: Artikelstamm nicht fällig, S' Module „not licensed" sieben Tage nicht gefragt.
-    expect(von(A)).toHaveLength(1 + 9)
+    // Zweite Nacht: Artikelstamm nicht fällig, S' Module „not licensed" sieben Tage nicht gefragt;
+    // die Prognose jede Nacht.
+    expect(von(A)).toHaveLength(1 + 9 + 1)
     expect(von(S).map(a => a.pfad)).toEqual(Array(3).fill('/extern/personal/personalkostenprotag'))
     expect(await rohJournal()).toBe(3)
     const { rows } = await db.query(
@@ -265,26 +273,37 @@ mitDb('TPAPI-Rohabzug (mit Datenbank und Attrappe)', () => {
         WHERE b.enc_id = $1`, [A])
     expect(rows.every(r => r.abrufe === 2 && r.geaendert_am === null)).toBe(true)
 
-    // Ein Tag ändert sich (nachträglich gebuchter Storno) — und 2b hatte ihn schon geladen.
+    // Ein Tag ändert sich (nachträglich gebuchter Storno) — und 2b hatte ihn schon geladen
+    // (seit 0153 wirklich: der Lader lief in Phase A).
     const gestern = tage6[0]!
-    await db.query(
-      `UPDATE core.tpapi_abruf x SET core_stand = 1 FROM core.betrieb b
-        WHERE b.betrieb_key = x.betrieb_key AND b.enc_id = $1 AND x.endpunkt = 'tpapi:journal'
-          AND x.geschaeftstag = $2`, [A, gestern])
+    const { rows: [vorher] } = await db.query(
+      `SELECT core_stand, core_geladen_am, core_zeilen FROM core.tpapi_abruf x JOIN core.betrieb b USING (betrieb_key)
+        WHERE b.enc_id = $1 AND x.endpunkt = 'tpapi:journal' AND x.geschaeftstag = $2`, [A, gestern])
+    expect(vorher.core_stand).toBe(1)
+    expect(vorher.core_zeilen).toBe(12)
+    // mart.tpapi_abruf_stand zaehlt ueber alle Betriebe — auf einem Klon, auf dem
+    // core_laden.test.ts schon lief, stehen dort fremde Zeilen; deshalb der Zuwachs.
+    const geaendertVorher = Number((await db.query(
+      `SELECT geaendert FROM mart.tpapi_abruf_stand WHERE endpunkt = 'tpapi:journal'`)).rows[0].geaendert)
     starte({
       antwortStufe2: (pfad, enc, bd) => pfad === 'revenue/journal' && enc === A && iso(bd) === gestern
-        ? [{ ID: 1, balance: 12.5, art: 'S' }] : undefined,
+        ? [{ ID: 1, balance: 12.5, art: 'S', finanzweg: 1 }] : undefined,
     })
     await nachlauf()
     expect(await rohJournal()).toBe(4)
+    // Der neue Rohsatz setzt core_stand zurück, und der Lader in Phase A lädt
+    // den Tag sofort neu — eine Zeile ohne datum, Saldo 12,50: beides auffällig.
     const { rows: [t] } = await db.query(
-      `SELECT abrufe, geaendert_am IS NOT NULL AS geaendert, core_stand, zeilen
+      `SELECT abrufe, geaendert_am IS NOT NULL AS geaendert, core_stand, zeilen, core_zeilen,
+              core_geladen_am > $3 AS neu_geladen, core_auffaellig
          FROM core.tpapi_abruf x JOIN core.betrieb b USING (betrieb_key)
-        WHERE b.enc_id = $1 AND x.endpunkt = 'tpapi:journal' AND x.geschaeftstag = $2`, [A, gestern])
-    expect(t).toEqual({ abrufe: 3, geaendert: true, core_stand: null, zeilen: 1 })
+        WHERE b.enc_id = $1 AND x.endpunkt = 'tpapi:journal' AND x.geschaeftstag = $2`,
+      [A, gestern, vorher.core_geladen_am])
+    expect(t).toMatchObject({ abrufe: 3, geaendert: true, core_stand: 1, zeilen: 1, core_zeilen: 1, neu_geladen: true })
+    expect(t.core_auffaellig).toEqual({ saldo: 12.5, ohne_zeitpunkt: 1 })
     const { rows: [stand] } = await db.query(
       `SELECT eintraege, geaendert FROM mart.tpapi_abruf_stand WHERE endpunkt = 'tpapi:journal'`)
-    expect(stand.geaendert).toBe(1)
+    expect(stand.geaendert).toBe(geaendertVorher + 1)
   })
 
   test('Phase C: neueste Tage zuerst, Tag außen/Betrieb innen, Obergrenze — S nur mit Personal', async () => {

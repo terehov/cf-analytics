@@ -10,8 +10,11 @@ import { afterAll, describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
-  aktiveStammendpunkte, aktiveTagesendpunkte, ENDPUNKT_LISTDAYS, TPAPI_ENDPUNKTE, VERBOTENE_PFADE,
+  aktiveStammendpunkte, aktiveTagesendpunkte, ENDPUNKT_LISTDAYS, prognoseEndpunkt, stundeEndpunkt,
+  TPAPI_ENDPUNKTE, VERBOTENE_PFADE,
 } from './endpunkte'
+import { ENDPUNKT_PERSONAL_STUNDE } from './laden'
+import { LADERSTAND, TAGESENDPUNKTE } from './core_laden'
 import { FormFehler } from './form'
 import { geschaeftstageAusListdays, geschaeftstagAusEpoch, protagVerdichten } from './verdichtung'
 import { epochFuerTag, protagZeilen, tpapiMockStarten } from './mock'
@@ -27,22 +30,50 @@ describe('Endpunktregister', () => {
     expect(VERBOTENE_PFADE.some(r => r.test('merchandiseman/recipe/42'))).toBe(true)
   })
 
-  test('die Endpunkte aus Plan S3: listdays, drei Tagesendpunkte, Prognose (aus), dreizehn Artikellisten', () => {
+  test('die Endpunkte aus Plan S3: listdays, drei Tagesendpunkte, Prognose (an seit 0153), dreizehn Artikellisten', () => {
     expect(ENDPUNKT_LISTDAYS.pfad).toBe('revenue/listdays')
     expect(aktiveTagesendpunkte().map(e => e.pfad).sort()).toEqual(
       ['personal/personalkostenprotag', 'revenue/journal', 'revenue/journaltables'])
     expect(aktiveStammendpunkte()).toHaveLength(13)
     expect(aktiveStammendpunkte().every(e => e.modul === 'artikel' && e.pfad.startsWith('merchandiseman/'))).toBe(true)
-    const prognose = TPAPI_ENDPUNKTE.find(e => e.pfad === 'revenue/getforecastperday')!
-    expect(prognose.aktiv).toBe(false)
+    // Die Prognose ist ein Bereichsabruf, kein Stamm: sonst holte der Wochenabzug sie ohne from/to.
+    expect(prognoseEndpunkt()).toMatchObject({ pfad: 'revenue/getforecastperday', art: 'bereich', modul: 'revenue' })
+  })
+
+  /**
+   * Personal je Stunde steht seit 0153 im Register (Plan S3) — als Art
+   * `stunde`, damit weder das Dreitagesfenster noch die VALUES-Listen aus 0151
+   * ihn erfassen; geladen wird er mit dem Lader aus Stufe 1 und unter dessen
+   * raw-Namen.
+   */
+  test('Personal je Stunde: im Register, aber nicht im Fenster und nicht in den Rueckstandssichten aus 0151', () => {
+    const st = stundeEndpunkt()!
+    expect(st).toMatchObject({ pfad: 'personal/personalkostenprostunde', art: 'stunde', modul: 'personal', fensterTage: 0 })
+    expect(st.endpunkt).toBe(ENDPUNKT_PERSONAL_STUNDE)
+    expect(aktiveTagesendpunkte()).not.toContain(st)
+    expect(aktiveStammendpunkte()).not.toContain(st)
+  })
+
+  /** Der Lader raw → core (0153) kennt jeden Endpunkt, der nach core soll — und nur die. */
+  test('der Lader hat fuer jeden Tages-, Stamm- und Bereichsendpunkt einen Laderstand', () => {
+    const erwartet = [...aktiveTagesendpunkte(), ...aktiveStammendpunkte(), prognoseEndpunkt()!]
+      .map(e => e.endpunkt).sort()
+    expect(Object.keys(LADERSTAND).sort()).toEqual(erwartet)
+    expect([...TAGESENDPUNKTE].sort() as string[]).toEqual(aktiveTagesendpunkte().map(e => e.endpunkt).sort())
+    // Und die Startbelegung in 0153 nennt dieselben Endpunkte.
+    const sql = readFileSync(join(import.meta.dir, '..', '..', 'migrations', '0153_tpapi_core.sql'), 'utf8')
+    const block = /FROM unnest\(ARRAY\[([\s\S]*?)\]\) AS e/.exec(sql)![1]!
+    const seed = [...block.matchAll(/'(tpapi:[a-z]+)'/g)].map(m => m[1]).sort()
+    expect(seed).toEqual(erwartet)
   })
 
   test('raw-Namen eindeutig, Muster tpapi:<name>; Fenster 3 Tage; nur protag wird verdichtet', () => {
     const namen = TPAPI_ENDPUNKTE.map(e => e.endpunkt)
     expect(new Set(namen).size).toBe(namen.length)
     expect(namen.every(n => /^tpapi:[a-z]+$/.test(n))).toBe(true)
-    // Nicht derselbe Name wie Stufe 1 — dort steht der Stundenrückstand.
-    expect(namen).not.toContain('tpapi:personalkostenprostunde')
+    // Den Namen aus Stufe 1 trägt nur der Eintrag der Art `stunde` (0153) —
+    // derselbe Endpunkt, derselbe Lader, kein zweiter Rohname.
+    expect(TPAPI_ENDPUNKTE.filter(e => e.endpunkt === 'tpapi:personalkostenprostunde').map(e => e.art)).toEqual(['stunde'])
     for (const e of aktiveTagesendpunkte()) expect(e.fensterTage).toBe(3)
     expect(TPAPI_ENDPUNKTE.filter(e => e.verdichten).map(e => e.name)).toEqual(['personalkostenprotag'])
   })

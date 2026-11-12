@@ -65,6 +65,23 @@ const PHASE_B = [
   'zulaufPruefen',
 ]
 
+/**
+ * Phase A des TPAPI-Dienstes (0153): die Fenstertage müssen VOR Phase B in
+ * core stehen — der Lader raw → core hängt deshalb in `tpapiNachlauf()` hinter
+ * dem Rohabzug, also vor dem Sammelpunkt von sync.ts.
+ */
+describe('tpapi/nachlauf.ts — der Lader raw → core in Phase A', () => {
+  test('tpapiCoreTagesgeschaeft läuft nach dem Rohabzug, im selben Dienst', async () => {
+    const nl = await Bun.file(`${import.meta.dir}/../tpapi/nachlauf.ts`).text()
+    const roh = nl.indexOf('await rohabzugTagesgeschaeft(client)')
+    const kern = nl.indexOf('await tpapiCoreTagesgeschaeft()')
+    expect(roh).toBeGreaterThan(0)
+    expect(kern).toBeGreaterThan(roh)
+    // ... und vor dem Ende von tpapiNachlauf, nicht in einer anderen Funktion.
+    expect(kern).toBeLessThan(nl.indexOf('async function personalJeStunde'))
+  })
+})
+
 describe('sync.ts — Phase A und Phase B', () => {
   test('der Sammelpunkt existiert', () => {
     // Ohne ihn gäbe es keine Grenze, und alle Prüfungen darunter wären
@@ -209,6 +226,25 @@ describe('sync.ts — Phase C nach Phase B', () => {
     expect(einsammeln).toBeGreaterThan(sync.indexOf(NACHLADEN))
     expect(einsammeln).toBeLessThan(sync.indexOf(ABSCHLUSS))
     expect(sync.split('tpapiNachladen()').length - 1).toBe(1)
+  })
+
+  /**
+   * Der Lader raw → core für den TPAPI-Bestand (0153) läuft als dritte Spur
+   * neben der TPAPI-Spur: nach dem Stempel von Phase B gestartet (sonst
+   * rutschte Nachladen vor die Ableitungen), mit der TPAPI-Spur als
+   * `abholung` (er lädt, was sie bringt), Fehler sofort aufgefangen und vor
+   * dem Abschluss eingesammelt.
+   */
+  test('der TPAPI-Lader raw → core läuft neben der TPAPI-Spur und wird vor dem Abschluss eingesammelt', () => {
+    const start = sync.indexOf('const tpapiKernC = tpapiCoreNachladen({ abholung: tpapiC })')
+    expect(start).toBeGreaterThan(sync.indexOf('const tpapiC = tpapiNachladen()'))
+    expect(start).toBeGreaterThan(sync.indexOf(ABLEITUNGEN_FERTIG))
+    expect(start).toBeLessThan(sync.indexOf(NACHLADEN))
+    expect(sync.slice(start, start + 120)).toContain('.catch(')
+    const einsammeln = sync.indexOf('await tpapiKernC')
+    expect(einsammeln).toBeGreaterThan(sync.indexOf(NACHLADEN))
+    expect(einsammeln).toBeLessThan(sync.indexOf(ABSCHLUSS))
+    expect(sync.split('tpapiCoreNachladen(').length - 1).toBe(1)
   })
 
   test('der Lauf wird erst nach Phase C geschlossen, mit dem Ergebnis der Zulaufprüfung', () => {

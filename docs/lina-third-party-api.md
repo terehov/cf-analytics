@@ -352,19 +352,20 @@ zwei Befunde daraus (Kopfzahl, Schlüssel ohne Schichten → `0150`) stehen in P
 
 | Endpunkt | Genutzt |
 |---|---|
-| `personal/personalkostenprostunde` | **seit `0149`** — Fenster 14 Tage plus Backfill bis 365 Tage |
-| `personal/personalkostenprotag` | ~~nein — Zeilen je Person ohne Kennung, Frage an Eugene (`offene-punkte.md`)~~ **seit `0151` (Stufe 2a)** — vor `raw` zur Summe je Betrieb und Tag verdichtet (S5), Fenster 3 Tage plus Rückstand |
+| `personal/personalkostenprostunde` | **seit `0149`** — Fenster 14 Tage plus Backfill bis 365 Tage; **seit `0153` (Stufe 2b) bis zur Tiefe von `listdays`**, der Rest im Nachladen von Phase C (`TPAPI_STUNDE_NACHLADEN`) |
+| `personal/personalkostenprotag` | ~~nein — Zeilen je Person ohne Kennung, Frage an Eugene (`offene-punkte.md`)~~ **seit `0151` (Stufe 2a)** — vor `raw` zur Summe je Betrieb und Tag verdichtet (S5), Fenster 3 Tage plus Rückstand; **seit `0153` in `core.personalkosten_tag`**, ohne Horizont |
 | `revenue/listdays` | **seit `0151`** — die Arbeitsliste, einmal je Betrieb und Nacht (`core.tpapi_geschaeftstag`) |
-| `revenue/journal`, `revenue/journaltables` | **seit `0151`** — roh gesichert (Fenster 3 Tage, Rückstand in Phase C); kein `core` vor der Formprobe (Schritt 2b) |
-| `merchandiseman/*` (13 lesende Listen) | **seit `0151`** — wöchentlich je Betrieb, roh (`core.tpapi_stammabzug`) |
-| `revenue/getforecastperday` | im Register, `aktiv: false` — Schreibweise von `from`/`to` ungemessen |
+| `revenue/journal`, `revenue/journaltables` | **seit `0151`** — roh gesichert (Fenster 3 Tage, Rückstand in Phase C); ~~kein `core` vor der Formprobe (Schritt 2b)~~ **seit `0153` in `core.kassenjournal` und `core.kassenbon`**, die letzten 24 Monate (`TPAPI_CORE_MONATE`), der Rest bleibt roh |
+| `merchandiseman/*` (13 lesende Listen) | **seit `0151`** — wöchentlich je Betrieb, roh (`core.tpapi_stammabzug`); **seit `0153`** der jüngste Abzug je Betrieb in `core.tpapi_artikel` & Co. (`prices` und `attributes` nur roh) |
+| `revenue/getforecastperday` | ~~im Register, `aktiv: false` — Schreibweise von `from`/`to` ungemessen~~ **seit `0153` aktiv** (`from`/`to` als `dd.mm.yyyy`, Formprobe 12.11.2026): Fenster um heute in Phase A, Monate der Historie in Phase C → `core.umsatzprognose_tag` |
 | ~~`revenue/*`, `merchandiseman/*`, `bwa/*`~~ `bwa/*` | nein (BWA nicht lizenziert) |
 | `revenue/store`, `revenue/getlimit` | nur in Probe und Formprobe, nicht im Nachtlauf |
 | `personal/acceptedworkingtimes`, `userdataperday`, `userdataperdaydelta`, `getPersonalData` | **bewusst nie** (Plan Stufe 2, S4) |
 
-**Stufe 2a ist gebaut und gegen die Attrappe getestet, aber nie gegen das echte LINA gelaufen**
-(Regel 7a). Nichts in der Tabelle ist damit am echten Zugang gemessen, was über die Messungen vom
-07. und 09.11.2026 hinausgeht. Plan und Abweichungen: `plan-tpapi-stufe2.md`.
+**Stufe 2a und 2b sind gebaut und gegen die Attrappe getestet, aber nie gegen das echte LINA als
+Nachtlauf gelaufen** (Regel 7a). Nichts in der Tabelle ist damit am echten Zugang gemessen, was über
+die Messungen vom 07. und 09.11.2026 und die Formprobe vom 12.11.2026 hinausgeht. Plan und
+Abweichungen: `plan-tpapi-stufe2.md`.
 
 Was der Client anders macht als der Scraper-Client: ein Schlüssel je Betrieb statt einer Sitzung,
 kein Retry für keinen Ausgang, 429 beendet nur den Betrieb, „not licensed" ist ein Zustand
@@ -421,7 +422,8 @@ die erst seit einem Jahr an dieser Kasse sind, nicht für die Schnittstelle.
 17 Stunden, `personalkostenprotag` 18 Zeilen, `journal` 2.143 Zeilen; vor 400 Tagen ebenso. Beim
 zweiten Betrieb (Kassenstart 04.11.2025) liefert der Tag vor 400 Tagen überall 200 mit null Zeilen.
 Der Horizont von 365 Tagen aus Stufe 1 (`0149`) ist damit zu kurz — Schritt 2b hängt Personal je
-Stunde an dieselbe Arbeitsliste (Plan S3).
+Stunde an dieselbe Arbeitsliste (Plan S3). **Seit `0153` gebaut** (`mart.personal_rueckstand` reicht bis
+zur Tiefe von `listdays`, Phase C holt den Rest); noch nicht gelaufen.
 
 **`businessdate` ist Berliner Mitternacht**: `1571781600` = 22.10.2019 22:00 UTC = 23.10.2019
 00:00 Berlin. Die Annahme in `src/tpapi/verdichtung.ts` stimmt; ~~„Aalen ab 22.10.2019"~~ (Erste
@@ -466,3 +468,26 @@ Grenze ist deshalb von 60 auf 40 gesenkt (`TPAPI_GRENZE_JE_BETRIEB`).
 **Rechnung für den Rückstand.** 92.686 Tage × drei Tagesendpunkte ≈ 278.000 Aufrufe, dazu Personal
 je Stunde für die Jahre vor dem bisherigen Horizont (≈ 65.000). Bei einem Aufruf je Sekunde und
 `TPAPI_NACHLADEN_JE_LAUF = 10.000` rund fünf Wochen, bei 25.000 rund zwei.
+
+## Ist-Stand 12.11.2026: Stufe 2b gebaut (`0153`)
+
+Der Lader raw → core steht (`src/tpapi/core_laden.ts`): Journal, Bons, Personal je Tag, Prognose und
+Kassenstamm. **Gebaut und gegen die Attrappe getestet, nie gegen das echte LINA gelaufen** — die
+Attrappe bildet die Form der Formprobe nach, echte Journalzeilen gibt es lokal nicht. Plan:
+`plan-tpapi-stufe2.md` §5 (B1–B16) und §8; Tabellen `datenmodell.md`, Quellenlage `datenherkunft.md`,
+Sichten `metabase.md`.
+
+**Was die Formprobe für den Bau entschieden hat:** die sieben in beiden Proben leeren Journalfelder
+sind keine Spalten (sie landen mit Wert in `zusatz`); `geschaeftstag` kommt aus der Abrufzeile und wird
+nicht umgerechnet (keine Zeile außerhalb 08:00–07:59); die Prognose ist ein Bereichsabruf mit
+`dd.mm.yyyy`; Personal je Stunde und Tag reichen so weit wie `listdays`; `grosscategory` hat doppelte
+`id`s (68 Einträge, 61 ids — deshalb Position als Schlüssel); `recipe` ist je Betrieb 12–32 MB, fast nur
+Preise und Allergene (deshalb nur ein Teil der Felder nach `core`).
+
+**Was ungemessen bleibt** (Plan §8, „Offen nach 2b"; nach dem ersten echten Lauf an den
+Abgleichsichten zu lesen): ob die Deutung „was ist Umsatz im Journal“ den Umsatzbericht trifft
+(`mart.kassenjournal_abgleich_monat`); ob `artnr` die Kassenartikelnummer und `finanzweg` die Nummer
+(nicht die id) ist (`mart.kassenjournal_stamm_pruefung`, `mart.kassenjournal_finanzweg_stamm`); ob eine
+Rabattzeile der Nachlassbetrag oder die rabattierte Position ist; ob ein Sofortstorno doppelt zählt;
+was `h_brutto` ist; ob LINA Prognosen für Zukunftstage liefert und nachträglich ändert. Für diese
+Betriebe gelten die Betriebsberichte des Scrapers weiter (S10).

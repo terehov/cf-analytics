@@ -266,6 +266,11 @@ const Schema = z.object({
    * `mart.personal_rueckstand` rechnet mit derselben Zahl; der Nachlauf
    * schneidet die Arbeitsliste zusätzlich hier ab, damit ein kleinerer Wert
    * in der Umgebung auch ohne Migration wirkt.
+   *
+   * SEIT 0153 GILT DIE ZAHL NUR FÜR PHASE A. Die Formprobe vom 12.11.2026 fand
+   * Personal je Stunde bis zum ältesten Tag aus `listdays` (Aalen: 2019);
+   * `mart.personal_rueckstand` reicht seitdem so tief, und Phase C holt alles
+   * jenseits dieser 365 Tage nach (`TPAPI_STUNDE_NACHLADEN`).
    */
   TPAPI_HISTORIE_TAGE: z.coerce.number().int().min(1).default(365),
 
@@ -377,6 +382,61 @@ const Schema = z.object({
    * setzt, ändert dort die Schwelle mit (Migration).
    */
   TPAPI_STAMM_TAGE: z.coerce.number().int().min(1).default(7),
+
+  /*
+   * --- TPAPI Stufe 2, Schritt 2b: raw → core (0153) ------------------------
+   * Plan: docs/plan-tpapi-stufe2.md §5 und §8. Der Lader steht in
+   * src/tpapi/core_laden.ts; Phase A lädt die Fenstertage, Phase C den Bestand.
+   */
+
+  /**
+   * Horizont für Journal und Bons in `core` (Monate vor dem laufenden Monat).
+   * 0 = alles, was roh liegt.
+   *
+   * WARUM 24 UND NICHT ALLES. Die Formprobe hat 92.686 Betrieb-Tage gezählt,
+   * mit rund 1.500 Journalzeilen je Tag wären das ~140 Mio. Zeilen. Auf dem Klon
+   * gemessen (12.11.2026, 5,25 Mio. synthetische Zeilen, Plan §8): 230 MB je
+   * Million Journalzeilen mit Index (188 Byte je Zeile, Primärschlüssel 41 MB je
+   * Million), dazu die Bons mit 155 Byte je Zeile — für alles also ~32 GB Journal
+   * und ~2,5 GB Bons, für 24 Monate ~9 GB und ~0,7 GB, neben den 20–60 GB, die
+   * `raw` selbst braucht, bei 97 GB frei. Ob alles nach `core` geht, entscheidet
+   * Eugene nach den ersten echten Größen (`mart.speicher_stand`,
+   * `mart.tpapi_core_stand.bytes_ausserhalb_horizont`). Was vor dem Horizont
+   * liegt, bleibt roh und steht als eigener Zustand da („ausserhalb horizont"),
+   * nicht als Rückstand.
+   *
+   * Personalkosten je Tag, Prognose und Artikelstamm haben keinen Horizont — sie
+   * sind klein.
+   */
+  TPAPI_CORE_MONATE: z.coerce.number().int().min(0).default(24),
+
+  /**
+   * Phase C: so viele Rohsätze lädt der Lader höchstens je Lauf nach `core`
+   * (Betrieb-Tage und Abzüge zusammen). 0 = der Bestand wird nicht nachgeladen —
+   * die Notbremse; Phase A lädt die Fenstertage trotzdem.
+   *
+   * DIE RECHNUNG (Klon, 12.11.2026, 300 Journaltage zu je 1.500 Zeilen und
+   * 1,06 MB JSON): 34,8 ms je Journaltag, 28,7 Tage je Sekunde; Bons und
+   * Personalkosten je Tag sind eine Größenordnung kleiner. Im
+   * Horizont von 24 Monaten liegen bei 35 Betrieben rund 25.000 Journal- und
+   * ebenso viele Bontage, dazu ~92.000 Personaltage — zusammen ~140.000 Rohsätze,
+   * gut eine Stunde. 150.000 lässt das in einer Nacht durch; danach lädt Phase C
+   * nur, was das Nachladen der TPAPI-Spur in derselben Nacht neu gebracht hat.
+   * Die Zeitgrenze `NACHLADEN_BIS` gilt zusätzlich.
+   */
+  TPAPI_CORE_JE_LAUF: z.coerce.number().int().min(0).default(150_000),
+
+  /**
+   * Personal je Stunde im Nachladen von Phase C (Plan S3): 1 = an, 0 = aus.
+   *
+   * Die Formprobe fand `personalkostenprostunde` bis zum ältesten Tag aus
+   * `listdays` (Aalen: 2019). Den Rest jenseits der 365 Tage von Phase A —
+   * rund 65.000 Aufrufe — holt Phase C unter `TPAPI_NACHLADEN_JE_LAUF`,
+   * zusammen mit Journal, Bons und Personalkosten je Tag, neueste zuerst. Der
+   * Schalter nimmt nur DIESEN Teil heraus, ohne den übrigen Rückstand
+   * anzuhalten — wenn er das Budget einer Nacht zu sehr belastet.
+   */
+  TPAPI_STUNDE_NACHLADEN: z.coerce.number().int().min(0).max(1).default(1),
 
   // --- Metabase ------------------------------------------------------------
   /**

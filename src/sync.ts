@@ -25,6 +25,7 @@ import { yextNachlauf } from './yext/nachlauf'
 import { bountiNachlauf } from './bounti/nachlauf'
 import { tpapiNachlauf } from './tpapi/nachlauf'
 import { tpapiNachladen } from './tpapi/rohabzug'
+import { tpapiCoreNachladen } from './tpapi/core_laden'
 import { zulaufPruefen } from './sync/zulauf'
 import { pflegeNachlauf } from './pflege/nachlauf'
 import { laufMelden } from './meldung'
@@ -457,6 +458,21 @@ try {
       })
       return 'FEHLER'
     })
+    /*
+     * Und daneben der Lader raw → core für den Bestand (seit 0153,
+     * src/tpapi/core_laden.ts): neueste zuerst, `TPAPI_CORE_JE_LAUF`, dieselbe
+     * Zeitgrenze. NEBEN der TPAPI-Spur, nicht dahinter — er lädt, was sie in
+     * derselben Nacht bringt (`abholung`), und hinter 50.000 Aufrufen bekäme er
+     * bis `NACHLADEN_BIS` keine Minute. Nur Datenbank, kein Aufruf gegen LINA.
+     * Keine materialisierte Sicht liest seine Tabellen; nach ihm frischt
+     * nichts auf.
+     */
+    const tpapiKernC = tpapiCoreNachladen({ abholung: tpapiC }).catch(e => {
+      log.error('tpapi-core-nachladen hat entgegen seiner Zusage geworfen — der Lauf geht weiter', {
+        fehler: String(e).slice(0, 300),
+      })
+      return 'FEHLER'
+    })
     const c = await sitzung.nachladen()
     if (c.konzernOk > 0) {
       log.info('phase c hat konzern-historie geladen — die sichten darauf werden aufgefrischt', {
@@ -480,8 +496,9 @@ try {
       await betriebsberichtSichtenNachlauf()
     }
 
-    // Die TPAPI-Spur endet spätestens an derselben Zeitgrenze wie die LINA-Spur.
-    log.info('phase c: tpapi-nachladen fertig', { ausgang: await tpapiC })
+    // Die TPAPI-Spur endet spätestens an derselben Zeitgrenze wie die LINA-Spur,
+    // der Lader raw → core kurz nach ihr (er lädt noch, was sie zuletzt brachte).
+    log.info('phase c: tpapi-nachladen fertig', { ausgang: await tpapiC, core: await tpapiKernC })
 
     /**
      * DER SPEICHERWÄCHTER (0152), ALS LETZTES VOR DEM ABSCHLUSS. Nach allem,

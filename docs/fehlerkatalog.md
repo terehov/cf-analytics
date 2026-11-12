@@ -5612,3 +5612,51 @@ Schichttage der letzten 14 Tage (`tage_mit_umsatz_14`, `tage_mit_schichten_14`,
 `Schluessel ohne Schichten`, dazu die Prüfzeile. Wer keinen Umsatz hat (Aposto Wuppertal GmbH, Park
 Cafe München), bleibt `ok` — dort ist nichts zu erwarten. Was die beiden Betriebe tun sollen, ist
 eine Frage an Daniel (`offene-punkte.md`), keine an den Importer.
+
+## `mcp.rechte_auffrischen()` gab der Leserolle das Zugriffsprotokoll zurück (12.11.2026)
+
+**Symptom.** Beim Bau von `0153` stand `mart.mcp_rechte_pruefung` auf einem Klon nach `0152` auf
+zwei Zeilen: `mcp.zugriff` und `mcp.zugriff_zugriff_id_seq`, beide mit `leser_darf = true`. In
+Produktion am 12.11.2026 **nachgemessen: dieselben zwei Zeilen**. Das ist genau der Zustand, den
+`0148` am 06.11.2026 beseitigt hatte (Fehler „Jeder MCP-Nutzer konnte das Zugriffsprotokoll aller
+Nutzer lesen"): `mcp_leser`, die Rolle, unter der das SQL der Nutzer läuft, durfte das Protokoll
+wieder lesen und die Sequenz wieder benutzen. In Produktion vermutlich seit dem 09.11.2026 (Deploy von `0149`/`0150`) — abgeleitet aus dem Deploy-Datum, nicht nachgemessen; nachgemessen ist der Zustand am 12.11.2026.
+
+**Ursache.** Der Funktionsrumpf von `mcp.rechte_auffrischen()` stammt aus `0110` und vergibt
+`SELECT` und `INSERT` auf `mcp.zugriff` samt Sequenz. `0148` hat die Rechte **entzogen**, den Rumpf
+aber **nicht geändert**. `0149`, `0150` und `0151` rufen die Funktion am Ende auf (Pflicht seit
+`0110`, damit neue `mart`-Sichten lesbar werden) — und jeder Aufruf vergab das Entzogene neu. Zwei
+Migrationen, die dasselbe Recht gegensätzlich setzen, über eine Funktion, die in einer dritten
+steht und die niemand beim Entziehen als Quelle des Rechts betrachtet hat.
+
+**Was die zweite Sperre gehalten hat.** Der Prüfer (`mcp/src/pruefen.ts`, Sperre
+`verwaltungsdaten`, Positivliste `MCP_KATALOG`) lehnt Abfragen auf `mcp.zugriff` weiterhin ab. Die
+Abfrage über den Server wäre also gescheitert; offen war das **Datenbankrecht**, die erste der zwei
+Sperren, nicht die zweite. Ob jemand es ausgenutzt hat, ist nicht nachgesehen.
+
+**Warum es nicht auffiel.** `mcp/test/nutzung.test.ts` prüft den **Text der Migrationen** ab `0148`
+auf ein `GRANT` an die Leserolle — der Rumpf der Funktion steht in `0110`, davor, und die
+aufrufenden Migrationen enthalten kein `GRANT`. Der Test konnte nicht anschlagen. Die Prüfsicht
+`mart.mcp_rechte_pruefung` hätte es gezeigt, und der MCP-Server meldet bei einer Zeile dort `/status`
+503 — **ob jemand am 09.11. oder danach `/status` gelesen hat und ob er auf 503 stand, ist nicht
+nachgeprüft.** Dieselbe Lehre wie Regel 10: eine Wache, die niemand liest, wacht nicht.
+
+**Was es künftig verhindert (`0153`).**
+* `0153` schreibt den Rumpf **neu**: im Schema `mcp` wird erst alles entzogen und dann namentlich
+  nur der Katalog vergeben (`mcp.sicht`, `achse`, `sicht_achse`, `kennzahl`, `fallstrick`,
+  `sicht_katalog`, `koernung_fehlend`, `einrichtung_offen`, `sicht_gesundheit`), das Protokoll
+  nicht. Danach entzieht die Migration `mcp.zugriff`, die Sequenz und die Nutzungssichten
+  ausdrücklich noch einmal — auf jeder Datenbank, auf der `0149` bis `0151` es schon vergeben haben.
+* Die Migration **bricht ab**, wenn `mart.mcp_rechte_pruefung` danach nicht leer ist, und prüft als
+  `mcp_leser`, dass `SELECT * FROM mcp.zugriff` scheitert. Kann der Migrationsnutzer nicht entziehen
+  (`insufficient_privilege`), steht `mcp_nutzung_rechte` in `mcp.einrichtung_offen` mit der
+  Anweisung, die Blöcke als Administrator auszuführen.
+* `mcp/test/nutzung.test.ts` prüft jetzt den **letzten** Rumpf von `mcp.rechte_auffrischen()` über
+  alle Migrationen: kein `GRANT` auf `mcp.zugriff` oder `zugriff_zugriff_id_seq`.
+* Wer die Funktion je wieder ändert, ändert sie vollständig: ein Entzug in einer Migration hält nur,
+  solange keine Funktion die Rechte neu setzt. **Rechte, die eine Funktion vergibt, werden dort
+  entzogen, wo die Funktion steht** — nicht in einer späteren Migration daneben.
+
+**Nicht belegt.** Dass in Produktion zwischen dem 09.11. und dem Einspielen von `0153` jemand das
+Protokoll gelesen hat, ist weder behauptet noch ausgeschlossen. `0153` ist zur Stunde nicht
+committet und nicht angewendet; bis dahin steht die Lücke offen (`docs/offene-punkte.md`).

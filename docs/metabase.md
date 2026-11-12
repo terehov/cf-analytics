@@ -2157,13 +2157,13 @@ in `mart` erst mit Schritt 2b (`datenherkunft.md`). Deshalb keine neuen Fallstri
 |---|---|---|
 | `mart.tpapi_rueckstand_tag` | Betrieb × Tagesendpunkt × fehlender Geschäftstag | **Die Arbeitsliste von Phase C** — der Importer liest genau diese Sicht, damit Nachladen und Prüfzeile dieselbe Zahl meinen. Muss auf 0 fallen. Betriebe nur mit Team Data (ohne `listdays`) bekommen für `personalkostenprotag` die letzten 365 Tage (`arbeitsliste = 'horizont 365'`). Nicht lizenzierte Module fehlen, sonst ginge die Zahl nie auf 0 |
 | `mart.tpapi_rueckstand` | Betrieb × Tagesendpunkt | Die verdichtete Fassung: `tage_liste`, `tage_geholt`, `tage_fehlend`, ältester/jüngster Tag, `letzter_nachladen`, `bekannt_seit`, `stockt` |
-| `mart.tpapi_abruf_stand` | TPAPI-Endpunkt (`art` = `tag` oder `stamm`) | Wie viel liegt roh, `in_core` (bis 2b immer 0), `geaendert` (Tage, deren Inhalt sich nach dem ersten Abruf noch änderte — die Messung, ob das Dreitagesfenster reicht), `bytes`, `leer`, `ladefehler` |
+| `mart.tpapi_abruf_stand` | TPAPI-Endpunkt (`art` = `tag` oder `stamm`) | Wie viel liegt roh, `in_core` (~~bis 2b immer 0~~ seit `0153` der aktuelle Laderstand), `geaendert` (Tage, deren Inhalt sich nach dem ersten Abruf noch änderte — die Messung, ob das Dreitagesfenster reicht), `bytes`, `leer`, `ladefehler` |
 | `mart.tpapi_zugang_modul` | Betrieb (alle) × Modul (`personal`, `revenue`, `artikel`) | Schlüssel, Zustand, letzter Erfolg, `befund`. **Neben** `mart.tpapi_zugang`, nicht an seiner Stelle: dort ist `befund` der des Personalmoduls mit „Schluessel ohne Schichten" (`0150`), und Spalten für zwei weitere Module hätten aus einem `befund` drei gemacht. Schwelle für „ohne Zulauf": 48 h für `personal`/`revenue`, 192 h für den wöchentlichen Artikelstamm |
 
 **Fallen, die man den Sichten nicht ansieht:**
 
 1. **Geholt heißt roh gesichert, nicht ausgewertet.** `tage_geholt` und `eintraege` sagen nichts
-   darüber, ob ein Tag in einer Auswertung steht (`in_core`, bis 2b immer 0).
+   darüber, ob ein Tag in einer Auswertung steht (`in_core`, ~~bis 2b immer 0~~ seit `0153` gefüllt).
 2. **`tage_fehlend = 0` kann heißen: nichts gefragt.** Ein Betrieb ohne Schlüssel oder ohne
    gebuchtes Modul steht gar nicht in `mart.tpapi_rueckstand`; `mart.tpapi_zugang_modul` sagt warum.
    `arbeitsliste = 'keine liste'` heißt: Sales Data gebucht, `listdays` noch nie erfolgreich.
@@ -2184,7 +2184,7 @@ in `mart` erst mit Schritt 2b (`datenherkunft.md`). Deshalb keine neuen Fallstri
 | „TPAPI: Rohabzug-Rueckstand faellt nicht (48 h)" (`mart.tpapi_rueckstand`) | **0.** `geprueft` = Betrieb-Endpunkte mit Rückstand, `auffaellig` = die mit `stockt`. Gebaut ohne Verlaufstabelle: „fällt nicht" heißt „kein Tag aus dem Nachladen seit 48 h" |
 | „TPAPI: Modul Umsatz/Artikel mit Schluessel ohne Zulauf" (`mart.tpapi_zugang_modul`) | **0** (`nicht lizenziert` ausgenommen, das ist ein Zustand). Das Personalmodul steht dort nicht — dafür gibt es seit `0149` „TPAPI: Schluessel ohne Zulauf (48 h)" |
 
-**Nicht gebaut, mit Absicht:** die Zeile „Rohsätze ohne `core` älter als 48 h" aus Plan §4. In 2a
+**~~Nicht gebaut, mit Absicht:~~ (seit `0153` gebaut, siehe „TPAPI Stufe 2b in `mart`“)** die Zeile „Rohsätze ohne `core` älter als 48 h" aus Plan §4. In 2a
 stünde sie dauerhaft auf „alles" (`0071`: eine Zeile, die nie auf null gehen kann, liest niemand);
 sie kommt mit Schritt 2b. Dasselbe gilt für alles Fachliche (Stunde × Artikel × Sparte, Gäste je
 Bon, Kellner, Storno, Nachlass je Position, Arbeitsstunden und Zuschläge je Tag).
@@ -2255,3 +2255,79 @@ Datenbank ohne Nachtlauf (lokale Klone) steht sie dauerhaft auf 1 — richtig so
 katalog:abzug`, gegen die Produktion); `mcp.achsen_ableiten()` hat die zwei Sichten aufgenommen, die
 Abzugsdatei nicht.
 
+## TPAPI Stufe 2b in `mart` (Migration `0153`, 12.11.2026)
+
+18 neue und zwei geänderte Sichten auf `core.kassenjournal`, `core.kassenbon`, die Personalkosten je
+Tag, die Prognose und den Kassenstamm. Alle live (keine Materialisierung — keine Messung verlangte
+eine, Plan §8), alle für `mcp_leser` lesbar (Leseprobe in der Migration als `mcp_leser`, `SELECT * …
+LIMIT 1`), im MCP-Katalog mit Körnung und Thema. ⚠️ **Gebaut gegen die Attrappe, nie gegen das echte
+LINA gelaufen: keine dieser Sichten ist an echten Journalzeilen gemessen.** **Es gibt noch keine
+Karte** (B16: erst, wenn der Abgleich mit echten Daten gemessen ist), und **der MCP-Katalogabzug
+(`mcp/test/katalog.json`) ist noch aus der Produktion zu ziehen** (`cd mcp && MCP_DATABASE_URL=… bun
+run katalog:abzug`, gegen eine vollständige Datenbank) — `mcp.achsen_ableiten()` hat die Sichten
+aufgenommen, die Abzugsdatei nicht. Plan: `plan-tpapi-stufe2.md` §5.
+
+**Gemeinsame Falle aller Sichten dieses Abschnitts:** sie zeigen nur **Betriebe mit TPAPI-Schlüssel**;
+Journal- und Bonsichten zusätzlich nur Geschäftstage **im Horizont** (24 Monate,
+`mart.tpapi_core_stand.horizont_ab`; Personalkosten je Tag, Prognose und Stamm haben keinen). Ein
+fehlender Betrieb oder Monat heißt **nicht** null; wer fehlt, sagt `mart.tpapi_zugang_modul`.
+
+**Die Auswertung**
+
+| Sicht | Körnung | Falle |
+|---|---|---|
+| `mart.kassenjournal_position` | Betrieb × Geschäftstag × Journalzeile | **Buchungsliste mit Saldo null:** `sum(betrag_brutto)` ohne Filter ist 0, `count(*)` zählt Zahlungen als Positionen. Umsatz nur über `zeilenart = 'umsatz'` — und das ist eine **Hypothese** (Fallstrick `kassenjournal_saldo_null`, **Sperre**, `…_deutung_hypothese_position`, Warnung). Immer einen Bereich auf `geschaeftstag` setzen, **auch** bei Gruppierung nach `monat` (Sperre `kassenjournal_ohne_zeitraum`: der Filter auf `monat` schließt keine Partition aus, 2,6 s gegen 1,2 s bei 5 Mio. Zeilen, mit Historie mehr). Nach `stunde_folge` sortieren (8 Uhr = 0), nicht nach `stunde`. `tag_fehleingabe` an der Zeile: solche Tage aus Zahlungssummen nehmen. Warengruppe/Hauptgruppe aus dem Kassenstamm, **keine Sparte aus dem Umsatzbericht** (Abweichung 19) |
+| `mart.kassenbon` | Betrieb × Geschäftstag × Bon | **`abrechnung = 'BILL'`** für Bons und Gäste je Bon, `EMPTY` sind Tische ohne Buchung (Fallstrick `kassenbon_leere_tische`). `gaeste = 0` heißt „nicht eingetragen“. Der Betrag eines Bons steht nicht hier, sondern über `bon_id` aus der Positionssicht. Kein Debitorentext, keine Postleitzahl |
+| `mart.personalkosten_tag` | Betrieb × Geschäftstag | **Lohnkosten der Personalplanung, nicht die der BWA** (Fallstrick `personalkosten_tag_nicht_bwa`, Warnung bei Mischung). `tag_leer` = LINA führt niemanden. `lohnkostenquote_pct` und `umsatz_je_arbeitsstunde` über Tage **aus den Summen neu rechnen, nicht mitteln**. `kopfzahl_ueber_arbeitsstunden_pct` misst die Obergrenzen-Aussage aus `0150` |
+| `mart.umsatzprognose_tag` | Betrieb × Geschäftstag | LINAs Zahl. **`prognose_grundlage = 'vorab'`** (letzter Wert vor 08:00) ist die einzige Trefferquote; `nachtraeglich` ist nicht als Güte der Prognose zu lesen. `abweichung_pct` nicht mitteln. `tage_voraus_erstmals` misst, ob LINA Zukunftstage liefert |
+| `mart.kassenartikel` | Betrieb × Kassenartikel | `fixedwe` ist **keine Marge** (Regel 5, Fallstrick `fixedwe_keine_marge_artikel`). Nicht `core.artikel` |
+
+**Die Abgleichsichten (S10) — das Instrument, an dem sich entscheidet, ob man dem Journal glaubt.**
+Alle sind von den **geladenen Journaltagen** getrieben und greifen je Tag über die Primärschlüssel in
+die Gegenstücke (ein Datumsfilter wandert bis in die Abrufzeilen, dieselbe Lehre wie `0117`).
+**Treffer = höchstens 5 Cent**, `nah` = höchstens 1 %; die **letzten sieben Tage zählen nicht**
+(`vorlaeufig`: LINA füllt den Umsatzbericht noch). Immer nach Zeitraum bzw. `monat` filtern.
+
+| Sicht | Körnung | Vergleicht | Falle |
+|---|---|---|---|
+| `mart.kassenjournal_umsatz_abgleich` | Betrieb × Geschäftstag | Journalumsatz nach der **Deutung** gegen den Umsatzbericht (Gesamtzeile, **nur** `quelle = 'umsatzbericht'`, nicht das Kassenblatt), daneben **zwei Kandidaten** (`kandidat_nur_boniert`, `kandidat_ohne_nachlasszeilen`) | `befund`: trifft / nah / weicht ab / beide leer / ohne umsatzbericht / fehleingabe. `journal_saldo` muss 0 sein. `zeilen_unbekannt > 0` heißt: eine Finanzwegnummer fehlt in `core.finanzweg`, die Umsatzsumme kann unvollständig sein |
+| `mart.kassenjournal_finanzweg_abgleich` | Betrieb × Geschäftstag × Finanzweg | Journal gegen Bericht 97 (`core.finanzweg_tag`) | Am 07.11.2026 traf das für Aposto Aalen **jeden** Finanzweg auf den Cent — an einem Betrieb, an einem Tag. `nachlass an der position` ist **kein** Fehler: im Journal steht der Nachlass an der Position |
+| `mart.kassenbon_abgleich` | Betrieb × Geschäftstag | abgerechnete Bons und Gäste gegen Bericht 96 und den Umsatzbericht | 96 zählt stornierte Rechnungen getrennt (`trifft mit stornierten`). Ob 96 jeden Bon der Kasse führt und der Umsatzbericht Gäste genauso zählt, ist nicht gemessen |
+| `mart.kassenjournal_nachlass_abgleich` | Betrieb × Geschäftstag | Nachlasszeilen gegen 97 und den Rabattbericht 92 | **Nicht gegeneinander addieren:** 97 zählt Vorgänge, 92 Artikel, das Journal Zeilen. Ob die Zeile der Nachlassbetrag oder die rabattierte Position ist, ist offen |
+| `mart.kassenjournal_storno_abgleich` | Betrieb × **Monat** | Sofortstorno und Storno mit Grund gegen Bericht 39 | Monatlich, weil 39 nur je Monat geholt wird; ein unvollständiger Monat (`tage_mit_journal`) kann nicht treffen. Ob ein Sofortstorno doppelt zählt, ist offen |
+| **`mart.kassenjournal_abgleich_monat`** | Betrieb × Monat | verdichtet: Anteil treffender Tage je Abgleich | **Die Zahl:** `umsatz_trifft_pct` nahe 100 bei allen Betrieben. Steht ein `kandidat_*_pct` höher, ist die Deutung in `mart.kassenjournal_zeilenart()` zu ändern — und nirgends sonst. Immer nach `monat` filtern. Prozentzahlen |
+
+**Messsichten für die Annahmen** (`pruefung`, nach dem ersten Lauf zu lesen): `mart.kassenjournal_finanzweg_stamm`
+(Betrieb × Finanzweg: Name im Kassenstamm über Nummer **und** id gegen Bericht 97; `befund`),
+`mart.kassenjournal_stamm_pruefung` (Betrieb × Monat; **immer nach `monat` filtern**, die Sicht zählt das
+Journal), `mart.kassenartikel_fixedwe_abgleich` (`fixedwe` gegen `fixer_we`; `gleich` / `abweichend` /
+`ohne wert` / `nur kasse`; **nur Messung, keine Marge, nicht in Auswertungen verwenden**) und
+`mart.kassenjournal_fehleingabe` (Journal: Finanzweg außer Boniert mit mindestens 1 Mio. EUR am Tag,
+dazu die Erkennung aus `0136` an Bericht 97).
+
+**Zustand des Imports:** `mart.tpapi_core_stand` (je Endpunkt: `roh_gesichert`, `in_core`,
+`ausserhalb_horizont` — **eine Entscheidung, kein Rückstand** —, `wartend`, `wartend_ueber_48h`,
+`ladefehler`, `ladefehler_endgueltig`, `auffaellig`, `bytes_ausserhalb_horizont`), `mart.tpapi_core_befund`
+(je Rohsatz mit Ladefehler oder Auffälligkeit, ohne Inhalt der Antwort; leer ist der Normalfall) und
+`mart.umsatzprognose_rueckstand` (Betrieb × fehlender Monat der Prognose-Historie, muss auf 0 fallen).
+Geändert: `mart.tpapi_abruf_stand.in_core` zählt nur den aktuellen Laderstand; `mart.personal_rueckstand`
+reicht bis zur Tiefe von `listdays` (Spalte `arbeitsliste`).
+
+**Drei neue Zeilen in `mart.pruefung_uebersicht`**, alle können auf null gehen:
+
+| Zeile | Erwartung |
+|---|---|
+| „TPAPI: Rohsaetze im Horizont ohne core, aelter als 48 h“ | **0.** Rohsätze **ausserhalb** des Horizonts zählen nicht mit |
+| „TPAPI: Ladefehler raw -> core“ | **0** |
+| „TPAPI: Journal/Bons mit unerwartetem Feld, Saldo oder Zeitpunkt (14 Tage)“ | **0.** Jeder Treffer ist eine Abweichung von der Formprobe, kein Datenfehler an sich |
+
+**Fallstricke im MCP-Prüfer (12 neue in `mcp.fallstrick`, nur bekannte Regelarten):** Sperren —
+`kassenjournal_saldo_null` (Filter auf `zeilenart`), `kassenjournal_ohne_zeitraum` (Bereich auf
+`geschaeftstag`); Warnungen — die Deutung als Hypothese, `kassenbon_ohne_zeitraum`,
+`kassenbon_leere_tische`, `kassenbon_nur_mit_schluessel`, Journal gegen Umsatzbericht mischen,
+`umsatzprognose_ist_lina`, `personalkosten_tag_nicht_bwa`, `personalkosten_tag_planung`, die zwei
+`fixedwe_keine_marge_*`. Zwei ältere Fallstricke (`personal_historie_ein_jahr_*`) sind auf „so tief
+wie die Kasse, Rückstand wird nachgeladen“ umgeschrieben.
+
+**Karten: keine.** Erst, wenn `mart.kassenjournal_abgleich_monat` an echten Daten sagt, ob die Deutung
+trifft. Eine Karte „Umsatz aus dem Journal“ vorher wäre eine plausibel aussehende, ungeprüfte Zahl.

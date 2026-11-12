@@ -16,10 +16,14 @@
  * BEWUSST NICHT HIER (Plan S4): `personal/acceptedworkingtimes`,
  * `userdataperday`, `userdataperdaydelta`, `getPersonalData` — Zeilen je
  * Person mit Arbeitszeiten und Stundenlohn, ohne Auftrag. `raw` ist
- * append-only; was dort einmal steht, bleibt. Und `personalkostenprostunde`
- * nicht: das ist Stufe 1 (`nachlauf.ts`, eigener Rückstand mit 365 Tagen).
- * Findet die Formprobe dort ältere Tage, bekommt er dieselbe Arbeitsliste
- * (S3) — als Eintrag hier, nicht als zweiter Weg.
+ * append-only; was dort einmal steht, bleibt.
+ *
+ * `personalkostenprostunde` STEHT SEIT 0153 HIER (Art `stunde`): die Formprobe
+ * vom 12.11.2026 fand ihn bis zum ältesten Tag aus `listdays`, und Plan S3
+ * sagt, er bekommt dann dieselbe Arbeitsliste — als Eintrag hier, nicht als
+ * zweiter Weg. Phase A bleibt bei Stufe 1 (`nachlauf.ts`, Fenster 14 Tage und
+ * die feste Grenze je Betrieb); den Rest holt Phase C über diesen Eintrag,
+ * geladen mit dem Lader aus Stufe 1 (`laden.ts`, ohne `kostUser`).
  */
 import { protagVerdichten } from './verdichtung'
 
@@ -27,11 +31,15 @@ import { protagVerdichten } from './verdichtung'
 export type TpapiModul = 'personal' | 'revenue' | 'artikel'
 
 /**
- *   tage   die Arbeitsliste (`listdays`), einmal je Betrieb und Nacht
- *   tag    je Betrieb und Geschäftstag (`businessdate=`) → `core.tpapi_abruf`
- *   stamm  tagfreie Liste, je Betrieb als Momentaufnahme → `core.tpapi_stammabzug`
+ *   tage     die Arbeitsliste (`listdays`), einmal je Betrieb und Nacht
+ *   tag      je Betrieb und Geschäftstag (`businessdate=`) → `core.tpapi_abruf`
+ *   stamm    tagfreie Liste, je Betrieb als Momentaufnahme → `core.tpapi_stammabzug`
+ *   bereich  ein Zeitraum (`from`/`to`) je Aufruf → `core.tpapi_stammabzug` mit
+ *            `von`/`bis` (seit 0153: die Umsatzprognose)
+ *   stunde   Personal je Stunde aus Stufe 1 (`laden.ts`, eigene Tabellen) —
+ *            nur im Nachladen von Phase C (seit 0153)
  */
-export type TpapiAbrufArt = 'tage' | 'tag' | 'stamm'
+export type TpapiAbrufArt = 'tage' | 'tag' | 'stamm' | 'bereich' | 'stunde'
 
 export type TpapiEndpunkt = {
   /** Kurzname = letztes Pfadstück; `raw.api_antwort.endpunkt` ist `tpapi:<name>`. */
@@ -96,18 +104,21 @@ export const TPAPI_ENDPUNKTE: readonly TpapiEndpunkt[] = [
     bemerkung: 'Eine Zeile je Person ohne Kennung — vor raw zur Summe je Betrieb und Tag verdichtet (S5).',
   }),
   eintrag({
-    pfad: 'revenue/getforecastperday', modul: 'revenue', art: 'stamm', fensterTage: 0,
+    pfad: 'revenue/getforecastperday', modul: 'revenue', art: 'bereich', fensterTage: 0,
     /*
-     * AUS, BIS DIE FORMPROBE ES FREISCHALTET. Der Endpunkt verlangt
-     * `from`/`to`, und deren Schreibweise (dd.mm.yyyy? Unix-Sekunden?) steht
-     * nur in der Postman-Doku, gemessen ist sie nicht (Plan §1, §3). Ein
-     * geratener Parameter brächte im besten Fall ein 400 je Betrieb und
-     * Woche, im schlechtesten eine leere Liste, die als „keine Prognose"
-     * gespeichert würde. Der Eintrag steht trotzdem hier, damit das Register
-     * vollständig ist und `sync.quelle` ihn als „nicht erwartet" führt.
+     * AN SEIT 0153. Die Formprobe vom 12.11.2026 hat die Schreibweise gemessen:
+     * `from`/`to` als dd.mm.yyyy, Antwort `{datum: Unix-Sekunden auf Berliner
+     * Mitternacht, forecast: netto EUR}` je Tag. Phase A fragt je Betrieb ein
+     * Fenster um heute (PROGNOSE_FENSTER), Phase C die Historie monatsweise
+     * (`mart.umsatzprognose_rueckstand`). Ob LINA Tage in der Zukunft liefert,
+     * ist NICHT gemessen — `mart.umsatzprognose_tag.tage_voraus_erstmals` misst es.
      */
-    aktiv: false,
-    bemerkung: 'Umsatzprognose je Tag; from/to-Schreibweise ungemessen — erst nach der Formprobe (Plan §3).',
+    aktiv: true,
+    bemerkung: 'Umsatzprognose je Tag (from/to dd.mm.yyyy). Fenster um heute in Phase A, Monate der Historie in Phase C.',
+  }),
+  eintrag({
+    pfad: 'personal/personalkostenprostunde', modul: 'personal', art: 'stunde', fensterTage: 0, aktiv: true,
+    bemerkung: 'Stufe 1 (Fenster in Phase A, nachlauf.ts). Hier nur fuer das Nachladen in Phase C bis zur Tiefe von listdays (Plan S3, 0153).',
   }),
   ...ARTIKELSTAMM.map(n => eintrag({
     pfad: `merchandiseman/${n}`, modul: 'artikel', art: 'stamm', fensterTage: 0, aktiv: true,
@@ -126,6 +137,24 @@ export function aktiveTagesendpunkte(): TpapiEndpunkt[] {
 export function aktiveStammendpunkte(): TpapiEndpunkt[] {
   return TPAPI_ENDPUNKTE.filter(e => e.aktiv && e.art === 'stamm')
 }
+
+/** Die Umsatzprognose (Art `bereich`), wenn aktiv. */
+export function prognoseEndpunkt(): TpapiEndpunkt | null {
+  return TPAPI_ENDPUNKTE.find(e => e.aktiv && e.art === 'bereich') ?? null
+}
+
+/** Personal je Stunde für Phase C (Art `stunde`), wenn aktiv. */
+export function stundeEndpunkt(): TpapiEndpunkt | null {
+  return TPAPI_ENDPUNKTE.find(e => e.aktiv && e.art === 'stunde') ?? null
+}
+
+/**
+ * Das Fenster der Prognose in Phase A, in Tagen um heute: ab dem
+ * Monatsersten (oder vor sieben Tagen, wenn das früher ist) bis in 14 Tagen.
+ * Der Monatserste, damit der laufende Monat ganz da ist — die Historie holt
+ * nur abgeschlossene Monate. Ein Aufruf je Betrieb und Nacht, rund 45 Tage.
+ */
+export const PROGNOSE_FENSTER = { zurueck: 7, voraus: 14 } as const
 
 /**
  * Pfade, die nie in dieses Register dürfen — schreibend oder personenbezogen

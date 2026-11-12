@@ -1092,11 +1092,13 @@ für die Betriebe mit Schlüssel, soweit LINA die Tage führt (`revenue/listdays
 * **Artikelstamm** — die dreizehn Listen `merchandiseman/*`, je Betrieb wöchentlich, in
   `core.tpapi_stammabzug`.
 
-**Dafür gibt es noch keine `core`- und keine `mart`-Tabelle** — nur die Verzeichnis- und
-Zustandssichten (`mart.tpapi_rueckstand*`, `tpapi_abruf_stand`, `tpapi_zugang_modul`). Wer nach
+~~**Dafür gibt es noch keine `core`- und keine `mart`-Tabelle**~~ (seit `0153` gibt es sie, siehe
+unten) — nur die Verzeichnis- und
+Zustandssichten (`mart.tpapi_rueckstand*`, `tpapi_abruf_stand`, `tpapi_zugang_modul`). ~~Wer nach
 Kellner, Gästen je Bon, Storno oder Nachlass je Position aus der TPAPI fragt, bekommt
 **keine Zeile und keinen Fehler**. Der Lader (Schritt 2b) wird erst nach der Formprobe gebaut: die
-Feldwerte (Typ, Datumsformat, Vorzeichen, Leerwert) sind nicht gemessen. Die Betriebsberichte des
+Feldwerte (Typ, Datumsformat, Vorzeichen, Leerwert) sind nicht gemessen.~~ Das galt in 2a; die Formprobe vom
+12.11.2026 hat die Feldwerte an zwei Betrieben gemessen, der Lader steht seit `0153`. Die Betriebsberichte des
 Scrapers (Finanzwege 97, Bons 96, Rabatt 92, Storno 39) bleiben, bis ein Abgleich Journal gegen
 Bericht steht (S10); zwei Quellen für dieselbe Zahl sind eine Gegenprobe, solange nicht beide in
 dieselbe Sicht laufen.
@@ -1108,9 +1110,9 @@ Bericht 97. Daraus folgt die Falle für 2b: nicht über alle Zeilen summieren.
 **Bewusst nicht geholt (Plan S4):** `personal/acceptedworkingtimes`, `userdataperday`,
 `userdataperdaydelta`, `getPersonalData` — Zeilen je Person mit Arbeitszeiten und Stundenlohn, ohne
 Auftrag und ohne Zweck in den Auswertungen. `raw` ist append-only; was dort einmal steht, bleibt.
-Wer diese Daten will, entscheidet das eigens. Ebenfalls nicht geholt: `revenue/getforecastperday`
-(im Register, aber `aktiv: false`, bis die Formprobe die Schreibweise von `from`/`to` misst) und
-alles Schreibende.
+Wer diese Daten will, entscheidet das eigens. Ebenfalls nicht geholt: ~~`revenue/getforecastperday`
+(im Register, aber `aktiv: false`, bis die Formprobe die Schreibweise von `from`/`to` misst)~~ (seit `0153`
+aktiv, siehe unten) und alles Schreibende.
 
 **Was in `mart` nie erscheinen wird (S6):** `debitor_text`, `addinfo` und `zip_code` aus Journal und
 Bons — Freitext und Postleitzahlen von Gästen gehören nicht in eine Schicht, die Nutzereingaben als
@@ -1125,3 +1127,80 @@ einer Probe, die `businessdate` über UTC rechnete, und kann einen Tag zu früh 
 **Mehr Betriebe gibt es nur über Buchungen, nicht über Code:** 22 laufende Betriebe ohne
 Daten-API, dazu zwei geschlossene bzw. insolvente mit Buchung (`offene-punkte.md`). **BWA und SuSa**
 brauchen die nicht gebuchte BWA Data API.
+
+### TPAPI Stufe 2b: was jetzt in `core` und `mart` steht (`0153`, 12.11.2026)
+
+⚠️ **Gebaut gegen die Attrappe, nie gegen das echte LINA gelaufen.** Kein Wert aus diesen Quellen ist
+an echten Journalzeilen nachgemessen; die Feldtypen stammen aus der Formprobe vom 12.11.2026 an zwei
+Betrieben. Plan: `plan-tpapi-stufe2.md` §5 (B1–B16) und §8. Wer eine Zahl daraus weitergibt, nennt
+das.
+
+**Woher was kommt**, jeweils nur für **Betriebe mit TPAPI-Schlüssel** (41 am 09.11.2026; Journal, Bons
+und Prognose nur dort, wo `mart.tpapi_zugang_modul` für `revenue` nicht `nicht lizenziert` sagt —
+Saarbrücken und BS Bier & Speisen haben nur Team Data):
+
+| Was | Aus | Nach | Tiefe |
+|---|---|---|---|
+| Kassenjournal (eine Buchung je Zeile) | `revenue/journal` | `core.kassenjournal`, `mart.kassenjournal_position` | **24 Monate** (`TPAPI_CORE_MONATE`); älter roh |
+| Bons (Tisch, Gäste, Kellner) | `revenue/journaltables` | `core.kassenbon`, `mart.kassenbon` | 24 Monate; älter roh |
+| Arbeitsstunden, Zuschläge, Bruttolohn, Lohnkosten je Tag | `personal/personalkostenprotag` (vor `raw` zur Summe verdichtet) | `core.personalkosten_tag`, `mart.personalkosten_tag` | so weit LINA liefert, ohne Horizont |
+| LINAs Umsatzprognose je Tag | `revenue/getforecastperday` | `core.umsatzprognose_tag`, `mart.umsatzprognose_tag` | ab dem ersten Tag in `listdays` |
+| Kassenartikel, Finanzwege, Warengruppen | `merchandiseman/*` | `core.tpapi_artikel` & Co., `mart.kassenartikel` | jüngster Abzug je Betrieb |
+| Personal je Stunde | `personal/personalkostenprostunde` | unverändert `core.personalkosten_stunde` | **jetzt so tief wie `listdays`** (vorher 365 Tage), nachgeladen in Phase C |
+
+**Wie die Tabellen zusammenfinden — beides Annahmen, noch nicht gemessen:**
+
+* `core.kassenjournal.artnr` ↔ `core.tpapi_artikel.artikelnummer` (Feld `number` des Kassenstamms, **nicht**
+  die interne `id`), je Betrieb. Die Trefferquote misst `mart.kassenjournal_stamm_pruefung`
+  (`im_kassenstamm_pct`). Die Migration nennt als zweite Lesart einen Stamm, der zum Monat nicht mehr passt; ein alter
+  Journalmonat gegen den jüngsten Stamm kann deshalb niedriger treffen (Vermutung, nicht gemessen).
+* `core.kassenjournal.finanzweg` ↔ `core.tpapi_finanzweg.nummer` (nicht `finanzweg_id`), und dieselbe
+  Nummer wie in Bericht 97 (`core.finanzweg`). `mart.kassenjournal_finanzweg_stamm` zeigt den Namen
+  über Nummer **und** id und gegen Bericht 97 und sagt `nummer trifft` / `id trifft` / `name weicht ab`.
+* `core.kassenjournal.tableheader_id` ↔ `core.kassenbon.tableheader_id` (ein Bon, mehrere Zeilen).
+* Warengruppe, Kategorie, Hauptgruppe am Kassenartikel über `detailcategory → category →
+  grosscategory` (`id`): aus den Wertebereichen der Formprobe abgeleitet, **nicht gemessen**.
+* **Nicht** `core.artikel`: das ist der Artikel der Konzernberichte (eine Zeile je Nummer für alle
+  Betriebe). Der Kassenstamm ist je Betrieb; nur `mart.kassenartikel_fixedwe_abgleich` legt beide
+  nebeneinander, als Messung.
+
+**Was die Zahlen NICHT sagen:**
+
+* **Die Summe über ein Journal ist null.** Umsatz gibt es nur über `zeilenart = 'umsatz'`, und diese
+  Deutung (`mart.kassenjournal_zeilenart()`, Finanzweg 1 und 10 und was Bericht 97 in der Gruppe
+  „Umsatz“ führt) ist **eine Hypothese aus zwei Stichproben**. Am 01.11.2026 lag „Boniert“
+  (7.638,14 EUR) über dem Umsatzbericht (7.291,64 EUR brutto) — Gutscheinverkauf, Nachlässe und
+  Sofortstorno sind die Kandidaten. **Ob die Deutung trifft, sagt erst
+  `mart.kassenjournal_abgleich_monat`** nach dem ersten echten Lauf. **Bis dahin ist keine
+  Umsatzzahl aus dem Journal belastbar**; für Umsatz gilt `mart.umsatz_tag`.
+* **Journal und Umsatzbericht sind zwei Quellen für dieselben Verkäufe.** Nicht addieren (Fallstrick
+  `kassenjournal_gegen_umsatzbericht`).
+* **Ein fehlender Betrieb hat nicht null Bons.** Ohne Schlüssel oder ohne Sales Data gibt es keine
+  Zeile; ein Monat vor dem Horizont ist roh vorhanden und nicht in `mart`.
+* **Der Nachlass steht im Journal an der Position** (`rabatt_id <> 0`), nicht als eigener Finanzweg. Ob die
+  Zeile mit `rabatt_id` der Nachlassbetrag selbst oder die rabattierte Position ist, ist **nicht
+  gemessen** (`mart.kassenjournal_nachlass_abgleich`). Glücksrad-Auswertungen bleiben bei den
+  Betriebsberichten (`plan-lina-vollabzug.md`), bis das geklärt ist.
+* **Ob ein Sofortstorno doppelt steht** (Finanzweg 10 und `cancellationreason`), ist nicht gemessen
+  (`mart.kassenjournal_storno_abgleich`).
+* **Die Prognose ist LINAs Zahl**, keine eigene. Nur Tage mit `prognose_grundlage = 'vorab'` (letzter
+  Wert vor 08:00 des Tages) sind eine Trefferquote; Tage aus der Historie sind `nachtraeglich`, und ob
+  LINA ihre Prognose nach dem Tag anpasst, weiß niemand.
+* **`personalkosten_tag` sind Lohnkosten der Personalplanung**, nicht die Personalkosten der BWA und
+  nicht die Quote des Round Table (Fallstrick `personalkosten_tag_nicht_bwa`). Was `h_brutto` ist (mit
+  oder ohne Pause), ist nicht gemessen. `personen = 0` heißt „LINA führt dort niemanden“. Die
+  Obergrenzen-Aussage aus `0150` (Summe der Personen je Stunde liegt im Median 26 % über LINAs
+  Effektivität) lässt sich jetzt endlich an den echten Arbeitsstunden messen
+  (`kopfzahl_ueber_arbeitsstunden_pct`).
+* **`fixedwe` ist keine Marge.** Es ist der in der Kasse hinterlegte Wareneinsatz je Artikel; ob er
+  die Quelle von `core.artikel.fixer_we` ist (Regel 5), sagt `mart.kassenartikel_fixedwe_abgleich`
+  (`gleich` fast überall = dieselbe Zahl). Das beantwortet die Herkunft, nicht die Pflege.
+* **Der Geschäftstag läuft 08:00 bis 07:59.** Der Lader rechnet nichts um (die Formprobe fand keine Zeile
+  außerhalb), sondern zählt Abweichungen. Stunden 0–7 stehen am Ende (`stunde_folge`).
+
+**Was nie in `mart` erscheint (S6):** `debitor_text`, `addinfo`, `zip_code`. Sie stehen in `core` und in
+`raw`.
+
+**Die Betriebsberichte des Scrapers bleiben (S10).** Sie decken alle Betriebe und reichen bis 2018, die
+TPAPI 41 Betriebe. Der Abgleich je Betrieb und Tag (`mart.kassenjournal_*_abgleich`) ist die Gegenprobe;
+erst danach wird über das Abschalten einzelner Berichte entschieden.

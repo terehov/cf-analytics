@@ -2491,3 +2491,97 @@ Tests: `src/sync/speicher.test.ts` (Prognose an synthetischen Messreihen gegen
 `TEST_DATABASE_URL`, jede Stufe, die Messung mit eigenem Client — nie über den Pool —, die
 Nachrichtenzeile).
 
+
+## TPAPI-Dienst, Stufe 2b: der Lader raw → core (`0153`, 12.11.2026)
+
+Plan, Entscheidungen B1–B16 und die Abweichungen 18–25: `plan-tpapi-stufe2.md` §5 und §8. **Gebaut und
+gegen die Attrappe getestet, nie gegen das echte LINA gelaufen** (Regel 7a) — die Attrappe
+(`src/tpapi/mock.ts`) bildet die Form der Formprobe vom 12.11.2026 nach, echte Journalzeilen gibt es
+lokal nicht. Der Abschnitt davor (Stufe 2a) gilt unverändert; sein Satz „kein `core`-Lader“ ist
+~~wahr~~ überholt.
+
+**Datei.** `src/tpapi/core_laden.ts`. Der Lader macht **keinen Aufruf gegen LINA**, nur Datenbank.
+
+**Laderstand je Endpunkt (`LADERSTAND`).** Jeder Endpunkt hat eine Laderversion. Geladen wird, was
+`core_stand IS DISTINCT FROM` dieser Version ist — **auch nach einer neuen Laderversion**. Ändert sich
+ein Lader, erhöht man die Zahl, und der Bestand lädt sich aus `raw` neu, ohne einen Aufruf (harte
+Regel 4, Plan S1: `core` neu aufzubauen ist hier der normale Weg, nicht der Notfall). Version und
+Horizont schreibt der Lader zu Beginn jedes Laufs in `sync.tpapi_core_lader`, damit die Sichten
+dieselbe Grenze ziehen.
+
+**Direkt in SQL, je Betrieb und Tag eine Transaktion.** Ein Journal hat 1–2 MB und 1.000–2.500 Zeilen;
+die zerlegt PostgreSQL selbst (`jsonb_array_elements`), statt sie durch JavaScript zu ziehen. Der Tag
+wird gelöscht und neu geschrieben, Journal und `core.kassenjournal_finanzweg_tag` im selben Zug —
+idempotent. Gecastet werden nur Zahlenfelder, **nie Freitext** (`addinfo`, `debitor_text`):
+PostgreSQL-Fehlermeldungen können einen Feldwert zitieren, und die Meldung landet in `ladefehler`.
+
+**Der Rohsatz wird gesperrt, nicht nur gelesen.** Die Abrufzeile wird mit `FOR UPDATE` gelesen: holt
+Phase C denselben Tag gerade neu, wartet das Schreiben des neuen Rohsatzes, bis der Lader fertig ist,
+und setzt `core_stand` danach zurück. Ein Lader, der einen alten Rohsatz lädt und den neuen als
+geladen markiert, ist damit ausgeschlossen (B8).
+
+**Fehler je Tag.** Scheitert ein Tag, rollt seine Transaktion zurück, die gekürzte Meldung steht in
+`core.tpapi_abruf.ladefehler`, der Lauf geht weiter. **Drei Fehlversuche mit derselben Laderversion,
+dann versucht der Lader diesen Rohsatz nicht mehr** (`ladefehler endgueltig` in
+`mart.tpapi_core_stand`, Prüfzeile) — bis ein neuer Rohsatz oder eine neue Laderversion kommt. **Ein
+Lauf versucht jeden Rohsatz höchstens einmal** (`ladefehler_am`). Wie `0136`: nicht endlos, aber
+sichtbar. Eine Journalzeile ohne Finanzweg lässt den ganzen Tag scheitern, statt mit einem Platzhalter
+zu laden (Abweichung 22).
+
+**Wo er läuft (B9).**
+
+* **Phase A**, `tpapiCoreTagesgeschaeft()`, am Ende von `tpapiNachlauf()` (nach Stufe 1 und dem
+  Rohabzug): Artikelstamm, Prognose und die Tagesrohsätze der **letzten sieben Tage** (Fenster des
+  Rohabzugs von drei Tagen plus Reserve für eine ausgefallene Nacht). Ohne Obergrenze — das Fenster
+  begrenzt sich selbst. Damit stehen die Fenstertage vor Phase B in `core`. Ein Ladefehler macht den
+  TPAPI-Dienst `teilweise`; der Rohsatz bleibt und steht in `mart.tpapi_core_stand`.
+* **Phase C**, `tpapiCoreNachladen()`, als **dritte Spur** neben der LINA-Spur und der TPAPI-Spur
+  (`src/sync.ts`): neueste Tage zuerst, höchstens `TPAPI_CORE_JE_LAUF`, nie über `NACHLADEN_BIS`.
+  **Neben** der TPAPI-Spur, nicht dahinter, und mit ihr als `abholung` verbunden: solange sie läuft
+  und neue Rohsätze bringt, wartet der Lader auf Nachschub (bis 30 s je Runde), statt sich zu
+  beenden — hinter 50.000 Aufrufen bekäme er bis 04:30 keine Minute. Nach ihm wird nichts
+  aufgefrischt: keine materialisierte Sicht liest diese Tabellen.
+
+**Horizont (B10).** Journal und Bons nur ab `mart.tpapi_core_ab(TPAPI_CORE_MONATE)` (Standard 24
+Monate vor dem laufenden Monat). Was davor liegt, wird nicht geladen und steht als „ausserhalb
+horizont“ da — ein Zustand, kein Rückstand, und er löst keine Prüfzeile aus. Personal je Tag,
+Prognose und Stamm haben keinen Horizont.
+
+**Prognose als Bereichsabruf (B6, Abweichung 24).** `revenue/getforecastperday` hat die Art `bereich`
+(`from`/`to` als `dd.mm.yyyy`, gemessen in der Formprobe): **Phase A** je Betrieb einen Aufruf, Fenster
+ab Monatserstem (oder vor 7 Tagen, was früher ist) bis in 14 Tagen (`PROGNOSE_FENSTER`); **Phase C** je
+abgeschlossenem Monat ab dem ersten Tag in `listdays` einen Aufruf (`mart.umsatzprognose_rueckstand`,
+rund 3.000 insgesamt), unter `TPAPI_NACHLADEN_JE_LAUF` und **nach** allen fehlenden Tagen — Tage
+fallen hinten aus `listdays`, eine Prognose nicht, und die nachträgliche ist die schwächere Zahl. Der
+Lader verarbeitet **jeden** Abzug in der Reihenfolge der Abrufe als eine Beobachtung. Ob LINA Tage in
+der Zukunft liefert und Prognosen nachträglich ändert, ist **nicht gemessen** (`tage_voraus_erstmals`,
+`aenderungen` messen es).
+
+**Personal je Stunde im Nachladen (B11, Abweichung 20, 21).** `personal/personalkostenprostunde`
+steht jetzt im Register (Art `stunde`). **Phase A bleibt bei Stufe 1** (Fenster, feste Grenze je
+Betrieb, 365 Tage). Den Rest bis zur Tiefe von `listdays` (Aalen bis 2019; rund 65.000 Aufrufe) holt
+Phase C in der TPAPI-Spur mit dem Lader aus Stufe 1, **derselbe Client, dieselbe gleitende Grenze,
+dasselbe Budget**. `TPAPI_STUNDE_NACHLADEN` = 0 nimmt nur diesen Teil heraus, ohne den übrigen
+Rückstand anzuhalten. Der raw-Name bleibt `tpapi:personalkostenprostunde`; der Test aus 2a, der diesen
+Namen im Register verbot, prüft jetzt, dass nur dieser eine Eintrag ihn trägt. `TPAPI_HISTORIE_TAGE`
+(365) gilt seitdem nur für Phase A.
+
+**Neue Variablen** (`src/config.ts`):
+
+| Variable | Vorgabe | Wirkung |
+|---|---|---|
+| `TPAPI_CORE_MONATE` | 24 (0 = alles) | Horizont für Journal und Bons in `core`. Gerechnet aus dem Klon (synthetisch): 230 MB je Mio. Journalzeilen mit Index, 24 Monate ~9 GB, alles ~32 GB. **Die Entscheidung „alles oder 24 Monate“ trifft Eugene nach den ersten echten Größen** (`mart.tpapi_core_stand.bytes_ausserhalb_horizont`, `mart.speicher_stand`) |
+| `TPAPI_CORE_JE_LAUF` | 150.000 (0 = der Bestand wird nicht nachgeladen; Phase A lädt die Fenstertage trotzdem) | Rohsätze (Betrieb-Tage und Abzüge) je Lauf in Phase C. Gerechnet: 34,8 ms je Journaltag auf dem Klon, im Horizont rund 140.000 Rohsätze ≈ gut eine Stunde — eine Annahme, bis der erste echte Lauf gemessen ist |
+| `TPAPI_STUNDE_NACHLADEN` | 1 (0 oder 1) | Personal je Stunde über die 365 Tage von Phase A hinaus |
+
+**Folge: der Lauf bleibt noch etwas länger auf `laeuft`.** Die dritte Spur gehört zu Phase C, und
+`abschliessen()` wartet auf sie; sie endet an `TPAPI_CORE_JE_LAUF` oder `NACHLADEN_BIS` (04:30). Die
+Regel „kein Push auf `main`, solange ein Lauf aktiv ist“ gilt entsprechend.
+
+**Was sichtbar bleibt (Regel 10).** `mart.tpapi_core_stand` (je Endpunkt: roh gesichert, in core,
+ausserhalb Horizont, wartend, Ladefehler), `mart.tpapi_core_befund` (je Rohsatz), drei Zeilen in
+`mart.pruefung_uebersicht` („Rohsaetze im Horizont ohne core, aelter als 48 h“, „Ladefehler raw →
+core“, „Journal/Bons mit unerwartetem Feld, Saldo oder Zeitpunkt (14 Tage)“), fünf Registereinträge
+`tpapi:core_*` in `sync.quelle` (Merker `tpapi_core`, gefragt ist der **Lader**, nicht LINA: ein
+Rohabzug, der Nacht für Nacht liefert, während der Lader steht, sähe an den Rohsätzen frisch aus) und
+die Prognose als erwartete Quelle. `src/sync/phasen.test.ts` prüft am Quelltext die dritte Spur.

@@ -2586,7 +2586,7 @@ nachsehen**, ob `letzter_tag_mit_schichten` bei beiden weitergewandert ist.
 Gebaut und gegen die Attrappe getestet, **nie gegen das echte LINA gelaufen**. Alles Folgende ist
 ungemessen. Plan: `plan-tpapi-stufe2.md`.
 
-**7. Formprobe laufen lassen (Eugene, im Importer-Container).** `bun run tpapi-formprobe --tag
+~~**7. Formprobe laufen lassen (Eugene, im Importer-Container).**~~ **Erledigt am 12.11.2026** (Ergebnis: `lina-third-party-api.md`, Abschnitt „Formprobe, 12.11.2026“; Lader seit `0153`). `bun run tpapi-formprobe --tag
 <Tag>` per `docker exec`, danach einmal mit `--alle` (Befehlszeile und Umfang:
 `lina-third-party-api.md`, Abschnitt „Die Formprobe"). Ohne sie gibt es keinen Lader (Schritt 2b):
 die Feldwerte von Journal, Bons und Artikelstamm sind nicht gemessen. Das Ergebnis gehört in
@@ -2632,6 +2632,57 @@ sync.tpapi_zugang GROUP BY 1` (steht dort `gebremst`, zählt das Limit fremde An
 Fenster noch, reicht S7 nicht), und die Laufdauer: die TPAPI-Spur hält den Lauf in Phase C auf
 `laeuft` (`importer.md`).
 
-**14. `getforecastperday` bleibt aus,** bis die Formprobe `from`/`to` misst; danach `aktiv: true` im
+~~**14. `getforecastperday` bleibt aus,** bis die Formprobe `from`/`to` misst;~~ **Erledigt mit `0153`:** die Formprobe hat `from`/`to` (`dd.mm.yyyy`) gemessen, der Endpunkt ist aktiv. Ursprünglicher Text: danach `aktiv: true` im
 Register und die Sicht-Endpunktliste anpassen. Und Schritt 2b (Lader, `mart`, Karten, Abgleich nach
 S10) ist zu planen, sobald die Formprobe vorliegt.
+
+## TPAPI Stufe 2b: was nach dem Deploy zu lesen und zu entscheiden ist (12.11.2026, `0153`)
+
+⚠️ **Gebaut und gegen die Attrappe getestet, nie gegen das echte LINA gelaufen.** Kein Wert aus
+Journal, Bons, Personalkosten je Tag, Prognose oder Kassenstamm ist an echten Daten gemessen. Plan:
+`plan-tpapi-stufe2.md` §5, §8 („Offen nach 2b“).
+
+**15. Den Abgleich lesen (Eugene oder Agent, nach dem ersten echten Lauf — die Messung, an der alles
+hängt).** `SELECT * FROM mart.kassenjournal_abgleich_monat WHERE monat = …`: trifft die Deutung „was
+ist Umsatz im Journal“ (`umsatz_trifft_pct` nahe 100 bei allen Betrieben)? Steht stattdessen einer
+der Kandidaten höher (`kandidat_nur_boniert_pct`, `kandidat_ohne_nachlass_pct`), ist
+`mart.kassenjournal_zeilenart()` zu ändern — an dieser einen Stelle. Dazu
+`mart.kassenjournal_finanzweg_stamm` (`befund = 'nummer trifft'`?), `mart.kassenjournal_stamm_pruefung`
+(`im_kassenstamm_pct` nahe 100?), `mart.kassenjournal_nachlass_abgleich` (ist die Rabattzeile der
+Nachlassbetrag?), `mart.kassenjournal_storno_abgleich` (zählt ein Sofortstorno doppelt?),
+`mart.kassenbon_abgleich` (Bons gegen 96, Gäste gegen den Umsatzbericht). **Bis dahin ist keine
+Umsatzzahl aus dem Journal belastbar.** Ergebnis in `plan-tpapi-stufe2.md` §8 und
+`datenherkunft.md`.
+
+**16. Horizont: alles oder 24 Monate? (Entscheidung Eugene, nach den ersten echten Größen.)** Gerechnet
+auf dem Klon (synthetisch): Journal 24 Monate ~9 GB, alles ~32 GB. Messen:
+`mart.tpapi_core_stand.bytes_ausserhalb_horizont`, `pg_total_relation_size('core.kassenjournal')`,
+`mart.speicher_stand`. Soll alles nach `core`: `TPAPI_CORE_MONATE=0`, der Lader holt den Rest aus
+`raw` ohne Aufruf gegen LINA. Zusammen mit Punkt 8 oben (Plattenplatz für `raw`).
+
+**17. MCP-Katalogabzug ziehen.** `cd mcp && MCP_DATABASE_URL=… bun run katalog:abzug` gegen eine
+**vollständige** Datenbank (Produktion, nach dem Deploy); `mcp.achsen_ableiten()` hat die 18 neuen
+Sichten aufgenommen, die Abzugsdatei `mcp/test/katalog.json` nicht. Ohne Abzug scheitern die
+Katalogtests nicht, aber der Stand driftet (20.09.2026: 37 Sichten).
+
+**18. Karten.** Es gibt **keine** (B16). Erst bauen, wenn Punkt 15 gemessen ist: Stunde × Artikel ×
+Warengruppe, Gäste je Bon, Prognose gegen Ist (nur `prognose_grundlage = 'vorab'`), Arbeitsstunden je
+Tag. Frage vorab: soll das Journal die Betriebsberichte ablösen (S10) oder neben ihnen bleiben?
+
+**19. Die Rechte der Leserolle in Produktion nachsehen — vor und nach dem Deploy.** `SELECT * FROM
+mart.mcp_rechte_pruefung;` stand am 12.11.2026 in Produktion auf zwei Zeilen (`mcp.zugriff`,
+`mcp.zugriff_zugriff_id_seq`, `leser_darf = true`), seit dem 09.11.2026 (`0149`, `0150`, `0151` rufen die Funktion
+`mcp.rechte_auffrischen()` auf) (`fehlerkatalog.md`, 12.11.2026). `0153` repariert das und bricht
+ab, wenn die Prüfung danach nicht leer ist. **Zu klären:** ob `/status` des MCP-Servers seit dem
+09.11. auf 503 stand und ob jemand es gelesen hat (nicht nachgeprüft); ob `mcp.zugriff` in der Zeit
+gelesen wurde (nicht nachgeprüft). Bis `0153` angewendet ist, steht die Lücke offen — der Prüfer
+(`MCP_KATALOG`) lehnt die Abfrage trotzdem ab.
+
+**20. Ungeprüfte Annahmen aus Plan §8 („Offen nach 2b“), die der erste Lauf klärt:** ob die Verweise
+`recipe.detailcategory → category → grosscategory` über `id` laufen (`mart.kassenartikel.warengruppe`
+leer = nein); ob `h_brutto` Pausen enthält; ob LINA Prognosen für Zukunftstage liefert
+(`tage_voraus_erstmals`) und nachträglich ändert (`aenderungen`); ob die erste Lader-Nacht in die
+Zeitgrenze passt (rund 140.000 Rohsätze, gerechnet 34,8 ms je Journaltag auf dem Klon — eine
+Annahme); ob der Lader die dritte Spur in Phase C ohne Lockkonflikt mit dem Rohabzug schafft
+(`FOR UPDATE` an der Abrufzeile); ob `fixedwe` der Kasse fast überall `gleich` `fixer_we` aus den Konzernberichten ist
+(`mart.kassenartikel_fixedwe_abgleich`, Regel 5 — beantwortet die Herkunft, nicht die Pflege).

@@ -60,6 +60,7 @@ import { laufClientMerken, PFAD_PERSONAL_STUNDE, TpapiClient, type TpapiAntwort 
 import { alsBusinessdate, tagLaden } from './laden'
 import { LIZENZ_PAUSE_TAGE, zugangSpiegeln } from './zugang'
 import { rohabzugTagesgeschaeft } from './rohabzug'
+import { tpapiCoreTagesgeschaeft } from './core_laden'
 
 const MODUL = 'personal'
 const MERKER = 'tpapi_personal'
@@ -153,6 +154,12 @@ async function merkerSchreiben(w: {
  *
  * Den Client merkt sich `laufClientMerken()` für Phase C (`tpapiNachladen()`),
  * damit die gleitende Grenze und die 429-Liste über den ganzen Lauf gelten.
+ *
+ * SEIT 0153 DANACH DER LADER raw → core (`core_laden.ts`, Schritt 2b) für die
+ * Fenstertage, den Artikelstamm und die Prognose: was diese Nacht geholt
+ * wurde, steht damit vor Phase B in `core.kassenjournal` & Co. Kein Aufruf
+ * gegen LINA — nur die Datenbank. Ein Ladefehler macht den Dienst
+ * `teilweise`; der Rohsatz bleibt und steht in `mart.tpapi_core_stand`.
  */
 export async function tpapiNachlauf(opt: TpapiNachlaufOptionen = {}): Promise<'ok' | 'teilweise' | 'uebersprungen'> {
   const client = opt.client ?? new TpapiClient()
@@ -162,8 +169,9 @@ export async function tpapiNachlauf(opt: TpapiNachlaufOptionen = {}): Promise<'o
   // Auch ohne Schlüssel: der Rohabzug spiegelt dann seine Module auf
   // `ohne_schluessel` und gibt `uebersprungen` zurück, ohne zu fragen.
   const stufe2 = await rohabzugTagesgeschaeft(client)
+  const kern = await tpapiCoreTagesgeschaeft()
   if (stufe1 === 'uebersprungen') return 'uebersprungen'
-  return stufe1 === 'ok' && stufe2 !== 'teilweise' ? 'ok' : 'teilweise'
+  return stufe1 === 'ok' && stufe2 !== 'teilweise' && kern === 'ok' ? 'ok' : 'teilweise'
 }
 
 async function personalJeStunde(client: TpapiClient): Promise<'ok' | 'teilweise' | 'uebersprungen'> {

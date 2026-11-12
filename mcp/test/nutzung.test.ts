@@ -143,3 +143,60 @@ describe('Keine Migration nach 0148 gibt der Leserolle die Nutzung zurueck', () 
     expect(treffer).toEqual([])
   })
 })
+
+/**
+ * Der Rumpf von mcp.rechte_auffrischen(), nicht nur der Text der Migrationen.
+ *
+ * 0148 hat der Leserolle das Zugriffsprotokoll entzogen, den Rumpf der Funktion
+ * aber nicht angefasst — er stammt aus 0110 und vergibt INSERT auf
+ * mcp.zugriff samt Sequenz. 0149, 0150 und 0151 riefen die Funktion auf und
+ * drehten 0148 damit zurueck (in Produktion seit dem 09.11.2026,
+ * docs/fehlerkatalog.md, 12.11.2026). Der Test darueber sah das nicht: die
+ * aufrufenden Migrationen enthalten kein GRANT, und die Definition steht davor.
+ * Hier zaehlt die LETZTE Definition ueber alle Migrationen.
+ */
+describe('Der letzte Rumpf von mcp.rechte_auffrischen() vergibt das Protokoll nicht', () => {
+  const ordner = join(import.meta.dir, '..', '..', 'migrations')
+  const dateien = readdirSync(ordner).filter(f => /^\d{4}_.*\.sql$/.test(f)).sort()
+  const KOPF = /CREATE\s+OR\s+REPLACE\s+FUNCTION\s+mcp\.rechte_auffrischen\s*\(\s*\)/gi
+  // Ein GRANT, in dem das Protokoll oder seine Sequenz vorkommt (bis zum naechsten Semikolon).
+  const VERGABE = /GRANT\b[^;]*\b(mcp\.zugriff\b|zugriff_zugriff_id_seq\b)/i
+
+  /** Rumpf der LETZTEN Definition, ohne Zeilenkommentare; null, wenn es keine gibt. */
+  function letzterRumpf(liste: string[]): { datei: string; rumpf: string } | null {
+    let gefunden: { datei: string; rumpf: string } | null = null
+    for (const datei of liste) {
+      const text = readFileSync(join(ordner, datei), 'utf8')
+      for (const m of text.matchAll(KOPF)) {
+        const ab = (m.index ?? 0) + m[0].length
+        const auf = /\$(\w*)\$/.exec(text.slice(ab))
+        if (!auf) continue
+        const von = ab + (auf.index ?? 0) + auf[0].length
+        const bis = text.indexOf(auf[0], von)
+        if (bis < 0) continue
+        gefunden = { datei, rumpf: text.slice(von, bis).replace(/--[^\n]*/g, '') }
+      }
+    }
+    return gefunden
+  }
+
+  test('es gibt eine Definition, und sie steht nicht vor 0148', () => {
+    const letzte = letzterRumpf(dateien)
+    expect(letzte).not.toBeNull()
+    expect(letzte!.datei >= '0148').toBe(true)
+  })
+
+  test('die letzte Definition enthaelt kein GRANT auf mcp.zugriff oder dessen Sequenz', () => {
+    const letzte = letzterRumpf(dateien)!
+    const treffer = letzte.rumpf.match(VERGABE)
+    expect({ datei: letzte.datei, vergabe: treffer?.[0].replace(/\s+/g, ' ') ?? null })
+      .toEqual({ datei: letzte.datei, vergabe: null })
+  })
+
+  test('der Test erkennt den alten Rumpf aus 0110 (er ist nicht leer gelaufen)', () => {
+    const bis0110 = dateien.filter(f => f <= '0110_zzz')
+    const alt = letzterRumpf(bis0110)
+    expect(alt).not.toBeNull()
+    expect(VERGABE.test(alt!.rumpf)).toBe(true)
+  })
+})

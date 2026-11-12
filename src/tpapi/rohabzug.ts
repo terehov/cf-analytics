@@ -7,12 +7,14 @@
  *   Phase A  `rohabzugTagesgeschaeft(client)` — aufgerufen von `tpapiNachlauf()`
  *            NACH Personal je Stunde, mit demselben Client. Holt `listdays`
  *            je Betrieb (die Arbeitsliste, S2), das Fenster der letzten drei
- *            Kalendertage für Journal, Bons und Personalkosten je Tag, und den
- *            fälligen Artikelstamm (wöchentlich je Betrieb, S11). Begrenzt
- *            durch sich selbst: 1 + 3 × 3 Aufrufe je Betrieb, dazu 13 einmal
- *            die Woche.
+ *            Kalendertage für Journal, Bons und Personalkosten je Tag, den
+ *            fälligen Artikelstamm (wöchentlich je Betrieb, S11) und seit 0153
+ *            die Umsatzprognose (ein Fenster um heute). Begrenzt durch sich
+ *            selbst: 1 + 3 × 3 + 1 Aufrufe je Betrieb, dazu 13 einmal die Woche.
  *   Phase C  `tpapiNachladen()` — aus src/sync.ts neben der LINA-Spur. Der
- *            Rückstand aus `mart.tpapi_rueckstand_tag`, neueste Tage zuerst,
+ *            Rückstand aus `mart.tpapi_rueckstand_tag` (seit 0153 dazu Personal
+ *            je Stunde aus `mart.personal_rueckstand` und, zuletzt, die Monate
+ *            der Prognose aus `mart.umsatzprognose_rueckstand`), neueste Tage zuerst,
  *            Tag außen, Betrieb innen, höchstens `TPAPI_NACHLADEN_JE_LAUF`
  *            Aufrufe und nie über `NACHLADEN_BIS` hinaus. Ein Rückstand von
  *            über 100.000 Aufrufen in Phase A hielte Phase B auf — dieselbe
@@ -53,10 +55,11 @@ import { eine, query } from '../db/pool'
 import { nachladenVorbei } from '../sync/worker'
 import { laufClient, TpapiClient, type TpapiAntwort } from './client'
 import {
-  aktiveStammendpunkte, aktiveTagesendpunkte, ENDPUNKT_LISTDAYS,
+  aktiveStammendpunkte, aktiveTagesendpunkte, ENDPUNKT_LISTDAYS, PROGNOSE_FENSTER,
+  prognoseEndpunkt, stundeEndpunkt,
   type TpapiEndpunkt, type TpapiModul,
 } from './endpunkte'
-import { alsBusinessdate } from './laden'
+import { alsBusinessdate, tagLaden } from './laden'
 import { listdaysLaden, stammRohLaden, tagRohLaden, type RohErgebnis } from './roh_laden'
 import { LIZENZ_PAUSE_TAGE, zugangFortschreiben, zugangSpiegeln, type ZugangZustand } from './zugang'
 
@@ -88,16 +91,30 @@ type Auftrag = {
   nr: number
   betrieb: Betrieb
   ep: TpapiEndpunkt
-  /** YYYY-MM-DD, nur bei Tagesendpunkten. */
+  /** YYYY-MM-DD, nur bei Tagesendpunkten und Personal je Stunde. */
   tag?: string
+  /** Nur Bereichsabrufe (Prognose): YYYY-MM-DD. */
+  von?: string
+  bis?: string
 }
 
+/**
+ * Gruppen für Zählung und Merker. Personal je Stunde (seit 0153 im Nachladen)
+ * zählt für sich und schreibt den Merker aus Stufe 1 (`tpapi_personal`) — er
+ * gehört zur Quelle `tpapi:personalkosten_stunde`, nicht zu den Personalkosten
+ * je Tag.
+ */
+type Gruppe = TpapiModul | 'stunde'
+
 /** Merker je Endpunktgruppe — dieselben Namen stehen in src/sync/quellen.ts. */
-export const MERKER_JE_MODUL: Record<TpapiModul, string> = {
+export const MERKER_JE_MODUL: Record<Gruppe, string> = {
   revenue: 'tpapi_revenue',
   personal: 'tpapi_personal_tag',
   artikel: 'tpapi_artikel',
+  stunde: 'tpapi_personal',
 }
+
+const gruppeVon = (ep: TpapiEndpunkt): Gruppe => (ep.art === 'stunde' ? 'stunde' : ep.modul)
 
 type Gruppenstand = {
   abrufe: number
@@ -126,7 +143,7 @@ type Laufstand = {
   /** `${betrieb_key}:${modul}` → Grund. */
   modulAus: Map<string, 'nicht_lizenziert' | 'fehler'>
   fehlerFolge: Map<string, number>
-  gruppen: Record<TpapiModul, Gruppenstand>
+  gruppen: Record<Gruppe, Gruppenstand>
   /** Zeitgrenze erreicht oder Obergrenze — kein Zustand, nur fürs Log. */
   abbruch: string | null
   listdaysNichtMitternacht: number
@@ -178,10 +195,25 @@ function istAus(s: Laufstand, b: Betrieb, m: TpapiModul): boolean {
  * Einen Auftrag ausführen und seinen Ausgang festhalten. Gibt nie einen
  * Fehler weiter.
  */
+/**
+ * Personal je Stunde (Art `stunde`) mit dem Lader aus Stufe 1 — raw und
+ * `core.personalkosten_stunde` in einer Transaktion, ohne `kostUser` (D3) —,
+ * übersetzt in den Ausgang des Rohabzugs.
+ */
+async function stundeLaden(a: TpapiAntwort, b: Betrieb, tag: string, laufId: string | null): Promise<RohErgebnis> {
+  const r = await tagLaden(a, b.betriebKey, b.encId, tag, laufId)
+  if (r.ergebnis === 'geladen' || r.ergebnis === 'leer') {
+    return { rawId: r.rawId, ergebnis: 'neu', zeilen: r.stunden }
+  }
+  return { rawId: r.rawId, ergebnis: r.ergebnis, zeilen: 0, meldung: r.meldung }
+}
+
 async function ausfuehren(s: Laufstand, x: Auftrag): Promise<void> {
   const { betrieb: b, ep } = x
-  const g = s.gruppen[ep.modul]
-  const parameter: Record<string, string> = x.tag ? { businessdate: alsBusinessdate(x.tag) } : {}
+  const g = s.gruppen[gruppeVon(ep)]
+  const parameter: Record<string, string> = x.tag ? { businessdate: alsBusinessdate(x.tag) }
+    : x.von && x.bis ? { from: alsBusinessdate(x.von), to: alsBusinessdate(x.bis) }
+    : {}
   const a: TpapiAntwort = await s.client.holen(b.encId, ep.pfad, parameter)
   g.abrufe++
 
@@ -190,6 +222,7 @@ async function ausfuehren(s: Laufstand, x: Auftrag): Promise<void> {
   try {
     r = ep.art === 'tage' ? await listdaysLaden(ep, a, b.betriebKey, b.encId, s.laufId)
       : ep.art === 'tag' ? await tagRohLaden(ep, a, b.betriebKey, b.encId, x.tag!, s.laufId)
+      : ep.art === 'stunde' ? await stundeLaden(a, b, x.tag!, s.laufId)
       : await stammRohLaden(ep, a, b.betriebKey, b.encId, parameter, s.laufId)
   } catch (e) {
     // Datenbankfehler. Die Meldung kann SQL-Text tragen, nie einen Schlüssel —
@@ -305,7 +338,7 @@ async function abarbeiten(s: Laufstand, auftraege: Auftrag[], ende: () => string
   }
 }
 
-async function merkerSchreiben(s: Laufstand, modul: TpapiModul): Promise<void> {
+async function merkerSchreiben(s: Laufstand, modul: Gruppe): Promise<void> {
   const g = s.gruppen[modul]
   // Ohne einen einzigen Aufruf dieser Gruppe in dieser Phase bleibt der
   // Merker, wie er ist: Phase C ohne Rückstand ist kein Versuch, und der
@@ -343,7 +376,7 @@ async function merkerSchreiben(s: Laufstand, modul: TpapiModul): Promise<void> {
  * sichtbar bleibt.
  */
 async function abschliessen(s: Laufstand, extra: Record<string, unknown>): Promise<'ok' | 'teilweise'> {
-  for (const m of ['revenue', 'personal', 'artikel'] as TpapiModul[]) await merkerSchreiben(s, m)
+  for (const m of ['revenue', 'personal', 'artikel', 'stunde'] as Gruppe[]) await merkerSchreiben(s, m)
   const summe = Object.values(s.gruppen).reduce((acc, g) => {
     for (const k of Object.keys(acc) as (keyof Gruppenstand)[]) acc[k] += g[k]
     return acc
@@ -362,7 +395,7 @@ async function abschliessen(s: Laufstand, extra: Record<string, unknown>): Promi
 function neuerStand(phase: Laufstand['phase'], client: TpapiClient, laufId: string | null): Laufstand {
   return {
     phase, client, laufId, betriebAus: new Map(), modulAus: new Map(), fehlerFolge: new Map(),
-    gruppen: { revenue: leererStand(), personal: leererStand(), artikel: leererStand() },
+    gruppen: { revenue: leererStand(), personal: leererStand(), artikel: leererStand(), stunde: leererStand() },
     abbruch: null, listdaysNichtMitternacht: 0,
   }
 }
@@ -440,6 +473,23 @@ export async function rohabzugTagesgeschaeft(client: TpapiClient): Promise<'ok' 
       }
     }
 
+    /*
+     * Die Umsatzprognose (seit 0153): je Betrieb ein Aufruf für ein Fenster um
+     * heute — ab dem Monatsersten (oder vor sieben Tagen, wenn das früher ist)
+     * bis in 14 Tagen. Zuletzt, damit sie keinem Tagesendpunkt Platz an der
+     * gleitenden Grenze nimmt. Ob LINA Tage in der Zukunft liefert, misst
+     * mart.umsatzprognose_tag.tage_voraus_erstmals.
+     */
+    const prognose = prognoseEndpunkt()
+    if (prognose) {
+      const [f] = await query<{ von: string; bis: string }>(
+        `SELECT least(current_date - $1::int, date_trunc('month', current_date)::date)::text AS von,
+                (current_date + $2::int)::text AS bis`, [PROGNOSE_FENSTER.zurueck, PROGNOSE_FENSTER.voraus])
+      for (const b of betriebe) {
+        if (b.module.has(prognose.modul)) auftraege.push({ nr: nr++, betrieb: b, ep: prognose, von: f!.von, bis: f!.bis })
+      }
+    }
+
     await abarbeiten(s, auftraege, () => null)
     return await abschliessen(s, { betriebe: betriebe.length, auftraege: auftraege.length })
   } catch (e) {
@@ -490,28 +540,56 @@ export async function tpapiNachladen(opt: TpapiNachladenOptionen = {}): Promise<
     const tagesEp = aktiveTagesendpunkte()
     const nachEndpunkt = new Map(tagesEp.map(e => [e.endpunkt, e]))
     let auftraege: Auftrag[] = []
-    if (betriebe.length > 0 && tagesEp.length > 0) {
+    const stunde = config.TPAPI_STUNDE_NACHLADEN === 1 ? stundeEndpunkt() : null
+    const prognose = prognoseEndpunkt()
+    if (stunde) nachEndpunkt.set(stunde.endpunkt, stunde)
+    if (prognose) nachEndpunkt.set(prognose.endpunkt, prognose)
+    if (betriebe.length > 0 && nachEndpunkt.size > 0) {
       /*
        * Paare (Betrieb, Modul), die heute gefragt werden, als zwei
        * gleichlange Listen — so filtert die Datenbank, bevor sie sortiert
        * und schneidet, und die Obergrenze geht nicht an Betriebe, die heute
        * ohnehin nicht dran sind (dieselbe Falle wie in Stufe 1).
+       *
+       * DREI ARBEITSLISTEN, EINE OBERGRENZE (seit 0153):
+       *   rang 0  die fehlenden Tage von Journal, Bons und Personalkosten je
+       *           Tag (mart.tpapi_rueckstand_tag) und von Personal je Stunde
+       *           (mart.personal_rueckstand, alles jenseits dessen, was Phase A
+       *           holt) — gemeinsam neueste zuerst, Tag außen, Betrieb innen
+       *   rang 1  die fehlenden Monate der Prognose (mart.umsatzprognose_rueckstand)
+       *           — DANACH: Tage fallen hinten aus listdays heraus, eine
+       *           Prognose nicht, und eine nachträglich geholte Prognose ist
+       *           die schwächere Zahl
        */
       const paare = betriebe.flatMap(b => [...b.module].map(m => [b.betriebKey, m] as const))
-      const liste = await query<{ betrieb_key: number; endpunkt: string; geschaeftstag: string }>(
-        `SELECT r.betrieb_key, r.endpunkt, r.geschaeftstag::text AS geschaeftstag
-           FROM mart.tpapi_rueckstand_tag r
-           JOIN unnest($2::int[], $3::text[]) AS p(betrieb_key, modul)
-             ON p.betrieb_key = r.betrieb_key AND p.modul = r.modul
-          WHERE r.endpunkt = ANY($4::text[])
-          ORDER BY r.geschaeftstag DESC, r.betrieb_key, r.endpunkt
+      const liste = await query<{ betrieb_key: number; endpunkt: string; tag: string | null; von: string | null; bis: string | null }>(
+        `WITH p(betrieb_key, modul) AS (SELECT * FROM unnest($2::int[], $3::text[])),
+         arbeit AS (
+           SELECT 0 AS rang, r.geschaeftstag AS sortiert, r.betrieb_key, r.endpunkt,
+                  r.geschaeftstag::text AS tag, NULL::text AS von, NULL::text AS bis
+             FROM mart.tpapi_rueckstand_tag r
+             JOIN p ON p.betrieb_key = r.betrieb_key AND p.modul = r.modul
+            WHERE r.endpunkt = ANY($4::text[])
+           UNION ALL
+           SELECT 0, r.geschaeftstag, r.betrieb_key, $5::text, r.geschaeftstag::text, NULL, NULL
+             FROM mart.personal_rueckstand r
+             JOIN p ON p.betrieb_key = r.betrieb_key AND p.modul = 'personal'
+            WHERE $5::text IS NOT NULL
+           UNION ALL
+           SELECT 1, r.monat, r.betrieb_key, $6::text, NULL, r.von::text, r.bis::text
+             FROM mart.umsatzprognose_rueckstand r
+             JOIN p ON p.betrieb_key = r.betrieb_key AND p.modul = 'revenue'
+            WHERE $6::text IS NOT NULL
+         )
+         SELECT betrieb_key, endpunkt, tag, von, bis FROM arbeit
+          ORDER BY rang, sortiert DESC, betrieb_key, endpunkt
           LIMIT $1`,
         [config.TPAPI_NACHLADEN_JE_LAUF, paare.map(p => p[0]), paare.map(p => p[1]),
-         tagesEp.map(e => e.endpunkt)])
+         tagesEp.map(e => e.endpunkt), stunde?.endpunkt ?? null, prognose?.endpunkt ?? null])
       auftraege = liste.flatMap((z, i) => {
         const b = nachKey.get(Number(z.betrieb_key))
         const ep = nachEndpunkt.get(z.endpunkt)
-        return b && ep ? [{ nr: i, betrieb: b, ep, tag: z.geschaeftstag }] : []
+        return b && ep ? [{ nr: i, betrieb: b, ep, tag: z.tag ?? undefined, von: z.von ?? undefined, bis: z.bis ?? undefined }] : []
       })
     }
 

@@ -101,9 +101,47 @@ function tpapiStufe2Quellen(): Quelle[] {
       system: 'tpapi',
       tabelle: { schema: 'core', name: 'tpapi_stammabzug', zeitspalte: 'abgerufen_am',
                  filter: { spalte: 'endpunkt', werte: [ep('getforecastperday').endpunkt] } },
-      kadenz_stunden: WOECHENTLICH, erwartet: false,
-      bemerkung: 'Im Register, aber aus: die Schreibweise von from/to ist nicht gemessen — erst nach der '
-               + 'Formprobe (docs/plan-tpapi-stufe2.md §3).' },
+      merker: 'tpapi_revenue', kadenz_stunden: 48, erwartet: mitSchluessel,
+      bemerkung: mitSchluessel
+        ? 'Seit 0153: je Betrieb und Nacht ein Fenster um heute (Phase A), die Monate der Historie in '
+          + 'Phase C (mart.umsatzprognose_rueckstand).'
+        : ohne },
+    /*
+     * SCHRITT 2b (0153): DER LADER raw → core. Je Zieltabelle ein Eintrag —
+     * gefragt ist hier der Lader, nicht LINA: ein Rohabzug, der Nacht für
+     * Nacht liefert, waehrend der Lader steht, saehe an den Rohsaetzen frisch
+     * aus. Journal, Bons und Artikelstamm an `core_geladen_am` der
+     * Abruf- bzw. Abzugszeile (das Journal selbst hat ~140 Mio. Zeilen und
+     * keinen Ladezeitpunkt je Zeile), Personalkosten je Tag und Prognose an
+     * ihrer kleinen Zieltabelle. Merker `tpapi_core` (src/tpapi/core_laden.ts).
+     * Kadenz 48 h: jede Nacht kommt mindestens der gestrige Tag dazu.
+     */
+    { quelle: 'tpapi:core_journal', bezeichnung: 'Kassenjournal in core (TPAPI, Lader 2b)',
+      system: 'tpapi',
+      tabelle: { schema: 'core', name: 'tpapi_abruf', zeitspalte: 'core_geladen_am',
+                 filter: { spalte: 'endpunkt', werte: [ep('journal').endpunkt] } },
+      merker: 'tpapi_core', kadenz_stunden: 48, erwartet: mitSchluessel,
+      bemerkung: mitSchluessel ? 'Fenstertage in Phase A, Bestand in Phase C (mart.tpapi_core_stand).' : ohne },
+    { quelle: 'tpapi:core_bons', bezeichnung: 'Bons in core (TPAPI, Lader 2b)',
+      system: 'tpapi',
+      tabelle: { schema: 'core', name: 'tpapi_abruf', zeitspalte: 'core_geladen_am',
+                 filter: { spalte: 'endpunkt', werte: [ep('journaltables').endpunkt] } },
+      merker: 'tpapi_core', kadenz_stunden: 48, erwartet: mitSchluessel,
+      bemerkung: mitSchluessel ? 'Fenstertage in Phase A, Bestand in Phase C (mart.tpapi_core_stand).' : ohne },
+    { quelle: 'tpapi:core_personal_tag', bezeichnung: 'Personalkosten je Tag in core (TPAPI, Lader 2b)',
+      system: 'tpapi', tabelle: { schema: 'core', name: 'personalkosten_tag', zeitspalte: 'geladen_am' },
+      merker: 'tpapi_core', kadenz_stunden: 48, erwartet: mitSchluessel,
+      bemerkung: mitSchluessel ? 'Ohne Horizont (mart.tpapi_core_stand).' : ohne },
+    { quelle: 'tpapi:core_prognose', bezeichnung: 'Umsatzprognose in core (TPAPI, Lader 2b)',
+      system: 'tpapi', tabelle: { schema: 'core', name: 'umsatzprognose_tag', zeitspalte: 'geladen_am' },
+      merker: 'tpapi_core', kadenz_stunden: 48, erwartet: mitSchluessel,
+      bemerkung: mitSchluessel ? 'Jeder Abzug eine Beobachtung (mart.umsatzprognose_tag).' : ohne },
+    { quelle: 'tpapi:core_artikelstamm', bezeichnung: 'Artikelstamm in core (TPAPI, Lader 2b)',
+      system: 'tpapi',
+      tabelle: { schema: 'core', name: 'tpapi_stammabzug', zeitspalte: 'core_geladen_am',
+                 filter: { spalte: 'endpunkt', werte: artikel.map(e => e.endpunkt) } },
+      merker: 'tpapi_core', kadenz_stunden: WOECHENTLICH, erwartet: mitSchluessel,
+      bemerkung: mitSchluessel ? 'Juengster Abzug je Betrieb und Liste (core.tpapi_artikel & Co.).' : ohne },
   ]
 }
 
@@ -599,8 +637,8 @@ export const QUELLEN: readonly Quelle[] = [
    * Reserve.
    *
    * `erwartet` hängt an den Schlüsseln wie beim Personal je Stunde. Die
-   * Prognose steht als nicht erwartet da, bis die Formprobe ihre Parameter
-   * gemessen hat — sichtbar als Lücke, nicht vergessen.
+   * Prognose ist seit 0153 erwartet (die Formprobe vom 12.11.2026 hat from/to
+   * gemessen), dazu je Zieltabelle des Laders raw → core ein Eintrag.
    */
   ...tpapiStufe2Quellen(),
 ] as const

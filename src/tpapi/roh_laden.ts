@@ -108,6 +108,8 @@ type RohSatz = {
   bytes: number
   laufId: string | null
   ladefehler?: string | null
+  /** Nur Bereichsabrufe: letzter Tag des Zeitraums (sonst = tag). */
+  bis?: string | null
 }
 
 /**
@@ -135,10 +137,10 @@ async function rohSchreiben(c: pg.PoolClient, r: RohSatz): Promise<string> {
     `INSERT INTO raw.api_antwort
        (quelle, endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis, parameter,
         http_status, payload, payload_text, payload_hash, payload_bytes, lauf_id, ladefehler)
-     VALUES ('tpapi', $1, $2, $3, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11)
+     VALUES ('tpapi', $1, $2, $3::date, coalesce($12::date, $3::date), $4, $5, $6::jsonb, $7, $8, $9, $10, $11)
      RETURNING id`,
     [r.endpunkt, r.encId, r.tag, JSON.stringify(r.parameter), r.status, r.json, r.text,
-     r.hash, r.bytes, r.laufId, r.ladefehler ?? null])
+     r.hash, r.bytes, r.laufId, r.ladefehler ?? null, r.bis ?? null])
   return String(x.rows[0].id)
 }
 
@@ -229,16 +231,28 @@ export async function tagRohLaden(
          abrufe        = least(core.tpapi_abruf.abrufe + 1, 2147483647),
          geaendert_am  = now(),
          core_stand    = NULL,
-         ladefehler    = NULL`,
+         ladefehler    = NULL,
+         ladeversuche  = 0,
+         ladefehler_stand = NULL,
+         ladefehler_am = NULL`,
       [betriebKey, ep.endpunkt, tag, a.status, g.zeilen, g.bytes, g.hash, rawId])
     return { rawId, ergebnis: 'neu' as const, zeilen: g.zeilen }
   })
 }
 
+/** dd.mm.yyyy → YYYY-MM-DD, sonst null. */
+function isoAusLinaDatum(t: string | undefined): string | null {
+  const m = t ? /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(t) : null
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : null
+}
+
 /**
- * Eine tagfreie Liste (Artikelstamm) für einen Betrieb sichern. Jeder
- * erfolgreiche Abruf bekommt eine Zeile in `core.tpapi_stammabzug`; ein neuer
- * Rohsatz nur, wenn sich der Hash gegen den letzten Abzug geändert hat.
+ * Eine tagfreie Liste (Artikelstamm) oder einen Bereichsabruf (Prognose,
+ * `from`/`to`) für einen Betrieb sichern. Jeder erfolgreiche Abruf bekommt
+ * eine Zeile in `core.tpapi_stammabzug`; ein neuer Rohsatz nur, wenn sich der
+ * Hash gegen den letzten Abzug DESSELBEN Zeitraums geändert hat (seit 0153
+ * `von`/`bis` — sonst verglich ein Monat der Historie mit dem Fenster von
+ * gestern und schriebe jedes Mal einen neuen Rohsatz).
  */
 export async function stammRohLaden(
   ep: TpapiEndpunkt, a: TpapiAntwort, betriebKey: number, encId: string,
@@ -246,8 +260,10 @@ export async function stammRohLaden(
 ): Promise<RohErgebnis> {
   if (a.status === 0) return { rawId: null, ergebnis: 'ohne_antwort', zeilen: 0 }
   await partitionenSichern()
+  const von = isoAusLinaDatum(parameter.from)
+  const bis = isoAusLinaDatum(parameter.to)
   if (a.art !== 'ok') {
-    const rawId = await inTransaktion(c => rohSchreiben(c, fehlerSatz(ep, a, encId, null, parameter, laufId)))
+    const rawId = await inTransaktion(c => rohSchreiben(c, fehlerSatz(ep, a, encId, von, parameter, laufId)))
     return { rawId, ergebnis: 'nur_raw', zeilen: 0 }
   }
   const g = gespeichert(ep, a)
@@ -255,17 +271,18 @@ export async function stammRohLaden(
     const alt = await c.query<{ payload_hash: string; raw_id: string }>(
       `SELECT payload_hash, raw_id::text AS raw_id FROM core.tpapi_stammabzug
         WHERE betrieb_key = $1 AND endpunkt = $2
-        ORDER BY abgerufen_am DESC, abzug_id DESC LIMIT 1`, [betriebKey, ep.endpunkt])
+          AND von IS NOT DISTINCT FROM $3::date AND bis IS NOT DISTINCT FROM $4::date
+        ORDER BY abgerufen_am DESC, abzug_id DESC LIMIT 1`, [betriebKey, ep.endpunkt, von, bis])
     const gleich = alt.rows[0]?.payload_hash === g.hash
     const rawId = gleich ? alt.rows[0]!.raw_id : await rohSchreiben(c, {
-      endpunkt: ep.endpunkt, encId, tag: null, parameter, status: a.status, json: g.json, text: null,
-      hash: g.hash, bytes: g.bytes, laufId,
+      endpunkt: ep.endpunkt, encId, tag: von, parameter, status: a.status, json: g.json, text: null,
+      hash: g.hash, bytes: g.bytes, laufId, bis,
     })
     await c.query(
       `INSERT INTO core.tpapi_stammabzug
-         (betrieb_key, endpunkt, http_status, zeilen, payload_bytes, payload_hash, raw_id, neu)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [betriebKey, ep.endpunkt, a.status, g.zeilen, g.bytes, g.hash, rawId, !gleich])
+         (betrieb_key, endpunkt, http_status, zeilen, payload_bytes, payload_hash, raw_id, neu, von, bis)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [betriebKey, ep.endpunkt, a.status, g.zeilen, g.bytes, g.hash, rawId, !gleich, von, bis])
     return { rawId, ergebnis: gleich ? 'unveraendert' as const : 'neu' as const, zeilen: g.zeilen }
   })
 }

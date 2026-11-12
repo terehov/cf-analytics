@@ -4729,7 +4729,8 @@ Attrappe getestet, nie gegen das echte LINA gelaufen** (Regel 7a). Plan: `plan-t
    zurück wie möglich" ist je Betrieb eine andere Zahl, LINA nennt sie selbst (Aalen 2.507 Tage,
    Nürnberg 362).
 3. **S3 — Endpunkte:** Journal, Bons, `personalkostenprotag`, die dreizehn `merchandiseman/*`;
-   `getforecastperday` im Register, aber aus.
+   ~~`getforecastperday` im Register, aber aus~~ (seit `0153` an, nach der Formprobe; dazu
+   `personalkostenprostunde` im Nachladen, siehe „TPAPI Stufe 2b“).
 4. **S4 — Nicht geholt:** `acceptedworkingtimes`, `userdataperday(delta)`, `getPersonalData`. Zeilen
    je Person mit Arbeitszeiten und Stundenlohn, kein Auftrag, kein Zweck; `raw` ist append-only.
 5. **S5 — `personalkostenprotag` wird vor `raw` zur Summe verdichtet.** Ohne Namen, aber in kleinen
@@ -4894,3 +4895,70 @@ fort, wo sie war — jeder Tag ist einzeln gesichert). Der Speicherwächter (`01
 Verbrauch je Tag. Nach dem Vollabzug den Wert wieder senken.
 
 **Verworfen:** schneller als ein Aufruf je Sekunde — `getlimit` stand schon ohne uns auf 50 von 100.
+
+
+## 12.11.2026 — TPAPI Stufe 2b: der Lader raw → core (`0153`)
+
+**Anlass.** Schritt 2a sichert Journal, Bons, Personal je Tag und Artikelstamm roh; die Formprobe vom
+12.11.2026 hat die Feldwerte an zwei Betrieben gemessen. Jetzt entsteht `core` aus `raw`. **Stand:
+gebaut und gegen die Attrappe getestet, nie gegen das echte LINA gelaufen** (Regel 7a); keine Zahl
+aus diesen Tabellen ist an echten Journalzeilen gemessen. Wortlaut und Begründung der Festlegungen
+B1–B16: `plan-tpapi-stufe2.md` §5, Abweichungen 18–25 in §8.
+
+**Entschieden.**
+
+1. **Horizont 24 Monate für Journal und Bons in `core`, bis zur Größenentscheidung
+   (`TPAPI_CORE_MONATE`, B10).** Gemessen auf dem Klon (synthetisch, 12.11.2026): 230 MB je Mio.
+   Journalzeilen mit Index, im Horizont ~9 GB, für die ganze Historie (~140 Mio. Zeilen) ~32 GB.
+   Was davor liegt, bleibt roh (append-only, nichts geht verloren) und ist ein eigener Zustand
+   „ausserhalb horizont“ — kein Rückstand, keine Prüfzeile. **Ob alles nach `core` geht,
+   entscheidet Eugene nach den ersten echten Größen** (`mart.speicher_stand`,
+   `mart.tpapi_core_stand.bytes_ausserhalb_horizont`); mit `TPAPI_CORE_MONATE=0` lädt der Lader den
+   Rest aus `raw`, ohne einen Aufruf. Personal je Tag, Prognose und Stamm haben keinen Horizont:
+   sie sind klein.
+2. **Die Deutung „was ist Umsatz im Journal“ steht an EINER Stelle, als Hypothese
+   (`mart.kassenjournal_zeilenart()`, B12).** Sie stützt sich auf zwei Stichproben, nicht auf eine
+   Messung gegen den Umsatzbericht. Wenn sie sich ändert, dann dort und nirgends sonst; geprüft wird
+   sie von `mart.kassenjournal_abgleich_monat`, die neben der Deutung zwei Kandidaten führt, damit
+   die Sicht nach dem ersten echten Lauf sagt, **welche** trifft — statt dass ein Mensch sie
+   rät.
+3. **Die Finanzwegsummen sind eine Tabelle in `core`, keine Materialisierung (B2).** Der Lader
+   schreibt sie im selben Zug wie das Journal: eine Materialisierung könnte still veralten (`0091`),
+   eine Tabelle im selben Zug nicht. Zwölf Zeilen je Tag statt 1.500 für jeden Abgleich.
+4. **Karten erst nach gemessenem Abgleich (B16).** Eine Karte „Umsatz aus dem Journal“ vor der
+   Messung wäre eine plausibel aussehende, ungeprüfte Zahl. Keine Materialisierung ohne Messung:
+   alle typischen Abfragen lagen im Klon unter 3 s (`plan-tpapi-stufe2.md` §8).
+5. **Die Betriebsberichte des Scrapers bleiben (S10).** Der Abgleich je Betrieb und Tag ist die
+   Gegenprobe; erst danach wird über das Abschalten einzelner Berichte entschieden. Der Scraper
+   deckt alle Betriebe und reicht bis 2018, die TPAPI 41 Betriebe.
+6. **Die Prognose behält drei Werte nebeneinander (B5)** — erste, vorab (letzte vor 08:00 des Tages),
+   jüngste. Ob LINA ihre Prognose nach dem Tag anpasst, ist nicht gemessen; eine Trefferquote aus
+   nachträglichen Werten wäre geschönt.
+7. **Der Lader als dritte Spur in Phase C, neben der TPAPI-Spur (B9)**, und die Fenstertage der
+   letzten sieben Tage in Phase A, damit sie vor Phase B in `core` stehen. Hinter der TPAPI-Spur bekäme
+   er bei 50.000 Aufrufen keine Minute.
+8. **Eine Journalzeile ohne Finanzweg lässt den ganzen Tag scheitern (Abweichung 22)** statt mit einem
+   Platzhalter zu laden, und ein doppelter Eintrag im Kassenstamm lässt das Laden scheitern statt
+   Journalzeilen still zu verdoppeln. Drei Fehlversuche mit derselben Laderversion, dann ruht der
+   Rohsatz sichtbar (wie `0136`).
+9. **Rechte-Reparatur in derselben Migration.** `mcp.rechte_auffrischen()` hatte `0148`
+   rückgängig gemacht; `0153` schreibt die Funktion neu und bricht ab, wenn
+   `mart.mcp_rechte_pruefung` danach nicht leer ist (`fehlerkatalog.md`, 12.11.2026).
+
+**Verworfen.**
+
+* **Alles sofort nach `core`.** Rund 32 GB für ~140 Mio. Zeilen neben 20–60 GB `raw`, bevor jemand
+  das Journal je gesehen hat; der Horizont ist umkehrbar (ein Wert, kein Abruf), eine volle Platte
+  nicht.
+* **Umrechnen der Nachtstunden auf den Folgetag.** Die Formprobe fand keine Zeile außerhalb 08:00–07:59,
+  `refdate` ist Berliner Mitternacht; der Lader zählt Abweichungen statt zu korrigieren (die Lehre
+  aus `0138`).
+* **`raw_id` und `geladen_am` je Journalzeile.** 2,2 GB für zwei Angaben, die je Tag gleich sind und in
+  `core.tpapi_abruf` stehen.
+* **Eine Sparte aus dem Umsatzbericht an der Journalzeile.** Der Verweis ist nicht gemessen; die
+  Positionssicht trägt Warengruppe und Hauptgruppe aus dem Kassenstamm (Abweichung 19).
+
+**Nicht belegt (Plan §8, „Offen nach 2b“):** dass die Deutung den Umsatzbericht trifft; dass `artnr`
+die Kassenartikelnummer und `finanzweg` die Nummer (nicht die id) ist; dass Rabattzeilen der
+Nachlassbetrag sind; ob ein Sofortstorno doppelt steht; was `h_brutto` ist; ob LINA Zukunftsprognosen
+liefert und ändert.
