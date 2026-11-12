@@ -357,7 +357,16 @@ const Schema = z.object({
    * das Älteste. Bei Betrieben mit einem Jahr Tiefe fällt jeden Tag einer
    * hinten aus `listdays` heraus — deshalb läuft das ohne Handbefehl.
    */
-  TPAPI_NACHLADEN_JE_LAUF: z.coerce.number().int().min(0).default(10_000),
+  /*
+   * 50.000 statt 10.000 (Entscheidung Eugene, 12.11.2026: die Historie soll in
+   * rund einer Woche da sein). Die Formprobe hat 92.686 Betrieb-Tage gezählt,
+   * mit Personal je Stunde rund 340.000 Aufrufe. Bei einem Aufruf je Sekunde
+   * plus Antwort- und Schreibzeit reicht die Nacht dafür nicht: der Lauf
+   * arbeitet dann bis in den Abend, im Zweifel bis `NACHLADEN_BIS`. Solange
+   * gilt „kein Push“. Nach dem Vollabzug wieder senken — der laufende Betrieb
+   * braucht nur das Fenster.
+   */
+  TPAPI_NACHLADEN_JE_LAUF: z.coerce.number().int().min(0).default(50_000),
 
   /**
    * Artikelstamm (13 Listen `merchandiseman/*`) je Betrieb höchstens alle so

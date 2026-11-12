@@ -4878,3 +4878,19 @@ mitvergrößert, kann später nicht mehr auf einen kleineren Typ zurück. Ein He
 Datenbank wäre die Alternative — dann gilt die Annahme aus Punkt 2 nicht mehr, und `SPEICHER_PFAD`
 muss auf das Volume zeigen.
 
+
+## 12.11.2026 — TPAPI-Vollabzug in einer Woche: 50.000 Aufrufe je Lauf
+
+**Anlass.** Die Formprobe zählte 92.686 Betrieb-Tage (bis 2014) statt der angenommenen rund 58.000;
+mit Personal je Stunde sind das etwa 340.000 Aufrufe. Bei 10.000 je Nacht wären es fünf Wochen.
+
+**Entschieden (Eugene).** `TPAPI_NACHLADEN_JE_LAUF` = 50.000. Das Tempo je Betrieb ändert sich
+nicht (ein Aufruf je Sekunde reihum, rund 24 je Betrieb und Viertelstunde, Riegel bei 40) — der
+Lauf arbeitet nur länger, bis in den Abend oder bis `NACHLADEN_BIS`.
+
+**Preis.** In der Woche ist der Lauf fast durchgehend `laeuft`; Deploys nur in der Lücke davor
+oder mit dem Wissen, dass der Push die TPAPI-Spur abbricht (sie setzt in der nächsten Nacht dort
+fort, wo sie war — jeder Tag ist einzeln gesichert). Der Speicherwächter (`0152`) sieht den
+Verbrauch je Tag. Nach dem Vollabzug den Wert wieder senken.
+
+**Verworfen:** schneller als ein Aufruf je Sekunde — `getlimit` stand schon ohne uns auf 50 von 100.

@@ -2370,7 +2370,7 @@ Antwort (Plan §8, Abweichung 1).
 `ableitungenFertig()` — nichts rutscht vor die Ableitungen (`0116`) —, eingesammelt vor
 `abschliessen()`, Fehlerbehandler sofort angehängt. Sie liest den Rückstand aus
 `mart.tpapi_rueckstand_tag` (**dieselbe** Sicht, die die Prüfzeile zählt), **neueste Tage zuerst,
-Tag außen, Betrieb innen**, höchstens `TPAPI_NACHLADEN_JE_LAUF` Aufrufe (10.000; 0 = aus) und nie
+Tag außen, Betrieb innen**, höchstens `TPAPI_NACHLADEN_JE_LAUF` Aufrufe (~~10.000~~ 50.000 seit 12.11.2026, Entscheidung Eugene: Vollabzug in rund einer Woche; 0 = aus) und nie
 über `NACHLADEN_BIS` hinaus (`nachladenVorbei()`, gemessen ab dem eigenen Beginn). Nach ihr wird
 nichts aufgefrischt: keine materialisierte Sicht liest die TPAPI-Rohtabellen. Anderer Host, eigener
 Zugang als der Scraper — das „ein Tempo" aus Regel 3 gilt für LINAs Scraper-Zugang, hier gilt die
@@ -2414,7 +2414,7 @@ Aufrufen gut zwei Minuten).
 |---|---|---|
 | `TPAPI_GRENZE_JE_BETRIEB` | 40 (höchstens 90) | Aufrufe je Betrieb im gleitenden Fenster |
 | `TPAPI_GRENZE_MINUTEN` | 15 (mindestens 15) | Breite des Fensters; kürzer zählte Aufrufe heraus, die LINA noch mitzählt |
-| `TPAPI_NACHLADEN_JE_LAUF` | 10.000 | Aufrufe je Lauf für den Rückstand in Phase C; 0 = aus (Notbremse, kein Handbefehl) |
+| `TPAPI_NACHLADEN_JE_LAUF` | 50.000 (bis der Vollabzug durch ist, danach senken) | Aufrufe je Lauf für den Rückstand in Phase C; 0 = aus (Notbremse, kein Handbefehl) |
 | `TPAPI_STAMM_TAGE` | 7 | Artikelstamm je Betrieb höchstens alle so viele Tage; `mart.tpapi_zugang_modul` erwartet einen Erfolg binnen 192 h — wer den Wert über 7 setzt, ändert dort die Schwelle mit (Migration) |
 
 **Die Rechnung hinter der Obergrenze** (Annahme, nicht gemessen: `listdays`-Tiefen von zwei
