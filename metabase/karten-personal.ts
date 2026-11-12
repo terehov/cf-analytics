@@ -268,7 +268,7 @@ SELECT z.betrieb                                    AS "Betrieb",
     beschreibung:
       'Wie weit die Personalplanung über den Stunden liegt, die sich aus LINAs Effektivität '
       + '(Umsatz je Personalstunde) zurückrechnen lassen — je Betrieb über die letzten 60 Tage. '
-      + 'Die Planung zählt **Köpfe je Stunde**: wer eine Viertelstunde da ist, zählt voll. Deshalb '
+      + 'Die Planung zählt **Personen je Stunde**: wer eine Viertelstunde da ist, zählt voll. Deshalb '
       + 'liegt sie **immer darüber**, meist um ein Viertel; das ist kein Fehler.\n\n'
       + 'Worauf zu achten ist: ein Betrieb, dessen Aufschlag **stark schwankt** (Spanne), oder der '
       + 'an vielen Tagen mit Umsatz **keine Schichten** liefert — dort plant jemand nicht oder nicht '
