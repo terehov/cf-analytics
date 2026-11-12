@@ -23,6 +23,7 @@
     "bounti:zuordnen": "bun run src/bounti_zuordnen.ts",
     "bestellansicht-probe": "bun run src/bestellansicht_probe.ts",
     "tpapi-probe": "bun run src/tpapi_probe.ts",
+    "tpapi-formprobe": "bun run src/tpapi_formprobe.ts",
     "tpapi-schluessel": "bun run src/tpapi_schluessel.ts",
     "status-melden": "bun run src/meldung.ts"
   },
