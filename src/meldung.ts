@@ -41,6 +41,7 @@ const BEZEICHNUNG: Record<string, string> = {
   bounti: 'Schulungen (Bounti)',
   mcp: 'Chat-Zugang (MCP)',
   luecken: 'Datenlücken',
+  speicher: 'Speicherplatz',
   datenbank: 'Datenbank',
 }
 

@@ -21,6 +21,7 @@
 import { config } from './config'
 import { eine, query } from './db/pool'
 import { zulaufStand } from './sync/zulauf'
+import { speicherPruefung, speicherStand } from './sync/speicher'
 
 export type Stufe = 'ok' | 'warnung' | 'stoerung'
 
@@ -745,6 +746,22 @@ export async function statusErheben(): Promise<Statusbericht> {
         })
   } catch (e) {
     p.push({ name: 'luecken', stufe: 'warnung', meldung: `mart.luecke_monat nicht lesbar: ${String(e).slice(0, 120)}` })
+  }
+
+  // --- Speicherplatz (0152) ------------------------------------------------
+  //
+  // Wann muss der Server hochskaliert werden? Die Rechnung steht in
+  // mart.speicher_stand (SQL — dieselbe Zeile lesen Metabase und MCP), die
+  // Zuordnung befund → Stufe in speicherPruefung() mit ihrer Begründung:
+  // beobachten ist eine Warnung (ein Termin), hochskalieren, dringend, eine
+  // veraltete Messung und die falsche Platte sind Störungen (503).
+  try {
+    p.push(speicherPruefung(await speicherStand()))
+  } catch (e) {
+    // Regel 10: ein Wächter, der nicht lesen kann, ist kein „ok".
+    p.push({ name: 'speicher', stufe: 'stoerung',
+             meldung: `mart.speicher_stand nicht lesbar: ${String(e).slice(0, 120)}`,
+             naechster_schritt: 'Ist Migration 0152 angewendet? SELECT * FROM mart.speicher_stand;' })
   }
 
   return {

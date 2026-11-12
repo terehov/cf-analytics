@@ -183,6 +183,14 @@ wird.
   `docs/fehlerkatalog.md`, „Von Grund auf migriert bricht die Kette".
 - ~~**Plausibilitätsprüfung** muss „Betrieb hat nie BWA" von „Monat noch nicht gebucht" unterscheiden (`core.bwa_buchungsstand`).~~ **Erledigt am 26.07.2026.** Der Ladepfad schreibt den Stand, `mart.bwa_rueckstand` wertet ihn aus, `/status` prüft die Spitze statt der Nachzügler. Drei Zustände statt zwei — siehe `datenherkunft.md`.
 - **Postgres nicht ins Internet exponieren** — Postico über SSH-Tunnel.
+- **Speicherwächter (`0152`, 12.11.2026):** ~~die Annahme zur Platte im Container nachmessen~~ **nachgemessen am 12.11.2026:** `docker exec <importer> df -h /` zeigt `overlay 149.9G, 46.4G belegt, 97.3G frei` — dieselbe Platte wie der Host. Offen bleibt nur die Kontrolle nach dem ersten Lauf. Ursprünglicher Text: Der
+  Wächter misst `statfs('/')` im Importer-Container und nimmt an, dass das dieselbe Platte ist wie
+  die des Postgres-Volumes. Einmal prüfen (Eugene, auf dem Host):
+  `docker exec <importer-container> df -h /` muss dieselbe Größe und denselben freien Platz zeigen
+  wie `df -h /` (bzw. `/dev/sda1`). Danach nach dem ersten Lauf
+  `SELECT befund, befund_text FROM mart.speicher_stand;` — Erwartung `ok` mit „Verbrauch noch nicht
+  messbar"; nach dem zweiten Lauf ein Verbrauch je Tag. Und den MCP-Katalogabzug aus der Produktion
+  ziehen (zwei neue Sichten). Einzelheiten `importer.md`, „Der Speicherwächter".
 
 ## Phase 4
 

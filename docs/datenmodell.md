@@ -1656,3 +1656,23 @@ Registereinträge in `src/sync/quellen.ts`: `tpapi:listdays`, `tpapi:journal`, `
 nur das eine Modul ab (S9): Ratskeller Saarbrücken und BS Bier & Speisen haben nur Team Data, ihr
 403 auf `revenue/*` ist ein Zustand, kein Fehler. Die Sichten dazu stehen in `metabase.md`
 (Abschnitt „TPAPI Stufe 2a in `mart`").
+
+## Speicherwächter: `sync.speicher_messung` (`0152`, 12.11.2026)
+
+Eine Zeile je Nachtlauf, geschrieben am Laufende (`src/sync/speicher.ts`): `gemessen_am`, `lauf_id`,
+`pfad`, Platte (`platte_gesamt`, `platte_belegt`, `platte_frei` — wie Size, Used, Avail in `df`),
+`platte_fehler`, `db_bytes`, `raw_bytes`, `je_schema` (jsonb `{schema: bytes}`, Partitionen beim
+Schema der Elterntabelle) und `groesste` (jsonb, die zehn größten Relationen, Partitionen
+zusammengefasst).
+
+Drei Entscheidungen am Schema:
+
+* **Append-only, nie gelöscht.** ~365 Zeilen im Jahr; die Reihe beantwortet „seit wann wächst das so?".
+* **`lauf_id` ohne Fremdschlüssel** auf `sync.lauf`: mehrere Tests leeren `sync.lauf` per `TRUNCATE`
+  ohne `CASCADE` (`src/sync/phasen.test.ts`), ein Fremdschlüssel ließe das scheitern; für die Messung
+  ist der Lauf nur ein Hinweis.
+* **Die Platte darf fehlen** (alle drei Spalten NULL, per `CHECK` nur gemeinsam), wenn `statfs`
+  scheitert — die Datenbankgröße steht trotzdem da. Eine halbe Messung ist mehr als keine.
+
+Die Auswertung (`mart.speicher_stand`, `mart.speicher_verlauf`) steht in `metabase.md`.
+

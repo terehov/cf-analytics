@@ -394,7 +394,7 @@ Der Container läuft über `health.ts` und beantwortet zwei **verschiedene** Fra
 
 **`/health` darf nur rot werden, wenn ein Neustart hilft.** Bei einer Zugangssperre hilft er nicht — er macht es schlimmer: Dokploy drehte den Container im Kreis, während LINA ohnehin gerade nichts von uns hören will.
 
-`/status` prüft elf Dinge und sagt zu jedem, was daraus folgt:
+`/status` prüft unter anderem diese Dinge (vollständig in `src/status.ts`) und sagt zu jedem, was daraus folgt:
 
 | Prüfung | Stufe | wann |
 |---|---|---|
@@ -409,6 +409,7 @@ Der Container läuft über `health.ts` und beantwortet zwei **verschiedene** Fra
 | `dashboard_filter` | Warnung | die Auswahllisten der Metabase-Filter kennen nicht mehr alle Betriebe — ein fehlender Betrieb im Dropdown fällt sonst niemandem auf |
 | `materialisierung` | Warnung | eine materialisierte Sicht ist älter als der letzte Lauf — oder hängt an gar keinem Nachlauf. Die Refreshes werfen nie, ein gescheiterter sah bis `0091` aus wie ein gelungener Lauf |
 | `yext` | Warnung | der Yext-Nachlauf hängt (> 48 h), oder er läuft und die **Analytics-Tabellen sind leer** |
+| `speicher` | Warnung / **Störung** | seit `0152`: Warnung bei `beobachten` (Warnschwelle in unter 60 Tagen) und vor der allerersten Messung; Störung bei `hochskalieren`, `dringend`, `falsche platte` und einer Messung, die älter als 48 h ist. Abschnitt „Der Speicherwächter" unten |
 
 `warnung` bleibt bei **HTTP 200**: Dinge, die man wissen sollte, wecken niemanden nachts. Nur `stoerung` gibt 503.
 
@@ -2375,7 +2376,7 @@ nichts aufgefrischt: keine materialisierte Sicht liest die TPAPI-Rohtabellen. An
 Zugang als der Scraper — das „ein Tempo" aus Regel 3 gilt für LINAs Scraper-Zugang, hier gilt die
 Grenze je Laden.
 
-**Die gleitende Grenze je Betrieb (S8).** Höchstens `TPAPI_GRENZE_JE_BETRIEB` (60) Aufrufe in
+**Die gleitende Grenze je Betrieb (S8).** Höchstens `TPAPI_GRENZE_JE_BETRIEB` (~~60~~ 40 seit der Formprobe vom 12.11.2026: `getlimit` stand schon vor unserem ersten Aufruf auf 50 von 100) Aufrufe in
 `TPAPI_GRENZE_MINUTEN` (15), gezählt im Client über **alle** TPAPI-Wege zusammen — Personal je
 Stunde, Phase A, Phase C teilen **einen** Zähler, weil LINA je Laden zählt und es deshalb je Lauf
 nur **einen** Client gibt (`tpapiNachlauf()` legt ihn an, Phase C übernimmt ihn per `laufClient()`).
@@ -2411,7 +2412,7 @@ Aufrufen gut zwei Minuten).
 
 | Variable | Vorgabe | Wirkung |
 |---|---|---|
-| `TPAPI_GRENZE_JE_BETRIEB` | 60 (höchstens 90) | Aufrufe je Betrieb im gleitenden Fenster |
+| `TPAPI_GRENZE_JE_BETRIEB` | 40 (höchstens 90) | Aufrufe je Betrieb im gleitenden Fenster |
 | `TPAPI_GRENZE_MINUTEN` | 15 (mindestens 15) | Breite des Fensters; kürzer zählte Aufrufe heraus, die LINA noch mitzählt |
 | `TPAPI_NACHLADEN_JE_LAUF` | 10.000 | Aufrufe je Lauf für den Rückstand in Phase C; 0 = aus (Notbremse, kein Handbefehl) |
 | `TPAPI_STAMM_TAGE` | 7 | Artikelstamm je Betrieb höchstens alle so viele Tage; `mart.tpapi_zugang_modul` erwartet einen Erfolg binnen 192 h — wer den Wert über 7 setzt, ändert dort die Schwelle mit (Migration) |
@@ -2434,3 +2435,59 @@ sind. Vorher `SELECT lauf_id, status FROM sync.lauf ORDER BY lauf_id DESC LIMIT 
 neue Zeilen in `mart.pruefung_uebersicht` (`metabase.md`, Abschnitt „TPAPI Stufe 2a in `mart`").
 `src/sync/phasen.test.ts` prüft am Quelltext, dass die zweite Spur in Phase C steht und nach
 `ableitungenFertig()` startet.
+
+## Der Speicherwächter (`0152`, 12.11.2026)
+
+**Anlass.** Eugene will rechtzeitig wissen, wann der Server hochskaliert werden muss. Der Server
+(Hetzner CX43) hat **eine** Platte, 150 GB, am 12.11.2026 46 GB belegt, 99 GB frei (`df -h` auf dem
+Host). Postgres, Docker-Images, Build-Cache und Logs liegen auf demselben Dateisystem `/dev/sda1`.
+Der TPAPI-Rohabzug (`0151`) legt in zwei Wochen geschätzt 12–45 GB dazu, Schritt 2b Tabellen
+ähnlicher Größe. Bis dahin stand keine einzige Zahl dazu in der Datenbank.
+
+**Der Nachlauf: `speicherNachlauf()` in `src/sync/speicher.ts`.** Eine Zeile je Lauf in
+`sync.speicher_messung`: Platte (gesamt, belegt, frei) per `statfs`, `pg_database_size`,
+`raw.api_antwort` mit allen Partitionen, Bytes je Schema (Partitionen beim Schema der
+Elterntabelle, nicht bei `part`) und die zehn größten Relationen (Partitionen zusammengefasst) als
+jsonb. Lokal gemessen 92 ms gegen den Klon mit 10,6 GB. Wirft nie; scheitert `statfs`, steht die
+Datenbankgröße trotzdem da und der Grund in `platte_fehler`.
+
+**Die Stelle: am Laufende, nach Phase C, direkt vor `abschliessen()`** — nicht in Phase B. Phase C
+schreibt den TPAPI-Rückstand und die Konzern-Historie, also genau das, was wächst; in Phase B
+gemessen, fehlte die halbe Nacht, und die Nachricht nach dem Lauf trüge eine Messung von vor zwanzig
+Stunden. Kein Refresh hängt daran (`mart.speicher_stand` ist eine gewöhnliche Sicht), also stört die
+Stelle keine Phasenregel. **Auch ein gescheiterter Lauf misst** (beide Fehlerzweige in `sync.ts`,
+einmal je Prozess über `speicherGemessen`): 30 von 101 Läufen standen einmal auf `abgebrochen`, und
+zwei Abbrüche hintereinander hätten sonst „keine messung" gemeldet, obwohl nur der Import scheiterte.
+
+**Die Annahme zur Platte — bitte im Container nachmessen.** Gemessen wird `statfs(SPEICHER_PFAD)` im
+Importer-Container, Vorgabe `/`. Das Overlay-Dateisystem des Containers liegt unter
+`/var/lib/docker` auf der Host-Platte, das Postgres-Volume ebenso; im `df -h` des Hosts zeigen alle
+`overlay`-Einträge dieselben 150G/46G/99G. Daraus folgt, dass `statfs('/')` im Container die Platte
+der Datenbank zeigt. **Gemessen ist das im Container noch nicht.** Prüfen:
+`docker exec <importer-container> df -h /` muss dieselbe Zeile zeigen wie `df -h /` auf dem Host.
+`frei` ist `bavail` (wie *Avail* in `df`): die Root-Reserve kann PostgreSQL nicht benutzen.
+
+**Wann die Annahme bricht.** Liegt die Datenbank auf einem eigenen Volume (Hetzner Volume, eigener
+Mount) oder Server, misst `/` die falsche Platte. Den häufigsten Fall merkt der Wächter selbst: ist
+die Datenbank größer als der belegte Teil der gemessenen Platte, heißt der Befund `falsche platte`
+(Störung). Nicht bemerkt wird der Fall, dass die gemessene Platte zufällig voller ist, als die
+Datenbank groß ist — dann `SPEICHER_PFAD` auf einen Mount der Datenbankplatte setzen.
+
+**Alte Messungen werden nie gelöscht.** Eine Zeile je Tag sind wenige hundert Kilobyte im Jahr, und
+die Reihe ist die einzige Antwort auf „seit wann wächst das so?".
+
+**Was daraus wird.** Prognose, Stufen und Begründung stehen in `metabase.md` (Abschnitt
+„Speicherwächter") und `entscheidungen.md` (12.11.2026). `/status` liest den Befund über
+`speicherPruefung()` (Prüfung `speicher`, Zuordnung in der Tabelle oben), die Nachricht nach dem Lauf
+damit auch: bei `ok` steht „Speicherplatz" nur in der Zeile ohne Befund, ab `beobachten` als eigene
+Zeile mit frei, Prozent, Verbrauch je Tag, dem Datum und dem Schritt („Server hochskalieren bis
+spätestens …").
+
+| Variable | Bedeutung |
+|---|---|
+| `SPEICHER_PFAD` | Gemessener Pfad im Container, Vorgabe `/`. Nur ändern, wenn die Datenbank auf eine eigene Platte zieht |
+
+Tests: `src/sync/speicher.test.ts` (Prognose an synthetischen Messreihen gegen
+`TEST_DATABASE_URL`, jede Stufe, die Messung mit eigenem Client — nie über den Pool —, die
+Nachrichtenzeile).
+

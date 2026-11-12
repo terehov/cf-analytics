@@ -28,12 +28,20 @@ import { tpapiNachladen } from './tpapi/rohabzug'
 import { zulaufPruefen } from './sync/zulauf'
 import { pflegeNachlauf } from './pflege/nachlauf'
 import { laufMelden } from './meldung'
+import { speicherNachlauf } from './sync/speicher'
 
 /** „ok" nur, wenn der Dienst nichts anderes sagt — siehe die Liste der Dienste unten. */
 function dienstAusgang(e: PromiseSettledResult<unknown>): string {
   if (e.status === 'rejected') return 'FEHLER'
   return typeof e.value === 'string' ? e.value : 'ok'
 }
+
+/**
+ * Ob der Speicherwächter in diesem Prozess schon gemessen hat — damit ein
+ * Lauf, der in Phase B oder C scheitert, nicht im äußeren Fehlerzweig ein
+ * zweites Mal misst. Siehe den Aufruf vor `abschliessen()`.
+ */
+let speicherGemessen = false
 
 const ausloeser = process.argv.includes('--backfill') ? 'backfill'
                 : process.argv.includes('--manuell')  ? 'manuell'
@@ -475,8 +483,23 @@ try {
     // Die TPAPI-Spur endet spätestens an derselben Zeitgrenze wie die LINA-Spur.
     log.info('phase c: tpapi-nachladen fertig', { ausgang: await tpapiC })
 
+    /**
+     * DER SPEICHERWÄCHTER (0152), ALS LETZTES VOR DEM ABSCHLUSS. Nach allem,
+     * was schreibt: Phase C lädt den TPAPI-Rückstand und die Historie, also
+     * genau das, was wächst — in Phase B gemessen, fehlte die halbe Nacht.
+     * Und direkt vor der Nachricht (`laufMelden` unten), damit sie eine
+     * Messung von vor einer Minute trägt. Kein Refresh hängt daran:
+     * mart.speicher_stand ist eine gewöhnliche Sicht.
+     * Wirft nie, siehe Kopf von sync/speicher.ts.
+     */
+    await speicherNachlauf(sitzung.laufId)
+    speicherGemessen = true
+
     r = await sitzung.abschliessen({ stummeQuellen: stumm })
   } catch (e) {
+    // Auch ein gescheiterter Lauf misst — sonst stünde der Wächter nach zwei
+    // Abbrüchen auf „keine messung", obwohl nur der Import scheiterte.
+    if (!speicherGemessen) { speicherGemessen = true; await speicherNachlauf(sitzung.laufId) }
     await sitzung.abschliessen({ fehler: e }).catch(() => {})
     throw e
   }
@@ -491,6 +514,9 @@ try {
   process.exit(r.status === 'abgebrochen' ? 1 : 0)
 } catch (e) {
   log.error('lauf abgebrochen', { fehler: String(e) })
+  // Bricht schon der Import in Phase A ab, hat noch niemand gemessen. Ohne
+  // lauf_id: die Sitzung ist hier nicht mehr greifbar.
+  if (!speicherGemessen) { speicherGemessen = true; await speicherNachlauf(null) }
   // Auch der Abbruch wird gemeldet. Der Lauf ist zu diesem Zeitpunkt als
   // abgebrochen geschlossen (abschliessen oben), also ist er der juengste.
   await laufMelden(null, { fehler: e })

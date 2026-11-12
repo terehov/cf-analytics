@@ -672,4 +672,70 @@ SELECT to_char(beendet_am, 'DD.MM. HH24:MI') AS "Zeit",
       },
     },
   },
+  // ===================================================================
+  // 5. Reicht der Platz? (Speicherwaechter, Migration 0152)
+  //
+  // Die Frage des Betreibers: wann muss der Server hochskaliert werden?
+  // Die Rechnung steht in mart.speicher_stand (dieselbe Zeile lesen /status,
+  // die Nachricht nach dem Lauf und der MCP-Zugang); die Karten zeigen sie nur.
+  // ===================================================================
+  /*
+   * EINE ZEILE ALS TABELLE, nicht fuenf Zahlenkacheln. Die Zahlen gehoeren
+   * zusammen gelesen — 30 % frei ist bei 0,1 GB/Tag kein Thema und bei 3 GB/Tag
+   * eines — und der Befund in Worten steht vorn, damit niemand aus einer
+   * einzelnen Kachel das Falsche schliesst. zeilen_max 1: die Sicht liefert
+   * immer genau eine Zeile, auch ohne Messung.
+   */
+  {
+    schluessel: 'im_speicher',
+    name: 'Speicherplatz des Servers',
+    beschreibung:
+      'Wie viel Platz auf der Serverplatte frei ist, wie schnell er schwindet und wann es eng wird. „Voll" heißt hier 10 % frei, nicht null — darunter fehlt der Datenbank die Luft für Aufräumen und Auffrischen, und das Hochskalieren (Server aus, umziehen, an) will geplant sein. Der Verbrauch je Tag ist der größere aus den letzten sieben und den letzten zwei Tagen, weil die Daten in Schüben kommen. „beobachten": Hochskalieren einplanen. „hochskalieren" oder „dringend": handeln. „keine messung" ist kein gutes Zeichen, sondern heißt, dass seit über zwei Tagen niemand nachgesehen hat.',
+    anzeige: 'table',
+    zeilen_max: 1,
+    sql: `
+SELECT befund                    AS "Befund",
+       frei_gb                   AS "frei (GB)",
+       frei_pct                  AS "frei %",
+       verbrauch_prognose_gb_tag AS "Verbrauch GB/Tag",
+       datum_warnschwelle        AS "25 % frei am",
+       datum_voll                AS "voll am",
+       db_gb                     AS "Datenbank (GB)",
+       raw_gb                    AS "davon Rohdaten (GB)",
+       gemessen_am               AS "gemessen",
+       befund_text               AS "Stand"
+  FROM mart.speicher_stand`,
+    visualisierung: {
+      column_settings: {
+        '["name","Stand"]': { text_wrapping: true },
+      },
+    },
+  },
+  /*
+   * LINIEN UEBER DIE ZEIT, alle drei in GB auf EINER Achse — dieselbe Einheit,
+   * also keine zweite Y-Achse (docs/dashboards.md). Frei faellt, Datenbank und
+   * Rohdaten steigen; wo die Linien sich naehern, wird es eng. Ein Knick
+   * zeigt einen Schub, eine Stufe nach oben bei "frei" ein Aufraeumen.
+   */
+  {
+    schluessel: 'im_speicher_verlauf',
+    name: 'Speicherplatz im Verlauf',
+    beschreibung:
+      'Freier Platz auf der Serverplatte, Größe der Datenbank und der darin gesicherten Rohdaten, je Nachtlauf eine Messung. Fällt „frei" steiler als sonst, kommt gerade ein großer Datenabruf herein; eine Stufe nach oben heißt, es wurde aufgeräumt. Auf der Platte liegt mehr als die Datenbank (Programme, Protokolle) — deshalb sinkt „frei" etwas schneller, als die Datenbank wächst.',
+    anzeige: 'line',
+    sql: `
+SELECT gemessen_am AS "Messung",
+       frei_gb     AS "frei",
+       db_gb       AS "Datenbank",
+       raw_gb      AS "Rohdaten"
+  FROM mart.speicher_verlauf
+ WHERE frei_gb IS NOT NULL
+ ORDER BY gemessen_am`,
+    visualisierung: {
+      'graph.dimensions': ['Messung'],
+      'graph.metrics': ['frei', 'Datenbank', 'Rohdaten'],
+      'graph.x_axis.title_text': '',
+      'graph.y_axis.title_text': 'GB',
+    },
+  },
 ]

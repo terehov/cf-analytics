@@ -4803,3 +4803,78 @@ länger (`importer.md`).
   bis 2018.
 * **`getforecastperday` mit geratenen `from`/`to`.** Im besten Fall ein 400 je Betrieb und Woche, im
   schlechtesten eine leere Liste, die als „keine Prognose" gespeichert würde.
+
+## 12.11.2026 — Speicherwächter (`0152`)
+
+**Anlass.** Eugene will rechtzeitig wissen, wann der Server hochskaliert werden muss. Eine Platte
+(Hetzner CX43, 150 GB, am 12.11.2026 46 belegt, 99 frei), darauf Postgres, Images, Build-Cache,
+Logs. Der TPAPI-Rohabzug (`0151`) legt in zwei Wochen geschätzt 12–45 GB dazu, Schritt 2b ähnlich
+viel. Hochskalieren heißt bei Hetzner: Server aus, umziehen, an — ein Wartungsfenster, das man
+planen will und nicht unter Druck nehmen.
+
+**Entschieden.**
+
+1. **Gemessen wird im Importer, am Ende jedes Laufs** (`src/sync/speicher.ts`), nach Phase C:
+   dort ist geschrieben, was wächst, und die Nachricht direkt danach trägt eine frische Zahl. Auch
+   ein gescheiterter Lauf misst. Eine Zeile je Lauf in `sync.speicher_messung`, **nie gelöscht**.
+2. **Platte per `statfs('/')` im Container** (`SPEICHER_PFAD`), unter der Annahme, dass Overlay und
+   Postgres-Volume auf derselben Host-Platte liegen. Nicht im Container nachgemessen; die
+   Gegenprobe `falsche platte` (Datenbank größer als der belegte Teil der gemessenen Platte) fängt
+   den häufigsten Fall, in dem die Annahme bricht.
+3. **Verbrauch = Abnahme des freien Platzes**, nicht Datenbankzuwachs — voll läuft die Platte.
+4. **Prognose mit dem größeren Verbrauch aus 7 und 2 Tagen.** Der Rohabzug kommt in Schüben; ein
+   Schub von vor zwei Tagen ist im Siebentagesmittel auf ein Dreieinhalbtel verdünnt. Zu früh gewarnt
+   kostet einen Blick, zu spät gewarnt einen Umzug unter Zeitdruck. Preis: ein einmaliger Sprung
+   (Deploy mit neuem Image) hebt die Prognose zwei Tage lang an — ein Fehlalarm in der harmlosen
+   Richtung.
+5. **„Voll" heißt 10 % frei** (bei 145 GB nutzbar rund 14,5 GB), nicht 0. PostgreSQL braucht Luft
+   für `VACUUM FULL` und Tabellenumschreibungen (die Tabelle noch einmal daneben), `REFRESH …
+   CONCURRENTLY` (die ganze Sicht noch einmal), WAL-Spitzen über `max_wal_size`, temporäre Dateien
+   großer Sortierungen, und jeder Deploy baut ein Image auf derselben Platte. Läuft die Platte voll,
+   hält PostgreSQL an. 10 % sind mehr als die größte Einzelrelation heute
+   (`core.artikelverkauf_tag`, im Klon 3,8 GB; Produktion nicht gemessen) — ein `VACUUM FULL` der
+   größten Tabelle passte also noch hinein.
+6. **Die Stufen:** `dringend` unter 10 % frei oder voll in unter 10 Tagen; `hochskalieren` unter
+   25 % frei oder voll in unter 30 Tagen; `beobachten` Warnschwelle (25 %) in unter 60 Tagen; sonst
+   `ok`. Darüber `keine messung` (keine, älter als 48 h, Platte nicht messbar) und `falsche platte`
+   — ein Wächter ohne Messung ist kein „ok" (Regel 10). **30 Tage** vor voll, weil ein Umzug ein
+   Wartungsfenster und eine Abstimmung braucht und die Prognose bei Schüben springt; **60 Tage** vor
+   der Warnschwelle, damit „beobachten" kommt, solange es nur ein Kalendereintrag ist; **25 %**, weil
+   darunter jeder größere Abzug (Schritt 2b: Tabellen in der Größe des Rohabzugs) die Platte in einem
+   Zug in den roten Bereich schieben kann.
+7. **`/status`: `beobachten` ist Warnung (200), `hochskalieren`/`dringend`/`falsche platte` und
+   eine veraltete Messung sind Störung (503).** Warnung heißt „wissen sollte man es", Störung
+   „jemand muss handeln" — und hochskalieren ist eine Handlung mit Termin. Ausnahme: vor der
+   allerersten Messung nur Warnung, sonst stünde `/status` nach dem Deploy bis zum Ende des nächsten
+   Laufs (bis zu 24 h) auf 503 für einen Zustand, der von selbst endet (Muster: „Yext-Nachlauf ist
+   noch nie gelaufen").
+8. **Schwellen als Konstanten in `mart.speicher_stand`**, als Spalten sichtbar — keine
+   Parametertabelle in `manual`. Sie folgen aus dem, was PostgreSQL und ein Umzug brauchen, nicht aus
+   Vorliebe; eine Tabelle in Postico lädt ein, einen lästigen Alarm still leiser zu drehen. Ändern
+   heißt Migration mit Begründung. Prozentschwellen skalieren mit der Platte.
+9. **Die Prüfzeile zählt `beobachten` nicht** — normal 0.
+
+**Verworfen.**
+
+* **Messen in Phase B.** Die halbe Nacht (Phase C) fehlte, und die Nachricht trüge eine 20 Stunden
+  alte Zahl.
+* **Messen in `health.ts` (stündlich).** Feinere Reihe, aber ein zweiter Schreiber außerhalb des
+  Laufs, 24 Zeilen am Tag, und das Wachstum entsteht ohnehin nachts. Tägliche Auflösung reicht für
+  eine Frage, deren Antwort in Wochen gemessen wird.
+* **Datenbankgröße statt Platte als Grundlage.** Unterschätzt den Verbrauch um Images, Cache und
+  Logs; voll läuft die Platte, nicht die Datenbank.
+* **Nur das 7-Tage-Mittel** (verdünnt Schübe) — und **nur das 2-Tage-Fenster** (springt bei jedem
+  Ausreißer in beide Richtungen, auch nach unten; das Maximum springt nur nach oben).
+* **Lineare Regression über alle Messungen.** Glättet Schübe genauso weg wie das Mittel und ist
+  schwerer nachzurechnen; die Differenz zweier Messungen kann jeder in Postico prüfen.
+* **„Voll" bei 0 Bytes oder bei 5 %.** 0 ist der Ausfall selbst; 5 % (~7 GB) reichen nicht für ein
+  `VACUUM FULL` der größten Tabelle plus WAL plus ein Image.
+* **Alte Messungen nach einem Jahr löschen.** Nichts gewonnen, die Reihe verloren.
+* **Ein Eintrag in `sync.quelle`.** Der Speicher ist keine Datenquelle; die Regel-10-Frage („misst
+  er noch?") beantwortet `keine messung` direkt in derselben Zeile.
+
+**Beim Hochskalieren bedenken (nicht gemessen, Hetzner-Verhalten):** wer beim Typwechsel die Platte
+mitvergrößert, kann später nicht mehr auf einen kleineren Typ zurück. Ein Hetzner Volume für die
+Datenbank wäre die Alternative — dann gilt die Annahme aus Punkt 2 nicht mehr, und `SPEICHER_PFAD`
+muss auf das Volume zeigen.
+

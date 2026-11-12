@@ -2253,6 +2253,14 @@ export const dashboards: Dashboard[] = [
       { teile: [{ karte: 'im_tpapi_zugang', hoehe: 12 }] },
       { teile: [{ karte: 'im_personal_pruefung', hoehe: 10 }] },
 
+      // Speicherwaechter (0152). Hinter dem Zulauf und vor "Woran haengt es?":
+      // eine volle Platte ist der eine Ausfall, nach dem keine Karte darunter
+      // mehr etwas bedeutet — und anders als eine Sperre geht er nicht von
+      // selbst weg.
+      { teile: [{ text: '## Reicht der Platz?\n\nDie Serverplatte trägt die Datenbank und alles andere. **„Voll" heißt 10 % frei**, nicht null — ab dort fehlt der Datenbank die Luft. Steht oben „beobachten", das Hochskalieren einplanen; bei „hochskalieren" oder „dringend" handeln.' }] },
+      { teile: [{ karte: 'im_speicher' }] },
+      { teile: [{ karte: 'im_speicher_verlauf' }] },
+
       { teile: [{ text: '## Woran hängt es?\n\n**Ruht der Zugang, steht alles still** — dann erübrigt sich die weitere Suche. Sperren laufen von selbst ab; nur ein Anmeldefehler braucht einen Menschen.' }] },
       { teile: [{ karte: 'im_sperre' }] },
       // Klick auf den Bericht oeffnet die einzelnen Fehlerfaelle mit

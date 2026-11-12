@@ -325,7 +325,14 @@ const Schema = z.object({
    * Höchstens 90: darüber wäre es keine Reserve mehr gegen das Limit, und ein
    * Tippfehler in der Umgebung soll den Start abbrechen (Regel 3).
    */
-  TPAPI_GRENZE_JE_BETRIEB: z.coerce.number().int().min(1).max(90).default(60),
+  /*
+   * 40 statt 60 seit der Formprobe vom 12.11.2026: `getlimit` stand bei beiden
+   * gemessenen Betrieben schon auf 50 von 100, BEVOR wir etwas gefragt hatten —
+   * andere Anbieter lesen am selben Laden mit. 60 eigene Aufrufe obendrauf
+   * wären 110. Der Takt (Tag außen, Betrieb innen) kommt ohnehin nur auf rund
+   * 24 je Betrieb und Viertelstunde; die Grenze ist der Riegel dahinter.
+   */
+  TPAPI_GRENZE_JE_BETRIEB: z.coerce.number().int().min(1).max(90).default(40),
   /**
    * Breite des gleitenden Fensters in Minuten. Mindestens 15 — das ist LINAs
    * Fenster; ein kürzeres zählte Aufrufe heraus, die LINA noch mitzählt.
@@ -532,6 +539,20 @@ const Schema = z.object({
    * Vorvormonat. Gemessen am 26.07.2026: Spitze Juni, also ein Monat.
    */
   STATUS_BWA_RUECKSTAND_MONATE: z.coerce.number().min(1).default(3),
+  /**
+   * Welcher Pfad im Container für den Speicherwächter gemessen wird
+   * (`src/sync/speicher.ts`, Migration 0152) — statfs, wie `df`.
+   *
+   * `/` reicht, solange die Annahme gilt: das Overlay-Dateisystem des
+   * Importer-Containers liegt auf derselben Host-Platte wie das
+   * Postgres-Volume (Hetzner CX43, eine Platte, 12.11.2026: alle
+   * `overlay`-Einträge im `df -h` des Hosts zeigen dieselben 150G/46G/99G).
+   * Liegt die Datenbank einmal auf einem eigenen Volume oder Server, misst `/`
+   * die falsche Platte — dann hierher einen Mount der Datenbankplatte. Den Fall
+   * meldet `mart.speicher_stand` als `falsche platte`, sobald die Datenbank
+   * größer ist als der belegte Teil der gemessenen Platte.
+   */
+  SPEICHER_PFAD: z.string().min(1).default('/'),
   /**
    * Zweite Bremse: harte Obergrenze pro Kalendertag (UTC).
    *
@@ -1414,6 +1435,7 @@ export function konfigZumLoggen(c: Config = config) {
     maxVersuche: c.MAX_VERSUCHE,
     // Nur ob, nie die URL: sie ist der Schluessel zum Channel.
     statusWebhook: c.STATUS_WEBHOOK_URL ? 'gesetzt' : 'nicht gesetzt',
+    speicherPfad: c.SPEICHER_PFAD,
     fortschritt: c.FORTSCHRITT_ALLE === 0
       ? 'aus'
       : c.FORTSCHRITT_ALLE === 1 ? 'jeder Posten' : `jeder ${c.FORTSCHRITT_ALLE}. Posten`,

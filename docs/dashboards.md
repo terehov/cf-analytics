@@ -1194,6 +1194,23 @@ Alle in `mart`, angelegt in `migrations/0019_import_ueberwachung.sql`:
 > synchronisiert; eine Karte darauf ist eine, die niemand in der Oberfläche nachbauen oder
 > prüfen kann. Deshalb nachträglich zwei `mart`-Sichten.
 
+### Reicht der Platz? (Speicherwächter, `0152`, 12.11.2026)
+
+Ein eigener Abschnitt auf *Import — Überwachung*, **hinter dem Zulauf und vor „Woran hängt es?"**:
+eine volle Platte ist der eine Ausfall, nach dem keine Karte darunter mehr etwas bedeutet, und anders
+als eine Sperre geht er nicht von selbst weg. Zwei Karten:
+
+| Karte | Darstellung | Warum so |
+|---|---|---|
+| `im_speicher` — *Speicherplatz des Servers* | Tabelle mit **einer** Zeile (`zeilen_max: 1`): Befund, frei (GB), frei %, Verbrauch GB/Tag, „25 % frei am", „voll am", Datenbank, davon Rohdaten, gemessen, Stand als Satz | Die Zahlen gehören zusammen gelesen — 30 % frei ist bei 0,1 GB/Tag kein Thema und bei 3 GB/Tag eines. Fünf einzelne Kacheln laden ein, eine davon allein zu lesen. Der Befund steht vorn, in Worten |
+| `im_speicher_verlauf` — *Speicherplatz im Verlauf* | Linie über die Messungen: frei, Datenbank, Rohdaten | Alle drei in GB, **eine** Achse (keine zweite Y-Achse). „frei" fällt, Datenbank und Rohdaten steigen; ein Knick zeigt einen Schub, eine Stufe nach oben bei „frei" ein Aufräumen |
+
+Die Beschreibungen erklären „voll heißt 10 % frei", warum der Verbrauch der größere aus sieben und
+zwei Tagen ist, und dass „keine messung" kein gutes Zeichen ist — ohne Tabellennamen und ohne feste
+Messwerte. Die Karten zeigen nur, was `mart.speicher_stand` rechnet; die Stufen und Schwellen stehen
+in `metabase.md`. Vor dem ersten `uebernehmen.ts` Metabase die zwei neuen Sichten synchronisieren
+lassen.
+
 ### Verhältnis zu „Datenqualität und Import"
 
 Die ältere Seite bleibt. Sie fragt **fachlich**: welchen Betrieben fehlen Daten, stimmen die

@@ -2192,3 +2192,66 @@ Bon, Kellner, Storno, Nachlass je Position, Arbeitsstunden und Zuschläge je Tag
 **Nach dem Deploy:** den MCP-Katalogabzug neu ziehen (`cd mcp && MCP_DATABASE_URL=… bun run
 katalog:abzug`, gegen die Produktion), `mcp.achsen_ableiten()` hat die vier Sichten schon
 aufgenommen, die Abzugsdatei nicht.
+
+## Speicherwächter in `mart` (Migration `0152`, 12.11.2026)
+
+Die Frage des Betreibers: **wann muss der Server hochskaliert werden?** Zwei Sichten auf
+`sync.speicher_messung` (eine Zeile je Nachtlauf, `importer.md`, Abschnitt „Der Speicherwächter"),
+beide für `mcp_leser` lesbar, ohne dass er `sync` sieht: eine gewöhnliche Sicht prüft Tabellenrechte
+gegen ihren Eigentümer. Funktionen im Rumpf laufen dagegen mit den Rechten des Aufrufers („Sicht
+gegen Funktionsrumpf") — deshalb steht die Zeitzone als Text `'Europe/Berlin'` in den Sichten und
+nicht als `core.geschaefts_zeitzone()`. Im MCP-Katalog mit Thema `import`, `summen_erlaubt = false`.
+
+| Sicht | Körnung | Wofür |
+|---|---|---|
+| `mart.speicher_stand` | **eine Zeile, immer** — auch ohne Messung | Der jüngste Stand: frei in GB und %, belegt, Datenbank, `raw`, Verbrauch je Tag über 7 und über 2 Tage, die Prognose, Tage und Datum bis zur Warnschwelle und bis voll, `befund`, `befund_text`, die Schwellen als Spalten, die zehn größten Relationen (`groesste`) und Bytes je Schema. `/status`, die Nachricht nach dem Lauf, die Karte und der MCP-Zugang lesen **diese eine Zeile** |
+| `mart.speicher_verlauf` | Messung (eine je Nachtlauf) | frei, belegt, Datenbank, `raw`, dazu die Änderung gegen die Messung davor (`verbrauch_gb`, `db_zuwachs_gb`, `raw_zuwachs_gb`, `tage_seit_vorher`) — für die Verlaufskarte |
+
+**Wie gerechnet wird.**
+
+* **Prozent wie `df -h`:** frei / (belegt + frei). Die Root-Reserve des Dateisystems zählt weder als
+  belegt noch als frei; „0 % frei" heißt wirklich, PostgreSQL kann nicht mehr schreiben. GB sind wie
+  bei `df -h` 1024³ Bytes. Am 12.11.2026 wären das 99 / (46 + 99) = 68,3 % frei gewesen.
+* **Verbrauch = Abnahme des freien Platzes**, nicht Zuwachs der Datenbank: auf der Platte liegen auch
+  Images, Build-Cache und Logs, und voll läuft die Platte. Der Datenbankzuwachs steht daneben
+  (`db_wachstum_7t_gb_tag`), damit man sieht, wer verbraucht.
+* **Zwei Fenster, die Prognose nimmt den größeren Verbrauch.** 7 Tage (Bezugsmessung mindestens 6,5
+  Tage alt), 2 Tage (mindestens 36 h); zwölf Stunden Toleranz, weil der Lauf nicht jeden Tag zur
+  selben Minute endet. Gibt es noch keine so alte Messung, gilt die älteste, die mindestens 20 h
+  zurückliegt. Bei einer einzigen Messung gibt es keinen Verbrauch und kein Datum — der Befund folgt
+  dann nur dem Prozentsatz.
+* **Kein Wachstum (oder schrumpfend) heißt kein Datum**, `tage_bis_voll` NULL — keine Division durch
+  null, kein „in 9.999 Tagen".
+
+**Die Stufen** (Begründung der Zahlen in `entscheidungen.md`, 12.11.2026), schlechteste zuerst:
+
+| `befund` | wann | `/status` |
+|---|---|---|
+| `keine messung` | keine Messung, die jüngste älter als 48 h, oder die Platte war nicht messbar | Störung; Warnung nur vor der allerersten Messung (nach dem Deploy, endet mit dem nächsten Lauf) |
+| `falsche platte` | Datenbank größer als der belegte Teil der gemessenen Platte | Störung — der Wächter ist blind |
+| `dringend` | unter 10 % frei, oder voll in unter 10 Tagen | Störung |
+| `hochskalieren` | unter 25 % frei, oder voll in unter 30 Tagen | Störung |
+| `beobachten` | die Warnschwelle (25 % frei) in unter 60 Tagen | Warnung |
+| `ok` | sonst | ok |
+
+**„Voll" heißt 10 % frei, nicht 0 Bytes.** PostgreSQL braucht Luft: `VACUUM FULL` und jede
+Tabellenumschreibung legen die Tabelle neben der alten noch einmal an, `REFRESH MATERIALIZED VIEW
+CONCURRENTLY` baut die ganze Sicht daneben neu, WAL wächst bei großen Schüben über `max_wal_size`,
+große Sortierungen schreiben temporäre Dateien, und jeder Deploy baut ein Image auf derselben
+Platte. Läuft die Platte wirklich voll, hält PostgreSQL an.
+
+**Die Schwellen sind Konstanten in der Sicht**, als Spalten mitgeliefert (`voll_pct`,
+`warnschwelle_pct`, `voll_gb`, `warnschwelle_gb`) — keine Parametertabelle in `manual`, damit niemand
+einen lästigen Alarm in Postico still leiser dreht. Prozentschwellen skalieren mit der Platte: nach
+dem Hochskalieren ist nichts anzupassen.
+
+**Prüfzeile in `mart.pruefung_uebersicht`:** „Speicher: hochskalieren, keine Messung oder falsche
+Platte" — `geprueft` immer 1, `auffaellig` 1 bei `hochskalieren`, `dringend`, `keine messung`,
+`falsche platte`. **Erwartung 0.** `beobachten` zählt bewusst nicht: das ist ein Termin, kein
+Befund, und eine Zeile, die den ganzen Rohabzug über auf 1 stünde, liest niemand (`0071`). Auf einer
+Datenbank ohne Nachtlauf (lokale Klone) steht sie dauerhaft auf 1 — richtig so, dort misst niemand.
+
+**Nach dem Deploy:** den MCP-Katalogabzug neu ziehen (`cd mcp && MCP_DATABASE_URL=… bun run
+katalog:abzug`, gegen die Produktion); `mcp.achsen_ableiten()` hat die zwei Sichten aufgenommen, die
+Abzugsdatei nicht.
+

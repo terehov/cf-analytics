@@ -403,3 +403,66 @@ Zahl der Tage — die Rechnung für den Rückstand). Ausgabe als Text und als JS
 Pause von mindestens einer Sekunde — rund 35 Sekunden je Betrieb, zwei Betriebe etwa anderthalb
 Minuten, mit `--alle` bei 41 Schlüsseln knapp eine Minute mehr. Die Grenze ist dokumentiert mit 100
 je Laden und 15 Minuten; andere Anbieter lesen am selben Laden mit.
+
+## Formprobe, 12.11.2026 (im Importer-Container, Tag 09.11.2026, 41 Schlüssel)
+
+Vollständige Ausgabe: `docs/payloads/tpapi-formprobe-2026-11-12.txt` (Feldprofile je Endpunkt für
+zwei Betriebe, ohne Beispielwerte für Kellner, Debitor, Freitext, Postleitzahl; Personal je Tag nur
+als Summen). 29 Aufrufe je Betrieb, kein 429.
+
+**Tiefe der Historie (`listdays` je Schlüssel).** 35 Betriebe führen Geschäftstage, zusammen
+**92.686 Betrieb-Tage**. Ältester Tag 12.07.2014; 23 Betriebe reichen vor 2020 zurück; fünf haben
+ein Jahr oder weniger (345, 365, 253, 167 Tage und einer mit 631). Ein Schlüssel liefert 200 mit
+null Tagen, einer endet am 12.01.2026, drei antworten `Module 'Revenue' not licensed`.
+~~„Die Historie reicht rund ein Jahr zurück" (Zweite Messung, Nürnberg)~~ — das galt für Betriebe,
+die erst seit einem Jahr an dieser Kasse sind, nicht für die Schnittstelle.
+
+**Auch Personal reicht so weit.** Aposto Aalen, ältester Tag 23.10.2019: `personalkostenprostunde`
+17 Stunden, `personalkostenprotag` 18 Zeilen, `journal` 2.143 Zeilen; vor 400 Tagen ebenso. Beim
+zweiten Betrieb (Kassenstart 04.11.2025) liefert der Tag vor 400 Tagen überall 200 mit null Zeilen.
+Der Horizont von 365 Tagen aus Stufe 1 (`0149`) ist damit zu kurz — Schritt 2b hängt Personal je
+Stunde an dieselbe Arbeitsliste (Plan S3).
+
+**`businessdate` ist Berliner Mitternacht**: `1571781600` = 22.10.2019 22:00 UTC = 23.10.2019
+00:00 Berlin. Die Annahme in `src/tpapi/verdichtung.ts` stimmt; ~~„Aalen ab 22.10.2019"~~ (Erste
+Messung, über UTC gelesen) war einen Tag zu früh. `refdate` im Journal ist ebenfalls Berliner
+Mitternacht des Geschäftstags.
+
+**Journal (1.182 bzw. 1.034 Zeilen, 1,2 bzw. 1,05 MB).** Alle Zahlen sind JSON-Zahlen, `tisch`,
+`ust`, `buchungsnr`, `art`, `addinfo` Text. `ID` und `am_id` sind eindeutig; `datum` sind
+Unix-Sekunden je Position, **keine Zeile liegt außerhalb des Geschäftstags 08:00–07:59**;
+Summe `balance` = 0; `preis` = `balance` in beiden Proben (keine Zeile mit `preis = 0` und
+`balance ≠ 0` — anders als am 01.11. gemessen, also nicht darauf bauen). `zahl` −1..3;
+`situation` 0/1/2; `site` 0/1; `rabatt_id ≠ 0` an 27 Zeilen; `parentid ≠ 0` an 311 (Beilagen,
+Zusätze); `artnr` an 967 Zeilen (237 verschiedene), Sonderzeilen mit `artnr` ≤ 0. Sieben Felder
+sind durchgehend `null` (`event_number`, `menucard_id`, `price_per_unit`,
+`financeextendedinfo_id`, `provision_free`, `course_price_print`, `coursedefentry_id`). `addinfo`
+ist zu 98 % leer, sonst bis 1.466 Zeichen lang.
+
+**Bons (`journaltables`, 190 bzw. 161 Zeilen).** `tableheader_id` eindeutig; jeder Bon des
+Journals steht darin (164/164), 26 Einträge ohne Journalzeilen haben `accounting_type = EMPTY`.
+`documentdate` Unix-Sekunden; Gäste in `number_adults`/`number_kids` (245 + 1). In beiden Proben
+leer oder null: `debitor_text`, `zip_code`, `debitor_id`, `reservation_id`, `vat1sum`–`vat3sum`,
+`finanzweg`, `zahl`.
+
+**Personal je Tag.** Sechs Felder, alle JSON-Zahlen; 09.11.2026 Aalen: 15 Personen, 106,21 Stunden,
+14,38 Zuschlagsstunden 25 %, Brutto 1.641,91, Lohnkosten 2.050,48.
+
+**Prognose.** `revenue/getforecastperday?from=05.11.2026&to=11.11.2026` (`dd.mm.yyyy`) liefert
+sieben Zeilen `datum` (Unix-Sekunden, Berliner Mitternacht) und `forecast` (netto, EUR).
+
+**Artikelstamm.** `merchandiseman/recipe`: 10.041 bzw. 4.070 Artikel, **31,6 bzw. 11,9 MB** je
+Betrieb, mit `number` (Artikelnummer), `name`, `active`, `function`, `detailcategory`, `meccode`,
+**`fixedwe`** (Wareneinsatz je Artikel, 0..204 — der Kandidat für die Herkunft von
+`core.artikel.fixer_we`, Regel 5), `prices` und `attributes` als Listen. Dazu `financetype`
+(208 Finanzwege mit Namen und Kategorie), `financecategory`, `meccode`, `meccodegroup`,
+`category`, `detailcategory`, `grosscategory`, `vat`, `pricelevel`, `site`, `operationprofile`,
+`attributes` (Allergene, Zusatzstoffe).
+
+**Limit.** `getlimit` stand bei beiden Betrieben **vor unserem ersten Aufruf auf 50 von 100** und
+nach 29 Aufrufen auf 75 bzw. 67. Andere Anbieter lesen am selben Laden mit; die eigene gleitende
+Grenze ist deshalb von 60 auf 40 gesenkt (`TPAPI_GRENZE_JE_BETRIEB`).
+
+**Rechnung für den Rückstand.** 92.686 Tage × drei Tagesendpunkte ≈ 278.000 Aufrufe, dazu Personal
+je Stunde für die Jahre vor dem bisherigen Horizont (≈ 65.000). Bei einem Aufruf je Sekunde und
+`TPAPI_NACHLADEN_JE_LAUF = 10.000` rund fünf Wochen, bei 25.000 rund zwei.

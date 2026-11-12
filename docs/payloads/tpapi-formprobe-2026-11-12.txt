@@ -1,0 +1,698 @@
+Container: cf-analytics-sync-nrmz0w.1.75bd57raht5tmxt3ynrhxtm8r
+Filesystem                Size      Used Available Use% Mounted on
+$ bun run src/tpapi_formprobe.ts --alle --aus /tmp/tpapi-formprobe.json
+TPAPI-Formprobe — Basis https://api.lina.de, Tag 09.11.2026, 41 Schluessel, Ausgabe /tmp/tpapi-formprobe.json
+
+Auswahl der Betriebe (revenue/store je Schluessel, bis zwei antworten):
+   5443e035c39d1dc278bfaaf8387b385077534019: HTTP 200
+   b8c6f7ab740ee78b9da49566a1f6c2f210daaa6d: HTTP 200
+
+====================================================================================================
+Betrieb 5443e035c39d1dc278bfaaf8387b385077534019, Tag 09.11.2026
+====================================================================================================
+revenue/store: HTTP 200, 899 Bytes, 113 ms
+revenue/getlimit vorher: HTTP 200 {"status":"SUCCESS","limit":50,"rateLimit":100}
+revenue/listdays: HTTP 200, 2512 Zeilen, 390467 Bytes, 1361 ms
+   businessdate — Rohwert | UTC-Datum | Berlin-Datum (erste und letzte drei):
+   1571781600 | 2019-10-22 | 2019-10-23   <- verschieden
+   1571868000 | 2019-10-23 | 2019-10-24   <- verschieden
+   1571954400 | 2019-10-24 | 2019-10-25   <- verschieden
+   1794265200 | 2026-11-09 | 2026-11-10   <- verschieden
+   1794351600 | 2026-11-10 | 2026-11-11   <- verschieden
+   1794438000 | 2026-11-11 | 2026-11-12   <- verschieden
+   Umrechnung fuer Abfragen: Unix-Sekunden -> Datum in Europe/Berlin (dd.mm.yyyy).
+personal/personalkostenprostunde businessdate=09.11.2026: HTTP 200, 1128 Bytes, 242 ms
+   Schluessel: kost, kostUser, eff (kostUser vorhanden: true, nicht ausgewertet); Stunden eff 22, kost 22
+personal/personalkostenprotag businessdate=09.11.2026: HTTP 200, 15 Zeilen, 1523 Bytes, 189 ms
+   nur Summen (15 Zeilen):
+   h_brutto       number  Text  leer 0  Summe 106.21
+   h_zuschl_25    number  Text  leer 0  Summe 14.38
+   h_zuschl_40    number  nur Ziffern  leer 0  Summe 0
+   h_zuschl_50    number  nur Ziffern  leer 0  Summe 0
+   brutto         number  Text  leer 0  Summe 1641.91
+   lohnkosten     number  Text  leer 0  Summe 2050.48
+revenue/journal businessdate=09.11.2026: HTTP 200, 1182 Zeilen, 1213479 Bytes, 343 ms
+   ID                          number:1182         leer 0%    versch 1182   185733426..185734607                 nur Ziffern  z.B. 185733426 | 185733427 | 185733428 | 185733429 | 185733430
+   datum                       number:1182         leer 0%    versch 979    1794212569..1794260977               Unix-Sekunden  z.B. 1794238780 | 1794219759 | 1794223537 | 1794227108 | 1794233036
+   refdate                     number:1182         leer 0%    versch 1      1794178800..1794178800               Unix-Sekunden  z.B. 1794178800
+   art                         string:1182         leer 0%    versch 247                            Len 1-33     Text  z.B. Bar gegeben | 0 | TIP_ | Girocard | Cappuccino.
+   artnr                       number:1182         leer 0%    versch 238    -4..9990047 neg.                     nur Ziffern (1181/1182)  z.B. 0 | 9990031 | 200020 | 200022 | 100002
+   preis                       number:1182         leer 0%    versch 214    -120..56.3 Nachk. neg.               Text  z.B. 0 | 4.5 | 15.5 | 3.7 | 4
+   zahl                        number:1182         leer 0%    versch 3      -1..3 neg.                           nur Ziffern (1179/1182)  z.B. 1 | -1 | 3
+   tisch                       string:1182         leer 0%    versch 65                             Len 1-7      Text  z.B. 999 | 6 | 42 | 21 | 10
+   ust                         string:1182         leer 0%    versch 3      0..19                   Len 4-5      Dezimalzahl mit Punkt  z.B. 19.00 | 7.00 | 0.00
+   vat_id                      number:1182         leer 0%    versch 4      0..3                                 nur Ziffern  z.B. 1 | 2 | 0 | 3
+   kellnernr                   number:1182         leer 0%    versch 6                                           nur Ziffern  [gesperrt]
+   finanzweg                   number:1182         leer 0%    versch 12     1..2700                              nur Ziffern  z.B. 1 | 20 | 2700 | 48 | 22
+   buchungsnr                  string:1182         leer 0%    versch 9      1..9                    Len 1-1      nur Ziffern  z.B. 1 | 2 | 3 | 4 | 5
+   tableheader_id              number:1182         leer 0%    versch 164    772797..772984                       nur Ziffern  z.B. 772937 | 772960 | 772834 | 772864 | 772917
+   am_id                       number:1182         leer 0%    versch 1182   5161145..5162326                     nur Ziffern  z.B. 5161145 | 5161146 | 5161147 | 5161148 | 5161149
+   balance                     number:1182         leer 0%    versch 214    -120..56.3 Nachk. neg.               Text  z.B. 0 | 4.5 | 15.5 | 3.7 | 4
+   terminal                    number:1182         leer 0%    versch 5      22..30                               nur Ziffern  z.B. 25 | 23 | 30 | 24 | 22
+   masterkellnernr             number:1182         leer 0%    versch 3                                           nur Ziffern  [gesperrt]
+   teamnr                      number:1182         leer 0%    versch 1                                           nur Ziffern  [gesperrt]
+   zcount                      number:1182         leer 0%    versch 1      2572..2572                           nur Ziffern  z.B. 2572
+   parentid                    number:1182         leer 0%    versch 233    0..5162306                           nur Ziffern  z.B. 0 | 5161165 | 5161784 | 5161204 | 5161454
+   site                        number:1182         leer 0%    versch 2      0..1                                 nur Ziffern  z.B. 0 | 1
+   situation                   number:1182         leer 0%    versch 3      0..2                                 nur Ziffern  z.B. 0 | 1 | 2
+   sortorder                   number:1182         leer 0%    versch 3      0..2                                 nur Ziffern  z.B. 0 | 2 | 1
+   addinfo                     string:1182         leer 98%   versch 24                             Len 31-1466  Text  [gesperrt]
+   rabatt_id                   number:1182         leer 0%    versch 6      0..3086                              nur Ziffern  z.B. 0 | 152 | 3086 | 117 | 3059
+   pricelevel_id               number:1182         leer 0%    versch 4      0..17                                nur Ziffern  z.B. 1 | 0 | 17 | 7
+   operationprofile_id         number:1182         leer 0%    versch 4      2..7                                 nur Ziffern  z.B. 2 | 6 | 7 | 5
+   cancellationreason          number:1182         leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   captivesupplyreason         number:804/null:378  leer 32%   versch 1      0..0                                 nur Ziffern  z.B. 0
+   event_number                null:1182           leer 100%  versch 0                                           –
+   menucard_id                 null:1182           leer 100%  versch 0                                           –
+   price_per_unit              null:1182           leer 100%  versch 0                                           –
+   financeextendedinfo_id      null:1182           leer 100%  versch 0                                           –
+   provision_free              null:1182           leer 100%  versch 0                                           –
+   course_price_print          null:1182           leer 100%  versch 0                                           –
+   coursedefentry_id           null:1182           leer 100%  versch 0                                           –
+   Summe balance 0; ID eindeutig: true (1182/1182); artnr gefuellt 967, verschieden 237
+   je finanzweg: 1: 893z 4624 | 6: 1z 40 | 10: 24z -197.8 | 11: 1z 0.5 | 13: 2z -12 | 20: 83z -1746.45 | 22: 27z -594.4 | 23: 27z 594.4 | 42: 21z -790.3 | 43: 16z -476.5 | 48: 41z -1577.42 | 2700: 46z 135.97
+   situation: 0=1143 1=33 2=6
+   am_id: 5161145=1 5161146=1 5161147=1 5161148=1 5161149=1 5161150=1 5161151=1 5161152=1 5161153=1 5161154=1 5161155=1 5161156=1 5161157=1 5161158=1 5161159=1
+   site: 0=1149 1=33
+   terminal: 25=379 23=296 30=277 24=175 22=55
+   ust: 19.00=458 7.00=454 0.00=270
+   vat_id: 1=458 2=454 0=216 3=54
+   rabatt_id<>0: 27, cancellationreason<>0: 0, parentid<>0: 311, preis=0 und balance<>0: 0
+   datum: {"roh":"1794212569","berlin":"2026-11-09 09:22:49"} bis {"roh":"1794260977","berlin":"2026-11-09 22:49:37"} (Unix-Sekunden); ausserhalb 08:00-07:59: 0
+   refdate: {"roh":"1794178800","berlin":"2026-11-09 00:00:00"} bis {"roh":"1794178800","berlin":"2026-11-09 00:00:00"}
+revenue/journaltables businessdate=09.11.2026: HTTP 200, 190 Zeilen, 144213 Bytes, 200 ms
+   tableheader_id              number:190          leer 0%    versch 190    772795..772984                       nur Ziffern  z.B. 772795 | 772796 | 772797 | 772798 | 772799
+   old_id                      number:190          leer 0%    versch 190    772795..772984                       nur Ziffern  z.B. 772795 | 772796 | 772797 | 772798 | 772799
+   table_type                  string:190          leer 0%    versch 1                              Len 8-8      Text  z.B. STANDARD
+   table_number                string:190          leer 0%    versch 67                             Len 1-7      Text  z.B. 999 | 6 | 42 | 7 | 5
+   refdate                     number:190          leer 0%    versch 1      1794178800..1794178800               Unix-Sekunden  z.B. 1794178800
+   documentdate                number:190          leer 0%    versch 189    1794210409..1794260979               Unix-Sekunden  z.B. 1794243575 | 1794210409 | 1794210418 | 1794212578 | 1794217422
+   transaction_number          null:190            leer 100%  versch 0                                           –
+   accounting_type             string:190          leer 0%    versch 2                              Len 4-5      Text  z.B. BILL | EMPTY
+   debitor_id                  number:190          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   parent_id                   number:190          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   archiveparent_id            number:86/null:104  leer 55%   versch 1      0..0                                 nur Ziffern  z.B. 0
+   debitor_text                string:190          leer 100%  versch 0                                           –  [gesperrt]
+   reservation_id              number:190          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   zcount                      number:190          leer 0%    versch 1      2572..2572                           nur Ziffern  z.B. 2572
+   number_adults               number:190          leer 0%    versch 7      0..15                                nur Ziffern  z.B. 2 | 0 | 1 | 3 | 4
+   number_kids                 number:190          leer 0%    versch 2      0..1                                 nur Ziffern  z.B. 0 | 1
+   number_infants              number:190          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   renum                       number:190          leer 0%    versch 164    0..625503                            nur Ziffern  z.B. 0 | 625341 | 625343 | 625342 | 625345
+   vat1sum                     number:190          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   vat2sum                     number:190          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   vat3sum                     number:190          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   finanzweg                   number:190          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   zahl                        number:190          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   kellnernr                   number:190          leer 0%    versch 6                                           nur Ziffern  [gesperrt]
+   is_archive                  number:190          leer 0%    versch 1      1..1                                 nur Ziffern  z.B. 1
+   zip_code                    string:86/null:104  leer 100%  versch 0                                           –  [gesperrt]
+   tablearea_id                null:190            leer 100%  versch 0                                           –
+   tableheader_id eindeutig: true; Journal-Bons in tables 164/164, tables-Bons im Journal 164/190
+   Summen: adults 245, kids 1, infants 0; debitor_id gefuellt 190 (<>0: 0), reservation_id gefuellt 190 (<>0: 0)
+   accounting_type: BILL=164 EMPTY=26
+   table_type: STANDARD=190
+   is_archive: 1=190
+revenue/getforecastperday from=05.11.2026&to=11.11.2026: HTTP 200, 7 Zeilen, 492 Bytes, 96 ms  [dd.mm.yyyy (Postman-Doku)]
+   datum                       number:7            leer 0%    versch 7      1793833200..1794351600               Unix-Sekunden  z.B. 1793833200 | 1793919600 | 1794006000 | 1794092400 | 1794178800
+   forecast                    number:7            leer 0%    versch 7      6685.24..13384.41 Nachk.               Dezimalzahl mit Punkt  z.B. 7451.73 | 9883.45 | 13384.41 | 8380.94 | 6921.6
+merchandiseman/recipe: HTTP 200, 10041 Zeilen, 31631837 Bytes, 8735 ms
+   0                           null:10041          leer 100%  versch 0                                           –
+   1                           boolean:10041       leer 0%    versch 1                                           Text  z.B. true
+   id                          number:10041        leer 0%    versch 10041  8582..19718                          nur Ziffern  z.B. 15449 | 15902 | 15903 | 15904 | 15905
+   number                      number:10041        leer 0%    versch 10041  1..40400004                          nur Ziffern  z.B. 9990034 | 2500001 | 2500002 | 2500003 | 2500004
+   name                        string:10041        leer 0%    versch 10041                          Len 2-69     Text  z.B. !!! NACHBON !!! | #1 BurgerDay | #2 BurgerDay | #3 BurgerDay | #4 BurgerDay
+   active                      boolean:10041       leer 0%    versch 2                                           Text  z.B. false | true
+   function                    string:10041        leer 0%    versch 4                              Len 4-18     Text  z.B. MAIN | TENDER | COURSE_COMPILATION | INFORMATION
+   detailcategory              number:10041        leer 0%    versch 345    228..1112                            nur Ziffern  z.B. 664 | 663 | 662 | 583 | 586
+   meccode                     number:10041        leer 0%    versch 419    378..1409                            nur Ziffern  z.B. 870 | 869 | 868 | 793 | 1129
+   artnr1                      null:10041          leer 100%  versch 0                                           –
+   artnr2                      null:10041          leer 100%  versch 0                                           –
+   productUse                  number:10041        leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   fixedwe                     number:10041        leer 0%    versch 164    0..204 Nachk.                        nur Ziffern (9771/10041)  z.B. 0 | 1.06 | 0.57 | 0.83 | 0.78
+   quantitycontrol             string:10041        leer 0%    versch 2                              Len 1-1      Text  z.B. N | Y
+   currentquantity             number:10041        leer 0%    versch 3      0..3                                 nur Ziffern  z.B. 0 | 1 | 3
+   prices                      array:10041         leer 0%    versch 1140                                        –  z.B. [{"active":true,"priceperunit":0,"pricefixed":0,"menucard... | [{"active":true,"priceperunit":0,"pricefixed":0,"menucard... | [{"active":true,"priceperunit":0,"pricefixed":0,"menucard... | [{"active":true,"priceperunit":0,"pricefixed":0,"menucard... | [{"active":true,"priceperunit":0,"pricefixed":0,"menucard...
+   attributes                  array:10041         leer 0%    versch 119                                         –  z.B. [] | [{"attributeType":"additive","attributeId":99,"attributeN... | [{"attributeType":"allergen","attributeId":57,"attributeN... | [{"attributeType":"additive","attributeId":2,"attributeNa... | [{"attributeType":"allergen","attributeId":52,"attributeN...
+merchandiseman/attributes: HTTP 200, 64 Zeilen, 11004 Bytes, 122 ms
+   attributeType               string:64           leer 0%    versch 3                              Len 8-9      Text  z.B. allergen | additive | nutrition
+   attributeId                 number:64           leer 0%    versch 64     1..99                                nur Ziffern  z.B. 1 | 2 | 3 | 4 | 5
+   attributeName               string:64           leer 0%    versch 64                             Len 4-124    Text  z.B. mit Farbstoff: E 100 - E 180 | Konservierungsstoffe E 300 - E 321 | mit Antioxidationsmittel E 300 - E 321 | mit Geschmacksverstärker | geschwefelt E 220 - E 228
+   unit                        null:56/string:8    leer 88%   versch 2                              Len 1-4      Text  z.B. g | kcal
+merchandiseman/meccode: HTTP 200, 727 Zeilen, 214987 Bytes, 154 ms
+   id                          number:727          leer 0%    versch 727    0..1409                              nur Ziffern  z.B. 0 | 403 | 504 | 506 | 507
+   number                      number:727          leer 0%    versch 727    0..4000000                           nur Ziffern  z.B. 0 | 10 | 11 | 12 | 13
+   name                        string:727          leer 0%    versch 727                            Len 3-43     Text  z.B. Keine Zuordnung | AFG_older | No Peeking_older | Trinkgeld_older | Gutschein_older
+   description                 string:588/null:139  leer 97%   versch 20                             Len 8-273    Text  z.B. Täglich Happy Hour ab 21.00 Uhr mit Cocktails zum Special... | Alle Pasta-Gerichte sind für einen Extrapreis mit Shirata... | Unsere Kaffeebohnen sind Fairtrade & Bio. Wahlweise mit v... | Hey, save water!
+Drink wine! | Täglich Aperitivo Hour von 15.00 bis 18.00 Uhr: Jeder Spr...
+   active                      string:727          leer 0%    versch 2                              Len 1-1      Text  z.B. N | Y
+   mecgroup                    number:727          leer 0%    versch 49     0..100                               nur Ziffern  z.B. 58 | 82 | 81 | 29 | 36
+   color                       string:727          leer 0%    versch 13                             Len 3-9      Text  z.B. NOTSET | RED | YELLOW | LIME | ORANGE
+   visible                     string:727          leer 0%    versch 2                              Len 1-1      Text  z.B. N | Y
+   priority                    number:727          leer 0%    versch 89     0..900                               nur Ziffern  z.B. 0 | 1 | 200 | 250 | 40
+   allowed_sites               string:727          leer 76%   versch 4                              Len 1-2      Text  z.B. * | 6 | 4 | 20
+   image                       null:109/string:618  leer 100%  versch 0                                           –
+merchandiseman/vat: HTTP 200, 8 Zeilen, 3254 Bytes, 112 ms
+   id                          number:8            leer 0%    versch 8      0..7                                 nur Ziffern  z.B. 0 | 1 | 2 | 3 | 4
+   number                      number:8            leer 0%    versch 8      0..15                                nur Ziffern  z.B. 0 | 1 | 2 | 3 | 4
+   name                        string:8            leer 0%    versch 8                              Len 2-18     Text  z.B. Keine Zuordnung | 19% Mwst | 7% Mwst | 0% | 0% Gutschein_older
+   active                      string:8            leer 0%    versch 2                              Len 1-1      Text  z.B. Y | N
+   description                 null:3/string:5     leer 88%   versch 1                              Len 5-5      Text  z.B. Dummy
+   description1                null:1/string:7     leer 25%   versch 6                              Len 8-12     Text  z.B. 19% Mwst. | 7% Mwst. | 0% Mwst. | 0% Gutschein | 16% Mwst.
+   image                       null:4/string:4     leer 100%  versch 0                                           –
+   factor                      number:8            leer 0%    versch 5      0..19000000                          nur Ziffern  z.B. 0 | 19000000 | 7000000 | 16000000 | 5000000
+   vat_rate_type               number:8            leer 0%    versch 3      1..5                                 nur Ziffern  z.B. 5 | 1 | 2
+   label                       string:8            leer 25%   versch 6                              Len 1-1      Text  z.B. A | B | C | D | E
+   taxrate                     number:8            leer 0%    versch 5      0..19                                nur Ziffern  z.B. 0 | 19 | 7 | 16 | 5
+   description2                null:8              leer 100%  versch 0                                           –
+   description3                null:8              leer 100%  versch 0                                           –
+   description4                null:8              leer 100%  versch 0                                           –
+   description5                null:8              leer 100%  versch 0                                           –
+merchandiseman/financetype: HTTP 200, 208 Zeilen, 261268 Bytes, 172 ms
+   id                          number:208          leer 0%    versch 208    -10..3250 neg.                       nur Ziffern (207/208)  z.B. -10 | 0 | 1 | 2 | 140
+   number                      number:208          leer 0%    versch 208    -10..3516 neg.                       nur Ziffern (207/208)  z.B. -10 | 0 | 1 | 2 | 3
+   name                        string:208          leer 0%    versch 208                            Len 3-32     Text  z.B. Systembuchung | Keine Zuordnung | Boniert | Rundungsdifferenz | EinzweckgutscheinEinlöse
+   description                 null:15/string:193  leer 100%  versch 0                                           –
+   active                      string:208          leer 0%    versch 2                              Len 1-1      Text  z.B. N | Y
+   fin_category                number:208          leer 0%    versch 19     0..120                               nur Ziffern  z.B. 60 | 109 | 101 | 116 | 119
+   ec                          number:208          leer 0%    versch 16     0..1008                              nur Ziffern  z.B. 0 | 8 | 1 | 47 | 3
+   gs                          number:208          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   bruch                       number:208          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   storno                      number:208          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   perso                       number:208          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   bar                         number:208          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   modifier                    number:208          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   factor                      number:208          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   boniert                     number:208          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   wawiumsatz                  null:60/number:148  leer 29%   versch 1      0..0                                 nur Ziffern  z.B. 0
+   clearing_factor             number:208          leer 0%    versch 3      -1..1 neg.                           Text  z.B. 0 | -1 | 1
+   clearing_relative           number:208          leer 0%    versch 13     0..100                               nur Ziffern  z.B. 100 | 50 | 25 | 30 | 10
+   clearing_absolute           number:208          leer 0%    versch 5      0..10 Nachk.                         nur Ziffern (206/208)  z.B. 0 | 5 | 4.8 | 4.9 | 10
+   clearing_relative_variable  string:208          leer 0%    versch 1                              Len 1-1      Text  z.B. N
+   clearing_absolute_variable  string:208          leer 0%    versch 1                              Len 1-1      Text  z.B. N
+   default_vdoc_id             null:207/number:1   leer 100%  versch 1      81..81                               nur Ziffern  z.B. 81
+   minimum_sales               number:208          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   can_drawback                string:208          leer 0%    versch 2                              Len 1-1      Text  z.B. N | Y
+   open_amount_allowed         string:208          leer 0%    versch 2                              Len 1-1      Text  z.B. Y | N
+   negative_balance_allowed    string:208          leer 0%    versch 2                              Len 1-1      Text  z.B. N | Y
+   use_mixed_allowed           string:208          leer 0%    versch 2                              Len 1-1      Text  z.B. Y | N
+   book_after_allowed          null:60/string:148  leer 29%   versch 1                              Len 1-1      Text  z.B. N
+   addinfo_required            string:208          leer 0%    versch 1                              Len 1-1      Text  z.B. N
+   fixed_number                string:208          leer 0%    versch 2                              Len 1-1      Text  z.B. N | Y
+   code                        null:38/string:170  leer 85%   versch 2                              Len 1-6      Text  z.B. NOTSET | 0
+   provisionable               string:208          leer 0%    versch 2                              Len 1-1      Text  z.B. N | Y
+   selectionvbillids           null:52/string:156  leer 89%   versch 10                             Len 1-33     Text  z.B. 0 | 81,82,170,171,172,173,175,176 | 81,82,163,159,149,153 | 81,82,170,171,172,173 | 81,82,149,153,159,163
+   selectioncardtype           null:201/string:7   leer 97%   versch 7      2..46                   Len 1-2      nur Ziffern  z.B. 46 | 2 | 10 | 6 | 8
+   sort_number                 number:208          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   exchange_rate               string:208          leer 0%    versch 1      0..0                    Len 4-4      Dezimalzahl mit Punkt  z.B. 0.00
+   is_tipp                     string:173/null:35  leer 17%   versch 2                              Len 1-1      Text  z.B. N | Y
+   salesarticle_id             number:77/null:131  leer 63%   versch 3      0..12521                             nur Ziffern  z.B. 0 | 12521 | 9785
+   vat_id                      number:208          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   selectionbinlist            null:208            leer 100%  versch 0                                           –
+   debitormandatory            string:208          leer 0%    versch 1                              Len 1-1      Text  z.B. N
+   is_delivery_note            string:208          leer 0%    versch 1                              Len 1-1      Text  z.B. N
+   only_complete_saldo_payment  string:208          leer 0%    versch 1                              Len 1-1      Text  z.B. N
+merchandiseman/financecategory: HTTP 200, 21 Zeilen, 4024 Bytes, 95 ms
+   id                          number:21           leer 0%    versch 21     0..120                               nur Ziffern  z.B. 0 | 1 | 2 | 101 | 110
+   number                      number:21           leer 0%    versch 21     0..106                               nur Ziffern  z.B. 0 | 1 | 2 | 3 | 4
+   name                        string:21           leer 0%    versch 21                             Len 5-23     Text  z.B. Keine Zuordnung | Umsatz | Debitoren | Unbar | Einzweckgutschein
+   description                 null:4/string:17    leer 95%   versch 1                              Len 5-5      Text  z.B. Dummy
+   active                      string:21           leer 0%    versch 2                              Len 1-1      Text  z.B. Y | N
+   type                        string:21           leer 0%    versch 11                             Len 4-18     Text  z.B. NONCASH | CAPTIVE_SUPPLY | SALES | EINZWECKGUTSCHEIN | MEHRZWECKGUTSCHEIN
+   fixed_number                string:21           leer 0%    versch 2                              Len 1-1      Text  z.B. N | Y
+merchandiseman/pricelevel: HTTP 200, 19 Zeilen, 3982 Bytes, 104 ms
+   id                          number:19           leer 0%    versch 19     0..18                                nur Ziffern  z.B. 0 | 1 | 2 | 3 | 4
+   number                      number:19           leer 0%    versch 19     0..18                                nur Ziffern  z.B. 0 | 1 | 2 | 3 | 4
+   name                        string:19           leer 0%    versch 19                             Len 7-23     Text  z.B. Keine Zuordnung | Standardpreis | Dummy 1 | Dummy 2 | Wilmas spätes Stündchen
+   description                 null:1/string:18    leer 100%  versch 0                                           –
+   active                      string:19           leer 0%    versch 2                              Len 1-1      Text  z.B. N | Y
+   type                        string:19           leer 0%    versch 2                              Len 6-7      Text  z.B. SYSTEM | GESTURE
+   formula_id                  null:19             leer 100%  versch 0                                           –
+   code                        null:1/string:18    leer 79%   versch 3                              Len 2-2      Text  z.B. HH | ST | SH
+merchandiseman/site: HTTP 200, 15 Zeilen, 4768 Bytes, 132 ms
+   id                          number:15           leer 0%    versch 15     0..14                                nur Ziffern  z.B. 0 | 1 | 2 | 3 | 4
+   number                      number:15           leer 0%    versch 15     0..57                                nur Ziffern  z.B. 0 | 1 | 2 | 3 | 4
+   name                        string:15           leer 0%    versch 15                             Len 8-26     Text  z.B. Gesamtbetrieb | Ausser Haus | AmadeusGO | Eisverkauf_older | Ausser Haus_older
+   description                 string:15           leer 93%   versch 1                              Len 5-5      Text  z.B. Dummy
+   active                      string:15           leer 0%    versch 2                              Len 1-1      Text  z.B. Y | N
+   profile_id                  number:11/null:4    leer 27%   versch 1      0..0                                 nur Ziffern  z.B. 0
+   vat_level                   number:15           leer 0%    versch 2      1..2                                 nur Ziffern  z.B. 2 | 1
+   pricelevel_id               number:15           leer 0%    versch 5      0..12                                nur Ziffern  z.B. 0 | 1 | 9 | 10 | 12
+   print_onhold                string:15           leer 0%    versch 1                              Len 1-1      Text  z.B. N
+   print_slips                 string:15           leer 0%    versch 2                              Len 1-1      Text  z.B. Y | N
+   code                        string:15           leer 73%   versch 4                              Len 2-2      Text  z.B. EV | AH | LD | AG
+   color                       string:15           leer 0%    versch 1                              Len 6-6      Text  z.B. NOTSET
+merchandiseman/operationprofile: HTTP 200, 10 Zeilen, 16098 Bytes, 119 ms
+   id                          number:10           leer 0%    versch 10     0..12                                nur Ziffern  z.B. 0 | 2 | 7 | 5 | 6
+   number                      number:10           leer 0%    versch 10     0..20                                nur Ziffern  z.B. 0 | 1 | 2 | 3 | 4
+   name                        string:10           leer 0%    versch 10                             Len 3-15     Text  z.B. Keine Zuordnung | Restaurant EG | Restaurant OG | Bar | To Go Verkauf
+   description                 null:1/string:9     leer 100%  versch 0                                           –
+   active                      string:10           leer 0%    versch 1                              Len 1-1      Text  z.B. Y
+   csvparameters               string:10           leer 10%   versch 9                              Len 884-1648  Text  z.B. SITE,NONE,0\nMENUCARD,NONE,0\nUSE_MENUCARD_ONLY,NONE,N\nU... | SITE,NONE,0\nMENUCARD,NONE,0\nUSE_MENUCARD_ONLY,NONE,N\nU... | SITE,NONE,0\nMENUCARD,NONE,0\nUSE_MENUCARD_ONLY,NONE,N\nU... | SITE,NONE,1\nMENUCARD,NONE,0\nUSE_MENUCARD_ONLY,NONE,N\nU... | SITE,NONE,3\nMENUCARD,NONE,2\nUSE_MENUCARD_ONLY,NONE,Y\nU...
+   lager_id                    null:2/number:8     leer 20%   versch 1      0..0                                 nur Ziffern  z.B. 0
+   lock_table_over_x_digit     number:10           leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+merchandiseman/meccodegroup: HTTP 200, 54 Zeilen, 12766 Bytes, 90 ms
+   id                          number:54           leer 0%    versch 54     0..100                               nur Ziffern  z.B. 0 | 57 | 58 | 59 | 60
+   number                      number:54           leer 0%    versch 54     0..170                               nur Ziffern  z.B. 0 | 1 | 2 | 3 | 4
+   name                        string:54           leer 0%    versch 54                             Len 2-22     Text  z.B. Keine Zuordnung | Vorspeisen | Food | AFG | Dessertkarte
+   description                 string:50/null:4    leer 100%  versch 0                                           –
+   active                      string:54           leer 0%    versch 2                              Len 1-1      Text  z.B. Y | N
+   color                       string:54           leer 0%    versch 1                              Len 6-6      Text  z.B. NOTSET
+   visible                     string:54           leer 0%    versch 2                              Len 1-1      Text  z.B. Y | N
+   image                       null:54             leer 100%  versch 0                                           –
+   online_name                 string:45/null:9    leer 91%   versch 5                              Len 8-13     Text  z.B. Speisekarte | Eiskarte | Aktionen | Getränkekarte | Speciale
+merchandiseman/category: HTTP 200, 80 Zeilen, 45019 Bytes, 132 ms
+   id                          number:80           leer 0%    versch 80     0..250                               nur Ziffern  z.B. 0 | 156 | 157 | 158 | 159
+   number                      number:80           leer 0%    versch 80     0..5555                              nur Ziffern  z.B. 0 | 1 | 2 | 3 | 4
+   name                        string:80           leer 0%    versch 80                             Len 2-46     Text  z.B. Keine Zuordnung | Zuppe_older | Antipasti_older | Salate_older | Pasta_older
+   description                 null:43/string:37   leer 100%  versch 0                                           –
+   active                      string:80           leer 0%    versch 2                              Len 1-1      Text  z.B. Y | N
+   grosscategory               number:80           leer 0%    versch 16     0..10015                             nur Ziffern  z.B. 1 | 2 | 3 | 5 | 0
+   vat1_id                     null:80             leer 100%  versch 0                                           –
+   vat2_id                     null:80             leer 100%  versch 0                                           –
+   vat3_id                     null:80             leer 100%  versch 0                                           –
+   bon1_id                     null:80             leer 100%  versch 0                                           –
+   bon2_id                     null:80             leer 100%  versch 0                                           –
+   bon3_id                     null:80             leer 100%  versch 0                                           –
+   bon4_id                     null:80             leer 100%  versch 0                                           –
+   bon5_id                     null:80             leer 100%  versch 0                                           –
+   vbon1_id                    null:80             leer 100%  versch 0                                           –
+   vbon2_id                    null:80             leer 100%  versch 0                                           –
+   vbon3_id                    null:80             leer 100%  versch 0                                           –
+   vbon4_id                    null:80             leer 100%  versch 0                                           –
+   vbon5_id                    null:80             leer 100%  versch 0                                           –
+   course_bon_id               null:80             leer 100%  versch 0                                           –
+   vcourse_bon_id              null:80             leer 100%  versch 0                                           –
+merchandiseman/detailcategory: HTTP 200, 621 Zeilen, 126177 Bytes, 168 ms
+   id                          number:621          leer 0%    versch 621    0..1114                              nur Ziffern  z.B. 0 | 228 | 229 | 230 | 231
+   number                      number:621          leer 0%    versch 621    0..990300                            nur Ziffern  z.B. 0 | 1 | 2 | 3 | 4
+   name                        string:621          leer 0%    versch 621                            Len 3-45     Text  z.B. Keine Zuordnung | Infotexte_older | Antipasti_older | Bruschetta_older | Vorspeisen Divers_older
+   description                 null:498/string:123  leer 100%  versch 0                                           –
+   active                      string:621          leer 0%    versch 2                              Len 1-1      Text  z.B. Y | N
+   category                    number:621          leer 0%    versch 75     0..250                               nur Ziffern  z.B. 222 | 227 | 224 | 221 | 226
+   classification              null:500/number:121  leer 81%   versch 3      0..6                                 nur Ziffern  z.B. 0 | 2 | 6
+merchandiseman/grosscategory: HTTP 200, 68 Zeilen, 5958 Bytes, 128 ms
+   id                          number:68           leer 0%    versch 61     0..10015                             nur Ziffern  z.B. 3 | 4 | 8 | 9 | 7
+   number                      null:50/number:18   leer 74%   versch 18     0..58                                nur Ziffern  z.B. 2 | 1 | 5 | 3 | 0
+   name                        string:68           leer 0%    versch 68                             Len 3-32     Text  z.B. Keine Zuordnung_inaktiv | Getränke | Speisen | Sonstiges / Divers | Gutscheine
+
+   Alterstest:
+   aeltester Tag aus listdays (Berlin-Lesart) 23.10.2019: prostunde HTTP 200 (17 Stunden), protag HTTP 200 (18 Zeilen), journal HTTP 200 (2143 Zeilen)
+   vor 400 Tagen 08.10.2025: prostunde HTTP 200 (21 Stunden), protag HTTP 200 (25 Zeilen), journal HTTP 200 (1827 Zeilen)
+
+revenue/getlimit nachher: HTTP 200 {"status":"SUCCESS","limit":75,"rateLimit":100}
+
+Aufrufe fuer 5443e035c39d1dc278bfaaf8387b385077534019: 29
+
+====================================================================================================
+Betrieb b8c6f7ab740ee78b9da49566a1f6c2f210daaa6d, Tag 09.11.2026
+====================================================================================================
+revenue/store: HTTP 200, 935 Bytes, 113 ms
+revenue/getlimit vorher: HTTP 200 {"status":"SUCCESS","limit":50,"rateLimit":100}
+revenue/listdays: HTTP 200, 365 Zeilen, 56356 Bytes, 285 ms
+   businessdate — Rohwert | UTC-Datum | Berlin-Datum (erste und letzte drei):
+   1762210800 | 2025-11-03 | 2025-11-04   <- verschieden
+   1762988400 | 2025-11-12 | 2025-11-13   <- verschieden
+   1763074800 | 2025-11-13 | 2025-11-14   <- verschieden
+   1794265200 | 2026-11-09 | 2026-11-10   <- verschieden
+   1794351600 | 2026-11-10 | 2026-11-11   <- verschieden
+   1794438000 | 2026-11-11 | 2026-11-12   <- verschieden
+   Umrechnung fuer Abfragen: Unix-Sekunden -> Datum in Europe/Berlin (dd.mm.yyyy).
+personal/personalkostenprostunde businessdate=09.11.2026: HTTP 200, 854 Bytes, 140 ms
+   Schluessel: kost, kostUser, eff (kostUser vorhanden: true, nicht ausgewertet); Stunden eff 17, kost 17
+personal/personalkostenprotag businessdate=09.11.2026: HTTP 200, 11 Zeilen, 1124 Bytes, 145 ms
+   nur Summen (11 Zeilen):
+   h_brutto       number  Dezimalzahl mit Punkt  leer 0  Summe 81.3
+   h_zuschl_25    number  Text  leer 0  Summe 14.07
+   h_zuschl_40    number  nur Ziffern  leer 0  Summe 0
+   h_zuschl_50    number  nur Ziffern  leer 0  Summe 0
+   brutto         number  Text  leer 0  Summe 1332.35
+   lohnkosten     number  Dezimalzahl mit Punkt  leer 0  Summe 1658.01
+revenue/journal businessdate=09.11.2026: HTTP 200, 1034 Zeilen, 1052854 Bytes, 303 ms
+   ID                          number:1034         leer 0%    versch 1034   493740..494773                       nur Ziffern  z.B. 493740 | 493741 | 493742 | 493743 | 493744
+   datum                       number:1034         leer 0%    versch 764    1794211770..1794259666               Unix-Sekunden  z.B. 1794258506 | 1794235847 | 1794226968 | 1794239219 | 1794239154
+   refdate                     number:1034         leer 0%    versch 1      1794178800..1794178800               Unix-Sekunden  z.B. 1794178800
+   art                         string:1034         leer 0%    versch 221                            Len 1-40     Text  z.B. Bar gegeben | 10% Glücksrad | TIP_ | 0 | EC-Karte
+   artnr                       number:1034         leer 0%    versch 209    -3..9990031 neg.                     nur Ziffern (1033/1034)  z.B. 0 | 9990031 | 9950006 | 4070029 | 450003
+   preis                       number:1034         leer 0%    versch 214    -312.84..107.3 Nachk. neg.               Text  z.B. 0 | 4.9 | 5.9 | 4.5 | 13.9
+   zahl                        number:1034         leer 0%    versch 4      -1..4 neg.                           nur Ziffern (1031/1034)  z.B. 1 | -1 | 2 | 4
+   tisch                       string:1034         leer 0%    versch 55                             Len 1-6      Text  z.B. 13 | 21 | 22 | 20 | 17
+   ust                         number:1034         leer 0%    versch 3      0..19                                nur Ziffern  z.B. 19 | 7 | 0
+   vat_id                      number:1034         leer 0%    versch 4      0..3                                 nur Ziffern  z.B. 1 | 2 | 0 | 3
+   kellnernr                   number:1034         leer 0%    versch 4                                           nur Ziffern  [gesperrt]
+   finanzweg                   number:1034         leer 0%    versch 12     1..2700                              nur Ziffern  z.B. 1 | 20 | 2700 | 41 | 47
+   buchungsnr                  string:1034         leer 0%    versch 11     1..11                   Len 1-2      nur Ziffern  z.B. 1 | 2 | 3 | 6 | 4
+   tableheader_id              number:1034         leer 0%    versch 133    71990..72150                         nur Ziffern  z.B. 72117 | 72111 | 72045 | 72026 | 72088
+   am_id                       number:1034         leer 0%    versch 1034   493740..494773                       nur Ziffern  z.B. 493740 | 493741 | 493742 | 493743 | 493744
+   balance                     number:1034         leer 0%    versch 214    -312.84..107.3 Nachk. neg.               Text  z.B. 0 | 4.9 | 5.9 | 4.5 | 13.9
+   terminal                    number:1034         leer 0%    versch 5      4..9                                 nur Ziffern  z.B. 4 | 8 | 5 | 9 | 7
+   masterkellnernr             number:1034         leer 0%    versch 3                                           nur Ziffern  [gesperrt]
+   teamnr                      number:1034         leer 0%    versch 1                                           nur Ziffern  [gesperrt]
+   zcount                      number:1034         leer 0%    versch 1      363..363                             nur Ziffern  z.B. 363
+   parentid                    number:1034         leer 0%    versch 241    0..494764                            nur Ziffern  z.B. 0 | 494102 | 494669 | 493910 | 494005
+   site                        number:1034         leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   situation                   number:1034         leer 0%    versch 2      0..1                                 nur Ziffern  z.B. 0 | 1
+   sortorder                   number:1034         leer 0%    versch 3      0..2                                 nur Ziffern  z.B. 0 | 2 | 1
+   addinfo                     string:1034         leer 99%   versch 10                             Len 31-1546  Text  [gesperrt]
+   rabatt_id                   number:1034         leer 0%    versch 8      0..3315                              nur Ziffern  z.B. 0 | 3315 | 155 | 160 | 254
+   pricelevel_id               number:1034         leer 0%    versch 4      0..5                                 nur Ziffern  z.B. 1 | 4 | 0 | 5
+   operationprofile_id         number:1034         leer 0%    versch 1      2..2                                 nur Ziffern  z.B. 2
+   cancellationreason          number:1034         leer 0%    versch 2      0..3                                 nur Ziffern  z.B. 0 | 3
+   captivesupplyreason         null:526/number:508  leer 51%   versch 1      0..0                                 nur Ziffern  z.B. 0
+   event_number                null:1034           leer 100%  versch 0                                           –
+   menucard_id                 null:1034           leer 100%  versch 0                                           –
+   price_per_unit              null:1034           leer 100%  versch 0                                           –
+   financeextendedinfo_id      null:1034           leer 100%  versch 0                                           –
+   provision_free              null:1034           leer 100%  versch 0                                           –
+   course_price_print          null:1034           leer 100%  versch 0                                           –
+   coursedefentry_id           null:1034           leer 100%  versch 0                                           –
+   Summe balance 0; ID eindeutig: true (1034/1034); artnr gefuellt 880, verschieden 208
+   je finanzweg: 1: 798z 3655.81 | 5: 1z -13.4 | 10: 21z -212.5 | 11: 11z -128.1 | 20: 58z -1272.65 | 22: 17z -751.3 | 23: 17z 751.3 | 41: 25z -703.35 | 46: 13z -782.19 | 47: 23z -640.1 | 73: 1z -30.8 | 2700: 49z 127.28
+   situation: 0=1032 1=2
+   am_id: 493740=1 493741=1 493742=1 493743=1 493744=1 493745=1 493746=1 493747=1 493748=1 493749=1 493750=1 493751=1 493752=1 493753=1 493754=1
+   site: 0=1034
+   terminal: 4=384 8=354 5=183 9=101 7=12
+   ust: 19=480 7=349 0=205
+   vat_id: 1=480 2=349 0=154 3=51
+   rabatt_id<>0: 89, cancellationreason<>0: 11, parentid<>0: 350, preis=0 und balance<>0: 0
+   datum: {"roh":"1794211770","berlin":"2026-11-09 09:09:30"} bis {"roh":"1794259666","berlin":"2026-11-09 22:27:46"} (Unix-Sekunden); ausserhalb 08:00-07:59: 0
+   refdate: {"roh":"1794178800","berlin":"2026-11-09 00:00:00"} bis {"roh":"1794178800","berlin":"2026-11-09 00:00:00"}
+revenue/journaltables businessdate=09.11.2026: HTTP 200, 161 Zeilen, 121912 Bytes, 156 ms
+   tableheader_id              number:161          leer 0%    versch 161    71990..72150                         nur Ziffern  z.B. 71990 | 71991 | 71992 | 71993 | 71994
+   old_id                      number:161          leer 0%    versch 161    71990..72150                         nur Ziffern  z.B. 71990 | 71991 | 71992 | 71993 | 71994
+   table_type                  string:161          leer 0%    versch 1                              Len 8-8      Text  z.B. STANDARD
+   table_number                string:161          leer 0%    versch 58                             Len 1-6      Text  z.B. 20 | 22 | 21 | 23 | 13
+   refdate                     number:161          leer 0%    versch 1      1794178800..1794178800               Unix-Sekunden  z.B. 1794178800
+   documentdate                number:161          leer 0%    versch 158    1794211991..1794259669               Unix-Sekunden  z.B. 1794219565 | 1794252416 | 1794257469 | 1794213747 | 1794211991
+   transaction_number          null:161            leer 100%  versch 0                                           –
+   accounting_type             string:161          leer 0%    versch 2                              Len 4-5      Text  z.B. BILL | EMPTY
+   debitor_id                  number:161          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   parent_id                   number:161          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   archiveparent_id            number:68/null:93   leer 58%   versch 1      0..0                                 nur Ziffern  z.B. 0
+   debitor_text                string:161          leer 100%  versch 0                                           –  [gesperrt]
+   reservation_id              number:161          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   zcount                      number:161          leer 0%    versch 1      363..363                             nur Ziffern  z.B. 363
+   number_adults               number:161          leer 0%    versch 7      0..12                                nur Ziffern  z.B. 1 | 2 | 0 | 3 | 5
+   number_kids                 number:161          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   number_infants              number:161          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   renum                       number:161          leer 0%    versch 130    0..59184                             nur Ziffern  z.B. 0 | 59056 | 59063 | 59072 | 59115
+   vat1sum                     number:161          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   vat2sum                     number:161          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   vat3sum                     number:161          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   finanzweg                   number:161          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   zahl                        number:161          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   kellnernr                   number:161          leer 0%    versch 4                                           nur Ziffern  [gesperrt]
+   is_archive                  number:161          leer 0%    versch 1      1..1                                 nur Ziffern  z.B. 1
+   zip_code                    string:68/null:93   leer 100%  versch 0                                           –  [gesperrt]
+   tablearea_id                null:161            leer 100%  versch 0                                           –
+   tableheader_id eindeutig: true; Journal-Bons in tables 133/133, tables-Bons im Journal 133/161
+   Summen: adults 200, kids 0, infants 0; debitor_id gefuellt 161 (<>0: 0), reservation_id gefuellt 161 (<>0: 0)
+   accounting_type: BILL=133 EMPTY=28
+   table_type: STANDARD=161
+   is_archive: 1=161
+revenue/getforecastperday from=05.11.2026&to=11.11.2026: HTTP 200, 7 Zeilen, 492 Bytes, 101 ms  [dd.mm.yyyy (Postman-Doku)]
+   datum                       number:7            leer 0%    versch 7      1793833200..1794351600               Unix-Sekunden  z.B. 1793833200 | 1793919600 | 1794006000 | 1794092400 | 1794178800
+   forecast                    number:7            leer 0%    versch 7      2779.92..4524.56 Nachk.               Dezimalzahl mit Punkt  z.B. 2869.75 | 3383.34 | 4291.64 | 4524.56 | 2779.92
+merchandiseman/recipe: HTTP 200, 4070 Zeilen, 11937894 Bytes, 4214 ms
+   0                           null:4070           leer 100%  versch 0                                           –
+   1                           boolean:4070        leer 0%    versch 1                                           Text  z.B. true
+   id                          number:4070         leer 0%    versch 4070   1..4070                              nur Ziffern  z.B. 1955 | 3094 | 3449 | 1967 | 1966
+   number                      number:4070         leer 0%    versch 4070   100001..40400004                     nur Ziffern  z.B. 9990034 | 5070013 | 5070015 | 9990040 | 9990039
+   name                        string:4070         leer 0%    versch 4070                           Len 2-58     Text  z.B. !!! NACHBON !!! | #Senfdressing | #Sylter Dressing | ***bezahlt*** | ***Kino***
+   active                      boolean:4070        leer 0%    versch 2                                           Text  z.B. false | true
+   function                    string:4070         leer 0%    versch 4                              Len 4-18     Text  z.B. MAIN | TENDER | COURSE_COMPILATION | INFORMATION
+   detailcategory              number:4070         leer 0%    versch 138    4..368                               nur Ziffern  z.B. 88 | 87 | 202 | 86 | 11
+   meccode                     number:4070         leer 0%    versch 154    4..457                               nur Ziffern  z.B. 102 | 101 | 231 | 100 | 13
+   artnr1                      null:4070           leer 100%  versch 0                                           –
+   artnr2                      null:4070           leer 100%  versch 0                                           –
+   productUse                  number:4070         leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   fixedwe                     number:4070         leer 0%    versch 62     0..5.5 Nachk.                        nur Ziffern (3981/4070)  z.B. 0 | 0.83 | 0.29 | 0.19 | 0.85
+   quantitycontrol             string:4070         leer 0%    versch 1                              Len 1-1      Text  z.B. N
+   currentquantity             number:4070         leer 0%    versch 3      0..3                                 nur Ziffern  z.B. 0 | 1 | 3
+   prices                      array:4070          leer 0%    versch 252                                         –  z.B. [{"active":true,"priceperunit":0,"pricefixed":0,"menucard... | [{"active":true,"priceperunit":0,"pricefixed":0,"menucard... | [{"active":true,"priceperunit":0,"pricefixed":0,"menucard... | [{"active":true,"priceperunit":0,"pricefixed":0,"menucard... | [{"active":true,"priceperunit":0,"pricefixed":0,"menucard...
+   attributes                  array:4070          leer 0%    versch 48                                          –  z.B. [] | [{"attributeType":"additive","attributeId":99,"attributeN... | [{"attributeType":"allergen","attributeId":57,"attributeN... | [{"attributeType":"additive","attributeId":2,"attributeNa... | [{"attributeType":"allergen","attributeId":77,"attributeN...
+merchandiseman/attributes: HTTP 200, 64 Zeilen, 11004 Bytes, 100 ms
+   attributeType               string:64           leer 0%    versch 3                              Len 8-9      Text  z.B. allergen | additive | nutrition
+   attributeId                 number:64           leer 0%    versch 64     1..99                                nur Ziffern  z.B. 1 | 2 | 3 | 4 | 5
+   attributeName               string:64           leer 0%    versch 64                             Len 4-124    Text  z.B. mit Farbstoff: E 100 - E 180 | Konservierungsstoffe E 300 - E 321 | mit Antioxidationsmittel E 300 - E 321 | mit Geschmacksverstärker | geschwefelt E 220 - E 228
+   unit                        null:56/string:8    leer 88%   versch 2                              Len 1-4      Text  z.B. g | kcal
+merchandiseman/meccode: HTTP 200, 458 Zeilen, 133860 Bytes, 169 ms
+   id                          number:458          leer 0%    versch 458    0..457                               nur Ziffern  z.B. 0 | 1 | 2 | 3 | 4
+   number                      number:458          leer 0%    versch 458    0..100013                            nur Ziffern  z.B. 0 | 1 | 2 | 3 | 999
+   name                        string:458          leer 0%    versch 458                            Len 3-32     Text  z.B. Keine Zuordnung | Trinkgeld | Gutschein | Forderung | Gangabruf
+   description                 string:455/null:3   leer 97%   versch 12                             Len 20-262   Text  z.B. zubereitet mit der exquisiten Kaffeemischung „Graz“ der T... | von „Trink Meer Tee“ – inspiriert vom rauen Klima
+und de... | Wilmas „spätes" Stündchen
+Täglich von 19:00-22:00 Uhr gi... | Wilmas Stündchen
+Täglich von 15:00-18:00 Uhr alle
+Sprit... | Für jeden Tag, jede Uhrzeit und jede Stimmung gibt es den...
+   active                      string:458          leer 0%    versch 2                              Len 1-1      Text  z.B. N | Y
+   mecgroup                    number:458          leer 0%    versch 39     0..44                                nur Ziffern  z.B. 2 | 25 | 24 | 26 | 31
+   color                       string:458          leer 0%    versch 12                             Len 3-9      Text  z.B. NOTSET | RED | ORANGE | LIME | LIGHTBLUE
+   visible                     string:458          leer 0%    versch 2                              Len 1-1      Text  z.B. Y | N
+   priority                    number:458          leer 0%    versch 78     0..900                               nur Ziffern  z.B. 0 | 1 | 200 | 250 | 40
+   allowed_sites               string:458          leer 84%   versch 1                              Len 1-1      Text  z.B. *
+   image                       null:109/string:349  leer 100%  versch 0                                           –
+merchandiseman/vat: HTTP 200, 5 Zeilen, 2012 Bytes, 118 ms
+   id                          number:5            leer 0%    versch 5      0..4                                 nur Ziffern  z.B. 0 | 1 | 2 | 3 | 4
+   number                      number:5            leer 0%    versch 5      0..15                                nur Ziffern  z.B. 0 | 1 | 2 | 3 | 15
+   name                        string:5            leer 0%    versch 5                              Len 2-17     Text  z.B. Keine Zuordnung | 19% Mwst | 7% Mwst | 0% | NEUE STEUER AB 15
+   active                      string:5            leer 0%    versch 2                              Len 1-1      Text  z.B. Y | N
+   description                 null:1/string:4     leer 80%   versch 1                              Len 5-5      Text  z.B. Dummy
+   description1                null:1/string:4     leer 40%   versch 3                              Len 8-9      Text  z.B. 19% Mwst. | 7% Mwst. | 0% Mwst.
+   image                       null:2/string:3     leer 100%  versch 0                                           –
+   factor                      number:5            leer 0%    versch 3      0..19000000                          nur Ziffern  z.B. 0 | 19000000 | 7000000
+   vat_rate_type               number:5            leer 0%    versch 3      1..5                                 nur Ziffern  z.B. 5 | 1 | 2
+   label                       string:5            leer 40%   versch 3                              Len 1-1      Text  z.B. A | B | C
+   taxrate                     number:5            leer 0%    versch 3      0..19                                nur Ziffern  z.B. 0 | 19 | 7
+   description2                null:5              leer 100%  versch 0                                           –
+   description3                null:5              leer 100%  versch 0                                           –
+   description4                null:5              leer 100%  versch 0                                           –
+   description5                null:5              leer 100%  versch 0                                           –
+merchandiseman/financetype: HTTP 200, 183 Zeilen, 229350 Bytes, 178 ms
+   id                          number:183          leer 0%    versch 183    -10..3405 neg.                       nur Ziffern (182/183)  z.B. 3392 | 3391 | -10 | 0 | 1
+   number                      number:183          leer 0%    versch 183    -12..3516 neg.                       nur Ziffern (180/183)  z.B. -12 | -11 | -10 | 0 | 1
+   name                        string:183          leer 0%    versch 183                            Len 4-32     Text  z.B. RabattProzent | RabattBetrag | AmadeusStorno | Keine Zuordnung | Boniert
+   description                 string:164/null:19  leer 100%  versch 0                                           –
+   active                      string:183          leer 0%    versch 2                              Len 1-1      Text  z.B. N | Y
+   fin_category                number:183          leer 0%    versch 15     0..116                               nur Ziffern  z.B. 105 | 101 | 114 | 116 | 1
+   ec                          number:183          leer 0%    versch 8      0..47                                nur Ziffern  z.B. 0 | 1 | 3 | 2 | 8
+   gs                          number:183          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   bruch                       number:183          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   storno                      number:183          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   perso                       number:183          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   bar                         number:183          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   modifier                    number:183          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   factor                      number:183          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   boniert                     number:183          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   wawiumsatz                  number:165/null:18  leer 10%   versch 1      0..0                                 nur Ziffern  z.B. 0
+   clearing_factor             number:183          leer 0%    versch 3      -1..1 neg.                           Text  z.B. 0 | -1 | 1
+   clearing_relative           number:183          leer 0%    versch 13     0..100                               nur Ziffern  z.B. 100 | 50 | 30 | 25 | 10
+   clearing_absolute           number:183          leer 0%    versch 3      0..10                                nur Ziffern  z.B. 0 | 5 | 10
+   clearing_relative_variable  string:183          leer 0%    versch 2                              Len 1-1      Text  z.B. N | Y
+   clearing_absolute_variable  string:183          leer 0%    versch 2                              Len 1-1      Text  z.B. N | Y
+   default_vdoc_id             null:181/number:2   leer 99%   versch 2      0..1                                 nur Ziffern  z.B. 0 | 1
+   minimum_sales               number:183          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   can_drawback                string:183          leer 0%    versch 2                              Len 1-1      Text  z.B. N | Y
+   open_amount_allowed         string:183          leer 0%    versch 2                              Len 1-1      Text  z.B. Y | N
+   negative_balance_allowed    string:183          leer 0%    versch 2                              Len 1-1      Text  z.B. N | Y
+   use_mixed_allowed           string:183          leer 0%    versch 2                              Len 1-1      Text  z.B. Y | N
+   book_after_allowed          string:171/null:12  leer 7%    versch 1                              Len 1-1      Text  z.B. N
+   addinfo_required            string:183          leer 0%    versch 1                              Len 1-1      Text  z.B. N
+   fixed_number                string:183          leer 0%    versch 2                              Len 1-1      Text  z.B. N | Y
+   code                        null:24/string:159  leer 97%   versch 3                              Len 1-6      Text  z.B. 0 | OW | NOTSET
+   provisionable               string:183          leer 0%    versch 2                              Len 1-1      Text  z.B. N | Y
+   selectionvbillids           null:24/string:159  leer 94%   versch 2      0..1.2 Nachk.           Len 1-3      Text  z.B. 0 | 1,2
+   selectioncardtype           null:176/string:7   leer 96%   versch 7      2.5..46 Nachk.          Len 1-3      Text  z.B. 2,5 | 6 | 10 | 46 | 8
+   sort_number                 number:183          leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   exchange_rate               string:183          leer 0%    versch 1      0..0                    Len 4-4      Dezimalzahl mit Punkt  z.B. 0.00
+   is_tipp                     null:37/string:146  leer 20%   versch 2                              Len 1-1      Text  z.B. N | Y
+   salesarticle_id             null:134/number:49  leer 73%   versch 2      0..3679                              nur Ziffern  z.B. 0 | 3679
+   vat_id                      number:183          leer 0%    versch 2      0..3                                 nur Ziffern  z.B. 0 | 3
+   selectionbinlist            null:183            leer 100%  versch 0                                           –
+   debitormandatory            string:183          leer 0%    versch 1                              Len 1-1      Text  z.B. N
+   is_delivery_note            string:183          leer 0%    versch 1                              Len 1-1      Text  z.B. N
+   only_complete_saldo_payment  string:183          leer 0%    versch 1                              Len 1-1      Text  z.B. N
+merchandiseman/financecategory: HTTP 200, 16 Zeilen, 3088 Bytes, 115 ms
+   id                          number:16           leer 0%    versch 16     0..116                               nur Ziffern  z.B. 0 | 1 | 111 | 106 | 107
+   number                      number:16           leer 0%    versch 16     0..106                               nur Ziffern  z.B. 0 | 1 | 2 | 4 | 5
+   name                        string:16           leer 0%    versch 16                             Len 5-23     Text  z.B. Keine Zuordnung | Umsatz | Forderung | Einzweckgutschein | Mehrzweckgutschein
+   description                 null:3/string:13    leer 94%   versch 1                              Len 5-5      Text  z.B. Dummy
+   active                      string:16           leer 0%    versch 2                              Len 1-1      Text  z.B. Y | N
+   type                        string:16           leer 0%    versch 11                             Len 4-18     Text  z.B. NONCASH | SALES | FORDERUNG | EINZWECKGUTSCHEIN | MEHRZWECKGUTSCHEIN
+   fixed_number                string:16           leer 0%    versch 2                              Len 1-1      Text  z.B. N | Y
+merchandiseman/pricelevel: HTTP 200, 19 Zeilen, 3982 Bytes, 110 ms
+   id                          number:19           leer 0%    versch 19     0..18                                nur Ziffern  z.B. 0 | 1 | 2 | 3 | 4
+   number                      number:19           leer 0%    versch 19     0..18                                nur Ziffern  z.B. 0 | 1 | 2 | 3 | 4
+   name                        string:19           leer 0%    versch 19                             Len 7-23     Text  z.B. Keine Zuordnung | Standardpreis | Dummy 1 | Dummy 2 | Wilmas spätes Stündchen
+   description                 null:1/string:18    leer 100%  versch 0                                           –
+   active                      string:19           leer 0%    versch 2                              Len 1-1      Text  z.B. N | Y
+   type                        string:19           leer 0%    versch 2                              Len 6-7      Text  z.B. SYSTEM | GESTURE
+   formula_id                  null:19             leer 100%  versch 0                                           –
+   code                        null:1/string:18    leer 79%   versch 3                              Len 2-2      Text  z.B. HH | ST | SH
+merchandiseman/site: HTTP 200, 11 Zeilen, 3473 Bytes, 110 ms
+   id                          number:11           leer 0%    versch 11     0..10                                nur Ziffern  z.B. 0 | 1 | 2 | 3 | 4
+   number                      number:11           leer 0%    versch 11     0..57                                nur Ziffern  z.B. 0 | 1 | 2 | 50 | 51
+   name                        string:11           leer 0%    versch 11                             Len 8-26     Text  z.B. Gesamtbetrieb | Ausser Haus | AmadeusGO | NEUE VERKAUFSSTELLEN AB 50 | Cocktail Casino
+   description                 string:11           leer 91%   versch 1                              Len 5-5      Text  z.B. Dummy
+   active                      string:11           leer 0%    versch 2                              Len 1-1      Text  z.B. Y | N
+   profile_id                  number:11           leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+   vat_level                   number:11           leer 0%    versch 2      1..2                                 nur Ziffern  z.B. 2 | 1
+   pricelevel_id               number:11           leer 0%    versch 4      0..12                                nur Ziffern  z.B. 1 | 0 | 10 | 12
+   print_onhold                string:11           leer 0%    versch 1                              Len 1-1      Text  z.B. N
+   print_slips                 string:11           leer 0%    versch 2                              Len 1-1      Text  z.B. Y | N
+   code                        string:11           leer 100%  versch 0                                           –
+   color                       string:11           leer 0%    versch 1                              Len 6-6      Text  z.B. NOTSET
+merchandiseman/operationprofile: HTTP 200, 3 Zeilen, 4932 Bytes, 99 ms
+   id                          number:3            leer 0%    versch 3      0..3                                 nur Ziffern  z.B. 0 | 2 | 3
+   number                      number:3            leer 0%    versch 3      0..2                                 nur Ziffern  z.B. 0 | 1 | 2
+   name                        string:3            leer 0%    versch 3                              Len 8-15     Text  z.B. Keine Zuordnung | Standard | Ausser Haus
+   description                 null:1/string:2     leer 100%  versch 0                                           –
+   active                      string:3            leer 0%    versch 1                              Len 1-1      Text  z.B. Y
+   csvparameters               string:3            leer 0%    versch 3                              Len 915-1641  Text  z.B. SITE,NONE,0\nMENUCARD,NONE,0\nUSE_MENUCARD_ONLY,NONE,N\nU... | SITE,NONE,0\nMENUCARD,NONE,0\nUSE_MENUCARD_ONLY,NONE,N\nP... | SITE,NONE,1\nMENUCARD,NONE,0\nUSE_MENUCARD_ONLY,NONE,N\nP...
+   lager_id                    null:3              leer 100%  versch 0                                           –
+   lock_table_over_x_digit     number:3            leer 0%    versch 1      0..0                                 nur Ziffern  z.B. 0
+merchandiseman/meccodegroup: HTTP 200, 45 Zeilen, 10591 Bytes, 105 ms
+   id                          number:45           leer 0%    versch 45     0..44                                nur Ziffern  z.B. 0 | 1 | 2 | 3 | 4
+   number                      number:45           leer 0%    versch 45     0..156                               nur Ziffern  z.B. 0 | 1 | 2 | 3 | 4
+   name                        string:45           leer 0%    versch 45                             Len 2-22     Text  z.B. Keine Zuordnung | Vorspeisen | Food | AFG | Dessertkarte
+   description                 string:45           leer 100%  versch 0                                           –
+   active                      string:45           leer 0%    versch 2                              Len 1-1      Text  z.B. Y | N
+   color                       string:45           leer 0%    versch 1                              Len 6-6      Text  z.B. NOTSET
+   visible                     string:45           leer 0%    versch 1                              Len 1-1      Text  z.B. Y
+   image                       null:45             leer 100%  versch 0                                           –
+   online_name                 string:45           leer 87%   versch 6                              Len 5-17     Text  z.B. Essen | Aktionen | Trinken | Winterzauber | Frühlingserwachen
+merchandiseman/category: HTTP 200, 28 Zeilen, 15749 Bytes, 107 ms
+   id                          number:28           leer 0%    versch 28     0..29                                nur Ziffern  z.B. 0 | 3 | 4 | 5 | 6
+   number                      number:28           leer 0%    versch 28     0..5555                              nur Ziffern  z.B. 0 | 1 | 1000 | 1001 | 1002
+   name                        string:28           leer 0%    versch 28                             Len 2-46     Text  z.B. Keine Zuordnung | Forderung | Frühstück | Vorspeisen | Salat
+   description                 null:4/string:24    leer 100%  versch 0                                           –
+   active                      string:28           leer 0%    versch 2                              Len 1-1      Text  z.B. Y | N
+   grosscategory               number:28           leer 0%    versch 10     0..10009                             nur Ziffern  z.B. 10001 | 10002 | 0 | 3 | 2
+   vat1_id                     null:28             leer 100%  versch 0                                           –
+   vat2_id                     null:28             leer 100%  versch 0                                           –
+   vat3_id                     null:28             leer 100%  versch 0                                           –
+   bon1_id                     null:28             leer 100%  versch 0                                           –
+   bon2_id                     null:28             leer 100%  versch 0                                           –
+   bon3_id                     null:28             leer 100%  versch 0                                           –
+   bon4_id                     null:28             leer 100%  versch 0                                           –
+   bon5_id                     null:28             leer 100%  versch 0                                           –
+   vbon1_id                    null:28             leer 100%  versch 0                                           –
+   vbon2_id                    null:28             leer 100%  versch 0                                           –
+   vbon3_id                    null:28             leer 100%  versch 0                                           –
+   vbon4_id                    null:28             leer 100%  versch 0                                           –
+   vbon5_id                    null:28             leer 100%  versch 0                                           –
+   course_bon_id               null:28             leer 100%  versch 0                                           –
+   vcourse_bon_id              null:28             leer 100%  versch 0                                           –
+merchandiseman/detailcategory: HTTP 200, 365 Zeilen, 72270 Bytes, 152 ms
+   id                          number:365          leer 0%    versch 365    0..371                               nur Ziffern  z.B. 0 | 1 | 2 | 3 | 4
+   number                      number:365          leer 0%    versch 365    0..99999                             nur Ziffern  z.B. 0 | 1 | 2 | 3 | 1000
+   name                        string:365          leer 0%    versch 365                            Len 3-32     Text  z.B. Keine Zuordnung | Trinkgeld | Gutschein_ | Forderung | AFG
+   description                 null:243/string:122  leer 100%  versch 0                                           –
+   active                      string:365          leer 0%    versch 2                              Len 1-1      Text  z.B. Y | N
+   category                    number:365          leer 0%    versch 28     0..29                                nur Ziffern  z.B. 7 | 12 | 9 | 11 | 19
+   classification              null:243/number:122  leer 67%   versch 3      0..6                                 nur Ziffern  z.B. 0 | 2 | 6
+merchandiseman/grosscategory: HTTP 200, 62 Zeilen, 5335 Bytes, 131 ms
+   id                          number:62           leer 0%    versch 59     0..10010                             nur Ziffern  z.B. 1 | 2 | 3 | 0 | 5
+   number                      number:14/null:48   leer 77%   versch 14     0..10003                             nur Ziffern  z.B. 0 | 10001 | 10002 | 10003 | 1
+   name                        string:62           leer 0%    versch 61                             Len 3-24     Text  z.B. Getränke | Keine Zuordnung | Essen | Sonstige | Gutschein_
+
+   Alterstest:
+   aeltester Tag aus listdays (Berlin-Lesart) 04.11.2025: prostunde HTTP 200 (9 Stunden), protag HTTP 200 (12 Zeilen), journal HTTP 200 (3369 Zeilen)
+   vor 400 Tagen 08.10.2025: prostunde HTTP 200 (0 Stunden), protag HTTP 200 (0 Zeilen), journal HTTP 200 (0 Zeilen)
+
+revenue/getlimit nachher: HTTP 200 {"status":"SUCCESS","limit":67,"rateLimit":100}
+
+Aufrufe fuer b8c6f7ab740ee78b9da49566a1f6c2f210daaa6d: 29
+
+====================================================================================================
+--alle: revenue/listdays je Schluessel
+====================================================================================================
+5443e035c39d1dc278bfaaf8387b385077534019: HTTP 200, 2512 Tage, 2019-10-23 bis 2026-11-12
+b8c6f7ab740ee78b9da49566a1f6c2f210daaa6d: HTTP 200, 365 Tage, 2025-11-04 bis 2026-11-12
+e02d445295a8f37221fef01dda73b83d31e6a2cc: HTTP 200, 2081 Tage, 2020-08-15 bis 2026-11-12
+c86ac9a297637d0401f78748b784ffab3f30ab3c: HTTP 200, 2736 Tage, 2019-03-14 bis 2026-11-12
+f4af70e6253d6ecd8f05fc927d35a0220dec585b: HTTP 200, 4461 Tage, 2014-07-12 bis 2026-11-12
+795835aec7e679377817759691890d82e1bb6068: HTTP 200, 3438 Tage, 2017-04-19 bis 2026-11-12
+73246318d5ee0622b2de975b537135b187678336: HTTP 200, 1994 Tage, 2021-05-20 bis 2026-11-12
+766a70718fd6d38c6ca51f9bee9bba79041291be: HTTP 200, 2210 Tage, 2020-06-06 bis 2026-11-12
+c5e3f3124ba9a44770d53bf3683439d92d1cbbc4: HTTP 200, 2520 Tage, 2019-11-14 bis 2026-11-12
+966d78b493616b1b6310a47301538cce8490dc34: HTTP 403, 0 Tage, – bis – — {"status":"error","message":"Module 'Revenue' not licensed"}
+7273db506cc969a4db868cb7cb59df631d8a08ab: HTTP 200, 0 Tage, – bis –
+c8ec94558e6877aadfc960f367b3535a2bc412e8: HTTP 403, 0 Tage, – bis – — {"status":"error","message":"Module 'Revenue' not licensed"}
+6fe02be5a39e4a6b62595d731a58bea096ece283: HTTP 200, 3332 Tage, 2016-01-04 bis 2026-01-12
+bb46ecc6ba3eb3bd7584d8d6abc0b5fb926cca75: HTTP 403, 0 Tage, – bis – — {"status":"error","message":"Module 'Revenue' not licensed"}
+a26be9839c0f13a6c6a10d979a7ae9f1387b8fc4: HTTP 200, 2374 Tage, 2019-07-26 bis 2026-11-12
+96c732756ee503b64c22dffae6fe7927609bcefd: HTTP 200, 3404 Tage, 2016-02-22 bis 2026-11-12
+64d0eb1ac0a0e5fc56b0a8e991f4edc0d47378d6: HTTP 200, 3219 Tage, 2017-02-22 bis 2026-11-12
+ac91fedb9cef49aca9f798debf580f775fd99906: HTTP 200, 3660 Tage, 2016-09-29 bis 2026-11-12
+4d0379933859178e75cae138484d3988838a7406: HTTP 200, 2942 Tage, 2018-05-29 bis 2026-11-12
+fd8876b09adee9637729839d53d973ed826ef6f9: HTTP 200, 4048 Tage, 2015-08-20 bis 2026-11-12
+3f6f872ab0b0797d7174467b16761dd037666ca9: HTTP 200, 3379 Tage, 2017-06-28 bis 2026-11-12
+fc9b3d9b07886a59b7ab1413fd3b9cbca17b2f38: HTTP 200, 3714 Tage, 2016-01-25 bis 2026-11-12
+4119348868d3a7825168fc0c7b55ec52e3fcac99: HTTP 200, 3171 Tage, 2018-01-11 bis 2026-11-12
+3ee4fb416fdba958f19ee4efdad54cd459e2df1d: HTTP 200, 1962 Tage, 2021-05-22 bis 2026-11-12
+e636256706c5c2d5115229c9e493dd93c029370d: HTTP 200, 2152 Tage, 2020-06-30 bis 2026-11-12
+0afe917c8d13b963fcf3385663299e55d3cfa891: HTTP 200, 3261 Tage, 2016-10-18 bis 2026-11-12
+18342f1c49335ba9c75a2956fbec415e88b17cfa: HTTP 200, 2165 Tage, 2019-10-17 bis 2026-11-12
+9d5866125ef24dee2f82364aed1959b74cb89b59: HTTP 200, 3757 Tage, 2015-09-28 bis 2026-11-12
+218915e23d622af8e5034255c32360b9985f79b7: HTTP 200, 2721 Tage, 2018-11-02 bis 2026-11-12
+e3ab4ba2043996630ca44127e1715fd0d8eb4f06: HTTP 200, 3569 Tage, 2016-08-14 bis 2026-11-12
+a9bbeb7f32f15b5d15a87765cfe55d797b810662: HTTP 200, 3069 Tage, 2017-10-07 bis 2026-11-12
+94b665f3685ea68fc017fe087b61bcac2ac746ea: HTTP 200, 167 Tage, 2026-05-28 bis 2026-11-12
+8edfad37cb6a609cd22a6e1f16e7adcee109b8c9: HTTP 200, 3037 Tage, 2018-05-27 bis 2026-11-12
+bc58d22fa71a45f4393bb60eff910afe4431c6d0: HTTP 200, 2571 Tage, 2018-08-20 bis 2026-11-12
+5a40aca0bba2a3da47de2167e2de7c57b28fc611: HTTP 200, 253 Tage, 2026-02-19 bis 2026-11-12
+f9725cb2ff7d3bc2be41697817f936351dd222ef: HTTP 200, 1259 Tage, 2023-05-31 bis 2026-11-12
+23e5725226acd57f99ec1ac2bb02612244d9dd9a: HTTP 200, 2333 Tage, 2019-10-04 bis 2026-11-12
+fda3b0a3fbc155ce0bfb009badcdf625bf70e560: HTTP 200, 1538 Tage, 2022-08-28 bis 2026-11-12
+d435fdd830dea101928a7e78826d84b8649530a5: HTTP 200, 631 Tage, 2025-02-10 bis 2026-11-12
+4c41b942c3aa6d5a355e85518d592fd8c637672d: HTTP 200, 2336 Tage, 2019-07-26 bis 2026-11-12
+79098421c54bb5005bbe662edb661e7c99c0bc45: HTTP 200, 345 Tage, 2025-12-03 bis 2026-11-12
+
+Summe der Tage ueber alle Betriebe: 92686 (Rueckstandsrechnung)
+
+Aufrufe je Betrieb:
+   5443e035c39d1dc278bfaaf8387b385077534019: 30
+   b8c6f7ab740ee78b9da49566a1f6c2f210daaa6d: 30
+   e02d445295a8f37221fef01dda73b83d31e6a2cc: 1
+   c86ac9a297637d0401f78748b784ffab3f30ab3c: 1
+   f4af70e6253d6ecd8f05fc927d35a0220dec585b: 1
+   795835aec7e679377817759691890d82e1bb6068: 1
+   73246318d5ee0622b2de975b537135b187678336: 1
+   766a70718fd6d38c6ca51f9bee9bba79041291be: 1
+   c5e3f3124ba9a44770d53bf3683439d92d1cbbc4: 1
+   966d78b493616b1b6310a47301538cce8490dc34: 1
+   7273db506cc969a4db868cb7cb59df631d8a08ab: 1
+   c8ec94558e6877aadfc960f367b3535a2bc412e8: 1
+   6fe02be5a39e4a6b62595d731a58bea096ece283: 1
+   bb46ecc6ba3eb3bd7584d8d6abc0b5fb926cca75: 1
+   a26be9839c0f13a6c6a10d979a7ae9f1387b8fc4: 1
+   96c732756ee503b64c22dffae6fe7927609bcefd: 1
+   64d0eb1ac0a0e5fc56b0a8e991f4edc0d47378d6: 1
+   ac91fedb9cef49aca9f798debf580f775fd99906: 1
+   4d0379933859178e75cae138484d3988838a7406: 1
+   fd8876b09adee9637729839d53d973ed826ef6f9: 1
+   3f6f872ab0b0797d7174467b16761dd037666ca9: 1
+   fc9b3d9b07886a59b7ab1413fd3b9cbca17b2f38: 1
+   4119348868d3a7825168fc0c7b55ec52e3fcac99: 1
+   3ee4fb416fdba958f19ee4efdad54cd459e2df1d: 1
+   e636256706c5c2d5115229c9e493dd93c029370d: 1
+   0afe917c8d13b963fcf3385663299e55d3cfa891: 1
+   18342f1c49335ba9c75a2956fbec415e88b17cfa: 1
+   9d5866125ef24dee2f82364aed1959b74cb89b59: 1
+   218915e23d622af8e5034255c32360b9985f79b7: 1
+   e3ab4ba2043996630ca44127e1715fd0d8eb4f06: 1
+   a9bbeb7f32f15b5d15a87765cfe55d797b810662: 1
+   94b665f3685ea68fc017fe087b61bcac2ac746ea: 1
+   8edfad37cb6a609cd22a6e1f16e7adcee109b8c9: 1
+   bc58d22fa71a45f4393bb60eff910afe4431c6d0: 1
+   5a40aca0bba2a3da47de2167e2de7c57b28fc611: 1
+   f9725cb2ff7d3bc2be41697817f936351dd222ef: 1
+   23e5725226acd57f99ec1ac2bb02612244d9dd9a: 1
+   fda3b0a3fbc155ce0bfb009badcdf625bf70e560: 1
+   d435fdd830dea101928a7e78826d84b8649530a5: 1
+   4c41b942c3aa6d5a355e85518d592fd8c637672d: 1
+   79098421c54bb5005bbe662edb661e7c99c0bc45: 1
+revenue/getlimit am Ende (5443e035c39d1dc278bfaaf8387b385077534019): HTTP 200 {"status":"SUCCESS","limit":76,"rateLimit":100}
+
+JSON geschrieben: /tmp/tpapi-formprobe.json
