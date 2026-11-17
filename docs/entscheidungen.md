@@ -5019,3 +5019,26 @@ keine Nebenzahl mehr, sondern die Messlatte.
 **Nicht belegt:** ob LINA Zukunftstage liefert und wie weit; ob LINA nachträglich ändert; was LINA
 genau prognostiziert (netto, mit oder ohne Trinkgeld — angenommen: netto wie der Umsatzbericht).
 
+## 17.11.2026 — Vertragsdaten bekommen eine eigene Datenbank und einen eigenen MCP
+
+**Entscheidung Eugene.** Finance (Andreas Heinz, Kristina Stokic) will Franchiseverträge,
+Gebührenkonditionen, Stundungen und offene Posten strukturiert führen. Das wird **nicht** in dieser
+Datenbank gebaut, auch nicht als eigenes Schema: eigene Datenbank, eigener MCP-Server, eigene
+Rollen, eigene Nutzer. Plan und Stand: `docs/vertragsdatenbank/`.
+
+**Warum.** Im Analytics-MCP sieht jeder Nutzer alles in `mart` — so gewollt. Vertragsdaten sind
+vertraulich und werden je Marke berechtigt (Geschäftsführer der Management-GmbHs nur ihre Marken).
+Eine Trennung über Rechte in derselben Datenbank hinge an jeder künftigen Migration; `0110` hat der
+Leserolle auf genau diesem Weg das Zugriffsprotokoll zurückgegeben (`docs/fehlerkatalog.md`,
+12.11.2026).
+
+**Datenfluss nur in eine Richtung:** die Vertragsdatenbank liest Nettoumsatz, die BWA-Zeile
+Franchisegebühr und die Betriebsliste aus Analytics. Analytics liest dort nichts.
+
+**Nicht entschieden:** wo die Datenbank läuft, wie der Umsatz hinüberkommt (Leserolle oder
+nächtlicher Abzug), Technik der Eingabeoberfläche, eigenes Repo oder Unterordner
+(`docs/vertragsdatenbank/architektur.md`).
+
+**Nebenbei geklärt:** Sell & Pick ist gekündigt, Finance hat keinen Zugriff mehr; nur die Schlüssel
+standen noch in den Ladenakten (Eintrag vom 13.11.2026). Der Bremer Januarwert im Gebührenblatt von
+Finance stammte noch von dort.
