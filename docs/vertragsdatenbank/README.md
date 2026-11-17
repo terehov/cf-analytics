@@ -32,6 +32,9 @@ Nutzerverwaltung; sie teilt nichts mit der Analytics-Datenbank und ihrem MCP (En
 Marke berechtigt werden, und eine Trennung über Rechte in derselben Datenbank hinge an jeder
 künftigen Migration. Daten fließen nur von Analytics in die Vertragsdatenbank, nie zurück.
 
+Finance arbeitet damit über ein Dashboard und den MCP-Zugang (Entscheidung Eugene, 17.11.2026). Dort
+steht auch der Umsatz für die Abrechnung — die frühere Quelle Sell & Pick ist gekündigt.
+
 Einzelheiten: `architektur.md`.
 
 ## Fahrplan

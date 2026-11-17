@@ -13,7 +13,7 @@ erscheinen. Geklärte Punkte werden durchgestrichen, nicht gelöscht, mit Datum 
 | Differenz Freudenstadt Januar 2026 (1.641,14 €) | Kristina | Am 11.11.2026 von Andreas an Kristina weitergegeben, keine Antwort in den Mails |
 | Sonderregeln Außer Haus / Lieferdienst bei der Bemessung | Kristina | Am 11.11.2026 von Andreas an Kristina weitergegeben. Hängt mit Freudenstadt zusammen (1.168,29 € Außer Haus) |
 | Liegen alle Verträge und Nachträge in der LINA-Ladenakte, oder nur im SharePoint? | Kristina | Am 11.11.2026 von Andreas an Kristina weitergegeben („Können wir sicherstellen, dass in LINA alles in der Ladenakte gepflegt ist?") |
-| Woher nimmt Finance künftig den Umsatz für Betriebe, die bisher aus Sell & Pick kamen (Bremen)? Vorschlag: aus Analytics | Andreas | Sell & Pick ist gekündigt, Finance hat keinen Zugriff mehr (Eugene, 17.11.2026). Vorschlag noch nicht an Finance gegangen — in den Mails bis 11.11.2026 nicht enthalten |
+| ~~Woher nimmt Finance künftig den Umsatz für Betriebe, die bisher aus Sell & Pick kamen (Bremen)?~~ | Eugene | **Entschieden 17.11.2026:** Finance bekommt dafür ein Dashboard und den MCP-Zugang der Vertragsdatenbank; der Umsatz kommt aus Analytics. Sell & Pick ist gekündigt. Finance noch nicht mitgeteilt |
 | DATEV: Exportformat der offenen Posten, Lesezugang | Andreas / Steuerberater | 11.11.2026: Export wird geprüft; Lesezugang klärt Andreas, wartet auf Rückruf des Steuerberaters |
 | Bankumsätze: Export oder Schnittstelle | Finance | 11.11.2026: „in Klärung". Entfällt als eigener Abgleich, wenn DATEV den Ausgleich führt |
 | Lesende je Marke: wer genau | Andreas mit Daniel | 11.11.2026: Vorstand, Aufsichtsrat, Finance, „ggf." Geschäftsführer der Management-GmbHs für ihre Marken; Details mit Daniel abzustimmen |
