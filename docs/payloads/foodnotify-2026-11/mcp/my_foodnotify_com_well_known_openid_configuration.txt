@@ -21,6 +21,6 @@
             </div>
         </app-root>
         <script src="https://public.tableau.com/javascripts/api/tableau-2.9.2.min.js"></script>
-        <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSy…[Schluessel gekuerzt]" type="text/javascript"></script>
+        <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDOy0Ns1iCrXpJeZ4phREHsjMI21hzpVlA" type="text/javascript"></script>
     <script src="runtime.c66b7750f57788e5.js" type="module"></script><script src="polyfills.714de2a32ff34f48.js" type="module"></script><script src="vendor.ce54eadb88537d6d.js" type="module"></script><script src="main.e1808370e68a3685.js" type="module"></script></body>
 </html>
