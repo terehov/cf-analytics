@@ -1263,6 +1263,11 @@ Nachtlauf mit `0132`:
    Septemberabzug kannte das Feld nicht. Nach dem ersten vollen Abzug beantwortbar:
    `SELECT in_liste, archiviert, count(*) FROM core.rezept GROUP BY 1, 2;` — stimmt die
    Hypothese, gibt es keine Zeile `in_liste = true, archiviert = true`.
+   **Nachtrag 18.11.2026:** `/api/recipe-viewer/recipes` (neue Oberfläche) führt `archived` je Listeneintrag und
+   antwortet dem Scope-Token — bei Wilma Wunder 13.263 Rezepte, 531 Seiten zu 25 (Detailmessung, nur Seite 1).
+   Ein Lauf über alle Seiten zeigt, ob diese Liste archivierte Rezepte führt und ob die 56 „nur über Verweise"
+   darin stehen — ein zweiter Weg zur Antwort, unabhängig vom ersten vollen Abzug
+   (`foodnotify-api-inventar-offiziell.md`).
 
 ## Nachprüfung nach dem Deploy von `0076` (Phase 4)
 
@@ -2750,3 +2755,78 @@ mart.umsatzprognose_vorlauf WHERE vorlauf_tage = 0 AND geschaeftstag = current_d
    spricht dafür, dass am 26.07.2026 der Weg der Sandbox abgewiesen wurde. Die Regel bleibt, bis
    Eugene sie ändert; ein Auftrag im Einzelfall ist damit aber technisch ausführbar.
 
+## 18.11.2026 — FoodNotify: Scope-Token und interne Schnittstelle
+
+Grundlage: `docs/foodnotify-api-inventar-offiziell.md` (Messung mit Token, Detailmessung, Was das für den Importer
+heißt) und `docs/foodnotify-api-inventar-intern-2026-11.md`. Gemessen ist nur Wilma Wunder, je Pfad ein Aufruf.
+
+1. ~~**Was vor einem Umbau noch zu messen ist.** Sechs Registereinträge tragen mit dem Token (`fn:betriebe`,
+   `fn:bestellungen`, `fn:bestellung`, `fn:rezept`, `fn:rezept_zutaten`, `fn:rezept_meta`), `fn:rezepte` nur über
+   `/api/recipe-viewer/recipes`, `fn:kostenstellen` über `/api/erp/core/{userId}/erps`; abgewiesen sind `fn:profil`,
+   `fn:pos_standorte`, `fn:bestellpositionen` (`/change`) und `fn:inventuren`. Offen:
+   `/api/recipes/{id}/ingredients` an einem Rezept **mit** Zutaten (das gemessene war leer — trägt die Antwort
+   `artikelId`?); `/api/erp/stocktakings/{uuid}/items` mit einer bekannten Inventur; die Felder von
+   `markedShopOrder.products[]` im Bestellkopf gegen `/change` aus `raw.api_antwort` (ersetzt der Kopf die
+   Positionen? Laut altem Inventar nur `price, productId` — vermutlich nicht). **Läuft:** dieselben Lesepfade mit
+   der Cookie-Sitzung im Browser, für die Antwortformen und den Vergleich Token gegen Sitzung.~~
+   **Endstand 18.11.2026** (`foodnotify-api-inventar-offiziell.md`, „Endstand"): Mit der **Sitzung** antworten 13
+   von 14 Registerpfaden (Bestellansicht nicht gemessen), auch `/change` und `/api/erp/stocktakings/{uuid}/items`
+   (`payloads/foodnotify-2026-11/messung-sitzung-2026-11-18.md`). Mit dem **Token** tragen sechs, zwei über einen
+   anderen Pfad, vier sind abgewiesen (`fn:profil`, `fn:pos_standorte`, `fn:bestellpositionen`, `fn:inventuren`);
+   die Zutaten tragen auch mit Token `artikelId` (ein Rezept, 5 von 6 Zutaten). `markedShopOrder.products[]` hat
+   nur `price` und `productId` — **kein Ersatz für `/change`**. Folge: Rezepte gingen mit Token, Bestellpositionen
+   und Inventuren nur mit Sitzung. Ob ein gemischter Betrieb gewollt ist, ist nicht entschieden. Weiter offen ist
+   nur der Vergleich Token gegen Sitzung auf **Zeilenebene**.
+2. **Die drei anderen Marken:** dieselben 22 Scopes? Dieselben Pfade? (Entscheidung Eugene: erst nach dem Inventar.)
+3. **Sechs Importer-Pfade stehen in keinem Bundle** (`/api/recipes`, `/{id}`, `/ingredients`, `/meta`,
+   `/api/erp/stocktakings/{uuid}/items`, Bestellansicht). Braucht die Oberfläche sie nicht mehr, kann FoodNotify
+   sie ohne Ankündigung abschalten. Wächter ist `mart.quelle_zulauf` (`fn:rezepte`, `fn:rezept_*`,
+   `fn:inventurpositionen` stehen in `src/sync/quellen.ts`) — nichts zu bauen, aber nicht wundern.
+4. **`full-access`:** wer stellt es aus, öffnet es die Pfade mit „does not support scope-limited tokens"
+   (darunter alle `/api/1.0/…`, `/change` und die Inventuren)? Hypothese. Kein Support-Kontakt (Entscheidung
+   18.11.2026) — bleibt offen.
+5. **`link-targets`: `restaurantId` und `updatedAt`** je Rezept (13.253 Zeilen; die Rezeptliste der neuen
+   Oberfläche zählt am selben Tag 13.263): Eigentümer oder Verwendung? Änderungsdatum des Rezepts? Wäre beides
+   wahr, gäbe es den Betriebsbezug und einen Änderungsfilter für den Umlauf (`0134`). Nicht geprüft.
+6. **`core.pos_artikel` und `core.ware_stand`** sind mit der Sitzung seit 01.08. bzw. 27.07.2026 erreichbar und
+   jetzt auch mit Token (`/api/pos/mapping/{connectionId}/articles`, `/api/{erpId}/products`). Am Zugang liegt die
+   Leere nicht. Frage 2 aus „Drei `core`-Tabellen mit null Zeilen" (14.08.2026) ist die eigentliche Entscheidung.
+7. **Der Token-Inhaber ersetzt das Testtoken** („CF Analytics", Id 179). Soll der Importer ein Token nutzen, gehört es
+   in eine Umgebungsvariable, nie in `raw`, Log oder Messdatei (Regel 2); dann je Marke ein Token.
+8. ~~**Host des FoodNotify-MCP-Servers** unbekannt (`api3…/mcp`, `connect…/mcp` → 403 „Invalid Host header").~~
+   **Gefunden 18.11.2026:** `https://my.foodnotify.com/mcp` (`docs/foodnotify-mcp-server.md`). Offen bleibt die
+   **Werkzeugliste**: sie gibt es nur nach OAuth-Anmeldung eines Personenkontos, und der Server darf Rezepte
+   schreiben — **nicht ohne Auftrag** von Eugene.
+9. **Hinweis an Concept Family:** Die alte FoodNotify-Oberfläche zeichnet 10 % der Sitzungen (100 % bei Fehlern)
+   unmaskiert bei Sentry (US) auf und meldet jeden Benutzer mit E-Mail und Namen an Gleap
+   (`foodnotify-api-inventar-intern-2026-11.md` §4). Für jeden, der dort arbeitet.
+10. ~~**Rohdateien ins Belegverzeichnis:** `fn-cookie-messung-1.json`, `fn-cookie-messung-2.json` und
+    `fn-menue-durchgang.json` (Sitzungsmessung und Menü-Durchgang vom 18.11.2026) hat der Nutzer im Chat; sie gehören
+    nach `belege/foodnotify-inventur-2026-11-18/` und **liegen dort noch nicht**. Erst dann sind die Antwortformen
+    der 129 + 45 Pfade nachlesbar.~~ **Stand 18.11.2026, abends:** `fn-cookie-messung-1.json` und
+    `fn-menue-durchgang.json` liegen dort; aus der ersten ist `payloads/foodnotify-2026-11/messung-sitzung-2026-11-18.csv`
+    erzeugt (204 Pfade mit Status und Form). ~~**`fn-cookie-messung-2.json` (55 Detailpfade) ist verloren** — der
+    Download kam nicht an.~~ Eugene hat die Datei gefunden und abgelegt (18.11.2026); ihre 54 zusätzlichen Pfade
+    stehen in derselben CSV mit `runde = 2`, ihre zehn Fehlermeldungen in `fehlermeldungen-2026-11-18.csv`.
+    Alle drei Rohdateien liegen damit unter `belege/foodnotify-inventur-2026-11-18/`.
+11. **Nicht durchgegangen:** die alte Oberfläche `/panel` (Catering, Tagesmenü, Menükarten, Lieferantenportal) und
+    die klassischen Seiten (`/recipes/db`, `/menucreator`, `/users`, `/account/subscription`). Vorher die Seiten gegen
+    die 14 GETs mit Wirkung prüfen (`foodnotify-api-inventar-intern-2026-11.md` §6, Vorfall 18.11.2026).
+12. **258 lesende Pfadvorlagen** mit Parametern, die sich aus keiner Antwort ergeben (vor allem Catering, Menükarten,
+    Lieferantenportal, Verwaltung), sind weder mit Token noch mit Sitzung gemessen. Für den Importer vermutlich ohne
+    Belang.
+13. **Ist der Verkaufsimport repariert?** In `/api/{erpId}/sales` stand bei allen zehn Probezeilen `finishError: null`
+    (Sitzungsmessung, ein Betrieb, Werte nicht gelesen). Am 27.07.2026 scheiterten 100 % der Stichproben
+    (`foodnotify-api-inventar.md` §8a). Ein Hinweis, kein Befund — eine eigene Messung über mehrere Kostenstellen und
+    die Kostenanalyse dagegen.
+14. **Taugt `link-targets.updatedAt` als Änderungsfilter für den Rezept-Umlauf (`0134`)?** 13.253 Rezepte, `updatedAt`
+    von 19.10.2022 bis 17.11.2026. Prüfen: bewegt sich `updatedAt`, wenn sich nur eine Zutat ändert? (gegen zwei
+    Abrufe desselben Rezepts in `raw.api_antwort`).
+15. **Lieferte `/api/recipes` schon vor dem 09.11.2026 die Form von `/api/recipe-viewer/recipes`** (`archived` je
+    Eintrag, `totalItems`)? Gegen die ältesten `fn:rezepte`-Antworten in `raw.api_antwort` prüfen; hängt mit 4a
+    (Rezepturen, 15.10.2026) zusammen.
+16. **Wie behandelt der Importer ein 404 von FoodNotify?** Die neue Code-Generation antwortet bei einem fehlenden
+    Pflichtparameter mit **404** und dem Text „Dieser Wert sollte nicht leer sein." — nicht mit 400
+    (`docs/foodnotify-interna-aus-fehlermeldungen.md` §4). Ändert FoodNotify an einem unserer Pfade einen
+    Pflichtparameter, sähe das aus wie „Datensatz gibt es nicht". In `src/foodnotify/client.ts` nachsehen, ob 404
+    als endgültig verbucht wird, und ob der Antworttext mitgelesen wird (Regel 10). Nicht geprüft.

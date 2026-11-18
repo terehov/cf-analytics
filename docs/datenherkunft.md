@@ -403,6 +403,9 @@ statt sie aufzulösen, benutzen wir LINAs fertigen `fixed_we` je Artikel.
 > **Seit `0132` (15.10.2026)** sind die Rezepturen aus FoodNotify da — Rezept → Zutat → Ware über
 > die Lieferanten-Artikelnummer (Abschnitt „FoodNotify: Rezepturen" unten). Die Brücke **Kassenartikel
 > → Rezept** fehlt weiter (`core.pos_artikel` leer); `fixed_we` bleibt deshalb unberührt.
+> Erreichbar ist die Zuordnung seit 01.08.2026 mit der Sitzung und seit 18.11.2026 auch mit dem Scope-Token
+> (`/api/pos/mapping/{connectionId}/articles`: `plu`, `recipeId`, `isIgnored`) — die Tabelle ist leer, weil sie nie
+> gebaut wurde, nicht weil der Zugang fehlt.
 
 ### Die Stände — über Zeiträume, nie über Monatsgleichheit
 
@@ -970,6 +973,33 @@ Betriebe stehen danach in `mart.betrieb_status` als `operativ`, nicht mehr als `
 ist die Spalte, mit der man sie aus Bon- und Gästekennzahlen nimmt, denn dort haben sie nichts.
 
 
+## FoodNotify: zwei Zugangswege (Stand 18.11.2026)
+
+Der Importer liest mit **Cookie-Sitzung** gegen `my.foodnotify.com` (`FN_BASE_URL`). Seit dem 09.11.2026 gibt es
+**Scope-Tokens** (`Authorization: Bearer`), die nur `api3.foodnotify.com` annimmt — dort auch für interne Pfade.
+Gemessen an Wilma Wunder, je Pfad ein Aufruf: `/api/core/business/{userId}/restaurants`,
+`/api/{erpId}/shop-order/paginate`, `/api/{erpId}/shop-order/{id}`, `/api/recipes/{id}` mit `/ingredients` und
+`/meta`, `/api/recipe-viewer/recipes`, `/api/pos/mapping/{connectionId}/…` und `/api/2.0/pos/accounts/{connectionId}/…`
+antworten; `/api/profile`, `/api/erp/all`, `/api/pos/locations`, `/api/recipes` (die Liste),
+`/api/{erpId}/shop-order/{id}/change`, `/api/erp/stocktakings` und jedes `/api/1.0/…` nicht. **Zwei Schlüssel neu
+belegt:** `accountIdentifier` der öffentlichen API 2.0 ist die `connectionId` (`core.kostenstelle.connection_id`);
+`/api/erp/core/{userId}/erps` liefert die Kostenstellen über die Benutzer-ID. Einzelheiten und Vorbehalte:
+`foodnotify-api-inventar-offiziell.md`. Kein Endpunkt des Registers ist umgestellt; ~~die Messung derselben Pfade mit
+der Cookie-Sitzung im Browser läuft.~~
+
+**Sitzung gegen Token (gemessen 18.11.2026, `payloads/foodnotify-2026-11/messung-sitzung-2026-11-18.md`):** Mit der
+Cookie-Sitzung antworten 129 von 204 Pfaden (Detailpfade: 45 von 55), mit dem Token 41 von 189; alle Registerpfade
+antworten mit der Sitzung (Bestellansicht nicht gemessen). **Nur mit der Sitzung:** Bestellpositionen (`/change`) und
+Inventuren samt Positionen. `markedShopOrder.products[]` im Bestellkopf trägt nur `price` und `productId` und ist
+kein Ersatz für `/change`. Die Zutaten tragen auch mit Token `artikelId` (ein Rezept, 5 von 6 Zutaten).
+`/api/recipes` und `/api/recipe-viewer/recipes` liefern mit der Sitzung dieselbe Antwort, mit `archived` je Eintrag.
+
+**`/api/pos/mapping/{connectionId}/link-targets`** (Sitzung und Token, Anbindung 2052): 13.253 Rezepte mit
+`recipeId, title, restaurantId, restaurantName, imagePath, ingredientCount, updatedAt`; 158 davon ohne Zutaten,
+17 verschiedene `restaurantId`, `updatedAt` von 19.10.2022 bis 17.11.2026, eine Antwort ohne Seiten, rund 11 s.
+Das ist die einzige Stelle mit einem Datum je Rezept. Ob `updatedAt` sich bei jeder Änderung an den Zutaten bewegt,
+ist **nicht geprüft** (`offene-punkte.md`, 18.11.2026).
+
 ## FoodNotify: Rezepturen (seit `0132`, 15.10.2026)
 
 **Quelle:** `/api/recipes?page=N` (Liste), `/api/recipes/{id}` (Kopf), `/ingredients`, `/meta` —
@@ -1000,11 +1030,15 @@ der 7.452 Positionen — also 91,5 % der Positionen mit Nummer treffen den Einka
 
 * **Kein Betriebsbezug.** Welcher Betrieb ein Rezept verkauft, steht in der Kassenzuordnung
   (`/api/pos/mapping/…`, `core.pos_artikel`) — nicht geladen.
+  Seit 18.11.2026 bekannt, **nicht geprüft**: `/api/pos/mapping/{connectionId}/link-targets` führt je Rezept
+  `restaurantId` und `restaurantName` (13.253 Zeilen bei Wilma Wunder, 17 verschiedene `restaurantId`). Ob das der Eigentümer oder die Verwendung
+  ist, weiß niemand (`foodnotify-api-inventar-offiziell.md`).
 * **Keine Effektivmenge.** Mengen gelten je Ebene; über Halbfabrikate wird nicht multipliziert
   (Einheiten Freitext, Ausbeute ungeklärt). `meta.weight.loss` steht roh in `verlust_roh`.
 * **Keine Historie vor dem ersten Abruf.** FoodNotify führt keine Fassungen und kein
   Änderungsdatum; der Umlauf (14 Tage) liest jedes Rezept neu, `erstmals_am`/`zuletzt_am` sind
   der beobachtete Zeitraum.
+  Dieselbe Antwort trägt `updatedAt` je Rezept — ob ein Änderungsdatum des Rezepts, ist nicht geprüft.
 * **Die Liste zählt nicht alle Rezepte auf** (56 Enchilada-Rezepte nur über Verweise,
   `in_liste = false`). Was weder in der Liste steht noch verwiesen wird, sehen wir nicht.
 * **Lieferant:** `supplier.id` steht in `lieferant_fn_id`, ist aber nicht gegen

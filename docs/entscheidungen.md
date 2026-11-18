@@ -5064,3 +5064,54 @@ nächtlicher Abzug), Technik der Eingabeoberfläche, eigenes Repo oder Unterordn
 **Nebenbei geklärt:** Sell & Pick ist gekündigt, Finance hat keinen Zugriff mehr; nur die Schlüssel
 standen noch in den Ladenakten (Eintrag vom 13.11.2026). Der Bremer Januarwert im Gebührenblatt von
 Finance stammte noch von dort.
+
+## 18.11.2026 — FoodNotify: das Scope-Token wird gemessen, nicht beantragt
+
+**Entscheidung Eugene.** FoodNotify bietet seit dem Umbau vom 09.11.2026 API-Tokens im Profil (OAuth-Ablauf,
+Scopes je Bereich, nur mit Hauptkonto-Recht `externalApi`). Wir messen, was ein **lesendes** Scope-Token erreicht,
+und bauen nichts um, bevor das feststeht. Im Einzelnen:
+
+* **Keine Anfrage beim FoodNotify-Support** nach Zugang zur API 1.0 oder einem `full-access`-Token — wie schon
+  am 01.08.2026 (kein Support-Kontakt). Ältere API-Zugangsdaten gibt es nicht.
+* **Erst Wilma Wunder**, die drei anderen Marken nach dem Inventar.
+* **Alles, was dabei gelernt wird, kommt ins Repo** (`docs/payloads/foodnotify-2026-11/`, zwei Inventardateien);
+  Bundles und Hilfeseiten nur lokal unter `belege/` (Fremdcode).
+* **Browserarbeit streng lesend.** Die 14 GETs mit Wirkung (`foodnotify-api-inventar-intern-2026-11.md` §6) werden
+  nie automatisch aufgerufen.
+
+**Ergebnis der Messung (Wilma Wunder, je Pfad ein Aufruf):** Das Token wirkt nur auf `api3.foodnotify.com`, dort
+auch auf interne Pfade; jedes `/api/1.0/…` und alle `/api/2.0/erp/stock/*` antworten 403 „does not support
+scope-limited tokens". Von 14 Registereinträgen tragen sechs (`fn:betriebe`, `fn:bestellungen`, `fn:bestellung`,
+`fn:rezept`, `fn:rezept_zutaten`, `fn:rezept_meta`), zwei über einen anderen Pfad (`fn:rezepte`,
+`fn:kostenstellen`), vier sind abgewiesen (`fn:profil`, `fn:pos_standorte`, `fn:bestellpositionen`,
+`fn:inventuren`), zwei nicht gemessen. **Der Importer bleibt bei der Cookie-Sitzung:** ohne `/change` gibt es keine
+Einkaufspreise je Position, ohne `/api/erp/stocktakings` keine Inventuren (`offene-punkte.md`, 18.11.2026).
+
+**Verworfen:** den Importer jetzt auf das Token umstellen (Positionen und Inventuren abgewiesen, ~~die Zutatenfelder
+nicht gesehen~~ — die Zutatenfelder sind inzwischen mit Token gesehen, siehe Nachtrag); alle 574 GET-Vorlagen durchprobieren (nur die 226 mit bekannten Parametern und lesender Wirkung,
+und davon nicht die mit Abgleich-, Export- oder Warenkorb-Namen).
+
+**Nicht belegt:** dass ein `full-access`-Token die abgewiesenen Pfade öffnet; dass die anderen Marken dieselben
+Scopes bekommen; dass Token und Sitzung dieselben Zeilen liefern (~~die Messung mit der Cookie-Sitzung läuft~~ die
+Sitzungsmessung vergleicht Status und Form, nicht Zeilen).
+
+**Weitere Entscheidungen Eugene am selben Tag:**
+
+* **Keine Chrome-Freigabe „lokales Netzwerk" für `my.foodnotify.com`.** Messergebnisse aus der angemeldeten Seite
+  kommen als Download-Datei, nicht über eine Verbindung vom Browser zu einem lokalen Dienst.
+* **Alle Menü- und Untermenüpunkte durchgehen** und technische Auffälligkeiten notieren — erledigt für die neue
+  Oberfläche, 68 Seiten (`payloads/foodnotify-2026-11/menue-durchgang-2026-11-18.md`); `/panel` und die klassischen
+  Seiten nicht.
+* **Den MCP-Server ansehen, wenn auffindbar** — gefunden unter `https://my.foodnotify.com/mcp`, nur öffentliche
+  Metadaten, keine Anmeldung (`docs/foodnotify-mcp-server.md`).
+
+**Endergebnis 18.11.2026** (nach Sitzungsmessung und Token-Nachprobe, `foodnotify-api-inventar-offiziell.md`,
+„Endstand"): Mit der Cookie-Sitzung antworten 13 von 14 Registerpfaden, mit dem Token sechs direkt und zwei über
+einen anderen Pfad. Die Rezepte gingen vollständig mit dem Token (Liste über `/api/recipe-viewer/recipes`, Zutaten
+mit `artikelId`), Bestellpositionen und Inventuren **nur** mit der Sitzung. **Der Importer bleibt bei der
+Cookie-Sitzung**; ein gemischter Betrieb (Rezepte über Token) ist möglich, aber nicht entschieden.
+
+**Vorfall beim Menü-Durchgang:** Das Öffnen von `/brew/erp/7984` hat einen der 14 GETs mit Wirkung ausgelöst
+(`/api/erp/last-used/7984`, zuletzt benutzter Betrieb jetzt 7984 statt 11035). Eingetragen in
+`docs/fehlerkatalog.md`; die Regel „Browserarbeit streng lesend" gilt seitdem ausdrücklich auch für Seiten, die
+solche Aufrufe beim Öffnen absetzen.

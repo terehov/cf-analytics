@@ -43,6 +43,21 @@ getrennt gepflegt.** Aposto hat 672 Rezepte, Enchilada 1.846.
 
 ---
 
+## Nachtrag 18.11.2026 — vollständiges Inventar und Token
+
+Dieses Inventar bleibt die Quelle für Antwortfelder, Mengen je Marke und die Datenbefunde. **Welche Pfade es gibt**,
+steht seit 18.11.2026 vollständig in `docs/foodnotify-api-inventar-intern-2026-11.md` (1.053 Methode-Pfad-Paare
+aus beiden Oberflächen statt 126), die öffentliche API und das Scope-Token in
+`docs/foodnotify-api-inventar-offiziell.md`.
+
+**Drei GETs unten verändern etwas** und sind keine Lesepfade: `GET /api/erp/last-used/{id}` (§4, merkt den Betrieb
+am Server), `GET /api/pos/sync/reload/{id}` (§5, lädt den Bestand aus der Kasse nach), `GET
+/api/menucreator/{id}/generate-embedded-url` (§8). Nie automatisch aufrufen — Liste aller 14 im Intern-Inventar §6.
+
+§7 ist überholt (siehe dort), §10 Punkt 8 geklärt.
+
+---
+
 ## Kurzfassung
 
 **FoodNotify ist technisch das Gegenteil von LINA.** Sauberes REST, durchgehend
@@ -68,7 +83,7 @@ ist der wichtigste Vorbehalt des ganzen Dokuments.
 | Backend | Symfony; Fehlerseiten liefern vollständige Stacktraces |
 | Frontends | drei: Angular unter `/panel/…`, eine neuere SPA unter `/brew/…`, klassisch gerendert unter `/recipes` |
 | Auth | JWT im `localStorage`; die Session-Cookies authentifizieren `/api/`-Aufrufe ebenfalls — ein `fetch` aus der Seite braucht keinen Authorization-Header |
-| Login | `POST /api/user/auth/signin_check` |
+| Login | `POST /api/user/auth/signin_check` — gilt für die neue Oberfläche `/brew`; die alte (`/panel`) meldet sich mit `POST /signin_check` an (Nachtrag 18.11.2026) |
 | **2FA** | vollständig vorhanden: E-Mail, TOTP, Trusted Devices, Reset |
 | Analytics | **Tableau-Einbettung**, kein eigenes API (siehe §7) |
 
@@ -529,8 +544,13 @@ Kostenanalyse ist ein zeitzonenloses Etikett, wie `geschaeftstag` bei uns.
 ## 7. Analytics ist Tableau
 
 ```
-GET /api/v2/analytics   →  {"token": "<JWT>"}
+GET /api/v2/analytics         →  {tableauUrl, siteContentUrl, analyticsId, views[]}   (gemessen 18.11.2026)
+GET /api/v2/analytics/token   →  das JWT (aus dem Bundle, nicht gemessen)
 ```
+
+~~`GET /api/v2/analytics → {"token": "<JWT>"}`~~ — **Widerlegt 18.11.2026** (Token-Messung, Wilma Wunder): der
+Pfad liefert Host, Site und Ansichtsliste; das JWT kommt laut Bundle aus `/api/v2/analytics/token`. Ob dessen
+`aud`/Scope/Laufzeit noch stimmen, ist nicht nachgemessen.
 
 Der Token hat `aud: tableau`, Scope `tableau:views:embed`, Laufzeit **9 Minuten**.
 Das Analytics-Modul ist eine Tableau-Einbettung, kein eigenes JSON-API. Die
@@ -608,6 +628,14 @@ diesem Befund ist es zumindest überwiegend ein **Fehler im Produkt**.
 3. Der Befund ist auch ein Argument für die eigene Datenhaltung: Er ist nur
    aufgefallen, weil wir in die Rohantwort geschaut haben. In der Oberfläche
    erscheint schlicht eine niedrige Zahl.
+
+> **Nachtrag 18.11.2026 — ein Hinweis, kein „behoben".** In der Sitzungsmessung
+> (`docs/payloads/foodnotify-2026-11/messung-sitzung-2026-11-18.md`, Befund 7) stand bei Wilma Wunder in
+> `/api/{erpId}/sales` bei **allen zehn** Probezeilen `finishError: null`, `sumPrice` war eine Zahl, und
+> `…/sales/{id}/recipe-sale` lieferte Positionen mit Rezept und `recipeIngredients`. Das ist **ein** Betrieb, zehn
+> Zeilen, Werte nicht gelesen. Ob der Verkaufsimport repariert ist und die Kostenanalyse damit stimmt, ist eine eigene
+> Messung über mehrere Kostenstellen und Marken (`docs/offene-punkte.md`, 18.11.2026). Bis dahin gelten die Befunde
+> oben und die Entscheidung vom 01.08.2026 (Verkäufe aus LINA, Kostenanalyse nicht importiert).
 
 ---
 
@@ -785,14 +813,14 @@ Mengengerüst aus §9 auf ein Viertel der ursprünglichen Annahme.
 
 ## 10. Offene Punkte
 
-1. **POS-Account-ID beschaffen.** Ohne sie keine Verknüpfung zu den LINA-Verkäufen. Höchste Priorität.
+1. ~~**POS-Account-ID beschaffen.** Ohne sie keine Verknüpfung zu den LINA-Verkäufen. Höchste Priorität.~~ Geklärt 01.08.2026: `connectionId` (Nachtrag oben).
 2. **Zeitparameter der Cost-Analysis-Endpunkte.** `from/to` und `dateFrom/dateTo` werden ignoriert.
 3. **2FA-Status der vierzehn Zugänge.** Falls aktiv, ist automatisiertes Anmelden nur mit einem dafür vorgesehenen Zugang lösbar.
 4. **Sind Rezepturen markenübergreifend?** Entscheidet über Faktor 1 oder 14 beim Backfill.
 5. **Zeittiefe** von Bestellungen und Inventuren nicht gemessen.
 6. **`artikelId` in den Zutaten ↔ `core.artikel.artikelnummer`** — passt das zusammen?
 7. **`/api/recipes/batch`** — Methode und Nutzen.
-8. **`/api/foodNotify/ep/`** — Namensraum aus dem Angular-Bundle, nicht untersucht.
+8. ~~**`/api/foodNotify/ep/`** — Namensraum aus dem Angular-Bundle, nicht untersucht.~~ **Geklärt 18.11.2026:** kein FoodNotify-Pfad, sondern der Platzhaltertext `https://*****-***.assd.com/api/foodNotify/ep/` im Eingabefeld `endpointUrl` beim Kassentyp `assd` (alte Oberfläche Chunk `742`, neue `index-ayCVcund.js`) — `foodnotify-api-inventar-intern-2026-11.md` §4.
 
 ---
 

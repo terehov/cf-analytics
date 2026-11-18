@@ -5660,3 +5660,31 @@ nachgeprüft.** Dieselbe Lehre wie Regel 10: eine Wache, die niemand liest, wach
 **Nicht belegt.** Dass in Produktion zwischen dem 09.11. und dem Einspielen von `0153` jemand das
 Protokoll gelesen hat, ist weder behauptet noch ausgeschlossen. `0153` ist zur Stunde nicht
 committet und nicht angewendet; bis dahin steht die Lücke offen (`docs/offene-punkte.md`).
+
+## Ein Seitendurchgang in FoodNotify hat einen GET mit Wirkung ausgelöst (18.11.2026)
+
+**Symptom.** Beim Durchgang durch die neue FoodNotify-Oberfläche (Konto Wilma Wunder, nur Öffnen, nichts angeklickt;
+`docs/payloads/foodnotify-2026-11/menue-durchgang-2026-11-18.md`) stand in der Abrufliste der Seite `/brew/erp/7984`
+der Aufruf `GET /api/erp/last-used/7984` — einer der 14 GETs, die etwas verändern. Folge: Das Konto führt seitdem den
+Betrieb mit `erpId` 7984 statt 11035 als zuletzt benutzten. Sonst keine Änderung; dieselbe Wirkung wie ein Klick
+eines Benutzers auf den Betrieb. Kein Fehler, keine Warnung — sichtbar nur in der mitgeschriebenen Abrufliste.
+
+**Ursache.** Die Sicherheitsliste (`docs/payloads/foodnotify-2026-11/messliste-token.md` §4) sperrte die 14 Pfade
+für **direkte** Aufrufe, in Messschleifen und Proben. Ein Seitendurchgang ruft keine Pfade, er öffnet Seiten — und
+die Seite `/erp/{erpId}` setzt den GET beim Laden selbst ab. Die Liste war richtig, aber für die falsche Art Werkzeug
+geschrieben. Dass die Oberfläche Wirkung per GET auslöst, stand dort sogar („Der Name ist bei FoodNotify kein Hinweis
+auf die Methode"); nicht bedacht war, dass sie es ungefragt beim Öffnen tut.
+
+**Was es künftig verhindert.**
+* Die Route `/erp/{erpId}` **ohne Unterseite** wird nie automatisch geöffnet. Die Unterseiten (`/erp/{erpId}/order`
+  usw.) lösen den Aufruf laut Durchgang nicht aus; `/erp` leitet auf `/erp/{zuletzt benutzt}/…` weiter, und
+  `/dashboard` zeigt `erp/last-used/{erpId}` beim ersten Laden ebenfalls in der Abrufliste.
+* **Vor jedem Seitendurchgang werden die Seiten gegen die Sicherheitsliste geprüft**, nicht nur die direkten
+  Aufrufe: welche Abrufe eine Seite beim Öffnen auslöst, steht für 68 Seiten im Menü-Durchgang; für ungeöffnete Seiten
+  aus `intern/brew-routen.csv` und den Chunks der Route.
+* Nachgetragen in der Sicherheitsliste selbst (`messliste-token.md` §4, `docs/foodnotify-api-inventar-intern-2026-11.md`
+  §6) und in `docs/entscheidungen.md` (18.11.2026).
+
+**Nicht belegt.** Mit welcher ID `/dashboard` den Aufruf beim ersten Laden abgesetzt hat (vermutlich mit dem damals
+gemerkten Betrieb, dann ohne Wirkung) — die Abrufliste nennt die ID nicht. Ob FoodNotify den gemerkten Betrieb
+irgendwo auswertet außer als Startseite der Warenwirtschaft, ist nicht bekannt.
