@@ -4,7 +4,7 @@
  */
 import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
-import { fnEndpunkt, REZEPT_DETAIL_ENDPUNKTE } from './endpunkte'
+import { fnEndpunkt, REZEPT_DETAIL_ENDPUNKTE, alsNichtGefundenVerbuchen } from './endpunkte'
 import { rezeptliste, rezeptKopf, rezeptZutaten, rezeptMeta, rezeptStrukturFehler } from './rezept'
 
 const FIX = JSON.parse(readFileSync(new URL('./fixtures/rezepte.json', import.meta.url), 'utf8')).rezepte
@@ -29,6 +29,23 @@ describe('Rezept-Endpunkte', () => {
 
   test('die Einzelabrufe je Rezept — dort wird ein 404 zu nicht_gefunden', () => {
     expect([...REZEPT_DETAIL_ENDPUNKTE]).toEqual(['fn:rezept', 'fn:rezept_zutaten', 'fn:rezept_meta'])
+  })
+
+  /**
+   * 18.11.2026: FoodNotify meldet einen fehlenden Pflichtparameter mit 404.
+   * Nur ein 404 OHNE Validierungs- oder Routentext heißt „Rezept gelöscht".
+   */
+  test('nur ein echtes 404 auf einen Einzelabruf wird nicht_gefunden — kein Validierungs-404, keine Liste', () => {
+    for (const ep of REZEPT_DETAIL_ENDPUNKTE) {
+      expect(alsNichtGefundenVerbuchen(ep, { status: 404 })).toBe(true)
+      expect(alsNichtGefundenVerbuchen(ep, { status: 404, anfrageFehler: 'validierung' })).toBe(false)
+      expect(alsNichtGefundenVerbuchen(ep, { status: 404, anfrageFehler: 'route' })).toBe(false)
+      expect(alsNichtGefundenVerbuchen(ep, { status: 500 })).toBe(false)
+      expect(alsNichtGefundenVerbuchen(ep, { status: 200 })).toBe(false)
+    }
+    expect(alsNichtGefundenVerbuchen('fn:rezepte', { status: 404 })).toBe(false)
+    expect(alsNichtGefundenVerbuchen('fn:bestellung', { status: 404 })).toBe(false)
+    expect(alsNichtGefundenVerbuchen('fn:inventurpositionen', { status: 404 })).toBe(false)
   })
 })
 

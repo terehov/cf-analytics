@@ -28,7 +28,7 @@ import { log } from '../lib/log'
 import { ohneNullzeichen, jsonOhneNullzeichen } from '../lib/text'
 import { eine } from '../db/pool'
 import { FnSession, FnAnmeldungFehlgeschlagen, fnSessionAbgelaufen } from './auth'
-import { auspacken } from './huelle'
+import { auspacken, fehlerAusAntwort } from './huelle'
 import type { FnEndpunkt } from './endpunkte'
 import type { Ergebnis } from '../lina/client'
 
@@ -180,11 +180,28 @@ export class FnClient {
           fehler: `HTTP ${res.status}${res.headers.get('retry-after') ? ` (Retry-After: ${res.headers.get('retry-after')})` : ''}`,
         }
       }
+      /**
+       * DER ANTWORTTEXT WIRD MITGELESEN (18.11.2026). Bis dahin stand hier
+       * nur `HTTP ${status}` — und damit war ausgerechnet der Text verloren,
+       * der ein Validierungs-404 („Dieser Wert sollte nicht leer sein.") von
+       * einem echten „gibt es nicht" unterscheidet. Das Präfix „HTTP NNN"
+       * bleibt unverändert: nachfuellen.ts und 0135 suchen mit
+       * `LIKE 'HTTP 500%'`, und ein leerer Fehlerkörper ergibt weiter genau
+       * „HTTP 500". Bei der HTML-Bestellansicht wird nichts gelesen — eine
+       * Fehlerseite der Oberfläche ist Navigation, keine Meldung.
+       */
       if (!res.ok) {
+        const { meldung, anfrageFehler } = ep.form === 'html'
+          ? { meldung: '', anfrageFehler: null }
+          : fehlerAusAntwort(text)
+        const art = anfrageFehler === 'validierung' ? ' (Validierung: die Anfrage stimmt nicht, kein fehlender Datensatz)'
+          : anfrageFehler === 'route' ? ' (keine Route: der Pfad fehlt, kein fehlender Datensatz)'
+          : ''
         return {
           art: 'fehler', status: res.status, dauerMs,
-          fehler: `HTTP ${res.status}`,
+          fehler: `HTTP ${res.status}${art}${meldung ? ` — ${meldung}` : ''}`,
           wiederholbar: res.status >= 500,
+          ...(anfrageFehler ? { anfrageFehler } : {}),
         }
       }
 

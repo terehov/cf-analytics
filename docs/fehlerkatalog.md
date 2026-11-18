@@ -5688,3 +5688,56 @@ auf die Methode"); nicht bedacht war, dass sie es ungefragt beim Öffnen tut.
 **Nicht belegt.** Mit welcher ID `/dashboard` den Aufruf beim ersten Laden abgesetzt hat (vermutlich mit dem damals
 gemerkten Betrieb, dann ohne Wirkung) — die Abrufliste nennt die ID nicht. Ob FoodNotify den gemerkten Betrieb
 irgendwo auswertet außer als Startseite der Warenwirtschaft, ist nicht bekannt.
+
+## Ein 404 von FoodNotify hätte ausgesehen wie die Löschung aller Rezepte (18.11.2026)
+
+**Symptom.** Keins — der Fehler ist nie eingetreten, er war angelegt. Gefunden bei der Durchsicht
+(offene-punkte 18.11.2026, Punkt 16), nachdem die Messung vom selben Tag gezeigt hatte, dass FoodNotifys
+neue Code-Generation einen fehlenden Pflichtparameter mit **HTTP 404** und „Dieser Wert sollte nicht leer
+sein." beantwortet, nicht mit 400/422 (`foodnotify-interna-aus-fehlermeldungen.md` §4; gemessen an
+sieben Pfaden, `payloads/foodnotify-2026-11/fehlermeldungen-2026-11-18.csv`). Hätte FoodNotify an
+`/api/recipes/{id}`, `…/ingredients` oder `…/meta` einen Pflichtparameter eingeführt, wäre jeder
+Einzelabruf als `nicht_gefunden` geschlossen worden, jedes Rezept hätte `core.rezept.fehlt_seit`
+bekommen, und der Posten zählte bewusst **nicht** als Fehler. Lauf `ok`, keine Notbremse, nur
+`mart.rezept_stand.nicht_gefunden` wäre gewachsen — als stünden die Rezepte nicht mehr in FoodNotify.
+
+**Ursache.** Zwei Stellen zusammen:
+* `src/foodnotify/client.ts` verbuchte jede Nicht-2xx-Antwort als `fehler: 'HTTP ${status}'` — der
+  Antworttext wurde zwar gelesen, aber verworfen. Damit war ausgerechnet der Text weg, der ein
+  Validierungs-404 von einem echten „gibt es nicht" unterscheidet. Das betraf jeden FoodNotify-Fehler:
+  auch beim 500 auf `/change` (`NonUniqueResultException`) stand in `letzter_fehler` nur „HTTP 500".
+* `src/sync/worker.ts` (und gleichlautend `src/rezepte_praxis.ts`) machte aus **jedem** 404 auf die drei
+  Rezept-Einzelabrufe `nicht_gefunden` (0132, Review 15.10.2026) — richtig gedacht gegen die dreifache
+  Wiederbelebung gelöschter Rezepte, aber unter der Annahme „404 heißt Datensatz fehlt".
+
+Andere `fn:*`-Einträge waren nicht betroffen: dort führt ein 404 (`wiederholbar: false`) zu `aufgegeben`
+und steht in `mart.posten_aufgegeben` — sichtbar, nur ohne Text. Ein Hüllenfehler mit HTTP 200
+(`{errors:['object not found'], code:404, isError:true}`) ging schon immer diesen Weg.
+
+**Was es künftig verhindert.**
+* `fehlerAusAntwort()` (`src/foodnotify/huelle.ts`) liest aus jeder Nicht-2xx-Antwort eine Meldung
+  (`title`, `message`, `detail`, `errors`, `violations`; sonst der Rohtext ohne Tags, höchstens 300
+  Zeichen) und erkennt den **Anfragefehler**: `validierung` bei „Dieser Wert sollte…", „Diese
+  Zeichenkette ist zu kurz", „Diese Sammlung sollte…" (gemessen), bei Symfonys englischen Fassungen und
+  einem Schlüssel `violations` (nicht gemessen); `route` bei „No route found for" (gemessen nur mit 405).
+* Der Client schreibt `HTTP 404 (Validierung: die Anfrage stimmt nicht, kein fehlender Datensatz) — Dieser
+  Wert sollte nicht leer sein.` und setzt `anfrageFehler` am Ergebnis. Das Präfix „HTTP NNN" bleibt, ein
+  leerer Fehlerkörper ergibt weiter genau „HTTP 500" (`nachfuellen.ts` und `0135` suchen
+  `LIKE 'HTTP 500%'`). Die HTML-Bestellansicht bleibt ohne Textauszug.
+* `alsNichtGefundenVerbuchen()` (`src/foodnotify/endpunkte.ts`) ist die eine Regel für Worker und
+  Praxislauf: nur 404 **ohne** Anfragefehler auf `fn:rezept`, `fn:rezept_zutaten`, `fn:rezept_meta` wird
+  `nicht_gefunden`. Ein Validierungs-404 geht den gewöhnlichen Fehlerpfad: `aufgegeben` mit dem Text in
+  `letzter_fehler`, Zeile in `mart.posten_aufgegeben`, Erstfehler (Lauf `teilweise`, nach
+  `ABBRUCH_NACH_FEHLERN` in Folge Abbruch der FoodNotify-Spur), das Rezept bleibt unberührt. Keine
+  Migration nötig — die vorhandenen Sichten zeigen es.
+* Tests: `src/foodnotify/huelle.test.ts` (gemessene Texte), `src/foodnotify/fehler404.test.ts` (Client
+  gegen die Attrappe: echtes 404 gegen Validierungs-404, leerer 500, Hüllenfehler),
+  `src/foodnotify/rezept.test.ts` (die Regel), `src/foodnotify/rezept_db.test.ts` (Worker bis
+  `fehlt_seit`, nur mit `TEST_DATABASE_URL`). Die Attrappe kann das Validierungs-404 jetzt herstellen
+  (`validierungsfehler(pfad)`).
+
+**Nicht belegt.** Wie ein **echtes** 404 auf `/api/recipes/{id}` aussieht, ist nicht gemessen (die
+Abzüge haben nur „HTTP 404" protokolliert). Die genaue Hülle des Validierungs-404 auch nicht — nur Text,
+Status und Länge (98 Bytes); deshalb prüft die Erkennung jede Zeichenkette der Antwort. Der beaufsichtigte
+Einzelabzug `src/rezepte.ts` (Handwerkzeug, schreibt Dateien, nicht `core`) verbucht 404 weiterhin ohne
+Textprüfung als `nicht_gefunden` in `nachgeholt.json`.

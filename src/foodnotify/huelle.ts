@@ -138,6 +138,129 @@ export function auspacken(antwort: unknown): Ausgepackt {
   return { daten, seiten, fehler }
 }
 
+// ---------------------------------------------------------------------------
+// Fehlertexte einer Nicht-2xx-Antwort (18.11.2026)
+// ---------------------------------------------------------------------------
+
+/**
+ * Was der Fehlertext über die ANFRAGE sagt — im Unterschied zum Datensatz.
+ *
+ *   'validierung'  ein Pflichtparameter fehlt oder ist ungültig
+ *   'route'        für den Pfad gibt es keine Route
+ *
+ * WARUM DAS ZÄHLT: FoodNotifys neue Code-Generation antwortet bei einem
+ * fehlenden Pflichtparameter mit HTTP **404** und „Dieser Wert sollte nicht
+ * leer sein." — nicht mit 400/422 (docs/foodnotify-interna-aus-fehlermeldungen.md
+ * §2 und §4). Der Worker verbucht ein 404 auf einen Rezept-Einzelabruf als
+ * 'nicht_gefunden' und setzt am Rezept fehlt_seit. Ändert FoodNotify an einem
+ * unserer Pfade einen Pflichtparameter, sähen ohne diese Unterscheidung alle
+ * Rezepte aus wie gelöscht — HTTP-Status, Ergebnis und Lauf wären unauffällig
+ * (Regel 10).
+ */
+export type Anfragefehler = 'validierung' | 'route'
+
+/**
+ * Die Muster. Die deutschen sind GEMESSEN (18.11.2026, Konto Wilma Wunder,
+ * docs/payloads/foodnotify-2026-11/fehlermeldungen-2026-11-18.csv) — mit 404
+ * auf erp/catalog/commodity-groups, erp/food-waste, erp/food-waste-alpha/totals,
+ * erp/stock-transfer, erp/stock-transfer-request, recipe/ingredient-search/
+ * candidates und core/business/{id}/locations/vat-defaults.
+ *
+ * Die englischen sind NICHT gemessen: es sind Symfonys Standardtexte derselben
+ * Prüfungen. Die Sprache folgt dem Konto, nicht dem Accept-Language (interna
+ * §1), und drei der vier Marken sind nicht gemessen. Ebenso nicht gemessen ist
+ * der Schlüssel `violations` (Symfonys Hülle für eine Liste von Prüffehlern).
+ *
+ * Abwägung: Ein echtes „gibt es nicht", das hier fälschlich als Validierung
+ * gilt, landet als 'aufgegeben' in mart.posten_aufgegeben — sichtbar, und
+ * nach drei Wiederbelebungen endgültig. Ein Validierungsfehler, der als „gibt
+ * es nicht" durchgeht, markiert still Rezepte als gelöscht. Im Zweifel also
+ * lieber ein Muster mehr.
+ */
+const VALIDIERUNG: RegExp[] = [
+  /Dieser Wert sollte/,               // gemessen: „… nicht leer sein.", „… nicht null sein.", „… vom Typ int|string sein." (422)
+  /Diese Zeichenkette ist zu kurz/,   // gemessen
+  /Diese Sammlung sollte/,            // gemessen
+  /This value should/,                // nicht gemessen — Symfony englisch
+  /This value is too short/,          // nicht gemessen — Symfony englisch
+  /This collection should/,           // nicht gemessen — Symfony englisch
+]
+
+/**
+ * „No route found for "GET …"" ist GEMESSEN — aber nur mit 405 („… Method Not
+ * Allowed (Allow: OPTIONS)"). FoodNotify hat eine OPTIONS-Route für jeden Pfad,
+ * ein entfernter Pfad kommt deshalb vermutlich als 405 zurück, und 405 ist
+ * ohnehin ein Fehler. Die 404-Fassung desselben Texts ist Symfonys Standard
+ * für einen Pfad ohne jede Route; mitgeprüft, damit ein abgeschalteter Pfad
+ * (offene-punkte 18.11.2026, Punkt 3) nicht als „Datensatz fehlt" endet.
+ */
+const ROUTE = /No route found for/
+
+/**
+ * Die Felder, aus denen die Meldung gelesen wird — dieselben, aus denen die
+ * Messung vom 18.11.2026 sie las (token_messen.py: message, detail, title).
+ * Die genaue Hülle des Validierungs-404 ist NICHT erfasst, nur ihr Text und
+ * ihre Länge (98 Bytes für „Dieser Wert sollte nicht leer sein."). Deshalb
+ * prüft die Erkennung zusätzlich JEDE Zeichenkette der Antwort.
+ */
+const MELDUNGSFELDER = ['title', 'message', 'detail'] as const
+
+/** Alle Zeichenketten einer JSON-Antwort, rekursiv, mit Tiefengrenze. */
+function zeichenketten(x: unknown, tiefe = 0, aus: string[] = []): string[] {
+  if (tiefe > 6) return aus
+  if (typeof x === 'string') aus.push(x)
+  else if (Array.isArray(x)) for (const e of x) zeichenketten(e, tiefe + 1, aus)
+  else if (istObjekt(x)) for (const v of Object.values(x)) zeichenketten(v, tiefe + 1, aus)
+  return aus
+}
+
+/**
+ * Liest aus dem Rumpf einer Nicht-2xx-Antwort eine kurze Meldung und, ob sie
+ * nach einem Fehler der ANFRAGE aussieht.
+ *
+ * `meldung` ist höchstens 300 Zeichen lang und geht nach
+ * sync.warteschlange.letzter_fehler und sync.aufgabe — dorthin, wo
+ * mart.posten_aufgegeben sie zeigt. Vorher stand dort nur „HTTP 404", und der
+ * Text, der die Ursache nennt, war verloren.
+ */
+export function fehlerAusAntwort(text: string): { meldung: string; anfrageFehler: Anfragefehler | null } {
+  let json: unknown = undefined
+  try { json = JSON.parse(text) } catch { /* kein JSON — dann der Rohtext */ }
+
+  let meldung = ''
+  let alles: string
+  let mitViolations = false
+  if (json !== undefined && json !== null && typeof json === 'object') {
+    const teile: string[] = []
+    if (istObjekt(json)) {
+      for (const f of MELDUNGSFELDER) {
+        const v = json[f]
+        if (typeof v === 'string' && v.trim() && !teile.includes(v.trim())) teile.push(v.trim())
+      }
+      for (const f of ['errors', 'violations'] as const) {
+        if (Array.isArray(json[f])) {
+          const s = zeichenketten(json[f]).map(z => z.trim()).filter(Boolean)
+          if (s.length > 0) teile.push(s.join('; '))
+        }
+      }
+      mitViolations = Array.isArray(json.violations) && json.violations.length > 0
+    }
+    meldung = teile.join(': ')
+    alles = zeichenketten(json).join('\n')
+  } else {
+    // HTML-Fehlerseite (nginx) oder Klartext: Tags weg, Leerraum zusammen.
+    meldung = text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+    alles = text
+  }
+  meldung = meldung.replace(/\s+/g, ' ').trim().slice(0, 300)
+
+  const anfrageFehler: Anfragefehler | null =
+    mitViolations || VALIDIERUNG.some(m => m.test(alles)) ? 'validierung'
+    : ROUTE.test(alles) ? 'route'
+    : null
+  return { meldung, anfrageFehler }
+}
+
 /**
  * Ist das ausgepackte Ergebnis leer?
  *

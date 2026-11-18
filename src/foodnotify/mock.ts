@@ -112,6 +112,18 @@ export function fnMockStarten(opt: FnMockOptionen = {}) {
   const kaputt = new Set<string>()
   /** /ingredients in einer fremden Huelle ({ingredients: [...]}) — zur Laufzeit umstellbar. */
   let rezeptHuelleFremd = false
+  /**
+   * Pfade, die mit dem VALIDIERUNGS-404 der neuen Code-Generation antworten
+   * (18.11.2026, docs/foodnotify-interna-aus-fehlermeldungen.md §4): HTTP 404,
+   * Text „Dieser Wert sollte nicht leer sein." — so meldet FoodNotify einen
+   * fehlenden Pflichtparameter. Der Fall, den es zu testen gilt: ein
+   * geaenderter Pflichtparameter an /api/recipes/{id} darf nicht aussehen wie
+   * ein geloeschtes Rezept. Gemessen sind nur Text, Status und Laenge (98 Bytes);
+   * die Huelle {statusCode, title, message} ist eine der beiden Fehlerformen der
+   * neuen Generation (interna §1), fuer genau diesen Fall NICHT gemessen.
+   * Zur Laufzeit umstellbar, aus demselben Grund wie `verbieten()`.
+   */
+  const validierung = new Set<string>()
 
   const json = (body: unknown, init: ResponseInit = {}) =>
     new Response(JSON.stringify(body), {
@@ -165,6 +177,11 @@ export function fnMockStarten(opt: FnMockOptionen = {}) {
        */
       if (kaputt.has(pfad)) {
         return json({ errors: [], code: 500, isError: true, payload: null }, { status: 500 })
+      }
+
+      if (validierung.has(pfad)) {
+        return json({ statusCode: 404, title: 'Not Found', message: 'Dieser Wert sollte nicht leer sein.' },
+                    { status: 404 })
       }
 
       const abWann = opt.leerAb?.[pfad]
@@ -472,6 +489,8 @@ export function fnMockStarten(opt: FnMockOptionen = {}) {
     reparieren: (pfad: string) => { kaputt.delete(pfad) },
     /** /ingredients in fremder Huelle antworten lassen (Test der Formpruefung, Rezept-Probe). */
     rezeptHuelleFremd: (an: boolean) => { rezeptHuelleFremd = an },
+    /** Einen Pfad mit dem Validierungs-404 antworten lassen bzw. zuruecknehmen (siehe `validierung`). */
+    validierungsfehler: (pfad: string, an = true) => { if (an) validierung.add(pfad); else validierung.delete(pfad) },
     stop: () => server.stop(true),
   }
 }

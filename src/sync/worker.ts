@@ -33,7 +33,7 @@ import { LinaClient, strukturPruefen } from '../lina/client'
 import { endpunkt } from '../lina/endpunkte'
 import { istBetriebsbericht } from '../lina/betriebsberichte'
 import { FnClient } from '../foodnotify/client'
-import { fnEndpunkt, REZEPT_DETAIL_ENDPUNKTE } from '../foodnotify/endpunkte'
+import { fnEndpunkt, alsNichtGefundenVerbuchen } from '../foodnotify/endpunkte'
 import { fnLaden, rezeptNichtGefunden } from '../foodnotify/laden'
 import { laden, rohNachLadefehlerSichern } from './laden'
 import { alsIsoDatum, kalendertagInGeschaeftszeitzone, minuteDesTagesInGeschaeftszeitzone, tagDanach } from '../lib/time'
@@ -1693,9 +1693,15 @@ async function sitzungOeffnen(
        * fehlt_seit zurueck; der Umlauf fragt hoechstens einmal je
        * REZEPT_UMLAUF_TAGE nach. Zaehlt NICHT als Erstfehler: ein geloeschtes
        * Rezept sagt nichts ueber den Anbieter.
+       *
+       * ABER NICHT JEDES 404 (18.11.2026): FoodNotify antwortet auch auf einen
+       * fehlenden Pflichtparameter mit 404 („Dieser Wert sollte nicht leer
+       * sein."). Traegt res.anfrageFehler einen Wert, faellt der Posten unten
+       * in den gewoehnlichen Fehlerpfad — 'aufgegeben' mit dem Text, Erstfehler,
+       * das Rezept bleibt unberuehrt. Sonst saehe ein geaenderter Pflicht-
+       * parameter aus wie die Loeschung aller Rezepte (Regel 10).
        */
-      if (quelle.art === 'fn' && res.status === 404
-          && (REZEPT_DETAIL_ENDPUNKTE as readonly string[]).includes(epKey)) {
+      if (quelle.art === 'fn' && alsNichtGefundenVerbuchen(epKey, res)) {
         uebersprungen++
         await rezeptNichtGefunden(posten.posten_id, quelle.markeKey, extra.rezeptId, res.fehler)
         log.warn('rezept bei foodnotify nicht gefunden (404) — posten geschlossen', {

@@ -250,8 +250,34 @@ function rezeptId(p: Record<string, string>): string {
   return id
 }
 
-/** Die Einzelabrufe je Rezept (ohne die Liste) — bei HTTP 404 wird daraus 'nicht_gefunden'. */
+/**
+ * Die Einzelabrufe je Rezept (ohne die Liste) — bei HTTP 404 wird daraus
+ * 'nicht_gefunden', AUSSER der Text sagt Validierung oder Route
+ * (`alsNichtGefundenVerbuchen`).
+ */
 export const REZEPT_DETAIL_ENDPUNKTE = ['fn:rezept', 'fn:rezept_zutaten', 'fn:rezept_meta'] as const
+
+/**
+ * Heißt diese Fehlerantwort „das Rezept gibt es bei FoodNotify nicht mehr"?
+ *
+ * Nur dann schließt der Worker (und der Praxislauf) den Posten als
+ * 'nicht_gefunden' und setzt core.rezept.fehlt_seit. EINE Stelle für beide,
+ * damit die Regel nicht auseinanderläuft.
+ *
+ * Ein 404 mit Validierungs- oder Routentext ist ein Fehler der ANFRAGE
+ * (docs/foodnotify-interna-aus-fehlermeldungen.md §4, gemessen 18.11.2026):
+ * er geht den gewöhnlichen Fehlerpfad — 'aufgegeben' mit dem Text in
+ * letzter_fehler, sichtbar in mart.posten_aufgegeben, zählt als Erstfehler
+ * (Lauf 'teilweise', nach ABBRUCH_NACH_FEHLERN in Folge Abbruch) —, und das
+ * Rezept bleibt unangetastet.
+ */
+export function alsNichtGefundenVerbuchen(
+  epKey: string, res: { status: number | null; anfrageFehler?: 'validierung' | 'route' },
+): boolean {
+  return res.status === 404
+    && !res.anfrageFehler
+    && (REZEPT_DETAIL_ENDPUNKTE as readonly string[]).includes(epKey)
+}
 
 const register = new Map(FN_ENDPUNKTE.map(e => [e.key, e]))
 

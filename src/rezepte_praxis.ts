@@ -90,7 +90,7 @@ export async function rezeptePraxis(o: {
   if (!sperre.frei) throw new Error('Auf dieser Datenbank läuft ein Sync (Laufsperre belegt) — kein Praxislauf.')
 
   const { FnClient } = await import('./foodnotify/client')
-  const { fnEndpunkt } = await import('./foodnotify/endpunkte')
+  const { fnEndpunkt, alsNichtGefundenVerbuchen } = await import('./foodnotify/endpunkte')
   const { fnLaden, rezeptNichtGefunden } = await import('./foodnotify/laden')
   const { rezepteNachfuellen } = await import('./sync/nachfuellen')
 
@@ -176,7 +176,8 @@ export async function rezeptePraxis(o: {
       }
 
       const fehler = 'fehler' in res ? res.fehler : res.art
-      if (res.status === 404 && ['fn:rezept', 'fn:rezept_zutaten', 'fn:rezept_meta'].includes(posten.endpunkt)) {
+      // Dieselbe Regel wie im Worker: ein Validierungs-404 ist kein geloeschtes Rezept (18.11.2026).
+      if (res.art === 'fehler' && alsNichtGefundenVerbuchen(posten.endpunkt, res)) {
         await rezeptNichtGefunden(posten.posten_id, Number(posten.marke_key), p.rezeptId, fehler)
         await aufgabe('uebersprungen', fehler, null, 404)
         e.nichtGefunden++

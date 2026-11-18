@@ -2050,6 +2050,13 @@ es zurück. Damit wird ein gelöschtes Rezept wirklich höchstens einmal je Umla
 `mart.artikel_in_rezept.rezept_fehlt_seit`; Verweise auf Rezepte, die wir gar nicht kennen, zählt
 `mart.rezept_stand.verweise_ohne_rezept`.
 
+~~**HTTP 404 auf `fn:rezept`, `fn:rezept_zutaten`, `fn:rezept_meta`** schließt der Worker mit
+`nicht_gefunden`~~ — **nicht jedes 404 (18.11.2026).** FoodNotify antwortet auch auf einen fehlenden
+Pflichtparameter mit 404 („Dieser Wert sollte nicht leer sein.", `foodnotify-interna-aus-fehlermeldungen.md`
+§4). Ein solches 404 trägt am Ergebnis `anfrageFehler` (siehe „FoodNotify: Fehlertexte und 404" unten)
+und ist **kein** gelöschtes Rezept: `alsNichtGefundenVerbuchen()` lässt es durch in den gewöhnlichen
+Fehlerpfad (`aufgegeben`, Text in `letzter_fehler`, Erstfehler), `fehlt_seit` bleibt unberührt.
+
 **Antwortform.** `rezeptStrukturFehler()` prüft vor dem Laden die gemessene Form (Zutaten: Liste,
 Meta: Objekt mit `weight`, Kopf: Objekt mit `id`, Liste: Liste). Bei einem Befund sichert `fnLaden`
 die Rohantwort, schreibt `sync.schema_abweichung` und wirft — der Posten scheitert sichtbar, `core`
@@ -2127,7 +2134,8 @@ bun run rezepte-praxis --datenbank postgresql://localhost/lina_rezept_1015 [--ma
   Wetterclient.
 * Dieselbe Laufsperre wie der Worker; ein Anmeldefehler oder eine Sperre (403/429) beendet den Lauf
   ohne zweiten Versuch; nach `ABBRUCH_NACH_FEHLERN` Fehlern in Folge ist Schluss. 404 →
-  `nicht_gefunden` wie im Worker (`rezeptNichtGefunden()`).
+  `nicht_gefunden` wie im Worker (`rezeptNichtGefunden()`), mit derselben Regel
+  `alsNichtGefundenVerbuchen()` — ein Validierungs-404 ist ein Fehler (18.11.2026).
 * `--max-rezepte N` hört nach N Zutatenlisten auf; der Rest bleibt in der lokalen Schlange, ein
   zweiter Aufruf setzt fort. Ein Eintrag in `sync.lauf` (`manuell`, Notiz „Praxislauf Rezepturen")
   und je Aufruf eine Zeile in `sync.aufgabe`.
@@ -2601,3 +2609,45 @@ core“, „Journal/Bons mit unerwartetem Feld, Saldo oder Zeitpunkt (14 Tage)�
 `tpapi:core_*` in `sync.quelle` (Merker `tpapi_core`, gefragt ist der **Lader**, nicht LINA: ein
 Rohabzug, der Nacht für Nacht liefert, während der Lader steht, sähe an den Rohsätzen frisch aus) und
 die Prognose als erwartete Quelle. `src/sync/phasen.test.ts` prüft am Quelltext die dritte Spur.
+
+## FoodNotify: Fehlertexte und 404 (18.11.2026)
+
+**Der Antworttext wird mitgelesen.** Bis zum 18.11.2026 schrieb `src/foodnotify/client.ts` bei jeder
+Nicht-2xx-Antwort nur `HTTP ${status}` nach `letzter_fehler` und `sync.aufgabe`. Seitdem liest
+`fehlerAusAntwort()` (`src/foodnotify/huelle.ts`) eine Meldung aus dem Rumpf — `title`, `message`,
+`detail`, `errors`, `violations`; ist er kein JSON, den Rohtext ohne Tags; höchstens 300 Zeichen — und
+hängt sie an: `HTTP 500 — NonUniqueResultException: …`. Das Präfix bleibt, und ein leerer Fehlerkörper
+ergibt weiter genau `HTTP 500` (`bestellansichtenNachziehen()` und `0135` suchen `LIKE 'HTTP 500%'`). Die
+HTML-Bestellansicht (`fn:bestellansicht`) bekommt keinen Auszug: ihre Fehlerseite ist Navigation.
+
+**Anfragefehler.** Sagt der Text, dass die *Anfrage* nicht stimmt, trägt das Ergebnis
+`anfrageFehler`, und der Fehlertext nennt es:
+
+| `anfrageFehler` | Muster | gemessen? |
+|---|---|---|
+| `validierung` | „Dieser Wert sollte…", „Diese Zeichenkette ist zu kurz", „Diese Sammlung sollte…" | ja, 18.11.2026, mit 404 an sieben Pfaden und 422 |
+| `validierung` | „This value should…", „This value is too short", „This collection should…", Schlüssel `violations` | nein — Symfonys englische Fassung; die Sprache folgt dem Konto, drei Marken sind nicht gemessen |
+| `route` | „No route found for" | nur mit 405; die 404-Fassung ist Symfonys Standard für einen Pfad ohne Route |
+
+**Was ein 404 je Endpunkt bewirkt** (nachgesehen am 18.11.2026):
+
+| Endpunkt | 404 ohne Anfragefehler | 404 mit Anfragefehler |
+|---|---|---|
+| `fn:rezept`, `fn:rezept_zutaten`, `fn:rezept_meta` | `nicht_gefunden`, `core.rezept.fehlt_seit`, kein Erstfehler, nicht wiederbelebt | `aufgegeben` mit Text, Erstfehler, Rezept unberührt |
+| alle übrigen `fn:*` | `aufgegeben` (`wiederholbar: false`), `mart.posten_aufgegeben`, dreimal wiederbelebt | ebenso, jetzt mit Text |
+| Hüllenfehler mit HTTP 200 (`{errors:['object not found'], code:404, isError:true}`) | `fehler` mit der Hüllenmeldung, `aufgegeben` — nie `nicht_gefunden`, weil der Status 200 ist | – |
+
+Die Entscheidung steht an **einer** Stelle, `alsNichtGefundenVerbuchen()` in
+`src/foodnotify/endpunkte.ts`, für Worker und Praxislauf. Abwägung: ein echtes „gibt es nicht", das
+fälschlich als Validierung gilt, steht sichtbar in `mart.posten_aufgegeben`; ein Validierungsfehler, der
+als „gibt es nicht" durchgeht, markiert still Rezepte als gelöscht. Deshalb im Zweifel ein Muster mehr.
+
+**Wie es auffällt, wenn FoodNotify einen Pflichtparameter ändert:** jeder Einzelabruf wird zum
+Erstfehler. Nach `ABBRUCH_NACH_FEHLERN` (10) in Folge bricht die FoodNotify-Spur ab, der Lauf ist
+`teilweise`, die Posten stehen mit „Validierung" in `mart.posten_aufgegeben`, und `mart.quelle_zulauf`
+meldet `fn:rezept_zutaten` und `fn:rezept_meta` (täglich erwartet, `src/sync/quellen.ts`) nach ihrer
+Frist als stumm — `fn:rezept` nicht, er ist `erwartet: false`. Eine eigene Migration war dafür nicht nötig.
+
+Die Attrappe stellt das Validierungs-404 her (`fnMockStarten().validierungsfehler(pfad)`); Tests in
+`src/foodnotify/fehler404.test.ts`, `huelle.test.ts`, `rezept.test.ts` und (mit Datenbank)
+`rezept_db.test.ts`.

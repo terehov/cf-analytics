@@ -488,6 +488,42 @@ lauf('Rezepturen mit Datenbank', () => {
   })
 
   /**
+   * 18.11.2026: FoodNotify meldet einen fehlenden Pflichtparameter mit 404 und
+   * „Dieser Wert sollte nicht leer sein." Das ist kein geloeschtes Rezept: der
+   * Posten endet 'aufgegeben' mit dem Text, fehlt_seit bleibt NULL, der Lauf
+   * ist 'teilweise' (Erstfehler), und mart.posten_aufgegeben zeigt den Grund.
+   */
+  test('Validierungs-404 auf einen Rezeptabruf: aufgegeben mit Text, Rezept unberührt, Lauf teilweise', async () => {
+    await db.query(
+      `INSERT INTO core.rezept (marke_key, fn_id, name, in_liste, zutaten_geholt_am)
+       VALUES ($1, 999996, 'Vorhanden', true, now() - interval '20 days')`, [enchilada])
+    await db.query(
+      `INSERT INTO sync.warteschlange (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter)
+       VALUES ('fn:rezept_zutaten', current_date, current_date, 41, $1, '{"rezeptId": "999996"}')`,
+      [enchilada])
+    fn.validierungsfehler('/api/recipes/999996/ingredients')
+    try {
+      const { workerLauf } = await import('../sync/worker')
+      const r = await workerLauf('manuell')
+      expect(r.status).toBe('teilweise')
+    } finally {
+      fn.validierungsfehler('/api/recipes/999996/ingredients', false)
+    }
+    const { rows: [w] } = await db.query(
+      `SELECT ergebnis, letzter_fehler FROM sync.warteschlange WHERE parameter->>'rezeptId' = '999996'`)
+    expect(w.ergebnis).toBe('aufgegeben')
+    expect(w.letzter_fehler).toContain('Dieser Wert sollte nicht leer sein.')
+    const { rows: [rz] } = await db.query(`SELECT fehlt_seit FROM core.rezept WHERE fn_id = 999996`)
+    expect(rz.fehlt_seit).toBeNull()
+    const { rows: auf } = await db.query(
+      `SELECT fehler FROM mart.posten_aufgegeben WHERE parameter->>'rezeptId' = '999996'`)
+    expect(auf).toHaveLength(1)
+    expect(auf[0].fehler).toContain('Validierung')
+    await db.query(`DELETE FROM sync.warteschlange WHERE parameter->>'rezeptId' = '999996'`)
+    await db.query(`DELETE FROM core.rezept WHERE fn_id = 999996`)
+  })
+
+  /**
    * Echter Lauf 15.10.2026: 300203 traf bei Wilma Wunder 26 Rezepte unter nur
    * drei Namen und sah in mart.artikel_in_rezept aus wie Duplikate. Die
    * Rezept-ID und das Anlagedatum machen sie unterscheidbar.

@@ -2825,8 +2825,18 @@ heißt) und `docs/foodnotify-api-inventar-intern-2026-11.md`. Gemessen ist nur W
 15. **Lieferte `/api/recipes` schon vor dem 09.11.2026 die Form von `/api/recipe-viewer/recipes`** (`archived` je
     Eintrag, `totalItems`)? Gegen die ältesten `fn:rezepte`-Antworten in `raw.api_antwort` prüfen; hängt mit 4a
     (Rezepturen, 15.10.2026) zusammen.
-16. **Wie behandelt der Importer ein 404 von FoodNotify?** Die neue Code-Generation antwortet bei einem fehlenden
+16. ~~**Wie behandelt der Importer ein 404 von FoodNotify?** Die neue Code-Generation antwortet bei einem fehlenden
     Pflichtparameter mit **404** und dem Text „Dieser Wert sollte nicht leer sein." — nicht mit 400
     (`docs/foodnotify-interna-aus-fehlermeldungen.md` §4). Ändert FoodNotify an einem unserer Pfade einen
     Pflichtparameter, sähe das aus wie „Datensatz gibt es nicht". In `src/foodnotify/client.ts` nachsehen, ob 404
-    als endgültig verbucht wird, und ob der Antworttext mitgelesen wird (Regel 10). Nicht geprüft.
+    als endgültig verbucht wird, und ob der Antworttext mitgelesen wird (Regel 10). Nicht geprüft.~~
+    **Erledigt 18.11.2026 (Code, Attrappe, Tests; nicht gegen FoodNotify gelaufen).** Befund: Der Client warf den
+    Antworttext weg (`HTTP 404` ohne Text), und jedes 404 auf `fn:rezept`, `fn:rezept_zutaten`, `fn:rezept_meta`
+    wurde `nicht_gefunden` mit `core.rezept.fehlt_seit`, ohne als Fehler zu zählen — ein geänderter Pflichtparameter
+    hätte alle Rezepte still als gelöscht markiert. Die übrigen `fn:*` enden bei 404 als `aufgegeben` (sichtbar).
+    Jetzt liest der Client die Meldung mit, erkennt Validierungs- und Routentexte (`anfrageFehler`), und nur ein 404
+    **ohne** sie wird `nicht_gefunden`; ein Validierungs-404 wird `aufgegeben` mit Text und Erstfehler, das Rezept
+    bleibt unberührt. Keine Migration. Einzelheiten: `fehlerkatalog.md` (18.11.2026), `importer.md` („FoodNotify:
+    Fehlertexte und 404"). **Offen bleibt:** wie ein echtes 404 auf `/api/recipes/{id}` aussieht (nie mit Text
+    protokolliert) — nach dem ersten Fall `letzter_fehler` in `sync.warteschlange` lesen; und ob eine Grenze „zu
+    viele `nicht_gefunden` in einem Lauf" gewollt ist (nicht gebaut, kein vorhandenes Muster dafür).

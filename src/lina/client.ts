@@ -59,6 +59,14 @@ export type Ergebnis =
        * statt denselben Minutenaufruf viermal zu wiederholen.
        */
       zeitueberschreitung?: boolean
+      /**
+       * Nur FoodNotify (18.11.2026): der Fehlertext sagt, dass die ANFRAGE
+       * nicht stimmt — Validierung eines Pflichtparameters oder keine Route —,
+       * nicht, dass der Datensatz fehlt. FoodNotify meldet beides auch mit 404
+       * (`fehlerAusAntwort()` in src/foodnotify/huelle.ts). Ein solches 404
+       * darf nie als „Rezept gelöscht" verbucht werden.
+       */
+      anfrageFehler?: 'validierung' | 'route'
     }
 
 const schlaf = (ms: number) => new Promise(r => setTimeout(r, ms))

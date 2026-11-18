@@ -177,6 +177,10 @@ Wer 404 als „gibt es nicht" verbucht (und nicht wiederholt), verliert bei eine
 still eine Quelle — dieselbe Signatur wie Regel 10. Den Antworttext mitlesen: „Dieser Wert sollte…" ist
 Validierung.
 
+**Umgesetzt am 18.11.2026:** Der Importer liest den Text mit (`fehlerAusAntwort()` in `src/foodnotify/huelle.ts`),
+und ein 404 mit den Mustern aus Abschnitt 2 wird nie mehr als „Rezept gelöscht" verbucht
+(`alsNichtGefundenVerbuchen()`, `docs/importer.md` „FoodNotify: Fehlertexte und 404").
+
 ## 5. Was sonst noch aus Antworten herausfällt
 
 * **`/app/is-authenticated`** liefert das ganze Rechteobjekt des Kontos (`roles`, `allowedModules`,

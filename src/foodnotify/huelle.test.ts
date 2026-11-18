@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { auspacken, istLeer } from './huelle'
+import { auspacken, istLeer, fehlerAusAntwort } from './huelle'
 
 /**
  * Die Formen stammen aus der Erhebung vom 27.07.2026
@@ -126,5 +126,61 @@ describe('istLeer', () => {
     const a = auspacken({ errors: [], code: 200, isError: false, payload: { data: [] } })
     expect(a.fehler).toBeNull()
     expect(istLeer(a.daten)).toBe(true)
+  })
+})
+
+/**
+ * Fehlertexte einer Nicht-2xx-Antwort (18.11.2026). Die deutschen Texte sind
+ * wörtlich aus docs/payloads/foodnotify-2026-11/fehlermeldungen-2026-11-18.csv.
+ */
+describe('fehlerAusAntwort', () => {
+  test('gemessene Validierungs-404 werden erkannt, egal in welchem Feld', () => {
+    for (const text of [
+      'Dieser Wert sollte nicht leer sein.',
+      'Dieser Wert sollte nicht null sein.',
+      'Dieser Wert sollte vom Typ int|string sein.',
+      'Dieser Wert sollte nicht leer sein.\nDiese Zeichenkette ist zu kurz. Sie sollte mindestens 2 Zeichen haben.'
+        + '\nDiese Sammlung sollte 1 oder mehr Elemente beinhalten.',
+    ]) {
+      for (const feld of ['message', 'detail', 'title']) {
+        const r = fehlerAusAntwort(JSON.stringify({ [feld]: text }))
+        expect(r.anfrageFehler).toBe('validierung')
+        expect(r.meldung).toContain('Dieser Wert sollte')
+      }
+    }
+    // Auch tief verschachtelt und als Klartext.
+    expect(fehlerAusAntwort(JSON.stringify({ a: { b: ['Diese Sammlung sollte 1 oder mehr Elemente beinhalten.'] } }))
+      .anfrageFehler).toBe('validierung')
+    expect(fehlerAusAntwort('Dieser Wert sollte nicht leer sein.').anfrageFehler).toBe('validierung')
+  })
+
+  test('Symfonys englische Fassung und violations (nicht gemessen) gelten ebenfalls als Validierung', () => {
+    expect(fehlerAusAntwort('{"detail":"This value should not be blank."}').anfrageFehler).toBe('validierung')
+    expect(fehlerAusAntwort('{"violations":[{"propertyPath":"id","title":"x"}]}').anfrageFehler).toBe('validierung')
+  })
+
+  test('keine Route ist ein Fehler der Anfrage, nicht des Datensatzes', () => {
+    const r = fehlerAusAntwort('{"message":"No route found for \\"GET https://my.foodnotify.com/api/recipes/1\\""}')
+    expect(r.anfrageFehler).toBe('route')
+  })
+
+  test('echtes „gibt es nicht" bleibt ohne Befund — auch der gemessene EntityValueResolver-Text', () => {
+    expect(fehlerAusAntwort('{"message":"not found"}')).toEqual({ meldung: 'not found', anfrageFehler: null })
+    expect(fehlerAusAntwort(
+      '{"message":"\\"PosBundle\\\\Database\\\\Entity\\\\Account\\" object not found by \\"Symfony\\\\Bridge\\\\Doctrine\\\\ArgumentResolver\\\\EntityValueResolver\\"."}',
+    ).anfrageFehler).toBeNull()
+    expect(fehlerAusAntwort('').anfrageFehler).toBeNull()
+  })
+
+  test('leerer Fehlerkörper ergibt keine Meldung — „HTTP 500" bleibt genau so', () => {
+    expect(fehlerAusAntwort(JSON.stringify({ errors: [], code: 500, isError: true, payload: null })).meldung).toBe('')
+  })
+
+  test('Titel und Meldung zusammen, HTML ohne Tags, höchstens 300 Zeichen', () => {
+    expect(fehlerAusAntwort('{"statusCode":500,"title":"NonUniqueResultException","message":"More than one result"}')
+      .meldung).toBe('NonUniqueResultException: More than one result')
+    expect(fehlerAusAntwort('<html><body><h1>502 Bad Gateway</h1><hr>nginx</body></html>').meldung)
+      .toBe('502 Bad Gateway nginx')
+    expect(fehlerAusAntwort(JSON.stringify({ message: 'x'.repeat(1000) })).meldung).toHaveLength(300)
   })
 })
