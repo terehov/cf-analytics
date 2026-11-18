@@ -1,0 +1,1 @@
+{"resource":"https:\/\/api3.foodnotify.com\/mcp","authorization_servers":["https:\/\/api3.foodnotify.com"],"scopes_supported":["recipe:read","recipe:write","erp-product:write","user:read","account:switch"],"bearer_methods_supported":["header"]}

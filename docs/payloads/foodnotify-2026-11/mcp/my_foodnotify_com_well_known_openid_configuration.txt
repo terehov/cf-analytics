@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8"/>
+        <title>FoodNotify</title>
+        <base href="/"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1"/>
+        <link rel="icon" type="image/x-icon" href="assets/favicon.ico?v=2"/>
+    <link rel="stylesheet" href="styles.df15b9a33f596127.css"></head>
+    <body>
+        <app-root>
+            <!-- The splash until Angular runs; AppComponent then shows the same one until the first page has loaded -->
+            <div class="tw:fixed tw:inset-0 tw:z-5001 tw:flex tw:items-center tw:justify-center tw:bg-sidebar">
+                <div class="tw:flex tw:flex-col tw:items-center">
+                    <img src="assets/foodnotify-logo-2027.png" alt="FoodNotify" class="tw:h-[32px] tw:w-auto"/>
+                    <svg class="tw:size-[20px] tw:animate-spin tw:text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="tw:opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="tw:opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </div>
+            </div>
+        </app-root>
+        <script src="https://public.tableau.com/javascripts/api/tableau-2.9.2.min.js"></script>
+        <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSy…[Schluessel gekuerzt]" type="text/javascript"></script>
+    <script src="runtime.c66b7750f57788e5.js" type="module"></script><script src="polyfills.714de2a32ff34f48.js" type="module"></script><script src="vendor.ce54eadb88537d6d.js" type="module"></script><script src="main.e1808370e68a3685.js" type="module"></script></body>
+</html>

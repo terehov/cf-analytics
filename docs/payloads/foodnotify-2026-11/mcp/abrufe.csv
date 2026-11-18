@@ -1,0 +1,16 @@
+url,status,content_type,bytes,note
+https://my.foodnotify.com/.well-known/oauth-protected-resource,200,application/json,240,datei=my_foodnotify_com_well_known_oauth_protected_resource.txt
+https://my.foodnotify.com/.well-known/oauth-protected-resource/mcp,404,text/html; charset=UTF-8,4456,Pfadvariante nach RFC 9728 fehlt; datei=my_foodnotify_com_well_known_oauth_protected_resource_mcp.txt (HTML-Fehlerseite)
+https://my.foodnotify.com/.well-known/oauth-authorization-server,200,application/json,520,datei=my_foodnotify_com_well_known_oauth_authorization_server.txt
+https://my.foodnotify.com/.well-known/openid-configuration,200,text/html; charset=utf-8,1873,kein OIDC-Dokument: Angular-Startseite als Rueckfall (SPA); datei=my_foodnotify_com_well_known_openid_configuration.txt
+https://my.foodnotify.com/mcp,401,text/html; charset=UTF-8,0,GET ohne Token; leerer Koerper; Kopf WWW-Authenticate: Bearer resource_metadata="https://my.foodnotify.com/.well-known/oauth-protected-resource"; scope="recipe:read"; server nginx/1.31.7; X-Powered-By PHP/8.2.35
+https://api3.foodnotify.com/.well-known/oauth-protected-resource,200,application/json,244,datei=api3_foodnotify_com_well_known_oauth_protected_resource.txt
+https://api3.foodnotify.com/.well-known/oauth-authorization-server,200,application/json,526,datei=api3_foodnotify_com_well_known_oauth_authorization_server.txt
+https://api3.foodnotify.com/mcp,401,application/json,170,GET mit Accept application/json und text/event-stream; Koerper {"type":...,"title":"An error occurred","status":401,"detail":"Full authentication is required to access this resource."}; KEIN WWW-Authenticate-Kopf; fruehere Messung 18.11.2026 (Auftraggeber): 403 text/plain "Forbidden: Invalid Host header." - heute nicht reproduziert
+https://connect.foodnotify.com/.well-known/oauth-protected-resource,200,application/json,250,datei=connect_foodnotify_com_well_known_oauth_protected_resource.txt
+https://connect.foodnotify.com/.well-known/oauth-authorization-server,200,application/json,535,datei=connect_foodnotify_com_well_known_oauth_authorization_server.txt
+https://connect.foodnotify.com/mcp,401,application/json,170,wie api3: JSON-401 ohne WWW-Authenticate-Kopf
+https://mcp.foodnotify.com/.well-known/oauth-protected-resource,ERR,,0,Name existiert nicht (DNS NXDOMAIN/kein Eintrag); kein Dokument
+https://ai.foodnotify.com/.well-known/oauth-protected-resource,ERR,,0,Name existiert nicht (DNS); kein Dokument
+https://www.foodnotify.com/en/ai,200,text/html,92528,Werbeseite; nur ausgewertet, nicht abgelegt (gleicher Inhalt wie belege/foodnotify-inventur-2026-11-18/hilfe/art_ki.html auf Deutsch)
+https://crt.sh/?q=%25.foodnotify.com&output=json,200,application/json,371365,Zertifikatstransparenz; Fremdhost; 64 Namen; *.foodnotify.com als Wildcard (ein mcp-Host waere dort nicht einzeln sichtbar)

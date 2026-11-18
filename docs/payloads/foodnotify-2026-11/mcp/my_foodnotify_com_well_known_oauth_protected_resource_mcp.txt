@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+        <meta name="description" content="">
+        <meta name="author" content="">
+        <link rel="shortcut icon" href="/favicon.ico?v=2">
+        <title>FoodNotify.com</title>
+        <!-- encore-entry: admin -->
+        <link rel="stylesheet" href="/build/admin.b5e9795c.css">
+        <link href="https://fonts.googleapis.com/css?family=Open+Sans:400,700,300" rel="stylesheet" type="text/css">
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
+
+                    <!-- encore-entry: error-404 -->
+            <link rel="stylesheet" href="/build/error-404.cde2766f.css">
+        
+        <link rel="shortcut icon" href="/ico/favicon.png">
+        <!-- encore-entry: tailwind -->
+        <link rel="stylesheet" href="/build/tailwind.66d0d59f.css">
+    </head>
+    <body  id="theme">
+                    <div class="container-fluid background-style h-100">
+              <div class="container w-100 h-100">
+                <div class="justify-content-center row h-100 align-items-center m-0">
+                    <div class="plate-img col-9 col-lg-5 h-50"></div>
+                    <div class="col-10 col-lg-7 text-center text-lg-left p-0">
+                    <div id="opm" class="ops-message">Ups! Hier ist etwas schief gelaufen!</div>
+                        <div id="apm" class="apologies">Wir entschuldigen uns für die Unannehmlichkeiten. Es scheint, dass Sie versuchen, eine Seite zu öffnen, die es nicht gibt oder die entfernt wurde.</div>
+                        <br>
+                        <br>
+                        <div>
+                            <a href="/brew/dashboard" id="btn-hmp" class="homepage-btn">
+                                Zur Homepage
+                            </a>
+                        </div>
+                    </div>
+                </div>
+              </div>
+            </div>
+                        <!-- Le javascript
+        ================================================== -->
+        <!-- Placed at the end of the document so the pages load faster -->
+        <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"
+                integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj"
+                crossorigin="anonymous"></script>
+        <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"
+                integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN"
+                crossorigin="anonymous"></script>
+        <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"
+                integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8shuf57BaghqFfPlYxofvL8/KUEfYiJOMMV+rV"
+                crossorigin="anonymous"></script>
+        <script>
+            let theme = window.localStorage.getItem('foodnotify.viewMode');
+            let lang = window.localStorage.getItem('foodnotify.language');
+            if(theme == "light") {
+            $("#theme").addClass("light");
+            $("#btn-hmp").addClass("light-btn");
+            $('#btn-hmp').append('<img src="/img/404/arrow-icon-light.svg"/>')
+                } else {
+                    $("#theme").addClass("dark");
+                    $("#btn-hmp").addClass("dark-btn");
+                    $('#btn-hmp').append('<img src="/img/404/arrow-icon.svg"/>')
+                }
+                if(lang == "en") {
+                    $("#opm").html("Ooops! Something is missing!");
+                    $("#apm").html("Our apologies for the inconvenience. It seems that you are trying to open the page that does not exist or it has been removed.");
+                    $('#btn-hmp').html("Go to homepage");
+                } else {
+                    $("#opm").html("Ups! Hier ist etwas schief gelaufen!");
+                    $("#apm").html("Wir entschuldigen uns für die Unannehmlichkeiten. Es scheint, dass Sie versuchen, eine Seite zu öffnen, die es nicht gibt oder die entfernt wurde.");
+                    $('#btn-hmp').html("Zur Homepage");
+                }
+            </script>
+            </body>
+</html>
