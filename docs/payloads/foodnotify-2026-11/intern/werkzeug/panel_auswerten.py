@@ -443,7 +443,7 @@ KIND = {
     'beam.foodnotify.com': 'eigener Host (Menue-Eintrag "lab", extern)',
     'help.foodnotify.com': 'eigener Host (Hilfe/Ticket)',
     'www.foodnotify.com': 'eigener Host (Webseite, Meta-Bild)',
-    'app.gleap.io': 'Gleap (Feedback-/Tracking-SDK in vendor, in main AKTIV initialisiert: initialize(<Schluessel luccHM\u2026>) + identify(Benutzer-Id, E-Mail, Name))',
+    'app.gleap.io': 'Gleap (Feedback-/Tracking-SDK in vendor, in main AKTIV initialisiert: initialize("luccHMyE9jFDLSEHv9Rp6U23EhkTXIES") + identify(Benutzer-Id, E-Mail, Name))',
     'api.gleap.io': 'Gleap API (SDK-Standard, Gleap ist in main initialisiert)',
     'ws.gleap.io': 'Gleap WebSocket (SDK-Standard, Gleap ist in main initialisiert)',
     'messenger-app.gleap.io': 'Gleap Widget-Frame (Bibliothek)',
@@ -464,10 +464,10 @@ for fn in sorted(glob.glob(os.path.join(bundle, '*'))):
         u = m.group(0)
         h = re.match(r'(?:https?|wss?)://([^/:]+)', u).group(1)
         if re.fullmatch(r'[0-9a-f]{32}', h):
-            # Sentry-DSN: Schluessel nur gekuerzt ausgeben, Rest der DSN aus dem Text lesen
+            # Sentry-DSN ungekuerzt ausgeben (Entscheidung Eugene, 18.11.2026: alle Funde ausschreiben)
             mm = re.match(r'https://([0-9a-f]{32})@([\w.\-]+)/(\d+)', s[m.start():m.start() + 160])
             if mm:
-                u = 'https://%s\u2026@%s/%s' % (mm.group(1)[:6], mm.group(2), mm.group(3))
+                u = 'https://%s@%s/%s' % (mm.group(1), mm.group(2), mm.group(3))
                 h = mm.group(2)
         if h in NOISE_HOSTS:
             noise[h][b] += 1
@@ -480,11 +480,7 @@ for fn in sorted(glob.glob(os.path.join(bundle, '*'))):
         kind = KIND.get(h, 'unbekannt')
         if h.endswith('.sentry.io') or h.startswith('625f77'):
             kind = 'Sentry (Fehlerverfolgung, DSN in main)'
-            # DSN-Schluessel nicht ausschreiben
-            ctx = re.sub(r'(https://)([0-9a-f]{6})[0-9a-f]+@', '\\1\\2\u2026@', ctx)
-        if 'AIza' in u or 'AIza' in ctx:
-            u = re.sub(r'(AIzaSy)[0-9A-Za-z_\-]+', '\\1\u2026', u)
-            ctx = re.sub(r'(AIzaSy)[0-9A-Za-z_\-]+', '\\1\u2026', ctx)
+            # Schluessel (DSN, Google Maps) bleiben ausgeschrieben - Entscheidung Eugene, 18.11.2026
         host_rows.append([u, kind, b, ctx[:170]])
 # Hosts ohne Schema in Anfuehrungszeichen, die auf eigene Domains zeigen (Kontrolle)
 for fn in sorted(glob.glob(os.path.join(bundle, '*.js'))):

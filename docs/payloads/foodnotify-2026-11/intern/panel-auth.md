@@ -121,15 +121,15 @@ sagt das Bundle nicht; der JWT-Weg gehört vermutlich zum `/brew`-Client (geschl
 
 ```
 { production: true,
-  sentry: { dsn: "https://625f77…@o4506841913491456.ingest.us.sentry.io/4507145965862912" },
+  sentry: { dsn: "https://625f77bce66956a41cbefcc3422a24ec@o4506841913491456.ingest.us.sentry.io/4507145965862912" },
   reactFrontendDomain: null }
 ```
 
 * `production`, `sentry.dsn`, `reactFrontendDomain` sind die drei Schlüssel. Der DSN-Schlüsselteil (hier nur die ersten sechs Zeichen) ist ein **Sentry-Projektschlüssel** für Fehlerberichte; er steht bewusst im Client.
 * `reactFrontendDomain: null` → die Umleitung auf die neue Oberfläche (`brew/**`) baut eine **relative** URL (`brew/<pfad>?<query>`), also dieselbe Domäne.
 * **Sentry mit Sitzungsaufzeichnung** (gelesen, `main`): `replaysOnErrorSampleRate: 1`, `replaysSessionSampleRate: 0.1`, Replay-Integration mit `maskAllText: false`, `blockAllMedia: false`. Nur in `production`.
-* **Gleap** (Rückmelde-/Tracking-SDK, Modul 33722 in `vendor`): `main` ruft nach jeder erfolgreichen Anmeldung `Gleap.initialize("luccHM…")` (Projektschlüssel, 32 Zeichen, hier nur sechs gezeigt) und `Gleap.identify(<Benutzer-Id>, {email, name})`. Ereignisse über `trackEvent("…")` in `239`, `658`, `88` (Lieferantenseite, Warenkorb, Smartlisten). **Gleap ist also aktiv, kein totes SDK.** Dienste: `api.gleap.io`, `wss://ws.gleap.io`, `messenger-app.gleap.io`, `outboundmedia.gleap.io`.
-* **Google Maps** (HTML `_panel_.html`, `_panel_catering.html`): `maps.googleapis.com/maps/api/js?key=AIzaSy…` — ein Browserschlüssel, im HTML im Klartext; Zweck: Karten (vermutlich Standortwahl im Catering, geschlossen).
+* **Gleap** (Rückmelde-/Tracking-SDK, Modul 33722 in `vendor`): `main` ruft nach jeder erfolgreichen Anmeldung `Gleap.initialize("luccHMyE9jFDLSEHv9Rp6U23EhkTXIES")` (Projektschlüssel, 32 Zeichen) und `Gleap.identify(<Benutzer-Id>, {email, name})`. Ereignisse über `trackEvent("…")` in `239`, `658`, `88` (Lieferantenseite, Warenkorb, Smartlisten). **Gleap ist also aktiv, kein totes SDK.** Dienste: `api.gleap.io`, `wss://ws.gleap.io`, `messenger-app.gleap.io`, `outboundmedia.gleap.io`.
+* **Google Maps** (HTML `_panel_.html`, `_panel_catering.html`): `maps.googleapis.com/maps/api/js?key=AIzaSyDOy0Ns1iCrXpJeZ4phREHsjMI21hzpVlA` — ein Browserschlüssel, im HTML im Klartext; Zweck: Karten (vermutlich Standortwahl im Catering, geschlossen).
 * **Übersetzungen** (`main`): `/assets/i18n/<bereich>/<sprache>.json?v=<Hash>`, 33 Dateien (de, en, fr; Bereiche analytics, daily-menu, dashboard, erp, event-catering, menu-creator, production-plan, settings, sidebar, supplier).
 
 ## 9. Was dieses Bundle über die Auth nicht sagt

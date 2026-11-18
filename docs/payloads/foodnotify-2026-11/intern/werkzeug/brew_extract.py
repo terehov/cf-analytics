@@ -386,11 +386,11 @@ def scan_hosts(b):
                     kind = k
                     break
             rows.append(dict(host_or_url=u[:200], kind=kind, chunk=f, context=ctx[:200]))
-    # eingebettete Build-Konstanten (VITE_*), Werte maskiert -- ein Schluessel gehoert nicht in eine Doku
+    # eingebettete Build-Konstanten (VITE_*), Werte ungekuerzt (Entscheidung Eugene, 18.11.2026: alle Funde ausschreiben)
     for f, s in sorted(b.files.items()):
         for m in re.finditer(r'(VITE_[A-Z_]+):"([^"]{4,200})"', s):
             v = m.group(2)
-            rows.append(dict(host_or_url='%s=%s... (Wert maskiert)' % (m.group(1), v[:4]), kind='build-konstante (im Bundle eingebettet)',
+            rows.append(dict(host_or_url='%s=%s' % (m.group(1), v), kind='build-konstante (im Bundle eingebettet)',
                              chunk=f, context='Browser-seitiger Schluessel/Konstante im ausgelieferten Bundle; Laenge %d' % len(v)))
         if 'VITE_API_DOMAIN:t' in s and 'window.location.origin' in s:
             rows.append(dict(host_or_url='(gleicher Ursprung: window.location.origin)', kind='backend (API-Basis)', chunk=f,
