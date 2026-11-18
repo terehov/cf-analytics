@@ -153,6 +153,9 @@ Kategorie, Anteilsverschiebungen zwischen Speisen und Getränken über Jahre.
 Ohne diesen einen Aufruf sind das alles nur Artikelnummern.
 
 Ohne `franchise=1` liefert derselbe Endpunkt 1.428 Artikel — die des aktuellen Betriebs.
+**`storeId` wird dabei ignoriert** (nachgemessen 13.11.2026, `lina-fragen d11`: mit und ohne
+`storeId` dieselben 1.428 ids). Den Artikelstamm eines anderen Betriebs, und damit seinen
+Self-Ordering-Haken (`selfordering`), liefert dieser Weg nicht. Siehe `amadeusgo-selfordering.md`.
 
 ---
 

@@ -112,6 +112,18 @@ Arbeitsliste: Karte *Betriebe ohne laufendes Geschäft* auf Dashboard ⑥, bzw.
 
 **`Stornotyp`-Ausprägungen** bleiben unverifiziert, weil kein Betrieb Stornodaten liefert. Struktur ist dokumentiert, Bericht deaktiviert.
 
+### ~~Self-Ordering-Haken je Betrieb: liefert `articleApi` mit `storeId` den Stamm eines Betriebs? (gefunden 13.11.2026)~~ — geklärt 13.11.2026: nein
+
+> **`d11` gelaufen (Terminal Eugene, 13.11.2026):** `storeId` wird ignoriert, beide Aufrufe
+> liefern dieselben 1.428 Artikel des Zugangsbetriebs (3 mit `selfordering = 1`). Der Haken je
+> Betrieb ist über diesen Weg nicht lesbar. Offen bleibt nur der Hinweis zu Recklinghausen.
+
+`articleApi:franchise` führt `selfordering` nur für die Zentralartikel (223 von 9.144, `shop_ids`
+leer). Ob der Haken je Betrieb lesbar ist, misst `bun run lina-fragen d11` — zwei GET, **nur im
+Terminal von Eugene** (Regel 7a). Kein Import beschlossen; Laura prüft die Karten selbst mit
+Claude in Chrome. Nebenbei an Laura/Daniel: Die Karte von **Recklinghausen (geschlossen) ist noch
+online**. Einzelheiten: `amadeusgo-selfordering.md`.
+
 ### FoodNotify: Bar Enchilada Augsburg / DISTRA lädt seit 31.08.2026 keine Positionen (gefunden 15.10.2026)
 
 > **Stand 19.10.2026: Ursache gefunden.** Der Artikel „Pickled Onions Gelb 3Kg Eimer“ (DISTRA 500081,

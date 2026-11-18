@@ -530,6 +530,73 @@ const MESSUNGEN: Messung[] = [
       return zeilen.join('\n')
     },
   },
+  // ---------------------------------------------------------------------
+  // d11: der Haken "Aktiv in Self-Ordering" je Betrieb.
+  //
+  // Anlass: Laura (Operations Wilma Wunder), 13.11.2026 — die Betriebe muessen
+  // jeden Artikel der digitalen Karte (amadeusGO, LINAs Self-Ordering) selbst
+  // anhaken. `articleApi` fuehrt dafuer das Feld `selfordering`, aber der
+  // Franchise-Abruf (`articleApi:franchise`, den der Sync monatlich holt)
+  // liefert nur die 9.144 ZENTRALartikel: am 02.08.2026 223 mit
+  // selfordering = 1, `shop_ids` ueberall leer. Ob es die Liste JE BETRIEB
+  // gibt, ist nicht gemessen — die Report-Endpunkte nehmen `storeId`
+  // (KORREKTUR in lina-api-korrekturen.md), ob articleApi das auch tut, weiss
+  // niemand. Erwartung zum Vergleich: amadeusGO zeigte am 13.11.2026 fuer
+  // Wilma Ballplatz Mainz 178 Hauptartikel (oeffentlich, /api/getArticles).
+  // Zwei GET, kein Schreiben. docs/amadeusgo-selfordering.md
+  // ---------------------------------------------------------------------
+  {
+    id: 'd11',
+    frage: 'Self-Ordering je Betrieb — liefert articleApi mit storeId den Artikelstamm EINES Betriebs?',
+    aufruf: 'Zwei Aufrufe: articleApi ohne Parameter (Betrieb des Zugangs) und mit storeId = '
+          + 'Wilma Ballplatz Mainz. Gezaehlt wird, wie viele Artikel selfordering = 1 tragen.',
+    deutung: [
+      ['Beide Aufrufe liefern dieselbe Liste (gleiche Anzahl, gleiche ids)',
+       'storeId wird ignoriert. Der Haken je Betrieb ist ueber diesen Weg NICHT lesbar. Dann bleibt '
+       + 'die oeffentliche Karte (amadeusGO) die einzige Quelle — was dort steht, ist angehakt. Ergebnis '
+       + 'in docs/amadeusgo-selfordering.md eintragen, kein weiterer Versuch.'],
+      ['Der zweite Aufruf liefert eine andere Liste, selfordering = 1 liegt in der Naehe von 178',
+       'Der Haken ist je Betrieb lesbar. Stichprobe: die ausgegebenen Namen mit der digitalen Karte '
+       + 'Mainz Ballplatz vergleichen (wilma-wunder.de/restaurants/mainz-am-ballplatz/karte/). '
+       + 'Nur dokumentieren — ein Import ist NICHT beschlossen (Eugene, 13.11.2026).'],
+      ['Der zweite Aufruf liefert eine andere Liste, selfordering = 1 weit weg von 178',
+       'Das Feld meint etwas anderes als die Sichtbarkeit in der Karte (z. B. Kategorie nicht '
+       + 'aktiv, Zeitsteuerung). Nicht deuten, sondern so dokumentieren.'],
+      ['HTTP 403 / Weiterleitung',
+       'Der Zugang darf den Artikelstamm des Betriebs nicht sehen. Dokumentieren, nicht wiederholen.'],
+    ],
+    lauf: async (client) => {
+      const zeilen: string[] = []
+      type Artikel = { id: number, name: string, active?: boolean, selfordering?: number | string,
+        shop_ids?: unknown[], function?: string }
+      const zaehlen = async (titel: string, parameter: Record<string, string>) => {
+        const r = await client.holen(adhoc('d11', '/wawi/rezept/articleApi', 'json'), parameter)
+        if (r.art !== 'ok') {
+          zeilen.push(`${titel}: ${r.art} ${'status' in r ? `HTTP ${r.status}` : ''} ${'fehler' in r ? r.fehler : ''}`)
+          return null
+        }
+        const daten = r.daten as { articles?: Artikel[] } | Artikel[]
+        const liste = Array.isArray(daten) ? daten : (daten.articles ?? [])
+        const so = liste.filter(a => Number(a.selfordering) === 1)
+        const soAktiv = so.filter(a => a.active !== false && (a.function ?? 'MAIN') === 'MAIN')
+        const mitShop = liste.filter(a => Array.isArray(a.shop_ids) && a.shop_ids.length > 0).length
+        zeilen.push(`${titel}: ${liste.length} Artikel, selfordering=1: ${so.length} `
+          + `(davon aktiv und MAIN: ${soAktiv.length}), mit shop_ids: ${mitShop}, ${r.bytes} Bytes`)
+        zeilen.push(`   Beispiele selfordering=1: ${soAktiv.slice(0, 12).map(a => a.name).join(' | ')}`)
+        return new Set(liste.map(a => a.id))
+      }
+      const a = await zaehlen('1) ohne Parameter       ', {})
+      await schlaf(3000)
+      const b = await zaehlen('2) storeId Ballplatz Mz ', { storeId: 'a9bbeb7f32f15b5d15a87765cfe55d797b810662' })
+      if (a && b) {
+        const gemeinsam = [...b].filter(x => a.has(x)).length
+        zeilen.push(`Gleiche ids in beiden Listen: ${gemeinsam} von ${b.size} `
+          + `(${a.size === b.size && gemeinsam === b.size ? 'IDENTISCH — storeId wird ignoriert' : 'verschieden'})`)
+      }
+      zeilen.push('Erwartung zum Vergleich: amadeusGO Mainz Ballplatz, 13.11.2026: 178 Hauptartikel.')
+      return zeilen.join('\n')
+    },
+  },
 ]
 
 /**
@@ -570,7 +637,7 @@ Einmalige LESENDE Messaufrufe gegen LINA.
 
   bun run lina-fragen <id> [--roh] [--datei <pfad>]
 
-d1-d5 sind je EIN Request. d7-d10 brauchen mehrere und sagen das dazu.
+d1-d5 sind je EIN Request. d7-d11 brauchen mehrere und sagen das dazu.
 Der Client drosselt, führt das Tagesbudget und bricht nach EINEM gescheiterten
 Anmeldeversuch ab (AGENTS.md Regel 7).
 Geschrieben wird nirgends — weder in LINA noch in die eigene Datenbank.
