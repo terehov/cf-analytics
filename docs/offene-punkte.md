@@ -2791,6 +2791,10 @@ heißt) und `docs/foodnotify-api-inventar-intern-2026-11.md`. Gemessen ist nur W
 6. **`core.pos_artikel` und `core.ware_stand`** sind mit der Sitzung seit 01.08. bzw. 27.07.2026 erreichbar und
    jetzt auch mit Token (`/api/pos/mapping/{connectionId}/articles`, `/api/{erpId}/products`). Am Zugang liegt die
    Leere nicht. Frage 2 aus „Drei `core`-Tabellen mit null Zeilen" (14.08.2026) ist die eigentliche Entscheidung.
+   **Nachtrag 19.11.2026 (`fn-probe`):** Alle 32 Anbindungen von Wilma Wunder sind `amadeus`; drei gemessen: 35,0 %,
+   49,4 % und 57,6 % der Kassenartikel tragen ein Rezept, PLU numerisch und je Anbindung eindeutig. Warenstamm in
+   Seiten zu 20 (746 und 97 Produkte bei zwei Kostenstellen). Füllbar ist beides; offen ist die Entscheidung und der
+   Umsatzanteil, den die zugeordneten Artikel tragen.
 7. **Der Token-Inhaber ersetzt das Testtoken** („CF Analytics", Id 179). Soll der Importer ein Token nutzen, gehört es
    in eine Umgebungsvariable, nie in `raw`, Log oder Messdatei (Regel 2); dann je Marke ein Token.
 8. ~~**Host des FoodNotify-MCP-Servers** unbekannt (`api3…/mcp`, `connect…/mcp` → 403 „Invalid Host header").~~
@@ -2819,9 +2823,15 @@ heißt) und `docs/foodnotify-api-inventar-intern-2026-11.md`. Gemessen ist nur W
     (Sitzungsmessung, ein Betrieb, Werte nicht gelesen). Am 27.07.2026 scheiterten 100 % der Stichproben
     (`foodnotify-api-inventar.md` §8a). Ein Hinweis, kein Befund — eine eigene Messung über mehrere Kostenstellen und
     die Kostenanalyse dagegen.
+    **Nachtrag 19.11.2026 (`payloads/foodnotify-2026-11/fn-probe-2026-11-19.md`):** Nein — der Verkaufsimport
+    **steht seit 31.08.2026**. Bei zwei Kostenstellen (11035, 12066), Sortierung `timeCreated DESC`, ist der jüngste
+    Verkauf vom 31.08.2026; die vorhandenen stehen sauber auf `finish`. Als Quelle unbrauchbar. Nicht gemessen:
+    andere Kostenstellen und Marken.
 14. **Taugt `link-targets.updatedAt` als Änderungsfilter für den Rezept-Umlauf (`0134`)?** 13.253 Rezepte, `updatedAt`
     von 19.10.2022 bis 17.11.2026. Prüfen: bewegt sich `updatedAt`, wenn sich nur eine Zutat ändert? (gegen zwei
     Abrufe desselben Rezepts in `raw.api_antwort`).
+    **Nachtrag 19.11.2026:** nicht beantwortet — `link-targets` lief im `fn-probe` zweimal in die 120-s-Grenze
+    (nachts; tagsüber am 18.11. rund 11 s). Bei Tag wiederholen.
 15. **Lieferte `/api/recipes` schon vor dem 09.11.2026 die Form von `/api/recipe-viewer/recipes`** (`archived` je
     Eintrag, `totalItems`)? Gegen die ältesten `fn:rezepte`-Antworten in `raw.api_antwort` prüfen; hängt mit 4a
     (Rezepturen, 15.10.2026) zusammen.
