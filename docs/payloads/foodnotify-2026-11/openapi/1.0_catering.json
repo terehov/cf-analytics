@@ -1,0 +1,2738 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Catering",
+        "version": "v1.0"
+    },
+    "paths": {
+        "/api/1.0/catering/consumerGroups": {
+            "get": {
+                "summary": "Get all ConsumerGroups.",
+                "operationId": "get_api_catering_consumer_groups_index",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/consumerGroups/{id}": {
+            "get": {
+                "summary": "Get single ConsumerGroup.",
+                "operationId": "get_api_catering_consumer_groups_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "put": {
+                "summary": "Update ConsumerGroup.",
+                "operationId": "put_api_catering_consumer_groups_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/consumerGroups/event/{eventId}": {
+            "get": {
+                "summary": "Get ConsumerGroups for Event.",
+                "operationId": "get_api_catering_consumer_groups_for_event",
+                "parameters": [
+                    {
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/consumerGroups/{id}/event/{eventId}": {
+            "post": {
+                "summary": "Add or update ConsumerGroup on Event.",
+                "operationId": "post_api_catering_consumer_groups_add_to_event",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Remove ConsumerGroup from Event.",
+                "operationId": "delete_api_catering_consumer_groups_remove_from_event",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/customers": {
+            "get": {
+                "summary": "Get all customers.",
+                "operationId": "get_api_catering_customers_index",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "summary": "Create Customer.",
+                "operationId": "post_api_catering_customers_create",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/customers/{id}": {
+            "get": {
+                "summary": "Get single customer.",
+                "operationId": "get_api_catering_customers_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "put": {
+                "summary": "Update Customer.",
+                "operationId": "put_api_catering_customers_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Delete Customer.",
+                "operationId": "delete_api_catering_customers_delete",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/drinks/event/{eventId}": {
+            "get": {
+                "summary": "Get drinks for event.",
+                "operationId": "get_api_catering_drinks_index",
+                "parameters": [
+                    {
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/drinks/event/{eventId}/byDate": {
+            "get": {
+                "summary": "Get drinks for event grouped by date.",
+                "operationId": "get_api_catering_drinks_by_date",
+                "parameters": [
+                    {
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/drinks/{id}": {
+            "get": {
+                "summary": "Get single Drink.",
+                "operationId": "get_api_catering_drinks_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "put": {
+                "summary": "Update Drink.",
+                "operationId": "put_api_catering_drinks_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Delete Drink.",
+                "operationId": "delete_api_catering_drinks_delete",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/drinks/recipe/{recipeId}": {
+            "post": {
+                "summary": "Create Drink from Recipe.",
+                "operationId": "post_api_catering_drinks_create",
+                "parameters": [
+                    {
+                        "name": "recipeId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/drinks/search": {
+            "post": {
+                "summary": "Search Drinks.",
+                "operationId": "post_api_catering_drinks_search",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/drinkGroups/event/{eventId}": {
+            "get": {
+                "summary": "Get DrinkGroups for event.",
+                "operationId": "get_api_catering_drink_groups_index",
+                "parameters": [
+                    {
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "summary": "Create new DrinkGroup.",
+                "operationId": "post_api_catering_drink_groups_create",
+                "parameters": [
+                    {
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/drinkGroups/{id}": {
+            "get": {
+                "summary": "Get single DrinkGroup.",
+                "operationId": "get_api_catering_drink_groups_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "put": {
+                "summary": "Update DrinkGroup.",
+                "operationId": "put_api_catering_drink_groups_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Delete DrinkGroup (CAUTION! This will delete all DrinkSubgroups belongs to current DrinkGroup and all Drinks in subgroups).",
+                "operationId": "delete_api_catering_drink_groups_delete",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/drinkGroups/search": {
+            "post": {
+                "summary": "Search DrinkGroups.",
+                "operationId": "post_api_catering_drink_groups_search",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/drinkGroups/{id}/clone": {
+            "post": {
+                "summary": "Clone DrinkGroup.",
+                "operationId": "post_api_catering_drink_groups_clone",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/drinkGroups/createMealGroups": {
+            "post": {
+                "summary": "Create MealGroups from DrinkGroups.",
+                "operationId": "post_api_catering_drink_groups_create_meal_groups",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/drinkGroups/createEquipmentGroups": {
+            "post": {
+                "summary": "Create EquipmentGroups from DrinkGroups.",
+                "operationId": "post_api_catering_drink_groups_create_equip_groups",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/drinkGroups/event/{eventId}/copyToMealGroups": {
+            "post": {
+                "summary": "Copy all DrinkGroups from event to MealGroups.",
+                "operationId": "post_api_catering_drink_groups_copy_to_meal_groups",
+                "parameters": [
+                    {
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/drinkGroups/event/{eventId}/copyToEquipmentGroups": {
+            "post": {
+                "summary": "Copy all DrinkGroups from event to EquipmentGroups.",
+                "operationId": "post_api_catering_drink_groups_copy_to_equip_groups",
+                "parameters": [
+                    {
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/drinkSubgroups/event/{eventId}": {
+            "get": {
+                "summary": "Get DrinkSubgroups for event.",
+                "operationId": "get_api_catering_drink_subgroups_index",
+                "parameters": [
+                    {
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "summary": "Create new DrinkSubgroup.",
+                "operationId": "post_api_catering_drink_subgroups_create",
+                "parameters": [
+                    {
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/drinkSubgroups/{id}": {
+            "get": {
+                "summary": "Get single DrinkSubgroup.",
+                "operationId": "get_api_catering_drink_subgroups_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "put": {
+                "summary": "Update DrinkSubgroup.",
+                "operationId": "put_api_catering_drink_subgroups_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Delete DrinkSubgroup (CAUTION! This will delete all Drinks in Subgroup).",
+                "operationId": "delete_api_catering_drink_subgroups_delete",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/drinkSubgroups/search": {
+            "post": {
+                "summary": "Search DrinkSubgroups.",
+                "operationId": "post_api_catering_drink_subgroups_search",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/drinkSubgroups/{id}/clone": {
+            "post": {
+                "summary": "Clone DrinkSubgroup.",
+                "operationId": "post_api_catering_drink_subgroups_clone",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/equipment/event/{eventId}": {
+            "get": {
+                "summary": "Get catering equipment for event.",
+                "operationId": "get_api_catering_equipment_index",
+                "parameters": [
+                    {
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/equipment/{id}": {
+            "get": {
+                "summary": "Get single catering equipment.",
+                "operationId": "get_api_catering_equipment_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "put": {
+                "summary": "Update Equipment.",
+                "operationId": "put_api_catering_equipment_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Delete catering equipment.",
+                "operationId": "delete_api_catering_equipment_delete",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/equipment": {
+            "post": {
+                "summary": "Create Equipment.",
+                "operationId": "post_api_catering_event_equipment_store",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/equipmentGroups/event/{eventId}": {
+            "get": {
+                "summary": "Get EquipmentGroups for event.",
+                "operationId": "get_api_catering_equipment_groups_index",
+                "parameters": [
+                    {
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "summary": "Create new EquipmentGroup.",
+                "operationId": "post_api_catering_equipment_groups_create",
+                "parameters": [
+                    {
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/equipmentGroups/{id}": {
+            "get": {
+                "summary": "Get single EquipmentGroup.",
+                "operationId": "get_api_catering_equipment_groups_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "put": {
+                "summary": "Update EquipmentGroup.",
+                "operationId": "put_api_catering_equipment_groups_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Delete EquipmentGroup (CAUTION! This will delete all EquipmentSubgroups belongs to current EquipmentGroup and all Equipments in subgroups).",
+                "operationId": "delete_api_catering_equipment_groups_delete",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/equipmentGroups/search": {
+            "post": {
+                "summary": "Search EquipmentGroups.",
+                "operationId": "post_api_catering_equipment_groups_search",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/equipmentGroups/{id}/clone": {
+            "post": {
+                "summary": "Clone EquipmentGroup.",
+                "operationId": "post_api_catering_equipment_groups_clone",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/equipmentGroups/createMealGroups": {
+            "post": {
+                "summary": "Create MealGroups from EquipmentGroups.",
+                "operationId": "post_api_catering_equipment_groups_create_meal_groups",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/equipmentGroups/createDrinkGroups": {
+            "post": {
+                "summary": "Create DrinkGroups from EquipmentGroups.",
+                "operationId": "post_api_catering_equipment_groups_create_drink_groups",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/equipmentGroups/event/{eventId}/copyToMealGroups": {
+            "post": {
+                "summary": "Copy all equipment groups from event to meal groups.",
+                "operationId": "post_api_catering_event_equipment_groups_copy_to_meal_groups",
+                "parameters": [
+                    {
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/equipmentGroups/event/{eventId}/copyToDrinkGroups": {
+            "post": {
+                "summary": "Copy all equipment groups from event to drink groups.",
+                "operationId": "post_api_catering_event_equipment_groups_copy_to_drink_groups",
+                "parameters": [
+                    {
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/equipmentSubgroups/event/{eventId}": {
+            "get": {
+                "summary": "Get EquipmentSubgroups for event.",
+                "operationId": "get_api_catering_equipment_subgroups_index",
+                "parameters": [
+                    {
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "summary": "Create new EquipmentSubgroup.",
+                "operationId": "post_api_catering_equipment_subgroups_create",
+                "parameters": [
+                    {
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/equipmentSubgroups/{id}": {
+            "get": {
+                "summary": "Get single EquipmentSubgroup.",
+                "operationId": "get_api_catering_equipment_subgroups_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "put": {
+                "summary": "Update EquipmentSubgroup.",
+                "operationId": "put_api_catering_equipment_subgroups_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Delete EquipmentSubgroup (CAUTION! This will delete all Equipments in Subgroup).",
+                "operationId": "delete_api_catering_equipment_subgroups_delete",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/equipmentSubgroups/search": {
+            "post": {
+                "summary": "Search EquipmentSubgroups.",
+                "operationId": "post_api_catering_equipment_subgroups_search",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/equipmentSubgroups/{id}/clone": {
+            "post": {
+                "summary": "Clone EquipmentSubgroup.",
+                "operationId": "post_api_catering_equipment_subgroups_clone",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/events": {
+            "get": {
+                "summary": "Get all events.",
+                "operationId": "get_api_catering_events_index",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "summary": "Create Event.",
+                "operationId": "post_api_catering_events_create",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/events/{id}": {
+            "get": {
+                "summary": "Get single event.",
+                "operationId": "get_api_catering_events_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "put": {
+                "summary": "Update Event.",
+                "operationId": "put_api_catering_events_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Delete Event.",
+                "operationId": "delete_api_catering_events_delete",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/events/search": {
+            "post": {
+                "summary": "Search Events.",
+                "operationId": "post_api_catering_events_search",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/events/search/dateRange": {
+            "post": {
+                "summary": "Filter events by date range.",
+                "operationId": "post_api_catering_events_search_date_range",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/events/search/filters": {
+            "post": {
+                "summary": "Multiple filters.",
+                "operationId": "post_api_catering_events_search_filters",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/events/{id}/search/recipes": {
+            "post": {
+                "summary": "Search Recipes (in Event CostCenter).",
+                "operationId": "post_api_catering_events_search_recipes",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/events/{id}/dateGroups": {
+            "get": {
+                "summary": "Get Event DateGroups.",
+                "operationId": "get_api_catering_events_date_groups",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/events/{id}/allergens": {
+            "get": {
+                "summary": "Get Event Allergens.",
+                "operationId": "get_api_catering_events_allergens",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/events/{id}/additives": {
+            "get": {
+                "summary": "Get Event Additives.",
+                "operationId": "get_api_catering_events_additives",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/events/{id}/additionals": {
+            "get": {
+                "summary": "Get Event Additionals.",
+                "operationId": "get_api_catering_events_additionals",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/events-recipes": {
+            "get": {
+                "summary": "Get all event recipes.",
+                "operationId": "get_api_catering_event_recipes_list",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/events-recipes/event/{eventId}": {
+            "get": {
+                "summary": "Get EventRecipes for event id.",
+                "operationId": "get_api_catering_event_recipe_detail",
+                "parameters": [
+                    {
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/eventTypes": {
+            "get": {
+                "summary": "Get all EventTypes.",
+                "operationId": "get_api_catering_event_types_index",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "summary": "Create new EventType.",
+                "operationId": "post_api_catering_event_types_create",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/eventTypes/{id}": {
+            "get": {
+                "summary": "Get single EventType.",
+                "operationId": "get_api_catering_event_types_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "put": {
+                "summary": "Update EventType.",
+                "operationId": "put_api_catering_event_types_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Delete EventType.",
+                "operationId": "delete_api_catering_event_types_delete",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/locations": {
+            "get": {
+                "summary": "Get all locations.",
+                "operationId": "get_api_catering_locations_index",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "summary": "Create new Location.",
+                "operationId": "post_api_catering_locations_create",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/locations/{id}": {
+            "get": {
+                "summary": "Get single location.",
+                "operationId": "get_api_catering_locations_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "put": {
+                "summary": "Update Location.",
+                "operationId": "put_api_catering_locations_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Delete Location.",
+                "operationId": "delete_api_catering_locations_delete",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/locations/{id}/locationType/{typeId}": {
+            "put": {
+                "summary": "Add Location Type.",
+                "operationId": "put_api_catering_locations_add_type",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "typeId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Remove Location Type.",
+                "operationId": "delete_api_catering_locations_delete_type",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "typeId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/locations/search": {
+            "post": {
+                "summary": "Search Locations.",
+                "operationId": "post_api_catering_locations_search",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/locations/{id}/image": {
+            "post": {
+                "summary": "Add image and thumbnail to Location. Accept form with file upload.",
+                "operationId": "post_api_catering_locations_image_add",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Remove image from Location.",
+                "operationId": "delete_api_catering_locations_image_remove",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/locationTypes": {
+            "get": {
+                "summary": "Get all Location Types.",
+                "operationId": "get_api_catering_location_types_index",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/meals/event/{eventId}": {
+            "get": {
+                "summary": "Get meals for event.",
+                "operationId": "get_api_catering_meals_index",
+                "parameters": [
+                    {
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/meals/event/{eventId}/byDate": {
+            "get": {
+                "summary": "Get meals for event grouped by date.",
+                "operationId": "get_api_catering_meals_by_date",
+                "parameters": [
+                    {
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/meals/{id}": {
+            "get": {
+                "summary": "Get single Meal.",
+                "operationId": "get_api_catering_meals_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "put": {
+                "summary": "Update Meal.",
+                "operationId": "put_api_catering_meals_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Delete Meal.",
+                "operationId": "delete_api_catering_meals_delete",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/meals/recipe/{recipeId}": {
+            "post": {
+                "summary": "Create Meal from Recipe.",
+                "operationId": "post_api_catering_meals_create",
+                "parameters": [
+                    {
+                        "name": "recipeId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/meals/search": {
+            "post": {
+                "summary": "Search Meals.",
+                "operationId": "post_api_catering_meals_search",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/meals/{id}/weights": {
+            "get": {
+                "summary": "Get Meal weights.",
+                "operationId": "get_api_catering_meals_weights",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/mealGroups/event/{eventId}": {
+            "get": {
+                "summary": "Get MealGroups for event.",
+                "operationId": "get_api_catering_meal_groups_index",
+                "parameters": [
+                    {
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "summary": "Create new MealGroup.",
+                "operationId": "post_api_catering_meal_groups_create",
+                "parameters": [
+                    {
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/mealGroups/{id}": {
+            "get": {
+                "summary": "Get single MealGroup.",
+                "operationId": "get_api_catering_meal_groups_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "put": {
+                "summary": "Update MealGroup.",
+                "operationId": "put_api_catering_meal_groups_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Delete MealGroup (CAUTION! This will delete all MealSubgroups belongs to current MealGroup and all Meals in subgroups).",
+                "operationId": "delete_api_catering_meal_groups_delete",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/mealGroups/search": {
+            "post": {
+                "summary": "Search MealGroups.",
+                "operationId": "post_api_catering_meal_groups_search",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/mealGroups/{id}/clone": {
+            "post": {
+                "summary": "Clone MealGroup.",
+                "operationId": "post_api_catering_meal_groups_clone",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/mealGroups/createDrinkGroups": {
+            "post": {
+                "summary": "Create DrinkGroups from MealGroups.",
+                "operationId": "post_api_catering_meal_groups_create_drink_groups",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/mealGroups/createEquipmentGroups": {
+            "post": {
+                "summary": "Create EquipmentGroups from MealGroups.",
+                "operationId": "post_api_catering_meal_groups_create_equip_groups",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/mealGroups/event/{eventId}/copyToDrinkGroups": {
+            "post": {
+                "summary": "Copy all MealGroups from event to DrinkGroups.",
+                "operationId": "post_api_catering_meal_groups_copy_to_drink_groups",
+                "parameters": [
+                    {
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/mealGroups/event/{eventId}/copyToEquipmentGroups": {
+            "post": {
+                "summary": "Copy all MealGroups from event to EquipmentGroups.",
+                "operationId": "post_api_catering_meal_groups_copy_to_equip_groups",
+                "parameters": [
+                    {
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/mealSubgroups/event/{eventId}": {
+            "get": {
+                "summary": "Get MealSubgroups for event.",
+                "operationId": "get_api_catering_meal_subgroups_index",
+                "parameters": [
+                    {
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "summary": "Create new MealSubgroup.",
+                "operationId": "post_api_catering_meal_subgroups_create",
+                "parameters": [
+                    {
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/mealSubgroups/{id}": {
+            "get": {
+                "summary": "Get single MealSubgroup.",
+                "operationId": "get_api_catering_meal_subgroups_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "put": {
+                "summary": "Update MealSubgroup.",
+                "operationId": "put_api_catering_meal_subgroups_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Delete MealSubgroup (CAUTION! This will delete all Meals in Subgroup).",
+                "operationId": "delete_api_catering_meal_subgroups_delete",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/mealSubgroups/search": {
+            "post": {
+                "summary": "Search MealSubgroups.",
+                "operationId": "post_api_catering_meal_subgroups_search",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/mealSubgroups/{id}/clone": {
+            "post": {
+                "summary": "Clone MealSubgroup.",
+                "operationId": "post_api_catering_meal_subgroups_clone",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/recipeBlacklist": {
+            "get": {
+                "summary": "List RecipeBlacklist.",
+                "operationId": "get_api_catering_recipe_blacklist_index",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "summary": "Create RecipeBlacklist.",
+                "operationId": "post_api_catering_recipe_blacklist_create",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/recipeBlacklist/{id}": {
+            "get": {
+                "summary": "Get one RecipeBlacklist.",
+                "operationId": "get_api_catering_recipe_blacklist_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "put": {
+                "summary": "Update RecipeBlacklist.",
+                "operationId": "put_api_catering_recipe_blacklist_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Delete RecipeBlacklist.",
+                "operationId": "delete_api_catering_recipe_blacklist_delete",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/recipeBlacklist/search": {
+            "post": {
+                "summary": "Search RecipeBlacklists.",
+                "operationId": "post_api_catering_recipe_blacklist_search",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/recipeCategoryBlacklist": {
+            "get": {
+                "summary": "List RecipeCategoryBlacklist.",
+                "operationId": "get_api_catering_recipe_category_blacklist_index",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "summary": "Create RecipeCategoryBlacklist.",
+                "operationId": "post_api_catering_recipe_category_blacklist_create",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/recipeCategoryBlacklist/{id}": {
+            "get": {
+                "summary": "Get one RecipeCategoryBlacklist.",
+                "operationId": "get_api_catering_recipe_category_blacklist_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "put": {
+                "summary": "Update RecipeCategoryBlacklist.",
+                "operationId": "put_api_catering_recipe_category_blacklist_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Delete RecipeCategoryBlacklist.",
+                "operationId": "delete_api_catering_recipe_category_blacklist_delete",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/recipeCategoryBlacklist/search": {
+            "post": {
+                "summary": "Search RecipeCategoryBlacklists.",
+                "operationId": "post_api_catering_recipe_category_blacklist_search",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/roles": {
+            "get": {
+                "summary": "Get All Roles.",
+                "operationId": "get_api_catering_roles_index",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "summary": "Create Role.",
+                "operationId": "post_api_catering_roles_create",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/roles/{id}": {
+            "get": {
+                "summary": "Get one Role.",
+                "operationId": "get_api_catering_roles_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "put": {
+                "summary": "Update Role.",
+                "operationId": "put_api_catering_roles_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Delete Role.",
+                "operationId": "delete_api_catering_roles_delete",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/roles/search": {
+            "post": {
+                "summary": "Search Roles.",
+                "operationId": "post_api_catering_roles_search",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/roleOptions": {
+            "get": {
+                "summary": "Get all RoleOptions.",
+                "operationId": "get_api_catering_role_options_index",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/roleOptionValues": {
+            "put": {
+                "summary": "Update RoleOptionValue.",
+                "operationId": "put_api_catering_role_option_values_update",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/serviceTypes": {
+            "get": {
+                "summary": "Get all Service Types.",
+                "operationId": "get_api_catering_service_types_index",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "summary": "Create new Service Type.",
+                "operationId": "post_api_catering_service_types_create",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/serviceTypes/{id}": {
+            "get": {
+                "summary": "Get single Service Type.",
+                "operationId": "get_api_catering_service_types_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "put": {
+                "summary": "Update Service Type.",
+                "operationId": "put_api_catering_service_types_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Delete Service Type.",
+                "operationId": "delete_api_catering_service_types_delete",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/serviceTypes/search": {
+            "post": {
+                "summary": "Search Service Types.",
+                "operationId": "post_api_catering_service_types_search",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/staff": {
+            "get": {
+                "summary": "Get all staff.",
+                "operationId": "get_api_catering_staff_index",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "summary": "Create Staff.",
+                "operationId": "post_api_catering_staff_create",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/staff/{id}": {
+            "get": {
+                "summary": "Get single staff.",
+                "operationId": "get_api_catering_staff_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "put": {
+                "summary": "Update Staff.",
+                "operationId": "put_api_catering_staff_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Delete Staff.",
+                "operationId": "delete_api_catering_staff_delete",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/staff/search": {
+            "post": {
+                "summary": "Search Customers.",
+                "operationId": "post_api_catering_customers_search",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/staff/event/{eventId}": {
+            "post": {
+                "summary": "Assign Staff to Event.",
+                "operationId": "post_api_catering_staff_to_event",
+                "parameters": [
+                    {
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/staffGroups/event/{id}": {
+            "get": {
+                "summary": "Get StaffGroups for event.",
+                "operationId": "get_api_catering_staff_groups_index",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/staffGroups": {
+            "post": {
+                "summary": "Create new StaffGroup.",
+                "operationId": "post_api_catering_staff_groups_create",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/staffGroups/{id}": {
+            "get": {
+                "summary": "Get one StaffGroup.",
+                "operationId": "get_api_catering_staff_groups_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "put": {
+                "summary": "Update StaffGroup.",
+                "operationId": "put_api_catering_staff_groups_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Delete StaffGroup.",
+                "operationId": "delete_api_catering_staff_groups_delete",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/staffGroups/search": {
+            "post": {
+                "summary": "Search StaffGroups.",
+                "operationId": "post_api_catering_staff_groups_search",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/staffGroupStaff": {
+            "put": {
+                "summary": "Update StaffGroupStaff (Update Team member(s) in Team Group).",
+                "operationId": "put_api_catering_staff_group_staff_update",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "summary": "Create StaffGroupStaff (Add Team member to Team Group).",
+                "operationId": "post_api_catering_staff_group_staff_create",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/catering/staffGroupStaff/{id}": {
+            "delete": {
+                "summary": "Delete StaffGroupStaff (Delete Team member from Team Group).",
+                "operationId": "delete_api_catering_staff_group_staff_delete",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        }
+    },
+    "security": [
+        {
+            "Bearer": []
+        }
+    ]
+}

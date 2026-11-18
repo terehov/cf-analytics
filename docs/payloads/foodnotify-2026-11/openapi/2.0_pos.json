@@ -1,0 +1,1959 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Pos",
+        "version": "v2.0"
+    },
+    "paths": {
+        "/api/2.0/pos/accounts/{accountIdentifier}/product-groups": {
+            "get": {
+                "tags": [
+                    "POS read-back"
+                ],
+                "summary": "List the product groups stored for the POS account.",
+                "operationId": "get_api.pos.accounts.product-groups.collection",
+                "parameters": [
+                    {
+                        "name": "accountIdentifier",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Page number, starting at 1 (max. 1000000).",
+                        "required": false,
+                        "schema": {
+                            "description": "Page number, starting at 1 (max. 1000000).",
+                            "type": "integer",
+                            "default": 1,
+                            "maximum": 1000000,
+                            "minimum": 1,
+                            "example": 1
+                        },
+                        "example": 1
+                    },
+                    {
+                        "name": "perPage",
+                        "in": "query",
+                        "description": "Items per page (max. 200).",
+                        "required": false,
+                        "schema": {
+                            "description": "Items per page (max. 200).",
+                            "type": "integer",
+                            "default": 50,
+                            "maximum": 200,
+                            "minimum": 1,
+                            "example": 50
+                        },
+                        "example": 50
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "One page of stored product groups, ordered by id.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProductGroupListResource"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "No access to this POS account, or the token lacks the pos:read scope."
+                    },
+                    "404": {
+                        "description": "Unknown POS account."
+                    },
+                    "422": {
+                        "description": "Validation errors",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "errors": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "propertyPath": {
+                                                        "type": "string",
+                                                        "example": "dateOfInvoices"
+                                                    },
+                                                    "message": {
+                                                        "type": "string",
+                                                        "example": "The value \"2024-13-01\" is not a valid date."
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/2.0/pos/accounts/{accountIdentifier}/products": {
+            "get": {
+                "tags": [
+                    "POS read-back"
+                ],
+                "summary": "List the products stored for the POS account, each with the recipe it is linked to.",
+                "operationId": "get_api.pos.accounts.products.collection",
+                "parameters": [
+                    {
+                        "name": "accountIdentifier",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "absentFromFeed",
+                        "in": "query",
+                        "description": "true: only products missing from your latest product sync; false: only products still in it; omit for both.",
+                        "required": false,
+                        "schema": {
+                            "description": "true: only products missing from your latest product sync; false: only products still in it; omit for both.",
+                            "type": "boolean",
+                            "example": false,
+                            "nullable": true
+                        },
+                        "example": false
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Page number, starting at 1 (max. 1000000).",
+                        "required": false,
+                        "schema": {
+                            "description": "Page number, starting at 1 (max. 1000000).",
+                            "type": "integer",
+                            "default": 1,
+                            "maximum": 1000000,
+                            "minimum": 1,
+                            "example": 1
+                        },
+                        "example": 1
+                    },
+                    {
+                        "name": "perPage",
+                        "in": "query",
+                        "description": "Items per page (max. 200).",
+                        "required": false,
+                        "schema": {
+                            "description": "Items per page (max. 200).",
+                            "type": "integer",
+                            "default": 50,
+                            "maximum": 200,
+                            "minimum": 1,
+                            "example": 50
+                        },
+                        "example": 50
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "One page of stored products, ordered by id.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RemoteProductListResource"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "No access to this POS account, or the token lacks the pos:read scope."
+                    },
+                    "404": {
+                        "description": "Unknown POS account."
+                    },
+                    "422": {
+                        "description": "Validation errors",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "errors": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "propertyPath": {
+                                                        "type": "string",
+                                                        "example": "dateOfInvoices"
+                                                    },
+                                                    "message": {
+                                                        "type": "string",
+                                                        "example": "The value \"2024-13-01\" is not a valid date."
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/2.0/pos/accounts/{accountIdentifier}/invoices": {
+            "get": {
+                "tags": [
+                    "POS read-back"
+                ],
+                "summary": "List the invoices stored for the POS account, with their items, newest business day first.",
+                "description": "A cancellation shows up as items with a negative quantity.",
+                "operationId": "get_api.pos.accounts.invoices.collection",
+                "parameters": [
+                    {
+                        "name": "accountIdentifier",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "businessDayFrom",
+                        "in": "query",
+                        "description": "Only invoices booked on or after this business day, Y-m-d.",
+                        "required": false,
+                        "schema": {
+                            "description": "Only invoices booked on or after this business day, Y-m-d.",
+                            "type": "string",
+                            "example": "2023-07-01",
+                            "nullable": true
+                        },
+                        "example": "2023-07-01"
+                    },
+                    {
+                        "name": "businessDayTo",
+                        "in": "query",
+                        "description": "Only invoices booked on or before this business day, Y-m-d.",
+                        "required": false,
+                        "schema": {
+                            "description": "Only invoices booked on or before this business day, Y-m-d.",
+                            "type": "string",
+                            "example": "2023-07-31",
+                            "nullable": true
+                        },
+                        "example": "2023-07-31"
+                    },
+                    {
+                        "name": "externalIds[]",
+                        "in": "query",
+                        "description": "Only the invoices with these invoiceIds (external ids), e.g. externalIds[]=INV-1&externalIds[]=INV-2 (max. 200).",
+                        "required": false,
+                        "schema": {
+                            "description": "Only the invoices with these invoiceIds (external ids), e.g. externalIds[]=INV-1&externalIds[]=INV-2 (max. 200).",
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "default": [],
+                            "maxItems": 200
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Page number, starting at 1 (max. 1000000).",
+                        "required": false,
+                        "schema": {
+                            "description": "Page number, starting at 1 (max. 1000000).",
+                            "type": "integer",
+                            "default": 1,
+                            "maximum": 1000000,
+                            "minimum": 1,
+                            "example": 1
+                        },
+                        "example": 1
+                    },
+                    {
+                        "name": "perPage",
+                        "in": "query",
+                        "description": "Items per page (max. 200).",
+                        "required": false,
+                        "schema": {
+                            "description": "Items per page (max. 200).",
+                            "type": "integer",
+                            "default": 50,
+                            "maximum": 200,
+                            "minimum": 1,
+                            "example": 50
+                        },
+                        "example": 50
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "One page of stored invoices.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InvoiceListResource"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "No access to this POS account, or the token lacks the pos:read scope."
+                    },
+                    "404": {
+                        "description": "Unknown POS account."
+                    },
+                    "422": {
+                        "description": "Validation errors",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "errors": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "propertyPath": {
+                                                        "type": "string",
+                                                        "example": "dateOfInvoices"
+                                                    },
+                                                    "message": {
+                                                        "type": "string",
+                                                        "example": "The value \"2024-13-01\" is not a valid date."
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/2.0/pos/vendors/fn-recipe/{accountIdentifier}/products": {
+            "get": {
+                "tags": [
+                    "FnRecipe"
+                ],
+                "summary": "List products synchronised from FoodNotify recipes for the connected location.",
+                "operationId": "get_api.pos.vendors.fn-recipe.products.collection",
+                "parameters": [
+                    {
+                        "name": "accountIdentifier",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "updated_since",
+                        "in": "query",
+                        "description": "Reserved \u2014 not yet publicly documented; subject to change. RFC 3339 timestamp, e.g. 2023-07-14T15:18:04+02:00.",
+                        "required": false,
+                        "deprecated": true,
+                        "schema": {
+                            "description": "Reserved \u2014 not yet publicly documented; subject to change. RFC 3339 timestamp, e.g. 2023-07-14T15:18:04+02:00.",
+                            "type": "string",
+                            "format": "date-time",
+                            "default": null,
+                            "nullable": true,
+                            "deprecated": true
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Collection of products available for the connected location.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProductCollectionResource2"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/2.0/pos/vendors/fn-recipe/{accountIdentifier}/product-groups": {
+            "get": {
+                "tags": [
+                    "FnRecipe"
+                ],
+                "summary": "List product groups synchronised from FoodNotify recipe categories for the connected location.",
+                "operationId": "get_api.pos.vendors.fn-recipe.product-groups.collection",
+                "parameters": [
+                    {
+                        "name": "accountIdentifier",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "updated_since",
+                        "in": "query",
+                        "description": "Reserved \u2014 not yet publicly documented; subject to change. RFC 3339 timestamp, e.g. 2023-07-14T15:18:04+02:00.",
+                        "required": false,
+                        "deprecated": true,
+                        "schema": {
+                            "description": "Reserved \u2014 not yet publicly documented; subject to change. RFC 3339 timestamp, e.g. 2023-07-14T15:18:04+02:00.",
+                            "type": "string",
+                            "format": "date-time",
+                            "default": null,
+                            "nullable": true,
+                            "deprecated": true
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Collection of product groups available for the connected location.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProductGroupCollectionResource2"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/2.0/pos/vendors/fn-recipe/{accountIdentifier}/invoices/{invoiceId}": {
+            "put": {
+                "tags": [
+                    "FnRecipe"
+                ],
+                "summary": "Push a single invoice from the POS terminal to FoodNotify.",
+                "description": "Idempotent on `invoiceId`: subsequent calls with the same id are a no-op\n\u2014 the previously stored payload is kept and not overwritten.",
+                "operationId": "put_api.pos.vendors.fn-recipe.invoices",
+                "parameters": [
+                    {
+                        "name": "accountIdentifier",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "invoiceId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InvoiceResource"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "422": {
+                        "description": "Validation errors",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "errors": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "propertyPath": {
+                                                        "type": "string",
+                                                        "example": "dateOfInvoices"
+                                                    },
+                                                    "message": {
+                                                        "type": "string",
+                                                        "example": "The value \"2024-13-01\" is not a valid date."
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/2.0/pos/vendors/restv2/{accountIdentifier}/products": {
+            "put": {
+                "tags": [
+                    "RestV2"
+                ],
+                "summary": "Replaces (default) all Products.",
+                "operationId": "put_api.pos.vendors.restv2.products.collection",
+                "parameters": [
+                    {
+                        "name": "accountIdentifier",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ProductCollectionResource"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/2.0/pos/vendors/restv2/{accountIdentifier}/product-groups": {
+            "put": {
+                "tags": [
+                    "RestV2"
+                ],
+                "summary": "Replaces (default) all Product Groups.",
+                "description": "Products that you do not send will be removed in our system.",
+                "operationId": "put_api.pos.vendors.restv2.product-groups.collection",
+                "parameters": [
+                    {
+                        "name": "accountIdentifier",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ProductGroupCollectionResource"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/2.0/pos/vendors/restv2/{accountIdentifier}/invoices/{invoiceId}": {
+            "put": {
+                "tags": [
+                    "RestV2"
+                ],
+                "summary": "Invoices.",
+                "operationId": "put_api.pos.vendors.restv2.invoices",
+                "parameters": [
+                    {
+                        "name": "accountIdentifier",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "invoiceId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InvoiceResource2"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "422": {
+                        "description": "Validation errors",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "errors": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "propertyPath": {
+                                                        "type": "string",
+                                                        "example": "dateOfInvoices"
+                                                    },
+                                                    "message": {
+                                                        "type": "string",
+                                                        "example": "The value \"2024-13-01\" is not a valid date."
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "PaginationPayload": {
+                "properties": {
+                    "page": {
+                        "description": "Page number, starting at 1 (max. 1000000).",
+                        "type": "integer",
+                        "default": 1,
+                        "maximum": 1000000,
+                        "minimum": 1,
+                        "example": 1
+                    },
+                    "perPage": {
+                        "description": "Items per page (max. 200).",
+                        "type": "integer",
+                        "default": 50,
+                        "maximum": 200,
+                        "minimum": 1,
+                        "example": 50
+                    }
+                },
+                "type": "object"
+            },
+            "RemoteProductListPayload": {
+                "properties": {
+                    "absentFromFeed": {
+                        "description": "true: only products missing from your latest product sync; false: only products still in it; omit for both.",
+                        "type": "boolean",
+                        "example": false,
+                        "nullable": true
+                    },
+                    "page": {
+                        "description": "Page number, starting at 1 (max. 1000000).",
+                        "type": "integer",
+                        "default": 1,
+                        "maximum": 1000000,
+                        "minimum": 1,
+                        "example": 1
+                    },
+                    "perPage": {
+                        "description": "Items per page (max. 200).",
+                        "type": "integer",
+                        "default": 50,
+                        "maximum": 200,
+                        "minimum": 1,
+                        "example": 50
+                    }
+                },
+                "type": "object"
+            },
+            "InvoiceListPayload": {
+                "properties": {
+                    "businessDayFrom": {
+                        "description": "Only invoices booked on or after this business day, Y-m-d.",
+                        "type": "string",
+                        "example": "2023-07-01",
+                        "nullable": true
+                    },
+                    "businessDayTo": {
+                        "description": "Only invoices booked on or before this business day, Y-m-d.",
+                        "type": "string",
+                        "example": "2023-07-31",
+                        "nullable": true
+                    },
+                    "externalIds": {
+                        "description": "Only the invoices with these invoiceIds (external ids), e.g. externalIds[]=INV-1&externalIds[]=INV-2 (max. 200).",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "default": [],
+                        "maxItems": 200
+                    },
+                    "page": {
+                        "description": "Page number, starting at 1 (max. 1000000).",
+                        "type": "integer",
+                        "default": 1,
+                        "maximum": 1000000,
+                        "minimum": 1,
+                        "example": 1
+                    },
+                    "perPage": {
+                        "description": "Items per page (max. 200).",
+                        "type": "integer",
+                        "default": 50,
+                        "maximum": 200,
+                        "minimum": 1,
+                        "example": 50
+                    }
+                },
+                "type": "object"
+            },
+            "InventoryFilterQuery": {
+                "properties": {
+                    "updated_since": {
+                        "description": "Reserved \u2014 not yet publicly documented; subject to change. RFC 3339 timestamp, e.g. 2023-07-14T15:18:04+02:00.",
+                        "type": "string",
+                        "format": "date-time",
+                        "default": null,
+                        "nullable": true,
+                        "deprecated": true
+                    }
+                },
+                "type": "object"
+            },
+            "InvoiceResource": {
+                "required": [
+                    "invoiceId",
+                    "invoiceNumber",
+                    "timeCreated",
+                    "saleLines"
+                ],
+                "properties": {
+                    "invoiceId": {
+                        "description": "The unique identifier of the invoice in the external system. Used as the **primary key for matching and deduplication** during import to prevent duplicate invoices.",
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "integer"
+                            }
+                        ]
+                    },
+                    "invoiceNumber": {
+                        "description": "The public invoice-number, not used to identify the invoice (no unique-check, just for display purposes).",
+                        "anyOf": [
+                            {
+                                "type": "integer",
+                                "example": 42
+                            },
+                            {
+                                "type": "string",
+                                "example": "R-2024-042"
+                            }
+                        ],
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "integer"
+                            }
+                        ]
+                    },
+                    "timeCreated": {
+                        "description": "**IMPORTANT:** The official invoice date-time from the external POS system. **Must include timezone information** in RFC 3339 (Atom) format. Examples: `2023-07-14T15:18:04+02:00` (with timezone offset) or `2023-07-14T15:18:04Z` (UTC). This is the business/legal invoice timestamp, not a technical creation timestamp.",
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2023-07-14T15:18:04+02:00",
+                        "x-importance": "high",
+                        "x-validation": "Must include timezone"
+                    },
+                    "saleLines": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/SaleLineResource"
+                        },
+                        "minItems": 1
+                    },
+                    "businessDay": {
+                        "description": "The business day to which this invoice belongs too. Date only \u2014 formatted as 'Y-m-d' (e.g. 2023-07-14).",
+                        "type": "string",
+                        "default": null,
+                        "example": "2023-07-14",
+                        "nullable": true
+                    },
+                    "isCancellation": {
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "previousInvoiceId": {
+                        "description": "Experimental: The external Id of the canceled invoice.",
+                        "default": null,
+                        "nullable": true,
+                        "anyOf": [
+                            {
+                                "type": "integer",
+                                "example": 12344
+                            },
+                            {
+                                "type": "string",
+                                "example": "INV-2024-000"
+                            }
+                        ],
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            {
+                                "type": "integer",
+                                "nullable": true
+                            }
+                        ]
+                    },
+                    "owner": {
+                        "description": "Information about the waiter",
+                        "default": null,
+                        "nullable": true,
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/StaffResource"
+                            }
+                        ]
+                    },
+                    "revenueCenter": {
+                        "description": "Information about the Revenue-Center",
+                        "default": null,
+                        "nullable": true,
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/RevenueCenterResource"
+                            }
+                        ]
+                    }
+                },
+                "type": "object"
+            },
+            "ProductCollectionResource": {
+                "required": [
+                    "products"
+                ],
+                "properties": {
+                    "products": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ProductResource"
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "ProductGroupCollectionResource": {
+                "required": [
+                    "productGroups"
+                ],
+                "properties": {
+                    "productGroups": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ProductGroupResource"
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "InvoiceResource2": {
+                "required": [
+                    "invoiceId",
+                    "invoiceNumber",
+                    "timeCreated",
+                    "saleLines"
+                ],
+                "properties": {
+                    "invoiceId": {
+                        "description": "The unique identifier of the invoice in the external system. Used as the **primary key for matching and deduplication** during import to prevent duplicate invoices.",
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "integer"
+                            }
+                        ]
+                    },
+                    "invoiceNumber": {
+                        "description": "The public invoice-number, not used to identify the invoice (no unique-check, just for display purposes).",
+                        "anyOf": [
+                            {
+                                "type": "integer",
+                                "example": 42
+                            },
+                            {
+                                "type": "string",
+                                "example": "R-2024-042"
+                            }
+                        ],
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "integer"
+                            }
+                        ]
+                    },
+                    "timeCreated": {
+                        "description": "**IMPORTANT:** The official invoice date-time from the external POS system. **Must include timezone information** in RFC 3339 (Atom) format. Examples: `2023-07-14T15:18:04+02:00` (with timezone offset) or `2023-07-14T15:18:04Z` (UTC). This is the business/legal invoice timestamp, not a technical creation timestamp.",
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2023-07-14T15:18:04+02:00",
+                        "x-importance": "high",
+                        "x-validation": "Must include timezone"
+                    },
+                    "saleLines": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/SaleLineResource2"
+                        },
+                        "minItems": 1
+                    },
+                    "businessDay": {
+                        "description": "The business day to which this invoice belongs too. Date only \u2014 formatted as 'Y-m-d' (e.g. 2023-07-14).",
+                        "type": "string",
+                        "default": null,
+                        "example": "2023-07-14",
+                        "nullable": true
+                    },
+                    "isCancellation": {
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "previousInvoiceId": {
+                        "description": "Experimental: The external Id of the canceled invoice.",
+                        "default": null,
+                        "nullable": true,
+                        "anyOf": [
+                            {
+                                "type": "integer",
+                                "example": 12344
+                            },
+                            {
+                                "type": "string",
+                                "example": "INV-2024-000"
+                            }
+                        ],
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            {
+                                "type": "integer",
+                                "nullable": true
+                            }
+                        ]
+                    },
+                    "owner": {
+                        "description": "Information about the waiter",
+                        "default": null,
+                        "nullable": true,
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/StaffResource2"
+                            }
+                        ]
+                    },
+                    "revenueCenter": {
+                        "description": "Information about the Revenue-Center",
+                        "default": null,
+                        "nullable": true,
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/RevenueCenterResource2"
+                            }
+                        ]
+                    }
+                },
+                "type": "object"
+            },
+            "ProductGroupListResource": {
+                "title": "PosProductGroupList",
+                "required": [
+                    "data",
+                    "pagination"
+                ],
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ProductGroupReadResource"
+                        }
+                    },
+                    "pagination": {
+                        "$ref": "#/components/schemas/PaginationMetaResource"
+                    }
+                },
+                "type": "object"
+            },
+            "RemoteProductListResource": {
+                "title": "PosRemoteProductList",
+                "required": [
+                    "data",
+                    "pagination"
+                ],
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/RemoteProductReadResource"
+                        }
+                    },
+                    "pagination": {
+                        "$ref": "#/components/schemas/PaginationMetaResource"
+                    }
+                },
+                "type": "object"
+            },
+            "InvoiceListResource": {
+                "title": "PosInvoiceList",
+                "required": [
+                    "data",
+                    "pagination"
+                ],
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/InvoiceReadResource"
+                        }
+                    },
+                    "pagination": {
+                        "$ref": "#/components/schemas/PaginationMetaResource"
+                    }
+                },
+                "type": "object"
+            },
+            "ProductCollectionResource2": {
+                "required": [
+                    "products"
+                ],
+                "properties": {
+                    "products": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ProductResource2"
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "ProductGroupCollectionResource2": {
+                "required": [
+                    "productGroups"
+                ],
+                "properties": {
+                    "productGroups": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ProductGroupResource2"
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "SaleLineResource": {
+                "required": [
+                    "id",
+                    "name",
+                    "quantity",
+                    "netPricePerItem",
+                    "vatRate",
+                    "productId"
+                ],
+                "properties": {
+                    "id": {
+                        "description": "The unique identifier of the invoice-item in the external system. Needs to be unique just within the invoice.",
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "integer"
+                            }
+                        ]
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "quantity": {
+                        "type": "number",
+                        "format": "float"
+                    },
+                    "netPricePerItem": {
+                        "description": "The net-price per single item. This is the price before tax is applied.",
+                        "type": "number",
+                        "format": "float"
+                    },
+                    "vatRate": {
+                        "description": "The vat-rate as floating point, e.g.: 0.19 for 19%.",
+                        "type": "number",
+                        "format": "float",
+                        "maximum": 1,
+                        "exclusiveMaximum": true,
+                        "minimum": 0
+                    },
+                    "productId": {
+                        "description": "The external product id referenced by this invoice line.",
+                        "anyOf": [
+                            {
+                                "type": "integer",
+                                "example": 5001
+                            },
+                            {
+                                "type": "string",
+                                "example": "PROD-COLA"
+                            }
+                        ],
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "integer"
+                            }
+                        ]
+                    },
+                    "plu": {
+                        "description": "Optional PLU code for the product.",
+                        "default": null,
+                        "nullable": true,
+                        "anyOf": [
+                            {
+                                "type": "integer",
+                                "example": 1001
+                            },
+                            {
+                                "type": "string",
+                                "example": "PLU-BURGER"
+                            }
+                        ],
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            {
+                                "type": "integer",
+                                "nullable": true
+                            }
+                        ]
+                    },
+                    "parentLineId": {
+                        "description": "Optional reference to a parent item within the same invoice. E.g.: for toppings.",
+                        "default": null,
+                        "nullable": true,
+                        "anyOf": [
+                            {
+                                "type": "integer",
+                                "example": 1
+                            },
+                            {
+                                "type": "string",
+                                "example": "ITEM-001"
+                            }
+                        ],
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            {
+                                "type": "integer",
+                                "nullable": true
+                            }
+                        ]
+                    },
+                    "affectsStock": {
+                        "description": "Describes if this invoice-line affected the stock of ingredients (in real world) this property is true, false otherwise.",
+                        "type": "boolean",
+                        "default": true
+                    },
+                    "voidReason": {
+                        "type": "string",
+                        "default": null,
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "StaffResource": {
+                "properties": {
+                    "ownerId": {
+                        "default": null,
+                        "nullable": true,
+                        "anyOf": [
+                            {
+                                "type": "integer",
+                                "example": 101
+                            },
+                            {
+                                "type": "string",
+                                "example": "WAITER-001"
+                            }
+                        ],
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            {
+                                "type": "integer",
+                                "nullable": true
+                            }
+                        ]
+                    },
+                    "name": {
+                        "type": "string",
+                        "default": null,
+                        "example": "Herbert",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "RevenueCenterResource": {
+                "properties": {
+                    "revenueCenterId": {
+                        "default": null,
+                        "nullable": true,
+                        "anyOf": [
+                            {
+                                "type": "integer",
+                                "example": 101
+                            },
+                            {
+                                "type": "string",
+                                "example": "KITCHEN-001"
+                            }
+                        ],
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            {
+                                "type": "integer",
+                                "nullable": true
+                            }
+                        ]
+                    },
+                    "name": {
+                        "type": "string",
+                        "default": null,
+                        "example": "Kitchen",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "ProductResource": {
+                "required": [
+                    "productId",
+                    "name",
+                    "isArchived"
+                ],
+                "properties": {
+                    "productId": {
+                        "description": "The unique identifier in the external system. Used as the **primary key for matching and deduplication** during import to prevent duplicates.",
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "integer"
+                            }
+                        ]
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string",
+                        "default": null,
+                        "nullable": true
+                    },
+                    "netPrice": {
+                        "title": "the net-price.",
+                        "type": "number",
+                        "format": "float",
+                        "default": null,
+                        "nullable": true
+                    },
+                    "vatRate": {
+                        "type": "number",
+                        "format": "float",
+                        "default": null,
+                        "maximum": 1,
+                        "exclusiveMaximum": true,
+                        "minimum": 0,
+                        "nullable": true
+                    },
+                    "plu": {
+                        "description": "**Required if** `invoice.item.productId` is not given, but `invoice.item.plu`.",
+                        "default": null,
+                        "nullable": true,
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            {
+                                "type": "integer",
+                                "nullable": true
+                            }
+                        ]
+                    },
+                    "productGroupId": {
+                        "default": null,
+                        "nullable": true,
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            {
+                                "type": "integer",
+                                "nullable": true
+                            }
+                        ]
+                    },
+                    "isArchived": {
+                        "type": "boolean"
+                    },
+                    "timeModified": {
+                        "description": "The datetime when the product was last updated in the external POS system. **Must include timezone information** in RFC 3339 (Atom) format. Examples: `2023-07-14T15:18:04+02:00` (with timezone offset) or `2023-07-14T15:18:04Z` (UTC).",
+                        "type": "string",
+                        "format": "date-time",
+                        "default": null,
+                        "example": "2023-07-14T15:18:04+02:00",
+                        "nullable": true,
+                        "x-importance": "high",
+                        "x-validation": "Must include timezone"
+                    }
+                },
+                "type": "object"
+            },
+            "ProductGroupResource": {
+                "required": [
+                    "productGroupId",
+                    "name"
+                ],
+                "properties": {
+                    "productGroupId": {
+                        "description": "The unique identifier in the external system. Used as the **primary key for matching and deduplication** during import to prevent duplicates.",
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "integer"
+                            }
+                        ]
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string",
+                        "default": null,
+                        "nullable": true
+                    },
+                    "vatRate": {
+                        "type": "number",
+                        "format": "float",
+                        "default": null,
+                        "maximum": 1,
+                        "exclusiveMaximum": true,
+                        "minimum": 0,
+                        "exclusiveMinimum": true,
+                        "nullable": true
+                    },
+                    "parentProductGroupId": {
+                        "default": null,
+                        "nullable": true,
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            {
+                                "type": "integer",
+                                "nullable": true
+                            }
+                        ]
+                    },
+                    "timeModified": {
+                        "type": "string",
+                        "format": "date-time",
+                        "default": null,
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "SaleLineResource2": {
+                "required": [
+                    "id",
+                    "name",
+                    "quantity",
+                    "netPricePerItem",
+                    "vatRate"
+                ],
+                "properties": {
+                    "id": {
+                        "description": "The unique identifier of the invoice-item in the external system. Needs to be unique just within the invoice.",
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "integer"
+                            }
+                        ]
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "quantity": {
+                        "type": "number",
+                        "format": "float"
+                    },
+                    "netPricePerItem": {
+                        "description": "The net-price per single item. This is the price before tax is applied.",
+                        "type": "number",
+                        "format": "float"
+                    },
+                    "vatRate": {
+                        "description": "The vat-rate as floating point, e.g.: 0.19 for 19%.",
+                        "type": "number",
+                        "format": "float",
+                        "maximum": 1,
+                        "exclusiveMaximum": true,
+                        "minimum": 0
+                    },
+                    "plu": {
+                        "description": "Either the PLU or the external product id must be given.",
+                        "default": null,
+                        "nullable": true,
+                        "anyOf": [
+                            {
+                                "type": "integer",
+                                "example": 1001
+                            },
+                            {
+                                "type": "string",
+                                "example": "PLU-BURGER"
+                            }
+                        ],
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            {
+                                "type": "integer",
+                                "nullable": true
+                            }
+                        ]
+                    },
+                    "productId": {
+                        "default": null,
+                        "nullable": true,
+                        "anyOf": [
+                            {
+                                "type": "integer",
+                                "example": 5001
+                            },
+                            {
+                                "type": "string",
+                                "example": "PROD-COLA"
+                            }
+                        ],
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            {
+                                "type": "integer",
+                                "nullable": true
+                            }
+                        ]
+                    },
+                    "parentLineId": {
+                        "description": "Optional reference to a parent item within the same invoice. E.g.: for toppings.",
+                        "default": null,
+                        "nullable": true,
+                        "anyOf": [
+                            {
+                                "type": "integer",
+                                "example": 1
+                            },
+                            {
+                                "type": "string",
+                                "example": "ITEM-001"
+                            }
+                        ],
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            {
+                                "type": "integer",
+                                "nullable": true
+                            }
+                        ]
+                    },
+                    "affectsStock": {
+                        "description": "Describes if this invoice-line affected the stock of ingredients (in real world) this property is true, false otherwise.",
+                        "type": "boolean",
+                        "default": true
+                    },
+                    "voidReason": {
+                        "type": "string",
+                        "default": null,
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "StaffResource2": {
+                "properties": {
+                    "ownerId": {
+                        "default": null,
+                        "nullable": true,
+                        "anyOf": [
+                            {
+                                "type": "integer",
+                                "example": 101
+                            },
+                            {
+                                "type": "string",
+                                "example": "WAITER-001"
+                            }
+                        ],
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            {
+                                "type": "integer",
+                                "nullable": true
+                            }
+                        ]
+                    },
+                    "name": {
+                        "type": "string",
+                        "default": null,
+                        "example": "Herbert",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "RevenueCenterResource2": {
+                "properties": {
+                    "revenueCenterId": {
+                        "default": null,
+                        "nullable": true,
+                        "anyOf": [
+                            {
+                                "type": "integer",
+                                "example": 101
+                            },
+                            {
+                                "type": "string",
+                                "example": "KITCHEN-001"
+                            }
+                        ],
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            {
+                                "type": "integer",
+                                "nullable": true
+                            }
+                        ]
+                    },
+                    "name": {
+                        "type": "string",
+                        "default": null,
+                        "example": "Kitchen",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "ProductGroupReadResource": {
+                "title": "PosProductGroupRead",
+                "required": [
+                    "id",
+                    "name"
+                ],
+                "properties": {
+                    "id": {
+                        "description": "Internal FoodNotify id of the stored product group.",
+                        "type": "integer",
+                        "example": 4711
+                    },
+                    "productGroupId": {
+                        "description": "The productGroupId you sent (external id).",
+                        "type": "string",
+                        "example": "PG-12",
+                        "nullable": true
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Drinks"
+                    },
+                    "description": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "PaginationMetaResource": {
+                "required": [
+                    "currentPage",
+                    "perPage",
+                    "totalItems",
+                    "totalPages"
+                ],
+                "properties": {
+                    "currentPage": {
+                        "title": "Current page number.",
+                        "type": "integer"
+                    },
+                    "perPage": {
+                        "title": "Number of items per page.",
+                        "type": "integer"
+                    },
+                    "totalItems": {
+                        "title": "Total number of items.",
+                        "type": "integer"
+                    },
+                    "totalPages": {
+                        "title": "Total number of pages.",
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "RemoteProductReadResource": {
+                "title": "PosProductRead",
+                "required": [
+                    "id"
+                ],
+                "properties": {
+                    "id": {
+                        "description": "Internal FoodNotify id of the stored product.",
+                        "type": "integer",
+                        "example": 98765
+                    },
+                    "productId": {
+                        "description": "The productId you sent (external id).",
+                        "type": "string",
+                        "example": "ART-1001",
+                        "nullable": true
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Wiener Schnitzel",
+                        "nullable": true
+                    },
+                    "description": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "netPrice": {
+                        "description": "Net sell price per item.",
+                        "type": "number",
+                        "format": "float",
+                        "example": 15.9,
+                        "nullable": true
+                    },
+                    "vatRate": {
+                        "description": "VAT rate as a fraction, e.g. 0.1 for 10%.",
+                        "type": "number",
+                        "format": "float",
+                        "example": 0.1,
+                        "nullable": true
+                    },
+                    "plu": {
+                        "type": "string",
+                        "example": "1001",
+                        "nullable": true
+                    },
+                    "productGroupId": {
+                        "description": "The productGroupId you sent (external id of the product group).",
+                        "type": "string",
+                        "example": "PG-12",
+                        "nullable": true
+                    },
+                    "timeModified": {
+                        "description": "The timeModified you sent. RFC 3339, UTC.",
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2023-07-14T13:18:04+00:00",
+                        "nullable": true
+                    },
+                    "absentFromFeedSince": {
+                        "description": "Set when the product was missing from a later product sync (PUT /products) and has not been sent again since; null while it is part of your feed. RFC 3339, UTC.",
+                        "type": "string",
+                        "format": "date-time",
+                        "example": null,
+                        "nullable": true
+                    },
+                    "recipe": {
+                        "description": "The FoodNotify recipe this product is linked to, or null when it is not linked.",
+                        "nullable": true,
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/RecipeRefResource"
+                            }
+                        ]
+                    }
+                },
+                "type": "object"
+            },
+            "InvoiceReadResource": {
+                "title": "PosInvoiceRead",
+                "required": [
+                    "id",
+                    "invoiceId",
+                    "businessDay",
+                    "total",
+                    "invoiceItems"
+                ],
+                "properties": {
+                    "id": {
+                        "description": "Internal FoodNotify id of the stored invoice.",
+                        "type": "integer",
+                        "example": 330011
+                    },
+                    "invoiceId": {
+                        "description": "The invoiceId you sent (external id).",
+                        "type": "string",
+                        "example": "INV-2024-042"
+                    },
+                    "timeCreated": {
+                        "description": "The timeCreated you sent. RFC 3339, UTC.",
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2023-07-14T13:18:04+00:00",
+                        "nullable": true
+                    },
+                    "businessDay": {
+                        "description": "Business day the invoice is booked on, Y-m-d.",
+                        "type": "string",
+                        "example": "2023-07-14"
+                    },
+                    "total": {
+                        "description": "Net total: sum of netPricePerItem \u00d7 quantity over all items.",
+                        "type": "number",
+                        "format": "float",
+                        "example": 31.8
+                    },
+                    "invoiceItems": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/InvoiceItemReadResource"
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "ProductResource2": {
+                "required": [
+                    "productId",
+                    "name"
+                ],
+                "properties": {
+                    "productId": {
+                        "description": "Stable external identifier of the product. Use this as the primary key when referencing the product (e.g. in invoice items).",
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "grossPrice": {
+                        "description": "Gross sell price per single item (net price including VAT), in the restaurant's configured currency.",
+                        "type": "number",
+                        "format": "float",
+                        "nullable": true
+                    },
+                    "vatRate": {
+                        "description": "VAT rate as floating point, e.g. 0.19 for 19%.",
+                        "type": "number",
+                        "format": "float",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "ProductGroupResource2": {
+                "required": [
+                    "productGroupId",
+                    "name"
+                ],
+                "properties": {
+                    "productGroupId": {
+                        "description": "Stable external identifier of the product group.",
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "parentProductGroupId": {
+                        "description": "External identifier of the parent product group, if any.",
+                        "nullable": true,
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            {
+                                "type": "integer",
+                                "nullable": true
+                            }
+                        ]
+                    }
+                },
+                "type": "object"
+            },
+            "RecipeRefResource": {
+                "title": "PosRecipeRef",
+                "description": "The FoodNotify recipe the product is linked to.",
+                "required": [
+                    "id"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 1234
+                    }
+                },
+                "type": "object"
+            },
+            "InvoiceItemReadResource": {
+                "title": "PosInvoiceItemRead",
+                "required": [
+                    "id",
+                    "quantity",
+                    "netPricePerItem",
+                    "affectsStock"
+                ],
+                "properties": {
+                    "id": {
+                        "description": "Internal FoodNotify id of the stored invoice item.",
+                        "type": "integer",
+                        "example": 555001
+                    },
+                    "externalId": {
+                        "description": "The sale-line id you sent (external id).",
+                        "type": "string",
+                        "example": "L-1",
+                        "nullable": true
+                    },
+                    "plu": {
+                        "type": "string",
+                        "example": "1001",
+                        "nullable": true
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Wiener Schnitzel",
+                        "nullable": true
+                    },
+                    "quantity": {
+                        "description": "Negative for a cancelled or returned line.",
+                        "type": "number",
+                        "format": "float",
+                        "example": 2
+                    },
+                    "netPricePerItem": {
+                        "description": "Net price per item, always positive.",
+                        "type": "number",
+                        "format": "float",
+                        "example": 15.9
+                    },
+                    "vatRate": {
+                        "description": "VAT rate as a fraction, e.g. 0.1 for 10%.",
+                        "type": "number",
+                        "format": "float",
+                        "example": 0.1,
+                        "nullable": true
+                    },
+                    "affectsStock": {
+                        "description": "Whether the line is booked against stock.",
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "voidReason": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            }
+        }
+    },
+    "security": [
+        {
+            "Bearer": []
+        }
+    ],
+    "tags": [
+        {
+            "name": "POS read-back"
+        },
+        {
+            "name": "FnRecipe"
+        },
+        {
+            "name": "RestV2"
+        }
+    ]
+}

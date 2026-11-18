@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Documentation - FoodNotify</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #080808;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding: 2rem 0;
+        }
+
+        .logo {
+            margin-bottom: 2rem;
+        }
+
+        .logo img {
+            height: 60px;
+            width: auto;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            color: #FFFFFF;
+        }
+
+        .subtitle {
+            font-size: 1.1rem;
+            color: #CECFD2;
+        }
+
+        .sections {
+            display: grid;
+            gap: 2rem;
+        }
+
+        .section {
+            background: #FAFAFA;
+            border-radius: 8px;
+            padding: 2rem;
+            box-shadow: 0 5px 20px rgba(255, 255, 255, 0.05);
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #080808;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid #A5EA07;
+        }
+
+        .doc-list {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .doc-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1.25rem;
+            background: #FFFFFF;
+            border-radius: 8px;
+            border: 1px solid #E5E5E5;
+            transition: all 0.3s ease;
+        }
+
+        .doc-item:hover {
+            border-color: #A5EA07;
+            box-shadow: 0 5px 20px rgba(165, 234, 7, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .doc-title {
+            font-weight: 500;
+            color: #080808;
+            flex: 1;
+            font-size: 1rem;
+        }
+
+        .doc-links {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .btn {
+            padding: 0.625rem 1.25rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: inline-block;
+            border: 1px solid transparent;
+        }
+
+        .btn-primary {
+            background: #080808;
+            color: #FFFFFF;
+            border-color: #080808;
+        }
+
+        .btn-primary:hover {
+            background: #A5EA07;
+            border-color: #A5EA07;
+            color: #080808;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(165, 234, 7, 0.3);
+        }
+
+        .btn-secondary {
+            background: #FFFFFF;
+            color: #080808;
+            border: 1px solid #E5E5E5;
+        }
+
+        .btn-secondary:hover {
+            background: #FAFAFA;
+            border-color: #080808;
+            transform: translateY(-2px);
+        }
+
+        footer {
+            text-align: center;
+            color: #CECFD2;
+            margin-top: 3rem;
+            font-size: 0.875rem;
+            padding: 2rem 0;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 1rem;
+            }
+
+            .logo img {
+                height: 48px;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+
+            .section {
+                padding: 1.5rem;
+            }
+
+            .doc-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.75rem;
+            }
+
+            .doc-links {
+                width: 100%;
+            }
+
+            .btn {
+                flex: 1;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <img src="/img/logo_fn.png" alt="FoodNotify">
+            </div>
+            <h1>
+                                    Public API
+                            </h1>
+            <p class="subtitle">Documentation</p>
+        </header>
+
+        <div class="sections">
+                            <div class="section">
+                    <h2 class="section-title">Public API v2.0</h2>
+                    <div class="doc-list">
+                                                    <div class="doc-item">
+                                <div class="doc-title">Pos</div>
+                                <div class="doc-links">
+                                    <a href="/api/doc/2.0/pos" class="btn btn-primary">View Docs</a>
+                                    <a href="/api/doc/2.0/pos.json" class="btn btn-secondary">JSON</a>
+                                </div>
+                            </div>
+                                                    <div class="doc-item">
+                                <div class="doc-title">Erp</div>
+                                <div class="doc-links">
+                                    <a href="/api/doc/2.0/erp" class="btn btn-primary">View Docs</a>
+                                    <a href="/api/doc/2.0/erp.json" class="btn btn-secondary">JSON</a>
+                                </div>
+                            </div>
+                                            </div>
+                </div>
+                            <div class="section">
+                    <h2 class="section-title">Public API v1.0</h2>
+                    <div class="doc-list">
+                                                    <div class="doc-item">
+                                <div class="doc-title">Recipe</div>
+                                <div class="doc-links">
+                                    <a href="/api/doc/1.0/recipes" class="btn btn-primary">View Docs</a>
+                                    <a href="/api/doc/1.0/recipes.json" class="btn btn-secondary">JSON</a>
+                                </div>
+                            </div>
+                                                    <div class="doc-item">
+                                <div class="doc-title">Catering</div>
+                                <div class="doc-links">
+                                    <a href="/api/doc/1.0/catering" class="btn btn-primary">View Docs</a>
+                                    <a href="/api/doc/1.0/catering.json" class="btn btn-secondary">JSON</a>
+                                </div>
+                            </div>
+                                                    <div class="doc-item">
+                                <div class="doc-title">User</div>
+                                <div class="doc-links">
+                                    <a href="/api/doc/1.0/user" class="btn btn-primary">View Docs</a>
+                                    <a href="/api/doc/1.0/user.json" class="btn btn-secondary">JSON</a>
+                                </div>
+                            </div>
+                                                    <div class="doc-item">
+                                <div class="doc-title">Erp.Legacy</div>
+                                <div class="doc-links">
+                                    <a href="/api/doc/1.0/erp" class="btn btn-primary">View Docs</a>
+                                    <a href="/api/doc/1.0/erp.json" class="btn btn-secondary">JSON</a>
+                                </div>
+                            </div>
+                                                    <div class="doc-item">
+                                <div class="doc-title">Webhooks</div>
+                                <div class="doc-links">
+                                    <a href="/api/doc/1.0/webhooks" class="btn btn-primary">View Docs</a>
+                                    <a href="/api/doc/1.0/webhooks.json" class="btn btn-secondary">JSON</a>
+                                </div>
+                            </div>
+                                                    <div class="doc-item">
+                                <div class="doc-title">Pos</div>
+                                <div class="doc-links">
+                                    <a href="/api/doc/1.0/pos" class="btn btn-primary">View Docs</a>
+                                    <a href="/api/doc/1.0/pos.json" class="btn btn-secondary">JSON</a>
+                                </div>
+                            </div>
+                                                    <div class="doc-item">
+                                <div class="doc-title">Shop</div>
+                                <div class="doc-links">
+                                    <a href="/api/doc/1.0/shops" class="btn btn-primary">View Docs</a>
+                                    <a href="/api/doc/1.0/shops.json" class="btn btn-secondary">JSON</a>
+                                </div>
+                            </div>
+                                            </div>
+                </div>
+                    </div>
+
+        <footer>
+            <p>Powered by Agents. Fixed and polished by Humans 😎</p>
+        </footer>
+    </div>
+</body>
+</html>
+

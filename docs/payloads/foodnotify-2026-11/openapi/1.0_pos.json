@@ -1,0 +1,2109 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Pos",
+        "version": "v1.0"
+    },
+    "paths": {
+        "/api/1.0/pos": {
+            "get": {
+                "tags": [
+                    "Account"
+                ],
+                "summary": "Get all accounts.",
+                "operationId": "get_api_pos_accounts_index",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Current page",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "pageSize",
+                        "in": "query",
+                        "description": "Items per page",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 10
+                        }
+                    },
+                    {
+                        "name": "orderBy",
+                        "in": "query",
+                        "description": "Order by field",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "timeCreated"
+                        }
+                    },
+                    {
+                        "name": "orderDirection",
+                        "in": "query",
+                        "description": "Order direction",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "DESC"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Get all accounts"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Account"
+                ],
+                "summary": "Create an account.",
+                "operationId": "post_api_pos_accounts_create",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "accountType",
+                                    "costCenter"
+                                ],
+                                "properties": {
+                                    "accountType": {
+                                        "type": "integer",
+                                        "example": 101
+                                    },
+                                    "costCenter": {
+                                        "type": "integer",
+                                        "example": 1211
+                                    },
+                                    "endpointUrl": {
+                                        "type": "string",
+                                        "example": "https://www.my-custom-url.com/endpoint"
+                                    },
+                                    "token": {
+                                        "type": "string",
+                                        "example": "12345678"
+                                    },
+                                    "syncInvoices": {
+                                        "type": "integer",
+                                        "example": 0
+                                    },
+                                    "syncAllergens": {
+                                        "type": "integer",
+                                        "example": 0
+                                    },
+                                    "syncAdditives": {
+                                        "type": "integer",
+                                        "example": 0
+                                    },
+                                    "syncCreate": {
+                                        "type": "integer",
+                                        "example": 0
+                                    },
+                                    "syncUpdate": {
+                                        "type": "integer",
+                                        "example": 0
+                                    },
+                                    "syncDelete": {
+                                        "type": "integer",
+                                        "example": 0
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Create account"
+                    }
+                },
+                "deprecated": true
+            }
+        },
+        "/api/1.0/pos/{id}": {
+            "get": {
+                "tags": [
+                    "Account"
+                ],
+                "summary": "Get one account.",
+                "operationId": "get_api_pos_accounts_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Get one account"
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "Account"
+                ],
+                "summary": "Update account.",
+                "operationId": "put_api_pos_accounts_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "Account"
+                ],
+                "summary": "Delete Account.",
+                "operationId": "delete_api_pos_accounts_delete",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Delete account"
+                    }
+                },
+                "deprecated": true
+            }
+        },
+        "/api/1.0/pos/search": {
+            "post": {
+                "tags": [
+                    "Account"
+                ],
+                "summary": "Search accounts.",
+                "operationId": "post_api_pos_accounts_search",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Current page",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "pageSize",
+                        "in": "query",
+                        "description": "Items per page",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 10
+                        }
+                    },
+                    {
+                        "name": "orderBy",
+                        "in": "query",
+                        "description": "Order results by this field",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "timeCreated"
+                        }
+                    },
+                    {
+                        "name": "orderDirection",
+                        "in": "query",
+                        "description": "Order direction",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "DESC"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Every field is optional. You don't have to send all the fields, just the ones you want to search.",
+                    "required": false,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "endpointUrl": {
+                                        "type": "string",
+                                        "example": "https://www.my-custom-url.com/endpoint"
+                                    },
+                                    "token": {
+                                        "type": "string",
+                                        "example": "12345678"
+                                    },
+                                    "syncInvoices": {
+                                        "type": "integer",
+                                        "example": 0
+                                    },
+                                    "syncAllergens": {
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "syncAdditives": {
+                                        "type": "integer",
+                                        "example": 0
+                                    },
+                                    "syncCreate": {
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "syncUpdate": {
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "syncDelete": {
+                                        "type": "integer",
+                                        "example": 0
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Search accounts"
+                    }
+                }
+            }
+        },
+        "/api/1.0/pos/{id}/invoices": {
+            "get": {
+                "tags": [
+                    "Invoice"
+                ],
+                "summary": "Get all Invoices.",
+                "operationId": "get_api_pos_invoices_index",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "The ID of the entity to fetch invoices for",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "12345"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Current page",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "pageSize",
+                        "in": "query",
+                        "description": "Items per page",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 10
+                        }
+                    },
+                    {
+                        "name": "orderBy",
+                        "in": "query",
+                        "description": "Order by field",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "timeCreated"
+                        }
+                    },
+                    {
+                        "name": "orderDirection",
+                        "in": "query",
+                        "description": "Order direction",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "DESC"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Get all Invoices"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Invoice"
+                ],
+                "summary": "Create Invoice.",
+                "operationId": "post_api_pos_invoices_create",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "externalId",
+                                    "total",
+                                    "items"
+                                ],
+                                "properties": {
+                                    "externalId": {
+                                        "type": "string",
+                                        "example": "abc-123"
+                                    },
+                                    "externalTimeCreated": {
+                                        "type": "string",
+                                        "format": "date-time",
+                                        "example": "2019-12-31T20:00:00Z"
+                                    },
+                                    "externalUserId": {
+                                        "type": "integer",
+                                        "example": 123
+                                    },
+                                    "total": {
+                                        "type": "number",
+                                        "format": "float",
+                                        "example": 44.5
+                                    },
+                                    "items": {
+                                        "type": "array",
+                                        "items": {
+                                            "required": [
+                                                "externalId",
+                                                "quantity",
+                                                "price",
+                                                "totalPrice"
+                                            ],
+                                            "properties": {
+                                                "externalId": {
+                                                    "type": "string",
+                                                    "example": "123-abc-456"
+                                                },
+                                                "quantity": {
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 1.5
+                                                },
+                                                "price": {
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 3.5
+                                                },
+                                                "totalPrice": {
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 5.25
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Create Invoice"
+                    }
+                }
+            }
+        },
+        "/api/1.0/pos/invoices/{id}": {
+            "get": {
+                "tags": [
+                    "Invoice"
+                ],
+                "summary": "Get one Invoice.",
+                "operationId": "get_api_pos_invoices_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Get one Invoice"
+                    }
+                }
+            }
+        },
+        "/api/1.0/pos/{id}/invoices/search": {
+            "post": {
+                "tags": [
+                    "Invoice"
+                ],
+                "summary": "Search Invoices.",
+                "operationId": "post_api_pos_invoices_search",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "The ID of the entity to search invoices for",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "12345"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Current page",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "pageSize",
+                        "in": "query",
+                        "description": "Items per page",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 10
+                        }
+                    },
+                    {
+                        "name": "orderBy",
+                        "in": "query",
+                        "description": "Order by field",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "timeCreated"
+                        }
+                    },
+                    {
+                        "name": "orderDirection",
+                        "in": "query",
+                        "description": "Order direction",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "DESC"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Every field is optional",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "externalId": {
+                                        "type": "string",
+                                        "example": "full id or part of it"
+                                    },
+                                    "externalUserId": {
+                                        "type": "string",
+                                        "example": "123"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Search Invoices"
+                    }
+                }
+            }
+        },
+        "/api/1.0/pos/{id}/invoices/sync": {
+            "put": {
+                "tags": [
+                    "Invoice"
+                ],
+                "summary": "Sync Invoices (maximum 10 invoices in one request).",
+                "operationId": "put_api_pos_invoices_sync",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Payload for syncing invoices. Maximum 10 invoices in one request.",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "array",
+                                "items": {
+                                    "properties": {
+                                        "externalId": {
+                                            "type": "string",
+                                            "example": "abc-123"
+                                        },
+                                        "externalTimeCreated": {
+                                            "type": "string",
+                                            "format": "date-time",
+                                            "example": "2019-12-31T20:00:00Z"
+                                        },
+                                        "externalUserId": {
+                                            "type": "integer",
+                                            "example": 123
+                                        },
+                                        "total": {
+                                            "type": "number",
+                                            "format": "float",
+                                            "example": 44.5
+                                        },
+                                        "items": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "externalId": {
+                                                        "type": "string",
+                                                        "example": "123-abc-456"
+                                                    },
+                                                    "quantity": {
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": 1.5
+                                                    },
+                                                    "price": {
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": 3.5
+                                                    },
+                                                    "totalPrice": {
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": 5.25
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Sync Invoices"
+                    }
+                }
+            }
+        },
+        "/api/1.0/pos/{costCenterId}/xenus-invoices/{dateOfInvoices}": {
+            "put": {
+                "tags": [
+                    "Xenus",
+                    "Invoice"
+                ],
+                "summary": "Transfer invoices from your Xenus-POS to FoodNotify.",
+                "description": "Invoices which are already present (based on externalId) in FoodNotify will not get imported a second time, nor will an already existing invoice get updated.",
+                "operationId": "put_api_pos_invoices_xenus_add",
+                "parameters": [
+                    {
+                        "name": "costCenterId",
+                        "in": "path",
+                        "description": "ID of the assigned cost-center",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 123
+                        }
+                    },
+                    {
+                        "name": "dateOfInvoices",
+                        "in": "path",
+                        "description": "Date of invoices in YYYY-MM-DD format",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "date",
+                            "example": "2024-12-01"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Invoices to sync for this cost center and date",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/XenusInvoiceCollection"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Invoices synced successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "greeting": {
+                                            "type": "string",
+                                            "example": "moving things forward"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Resource not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Resource not found."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "error": {
+                                            "type": "string",
+                                            "example": "A required parameter is missing."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "error": {
+                                            "type": "string",
+                                            "example": "An unexpected error occurred."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation errors",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "errors": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "propertyPath": {
+                                                        "type": "string",
+                                                        "example": "dateOfInvoices"
+                                                    },
+                                                    "message": {
+                                                        "type": "string",
+                                                        "example": "The value \"2024-13-01\" is not a valid date."
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/1.0/pos/{id}/products": {
+            "get": {
+                "tags": [
+                    "Product"
+                ],
+                "summary": "Get all Products.",
+                "operationId": "get_api_pos_products_index",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Current page",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "pageSize",
+                        "in": "query",
+                        "description": "Items per page",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 10
+                        }
+                    },
+                    {
+                        "name": "orderBy",
+                        "in": "query",
+                        "description": "Order by field",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "timeCreated"
+                        }
+                    },
+                    {
+                        "name": "orderDirection",
+                        "in": "query",
+                        "description": "Order direction",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "DESC"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Get all Products"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Product"
+                ],
+                "summary": "Create new Product.",
+                "operationId": "post_api_pos_products_create",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "recipe",
+                                    "externalId"
+                                ],
+                                "properties": {
+                                    "recipe": {
+                                        "type": "integer",
+                                        "example": 123
+                                    },
+                                    "externalId": {
+                                        "type": "string",
+                                        "example": "123-abc-456"
+                                    },
+                                    "productGroup": {
+                                        "type": "integer",
+                                        "example": 456
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Create Product"
+                    }
+                }
+            }
+        },
+        "/api/1.0/pos/products/{id}": {
+            "get": {
+                "tags": [
+                    "Product"
+                ],
+                "summary": "Get one Product.",
+                "operationId": "get_api_pos_products_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Get one Product"
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "Product"
+                ],
+                "summary": "Update Product.",
+                "operationId": "put_api_pos_products_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Every field is optional. Only the fields that need to be updated should be sent.",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "recipe": {
+                                        "type": "integer",
+                                        "example": 123
+                                    },
+                                    "productGroup": {
+                                        "type": "integer",
+                                        "example": 1234
+                                    },
+                                    "name": {
+                                        "type": "string",
+                                        "example": "some name"
+                                    },
+                                    "description": {
+                                        "type": "string",
+                                        "example": "product desc"
+                                    },
+                                    "price": {
+                                        "type": "number",
+                                        "format": "float",
+                                        "example": 6.5
+                                    },
+                                    "vat": {
+                                        "type": "number",
+                                        "format": "float",
+                                        "example": 17.5
+                                    },
+                                    "plu": {
+                                        "type": "string",
+                                        "example": "abc"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Update Product"
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "Product"
+                ],
+                "summary": "Delete Product.",
+                "operationId": "delete_api_pos_products_delete",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Delete Product"
+                    }
+                }
+            }
+        },
+        "/api/1.0/pos/{id}/products/search": {
+            "post": {
+                "tags": [
+                    "Product"
+                ],
+                "summary": "Search Products.",
+                "operationId": "post_api_pos_products_search",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Current page",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "pageSize",
+                        "in": "query",
+                        "description": "Items per page",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 10
+                        }
+                    },
+                    {
+                        "name": "orderBy",
+                        "in": "query",
+                        "description": "Order by field",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "timeCreated"
+                        }
+                    },
+                    {
+                        "name": "orderDirection",
+                        "in": "query",
+                        "description": "Order direction",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "DESC"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Every field is optional. Send only the fields to search for.",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "recipe": {
+                                        "type": "integer",
+                                        "example": 1234
+                                    },
+                                    "externalId": {
+                                        "type": "string",
+                                        "example": "123-abc-456"
+                                    },
+                                    "externalProductGroupId": {
+                                        "type": "string",
+                                        "example": "123-abc-456"
+                                    },
+                                    "productGroup": {
+                                        "type": "integer",
+                                        "example": 1234
+                                    },
+                                    "name": {
+                                        "type": "string",
+                                        "example": "some name"
+                                    },
+                                    "description": {
+                                        "type": "string",
+                                        "example": "product desc"
+                                    },
+                                    "price": {
+                                        "type": "number",
+                                        "format": "float",
+                                        "example": 6.5
+                                    },
+                                    "vat": {
+                                        "type": "number",
+                                        "format": "float",
+                                        "example": 17.5
+                                    },
+                                    "plu": {
+                                        "type": "string",
+                                        "example": "abc"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Search Products"
+                    }
+                }
+            }
+        },
+        "/api/1.0/pos/{id}/products/sync": {
+            "post": {
+                "tags": [
+                    "Product"
+                ],
+                "summary": "Sync Products (maximum 10 products in one request).",
+                "operationId": "post_api_pos_products_sync",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "A collection of products to sync",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "array",
+                                "items": {
+                                    "required": [
+                                        "externalId"
+                                    ],
+                                    "properties": {
+                                        "recipe": {
+                                            "type": "integer",
+                                            "example": 1234
+                                        },
+                                        "externalId": {
+                                            "type": "string",
+                                            "example": "123-abc-456"
+                                        },
+                                        "externalProductGroupId": {
+                                            "type": "string",
+                                            "example": "123-abc"
+                                        },
+                                        "name": {
+                                            "type": "string",
+                                            "example": "some name"
+                                        },
+                                        "description": {
+                                            "type": "string",
+                                            "example": "product desc"
+                                        },
+                                        "price": {
+                                            "type": "number",
+                                            "format": "float",
+                                            "example": 6.5
+                                        },
+                                        "vat": {
+                                            "type": "number",
+                                            "format": "float",
+                                            "example": 17.5
+                                        },
+                                        "recipeType": {
+                                            "type": "string",
+                                            "example": "meal | drink"
+                                        },
+                                        "plu": {
+                                            "type": "string",
+                                            "example": "abc"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Sync Products"
+                    }
+                }
+            }
+        },
+        "/api/1.0/pos/{costCenterId}/xenus-products": {
+            "put": {
+                "tags": [
+                    "Xenus",
+                    "Product"
+                ],
+                "summary": "Transfer all products from your Xenus-POS to FoodNotify.",
+                "description": "This will overwrite all existing products in FoodNotify for this account.\nProducts which exist in FoodNotify but not in your request will not be deleted in FoodNotify.",
+                "operationId": "put_api_pos_products_xenus_put",
+                "parameters": [
+                    {
+                        "name": "costCenterId",
+                        "in": "path",
+                        "description": "ID of the assigned cost-center",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 123
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Products to sync for this cost center",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/XenusProductCollection"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Products synced successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "greeting": {
+                                            "type": "string",
+                                            "example": "moving things forward"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Resource not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Resource not found."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "error": {
+                                            "type": "string",
+                                            "example": "A required parameter is missing."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "error": {
+                                            "type": "string",
+                                            "example": "An unexpected error occurred."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation errors",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "errors": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "propertyPath": {
+                                                        "type": "string",
+                                                        "example": "dateOfInvoices"
+                                                    },
+                                                    "message": {
+                                                        "type": "string",
+                                                        "example": "The value \"2024-13-01\" is not a valid date."
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/1.0/pos/{id}/productGroups": {
+            "get": {
+                "tags": [
+                    "Product Group"
+                ],
+                "summary": "Get all Product Groups.",
+                "operationId": "get_api_pos_product_groups_index",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Current page",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "pageSize",
+                        "in": "query",
+                        "description": "Items per page",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 10
+                        }
+                    },
+                    {
+                        "name": "orderBy",
+                        "in": "query",
+                        "description": "Order by field",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "timeCreated"
+                        }
+                    },
+                    {
+                        "name": "orderDirection",
+                        "in": "query",
+                        "description": "Order direction",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "DESC"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Get all Product Groups"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Product Group"
+                ],
+                "summary": "Create Product Group.",
+                "operationId": "post_api_pos_product_groups_create",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "name",
+                                    "description",
+                                    "costCenter"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "example": "some name"
+                                    },
+                                    "description": {
+                                        "type": "string",
+                                        "example": "product group desc"
+                                    },
+                                    "externalId": {
+                                        "type": "string",
+                                        "example": "123-abc-456"
+                                    },
+                                    "parentExternalId": {
+                                        "type": "string",
+                                        "example": "123-abc-456"
+                                    },
+                                    "vat": {
+                                        "type": "number",
+                                        "format": "float",
+                                        "example": 17.5
+                                    },
+                                    "costCenter": {
+                                        "type": "integer",
+                                        "example": 1234
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Create Product Group"
+                    }
+                }
+            }
+        },
+        "/api/1.0/pos/productGroups/{id}": {
+            "get": {
+                "tags": [
+                    "Product Group"
+                ],
+                "summary": "Get one Product Group.",
+                "operationId": "get_api_pos_product_groups_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Get one Product Group"
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "Product Group"
+                ],
+                "summary": "Update Product Group.",
+                "operationId": "put_api_pos_product_groups_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "example": "some name"
+                                    },
+                                    "description": {
+                                        "type": "string",
+                                        "example": "product desc"
+                                    },
+                                    "externalId": {
+                                        "type": "string",
+                                        "example": "123-abc-456"
+                                    },
+                                    "parentExternalId": {
+                                        "type": "string",
+                                        "example": "123-abc-456"
+                                    },
+                                    "vat": {
+                                        "type": "number",
+                                        "format": "float",
+                                        "example": 17.5
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Update Product Group"
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "Product Group"
+                ],
+                "summary": "Delete Product Group (!!! will delete all products in group).",
+                "operationId": "delete_api_pos_product_groups_delete",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Delete Product Group"
+                    }
+                }
+            }
+        },
+        "/api/1.0/pos/{id}/productGroups/search": {
+            "post": {
+                "tags": [
+                    "Product Group"
+                ],
+                "summary": "Search Product Groups.",
+                "operationId": "post_api_pos_product_groups_search",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Current page",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "pageSize",
+                        "in": "query",
+                        "description": "Items per page",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 10
+                        }
+                    },
+                    {
+                        "name": "orderBy",
+                        "in": "query",
+                        "description": "Order by field",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "timeCreated"
+                        }
+                    },
+                    {
+                        "name": "orderDirection",
+                        "in": "query",
+                        "description": "Order direction",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "DESC"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Every field is optional",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "example": "some name"
+                                    },
+                                    "description": {
+                                        "type": "string",
+                                        "example": "product group desc"
+                                    },
+                                    "externalId": {
+                                        "type": "string",
+                                        "example": "123-abc-456"
+                                    },
+                                    "parentExternalId": {
+                                        "type": "string",
+                                        "example": "123-abc-456"
+                                    },
+                                    "vat": {
+                                        "type": "number",
+                                        "example": 17.5
+                                    },
+                                    "costCenter": {
+                                        "type": "integer",
+                                        "example": 1234
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Search Product Groups"
+                    }
+                }
+            }
+        },
+        "/api/1.0/pos/{id}/productGroups/sync": {
+            "post": {
+                "tags": [
+                    "Product Group"
+                ],
+                "summary": "Sync Product Groups (maximum 10 product groups in one request).",
+                "operationId": "post_api_pos_product_groups_sync",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "A collection of product groups to sync",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "array",
+                                "items": {
+                                    "properties": {
+                                        "name": {
+                                            "type": "string",
+                                            "example": "some name"
+                                        },
+                                        "description": {
+                                            "type": "string",
+                                            "example": "product group desc"
+                                        },
+                                        "externalId": {
+                                            "type": "string",
+                                            "example": "123-abc-456"
+                                        },
+                                        "parentExternalId": {
+                                            "type": "string",
+                                            "example": "123-abc-456"
+                                        },
+                                        "vat": {
+                                            "type": "number",
+                                            "format": "float",
+                                            "example": 17.5
+                                        },
+                                        "costCenter": {
+                                            "type": "integer",
+                                            "example": 1234
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Sync Product Groups"
+                    }
+                }
+            }
+        },
+        "/api/1.0/pos/{costCenterId}/xenus-productGroups": {
+            "put": {
+                "tags": [
+                    "Xenus",
+                    "Product Group"
+                ],
+                "summary": "Transfer all product-groups from your Xenus-POS to FoodNotify.",
+                "description": "This will overwrite all existing product-groups in FoodNotify for this account.\nGroups which exist in FoodNotify but not in your request will get deleted.",
+                "operationId": "put_api_pos_product_groups_xenus_put",
+                "parameters": [
+                    {
+                        "name": "costCenterId",
+                        "in": "path",
+                        "description": "ID of the assigned cost-center",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 123
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Product groups to sync for this cost center",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/XenusProductGroupCollection"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Product groups synced successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "greeting": {
+                                            "type": "string",
+                                            "example": "moving things forward"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Resource not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Resource not found."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "error": {
+                                            "type": "string",
+                                            "example": "A required parameter is missing."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "error": {
+                                            "type": "string",
+                                            "example": "An unexpected error occurred."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation errors",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "errors": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "propertyPath": {
+                                                        "type": "string",
+                                                        "example": "dateOfInvoices"
+                                                    },
+                                                    "message": {
+                                                        "type": "string",
+                                                        "example": "The value \"2024-13-01\" is not a valid date."
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "XenusInvoiceCollection": {
+                "required": [
+                    "invoices"
+                ],
+                "properties": {
+                    "invoices": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/XenusInvoice"
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "XenusProductCollection": {
+                "required": [
+                    "products"
+                ],
+                "properties": {
+                    "products": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/XenusProduct"
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "XenusProductGroupCollection": {
+                "required": [
+                    "productGroups"
+                ],
+                "properties": {
+                    "productGroups": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/XenusProductGroup"
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "XenusInvoice": {
+                "required": [
+                    "externalId",
+                    "departmentId",
+                    "externalTimeCreated",
+                    "roomNbr",
+                    "invoiceItems"
+                ],
+                "properties": {
+                    "externalId": {
+                        "type": "string"
+                    },
+                    "departmentId": {
+                        "type": "integer"
+                    },
+                    "externalTimeCreated": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "roomNbr": {
+                        "type": "string"
+                    },
+                    "externalUserId": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "invoiceItems": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/XenusInvoiceItem"
+                        },
+                        "minItems": 1
+                    }
+                },
+                "type": "object"
+            },
+            "XenusProduct": {
+                "required": [
+                    "externalId",
+                    "name",
+                    "price",
+                    "vatRate"
+                ],
+                "properties": {
+                    "externalId": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "price": {
+                        "title": "The gross-price per unit.",
+                        "type": "number",
+                        "format": "float"
+                    },
+                    "vatRate": {
+                        "title": "The vat-rate in the format 20 for 20%.",
+                        "type": "number",
+                        "format": "float"
+                    },
+                    "plu": {
+                        "title": "the plu or sku. will be shown to the user.",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "externalProductGroupId": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "remoteTimeUpdated": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "XenusProductGroup": {
+                "required": [
+                    "externalId",
+                    "name"
+                ],
+                "properties": {
+                    "externalId": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "vatRate": {
+                        "title": "The vat-rate in the format 20 for 20%.",
+                        "type": "number",
+                        "format": "float",
+                        "nullable": true
+                    },
+                    "parentExternalId": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "XenusInvoiceItem": {
+                "required": [
+                    "externalProductId",
+                    "quantity",
+                    "price",
+                    "vatRate",
+                    "totalPrice",
+                    "name"
+                ],
+                "properties": {
+                    "externalId": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "externalProductId": {
+                        "type": "string"
+                    },
+                    "quantity": {
+                        "title": "negative for cancellations.",
+                        "type": "integer"
+                    },
+                    "price": {
+                        "title": "the gross price per item, always positive.",
+                        "type": "number",
+                        "format": "float"
+                    },
+                    "vatRate": {
+                        "title": "the vat rate in the format 20 for 20%.",
+                        "type": "number",
+                        "format": "float"
+                    },
+                    "plu": {
+                        "title": "optional the plu.",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "label": {
+                        "title": "optional the label of the item e.g.: \"1 bottle ice tea\".",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "totalPrice": {
+                        "title": "Attention: not meant to be written.",
+                        "type": "-- readOnly --"
+                    },
+                    "name": {
+                        "title": "Attention: not meant to be written.",
+                        "type": "-- readOnly --"
+                    }
+                },
+                "type": "object"
+            }
+        }
+    },
+    "security": [
+        {
+            "Bearer": []
+        }
+    ],
+    "tags": [
+        {
+            "name": "Account"
+        },
+        {
+            "name": "Invoice"
+        },
+        {
+            "name": "Xenus"
+        },
+        {
+            "name": "Product"
+        },
+        {
+            "name": "Product Group"
+        }
+    ]
+}

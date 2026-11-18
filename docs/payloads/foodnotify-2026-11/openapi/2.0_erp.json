@@ -1,0 +1,1437 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Erp",
+        "version": "v2.0"
+    },
+    "paths": {
+        "/api/2.0/erp/goods-receipts/{billingAccountId}": {
+            "get": {
+                "tags": [
+                    "Billing - Goods Receipts"
+                ],
+                "summary": "\ud83d\udcc1 List Goods Receipts.",
+                "description": "Get a paginated list of goods receipts for a billing account.\nThis endpoint allows external billing systems (like Cisbox) to fetch goods receipt data.\nThe billing account must belong to the authenticated user.\n\n**Filters:**\n- `startDate` / `endDate`: Filter by delivery date range\n- `syncStatus`: Filter by sync status (not_synced, synced, failed)\n\n**Pagination:**\n- `page`: Page number (default: 1)\n- `limit`: Items per page (default: 25, max: 100)",
+                "operationId": "get_erp.billing.goods-receipts.list",
+                "parameters": [
+                    {
+                        "name": "billingAccountId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "\\d+"
+                        }
+                    },
+                    {
+                        "name": "startDate",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "title": "Start date for delivery date range filter (format: Y-m-d).",
+                            "type": "string",
+                            "nullable": true
+                        }
+                    },
+                    {
+                        "name": "endDate",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "title": "End date for delivery date range filter (format: Y-m-d).",
+                            "type": "string",
+                            "nullable": true
+                        }
+                    },
+                    {
+                        "name": "syncStatus",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "title": "Filter by sync status.",
+                            "type": "string",
+                            "enum": [
+                                "not_synced",
+                                "synced",
+                                "failed"
+                            ],
+                            "nullable": true
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "title": "Page number for pagination (must be greater than or equal to 1).",
+                            "type": "integer",
+                            "default": 1,
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "title": "Number of items per page.",
+                            "type": "integer",
+                            "default": 25,
+                            "maximum": 100,
+                            "minimum": 0,
+                            "exclusiveMinimum": true
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated list of goods receipts",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/GoodsReceiptResource"
+                                            }
+                                        },
+                                        "pagination": {
+                                            "$ref": "#/components/schemas/PaginationMetaResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request parameters"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "description": "Forbidden - No access to this billing account"
+                    }
+                }
+            }
+        },
+        "/api/2.0/erp/billing/webhook/{billingAccountId}": {
+            "post": {
+                "tags": [
+                    "Billing - Webhook (External System Sample)"
+                ],
+                "summary": "\ud83d\udce4 Receive Goods Receipt (PUSH from FoodNotify).",
+                "description": "**SAMPLE ENDPOINT for External Billing Systems**\n\nThis endpoint shows how external billing systems (like CisBox) should implement\ntheir webhook to receive goods receipt data pushed from FoodNotify.\n\n**Flow:**\n1. External system registers their webhook URL with FoodNotify\n2. FoodNotify creates/updates a goods receipt (delivery note or accepted order)\n3. FoodNotify POSTs the goods receipt data to external system's webhook URL\n4. External system receives and validates the data\n5. External system stores the goods receipt in their database\n6. External system returns success response with their internal ID\n7. FoodNotify updates sync status and stores the external ID\n\n**Authentication:**\n- External system should validate request signature/token from FoodNotify\n- Verify the billing account is authorized\n\n**Response:**\n- Return 200 with `externalId` on success\n- Return 400 for invalid data\n- Return 401/403 for authentication/authorization failures",
+                "operationId": "post_erp.billing.webhook.receive",
+                "parameters": [
+                    {
+                        "name": "billingAccountId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Goods receipt data pushed from FoodNotify",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/GoodsReceiptResource"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Goods receipt received and processed successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Goods receipt received"
+                                        },
+                                        "externalId": {
+                                            "description": "ID assigned by external billing system (e.g., CISBOX-12345)",
+                                            "type": "string",
+                                            "example": "CISBOX-12345"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request data or JSON payload"
+                    },
+                    "401": {
+                        "description": "Unauthorized - Invalid or missing authentication"
+                    },
+                    "403": {
+                        "description": "Forbidden - No access to this billing account"
+                    }
+                }
+            }
+        },
+        "/api/2.0/erp/stock/balances": {
+            "get": {
+                "tags": [
+                    "Erp Stock Balances"
+                ],
+                "summary": "\ud83d\udccb List daily stock-change summaries.",
+                "description": "Paginated list of daily aggregated stock movements (opening / closing /\ndelta of price and amount) per ERP and concrete product.\nFilter by ERP IDs, concrete product IDs,\nand a business date range; sort ascending or descending by business date.\nOmitting `erp_ids` returns data across all ERPs the master user owns.",
+                "operationId": "get_api.erp.stock.balances",
+                "parameters": [
+                    {
+                        "name": "erp_ids[]",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "integer"
+                            },
+                            "default": null,
+                            "nullable": true
+                        }
+                    },
+                    {
+                        "name": "concrete_product_ids[]",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "integer"
+                            },
+                            "default": null,
+                            "nullable": true
+                        }
+                    },
+                    {
+                        "name": "business_date_from",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time",
+                            "default": null,
+                            "nullable": true
+                        }
+                    },
+                    {
+                        "name": "business_date_to",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time",
+                            "default": null,
+                            "nullable": true
+                        }
+                    },
+                    {
+                        "name": "order",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "$ref": "#/components/schemas/SortDirection"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 1,
+                            "minimum": 0,
+                            "exclusiveMinimum": true
+                        }
+                    },
+                    {
+                        "name": "page_size",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 50,
+                            "enum": [
+                                5,
+                                10,
+                                20,
+                                50,
+                                100,
+                                1000,
+                                5000,
+                                10000
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated list of daily stock-change summaries",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/StockChangeDailySummaryResource"
+                                            }
+                                        },
+                                        "filters": {
+                                            "$ref": "#/components/schemas/AppliedFiltersResource"
+                                        },
+                                        "pagination": {
+                                            "$ref": "#/components/schemas/PaginationMetaResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "User does not have access to one of the requested ERPs."
+                    },
+                    "404": {
+                        "description": "One of the requested ERPs was not found."
+                    }
+                }
+            }
+        },
+        "/api/2.0/erp/stock/movements": {
+            "get": {
+                "tags": [
+                    "Erp Stock Balances"
+                ],
+                "summary": "\ud83d\udcc8 List stock movements grouped by reason.",
+                "description": "Paginated list of stock movements aggregated per ERP, business date,\nconcrete product, and reason. Sum of amount\nand price deltas are reported per group. Same filters as the index\nendpoint: ERP IDs, concrete product IDs, business date range, order.\nOmitting `erp_ids` returns data across all ERPs the master user owns.",
+                "operationId": "get_api.erp.stock.movements",
+                "parameters": [
+                    {
+                        "name": "reasons[]",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "default": null,
+                            "nullable": true
+                        }
+                    },
+                    {
+                        "name": "erp_ids[]",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "integer"
+                            },
+                            "default": null,
+                            "nullable": true
+                        }
+                    },
+                    {
+                        "name": "concrete_product_ids[]",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "integer"
+                            },
+                            "default": null,
+                            "nullable": true
+                        }
+                    },
+                    {
+                        "name": "business_date_from",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time",
+                            "default": null,
+                            "nullable": true
+                        }
+                    },
+                    {
+                        "name": "business_date_to",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time",
+                            "default": null,
+                            "nullable": true
+                        }
+                    },
+                    {
+                        "name": "order",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "$ref": "#/components/schemas/SortDirection"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 1,
+                            "minimum": 0,
+                            "exclusiveMinimum": true
+                        }
+                    },
+                    {
+                        "name": "page_size",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 50,
+                            "enum": [
+                                5,
+                                10,
+                                20,
+                                50,
+                                100,
+                                1000,
+                                5000,
+                                10000
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated list of stock movements grouped by reason",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/StockMovementResource"
+                                            }
+                                        },
+                                        "filters": {
+                                            "$ref": "#/components/schemas/AppliedFiltersResource"
+                                        },
+                                        "pagination": {
+                                            "$ref": "#/components/schemas/PaginationMetaResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "User does not have access to one of the requested ERPs."
+                    },
+                    "404": {
+                        "description": "One of the requested ERPs was not found."
+                    }
+                }
+            }
+        },
+        "/api/2.0/erp/stock/aggregate": {
+            "get": {
+                "tags": [
+                    "Erp Stock Balances"
+                ],
+                "summary": "\ud83e\uddee Aggregate stock movements across a flexible set of grouping dimensions.",
+                "description": "Groups stock movements by any combination of ERP, concrete product, and/or\nreason (configurable via `group_by`). Each row carries the grouping keys,\nthe covered period (from business_date filters), and the aggregated values.\n`deltaPrice` is always included; `deltaAmount` is included only when\n`concrete_product_id` is part of the grouping (summing amounts across\nheterogeneous products would be meaningless). Supports the same base\nfilters as the other endpoints plus the movements-style `reasons` filter.",
+                "operationId": "get_api.erp.stock.aggregate",
+                "parameters": [
+                    {
+                        "name": "group_by[]",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "default": [],
+                            "minItems": 1
+                        }
+                    },
+                    {
+                        "name": "granularity",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "$ref": "#/components/schemas/StockAggregateGranularity"
+                        }
+                    },
+                    {
+                        "name": "reasons[]",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "default": null,
+                            "nullable": true
+                        }
+                    },
+                    {
+                        "name": "erp_ids[]",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "integer"
+                            },
+                            "default": null,
+                            "nullable": true
+                        }
+                    },
+                    {
+                        "name": "concrete_product_ids[]",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "integer"
+                            },
+                            "default": null,
+                            "nullable": true
+                        }
+                    },
+                    {
+                        "name": "business_date_from",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time",
+                            "default": null,
+                            "nullable": true
+                        }
+                    },
+                    {
+                        "name": "business_date_to",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time",
+                            "default": null,
+                            "nullable": true
+                        }
+                    },
+                    {
+                        "name": "order",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "$ref": "#/components/schemas/SortDirection"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 1,
+                            "minimum": 0,
+                            "exclusiveMinimum": true
+                        }
+                    },
+                    {
+                        "name": "page_size",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 50,
+                            "enum": [
+                                5,
+                                10,
+                                20,
+                                50,
+                                100,
+                                1000,
+                                5000,
+                                10000
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated list of aggregated stock movements",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/StockAggregateResource"
+                                            }
+                                        },
+                                        "filters": {
+                                            "$ref": "#/components/schemas/AppliedFiltersResource"
+                                        },
+                                        "pagination": {
+                                            "$ref": "#/components/schemas/PaginationMetaResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "User does not have access to one of the requested ERPs."
+                    },
+                    "404": {
+                        "description": "One of the requested ERPs was not found."
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "GoodsReceiptListQuery": {
+                "properties": {
+                    "startDate": {
+                        "title": "Start date for delivery date range filter (format: Y-m-d).",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "endDate": {
+                        "title": "End date for delivery date range filter (format: Y-m-d).",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "syncStatus": {
+                        "title": "Filter by sync status.",
+                        "type": "string",
+                        "enum": [
+                            "not_synced",
+                            "synced",
+                            "failed"
+                        ],
+                        "nullable": true
+                    },
+                    "page": {
+                        "title": "Page number for pagination (must be greater than or equal to 1).",
+                        "type": "integer",
+                        "default": 1,
+                        "minimum": 1
+                    },
+                    "limit": {
+                        "title": "Number of items per page.",
+                        "type": "integer",
+                        "default": 25,
+                        "maximum": 100,
+                        "minimum": 0,
+                        "exclusiveMinimum": true
+                    }
+                },
+                "type": "object"
+            },
+            "SearchStockChangesResource": {
+                "properties": {
+                    "erp_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "default": null,
+                        "nullable": true
+                    },
+                    "concrete_product_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "default": null,
+                        "nullable": true
+                    },
+                    "business_date_from": {
+                        "type": "string",
+                        "format": "date-time",
+                        "default": null,
+                        "nullable": true
+                    },
+                    "business_date_to": {
+                        "type": "string",
+                        "format": "date-time",
+                        "default": null,
+                        "nullable": true
+                    },
+                    "order": {
+                        "$ref": "#/components/schemas/SortDirection"
+                    },
+                    "page": {
+                        "type": "integer",
+                        "default": 1,
+                        "minimum": 0,
+                        "exclusiveMinimum": true
+                    },
+                    "page_size": {
+                        "type": "integer",
+                        "default": 50,
+                        "enum": [
+                            5,
+                            10,
+                            20,
+                            50,
+                            100,
+                            1000,
+                            5000,
+                            10000
+                        ]
+                    }
+                },
+                "type": "object"
+            },
+            "SearchStockMovementsResource": {
+                "properties": {
+                    "reasons": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "default": null,
+                        "nullable": true
+                    },
+                    "erp_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "default": null,
+                        "nullable": true
+                    },
+                    "concrete_product_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "default": null,
+                        "nullable": true
+                    },
+                    "business_date_from": {
+                        "type": "string",
+                        "format": "date-time",
+                        "default": null,
+                        "nullable": true
+                    },
+                    "business_date_to": {
+                        "type": "string",
+                        "format": "date-time",
+                        "default": null,
+                        "nullable": true
+                    },
+                    "order": {
+                        "$ref": "#/components/schemas/SortDirection"
+                    },
+                    "page": {
+                        "type": "integer",
+                        "default": 1,
+                        "minimum": 0,
+                        "exclusiveMinimum": true
+                    },
+                    "page_size": {
+                        "type": "integer",
+                        "default": 50,
+                        "enum": [
+                            5,
+                            10,
+                            20,
+                            50,
+                            100,
+                            1000,
+                            5000,
+                            10000
+                        ]
+                    }
+                },
+                "type": "object"
+            },
+            "SearchStockAggregateResource": {
+                "properties": {
+                    "group_by": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "default": [],
+                        "minItems": 1
+                    },
+                    "granularity": {
+                        "$ref": "#/components/schemas/StockAggregateGranularity"
+                    },
+                    "reasons": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "default": null,
+                        "nullable": true
+                    },
+                    "erp_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "default": null,
+                        "nullable": true
+                    },
+                    "concrete_product_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "default": null,
+                        "nullable": true
+                    },
+                    "business_date_from": {
+                        "type": "string",
+                        "format": "date-time",
+                        "default": null,
+                        "nullable": true
+                    },
+                    "business_date_to": {
+                        "type": "string",
+                        "format": "date-time",
+                        "default": null,
+                        "nullable": true
+                    },
+                    "order": {
+                        "$ref": "#/components/schemas/SortDirection"
+                    },
+                    "page": {
+                        "type": "integer",
+                        "default": 1,
+                        "minimum": 0,
+                        "exclusiveMinimum": true
+                    },
+                    "page_size": {
+                        "type": "integer",
+                        "default": 50,
+                        "enum": [
+                            5,
+                            10,
+                            20,
+                            50,
+                            100,
+                            1000,
+                            5000,
+                            10000
+                        ]
+                    }
+                },
+                "type": "object"
+            },
+            "GoodsReceiptResource": {
+                "title": "GoodsReceipt",
+                "description": "GOODS_RECEIPT document - used for both delivery notes and accepted orders. The presence of confirmationNumber distinguishes between the two.",
+                "required": [
+                    "goodsReceiptId",
+                    "createdAt",
+                    "supplier",
+                    "client",
+                    "type",
+                    "currency",
+                    "lineItemPriceType",
+                    "number",
+                    "issueDate",
+                    "totalPrice",
+                    "lineItems"
+                ],
+                "properties": {
+                    "goodsReceiptId": {
+                        "type": "integer"
+                    },
+                    "createdAt": {
+                        "title": "when user finalized it.",
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "supplier": {
+                        "$ref": "#/components/schemas/SupplierResource"
+                    },
+                    "client": {
+                        "$ref": "#/components/schemas/GoodsReceiptClientResource"
+                    },
+                    "type": {
+                        "title": "Document type (always GOODS_RECEIPT).",
+                        "type": "string",
+                        "enum": [
+                            "GOODS_RECEIPT"
+                        ]
+                    },
+                    "currency": {
+                        "title": "Currency code (ISO 4217).",
+                        "type": "string"
+                    },
+                    "lineItemPriceType": {
+                        "title": "Price type for line items.",
+                        "type": "string",
+                        "enum": [
+                            "gross",
+                            "net"
+                        ]
+                    },
+                    "number": {
+                        "title": "Delivery note number (external delivery note ID).",
+                        "type": "string"
+                    },
+                    "issueDate": {
+                        "title": "Date when the document was issued.",
+                        "type": "string"
+                    },
+                    "totalPrice": {
+                        "title": "Total price including VAT.",
+                        "type": "number",
+                        "format": "float",
+                        "minimum": 0
+                    },
+                    "lineItems": {
+                        "title": "List of line items.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/LineItemResource"
+                        },
+                        "minItems": 1
+                    },
+                    "confirmationNumber": {
+                        "title": "Order confirmation number (optional, only for accepted orders). Format: K-{orderId}.",
+                        "type": "string",
+                        "default": null,
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "PaginationMetaResource": {
+                "required": [
+                    "currentPage",
+                    "perPage",
+                    "totalItems",
+                    "totalPages"
+                ],
+                "properties": {
+                    "currentPage": {
+                        "title": "Current page number.",
+                        "type": "integer"
+                    },
+                    "perPage": {
+                        "title": "Number of items per page.",
+                        "type": "integer"
+                    },
+                    "totalItems": {
+                        "title": "Total number of items.",
+                        "type": "integer"
+                    },
+                    "totalPages": {
+                        "title": "Total number of pages.",
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "StockChangeDailySummaryResource": {
+                "title": "StockChangeDailySummary",
+                "required": [
+                    "group",
+                    "values"
+                ],
+                "properties": {
+                    "group": {
+                        "$ref": "#/components/schemas/StockChangeDailySummaryGroupResource"
+                    },
+                    "values": {
+                        "$ref": "#/components/schemas/StockChangeDailySummaryValuesResource"
+                    }
+                },
+                "type": "object"
+            },
+            "AppliedFiltersResource": {
+                "title": "StockChangesAppliedFilters",
+                "required": [
+                    "order"
+                ],
+                "properties": {
+                    "erpIds": {
+                        "description": "ERP IDs the query was scoped to",
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "nullable": true
+                    },
+                    "concreteProductIds": {
+                        "description": "Concrete product IDs the query was scoped to",
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "nullable": true
+                    },
+                    "businessDateFrom": {
+                        "description": "Earliest business date included (inclusive)",
+                        "type": "string",
+                        "format": "date",
+                        "nullable": true
+                    },
+                    "businessDateTo": {
+                        "description": "Latest business date included (inclusive)",
+                        "type": "string",
+                        "format": "date",
+                        "nullable": true
+                    },
+                    "reasons": {
+                        "description": "Reasons filter applied (movements endpoint only)",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "nullable": true
+                    },
+                    "order": {
+                        "description": "Sort direction on business_date",
+                        "type": "string",
+                        "enum": [
+                            "asc",
+                            "desc"
+                        ]
+                    },
+                    "groupBy": {
+                        "description": "Group-by fields applied (aggregate endpoint only)",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "default": null,
+                        "nullable": true
+                    },
+                    "granularity": {
+                        "description": "Time bucket granularity applied (aggregate endpoint only)",
+                        "type": "string",
+                        "default": null,
+                        "enum": [
+                            "day",
+                            "week",
+                            "month",
+                            "year",
+                            "period"
+                        ],
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "StockMovementResource": {
+                "title": "StockMovement",
+                "required": [
+                    "group",
+                    "values"
+                ],
+                "properties": {
+                    "group": {
+                        "$ref": "#/components/schemas/StockMovementGroupResource"
+                    },
+                    "values": {
+                        "$ref": "#/components/schemas/StockMovementValuesResource"
+                    }
+                },
+                "type": "object"
+            },
+            "StockAggregateResource": {
+                "title": "StockAggregate",
+                "required": [
+                    "group",
+                    "values"
+                ],
+                "properties": {
+                    "group": {
+                        "description": "Grouping keys plus the covered period. Contains the fields included in the `group_by` query parameter and a `period` entry as [from, to] (inclusive). For `PERIOD` granularity the period is derived from the business_date_from / business_date_to filters (null elements indicate an unbounded side); otherwise it is the bucket range for the granularity.",
+                        "type": "object",
+                        "example": {
+                            "erpId": 12284,
+                            "concreteProductId": 389636,
+                            "reason": "waste",
+                            "period": [
+                                "2026-01-01",
+                                "2026-01-31"
+                            ]
+                        },
+                        "additionalProperties": {}
+                    },
+                    "values": {
+                        "description": "Aggregated values. Price fields (`deltaPrice`, `grossInflowPrice`, `grossOutflowPrice`) are always present. Amount fields (`deltaAmount`, `grossInflowAmount`, `grossOutflowAmount`) and their base-unit counterparts (`deltaAmountBaseUnit`, `grossInflowAmountBaseUnit`, `grossOutflowAmountBaseUnit`) are only present when `concrete_product_id` is in `group_by` (summing amounts across heterogeneous products is meaningless). `grossInflow*` sums only positive changes, `grossOutflow*` sums only negative changes.",
+                        "type": "object",
+                        "example": {
+                            "deltaAmount": -15,
+                            "grossInflowAmount": 5,
+                            "grossOutflowAmount": -20,
+                            "deltaAmountBaseUnit": -7.5,
+                            "grossInflowAmountBaseUnit": 2.5,
+                            "grossOutflowAmountBaseUnit": -10,
+                            "deltaPrice": -63,
+                            "grossInflowPrice": 21,
+                            "grossOutflowPrice": -84
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "SortDirection": {
+                "type": "string",
+                "enum": [
+                    "asc",
+                    "desc"
+                ]
+            },
+            "StockAggregateGranularity": {
+                "type": "string",
+                "enum": [
+                    "day",
+                    "week",
+                    "month",
+                    "year",
+                    "period"
+                ]
+            },
+            "SupplierResource": {
+                "title": "GoodsReceiptSupplier",
+                "description": "Supplier (shop) identification - requires either vatNumber or GLN",
+                "required": [
+                    "identifier"
+                ],
+                "properties": {
+                    "vatNumber": {
+                        "title": "VAT number of the supplier (shop).",
+                        "type": "string",
+                        "default": null,
+                        "nullable": true
+                    },
+                    "GLN": {
+                        "title": "Global Location Number of the supplier.",
+                        "type": "string",
+                        "default": null,
+                        "nullable": true
+                    },
+                    "identifier": {
+                        "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
+            "GoodsReceiptClientResource": {
+                "title": "GoodsReceiptClient",
+                "description": "Client identifier in the external billing system",
+                "required": [
+                    "vatNumber",
+                    "accountNumber"
+                ],
+                "properties": {
+                    "vatNumber": {
+                        "title": "Client identifier VAT number: ATU12345678.",
+                        "type": "string"
+                    },
+                    "accountNumber": {
+                        "title": "Recipient account number in the external billing system (e.g. ClearingCenterID for Cisbox).",
+                        "type": "string",
+                        "example": "123456"
+                    }
+                },
+                "type": "object"
+            },
+            "LineItemResource": {
+                "title": "GoodsReceiptLineItem",
+                "description": "A single line item in a goods receipt document",
+                "required": [
+                    "position",
+                    "productNumber",
+                    "productName",
+                    "unitPrice",
+                    "quantity",
+                    "totalPrice",
+                    "taxRate",
+                    "unit"
+                ],
+                "properties": {
+                    "position": {
+                        "title": "Line item position number (1-based).",
+                        "type": "integer",
+                        "minimum": 0,
+                        "exclusiveMinimum": true
+                    },
+                    "productNumber": {
+                        "title": "Product article ID.",
+                        "type": "string"
+                    },
+                    "productName": {
+                        "title": "Product name.",
+                        "type": "string"
+                    },
+                    "unitPrice": {
+                        "title": "Price per unit (gross, including VAT).",
+                        "type": "number",
+                        "format": "float",
+                        "minimum": 0
+                    },
+                    "quantity": {
+                        "title": "Quantity ordered/delivered.",
+                        "type": "number",
+                        "format": "float",
+                        "minimum": 0,
+                        "exclusiveMinimum": true
+                    },
+                    "totalPrice": {
+                        "title": "Total price for this line item (gross).",
+                        "type": "number",
+                        "format": "float",
+                        "minimum": 0
+                    },
+                    "taxRate": {
+                        "title": "Tax rate (currently always 0 as prices are gross).",
+                        "type": "number",
+                        "format": "float",
+                        "minimum": 0
+                    },
+                    "unit": {
+                        "title": "Unit of measurement.",
+                        "type": "string"
+                    },
+                    "stockGroup": {
+                        "title": "Stock group classification (optional).",
+                        "type": "string",
+                        "default": ""
+                    },
+                    "discountInfo": {
+                        "title": "Discount information (optional).",
+                        "type": "string",
+                        "default": ""
+                    }
+                },
+                "type": "object"
+            },
+            "StockChangeDailySummaryGroupResource": {
+                "title": "StockChangeDailySummaryGroup",
+                "required": [
+                    "erpId",
+                    "period",
+                    "concreteProductId"
+                ],
+                "properties": {
+                    "erpId": {
+                        "description": "ERP ID",
+                        "type": "integer",
+                        "example": 12284
+                    },
+                    "period": {
+                        "description": "Period the row covers, as [from, to] (inclusive). For daily granularity both elements equal the business date.",
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "format": "date"
+                        },
+                        "example": [
+                            "2026-01-31",
+                            "2026-01-31"
+                        ]
+                    },
+                    "concreteProductId": {
+                        "description": "Concrete product ID",
+                        "type": "integer",
+                        "example": 183928
+                    }
+                },
+                "type": "object"
+            },
+            "StockChangeDailySummaryValuesResource": {
+                "title": "StockChangeDailySummaryValues",
+                "required": [
+                    "openingPrice",
+                    "deltaPrice",
+                    "closingPrice",
+                    "openingAmount",
+                    "deltaAmount",
+                    "closingAmount",
+                    "openingAmountBaseUnit",
+                    "deltaAmountBaseUnit",
+                    "closingAmountBaseUnit"
+                ],
+                "properties": {
+                    "openingPrice": {
+                        "description": "Opening price at the start of the business date",
+                        "type": "number",
+                        "format": "float",
+                        "example": 123.45
+                    },
+                    "deltaPrice": {
+                        "description": "Sum of price deltas within the business date",
+                        "type": "number",
+                        "format": "float",
+                        "example": 12.5
+                    },
+                    "closingPrice": {
+                        "description": "Closing price at the end of the business date",
+                        "type": "number",
+                        "format": "float",
+                        "example": 135.95
+                    },
+                    "openingAmount": {
+                        "description": "Opening amount at the start of the business date",
+                        "type": "number",
+                        "format": "float",
+                        "example": 5
+                    },
+                    "deltaAmount": {
+                        "description": "Sum of amount deltas within the business date",
+                        "type": "number",
+                        "format": "float",
+                        "example": 1.75
+                    },
+                    "closingAmount": {
+                        "description": "Closing amount at the end of the business date",
+                        "type": "number",
+                        "format": "float",
+                        "example": 6.75
+                    },
+                    "openingAmountBaseUnit": {
+                        "description": "Opening amount expressed in the base unit at the start of the business date",
+                        "type": "number",
+                        "format": "float",
+                        "example": 5
+                    },
+                    "deltaAmountBaseUnit": {
+                        "description": "Sum of amount deltas in the base unit within the business date",
+                        "type": "number",
+                        "format": "float",
+                        "example": 1.75
+                    },
+                    "closingAmountBaseUnit": {
+                        "description": "Closing amount expressed in the base unit at the end of the business date",
+                        "type": "number",
+                        "format": "float",
+                        "example": 6.75
+                    }
+                },
+                "type": "object"
+            },
+            "StockMovementGroupResource": {
+                "title": "StockMovementGroup",
+                "required": [
+                    "erpId",
+                    "period",
+                    "concreteProductId",
+                    "reason"
+                ],
+                "properties": {
+                    "erpId": {
+                        "description": "ERP ID",
+                        "type": "integer",
+                        "example": 12284
+                    },
+                    "period": {
+                        "description": "Period the row covers, as [from, to] (inclusive). For daily granularity both elements equal the business date.",
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "format": "date"
+                        },
+                        "example": [
+                            "2026-01-31",
+                            "2026-01-31"
+                        ]
+                    },
+                    "concreteProductId": {
+                        "description": "Concrete product ID",
+                        "type": "integer",
+                        "example": 389636
+                    },
+                    "reason": {
+                        "description": "Movement reason (food-waste detail \u2192 ref_type \u2192 raw reason, first non-empty)",
+                        "type": "string",
+                        "example": "sale"
+                    }
+                },
+                "type": "object"
+            },
+            "StockMovementValuesResource": {
+                "title": "StockMovementValues",
+                "required": [
+                    "totalAmount",
+                    "totalAmountBaseUnit",
+                    "totalPrice"
+                ],
+                "properties": {
+                    "totalAmount": {
+                        "description": "Total amount moved within the period for this reason",
+                        "type": "number",
+                        "format": "float",
+                        "example": 1.75
+                    },
+                    "totalAmountBaseUnit": {
+                        "description": "Total amount moved expressed in the base unit within the period for this reason",
+                        "type": "number",
+                        "format": "float",
+                        "example": 0.875
+                    },
+                    "totalPrice": {
+                        "description": "Total price moved within the period for this reason",
+                        "type": "number",
+                        "format": "float",
+                        "example": 12.5
+                    }
+                },
+                "type": "object"
+            }
+        }
+    },
+    "security": [
+        {
+            "Bearer": []
+        }
+    ],
+    "tags": [
+        {
+            "name": "Billing - Goods Receipts"
+        },
+        {
+            "name": "Billing - Webhook (External System Sample)"
+        },
+        {
+            "name": "Erp Stock Balances"
+        }
+    ]
+}

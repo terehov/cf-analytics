@@ -1,0 +1,1063 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Recipe",
+        "version": "v1.0"
+    },
+    "paths": {
+        "/api/1.0/dailymenus": {
+            "get": {
+                "summary": "List all Dailymenus.",
+                "operationId": "get_api_dailymenus_index",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/dailymenus/{id}": {
+            "get": {
+                "summary": "Get one Dailymenu.",
+                "operationId": "get_api_dailymenus_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/ingredients/search": {
+            "post": {
+                "summary": "Search ingredients.",
+                "operationId": "post_api_ingredients_search",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/recipes": {
+            "get": {
+                "summary": "Get All Recipes.",
+                "operationId": "get_api_recipes_index",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "summary": "Create Recipe.",
+                "operationId": "post_api_recipes_create",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/recipes/allData": {
+            "get": {
+                "summary": "Get All Recipes data paginated.",
+                "operationId": "get_api_recipes_all_data",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/recipes/pricing": {
+            "get": {
+                "summary": "Get paginated list of recipes including per-restaurant pricing.",
+                "operationId": "get_api_recipes_pricing_list",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/recipes/{id}": {
+            "get": {
+                "summary": "Get single Recipe.",
+                "operationId": "get_api_recipes_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "\\d+"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "put": {
+                "summary": "Update Recipe.",
+                "operationId": "put_api_recipes_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Delete Recipe.",
+                "operationId": "delete_api_recipes_delete",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/recipes/search": {
+            "post": {
+                "summary": "Search Recipes.",
+                "operationId": "post_api_recipes_search",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/recipes/{id}/image": {
+            "post": {
+                "summary": "Add image to Recipe. Accept form with file upload.",
+                "operationId": "post_api_recipes_image_add",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/recipes/{id}/image/{imageId}": {
+            "delete": {
+                "summary": "Delete image from Recipe.",
+                "operationId": "delete_api_recipes_image_delete",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "imageId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/recipes/{id}/names": {
+            "get": {
+                "summary": "Get all Recipe Names.",
+                "operationId": "get_api_recipes_names_all",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "summary": "Add/Update Name to Recipe.",
+                "operationId": "post_api_recipes_names_add",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/recipes/{id}/names/{nameId}": {
+            "delete": {
+                "summary": "Remove Name from Recipe.",
+                "operationId": "delete_api_recipes_names_remove",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "nameId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/recipes/{id}/categories": {
+            "get": {
+                "summary": "Get Recipe Categories.",
+                "operationId": "get_api_recipes_categories_all",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "summary": "Add Recipe to Category.",
+                "operationId": "post_api_recipes_categories_add",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/recipes/{id}/categories/{categoryId}": {
+            "delete": {
+                "summary": "Remove Recipe from Category.",
+                "operationId": "delete_api_recipes_categories_remove",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "categoryId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/recipes/{id}/tags": {
+            "get": {
+                "summary": "Get all Tags for Recipe.",
+                "operationId": "get_api_recipes_tags_all",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "summary": "Add Tag to Recipe.",
+                "operationId": "post_api_recipes_tags_add",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/recipes/{id}/nutritionTags": {
+            "get": {
+                "summary": "Get all Nutrition Tags for Recipe.",
+                "operationId": "get_api_recipes_nutrition_tags_all",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/recipes/{id}/tags/{tagId}": {
+            "delete": {
+                "summary": "Remove Tag from Recipe.",
+                "operationId": "delete_api_recipes_tags_remove",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "tagId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/recipes/{id}/allergens": {
+            "get": {
+                "summary": "Get Recipe allergens.",
+                "operationId": "get_api_recipes_allergens",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/recipes/{id}/additives": {
+            "get": {
+                "summary": "Get Recipe additives.",
+                "operationId": "get_api_recipes_additives",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/recipes/{id}/additionals": {
+            "get": {
+                "summary": "Get Recipe additionals.",
+                "operationId": "get_api_recipes_additionals",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/recipes/{id}/nutritions": {
+            "get": {
+                "summary": "Get Recipe nutritions.",
+                "operationId": "get_api_recipes_nutritions",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/recipes/{id}/contributionMarginData": {
+            "get": {
+                "summary": "Get Recipe ContributionMarginData.",
+                "operationId": "get_api_recipes_contribution_margin_data",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/recipes/{id}/ingredients": {
+            "get": {
+                "summary": "Get Recipe ingredients.",
+                "operationId": "get_api_recipes_ingredients",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/recipes/{id}/ingredients/{ingredientId}": {
+            "post": {
+                "summary": "Add Ingredient to Recipe.",
+                "operationId": "post_api_recipes_ingredients_create",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "ingredientId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/recipes/{id}/ingredients/recipes/{recipeId}": {
+            "post": {
+                "summary": "Add Recipe as Ingredient to Recipe.",
+                "operationId": "post_api_recipes_ingredients_create_from_recipe",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "recipeId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/recipes/ingredients/{id}": {
+            "put": {
+                "summary": "Update RecipeIngredient.",
+                "operationId": "put_api_recipes_ingredients_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Delete RecipeIngredient.",
+                "operationId": "delete_api_recipes_ingredients_delete",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/recipes/{id}/restaurants": {
+            "get": {
+                "summary": "Get Recipe Restaurants.",
+                "operationId": "get_api_recipes_restaurants_all",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "summary": "Add Recipe to Restaurant.",
+                "operationId": "post_api_recipes_restaurants_add",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/recipes/restaurants/{id}": {
+            "get": {
+                "summary": "Get single RecipeRestaurant.",
+                "operationId": "get_api_recipes_restaurants_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "put": {
+                "summary": "Update RecipeRestaurant.",
+                "operationId": "put_api_recipes_restaurants_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Delete RecipeRestaurant (Remove Recipe from Restaurant).",
+                "operationId": "delete_api_recipes_restaurants_delete",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/recipes/{id}/availabilities": {
+            "get": {
+                "summary": "Get all Recipe Availabilities.",
+                "operationId": "get_api_recipes_availabilities_all",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "summary": "Create Recipe Availability.",
+                "operationId": "post_api_recipes_availabilities_add",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/recipes/{id}/availabilities/{availabilityId}": {
+            "delete": {
+                "summary": "Delete Recipe Availability.",
+                "operationId": "delete_api_recipes_availabilities_remove",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "availabilityId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/recipes/{id}/blacklists": {
+            "get": {
+                "summary": "Get Recipe blacklists.",
+                "operationId": "get_api_recipes_blacklists_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/recipes/categories": {
+            "get": {
+                "tags": [
+                    "Category"
+                ],
+                "summary": "Get all Categories.",
+                "operationId": "get_api_recipes_distinct_categories_index",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Current page",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "pageSize",
+                        "in": "query",
+                        "description": "Items per page",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 10
+                        }
+                    },
+                    {
+                        "name": "orderBy",
+                        "in": "query",
+                        "description": "Order by field",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "orderId"
+                        }
+                    },
+                    {
+                        "name": "orderDirection",
+                        "in": "query",
+                        "description": "Order direction",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "ASC"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Get All Categories"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Category"
+                ],
+                "summary": "Create new Category.",
+                "operationId": "post_api_recipes_distinct_categories_create",
+                "requestBody": {
+                    "description": "Payload to create a new Category",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "categoryName"
+                                ],
+                                "properties": {
+                                    "categoryName": {
+                                        "description": "The name of the category",
+                                        "type": "string",
+                                        "example": "My Category"
+                                    },
+                                    "orderId": {
+                                        "description": "Order ID for sorting the category",
+                                        "type": "integer",
+                                        "example": 10
+                                    },
+                                    "parent": {
+                                        "description": "Parent category ID (if applicable)",
+                                        "type": "integer",
+                                        "example": 1345
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Details of the created Category"
+                    }
+                }
+            }
+        },
+        "/api/1.0/recipes/categories/{id}": {
+            "get": {
+                "tags": [
+                    "Category"
+                ],
+                "summary": "Get one category.",
+                "operationId": "get_api_recipes_distinct_categories_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Get one Category"
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "Category"
+                ],
+                "summary": "Update Category.",
+                "operationId": "put_api_recipes_distinct_categories_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "The ID of the category to update",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 123
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Payload to update the Category. All fields are optional.",
+                    "required": false,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "categoryName": {
+                                        "description": "The updated name of the category",
+                                        "type": "string",
+                                        "example": "My Category"
+                                    },
+                                    "orderId": {
+                                        "description": "The updated order ID for sorting the category",
+                                        "type": "integer",
+                                        "example": 10
+                                    },
+                                    "parent": {
+                                        "description": "The updated parent category ID (if applicable)",
+                                        "type": "integer",
+                                        "example": 1345
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Details of the updated Category"
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "Category"
+                ],
+                "summary": "Delete Category.",
+                "operationId": "delete_api_recipes_distinct_categories_delete",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Delete Category"
+                    }
+                }
+            }
+        }
+    },
+    "security": [
+        {
+            "Bearer": []
+        }
+    ],
+    "tags": [
+        {
+            "name": "Category"
+        }
+    ]
+}

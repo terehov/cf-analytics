@@ -1,0 +1,88 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Shop",
+        "version": "v1.0"
+    },
+    "paths": {
+        "/api/1.0/shops": {
+            "get": {
+                "summary": "Get all Shops.",
+                "operationId": "get_api_shops_index",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/shops/{id}": {
+            "get": {
+                "summary": "Get one Shop.",
+                "operationId": "get_api_shops_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/shops/{id}/orders": {
+            "get": {
+                "summary": "Get all ShopOrders (with or without products).",
+                "operationId": "get_api_shops_orders",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/shops/orders/{id}": {
+            "get": {
+                "summary": "Get one ShopOrder (with products).",
+                "operationId": "get_api_shops_orders_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        }
+    },
+    "security": [
+        {
+            "Bearer": []
+        }
+    ]
+}

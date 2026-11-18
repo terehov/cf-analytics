@@ -1,0 +1,126 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Webhooks",
+        "version": "v1.0"
+    },
+    "paths": {
+        "/api/1.0/webhooks/events": {
+            "get": {
+                "summary": "List Webhook Event values.",
+                "operationId": "get_api_webhooks_events",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/webhooks": {
+            "get": {
+                "summary": "List all users webhooks (urls).",
+                "operationId": "get_api_webhooks_index",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "summary": "Set new Webhook (url) for event.",
+                "operationId": "post_api_webhooks_create",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/webhooks/{id}": {
+            "get": {
+                "summary": "Get single Webhook.",
+                "operationId": "get_api_webhooks_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "put": {
+                "summary": "Update Webhook.",
+                "operationId": "put_api_webhooks_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Delete Webhook.",
+                "operationId": "delete_api_webhooks_delete",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/webhooks/posts": {
+            "get": {
+                "summary": "List Posts created for user.",
+                "operationId": "get_api_webhooks_posts",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/webhooks/posts/search": {
+            "post": {
+                "summary": "Search Posts created for user.",
+                "operationId": "post_api_webhooks_posts_search",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        }
+    },
+    "security": [
+        {
+            "Bearer": []
+        }
+    ]
+}

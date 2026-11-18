@@ -1,0 +1,88 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Erp.Legacy",
+        "version": "v1.0"
+    },
+    "paths": {
+        "/api/1.0/erp/concrete-products": {
+            "get": {
+                "summary": "Get all products.",
+                "operationId": "get_api_erp_concrete_products_list",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/erp/concrete-products/event/{eventId}/search": {
+            "post": {
+                "summary": "Search concreteProduct for event.",
+                "operationId": "post_api_concrete_product_search",
+                "parameters": [
+                    {
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/erp/erp": {
+            "get": {
+                "summary": "Get all erps.",
+                "operationId": "get_api_erp_erp_list",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/erp/stock-changes": {
+            "get": {
+                "summary": "Get all stock changes.",
+                "operationId": "get_api_erp_stockchanges_list",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/erp/stocktaking": {
+            "get": {
+                "summary": "Get all stocktaking.",
+                "operationId": "get_api_erp_stocktaking_list",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "summary": "Create stocktaking.",
+                "operationId": "post_api_erp_stocktaking_create",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        }
+    },
+    "security": [
+        {
+            "Bearer": []
+        }
+    ]
+}

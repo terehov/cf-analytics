@@ -1,0 +1,79 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "User",
+        "version": "v1.0"
+    },
+    "paths": {
+        "/api/1.0/user/restaurants": {
+            "get": {
+                "summary": "Get all Restaurants.",
+                "operationId": "get_api_user_restaurants_index",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/user/restaurants/{id}": {
+            "get": {
+                "summary": "Get single Restaurant.",
+                "operationId": "get_api_user_restaurants_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/user": {
+            "get": {
+                "summary": "Get Current User.",
+                "operationId": "get_api_user_index",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/user/subusers": {
+            "get": {
+                "summary": "Get Current User Subusers.",
+                "operationId": "get_api_user_subusers",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/1.0/user/subusers/search": {
+            "post": {
+                "summary": "Search Subusers.",
+                "operationId": "post_api_user_subusers_search",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        }
+    },
+    "security": [
+        {
+            "Bearer": []
+        }
+    ]
+}

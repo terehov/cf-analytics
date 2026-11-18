@@ -1,0 +1,575 @@
+pfad,quellen,parameter,parameter_quelle,query_noetig,klasse,messen,grund
+/api/1.0/catering/consumerGroups,offiziell,,,,lesend,ja,Familie /api/1.0/* bereits getestet: 403 (nicht jeder Pfad einzeln)
+/api/1.0/catering/events,offiziell,,,,lesend,ja,Familie /api/1.0/* bereits getestet: 403 (nicht jeder Pfad einzeln)
+/api/1.0/catering/events-recipes,offiziell,,,,lesend,ja,Familie /api/1.0/* bereits getestet: 403 (nicht jeder Pfad einzeln)
+/api/1.0/catering/eventTypes,offiziell,,,,lesend,ja,Familie /api/1.0/* bereits getestet: 403 (nicht jeder Pfad einzeln)
+/api/1.0/catering/locations,offiziell,,,,lesend,ja,Familie /api/1.0/* bereits getestet: 403 (nicht jeder Pfad einzeln)
+/api/1.0/catering/locationTypes,offiziell,,,,lesend,ja,Familie /api/1.0/* bereits getestet: 403 (nicht jeder Pfad einzeln)
+/api/1.0/catering/recipeBlacklist,offiziell,,,,lesend,ja,Familie /api/1.0/* bereits getestet: 403 (nicht jeder Pfad einzeln)
+/api/1.0/catering/recipeCategoryBlacklist,offiziell,,,,lesend,ja,Familie /api/1.0/* bereits getestet: 403 (nicht jeder Pfad einzeln)
+/api/1.0/catering/roleOptions,offiziell,,,,lesend,ja,Familie /api/1.0/* bereits getestet: 403 (nicht jeder Pfad einzeln)
+/api/1.0/catering/roles,offiziell,,,,lesend,ja,Familie /api/1.0/* bereits getestet: 403 (nicht jeder Pfad einzeln)
+/api/1.0/catering/serviceTypes,offiziell,,,,lesend,ja,Familie /api/1.0/* bereits getestet: 403 (nicht jeder Pfad einzeln)
+/api/1.0/dailymenus,offiziell,,,,lesend,ja,Familie /api/1.0/* bereits getestet: 403 (nicht jeder Pfad einzeln)
+/api/1.0/erp/concrete-products,offiziell,,,,lesend,ja,Familie /api/1.0/* bereits getestet: 403 (nicht jeder Pfad einzeln)
+/api/1.0/erp/erp,offiziell,,,,lesend,ja,Familie /api/1.0/* bereits getestet: 403 (nicht jeder Pfad einzeln)
+/api/1.0/erp/stock-changes,offiziell,,,,lesend,ja,Familie /api/1.0/* bereits getestet: 403 (nicht jeder Pfad einzeln)
+/api/1.0/erp/stocktaking,offiziell,,,,lesend,ja,Familie /api/1.0/* bereits getestet: 403 (nicht jeder Pfad einzeln)
+/api/1.0/pos,offiziell,,,,lesend,ja,Familie /api/1.0/* bereits getestet: 403 (nicht jeder Pfad einzeln)
+/api/1.0/pos/{accountId},offiziell,accountId,accountId=connectionId,,lesend,ja,Familie /api/1.0/* bereits getestet: 403 (nicht jeder Pfad einzeln)
+/api/1.0/pos/{accountId}/invoices,offiziell,accountId,accountId=connectionId,,lesend,ja,Familie /api/1.0/* bereits getestet: 403 (nicht jeder Pfad einzeln)
+/api/1.0/pos/{accountId}/productGroups,offiziell,accountId,accountId=connectionId,,lesend,ja,Familie /api/1.0/* bereits getestet: 403 (nicht jeder Pfad einzeln)
+/api/1.0/pos/{accountId}/products,offiziell,accountId,accountId=connectionId,,lesend,ja,Familie /api/1.0/* bereits getestet: 403 (nicht jeder Pfad einzeln)
+/api/1.0/recipes,offiziell,,,,lesend,ja,Familie /api/1.0/* bereits getestet: 403 (nicht jeder Pfad einzeln)
+/api/1.0/recipes/allData,offiziell,,,,lesend,ja,Familie /api/1.0/* bereits getestet: 403 (nicht jeder Pfad einzeln)
+/api/1.0/recipes/categories,offiziell,,,,lesend,ja,Familie /api/1.0/* bereits getestet: 403 (nicht jeder Pfad einzeln)
+/api/1.0/recipes/pricing,offiziell,,,,lesend,ja,Familie /api/1.0/* bereits getestet: 403 (nicht jeder Pfad einzeln)
+/api/1.0/shops,offiziell,,,,lesend,ja,Familie /api/1.0/* bereits getestet: 403 (nicht jeder Pfad einzeln)
+/api/1.0/user,offiziell,,,,lesend,ja,Familie /api/1.0/* bereits getestet: 403 (nicht jeder Pfad einzeln)
+/api/1.0/user/restaurants,offiziell,,,,lesend,ja,Familie /api/1.0/* bereits getestet: 403 (nicht jeder Pfad einzeln)
+/api/1.0/user/restaurants/{restaurantId},offiziell,restaurantId,restaurantId=restaurantId,,lesend,ja,Familie /api/1.0/* bereits getestet: 403 (nicht jeder Pfad einzeln)
+/api/1.0/webhooks,offiziell,,,,lesend,ja,Familie /api/1.0/* bereits getestet: 403 (nicht jeder Pfad einzeln)
+/api/1.0/webhooks/events,offiziell,,,,lesend,ja,Familie /api/1.0/* bereits getestet: 403 (nicht jeder Pfad einzeln)
+/api/1.0/webhooks/posts,offiziell,,,,lesend,ja,Familie /api/1.0/* bereits getestet: 403 (nicht jeder Pfad einzeln)
+/api/2.0/erp/stock/aggregate,offiziell,,,,lesend,ja,bereits gemessen: 403
+/api/2.0/erp/stock/balances,offiziell,,,,lesend,ja,bereits gemessen: 403
+/api/2.0/erp/stock/movements,offiziell,,,,lesend,ja,bereits gemessen: 403
+/api/2.0/pos/accounts/{accountIdentifier}/invoices,offiziell,accountIdentifier,accountIdentifier=connectionId,,lesend,ja,bereits gemessen: 200
+/api/2.0/pos/accounts/{accountIdentifier}/product-groups,offiziell,accountIdentifier,accountIdentifier=connectionId,,lesend,ja,bereits gemessen: 200
+/api/2.0/pos/accounts/{accountIdentifier}/products,offiziell,accountIdentifier,accountIdentifier=connectionId,,lesend,ja,bereits gemessen: 200
+/api/2.0/pos/vendors/fn-recipe/{accountIdentifier}/product-groups,offiziell,accountIdentifier,accountIdentifier=connectionId,,lesend,ja,
+/api/2.0/pos/vendors/fn-recipe/{accountIdentifier}/products,offiziell,accountIdentifier,accountIdentifier=connectionId,,lesend,ja,
+/api/allowedLocations,"brew,panel",,,,lesend,ja,
+/api/analytics,panel,,,,lesend,ja,
+/api/analytics/reports/cost-analysis/ingredients/by-month,brew,,,restaurant_ids;date_from;date_to,lesend,ja,"Query vom Client stets gesetzt: restaurant_ids,date_from,date_to"
+/api/analytics/reports/cost-analysis/ingredients/by-product,brew,,,restaurant_ids;date_from;date_to,lesend,ja,"Query vom Client stets gesetzt: restaurant_ids,date_from,date_to"
+/api/analytics/reports/cost-analysis/ingredients/by-restaurant,brew,,,restaurant_ids;date_from;date_to,lesend,ja,"Query vom Client stets gesetzt: restaurant_ids,date_from,date_to"
+/api/analytics/reports/cost-analysis/ingredients/cards,brew,,,restaurant_ids;date_from;date_to,lesend,ja,"Query vom Client stets gesetzt: restaurant_ids,date_from,date_to"
+/api/analytics/reports/cost-analysis/ingredients/food-waste,brew,,,restaurant_ids;date_from;date_to,lesend,ja,"Query vom Client stets gesetzt: restaurant_ids,date_from,date_to"
+/api/analytics/reports/cost-analysis/runner-bummer/ingredients,brew,,,restaurant_ids;date_from;date_to;page;page_size,lesend,ja,"Query vom Client stets gesetzt: restaurant_ids,date_from,date_to,page,page_size"
+/api/analytics/reports/cost-analysis/runner-bummer/unmapped,brew,,,restaurant_ids;date_from;date_to;page;page_size,lesend,ja,"Query vom Client stets gesetzt: restaurant_ids,date_from,date_to,page,page_size"
+/api/carts/count,"brew,panel",,,,lesend,ja,
+/api/connectedSuppliers,"brew,panel",,,,lesend,ja,
+/api/costCenters/eventFilter,panel,,,,lesend,ja,
+/api/dailyMenu/menu,panel,,,pageSize;orderBy;orderDirection;page,lesend,ja,"Query vom Client stets gesetzt: pageSize,orderBy,orderDirection,page"
+/api/dashboard/costCenters,panel,,,,lesend,ja,
+/api/dashboard/getBoxesData,panel,,,,lesend,ja,
+/api/erp/all,"brew,panel",,,,lesend,ja,bereits gemessen: 403
+/api/erp/available,"brew,panel",,,,lesend,ja,
+/api/erp/catalog/commodity-groups,"brew,panel",,,erpId;page;perPage;includeEmpty,lesend,ja,"Query vom Client stets gesetzt: erpId,page,perPage,includeEmpty"
+/api/erp/commodity-groups,brew,,,page;perPage;search,lesend,ja,"Query vom Client stets gesetzt: page,perPage,search"
+/api/erp/concrete-products,brew,,,page;perPage;search;costCenterIds,lesend,ja,"Query vom Client stets gesetzt: page,perPage,search,costCenterIds"
+/api/erp/core/{userId}/erps,brew,userId,userId=userId,,lesend,ja,
+/api/erp/dashboard,panel,,,erpId;low_on_stock_page;low_on_stock_search;low_on_stock_searchView;pending_orders_page,lesend,ja,"Query vom Client stets gesetzt: erpId,low_on_stock_page,low_on_stock_search,low_on_stock_searchView,pending_orders_page"
+/api/erp/food-waste,brew,,,erpId;limit;page,lesend,ja,"Query vom Client stets gesetzt: erpId,limit,page"
+/api/erp/food-waste-alpha/reasons,brew,,,,lesend,ja,
+/api/erp/food-waste-alpha/recipes,brew,,,erpId;searchTerm;page;limit,lesend,ja,"Query vom Client stets gesetzt: erpId,searchTerm,page,limit"
+/api/erp/food-waste-alpha/totals,brew,,,erpId;fromDate;toDate;reasons,lesend,ja,"Query vom Client stets gesetzt: erpId,fromDate,toDate,reasons"
+/api/erp/order/auto-import-settings,"brew,panel",,,,lesend,ja,
+/api/erp/product-groups,brew,,,page;perPage;search;costCenterId;translationStatus,lesend,ja,"Query vom Client stets gesetzt: page,perPage,search,costCenterId,translationStatus"
+/api/erp/stock-transfer,"brew,panel",,,erpId;status;page;limit;order_by;order_direction,lesend,ja,"Query vom Client stets gesetzt: erpId,status,page,limit,order_by,order_direction"
+/api/erp/stock-transfer/paginate,panel,,,page_size;page,lesend,ja,"Query vom Client stets gesetzt: page_size,page; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/erp/stock-transfer/search,panel,,,page_size;page;search,lesend,ja,"Query vom Client stets gesetzt: page_size,page,search; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/erp/stock-transfer-request,brew,,,erpId;status;page;limit,lesend,ja,"Query vom Client stets gesetzt: erpId,status,page,limit"
+/api/erp/stocktakings,"brew,panel",,,erpIds[];page;order_by,lesend,ja,"bereits gemessen: 403; Query vom Client stets gesetzt: erpIds[],page,order_by"
+/api/erp/unit/containers,"brew,panel",,,,lesend,ja,
+/api/erpSettings/categories,panel,,,page;pageSize;search,lesend,ja,"Query vom Client stets gesetzt: page,pageSize,search"
+/api/erpSettings/productGroups,"brew,panel",,,page;pageSize;search;erpId,lesend,ja,"Query vom Client stets gesetzt: page,pageSize,search,erpId"
+/api/erpSettings/productGroups/listOfSuppliers,"brew,panel",,,,lesend,ja,
+/api/erpSettings/restaurants,"brew,panel",,,,lesend,ja,
+/api/erpSettings/restaurants/shared,"brew,panel",,,,lesend,ja,
+/api/erpSettings/storages,"brew,panel",,,page;pageSize;search,lesend,ja,"Query vom Client stets gesetzt: page,pageSize,search"
+/api/eventCatering/event,panel,,,pageSize;orderBy;orderDirection;page,lesend,ja,"Query vom Client stets gesetzt: pageSize,orderBy,orderDirection,page"
+/api/eventCatering/eventComment,panel,,,,lesend,ja,
+/api/eventCatering/eventConsumerGroup,panel,,,,lesend,ja,
+/api/eventCatering/eventCourse,panel,,,orderBy;orderDirection;page,lesend,ja,"Query vom Client stets gesetzt: orderBy,orderDirection,page"
+/api/eventCatering/eventCourseTemplate,panel,,,orderBy;orderDirection;page,lesend,ja,"Query vom Client stets gesetzt: orderBy,orderDirection,page"
+/api/eventCatering/eventLocation,panel,,,pageSize;orderBy;orderDirection;page,lesend,ja,"Query vom Client stets gesetzt: pageSize,orderBy,orderDirection,page"
+/api/eventCatering/eventLocationType,panel,,,,lesend,ja,
+/api/eventCatering/eventOrder/costCenter/{costCenterId}/carts,panel,costCenterId,costCenterId=costCenterId,,lesend,ja,
+/api/eventCatering/eventStaffRole,panel,,,,lesend,ja,
+/api/eventCatering/eventType,panel,,,pageSize;orderBy;orderDirection;page,lesend,ja,"Query vom Client stets gesetzt: pageSize,orderBy,orderDirection,page"
+/api/eventCatering/recipeBlacklist,panel,,,pageSize,lesend,ja,Query vom Client stets gesetzt: pageSize
+/api/eventCatering/recipeCategoryBlacklist,panel,,,pageSize,lesend,ja,Query vom Client stets gesetzt: pageSize
+/api/eventCatering/role,panel,,,pageSize;orderBy;orderDirection;page,lesend,ja,"Query vom Client stets gesetzt: pageSize,orderBy,orderDirection,page"
+/api/eventCatering/roleOption,panel,,,,lesend,ja,
+/api/eventCatering/roleOptionValue,panel,,,,lesend,ja,
+/api/eventCatering/serviceType,panel,,,pageSize;orderBy;orderDirection;page,lesend,ja,"Query vom Client stets gesetzt: pageSize,orderBy,orderDirection,page"
+/api/menu_creator/mc_images,panel,,,,lesend,ja,
+/api/menu_creator/mc_trans,panel,,,,lesend,ja,
+/api/menu_creator/menu_card/show_many,panel,,,,lesend,ja,
+/api/menu_creator/template/show_many,panel,,,,lesend,ja,
+/api/pos/connection/product_groups/{connectionId},"brew,panel",connectionId,connectionId=connectionId,,lesend,ja,
+/api/pos/connection/{connectionId},"brew,panel",connectionId,connectionId=connectionId,,lesend,ja,
+/api/pos/device_types,"brew,panel",,,,lesend,ja,
+/api/pos/export/without_reload/{connectionId},"brew,panel",connectionId,connectionId=connectionId,,lesend,ja,
+/api/pos/locations,"brew,panel",,,,lesend,ja,bereits gemessen: 403
+/api/pos/mapping/{accountId}/article-sales,brew,accountId,accountId=connectionId,,lesend,ja,
+/api/pos/mapping/{accountId}/articles,brew,accountId,accountId=connectionId,,lesend,ja,
+/api/pos/mapping/{mappingId}/jobs/active,brew,mappingId,mappingId=connectionId,,lesend,ja,
+/api/pos/mapping/{mappingId}/link-targets,brew,mappingId,mappingId=connectionId,,lesend,ja,
+/api/pos/sync/locations,"brew,panel",,,,lesend,ja,
+/api/pos/sync/user/distinct_categories,"brew,panel",,,,lesend,ja,
+/api/pub/version,panel,,,,lesend,ja,
+/api/recipe/ingredient-search/candidates,brew,,,searchTerm;kinds,lesend,ja,"Query vom Client stets gesetzt: searchTerm,kinds"
+/api/recipe/ingredient-search/suppliers,brew,,,,lesend,ja,
+/api/recipe/ingredients,brew,,,page,lesend,ja,Query vom Client stets gesetzt: page
+/api/recipe/ingredients/copy-target-erps,brew,,,,lesend,ja,
+/api/recipe/ingredients/suppliers,brew,,,,lesend,ja,
+/api/recipe-viewer/config,brew,,,,lesend,ja,
+/api/recipe-viewer/groups,brew,,,,lesend,ja,
+/api/recipe-viewer/recipes,brew,,,page;limit;orderBy;orderDirection,lesend,ja,"Query vom Client stets gesetzt: page,limit,orderBy,orderDirection"
+/api/recipe-viewer/recipes/batch,brew,,,recipeIds[],lesend,ja,Query vom Client stets gesetzt: recipeIds[]
+/api/recipes/cogs-corridors/distinct-categories,brew,,,,lesend,ja,
+/api/recipes/cogs-corridors/recipe-types,brew,,,,lesend,ja,
+/api/recipes/cost-calculation/recipes,brew,,,page;limit,lesend,ja,"Query vom Client stets gesetzt: page,limit"
+/api/recipes/cost-calculation/summary,brew,,,search;recipeType;countryCodes;distinctCategoryId;excludeZeroCogs;excludeZeroPosPrice,lesend,ja,"Query vom Client stets gesetzt: search,recipeType,countryCodes,distinctCategoryId,excludeZeroCogs,excludeZeroPosPrice"
+/api/recipes/dashboard-mix/restaurants,brew,,,,lesend,ja,
+/api/recipes/dashboard-mix/{restaurantId}/monthly-costs,brew,restaurantId,restaurantId=restaurantId,,lesend,ja,
+/api/recipes/distinct-categories,brew,,,,lesend,ja,
+/api/recipes/distinct-categories/name-translations,brew,,,,lesend,ja,
+/api/recipes/tags,brew,,,,lesend,ja,
+/api/shop/multi-cost-center-ordering,brew,,,page;limit,lesend,ja,"Query vom Client stets gesetzt: page,limit"
+/api/shop/order-reminder/subscriptions/options,brew,,,,lesend,ja,
+/api/shop/products/search,brew,,,query;page;perPage,lesend,ja,"Query vom Client stets gesetzt: query,page,perPage"
+/api/shop/shoppingList/{costCenterId},"brew,panel",costCenterId,costCenterId=costCenterId,,lesend,ja,
+/api/shops/categories,"brew,panel",,,,lesend,ja,
+/api/shops/list,"brew,panel",,,q;sector;my,lesend,ja,"Query vom Client stets gesetzt: q,sector,my"
+/api/shops/{erpId}/list/disconnected,"brew,panel",erpId,erpId=erpId,,lesend,ja,
+/api/supplier/onboardings/reminder-default,brew,,,,lesend,ja,
+/api/user/api-tokens/grantable-scopes,brew,,,,lesend,ja,
+/api/v2/analytics,brew,,,,lesend,ja,bereits gemessen: 200
+/api/v2/analytics/management/groups,brew,,,,lesend,ja,
+/api/v2/billing/management/providers,brew,,,,lesend,ja,
+/api/v2/erp/catalog-sync/management/syncs,brew,,,,lesend,ja,
+/api/{erpId}/category,"brew,panel",erpId,erpId=erpId,,lesend,ja,
+/api/{erpId}/category/paginate,"brew,panel",erpId,erpId=erpId,search;page;page_size;categoryId,lesend,ja,"Query vom Client stets gesetzt: search,page,page_size,categoryId"
+/api/{erpId}/category/search,panel,erpId,erpId=erpId,page_size;page;search,lesend,ja,"Query vom Client stets gesetzt: page_size,page,search; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/category-icon,panel,erpId,erpId=erpId,,lesend,ja,"nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/category-icon/paginate,panel,erpId,erpId=erpId,page_size;page,lesend,ja,"Query vom Client stets gesetzt: page_size,page; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/category-icon/search,panel,erpId,erpId=erpId,page_size;page;search,lesend,ja,"Query vom Client stets gesetzt: page_size,page,search; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/category-icon-group,panel,erpId,erpId=erpId,,lesend,ja,"nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/category-icon-group/paginate,"brew,panel",erpId,erpId=erpId,page_size;page,lesend,ja,"Query vom Client stets gesetzt: page_size,page"
+/api/{erpId}/category-icon-group/search,panel,erpId,erpId=erpId,page_size;page;search,lesend,ja,"Query vom Client stets gesetzt: page_size,page,search; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/dashboard,"brew,panel",erpId,erpId=erpId,low_on_stock_filters;low_on_stock_page_size;low_on_stock_page;low_on_stock_search;low_on_stock_searchView;pending_orders_page_size;pending_orders_page,lesend,ja,"Query vom Client stets gesetzt: low_on_stock_filters,low_on_stock_page_size,low_on_stock_page,low_on_stock_search,low_on_stock_searchView,pending_orders_page_size,pending_orders_page"
+/api/{erpId}/erpSettings,panel,erpId,erpId=erpId,,lesend,ja,"nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/erpSettings/paginate,panel,erpId,erpId=erpId,page_size;page,lesend,ja,"Query vom Client stets gesetzt: page_size,page; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/erpSettings/search,panel,erpId,erpId=erpId,page_size;page;search,lesend,ja,"Query vom Client stets gesetzt: page_size,page,search; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/preproductionConcreteProduct,panel,erpId,erpId=erpId,,lesend,ja,"nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/preproductionConcreteProduct/paginate,panel,erpId,erpId=erpId,page_size;page,lesend,ja,"Query vom Client stets gesetzt: page_size,page; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/preproductionConcreteProduct/search,panel,erpId,erpId=erpId,page_size;page;search,lesend,ja,"Query vom Client stets gesetzt: page_size,page,search; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/product,panel,erpId,erpId=erpId,,lesend,ja,"nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/product/categories,panel,erpId,erpId=erpId,page;page_size;categoryIds[],lesend,ja,"Query vom Client stets gesetzt: page,page_size,categoryIds[]"
+/api/{erpId}/product/categories/additional-sorting,panel,erpId,erpId=erpId,page;page_size;categoryIds[];additional_order_by;additional_order_by_direction,lesend,ja,"Query vom Client stets gesetzt: page,page_size,categoryIds[],additional_order_by,additional_order_by_direction"
+/api/{erpId}/product/paginate,panel,erpId,erpId=erpId,page_size;page,lesend,ja,"Query vom Client stets gesetzt: page_size,page; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/product/search,"brew,panel",erpId,erpId=erpId,page_size;page;search,lesend,ja,"Query vom Client stets gesetzt: page_size,page,search"
+/api/{erpId}/product/search-products-without-specified-products,panel,erpId,erpId=erpId,page;page_size;productsToExclude[],lesend,ja,"Query vom Client stets gesetzt: page,page_size,productsToExclude[]"
+/api/{erpId}/product/storages,panel,erpId,erpId=erpId,search;page;page_size;storageIds[];additional_order_by;additional_order_by_direction,lesend,ja,"Query vom Client stets gesetzt: search,page,page_size,storageIds[],additional_order_by,additional_order_by_direction"
+/api/{erpId}/product/suppliers,panel,erpId,erpId=erpId,search;page;page_size;supplierIds[];additional_order_by;additional_order_by_direction,lesend,ja,"Query vom Client stets gesetzt: search,page,page_size,supplierIds[],additional_order_by,additional_order_by_direction"
+/api/{erpId}/product-group,panel,erpId,erpId=erpId,page;page_size,lesend,ja,"Query vom Client stets gesetzt: page,page_size; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/product-group/paginate,panel,erpId,erpId=erpId,page_size;page,lesend,ja,"Query vom Client stets gesetzt: page_size,page; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/product-group/search,"brew,panel",erpId,erpId=erpId,page;page_size;search,lesend,ja,"Query vom Client stets gesetzt: page,page_size,search"
+/api/{erpId}/product-unit,"brew,panel",erpId,erpId=erpId,,lesend,ja,
+/api/{erpId}/product-unit/paginate,panel,erpId,erpId=erpId,page_size;page,lesend,ja,"Query vom Client stets gesetzt: page_size,page; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/product-unit/search,panel,erpId,erpId=erpId,page_size;page;search,lesend,ja,"Query vom Client stets gesetzt: page_size,page,search; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/products,"brew,panel",erpId,erpId=erpId,concreteProductIds;page_size;stocktakingVisibility;search;page;categoryIds;storageIds;order_by;additional_order_by;additional_order_by_direction;order_direction,lesend,ja,"Query vom Client stets gesetzt: concreteProductIds,page_size,stocktakingVisibility,search,page,categoryIds,storageIds,order_by,additional_order_by,additional_order_by_direction,order_direction"
+/api/{erpId}/products/paginate,panel,erpId,erpId=erpId,page_size;page,lesend,ja,"Query vom Client stets gesetzt: page_size,page; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/products/search,panel,erpId,erpId=erpId,page_size;page;search,lesend,ja,"Query vom Client stets gesetzt: page_size,page,search; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/recipe,panel,erpId,erpId=erpId,,lesend,ja,"nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/recipe/paginate,"brew,panel",erpId,erpId=erpId,search;page;page_size;page_count,lesend,ja,"Query vom Client stets gesetzt: search,page,page_size,page_count"
+/api/{erpId}/recipe/search,panel,erpId,erpId=erpId,page_size;page;search,lesend,ja,"Query vom Client stets gesetzt: page_size,page,search; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/recipe-sale,panel,erpId,erpId=erpId,,lesend,ja,"nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/recipe-sale/paginate,panel,erpId,erpId=erpId,page_size;page,lesend,ja,"Query vom Client stets gesetzt: page_size,page; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/recipe-sale/search,panel,erpId,erpId=erpId,page_size;page;search,lesend,ja,"Query vom Client stets gesetzt: page_size,page,search; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/resets,panel,erpId,erpId=erpId,page_size;page,lesend,ja,"Query vom Client stets gesetzt: page_size,page; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/resets/paginate,panel,erpId,erpId=erpId,page_size;page,lesend,ja,"Query vom Client stets gesetzt: page_size,page; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/resets/search,panel,erpId,erpId=erpId,page_size;page;search,lesend,ja,"Query vom Client stets gesetzt: page_size,page,search; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/sales,"brew,panel",erpId,erpId=erpId,page;page_size;order_by;order_direction,lesend,ja,"Query vom Client stets gesetzt: page,page_size,order_by,order_direction"
+/api/{erpId}/sales/search,panel,erpId,erpId=erpId,page_size;page;search,lesend,ja,"Query vom Client stets gesetzt: page_size,page,search; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/shop,panel,erpId,erpId=erpId,,lesend,ja,"nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/shop/paginate,panel,erpId,erpId=erpId,page_size;page,lesend,ja,"Query vom Client stets gesetzt: page_size,page; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/shop/search,panel,erpId,erpId=erpId,page_size;page;search,lesend,ja,"Query vom Client stets gesetzt: page_size,page,search; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/shop-order,panel,erpId,erpId=erpId,,lesend,ja,"nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/shop-order/count-orders,panel,erpId,erpId=erpId,,lesend,ja,
+/api/{erpId}/shop-order/get-shops-for-all-orders,"brew,panel",erpId,erpId=erpId,,lesend,ja,
+/api/{erpId}/shop-order/get-status-for-all-orders,"brew,panel",erpId,erpId=erpId,,lesend,ja,
+/api/{erpId}/shop-order/paginate,"brew,panel",erpId,erpId=erpId,page_size;page,lesend,ja,"Query vom Client stets gesetzt: page_size,page"
+/api/{erpId}/shop-order/paginate/all,brew,erpId,erpId=erpId,orderView,lesend,ja,Query vom Client stets gesetzt: orderView
+/api/{erpId}/shop-order/search,panel,erpId,erpId=erpId,page_size;page;search,lesend,ja,"Query vom Client stets gesetzt: page_size,page,search; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/shop-order-mapped-product,panel,erpId,erpId=erpId,,lesend,ja,"nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/shop-order-mapped-product/paginate,panel,erpId,erpId=erpId,page_size;page,lesend,ja,"Query vom Client stets gesetzt: page_size,page; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/shop-order-mapped-product/search,panel,erpId,erpId=erpId,page_size;page;search,lesend,ja,"Query vom Client stets gesetzt: page_size,page,search; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/shop-order-order-tag-type,panel,erpId,erpId=erpId,,lesend,ja,"nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/shop-order-order-tag-type/concrete-product,"brew,panel",erpId,erpId=erpId,page;page_size;search,lesend,ja,"Query vom Client stets gesetzt: page,page_size,search"
+/api/{erpId}/shop-order-order-tag-type/paginate,panel,erpId,erpId=erpId,page_size;page,lesend,ja,"Query vom Client stets gesetzt: page_size,page; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/shop-order-order-tag-type/search,panel,erpId,erpId=erpId,page_size;page;search,lesend,ja,"Query vom Client stets gesetzt: page_size,page,search; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/statistics,panel,erpId,erpId=erpId,,lesend,ja,"nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/statistics/erp/overview,panel,erpId,erpId=erpId,,lesend,ja,
+/api/{erpId}/statistics/paginate,panel,erpId,erpId=erpId,page_size;page,lesend,ja,"Query vom Client stets gesetzt: page_size,page; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/statistics/sales,panel,erpId,erpId=erpId,begin;end,lesend,ja,"Query vom Client stets gesetzt: begin,end"
+/api/{erpId}/statistics/search,panel,erpId,erpId=erpId,page_size;page;search,lesend,ja,"Query vom Client stets gesetzt: page_size,page,search; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/statistics/shop-orders,panel,erpId,erpId=erpId,begin;end,lesend,ja,"Query vom Client stets gesetzt: begin,end"
+/api/{erpId}/stock,panel,erpId,erpId=erpId,,lesend,ja,"nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/stock/change/notification/types,"brew,panel",erpId,erpId=erpId,,lesend,ja,
+/api/{erpId}/stock/change/reasons,"brew,panel",erpId,erpId=erpId,,lesend,ja,
+/api/{erpId}/stock/damagedGoods,panel,erpId,erpId=erpId,page;page_size;filter;search;categoryIds;startDate;endDate,lesend,ja,"Query vom Client stets gesetzt: page,page_size,filter,search,categoryIds,startDate,endDate"
+/api/{erpId}/stock/damagedGoodsCategories,panel,erpId,erpId=erpId,,lesend,ja,
+/api/{erpId}/stock/damagedGoodsTotalValueLost,panel,erpId,erpId=erpId,filter;search;categoryIds;startDate;endDate,lesend,ja,"Query vom Client stets gesetzt: filter,search,categoryIds,startDate,endDate"
+/api/{erpId}/stock/paginate,panel,erpId,erpId=erpId,page_size;page,lesend,ja,"Query vom Client stets gesetzt: page_size,page; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/stock/search,panel,erpId,erpId=erpId,page_size;page;search,lesend,ja,"Query vom Client stets gesetzt: page_size,page,search; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/stocktaking,panel,erpId,erpId=erpId,state;page;page_size;order_by;order_direction,lesend,ja,"Query vom Client stets gesetzt: state,page,page_size,order_by,order_direction; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/stocktaking/paginate,panel,erpId,erpId=erpId,page_size;page,lesend,ja,"Query vom Client stets gesetzt: page_size,page; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/stocktaking/search,panel,erpId,erpId=erpId,page_size;page;search,lesend,ja,"Query vom Client stets gesetzt: page_size,page,search; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/storage,"brew,panel",erpId,erpId=erpId,,lesend,ja,
+/api/{erpId}/storage/paginate,panel,erpId,erpId=erpId,page_size;page,lesend,ja,"Query vom Client stets gesetzt: page_size,page; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/storage/search,panel,erpId,erpId=erpId,page_size;page;search,lesend,ja,"Query vom Client stets gesetzt: page_size,page,search; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/app/client-navbar-items,panel,,,,lesend,ja,
+/app/is-authenticated,"brew,panel",,,,lesend,ja,
+/api/1.0/catering/consumerGroups/event/{eventId},offiziell,eventId,eventId=unbekannt,,lesend,nein,Parameter unbekannt: eventId
+/api/1.0/catering/consumerGroups/{id},offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/catering/customers,offiziell,,,,personenbezogen,nein,Personenbezug: Kunden (Personen) des Caterings
+/api/1.0/catering/customers/{id},offiziell,id,id=unbekannt,,personenbezogen,nein,Personenbezug: Kunden (Personen) des Caterings
+/api/1.0/catering/drinkGroups/event/{eventId},offiziell,eventId,eventId=unbekannt,,lesend,nein,Parameter unbekannt: eventId
+/api/1.0/catering/drinkGroups/{id},offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/catering/drinks/event/{eventId},offiziell,eventId,eventId=unbekannt,,lesend,nein,Parameter unbekannt: eventId
+/api/1.0/catering/drinks/event/{eventId}/byDate,offiziell,eventId,eventId=unbekannt,,lesend,nein,Parameter unbekannt: eventId
+/api/1.0/catering/drinks/{id},offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/catering/drinkSubgroups/event/{eventId},offiziell,eventId,eventId=unbekannt,,lesend,nein,Parameter unbekannt: eventId
+/api/1.0/catering/drinkSubgroups/{id},offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/catering/equipment/event/{eventId},offiziell,eventId,eventId=unbekannt,,lesend,nein,Parameter unbekannt: eventId
+/api/1.0/catering/equipment/{id},offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/catering/equipmentGroups/event/{eventId},offiziell,eventId,eventId=unbekannt,,lesend,nein,Parameter unbekannt: eventId
+/api/1.0/catering/equipmentGroups/{id},offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/catering/equipmentSubgroups/event/{eventId},offiziell,eventId,eventId=unbekannt,,lesend,nein,Parameter unbekannt: eventId
+/api/1.0/catering/equipmentSubgroups/{id},offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/catering/events-recipes/event/{eventId},offiziell,eventId,eventId=unbekannt,,lesend,nein,Parameter unbekannt: eventId
+/api/1.0/catering/events/{id},offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/catering/events/{id}/additionals,offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/catering/events/{id}/additives,offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/catering/events/{id}/allergens,offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/catering/events/{id}/dateGroups,offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/catering/eventTypes/{id},offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/catering/locations/{id},offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/catering/mealGroups/event/{eventId},offiziell,eventId,eventId=unbekannt,,lesend,nein,Parameter unbekannt: eventId
+/api/1.0/catering/mealGroups/{id},offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/catering/meals/event/{eventId},offiziell,eventId,eventId=unbekannt,,lesend,nein,Parameter unbekannt: eventId
+/api/1.0/catering/meals/event/{eventId}/byDate,offiziell,eventId,eventId=unbekannt,,lesend,nein,Parameter unbekannt: eventId
+/api/1.0/catering/meals/{id},offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/catering/meals/{id}/weights,offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/catering/mealSubgroups/event/{eventId},offiziell,eventId,eventId=unbekannt,,lesend,nein,Parameter unbekannt: eventId
+/api/1.0/catering/mealSubgroups/{id},offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/catering/recipeBlacklist/{id},offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/catering/recipeCategoryBlacklist/{id},offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/catering/roles/{id},offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/catering/serviceTypes/{id},offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/catering/staff,offiziell,,,,personenbezogen,nein,Personenbezug: Personal des Caterings
+/api/1.0/catering/staff/{id},offiziell,id,id=unbekannt,,personenbezogen,nein,Personenbezug: Personal des Caterings
+/api/1.0/catering/staffGroups/event/{id},offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/catering/staffGroups/{id},offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/dailymenus/{id},offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/pos/invoices/{id},offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/pos/productGroups/{id},offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/pos/products/{id},offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/recipes/categories/{id},offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/recipes/restaurants/{id},offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/recipes/{id},offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/recipes/{id}/additionals,offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/recipes/{id}/additives,offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/recipes/{id}/allergens,offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/recipes/{id}/availabilities,offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/recipes/{id}/blacklists,offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/recipes/{id}/categories,offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/recipes/{id}/contributionMarginData,offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/recipes/{id}/ingredients,offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/recipes/{id}/names,offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/recipes/{id}/nutritions,offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/recipes/{id}/nutritionTags,offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/recipes/{id}/restaurants,offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/recipes/{id}/tags,offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/shops/orders/{id},offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/shops/{id},offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/shops/{id}/orders,offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/1.0/user/subusers,offiziell,,,,personenbezogen,nein,Personenbezug: Unterkonten (Personen bzw. deren Rollen/Rechte)
+/api/1.0/webhooks/{id},offiziell,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/2.0/erp/goods-receipts/{billingAccountId},offiziell,billingAccountId,billingAccountId=unbekannt,,lesend,nein,Parameter unbekannt: billingAccountId
+/api/analytics/budget/{masterUserId},brew,masterUserId,masterUserId=unbekannt,year,lesend,nein,"Parameter unbekannt: masterUserId; masterUserId (Hauptkonto) ist nicht userId aus unseren Daten, ungeprueft"
+/api/analytics/budget/{masterUserId}/settings,brew,masterUserId,masterUserId=unbekannt,,lesend,nein,"Parameter unbekannt: masterUserId; masterUserId (Hauptkonto) ist nicht userId aus unseren Daten, ungeprueft"
+/api/analytics/reports/cost-analysis/ingredients/single/{restaurantId}/{concreteProductId},brew,restaurantId;concreteProductId,restaurantId=restaurantId; concreteProductId=unbekannt,date_from;date_to;page;page_size,lesend,nein,Parameter unbekannt: concreteProductId
+/api/cart/{cartId}/product/details,"brew,panel",cartId,cartId=unbekannt,,lesend,nein,Parameter unbekannt: cartId
+/api/carts/{p1}/basic_info,panel,p1,p1=unbekannt,,lesend,nein,Parameter unbekannt: p1
+/api/carts/{type},"brew,panel",type,type=unbekannt,supplierId;locationId;cartId;page;limit,lesend,nein,Parameter unbekannt: type
+/api/completion/{completionId}/empty-product-groups,brew,completionId,completionId=unbekannt,,lesend,nein,Parameter unbekannt: completionId
+/api/completion/{completionId}/overall,brew,completionId,completionId=unbekannt,,lesend,nein,Parameter unbekannt: completionId
+/api/core/business/{businessId}/locations/{locationId}/deletability,brew,businessId;locationId,businessId=unbekannt; locationId=unbekannt,,lesend,nein,"Parameter unbekannt: businessId, locationId"
+/api/core/business/{businessId}/restaurants,brew,businessId,businessId=unbekannt,,lesend,nein,Parameter unbekannt: businessId
+/api/core/business/{masterUserId}/company,brew,masterUserId,masterUserId=unbekannt,,lesend,nein,"Parameter unbekannt: masterUserId; masterUserId (Hauptkonto) ist nicht userId aus unseren Daten, ungeprueft"
+/api/core/business/{masterUserId}/cost-centers,brew,masterUserId,masterUserId=unbekannt,,lesend,nein,"Parameter unbekannt: masterUserId; masterUserId (Hauptkonto) ist nicht userId aus unseren Daten, ungeprueft"
+/api/core/business/{masterUserId}/cost-centers/overview,brew,masterUserId,masterUserId=unbekannt,,lesend,nein,"Parameter unbekannt: masterUserId; masterUserId (Hauptkonto) ist nicht userId aus unseren Daten, ungeprueft"
+/api/core/business/{masterUserId}/cost-centers/{costCenterId},brew,masterUserId;costCenterId,masterUserId=unbekannt; costCenterId=costCenterId,,lesend,nein,"Parameter unbekannt: masterUserId; masterUserId (Hauptkonto) ist nicht userId aus unseren Daten, ungeprueft"
+/api/core/business/{masterUserId}/cost-centers/{costCenterId}/deletability,brew,masterUserId;costCenterId,masterUserId=unbekannt; costCenterId=costCenterId,,lesend,nein,"Parameter unbekannt: masterUserId; masterUserId (Hauptkonto) ist nicht userId aus unseren Daten, ungeprueft"
+/api/core/business/{masterUserId}/invoice-email,brew,masterUserId,masterUserId=unbekannt,,personenbezogen,nein,Personenbezug: Rechnungs-E-Mail-Adresse
+/api/core/business/{masterUserId}/locations,brew,masterUserId,masterUserId=unbekannt,,lesend,nein,"Parameter unbekannt: masterUserId; masterUserId (Hauptkonto) ist nicht userId aus unseren Daten, ungeprueft"
+/api/core/business/{masterUserId}/locations/form-options,brew,masterUserId,masterUserId=unbekannt,,lesend,nein,"Parameter unbekannt: masterUserId; masterUserId (Hauptkonto) ist nicht userId aus unseren Daten, ungeprueft"
+/api/core/business/{masterUserId}/locations/vat-defaults,brew,masterUserId,masterUserId=unbekannt,country,lesend,nein,"Parameter unbekannt: masterUserId; masterUserId (Hauptkonto) ist nicht userId aus unseren Daten, ungeprueft"
+/api/core/business/{masterUserId}/locations/{restaurantId},brew,masterUserId;restaurantId,masterUserId=unbekannt; restaurantId=restaurantId,,lesend,nein,"Parameter unbekannt: masterUserId; masterUserId (Hauptkonto) ist nicht userId aus unseren Daten, ungeprueft"
+/api/core/business/{masterUserId}/vat-defaults,brew,masterUserId,masterUserId=unbekannt,,lesend,nein,"Parameter unbekannt: masterUserId; masterUserId (Hauptkonto) ist nicht userId aus unseren Daten, ungeprueft"
+/api/core/languages/{masterUserId}/business,brew,masterUserId,masterUserId=unbekannt,,lesend,nein,"Parameter unbekannt: masterUserId; masterUserId (Hauptkonto) ist nicht userId aus unseren Daten, ungeprueft"
+/api/core/languages/{masterUserId}/locations,brew,masterUserId,masterUserId=unbekannt,,lesend,nein,"Parameter unbekannt: masterUserId; masterUserId (Hauptkonto) ist nicht userId aus unseren Daten, ungeprueft"
+/api/customer-success/assignments,brew,,,customerSuccessId;limit,personenbezogen,nein,Personenbezug: Betreuungszuordnung / Benutzersuche
+/api/customer-success/users/search,brew,,,email;isMaster;limit;adminOnly,personenbezogen,nein,Personenbezug: Betreuungszuordnung / Benutzersuche
+/api/dailyMenu/menu/{menuID},panel,menuID,menuID=unbekannt,,lesend,nein,Parameter unbekannt: menuID
+/api/dashboard/getChartData/{p1},panel,p1,p1=unbekannt,,lesend,nein,Parameter unbekannt: p1
+/api/dashboard/getDashboard/{getDashboardId},"brew,panel",getDashboardId,getDashboardId=unbekannt,,lesend,nein,Parameter unbekannt: getDashboardId
+/api/dashboard/getWeatherData/{p1},panel,p1,p1=unbekannt,,lesend,nein,Parameter unbekannt: p1
+/api/erp/core/{masterUserId}/stock-change-notification,brew,masterUserId,masterUserId=unbekannt,,lesend,nein,"Parameter unbekannt: masterUserId; masterUserId (Hauptkonto) ist nicht userId aus unseren Daten, ungeprueft"
+/api/erp/last-used/{lastUsedId},"brew,panel",lastUsedId,lastUsedId=unbekannt,,zustandsaendernd,nein,GET mit Seiteneffekt: erpSetLastUsed (brew) / panel setLastUsed: merkt den zuletzt benutzten Betrieb am Server
+/api/erp/product-groups/{groupId}/products/cost-centers,brew,groupId,groupId=unbekannt,,lesend,nein,Parameter unbekannt: groupId
+/api/erp/product-groups/{productGroupId}/products,brew,productGroupId,productGroupId=unbekannt,search,lesend,nein,Parameter unbekannt: productGroupId
+/api/erp/profile,panel,,,,personenbezogen,nein,Personenbezug: Profil
+/api/erp/stock-transfer/create,panel,,,,unklar,nein,"unklar: geerbte CRUD-Zeile ""create"": Vorlage oder Entwurf, am Server nicht belegt; Nutzung durch die Oberflaeche nicht belegt; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/erp/stock-transfer/notifications/{notificationId},brew,notificationId,notificationId=unbekannt,,lesend,nein,Parameter unbekannt: notificationId
+/api/erp/stock-transfer/{p1}/edit,panel,p1,p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/erp/stock-transfer/{stockTranferId},"brew,panel",stockTranferId,stockTranferId=unbekannt,,lesend,nein,Parameter unbekannt: stockTranferId
+/api/erp/stock-transfer/{stockTranferId}/status,panel,stockTranferId,stockTranferId=unbekannt,,lesend,nein,Parameter unbekannt: stockTranferId
+/api/erp/stock-transfer-request/{requestId},brew,requestId,requestId=unbekannt,,lesend,nein,Parameter unbekannt: requestId
+/api/erp/stocktakings/validation/{validationId},brew,validationId,validationId=unbekannt,,lesend,nein,Parameter unbekannt: validationId
+/api/erp/stocktakings/{stocktakingId}/excel.xlsx,"brew,panel",stocktakingId,stocktakingId=unbekannt,,download,nein,Datei-Antwort: liefert Excel-Datei
+/api/erp/unit/product-units/{productUnitId},"brew,panel",productUnitId,productUnitId=unbekannt,,lesend,nein,Parameter unbekannt: productUnitId
+/api/eventCatering/event/{currentEventId}/additionals,panel,currentEventId,currentEventId=unbekannt,,lesend,nein,Parameter unbekannt: currentEventId
+/api/eventCatering/event/{currentEventId}/additives,panel,currentEventId,currentEventId=unbekannt,,lesend,nein,Parameter unbekannt: currentEventId
+/api/eventCatering/event/{currentEventId}/allergens,panel,currentEventId,currentEventId=unbekannt,,lesend,nein,Parameter unbekannt: currentEventId
+/api/eventCatering/event/{currentEventId}/commentsByParent,panel,currentEventId,currentEventId=unbekannt,,lesend,nein,Parameter unbekannt: currentEventId
+/api/eventCatering/event/{currentEventId}/weather,panel,currentEventId,currentEventId=unbekannt,,lesend,nein,Parameter unbekannt: currentEventId
+/api/eventCatering/event/{p1},panel,p1,p1=unbekannt,,lesend,nein,Parameter unbekannt: p1
+/api/eventCatering/eventComment/{p1},panel,p1,p1=unbekannt,,lesend,nein,Parameter unbekannt: p1
+/api/eventCatering/eventConsumerGroupEvent/event/{id},panel,id,id=unbekannt,orderBy;orderDirection,lesend,nein,Parameter unbekannt: id
+/api/eventCatering/eventCourseTemplate/{id},panel,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/eventCatering/eventCustomer,panel,,,pageSize;orderBy;orderDirection;page,personenbezogen,nein,Personenbezug: Kunden (Personen) einer Veranstaltung
+/api/eventCatering/eventCustomer/{p1},panel,p1,p1=unbekannt,,personenbezogen,nein,Personenbezug: Kunden (Personen) einer Veranstaltung
+/api/eventCatering/eventDateGroup/event/{eventId}/{p2},panel,eventId;p2,eventId=unbekannt; p2=unbekannt,,lesend,nein,"Parameter unbekannt: eventId, p2"
+/api/eventCatering/eventDocument/event/{currentEventId},panel,currentEventId,currentEventId=unbekannt,,lesend,nein,Parameter unbekannt: currentEventId
+/api/eventCatering/eventDocument/{id},panel,id,id=unbekannt,,download,nein,Datei-Antwort: getDocument: Antwort als Blob (Dokument zum Herunterladen)
+/api/eventCatering/eventDrink/event/{eventId},panel,eventId,eventId=unbekannt,orderBy;orderDirection,lesend,nein,Parameter unbekannt: eventId
+/api/eventCatering/eventDrink/event/{p2}/eventStaff/{p1},panel,p2;p1,p2=unbekannt; p1=unbekannt,,personenbezogen,nein,Personenbezug: Personal einer Veranstaltung
+/api/eventCatering/eventDrink/{recipeId},panel,recipeId,recipeId=unbekannt,,lesend,nein,Parameter unbekannt: recipeId
+/api/eventCatering/eventEquipmentGroup/event/{p1},panel,p1,p1=unbekannt,orderBy;orderDirection,lesend,nein,Parameter unbekannt: p1
+/api/eventCatering/eventLocation/{p1},panel,p1,p1=unbekannt,,lesend,nein,Parameter unbekannt: p1
+/api/eventCatering/eventMeal/event/{p1},panel,p1,p1=unbekannt,orderBy;orderDirection,lesend,nein,Parameter unbekannt: p1
+/api/eventCatering/eventMeal/event/{p2}/eventStaff/{p1},panel,p2;p1,p2=unbekannt; p1=unbekannt,,personenbezogen,nein,Personenbezug: Personal einer Veranstaltung
+/api/eventCatering/eventMeal/{recipeId},panel,recipeId,recipeId=unbekannt,,lesend,nein,Parameter unbekannt: recipeId
+/api/eventCatering/eventOrder/event/{eventId},panel,eventId,eventId=unbekannt,,lesend,nein,Parameter unbekannt: eventId
+/api/eventCatering/eventOrder/event/{eventId}/{categoryName},panel,eventId;categoryName,eventId=unbekannt; categoryName=unbekannt,,lesend,nein,"Parameter unbekannt: eventId, categoryName"
+/api/eventCatering/eventRecipe/event/{eventId},panel,eventId,eventId=unbekannt,pageSize,lesend,nein,Parameter unbekannt: eventId
+/api/eventCatering/eventRecipe/eventMealsAndDrinks/{p1},panel,p1,p1=unbekannt,,lesend,nein,Parameter unbekannt: p1
+/api/eventCatering/eventRecipe/recipe/{recipeId}/ingredients,panel,recipeId,recipeId=unbekannt,,lesend,nein,Parameter unbekannt: recipeId
+/api/eventCatering/eventRecipe/staff/{p1}/{p2},panel,p1;p2,p1=unbekannt; p2=unbekannt,,personenbezogen,nein,Personenbezug: Personalbezogener Ausdruck
+/api/eventCatering/eventStaff/currentEventUser/{p1},panel,p1,p1=unbekannt,,personenbezogen,nein,Personenbezug: Personal einer Veranstaltung
+/api/eventCatering/eventStaff/event/{p1},panel,p1,p1=unbekannt,,personenbezogen,nein,Personenbezug: Personal einer Veranstaltung
+/api/eventCatering/eventStaff/new,panel,,,pageSize;orderBy;orderDirection;page,unklar,nein,"unklar: GET ""new"": Vorlage oder Anlage, am Server nicht belegt"
+/api/eventCatering/eventStaff/{staffId},panel,staffId,staffId=unbekannt,,personenbezogen,nein,Personenbezug: Personal einer Veranstaltung
+/api/eventCatering/eventStaffGroup/event/{currentEventId},panel,currentEventId,currentEventId=unbekannt,,lesend,nein,Parameter unbekannt: currentEventId
+/api/eventCatering/eventStaffRole/{p1},panel,p1,p1=unbekannt,,lesend,nein,Parameter unbekannt: p1
+/api/eventCatering/eventType/{p1},panel,p1,p1=unbekannt,,lesend,nein,Parameter unbekannt: p1
+/api/eventCatering/images/EventStaff/{imageFileName},panel,imageFileName,imageFileName=unbekannt,,personenbezogen,nein,Personenbezug: Bild einer Person (Personal)
+/api/eventCatering/serviceType/{p1},panel,p1,p1=unbekannt,,lesend,nein,Parameter unbekannt: p1
+/api/menu-creator/settings/{masterUserId}/menu-cards,brew,masterUserId,masterUserId=unbekannt,,lesend,nein,"Parameter unbekannt: masterUserId; masterUserId (Hauptkonto) ist nicht userId aus unseren Daten, ungeprueft"
+/api/menu_creator/menu_card/new,panel,,,,unklar,nein,"unklar: GET ""new"": Vorlage oder Anlage, am Server nicht belegt"
+/api/menu_creator/menu_card/show/hash/{hash},panel,hash,hash=unbekannt,,lesend,nein,Parameter unbekannt: hash
+/api/menu_creator/menu_card/show/{id},panel,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/menu_creator/menu_card/show/{p1}/embedded,panel,p1,p1=unbekannt,,lesend,nein,Parameter unbekannt: p1
+/api/menu_creator/menu_card/showRecipe/{p1},panel,p1,p1=unbekannt,,lesend,nein,Parameter unbekannt: p1
+/api/menu_creator/menu_card/version/show_many/{id},panel,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/menu_creator/menu_card/widgets/{p1},panel,p1,p1=unbekannt,,lesend,nein,Parameter unbekannt: p1
+/api/menu_creator/recipeData/{id},panel,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/menu_creator/recipeSearch/{p1},panel,p1,p1=unbekannt,,lesend,nein,Parameter unbekannt: p1
+/api/menu_creator/template/show/{p1},panel,p1,p1=unbekannt,,lesend,nein,Parameter unbekannt: p1
+/api/menu_creator/template/widgets/{p1},panel,p1,p1=unbekannt,,lesend,nein,Parameter unbekannt: p1
+/api/menucreator/{id}/generate-embedded-url,panel,id,id=unbekannt,,zustandsaendernd,nein,"GET mit Seiteneffekt: panel 283: generateEmbeddedUrl, Klick auf Symbol, erzeugt eine Einbettungs-URL"
+/api/pos/connection/unlink/{connectionId},"brew,panel",connectionId,connectionId=connectionId,,zustandsaendernd,nein,"GET mit Seiteneffekt: panel 742: unlinkConnection, Knopf ""unlink"" im Dialog, danach Weiterleitung"
+/api/pos/export/recommended/{recommendedId},"brew,panel",recommendedId,recommendedId=unbekannt,,lesend,nein,Parameter unbekannt: recommendedId
+/api/pos/export/{connectionId},"brew,panel",connectionId,connectionId=connectionId,,unklar,nein,"unklar: Gegenstueck /export/without_reload deutet an, dass dieser Aufruf aus dem Kassensystem nachlaedt; Wirkung nicht belegt"
+/api/pos/ikentoo/businessData/{connectionId},"brew,panel",connectionId,connectionId=connectionId,,unklar,nein,"unklar: Teil des Verbindungsassistenten, ruft vermutlich den Kassenanbieter ab; Wirkung am Server nicht belegt"
+/api/pos/ikentoo/businessData/{connectionId}/{blId},"brew,panel",connectionId;blId,connectionId=connectionId; blId=unbekannt,,zustandsaendernd,nein,"GET mit Seiteneffekt: panel 742: storeBusinessLocation, Aufruf aus selectBusinessLocation (speichert die Auswahl)"
+/api/pos/mapping/{accountId}/ingest-issues/export.xlsx,brew,accountId,accountId=connectionId,,download,nein,Datei-Antwort: liefert Excel-Datei
+/api/pos/mapping/{mappingId}/jobs/{jobId},brew,mappingId;jobId,mappingId=connectionId; jobId=unbekannt,,lesend,nein,Parameter unbekannt: jobId
+/api/pos/product/recommended/{connectionId}/{recipeId},"brew,panel",connectionId;recipeId,connectionId=connectionId; recipeId=unbekannt,,lesend,nein,Parameter unbekannt: recipeId
+/api/pos/product/unlink/all/{connectionId},"brew,panel",connectionId,connectionId=connectionId,,zustandsaendernd,nein,"GET mit Seiteneffekt: panel 742: unlinkAll, Knopf ""unlinkExistingForLocation"" loest alle Produktverknuepfungen"
+/api/pos/sync/reload/{accountId},"brew,panel",accountId,accountId=connectionId,,zustandsaendernd,nein,"GET mit Seiteneffekt: posReloadInventory (brew) / panel 742: reloadFromPos, Klick-Handler ""Reload from POS"""
+/api/profile,brew,,,,personenbezogen,nein,Personenbezug: Profil; bereits gemessen: 403
+/api/recipe/ingredients/erp-copy-jobs/{erpCopyJobId},brew,erpCopyJobId,erpCopyJobId=unbekannt,,lesend,nein,Parameter unbekannt: erpCopyJobId
+/api/recipe/ingredients/{ingredientId}/recipes/{recipeId}/locations,brew,ingredientId;recipeId,ingredientId=unbekannt; recipeId=unbekannt,,lesend,nein,"Parameter unbekannt: ingredientId, recipeId"
+/api/recipe/ingredients/{ingredientId}/replacement-usage,brew,ingredientId,ingredientId=unbekannt,page,lesend,nein,Parameter unbekannt: ingredientId
+/api/recipe-viewer/recipes/{recipeId},brew,recipeId,recipeId=unbekannt,,lesend,nein,Parameter unbekannt: recipeId
+/api/recipe-viewer/recipes/{recipeId}/ingredients,brew,recipeId,recipeId=unbekannt,,lesend,nein,Parameter unbekannt: recipeId
+/api/recipe-viewer/recipes/{recipeId}/meta,brew,recipeId,recipeId=unbekannt,,lesend,nein,Parameter unbekannt: recipeId
+/api/recipe-viewer/recipes/{recipeId}/steps,brew,recipeId,recipeId=unbekannt,,lesend,nein,Parameter unbekannt: recipeId
+/api/recipes/cost-calculation/recipes/{recipeId},brew,recipeId,recipeId=unbekannt,,lesend,nein,Parameter unbekannt: recipeId
+/api/recipes/cost-calculation/recipes/{recipeId}/locations/{restaurantId}/product-groups,brew,recipeId;restaurantId,recipeId=unbekannt; restaurantId=restaurantId,,lesend,nein,Parameter unbekannt: recipeId
+/api/recipes/dashboard-mix/{dashboardMixId},brew,dashboardMixId,dashboardMixId=unbekannt,,lesend,nein,Parameter unbekannt: dashboardMixId
+/api/recipes/dashboard-mix/{dashboardMixId}/items,brew,dashboardMixId,dashboardMixId=unbekannt,,lesend,nein,Parameter unbekannt: dashboardMixId
+/api/recipes/settings/{masterUserId}/display,brew,masterUserId,masterUserId=unbekannt,,lesend,nein,"Parameter unbekannt: masterUserId; masterUserId (Hauptkonto) ist nicht userId aus unseren Daten, ungeprueft"
+/api/recipes/settings/{masterUserId}/loss-templates,brew,masterUserId,masterUserId=unbekannt,,lesend,nein,"Parameter unbekannt: masterUserId; masterUserId (Hauptkonto) ist nicht userId aus unseren Daten, ungeprueft"
+/api/recipes/settings/{masterUserId}/recipe-units,brew,masterUserId,masterUserId=unbekannt,,lesend,nein,"Parameter unbekannt: masterUserId; masterUserId (Hauptkonto) ist nicht userId aus unseren Daten, ungeprueft"
+/api/recipes/settings/{masterUserId}/recipes/deletion-request,brew,masterUserId,masterUserId=unbekannt,,lesend,nein,"Parameter unbekannt: masterUserId; masterUserId (Hauptkonto) ist nicht userId aus unseren Daten, ungeprueft"
+/api/recipes/{recipeId}/ppa-unit-suggestion,"brew,panel",recipeId,recipeId=unbekannt,,lesend,nein,Parameter unbekannt: recipeId
+/api/security_logout,panel,,,,zustandsaendernd,nein,GET mit Seiteneffekt: panel main: logout() -- beendet die Sitzung
+/api/shop/multi-cost-center-ordering/{orderId},brew,orderId,orderId=unbekannt,,lesend,nein,Parameter unbekannt: orderId
+/api/shop/order-reminder/subscription/{subscriptionId},brew,subscriptionId,subscriptionId=unbekannt,,lesend,nein,Parameter unbekannt: subscriptionId
+/api/shop/order-reminder/subscriptions/users/{userId}/{p1},brew,userId;p1,userId=unbekannt; p1=unbekannt,,personenbezogen,nein,Personenbezug: Erinnerungs-Abonnement je Benutzer
+/api/shop/products/{productId}/packagings,brew,productId,productId=unbekannt,,lesend,nein,Parameter unbekannt: productId
+/api/shop/settings/{masterUserId}/favourites,brew,masterUserId,masterUserId=unbekannt,,lesend,nein,"Parameter unbekannt: masterUserId; masterUserId (Hauptkonto) ist nicht userId aus unseren Daten, ungeprueft"
+/api/shop/shopping-list/copy-to-cost-center/jobs/{jobId},brew,jobId,jobId=unbekannt,,lesend,nein,Parameter unbekannt: jobId
+/api/shop/shopping-list/{listId}/forecasts,panel,listId,listId=unbekannt,,lesend,nein,Parameter unbekannt: listId
+/api/shop/shopping-list/{shoppingListId}/export.pdf,"brew,panel",shoppingListId,shoppingListId=unbekannt,,download,nein,Datei-Antwort: liefert PDF
+/api/shop/shoppingListProducts/all/{p2},panel,p2,p2=unbekannt,,lesend,nein,Parameter unbekannt: p2
+/api/shop/shoppingListProducts/{listId},panel,listId,listId=unbekannt,,lesend,nein,Parameter unbekannt: listId
+/api/shop/shoppingListProductsAvailability/{listId}/{id},panel,listId;id,listId=unbekannt; id=unbekannt,,lesend,nein,"Parameter unbekannt: listId, id"
+/api/shop/{p1}/products/{p2},panel,p1;p2,p1=unbekannt; p2=unbekannt,,lesend,nein,"Parameter unbekannt: p1, p2"
+/api/shop/{shopId}/cart/{cartType}/{cartId},"brew,panel",shopId;cartType;cartId,shopId=unbekannt; cartType=unbekannt; cartId=unbekannt,,lesend,nein,"Parameter unbekannt: shopId, cartType, cartId"
+/api/shop/{shopId}/products/all,brew,shopId,shopId=unbekannt,searchQuery,lesend,nein,Parameter unbekannt: shopId
+/api/subuser-permissions,brew,,,,personenbezogen,nein,Personenbezug: Unterkonten (Personen bzw. deren Rollen/Rechte)
+/api/subuser-roles,brew,,,,personenbezogen,nein,Personenbezug: Unterkonten (Personen bzw. deren Rollen/Rechte)
+/api/subuser-roles/{roleId},brew,roleId,roleId=unbekannt,,personenbezogen,nein,Personenbezug: Unterkonten (Personen bzw. deren Rollen/Rechte)
+/api/subusers,brew,,,page;limit;search;roleIds;restaurantIds;twoFactor;login,personenbezogen,nein,Personenbezug: Unterkonten (Personen bzw. deren Rollen/Rechte)
+/api/subusers/{userId},brew,userId,userId=userId,,personenbezogen,nein,Personenbezug: Unterkonten (Personen bzw. deren Rollen/Rechte)
+/api/supplier/getAdditives/{productId},panel,productId,productId=unbekannt,,lesend,nein,Parameter unbekannt: productId
+/api/supplier/getAllergens/{productId},panel,productId,productId=unbekannt,,lesend,nein,Parameter unbekannt: productId
+/api/supplier/getAllLabels/{productId},panel,productId,productId=unbekannt,,lesend,nein,Parameter unbekannt: productId
+/api/supplier/getDashboardData/{shopId},panel,shopId,shopId=unbekannt,,lesend,nein,Parameter unbekannt: shopId
+/api/supplier/getIngredients/{productId},panel,productId,productId=unbekannt,,lesend,nein,Parameter unbekannt: productId
+/api/supplier/getNutritionalValues/{p1},panel,p1,p1=unbekannt,,lesend,nein,Parameter unbekannt: p1
+/api/supplier/getOrderDetailsData/{orderId},panel,orderId,orderId=unbekannt,,lesend,nein,Parameter unbekannt: orderId
+/api/supplier/getPackagings/{productId},panel,productId,productId=unbekannt,,lesend,nein,Parameter unbekannt: productId
+/api/supplier/getProductDetailsData/{productId},panel,productId,productId=unbekannt,,lesend,nein,Parameter unbekannt: productId
+/api/supplier/getShopCategories/{productId},panel,productId,productId=unbekannt,,lesend,nein,Parameter unbekannt: productId
+/api/supplier/intake/{submissionId},brew,submissionId,submissionId=unbekannt,,personenbezogen,nein,Personenbezug: Lieferanten-Erfassung mit Kontaktdaten
+/api/supplier/invitations/{invitationId},brew,invitationId,invitationId=unbekannt,,personenbezogen,nein,Personenbezug: Einladung an eine Person (E-Mail)
+/api/supplier/onboardings,brew,,,limit,personenbezogen,nein,Personenbezug: Lieferanten-Onboarding mit Kontaktdaten
+/api/supplier/onboardings/{onboardingId}/emails,brew,onboardingId,onboardingId=unbekannt,,personenbezogen,nein,Personenbezug: E-Mail-Adressen der Lieferanten-Onboardings
+/api/supplier/paginateOrdersData/{p1},panel,p1,p1=unbekannt,page_size;page;order_by;order_direction;filter,lesend,nein,Parameter unbekannt: p1
+/api/supplier/paginateProductsData/{p1},panel,p1,p1=unbekannt,page_size;page;order_by;order_direction;filter,lesend,nein,Parameter unbekannt: p1
+/api/user/api-tokens,brew,,,,personenbezogen,nein,Personenbezug: Kontosicherheit: Liste der API-Token des Kontos
+/api/user/auth/users/{userId},brew,userId,userId=userId,,personenbezogen,nein,Personenbezug: Sicherheitsrichtlinie / Anmeldestatus je Benutzer
+/api/user/auth/users/{userId}/security-policy,brew,userId,userId=userId,,personenbezogen,nein,Personenbezug: Sicherheitsrichtlinie / Anmeldestatus je Benutzer
+/api/user/email-change,brew,,,email,personenbezogen,nein,Personenbezug: E-Mail-Wechsel eines Benutzers
+/api/user/oauth/consent-context,brew,,,clientId;scope,unklar,nein,"unklar: Teil des OAuth-Einwilligungsablaufs (braucht clientId), nicht fuer Direktaufruf gedacht"
+/api/users,brew,,,email;page;limit;isMaster,personenbezogen,nein,Personenbezug: Benutzerliste
+/api/v2/analytics/management/users,brew,,,,personenbezogen,nein,Personenbezug: Benutzerverwaltung Analytics
+/api/v2/analytics/management/users/{userId},brew,userId,userId=userId,,personenbezogen,nein,Personenbezug: Benutzerverwaltung Analytics
+/api/v2/analytics/management/users/{userId}/groups,brew,userId,userId=userId,,personenbezogen,nein,Personenbezug: Benutzerverwaltung Analytics
+/api/v2/analytics/token,brew,,,,unklar,nein,"unklar: stellt ein Einbettungs-Token (Tableau) aus; keine bleibende Aenderung belegt, aber ein neues Zugangsdatum"
+/api/v2/billing/management/users/{userId}/accounts,brew,userId,userId=userId,page;limit,personenbezogen,nein,Personenbezug: Abrechnungskonten je Benutzer
+/api/v2/billing/management/users/{userId}/targets,brew,userId,userId=userId,,personenbezogen,nein,Personenbezug: Abrechnungskonten je Benutzer
+/api/{erpId}/category/create,panel,erpId,erpId=erpId,,unklar,nein,"unklar: geerbte CRUD-Zeile ""create"": Vorlage oder Entwurf, am Server nicht belegt; Nutzung durch die Oberflaeche nicht belegt; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/category/{categoryId}/products,"brew,panel",erpId;categoryId,erpId=erpId; categoryId=unbekannt,filters;page;page_size;search;filters[],lesend,nein,Parameter unbekannt: categoryId
+/api/{erpId}/category/{p1},panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/category/{p1}/edit,panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/category-icon/create,panel,erpId,erpId=erpId,,unklar,nein,"unklar: geerbte CRUD-Zeile ""create"": Vorlage oder Entwurf, am Server nicht belegt; Nutzung durch die Oberflaeche nicht belegt; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/category-icon/{p1},panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/category-icon/{p1}/edit,panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/category-icon-group/create,panel,erpId,erpId=erpId,,unklar,nein,"unklar: geerbte CRUD-Zeile ""create"": Vorlage oder Entwurf, am Server nicht belegt; Nutzung durch die Oberflaeche nicht belegt; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/category-icon-group/{categoryIconGroupId}/category-icon,"brew,panel",erpId;categoryIconGroupId,erpId=erpId; categoryIconGroupId=unbekannt,page;page_size,lesend,nein,Parameter unbekannt: categoryIconGroupId
+/api/{erpId}/category-icon-group/{p1},panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/category-icon-group/{p1}/edit,panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/erpSettings/create,panel,erpId,erpId=erpId,,unklar,nein,"unklar: geerbte CRUD-Zeile ""create"": Vorlage oder Entwurf, am Server nicht belegt; Nutzung durch die Oberflaeche nicht belegt; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/erpSettings/{p1},panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/erpSettings/{p1}/edit,panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/preproductionConcreteProduct/create,panel,erpId,erpId=erpId,,unklar,nein,"unklar: geerbte CRUD-Zeile ""create"": Vorlage oder Entwurf, am Server nicht belegt; Nutzung durch die Oberflaeche nicht belegt; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/preproductionConcreteProduct/{p1}/edit,panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/preproductionConcreteProduct/{preproductionConcreteProductId},"brew,panel",erpId;preproductionConcreteProductId,erpId=erpId; preproductionConcreteProductId=unbekannt,,lesend,nein,Parameter unbekannt: preproductionConcreteProductId
+/api/{erpId}/product/create,panel,erpId,erpId=erpId,,unklar,nein,"unklar: geerbte CRUD-Zeile ""create"": Vorlage oder Entwurf, am Server nicht belegt; Nutzung durch die Oberflaeche nicht belegt; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/product/download,"brew,panel",erpId,erpId=erpId,categoryIds[];storageIds[],download,nein,Datei-Antwort: Produktexport als Datei
+/api/{erpId}/product/ingredient/{ingredientId},"brew,panel",erpId;ingredientId,erpId=erpId; ingredientId=unbekannt,,lesend,nein,Parameter unbekannt: ingredientId
+/api/{erpId}/product/recipe-ppa-price/{p1},panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,Parameter unbekannt: p1
+/api/{erpId}/product/recipe-ppa/{recipePpaId},"brew,panel",erpId;recipePpaId,erpId=erpId; recipePpaId=unbekannt,,lesend,nein,Parameter unbekannt: recipePpaId
+/api/{erpId}/product/{p1},panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/product/{p1}/category,panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,Parameter unbekannt: p1
+/api/{erpId}/product/{p1}/edit,panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/product/{productId}/packagings,panel,erpId;productId,erpId=erpId; productId=unbekannt,,lesend,nein,Parameter unbekannt: productId
+/api/{erpId}/product/{productId}/packagings-with-price,"brew,panel",erpId;productId,erpId=erpId; productId=unbekannt,,lesend,nein,Parameter unbekannt: productId
+/api/{erpId}/product/{productId}/stock-change/paginate,"brew,panel",erpId;productId,erpId=erpId; productId=unbekannt,page;page_size,lesend,nein,Parameter unbekannt: productId
+/api/{erpId}/product-group/create,panel,erpId,erpId=erpId,,unklar,nein,"unklar: geerbte CRUD-Zeile ""create"": Vorlage oder Entwurf, am Server nicht belegt; Nutzung durch die Oberflaeche nicht belegt; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/product-group/{p1},panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/product-group/{p1}/edit,panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/product-group/{productGroupId}/products,"brew,panel",erpId;productGroupId,erpId=erpId; productGroupId=unbekannt,page;page_size;order_by;order_direction,lesend,nein,Parameter unbekannt: productGroupId
+/api/{erpId}/product-unit/create,panel,erpId,erpId=erpId,,unklar,nein,"unklar: geerbte CRUD-Zeile ""create"": Vorlage oder Entwurf, am Server nicht belegt; Nutzung durch die Oberflaeche nicht belegt; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/product-unit/{p1},panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/product-unit/{p1}/edit,panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/products/create,panel,erpId,erpId=erpId,,unklar,nein,"unklar: geerbte CRUD-Zeile ""create"": Vorlage oder Entwurf, am Server nicht belegt; Nutzung durch die Oberflaeche nicht belegt; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/products/{p1},panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/products/{p1}/edit,panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/recipe/create,panel,erpId,erpId=erpId,,unklar,nein,"unklar: geerbte CRUD-Zeile ""create"": Vorlage oder Entwurf, am Server nicht belegt; Nutzung durch die Oberflaeche nicht belegt; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/recipe/{p1},panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/recipe/{p1}/edit,panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/recipe-sale/create,panel,erpId,erpId=erpId,,unklar,nein,"unklar: geerbte CRUD-Zeile ""create"": Vorlage oder Entwurf, am Server nicht belegt; Nutzung durch die Oberflaeche nicht belegt; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/recipe-sale/{p1},panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/recipe-sale/{p1}/edit,panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/resets/create,panel,erpId,erpId=erpId,,unklar,nein,"unklar: geerbte CRUD-Zeile ""create"": Vorlage oder Entwurf, am Server nicht belegt; Nutzung durch die Oberflaeche nicht belegt; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/resets/{p1},panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/resets/{p1}/edit,panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/sales/create,panel,erpId,erpId=erpId,,unklar,nein,"unklar: geerbte CRUD-Zeile ""create"": Vorlage oder Entwurf, am Server nicht belegt; Nutzung durch die Oberflaeche nicht belegt; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/sales/{p1}/edit,panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/sales/{saleId},"brew,panel",erpId;saleId,erpId=erpId; saleId=unbekannt,,lesend,nein,Parameter unbekannt: saleId
+/api/{erpId}/sales/{saleId}/finish,"brew,panel",erpId;saleId,erpId=erpId; saleId=unbekannt,,zustandsaendernd,nein,"GET mit Seiteneffekt: panel 592/167: finish, Aufruf aus clickFinish() -- schliesst den Verkauf ab"
+/api/{erpId}/sales/{saleId}/recipe-sale,"brew,panel",erpId;saleId,erpId=erpId; saleId=unbekannt,page;page_size,lesend,nein,Parameter unbekannt: saleId
+/api/{erpId}/shop/create,panel,erpId,erpId=erpId,,unklar,nein,"unklar: geerbte CRUD-Zeile ""create"": Vorlage oder Entwurf, am Server nicht belegt; Nutzung durch die Oberflaeche nicht belegt; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/shop/{p1},panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/shop/{p1}/edit,panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/shop-order/create,panel,erpId,erpId=erpId,,unklar,nein,"unklar: geerbte CRUD-Zeile ""create"": Vorlage oder Entwurf, am Server nicht belegt; Nutzung durch die Oberflaeche nicht belegt; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/shop-order/paginate/{p1},panel,erpId;p1,erpId=erpId; p1=unbekannt,page_size;page;orderView,lesend,nein,Parameter unbekannt: p1
+/api/{erpId}/shop-order/{p1}/change/paginate,panel,erpId;p1,erpId=erpId; p1=unbekannt,page_size;page,lesend,nein,Parameter unbekannt: p1
+/api/{erpId}/shop-order/{p1}/edit,panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/shop-order/{shopOrderId},"brew,panel",erpId;shopOrderId,erpId=erpId; shopOrderId=unbekannt,,lesend,nein,Parameter unbekannt: shopOrderId
+/api/{erpId}/shop-order/{shopOrderId}/change,"brew,panel",erpId;shopOrderId,erpId=erpId; shopOrderId=unbekannt,order_by;order_direction;categories[];storages[],lesend,nein,Parameter unbekannt: shopOrderId
+/api/{erpId}/shop-order/{shopOrderId}/change/paginate/checked,"brew,panel",erpId;shopOrderId,erpId=erpId; shopOrderId=unbekannt,checked;page;page_size,lesend,nein,Parameter unbekannt: shopOrderId
+/api/{erpId}/shop-order/{shopOrderId}/check-delivery-notice-number,"brew,panel",erpId;shopOrderId,erpId=erpId; shopOrderId=unbekannt,extDeliveryNoteId,lesend,nein,Parameter unbekannt: shopOrderId
+/api/{erpId}/shop-order-mapped-product/create,panel,erpId,erpId=erpId,,unklar,nein,"unklar: geerbte CRUD-Zeile ""create"": Vorlage oder Entwurf, am Server nicht belegt; Nutzung durch die Oberflaeche nicht belegt; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/shop-order-mapped-product/{p1},panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/shop-order-mapped-product/{p1}/edit,panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/shop-order-order-tag-type/concrete-product/{concreteProductId},"brew,panel",erpId;concreteProductId,erpId=erpId; concreteProductId=unbekannt,page;page_size;search,lesend,nein,Parameter unbekannt: concreteProductId
+/api/{erpId}/shop-order-order-tag-type/create,panel,erpId,erpId=erpId,,unklar,nein,"unklar: geerbte CRUD-Zeile ""create"": Vorlage oder Entwurf, am Server nicht belegt; Nutzung durch die Oberflaeche nicht belegt; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/shop-order-order-tag-type/{p1},panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/shop-order-order-tag-type/{p1}/edit,panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/statistics/create,panel,erpId,erpId=erpId,,unklar,nein,"unklar: geerbte CRUD-Zeile ""create"": Vorlage oder Entwurf, am Server nicht belegt; Nutzung durch die Oberflaeche nicht belegt; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/statistics/product/{p1},panel,erpId;p1,erpId=erpId; p1=unbekannt,start_date;end_date,lesend,nein,Parameter unbekannt: p1
+/api/{erpId}/statistics/{p1},panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/statistics/{p1}/edit,panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/stock/create,panel,erpId,erpId=erpId,,unklar,nein,"unklar: geerbte CRUD-Zeile ""create"": Vorlage oder Entwurf, am Server nicht belegt; Nutzung durch die Oberflaeche nicht belegt; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/stock/ingredient/{p1},panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,Parameter unbekannt: p1
+/api/{erpId}/stock/product/{p1},panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,Parameter unbekannt: p1
+/api/{erpId}/stock/{id}/initial-import-price,panel,erpId;id,erpId=erpId; id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/{erpId}/stock/{p1},panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/stock/{p1}/edit,panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/stocktaking/create,panel,erpId,erpId=erpId,,unklar,nein,"unklar: geerbte CRUD-Zeile ""create"": Vorlage oder Entwurf, am Server nicht belegt; Nutzung durch die Oberflaeche nicht belegt; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/stocktaking/{id}/get-categories-for-stocktaking,panel,erpId;id,erpId=erpId; id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/{erpId}/stocktaking/{id}/get-storages-for-stocktaking,panel,erpId;id,erpId=erpId; id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/api/{erpId}/stocktaking/{id}/stocktaking-change,panel,erpId;id,erpId=erpId; id=unbekannt,page;page_size;search;filter;categories[];storages[],lesend,nein,Parameter unbekannt: id
+/api/{erpId}/stocktaking/{p1},panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/stocktaking/{p1}/edit,panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/stocktaking/{p1}/print,panel,erpId;p1,erpId=erpId; p1=unbekannt,,unklar,nein,"unklar: Name ""print"": liefert Druckansicht oder Datei, Antwort nicht belegt"
+/api/{erpId}/stocktaking/{p1}/stocktaking-change/checked,panel,erpId;p1,erpId=erpId; p1=unbekannt,page;page_size;search;filter;categories[];storages[],lesend,nein,Parameter unbekannt: p1
+/api/{erpId}/storage/create,panel,erpId,erpId=erpId,,unklar,nein,"unklar: geerbte CRUD-Zeile ""create"": Vorlage oder Entwurf, am Server nicht belegt; Nutzung durch die Oberflaeche nicht belegt; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/storage/{p1}/edit,panel,erpId;p1,erpId=erpId; p1=unbekannt,,lesend,nein,"Parameter unbekannt: p1; nur geerbte CRUD-Zeile, Nutzung durch die Oberflaeche nicht belegt"
+/api/{erpId}/storage/{storageId},"brew,panel",erpId;storageId,erpId=erpId; storageId=unbekannt,,lesend,nein,Parameter unbekannt: storageId
+/api/{erpId}/storage/{storageId}/products/search,"brew,panel",erpId;storageId,erpId=erpId; storageId=unbekannt,search;page;page_size;order_by;order_direction;filters[],lesend,nein,Parameter unbekannt: storageId
+/api/{erpId}/storage/{storageId}/products/search_all,"brew,panel",erpId;storageId,erpId=erpId; storageId=unbekannt,search;page;page_size;order_by;order_direction;filters[],lesend,nein,Parameter unbekannt: storageId
+/app/lang,"brew,panel",,,lang,zustandsaendernd,nein,GET mit Seiteneffekt: setLanguage (brew) / panel main: onLangChange setzt die Sprache des Benutzers per GET
+/app/switch-design-mode,"brew,panel",,,designMode,zustandsaendernd,nein,GET mit Seiteneffekt: setTheme (brew) / panel main: updateDesignModeForUser speichert die Darstellung des Benutzers
+/assets/i18n/{bereich}/{lang}.json,panel,bereich;lang,bereich=unbekannt; lang=unbekannt,v,lesend,nein,"Parameter unbekannt: bereich, lang"
+/pos/lightspeed-k/pending/{pendingId}/business-locations,"brew,panel",pendingId,pendingId=unbekannt,,lesend,nein,Parameter unbekannt: pendingId
+/pos/sellpick/stores,"brew,panel",,,clientName,unklar,nein,unklar: ruft mit frei eingegebenem clientName einen Drittanbieter ab
+/recipes/contributionMargins/{id},panel,id,id=unbekannt,,lesend,nein,Parameter unbekannt: id
+/recipes/contributionMargins/{p1}/{restaurantId},panel,p1;restaurantId,p1=unbekannt; restaurantId=unbekannt,,lesend,nein,"Parameter unbekannt: p1, restaurantId"
+/recipes/findall/{searchTerm},panel,searchTerm,searchTerm=unbekannt,limit,lesend,nein,Parameter unbekannt: searchTerm
+/recipes/ingredients/find/0/{searchTerm},panel,searchTerm,searchTerm=unbekannt,_;limit,lesend,nein,Parameter unbekannt: searchTerm
+/recipes/ppaPrice/{recipeId}/unit/{unitId},"brew,panel",recipeId;unitId,recipeId=unbekannt; unitId=unbekannt,,lesend,nein,"Parameter unbekannt: recipeId, unitId"
+/recipes/{p1}/{restaurantId}/cmcalc-graph,panel,p1;restaurantId,p1=unbekannt; restaurantId=unbekannt,_,lesend,nein,"Parameter unbekannt: p1, restaurantId"
+/shop/{shopId}/categories/{categoryId},brew,shopId;categoryId,shopId=unbekannt; categoryId=unbekannt,view,lesend,nein,"Parameter unbekannt: shopId, categoryId"
+/shop/{shopId}/lists,brew,shopId,shopId=unbekannt,view,lesend,nein,Parameter unbekannt: shopId
+/shops/private/cancel-import,panel,,,,zustandsaendernd,nein,"GET mit Seiteneffekt: panel 488: cancelProductImport, bricht einen laufenden Produktimport ab"
+/shops/private/{shopId}/edited_file/upload,panel,shopId,shopId=unbekannt,,zustandsaendernd,nein,"GET mit Seiteneffekt: panel 488: productImport, Aufruf aus startImporting() -- startet den Import"
+/shops/private/{shopId}/product/{productId}/image/remove,panel,shopId;productId,shopId=unbekannt; productId=unbekannt,_confirmed,zustandsaendernd,nein,"GET mit Seiteneffekt: panel 488: removeProductImage mit _confirmed=1, nach Loesch-Bestaetigung"
+/shops/private/{shopId}/product/{productId}/image/remove/{p6},panel,shopId;productId;p6,shopId=unbekannt; productId=unbekannt; p6=unbekannt,_confirmed,zustandsaendernd,nein,"GET mit Seiteneffekt: panel 488: removeProductImage mit _confirmed=1, nach Loesch-Bestaetigung"
+/shops/private/{shopId}/supplier/errors,panel,shopId,shopId=unbekannt,,download,nein,Datei-Antwort: downloadFileWithErrors: Fehlerdatei
+/shops/supplier/{shopId}/product/template,panel,shopId,shopId=unbekannt,products-download,download,nein,Datei-Antwort: downloadExcelTemplate: Vorlage
+/shops/{shopId}/costcenters/{costCenterId}/search,"brew,panel",shopId;costCenterId,shopId=unbekannt; costCenterId=unbekannt,q,lesend,nein,"Parameter unbekannt: shopId, costCenterId"
