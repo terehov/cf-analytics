@@ -1,0 +1,195 @@
+{
+ "ROLE_/IS_-Literale": {
+  "IS_IMPERSONATOR": [
+   "_id-CwA9RmXO.js",
+   "index-ayCVcund.js",
+   "index-lKBZAT8Z.js"
+  ],
+  "IS_POSSIBLE": [
+   "use-intake-sections-CO4w_idd.js"
+  ],
+  "ROLE_ADMIN": [
+   "_id-CwA9RmXO.js",
+   "index-lKBZAT8Z.js",
+   "route-CJcc_hgD.js"
+  ],
+  "ROLE_DISPLAY": [
+   "route-CJcc_hgD.js"
+  ],
+  "ROLE_EDU_ADMIN": [
+   "index-lKBZAT8Z.js"
+  ],
+  "ROLE_EDU_STUDENT": [
+   "index-lKBZAT8Z.js"
+  ],
+  "ROLE_EDU_TEACHER": [
+   "index-lKBZAT8Z.js"
+  ],
+  "ROLE_ERP_CATALOG_SYNC_ADMIN": [
+   "index-C-BcOx_r.js",
+   "route-l_G0T8q_.js"
+  ],
+  "ROLE_SUBUSER_ADMIN": [
+   "route-CJcc_hgD.js"
+  ],
+  "ROLE_SUPER_ADMIN": [
+   "route-CJcc_hgD.js"
+  ]
+ },
+ "erp": {
+  "confirmCancelOrder": [
+   "use-legacy-url-generator-CX-7Kk4T.js"
+  ],
+  "orders": [
+   "index-VDd8otri.js"
+  ]
+ },
+ "erpPermissions": {
+  "all": [
+   "index-lKBZAT8Z.js"
+  ]
+ },
+ "hasModule": {
+  "analytics": [
+   "route-CJcc_hgD.js"
+  ],
+  "catering": [
+   "route-CJcc_hgD.js"
+  ],
+  "erp": [
+   "route-CJcc_hgD.js"
+  ],
+  "insights": [
+   "route-CJcc_hgD.js"
+  ],
+  "recipes": [
+   "route-CJcc_hgD.js"
+  ]
+ },
+ "hasRole": {
+  "ROLE_ADMIN": [
+   "route-CJcc_hgD.js"
+  ],
+  "ROLE_DISPLAY": [
+   "route-CJcc_hgD.js"
+  ],
+  "ROLE_SUBUSER_ADMIN": [
+   "route-CJcc_hgD.js"
+  ],
+  "ROLE_SUPER_ADMIN": [
+   "route-CJcc_hgD.js"
+  ]
+ },
+ "hasSubuserPermission": {
+  "add_subusers": [
+   "index-D3MzMQrv.js",
+   "user-form-page-DsP1o75V.js"
+  ],
+  "analytics_edit_budget_information": [
+   "index-B1IQSXRQ.js"
+  ],
+  "analytics_view": [
+   "route-BjKIfbYn.js",
+   "route-CJcc_hgD.js"
+  ],
+  "analytics_view_budget_information": [
+   "route-CJcc_hgD.js"
+  ],
+  "erp_can_delete_stocktaking": [
+   "route-CJcc_hgD.js"
+  ],
+  "erp_categories": [
+   "route-CJcc_hgD.js"
+  ],
+  "erp_create_confirm_stocktaking": [
+   "route-CJcc_hgD.js"
+  ],
+  "erp_edit_commodity_groups": [
+   "route-CJcc_hgD.js"
+  ],
+  "erp_edit_product_groups": [
+   "route-CJcc_hgD.js"
+  ],
+  "erp_edit_storage_groups": [
+   "route-CJcc_hgD.js"
+  ],
+  "erp_orders": [
+   "route-CJcc_hgD.js"
+  ],
+  "erp_sales": [
+   "route-CJcc_hgD.js"
+  ],
+  "erp_stocktaking": [
+   "route-CJcc_hgD.js"
+  ],
+  "erp_storage": [
+   "route-CJcc_hgD.js"
+  ],
+  "other_settings": [
+   "index-B1IQSXRQ.js",
+   "index-lKBZAT8Z.js"
+  ],
+  "recipe_corridor_edit": [
+   "index-34XIdDpQ.js",
+   "legend-rail-card-Cf0aH4Xl.js",
+   "settings-DOBu_H5p.js"
+  ],
+  "recipe_groups_add": [
+   "route-CJcc_hgD.js"
+  ],
+  "recipe_groups_edit": [
+   "route-CJcc_hgD.js"
+  ],
+  "recipe_view": [
+   "route-CJcc_hgD.js",
+   "route-Y3MgZ-Li.js"
+  ],
+  "shops_orders_send": [
+   "index-C_S_dUhD.js"
+  ],
+  "user_ingredients_view": [
+   "route-CJcc_hgD.js"
+  ]
+ },
+ "master": {
+  "erpGlobalSettings": [
+   "route-CJcc_hgD.js"
+  ],
+  "externalApi": [
+   "index-C_S_dUhD.js"
+  ],
+  "gesoca": [
+   "index-B1IQSXRQ.js"
+  ]
+ },
+ "masterPermissions": {
+  "erpGlobalSettings": [
+   "permissions-C7CIg3Pc.js",
+   "product-sheet-KDAojRec.js"
+  ]
+ },
+ "posPermissions": {
+  "configurationPage": [
+   "_id-CwA9RmXO.js",
+   "index-ayCVcund.js"
+  ],
+  "synchronisationPage": [
+   "_id-CwA9RmXO.js",
+   "_id-DJEucL_Q.js",
+   "index-DuvhUu_m.js",
+   "index-ayCVcund.js"
+  ]
+ },
+ "roles.includes": {
+  "IS_IMPERSONATOR": [
+   "index-ayCVcund.js"
+  ]
+ },
+ "subuserPerms": {
+  "settings_manage_units": [
+   "index-D4y6XOms.js",
+   "product-sheet-Brkk9iA2.js",
+   "product-sheet-KDAojRec.js"
+  ]
+ }
+}

@@ -1,0 +1,183 @@
+route_path,chunk,guard_or_permission,note
+/,main,"canActivate J (gelesen): Wurzelroute '/': eingeloggt per GET app/is-authenticated, dann Weiterleitung auf die gemerkte Zielroute","component N (minifiziert) ; pathMatch ""full"""
+/panel,main,"canActivate F (gelesen): Host mit 'supplier' -> nur Rolle ROLE_SUPPLIER (sonst /supplier/login|register); sonst /login und /reset-password offen, eingeloggt nur /panel, alles andere -> /forbidden; Anmeldung per GET app/is-authenticated","loadChildren -> Chunks 707,239, Modul 22239 (PanelModule)"
+/panel,239,"canActivate wt (gelesen): ist ein Benutzer geladen, muss data.role (falls gesetzt) in user.roles stehen; sonst GET app/is-authenticated",component xt (minifiziert)
+/panel/dashboard,239,,"loadChildren -> Chunks 120,28,703,557,356,277,727,184,567, Modul 84567 (DashboardModule)"
+/panel/dashboard,567,,component: Inline-Klasse
+/panel/catering,239,"canActivate Le (gelesen): user.allowedModules.{analytics|catering|erp|menucreator} je Pfadpraefix /panel/<modul>; fehlt es -> /panel/module-not-allowed (shop, shopping-list, settings, dashboard: keine Modulpruefung im Code)","loadChildren -> Chunks 120,863,28,703,436,356,592,330, Modul 81330 (CateringModule)"
+/panel/catering,330,,component R (minifiziert)
+/panel/catering/:id/event,330,"canActivate So (gelesen): permissionsService.hasCateringViewAllEventDetailsPermissions(user), sonst Warnfenster und Weiterleitung /catering",component Ec (minifiziert)
+/panel/catering/:id/event/meals,330,,component Hu (minifiziert)
+/panel/catering/:id/event/drinks,330,,component R1 (minifiziert)
+/panel/catering/:id/event/equipment,330,,component wO (minifiziert)
+/panel/catering/:id/event/finances,330,,component sf (minifiziert)
+/panel/catering/:id/event/orders,330,,component b0 (minifiziert)
+/panel/catering/:id/event/team,330,,component mx (minifiziert)
+/panel/catering/:id/event/general,330,,component qx (minifiziert)
+/panel/catering/:id/event/:staffId/staff-printout,330,,component lr (minifiziert)
+/panel/catering/:id/event/printout,330,,component lr (minifiziert)
+/panel/catering/:id/event/recipe-details/:recipeName,330,,component QO (minifiziert)
+/panel/catering/:id/event/recipe-print,330,,component q7 (minifiziert)
+/panel/catering/:id/event/ingredients-print,330,,component v8 (minifiziert)
+/panel/catering/settings,330,,component Bx (minifiziert)
+/panel/catering/settings/customer,330,,component E2 (minifiziert)
+/panel/catering/settings/event-type,330,,component Y2 (minifiziert)
+/panel/catering/settings/service-type,330,,component cb (minifiziert)
+/panel/catering/settings/courses,330,,component $b (minifiziert)
+/panel/catering/settings/templates,330,,component j3 (minifiziert)
+/panel/catering/settings/templates,330,,component Jb (minifiziert)
+/panel/catering/settings/templates/:id/template-detail,330,,component B3 (minifiziert)
+/panel/catering/settings/location,330,,component k2 (minifiziert)
+/panel/catering/settings/blacklist,330,,component cP (minifiziert)
+/panel/catering/settings/team,330,,component h2 (minifiziert)
+/panel/catering/settings/roles,330,,component K2 (minifiziert)
+/panel/catering,330,,component xl (minifiziert)
+/panel/erp,239,"canActivate Le (gelesen): user.allowedModules.{analytics|catering|erp|menucreator} je Pfadpraefix /panel/<modul>; fehlt es -> /panel/module-not-allowed (shop, shopping-list, settings, dashboard: keine Modulpruefung im Code)","loadChildren -> Chunks 436,184,592,607, Modul 15597 (ErpModule)"
+/panel/erp,607,,"loadChildren -> Chunks 195,592,569, Modul 48569 (DashboardModule)"
+/panel/erp,569,,"redirectTo ""/brew/erp"" ; pathMatch ""full"""
+/panel/erp/dashboard,569,,"redirectTo ""/brew/erp"""
+/panel/erp/order,607,,"loadChildren -> Chunks 195,771,287,326,592,678, Modul 63678 (OrderModule)"
+/panel/erp/order,678,,component Rn (minifiziert)
+/panel/erp/order/accept/:id,678,,component ka (minifiziert)
+/panel/erp/order/accepted/:id,678,,component hc (minifiziert)
+/panel/erp/product,607,,"loadChildren -> Chunks 195,771,313,287,326,592,735, Modul 10735 (ProductModule)"
+/panel/erp/product/preproductionProduct/:id,735,,component $r (minifiziert)
+/panel/erp/product/search,735,,component Te (minifiziert)
+/panel/erp/product/FoodWasteReport,735,,"loadChildren -> Chunks 754, Modul 74754 (DamagedGoodsModule)"
+/panel/erp/product/FoodWasteReport,754,,"redirectTo ""/brew/erp/food-waste"" ; pathMatch ""full"""
+/panel/erp/product/FoodWasteReport/print,754,,"redirectTo ""/brew/erp/food-waste"""
+/panel/erp/product,735,,component Cr (minifiziert)
+/panel/erp/category,607,,"loadChildren -> Chunks 195,771,313,287,592,7, Modul 53678 (CategoryModule)"
+/panel/erp/category/edit,7,,component Zo (minifiziert)
+/panel/erp/category/product-group/:id,7,,component ii (minifiziert)
+/panel/erp/category/:id,7,,component Ot (minifiziert)
+/panel/erp/category,7,,component Ot (minifiziert)
+/panel/erp/storage,607,,"loadChildren -> Chunks 195,771,313,768,592,143, Modul 50143 (StorageModule)"
+/panel/erp/storage,143,,component gt (minifiziert)
+/panel/erp/storage/edit-product-order/:id,143,,component Fn (minifiziert)
+/panel/erp/storage/edit,143,,component Zn (minifiziert)
+/panel/erp/storage/:id,143,,component gt (minifiziert)
+/panel/erp/sale,607,,"loadChildren -> Chunks 195,170,592,167, Modul 64167 (SaleModule)"
+/panel/erp/sale,167,,component lt (minifiziert)
+/panel/erp/sale/:id,167,,component kt (minifiziert)
+/panel/erp/stocktaking,607,,"loadChildren -> Chunks 863,326,592,554, Modul 76298 (StocktakingModule)"
+/panel/erp/stocktaking,554,,component Je (minifiziert)
+/panel/erp/stocktaking/legacy,554,,component pn (minifiziert)
+/panel/erp/stocktaking/view/:id,554,,component Ki (minifiziert)
+/panel/erp/stocktaking/category/:id/print,554,,component vt (minifiziert)
+/panel/erp/stocktaking/storage/:id/print,554,,component vt (minifiziert)
+/panel/erp/stocktaking/products/:id/print,554,,component vt (minifiziert)
+/panel/erp/stocktransfer,607,,"loadChildren -> Chunks 195,771,592,545, Modul 54116 (StocktransferModule)"
+/panel/erp/stocktransfer/:id/accepted,545,,component Ke (minifiziert)
+/panel/erp/stocktransfer/:id/accept,545,canActivate I (gelesen): data.permission == StocktransferApproving UND (erpPermissions.all ODER erpPermissions.stocktransferApproves) | data {permission:t.StocktransferApproving},component Mn (minifiziert)
+/panel/erp/stocktransfer/:id,545,,component Yi (minifiziert)
+/panel/erp/stocktransfer,545,,component nt (minifiziert)
+/panel/erp/stocktransfer/:id/print,545,,component an (minifiziert)
+/panel/erp/global-settings,607,,
+/panel/erp/global-settings/categories,607,"canActivate <alias>.F aus Modul 13596 (Chunk 592, gelesen am 18.11.2026): setzt window.location.href auf <reactFrontendDomain>/brew/<data.brewPath mit :param aus der Route> (+ Query) und gibt false zurueck -> Weiterleitung auf die neue Oberflaeche, kein Aufruf der API | data {brewPath:""erp/global/commodity-groups""}",component en (minifiziert)
+/panel/erp/global-settings/product-groups,607,"canActivate <alias>.F aus Modul 13596 (Chunk 592, gelesen am 18.11.2026): setzt window.location.href auf <reactFrontendDomain>/brew/<data.brewPath mit :param aus der Route> (+ Query) und gibt false zurueck -> Weiterleitung auf die neue Oberflaeche, kein Aufruf der API | data {brewPath:""erp/global/product-groups""}",component ce (minifiziert)
+/panel/erp/global-settings/storages,607,,component Ue (minifiziert)
+/panel/erp/global-settings/order-import,607,,component qe (minifiziert)
+/panel/shop,239,"canActivate Le (gelesen): user.allowedModules.{analytics|catering|erp|menucreator} je Pfadpraefix /panel/<modul>; fehlt es -> /panel/module-not-allowed (shop, shopping-list, settings, dashboard: keine Modulpruefung im Code)","loadChildren -> Chunks 592,658, Modul 51658 (ShopModule)"
+/panel/shop,658,,component je (minifiziert)
+/panel/shop/:id/cart/:type/:cartId,658,"canActivate <alias>.F aus Modul 13596 (Chunk 592, gelesen am 18.11.2026): setzt window.location.href auf <reactFrontendDomain>/brew/<data.brewPath mit :param aus der Route> (+ Query) und gibt false zurueck -> Weiterleitung auf die neue Oberflaeche, kein Aufruf der API | data {brewPath:""shop/:id/cart/:type/:cartId""}",component ue (minifiziert)
+/panel/shop/carts/:status,658,"canActivate <alias>.F aus Modul 13596 (Chunk 592, gelesen am 18.11.2026): setzt window.location.href auf <reactFrontendDomain>/brew/<data.brewPath mit :param aus der Route> (+ Query) und gibt false zurueck -> Weiterleitung auf die neue Oberflaeche, kein Aufruf der API | data {brewPath:""shop/carts/:status""}",component go (minifiziert)
+/panel/shops,239,"canActivate Le (gelesen): user.allowedModules.{analytics|catering|erp|menucreator} je Pfadpraefix /panel/<modul>; fehlt es -> /panel/module-not-allowed (shop, shopping-list, settings, dashboard: keine Modulpruefung im Code)",component: Inline-Klasse
+/panel/shopping-list,239,"canActivate Le (gelesen): user.allowedModules.{analytics|catering|erp|menucreator} je Pfadpraefix /panel/<modul>; fehlt es -> /panel/module-not-allowed (shop, shopping-list, settings, dashboard: keine Modulpruefung im Code)","loadChildren -> Chunks 88, Modul 1088 (ShoppingListModule)"
+/panel/shopping-list,88,,component m (minifiziert)
+/panel/shopping-list/all,88,,component It (minifiziert)
+/panel/shopping-list/:articleId,88,,component: Inline-Klasse
+/panel/shopping-list,88,,"redirectTo ""all"" ; pathMatch ""full"""
+/panel/menucreator,239,"canActivate Le (gelesen): user.allowedModules.{analytics|catering|erp|menucreator} je Pfadpraefix /panel/<modul>; fehlt es -> /panel/module-not-allowed (shop, shopping-list, settings, dashboard: keine Modulpruefung im Code)","loadChildren -> Chunks 170,592,848, Modul 14848 (MenuCreatorModule)"
+/panel/menucreator/:hash/embedded,848,,"loadChildren -> Chunks 733,435, Modul 11435 (EmbeddedModule)"
+/panel/menucreator/:hash/embedded,435,"resolve {menu:T} (Resolver, nicht ausgewertet)",component S0 (minifiziert)
+/panel/menucreator,848,,"loadChildren -> Chunks 120,771,733,768,592,283, Modul 40283 (UserModule)"
+/panel/menucreator,283,,component or (minifiziert)
+/panel/menucreator/editor/:id,283,"canDeactivate [fn] (nicht aufgeloest) | resolve {menu:Ti.N} (Resolver, nicht ausgewertet)",component Mi (minifiziert)
+/panel/menucreator/editor/new/:id,283,"canDeactivate [fn] (nicht aufgeloest) | resolve {menu:un} (Resolver, nicht ausgewertet)",component Mi (minifiziert)
+/panel/menucreator/create,283,"resolve {templates:hn} (Resolver, nicht ausgewertet)",component Fs (minifiziert)
+/panel/menucreator/print,283,,component Ms (minifiziert)
+/panel/menucreator,283,"resolve {menuCards:Si.L} (Resolver, nicht ausgewertet)",component xs (minifiziert)
+/panel/menucreator/daily-menu,848,,"loadChildren -> Chunks 120,863,436,125, Modul 52677 (DailyMenuModule)"
+/panel/menucreator/daily-menu,125,,component T (minifiziert)
+/panel/menucreator/daily-menu,125,,component xe (minifiziert)
+/panel/menucreator/daily-menu,125,,component pt (minifiziert)
+/panel/menucreator/daily-menu/:id/standard,125,,component cn (minifiziert)
+/panel/menucreator/daily-menu/:id/custom,125,,component ua (minifiziert)
+/panel/menucreator/daily-menu/:id/print,125,,component Eo (minifiziert)
+/panel/analytics,239,"canActivate Le (gelesen): user.allowedModules.{analytics|catering|erp|menucreator} je Pfadpraefix /panel/<modul>; fehlt es -> /panel/module-not-allowed (shop, shopping-list, settings, dashboard: keine Modulpruefung im Code)","loadChildren -> Chunks 120,605, Modul 48605 (AnalyticsModule)"
+/panel/analytics,605,"resolve {data:f} (Resolver, nicht ausgewertet)",component H (minifiziert)
+/panel/settings,239,"canActivate Le (gelesen): user.allowedModules.{analytics|catering|erp|menucreator} je Pfadpraefix /panel/<modul>; fehlt es -> /panel/module-not-allowed (shop, shopping-list, settings, dashboard: keine Modulpruefung im Code)","loadChildren -> Chunks 863,28,557,727,592,742, Modul 2742 (SettingsModule)"
+/panel/settings,742,canActivate Ys (gelesen): gibt immer true zurueck,component $s (minifiziert)
+/panel/settings/pos/locations,742,"canActivate <alias>.F aus Modul 13596 (Chunk 592, gelesen am 18.11.2026): setzt window.location.href auf <reactFrontendDomain>/brew/<data.brewPath mit :param aus der Route> (+ Query) und gibt false zurueck -> Weiterleitung auf die neue Oberflaeche, kein Aufruf der API | data {brewPath:""settings/pos/locations""}",component rn (minifiziert)
+/panel/settings/pos/configure/:id,742,"canActivate <alias>.F aus Modul 13596 (Chunk 592, gelesen am 18.11.2026): setzt window.location.href auf <reactFrontendDomain>/brew/<data.brewPath mit :param aus der Route> (+ Query) und gibt false zurueck -> Weiterleitung auf die neue Oberflaeche, kein Aufruf der API | data {brewPath:""settings/pos/configure/:id""}",component Rn (minifiziert)
+/panel/settings/pos/export/:id,742,"canActivate <alias>.F aus Modul 13596 (Chunk 592, gelesen am 18.11.2026): setzt window.location.href auf <reactFrontendDomain>/brew/<data.brewPath mit :param aus der Route> (+ Query) und gibt false zurueck -> Weiterleitung auf die neue Oberflaeche, kein Aufruf der API | data {brewPath:""settings/pos/export/:id""}",component Pi (minifiziert)
+/panel/settings/pos/synchronisation,742,"canActivate <alias>.F aus Modul 13596 (Chunk 592, gelesen am 18.11.2026): setzt window.location.href auf <reactFrontendDomain>/brew/<data.brewPath mit :param aus der Route> (+ Query) und gibt false zurueck -> Weiterleitung auf die neue Oberflaeche, kein Aufruf der API | data {brewPath:""settings/pos/synchronisation""}",component Rs (minifiziert)
+/panel/settings/**,742,,"redirectTo ""pos/locations"""
+/panel/module-not-allowed,239,,component _t (minifiziert)
+/panel,239,,"redirectTo ""/brew/dashboard"" ; pathMatch ""full"""
+/signin,main,,"redirectTo ""login"" ; pathMatch ""full"""
+/login,main,,"redirectTo ""brew/login"" ; pathMatch ""full"""
+/reset-password,main,"canActivate F (gelesen): Host mit 'supplier' -> nur Rolle ROLE_SUPPLIER (sonst /supplier/login|register); sonst /login und /reset-password offen, eingeloggt nur /panel, alles andere -> /forbidden; Anmeldung per GET app/is-authenticated",component ce (minifiziert)
+/forbidden,main,,component pe (minifiziert)
+/dashboard,main,,"redirectTo ""brew/dashboard"" ; pathMatch ""full"""
+/catering,main,,"redirectTo ""panel/catering"" ; pathMatch ""full"""
+/analytics,main,,"redirectTo ""brew/analytics"" ; pathMatch ""full"""
+/menucreator,main,,"redirectTo ""panel/menucreator"" ; pathMatch ""full"""
+/erp-client,main,,"redirectTo ""panel/erp"" ; pathMatch ""full"""
+/settings,main,,"redirectTo ""panel/settings"" ; pathMatch ""full"""
+/shop,main,,"redirectTo ""panel/shop"" ; pathMatch ""full"""
+/supplier,main,"canActivate F (gelesen): Host mit 'supplier' -> nur Rolle ROLE_SUPPLIER (sonst /supplier/login|register); sonst /login und /reset-password offen, eingeloggt nur /panel, alles andere -> /forbidden; Anmeldung per GET app/is-authenticated","loadChildren -> Chunks 120,28,703,557,707,277,592,488, Modul 30488 (SupplierModule)"
+/supplier/register,488,,component df (minifiziert)
+/supplier/login,488,,component yf (minifiziert)
+/supplier,488,canActivate Cf (gelesen): user.roles enthaelt 'ROLE_SUPPLIER',component C0 (minifiziert)
+/supplier/dashboard,488,,component $f (minifiziert)
+/supplier/products,488,,component nu (minifiziert)
+/supplier/product-details/:id,488,,component: Inline-Klasse
+/supplier/products-import,488,,component s6 (minifiziert)
+/supplier/orders,488,,component _6 (minifiziert)
+/supplier/order-details/:id,488,,component y6 (minifiziert)
+/supplier,488,,"redirectTo ""dashboard"" ; pathMatch ""full"""
+/brew,main,,
+/brew/**,main,"canActivate [c=>(window.location.href=function ge(c,E){const d=null!=c?c.trim().replace(/\/+ (nicht aufgeloest)",component: Inline-Klasse
+/**,main,,component N (minifiziert)
+/brew/analytics,239,,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/analytics-custom/cost-analysis,239,,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/apps/recipe-viewer,239,,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/completion-dashboard,239,,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/dashboard,"239,main",,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/erp,"554,567,569",,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/erp/,567,,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/erp/category,239,,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/erp/dashboard,"239,567",,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/erp/food-waste,"239,754",,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/erp/global/storages,239,,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/erp/order,239,,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/erp/product,239,,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/erp/sale,239,,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/erp/stocktaking,239,,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/erp/stocktransfer,239,,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/erp/stocktransfer-request,239,,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/erp/storage,239,,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/recipes/contribution-margin,239,,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/recipes/dashboard-mix,239,,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/recipes/groups,239,,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/recipes/ingredients,239,,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/settings/business-information?tab=company,239,,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/settings/general?tab=recipes,239,,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/settings/general?tab=shops,239,,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/settings/pos/,742,,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/settings/pos/locations,239,,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/settings/users/,330,,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/shop/${a.shopId??n}/cart/${a.type}/${a.cartId},658,,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/shop/carts/active,"239,567",,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/shop/carts/all,"239,658",,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/shop/carts/draft,239,,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/shop/carts/faulty,239,,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/shop/mass-ordering,239,,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/shop/smartlists,"239,88",,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/shops,"239,658",,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/,592,,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/analytics,main,,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/dashboard,main,,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"
+/brew/login,main,,"Verweis/Weiterleitung auf die NEUE Oberflaeche (/brew, React), keine Route dieser App"

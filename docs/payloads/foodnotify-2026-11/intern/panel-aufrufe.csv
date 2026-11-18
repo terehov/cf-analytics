@@ -1,0 +1,782 @@
+method,path_template,query_params,body_fields,chunks,routes,param_confidence,in_altem_inventar,note
+GET,/api/allowedLocations,,,239,/panel ; /panel/erp/product ; /panel/shop ; /panel/shopping-list,none,nein,
+GET,/api/analytics,,,605,/panel/analytics,none,nein,
+POST,/api/cart/transferProducts,,"oldCartId,newCartId,products",239,/panel ; /panel/erp/product ; /panel/shop ; /panel/shopping-list,none,nein,
+PUT,/api/cart/{cartId},,deliveryDate,239,/panel ; /panel/erp/product ; /panel/shop ; /panel/shopping-list,named(callers),nein,
+PUT,/api/cart/{cartId}/updateNote,,note,239,/panel ; /panel/erp/product ; /panel/shop ; /panel/shopping-list,named(callers),nein,
+GET,/api/cart/{productId}/product/details,,,239,/panel ; /panel/erp/product ; /panel/shop ; /panel/shopping-list,named(callers),nein,
+GET,/api/carts/count,,,239,/panel ; /panel/erp/product ; /panel/shop ; /panel/shopping-list,none,nein,
+GET,/api/carts/{p1}/basic_info,,,239,/panel ; /panel/erp/product ; /panel/shop ; /panel/shopping-list,positional,nein,"p1 folgt auf Segment ""carts"""
+GET,/api/carts/{type},,,239,/panel ; /panel/erp/product ; /panel/shop ; /panel/shopping-list,named(callers),nein,
+GET,/api/connectedSuppliers,,,239,/panel ; /panel/erp/product ; /panel/shop ; /panel/shopping-list,none,nein,
+GET,/api/costCenters/eventFilter,,,330,/panel/catering,none,nein,
+POST,/api/dailyMenu/group,,"(Aufrufer) dailyMenuDay,(Aufrufer) name,(Aufrufer) beginTime,(Aufrufer) endTime,(Aufrufer) index,(Aufrufer) visible,(Aufrufer) dailyMenuGroupRecipes",125,/panel/menucreator/daily-menu,none,nein,
+POST,/api/dailyMenu/group/duplicate,,,125,/panel/menucreator/daily-menu,none,nein,Body nicht aus Dienst ableitbar (Parameter 1 von duplicateDailyMenuGroup)
+POST,/api/dailyMenu/group/removeStandardGroups,,,125,/panel/menucreator/daily-menu,none,nein,Body nicht aus Dienst ableitbar (Parameter 1 von deleteStandardDailyMenuGroups)
+DELETE,/api/dailyMenu/group/{id},,,125,/panel/menucreator/daily-menu,named(callers),nein,
+POST,/api/dailyMenu/group/{id},,"(Aufrufer) newRecipes,(Aufrufer) existingRecipes,(Aufrufer) name,(Aufrufer) beginTime,(Aufrufer) endTime,(Aufrufer) groups",125,/panel/menucreator/daily-menu,named(callers),nein,
+DELETE,/api/dailyMenu/group/{id}/removeRecipes,,,125,/panel/menucreator/daily-menu,named(callers),nein,
+POST,/api/dailyMenu/group/{id}/standardGroups,,"(Aufrufer) dailyMenuDay,(Aufrufer) name,(Aufrufer) beginTime,(Aufrufer) endTime,(Aufrufer) index,(Aufrufer) visible,(Aufrufer) dailyMenuGroupRecipes",125,/panel/menucreator/daily-menu,named(callers),nein,
+POST,/api/dailyMenu/groupRecipe/search,pageSize*,"(Aufrufer) title,(Aufrufer) restaurants,(Aufrufer) searchString,(Aufrufer) clonedFromRecipe,(Aufrufer) costCenterId,(Aufrufer) recipeType,(Aufrufer) eventId",125,/panel/menucreator/daily-menu,none,nein,
+DELETE,/api/dailyMenu/groupRecipe/{id},,,125,/panel/menucreator/daily-menu,named(callers),nein,
+GET,/api/dailyMenu/menu,"pageSize,orderBy,orderDirection,page,filter*,beginDate*,endDate*",,"125,main",/panel/catering ; /panel/menucreator/daily-menu,none,nein,Dienst-Code in main
+POST,/api/dailyMenu/menu,,"(Aufrufer) name,(Aufrufer) beginTime,(Aufrufer) endTime,(Aufrufer) viewType,(Aufrufer) dailyMenuDays",125,/panel/menucreator/daily-menu,none,nein,
+DELETE,/api/dailyMenu/menu/{id},,,125,/panel/menucreator/daily-menu,named(callers),nein,
+PUT,/api/dailyMenu/menu/{id},,"(Aufrufer) name,(Aufrufer) beginTime,(Aufrufer) endTime,(Aufrufer) viewType,(Aufrufer) dailyMenuDays",125,/panel/menucreator/daily-menu,named(callers),nein,
+POST,/api/dailyMenu/menu/{id}/cancel,,,125,/panel/menucreator/daily-menu,named(callers),nein,leerer Body {}
+POST,/api/dailyMenu/menu/{id}/duplicate,,"(Aufrufer) name,(Aufrufer) beginTime,(Aufrufer) endTime",125,/panel/menucreator/daily-menu,named(callers),nein,
+POST,/api/dailyMenu/menu/{id}/prepared,,,125,/panel/menucreator/daily-menu,named(callers),nein,leerer Body {}
+POST,/api/dailyMenu/menu/{id}/progress,,,125,/panel/menucreator/daily-menu,named(callers),nein,leerer Body {}
+GET,/api/dailyMenu/menu/{menuID},,,125,/panel/menucreator/daily-menu,named(callers),nein,
+PUT,/api/dailyMenu/menu/{p1}/options,,"(Aufrufer) checkedDays,(Aufrufer) checkedOptions,(Aufrufer) checkedRestaurants,(Aufrufer) fonts",125,/panel/menucreator/daily-menu,positional,nein,"p1 folgt auf Segment ""menu"""
+GET,/api/dashboard/costCenters,,,main,/panel/catering,none,nein,Dienst-Code in main
+GET,/api/dashboard/getBoxesData,,,main,/panel/dashboard,none,nein,Dienst-Code in main
+GET,/api/dashboard/getChartData/{p1},,,main,/panel/dashboard,positional,nein,"p1 folgt auf Segment ""getChartData"" | Dienst-Code in main"
+GET,/api/dashboard/getDashboard/{id},,,main,/panel/dashboard,named(callers),nein,Dienst-Code in main
+GET,/api/dashboard/getWeatherData/{p1},,,main,/panel/dashboard,positional,nein,"p1 folgt auf Segment ""getWeatherData"" | Dienst-Code in main"
+PUT,/api/dashboard/updateCheckedArray,,,main,/panel/dashboard,none,nein,Body nicht aus Dienst ableitbar (Parameter 1 von sendCheckedArray) | Dienst-Code in main
+PUT,/api/dashboard/updateLayout,,,main,/panel/dashboard,none,nein,Body nicht aus Dienst ableitbar (Parameter 1 von sendUpdatedLayout) | Dienst-Code in main
+GET,/api/erp/all,,,main,8 Routen (geteilter Dienst): /panel ; /panel/dashboard ; /panel/erp/category ; /panel/erp/order ...,none,ja,Dienst-Code in main
+GET,/api/erp/available,,,"88,main",9 Routen (geteilter Dienst): /panel ; /panel/dashboard ; /panel/erp/category ; /panel/erp/order ...,none,ja,Dienst-Code in main
+POST,/api/erp/catalog/bulk-delete,,"productIds,erpId","167,195,239,313,554,569,592,607,678,735",9 Routen (geteilter Dienst): /panel ; /panel/erp ; /panel/erp/category ; /panel/erp/order ...,none,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 64167:n - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 38163:p - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 30878:d - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 55850:d - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 3812:w - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 90514:X - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | geerbt: CRU"
+GET,/api/erp/catalog/commodity-groups,"erpId,page,perPage,includeEmpty",,735,/panel/erp/product,none,nein,
+PATCH,/api/erp/catalog/products/mass-update,,"(Aufrufer) productIds,(Aufrufer) erpId,(Aufrufer) updates",239,9 Routen (geteilter Dienst): /panel ; /panel/erp ; /panel/erp/category ; /panel/erp/order ...,none,nein,
+GET,/api/erp/dashboard,"erpId,low_on_stock_page,low_on_stock_search,low_on_stock_searchView,pending_orders_page",,607,/panel/erp,none,nein,
+GET,/api/erp/last-used/{id},,,main,8 Routen (geteilter Dienst): /panel ; /panel/dashboard ; /panel/erp/category ; /panel/erp/order ...,named(callers),ja,Dienst-Code in main
+GET,/api/erp/order/auto-import-settings,,,607,/panel/erp ; /panel/erp/order ; /panel/erp/product ; /panel/erp/sale,none,ja,
+PUT,/api/erp/order/auto-import-settings,,"(Aufrufer) autoImportEnabled,(Aufrufer) autoImportDeadlineHours",607,/panel/erp ; /panel/erp/order ; /panel/erp/product ; /panel/erp/sale,none,ja,
+GET,/api/erp/profile,,,607,8 Routen (geteilter Dienst): /panel/erp ; /panel/erp/category ; /panel/erp/order ; /panel/erp/product ...,none,nein,
+POST,/api/erp/stock-movements,,,195,7 Routen (geteilter Dienst): /panel/erp ; /panel/erp/category ; /panel/erp/order ; /panel/erp/product ...,none,nein,Body nicht aus Dienst ableitbar (Parameter 1 von record) | Routen nur ueber Modulkette (Tiefe 2)
+GET,/api/erp/stock-transfer,"erpId,status*,page,limit",,"239,592",/panel/erp/stocktransfer,none,ja,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 56917:c - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+POST,/api/erp/stock-transfer,,,"239,592",/panel/erp/stocktransfer,none,ja,"Body nicht aus Dienst ableitbar (Parameter 1 von store) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 56917:c - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/erp/stock-transfer/create,,,"239,592",/panel/erp/stocktransfer,none,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 56917:c - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | Familie im alten Inventar genannt (/api/erp/stock-transfer), dieser Pfad nicht"
+POST,/api/erp/stock-transfer/initiate,,"fromErpId,toErpId",592,/panel/erp/stocktransfer,none,nein,"Familie im alten Inventar genannt (/api/erp/stock-transfer), dieser Pfad nicht"
+GET,/api/erp/stock-transfer/paginate,"page_size,page,order_by*,order_direction*,from*,to*",,"239,592",/panel/erp/stocktransfer,none,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 56917:c - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | Familie im alten Inventar genannt (/api/erp/stock-transfer), dieser Pfad nicht"
+GET,/api/erp/stock-transfer/search,"page_size,page,search,searchView*,filters[]*",,"239,592",/panel/erp/stocktransfer,none,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 56917:c - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | Familie im alten Inventar genannt (/api/erp/stock-transfer), dieser Pfad nicht"
+POST,/api/erp/stock-transfer/{id}/products,,concreteProductId,592,/panel/erp/stocktransfer,named(callers),ja,
+PUT,/api/erp/stock-transfer/{id}/products/{id},,"(Aufrufer) quantity_to,(Aufrufer) quantity_from",592,/panel/erp/stocktransfer,named(callers),nein,"Familie im alten Inventar genannt (/api/erp/stock-transfer), dieser Pfad nicht"
+DELETE,/api/erp/stock-transfer/{p1},,,"239,592",/panel/erp/stocktransfer,positional,ja,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 56917:c - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""stock-transfer"""
+GET,/api/erp/stock-transfer/{p1},,,"239,592",/panel/erp/stocktransfer,positional,ja,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 56917:c - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""stock-transfer"""
+PUT,/api/erp/stock-transfer/{p1},,,"239,592",/panel/erp/stocktransfer,positional,ja,"Body nicht aus Dienst ableitbar (Parameter 2 von update) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 56917:c - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""stock-transfer"""
+POST,/api/erp/stock-transfer/{p1}/accept-all,,,592,/panel/erp/stocktransfer,positional,nein,"leerer Body {} | p1 folgt auf Segment ""stock-transfer"" | Familie im alten Inventar genannt (/api/erp/stock-transfer), dieser Pfad nicht"
+GET,/api/erp/stock-transfer/{p1}/edit,,,"239,592",/panel/erp/stocktransfer,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 56917:c - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""stock-transfer"" | Familie im alten Inventar genannt (/api/erp/stock-transfer), dieser Pfad nicht"
+GET,/api/erp/stock-transfer/{stockTranferId},,,592,/panel/erp/stocktransfer,named(callers),ja,
+POST,/api/erp/stock-transfer/{stockTranferId}/accept,,,592,/panel/erp/stocktransfer,named(callers),nein,"leerer Body {} | Familie im alten Inventar genannt (/api/erp/stock-transfer), dieser Pfad nicht"
+POST,/api/erp/stock-transfer/{stockTranferId}/accept-all,,,592,/panel/erp/stocktransfer,named(callers),nein,"leerer Body {} | Familie im alten Inventar genannt (/api/erp/stock-transfer), dieser Pfad nicht"
+POST,/api/erp/stock-transfer/{stockTranferId}/cancel,,,592,/panel/erp/stocktransfer,named(callers),nein,"leerer Body {} | Familie im alten Inventar genannt (/api/erp/stock-transfer), dieser Pfad nicht"
+POST,/api/erp/stock-transfer/{stockTranferId}/finish,,,592,/panel/erp/stocktransfer,named(callers),nein,"leerer Body {} | Familie im alten Inventar genannt (/api/erp/stock-transfer), dieser Pfad nicht"
+DELETE,/api/erp/stock-transfer/{stockTranferId}/products/{id},,,592,/panel/erp/stocktransfer,named(callers),nein,"Familie im alten Inventar genannt (/api/erp/stock-transfer), dieser Pfad nicht"
+PUT,/api/erp/stock-transfer/{stockTranferId}/products/{id}/checked,,checked,592,/panel/erp/stocktransfer,named(callers),nein,"Familie im alten Inventar genannt (/api/erp/stock-transfer), dieser Pfad nicht"
+POST,/api/erp/stock-transfer/{stockTranferId}/reject,,,592,/panel/erp/stocktransfer,named(callers),nein,"leerer Body {} | Familie im alten Inventar genannt (/api/erp/stock-transfer), dieser Pfad nicht"
+GET,/api/erp/stock-transfer/{stockTranferId}/status,,,545,/panel/erp/stocktransfer,named(callers),ja,
+GET,/api/erp/stocktakings,"erpIds[],page,order_by",,554,/panel/erp/stocktaking,none,ja,
+GET,/api/erp/stocktakings/{id}/excel.xlsx,,,554,/panel/erp/stocktaking,named,nein,"Link/Download/Literal, kein HttpClient-Aufruf (t.s9C(""href"",""/api/erp/stocktakings/""+e.id+""/excel.xlsx"",t.L) | Familie im alten Inventar genannt (/api/erp/stocktakings), dieser Pfad nicht"
+GET,/api/erp/unit/containers,,,195,7 Routen (geteilter Dienst): /panel/erp ; /panel/erp/category ; /panel/erp/order ; /panel/erp/product ...,none,nein,"Routen nur ueber Modulkette (Tiefe 2) | Familie im alten Inventar genannt (/api/erp/unit), dieser Pfad nicht"
+POST,/api/erp/unit/containers,,(Aufrufer) name,195,7 Routen (geteilter Dienst): /panel/erp ; /panel/erp/category ; /panel/erp/order ; /panel/erp/product ...,none,nein,"Routen nur ueber Modulkette (Tiefe 2) | Familie im alten Inventar genannt (/api/erp/unit), dieser Pfad nicht"
+GET,/api/erp/unit/product-units/{id},,,195,7 Routen (geteilter Dienst): /panel/erp ; /panel/erp/category ; /panel/erp/order ; /panel/erp/product ...,named(callers),ja,Routen nur ueber Modulkette (Tiefe 2)
+PUT,/api/erp/unit/product-units/{id}/define,,(Aufrufer) data,195,7 Routen (geteilter Dienst): /panel/erp ; /panel/erp/category ; /panel/erp/order ; /panel/erp/product ...,named(callers),nein,"Routen nur ueber Modulkette (Tiefe 2) | Familie im alten Inventar genannt (/api/erp/unit), dieser Pfad nicht"
+GET,/api/erpSettings/categories,"page,pageSize,search",,607,/panel/erp ; /panel/erp/category ; /panel/erp/stocktaking ; /panel/erp/storage,none,nein,
+POST,/api/erpSettings/categories,,"(Aufrufer) title,(Aufrufer) parent,(Aufrufer) categoryIcon,(Aufrufer) costCenters",607,/panel/erp ; /panel/erp/category ; /panel/erp/stocktaking ; /panel/erp/storage,none,nein,
+DELETE,/api/erpSettings/categories/costCenters/{id},,,607,/panel/erp ; /panel/erp/category ; /panel/erp/stocktaking ; /panel/erp/storage,named(callers),nein,
+DELETE,/api/erpSettings/categories/{id},,,607,/panel/erp ; /panel/erp/category ; /panel/erp/stocktaking ; /panel/erp/storage,named(callers),nein,
+PUT,/api/erpSettings/categories/{id},,"(Aufrufer) id,(Aufrufer) title,(Aufrufer) categoryIcon,(Aufrufer) costCenters",607,/panel/erp ; /panel/erp/category ; /panel/erp/stocktaking ; /panel/erp/storage,named,nein,
+POST,/api/erpSettings/categories/{id}/moveProductsTo/{id},,,607,/panel/erp ; /panel/erp/category ; /panel/erp/stocktaking ; /panel/erp/storage,named(callers),nein,Body-Quelle: null
+PUT,/api/erpSettings/categories/{p1}/changeParent/{p2},,,607,/panel/erp ; /panel/erp/category ; /panel/erp/stocktaking ; /panel/erp/storage,positional,nein,"Body-Quelle: null | p1 folgt auf Segment ""categories"" | p2 folgt auf Segment ""changeParent"""
+GET,/api/erpSettings/productGroups,"page,pageSize,search,erpId*",,607,/panel/erp ; /panel/erp/category ; /panel/erp/stocktaking ; /panel/erp/storage,none,nein,
+POST,/api/erpSettings/productGroups,,"(Aufrufer) name,(Aufrufer) costCenters",607,/panel/erp ; /panel/erp/category ; /panel/erp/stocktaking ; /panel/erp/storage,none,nein,
+DELETE,/api/erpSettings/productGroups/costCenters/{id},,,607,/panel/erp ; /panel/erp/category ; /panel/erp/stocktaking ; /panel/erp/storage,named(callers),nein,
+GET,/api/erpSettings/productGroups/listOfSuppliers,,,607,/panel/erp ; /panel/erp/category ; /panel/erp/product ; /panel/erp/storage,none,nein,
+PUT,/api/erpSettings/productGroups/{groupId}/{productId}/{position},,,239,9 Routen (geteilter Dienst): /panel ; /panel/erp ; /panel/erp/category ; /panel/erp/order ...,named,nein,"Body: """""
+DELETE,/api/erpSettings/productGroups/{id},,,607,/panel/erp ; /panel/erp/category ; /panel/erp/stocktaking ; /panel/erp/storage,named(callers),nein,
+PUT,/api/erpSettings/productGroups/{id},,"(Aufrufer) id,(Aufrufer) name,(Aufrufer) costCenters",607,/panel/erp ; /panel/erp/category ; /panel/erp/stocktaking ; /panel/erp/storage,named,nein,
+POST,/api/erpSettings/productGroups/{id}/moveProductsTo/{id},,,607,/panel/erp ; /panel/erp/category ; /panel/erp/stocktaking ; /panel/erp/storage,named(callers),nein,Body-Quelle: null
+GET,/api/erpSettings/restaurants,,,607,/panel/erp ; /panel/erp/category ; /panel/erp/stocktaking ; /panel/erp/storage,none,nein,
+GET,/api/erpSettings/restaurants/shared,,,607,/panel/erp ; /panel/erp/category ; /panel/erp/stocktaking ; /panel/erp/storage,none,nein,
+GET,/api/erpSettings/storages,"page,pageSize,search",,607,/panel/erp ; /panel/erp/category ; /panel/erp/stocktaking ; /panel/erp/storage,none,nein,
+POST,/api/erpSettings/storages,,"(Aufrufer) name,(Aufrufer) parent,(Aufrufer) costCenters",607,/panel/erp ; /panel/erp/category ; /panel/erp/stocktaking ; /panel/erp/storage,none,nein,
+DELETE,/api/erpSettings/storages/costCenters/{id},,,607,/panel/erp ; /panel/erp/category ; /panel/erp/stocktaking ; /panel/erp/storage,named(callers),nein,
+DELETE,/api/erpSettings/storages/{id},,,607,/panel/erp ; /panel/erp/category ; /panel/erp/stocktaking ; /panel/erp/storage,named(callers),nein,
+PUT,/api/erpSettings/storages/{id},,"(Aufrufer) id,(Aufrufer) name,(Aufrufer) costCenters",607,/panel/erp ; /panel/erp/category ; /panel/erp/stocktaking ; /panel/erp/storage,named,nein,
+POST,/api/erpSettings/storages/{id}/moveProductsTo/{id},,,607,/panel/erp ; /panel/erp/category ; /panel/erp/stocktaking ; /panel/erp/storage,named(callers),nein,Body-Quelle: null
+PUT,/api/erpSettings/storages/{p1}/changeParent/{p2},,,607,/panel/erp ; /panel/erp/category ; /panel/erp/stocktaking ; /panel/erp/storage,positional,nein,"Body-Quelle: null | p1 folgt auf Segment ""storages"" | p2 folgt auf Segment ""changeParent"""
+GET,/api/eventCatering/event,"pageSize,orderBy,orderDirection,page",,main,/panel/catering,none,nein,Dienst-Code in main
+POST,/api/eventCatering/event,,"(Aufrufer) name,(Aufrufer) eventCustomer,(Aufrufer) eventType,(Aufrufer) serviceType,(Aufrufer) eventLocation,(Aufrufer) status,(Aufrufer) timeBegin,(Aufrufer) timeEnd,(Aufrufer) costCenter",main,/panel/catering,none,nein,Dienst-Code in main
+POST,/api/eventCatering/event/filters,"operator,pageSize",,main,/panel/catering,none,nein,Body nicht ableitbar (Parameter 1) | Dienst-Code in main
+POST,/api/eventCatering/event/generateReport,"operator,pageSize,page,orderBy,orderDirection","(Aufrufer) field,(Aufrufer) from,(Aufrufer) to,(Aufrufer) string,(Aufrufer) eventLocation,(Aufrufer) eventCustomer,(Aufrufer) status,(Aufrufer) eventType,(Aufrufer) serviceType,(Aufrufer) costCenter",main,/panel/catering,none,nein,Dienst-Code in main
+POST,/api/eventCatering/event/search,pageSize,,main,/panel/catering,none,nein,Body nicht aus Dienst ableitbar (Parameter 1 von search) | Dienst-Code in main
+POST,/api/eventCatering/event/searchRange,"pageSize,orderBy,orderDirection,page",,main,/panel/catering,none,nein,Body nicht ableitbar (Parameter 1) | Dienst-Code in main
+POST,/api/eventCatering/event/searchWithFilters,"operator,pageSize,page,orderBy,orderDirection","(Aufrufer) field,(Aufrufer) from,(Aufrufer) to,(Aufrufer) string,(Aufrufer) eventLocation,(Aufrufer) eventCustomer,(Aufrufer) status,(Aufrufer) eventType,(Aufrufer) serviceType,(Aufrufer) costCenter",main,/panel/catering,none,nein,Dienst-Code in main
+POST,/api/eventCatering/event/setUserCostCenter/{costCenterId},,,main,/panel/catering,named(callers),nein,leerer Body {} | Dienst-Code in main
+GET,/api/eventCatering/event/{currentEventId}/additionals,,,main,/panel/catering,named(callers),nein,Dienst-Code in main
+GET,/api/eventCatering/event/{currentEventId}/additives,,,main,/panel/catering,named(callers),nein,Dienst-Code in main
+GET,/api/eventCatering/event/{currentEventId}/allergens,,,main,/panel/catering,named(callers),nein,Dienst-Code in main
+GET,/api/eventCatering/event/{currentEventId}/commentsByParent,,,330,/panel/catering,named(callers),nein,
+GET,/api/eventCatering/event/{currentEventId}/weather,,,main,/panel/catering,named(callers),nein,Dienst-Code in main
+POST,/api/eventCatering/event/{event}/clone,,,main,/panel/catering,named(callers),nein,leerer Body {} | Dienst-Code in main
+DELETE,/api/eventCatering/event/{id},,,main,/panel/catering,named(callers),nein,Dienst-Code in main
+PUT,/api/eventCatering/event/{id},,"(Aufrufer) name,(Aufrufer) eventCustomer,(Aufrufer) eventType,(Aufrufer) serviceType,(Aufrufer) eventLocation,(Aufrufer) costCenter,(Aufrufer) timeBegin,(Aufrufer) timeEnd,(Aufrufer) description,(Aufrufer) status,(Aufrufer) discount,(Aufrufer) priceVA,(Aufrufer) mealDiscount,(Aufrufer) mealPriceVA,(Aufrufer) drinkDiscount,(Aufrufer) drinkPriceVA,(Aufrufer) considerGuestsPrintout",main,/panel/catering,named(callers),nein,Dienst-Code in main
+POST,/api/eventCatering/event/{id}/importFromDailyMenu/{selectedDailyMenuId},,,main,/panel/catering,named(callers),nein,leerer Body {} | Dienst-Code in main
+GET,/api/eventCatering/event/{p1},,,main,/panel/catering,positional,nein,"p1 folgt auf Segment ""event"" | Dienst-Code in main"
+GET,/api/eventCatering/eventComment,,,330,/panel/catering,none,nein,
+POST,/api/eventCatering/eventComment,,"(Aufrufer) event,(Aufrufer) eventStaff,(Aufrufer) commentText,(Aufrufer) repliedTo",330,/panel/catering,none,nein,
+DELETE,/api/eventCatering/eventComment/{id},,,330,/panel/catering,named(callers),nein,
+PUT,/api/eventCatering/eventComment/{id},,(Aufrufer) commentText,330,/panel/catering,named(callers),nein,
+GET,/api/eventCatering/eventComment/{p1},,,330,/panel/catering,positional,nein,"p1 folgt auf Segment ""eventComment"""
+GET,/api/eventCatering/eventConsumerGroup,,,330,/panel/catering,none,nein,
+POST,/api/eventCatering/eventConsumerGroup,,(Aufrufer) name,330,/panel/catering,none,nein,
+POST,/api/eventCatering/eventConsumerGroup/search,"orderBy,orderDirection,pageSize",,330,/panel/catering,none,nein,Body nicht aus Dienst ableitbar (Parameter 2 von search)
+GET,/api/eventCatering/eventConsumerGroupEvent/event/{id},"orderBy,orderDirection",,330,/panel/catering,named(callers),nein,
+POST,/api/eventCatering/eventConsumerGroupEvent/event/{p1},"orderBy,orderDirection",,330,/panel/catering,positional,nein,"Body nicht aus Dienst ableitbar (Parameter 2 von createConsumerEventGroups) | p1 folgt auf Segment ""event"""
+POST,/api/eventCatering/eventConsumerGroupEventRecipe,,,330,/panel/catering,none,nein,Body nicht ableitbar (Parameter 1)
+POST,/api/eventCatering/eventConsumerGroupEventRecipe/eventRecipe/{id},,,330,/panel/catering,named(callers),nein,Body nicht aus Dienst ableitbar (Parameter 1 von addMultipleConsumerGroupsToRecipe)
+PUT,/api/eventCatering/eventConsumerGroupEventRecipe/index/update,,,330,/panel/catering,none,nein,Body nicht ableitbar (Parameter 1)
+PUT,/api/eventCatering/eventConsumerGroupEventRecipe/updateNumberofConsumersAndEquipmentQuantities/{p1},,,330,/panel/catering,positional,nein,"leerer Body {} | p1 folgt auf Segment ""updateNumberofConsumersAndEquipmentQuantities"""
+PUT,/api/eventCatering/eventConsumerGroupEventRecipe/{id},,"(Aufrufer) numberOfConsumers,(Aufrufer) index,(Aufrufer) eventRecipe",330,/panel/catering,named(callers),nein,
+DELETE,/api/eventCatering/eventConsumerGroupEventRecipe/{p1},,,330,/panel/catering,positional,nein,"p1 folgt auf Segment ""eventConsumerGroupEventRecipe"""
+GET,/api/eventCatering/eventCourse,"pageSize*,orderBy,orderDirection,page",,330,/panel/catering,none,nein,
+POST,/api/eventCatering/eventCourse,,"(Aufrufer) name,(Aufrufer) timeBegin,(Aufrufer) timeEnd",330,/panel/catering,none,nein,
+POST,/api/eventCatering/eventCourse/search,"pageSize*,pageSize,orderDirection,page,orderBy","name,(Aufrufer) name,(Aufrufer) searchTerm,(Aufrufer) pageSize",330,/panel/catering,none,nein,
+DELETE,/api/eventCatering/eventCourse/{id},,,330,/panel/catering,named(callers),nein,
+PUT,/api/eventCatering/eventCourse/{id},,"(Aufrufer) name,(Aufrufer) timeBegin,(Aufrufer) timeEnd",330,/panel/catering,named(callers),nein,
+GET,/api/eventCatering/eventCourseTemplate,"pageSize*,orderBy,orderDirection,page",,330,/panel/catering,none,nein,Pfad nur unter Bedingung
+POST,/api/eventCatering/eventCourseTemplate,,(Aufrufer) name,330,/panel/catering,none,nein,
+POST,/api/eventCatering/eventCourseTemplate/search,"pageSize,orderDirection,page,orderBy",(Aufrufer) name,330,/panel/catering,none,nein,
+DELETE,/api/eventCatering/eventCourseTemplate/{id},,,330,/panel/catering,named(callers),nein,
+GET,/api/eventCatering/eventCourseTemplate/{id},pageSize*,,330,/panel/catering,named,nein,Pfad nur unter Bedingung
+PUT,/api/eventCatering/eventCourseTemplate/{id},,(Aufrufer) name,330,/panel/catering,named(callers),nein,
+POST,/api/eventCatering/eventCourseTemplateCourse,,"(Aufrufer) eventCourse,(Aufrufer) eventCourseTemplate,(Aufrufer) index",330,/panel/catering,none,nein,
+DELETE,/api/eventCatering/eventCourseTemplateCourse/{id},,,330,/panel/catering,named,nein,
+PUT,/api/eventCatering/eventCourseTemplateCourse/{id},,"index,name,timeBegin,timeEnd",330,/panel/catering,named,nein,
+GET,/api/eventCatering/eventCustomer,"pageSize,orderBy,orderDirection,page",,330,/panel/catering,none,nein,
+POST,/api/eventCatering/eventCustomer,,"(Aufrufer) name,(Aufrufer) phoneNumber,(Aufrufer) email,(Aufrufer) address",330,/panel/catering,none,nein,
+POST,/api/eventCatering/eventCustomer/search,"pageSize,orderDirection,page,orderBy",,330,/panel/catering,none,nein,Body nicht aus Dienst ableitbar (Parameter 1 von search)
+DELETE,/api/eventCatering/eventCustomer/{id},,,330,/panel/catering,named(callers),nein,
+PUT,/api/eventCatering/eventCustomer/{id},,"(Aufrufer) name,(Aufrufer) phoneNumber,(Aufrufer) email,(Aufrufer) address",330,/panel/catering,named(callers),nein,
+GET,/api/eventCatering/eventCustomer/{p1},,,330,/panel/catering,positional,nein,"p1 folgt auf Segment ""eventCustomer"""
+GET,/api/eventCatering/eventDateGroup/event/{eventId}/{p2},,,330,/panel/catering,positional,nein,"p2 folgt auf Segment ""{eventId}"""
+POST,/api/eventCatering/eventDateGroup/{p1}/{p2},,,330,/panel/catering,positional,nein,"Body nicht aus Dienst ableitbar (Parameter 3 von add) | p1 folgt auf Segment ""eventDateGroup"" | p2 folgt auf Segment ""{p1}"""
+GET,/api/eventCatering/eventDocument/event/{currentEventId},,,330,/panel/catering,named(callers),nein,
+POST,/api/eventCatering/eventDocument/event/{eventId},,"FormData:file,FormData:name",330,/panel/catering,named,nein,
+DELETE,/api/eventCatering/eventDocument/{id},,,330,/panel/catering,named(callers),nein,
+GET,/api/eventCatering/eventDocument/{id},,,330,/panel/catering,named(callers),nein,Antwort als Datei (blob/arraybuffer)
+PUT,/api/eventCatering/eventDocument/{renameId},,(Aufrufer) name,330,/panel/catering,named(callers),nein,
+POST,/api/eventCatering/eventDrink,,"event,eventRecipe,persons,perPerson,index",main,/panel/catering,none,nein,Dienst-Code in main
+POST,/api/eventCatering/eventDrink/createFromRecipe/{recipeId},catering,"event,persons,perPerson,index,totalPieces,eventDrinkSubgroup,eventDrinkGroup",main,/panel/catering,named,nein,Dienst-Code in main
+GET,/api/eventCatering/eventDrink/event/{eventId},"orderBy,orderDirection",,main,/panel/catering,named(callers),nein,Dienst-Code in main
+POST,/api/eventCatering/eventDrink/event/{p2}/eventStaff,,,330,/panel/catering,positional,nein,"Body nicht ableitbar (Parameter 1) | p2 folgt auf Segment ""event"""
+GET,/api/eventCatering/eventDrink/event/{p2}/eventStaff/{p1},,,330,/panel/catering,positional,nein,"p2 folgt auf Segment ""event"" | p1 folgt auf Segment ""eventStaff"""
+PUT,/api/eventCatering/eventDrink/index/update,,,main,/panel/catering,none,nein,Body nicht aus Dienst ableitbar (Parameter 1 von updateDrinkOrder) | Dienst-Code in main
+DELETE,/api/eventCatering/eventDrink/{drinkId},,,main,/panel/catering,named,nein,Dienst-Code in main
+PUT,/api/eventCatering/eventDrink/{drinkId},,eventStaff,330,/panel/catering,named,nein,
+PUT,/api/eventCatering/eventDrink/{id},,"(Aufrufer) perPerson,(Aufrufer) persons",main,/panel/catering,named(callers),nein,Dienst-Code in main
+GET,/api/eventCatering/eventDrink/{recipeId},,,main,/panel/catering,named(callers),nein,Dienst-Code in main
+POST,/api/eventCatering/eventDrinkGroup,,"(Aufrufer) event,(Aufrufer) name,(Aufrufer) index,(Aufrufer) eventDateGroup",main,/panel/catering,none,nein,Dienst-Code in main
+POST,/api/eventCatering/eventDrinkGroup/courseTemplate/{p3}/{p2},,,330,/panel/catering,positional,nein,"Body nicht ableitbar (Parameter 1) | p3 folgt auf Segment ""courseTemplate"" | p2 folgt auf Segment ""{p3}"""
+POST,/api/eventCatering/eventDrinkGroup/event/{id}/createEquipmentGroups,,,main,/panel/catering,named(callers),nein,leerer Body {} | Dienst-Code in main
+POST,/api/eventCatering/eventDrinkGroup/event/{id}/createMealGroups,,,main,/panel/catering,named(callers),nein,leerer Body {} | Dienst-Code in main
+PUT,/api/eventCatering/eventDrinkGroup/index/update,,,main,/panel/catering,none,nein,Body nicht aus Dienst ableitbar (Parameter 1 von updateDrinkGroupsOrder) | Dienst-Code in main
+POST,/api/eventCatering/eventDrinkGroup/search,pageSize*,"name,event","330,main",/panel/catering,none,nein,Dienst-Code in main
+POST,/api/eventCatering/eventDrinkGroup/template/{eventId},,,330,/panel/catering,named(callers),nein,Body nicht aus Dienst ableitbar (Parameter 2 von addMultipleTemplatesToDrink)
+POST,/api/eventCatering/eventDrinkGroup/template/{p2}/{p1},,,330,/panel/catering,positional,nein,"Body nicht ableitbar (Parameter 3) | p2 folgt auf Segment ""template"" | p1 folgt auf Segment ""{p2}"""
+DELETE,/api/eventCatering/eventDrinkGroup/{drinkGroupId},,,main,/panel/catering,named,nein,Dienst-Code in main
+POST,/api/eventCatering/eventDrinkGroup/{drinkGroupId}/staff,,(Aufrufer) eventStaff,330,/panel/catering,named(callers),nein,
+PUT,/api/eventCatering/eventDrinkGroup/{renameId},,"(Aufrufer) name,(Aufrufer) timeBegin,(Aufrufer) timeEnd",main,/panel/catering,named(callers),nein,Dienst-Code in main
+POST,/api/eventCatering/eventDrinkSubgroup,,"event,name,eventDrinkGroup,index",main,/panel/catering,none,nein,Dienst-Code in main
+POST,/api/eventCatering/eventDrinkSubgroup/courseTemplate/{p3}/{p2},,,330,/panel/catering,positional,nein,"Body nicht ableitbar (Parameter 1) | p3 folgt auf Segment ""courseTemplate"" | p2 folgt auf Segment ""{p3}"""
+POST,/api/eventCatering/eventDrinkSubgroup/createMultiple,,,main,/panel/catering,none,nein,Body nicht aus Dienst ableitbar (Parameter 1 von addSubGroupMultiple) | Dienst-Code in main
+PUT,/api/eventCatering/eventDrinkSubgroup/index/update,,,main,/panel/catering,none,nein,Body nicht aus Dienst ableitbar (Parameter 1 von updateDrinkSubgroupsOrder) | Dienst-Code in main
+POST,/api/eventCatering/eventDrinkSubgroup/search,,"event,name",main,/panel/catering,none,nein,Dienst-Code in main
+DELETE,/api/eventCatering/eventDrinkSubgroup/{id},,,main,/panel/catering,named(callers),nein,Dienst-Code in main
+PUT,/api/eventCatering/eventDrinkSubgroup/{renameId},,"(Aufrufer) name,(Aufrufer) timeBegin,(Aufrufer) timeEnd",main,/panel/catering,named(callers),nein,Dienst-Code in main
+POST,/api/eventCatering/eventEquipment,,"(Aufrufer) concreteProduct,(Aufrufer) eventEquipmentSubgroup,(Aufrufer) eventEquipmentGroup,(Aufrufer) index,(Aufrufer) quantity",main,/panel/catering,none,nein,Dienst-Code in main
+POST,/api/eventCatering/eventEquipment/createFromRecipe/{recipeId},catering,"event,persons,perPerson,index,totalPieces,eventEquipmentSubgroup",main,/panel/catering,named,nein,Dienst-Code in main
+PUT,/api/eventCatering/eventEquipment/index/update,,,main,/panel/catering,none,nein,Body nicht aus Dienst ableitbar (Parameter 1 von updateEquipmentOrder) | Dienst-Code in main
+PUT,/api/eventCatering/eventEquipment/index/update/{eventEquipmentId},,"id,eventEquipmentGroup,index",main,/panel/catering,named,nein,Dienst-Code in main
+POST,/api/eventCatering/eventEquipment/searchConcreteProducts/event/{eventId},pageSize,searchString,main,/panel/catering,named,nein,Dienst-Code in main
+DELETE,/api/eventCatering/eventEquipment/{equipmentId},,,main,/panel/catering,named,nein,Dienst-Code in main
+PUT,/api/eventCatering/eventEquipment/{equipmentId},,eventStaff,330,/panel/catering,named,nein,
+PUT,/api/eventCatering/eventEquipment/{eventEquipmentId},,"eventEquipmentSubgroup,quantity",main,/panel/catering,named,nein,Dienst-Code in main
+POST,/api/eventCatering/eventEquipmentGroup,,"(Aufrufer) event,(Aufrufer) name,(Aufrufer) index,(Aufrufer) eventDateGroup",main,/panel/catering,none,nein,Dienst-Code in main
+POST,/api/eventCatering/eventEquipmentGroup/courseTemplate/{p3}/{p2},,,330,/panel/catering,positional,nein,"Body nicht ableitbar (Parameter 1) | p3 folgt auf Segment ""courseTemplate"" | p2 folgt auf Segment ""{p3}"""
+POST,/api/eventCatering/eventEquipmentGroup/event/{id}/createDrinkGroups,,,main,/panel/catering,named(callers),nein,leerer Body {} | Dienst-Code in main
+POST,/api/eventCatering/eventEquipmentGroup/event/{id}/createMealGroups,,,main,/panel/catering,named(callers),nein,leerer Body {} | Dienst-Code in main
+GET,/api/eventCatering/eventEquipmentGroup/event/{p1},"orderBy,orderDirection",,main,/panel/catering,positional,nein,"p1 folgt auf Segment ""event"" | Dienst-Code in main"
+PUT,/api/eventCatering/eventEquipmentGroup/index/update,,,main,/panel/catering,none,nein,Body nicht aus Dienst ableitbar (Parameter 1 von updateEquipmentGroupsOrder) | Dienst-Code in main
+POST,/api/eventCatering/eventEquipmentGroup/search,pageSize,"event,name",main,/panel/catering,none,nein,Dienst-Code in main
+POST,/api/eventCatering/eventEquipmentGroup/template/{eventId},,,330,/panel/catering,named(callers),nein,Body nicht aus Dienst ableitbar (Parameter 2 von addMultipleTemplatesToEquipment)
+POST,/api/eventCatering/eventEquipmentGroup/template/{p2}/{p1},,,330,/panel/catering,positional,nein,"Body nicht ableitbar (Parameter 3) | p2 folgt auf Segment ""template"" | p1 folgt auf Segment ""{p2}"""
+DELETE,/api/eventCatering/eventEquipmentGroup/{equipmentGroupId},,,main,/panel/catering,named,nein,Dienst-Code in main
+POST,/api/eventCatering/eventEquipmentGroup/{p1}/staff,,,main,/panel/catering,positional,nein,"Body nicht ableitbar (Parameter 2) | p1 folgt auf Segment ""eventEquipmentGroup"" | Dienst-Code in main"
+PUT,/api/eventCatering/eventEquipmentGroup/{renameId},,"(Aufrufer) name,(Aufrufer) timeBegin,(Aufrufer) timeEnd",main,/panel/catering,named(callers),nein,Dienst-Code in main
+POST,/api/eventCatering/eventEquipmentSubgroup,,"event,name,eventEquipmentGroup,index",main,/panel/catering,none,nein,Dienst-Code in main
+POST,/api/eventCatering/eventEquipmentSubgroup/courseTemplate/{p3}/{p2},,,330,/panel/catering,positional,nein,"Body nicht ableitbar (Parameter 1) | p3 folgt auf Segment ""courseTemplate"" | p2 folgt auf Segment ""{p3}"""
+POST,/api/eventCatering/eventEquipmentSubgroup/createMultiple,,,main,/panel/catering,none,nein,Body nicht aus Dienst ableitbar (Parameter 1 von addSubGroupMultiple) | Dienst-Code in main
+PUT,/api/eventCatering/eventEquipmentSubgroup/index/update,,,main,/panel/catering,none,nein,Body nicht aus Dienst ableitbar (Parameter 1 von updateEquipmentSubgroupsOrder) | Dienst-Code in main
+POST,/api/eventCatering/eventEquipmentSubgroup/search,,"event,name",main,/panel/catering,none,nein,Dienst-Code in main
+DELETE,/api/eventCatering/eventEquipmentSubgroup/{id},,,main,/panel/catering,named(callers),nein,Dienst-Code in main
+PUT,/api/eventCatering/eventEquipmentSubgroup/{renameId},,"(Aufrufer) name,(Aufrufer) timeBegin,(Aufrufer) timeEnd",main,/panel/catering,named(callers),nein,Dienst-Code in main
+GET,/api/eventCatering/eventLocation,"pageSize,orderBy,orderDirection,page",,main,/panel/catering,none,nein,Dienst-Code in main
+POST,/api/eventCatering/eventLocation,,"(Aufrufer) address,(Aufrufer) phone,(Aufrufer) addressName,(Aufrufer) capacity,(Aufrufer) eventLocationTypes",main,/panel/catering,none,nein,Dienst-Code in main
+POST,/api/eventCatering/eventLocation/search,"pageSize,orderDirection,page,orderBy",,main,/panel/catering,none,nein,Body nicht aus Dienst ableitbar (Parameter 1 von search) | Dienst-Code in main
+DELETE,/api/eventCatering/eventLocation/{id},,,main,/panel/catering,named(callers),nein,Dienst-Code in main
+PUT,/api/eventCatering/eventLocation/{id},,"(Aufrufer) address,(Aufrufer) phone,(Aufrufer) addressName,(Aufrufer) capacity,(Aufrufer) eventLocationTypes",main,/panel/catering,named(callers),nein,Dienst-Code in main
+DELETE,/api/eventCatering/eventLocation/{id}/image,,,main,/panel/catering,named(callers),nein,Dienst-Code in main
+POST,/api/eventCatering/eventLocation/{id}/image,,"FormData:image,FormData:name,FormData:thumbnail",main,/panel/catering,named(callers),nein,Dienst-Code in main
+GET,/api/eventCatering/eventLocation/{p1},,,main,/panel/catering,positional,nein,"p1 folgt auf Segment ""eventLocation"" | Dienst-Code in main"
+GET,/api/eventCatering/eventLocationType,,,main,/panel/catering,none,nein,Dienst-Code in main
+POST,/api/eventCatering/eventMeal,,"event,eventRecipe,eventMealGroup,portitions,index",main,/panel/catering,none,nein,Dienst-Code in main
+POST,/api/eventCatering/eventMeal/createFromRecipe/{recipeId},catering,"event,eventMealSubgroup,eventMealGroup,portitions,index",main,/panel/catering,named,nein,Dienst-Code in main
+GET,/api/eventCatering/eventMeal/event/{p1},"orderBy,orderDirection",,main,/panel/catering,positional,nein,"p1 folgt auf Segment ""event"" | Dienst-Code in main"
+POST,/api/eventCatering/eventMeal/event/{p2}/eventStaff,,,330,/panel/catering,positional,nein,"Body nicht ableitbar (Parameter 1) | p2 folgt auf Segment ""event"""
+GET,/api/eventCatering/eventMeal/event/{p2}/eventStaff/{p1},,,330,/panel/catering,positional,nein,"p2 folgt auf Segment ""event"" | p1 folgt auf Segment ""eventStaff"""
+PUT,/api/eventCatering/eventMeal/index/update,,,main,/panel/catering,none,nein,Body nicht aus Dienst ableitbar (Parameter 1 von updateMealsOrder) | Dienst-Code in main
+POST,/api/eventCatering/eventMeal/search,,recipeTitle,main,/panel/catering,none,nein,Dienst-Code in main
+PUT,/api/eventCatering/eventMeal/{eventMealId},,"eventMealGroup,portitions,index",main,/panel/catering,named,nein,Dienst-Code in main
+PUT,/api/eventCatering/eventMeal/{id},,(Aufrufer) status,main,/panel/catering,named(callers),nein,Dienst-Code in main
+DELETE,/api/eventCatering/eventMeal/{mealId},,,main,/panel/catering,named,nein,Dienst-Code in main
+PUT,/api/eventCatering/eventMeal/{mealId},,eventStaff,330,/panel/catering,named,nein,
+GET,/api/eventCatering/eventMeal/{recipeId},,,main,/panel/catering,named(callers),nein,Dienst-Code in main
+POST,/api/eventCatering/eventMealGroup,,"(Aufrufer) event,(Aufrufer) name,(Aufrufer) index,(Aufrufer) eventDateGroup",main,/panel/catering,none,nein,Dienst-Code in main
+POST,/api/eventCatering/eventMealGroup/courseTemplate/{p3}/{p2},,,330,/panel/catering,positional,nein,"Body nicht ableitbar (Parameter 1) | p3 folgt auf Segment ""courseTemplate"" | p2 folgt auf Segment ""{p3}"""
+POST,/api/eventCatering/eventMealGroup/event/{id}/createDrinkGroups,,,main,/panel/catering,named(callers),nein,leerer Body {} | Dienst-Code in main
+POST,/api/eventCatering/eventMealGroup/event/{id}/createEquipmentGroups,,,main,/panel/catering,named(callers),nein,leerer Body {} | Dienst-Code in main
+PUT,/api/eventCatering/eventMealGroup/index/update,,,main,/panel/catering,none,nein,Body nicht aus Dienst ableitbar (Parameter 1 von updateMealGroupsOrder) | Dienst-Code in main
+POST,/api/eventCatering/eventMealGroup/search,pageSize*,"name,event","330,main",/panel/catering,none,nein,Dienst-Code in main
+POST,/api/eventCatering/eventMealGroup/template/{eventId},,,330,/panel/catering,named(callers),nein,Body nicht aus Dienst ableitbar (Parameter 2 von addMultipleTemplatesToMeal)
+POST,/api/eventCatering/eventMealGroup/template/{p2}/{p1},,,330,/panel/catering,positional,nein,"Body nicht ableitbar (Parameter 3) | p2 folgt auf Segment ""template"" | p1 folgt auf Segment ""{p2}"""
+PUT,/api/eventCatering/eventMealGroup/updateEventMeals/{renameId},,(Aufrufer) portions,main,/panel/catering,named(callers),nein,Dienst-Code in main
+DELETE,/api/eventCatering/eventMealGroup/{mealGroupId},,,main,/panel/catering,named,nein,Dienst-Code in main
+POST,/api/eventCatering/eventMealGroup/{mealGroupId}/staff,,(Aufrufer) eventStaff,330,/panel/catering,named(callers),nein,
+PUT,/api/eventCatering/eventMealGroup/{renameId},,"(Aufrufer) name,(Aufrufer) timeBegin,(Aufrufer) timeEnd",main,/panel/catering,named(callers),nein,Dienst-Code in main
+POST,/api/eventCatering/eventMealSubgroup,,"event,name,eventMealGroup,index",main,/panel/catering,none,nein,Dienst-Code in main
+POST,/api/eventCatering/eventMealSubgroup/courseTemplate/{p3}/{p2},,,330,/panel/catering,positional,nein,"Body nicht ableitbar (Parameter 1) | p3 folgt auf Segment ""courseTemplate"" | p2 folgt auf Segment ""{p3}"""
+POST,/api/eventCatering/eventMealSubgroup/createMultiple,,,main,/panel/catering,none,nein,Body nicht aus Dienst ableitbar (Parameter 1 von addSubGroupMultiple) | Dienst-Code in main
+PUT,/api/eventCatering/eventMealSubgroup/index/update,,,main,/panel/catering,none,nein,Body nicht aus Dienst ableitbar (Parameter 1 von updateMealSubgroupsOrder) | Dienst-Code in main
+POST,/api/eventCatering/eventMealSubgroup/search,,"event,name",main,/panel/catering,none,nein,Dienst-Code in main
+DELETE,/api/eventCatering/eventMealSubgroup/{id},,,main,/panel/catering,named(callers),nein,Dienst-Code in main
+PUT,/api/eventCatering/eventMealSubgroup/{renameId},,"(Aufrufer) name,(Aufrufer) timeBegin,(Aufrufer) timeEnd",main,/panel/catering,named(callers),nein,Dienst-Code in main
+POST,/api/eventCatering/eventOrder/activeCarts,,"(Aufrufer) costCenter,(Aufrufer) productIds",330,/panel/catering,none,nein,
+POST,/api/eventCatering/eventOrder/cartState,,,330,/panel/catering,none,nein,Body nicht ableitbar (Parameter 1)
+POST,/api/eventCatering/eventOrder/costCenter/{costCenterId},,,330,/panel/catering,named(callers),nein,Body nicht aus Dienst ableitbar (Parameter 2 von addAllToCart)
+GET,/api/eventCatering/eventOrder/costCenter/{costCenterId}/carts,,,330,/panel/catering,named(callers),nein,
+PUT,/api/eventCatering/eventOrder/costCenter/{costCenterId}/shop/{shop_id},,"(Aufrufer) quantity,(Aufrufer) productId",330,/panel/catering,named(callers),nein,
+POST,/api/eventCatering/eventOrder/costCenter/{p1}/shop/{p2},,"(Aufrufer) quantity,(Aufrufer) productId,(Aufrufer) packaging",330,/panel/catering,positional,nein,"p1 folgt auf Segment ""costCenter"" | p2 folgt auf Segment ""shop"""
+GET,/api/eventCatering/eventOrder/event/{eventId},pageSize*,,330,/panel/catering,named,nein,Pfad nur unter Bedingung
+POST,/api/eventCatering/eventOrder/event/{eventId}/print,,"(Aufrufer) getDrinks,(Aufrufer) getEquipments,(Aufrufer) getMeals,(Aufrufer) numberPerPage,(Aufrufer) staffsIds",330,/panel/catering,named(callers),nein,
+GET,/api/eventCatering/eventOrder/event/{eventId}/{categoryName},pageSize*,,330,/panel/catering,named,nein,Pfad nur unter Bedingung
+POST,/api/eventCatering/eventOrder/shop/event/{id},,"withMeals,withDrinks",330,/panel/catering,named(callers),nein,
+POST,/api/eventCatering/eventRecipe/createNewEventItemNote/{p1},,"(Aufrufer) note,(Aufrufer) item",330,/panel/catering,positional,nein,"p1 folgt auf Segment ""createNewEventItemNote"""
+PUT,/api/eventCatering/eventRecipe/deleteEventItemNote/{noteId},,,330,/panel/catering,named(callers),nein,leerer Body {}
+GET,/api/eventCatering/eventRecipe/event/{currentEventId},pageSize,,330,/panel/catering,named(callers),nein,
+GET,/api/eventCatering/eventRecipe/event/{eventId},"pageSize,drinks*,meals*",,330,/panel/catering,named,nein,
+GET,/api/eventCatering/eventRecipe/eventMealsAndDrinks/{p1},,,330,/panel/catering,positional,nein,"p1 folgt auf Segment ""eventMealsAndDrinks"""
+PUT,/api/eventCatering/eventRecipe/ingredient-catering-portions/{id},,(Aufrufer) cateringPortions,330,/panel/catering,named(callers),nein,
+PUT,/api/eventCatering/eventRecipe/ingredient-quantity/{id},,(Aufrufer) quantityInGrams,330,/panel/catering,named(callers),nein,
+DELETE,/api/eventCatering/eventRecipe/ingredient/{recipeId}/{ingredientId},,,330,/panel/catering,named,nein,
+POST,/api/eventCatering/eventRecipe/ingredient/{recipeId}/{ingredientId},,,330,/panel/catering,named,nein,leerer Body {}
+PUT,/api/eventCatering/eventRecipe/recipe/{currentRecipeId}/updateTarget,,"(Aufrufer) vat,(Aufrufer) salesBudget",330,/panel/catering,named(callers),nein,
+GET,/api/eventCatering/eventRecipe/recipe/{recipeId}/ingredients,,,330,/panel/catering,named(callers),nein,
+POST,/api/eventCatering/eventRecipe/search,pageSize*,recipeTitle,330,/panel/catering,none,nein,
+POST,/api/eventCatering/eventRecipe/searchRecipes/{costCenterId},"pageSize,page","(Aufrufer) title,(Aufrufer) restaurants,(Aufrufer) searchString,(Aufrufer) clonedFromRecipe,(Aufrufer) costCenterId,(Aufrufer) recipeType,(Aufrufer) eventId",330,/panel/catering,named,nein,
+GET,/api/eventCatering/eventRecipe/staff/{p1}/{p2},,,330,/panel/catering,positional,nein,"p1 folgt auf Segment ""staff"" | p2 folgt auf Segment ""{p1}"""
+POST,/api/eventCatering/eventRecipe/staff/{p2},,,330,/panel/catering,positional,nein,"Body nicht ableitbar (Parameter 1) | p2 folgt auf Segment ""staff"""
+PUT,/api/eventCatering/eventRecipe/updateCustomUnitQuantity/ingredient/{p1},,,330,/panel/catering,positional,nein,"Body nicht ableitbar (Parameter 2) | p1 folgt auf Segment ""ingredient"""
+PUT,/api/eventCatering/eventRecipe/updateEventItemNote/{p1},,(Aufrufer) note,330,/panel/catering,positional,nein,"p1 folgt auf Segment ""updateEventItemNote"""
+GET,/api/eventCatering/eventStaff/currentEventUser/{p1},,,main,/panel/catering,positional,nein,"p1 folgt auf Segment ""currentEventUser"" | Dienst-Code in main"
+POST,/api/eventCatering/eventStaff/currentUser,,,main,/panel/catering,none,nein,leerer Body {} | Dienst-Code in main
+GET,/api/eventCatering/eventStaff/event/{p1},,,main,/panel/catering,positional,nein,"p1 folgt auf Segment ""event"" | Dienst-Code in main"
+GET,/api/eventCatering/eventStaff/new,"pageSize,orderBy,orderDirection,page",,330,/panel/catering,none,nein,
+POST,/api/eventCatering/eventStaff/new,,"(Aufrufer) canLogin,(Aufrufer) user,(Aufrufer) firstName,(Aufrufer) lastName",330,/panel/catering,none,nein,
+POST,/api/eventCatering/eventStaff/search,"pageSize,orderDirection,page,orderBy",,330,/panel/catering,none,nein,Body nicht aus Dienst ableitbar (Parameter 1 von search)
+PUT,/api/eventCatering/eventStaff/setCurrentEvent,,(Aufrufer) currentEvent,main,/panel/catering,none,nein,Dienst-Code in main
+DELETE,/api/eventCatering/eventStaff/{id},,,330,/panel/catering,named(callers),nein,
+PUT,/api/eventCatering/eventStaff/{id},,"(Aufrufer) canLogin,(Aufrufer) user",330,/panel/catering,named(callers),nein,
+DELETE,/api/eventCatering/eventStaff/{id}/event/{id},,,330,/panel/catering,named(callers),nein,
+DELETE,/api/eventCatering/eventStaff/{id}/image,,,330,/panel/catering,named(callers),nein,
+POST,/api/eventCatering/eventStaff/{id}/image,,"FormData:image,FormData:name,FormData:thumbnail",330,/panel/catering,named(callers),nein,
+GET,/api/eventCatering/eventStaff/{staffId},,,330,/panel/catering,named(callers),nein,
+DELETE,/api/eventCatering/eventStaff/{team}/event/{p2},,,main,/panel/catering,positional,nein,"p2 folgt auf Segment ""event"" | Dienst-Code in main"
+POST,/api/eventCatering/eventStaffGroup,,"(Aufrufer) event,(Aufrufer) name,(Aufrufer) index,(Aufrufer) role",330,/panel/catering,none,nein,
+GET,/api/eventCatering/eventStaffGroup/event/{currentEventId},,,330,/panel/catering,named(callers),nein,
+PUT,/api/eventCatering/eventStaffGroup/index/update,,,330,/panel/catering,none,nein,Body nicht aus Dienst ableitbar (Parameter 1 von updateGroupIndex)
+POST,/api/eventCatering/eventStaffGroup/search,pageSize,,330,/panel/catering,none,nein,Body nicht ableitbar (Parameter 1)
+DELETE,/api/eventCatering/eventStaffGroup/{id},,,330,/panel/catering,named(callers),nein,
+PUT,/api/eventCatering/eventStaffGroup/{renameId},,(Aufrufer) name,330,/panel/catering,named(callers),nein,
+PUT,/api/eventCatering/eventStaffGroupStaff,,,330,/panel/catering,none,nein,Body nicht aus Dienst ableitbar (Parameter 1 von updateTeamIndex)
+GET,/api/eventCatering/eventStaffRole,,,330,/panel/catering,none,nein,
+POST,/api/eventCatering/eventStaffRole,,,330,/panel/catering,none,nein,Body nicht ableitbar (Parameter 1)
+DELETE,/api/eventCatering/eventStaffRole/{p1},,,330,/panel/catering,positional,nein,"p1 folgt auf Segment ""eventStaffRole"""
+GET,/api/eventCatering/eventStaffRole/{p1},,,330,/panel/catering,positional,nein,"p1 folgt auf Segment ""eventStaffRole"""
+PUT,/api/eventCatering/eventStaffRole/{p1},,,330,/panel/catering,positional,nein,"Body nicht ableitbar (Parameter 2) | p1 folgt auf Segment ""eventStaffRole"""
+GET,/api/eventCatering/eventType,"pageSize,orderBy,orderDirection,page",,330,/panel/catering,none,nein,
+POST,/api/eventCatering/eventType,,(Aufrufer) name,330,/panel/catering,none,nein,
+POST,/api/eventCatering/eventType/search,"pageSize,orderDirection,page,orderBy",,330,/panel/catering,none,nein,Body nicht aus Dienst ableitbar (Parameter 1 von search)
+DELETE,/api/eventCatering/eventType/{id},,,330,/panel/catering,named(callers),nein,
+PUT,/api/eventCatering/eventType/{id},,(Aufrufer) name,330,/panel/catering,named(callers),nein,
+GET,/api/eventCatering/eventType/{p1},,,330,/panel/catering,positional,nein,"p1 folgt auf Segment ""eventType"""
+GET,/api/eventCatering/images/EventStaff/{imageFileName},,,330,/panel/catering,named,nein,"Link/Download/Literal, kein HttpClient-Aufruf (arg:bypassSecurityTrustUrl)"
+POST,/api/eventCatering/packagingList/event/preview/{id},,,330,/panel/catering,named(callers),nein,Body nicht aus Dienst ableitbar (Parameter 2 von generateAndGetPackagingListPreview)
+GET,/api/eventCatering/recipeBlacklist,pageSize,,330,/panel/catering,none,nein,
+POST,/api/eventCatering/recipeBlacklist,,"(Aufrufer) enabled,(Aufrufer) eventLocations,(Aufrufer) recipe,(Aufrufer) whitelisted",330,/panel/catering,none,nein,
+POST,/api/eventCatering/recipeBlacklist/search,"page,pageSize","(Aufrufer) searchString,(Aufrufer) eventLocations,(Aufrufer) options",330,/panel/catering,none,nein,
+POST,/api/eventCatering/recipeBlacklist/searchRecipes,,"(Aufrufer) searchString,(Aufrufer) clonedFromRecipe,(Aufrufer) pageSize",330,/panel/catering,none,nein,
+DELETE,/api/eventCatering/recipeBlacklist/{id},,,330,/panel/catering,named(callers),nein,
+PUT,/api/eventCatering/recipeBlacklist/{id},,"(Aufrufer) enabled,(Aufrufer) eventLocations,(Aufrufer) recipe,(Aufrufer) whitelisted",330,/panel/catering,named(callers),nein,
+GET,/api/eventCatering/recipeCategoryBlacklist,pageSize,,330,/panel/catering,none,nein,
+POST,/api/eventCatering/recipeCategoryBlacklist,,"(Aufrufer) enabled,(Aufrufer) eventLocations,(Aufrufer) recipeCategory,(Aufrufer) whitelisted",330,/panel/catering,none,nein,
+POST,/api/eventCatering/recipeCategoryBlacklist/search,"page,pageSize","(Aufrufer) searchString,(Aufrufer) eventLocations,(Aufrufer) options",330,/panel/catering,none,nein,
+POST,/api/eventCatering/recipeCategoryBlacklist/searchRecipeCategories,,"(Aufrufer) searchString,(Aufrufer) pageSize",330,/panel/catering,none,nein,
+DELETE,/api/eventCatering/recipeCategoryBlacklist/{id},,,330,/panel/catering,named(callers),nein,
+PUT,/api/eventCatering/recipeCategoryBlacklist/{id},,"(Aufrufer) enabled,(Aufrufer) eventLocations,(Aufrufer) recipeCategory,(Aufrufer) whitelisted",330,/panel/catering,named(callers),nein,
+GET,/api/eventCatering/role,"pageSize,orderBy,orderDirection,page,page*",,330,/panel/catering,none,nein,
+POST,/api/eventCatering/role,,,330,/panel/catering,none,nein,Body nicht aus Dienst ableitbar (Parameter 1 von create)
+POST,/api/eventCatering/role/search,"pageSize,orderDirection,page,orderBy",,330,/panel/catering,none,nein,Body nicht aus Dienst ableitbar (Parameter 1 von search)
+POST,/api/eventCatering/role/searchWithValues,"pageSize,orderDirection,page,orderBy",(Aufrufer) name,330,/panel/catering,none,nein,
+DELETE,/api/eventCatering/role/{p1},,,330,/panel/catering,positional,nein,"p1 folgt auf Segment ""role"""
+PUT,/api/eventCatering/role/{p1},,,330,/panel/catering,positional,nein,"Body nicht aus Dienst ableitbar (Parameter 2 von update) | p1 folgt auf Segment ""role"""
+GET,/api/eventCatering/roleOption,,,330,/panel/catering,none,nein,
+GET,/api/eventCatering/roleOptionValue,,,330,/panel/catering,none,nein,
+POST,/api/eventCatering/roleOptionValue,,,330,/panel/catering,none,nein,Body nicht ableitbar (Parameter 1)
+PUT,/api/eventCatering/roleOptionValue,,,330,/panel/catering,none,nein,Body nicht aus Dienst ableitbar (Parameter 1 von updateRoleOptionValue)
+GET,/api/eventCatering/serviceType,"pageSize,orderBy,orderDirection,page",,330,/panel/catering,none,nein,
+POST,/api/eventCatering/serviceType,,(Aufrufer) name,330,/panel/catering,none,nein,
+POST,/api/eventCatering/serviceType/search,"pageSize,orderDirection,page,orderBy",,330,/panel/catering,none,nein,Body nicht aus Dienst ableitbar (Parameter 1 von search)
+DELETE,/api/eventCatering/serviceType/{id},,,330,/panel/catering,named(callers),nein,
+PUT,/api/eventCatering/serviceType/{id},,(Aufrufer) name,330,/panel/catering,named(callers),nein,
+GET,/api/eventCatering/serviceType/{p1},,,330,/panel/catering,positional,nein,"p1 folgt auf Segment ""serviceType"""
+POST,/api/eventCatering/{copyTemplatesFrom}/event/{id}/{p3},,override,330,/panel/catering,positional,nein,"p3 folgt auf Segment ""{id}"""
+POST,/api/menu_creator/mc_image/upload,,"FormData:imageFile,FormData:imageType",283,,none,nein,"Methode und Body aus Dienst postImage(url,file,type) gelesen (FormData), URL als Literal this.imageUrl in einer Komponente - Verknuepfung von Hand gelesen, nicht automatisch"
+GET,/api/menu_creator/mc_images,,,733,/panel/menucreator,none,ja,
+GET,/api/menu_creator/mc_trans,,,733,/panel/menucreator ; /panel/menucreator/:hash/embedded,none,ja,
+PUT,/api/menu_creator/menu_card,,,283,/panel/menucreator,none,ja,Body nicht ableitbar (Parameter 1)
+DELETE,/api/menu_creator/menu_card/delete/{p1},,,733,/panel/menucreator ; /panel/menucreator/:hash/embedded,positional,nein,"p1 folgt auf Segment ""delete"" | Familie im alten Inventar genannt (/api/menu_creator/menu_card), dieser Pfad nicht"
+POST,/api/menu_creator/menu_card/duplicate,,,733,/panel/menucreator ; /panel/menucreator/:hash/embedded,none,nein,"Body nicht aus Dienst ableitbar (Parameter 1 von duplicateMenu) | Familie im alten Inventar genannt (/api/menu_creator/menu_card), dieser Pfad nicht"
+POST,/api/menu_creator/menu_card/getPricesFromSameLocationForAll,,"(Aufrufer) itemAndRecipeIds,(Aufrufer) costCenterId",733,/panel/menucreator ; /panel/menucreator/:hash/embedded,none,nein,"Familie im alten Inventar genannt (/api/menu_creator/menu_card), dieser Pfad nicht"
+GET,/api/menu_creator/menu_card/new/,,,733,/panel/menucreator ; /panel/menucreator/:hash/embedded,none,nein,"Familie im alten Inventar genannt (/api/menu_creator/menu_card), dieser Pfad nicht"
+POST,/api/menu_creator/menu_card/save,,"(Aufrufer) imageFile,(Aufrufer) imageType,(Aufrufer) menuCard",733,/panel/menucreator ; /panel/menucreator/:hash/embedded,none,nein,"Familie im alten Inventar genannt (/api/menu_creator/menu_card), dieser Pfad nicht"
+GET,/api/menu_creator/menu_card/show/hash/{hash},,,733,/panel/menucreator ; /panel/menucreator/:hash/embedded,named(callers),nein,"Familie im alten Inventar genannt (/api/menu_creator/menu_card), dieser Pfad nicht"
+GET,/api/menu_creator/menu_card/show/{id},,,733,/panel/menucreator ; /panel/menucreator/:hash/embedded,named(callers),nein,"Familie im alten Inventar genannt (/api/menu_creator/menu_card), dieser Pfad nicht"
+GET,/api/menu_creator/menu_card/show/{p1}/embedded,,,733,/panel/menucreator ; /panel/menucreator/:hash/embedded,positional,nein,"p1 folgt auf Segment ""show"" | Familie im alten Inventar genannt (/api/menu_creator/menu_card), dieser Pfad nicht"
+GET,/api/menu_creator/menu_card/showRecipe/{p1},,,733,/panel/menucreator ; /panel/menucreator/:hash/embedded,positional,nein,"p1 folgt auf Segment ""showRecipe"" | Familie im alten Inventar genannt (/api/menu_creator/menu_card), dieser Pfad nicht"
+GET,/api/menu_creator/menu_card/show_many,,,733,/panel/menucreator ; /panel/menucreator/:hash/embedded,none,nein,"Familie im alten Inventar genannt (/api/menu_creator/menu_card), dieser Pfad nicht"
+POST,/api/menu_creator/menu_card/update,,"(Aufrufer) imageFile,(Aufrufer) imageType,(Aufrufer) menuCard",733,/panel/menucreator ; /panel/menucreator/:hash/embedded,none,nein,"Familie im alten Inventar genannt (/api/menu_creator/menu_card), dieser Pfad nicht"
+GET,/api/menu_creator/menu_card/version/show_many/{id},,,733,/panel/menucreator ; /panel/menucreator/:hash/embedded,named(callers),nein,"Familie im alten Inventar genannt (/api/menu_creator/menu_card), dieser Pfad nicht"
+GET,/api/menu_creator/menu_card/widgets/{p1},,,733,/panel/menucreator ; /panel/menucreator/:hash/embedded,positional,nein,"p1 folgt auf Segment ""widgets"" | Familie im alten Inventar genannt (/api/menu_creator/menu_card), dieser Pfad nicht"
+GET,/api/menu_creator/recipeData/{id},,,283,/panel/menucreator,named(callers),nein,
+GET,/api/menu_creator/recipeSearch/{p1},,,283,/panel/menucreator,positional,nein,"p1 folgt auf Segment ""recipeSearch"""
+GET,/api/menu_creator/template/show/{p1},,,283,/panel/menucreator,positional,nein,"p1 folgt auf Segment ""show"" | Familie im alten Inventar genannt (/api/menu_creator/template), dieser Pfad nicht"
+GET,/api/menu_creator/template/show_many,,,283,/panel/menucreator,none,nein,"Familie im alten Inventar genannt (/api/menu_creator/template), dieser Pfad nicht"
+GET,/api/menu_creator/template/widgets/{p1},,,283,/panel/menucreator,positional,nein,"p1 folgt auf Segment ""widgets"" | Familie im alten Inventar genannt (/api/menu_creator/template), dieser Pfad nicht"
+POST,/api/menu_creator/uploadhtml/embedded,,"FormData:text,FormData:hash,FormData:cssUrl",435,/panel/menucreator/:hash/embedded,none,nein,
+GET,/api/menucreator/{id}/generate-embedded-url,,,283,/panel/menucreator,named(callers),ja,
+POST,/api/password/reset/save,,_username,main,15 Routen (geteilter Dienst): /panel ; /panel/catering ; /panel/erp ; /panel/erp/category ...,none,nein,Dienst-Code in main
+POST,/api/pos/connection/configure/{connectionId},,"(Aufrufer) invoices,(Aufrufer) allergens,(Aufrufer) additives,(Aufrufer) names,(Aufrufer) description,(Aufrufer) prices,(Aufrufer) recipeGroups,(Aufrufer) sendInvoicesToErp,(Aufrufer) excludeInvoicesToErpBeforeInvoiceDate,(Aufrufer) invoiceFetchTime",742,/panel/settings,named(callers),nein,
+POST,/api/pos/connection/copy-account-settings/{connectionId},,"targetAccountIds,replaceMode,allowFuzzyNameMatch",742,/panel/settings,named(callers),nein,
+POST,/api/pos/connection/copy_settings,,,742,/panel/settings,none,nein,Body nicht ableitbar (Parameter 1)
+POST,/api/pos/connection/product_group/connect/{connectionId},,"FormData:productGroupId,FormData:productGroup,FormData:costCenterId,FormData:costCenter",742,/panel/settings,named(callers),nein,
+POST,/api/pos/connection/product_group/remove/{connectionId},,FormData:productGroupId,742,/panel/settings,named(callers),nein,
+GET,/api/pos/connection/product_groups/{connectionId},,,742,/panel/settings,named(callers),nein,
+GET,/api/pos/connection/unlink/{connectionId},,,742,/panel/settings,named(callers),nein,"GET mit Namen einer Zustandsaenderung (nach Namen vermutet, nicht belegt)"
+GET,/api/pos/connection/{connectionId},,,742,/panel/settings,named(callers),nein,
+GET,/api/pos/device_types,,,742,/panel/settings,none,nein,
+PUT,/api/pos/export/connect,,"recipeId,remoteProductId",742,/panel/settings,none,nein,
+PUT,/api/pos/export/create_recipe/{connectionId}/{id},,,742,/panel/settings,named(callers),nein,leerer Body {}
+DELETE,/api/pos/export/delete_recipe/{connectionId}/{recipeId},,,742,/panel/settings,named(callers),nein,
+GET,/api/pos/export/recommended/{id},,,742,/panel/settings,named(callers),nein,
+POST,/api/pos/export/search_recipes/{id},,FormData:searchString,742,/panel/settings,named(callers),nein,
+PUT,/api/pos/export/sync/{posItemId},,shouldSync,742,/panel/settings,named(callers),nein,
+POST,/api/pos/export/sync_all/{p1},,FormData:sync,742,/panel/settings,positional,nein,"p1 folgt auf Segment ""sync_all"""
+PUT,/api/pos/export/unlink_recipe/{id},,,742,/panel/settings,named(callers),nein,leerer Body {}
+GET,/api/pos/export/without_reload/{connectionId},,,742,/panel/settings,named(callers),nein,
+GET,/api/pos/export/{connectionId},,,742,/panel/settings,named(callers),nein,
+GET,/api/pos/ikentoo/businessData/{connectionId},,,742,/panel/settings,named,nein,
+GET,/api/pos/ikentoo/businessData/{connectionId}/{blId},,,742,/panel/settings,named(callers),nein,
+GET,/api/pos/locations,,,742,/panel/settings,none,ja,
+POST,/api/pos/product/connect,,"FormData:productId,FormData:recipeId",742,/panel/settings,none,nein,
+GET,/api/pos/product/recommended/{connectionId}/{id},,,742,/panel/settings,named(callers),nein,
+POST,/api/pos/product/remove,,FormData:productId,742,/panel/settings,none,nein,
+POST,/api/pos/product/search/{connectionId},,FormData:search,742,/panel/settings,named(callers),nein,
+POST,/api/pos/product/sync/all/{connectionId},,FormData:sync,742,/panel/settings,named(callers),nein,
+POST,/api/pos/product/sync/{posItemId},,FormData:sync,742,/panel/settings,named(callers),nein,
+GET,/api/pos/product/unlink/all/{connectionId},,,742,/panel/settings,named(callers),nein,"GET mit Namen einer Zustandsaenderung (nach Namen vermutet, nicht belegt)"
+GET,/api/pos/sync/locations,,,742,/panel/settings,none,nein,"Familie im alten Inventar genannt (/api/pos/sync), dieser Pfad nicht"
+POST,/api/pos/sync/recipes/{pageNumber},sortingOption,"searchString,locationsFilter,typesFilter,groupsFilter",742,/panel/settings,named(callers),nein,"Familie im alten Inventar genannt (/api/pos/sync), dieser Pfad nicht"
+GET,/api/pos/sync/reload/{connectionId},,,742,/panel/settings,named(callers),ja,
+GET,/api/pos/sync/user/distinct_categories,,,742,/panel/settings,none,nein,"Familie im alten Inventar genannt (/api/pos/sync), dieser Pfad nicht"
+POST,/api/productionPlan/plan/createFromEvents,,"(Aufrufer) name,(Aufrufer) timeBegin,(Aufrufer) timeEnd,(Aufrufer) status,(Aufrufer) progress,(Aufrufer) events",main,/panel/catering,none,nein,Dienst-Code in main
+GET,/api/pub/version,,,main,,none,nein,Dienst-Code in main (von keinem Lazy-Modul importiert: global/Wurzelkomponente)
+GET,/api/recipes/{p1}/ppa-unit-suggestion,,,"167,313",/panel/erp/product ; /panel/erp/sale,positional,nein,"p1 folgt auf Segment ""recipes"" | Familie im alten Inventar genannt (/api/recipes/*), dieser Pfad nicht"
+GET,/api/security_logout,,,main,15 Routen (geteilter Dienst): /panel ; /panel/catering ; /panel/erp ; /panel/erp/category ...,none,nein,"Dienst-Code in main | GET mit Namen einer Zustandsaenderung (nach Namen vermutet, nicht belegt)"
+POST,/api/shop/cart/add,,"(Aufrufer) shopId,(Aufrufer) cartId,(Aufrufer) products,(Aufrufer) costCenterId","88,239",/panel ; /panel/erp/product ; /panel/shop ; /panel/shopping-list,none,nein,
+DELETE,/api/shop/cart/remove,,,239,/panel ; /panel/erp/product ; /panel/shop ; /panel/shopping-list,none,nein,
+POST,/api/shop/order,,"cartId,shopId,restaurant_id,delivery_date,comment,notes,confirmed",239,/panel ; /panel/erp/product ; /panel/shop ; /panel/shopping-list,none,nein,
+POST,/api/shop/order/{orderId}/punchout-dispatched,,,239,/panel ; /panel/erp/product ; /panel/shop ; /panel/shopping-list,named(callers),nein,leerer Body {}
+PUT,/api/shop/setCostCenter,,"costCenterId,shopId",239,/panel ; /panel/erp/product ; /panel/shop ; /panel/shopping-list,none,nein,
+POST,/api/shop/shopping-list/copy-to-cost-center/{id},,,88,/panel/shopping-list,named(callers),nein,"leerer Body {} | Familie im alten Inventar genannt (/api/shop/shopping-list), dieser Pfad nicht"
+POST,/api/shop/shopping-list/copy-to-locations,,"(Aufrufer) shoppingListIds,(Aufrufer) targetCostCenterIds,(Aufrufer) policy",88,/panel/shopping-list,none,nein,"Familie im alten Inventar genannt (/api/shop/shopping-list), dieser Pfad nicht"
+GET,/api/shop/shopping-list/{id}/export.pdf,,,88,/panel/shopping-list,named,ja,"Link/Download/Literal, kein HttpClient-Aufruf (return`/api/shop/shopping-list/${n.id}/export.pdf`)"
+GET,/api/shop/shopping-list/{listId}/forecasts,,,88,/panel/shopping-list,named(callers),nein,"Familie im alten Inventar genannt (/api/shop/shopping-list), dieser Pfad nicht"
+GET,/api/shop/shoppingList/{id},,,88,/panel/shopping-list,named(callers),nein,
+POST,/api/shop/shoppingList/{id},,,88,/panel/shopping-list,named(callers),nein,leerer Body {}
+PUT,/api/shop/shoppingList/{listId},,(Aufrufer) name,88,/panel/shopping-list,named(callers),nein,
+DELETE,/api/shop/shoppingList/{selectedList},,,88,/panel/shopping-list,named(callers),nein,
+POST,/api/shop/shoppingListProducts,,"(Aufrufer) shopping_list_id,(Aufrufer) product_id",88,/panel/shopping-list,none,nein,
+GET,/api/shop/shoppingListProducts/all/{p2},,,88,/panel/shopping-list,positional,nein,"p2 folgt auf Segment ""all"""
+POST,/api/shop/shoppingListProducts/packaging,,"(Aufrufer) id,(Aufrufer) packaging,(Aufrufer) packagingQuantity",88,/panel/shopping-list,none,nein,
+POST,/api/shop/shoppingListProducts/reorder,,"(Aufrufer) shopping_list_id,(Aufrufer) products",88,/panel/shopping-list,none,nein,
+DELETE,/api/shop/shoppingListProducts/{id},,,88,/panel/shopping-list,named(callers),nein,
+GET,/api/shop/shoppingListProducts/{listId},,,88,/panel/shopping-list,named(callers),nein,
+GET,/api/shop/shoppingListProductsAvailability/{listId}/{id},,,88,/panel/shopping-list,named(callers),nein,
+POST,/api/shop/switchCartLocation,,"oldCartId,newCostCenterId",239,/panel ; /panel/erp/product ; /panel/shop ; /panel/shopping-list,none,nein,
+GET,/api/shop/{p1}/products/{p2},,,239,/panel ; /panel/erp/product ; /panel/shop ; /panel/shopping-list,positional,nein,"p1 folgt auf Segment ""shop"" | p2 folgt auf Segment ""products"""
+GET,/api/shop/{shopId}/cart/{cartType}/{cartId},,,239,/panel ; /panel/erp/product ; /panel/shop ; /panel/shopping-list,named(callers),nein,
+POST,/api/shop/{shopId}/info,,,239,/panel ; /panel/erp/product ; /panel/shop ; /panel/shopping-list,named(callers),nein,"Body: """""
+GET,/api/shops/categories,,,239,/panel ; /panel/erp/product ; /panel/shop ; /panel/shopping-list,none,nein,
+GET,/api/shops/list,,,239,/panel ; /panel/erp/product ; /panel/shop ; /panel/shopping-list,none,nein,
+PUT,/api/shops/updateCostCenter/{p1},,withCredentials,main,/panel/dashboard,positional,nein,"p1 folgt auf Segment ""updateCostCenter"" | Dienst-Code in main"
+GET,/api/shops/{id}/list/disconnected,,,239,/panel ; /panel/erp/product ; /panel/shop ; /panel/shopping-list,named(callers),nein,
+POST,/api/supplier/countries,,,488,/supplier,none,nein,Body nicht aus Dienst ableitbar (Parameter 1 von getCountries)
+PUT,/api/supplier/deletePackaging/{productId},,,488,/supplier,named(callers),nein,Body nicht aus Dienst ableitbar (Parameter 2 von deletePackaging)
+GET,/api/supplier/getAdditives/{productId},,,488,/supplier,named(callers),nein,
+GET,/api/supplier/getAllLabels/{productId},,,488,/supplier,named(callers),nein,
+GET,/api/supplier/getAllergens/{productId},,,488,/supplier,named(callers),nein,
+GET,/api/supplier/getDashboardData/{shopId},,,488,/supplier,named(callers),nein,
+GET,/api/supplier/getIngredients/{productId},,,488,/supplier,named(callers),nein,
+GET,/api/supplier/getNutritionalValues/{p1},,,488,/supplier,positional,nein,"p1 folgt auf Segment ""getNutritionalValues"""
+GET,/api/supplier/getOrderDetailsData/{orderId},,,488,/supplier,named(callers),nein,
+GET,/api/supplier/getPackagings/{productId},,,488,/supplier,named(callers),nein,
+GET,/api/supplier/getProductDetailsData/{productId},,,488,/supplier,named(callers),nein,
+PUT,/api/supplier/getSearchCategories/{productId},,,488,/supplier,named(callers),nein,Body nicht aus Dienst ableitbar (Parameter 2 von getCategoriesBySearch)
+PUT,/api/supplier/getSearchLabels/{productId},,,488,/supplier,named(callers),nein,Body nicht aus Dienst ableitbar (Parameter 2 von getLabelsBySearch)
+GET,/api/supplier/getShopCategories/{productId},,,488,/supplier,named(callers),nein,
+POST,/api/supplier/getUserShops,,,488,/supplier,none,nein,Body nicht aus Dienst ableitbar (Parameter 1 von getUserShops)
+GET,/api/supplier/paginateOrdersData/{p1},"page_size,page,order_by,order_direction,filter",,488,/supplier,positional,nein,"p1 folgt auf Segment ""paginateOrdersData"""
+GET,/api/supplier/paginateProductsData/{p1},"page_size,page,order_by,order_direction,filter",,488,/supplier,positional,nein,"p1 folgt auf Segment ""paginateProductsData"""
+POST,/api/supplier/register,,"FormData:firstName,FormData:surname,FormData:email,FormData:password,FormData:phoneNumber,FormData:companyName,FormData:zip,FormData:city,FormData:country,FormData:countryShort",488,/supplier,none,nein,
+PUT,/api/supplier/updateAdditives/{productId},,,488,/supplier,named(callers),nein,Body nicht aus Dienst ableitbar (Parameter 2 von updateAdditives)
+PUT,/api/supplier/updateAllergens/{productId},,,488,/supplier,named(callers),nein,Body nicht aus Dienst ableitbar (Parameter 2 von updateAllergens)
+PUT,/api/supplier/updateCheckedArray,,,488,/supplier,none,nein,Body nicht aus Dienst ableitbar (Parameter 1 von sendCheckedArray)
+PUT,/api/supplier/updateIngredients/{productId},,,488,/supplier,named(callers),nein,Body nicht aus Dienst ableitbar (Parameter 2 von updateIngredients)
+PUT,/api/supplier/updateLayout,,,488,/supplier,none,nein,Body nicht aus Dienst ableitbar (Parameter 1 von sendUpdatedLayout)
+PUT,/api/supplier/updateNutritionalValues/{productId},,,488,/supplier,named(callers),nein,Body nicht aus Dienst ableitbar (Parameter 2 von updateNutritionalValues)
+PUT,/api/supplier/updatePackagings/{productId},,,488,/supplier,named(callers),nein,Body nicht aus Dienst ableitbar (Parameter 2 von updatePackagings)
+PUT,/api/supplier/updateProductDetails/{p1},,,488,/supplier,positional,nein,"Body nicht aus Dienst ableitbar (Parameter 2 von updateProduct) | p1 folgt auf Segment ""updateProductDetails"""
+GET,/api/{erpId}/category,,,"239,607",/panel/erp/category ; /panel/erp/order ; /panel/erp/product ; /panel/erp/stocktaking ; /panel/erp/stocktransfer,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 23400:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+POST,/api/{erpId}/category,,,"239,607",/panel/erp/category ; /panel/erp/order ; /panel/erp/product ; /panel/erp/stocktaking ; /panel/erp/stocktransfer,named,nein,"Body nicht aus Dienst ableitbar (Parameter 1 von store) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 23400:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/category-icon,,,"239,313",/panel/erp/category ; /panel/erp/product ; /panel/erp/storage,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 90652:V - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+POST,/api/{erpId}/category-icon,,,"239,313",/panel/erp/category ; /panel/erp/product ; /panel/erp/storage,named,nein,"Body nicht aus Dienst ableitbar (Parameter 1 von store) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 90652:V - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/category-icon-group,,,"239,313",/panel/erp/category,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 97930:i - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+POST,/api/{erpId}/category-icon-group,,,"239,313",/panel/erp/category,named,nein,"Body nicht aus Dienst ableitbar (Parameter 1 von store) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 97930:i - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/category-icon-group/create,,,"239,313",/panel/erp/category,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 97930:i - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/category-icon-group/paginate,"page_size,page,order_by*,order_direction*,from*,to*",,"239,313",/panel/erp/category,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 97930:i - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/category-icon-group/search,"page_size,page,search,searchView*,filters[]*",,"239,313",/panel/erp/category,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 97930:i - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/category-icon-group/{id}/category-icon,"page,page_size",,313,/panel/erp/category,named(callers),nein,
+DELETE,/api/{erpId}/category-icon-group/{p1},,,"239,313",/panel/erp/category,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 97930:i - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""category-icon-group"""
+GET,/api/{erpId}/category-icon-group/{p1},,,"239,313",/panel/erp/category,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 97930:i - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""category-icon-group"""
+PUT,/api/{erpId}/category-icon-group/{p1},,,"239,313",/panel/erp/category,positional,nein,"Body nicht aus Dienst ableitbar (Parameter 2 von update) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 97930:i - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""category-icon-group"""
+GET,/api/{erpId}/category-icon-group/{p1}/edit,,,"239,313",/panel/erp/category,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 97930:i - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""category-icon-group"""
+GET,/api/{erpId}/category-icon/create,,,"239,313",/panel/erp/category ; /panel/erp/product ; /panel/erp/storage,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 90652:V - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/category-icon/paginate,"page_size,page,order_by*,order_direction*,from*,to*",,"239,313",/panel/erp/category ; /panel/erp/product ; /panel/erp/storage,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 90652:V - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/category-icon/search,"page_size,page,search,searchView*,filters[]*",,"239,313",/panel/erp/category ; /panel/erp/product ; /panel/erp/storage,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 90652:V - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+DELETE,/api/{erpId}/category-icon/{p1},,,"239,313",/panel/erp/category ; /panel/erp/product ; /panel/erp/storage,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 90652:V - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""category-icon"""
+GET,/api/{erpId}/category-icon/{p1},,,"239,313",/panel/erp/category ; /panel/erp/product ; /panel/erp/storage,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 90652:V - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""category-icon"""
+PUT,/api/{erpId}/category-icon/{p1},,,"239,313",/panel/erp/category ; /panel/erp/product ; /panel/erp/storage,positional,nein,"Body nicht aus Dienst ableitbar (Parameter 2 von update) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 90652:V - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""category-icon"""
+GET,/api/{erpId}/category-icon/{p1}/edit,,,"239,313",/panel/erp/category ; /panel/erp/product ; /panel/erp/storage,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 90652:V - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""category-icon"""
+POST,/api/{erpId}/category/copy,,"selectedCategory,selectedCostCenters",607,/panel/erp/category ; /panel/erp/order ; /panel/erp/product ; /panel/erp/stocktaking ; /panel/erp/stocktransfer,named,nein,
+GET,/api/{erpId}/category/create,,,"239,607",/panel/erp/category ; /panel/erp/order ; /panel/erp/product ; /panel/erp/stocktaking ; /panel/erp/stocktransfer,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 23400:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+PUT,/api/{erpId}/category/delete,,"categories,deleteAll",607,/panel/erp/category ; /panel/erp/order ; /panel/erp/product ; /panel/erp/stocktaking ; /panel/erp/stocktransfer,named,nein,
+GET,/api/{erpId}/category/paginate,"search,page,page_size,categoryId*,order_by*,order_direction*,from*,to*",,"239,607",/panel/erp/category ; /panel/erp/order ; /panel/erp/product ; /panel/erp/stocktaking ; /panel/erp/stocktransfer,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 23400:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/category/search,"page_size,page,search,searchView*,filters[]*",,"239,607",/panel/erp/category ; /panel/erp/order ; /panel/erp/product ; /panel/erp/stocktaking ; /panel/erp/stocktransfer,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 23400:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+DELETE,/api/{erpId}/category/{p1},,,"239,607",/panel/erp/category ; /panel/erp/order ; /panel/erp/product ; /panel/erp/stocktaking ; /panel/erp/stocktransfer,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 23400:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""category"""
+GET,/api/{erpId}/category/{p1},,,"239,607",/panel/erp/category ; /panel/erp/order ; /panel/erp/product ; /panel/erp/stocktaking ; /panel/erp/stocktransfer,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 23400:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""category"""
+PUT,/api/{erpId}/category/{p1},,,"239,607",/panel/erp/category ; /panel/erp/order ; /panel/erp/product ; /panel/erp/stocktaking ; /panel/erp/stocktransfer,positional,nein,"Body nicht aus Dienst ableitbar (Parameter 2 von update) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 23400:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""category"""
+GET,/api/{erpId}/category/{p1}/edit,,,"239,607",/panel/erp/category ; /panel/erp/order ; /panel/erp/product ; /panel/erp/stocktaking ; /panel/erp/stocktransfer,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 23400:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""category"""
+GET,/api/{erpId}/category/{p1}/products,"page,page_size,search,filters[]",,607,/panel/erp/category ; /panel/erp/order ; /panel/erp/product ; /panel/erp/stocktaking ; /panel/erp/stocktransfer,positional,nein,"p1 folgt auf Segment ""category"""
+PUT,/api/{erpId}/category/{p1}/structure,,"new_parent_id,new_position,old_position",607,/panel/erp/category ; /panel/erp/order ; /panel/erp/product ; /panel/erp/stocktaking ; /panel/erp/stocktransfer,positional,nein,"p1 folgt auf Segment ""category"""
+GET,/api/{erpId}/dashboard,"low_on_stock_page_size,low_on_stock_page,low_on_stock_search,low_on_stock_searchView*,low_on_stock_filters[]*,pending_orders_page_size,pending_orders_page,pending_orders_order_by*,pending_orders_order_direction*,pending_orders_from*,pending_orders_to*",,607,/panel/erp,named,ja,
+GET,/api/{erpId}/erpSettings,,,"239,607",/panel/erp ; /panel/erp/category ; /panel/erp/stocktaking ; /panel/erp/storage,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 8519:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+POST,/api/{erpId}/erpSettings,,,"239,607",/panel/erp ; /panel/erp/category ; /panel/erp/stocktaking ; /panel/erp/storage,named,nein,"Body nicht aus Dienst ableitbar (Parameter 1 von store) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 8519:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/erpSettings/create,,,"239,607",/panel/erp ; /panel/erp/category ; /panel/erp/stocktaking ; /panel/erp/storage,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 8519:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/erpSettings/paginate,"page_size,page,order_by*,order_direction*,from*,to*",,"239,607",/panel/erp ; /panel/erp/category ; /panel/erp/stocktaking ; /panel/erp/storage,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 8519:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/erpSettings/search,"page_size,page,search,searchView*,filters[]*",,"239,607",/panel/erp ; /panel/erp/category ; /panel/erp/stocktaking ; /panel/erp/storage,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 8519:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+DELETE,/api/{erpId}/erpSettings/{p1},,,"239,607",/panel/erp ; /panel/erp/category ; /panel/erp/stocktaking ; /panel/erp/storage,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 8519:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""erpSettings"""
+GET,/api/{erpId}/erpSettings/{p1},,,"239,607",/panel/erp ; /panel/erp/category ; /panel/erp/stocktaking ; /panel/erp/storage,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 8519:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""erpSettings"""
+PUT,/api/{erpId}/erpSettings/{p1},,,"239,607",/panel/erp ; /panel/erp/category ; /panel/erp/stocktaking ; /panel/erp/storage,positional,nein,"Body nicht aus Dienst ableitbar (Parameter 2 von update) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 8519:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""erpSettings"""
+GET,/api/{erpId}/erpSettings/{p1}/edit,,,"239,607",/panel/erp ; /panel/erp/category ; /panel/erp/stocktaking ; /panel/erp/storage,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 8519:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""erpSettings"""
+POST,/api/{erpId}/getProducts,"page,page_size,order_by,order_direction,productGroupId,costCenterId,search,shopId,from*,to*",,239,9 Routen (geteilter Dienst): /panel ; /panel/erp ; /panel/erp/category ; /panel/erp/order ...,named,nein,Body nicht aus Dienst ableitbar (Parameter 3 von paginateProductItems)
+GET,/api/{erpId}/preproductionConcreteProduct,,,"239,735",/panel/erp/product,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 10735:o - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+POST,/api/{erpId}/preproductionConcreteProduct,,,"239,735",/panel/erp/product,named,nein,"Body nicht aus Dienst ableitbar (Parameter 1 von store) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 10735:o - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/preproductionConcreteProduct/create,,,"239,735",/panel/erp/product,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 10735:o - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/preproductionConcreteProduct/paginate,"page_size,page,order_by*,order_direction*,from*,to*",,"239,735",/panel/erp/product,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 10735:o - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/preproductionConcreteProduct/search,"page_size,page,search,searchView*,filters[]*",,"239,735",/panel/erp/product,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 10735:o - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+DELETE,/api/{erpId}/preproductionConcreteProduct/{p1},,,"239,735",/panel/erp/product,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 10735:o - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""preproductionConcreteProduct"""
+GET,/api/{erpId}/preproductionConcreteProduct/{p1},,,"239,735",/panel/erp/product,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 10735:o - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""preproductionConcreteProduct"""
+PUT,/api/{erpId}/preproductionConcreteProduct/{p1},,,"239,735",/panel/erp/product,positional,nein,"Body nicht aus Dienst ableitbar (Parameter 2 von update) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 10735:o - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""preproductionConcreteProduct"""
+GET,/api/{erpId}/preproductionConcreteProduct/{p1}/edit,,,"239,735",/panel/erp/product,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 10735:o - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""preproductionConcreteProduct"""
+GET,/api/{erpId}/product,,,239,9 Routen (geteilter Dienst): /panel ; /panel/erp ; /panel/erp/category ; /panel/erp/order ...,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 90514:X - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+POST,/api/{erpId}/product,,,239,9 Routen (geteilter Dienst): /panel ; /panel/erp ; /panel/erp/category ; /panel/erp/order ...,named,nein,"Body nicht aus Dienst ableitbar (Parameter 1 von store) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 90514:X - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/product-group,"page,page_size",,"239,607",/panel/erp ; /panel/erp/category ; /panel/erp/product ; /panel/erp/storage,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 65220:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+POST,/api/{erpId}/product-group,,,"239,607",/panel/erp ; /panel/erp/category ; /panel/erp/product ; /panel/erp/storage,named,nein,"Body nicht aus Dienst ableitbar (Parameter 1 von store) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 65220:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/product-group/create,,,"239,607",/panel/erp ; /panel/erp/category ; /panel/erp/product ; /panel/erp/storage,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 65220:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+DELETE,/api/{erpId}/product-group/delete-all,,,607,/panel/erp ; /panel/erp/category ; /panel/erp/product ; /panel/erp/storage,named,nein,
+GET,/api/{erpId}/product-group/paginate,"page_size,page,order_by*,order_direction*,from*,to*",,"239,607",/panel/erp ; /panel/erp/category ; /panel/erp/product ; /panel/erp/storage,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 65220:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/product-group/search,"page_size,page,search,searchView*,filters[]*",,"239,607",/panel/erp ; /panel/erp/category ; /panel/erp/product ; /panel/erp/storage,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 65220:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/product-group/{_id}/products,"page,page_size,order_by,order_direction",,607,/panel/erp ; /panel/erp/category ; /panel/erp/product ; /panel/erp/storage,named(callers),nein,
+PUT,/api/{erpId}/product-group/{id}/removeProduct/{id},,,"167,195,239,313,554,569,592,607,678,735",9 Routen (geteilter Dienst): /panel ; /panel/erp ; /panel/erp/category ; /panel/erp/order ...,named(callers),nein,"Body: """" | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 64167:n - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 38163:p - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 30878:d - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 55850:d - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 3812:w - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 90514:X - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | "
+DELETE,/api/{erpId}/product-group/{p1},,,"239,607",/panel/erp ; /panel/erp/category ; /panel/erp/product ; /panel/erp/storage,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 65220:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""product-group"""
+GET,/api/{erpId}/product-group/{p1},,,"239,607",/panel/erp ; /panel/erp/category ; /panel/erp/product ; /panel/erp/storage,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 65220:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""product-group"""
+PUT,/api/{erpId}/product-group/{p1},,,"239,607",/panel/erp ; /panel/erp/category ; /panel/erp/product ; /panel/erp/storage,positional,nein,"Body nicht aus Dienst ableitbar (Parameter 2 von update) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 65220:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""product-group"""
+GET,/api/{erpId}/product-group/{p1}/edit,,,"239,607",/panel/erp ; /panel/erp/category ; /panel/erp/product ; /panel/erp/storage,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 65220:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""product-group"""
+GET,/api/{erpId}/product-unit,,,"195,239",/panel/erp/order ; /panel/erp/product ; /panel/erp/stocktransfer,named,ja,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 55850:d - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+POST,/api/{erpId}/product-unit,,,"195,239",/panel/erp/order ; /panel/erp/product ; /panel/erp/stocktransfer,named,ja,"Body nicht aus Dienst ableitbar (Parameter 1 von store) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 55850:d - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/product-unit/create,,,"195,239",/panel/erp/order ; /panel/erp/product ; /panel/erp/stocktransfer,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 55850:d - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | Familie im alten Inventar genannt (/api/*/product-unit), dieser Pfad nicht"
+GET,/api/{erpId}/product-unit/paginate,"page_size,page,order_by*,order_direction*,from*,to*",,"195,239",/panel/erp/order ; /panel/erp/product ; /panel/erp/stocktransfer,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 55850:d - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | Familie im alten Inventar genannt (/api/*/product-unit), dieser Pfad nicht"
+GET,/api/{erpId}/product-unit/search,"page_size,page,search,searchView*,filters[]*",,"195,239",/panel/erp/order ; /panel/erp/product ; /panel/erp/stocktransfer,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 55850:d - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | Familie im alten Inventar genannt (/api/*/product-unit), dieser Pfad nicht"
+DELETE,/api/{erpId}/product-unit/{p1},,,"195,239",/panel/erp/order ; /panel/erp/product ; /panel/erp/stocktransfer,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 55850:d - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""product-unit"" | Familie im alten Inventar genannt (/api/*/product-unit), dieser Pfad nicht"
+GET,/api/{erpId}/product-unit/{p1},,,"195,239",/panel/erp/order ; /panel/erp/product ; /panel/erp/stocktransfer,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 55850:d - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""product-unit"" | Familie im alten Inventar genannt (/api/*/product-unit), dieser Pfad nicht"
+PUT,/api/{erpId}/product-unit/{p1},,,"195,239",/panel/erp/order ; /panel/erp/product ; /panel/erp/stocktransfer,positional,nein,"Body nicht aus Dienst ableitbar (Parameter 2 von update) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 55850:d - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""product-unit"" | Familie im alten Inventar genannt (/api/*/product-unit), dieser Pfad nicht"
+GET,/api/{erpId}/product-unit/{p1}/edit,,,"195,239",/panel/erp/order ; /panel/erp/product ; /panel/erp/stocktransfer,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 55850:d - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""product-unit"" | Familie im alten Inventar genannt (/api/*/product-unit), dieser Pfad nicht"
+GET,/api/{erpId}/product/categories,"search*,page,page_size,categoryIds[]",,239,9 Routen (geteilter Dienst): /panel ; /panel/erp ; /panel/erp/category ; /panel/erp/order ...,named,nein,
+GET,/api/{erpId}/product/categories/additional-sorting,"search*,page,page_size,categoryIds[],additional_order_by,additional_order_by_direction",,239,9 Routen (geteilter Dienst): /panel ; /panel/erp ; /panel/erp/category ; /panel/erp/order ...,named,nein,
+GET,/api/{erpId}/product/create,,,239,9 Routen (geteilter Dienst): /panel ; /panel/erp ; /panel/erp/category ; /panel/erp/order ...,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 90514:X - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/product/download,"categoryIds[],storageIds[]",,239,9 Routen (geteilter Dienst): /panel ; /panel/erp ; /panel/erp/category ; /panel/erp/order ...,named,nein,Antwort als Datei (blob/arraybuffer)
+GET,/api/{erpId}/product/ingredient/{id},,,239,9 Routen (geteilter Dienst): /panel ; /panel/erp ; /panel/erp/category ; /panel/erp/order ...,named(callers),nein,
+POST,/api/{erpId}/product/merge,,"(Aufrufer) mainProductId,(Aufrufer) data",239,9 Routen (geteilter Dienst): /panel ; /panel/erp ; /panel/erp/category ; /panel/erp/order ...,named,nein,
+GET,/api/{erpId}/product/paginate,"page_size,page,order_by*,order_direction*,from*,to*",,239,9 Routen (geteilter Dienst): /panel ; /panel/erp ; /panel/erp/category ; /panel/erp/order ...,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 90514:X - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/product/recipe-ppa-price/{p1},,,239,9 Routen (geteilter Dienst): /panel ; /panel/erp ; /panel/erp/category ; /panel/erp/order ...,positional,nein,"p1 folgt auf Segment ""recipe-ppa-price"""
+GET,/api/{erpId}/product/recipe-ppa/{id},,,239,9 Routen (geteilter Dienst): /panel ; /panel/erp ; /panel/erp/category ; /panel/erp/order ...,named(callers),nein,
+GET,/api/{erpId}/product/search,"page_size,page,search,searchView*,filters[]*",,239,9 Routen (geteilter Dienst): /panel ; /panel/erp ; /panel/erp/category ; /panel/erp/order ...,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 90514:X - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/product/search-products-without-specified-products,"search*,page,page_size,productsToExclude[]",,239,9 Routen (geteilter Dienst): /panel ; /panel/erp ; /panel/erp/category ; /panel/erp/order ...,named,nein,
+GET,/api/{erpId}/product/storages,"search,page,page_size,storageIds[],additional_order_by,additional_order_by_direction",,239,9 Routen (geteilter Dienst): /panel ; /panel/erp ; /panel/erp/category ; /panel/erp/order ...,named,nein,
+GET,/api/{erpId}/product/suppliers,"search,page,page_size,supplierIds[],additional_order_by,additional_order_by_direction",,239,9 Routen (geteilter Dienst): /panel ; /panel/erp ; /panel/erp/category ; /panel/erp/order ...,named,nein,
+GET,/api/{erpId}/product/{id}/packagings-with-price,,,239,9 Routen (geteilter Dienst): /panel ; /panel/erp ; /panel/erp/category ; /panel/erp/order ...,named(callers),nein,
+PUT,/api/{erpId}/product/{id}/set-preferred-shop-unit,,(Aufrufer) preferredShopUnit,239,9 Routen (geteilter Dienst): /panel ; /panel/erp ; /panel/erp/category ; /panel/erp/order ...,named(callers),nein,
+GET,/api/{erpId}/product/{id}/stock-change/paginate,"page,page_size",,239,9 Routen (geteilter Dienst): /panel ; /panel/erp ; /panel/erp/category ; /panel/erp/order ...,named(callers),nein,
+PUT,/api/{erpId}/product/{id}/update-stock-amount,,,239,9 Routen (geteilter Dienst): /panel ; /panel/erp ; /panel/erp/category ; /panel/erp/order ...,named(callers),nein,Body nicht aus Dienst ableitbar (Parameter 2 von updateStockAmount)
+PUT,/api/{erpId}/product/{id}/update-stock-limit,,,239,9 Routen (geteilter Dienst): /panel ; /panel/erp ; /panel/erp/category ; /panel/erp/order ...,named(callers),nein,Body nicht aus Dienst ableitbar (Parameter 2 von updateStockLimit)
+DELETE,/api/{erpId}/product/{p1},,,239,9 Routen (geteilter Dienst): /panel ; /panel/erp ; /panel/erp/category ; /panel/erp/order ...,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 90514:X - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""product"""
+GET,/api/{erpId}/product/{p1},,,239,9 Routen (geteilter Dienst): /panel ; /panel/erp ; /panel/erp/category ; /panel/erp/order ...,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 90514:X - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""product"""
+PUT,/api/{erpId}/product/{p1},,,239,9 Routen (geteilter Dienst): /panel ; /panel/erp ; /panel/erp/category ; /panel/erp/order ...,positional,nein,"Body nicht aus Dienst ableitbar (Parameter 2 von update) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 90514:X - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""product"""
+GET,/api/{erpId}/product/{p1}/category,,,239,9 Routen (geteilter Dienst): /panel ; /panel/erp ; /panel/erp/category ; /panel/erp/order ...,positional,nein,"p1 folgt auf Segment ""product"""
+GET,/api/{erpId}/product/{p1}/edit,,,239,9 Routen (geteilter Dienst): /panel ; /panel/erp ; /panel/erp/category ; /panel/erp/order ...,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 90514:X - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""product"""
+PUT,/api/{erpId}/product/{p1}/groups,,,239,9 Routen (geteilter Dienst): /panel ; /panel/erp ; /panel/erp/category ; /panel/erp/order ...,positional,nein,"Body nicht ableitbar (Parameter 2) | p1 folgt auf Segment ""product"""
+GET,/api/{erpId}/product/{productId}/packagings,,,239,9 Routen (geteilter Dienst): /panel ; /panel/erp ; /panel/erp/category ; /panel/erp/order ...,named(callers),nein,
+GET,/api/{erpId}/products,"page,page_size,order_by,additional_order_by,additional_order_by_direction,order_direction,search,from*,to*,supplierIds[]*,categoryIds[]*,storageIds[]*,withoutProductGroups*,notInProductLists*,stocktakingVisibility*,productListStatus*,stockLevel*,type*",,"239,607",/panel/erp ; /panel/erp/product,named,ja,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 46028:g - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+POST,/api/{erpId}/products,,,"239,607",/panel/erp ; /panel/erp/product,named,ja,"Body nicht aus Dienst ableitbar (Parameter 1 von store) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 46028:g - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/products/create,,,"239,607",/panel/erp ; /panel/erp/product,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 46028:g - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | Familie im alten Inventar genannt (/api/*/products), dieser Pfad nicht"
+GET,/api/{erpId}/products/paginate,"page_size,page,order_by*,order_direction*,from*,to*",,"239,607",/panel/erp ; /panel/erp/product,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 46028:g - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | Familie im alten Inventar genannt (/api/*/products), dieser Pfad nicht"
+GET,/api/{erpId}/products/search,"page_size,page,search,searchView*,filters[]*",,"239,607",/panel/erp ; /panel/erp/product,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 46028:g - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | Familie im alten Inventar genannt (/api/*/products), dieser Pfad nicht"
+DELETE,/api/{erpId}/products/{p1},,,"239,607",/panel/erp ; /panel/erp/product,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 46028:g - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""products"" | Familie im alten Inventar genannt (/api/*/products), dieser Pfad nicht"
+GET,/api/{erpId}/products/{p1},,,"239,607",/panel/erp ; /panel/erp/product,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 46028:g - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""products"" | Familie im alten Inventar genannt (/api/*/products), dieser Pfad nicht"
+PUT,/api/{erpId}/products/{p1},,,"239,607",/panel/erp ; /panel/erp/product,positional,nein,"Body nicht aus Dienst ableitbar (Parameter 2 von update) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 46028:g - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""products"" | Familie im alten Inventar genannt (/api/*/products), dieser Pfad nicht"
+GET,/api/{erpId}/products/{p1}/edit,,,"239,607",/panel/erp ; /panel/erp/product,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 46028:g - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""products"" | Familie im alten Inventar genannt (/api/*/products), dieser Pfad nicht"
+GET,/api/{erpId}/recipe,,,"167,239,313",/panel/erp/product ; /panel/erp/sale,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 38163:p - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 38163:e - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+POST,/api/{erpId}/recipe,,,"167,239,313",/panel/erp/product ; /panel/erp/sale,named,nein,"Body nicht aus Dienst ableitbar (Parameter 1 von store) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 38163:p - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 38163:e - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/recipe-sale,,,"167,239",/panel/erp/sale,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 64167:n - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+POST,/api/{erpId}/recipe-sale,,,"167,239",/panel/erp/sale,named,nein,"Body nicht aus Dienst ableitbar (Parameter 1 von store) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 64167:n - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/recipe-sale/create,,,"167,239",/panel/erp/sale,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 64167:n - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/recipe-sale/paginate,"page_size,page,order_by*,order_direction*,from*,to*",,"167,239",/panel/erp/sale,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 64167:n - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/recipe-sale/search,"page_size,page,search,searchView*,filters[]*",,"167,239",/panel/erp/sale,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 64167:n - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+DELETE,/api/{erpId}/recipe-sale/{p1},,,"167,239",/panel/erp/sale,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 64167:n - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""recipe-sale"""
+GET,/api/{erpId}/recipe-sale/{p1},,,"167,239",/panel/erp/sale,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 64167:n - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""recipe-sale"""
+PUT,/api/{erpId}/recipe-sale/{p1},,,"167,239",/panel/erp/sale,positional,nein,"Body nicht aus Dienst ableitbar (Parameter 2 von update) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 64167:n - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""recipe-sale"""
+GET,/api/{erpId}/recipe-sale/{p1}/edit,,,"167,239",/panel/erp/sale,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 64167:n - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""recipe-sale"""
+GET,/api/{erpId}/recipe/create,,,"167,239,313",/panel/erp/product ; /panel/erp/sale,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 38163:p - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 38163:e - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/recipe/paginate,"search,page,page_size,page_count,order_by*,order_direction*,from*,to*",,"167,239,313",/panel/erp/product ; /panel/erp/sale,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 38163:p - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 38163:e - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/recipe/search,"page_size,page,search,searchView*,filters[]*",,"167,239,313",/panel/erp/product ; /panel/erp/sale,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 38163:p - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 38163:e - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+DELETE,/api/{erpId}/recipe/{p1},,,"167,239,313",/panel/erp/product ; /panel/erp/sale,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 38163:p - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""recipe"" | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 38163:e - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/recipe/{p1},,,"167,239,313",/panel/erp/product ; /panel/erp/sale,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 38163:p - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""recipe"" | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 38163:e - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+PUT,/api/{erpId}/recipe/{p1},,,"167,239,313",/panel/erp/product ; /panel/erp/sale,positional,nein,"Body nicht aus Dienst ableitbar (Parameter 2 von update) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 38163:p - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""recipe"" | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 38163:e - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/recipe/{p1}/edit,,,"167,239,313",/panel/erp/product ; /panel/erp/sale,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 38163:p - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""recipe"" | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 38163:e - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/resets,"page_size,page,order_by*,order_direction*,from*,to*",,"239,569",/panel/erp,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 48569:a - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+POST,/api/{erpId}/resets,,comment,"239,569",/panel/erp,named,nein,"Body nicht aus Dienst ableitbar (Parameter 1 von store) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 48569:a - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/resets/create,,,"239,569",/panel/erp,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 48569:a - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/resets/paginate,"page_size,page,order_by*,order_direction*,from*,to*",,"239,569",/panel/erp,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 48569:a - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/resets/search,"page_size,page,search,searchView*,filters[]*",,"239,569",/panel/erp,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 48569:a - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+DELETE,/api/{erpId}/resets/{p1},,,"239,569",/panel/erp,positional,nein,"p1 folgt auf Segment ""resets"" | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 48569:a - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/resets/{p1},,,"239,569",/panel/erp,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 48569:a - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""resets"""
+PUT,/api/{erpId}/resets/{p1},,,"239,569",/panel/erp,positional,nein,"Body nicht aus Dienst ableitbar (Parameter 2 von update) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 48569:a - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""resets"""
+GET,/api/{erpId}/resets/{p1}/edit,,,"239,569",/panel/erp,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 48569:a - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""resets"""
+GET,/api/{erpId}/sales,"page,page_size,order_by,order_direction,from*,to*,status*",,"239,592",/panel/erp/order ; /panel/erp/sale,named,ja,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 61857:m - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+POST,/api/{erpId}/sales,,,"239,592",/panel/erp/order ; /panel/erp/sale,named,ja,"Body nicht aus Dienst ableitbar (Parameter 1 von store) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 61857:m - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/sales/create,,,"239,592",/panel/erp/order ; /panel/erp/sale,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 61857:m - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | Familie im alten Inventar genannt (/api/*/sales), dieser Pfad nicht"
+GET,/api/{erpId}/sales/search,"page_size,page,search,searchView*,filters[]*",,"239,592",/panel/erp/order ; /panel/erp/sale,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 61857:m - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | Familie im alten Inventar genannt (/api/*/sales), dieser Pfad nicht"
+GET,/api/{erpId}/sales/{id}/finish,,,592,/panel/erp/order ; /panel/erp/sale,named(callers),nein,"Familie im alten Inventar genannt (/api/*/sales), dieser Pfad nicht"
+GET,/api/{erpId}/sales/{id}/recipe-sale,"page,page_size,order_by*,order_direction*",,592,/panel/erp/order ; /panel/erp/sale,named(callers),nein,"Familie im alten Inventar genannt (/api/*/sales), dieser Pfad nicht"
+DELETE,/api/{erpId}/sales/{p1},,,"239,592",/panel/erp/order ; /panel/erp/sale,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 61857:m - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""sales"" | Familie im alten Inventar genannt (/api/*/sales), dieser Pfad nicht"
+GET,/api/{erpId}/sales/{p1},,,"239,592",/panel/erp/order ; /panel/erp/sale,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 61857:m - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""sales"" | Familie im alten Inventar genannt (/api/*/sales), dieser Pfad nicht"
+PUT,/api/{erpId}/sales/{p1},,,"239,592",/panel/erp/order ; /panel/erp/sale,positional,nein,"Body nicht aus Dienst ableitbar (Parameter 2 von update) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 61857:m - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""sales"" | Familie im alten Inventar genannt (/api/*/sales), dieser Pfad nicht"
+GET,/api/{erpId}/sales/{p1}/edit,,,"239,592",/panel/erp/order ; /panel/erp/sale,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 61857:m - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""sales"" | Familie im alten Inventar genannt (/api/*/sales), dieser Pfad nicht"
+GET,/api/{erpId}/shop,,,"239,735",/panel/erp/product,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 79573:_ - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+POST,/api/{erpId}/shop,,,"239,735",/panel/erp/product,named,nein,"Body nicht aus Dienst ableitbar (Parameter 1 von store) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 79573:_ - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/shop-order,,,"239,607",/panel/erp ; /panel/erp/order ; /panel/erp/product ; /panel/erp/sale,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 88890:_ - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | Familie im alten Inventar genannt (/api/*/shop-order), dieser Pfad nicht"
+POST,/api/{erpId}/shop-order,,,"239,607",/panel/erp ; /panel/erp/order ; /panel/erp/product ; /panel/erp/sale,named,nein,"Body nicht aus Dienst ableitbar (Parameter 1 von store) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 88890:_ - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | Familie im alten Inventar genannt (/api/*/shop-order), dieser Pfad nicht"
+GET,/api/{erpId}/shop-order-mapped-product,,,"239,678",/panel/erp/order,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 63678:n - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+POST,/api/{erpId}/shop-order-mapped-product,,,"239,678",/panel/erp/order,named,nein,"Body nicht aus Dienst ableitbar (Parameter 1 von store) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 63678:n - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/shop-order-mapped-product/create,,,"239,678",/panel/erp/order,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 63678:n - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/shop-order-mapped-product/paginate,"page_size,page,order_by*,order_direction*,from*,to*",,"239,678",/panel/erp/order,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 63678:n - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/shop-order-mapped-product/search,"page_size,page,search,searchView*,filters[]*",,"239,678",/panel/erp/order,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 63678:n - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+DELETE,/api/{erpId}/shop-order-mapped-product/{p1},,,"239,678",/panel/erp/order,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 63678:n - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""shop-order-mapped-product"""
+GET,/api/{erpId}/shop-order-mapped-product/{p1},,,"239,678",/panel/erp/order,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 63678:n - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""shop-order-mapped-product"""
+PUT,/api/{erpId}/shop-order-mapped-product/{p1},,,"239,678",/panel/erp/order,positional,nein,"Body nicht aus Dienst ableitbar (Parameter 2 von update) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 63678:n - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""shop-order-mapped-product"""
+GET,/api/{erpId}/shop-order-mapped-product/{p1}/edit,,,"239,678",/panel/erp/order,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 63678:n - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""shop-order-mapped-product"""
+GET,/api/{erpId}/shop-order-order-tag-type,,,"195,239",/panel/erp/order,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 30878:d - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+POST,/api/{erpId}/shop-order-order-tag-type,,,"195,239",/panel/erp/order,named,nein,"Body nicht aus Dienst ableitbar (Parameter 1 von store) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 30878:d - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/shop-order-order-tag-type/concrete-product,"page_size,page,search,filters[]*",,195,/panel/erp/order,named,nein,Pfad nur unter Bedingung
+GET,/api/{erpId}/shop-order-order-tag-type/concrete-product/{concreteProductId},"page_size,page,search,filters[]*",,195,/panel/erp/order,named(callers),nein,Pfad nur unter Bedingung
+GET,/api/{erpId}/shop-order-order-tag-type/create,,,"195,239",/panel/erp/order,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 30878:d - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+POST,/api/{erpId}/shop-order-order-tag-type/mapping-product/{id},,,195,/panel/erp/order,named(callers),nein,Body nicht aus Dienst ableitbar (Parameter 2 von addTagToMappingProduct)
+POST,/api/{erpId}/shop-order-order-tag-type/mapping-product/{id}/remove,,,195,/panel/erp/order,named(callers),nein,Body nicht aus Dienst ableitbar (Parameter 2 von removeTagToMappingProduct)
+GET,/api/{erpId}/shop-order-order-tag-type/paginate,"page_size,page,order_by*,order_direction*,from*,to*",,"195,239",/panel/erp/order,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 30878:d - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/shop-order-order-tag-type/search,"page_size,page,search,searchView*,filters[]*",,"195,239",/panel/erp/order,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 30878:d - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+DELETE,/api/{erpId}/shop-order-order-tag-type/{p1},,,"195,239",/panel/erp/order,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 30878:d - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""shop-order-order-tag-type"""
+GET,/api/{erpId}/shop-order-order-tag-type/{p1},,,"195,239",/panel/erp/order,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 30878:d - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""shop-order-order-tag-type"""
+PUT,/api/{erpId}/shop-order-order-tag-type/{p1},,,"195,239",/panel/erp/order,positional,nein,"Body nicht aus Dienst ableitbar (Parameter 2 von update) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 30878:d - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""shop-order-order-tag-type"""
+GET,/api/{erpId}/shop-order-order-tag-type/{p1}/edit,,,"195,239",/panel/erp/order,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 30878:d - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""shop-order-order-tag-type"""
+GET,/api/{erpId}/shop-order/count-orders,"statusesIds[]*,storesIds[]*,from*,to*",,607,/panel/erp ; /panel/erp/order ; /panel/erp/product ; /panel/erp/sale,named,nein,"Familie im alten Inventar genannt (/api/*/shop-order), dieser Pfad nicht"
+GET,/api/{erpId}/shop-order/create,,,"239,607",/panel/erp ; /panel/erp/order ; /panel/erp/product ; /panel/erp/sale,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 88890:_ - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | Familie im alten Inventar genannt (/api/*/shop-order), dieser Pfad nicht"
+GET,/api/{erpId}/shop-order/get-shops-for-all-orders,,,607,/panel/erp ; /panel/erp/order ; /panel/erp/product ; /panel/erp/sale,named,ja,
+GET,/api/{erpId}/shop-order/get-status-for-all-orders,,,607,/panel/erp ; /panel/erp/order ; /panel/erp/product ; /panel/erp/sale,named,ja,
+GET,/api/{erpId}/shop-order/paginate,"page_size,page,order_by*,order_direction*,from*,to*",,"239,607",/panel/erp ; /panel/erp/order ; /panel/erp/product ; /panel/erp/sale,named,ja,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 88890:_ - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/shop-order/paginate/{p1},"page_size,page,order_by*,order_direction*,from*,to*,orderView,statusesIds[]*,storesIds[]*",,607,/panel/erp ; /panel/erp/order ; /panel/erp/product ; /panel/erp/sale,positional,nein,"p1 folgt auf Segment ""paginate"" | Familie im alten Inventar genannt (/api/*/shop-order), dieser Pfad nicht"
+PUT,/api/{erpId}/shop-order/removeShopOrderNote/{p1},,,607,/panel/erp ; /panel/erp/order ; /panel/erp/product ; /panel/erp/sale,positional,nein,"leerer Body {} | p1 folgt auf Segment ""removeShopOrderNote"" | Familie im alten Inventar genannt (/api/*/shop-order), dieser Pfad nicht"
+GET,/api/{erpId}/shop-order/search,"page_size,page,search,searchView*,filters[]*",,"239,607",/panel/erp ; /panel/erp/order ; /panel/erp/product ; /panel/erp/sale,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 88890:_ - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | Familie im alten Inventar genannt (/api/*/shop-order), dieser Pfad nicht"
+POST,/api/{erpId}/shop-order/updateShopOrderNote/{p1},,(Aufrufer) note,607,/panel/erp ; /panel/erp/order ; /panel/erp/product ; /panel/erp/sale,positional,nein,"p1 folgt auf Segment ""updateShopOrderNote"" | Familie im alten Inventar genannt (/api/*/shop-order), dieser Pfad nicht"
+POST,/api/{erpId}/shop-order/{id}/accept,,"(Aufrufer) checked,(Aufrufer) numOfCheckedProducts",607,/panel/erp ; /panel/erp/order ; /panel/erp/product ; /panel/erp/sale,named(callers),nein,"Familie im alten Inventar genannt (/api/*/shop-order), dieser Pfad nicht"
+PUT,/api/{erpId}/shop-order/{id}/cancel,,(Aufrufer) checked,607,/panel/erp ; /panel/erp/order ; /panel/erp/product ; /panel/erp/sale,named(callers),nein,"Familie im alten Inventar genannt (/api/*/shop-order), dieser Pfad nicht"
+GET,/api/{erpId}/shop-order/{id}/change,"order_by*,order_direction*,search*,categories[],storages[]",,607,/panel/erp ; /panel/erp/order ; /panel/erp/product ; /panel/erp/sale,named(callers),ja,
+GET,/api/{erpId}/shop-order/{id}/change/paginate/checked,"checked,page,page_size",,607,/panel/erp ; /panel/erp/order ; /panel/erp/product ; /panel/erp/sale,named(callers),ja,
+POST,/api/{erpId}/shop-order/{id}/change/{id},,,607,/panel/erp ; /panel/erp/order ; /panel/erp/product ; /panel/erp/sale,named(callers),nein,"Body nicht aus Dienst ableitbar (Parameter 3 von updateRelatedShopOrderChange) | Familie im alten Inventar genannt (/api/*/shop-order), dieser Pfad nicht"
+DELETE,/api/{erpId}/shop-order/{id}/change/{id}/delete,,,607,/panel/erp ; /panel/erp/order ; /panel/erp/product ; /panel/erp/sale,named(callers),nein,"Familie im alten Inventar genannt (/api/*/shop-order), dieser Pfad nicht"
+GET,/api/{erpId}/shop-order/{id}/check-delivery-notice-number,extDeliveryNoteId,,607,/panel/erp ; /panel/erp/order ; /panel/erp/product ; /panel/erp/sale,named(callers),nein,"Familie im alten Inventar genannt (/api/*/shop-order), dieser Pfad nicht"
+POST,/api/{erpId}/shop-order/{id}/create-substitute-order-change,,,607,/panel/erp ; /panel/erp/order ; /panel/erp/product ; /panel/erp/sale,named(callers),nein,"Body nicht aus Dienst ableitbar (Parameter 2 von createSubstituteOrderChange) | Familie im alten Inventar genannt (/api/*/shop-order), dieser Pfad nicht"
+POST,/api/{erpId}/shop-order/{id}/finish,,,607,/panel/erp ; /panel/erp/order ; /panel/erp/product ; /panel/erp/sale,named(callers),nein,"Body: """" | Familie im alten Inventar genannt (/api/*/shop-order), dieser Pfad nicht"
+PUT,/api/{erpId}/shop-order/{id}/retry-billing-sync,,,607,/panel/erp ; /panel/erp/order ; /panel/erp/product ; /panel/erp/sale,named(callers),nein,"leerer Body {} | Familie im alten Inventar genannt (/api/*/shop-order), dieser Pfad nicht"
+PUT,/api/{erpId}/shop-order/{id}/uncancel,,,607,/panel/erp ; /panel/erp/order ; /panel/erp/product ; /panel/erp/sale,named(callers),nein,"Body nicht aus Dienst ableitbar (Parameter 2 von uncancel) | Familie im alten Inventar genannt (/api/*/shop-order), dieser Pfad nicht"
+PUT,/api/{erpId}/shop-order/{id}/update-shop-order-ext-delivery-note-id,,extDeliveryNoteId,607,/panel/erp ; /panel/erp/order ; /panel/erp/product ; /panel/erp/sale,named(callers),nein,"Familie im alten Inventar genannt (/api/*/shop-order), dieser Pfad nicht"
+POST,/api/{erpId}/shop-order/{noteId}/addNewShopOrderNote,,(Aufrufer) note,607,/panel/erp ; /panel/erp/order ; /panel/erp/product ; /panel/erp/sale,named(callers),nein,"Familie im alten Inventar genannt (/api/*/shop-order), dieser Pfad nicht"
+DELETE,/api/{erpId}/shop-order/{p1},,,"239,607",/panel/erp ; /panel/erp/order ; /panel/erp/product ; /panel/erp/sale,positional,ja,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 88890:_ - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""shop-order"""
+GET,/api/{erpId}/shop-order/{p1},,,"239,607",/panel/erp ; /panel/erp/order ; /panel/erp/product ; /panel/erp/sale,positional,ja,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 88890:_ - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""shop-order"""
+PUT,/api/{erpId}/shop-order/{p1},,,"239,607",/panel/erp ; /panel/erp/order ; /panel/erp/product ; /panel/erp/sale,positional,ja,"Body nicht aus Dienst ableitbar (Parameter 2 von update) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 88890:_ - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""shop-order"""
+GET,/api/{erpId}/shop-order/{p1}/change/paginate,"page_size,page,order_by*,order_direction*",,607,/panel/erp ; /panel/erp/order ; /panel/erp/product ; /panel/erp/sale,positional,nein,"p1 folgt auf Segment ""shop-order"" | Familie im alten Inventar genannt (/api/*/shop-order), dieser Pfad nicht"
+GET,/api/{erpId}/shop-order/{p1}/edit,,,"239,607",/panel/erp ; /panel/erp/order ; /panel/erp/product ; /panel/erp/sale,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 88890:_ - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""shop-order"" | Familie im alten Inventar genannt (/api/*/shop-order), dieser Pfad nicht"
+GET,/api/{erpId}/shop/create,,,"239,735",/panel/erp/product,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 79573:_ - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/shop/paginate,"page_size,page,order_by*,order_direction*,from*,to*",,"239,735",/panel/erp/product,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 79573:_ - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/shop/search,"page_size,page,search,searchView*,filters[]*",,"239,735",/panel/erp/product,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 79573:_ - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+DELETE,/api/{erpId}/shop/{p1},,,"239,735",/panel/erp/product,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 79573:_ - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""shop"""
+GET,/api/{erpId}/shop/{p1},,,"239,735",/panel/erp/product,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 79573:_ - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""shop"""
+PUT,/api/{erpId}/shop/{p1},,,"239,735",/panel/erp/product,positional,nein,"Body nicht aus Dienst ableitbar (Parameter 2 von update) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 79573:_ - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""shop"""
+GET,/api/{erpId}/shop/{p1}/edit,,,"239,735",/panel/erp/product,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 79573:_ - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""shop"""
+GET,/api/{erpId}/statistics,,,"239,569",/panel/erp,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 48569:a - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+POST,/api/{erpId}/statistics,,,"239,569",/panel/erp,named,nein,"Body nicht aus Dienst ableitbar (Parameter 1 von store) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 48569:a - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/statistics/create,,,"239,569",/panel/erp,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 48569:a - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/statistics/erp/overview,,,569,/panel/erp,named,nein,
+GET,/api/{erpId}/statistics/paginate,"page_size,page,order_by*,order_direction*,from*,to*",,"239,569",/panel/erp,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 48569:a - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/statistics/product/{p1},"start_date,end_date",,569,/panel/erp,positional,nein,"p1 folgt auf Segment ""product"""
+GET,/api/{erpId}/statistics/sales,"begin,end",,569,/panel/erp,named,nein,
+GET,/api/{erpId}/statistics/search,"page_size,page,search,searchView*,filters[]*",,"239,569",/panel/erp,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 48569:a - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/statistics/shop-orders,"begin,end",,569,/panel/erp,named,nein,
+DELETE,/api/{erpId}/statistics/{p1},,,"239,569",/panel/erp,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 48569:a - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""statistics"""
+GET,/api/{erpId}/statistics/{p1},,,"239,569",/panel/erp,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 48569:a - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""statistics"""
+PUT,/api/{erpId}/statistics/{p1},,,"239,569",/panel/erp,positional,nein,"Body nicht aus Dienst ableitbar (Parameter 2 von update) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 48569:a - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""statistics"""
+GET,/api/{erpId}/statistics/{p1}/edit,,,"239,569",/panel/erp,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 48569:a - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""statistics"""
+GET,/api/{erpId}/stock,,,"195,239",/panel/erp/order ; /panel/erp/product ; /panel/erp/sale ; /panel/erp/stocktransfer,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 3812:w - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | Familie im alten Inventar genannt (/api/*/stock), dieser Pfad nicht"
+POST,/api/{erpId}/stock,,,"195,239",/panel/erp/order ; /panel/erp/product ; /panel/erp/sale ; /panel/erp/stocktransfer,named,nein,"Body nicht aus Dienst ableitbar (Parameter 1 von store) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 3812:w - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | Familie im alten Inventar genannt (/api/*/stock), dieser Pfad nicht"
+GET,/api/{erpId}/stock/change/notification/types,,,195,/panel/erp/order ; /panel/erp/product ; /panel/erp/sale ; /panel/erp/stocktransfer,named,ja,
+GET,/api/{erpId}/stock/change/reasons,,,195,/panel/erp/order ; /panel/erp/product ; /panel/erp/sale ; /panel/erp/stocktransfer,named,nein,"Familie im alten Inventar genannt (/api/*/stock), dieser Pfad nicht"
+GET,/api/{erpId}/stock/create,,,"195,239",/panel/erp/order ; /panel/erp/product ; /panel/erp/sale ; /panel/erp/stocktransfer,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 3812:w - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | Familie im alten Inventar genannt (/api/*/stock), dieser Pfad nicht"
+GET,/api/{erpId}/stock/damagedGoods,"page,page_size,filter,search,categoryIds,startDate,endDate",,195,/panel/erp/order ; /panel/erp/product ; /panel/erp/sale ; /panel/erp/stocktransfer,named,nein,"Familie im alten Inventar genannt (/api/*/stock), dieser Pfad nicht"
+GET,/api/{erpId}/stock/damagedGoodsCategories,,,195,/panel/erp/order ; /panel/erp/product ; /panel/erp/sale ; /panel/erp/stocktransfer,named,nein,"Familie im alten Inventar genannt (/api/*/stock), dieser Pfad nicht"
+GET,/api/{erpId}/stock/damagedGoodsTotalValueLost,"filter,search,categoryIds,startDate,endDate",,195,/panel/erp/order ; /panel/erp/product ; /panel/erp/sale ; /panel/erp/stocktransfer,named,nein,"Familie im alten Inventar genannt (/api/*/stock), dieser Pfad nicht"
+GET,/api/{erpId}/stock/ingredient/{p1},,,195,/panel/erp/order ; /panel/erp/product ; /panel/erp/sale ; /panel/erp/stocktransfer,positional,nein,"p1 folgt auf Segment ""ingredient"" | Familie im alten Inventar genannt (/api/*/stock), dieser Pfad nicht"
+GET,/api/{erpId}/stock/paginate,"page_size,page,order_by*,order_direction*,from*,to*",,"195,239",/panel/erp/order ; /panel/erp/product ; /panel/erp/sale ; /panel/erp/stocktransfer,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 3812:w - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | Familie im alten Inventar genannt (/api/*/stock), dieser Pfad nicht"
+GET,/api/{erpId}/stock/product/{p1},,,195,/panel/erp/order ; /panel/erp/product ; /panel/erp/sale ; /panel/erp/stocktransfer,positional,nein,"p1 folgt auf Segment ""product"" | Familie im alten Inventar genannt (/api/*/stock), dieser Pfad nicht"
+GET,/api/{erpId}/stock/search,"page_size,page,search,searchView*,filters[]*",,"195,239",/panel/erp/order ; /panel/erp/product ; /panel/erp/sale ; /panel/erp/stocktransfer,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 3812:w - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | Familie im alten Inventar genannt (/api/*/stock), dieser Pfad nicht"
+GET,/api/{erpId}/stock/{id}/initial-import-price,,,195,/panel/erp/order ; /panel/erp/product ; /panel/erp/sale ; /panel/erp/stocktransfer,named(callers),nein,"Familie im alten Inventar genannt (/api/*/stock), dieser Pfad nicht"
+PUT,/api/{erpId}/stock/{id}/update-price,,price,195,/panel/erp/order ; /panel/erp/product ; /panel/erp/sale ; /panel/erp/stocktransfer,named(callers),nein,"Familie im alten Inventar genannt (/api/*/stock), dieser Pfad nicht"
+DELETE,/api/{erpId}/stock/{p1},,,"195,239",/panel/erp/order ; /panel/erp/product ; /panel/erp/sale ; /panel/erp/stocktransfer,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 3812:w - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""stock"" | Familie im alten Inventar genannt (/api/*/stock), dieser Pfad nicht"
+GET,/api/{erpId}/stock/{p1},,,"195,239",/panel/erp/order ; /panel/erp/product ; /panel/erp/sale ; /panel/erp/stocktransfer,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 3812:w - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""stock"" | Familie im alten Inventar genannt (/api/*/stock), dieser Pfad nicht"
+PUT,/api/{erpId}/stock/{p1},,,"195,239",/panel/erp/order ; /panel/erp/product ; /panel/erp/sale ; /panel/erp/stocktransfer,positional,nein,"Body nicht aus Dienst ableitbar (Parameter 2 von update) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 3812:w - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""stock"" | Familie im alten Inventar genannt (/api/*/stock), dieser Pfad nicht"
+GET,/api/{erpId}/stock/{p1}/edit,,,"195,239",/panel/erp/order ; /panel/erp/product ; /panel/erp/sale ; /panel/erp/stocktransfer,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 3812:w - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""stock"" | Familie im alten Inventar genannt (/api/*/stock), dieser Pfad nicht"
+GET,/api/{erpId}/stocktaking,"state,page,page_size,order_by,order_direction",,"239,554",/panel/erp/stocktaking,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 76298:n - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+POST,/api/{erpId}/stocktaking,,,"239,554",/panel/erp/stocktaking,named,nein,"Body nicht aus Dienst ableitbar (Parameter 1 von store) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 76298:n - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/stocktaking/create,,,"239,554",/panel/erp/stocktaking,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 76298:n - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/stocktaking/paginate,"page_size,page,order_by*,order_direction*,from*,to*",,"239,554",/panel/erp/stocktaking,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 76298:n - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/stocktaking/search,"page_size,page,search,searchView*,filters[]*",,"239,554",/panel/erp/stocktaking,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 76298:n - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+PUT,/api/{erpId}/stocktaking/{_id}/download-csv,filter*,"checkedRows,checkedColumns",554,/panel/erp/stocktaking,named(callers),nein,Antwort als Datei (blob/arraybuffer)
+PUT,/api/{erpId}/stocktaking/{_id}/download-excel,filter*,"checkedRows,checkedColumns",554,/panel/erp/stocktaking,named(callers),nein,Antwort als Datei (blob/arraybuffer)
+POST,/api/{erpId}/stocktaking/{id}/add-product-to-category-stocktaking-list,,"(Aufrufer) productName,(Aufrufer) productId",554,/panel/erp/stocktaking,named(callers),nein,
+POST,/api/{erpId}/stocktaking/{id}/book,force*,,554,/panel/erp/stocktaking,named(callers),nein,Body-Quelle: !0
+POST,/api/{erpId}/stocktaking/{id}/cancel,,,554,/panel/erp/stocktaking,named(callers),nein,Body-Quelle: !0
+POST,/api/{erpId}/stocktaking/{id}/finish,,,554,/panel/erp/stocktaking,named(callers),nein,leerer Body {}
+GET,/api/{erpId}/stocktaking/{id}/get-categories-for-stocktaking,,,554,/panel/erp/stocktaking,named(callers),nein,
+GET,/api/{erpId}/stocktaking/{id}/get-storages-for-stocktaking,,,554,/panel/erp/stocktaking,named(callers),nein,
+POST,/api/{erpId}/stocktaking/{id}/reedit,,,554,/panel/erp/stocktaking,named(callers),nein,Body-Quelle: !0
+GET,/api/{erpId}/stocktaking/{id}/stocktaking-change,"page,page_size,order_by*,order_direction*,searchView*,search,filter,categories[],storages[]",,554,/panel/erp/stocktaking,named(callers),nein,
+POST,/api/{erpId}/stocktaking/{id}/stocktaking-change/{id},,"(Aufrufer) quantity,(Aufrufer) checked,(Aufrufer) packagings,(Aufrufer) countedOnDate",554,/panel/erp/stocktaking,named(callers),nein,
+DELETE,/api/{erpId}/stocktaking/{p1},,,"239,554",/panel/erp/stocktaking,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 76298:n - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""stocktaking"""
+GET,/api/{erpId}/stocktaking/{p1},,,"239,554",/panel/erp/stocktaking,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 76298:n - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""stocktaking"""
+PUT,/api/{erpId}/stocktaking/{p1},,,"239,554",/panel/erp/stocktaking,positional,nein,"Body nicht aus Dienst ableitbar (Parameter 2 von update) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 76298:n - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""stocktaking"""
+POST,/api/{erpId}/stocktaking/{p1}/add-product-to-storage-stocktaking-list,,,554,/panel/erp/stocktaking,positional,nein,"Body nicht ableitbar (Parameter 2) | p1 folgt auf Segment ""stocktaking"""
+GET,/api/{erpId}/stocktaking/{p1}/edit,,,"239,554",/panel/erp/stocktaking,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 76298:n - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""stocktaking"""
+GET,/api/{erpId}/stocktaking/{p1}/print,filter*,,554,/panel/erp/stocktaking,positional,nein,"p1 folgt auf Segment ""stocktaking"""
+GET,/api/{erpId}/stocktaking/{p1}/stocktaking-change,"page,page_size,order_by*,order_direction*,searchView*,search,filter,categories[],storages[]",,554,/panel/erp/stocktaking,positional,nein,"p1 folgt auf Segment ""stocktaking"""
+POST,/api/{erpId}/stocktaking/{p1}/stocktaking-change-storage/{p2},,,554,/panel/erp/stocktaking,positional,nein,"Body nicht ableitbar (Parameter 3) | p1 folgt auf Segment ""stocktaking"" | p2 folgt auf Segment ""stocktaking-change-storage"""
+GET,/api/{erpId}/stocktaking/{p1}/stocktaking-change/checked,"page,page_size,order_by*,order_direction*,searchView*,search,filter,categories[],storages[]",,554,/panel/erp/stocktaking,positional,nein,"p1 folgt auf Segment ""stocktaking"""
+DELETE,/api/{erpId}/stocktaking/{p1}/stocktaking-change/{p2},,,554,/panel/erp/stocktaking,positional,nein,"p1 folgt auf Segment ""stocktaking"" | p2 folgt auf Segment ""stocktaking-change"""
+DELETE,/api/{erpId}/stocktaking/{stocktakingId}/stocktaking-delete,,,554,/panel/erp/stocktaking,named(callers),nein,
+GET,/api/{erpId}/storage,,,"239,607",/panel/erp/product ; /panel/erp/stocktaking ; /panel/erp/storage,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 68106:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+POST,/api/{erpId}/storage,,,"239,607",/panel/erp/product ; /panel/erp/stocktaking ; /panel/erp/storage,named,nein,"Body nicht aus Dienst ableitbar (Parameter 1 von store) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 68106:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+POST,/api/{erpId}/storage/copy,,"selectedStorage,selectedCostCenters",607,/panel/erp/product ; /panel/erp/stocktaking ; /panel/erp/storage,named,nein,
+GET,/api/{erpId}/storage/create,,,"239,607",/panel/erp/product ; /panel/erp/stocktaking ; /panel/erp/storage,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 68106:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+PUT,/api/{erpId}/storage/delete,,"storages,deleteAll",607,/panel/erp/product ; /panel/erp/stocktaking ; /panel/erp/storage,named,nein,
+GET,/api/{erpId}/storage/paginate,"page_size,page,order_by*,order_direction*,from*,to*",,"239,607",/panel/erp/product ; /panel/erp/stocktaking ; /panel/erp/storage,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 68106:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/storage/search,"page_size,page,search,searchView*,filters[]*",,"239,607",/panel/erp/product ; /panel/erp/stocktaking ; /panel/erp/storage,named,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 68106:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt"
+GET,/api/{erpId}/storage/{_id}/products/search,"search,page,page_size,order_by,order_direction,filters[]",,607,/panel/erp/product ; /panel/erp/stocktaking ; /panel/erp/storage,named(callers),nein,
+PUT,/api/{erpId}/storage/{_id}/storage-product/{id}/position,,"(Aufrufer) new_position,(Aufrufer) old_position",607,/panel/erp/product ; /panel/erp/stocktaking ; /panel/erp/storage,named(callers),nein,
+DELETE,/api/{erpId}/storage/{p1},,,"239,607",/panel/erp/product ; /panel/erp/stocktaking ; /panel/erp/storage,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 68106:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""storage"""
+GET,/api/{erpId}/storage/{p1},,,"239,607",/panel/erp/product ; /panel/erp/stocktaking ; /panel/erp/storage,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 68106:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""storage"""
+PUT,/api/{erpId}/storage/{p1},,,"239,607",/panel/erp/product ; /panel/erp/stocktaking ; /panel/erp/storage,positional,nein,"Body nicht aus Dienst ableitbar (Parameter 2 von update) | geerbt: CRUD-Basisklasse (Modul 55964), Instanz 68106:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""storage"""
+GET,/api/{erpId}/storage/{p1}/edit,,,"239,607",/panel/erp/product ; /panel/erp/stocktaking ; /panel/erp/storage,positional,nein,"geerbt: CRUD-Basisklasse (Modul 55964), Instanz 68106:v - ob die Oberflaeche diesen Pfad nutzt, ist nicht belegt | p1 folgt auf Segment ""storage"""
+GET,/api/{erpId}/storage/{p1}/products/search_all,"search,page,page_size,order_by,order_direction,filters[]",,607,/panel/erp/product ; /panel/erp/stocktaking ; /panel/erp/storage,positional,nein,"p1 folgt auf Segment ""storage"""
+PUT,/api/{erpId}/storage/{p1}/structure,,"new_parent_id,new_position,old_position",607,/panel/erp/product ; /panel/erp/stocktaking ; /panel/erp/storage,positional,nein,"p1 folgt auf Segment ""storage"""
+PUT,/api/{erpId}/storage/{storageId}/storage-products/positions,,,607,/panel/erp/product ; /panel/erp/stocktaking ; /panel/erp/storage,named(callers),nein,Body nicht aus Dienst ableitbar (Parameter 2 von updateStorageProducstPosition)
+POST,/api/{id}/product-group/{id}/addProducts,,products,607,/panel/erp ; /panel/erp/category ; /panel/erp/product ; /panel/erp/storage,named(callers),nein,
+PUT,/api/{id}/product/{id}/set-preferred-shop-unit,,(Aufrufer) preferredShopUnit,592,/panel/erp/order ; /panel/erp/product,named(callers),nein,
+GET,/api/{p1}/product/{p2}/packagings,,,239,9 Routen (geteilter Dienst): /panel ; /panel/erp ; /panel/erp/category ; /panel/erp/order ...,positional,nein,"p1 folgt auf Segment ""api"" | p2 folgt auf Segment ""product"""
+GET,/app/client-navbar-items,,,main,/panel ; /panel/menucreator/:hash/embedded,none,nein,Pfad ohne /api-Praefix (baseUrl bzw. Literal): klassische serverseitige Route | Dienst-Code in main
+GET,/app/is-authenticated,,,main,15 Routen (geteilter Dienst): /panel ; /panel/catering ; /panel/erp ; /panel/erp/category ...,none,nein,Pfad ohne /api-Praefix (baseUrl bzw. Literal): klassische serverseitige Route | Dienst-Code in main
+GET,/app/lang,lang,,main,,none,nein,Pfad ohne /api-Praefix (baseUrl bzw. Literal): klassische serverseitige Route | Dienst-Code in main (von keinem Lazy-Modul importiert: global/Wurzelkomponente)
+GET,/app/switch-design-mode,designMode,,main,/panel ; /panel/menucreator/:hash/embedded,none,nein,Pfad ohne /api-Praefix (baseUrl bzw. Literal): klassische serverseitige Route | Dienst-Code in main
+GET,/assets/i18n/{bereich}/{lang}.json,v,,main,,named,nein,"statisches Asset (ngx-translate-Lader in main): Praefixe /assets/i18n/ plus dashboard, menu-creator, analytics, daily-menu, event-catering, production-plan, erp, sidebar, supplier, settings; Query v=<Hash aus Tabelle in main>"
+POST,/password/reset/save,"do,_username",,330,/panel/catering,none,nein,leerer Body {} | Pfad ohne /api-Praefix (baseUrl bzw. Literal): klassische serverseitige Route
+POST,/pos/lightspeed-g/auth/initiate,,costCenterId,742,/panel/settings,none,nein,Pfad ohne /api-Praefix (baseUrl bzw. Literal): klassische serverseitige Route
+POST,/pos/lightspeed-g/pending/{pendingId}/confirm,,businessId,742,/panel/settings,named(callers),nein,Pfad ohne /api-Praefix (baseUrl bzw. Literal): klassische serverseitige Route
+POST,/pos/lightspeed-k/auth/initiate,,costCenterId,742,/panel/settings,none,nein,Pfad ohne /api-Praefix (baseUrl bzw. Literal): klassische serverseitige Route
+GET,/pos/lightspeed-k/pending/{pendingId}/business-locations,,,742,/panel/settings,named(callers),nein,Pfad ohne /api-Praefix (baseUrl bzw. Literal): klassische serverseitige Route
+POST,/pos/lightspeed-k/pending/{pendingId}/confirm,,"businessId,businessLocationId",742,/panel/settings,named(callers),nein,Pfad ohne /api-Praefix (baseUrl bzw. Literal): klassische serverseitige Route
+GET,/pos/sellpick/stores,clientName,,742,/panel/settings,none,nein,Pfad ohne /api-Praefix (baseUrl bzw. Literal): klassische serverseitige Route
+POST,/pos/sides/get-stores,,"(Aufrufer) username,(Aufrufer) password",742,/panel/settings,none,nein,Pfad ohne /api-Praefix (baseUrl bzw. Literal): klassische serverseitige Route
+POST,/pos/{posName}/access/connect,,,742,/panel/settings,named,nein,Body nicht aus Dienst ableitbar (Parameter 1 von createPosConnection) | Pfad ohne /api-Praefix (baseUrl bzw. Literal): klassische serverseitige Route
+GET,/recipes/contributionMargins/{id},,,"167,313",/panel/erp/product ; /panel/erp/sale,named,nein,Pfad ohne /api-Praefix (baseUrl bzw. Literal): klassische serverseitige Route
+GET,/recipes/contributionMargins/{p1}/{restaurantId},,,330,/panel/catering,positional,nein,"Pfad ohne /api-Praefix (baseUrl bzw. Literal): klassische serverseitige Route | p1 folgt auf Segment ""contributionMargins"""
+GET,/recipes/findall/{searchTerm},limit,,330,/panel/catering,named,nein,Pfad ohne /api-Praefix (baseUrl bzw. Literal): klassische serverseitige Route
+GET,/recipes/ingredients/find/0/{searchTerm},"_,limit",,330,/panel/catering,named,nein,Pfad ohne /api-Praefix (baseUrl bzw. Literal): klassische serverseitige Route
+GET,/recipes/ppaPrice/{id}/unit/{unitId},,,"167,313",/panel/erp/product ; /panel/erp/sale,named(callers),nein,Pfad ohne /api-Praefix (baseUrl bzw. Literal): klassische serverseitige Route
+GET,/recipes/{p1}/{restaurantId}/cmcalc-graph,_,,330,/panel/catering,positional,nein,"Pfad ohne /api-Praefix (baseUrl bzw. Literal): klassische serverseitige Route | p1 folgt auf Segment ""recipes"""
+POST,/shop/{id}/cart/{id}/update,_confirmed,"(Aufrufer) quantity,(Aufrufer) packaging",592,/panel/erp/order ; /panel/erp/product,named(callers),nein,Pfad ohne /api-Praefix (baseUrl bzw. Literal): klassische serverseitige Route
+POST,/shop/{id}/cart/{id}/update/{id},,"(Aufrufer) quantity,(Aufrufer) packaging",592,/panel/erp/order ; /panel/erp/product,named(callers),nein,Pfad ohne /api-Praefix (baseUrl bzw. Literal): klassische serverseitige Route
+PUT,/shop/{p1}/cart/{p2}/update,,,735,/panel/erp/product,positional,nein,"Body nicht ableitbar (Parameter 3) | Pfad ohne /api-Praefix (baseUrl bzw. Literal): klassische serverseitige Route | p1 folgt auf Segment ""shop"" | p2 folgt auf Segment ""cart"""
+GET,/shops/private/cancel-import,,,488,/supplier,none,nein,"Pfad ohne /api-Praefix (baseUrl bzw. Literal): klassische serverseitige Route | GET mit Namen einer Zustandsaenderung (nach Namen vermutet, nicht belegt)"
+GET,/shops/private/{shopId}/edited_file/upload,,,488,/supplier,named(callers),nein,Pfad ohne /api-Praefix (baseUrl bzw. Literal): klassische serverseitige Route
+POST,/shops/private/{shopId}/edited_file/upload,,FormData:file,488,/supplier,named(callers),nein,Pfad ohne /api-Praefix (baseUrl bzw. Literal): klassische serverseitige Route
+POST,/shops/private/{shopId}/file/delete,,"withCredentials,reportProgress,observe",488,/supplier,named(callers),nein,Pfad ohne /api-Praefix (baseUrl bzw. Literal): klassische serverseitige Route
+POST,/shops/private/{shopId}/file/upload,,FormData:file,488,/supplier,named(callers),nein,Pfad ohne /api-Praefix (baseUrl bzw. Literal): klassische serverseitige Route
+POST,/shops/private/{shopId}/product/image/upload/{productId},,FormData:file,488,/supplier,named(callers),nein,Pfad ohne /api-Praefix (baseUrl bzw. Literal): klassische serverseitige Route
+GET,/shops/private/{shopId}/product/{productId}/image/remove,_confirmed,,488,/supplier,named(callers),nein,"Pfad nur unter Bedingung | Pfad ohne /api-Praefix (baseUrl bzw. Literal): klassische serverseitige Route | GET mit Namen einer Zustandsaenderung (nach Namen vermutet, nicht belegt)"
+GET,/shops/private/{shopId}/product/{productId}/image/remove/{p6},_confirmed,,488,/supplier,positional,nein,"Pfad nur unter Bedingung | Pfad ohne /api-Praefix (baseUrl bzw. Literal): klassische serverseitige Route | p6 folgt auf Segment ""remove"" | GET mit Namen einer Zustandsaenderung (nach Namen vermutet, nicht belegt)"
+GET,/shops/private/{shopId}/supplier/errors,,,488,/supplier,named(callers),nein,Pfad ohne /api-Praefix (baseUrl bzw. Literal): klassische serverseitige Route | Antwort als Datei (blob/arraybuffer)
+GET,/shops/supplier/{shopId}/product/template,products-download,,488,/supplier,named(callers),nein,Pfad ohne /api-Praefix (baseUrl bzw. Literal): klassische serverseitige Route | Antwort als Datei (blob/arraybuffer)
+GET,/shops/{shopId}/costcenters/{id}/search,q,,239,9 Routen (geteilter Dienst): /panel ; /panel/erp ; /panel/erp/category ; /panel/erp/order ...,named(callers),nein,Pfad ohne /api-Praefix (baseUrl bzw. Literal): klassische serverseitige Route
+POST,/signin_check,,"FormData:(dyn),FormData:_username,FormData:_password,FormData:_remember_me","283,330,488,main",15 Routen (geteilter Dienst): /panel ; /panel/catering ; /panel/erp ; /panel/erp/category ...,none,nein,Pfad ohne /api-Praefix (baseUrl bzw. Literal): klassische serverseitige Route | Body nicht ableitbar (Parameter 1) | Dienst-Code in main
+POST,/signout,,withCredentials,488,/supplier,none,nein,Pfad ohne /api-Praefix (baseUrl bzw. Literal): klassische serverseitige Route

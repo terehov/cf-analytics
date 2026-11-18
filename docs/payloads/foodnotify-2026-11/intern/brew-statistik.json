@@ -1,0 +1,62 @@
+{
+ "entry": "index-lKBZAT8Z.js",
+ "dateien": 340,
+ "registry_eintraege": 252,
+ "stellen_axios": 551,
+ "stellen_ref": 4,
+ "distinct_method_path": 475,
+ "methoden": {
+  "GET": 213,
+  "PUT": 87,
+  "?": 3,
+  "POST": 128,
+  "DELETE": 41,
+  "PATCH": 3
+ },
+ "konfidenz": {
+  "keine_parameter": 144,
+  "named": 156,
+  "inferred": 167,
+  "positional": 8
+ },
+ "body_vorhanden_nicht_get": 144,
+ "nicht_get": 259,
+ "routen": 105,
+ "altsystem_links": 57,
+ "hosts": 27,
+ "hosts_noise": 94,
+ "ohne_referenz": [
+  "costAnalysisIngredients",
+  "costAnalysisConcreteProducts",
+  "stockTransferGetStatus"
+ ],
+ "wrapper": [
+  [
+   "locations-tones-CIUmbmUn.js",
+   "l",
+   "wrap",
+   "GET"
+  ],
+  [
+   "locations-tones-CIUmbmUn.js",
+   "c",
+   "wrap",
+   "POST"
+  ],
+  [
+   "locations-tones-CIUmbmUn.js",
+   "r",
+   "wrap",
+   "POST"
+  ]
+ ],
+ "schichten": {
+  "ot": 340,
+  "get": 97,
+  "req": 92,
+  "wrap": 20,
+  "raw": 2
+ },
+ "dynamisch": 0,
+ "body_nicht_lesbar": 35
+}

@@ -1,0 +1,104 @@
+quelle,aufruf,status,meldung,klasse
+sitzung,/api/erp/catalog/commodity-groups,404,Dieser Wert sollte nicht leer sein.,Validierung
+sitzung,/api/erp/dashboard,500,The identifier id is missing for a query of ErpBundle\Database\Entity\Erp,500 Doctrine ohne ID
+sitzung,/api/erp/food-waste,404,Dieser Wert sollte nicht null sein.,Validierung
+sitzung,/api/erp/food-waste-alpha/recipes,422,"Dieser Wert sollte nicht null sein.
+Dieser Wert sollte nicht leer sein.",Validierung
+sitzung,/api/erp/food-waste-alpha/totals,404,Dieser Wert sollte nicht null sein.,Validierung
+sitzung,/api/erp/stock-transfer,404,Dieser Wert sollte nicht leer sein.,Validierung
+sitzung,/api/erp/stock-transfer/paginate?page=1&page_size=5,500,"An exception occurred while executing a query: SQLSTATE[22P02]: Invalid text representation: 7 ERROR:  invalid input syntax for type integer: ""paginate""
+CONTEXT:  unnamed portal parameter $1 = '...'",500 SQL-Fehler
+sitzung,/api/erp/stock-transfer/search?page=1&page_size=5,500,"An exception occurred while executing a query: SQLSTATE[22P02]: Invalid text representation: 7 ERROR:  invalid input syntax for type integer: ""search""
+CONTEXT:  unnamed portal parameter $1 = '...'",500 SQL-Fehler
+sitzung,/api/erp/stock-transfer-request,404,Dieser Wert sollte nicht leer sein.,Validierung
+sitzung,/api/erp/stocktakings,500,Typed property App\Modules\Erp\Stocktaking\Presentation\Controller\Stocktaking\StocktakingListQuery::$erpIds must not be accessed before initialization,500 Pflichtparameter fehlt (DTO)
+sitzung,/api/eventCatering/eventStaffRole,500,,500 ohne Text
+sitzung,/api/eventCatering/roleOptionValue,500,,500 ohne Text
+sitzung,/api/pub/version,405,"No route found for ""GET https://my.foodnotify.com/api/pub/version"": Method Not Allowed (Allow: OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/recipe/ingredient-search/candidates,404,"Dieser Wert sollte nicht leer sein.
+Diese Zeichenkette ist zu kurz. Sie sollte mindestens 2 Zeichen haben.
+Diese Sammlung sollte 1 oder mehr Elemente beinhalten.",Validierung
+sitzung,/api/shop/multi-cost-center-ordering,403,Access Denied.,403
+sitzung,/api/supplier/onboardings/reminder-default,403,Access Denied. The user doesn't have ROLE_ADMIN.,403 Rolle
+sitzung,/api/v2/analytics/management/groups,403,Access Denied. The user doesn't have ROLE_ADMIN.,403 Rolle
+sitzung,/api/v2/billing/management/providers,403,Access Denied. The user doesn't have ROLE_ADMIN.,403 Rolle
+sitzung,/api/v2/erp/catalog-sync/management/syncs,403,Access Denied. The user doesn't have ROLE_ADMIN.,403 Rolle
+sitzung,/api/analytics/budget/10616,422,Dieser Wert sollte nicht null sein.,Validierung
+sitzung,/api/core/business/10616/locations/vat-defaults,404,Dieser Wert sollte nicht leer sein.,Validierung
+sitzung,/api/7984/category/search?page=1&page_size=5,500,"ErpBundle\Controller\Api\CategoryController::showAction(): Argument #3 ($id) must be of type int, string given, called in /var/www/vendor/symfony/http-kernel/HttpKernel.php on line 183",500 PHP-Typfehler
+sitzung,/api/7984/category-icon,405,"No route found for ""GET https://my.foodnotify.com/api/7984/category-icon"": Method Not Allowed (Allow: OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/category-icon/paginate?page=1&page_size=5,500,"You have requested a non-existent service ""erp.category.icon.normalizer"". Did you mean one of these: ""erp.category.icon.group.normalizer"", ""erp.category.icon.service"", ""erp.category.normalizer""?",500 Container
+sitzung,/api/7984/category-icon/search?page=1&page_size=5,405,"No route found for ""GET https://my.foodnotify.com/api/7984/category-icon/search"": Method Not Allowed (Allow: OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/category-icon-group,405,"No route found for ""GET https://my.foodnotify.com/api/7984/category-icon-group"": Method Not Allowed (Allow: OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/category-icon-group/search?page=1&page_size=5,405,"No route found for ""GET https://my.foodnotify.com/api/7984/category-icon-group/search"": Method Not Allowed (Allow: OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/erpSettings,405,"No route found for ""GET https://my.foodnotify.com/api/7984/erpSettings"": Method Not Allowed (Allow: OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/erpSettings/paginate?page=1&page_size=5,405,"No route found for ""GET https://my.foodnotify.com/api/7984/erpSettings/paginate"": Method Not Allowed (Allow: OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/erpSettings/search?page=1&page_size=5,405,"No route found for ""GET https://my.foodnotify.com/api/7984/erpSettings/search"": Method Not Allowed (Allow: OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/preproductionConcreteProduct,405,"No route found for ""GET https://my.foodnotify.com/api/7984/preproductionConcreteProduct"": Method Not Allowed (Allow: OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/preproductionConcreteProduct/paginate?page=1&page_size=5,500,"ErpBundle\Controller\Api\PreproductionConcreteProductController::showAction(): Argument #3 ($id) must be of type int, string given, called in /var/www/vendor/symfony/http-kernel/HttpKernel.php on line",500 PHP-Typfehler
+sitzung,/api/7984/preproductionConcreteProduct/search?page=1&page_size=5,500,"ErpBundle\Controller\Api\PreproductionConcreteProductController::showAction(): Argument #3 ($id) must be of type int, string given, called in /var/www/vendor/symfony/http-kernel/HttpKernel.php on line",500 PHP-Typfehler
+sitzung,/api/7984/product,500,"BaseBundle\Dto\LegacyPaginatedData::fromQuery(): Argument #3 ($pageSize) must be of type int, null given, called in /var/www/src/ErpBundle/Service/EntityService/ConcreteProductEntityService.php on lin",500 PHP-Typfehler
+sitzung,/api/7984/product/paginate?page=1&page_size=5,405,"No route found for ""GET https://my.foodnotify.com/api/7984/product/paginate"": Method Not Allowed (Allow: PUT, OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/product/search?page=1&page_size=5,500,"ErpBundle\Service\EntityService\CategoryService::getSearch(): Argument #2 ($searchTerm) must be of type string, null given, called in /var/www/src/ErpBundle/Controller/Api/ProductController.php on lin",500 PHP-Typfehler
+sitzung,/api/7984/product-group/paginate?page=1&page_size=5,405,"No route found for ""GET https://my.foodnotify.com/api/7984/product-group/paginate"": Method Not Allowed (Allow: PUT, DELETE, OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/product-unit/paginate?page=1&page_size=5,405,"No route found for ""GET https://my.foodnotify.com/api/7984/product-unit/paginate"": Method Not Allowed (Allow: OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/product-unit/search?page=1&page_size=5,405,"No route found for ""GET https://my.foodnotify.com/api/7984/product-unit/search"": Method Not Allowed (Allow: OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/products/paginate?page=1&page_size=5,405,"No route found for ""GET https://my.foodnotify.com/api/7984/products/paginate"": Method Not Allowed (Allow: OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/products/search?page=1&page_size=5,405,"No route found for ""GET https://my.foodnotify.com/api/7984/products/search"": Method Not Allowed (Allow: OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/recipe,405,"No route found for ""GET https://my.foodnotify.com/api/7984/recipe"": Method Not Allowed (Allow: OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/recipe/search?page=1&page_size=5,405,"No route found for ""GET https://my.foodnotify.com/api/7984/recipe/search"": Method Not Allowed (Allow: OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/recipe-sale,405,"No route found for ""GET https://my.foodnotify.com/api/7984/recipe-sale"": Method Not Allowed (Allow: OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/recipe-sale/paginate?page=1&page_size=5,405,"No route found for ""GET https://my.foodnotify.com/api/7984/recipe-sale/paginate"": Method Not Allowed (Allow: PUT, OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/recipe-sale/search?page=1&page_size=5,405,"No route found for ""GET https://my.foodnotify.com/api/7984/recipe-sale/search"": Method Not Allowed (Allow: PUT, OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/resets/paginate?page=1&page_size=5,500,"An exception occurred while executing a query: SQLSTATE[22P02]: Invalid text representation: 7 ERROR:  invalid input syntax for type integer: ""paginate""
+CONTEXT:  unnamed portal parameter $1 = '...'",500 SQL-Fehler
+sitzung,/api/7984/resets/search?page=1&page_size=5,500,"An exception occurred while executing a query: SQLSTATE[22P02]: Invalid text representation: 7 ERROR:  invalid input syntax for type integer: ""search""
+CONTEXT:  unnamed portal parameter $1 = '...'",500 SQL-Fehler
+sitzung,/api/7984/shop,405,"No route found for ""GET https://my.foodnotify.com/api/7984/shop"": Method Not Allowed (Allow: OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/shop/paginate?page=1&page_size=5,405,"No route found for ""GET https://my.foodnotify.com/api/7984/shop/paginate"": Method Not Allowed (Allow: OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/shop/search?page=1&page_size=5,405,"No route found for ""GET https://my.foodnotify.com/api/7984/shop/search"": Method Not Allowed (Allow: OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/shop-order,405,"No route found for ""GET https://my.foodnotify.com/api/7984/shop-order"": Method Not Allowed (Allow: OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/shop-order/search?page=1&page_size=5,405,"No route found for ""GET https://my.foodnotify.com/api/7984/shop-order/search"": Method Not Allowed (Allow: DELETE, OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/shop-order-mapped-product,405,"No route found for ""GET https://my.foodnotify.com/api/7984/shop-order-mapped-product"": Method Not Allowed (Allow: OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/shop-order-mapped-product/paginate?page=1&page_size=5,405,"No route found for ""GET https://my.foodnotify.com/api/7984/shop-order-mapped-product/paginate"": Method Not Allowed (Allow: OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/shop-order-mapped-product/search?page=1&page_size=5,405,"No route found for ""GET https://my.foodnotify.com/api/7984/shop-order-mapped-product/search"": Method Not Allowed (Allow: OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/shop-order-order-tag-type/paginate?page=1&page_size=5,405,"No route found for ""GET https://my.foodnotify.com/api/7984/shop-order-order-tag-type/paginate"": Method Not Allowed (Allow: OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/shop-order-order-tag-type/search?page=1&page_size=5,405,"No route found for ""GET https://my.foodnotify.com/api/7984/shop-order-order-tag-type/search"": Method Not Allowed (Allow: OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/statistics,405,"No route found for ""GET https://my.foodnotify.com/api/7984/statistics"": Method Not Allowed (Allow: OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/statistics/paginate?page=1&page_size=5,405,"No route found for ""GET https://my.foodnotify.com/api/7984/statistics/paginate"": Method Not Allowed (Allow: OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/statistics/search?page=1&page_size=5,405,"No route found for ""GET https://my.foodnotify.com/api/7984/statistics/search"": Method Not Allowed (Allow: OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/stock,405,"No route found for ""GET https://my.foodnotify.com/api/7984/stock"": Method Not Allowed (Allow: OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/stock/paginate?page=1&page_size=5,405,"No route found for ""GET https://my.foodnotify.com/api/7984/stock/paginate"": Method Not Allowed (Allow: OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/stock/search?page=1&page_size=5,405,"No route found for ""GET https://my.foodnotify.com/api/7984/stock/search"": Method Not Allowed (Allow: OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/stocktaking/paginate?page=1&page_size=5,500,"ErpBundle\Controller\Api\StocktakingController::show(): Argument #3 ($id) must be of type int, string given, called in /var/www/vendor/symfony/http-kernel/HttpKernel.php on line 183",500 PHP-Typfehler
+sitzung,/api/7984/stocktaking/search?page=1&page_size=5,500,"ErpBundle\Controller\Api\StocktakingController::show(): Argument #3 ($id) must be of type int, string given, called in /var/www/vendor/symfony/http-kernel/HttpKernel.php on line 183",500 PHP-Typfehler
+sitzung,/api/7984/storage/paginate?page=1&page_size=5,405,"No route found for ""GET https://my.foodnotify.com/api/7984/storage/paginate"": Method Not Allowed (Allow: PUT, DELETE, OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/storage/search?page=1&page_size=5,405,"No route found for ""GET https://my.foodnotify.com/api/7984/storage/search"": Method Not Allowed (Allow: PUT, DELETE, OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/dashboard,500,"BaseBundle\Dto\LegacyPaginatedData::fromQuery(): Argument #3 ($pageSize) must be of type int, null given, called in /var/www/src/ErpBundle/Service/EntityService/StockEntityService.php on line 292",500 PHP-Typfehler
+sitzung,/api/7984/sales/search?page=1&page_size=5,500,,500 ohne Text
+sitzung,/api/7984/product/categories,500,"BaseBundle\Dto\LegacyPaginatedData::fromQuery(): Argument #2 ($page) must be of type int, null given, called in /var/www/src/ErpBundle/Service/EntityService/ConcreteProductEntityService.php on line 10",500 PHP-Typfehler
+sitzung,/api/7984/product/categories/additional-sorting,500,"BaseBundle\Dto\LegacyPaginatedData::fromQuery(): Argument #2 ($page) must be of type int, null given, called in /var/www/src/ErpBundle/Service/EntityService/ConcreteProductEntityService.php on line 10",500 PHP-Typfehler
+sitzung,/api/7984/product/search-products-without-specified-products,405,"No route found for ""GET https://my.foodnotify.com/api/7984/product/search-products-without-specified-products"": Method Not Allowed (Allow: PUT, OPTIONS)",405 Route nur fuer andere Methode
+sitzung,/api/7984/product/storages,500,"BaseBundle\Dto\LegacyPaginatedData::fromQuery(): Argument #2 ($page) must be of type int, null given, called in /var/www/src/ErpBundle/Service/EntityService/ConcreteProductEntityService.php on line 10",500 PHP-Typfehler
+sitzung,/api/7984/product/suppliers,405,"No route found for ""GET https://my.foodnotify.com/api/7984/product/suppliers"": Method Not Allowed (Allow: PUT, OPTIONS)",405 Route nur fuer andere Methode
+token,/api/2.0/pos/vendors/fn-recipe/2052/product-groups,500,Account is not of type FnRecipe,sonstig
+token,/api/erp/commodity-groups,403,Access Denied.,403
+token,/api/erp/dashboard,500,The identifier id is missing for a query of ErpBundle\Database\Entity\Erp,500 Doctrine ohne ID
+token,/api/erp/stock-transfer/paginate,500,"An exception occurred while executing a query: SQLSTATE[22P02]: Invalid text representation: 7 ERROR:  invalid input syntax for type integer: ""paginate""
+CONTEXT",500 SQL-Fehler
+token,/api/erp/stock-transfer/search,500,"An exception occurred while executing a query: SQLSTATE[22P02]: Invalid text representation: 7 ERROR:  invalid input syntax for type integer: ""search""
+CONTEXT: ",500 SQL-Fehler
+token,/api/recipe/ingredient-search/candidates,404,"Dieser Wert sollte nicht leer sein.
+Diese Zeichenkette ist zu kurz. Sie sollte mindestens 2 Zeichen haben.
+Diese Sammlung sollte 1 oder mehr Elemente beinhalten",Validierung
+token,/api/supplier/onboardings/reminder-default,403,Access Denied. The user doesn't have ROLE_ADMIN.,403 Rolle
+sitzung-runde2,/api/recipes/dashboard-mix/7846?day=,500,Call to a member function format() on bool,500 PHP-Fehler
+sitzung-runde2,/api/recipes/dashboard-mix/7846/items?day=,500,Call to a member function format() on bool,500 PHP-Fehler
+sitzung-runde2,/api/recipe/ingredients?page=1&source=,422,Dieser Wert sollte vom Typ int|string sein.,Validierung
+sitzung-runde2,/api/recipe/ingredients/28881736,405,"No route found for ""GET https://my.foodnotify.com/api/recipe/ingredients/28881736"": Method Not Allowed (Allow: OPTIONS)",405 Route nur fuer andere Methode
+sitzung-runde2,/api/7984/product/537540,405,"No route found for ""GET https://my.foodnotify.com/api/7984/product/537540"": Method Not Allowed (Allow: PUT, OPTIONS)",405 Route nur fuer andere Methode
+sitzung-runde2,/api/7984/product-group/186723,405,"No route found for ""GET https://my.foodnotify.com/api/7984/product-group/186723"": Method Not Allowed (Allow: PUT, DELETE, OPTIONS)",405 Route nur fuer andere Methode
+sitzung-runde2,/api/7984/shop/567,405,"No route found for ""GET https://my.foodnotify.com/api/7984/shop/567"": Method Not Allowed (Allow: OPTIONS)",405 Route nur fuer andere Methode
+sitzung-runde2,/api/erp/commodity-groups/62248,405,"No route found for ""GET https://my.foodnotify.com/api/erp/commodity-groups/62248"": Method Not Allowed (Allow: OPTIONS, PUT, DELETE)",405 Route nur fuer andere Methode
+sitzung-runde2,/api/analytics/reports/cost-analysis/ingredients/concrete-products,405,"No route found for ""GET https://my.foodnotify.com/api/analytics/reports/cost-analysis/ingredients/concrete-products"": Method Not Allowed (Allow: OPTIONS)",405 Route nur fuer andere Methode
+sitzung-runde2,/api/menu_creator/menu_card/5574,405,"No route found for ""GET https://my.foodnotify.com/api/menu_creator/menu_card/5574"": Method Not Allowed (Allow: OPTIONS)",405 Route nur fuer andere Methode

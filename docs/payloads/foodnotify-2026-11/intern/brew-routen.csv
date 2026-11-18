@@ -1,0 +1,163 @@
+route_path,chunk,note,route_id
+/account/subscription,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/brew/,route-CJcc_hgD.js,TanStack-Route-ID: /_user | Eltern: (Wurzel) | Layout-Route mit Unterrouten | vorgeladene Chunks: 51,/_user
+/brew/,route-CRshe3f-.js,TanStack-Route-ID: /_guest | Eltern: (Wurzel) | Layout-Route mit Unterrouten | vorgeladene Chunks: 13,/_guest
+/brew/,index-C3ZkMYQC.js,TanStack-Route-ID: /_user/ | Eltern: /_user | Layout-Route mit Unterrouten | vorgeladene Chunks: 0,/_user/
+/brew/admin,route-l_G0T8q_.js,TanStack-Route-ID: /_user/admin | Eltern: /_user | Layout-Route mit Unterrouten | vorgeladene Chunks: 8,/_user/admin
+/brew/admin,index-Dty5jBR0.js,TanStack-Route-ID: /_user/admin/ | Eltern: /_user/admin | vorgeladene Chunks: 0,/_user/admin/
+/brew/admin/analytics,index-ChxQif4P.js,TanStack-Route-ID: /_user/admin/analytics/ | Eltern: /_user/admin | vorgeladene Chunks: 13,/_user/admin/analytics/
+/brew/admin/analytics/{userId},_userId-Cucw2aT0.js,TanStack-Route-ID: /_user/admin/analytics/$userId | Eltern: /_user/admin | vorgeladene Chunks: 5,/_user/admin/analytics/$userId
+/brew/admin/billing-accounts/{userId},_userId-CqmU6LV4.js,TanStack-Route-ID: /_user/admin/billing-accounts/$userId | Eltern: /_user/admin | Suchparameter: return | vorgeladene Chunks: 11,/_user/admin/billing-accounts/$userId
+/brew/admin/customer-success,index-Dgy9gg6-.js,TanStack-Route-ID: /_user/admin/customer-success/ | Eltern: /_user/admin | vorgeladene Chunks: 20,/_user/admin/customer-success/
+/brew/admin/erp-catalog-sync,index-C-BcOx_r.js,TanStack-Route-ID: /_user/admin/erp-catalog-sync/ | Eltern: /_user/admin | vorgeladene Chunks: 28,/_user/admin/erp-catalog-sync/
+/brew/admin/supplier-onboarding,index-B0r6VY5L.js,TanStack-Route-ID: /_user/admin/supplier-onboarding/ | Eltern: /_user/admin | vorgeladene Chunks: 35,/_user/admin/supplier-onboarding/
+/brew/admin/supplier-onboarding/{submissionId},index-BFPZYN7h.js,TanStack-Route-ID: /_user/admin/supplier-onboarding/$submissionId/ | Eltern: /_user/admin | vorgeladene Chunks: 13,/_user/admin/supplier-onboarding/$submissionId/
+/brew/admin/supplier-registration,(kein eigener Chunk),TanStack-Route-ID: /_user/admin/supplier-registration/ | Eltern: /_user/admin | beforeLoad (Weiterleitung/Pruefung) | vorgeladene Chunks: 0,/_user/admin/supplier-registration/
+/brew/admin/supplier-registration/{submissionId},(kein eigener Chunk),TanStack-Route-ID: /_user/admin/supplier-registration/$submissionId/ | Eltern: /_user/admin | beforeLoad (Weiterleitung/Pruefung) | vorgeladene Chunks: 0,/_user/admin/supplier-registration/$submissionId/
+/brew/analytics,route-BjKIfbYn.js,TanStack-Route-ID: /_user/analytics | Eltern: /_user | Layout-Route mit Unterrouten | vorgeladene Chunks: 7,/_user/analytics
+/brew/analytics,index-Bnp-AALU.js,TanStack-Route-ID: /_user/analytics/ | Eltern: /_user/analytics | vorgeladene Chunks: 7,/_user/analytics/
+/brew/analytics-custom,route-BqcyMag-.js,TanStack-Route-ID: /_user/analytics-custom | Eltern: /_user | Layout-Route mit Unterrouten | vorgeladene Chunks: 3,/_user/analytics-custom
+/brew/analytics-custom/cost-analysis,index-BOmdHEM0.js,TanStack-Route-ID: /_user/analytics-custom/cost-analysis/ | Eltern: /_user/analytics-custom | vorgeladene Chunks: 19,/_user/analytics-custom/cost-analysis/
+/brew/analytics/{id},_id-DgAxC9ZA.js,TanStack-Route-ID: /_user/analytics/$id | Eltern: /_user/analytics | vorgeladene Chunks: 6,/_user/analytics/$id
+/brew/apps/recipe-viewer,route-B-cZ1R7X.js,TanStack-Route-ID: /_user/apps/recipe-viewer | Eltern: /_user | Layout-Route mit Unterrouten | vorgeladene Chunks: 4,/_user/apps/recipe-viewer
+/brew/apps/recipe-viewer,index-BI4o5ePt.js,TanStack-Route-ID: /_user/apps/recipe-viewer/ | Eltern: /_user/apps/recipe-viewer | vorgeladene Chunks: 21,/_user/apps/recipe-viewer/
+/brew/apps/recipe-viewer/cards,cards-rLbbD1Mv.js,TanStack-Route-ID: /_user/apps/recipe-viewer/cards | Eltern: /_user/apps/recipe-viewer | vorgeladene Chunks: 15,/_user/apps/recipe-viewer/cards
+/brew/apps/recipe-viewer/config,config-D5YdhZPB.js,TanStack-Route-ID: /_user/apps/recipe-viewer/config | Eltern: /_user/apps/recipe-viewer | vorgeladene Chunks: 8,/_user/apps/recipe-viewer/config
+/brew/apps/recipe-viewer/preview,preview-tFfCc7gB.js,"TanStack-Route-ID: /_user/apps/recipe-viewer/preview | Eltern: /_user/apps/recipe-viewer | Suchparameter: comments,ids,orientation,unitDisplay | vorgeladene Chunks: 7",/_user/apps/recipe-viewer/preview
+/brew/apps/recipe-viewer/{id},_id-CUB6L05A.js,TanStack-Route-ID: /_user/apps/recipe-viewer/$id | Eltern: /_user/apps/recipe-viewer | vorgeladene Chunks: 16,/_user/apps/recipe-viewer/$id
+/brew/completion-dashboard,route-Dzc4YzQl.js,TanStack-Route-ID: /_user/completion-dashboard | Eltern: /_user | Layout-Route mit Unterrouten | vorgeladene Chunks: 0,/_user/completion-dashboard
+/brew/completion-dashboard,index-DvkLI9zw.js,TanStack-Route-ID: /_user/completion-dashboard/ | Eltern: /_user/completion-dashboard | Suchparameter: id | vorgeladene Chunks: 21,/_user/completion-dashboard/
+/brew/dashboard,index-C08Jckgx.js,TanStack-Route-ID: /_user/(reskin)/dashboard/ | Eltern: /_user | vorgeladene Chunks: 28,/_user/(reskin)/dashboard/
+/brew/email-change/confirm,confirm-C5QnbFKf.js,TanStack-Route-ID: /email-change/confirm | Eltern: (Wurzel) | vorgeladene Chunks: 7,/email-change/confirm
+/brew/erp,route-CFy5mPM8.js,TanStack-Route-ID: /_user/erp | Eltern: /_user | Layout-Route mit Unterrouten | vorgeladene Chunks: 5,/_user/erp
+/brew/erp,index--0S5arKK.js,TanStack-Route-ID: /_user/erp/ | Eltern: /_user/erp | vorgeladene Chunks: 4,/_user/erp/
+/brew/erp/{erpId},route-BckXgtmy.js,TanStack-Route-ID: /_user/erp/$erpId | Eltern: /_user/erp | Layout-Route mit Unterrouten | vorgeladene Chunks: 10,/_user/erp/$erpId
+/brew/erp/{erpId}/category,index-CfRuKS4c.js,TanStack-Route-ID: /_user/erp/$erpId/(reskin)/category/ | Eltern: /_user/erp/$erpId | vorgeladene Chunks: 32,/_user/erp/$erpId/(reskin)/category/
+/brew/erp/{erpId}/category/edit,index-D-Cg0JNx.js,TanStack-Route-ID: /_user/erp/$erpId/(reskin)/category/edit/ | Eltern: /_user/erp/$erpId | vorgeladene Chunks: 11,/_user/erp/$erpId/(reskin)/category/edit/
+/brew/erp/{erpId}/category/product-group/{id},index-C88a1EdB.js,TanStack-Route-ID: /_user/erp/$erpId/(reskin)/category/product-group/$id/ | Eltern: /_user/erp/$erpId | vorgeladene Chunks: 23,/_user/erp/$erpId/(reskin)/category/product-group/$id/
+/brew/erp/{erpId}/category/{id},index-DJij8kKi.js,TanStack-Route-ID: /_user/erp/$erpId/(reskin)/category/$id/ | Eltern: /_user/erp/$erpId | vorgeladene Chunks: 37,/_user/erp/$erpId/(reskin)/category/$id/
+/brew/erp/{erpId}/dashboard,index-VDd8otri.js,TanStack-Route-ID: /_user/erp/$erpId/dashboard/ | Eltern: /_user/erp/$erpId | vorgeladene Chunks: 23,/_user/erp/$erpId/dashboard/
+/brew/erp/{erpId}/food-waste,index-a5U6PL62.js,TanStack-Route-ID: /_user/erp/$erpId/food-waste/ | Eltern: /_user/erp/$erpId | vorgeladene Chunks: 40,/_user/erp/$erpId/food-waste/
+/brew/erp/{erpId}/global/commodity-groups,index-DvJClJqO.js,TanStack-Route-ID: /_user/erp/$erpId/global/commodity-groups/ | Eltern: /_user/erp/$erpId | vorgeladene Chunks: 21,/_user/erp/$erpId/global/commodity-groups/
+/brew/erp/{erpId}/global/product-groups,index-EdH1AT4g.js,TanStack-Route-ID: /_user/erp/$erpId/global/product-groups/ | Eltern: /_user/erp/$erpId | vorgeladene Chunks: 35,/_user/erp/$erpId/global/product-groups/
+/brew/erp/{erpId}/global/storages,index-d3hjIK7a.js,TanStack-Route-ID: /_user/erp/$erpId/(reskin)/global/storages/ | Eltern: /_user/erp/$erpId | vorgeladene Chunks: 15,/_user/erp/$erpId/(reskin)/global/storages/
+/brew/erp/{erpId}/order,index-CEYY4QIU.js,TanStack-Route-ID: /_user/erp/$erpId/(reskin)/order/ | Eltern: /_user/erp/$erpId | vorgeladene Chunks: 38,/_user/erp/$erpId/(reskin)/order/
+/brew/erp/{erpId}/order/accept/{id},_id-B0bIsom5.js,TanStack-Route-ID: /_user/erp/$erpId/(reskin)/order/accept/$id | Eltern: /_user/erp/$erpId | vorgeladene Chunks: 25,/_user/erp/$erpId/(reskin)/order/accept/$id
+/brew/erp/{erpId}/order/accepted/{id},_id-DaZJCK5n.js,TanStack-Route-ID: /_user/erp/$erpId/(reskin)/order/accepted/$id | Eltern: /_user/erp/$erpId | vorgeladene Chunks: 18,/_user/erp/$erpId/(reskin)/order/accepted/$id
+/brew/erp/{erpId}/product,index-C0h-FOIS.js,TanStack-Route-ID: /_user/erp/$erpId/(reskin)/product/ | Eltern: /_user/erp/$erpId | vorgeladene Chunks: 45,/_user/erp/$erpId/(reskin)/product/
+/brew/erp/{erpId}/product-groups,index-BtoJ_O32.js,TanStack-Route-ID: /_user/erp/$erpId/(reskin)/product-groups/ | Eltern: /_user/erp/$erpId | vorgeladene Chunks: 32,/_user/erp/$erpId/(reskin)/product-groups/
+/brew/erp/{erpId}/product/preproductionProduct/{id},_id-Dgqaiz96.js,TanStack-Route-ID: /_user/erp/$erpId/(reskin)/product/preproductionProduct/$id | Eltern: /_user/erp/$erpId | vorgeladene Chunks: 12,/_user/erp/$erpId/(reskin)/product/preproductionProduct/$id
+/brew/erp/{erpId}/product/search,search-icYqB6KQ.js,TanStack-Route-ID: /_user/erp/$erpId/(reskin)/product/search | Eltern: /_user/erp/$erpId | vorgeladene Chunks: 32,/_user/erp/$erpId/(reskin)/product/search
+/brew/erp/{erpId}/sale,index-BXVUjXtP.js,TanStack-Route-ID: /_user/erp/$erpId/(reskin)/sale/ | Eltern: /_user/erp/$erpId | vorgeladene Chunks: 30,/_user/erp/$erpId/(reskin)/sale/
+/brew/erp/{erpId}/sale/{id},_id-Bk5W45jN.js,TanStack-Route-ID: /_user/erp/$erpId/(reskin)/sale/$id | Eltern: /_user/erp/$erpId | vorgeladene Chunks: 16,/_user/erp/$erpId/(reskin)/sale/$id
+/brew/erp/{erpId}/stocktaking,index-B2aSiXhF.js,TanStack-Route-ID: /_user/erp/$erpId/(reskin)/stocktaking/ | Eltern: /_user/erp/$erpId | vorgeladene Chunks: 9,/_user/erp/$erpId/(reskin)/stocktaking/
+/brew/erp/{erpId}/stocktransfer,index-Dv3i6Ksh.js,TanStack-Route-ID: /_user/erp/$erpId/stocktransfer/ | Eltern: /_user/erp/$erpId | vorgeladene Chunks: 23,/_user/erp/$erpId/stocktransfer/
+/brew/erp/{erpId}/stocktransfer-request,index-M65VPXqO.js,TanStack-Route-ID: /_user/erp/$erpId/stocktransfer-request/ | Eltern: /_user/erp/$erpId | vorgeladene Chunks: 23,/_user/erp/$erpId/stocktransfer-request/
+/brew/erp/{erpId}/stocktransfer-request/{requestId},index-DknRln8I.js,TanStack-Route-ID: /_user/erp/$erpId/stocktransfer-request/$requestId/ | Eltern: /_user/erp/$erpId | vorgeladene Chunks: 34,/_user/erp/$erpId/stocktransfer-request/$requestId/
+/brew/erp/{erpId}/stocktransfer/{stockTransferId},index-DE2COd3m.js,TanStack-Route-ID: /_user/erp/$erpId/stocktransfer/$stockTransferId/ | Eltern: /_user/erp/$erpId | Suchparameter: fromRequest | vorgeladene Chunks: 38,/_user/erp/$erpId/stocktransfer/$stockTransferId/
+/brew/erp/{erpId}/storage,index-D8OOQf2K.js,TanStack-Route-ID: /_user/erp/$erpId/(reskin)/storage/ | Eltern: /_user/erp/$erpId | vorgeladene Chunks: 10,/_user/erp/$erpId/(reskin)/storage/
+/brew/erp/{erpId}/storage/edit,index-COKOyWeq.js,TanStack-Route-ID: /_user/erp/$erpId/(reskin)/storage/edit/ | Eltern: /_user/erp/$erpId | vorgeladene Chunks: 8,/_user/erp/$erpId/(reskin)/storage/edit/
+/brew/erp/{erpId}/storage/edit-product-order/{id},index-BtQtnLsR.js,TanStack-Route-ID: /_user/erp/$erpId/(reskin)/storage/edit-product-order/$id/ | Eltern: /_user/erp/$erpId | vorgeladene Chunks: 9,/_user/erp/$erpId/(reskin)/storage/edit-product-order/$id/
+/brew/erp/{erpId}/storage/{id},index-D4y6XOms.js,TanStack-Route-ID: /_user/erp/$erpId/(reskin)/storage/$id/ | Eltern: /_user/erp/$erpId | vorgeladene Chunks: 30,/_user/erp/$erpId/(reskin)/storage/$id/
+/brew/erp/{erpId}/test,test-GfV8UCq9.js,TanStack-Route-ID: /_user/erp/$erpId/test | Eltern: /_user/erp/$erpId | vorgeladene Chunks: 3,/_user/erp/$erpId/test
+/brew/forgot-password,index-D36wIzdN.js,TanStack-Route-ID: /_guest/forgot-password/ | Eltern: /_guest | vorgeladene Chunks: 4,/_guest/forgot-password/
+/brew/forgot-password/success,success-Cg2Bri7F.js,TanStack-Route-ID: /_guest/forgot-password/success | Eltern: /_guest | vorgeladene Chunks: 3,/_guest/forgot-password/success
+/brew/login,login-CnPqt-Ro.js,TanStack-Route-ID: /_guest/login | Eltern: /_guest | vorgeladene Chunks: 6,/_guest/login
+/brew/oauth/authorize,index-nrT8yg1O.js,"TanStack-Route-ID: /_user/oauth/authorize/ | Eltern: /_user | Suchparameter: client_id,redirect_uri,response_type,scope,state | vorgeladene Chunks: 5",/_user/oauth/authorize/
+/brew/recipes,route-CA9Xo5Cg.js,TanStack-Route-ID: /_user/recipes | Eltern: /_user | Layout-Route mit Unterrouten | vorgeladene Chunks: 3,/_user/recipes
+/brew/recipes/contribution-margin,route-Y3MgZ-Li.js,TanStack-Route-ID: /_user/recipes/contribution-margin | Eltern: /_user/recipes | Layout-Route mit Unterrouten | vorgeladene Chunks: 3,/_user/recipes/contribution-margin
+/brew/recipes/contribution-margin,index-34XIdDpQ.js,TanStack-Route-ID: /_user/recipes/contribution-margin/ | Eltern: /_user/recipes/contribution-margin | vorgeladene Chunks: 29,/_user/recipes/contribution-margin/
+/brew/recipes/contribution-margin/settings,settings-DOBu_H5p.js,TanStack-Route-ID: /_user/recipes/contribution-margin/settings | Eltern: /_user/recipes/contribution-margin | vorgeladene Chunks: 20,/_user/recipes/contribution-margin/settings
+/brew/recipes/contribution-margin/{recipeId},_recipeId-DvUQSpKI.js,TanStack-Route-ID: /_user/recipes/contribution-margin/$recipeId | Eltern: /_user/recipes/contribution-margin | vorgeladene Chunks: 24,/_user/recipes/contribution-margin/$recipeId
+/brew/recipes/dashboard-mix,index-CCCkeZDn.js,TanStack-Route-ID: /_user/recipes/dashboard-mix/ | Eltern: /_user/recipes | Suchparameter: R$ | vorgeladene Chunks: 10,/_user/recipes/dashboard-mix/
+/brew/recipes/dashboard-mix/recipes,recipes-CPNNtE0h.js,TanStack-Route-ID: /_user/recipes/dashboard-mix/recipes | Eltern: /_user/recipes | Suchparameter: R$ | vorgeladene Chunks: 12,/_user/recipes/dashboard-mix/recipes
+/brew/recipes/groups,index-hdfvafGs.js,TanStack-Route-ID: /_user/recipes/groups/ | Eltern: /_user/recipes | vorgeladene Chunks: 16,/_user/recipes/groups/
+/brew/recipes/ingredients,index-Dmr85kZK.js,TanStack-Route-ID: /_user/recipes/ingredients/ | Eltern: /_user/recipes | vorgeladene Chunks: 41,/_user/recipes/ingredients/
+/brew/recipes/ingredients/{ingredientId}/replace,index-CVHhJXWm.js,"TanStack-Route-ID: /_user/recipes/ingredients/$ingredientId/replace/ | Eltern: /_user/recipes | Suchparameter: kind,replacementId,replacementKind,replacementName | vorgeladene Chunks: 20",/_user/recipes/ingredients/$ingredientId/replace/
+/brew/register,register-BlJBxck8.js,TanStack-Route-ID: /_guest/register | Eltern: /_guest | vorgeladene Chunks: 0,/_guest/register
+/brew/settings,route-5oX2t42F.js,TanStack-Route-ID: /_user/settings | Eltern: /_user | Layout-Route mit Unterrouten | vorgeladene Chunks: 0,/_user/settings
+/brew/settings/business-information,index-DGv2SkBR.js,"TanStack-Route-ID: /_user/settings/business-information/ | Eltern: /_user/settings | Suchparameter: language,location,page,q,tab | vorgeladene Chunks: 2",/_user/settings/business-information/
+/brew/settings/business-information/locations/new,index-gDqKL1Qu.js,TanStack-Route-ID: /_user/settings/business-information/locations/new/ | Eltern: /_user/settings | Suchparameter: tab | vorgeladene Chunks: 6,/_user/settings/business-information/locations/new/
+/brew/settings/business-information/locations/{restaurantId},index-8QTupWXh.js,TanStack-Route-ID: /_user/settings/business-information/locations/$restaurantId/ | Eltern: /_user/settings | Suchparameter: tab | vorgeladene Chunks: 6,/_user/settings/business-information/locations/$restaurantId/
+/brew/settings/general,index-B1IQSXRQ.js,"TanStack-Route-ID: /_user/settings/general/ | Eltern: /_user/settings | Suchparameter: section,tab | vorgeladene Chunks: 21",/_user/settings/general/
+/brew/settings/pos/configure/{id},_id-CwA9RmXO.js,TanStack-Route-ID: /_user/settings/(reskin)/pos/configure/$id | Eltern: /_user/settings | vorgeladene Chunks: 14,/_user/settings/(reskin)/pos/configure/$id
+/brew/settings/pos/export/{id},_id-DJEucL_Q.js,TanStack-Route-ID: /_user/settings/(reskin)/pos/export/$id | Eltern: /_user/settings | vorgeladene Chunks: 18,/_user/settings/(reskin)/pos/export/$id
+/brew/settings/pos/locations,index-ayCVcund.js,TanStack-Route-ID: /_user/settings/(reskin)/pos/locations/ | Eltern: /_user/settings | vorgeladene Chunks: 17,/_user/settings/(reskin)/pos/locations/
+/brew/settings/pos/synchronisation,index-DuvhUu_m.js,TanStack-Route-ID: /_user/settings/(reskin)/pos/synchronisation/ | Eltern: /_user/settings | vorgeladene Chunks: 12,/_user/settings/(reskin)/pos/synchronisation/
+/brew/settings/pos/{accountId}/mapping,index-DoHMxaL6.js,TanStack-Route-ID: /_user/settings/pos/$accountId/mapping/ | Eltern: /_user/settings | vorgeladene Chunks: 42,/_user/settings/pos/$accountId/mapping/
+/brew/settings/profile,index-C_S_dUhD.js,TanStack-Route-ID: /_user/settings/profile/ | Eltern: /_user/settings | Suchparameter: tab | vorgeladene Chunks: 30,/_user/settings/profile/
+/brew/settings/users,index-D3MzMQrv.js,TanStack-Route-ID: /_user/settings/users/ | Eltern: /_user/settings | vorgeladene Chunks: 18,/_user/settings/users/
+/brew/settings/users/new,index-DeeH29Rg.js,TanStack-Route-ID: /_user/settings/users/new/ | Eltern: /_user/settings | vorgeladene Chunks: 28,/_user/settings/users/new/
+/brew/settings/users/roles,index-D8fBaGgh.js,TanStack-Route-ID: /_user/settings/users/roles/ | Eltern: /_user/settings | vorgeladene Chunks: 4,/_user/settings/users/roles/
+/brew/settings/users/roles/new,index-CfP24fcb.js,TanStack-Route-ID: /_user/settings/users/roles/new/ | Eltern: /_user/settings | vorgeladene Chunks: 8,/_user/settings/users/roles/new/
+/brew/settings/users/roles/{roleId}/edit,index-Cv4xwBvE.js,TanStack-Route-ID: /_user/settings/users/roles/$roleId/edit/ | Eltern: /_user/settings | vorgeladene Chunks: 8,/_user/settings/users/roles/$roleId/edit/
+/brew/settings/users/{userId}/edit,index-CXPutTEN.js,TanStack-Route-ID: /_user/settings/users/$userId/edit/ | Eltern: /_user/settings | vorgeladene Chunks: 28,/_user/settings/users/$userId/edit/
+/brew/shop,route-D7elYwxl.js,TanStack-Route-ID: /_user/shop | Eltern: /_user | Layout-Route mit Unterrouten | vorgeladene Chunks: 11,/_user/shop
+/brew/shop/carts/{status},_status-BrTaD2lB.js,TanStack-Route-ID: /_user/(reskin)/shop_/carts/$status | Eltern: /_user | vorgeladene Chunks: 12,/_user/(reskin)/shop_/carts/$status
+/brew/shop/cost-center/{costCenterId}/smartlists,index-C1WMuBgW.js,TanStack-Route-ID: /_user/shop/cost-center/$costCenterId/smartlists/ | Eltern: /_user/shop | vorgeladene Chunks: 25,/_user/shop/cost-center/$costCenterId/smartlists/
+/brew/shop/mass-ordering,index-BhLBZYlQ.js,TanStack-Route-ID: /_user/shop/mass-ordering/ | Eltern: /_user/shop | vorgeladene Chunks: 21,/_user/shop/mass-ordering/
+/brew/shop/mass-ordering/new,index-BBotAqAf.js,TanStack-Route-ID: /_user/shop/mass-ordering/new/ | Eltern: /_user/shop | vorgeladene Chunks: 15,/_user/shop/mass-ordering/new/
+/brew/shop/mass-ordering/{orderId},index-CiCMNQs2.js,TanStack-Route-ID: /_user/shop/mass-ordering/$orderId/ | Eltern: /_user/shop | vorgeladene Chunks: 32,/_user/shop/mass-ordering/$orderId/
+/brew/shop/smartlists,index-D3fTy8OX.js,TanStack-Route-ID: /_user/shop/smartlists/ | Eltern: /_user/shop | vorgeladene Chunks: 3,/_user/shop/smartlists/
+/brew/shop/{id}/cart/{type}/{cartId},_cartId-DoiB21pW.js,TanStack-Route-ID: /_user/(reskin)/shop_/$id/cart/$type/$cartId | Eltern: /_user | vorgeladene Chunks: 28,/_user/(reskin)/shop_/$id/cart/$type/$cartId
+/brew/shops,index-DVvA6R3w.js,TanStack-Route-ID: /_user/(reskin)/shops/ | Eltern: /_user | vorgeladene Chunks: 6,/_user/(reskin)/shops/
+/brew/supplier-registration,index-BjQq4Ilz.js,TanStack-Route-ID: /supplier-registration/ | Eltern: (Wurzel) | Suchparameter: invitation | vorgeladene Chunks: 20,/supplier-registration/
+/brew/supplier-registration/decline,index-HHIWM320.js,TanStack-Route-ID: /supplier-registration/decline/ | Eltern: (Wurzel) | Suchparameter: invitation | vorgeladene Chunks: 7,/supplier-registration/decline/
+/brew/translations,route-Doa8Wwbt.js,TanStack-Route-ID: /_user/translations | Eltern: /_user | Layout-Route mit Unterrouten | vorgeladene Chunks: 0,/_user/translations
+/brew/translations,index-C8AB8Wi5.js,TanStack-Route-ID: /_user/translations/ | Eltern: /_user/translations | vorgeladene Chunks: 0,/_user/translations/
+/certificates,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/cmcalc,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/displays,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/login,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/menucreator,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/panel/analytics,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/panel/catering,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/panel/dashboard,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/panel/erp,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/panel/erp/category,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/panel/erp/dashboard,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/panel/erp/global-settings/categories,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/panel/erp/global-settings/product-groups,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/panel/erp/global-settings/storages,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/panel/erp/order,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/panel/erp/order/accept/{orderId},legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/panel/erp/order/accepted/{orderId},legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/panel/erp/product,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/panel/erp/product/FoodWasteReport,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/panel/erp/sale,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/panel/erp/stocktaking,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/panel/erp/stocktransfer,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/panel/erp/storage,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/panel/menucreator,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/panel/menucreator/daily-menu,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/panel/settings/pos/locations,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/panel/shop/carts/active,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/panel/shop/carts/all,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/panel/shop/carts/draft,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/panel/shop/carts/faulty,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/panel/shop/{shopId}/cart/active/{cartId},legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/panel/shopping-list/{shoppingListId},legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/panel/shops,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/profile,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/profile/business-information,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/profile/edu/groups,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/profile/edu/reporting,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/profile/edu/users,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/profile/password,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/recipes,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/recipes/categories,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/recipes/catering/cards,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/recipes/db,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/recipes/db/view/{id}/{id},legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/recipes/export,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/recipes/ingredients/add,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/recipes/ingredients/{id}/edit,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/recipes/ingredients?page=1&uif=shop_ingredients&sf=all_shops&q=,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/recipes/menus,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/recipes/menus/daily,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/recipes/view/{id}/{id},legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/recipes/{type}/{id}/replace,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/recipes?_switch_user={email},legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/settings,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/signout,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
+/users,legacy-system-url-DtY5iCT3.js,"Link ins Altsystem (gleicher Ursprung, VITE_BASE_DOMAIN; Pfad ausserhalb /brew), keine Route dieser SPA",
