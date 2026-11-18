@@ -388,6 +388,12 @@ bun run rezepte-probe [--marke wilma_wunder] [--artikel 300203]
                                              # liest FoodNotify, nur GET: Form von Liste/Kopf/Zutaten/Meta
                                              # je Marke, ≤ 40 Aufrufe, Rohantworten nach belege/ — keine DB
                                              # (nur im Terminal des Nutzers)
+bun run fn-probe [--marke x] [--max-anbindungen 3] [--max-kostenstellen 2] [--max-aufrufe 40] [--dry-run]
+                                             # misst vier offene Fragen der FoodNotify-Inventur (Kassenartikel→Rezept,
+                                             # link-targets, Rezeptliste, Warenstamm/Verkäufe/Food Waste); nur GET auf
+                                             # einer festen Erlaubtliste (die 14 GETs mit Wirkung gesperrt), ~16 Aufrufe
+                                             # je Marke, Rohantworten + Zusammenfassung nach belege/fn-probe-<datum>/ —
+                                             # keine DB; --dry-run ohne Netz (nur im Terminal des Nutzers)
 bun run rezepte-praxis --datenbank postgresql://localhost/<db> [--marke x] [--max-rezepte N]
                                              # echter Ladepfad NUR fuer FoodNotify-Rezepte gegen eine
                                              # LOKALE Datenbank (Abbruch sonst); liest FoodNotify, nur GET
