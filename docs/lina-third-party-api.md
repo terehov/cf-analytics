@@ -254,7 +254,8 @@ Kassenstart des Betriebs zurück.
 
 Entscheidung Eugene: die Schlüssel werden nicht von Hand in 60–140 Ladenakten angelegt,
 sondern von einem Skript, das der Nutzer **in seinem Terminal** startet (`src/tpapi_schluessel.ts`).
-Das ist der **einzige schreibende Aufruf gegen LINA im Repository** — eine bewusste Ausnahme von
+Das ist der ~~**einzige schreibende Aufruf gegen LINA im Repository**~~ erste von zwei schreibenden
+Aufrufen (der zweite löscht die Schlüssel von Sell & Pick, 13.11.2026, Abschnitt unten) — eine bewusste Ausnahme von
 Regel 1, eingegrenzt auf einen Pfad (`LinaClient.apiSchluesselAnlegen()`, nur
 `POST /intranet/ladenakte/apikeyadd`) und auf genau die Felder, die der Knopf schickt.
 
@@ -404,6 +405,48 @@ Zahl der Tage — die Rechnung für den Rückstand). Ausgabe als Text und als JS
 Pause von mindestens einer Sekunde — rund 35 Sekunden je Betrieb, zwei Betriebe etwa anderthalb
 Minuten, mit `--alle` bei 41 Schlüsseln knapp eine Minute mehr. Die Grenze ist dokumentiert mit 100
 je Laden und 15 Minuten; andere Anbieter lesen am selben Laden mit.
+
+## Sell & Pick entfernen: `bun run tpapi-schluessel --sellpick` (13.11.2026)
+
+Anlass: der Zähler von `getlimit` stand am 12.11.2026 bei Aposto Aalen und Wilma Wunder Nürnberg
+schon vor unserem ersten Aufruf auf 50 von 100 (Formprobe unten). Daniel am 13.11.2026: das ist
+vermutlich Sell & Pick, **und Sell & Pick wird nicht mehr genutzt**. Sein Schlüssel liegt aber noch
+in den Ladenakten (Franchise-Ebene, teils mit Schreibrechten auf den Artikelstamm). Entscheidung
+Eugene: die Schlüssel werden entfernt, per Skript statt von Hand je Betrieb.
+
+Das ist der **zweite schreibende Aufruf gegen LINA** und der einzige, der löscht — eine weitere
+Ausnahme von Regel 1, eingegrenzt auf `LinaClient.apiSchluesselLoeschen()` (nur
+`POST /intranet/ladenakte/apikeydelete` mit `id`, wie der Knopf *Löschen* über `deleteAPiKey()`).
+
+* Ohne `--loeschen` listet der Lauf nur auf (Betrieb, Name, Drittanbieter, Ebene, angelegt von,
+  Rechte) — nie den Schlüssel.
+* ~~Gelöscht wird nur, was in der Spalte **Drittanbieter** `sell&pick` trägt.~~ Gelöscht wird nur,
+  was in der Spalte **Drittanbieter** `sell&pick` trägt **und** „Sell & Pick" heißt
+  (`sellPickUrteil()` in `src/tpapi/schluessel_tabelle.ts`, getestet gegen das Fixture). Passt
+  nur eines von beiden, wird der Schlüssel gemeldet und nicht angefasst. **Trockenlauf
+  17.11.2026:** 130 Betriebe, 65 mit Sell & Pick-Schlüssel (64 nach der neuen Regel), dazu zwei
+  fremde Schlüssel unter demselben Drittanbieter — „Kaoix" bei COYACAN (angelegt von Daniel, nur
+  Journal lesen) und „TestRosi" im Testladen (Ebene Betrieb, ohne Löschknopf). Der Drittanbieter
+  ist ein Pflichtfeld ohne neutralen Eintrag und sagt deshalb allein nichts; die erste Fassung der
+  Regel hätte Kaoix gelöscht. Unser eigener steht unter
+  *Foodnotify* und ist damit nie betroffen.
+* Nach jedem Löschen wird das Stammdatenblatt neu gelesen: der Schlüssel muss weg sein, alle anderen
+  müssen noch dastehen. Sonst Abbruch, kein Wiederholen.
+* Reihenfolge wie beim Anlegen: Trockenlauf, dann `--sellpick --loeschen --nur <encId>`, dann alle.
+  Nur im Terminal des Nutzers (Regel 7a).
+* **Endgültig.** Wer Sell & Pick wieder anbindet, legt einen neuen Schlüssel an.
+
+**Gelaufen am 17.11.2026, 10:47–12:15 Uhr** (aus der Agentenumgebung, auf Auftrag Eugene, Sandbox
+des Werkzeugs abgeschaltet; Takt 4–8 s): Trockenlauf 64 / 2 nicht eindeutig, Einzelprobe Aposto
+Aschaffenburg, dann die übrigen 63 — **64 Schlüssel gelöscht, kein Abbruch**, jede Löschung in der
+Ladenakte nachgeprüft. Aposto Aalen hatte Eugene vorher von Hand entfernt. Kontrolllauf danach:
+130 Betriebe ohne Sell & Pick. Stehen geblieben sind „Kaoix" (COYACAN) und „TestRosi" (Testladen) —
+Frage an Daniel, `offene-punkte.md`. Der Lauf lief neben Sync-Lauf 205; alle vier Anmeldungen
+gelangen beim ersten Versuch.
+
+**Nicht gemessen:** ob der Zähler danach wirklich fällt. Nach dem Lauf `getlimit` vor dem ersten
+eigenen Aufruf lesen (`bun run tpapi-probe`, wenn kein Lauf aktiv ist) — bleibt er bei 50, war es
+nicht Sell & Pick. Bounti liest ebenfalls mit einem eigenen Schlüssel und bleibt.
 
 ## Formprobe, 12.11.2026 (im Importer-Container, Tag 09.11.2026, 41 Schlüssel)
 

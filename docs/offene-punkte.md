@@ -2733,3 +2733,20 @@ Rohabzugs; ob sie bei allen Betrieben vor 08:00 fertig ist, ist nicht gemessen �
 `SELECT min(prognose_gesehen_ab AT TIME ZONE 'Europe/Berlin')::time, max(...)::time FROM
 mart.umsatzprognose_vorlauf WHERE vorlauf_tage = 0 AND geschaeftstag = current_date - 1;`.
 
+
+## 17.11.2026 — Nach dem Entfernen von Sell & Pick
+
+1. **Fällt der Zähler?** 64 Schlüssel von Sell & Pick sind gelöscht (`docs/lina-third-party-api.md`).
+   Ob `getlimit` vor unserem ersten Aufruf jetzt nahe 0 steht statt bei 50, ist nicht gemessen —
+   `bun run tpapi-probe` per `docker exec`, wenn kein Lauf aktiv ist. Bleibt er bei 50, war es nicht
+   Sell & Pick; dann `TPAPI_GRENZE_JE_BETRIEB` (40) nicht anheben.
+2. **„Kaoix" bei COYACAN** (angelegt von Daniel, Drittanbieter sell&pick, nur Journal lesen): noch
+   gebraucht? Frage an Daniel.
+3. **„TestRosi" im Testladen** (Ebene Betrieb, angelegt von „Support Wilmawunder", Schreibrechte auf
+   Artikelstamm, Webkasse und Schichten): LINA zeigt uns keinen Löschknopf. Frage an Daniel, wer ihn
+   entfernen kann.
+4. **Regel 7a.** Am 17.11.2026 gelangen vier LINA-Anmeldungen aus der Agentenumgebung beim ersten
+   Versuch — mit abgeschalteter Sandbox des Werkzeugs, also über den Netzwerkweg des Rechners. Das
+   spricht dafür, dass am 26.07.2026 der Weg der Sandbox abgewiesen wurde. Die Regel bleibt, bis
+   Eugene sie ändert; ein Auftrag im Einzelfall ist damit aber technisch ausführbar.
+

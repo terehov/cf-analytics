@@ -401,9 +401,13 @@ bun run tpapi-formprobe [--tag 09.11.2026] [--laden <encId>]... [--alle] [--aus 
                                              # keine DB, keine Rohantwort, kein Schluessel in der Ausgabe — NUR per docker exec
                                              # im Importer-Container (Regel 7a, docs/lina-third-party-api.md). Noch nie gelaufen
 bun run tpapi-schluessel [--anlegen [--nur <encId>]]
-                                             # TPAPI-Schluessel je Betrieb anlegen und einsammeln — der EINZIGE
-                                             # schreibende Lauf gegen LINA (Regel 1, Ausnahme 07.11.2026); ohne
+                                             # TPAPI-Schluessel je Betrieb anlegen und einsammeln — einer von ZWEI
+                                             # schreibenden Laeufen gegen LINA (Regel 1, Ausnahme 07.11.2026); ohne
                                              # --anlegen nur Trockenlauf. Nur im Terminal des Nutzers (Regel 7a)
+bun run tpapi-schluessel --sellpick [--loeschen [--nur <encId>]]
+                                             # Schluessel des nicht mehr genutzten Anbieters Sell & Pick aus den
+                                             # Ladenakten entfernen (Regel 1, zweite Ausnahme 13.11.2026, ENDGUELTIG);
+                                             # ohne --loeschen nur auflisten. Nur im Terminal des Nutzers (Regel 7a)
 bun run status-melden                        # Testnachricht mit dem Status in den kChat-Channel (braucht STATUS_WEBHOOK_URL)
 curl localhost:3000/health                     # lebt der Container?
 curl localhost:3000/status                     # muss jemand hinsehen? (503 = ja)

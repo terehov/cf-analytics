@@ -5019,6 +5019,28 @@ keine Nebenzahl mehr, sondern die Messlatte.
 **Nicht belegt:** ob LINA Zukunftstage liefert und wie weit; ob LINA nachträglich ändert; was LINA
 genau prognostiziert (netto, mit oder ohne Trinkgeld — angenommen: netto wie der Umsatzbericht).
 
+
+## 13.11.2026 — Die Schlüssel von Sell & Pick werden per Skript gelöscht
+
+**Entscheidung Eugene**, nach dem Gespräch mit Daniel: Sell & Pick wird nicht mehr genutzt, liest
+aber vermutlich weiter über seinen Third-Party-API-Schlüssel und zählt gegen das Limit von 100
+Aufrufen je Betrieb und 15 Minuten. Die Schlüssel werden aus den Ladenakten entfernt —
+`bun run tpapi-schluessel --sellpick --loeschen`, im Terminal des Nutzers.
+
+**Das durchbricht Regel 1 ein zweites Mal** (nach dem Anlegen der eigenen Schlüssel, 07.11.2026),
+und diesmal löschend. Eingegrenzt wie damals: ein Pfad (`apikeydelete`), ein Skript, vom Nutzer
+gestartet, Trockenlauf als Standard, Prüfung nach jedem Schritt, Abbruch statt Wiederholen.
+~~Gelöscht wird nach der Spalte Drittanbieter, nicht nach dem Namen.~~ Gelöscht wird nur, wo
+Drittanbieter **und** Name zu Sell & Pick passen (revidiert 17.11.2026 nach dem Trockenlauf: „Kaoix"
+bei COYACAN trägt sell&pick nur als Pflichtauswahl).
+
+**Verworfen:** von Hand je Betrieb durchklicken (über 100 Ladenakten); den Schlüssel stehen lassen
+und nur die eigene Grenze senken (das Limit bliebe halbiert, und ein ungenutzter Schlüssel mit
+Schreibrecht auf den Artikelstamm bliebe offen).
+
+**Nicht belegt:** dass Sell & Pick die Aufrufe verursacht. Gemessen wird es nach dem Löschen an
+`getlimit` (`docs/lina-third-party-api.md`).
+
 ## 17.11.2026 — Vertragsdaten bekommen eine eigene Datenbank und einen eigenen MCP
 
 **Entscheidung Eugene.** Finance (Andreas Heinz, Kristina Stokic) will Franchiseverträge,

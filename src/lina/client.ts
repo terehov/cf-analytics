@@ -433,7 +433,8 @@ export class LinaClient {
   }
 
   /**
-   * DER EINZIGE SCHREIBENDE AUFRUF GEGEN LINA IN DIESEM REPOSITORY (07.11.2026).
+   * DER ERSTE VON ZWEI SCHREIBENDEN AUFRUFEN GEGEN LINA IN DIESEM REPOSITORY (07.11.2026;
+   * der zweite ist `apiSchluesselLoeschen()` darunter, 13.11.2026).
    *
    * Legt im Betrieb `laden` einen Schluessel fuer LINAs offizielle Third-Party-API
    * an — genau das, was der Knopf „API-Key erzeugen" in der Ladenakte tut
@@ -463,6 +464,42 @@ export class LinaClient {
     for (const s of felder.scopes) body.append('scopes[]', s)
     body.set('laden', laden)
     const res = await fetch(`${config.LINA_BASE_URL}/intranet/ladenakte/apikeyadd`, {
+      method: 'POST',
+      headers: this.session.header({
+        'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        referer: `${config.LINA_BASE_URL}/intranet/ladenakte/index?admin=1&tab=apikey`,
+      }),
+      body,
+      redirect: 'manual',
+      signal: AbortSignal.timeout(config.ANFRAGE_TIMEOUT_MS),
+    })
+    this.letzterRequest = Date.now()
+    this.heuteVerbraucht++
+    return { status: res.status, text: await res.text() }
+  }
+
+  /**
+   * DER ZWEITE SCHREIBENDE AUFRUF GEGEN LINA (13.11.2026) — und er loescht.
+   *
+   * Entfernt einen Third-Party-API-Schluessel aus der Ladenakte, genau wie der Knopf
+   * „Löschen" in der Tabelle API-Keys (`deleteAPiKey()` → `POST
+   * /intranet/ladenakte/apikeydelete` mit `id`). Endgueltig: LINA zeigt den Schluessel
+   * danach nicht mehr.
+   *
+   * Regel 1 ist hier auf Entscheidung von Eugene durchbrochen, nur fuer die
+   * Schluessel des nicht mehr genutzten Anbieters Sell & Pick, nur aus
+   * `src/tpapi_schluessel.ts --sellpick --loeschen`, das der Nutzer selbst startet.
+   * WELCHE Kennung geloescht wird, entscheidet der Aufrufer (Spalte Drittanbieter) —
+   * diese Methode prueft nur die Form. Kein Wiederholen. Nicht aus dem Sync aufrufen.
+   */
+  async apiSchluesselLoeschen(id: string): Promise<{ status: number; text: string }> {
+    if (!/^[0-9a-f]{40}$/.test(id)) throw new Error(`apiSchluesselLoeschen: keine Schluessel-Kennung: ${id}`)
+    const warten = this.naechsteWartezeit()
+    if (warten > 0) await schlaf(warten)
+    if (!this.session.istAngemeldet) await this.session.anmelden()
+    const body = new URLSearchParams()
+    body.set('id', id)
+    const res = await fetch(`${config.LINA_BASE_URL}/intranet/ladenakte/apikeydelete`, {
       method: 'POST',
       headers: this.session.header({
         'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
