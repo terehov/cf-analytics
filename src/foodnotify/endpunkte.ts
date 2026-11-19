@@ -33,6 +33,11 @@ export type FnEndpunkt = {
    * JSON zu lesen; geprüft wird das Ergebnis des Parsers, nicht das HTML.
    */
   form?: 'html'
+  /**
+   * 'lang': gemessen langsamer Pfad — der Client nimmt FN_ZEITGRENZE_LANG_MS
+   * statt ANFRAGE_TIMEOUT_MS (seit 0155 nur fn:pos_artikel, 19–39 s je Antwort).
+   */
+  zeitgrenze?: 'lang'
 }
 
 /** Pflichtparameter holen oder werfen — mit dem Namen im Fehlertext. */
@@ -80,8 +85,28 @@ export const FN_ENDPUNKTE: FnEndpunkt[] = [
     prioritaet: 6,
     pfad: () => '/api/pos/locations',
     hinweis: 'connection.connectionId ist der Schlüssel für die POS-Zuordnung '
-      + '(fn:pos_zuordnung, Stufe 2.3). deviceType.name entscheidet, ob die '
+      + '(fn:pos_artikel, 0155). deviceType.name entscheidet, ob die '
       + 'PLU-Brücke trägt — nur bei amadeus.',
+  },
+  {
+    key: 'fn:pos_artikel',
+    zweck: 'Kassenartikel einer Kassenanbindung mit zugeordnetem Rezept — die Brücke LINA-Artikel → FoodNotify-Rezept',
+    // Nach den Tagesbestellungen (20), vor den Rezeptlisten (40). Die
+    // connectionId kommt beim Einreihen aus core.kostenstelle — also vom
+    // fn:pos_standorte der Vornacht; eine neue Anbindung kommt einen Tag später.
+    prioritaet: 30,
+    zeitgrenze: 'lang',
+    pfad: p => {
+      const id = pflicht(p, 'connectionId')
+      // Eine Zahl, sonst ist es ein Einreihungsfehler — kein Pfad an FoodNotify.
+      if (!/^\d+$/.test(id)) throw new Error(`fn:pos_artikel: connectionId "${id}" ist keine Zahl`)
+      return `/api/pos/mapping/${id}/articles`
+    },
+    hinweis: 'Gemessen 19.11.2026 (Wilma Wunder, 3 von 32 Anbindungen): keine Hülle, keine Seiten — '
+      + '{items[], location, restaurantId, canCreateRecipes, ingestIssues[]}; 798 bis 1.171 Artikel, '
+      + '19 bis 39 s je Antwort, einer von drei Aufrufen brach ab. Ein Abbruch ist nie „keine Artikel": '
+      + 'core wird nur aus einer vollständigen 200er-Antwort geändert. plu = core.artikel.artikelnummer '
+      + 'NUR bei kassensystem amadeus (docs/foodnotify-0-1-nummernraum.md).',
   },
 
   // --- A2 · Bestellungen und Einkaufspreise — der eigentliche Gewinn ----

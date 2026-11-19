@@ -26,6 +26,7 @@ import { auspacken, istLeer } from './huelle'
 import * as t from './transform'
 import * as inv from './inventur'
 import * as rz from './rezept'
+import * as pa from './pos_artikel'
 import { bestellansichtLesen } from './bestellansicht'
 import type { FnEndpunkt } from './endpunkte'
 import { config } from '../config'
@@ -74,17 +75,22 @@ export async function fnLaden(k: FnKontext): Promise<number> {
    * Posten scheitert sichtbar (Wiedervorlage, später mart.posten_aufgegeben),
    * core bleibt unberührt.
    */
-  const struktur = k.ep.key.startsWith('fn:rezept') ? rz.rezeptStrukturFehler(k.ep.key, k.daten) : null
+  let struktur = k.ep.key.startsWith('fn:rezept') ? rz.rezeptStrukturFehler(k.ep.key, k.daten)
+    // Kassenartikel (0155): eine fremde Form sähe sonst aus wie „kein Artikel
+    // hat ein Rezept" oder „alle Artikel fehlen seit heute".
+    : k.ep.key === 'fn:pos_artikel' ? pa.posArtikelStrukturFehler(k.daten)
+    : null
 
   const ergebnis = await inTransaktion(async c => {
     await c.query(
       `SELECT core.partition_anlegen('raw.api_antwort', d)
          FROM unnest(ARRAY[current_date, current_date + 1]) AS d`)
-    await c.query(
+    const roh = await c.query<{ id: string }>(
       `INSERT INTO raw.api_antwort
          (quelle, endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis, parameter,
           http_status, payload, payload_hash, payload_bytes, lauf_id)
-       VALUES ('foodnotify',$1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+       VALUES ('foodnotify',$1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+       RETURNING id`,
       // quelle explizit setzen — der Spalten-Default ist 'lina'.
       // Die Marke steht im parameter-JSON mit drin: raw.api_antwort hat keine
       // Mandantenspalte, und die Antwort selbst verrät ihren Mandanten nicht.
@@ -159,6 +165,122 @@ export async function fnLaden(k: FnKontext): Promise<number> {
             [k.markeKey, z.kostenstelleId, z.connectionId, z.kassensystem])
         }
         return standorte.length
+      }
+
+      /**
+       * Kassenartikel → Rezept (0155). Eine Antwort je Kassenanbindung, ohne
+       * Seiten: sie ist der VOLLSTÄNDIGE Stand dieser Anbindung.
+       *
+       * Upsert je (Kostenstelle, remoteProductId), NICHT ersetzen: ein Artikel,
+       * der nicht mehr geliefert wird, bekommt `fehlt_seit` und bleibt stehen
+       * (Muster core.rezept.fehlt_seit). Seine Rezeptzuordnung war einmal
+       * richtig, und wer einen älteren Verkauf deutet, braucht sie noch.
+       *
+       * „Nicht mehr geliefert" heißt: in dieser erfolgreichen Antwort nicht
+       * gesehen. Alle gesehenen Zeilen tragen nach dem Upsert
+       * zuletzt_gesehen_am = now() — now() ist je Transaktion fest und damit
+       * derselbe Zeitpunkt wie raw.api_antwort.abgerufen_am. Ein Abbruch
+       * (Zeitgrenze, ECONNRESET, HTTP 5xx) kommt hier nie an: der Client meldet
+       * ihn als Fehler, und core bleibt, wie es war.
+       */
+      case 'fn:pos_artikel': {
+        const antwort = pa.posArtikel(k.daten)
+        const verbindung = k.parameter.connectionId
+        if (!verbindung) throw new Error('fn:pos_artikel ohne connectionId im Posten')
+        const ksKey = await kostenstelleKeyNachAnbindung(c, k.markeKey, Number(verbindung))
+
+        /**
+         * NULL ARTIKEL, WO GESTERN NOCH WELCHE STANDEN, IST KEIN BESTAND.
+         * Die Leere-200er-Regel oben greift hier nicht (zeilenZaehlen zählt das
+         * Objekt als eine Zeile). Ohne diese Sperre stünde jeder Artikel der
+         * Anbindung ab heute auf „fehlt" — lautlos, wie der Wilma-Wunder-Fehler.
+         * Rohantwort und Befund werden gesichert, der Posten scheitert sichtbar.
+         */
+        if (antwort.artikel.length === 0) {
+          const vorher = await c.query<{ n: number }>(
+            `SELECT count(*)::int AS n FROM core.pos_artikel
+              WHERE kostenstelle_key = $1 AND fehlt_seit IS NULL`, [ksKey])
+          const n = Number(vorher.rows[0]?.n ?? 0)
+          if (n > 0) {
+            struktur = `fn:pos_artikel: Anbindung ${verbindung} liefert 0 Artikel, im Bestand stehen ${n} — `
+              + 'nichts als fehlend markiert'
+            await c.query(
+              `INSERT INTO sync.schema_abweichung (endpunkt, erwartet, tatsaechlich)
+               VALUES ($1, $2, $3)`,
+              [k.ep.key, JSON.stringify({ endpunkt: k.ep.key, hinweis: 'Anbindung lieferte früher Artikel' }),
+               JSON.stringify({ probleme: [{ pfad: 'items', problem: struktur }] })])
+            return null
+          }
+        }
+
+        const rawId = roh.rows[0]?.id ?? null
+        await c.query(
+          `INSERT INTO core.pos_artikel AS p
+             (kostenstelle_key, remote_id, plu, externe_id, name, rezept_fn_id, rezept_titel,
+              preis, mwst, ist_ignoriert, wird_synchronisiert, abwesend_seit, name_doppelt,
+              name_weicht_ab, raw_id)
+           SELECT $1, x.remote_id, x.plu, x.externe_id, x.name, x.rezept_fn_id, x.rezept_titel,
+                  x.preis, x.mwst, x.ist_ignoriert, x.wird_synchronisiert, x.abwesend_seit,
+                  x.name_doppelt, x.name_weicht_ab, $3
+             FROM jsonb_to_recordset($2::jsonb) AS x(
+                  remote_id bigint, plu text, externe_id text, name text, rezept_fn_id integer,
+                  rezept_titel text, preis numeric, mwst numeric, ist_ignoriert boolean,
+                  wird_synchronisiert boolean, abwesend_seit timestamptz, name_doppelt boolean,
+                  name_weicht_ab boolean)
+           ON CONFLICT (kostenstelle_key, remote_id) DO UPDATE SET
+             plu = EXCLUDED.plu,
+             externe_id = EXCLUDED.externe_id,
+             name = EXCLUDED.name,
+             rezept_fn_id = EXCLUDED.rezept_fn_id,
+             rezept_titel = EXCLUDED.rezept_titel,
+             preis = EXCLUDED.preis,
+             mwst = EXCLUDED.mwst,
+             ist_ignoriert = EXCLUDED.ist_ignoriert,
+             wird_synchronisiert = EXCLUDED.wird_synchronisiert,
+             abwesend_seit = EXCLUDED.abwesend_seit,
+             name_doppelt = EXCLUDED.name_doppelt,
+             name_weicht_ab = EXCLUDED.name_weicht_ab,
+             -- Wann sich zuletzt etwas Fachliches geändert hat — vor allem, wann
+             -- ein Rezept zugeordnet oder getauscht wurde. Der Verlauf selbst
+             -- steht in raw (jede Antwort), nicht hier.
+             geaendert_am = CASE
+               WHEN (p.plu, p.name, p.rezept_fn_id, p.preis, p.mwst, p.ist_ignoriert,
+                     p.abwesend_seit, p.name_weicht_ab, p.fehlt_seit IS NULL)
+                    IS DISTINCT FROM
+                    (EXCLUDED.plu, EXCLUDED.name, EXCLUDED.rezept_fn_id, EXCLUDED.preis,
+                     EXCLUDED.mwst, EXCLUDED.ist_ignoriert, EXCLUDED.abwesend_seit,
+                     EXCLUDED.name_weicht_ab, true)
+               THEN now() ELSE p.geaendert_am END,
+             zuletzt_gesehen_am = now(),
+             fehlt_seit = NULL,
+             raw_id = EXCLUDED.raw_id`,
+          [ksKey, JSON.stringify(antwort.artikel.map(a => ({
+            remote_id: a.remoteId, plu: a.plu, externe_id: a.externeId, name: a.name,
+            rezept_fn_id: a.rezeptFnId, rezept_titel: a.rezeptTitel, preis: a.preis, mwst: a.mwst,
+            ist_ignoriert: a.istIgnoriert, wird_synchronisiert: a.wirdSynchronisiert,
+            abwesend_seit: a.abwesendSeit, name_doppelt: a.nameDoppelt, name_weicht_ab: a.nameWeichtAb,
+          }))), rawId])
+
+        // Was diese Antwort nicht mehr nennt: fehlt seit jetzt. Nicht löschen.
+        await c.query(
+          `UPDATE core.pos_artikel SET fehlt_seit = now(), geaendert_am = now()
+            WHERE kostenstelle_key = $1 AND fehlt_seit IS NULL AND zuletzt_gesehen_am < now()`,
+          [ksKey])
+
+        await c.query(
+          `INSERT INTO core.pos_artikel_abruf
+             (kostenstelle_key, connection_id, abgerufen_am, artikel, standort, restaurant_id,
+              kann_rezepte_anlegen, ingest_hinweise, raw_id)
+           VALUES ($1, $2, now(), $3, $4, $5, $6, $7, $8)
+           ON CONFLICT (kostenstelle_key) DO UPDATE SET
+             connection_id = EXCLUDED.connection_id, abgerufen_am = now(),
+             artikel = EXCLUDED.artikel, standort = EXCLUDED.standort,
+             restaurant_id = EXCLUDED.restaurant_id,
+             kann_rezepte_anlegen = EXCLUDED.kann_rezepte_anlegen,
+             ingest_hinweise = EXCLUDED.ingest_hinweise, raw_id = EXCLUDED.raw_id`,
+          [ksKey, Number(verbindung), antwort.artikel.length, antwort.standort, antwort.restaurantId,
+           antwort.kannRezepteAnlegen, antwort.ingestHinweise, rawId])
+        return antwort.artikel.length
       }
 
       case 'fn:bestellungen': {
@@ -879,6 +1001,24 @@ async function kostenstelleKey(c: PoolClient, markeKey: number, erpId: number): 
     throw new Error(`Keine Kostenstelle für erpId ${erpId} (marke_key ${markeKey}) — erst fn:kostenstellen laden`)
   }
   return Number(r.rows[0].kostenstelle_key)
+}
+
+/**
+ * kostenstelle_key über (Marke, connectionId) — wirft, wenn die Anbindung
+ * keiner oder mehr als einer Kostenstelle gehört. Gemessen 19.11.2026: 32
+ * Anbindungen bei Wilma Wunder, 32 verschiedene connectionId, je eine
+ * Kostenstelle. Zwei Treffer wären neu und sollen auffallen, nicht still die
+ * erste Kostenstelle beschreiben.
+ */
+async function kostenstelleKeyNachAnbindung(c: PoolClient, markeKey: number, connectionId: number): Promise<number> {
+  const r = await c.query<{ kostenstelle_key: number }>(
+    `SELECT kostenstelle_key FROM core.kostenstelle WHERE marke_key = $1 AND connection_id = $2`,
+    [markeKey, connectionId])
+  if (r.rows.length !== 1) {
+    throw new Error(`fn:pos_artikel: Anbindung ${connectionId} (marke_key ${markeKey}) gehört zu `
+      + `${r.rows.length} Kostenstellen statt einer — erst fn:pos_standorte laden`)
+  }
+  return Number(r.rows[0]!.kostenstelle_key)
 }
 
 /** ware_key über (marke, fn_id) — legt die Ware bei Bedarf mit Namen an. */

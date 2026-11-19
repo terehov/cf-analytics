@@ -5115,3 +5115,74 @@ Cookie-Sitzung**; ein gemischter Betrieb (Rezepte über Token) ist möglich, abe
 (`/api/erp/last-used/7984`, zuletzt benutzter Betrieb jetzt 7984 statt 11035). Eingetragen in
 `docs/fehlerkatalog.md`; die Regel „Browserarbeit streng lesend" gilt seitdem ausdrücklich auch für Seiten, die
 solche Aufrufe beim Öffnen absetzen.
+
+## 19.11.2026 — Kassenartikel → Rezept wird geladen, vorerst nur Wilma Wunder (`0155`)
+
+**Anlass.** `core.pos_artikel` stand seit `0030` leer, und `AGENTS.md` beschrieb die Brücke LINA-Artikel →
+FoodNotify-Rezept, als bestünde sie. Die Leseprobe vom 19.11.2026 hat den Weg gemessen (ein Aufruf je
+Kassenanbindung, `payloads/foodnotify-2026-11/fn-probe-2026-11-19.md`). Eugene: bauen, im Nachtlauf, mit
+Prüfsicht und Abdeckungszahl.
+
+**Entschieden:**
+
+1. **Schlüssel `(Kostenstelle, remoteProductId)`, nicht `(Kostenstelle, plu)`.** `remoteProductId` ist
+   FoodNotifys eigene Kennung des Kassenartikels; an diesem Datensatz hängt die Rezeptzuordnung. Die PLU
+   vergibt die Kasse — wird ein Artikel dort umnummeriert, bliebe bei einem PLU-Schlüssel die alte Zeile mit
+   Rezept als Leiche stehen, und die neue PLU käme ohne; ein Upsert über die PLU würde zudem zwei
+   gleichzeitig gelieferte Artikel mit derselben PLU (anderes Kassensystem, Dublette) nicht aufnehmen können.
+   Gemessen 19.11.2026 an 2.864 Artikeln dreier Anbindungen: `remoteProductId`, `plu` und `externalId` je
+   Anbindung eindeutig — die Wahl kostet heute nichts. Die PLU-Seite fangen die Sichten ab (`EXISTS`, Spalte
+   `plu_doppelt`).
+2. **Zustand statt Monatsmomentaufnahme** (revidiert `0030`, siehe unten). In `core` steht die letzte
+   erfolgreiche Antwort mit `fehlt_seit` und `geaendert_am`; die Historie liegt in `raw`, jede Antwort je
+   Anbindung und Nacht, append-only. Eine Monatskopie in `core` hätte jede Nacht ~1.000 Zeilen je Anbindung
+   dupliziert, um eine Frage zu beantworten, die noch niemand gestellt hat — und `raw` beantwortet sie auch.
+3. **Nicht mehr gelieferte Artikel bekommen `fehlt_seit`, sie werden nicht gelöscht** (Muster
+   `core.rezept.fehlt_seit`). Ihre Zuordnung war richtig und erklärt ältere Verkäufe; die Umsatzabdeckung der
+   letzten drei Monate zählt sie deshalb mit.
+4. **Nur Wilma Wunder** (`POS_ARTIKEL_MARKEN`, Vorgabe `wilma_wunder`). Gemessen ist nur diese Marke: 32
+   Anbindungen, alle `amadeus`. Bei den anderen Marken sind weder Antwortform noch Kassensystem je Anbindung
+   gemessen, und Aposto Wuppertal läuft über `ikentoo` mit fremdem Nummernkreis. Eine Marke kommt dazu, wenn
+   sie gemessen ist (`bun run fn-probe --marke …`), durch einen Eintrag im Schalter — ohne Codeänderung.
+5. **Im Tagesgeschäft, ein Posten je Anbindung und Nacht, mit langer Zeitgrenze** (`FN_ZEITGRENZE_LANG_MS`,
+   180 s, nur für diesen Pfad). Kein eigener Takt, keine eigene Spur (Regel 3). Ein Abbruch ändert `core` nie.
+6. **Umsatzabdeckung je Betrieb über alle Anbindungen** (ein Artikel zählt als „mit Rezept", wenn er in
+   irgendeiner amadeus-Anbindung des Betriebs eins trägt), aus `mart.artikel_monat_basis`, die drei letzten
+   vollen Monate. Je Anbindung steht dieselbe Rechnung daneben, aber der Betriebsumsatz heißt dort
+   `umsatz_betrieb_3m`, damit niemand ihn über Bar und Küche summiert.
+
+~~`0030`: POS-Zuordnung als Monatsmomentaufnahme (`PRIMARY KEY (kostenstelle_key, monat, plu)`), damit „welches
+Rezept stand im März dahinter" beantwortbar bleibt.~~ Revidiert mit `0155`: die Frage beantwortet `raw`, `core`
+hält den Zustand (Punkt 2). Die Tabelle war leer, der Umbau also ohne Datenverlust (die Migration bricht ab,
+wenn doch Zeilen darin stehen).
+
+**Verworfen.** `rezept_key` beim Laden auflösen (das Rezept kommt oft erst nach der Zuordnung in `core.rezept`,
+der Schlüssel bliebe still NULL — die Sichten lösen über `(marke_key, rezept_fn_id)` auf). Die `connectionId`
+als Folgeposten von `fn:pos_standorte` einreihen statt aus `core.kostenstelle` zu lesen (fällt
+`fn:pos_standorte` aus, fielen alle Anbindungen mit aus). Alle vier Marken sofort (ungemessen).
+
+## Lieferkonditionen: erst beobachten, nicht laden (19.11.2026)
+
+**Anlass.** Der Fachbereich fragt nach Liefertagen (Tourenplan), Bestellfristen (Vorlauf) und Mindestbestellwert je
+Lieferant und Betrieb. Vermutet war `POST /api/shop/{shopId}/info`.
+
+**Befund (Bundle-Analyse, kein Aufruf).** Der POST trägt keine Konditionen; sie stehen am Warenkorb, und der ist ein GET
+(`GET /api/shop/{shopId}/cart/{type}/{cartId}`: `minimalOrderSum`, `deliveryDates`, `preorderDays`) — aber nur dort, wo
+ein Warenkorb existiert, und er ist nicht gemessen (`payloads/foodnotify-2026-11/lieferkonditionen-bundle-2026-11-19.md`).
+Der kundenspezifische Tourenplan als Regel hat keinen Lesepfad.
+
+**Entscheidung.** Aus den eigenen Bestellungen ableiten, was sich **beobachten** lässt (`mart.lieferkondition_beobachtet`,
+`0156`), statt auf eine Messung zu warten oder einen POST zu riskieren. Begründung: die Bestellungen liegen vollständig vor
+(50.072 lokal, 12 Monate gerechnet in 0,1 s), kosten keinen Aufruf gegen FoodNotify und beantworten einen Teil der Frage
+sofort — Liefertage und Vorlauf gut, Mindestbestellwert nur als Hinweis (FoodNotify warnt, sperrt nicht; kleinste
+beobachtete Werte 1,50–2,82 EUR). Der gewählte Liefertermin liegt in der Regel im freigegebenen Tourenplan, weil
+FoodNotify nur diese Termine anbietet — das macht ihn zu einem brauchbaren Stellvertreter, nicht zum Plan.
+
+**Verworfen.** Den POST `info` aufrufen (kein Nutzen, schreibende Methode, nur mit ausdrücklichem Ja des Nutzers); die
+Sicht als „Konditionen" zu benennen (die Sicht heißt bewusst `…_beobachtet`, jede Spalte sagt es); den Warenkorb-GET
+sofort in den Importer zu bauen (nicht gemessen, mögliche Nebenwirkung `deliveryDateUpdated`, Lücke bei Lieferanten ohne
+offenen Warenkorb).
+
+**Nebenbei entschieden:** `core.bestellung.geliefert_am` wird in derselben Migration aus `raw` zurückgebaut. Ohne die
+Reparatur wären alle Wochentage der Sicht um einen Tag verschoben (Fehlerkatalog, 19.11.2026). Der Lader wird im selben
+Commit korrigiert, nicht erst später.

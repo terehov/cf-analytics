@@ -1253,6 +1253,41 @@ const Schema = z.object({
    */
   REZEPT_TAGESGESCHAEFT_SEITEN: z.coerce.number().int().min(1).default(10),
 
+  /**
+   * Kassenartikel → Rezept (0155, `fn:pos_artikel`): für welche Marken die
+   * Zuordnung je Kassenanbindung geholt wird. Kommagetrennte Schlüssel aus
+   * core.marke (`wilma_wunder,aposto`), leer = für keine.
+   *
+   * NUR WILMA WUNDER, bis die anderen Marken gemessen sind (Entscheidung
+   * Eugene, 19.11.2026). Gemessen ist allein Wilma Wunder (Leseprobe
+   * 19.11.2026, docs/payloads/foodnotify-2026-11/fn-probe-2026-11-19.md):
+   * 32 Anbindungen, alle `amadeus`, drei davon abgerufen. Bei den anderen
+   * Marken ist weder die Antwortform noch das Kassensystem je Anbindung
+   * gemessen — Aposto Wuppertal etwa läuft über `ikentoo`, dort ist die PLU
+   * ein fremder Nummernkreis (docs/foodnotify-0-1-nummernraum.md). Wer eine
+   * Marke ergänzt, misst sie vorher (`bun run fn-probe --marke …`).
+   *
+   * Ein unbekannter Schlüssel lässt den Start scheitern: ein Tippfehler sähe
+   * sonst aus wie „Marke abgeschaltet". Der wirksame Wert steht nach jedem Lauf
+   * in sync.merker (`pos_artikel_marken`), damit mart.pos_artikel_abdeckung
+   * eine bewusst abgeschaltete Marke von einer ausgefallenen unterscheidet.
+   */
+  POS_ARTIKEL_MARKEN: z.string().default('wilma_wunder'),
+
+  /**
+   * Zeitgrenze für FoodNotify-Pfade, die als langsam gemessen sind
+   * (`zeitgrenze: 'lang'` im Register, seit 0155 nur `fn:pos_artikel`).
+   *
+   * Gemessen am 19.11.2026: 19 bis 39 s je Antwort, und je Lauf brach einer
+   * von drei Aufrufen ab — einmal an der 120-s-Grenze der Probe, einmal mit
+   * ECONNRESET nach 81 s. Die 60 s von ANFRAGE_TIMEOUT_MS hätten auch gesunde
+   * Antworten abgeschnitten. 180 s lassen Luft über den gemessenen 39 s, ohne
+   * einen hängenden Aufruf eine halbe Stunde warten zu lassen. Das Tempo der
+   * Spur bleibt, wie es ist (Regel 3): eine längere Zeitgrenze ist kein
+   * zusätzlicher Aufruf. Es gilt der größere der beiden Werte.
+   */
+  FN_ZEITGRENZE_LANG_MS: z.coerce.number().int().min(1_000).default(180_000),
+
   /** Ab so vielen Fehlern in Folge pausiert der Worker den ganzen Lauf. */
   ABBRUCH_NACH_FEHLERN: z.coerce.number().int().min(1).default(10),
 
@@ -1345,6 +1380,13 @@ function laden() {
         `FN_${m.env}_USER und FN_${m.env}_PASSWORD müssen beide gesetzt sein oder beide fehlen — ` +
         `gesetzt ist nur ${user ? 'der Benutzer' : 'das Passwort'}`)
     }
+  }
+  // POS_ARTIKEL_MARKEN (0155): ein vertippter Schlüssel hiesse still „aus".
+  const bekannteMarken: readonly string[] = FN_MARKEN.map(m => m.schluessel)
+  const unbekannt = posArtikelMarkenLesen(r.data.POS_ARTIKEL_MARKEN).filter(m => !bekannteMarken.includes(m))
+  if (unbekannt.length > 0) {
+    throw new Error(`POS_ARTIKEL_MARKEN nennt unbekannte Marken: ${unbekannt.join(', ')} — `
+      + `bekannt sind ${bekannteMarken.join(', ')}`)
   }
   // Dasselbe für Metabase, aus demselben Grund: ein halbes Paar sieht aus
   // wie „nicht konfiguriert" und fiele erst auf, wenn die Übernahme
@@ -1469,6 +1511,19 @@ export function fnGrenzen(c: Config = config) {
     eigen: c.FN_TAKT_MIN_MS !== undefined || c.FN_TAKT_MAX_MS !== undefined
         || c.FN_TAGESBUDGET !== undefined,
   }
+}
+
+/** POS_ARTIKEL_MARKEN zerlegen: kommagetrennt, ohne Leerraum, ohne Doppelte. */
+function posArtikelMarkenLesen(wert: string): string[] {
+  return [...new Set(wert.split(',').map(s => s.trim()).filter(Boolean))]
+}
+
+/**
+ * Die Marken, für die `fn:pos_artikel` eingereiht wird (0155). Nur Marken mit
+ * Zugangsdaten werden tatsächlich gefragt — das entscheidet der Einreihweg.
+ */
+export function posArtikelMarken(c: Pick<Config, 'POS_ARTIKEL_MARKEN'> = config): string[] {
+  return posArtikelMarkenLesen(c.POS_ARTIKEL_MARKEN)
 }
 
 export function fnZugaenge(c: Config = config): FnZugang[] {

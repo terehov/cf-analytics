@@ -1,0 +1,31 @@
+{
+  "_hinweis": "Synthetische Attrappe fuer fn:pos_artikel (0155). Form und Feldnamen wie die echte Antwort von /api/pos/mapping/{connectionId}/articles (Wilma Wunder, 19.11.2026), Werte erfunden. rezeptId 1032008, 1048034 und 1030679 stehen in rezepte.json.",
+  "location": "Testbetrieb Gera — Küche Test",
+  "restaurantId": 10436,
+  "canCreateRecipes": true,
+  "ingestIssues": [
+    {
+      "product": { "posId": "905", "plu": "9990001", "name": "Testrabatt", "price": "-5.0000" },
+      "issue": "negative_price",
+      "decision": "imported_with_warning",
+      "imported": true
+    }
+  ],
+  "items": [
+    { "remoteProductId": 900001, "name": "Testartikel mit Rezept", "plu": "1100001", "externalId": "901",
+      "recipeId": 1032008, "recipeTitle": "Testrezept A", "isSyncing": true, "isIgnored": false,
+      "price": "12.5", "vat": 19, "absentFromFeedSince": null, "hasDuplicateName": false, "hasLinkNameMismatch": false },
+    { "remoteProductId": 900002, "name": "Testartikel ohne Rezept", "plu": "1100002", "externalId": "902",
+      "recipeId": null, "recipeTitle": null, "isSyncing": false, "isIgnored": false,
+      "price": "4.4", "vat": 19, "absentFromFeedSince": null, "hasDuplicateName": false, "hasLinkNameMismatch": false },
+    { "remoteProductId": 900003, "name": "Testartikel ignoriert", "plu": "1100003", "externalId": "903",
+      "recipeId": 1048034, "recipeTitle": "Testrezept B", "isSyncing": true, "isIgnored": true,
+      "price": "3", "vat": 7, "absentFromFeedSince": null, "hasDuplicateName": false, "hasLinkNameMismatch": false },
+    { "remoteProductId": 900004, "name": "Testartikel abwesend", "plu": "300004", "externalId": "904",
+      "recipeId": null, "recipeTitle": null, "isSyncing": false, "isIgnored": false,
+      "price": "0", "vat": 0, "absentFromFeedSince": "2026-10-30T13:04:57+00:00", "hasDuplicateName": false, "hasLinkNameMismatch": false },
+    { "remoteProductId": 900005, "name": "Testartikel Name weicht ab", "plu": "500005", "externalId": "905",
+      "recipeId": 1030679, "recipeTitle": "Ganz anderer Name", "isSyncing": true, "isIgnored": false,
+      "price": "7.9", "vat": 19, "absentFromFeedSince": null, "hasDuplicateName": true, "hasLinkNameMismatch": true }
+  ]
+}

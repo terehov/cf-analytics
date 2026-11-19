@@ -169,6 +169,33 @@ trägt `mart.betriebsbericht_ladestand_monat`, `mart.betriebsbericht_ladestand`,
 und `mart.pruefung_uebersicht` — der Neuaufbau muss diese vier wortgleich aus der Zieldatenbank
 wiederherstellen (`pg_get_viewdef`), nicht aus alten Migrationen.
 
+### Lieferkonditionen: echte Konditionen fehlen, beobachtet gibt es sie (gefunden 19.11.2026, `0156`)
+
+Der Fachbereich fragt nach Liefertagen (Tourenplan), Bestellfristen und Mindestbestellwert je Lieferant und
+Betrieb. Geladen ist davon nichts. Bundle-Analyse (`payloads/foodnotify-2026-11/lieferkonditionen-bundle-2026-11-19.md`):
+**`POST /api/shop/{shopId}/info` trägt keine Konditionen**; sie stehen am Warenkorb, und der ist ein GET
+(`GET /api/shop/{shopId}/cart/{type}/{cartId}`: `minimalOrderSum`, `deliveryDates`, `preorderDays`). Bis dahin liefert
+`mart.lieferkondition_beobachtet` das **beobachtete** Verhalten — nicht vereinbart.
+
+1. **Die echten Konditionen:** eine lesende Probe auf den Warenkorb-GET, nur im Terminal des Nutzers, mit drei
+   Warenkörben zu beginnen (Muster im Bundle-Dokument, Abschnitt 2). Nur dort, wo ein Warenkorb existiert; für den
+   Rest bleibt die Lücke. Vorher entscheiden, ob das Risiko `deliveryDateUpdated` (der Server verschiebt beim Lesen
+   womöglich den Termin des offenen Warenkorbs) tragbar ist.
+2. **Der POST bleibt unberührt**, ohne ausdrückliches Ja des Nutzers, und es gibt keinen Anlass: er liefert nichts davon.
+3. **Der kundenspezifische Tourenplan als Regel** (Wochentage je Kunde und Lieferant) hat in keinem Bundle einen
+   Lesepfad; er liegt serverseitig. Verbindlich beantworten können ihn nur der Lieferant oder FoodNotify; ob und
+   wie das angefragt wird, entscheidet Eugene (keine Anfrage empfohlen).
+4. **Welche unserer `core.lieferant`-Zeilen sind Havi, GVS, Ultra, Nordmann?** Die Oberfläche kennt vier feste
+   Bestellschluss- und Mengenhinweise nach Shop-ID (9243, 8014, 8522, 130036). Abgleich gegen `core.lieferant.fn_id`
+   ist eine lokale Abfrage, nicht gemacht.
+5. **MCP-Katalogabzug aus Produktion** (`cd mcp && bun run katalog:abzug` gegen die vollständige Datenbank) steht aus:
+   `mart.lieferkondition_beobachtet`, ihr Fallstrick `lieferkondition_beobachtet_nicht_vereinbart` und die Körnung
+   sind in der Migration, aber noch nicht in `mcp/test/katalog.json`.
+6. **Nach dem Deploy von `0156` nachsehen:** `SELECT count(*) FILTER (WHERE geliefert_am < (bestellt_am AT TIME ZONE
+   'Europe/Berlin')::date) FROM core.bestellung WHERE status IS DISTINCT FROM 'canceled'` — Erwartung einstellig
+   (lokal 6 von 48.489 nach dem Rückbau, vorher 139). Und: die Karten „Lieferdatum" / „Geliefert am" im Drill-down
+   (`mart.einkauf_beleg.lieferdatum`) zeigen ab dann den richtigen Tag, nicht den davor.
+
 ## Strategisch
 
 **Amadeus 360 ist das führende System, nicht LINA.** Die Oberfläche sagt es selbst („Die Daten sind nur eingeschränkt änderbar, weil Amadeus 360 nicht führendes System ist"), dazu passen `a360isMaster`, `isSynced` und `syncGroups` im Code. Ein Teil dessen, was wir aus LINA ziehen, ist dort selbst nur eine Kopie. Falls die Datenqualitätsprobleme — Stichwort „Doppelte Artikelnummern, unbedingt korrigieren" aus dem `errors`-Feld — aus dieser Synchronisation stammen, wäre das Vorsystem der bessere Anknüpfungspunkt.
@@ -1174,7 +1201,7 @@ nirgends, weil eine Tabelle ohne Eintrag in keiner Sicht auftaucht.
 | Tabelle | Zeilen | Schreiber im Repo | Endpunkt |
 |---|---|---|---|
 | ~~`core.rezept`~~ | ~~0~~ | ~~keiner~~ | ~~keiner (`src/foodnotify/endpunkte.ts` führt neun, keiner davon)~~ — **seit `0132` (15.10.2026) befüllt**, siehe unten |
-| `core.pos_artikel` | 0 | keiner | keiner |
+| ~~`core.pos_artikel`~~ | ~~0~~ | ~~keiner~~ | ~~keiner~~ — **seit `0155` (19.11.2026) befüllt** über `fn:pos_artikel`, vorerst nur Wilma Wunder; siehe „Kassenartikel → Rezept" (19.11.2026) |
 | `core.ware_stand` | 0 | keiner | keiner |
 
 Zum Vergleich: `core.ware` hat 43.271 Zeilen — die Waren kommen über die
@@ -1183,8 +1210,9 @@ Bestellpositionen herein, nicht über einen Stammdatenabruf.
 **`core.pos_artikel` ist der unangenehme Fall.** `AGENTS.md` beschreibt ihn als
 die Brücke zwischen LINA-Artikel und FoodNotify-Rezept (`plu =
 core.artikel.artikelnummer`, gültig nur bei `kassensystem = 'amadeus'`) — als
-bestünde sie. Sie besteht nicht. Wer darauf joint, bekommt null Zeilen und
-keinen Fehler.
+bestünde sie. ~~Sie besteht nicht. Wer darauf joint, bekommt null Zeilen und
+keinen Fehler.~~ Seit `0155` (19.11.2026) wird sie geladen — vorerst nur für Wilma Wunder; für die
+anderen drei Marken bleibt der Join leer.
 
 **Wer muss was klären:**
 
@@ -1197,8 +1225,8 @@ keinen Fehler.
    an 2.111 Enchilada-Rezepten gelesen (`foodnotify-api-inventar.md` §3). Seit
    Migration `0132` holt der Nachtlauf sie für alle vier Marken
    (`docs/plan-rezepturen.md`); `core:rezept` steht im Register als erwartet.
-   `core.pos_artikel` (Kassenzuordnung) und `core.ware_stand` bleiben leer und
-   `erwartet: false`.
+   ~~`core.pos_artikel` (Kassenzuordnung) und~~ `core.ware_stand` ~~bleiben~~ bleibt leer und
+   `erwartet: false` (`core.pos_artikel` seit `0155`).
 2. **Braucht die Auswertung sie überhaupt?** Der theoretische Wareneinsatz läuft
    heute über `core.artikel.fixer_we`, dessen Herkunft ungeklärt ist (Regel 5).
    Ein echter Rezeptbezug wäre die Ablösung dafür — das ist eine fachliche
@@ -2788,6 +2816,9 @@ heißt) und `docs/foodnotify-api-inventar-intern-2026-11.md`. Gemessen ist nur W
 5. **`link-targets`: `restaurantId` und `updatedAt`** je Rezept (13.253 Zeilen; die Rezeptliste der neuen
    Oberfläche zählt am selben Tag 13.263): Eigentümer oder Verwendung? Änderungsdatum des Rezepts? Wäre beides
    wahr, gäbe es den Betriebsbezug und einen Änderungsfilter für den Umlauf (`0134`). Nicht geprüft.
+   **Nachtrag 19.11.2026 (Tagesmessung, `fn-probe-2026-11-19-tag.md`):** `link-targets` liefert **alle 13.265 Rezepte
+   der Marke** (nicht die der Anbindung), **17 verschiedene `restaurantId`** mit 42 bis 1.166 Rezepten. Ob
+   `restaurantId` Eigentümer oder Verwendung meint, ist weiter nicht entschieden; `updatedAt` siehe Punkt 14.
 6. **`core.pos_artikel` und `core.ware_stand`** sind mit der Sitzung seit 01.08. bzw. 27.07.2026 erreichbar und
    jetzt auch mit Token (`/api/pos/mapping/{connectionId}/articles`, `/api/{erpId}/products`). Am Zugang liegt die
    Leere nicht. Frage 2 aus „Drei `core`-Tabellen mit null Zeilen" (14.08.2026) ist die eigentliche Entscheidung.
@@ -2795,6 +2826,14 @@ heißt) und `docs/foodnotify-api-inventar-intern-2026-11.md`. Gemessen ist nur W
    49,4 % und 57,6 % der Kassenartikel tragen ein Rezept, PLU numerisch und je Anbindung eindeutig. Warenstamm in
    Seiten zu 20 (746 und 97 Produkte bei zwei Kostenstellen). Füllbar ist beides; offen ist die Entscheidung und der
    Umsatzanteil, den die zugeordneten Artikel tragen.
+   **Nachtrag 19.11.2026 (Seitengröße, `fn-probe-2026-11-19-tag.md`):** `page_size` wird angenommen und **nicht
+   gekappt**: `page=1&page_size=1000` liefert alle 746 Produkte der Kostenstelle 11035 in einem Aufruf (6,4 s,
+   1,07 MB; 100 → 8 Seiten, Standard 20 → 38). Ein Abzug ist damit ein Aufruf je Kostenstelle. Obergrenze über 1000
+   nicht gemessen. **Preisfelder:** `unitPrice` ist bei 746 von 746 gefüllt, **`pricePerUnit` bei 0** (immer `null`),
+   ebenso `packagingUnit`, `packagingUnits`, `baseUnitQuantity`, `baseUnitUnit`; `packagingQuantity` 99,5 %,
+   `ingredient.artikelId` 99,5 % (gleich dem Zeilenfeld `artikelId`). `timeModified`: 650 von 746 aus 2024, nur 13 aus
+   2026 — **kein Preisänderungsdatum**. Offen: wie `unitPrice` je Basiseinheit zu lesen ist und ob er der Bestellpreis
+   ist. (Die Frage zum Warenstamm steht hier unter Punkt 6, nicht unter 13.)
 7. **Der Token-Inhaber ersetzt das Testtoken** („CF Analytics", Id 179). Soll der Importer ein Token nutzen, gehört es
    in eine Umgebungsvariable, nie in `raw`, Log oder Messdatei (Regel 2); dann je Marke ein Token.
 8. ~~**Host des FoodNotify-MCP-Servers** unbekannt (`api3…/mcp`, `connect…/mcp` → 403 „Invalid Host header").~~
@@ -2830,8 +2869,15 @@ heißt) und `docs/foodnotify-api-inventar-intern-2026-11.md`. Gemessen ist nur W
 14. **Taugt `link-targets.updatedAt` als Änderungsfilter für den Rezept-Umlauf (`0134`)?** 13.253 Rezepte, `updatedAt`
     von 19.10.2022 bis 17.11.2026. Prüfen: bewegt sich `updatedAt`, wenn sich nur eine Zutat ändert? (gegen zwei
     Abrufe desselben Rezepts in `raw.api_antwort`).
-    **Nachtrag 19.11.2026:** nicht beantwortet — `link-targets` lief im `fn-probe` zweimal in die 120-s-Grenze
-    (nachts; tagsüber am 18.11. rund 11 s). Bei Tag wiederholen.
+    ~~**Nachtrag 19.11.2026:** nicht beantwortet — `link-targets` lief im `fn-probe` zweimal in die 120-s-Grenze
+    (nachts; tagsüber am 18.11. rund 11 s). Bei Tag wiederholen.~~
+    **Tagesergebnis 19.11.2026, 06:12 UTC** (`payloads/foodnotify-2026-11/fn-probe-2026-11-19-tag.md`): `link-targets`
+    kam in **2,0 s** (3,06 MB), 13.265 Rezepte. `ingredientCount`: 0 → 158, 1–5 → 10.503, 6–20 → 2.597, über 20 → 7.
+    `updatedAt` 19.10.2022 bis 18.11.2026 21:50; **80 Rezepte in den letzten 14 Tagen** (0,6 %), 19 in den letzten
+    sieben, je Tag 0 bis 47 (Stoß am 10.11.). Die Spanne ist klein genug für einen Filter; **nicht entschieden**, ob
+    `updatedAt` bei einer reinen Zutatenänderung wandert — dazu zwei Abrufe desselben Rezepts in `raw.api_antwort`
+    gegen `updatedAt`. Bis dahin höchstens als Zusatz zum festen 14-Tage-Umlauf. **Gegenprobe gegen `core.zutat`
+    offen:** lokal leer (`core.rezept`/`core.zutat` 0 Zeilen in allen `lina*`-Datenbanken), Produktion nicht berührt.
 15. **Lieferte `/api/recipes` schon vor dem 09.11.2026 die Form von `/api/recipe-viewer/recipes`** (`archived` je
     Eintrag, `totalItems`)? Gegen die ältesten `fn:rezepte`-Antworten in `raw.api_antwort` prüfen; hängt mit 4a
     (Rezepturen, 15.10.2026) zusammen.
@@ -2850,3 +2896,38 @@ heißt) und `docs/foodnotify-api-inventar-intern-2026-11.md`. Gemessen ist nur W
     Fehlertexte und 404"). **Offen bleibt:** wie ein echtes 404 auf `/api/recipes/{id}` aussieht (nie mit Text
     protokolliert) — nach dem ersten Fall `letzter_fehler` in `sync.warteschlange` lesen; und ob eine Grenze „zu
     viele `nicht_gefunden` in einem Lauf" gewollt ist (nicht gebaut, kein vorhandenes Muster dafür).
+
+## 19.11.2026 — Kassenartikel → Rezept (`0155`): was nach dem Deploy offen ist
+
+Gebaut gegen die Attrappe und gegen einen lokalen Klon mit den drei echten Antworten der Leseprobe;
+**in Produktion noch nicht gelaufen.** Bau: `importer.md`, Sichten: `metabase.md`, Entscheidung:
+`entscheidungen.md` (19.11.2026).
+
+1. **Erste Nacht nachmessen.** Erwartung: 32 Posten `fn:pos_artikel` bei Wilma Wunder (so viele
+   Kostenstellen tragen dort eine `connection_id`; lokal waren es 31), höchstens einzelne Abbrüche in
+   Wiedervorlage.
+   ```sql
+   SELECT zustand, count(*) FROM mart.pos_artikel_abdeckung WHERE marke_aktiv GROUP BY 1;
+   SELECT * FROM mart.pruefung_uebersicht WHERE sicht = 'mart.pos_artikel_abdeckung';   -- auffaellig = 0
+   SELECT * FROM mart.quelle_zulauf WHERE quelle LIKE '%pos_artikel';                    -- beide 'ok'
+   SELECT ergebnis, count(*), max(letzter_fehler) FROM sync.warteschlange
+    WHERE endpunkt = 'fn:pos_artikel' AND zeitraum_von >= current_date - 1 GROUP BY 1;
+   ```
+   Dazu die Antwortzeiten in `sync.aufgabe` (`dauer_ms`): reichen 180 s (`FN_ZEITGRENZE_LANG_MS`)?
+2. **Trägt die PLU-Brücke in allen Anbindungen?** `umsatz_im_feed_pct` je Anbindung und Betrieb lesen
+   (lokal 81,8–88,5 % mit nur einer der zwei Anbindungen). Fällt eine Anbindung weit unter die übrigen,
+   Nummernkreis prüfen. Dann die eigentliche Zahl: `umsatz_rezept_pct` in
+   `mart.pos_artikel_abdeckung_betrieb` (lokal 71,6–82,4 %).
+3. **`ohne betrieb`**: Kostenstellen mit Kasse, aber ohne `betrieb_key` zählen keinen Umsatz. Lokal 2 von 31
+   Wilma-Anbindungen. Entscheidungsliste: `mart.kostenstelle_ohne_betrieb` (Mensch, nicht Importer).
+4. **Die anderen drei Marken.** Je Marke erst messen (`bun run fn-probe --marke …`, im Terminal des Nutzers):
+   Kassensystem je Anbindung, Antwortform, Antwortzeit. Lokal tragen Aposto 4, Enchilada 7 und Deutsche
+   Konzepte 2 Kostenstellen eine `connection_id`, Aposto zwei davon mit `ikentoo` (dort trägt die Brücke
+   nicht, `ohne plu-bruecke`). Freischalten heißt `POS_ARTIKEL_MARKEN` ergänzen, keine Codeänderung.
+5. **MCP-Katalogabzug aus Produktion** (`cd mcp && bun run katalog:abzug` gegen eine vollständige Datenbank),
+   nachdem `0155` dort läuft — drei neue Sichten, drei Fallstricke.
+6. **`isSyncing`** (`wird_synchronisiert`) ist ungedeutet: bei Artikeln mit Rezept meist `true`. Ob es
+   „FoodNotify verbucht Verkäufe dieses Artikels" heißt, ist nicht gemessen — die Sichten werten es nicht aus.
+7. **Eine Anbindung, die wirklich leer zurückkommt** (Kasse abgemeldet), scheitert jede Nacht an der Sperre
+   „0 Artikel, im Bestand stehen N" und steht dann `veraltet`. Ob sie dann aus dem Bestand genommen werden soll
+   (alle Artikel `fehlt_seit`), entscheidet ein Mensch; gebaut ist nur das Sichtbarmachen.

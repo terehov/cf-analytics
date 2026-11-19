@@ -402,10 +402,11 @@ statt sie aufzulösen, benutzen wir LINAs fertigen `fixed_we` je Artikel.
 
 > **Seit `0132` (15.10.2026)** sind die Rezepturen aus FoodNotify da — Rezept → Zutat → Ware über
 > die Lieferanten-Artikelnummer (Abschnitt „FoodNotify: Rezepturen" unten). Die Brücke **Kassenartikel
-> → Rezept** fehlt weiter (`core.pos_artikel` leer); `fixed_we` bleibt deshalb unberührt.
+> → Rezept** ~~fehlt weiter (`core.pos_artikel` leer)~~ wird seit `0155` (19.11.2026) geladen, vorerst nur
+> für Wilma Wunder (Abschnitt „FoodNotify: Kassenartikel → Rezept" unten); `fixed_we` bleibt unberührt.
 > Erreichbar ist die Zuordnung seit 01.08.2026 mit der Sitzung und seit 18.11.2026 auch mit dem Scope-Token
-> (`/api/pos/mapping/{connectionId}/articles`: `plu`, `recipeId`, `isIgnored`) — die Tabelle ist leer, weil sie nie
-> gebaut wurde, nicht weil der Zugang fehlt.
+> (`/api/pos/mapping/{connectionId}/articles`: `plu`, `recipeId`, `isIgnored`) — ~~die Tabelle ist leer, weil sie nie
+> gebaut wurde, nicht weil der Zugang fehlt~~.
 
 ### Die Stände — über Zeiträume, nie über Monatsgleichheit
 
@@ -1028,8 +1029,9 @@ der 7.452 Positionen — also 91,5 % der Positionen mit Nummer treffen den Einka
 
 **Was die Zahlen nicht sagen:**
 
-* **Kein Betriebsbezug.** Welcher Betrieb ein Rezept verkauft, steht in der Kassenzuordnung
-  (`/api/pos/mapping/…`, `core.pos_artikel`) — nicht geladen.
+* **Kein Betriebsbezug** am Rezept selbst. Welcher Betrieb ein Rezept verkauft, steht in der Kassenzuordnung
+  (`/api/pos/mapping/…`, `core.pos_artikel`) — ~~nicht geladen~~ seit `0155` geladen, vorerst nur Wilma Wunder
+  (`mart.pos_artikel_rezept`).
   Seit 18.11.2026 bekannt, **nicht geprüft**: `/api/pos/mapping/{connectionId}/link-targets` führt je Rezept
   `restaurantId` und `restaurantName` (13.253 Zeilen bei Wilma Wunder, 17 verschiedene `restaurantId`). Ob das der Eigentümer oder die Verwendung
   ist, weiß niemand (`foodnotify-api-inventar-offiziell.md`).
@@ -1046,6 +1048,57 @@ der 7.452 Positionen — also 91,5 % der Positionen mit Nummer treffen den Einka
 
 **Wo man nachsieht, ob es noch läuft:** `SELECT * FROM mart.rezept_stand;` (Zustand je Marke),
 `SELECT * FROM mart.quelle_zulauf WHERE quelle LIKE 'fn:rezept%' OR quelle = 'core:rezept';`.
+
+## FoodNotify: Kassenartikel → Rezept (seit `0155`, 19.11.2026)
+
+**Gebaut gegen die Attrappe, in Produktion noch nicht gelaufen.** Vorerst **nur Wilma Wunder**
+(`POS_ARTIKEL_MARKEN`, Begründung in `entscheidungen.md`).
+
+**Quelle:** `GET /api/pos/mapping/{connectionId}/articles` (Cookie-Sitzung), ein Aufruf je
+Kassenanbindung und Nacht (`fn:pos_artikel`). Die `connectionId` liefert `/api/pos/locations`
+(`fn:pos_standorte` → `core.kostenstelle.connection_id`, dort auch `kassensystem`). Gemessen am
+19.11.2026 (`payloads/foodnotify-2026-11/fn-probe-2026-11-19.md`): 32 Anbindungen bei Wilma Wunder,
+alle `amadeus`; keine Hülle, keine Seiten; 798–1.171 Artikel je Anbindung, 35–58 % mit Rezept.
+
+```text
+core.kostenstelle (connection_id, kassensystem, betrieb_key)
+  └─ core.pos_artikel (kostenstelle_key, remote_id)
+       ├─ plu_zahl      → core.artikel.artikelnummer   NUR bei kassensystem = 'amadeus'
+       └─ rezept_fn_id  → core.rezept (marke_key, fn_id)
+```
+
+**Wie die Tabellen zusammenfinden:**
+
+* **`plu_zahl = core.artikel.artikelnummer` gilt nur bei `amadeus`** (Aposto Gera 01.08.2026: 99,7 %
+  Namensgleichheit gegen 0,3 % Zufall; Wuppertal/`ikentoo`: fremder Nummernkreis, `foodnotify-0-1-nummernraum.md`).
+  `mart.pos_artikel_rezept` macht den Join nur dort.
+* **Das Rezept über `(marke_key, rezept_fn_id)`**, nie über den Titel — Rezeptnamen sind nicht eindeutig.
+  Kommt die Zuordnung vor dem Rezept an, steht `rezept_titel` schon da und `rezept` (aus `core.rezept`) ist NULL.
+* **Ein Betrieb hat oft zwei Anbindungen** (Bar, Küche). Ihre Artikellisten überschneiden sich, sind aber
+  **nicht gleich**: gemessen 19.11.2026 führt die Bar Ballplatz Mainz Speisenrezepte, und der Küche Düsseldorf
+  fehlen die Kaffeegetränke. Je Betrieb gilt ein Artikel als „mit Rezept", wenn er in irgendeiner Anbindung
+  eins trägt (`mart.pos_artikel_abdeckung_betrieb`).
+* **Schlüssel ist `remoteProductId`**, nicht die PLU (`entscheidungen.md`). Die PLU war in allen drei
+  gemessenen Antworten je Anbindung eindeutig; doppelte PLU zählt `plu_doppelt`.
+
+**Was die Zahlen nicht sagen:**
+
+* **Keinen Wareneinsatz.** Die Abdeckung sagt, welcher Umsatzanteil ein Rezept trägt — nicht, was die Ware
+  kostete, und nicht, ob das Rezept stimmt. `name_weicht_ab` (FoodNotifys `hasLinkNameMismatch`) markiert
+  Zuordnungen, bei denen Artikel- und Rezeptname auseinanderlaufen.
+* **Keine Historie vor dem ersten Abruf.** `core` hält den Zustand der letzten erfolgreichen Antwort; was
+  vorher zugeordnet war, weiß niemand. Ab dem ersten Abruf liegt jede Antwort in `raw`.
+* **Keinen Verkauf aus FoodNotify.** FoodNotifys eigener Verkaufsimport steht seit 31.08.2026 still
+  (Leseprobe Abschnitt 4); der Umsatz in den Sichten kommt aus LINA (`mart.artikel_monat`).
+* **`umsatz_im_feed_pct` liegt unter 100, auch wenn die Brücke trägt.** Auf einem lokalen Klon mit den drei
+  echten Antworten gemessen (19.11.2026, LINA-Umsatz Mai–Juli 2026): 81,8–88,5 % des Artikelumsatzes der drei
+  Betriebe standen im Feed der einen geladenen Anbindung, 71,6–82,4 % trugen ein Rezept. Was fehlt, sind
+  Artikel der anderen Anbindung (Kaffee an der Bar) und Saisonartikel, die FoodNotify vor dem Abruf schon
+  gestrichen hatte (Spargel, Sommerbowl). In Produktion mit allen Anbindungen nachmessen.
+
+**Wo man nachsieht, ob es noch läuft:** `SELECT zustand, count(*) FROM mart.pos_artikel_abdeckung GROUP BY 1;`
+(Erwartung: nur `ok`, `ohne betrieb`, `marke nicht aktiv`), `SELECT * FROM mart.quelle_zulauf WHERE quelle LIKE
+'%pos_artikel';`.
 
 ## Personal je Stunde — LINAs offizielle Schnittstelle (TPAPI, seit `0149`, 09.11.2026)
 

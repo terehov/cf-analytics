@@ -58,6 +58,19 @@ function rezeptAntwort(pfad: string, url: URL, fremd = false): unknown | null {
   return { data: r.kopf }
 }
 
+/**
+ * KASSENARTIKEL (0155) — synthetische Antwort von
+ * /api/pos/mapping/{connectionId}/articles für die Anbindung 1907 (Küche
+ * Aposto Gera in dieser Attrappe). Die FORM ist gemessen (Wilma Wunder,
+ * 19.11.2026): keine Hülle, keine Seiten, items[] neben location,
+ * restaurantId, canCreateRecipes, ingestIssues[]. Die Werte sind erfunden
+ * (src/foodnotify/fixtures/pos_artikel.json).
+ */
+const POS_ARTIKEL = JSON.parse(readFileSync(
+  new URL('./fixtures/pos_artikel.json', import.meta.url), 'utf8')) as {
+    items: Array<Record<string, unknown> & { remoteProductId: number }>; [k: string]: unknown }
+const POS_ANBINDUNGEN = new Set([1907])
+
 export type FnMockOptionen = {
   port?: number
   /**
@@ -124,8 +137,19 @@ export function fnMockStarten(opt: FnMockOptionen = {}) {
    * Zur Laufzeit umstellbar, aus demselben Grund wie `verbieten()`.
    */
   const validierung = new Set<string>()
+  /**
+   * Kassenartikel (0155), zur Laufzeit umstellbar wie `verbieten()`:
+   *   posOhne       remoteProductIds, die in der Antwort fehlen (Test „fehlt seit")
+   *   posForm       'fremd' = recipeId umbenannt (Formprüfung), 'leer' = items: []
+   *   verzoegert    Pfad → Verzögerung in ms NUR für diesen Pfad — die
+   *                 Zeitgrenze eines langsamen Pfads lässt sich so prüfen, ohne
+   *                 die Anmeldung mitzubremsen (die hat ANFRAGE_TIMEOUT_MS)
+   */
+  const posOhne = new Set<number>()
+  let posForm: 'echt' | 'fremd' | 'leer' = 'echt'
+  const verzoegert = new Map<string, number>()
 
-  const json = (body: unknown, init: ResponseInit = {}) =>
+  const json =(body: unknown, init: ResponseInit = {}) =>
     new Response(JSON.stringify(body), {
       ...init, headers: { 'content-type': 'application/json', ...(init.headers ?? {}) },
     })
@@ -137,6 +161,8 @@ export function fnMockStarten(opt: FnMockOptionen = {}) {
       const pfad = url.pathname
       zaehler[pfad] = (zaehler[pfad] ?? 0) + 1
       if (langsamMs) await Bun.sleep(langsamMs)
+      const pfadVerzoegerung = verzoegert.get(pfad)
+      if (pfadVerzoegerung) await Bun.sleep(pfadVerzoegerung)
 
       if (pfad === '/api/user/auth/signin_check' && req.method === 'POST') {
         anmeldungen++
@@ -413,6 +439,18 @@ export function fnMockStarten(opt: FnMockOptionen = {}) {
         default: {
           const rezept = rezeptAntwort(pfad, url, rezeptHuelleFremd)
           if (rezept) return json(rezept)
+          const pos = pfad.match(/^\/api\/pos\/mapping\/(\d+)\/articles$/)
+          if (pos) {
+            if (!POS_ANBINDUNGEN.has(Number(pos[1]))) break
+            const items = posForm === 'leer' ? []
+              : POS_ARTIKEL.items.filter(a => !posOhne.has(a.remoteProductId)).map(a => {
+                  if (posForm !== 'fremd') return a
+                  // Umbenanntes Pflichtfeld: ohne Formprüfung hiesse das „kein Artikel hat ein Rezept".
+                  const { recipeId, ...rest } = a
+                  return { ...rest, recipe_id: recipeId }
+                })
+            return json({ ...POS_ARTIKEL, _hinweis: undefined, items })
+          }
           const items = pfad.match(/^\/api\/erp\/stocktakings\/([^/]+)\/items$/)
           if (!items) break
           const seite = Number(url.searchParams.get('page') ?? 1)
@@ -491,6 +529,12 @@ export function fnMockStarten(opt: FnMockOptionen = {}) {
     rezeptHuelleFremd: (an: boolean) => { rezeptHuelleFremd = an },
     /** Einen Pfad mit dem Validierungs-404 antworten lassen bzw. zuruecknehmen (siehe `validierung`). */
     validierungsfehler: (pfad: string, an = true) => { if (an) validierung.add(pfad); else validierung.delete(pfad) },
+    /** Kassenartikel (0155): diese remoteProductIds aus der Antwort nehmen (leere Liste = alle zurück). */
+    posArtikelOhne: (ids: number[]) => { posOhne.clear(); for (const id of ids) posOhne.add(id) },
+    /** Kassenartikel (0155): 'fremd' = recipeId umbenannt, 'leer' = items: [], 'echt' = gemessene Form. */
+    posArtikelForm: (form: 'echt' | 'fremd' | 'leer') => { posForm = form },
+    /** Nur DIESEN Pfad um ms verzögern (0 = aus) — für die Zeitgrenze langsamer Pfade. */
+    verzoegern: (pfad: string, ms: number) => { if (ms > 0) verzoegert.set(pfad, ms); else verzoegert.delete(pfad) },
     stop: () => server.stop(true),
   }
 }

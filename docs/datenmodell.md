@@ -1405,7 +1405,8 @@ befüllbar (Plan und Entscheidungen A–D: `plan-rezepturen.md`):
 * Index `bestellposition_lieferanten_nr` (Teilindex, `lieferanten_nr IS NOT NULL`): die Zuordnung
   Zutat → Einkauf fragt je Zutat danach.
 
-`core.pos_artikel` (Kassenzuordnung, Betriebsbezug) ist **nicht** Teil dieses Schritts und bleibt leer.
+`core.pos_artikel` (Kassenzuordnung, Betriebsbezug) ist **nicht** Teil dieses Schritts ~~und bleibt leer~~
+(befüllt seit `0155`, siehe unten).
 
 ### Nachtrag `0132` nach der Probe vom 15.10.2026
 
@@ -1831,3 +1832,59 @@ der Reihe.
 Die Auswertung (`mart.umsatzprognose_vorlauf`, `_guete`, `_nachher`, `_nachher_betrieb`, `_horizont`,
 `_verlauf`) steht in `metabase.md`.
 
+
+## Kassenartikel → Rezept: `core.pos_artikel` befüllt (`0155`, 19.11.2026)
+
+`core.pos_artikel` stand seit `0030` leer im Schema. Seit `0155` schreibt `fn:pos_artikel`
+(`/api/pos/mapping/{connectionId}/articles`) hinein — vorerst nur für Wilma Wunder
+(`POS_ARTIKEL_MARKEN`). **Gebaut gegen die Attrappe, in Produktion noch nicht gelaufen.**
+
+**~~Monatsmomentaufnahme~~ → Zustand.** `0030` legte die Tabelle mit `monat` im Primärschlüssel an,
+damit „welches Rezept stand im März hinter dem Artikel" beantwortbar bleibt. Die Frage beantwortet
+jetzt `raw`: jede Antwort je Anbindung und Tag liegt append-only in `raw.api_antwort`, `core` ist
+daraus neu aufbaubar. In `core` steht der Zustand der letzten **erfolgreichen** Antwort — dazu
+`geaendert_am` (letzte fachliche Änderung) und `fehlt_seit`. Begründung in `entscheidungen.md`
+(19.11.2026).
+
+**Umbau per `ALTER`** (`0030` bleibt unverändert; die Migration bricht ab, wenn die Tabelle nicht leer
+ist):
+
+| Spalte | Quelle | Bemerkung |
+|---|---|---|
+| `kostenstelle_key`, `remote_id` | Posten, `remoteProductId` | **Primärschlüssel** — nicht `plu` |
+| `plu` | `plu` | Text, jetzt nullbar (andere Kassensysteme) |
+| `plu_zahl` | berechnet | `plu` als `bigint`, wenn nur Ziffern — der Join gegen `core.artikel.artikelnummer`, **nur bei `kassensystem = 'amadeus'`** |
+| `externe_id` | `externalId` | Kennung im Kassensystem (amadeus: `posId`) |
+| `name`, `preis`, `mwst` | `name`, `price` (Text „4.4"), `vat` | |
+| `rezept_fn_id`, `rezept_titel` | `recipeId`, `recipeTitle` | **ersetzt `rezept_key`**: das Rezept kommt oft erst nach der Zuordnung in `core.rezept` an, ein beim Laden aufgelöster Schlüssel bliebe still NULL. Aufgelöst wird in den Sichten über `(marke_key, rezept_fn_id)` |
+| `ist_ignoriert` | `isIgnored` | umbenannt aus `ignoriert` |
+| `wird_synchronisiert` | `isSyncing` | Bedeutung nicht gemessen |
+| `abwesend_seit` | `absentFromFeedSince` | die **Kasse** meldet ihn nicht mehr — nicht dasselbe wie `fehlt_seit` |
+| `name_doppelt`, `name_weicht_ab` | `hasDuplicateName`, `hasLinkNameMismatch` | FoodNotifys eigene Qualitätskennzeichen |
+| `fehlt_seit` | Lader | in einer erfolgreichen Antwort nicht mehr enthalten; nie gelöscht, geleert, wenn er zurückkommt |
+| `erstmals_am`, `zuletzt_gesehen_am` (umbenannt aus `geladen_am`), `geaendert_am`, `raw_id` | Lader | `zuletzt_gesehen_am` = `abgerufen_am` der Rohantwort (dasselbe `now()` der Transaktion) |
+
+Index `pos_artikel_plu_zahl (kostenstelle_key, plu_zahl)` für die Abdeckungssichten, Teilindex
+`pos_artikel_rezept (rezept_fn_id)`.
+
+**Neu: `core.pos_artikel_abruf`** — eine Zeile je Kostenstelle mit Kasse: letzter erfolgreicher Abruf
+(`abgerufen_am`), Artikelzahl, `standort` und `restaurant_id` laut Antwort, `kann_rezepte_anlegen`,
+`ingest_hinweise` (Länge von `ingestIssues[]`, Inhalt in `raw`), `raw_id`. Ohne sie sähe eine Anbindung,
+die erfolgreich null Artikel liefert, aus wie eine, die nie gefragt wurde.
+
+Was die Tabelle **nicht** hat: einen Betriebsbezug am Rezept (Rezepte gelten je Marke; der Betrieb
+kommt über `core.kostenstelle.betrieb_key`) und keinen Wareneinsatz. Auswertung in `metabase.md`.
+
+
+## Lieferkonditionen: beobachtet, nicht geladen (`0156`, 19.11.2026)
+
+**Keine neue Tabelle.** Die Konditionen eines Lieferanten (Tourenplan, Bestellfrist, Mindestbestellwert) stehen in
+FoodNotify am Warenkorb und sind nicht importiert (`payloads/foodnotify-2026-11/lieferkonditionen-bundle-2026-11-19.md`).
+`mart.lieferkondition_beobachtet` (Beschreibung in `metabase.md`) leitet aus `core.bestellung` ab, was die Bestellungen
+zeigen — je Kostenstelle × Lieferant, zwölf Monate, **beobachtet, nicht vereinbart**.
+
+**`core.bestellung.geliefert_am` bedeutet:** der bei der Bestellung **gewählte** Liefertermin
+(`markedShopOrder.deliveryDate`), als **Berliner Kalendertag**. Kein Wareneingang. Bis `0156` stand bei 50.014 von
+50.050 Bestellungen der Tag davor (UTC-Tag der Berliner Mitternacht); die Migration baut die Spalte aus `raw`
+(`fn:bestellung`) zurück, der Lader (`src/foodnotify/transform.ts`, `alsBerlinerDatum`) schreibt seitdem richtig.
+`bestellt_am` (`timeCreated`) und `beleg_datum` (`invoiceDate`, 11:00/12:00 UTC) waren nicht betroffen.

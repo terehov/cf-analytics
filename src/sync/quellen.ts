@@ -27,7 +27,7 @@
  */
 import { query } from '../db/pool'
 import { log } from '../lib/log'
-import { config } from '../config'
+import { config, posArtikelMarken } from '../config'
 import { ENDPUNKTE } from '../lina/endpunkte'
 import { BETRIEBSBERICHTE, type Fensterklasse } from '../lina/betriebsberichte'
 import { TPAPI_ENDPUNKTE } from '../tpapi/endpunkte'
@@ -328,6 +328,23 @@ export const QUELLEN: readonly Quelle[] = [
   { quelle: 'fn:pos_standorte', bezeichnung: 'POS-Standorte und Kassensystem',
     system: 'foodnotify', endpunkt: 'fn:pos_standorte', kadenz_stunden: TAEGLICH },
   /*
+   * KASSENARTIKEL → REZEPT (0155). Ein Posten je Anbindung und Tag, im
+   * Tagesgeschäft. `erwartet` hängt am Schalter POS_ARTIKEL_MARKEN, wie die
+   * Rezeptzutaten am Notschalter: leer heißt bewusst aus, und ein Alarm, der
+   * dann jede Nacht schlägt, entwertet die Prüfzeile. Gemessen an sync.aufgabe
+   * (wird gefragt?) UND an der Tabelle (core:pos_artikel weiter unten — kommt
+   * an?): die beiden Ausfälle dieses Projekts waren verschiedene (0076).
+   * JE ANBINDUNG misst das nicht — fällt eine von 32 aus, halten die anderen
+   * diese Zeile grün. Das misst mart.pos_artikel_abdeckung (zustand) und die
+   * Zeile in mart.pruefung_uebersicht.
+   */
+  { quelle: 'fn:pos_artikel', bezeichnung: 'Kassenartikel mit Rezeptzuordnung je Kassenanbindung',
+    system: 'foodnotify', endpunkt: 'fn:pos_artikel', kadenz_stunden: TAEGLICH,
+    erwartet: posArtikelMarken().length > 0,
+    bemerkung: posArtikelMarken().length > 0
+      ? `Marken: ${posArtikelMarken().join(', ')} (POS_ARTIKEL_MARKEN). Je Anbindung: mart.pos_artikel_abdeckung.`
+      : 'POS_ARTIKEL_MARKEN leer: Kassenartikel bewusst fuer keine Marke geholt.' },
+  /*
    * Inventuren entstehen nicht täglich. Der Lauf zieht bei jedem Lauf die
    * jeweils letzte Seite nach; ob dabei Zeilen anfallen, hängt am Betrieb.
    * Eine Woche ist die Grenze, ab der „gar keine Inventur mehr" eine
@@ -559,12 +576,14 @@ export const QUELLEN: readonly Quelle[] = [
    * (jeder Listenabruf setzt ihn) — NICHT an `erstellt_am`, das ist
    * FoodNotifys Anlagedatum und sagt nichts über unseren Zulauf.
    *
-   * `core.pos_artikel` ist dabei der unangenehmste Fall: `AGENTS.md`
+   * ~~`core.pos_artikel` ist dabei der unangenehmste Fall: `AGENTS.md`
    * beschreibt ihn als die Brücke zwischen LINA-Artikel und
    * FoodNotify-Rezept (`plu = core.artikel.artikelnummer`) — als
-   * bestünde sie. Sie besteht nicht.
+   * bestünde sie. Sie besteht nicht.~~ Seit 0155 (19.11.2026) schreibt
+   * fn:pos_artikel `core.pos_artikel` — vorerst nur für Wilma Wunder
+   * (POS_ARTIKEL_MARKEN); erwartet, solange der Schalter eine Marke nennt.
    *
-   * Sie stehen hier als `erwartet: false`, weil ein Alarm ohne
+   * `core.ware_stand` steht hier als `erwartet: false`, weil ein Alarm ohne
    * Handlungsmöglichkeit nur die Prüfzeile entwertet. Was daraus folgt,
    * steht in `docs/offene-punkte.md`.
    */
@@ -573,11 +592,18 @@ export const QUELLEN: readonly Quelle[] = [
     kadenz_stunden: TAEGLICH,
     bemerkung: 'Seit 0132 befuellt (fn:rezepte, fn:rezept). Gemessen an zuletzt_am. '
              + 'Je Marke: mart.rezept_stand.' },
+  /*
+   * ~~Kein Schreiber im Repo, 0 Zeilen~~ — seit 0155 schreibt fn:pos_artikel.
+   * Gemessen an zuletzt_gesehen_am: jeder Artikel einer erfolgreichen Antwort
+   * rückt nach. Steht die Spalte, kommt nichts an, auch wenn sync.aufgabe
+   * „ok" meldet.
+   */
   { quelle: 'core:pos_artikel', bezeichnung: 'Bruecke LINA-Artikel → FoodNotify-Rezept',
-    system: 'foodnotify', tabelle: { schema: 'core', name: 'pos_artikel', zeitspalte: 'geladen_am' },
-    kadenz_stunden: MONATLICH, erwartet: false,
-    bemerkung: 'Kein Schreiber im Repo, 0 Zeilen. AGENTS.md beschreibt den Join, '
-             + 'als gaebe es ihn. Siehe docs/offene-punkte.md.' },
+    system: 'foodnotify', tabelle: { schema: 'core', name: 'pos_artikel', zeitspalte: 'zuletzt_gesehen_am' },
+    kadenz_stunden: TAEGLICH, erwartet: posArtikelMarken().length > 0,
+    bemerkung: posArtikelMarken().length > 0
+      ? 'Seit 0155 befuellt (fn:pos_artikel), gemessen an zuletzt_gesehen_am. Je Anbindung: mart.pos_artikel_abdeckung.'
+      : 'POS_ARTIKEL_MARKEN leer: kein Zulauf erwartet.' },
   { quelle: 'core:ware_stand', bezeichnung: 'Warenhistorie (FoodNotify)',
     system: 'foodnotify', tabelle: { schema: 'core', name: 'ware_stand', zeitspalte: 'geladen_am' },
     kadenz_stunden: MONATLICH, erwartet: false,

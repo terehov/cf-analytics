@@ -1169,8 +1169,9 @@ behält seinen Grund — die erste Ursache ist die wichtigere.
   geschlossen ins Leere. Läuft seit dem 14.08.2026 täglich mit den übrigen
   Stammdaten mit (+4 Aufrufe am Tag gegen 140.000 Budget).
 * **Drei `core`-Tabellen haben null Zeilen und keinen Schreiber**:
-  `core.rezept`, `core.pos_artikel`, `core.ware_stand`. Sie stehen im Register
-  als `erwartet: false` mit Begründung — siehe `offene-punkte.md`.
+  ~~`core.rezept`, `core.pos_artikel`,~~ `core.ware_stand`. Sie stehen im Register
+  als `erwartet: false` mit Begründung — siehe `offene-punkte.md`. (`core.rezept`
+  befüllt seit `0132`, `core.pos_artikel` seit `0155`.)
 
 ## Zehn Umsatzberichte statt zwei (Migration `0077`, 14.08.2026)
 
@@ -2651,3 +2652,66 @@ Frist als stumm — `fn:rezept` nicht, er ist `erwartet: false`. Eine eigene Mig
 Die Attrappe stellt das Validierungs-404 her (`fnMockStarten().validierungsfehler(pfad)`); Tests in
 `src/foodnotify/fehler404.test.ts`, `huelle.test.ts`, `rezept.test.ts` und (mit Datenbank)
 `rezept_db.test.ts`.
+
+## FoodNotify: Kassenartikel → Rezept (`fn:pos_artikel`, `0155`, 19.11.2026)
+
+Entscheidung Eugene, 19.11.2026. **Gebaut gegen die Attrappe, in Produktion noch nicht gelaufen.**
+Messgrundlage: `payloads/foodnotify-2026-11/fn-probe-2026-11-19.md`, Abschnitt 1.
+
+| Teil | Wo | Was |
+|---|---|---|
+| Register | `src/foodnotify/endpunkte.ts` | `fn:pos_artikel`, Pfad `/api/pos/mapping/{connectionId}/articles`, Priorität 30 (nach den Tagesbestellungen 20, vor den Rezeptlisten 40), `zeitgrenze: 'lang'` |
+| Zeitgrenze | `src/foodnotify/client.ts` (`fnZeitgrenzeMs`) | `FN_ZEITGRENZE_LANG_MS` (180 s), der größere von beiden Werten gegen `ANFRAGE_TIMEOUT_MS` — gemessen 19–39 s je Antwort, je Lauf ein Abbruch (120 s, `ECONNRESET` nach 81 s) |
+| Einreihen | `src/sync/nachfuellen.ts` (`posArtikelNachfuellen`, aus `foodnotifyNachfuellen`) | ein Posten je Kostenstelle mit `connection_id`, je Marke aus `POS_ARTIKEL_MARKEN` mit Zugangsdaten; `nachladen = false` → Phase A, FoodNotify-Spur; gesperrt gegen denselben Tag und gegen einen offenen älteren Posten |
+| Schalter | `src/config.ts` | `POS_ARTIKEL_MARKEN`, Vorgabe `wilma_wunder`; unbekannter Schlüssel lässt den Start scheitern; der wirksame Wert geht je Lauf nach `sync.merker` (`pos_artikel_marken`) |
+| Form | `src/foodnotify/pos_artikel.ts` | zod-Schema der gemessenen Form, `posArtikelStrukturFehler` vor dem Laden |
+| Laden | `src/foodnotify/laden.ts` (`case 'fn:pos_artikel'`) | ein Upsert über `jsonb_to_recordset` je Antwort, dann `fehlt_seit` für Nichtgesehenes, dann `core.pos_artikel_abruf` |
+| Zulauf | `src/sync/quellen.ts` | `fn:pos_artikel` (`sync.aufgabe`) und `core:pos_artikel` (`zuletzt_gesehen_am`), beide `erwartet`, solange der Schalter eine Marke nennt |
+
+**Die connectionId kommt aus `core.kostenstelle`**, gesetzt von `fn:pos_standorte` (läuft jede Nacht mit,
+Priorität 6). Eingereiht wird mit dem Stand der Vornacht: eine neu angebundene Kasse kommt einen Tag später.
+Das ist Absicht — fällt `fn:pos_standorte` einmal aus, laufen die bekannten Anbindungen weiter. Der Lader
+sucht die Kostenstelle über `(marke_key, connection_id)` und wirft, wenn es nicht genau eine ist (gemessen:
+32 Anbindungen, 32 verschiedene `connectionId`).
+
+**Ein Abbruch ist nie „keine Artikel".** Zeitgrenze, Verbindungsabbruch und HTTP 5xx kommen als Fehler aus
+dem Client: keine Rohantwort, `core` unberührt, Wiedervorlage nach dem üblichen Takt (`MAX_VERSUCHE`, dann
+`aufgegeben`, dann Wiederbelebung). `core.pos_artikel_abruf.abgerufen_am` bleibt stehen, und nach 36 h steht
+die Anbindung in `mart.pos_artikel_abdeckung` auf `veraltet`.
+
+**Drei Sperren beim Laden**, alle mit Rohantwort in `raw` und Befund in `sync.schema_abweichung`, `core`
+unberührt, Posten scheitert sichtbar:
+
+1. **Form** (zod): `items[]` muss eine Liste sein, je Artikel `remoteProductId` (ganze Zahl), `name`, `plu`
+   und **der Schlüssel `recipeId`** (Wert darf null sein). Eine umbenannte `recipeId` sähe sonst aus wie
+   „kein Artikel hat ein Rezept". Fehlende Kennzeichen werden null bzw. false, neue Felder stören nicht.
+2. **Doppelte `remoteProductId`** in einer Antwort — der Upsert scheiterte sonst unlesbar
+   („ON CONFLICT … cannot affect row a second time").
+3. **Null Artikel, wo der Bestand noch welche führt.** Die Leere-200er-Regel in `fnLaden` greift hier nicht
+   (`zeilenZaehlen` zählt das Antwortobjekt als eine Zeile); ohne diese Sperre stünde jeder Artikel der
+   Anbindung ab heute auf „fehlt". Kommt eine Anbindung wirklich leer zurück (Kasse abgemeldet), scheitert
+   der Posten jede Nacht — sichtbar in `mart.posten_aufgegeben` und als `veraltet`; ein Mensch entscheidet.
+
+**„Fehlt seit" statt Löschen.** Nach dem Upsert tragen alle gesehenen Zeilen `zuletzt_gesehen_am = now()`
+(je Transaktion fest, = `raw.api_antwort.abgerufen_am`); wer älter ist und noch kein `fehlt_seit` hat, bekommt
+es. Taucht der Artikel wieder auf, wird `fehlt_seit` geleert. `geaendert_am` rückt nur bei einer fachlichen
+Änderung nach (Vergleich als Zeilentupel im `ON CONFLICT`).
+
+**Tempo (Regel 3).** 32 Aufrufe je Nacht für Wilma Wunder, im Takt der FoodNotify-Spur — keine eigene
+Spur, keine Erhöhung. Die längere Zeitgrenze ist kein zusätzlicher Aufruf. Bei ~30 s je Antwort hält der
+Pfad die FoodNotify-Spur in Phase A rund 16 Minuten länger.
+
+**Tests:** `src/foodnotify/pos_artikel.test.ts` (Form, Pfad, Zeitgrenze, Schalter; ohne Datenbank) und
+`src/foodnotify/pos_artikel_db.test.ts` (Nachfüllen → Worker → raw → core → mart gegen die Attrappe:
+Schalter je Marke, „fehlt seit" und zurück, Zeitgrenze und HTTP 500 ändern nichts, 1,2 s über
+`ANFRAGE_TIMEOUT_MS` gehen dank der langen Grenze durch, fremde Form und leere Antwort, Zulauf). Die
+Attrappe (`src/foodnotify/mock.ts`) kennt dafür `posArtikelOhne()`, `posArtikelForm()` und `verzoegern()`
+(Verzögerung nur für einen Pfad, damit die Anmeldung nicht mitgebremst wird).
+
+## FoodNotify: der Liefertag ist ein Berliner Kalendertag (`0156`, 19.11.2026)
+
+`bestellkopf()` (`src/foodnotify/transform.ts`) liest `markedShopOrder.deliveryDate` seitdem mit `alsBerlinerDatum`
+(`kalendertagInGeschaeftszeitzone`), nicht mehr mit dem UTC-Tag. FoodNotify schickt den Liefertag als Unix-Sekunden der
+Berliner Mitternacht (22:00/23:00 UTC); der UTC-Tag war bei 50.014 von 50.050 Bestellungen der Tag **vor** der Lieferung.
+`core.bestellung.geliefert_am` ist der bei der Bestellung gewählte Termin, kein Wareneingang. `0156` baut den Bestand aus
+`raw` zurück; Hergang und Gegenprobe in `fehlerkatalog.md` (19.11.2026). `invoiceDate` (11:00/12:00 UTC) bleibt beim UTC-Tag.

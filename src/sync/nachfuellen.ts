@@ -33,7 +33,7 @@
  */
 
 import { query, eine } from '../db/pool'
-import { config, fnZugaenge } from '../config'
+import { config, fnZugaenge, posArtikelMarken } from '../config'
 import { log } from '../lib/log'
 import { AKTIVE_ENDPUNKTE, istMomentaufnahme, einreihPrioritaet, PRIORITAET } from '../lina/endpunkte'
 import { geschaeftstag } from '../lib/time'
@@ -1030,7 +1030,66 @@ export async function foodnotifyNachfuellen(): Promise<number> {
     log.error('nachfüllen rezepte gescheitert — der Lauf geht weiter', { fehler: String(e) })
   }
 
+  // Kassenartikel → Rezept (0155), ebenfalls mit eigenem Fang.
+  try {
+    n += await posArtikelNachfuellen()
+  } catch (e) {
+    log.error('nachfüllen kassenartikel gescheitert — der Lauf geht weiter', { fehler: String(e) })
+  }
+
   return n
+}
+
+/**
+ * Kassenartikel → Rezept (0155, Entscheidung Eugene 19.11.2026): je
+ * Kassenanbindung ein `fn:pos_artikel` am Tag, im Tagesgeschäft (Phase A,
+ * nachladen = false), für die Marken aus POS_ARTIKEL_MARKEN, die Zugangsdaten
+ * haben.
+ *
+ * Die connectionId kommt aus core.kostenstelle — gesetzt von fn:pos_standorte,
+ * das jede Nacht mitläuft. Hier gelesen wird also der Stand der Vornacht: eine
+ * neu angebundene Kasse kommt einen Tag später dazu. Das ist Absicht —
+ * scheitert fn:pos_standorte einmal, laufen die bekannten Anbindungen weiter,
+ * statt mit ihm auszufallen.
+ *
+ * GESPERRT gegen einen Posten desselben Tages (gleich, wie er ausging — der
+ * Takt hängt am Zeitraum, nicht am Ergebnis, wie bei den Stammdaten oben) und
+ * gegen einen noch offenen älteren: ein Abbruch von gestern, der noch auf
+ * Wiedervorlage steht, wird nicht verdoppelt.
+ *
+ * Der wirksame Schalter geht nach sync.merker (`pos_artikel_marken`), auch
+ * wenn er leer ist: mart.pos_artikel_abdeckung unterscheidet damit „Marke
+ * abgeschaltet" von „Anbindung ohne Abruf".
+ */
+export async function posArtikelNachfuellen(): Promise<number> {
+  const marken = posArtikelMarken()
+  await query(
+    `INSERT INTO sync.merker (schluessel, wert)
+     VALUES ('pos_artikel_marken', jsonb_build_object('marken', $1::text[]))
+     ON CONFLICT (schluessel) DO UPDATE SET wert = EXCLUDED.wert, gesetzt_am = now()`,
+    [marken])
+  const zugaenge = fnZugaenge().map(z => z.schluessel).filter(s => marken.includes(s))
+  if (zugaenge.length === 0) return 0
+
+  const { fnEndpunkt } = await import('../foodnotify/endpunkte')
+  const heute = geschaeftstag(new Date())
+  const r = await query(
+    `INSERT INTO sync.warteschlange
+       (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter, nachladen)
+     SELECT DISTINCT 'fn:pos_artikel', $1::date, $1::date, $3::int, k.marke_key,
+            jsonb_build_object('connectionId', k.connection_id::text), false
+       FROM core.kostenstelle k
+       JOIN core.marke m USING (marke_key)
+      WHERE m.schluessel = ANY($2::text[])
+        AND k.connection_id IS NOT NULL
+        AND NOT EXISTS (
+            SELECT 1 FROM sync.warteschlange w
+             WHERE w.endpunkt = 'fn:pos_artikel' AND w.marke_key = k.marke_key
+               AND w.parameter = jsonb_build_object('connectionId', k.connection_id::text)
+               AND (w.zeitraum_von = $1::date OR w.erledigt_am IS NULL))
+     RETURNING posten_id`,
+    [heute, zugaenge, fnEndpunkt('fn:pos_artikel').prioritaet])
+  return r.length
 }
 
 export type RezeptNachfuellStand = {

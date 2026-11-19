@@ -1824,7 +1824,8 @@ vorkommt" — Erwartung **konstant**, nicht 0).
 * **`artikelnummer` ist die Lieferanten-Artikelnummer**, nicht die der Kasse. Gegen den Einkauf
   (`mart.einkauf_position`) verbinden, nie gegen Kassenartikel.
 * **Rezepte gelten je Marke, nicht je Betrieb.** Den Betriebsbezug gäbe es nur über die
-  Kassenzuordnung (`core.pos_artikel`), die leer ist.
+  Kassenzuordnung (`core.pos_artikel`), ~~die leer ist~~ — seit `0155` geladen, vorerst nur Wilma Wunder
+  (`mart.pos_artikel_rezept`).
 * **Mengen werden über Ebenen nicht multipliziert.** In `mart.artikel_in_rezept` ist
   `menge`/`einheit` die Menge im Rezept, in dem die Ware **direkt** steht (`direkt_rezept`);
   `via_menge`/`via_einheit` sagt, wie viel vom Halbfabrikat im Rezept der Zeile steht. Einheiten
@@ -2367,3 +2368,97 @@ kein Fehler; sie steht in `mart.umsatzprognose_nachher_betrieb`.
 (filter_noetig, Warnung — eine Sperre hätte auch das legitime `GROUP BY vorlauf_tage` gesperrt).
 `umsatzprognose_ist_lina` aus 0153 verweist jetzt auf die neuen Sichten.
 
+
+## Kassenartikel → Rezept in `mart` (Migration `0155`, 19.11.2026)
+
+Drei Sichten, live (keine Materialisierung), alle für `mcp_leser` lesbar, im MCP-Katalog. **Gebaut gegen
+die Attrappe; in Produktion steht bis zum ersten Lauf nach dem Deploy nichts darin.** Vorerst nur Wilma
+Wunder (`POS_ARTIKEL_MARKEN`).
+
+| Sicht | Körnung | Wofür |
+|---|---|---|
+| `mart.pos_artikel_rezept` | Kassenanbindung × Kassenartikel (`remote_id`) | „Welches Rezept steckt hinter Kassenartikel X?" — mit `artikel_key`/`artikelnummer` (LINA, nur bei amadeus), `rezept_fn_id`, `rezept` (aus `core.rezept`), `hat_rezept`, allen Kennzeichen, `fehlt_seit` |
+| `mart.pos_artikel_abdeckung` | eine Kassenanbindung | Artikel gesamt / mit Rezept / `rezept_anteil_pct`, ignoriert, abwesend, Namensabweichung, nicht mehr geliefert, doppelte PLU, `letzter_abruf_am`, **`zustand`** (Regel 10), Umsatzabdeckung über diese Anbindung |
+| `mart.pos_artikel_abdeckung_betrieb` | ein Betrieb mit amadeus-Anbindung | **die Umsatzabdeckung**: Anteil des Artikelumsatzes der letzten drei vollen Monate, dessen Artikel in irgendeiner Anbindung des Betriebs ein Rezept trägt |
+
+**`zustand`** in `mart.pos_artikel_abdeckung`, in dieser Reihenfolge: `marke nicht aktiv` (Marke nicht in
+`POS_ARTIKEL_MARKEN`, gelesen aus `sync.merker`), `nie geladen`, `veraltet` (letzter erfolgreicher Abruf älter
+als 36 h), `leer`, `ohne plu-bruecke` (kein amadeus: Artikel gezählt, Umsatz NULL), `ohne betrieb`
+(Kostenstelle keinem LINA-Betrieb zugeordnet, `mart.kostenstelle_ohne_betrieb`), `ok`.
+
+**Prüfzeile** „FoodNotify-Kassenartikel: Anbindung einer aktiven Marke ohne frischen Abruf (36 h) oder leer" in
+`mart.pruefung_uebersicht`: geprüft = Anbindungen aktiver Marken, auffällig = `nie geladen`, `veraltet`,
+`leer`. **Erwartung 0.** Abgeschaltete Marken zählen nicht — sonst stünde die Zeile dauerhaft auf den drei
+anderen Marken.
+
+**Wie gerechnet wird:**
+
+* **Zählungen** über die Artikel der letzten Antwort (`fehlt_seit IS NULL`). `rezept_anteil_pct` =
+  mit Rezept (zugeordnet **und nicht ignoriert**) / gesamt — dieselbe Definition wie die Leseprobe
+  (2052: 442 / 895 = 49,4 %; ignoriert war dort keiner).
+* **Umsatz** aus `mart.artikel_monat_basis` (materialisiert, Artikel × Betrieb × Monat), die drei letzten
+  **vollen** Monate (`umsatz_von`, `umsatz_bis`) — nicht die Tagestabelle. „Mit Rezept" über `EXISTS`, damit
+  eine doppelte PLU nichts doppelt zählt. Für den Umsatz zählen **alle je gesehenen** Artikel, auch solche
+  mit `fehlt_seit`: ein im Zeitraum verkaufter, inzwischen gestrichener Artikel trug damals sein Rezept.
+* **`umsatz_im_feed_pct`** ist die Gegenprobe der PLU-Brücke: welcher Umsatzanteil überhaupt eine PLU im Feed
+  hat. Unter 100 auch bei intakter Brücke (andere Anbindung, Saisonartikel vor dem ersten Abruf gestrichen).
+
+**Fallen, die in den Sichten stecken:**
+
+* **In `mart.pos_artikel_abdeckung` ist `umsatz_betrieb_3m` ein Betriebswert** und steht bei zwei
+  Anbindungen in beiden Zeilen. Nicht über Anbindungen summieren; für den Betrieb die Betriebssicht nehmen
+  (Fallstrick `pos_artikel_umsatz_betriebswert`). Der Spaltenname ist absichtlich ein anderer als
+  `umsatz_netto_3m` in der Betriebssicht: `mcp.kennzahl` gilt im Prüfer je Spaltenname über alle Sichten,
+  und in der Betriebssicht ist die Summe über Betriebe erlaubt.
+* **Derselbe Artikel kann je Betrieb zweimal stehen** (Bar und Küche, Fallstrick `pos_artikel_zwei_anbindungen`).
+* **`artikelnummer` ist die der Kasse (LINA)**, nicht die Lieferanten-Artikelnummer der Rezeptzutaten.
+* **Keine Wareneinsatzquote** (Fallstrick `pos_artikel_kein_wareneinsatz`): die Abdeckung ist die Reichweite
+  einer künftigen Rezeptkalkulation, nicht deren Ergebnis.
+* **Prozentzahlen** (`49.4`), nie über Anbindungen oder Betriebe mitteln (`mcp.kennzahl`, `nicht_aggregieren`).
+
+**Gemessen auf einem lokalen Klon** (Stand `0129`, LINA-Artikelumsatz bis 12.08.2026), nachdem die drei echten
+Antworten der Leseprobe über den echten Lader geladen waren (19.11.2026): Laden 18–45 ms je Antwort;
+`mart.pos_artikel_abdeckung` 31 ms, `mart.pos_artikel_abdeckung_betrieb` 98 ms, `mart.pos_artikel_rezept`
+3 ms (alle ohne Filter, `EXPLAIN ANALYZE`). Artikelzahlen wie in der Leseprobe (895/442, 798/460,
+1.171/410). Umsatzabdeckung über Mai–Juli 2026 (Abfrage von Hand, gleiche Logik wie die Betriebssicht):
+Gastronomie am Markt Mainz 82,4 % mit Rezept / 85,7 % im Feed, Ballplatz Mainz 71,6 / 88,5, Düsseldorf
+75,6 / 81,8 — je mit nur **einer** der zwei Anbindungen geladen. In Produktion nach der ersten Nacht
+nachmessen (`offene-punkte.md`).
+
+Noch **keine Dashboard-Karte**. Der MCP-Katalogabzug aus Produktion steht aus.
+
+
+## `mart.lieferkondition_beobachtet` — Liefertage, Vorlauf, Bestellwert aus den Bestellungen (Migration `0156`, 19.11.2026)
+
+Eine Sicht auf `core.bestellung`/`core.bestellposition`, live, für `mcp_leser` lesbar, im MCP-Katalog (Thema `einkauf`).
+Anlass: der Fachbereich fragt nach Tourenplan, Bestellfrist und Mindestbestellwert je Lieferant und Betrieb. **Die
+echten Konditionen sind nicht geladen** (sie stehen am FoodNotify-Warenkorb, `payloads/foodnotify-2026-11/
+lieferkonditionen-bundle-2026-11-19.md`); die Sicht zeigt, was die Bestellungen der letzten zwölf Monate **beobachten
+lassen**. **Keine Karte** — bis der Fachbereich sagt, in welcher Form er es braucht.
+
+**Die Falle: beobachtet ist nicht vereinbart.** Ein Lieferant, der in zwölf Monaten nie dienstags geliefert hat,
+liefert dienstags vielleicht trotzdem — es hat nur niemand dienstags bestellt. Der kleinste beobachtete Bestellwert
+ist **nicht** der Mindestbestellwert: FoodNotify warnt bei Unterschreitung und sperrt nicht. Nachgemessen am
+19.11.2026 (lokaler Bestand, Stand 04.08.2026): bei den drei meistbestellten Paaren liegt der kleinste Wert bei 1,50
+bis 2,82 EUR, das 5-%-Quantil bei 2,49 bis 24,68 EUR, der Median bei 149 bis 195 EUR. Der Fallstrick
+`lieferkondition_beobachtet_nicht_vereinbart` (deutung, Warnung) steht im MCP-Katalog.
+
+| Eigenschaft | Festlegung |
+|---|---|
+| Körnung | **Kostenstelle × Lieferant** (= Betrieb × Bereich Bar/Küche × Lieferant), nicht Betrieb × Lieferant: Bar und Küche werden getrennt beliefert. `betrieb_key` NULL = Kostenstelle ohne LINA-Betrieb (lokal 9 von 449 Zeilen). Über `betrieb_key`/`kostenstelle_key`/`lieferant_key` joinen, nie über Namen. Die Lieferanten-Schlüssel gelten je Marke. |
+| Fenster | zwölf Monate bis heute (Bestelltag, Berlin), als `zeitraum_von`/`zeitraum_bis` ausgewiesen; die Sicht rechnet immer gegen heute. Stornos (`status = 'canceled'`) raus, `pending` drin und in `bestellungen_pending` sichtbar. |
+| Liefertage | `lieferungen_mo` … `lieferungen_so` zählen **verschiedene Liefertage**, nicht Bestellungen (zwei Bestellungen für denselben Dienstag = eine Lieferung). `liefertage_ueblich` = Wochentage mit ≥ 15 % der Liefertage („Di, Fr"); `liefertage_gesehen` = jeder Tag mit mindestens einer Lieferung. Schwelle begründet: ein regelmäßiger Lieferant liegt je Tag bei 17–50 %, eine Ausnahme bei 1–5 % (CF Gastro Aschaffenburg: Mo 35, Mi 34, Fr 35 gegen Di 1, Do 1, Sa 5 von 111 → „Mo, Mi, Fr"). Wer jeden Tag liefert (je 14 %), fällt durch die Schwelle — dann `liefertage_gesehen`. |
+| Vorlauf | Liefertag − Bestelltag in Kalendertagen (Berlin): `vorlauf_min_tage`, `vorlauf_median_tage`, `vorlauf_typisch_tage` (häufigster Wert). Lieferung vor Bestellung (Erfassungsfehler, lokal 6 von 48.489) steht in `lieferung_vor_bestellung`, nicht im Vorlauf. |
+| Bestellzeit | nur für Bestellungen mit Vorlauf 1: `bestellzeit_vortag_spaetest` (Maximum) und `bestellzeit_vortag_p95`. Näherung an einen Bestellschluss **von unten**, kein Bestellschluss. |
+| Bestellwert | Summe der geladenen Positionen (`summe_preis`, **netto**) je Bestellung — dieselbe Basis, gegen die FoodNotify den Mindestbestellwert prüft. `bestellwert_min_netto`, `bestellwert_p05_netto`, `bestellwert_median_netto`; Bestellungen ohne geladene Positionen fehlen (`bestellungen_mit_wert`). Quantile und Median nicht summieren. |
+| Datenbasis | `bestellungen` und `belastbar` (ab 10 Bestellungen; lokal 264 von 449 Zeilen). Das 5-%-Quantil braucht etwa 20. |
+| Liefertag-Quelle | `core.bestellung.geliefert_am` — der bei der Bestellung **gewählte** Termin, kein Wareneingang. FoodNotify bietet nur Termine an, die der Lieferant freigegeben hat; deshalb ist er ein brauchbarer Hinweis auf den Tourenplan. Seit `0156` als Berliner Kalendertag (vorher ein Tag zu früh, `fehlerkatalog.md`, 19.11.2026). |
+
+**Leistung** (nachgemessen am 19.11.2026 auf einem Klon des lokalen Bestands, 12.779 Bestellungen im Fenster, 449
+Zeilen): `EXPLAIN ANALYZE` 1,5 s kalt, rund 0,1 s warm, mit Markenfilter 40 ms. Keine Materialisierung. In Produktion mehr
+Zeilen, nicht Größenordnungen mehr — beim Deploy nachmessen.
+
+**Nebenwirkung: `mart.einkauf_beleg.lieferdatum`** (Karten „Lieferdatum" und „Geliefert am" im Drill-down, `karten-drilldown.ts`)
+zeigt ab `0156` den richtigen Tag statt des Tages davor.
+
+**Noch nicht erledigt:** MCP-Katalogabzug aus Produktion (`mcp/test/katalog.json`), siehe `offene-punkte.md`.

@@ -158,12 +158,12 @@ export class FnClient {
         return { art: 'fehler', status: null, fehler: String(e), dauerMs: 0, wiederholbar: false }
       }
 
-      let res = await this.request(pfad, session)
+      let res = await this.request(pfad, session, ep)
       // Session abgelaufen: genau einmal neu anmelden und wiederholen.
       if (fnSessionAbgelaufen(res)) {
         log.info('foodnotify-session abgelaufen, melde neu an', { marke, endpunkt: ep.key })
         await session.anmelden()
-        res = await this.request(pfad, session)
+        res = await this.request(pfad, session, ep)
       }
       const text = ohneNullzeichen(await res.text(), ep.key)
 
@@ -263,11 +263,24 @@ export class FnClient {
     }
   }
 
-  private request(pfad: string, session: FnSession) {
+  private request(pfad: string, session: FnSession, ep: FnEndpunkt) {
     return fetch(`${config.FN_BASE_URL}${pfad}`, {
       headers: session.header(),
       redirect: 'manual',
-      signal: AbortSignal.timeout(config.ANFRAGE_TIMEOUT_MS),
+      signal: AbortSignal.timeout(fnZeitgrenzeMs(ep)),
     })
   }
+}
+
+/**
+ * Die Zeitgrenze eines Aufrufs. Ein gemessen langsamer Pfad (`zeitgrenze:
+ * 'lang'`, seit 0155 fn:pos_artikel) bekommt FN_ZEITGRENZE_LANG_MS — der
+ * größere der beiden Werte, damit ein erhöhtes ANFRAGE_TIMEOUT_MS nicht
+ * ausgerechnet den langsamen Pfad verkürzt. Ein Abbruch ist ein
+ * wiederholbarer Fehler: keine Rohantwort, core bleibt unberührt.
+ */
+export function fnZeitgrenzeMs(ep: Pick<FnEndpunkt, 'zeitgrenze'>, c: typeof config = config): number {
+  return ep.zeitgrenze === 'lang'
+    ? Math.max(c.ANFRAGE_TIMEOUT_MS, c.FN_ZEITGRENZE_LANG_MS)
+    : c.ANFRAGE_TIMEOUT_MS
 }
