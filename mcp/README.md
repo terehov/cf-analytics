@@ -87,10 +87,12 @@ bun run migrate
 #    ALTER ROLE mcp_anmeldung LOGIN PASSWORD '...';
 #    Solange das fehlt, meldet es /status und mcp.einrichtung_offen.
 
-# 3. Umgebung (mcp/.env oder Dokploy)
+# 3. Umgebung (mcp/.env oder Dokploy) — Vorlage mit Begründung je Variable:
+#    mcp/.env.example. NICHT die .env.example im Wurzelverzeichnis, die gehört
+#    dem Importer.
 MCP_DATABASE_URL=postgresql://mcp_leser:...@host/lina
 MCP_AUTH_DATABASE_URL=postgresql://mcp_anmeldung:...@host/lina
-MCP_OEFFENTLICHE_URL=https://mcp.concept-family.de
+MCP_OEFFENTLICHE_URL=https://concept-family.brainfood.space
 
 # 4. Nutzer anlegen — das Passwort wird abgefragt, nie als Argument übergeben
 bun run nutzer anlegen eugene@brain.food "Eugene" fragen

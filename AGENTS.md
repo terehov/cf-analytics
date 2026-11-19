@@ -377,7 +377,7 @@ Priorität.
 # Der MCP-Zugang (mcp/, eigene package.json — dort `bun install` laufen lassen)
 cd mcp && bun test          # nachgemessen 19.10.2026: 441 pass, 54 skip ohne Datenbank — Fallenfragen, Umgehungen aus dem Review, Anmeldeablauf, Spaltenprofil, Zugriffsprotokoll
 cd mcp && bun run nutzer liste    # Nutzer verwalten (anlegen, stufe, passwort, sperren)
-cd mcp && bun run start     # braucht MCP_DATABASE_URL, MCP_AUTH_DATABASE_URL und MCP_OEFFENTLICHE_URL (mit https://)
+cd mcp && bun run start     # braucht MCP_DATABASE_URL, MCP_AUTH_DATABASE_URL und MCP_OEFFENTLICHE_URL (mit https://) — Vorlage mcp/.env.example, NICHT die des Importers
 cd mcp && bun run katalog:abzug   # test/katalog.json neu aus der Datenbank ziehen
 ```
 
