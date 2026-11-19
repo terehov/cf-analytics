@@ -52,6 +52,9 @@ stellen: Admin → Tabellenmetadaten → Schema `core` → Sichtbarkeit.
 | Artikel, Renner und Penner, Deckungsbeitrag | `mart.artikelverkauf` |
 | Sortiment nach Warengruppe | `mart.deckungsbeitrag_warengruppe` |
 | Einkaufspreise über die Zeit, echte Belegpreise | `mart.einkaufspreis_monat` — löst das stillgelegte `preisentwicklung_ware` ab |
+| Einkaufspreise je Lieferant und **Artikelnummer** (eine umbenannte Ware bleibt eine Reihe) | `mart.einkaufspreis_artikel_monat` (seit `0157`); Listen- und Katalogpreis aus dem Warenstamm in `mart.listenpreis_aktuell` / `_aenderung` — je kg/l, nicht bezahlt. Abschnitt „Welche Preissicht wofür“ |
+| Welches Rezept steckt hinter einem Kassenartikel, wie viel Umsatz trägt ein Rezept? | `mart.pos_artikel_rezept`, `mart.pos_artikel_abdeckung_betrieb` (seit `0155`) — Reichweite, kein Wareneinsatz |
+| An welchen Tagen liefert ein Lieferant, mit wie viel Vorlauf? | `mart.lieferkondition_beobachtet` (seit `0156`) — **beobachtet, nicht vereinbart** |
 | Zahlt **dieser Betrieb** mehr als die anderen für dieselbe Ware? | `mart.einkaufspreis_betrieb` — **nur mit `vergleichbar = true` lesen**, und auch dann mit den drei Sperren aus dem Abschnitt zu Migration `0056` |
 | Konkrete Bestellungen je Betrieb, inklusive Stornos | `mart.einkauf_beleg` — eine Zeile je Bestellung, `storniert` kennzeichnet statt auszublenden |
 | Ist dieser Lieferant überhaupt eingeordnet? | `mart.lieferant_freigabe_stand` — die Arbeitsliste, hier fängt man an; Sortierung nach `fn_netto` selbst setzen |
@@ -2428,7 +2431,7 @@ Gastronomie am Markt Mainz 82,4 % mit Rezept / 85,7 % im Feed, Ballplatz Mainz 7
 75,6 / 81,8 — je mit nur **einer** der zwei Anbindungen geladen. In Produktion nach der ersten Nacht
 nachmessen (`offene-punkte.md`).
 
-Noch **keine Dashboard-Karte**. Der MCP-Katalogabzug aus Produktion steht aus.
+~~Noch **keine Dashboard-Karte**.~~ Karten seit 19.11.2026 (noch nicht übernommen): Seite *Rezepturen* (`db_rezept`), `ar_rezept` auf *Artikel — Verlauf und Betriebe*, `im_pos_artikel` auf der Importseite (`dashboards.md`). Der MCP-Katalogabzug aus Produktion steht aus; die Abzugsdatei kennt die Sichten seit 19.11.2026 aus einem Klon (siehe `0158` unten).
 
 
 ## `mart.lieferkondition_beobachtet` — Liefertage, Vorlauf, Bestellwert aus den Bestellungen (Migration `0156`, 19.11.2026)
@@ -2437,7 +2440,7 @@ Eine Sicht auf `core.bestellung`/`core.bestellposition`, live, für `mcp_leser` 
 Anlass: der Fachbereich fragt nach Tourenplan, Bestellfrist und Mindestbestellwert je Lieferant und Betrieb. **Die
 echten Konditionen sind nicht geladen** (sie stehen am FoodNotify-Warenkorb, `payloads/foodnotify-2026-11/
 lieferkonditionen-bundle-2026-11-19.md`); die Sicht zeigt, was die Bestellungen der letzten zwölf Monate **beobachten
-lassen**. **Keine Karte** — bis der Fachbereich sagt, in welcher Form er es braucht.
+lassen**. ~~**Keine Karte** — bis der Fachbereich sagt, in welcher Form er es braucht.~~ Seit 19.11.2026 eine Tabelle auf *Einkauf* (`wa_lieferkondition`, noch nicht übernommen; `dashboards.md`) — Auftrag Eugene, ohne Rückmeldung des Fachbereichs zur Form.
 
 **Die Falle: beobachtet ist nicht vereinbart.** Ein Lieferant, der in zwölf Monaten nie dienstags geliefert hat,
 liefert dienstags vielleicht trotzdem — es hat nur niemand dienstags bestellt. Der kleinste beobachtete Bestellwert
@@ -2566,4 +2569,34 @@ gehobelt 500 g (CHEFS CULINAR 18858570): bei Enchilada eine Reihe, durchgehend 8
 `verdaechtig` (zwei Gebindeangaben im Monat) — `mart.einkaufspreis_monat` springt für dieselbe Ware je nach
 Schreibweise zwischen 8,82 und 17,64.
 
-Noch **keine Dashboard-Karte**. Der MCP-Katalogabzug aus Produktion steht aus.
+~~Noch **keine Dashboard-Karte**.~~ Karten seit 19.11.2026 (noch nicht übernommen): Seite *Einkaufspreise — je Artikelnummer, Liste und Katalog* (`db_einkaufspreis`), Verweiskachel auf *Einkauf*, `im_warenstamm` auf der Importseite (`dashboards.md`). Der MCP-Katalogabzug aus Produktion steht aus.
+
+
+## Der MCP-Katalog zu `0155`–`0157` nachgeschärft (Migration `0158`, 19.11.2026)
+
+Keine neue Sicht, keine neue Tabelle — nur `mcp.kennzahl`, `mcp.fallstrick` und drei Spaltenkommentare. Anlass
+war der Bau der Karten und der Fallenfragen (`mcp/test/fallen_preise_rezepte.test.ts`). Korrekturen an den
+committeten, aber nirgends angewendeten `0155`–`0157` nur hier, damit lokale Klone anderer nicht auseinanderlaufen.
+
+| Was | Neu | Warum |
+|---|---|---|
+| `pos_artikel_abdeckung.artikel_gesamt`, `artikel_mit_rezept` | `nicht_aggregieren` | Bar und Küche führen viele Kassenartikel doppelt; eine Summe über die Anbindungen eines Betriebs zählt sie zweimal. **Der Hinweis an `rezept_anteil_pct` empfahl bis dahin genau diese Summe** („über Anbindungen aus `artikel_mit_rezept` und `artikel_gesamt` neu rechnen") — korrigiert, ebenso der Spaltenkommentar (`fehlerkatalog.md`, 19.11.2026). Für einen Betrieb: `count(DISTINCT artikel_key)` in `mart.pos_artikel_rezept` |
+| `pos_artikel_abdeckung_betrieb.artikel_verkauft`, `_mit_rezept` | `nicht_aggregieren` | Über Betriebe summiert zählt derselbe LINA-Artikel je Betrieb einmal. Für mehrere Betriebe die Euro-Summen |
+| `lieferkondition_beobachtet.bestellwert_min/p05/median_netto`, `vorlauf_min/median/typisch_tage` | `nicht_aggregieren` | Minimum, Quantil, Median und Modus je Kostenstelle und Lieferant; `avg()` darüber ist keine gemessene Zahl |
+| Fallstrick `lieferkondition_nur_belastbar` | `filter_noetig` (`belastbar = true`), Warnung | Der Fallstrick aus `0156` warnt bei jeder Abfrage gleich; dass Paare mit unter zehn Bestellungen dabei sind, sah er nicht |
+| Fallstrick `listenpreis_aenderung_preisart` | `filter_noetig` (`preisart`), Warnung | Eine Änderung beider Preise steht zweimal da. Warnung, nicht Sperre: `GROUP BY preisart` ist richtig, erfüllt die Regel aber nicht |
+| Fallstrick `listenpreis_aenderung_vergleichbar` | `filter_noetig` (`vergleichbar = true`), Warnung | Wer selbst `(preis_neu - preis_alt) / preis_alt` rechnet, bekommt beim Wechsel auf 0 „−100 %" — 0 ist „kein Preis mehr" |
+| Fallstrick `einkaufspreis_artikel_basis_zwischenstufe` | `deutung`, Warnung | Die Materialisierung führt weder `verdaechtig` noch `veraenderung_pct` noch Namen; Teuerung daraus zählt Gebindewechsel mit |
+| Fallstrick `listenpreis_reihe_beginnt_spaet` | Hinweis erweitert | Nennt jetzt auch: je kg/l, **kein bezahlter Preis**. Der Fallstrick `listenpreis_ist_nicht_bezahlt` hängt nur an `listenpreis_aktuell`; wer `listenpreis_aenderung` fragte, erfuhr es nicht |
+
+`mcp.kennzahl` gilt im Prüfer je **Spaltenname** über alle Sichten (die strengere Regel gewinnt); keine andere Sicht
+führt eine dieser Spalten (nachgesehen am 19.11.2026 in der Abzugsdatei). Nur Regelarten, die `mcp/src/pruefen.ts`
+kennt. Die Migration bricht ab, wenn nicht alle zehn Kennzahlen und vier Fallstricke angekommen sind oder der alte
+Hinweis an `rezept_anteil_pct` noch steht.
+
+**Laufzeiten der neuen Karten**, nachgemessen am 19.11.2026 auf einem Klon von `lina_mgmt` (Stand `0129`, Einkauf bis
+04.08.2026, Artikelumsatz bis 12.08.2026) mit `0130`–`0158`, die echten Antworten der Leseprobe über den echten Lader
+geladen (drei Kassenanbindungen, Warenstamm 7984 und ein zweiter, künstlich veränderter Abzug für die Änderungslisten),
+ausgeführt als `mcp_leser` über die MCP-Übersetzung, ohne und mit Filtern: alle Karten unter 0,1 s außer
+`wa_lieferkondition` (0,06–0,40 s, keine Materialisierung — wie in `0156` gemessen), `ap_verlauf`/`ap_tabelle` ohne
+Filter (0,07–0,10 s) und den `rz_*`-Karten auf der Betriebssicht (0,05 s warm, 0,27 s beim ersten Aufruf).

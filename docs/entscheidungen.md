@@ -5270,3 +5270,46 @@ für den Warenstamm (Regel 3). Die alte Namenssicht umbauen.
     35 mit `erp_id`); sie stehen ohne Betrieb auf `ohne betrieb`. Nur der Kostenstellenvergleich rechnet mit
     Kostenstellen mit Betrieb — ein Testpreis soll keinen Median setzen. Die Probe (`src/fn_probe.ts`) überspringt
     sie bei der automatischen Auswahl, weil dort der Name nicht sichtbar war.
+
+## 19.11.2026 — Der Warenkorb-GET wird gesperrt; Verkäufe werden vorerst nicht importiert
+
+**Anlass.** Zwei freigegebene Messungen (`payloads/foodnotify-2026-11/fn-probe-2026-11-19-warenkorb-verkaeufe.md`).
+
+**1. Warenkorb: gesperrt, nicht „mit Vorsicht weiter".** Der Detail-GET hat beim ersten Lesen den Liefertermin eines
+Entwurfs verschoben (`docs/fehlerkatalog.md`, 19.11.2026). Entschieden: die Messung endet nach **einem** Warenkorb, der Pfad
+steht in der Sperrliste von `src/fn_probe.ts`, die Stufen `eins`/`weitere` sind aus dem Skript entfernt (die Frage
+`warenkorb` liest nur die Liste). Die Alternative — weitere Entwürfe lesen und die Änderung als belanglos verbuchen — wurde
+verworfen: jeder weitere Lesezugriff ist ein Schreibzugriff in fremde Daten, und der Ertrag (Mindestbestellwert und
+Frist je Lieferant) ist nur mit einem Warenkorb zu haben, den ohnehin jemand bearbeitet. Das entscheidet der Nutzer je Fall.
+Die Konditionen bleiben bis dahin **beobachtet, nicht vereinbart** (`mart.lieferkondition_beobachtet`, `0156`).
+
+**2. Verkäufe: nicht in der gemessenen Form importieren.** Ein Verkauf ist ein Kassenvorgang; die Positionen kosten einen
+Aufruf je Bon (132–266 Aufrufe je Kostenstelle und Tag), tragen keine PLU, und Bar + Küche eines Betriebs tragen dieselben
+Bons. Entschieden: **zuerst die Aggregat-Pfade messen** (`recipe-sale/paginate`, `pos/mapping/{id}/article-sales`) und gegen
+den LINA-Umsatz abgleichen, dann erst bauen. Begründung und Zahlen im Messprotokoll.
+
+## 19.11.2026 — Karten zu `0155`–`0157`: zwei neue Seiten statt Reiter, Wirkung in Euro statt Prozent
+
+**Anlass.** Auftrag Eugene: „MCP und die ganzen Karten bauen", solange `0155`–`0157` nicht gepusht werden können.
+Vorgabe: neue Seiten oder Reiter nur, wo es nirgends passt — begründet.
+
+**1. Preise je Artikelnummer und Listenpreis: eigene Seite `db_einkaufspreis`, kein Reiter auf `db_einkauf`.**
+Metabase-Filter gelten seitenweit über alle Reiter. Die neue Reihe hängt an Lieferant und Artikelnummer — Filter, die
+keine der zwölf Karten auf `db_einkauf` lesen kann; der Prüfer in `uebernehmen.ts` hätte zwölf Ausnahmen verlangt, und
+die Seite hätte halb geantwortet. Verworfen auch: die neuen Karten ohne Lieferanten-/Nummernfilter auf `db_einkauf`
+(die Frage „Verlauf **einer** Ware" braucht genau diese Filter). Die **Lieferkonditionen** stehen dagegen auf
+`db_einkauf`: sie gelten je Betrieb, und nur dort gibt es den Betriebsfilter; „nur belastbar" ist ein Filter für genau
+diese Karte (`FILTER_NUR_FUER`).
+
+**2. Rezepturen: eigene Seite `db_rezept`, kein Abschnitt auf `db_ware`.** Dort heißt „Abdeckung" schon der Anteil
+mit LINA-Wareneinsatzwert (`fixer_we`, Regel 5) — zwei Abdeckungen auf einer Seite würden verwechselt; und der
+Zeitraumfilter von `db_ware` wäre auf allen Rezeptkarten taub (die Sicht rechnet fest drei volle Monate). Der
+Drill-Down „Rezept hinter Artikel X" steht trotzdem auf der **bestehenden** Seite `dd_artikel`.
+
+**3. „Was ist teurer geworden? — je Artikelnummer" sortiert nach Wirkung in Euro** (Preisunterschied × Gebinde im
+Monat), nicht nach Prozent wie `wa_preis_veraenderung`. Prozent stellt Kleinstposten nach oben; die Euro-Wirkung zeigt,
+wo eine Preisänderung Geld kostet. Prozent bleibt als Spalte und per Klick sortierbar. Mit dem Fachbereich abzustimmen
+(`offene-punkte.md`).
+
+**4. Korrekturen am Katalog in `0158`, nicht in `0155`–`0157`**, obwohl diese nirgends angewendet sind: committet ist
+committet, und lokale Klone anderer liefen sonst auseinander.

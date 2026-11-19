@@ -37,6 +37,8 @@ import { karten as kartenArtikelaktion } from './karten-artikelaktion'
 import { karten as kartenKasse } from './karten-kasse'
 import { karten as kartenManagement } from './karten-management'
 import { karten as kartenPersonal } from './karten-personal'
+import { karten as kartenEinkaufspreis } from './karten-einkaufspreis'
+import { karten as kartenRezept } from './karten-rezept'
 
 export const alleKarten: Karte[] = [
   ...kartenManagement,
@@ -44,6 +46,7 @@ export const alleKarten: Karte[] = [
   ...kartenStandort, ...kartenBewertung, ...kartenAktionen, ...kartenYext, ...kartenVergleich,
   ...kartenFremdeinkauf, ...kartenPflichtartikel, ...kartenKalender, ...kartenBounti,
   ...kartenArtikelaktion, ...kartenKasse, ...kartenPersonal,
+  ...kartenEinkaufspreis, ...kartenRezept,
 ]
 
 /** Eine Karte an ihrem Schluessel. */

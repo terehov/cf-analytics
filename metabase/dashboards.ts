@@ -199,6 +199,36 @@ const F_ENDPUNKT: Parameter = {
   id: 'd-endpunkt', name: 'endpunkt', 'display-name': 'Bericht', type: 'string/=',
 }
 
+// --- Einkaufspreise je Artikelnummer (0157) --------------------------
+// Der Lieferant MIT Auswahlliste — anders als F_LIEFERANT (Fremdeinkauf, aus
+// OCR-Namen des Belegarchivs, nicht auswaehlbar). Hier sind es die Namen aus
+// den FoodNotify-Bestellungen, je Marke einer, einige Hundert. Die Liste
+// wird beim Uebernehmen gelesen, nicht naechtlich: ein neuer Lieferant fehlt
+// bis zum naechsten uebernehmen.ts im Dropdown (wie F_WARE).
+const F_LIEFERANT_EINKAUF: Parameter = {
+  id: 'd-lieferant-einkauf', name: 'lieferant', 'display-name': 'Lieferant', type: 'string/=',
+  werteliste: ['mart', 'einkaufspreis_artikel_monat', 'lieferant'],
+}
+// Die Lieferanten-Artikelnummer, OHNE Werteliste: zwoelftausend Nummern sind
+// keine Auswahl. Wird geklickt (aus den Tabellen) oder aus einer Rechnung
+// kopiert.
+const F_ARTIKELNUMMER: Parameter = {
+  id: 'd-artikelnummer', name: 'artikelnummer', 'display-name': 'Artikelnummer', type: 'string/=',
+}
+// Teil des Warennamens — Teilsuche, weil Bestellung und Warenstamm dieselbe
+// Ware verschieden schreiben (karten-einkaufspreis.ts, P_WARE_TEXT).
+const F_WARE_TEXT: Parameter = {
+  id: 'd-ware-text', name: 'ware_text', 'display-name': 'Ware enthält', type: 'string/=',
+}
+// Nur belastbare Lieferkonditionen (ab zehn Bestellungen) oder alle. Gehoert
+// zu GENAU einer Karte (FILTER_NUR_FUER in uebernehmen.ts). Vorgabe
+// 'belastbar': ohne Wert zeigt die Karte dasselbe, mit Vorgabe steht es
+// sichtbar oben.
+const F_DATENBASIS: Parameter = {
+  id: 'd-datenbasis', name: 'datenbasis', 'display-name': 'Datenbasis', type: 'string/=',
+  festeWerte: ['belastbar', 'alle'], default: 'belastbar',
+}
+
 // Vier einzelne Datumsfelder fuer den Zeitraumvergleich. Bewusst nicht
 // zwei Bereichsfilter: Metabase kann einen Bereichsfilter nur EINEM
 // Zeitraum zuordnen, hier brauchen beide Seiten ihren eigenen.
@@ -1614,6 +1644,49 @@ export const dashboards: Dashboard[] = [
       { teile: [{ karte: 'ar_verlauf', hoehe: 9 }] },
       { teile: [{ karte: 'ar_betriebe', hoehe: 12,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      // Welches Rezept dahinter steckt (0155). Hier und nicht nur auf der
+      // Rezeptseite: wer einen Artikel aus den Rennern anklickt, fragt als
+      // Naechstes, woraus er besteht — und die Arbeitsliste auf db_rezept
+      // fuehrt mit ihrem Klick genau hierher.
+      { teile: [{ text: '### Das Rezept dahinter\n\nJe Betrieb und Kassenanbindung, welches Rezept FoodNotify diesem Artikel zuordnet. Bar und Küche können verschieden zuordnen — dann stehen zwei Zeilen da.' }] },
+      { teile: [{ karte: 'ar_rezept', hoehe: 10 }] },
+    ],
+  },
+
+  // ---------------------------------------------------------------------
+  // Rezepturen (0155). EIGENE SEITE und kein Abschnitt auf db_ware, aus drei
+  // Gruenden, die in karten-rezept.ts ausgeschrieben stehen: (1) bisher zeigt
+  // keine Seite Rezepturen; (2) "Abdeckung" heisst auf db_ware schon etwas
+  // anderes (LINA-Wareneinsatzwert, fixer_we) — zwei Abdeckungen auf einer
+  // Seite wuerden verwechselt; (3) db_ware filtert ueber einen Zeitraum, den
+  // keine dieser Karten lesen kann (die Sicht rechnet fest die letzten drei
+  // vollen Monate) — die Seite antwortete halb.
+  // ---------------------------------------------------------------------
+  {
+    schluessel: 'db_rezept',
+    name: 'Rezepturen — welche Kassenartikel ein Rezept tragen',
+    beschreibung:
+      'Welcher Teil des Kassenumsatzes auf Artikel fällt, denen in FoodNotify ein Rezept zugeordnet ist — je Betrieb, mit der Arbeitsliste der umsatzstärksten Artikel ohne Rezept und den Zuordnungen, die FoodNotify selbst für fraglich hält. Eine Reichweite für eine künftige Rezeptkalkulation, kein Wareneinsatz.',
+    sammlung: 'Betrieb',
+    filter: [F_MARKE, F_BETRIEB],
+    reihen: [
+      { teile: [{ text: '# Rezepturen hinter der Kasse\n\n**Die Leitzahl ist eine Reichweite, kein Wareneinsatz.** Sie sagt, welcher Teil des Artikelumsatzes auf Kassenartikel fällt, denen in FoodNotify ein Rezept zugeordnet ist — also wie weit eine Kalkulation aus Rezepten reichen könnte. Ob das Rezept stimmt und was die Ware gekostet hat, sagt sie nicht.\n\n**Je Betrieb, nicht je Kasse.** Ein Betrieb hat oft zwei Anbindungen (Bar und Küche), und dieselben Artikel stehen in beiden. Ein Artikel zählt als „mit Rezept", wenn er in einer davon eins trägt.\n\n**Zeitraum sind die letzten drei vollen Monate**, fest — der laufende Monat würde die Wochentage ungleich gewichten. **Noch nicht jede Marke wird geholt**; Betriebe solcher Marken stehen mit „Marke noch nicht geholt" in der Tabelle und haben keine Zahl, nicht null Prozent.' }] },
+      { teile: [
+        { karte: 'rz_umsatz_rezept' },
+        { karte: 'rz_umsatz_unbekannt' },
+        { karte: 'rz_betriebe' },
+      ] },
+      // Klick auf einen Balken setzt den Betrieb DIESER Seite: Arbeitsliste
+      // und Namensabweichungen darunter springen auf ihn um (Selbstziel wie
+      // die Balkensegmente auf ②).
+      { teile: [{ karte: 'rz_betrieb_balken', hoehe: 9,
+        klick: [{ ziel: 'db_rezept', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      { teile: [{ karte: 'rz_betrieb_tabelle', hoehe: 10,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      { teile: [{ text: '## Was zu tun ist\n\n**Die erste Tabelle ist die Arbeitsliste**, nach Umsatz ohne Rezept sortiert: oben lohnt die Pflege am meisten. Steht unter „Rezept anderswo" ein Name, gibt es das Rezept schon — dann fehlt nur die Zuordnung in dieser Kasse. **Die zweite Tabelle** sind Zuordnungen, die FoodNotify selbst für fraglich hält; eine falsche Zuordnung zählt oben als „mit Rezept" und ist deshalb teurer als eine fehlende.' }] },
+      { teile: [{ karte: 'rz_ohne_rezept', hoehe: 13,
+        klick: [{ ziel: 'dd_artikel', spalte: 'Artikel', uebergabe: { artikel: 'Artikel' } }] }] },
+      { teile: [{ karte: 'rz_name_weicht_ab', hoehe: 10 }] },
     ],
   },
 
@@ -1629,7 +1702,7 @@ export const dashboards: Dashboard[] = [
     // FOODNOTIFY-MANDANT (vier Werte), nicht das Round-Table-Konzept —
     // acht der zwoelf Konzern-Marken lieferten grundsaetzlich leere
     // Karten, siehe F_MARKE_EINKAUF.
-    filter: [F_MARKE_EINKAUF, F_BETRIEB, F_WARE],
+    filter: [F_MARKE_EINKAUF, F_BETRIEB, F_WARE, F_DATENBASIS],
     reihen: [
       { teile: [{ text: '# Einkauf\n\nGrundlage sind **echte Bestellungen bei FoodNotify**, keine Katalogpreise — und damit nur der Teil des Einkaufs, der über das Bestellsystem läuft. Was daran vorbeigeht, steht ganz unten unter „Durfte dort eingekauft werden?".\n\nAlle Preise sind **je Gebinde** — was ein bestellter Karton, Sack oder Eimer gekostet hat. Der Preis je Kilo oder Liter steht als Zusatzspalte daneben, bleibt aber oft leer: FoodNotify pflegt die Angabe, wie viel in einem Gebinde steckt, für dieselbe Ware widersprüchlich. Was auffällt oder fehlt, steht in der letzten Karte.\n\n**Ein Sprung auf genau das Doppelte ist fast nie eine Teuerung.** Dieselbe Ware wird im selben Monat mit verschiedenen Gebindegrößen gebucht — Grana Padano 8,82 € bei Größe 1 und 17,64 € bei Größe 2 —, und der Monatsmedian kippt zwischen beiden. Solche Zeilen sind seit Migration 0062 aus „Was ist teurer geworden?" heraus; die Spalte „Gebindegröße" in der Preistabelle zeigt, worauf sich ein Preis bezieht.\n\n**Wie belastbar ein Zeitraum ist, sagt die Karte direkt darunter.** Sie zählt je Marke und Monat, wie viele Bestellungen mit Positionen geladen sind. Ein dünner Monat ist dort Ladestand und kein Einbruch: geladen wird je Kostenstelle chronologisch aufsteigend, bei einer Marke mit offenen Bestellseiten fehlen also die **jüngsten** Monate zuerst.' }] },
       // Der Ladestand steht GANZ OBEN, nicht unten als Fussnote: er ist
@@ -1642,6 +1715,15 @@ export const dashboards: Dashboard[] = [
       // dasselbe Selbstziel-Muster wie die Balkensegmente auf ②.
       { teile: [{ karte: 'wa_preis_veraenderung', hoehe: 12,
         klick: [{ ziel: 'db_einkauf', spalte: 'Ware', uebergabe: { ware: 'Ware' } }] }] },
+      // Die Tuer zur Preisseite je Artikelnummer (0157): dort bleibt eine
+      // umbenannte Ware EINE Reihe, und dort stehen Listen- und Katalogpreis.
+      // Direkt unter der Namens-Rangliste, weil genau deren Schwaeche (die
+      // Reihe bricht beim Namenswechsel) der Grund fuer die andere Seite ist.
+      { teile: [
+        { text: '### Genauer: je Artikelnummer\n\nDie Preise oben sind nach dem **Warennamen** gruppiert — wechselt die Schreibweise, bricht die Reihe, und gleichnamige Waren zweier Lieferanten fallen zusammen. Die Seite hinter der Kachel rechnet je **Lieferant und Artikelnummer** und zeigt daneben Listen- und Katalogpreis aus dem Warenstamm.', breite: 16 },
+        { karte: 'wa_kachel_artikelpreis', breite: 8,
+          klick: [{ ziel: 'db_einkaufspreis', uebergabe: {}, fest: true }] },
+      ] },
       // Erst das Bild, dann die Zahlen: ein Preissprung faellt in der Linie
       // auf, bevor man ihn in 500 Tabellenzeilen sucht. Beide haengen am
       // Warenfilter oben — ohne ihn zeigen sie die umsatzstaerksten Waren,
@@ -1656,6 +1738,14 @@ export const dashboards: Dashboard[] = [
       { teile: [{ karte: 'wa_lieferant_konzentration', hoehe: 11,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       { teile: [{ karte: 'wa_einkauf_betrieb', hoehe: 11,
+        klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      // Lieferkonditionen (0156). Hier und nicht auf der Preisseite: sie
+      // gelten je Betrieb und Lieferant, und nur diese Seite hat den
+      // Betriebsfilter. Die Ueberschrift sagt "beobachtet" schon im Titel —
+      // eine Tabelle mit "Liefertage" und "Bestellwert" liest sonst jeder
+      // als Vertrag.
+      { teile: [{ text: '### Liefertage, Vorlauf, Bestellwert — beobachtet, nicht vereinbart\n\nWas die Bestellungen der letzten zwölf Monate zeigen, **nicht was mit dem Lieferanten vereinbart ist**. Ein fehlender Wochentag heißt nur, dass niemand für diesen Tag bestellt hat; der übliche Bestellwert ist **kein Mindestbestellwert**. Der Filter „Datenbasis" gilt nur für diese Tabelle: voreingestellt sind Lieferanten mit mindestens zehn Bestellungen.' }] },
+      { teile: [{ karte: 'wa_lieferkondition', hoehe: 12,
         klick: [{ ziel: 'dd_betrieb', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
       // Die Pruefliste ganz unten, aber sichtbar: eine ausgeschlossene
       // Position, die nirgends auftaucht, ist eine stille Kuerzung.
@@ -1682,6 +1772,63 @@ export const dashboards: Dashboard[] = [
       { teile: [{ text: '## Durfte dort eingekauft werden?\n\nDie Frage nach dem **Lieferanten** statt nach dem Preis: Wareneinkauf bei Firmen, die weder auf der Konzernfreigabe stehen noch der hinterlegte GFGH ihres Betriebs sind. Grundlage ist das **Belegarchiv** — die Rechnungen selbst, nicht die Bestellungen. Das ist der Unterschied, auf den es hier ankommt: wer bei einem nicht freigegebenen Lieferanten kauft, bestellt ihn nicht über FoodNotify.' }] },
       { teile: [{ karte: 'fe_kachel_verweis', breite: 8,
         klick: [{ ziel: 'db_fremdeinkauf', uebergabe: {}, fest: true }] }] },
+    ],
+  },
+
+  // ---------------------------------------------------------------------
+  // Einkaufspreise je Artikelnummer, Listen- und Katalogpreis (0157).
+  //
+  // EIGENE SEITE UND KEIN REITER AUF db_einkauf, weil die Filter andere
+  // sind: Lieferant und Artikelnummer sind hier der Schluessel der Reihe —
+  // auf db_einkauf liest sie keine der zwoelf Karten (die rechnen je
+  // Warenname oder je Betrieb), und Metabase-Filter gelten fuer die ganze
+  // Seite ueber alle Reiter. Zwoelf Ausnahmen haetten eine halb
+  // antwortende Seite erzeugt. Umgekehrt hat diese Seite KEINEN
+  // Betriebsfilter: die bezahlten Preise gelten je Marke, er waere auf dem
+  // ersten Reiter auf jeder Karte taub.
+  //
+  // ZWEI REITER, weil zwei Preisbasen: bezahlt je Gebinde, Liste/Katalog je
+  // kg/l. Nebeneinander auf einem Reiter laesen sie sich als vergleichbar.
+  // ---------------------------------------------------------------------
+  {
+    schluessel: 'db_einkaufspreis',
+    name: 'Einkaufspreise — je Artikelnummer, Liste und Katalog',
+    beschreibung:
+      'Wie sich die Einkaufspreise entwickeln — je Lieferant und Artikelnummer statt je Warenname: was bezahlt wurde und was teurer geworden ist, dazu Listen- und Katalogpreis aus dem FoodNotify-Warenstamm und wo der Katalog sich bewegt hat, bevor jemand bestellte.',
+    sammlung: 'Betrieb',
+    filter: [F_MARKE_EINKAUF, F_LIEFERANT_EINKAUF, F_ARTIKELNUMMER, F_WARE_TEXT],
+    tabs: [
+      { name: 'Bezahlt je Artikelnummer', reihen: [
+        { teile: [{ text: '# Bezahlte Preise je Artikelnummer\n\nEchte Bestellungen bei FoodNotify, ohne Stornos, **je bestelltem Gebinde** (Karton, Sack, Eimer) — nicht je Kilo. Eine Reihe ist **ein Lieferant mit einer Artikelnummer**: eine Ware, die umbenannt wurde, bleibt eine Reihe; gleichnamige Waren zweier Lieferanten sind zwei. Wechselt der Lieferant die Artikelnummer, beginnt eine neue Reihe.\n\n**Verglichen wird mit dem letzten Monat, in dem die Ware bestellt wurde** — nicht mit dem Kalender-Vormonat. Die Spalte „Monate dazwischen" sagt, wie weit der Vergleich zurückreicht.\n\n**Ein Sprung auf das Doppelte ist fast nie eine Teuerung**, sondern ein anderes Gebinde. Solche Monate stehen nicht in „Was ist teurer geworden?", sondern mit Grund in der Tabelle darunter.\n\nOben filtern: Lieferant, Artikelnummer oder ein Teil des Warennamens. Ein Klick auf eine Artikelnummer setzt beide Filter.' }] },
+        { teile: [{ karte: 'ap_verlauf', hoehe: 10 }] },
+        // Klick auf die Artikelnummer setzt Nummer UND Lieferanten dieser
+        // Seite (Selbstziel): die Linie darueber zeigt dann genau diese Reihe.
+        // Beide, weil eine Nummer bei zwei Lieferanten vorkommen kann.
+        { teile: [{ karte: 'ap_veraenderung', hoehe: 12,
+          klick: [{ ziel: 'db_einkaufspreis', spalte: 'Artikelnummer',
+                    uebergabe: { artikelnummer: 'Artikelnummer', lieferant: 'Lieferant' } }] }] },
+        { teile: [{ karte: 'ap_auffaellig', hoehe: 11,
+          klick: [{ ziel: 'db_einkaufspreis', spalte: 'Artikelnummer',
+                    uebergabe: { artikelnummer: 'Artikelnummer', lieferant: 'Lieferant' } }] }] },
+        { teile: [{ karte: 'ap_tabelle', hoehe: 12 }] },
+      ] },
+      { name: 'Liste und Katalog', reihen: [
+        { teile: [{ text: '# Listen- und Katalogpreis aus dem Warenstamm\n\n**Keiner der beiden ist ein bezahlter Preis**, und beide gelten **je kg oder Liter**, nicht je Gebinde — mit dem ersten Reiter also nicht Zeile für Zeile vergleichbar. Der **Listenpreis** folgt meist dem Preis der letzten Bestellung. Der **Katalogpreis** ist, was der Lieferant heute verlangt; weicht er ab, wird die nächste Bestellung teurer oder günstiger, bevor eine Rechnung es zeigt.\n\n**Die Reihe beginnt mit dem ersten nächtlichen Lesen** — FoodNotify bewahrt alte Preise nicht auf. Eine leere Änderungsliste heißt in den ersten Wochen „noch nichts beobachtet", nicht „keine Preisänderung"; seit wann gelesen wird, steht in der Kachel links. Testkostenstellen werden mitgelesen, stehen aber nicht hier.' }] },
+        { teile: [
+          { karte: 'lp_reihe_seit' },
+          { karte: 'lp_aenderungen_30' },
+          { karte: 'lp_katalog_anzahl' },
+        ] },
+        // Nur die Nummer wird uebergeben, nicht der Lieferant: der Warenstamm
+        // nennt ihn anders als die Bestellungen ("Distra GmbH" gegen "Distra
+        // Aposto"), und der erste Reiter faende ihn unter diesem Namen nicht.
+        { teile: [{ karte: 'lp_aenderung', hoehe: 11,
+          klick: [{ ziel: 'db_einkaufspreis', spalte: 'Artikelnummer', uebergabe: { artikelnummer: 'Artikelnummer' } }] }] },
+        { teile: [{ karte: 'lp_katalog_abweichung', hoehe: 10,
+          klick: [{ ziel: 'db_einkaufspreis', spalte: 'Artikelnummer', uebergabe: { artikelnummer: 'Artikelnummer' } }] }] },
+        { teile: [{ karte: 'lp_aktuell', hoehe: 12,
+          klick: [{ ziel: 'db_einkaufspreis', spalte: 'Artikelnummer', uebergabe: { artikelnummer: 'Artikelnummer' } }] }] },
+      ] },
     ],
   },
 
@@ -2282,6 +2429,12 @@ export const dashboards: Dashboard[] = [
       { teile: [{ text: '## Wie vollständig ist es?\n\n**„Tage alt“** zeigt einen hängenden Bericht — ein bis zwei Tage sind normal. **„wartet“** heißt nicht kaputt: laufender Betrieb geht vor Historie.\n\nDaneben die beiden anderen Quellen: **FoodNotify** (Bestellseiten je Kostenstelle, chronologisch aufsteigend) und **Yext** (Bewertungen, einmal täglich — älter als ~28 Stunden ist eine Nachfrage wert).' }] },
       { teile: [{ karte: 'im_bericht', hoehe: 11 }] },
       { teile: [{ karte: 'im_foodnotify', hoehe: 9 }] },
+      // Kassenartikel und Warenstamm (0155, 0157): je Anbindung bzw.
+      // Kostenstelle ein Zustand. Regel 10 — die Summe steht oben in "Zulauf
+      // je Quelle", hier steht, WELCHE Anbindung schweigt.
+      { teile: [{ text: '### FoodNotify: Kassenartikel und Warenstamm\n\nJe Kassenanbindung bzw. Kostenstelle, ob der tägliche Abzug ankommt. Oben steht, was jemand ansehen muss; **„marke nicht aktiv"** unten ist gewollt (die Marke wird noch nicht geholt). Ein abgebrochener Abruf ändert nichts am Bestand — er lässt nur „Letzter Abruf" altern, bis „veraltet" erscheint.' }] },
+      { teile: [{ karte: 'im_pos_artikel', hoehe: 10 }] },
+      { teile: [{ karte: 'im_warenstamm', hoehe: 10 }] },
       { teile: [{ karte: 'im_yext', hoehe: 9 }] },
       { teile: [
         { karte: 'im_bericht_balken', breite: 12 },

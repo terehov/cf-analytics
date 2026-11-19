@@ -31,7 +31,8 @@ metabase/
 
 ~~Stand 26.07.2026: **98 Karten, 17 Dashboards, drei Sammlungen.**~~
 ~~Stand 24.08.2026: **285 Karten, 34 Dashboards, vier Sammlungen.**~~
-Stand 29.09.2026: **324 Karten, 38 Dashboards, fünf Sammlungen** (gezählt von `uebernehmen.ts`).
+~~Stand 29.09.2026: **324 Karten, 38 Dashboards, fünf Sammlungen**~~
+Stand 19.11.2026: **358 Karten, 40 Dashboards, fünf Sammlungen** (gezählt mit den statischen Prüfungen aus `uebernehmen.ts`, ohne Übertragung — davon 22 Karten und 2 Dashboards aus `0155`–`0157`, noch nicht übernommen).
 
 ### Übernehmen
 
@@ -1869,3 +1870,98 @@ Erklärung steht in der Textkachel.
 **Vor dem ersten `uebernehmen.ts`:** Metabase die neuen `mart`-Sichten synchronisieren lassen. Die
 Karten lesen nur `mart` (`metabase/karten_schema.test.ts` wacht darüber, der MCP-Zugang führt sie
 als `mcp_leser` aus). `bun test metabase/karten.test.ts` fasst Metabase nicht an.
+
+
+## Preise je Artikelnummer, Listen- und Katalogpreis, Lieferkonditionen, Rezepturen (`0155`–`0158`, 19.11.2026)
+
+Auftrag Eugene: „MCP und die ganzen Karten bauen", solange `0155`–`0157` noch nicht in Produktion sind.
+22 Karten: zwanzig in `metabase/karten-einkaufspreis.ts` und `metabase/karten-rezept.ts`, zwei in
+`karten-import.ts`; zwei neue Dashboards, Ergänzungen auf drei bestehenden. **Noch nicht übernommen** —
+`uebernehmen.ts` schreibt sofort gegen die Produktivinstanz, und dort fehlen die Sichten bis zum Deploy
+(`offene-punkte.md`). Geprüft: statische Prüfungen aus `uebernehmen.ts` (Filter, Klicks, Layout) ohne
+Übertragung, `bun test metabase` auf einem Klon mit `0158`, jede Karte einmal ausgeführt — als
+`mcp_leser`, über die MCP-Übersetzung, ohne und mit Filtern, mit den echten Probeantworten vom
+18./19.11.2026 geladen (Laufzeiten in `metabase.md`).
+
+### Wo die Karten stehen, und warum zwei neue Seiten
+
+| Seite | Neu | Warum dort |
+|---|---|---|
+| **`db_einkaufspreis`** — *Einkaufspreise — je Artikelnummer, Liste und Katalog* (neu, Sammlung Betrieb, zwei Reiter) | `ap_*`, `lp_*` | **Eigene Seite statt Reiter auf `db_einkauf`**, weil die Filter andere sind: Lieferant und Artikelnummer sind der Schlüssel der neuen Reihe, und keine der zwölf Karten auf `db_einkauf` kann sie lesen (Namens- und Betriebssichten). Metabase-Filter gelten seitenweit über alle Reiter — zwölf Ausnahmen hätten eine halb antwortende Seite ergeben. Umgekehrt **kein Betriebsfilter**: die bezahlten Preise gelten je Marke, er wäre auf dem ersten Reiter überall taub. **Zwei Reiter, weil zwei Preisbasen**: bezahlt je Gebinde, Liste/Katalog je kg/l — nebeneinander läsen sie sich als vergleichbar (`metabase.md`, „Welche Preissicht wofür") |
+| **`db_einkauf`** — *Einkauf — Preise, Lieferanten, Volumen* | `wa_kachel_artikelpreis`, `wa_lieferkondition`, Filter „Datenbasis" | Die **Lieferkonditionen** gelten je Betrieb und Lieferant — nur diese Seite hat den Betriebsfilter, und sie hat schon den Abschnitt „Lieferanten". Die **Verweiskachel** steht direkt unter „Was ist teurer geworden?": deren Schwäche (Reihe bricht beim Namenswechsel) ist der Grund für die neue Seite. Bauart wie `fe_kachel_verweis` |
+| **`db_rezept`** — *Rezepturen — welche Kassenartikel ein Rezept tragen* (neu, Sammlung Betrieb) | `rz_*` | **Eigene Seite statt Abschnitt auf `db_ware`**, aus drei Gründen: bisher zeigt keine Seite Rezepturen; „Abdeckung" heißt auf `db_ware` schon etwas anderes (der Anteil mit LINA-Wareneinsatzwert `fixer_we`, Regel 5) — zwei Abdeckungen auf einer Seite würden verwechselt; und `db_ware` filtert über einen Zeitraum, den keine dieser Karten lesen kann (die Sicht rechnet fest die letzten drei vollen Monate) |
+| **`dd_artikel`** — *Artikel — Verlauf und Betriebe* | `ar_rezept` | „Welches Rezept steckt hinter Kassenartikel X" ist die Frage nach **einem** Artikel; der Drill-Down dafür existiert. Die Arbeitsliste auf `db_rezept` führt per Klick hierher |
+| **`db_import`** — *Import — Überwachung* | `im_pos_artikel`, `im_warenstamm` | Regel 10: je Anbindung bzw. Kostenstelle ein Zustand. Die Summe steht schon in „Zulauf je Quelle"; hier steht, **welche** Anbindung schweigt |
+
+### Die Karten, und warum diese Darstellung
+
+**`db_einkaufspreis`, Reiter „Bezahlt je Artikelnummer"** (`mart.einkaufspreis_artikel_monat`)
+
+| Karte | Darstellung | Warum so |
+|---|---|---|
+| `ap_verlauf` — Preisreihe je Artikelnummer | Linie, höchstens acht Reihen, 24 Monate | Ein Preissprung fällt in der Linie auf, bevor man ihn in Tabellenzeilen sucht. Acht Linien wie bei `wa_preis_verlauf` — mehr unterscheidet niemand. Die Beschriftung trägt Nummer und Marke, weil der Name allein nicht eindeutig ist. Ohne Filter eine Auswahl (höchste Ausgaben), keine Konzernaussage |
+| `ap_veraenderung` — Was ist teurer geworden? — je Artikelnummer | Tabelle, sortiert nach **Wirkung in Euro** (Preisunterschied × Gebinde im Monat) | Je Reihe der jüngste Monat mit Bestellung gegen **ihren** vorigen Monat mit Bestellung — „Monate dazwischen" steht daneben, damit ein Jahresvergleich nicht als Monatsveränderung gelesen wird. Euro statt Prozent als Vorgabe: +40 % auf eine Dose Zimt ist kein Thema, +4 % auf Mozzarella für alle Betriebe eins; Prozent sortiert man per Spaltenklick. Gebindewechsel (`verdaechtig`) stehen nicht hier, sondern in der nächsten Karte. Klick auf die Artikelnummer setzt Nummer **und** Lieferant der Seite |
+| `ap_auffaellig` — Sprünge, die keine Teuerung sein müssen | Tabelle mit Grund in Worten | Was oben herausfällt, steht hier mit Grund (Gebinde gewechselt, mehrere Gebinde im Monat, Einheit unklar, Faktor 2, Ausreißer) — eine ausgeschlossene Zeile, die nirgends auftaucht, wäre eine stille Kürzung. „Schreibweisen" > 1 zeigt Waren, die unter mehreren Namen bestellt wurden |
+| `ap_tabelle` — Bezahlte Preise je Artikelnummer und Monat | Tabelle, 20 Reihen mit allen Monaten | Die Zahlen zur Linie. Erst Reihen ranken, dann ihre Monate zeigen (die Lehre aus `wa_preise`). „Name im Monat" nur, wo die Ware damals anders hieß |
+
+**`db_einkaufspreis`, Reiter „Liste und Katalog"** (`mart.listenpreis_aktuell`, `mart.listenpreis_aenderung`, `mart.warenstamm_stand`)
+
+| Karte | Darstellung | Warum so |
+|---|---|---|
+| `lp_reihe_seit` — Preise beobachtet seit | Kachel mit Datum oder „noch kein Abzug" | **Der Leerzustand als Zahl.** Die Änderungsliste ist in den ersten Wochen leer, und eine leere Tabelle liest sich als „keine Preisänderung". Die Kachel steht links oben und sagt, ab wann überhaupt hingesehen wird |
+| `lp_aenderungen_30` — Listenpreis-Änderungen, 30 Tage | Kachel | Nur `preisart = 'listenpreis'` und `vergleichbar` — eine Zählung über beide Preisarten zählte doppelt |
+| `lp_katalog_anzahl` — Katalog weicht vom Listenpreis ab | Kachel | Die vorausschauende Zahl: so viele Waren werden bei der nächsten Bestellung teurer oder günstiger |
+| `lp_aenderung` — Jüngste Preisänderungen im Warenstamm | Tabelle, beide Preisarten mit Spalte „Preis" | Eine Liste zählt nicht — beide Zeilen nebeneinander sind hier die Information (der Katalog bewegt sich vor der Bestellung, der Listenpreis danach). „kein Preis mehr" / „Preis neu" ohne Prozent, nie „−100 %". „auch geändert" sagt, wann der Prozentwert Ungleiches vergleicht |
+| `lp_katalog_abweichung` — Katalog bewegt, noch nicht bestellt | Tabelle, nach Größe der Abweichung | Die Arbeitsliste für den Einkauf: hier wird die nächste Bestellung teurer oder günstiger, bevor eine Rechnung es zeigt. Beide Preise je kg/l, daneben der Preis der Bestelleinheit, wie der Katalog ihn angibt |
+| `lp_aktuell` — Listenpreis heute je Ware | Tabelle | Nachschlagen, keine Aussage über eine Menge — dafür ist eine Tabelle da. Der Gebindepreis ist **gerechnet** und so beschriftet; Waren ohne Preis (0 ist dort „kein Preis") stehen nicht hier |
+
+Auf beiden Reitern zählen **nur Kostenstellen mit Betrieb**: die Testkostenstellen werden mitgelesen, setzen aber
+keinen Maßstab. Klicks auf eine Artikelnummer im zweiten Reiter geben **nur die Nummer** weiter — der Warenstamm
+nennt den Lieferanten anders als die Bestellungen („Distra GmbH" gegen „Distra Aposto"), der erste Reiter fände
+ihn unter diesem Namen nicht. Aus demselben Grund trifft der Lieferantenfilter die Listenpreise auch über den
+Lieferantenschlüssel.
+
+**Filter der Seite:** Marke (FoodNotify-Marken, Liste wie `db_einkauf` — dafür ein Eintrag in
+`LISTEN_JE_DASHBOARD`, `src/sync/auswahllisten.ts`, sonst überschriebe der Nachlauf sie mit den zwölf
+Round-Table-Konzepten), Lieferant (Auswahlliste aus den Bestellungen, beim Übernehmen gelesen — ein neuer
+Lieferant fehlt bis zum nächsten `uebernehmen.ts`, wie bei „Ware"), Artikelnummer (genau, ohne Liste) und
+„Ware enthält" (Teilsuche — Bestellung und Warenstamm schreiben dieselbe Ware verschieden). Ausnahme:
+`lp_reihe_seit` liest nur die Marke (der Beobachtungsbeginn gilt je Kostenstelle).
+
+**`db_einkauf`**
+
+| Karte | Darstellung | Warum so |
+|---|---|---|
+| `wa_kachel_artikelpreis` — Preisreihen je Artikelnummer | Kachel mit Klick | Tür zur neuen Seite, wie `fe_kachel_verweis`. Liest die Marke; Betrieb und Ware nicht (`FILTER_AUSNAHME`) |
+| `wa_lieferkondition` — Wann geliefert wird — beobachtet, nicht vereinbart | Tabelle | Die Antworten sind Wochentagslisten („Mo, Mi, Fr"), Uhrzeiten und Tageszahlen je Betrieb und Lieferant — nichts davon wird durch eine Fläche lesbarer, und ein Balken je Wochentag machte aus einer Zeile sieben. „Beobachtet, nicht vereinbart" steht im **Titel**, in der Beschreibung und in der Überschrift darüber: eine Tabelle mit „Liefertage" und „Bestellwert" liest sonst jeder als Vertrag. Der kleinste beobachtete Bestellwert steht **nicht** da (er zeigt die Ausnahme); das 5-%-Quantil heißt „untere 5 %", nicht „Mindestbestellwert". **Nur belastbare Zeilen als Vorgabe** (ab zehn Bestellungen) über den neuen Filter „Datenbasis" (`belastbar`/`alle`) — er gehört zu genau dieser Karte (`FILTER_NUR_FUER`), die Karte macht es mit einem optionalen Block ohne Unterabfrage: `WHERE (belastbar [[OR {{datenbasis}} = 'alle']])` |
+
+**`db_rezept`** (`mart.pos_artikel_abdeckung_betrieb`, `mart.pos_artikel_rezept`)
+
+| Karte | Darstellung | Warum so |
+|---|---|---|
+| `rz_umsatz_rezept` — Umsatz mit Rezept | Kachel, % | Aus den **Euro-Summen** gerechnet, nie als Mittel der Betriebsprozente. Beschreibung: Reichweite, **kein Wareneinsatz** |
+| `rz_umsatz_unbekannt` — Umsatz, den FoodNotify nicht kennt | Kachel, % | Die Gegenprobe der PLU-Brücke als Zahl: groß heißt meist, eine Anbindung fehlt — dann ist die Zahl daneben zu niedrig, ohne dass ein Rezept fehlt |
+| `rz_betriebe` — Betriebe ausgewertet | Kachel „x von y" | Sagt, wie viel vom Ganzen die Prozentzahlen überhaupt abdecken |
+| `rz_betrieb_balken` — Umsatzanteil mit Rezept je Betrieb | Balken waagerecht, höchstens 20, niedrigste oben, Achse bis 100 | Lange Betriebsnamen (`row`), gekappt nach der Regel für Betriebsachsen; die niedrigsten oben, weil dort die Arbeit liegt. Klick setzt den Betrieb der Seite (Arbeitsliste springt um) |
+| `rz_betrieb_tabelle` — Rezeptabdeckung je Betrieb | Tabelle, **alle** Betriebe mit Kasse | Mit „Stand" in Worten (Marke noch nicht geholt, noch nicht geladen, x von y Anbindungen) — eine Zeile ohne Prozent ohne Begründung liest sich als „null Prozent" |
+| `rz_ohne_rezept` — Artikel ohne Rezept — nach Umsatz | Tabelle, eine Zeile je LINA-Artikel | **Die Arbeitsliste.** Je Artikel statt je Betrieb, weil ein Rezept einmal je Marke angelegt, aber je Anbindung zugeordnet wird: „Rezept anderswo" zeigt, wo es das Rezept schon gibt und nur die Zuordnung fehlt — die billigste Arbeit auf der Seite. Getrennt: „ohne Rezept" (FoodNotify kennt den Artikel) gegen „nicht in FoodNotify" (fehlende Anbindung oder vor dem ersten Abruf gestrichen). Klick auf den Artikel öffnet `dd_artikel` |
+| `rz_name_weicht_ab` — Rezept passt nicht zum Namen? | Tabelle | FoodNotifys eigenes Kennzeichen für eine fragliche Zuordnung. Eine falsche Zuordnung zählt oben als „mit Rezept" und ist teurer als eine fehlende |
+
+**`dd_artikel`**: `ar_rezept` — Rezept hinter diesem Artikel, Tabelle je Betrieb **und** Anbindung (Bar und Küche
+können verschieden zuordnen; genau das soll sichtbar sein, nicht zusammengefasst). Der Artikel kommt als Name aus
+dem Artikelverkauf; die Brücke läuft über den Artikelschlüssel, nicht über den Kassennamen in FoodNotify.
+
+**`db_import`**: `im_pos_artikel` und `im_warenstamm` — Tabellen, Auffälliges oben (nie geladen, veraltet, leer,
+unvollständig), gewollte Zustände unten („marke nicht aktiv"). Tabellen, weil es Arbeitslisten je Anbindung sind.
+
+**Marke auf `db_rezept` und `dd_artikel`:** die Rezeptsichten führen den FoodNotify-Schlüssel (`wilma_wunder`), der
+Filter das Round-Table-Hauptkonzept. Verbunden wird über `betrieb_key` in `mart.konzept_zuordnung`, nie über einen
+Namen.
+
+**Kein fester Messwert in den Beschreibungen**, auch nicht „vorerst nur Wilma Wunder" — das veraltet mit dem
+ersten weiteren Eintrag in `POS_ARTIKEL_MARKEN`/`WARENSTAMM_MARKEN`. Stattdessen: „Noch nicht jede Marke wird
+geholt", und die Tabellen zeigen, welche.
+
+**Vor dem ersten `uebernehmen.ts`:** Metabase die neuen Sichten synchronisieren lassen, `sichtbarkeit.ts` (die vier
+neuen `core`-Tabellen verstecken) und `beziehungen.ts --setzen` (neue Sichten mit `betrieb_key`). Alles durch
+Eugene, nach dem Deploy (`offene-punkte.md`).

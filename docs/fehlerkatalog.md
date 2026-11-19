@@ -5807,3 +5807,62 @@ Kostenstellenvergleich in `mart.listenpreis_aktuell` zählt nur Kostenstellen mi
 **Allgemeine Lehre.** Eine Messung, deren Datei nicht sagt, **woran** gemessen wurde, ist keine Messung über die Marke.
 Wer automatisch auswählt, schreibt den Namen des Gewählten dazu — und eine Stichprobe von zwei ist keine Stichprobe, wenn
 beide aus demselben Ende einer sortierten Liste kommen.
+
+## Die Warenkorb-Probe las einen Entwurf — und verschob dessen Liefertermin (19.11.2026)
+
+**Symptom.** Die freigegebene Messung der Lieferkonditionen las `GET /api/shop/567/cart/draft/28093` (Distra GmbH, Bar
+Hannover, ein Entwurf vom 01.03.2026). Die Antwort kam mit 200 und `deliveryDateUpdated: true`; die Warenkorb-Liste
+zeigte danach für **genau diesen** Warenkorb `timeUpdated` = Lesezeitpunkt (19.11.2026 10:09:56 Berliner Zeit, zwei
+Sekunden nach dem GET) statt 01.03.2026 08:40:53. Alle anderen 36 Einträge waren unverändert. `deliveryDate` im Detail:
+20.11.2026, der frühestmögliche Termin. Kein Fehlerstatus, kein Hinweis in der Antwort.
+
+**Ursache.** Der Server prüft beim **Lesen** den gespeicherten Liefertermin des Warenkorbs, setzt ihn bei Ablauf auf den
+frühestmöglichen und speichert das. Die Oberfläche zeigt dafür den Hinweis „Lieferdatum wurde auf das Ehestmögliche
+verschoben"; im Quelltext stand der Pfad als reiner Lesepfad (`getCart`/`x=…r(\`/api/shop/…\`)`), und die Bundle-Analyse
+vom selben Tag hatte das Risiko ausdrücklich benannt, aber als „nicht beweisbar" stehen lassen. Es ist der **fünfzehnte
+GET mit Wirkung** neben den 14 aus `foodnotify-api-inventar-intern-2026-11.md` §6 — und der erste, der nicht aus dem Code,
+sondern aus einer Messung stammt.
+
+**Warum es kein Fehler der Probe war, aber eine Lücke ihrer Vorsicht.** Die Probe war in Stufen gebaut (Liste, ein
+Warenkorb, Liste danach, Stopp bei Veränderung; ältester Entwurf eines geschlossenen Betriebs) — und genau diese Stufen
+haben den Schaden auf **einen** Warenkorb begrenzt. Bei einem Entwurf, den jemand bearbeitet, wäre der Termin im offenen
+Warenkorb verschoben worden. Nicht erfasst: der Liefertermin **vor** dem Lesen (die Liste trägt ihn nicht, ein Vorabruf
+des Details wäre derselbe Schreibzugriff). Keine Bestellung, keine Positionen, keine Preise verändert.
+
+**Was ihn künftig verhindert.** `src/fn_probe.ts`: `/\/shop\/\d+\/cart\//i` steht in `GESPERRTE_TEILE` (auch in anderer
+Schreibweise und mit Query gesperrt), das Muster ist aus der Erlaubtliste entfernt, die Frage `warenkorb` liest nur noch die
+**Liste** (`/api/carts/{all|active}?page=1&limit=50`). Tests in `src/fn_probe.test.ts`. Die Auswertung der gemessenen
+Rohantwort (`warenkorbAuswerten`) bleibt für die gespeicherte Datei, nicht für einen neuen Abruf.
+`foodnotify-api-inventar-intern-2026-11.md` §6 führt ihn als Nr. 15.
+
+**Was es für die Konditionen heißt.** Mindestbestellwert, wählbare Liefertermine und Bestellfrist stehen nur in dieser
+einen Antwort. Wer sie weiter lesen will, schreibt dabei in einen Warenkorb: nur mit einem Entwurf, den ohnehin jemand
+bearbeitet, und mit ausdrücklichem Ja (`docs/offene-punkte.md`, „Lieferkonditionen").
+
+**Allgemeine Lehre.** Ein Lesepfad, dessen Antwort ein Feld wie `…Updated` trägt, ist nicht beweisbar lesend, solange
+niemand an einem Wegwerf-Objekt nachgesehen hat. Stufen mit Vorher/Nachher-Vergleich sind keine Übervorsicht: sie sind
+der Unterschied zwischen einem verschobenen Termin und fünfzig.
+
+## Ein Katalog-Hinweis empfahl genau die Summe, die doppelt zählt (19.11.2026)
+
+**Symptom.** Beim Schreiben der Fallenfragen zu `0155` fiel auf: die Frage „Artikelabdeckung je Betrieb" als
+`sum(artikel_mit_rezept) / sum(artikel_gesamt)` aus `mart.pos_artikel_abdeckung`, gruppiert nach Betrieb, kam im
+MCP-Prüfer mit einer allgemeinen Warnung durch — und der Hinweis an `rezept_anteil_pct` (in `mcp.kennzahl` und im
+Spaltenkommentar) empfahl sie sogar: „über Anbindungen aus `artikel_mit_rezept` und `artikel_gesamt` neu rechnen".
+
+**Ursache.** Die Sicht hat eine Zeile je **Kassenanbindung**, und ein Betrieb hat oft zwei (Bar und Küche), deren
+Artikellisten sich überschneiden (gemessen 19.11.2026: die Bar Ballplatz führt Speisenrezepte). Eine Summe über die
+Anbindungen eines Betriebs zählt jeden Artikel, den beide führen, zweimal — der Anteil liegt dann zwischen zwei
+richtigen Zahlen und sieht plausibel aus. Für die Umsatzspalten war die Falle erkannt (Fallstrick
+`pos_artikel_umsatz_betriebswert`), für die Artikelzählung nicht.
+
+**Warum es nicht auffiel.** Nicht angewendet: `0155` war committet, lief aber nirgends. Ein Hinweis im Katalog wird
+nur gelesen, wenn jemand ihn befolgt.
+
+**Was ihn künftig verhindert.** Migration `0158`: `artikel_gesamt`, `artikel_mit_rezept` (und `artikel_verkauft*` in
+der Betriebssicht) sind `nicht_aggregieren` — eine Summe ist gesperrt, die Sperre nennt den Weg über
+`count(DISTINCT artikel_key)` in `mart.pos_artikel_rezept`. Hinweis und Spaltenkommentar sind berichtigt, die Migration
+bricht ab, wenn der alte Hinweis noch steht. Fallenfrage 9 in `mcp/test/fallen_preise_rezepte.test.ts`.
+
+**Allgemeine Lehre.** Jeder Hinweis „aus den Summen neu rechnen" setzt voraus, dass die Zeilen sich nicht überschneiden.
+Bei einer Körnung unterhalb des Betriebs (Anbindung, Kostenstelle) ist das zu prüfen, bevor der Satz in den Katalog geht.

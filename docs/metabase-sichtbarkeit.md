@@ -256,3 +256,23 @@ Einordnung neuer Objekte gilt trotzdem. Migration `0149` bringt drei Tabellen:
 `metabase/sichtbarkeit.ts` braucht dafür keine Änderung: `core` ist dort schemaweit versteckt,
 `sync` kommt nicht vor. Die sechs neuen `mart`-Sichten sind sichtbar (`metabase.md`, Abschnitt
 „Personal je Stunde in `mart`").
+
+---
+
+## Nachtrag 19.11.2026 — Kassenartikel, Lieferkonditionen, Warenstamm (`0155`–`0158`)
+
+Die Zählungen oben sind weiter nicht fortgeschrieben; die Einordnung gilt. `metabase/sichtbarkeit.ts` braucht keine
+Änderung (schemaweise Regel), muss nach dem Deploy aber **einmal laufen**: neue `core`-Tabellen sind in Metabase
+zunächst sichtbar.
+
+| Objekt | Stufe | Begründung |
+|---|---|---|
+| `mart.pos_artikel_rezept`, `mart.pos_artikel_abdeckung`, `mart.pos_artikel_abdeckung_betrieb` | sichtbar | Die Brücke Kasse → Rezept. Karten auf *Rezepturen*, *Artikel — Verlauf und Betriebe* und der Importseite. Die Falle in `pos_artikel_abdeckung`: Umsatz- und Artikelzahlen je **Anbindung** — nicht über Anbindungen summieren (`metabase.md`, `0155`/`0158`) |
+| `mart.lieferkondition_beobachtet` | sichtbar | Karte auf *Einkauf*. **Beobachtet, nicht vereinbart** — steht im Sichtkommentar, den Metabase als Beschreibung zeigt |
+| `mart.listenpreis_aktuell`, `mart.listenpreis_aenderung`, `mart.einkaufspreis_artikel_monat` | sichtbar | Karten auf *Einkaufspreise — je Artikelnummer, Liste und Katalog*. Listen- und Katalogpreis sind je kg/l und nicht bezahlt |
+| `mart.warenstamm_stand` | sichtbar | Zustand je Kostenstelle (Regel 10), Karte auf der Importseite |
+| `mart.einkaufspreis_artikel_monat_basis` | sichtbar (ganz `mart`) | Materialisierte Zwischenstufe ohne Namen und ohne Gebindekennzeichen. Bewusst **nicht** einzeln versteckt: `sichtbarkeit.ts` kennt nur Schemata, und die übrigen `*_basis` stehen ebenso da. Wer sie direkt abfragt, bekommt im MCP-Zugang eine Warnung (`einkaufspreis_artikel_basis_zwischenstufe`, `0158`); keine Karte liest sie |
+| `core.pos_artikel` (umgebaut), `core.pos_artikel_abruf`, `core.ware_stand` (neu angelegt), `core.ware_stand_abruf`, `core.listenpreis_beobachtung` | nur in Detailansichten (ganz `core`) | In `mart` aufbereitet. Die Fallen beim Direktzugriff: `core.pos_artikel` führt gestrichene Artikel weiter (`fehlt_seit`) und kennt die PLU-Brücke nur bei amadeus; in `core.listenpreis_beobachtung` ist die erste Zeile je Produkt **keine** Änderung, sondern der Stand beim ersten Abzug; `core.ware_stand` mischt Testkostenstellen ohne Betrieb unter |
+
+Nach dem Deploy außerdem `metabase/beziehungen.ts --setzen`: die neuen Sichten mit `betrieb_key` kommen ohne
+semantische Typen aus dem Katalog.

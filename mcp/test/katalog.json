@@ -2885,6 +2885,119 @@
    "fallstricke": []
   },
   {
+   "sicht": "mart.einkaufspreis_artikel_monat",
+   "koernung": "Marke × Lieferant × Lieferanten-Artikelnummer × Monat — bezahlte Gebindepreise, Vergleich mit dem letzten Monat mit Bestellung",
+   "thema": "einkauf",
+   "summen_erlaubt": false,
+   "kommentar": "Was hat eine Ware gekostet, und wie hat sich der Preis entwickelt — je Marke, Lieferant und\nLIEFERANTEN-ARTIKELNUMMER (nicht je Warenname) und Monat (0157). Echte Belegpreise aus FoodNotify-Bestellungen,\nohne Stornos. preis_je_gebinde ist der Median von summe_preis / menge, also je bestellter Einheit (Karton,\nSack), nicht je kg. veraenderung_pct vergleicht mit dem LETZTEN MONAT MIT BESTELLUNG (vorher_monat,\nmonate_seit_vorher), nicht mit dem Kalender-Vormonat. verdaechtig = true heisst: der Sprung kann ein\nGebinde- oder Einheitenwechsel sein, keine Teuerung — fuer \"was ist teurer geworden\" auf NOT verdaechtig\nfiltern. Eine Ware, deren Name wechselte, bleibt EINE Reihe (ware = juengster Name, namen = Zahl der\nSchreibweisen). Wechselt der Lieferant die Artikelnummer, beginnt eine neue Reihe. Listenpreise aus dem\nWarenstamm: mart.listenpreis_aktuell.\n\nKoernung: Marke × Lieferant × Lieferanten-Artikelnummer × Monat — bezahlte Gebindepreise, Vergleich mit dem letzten Monat mit Bestellung",
+   "spalten": [
+    "marke",
+    "marke_key",
+    "lieferant_key",
+    "lieferant",
+    "lieferanten_nr",
+    "ware",
+    "namen",
+    "name_gewechselt",
+    "ware_im_monat",
+    "monat",
+    "bestellungen",
+    "positionen",
+    "betriebe",
+    "kostenstellen",
+    "gebinde",
+    "ausgaben",
+    "preis_je_gebinde",
+    "preis_min",
+    "preis_max",
+    "gebinde_typisch",
+    "gebinde_varianten",
+    "einheit",
+    "vorher_monat",
+    "vorher_preis",
+    "monate_seit_vorher",
+    "veraenderung_pct",
+    "gebinde_gewechselt",
+    "einheit_gewechselt",
+    "verdaechtig",
+    "ausreisser"
+   ],
+   "achsen": [
+    "lieferant",
+    "marke",
+    "monat",
+    "ware"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "summe",
+     "spalte": "ausgaben",
+     "einheit": "euro",
+     "hinweis": null
+    },
+    {
+     "regel": "summe",
+     "spalte": "gebinde",
+     "einheit": "anzahl",
+     "hinweis": null
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "preis_je_gebinde",
+     "einheit": "euro",
+     "hinweis": "Median je Monat. Fuer mehrere Monate nicht mitteln, sondern ausgaben / gebinde rechnen."
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "veraenderung_pct",
+     "einheit": "prozentzahl",
+     "hinweis": "Gegen den letzten Monat mit Bestellung; nur mit NOT verdaechtig lesen."
+    }
+   ],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.einkaufspreis_artikel_monat_basis",
+   "koernung": "Marke × Lieferant × Lieferanten-Artikelnummer × Monat (Zwischenstufe von mart.einkaufspreis_artikel_monat)",
+   "thema": "einkauf",
+   "summen_erlaubt": false,
+   "kommentar": "Koernung: Marke × Lieferant × Lieferanten-Artikelnummer × Monat — Zwischenstufe von\nmart.einkaufspreis_artikel_monat (0157), aufgefrischt im Einkaufs-Nachlauf. Wie alt: mart.materialisierung_stand.",
+   "spalten": [
+    "marke_key",
+    "lieferant_key",
+    "lieferanten_nr",
+    "monat",
+    "ware",
+    "namen",
+    "ware_im_monat",
+    "namen_monat",
+    "bestellungen",
+    "positionen",
+    "betriebe",
+    "kostenstellen",
+    "gebinde",
+    "ausgaben",
+    "preis_je_gebinde",
+    "preis_min",
+    "preis_max",
+    "gebinde_typisch",
+    "gebinde_varianten",
+    "einheit",
+    "einheiten",
+    "vorher_monat",
+    "vorher_preis",
+    "vorher_gebinde",
+    "vorher_einheit",
+    "ausreisser"
+   ],
+   "achsen": [
+    "monat",
+    "ware"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
    "sicht": "mart.einkaufspreis_betrieb",
    "koernung": "Betrieb, Ware und Monat; NUR mit vergleichbar = true lesen",
    "thema": "einkauf",
@@ -4109,11 +4222,71 @@
    "fallstricke": []
   },
   {
+   "sicht": "mart.kassenartikel",
+   "koernung": "Betrieb × Kassenartikel (TPAPI recipe) — Nummer, Name, Warengruppe, Hauptgruppe, fixedwe",
+   "thema": "stammdaten",
+   "summen_erlaubt": false,
+   "kommentar": "Koernung: Betrieb × Kassenartikel — der Artikelstamm der Kasse je Betrieb (TPAPI recipe), juengster\nAbzug (0153), mit Warengruppe, Kategorie und Hauptgruppe aus dem Stamm desselben Betriebs. Die\nArtikelnummer verbindet mit mart.kassenjournal_position.artnr. fixedwe ist LINAs Wareneinsatz je\nArtikel — gemessen gegen fixer_we in mart.kassenartikel_fixedwe_abgleich, KEINE Marge und kein\nWareneinsatz im Sinne der BWA (Regel 5).",
+   "spalten": [
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "artikelnummer",
+    "artikel_id",
+    "artikel",
+    "aktiv",
+    "funktion",
+    "warengruppe",
+    "kategorie",
+    "hauptgruppe",
+    "fixedwe",
+    "mengenkontrolle",
+    "stand_am",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "marke",
+    "warengruppe"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.kassenartikel_fixedwe_abgleich",
+   "koernung": "Betrieb × Kassenartikel — fixedwe der Kasse gegen fixer_we der Konzernberichte; nur Messung, keine Marge",
+   "thema": "pruefung",
+   "summen_erlaubt": false,
+   "kommentar": "Messsicht (0153, Regel 5): je Betrieb und Kassenartikel LINAs fixedwe aus dem Kassenstamm (TPAPI)\ngegen fixer_we aus den Konzernberichten (core.artikel, ueber die Artikelnummer). Beantwortet die\noffene Frage, woher fixer_we kommt: steht befund fast ueberall auf gleich, ist es dieselbe Zahl.\nbefund: gleich (hoechstens 0,005 EUR) | abweichend | ohne wert | nur kasse (Nummer nicht in\ncore.artikel). NUR MESSUNG — keine Marge, kein Wareneinsatz der BWA, nicht in Auswertungen\nverwenden. fixer_we ist eine Zahl je Artikelnummer fuer alle Betriebe, fixedwe eine je Betrieb.\n\nKoernung: Betrieb × Kassenartikel — fixedwe der Kasse gegen fixer_we der Konzernberichte; nur Messung, keine Marge",
+   "spalten": [
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "artikelnummer",
+    "artikel_kasse",
+    "artikel_konzern",
+    "aktiv",
+    "fixedwe_kasse",
+    "fixer_we_konzern",
+    "differenz",
+    "befund",
+    "stand_am"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "marke"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
    "sicht": "mart.kassenblatt_stand",
    "koernung": "Betrieb × Monat — Monatswert aus LINAs Jahresuebersicht gegen Kasse und Kassenblatt (0141)",
    "thema": "import",
    "summen_erlaubt": false,
-   "kommentar": "Betrieb x Monat: Monatswert aus \"Die letzten Jahre\" gegen LINAs Kasse und gegen geladene Kassenblatt-Tage (0141). Zugleich die Einreihbedingung des Importers. ERWARTUNG: keine Zeile \"faellig\", die aelter als zwei Naechte ist. \"abweichung\" heisst: Kasse und Kassenblatt fuehren beide Umsatz und treffen sich nicht — Kassenwechsel im Monat oder ein Datenproblem, wird nicht automatisch gefuellt.\n\nKoernung: Betrieb × Monat — Monatswert aus LINAs Jahresuebersicht gegen Kasse und Kassenblatt (0141)",
+   "kommentar": "Betrieb x Monat: Monatswert aus \"Die letzten Jahre\" gegen LINAs Kasse und gegen geladene Kassenblatt-Tage (0141, 0147). Zugleich die Einreihbedingung des Importers (faellig, luecke). ERWARTUNG: keine Zeile \"faellig\" oder \"luecke\", die aelter als zwei Naechte ist. \"luecke\": LINA-Kasse liegt unter dem Monatswert, der Betrieb trifft ihn sonst (lina_quote >= 0.75) — das Kassenblatt hebt die unvollstaendigen Tage an. \"ergaenzt\": danach getroffen. \"abweichung\": Kasse und Monatswert treffen sich nicht, und der Betrieb weicht auch sonst ab (Ladenakte zaehlt mehr als den einen LINA-Betrieb) — wird nicht gefuellt, Frage an den Fachbereich.\n\nKoernung: Betrieb × Monat — Monatswert aus LINAs Jahresuebersicht gegen Kasse und Kassenblatt (0141)",
    "spalten": [
     "betrieb_key",
     "betrieb",
@@ -4125,11 +4298,386 @@
     "tage_kassenblatt",
     "jahresuebersicht_abgerufen_am",
     "kassenblatt_geladen_am",
-    "zustand"
+    "zustand",
+    "lina_quote"
    ],
    "achsen": [
     "betrieb_key",
     "konzept",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.kassenbon",
+   "koernung": "Betrieb × Geschaeftstag × Bon (TPAPI journaltables) — Tisch, Gaeste, Kellner; Bons zaehlen nur mit abrechnung = BILL",
+   "thema": "kasse",
+   "summen_erlaubt": true,
+   "kommentar": "Koernung: ein Bon (Tisch) der Kasse (TPAPI journaltables) — Betrieb × Geschaeftstag × Bon (0153).\nGleiche Abdeckung wie mart.kassenjournal_position: nur Betriebe mit Schluessel, nur im Horizont.\nabrechnung BILL = abgerechnet, EMPTY = Tisch ohne Buchung (ohne_buchung) — wer Bons oder Gaeste je\nBon zaehlt, filtert auf abrechnung = 'BILL'. gaeste = Erwachsene + Kinder + Kleinkinder (in den\nProben fast nur Erwachsene). Der Betrag eines Bons steht nicht hier: aus\nmart.kassenjournal_position ueber bon_id und zeilenart = 'umsatz' summieren. Debitorentext und\nPostleitzahl stehen bewusst nicht in mart (Plan S6).",
+   "spalten": [
+    "geschaeftstag",
+    "monat",
+    "wochentag",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "bon_id",
+    "tisch",
+    "tischart",
+    "abrechnung",
+    "ohne_buchung",
+    "dokument_zeitpunkt",
+    "stunde",
+    "stunde_folge",
+    "gaeste_erwachsene",
+    "gaeste_kinder",
+    "gaeste_kleinkinder",
+    "gaeste",
+    "kellnernr",
+    "rechnungsnummer",
+    "mit_debitor",
+    "mit_reservierung",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag",
+    "marke",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.kassenbon_abgleich",
+   "koernung": "Betrieb × Geschaeftstag — Bons und Gaeste der Kasse gegen Bericht 96 und den Umsatzbericht",
+   "thema": "pruefung",
+   "summen_erlaubt": false,
+   "kommentar": "Abgleich (S10, 0153): je Betrieb und geladenem Bontag die abgerechneten Bons der Kasse (TPAPI\njournaltables, accounting_type BILL) und ihre Gaeste gegen das Rechnungsausgangsbuch (Bericht 96,\ncore.bon: Rechnungen) und gegen Rechnungen und Gaeste des Umsatzberichts; dazu die Bons mit\nBoniert-Zeilen im Journal. befund_bons: trifft | trifft mit stornierten (96 zaehlt stornierte\nRechnungen getrennt) | weicht ab | ohne bericht 96 (96 fuer den Tag nicht geladen oder ohne Bon).\nbefund_gaeste: gegen den Umsatzbericht. Was eine Abweichung bedeutet, ist offen: ob 96 jeden Bon\nder Kasse fuehrt und ob der Umsatzbericht Gaeste genauso zaehlt, ist nicht gemessen.\n\nKoernung: Betrieb × Geschaeftstag — Bons und Gaeste der Kasse gegen Bericht 96 und den Umsatzbericht",
+   "spalten": [
+    "geschaeftstag",
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "kasse_bons",
+    "kasse_bons_ohne_buchung",
+    "kasse_gaeste",
+    "journal_bons",
+    "bericht_96_rechnungen",
+    "bericht_96_stornierte",
+    "umsatzbericht_rechnungen",
+    "umsatzbericht_gaeste",
+    "befund_bons",
+    "befund_gaeste",
+    "bons_trifft_umsatzbericht",
+    "vorlaeufig"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.kassenjournal_abgleich_monat",
+   "koernung": "Betrieb × Monat — Anteil treffender Tage je Abgleich (Umsatz, Finanzwege, Bons, Gaeste); nach monat filtern",
+   "thema": "pruefung",
+   "summen_erlaubt": false,
+   "kommentar": "Abgleich verdichtet (S10, 0153): je Betrieb und Monat, wie oft die Deutung des Kassenjournals trifft\n— der Anteil treffender Tage (Umsatz gegen Umsatzbericht, umsatz_trifft_pct; ohne die letzten\nsieben Tage), die Differenz in EUR, und dieselbe Quote fuer die Kandidaten (nur Boniert, ohne\nNachlasszeilen), fuer die Finanzwege gegen Bericht 97 (Anteil treffender Finanzweg-Tage), die Bons\ngegen 96 und die Gaeste gegen den Umsatzbericht. Die Zahl, an der sich entscheidet, ob die Deutung\nstimmt: umsatz_trifft_pct nahe 100 bei allen Betrieben. Steht stattdessen ein Kandidat dort, ist die\nDeutung in mart.kassenjournal_zeilenart() zu aendern. Immer nach monat filtern. Prozentzahlen.\n\nKoernung: Betrieb × Monat — Anteil treffender Tage je Abgleich (Umsatz, Finanzwege, Bons, Gaeste); nach monat filtern",
+   "spalten": [
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "tage_im_journal",
+    "tage_vergleichbar",
+    "tage_trifft",
+    "umsatz_trifft_pct",
+    "tage_nah",
+    "umsatz_trifft_netto_pct",
+    "kandidat_nur_boniert_pct",
+    "kandidat_ohne_nachlass_pct",
+    "journal_brutto",
+    "umsatzbericht_brutto",
+    "differenz_brutto",
+    "tage_fehleingabe",
+    "tage_ohne_umsatzbericht",
+    "zeilen_unbekannt",
+    "finanzwege_vergleichbar",
+    "finanzwege_trifft",
+    "finanzwege_trifft_pct",
+    "bontage_vergleichbar",
+    "bons_trifft_pct",
+    "gaestetage_vergleichbar",
+    "gaeste_trifft_pct"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.kassenjournal_fehleingabe",
+   "koernung": "Betrieb × Geschaeftstag × Finanzweg mit Kassen-Fehleingabe (Journal und Bericht 97)",
+   "thema": "pruefung",
+   "summen_erlaubt": false,
+   "kommentar": "Koernung: Betrieb × Geschaeftstag × Finanzweg mit erkannter Kassen-Fehleingabe (0153, Regel wie\n0136): im Journal ein Finanzweg ausser Boniert mit mindestens 1 Mio. EUR an einem Tag, oder die\nErkennung aus Bericht 97 (core.finanzweg_fehleingabe). An solchen Tagen stimmen Summen ueber\nZahlungen und Trinkgeld nicht; die Journalsichten zeigen es in tag_fehleingabe bzw. befund.\nbetrag mit LINAs Vorzeichen.",
+   "spalten": [
+    "betrieb_key",
+    "geschaeftstag",
+    "regel",
+    "finanzweg",
+    "betrag"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.kassenjournal_finanzweg_abgleich",
+   "koernung": "Betrieb × Geschaeftstag × Finanzweg — Journal gegen Bericht 97",
+   "thema": "pruefung",
+   "summen_erlaubt": false,
+   "kommentar": "Abgleich (S10, 0153): je Betrieb, Geschaeftstag und Finanzweg die Summe des Kassenjournals gegen\nBericht 97 (Tagesabschluss, core.finanzweg_tag) — nur Tage, die in beiden Quellen stehen. Am\n07.11.2026 traf das fuer Aposto Aalen jeden Finanzweg auf den Cent; das soll die Regel bleiben.\nBeide Betraege mit LINAs Vorzeichen (Zahlungen negativ). befund: trifft (hoechstens 5 Cent) | weicht\nab | nur journal | nur bericht 97 | nachlass an der position (ein Nachlass-Finanzweg aus 97: im\nJournal steht der Nachlass an der Position, nicht als Finanzweg — kein Fehler) | fehleingabe.\n\nKoernung: Betrieb × Geschaeftstag × Finanzweg — Journal gegen Bericht 97",
+   "spalten": [
+    "geschaeftstag",
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "finanzweg",
+    "finanzweg_name",
+    "finanzgruppe_97",
+    "zeilenart",
+    "journal_zeilen",
+    "journal_betrag",
+    "bericht_97_betrag",
+    "differenz",
+    "befund"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.kassenjournal_finanzweg_stamm",
+   "koernung": "Betrieb × Finanzweg im Journal — Name im Kassenstamm ueber Nummer und id gegen Bericht 97",
+   "thema": "pruefung",
+   "summen_erlaubt": false,
+   "kommentar": "Pruefsicht (0153): je Betrieb und Finanzweg, der im Kassenjournal vorkommt, der Name im Kassenstamm\nueber die NUMMER und ueber die id, der Name und die Finanzgruppe aus Bericht 97 (core.finanzweg) und\ndie Zeilenart nach der Deutung. befund: nummer trifft (die Annahme stimmt) | id trifft (der Verweis\nlaeuft ueber die id — dann sind finanzweg_name und Deutung zu korrigieren) | name weicht ab | nicht\nin bericht 97 (Zeilenart dann aus der festen Liste oder unbekannt) | nicht im kassenstamm.\n\nKoernung: Betrieb × Finanzweg im Journal — Name im Kassenstamm ueber Nummer und id gegen Bericht 97",
+   "spalten": [
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "finanzweg",
+    "zeilen",
+    "betrag_brutto",
+    "erster_tag",
+    "letzter_tag",
+    "name_kasse_nummer",
+    "name_kasse_id",
+    "name_bericht_97",
+    "finanzgruppe_bericht_97",
+    "kategorie_kasse",
+    "zeilenart",
+    "befund"
+   ],
+   "achsen": [
+    "betrieb_key"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.kassenjournal_nachlass_abgleich",
+   "koernung": "Betrieb × Geschaeftstag — Nachlasszeilen im Journal gegen Bericht 97 und 92",
+   "thema": "pruefung",
+   "summen_erlaubt": false,
+   "kommentar": "Abgleich (S10, 0153): je Betrieb und geladenem Journaltag die Journalzeilen mit Nachlass\n(rabatt_id <> 0: Zahl und Summe balance) gegen die Nachlass-Finanzwege aus Bericht 97 (Vorgaenge,\nBetrag) und den Rabattbericht 92 (Artikel, Betrag). Alle Betraege mit LINAs Vorzeichen (Nachlass\nnegativ). Deutung offen: ob eine Zeile mit rabatt_id der Nachlassbetrag selbst ist oder die\nrabattierte Position, ist nicht gemessen — genau das zeigt befund: trifft 97 | trifft 92 | weicht ab\n| kein nachlass | ohne gegenstueck (92 und 97 fuer den Tag nicht geladen). Zahlen nicht\ngegeneinander addieren: 97 zaehlt Vorgaenge, 92 Artikel, das Journal Zeilen.\n\nKoernung: Betrieb × Geschaeftstag — Nachlasszeilen im Journal gegen Bericht 97 und 92",
+   "spalten": [
+    "geschaeftstag",
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "journal_nachlass_zeilen",
+    "journal_nachlass_betrag",
+    "bericht_97_vorgaenge",
+    "bericht_97_betrag",
+    "bericht_92_artikel",
+    "bericht_92_betrag",
+    "befund"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.kassenjournal_position",
+   "koernung": "Betrieb × Geschaeftstag × Journalzeile (TPAPI) — Buchungsliste mit Saldo null, nur mit Filter auf zeilenart summieren; nur Betriebe mit Schluessel, nur im Horizont",
+   "thema": "kasse",
+   "summen_erlaubt": true,
+   "kommentar": "Koernung: eine Zeile des Kassenjournals (TPAPI) — Betrieb × Geschaeftstag × Position (0153). Nur\nBetriebe mit TPAPI-Schluessel und Sales Data API (mart.tpapi_zugang_modul) und nur Geschaeftstage im\nHorizont (mart.tpapi_core_stand, horizont_ab); fehlt ein Betrieb oder Monat, heisst das nicht null.\n\nDAS JOURNAL IST EINE BUCHUNGSLISTE MIT SALDO NULL: Verkaeufe positiv, Zahlungen negativ, Trinkgeld\npositiv, Tischuebergabe hin und zurueck. sum(betrag_brutto) ohne Filter ist 0. Fuer Umsatz IMMER\nzeilenart = 'umsatz' — und das ist eine HYPOTHESE (mart.kassenjournal_zeilenart), deren Treffer\ngegen den Umsatzbericht mart.kassenjournal_abgleich_monat zeigt. Fuer belastbare Umsatzzahlen\nmart.umsatz_tag; das Journal fuer das, was der Umsatzbericht nicht kann: Stunde × Artikel ×\nWarengruppe, Bon, Kellner, Nachlass und Storno an der Position.\n\nDer Geschaeftstag laeuft 08:00 bis 07:59, Nachtstunden gehoeren zum Vortag; nach stunde_folge\nsortieren. betrag_netto = betrag_brutto / (1 + ust/100). ist_zusatz: Beilage oder Zusatz zu\nzu_position. tag_fehleingabe: an diesem Tag steckt eine Kassen-Fehleingabe in Zahlungen oder\nTrinkgeld (mart.kassenjournal_fehleingabe) — solche Tage aus Zahlungssummen herausnehmen.\nartikel/warengruppe/hauptgruppe aus dem Kassenstamm desselben Betriebs ueber die Nummer.",
+   "spalten": [
+    "geschaeftstag",
+    "monat",
+    "wochentag",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "zeitpunkt",
+    "stunde",
+    "stunde_folge",
+    "journal_id",
+    "bon_id",
+    "tisch",
+    "artnr",
+    "buchungstext",
+    "artikel",
+    "warengruppe",
+    "hauptgruppe",
+    "menge",
+    "betrag_brutto",
+    "ust_pct",
+    "betrag_netto",
+    "finanzweg",
+    "finanzweg_name",
+    "zeilenart",
+    "ist_zusatz",
+    "zu_position",
+    "rabatt_id",
+    "stornogrund_id",
+    "kellnernr",
+    "terminal",
+    "site_id",
+    "situation",
+    "preisebene_id",
+    "betriebsprofil_id",
+    "tag_fehleingabe",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag",
+    "marke",
+    "monat",
+    "warengruppe"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.kassenjournal_stamm_pruefung",
+   "koernung": "Betrieb × Monat — Journalpositionen mit Artikelnummer, davon im Kassenstamm und in core.artikel; nach monat filtern",
+   "thema": "pruefung",
+   "summen_erlaubt": false,
+   "kommentar": "Pruefsicht (0153): je Betrieb und Monat, wie viele Journalpositionen mit Artikelnummer (artnr > 0)\nihren Artikel im Kassenstamm desselben Betriebs finden (recipe.number, die Annahme) und wie viele in\ncore.artikel (Konzernberichte). Eine niedrige im_kassenstamm_pct heisst: der Verweis laeuft anders,\noder der Stamm ist aelter als der Monat. Immer nach monat filtern — die Sicht zaehlt das Journal.\n\nKoernung: Betrieb × Monat — Journalpositionen mit Artikelnummer, davon im Kassenstamm und in core.artikel; nach monat filtern",
+   "spalten": [
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "monat",
+    "positionen_mit_artnr",
+    "artikelnummern",
+    "im_kassenstamm",
+    "in_core_artikel",
+    "im_kassenstamm_pct",
+    "in_core_artikel_pct",
+    "zeilen_finanzweg_ohne_stamm"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.kassenjournal_storno_abgleich",
+   "koernung": "Betrieb × Monat — Stornos im Journal gegen Bericht 39",
+   "thema": "pruefung",
+   "summen_erlaubt": false,
+   "kommentar": "Abgleich (S10, 0153): je Betrieb und Monat die Stornos im Kassenjournal (Finanzweg 10 Sofortstorno;\nZeilen mit cancellationreason <> 0 = Storno mit Grund) gegen den Stornobericht 39\n(core.storno_artikel_monat, nach Stornotyp). Monatlich, weil 39 nur je Monat geholt wird. Betraege mit\nLINAs Vorzeichen (negativ). tage_mit_journal: wie viele Tage des Monats im Journal stehen — ein\nunvollstaendiger Monat kann nicht treffen. befund: trifft (Summe beider Stornoarten auf 5 Cent) |\nweicht ab | ohne bericht 39. Deutung offen: ob ein Sofortstorno eine Zeile in Finanzweg 10 UND\neine Position mit Grund sein kann (dann zaehlte er doppelt), ist nicht gemessen.\n\nKoernung: Betrieb × Monat — Stornos im Journal gegen Bericht 39",
+   "spalten": [
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "tage_mit_journal",
+    "journal_sofortstorno_zeilen",
+    "journal_sofortstorno_betrag",
+    "journal_storno_mit_grund_zeilen",
+    "journal_storno_mit_grund_betrag",
+    "bericht_39_sofortstorno_menge",
+    "bericht_39_sofortstorno_betrag",
+    "bericht_39_storno_menge",
+    "bericht_39_storno_betrag",
+    "befund"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.kassenjournal_umsatz_abgleich",
+   "koernung": "Betrieb × Geschaeftstag — Journalumsatz nach der Deutung gegen den Umsatzbericht, mit Kandidaten",
+   "thema": "pruefung",
+   "summen_erlaubt": false,
+   "kommentar": "Abgleich (S10, 0153): je Betrieb und geladenem Journaltag der Umsatz nach der DEUTUNG\n(mart.kassenjournal_zeilenart: Summe balance der Zeilen mit zeilenart = umsatz, brutto) gegen den\nUmsatzbericht (core.umsatzbericht_tag, Gesamtzeile, nur LINAs Kasse — nicht das Kassenblatt). Prueft\ndie Deutung: nach dem ersten echten Lauf muss befund = trifft der Normalfall sein. Daneben zwei\nKandidaten, falls nicht: kandidat_nur_boniert (nur Finanzweg 1) und kandidat_ohne_nachlasszeilen\n(Deutung ohne die Zeilen mit rabatt_id) mit eigenem trifft_*. befund: trifft (hoechstens 5 Cent) |\nnah (hoechstens 1 %) | weicht ab | beide leer | ohne umsatzbericht | fehleingabe (Kassen-\nFehleingabe an diesem Tag, mart.kassenjournal_fehleingabe). vorlaeufig: die letzten sieben Tage, der\nUmsatzbericht kann sich noch aendern. journal_saldo muss 0 sein (Buchungsliste). Verdichtet je Monat:\nmart.kassenjournal_abgleich_monat.\n\nKoernung: Betrieb × Geschaeftstag — Journalumsatz nach der Deutung gegen den Umsatzbericht, mit Kandidaten",
+   "spalten": [
+    "geschaeftstag",
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "journal_zeilen",
+    "journal_umsatz_brutto",
+    "journal_umsatz_netto",
+    "umsatzbericht_brutto",
+    "umsatzbericht_netto",
+    "differenz_brutto",
+    "differenz_netto",
+    "differenz_pct",
+    "befund",
+    "trifft_netto",
+    "kandidat_nur_boniert",
+    "trifft_nur_boniert",
+    "kandidat_ohne_nachlasszeilen",
+    "trifft_ohne_nachlasszeilen",
+    "journal_nachlass_brutto",
+    "journal_saldo",
+    "zeilen_unbekannt",
+    "fehleingabe",
+    "vorlaeufig",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag",
+    "marke",
     "monat"
    ],
    "kennzahlen": [],
@@ -4487,6 +5035,249 @@
    "fallstricke": []
   },
   {
+   "sicht": "mart.lieferkondition_beobachtet",
+   "koernung": "Kostenstelle (Betrieb × Bar/Kueche) × Lieferant, letzte 12 Monate — BEOBACHTETE Liefertage, Vorlauf, Bestellwert; keine vereinbarten Konditionen; Quantile und Median nicht summieren",
+   "thema": "einkauf",
+   "summen_erlaubt": false,
+   "kommentar": "BEOBACHTET, NICHT VEREINBART. Was die Bestellungen der letzten zwoelf Monate ueber\nLiefertage, Vorlauf und Bestellwert je Kostenstelle (Betrieb × Bereich Bar/Kueche)\nund Lieferant zeigen. Eine Zeile je Kostenstelle × Lieferant, ohne Stornos. Ein\nLieferant, der in dem Zeitraum nie an einem Dienstag geliefert hat, liefert\ndienstags vielleicht trotzdem; der kleinste beobachtete Bestellwert ist nicht der\nMindestbestellwert (FoodNotify warnt nur, es sperrt nicht). Die echten\nKonditionen fuehrt FoodNotify am Warenkorb (docs/payloads/foodnotify-2026-11/\nlieferkonditionen-bundle-2026-11-19.md) — hier nicht geladen. Zahlen mit\nbelastbar = false (unter 10 Bestellungen) nur als Anhaltspunkt nennen, und immer\nsagen, dass es beobachtetes Verhalten ist. betrieb ist NULL, solange die\nKostenstelle keinem LINA-Betrieb zugeordnet ist; ueber betrieb_key joinen, nie\nueber den Namen.\n\nKoernung: Kostenstelle (Betrieb × Bar/Kueche) × Lieferant, letzte 12 Monate — BEOBACHTETE Liefertage, Vorlauf, Bestellwert; keine vereinbarten Konditionen; Quantile und Median nicht summieren",
+   "spalten": [
+    "marke",
+    "fn_betrieb",
+    "betrieb_key",
+    "betrieb",
+    "bereich",
+    "kostenstelle_key",
+    "lieferant_key",
+    "lieferant",
+    "zeitraum_von",
+    "zeitraum_bis",
+    "bestellungen",
+    "belastbar",
+    "bestellungen_pending",
+    "erste_bestellung",
+    "letzte_bestellung",
+    "bestellungen_mit_liefertermin",
+    "liefertage",
+    "lieferungen_mo",
+    "lieferungen_di",
+    "lieferungen_mi",
+    "lieferungen_do",
+    "lieferungen_fr",
+    "lieferungen_sa",
+    "lieferungen_so",
+    "liefertage_ueblich",
+    "liefertage_gesehen",
+    "lieferung_vor_bestellung",
+    "vorlauf_min_tage",
+    "vorlauf_median_tage",
+    "vorlauf_typisch_tage",
+    "bestellungen_vortag",
+    "bestellzeit_vortag_spaetest",
+    "bestellzeit_vortag_p95",
+    "bestellungen_mit_wert",
+    "bestellwert_min_netto",
+    "bestellwert_p05_netto",
+    "bestellwert_median_netto"
+   ],
+   "achsen": [
+    "bereich",
+    "betrieb_key",
+    "lieferant",
+    "marke"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "bestellwert_median_netto",
+     "einheit": "euro",
+     "hinweis": "Median je Kostenstelle und Lieferant. Ueber Betriebe nicht mitteln; je Zeile nennen."
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "bestellwert_min_netto",
+     "einheit": "euro",
+     "hinweis": "Kleinster beobachteter Bestellwert je Kostenstelle und Lieferant — nicht der Mindestbestellwert, nicht mitteln."
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "bestellwert_p05_netto",
+     "einheit": "euro",
+     "hinweis": "5-%-Quantil je Kostenstelle und Lieferant — nicht der Mindestbestellwert, ein Quantil laesst sich nicht mitteln."
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "vorlauf_median_tage",
+     "einheit": "tage",
+     "hinweis": "Median je Kostenstelle und Lieferant, nicht mitteln."
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "vorlauf_min_tage",
+     "einheit": "tage",
+     "hinweis": "Kuerzester beobachteter Vorlauf — keine Bestellfrist, nicht mitteln."
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "vorlauf_typisch_tage",
+     "einheit": "tage",
+     "hinweis": "Haeufigster Vorlauf je Kostenstelle und Lieferant, nicht mitteln."
+    }
+   ],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.listenpreis_aenderung",
+   "koernung": "eine beobachtete Aenderung des Listenpreises je Kostenstelle und Produkt — die Reihe beginnt am Tag des ersten Abzugs",
+   "thema": "einkauf",
+   "summen_erlaubt": false,
+   "kommentar": "Jede beobachtete Preisaenderung im FoodNotify-Warenstamm (0157), je PREISART: listenpreis (unitPrice, folgt\ndem Preis der letzten Bestellung) oder katalogpreis (pricePerUnit, Lieferantenkatalog). Alter und neuer Preis\nje Einheit, Aenderung in Prozent, Tag, Kostenstelle, Lieferant, Artikelnummer. IMMER NACH preisart FILTERN —\neine Aenderung beider Preise steht zweimal da. DIE REIHE BEGINNT AM TAG DES ERSTEN ABZUGS: der erste Wert je\nProdukt ist keine Aenderung und steht hier nicht. EIN PREIS 0 ODER LEER IST KEIN PREIS — der Wechsel auf oder\ndavon steht als 'kein preis mehr' bzw. 'preis neu' da (beim Katalogpreis auch: Ware kommt in den oder\nfaellt aus dem Katalog), ohne Prozent, nie als Senkung auf null. Nur vergleichbar = true ist eine reine\nPreisaenderung (Einheit, Inhalt, Gebinde, Artikelnummer und Lieferant unveraendert). Eine\nListenpreisaenderung heisst meist \"es wurde zu einem neuen Preis bestellt\", eine Katalogpreisaenderung \"der\nLieferant hat den Katalog geaendert\". Vorerst nur Wilma Wunder.\n\nKoernung: eine beobachtete Aenderung des Listenpreises je Kostenstelle und Produkt — die Reihe beginnt am Tag des ersten Abzugs",
+   "spalten": [
+    "marke",
+    "betrieb_key",
+    "betrieb",
+    "kostenstelle_id",
+    "kostenstelle",
+    "kostenstelle_key",
+    "lieferant_key",
+    "lieferant",
+    "artikelnummer",
+    "artikelnummer_alt",
+    "ware",
+    "produkt_id",
+    "preisart",
+    "einheit",
+    "inhalt",
+    "gebinde_menge",
+    "preis_alt",
+    "preis_neu",
+    "aenderung_pct",
+    "art",
+    "gueltig_ab",
+    "gesehen_ab",
+    "vorher_zuletzt_gesehen_am",
+    "auch_geaendert",
+    "vergleichbar",
+    "nicht_mehr_geliefert"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "kostenstelle",
+    "lieferant",
+    "marke",
+    "ware"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "aenderung_pct",
+     "einheit": "prozentzahl",
+     "hinweis": "Nur mit vergleichbar = true als Preisaenderung lesen."
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "preis_alt",
+     "einheit": "euro",
+     "hinweis": null
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "preis_neu",
+     "einheit": "euro",
+     "hinweis": null
+    }
+   ],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.listenpreis_aktuell",
+   "koernung": "Kostenstelle × Produkt des Warenstamms (heutiger Stand) — ein Betrieb hat oft zwei Kostenstellen (Bar, Kueche) mit eigenem Warenstamm",
+   "thema": "einkauf",
+   "summen_erlaubt": false,
+   "kommentar": "Was kostet eine Ware heute laut FoodNotify-Warenstamm? Eine Zeile je Kostenstelle und Produkt der letzten\nAntwort (0157). ZWEI PREISE, beide JE EINHEIT (kg, l), nicht je Gebinde: listenpreis (unitPrice, immer\ngefuellt) folgt nach der Messung vom 19.11.2026 dem Preis der letzten Bestellung; katalogpreis (pricePerUnit)\nist der heutige Preis im Lieferantenkatalog, nur bei bestellbaren Waren. katalog_abweichung_pct ungleich 0\nheisst: der Katalog hat sich bewegt, seit zuletzt bestellt wurde. Bezahlte Preise:\nmart.einkaufspreis_artikel_monat. preis_seit = erster Tag, an dem dieser Preis gesehen wurde; steht\npreis_seit_erstem_abzug auf true, gilt er MINDESTENS seit dann — die Reihe beginnt mit unserem ersten Abzug.\nEin Betrieb hat oft zwei Kostenstellen (Bar, Kueche) mit eigenem Warenstamm. Vorerst nur Wilma Wunder;\nStand je Kostenstelle: mart.warenstamm_stand.\n\nKoernung: Kostenstelle × Produkt des Warenstamms (heutiger Stand) — ein Betrieb hat oft zwei Kostenstellen (Bar, Kueche) mit eigenem Warenstamm",
+   "spalten": [
+    "marke",
+    "betrieb_key",
+    "betrieb",
+    "kostenstelle_id",
+    "kostenstelle",
+    "kostenstelle_art",
+    "lieferant_key",
+    "lieferant",
+    "artikelnummer",
+    "ware",
+    "produkt_id",
+    "einheit",
+    "inhalt",
+    "gebinde_menge",
+    "listenpreis",
+    "listenpreis_gebinde",
+    "kein_preis",
+    "katalogpreis",
+    "katalog_abweichung_pct",
+    "katalog_gebinde",
+    "katalog_gebinde_menge",
+    "katalog_gebinde_preis",
+    "bestellbar",
+    "eigenproduktion",
+    "preis_seit",
+    "preis_seit_erstem_abzug",
+    "beobachtet_seit",
+    "fn_geaendert_am",
+    "zuletzt_gesehen_am",
+    "bestand_menge",
+    "bestand_wert",
+    "kostenstellen_gleiche_ware",
+    "listenpreis_median_marke",
+    "abweichung_median_pct"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "kostenstelle",
+    "lieferant",
+    "marke",
+    "ware"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "abweichung_median_pct",
+     "einheit": "prozentzahl",
+     "hinweis": null
+    },
+    {
+     "regel": "summe",
+     "spalte": "bestand_wert",
+     "einheit": "euro",
+     "hinweis": "Bestandswert laut FoodNotify zum Abrufzeitpunkt; ueber Kostenstellen summierbar, nicht ueber Tage."
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "katalog_abweichung_pct",
+     "einheit": "prozentzahl",
+     "hinweis": null
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "katalogpreis",
+     "einheit": "euro",
+     "hinweis": "Preis je Einheit im Lieferantenkatalog, nur bei bestellbaren Waren; NULL ist kein Preis."
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "listenpreis",
+     "einheit": "euro",
+     "hinweis": "Preis je Einheit (kg, l), nicht je Gebinde. Ueber Waren nicht summieren oder mitteln."
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "listenpreis_gebinde",
+     "einheit": "euro",
+     "hinweis": "Gerechnet aus listenpreis x inhalt x gebinde_menge, nicht geliefert."
+    }
+   ],
+   "fallstricke": []
+  },
+  {
    "sicht": "mart.luecke_monat",
    "koernung": "Quelle × Pruefung × Betrieb (bei Betriebsberichten: Bericht) × Monat — eine Zeile je Luecke, 24 Monate zurueck",
    "thema": "pruefung",
@@ -4827,6 +5618,158 @@
    "fallstricke": []
   },
   {
+   "sicht": "mart.personal_rueckstand",
+   "koernung": "Betrieb × fehlender Geschaeftstag — Arbeitsliste fuer Personal je Stunde bis zur Tiefe von listdays, muss auf 0 fallen",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "Arbeitsliste fuer Personal je Stunde (0149, seit 0153 mit der Tiefe von listdays): je Betrieb mit\nSchluessel die Geschaeftstage, die noch nie erfolgreich geholt wurden — die letzten 365 Tage und\ndazu jeder aeltere Tag, den LINAs listdays fuer den Betrieb fuehrt (Aposto Aalen bis Oktober 2019).\nEin leerer Tag zaehlt als erledigt. Phase A holt davon die letzten 365 Tage (feste Grenze je\nBetrieb), Phase C den Rest unter TPAPI_NACHLADEN_JE_LAUF. Die Zeilenzahl MUSS von Nacht zu Nacht\nfallen und 0 erreichen. Betriebe, deren Modul nicht lizenziert ist, fehlen hier — sie stehen in\nmart.tpapi_zugang.\n\nKoernung: Betrieb × fehlender Geschaeftstag — Arbeitsliste fuer Personal je Stunde bis zur Tiefe von listdays, muss auf 0 fallen",
+   "spalten": [
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "geschaeftstag",
+    "zugang_zustand",
+    "arbeitsliste"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.personal_stunde",
+   "koernung": "Betrieb × Geschaeftstag × Stunde — Personen und Lohnkosten aus LINAs Personalplanung (TPAPI), nur Betriebe mit Schluessel",
+   "thema": "personal",
+   "summen_erlaubt": true,
+   "kommentar": "Personen und Lohnkosten je Betrieb, Geschaeftstag und Stunde aus LINAs Personalplanung (TPAPI,\n0149), daneben der Nettoumsatz derselben Stunde. Nur Betriebe mit TPAPI-Schluessel — wer fehlt und\nwarum, sagt mart.tpapi_zugang; ein fehlender Betrieb hat nicht null Personal. Eine Stunde ohne\nZeile ist keine Stunde mit null Personen, sondern eine, die LINA nicht fuehrt. Der Geschaeftstag\nlaeuft 08:00 bis 07:59: \"ab 18 Uhr\" ist stunde >= 18 OR stunde < 8, fuer den Verlauf nach\nstunde_folge sortieren. LINA liefert so weit zurueck, wie die Kasse des Betriebs reicht (bei\nmanchen bis 2019, seit 0153 nachgeladen; was noch fehlt, steht in mart.personal_rueckstand). Die\nLohnkosten sind die der Personalplanung, NICHT die Personalkosten der BWA — Quoten nicht gegen die\nBWA vergleichen. Arbeitsstunden je Tag (statt Kopfzahlen) in mart.personalkosten_tag.\n\nKoernung: Betrieb × Geschaeftstag × Stunde — Personen und Lohnkosten aus LINAs Personalplanung (TPAPI), nur Betriebe mit Schluessel",
+   "spalten": [
+    "betrieb_key",
+    "betrieb",
+    "konzept",
+    "geschaeftstag",
+    "monat",
+    "wochentag",
+    "stunde",
+    "personen",
+    "personalkosten",
+    "umsatz_netto",
+    "umsatz_je_person",
+    "personalkostenquote_pct",
+    "wochentag_nr",
+    "stunde_folge"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag",
+    "konzept",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.personal_stunde_pruefung",
+   "koernung": "Betrieb × Geschaeftstag — TPAPI gegen LINAs Personalkostenbericht; immer nach geschaeftstag filtern",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "Messsicht (0149, Befund 0150): je Betrieb und abgerufenem Geschaeftstag die TPAPI-Personaldaten\ngegen LINAs Personalkostenbericht (Scraper, core.personalkosten). befund vergleicht die\nTPAPI-Lohnkosten vom Monatsersten bis zu diesem Tag mit pek_gesamt × Tagesumsatz (pek ist seit\nMonatsanfang aufgelaufen); befund_stunden die Kopfzahlsumme des Tages mit Tagesumsatz / eff_gesamt.\nERWARTUNG SEIT 09.11.2026: \"weicht ab\" ist der Normalfall, nicht der Fehler — die TPAPI liefert\nKopfzahlen je Stunde (Obergrenze), die Summe liegt im Median 26 % ueber LINAs Effektivitaet, die\nLohnkosten des Monats ebenso (+27 %, 23 von 31 Betrieben im Oktober 2026). Die Nachtprobe ist\nbestanden: die Stunden 0-7 dem Folgetag zugeschlagen passen schlechter (Korrelation 0,918 gegen\n0,925). Brauchbar ist die Sicht fuer den Faktor je Betrieb (Median von abweichung_stunden_pct) und\nseine Stabilitaet, nicht fuer ok/weicht ab. Werte: ok (hoechstens 5 %) | weicht ab | ohne vergleich\n| leer | monat unvollstaendig (nur befund). Immer nach geschaeftstag filtern.\n\nKoernung: Betrieb × Geschaeftstag — TPAPI gegen LINAs Personalkostenbericht; immer nach geschaeftstag filtern",
+   "spalten": [
+    "betrieb_key",
+    "betrieb",
+    "konzept",
+    "geschaeftstag",
+    "personalkosten_tpapi",
+    "personalkosten_tpapi_monat",
+    "personalkosten_aus_quote",
+    "abweichung_pct",
+    "befund",
+    "umsatz_netto",
+    "pek_gesamt",
+    "tage_geholt_monat",
+    "personenstunden_tpapi",
+    "personenstunden_aus_effektivitaet",
+    "abweichung_stunden_pct",
+    "befund_stunden"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag",
+    "konzept"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.personal_tag",
+   "koernung": "Betrieb × Geschaeftstag — Personenstunden, Lohnkosten, besetzte Stunden, Tagesumsatz",
+   "thema": "personal",
+   "summen_erlaubt": true,
+   "kommentar": "Personal je Betrieb und Geschaeftstag aus LINAs Personalplanung (TPAPI, 0149): Personenstunden,\nLohnkosten, besetzte Stunden, erste und letzte besetzte Stunde, dazu der Tagesumsatz aus dem\nUmsatzbericht. Eine Zeile je abgerufenem Tag — auch leere Tage (stunden_geliefert = 0): dort fuehrt\nLINA keine Schichten, das heisst nicht \"niemand da\". Nur Betriebe mit TPAPI-Schluessel, siehe\nmart.tpapi_zugang. Lohnkosten der Personalplanung, nicht der BWA.\n\nKoernung: Betrieb × Geschaeftstag — Personenstunden, Lohnkosten, besetzte Stunden, Tagesumsatz",
+   "spalten": [
+    "betrieb_key",
+    "betrieb",
+    "konzept",
+    "geschaeftstag",
+    "monat",
+    "wochentag",
+    "personenstunden",
+    "personalkosten",
+    "stunden_besetzt",
+    "erste_stunde",
+    "letzte_stunde",
+    "umsatz_netto",
+    "umsatz_je_personenstunde",
+    "personalkostenquote_pct",
+    "wochentag_nr",
+    "stunden_geliefert",
+    "abgerufen_am"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag",
+    "konzept",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.personal_zeitfenster",
+   "koernung": "Betrieb × Geschaeftstag × eigenes Zeitfenster (manual.zeitfenster) — Personenstunden, Lohnkosten, Umsatz",
+   "thema": "personal",
+   "summen_erlaubt": true,
+   "kommentar": "Personenstunden, Lohnkosten und Nettoumsatz je Betrieb, Geschaeftstag und eigenem Zeitfenster\n(manual.zeitfenster, dieselben Fenster wie mart.umsatz_zeitfenster) — aus LINAs Personalplanung\n(TPAPI, 0149). Eine Zeile je abgerufenem Tag und aktivem Fenster, auch wenn im Fenster niemand\neingeplant war (stunden_besetzt = 0). Nur Betriebe mit TPAPI-Schluessel, siehe mart.tpapi_zugang.\nWer andere Grenzen braucht (etwa ab 18 Uhr), schneidet sie in mart.personal_stunde ueber stunde:\nder Geschaeftstag laeuft 08:00 bis 07:59, \"ab 18 Uhr\" ist stunde >= 18 OR stunde < 8. Lohnkosten\nder Personalplanung, nicht der BWA.\n\nKoernung: Betrieb × Geschaeftstag × eigenes Zeitfenster (manual.zeitfenster) — Personenstunden, Lohnkosten, Umsatz",
+   "spalten": [
+    "betrieb_key",
+    "betrieb",
+    "konzept",
+    "geschaeftstag",
+    "monat",
+    "wochentag",
+    "fenster_key",
+    "fenster",
+    "reihenfolge",
+    "ueber_mitternacht",
+    "personenstunden",
+    "personalkosten",
+    "umsatz_netto",
+    "umsatz_je_personenstunde",
+    "personalkostenquote_pct",
+    "stunden_besetzt",
+    "wochentag_nr"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag",
+    "konzept",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
    "sicht": "mart.personalkosten",
    "koernung": "Betrieb und Abrechnungszeitraum (TAGESzeilen) — die Quoten haben den Tagesumsatz im Nenner und sind nur als Median und mit Plausibilitaetsfilter zu gebrauchen",
    "thema": "personal",
@@ -4886,6 +5829,46 @@
      "hinweis": null
     }
    ],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.personalkosten_tag",
+   "koernung": "Betrieb × Geschaeftstag — Arbeitsstunden, Zuschlagsstunden, Bruttolohn, Lohnkosten (TPAPI), daneben Kopfzahlstunden und Umsatz",
+   "thema": "personal",
+   "summen_erlaubt": true,
+   "kommentar": "Koernung: Betrieb × Geschaeftstag — Arbeitsstunden, Zuschlagsstunden, Bruttolohn und Lohnkosten aus\nLINAs Personalplanung (TPAPI personalkostenprotag, Summe ueber die Personen, 0153), daneben die Summe\nder stuendlichen Kopfzahlen aus Stufe 1 (kopfzahl_stunden, mart.personal_tag) und der Tagesumsatz.\nkopfzahl_ueber_arbeitsstunden_pct misst endlich die Aussage aus 0150, die Kopfzahlsumme sei eine\nOBERGRENZE (Median +26 % gegen LINAs Effektivitaet): sie vergleicht mit den echten Arbeitsstunden.\n\nNur Betriebe mit TPAPI-Schluessel und gebuchter Team Data API (mart.tpapi_zugang_modul).\ntag_leer: LINA fuehrt an dem Tag niemanden — nicht \"niemand da\". Lohnkosten der PERSONALPLANUNG,\nNICHT die Personalkosten der BWA oder des Round Table (andere Basis, anderer Zeitpunkt) — Quoten\nnicht gegeneinander vergleichen. umsatz_je_arbeitsstunde und lohnkostenquote_pct ueber Tage aus den\nSummen neu rechnen, nicht mitteln.",
+   "spalten": [
+    "geschaeftstag",
+    "monat",
+    "wochentag",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "personen",
+    "tag_leer",
+    "arbeitsstunden",
+    "zuschlagsstunden_25",
+    "zuschlagsstunden_40",
+    "zuschlagsstunden_50",
+    "bruttolohn",
+    "lohnkosten",
+    "kopfzahl_stunden",
+    "lohnkosten_je_stunde_summe",
+    "kopfzahl_ueber_arbeitsstunden_pct",
+    "umsatz_netto",
+    "umsatz_je_arbeitsstunde",
+    "lohnkostenquote_pct",
+    "geladen_am",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag",
+    "marke",
+    "monat"
+   ],
+   "kennzahlen": [],
    "fallstricke": []
   },
   {
@@ -5272,6 +6255,195 @@
    ],
    "achsen": [
     "konzept"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.pos_artikel_abdeckung",
+   "koernung": "eine Kassenanbindung (Kostenstelle mit Kasse) — Umsatzspalten sind Betriebswerte und stehen bei zwei Anbindungen doppelt",
+   "thema": "pruefung",
+   "summen_erlaubt": false,
+   "kommentar": "Je Kassenanbindung (Kostenstelle mit Kasse): wie viele Kassenartikel FoodNotify fuehrt, wie viele davon\nein Rezept tragen, und welcher Anteil des Artikelumsatz der letzten drei vollen Monate darauf entfaellt\n(0155). Dazu der Zustand des Abrufs (Regel 10): ok / marke nicht aktiv (POS_ARTIKEL_MARKEN, vorerst nur\nWilma Wunder) / nie geladen / veraltet (letzter erfolgreicher Abruf aelter als 36 h) / leer / ohne\nplu-bruecke (kein amadeus: Artikel gezaehlt, Umsatz NULL) / ohne betrieb (Kostenstelle keinem Betrieb\nzugeordnet). Zaehlungen nur ueber Artikel der letzten Antwort (fehlt_seit IS NULL), Umsatz ueber alle je\ngesehenen Artikel (ein im Zeitraum verkaufter, inzwischen gestrichener Artikel trug damals sein Rezept);\nrezept_anteil_pct ist\nmit_rezept / gesamt, Prozentzahl. UMSATZ: umsatz_betrieb_3m ist der ganze Artikelumsatz des BETRIEBS — bei\nzwei Anbindungen (Bar, Kueche) steht er in beiden Zeilen; NICHT ueber Anbindungen summieren. Die Zahl je\nBetrieb (Rezept in irgendeiner Anbindung) steht in mart.pos_artikel_abdeckung_betrieb. umsatz_im_feed_pct\nist die Gegenprobe der PLU-Bruecke (Aposto Gera 01.08.2026: 95,6 % der Artikel trafen).\n\nKoernung: eine Kassenanbindung (Kostenstelle mit Kasse) — Umsatzspalten sind Betriebswerte und stehen bei zwei Anbindungen doppelt",
+   "spalten": [
+    "marke",
+    "betrieb_key",
+    "betrieb",
+    "kostenstelle_id",
+    "kostenstelle",
+    "kostenstelle_art",
+    "connection_id",
+    "kassensystem",
+    "plu_bruecke",
+    "marke_aktiv",
+    "zustand",
+    "letzter_abruf_am",
+    "standort",
+    "ingest_hinweise",
+    "artikel_gesamt",
+    "artikel_mit_rezept",
+    "rezept_anteil_pct",
+    "artikel_ignoriert",
+    "artikel_abwesend",
+    "name_weicht_ab",
+    "nicht_mehr_geliefert",
+    "plu_doppelt",
+    "zuletzt_geaendert_am",
+    "umsatz_von",
+    "umsatz_bis",
+    "umsatz_betrieb_3m",
+    "umsatz_im_feed_3m",
+    "umsatz_mit_rezept_3m",
+    "umsatz_im_feed_pct",
+    "umsatz_rezept_pct"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "kostenstelle",
+    "marke"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "artikel_gesamt",
+     "einheit": "anzahl",
+     "hinweis": "Kassenartikel je Anbindung. Bar und Kueche eines Betriebs fuehren viele Artikel doppelt — eine Summe zaehlt sie zweimal. Fuer einen Betrieb count(DISTINCT artikel_key) in mart.pos_artikel_rezept (fehlt_seit IS NULL)."
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "artikel_mit_rezept",
+     "einheit": "anzahl",
+     "hinweis": "Je Anbindung, wie artikel_gesamt. Fuer einen Betrieb count(DISTINCT artikel_key) FILTER (WHERE hat_rezept) in mart.pos_artikel_rezept; fuer den Umsatzanteil mart.pos_artikel_abdeckung_betrieb."
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "rezept_anteil_pct",
+     "einheit": "prozentzahl",
+     "hinweis": "Anteil je Anbindung, nicht mitteln und nicht aus Anbindungssummen neu rechnen (Artikel stehen in Bar und Kueche doppelt). Fuer einen Betrieb aus mart.pos_artikel_rezept zaehlen."
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "umsatz_betrieb_3m",
+     "einheit": "euro",
+     "hinweis": "Betriebswert, steht bei zwei Anbindungen eines Betriebs in beiden Zeilen."
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "umsatz_im_feed_pct",
+     "einheit": "prozentzahl",
+     "hinweis": null
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "umsatz_rezept_pct",
+     "einheit": "prozentzahl",
+     "hinweis": "Anteil je Anbindung. Fuer den Betrieb mart.pos_artikel_abdeckung_betrieb."
+    }
+   ],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.pos_artikel_abdeckung_betrieb",
+   "koernung": "ein Betrieb mit amadeus-Kassenanbindung — Umsatzabdeckung der letzten drei vollen Monate",
+   "thema": "rezept",
+   "summen_erlaubt": true,
+   "kommentar": "Je Betrieb mit amadeus-Kassenanbindung: welcher Anteil des Artikelumsatzes der letzten drei vollen Monate\nauf Kassenartikel entfaellt, die in IRGENDEINER Anbindung des Betriebs ein Rezept tragen (0155). Das ist die\nZahl, die sagt, wie weit ein Wareneinsatz aus Rezepten reichen koennte — nicht der Wareneinsatz selbst.\nProzentzahlen; ueber Betriebe nicht mitteln, sondern aus den Euro-Summen neu rechnen. umsatz_im_feed_pct ist\ndie Gegenprobe der PLU-Bruecke. Nur Betriebe, deren Kostenstelle einem LINA-Betrieb zugeordnet ist; ob die\nAbrufe frisch sind, sagen aeltester_abruf_am, anbindungen_geladen und mart.pos_artikel_abdeckung (zustand).\nmarke_aktiv = false: fuer diese Marke werden Kassenartikel bewusst nicht geholt (POS_ARTIKEL_MARKEN, vorerst\nnur Wilma Wunder) — die Umsatzspalten mit Rezept sind dann leer, nicht null Prozent.\n\nKoernung: ein Betrieb mit amadeus-Kassenanbindung — Umsatzabdeckung der letzten drei vollen Monate",
+   "spalten": [
+    "marke",
+    "betrieb_key",
+    "betrieb",
+    "marke_aktiv",
+    "anbindungen",
+    "anbindungen_geladen",
+    "aeltester_abruf_am",
+    "umsatz_von",
+    "umsatz_bis",
+    "artikel_verkauft",
+    "artikel_verkauft_mit_rezept",
+    "umsatz_netto_3m",
+    "umsatz_im_feed_3m",
+    "umsatz_mit_rezept_3m",
+    "umsatz_im_feed_pct",
+    "umsatz_rezept_pct"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "marke"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "artikel_verkauft",
+     "einheit": "anzahl",
+     "hinweis": "Verschiedene LINA-Artikel je Betrieb; ueber Betriebe summiert zaehlt derselbe Artikel je Betrieb einmal."
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "artikel_verkauft_mit_rezept",
+     "einheit": "anzahl",
+     "hinweis": "Wie artikel_verkauft. Fuer mehrere Betriebe die Euro-Summen nehmen (umsatz_mit_rezept_3m / umsatz_netto_3m)."
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "umsatz_im_feed_pct",
+     "einheit": "prozentzahl",
+     "hinweis": null
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "umsatz_rezept_pct",
+     "einheit": "prozentzahl",
+     "hinweis": "Anteil je Betrieb. Ueber Betriebe aus umsatz_mit_rezept_3m und umsatz_netto_3m neu rechnen."
+    }
+   ],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.pos_artikel_rezept",
+   "koernung": "Kassenanbindung (Kostenstelle) × Kassenartikel (remote_id) — ein Betrieb hat oft zwei Anbindungen, derselbe Artikel steht dann zweimal; fuer den aktuellen Stand fehlt_seit IS NULL",
+   "thema": "rezept",
+   "summen_erlaubt": false,
+   "kommentar": "Welches Rezept steckt hinter Kassenartikel X? Eine Zeile je Kassenanbindung (Kostenstelle) und\nKassenartikel, mit FoodNotifys Rezeptzuordnung (0155). Ein Betrieb hat oft ZWEI Anbindungen (Bar und\nKueche). Ihre Artikellisten ueberschneiden sich, sind aber nicht gleich (gemessen 19.11.2026: die Bar\nBallplatz fuehrt Speisenrezepte, die Kueche Duesseldorf keinen Kaffee) — derselbe Artikel kann zweimal\nstehen, mit gleichem, anderem oder keinem Rezept. Nach betrieb_key und artikel_key fragen, nicht ueber Anbindungen summieren.\nartikelnummer und artikel_key (LINA, Kassenartikel) nur bei kassensystem amadeus, sonst NULL — nicht die\nLieferanten-Artikelnummer aus den Rezeptzutaten. hat_rezept: Rezept zugeordnet und nicht ignoriert.\nfehlt_seit gesetzt: in der letzten Antwort nicht mehr enthalten (fuer den aktuellen Stand auf fehlt_seit\nIS NULL filtern). Vorerst nur Wilma Wunder; Stand je Anbindung: mart.pos_artikel_abdeckung.\n\nKoernung: Kassenanbindung (Kostenstelle) × Kassenartikel (remote_id) — ein Betrieb hat oft zwei Anbindungen, derselbe Artikel steht dann zweimal; fuer den aktuellen Stand fehlt_seit IS NULL",
+   "spalten": [
+    "marke",
+    "betrieb_key",
+    "betrieb",
+    "kostenstelle_id",
+    "kostenstelle",
+    "kostenstelle_art",
+    "connection_id",
+    "kassensystem",
+    "plu_bruecke",
+    "remote_id",
+    "plu",
+    "artikel_key",
+    "artikelnummer",
+    "lina_artikel",
+    "kassenartikel",
+    "preis",
+    "mwst",
+    "hat_rezept",
+    "rezept_fn_id",
+    "rezept_titel",
+    "rezept",
+    "rezept_archiviert",
+    "rezept_fehlt_seit",
+    "rezept_zutaten_geholt_am",
+    "ist_ignoriert",
+    "abwesend_seit",
+    "name_weicht_ab",
+    "name_doppelt",
+    "wird_synchronisiert",
+    "fehlt_seit",
+    "erstmals_am",
+    "geaendert_am",
+    "zuletzt_gesehen_am"
+   ],
+   "achsen": [
+    "artikel_key",
+    "betrieb_key",
+    "kostenstelle",
+    "marke"
    ],
    "kennzahlen": [],
    "fallstricke": []
@@ -6044,6 +7216,79 @@
    "fallstricke": []
   },
   {
+   "sicht": "mart.speicher_stand",
+   "koernung": "Eine Zeile — juengste Speichermessung des Servers: frei, Verbrauch je Tag, Tage/Datum bis Warnschwelle und voll, befund",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "Speicherwaechter (0152): EINE Zeile, der juengste Stand der Server-Platte und der Datenbank — frei\nin GB und Prozent (wie df -h: frei / (belegt + frei)), Verbrauch je Tag ueber 7 und ueber 2 Tage,\ndie Prognose mit dem GROESSEREN der beiden, Tage und Datum bis zur Warnschwelle (25 % frei) und\nbis voll (10 % frei — nicht 0, PostgreSQL braucht Luft fuer VACUUM FULL, Refresh, WAL und\ntemporaere Dateien). befund: ok | beobachten (Warnschwelle in weniger als 60 Tagen) |\nhochskalieren (weniger als 25 % frei oder voll in weniger als 30 Tagen) | dringend (weniger als\n10 % frei oder voll in weniger als 10 Tagen) | keine messung (keine, aelter als 48 h oder Platte\nnicht messbar) | falsche platte (Datenbank groesser als der belegte Teil der gemessenen Platte).\nAuch ohne Messung steht genau eine Zeile da. Verlauf: mart.speicher_verlauf.\n\nKoernung: Eine Zeile — juengste Speichermessung des Servers: frei, Verbrauch je Tag, Tage/Datum bis Warnschwelle und voll, befund",
+   "spalten": [
+    "befund",
+    "befund_text",
+    "gemessen_am",
+    "alter_stunden",
+    "lauf_id",
+    "pfad",
+    "messungen",
+    "erste_messung",
+    "platte_gesamt_gb",
+    "platte_nutzbar_gb",
+    "belegt_gb",
+    "frei_gb",
+    "frei_pct",
+    "db_gb",
+    "raw_gb",
+    "verbrauch_7t_gb_tag",
+    "verbrauch_2t_gb_tag",
+    "verbrauch_prognose_gb_tag",
+    "fenster_7t_tage",
+    "fenster_2t_tage",
+    "db_wachstum_7t_gb_tag",
+    "db_wachstum_2t_gb_tag",
+    "raw_wachstum_7t_gb_tag",
+    "tage_bis_warnschwelle",
+    "datum_warnschwelle",
+    "tage_bis_voll",
+    "datum_voll",
+    "warnschwelle_pct",
+    "voll_pct",
+    "warnschwelle_gb",
+    "voll_gb",
+    "platte_fehler",
+    "groesste",
+    "je_schema"
+   ],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.speicher_verlauf",
+   "koernung": "Messung (eine je Nachtlauf) — frei, belegt, Datenbank, raw, Aenderung gegen die Messung davor",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "Speicherwaechter (0152): eine Zeile je Messung (eine je Nachtlauf) — frei, belegt, Datenbank, raw,\nund was sich gegen die Messung davor geaendert hat. Fuer die Verlaufskarte; die Prognose steht in\nmart.speicher_stand.\n\nKoernung: Messung (eine je Nachtlauf) — frei, belegt, Datenbank, raw, Aenderung gegen die Messung davor",
+   "spalten": [
+    "messung_id",
+    "gemessen_am",
+    "tag",
+    "lauf_id",
+    "pfad",
+    "frei_gb",
+    "frei_pct",
+    "belegt_gb",
+    "db_gb",
+    "raw_gb",
+    "verbrauch_gb",
+    "db_zuwachs_gb",
+    "raw_zuwachs_gb",
+    "tage_seit_vorher",
+    "platte_fehler"
+   ],
+   "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
    "sicht": "mart.stadt_schnitt_monat",
    "koernung": "Ort und Monat, nur Orte mit mehr als einem laufenden Betrieb",
    "thema": "round_table",
@@ -6351,6 +7596,209 @@
     "geschaeftstag",
     "marke",
     "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.tpapi_abruf_stand",
+   "koernung": "TPAPI-Endpunkt — roh gesicherte Tage bzw. Abzuege, davon in core, geaendert, Bytes",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "TPAPI-Rohabzug je Endpunkt (0151): wie viel liegt roh gesichert, wie viel davon ist schon in den\nAuswertungen (in_core — erst ab Schritt 2b), wie oft hat sich ein Tag nach dem ersten Abruf noch\ngeaendert. art = tag (Journal, Bons, Personalkosten je Tag: eine Zeile je Betrieb und Tag) | stamm\n(Artikelstamm: eine Zeile je Abzug). Fuer stamm zaehlt eintraege die Abzuege, geaendert die mit\nneuem Inhalt, bytes nur die neuen Rohsaetze.\n\nKoernung: TPAPI-Endpunkt — roh gesicherte Tage bzw. Abzuege, davon in core, geaendert, Bytes",
+   "spalten": [
+    "art",
+    "endpunkt",
+    "betriebe",
+    "eintraege",
+    "in_core",
+    "geaendert",
+    "abrufe",
+    "bytes",
+    "zeilen",
+    "leer",
+    "aeltester_tag",
+    "juengster_tag",
+    "letzter_abruf",
+    "ladefehler"
+   ],
+   "achsen": [
+    "endpunkt"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.tpapi_core_befund",
+   "koernung": "TPAPI-Rohsatz mit Ladefehler oder Auffaelligkeit — Betrieb × Endpunkt × Tag, leer im Normalfall",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "Je TPAPI-Rohsatz, der nicht glatt nach core kam (0153): ladefehler (wird wieder versucht) | ladefehler\nendgueltig (drei Versuche mit diesem Laderstand) | auffaellig (geladen, aber mit unerwartetem Feld,\nZeitpunkt ausserhalb des Geschaeftstags, Saldo ungleich null — Schluessel in auffaellig: felder,\nausserhalb_geschaeftstag, ohne_zeitpunkt, refdate_abweichend, saldo, unbekannte_felder,\nnicht_berliner_mitternacht, ausserhalb_bereich). Kein Inhalt der Antwort, nur Feldnamen und Zaehler.\nLeer ist der Normalfall; die Zahl steht in mart.tpapi_core_stand und mart.pruefung_uebersicht.\n\nKoernung: TPAPI-Rohsatz mit Ladefehler oder Auffaelligkeit — Betrieb × Endpunkt × Tag, leer im Normalfall",
+   "spalten": [
+    "art",
+    "endpunkt",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "geschaeftstag",
+    "befund",
+    "ladefehler",
+    "ladeversuche",
+    "auffaellig",
+    "core_geladen_am",
+    "abgerufen_am"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "endpunkt",
+    "geschaeftstag"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.tpapi_core_stand",
+   "koernung": "TPAPI-Endpunkt — roh gesichert, in core, ausserhalb Horizont, wartend, Ladefehler",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "TPAPI raw → core je Endpunkt (0153): wie viele Rohsaetze liegen roh gesichert (roh_gesichert), wie\nviele davon stehen mit dem aktuellen Laderstand in core (in_core), wie viele liegen BEWUSST nur roh,\nweil ihr Geschaeftstag vor dem Horizont liegt (ausserhalb_horizont: Journal und Bons vor\nhorizont_ab, TPAPI_CORE_MONATE — kein Rueckstand, eine Entscheidung), wie viele warten auf den Lader\n(wartend; wartend_ueber_48h ist ein Befund), und wie viele scheiterten (ladefehler: wird wieder\nversucht; ladefehler_endgueltig: drei Versuche mit diesem Laderstand, erst ein neuer Rohsatz oder\neine neue Laderversion versucht es wieder). auffaellig: geladen, aber mit unerwartetem Feld, Saldo\noder Zeitpunkt (core.tpapi_abruf.core_auffaellig). art = tag (je Betrieb und Tag) | stamm (je\nAbzug: Artikelstamm und Prognose).\n\nKoernung: TPAPI-Endpunkt — roh gesichert, in core, ausserhalb Horizont, wartend, Ladefehler",
+   "spalten": [
+    "art",
+    "endpunkt",
+    "laderstand",
+    "horizont_ab",
+    "roh_gesichert",
+    "in_core",
+    "ausserhalb_horizont",
+    "wartend",
+    "wartend_ueber_48h",
+    "ladefehler",
+    "ladefehler_endgueltig",
+    "auffaellig",
+    "bytes_ausserhalb_horizont",
+    "aeltester_tag_in_core",
+    "juengster_tag_in_core",
+    "zuletzt_geladen"
+   ],
+   "achsen": [
+    "endpunkt"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.tpapi_rueckstand",
+   "koernung": "Betrieb × TPAPI-Tagesendpunkt — Tage laut listdays, geholt, fehlend, stockt",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "TPAPI-Rohabzug je Betrieb und Tagesendpunkt (0151): wie viele Geschaeftstage LINA fuehrt\n(tage_liste), wie viele geholt sind und wie viele fehlen — die Zahl, die Nacht fuer Nacht FALLEN\nmuss. stockt = es fehlt etwas, und seit 48 Stunden kam kein Tag aus dem Nachladen dazu (Pruefzeile\nin mart.pruefung_uebersicht). Ein Betrieb, der fehlt, hat keinen Schluessel oder das Modul nicht\ngebucht — siehe mart.tpapi_zugang_modul. Geholt heisst roh gesichert; ob ein Tag schon in den\nAuswertungen steht, sagt mart.tpapi_abruf_stand (in_core).\n\nKoernung: Betrieb × TPAPI-Tagesendpunkt — Tage laut listdays, geholt, fehlend, stockt",
+   "spalten": [
+    "betrieb_key",
+    "betrieb",
+    "enc_id",
+    "endpunkt",
+    "modul",
+    "zugang_zustand",
+    "arbeitsliste",
+    "tage_liste",
+    "tage_geholt",
+    "tage_fehlend",
+    "aeltester_tag_liste",
+    "aeltester_tag_geholt",
+    "juengster_tag_fehlend",
+    "letzter_abruf",
+    "letzter_nachladen",
+    "bekannt_seit",
+    "stockt"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "endpunkt"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.tpapi_rueckstand_tag",
+   "koernung": "Betrieb × TPAPI-Tagesendpunkt × fehlender Geschaeftstag — Arbeitsliste des Nachladens, muss auf 0 fallen",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "Arbeitsliste des TPAPI-Nachladens (0151): je Betrieb mit Schluessel, Tagesendpunkt (Journal, Bons,\nPersonalkosten je Tag) und Geschaeftstag, der laut LINAs listdays existiert und noch nie\nerfolgreich geholt wurde. Phase C holt daraus die neuesten Tage zuerst. Die Zeilenzahl MUSS fallen\nund 0 erreichen; die verdichtete Zahl je Betrieb steht in mart.tpapi_rueckstand. Betriebe ohne\nSales Data API haben keine listdays — fuer Personalkosten je Tag gelten dort die letzten 365 Tage\n(arbeitsliste = horizont 365). Nicht lizenzierte Module fehlen hier und stehen in\nmart.tpapi_zugang_modul.\n\nKoernung: Betrieb × TPAPI-Tagesendpunkt × fehlender Geschaeftstag — Arbeitsliste des Nachladens, muss auf 0 fallen",
+   "spalten": [
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "endpunkt",
+    "modul",
+    "geschaeftstag",
+    "arbeitsliste",
+    "zugang_zustand"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "endpunkt",
+    "geschaeftstag"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.tpapi_zugang",
+   "koernung": "Betrieb (alle) — TPAPI-Schluessel, letzter Aufruf, Schichten der letzten 14 Tage, geladene und fehlende Tage",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "TPAPI-Zugang je Betrieb, alle Betriebe (0149, 0150): hat er einen Schluessel fuer das\nPersonalmodul, wie ging der letzte Aufruf aus, wie viele Tage sind geladen und wie viele fehlen\nnoch. befund: ok | Schluessel ohne Zulauf (seit 48 h keine erfolgreiche Antwort) | Schluessel ohne\nSchichten (Antworten kommen, aber in 14 Tagen mit mindestens sieben Umsatztagen keine einzige\nSchicht — der Betrieb plant sein Personal nicht in LINA, oder nicht mehr) | nicht lizenziert\n(Modul fuer den Betrieb nicht gebucht — ein Zustand, kein Fehler) | abgewiesen (Schluessel\nabgelehnt) | gebremst (Anfragelimit erreicht) | operativ ohne Schluessel (laufender Betrieb, fuer\nden es keine Personaldaten gibt) | nicht operativ (kein Schluessel, kein laufendes Geschaeft). Wer\nin den Personalsichten fehlt oder leer ist, steht hier mit Grund.\n\nKoernung: Betrieb (alle) — TPAPI-Schluessel, letzter Aufruf, Schichten der letzten 14 Tage, geladene und fehlende Tage",
+   "spalten": [
+    "betrieb_key",
+    "betrieb",
+    "konzept",
+    "status",
+    "schluessel",
+    "zustand",
+    "zuletzt_gefragt",
+    "zuletzt_erfolg",
+    "letzter_fehler",
+    "tage_geladen",
+    "aeltester_tag",
+    "juengster_tag",
+    "rueckstand_tage",
+    "befund",
+    "letzter_http",
+    "tage_mit_umsatz_14",
+    "tage_mit_schichten_14",
+    "letzter_tag_mit_schichten"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "konzept"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.tpapi_zugang_modul",
+   "koernung": "Betrieb (alle) × TPAPI-Modul (personal, revenue, artikel) — Schluessel, letzter Aufruf, befund",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "TPAPI-Zugang je Betrieb und Modul, alle Betriebe (0151): personal (Team Data API: Personal je\nStunde und je Tag) | revenue (Sales Data API: Journal, Bons, listdays) | artikel (Article Data API:\nArtikelstamm). Ein Betrieb kann ein Modul gebucht haben und ein anderes nicht. befund: ok |\nSchluessel ohne Zulauf (kein Erfolg binnen erfolg_binnen_stunden) | nicht lizenziert (Modul nicht\ngebucht — ein Zustand, kein Fehler) | abgewiesen | gebremst | operativ ohne Schluessel | nicht\noperativ. Fuer das Personalmodul fuehrt mart.tpapi_zugang den genaueren befund (mit \"Schluessel\nohne Schichten\").\n\nKoernung: Betrieb (alle) × TPAPI-Modul (personal, revenue, artikel) — Schluessel, letzter Aufruf, befund",
+   "spalten": [
+    "betrieb_key",
+    "betrieb",
+    "konzept",
+    "status",
+    "modul",
+    "schluessel",
+    "zustand",
+    "zuletzt_gefragt",
+    "zuletzt_erfolg",
+    "letzter_http",
+    "letzter_fehler",
+    "erfolg_binnen_stunden",
+    "befund"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "konzept"
    ],
    "kennzahlen": [],
    "fallstricke": []
@@ -6692,6 +8140,275 @@
     "betrieb_key",
     "geschaeftstag",
     "konzept",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.umsatzprognose_guete",
+   "koernung": "Betrieb × Monat × Grundlage × Vorlauf — MAE, MAPE, WAPE, Bias von LINAs Prognose; aus den summe_-Spalten neu rechnen",
+   "thema": "umsatz",
+   "summen_erlaubt": false,
+   "kommentar": "Koernung: Betrieb × Monat × Grundlage × Vorlauf — wie genau LINAs Umsatzprognose war (0154): MAE (EUR),\nMAPE, WAPE (Summe |Fehler| / Summe Ist) und Bias, nur ueber vergleichbare Tage (mart.umsatzprognose_vorlauf,\nvergleichbar). Fehler = Prognose - Ist; Prozentwerte sind Prozentzahlen. grundlage = vorab mit\nvorlauf_tage 0/1/2/3/7/14/28 ist die belastbare Zahl; grundlage = nachtraeglich (vorlauf_tage NULL) erst\ndann, wenn mart.umsatzprognose_nachher_betrieb ueber Wochen zeigt, dass LINA nachtraeglich nichts aendert.\nNie ueber Vorlaeufe oder Grundlagen summieren; fuer Marke, Quartal oder Gruppe aus den summe_-Spalten neu\nrechnen (WAPE = summe_fehler_abs_netto / summe_ist_netto * 100), nicht Prozente mitteln. Fuer den Vergleich\nmit eigenen Prognosen dieselben Tage und denselben Vorlauf nehmen.",
+   "spalten": [
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "monat",
+    "grundlage",
+    "vorlauf_tage",
+    "tage",
+    "tage_ausgeschlossen",
+    "tage_geschlossen",
+    "tage_geschlossen_mit_prognose",
+    "summe_ist_netto",
+    "summe_prognose_netto",
+    "summe_fehler_netto",
+    "summe_fehler_abs_netto",
+    "summe_ape_pct",
+    "mae_netto",
+    "mape_pct",
+    "wape_pct",
+    "bias_netto",
+    "bias_pct",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "marke",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.umsatzprognose_horizont",
+   "koernung": "Betrieb — wie weit LINA die Prognose voraus liefert, Tage mit Vorabprognose",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "Koernung: Betrieb — wie weit LINA ihre Umsatzprognose voraus liefert (0154), aus dem juengsten\nFensterabzug von Phase A: angefragt_bis (TPAPI_PROGNOSE_TAGE_VORAUS) gegen geliefert_bis;\nvorlauf_geliefert_tage = groesster Vorlauf, fuer den dieser Abzug zaehlt. groesster_vorlauf_tage: der\ngroesste je gesehene. tage_mit_vorab: wie viele Tage es mit echter Vorabprognose gibt (die Vergleichsbasis\nwaechst damit jede Nacht um einen Tag je Betrieb). befund: liefert bis fensterende | liefert kuerzer als\ngefragt | liefert kein heute (dann gibt es KEINE Vorabprognose — ein Befund) | abzug leer | wartet auf\nlader. Nur Betriebe mit Prognoseabzug.",
+   "spalten": [
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "letzter_abzug_am",
+    "angefragt_bis",
+    "geliefert_bis",
+    "vorlauf_angefragt_tage",
+    "vorlauf_geliefert_tage",
+    "tage_im_abzug",
+    "groesster_vorlauf_tage",
+    "tage",
+    "tage_mit_vorab",
+    "erster_tag",
+    "erster_tag_mit_vorab",
+    "befund",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "marke"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.umsatzprognose_nachher",
+   "koernung": "Betrieb × Geschaeftstag — Vorabwert gegen den nach dem Tag gesehenen Wert (aendert LINA nachtraeglich?)",
+   "thema": "pruefung",
+   "summen_erlaubt": false,
+   "kommentar": "Koernung: Betrieb × Geschaeftstag — Tage mit echter Vorabprognose (gesehen vor 08:00 des Tages) UND\neiner Beobachtung nach Ende des Tages (Folgetag 08:00), 0154: hat LINA den Wert nach dem Tag noch\ngeaendert? vorab_netto = Stand bei Beginn des Tages, nachher_netto = juengster Wert, der nach dem Tag\ngesehen wurde, unveraendert = beide gleich, aenderung_pct in Prozent des Vorabwerts (Prozentzahl).\nbeobachtet_tage_danach: wie lange nach dem Tag zuletzt hingesehen wurde. wechsel_ab_beginn: wie viele neue\nWerte ab Beginn des Tages kamen (auch hin und zurueck, das unveraendert nicht sieht). Je Betrieb\nzusammengefasst in mart.umsatzprognose_nachher_betrieb.",
+   "spalten": [
+    "geschaeftstag",
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "vorab_netto",
+    "vorab_gesehen_ab",
+    "nachher_netto",
+    "nachher_zuletzt_gesehen",
+    "beobachtet_tage_danach",
+    "wechsel_ab_beginn",
+    "unveraendert",
+    "aenderung_netto",
+    "aenderung_pct",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag",
+    "marke",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.umsatzprognose_nachher_betrieb",
+   "koernung": "Betrieb — Anteil Tage, an denen LINA die Prognose nach dem Tag nicht geaendert hat; Freigabe der Historie",
+   "thema": "pruefung",
+   "summen_erlaubt": false,
+   "kommentar": "Koernung: Betrieb — aendert LINA ihre Umsatzprognose nach dem Tag noch (0154)? Ueber alle Tage mit\nechter Vorabprognose und spaeterer Beobachtung (mart.umsatzprognose_nachher): Anteil unveraenderter Tage,\nmittlere und groesste Aenderung, wie lange nach dem Tag gemessen wurde. befund: noch keine messung |\nunveraendert | wechselt, kehrt zurueck | aendert nachtraeglich. DIE FREIGABE: erst wenn diese Sicht\nueber einige Wochen (Vorschlag: vier) bei allen Betrieben \"unveraendert\" zeigt, mit groesster_abstand_tage\nueber 28, darf die nachtraeglich geholte Historie (grundlage = nachtraeglich in\nmart.umsatzprognose_vorlauf und _guete) als Vergleichsbasis gelten — vorher ist ihre Verzerrung\nunbekannt, in beide Richtungen. Gemessen wird nur bis gut fuenf Wochen nach dem Tag; ob LINA Jahre alte\nPrognosen anders liefert, misst die Sicht nicht.",
+   "spalten": [
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "tage",
+    "tage_unveraendert",
+    "anteil_unveraendert_pct",
+    "tage_mit_wechsel",
+    "mittlere_abs_aenderung_netto",
+    "mittlere_abs_aenderung_pct",
+    "groesste_abs_aenderung_netto",
+    "mittlerer_abstand_tage",
+    "groesster_abstand_tage",
+    "erster_tag",
+    "letzter_tag",
+    "befund",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "marke"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.umsatzprognose_rueckstand",
+   "koernung": "Betrieb × fehlender Monat — Arbeitsliste der Prognose-Historie, muss auf 0 fallen",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "Arbeitsliste der Prognose-Historie (0153, Rang seit 0154): je Betrieb mit Sales Data API jeder\nabgeschlossene Monat ab dem ersten Tag in listdays, fuer den LINAs Umsatzprognose noch nicht geholt ist.\nPhase C holt einen Aufruf je Monat, seit 0154 VOR allen fehlenden Tagen von Journal, Bons und Personal\n(neueste Monate zuerst) — es ist unbekannt, wie lange LINA alte Prognosen vorhaelt, und der Posten ist\nklein (rund 3.000 Aufrufe). Muss nach der ersten Nacht auf 0 stehen; danach kommt je Betrieb und\nMonatsende ein Monat dazu, der in der naechsten Nacht geholt wird.\n\nKoernung: Betrieb × fehlender Monat — Arbeitsliste der Prognose-Historie, muss auf 0 fallen",
+   "spalten": [
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "monat",
+    "von",
+    "bis",
+    "zugang_zustand"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.umsatzprognose_tag",
+   "koernung": "Betrieb × Geschaeftstag — LINAs Umsatzprognose netto gegen den Nettoumsatz",
+   "thema": "umsatz",
+   "summen_erlaubt": true,
+   "kommentar": "Koernung: Betrieb × Geschaeftstag — LINAs Umsatzprognose (netto) gegen den Nettoumsatz des Tages\n(mart.umsatz_tag), 0153. LINAs Zahl, keine eigene Prognose. prognose_netto ist der letzte Wert, den\nLINA VOR Beginn des Tages (08:00) nannte (prognose_grundlage = vorab); fuer Tage, die erst\nnachtraeglich geholt wurden, der juengste Wert (nachtraeglich) — ob LINA ihre Prognose nach dem Tag\nanpasst, ist nicht gemessen, solche Zeilen also nicht als Trefferquote der Prognose lesen.\nabweichung_pct: (Ist - Prognose) in Prozent der Prognose (Prozentzahl), nicht mitteln, aus Summen\nneu rechnen. tage_voraus_erstmals: wie viele Tage vor dem Tag die Prognose zum ersten Mal kam (misst,\nob LINA Zukunftstage liefert). Nur Betriebe mit TPAPI-Schluessel und Sales Data API.",
+   "spalten": [
+    "geschaeftstag",
+    "monat",
+    "wochentag",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "prognose_netto",
+    "prognose_grundlage",
+    "prognose_vorab_netto",
+    "prognose_juengste_netto",
+    "erste_prognose_netto",
+    "ist_netto",
+    "abweichung_netto",
+    "abweichung_pct",
+    "aenderungen",
+    "erstmals_am",
+    "geaendert_am",
+    "abgerufen_am",
+    "tage_voraus_erstmals",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag",
+    "marke",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.umsatzprognose_verlauf",
+   "koernung": "Betrieb × Geschaeftstag × Wert — Verlauf von LINAs Umsatzprognose, eine Zeile je neuem Wert",
+   "thema": "umsatz",
+   "summen_erlaubt": false,
+   "kommentar": "Koernung: Betrieb × Geschaeftstag × Wert — der Verlauf von LINAs Umsatzprognose (0154): eine Zeile\nbei der ersten Sichtung und bei jeder Aenderung, nr zaehlt sie je Tag. Ein Wert galt nachweislich von\ngesehen_ab bis zuletzt_gesehen_am und wurde zu abgeloest_am durch die naechste Zeile ersetzt (NULL =\ngilt noch). vor_beginn = true: gesehen vor 08:00 des Tages (echte Vorabprognose). vorlauf_tage: fuer\nwelchen Vorlauf der Wert hoechstens zaehlt (negativ = erst nach Beginn des Tages gesehen). LINAs Zahl,\nkeine eigene; nur Betriebe mit TPAPI-Schluessel und Sales Data API. Fuer Prognose gegen Ist\nmart.umsatzprognose_vorlauf.",
+   "spalten": [
+    "geschaeftstag",
+    "monat",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "nr",
+    "prognose_netto",
+    "gesehen_ab",
+    "zuletzt_gesehen_am",
+    "abgeloest_am",
+    "sichtungen",
+    "vor_beginn",
+    "vorlauf_tage",
+    "abzug_id",
+    "zuletzt_abzug_id",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag",
+    "marke",
+    "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.umsatzprognose_vorlauf",
+   "koernung": "Betrieb × Geschaeftstag × Vorlauf (0/1/2/3/7/14/28, dazu nachtraeglich) — LINAs Prognose gegen Ist; nur mit Filter auf vorlauf_tage bzw. grundlage summieren",
+   "thema": "umsatz",
+   "summen_erlaubt": true,
+   "kommentar": "Koernung: Betrieb × Geschaeftstag × Vorlauf — LINAs Umsatzprognose, wie sie N Tage vor dem Tag (vor\n08:00 Berlin) dastand, gegen den Nettoumsatz (mart.umsatz_tag), 0154. Die Vergleichsbasis fuer eigene\nPrognosen: immer DENSELBEN Vorlauf vergleichen. vorlauf_tage in 0, 1, 2, 3, 7, 14, 28 (0 = am Morgen\ndes Tages) mit grundlage = vorab; dazu je Tag eine Zeile grundlage = nachtraeglich (vorlauf_tage\nNULL): der erste Wert, der nach dem Tag gesehen wurde — ob LINA ihn nachtraeglich angepasst hat, ist\nunbekannt (mart.umsatzprognose_nachher_betrieb). Jeder Tag steht bis zu achtmal da: nie ohne Filter\nauf vorlauf_tage bzw. grundlage summieren. fehler_netto = Prognose - Ist (positiv = LINA zu hoch, die\numgekehrte Richtung von mart.umsatzprognose_tag.abweichung_netto), fehler_pct in Prozent des Ist\n(Prozentzahl). Fuer Fehlermasse nur vergleichbar = true; ausschluss_grund sagt, warum ein Tag nicht\nzaehlt. Fertige Fehlermasse je Betrieb und Monat: mart.umsatzprognose_guete. Nur Betriebe mit\nTPAPI-Schluessel und Sales Data API; Vorabwerte erst ab dem ersten Lauf mit 0154.",
+   "spalten": [
+    "geschaeftstag",
+    "monat",
+    "wochentag",
+    "betrieb_key",
+    "enc_id",
+    "betrieb",
+    "marke",
+    "grundlage",
+    "vorlauf_tage",
+    "stichtag",
+    "prognose_netto",
+    "ist_netto",
+    "fehler_netto",
+    "fehler_abs_netto",
+    "fehler_pct",
+    "fehler_abs_pct",
+    "prognose_gesehen_ab",
+    "prognose_zuletzt_gesehen",
+    "sichtung_luecke_tage",
+    "tag_hat_vorab",
+    "ausschluss_grund",
+    "vergleichbar",
+    "operativ"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag",
+    "marke",
     "monat"
    ],
    "kennzahlen": [],
@@ -7055,6 +8772,46 @@
     "betrieb_key",
     "konzept",
     "monat"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.warenstamm_stand",
+   "koernung": "eine Kostenstelle mit Warenwirtschaft (erpId) — Zulauf des Warenstamms",
+   "thema": "pruefung",
+   "summen_erlaubt": false,
+   "kommentar": "Je Kostenstelle mit Warenwirtschaft (erpId): kommt der Warenstamm an (0157, Regel 10)? zustand: ok / marke nicht\naktiv (WARENSTAMM_MARKEN, vorerst nur Wilma Wunder) / kein zugriff (FoodNotify verweigert die Kostenstelle\ndauerhaft, 0075) / nie geladen / unvollstaendig (eine Folgeseite meldete eine andere Gesamtzahl) / veraltet\n(letzter VOLLSTAENDIGER Abzug aelter als 36 h) / leer / ohne betrieb (Kostenstelle keinem Betrieb zugeordnet —\ndarunter die Testkostenstellen \"AAA Testrestaurant\", \"… TESTBETRIEB\", die mit geladen werden).\nDazu die Zahl der Produkte der letzten Antwort, ohne Preis, ohne Artikelnummer, Eigenproduktion, und reihe_ab:\nab diesem Tag gibt es fuer die Kostenstelle eine Preisreihe — davor nicht.\n\nKoernung: eine Kostenstelle mit Warenwirtschaft (erpId) — Zulauf des Warenstamms",
+   "spalten": [
+    "marke",
+    "marke_aktiv",
+    "betrieb_key",
+    "betrieb",
+    "kostenstelle_id",
+    "kostenstelle",
+    "kostenstelle_art",
+    "erp_id",
+    "zustand",
+    "letzter_abruf_am",
+    "vollstaendig_am",
+    "abzug_tag",
+    "seiten",
+    "produkte_gemeldet",
+    "produkte",
+    "nicht_mehr_geliefert",
+    "ohne_preis",
+    "ohne_artikelnummer",
+    "eigenproduktion",
+    "mit_katalogpreis",
+    "reihe_ab",
+    "preisaenderungen_30_tage",
+    "katalogaenderungen_30_tage",
+    "befund"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "kostenstelle",
+    "marke"
    ],
    "kennzahlen": [],
    "fallstricke": []
@@ -7705,6 +9462,26 @@
    "quelle": "docs/datenmodell.md, Entscheidung 6"
   },
   {
+   "schluessel": "einkaufspreis_artikel_basis_zwischenstufe",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.einkaufspreis_artikel_monat_basis",
+   "parameter": {},
+   "hinweis": "mart.einkaufspreis_artikel_monat_basis ist die materialisierte Zwischenstufe: ohne Marken- und Lieferantennamen, ohne veraenderung_pct und ohne verdaechtig. Wer daraus eine Teuerung rechnet, zaehlt Gebinde- und Einheitenwechsel als Preisaenderung.",
+   "berichtigung": "mart.einkaufspreis_artikel_monat nehmen — dieselben Zeilen, mit Namen, Vergleich und Gebindekennzeichen.",
+   "quelle": "0158"
+  },
+  {
+   "schluessel": "einkaufspreis_artikel_vergleich_letzte_bestellung",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.einkaufspreis_artikel_monat",
+   "parameter": {},
+   "hinweis": "veraenderung_pct vergleicht mit dem letzten Monat MIT Bestellung (monate_seit_vorher kann 12 und mehr sein), und preis_je_gebinde ist je bestellter Einheit. Ein Gebinde- oder Einheitenwechsel sieht aus wie eine Preisaenderung; dann steht verdaechtig auf true.",
+   "berichtigung": "Fuer Teuerung auf NOT verdaechtig filtern und monate_seit_vorher nennen; ueber Waren nicht mitteln.",
+   "quelle": "0157"
+  },
+  {
    "schluessel": "einkaufspreis_vergleichbar",
    "art": "filter_noetig",
    "schwere": "sperre",
@@ -7762,6 +9539,26 @@
    "hinweis": "Filter ueber finanzweg_nummer: fuer eine Zahlart meist richtig, fuer eine AKTION nicht — sie kann ueber mehrere Nummern laufen (Gluecksrad 25 %: 3501 und 3168).",
    "berichtigung": "Fuer Nachlaesse ueber aktion und prozentsatz filtern, oder gleich mart.nachlass_monat nehmen (dort sind die Finanzwege einer Aktion schon zusammengefasst).",
    "quelle": "docs/metabase.md, Abschnitt zu 0117"
+  },
+  {
+   "schluessel": "fixedwe_keine_marge_abgleich",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.kassenartikel_fixedwe_abgleich",
+   "parameter": {},
+   "hinweis": "fixedwe und fixer_we sind hinterlegte Wareneinsaetze je Artikel, deren Pflege niemand kennt (Regel 5). Diese Sicht misst nur, ob beide dieselbe Zahl sind — sie sagt nichts ueber Marge oder echten Wareneinsatz.",
+   "berichtigung": "Keine Marge, keinen Wareneinsatz und keinen Deckungsbeitrag daraus ableiten. Fuer Einkauf und Wareneinsatz die FoodNotify-Sichten.",
+   "quelle": "0153"
+  },
+  {
+   "schluessel": "fixedwe_keine_marge_artikel",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.kassenartikel",
+   "parameter": {},
+   "hinweis": "fixedwe ist ein in der Kasse hinterlegter Wareneinsatz je Artikel, dessen Pflege niemand kennt (Regel 5) — keine Marge, kein Wareneinsatz der BWA.",
+   "berichtigung": "fixedwe nicht fuer Margen- oder Wareneinsatzaussagen verwenden.",
+   "quelle": "0153"
   },
   {
    "schluessel": "fremdeinkauf_quelle",
@@ -7836,6 +9633,165 @@
    "hinweis": "Betriebe mit fremder Kasse melden nur den Nettoumsatz (Kassenblatt, 0141). Rechnungen und Gaeste fehlen dort, bon_schnitt und umsatz_pro_gast sind NULL, gaeste_abdeckung_pct ist 0 — nicht, weil niemand gezaehlt hat, sondern weil es dort keine Kasse an LINA gibt.",
    "berichtigung": "Diese Betriebe bei Bon- und Gaestekennzahlen ausnehmen: mart.datenstand.umsatz_quelle = 'kassenblatt' nennt sie. Der Umsatz selbst ist vollwertig.",
    "quelle": "0141"
+  },
+  {
+   "schluessel": "kassenbon_leere_tische",
+   "art": "filter_noetig",
+   "schwere": "warnung",
+   "sicht": "mart.kassenbon",
+   "parameter": {
+    "spalte": "abrechnung",
+    "beispiel": "abrechnung = 'BILL'"
+   },
+   "hinweis": "Die Kasse fuehrt auch Tische ohne Buchung (abrechnung = EMPTY, in der Formprobe 26 von 190). Wer Bons oder Gaeste je Bon zaehlt, ohne sie herauszunehmen, zaehlt leere Tische mit.",
+   "berichtigung": "Fuer Bons und Gaeste je Bon: abrechnung = 'BILL'.",
+   "quelle": "0153"
+  },
+  {
+   "schluessel": "kassenbon_nur_mit_schluessel",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.kassenbon",
+   "parameter": {},
+   "hinweis": "Bons der Kasse gibt es nur fuer Betriebe mit TPAPI-Schluessel und nur im Horizont (mart.tpapi_core_stand). Ein fehlender Betrieb hat nicht null Bons. Gaeste = 0 heisst: nicht eingetragen.",
+   "berichtigung": "Fehlende Betriebe in mart.tpapi_zugang_modul (modul revenue) nachsehen und nennen; fuer Gaeste aller Betriebe mart.umsatz_tag.",
+   "quelle": "0153"
+  },
+  {
+   "schluessel": "kassenbon_ohne_zeitraum",
+   "art": "zeitraum_noetig",
+   "schwere": "warnung",
+   "sicht": "mart.kassenbon",
+   "parameter": {
+    "spalte": "geschaeftstag"
+   },
+   "hinweis": "Die Bons der Kasse haben rund 200 Zeilen je Betrieb und Tag. Ohne Zeitraum liest die Abfrage alles.",
+   "berichtigung": "Immer auf geschaeftstag filtern.",
+   "quelle": "0153"
+  },
+  {
+   "schluessel": "kassenjournal_deutung_hypothese_position",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.kassenjournal_position",
+   "parameter": {},
+   "hinweis": "Welche Journalzeilen Umsatz sind (zeilenart), ist eine Hypothese aus zwei Stichproben — ob sie den Umsatzbericht trifft, steht in mart.kassenjournal_abgleich_monat (umsatz_trifft_pct). Das Journal gibt es nur fuer Betriebe mit TPAPI-Schluessel und nur im Horizont (mart.tpapi_core_stand, horizont_ab); ein fehlender Betrieb oder Monat ist nicht null.",
+   "berichtigung": "Vor einer Umsatzzahl aus dem Journal in mart.kassenjournal_abgleich_monat nachsehen und die Trefferquote nennen. Fuer Stunde × Artikel und Bonfragen ist das Journal richtig, fuer Umsatzsummen mart.umsatz_tag. Fehlende Betriebe in mart.tpapi_zugang_modul (modul revenue) nachsehen und nennen.",
+   "quelle": "0153"
+  },
+  {
+   "schluessel": "kassenjournal_gegen_umsatzbericht",
+   "art": "sichten_mischen",
+   "schwere": "warnung",
+   "sicht": null,
+   "parameter": {
+    "a": [
+     "mart.kassenjournal_position",
+     "mart.kassenbon"
+    ],
+    "b": [
+     "mart.umsatz_tag",
+     "mart.artikelverkauf",
+     "mart.bon_tag",
+     "mart.finanzweg_tag"
+    ]
+   },
+   "hinweis": "Kassenjournal (TPAPI) und Umsatzbericht, Artikelverkauf, Bons (96) und Finanzwege (97) des Scrapers beschreiben DIESELBEN Verkaeufe aus zwei Quellen. Zusammen summiert zaehlt jede doppelt; gegeneinander gerechnet ist eine Abweichung so lange offen, bis der Abgleich sie erklaert.",
+   "berichtigung": "Nicht addieren. Fuer den Vergleich beider Quellen die Abgleichsichten nehmen (mart.kassenjournal_umsatz_abgleich, _finanzweg_abgleich, mart.kassenbon_abgleich).",
+   "quelle": "0153"
+  },
+  {
+   "schluessel": "kassenjournal_ohne_zeitraum",
+   "art": "zeitraum_noetig",
+   "schwere": "sperre",
+   "sicht": "mart.kassenjournal_position",
+   "parameter": {
+    "spalte": "geschaeftstag"
+   },
+   "hinweis": "Das Kassenjournal hat rund 1.500 Zeilen je Betrieb und Tag, fuer zwei Jahre Dutzende Millionen. Ohne Bereich auf geschaeftstag liest die Abfrage jede Monatspartition — auch mit einem Filter auf monat, der keine Partition ausschliesst (gemessen: eine Marke und ein Monat 2,6 s ueber monat gegen 1,2 s ueber geschaeftstag bei 5 Mio. Zeilen, mit der Historie entsprechend laenger).",
+   "berichtigung": "Immer einen Bereich auf geschaeftstag setzen (geschaeftstag >= '2026-10-01' AND geschaeftstag < '2026-11-01'), auch wenn nach monat gruppiert wird.",
+   "quelle": "0153"
+  },
+  {
+   "schluessel": "kassenjournal_saldo_null",
+   "art": "filter_noetig",
+   "schwere": "sperre",
+   "sicht": "mart.kassenjournal_position",
+   "parameter": {
+    "spalte": "zeilenart",
+    "beispiel": "zeilenart = 'umsatz'"
+   },
+   "hinweis": "Das Kassenjournal ist eine Buchungsliste mit Saldo null: Verkaeufe positiv, Zahlungen negativ, Trinkgeld positiv, Tischuebergabe hin und zurueck. Eine Summe ueber alle Zeilen ist 0, eine Zaehlung zaehlt Zahlungen als Positionen.",
+   "berichtigung": "Immer auf zeilenart filtern: zeilenart = 'umsatz' fuer Verkaeufe, 'zahlung' fuer Zahlarten. Fuer Umsatz je Tag oder Monat mart.umsatz_tag nehmen.",
+   "quelle": "0153"
+  },
+  {
+   "schluessel": "lieferkondition_beobachtet_nicht_vereinbart",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.lieferkondition_beobachtet",
+   "parameter": {},
+   "hinweis": "Die Sicht zeigt, was in den letzten zwoelf Monaten bestellt wurde, nicht was mit dem Lieferanten vereinbart ist. Ein Wochentag ohne Lieferung kann trotzdem beliefert werden; der kleinste oder fuenf-Prozent-Bestellwert ist nicht der Mindestbestellwert (FoodNotify warnt bei Unterschreitung, sperrt nicht); der kleinste Vorlauf ist keine Bestellfrist. Tourenplan, Bestellschluss und Mindestbestellwert fuehrt FoodNotify am Warenkorb und sind hier nicht geladen.",
+   "berichtigung": "Als „beobachtet\" benennen, belastbar und bestellungen mitnennen, bei Zeilen mit belastbar = false nur als Anhaltspunkt. Fuer die tatsaechlichen Konditionen den Lieferanten oder FoodNotify fragen, nicht diese Sicht.",
+   "quelle": "0156"
+  },
+  {
+   "schluessel": "lieferkondition_nur_belastbar",
+   "art": "filter_noetig",
+   "schwere": "warnung",
+   "sicht": "mart.lieferkondition_beobachtet",
+   "parameter": {
+    "wert": true,
+    "spalte": "belastbar"
+   },
+   "hinweis": "Ohne belastbar = true stehen Paare aus Kostenstelle und Lieferant mit weniger als zehn Bestellungen in zwoelf Monaten dabei. Ihre Liefertage, Vorlaeufe und Bestellwerte beruhen auf ein paar Bestellungen — ein Zufall sieht dort aus wie ein Tourenplan.",
+   "berichtigung": "WHERE belastbar setzen, oder die duennen Zeilen ausdruecklich als Anhaltspunkt kennzeichnen und bestellungen mitnennen.",
+   "quelle": "0158"
+  },
+  {
+   "schluessel": "listenpreis_aenderung_preisart",
+   "art": "filter_noetig",
+   "schwere": "warnung",
+   "sicht": "mart.listenpreis_aenderung",
+   "parameter": {
+    "spalte": "preisart"
+   },
+   "hinweis": "mart.listenpreis_aenderung fuehrt zwei Preisarten: listenpreis (Warenstamm, folgt der letzten Bestellung) und katalogpreis (Lieferantenkatalog). Aendern sich beide, steht die Ware zweimal da; eine Zaehlung oder ein Mittel ueber beide zaehlt doppelt und mischt zwei Bedeutungen.",
+   "berichtigung": "Auf preisart = 'listenpreis' oder 'katalogpreis' filtern, oder nach preisart gruppieren und beide Zahlen getrennt nennen.",
+   "quelle": "0158"
+  },
+  {
+   "schluessel": "listenpreis_aenderung_vergleichbar",
+   "art": "filter_noetig",
+   "schwere": "warnung",
+   "sicht": "mart.listenpreis_aenderung",
+   "parameter": {
+    "wert": true,
+    "spalte": "vergleichbar"
+   },
+   "hinweis": "Nur vergleichbar = true ist eine reine Preisaenderung. Ein Wechsel auf oder von 0 heisst \"kein preis mehr\" bzw. \"preis neu\" (Ware faellt aus dem Katalog oder kommt hinein) und hat kein aenderung_pct — wer selbst (preis_neu - preis_alt) / preis_alt rechnet, bekommt -100 % und eine Ware, die scheinbar gratis wurde. Aendern sich Einheit, Inhalt, Gebinde, Artikelnummer oder Lieferant mit (auch_geaendert), vergleicht der Prozentwert Ungleiches.",
+   "berichtigung": "WHERE vergleichbar setzen und aenderung_pct aus der Sicht nehmen; Wechsel auf oder von 0 als \"kein Preis mehr\" / \"Preis neu\" nennen, nie als Senkung um 100 %.",
+   "quelle": "0158"
+  },
+  {
+   "schluessel": "listenpreis_ist_nicht_bezahlt",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.listenpreis_aktuell",
+   "parameter": {},
+   "hinweis": "Zwei Preise je Einheit (kg, l), beide nicht bezahlt und nicht je Gebinde: listenpreis (Warenstamm) folgt nach der Messung vom 19.11.2026 dem Preis der letzten Bestellung, katalogpreis ist der heutige Lieferantenkatalog und nur bei bestellbaren Waren gefuellt. Ein Preis 0 oder leer heisst kein Preis. Vorerst nur Wilma Wunder; Kostenstellen ohne Betrieb sind oft Testkostenstellen.",
+   "berichtigung": "Fuer bezahlte Preise mart.einkaufspreis_artikel_monat nehmen; Preise als \"laut Warenstamm\" bzw. \"laut Lieferantenkatalog, je kg/l\" nennen, kein_preis ausschliessen, fuer Betriebsaussagen betrieb_key IS NOT NULL setzen.",
+   "quelle": "0157"
+  },
+  {
+   "schluessel": "listenpreis_reihe_beginnt_spaet",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.listenpreis_aenderung",
+   "parameter": {},
+   "hinweis": "Die Listenpreis-Reihe beginnt mit dem ersten Abzug des Warenstamms (0157); FoodNotify fuehrt keine Preishistorie. Vor diesem Tag gibt es keine Aenderungen, auch wenn es welche gab. Der Tag einer Aenderung ist der Tag, an dem wir sie sahen. Beide Preisarten gelten je kg/l und sind KEINE bezahlten Preise: eine Listenpreisaenderung heisst meist \"es wurde zu einem neuen Preis bestellt\", eine Katalogpreisaenderung \"der Lieferant hat den Katalog geaendert\".",
+   "berichtigung": "Bei Fragen vor reihe_ab (mart.warenstamm_stand) und fuer bezahlte Teuerung auf mart.einkaufspreis_artikel_monat ausweichen; Aenderungen nur mit vergleichbar = true und immer je preisart (listenpreis oder katalogpreis) zaehlen.",
+   "quelle": "0157, 0158"
   },
   {
    "schluessel": "nachlass_join_artikelname",
@@ -7928,6 +9884,165 @@
    "quelle": "migrations/0129_management_regelwerk.sql"
   },
   {
+   "schluessel": "personal_historie_ein_jahr_stunde",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.personal_stunde",
+   "parameter": {},
+   "hinweis": "LINAs Schnittstelle liefert Personal je Stunde so weit zurueck, wie die Kasse des Betriebs reicht (bei manchen bis 2019, bei anderen ein Jahr). Seit 0153 laedt das Nachladen die aelteren Tage nach — bis es durch ist, fehlen sie; sie sind nicht null.",
+   "berichtigung": "Vor einer Zeitreihe oder einem Vorjahresvergleich in mart.personal_rueckstand und mart.tpapi_zugang (aeltester_tag, rueckstand_tage) nachsehen, ab wann die Daten vollstaendig sind.",
+   "quelle": "0149, 0153"
+  },
+  {
+   "schluessel": "personal_historie_ein_jahr_tag",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.personal_tag",
+   "parameter": {},
+   "hinweis": "LINAs Schnittstelle liefert Personal je Stunde so weit zurueck, wie die Kasse des Betriebs reicht (bei manchen bis 2019, bei anderen ein Jahr). Seit 0153 laedt das Nachladen die aelteren Tage nach — bis es durch ist, fehlen sie; sie sind nicht null.",
+   "berichtigung": "Vor einer Zeitreihe oder einem Vorjahresvergleich in mart.personal_rueckstand und mart.tpapi_zugang (aeltester_tag, rueckstand_tage) nachsehen, ab wann die Daten vollstaendig sind.",
+   "quelle": "0149, 0153"
+  },
+  {
+   "schluessel": "personal_kopfzahl_stunde",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.personal_stunde",
+   "parameter": {},
+   "hinweis": "personen ist die KOPFZAHL je Stunde (ganzzahlig: wer 15 Minuten in der Stunde arbeitet, zaehlt 1), personenstunden die Summe dieser Kopfzahlen — eine Obergrenze, im Median 26 % ueber LINAs eigener Effektivitaetsrechnung (09.11.2026), je Betrieb +7 bis +57 %. Als Besetzung (\"wie viele stehen da\") richtig, als geleistete Arbeitszeit oder Lohnsumme nicht.",
+   "berichtigung": "Besetzung je Stunde und Vergleiche zwischen Betrieben, Tagen und Fenstern sind in Ordnung. Umsatz je Personenstunde nur als Vergleich (Betrieb gegen Betrieb, Monat gegen Monat), nie als absolute Produktivitaet; keine Rechnung gegen core.personalkosten, BWA oder Lohnlisten.",
+   "quelle": "0150"
+  },
+  {
+   "schluessel": "personal_kopfzahl_tag",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.personal_tag",
+   "parameter": {},
+   "hinweis": "personen ist die KOPFZAHL je Stunde (ganzzahlig: wer 15 Minuten in der Stunde arbeitet, zaehlt 1), personenstunden die Summe dieser Kopfzahlen — eine Obergrenze, im Median 26 % ueber LINAs eigener Effektivitaetsrechnung (09.11.2026), je Betrieb +7 bis +57 %. Als Besetzung (\"wie viele stehen da\") richtig, als geleistete Arbeitszeit oder Lohnsumme nicht.",
+   "berichtigung": "Besetzung je Stunde und Vergleiche zwischen Betrieben, Tagen und Fenstern sind in Ordnung. Umsatz je Personenstunde nur als Vergleich (Betrieb gegen Betrieb, Monat gegen Monat), nie als absolute Produktivitaet; keine Rechnung gegen core.personalkosten, BWA oder Lohnlisten.",
+   "quelle": "0150"
+  },
+  {
+   "schluessel": "personal_kopfzahl_zeitfenster",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.personal_zeitfenster",
+   "parameter": {},
+   "hinweis": "personen ist die KOPFZAHL je Stunde (ganzzahlig: wer 15 Minuten in der Stunde arbeitet, zaehlt 1), personenstunden die Summe dieser Kopfzahlen — eine Obergrenze, im Median 26 % ueber LINAs eigener Effektivitaetsrechnung (09.11.2026), je Betrieb +7 bis +57 %. Als Besetzung (\"wie viele stehen da\") richtig, als geleistete Arbeitszeit oder Lohnsumme nicht.",
+   "berichtigung": "Besetzung je Stunde und Vergleiche zwischen Betrieben, Tagen und Fenstern sind in Ordnung. Umsatz je Personenstunde nur als Vergleich (Betrieb gegen Betrieb, Monat gegen Monat), nie als absolute Produktivitaet; keine Rechnung gegen core.personalkosten, BWA oder Lohnlisten.",
+   "quelle": "0150"
+  },
+  {
+   "schluessel": "personal_leer_ist_nicht_null_stunde",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.personal_stunde",
+   "parameter": {},
+   "hinweis": "Ein Tag oder eine Stunde ohne Personal heisst: LINA fuehrt dort keine Schichten (etwa bei Betrieben, die ihre Personalplanung nicht in LINA machen), nicht \"niemand da\". Fehlende Stunden fehlen, sie sind nicht 0.",
+   "berichtigung": "Erst stunden_besetzt bzw. mart.personal_tag (stunden_geliefert) ansehen; Tage ohne besetzte Stunde aus Durchschnitten herausnehmen und ihre Zahl nennen.",
+   "quelle": "0149"
+  },
+  {
+   "schluessel": "personal_leer_ist_nicht_null_tag",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.personal_tag",
+   "parameter": {},
+   "hinweis": "Ein Tag oder eine Stunde ohne Personal heisst: LINA fuehrt dort keine Schichten (etwa bei Betrieben, die ihre Personalplanung nicht in LINA machen), nicht \"niemand da\". Fehlende Stunden fehlen, sie sind nicht 0.",
+   "berichtigung": "Erst stunden_besetzt bzw. mart.personal_tag (stunden_geliefert) ansehen; Tage ohne besetzte Stunde aus Durchschnitten herausnehmen und ihre Zahl nennen.",
+   "quelle": "0149"
+  },
+  {
+   "schluessel": "personal_leer_ist_nicht_null_zeitfenster",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.personal_zeitfenster",
+   "parameter": {},
+   "hinweis": "Ein Tag oder eine Stunde ohne Personal heisst: LINA fuehrt dort keine Schichten (etwa bei Betrieben, die ihre Personalplanung nicht in LINA machen), nicht \"niemand da\". Fehlende Stunden fehlen, sie sind nicht 0.",
+   "berichtigung": "Erst stunden_besetzt bzw. mart.personal_tag (stunden_geliefert) ansehen; Tage ohne besetzte Stunde aus Durchschnitten herausnehmen und ihre Zahl nennen.",
+   "quelle": "0149"
+  },
+  {
+   "schluessel": "personal_nur_mit_schluessel_stunde",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.personal_stunde",
+   "parameter": {},
+   "hinweis": "Personaldaten je Stunde gibt es nur fuer Betriebe mit TPAPI-Schluessel — wie viele das gerade sind, sagt mart.tpapi_zugang (schluessel). Ein Betrieb, der hier fehlt, hat nicht null Personal — er ist nicht angebunden.",
+   "berichtigung": "Vor einem Vergleich zwischen Betrieben oder Marken in mart.tpapi_zugang nachsehen, wer fehlt und warum (befund). Fehlende Betriebe nennen, nicht als null zaehlen.",
+   "quelle": "0149"
+  },
+  {
+   "schluessel": "personal_nur_mit_schluessel_tag",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.personal_tag",
+   "parameter": {},
+   "hinweis": "Personaldaten je Stunde gibt es nur fuer Betriebe mit TPAPI-Schluessel — wie viele das gerade sind, sagt mart.tpapi_zugang (schluessel). Ein Betrieb, der hier fehlt, hat nicht null Personal — er ist nicht angebunden.",
+   "berichtigung": "Vor einem Vergleich zwischen Betrieben oder Marken in mart.tpapi_zugang nachsehen, wer fehlt und warum (befund). Fehlende Betriebe nennen, nicht als null zaehlen.",
+   "quelle": "0149"
+  },
+  {
+   "schluessel": "personal_nur_mit_schluessel_zeitfenster",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.personal_zeitfenster",
+   "parameter": {},
+   "hinweis": "Personaldaten je Stunde gibt es nur fuer Betriebe mit TPAPI-Schluessel — wie viele das gerade sind, sagt mart.tpapi_zugang (schluessel). Ein Betrieb, der hier fehlt, hat nicht null Personal — er ist nicht angebunden.",
+   "berichtigung": "Vor einem Vergleich zwischen Betrieben oder Marken in mart.tpapi_zugang nachsehen, wer fehlt und warum (befund). Fehlende Betriebe nennen, nicht als null zaehlen.",
+   "quelle": "0149"
+  },
+  {
+   "schluessel": "personal_tpapi_gegen_bwa",
+   "art": "sichten_mischen",
+   "schwere": "warnung",
+   "sicht": null,
+   "parameter": {
+    "a": [
+     "mart.personal_stunde",
+     "mart.personal_zeitfenster",
+     "mart.personal_tag"
+    ],
+    "b": [
+     "mart.personal_bereich_monat",
+     "mart.round_table_monat"
+    ]
+   },
+   "hinweis": "Die Lohnkosten je Stunde stammen aus LINAs Personalplanung, die Personalkosten der BWA und des Round Table aus der Buchhaltung — andere Basis (ohne GF, Verwaltung, Abgrenzungen), anderer Zeitpunkt. Gegeneinander gerechnet entsteht eine Zahl ohne Bedeutung.",
+   "berichtigung": "Nicht gegeneinander rechnen, Quoten nicht vergleichen. Fuer die Personalquote mart.personal_bereich_monat bzw. mart.round_table_monat nehmen; die Stundensichten fuer Besetzung und Umsatz je Person.",
+   "quelle": "0149"
+  },
+  {
+   "schluessel": "personalkosten_tag_nicht_bwa",
+   "art": "sichten_mischen",
+   "schwere": "warnung",
+   "sicht": null,
+   "parameter": {
+    "a": [
+     "mart.personalkosten_tag"
+    ],
+    "b": [
+     "mart.personal_bereich_monat",
+     "mart.round_table_monat",
+     "mart.personalkosten"
+    ]
+   },
+   "hinweis": "Die Lohnkosten je Tag stammen aus LINAs Personalplanung, die Personalkosten der BWA, des Round Table und des Personalkostenberichts aus anderer Basis und zu anderem Zeitpunkt. Gegeneinander gerechnet entsteht eine Zahl ohne Bedeutung.",
+   "berichtigung": "Nicht gegeneinander rechnen, Quoten nicht vergleichen. Fuer die Personalquote mart.personal_bereich_monat bzw. mart.round_table_monat nehmen.",
+   "quelle": "0153"
+  },
+  {
+   "schluessel": "personalkosten_tag_planung",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.personalkosten_tag",
+   "parameter": {},
+   "hinweis": "Arbeitsstunden und Lohnkosten je Tag sind die der Personalplanung in LINA, nur fuer Betriebe mit TPAPI-Schluessel und Team Data API. tag_leer heisst: LINA fuehrt dort niemanden, nicht \"niemand da\". Ob arbeitsstunden Pausen enthalten, ist nicht gemessen.",
+   "berichtigung": "Leere Tage aus Durchschnitten herausnehmen und ihre Zahl nennen; fehlende Betriebe in mart.tpapi_zugang_modul (modul personal) nachsehen.",
+   "quelle": "0153"
+  },
+  {
    "schluessel": "personalquote_ungefiltert",
    "art": "filter_noetig",
    "schwere": "warnung",
@@ -7939,6 +10054,36 @@
    "hinweis": "mart.personalkosten fuehrt TAGESzeilen, und die Quoten darin haben den Tagesumsatz im Nenner. An einem Tag mit 6,05 EUR Umsatz ergibt das 316.576 Prozent; ueber alle Tageswerte liegt der Median bei 383 Prozent. Ohne Plausibilitaetsfilter ist jede Zusammenfassung Unsinn.",
    "berichtigung": "WHERE pek_gesamt > 0 AND pek_gesamt <= 200 ergaenzen und den MEDIAN nehmen, nicht den Mittelwert — genau so macht es jede Metabase-Karte.",
    "quelle": "metabase/karten-drilldown.ts, Konstante PLAUSIBEL"
+  },
+  {
+   "schluessel": "pos_artikel_kein_wareneinsatz",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.pos_artikel_abdeckung_betrieb",
+   "parameter": {},
+   "hinweis": "Die Abdeckung sagt, welcher Umsatzanteil ein Rezept TRAEGT — nicht, was die Ware gekostet hat, und nicht, ob das Rezept stimmt. Ein Wareneinsatz aus Rezepten ist nicht gebaut.",
+   "berichtigung": "Als Reichweite einer kuenftigen Rezeptkalkulation nennen, nicht als Wareneinsatzquote.",
+   "quelle": "0155"
+  },
+  {
+   "schluessel": "pos_artikel_umsatz_betriebswert",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.pos_artikel_abdeckung",
+   "parameter": {},
+   "hinweis": "umsatz_betrieb_3m ist der Artikelumsatz des ganzen Betriebs und steht bei zwei Anbindungen in beiden Zeilen. umsatz_rezept_pct gilt fuer das Rezept in DIESER Anbindung.",
+   "berichtigung": "Fuer den Betrieb mart.pos_artikel_abdeckung_betrieb nehmen; Umsatzspalten nicht ueber Anbindungen summieren.",
+   "quelle": "0155"
+  },
+  {
+   "schluessel": "pos_artikel_zwei_anbindungen",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.pos_artikel_rezept",
+   "parameter": {},
+   "hinweis": "Ein Betrieb hat oft zwei Kassenanbindungen (Bar und Kueche) mit sich ueberschneidenden Artikellisten. Derselbe Kassenartikel kann zweimal stehen, mit gleichem, anderem oder keinem Rezept. Artikel mit fehlt_seit stehen nicht mehr in FoodNotifys letzter Antwort. Vorerst nur Wilma Wunder.",
+   "berichtigung": "Fuer \"welches Rezept steckt hinter Artikel X\" nach betrieb_key und artikel_key filtern und alle Zeilen zeigen; fuer Zaehlungen fehlt_seit IS NULL setzen und je Anbindung oder count(DISTINCT artikel_key) zaehlen.",
+   "quelle": "0155"
   },
   {
    "schluessel": "prozent_skaliert",
@@ -8090,6 +10235,85 @@
    "hinweis": "mart.umsatz_tag fuehrt 443.304 Tageszeilen ab 01.01.2018. Ohne Zeitraum ist das Ergebnis gross und die Antwort langsam.",
    "berichtigung": "WHERE geschaeftstag >= ... ergaenzen.",
    "quelle": "docs/plan-kalender-wetter.md"
+  },
+  {
+   "schluessel": "umsatzprognose_guete_nachtraeglich",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.umsatzprognose_guete",
+   "parameter": {},
+   "hinweis": "Die Guete gibt es getrennt nach grundlage: vorab (echte Vorabprognose, vorlauf_tage 0 bis 28) und nachtraeglich (vorlauf_tage NULL, erst nach dem Tag gesehen). Ob LINA nachtraeglich geholte Werte angepasst hat, ist nicht gemessen; ihre Guete ist bis zur Freigabe keine Aussage ueber LINAs Prognose. MAPE und WAPE sind Prozentzahlen und lassen sich nicht mitteln.",
+   "berichtigung": "Fuer Aussagen ueber LINAs Prognose grundlage = 'vorab' und einen vorlauf_tage nehmen. Ueber Monate, Betriebe oder Marken aus den summe_-Spalten neu rechnen (WAPE = sum(summe_fehler_abs_netto) / sum(summe_ist_netto) * 100). Nachtraegliche Werte erst nach Freigabe in mart.umsatzprognose_nachher_betrieb, und den Stand dieser Sicht nennen.",
+   "quelle": "0154"
+  },
+  {
+   "schluessel": "umsatzprognose_guete_vorlauf",
+   "art": "filter_noetig",
+   "schwere": "warnung",
+   "sicht": "mart.umsatzprognose_guete",
+   "parameter": {
+    "spalte": "vorlauf_tage",
+    "beispiel": "vorlauf_tage = 1"
+   },
+   "hinweis": "mart.umsatzprognose_guete hat je Betrieb und Monat eine Zeile je Vorlauf und Grundlage. Eine Summe der Tage oder des Ist ueber alle Zeilen zaehlt jeden Tag bis zu achtmal.",
+   "berichtigung": "Auf einen Vorlauf filtern oder nach vorlauf_tage und grundlage gruppieren.",
+   "quelle": "0154"
+  },
+  {
+   "schluessel": "umsatzprognose_ist_lina",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.umsatzprognose_tag",
+   "parameter": {},
+   "hinweis": "Die Prognose ist LINAs Zahl, keine eigene. Fuer Tage, die erst nachtraeglich geholt wurden (prognose_grundlage = nachtraeglich), ist unbekannt, ob LINA sie nach dem Tag angepasst hat — eine Trefferquote daraus waere geschoent. Nur Betriebe mit TPAPI-Schluessel.",
+   "berichtigung": "Fuer die Guete der Prognose nur prognose_grundlage = 'vorab' auswerten und das sagen; Abweichungen aus den Summen neu rechnen, nicht abweichung_pct mitteln. Fuer den Vergleich je Vorlauf mart.umsatzprognose_vorlauf bzw. mart.umsatzprognose_guete; ob LINA nachtraeglich aendert, misst mart.umsatzprognose_nachher_betrieb.",
+   "quelle": "0153, 0154"
+  },
+  {
+   "schluessel": "umsatzprognose_nachher_freigabe",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.umsatzprognose_nachher_betrieb",
+   "parameter": {},
+   "hinweis": "Die Sicht misst nur, ob LINA eine Prognose bis gut fuenf Wochen nach dem Tag aendert. Ob LINA Jahre alte Prognosen so liefert, wie sie damals ausgegeben wurden, misst sie nicht.",
+   "berichtigung": "Den Befund mit groesster_abstand_tage und dem Zeitraum (erster_tag, letzter_tag) nennen; fuer die Historie von vor dem ersten Lauf die Einschraenkung dazusagen.",
+   "quelle": "0154"
+  },
+  {
+   "schluessel": "umsatzprognose_vorlauf_mehrfach",
+   "art": "filter_noetig",
+   "schwere": "warnung",
+   "sicht": "mart.umsatzprognose_vorlauf",
+   "parameter": {
+    "spalte": "vorlauf_tage",
+    "beispiel": "vorlauf_tage = 1"
+   },
+   "hinweis": "Jeder Tag steht in mart.umsatzprognose_vorlauf bis zu achtmal: je Vorlauf (0, 1, 2, 3, 7, 14, 28) und einmal nachtraeglich. Eine Summe oder Zaehlung ohne Filter auf vorlauf_tage zaehlt Ist und Prognose mehrfach und mischt Vorlaeufe.",
+   "berichtigung": "Auf einen Vorlauf filtern (vorlauf_tage = 1) oder nach vorlauf_tage gruppieren; fuer nachtraeglich grundlage = 'nachtraeglich' (vorlauf_tage ist dort NULL).",
+   "quelle": "0154"
+  },
+  {
+   "schluessel": "umsatzprognose_vorlauf_nachtraeglich",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.umsatzprognose_vorlauf",
+   "parameter": {},
+   "hinweis": "Zeilen mit grundlage = nachtraeglich sind Werte, die erst NACH dem Tag gesehen wurden (vor allem die Historie vor dem ersten Lauf). Ob LINA sie nachtraeglich angepasst hat, ist nicht gemessen; eine Trefferquote daraus kann in beide Richtungen verzerrt sein. Die Prognose ist LINAs Zahl, nur fuer Betriebe mit TPAPI-Schluessel.",
+   "berichtigung": "Fuer die Guete grundlage = 'vorab' und einen festen vorlauf_tage nehmen und das sagen. Nachtraegliche Werte erst verwenden, wenn mart.umsatzprognose_nachher_betrieb ueber Wochen befund = 'unveraendert' zeigt — und dann den Stand dieser Sicht nennen.",
+   "quelle": "0154"
+  },
+  {
+   "schluessel": "umsatzprognose_vorlauf_vergleichbar",
+   "art": "filter_noetig",
+   "schwere": "warnung",
+   "sicht": "mart.umsatzprognose_vorlauf",
+   "parameter": {
+    "wert": true,
+    "spalte": "vergleichbar"
+   },
+   "hinweis": "Nicht jeder Tag vertraegt eine Fehlerrechnung: geschlossene Tage (Ist 0), Tage ohne Ist, mit Kassen-Fehleingabe, mit noch offenem Ist (juenger als 7 Tage) und nicht operative Betriebe. Mit ihnen werden MAPE und WAPE sinnlos (Teilung durch 0, Fehler von 100 %).",
+   "berichtigung": "Fuer Fehlermasse vergleichbar = true filtern und die Zahl der ausgeschlossenen Tage nennen (ausschluss_grund) — oder gleich mart.umsatzprognose_guete nehmen.",
+   "quelle": "0154"
   },
   {
    "schluessel": "verkaufsstelle_plus_gesamt",

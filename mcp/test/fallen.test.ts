@@ -96,7 +96,7 @@ describe('Die zehn Fallenfragen', () => {
     expect(e.befunde.find(b => b.schluessel === 'bwa_versatz')!.hinweis).toContain('bwa_monat')
   })
 
-  test('7. Wareneinsatz aus Rezepturen — core ist gesperrt, und die Bruecke ist leer', () => {
+  test('7. Wareneinsatz aus Rezepturen — core ist gesperrt (die Bruecke steht seit 0155 in mart.pos_artikel_rezept)', () => {
     const e = gesperrt(`
       SELECT a.artikel, sum(r.menge)
         FROM core.artikelverkauf_tag a

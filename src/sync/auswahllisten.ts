@@ -81,6 +81,14 @@ export const LISTEN_JE_DASHBOARD: Record<string, Record<string, string>> = {
     marke: `SELECT DISTINCT marke AS w FROM mart.einkauf_ladestand
              WHERE marke IS NOT NULL ORDER BY 1`,
   },
+  // Die Preisseite je Artikelnummer (0157) fuehrt dieselben FoodNotify-Marken
+  // (metabase/dashboards.ts, F_MARKE_EINKAUF) — ohne diesen Eintrag
+  // ueberschriebe der Nachlauf die Liste jede Nacht mit den zwoelf
+  // Round-Table-Konzepten, und acht davon zeigten leere Karten.
+  db_einkaufspreis: {
+    marke: `SELECT DISTINCT marke AS w FROM mart.einkauf_ladestand
+             WHERE marke IS NOT NULL ORDER BY 1`,
+  },
 }
 
 /**

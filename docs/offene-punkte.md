@@ -177,10 +177,19 @@ Betrieb. Geladen ist davon nichts. Bundle-Analyse (`payloads/foodnotify-2026-11/
 (`GET /api/shop/{shopId}/cart/{type}/{cartId}`: `minimalOrderSum`, `deliveryDates`, `preorderDays`). Bis dahin liefert
 `mart.lieferkondition_beobachtet` das **beobachtete** Verhalten — nicht vereinbart.
 
-1. **Die echten Konditionen:** eine lesende Probe auf den Warenkorb-GET, nur im Terminal des Nutzers, mit drei
+1. ~~**Die echten Konditionen:** eine lesende Probe auf den Warenkorb-GET, nur im Terminal des Nutzers, mit drei
    Warenkörben zu beginnen (Muster im Bundle-Dokument, Abschnitt 2). Nur dort, wo ein Warenkorb existiert; für den
    Rest bleibt die Lücke. Vorher entscheiden, ob das Risiko `deliveryDateUpdated` (der Server verschiebt beim Lesen
-   womöglich den Termin des offenen Warenkorbs) tragbar ist.
+   womöglich den Termin des offenen Warenkorbs) tragbar ist.~~ **Gemessen am 19.11.2026, 09:09 UTC
+   (`payloads/foodnotify-2026-11/fn-probe-2026-11-19-warenkorb-verkaeufe.md`): das Risiko ist eingetreten.** Das Lesen
+   **eines** Entwurfs (Distra GmbH, Shop 567, Bar Hannover — Betrieb geschlossen) hat `timeUpdated` auf den Lesezeitpunkt
+   gesetzt und den Liefertermin auf den frühestmöglichen (20.11.2026) verschoben (`deliveryDateUpdated: true`). Die Probe
+   wurde sofort abgebrochen; der Pfad ist in `src/fn_probe.ts` gesperrt, der Warenkorb-GET der **fünfzehnte GET mit
+   Wirkung**. **Ihr entscheidet, ob weitere Warenkörbe gelesen werden** (dann einen, den ohnehin jemand bearbeitet, und mit
+   ausdrücklichem Ja); sonst bleibt die Lücke. Zu dem einen Lieferanten: Mindestbestellwert 0 EUR, Termine Mo–Sa ab dem
+   Folgetag, keine Bestellfrist je Artikel — und **nicht der Tourenplan** (dieselbe Kostenstelle bestellte nur mittwochs).
+   Offen: Mindestbestellwert und Fristen bei anderen Lieferanten; ob der Server nur abgelaufene Termine verschiebt.
+   **Ob Eugene den verschobenen Termin im Entwurf Bar Hannover prüfen will:** der vorherige Wert ist nicht erfasst.
 2. **Der POST bleibt unberührt**, ohne ausdrückliches Ja des Nutzers, und es gibt keinen Anlass: er liefert nichts davon.
 3. **Der kundenspezifische Tourenplan als Regel** (Wochentage je Kunde und Lieferant) hat in keinem Bundle einen
    Lesepfad; er liegt serverseitig. Verbindlich beantworten können ihn nur der Lieferant oder FoodNotify; ob und
@@ -2882,6 +2891,20 @@ heißt) und `docs/foodnotify-api-inventar-intern-2026-11.md`. Gemessen ist nur W
     **Eine** echte Kostenstelle gemessen. **Verkäufe als Quelle für den Soll-Verbrauch sind damit wieder offen und
     prüfenswert:** an mehreren Kostenstellen und gegen LINAs Artikelverkauf derselben Tage messen (Menge je Rezept),
     bevor jemand einen Import plant.
+    **Stand 19.11.2026, 09:10 UTC (`payloads/foodnotify-2026-11/fn-probe-2026-11-19-warenkorb-verkaeufe.md`), drei echte
+    Kostenstellen** (7984 Bar Ballplatz, 9444 Küche Ballplatz, 10772 Bar Karlsruhe): 3.000 von 3.000 Zeilen `finish`, kein
+    `finishError`. Ein Verkauf ist ein **Kassenvorgang (Bon)**, Summe der Positionen = `sumPrice` (netto) auf den Cent.
+    **Fallen für jeden Import:** (a) **Bar und Küche desselben Betriebs tragen dieselben Bons** (998 von 999 gleiche
+    Verkaufszeiten) — Summen über beide verdoppeln; (b) **jeder vierte Verkauf am Ballplatz ist ein negativer Gegenbon**
+    (273 und 271 von 1.000, je mit gleich hohem positivem Gegenstück; Karlsruhe 0); (c) die Position trägt **keine
+    Kassen-PLU**, nur `recipe.id`, und die Zutat keine Artikelnummer, keine Kosten; (d) die **Historie beginnt mit der
+    Anbindung** (Karlsruhe 12.08., Ballplatz 15.09.2026) — ein Zwölf-Monats-Rückblick existiert nicht; (e) **ein Aufruf je
+    Bon** für die Positionen: Tagesimport 132 (Karlsruhe) bis 266 (Ballplatz) Aufrufe je Kostenstelle, Historie je
+    Kostenstelle rund 21.000 Aufrufe. **Empfehlung: nicht in dieser Form importieren.** Zuerst die Aggregat-Pfade
+    `GET /api/{erpId}/recipe-sale/paginate` (mit `from`/`to`) und `GET /api/pos/mapping/{id}/article-sales` messen (in
+    der Erlaubtliste mit Test, je höchstens zwei Aufrufe an 7984), und den **Tagesabgleich gegen den LINA-Umsatz**
+    (14.–18.11.2026, mit Produktivdaten — lokal endet LINA am 12.08.) ziehen. Offen auch: Dienstag in Karlsruhe (33
+    Verkäufe, Umsatz 453 EUR), Bedeutung von `recipeIngredients[].id`, Verteilung der Positionen auf Bar und Küche.
 14. **Taugt `link-targets.updatedAt` als Änderungsfilter für den Rezept-Umlauf (`0134`)?** 13.253 Rezepte, `updatedAt`
     von 19.10.2022 bis 17.11.2026. Prüfen: bewegt sich `updatedAt`, wenn sich nur eine Zutat ändert? (gegen zwei
     Abrufe desselben Rezepts in `raw.api_antwort`).
@@ -2986,8 +3009,9 @@ Entscheidung: `entscheidungen.md` (19.11.2026).
    `erp_id` (lokal) — zusammen rund 150 Aufrufe je Nacht.
 5. **MCP-Katalogabzug aus Produktion** (`cd mcp && bun run katalog:abzug` gegen eine vollständige Datenbank),
    nachdem `0157` dort läuft — vier neue Sichten, eine Materialisierung, drei Fallstricke.
-6. **Karten fehlen.** Weder Listenpreis noch die Artikelnummer-Reihe haben eine Dashboard-Karte. Erst wenn der
-   Fachbereich sagt, welche Frage er stellt („was ist teurer geworden", „was setzt FoodNotify heute an").
+6. ~~**Karten fehlen.** Weder Listenpreis noch die Artikelnummer-Reihe haben eine Dashboard-Karte. Erst wenn der
+   Fachbereich sagt, welche Frage er stellt („was ist teurer geworden", „was setzt FoodNotify heute an").~~ Gebaut
+   19.11.2026 auf Auftrag Eugene, **noch nicht übernommen** — siehe „Karten und MCP zu `0155`–`0158`" unten.
 7. **Kostenstellenvergleich ungemessen.** Ob dieselbe Ware (Lieferant + Nummer) in Bar und Küche verschiedene
    Listenpreise trägt, ließ sich nicht prüfen (die beiden ersten Probe-Kostenstellen waren das Testrestaurant ohne
    gemeinsame Ware, die echte 7984 ist allein). Der Vergleich zählt nur Kostenstellen mit Betrieb. Nach
@@ -3005,3 +3029,37 @@ Entscheidung: `entscheidungen.md` (19.11.2026).
 11. **Teil B in Produktion nachmessen:** Laufzeit des Refresh von `mart.einkaufspreis_artikel_monat_basis` in
     `mart.materialisierung_stand` (`dauer_s` gilt für alle Einkaufssichten zusammen; am Klon 2,5 s allein).
 
+
+## 19.11.2026 — Karten und MCP zu `0155`–`0158`: was nach dem Deploy offen ist
+
+22 Karten, zwei neue Dashboards (*Einkaufspreise — je Artikelnummer, Liste und Katalog*, *Rezepturen*), Ergänzungen
+auf *Einkauf*, *Artikel — Verlauf und Betriebe* und der Importseite (`dashboards.md`), dazu Migration `0158`
+(Katalog: zehn Kennzahlen, vier Fallstricke, ein Hinweis berichtigt — `metabase.md`). Geprüft auf einem Klon von
+`lina_mgmt` mit `0130`–`0158` und den echten Probeantworten; **nichts davon ist in Metabase oder Produktion.**
+
+1. **Nach dem Deploy, durch Eugene, in dieser Reihenfolge:** Metabase „Datenbank jetzt synchronisieren" (neue
+   Sichten), `bun run metabase/sichtbarkeit.ts` (die vier neuen `core`-Tabellen verstecken), `bun run
+   metabase/beziehungen.ts --setzen` (neue Sichten mit `betrieb_key`), dann `bun run metabase/uebernehmen.ts`.
+   Alle drei schreiben sofort gegen die Produktivinstanz. Danach ansehen: rendern beide neuen Seiten, ist die
+   Lieferanten-Auswahlliste gefüllt, und zeigt der Markenfilter auf der Preisseite nach dem nächsten Nachtlauf die
+   vier FoodNotify-Marken (`LISTEN_JE_DASHBOARD`, `src/sync/auswahllisten.ts`) statt der zwölf Konzepte?
+2. **MCP-Katalogabzug aus Produktion** — ersetzt Punkt 5 in den beiden Abschnitten zu `0155` und `0157` darüber.
+   `cd mcp && bun run katalog:abzug` gegen Produktion (oder der Postico-Weg `katalog_abzug.sql` +
+   `katalog:normieren`), sobald `0158` dort läuft. **Befund vom 19.11.2026:** die committete Abzugsdatei (Stand
+   29.10./04.11.) kannte **45 Sichten und 41 Fallstricke nicht** — nicht nur die aus `0155`–`0158`, sondern alle
+   aus `0149`–`0154` (Personal je Stunde, TPAPI-Rohabzug und -core, Speicherwächter, Umsatzprognose). Sie ist jetzt
+   aus dem Klon ergänzt; **nichts Bestehendes ging verloren**. Drei bestehende Einträge wichen ab: `kassenblatt_stand`
+   (Kommentar und Spalte `lina_quote` aus `0147` — echt, übernommen) sowie `bounti_quote_betrieb` und
+   `einkaufspreis_veraenderung` (Kommentare — **Klon-Artefakte**, nicht übernommen: `0129` wurde nach dem Anlegen von
+   `lina_mgmt` noch geändert, Commit `6ddb8ea`; beim zweiten fehlt im Klon der erste Absatz). Der Abzug aus Produktion
+   kann deshalb weitere Kommentare anders zeigen — dann gilt Produktion.
+3. **Lokal kann sich `mcp_leser` nicht anmelden** (`NOLOGIN`, 19.11.2026). Der Klonabzug und die MCP-Suite mit
+   Datenbank liefen deshalb als Eigentümer — für den Katalog gleichwertig, für die Rechteprüfungen nicht. Wer die
+   Suite als Leserolle braucht: `ALTER ROLE mcp_leser LOGIN` nur auf dem eigenen Rechner, danach zurücksetzen.
+4. **Form der Lieferkonditionen-Karte** mit dem Fachbereich abstimmen: `0156` wollte „keine Karte, bis der
+   Fachbereich sagt, in welcher Form" — gebaut ist eine Tabelle je Betrieb, Bereich und Lieferant auf *Einkauf*,
+   Vorgabe nur belastbare Zeilen. Ebenso, ob „Was ist teurer geworden? — je Artikelnummer" nach Wirkung in Euro (so
+   gebaut) oder nach Prozent sortiert sein soll.
+5. **Nicht gebaut:** die Zutaten des Rezepts im Drill-Down (`ar_rezept` nennt Rezept und Nummer;
+   `mart.rezept_position`/`mart.artikel_in_rezept` lägen bereit) und ein Kostenstellenvergleich des Listenpreises
+   (ungemessen, siehe Punkt 7 im Abschnitt zu `0157`).

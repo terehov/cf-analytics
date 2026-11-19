@@ -556,6 +556,18 @@ const FILTER_AUSNAHME: Record<string, Record<string, string>> = {
   wa_einkauf_pruefung:    { ware: 'Pruefliste ueber alle auffaelligen Positionen; wer sie nach '
                                 + 'einer Ware filtert, sieht nicht mehr, was sonst auffiel.' },
   wa_inventur_schwund:    { ware: 'Inventuren zaehlen Bestaende, keine Bestellartikel.' },
+  // --- Einkaufspreise je Artikelnummer, Lieferkonditionen (0156/0157) ----
+  wa_kachel_artikelpreis: { betrieb: 'Preisreihen gelten je Marke, nicht je Betrieb -- '
+                                   + 'mart.einkaufspreis_artikel_monat fuehrt keinen Betrieb.',
+                            ware: 'Verweiskachel auf die Preisseite je Artikelnummer; sie zaehlt '
+                                + 'Reihen, keinen Artikel.' },
+  wa_lieferkondition:     { ware: 'Liefertage, Vorlauf und Bestellwert gelten je Lieferant und '
+                                + 'Kostenstelle, nicht je Ware -- eine Bestellung umfasst viele.' },
+  lp_reihe_seit: {
+    lieferant:     'Der Beginn der Preisbeobachtung gilt je Kostenstelle, nicht je Lieferant.',
+    artikelnummer: 'ebenso -- eine Ware hat keinen eigenen Beobachtungsbeginn.',
+    ware_text:     'ebenso.',
+  },
 
   // --- Fremdeinkauf (0055/0058) ---------------------------------------------
   fe_kachel_verweis: {
@@ -849,6 +861,9 @@ const FILTER_NUR_FUER: Record<string, Record<string, string>> = {
   // uebrigen Karten der Seite rechnen den Nachlass aus Preisen und kennen
   // keine Kassentaste (0117, Plan 6.2).
   db_artikelaktion: { finanzweg: 'aa_nachlass' },
+  // Nur belastbare Lieferkonditionen oder alle (0156) — eine Eigenschaft der
+  // einen Tabelle, nicht der Seite.
+  db_einkauf: { datenbasis: 'wa_lieferkondition' },
 }
 
 const filterFehler: string[] = []

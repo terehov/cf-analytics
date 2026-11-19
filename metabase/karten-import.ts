@@ -405,6 +405,74 @@ SELECT endpunkt            AS "Endpunkt",
       column_settings: { '["name","%"]': { suffix: ' %' } },
     },
   },
+  /*
+   * REGEL 10 FUER DIE BEIDEN FOODNOTIFY-STAENDE (0155, 0157). Je Anbindung
+   * bzw. Kostenstelle ein Zustand aus der Sicht — „marke nicht aktiv" ganz
+   * unten, weil er gewollt ist (POS_ARTIKEL_MARKEN / WARENSTAMM_MARKEN),
+   * alles, was ein Mensch ansehen muss, ganz oben. Die Summe beider steht
+   * schon in „Zulauf je Quelle"; hier steht, WELCHE Anbindung es ist.
+   */
+  {
+    schluessel: 'im_pos_artikel',
+    name: 'FoodNotify-Kassenartikel — Stand je Anbindung',
+    beschreibung:
+      'Je Kassenanbindung (Bar oder Küche eines Betriebs), ob die Kassenartikel mit ihrer Rezeptzuordnung täglich ankommen. Auffällig sind **nie geladen**, **veraltet** (letzter erfolgreicher Abruf älter als 36 Stunden) und **leer** — diese drei zählt auch die Prüfübersicht. **ohne plu-bruecke** (kein amadeus) und **ohne betrieb** (Kostenstelle keinem Betrieb zugeordnet) sind Zustände, keine Ausfälle: die Artikel kommen an, lassen sich aber nicht mit dem Kassenumsatz verbinden. **marke nicht aktiv** ist gewollt — die Marke wird noch nicht geholt. Ein abgebrochener Abruf ändert nichts am Bestand; er lässt nur „letzter Abruf" altern.',
+    anzeige: 'table',
+    sql: `
+SELECT marke                                   AS "Marke",
+       coalesce(betrieb, '— ohne Betrieb')     AS "Betrieb",
+       kostenstelle                            AS "Anbindung",
+       connection_id                           AS "Anbindungs-Nr.",
+       kassensystem                            AS "Kasse",
+       zustand                                 AS "Zustand",
+       letzter_abruf_am                        AS "Letzter Abruf",
+       artikel_gesamt                          AS "Artikel",
+       artikel_mit_rezept                      AS "mit Rezept",
+       rezept_anteil_pct                       AS "Rezept %",
+       nullif(name_weicht_ab, 0)               AS "Name weicht ab",
+       nullif(nicht_mehr_geliefert, 0)         AS "nicht mehr geliefert",
+       nullif(plu_doppelt, 0)                  AS "PLU doppelt",
+       nullif(ingest_hinweise, 0)              AS "Hinweise beim Einlesen",
+       umsatz_im_feed_pct                      AS "Umsatz im Feed %"
+  FROM mart.pos_artikel_abdeckung
+ ORDER BY CASE zustand WHEN 'nie geladen' THEN 0 WHEN 'veraltet' THEN 1 WHEN 'leer' THEN 2
+                       WHEN 'ohne betrieb' THEN 3 WHEN 'ohne plu-bruecke' THEN 4 WHEN 'ok' THEN 5
+                       ELSE 9 END,
+          marke, betrieb, kostenstelle`,
+    visualisierung: {
+      column_settings: {
+        '["name","Rezept %"]': { suffix: ' %' },
+        '["name","Umsatz im Feed %"]': { suffix: ' %' },
+      },
+    },
+  },
+  {
+    schluessel: 'im_warenstamm',
+    name: 'FoodNotify-Warenstamm — Stand je Kostenstelle',
+    beschreibung:
+      'Je Kostenstelle mit Warenwirtschaft, ob der Warenstamm mit Listen- und Katalogpreis täglich vollständig ankommt. Auffällig sind **nie geladen**, **unvollständig** (eine Folgeseite meldete eine andere Gesamtzahl — der Abzug zählt dann nicht), **veraltet** (letzter vollständiger Abzug älter als 36 Stunden) und **leer**. **kein zugriff** heißt: FoodNotify verweigert diese Kostenstelle dauerhaft, meist eine fremde im selben Zugang. **ohne betrieb** sind meist Testkostenstellen; sie werden mitgelesen, zählen aber in keinem Vergleich. **marke nicht aktiv** ist gewollt. „Reihe ab" ist der erste Tag mit Preisbeobachtung — davor gibt es für diese Kostenstelle keine Preisänderungen.',
+    anzeige: 'table',
+    sql: `
+SELECT marke                                   AS "Marke",
+       coalesce(betrieb, '— ohne Betrieb')     AS "Betrieb",
+       kostenstelle                            AS "Kostenstelle",
+       zustand                                 AS "Zustand",
+       letzter_abruf_am                        AS "Letzter Abruf",
+       vollstaendig_am                         AS "Letzter vollständiger Abzug",
+       produkte_gemeldet                       AS "gemeldet",
+       produkte                                AS "Produkte",
+       nullif(ohne_preis, 0)                   AS "ohne Preis",
+       nullif(ohne_artikelnummer, 0)           AS "ohne Artikelnummer",
+       mit_katalogpreis                        AS "mit Katalogpreis",
+       reihe_ab                                AS "Reihe ab",
+       preisaenderungen_30_tage                AS "Listenpreis-Änderungen 30 T.",
+       befund                                  AS "Befund"
+  FROM mart.warenstamm_stand
+ ORDER BY CASE zustand WHEN 'nie geladen' THEN 0 WHEN 'unvollstaendig' THEN 1 WHEN 'veraltet' THEN 2
+                       WHEN 'leer' THEN 3 WHEN 'kein zugriff' THEN 4 WHEN 'ohne betrieb' THEN 5
+                       WHEN 'ok' THEN 6 ELSE 9 END,
+          marke, betrieb, kostenstelle`,
+  },
   {
     schluessel: 'im_yext',
     name: 'Bewertungsimport — letzter Lauf',
