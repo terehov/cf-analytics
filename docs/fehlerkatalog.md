@@ -5741,3 +5741,28 @@ Abzüge haben nur „HTTP 404" protokolliert). Die genaue Hülle des Validierung
 Status und Länge (98 Bytes); deshalb prüft die Erkennung jede Zeichenkette der Antwort. Der beaufsichtigte
 Einzelabzug `src/rezepte.ts` (Handwerkzeug, schreibt Dateien, nicht `core`) verbucht 404 weiterhin ohne
 Textprüfung als `nicht_gefunden` in `nachgeholt.json`.
+
+## Der gewählte Liefertag stand bei fast jeder Bestellung einen Tag zu früh (19.11.2026)
+
+**Symptom.** Beim Bau von `mart.lieferkondition_beobachtet` (Liefertage je Wochentag) lagen 139 von 48.489 nicht
+stornierten Bestellungen mit ihrem Liefertag **vor** der Bestellung, und 18.218 am selben Kalendertag. Auffällig war nichts
+vorher: die Spalte `core.bestellung.geliefert_am` war gefüllt, plausibel und stand auf der Drill-down-Karte „Geliefert am".
+
+**Ursache.** FoodNotify liefert `markedShopOrder.deliveryDate` als Unix-Sekunden der **Berliner Mitternacht** (22:00 UTC im
+Sommer, 23:00 UTC im Winter; 29.792 + 20.226 von 50.050 Köpfen, nur 36 um 00:00 UTC). Der Lader schnitt mit `alsDatum`
+den **UTC**-Tag ab (`z.slice(0, 10)`) und schrieb damit den Tag davor. Die Testfixture (`1634428800` = 00:00 UTC) traf den
+Fehler nicht: dort fällt der UTC-Tag mit dem Berliner Tag zusammen. Die zweite Datumsspalte (`beleg_datum`, `invoiceDate`
+um 11:00/12:00 UTC) war nie betroffen. Nachgemessen am 19.11.2026 am lokalen Bestand: der alte Wert traf in 36 von 50.050
+Fällen den Berliner Tag, in 50.014 den Berliner Tag minus 1.
+
+**Warum es nicht auffiel.** Kein Schreiber und keine Sicht rechnete mit der Differenz zum Bestelltag; `mart.einkauf_beleg`
+zeigt das Datum nur an. Eine Spalte, die nur angezeigt wird, kann ohne Fehler um einen Tag falsch stehen.
+
+**Was ihn künftig verhindert.** `src/foodnotify/transform.ts`: `geliefertAm` über `alsBerlinerDatum`
+(`kalendertagInGeschaeftszeitzone`), mit Test auf Sommer- und Winterzeit. Migration `0156` baut `geliefert_am` aus
+`raw` (`fn:bestellung`, jüngster Abruf) zurück und bricht ab, wenn danach eine Zeile vom Rohsatz abweicht. Nach dem
+Rückbau auf dem Klon: Lieferung vor Bestellung 6 (vorher 139), am selben Tag 134. Verbleibende 6 sind Erfassungsfehler und
+stehen in `mart.lieferkondition_beobachtet.lieferung_vor_bestellung`.
+
+**Allgemeine Lehre.** Ein Zeitstempel, der an der Grenze zu einem Kalendertag liegt, wird mit dem Tag der **Zone** gelesen,
+in der das Geschäft arbeitet, nie mit dem UTC-Tag — dieselbe Klasse wie die Nachtstunden von `0138`.

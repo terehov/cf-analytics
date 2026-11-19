@@ -149,6 +149,15 @@ describe('bestellkopf (/{orderId})', () => {
     expect(k.belegNummer).toBe('RE-2021-4711')
     expect(k.belegDatum).toBe('2021-10-18')
   })
+  test('Liefertag ist der Berliner Kalendertag — die Mitternacht liegt um 22:00/23:00 UTC (0156)', () => {
+    const tag = (ts: number) => bestellkopf({ data: { id: 'x', markedShopOrder: { deliveryDate: { timestamp: ts } } } }).geliefertAm
+    // 20.11.2026 00:00 Berlin = 19.11.2026 23:00 UTC (Winterzeit)
+    expect(tag(Date.UTC(2026, 10, 19, 23, 0, 0) / 1000)).toBe('2026-11-20')
+    // 21.07.2026 00:00 Berlin = 20.07.2026 22:00 UTC (Sommerzeit)
+    expect(tag(Date.UTC(2026, 6, 20, 22, 0, 0) / 1000)).toBe('2026-07-21')
+    // Die Attrappe liefert 00:00 UTC — derselbe Kalendertag in Berlin
+    expect(tag(1634428800)).toBe('2021-10-17')
+  })
   test('ohne Rechnung und ohne Liefertermin: null, kein Wurf', () => {
     const k = bestellkopf({ data: { id: 'b2', markedShopOrder: { total: 68.4, deliveryDate: null } } })
     expect(k.belegNummer).toBeNull()

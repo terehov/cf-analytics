@@ -10,6 +10,7 @@
  */
 import { auspacken } from './huelle'
 import { createHash } from 'node:crypto'
+import { kalendertagInGeschaeftszeitzone } from '../lib/time'
 
 const alsObjekt = (x: unknown): Record<string, any> | null =>
   typeof x === 'object' && x !== null && !Array.isArray(x) ? x as Record<string, any> : null
@@ -60,10 +61,26 @@ const alsZeit = (x: unknown): string | null => {
   return Number.isNaN(d.getTime()) ? null : d.toISOString()
 }
 
-/** Nur das Datum. */
+/** Nur das Datum — der UTC-Tag des Zeitpunkts. Fuer Berliner Kalendertage `alsBerlinerDatum`. */
 const alsDatum = (x: unknown): string | null => {
   const z = alsZeit(x)
   return z ? z.slice(0, 10) : null
+}
+
+/**
+ * Der Kalendertag in Berlin.
+ *
+ * FoodNotify schickt den Liefertag (`markedShopOrder.deliveryDate`) als Unix-
+ * Sekunden der BERLINER MITTERNACHT: 22:00 UTC im Sommer, 23:00 UTC im Winter
+ * (nachgemessen am 19.11.2026: 29.792 + 20.226 von 50.050 Koepfen, nur 36 um
+ * 00:00 UTC). `alsDatum` schnitt den UTC-Tag ab und lieferte damit bei 50.014
+ * von 50.050 Bestellungen den Tag VOR der Lieferung — Migration 0156 baut die
+ * Spalte aus raw zurueck. Das Rechnungsdatum (`invoiceDate`) liegt dagegen um
+ * 11:00/12:00 UTC und bleibt beim UTC-Tag richtig.
+ */
+const alsBerlinerDatum = (x: unknown): string | null => {
+  const z = alsZeit(x)
+  return z ? kalendertagInGeschaeftszeitzone(new Date(z)) : null
 }
 
 /**
@@ -241,7 +258,7 @@ export function bestellkopf(daten: unknown): Bestellkopf {
     bestellnummer: alsText(o.orderNumber),
     status: alsBezeichnung(o.shopOrderStatus),
     bestelltAm: alsZeit(o.timeCreated),
-    geliefertAm: alsDatum(shopOrder?.deliveryDate),
+    geliefertAm: alsBerlinerDatum(shopOrder?.deliveryDate),
     summe: alsZahl(shopOrder?.total),
     kommentar: alsText(o.comment),
     lieferant: laden && lieferantId
