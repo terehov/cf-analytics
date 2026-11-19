@@ -19,6 +19,7 @@
     "belege-herunterladen": "bun run src/belege.ts --ziehen",
     "rezepte-probe": "bun run src/rezepte_probe.ts",
     "fn-probe": "bun run src/fn_probe.ts",
+    "fn-token-probe": "bun run src/fn_token_probe.ts",
     "rezepte-praxis": "bun run src/rezepte_praxis.ts",
     "bounti:pruefen": "bun run src/bounti_pruefen.ts",
     "bounti:zuordnen": "bun run src/bounti_zuordnen.ts",

@@ -40,8 +40,9 @@
 **Ablage der Tokens (seit 19.11.2026):** `FN_API_TOKENS`, ein JSON `{ "<marke>": "<Token>" }` mit einem Token je
 Marke (`aposto`, `enchilada`, `deutsche_konzepte`, `wilma_wunder`) — in `.env` lokal und in Dokploy, nie im Repo,
 nie in einem Log oder einer Messdatei. `src/config.ts` prüft beim Start Form und Markennamen, nennt in keiner
-Meldung einen Wert und reicht das Ergebnis als `config.FN_API_TOKEN` weiter. **Noch liest kein Code die Tokens**;
-der Importer arbeitet weiter mit der Sitzung (Bestellpositionen und Inventuren gehen mit Token nicht).
+Meldung einen Wert und reicht das Ergebnis als `config.FN_API_TOKEN` weiter. ~~**Noch liest kein Code die Tokens**;~~
+**Seit 19.11.2026 liest nur die Messprobe `bun run fn-token-probe` (`src/fn_token_probe.ts`) die Tokens**, nicht der
+Importer; der Importer arbeitet weiter mit der Sitzung (Bestellpositionen und Inventuren gehen mit Token nicht).
 
 ### Anmeldung und Hosts (Einzelmessung)
 
@@ -234,7 +235,7 @@ FoodNotify bewirbt einen MCP-Server „für Claude und ChatGPT", „mit Ihren Re
 
 ### Was diese Messung nicht sagt
 
-* **Ein Konto.** Nur Wilma Wunder, nur die IDs eines Betriebs und einer Kassenanbindung. Ob die drei anderen Marken dieselben 22 Scopes bekommen und dieselben Pfade erreichen, ist nicht gemessen (Entscheidung Eugene: erst nach dem Inventar).
+* ~~**Ein Konto.** Nur Wilma Wunder, nur die IDs eines Betriebs und einer Kassenanbindung. Ob die drei anderen Marken dieselben 22 Scopes bekommen und dieselben Pfade erreichen, ist nicht gemessen (Entscheidung Eugene: erst nach dem Inventar).~~ **Nachtrag 19.11.2026:** Die 14 Importer-Pfade sind bei allen vier Marken gemessen (Nachtrag „alle vier Marken" unten) — gleiches Ergebnis bei jeder Marke. Die Messreihe der 189 Pfade und `grantable-scopes` bleiben nur für Wilma Wunder gemessen.
 * **Jeder Pfad einmal**, ohne die Parameter des Importers (`order_by`, `order_direction`, `page_size=25`, `erpIds[]`). Ob Sortierung und Seitengröße mit Token wirken, ist offen. (Detailmessung: `order_by=timeCreated&order_direction=DESC` an der Bestellliste angenommen; `ASC` und `page_size=25` nicht gemessen.)
 * ~~**Keine Detailpfade.** Bestellkopf (`/api/{erpId}/shop-order/{id}`), Positionen (`…/change`), Inventurpositionen (`/api/erp/stocktakings/{uuid}/items`), Rezeptkopf, Zutaten und Meta sind **nicht** mit Token gemessen — die Messliste kannte für diese Parameter keine ID.~~ Seit der Detailmessung (oben) gemessen, je einmal: Bestellkopf, Positionen (403), Rezeptkopf, Zutaten, Meta. **Weiter nicht gemessen:** Inventurpositionen (`/api/erp/stocktakings/{uuid}/items`) und Zutaten eines Rezepts, das Zutaten hat.
 * **Nicht verglichen mit der Sitzung.** Ob ein Pfad mit Token dieselben Zeilen liefert wie mit Cookie, ist nirgends geprüft. ~~Die Messung mit der Cookie-Sitzung im Browser läuft (18.11.2026).~~ Die Sitzungsmessung (Abschnitt „Gegenprobe mit der Cookie-Sitzung") vergleicht Status und Form, nicht Zeilen.
@@ -268,6 +269,59 @@ Je Zelle ein Aufruf. „Sitzung" aus `messung-sitzung-2026-11-18.md`, „Token" 
 | `fn:rezept_meta` | `/api/recipes/{id}/meta` | 200 | **200** | derselbe Pfad | — |
 
 **Ergebnis (Endstand):** Mit der Sitzung antworten **13 von 14** Einträgen (die Bestellansicht ist nicht gemessen). Mit dem Token tragen **sechs** (`fn:betriebe`, `fn:bestellungen`, `fn:bestellung`, `fn:rezept`, `fn:rezept_zutaten`, `fn:rezept_meta`), **zwei** über einen anderen Pfad (`fn:rezepte`, `fn:kostenstellen`), **vier** sind abgewiesen (`fn:profil`, `fn:pos_standorte`, `fn:bestellpositionen`, `fn:inventuren`), `fn:inventurpositionen` ist mit Token nicht gemessen und `fn:bestellansicht` gar nicht. **Die Rezepte ließen sich vollständig über das Token holen** (Liste über `recipe-viewer`, Kopf, Zutaten mit `artikelId`, Meta) — belegt an je einem Aufruf eines Kontos. **Bestellpositionen und Inventuren gehen nur mit der Sitzung**, und ohne `/api/profile` und `/api/pos/locations` fehlen dem Token Benutzer-ID und Anbindungsliste. Das Token ersetzt die Sitzung deshalb nicht; ein gemischter Betrieb wäre möglich, ist aber nicht entschieden.
+
+### Nachtrag: alle vier Marken, 19.11.2026
+
+**Gemessen am 19.11.2026, 18:51–18:53 UTC** mit `bun run fn-token-probe` (`src/fn_token_probe.ts`): je Marke ein
+Token aus `FN_API_TOKENS`, nur `api3`, je Pfad **ein** GET in der **Form des Registers** (mit `order_by`,
+`order_direction`, `page_size=25` bzw. `1000`, `erpIds%5B%5D`), 16 GET je Marke. Benutzer-ID und Kassenanbindung
+aus der Sitzung, die Kostenstelle aus der Token-Antwort `/api/erp/core/{userId}/erps`. Je Marke eine echte
+Kostenstelle mit amadeus-Anbindung (Testbetriebe übersprungen): Aposto Aalen Küche (10117/2070), Enchilada Köln
+Küche (10059/1095), Würzburger Hofbräu Küche (12011/1729), Wilma Wunder Ballplatz Mainz Bar (7984/2052). Bericht
+mit allen Zahlen: `docs/payloads/foodnotify-2026-11/fn-token-probe-2026-11-19.md`.
+
+| Registereintrag | Pfad mit Token | aposto | enchilada | deutsche_konzepte | wilma_wunder |
+|---|---|---|---|---|---|
+| `fn:profil` | `/api/profile` | nicht neu gemessen | nicht neu gemessen | nicht neu gemessen | 403 (18.11.) |
+| `fn:betriebe` | `/api/core/business/{userId}/restaurants` | **200** | **200** | **200** | **200** |
+| `fn:kostenstellen` | Ersatz `/api/erp/core/{userId}/erps` | **200** | **200** | **200** | **200** |
+| `fn:pos_standorte` | `/api/pos/locations` | nicht neu gemessen | nicht neu gemessen | nicht neu gemessen | 403 (18.11.) |
+| `fn:bestellungen` | `…/shop-order/paginate?page=1&page_size=25&order_by=timeCreated&order_direction=ASC` | **200** | **200** | **200** | **200** |
+| `fn:bestellung` | `/api/{erpId}/shop-order/{orderId}` | **200** | **200** | **200** | **200** |
+| `fn:bestellpositionen` | `…/change?order_by=name` | **403** | **403** | **403** | **403** |
+| `fn:bestellansicht` | HTML auf `my` | nicht gemessen | nicht gemessen | nicht gemessen | nicht gemessen |
+| `fn:inventuren` | `/api/erp/stocktakings?page=1&order_by=timeCreated&order_direction=ASC&erpIds%5B%5D=…` | **403** | **403** | **403** | **403** |
+| `fn:inventurpositionen` | `/api/erp/stocktakings/{uuid}/items` | nicht gemessen | nicht gemessen | nicht gemessen | nicht gemessen |
+| `fn:rezepte` | `/api/recipes?page=1` | **403** | **403** | **403** | **403** |
+| `fn:rezepte` (Ersatz) | `/api/recipe-viewer/recipes?page=1` | **200** | **200** | **200** | **200** |
+| `fn:rezept` | `/api/recipes/{id}` | **200** | **200** | **200** | **200** |
+| `fn:rezept_zutaten` | `/api/recipes/{id}/ingredients` | **200**, `artikelId` 8 von 10 | **200**, 3 von 5 | **200**, 7 von 7 | **200**, 1 von 1 |
+| `fn:rezept_meta` | `/api/recipes/{id}/meta` | **200** | **200** | **200** | **200** |
+| `fn:warenstamm` | `/api/{erpId}/products?page=1&page_size=1000` | **200** (145) | **200** (627) | **200** (333) | **200** (206) |
+| `fn:pos_artikel` | `/api/pos/mapping/{connectionId}/articles` | **200** (1.157) | **200** (1.357) | **200** (438) | **200** (895) |
+| — | `/api/pos/mapping/{connectionId}/link-targets` | **200** (965) | **200** (1.972) | **200** (1.992) | **200** (13.265) |
+
+Jede 403 lautet „This endpoint does not support scope-limited tokens.". **Keine Abweichung zwischen den Marken.**
+
+**Ergebnis (19.11.2026, ersetzt den Vorbehalt „gemessen für ein Konto" im Endstand oben):**
+
+* Das Ergebnis von Wilma Wunder gilt für **alle vier Marken**: Mit dem Token tragen `fn:betriebe`,
+  `fn:bestellungen`, `fn:bestellung`, `fn:rezept`, `fn:rezept_zutaten`, `fn:rezept_meta` und — neu im Register seit
+  `0155`/`0157` und erstmals in Registerform mit Token gemessen — **`fn:warenstamm`** und **`fn:pos_artikel`**;
+  `fn:rezepte` über `recipe-viewer`, `fn:kostenstellen` über `/api/erp/core/{userId}/erps`. Abgewiesen bleiben
+  `fn:bestellpositionen` und `fn:inventuren` (bei allen vier), `fn:profil` und `fn:pos_standorte` (bei Wilma
+  gemessen, für die anderen geschlossen, nicht gemessen).
+* **Die Registerform trägt mit Token:** `ASC` mit `page_size=25` an der Bestellliste (vorher nur `DESC` gemessen),
+  `page_size=1000` am Warenstamm (`current_page_size` 1000, alle Zeilen in einer Antwort).
+* **Rezepte gingen bei allen vier Marken vollständig über das Token** — Liste (`recipe-viewer`), Kopf, Zutaten mit
+  `artikelId` (dieselben zwölf Felder je Marke), Meta. Je ein Aufruf je Marke; Folgeseiten der Liste nicht gemessen.
+* **Kassenartikel (`fn:pos_artikel`) und Warenstamm (`fn:warenstamm`) gingen ebenfalls über das Token**; nur die
+  Anbindungsliste fehlt dem Token (die `connectionId` muss aus der Sitzung oder dem Bestand kommen,
+  `core.kostenstelle`). Die Kassenartikel kamen mit Token in 0,4–1,3 s statt 19–39 s mit der Sitzung — eine Messung,
+  nicht geklärt.
+* ~~Was offen bleibt: dieselbe Messung für die drei anderen Marken~~ erledigt. **Weiter offen:** Token gegen Sitzung
+  auf Zeilenebene; die Differenz Rezeptliste gegen `link-targets` (Enchilada 2.079 gegen 1.972 — archivierte?);
+  Inventurpositionen und Bestellansicht mit Token.
 
 ### Zwischenstand vor der Sitzungsmessung (überholt)
 
@@ -315,7 +369,7 @@ Alles gemessen für ein Konto und eine Anbindung. **Erreichbar heißt nicht neu:
 
 ~~**Was noch zu messen ist, bevor jemand umbaut:** `/api/recipes/{id}/ingredients` an einem Rezept **mit** Zutaten (trägt es `artikelId`?); `/api/erp/stocktakings/{uuid}/items` mit einer bekannten Inventur; die Felder von `markedShopOrder.products[]` gegen `/change` aus `raw.api_antwort`; Token- gegen Sitzungsantwort derselben Pfade (läuft, Cookie-Sitzung im Browser); danach dieselbe Liste für die drei anderen Marken.~~ Zutaten mit `artikelId`, `products[]` gegen `/change` und die Sitzungsmessung sind am 18.11.2026 erledigt.
 
-**Was offen bleibt, bevor jemand umbaut:** dieselbe Messung für die drei anderen Marken; Token gegen Sitzung **auf Zeilenebene** (dieselben Rezepte, dieselben Bestellungen); ob `link-targets.updatedAt` als Änderungsfilter für den Rezept-Umlauf taugt; ob `/api/recipes` schon vor dem 09.11.2026 die Form von `recipe-viewer` lieferte (gegen `raw.api_antwort`). Die Liste steht in `docs/offene-punkte.md` (18.11.2026).
+**Was offen bleibt, bevor jemand umbaut:** ~~dieselbe Messung für die drei anderen Marken;~~ (erledigt 19.11.2026, Nachtrag „alle vier Marken" oben) Token gegen Sitzung **auf Zeilenebene** (dieselben Rezepte, dieselben Bestellungen); ob `link-targets.updatedAt` als Änderungsfilter für den Rezept-Umlauf taugt; ob `/api/recipes` schon vor dem 09.11.2026 die Form von `recipe-viewer` lieferte (gegen `raw.api_antwort`). Die Liste steht in `docs/offene-punkte.md` (18.11.2026).
 
 ## Was FoodNotify selbst über die Schnittstellen sagt (weitergegeben von Eugene, 18.11.2026)
 

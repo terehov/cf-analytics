@@ -2849,7 +2849,13 @@ heißt) und `docs/foodnotify-api-inventar-intern-2026-11.md`. Gemessen ist nur W
    nur `price` und `productId` — **kein Ersatz für `/change`**. Folge: Rezepte gingen mit Token, Bestellpositionen
    und Inventuren nur mit Sitzung. Ob ein gemischter Betrieb gewollt ist, ist nicht entschieden. Weiter offen ist
    nur der Vergleich Token gegen Sitzung auf **Zeilenebene**.
-2. **Die drei anderen Marken:** dieselben 22 Scopes? Dieselben Pfade? (Entscheidung Eugene: erst nach dem Inventar.)
+2. ~~**Die drei anderen Marken:** dieselben 22 Scopes? Dieselben Pfade? (Entscheidung Eugene: erst nach dem Inventar.)~~
+   **Gemessen 19.11.2026** (`bun run fn-token-probe`, `payloads/foodnotify-2026-11/fn-token-probe-2026-11-19.md`):
+   die 14 Importer-Pfade in Registerform bei allen vier Marken, **gleiches Ergebnis bei jeder Marke** — Rezepte
+   (über `recipe-viewer`, Kopf, Zutaten mit `artikelId`, Meta), Bestellliste und -kopf, Warenstamm und Kassenartikel
+   tragen; `/change`, Inventuren und `/api/recipes` sind 403 „scope-limited". Offen bleibt: ob die Tokens dieselben
+   Scopes tragen (`grantable-scopes` nur bei Wilma), Zeilenvergleich Token gegen Sitzung, und warum die Rezeptliste
+   mehr Rezepte zählt als `link-targets` (Enchilada 2.079 gegen 1.972, sonst 1–10).
 3. **Sechs Importer-Pfade stehen in keinem Bundle** (`/api/recipes`, `/{id}`, `/ingredients`, `/meta`,
    `/api/erp/stocktakings/{uuid}/items`, Bestellansicht). Braucht die Oberfläche sie nicht mehr, kann FoodNotify
    sie ohne Ankündigung abschalten. Wächter ist `mart.quelle_zulauf` (`fn:rezepte`, `fn:rezept_*`,

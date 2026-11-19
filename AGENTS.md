@@ -415,6 +415,11 @@ bun run fn-probe [--marke x] [--max-anbindungen 3] [--max-kostenstellen 2] [--ma
                                              # GESPERRT, er schreibt — fehlerkatalog.md 19.11.2026) und `--nur
                                              # verkaeufe-tiefe --erps 7984,9444,10772` (höchstens drei, nie Test) holt je
                                              # Kostenstelle die jüngsten 1.000 Verkäufe, den ältesten und zwei Bons
+bun run fn-token-probe [--marke x] [--max-aufrufe 16] [--dry-run]
+                                             # was FoodNotifys Scope-Token (FN_API_TOKENS, nur api3) je Marke trägt: 14 Pfade
+                                             # in Registerform, Sitzung nur für Benutzer-ID und Anbindung; höchstens 16 GET je
+                                             # Marke (nur senkbar), Erlaubtliste je Host, Token/Passwort geschwärzt; Ergebnis
+                                             # nach belege/fn-token-probe-<datum>-<HHMM>/zusammenfassung.md — keine DB
 bun run rezepte-praxis --datenbank postgresql://localhost/<db> [--marke x] [--max-rezepte N]
                                              # echter Ladepfad NUR fuer FoodNotify-Rezepte gegen eine
                                              # LOKALE Datenbank (Abbruch sonst); liest FoodNotify, nur GET
