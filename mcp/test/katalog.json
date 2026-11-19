@@ -6835,6 +6835,115 @@
    "fallstricke": []
   },
   {
+   "sicht": "mart.rezept_stueckliste",
+   "koernung": "Rezept × Weg zu einer Ware ueber alle Unterrezept-Ebenen — Menge je EINER verkauften Portion; je Marke, nicht je Betrieb",
+   "thema": "rezept",
+   "summen_erlaubt": false,
+   "kommentar": "Woraus besteht EINE verkaufte Portion von Rezept X? Je Rezept (je Marke, nicht je Betrieb) die Waren ueber\nalle Unterrezept-Ebenen, mit der Menge je Portion (0159). menge_je_portion ist ueber die Ebenen\nmultipliziert: Menge im Halbfabrikat × Anteil des Halbfabrikats (Menge in g / Gesamtgewicht, Dichte 1 wie\nFoodNotify) × Portion des Rezepts. einheit_soll ist kg oder l, wo die Einheit metrisch ist, sonst die\nRezepteinheit (\"Stück\"). belastbar = false heisst: KEINE Menge, weil eine Einheit auf dem Weg nicht\numrechenbar ist (\"Portionierer\", \"Stück\" eines Halbfabrikats), ein Halbfabrikat fehlt oder leer ist, oder ein\nZyklus — der Grund steht in grund, nichts wird geraten. art = luecke: eine Zeile fuer das, was nicht\naufgeloest werden kann. kosten_je_portion ist FoodNotifys eigene Kalkulation (cost der Zeile × Faktor), kein\nbezahlter Preis. Rezeptnamen sind nicht eindeutig: nach rezept_fn_id filtern. Mengen nur je einheit_soll\nsummieren und nur mit belastbar.\n\nKoernung: Rezept × Weg zu einer Ware ueber alle Unterrezept-Ebenen — Menge je EINER verkauften Portion; je Marke, nicht je Betrieb",
+   "spalten": [
+    "marke",
+    "marke_key",
+    "rezept_key",
+    "rezept_fn_id",
+    "rezept",
+    "rezept_archiviert",
+    "rezept_fehlt_seit",
+    "zutaten_geholt_am",
+    "portion_regel",
+    "ebene",
+    "pfad",
+    "direkt_rezept_fn_id",
+    "direkt_rezept",
+    "position",
+    "art",
+    "artikelnummer",
+    "ware",
+    "lieferant",
+    "lieferant_fn_id",
+    "menge_im_rezept",
+    "einheit",
+    "basis_menge",
+    "basis_einheit",
+    "faktor",
+    "einheit_soll",
+    "menge_je_portion",
+    "kosten_je_portion",
+    "belastbar",
+    "grund",
+    "ueber_basismenge",
+    "rezept_zeilen",
+    "rezept_zeilen_belastbar",
+    "rezept_belastbar",
+    "weg"
+   ],
+   "achsen": [
+    "lieferant",
+    "marke",
+    "ware"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "faktor",
+     "einheit": null,
+     "hinweis": null
+    },
+    {
+     "regel": "summe",
+     "spalte": "kosten_je_portion",
+     "einheit": "euro",
+     "hinweis": "FoodNotifys Kalkulation je Portion; je Rezept summierbar (nur belastbar), kein bezahlter Preis."
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "menge_je_portion",
+     "einheit": null,
+     "hinweis": "Menge je verkaufter Portion in einheit_soll, je Zeile nennen. Nicht summieren: ein Rezept mischt kg, l und Rezepteinheiten, und nicht belastbare Zeilen haben keine Menge. Fuer Mengen ueber Verkaeufe mart.soll_verbrauch_monat."
+    }
+   ],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.rezept_stueckliste_basis",
+   "koernung": "Rezept × Weg zu einer Ware (Zwischenstufe von mart.rezept_stueckliste, ohne Namen)",
+   "thema": "rezept",
+   "summen_erlaubt": false,
+   "kommentar": "Koernung: Rezept (Wurzel) × Weg zu einer Ware ueber alle Unterrezept-Ebenen — Zwischenstufe von\nmart.rezept_stueckliste (0159), aufgefrischt im Einkaufs-Nachlauf. Wie alt: mart.materialisierung_stand.",
+   "spalten": [
+    "rezept_key",
+    "marke_key",
+    "ebene",
+    "weg",
+    "pfad",
+    "direkt_key",
+    "position",
+    "art",
+    "artikelnummer",
+    "ware",
+    "lieferant",
+    "lieferant_fn_id",
+    "menge_im_rezept",
+    "einheit",
+    "basis_menge",
+    "basis_einheit",
+    "faktor",
+    "einheit_soll",
+    "menge_je_portion",
+    "kosten_je_portion",
+    "belastbar",
+    "grund",
+    "ueber_basismenge",
+    "rezept_zeilen",
+    "rezept_zeilen_belastbar"
+   ],
+   "achsen": [
+    "lieferant",
+    "ware"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
    "sicht": "mart.rezept_zuordnung_pruefung",
    "koernung": "Marke × Zuordnung (eingekauft / nummer ohne einkauf / ohne nummer / unterrezept)",
    "thema": "pruefung",
@@ -7212,6 +7321,315 @@
     "geprueft_am"
    ],
    "achsen": [],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.soll_artikel_monat",
+   "koernung": "Betrieb (amadeus-Kasse) × Monat × verkaufter LINA-Artikel — letzte 13 volle Monate und der laufende",
+   "thema": "rezept",
+   "summen_erlaubt": true,
+   "kommentar": "Je Betrieb (mit amadeus-Kasse), Monat und verkauftem LINA-Artikel: Menge, Umsatz, das Rezept laut\nKassenzuordnung und ob es in den Soll-Verbrauch eingeht (0159). soll_zustand: kein rezept / rezept nicht\ngeladen / rezept ohne zutaten / nicht umrechenbar (keine Zeile mit Menge) / teilweise (ein Teil der Waren ohne\nMenge — die belastbaren gehen ein) / vollstaendig. im_feed = false: die Artikelnummer steht in keiner\nKassenanbindung des Betriebs (Bar ohne Anbindung, vor dem ersten Abruf gestrichen). Nur die letzten 13 vollen\nMonate und der laufende: Rezept und Zuordnung sind der HEUTIGE Stand, auf fruehere Monate angewendet.\nsoll_wert_fn_eur nur bei vollstaendig: Menge × FoodNotifys Rezeptkalkulation, kein bezahlter Wareneinsatz.\n\nKoernung: Betrieb (amadeus-Kasse) × Monat × verkaufter LINA-Artikel — letzte 13 volle Monate und der laufende",
+   "spalten": [
+    "marke",
+    "marke_key",
+    "betrieb_key",
+    "betrieb",
+    "monat",
+    "artikel_key",
+    "artikelnummer",
+    "artikel",
+    "warengruppe",
+    "menge_verkauft",
+    "umsatz_netto",
+    "im_feed",
+    "rezept_fn_id",
+    "rezept_key",
+    "rezept",
+    "rezept_uneindeutig",
+    "rezept_zeilen",
+    "rezept_zeilen_belastbar",
+    "soll_zustand",
+    "soll_wert_fn_eur"
+   ],
+   "achsen": [
+    "artikel_key",
+    "betrieb_key",
+    "marke",
+    "monat",
+    "warengruppe"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "summe",
+     "spalte": "menge_verkauft",
+     "einheit": "anzahl",
+     "hinweis": null
+    },
+    {
+     "regel": "summe",
+     "spalte": "soll_wert_fn_eur",
+     "einheit": "euro",
+     "hinweis": "FoodNotifys Rezeptkalkulation, nur fuer abgedeckte Artikel. Nicht durch den Gesamtumsatz teilen."
+    }
+   ],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.soll_ist_monat",
+   "koernung": "Betrieb × Monat × Ware (Lieferanten-Artikelnummer) — Soll-Menge neben eingekaufter Menge, kein Schwund",
+   "thema": "rezept",
+   "summen_erlaubt": true,
+   "kommentar": "Soll-Verbrauch neben dem Einkauf, je Betrieb, Monat und Ware (Lieferanten-Artikelnummer) — KEIN\nSchwund-Urteil (0159). Einkauf ist nicht Verbrauch: die Lagerveraenderung fehlt (Inventuren fast nur bei Wilma\nWunder), und das Soll ist eine Untergrenze (abdeckung_umsatz_pct) — einkauf_zu_soll_pct liegt deshalb auch bei\nkorrekter Pflege meist ueber 100. Einkauf ohne Stornos, Monat der Bestellung (Berlin), beide Kostenstellen des\nBetriebs, Menge nur aus Positionen in kg/l mit belastbarer Gesamtmenge. vergleich sagt, warum ein Vergleich\nnicht geht (soll nicht in kg oder l / kein einkauf im monat / einkauf in anderer einheit / einkauf teilweise\nohne menge / soll unvollstaendig / soll null — zuerst die Soll-Seite); einkauf_zu_soll_pct nur bei vergleichbar. soll_wert_eur =\nsoll_menge × bezahlter Preis je kg/l (preis_quelle); soll_wert_fn_eur = FoodNotifys Rezeptkalkulation.\n\nKoernung: Betrieb × Monat × Ware (Lieferanten-Artikelnummer) — Soll-Menge neben eingekaufter Menge, kein Schwund",
+   "spalten": [
+    "marke",
+    "marke_key",
+    "betrieb_key",
+    "betrieb",
+    "monat",
+    "artikelnummer",
+    "ware",
+    "einheit",
+    "soll_menge",
+    "soll_unvollstaendig",
+    "abdeckung_umsatz_pct",
+    "abdeckung_zustand",
+    "positionen",
+    "einkauf_lieferanten",
+    "ausgaben",
+    "eingekauft_menge",
+    "positionen_ohne_menge",
+    "vergleich",
+    "vergleichbar",
+    "einkauf_zu_soll_pct",
+    "preis_eur_je_einheit",
+    "preis_quelle",
+    "soll_wert_eur",
+    "soll_wert_fn_eur"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "marke",
+    "monat",
+    "ware"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "summe",
+     "spalte": "eingekauft_menge",
+     "einheit": null,
+     "hinweis": "In der Einheit der Zeile (kg oder l); nur je Ware summieren."
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "einkauf_zu_soll_pct",
+     "einheit": "prozentzahl",
+     "hinweis": "Nur bei vergleichbar; kein Schwund, ueber 100 ist bei unvollstaendiger Abdeckung der Normalfall."
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "preis_eur_je_einheit",
+     "einheit": "euro",
+     "hinweis": "Je kg bzw. l."
+    },
+    {
+     "regel": "summe",
+     "spalte": "soll_wert_eur",
+     "einheit": "euro",
+     "hinweis": "Soll-Menge × bezahlter Preis je kg/l; nicht durch den Gesamtumsatz teilen."
+    }
+   ],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.soll_rezept_zuordnung",
+   "koernung": "Betrieb × LINA-Artikel mit Rezept — das EINE Rezept, mit dem der Soll-Verbrauch rechnet",
+   "thema": "rezept",
+   "summen_erlaubt": false,
+   "kommentar": "Welches Rezept rechnet der Soll-Verbrauch fuer LINA-Artikel X in Betrieb Y? Eine Zeile je Betrieb und\nLINA-Artikel mit Rezept (0159). Quelle ist FoodNotifys Kassenzuordnung (mart.pos_artikel_rezept), nur bei\namadeus-Kassen (PLU = LINA-Artikelnummer). Fuehren Bar und Kueche den Artikel mit verschiedenen Rezepten,\ngewinnt die Zeile der letzten Antwort, dann die, die die Kasse noch meldet, dann die zuletzt geaenderte —\nrezept_uneindeutig = true und rezept_fn_ids nennen alle Kandidaten. rezept_key NULL: das Rezept ist (noch)\nnicht geladen. Die Zuordnung ist der HEUTIGE Stand; FoodNotify fuehrt keine Historie.\n\nKoernung: Betrieb × LINA-Artikel mit Rezept — das EINE Rezept, mit dem der Soll-Verbrauch rechnet",
+   "spalten": [
+    "marke",
+    "marke_key",
+    "betrieb_key",
+    "betrieb",
+    "artikel_key",
+    "artikelnummer",
+    "rezept_fn_id",
+    "rezept_key",
+    "rezept",
+    "kostenstelle_key",
+    "kostenstelle_art",
+    "zuordnung_aktuell",
+    "kandidaten",
+    "rezept_fn_ids",
+    "rezept_uneindeutig",
+    "rezept_zeilen",
+    "rezept_zeilen_belastbar",
+    "rezept_zustand",
+    "rezept_kosten_je_portion"
+   ],
+   "achsen": [
+    "artikel_key",
+    "betrieb_key",
+    "marke"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.soll_verbrauch_abdeckung",
+   "koernung": "Betrieb (amadeus-Kasse) × Monat — Anteil des Verkaufs, der in den Soll-Verbrauch eingeht",
+   "thema": "rezept",
+   "summen_erlaubt": true,
+   "kommentar": "Wie viel des Verkaufs steckt im Soll-Verbrauch? Je Betrieb mit amadeus-Kasse und Monat (letzte 13 volle\nund der laufende), aufgeteilt nach soll_zustand (0159). abdeckung_umsatz_pct = Umsatz der Artikel mit\nVOLLSTAENDIG umrechenbarem Rezept / Artikelumsatz, Prozentzahl. Die Soll-Mengen in mart.soll_verbrauch_monat\numfassen zusaetzlich die belastbaren Zeilen der Artikel mit soll_zustand teilweise — sie sind also eine\nUntergrenze, nie der ganze Verbrauch. rezept_umsatz_pct ist die Reichweite der Kassenzuordnung (Rezept\nzugeordnet, egal ob umrechenbar). zustand: ok / bruecke teilweise geladen / bruecke nicht geladen / marke\nnicht aktiv (POS_ARTIKEL_MARKEN, vorerst nur Wilma Wunder). Bei marke nicht aktiv und bruecke nicht geladen\nsind die Prozentzahlen NULL (keine Zahl, nicht null Prozent); bei bruecke teilweise geladen fehlt eine\nAnbindung, die Zahl ist zu niedrig. Ueber Betriebe oder Monate nicht mitteln, sondern aus den Euro-Summen neu\nrechnen.\n\nKoernung: Betrieb (amadeus-Kasse) × Monat — Anteil des Verkaufs, der in den Soll-Verbrauch eingeht",
+   "spalten": [
+    "marke",
+    "betrieb_key",
+    "betrieb",
+    "monat",
+    "zustand",
+    "marke_aktiv",
+    "anbindungen",
+    "anbindungen_geladen",
+    "aeltester_abruf_am",
+    "artikel_verkauft",
+    "menge_verkauft",
+    "umsatz_netto",
+    "umsatz_vollstaendig",
+    "umsatz_teilweise",
+    "umsatz_nicht_umrechenbar",
+    "umsatz_rezept_ohne_zutaten",
+    "umsatz_rezept_nicht_geladen",
+    "umsatz_kein_rezept",
+    "umsatz_nicht_im_feed",
+    "menge_vollstaendig",
+    "menge_eingehend",
+    "abdeckung_umsatz_pct",
+    "abdeckung_menge_pct",
+    "rezept_umsatz_pct",
+    "artikel_rezept_uneindeutig"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "marke",
+    "monat"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "abdeckung_menge_pct",
+     "einheit": "prozentzahl",
+     "hinweis": "Je Betrieb und Monat. Fuer mehrere: sum(menge_vollstaendig) / sum(menge_verkauft)."
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "abdeckung_umsatz_pct",
+     "einheit": "prozentzahl",
+     "hinweis": "Je Betrieb und Monat. Fuer mehrere: sum(umsatz_vollstaendig) / sum(umsatz_netto)."
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "rezept_umsatz_pct",
+     "einheit": "prozentzahl",
+     "hinweis": "Je Betrieb und Monat. Fuer mehrere: Euro-Summen neu rechnen."
+    },
+    {
+     "regel": "summe",
+     "spalte": "umsatz_kein_rezept",
+     "einheit": "euro",
+     "hinweis": null
+    },
+    {
+     "regel": "summe",
+     "spalte": "umsatz_vollstaendig",
+     "einheit": "euro",
+     "hinweis": null
+    }
+   ],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.soll_verbrauch_monat",
+   "koernung": "Betrieb × Monat × Ware (Lieferanten-Artikelnummer) × Einheit — Soll-Menge aus Verkauf × Rezept, Untergrenze",
+   "thema": "rezept",
+   "summen_erlaubt": true,
+   "kommentar": "Wie viel einer Ware haette ein Betrieb im Monat laut Rezept verbraucht? Je Betrieb, Monat, Ware\n(Lieferanten-Artikelnummer) und Einheit: verkaufte Portionen (LINA) × Menge je Portion\n(mart.rezept_stueckliste), summiert ueber alle Rezepte, in denen die Ware steckt (0159). DIE ZAHL IST EINE\nUNTERGRENZE: sie umfasst nur Artikel mit zugeordnetem und umrechenbarem Rezept — abdeckung_umsatz_pct steht in\njeder Zeile und muss mitgenannt werden. soll_unvollstaendig = true: die Ware steckt auch in Rezeptzeilen ohne\nMenge (portionen_nicht_umrechenbar Portionen). einheit ist kg oder l, wo metrisch, sonst die Rezepteinheit —\nMengen nur je Ware UND Einheit summieren. Freitextzutaten ohne Nummer stehen mit artikelnummer NULL je Name.\nsoll_wert_fn_eur ist FoodNotifys Rezeptkalkulation, kein bezahlter Preis (bezahlt: mart.soll_ist_monat).\nRezept und Zuordnung sind der heutige Stand. Einkauf daneben: mart.soll_ist_monat.\n\nKoernung: Betrieb × Monat × Ware (Lieferanten-Artikelnummer) × Einheit — Soll-Menge aus Verkauf × Rezept, Untergrenze",
+   "spalten": [
+    "marke",
+    "marke_key",
+    "betrieb_key",
+    "betrieb",
+    "monat",
+    "artikelnummer",
+    "ware",
+    "einheit",
+    "soll_menge",
+    "soll_wert_fn_eur",
+    "artikel",
+    "rezepte",
+    "portionen_nicht_umrechenbar",
+    "soll_unvollstaendig",
+    "lieferanten",
+    "abdeckung_umsatz_pct",
+    "abdeckung_menge_pct",
+    "abdeckung_zustand"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "marke",
+    "monat",
+    "ware"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "portionen_nicht_umrechenbar",
+     "einheit": "anzahl",
+     "hinweis": "Je Ware; ueber Waren summiert zaehlt dieselbe Portion mehrfach."
+    },
+    {
+     "regel": "summe",
+     "spalte": "soll_menge",
+     "einheit": null,
+     "hinweis": "Nur je Ware (artikelnummer) UND einheit summieren — nie ueber Waren oder Einheiten. Untergrenze: abdeckung_umsatz_pct mitnennen."
+    },
+    {
+     "regel": "summe",
+     "spalte": "soll_wert_fn_eur",
+     "einheit": "euro",
+     "hinweis": "FoodNotifys Rezeptkalkulation, nur abgedeckter Verkauf."
+    }
+   ],
+   "fallstricke": []
+  },
+  {
+   "sicht": "mart.soll_verbrauch_tag",
+   "koernung": "Betrieb × Geschaeftstag × Ware × Einheit — Soll-Menge aus Verkauf × Rezept, Untergrenze",
+   "thema": "rezept",
+   "summen_erlaubt": true,
+   "kommentar": "Wie mart.soll_verbrauch_monat, je Geschaeftstag (0159): Soll-Menge einer Ware je Betrieb und Tag aus\nLINA-Artikelverkauf × Rezept. Eine UNTERGRENZE — abdeckung_umsatz_pct (Anteil des Tagesumsatzes mit\nvollstaendig umrechenbarem Rezept) gehoert zu jeder Zahl. Immer nach geschaeftstag (und betrieb_key) filtern:\nohne Filter rechnet die Sicht 13 Monate aller Betriebe. Nur die letzten 13 vollen Monate und der laufende.\n\nKoernung: Betrieb × Geschaeftstag × Ware × Einheit — Soll-Menge aus Verkauf × Rezept, Untergrenze",
+   "spalten": [
+    "marke",
+    "marke_key",
+    "betrieb_key",
+    "betrieb",
+    "geschaeftstag",
+    "artikelnummer",
+    "ware",
+    "einheit",
+    "soll_menge",
+    "soll_wert_fn_eur",
+    "artikel",
+    "portionen_nicht_umrechenbar",
+    "soll_unvollstaendig",
+    "abdeckung_umsatz_pct"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "geschaeftstag",
+    "marke",
+    "ware"
+   ],
    "kennzahlen": [],
    "fallstricke": []
   },
@@ -10061,9 +10479,9 @@
    "schwere": "warnung",
    "sicht": "mart.pos_artikel_abdeckung_betrieb",
    "parameter": {},
-   "hinweis": "Die Abdeckung sagt, welcher Umsatzanteil ein Rezept TRAEGT — nicht, was die Ware gekostet hat, und nicht, ob das Rezept stimmt. Ein Wareneinsatz aus Rezepten ist nicht gebaut.",
-   "berichtigung": "Als Reichweite einer kuenftigen Rezeptkalkulation nennen, nicht als Wareneinsatzquote.",
-   "quelle": "0155"
+   "hinweis": "Die Abdeckung sagt, welcher Umsatzanteil ein Rezept TRAEGT — nicht, was die Ware gekostet hat, und nicht, ob das Rezept stimmt. Den Soll-Verbrauch aus Rezepten rechnen mart.soll_verbrauch_monat und mart.soll_ist_monat (seit 0159), mit eigener Abdeckung (mart.soll_verbrauch_abdeckung).",
+   "berichtigung": "Als Reichweite der Kassenzuordnung nennen, nicht als Wareneinsatzquote; fuer Mengen den Soll-Verbrauch nehmen.",
+   "quelle": "0155, 0159"
   },
   {
    "schluessel": "pos_artikel_umsatz_betriebswert",
@@ -10164,6 +10582,19 @@
    "quelle": "0134"
   },
   {
+   "schluessel": "rezept_stueckliste_belastbar",
+   "art": "filter_noetig",
+   "schwere": "warnung",
+   "sicht": "mart.rezept_stueckliste",
+   "parameter": {
+    "wert": true,
+    "spalte": "belastbar"
+   },
+   "hinweis": "Zeilen mit belastbar = false haben keine Menge (Einheit nicht umrechenbar, Halbfabrikat fehlt oder leer, Zyklus). Eine Summe ueber menge_je_portion ohne den Filter laesst sie still weg und sieht vollstaendig aus.",
+   "berichtigung": "Fuer Mengen WHERE belastbar setzen und rezept_belastbar bzw. die Zahl der nicht belastbaren Zeilen nennen; fuer \"woraus besteht das Rezept\" alle Zeilen mit grund zeigen.",
+   "quelle": "0159"
+  },
+  {
    "schluessel": "schwellen_seit_0129",
    "art": "deutung",
    "schwere": "warnung",
@@ -10172,6 +10603,71 @@
    "hinweis": "Seit dem 29.09.2026 urteilt das Management-Regelwerk: Personal und Wareneinsatz werden als ABWEICHUNG bewertet (vom Budget, vom Soll der Marke, beim Personal je Bereich vom Vorjahr), Umsatz gruen erst ueber +2 %, Bewertung ab 4,30. OM zaehlt nicht mehr, Rendite und Bounti stehen neben dem Gesamturteil. Die Materialisierung rechnet ALLE Monate mit dem geltenden Regelwerk neu — eine Ampel von Juli 2026 heisst heute etwas anderes als im Juli-Round-Table.",
    "berichtigung": "Fuer Zeitreihen die Werte und Abweichungen vergleichen (wert, bezugswert, abweichung), nicht die Ampeln. Was gilt: mart.ampel_schwelle WHERE ist_standard.",
    "quelle": "migrations/0129_management_regelwerk.sql"
+  },
+  {
+   "schluessel": "soll_ist_kein_schwund",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.soll_ist_monat",
+   "parameter": {},
+   "hinweis": "Einkauf ist nicht Verbrauch: die Lagerveraenderung fehlt (Inventuren fast nur bei Wilma Wunder), und das Soll ist eine Untergrenze (abdeckung_umsatz_pct). Mehr Einkauf als Soll ist deshalb der Normalfall und KEIN Schwund, kein Diebstahl, keine Verschwendung. Bestellmonat ist nicht Liefer- oder Verbrauchsmonat.",
+   "berichtigung": "Als \"eingekauft X kg, laut Rezept mindestens Y kg verbraucht (Abdeckung Z %)\" nennen; kein Schwund-, Verlust- oder Effizienzurteil; mehrere Monate zusammen betrachten.",
+   "quelle": "0159"
+  },
+  {
+   "schluessel": "soll_ist_vergleichbar",
+   "art": "filter_noetig",
+   "schwere": "warnung",
+   "sicht": "mart.soll_ist_monat",
+   "parameter": {
+    "wert": true,
+    "spalte": "vergleichbar"
+   },
+   "hinweis": "Ohne vergleichbar = true stehen Zeilen dabei, deren Einheiten nicht zusammenpassen (Soll in Stueck, Einkauf in l, Positionen ohne belastbare Menge) oder deren Soll unvollstaendig ist — dort ist eingekauft_menge neben soll_menge kein Vergleich.",
+   "berichtigung": "WHERE vergleichbar setzen oder vergleich mitnennen; einkauf_zu_soll_pct ist ausserhalb ohnehin NULL.",
+   "quelle": "0159"
+  },
+  {
+   "schluessel": "soll_rezeptstand_heute",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.soll_artikel_monat",
+   "parameter": {},
+   "hinweis": "Kassenzuordnung und Rezept sind der HEUTIGE Stand und werden auf fruehere Monate angewendet (FoodNotify fuehrt keine Historie). Fuehren Bar und Kueche einen Artikel mit verschiedenen Rezepten, rechnet die Sicht mit einem (rezept_uneindeutig). soll_wert_fn_eur ist FoodNotifys Kalkulation, kein bezahlter Wareneinsatz.",
+   "berichtigung": "Den Rezeptstand nennen; fuer weit zurueckliegende Monate vorsichtig formulieren; rezept_uneindeutig zeigen.",
+   "quelle": "0159"
+  },
+  {
+   "schluessel": "soll_verbrauch_tag_untergrenze",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.soll_verbrauch_tag",
+   "parameter": {},
+   "hinweis": "Wie mart.soll_verbrauch_monat: eine Untergrenze, nur abgedeckte Artikel. abdeckung_umsatz_pct gilt fuer den Betrieb und Tag.",
+   "berichtigung": "Mit abdeckung_umsatz_pct nennen; soll_menge nur je Ware und Einheit summieren.",
+   "quelle": "0159"
+  },
+  {
+   "schluessel": "soll_verbrauch_tag_zeitraum",
+   "art": "zeitraum_noetig",
+   "schwere": "warnung",
+   "sicht": "mart.soll_verbrauch_tag",
+   "parameter": {
+    "spalte": "geschaeftstag"
+   },
+   "hinweis": "Ohne Filter auf geschaeftstag rechnet die Sicht 13 Monate Artikelverkauf aller Betriebe gegen die Rezepte.",
+   "berichtigung": "WHERE geschaeftstag BETWEEN ... setzen, am besten auch betrieb_key; fuer Monate mart.soll_verbrauch_monat.",
+   "quelle": "0159"
+  },
+  {
+   "schluessel": "soll_verbrauch_untergrenze",
+   "art": "deutung",
+   "schwere": "warnung",
+   "sicht": "mart.soll_verbrauch_monat",
+   "parameter": {},
+   "hinweis": "Der Soll-Verbrauch umfasst nur verkaufte Artikel mit zugeordnetem UND umrechenbarem Rezept — eine Untergrenze, nie der ganze Verbrauch. Wie viel eingeht, steht in abdeckung_umsatz_pct (oft deutlich unter 100). Rezepteinheiten wie \"Portionierer\" oder \"Stück\" eines Halbfabrikats sind nicht umrechenbar und fehlen. Vorerst nur Wilma Wunder (Kassenzuordnung). Rezept und Zuordnung sind der heutige Stand.",
+   "berichtigung": "Jede Soll-Zahl mit abdeckung_umsatz_pct nennen (\"deckt X % des Artikelumsatzes ab\"); soll_menge nur je Ware und Einheit summieren; nie als Gesamtverbrauch oder Wareneinsatzquote ausgeben.",
+   "quelle": "0159"
   },
   {
    "schluessel": "stadt_immer_null",

@@ -31,13 +31,37 @@
 // Seite wuerden verwechselt. Und db_ware filtert ueber einen Zeitraum, den
 // keine dieser Karten lesen kann (Regel 3) — die Seite antwortete halb.
 //
+// SOLL-VERBRAUCH (0159, Abschnitt am Ende, Karten sv_*). Verkauf × Rezept:
+// wie viel einer Ware ein Betrieb laut Rezept verbraucht haben muesste. Drei
+// weitere Regeln gelten nur dort:
+//
+//   4. JEDE SOLL-ZAHL HAT IHRE ABDECKUNG DANEBEN. Das Soll umfasst nur
+//      Artikel mit zugeordnetem UND umrechenbarem Rezept — eine
+//      Untergrenze (Fallstrick soll_verbrauch_untergrenze). Kachel, Balken
+//      und Tabellen zeigen sie; keine Karte teilt einen Soll-Wert durch den
+//      Gesamtumsatz (das waere eine Wareneinsatzquote aus dem falschen
+//      Nenner).
+//
+//   5. EINKAUF IST NICHT VERBRAUCH. Die Soll-Ist-Tabelle stellt nebeneinander,
+//      sie urteilt nicht: keine Spalte „Schwund", keine Farbe fuer „zu viel"
+//      (Fallstrick soll_ist_kein_schwund).
+//
+//   6. DERSELBE FESTE ZEITRAUM WIE OBEN: die letzten drei vollen Monate
+//      (Regel 3), summiert. Ein waehlbarer Monat ging nicht: uebernehmen.ts
+//      verlangt, dass ein Seitenfilter auf alle Karten wirkt, und die
+//      rz_*-Karten rechnen fest — sieben Ausnahmen haetten genau die Pruefung
+//      ausgehoehlt, die halb antwortende Seiten verhindert. Fuer Soll gegen
+//      Einkauf sind drei Monate ohnehin richtiger als einer: das Lager
+//      verschiebt Einkauf und Verbrauch gegeneinander. Einzelne Monate und
+//      Tage beantwortet der MCP-Zugang (mart.soll_verbrauch_monat/_tag).
+//
 // MARKE: die Sichten fuehren den FoodNotify-Schluessel ('wilma_wunder'). Der
 // Filter traegt das Round-Table-Hauptkonzept; verbunden wird ueber den
 // Betriebsschluessel in mart.konzept_zuordnung, nie ueber einen Namen.
 // =====================================================================
 
 import type { Karte } from './typen'
-import { P_ARTIKEL, P_BETRIEB, P_MARKE } from './gemeinsam'
+import { P_ARTIKEL, P_BETRIEB, P_MARKE, P_REZEPT } from './gemeinsam'
 
 const MARKE = P_MARKE
 const BETRIEB = P_BETRIEB
@@ -57,6 +81,19 @@ const FILTER = (alias = '') => `
  * Prozentzahl — nicht null Prozent.
  */
 const AUSGEWERTET = `marke_aktiv AND anbindungen_geladen > 0`
+
+/** Die letzten drei vollen Monate, auf der Monatsspalte (Regel 6). */
+const DREI_MONATE = `monat >= (date_trunc('month', current_date) - interval '3 months')::date
+   AND monat < date_trunc('month', current_date)::date`
+
+/** soll_zustand in Worten fuer den Fachbereich. */
+const ZUSTAND_TEXT = (spalte: string) => `CASE ${spalte}
+         WHEN 'vollstaendig'         THEN 'vollständig'
+         WHEN 'teilweise'            THEN 'teilweise (Teil der Zutaten ohne Menge)'
+         WHEN 'nicht umrechenbar'    THEN 'nein — Mengen nicht umrechenbar'
+         WHEN 'rezept ohne zutaten'  THEN 'nein — Rezept ohne Zutaten'
+         WHEN 'rezept nicht geladen' THEN 'nein — Rezept noch nicht geladen'
+         ELSE 'nein — kein Rezept' END`
 
 export const karten: Karte[] = [
 
@@ -335,5 +372,334 @@ SELECT betrieb                                         AS "Betrieb",
    [[AND artikel_key IN (SELECT artikel_key FROM mart.artikel_monat WHERE artikel = {{artikel}})]]${FILTER()}
  ORDER BY geaendert_am DESC, betrieb, kostenstelle
  LIMIT 300`,
+  },
+
+  // -------------------------------------------------------------------
+  // Soll-Verbrauch (0159): Verkauf × Rezept, die letzten drei vollen Monate
+  // -------------------------------------------------------------------
+  {
+    /*
+     * Aus den Euro-Summen, nie als Mittel der Betriebsprozente
+     * (abdeckung_umsatz_pct nicht_aggregieren). Nur Betriebe mit
+     * zustand = 'ok': bei nicht geladener Kassenzuordnung waere 0 % keine
+     * Aussage ueber die Rezepte.
+     */
+    schluessel: 'sv_abdeckung',
+    name: 'Verkauf im Soll-Verbrauch',
+    beschreibung:
+      'Welcher Anteil des Artikelumsatzes der letzten drei vollen Monate in den Soll-Verbrauch eingeht: Artikel, deren Rezept zugeordnet ist und sich vollständig in Mengen umrechnen lässt. Nur dieser Teil des Verkaufs steckt in den Soll-Mengen darunter — **sie sind deshalb eine Untergrenze, nie der ganze Verbrauch.**',
+    anzeige: 'scalar',
+    parameter: [MARKE, BETRIEB],
+    sql: `
+SELECT round(100.0 * sum(umsatz_vollstaendig) / nullif(sum(umsatz_netto), 0), 1) AS "Verkauf im Soll-Verbrauch (%)"
+  FROM mart.soll_verbrauch_abdeckung
+ WHERE zustand = 'ok'
+   AND ${DREI_MONATE}${FILTER()}`,
+    visualisierung: { suffix: ' %' },
+  },
+
+  {
+    schluessel: 'sv_betriebe',
+    name: 'Betriebe mit Soll-Verbrauch',
+    beschreibung:
+      'Betriebe, deren Kassenzuordnung aus FoodNotify geladen ist, von allen Betrieben mit angebundener Kasse und Verkauf in den letzten drei vollen Monaten. Die übrigen haben keinen Soll-Verbrauch — nicht null.',
+    anzeige: 'scalar',
+    parameter: [MARKE, BETRIEB],
+    sql: `
+SELECT count(DISTINCT betrieb_key) FILTER (WHERE zustand = 'ok') || ' von ' || count(DISTINCT betrieb_key) AS "Betriebe"
+  FROM mart.soll_verbrauch_abdeckung
+ WHERE ${DREI_MONATE}${FILTER()}`,
+  },
+
+  {
+    /*
+     * Gestapelter Balken mit Anteilen, die je Betrieb 100 ergeben: die Frage
+     * ist die Zusammensetzung ("wie viel geht ein, woran scheitert der
+     * Rest"), nicht die Groesse — deshalb Prozent statt Euro, und row statt
+     * bar wegen der langen Betriebsnamen. Die Anteile rechnet die Abfrage
+     * selbst aus den Euro-Summen, statt Metabases normalized-Stapel: so
+     * stehen dieselben Zahlen im Tooltip wie in der Tabelle darunter.
+     * Gekappt auf 20, die niedrigste Abdeckung oben (docs/dashboards.md).
+     */
+    schluessel: 'sv_abdeckung_balken',
+    name: 'Was in den Soll-Verbrauch eingeht — je Betrieb',
+    beschreibung:
+      'Je Betrieb, wie sich der Artikelumsatz der letzten drei vollen Monate aufteilt: „vollständig" geht ganz in den Soll-Verbrauch ein, „teilweise" nur mit den Zutaten, deren Menge sich umrechnen lässt, „Rezept ohne Menge" gar nicht (Einheiten wie „Portionierer" oder „Stück" eines Halbfabrikats, Rezept ohne Zutaten), „kein Rezept" ebenfalls nicht. Die niedrigste Abdeckung oben, höchstens 20 Betriebe; alle stehen in der Tabelle darunter.',
+    anzeige: 'row',
+    parameter: [MARKE, BETRIEB],
+    sql: `
+WITH a AS (
+    SELECT betrieb_key, betrieb,
+           sum(umsatz_netto)        AS umsatz_netto,
+           sum(umsatz_vollstaendig) AS vollstaendig,
+           sum(umsatz_teilweise)    AS teilweise,
+           sum(umsatz_nicht_umrechenbar + umsatz_rezept_ohne_zutaten + umsatz_rezept_nicht_geladen) AS ohne_menge,
+           sum(umsatz_kein_rezept)  AS kein_rezept
+      FROM mart.soll_verbrauch_abdeckung
+     WHERE zustand = 'ok'
+       AND ${DREI_MONATE}${FILTER()}
+     GROUP BY betrieb_key, betrieb
+), auswahl AS (
+    SELECT betrieb_key, vollstaendig / nullif(umsatz_netto, 0) AS anteil
+      FROM a ORDER BY 2 NULLS LAST, betrieb_key LIMIT 20
+)
+SELECT a.betrieb                                            AS "Betrieb",
+       t.teil                                               AS "Anteil",
+       round(100.0 * t.umsatz / nullif(a.umsatz_netto, 0), 1) AS "Umsatz %"
+  FROM a
+  JOIN auswahl w USING (betrieb_key)
+ CROSS JOIN LATERAL (VALUES
+        (1, 'vollständig',       a.vollstaendig),
+        (2, 'teilweise',         a.teilweise),
+        (3, 'Rezept ohne Menge', a.ohne_menge),
+        (4, 'kein Rezept',       a.kein_rezept)) AS t(folge, teil, umsatz)
+ ORDER BY w.anteil NULLS LAST, a.betrieb, t.folge`,
+    visualisierung: {
+      'graph.dimensions': ['Betrieb', 'Anteil'],
+      'graph.metrics': ['Umsatz %'],
+      'stackable.stack_type': 'stacked',
+      'graph.y_axis.max': 100,
+      'graph.x_axis.title_text': '',
+      'graph.y_axis.title_text': 'Anteil am Artikelumsatz (%)',
+      series_settings: {
+        'vollständig': { color: '#84BB4C' }, teilweise: { color: '#F9CF48' },
+        'Rezept ohne Menge': { color: '#F2A86F' }, 'kein Rezept': { color: '#C7CFD4' },
+      },
+    },
+  },
+
+  {
+    /*
+     * Alle Betriebe mit amadeus-Kasse, auch nicht ausgewertete — mit dem
+     * Stand in Worten (wie rz_betrieb_tabelle). Prozente aus den Summen der
+     * drei Monate neu gerechnet, nie gemittelt. "nicht in FoodNotify" ist der
+     * Teil von "kein Rezept", der keine Pflegeluecke ist, sondern eine
+     * fehlende Anbindung.
+     */
+    schluessel: 'sv_abdeckung_tabelle',
+    name: 'Abdeckung des Soll-Verbrauchs je Betrieb',
+    beschreibung:
+      'Alle Betriebe mit angebundener Kasse, über die letzten drei vollen Monate. „Abdeckung" ist der Anteil des Artikelumsatzes, der vollständig in den Soll-Verbrauch eingeht; „mit Rezept" der Anteil mit zugeordnetem Rezept, ob umrechenbar oder nicht. „davon nicht in FoodNotify" ist Umsatz, dessen Artikel FoodNotify in diesem Betrieb gar nicht kennt — meist fehlt eine Kassenanbindung, kein Rezept. „Bar/Küche verschieden" zählt Artikel, denen Bar und Küche verschiedene Rezepte zuordnen; gerechnet wird mit dem zuletzt gepflegten. Ohne geladene Kassenzuordnung steht keine Zahl da, nicht null Prozent. Prozentwerte nicht über Betriebe mitteln.',
+    anzeige: 'table',
+    parameter: [MARKE, BETRIEB],
+    sql: `
+SELECT a.betrieb                                  AS "Betrieb",
+       CASE max(a.zustand) WHEN 'ok' THEN 'ausgewertet'
+            WHEN 'marke nicht aktiv' THEN 'Marke noch nicht geholt'
+            WHEN 'bruecke nicht geladen' THEN 'Kassenzuordnung noch nicht geladen'
+            ELSE 'Kassenzuordnung teilweise geladen' END AS "Stand",
+       CASE WHEN bool_and(a.abdeckung_umsatz_pct IS NOT NULL) THEN
+         round(100.0 * sum(a.umsatz_vollstaendig) / nullif(sum(a.umsatz_netto), 0), 1) END AS "Abdeckung %",
+       CASE WHEN bool_and(a.abdeckung_menge_pct IS NOT NULL) THEN
+         round(100.0 * sum(a.menge_vollstaendig) / nullif(sum(a.menge_verkauft), 0), 1) END AS "Abdeckung Menge %",
+       CASE WHEN bool_and(a.rezept_umsatz_pct IS NOT NULL) THEN
+         round(100.0 * sum(a.umsatz_netto - a.umsatz_kein_rezept) / nullif(sum(a.umsatz_netto), 0), 1) END AS "mit Rezept %",
+       round(sum(a.umsatz_netto))                 AS "Artikelumsatz",
+       round(sum(a.umsatz_vollstaendig))          AS "vollständig",
+       round(sum(a.umsatz_teilweise))             AS "teilweise",
+       round(sum(a.umsatz_nicht_umrechenbar + a.umsatz_rezept_ohne_zutaten + a.umsatz_rezept_nicht_geladen)) AS "Rezept ohne Menge",
+       round(sum(a.umsatz_kein_rezept))           AS "kein Rezept",
+       round(sum(a.umsatz_nicht_im_feed))         AS "davon nicht in FoodNotify",
+       max(a.artikel_rezept_uneindeutig)          AS "Bar/Küche verschieden",
+       max(a.aeltester_abruf_am)::date            AS "Zuordnung geladen am"
+  FROM mart.soll_verbrauch_abdeckung a
+ WHERE ${DREI_MONATE.replace(/monat/g, 'a.monat')}${FILTER('a.')}
+ GROUP BY a.betrieb_key, a.betrieb
+ ORDER BY (max(a.zustand) = 'ok') DESC, 3 NULLS LAST, a.betrieb`,
+    visualisierung: {
+      column_settings: {
+        '["name","Abdeckung %"]': PROZENT,
+        '["name","Abdeckung Menge %"]': PROZENT,
+        '["name","mit Rezept %"]': PROZENT,
+        '["name","Artikelumsatz"]': EURO,
+        '["name","vollständig"]': EURO,
+        '["name","teilweise"]': EURO,
+        '["name","Rezept ohne Menge"]': EURO,
+        '["name","kein Rezept"]': EURO,
+        '["name","davon nicht in FoodNotify"]': EURO,
+      },
+    },
+  },
+
+  {
+    /*
+     * TABELLE, KEIN BALKEN: die Mengen stehen in kg, l und Rezepteinheiten
+     * ("Stück", "FL") — eine gemeinsame Achse gaebe es nur fuer den Wert,
+     * und der ist FoodNotifys Kalkulation, nicht bezahlt. Sortiert nach dem
+     * Wert, weil kg Salz und kg Fleisch nicht gleich wichtig sind. Gruppiert
+     * ueber Artikelnummer UND Einheit (soll_menge nur je Ware und Einheit
+     * summieren); Freitextzutaten ohne Nummer je Name.
+     */
+    schluessel: 'sv_waren',
+    name: 'Größte Waren im Soll-Verbrauch',
+    beschreibung:
+      'Die Waren mit dem höchsten Soll-Verbrauch der letzten drei vollen Monate, über die gewählten Betriebe: verkaufte Portionen mal Menge laut Rezept, über alle Rezepte, in denen die Ware steckt. „Wert laut Kalkulation" ist FoodNotifys eigene Rezeptkalkulation, kein bezahlter Preis. Eine **Untergrenze**: nur Artikel mit umrechenbarem Rezept zählen (Abdeckung in der Kachel oben); ⚠ heißt, die Ware steckt zusätzlich in Rezeptzeilen ohne Menge. Mengen in kg und l, sonst in der Einheit des Rezepts.',
+    anzeige: 'table',
+    parameter: [MARKE, BETRIEB],
+    sql: `
+SELECT min(ware)                                              AS "Ware",
+       artikelnummer                                          AS "Artikelnummer",
+       einheit                                                AS "Einheit",
+       round(sum(soll_menge), 2)                              AS "Soll-Menge",
+       round(sum(soll_wert_fn_eur))                           AS "Wert laut Kalkulation",
+       count(DISTINCT betrieb_key)                            AS "Betriebe",
+       CASE WHEN bool_or(soll_unvollstaendig) THEN '⚠ teils ohne Menge' END AS "Hinweis"
+  FROM mart.soll_verbrauch_monat
+ WHERE abdeckung_zustand = 'ok'
+   AND ${DREI_MONATE}${FILTER()}
+ GROUP BY artikelnummer, CASE WHEN artikelnummer IS NULL THEN ware END, einheit
+ ORDER BY sum(soll_wert_fn_eur) DESC NULLS LAST, sum(soll_menge) DESC NULLS LAST
+ LIMIT 100`,
+    visualisierung: {
+      column_settings: { '["name","Wert laut Kalkulation"]': EURO },
+    },
+  },
+
+  {
+    /*
+     * Nebeneinander, kein Urteil (Regel 5): keine Differenzspalte, keine
+     * Farbe. Ueber drei Monate summiert — vergleichbar heisst: in jedem
+     * Monat passten die Einheiten (ein Monat ohne Bestellung zaehlt als
+     * null, nicht als unvergleichbar), und mindestens einmal wurde bestellt.
+     * "Vergleich" nennt sonst den haeufigsten Grund. Die Abdeckung des
+     * Betriebs (aus den Summen der drei Monate) steht in jeder Zeile — sie
+     * erklaert, warum "eingekauft / Soll" meist weit ueber 100 liegt.
+     */
+    schluessel: 'sv_soll_ist',
+    name: 'Soll laut Rezept und Einkauf — je Ware',
+    beschreibung:
+      'Je Betrieb und Ware, über die letzten drei vollen Monate: wie viel laut Rezept mindestens verbraucht wurde und wie viel bestellt wurde. **Das ist kein Schwund.** Einkauf ist nicht Verbrauch — das Lager fehlt —, und das Soll umfasst nur den abgedeckten Teil des Verkaufs: liegt die Abdeckung des Betriebs bei 30 %, ist ein Einkauf vom Dreifachen des Solls nichts Auffälliges. „eingekauft / Soll" steht nur, wo die Mengen vergleichbar sind; sonst sagt „Vergleich", warum nicht. „Soll-Wert" ist die Soll-Menge zum bezahlten Preis je kg/l („Preis aus": eigene Bestellungen im Monat, sonst die der Marke über zwölf Monate).',
+    anzeige: 'table',
+    parameter: [MARKE, BETRIEB],
+    sql: `
+WITH abdeckung AS (
+    SELECT betrieb_key,
+           round(100.0 * sum(umsatz_vollstaendig) / nullif(sum(umsatz_netto), 0), 1) AS abdeckung_pct
+      FROM mart.soll_verbrauch_abdeckung
+     WHERE zustand = 'ok'
+       AND ${DREI_MONATE}${FILTER()}
+     GROUP BY betrieb_key
+), zeile AS (
+    SELECT betrieb_key, betrieb, artikelnummer, einheit,
+           min(ware)                                                       AS ware,
+           sum(soll_menge)                                                 AS soll,
+           sum(eingekauft_menge)                                           AS eingekauft,
+           bool_and(vergleich IN ('vergleichbar', 'kein einkauf im monat'))
+             AND bool_or(vergleichbar)                                     AS vergleichbar,
+           mode() WITHIN GROUP (ORDER BY vergleich)
+             FILTER (WHERE vergleich NOT IN ('vergleichbar', 'kein einkauf im monat')) AS grund,
+           sum(soll_wert_eur)                                              AS soll_wert,
+           mode() WITHIN GROUP (ORDER BY preis_quelle)                     AS preis_quelle
+      FROM mart.soll_ist_monat
+     WHERE abdeckung_zustand = 'ok'
+       AND ${DREI_MONATE}${FILTER()}
+     GROUP BY betrieb_key, betrieb, artikelnummer, einheit
+)
+SELECT z.betrieb                                        AS "Betrieb",
+       z.ware                                           AS "Ware",
+       z.artikelnummer                                  AS "Artikelnummer",
+       z.einheit                                        AS "Einheit",
+       round(z.soll, 2)                                 AS "Soll laut Rezept",
+       round(z.eingekauft, 2)                           AS "eingekauft",
+       CASE WHEN z.vergleichbar THEN round(100.0 * coalesce(z.eingekauft, 0) / nullif(z.soll, 0), 1) END
+                                                        AS "eingekauft / Soll %",
+       CASE WHEN z.vergleichbar THEN 'vergleichbar'
+            ELSE CASE coalesce(z.grund, 'kein einkauf im monat')
+                   WHEN 'soll nicht in kg oder l'      THEN 'Rezept nicht in kg/l'
+                   WHEN 'soll unvollstaendig'          THEN 'Rezept teils ohne Menge'
+                   WHEN 'soll null'                    THEN 'Soll null'
+                   WHEN 'kein einkauf im monat'        THEN 'nicht bestellt'
+                   WHEN 'einkauf in anderer einheit'   THEN 'bestellt in anderer Einheit'
+                   ELSE 'Bestellungen teils ohne Menge' END END AS "Vergleich",
+       round(z.soll_wert)                               AS "Soll-Wert",
+       CASE z.preis_quelle
+         WHEN 'bezahlt, betrieb im monat' THEN 'eigene Bestellungen'
+         WHEN 'bezahlt, marke 12 monate'  THEN 'Marke, zwölf Monate'
+         ELSE '—' END                                   AS "Preis aus",
+       a.abdeckung_pct                                  AS "Abdeckung des Betriebs %"
+  FROM zeile z
+  JOIN abdeckung a ON a.betrieb_key = z.betrieb_key
+ ORDER BY z.soll_wert DESC NULLS LAST, z.betrieb, z.ware
+ LIMIT 500`,
+    visualisierung: {
+      column_settings: {
+        '["name","eingekauft / Soll %"]': PROZENT,
+        '["name","Soll-Wert"]': EURO,
+        '["name","Abdeckung des Betriebs %"]': PROZENT,
+      },
+    },
+  },
+
+  {
+    /*
+     * Die Quelle des Drill-downs: Klick auf "Rezept-Nr." setzt den Filter
+     * Rezept-Nr. dieser Seite, und die Stueckliste darunter zeigt das
+     * Rezept. Ohne "kein rezept" — diese Artikel stehen in der Arbeitsliste
+     * oben (rz_ohne_rezept). Der Zustand ist ein heutiger (Rezept und
+     * Zuordnung), deshalb max() ueber die drei Monate.
+     */
+    schluessel: 'sv_artikel',
+    name: 'Verkaufte Artikel mit Rezept — geht es ein?',
+    beschreibung:
+      'Verkaufte Artikel der letzten drei vollen Monate mit zugeordnetem Rezept, nach Umsatz: ob und wie das Rezept in den Soll-Verbrauch eingeht. „teilweise" und „nein" heißen fast immer, dass eine Menge im Rezept in einer Einheit steht, die sich nicht in Gramm oder Liter umrechnen lässt (etwa „Portionierer" oder „Stück" eines Halbfabrikats). Klick auf die Rezept-Nr. zeigt darunter, woraus eine Portion besteht und welche Zeile keine Menge hat. Rezept und Zuordnung sind der heutige Stand in FoodNotify.',
+    anzeige: 'table',
+    parameter: [MARKE, BETRIEB],
+    sql: `
+SELECT max(artikel)                                     AS "Artikel",
+       betrieb                                          AS "Betrieb",
+       rezept                                           AS "Rezept",
+       rezept_fn_id::text                               AS "Rezept-Nr.",
+       ${ZUSTAND_TEXT('max(soll_zustand)')}             AS "im Soll-Verbrauch",
+       round(sum(menge_verkauft))                       AS "verkauft",
+       round(sum(umsatz_netto))                         AS "Umsatz",
+       CASE WHEN bool_or(rezept_uneindeutig) THEN 'Bar und Küche ordnen verschieden zu' END AS "Hinweis"
+  FROM mart.soll_artikel_monat
+ WHERE soll_zustand <> 'kein rezept'
+   AND ${DREI_MONATE}${FILTER()}
+ GROUP BY betrieb_key, betrieb, artikel_key, rezept, rezept_fn_id
+ ORDER BY sum(umsatz_netto) DESC NULLS LAST, 1
+ LIMIT 300`,
+    visualisierung: {
+      column_settings: { '["name","Umsatz"]': EURO },
+    },
+  },
+
+  {
+    /*
+     * Das bisher als "nicht gebaut" vermerkte Zutaten-Drill-down. Ohne
+     * gewaehltes Rezept bewusst leer (coalesce auf ''), statt 100.000
+     * Zeilen aller Rezepte: die Beschreibung sagt, wie man es fuellt.
+     * Rezept-IDs sind ueber alle Marken eine Folge (Enchilada, Wilma
+     * Wunder, Aposto, Deutsche Konzepte greifen ineinander), die Nummer
+     * allein genuegt. Marke und Betrieb wirken auch hier: nur Rezepte, die
+     * eine Kasse dieser Betriebe fuehrt (die Seitenfilter sollen auf jede
+     * Karte wirken, uebernehmen.ts).
+     */
+    schluessel: 'sv_stueckliste',
+    name: 'Woraus eine Portion besteht',
+    beschreibung:
+      'Das in der Tabelle darüber angeklickte Rezept (Filter „Rezept-Nr."), aufgelöst bis zur eingekauften Ware: je Zeile der Weg über die Halbfabrikate, die Menge im Rezept und die Menge für **eine verkaufte Portion** (in kg oder l, sonst in der Einheit des Rezepts). Steht unter „ohne Menge, weil" etwas, lässt sich diese Zeile nicht umrechnen — sie fehlt im Soll-Verbrauch, die Ursache steht dort. „Kalkulation je Portion" ist FoodNotifys eigener Wert. Ohne gewähltes Rezept bleibt die Tabelle leer.',
+    anzeige: 'table',
+    parameter: [P_REZEPT, MARKE, BETRIEB],
+    sql: `
+SELECT pfad                                             AS "Weg",
+       coalesce(ware, '—')                              AS "Ware",
+       artikelnummer                                    AS "Artikelnummer",
+       menge_im_rezept                                  AS "Menge im Rezept",
+       einheit                                          AS "Einheit",
+       round(menge_je_portion, 4)                       AS "je Portion",
+       einheit_soll                                     AS "Einheit je Portion",
+       round(kosten_je_portion, 3)                      AS "Kalkulation je Portion",
+       CASE WHEN NOT belastbar THEN grund END           AS "ohne Menge, weil"
+  FROM mart.rezept_stueckliste
+ WHERE rezept_fn_id::text = coalesce([[ {{rezept}}, ]] '')
+   [[AND rezept_key IN (SELECT rezept_key FROM mart.soll_rezept_zuordnung WHERE betrieb = {{betrieb}})]]
+   [[AND rezept_key IN (SELECT rezept_key FROM mart.soll_rezept_zuordnung
+                         WHERE betrieb_key IN (SELECT betrieb_key FROM mart.konzept_zuordnung
+                                                WHERE hauptkonzept = {{marke}}))]]
+ ORDER BY weg`,
+    visualisierung: {
+      column_settings: { '["name","Kalkulation je Portion"]': { number_style: 'currency', currency: 'EUR', currency_style: 'symbol', decimals: 3 } },
+    },
   },
 ]

@@ -2600,3 +2600,65 @@ geladen (drei Kassenanbindungen, Warenstamm 7984 und ein zweiter, künstlich ver
 ausgeführt als `mcp_leser` über die MCP-Übersetzung, ohne und mit Filtern: alle Karten unter 0,1 s außer
 `wa_lieferkondition` (0,06–0,40 s, keine Materialisierung — wie in `0156` gemessen), `ap_verlauf`/`ap_tabelle` ohne
 Filter (0,07–0,10 s) und den `rz_*`-Karten auf der Betriebssicht (0,05 s warm, 0,27 s beim ersten Aufruf).
+
+## Soll-Verbrauch: Verkauf × Rezept (Migration `0159`, 19.11.2026)
+
+Wie viel einer Ware hätte ein Betrieb laut Rezept verbraucht? Verkaufte Portionen aus LINA × Menge je Portion aus dem
+aufgelösten Rezept. Rechenweg in `datenherkunft.md`, Regeln in `entscheidungen.md`.
+
+### Welche Sicht wofür
+
+| Frage | Sicht |
+|---|---|
+| Woraus besteht eine Portion von Rezept X? | `mart.rezept_stueckliste` (nach `rezept_fn_id` filtern) |
+| Mit welchem Rezept rechnet das Soll für Artikel Y in Betrieb Z? | `mart.soll_rezept_zuordnung` |
+| Welche verkauften Artikel gehen ein, welche nicht und warum? | `mart.soll_artikel_monat` (`soll_zustand`) |
+| Wie viel des Verkaufs steckt überhaupt im Soll? | **`mart.soll_verbrauch_abdeckung`** |
+| Soll-Menge je Ware im Monat / am Tag | `mart.soll_verbrauch_monat` / `mart.soll_verbrauch_tag` |
+| Soll neben dem Einkauf | `mart.soll_ist_monat` |
+
+### Vier Regeln, die in den Sichten stecken
+
+1. **Das Soll ist eine Untergrenze.** Es zählen nur Artikel mit zugeordnetem und umrechenbarem Rezept;
+   `abdeckung_umsatz_pct` steht in jeder Soll-Zeile und gehört zu jeder Zahl. Bei „teilweise" gehen die belastbaren
+   Zeilen ein, die anderen nicht (`soll_unvollstaendig`, `portionen_nicht_umrechenbar`).
+2. **`soll_menge` nur je Ware und Einheit summieren.** Einheit ist `kg` oder `l`, wo metrisch, sonst die Rezepteinheit.
+3. **Kein Schwund.** `mart.soll_ist_monat` urteilt nicht; `einkauf_zu_soll_pct` steht nur bei `vergleichbar` und liegt
+   bei unvollständiger Abdeckung erwartbar weit über 100.
+4. **Ohne geladene Kassenzuordnung keine Prozentzahl.** `zustand` = `marke nicht aktiv` (vorerst alles außer Wilma
+   Wunder) oder `bruecke nicht geladen` → Abdeckung NULL, nicht 0 %.
+
+**Keine eigene Prüfzeile (Regel 10):** der Soll-Verbrauch hat keinen eigenen Zulauf. Ob seine Quellen ankommen,
+messen `mart.rezept_stand` (Rezepte je Marke), `mart.pos_artikel_abdeckung` (Kassenzuordnung je Anbindung) und
+`mart.materialisierung_stand` (Refresh der Stückliste, Merker `einkauf_sichten_refresh`); fehlt die Zuordnung, steht
+`zustand` in `mart.soll_verbrauch_abdeckung` nicht auf `ok`.
+
+Sieben Fallstricke im MCP-Prüfer (`soll_verbrauch_untergrenze`, `soll_verbrauch_tag_untergrenze`,
+`soll_verbrauch_tag_zeitraum`, `soll_ist_kein_schwund`, `soll_ist_vergleichbar`, `soll_rezeptstand_heute`,
+`rezept_stueckliste_belastbar`); `pos_artikel_kein_wareneinsatz` verweist jetzt auf den Soll-Verbrauch. Fallenfragen in
+`mcp/test/fallen_soll_verbrauch.test.ts`.
+
+### Gemessen — und was nicht
+
+**Echte Daten:** Klon von `lina_mgmt` (Stand `0129`, Artikelumsatz bis 12.08.2026) mit `0130`–`0159`, darin der echte
+Enchilada-Einzelabzug (2.111 Rezepte, 7.452 Zutatenzeilen, 14./15.09.2026) und die 1.046 Kassenartikel der Kölner
+Küchenkasse (`connectionId` 1095, 164 mit Rezept) **über den echten Lader** (`fnLaden`). Ergebnis für COYACAN GmbH
+(Enchilada Köln), Oktober 2025 bis Juli 2026: **Abdeckung 2,8–3,5 % des Artikelumsatzes**, mit Rezept 8,1–10,0 %; die
+Bar hat keine Anbindung (44–49 % des Umsatzes stehen in keinem Feed). 154 Artikel mit Rezept: 123 vollständig umrechenbar,
+27 teilweise, 4 ohne Zutaten (Kölsch). Gegenprobe der Mengen: Soll-Menge × bezahlter Preis gegen FoodNotifys eigene
+Kalkulation, 238 von 304 Zeilen auf 2 %, 302 auf 10 %. **Wilma Wunder ist an echten Rezepten nicht geprüft** (lokal
+keine), ebenso keine Brücke mit zwei Anbindungen.
+
+**Synthetisch:** `src/foodnotify/soll_verbrauch_db.test.ts` (8 Tests, von Hand nachgerechnet: zwei Ebenen, g/cl/kg,
+Portion, `baseQuantity`, „Stück", Zyklus, unbekanntes Unterrezept, Rezept ohne Zutaten, Bar/Küche verschieden, Storno,
+`baseUnit`, fremde Einheit, Preis der Marke).
+
+**Laufzeiten in Produktionsgröße** (Klon, Enchilada-Rezepte sechsmal unter Wilma Wunder kopiert = 14.777 Rezepte,
+115.332 Stücklistenzeilen, 19.461 Kassenartikel an 31 Anbindungen / 19 Betrieben, frische Statistik): Refresh der
+Stückliste 1,5 s; Abdeckung ein Betrieb 13 Monate 0,01 s, ein Monat alle Betriebe 0,06 s, alles 0,15 s; Soll je Monat,
+ein Monat alle Betriebe (Top 10) 0,12 s, alles 0,46 s; Tag, ein Betrieb ein Monat 0,10 s, ein Tag alle Betriebe 0,05 s;
+Soll gegen Ist, ein Betrieb ein Monat 0,05 s, ein Monat alle Betriebe 1,6 s, alles 12 s (der Preis der Marke wird je
+Zeile über den Index gesucht). Karten auf `db_rezept`: alle unter 0,25 s außer `sv_soll_ist` (3,9 s ohne Betriebsfilter).
+Zwei Planfallen sind dabei behoben: `row_number() = 1` in der Zuordnung schätzte der Planer auf eine Handvoll Zeilen
+(Nested Loops, 2,7 s für einen Monat Abdeckung → `DISTINCT ON`, 0,06 s), und ein zweimal gelesener CTE in der
+Tagessicht gab den Tagesfilter nicht nach innen (7,2 s → `NOT MATERIALIZED`, 0,1 s).

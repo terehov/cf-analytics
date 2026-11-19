@@ -56,6 +56,12 @@ const SICHTEN = [
   // Liest die Positionen wie die beiden Preissichten oben, keine andere Sicht.
   // 2,5 s am Klon (634.175 Positionen).
   'mart.einkaufspreis_artikel_monat_basis',
+  // Migration 0159: das aufgeloeste Rezept (Stueckliste) fuer den Soll-Verbrauch.
+  // Liest nur core.rezept/core.zutat, keine andere Sicht. Hier und nicht im
+  // Round-Table-Nachlauf, weil Rezepte FoodNotify-Ware sind; was Phase C an
+  // Rezepten nachlaedt, steht ab dem naechsten Lauf darin. Am Klon mit
+  // 14.777 Rezepten 1,5 s.
+  'mart.rezept_stueckliste_basis',
 ]
 
 /** Notnagel gegen stille Blockaden, keine erwartete Laufzeit. */

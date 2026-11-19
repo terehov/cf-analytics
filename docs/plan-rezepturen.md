@@ -104,6 +104,12 @@ Vorschlag (siehe Frage B/C):
 **Mengen werden über Ebenen nicht multipliziert.** Für eine Effektivmenge („wie viel Gramm Mehl in
 einer Pizza") bräuchte es Einheitenumrechnung und die Ausbeute des Halbfabrikats. Beides liefert
 FoodNotify nicht verlässlich („Portionierer Silber (60g)", `loss` ohne geklärte Bedeutung).
+
+> **Nachtrag 19.11.2026 (`0159`):** ~~Beides liefert FoodNotify nicht verlässlich~~ — für metrische Einheiten doch.
+> `meta.weight.total` ist die Summe der metrischen Zutatenmengen mit Dichte 1, und „Menge in g ÷ `weight.total`"
+> reproduziert FoodNotifys eigene Kosten (g 82 %, cl 87 %, kg/ml/l 100 %, „Portion" 98,5 %). `mart.artikel_in_rezept`
+> bleibt, wie sie ist (Mengen je Ebene); die multiplizierte Menge je Portion steht in `mart.rezept_stueckliste`, nicht
+> umrechenbare Wege („Portionierer", „Stück" eines Halbfabrikats) mit `belastbar = false`. `entscheidungen.md`, 19.11.2026.
 Fallstrick im MCP-Katalog: keine Summe über `menge` ohne Filter auf `ebene`, keine Summe über
 Einheiten hinweg.
 

@@ -2805,3 +2805,9 @@ die Fixture `src/foodnotify/fixtures/warenstamm.json` hat die gemessene Form mit
 **Einkaufs-Nachlauf.** `src/sync/einkauf_sichten.ts` frischt seit `0157` auch
 `mart.einkaufspreis_artikel_monat_basis` auf (2,5 s am Klon), hinter den übrigen Einkaufssichten und damit
 nach `core.gebinde_vereinheitlichen()`.
+
+**Einkaufs-Nachlauf, Nachtrag `0159`.** `src/sync/einkauf_sichten.ts` frischt als letzte Sicht
+`mart.rezept_stueckliste_basis` auf (das aufgelöste Rezept für den Soll-Verbrauch; liest nur `core.rezept`/`core.zutat`,
+1,5 s am Klon mit 14.777 Rezepten). Hier und nicht im Round-Table-Nachlauf, weil Rezepte FoodNotify-Ware sind. Was Phase C
+an Rezepten nachlädt, steht ab dem nächsten Lauf in der Stückliste — kein Refresh nach Phase C. Kein neuer Abruf, kein
+neuer Schalter.

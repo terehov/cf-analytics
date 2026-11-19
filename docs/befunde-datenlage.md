@@ -2410,3 +2410,24 @@ Monate, nie LINA). Die Historie lädt sie ab der zweiten Nacht, neueste zuerst, 
 
 Abfrage: `SELECT zustand, count(*), count(DISTINCT betrieb_key) FROM mart.kassenblatt_stand GROUP BY 1`
 und je Betrieb `percentile_cont(0.5) WITHIN GROUP (ORDER BY umsatz_lina / jahresuebersicht)`.
+
+## Soll-Verbrauch am Kölner Beispiel: 3 % Abdeckung, und FoodNotifys Gewichte rechnen mit Dichte 1 (19.11.2026)
+
+Gemessen am Klon (`lina_mgmt` → `0159`) mit dem echten Enchilada-Einzelabzug und den Kölner Kassenartikeln über den
+echten Lader.
+
+* **Abdeckung 2,8–3,5 %** des Artikelumsatzes von COYACAN GmbH (Okt. 2025–Juli 2026), mit Rezept 8,1–10,0 %. Die Bar hat
+  keine Kassenanbindung — 44–49 % des Umsatzes (Juli 2026: 82.829 von 185.464 EUR) stehen in keinem Feed. Wer daraus eine
+  Aussage über den Verbrauch des Betriebs macht, rechnet mit 3 % des Verkaufs.
+  `SELECT monat, abdeckung_umsatz_pct, rezept_umsatz_pct, umsatz_nicht_im_feed, umsatz_netto FROM mart.soll_verbrauch_abdeckung WHERE betrieb_key = 32`
+* **`meta.weight.total` ist die Summe der metrischen Zutatenmengen mit Dichte 1** (1 cl = 10 g): 1.064 von 1.069 rein
+  metrischen Rezepten, 585 von 590 mit Volumenzutaten. Rezepte mit freien Einheiten liegen in 800 von 823 Fällen
+  darüber — FoodNotify rechnet „Stück" und „Portionierer" mit Gewichten, die die Schnittstelle nicht liefert.
+* **Die Kostenregel aus `belege/coyacan/README.md`** („Kosten nicht aus Unterrezepten nachrechenbar, Median 1,45")
+  stimmt nur über alle Einheiten zusammen. Je Einheit: g 82 %, cl 87 %, ml/kg/l 100 %, „Portion" 98,5 % auf 2 % genau;
+  „Portionierer" nie (Verhältnis 0,01–0,4), „Stück" 114 von 265.
+* **Rezeptpflege mit Ausreißern:** „23 Maiskolben Beilage" = 1 kg Maiskolben je Portion. Eine Plausibilitätsprüfung
+  (Gewicht je Portion eines Kassenrezepts) gibt es nicht.
+* **„eingekauft ÷ Soll"** in Köln, vergleichbare Zeilen: Quartile 333 / 738 / 3.630 %. Erwartbar bei 3 % Abdeckung — kein
+  Befund über die Küche. Die eine Ware, die fast nur über ein abgedecktes Rezept läuft (Lioko Mexikaner), liegt über zehn
+  Monate bei 112 %.

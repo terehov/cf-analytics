@@ -34,6 +34,11 @@ const F_BETRIEB: Parameter = {
 // von Hand gesetzt -- eine Auswahlliste mit 355 Schluesselzahlen waere
 // niemandem eine Hilfe. Wer die Seite ohne Wert oeffnet, sieht die
 // letzten Zaehlungen.
+// Das einzelne FoodNotify-Rezept fuer die Stueckliste auf db_rezept (0159).
+// Ohne Werteliste: geklickt, nicht getippt — Rezeptnamen sind nicht eindeutig.
+const F_REZEPT: Parameter = {
+  id: 'd-rezept', name: 'rezept', 'display-name': 'Rezept-Nr.', type: 'string/=',
+}
 const F_INVENTUR: Parameter = {
   id: 'd-inventur', name: 'inventur', 'display-name': 'Zählung', type: 'string/=',
 }
@@ -1666,9 +1671,12 @@ export const dashboards: Dashboard[] = [
     schluessel: 'db_rezept',
     name: 'Rezepturen — welche Kassenartikel ein Rezept tragen',
     beschreibung:
-      'Welcher Teil des Kassenumsatzes auf Artikel fällt, denen in FoodNotify ein Rezept zugeordnet ist — je Betrieb, mit der Arbeitsliste der umsatzstärksten Artikel ohne Rezept und den Zuordnungen, die FoodNotify selbst für fraglich hält. Eine Reichweite für eine künftige Rezeptkalkulation, kein Wareneinsatz.',
+      'Welcher Teil des Kassenumsatzes auf Artikel fällt, denen in FoodNotify ein Rezept zugeordnet ist — je Betrieb, mit der Arbeitsliste der umsatzstärksten Artikel ohne Rezept und den Zuordnungen, die FoodNotify selbst für fraglich hält. Dazu der Soll-Verbrauch je Monat: wie viel einer Ware laut Rezept verbraucht wurde, wie viel des Verkaufs das abdeckt, und daneben der Einkauf — kein Schwund-Urteil.',
     sammlung: 'Betrieb',
-    filter: [F_MARKE, F_BETRIEB],
+    // Rezept-Nr. gehoert nur zur Stueckliste (0159, FILTER_NUR_FUER in
+    // uebernehmen.ts). Kein Monat: die ganze Seite rechnet fest ueber die
+    // letzten drei vollen Monate (karten-rezept.ts, Regeln 3 und 6).
+    filter: [F_MARKE, F_BETRIEB, F_REZEPT],
     reihen: [
       { teile: [{ text: '# Rezepturen hinter der Kasse\n\n**Die Leitzahl ist eine Reichweite, kein Wareneinsatz.** Sie sagt, welcher Teil des Artikelumsatzes auf Kassenartikel fällt, denen in FoodNotify ein Rezept zugeordnet ist — also wie weit eine Kalkulation aus Rezepten reichen könnte. Ob das Rezept stimmt und was die Ware gekostet hat, sagt sie nicht.\n\n**Je Betrieb, nicht je Kasse.** Ein Betrieb hat oft zwei Anbindungen (Bar und Küche), und dieselben Artikel stehen in beiden. Ein Artikel zählt als „mit Rezept", wenn er in einer davon eins trägt.\n\n**Zeitraum sind die letzten drei vollen Monate**, fest — der laufende Monat würde die Wochentage ungleich gewichten. **Noch nicht jede Marke wird geholt**; Betriebe solcher Marken stehen mit „Marke noch nicht geholt" in der Tabelle und haben keine Zahl, nicht null Prozent.' }] },
       { teile: [
@@ -1687,6 +1695,28 @@ export const dashboards: Dashboard[] = [
       { teile: [{ karte: 'rz_ohne_rezept', hoehe: 13,
         klick: [{ ziel: 'dd_artikel', spalte: 'Artikel', uebergabe: { artikel: 'Artikel' } }] }] },
       { teile: [{ karte: 'rz_name_weicht_ab', hoehe: 10 }] },
+      // -----------------------------------------------------------------
+      // Soll-Verbrauch (0159). Ein ABSCHNITT und kein Reiter: der Klick auf
+      // die Rezept-Nr. setzt einen Filter dieser Seite, und ein Drill-down
+      // landet immer auf dem ersten Reiter (typen.ts) — die Stueckliste
+      // laege dann auf dem anderen. Abdeckung zuerst (Regel 4 in
+      // karten-rezept.ts), dann die Mengen, dann Einkauf, dann der Drill-down.
+      // -----------------------------------------------------------------
+      { teile: [{ text: '## Soll-Verbrauch — was laut Rezept verbraucht wurde\n\nVerkaufte Portionen aus der Kasse mal Menge laut Rezept, über alle Halbfabrikate bis zur eingekauften Ware. Wie oben über **die letzten drei vollen Monate**.\n\n**Eine Untergrenze, nie der ganze Verbrauch.** Es zählen nur Artikel mit zugeordnetem Rezept, dessen Mengen sich in Gramm oder Liter umrechnen lassen — wie viel das ist, steht in der ersten Kachel und je Betrieb darunter. Einheiten wie „Portionierer" werden nicht geschätzt.\n\n**Kein Schwund.** Die Tabelle „Soll laut Rezept und Einkauf" stellt nebeneinander, sie urteilt nicht: das Lager fehlt, und das Soll deckt nur einen Teil des Verkaufs ab. **Rezept und Zuordnung sind der heutige Stand** in FoodNotify, auch für frühere Monate.' }] },
+      { teile: [
+        { karte: 'sv_abdeckung' },
+        { karte: 'sv_betriebe' },
+      ] },
+      { teile: [{ karte: 'sv_abdeckung_balken', hoehe: 9,
+        klick: [{ ziel: 'db_rezept', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      { teile: [{ karte: 'sv_abdeckung_tabelle', hoehe: 10,
+        klick: [{ ziel: 'db_rezept', spalte: 'Betrieb', uebergabe: { betrieb: 'Betrieb' } }] }] },
+      { teile: [{ karte: 'sv_waren', hoehe: 12 }] },
+      { teile: [{ karte: 'sv_soll_ist', hoehe: 12 }] },
+      { teile: [{ text: '### Woraus besteht ein Rezept?\n\nKlick auf eine **Rezept-Nr.** in der ersten Tabelle zeigt darunter das Rezept bis zur eingekauften Ware — mit der Menge für eine verkaufte Portion und dem Grund, wenn eine Zeile keine Menge hat.' }] },
+      { teile: [{ karte: 'sv_artikel', hoehe: 11,
+        klick: [{ ziel: 'db_rezept', spalte: 'Rezept-Nr.', uebergabe: { rezept: 'Rezept-Nr.' } }] }] },
+      { teile: [{ karte: 'sv_stueckliste', hoehe: 10 }] },
     ],
   },
 

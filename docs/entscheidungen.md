@@ -5313,3 +5313,64 @@ wo eine Preisänderung Geld kostet. Prozent bleibt als Spalte und per Klick sort
 
 **4. Korrekturen am Katalog in `0158`, nicht in `0155`–`0157`**, obwohl diese nirgends angewendet sind: committet ist
 committet, und lokale Klone anderer liefen sonst auseinander.
+
+## 19.11.2026 — Soll-Verbrauch selbst gerechnet: Umrechnung über Halbfabrikate, Bar/Küche, kein Schwund-Urteil (`0159`)
+
+**Anlass.** Entscheidung Eugene: den Soll-Verbrauch aus LINA-Artikelverkauf × Kassenzuordnung (`core.pos_artikel`) ×
+Rezept selbst rechnen, statt FoodNotifys Verkäufe zu importieren (Begründung im Eintrag „Der Warenkorb-GET wird
+gesperrt; Verkäufe werden vorerst nicht importiert" darüber und im Messprotokoll
+`payloads/foodnotify-2026-11/fn-probe-2026-11-19-warenkorb-verkaeufe.md`).
+
+**1. Mengen werden über die Rezeptebenen multipliziert — ~~„Mengen werden über Ebenen nicht multipliziert"~~
+(`plan-rezepturen.md` §4) gilt für `mart.artikel_in_rezept` weiter, nicht mehr für den Soll-Verbrauch.** §4 hielt die
+Ausbeute des Halbfabrikats für unbekannt. Nachgemessen am 19.11.2026 am Enchilada-Einzelabzug (2.111 Rezepte,
+`belege/coyacan/rezepte`): `meta.weight.total` ist die Summe der metrischen Zutatenmengen mit **Dichte 1** (1.064 von
+1.069 rein metrischen Rezepten, 585 von 590 mit Volumen), und der Anteil „Menge der Unterrezept-Zeile in g ÷
+`weight.total`" reproduziert FoodNotifys **eigene** Kosten dieser Zeile auf 2 % genau bei g 884 von 1.077 (82 %), cl
+87 %, ml/kg/l 100 %, „Portion" (× `perPerson`) 134 von 136. Damit rechnen wir mit FoodNotifys eigener Konvention, nicht
+mit einer eigenen Annahme. Die Kassenrezepte selbst sind eine Portion (124 von 124 mit `total = perPerson`); die
+Wurzel bekommt trotzdem `perPerson ÷ total`, damit ein Rezept für mehrere Portionen richtig zählt.
+
+**2. Nicht umrechenbar heißt: keine Menge, nicht geschätzt.** „Stück" eines Halbfabrikats trifft als Portion nur 114
+von 265 Zeilen, „Portionierer …" (rund 280 Zeilen) nie — auch nicht mit dem Gewicht aus dem Namen („Portionierer Silber
+(60g)": 0 von 63). Solche Zeilen und alles darunter stehen mit `belastbar = false` und `grund` in der Stückliste; das
+Soll ist dann eine Untergrenze, und das sagen `soll_unvollstaendig`, `portionen_nicht_umrechenbar` und die Abdeckung.
+**Verworfen:** den Anteil aus den Kosten zu lesen (`cost` der Zeile ÷ Summe der Kosten des Halbfabrikats). Das
+reproduzierte FoodNotifys Umrechnung auch für „Portionierer", aber nur, wo die Kosten aktuell sind — bei g-Zeilen
+weichen 18 % ab; eine Menge, die an einem veralteten Preis hängt, ist eine geratene Menge
+(`offene-punkte.md`). `meta.weight.loss` geht nicht ein (Bedeutung offen, die Kostengegenprobe trifft ohne ihn).
+
+**3. Bar und Küche: je Betrieb und LINA-Artikel ein Rezept, die zuletzt gepflegte Zuordnung gewinnt.** Die Artikellisten
+der beiden Anbindungen überlappen (`0155`). Ein Artikel gilt als „mit Rezept", wenn er in **irgendeiner** Anbindung eins
+trägt (wie `mart.pos_artikel_abdeckung_betrieb`). Zeigen beide auf verschiedene Rezepte: zuerst die Zeile der letzten
+Antwort (`fehlt_seit IS NULL`), dann die, die die Kasse noch meldet (`abwesend_seit IS NULL`), dann die zuletzt
+geänderte (`geaendert_am`), dann die kleinere `kostenstelle_key`. Sichtbar als `rezept_uneindeutig` mit allen
+Kandidaten. **Verworfen:** beide Rezepte halb zählen (erfindet ein Mischrezept), den Artikel ausschließen (versteckt
+die Pflegefrage hinter einer kleineren Abdeckung), „Küche vor Bar" (die Bar Ballplatz führt Speisenrezepte, `0155`).
+
+**4. Nur die letzten 13 vollen Monate.** Kassenzuordnung und Rezept sind ein heutiger Stand ohne Historie; je weiter
+zurück, desto wahrscheinlicher stand eine andere Karte. 13 Monate erlauben den Vergleich mit dem Vorjahresmonat und
+begrenzen die Rechnung.
+
+**5. Kein Schwund-Urteil.** `mart.soll_ist_monat` stellt Soll und Einkauf nebeneinander, ohne Differenzspalte:
+Einkauf ist nicht Verbrauch (die Lagerveränderung fehlt, Inventuren gibt es fast nur bei Wilma Wunder), und das Soll
+deckt nur den abgedeckten Verkauf ab — am Kölner Beispiel liegt „eingekauft ÷ Soll" im Median bei 738 %, bei 3 %
+Abdeckung. Ein Schwund-Urteil bräuchte Anfangs- und Endbestand und eine Abdeckung nahe 100 %. Mengen werden nur in kg
+und l verglichen, aus Bestellpositionen mit belastbarer Gesamtmenge (`menge_unstimmig`, `0040`/`0061`); `baseUnit`
+trägt keine brauchbare Gesamtmenge.
+
+**6. Zwei Euro-Werte, beide ausdrücklich benannt, kein `fixer_we` (Regel 5).** `soll_wert_fn_eur` = Menge je Portion ×
+FoodNotifys `cost` (Rezeptkalkulation, Preisstand des Rezeptabrufs); `soll_wert_eur` = Soll-Menge × bezahlter Preis je
+kg/l aus `core.bestellposition.preis_je_einheit` (die geprüfte Größe aus `0042`, mengengewichtet; eigene Bestellungen im
+Monat, sonst die der Marke über zwölf Monate). Am Kölner Beispiel stimmen beide in 238 von 304 Zeilen auf 2 % und in
+302 auf 10 % überein — die Gegenprobe der Mengen. Keine Sicht teilt einen Soll-Wert durch den Gesamtumsatz.
+
+**7. Die Stückliste ist materialisiert, alles darüber nicht.** Die Rekursion über alle Rezepte (Produktion ~17.700)
+kann eine Sicht nicht filtern; materialisiert dauert der Aufbau am Klon in Produktionsgröße 1,5 s (Einkaufs-Nachlauf,
+Phase B). Die Sichten darüber laufen mit Filter in 0,01–0,3 s (`metabase.md`).
+
+**8. Auf `db_rezept` derselbe feste Zeitraum wie oben (drei volle Monate), kein Monatsfilter.** Ein Seitenfilter muss
+in `uebernehmen.ts` auf alle Karten wirken; die `rz_*`-Karten rechnen fest. Sieben Ausnahmen hätten die Prüfung
+ausgehöhlt, und für Soll gegen Einkauf sind drei Monate ohnehin richtiger als einer (das Lager verschiebt beides
+gegeneinander). Einzelne Monate und Tage beantwortet der MCP-Zugang. Ein Abschnitt statt eines Reiters: der Klick auf
+die Rezept-Nr. setzt einen Filter der Seite, und ein Drill-down landet immer auf dem ersten Reiter.

@@ -1965,3 +1965,27 @@ geholt", und die Tabellen zeigen, welche.
 **Vor dem ersten `uebernehmen.ts`:** Metabase die neuen Sichten synchronisieren lassen, `sichtbarkeit.ts` (die vier
 neuen `core`-Tabellen verstecken) und `beziehungen.ts --setzen` (neue Sichten mit `betrieb_key`). Alles durch
 Eugene, nach dem Deploy (`offene-punkte.md`).
+
+## Soll-Verbrauch auf „Rezepturen" (`db_rezept`, `0159`, 19.11.2026)
+
+Ein **Abschnitt** am Ende von `db_rezept`, kein Reiter und keine eigene Seite: die Seite fragt schon „wie weit reicht
+eine Rezeptkalkulation", der Soll-Verbrauch ist die Kalkulation selbst. Kein Reiter, weil der Klick auf die Rezept-Nr.
+einen Filter der Seite setzt und ein Drill-down auf dem ersten Reiter landet — die Stückliste läge dann woanders.
+**Zeitraum wie oben fest die letzten drei vollen Monate**, kein Monatsfilter (Begründung `entscheidungen.md`,
+19.11.2026, Punkt 8). Neuer Seitenfilter „Rezept-Nr." (`F_REZEPT`), der nur die Stückliste betrifft
+(`FILTER_NUR_FUER` in `uebernehmen.ts`).
+
+| Karte | Darstellung | Warum so |
+|---|---|---|
+| `sv_abdeckung` | Kachel | Die Zahl, ohne die keine andere gelesen werden darf — deshalb oben. Aus den Euro-Summen, nie gemittelt |
+| `sv_betriebe` | Kachel | „x von y": wie viele Betriebe überhaupt eine Zahl haben |
+| `sv_abdeckung_balken` | gestapelter Balken (row), Anteile je Betrieb = 100 % | Die Frage ist die Zusammensetzung („woran scheitert der Rest"), nicht die Größe. Anteile in der Abfrage gerechnet, damit Tooltip und Tabelle dieselben Zahlen zeigen; Betriebsnamen lang → row; höchstens 20, die niedrigste Abdeckung oben |
+| `sv_abdeckung_tabelle` | Tabelle | Alle Betriebe mit Kasse, auch nicht ausgewertete mit „Stand" in Worten — eine leere Zeile liest sich sonst als 0 % |
+| `sv_waren` | Tabelle | **Kein Balken:** die Mengen stehen in kg, l und Rezepteinheiten; eine gemeinsame Achse gäbe es nur für den Wert, und der ist FoodNotifys Kalkulation. Sortiert nach Wert, weil kg Salz und kg Fleisch nicht gleich wichtig sind |
+| `sv_soll_ist` | Tabelle | Nebeneinander, **kein Urteil**: keine Differenzspalte, keine Farbe. „Vergleich" sagt in Worten, warum eine Zeile keinen Prozentwert hat; die Abdeckung des Betriebs steht in jeder Zeile |
+| `sv_artikel` | Tabelle, Klick auf Rezept-Nr. | Die Quelle des Drill-downs; ohne „kein Rezept" (die stehen in der Arbeitsliste oben) |
+| `sv_stueckliste` | Tabelle | Das bisher fehlende Zutaten-Drill-down: Weg über die Halbfabrikate, Menge je Portion, Grund, wenn keine Menge. Ohne gewähltes Rezept bewusst leer statt 100.000 Zeilen |
+
+Gemessen am Klon in Produktionsgröße: alle Karten unter 0,25 s, `sv_soll_ist` ohne Betriebsfilter 3,9 s (`metabase.md`).
+**Nicht übernommen** — `uebernehmen.ts`, `sichtbarkeit.ts`, `auswahllisten.ts` laufen erst nach dem Deploy durch
+Eugene. Die Filterprüfung aus `uebernehmen.ts` ist am Quelltext nachgebaut und ohne Befund.

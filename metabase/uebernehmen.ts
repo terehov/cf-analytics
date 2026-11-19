@@ -864,6 +864,9 @@ const FILTER_NUR_FUER: Record<string, Record<string, string>> = {
   // Nur belastbare Lieferkonditionen oder alle (0156) — eine Eigenschaft der
   // einen Tabelle, nicht der Seite.
   db_einkauf: { datenbasis: 'wa_lieferkondition' },
+  // Die Rezept-Nr. waehlt das Rezept der Stueckliste (0159) — sie wird aus
+  // sv_artikel geklickt und betrifft keine andere Karte der Seite.
+  db_rezept: { rezept: 'sv_stueckliste' },
 }
 
 const filterFehler: string[] = []

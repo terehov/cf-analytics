@@ -1988,3 +1988,33 @@ Kostenstellen mit Betrieb.
 **Teil B, ohne neue Tabelle:** `mart.einkaufspreis_artikel_monat_basis` (materialisiert) und
 `mart.einkaufspreis_artikel_monat` — bezahlte Gebindepreise je Marke, Lieferant, `lieferanten_nr` und Monat.
 Beschreibung in `metabase.md`.
+
+## Soll-Verbrauch aus Kasse × Rezept (`0159`, 19.11.2026)
+
+Keine neue Tabelle — eine Funktion, eine materialisierte Sicht und sieben Sichten. Begründung der Regeln in
+`entscheidungen.md` (19.11.2026), Rechenweg in `datenherkunft.md`.
+
+| Objekt | Körnung | Bemerkung |
+|---|---|---|
+| `core.einheit_metrisch(text)` | Funktion | Einheit → (`kg`/`l`, Faktor). Nur g/gr/gramm/kg/mg und ml/cl/dl/l/ltr/liter; alles andere NULL |
+| `mart.rezept_stueckliste_basis` | Rezept (Wurzel) × Weg | **materialisiert**, eindeutiger Index `(rezept_key, weg)` — `weg` = Positionen der Unterrezept-Zeilen und der Ware, eindeutig auch, wenn dasselbe Halbfabrikat zweimal im Rezept steht. Refresh im Einkaufs-Nachlauf, Zeile in `mart.materialisierung_stand` |
+| `mart.rezept_stueckliste` | dieselbe | mit Namen, `portion_regel`, `rezept_belastbar` |
+| `mart.soll_rezept_zuordnung` | Betrieb × LINA-Artikel | das **eine** Rezept je Betrieb (Regel Bar/Küche), `rezept_zustand`, `rezept_kosten_je_portion` |
+| `mart.soll_artikel_monat` | Betrieb × Monat × LINA-Artikel | aus `mart.artikel_monat_basis`, nur Betriebe mit amadeus-Anbindung, letzte 13 volle Monate; `soll_zustand` |
+| `mart.soll_verbrauch_abdeckung` | Betrieb × Monat | Umsatz und Menge je `soll_zustand`, Abdeckung in Prozent, `zustand` der Brücke |
+| `mart.soll_verbrauch_monat` | Betrieb × Monat × Ware × Einheit | Ware = Lieferanten-Artikelnummer (Freitext ohne Nummer je Name); Abdeckung in jeder Zeile |
+| `mart.soll_verbrauch_tag` | Betrieb × Geschäftstag × Ware × Einheit | aus `core.artikelverkauf_tag`, nicht materialisiert |
+| `mart.soll_ist_monat` | Betrieb × Monat × Ware | Soll neben Einkauf (kg/l), Preis je kg/l und Quelle |
+
+**Die Stückliste.** Rekursiv wie `mart.artikel_in_rezept` (Zyklusschutz über die Kette der `rezept_key`, Tiefe < 12),
+aber von der Wurzel nach unten und mit einem **Faktor**: Wurzel `perPerson ÷ total` (ohne Gewicht 1), je
+Unterrezept-Zeile × Anteil (metrisch: Menge in g ÷ `gewicht_gesamt` des Halbfabrikats; „Portion": × `perPerson ÷ total`;
+sonst `basis_menge`, wenn metrisch; sonst NULL mit `grund`). `menge_je_portion` = Faktor × Menge der Ware in `kg`/`l`
+(oder in ihrer Rezepteinheit), `kosten_je_portion` = Faktor × `cost`. Lücken stehen als eigene Zeilen (`art = 'luecke'`):
+Rezept ohne Zutaten / Zutaten nicht geladen / Unterrezept unbekannt / Unterrezept ohne Zutaten / Zyklus / Tiefe.
+`rezept_zeilen` und `rezept_zeilen_belastbar` je Wurzel stehen schon in der Materialisierung, damit die Sichten darüber
+den Zustand eines Rezepts über den Index lesen statt über eine Gruppierung.
+
+**Was das Modell nicht hat:** eine Rezepthistorie (FoodNotify führt keine Fassungen; auf frühere Monate wird der heutige
+Stand angewendet), einen Lagerbestand (deshalb kein Schwund) und einen Betriebsbezug am Rezept (der kommt über die
+Kassenzuordnung).

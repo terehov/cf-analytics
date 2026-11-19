@@ -1404,3 +1404,36 @@ Jeder Abzug geht als Beobachtung in `core.umsatzprognose_beobachtung` (eine Zeil
   jünger als sieben Tage.
 * **Nur Betriebe mit TPAPI-Schlüssel und Sales Data API.**
 
+
+## Soll-Verbrauch: Verkauf × Rezept (seit `0159`, 19.11.2026)
+
+**Rechenweg.**
+
+```
+core.artikelverkauf_tag / mart.artikel_monat_basis   verkaufte Menge je Betrieb, Tag/Monat, LINA-Artikel
+   └─ core.artikel.artikelnummer = core.pos_artikel.plu_zahl     NUR kassensystem = 'amadeus'
+        └─ mart.soll_rezept_zuordnung                            EIN Rezept je Betrieb und Artikel (Bar/Küche-Regel)
+             └─ core.rezept (marke_key, fn_id)
+                  └─ mart.rezept_stueckliste                     Menge je Portion, über alle Halbfabrikate
+                       └─ artikelnummer (Lieferanten-Nr.) = core.bestellposition.lieferanten_nr   (Soll gegen Ist)
+```
+
+Soll-Menge = verkaufte Menge × `menge_je_portion`. `menge_je_portion` = Menge der Ware im Halbfabrikat × Anteil jedes
+Halbfabrikats auf dem Weg × Portion des Kassenrezepts. Anteil = Menge der Unterrezept-Zeile in g ÷ `gewicht_gesamt` des
+Halbfabrikats (cl/ml/l mit Dichte 1, so rechnet FoodNotify selbst `weight.total`); bei „Portion" × `perPerson ÷ total`.
+Gemessen am Enchilada-Einzelabzug: das trifft FoodNotifys eigene Zeilenkosten bei g 82 %, cl 87 %, kg/ml/l 100 %,
+„Portion" 98,5 % auf 2 % (`entscheidungen.md`, 19.11.2026).
+
+**Was die Zahl NICHT sagt.**
+
+* **Nicht den ganzen Verbrauch.** Nur Artikel mit zugeordnetem und umrechenbarem Rezept zählen —
+  `mart.soll_verbrauch_abdeckung`. Am Kölner Beispiel 3 % des Artikelumsatzes; Wilma Wunder ist nicht gemessen.
+* **Nicht, was im Monat im Rezept stand.** Zuordnung und Rezept sind der heutige Stand; deshalb nur 13 Monate.
+* **Nicht, was „Portionierer" oder „Stück" eines Halbfabrikats wiegen.** Diese Zeilen haben keine Menge (`grund`).
+* **Keinen Schwund.** Einkauf ist nicht Verbrauch (Lager fehlt), und das Soll ist eine Untergrenze.
+* **Keine Wareneinsatzquote.** `soll_wert_fn_eur` (FoodNotifys Kalkulation) und `soll_wert_eur` (bezahlter Preis je
+  kg/l) gelten nur für den abgedeckten Verkauf; durch den Gesamtumsatz geteilt ergäben sie eine Quote aus dem falschen
+  Nenner. `core.artikel.fixer_we` geht nirgends ein (Regel 5).
+* **Nicht, ob das Rezept stimmt.** Ein Beispiel aus Köln: „23 Maiskolben Beilage" führt 1 **kg** Maiskolben je Portion
+  (vermutlich 1 Stück gemeint) — 98 kg Soll im Juli 2026. Die Rechnung übernimmt, was in FoodNotify steht.
+* **Nur amadeus-Kassen**, und nur Marken in `POS_ARTIKEL_MARKEN` (vorerst Wilma Wunder).

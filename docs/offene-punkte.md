@@ -205,6 +205,37 @@ Betrieb. Geladen ist davon nichts. Bundle-Analyse (`payloads/foodnotify-2026-11/
    (lokal 6 von 48.489 nach dem Rückbau, vorher 139). Und: die Karten „Lieferdatum" / „Geliefert am" im Drill-down
    (`mart.einkauf_beleg.lieferdatum`) zeigen ab dann den richtigen Tag, nicht den davor.
 
+### Soll-Verbrauch: nach dem Deploy zuerst nachmessen (gebaut 19.11.2026, `0159`)
+
+Gebaut und geprüft am Klon mit dem echten Enchilada-Einzelabzug (Köln) und synthetischen Rezepten; **in Produktion
+nicht gelaufen**, Wilma Wunder an echten Rezepten **nicht** geprüft, keine Brücke mit zwei Anbindungen gesehen.
+
+1. **Abdeckung je Betrieb** (erste Nacht nach `0155` + `0159`):
+   `SELECT betrieb, zustand, abdeckung_umsatz_pct, rezept_umsatz_pct, umsatz_nicht_im_feed, artikel_rezept_uneindeutig FROM mart.soll_verbrauch_abdeckung WHERE monat = date_trunc('month', current_date - 30)::date ORDER BY 3`.
+   Erwartung: Wilma Wunder `zustand = 'ok'`; `rezept_umsatz_pct` in der Größenordnung von `mart.pos_artikel_abdeckung_betrieb.umsatz_rezept_pct`
+   (gemessen 35–58 % der Artikel mit Rezept, 19.11.2026). Liegt `abdeckung_umsatz_pct` weit darunter: die Gründe in
+   `mart.rezept_stueckliste` (`grund`) für die umsatzstärksten Rezepte lesen — welche Einheiten bei Wilma Wunder nicht umrechenbar sind.
+2. **Plausibilität an drei Waren** eines Betriebs mit Inventur (Wilma Wunder): Soll-Menge über drei Monate neben
+   Einkauf und Inventurdifferenz (`mart.inventur_schwund`) — Größenordnung, kein Urteil. Kandidaten: eine Ware, die fast nur
+   in einem abgedeckten Rezept steckt (in Köln lag so eine bei 112 %).
+3. **Laufzeiten in Produktionsgröße:** Refresh `mart.rezept_stueckliste_basis` in `mart.materialisierung_stand`
+   (am Klon 1,5 s), die Karte `sv_soll_ist` ohne Filter (am Klon 3,9 s — der Preis der Marke wird je Zeile gesucht;
+   wird sie zu langsam: den Preis je Marke, Nummer, Einheit und Monat vorab gruppieren) und
+   `SELECT count(*) FROM mart.soll_verbrauch_tag WHERE geschaeftstag = current_date - 1` (am Klon 0,05 s).
+4. **Bar/Küche verschieden:** `SELECT count(*) FILTER (WHERE rezept_uneindeutig), count(*) FROM mart.soll_rezept_zuordnung`.
+   Sind es viele, die Regel (zuletzt gepflegte Zuordnung gewinnt) mit dem Fachbereich prüfen.
+5. **Nicht umrechenbare Einheiten** („Portionierer", „Stück" eines Halbfabrikats): FoodNotify kennt ihr Gewicht, die
+   Schnittstelle liefert es nicht. Zwei Wege, beide nicht gebaut: (a) `baseQuantity` füllt sich bei Wilma Wunder auch an
+   Unterrezept-Zeilen — dann rechnet die Stückliste es schon (`ueber_basismenge`); (b) den Anteil aus den Kosten lesen
+   (`cost` der Zeile ÷ Kosten des Halbfabrikats) — trifft bei g-Zeilen nur in 82 %, weil Kosten veralten; nur als
+   gekennzeichnete Schätzung denkbar, Entscheidung Eugene.
+6. **Plausibilitätsprüfung der Rezepte:** „23 Maiskolben Beilage" führt 1 kg je Portion (Köln). Eine Prüfsicht
+   „Kassenrezept mit mehr als x kg je Portion" wäre billig; die Schwelle ist eine fachliche Festlegung.
+7. **MCP-Katalogabzug aus Produktion** nach dem Deploy (`cd mcp && bun run katalog:abzug`): die 0159-Einträge in
+   `mcp/test/katalog.json` stammen aus dem Klon und sind von Hand eingefügt (nur Neues übernommen).
+8. **Vor `uebernehmen.ts`:** Metabase die acht neuen Sichten synchronisieren lassen, `beziehungen.ts --setzen`
+   (neue Sichten mit `betrieb_key`). Durch Eugene.
+
 ## Strategisch
 
 **Amadeus 360 ist das führende System, nicht LINA.** Die Oberfläche sagt es selbst („Die Daten sind nur eingeschränkt änderbar, weil Amadeus 360 nicht führendes System ist"), dazu passen `a360isMaster`, `isSynced` und `syncGroups` im Code. Ein Teil dessen, was wir aus LINA ziehen, ist dort selbst nur eine Kopie. Falls die Datenqualitätsprobleme — Stichwort „Doppelte Artikelnummern, unbedingt korrigieren" aus dem `errors`-Feld — aus dieser Synchronisation stammen, wäre das Vorsystem der bessere Anknüpfungspunkt.
@@ -3060,6 +3091,7 @@ auf *Einkauf*, *Artikel — Verlauf und Betriebe* und der Importseite (`dashboar
    Fachbereich sagt, in welcher Form" — gebaut ist eine Tabelle je Betrieb, Bereich und Lieferant auf *Einkauf*,
    Vorgabe nur belastbare Zeilen. Ebenso, ob „Was ist teurer geworden? — je Artikelnummer" nach Wirkung in Euro (so
    gebaut) oder nach Prozent sortiert sein soll.
-5. **Nicht gebaut:** die Zutaten des Rezepts im Drill-Down (`ar_rezept` nennt Rezept und Nummer;
-   `mart.rezept_position`/`mart.artikel_in_rezept` lägen bereit) und ein Kostenstellenvergleich des Listenpreises
-   (ungemessen, siehe Punkt 7 im Abschnitt zu `0157`).
+5. **Nicht gebaut:** ~~die Zutaten des Rezepts im Drill-Down (`ar_rezept` nennt Rezept und Nummer;
+   `mart.rezept_position`/`mart.artikel_in_rezept` lägen bereit)~~ — seit `0159` auf `db_rezept` (`sv_artikel` →
+   `sv_stueckliste`, Klick auf die Rezept-Nr., 19.11.2026); `ar_rezept` auf `dd_artikel` verweist noch nicht dorthin —
+   und ein Kostenstellenvergleich des Listenpreises (ungemessen, siehe Punkt 7 im Abschnitt zu `0157`).

@@ -187,6 +187,16 @@ export const P_ARTIKEL: Parameter = {
   required: false,
 }
 
+/**
+ * Das einzelne FoodNotify-Rezept (Rezept-Nr. = rezept_fn_id), fuer den
+ * Drill-Down in die Stueckliste auf db_rezept (0159). Ohne Werteliste: er
+ * wird geklickt — Rezeptnamen sind nicht eindeutig, die Nummer schon.
+ */
+export const P_REZEPT: Parameter = {
+  id: 'rezept-param', name: 'rezept', 'display-name': 'Rezept-Nr.', type: 'text',
+  required: false,
+}
+
 /** Die einzelne Aktion, fuer den Aktions-Drill-Down. */
 export const P_AKTION: Parameter = {
   id: 'aktion-param', name: 'aktion', 'display-name': 'Aktion', type: 'text',
