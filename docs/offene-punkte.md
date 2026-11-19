@@ -229,6 +229,10 @@ nicht gelaufen**, Wilma Wunder an echten Rezepten **nicht** geprüft, keine Brü
    Unterrezept-Zeilen — dann rechnet die Stückliste es schon (`ueber_basismenge`); (b) den Anteil aus den Kosten lesen
    (`cost` der Zeile ÷ Kosten des Halbfabrikats) — trifft bei g-Zeilen nur in 82 %, weil Kosten veralten; nur als
    gekennzeichnete Schätzung denkbar, Entscheidung Eugene.
+   **Entschieden 19.11.2026 (Eugene): zurückgestellt, nicht verworfen** — erst Punkt 1 an Wilma Wunder messen, dann
+   **wieder vorlegen**, mit der Zahl dazu: welcher Umsatzanteil hängt an `grund` „Portionierer" bzw. „Stück"
+   (`mart.rezept_stueckliste` je `grund`, gewichtet mit `mart.soll_artikel_monat`). Wer Punkt 1 abhakt, ohne diese
+   Frage zu stellen, hat sie vergessen.
 6. **Plausibilitätsprüfung der Rezepte:** „23 Maiskolben Beilage" führt 1 kg je Portion (Köln). Eine Prüfsicht
    „Kassenrezept mit mehr als x kg je Portion" wäre billig; die Schwelle ist eine fachliche Festlegung.
 7. **MCP-Katalogabzug aus Produktion** nach dem Deploy (`cd mcp && bun run katalog:abzug`): die 0159-Einträge in
