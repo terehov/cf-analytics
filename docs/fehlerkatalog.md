@@ -5766,3 +5766,44 @@ stehen in `mart.lieferkondition_beobachtet.lieferung_vor_bestellung`.
 
 **Allgemeine Lehre.** Ein Zeitstempel, der an der Grenze zu einem Kalendertag liegt, wird mit dem Tag der **Zone** gelesen,
 in der das Geschäft arbeitet, nie mit dem UTC-Tag — dieselbe Klasse wie die Nachtstunden von `0138`.
+
+## Die Leseprobe maß ein Testrestaurant, und der Befund „Verkaufsimport steht" ging an den Nutzer (19.11.2026)
+
+**Symptom.** Die nächtliche Leseprobe (`bun run fn-probe --marke wilma_wunder`, 19.11.2026 00:48–01:15) meldete für
+Warenstamm, Verkäufe und Food Waste: **„der Verkaufsimport steht seit 31.08.2026"** (jüngster Verkauf bei beiden
+gemessenen Kostenstellen vom 31.08.), `pricePerUnit`/`packagingUnit(s)` **immer null**, `isOrderable` überall `false`,
+`timeModified` meist aus 2024. Der Befund steht in Commit `72756c5` (`docs/payloads/foodnotify-2026-11/
+fn-probe-2026-11-19.md`, `docs/offene-punkte.md`, 18.11., Punkt 13) und wurde dem Nutzer gemeldet; die Tagesprobe
+(`ad96de6`) und der Bau von `0157` (Formvorlage, Fixture, Sichtkommentare) übernahmen die Füllgrade als allgemeingültig.
+Aufgefallen ist es erst, als beim Bau von `0157` die erpId in `core.kostenstelle` nachgeschlagen wurde:
+11035 = „AAA Testrestaurant Wilma Wunder Bar", 12066 = „… Küche".
+
+**Ursache.** `src/fn_probe.ts` wählte ohne `--erp` die **ersten** Kostenstellen aus `/api/erp/all` (mit amadeus-Anbindung
+zuerst) — und das „AAA" im Namen sortiert die Testbetriebe nach vorn. Die Zusammenfassung nannte nur erpIds, keine Namen;
+niemand konnte der Messdatei ansehen, woran gemessen war. Ein Testrestaurant hat keinen Lieferantenkatalog (deshalb
+`pricePerUnit` null, `isOrderable` false), wird kaum gepflegt (`timeModified` 2024) und verkauft nichts (deshalb „steht seit
+31.08."). Jede einzelne Zahl stimmte; nur die Kostenstelle war die falsche.
+
+**Was nachgemessen ist.** Eine echte Kostenstelle, 7984 (Bar Ballplatz Mainz, 19.11.2026 07:29 UTC, 9 GET, alle 200,
+`fn-probe-2026-11-19-echt.md`): 21.362 Verkäufe, die jüngsten vom 18.11.2026, alle `finish` — **der Verkaufsimport läuft**.
+`pricePerUnit`/`packagingUnit(s)` bei den 110 Waren mit Katalog gefüllt, `timeModified` August bis November 2026.
+`0157` ist daraufhin geändert (Katalogpreis in `core.ware_stand` und im Verlauf, Kommentare, Fixture); die falschen
+Aussagen sind in den Messdateien und `offene-punkte.md` durchgestrichen, nicht gelöscht.
+
+**Was ihn künftig verhindert.** `src/fn_probe.ts`:
+* Die automatische Auswahl überspringt Kostenstellen und Anbindungen mit **„test" im Kostenstellen- oder Restaurantnamen**
+  (`istTestName`, ohne Groß/Klein) und listet sie unter „Automatisch übersprungen". Mit `--erp`/`--anbindung` ausdrücklich
+  gewählt bleibt alles erlaubt.
+* Die Zusammenfassung nennt **immer den Namen** jeder gemessenen Kostenstelle und Anbindung („Gemessen an — …"). Dafür
+  holen auch Läufe mit festen IDs `/api/erp/all` und `/api/pos/locations` (zwei kleine GET).
+* Tests in `src/fn_probe.test.ts`: eine vorn sortierte Testkostenstelle mit amadeus-Anbindung wird übersprungen, die
+  Namen stehen in Zusammenfassung und JSON.
+
+**Was es im Importer heißt.** Die Nachtläufe `fn:warenstamm` und `fn:pos_artikel` ziehen Testkostenstellen weiter mit ab
+(Wilma Wunder: 4 von 35 mit `erp_id`, 2 von 32 Anbindungen) — **nicht still gefiltert**, sondern sichtbar: sie haben keinen
+Betrieb und stehen in `mart.warenstamm_stand` bzw. `mart.pos_artikel_abdeckung` auf `ohne betrieb`. Der
+Kostenstellenvergleich in `mart.listenpreis_aktuell` zählt nur Kostenstellen mit Betrieb.
+
+**Allgemeine Lehre.** Eine Messung, deren Datei nicht sagt, **woran** gemessen wurde, ist keine Messung über die Marke.
+Wer automatisch auswählt, schreibt den Namen des Gewählten dazu — und eine Stichprobe von zwei ist keine Stichprobe, wenn
+beide aus demselben Ende einer sortierten Liste kommen.

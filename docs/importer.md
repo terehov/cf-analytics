@@ -1168,10 +1168,11 @@ behält seinen Grund — die erste Ursache ist die wichtigere.
   Pfade **aller anderen** FoodNotify-Aufrufe baut. Ändert sie sich, laufen sie
   geschlossen ins Leere. Läuft seit dem 14.08.2026 täglich mit den übrigen
   Stammdaten mit (+4 Aufrufe am Tag gegen 140.000 Budget).
-* **Drei `core`-Tabellen haben null Zeilen und keinen Schreiber**:
-  ~~`core.rezept`, `core.pos_artikel`,~~ `core.ware_stand`. Sie stehen im Register
-  als `erwartet: false` mit Begründung — siehe `offene-punkte.md`. (`core.rezept`
-  befüllt seit `0132`, `core.pos_artikel` seit `0155`.)
+* ~~**Drei `core`-Tabellen haben null Zeilen und keinen Schreiber**:
+  `core.rezept`, `core.pos_artikel`, `core.ware_stand`. Sie stehen im Register
+  als `erwartet: false` mit Begründung — siehe `offene-punkte.md`.~~ (`core.rezept`
+  befüllt seit `0132`, `core.pos_artikel` seit `0155`, `core.ware_stand` seit `0157` — alle drei
+  erwartet, die beiden letzten vorerst nur für Wilma Wunder.)
 
 ## Zehn Umsatzberichte statt zwei (Migration `0077`, 14.08.2026)
 
@@ -2715,3 +2716,88 @@ Attrappe (`src/foodnotify/mock.ts`) kennt dafür `posArtikelOhne()`, `posArtikel
 Berliner Mitternacht (22:00/23:00 UTC); der UTC-Tag war bei 50.014 von 50.050 Bestellungen der Tag **vor** der Lieferung.
 `core.bestellung.geliefert_am` ist der bei der Bestellung gewählte Termin, kein Wareneingang. `0156` baut den Bestand aus
 `raw` zurück; Hergang und Gegenprobe in `fehlerkatalog.md` (19.11.2026). `invoiceDate` (11:00/12:00 UTC) bleibt beim UTC-Tag.
+
+## FoodNotify: Warenstamm mit Listenpreis (`fn:warenstamm`, `0157`, 19.11.2026)
+
+Entscheidung Eugene, 19.11.2026. **Gebaut gegen die Attrappe, in Produktion noch nicht gelaufen.**
+Messgrundlage: `payloads/foodnotify-2026-11/fn-probe-2026-11-19-tag.md`, Abschnitt 2, und
+`fn-probe-2026-11-19.md`, Abschnitt 3. Vorbild ist `fn:pos_artikel` (Abschnitt darüber) — dieselben Muster,
+mit einem Unterschied: **geladen wird in SQL**.
+
+| Teil | Wo | Was |
+|---|---|---|
+| Register | `src/foodnotify/endpunkte.ts` | `fn:warenstamm`, Pfad `/api/{erpId}/products?page={seite}&page_size=1000` (genau die gemessene Form, `WARENSTAMM_SEITENGROESSE`), Priorität 32 (nach den Kassenartikeln 30, vor den Rezeptlisten 40), gewöhnliche Zeitgrenze (6,4 s gemessen) |
+| Einreihen | `src/sync/nachfuellen.ts` (`warenstammNachfuellen`, aus `foodnotifyNachfuellen`) | Seite 1 je Kostenstelle mit `erp_id`, je Marke aus `WARENSTAMM_MARKEN` mit Zugangsdaten; `nachladen = false` → Phase A, FoodNotify-Spur; gesperrt gegen denselben Tag, gegen einen offenen älteren Posten und gegen eine Kostenstelle, deren letzter Posten `kein_zugriff` war |
+| Schalter | `src/config.ts` | `WARENSTAMM_MARKEN`, Vorgabe `wilma_wunder`; unbekannter Schlüssel lässt den Start scheitern (dieselbe Prüfung wie `POS_ARTIKEL_MARKEN`); wirksamer Wert je Lauf nach `sync.merker` (`warenstamm_marken`) |
+| Form | `src/foodnotify/warenstamm.ts` | zod-Schema der gemessenen Form, `warenstammStrukturFehler` vor dem Laden — keine Transformation in TypeScript |
+| Laden | `src/foodnotify/laden.ts` (`case 'fn:warenstamm'`) → `core.warenstamm_laden()` (0157) | Upsert `core.ware_stand`, Verlauf `core.listenpreis_beobachtung`, Abzug `core.ware_stand_abruf`, `fehlt_seit` nach vollständigem Abzug; Seite 1 reiht Folgeseiten ein |
+| Neuaufbau | `core.warenstamm_neu_aufbauen(kostenstelle_key)` | spielt alle Rohantworten in Abrufreihenfolge durch dieselbe Funktion |
+| Zulauf | `src/sync/quellen.ts` | `fn:warenstamm` (`sync.aufgabe`) und `core:ware_stand` (`zuletzt_gesehen_am`, vorher `erwartet: false`), beide `erwartet`, solange der Schalter eine Marke nennt; je Kostenstelle `mart.warenstamm_stand` |
+
+**Warum der Lader in SQL steht.** Regel 4 verspricht, dass `core` aus `raw` neu aufbaubar ist. Beim Warenstamm
+entsteht der Verlauf des Listenpreises erst aus der **Reihenfolge** der Antworten — ein Neuaufbau braucht also
+dieselbe Logik noch einmal. In TypeScript wären es zwei Fassungen (Nachtlauf, Neuaufbau), die auseinanderlaufen.
+`fnLaden` sichert die Rohantwort wie immer und ruft in derselben Transaktion
+`core.warenstamm_laden(id, abgerufen_am)` auf (gefunden über `abgerufen_am = now()`, dem Spaltenstandard derselben
+Transaktion — das trifft die Partition). Zeit ist in der Funktion immer `raw.api_antwort.abgerufen_am`, nie
+`now()`; sonst stünde nach einem Neuaufbau jede Preisänderung auf dem Tag des Neuaufbaus.
+
+**Vier Sperren**, alle mit Rohantwort in `raw` und Befund in `sync.schema_abweichung`, `core` unberührt,
+Posten scheitert sichtbar:
+
+1. **Form** (zod, `warenstamm.ts`): `payload` mit `current_page`, `current_page_size`, `page_count`,
+   `total_count` und `data[]`; je Produkt `id` (ganze Zahl), `name` und **der Schlüssel `unitPrice`** (Wert darf
+   null sein). Ein umbenanntes `unitPrice` sähe sonst aus wie „alle Preise entfallen". Die Katalogfelder
+   (`pricePerUnit`, `packagingUnit`, `packagingUnits`) dürfen fehlen, aber nur in der an 7984 gemessenen Form
+   stehen — ein `pricePerUnit` als Zahl hieße sonst still „kein Katalogpreis". Dazu doppelte `id` und
+   Hüllenfehler (`isError`, `errors`). Die SQL-Funktion wiederholt die Untergrenze davon für den Neuaufbau.
+2. **Nie still abschneiden** (SQL): eine Seite muss genau `least(current_page_size, total_count − (seite−1) ×
+   current_page_size)` Produkte tragen. Kappt FoodNotify die Seitengröße und meldet es, kommen Folgeseiten; kappt
+   es, ohne es zu melden, scheitert die Seite.
+3. **Seite passt nicht zum Posten** (`current_page` ≠ angefragte Seite).
+4. **Null Produkte, wo der Bestand noch welche führt** — sonst stünde das ganze Sortiment ab heute auf „fehlt".
+   Die allgemeine Leere-200er-Meldung in `fnLaden` ist für diesen Endpunkt abgeschaltet (sie wäre eine zweite
+   Meldung derselben Antwort).
+
+**Folgeseiten.** Heute reicht eine Seite (gemessen: echte Kostenstelle 7984 mit 206, Testrestaurant mit 746
+Produkten bei `page_size` 1000). Meldet
+FoodNotify `page_count > 1`, reiht Seite 1 die Seiten 2…n ein (Sperre `offen`, gleicher Zeitraum, gleiche
+Priorität), im selben Lauf. Ein Abzug gilt erst als vollständig, wenn alle Seiten desselben `zeitraum_von` da
+sind und die Zeilen `total_count` treffen; meldet eine Folgeseite eine andere Gesamtzahl, steht `befund` in
+`core.ware_stand_abruf` und der Abzug bleibt unvollständig bis zur nächsten Seite 1. **Erst nach einem
+vollständigen Abzug** bekommt, was nicht gesehen wurde, `fehlt_seit`. Ungemessen: ob die Sortierung bei
+mehreren Seiten stabil ist (gemessen ohne `order_by`, Zeilen nach `id` aufsteigend) — rutscht eine Zeile
+zwischen zwei Seiten, steht sie einen Tag auf „fehlt" und kommt am nächsten zurück.
+
+**Ein Abbruch ist nie „keine Produkte".** Zeitgrenze, Verbindungsabbruch und HTTP 5xx kommen als Fehler aus dem
+Client: keine Rohantwort, `core` unberührt, `core.ware_stand_abruf` unverändert; nach 36 h steht die
+Kostenstelle in `mart.warenstamm_stand` auf `veraltet`.
+
+**403.** Eine Kostenstelle, die FoodNotify dauerhaft verweigert, schließt der Worker nach
+`SPERRE_AUFGEBEN_TAGE` als `kein_zugriff` (`0075`). Danach reiht `warenstammNachfuellen()` sie nicht mehr ein —
+sonst begänne jeden Tag ein neuer Posten denselben Kreislauf. Sie steht als `kein zugriff` in
+`mart.warenstamm_stand` und zählt in der Prüfzeile nicht mit.
+
+**Tempo (Regel 3).** Rund 35 Aufrufe je Nacht für Wilma Wunder (eine Seite je Kostenstelle), im Takt der
+FoodNotify-Spur — keine eigene Spur, keine Erhöhung. Bei ~6 s je Antwort hält das die Spur in Phase A gut drei
+Minuten länger. Speicher: ~~~118 KB je Antwort in `raw` (gemessen), rund 4 MB je Nacht~~ (Testrestaurant) — die
+echte Kostenstelle 7984 belegt 304 KB je Antwort, hochgerechnet ~10 MB je Nacht.
+
+**Testkostenstellen** (Wilma Wunder: zwei „AAA Testrestaurant", „CF GASTRO TESTBETRIEB", „DISTRA TESTBETRIEB" — 4 von
+35 mit `erp_id`) reiht `warenstammNachfuellen()` mit ein, ebenso `posArtikelNachfuellen()` die beiden mit Kasse
+(Anbindungen 1454, 1616). **Nicht still gefiltert:** sie haben keinen Betrieb und stehen in `mart.warenstamm_stand`
+bzw. `mart.pos_artikel_abdeckung` auf `ohne betrieb`; der Kostenstellenvergleich in `mart.listenpreis_aktuell`
+zählt nur Kostenstellen mit Betrieb. Kosten: vier bzw. zwei Aufrufe je Nacht.
+
+**Tests:** `src/foodnotify/warenstamm.test.ts` (Form, Pfad, Register, Schalter; ohne Datenbank, 13 Tests) und
+`src/foodnotify/warenstamm_db.test.ts` (gegen die Attrappe, 11 Tests: Nachfüllen nur für den Schalter,
+raw → core → mart mit allen Feldern, Regel 10, Preisänderung samt „preis neu"/„kein preis mehr", „fehlt seit"
+und zurück, Folgeseiten bei gekappter Seitengröße, Zeitgrenze und HTTP 500 ändern nichts, fremde Form/leere/
+gekappte Antwort, **Neuaufbau aus raw ergibt denselben Stand, Verlauf und Abzug**, unvollständiger Abzug setzt
+kein `fehlt_seit`, dieselbe Antwort zweimal ändert nichts — dazu Teil B, `mart.einkaufspreis_artikel_monat`).
+Die Attrappe kennt `warenstammOhne()`, `warenstammPreis()`, `warenstammForm()` und `warenstammSeitenMax()`;
+die Fixture `src/foodnotify/fixtures/warenstamm.json` hat die gemessene Form mit erfundenen Werten.
+
+**Einkaufs-Nachlauf.** `src/sync/einkauf_sichten.ts` frischt seit `0157` auch
+`mart.einkaufspreis_artikel_monat_basis` auf (2,5 s am Klon), hinter den übrigen Einkaufssichten und damit
+nach `core.gebinde_vereinheitlichen()`.

@@ -1888,3 +1888,103 @@ zeigen — je Kostenstelle × Lieferant, zwölf Monate, **beobachtet, nicht vere
 50.050 Bestellungen der Tag davor (UTC-Tag der Berliner Mitternacht); die Migration baut die Spalte aus `raw`
 (`fn:bestellung`) zurück, der Lader (`src/foodnotify/transform.ts`, `alsBerlinerDatum`) schreibt seitdem richtig.
 `bestellt_am` (`timeCreated`) und `beleg_datum` (`invoiceDate`, 11:00/12:00 UTC) waren nicht betroffen.
+
+
+## Warenstamm und Listenpreis: `core.ware_stand` befüllt (`0157`, 19.11.2026)
+
+`core.ware_stand` stand seit `0030` leer im Schema. Seit `0157` schreibt `fn:warenstamm`
+(`/api/{erpId}/products?page=1&page_size=1000`) hinein — vorerst nur für Wilma Wunder (`WARENSTAMM_MARKEN`).
+**Gebaut gegen die Attrappe, in Produktion noch nicht gelaufen.**
+
+**~~Monatsmomentaufnahme je Ware~~ → Zustand je Kostenstelle und Produkt, plus Verlauf.** `0030` hatte
+`(ware_key, monat)` mit `preis_je_einheit` und `bestand`. Neu angelegt (`DROP` + `CREATE`, die Migration bricht
+ab, wenn die Tabelle nicht leer ist; keine Sicht hing an ihr), weil fast nichts bleibt:
+
+* **Der Warenstamm gehört der Kostenstelle**, nicht der Marke: dieselbe Ware steht in Bar und Küche als zwei
+  Produkte mit eigener `id`, eigenem Preis, eigenem Bestand. `core.ware` ist je Marke und Nummernraum
+  geschlüsselt (`0042`) und fasst dieselbe Lieferantennummer zweier Lieferanten zu **einer** Ware zusammen.
+  Ein `ware_key` wäre genau dort ungenau, wo der Warenstamm genau ist. Deshalb kein `ware_key`.
+* **Schlüssel ist die Produkt-`id` der Kostenstelle**, nicht `artikelId`. Gemessen 19.11.2026 ~~(11035)~~ —
+  11035 ist das „AAA Testrestaurant Wilma Wunder Bar" (`fehlerkatalog.md`): `id` 746 von 746 eindeutig;
+  `artikelId` nur 739 Nummern für 742 Produkte (dieselbe Nummer bei zwei Lieferanten), Lieferant + `artikelId`
+  742 von 742; bei Eigenproduktion fehlt `artikelId` (4). **An der echten Kostenstelle 7984 (Bar Ballplatz):** `id`
+  206 von 206, 194 Nummern alle eindeutig (auch mit Lieferant), 12 Produkte ohne Nummer (6 Eigenproduktion, 6
+  Kleinlieferanten mit leerem `artikelId`). Die Schlüsselwahl hält an beiden. Die `id` bleibt,
+  wenn der Lieferant die Nummer wechselt (`0094`: 268 → 500096) — der Wechsel erscheint im Verlauf als
+  Änderung, statt die Reihe abzubrechen.
+* **Nach Änderung, nicht je Tag.** Der Stand wird überschrieben, der Verlauf des Listenpreises steht in
+  `core.listenpreis_beobachtung` (Muster `core.umsatzprognose_beobachtung`, `0154`).
+
+**`core.ware_stand`** — Schlüssel `(kostenstelle_key, produkt_id)`:
+
+| Spalte | Quelle | Bemerkung |
+|---|---|---|
+| `produkt_id` | `id` | **Primärschlüssel** mit der Kostenstelle |
+| `fn_produkt_id` | `productId` (= `ingredient.id`) | FoodNotifys Warennummer hinter dem Produkt; Bedeutung über Kostenstellen nicht gemessen |
+| `artikelnummer` | `artikelId` (Rückfall `ingredient.artikelId`, 742 von 742 gleich) | **Lieferanten**-Artikelnummer = `core.bestellposition.lieferanten_nr`; Text, führende Nullen bleiben |
+| `lieferant_fn_id`, `lieferant_name` | `shop.id`, `shop.name` | `shop.id` = `core.lieferant.fn_id` (11 von 11 gemessen); aufgelöst wird in den Sichten |
+| `einheit`, `inhalt`, `gebinde_menge` | `unit.name`, `unitQuantity`, `packagingQuantity` | Namen wie bei den Bestellpositionen (`transform.ts`) |
+| `listenpreis` | `unitPrice` | **Preis je Einheit** (kg, l), nicht je Gebinde, folgt der letzten Bestellung — siehe unten |
+| `katalogpreis`, `katalogpreis_einheit` | `pricePerUnit.price`, `.unit` | **Preis je Einheit im Lieferantenkatalog**, nur bei Waren mit Katalog (7984: 109 von 206) |
+| `katalog_gebinde`, `katalog_gebinde_menge`, `katalog_gebinde_preis` | `packagingUnit.label`, `.quantity`, `.price.amount` | Bestelleinheit im Katalog mit Preis, wie geliefert |
+| `katalog_gebinde_alle` | `packagingUnits` | alle Bestelleinheiten als `jsonb` (meist eine) |
+| `katalog_produkt_id` | `productForShow.id` | das Katalogprodukt des Lieferanten |
+| `rezept_fn_id` | `recipeProduct.recipe.id` | Eigenproduktion (ohne Lieferant, ohne Nummer) |
+| `bestellbar`, `verfuegbar`, `in_inventur` | `isOrderable`, `isAvailable`, `showInStocktaking` | `isOrderable` = Ware hängt an einem Lieferantenkatalog (7984: 110 von 206, genau die mit `productForShow`); ~~am 19.11.2026 bei allen 746 `false` — Bedeutung offen~~ (Testrestaurant ohne Katalog) |
+| `bestand_menge`, `bestand_wert`, `bestand_deaktiviert` | `stock.sumAmount`, `.sumPrice`, `.deactivated` | **nur der letzte Stand, kein Bestandsverlauf** (nicht beauftragt) — der Verlauf liegt in `raw` |
+| `fn_geaendert_am` | `timeModified` | ~~**kein Preisänderungsdatum** (650 von 746 tragen 2024)~~ — das war das Testrestaurant. Bei 7984 19.08. bis 19.11.2026, es bewegt sich; **was es auslöst, ist nicht gemessen** — deshalb als Spalte geführt, aber nicht als Preisdatum |
+| `erstmals_am`, `geaendert_am`, `zuletzt_gesehen_am`, `fehlt_seit`, `raw_id` | Lader | Zeit = `abgerufen_am` der Rohantwort; `fehlt_seit` nur nach einem **vollständigen** Abzug |
+
+~~Nicht gelesen, weil in allen 746 Zeilen `null`: `pricePerUnit`, `packagingUnit`, `packagingUnits`,
+`baseUnitQuantity`, `baseUnitUnit`.~~ Das galt im Testrestaurant ohne Katalog; an der echten Kostenstelle 7984 sind
+`pricePerUnit` und `packagingUnit(s)` bei den Katalogwaren gefüllt und stehen jetzt in den `katalog*`-Spalten.
+Nicht gelesen, weil in beiden gemessenen Kostenstellen immer `null`: `baseUnitQuantity`, `baseUnitUnit`. Zahlen, die nicht in `numeric(14,s)` passen, werden `NULL` statt den Abzug
+abzubrechen (wie `PREIS_MAX` in `transform.ts`).
+
+**Was `listenpreis` und `katalogpreis` sind — am Klon gemessen, 19.11.2026.** ~~Gegen die letzte Bestellung
+derselben Ware (Lieferant + Lieferantennummer, Wilma Wunder, Bestand bis 04.08.2026): 733 Waren gefunden; `unitPrice`
+trifft `preis_je_einheit` bei 438 auf 2 %, den Gebindepreis (`einzelpreis`) nur bei 109 — bei den 579 Waren mit
+`inhalt <> 1` sind es 331 gegen 2. Bei den seit Juni 2026 bestellten Waren treffen 170 von 181.~~ (Das war der
+Warenstamm des Testrestaurants gegen ganz Wilma Wunder.) **An der echten Kostenstelle 7984 gegen ihre eigenen
+Bestellungen** (bis 02.08.2026): 163 Waren gefunden; `unitPrice` trifft den Preis je Einheit der letzten Bestellung
+bei 141, den Gebindepreis bei 28 — bei Inhalt ≠ 1 sind es 111 gegen 2; seit Juni bestellt 99 von 106. Also: Preis je
+Einheit, und er **folgt dem Preis der letzten Bestellung**. `pricePerUnit` ist dagegen der **Lieferantenkatalog**:
+gleich `unitPrice` bei 105 von 109; in den vier anderen liegt der Katalog darunter (−1,6 bis −8,5 %), dreimal ist
+`unitPrice` genau die letzte Bestellung. Deshalb beide Preise in `core.ware_stand` und im Verlauf. Der Gebindepreis
+ist rechnerisch `listenpreis × inhalt × gebinde_menge` (trifft bei 96 von 110 Katalogwaren einen Gebindepreis aus
+`packagingUnits`) und steht nur in `mart.listenpreis_aktuell`; geliefert steht er in `katalog_gebinde_preis`.
+
+**`core.listenpreis_beobachtung`** — eine Zeile je `(kostenstelle_key, produkt_id)` und **neuem Wert** von
+`(listenpreis, katalogpreis, einheit, inhalt, gebinde_menge, artikelnummer, lieferant_fn_id)`, Schlüssel
+`(kostenstelle_key, produkt_id, gesehen_ab)`, FK auf `core.ware_stand`. `gesehen_ab` = erster Abruf mit diesem
+Wert, `gueltig_ab` = dessen **Berliner** Kalendertag, `zuletzt_gesehen_am`, `sichtungen`, `raw_id`,
+`zuletzt_raw_id`. Bei gleichem Wert rücken nur `zuletzt_gesehen_am`, `zuletzt_raw_id` und `sichtungen` nach.
+**Die Reihe beginnt am Tag des ersten Abzugs** — die erste Zeile je Produkt ist keine Änderung. Die fünf
+Begleitfelder gehören in den Wert, weil ein Kilopreis ohne Gebinde, Nummer und Lieferant nicht lesbar ist.
+
+**`core.ware_stand_abruf`** — eine Zeile je Kostenstelle: der laufende bzw. letzte Abzug (`abzug_tag` =
+`zeitraum_von` des Postens, `abzug_beginn`, `seiten_gesamt`, `seiten_geladen int[]`, `produkte_gemeldet` =
+`total_count`, `produkte_geladen`, `befund`) und der letzte **vollständige** (`vollstaendig_am`, `produkte`).
+Vollständig heißt: alle Seiten 1…`page_count` desselben Tages da und Zeilen = `total_count`. Erst dann bekommt,
+was nicht gesehen wurde, `fehlt_seit`.
+
+**Der Lader steht in SQL** (`core.warenstamm_laden(raw_id, abgerufen_am)`, `core.warenstamm_zeilen(jsonb)`,
+`core.warenstamm_zahl()`), und `core.warenstamm_neu_aufbauen(kostenstelle_key DEFAULT NULL)` spielt alle
+Rohantworten in Abrufreihenfolge durch dieselbe Funktion (Regel 4). Begründung in `entscheidungen.md`
+(19.11.2026). Der Lader ist wiederholbar: eine schon verarbeitete oder ältere Antwort wird übersprungen.
+Am Klon mit der Antwort von 11035 (Testrestaurant) gemessen: 746 Produkte in 46 ms; mit der echten Kostenstelle
+7984: 206 Produkte in 25 ms, 109 Katalogpreise, Zustand `ok`. Beide Male ergibt der Neuaufbau denselben Stand.
+
+**Speicher.** ~~Eine Antwort von 11035 sind 1,15 MB Text, als `jsonb` in `raw` 118 KB (pglz). Bei 35
+Kostenstellen rund 4 MB je Nacht, gut 1,5 GB im Jahr.~~ (Testrestaurant ohne Katalog, komprimiert gut.) Die echte
+Antwort von 7984 sind 885 KB Text, in `raw` **304 KB** (pglz). Bei 35 Kostenstellen grob 10 MB je Nacht, rund
+3,7 GB im Jahr — der Bestandsverlauf liegt darin. Hochgerechnet von einer Kostenstelle.
+
+**Testkostenstellen** werden mit abgezogen (Wilma Wunder: zwei „AAA Testrestaurant", „CF GASTRO TESTBETRIEB",
+„DISTRA TESTBETRIEB" — 4 von 35 mit `erp_id`). Nicht still gefiltert: sie haben keinen Betrieb und stehen in
+`mart.warenstamm_stand` auf `ohne betrieb`; der Kostenstellenvergleich in `mart.listenpreis_aktuell` zählt nur
+Kostenstellen mit Betrieb.
+
+**Teil B, ohne neue Tabelle:** `mart.einkaufspreis_artikel_monat_basis` (materialisiert) und
+`mart.einkaufspreis_artikel_monat` — bezahlte Gebindepreise je Marke, Lieferant, `lieferanten_nr` und Monat.
+Beschreibung in `metabase.md`.

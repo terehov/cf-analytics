@@ -1275,6 +1275,26 @@ const Schema = z.object({
   POS_ARTIKEL_MARKEN: z.string().default('wilma_wunder'),
 
   /**
+   * Warenstamm mit Listenpreis (0157, `fn:warenstamm`): für welche Marken der
+   * Warenstamm je Kostenstelle täglich geholt wird. Kommagetrennte Schlüssel
+   * aus core.marke, leer = für keine.
+   *
+   * NUR WILMA WUNDER, bis die anderen Marken gemessen sind (Entscheidung
+   * Eugene, 19.11.2026). Gemessen ist eine echte Kostenstelle (erpId 7984,
+   * Bar Ballplatz: 206 Produkte in einem Aufruf mit page_size=1000, 813 KB,
+   * 4,6 s — docs/payloads/foodnotify-2026-11/fn-probe-2026-11-19-echt.md) und
+   * das Testrestaurant 11035 (746 Produkte, ohne Katalog). Bei den
+   * anderen Marken sind weder die Größe der Kostenstellen noch die Form
+   * gemessen. Wer eine Marke ergänzt, misst sie vorher
+   * (`bun run fn-probe --marke … --nur warenstamm --seitengroessen`).
+   *
+   * Ein unbekannter Schlüssel lässt den Start scheitern; der wirksame Wert
+   * steht nach jedem Lauf in sync.merker (`warenstamm_marken`), damit
+   * mart.warenstamm_stand „Marke abgeschaltet" von „ausgefallen" trennt.
+   */
+  WARENSTAMM_MARKEN: z.string().default('wilma_wunder'),
+
+  /**
    * Zeitgrenze für FoodNotify-Pfade, die als langsam gemessen sind
    * (`zeitgrenze: 'lang'` im Register, seit 0155 nur `fn:pos_artikel`).
    *
@@ -1381,12 +1401,15 @@ function laden() {
         `gesetzt ist nur ${user ? 'der Benutzer' : 'das Passwort'}`)
     }
   }
-  // POS_ARTIKEL_MARKEN (0155): ein vertippter Schlüssel hiesse still „aus".
+  // POS_ARTIKEL_MARKEN (0155) und WARENSTAMM_MARKEN (0157): ein vertippter
+  // Schlüssel hiesse still „aus".
   const bekannteMarken: readonly string[] = FN_MARKEN.map(m => m.schluessel)
-  const unbekannt = posArtikelMarkenLesen(r.data.POS_ARTIKEL_MARKEN).filter(m => !bekannteMarken.includes(m))
-  if (unbekannt.length > 0) {
-    throw new Error(`POS_ARTIKEL_MARKEN nennt unbekannte Marken: ${unbekannt.join(', ')} — `
-      + `bekannt sind ${bekannteMarken.join(', ')}`)
+  for (const schalter of ['POS_ARTIKEL_MARKEN', 'WARENSTAMM_MARKEN'] as const) {
+    const unbekannt = posArtikelMarkenLesen(r.data[schalter]).filter(m => !bekannteMarken.includes(m))
+    if (unbekannt.length > 0) {
+      throw new Error(`${schalter} nennt unbekannte Marken: ${unbekannt.join(', ')} — `
+        + `bekannt sind ${bekannteMarken.join(', ')}`)
+    }
   }
   // Dasselbe für Metabase, aus demselben Grund: ein halbes Paar sieht aus
   // wie „nicht konfiguriert" und fiele erst auf, wenn die Übernahme
@@ -1524,6 +1547,15 @@ function posArtikelMarkenLesen(wert: string): string[] {
  */
 export function posArtikelMarken(c: Pick<Config, 'POS_ARTIKEL_MARKEN'> = config): string[] {
   return posArtikelMarkenLesen(c.POS_ARTIKEL_MARKEN)
+}
+
+/**
+ * Die Marken, für die `fn:warenstamm` eingereiht wird (0157). Dieselbe
+ * Zerlegung wie POS_ARTIKEL_MARKEN; nur Marken mit Zugangsdaten werden
+ * tatsächlich gefragt — das entscheidet der Einreihweg.
+ */
+export function warenstammMarken(c: Pick<Config, 'WARENSTAMM_MARKEN'> = config): string[] {
+  return posArtikelMarkenLesen(c.WARENSTAMM_MARKEN)
 }
 
 export function fnZugaenge(c: Config = config): FnZugang[] {

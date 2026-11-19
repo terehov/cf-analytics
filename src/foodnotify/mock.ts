@@ -71,6 +71,20 @@ const POS_ARTIKEL = JSON.parse(readFileSync(
     items: Array<Record<string, unknown> & { remoteProductId: number }>; [k: string]: unknown }
 const POS_ANBINDUNGEN = new Set([1907])
 
+/**
+ * WARENSTAMM (0157) — synthetische Antwort von /api/{erpId}/products für die
+ * Kostenstellen 990302 und 990402 dieser Attrappe. Die FORM ist gemessen an
+ * der echten Kostenstelle 7984 (Bar Ballplatz, 19.11.2026), mit
+ * Katalogfeldern — nicht am Testrestaurant 11035: erp-Hülle, darin current_page,
+ * current_page_size, page_count, total_count und data[]. Die Werte sind
+ * erfunden (src/foodnotify/fixtures/warenstamm.json). Die Attrappe blättert
+ * wie das Original nach page und page_size und meldet ihre Seitengröße selbst.
+ */
+const WARENSTAMM = JSON.parse(readFileSync(
+  new URL('./fixtures/warenstamm.json', import.meta.url), 'utf8')) as {
+    payload: { data: Array<Record<string, unknown> & { id: number }>; [k: string]: unknown }; [k: string]: unknown }
+const WARENSTAMM_ERP = new Set([990302, 990402])
+
 export type FnMockOptionen = {
   port?: number
   /**
@@ -148,6 +162,21 @@ export function fnMockStarten(opt: FnMockOptionen = {}) {
   const posOhne = new Set<number>()
   let posForm: 'echt' | 'fremd' | 'leer' = 'echt'
   const verzoegert = new Map<string, number>()
+  /**
+   * Warenstamm (0157), zur Laufzeit umstellbar wie `verbieten()`:
+   *   wsOhne       Produkt-ids, die in der Antwort fehlen (Test „fehlt seit")
+   *   wsPreis      Produkt-id → anderer unitPrice (Test Preisänderung)
+   *   wsForm       'fremd' = unitPrice umbenannt, 'leer' = keine Produkte,
+   *                'gekappt' = total_count meldet eins mehr, als geliefert wird
+   *   wsSeitenMax  die Seitengröße, die der Server höchstens annimmt (Test
+   *                Folgeseiten) — gemeldet in current_page_size wie im Original
+   */
+  const wsOhne = new Set<number>()
+  const wsPreis = new Map<number, number>()
+  /** Produkt-id → anderer pricePerUnit.price (Test Katalogpreisänderung); null = Katalogeintrag entfernen. */
+  const wsKatalog = new Map<number, number | null>()
+  let wsForm: 'echt' | 'fremd' | 'leer' | 'gekappt' = 'echt'
+  let wsSeitenMax = Infinity
 
   const json =(body: unknown, init: ResponseInit = {}) =>
     new Response(JSON.stringify(body), {
@@ -451,6 +480,36 @@ export function fnMockStarten(opt: FnMockOptionen = {}) {
                 })
             return json({ ...POS_ARTIKEL, _hinweis: undefined, items })
           }
+          const ws = pfad.match(/^\/api\/(\d+)\/products$/)
+          if (ws) {
+            if (!WARENSTAMM_ERP.has(Number(ws[1]))) break
+            const alle = wsForm === 'leer' ? []
+              : WARENSTAMM.payload.data.filter(p => !wsOhne.has(p.id)).map(p => {
+                  let mitPreis: Record<string, unknown> & { id: number } = wsPreis.has(p.id) ? { ...p, unitPrice: wsPreis.get(p.id) } : p
+                  if (wsKatalog.has(p.id)) {
+                    const k = wsKatalog.get(p.id)
+                    mitPreis = { ...mitPreis, pricePerUnit: k === null ? null
+                      : { ...(mitPreis.pricePerUnit as object ?? { quantity: 1, unit: 'KG' }), price: k } }
+                  }
+                  if (wsForm !== 'fremd') return mitPreis
+                  // Umbenanntes Pflichtfeld: ohne Formprüfung hiesse das „alle Preise entfallen".
+                  const { unitPrice, ...rest } = mitPreis
+                  return { ...rest, price: unitPrice }
+                })
+            const seite = Number(url.searchParams.get('page') ?? 1)
+            const gewuenscht = Number(url.searchParams.get('page_size') ?? 20)
+            const groesse = Math.min(gewuenscht, wsSeitenMax)
+            const gesamt = alle.length + (wsForm === 'gekappt' ? 1 : 0)
+            return json({
+              ...WARENSTAMM, _hinweis: undefined,
+              payload: {
+                ...WARENSTAMM.payload,
+                current_page: seite, current_page_size: groesse,
+                page_count: Math.ceil(gesamt / groesse), total_count: gesamt,
+                data: alle.slice((seite - 1) * groesse, seite * groesse),
+              },
+            })
+          }
           const items = pfad.match(/^\/api\/erp\/stocktakings\/([^/]+)\/items$/)
           if (!items) break
           const seite = Number(url.searchParams.get('page') ?? 1)
@@ -533,6 +592,18 @@ export function fnMockStarten(opt: FnMockOptionen = {}) {
     posArtikelOhne: (ids: number[]) => { posOhne.clear(); for (const id of ids) posOhne.add(id) },
     /** Kassenartikel (0155): 'fremd' = recipeId umbenannt, 'leer' = items: [], 'echt' = gemessene Form. */
     posArtikelForm: (form: 'echt' | 'fremd' | 'leer') => { posForm = form },
+    /** Warenstamm (0157): diese Produkt-ids aus der Antwort nehmen (leere Liste = alle zurück). */
+    warenstammOhne: (ids: number[]) => { wsOhne.clear(); for (const id of ids) wsOhne.add(id) },
+    /** Warenstamm (0157): unitPrice eines Produkts setzen (null = zurück auf die Fixture). */
+    warenstammPreis: (id: number, preis: number | null) => { if (preis === null) wsPreis.delete(id); else wsPreis.set(id, preis) },
+    /** Warenstamm (0157): pricePerUnit.price eines Produkts setzen (null = Katalogeintrag weg, undefined = zurück). */
+    warenstammKatalogpreis: (id: number, preis: number | null | undefined) => {
+      if (preis === undefined) wsKatalog.delete(id); else wsKatalog.set(id, preis)
+    },
+    /** Warenstamm (0157): 'fremd' = unitPrice umbenannt, 'leer' = keine Produkte, 'gekappt' = eins weniger als gemeldet. */
+    warenstammForm: (form: 'echt' | 'fremd' | 'leer' | 'gekappt') => { wsForm = form },
+    /** Warenstamm (0157): höchste Seitengröße, die der Server annimmt (Infinity = keine Grenze). */
+    warenstammSeitenMax: (n: number) => { wsSeitenMax = n },
     /** Nur DIESEN Pfad um ms verzögern (0 = aus) — für die Zeitgrenze langsamer Pfade. */
     verzoegern: (pfad: string, ms: number) => { if (ms > 0) verzoegert.set(pfad, ms); else verzoegert.delete(pfad) },
     stop: () => server.stop(true),

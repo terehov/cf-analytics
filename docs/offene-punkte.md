@@ -1202,7 +1202,7 @@ nirgends, weil eine Tabelle ohne Eintrag in keiner Sicht auftaucht.
 |---|---|---|---|
 | ~~`core.rezept`~~ | ~~0~~ | ~~keiner~~ | ~~keiner (`src/foodnotify/endpunkte.ts` führt neun, keiner davon)~~ — **seit `0132` (15.10.2026) befüllt**, siehe unten |
 | ~~`core.pos_artikel`~~ | ~~0~~ | ~~keiner~~ | ~~keiner~~ — **seit `0155` (19.11.2026) befüllt** über `fn:pos_artikel`, vorerst nur Wilma Wunder; siehe „Kassenartikel → Rezept" (19.11.2026) |
-| `core.ware_stand` | 0 | keiner | keiner |
+| ~~`core.ware_stand`~~ | ~~0~~ | ~~keiner~~ | ~~keiner~~ — **seit `0157` (19.11.2026) befüllt** über `fn:warenstamm`, vorerst nur Wilma Wunder; siehe „Warenstamm und Listenpreis" (19.11.2026) |
 
 Zum Vergleich: `core.ware` hat 43.271 Zeilen — die Waren kommen über die
 Bestellpositionen herein, nicht über einen Stammdatenabruf.
@@ -1225,8 +1225,8 @@ anderen drei Marken bleibt der Join leer.
    an 2.111 Enchilada-Rezepten gelesen (`foodnotify-api-inventar.md` §3). Seit
    Migration `0132` holt der Nachtlauf sie für alle vier Marken
    (`docs/plan-rezepturen.md`); `core:rezept` steht im Register als erwartet.
-   ~~`core.pos_artikel` (Kassenzuordnung) und~~ `core.ware_stand` ~~bleiben~~ bleibt leer und
-   `erwartet: false` (`core.pos_artikel` seit `0155`).
+   ~~`core.pos_artikel` (Kassenzuordnung) und `core.ware_stand` bleiben leer und
+   `erwartet: false`~~ (`core.pos_artikel` seit `0155`, `core.ware_stand` seit `0157` befüllt und erwartet).
 2. **Braucht die Auswertung sie überhaupt?** Der theoretische Wareneinsatz läuft
    heute über `core.artikel.fixer_we`, dessen Herkunft ungeklärt ist (Regel 5).
    Ein echter Rezeptbezug wäre die Ablösung dafür — das ist eine fachliche
@@ -2824,16 +2824,25 @@ heißt) und `docs/foodnotify-api-inventar-intern-2026-11.md`. Gemessen ist nur W
    Leere nicht. Frage 2 aus „Drei `core`-Tabellen mit null Zeilen" (14.08.2026) ist die eigentliche Entscheidung.
    **Nachtrag 19.11.2026 (`fn-probe`):** Alle 32 Anbindungen von Wilma Wunder sind `amadeus`; drei gemessen: 35,0 %,
    49,4 % und 57,6 % der Kassenartikel tragen ein Rezept, PLU numerisch und je Anbindung eindeutig. Warenstamm in
-   Seiten zu 20 (746 und 97 Produkte bei zwei Kostenstellen). Füllbar ist beides; offen ist die Entscheidung und der
-   Umsatzanteil, den die zugeordneten Artikel tragen.
+   Seiten zu 20 (746 und 97 Produkte bei zwei Kostenstellen — **beide das „AAA Testrestaurant Wilma Wunder"**, siehe
+   unten). Füllbar ist beides; offen ist die Entscheidung und der Umsatzanteil, den die zugeordneten Artikel tragen.
    **Nachtrag 19.11.2026 (Seitengröße, `fn-probe-2026-11-19-tag.md`):** `page_size` wird angenommen und **nicht
    gekappt**: `page=1&page_size=1000` liefert alle 746 Produkte der Kostenstelle 11035 in einem Aufruf (6,4 s,
    1,07 MB; 100 → 8 Seiten, Standard 20 → 38). Ein Abzug ist damit ein Aufruf je Kostenstelle. Obergrenze über 1000
-   nicht gemessen. **Preisfelder:** `unitPrice` ist bei 746 von 746 gefüllt, **`pricePerUnit` bei 0** (immer `null`),
+   nicht gemessen. ~~**Preisfelder:** `unitPrice` ist bei 746 von 746 gefüllt, **`pricePerUnit` bei 0** (immer `null`),
    ebenso `packagingUnit`, `packagingUnits`, `baseUnitQuantity`, `baseUnitUnit`; `packagingQuantity` 99,5 %,
    `ingredient.artikelId` 99,5 % (gleich dem Zeilenfeld `artikelId`). `timeModified`: 650 von 746 aus 2024, nur 13 aus
-   2026 — **kein Preisänderungsdatum**. Offen: wie `unitPrice` je Basiseinheit zu lesen ist und ob er der Bestellpreis
-   ist. (Die Frage zum Warenstamm steht hier unter Punkt 6, nicht unter 13.)
+   2026 — **kein Preisänderungsdatum**.~~ **Korrektur 19.11.2026: 11035 ist das „AAA Testrestaurant Wilma Wunder Bar"**
+   ohne Lieferantenkatalog; die Füllgrade gelten nur dort. An der echten Kostenstelle 7984 (Bar Ballplatz,
+   `fn-probe-2026-11-19-echt.md`): 206 Produkte in einem Aufruf, `pricePerUnit`/`packagingUnit(s)` bei den 110
+   bestellbaren Waren mit Katalog gefüllt (Katalogpreis je Einheit, Bestelleinheit mit Preis), `preferredShopUnit` 0 %,
+   `ingredient.artikelId` 94,2 %, `timeModified` 19.08. bis 19.11.2026 (bewegt sich; was es auslöst, ist nicht
+   gemessen). ~~Offen: wie `unitPrice` je Basiseinheit zu lesen ist und ob er der Bestellpreis
+   ist.~~ **Beantwortet 19.11.2026 (am Klon gegen die Bestellungen, `0157`):** `unitPrice` ist der Preis **je Einheit**
+   (kg, l) und folgt dem Preis der letzten Bestellung — ~~170 von 181 seit Juni bestellten Waren~~ (Testrestaurant
+   gegen ganz Wilma Wunder) an der echten Kostenstelle 7984 gegen ihre eigenen Bestellungen 141 von 163, seit Juni
+   99 von 106; `pricePerUnit` ist der Lieferantenkatalog. Seit `0157` wird der Warenstamm täglich geladen (Wilma
+   Wunder), mit beiden Preisen. (Die Frage zum Warenstamm steht hier unter Punkt 6, nicht unter 13.)
 7. **Der Token-Inhaber ersetzt das Testtoken** („CF Analytics", Id 179). Soll der Importer ein Token nutzen, gehört es
    in eine Umgebungsvariable, nie in `raw`, Log oder Messdatei (Regel 2); dann je Marke ein Token.
 8. ~~**Host des FoodNotify-MCP-Servers** unbekannt (`api3…/mcp`, `connect…/mcp` → 403 „Invalid Host header").~~
@@ -2862,10 +2871,17 @@ heißt) und `docs/foodnotify-api-inventar-intern-2026-11.md`. Gemessen ist nur W
     (Sitzungsmessung, ein Betrieb, Werte nicht gelesen). Am 27.07.2026 scheiterten 100 % der Stichproben
     (`foodnotify-api-inventar.md` §8a). Ein Hinweis, kein Befund — eine eigene Messung über mehrere Kostenstellen und
     die Kostenanalyse dagegen.
-    **Nachtrag 19.11.2026 (`payloads/foodnotify-2026-11/fn-probe-2026-11-19.md`):** Nein — der Verkaufsimport
+    ~~**Nachtrag 19.11.2026 (`payloads/foodnotify-2026-11/fn-probe-2026-11-19.md`):** Nein — der Verkaufsimport
     **steht seit 31.08.2026**. Bei zwei Kostenstellen (11035, 12066), Sortierung `timeCreated DESC`, ist der jüngste
     Verkauf vom 31.08.2026; die vorhandenen stehen sauber auf `finish`. Als Quelle unbrauchbar. Nicht gemessen:
-    andere Kostenstellen und Marken.
+    andere Kostenstellen und Marken.~~ Widerlegt: 11035 und 12066 sind das „AAA Testrestaurant Wilma Wunder", dort
+    wird nicht verkauft (`fehlerkatalog.md`, 19.11.2026).
+    **Stand 19.11.2026, 07:29 UTC (`payloads/foodnotify-2026-11/fn-probe-2026-11-19-echt.md`): der Verkaufsimport
+    läuft.** An der echten Kostenstelle 7984 (Bar Ballplatz Mainz) 21.362 Verkäufe, die zehn jüngsten vom
+    18.11.2026, alle `finish`, kein `finishError`; zwei `recipe-sale` mit 6 von 6 und 4 von 4 Positionen mit Rezept.
+    **Eine** echte Kostenstelle gemessen. **Verkäufe als Quelle für den Soll-Verbrauch sind damit wieder offen und
+    prüfenswert:** an mehreren Kostenstellen und gegen LINAs Artikelverkauf derselben Tage messen (Menge je Rezept),
+    bevor jemand einen Import plant.
 14. **Taugt `link-targets.updatedAt` als Änderungsfilter für den Rezept-Umlauf (`0134`)?** 13.253 Rezepte, `updatedAt`
     von 19.10.2022 bis 17.11.2026. Prüfen: bewegt sich `updatedAt`, wenn sich nur eine Zutat ändert? (gegen zwei
     Abrufe desselben Rezepts in `raw.api_antwort`).
@@ -2931,3 +2947,61 @@ Gebaut gegen die Attrappe und gegen einen lokalen Klon mit den drei echten Antwo
 7. **Eine Anbindung, die wirklich leer zurückkommt** (Kasse abgemeldet), scheitert jede Nacht an der Sperre
    „0 Artikel, im Bestand stehen N" und steht dann `veraltet`. Ob sie dann aus dem Bestand genommen werden soll
    (alle Artikel `fehlt_seit`), entscheidet ein Mensch; gebaut ist nur das Sichtbarmachen.
+
+
+## 19.11.2026 — Warenstamm und Listenpreis (`0157`): was nach dem Deploy offen ist
+
+Gebaut gegen die Attrappe und gegen einen lokalen Klon (Stand `0156`) mit der ~~echten~~ Antwort von Kostenstelle
+11035 (dem „AAA Testrestaurant", `fehlerkatalog.md` 19.11.2026) und, nachgeprüft, der echten Kostenstelle 7984 (Bar
+Ballplatz); **in Produktion noch nicht gelaufen.** Bau: `importer.md`, Sichten: `metabase.md`, Schema: `datenmodell.md`,
+Entscheidung: `entscheidungen.md` (19.11.2026).
+
+1. **Erste Nacht nachmessen.** Erwartung: ein Posten `fn:warenstamm` je Wilma-Kostenstelle mit `erp_id` (lokal 35),
+   alle mit einer Seite, alle Kostenstellen `ok` oder `ohne betrieb` (die vier Testkostenstellen: zwei „AAA
+   Testrestaurant", „CF GASTRO TESTBETRIEB", „DISTRA TESTBETRIEB").
+   ```sql
+   SELECT zustand, count(*), sum(produkte), max(seiten) FROM mart.warenstamm_stand WHERE marke_aktiv GROUP BY 1;
+   SELECT * FROM mart.pruefung_uebersicht WHERE sicht = 'mart.warenstamm_stand';     -- auffaellig = 0
+   SELECT * FROM mart.quelle_zulauf WHERE quelle IN ('fn:warenstamm', 'core:ware_stand');   -- beide 'ok'
+   SELECT ergebnis, count(*), max(letzter_fehler) FROM sync.warteschlange
+    WHERE endpunkt = 'fn:warenstamm' AND zeitraum_von >= current_date - 1 GROUP BY 1;
+   SELECT * FROM sync.schema_abweichung WHERE endpunkt = 'fn:warenstamm' AND quittiert_am IS NULL;   -- leer
+   ```
+   Dazu `sync.aufgabe.dauer_ms` und `payload_bytes` der Rohantworten: hält die größte Kostenstelle eine Seite
+   (`page_size` 1000), und reicht `ANFRAGE_TIMEOUT_MS`?
+2. **Zweite Nacht: entsteht der Verlauf?** `SELECT preisart, count(*) FROM mart.listenpreis_aenderung GROUP BY 1` —
+   nach der ersten Nacht 0 (der erste Wert ist keine Änderung), danach die ersten echten Änderungen, je Preisart. Stichprobe: stimmt eine Änderung mit
+   einer neuen Bestellung derselben Ware überein (Befund „Listenpreis folgt dem Bestellpreis")? Wenn ja, den Satz in
+   den Sichtkommentaren von „sehr wahrscheinlich" auf gemessen setzen; wenn nein, die Deutung neu schreiben.
+   (Nachtrag 19.11.2026: an 7984 gegen deren eigene Bestellungen bereits 141 von 163 — die Kommentare sagen jetzt
+   „folgt"; offen bleibt, ob eine Änderung **zeitlich** mit einer Bestellung zusammenfällt.)
+   **Dazu `timeModified`:** wandert `fn_geaendert_am` mit einer Preisänderung (beider Preise), mit dem Bestand oder
+   mit beidem? Aus zwei Nächten `raw` messbar; erst dann darf es mehr heißen als „zuletzt geändert".
+3. **Mehrere Seiten** sind nur gegen die Attrappe geprüft. Meldet eine Kostenstelle `page_count > 1`, die erste
+   Nacht danach von Hand ansehen: `core.ware_stand_abruf` (`seiten_geladen`, `befund`) und ob eine Zeile zwischen
+   den Seiten gerutscht ist (Sortierung ohne `order_by` ungemessen).
+4. **Die anderen drei Marken.** Je Marke erst messen (`bun run fn-probe --marke … --nur warenstamm
+   --seitengroessen`, im Terminal des Nutzers): Größe der Kostenstellen, Form, Antwortzeit. Freischalten heißt
+   `WARENSTAMM_MARKEN` ergänzen, keine Codeänderung. Aposto 27, Enchilada 58, Deutsche Konzepte 32 Kostenstellen mit
+   `erp_id` (lokal) — zusammen rund 150 Aufrufe je Nacht.
+5. **MCP-Katalogabzug aus Produktion** (`cd mcp && bun run katalog:abzug` gegen eine vollständige Datenbank),
+   nachdem `0157` dort läuft — vier neue Sichten, eine Materialisierung, drei Fallstricke.
+6. **Karten fehlen.** Weder Listenpreis noch die Artikelnummer-Reihe haben eine Dashboard-Karte. Erst wenn der
+   Fachbereich sagt, welche Frage er stellt („was ist teurer geworden", „was setzt FoodNotify heute an").
+7. **Kostenstellenvergleich ungemessen.** Ob dieselbe Ware (Lieferant + Nummer) in Bar und Küche verschiedene
+   Listenpreise trägt, ließ sich nicht prüfen (die beiden ersten Probe-Kostenstellen waren das Testrestaurant ohne
+   gemeinsame Ware, die echte 7984 ist allein). Der Vergleich zählt nur Kostenstellen mit Betrieb. Nach
+   der ersten Nacht: `SELECT count(*) FILTER (WHERE abs(abweichung_median_pct) > 1), count(*) FROM
+   mart.listenpreis_aktuell WHERE kostenstellen_gleiche_ware > 1;`
+8. ~~**`isOrderable`** (`bestellbar`) stand am 19.11.2026 bei allen 746 Produkten auf `false` — Bedeutung ungeklärt,
+   die Sichten werten es nicht aus.~~ Testrestaurant ohne Katalog. An 7984 heißt `isOrderable`: die Ware hängt an
+   einem Lieferantenkatalog (110 von 206, genau die mit `productForShow`/`pricePerUnit`). Offen bleibt, **wovon der
+   Katalogpreis abhängt**, wenn ein Lieferant mehrere Kostenstellen beliefert (gleicher Katalog, gleicher Preis?).
+9. **Speicher.** ~~~118 KB je Antwort in `raw`, rund 4 MB je Nacht für Wilma Wunder~~ (Testrestaurant) — an der
+   echten Kostenstelle 7984 304 KB je Antwort, hochgerechnet ~10 MB je Nacht für Wilma Wunder, mit allen Marken mehr.
+   `mart.speicher_stand` nach zwei Wochen gegenlesen.
+10. **Eine Kostenstelle, die wirklich leer zurückkommt**, scheitert jede Nacht an „0 Produkte, im Bestand stehen
+    N" und steht `veraltet`. Ob ihr Bestand dann auf `fehlt_seit` gehen soll, entscheidet ein Mensch.
+11. **Teil B in Produktion nachmessen:** Laufzeit des Refresh von `mart.einkaufspreis_artikel_monat_basis` in
+    `mart.materialisierung_stand` (`dauer_s` gilt für alle Einkaufssichten zusammen; am Klon 2,5 s allein).
+

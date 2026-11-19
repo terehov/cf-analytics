@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   ERLAUBTE_MUSTER, aufrufplan, anbindungenWaehlen, artikelAuswerten, ausgabeVerzeichnis, feldpfade, foodWasteKostenanalyseAuswerten,
-  fuellgrad, gemeldeteSeitengroesse, kostenstellenWaehlen, kuerzen, letzteMonate, letzteTage, linkTargetsAuswerten, pfadErlaubt, pluForm, rezeptVerkaufAuswerten,
+  fuellgrad, gemeldeteSeitengroesse, istTestName, kostenstellenWaehlen, kuerzen, letzteMonate, letzteTage, linkTargetsAuswerten, pfadErlaubt, pluForm, rezeptVerkaufAuswerten,
   rezeptlisteAuswerten, standorteAuswerten, verkaeufeAuswerten, warenstammAuswerten,
 } from './fn_probe'
 
@@ -75,10 +75,11 @@ describe('Erlaubtliste', () => {
     expect(aufrufplan().reduce((s, p) => s + p.anzahl, 0)).toBe(16)
   })
 
-  test('Aufrufplan mit --nur, festen IDs und Seitengrößen: link-targets + Warenstamm = 4 Aufrufe, keine Grundaufrufe', () => {
-    const plan = aufrufplan(3, 2, { nur: ['link-targets', 'warenstamm'], anbindung: 2052, erp: 11035, seitengroessen: true })
-    expect(plan.reduce((s, p) => s + p.anzahl, 0)).toBe(4)
-    expect(plan.map(p => p.vorlage)).toEqual([
+  test('Aufrufplan mit --nur, festen IDs und Seitengrößen: Grundaufrufe für die Namen + link-targets + Warenstamm = 6 Aufrufe', () => {
+    const plan = aufrufplan(3, 2, { nur: ['link-targets', 'warenstamm'], anbindung: 2052, erp: 7984, seitengroessen: true })
+    expect(plan.reduce((s, p) => s + p.anzahl, 0)).toBe(6)
+    // Seit 19.11.2026 auch bei festen IDs: die Zusammenfassung nennt den Namen (Testrestaurant-Fehler).
+    expect(plan.map(p => p.vorlage)).toEqual(['/api/erp/all', '/api/pos/locations',
       '/api/pos/mapping/{connectionId}/link-targets', '/api/{erpId}/products', '/api/{erpId}/products?page=1&page_size={100|1000}'])
     // ohne feste IDs: erp/all und locations kommen dazu
     expect(aufrufplan(3, 2, { nur: ['warenstamm'] }).map(p => p.vorlage)).toEqual(['/api/erp/all', '/api/pos/locations', '/api/{erpId}/products'])
@@ -102,6 +103,23 @@ describe('Auswertungen', () => {
   test('pluForm gibt nur die Form, nie den Wert', () => {
     expect(pluForm('1234')).toBe('9999')
     expect(pluForm('A12b')).toBe('A99A')
+  })
+
+  test('Testkostenstellen: „test" im Kostenstellen- oder Restaurantnamen, ohne Groß/Klein', () => {
+    expect(istTestName('AAA Testrestaurant Wilma Wunder Bar')).toBe(true)
+    expect(istTestName('Bar', 'CF GASTRO TESTBETRIEB')).toBe(true)
+    expect(istTestName('Bar Ballplatz', 'Wilma Wunder Mainz')).toBe(false)
+    expect(istTestName(null, undefined)).toBe(false)
+    const st = [{ kostenstelleId: 1, connectionId: 10, kassensystem: 'amadeus' }, { kostenstelleId: 2, connectionId: 20, kassensystem: 'amadeus' }]
+    const namen = new Map([[1, { kostenstelle: 'AAA Testrestaurant Bar', restaurant: 'AAA Testrestaurant' }],
+                           [2, { kostenstelle: 'Bar Ballplatz', restaurant: 'Wilma Wunder Mainz' }]])
+    const a = standorteAuswerten(st, namen)
+    expect(a.anbindungen.map(x => [x.connectionId, x.test, x.namen])).toEqual([
+      [10, true, ['AAA Testrestaurant — AAA Testrestaurant Bar']], [20, false, ['Wilma Wunder Mainz — Bar Ballplatz']]])
+    expect(anbindungenWaehlen(a, 3).map(x => x.connectionId)).toEqual([20])
+    const ks = [{ erpId: 11035, kostenstelleId: 1, name: 'AAA Testrestaurant Bar', restaurantName: 'AAA Testrestaurant' },
+                { erpId: 7984, kostenstelleId: 2, name: 'Bar Ballplatz', restaurantName: 'Wilma Wunder Mainz' }]
+    expect(kostenstellenWaehlen(ks, st, 2)).toEqual([7984])
   })
 
   test('Anbindungen und Kostenstellen: amadeus zuerst', () => {
@@ -268,14 +286,19 @@ describe('fn-probe gegen die Attrappe', () => {
         switch (url.pathname) {
           case '/api/profile': return json({ data: { id: 1 } })
           case '/api/erp/all': return huelle([
+            // Steht vorn wie im Original („AAA …") und hat eine amadeus-Anbindung — die automatische
+            // Auswahl muss sie trotzdem überspringen (19.11.2026).
+            { id: 6999, costCenter: { id: 499, name: 'AAA Testrestaurant X Bar', restaurant: { id: 8, name: 'AAA Testrestaurant X' } } },
             { id: 7001, costCenter: { id: 501, name: 'Küche X', restaurant: { id: 9, name: 'X' } } },
             { id: 7002, costCenter: { id: 502, name: 'Bar X', restaurant: { id: 9, name: 'X' } } },
             { id: 7003, costCenter: { id: 503, name: 'Küche Y', restaurant: { id: 9, name: 'X' } } },
           ])
           case '/api/pos/locations': return huelle({ userId: 1, locations: [
-            { costCenterId: 501, connection: { connectionId: 2052, deviceType: { name: 'amadeus' } } },
-            { costCenterId: 502, connection: { connectionId: 2053, deviceType: { name: 'vectron' } } },
-            { costCenterId: 503 },
+            { restaurant: 'AAA Testrestaurant X', costCenter: 'AAA Testrestaurant X Bar', costCenterId: 499,
+              connection: { connectionId: 2050, deviceType: { name: 'amadeus' } } },
+            { restaurant: 'X', costCenter: 'Küche X', costCenterId: 501, connection: { connectionId: 2052, deviceType: { name: 'amadeus' } } },
+            { restaurant: 'X', costCenter: 'Bar X', costCenterId: 502, connection: { connectionId: 2053, deviceType: { name: 'vectron' } } },
+            { restaurant: 'X', costCenter: 'Küche Y', costCenterId: 503 },
           ] })
           case '/api/pos/mapping/2052/articles': return json({ location: 'a', restaurantId: 9, items: [
             { remoteProductId: 1, name: 'Burger', plu: '1001', recipeId: 5, recipeTitle: 'B', isIgnored: false },
@@ -349,8 +372,18 @@ describe('fn-probe gegen die Attrappe', () => {
     expect(r.exitCode).toBe(0)
     // 1 erp/all + 1 locations + 2 articles + 1 link-targets + 1 recipes + 2 products + 2 sales + 2 recipe-sale + 3 food waste
     expect(e.aufrufe.length).toBe(15)
-    expect(e.gewaehlteAnbindungen).toEqual([{ connectionId: 2052, kassensystem: 'amadeus' }, { connectionId: 2053, kassensystem: 'vectron' }])
+    // Die Testkostenstelle (6999, Anbindung 2050) steht vorn und hat amadeus — sie wird trotzdem übersprungen.
+    expect(e.gewaehlteAnbindungen).toEqual([
+      { connectionId: 2052, kassensystem: 'amadeus', name: 'X — Küche X' },
+      { connectionId: 2053, kassensystem: 'vectron', name: 'X — Bar X' }])
     expect(e.gewaehlteKostenstellen).toEqual([7001, 7002])
+    expect(e.kostenstellenNamen).toEqual([{ erpId: 7001, name: 'X — Küche X' }, { erpId: 7002, name: 'X — Bar X' }])
+    expect(e.uebersprungenTest).toEqual([
+      'Anbindung 2050 (AAA Testrestaurant X — AAA Testrestaurant X Bar)',
+      'Kostenstelle 6999 (AAA Testrestaurant X — AAA Testrestaurant X Bar)'])
+    const md = readFileSync(alleDateien(join(aus, 'enchilada')).find(d => d.endsWith('zusammenfassung.md'))!, 'utf8')
+    expect(md).toContain('Gemessen an — Kostenstellen: 7001 (X — Küche X); 7002 (X — Bar X).')
+    expect(md).toContain('Automatisch übersprungen')
     // Jede Anfrage: GET (außer der einen Anmeldung) und auf der Erlaubtliste (außer /api/profile der Anmeldung).
     for (const l of log) {
       if (l.pfad === '/api/user/auth/signin_check') { expect(l.methode).toBe('POST'); continue }
@@ -381,7 +414,7 @@ describe('fn-probe gegen die Attrappe', () => {
     expect(r.text).not.toContain('PHPSESSID')
   })
 
-  test('--nur, feste IDs, Seitengrößen: genau vier GET, keine Grundaufrufe; zweiter Lauf im eigenen Ordner', async () => {
+  test('--nur, feste IDs, Seitengrößen: zwei Grundaufrufe für die Namen, dann vier GET; zweiter Lauf im eigenen Ordner', async () => {
     modus = 'normal'
     const zweiOrdner = mkdtempSync(join(tmpdir(), 'fn-probe-nur-'))
     try {
@@ -389,8 +422,12 @@ describe('fn-probe gegen die Attrappe', () => {
       const e = r.ergebnisse[0]!
       expect(r.exitCode).toBe(0)
       const gets = log.filter(l => l.methode === 'GET' && l.pfad !== '/api/profile').map(l => l.pfad)
-      expect(gets).toEqual(['/api/pos/mapping/2052/link-targets', '/api/7001/products',
+      expect(gets).toEqual(['/api/erp/all', '/api/pos/locations', '/api/pos/mapping/2052/link-targets', '/api/7001/products',
         '/api/7001/products?page=1&page_size=100', '/api/7001/products?page=1&page_size=1000'])
+      // Ausdrücklich gewählt: der Name steht in der Zusammenfassung, ein Testname würde nicht gesperrt.
+      expect(e.kostenstellenNamen).toEqual([{ erpId: 7001, name: 'X — Küche X' }])
+      expect(e.gewaehlteAnbindungen).toEqual([{ connectionId: 2052, kassensystem: 'amadeus', name: 'X — Küche X' }])
+      expect(e.uebersprungenTest).toEqual([])
       for (const g of gets) expect(pfadErlaubt(g).ok).toBe(true)
       expect(e.fragen).toEqual(['link-targets', 'warenstamm'])
       expect(e.festeAnbindung).toBe(2052)

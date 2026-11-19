@@ -1,0 +1,518 @@
+{
+  "_hinweis": "Synthetische Attrappe fuer fn:warenstamm (0157). Huelle, Zaehlfelder und Feldnamen wie die echte Antwort von /api/{erpId}/products?page=1&page_size=1000 der Kostenstelle 7984 (Bar Ballplatz Mainz, Wilma Wunder, 19.11.2026), Werte erfunden. Die erste Fassung war nach dem Testrestaurant 11035 gebaut (kein Katalog, pricePerUnit/packagingUnit immer null) — korrigiert. Seitenfelder setzt die Attrappe je Aufruf. 700001 und 700003 tragen dieselbe Artikelnummer bei zwei Lieferanten (Testrestaurant: 739 Nummern fuer 742 Produkte), 700001, 700002 und 700006 haben einen Katalogeintrag (bei 700006 liegt der Katalogpreis unter unitPrice, bei 700002 fehlt der Gebindepreis), 700004 hat Preis 0, 700005 ist Eigenproduktion (Rezept 1032008 aus rezepte.json), 700006 hat eine fuehrende Null, 700007 ist ein Kleinlieferant mit leerem artikelId.",
+  "errors": [],
+  "code": 200,
+  "isError": false,
+  "payload": {
+    "order_by": "",
+    "order_direction": "DESC",
+    "currency": "eur",
+    "data": [
+      {
+        "id": 700001,
+        "name": "Testzwiebel Rot Julienne (2,5 Kg)",
+        "unit": {
+          "id": 1,
+          "name": "kg"
+        },
+        "unitQuantity": 2.5,
+        "ingredient": {
+          "id": 8800001,
+          "parentId": 1,
+          "activeExtIngredient": true,
+          "shop": {
+            "id": 9101,
+            "name": "Testlieferant Frisch"
+          },
+          "artikelId": "91001",
+          "image": null
+        },
+        "weightWare": false,
+        "weightUnknown": false,
+        "baseUnitQuantity": null,
+        "baseUnitUnit": null,
+        "showInStocktaking": true,
+        "preferredShopUnit": null,
+        "productOrdered": null,
+        "productStockDetails": null,
+        "isOrderable": true,
+        "packagingUnit": {
+          "name": "SA",
+          "label": "Sack (1)",
+          "quantity": 1,
+          "price": {
+            "amount": 3.75,
+            "currency": "EUR"
+          }
+        },
+        "packagingUnits": [
+          {
+            "name": "SA",
+            "label": "Sack (1)",
+            "quantity": 1,
+            "price": {
+              "amount": 3.75,
+              "currency": "EUR"
+            }
+          }
+        ],
+        "pricePerUnit": {
+          "quantity": 1,
+          "unit": "KG",
+          "price": 1.5
+        },
+        "timeModified": {
+          "date": "2026-08-19 19:31:55.000000",
+          "timezone_type": 3,
+          "timezone": "Europe/Berlin"
+        },
+        "shop": {
+          "id": 9101,
+          "name": "Testlieferant Frisch",
+          "orderComments": false,
+          "image": ""
+        },
+        "productId": 8800001,
+        "whitelisted": false,
+        "packagingQuantity": 1,
+        "quantity": 2.5,
+        "productForShow": {
+          "id": 29000001,
+          "productId": "K0001",
+          "shopProductId": 29000001,
+          "available": true,
+          "pricePerUnit": {
+            "amount": 1.5,
+            "currency": "EUR"
+          },
+          "timeModified": null
+        },
+        "productImage": "",
+        "cartId": null,
+        "artikelId": "91001",
+        "isAvailable": true,
+        "cartProductQuantity": null,
+        "groups": [],
+        "storageProducts": [],
+        "categories": [],
+        "stock": {
+          "id": 1,
+          "warnAmount": 20,
+          "dangerAmount": 10,
+          "sumAmount": 2,
+          "maxAmount": null,
+          "sumPrice": 3.0,
+          "currency": "EUR",
+          "deactivated": null,
+          "warnAmountUnit": null,
+          "negativeAmount": null,
+          "shouldUpdatePrice": false
+        },
+        "unitPrice": 1.5,
+        "isInProductLists": false
+      },
+      {
+        "id": 700002,
+        "name": "Testsaft 1l Karton 6x1l:Karton 6x l",
+        "unit": {
+          "id": 2,
+          "name": "l"
+        },
+        "unitQuantity": 6,
+        "ingredient": {
+          "id": 8800002,
+          "parentId": 1,
+          "activeExtIngredient": true,
+          "shop": {
+            "id": 9102,
+            "name": "Testlieferant Getraenke"
+          },
+          "artikelId": "92002",
+          "image": null
+        },
+        "showInStocktaking": true,
+        "preferredShopUnit": null,
+        "isOrderable": true,
+        "packagingUnit": {
+          "name": "KA",
+          "label": "Karton (6)",
+          "quantity": 6
+        },
+        "packagingUnits": [
+          {
+            "name": "KA",
+            "label": "Karton (6)",
+            "quantity": 6
+          }
+        ],
+        "pricePerUnit": {
+          "quantity": 1,
+          "unit": "L",
+          "price": 2.25
+        },
+        "baseUnitQuantity": null,
+        "baseUnitUnit": null,
+        "timeModified": {
+          "date": "2026-10-29 10:00:00.000000",
+          "timezone_type": 3,
+          "timezone": "Europe/Berlin"
+        },
+        "shop": {
+          "id": 9102,
+          "name": "Testlieferant Getraenke",
+          "orderComments": false,
+          "image": ""
+        },
+        "productId": 8800002,
+        "packagingQuantity": 1,
+        "quantity": 6,
+        "artikelId": "92002",
+        "isAvailable": true,
+        "stock": {
+          "id": 2,
+          "warnAmount": 20,
+          "dangerAmount": 10,
+          "sumAmount": 1.5,
+          "maxAmount": null,
+          "sumPrice": 20.25,
+          "currency": "EUR",
+          "deactivated": null,
+          "warnAmountUnit": null,
+          "negativeAmount": null,
+          "shouldUpdatePrice": false
+        },
+        "unitPrice": 2.25,
+        "productForShow": {
+          "id": 29000002,
+          "productId": "K0002",
+          "shopProductId": 29000002,
+          "available": true,
+          "pricePerUnit": {
+            "amount": 2.25,
+            "currency": "EUR"
+          },
+          "timeModified": null
+        }
+      },
+      {
+        "id": 700003,
+        "name": "Testzwiebel anderer Lieferant (Kg)",
+        "unit": {
+          "id": 1,
+          "name": "kg"
+        },
+        "unitQuantity": 1,
+        "ingredient": {
+          "id": 8800003,
+          "parentId": 1,
+          "activeExtIngredient": true,
+          "shop": {
+            "id": 9102,
+            "name": "Testlieferant Getraenke"
+          },
+          "artikelId": "91001",
+          "image": null
+        },
+        "showInStocktaking": true,
+        "preferredShopUnit": null,
+        "isOrderable": false,
+        "packagingUnit": null,
+        "packagingUnits": null,
+        "pricePerUnit": null,
+        "baseUnitQuantity": null,
+        "baseUnitUnit": null,
+        "timeModified": {
+          "date": "2026-09-02 08:15:00.000000",
+          "timezone_type": 3,
+          "timezone": "Europe/Berlin"
+        },
+        "shop": {
+          "id": 9102,
+          "name": "Testlieferant Getraenke",
+          "orderComments": false,
+          "image": ""
+        },
+        "productId": 8800003,
+        "packagingQuantity": 1,
+        "quantity": 1,
+        "artikelId": "91001",
+        "isAvailable": false,
+        "stock": {
+          "id": 3,
+          "warnAmount": 20,
+          "dangerAmount": 10,
+          "sumAmount": 0,
+          "maxAmount": null,
+          "sumPrice": 0,
+          "currency": "EUR",
+          "deactivated": true,
+          "warnAmountUnit": null,
+          "negativeAmount": null,
+          "shouldUpdatePrice": false
+        },
+        "unitPrice": 1.79,
+        "productForShow": null
+      },
+      {
+        "id": 700004,
+        "name": "Testmilch 1L",
+        "unit": {
+          "id": 2,
+          "name": "l"
+        },
+        "unitQuantity": 1,
+        "ingredient": {
+          "id": 8800004,
+          "parentId": 1,
+          "activeExtIngredient": true,
+          "shop": {
+            "id": 9102,
+            "name": "Testlieferant Getraenke"
+          },
+          "artikelId": "92004",
+          "image": null
+        },
+        "showInStocktaking": true,
+        "preferredShopUnit": null,
+        "isOrderable": false,
+        "packagingUnit": null,
+        "packagingUnits": null,
+        "pricePerUnit": null,
+        "baseUnitQuantity": null,
+        "baseUnitUnit": null,
+        "timeModified": {
+          "date": "2026-11-15 16:50:39.000000",
+          "timezone_type": 3,
+          "timezone": "Europe/Berlin"
+        },
+        "shop": {
+          "id": 9102,
+          "name": "Testlieferant Getraenke",
+          "orderComments": false,
+          "image": ""
+        },
+        "productId": 8800004,
+        "packagingQuantity": 1,
+        "quantity": 1,
+        "artikelId": "92004",
+        "isAvailable": true,
+        "stock": {
+          "id": 4,
+          "warnAmount": 20,
+          "dangerAmount": 10,
+          "sumAmount": 0,
+          "maxAmount": null,
+          "sumPrice": 0,
+          "currency": "EUR",
+          "deactivated": null,
+          "warnAmountUnit": null,
+          "negativeAmount": null,
+          "shouldUpdatePrice": false
+        },
+        "unitPrice": 0,
+        "productForShow": null
+      },
+      {
+        "id": 700005,
+        "name": "VP_Testschnecken",
+        "unit": {
+          "id": 1,
+          "name": "kg"
+        },
+        "unitQuantity": 1,
+        "ingredient": [],
+        "showInStocktaking": true,
+        "preferredShopUnit": null,
+        "isOrderable": false,
+        "packagingUnit": null,
+        "packagingUnits": null,
+        "pricePerUnit": null,
+        "baseUnitQuantity": null,
+        "baseUnitUnit": null,
+        "timeModified": {
+          "date": "2026-08-22 11:09:59.000000",
+          "timezone_type": 3,
+          "timezone": "Europe/Berlin"
+        },
+        "shop": null,
+        "productId": null,
+        "packagingQuantity": null,
+        "quantity": 1,
+        "artikelId": null,
+        "isAvailable": true,
+        "recipeProduct": {
+          "id": 11,
+          "recipe": {
+            "id": 1032008,
+            "name": "Testrezept A"
+          }
+        },
+        "stock": {
+          "id": 5,
+          "warnAmount": 20,
+          "dangerAmount": 10,
+          "sumAmount": 0,
+          "maxAmount": null,
+          "sumPrice": 0,
+          "currency": null,
+          "deactivated": null,
+          "warnAmountUnit": null,
+          "negativeAmount": null,
+          "shouldUpdatePrice": false
+        },
+        "unitPrice": 5.3038,
+        "productForShow": null
+      },
+      {
+        "id": 700006,
+        "name": "Testpfeffer Lose (Kg)",
+        "unit": {
+          "id": 1,
+          "name": "kg"
+        },
+        "unitQuantity": 1,
+        "ingredient": {
+          "id": 8800006,
+          "parentId": 1,
+          "activeExtIngredient": true,
+          "shop": {
+            "id": 9101,
+            "name": "Testlieferant Frisch"
+          },
+          "artikelId": "0305",
+          "image": null
+        },
+        "showInStocktaking": true,
+        "preferredShopUnit": null,
+        "isOrderable": true,
+        "packagingUnit": {
+          "name": "BE",
+          "label": "Beutel (1)",
+          "quantity": 1,
+          "price": {
+            "amount": 12.5,
+            "currency": "EUR"
+          }
+        },
+        "packagingUnits": [
+          {
+            "name": "BE",
+            "label": "Beutel (1)",
+            "quantity": 1,
+            "price": {
+              "amount": 12.5,
+              "currency": "EUR"
+            }
+          }
+        ],
+        "pricePerUnit": {
+          "quantity": 1,
+          "unit": "KG",
+          "price": 12.5
+        },
+        "baseUnitQuantity": null,
+        "baseUnitUnit": null,
+        "timeModified": {
+          "date": "2026-11-08 12:35:17.000000",
+          "timezone_type": 3,
+          "timezone": "Europe/Berlin"
+        },
+        "shop": {
+          "id": 9101,
+          "name": "Testlieferant Frisch",
+          "orderComments": false,
+          "image": ""
+        },
+        "productId": 8800006,
+        "packagingQuantity": 1,
+        "quantity": 1,
+        "artikelId": "0305",
+        "isAvailable": true,
+        "stock": {
+          "id": 6,
+          "warnAmount": 20,
+          "dangerAmount": 10,
+          "sumAmount": -0.05,
+          "maxAmount": null,
+          "sumPrice": -0.6475,
+          "currency": "EUR",
+          "deactivated": null,
+          "warnAmountUnit": null,
+          "negativeAmount": null,
+          "shouldUpdatePrice": false
+        },
+        "unitPrice": 12.95,
+        "productForShow": {
+          "id": 29000006,
+          "productId": "K0006",
+          "shopProductId": 29000006,
+          "available": true,
+          "pricePerUnit": {
+            "amount": 12.5,
+            "currency": "EUR"
+          },
+          "timeModified": null
+        }
+      },
+      {
+        "id": 700007,
+        "name": "Testtee Hofladen 100G",
+        "unit": {
+          "id": 1,
+          "name": "kg"
+        },
+        "unitQuantity": 0.1,
+        "ingredient": {
+          "id": 8800007,
+          "parentId": 1,
+          "activeExtIngredient": true,
+          "shop": {
+            "id": 9103,
+            "name": "Testlieferant Klein"
+          },
+          "artikelId": "",
+          "image": null
+        },
+        "showInStocktaking": true,
+        "preferredShopUnit": null,
+        "isOrderable": false,
+        "packagingUnit": null,
+        "packagingUnits": null,
+        "pricePerUnit": null,
+        "baseUnitQuantity": null,
+        "baseUnitUnit": null,
+        "timeModified": {
+          "date": "2026-11-19 00:09:56.000000",
+          "timezone_type": 3,
+          "timezone": "Europe/Berlin"
+        },
+        "shop": {
+          "id": 9103,
+          "name": "Testlieferant Klein",
+          "orderComments": false,
+          "image": ""
+        },
+        "productId": 8800007,
+        "packagingQuantity": 1,
+        "quantity": 1,
+        "artikelId": "",
+        "isAvailable": true,
+        "stock": {
+          "id": 7,
+          "warnAmount": 20,
+          "dangerAmount": 10,
+          "sumAmount": 3,
+          "maxAmount": null,
+          "sumPrice": 11.0,
+          "currency": "EUR",
+          "deactivated": null,
+          "warnAmountUnit": null,
+          "negativeAmount": null,
+          "shouldUpdatePrice": false
+        },
+        "unitPrice": 38.5,
+        "productForShow": null
+      }
+    ]
+  }
+}

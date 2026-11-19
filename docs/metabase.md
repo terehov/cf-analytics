@@ -517,6 +517,9 @@ und bekommen ihre Abweichung, bilden den Maßstab aber nicht mit.
 Betriebe hinweg nicht — der eine Betrieb bucht den Karton als `menge = 1`, der andere sechs Flaschen
 als `menge = 6`. Gleiche Ware, gleiches Geld, Faktor 6.
 
+> Seit `0157` (19.11.2026) gibt es zwei weitere Preissichten — bezahlte Preise je Lieferanten-Artikelnummer
+> und den Listenpreis aus dem Warenstamm. Welche wofür: Abschnitt „Welche Preissicht wofür" (Migration `0157`).
+
 **Die beiden Sichten nennen deshalb für dieselbe Ware verschiedene Preise, und das ist kein
 Fehler, sondern die Preisbasis.** Nachgemessen am 12.08.2026: von 7.742 eindeutigen
 Ware/Einheit/Monat-Zellen weichen **274 (3,5 %)** voneinander ab, im Extremfall um 47.432 EUR.
@@ -2462,3 +2465,105 @@ Zeilen, nicht Größenordnungen mehr — beim Deploy nachmessen.
 zeigt ab `0156` den richtigen Tag statt des Tages davor.
 
 **Noch nicht erledigt:** MCP-Katalogabzug aus Produktion (`mcp/test/katalog.json`), siehe `offene-punkte.md`.
+
+
+## Preisentwicklung: Listenpreis und Artikelnummer-Reihe (Migration `0157`, 19.11.2026)
+
+Vier Sichten und eine Materialisierung, alle für `mcp_leser` lesbar, im MCP-Katalog (Thema `einkauf` bzw.
+`pruefung`). **Teil A ist gegen die Attrappe gebaut; in Produktion steht bis zum ersten Lauf nach dem Deploy
+nichts darin.** Vorerst nur Wilma Wunder (`WARENSTAMM_MARKEN`). Teil B rechnet auf dem vorhandenen Einkauf.
+
+| Sicht | Körnung | Wofür |
+|---|---|---|
+| `mart.listenpreis_aktuell` | Kostenstelle × Produkt, heutiger Stand | Was kostet die Ware **laut Warenstamm**, je kg/l, seit wann gilt dieser Preis, dazu rechnerischer Gebindepreis, Bestand, Kostenstellenvergleich |
+| `mart.listenpreis_aenderung` | eine beobachtete Änderung | alter/neuer Listenpreis, `aenderung_pct`, `art`, Tag, was sich mitgeändert hat, `vergleichbar` |
+| `mart.warenstamm_stand` | Kostenstelle mit `erp_id` | **`zustand`** (Regel 10), Produkte, ohne Preis, ohne Nummer, Eigenproduktion, `reihe_ab`, Preisänderungen 30 Tage |
+| `mart.einkaufspreis_artikel_monat` | Marke × Lieferant × `lieferanten_nr` × Monat | **bezahlte** Gebindepreise je Artikelnummer, Vergleich mit dem letzten Monat **mit Bestellung** |
+| `mart.einkaufspreis_artikel_monat_basis` | dieselbe | materialisiert, aufgefrischt im Einkaufs-Nachlauf (`einkauf_sichten.ts`), in `mart.materialisierung_stand` |
+
+### Welche Preissicht wofür
+
+| Frage | Sicht | Preis |
+|---|---|---|
+| Was haben wir für diese Ware **bezahlt**, und wie lief der Preis? | **`mart.einkaufspreis_artikel_monat`** | Beleg, je bestellter Einheit (Gebinde), je Lieferant + Artikelnummer |
+| dieselbe Frage, aber nach Warenname gruppiert (älter) | `mart.einkaufspreis_monat` / `_veraenderung` | Beleg, je Gebinde, je **Name** — bricht bei Namens- oder Nummernwechsel, mischt gleichnamige Waren zweier Lieferanten |
+| Zahlt **dieser Betrieb** mehr als die anderen? | `mart.einkaufspreis_betrieb` | Beleg, je Basiseinheit, nur mit `vergleichbar` |
+| Was steht **heute im Warenstamm**, und wann hat es sich geändert? | `mart.listenpreis_aktuell`, `mart.listenpreis_aenderung` (`preisart = 'listenpreis'`) | **Listenpreis je kg/l**, folgt der letzten Bestellung, kein bezahlter Preis, Reihe erst ab dem ersten Abzug |
+| Was verlangt der **Lieferant heute laut Katalog**? | `mart.listenpreis_aktuell.katalogpreis`, `mart.listenpreis_aenderung` (`preisart = 'katalogpreis'`) | **Katalogpreis je kg/l**, nur bei bestellbaren Waren; `katalog_abweichung_pct` zeigt, wo der Katalog sich seit der letzten Bestellung bewegt hat |
+
+**Bezahlt gegen Listenpreis gegen Katalogpreis.** Der Listenpreis folgt nach der Messung vom 19.11.2026 dem Preis
+der letzten Bestellung (~~170 von 181~~ — Testrestaurant; an der echten Kostenstelle 7984 gegen ihre eigenen
+Bestellungen 141 von 163, seit Juni 99 von 106 auf 2 % gleich dem Preis je Einheit). Er ist also **keine
+unabhängige Preisliste** — eine Listenpreisänderung heißt meist „zu neuem Preis bestellt". Die Preisliste des
+Lieferanten ist der **Katalogpreis** (`pricePerUnit`): bei 7984 für 109 von 206 Waren, gleich dem Listenpreis bei
+105; die vier anderen lagen darunter — der Katalog bewegt sich vor der nächsten Bestellung. Für Teuerung über
+Monate ist die bezahlte Reihe die belastbare; der Listenpreis sagt, was FoodNotify **heute** für eine Ware
+ansetzt (auch für Waren, die lange nicht bestellt wurden), und seine Reihe wird mit jeder Nacht länger.
+Die beiden Sichten nicht nebeneinander auf eine Karte, ohne die Preisbasis dazuzuschreiben: der Listenpreis ist
+je kg/l, der bezahlte je Gebinde.
+
+### Teil A: Listenpreis
+
+* **`preis_seit`** ist der erste Tag, an dem der heutige Preis durchgehend stand. Steht
+  `preis_seit_erstem_abzug` auf true, gilt er **mindestens** seit dann — die Reihe beginnt mit unserem ersten
+  Abzug (`mart.warenstamm_stand.reihe_ab`), FoodNotify kennt keine Preishistorie. `fn_geaendert_am`
+  (`timeModified`) steht daneben: ~~kein Änderungsdatum~~ es bewegt sich an der echten Kostenstelle (19.08. bis
+  19.11.2026), aber was es auslöst, ist nicht gemessen — nicht als Preisdatum lesen.
+* **`mart.listenpreis_aenderung` hat zwei Preisarten** (`preisart`: `listenpreis`, `katalogpreis`). Eine Änderung
+  beider steht zweimal da — **immer nach `preisart` filtern**. Fällt eine Ware aus dem Katalog oder kommt hinein,
+  steht beim Katalogpreis `kein preis mehr` bzw. `preis neu`.
+* **In `mart.listenpreis_aenderung` ist der erste Wert keine Änderung** und steht nicht darin. **Ein Preis 0 ist
+  kein Preis:** der Wechsel auf oder von 0 heißt `kein preis mehr` bzw. `preis neu`, ohne Prozent — nie eine
+  Senkung auf null. **Nur `vergleichbar = true`** ist eine reine Preisänderung; ändern sich Einheit, Inhalt,
+  Gebinde, Artikelnummer oder Lieferant mit, steht es in `auch_geaendert`. Der Tag ist der, an dem wir die
+  Änderung sahen (`gueltig_ab`); geändert hat sie sich zwischen `vorher_zuletzt_gesehen_am` und `gesehen_ab`.
+* **`listenpreis_gebinde` ist gerechnet** (`listenpreis × inhalt × gebinde_menge`) und hängt an FoodNotifys
+  Inhaltsangabe, die im Testrestaurant teils unsinnig gepflegt ist (0,003 kg für eine Kiste mit zehn Rettich). An
+  der echten Kostenstelle 7984 trifft er bei 96 von 110 Katalogwaren einen Gebindepreis des Katalogs; der gelieferte
+  steht in `katalog_gebinde_preis`.
+* **Kostenstellenvergleich** (`kostenstellen_gleiche_ware`, `listenpreis_median_marke`, `abweichung_median_pct`):
+  gruppiert über Lieferant + Artikelnummer + Einheit + Inhalt derselben Marke und zählt **nur Kostenstellen mit
+  Betrieb** — Testkostenstellen werden mit geladen, setzen aber keinen Maßstab. **Ob Listenpreise über
+  Kostenstellen überhaupt auseinanderlaufen, ist nicht gemessen** — die beiden ersten Kostenstellen (11035, 12066)
+  waren das Testrestaurant ohne gemeinsame Ware, die echte 7984 ist allein. Die Spalten sind ein Angebot.
+* **`zustand`** in `mart.warenstamm_stand`, in dieser Reihenfolge: `marke nicht aktiv`, `kein zugriff` (letzter
+  Posten `kein_zugriff`, `0075`), `nie geladen`, `unvollstaendig` (eine Folgeseite meldete eine andere
+  Gesamtzahl), `veraltet` (letzter **vollständiger** Abzug älter als 36 h), `leer`, `ohne betrieb`, `ok`.
+* **Prüfzeile** „FoodNotify-Warenstamm: Kostenstelle einer aktiven Marke ohne vollstaendigen Abzug (36 h) oder
+  leer": geprüft = Kostenstellen aktiver Marken mit Zugriff, auffällig = `nie geladen`, `unvollstaendig`,
+  `veraltet`, `leer`. **Erwartung 0.** Die Testkostenstellen (zwei „AAA Testrestaurant Wilma Wunder", „CF GASTRO
+  TESTBETRIEB", „DISTRA TESTBETRIEB") werden mit geladen und stehen auf `ohne betrieb`, nicht auffällig.
+
+Gemessen am Klon ~~mit der echten Antwort von 11035~~ mit der Antwort des Testrestaurants 11035 (19.11.2026): Laden
+46 ms; `mart.listenpreis_aktuell` 5 ms (746 Zeilen), `mart.listenpreis_aenderung` 1 ms, `mart.warenstamm_stand` 7 ms.
+Mit der echten Kostenstelle 7984: Laden 25 ms; `mart.listenpreis_aktuell` 11 ms (206 Zeilen, 109 mit Katalogpreis,
+`katalog_abweichung_pct` −8,5 bis 0, 200 Lieferanten aufgelöst), `mart.warenstamm_stand` 3 ms, Zustand `ok`.
+
+### Teil B: bezahlte Preise je Lieferanten-Artikelnummer
+
+* **Schlüssel ist Lieferant + `lieferanten_nr`** (`0094`: 100 % Treffer gegen 10,1 % über `core.ware.fn_id`),
+  nicht der Name. Eine Ware, deren Schreibweise wechselte, bleibt **eine** Reihe: `ware` = jüngster Name der
+  Reihe, `namen` = Zahl der Schreibweisen, `ware_im_monat` = jüngster Name im Monat. **Wechselt der Lieferant die
+  Nummer, beginnt eine neue Reihe** (Cheddar/Gouda Mix: 268 bis 11/2025, 500096 ab 11/2025).
+* **Gebindepreis** `summe_preis / menge`, Median, min, max je Monat (wie `0041`) — **nicht** die Basiseinheit.
+  Stornos zählen nicht (`0043`). Positionen über Faktor 20 zum Median der Reihe fallen heraus (Reihe mit
+  mindestens vier Positionen); wie viele, steht in `ausreisser`. Die leere Nummer `''` zählt nicht (2.192
+  Positionen am Klon, bei einem Lieferanten 13 Waren unter derselben leeren Nummer).
+* **`veraenderung_pct` gegen den letzten Monat mit Bestellung** (`vorher_monat`, `monate_seit_vorher`), nicht
+  gegen den Kalender-Vormonat. 16.868 von 110.142 Zeilen am Klon vergleichen über eine Lücke.
+* **`verdaechtig`** wie in `0062`: Wechsel des typischen Gebindes oder der Einheit, mehrere Gebinde oder
+  Einheiten im Monat, `baseUnit`, oder Sprung um Faktor 2 in eine der beiden Richtungen. **Für „was ist teurer
+  geworden" auf `NOT verdaechtig` filtern** (Fallstrick `einkaufspreis_artikel_vergleich_letzte_bestellung`).
+* **Monat** ist der Berliner Kalendermonat des Bestellzeitpunkts — explizit, nicht die Zeitzone der Sitzung.
+* `betriebe` zählt LINA-Betriebe; Kostenstellen ohne Betriebszuordnung zählen nur in `kostenstellen`.
+
+**Gemessen am Klon** (Stand `0156`, 634.175 Positionen bis 04.08.2026): Basis 2,5 s (ohne Materialisierung je
+Abfrage 3,0–4,3 s — deshalb materialisiert), auf der Sicht 14–36 ms. 110.142 Zeilen, 12.542 Reihen, 1.840 mit
+mehr als einem Namen. Drei Waren von Hand geprüft:
+„Kerze 36 Stunden" (Distra 14200): Juli 2026 5 Positionen, 350,16 EUR, Median 58,36 — gleich der Rohzählung;
+Januar 2026 +2,7 % gegen Dezember. Cheddar/Gouda Mix: zwei Reihen (268, 500096) wie erwartet. Grana Padano
+gehobelt 500 g (CHEFS CULINAR 18858570): bei Enchilada eine Reihe, durchgehend 8,82 je Gebinde und
+`verdaechtig` (zwei Gebindeangaben im Monat) — `mart.einkaufspreis_monat` springt für dieselbe Ware je nach
+Schreibweise zwischen 8,82 und 17,64.
+
+Noch **keine Dashboard-Karte**. Der MCP-Katalogabzug aus Produktion steht aus.

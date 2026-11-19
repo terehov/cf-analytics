@@ -321,6 +321,8 @@ lauf('Ende-zu-Ende', () => {
       'Finanzwege: Tag mit Kassen-Fehleingabe, Zahlarten ausgeblendet (60 Tage)',
       // Seit 0155: nur Anbindungen aktiver Marken (POS_ARTIKEL_MARKEN), Erwartung 0.
       'FoodNotify-Kassenartikel: Anbindung einer aktiven Marke ohne frischen Abruf (36 h) oder leer',
+      // Seit 0157: nur Kostenstellen aktiver Marken (WARENSTAMM_MARKEN) mit Zugriff, Erwartung 0.
+      'FoodNotify-Warenstamm: Kostenstelle einer aktiven Marke ohne vollstaendigen Abzug (36 h) oder leer',
       /**
        * Beide seit 0079. Zwei Zeilen, weil es zwei verschiedene Fehler
        * sind: eine abgewiesene Datei ist ein Tippfehler von heute, eine

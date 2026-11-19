@@ -52,6 +52,10 @@ const SICHTEN = [
   // diese beiden trugen die restlichen 5,8 s von Dashboard 16 fast allein.
   'mart.einkauf_betrieb_monat_basis',
   'mart.einkauf_pruefung_basis',
+  // Migration 0157: bezahlte Preise je Lieferant und Lieferanten-Artikelnummer.
+  // Liest die Positionen wie die beiden Preissichten oben, keine andere Sicht.
+  // 2,5 s am Klon (634.175 Positionen).
+  'mart.einkaufspreis_artikel_monat_basis',
 ]
 
 /** Notnagel gegen stille Blockaden, keine erwartete Laufzeit. */

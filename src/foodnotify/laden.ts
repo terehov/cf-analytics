@@ -27,6 +27,7 @@ import * as t from './transform'
 import * as inv from './inventur'
 import * as rz from './rezept'
 import * as pa from './pos_artikel'
+import * as ws from './warenstamm'
 import { bestellansichtLesen } from './bestellansicht'
 import type { FnEndpunkt } from './endpunkte'
 import { config } from '../config'
@@ -65,7 +66,10 @@ export async function fnLaden(k: FnKontext): Promise<number> {
    * immer speichern: auch eine verdächtige Antwort gehört in den Raw-Layer —
    * sie ist der Beleg dafür, was der Server gesagt hat.
    */
-  const verdaechtig = zeilen === 0 && await kamFrueherEtwas(k)
+  // Nicht für den Warenstamm (0157): dessen Lader prüft „0 Produkte, obwohl
+  // Bestand" selbst und schärfer (er kennt den Bestand), und eine zweite,
+  // allgemeinere Meldung derselben Antwort wäre nur Rauschen.
+  const verdaechtig = zeilen === 0 && k.ep.key !== 'fn:warenstamm' && await kamFrueherEtwas(k)
 
   /**
    * DIE FORM VOR DEM LADEN PRÜFEN — bisher nur für Rezepturen (Review
@@ -79,6 +83,9 @@ export async function fnLaden(k: FnKontext): Promise<number> {
     // Kassenartikel (0155): eine fremde Form sähe sonst aus wie „kein Artikel
     // hat ein Rezept" oder „alle Artikel fehlen seit heute".
     : k.ep.key === 'fn:pos_artikel' ? pa.posArtikelStrukturFehler(k.daten)
+    // Warenstamm (0157): ein umbenanntes unitPrice sähe sonst aus wie „alle
+    // Preise entfallen", eine fremde Hülle wie „das Sortiment ist gestrichen".
+    : k.ep.key === 'fn:warenstamm' ? ws.warenstammStrukturFehler(k.daten)
     : null
 
   const ergebnis = await inTransaktion(async c => {
@@ -281,6 +288,56 @@ export async function fnLaden(k: FnKontext): Promise<number> {
           [ksKey, Number(verbindung), antwort.artikel.length, antwort.standort, antwort.restaurantId,
            antwort.kannRezepteAnlegen, antwort.ingestHinweise, rawId])
         return antwort.artikel.length
+      }
+
+      /**
+       * Warenstamm mit Listenpreis (0157). Geladen wird IN SQL
+       * (core.warenstamm_laden): dieselbe Funktion baut core aus raw neu auf
+       * (core.warenstamm_neu_aufbauen), und der Verlauf des Listenpreises
+       * entsteht nur aus der Reihenfolge der Antworten — eine zweite Fassung
+       * in TypeScript liefe auseinander.
+       *
+       * Die Rohantwort steht oben in DIESER Transaktion; `abgerufen_am = now()`
+       * findet sie in ihrer Partition (now() ist je Transaktion fest und der
+       * Spaltenstandard). Ein Abbruch (Zeitgrenze, ECONNRESET, HTTP 5xx) kommt
+       * hier nie an: der Client meldet ihn als Fehler, core bleibt, wie es war.
+       *
+       * Ein Befund der Funktion (Seite kürzer als gemeldet, 0 Produkte bei
+       * vorhandenem Bestand, fremde Form) heißt: NICHTS geschrieben. Dann wie
+       * bei einer fremden Form — Befund nach sync.schema_abweichung, der
+       * Posten scheitert sichtbar.
+       */
+      case 'fn:warenstamm': {
+        const r = await c.query<{ e: { befund?: string; produkte?: number; seite?: number; seiten?: number } }>(
+          `SELECT core.warenstamm_laden(a.id, a.abgerufen_am) AS e
+             FROM raw.api_antwort a
+            WHERE a.id = $1 AND a.abgerufen_am = now()`,
+          [roh.rows[0]?.id])
+        const e = r.rows[0]?.e
+        if (!e) throw new Error('fn:warenstamm: die eben gesicherte Rohantwort wurde nicht wiedergefunden')
+        if (e.befund) {
+          struktur = e.befund
+          await c.query(
+            `INSERT INTO sync.schema_abweichung (endpunkt, erwartet, tatsaechlich)
+             VALUES ($1, $2, $3)`,
+            [k.ep.key, JSON.stringify({ endpunkt: k.ep.key, hinweis: 'vollständige Seite der gemessenen Form' }),
+             JSON.stringify({ probleme: [{ pfad: 'payload.data', problem: `${e.befund}. Parameter: ${JSON.stringify(k.parameter)}` }] })])
+          return null
+        }
+        /**
+         * SEITE 1 REIHT DIE ÜBRIGEN EIN — heute gibt es keine (page_size 1000;
+         * gemessen 206 Produkte an 7984, 746 im Testrestaurant). Meldet FoodNotify mehr, kommen
+         * sie im selben Lauf, und erst wenn alle da sind, gilt der Abzug als
+         * vollständig (core.ware_stand_abruf). Sperre 'offen': morgen soll
+         * dieselbe Seite wieder geholt werden dürfen.
+         */
+        if (e.seite === 1 && (e.seiten ?? 1) > 1) {
+          for (let n = 2; n <= e.seiten!; n++) {
+            await folgepostenEinreihen(c, k.markeKey, 'fn:warenstamm',
+              { erpId: String(k.parameter.erpId), seite: String(n) }, k.von, k.ep.prioritaet, 'offen', false)
+          }
+        }
+        return e.produkte ?? 0
       }
 
       case 'fn:bestellungen': {

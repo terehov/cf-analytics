@@ -184,7 +184,7 @@ Monatsersten gesetzt, `--historie` überspringt sie.
 | `articleApi:franchise` | `/wawi/rezept/articleApi?franchise=1` | `core.warengruppe`, `core.artikel_warengruppe_stand` |
 | `wawi:units` | `/wawi/api/units` | `core.einheit` |
 | `wawi:suppliers` | `/wawi/api/suppliers` | `core.lieferant` — **Feld-Whitelist, siehe unten** |
-| `wawi:items` | `/wawi/api/items?archive=0` | `core.ware`, `core.ware_stand`, `core.einkaufspreis_stand` |
+| `wawi:items` | `/wawi/api/items?archive=0` | ~~`core.ware`, `core.ware_stand`, `core.einkaufspreis_stand`~~ — LINA-WAWI sind Demodaten (Regel 5), die Tabellen hat `0030` abgeräumt; `core.ware_stand` ist seit `0157` FoodNotifys Warenstamm |
 | `wawi:orders` | `/wawi/api/orders` | `core.bestellung`, `core.bestellposten` |
 | `wawi:inventory` | `/wawi/inventory/inventory` | `core.inventurtermin` |
 
@@ -1088,8 +1088,10 @@ core.kostenstelle (connection_id, kassensystem, betrieb_key)
   Zuordnungen, bei denen Artikel- und Rezeptname auseinanderlaufen.
 * **Keine Historie vor dem ersten Abruf.** `core` hält den Zustand der letzten erfolgreichen Antwort; was
   vorher zugeordnet war, weiß niemand. Ab dem ersten Abruf liegt jede Antwort in `raw`.
-* **Keinen Verkauf aus FoodNotify.** FoodNotifys eigener Verkaufsimport steht seit 31.08.2026 still
-  (Leseprobe Abschnitt 4); der Umsatz in den Sichten kommt aus LINA (`mart.artikel_monat`).
+* **Keinen Verkauf aus FoodNotify.** ~~FoodNotifys eigener Verkaufsimport steht seit 31.08.2026 still
+  (Leseprobe Abschnitt 4)~~ — widerlegt: das galt für das Testrestaurant; an der echten Kostenstelle 7984 läuft er
+  (jüngste Verkäufe 18.11.2026, `payloads/foodnotify-2026-11/fn-probe-2026-11-19-echt.md`). Geladen werden
+  FoodNotify-Verkäufe trotzdem nicht; der Umsatz in den Sichten kommt aus LINA (`mart.artikel_monat`).
 * **`umsatz_im_feed_pct` liegt unter 100, auch wenn die Brücke trägt.** Auf einem lokalen Klon mit den drei
   echten Antworten gemessen (19.11.2026, LINA-Umsatz Mai–Juli 2026): 81,8–88,5 % des Artikelumsatzes der drei
   Betriebe standen im Feed der einen geladenen Anbindung, 71,6–82,4 % trugen ein Rezept. Was fehlt, sind
@@ -1099,6 +1101,77 @@ core.kostenstelle (connection_id, kassensystem, betrieb_key)
 **Wo man nachsieht, ob es noch läuft:** `SELECT zustand, count(*) FROM mart.pos_artikel_abdeckung GROUP BY 1;`
 (Erwartung: nur `ok`, `ohne betrieb`, `marke nicht aktiv`), `SELECT * FROM mart.quelle_zulauf WHERE quelle LIKE
 '%pos_artikel';`.
+
+## FoodNotify: Warenstamm und Listenpreis (seit `0157`, 19.11.2026)
+
+**Gebaut gegen die Attrappe, in Produktion noch nicht gelaufen.** Vorerst **nur Wilma Wunder**
+(`WARENSTAMM_MARKEN`, Begründung in `entscheidungen.md`).
+
+**Quelle:** `GET /api/{erpId}/products?page=1&page_size=1000` (Cookie-Sitzung), ein Aufruf je Kostenstelle und
+Nacht (`fn:warenstamm`); mehr Seiten nur, wenn die Antwort mehr meldet. Gemessen am 19.11.2026
+(`payloads/foodnotify-2026-11/fn-probe-2026-11-19-tag.md`): ~~erpId 11035, 746 Produkte in einer Antwort, 1,07 MB,
+6,4 s~~ — 11035 ist das „AAA Testrestaurant Wilma Wunder Bar". An der echten Kostenstelle 7984 (Bar Ballplatz,
+`fn-probe-2026-11-19-echt.md`): 206 Produkte in einer Antwort, 813 KB, 4,6 s; erp-Hülle mit `current_page`,
+`current_page_size`, `page_count`, `total_count`, `data[]`.
+
+```text
+core.kostenstelle (erp_id, marke_key, betrieb_key)
+  └─ core.ware_stand (kostenstelle_key, produkt_id)              Zustand der letzten Antwort
+       ├─ core.listenpreis_beobachtung (… , gesehen_ab)          Verlauf: eine Zeile je neuem Wert
+       ├─ lieferant_fn_id → core.lieferant (marke_key, fn_id)     shop.id (7984: 200 von 200 aufgelöst)
+       ├─ artikelnummer   → core.bestellposition.lieferanten_nr   NUR zusammen mit dem Lieferanten
+       └─ rezept_fn_id    → core.rezept (marke_key, fn_id)        Eigenproduktion
+```
+
+**Wie die Tabellen zusammenfinden:**
+
+* **Schlüssel ist die Produkt-`id` der Kostenstelle** (`core.ware_stand.produkt_id`). Dieselbe Ware in Bar und
+  Küche sind zwei Produkte. Nicht `core.ware` — die ist je Marke geschlüsselt und kennt den Lieferanten nicht.
+* **`artikelnummer` ist die Lieferanten-Artikelnummer**, dieselbe Art wie `core.bestellposition.lieferanten_nr`
+  und `core.zutat.artikelnummer` — und **nur mit dem Lieferanten sicher eindeutig**: im Testrestaurant 11035 trägt
+  dieselbe Nummer zwei Lieferanten (739 Nummern für 742 Produkte, Lieferant + Nummer 742 von 742); an der echten
+  Kostenstelle 7984 sind die 194 Nummern auch allein eindeutig. Wer ohne Lieferanten joint, kann fremde Waren
+  treffen. 12 von 206 Produkten bei 7984 haben keine Nummer (Eigenproduktion, Kleinlieferanten mit leerem `artikelId`).
+* **`lieferant_fn_id` = `core.lieferant.fn_id`** derselben Marke (Testrestaurant 11 von 11, 7984: 200 von 200
+  Produkten mit Lieferant aufgelöst). Aufgelöst wird in den Sichten
+  (`mart.listenpreis_aktuell.lieferant_key`); NULL, solange von dem Lieferanten keine Bestellung geladen ist.
+* **Der Warenstamm gegen den Einkauf:** am Klon gegen die letzte Bestellung derselben Ware gemessen (Lieferant +
+  Nummer): ~~733 von 742 Produkten mit Lieferant gefunden~~ (Testrestaurant gegen ganz Wilma Wunder); echte
+  Kostenstelle 7984 gegen ihre eigenen Bestellungen: 163 von 194 Produkten mit Nummer gefunden.
+
+**Was `unitPrice` ist:** der **Preis je Einheit** (`unit.name`: kg, l), nicht je Gebinde, und er **folgt dem Preis
+der letzten Bestellung**: bei 7984 treffen 141 von 163 den Preis je Basiseinheit der letzten eigenen Bestellung auf
+2 %, 28 den Gebindepreis (bei Inhalt ≠ 1: 111 gegen 2); seit Juni bestellt 99 von 106. ~~438 von 733 … 170 von 181~~
+waren Testrestaurant-Zahlen. Der Gebindepreis ist `listenpreis × inhalt × gebinde_menge` (gerechnet).
+
+**Was `pricePerUnit` ist:** ~~in der Antwort immer `null` — das im Inventar genannte `pricePerUnit` trägt keinen
+Preis~~ (Testrestaurant ohne Katalog). Bei 7984 der **Preis je Einheit im Lieferantenkatalog**
+(`{quantity: 1, unit: KG|L, price}`), nur bei den Waren mit Katalog (`isOrderable`, 110 von 206; 109 mit Preis),
+dazu `packagingUnit(s)` mit Bestelleinheit und Gebindepreis. Gleich `unitPrice` bei 105 von 109; die vier anderen
+liegen darunter, und dreimal ist `unitPrice` genau die letzte Bestellung — der Katalog bewegt sich zuerst.
+Geladen als `katalogpreis` und `katalog_gebinde*`.
+
+**Was die Zahlen nicht sagen:**
+
+* **Keine Preishistorie vor dem ersten Abzug.** ~~`timeModified` ist kein Preisänderungsdatum (650 von 746 tragen
+  2024).~~ `timeModified` bewegt sich an der echten Kostenstelle (19.08. bis 19.11.2026; im Testrestaurant meist
+  2024), aber was es auslöst, ist nicht gemessen — es steht als `fn_geaendert_am` da, nicht als Preisdatum. Der
+  Verlauf entsteht nur aus unseren täglichen Beobachtungen; die erste Zeile je Produkt ist der vorgefundene Stand,
+  keine Änderung. Der Tag einer Änderung ist der Tag, an dem wir sie sahen.
+* **Kein bezahlter Preis.** Bezahlt wird, was in `core.bestellposition` steht (`mart.einkaufspreis_artikel_monat`).
+  Weil der Listenpreis dem Bestellpreis folgt, heißt eine Listenpreisänderung meist „es wurde zu einem neuen Preis
+  bestellt"; „der Lieferant hat seinen Katalog geändert" zeigt der Katalogpreis.
+* **Kein Bestandsverlauf.** `bestand_menge`/`bestand_wert` sind der letzte Stand; jede Antwort liegt in `raw`.
+* **Ein Preis 0 ist kein Preis** (Testrestaurant 4 von 746, 7984 keiner), keine Gratisware. Ein fehlender
+  Katalogpreis ist ebenfalls kein Preis, nicht 0.
+* **Eine Kostenstelle ist nicht immer ein echter Betrieb:** 11035 und 12066 sind „AAA Testrestaurant Wilma
+  Wunder" (Bar, Küche), dazu „CF GASTRO TESTBETRIEB" und „DISTRA TESTBETRIEB". Sie werden mit geladen und stehen
+  in `mart.warenstamm_stand` auf `ohne betrieb`; der Kostenstellenvergleich zählt sie nicht mit.
+
+**Bezahlte Preise je Artikelnummer (Teil B, ohne neuen Abruf):** `mart.einkaufspreis_artikel_monat` führt die
+Belegpreise aus `core.bestellposition` je Lieferant und `lieferanten_nr` statt je Warenname. Gemessen am Klon
+(19.11.2026, 634.175 Positionen): 12.542 Reihen, davon 1.840 mit mehr als einem Namen — Reihen, die in
+`mart.einkaufspreis_monat` (nach Name) zerfallen. 2.192 Positionen tragen die leere Nummer `''` und zählen nicht.
 
 ## Personal je Stunde — LINAs offizielle Schnittstelle (TPAPI, seit `0149`, 09.11.2026)
 

@@ -16,6 +16,12 @@ die Uhrzeit, damit ein zweiter Lauf am selben Tag den ersten nicht überschreibt
 
 Nur Wilma Wunder, eine Anbindung (2052), eine Kostenstelle (erpId 11035).
 
+> **Korrektur 19.11.2026: erpId 11035 ist „AAA Testrestaurant Wilma Wunder Bar".** Abschnitt 2 (Warenstamm) misst
+> also ein Testrestaurant **ohne angebundenen Lieferantenkatalog**. Die Seitengröße (`page_size` angenommen,
+> nicht gekappt) hält an der echten Kostenstelle 7984; **die Füllgrade und die `timeModified`-Aussage gelten nur
+> für das Testrestaurant**. Echte Werte: `fn-probe-2026-11-19-echt.md`. Abschnitt 1 (`link-targets`, Anbindung
+> 2052, echt) bleibt gültig.
+
 ## Aufrufe
 
 | Nr | Pfad | Status | Bytes | ms |
@@ -74,14 +80,18 @@ Rezepte) und stehen **nicht** auf der Erlaubtliste. Aufgenommen sind genau zwei 
   geladen" ist `zeilen = total_count`.
 * Sortierung: `order_by` leer, `order_direction` `DESC`; die Zeilen liegen nach `id` aufsteigend.
 
-### Preisfelder und Füllgrad (page_size 1000, 746 Produkte)
+### Preisfelder und Füllgrad (page_size 1000, 746 Produkte) — **Testrestaurant**
+
+> An der echten Kostenstelle 7984 (206 Produkte): `pricePerUnit` 52,9 %, `packagingUnit` 53,4 %, `packagingUnits`
+> 52,9 % gefüllt — genau die Waren mit Lieferantenkatalog (`isOrderable`, 110 von 206); `preferredShopUnit` 0 %,
+> `ingredient.artikelId` 94,2 %, `timeModified` 19.08. bis 19.11.2026. Die Tabelle darunter ist das Testrestaurant.
 
 | Feld | gefüllt | Typ / Lesart |
 |---|---|---|
 | `unitPrice` | 746 (100 %) | Zahl; **das ist das Preisfeld**, bei 4 Produkten 0 |
-| **`pricePerUnit`** | **0** | **bei allen 746 `null`** — das im Inventar genannte Feld trägt keinen Preis |
+| **`pricePerUnit`** | **0** | **bei allen 746 `null`** — ~~das im Inventar genannte Feld trägt keinen Preis~~ (Testrestaurant ohne Katalog; bei 7984 der Katalogpreis je Einheit) |
 | `packagingQuantity` | 742 (99,5 %) | Zahl |
-| `packagingUnit`, `packagingUnits` | **0** | immer `null` |
+| `packagingUnit`, `packagingUnits` | **0** | ~~immer `null`~~ im Testrestaurant `null`; bei 7984 Bestelleinheiten mit Preis |
 | `baseUnitQuantity`, `baseUnitUnit` | **0** | immer `null` |
 | `preferredShopUnit` | 601 (80,6 %) | Text |
 | `unit` | 746 | Objekt `{id, name}` |
@@ -93,14 +103,20 @@ Rezepte) und stehen **nicht** auf der Erlaubtliste. Aufgenommen sind genau zwei 
 Bei 20 und 100 Zeilen sehen die Füllgrade gleich aus (95 und 99 %); `preferredShopUnit` fiel erst in der
 Vollmenge auf 80,6 %.
 
-* **`timeModified` taugt nicht als Preisänderungsdatum:** 650 von 746 Produkten tragen 2024 (frühestens 10.12.2024),
+* ~~**`timeModified` taugt nicht als Preisänderungsdatum:**~~ (gilt für das Testrestaurant; bei 7984 liegt
+  `timeModified` zwischen 19.08. und 19.11.2026 — es bewegt sich, was es auslöst, ist nicht gemessen)
+  650 von 746 Produkten tragen 2024 (frühestens 10.12.2024),
   83 tragen 2025, **13** tragen 2026 (zuletzt 21.10.2026). Die Standardseite zeigte dieselbe Untergrenze und als
   Obergrenze 26.11.2025 — sie liegt nicht in Änderungsreihenfolge. Ob sich der Preis (`unitPrice`) ohne
   `timeModified`-Änderung bewegt, ist nicht gemessen.
-* `isOrderable` ist bei **allen** 746 `false`, `stock` ist bei allen Zeilen vorhanden (Bestand ≠ 0 bei 87,8 %).
-* **Preis- und Verpackungsangabe sind für den Wareneinsatz nicht ausreichend belegt:** Eine Verpackungseinheit
+* `isOrderable` ist bei **allen** 746 `false` (Testrestaurant; bei 7984 110 von 206 `true` — die Waren mit
+  Katalog), `stock` ist bei allen Zeilen vorhanden (Bestand ≠ 0 bei 87,8 %).
+* ~~**Preis- und Verpackungsangabe sind für den Wareneinsatz nicht ausreichend belegt:** Eine Verpackungseinheit
   (`packagingUnit`) fehlt überall; `unitPrice` hängt an `unit`/`unitQuantity`. Wie der Preis je Basiseinheit zu
-  rechnen ist, ist **nicht** gemessen — und ob er der Bestellpreis ist, gegen `core.bestellposition` zu prüfen.
+  rechnen ist, ist **nicht** gemessen — und ob er der Bestellpreis ist, gegen `core.bestellposition` zu prüfen.~~
+  **Beantwortet 19.11.2026 (am Klon, Migration `0157`):** `unitPrice` ist der Preis **je Einheit** (kg, l) und
+  folgt dem Preis der letzten Bestellung — an der echten Kostenstelle 7984 gegen ihre eigenen Bestellungen 141 von
+  163 auf 2 %. Die Verpackungseinheit fehlt nur im Testrestaurant.
 
 ## Was offen bleibt
 

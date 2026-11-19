@@ -5186,3 +5186,87 @@ offenen Warenkorb).
 **Nebenbei entschieden:** `core.bestellung.geliefert_am` wird in derselben Migration aus `raw` zurückgebaut. Ohne die
 Reparatur wären alle Wochentage der Sicht um einen Tag verschoben (Fehlerkatalog, 19.11.2026). Der Lader wird im selben
 Commit korrigiert, nicht erst später.
+
+## 19.11.2026 — Warenstamm täglich als Stand, Listenpreis-Verlauf, Einkaufspreis-Reihe je Artikelnummer (`0157`)
+
+**Anlass.** Eugene: die Preisentwicklung der Waren besser erfassen. Zwei Wege: der Warenstamm
+(`/api/{erpId}/products`, Leseprobe 19.11.2026: alle 746 Produkte einer Kostenstelle in einem Aufruf mit
+`page_size=1000`) und die vorhandenen Bestellpositionen, die bisher nach Warenname ausgewertet werden.
+
+**Entschieden:**
+
+1. **`core.ware_stand` neu, Schlüssel (Kostenstelle, Produkt-`id`).** Nicht `(ware_key, monat)` wie in `0030`
+   und nicht `(Kostenstelle, artikelId)`. Der Warenstamm gehört der Kostenstelle (Bar und Küche führen dieselbe
+   Ware als zwei Produkte mit eigenem Preis). `core.ware` fasst dieselbe Lieferantennummer zweier Lieferanten zu
+   einer Ware zusammen (`0042`), ein `ware_key` wäre also ungenauer als die Quelle. `artikelId` ist je
+   Kostenstelle nicht zugesichert eindeutig (739 Nummern für 742 Produkte im Testrestaurant 11035; an der echten
+   Kostenstelle 7984 194 von 194), bei Eigenproduktion und Kleinlieferanten leer, und ihr
+   Wechsel (`0094`: 268 → 500096) soll im Verlauf als Änderung erscheinen statt eine Reihe abzubrechen. Die
+   Produkt-`id` ist je Antwort eindeutig (746 von 746) und von FoodNotify vergeben.
+2. **Speichern nach Änderung.** Stand je Produkt in `core.ware_stand` (überschrieben), Verlauf in
+   `core.listenpreis_beobachtung`: eine Zeile je neuem Wert von Listenpreis, Einheit, Inhalt, Gebinde,
+   Artikelnummer, Lieferant — Muster `core.umsatzprognose_beobachtung` (`0154`). Eine Zeile je Tag hätte ~25.000
+   fast immer gleiche Zeilen je Nacht dupliziert, eine Monatskopie die Änderung innerhalb des Monats verschluckt.
+   Die fünf Begleitfelder gehören zum Wert, weil ein Kilopreis ohne sie nicht lesbar ist.
+3. **Kein Bestandsverlauf** (nicht beauftragt). `stock.sumAmount`/`sumPrice` stehen als letzter Stand in
+   `core.ware_stand`; jede Antwort liegt in `raw` (~~118 KB je Antwort, ~4 MB je Nacht~~ — Testrestaurant; echte
+   Kostenstelle 7984: 304 KB je Antwort, hochgerechnet ~10 MB je Nacht).
+4. **Der Lader steht in SQL** (`core.warenstamm_laden`), und der Neuaufbau aus `raw`
+   (`core.warenstamm_neu_aufbauen`) ruft dieselbe Funktion in Abrufreihenfolge. Begründung: der Verlauf entsteht
+   erst aus der Reihenfolge der Antworten; eine Fassung in TypeScript und eine zweite für den Neuaufbau liefen
+   auseinander (Regel 4). Zeit ist immer `raw.api_antwort.abgerufen_am`. TypeScript prüft nur die Form vorher
+   (zod, genauere Gründe). Abweichung vom Vorbild `fn:pos_artikel`, das in TypeScript lädt — dort entsteht kein
+   Verlauf, der Zustand der letzten Antwort genügt.
+5. **Folgeseiten statt Vertrauen in `page_size`.** 1000 ist gemessen und reicht für die größte gemessene
+   Kostenstelle (746); eine Obergrenze darüber ist ungemessen. Seite 1 reiht weitere Seiten ein, jede Seite muss
+   so viele Zeilen tragen, wie `total_count` und `current_page_size` sagen, und erst ein vollständiger Abzug
+   setzt `fehlt_seit`. `page_size` ist kein Schalter (`WARENSTAMM_SEITENGROESSE`): ein anderer Wert wäre eine
+   ungemessene Annahme.
+6. **Nur Wilma Wunder** (`WARENSTAMM_MARKEN`, Vorgabe `wilma_wunder`), wie bei `POS_ARTIKEL_MARKEN`: die anderen
+   Marken sind ungemessen. Ergänzen heißt messen (`bun run fn-probe --marke … --nur warenstamm
+   --seitengroessen`), dann eintragen — ohne Codeänderung.
+7. **Kostenstellen mit dauerhaftem 403 nicht mehr einreihen.** Nach `kein_zugriff` (`0075`) begänne sonst jeden
+   Tag ein neuer Posten denselben Kreislauf; sichtbar bleibt die Kostenstelle als `kein zugriff`.
+8. **Teil B: eine neue Sicht statt Umbau der alten.** `mart.einkaufspreis_artikel_monat` gruppiert je Marke,
+   Lieferant und `lieferanten_nr`; `mart.einkaufspreis_monat` und `_veraenderung` bleiben unverändert (Karten und
+   MCP-Fallstricke hängen an ihnen). Gebindepreis wie `0041`, Stornoregel wie `0043`, Gebindewarnung wie `0062`;
+   Vergleich mit dem **letzten Monat mit Bestellung**, weil die meisten Waren nicht jeden Monat bestellt werden
+   und eine Reihe mit Lücken sonst gar keinen Vergleich hat. **Materialisiert**, weil Median und Vorgänger die
+   ganze Reihe brauchen und ein Filter deshalb nicht nach innen wirkt (3,0–4,3 s je Abfrage am Klon); Refresh im
+   Einkaufs-Nachlauf, Eintrag in `mart.materialisierung_stand`.
+
+~~`0030`: `core.ware_stand` als Monatsmomentaufnahme je Ware (`PRIMARY KEY (ware_key, monat)`), damit eine
+Rückrechnung auf einen vergangenen Monat nicht mit heutigen Preisen rechnet.~~ Revidiert mit `0157`: der Verlauf
+steht nach Änderung in `core.listenpreis_beobachtung`, der Stand je Kostenstelle in `core.ware_stand`. Die Tabelle
+war leer, der Umbau ohne Datenverlust (die Migration bricht ab, wenn doch Zeilen darin stehen).
+
+**Befund, der die Deutung bestimmt.** `unitPrice` ist der Preis **je Einheit** (kg, l) und folgt ~~sehr
+wahrscheinlich~~ dem Bestellpreis (~~170 von 181 seit Juni bestellten Waren~~ — das war der Warenstamm des
+Testrestaurants; an der echten Kostenstelle 7984 gegen ihre eigenen Bestellungen 141 von 163, seit Juni 99 von 106
+auf 2 % gleich dem Preis je Einheit der letzten Bestellung). Der Listenpreis ist also keine unabhängige Preisliste;
+die belastbare Teuerungsreihe ist die bezahlte (`mart.einkaufspreis_artikel_monat`). Steht so in den
+Sichtkommentaren und als Fallstrick.
+
+**Verworfen.** `core.ware` als Schlüssel (ungenauer als die Quelle, siehe 1). ~~`pricePerUnit` als Preisfeld
+(immer `null`). `timeModified` als Änderungsdatum (650 von 746 tragen 2024).~~ (Beides am Testrestaurant
+gemessen, revidiert unten.) Eine Tageskopie des Warenstamms in `core` (`raw` hält jede Antwort). Ein eigener Takt
+für den Warenstamm (Regel 3). Die alte Namenssicht umbauen.
+
+**Revidiert am selben Tag, nach der Messung an einer echten Kostenstelle** (7984, Bar Ballplatz,
+`payloads/foodnotify-2026-11/fn-probe-2026-11-19-echt.md`; die erste Formvorlage war das „AAA Testrestaurant",
+`fehlerkatalog.md` 19.11.2026):
+
+9. **Zwei Preise statt einem.** `pricePerUnit` ist dort bei den 110 Waren mit Lieferantenkatalog gefüllt — der
+   **Katalogpreis je Einheit** — und weicht bei 4 von 109 vom `unitPrice` ab (der Katalog war billiger, `unitPrice`
+   stand auf der letzten Bestellung). Er kommt als `katalogpreis` in `core.ware_stand` **und in den Verlauf**, dazu
+   die Bestelleinheit mit Preis (`katalog_gebinde*`, `packagingUnits` als `jsonb`). In `mart.listenpreis_aenderung`
+   unterscheidet `preisart` die beiden; eine Änderung beider steht zweimal da. Verworfen: den Katalogpreis zum
+   „Listenpreis" umzubenennen — der Auftrag nannte `unitPrice` so, und eine Umbenennung hätte jede Tabelle und Sicht
+   getroffen; die Kommentare sagen jetzt, welcher Preis was ist.
+10. **`timeModified` als Spalte, nicht als Preisdatum.** Es bewegt sich an der echten Kostenstelle (19.08. bis
+    19.11.2026), aber eine einzelne Antwort zeigt nicht, was es auslöst. Ob es mit dem Preis wandert, messen zwei
+    Nächte `raw` nach dem Deploy (`offene-punkte.md`).
+11. **Testkostenstellen nicht filtern, sondern sichtbar lassen.** Der Nachtlauf zieht sie mit ab (Wilma Wunder: 4 von
+    35 mit `erp_id`); sie stehen ohne Betrieb auf `ohne betrieb`. Nur der Kostenstellenvergleich rechnet mit
+    Kostenstellen mit Betrieb — ein Testpreis soll keinen Median setzen. Die Probe (`src/fn_probe.ts`) überspringt
+    sie bei der automatischen Auswahl, weil dort der Name nicht sichtbar war.

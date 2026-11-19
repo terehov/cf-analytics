@@ -27,7 +27,7 @@
  */
 import { query } from '../db/pool'
 import { log } from '../lib/log'
-import { config, posArtikelMarken } from '../config'
+import { config, posArtikelMarken, warenstammMarken } from '../config'
 import { ENDPUNKTE } from '../lina/endpunkte'
 import { BETRIEBSBERICHTE, type Fensterklasse } from '../lina/betriebsberichte'
 import { TPAPI_ENDPUNKTE } from '../tpapi/endpunkte'
@@ -345,6 +345,19 @@ export const QUELLEN: readonly Quelle[] = [
       ? `Marken: ${posArtikelMarken().join(', ')} (POS_ARTIKEL_MARKEN). Je Anbindung: mart.pos_artikel_abdeckung.`
       : 'POS_ARTIKEL_MARKEN leer: Kassenartikel bewusst fuer keine Marke geholt.' },
   /*
+   * WARENSTAMM MIT LISTENPREIS (0157). Ein Posten je Kostenstelle und Tag im
+   * Tagesgeschäft, `erwartet` am Schalter WARENSTAMM_MARKEN wie oben. Gemessen
+   * an sync.aufgabe (wird gefragt?) und an core:ware_stand weiter unten (kommt
+   * an?). Je KOSTENSTELLE misst das nicht — das tut mart.warenstamm_stand
+   * (zustand) mit seiner Zeile in mart.pruefung_uebersicht.
+   */
+  { quelle: 'fn:warenstamm', bezeichnung: 'Warenstamm je Kostenstelle mit Listenpreis und Bestand',
+    system: 'foodnotify', endpunkt: 'fn:warenstamm', kadenz_stunden: TAEGLICH,
+    erwartet: warenstammMarken().length > 0,
+    bemerkung: warenstammMarken().length > 0
+      ? `Marken: ${warenstammMarken().join(', ')} (WARENSTAMM_MARKEN). Je Kostenstelle: mart.warenstamm_stand.`
+      : 'WARENSTAMM_MARKEN leer: Warenstamm bewusst fuer keine Marke geholt.' },
+  /*
    * Inventuren entstehen nicht täglich. Der Lauf zieht bei jedem Lauf die
    * jeweils letzte Seite nach; ob dabei Zeilen anfallen, hängt am Betrieb.
    * Eine Woche ist die Grenze, ab der „gar keine Inventur mehr" eine
@@ -583,9 +596,11 @@ export const QUELLEN: readonly Quelle[] = [
    * fn:pos_artikel `core.pos_artikel` — vorerst nur für Wilma Wunder
    * (POS_ARTIKEL_MARKEN); erwartet, solange der Schalter eine Marke nennt.
    *
-   * `core.ware_stand` steht hier als `erwartet: false`, weil ein Alarm ohne
+   * ~~`core.ware_stand` steht hier als `erwartet: false`, weil ein Alarm ohne
    * Handlungsmöglichkeit nur die Prüfzeile entwertet. Was daraus folgt,
-   * steht in `docs/offene-punkte.md`.
+   * steht in `docs/offene-punkte.md`.~~ Seit 0157 (19.11.2026) schreibt
+   * fn:warenstamm `core.ware_stand` — vorerst nur für Wilma Wunder
+   * (WARENSTAMM_MARKEN); erwartet, solange der Schalter eine Marke nennt.
    */
   { quelle: 'core:rezept', bezeichnung: 'Rezepte (FoodNotify)',
     system: 'foodnotify', tabelle: { schema: 'core', name: 'rezept', zeitspalte: 'zuletzt_am' },
@@ -604,10 +619,17 @@ export const QUELLEN: readonly Quelle[] = [
     bemerkung: posArtikelMarken().length > 0
       ? 'Seit 0155 befuellt (fn:pos_artikel), gemessen an zuletzt_gesehen_am. Je Anbindung: mart.pos_artikel_abdeckung.'
       : 'POS_ARTIKEL_MARKEN leer: kein Zulauf erwartet.' },
-  { quelle: 'core:ware_stand', bezeichnung: 'Warenhistorie (FoodNotify)',
-    system: 'foodnotify', tabelle: { schema: 'core', name: 'ware_stand', zeitspalte: 'geladen_am' },
-    kadenz_stunden: MONATLICH, erwartet: false,
-    bemerkung: 'Kein Schreiber im Repo, 0 Zeilen. core.ware selbst hat 43.271.' },
+  /*
+   * ~~Kein Schreiber im Repo, 0 Zeilen~~ — seit 0157 schreibt fn:warenstamm
+   * über core.warenstamm_laden(). Gemessen an zuletzt_gesehen_am: jedes
+   * Produkt einer erfolgreichen Antwort rückt nach.
+   */
+  { quelle: 'core:ware_stand', bezeichnung: 'Warenstamm und Listenpreis (FoodNotify)',
+    system: 'foodnotify', tabelle: { schema: 'core', name: 'ware_stand', zeitspalte: 'zuletzt_gesehen_am' },
+    kadenz_stunden: TAEGLICH, erwartet: warenstammMarken().length > 0,
+    bemerkung: warenstammMarken().length > 0
+      ? 'Seit 0157 befuellt (fn:warenstamm), gemessen an zuletzt_gesehen_am. Je Kostenstelle: mart.warenstamm_stand.'
+      : 'WARENSTAMM_MARKEN leer: kein Zulauf erwartet.' },
   /**
    * WETTER — Bright Sky auf DWD-Messdaten, seit Migration `0086`.
    *

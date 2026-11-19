@@ -33,7 +33,7 @@
  */
 
 import { query, eine } from '../db/pool'
-import { config, fnZugaenge, posArtikelMarken } from '../config'
+import { config, fnZugaenge, posArtikelMarken, warenstammMarken } from '../config'
 import { log } from '../lib/log'
 import { AKTIVE_ENDPUNKTE, istMomentaufnahme, einreihPrioritaet, PRIORITAET } from '../lina/endpunkte'
 import { geschaeftstag } from '../lib/time'
@@ -1037,6 +1037,13 @@ export async function foodnotifyNachfuellen(): Promise<number> {
     log.error('nachfüllen kassenartikel gescheitert — der Lauf geht weiter', { fehler: String(e) })
   }
 
+  // Warenstamm mit Listenpreis (0157), ebenfalls mit eigenem Fang.
+  try {
+    n += await warenstammNachfuellen()
+  } catch (e) {
+    log.error('nachfüllen warenstamm gescheitert — der Lauf geht weiter', { fehler: String(e) })
+  }
+
   return n
 }
 
@@ -1089,6 +1096,66 @@ export async function posArtikelNachfuellen(): Promise<number> {
                AND (w.zeitraum_von = $1::date OR w.erledigt_am IS NULL))
      RETURNING posten_id`,
     [heute, zugaenge, fnEndpunkt('fn:pos_artikel').prioritaet])
+  return r.length
+}
+
+/**
+ * Warenstamm mit Listenpreis (0157, Entscheidung Eugene 19.11.2026): je
+ * Kostenstelle mit erpId ein `fn:warenstamm` (Seite 1) am Tag, im
+ * Tagesgeschäft (Phase A, nachladen = false), für die Marken aus
+ * WARENSTAMM_MARKEN, die Zugangsdaten haben. Kein eigenes Tempo: der Posten
+ * läuft in der FoodNotify-Spur wie jeder andere (Regel 3) — rund 35 Aufrufe
+ * je Nacht für Wilma Wunder.
+ *
+ * GESPERRT gegen einen Posten desselben Tages (gleich welche Seite, gleich
+ * wie er ausging — der Takt hängt am Zeitraum, nicht am Ergebnis) und gegen
+ * einen noch offenen älteren: ein Abbruch von gestern auf Wiedervorlage wird
+ * nicht verdoppelt.
+ *
+ * NICHT eingereiht wird eine Kostenstelle, deren letzter abgeschlossener
+ * Posten `kein_zugriff` war (0075: FoodNotify verweigert sie dauerhaft — eine
+ * fremde Kostenstelle im Mandanten). Ohne diese Sperre finge jeden Tag ein
+ * neuer Posten an, der erst nach SPERRE_AUFGEBEN_TAGE schliesst. Sichtbar
+ * bleibt sie als Zustand `kein zugriff` in mart.warenstamm_stand.
+ *
+ * Der wirksame Schalter geht nach sync.merker (`warenstamm_marken`), auch wenn
+ * er leer ist.
+ */
+export async function warenstammNachfuellen(): Promise<number> {
+  const marken = warenstammMarken()
+  await query(
+    `INSERT INTO sync.merker (schluessel, wert)
+     VALUES ('warenstamm_marken', jsonb_build_object('marken', $1::text[]))
+     ON CONFLICT (schluessel) DO UPDATE SET wert = EXCLUDED.wert, gesetzt_am = now()`,
+    [marken])
+  const zugaenge = fnZugaenge().map(z => z.schluessel).filter(s => marken.includes(s))
+  if (zugaenge.length === 0) return 0
+
+  const { fnEndpunkt } = await import('../foodnotify/endpunkte')
+  const heute = geschaeftstag(new Date())
+  const r = await query(
+    `INSERT INTO sync.warteschlange
+       (endpunkt, zeitraum_von, zeitraum_bis, prioritaet, marke_key, parameter, nachladen)
+     SELECT DISTINCT 'fn:warenstamm', $1::date, $1::date, $3::int, k.marke_key,
+            jsonb_build_object('erpId', k.erp_id::text, 'seite', '1'), false
+       FROM core.kostenstelle k
+       JOIN core.marke m USING (marke_key)
+      WHERE m.schluessel = ANY($2::text[])
+        AND k.erp_id IS NOT NULL
+        AND NOT EXISTS (
+            SELECT 1 FROM sync.warteschlange w
+             WHERE w.endpunkt = 'fn:warenstamm' AND w.marke_key = k.marke_key
+               AND w.parameter->>'erpId' = k.erp_id::text
+               AND (w.zeitraum_von = $1::date OR w.erledigt_am IS NULL))
+        AND NOT EXISTS (
+            SELECT 1 FROM (
+                SELECT w.ergebnis FROM sync.warteschlange w
+                 WHERE w.endpunkt = 'fn:warenstamm' AND w.marke_key = k.marke_key
+                   AND w.parameter->>'erpId' = k.erp_id::text AND w.erledigt_am IS NOT NULL
+                 ORDER BY w.erledigt_am DESC LIMIT 1) letzter
+             WHERE letzter.ergebnis = 'kein_zugriff')
+     RETURNING posten_id`,
+    [heute, zugaenge, fnEndpunkt('fn:warenstamm').prioritaet])
   return r.length
 }
 

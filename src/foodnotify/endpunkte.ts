@@ -40,6 +40,15 @@ export type FnEndpunkt = {
   zeitgrenze?: 'lang'
 }
 
+/**
+ * Seitengröße des Warenstamms (0157): gemessen am 19.11.2026 — 1000 wurde
+ * angenommen und nicht gekappt (`current_page_size` 1000; alle 206 Produkte
+ * der echten Kostenstelle 7984 und alle 746 des Testrestaurants 11035 in
+ * einer Antwort). Kein Schalter: ein anderer Wert wäre eine ungemessene
+ * Annahme über fremdes Verhalten.
+ */
+export const WARENSTAMM_SEITENGROESSE = 1000
+
 /** Pflichtparameter holen oder werfen — mit dem Namen im Fehlertext. */
 function pflicht(p: Record<string, string>, name: string): string {
   const wert = p[name]
@@ -107,6 +116,33 @@ export const FN_ENDPUNKTE: FnEndpunkt[] = [
       + '19 bis 39 s je Antwort, einer von drei Aufrufen brach ab. Ein Abbruch ist nie „keine Artikel": '
       + 'core wird nur aus einer vollständigen 200er-Antwort geändert. plu = core.artikel.artikelnummer '
       + 'NUR bei kassensystem amadeus (docs/foodnotify-0-1-nummernraum.md).',
+  },
+  {
+    key: 'fn:warenstamm',
+    zweck: 'Warenstamm einer Kostenstelle mit Listenpreis (je Einheit), Gebinde, Lieferant und Bestand',
+    // Nach den Kassenartikeln (30), vor den Rezeptlisten (40): Tagesgeschäft,
+    // ein Aufruf je Kostenstelle. Folgeseiten (nur wenn FoodNotify mehr als
+    // eine Seite meldet) tragen dieselbe Priorität.
+    prioritaet: 32,
+    pfad: p => {
+      const erpId = pflicht(p, 'erpId')
+      const seite = pflicht(p, 'seite')
+      // Zahlen, sonst ist es ein Einreihungsfehler — kein Pfad an FoodNotify.
+      if (!/^\d+$/.test(erpId) || !/^\d+$/.test(seite)) {
+        throw new Error(`fn:warenstamm: erpId "${erpId}" / seite "${seite}" sind keine Zahlen`)
+      }
+      // Genau die gemessene Form (page, page_size in dieser Reihenfolge, keine Sortierung):
+      // order_by ist mit page_size ungemessen, die Zeilen lagen nach id aufsteigend.
+      return `/api/${erpId}/products?page=${seite}&page_size=${WARENSTAMM_SEITENGROESSE}`
+    },
+    hinweis: 'Gemessen 19.11.2026 (Wilma Wunder, erpId 7984 Bar Ballplatz; vorher 11035 = Testrestaurant): '
+      + 'erp-Hülle {errors, code, isError, payload: {current_page, current_page_size, page_count, total_count, '
+      + 'data[]}}; page_size=1000 lieferte alle 206 Produkte in einem Aufruf (813 KB, 4,6 s), eine Obergrenze '
+      + 'darüber ist ungemessen — Seite 1 reiht '
+      + 'weitere Seiten ein, und jede Seite muss so viele Zeilen tragen, wie total_count und current_page_size '
+      + 'sagen. unitPrice ist der Preis JE EINHEIT (kg, l) und folgt der letzten Bestellung; pricePerUnit ist der '
+      + 'Katalogpreis je Einheit und mit packagingUnit(s) nur bei Waren mit Lieferantenkatalog gefüllt (7984: 109 '
+      + 'von 206; im Testrestaurant nie). baseUnit* sind immer null. Geladen von core.warenstamm_laden() (SQL, 0157), damit der Neuaufbau aus raw derselbe ist.',
   },
 
   // --- A2 · Bestellungen und Einkaufspreise — der eigentliche Gewinn ----

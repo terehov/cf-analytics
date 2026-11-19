@@ -7,10 +7,14 @@
  *   bun run fn-probe                                alle Marken mit FN_*-Zugang
  *   bun run fn-probe --max-anbindungen 3 --max-kostenstellen 2 --max-aufrufe 40
  *   bun run fn-probe --marke wilma_wunder --nur link-targets,warenstamm \
- *       --anbindung 2052 --erp 11035 --seitengroessen
+ *       --anbindung 2052 --erp 7984 --seitengroessen
  *       nur ausgewählte Fragen (bruecke, link-targets, rezeptliste, warenstamm,
- *       verkaeufe, foodwaste); --anbindung/--erp setzen die IDs fest und sparen
- *       /api/erp/all und /api/pos/locations; --seitengroessen fragt den Warenstamm
+ *       verkaeufe, foodwaste); --anbindung/--erp setzen die IDs fest
+ *       ~~und sparen /api/erp/all und /api/pos/locations~~ — seit 19.11.2026
+ *       laufen beide auch dann mit, damit die Zusammenfassung den NAMEN nennt;
+ *       ohne feste IDs überspringt die Auswahl Kostenstellen und Anbindungen
+ *       mit „test" im Namen (istTestName, docs/fehlerkatalog.md 19.11.2026:
+ *       die erste Probe maß das „AAA Testrestaurant"); --seitengroessen fragt den Warenstamm
  *       der ersten Kostenstelle zusätzlich mit page_size=100 und page_size=1000
  *       (die einzigen zwei Varianten auf der Erlaubtliste)
  *
@@ -57,7 +61,7 @@ import { join, resolve } from 'node:path'
 import { config, fnGrenzen, fnZugaenge } from './config'
 import { FnAnmeldungFehlgeschlagen, FnSession } from './foodnotify/auth'
 import { auspacken } from './foodnotify/huelle'
-import { kostenstellen, posStandorte, type PosStandortZeile } from './foodnotify/transform'
+import { kostenstellen, posStandorte, type KostenstelleZeile, type PosStandortZeile } from './foodnotify/transform'
 import { gitIgnoriert } from './rezepte_probe'
 
 export const PAUSE_MS = 1_000
@@ -167,21 +171,71 @@ export const pluForm = (plu: string): string => plu.replace(/\d/g, '9').replace(
 
 const hoechstens = <T>(x: T[], n: number) => x.slice(0, n)
 
+/**
+ * TESTKOSTENSTELLEN ÜBERSPRINGEN (19.11.2026, docs/fehlerkatalog.md).
+ *
+ * Die automatische Auswahl nahm die ersten Kostenstellen aus /api/erp/all —
+ * und die heißen „AAA Testrestaurant …" (das „AAA" sortiert sie nach vorn).
+ * Gemessen wurde ein Testrestaurant ohne Lieferantenkatalog und mit einem
+ * Verkaufsimport, der seit 31.08.2026 nichts mehr bekam; der Befund „der
+ * Verkaufsimport steht" ging so in einen Commit und an den Nutzer. Deshalb:
+ * wer „test" im Kostenstellen- oder Restaurantnamen trägt (ohne Groß/Klein),
+ * wird nicht automatisch gewählt. Mit --erp/--anbindung ausdrücklich gewählt
+ * bleibt alles erlaubt.
+ */
+export const istTestName = (...namen: (string | null | undefined)[]): boolean =>
+  namen.some(n => typeof n === 'string' && /test/i.test(n))
+
+/** Namen je Kostenstelle aus /api/pos/locations (costCenter, restaurant) — für Auswahl und Zusammenfassung. */
+export type Standortname = { kostenstelle: string | null; restaurant: string | null }
+export function standortNamen(roh: unknown): Map<number, Standortname> {
+  const namen = new Map<number, Standortname>()
+  const inhalt = auspacken(roh).daten as { locations?: unknown } | null
+  const liste = inhalt && typeof inhalt === 'object' && Array.isArray(inhalt.locations) ? inhalt.locations : []
+  for (const e of liste as Record<string, unknown>[]) {
+    const id = Number(e?.costCenterId)
+    if (!Number.isFinite(id)) continue
+    namen.set(id, {
+      kostenstelle: typeof e.costCenter === 'string' ? e.costCenter : null,
+      restaurant: typeof e.restaurant === 'string' ? e.restaurant : null,
+    })
+  }
+  return namen
+}
+
+const nameAus = (n: Standortname | undefined): string | null =>
+  n ? [n.restaurant, n.kostenstelle].filter(Boolean).join(' — ') || null : null
+
+export type Anbindung = {
+  connectionId: number
+  kassensystem: string | null
+  kostenstellen: number
+  /** „Restaurant — Kostenstelle" je Kostenstelle an dieser Anbindung, soweit bekannt. */
+  namen: string[]
+  /** Eine der Kostenstellen trägt „test" im Namen — wird nicht automatisch gewählt. */
+  test: boolean
+}
+
 export type StandortAuswertung = {
   standorte: number
   ohneAnbindung: number
-  anbindungen: { connectionId: number; kassensystem: string | null; kostenstellen: number }[]
+  anbindungen: Anbindung[]
   nachKassensystem: Record<string, number>
 }
 
 /** /api/pos/locations → Anbindungen. Ein connectionId kann mehrere Kostenstellen tragen. */
-export function standorteAuswerten(zeilen: PosStandortZeile[]): StandortAuswertung {
-  const je = new Map<number, { connectionId: number; kassensystem: string | null; kostenstellen: number }>()
+export function standorteAuswerten(zeilen: PosStandortZeile[], namen: Map<number, Standortname> = new Map()): StandortAuswertung {
+  const je = new Map<number, Anbindung>()
   let ohne = 0
   for (const z of zeilen) {
     if (z.connectionId === null) { ohne++; continue }
-    const a = je.get(z.connectionId) ?? { connectionId: z.connectionId, kassensystem: z.kassensystem, kostenstellen: 0 }
+    const a = je.get(z.connectionId)
+      ?? { connectionId: z.connectionId, kassensystem: z.kassensystem, kostenstellen: 0, namen: [], test: false }
     a.kostenstellen++
+    const n = namen.get(z.kostenstelleId)
+    const name = nameAus(n)
+    if (name) a.namen.push(name)
+    if (istTestName(n?.kostenstelle, n?.restaurant)) a.test = true
     je.set(z.connectionId, a)
   }
   const anbindungen = [...je.values()]
@@ -190,19 +244,28 @@ export function standorteAuswerten(zeilen: PosStandortZeile[]): StandortAuswertu
   return { standorte: zeilen.length, ohneAnbindung: ohne, anbindungen, nachKassensystem }
 }
 
-/** Welche Anbindungen gelesen werden: amadeus zuerst (nur dort trägt die PLU-Brücke), dann der Rest. */
-export function anbindungenWaehlen(a: StandortAuswertung, max: number): StandortAuswertung['anbindungen'] {
-  const amadeus = a.anbindungen.filter(x => x.kassensystem === 'amadeus')
-  const rest = a.anbindungen.filter(x => x.kassensystem !== 'amadeus')
+/**
+ * Welche Anbindungen gelesen werden: amadeus zuerst (nur dort trägt die
+ * PLU-Brücke), dann der Rest — ohne Testkostenstellen (`istTestName`).
+ */
+export function anbindungenWaehlen(a: StandortAuswertung, max: number): Anbindung[] {
+  const echt = a.anbindungen.filter(x => !x.test)
+  const amadeus = echt.filter(x => x.kassensystem === 'amadeus')
+  const rest = echt.filter(x => x.kassensystem !== 'amadeus')
   return hoechstens([...amadeus, ...rest], Math.max(max, 0))
 }
 
-/** Welche Kostenstellen gelesen werden: zuerst die mit amadeus-Anbindung, dann der Rest in Quellreihenfolge. */
+/**
+ * Welche Kostenstellen gelesen werden: zuerst die mit amadeus-Anbindung, dann
+ * der Rest in Quellreihenfolge — ohne Testkostenstellen (`istTestName` auf
+ * Kostenstellen- und Restaurantname).
+ */
 export function kostenstellenWaehlen(
-  ks: { erpId: number; kostenstelleId: number }[], standorte: PosStandortZeile[], max: number,
+  ks: { erpId: number; kostenstelleId: number; name?: string | null; restaurantName?: string | null }[],
+  standorte: PosStandortZeile[], max: number,
 ): number[] {
   const amadeus = new Set(standorte.filter(s => s.kassensystem === 'amadeus').map(s => s.kostenstelleId))
-  const ids = [...new Set(ks.map(k => k.erpId))]
+  const ids = [...new Set(ks.filter(k => !istTestName(k.name, k.restaurantName)).map(k => k.erpId))]
   const mitAmadeus = ids.filter(id => ks.some(k => k.erpId === id && amadeus.has(k.kostenstelleId)))
   const rest = ids.filter(id => !mitAmadeus.includes(id))
   return hoechstens([...mitAmadeus, ...rest], Math.max(max, 0))
@@ -593,8 +656,12 @@ export type MarkenErgebnis = {
   nichtGeholt: string[]
   befunde: string[]
   standorte: StandortAuswertung | null
-  gewaehlteAnbindungen: { connectionId: number; kassensystem: string | null }[]
+  gewaehlteAnbindungen: { connectionId: number; kassensystem: string | null; name: string | null }[]
   gewaehlteKostenstellen: number[]
+  /** Name je gewählter Kostenstelle — „(nicht in /api/erp/all)", wenn die erpId dort fehlt. */
+  kostenstellenNamen: { erpId: number; name: string }[]
+  /** Automatisch übersprungen, weil „test" im Namen steht. */
+  uebersprungenTest: string[]
   artikel: ({ connectionId: number; kassensystem: string | null } & ArtikelAuswertung)[]
   linkTargets: ({ connectionId: number } & Omit<LinkTargetsAuswertung, 'csv'>) | null
   rezeptliste: RezeptlisteAuswertung | null
@@ -639,7 +706,8 @@ function leeresErgebnis(marke: string, jetzt: Date, grenze: number, fragen: Frag
   return {
     marke, datum: jetzt.toISOString().slice(0, 10), gestartet: jetzt.toISOString(), fragen,
     festeAnbindung: anb, festeKostenstelle: erp, anmeldung: 'nicht versucht', abbruch: null, aufrufGrenze: grenze, aufrufe: [], nichtGeholt: [], befunde: [],
-    standorte: null, gewaehlteAnbindungen: [], gewaehlteKostenstellen: [], artikel: [], linkTargets: null,
+    standorte: null, gewaehlteAnbindungen: [], gewaehlteKostenstellen: [], kostenstellenNamen: [], uebersprungenTest: [],
+    artikel: [], linkTargets: null,
     rezeptliste: null, abgleichRezeptzahl: null, warenstamm: [], verkaeufe: [], rezeptVerkaeufe: [],
     foodWaste: { kostenanalyse: null, liste: null, summen: null },
   }
@@ -779,20 +847,41 @@ export async function fnProbe(o: ProbeOptionen): Promise<{ ergebnisse: MarkenErg
     }
 
     // --- Grundlage: Kostenstellen und Anbindungen -------------------------
-    // Feste IDs (--anbindung/--erp) ersetzen den jeweiligen Grundaufruf; ohne sie wie bisher.
-    const braucheAnbindung = (will('bruecke') || will('link-targets')) && o.anbindung === undefined
-    const braucheKs = (will('warenstamm') || will('verkaeufe') || will('foodwaste')) && o.erp === undefined
+    // ~~Feste IDs (--anbindung/--erp) ersetzen den jeweiligen Grundaufruf~~ — seit 19.11.2026 holen auch
+    // feste IDs die Grundaufrufe (zwei kleine GET), damit die Zusammenfassung IMMER den Namen nennt: eine
+    // Messung am Testrestaurant fiel nur auf, weil jemand den Namen nachschlug (docs/fehlerkatalog.md).
+    const braucheAnbindung = will('bruecke') || will('link-targets')
+    const braucheKs = will('warenstamm') || will('verkaeufe') || will('foodwaste')
     const ksRoh = braucheKs ? await holenRoh('erp_all', '/api/erp/all') : null
-    const ks = ksRoh === null ? [] : kostenstellen(ksRoh)
+    const ks: KostenstelleZeile[] = ksRoh === null ? [] : kostenstellen(ksRoh)
     const stRoh = braucheAnbindung || braucheKs ? await holenRoh('pos_standorte', '/api/pos/locations') : null
     const standorte = stRoh === null ? [] : posStandorte(stRoh)
-    if (stRoh !== null) e.standorte = standorteAuswerten(standorte)
-    const anbindungen = o.anbindung !== undefined
-      ? [{ connectionId: o.anbindung, kassensystem: null as string | null, kostenstellen: 0 }]
+    const namen = stRoh === null ? new Map<number, Standortname>() : standortNamen(stRoh)
+    if (stRoh !== null) e.standorte = standorteAuswerten(standorte, namen)
+    if (o.anbindung === undefined && e.standorte) {
+      for (const a of e.standorte.anbindungen.filter(x => x.test)) {
+        e.uebersprungenTest.push(`Anbindung ${a.connectionId} (${a.namen.join(', ') || 'ohne Namen'})`)
+      }
+    }
+    if (o.erp === undefined) {
+      for (const k of ks.filter(x => istTestName(x.name, x.restaurantName))) {
+        e.uebersprungenTest.push(`Kostenstelle ${k.erpId} (${[k.restaurantName, k.name].filter(Boolean).join(' — ')})`)
+      }
+    }
+    const anbindungen: Anbindung[] = o.anbindung !== undefined
+      ? [e.standorte?.anbindungen.find(a => a.connectionId === o.anbindung)
+          ?? { connectionId: o.anbindung, kassensystem: null, kostenstellen: 0, namen: [], test: false }]
       : e.standorte ? anbindungenWaehlen(e.standorte, maxAnb) : []
-    e.gewaehlteAnbindungen = anbindungen.map(a => ({ connectionId: a.connectionId, kassensystem: a.kassensystem }))
+    e.gewaehlteAnbindungen = anbindungen.map(a => ({
+      connectionId: a.connectionId, kassensystem: a.kassensystem,
+      name: a.namen.length ? a.namen.join(', ') : stRoh === null ? null : '(nicht in /api/pos/locations)',
+    }))
     const erpIds = o.erp !== undefined ? [o.erp] : kostenstellenWaehlen(ks, standorte, maxKs)
     e.gewaehlteKostenstellen = erpIds
+    e.kostenstellenNamen = erpIds.map(id => {
+      const k = ks.find(x => x.erpId === id)
+      return { erpId: id, name: k ? [k.restaurantName, k.name].filter(Boolean).join(' — ') : '(nicht in /api/erp/all)' }
+    })
     if (stRoh !== null && braucheAnbindung && anbindungen.length === 0) e.befunde.push('keine Kassenanbindung in /api/pos/locations — Brücke und link-targets nicht messbar')
     if (ksRoh !== null && erpIds.length === 0) e.befunde.push('keine Kostenstelle in /api/erp/all — Warenstamm, Verkäufe, Food Waste nicht messbar')
 
@@ -918,6 +1007,11 @@ export function zusammenfassungMarkdown(e: MarkenErgebnis): string {
   z.push(`# fn-probe ${e.marke} — ${e.gestartet.slice(0, 16).replace('T', ' ')} UTC`, '',
     `Anmeldung: ${e.anmeldung}. Aufrufe: ${e.aufrufe.length} von höchstens ${e.aufrufGrenze}. ${e.abbruch ? `**Abbruch:** ${e.abbruch}` : ''}`, '',
     `Fragen: ${e.fragen.join(', ')}. Feste IDs: Anbindung ${zahlOderStrich(e.festeAnbindung)}, Kostenstelle ${zahlOderStrich(e.festeKostenstelle)}.`, '',
+    // Immer mit Namen: woran gemessen wurde, muss man der Datei ansehen (19.11.2026, Testrestaurant).
+    `Gemessen an — Kostenstellen: ${e.kostenstellenNamen.map(k => `${k.erpId} (${k.name})`).join('; ') || '—'}. `
+      + `Anbindungen: ${e.gewaehlteAnbindungen.map(a => `${a.connectionId} (${a.name ?? 'Name nicht geholt'})`).join('; ') || '—'}.`, '',
+    ...(e.uebersprungenTest.length
+      ? [`Automatisch übersprungen (\`test\` im Namen): ${e.uebersprungenTest.join('; ')}.`, ''] : []),
     'Nur Zahlen, Feldnamen und Formen. Prozentwerte sind Prozentzahlen.', '')
   z.push('## Aufrufe', '')
   t(['Nr', 'Name', 'Pfad', 'Status', 'Bytes', 'ms', 'Hinweis'], e.aufrufe.map(a => [a.nr, a.name, `\`${a.pfad}\``, a.status, a.bytes, a.dauerMs, a.hinweis]))
@@ -1010,8 +1104,10 @@ export function aufrufplan(
   const will = (f: Frage) => fragen.includes(f)
   const anbFest = opt.anbindung !== undefined
   const ksFest = opt.erp !== undefined
-  const brauchtAnb = (will('bruecke') || will('link-targets')) && !anbFest
-  const brauchtKs = (will('warenstamm') || will('verkaeufe') || will('foodwaste')) && !ksFest
+  // Die Grundaufrufe laufen seit 19.11.2026 auch bei festen IDs mit: sie liefern die Namen fuer die
+  // Zusammenfassung (Testrestaurant-Fehler, docs/fehlerkatalog.md).
+  const brauchtAnb = will('bruecke') || will('link-targets')
+  const brauchtKs = will('warenstamm') || will('verkaeufe') || will('foodwaste')
   const anb = anbFest ? 1 : maxAnbindungen
   const ks = ksFest ? 1 : maxKostenstellen
   const plan: { vorlage: string; anzahl: number }[] = [
