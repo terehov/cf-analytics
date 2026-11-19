@@ -464,8 +464,12 @@ Dokploys Schedule Jobs führen Kommandos per `docker exec` in einem **laufenden*
 **Ein** Schedule Job:
 
 ```
-täglich 05:02   bun run sync
+täglich 03:00 UTC   bun run sync      (Sommer 05:00, Winter 04:00 Ortszeit)
 ```
+
+> **Nachgemessen am 19.11.2026:** Der Job steht auf 03:00 UTC, nicht auf 05:02 — Dokploys Zeitplan kennt keine
+> Sommerzeit. Seit der Zeitumstellung startet er um **04:00 Ortszeit**. `NACHLADEN_BIS` (Ortszeit) muss davor liegen,
+> sonst wird der nächste Start übersprungen (am 19.11. passiert, `docs/fehlerkatalog.md`); seitdem 03:30.
 
 > **Nachgemessen am 10.08.2026**, weil hier „stündlich" stand: `mart.sync_status` führt die
 > Läufe 76 bis 80 an fünf aufeinanderfolgenden Tagen, jeweils um 05:02, `lauf_id` lückenlos.
@@ -477,7 +481,7 @@ Containerwechsel beendet den per `docker exec` gestarteten Sync **ohne Signal** 
 um 21:58 genau so passiert: Lauf 125 starb mitten in den Belegarchiv-Zählungen, 335 Posten
 blieben offen, Phase B lief nicht, und `mart.sync_status` zeigte stundenlang einen Lauf, der
 arbeitet. Vorher nachsehen: `SELECT lauf_id, status FROM sync.lauf ORDER BY lauf_id DESC LIMIT 1`
-— steht dort `laeuft`, warten. Seit `0151` bleibt der Lauf, solange es TPAPI-Rückstand gibt, bis zur Obergrenze oder `NACHLADEN_BIS` (04:30) auf `laeuft` (die zweite Spur von Phase C) — das Warten dauert dann entsprechend länger. Wer so stirbt, wird vom nächsten Start als `abgebrochen`
+— steht dort `laeuft`, warten. Seit `0151` bleibt der Lauf, solange es TPAPI-Rückstand gibt, bis zur Obergrenze oder `NACHLADEN_BIS` (03:30, bis 19.11.2026 04:30) auf `laeuft` (die zweite Spur von Phase C) — das Warten dauert dann entsprechend länger. Wer so stirbt, wird vom nächsten Start als `abgebrochen`
 geschlossen (`verwaisteLaeufeSchliessen()`, `docs/importer.md`).
 
 `sync` füllt die Warteschlange zu Beginn jedes Laufs selbst (`src/sync/nachfuellen.ts`):
@@ -502,7 +506,7 @@ Ebenfalls im Nachtlauf, ohne Befehl: der Yext-Vollabgleich und der
 Zuordnungsabgleich (monatlich), die Handpflege aus `pflege/` (bei jedem Lauf)
 und die Feiertage/Schulferien (monatlich, `openholidaysapi.org`).
 
-~~Der Sync läuft **tagsüber** (Fenster 7–23 Uhr, konfigurierbar).~~ Seit dem 25.07.2026 ohne Fenster (`FENSTER_*` 0–24, Begründung in `src/config.ts`), und seit dem 28.09.2026 lädt Phase C bis 04:30 nach (`NACHLADEN_BIS`, `TAGESBUDGET` 15.000 — `docs/importer.md`). Die alte Begründung: Das ist Absicht: ein einzelner Client um drei Uhr früh ist im Log ein Ausreißer, dieselben Anfragen im Tagesverkehr von 141 Betrieben fallen nicht auf.
+~~Der Sync läuft **tagsüber** (Fenster 7–23 Uhr, konfigurierbar).~~ Seit dem 25.07.2026 ohne Fenster (`FENSTER_*` 0–24, Begründung in `src/config.ts`), und seit dem 28.09.2026 lädt Phase C bis kurz vor den nächsten Start nach (`NACHLADEN_BIS`, seit 19.11.2026 03:30, `TAGESBUDGET` 15.000 — `docs/importer.md`). Die alte Begründung: Das ist Absicht: ein einzelner Client um drei Uhr früh ist im Log ein Ausreißer, dieselben Anfragen im Tagesverkehr von 141 Betrieben fallen nicht auf.
 
 **Postgres nie ins Internet exponieren** — Postico über SSH-Tunnel.
 

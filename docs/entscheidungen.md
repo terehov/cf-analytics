@@ -5374,3 +5374,17 @@ in `uebernehmen.ts` auf alle Karten wirken; die `rz_*`-Karten rechnen fest. Sieb
 ausgehöhlt, und für Soll gegen Einkauf sind drei Monate ohnehin richtiger als einer (das Lager verschiebt beides
 gegeneinander). Einzelne Monate und Tage beantwortet der MCP-Zugang. Ein Abschnitt statt eines Reiters: der Klick auf
 die Rezept-Nr. setzt einen Filter der Seite, und ein Drill-down landet immer auf dem ersten Reiter.
+
+## 19.11.2026 — Das Nachladen endet um 03:30 statt 04:30
+
+**Anlass.** Der Schedule Job startet um 03:00 UTC, im Winter also um 04:00 Ortszeit; die Frist 04:30 lag dahinter, und
+am 19.11. fiel Lauf 207 aus (`fehlerkatalog.md`, 19.11.2026). Auftrag Eugene: im Code nachziehen.
+
+**Entscheidung.** `NACHLADEN_BIS` = 03:30 ganzjährig. ~~04:30~~ (28.09.–19.11.2026).
+
+**Verworfen.** Den Zeitplan in Dokploy auf 04:02 UTC verschieben: dann liegt der Start im Sommer bei 06:02, und das
+Tagesgeschäft verschiebt sich zweimal im Jahr. Die Frist zweimal im Jahr umstellen: genau so eine Handlung, die
+irgendwann ausbleibt (`AGENTS.md`, „Betrieb ohne Handbefehl"). Die Frist aus der Sommerzeit ableiten: setzt voraus,
+dass der Code den Zeitplan kennt, und der steht in Dokploy. **Preis:** im Sommer anderthalb Stunden Nachladen je Nacht
+weniger. Dazu misst der Ausfallwächter seitdem ab dem Ende des Tagesgeschäfts statt ab dem Laufende.
+

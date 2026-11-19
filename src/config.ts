@@ -691,7 +691,7 @@ const Schema = z.object({
    * gleichzeitig. Gemessen in Phase C: Lauf 140 9.076 Posten in 15,6 h,
    * Lauf 141 9.051 in 15,4 h — 6,1–6,2 s je Posten beim Takt 4–6 s. Das sind
    * hoechstens ~14.100 Aufrufe in 24 Stunden. Ein UTC-Tag (02:00 bis 02:00
-   * Ortszeit) traegt kuenftig den Rest des Vorlaufs (02:00–04:30, ~1.450)
+   * Ortszeit) traegt kuenftig den Rest des Vorlaufs (02:00–04:30, ~1.450; seit 19.11.2026 bis 03:30)
    * plus Tagesgeschaeft und Nachladen bis 02:00 (~11.800), zusammen ~13.300.
    * 15.000 liegt knapp ueber dem, was der Takt zulaesst — wieder das
    * Notfallnetz und keine Bremse.
@@ -716,32 +716,48 @@ const Schema = z.object({
   FENSTER_BIS_STUNDE: z.coerce.number().int().min(1).max(24).default(24),
   /**
    * Phase C (Nachladen) endet beim NÄCHSTEN Erreichen dieser Uhrzeit (Ortszeit,
-   * "HH:MM") nach ihrem Beginn. Beginnt sie um 08:20, ist das 04:30 am
-   * Folgetag; beginnt ein Handlauf um 03:00, ist es 04:30 desselben Tages.
-   * Beides endet vor dem 05:02-Lauf — genau das ist die Bedingung.
+   * "HH:MM") nach ihrem Beginn. Beginnt sie um 08:20, ist das 03:30 am
+   * Folgetag; beginnt ein Handlauf um 03:00, ist es 03:30 desselben Tages.
+   * Beides endet vor dem nächsten Start des Schedule Jobs — genau das ist die
+   * Bedingung.
+   *
+   * WANN DER NÄCHSTE START IST (nachgemessen 19.11.2026 an `sync.lauf`): der
+   * Schedule Job in Dokploy steht auf **03:00 UTC**. Das ist im Sommer 05:00
+   * und im Winter **04:00** Ortszeit — Dokploys Zeitplan kennt keine
+   * Sommerzeit, diese Frist schon. Bis zum 19.11. stand hier „vor dem
+   * 05:02-Lauf" (der Zeitplan lag im August bei 05:05) und die Frist auf
+   * 04:30. Seit der Zeitumstellung am 25.10.2026 lag sie damit eine halbe
+   * Stunde NACH dem Start. Aufgefallen, sobald ein Lauf zum ersten Mal bis
+   * an die Frist nachlud: Lauf 206 endete am 19.11. um 04:30, der Start 207
+   * um 04:00 fand die Laufsperre belegt und endete `uebersprungen` — kein
+   * Tagesgeschäft am 19.11. (`docs/fehlerkatalog.md`, 19.11.2026).
    *
    * Anlass der Frist (24.09.2026): Lauf 135 lud von 15:30 bis zum nächsten
-   * Mittag nach. Das Tagesbudget wechselt um 00:00 UTC, also 02:00 Ortszeit;
-   * danach bekam das Nachladen ein frisches Budget und lief einfach weiter. Der
-   * 05:02-Lauf 136 fand die Sperre belegt und fiel aus — kein Tagesgeschäft,
-   * die Dashboards blieben einen Tag stehen. Das Nachladen darf nie den
-   * nächsten Lauf verdrängen.
+   * Mittag nach. Das Tagesbudget wechselt um 00:00 UTC, also 02:00 Ortszeit
+   * (im Winter 01:00); danach bekam das Nachladen ein frisches Budget und
+   * lief einfach weiter. Der Lauf 136 fand die Sperre belegt und fiel aus —
+   * kein Tagesgeschäft, die Dashboards blieben einen Tag stehen. Das
+   * Nachladen darf nie den nächsten Lauf verdrängen.
    *
    * ~~NACHLADEN_BIS_STUNDE = 23, und nie nach Mitternacht~~ (24.–28.09.2026).
    * Das hielt den nächsten Lauf sicher frei, verschenkte aber sechs Stunden
    * je Nacht: bei ~456.000 Posten Historie der Betriebsberichte heisst das
    * Wochen. Eugene, 28.09.2026: bis kurz vor dem neuen Lauf laden. Der
-   * Mitternachtsschutz ist dafuer nicht mehr noetig — die Frist liegt jetzt
-   * selbst vor 05:02, und das Budget des neuen UTC-Tags ist gross genug
-   * (TAGESBUDGET), dass der Rest zwischen 02:00 und 04:30 dem Tagesgeschaeft
+   * Mitternachtsschutz ist dafuer nicht mehr noetig — die Frist liegt selbst
+   * vor dem Start, und das Budget des neuen UTC-Tags ist gross genug
+   * (TAGESBUDGET), dass der Rest nach dem Budgetwechsel dem Tagesgeschaeft
    * des Folgelaufs nichts wegnimmt.
    *
-   * WARUM 04:30 UND NICHT 05:00. Nach Phase C frischt der Lauf noch die
-   * Sichten auf, die aus der Konzern-Historie lesen; am 26.09. endete Phase C
-   * um 23:00 und der Lauf um 23:09. Eine halbe Stunde Abstand zum 05:02-Lauf
-   * sind diese neun Minuten mit Reserve fuer eine langsame Nacht.
+   * WARUM 03:30. Die Frist muss vor dem FRÜHEREN der beiden Starts liegen,
+   * also vor 04:00 im Winter. Nach Phase C frischt der Lauf noch die Sichten
+   * auf, die aus der Konzern-Historie lesen; am 26.09. endete Phase C um
+   * 23:00 und der Lauf um 23:09. Eine halbe Stunde Abstand sind diese neun
+   * Minuten mit Reserve fuer eine langsame Nacht. Im Sommer verschenkt das
+   * anderthalb Stunden; dafuer muss niemand die Frist zweimal im Jahr
+   * umstellen. ~~04:30~~ (28.09.–19.11.2026). Wer den Zeitplan in Dokploy
+   * verschiebt, prüft diese Frist gegen den Winterstart.
    */
-  NACHLADEN_BIS: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Format HH:MM').default('04:30'),
+  NACHLADEN_BIS: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Format HH:MM').default('03:30'),
 
   // --- Fehlerverhalten ---------------------------------------------------
   /**

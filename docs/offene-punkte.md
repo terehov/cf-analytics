@@ -3099,3 +3099,16 @@ auf *Einkauf*, *Artikel — Verlauf und Betriebe* und der Importseite (`dashboar
    `mart.rezept_position`/`mart.artikel_in_rezept` lägen bereit)~~ — seit `0159` auf `db_rezept` (`sv_artikel` →
    `sv_stueckliste`, Klick auf die Rezept-Nr., 19.11.2026); `ar_rezept` auf `dd_artikel` verweist noch nicht dorthin —
    und ein Kostenstellenvergleich des Listenpreises (ungemessen, siehe Punkt 7 im Abschnitt zu `0157`).
+
+## TPAPI-Nachladen: warum lief nach 23 Uhr nur noch ein Betrieb? (19.11.2026)
+
+In Lauf 206 holte die TPAPI-Spur bis 22 Uhr rund 2.100 neue Tage je Stunde über 13–25 Betriebe; ab 23 Uhr standen
+alle still außer Enchilada Aalen (`tpapi:personalkostenprotag`, 80 Abrufe je Stunde von 00 bis 04 Uhr), obwohl
+13 Betriebe beim Journal und 17 beim Personal noch Rückstand hatten (`mart.tpapi_rueckstand`, keiner `stockt`). Erst
+um 04:28 holten alle Betriebe noch einmal je einen Tag. Vermutlich griff um 23 Uhr `TPAPI_NACHLADEN_JE_LAUF` und die
+Aalen-Spur ist das Personal je Stunde (`TPAPI_STUNDE_NACHLADEN`) mit eigener Grenze — **nicht gemessen**. Folge war,
+dass Phase C bis zur Frist offen blieb und den nächsten Start verdrängte (`fehlerkatalog.md`, 19.11.2026); mit
+`NACHLADEN_BIS` 03:30 ist das entschärft, kostet aber weiter vier Stunden, in denen der Zugang fast nichts holt.
+**Messen nach dem nächsten langen Lauf:** `SELECT date_trunc('hour', erstmals_am), endpunkt, count(DISTINCT
+betrieb_key), count(*) FROM core.tpapi_abruf WHERE erstmals_am > now() - interval '1 day' GROUP BY 1, 2 ORDER BY 1`
+und die Laufnotiz in `sync.lauf`. Erledigt sich von selbst, sobald der Rückstand null ist.

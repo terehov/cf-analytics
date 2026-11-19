@@ -49,7 +49,7 @@ type Phase = 'tagesgeschaeft' | 'nachladen'
 /**
  * Ist das Nachladen (Phase C) vorbei? Ja ab dem ersten Erreichen der Uhrzeit
  * `bis` ("HH:MM", Ortszeit) nach `beginn` — um 08:20 begonnen und `bis`
- * 04:30 heisst 04:30 am Folgetag. Rein, damit es ohne Uhr testbar ist.
+ * 03:30 heisst 03:30 am Folgetag. Rein, damit es ohne Uhr testbar ist.
  * Begründung an `NACHLADEN_BIS` in config.ts.
  */
 export function nachladenVorbei(jetzt: Date, beginn: Date, bis: string): boolean {
@@ -1043,10 +1043,10 @@ async function sitzungOeffnen(
       /**
        * DAS NACHLADEN HAT EIN ENDE, das Tagesgeschäft nicht (seit 24.09.2026).
        * Lauf 135 lud bis zum nächsten Mittag nach, weil das Tagesbudget um
-       * 00:00 UTC frisch wurde — und der 05:02-Lauf fiel aus. Phase C endet
-       * deshalb beim nächsten Erreichen von `NACHLADEN_BIS` (seit 28.09.2026
-       * 04:30, vorher 23 Uhr am selben Tag), in jedem Fall vor dem nächsten
-       * Lauf. Was übrig bleibt, holt die nächste Nacht; die Notiz sagt es
+       * 00:00 UTC frisch wurde — und der nächste Lauf fiel aus. Phase C endet
+       * deshalb beim nächsten Erreichen von `NACHLADEN_BIS` (seit 19.11.2026
+       * 03:30, vom 28.09. an 04:30 — im Winter NACH dem Start um 04:00 —,
+       * vorher 23 Uhr am selben Tag), in jedem Fall vor dem nächsten Lauf. Was übrig bleibt, holt die nächste Nacht; die Notiz sagt es
        * (harte Regel 10).
        */
       if (phase === 'nachladen' && nachladenEndeErreicht(new Date())) {

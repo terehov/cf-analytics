@@ -5866,3 +5866,35 @@ bricht ab, wenn der alte Hinweis noch steht. Fallenfrage 9 in `mcp/test/fallen_p
 
 **Allgemeine Lehre.** Jeder Hinweis „aus den Summen neu rechnen" setzt voraus, dass die Zeilen sich nicht überschneiden.
 Bei einer Körnung unterhalb des Betriebs (Anbindung, Kostenstelle) ist das zu prüfen, bevor der Satz in den Katalog geht.
+
+## Die Nachladefrist lag seit der Zeitumstellung hinter dem Start — ein Nachtlauf fiel aus (19.11.2026)
+
+**Symptom.** Lauf 207 (19.11.2026, 04:00) endete sofort mit `uebersprungen`: „Lauf 206 läuft noch". Lauf 206 hatte am
+18.11. um 04:00 begonnen und lud bis zur Frist `NACHLADEN_BIS` um 04:30 nach. Am 19.11. gab es damit kein
+Tagesgeschäft, die Dashboards blieben auf dem Stand vom 18.11. — und nichts meldete es: `/status` und der
+Ausfallwächter (`ausfallMelden()`) sahen einen Lauf, der vor wenigen Minuten fertig geworden war.
+
+**Ursache.** Zwei Zeitzonen. Der Schedule Job in Dokploy steht auf **03:00 UTC** (nachgemessen an `sync.lauf`: bis
+24.10. Start 05:00 Ortszeit, ab 25.10. 04:00). Die Frist rechnet in **Ortszeit** und stand auf 04:30, begründet mit
+„vor dem 05:02-Lauf" — so lag der Zeitplan im August (05:05), und im Sommer stimmte es. Seit der Zeitumstellung am
+25.10.2026 lag die Frist eine halbe Stunde nach dem Start. Aufgefallen ist es erst nach drei Wochen, weil die Läufe bis
+dahin vor Mitternacht an ihrer Aufrufgrenze endeten; Lauf 206 war der erste, der bis an die Frist lief — nach 23 Uhr
+holte nur noch eine Spur Personal je Tag für einen einzigen Betrieb (Enchilada Aalen, ~80 Aufrufe je Stunde) und hielt
+Phase C fünf Stunden offen. Warum die übrigen Betriebe um 23 Uhr stehen blieben, ist nicht geklärt
+(`docs/offene-punkte.md`).
+
+**Warum es niemand sah.** Der Ausfallwächter maß ab `beendet_am` des jüngsten Laufs. Ein Lauf, der bis zum Morgen
+nachlädt, ist danach frisch — auch wenn sein Tagesgeschäft 22 Stunden zurückliegt und das nächste erst in 46 Stunden
+kommt. Das ist Regel 10 in neuer Form: ein Lauf ohne Tagesgeschäft sah aus wie einer, der gerade fertig war.
+
+**Was ihn künftig verhindert.**
+* `NACHLADEN_BIS` steht auf **03:30** — vor dem früheren der beiden Starts (04:00 im Winter). Begründung an der
+  Variablen in `src/config.ts`. `src/sync/nachladen_ende.test.ts` prüft die Voreinstellung gegen den Start um 03:00 UTC
+  in Sommer **und** Winter.
+* Der Ausfallwächter misst ab `tagesgeschaeft_bis` (für Läufe ohne den Stempel weiter ab `beendet_am`), meldet „Kein
+  Tagesgeschäft seit … Stunden", nennt die übersprungenen Starts danach und den Weg dorthin. Am 19.11. hätte er um
+  12:18 gemeldet.
+
+**Allgemeine Lehre.** Eine Uhrzeit, die „vor dem nächsten Lauf" liegen soll, ist nur so gut wie die Zeitzone des
+Zeitplans. Dokploys Zeitplan kennt keine Sommerzeit; jede Frist in Ortszeit muss gegen den **Winterstart** geprüft werden.
+

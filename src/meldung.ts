@@ -240,16 +240,29 @@ const MERKER_AUSFALL = 'status_meldung_ausfall'
  * Lauf: der Merker hält fest, zu welchem letzten Lauf schon gemeldet wurde.
  * Ein Lauf, der seit über STATUS_AUSFALL_STUNDEN arbeitet, zählt ebenso — er
  * hängt.
+ *
+ * GEMESSEN WIRD AB DEM ENDE DES TAGESGESCHÄFTS, nicht ab dem Laufende (seit
+ * 19.11.2026). Lauf 206 lud bis 04:30 nach, der Start 207 um 04:00 wurde
+ * übersprungen — und ab `beendet_am` gerechnet war der jüngste Lauf ganze
+ * Minuten alt: der Wächter hätte nie gemeldet, obwohl das Tagesgeschäft
+ * 22 Stunden zurücklag und erst 46 Stunden später wiederkam. Was die
+ * Dashboards frisch hält, ist `tagesgeschaeft_bis` (`0116`); ein Lauf, der
+ * danach bis zum Morgen nachlädt, ist dafür ohne Belang. Für Läufe ohne den
+ * Stempel (abgebrochen in Phase A, vor `0116`) bleibt es `beendet_am`.
  */
 export async function ausfallMelden(): Promise<boolean> {
   if (!config.STATUS_WEBHOOK_URL) return false
   try {
     const l = await eine<any>(
-      `SELECT lauf_id::text AS lauf_id, status, gestartet_am, beendet_am,
-              round(EXTRACT(epoch FROM now() - coalesce(beendet_am, gestartet_am)) / 3600, 1)::float AS stunden
-         FROM sync.lauf
-        WHERE status NOT IN ('uebersprungen', 'gesperrt')
-        ORDER BY lauf_id DESC LIMIT 1`)
+      `SELECT l.lauf_id::text AS lauf_id, l.status, l.gestartet_am, l.beendet_am, l.tagesgeschaeft_bis,
+              round(EXTRACT(epoch FROM now() - CASE WHEN l.beendet_am IS NULL THEN l.gestartet_am
+                                                     ELSE coalesce(l.tagesgeschaeft_bis, l.beendet_am) END)
+                    / 3600, 1)::float AS stunden,
+              (SELECT count(*) FROM sync.lauf u
+                WHERE u.lauf_id > l.lauf_id AND u.status = 'uebersprungen')::int AS uebersprungen
+         FROM sync.lauf l
+        WHERE l.status NOT IN ('uebersprungen', 'gesperrt')
+        ORDER BY l.lauf_id DESC LIMIT 1`)
     if (!l || Number(l.stunden) < config.STATUS_AUSFALL_STUNDEN) return false
     const m = await eine<{ wert: any }>(`SELECT wert FROM sync.merker WHERE schluessel = $1`, [MERKER_AUSFALL])
     if (m?.wert?.lauf_id === l.lauf_id) return false
@@ -258,15 +271,22 @@ export async function ausfallMelden(): Promise<boolean> {
     const text = [
       haengt
         ? `#### 🔴 Nachtlauf ${l.lauf_id} hängt — seit ${zahl(Math.round(l.stunden))} Stunden nicht fertig`
-        : `#### 🔴 Kein Nachtlauf seit ${zahl(Math.round(l.stunden))} Stunden`,
+        : `#### 🔴 Kein Tagesgeschäft seit ${zahl(Math.round(l.stunden))} Stunden`,
       haengt
         ? `Gestartet ${tag(new Date(l.gestartet_am))}, ${uhr(new Date(l.gestartet_am))} Uhr. Die Dashboards zeigen bis dahin den alten Stand.`
-        : `Der letzte Lauf (${l.lauf_id}) endete ${tag(new Date(l.beendet_am))}, ${uhr(new Date(l.beendet_am))} Uhr, Status „${l.status}". Seitdem ist keiner gestartet — die Dashboards altern still.`,
+        : (l.tagesgeschaeft_bis
+            ? `Der letzte Lauf (${l.lauf_id}) hat das Tagesgeschäft ${tag(new Date(l.tagesgeschaeft_bis))}, ${uhr(new Date(l.tagesgeschaeft_bis))} Uhr abgeschlossen und endete ${tag(new Date(l.beendet_am))}, ${uhr(new Date(l.beendet_am))} Uhr, Status „${l.status}".`
+            : `Der letzte Lauf (${l.lauf_id}) endete ${tag(new Date(l.beendet_am))}, ${uhr(new Date(l.beendet_am))} Uhr, Status „${l.status}".`)
+          + (l.uebersprungen > 0
+              ? ` Danach ${l.uebersprungen === 1 ? 'wurde ein Start' : `wurden ${zahl(l.uebersprungen)} Starts`} übersprungen, weil die Laufsperre belegt war — die Dashboards altern still.`
+              : ' Seitdem ist keiner gestartet — die Dashboards altern still.'),
       '',
       '**Was zu tun ist**',
       haengt
         ? '- In Dokploy im Importer-Container nachsehen, ob `bun run src/sync.ts` noch arbeitet (`pgrep -f sync.ts`). Ein Deploy während des Laufs beendet ihn ohne Meldung; der nächste Start schließt ihn dann als abgebrochen.'
-        : '- In Dokploy den Schedule Job `bun run sync` des Importers prüfen: aktiv? letzte Ausführung? Notfalls dort von Hand starten.',
+        : l.uebersprungen > 0
+          ? '- Ein übersprungener Start heißt: der Lauf davor lud noch nach. `NACHLADEN_BIS` (Ortszeit) muss vor dem Start des Schedule Jobs liegen — der Job läuft in UTC und startet im Winter eine Stunde früher. Läuft gerade kein Lauf, `bun run sync` im Importer-Container von Hand starten.'
+          : '- In Dokploy den Schedule Job `bun run sync` des Importers prüfen: aktiv? letzte Ausführung? Notfalls dort von Hand starten.',
       '- Danach kommt die gewohnte Meldung nach dem Lauf.',
     ].join('\n')
     const gesendet = await senden(text)

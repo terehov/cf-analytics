@@ -28,14 +28,21 @@ Tag. ~~Seitdem endet Phase C zur vollen Stunde `NACHLADEN_BIS_STUNDE` (Voreinste
 und **nie nach Mitternacht des Tages, an dem sie begann**.~~ (24.–28.09.2026)
 
 **Seit dem 28.09.2026 lädt Phase C bis kurz vor dem nächsten Lauf.** Sie endet beim **nächsten
-Erreichen** von `NACHLADEN_BIS` (Voreinstellung `04:30`, Ortszeit) nach ihrem Beginn — um 08:20
-begonnen also um 04:30 am Folgetag, ein Handlauf ab 03:00 um 04:30 desselben Morgens
+Erreichen** von `NACHLADEN_BIS` (Voreinstellung ~~`04:30`~~ **`03:30`** seit 19.11.2026, Ortszeit) nach ihrem Beginn — um 08:20
+begonnen also um 03:30 am Folgetag, ein Handlauf ab 03:00 um 03:30 desselben Morgens
 (`nachladenVorbei()` in `src/sync/worker.ts`, Test `src/sync/nachladen_ende.test.ts`, auch für die
 Zeitumstellung). Anlass: zwischen 23:00 und 05:02 stand der Zugang sechs Stunden je Nacht still,
 während ~456.000 Posten Historie warten; Lauf 139–141 endeten alle um 23 Uhr, an der Frist oder am
 Budget. Die Bedingung aus Lauf 135 gilt unverändert — **das Nachladen darf den nächsten Lauf nie
-verdrängen** —, nur sichert sie jetzt die Uhrzeit selbst: 04:30 liegt vor 05:02, und die halbe
+verdrängen** —, nur sichert sie jetzt die Uhrzeit selbst: ~~04:30 liegt vor 05:02~~, und die halbe
 Stunde deckt den Refresh nach Phase C (am 26.09. neun Minuten, 23:00 → 23:09).
+
+**Der Start liegt im Winter um 04:00 (19.11.2026).** Der Schedule Job steht auf 03:00 UTC: 05:00 Ortszeit im
+Sommer, 04:00 im Winter. Mit 04:30 lag die Frist ab dem 25.10. hinter dem Start; Lauf 206 lud am 19.11. bis
+04:30, der Start 207 um 04:00 wurde übersprungen — kein Tagesgeschäft an dem Tag (`fehlerkatalog.md`). Seitdem
+03:30, ganzjährig, Test gegen beide Starts in `src/sync/nachladen_ende.test.ts`. Wer den Zeitplan verschiebt,
+prüft die Frist gegen den **Winterstart**. Ein übersprungener Start meldet der Ausfallwächter (`src/meldung.ts`)
+seitdem, weil er ab `tagesgeschaeft_bis` misst, nicht ab dem Laufende.
 
 **Das Budget musste mit.** Es zählt je UTC-Tag, also 02:00 bis 02:00 Ortszeit. Ein UTC-Tag trägt
 jetzt den Rest des Vorlaufs (02:00–04:30, ~1.450 Posten) und den eigenen Lauf bis 02:00 (~11.800),
@@ -62,7 +69,7 @@ Tagesgeschäft des Folgelaufs kann dabei nicht zu kurz kommen: der Rest nach 02:
 
   ── Phase C ── das Nachladen, nur die LINA-Spur ──────────
      sitzung.nachladen()            alles Fällige, verschränkt, bis Budget/Fenster/Notbremse
-                                    und spätestens NACHLADEN_BIS (04:30 am Folgetag)
+                                    und spätestens NACHLADEN_BIS (03:30 am Folgetag)
      wenn Konzern-Historie geladen: deckungsbeitrag · roundTable · vergleichstag
   ── sitzung.abschliessen() ── Status, Notiz, nachladen_posten/_offen, Sperre frei ──
 ```

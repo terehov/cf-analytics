@@ -1,10 +1,14 @@
 /**
  * Das Nachladen (Phase C) hat eine Frist — Anlass Lauf 135 (24.09.2026), der
- * bis zum nächsten Mittag nachlud und den 05:02-Lauf verdrängte. Seit dem
- * 28.09.2026 liegt die Frist in der Nacht darauf (NACHLADEN_BIS = 04:30),
- * und die Bedingung ist dieselbe geblieben: vor dem nächsten Lauf Schluss.
+ * bis zum nächsten Mittag nachlud und den nächsten Lauf verdrängte. Seit dem
+ * 28.09.2026 liegt die Frist in der Nacht darauf (NACHLADEN_BIS, bis
+ * 19.11.2026 04:30, seitdem 03:30), und die Bedingung ist dieselbe
+ * geblieben: vor dem nächsten Lauf Schluss. Die Fälle unten rechnen mit
+ * 04:30 als festem Parameter — sie prüfen die Rechnung, nicht die Wahl;
+ * die Wahl prüft der letzte Block.
  */
 import { describe, expect, test } from 'bun:test'
+import { config } from '../config'
 import { nachladenVorbei } from './worker'
 
 // Alle Zeitpunkte in UTC geschrieben; Europe/Berlin ist im September UTC+2.
@@ -46,5 +50,22 @@ describe('nachladenVorbei', () => {
     const oktober = new Date('2026-10-24T06:20:00Z') // 08:20 MESZ
     expect(nachladenVorbei(new Date('2026-10-25T03:29:00Z'), oktober, '04:30')).toBe(false) // 04:29 MEZ
     expect(nachladenVorbei(new Date('2026-10-25T03:30:00Z'), oktober, '04:30')).toBe(true)  // 04:30 MEZ
+  })
+
+  /*
+   * Der Schedule Job in Dokploy steht auf 03:00 UTC (nachgemessen 19.11.2026):
+   * im Sommer 05:00, im Winter 04:00 Ortszeit. Mit 04:30 lag die Frist ab dem
+   * 25.10.2026 hinter dem Winterstart; am 19.11. fiel Lauf 207 deshalb aus.
+   */
+  test('die voreingestellte Frist liegt im Sommer UND im Winter vor dem Start um 03:00 UTC', () => {
+    const bis = config.NACHLADEN_BIS
+    // Winter: Phase C beginnt 08:20 MEZ, nächster Start 19.11. 04:00 MEZ = 03:00 UTC.
+    const winter = new Date('2026-11-18T07:20:00Z')
+    expect(nachladenVorbei(new Date('2026-11-19T03:00:00Z'), winter, bis)).toBe(true)
+    // mindestens 20 Minuten Luft fuer den Refresh nach Phase C
+    expect(nachladenVorbei(new Date('2026-11-19T02:40:00Z'), winter, bis)).toBe(true)
+    // Sommer: nächster Start 05:00 MESZ = 03:00 UTC.
+    const sommer = new Date('2026-07-14T06:20:00Z')
+    expect(nachladenVorbei(new Date('2026-07-15T02:40:00Z'), sommer, bis)).toBe(true)
   })
 })
