@@ -227,6 +227,27 @@ const Schema = z.object({
    * überspringt sich, `sync.quelle` führt die Quelle als nicht erwartet.
    */
   LINA_API_SCHLUESSEL: z.string().optional(),
+  /**
+   * Die Scope-Tokens der FoodNotify-API, als JSON `{ "<marke>": "<Token>" }`.
+   *
+   * EIN TOKEN JE MARKE: ein Token gehört dem FoodNotify-Konto, in dem es
+   * angelegt wurde, und jede Marke hat ihr eigenes Konto. Die Marke ist
+   * `core.marke.schluessel` (aposto, enchilada, deutsche_konzepte,
+   * wilma_wunder) — dieselben Namen wie bei `FN_<MARKE>_USER`.
+   *
+   * Bearer-Token, NUR gegen `https://api3.foodnotify.com` (gemessen
+   * 18.11.2026, `docs/foodnotify-api-inventar-offiziell.md`): trägt Rezepte
+   * samt Zutaten und Pos 2.0, NICHT Bestellpositionen und Inventuren. Der
+   * Importer arbeitet deshalb weiter mit der Cookie-Sitzung; **noch liest
+   * kein Code diese Tokens** — die Variable ist die Ablage, damit sie an
+   * einer Stelle liegen, bevor der erste Abruf darauf gebaut wird.
+   *
+   * Behandelt wie `LINA_API_SCHLUESSEL`: der Rohtext bleibt nicht im
+   * Konfigurationsobjekt (Ergebnis: `config.FN_API_TOKEN`), keine Meldung
+   * nennt einen Wert, `konfigZumLoggen` nur die Marken. Leer oder ungesetzt
+   * heißt: keine Tokens hinterlegt.
+   */
+  FN_API_TOKENS: z.string().optional(),
   /** Nur ändern, wenn Gastro-MIS die Basis verlegt (alt: https://app.lina.de). */
   LINA_API_BASIS: z.string().default('https://api.lina.de'),
 
@@ -1443,12 +1464,55 @@ function laden() {
    * Die TPAPI-Schlüssel: geprüft und geparst, der Rohtext fällt heraus
    * (Begründung bei LINA_API_SCHLUESSEL oben).
    */
-  const { LINA_API_SCHLUESSEL, ...rest } = r.data
+  const { LINA_API_SCHLUESSEL, FN_API_TOKENS, ...rest } = r.data
   return {
     ...rest,
     BETRIEBSBERICHT_JE_LAUF: r.data.BETRIEBSBERICHT_JE_LAUF ?? r.data.TAGESBUDGET,
     TPAPI_SCHLUESSEL: tpapiSchluesselParsen(LINA_API_SCHLUESSEL),
+    FN_API_TOKEN: fnApiTokensParsen(FN_API_TOKENS),
   }
+}
+
+/**
+ * `FN_API_TOKENS` → `{ marke: Token }`. Wirft beim Start, nie später.
+ *
+ * Wie bei `tpapiSchluesselParsen`: KEINE MELDUNG ENTHÄLT EINEN WERT, auch
+ * nicht die von `JSON.parse`. Eine unbekannte Marke ist ein Fehler — ein
+ * vertippter Name (`wilma-wunder`) hieße sonst still „kein Token".
+ */
+export function fnApiTokensParsen(roh: string | undefined): Record<string, string> {
+  if (roh === undefined || roh.trim() === '') return {}
+  let daten: unknown
+  try {
+    daten = JSON.parse(roh)
+  } catch {
+    throw new Error('FN_API_TOKENS ist kein gültiges JSON — erwartet ein Objekt '
+      + '{ "<marke>": "<Token>" }, einzeilig in einfachen Anführungszeichen. '
+      + '(Der Wert wird bewusst nicht ausgegeben.)')
+  }
+  if (daten === null || typeof daten !== 'object' || Array.isArray(daten)) {
+    throw new Error('FN_API_TOKENS ist JSON, aber kein Objekt — erwartet '
+      + '{ "<marke>": "<Token>" }. (Der Wert wird bewusst nicht ausgegeben.)')
+  }
+  const bekannt: string[] = FN_MARKEN.map(m => m.schluessel)
+  const aus: Record<string, string> = {}
+  for (const [i, [marke, wert]] of Object.entries(daten as Record<string, unknown>).entries()) {
+    if (!bekannt.includes(marke)) {
+      throw new Error(`FN_API_TOKENS, Eintrag ${i + 1}: unbekannte Marke — erlaubt sind `
+        + `${bekannt.join(', ')}. Vertauschte Reihenfolge? Erwartet { "<marke>": "<Token>" }.`)
+    }
+    if (typeof wert !== 'string' || wert.trim() === '') {
+      throw new Error(`FN_API_TOKENS, Eintrag ${i + 1} (${marke}): der Wert ist leer oder kein Text.`)
+    }
+    if (wert !== wert.trim()) {
+      throw new Error(`FN_API_TOKENS, Eintrag ${i + 1} (${marke}): der Wert hat Leerraum am Rand.`)
+    }
+    if (/^bearer\s/i.test(wert)) {
+      throw new Error(`FN_API_TOKENS, Eintrag ${i + 1} (${marke}): nur das Token, ohne das Wort „Bearer".`)
+    }
+    aus[marke] = wert
+  }
+  return aus
 }
 
 /**
@@ -1566,7 +1630,9 @@ export function fnZugaenge(c: Config = config): FnZugang[] {
   })
 }
 
-export type Config = Omit<z.infer<typeof Schema>, 'LINA_API_SCHLUESSEL'> & {
+export type Config = Omit<z.infer<typeof Schema>, 'LINA_API_SCHLUESSEL' | 'FN_API_TOKENS'> & {
+  /** marke → FoodNotify-Scope-Token, leer wenn keins hinterlegt. Nie loggen. */
+  FN_API_TOKEN: Record<string, string>
   BETRIEBSBERICHT_JE_LAUF: number
   /** encId → TPAPI-Schlüssel, leer wenn nicht eingerichtet. Nie loggen. */
   TPAPI_SCHLUESSEL: Record<string, string>
@@ -1638,5 +1704,9 @@ export function konfigZumLoggen(c: Config = config) {
     tpapi: Object.keys(c.TPAPI_SCHLUESSEL).length > 0
       ? `${Object.keys(c.TPAPI_SCHLUESSEL).length} Schluessel`
       : 'nicht konfiguriert',
+    /** Nur die Marken mit hinterlegtem Token, nie ein Wert. */
+    fnApiTokens: Object.keys(c.FN_API_TOKEN).length > 0
+      ? Object.keys(c.FN_API_TOKEN).sort().join(', ')
+      : 'keine hinterlegt',
   }
 }

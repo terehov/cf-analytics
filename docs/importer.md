@@ -2296,6 +2296,10 @@ Zeilen, Rundung auf Cent; getrennt von `laden.ts`, damit ein Test nicht die `.en
 `laden.ts` (raw → core in einer Transaktion), `nachlauf.ts` (`tpapiNachlauf()`), `mock.ts`
 (Attrappe). `src/sync.ts` ruft sie neben Yext, Bounti, Wetter und Handpflege auf.
 
+**FoodNotify-Tokens.** `FN_API_TOKENS` (JSON `marke → Scope-Token`, seit 19.11.2026) ist die Ablage der
+API-Tokens je Marke, geprüft wie `LINA_API_SCHLUESSEL` (`fnApiTokensParsen`, `config.FN_API_TOKEN`). Kein
+Importweg liest sie bisher — Begründung und Messung in `foodnotify-api-inventar-offiziell.md`.
+
 **Konfiguration.** `LINA_API_SCHLUESSEL` (JSON `encId → Schlüssel`) wird beim Start zu
 `config.TPAPI_SCHLUESSEL` geparst: encId 40 Hex klein, Wert nicht leer; ungültig bricht den Start
 ab. Der Rohtext steht **nicht** im `config`-Objekt, `konfigZumLoggen` nennt nur die Anzahl.

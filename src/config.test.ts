@@ -83,3 +83,37 @@ describe('FoodNotify-Zugangsdaten', () => {
     expect(fnZugaenge({} as unknown as Config)).toEqual([])
   })
 })
+
+describe('FN_API_TOKENS', () => {
+  test('leer oder ungesetzt heißt: keine Tokens', async () => {
+    const { fnApiTokensParsen } = await import('./config')
+    expect(fnApiTokensParsen(undefined)).toEqual({})
+    expect(fnApiTokensParsen('  ')).toEqual({})
+  })
+
+  test('ein Token je Marke', async () => {
+    const { fnApiTokensParsen } = await import('./config')
+    expect(fnApiTokensParsen('{"wilma_wunder":"abc","aposto":"def"}'))
+      .toEqual({ wilma_wunder: 'abc', aposto: 'def' })
+  })
+
+  test('keine Fehlermeldung nennt einen Wert', async () => {
+    const { fnApiTokensParsen } = await import('./config')
+    const geheim = 'GEHEIM-0123456789'
+    const faelle = [
+      `{"wilma_wunder":"${geheim}"`,               // abgeschnittenes JSON
+      `["${geheim}"]`,                              // kein Objekt
+      `{"wilma-wunder":"${geheim}"}`,               // vertippte Marke
+      `{"${geheim}":"wilma_wunder"}`,               // vertauscht
+      `{"wilma_wunder":" ${geheim}"}`,              // Leerraum
+      `{"wilma_wunder":"Bearer ${geheim}"}`,        // mit Präfix
+      '{"wilma_wunder":""}',
+    ]
+    for (const f of faelle) {
+      let meldung = ''
+      try { fnApiTokensParsen(f) } catch (e) { meldung = String((e as Error).message) }
+      expect(meldung).not.toBe('')
+      expect(meldung).not.toContain(geheim)
+    }
+  })
+})

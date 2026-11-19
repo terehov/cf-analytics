@@ -37,6 +37,12 @@
 | Vorab einzeln gemessen, **nicht** in der Messdatei | vom Hauptagenten am selben Tag: Anmeldung und Hosts (Tabelle unten), die Familie `/api/1.0/…` (403, nicht jeder Pfad einzeln), `/api/profile` (403, auch in `messliste-token.csv` Spalte `grund`), `/api/recipes` (~~abgewiesen; Statuscode und Meldung nicht festgehalten~~ 403 „This endpoint does not support scope-limited tokens.", am Vormittag), die Mengen 895 Produkte / 509 Produktgruppen / 316 Rechnungen und die Positionsfelder der Rechnungen bei Anbindung 2052, `recipe` gesetzt bei 3 von 5 Produkten einer Stichprobe. Diese Angaben sind unten mit „Einzelmessung" gekennzeichnet; einen Rohbeleg dafür gibt es im Repo nicht. |
 | Nach der Reihe gemessen, **nicht** in der Messdatei | die Detailmessung des Hauptagenten am selben Tag: Bestellliste mit Sortierung, Bestellkopf, Bestellpositionen, Rezeptliste, -kopf, -zutaten, -meta, Inventuren, Betriebe — Abschnitt „Detailmessung nach der Reihe", unten als „Detailmessung" gekennzeichnet. Ebenfalls ohne Rohbeleg im Repo. |
 
+**Ablage der Tokens (seit 19.11.2026):** `FN_API_TOKENS`, ein JSON `{ "<marke>": "<Token>" }` mit einem Token je
+Marke (`aposto`, `enchilada`, `deutsche_konzepte`, `wilma_wunder`) — in `.env` lokal und in Dokploy, nie im Repo,
+nie in einem Log oder einer Messdatei. `src/config.ts` prüft beim Start Form und Markennamen, nennt in keiner
+Meldung einen Wert und reicht das Ergebnis als `config.FN_API_TOKEN` weiter. **Noch liest kein Code die Tokens**;
+der Importer arbeitet weiter mit der Sitzung (Bestellpositionen und Inventuren gehen mit Token nicht).
+
 ### Anmeldung und Hosts (Einzelmessung)
 
 | Host | Ergebnis mit `Authorization: Bearer <token>` |
