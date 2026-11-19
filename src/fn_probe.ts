@@ -6,6 +6,13 @@
  *   bun run fn-probe --marke wilma_wunder           eine Marke
  *   bun run fn-probe                                alle Marken mit FN_*-Zugang
  *   bun run fn-probe --max-anbindungen 3 --max-kostenstellen 2 --max-aufrufe 40
+ *   bun run fn-probe --marke wilma_wunder --nur link-targets,warenstamm \
+ *       --anbindung 2052 --erp 11035 --seitengroessen
+ *       nur ausgewählte Fragen (bruecke, link-targets, rezeptliste, warenstamm,
+ *       verkaeufe, foodwaste); --anbindung/--erp setzen die IDs fest und sparen
+ *       /api/erp/all und /api/pos/locations; --seitengroessen fragt den Warenstamm
+ *       der ersten Kostenstelle zusätzlich mit page_size=100 und page_size=1000
+ *       (die einzigen zwei Varianten auf der Erlaubtliste)
  *
  * WAS ES MISST, je Marke (Fundstellen: docs/offene-punkte.md „18.11.2026 —
  * FoodNotify" Punkte 5, 6, 13, 14, 15; Formen aus
@@ -33,8 +40,9 @@
  *     KEIN Wiederholen.
  *   * Zugangsdaten und Cookies erscheinen nie in Ausgabe, Dateien oder Log.
  *     `/api/analytics` (Tableau-Ticket) wird nicht abgerufen.
- *   * Rohantworten nur nach belege/fn-probe-<datum>/<marke>/ (git-ignoriert,
- *     sonst Abbruch VOR dem ersten Aufruf). Die Zusammenfassung enthält nur
+ *   * Rohantworten nur nach belege/fn-probe-<datum>-<HHMM>/<marke>/ (UTC, git-ignoriert,
+ *     sonst Abbruch VOR dem ersten Aufruf). Zeit im Namen: ein zweiter Lauf am selben
+ *     Tag überschreibt den ersten nicht (bei gleicher Minute folgt `-2`, `-3` …). Die Zusammenfassung enthält nur
  *     Zahlen, Feldnamen und Formen — keine Namen und keine Personenfelder.
  *   * Keine Datenbank.
  *
@@ -44,7 +52,7 @@
  * NUR im Terminal des Nutzers oder per docker exec im Container — nicht aus
  * der Agentenumgebung (AGENTS.md Regel 7a).
  */
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { config, fnGrenzen, fnZugaenge } from './config'
 import { FnAnmeldungFehlgeschlagen, FnSession } from './foodnotify/auth'
@@ -59,6 +67,11 @@ export const MAX_KOSTENSTELLEN = 2
 /** link-targets ist 3 MB groß und braucht ~11 s; alle anderen Antworten sind klein. */
 export const TIMEOUT_MIN_MS = 120_000
 export const MARKEN = ['aposto', 'enchilada', 'deutsche_konzepte', 'wilma_wunder'] as const
+/** Die einzigen Seitengrößen, die `--seitengroessen` am Warenstamm ausprobiert (fest, siehe Erlaubtliste). */
+export const SEITENGROESSEN = [100, 1000] as const
+/** Fragen, die `--nur` einzeln wählen kann. Ohne `--nur` laufen alle. */
+export const FRAGEN = ['bruecke', 'link-targets', 'rezeptliste', 'warenstamm', 'verkaeufe', 'foodwaste'] as const
+export type Frage = (typeof FRAGEN)[number]
 
 // ---------------------------------------------------------------------------
 // Erlaubtliste und Sperrliste
@@ -67,7 +80,8 @@ export const MARKEN = ['aposto', 'enchilada', 'deutsche_konzepte', 'wilma_wunder
 /**
  * Die EINZIGEN Pfade (samt Query), die diese Probe aufruft. Jedes Muster ist
  * vollständig verankert; Zahlen stehen als `\d+`, nie als Platzhalter für Text.
- * Alle elf sind in messung-sitzung-2026-11-18.csv mit Status 200 belegt.
+ * Elf sind in messung-sitzung-2026-11-18.csv mit Status 200 belegt; die zwei `page_size`-Varianten
+ * am Warenstamm sind neu (19.11.2026) und stehen nur dort, bis die Messung sie belegt.
  */
 export const ERLAUBTE_MUSTER: { name: string; re: RegExp }[] = [
   { name: 'kostenstellen', re: /^\/api\/erp\/all$/ },
@@ -76,6 +90,10 @@ export const ERLAUBTE_MUSTER: { name: string; re: RegExp }[] = [
   { name: 'link_targets', re: /^\/api\/pos\/mapping\/\d+\/link-targets$/ },
   { name: 'rezeptliste', re: /^\/api\/recipes\?page=1$/ },
   { name: 'warenstamm', re: /^\/api\/\d+\/products$/ },
+  // Seitengrößen-Messung (19.11.2026): `page_size` heißt der Parameter in Panel (Produktmodul) und Brew
+  // (fn-menue-durchgang.json: /api/{erpId}/products?page=&page_size=). Genau zwei feste Werte.
+  { name: 'warenstamm_seite_100', re: /^\/api\/\d+\/products\?page=1&page_size=100$/ },
+  { name: 'warenstamm_seite_1000', re: /^\/api\/\d+\/products\?page=1&page_size=1000$/ },
   { name: 'verkaeufe', re: /^\/api\/\d+\/sales$/ },
   { name: 'verkauf_rezepte', re: /^\/api\/\d+\/sales\/\d+\/recipe-sale$/ },
   { name: 'foodwaste_kostenanalyse', re: /^\/api\/analytics\/reports\/cost-analysis\/ingredients\/food-waste$/ },
@@ -244,8 +262,16 @@ export type LinkTargetsAuswertung = {
   anzahl: number
   ohneZutaten: number
   ohneZutatenPct: number | null
+  /** Rezepte nach `ingredientCount`: 0, 1–5, 6–20, > 20 (fehlend zählt als 0). */
+  zutatenVerteilung: { '0': number; '1-5': number; '6-20': number; '>20': number }
   restaurantIds: number
   updatedAtJeMonat: Record<string, number>
+  /** Je Kalendertag der letzten 14 (Datumsteil von `updatedAt`, so wie FoodNotify ihn schreibt), älteste zuerst. */
+  updatedAtJeTag: Record<string, number>
+  updatedAtLetzte14Tage: number
+  updatedAtLetzte7Tage: number
+  updatedAtMin: string | null
+  updatedAtMax: string | null
   aelterAlsZwoelfMonate: number
   ohneDatum: number
   felder: string[]
@@ -262,6 +288,15 @@ export function letzteMonate(jetzt: Date, n: number): string[] {
   return m
 }
 
+/** Die letzten n Kalendertage (UTC) bis einschließlich `jetzt`, als 'YYYY-MM-DD', älteste zuerst. */
+export function letzteTage(jetzt: Date, n: number): string[] {
+  const t: string[] = []
+  for (let i = n - 1; i >= 0; i--) {
+    t.push(new Date(Date.UTC(jetzt.getUTCFullYear(), jetzt.getUTCMonth(), jetzt.getUTCDate() - i)).toISOString().slice(0, 10))
+  }
+  return t
+}
+
 /**
  * /api/pos/mapping/{id}/link-targets: nacktes Array `[{recipeId, title,
  * restaurantId, imagePath, restaurantName, ingredientCount, updatedAt}]`.
@@ -270,25 +305,45 @@ export function letzteMonate(jetzt: Date, n: number): string[] {
 export function linkTargetsAuswerten(roh: unknown, jetzt: Date): LinkTargetsAuswertung {
   const rows = (Array.isArray(roh) ? roh : liste(auspacken(roh).daten)).filter(istObjekt)
   const monate = letzteMonate(jetzt, 12)
+  const tage = letzteTage(jetzt, 14)
   const jeMonat: Record<string, number> = Object.fromEntries(monate.map(m => [m, 0]))
+  const jeTag: Record<string, number> = Object.fromEntries(tage.map(t => [t, 0]))
+  const verteilung = { '0': 0, '1-5': 0, '6-20': 0, '>20': 0 }
   let aelter = 0, ohneDatum = 0, ohneZutaten = 0
+  let min: { ms: number; s: string } | null = null
+  let max: { ms: number; s: string } | null = null
   const restaurants = new Set<string>()
   const zeilen = ['id,ingredientCount,updatedAt,restaurantId']
   for (const r of rows) {
     const id = r.recipeId ?? r.id
     const n = zahl(r.ingredientCount)
     if (n === null || n === 0) ohneZutaten++
+    if (n === null || n <= 0) verteilung['0']++
+    else if (n <= 5) verteilung['1-5']++
+    else if (n <= 20) verteilung['6-20']++
+    else verteilung['>20']++
     if (gefuellt(r.restaurantId)) restaurants.add(String(r.restaurantId))
     const ts = gefuellt(r.updatedAt) ? String(r.updatedAt) : ''
     const monat = /^\d{4}-\d{2}/.test(ts) ? ts.slice(0, 7) : ''
     if (!monat) ohneDatum++
     else if (monat in jeMonat) jeMonat[monat] = (jeMonat[monat] ?? 0) + 1
     else if (monat < monate[0]!) aelter++
+    const tag = /^\d{4}-\d{2}-\d{2}/.test(ts) ? ts.slice(0, 10) : ''
+    if (tag && tag in jeTag) jeTag[tag] = (jeTag[tag] ?? 0) + 1
+    const ms = ts ? Date.parse(ts) : NaN
+    if (Number.isFinite(ms)) {
+      if (!min || ms < min.ms) min = { ms, s: ts }
+      if (!max || ms > max.ms) max = { ms, s: ts }
+    }
     zeilen.push([id, r.ingredientCount, ts, r.restaurantId].map(v => csvFeld(v)).join(','))
   }
+  const summe = (ts: string[]) => ts.reduce((a, t) => a + (jeTag[t] ?? 0), 0)
   return {
     anzahl: rows.length, ohneZutaten, ohneZutatenPct: pct(ohneZutaten, rows.length),
+    zutatenVerteilung: verteilung,
     restaurantIds: restaurants.size, updatedAtJeMonat: jeMonat,
+    updatedAtJeTag: jeTag, updatedAtLetzte14Tage: summe(tage), updatedAtLetzte7Tage: summe(tage.slice(-7)),
+    updatedAtMin: min?.s ?? null, updatedAtMax: max?.s ?? null,
     aelterAlsZwoelfMonate: aelter, ohneDatum, felder: feldpfade(rows),
     csv: zeilen.join('\n') + '\n',
   }
@@ -324,33 +379,79 @@ export function rezeptlisteAuswerten(roh: unknown): RezeptlisteAuswertung {
   }
 }
 
+/** Preis- und Verpackungsfelder, deren Füllgrad die Warenstamm-Messung ausweist (auch bei 0, damit ein Fehlen sichtbar ist). */
+export const PREISFELDER = [
+  'pricePerUnit', 'unitPrice', 'packagingQuantity', 'packagingUnit', 'packagingUnits', 'preferredShopUnit',
+  'baseUnitQuantity', 'baseUnitUnit', 'unit', 'unitQuantity', 'timeModified', 'shop', 'shop.id', 'ingredient.artikelId',
+] as const
+
+const feldWert = (z: unknown, pfad: string): unknown =>
+  pfad.split('.').reduce<unknown>((x, k) => (istObjekt(x) ? x[k] : undefined), z)
+
+/** Je Feldpfad: bei wie vielen Zeilen er gefüllt ist (nicht null, nicht leer). Nur Zählungen. */
+export function fuellgrad(zeilen: unknown[], pfade: readonly string[]): Record<string, number> {
+  const r: Record<string, number> = {}
+  for (const p of pfade) r[p] = zeilen.filter(z => gefuellt(feldWert(z, p))).length
+  return r
+}
+
+/** `{date: '2026-11-18 10:00:00.000000'}` (PHP) oder ISO-Text → ganzer Text, sonst null. */
+const zeitText = (x: unknown): string | null => {
+  const s = istObjekt(x) ? x.date : x
+  return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}/.test(s) ? s : null
+}
+
+/** Was die Antwort über ihre eigene Seitengröße sagt: `current_page_size` (flach/payload) oder `pagination.perPage`. */
+export function gemeldeteSeitengroesse(roh: unknown): number | null {
+  let x: unknown = roh
+  for (let i = 0; i < 4 && istObjekt(x); i++) {
+    if ('current_page_size' in x) return zahl(x.current_page_size)
+    if (istObjekt(x.pagination)) return zahl(x.pagination.perPage)
+    if (!('payload' in x)) break
+    x = x.payload
+  }
+  return null
+}
+
 export type WarenstammAuswertung = {
   zeilen: number
   gesamt: number | null
   seitenZahl: number | null
   hatSeiten: boolean | null
+  /** Mit `page_size=N` angefragt; null = Standard (kein Parameter). */
+  seitengroesseAngefragt: number | null
+  /** Was die Antwort über sich sagt (`current_page_size`); null = nicht genannt. */
+  seitengroesseGemeldet: number | null
   felder: string[]
   mitIngredientArtikelId: number
   mitIngredientArtikelIdPct: number | null
   mitBestandsdatensatz: number
   bestandUngleichNull: number
   bestandUngleichNullPct: number | null
+  /** Füllgrad (Zeilen mit Wert) der Preis- und Verpackungsfelder, siehe `PREISFELDER`. */
+  preisfelder: Record<string, number>
+  timeModifiedVon: string | null
+  timeModifiedBis: string | null
 }
 
 /** /api/{erpId}/products: `{errors, payload:{page_count, total_count, data[]}, code, isError}`. */
-export function warenstammAuswerten(roh: unknown): WarenstammAuswertung {
+export function warenstammAuswerten(roh: unknown, angefragt: number | null = null): WarenstammAuswertung {
   const a = auspacken(roh)
   const zeilen = liste(a.daten).filter(istObjekt)
   const mitId = zeilen.filter(z => gefuellt(z.ingredient?.artikelId)).length
   const mitStock = zeilen.filter(z => istObjekt(z.stock))
   const bestand = mitStock.filter(z => { const n = zahl(z.stock.sumAmount); return n !== null && n !== 0 }).length
+  const zeiten = zeilen.map(z => zeitText(z.timeModified)).filter((t): t is string => t !== null).sort()
   return {
     zeilen: zeilen.length, gesamt: a.seiten?.gesamt ?? null, seitenZahl: a.seiten?.gesamtSeiten ?? null,
     hatSeiten: a.seiten ? a.seiten.gesamtSeiten > 1 : null,
+    seitengroesseAngefragt: angefragt, seitengroesseGemeldet: gemeldeteSeitengroesse(roh),
     felder: feldpfade(zeilen),
     mitIngredientArtikelId: mitId, mitIngredientArtikelIdPct: pct(mitId, zeilen.length),
     mitBestandsdatensatz: mitStock.length,
     bestandUngleichNull: bestand, bestandUngleichNullPct: pct(bestand, zeilen.length),
+    preisfelder: fuellgrad(zeilen, PREISFELDER),
+    timeModifiedVon: zeiten[0] ?? null, timeModifiedBis: zeiten[zeiten.length - 1] ?? null,
   }
 }
 
@@ -478,6 +579,13 @@ export type AufrufProtokoll = {
 export type MarkenErgebnis = {
   marke: string
   datum: string
+  /** Beginn des Laufs (UTC, ISO) — der Ordnername trägt nur Datum und Minute. */
+  gestartet: string
+  /** Welche Fragen liefen (`--nur`); alle, wenn nicht eingeschränkt. */
+  fragen: Frage[]
+  /** Festgesetzte IDs (`--anbindung`, `--erp`); null = aus /api/pos/locations bzw. /api/erp/all gewählt. */
+  festeAnbindung: number | null
+  festeKostenstelle: number | null
   anmeldung: 'ok' | 'gescheitert' | 'kein Zugang' | 'nicht versucht'
   abbruch: string | null
   aufrufGrenze: number
@@ -507,6 +615,14 @@ export type ProbeOptionen = {
   maxAnbindungen?: number
   maxKostenstellen?: number
   maxAufrufe?: number
+  /** Nur diese Fragen; leer/fehlt = alle. */
+  nur?: Frage[]
+  /** Anbindung fest vorgeben: spart /api/pos/locations, wenn auch keine Kostenstelle zu wählen ist. */
+  anbindung?: number
+  /** Kostenstelle (erpId) fest vorgeben: spart /api/erp/all. */
+  erp?: number
+  /** Warenstamm der ersten Kostenstelle zusätzlich mit page_size=100 und page_size=1000. */
+  seitengroessen?: boolean
   /** Nur für Tests kleiner als PAUSE_MS. */
   pauseMs?: number
   jetzt?: Date
@@ -519,9 +635,10 @@ const schlaf = (ms: number) => new Promise(r => setTimeout(r, ms))
 export const kuerzen = (text: string, n = 300): string =>
   text.replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '<mail>').replace(/\s+/g, ' ').trim().slice(0, n)
 
-function leeresErgebnis(marke: string, datum: string, grenze: number): MarkenErgebnis {
+function leeresErgebnis(marke: string, jetzt: Date, grenze: number, fragen: Frage[], anb: number | null, erp: number | null): MarkenErgebnis {
   return {
-    marke, datum, anmeldung: 'nicht versucht', abbruch: null, aufrufGrenze: grenze, aufrufe: [], nichtGeholt: [], befunde: [],
+    marke, datum: jetzt.toISOString().slice(0, 10), gestartet: jetzt.toISOString(), fragen,
+    festeAnbindung: anb, festeKostenstelle: erp, anmeldung: 'nicht versucht', abbruch: null, aufrufGrenze: grenze, aufrufe: [], nichtGeholt: [], befunde: [],
     standorte: null, gewaehlteAnbindungen: [], gewaehlteKostenstellen: [], artikel: [], linkTargets: null,
     rezeptliste: null, abgleichRezeptzahl: null, warenstamm: [], verkaeufe: [], rezeptVerkaeufe: [],
     foodWaste: { kostenanalyse: null, liste: null, summen: null },
@@ -535,9 +652,15 @@ export async function fnProbe(o: ProbeOptionen): Promise<{ ergebnisse: MarkenErg
   const maxAnb = o.maxAnbindungen ?? MAX_ANBINDUNGEN
   const maxKs = o.maxKostenstellen ?? MAX_KOSTENSTELLEN
   const jetzt = o.jetzt ?? new Date()
-  const datum = jetzt.toISOString().slice(0, 10)
   const zugaenge = fnZugaenge()
   const marken = o.marken?.length ? o.marken : [...MARKEN]
+  const fragen: Frage[] = o.nur?.length ? [...new Set(o.nur)] : [...FRAGEN]
+  const falscheFragen = fragen.filter(f => !(FRAGEN as readonly string[]).includes(f))
+  if (falscheFragen.length) throw new Error(`Unbekannte Frage: ${falscheFragen.join(', ')} (erlaubt: ${FRAGEN.join(', ')})`)
+  for (const [n, v] of [['anbindung', o.anbindung], ['erp', o.erp]] as const) {
+    if (v !== undefined && (!Number.isInteger(v) || v <= 0)) throw new Error(`--${n} braucht eine positive ganze Zahl`)
+  }
+  const will = (f: Frage) => fragen.includes(f)
   const unbekannt = marken.filter(m => !(MARKEN as readonly string[]).includes(m))
   if (unbekannt.length) throw new Error(`Unbekannte Marke: ${unbekannt.join(', ')} (erlaubt: ${MARKEN.join(', ')})`)
 
@@ -545,7 +668,7 @@ export async function fnProbe(o: ProbeOptionen): Promise<{ ergebnisse: MarkenErg
   let letzter = 0
 
   for (const marke of marken) {
-    const e = leeresErgebnis(marke, datum, grenze)
+    const e = leeresErgebnis(marke, jetzt, grenze, fragen, o.anbindung ?? null, o.erp ?? null)
     ergebnisse.push(e)
     const zugang = zugaenge.find(z => z.schluessel === marke)
     if (!zugang) {
@@ -656,28 +779,35 @@ export async function fnProbe(o: ProbeOptionen): Promise<{ ergebnisse: MarkenErg
     }
 
     // --- Grundlage: Kostenstellen und Anbindungen -------------------------
-    const ksRoh = await holenRoh('erp_all', '/api/erp/all')
+    // Feste IDs (--anbindung/--erp) ersetzen den jeweiligen Grundaufruf; ohne sie wie bisher.
+    const braucheAnbindung = (will('bruecke') || will('link-targets')) && o.anbindung === undefined
+    const braucheKs = (will('warenstamm') || will('verkaeufe') || will('foodwaste')) && o.erp === undefined
+    const ksRoh = braucheKs ? await holenRoh('erp_all', '/api/erp/all') : null
     const ks = ksRoh === null ? [] : kostenstellen(ksRoh)
-    const stRoh = await holenRoh('pos_standorte', '/api/pos/locations')
+    const stRoh = braucheAnbindung || braucheKs ? await holenRoh('pos_standorte', '/api/pos/locations') : null
     const standorte = stRoh === null ? [] : posStandorte(stRoh)
     if (stRoh !== null) e.standorte = standorteAuswerten(standorte)
-    const anbindungen = e.standorte ? anbindungenWaehlen(e.standorte, maxAnb) : []
+    const anbindungen = o.anbindung !== undefined
+      ? [{ connectionId: o.anbindung, kassensystem: null as string | null, kostenstellen: 0 }]
+      : e.standorte ? anbindungenWaehlen(e.standorte, maxAnb) : []
     e.gewaehlteAnbindungen = anbindungen.map(a => ({ connectionId: a.connectionId, kassensystem: a.kassensystem }))
-    const erpIds = kostenstellenWaehlen(ks, standorte, maxKs)
+    const erpIds = o.erp !== undefined ? [o.erp] : kostenstellenWaehlen(ks, standorte, maxKs)
     e.gewaehlteKostenstellen = erpIds
-    if (stRoh !== null && anbindungen.length === 0) e.befunde.push('keine Kassenanbindung in /api/pos/locations — Brücke und link-targets nicht messbar')
+    if (stRoh !== null && braucheAnbindung && anbindungen.length === 0) e.befunde.push('keine Kassenanbindung in /api/pos/locations — Brücke und link-targets nicht messbar')
     if (ksRoh !== null && erpIds.length === 0) e.befunde.push('keine Kostenstelle in /api/erp/all — Warenstamm, Verkäufe, Food Waste nicht messbar')
 
     // --- 1. Brücke Kassenartikel → Rezept ---------------------------------
-    for (const a of anbindungen) {
-      const roh = await holenRoh(`articles_${a.connectionId}`, `/api/pos/mapping/${a.connectionId}/articles`)
-      if (roh !== null) e.artikel.push({ connectionId: a.connectionId, kassensystem: a.kassensystem, ...artikelAuswerten(roh) })
+    if (will('bruecke')) {
+      for (const a of anbindungen) {
+        const roh = await holenRoh(`articles_${a.connectionId}`, `/api/pos/mapping/${a.connectionId}/articles`)
+        if (roh !== null) e.artikel.push({ connectionId: a.connectionId, kassensystem: a.kassensystem, ...artikelAuswerten(roh) })
+      }
     }
 
     // --- 2. link-targets (ein Aufruf, 3 MB) -------------------------------
     const lt = anbindungen[0]
     let ltAnzahl: number | null = null
-    if (lt) {
+    if (lt && will('link-targets')) {
       const roh = await holenRoh(`link_targets_${lt.connectionId}`, `/api/pos/mapping/${lt.connectionId}/link-targets`)
       if (roh !== null) {
         const { csv, ...rest } = linkTargetsAuswerten(roh, jetzt)
@@ -688,42 +818,63 @@ export async function fnProbe(o: ProbeOptionen): Promise<{ ergebnisse: MarkenErg
     }
 
     // --- 3. Rezeptliste Seite 1 und Abgleich ------------------------------
-    const rl = await holenRoh('rezeptliste_seite1', '/api/recipes?page=1')
-    if (rl !== null) {
-      e.rezeptliste = rezeptlisteAuswerten(rl)
-      const total = e.rezeptliste.totalItems
-      e.abgleichRezeptzahl = { totalItems: total, linkTargets: ltAnzahl,
-        differenz: total !== null && ltAnzahl !== null ? total - ltAnzahl : null }
-    }
-
-    // --- 4. Warenstamm, 5. Verkäufe ---------------------------------------
-    for (const erpId of erpIds) {
-      const roh = await holenRoh(`products_${erpId}`, `/api/${erpId}/products`)
-      if (roh !== null) {
-        const l = e.aufrufe[e.aufrufe.length - 1]!
-        e.warenstamm.push({ erpId, bytes: l.bytes, dauerMs: l.dauerMs, ...warenstammAuswerten(roh) })
+    if (will('rezeptliste')) {
+      const rl = await holenRoh('rezeptliste_seite1', '/api/recipes?page=1')
+      if (rl !== null) {
+        e.rezeptliste = rezeptlisteAuswerten(rl)
+        const total = e.rezeptliste.totalItems
+        e.abgleichRezeptzahl = { totalItems: total, linkTargets: ltAnzahl,
+          differenz: total !== null && ltAnzahl !== null ? total - ltAnzahl : null }
       }
     }
-    for (const erpId of erpIds) {
-      const roh = await holenRoh(`sales_${erpId}`, `/api/${erpId}/sales`)
-      if (roh !== null) e.verkaeufe.push({ erpId, ...verkaeufeAuswerten(roh) })
+
+    // --- 4. Warenstamm ----------------------------------------------------
+    if (will('warenstamm')) {
+      for (const erpId of erpIds) {
+        const roh = await holenRoh(`products_${erpId}`, `/api/${erpId}/products`)
+        if (roh !== null) {
+          const l = e.aufrufe[e.aufrufe.length - 1]!
+          e.warenstamm.push({ erpId, bytes: l.bytes, dauerMs: l.dauerMs, ...warenstammAuswerten(roh) })
+        }
+      }
+      // Seitengröße: nur die erste Kostenstelle, nur die zwei festen Werte.
+      const erp1 = erpIds[0]
+      if (o.seitengroessen && erp1 !== undefined) {
+        for (const groesse of SEITENGROESSEN) {
+          const roh = await holenRoh(`products_${erp1}_page_size_${groesse}`, `/api/${erp1}/products?page=1&page_size=${groesse}`)
+          if (roh !== null) {
+            const l = e.aufrufe[e.aufrufe.length - 1]!
+            e.warenstamm.push({ erpId: erp1, bytes: l.bytes, dauerMs: l.dauerMs, ...warenstammAuswerten(roh, groesse) })
+          }
+        }
+      }
     }
-    // Für höchstens zwei Verkäufe zusammen: die ersten zwei der ersten Kostenstelle mit Verkäufen.
-    const mitVerkauf = e.verkaeufe.find(v => v.ids.length > 0)
-    for (const id of mitVerkauf ? mitVerkauf.ids.slice(0, 2) : []) {
-      const roh = await holenRoh(`recipe_sale_${mitVerkauf!.erpId}_${id}`, `/api/${mitVerkauf!.erpId}/sales/${id}/recipe-sale`)
-      if (roh !== null) e.rezeptVerkaeufe.push({ erpId: mitVerkauf!.erpId, verkaufId: id, ...rezeptVerkaufAuswerten(roh) })
+
+    // --- 5. Verkäufe ------------------------------------------------------
+    if (will('verkaeufe')) {
+      for (const erpId of erpIds) {
+        const roh = await holenRoh(`sales_${erpId}`, `/api/${erpId}/sales`)
+        if (roh !== null) e.verkaeufe.push({ erpId, ...verkaeufeAuswerten(roh) })
+      }
+      // Für höchstens zwei Verkäufe zusammen: die ersten zwei der ersten Kostenstelle mit Verkäufen.
+      const mitVerkauf = e.verkaeufe.find(v => v.ids.length > 0)
+      for (const id of mitVerkauf ? mitVerkauf.ids.slice(0, 2) : []) {
+        const roh = await holenRoh(`recipe_sale_${mitVerkauf!.erpId}_${id}`, `/api/${mitVerkauf!.erpId}/sales/${id}/recipe-sale`)
+        if (roh !== null) e.rezeptVerkaeufe.push({ erpId: mitVerkauf!.erpId, verkaufId: id, ...rezeptVerkaufAuswerten(roh) })
+      }
     }
 
     // --- 6. Food Waste: nur die in der Sitzungsmessung mit 200 belegten Pfade ---
-    const fwk = await holenRoh('food_waste_kostenanalyse', '/api/analytics/reports/cost-analysis/ingredients/food-waste')
-    if (fwk !== null) e.foodWaste.kostenanalyse = foodWasteKostenanalyseAuswerten(fwk)
-    const erp0 = erpIds[0]
-    if (erp0 !== undefined) {
-      const fwl = await holenRoh(`food_waste_liste_${erp0}`, `/api/erp/food-waste?erpId=${erp0}&limit=5&page=1`)
-      if (fwl !== null) e.foodWaste.liste = { erpId: erp0, ...foodWasteListeAuswerten(fwl) }
-      const fws = await holenRoh(`food_waste_summen_${erp0}`, `/api/erp/food-waste-alpha/totals?erpId=${erp0}`)
-      if (fws !== null) e.foodWaste.summen = { erpId: erp0, ...foodWasteSummenAuswerten(fws) }
+    if (will('foodwaste')) {
+      const fwk = await holenRoh('food_waste_kostenanalyse', '/api/analytics/reports/cost-analysis/ingredients/food-waste')
+      if (fwk !== null) e.foodWaste.kostenanalyse = foodWasteKostenanalyseAuswerten(fwk)
+      const erp0 = erpIds[0]
+      if (erp0 !== undefined) {
+        const fwl = await holenRoh(`food_waste_liste_${erp0}`, `/api/erp/food-waste?erpId=${erp0}&limit=5&page=1`)
+        if (fwl !== null) e.foodWaste.liste = { erpId: erp0, ...foodWasteListeAuswerten(fwl) }
+        const fws = await holenRoh(`food_waste_summen_${erp0}`, `/api/erp/food-waste-alpha/totals?erpId=${erp0}`)
+        if (fws !== null) e.foodWaste.summen = { erpId: erp0, ...foodWasteSummenAuswerten(fws) }
+      }
     }
 
     zusammenfassungSchreiben(verzeichnis, e)
@@ -745,9 +896,9 @@ function konsole(aus: (z: string) => void, e: MarkenErgebnis) {
   if (e.standorte) aus(`  Anbindungen: ${e.standorte.anbindungen.length} (${Object.entries(e.standorte.nachKassensystem).map(([k, n]) => `${k} ${n}`).join(', ') || '—'}), Standorte ohne Anbindung: ${e.standorte.ohneAnbindung}`)
   for (const x of e.artikel) aus(`  Artikel ${x.connectionId} (${x.kassensystem ?? '?'}): ${x.artikel}, mit Rezept ${x.mitRezept} (${x.mitRezeptPct ?? '—'} %), PLU-Formen ${x.pluBeispielformen.join(', ') || '—'}`)
   if (!a && e.standorte) aus('  Artikel: keine gelesen')
-  if (e.linkTargets) aus(`  link-targets: ${e.linkTargets.anzahl} Rezepte, ohne Zutaten ${e.linkTargets.ohneZutaten} (${e.linkTargets.ohneZutatenPct ?? '—'} %), ${e.linkTargets.restaurantIds} restaurantId`)
+  if (e.linkTargets) aus(`  link-targets: ${e.linkTargets.anzahl} Rezepte, ohne Zutaten ${e.linkTargets.ohneZutaten} (${e.linkTargets.ohneZutatenPct ?? '—'} %), ${e.linkTargets.restaurantIds} restaurantId, ingredientCount ${JSON.stringify(e.linkTargets.zutatenVerteilung)}, updatedAt in 14 Tagen ${e.linkTargets.updatedAtLetzte14Tage}, in 7 Tagen ${e.linkTargets.updatedAtLetzte7Tage}`)
   if (e.rezeptliste) aus(`  Rezeptliste: totalItems ${e.rezeptliste.totalItems ?? '—'}, ${e.rezeptliste.totalPages ?? '—'} Seiten, archiviert auf Seite 1: ${e.rezeptliste.archiviert}/${e.rezeptliste.archivedFeldVorhanden}; Differenz zu link-targets: ${e.abgleichRezeptzahl?.differenz ?? '—'}`)
-  for (const w of e.warenstamm) aus(`  Warenstamm ${w.erpId}: ${w.zeilen} Zeilen (gesamt ${w.gesamt ?? '—'}), mit artikelId ${w.mitIngredientArtikelIdPct ?? '—'} %, Bestand ≠ 0 ${w.bestandUngleichNullPct ?? '—'} %, ${w.bytes ?? '—'} B in ${w.dauerMs ?? '—'} ms`)
+  for (const w of e.warenstamm) aus(`  Warenstamm ${w.erpId} (page_size ${w.seitengroesseAngefragt ?? 'Standard'}, gemeldet ${w.seitengroesseGemeldet ?? '—'}): ${w.zeilen} Zeilen (gesamt ${w.gesamt ?? '—'}, ${w.seitenZahl ?? '—'} Seiten), mit artikelId ${w.mitIngredientArtikelIdPct ?? '—'} %, Bestand ≠ 0 ${w.bestandUngleichNullPct ?? '—'} %, ${w.bytes ?? '—'} B in ${w.dauerMs ?? '—'} ms`)
   for (const v of e.verkaeufe) aus(`  Verkäufe ${v.erpId}: ${v.zeilen} (gesamt ${v.gesamt ?? '—'}), Status ${JSON.stringify(v.saleStatus)}, finishError ${v.finishErrorGesetzt}, ${v.datumVon ?? '—'} bis ${v.datumBis ?? '—'}`)
   for (const r of e.rezeptVerkaeufe) aus(`  recipe-sale ${r.erpId}/${r.verkaufId}: ${r.positionen} Positionen, mit Rezept ${r.mitRezept}`)
   if (e.foodWaste.kostenanalyse) aus(`  Food Waste (Kostenanalyse): ${e.foodWaste.kostenanalyse.zeilen} Zeilen, ${e.foodWaste.kostenanalyse.datumVon ?? '—'} bis ${e.foodWaste.kostenanalyse.datumBis ?? '—'}`)
@@ -764,8 +915,9 @@ export function zusammenfassungMarkdown(e: MarkenErgebnis): string {
     for (const r of zeilen) z.push(`| ${r.map(zahlOderStrich).join(' | ')} |`)
     z.push('')
   }
-  z.push(`# fn-probe ${e.marke} — ${e.datum}`, '',
+  z.push(`# fn-probe ${e.marke} — ${e.gestartet.slice(0, 16).replace('T', ' ')} UTC`, '',
     `Anmeldung: ${e.anmeldung}. Aufrufe: ${e.aufrufe.length} von höchstens ${e.aufrufGrenze}. ${e.abbruch ? `**Abbruch:** ${e.abbruch}` : ''}`, '',
+    `Fragen: ${e.fragen.join(', ')}. Feste IDs: Anbindung ${zahlOderStrich(e.festeAnbindung)}, Kostenstelle ${zahlOderStrich(e.festeKostenstelle)}.`, '',
     'Nur Zahlen, Feldnamen und Formen. Prozentwerte sind Prozentzahlen.', '')
   z.push('## Aufrufe', '')
   t(['Nr', 'Name', 'Pfad', 'Status', 'Bytes', 'ms', 'Hinweis'], e.aufrufe.map(a => [a.nr, a.name, `\`${a.pfad}\``, a.status, a.bytes, a.dauerMs, a.hinweis]))
@@ -788,7 +940,11 @@ export function zusammenfassungMarkdown(e: MarkenErgebnis): string {
     const l = e.linkTargets
     z.push(`Anbindung ${l.connectionId}: ${l.anzahl} Rezepte, ohne Zutaten ${l.ohneZutaten} (${zahlOderStrich(l.ohneZutatenPct)} %), verschiedene restaurantId: ${l.restaurantIds}, `
       + `updatedAt älter als zwölf Monate: ${l.aelterAlsZwoelfMonate}, ohne Datum: ${l.ohneDatum}. Felder: ${l.felder.join(', ')}. CSV: \`link-targets.csv\`.`, '')
+    z.push(`\`ingredientCount\`: 0 → ${l.zutatenVerteilung['0']}, 1–5 → ${l.zutatenVerteilung['1-5']}, 6–20 → ${l.zutatenVerteilung['6-20']}, über 20 → ${l.zutatenVerteilung['>20']}. `
+      + `\`updatedAt\` frühestens ${zahlOderStrich(l.updatedAtMin)}, spätestens ${zahlOderStrich(l.updatedAtMax)}. `
+      + `Mit \`updatedAt\` in den letzten 14 Tagen: **${l.updatedAtLetzte14Tage}** (letzte 7 Tage: ${l.updatedAtLetzte7Tage}). Datumsteil wie geliefert, Tage gezählt bis heute (UTC).`, '')
     t(['Monat', 'Rezepte (updatedAt)'], Object.entries(l.updatedAtJeMonat))
+    t(['Tag', 'Rezepte (updatedAt)'], Object.entries(l.updatedAtJeTag))
   } else z.push('nicht geholt', '')
 
   z.push('## 3. Rezeptliste Seite 1', '')
@@ -800,9 +956,15 @@ export function zusammenfassungMarkdown(e: MarkenErgebnis): string {
   } else z.push('nicht geholt', '')
 
   z.push('## 4. Warenstamm', '')
-  t(['erpId', 'Zeilen', 'gesamt', 'Seiten', 'Bytes', 'ms', 'ingredient.artikelId %', 'Bestand ≠ 0 %', 'Bestandsdatensatz'],
-    e.warenstamm.map(w => [w.erpId, w.zeilen, w.gesamt, w.seitenZahl, w.bytes, w.dauerMs, w.mitIngredientArtikelIdPct, w.bestandUngleichNullPct, w.mitBestandsdatensatz]))
-  for (const w of e.warenstamm) z.push(`Felder ${w.erpId}: ${w.felder.join(', ')}`, '')
+  t(['erpId', 'page_size angefragt', 'gemeldet', 'Zeilen', 'gesamt', 'Seiten', 'Bytes', 'ms', 'ingredient.artikelId %', 'Bestand ≠ 0 %', 'Bestandsdatensatz', 'timeModified von', 'bis'],
+    e.warenstamm.map(w => [w.erpId, w.seitengroesseAngefragt ?? 'Standard', w.seitengroesseGemeldet, w.zeilen, w.gesamt, w.seitenZahl, w.bytes, w.dauerMs,
+      w.mitIngredientArtikelIdPct, w.bestandUngleichNullPct, w.mitBestandsdatensatz, w.timeModifiedVon, w.timeModifiedBis]))
+  for (const w of e.warenstamm) {
+    const titel = `${w.erpId}, page_size ${w.seitengroesseAngefragt ?? 'Standard'}`
+    z.push(`Füllgrad Preis- und Verpackungsfelder (${titel}; Zeilen mit Wert von ${w.zeilen}):`, '')
+    t(['Feld', 'gefüllt', '%'], Object.entries(w.preisfelder).map(([k, n]) => [k, n, pct(n, w.zeilen)]))
+    z.push(`Felder (${titel}): ${w.felder.join(', ')}`, '')
+  }
 
   z.push('## 5. Verkäufe', '')
   t(['erpId', 'Zeilen', 'gesamt', 'Seiten', 'saleStatus', 'finishError ≠ null', '%', 'von', 'bis'],
@@ -830,21 +992,52 @@ function zusammenfassungSchreiben(verzeichnis: string, e: MarkenErgebnis) {
 // Aufrufplan ohne Netz
 // ---------------------------------------------------------------------------
 
-/** Der Plan je Marke als Vorlagen — die konkreten IDs kennt erst die Antwort. Standardfall: 1+1+3+1+1+2+2+2+3 = 16. */
-export function aufrufplan(maxAnbindungen = MAX_ANBINDUNGEN, maxKostenstellen = MAX_KOSTENSTELLEN): { vorlage: string; anzahl: number }[] {
-  return [
-    { vorlage: '/api/erp/all', anzahl: 1 },
-    { vorlage: '/api/pos/locations', anzahl: 1 },
-    { vorlage: '/api/pos/mapping/{connectionId}/articles', anzahl: maxAnbindungen },
-    { vorlage: '/api/pos/mapping/{connectionId}/link-targets', anzahl: maxAnbindungen > 0 ? 1 : 0 },
-    { vorlage: '/api/recipes?page=1', anzahl: 1 },
-    { vorlage: '/api/{erpId}/products', anzahl: maxKostenstellen },
-    { vorlage: '/api/{erpId}/sales', anzahl: maxKostenstellen },
-    { vorlage: '/api/{erpId}/sales/{id}/recipe-sale', anzahl: 2 },
-    { vorlage: '/api/analytics/reports/cost-analysis/ingredients/food-waste', anzahl: 1 },
-    { vorlage: '/api/erp/food-waste?erpId={erpId}&limit=5&page=1', anzahl: maxKostenstellen > 0 ? 1 : 0 },
-    { vorlage: '/api/erp/food-waste-alpha/totals?erpId={erpId}', anzahl: maxKostenstellen > 0 ? 1 : 0 },
+export type PlanOptionen = {
+  nur?: Frage[]
+  anbindung?: number
+  erp?: number
+  seitengroessen?: boolean
+}
+
+/**
+ * Der Plan je Marke als Vorlagen — die konkreten IDs kennt erst die Antwort.
+ * Standardfall: 1+1+3+1+1+2+2+2+3 = 16. Mit `--nur`/`--anbindung`/`--erp`/`--seitengroessen` entsprechend weniger oder mehr.
+ */
+export function aufrufplan(
+  maxAnbindungen = MAX_ANBINDUNGEN, maxKostenstellen = MAX_KOSTENSTELLEN, opt: PlanOptionen = {},
+): { vorlage: string; anzahl: number }[] {
+  const fragen: Frage[] = opt.nur?.length ? opt.nur : [...FRAGEN]
+  const will = (f: Frage) => fragen.includes(f)
+  const anbFest = opt.anbindung !== undefined
+  const ksFest = opt.erp !== undefined
+  const brauchtAnb = (will('bruecke') || will('link-targets')) && !anbFest
+  const brauchtKs = (will('warenstamm') || will('verkaeufe') || will('foodwaste')) && !ksFest
+  const anb = anbFest ? 1 : maxAnbindungen
+  const ks = ksFest ? 1 : maxKostenstellen
+  const plan: { vorlage: string; anzahl: number }[] = [
+    { vorlage: '/api/erp/all', anzahl: brauchtKs ? 1 : 0 },
+    { vorlage: '/api/pos/locations', anzahl: brauchtAnb || brauchtKs ? 1 : 0 },
+    { vorlage: '/api/pos/mapping/{connectionId}/articles', anzahl: will('bruecke') ? anb : 0 },
+    { vorlage: '/api/pos/mapping/{connectionId}/link-targets', anzahl: will('link-targets') && anb > 0 ? 1 : 0 },
+    { vorlage: '/api/recipes?page=1', anzahl: will('rezeptliste') ? 1 : 0 },
+    { vorlage: '/api/{erpId}/products', anzahl: will('warenstamm') ? ks : 0 },
+    { vorlage: '/api/{erpId}/products?page=1&page_size={100|1000}', anzahl: will('warenstamm') && opt.seitengroessen && ks > 0 ? SEITENGROESSEN.length : 0 },
+    { vorlage: '/api/{erpId}/sales', anzahl: will('verkaeufe') ? ks : 0 },
+    { vorlage: '/api/{erpId}/sales/{id}/recipe-sale', anzahl: will('verkaeufe') ? 2 : 0 },
+    { vorlage: '/api/analytics/reports/cost-analysis/ingredients/food-waste', anzahl: will('foodwaste') ? 1 : 0 },
+    { vorlage: '/api/erp/food-waste?erpId={erpId}&limit=5&page=1', anzahl: will('foodwaste') && ks > 0 ? 1 : 0 },
+    { vorlage: '/api/erp/food-waste-alpha/totals?erpId={erpId}', anzahl: will('foodwaste') && ks > 0 ? 1 : 0 },
   ]
+  return plan.filter(p => p.anzahl > 0)
+}
+
+/** `fn-probe-<UTC-Datum>-<HHMM>`, bei Kollision `-2`, `-3` … — ein zweiter Lauf überschreibt den ersten nie. */
+export function ausgabeVerzeichnis(basis: string, jetzt: Date, existiert: (p: string) => boolean = existsSync): string {
+  const iso = jetzt.toISOString()
+  const name = `fn-probe-${iso.slice(0, 10)}-${iso.slice(11, 13)}${iso.slice(14, 16)}`
+  let ziel = join(basis, name)
+  for (let n = 2; existiert(ziel); n++) ziel = join(basis, `${name}-${n}`)
+  return ziel
 }
 
 if (import.meta.main) {
@@ -856,21 +1049,37 @@ if (import.meta.main) {
     if (!Number.isInteger(x) || x < 0) { console.error(`--${n} braucht eine ganze Zahl ≥ 0`); process.exit(64) }
     return x
   }
+  const idArg = (n: string): number | undefined => {
+    const v = arg(n)
+    if (v === undefined) return undefined
+    const x = Number(v)
+    if (!Number.isInteger(x) || x <= 0) { console.error(`--${n} braucht eine positive ganze Zahl`); process.exit(64) }
+    return x
+  }
   const marke = arg('marke')
   const maxAnbindungen = zahlArg('max-anbindungen', MAX_ANBINDUNGEN)
   const maxKostenstellen = zahlArg('max-kostenstellen', MAX_KOSTENSTELLEN)
   const maxAufrufe = zahlArg('max-aufrufe', MAX_AUFRUFE)
+  const nurText = arg('nur')
+  const nur = nurText ? nurText.split(',').map(x => x.trim()).filter(Boolean) : undefined
+  const falsch = (nur ?? []).filter(f => !(FRAGEN as readonly string[]).includes(f))
+  if (falsch.length) { console.error(`Unbekannte Frage: ${falsch.join(', ')} (erlaubt: ${FRAGEN.join(', ')})`); process.exit(64) }
+  const opt: PlanOptionen = {
+    nur: nur as Frage[] | undefined, anbindung: idArg('anbindung'), erp: idArg('erp'),
+    seitengroessen: process.argv.includes('--seitengroessen'),
+  }
 
   if (process.argv.includes('--dry-run')) {
     // Kein Netz, keine Anmeldung: nur die Muster, der Plan und wer überhaupt einen Zugang hat.
-    const plan = aufrufplan(maxAnbindungen, maxKostenstellen)
+    const plan = aufrufplan(maxAnbindungen, maxKostenstellen, opt)
     console.log('Erlaubtliste (nur GET, vollständig verankert):')
     for (const m of ERLAUBTE_MUSTER) console.log(`  ${m.name.padEnd(24)} ${m.re}`)
     console.log('\nSperrliste (darf in keinem Pfad vorkommen):')
     for (const s of GESPERRTE_TEILE) console.log(`  ${s}`)
-    console.log(`\nAufrufplan je Marke (höchstens ${maxAufrufe}; ohne Anmeldung und /api/profile):`)
+    console.log(`\nFragen: ${(opt.nur ?? [...FRAGEN]).join(', ')}; feste Anbindung ${opt.anbindung ?? '—'}, feste Kostenstelle ${opt.erp ?? '—'}, Seitengrößen ${opt.seitengroessen ? SEITENGROESSEN.join('/') : 'aus'}`)
+    console.log(`Aufrufplan je Marke (höchstens ${maxAufrufe}; ohne Anmeldung und /api/profile):`)
     for (const p of plan) console.log(`  ${String(p.anzahl).padStart(2)}×  ${p.vorlage}`)
-    console.log(`  = ${plan.reduce((s, p) => s + p.anzahl, 0)} Aufrufe im Standardfall`)
+    console.log(`  = ${plan.reduce((s, p) => s + p.anzahl, 0)} Aufrufe`)
     const zug = fnZugaenge().map(z => z.schluessel)
     const ziel = marke ? [marke] : [...MARKEN]
     console.log(`\nMarken: ${ziel.map(m => `${m} (${zug.includes(m) ? 'Zugang' : 'KEIN Zugang'})`).join(', ')}`)
@@ -878,15 +1087,15 @@ if (import.meta.main) {
     process.exit(0)
   }
 
-  const datum = new Date().toISOString().slice(0, 10)
-  const ziel = resolve(arg('aus') ?? join('belege', `fn-probe-${datum}`))
+  const jetzt = new Date()
+  const ziel = resolve(arg('aus') ?? ausgabeVerzeichnis('belege', jetzt))
   if (!gitIgnoriert(ziel)) {
     console.error(`Abbruch vor dem ersten Aufruf: ${ziel} ist nicht von git ignoriert. `
       + 'Rohantworten gehören nicht ins Repository — ein Verzeichnis unter belege/ wählen.')
     process.exit(3)
   }
   const { exitCode } = await fnProbe({
-    marken: marke ? [marke] : undefined, aus: ziel, maxAnbindungen, maxKostenstellen, maxAufrufe,
+    marken: marke ? [marke] : undefined, aus: ziel, maxAnbindungen, maxKostenstellen, maxAufrufe, jetzt, ...opt,
   })
   process.exit(exitCode)
 }

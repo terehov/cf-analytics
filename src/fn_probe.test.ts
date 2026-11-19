@@ -10,8 +10,8 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
-  ERLAUBTE_MUSTER, aufrufplan, anbindungenWaehlen, artikelAuswerten, feldpfade, foodWasteKostenanalyseAuswerten,
-  kostenstellenWaehlen, kuerzen, letzteMonate, linkTargetsAuswerten, pfadErlaubt, pluForm, rezeptVerkaufAuswerten,
+  ERLAUBTE_MUSTER, aufrufplan, anbindungenWaehlen, artikelAuswerten, ausgabeVerzeichnis, feldpfade, foodWasteKostenanalyseAuswerten,
+  fuellgrad, gemeldeteSeitengroesse, kostenstellenWaehlen, kuerzen, letzteMonate, letzteTage, linkTargetsAuswerten, pfadErlaubt, pluForm, rezeptVerkaufAuswerten,
   rezeptlisteAuswerten, standorteAuswerten, verkaeufeAuswerten, warenstammAuswerten,
 } from './fn_probe'
 
@@ -51,17 +51,44 @@ describe('Erlaubtliste', () => {
     }
   })
 
-  test('die elf gemessenen Pfade sind erlaubt', () => {
+  test('die elf gemessenen und die zwei Seitengrößen-Pfade sind erlaubt', () => {
     const ok = ['/api/erp/all', '/api/pos/locations', '/api/pos/mapping/2052/articles', '/api/pos/mapping/2052/link-targets',
       '/api/recipes?page=1', '/api/7984/products', '/api/7984/sales', '/api/7984/sales/43027622/recipe-sale',
       '/api/analytics/reports/cost-analysis/ingredients/food-waste', '/api/erp/food-waste?erpId=7984&limit=5&page=1',
-      '/api/erp/food-waste-alpha/totals?erpId=7984']
+      '/api/erp/food-waste-alpha/totals?erpId=7984',
+      '/api/11035/products?page=1&page_size=100', '/api/11035/products?page=1&page_size=1000']
     expect(ok.length).toBe(ERLAUBTE_MUSTER.length)
     for (const p of ok) expect(pfadErlaubt(p).ok).toBe(true)
   })
 
+  test('Seitengröße: nur zwei feste Varianten — kein anderer Wert, keine weiteren Parameter, keine andere Seite', () => {
+    for (const p of ['/api/11035/products?page=1&page_size=500', '/api/11035/products?page=1&page_size=10000',
+      '/api/11035/products?page=1&page_size=100&order_by=id', '/api/11035/products?page=2&page_size=100',
+      '/api/11035/products?page_size=100', '/api/11035/products?page=1&page_size=100x', '/api/11035/products?page=1&page_size=-1',
+      '/api/11035/products?page=1&perPage=100', '/api/11035/products?page=1&limit=100',
+      '/api/11035/products?stocktakingVisibility=visible', '/api/11035/products/5', '/api/x/products?page=1&page_size=100']) {
+      expect(pfadErlaubt(p).ok).toBe(false)
+    }
+  })
+
   test('Aufrufplan im Standardfall: 16 Aufrufe', () => {
     expect(aufrufplan().reduce((s, p) => s + p.anzahl, 0)).toBe(16)
+  })
+
+  test('Aufrufplan mit --nur, festen IDs und Seitengrößen: link-targets + Warenstamm = 4 Aufrufe, keine Grundaufrufe', () => {
+    const plan = aufrufplan(3, 2, { nur: ['link-targets', 'warenstamm'], anbindung: 2052, erp: 11035, seitengroessen: true })
+    expect(plan.reduce((s, p) => s + p.anzahl, 0)).toBe(4)
+    expect(plan.map(p => p.vorlage)).toEqual([
+      '/api/pos/mapping/{connectionId}/link-targets', '/api/{erpId}/products', '/api/{erpId}/products?page=1&page_size={100|1000}'])
+    // ohne feste IDs: erp/all und locations kommen dazu
+    expect(aufrufplan(3, 2, { nur: ['warenstamm'] }).map(p => p.vorlage)).toEqual(['/api/erp/all', '/api/pos/locations', '/api/{erpId}/products'])
+  })
+
+  test('Ausgabeverzeichnis trägt die Uhrzeit; gleiche Minute bekommt ein Suffix, nie dasselbe Verzeichnis', () => {
+    const t = new Date('2026-11-19T13:07:42Z')
+    expect(ausgabeVerzeichnis('belege', t, () => false)).toBe('belege/fn-probe-2026-11-19-1307')
+    const da = new Set(['belege/fn-probe-2026-11-19-1307', 'belege/fn-probe-2026-11-19-1307-2'])
+    expect(ausgabeVerzeichnis('belege', t, p => da.has(p))).toBe('belege/fn-probe-2026-11-19-1307-3')
   })
 })
 
@@ -122,6 +149,30 @@ describe('Auswertungen', () => {
     expect(r.csv).not.toContain('Geheim')
   })
 
+  test('link-targets: Verteilung der Zutatenzahl, updatedAt je Tag (14) und Spanne', () => {
+    const jetzt = new Date('2026-11-18T12:00:00Z')
+    expect(letzteTage(jetzt, 14)[0]).toBe('2026-11-05')
+    expect(letzteTage(jetzt, 14)[13]).toBe('2026-11-18')
+    const r = linkTargetsAuswerten([
+      { recipeId: 1, restaurantId: 9, ingredientCount: 0, updatedAt: '2026-11-18T01:00:00+01:00' },
+      { recipeId: 2, restaurantId: 9, ingredientCount: 1, updatedAt: '2026-11-18T09:00:00+01:00' },
+      { recipeId: 3, restaurantId: 9, ingredientCount: 5, updatedAt: '2026-11-12T09:00:00+01:00' },
+      { recipeId: 4, restaurantId: 9, ingredientCount: 6, updatedAt: '2026-11-05T09:00:00+01:00' },
+      { recipeId: 5, restaurantId: 9, ingredientCount: 20, updatedAt: '2026-11-04T09:00:00+01:00' },
+      { recipeId: 6, restaurantId: 9, ingredientCount: 21, updatedAt: '2026-06-01T09:00:00+01:00' },
+      { recipeId: 7, restaurantId: 9, ingredientCount: null },
+    ], jetzt)
+    expect(r.zutatenVerteilung).toEqual({ '0': 2, '1-5': 2, '6-20': 2, '>20': 1 })
+    expect(r.updatedAtJeTag['2026-11-18']).toBe(2)
+    expect(r.updatedAtJeTag['2026-11-05']).toBe(1)
+    expect(Object.keys(r.updatedAtJeTag).length).toBe(14)
+    expect(r.updatedAtLetzte14Tage).toBe(4)
+    expect(r.updatedAtLetzte7Tage).toBe(3) // 18.11. (2) + 12.11. (1)
+    expect(r.updatedAtMin).toBe('2026-06-01T09:00:00+01:00')
+    expect(r.updatedAtMax).toBe('2026-11-18T09:00:00+01:00')
+    expect(r.ohneDatum).toBe(1)
+  })
+
   test('Rezeptliste, Warenstamm, Verkäufe, recipe-sale, Food Waste', () => {
     expect(rezeptlisteAuswerten({ data: [{ id: 1, archived: false }, { id: 2, archived: true }],
       pagination: { currentPage: 1, perPage: 25, totalItems: 60, totalPages: 3 } }))
@@ -135,6 +186,10 @@ describe('Auswertungen', () => {
     expect(w).toMatchObject({ zeilen: 2, gesamt: 50, seitenZahl: 3, hatSeiten: true, mitIngredientArtikelId: 1,
       bestandUngleichNull: 1, bestandUngleichNullPct: 50 })
     expect(w.felder).toContain('ingredient.artikelId')
+    expect(w).toMatchObject({ seitengroesseAngefragt: null, seitengroesseGemeldet: null })
+    expect(w.preisfelder.pricePerUnit).toBe(0)
+    expect(w.preisfelder['ingredient.artikelId']).toBe(1)
+    expect(w.timeModifiedVon).toBeNull()
 
     const v = verkaeufeAuswerten({ errors: [], code: 200, isError: false, payload: { total_count: 9, page_count: 1, data: [
       { id: 5, saleStatus: { name: 'init' }, finishError: null, timeSold: { date: '2026-11-17 12:00:00.000000' } },
@@ -154,6 +209,21 @@ describe('Auswertungen', () => {
       { restaurantId: 1, businessDate: '2026-11-01', totalWasteValue: 1.5 },
       { restaurantId: 2, businessDate: '2026-11-02', totalWasteValue: 2.25 },
     ] })).toMatchObject({ zeilen: 2, restaurants: 2, datumVon: '2026-11-01', datumBis: '2026-11-02', summeGesamtwert: 3.75 })
+  })
+
+  test('Warenstamm: Füllgrad der Preisfelder, timeModified-Spanne, gemeldete Seitengröße', () => {
+    const roh = { errors: [], code: 200, isError: false, payload: { current_page: 1, current_page_size: 100, page_count: 8, total_count: 746, data: [
+      { id: 1, pricePerUnit: 2.5, packagingQuantity: 6, packagingUnit: 'Fl', shop: { id: 3, name: 'S' }, timeModified: { date: '2026-10-01 08:00:00.000000' }, ingredient: { artikelId: '1' } },
+      { id: 2, pricePerUnit: 0, packagingQuantity: null, packagingUnit: '', shop: null, timeModified: '2026-11-17T08:00:00+01:00', ingredient: null },
+    ] } }
+    const w = warenstammAuswerten(roh, 100)
+    expect(w).toMatchObject({ seitengroesseAngefragt: 100, seitengroesseGemeldet: 100, gesamt: 746, seitenZahl: 8,
+      timeModifiedVon: '2026-10-01 08:00:00.000000', timeModifiedBis: '2026-11-17T08:00:00+01:00' })
+    expect(w.preisfelder).toMatchObject({ pricePerUnit: 2, packagingQuantity: 1, packagingUnit: 1, shop: 1, 'shop.id': 1, timeModified: 2, 'ingredient.artikelId': 1, unitPrice: 0 })
+    expect(fuellgrad([{ a: { b: 1 } }, { a: { b: null } }, {}], ['a', 'a.b', 'c'])).toEqual({ a: 2, 'a.b': 1, c: 0 })
+    expect(gemeldeteSeitengroesse({ data: [], pagination: { perPage: 800 } })).toBe(800)
+    expect(gemeldeteSeitengroesse({ current_page_size: 20, data: [] })).toBe(20)
+    expect(gemeldeteSeitengroesse([1])).toBeNull()
   })
 
   test('kuerzen: 300 Zeichen, keine Mail-Adressen', () => {
@@ -309,6 +379,37 @@ describe('fn-probe gegen die Attrappe', () => {
     }
     expect(r.text).not.toContain('geheim')
     expect(r.text).not.toContain('PHPSESSID')
+  })
+
+  test('--nur, feste IDs, Seitengrößen: genau vier GET, keine Grundaufrufe; zweiter Lauf im eigenen Ordner', async () => {
+    modus = 'normal'
+    const zweiOrdner = mkdtempSync(join(tmpdir(), 'fn-probe-nur-'))
+    try {
+      const r = await lauf(['enchilada'], { nur: ['link-targets', 'warenstamm'], anbindung: 2052, erp: 7001, seitengroessen: true, aus: zweiOrdner })
+      const e = r.ergebnisse[0]!
+      expect(r.exitCode).toBe(0)
+      const gets = log.filter(l => l.methode === 'GET' && l.pfad !== '/api/profile').map(l => l.pfad)
+      expect(gets).toEqual(['/api/pos/mapping/2052/link-targets', '/api/7001/products',
+        '/api/7001/products?page=1&page_size=100', '/api/7001/products?page=1&page_size=1000'])
+      for (const g of gets) expect(pfadErlaubt(g).ok).toBe(true)
+      expect(e.fragen).toEqual(['link-targets', 'warenstamm'])
+      expect(e.festeAnbindung).toBe(2052)
+      expect(e.warenstamm.map(w => w.seitengroesseAngefragt)).toEqual([null, 100, 1000])
+      expect(e.linkTargets).toMatchObject({ anzahl: 2, updatedAtLetzte14Tage: 0 })
+      expect(e.verkaeufe).toEqual([])
+      expect(e.artikel).toEqual([])
+      const md = readFileSync(join(zweiOrdner, 'enchilada', 'zusammenfassung.md'), 'utf8')
+      expect(md).toContain('page_size angefragt')
+      expect(md).toContain('Füllgrad')
+      expect(md).toContain('Fragen: link-targets, warenstamm')
+    } finally { rmSync(zweiOrdner, { recursive: true, force: true }) }
+  })
+
+  test('unbekannte Frage oder ungültige ID: Fehler vor dem ersten Aufruf', async () => {
+    modus = 'normal'
+    await expect(lauf(['enchilada'], { nur: ['sales' as any] })).rejects.toThrow('Unbekannte Frage')
+    await expect(lauf(['enchilada'], { erp: -1 })).rejects.toThrow('--erp')
+    expect(log.length).toBe(0)
   })
 
   test('Aufrufgrenze: hart, sauber abgebrochen, Rest steht als nicht geholt', async () => {
