@@ -9,7 +9,7 @@ Dieses Dokument **ergänzt** `docs/foodnotify-api-inventar.md` (27.07.2026, 126 
 * **1.053 verschiedene Paare aus Methode und Pfad** in beiden Oberflächen zusammen (475 in der neuen, 770 in der alten nach Vereinheitlichung der Platzhalter, 192 in beiden). Davon 467 GET. Das alte Inventar kannte 126.
 * **Zwei Oberflächen, eine Schnittstelle ohne Versionsnummer.** Die alte (`/panel`, Angular 15) und die neue (`/brew`, React) rufen beide `/api/…` auf demselben Host. Die öffentlichen Pfade `/api/1.0/…` und `/api/2.0/…` kommen in **keiner** der beiden vor.
 * **Beide melden sich per Cookie an**, keine schickt einen `Authorization`-Header. API-Token gibt es nur für Fremdprogramme (Profil → „API-Tokens", OAuth-Ablauf, Recht `externalApi`).
-* **14 GET-Aufrufe verändern etwas** — Abmelden, Kassenverbindung lösen, Bestand aus der Kasse nachladen, Verkauf abschließen. Drei davon stehen im alten Inventar als gewöhnliche Lesepfade. Liste in Abschnitt 6: **nie automatisch aufrufen.**
+* ~~**14 GET-Aufrufe verändern etwas**~~ **15 GET-Aufrufe verändern etwas** — Abmelden, Kassenverbindung lösen, Bestand aus der Kasse nachladen, Verkauf abschließen, und (gemessen am 19.11.2026, nicht aus dem Code) **das Lesen eines Warenkorbs**. Drei davon stehen im alten Inventar als gewöhnliche Lesepfade. Liste in Abschnitt 6: **nie automatisch aufrufen.**
 * **Sechs der 14 Pfade, die der Importer heute benutzt, stehen in keinem der beiden Bundles**: die vier Rezeptpfade `/api/recipes…`, die Inventurpositionen `/api/erp/stocktakings/{uuid}/items` und die Bestellansicht (HTML). Wer sie ruft — das Altsystem `/recipes`, die mobile App —, ist nicht erhoben.
 * **Die alte Oberfläche bettet Sentry mit Sitzungsaufzeichnung ohne Textmaskierung ein und meldet jeden Benutzer mit E-Mail und Namen an Gleap.** Das betrifft jede Browserarbeit in FoodNotify (Abschnitt 4).
 
@@ -179,7 +179,7 @@ Was je Thema für uns zählt:
 
 ## 6. Sicherheitsliste: GETs, die etwas verändern
 
-**Diese GETs nie automatisch aufrufen** — weder in einer Messschleife noch „nur zum Testen", weder mit Token noch mit Sitzung. Bei FoodNotify sagt die Methode nichts über die Wirkung: die alte Oberfläche schickt Aktionen oft als GET. Belegt im Code; Fundstelle und Auszug je Zeile in `messliste-token.md` §4. In `messliste-token.csv` stehen sie als `zustandsaendernd`, `messen = nein`.
+**Diese GETs nie automatisch aufrufen** (Stand 19.11.2026: **15**, die fünfzehnte ist gemessen, nicht gelesen) — weder in einer Messschleife noch „nur zum Testen", weder mit Token noch mit Sitzung. Bei FoodNotify sagt die Methode nichts über die Wirkung: die alte Oberfläche schickt Aktionen oft als GET. Belegt im Code; Fundstelle und Auszug je Zeile in `messliste-token.md` §4. In `messliste-token.csv` stehen sie als `zustandsaendernd`, `messen = nein`.
 
 | # | GET-Pfad | Wirkung | Fundstelle |
 |---|---|---|---|
@@ -197,6 +197,9 @@ Was je Thema für uns zählt:
 | 12 | `/shops/private/{shopId}/edited_file/upload` | startet einen Produktimport | `/panel` `488` |
 | 13 | `/shops/private/{shopId}/product/{productId}/image/remove` | löscht ein Produktbild | `/panel` `488` |
 | 14 | `/shops/private/{shopId}/product/{productId}/image/remove/{p6}` | wie 13 | `/panel` `488` |
+| **15** | **`/api/shop/{shopId}/cart/{cartType}/{cartId}`** | **schreibt beim Lesen:** setzt `timeUpdated` des Warenkorbs auf den Lesezeitpunkt und verschiebt den gewählten Liefertermin auf den frühestmöglichen (`deliveryDateUpdated: true`). **Gemessen 19.11.2026**, an einem Entwurf; im Code stand er als reiner Lesepfad (`getCart`) | `/panel` `239`/`658`; `/brew` `use-error-toast-…`, `_cartId-…` |
+
+**Nr. 15 ist die einzige Zeile, die nicht aus dem Code, sondern aus einer Messung stammt** (`payloads/foodnotify-2026-11/fn-probe-2026-11-19-warenkorb-verkaeufe.md`, `docs/fehlerkatalog.md` 19.11.2026): `fn-probe` hat einen Entwurf eines geschlossenen Betriebs gelesen und danach in der Warenkorb-Liste das neue `timeUpdated` gefunden — ein einziger Warenkorb, dann Abbruch. In `src/fn_probe.ts` steht er in der Sperrliste. Er gehört damit auch zu jeder **Seite**, die ihn beim Öffnen absetzt: die Warenkorbseite `/brew/shop/{id}/cart/{type}/{cartId}` (und `/panel/shop/…/cart/…`) setzt ihn und zusätzlich `POST /info` beim Laden ab — **nie automatisch öffnen**.
 
 Dazu, kein API-Aufruf, aber gleich zu behandeln: der Link `/recipes?_switch_user={email}` (Anmelden als anderer Benutzer, nur für FoodNotify-Mitarbeiter).
 

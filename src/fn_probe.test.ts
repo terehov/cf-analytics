@@ -13,6 +13,8 @@ import {
   ERLAUBTE_MUSTER, aufrufplan, anbindungenWaehlen, artikelAuswerten, ausgabeVerzeichnis, feldpfade, foodWasteKostenanalyseAuswerten,
   fuellgrad, gemeldeteSeitengroesse, istTestName, kostenstellenWaehlen, kuerzen, letzteMonate, letzteTage, linkTargetsAuswerten, pfadErlaubt, pluForm, rezeptVerkaufAuswerten,
   rezeptlisteAuswerten, standorteAuswerten, verkaeufeAuswerten, warenstammAuswerten,
+  aeltesterVerkaufAuswerten, freigabeOptionenPruefen, positionenAuswerten, tagAus, termineAuswerten,
+  tiefeKosten, verkaufsTiefeAuswerten, warenkorbAuswerten, warenkorbListeAuswerten, wochentag,
 } from './fn_probe'
 
 // Die 14 GETs mit Wirkung aus docs/foodnotify-api-inventar-intern-2026-11.md §6, mit Beispiel-IDs.
@@ -51,12 +53,16 @@ describe('Erlaubtliste', () => {
     }
   })
 
-  test('die elf gemessenen und die zwei Seitengrößen-Pfade sind erlaubt', () => {
+  test('die elf gemessenen, die zwei Seitengrößen-Pfade und die fünf Pfade vom 19.11.2026 sind erlaubt', () => {
     const ok = ['/api/erp/all', '/api/pos/locations', '/api/pos/mapping/2052/articles', '/api/pos/mapping/2052/link-targets',
       '/api/recipes?page=1', '/api/7984/products', '/api/7984/sales', '/api/7984/sales/43027622/recipe-sale',
       '/api/analytics/reports/cost-analysis/ingredients/food-waste', '/api/erp/food-waste?erpId=7984&limit=5&page=1',
       '/api/erp/food-waste-alpha/totals?erpId=7984',
-      '/api/11035/products?page=1&page_size=100', '/api/11035/products?page=1&page_size=1000']
+      '/api/11035/products?page=1&page_size=100', '/api/11035/products?page=1&page_size=1000',
+      '/api/7984/sales?page=1&page_size=1000&order_by=timeSold&order_direction=DESC',
+      '/api/7984/sales?page=1&page_size=1&order_by=timeSold&order_direction=ASC',
+      '/api/7984/sales/43077976/recipe-sale?page=1&page_size=100',
+      '/api/carts/all?page=1&limit=50', '/api/carts/active?page=1&limit=50']
     expect(ok.length).toBe(ERLAUBTE_MUSTER.length)
     for (const p of ok) expect(pfadErlaubt(p).ok).toBe(true)
   })
@@ -71,6 +77,34 @@ describe('Erlaubtliste', () => {
     }
   })
 
+  test('Der Warenkorb-Detail-GET ist gesperrt (er schreibt, gemessen 19.11.2026) — in jeder Schreibweise', () => {
+    for (const p of ['/api/shop/567/cart/draft/28093', '/api/shop/567/cart/active/1', '/api/shop/567/cart/faulty/1',
+      '/api/shop/567/cart/draft/28093?x=1', '/api/shop/567/cart/DRAFT/28093', '/api/shop/8014/cart/draft/123/']) {
+      const r = pfadErlaubt(p)
+      expect(r.ok).toBe(false)
+      if (!r.ok) expect(r.grund).toContain('Sperrliste')
+    }
+    for (const m of ERLAUBTE_MUSTER) expect(m.re.test('/api/shop/567/cart/draft/28093')).toBe(false)
+  })
+
+  test('Verkaufstiefe und Warenkorb-Liste: nur die festen Varianten, kein anderer Wert, keine Schreib- oder Nachbarpfade', () => {
+    for (const p of [
+      '/api/7984/sales?page=1&page_size=500&order_by=timeSold&order_direction=DESC',
+      '/api/7984/sales?page=2&page_size=1000&order_by=timeSold&order_direction=DESC',
+      '/api/7984/sales?page=1&page_size=1000&order_by=timeSold&order_direction=ASC',
+      '/api/7984/sales?page=1&page_size=1&order_by=timeSold&order_direction=DESC',
+      '/api/7984/sales?page=1&page_size=1000&order_by=id&order_direction=DESC',
+      '/api/7984/sales?page=1&page_size=1000&order_by=timeSold&order_direction=DESC&from=2026-11-01',
+      '/api/7984/sales?status=finish', '/api/7984/sales/43077976', '/api/7984/sales/43077976/finish',
+      '/api/7984/sales/43077976/recipe-sale?page=2&page_size=100', '/api/7984/sales/43077976/recipe-sale?page=1&page_size=1000',
+      '/api/7984/recipe-sale/5', '/api/7984/recipe-sale/paginate',
+      '/api/carts/draft?page=1&limit=50', '/api/carts/all?page=1&limit=500', '/api/carts/all?page=2&limit=50', '/api/carts/count', '/api/carts/all',
+      '/api/shop/8014/cart/draft', '/api/shop/8014/cart/draft/123/x',
+      '/api/shop/8014/info', '/api/shop/cart/add', '/api/shop/setCostCenter', '/api/cart/123/product/details', '/api/shop/x/cart/draft/1',
+      '/shops/8014/cart/draft/123',
+    ]) expect(pfadErlaubt(p).ok).toBe(false)
+  })
+
   test('Aufrufplan im Standardfall: 16 Aufrufe', () => {
     expect(aufrufplan().reduce((s, p) => s + p.anzahl, 0)).toBe(16)
   })
@@ -81,6 +115,10 @@ describe('Erlaubtliste', () => {
     // Seit 19.11.2026 auch bei festen IDs: die Zusammenfassung nennt den Namen (Testrestaurant-Fehler).
     expect(plan.map(p => p.vorlage)).toEqual(['/api/erp/all', '/api/pos/locations',
       '/api/pos/mapping/{connectionId}/link-targets', '/api/{erpId}/products', '/api/{erpId}/products?page=1&page_size={100|1000}'])
+    // warenkorb und verkaeufe-tiefe laufen nie ohne --nur
+    expect(aufrufplan().some(p => /carts|cart\/|page_size=1000&order_by/.test(p.vorlage))).toBe(false)
+    expect(aufrufplan(3, 2, { nur: ['warenkorb'] }).map(p => [p.vorlage, p.anzahl])).toEqual([['/api/carts/{all|active}?page=1&limit=50', 1]])
+    expect(aufrufplan(3, 2, { nur: ['verkaeufe-tiefe'], erpsAnzahl: 3 }).reduce((s, p) => s + p.anzahl, 0)).toBe(1 + 3 * 4)
     // ohne feste IDs: erp/all und locations kommen dazu
     expect(aufrufplan(3, 2, { nur: ['warenstamm'] }).map(p => p.vorlage)).toEqual(['/api/erp/all', '/api/pos/locations', '/api/{erpId}/products'])
   })
@@ -250,6 +288,128 @@ describe('Auswertungen', () => {
   })
 })
 
+describe('Freigabepflicht der Verkaufstiefe (19.11.2026)', () => {
+  test('--erps ist Pflicht, höchstens drei, nur positive Zahlen, nur mit der Frage', () => {
+    expect(() => freigabeOptionenPruefen(['verkaeufe-tiefe'], {})).toThrow('--erps')
+    expect(() => freigabeOptionenPruefen(['verkaeufe-tiefe'], { erps: [1, 2, 3, 4] })).toThrow('höchstens 3')
+    expect(() => freigabeOptionenPruefen(['verkaeufe-tiefe'], { erps: [1, -2] })).toThrow('positive')
+    expect(() => freigabeOptionenPruefen(['verkaeufe-tiefe'], { erps: [7984, 9444, 10772] })).not.toThrow()
+    expect(() => freigabeOptionenPruefen(['warenstamm'], { erps: [7984] })).toThrow('gehört zur Frage verkaeufe-tiefe')
+    expect(() => freigabeOptionenPruefen(['warenkorb'], {})).not.toThrow()
+  })
+})
+
+describe('Auswertungen Warenkorb und Verkaufstiefe', () => {
+  const liste = { isError: false, data: { carts: [
+    { cartId: 1, shopId: 10, restaurantId: 5, costCenterId: 50, type: 'active', shopName: 'Lieferant A', restaurantName: 'X', costCenterName: 'Bar X', productCount: 3, cartTotal: '12.50', timeUpdated: { date: '2026-11-18 10:00:00.000000', timezone_type: 3, timezone: 'Europe/Berlin' } },
+    { cartId: 2, shopId: 11, restaurantId: 5, costCenterId: 50, type: 'draft', shopName: 'Lieferant B', restaurantName: 'X', costCenterName: 'Bar X', productCount: 1, cartTotal: '5', timeUpdated: { date: '2026-11-10 09:00:00.000000' } },
+    { cartId: 3, shopId: 12, restaurantId: 5, costCenterId: 50, type: 'draft', shopName: 'Lieferant C', restaurantName: 'X', costCenterName: 'Bar X', productCount: 1, cartTotal: '5', timeUpdated: { date: '2026-11-05 09:00:00.000000' }, deliveryDate: 1 },
+    { cartId: 4, shopId: 13, restaurantId: 9, costCenterId: 90, type: 'draft', shopName: 'Lieferant D', restaurantName: 'AAA Testrestaurant', costCenterName: 'AAA Testrestaurant Bar', productCount: 1, cartTotal: '1', timeUpdated: { date: '2026-01-01 09:00:00.000000' } },
+  ], totalPages: 1, totalResults: 4, currentPage: 1 } }
+
+  test('Liste: Typen, Test erkannt, Vorschlag = ältester Entwurf ohne Test, Konditionsfelder', () => {
+    const l = warenkorbListeAuswerten(liste)
+    expect(l).toMatchObject({ anzahl: 4, gesamt: 4, seiten: 1, nachTyp: { active: 1, draft: 3 }, test: 1 })
+    expect(l.vorschlag).toMatchObject({ cartId: 3, shopId: 12, type: 'draft', timeUpdated: '2026-11-05 09:00:00.000000' })
+    expect(l.konditionsfelder).toEqual(['deliveryDate'])
+    expect(l.eintraege.find(x => x.cartId === 4)?.test).toBe(true)
+    expect(warenkorbListeAuswerten({ isError: false, data: { carts: [] } })).toMatchObject({ anzahl: 0, vorschlag: null })
+  })
+
+  test('Detail (nur Auswertung einer gespeicherten Rohantwort): Mindestbestellwert, Termine mit Wochentagen, preorderDays als Form', () => {
+    const w = warenkorbAuswerten({ isError: false, data: { cart: {
+      minimalOrderSum: 150, currency: 'EUR', deliveryDate: { date: '2026-11-24 00:00:00.000000' }, deliveryDateUpdated: false, note: '',
+      deliveryDates: [{ date: '2026-11-24' }, { date: '2026-11-26' }, { date: '2026-11-27' }, { date: '2026-12-01' }],
+      unavailableDeliveryDates: [{ date: '2026-11-25' }],
+      createdByUser: { firstName: 'Erika' },
+      products: [
+        { id: 1, name: 'Burger', preorderDays: { passed: false, orderableUntil: { date: '2026-11-23 10:00:00.000000' }, available_from: { date: '2026-11-24 00:00:00.000000' }, desiredDeliveryDate: null } },
+        { id: 2, name: 'Cola', preorderDays: null },
+      ] } } })
+    expect(w).toMatchObject({ gefunden: true, minimalOrderSum: 150, currency: 'EUR', deliveryDate: '2026-11-24', deliveryDateUpdated: false,
+      produkte: 2, mitPreorderDays: 1, preorderPassed: 0, noteGefuellt: false })
+    expect(w.liefertermine).toMatchObject({ anzahl: 4, von: '2026-11-24', bis: '2026-12-01', jeWochentag: { Di: 2, Do: 1, Fr: 1, Mo: 0 } })
+    expect(w.gesperrteTermine.jeWochentag.Mi).toBe(1)
+    expect(w.preorderFuellgrad).toEqual({ available_from: 1, desiredDeliveryDate: 0, orderableUntil: 1, passed: 1 })
+    expect(JSON.stringify(w.preorderForm)).toContain('9999-99-99 99:99:99.999999')
+    expect(JSON.stringify(w)).not.toContain('Burger')
+    expect(JSON.stringify(w)).not.toContain('Erika')
+    expect(w.felder).not.toContain('createdByUser')
+    expect(warenkorbAuswerten({ foo: 1 }).gefunden).toBe(false)
+    expect(warenkorbAuswerten({ minimalOrderSum: 5, deliveryDateUpdated: true })).toMatchObject({ deliveryDateUpdated: true })
+  })
+
+  test('tagAus, wochentag, Terminlisten: Text, PHP-Objekt, Unix-Zeit in Berliner Zeit', () => {
+    expect(tagAus('2026-11-24')).toBe('2026-11-24')
+    expect(tagAus({ date: '2026-11-24 00:00:00.000000' })).toBe('2026-11-24')
+    expect(tagAus(1_795_561_200)).toBe('2026-11-25')            // 24.11.2026 23:00 UTC = 25.11. 00:00 Berlin
+    expect(tagAus(1_795_561_200_000)).toBe('2026-11-25')
+    expect(tagAus(null)).toBeNull()
+    expect(wochentag('2026-11-19')).toBe('Do')
+    expect(termineAuswerten([1_795_561_200, '2026-11-26']).tage).toEqual(['2026-11-25', '2026-11-26'])
+  })
+
+  const tag = (d: string, h: string, i: number, extra: Record<string, unknown> = {}) => ({
+    id: i, sumPrice: 10 + i, saleStatus: { name: 'finish' }, saleType: { name: 'amadeus' }, finishError: null,
+    timeSold: { date: `${d} ${h}:00:00.000000` }, timeCreated: { date: `${d} 23:50:17.000000` }, ...extra,
+  })
+  const jetzt = new Date('2026-11-19T10:00:00Z')
+
+  test('Verkaufstiefe: Tage, angeschnittener Rand, heute zählt nicht, Lücke, Verzug, Schübe, Auswahl', () => {
+    const daten = [
+      tag('2026-11-19', '09', 1),                       // heute: unvollständig
+      tag('2026-11-18', '20', 2), tag('2026-11-18', '07', 3, { sumPrice: -4 }),
+      tag('2026-11-17', '12', 4, { sumPrice: 500 }),
+      // 16.11. fehlt
+      tag('2026-11-15', '12', 5), tag('2026-11-15', '13', 6, { saleStatus: { name: 'error' }, finishError: 'x' }),
+      tag('2026-11-14', '12', 7),                       // ältester Tag der Seite: angeschnitten
+    ]
+    const roh = { errors: [], code: 200, isError: false, payload: { order_by: 'timeSold', order_direction: 'DESC', current_page: 1, current_page_size: 1000, page_count: 3, total_count: 2500, data: daten } }
+    const t = verkaufsTiefeAuswerten(roh, jetzt)
+    expect(t).toMatchObject({ zeilen: 7, gesamt: 2500, seitenZahl: 3, seitengroesseGemeldet: 1000, orderByGemeldet: 'timeSold', orderDirectionGemeldet: 'DESC',
+      tageVollstaendig: 3, tageOhneVerkauf: ['2026-11-16'], finishErrorGesetzt: 1, negativ: 1, saleStatus: { finish: 6, error: 1 }, saleType: { amadeus: 7 } })
+    expect(t.jeTag.map(d => [d.tag, d.vollstaendig])).toEqual([['2026-11-14', false], ['2026-11-15', true], ['2026-11-17', true], ['2026-11-18', true], ['2026-11-19', false]])
+    expect(t.medianJeTag).toBe(2)
+    expect(t.deckt14Tage).toBe(false)
+    expect(t.verkaeufeLetzte14Tage).toBe(5)
+    expect(t.anteilVor8UhrPct).toBe(14.3)
+    expect(t.verzugMinuten.median).toBeGreaterThan(0)
+    expect(t.anlageSchuebe.verschiedene).toBe(5)
+    // Auswahl: jüngster Verkauf und größte Summe (beide finish), ohne Doppelung
+    expect(t.auswahl.map(a => a.id)).toEqual([1, 4])
+    // Die Seite enthält die ganze Historie: der älteste Tag ist vollständig
+    const ganz = verkaufsTiefeAuswerten({ ...roh, payload: { ...roh.payload, total_count: 7 } }, jetzt)
+    expect(ganz.jeTag[0]).toMatchObject({ tag: '2026-11-14', vollstaendig: true })
+  })
+
+  test('Ältester Verkauf, Positionen (Summen, Nummernfelder, keine Personen), Kostenrechnung', () => {
+    const alt = aeltesterVerkaufAuswerten({ errors: [], code: 200, isError: false, payload: { current_page_size: 1, total_count: 21362, page_count: 21362,
+      data: [{ id: 5, timeSold: { date: '2024-03-01 12:00:00.000000' }, timeCreated: { date: '2024-03-01 13:00:00.000000' }, saleStatus: { name: 'finish' } }] } })
+    expect(alt).toMatchObject({ id: 5, timeSold: '2024-03-01 12:00:00.000000', gesamt: 21362, gemeldeteSeitengroesse: 1 })
+    const p = positionenAuswerten({ errors: [], code: 200, isError: false, payload: { current_page_size: 100, page_count: 1, total_count: 3, data: [
+      { id: 1, amount: 1, price: 2, sumPrice: 2.5, staffId: 3, staffName: 'Max Mustermann', voidReason: null,
+        recipe: { id: 7, name: 'Cappuccino (Kasse)', price: 0, recipeIngredients: [{ id: 1, isRecipe: true, deleted: false, unresolvable: false, unitName: 'g', unitQuantity: 24 }, { id: 2, isRecipe: false, deleted: true, unresolvable: true, unitName: 'cu_7583', unitQuantity: 1 }] } },
+      { id: 2, amount: -1, sumPrice: 1.5, staffId: 3, voidReason: 'x', recipe: { id: 7, name: 'Cappuccino (Kasse)', recipeIngredients: [] } },
+      { id: 3, amount: 1, sumPrice: 0, recipe: { id: 8, name: 'Salat', plu: '1001', recipeIngredients: [{ id: 9, articleNumber: 'A1', unitName: 'ml' }] } },
+    ] } }, 4)
+    expect(p).toMatchObject({ positionen: 3, gesamt: 3, seitenZahl: 1, summePositionen: 4, abweichungZurListe: 0, rezeptIds: 2,
+      zutatenJePosition: { min: 0, median: 1, max: 2 }, zutatenAufgeloest: 1, zutatenGeloescht: 1, zutatenUnaufloesbar: 1,
+      mitStornogrund: 1, negativeMengen: 1, rezeptnameMitKasse: 2 })
+    expect(p.nummernFelder).toEqual(['recipe.plu', 'zutat.articleNumber'])
+    expect(JSON.stringify(p)).not.toContain('staff')
+    expect(JSON.stringify(p)).not.toContain('Mustermann')
+    expect(JSON.stringify(p)).not.toContain('Cappuccino')
+    // 150 Verkäufe je Tag: 1 Listenaufruf + 150 Positionen; 35 Kostenstellen; Rückblick 54.750 Verkäufe
+    const t = { ...verkaufsTiefeAuswerten({ errors: [], code: 200, isError: false, payload: { total_count: 1, data: [] } }, jetzt), medianJeTag: 150, gesamt: 21362 }
+    const k = tiefeKosten(t, alt, jetzt, 2)
+    expect(k).toMatchObject({ verkaeufeJeTag: 150, aufrufeJeTag: 151, aufrufeJeTag35: 5285 })
+    expect(k.rueckblick12Monate).toEqual({ verkaeufe: 54750, listenaufrufe: 55, detailaufrufe: 54750, aufrufe: 54805 })
+    expect(k.stundenJeTag35).toBe(2.9)
+    expect(k.verkaeufeJeTagGesamt).toBe(Math.round((21362 / 993) * 10) / 10)   // 01.03.2024 bis 19.11.2026
+    expect(tiefeKosten({ ...t, medianJeTag: null }, null, jetzt, 2)).toMatchObject({ aufrufeJeTag: null, rueckblick12Monate: null })
+  })
+})
+
 // ---------------------------------------------------------------------------
 // Lauf gegen eine eigene Attrappe
 // ---------------------------------------------------------------------------
@@ -317,9 +477,19 @@ describe('fn-probe gegen die Attrappe', () => {
             return flach([{ id: 1, ingredient: { artikelId: '12' }, stock: { sumAmount: 3 },
               createdByUser: { firstName: 'Erika', lastName: 'Musterfrau' } }], 40)
           case '/api/7002/products': return flach([{ id: 2, ingredient: { artikelId: '' }, stock: { sumAmount: 0 } }], 10)
+          case '/api/carts/all':
+          case '/api/carts/active': {
+            return json({ isError: false, data: { carts: [
+              { cartId: 1, shopId: 10, restaurantId: 9, costCenterId: 501, type: 'active', shopName: 'Lieferant A', restaurantName: 'X', costCenterName: 'Küche X', productCount: 3, cartTotal: '12.50', currency: 'EUR', timeUpdated: { date: '2026-11-18 10:00:00.000000' } },
+              { cartId: 2, shopId: 11, restaurantId: 9, costCenterId: 502, type: 'draft', shopName: 'Lieferant B', restaurantName: 'X', costCenterName: 'Bar X', productCount: 1, cartTotal: '5', currency: 'EUR', timeUpdated: { date: '2026-11-10 09:00:00.000000' } },
+              { cartId: 3, shopId: 12, restaurantId: 9, costCenterId: 502, type: 'draft', shopName: 'Lieferant C', restaurantName: 'X', costCenterName: 'Bar X', productCount: 2, cartTotal: '8', currency: 'EUR',
+                timeUpdated: { date: '2026-11-05 09:00:00.000000' } },
+              { cartId: 4, shopId: 13, restaurantId: 8, costCenterId: 499, type: 'draft', shopName: 'Lieferant D', restaurantName: 'AAA Testrestaurant X', costCenterName: 'AAA Testrestaurant X Bar', productCount: 1, cartTotal: '1', currency: 'EUR', timeUpdated: { date: '2026-01-01 09:00:00.000000' } },
+            ], totalPages: 1, totalResults: 4, currentPage: 1 } })
+          }
           case '/api/7001/sales': return flach([
-            { id: 11, saleStatus: { name: 'finished' }, finishError: null, timeSold: { date: '2026-11-17 10:00:00.000000' } },
-            { id: 12, saleStatus: { name: 'init' }, finishError: 'x', timeSold: { date: '2026-11-16 10:00:00.000000' } },
+            { id: 11, sumPrice: 10, saleStatus: { name: 'finish' }, saleType: { name: 'amadeus' }, finishError: null, timeSold: { date: '2026-11-17 10:00:00.000000' }, timeCreated: { date: '2026-11-17 23:50:17.000000' } },
+            { id: 12, sumPrice: 99, saleStatus: { name: 'finish' }, saleType: { name: 'amadeus' }, finishError: 'x', timeSold: { date: '2026-11-16 10:00:00.000000' }, timeCreated: { date: '2026-11-16 23:50:17.000000' } },
             { id: 13, saleStatus: { name: 'init' }, finishError: null, timeSold: { date: '2026-11-15 10:00:00.000000' } }], 3)
           case '/api/7002/sales': return flach([], 0)
           case '/api/7001/sales/11/recipe-sale':
@@ -392,6 +562,10 @@ describe('fn-probe gegen die Attrappe', () => {
       expect(pfadErlaubt(l.pfad).ok).toBe(true)
     }
     expect(log.filter(l => l.methode === 'POST').length).toBe(1)
+    // Ohne --nur liest der Standardlauf weder Warenkörbe noch die Verkaufstiefe.
+    expect(log.some(l => /\/carts\/|\/cart\/|order_by=timeSold/.test(l.pfad))).toBe(false)
+    expect(e.warenkorb).toBeNull()
+    expect(e.verkaufsTiefe).toEqual([])
     expect(e.artikel.map(a => a.mitRezeptPct)).toEqual([50, 0])
     expect(e.linkTargets).toMatchObject({ connectionId: 2052, anzahl: 2, ohneZutaten: 1 })
     expect(e.abgleichRezeptzahl).toEqual({ totalItems: 3, linkTargets: 2, differenz: 1 })
@@ -440,6 +614,79 @@ describe('fn-probe gegen die Attrappe', () => {
       expect(md).toContain('Füllgrad')
       expect(md).toContain('Fragen: link-targets, warenstamm')
     } finally { rmSync(zweiOrdner, { recursive: true, force: true }) }
+  })
+
+  // --- Messungen vom 19.11.2026 ------------------------------------------------
+
+  const gets = () => log.filter(l => l.methode === 'GET' && l.pfad !== '/api/profile').map(l => l.pfad)
+  const zusammenfassungJson = (dir: string, marke = 'enchilada') =>
+    JSON.parse(readFileSync(alleDateien(join(dir, marke)).find(d => d.endsWith('zusammenfassung.json'))!, 'utf8'))
+  const neuerOrdner = () => mkdtempSync(join(tmpdir(), 'fn-probe-wk-'))
+
+  test('Verkaufstiefe ohne --erps: Fehler vor dem ersten Aufruf', async () => {
+    await expect(lauf(['enchilada'], { nur: ['verkaeufe-tiefe'] })).rejects.toThrow('--erps')
+    expect(log.length).toBe(0)
+  })
+
+  test('Warenkorb-Liste: genau ein GET, nie ein Detail, Vorschlag und Test stehen in der Zusammenfassung', async () => {
+    modus = 'normal'
+    const dir = neuerOrdner()
+    try {
+      const r = await lauf(['enchilada'], { nur: ['warenkorb'], aus: dir })
+      expect(gets()).toEqual(['/api/carts/all?page=1&limit=50'])
+      expect(log.some(l => /\/cart\//.test(l.pfad))).toBe(false)
+      const w = r.ergebnisse[0]!.warenkorb!
+      expect(w.liste).toMatchObject({ anzahl: 4, test: 1, nachTyp: { active: 1, draft: 3 } })
+      expect(w.liste?.vorschlag).toMatchObject({ shopId: 12, cartId: 3 })
+      expect(r.exitCode).toBe(0)
+      const md = readFileSync(join(dir, 'enchilada', 'zusammenfassung.md'), 'utf8')
+      expect(md).toContain('## 7. Warenkorb-Liste')
+      expect(md).toContain('Lieferant C')
+      expect(md).not.toContain('PHPSESSID')
+    } finally { rmSync(dir, { recursive: true, force: true }) }
+    // --warenkorb-liste active holt die andere Liste
+    const dir2 = neuerOrdner()
+    try {
+      await lauf(['enchilada'], { nur: ['warenkorb'], warenkorbListe: 'active', aus: dir2 })
+      expect(gets()).toEqual(['/api/carts/active?page=1&limit=50'])
+    } finally { rmSync(dir2, { recursive: true, force: true }) }
+  })
+
+  test('Verkaufstiefe: nur gewählte Kostenstellen, Testkostenstelle und Unbekannte nie, zwei Positionsabrufe, nur Erlaubtliste', async () => {
+    modus = 'normal'
+    const dir = neuerOrdner()
+    try {
+      const r = await lauf(['enchilada'], { nur: ['verkaeufe-tiefe'], erps: [7001, 6999, 7002], aus: dir })
+      const e = r.ergebnisse[0]!
+      expect(gets()).toEqual([
+        '/api/erp/all',
+        '/api/7001/sales?page=1&page_size=1000&order_by=timeSold&order_direction=DESC',
+        '/api/7001/sales?page=1&page_size=1&order_by=timeSold&order_direction=ASC',
+        '/api/7001/sales/11/recipe-sale?page=1&page_size=100',
+        '/api/7001/sales/12/recipe-sale?page=1&page_size=100',
+        '/api/7002/sales?page=1&page_size=1000&order_by=timeSold&order_direction=DESC',
+        '/api/7002/sales?page=1&page_size=1&order_by=timeSold&order_direction=ASC',
+      ])
+      for (const g of gets()) expect(pfadErlaubt(g).ok).toBe(true)
+      expect(e.verkaufsTiefe.map(t => [t.erpId, t.name])).toEqual([[7001, 'X — Küche X'], [7002, 'X — Bar X']])
+      expect(e.verkaufsTiefe[0]!.positionen.map(p => p.verkaufId)).toEqual([11, 12])
+      expect(e.verkaufsTiefe[0]!.liste).toMatchObject({ zeilen: 3, gesamt: 3 })
+      expect(e.verkaufsTiefe[1]!.liste?.zeilen).toBe(0)
+      expect(e.befunde.some(b => b.includes('6999') && b.includes('Testkostenstelle'))).toBe(true)
+      // Zusammenfassung nennt die Kostenstellen mit Namen und trägt keine Personen
+      const md = readFileSync(join(dir, 'enchilada', 'zusammenfassung.md'), 'utf8')
+      expect(md).toContain('## 8. Verkaufstiefe')
+      expect(md).toContain('7001 (X — Küche X)')
+      expect(md).not.toContain('Mustermann')
+      expect(md).not.toContain('staff')
+      // Eine erpId, die nicht in /api/erp/all steht, wird nie gelesen (ihr Name wäre nicht prüfbar)
+      const dir2 = neuerOrdner()
+      try {
+        const unbekannt = await lauf(['enchilada'], { nur: ['verkaeufe-tiefe'], erps: [5555], aus: dir2 })
+        expect(gets()).toEqual(['/api/erp/all'])
+        expect(unbekannt.ergebnisse[0]!.befunde.some(b => b.includes('5555') && b.includes('nicht in /api/erp/all'))).toBe(true)
+      } finally { rmSync(dir2, { recursive: true, force: true }) }
+    } finally { rmSync(dir, { recursive: true, force: true }) }
   })
 
   test('unbekannte Frage oder ungültige ID: Fehler vor dem ersten Aufruf', async () => {

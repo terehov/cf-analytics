@@ -3,6 +3,13 @@
 **Frage (Fachbereich):** Wo führt FoodNotify je Lieferant und Betrieb den **Tourenplan** (Liefertage),
 die **Bestellfrist** (Vorlauf, Bestellschluss) und den **Mindestbestellwert**?
 
+> **Nachtrag 19.11.2026, 09:09 UTC — gemessen (`fn-probe-2026-11-19-warenkorb-verkaeufe.md`).** Die Felder unten
+> stimmen, **aber der GET schreibt**: das Lesen eines Entwurfs setzte dessen `timeUpdated` auf den Lesezeitpunkt und
+> verschob den Liefertermin auf den frühestmöglichen (`deliveryDateUpdated: true`). Die Probe brach nach diesem einen
+> Warenkorb ab; der Pfad ist gesperrt. Die „Vorsicht" in Abschnitt 2 ist eingetreten. Aus der einen Antwort (Distra GmbH,
+> Bar Hannover): `minimalOrderSum` 0, 14 `deliveryDates` (Mo–Sa, 20.11.–05.12.), `unavailableDeliveryDates` leer,
+> `preorderDays` leer. **Nicht der Tourenplan:** dieselbe Kostenstelle bestellte nur mittwochs.
+
 **Methode.** Nur lokale Dateien gelesen: die Bundles beider Oberflächen in
 `belege/foodnotify-inventur-2026-11-18/` (`brew/` = neue React-Oberfläche, `panel/` = alte Angular-Oberfläche,
 `hilfe/` = Hilfeartikel), dazu die Inventare `intern/brew-aufrufe.csv`, `intern/panel-aufrufe.csv`,
@@ -82,9 +89,11 @@ currency, logo, timeUpdated`, dazu `totalPages`, `totalResults`, `currentPage`. 
   2. Je Warenkorb **ein** Aufruf `GET /api/shop/{shopId}/cart/{type}/{cartId}`; protokollieren nur die Felder der Tabelle
      (`minimalOrderSum`, `currency`, `deliveryDates[].date`, `unavailableDeliveryDates[].date`,
      `products[].preorderDays.*`), keine Positionen, keine Preise. Mit drei Warenkörben anfangen.
+  ~~Je Warenkorb **ein** Aufruf … mit drei Warenkörben anfangen.~~ **Gelaufen und nach einem Warenkorb abgebrochen**
+  (siehe Nachtrag oben).
   3. **Nie die Warenkorb-Seite im Browser öffnen** — sie setzt beim Laden `POST /info` und `GET /api/cart/{cartId}/product/details`
      ab (Lehre aus dem Vorfall `/erp/{erpId}`, §6 des Inventars).
-* **Vorsicht, nicht ausgeschlossen:** `deliveryDateUpdated` deutet darauf, dass der Server beim **Lesen** den gewählten
+* ~~**Vorsicht, nicht ausgeschlossen:**~~ **Eingetreten (19.11.2026):** `deliveryDateUpdated` deutet darauf, dass der Server beim **Lesen** den gewählten
   Termin des Warenkorbs auf den frühestmöglichen setzt, wenn der gespeicherte nicht mehr verfügbar ist. Ob das beim GET
   gespeichert wird, ist aus dem Code nicht zu sehen. Folge wäre ein geänderter Liefertermin **im offenen Warenkorb**
   (keine Bestellung). Vor der Probe dem Nutzer sagen; mit einem Entwurf-Warenkorb beginnen, nicht mit einem aktiven.
@@ -131,8 +140,12 @@ gegen diese vier Nummern wäre eine lokale Abfrage (nicht gemacht).
 
 ## 6. Was offen bleibt
 
-* **Nicht gemessen:** der Warenkorb-GET (Antwortform, ob `deliveryDates` wirklich je Standort gilt, ob er beim Lesen
-  schreibt). Die Felder oben sind aus dem Quelltext der Oberfläche, nicht aus einer Antwort.
+* ~~**Nicht gemessen:** der Warenkorb-GET (Antwortform, ob `deliveryDates` wirklich je Standort gilt, ob er beim Lesen
+  schreibt). Die Felder oben sind aus dem Quelltext der Oberfläche, nicht aus einer Antwort.~~ **Gemessen am 19.11.2026
+  an einem Warenkorb:** Antwortform wie im Bundle (flach, ohne Hülle; Kopf `cartId, costCenterId, currency, deliveryDate,
+  deliveryDateUpdated, deliveryDates, enableComments, minimalOrderSum, net, numberOfProducts, restaurantId, shop, shopid,
+  total, type, unavailableDeliveryDates, vat, products`), **und er schreibt** (Termin, `timeUpdated`). Nicht beantwortet:
+  ob `deliveryDates` je Standort gilt (ein Warenkorb), `preorderDays` bei einem Lieferanten mit Vorlauf.
 * **Nicht beantwortbar aus den Bundles:** der kundenspezifische Tourenplan als Regel (Wochentage), der Mindestbestellwert
   für Lieferanten ohne offenen Warenkorb, die Bestellfrist als Uhrzeit.
 * **POST nur mit ausdrücklichem Ja des Nutzers.** Es gibt keinen Grund für `POST /api/shop/{shopId}/info`: die

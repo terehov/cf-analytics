@@ -6,6 +6,12 @@
  *   bun run fn-probe --marke wilma_wunder           eine Marke
  *   bun run fn-probe                                alle Marken mit FN_*-Zugang
  *   bun run fn-probe --max-anbindungen 3 --max-kostenstellen 2 --max-aufrufe 40
+ *   bun run fn-probe --marke wilma_wunder --nur warenkorb [--warenkorb-liste all|active]
+ *       NUR die Warenkorb-LISTE (ein Aufruf, läuft nie ohne --nur). Der Warenkorb-DETAIL-GET ist seit der Messung
+ *       vom 19.11.2026 GESPERRT: er schreibt (`GESPERRTE_TEILE`, docs/fehlerkatalog.md 19.11.2026)
+ *   bun run fn-probe --marke wilma_wunder --nur verkaeufe-tiefe --erps 7984,9444,10772
+ *       Messung 19.11.2026: je Kostenstelle die jüngsten 1.000 Verkäufe nach timeSold, der älteste Verkauf,
+ *       Positionen von zwei Verkäufen (jüngster, größter); höchstens 3 Kostenstellen, nie Test
  *   bun run fn-probe --marke wilma_wunder --nur link-targets,warenstamm \
  *       --anbindung 2052 --erp 7984 --seitengroessen
  *       nur ausgewählte Fragen (bruecke, link-targets, rezeptliste, warenstamm,
@@ -30,6 +36,9 @@
  *   5. Verkäufe /api/{erpId}/sales und für zwei Verkäufe .../recipe-sale.
  *   6. Food Waste: die in der Sitzungsmessung mit 200 belegten Lesepfade, genau
  *      in der dort gemessenen Parameterform.
+ *   7. Warenkorb-Liste (`warenkorb`): Warenkörbe je Lieferant und Kostenstelle, Änderungsdatum. Die Konditionen
+ *      stehen nur im Detail-GET, und der verändert den Warenkorb — deshalb gesperrt (Messung 19.11.2026).
+ *   8. Verkaufstiefe (`verkaeufe-tiefe`): was ein Verkauf ist, Spanne, Verkäufe je Tag, Positionen, Aufrufkosten.
  *
  * GRENZEN, IM CODE UND NICHT NUR HIER:
  *   * ERLAUBTLISTE (`ERLAUBTE_MUSTER`): jeder Pfad muss vor dem Absenden auf
@@ -74,8 +83,16 @@ export const MARKEN = ['aposto', 'enchilada', 'deutsche_konzepte', 'wilma_wunder
 /** Die einzigen Seitengrößen, die `--seitengroessen` am Warenstamm ausprobiert (fest, siehe Erlaubtliste). */
 export const SEITENGROESSEN = [100, 1000] as const
 /** Fragen, die `--nur` einzeln wählen kann. Ohne `--nur` laufen alle. */
-export const FRAGEN = ['bruecke', 'link-targets', 'rezeptliste', 'warenstamm', 'verkaeufe', 'foodwaste'] as const
+export const FRAGEN = ['bruecke', 'link-targets', 'rezeptliste', 'warenstamm', 'verkaeufe', 'foodwaste', 'warenkorb', 'verkaeufe-tiefe'] as const
 export type Frage = (typeof FRAGEN)[number]
+/**
+ * Was OHNE `--nur` läuft. `warenkorb` (nur die Liste) und `verkaeufe-tiefe` (19.11.2026) laufen NIE von
+ * selbst: die Verkaufstiefe liest bis zu 1.000 Zeilen je Aufruf und verlangt ausdrücklich `--erps`
+ * (höchstens drei) — sie wirft vor dem ersten Aufruf, wenn es fehlt.
+ */
+export const FRAGEN_STANDARD: readonly Frage[] = ['bruecke', 'link-targets', 'rezeptliste', 'warenstamm', 'verkaeufe', 'foodwaste']
+/** Höchstens so viele Kostenstellen je Lauf der Verkaufstiefe (je 4 Aufrufe). */
+export const MAX_ERPS_TIEFE = 3
 
 // ---------------------------------------------------------------------------
 // Erlaubtliste und Sperrliste
@@ -100,6 +117,16 @@ export const ERLAUBTE_MUSTER: { name: string; re: RegExp }[] = [
   { name: 'warenstamm_seite_1000', re: /^\/api\/\d+\/products\?page=1&page_size=1000$/ },
   { name: 'verkaeufe', re: /^\/api\/\d+\/sales$/ },
   { name: 'verkauf_rezepte', re: /^\/api\/\d+\/sales\/\d+\/recipe-sale$/ },
+  // Verkaufstiefe (19.11.2026). Parameter aus dem Bundle (brew/index-BXVUjXtP.js: page, page_size, order_by,
+  // order_direction, from, to, status; Sortierfelder timeSold, sumPrice, saleStatus). Genau zwei feste Varianten:
+  // die jüngsten 1.000 nach Verkaufszeit und der älteste Verkauf (eine Zeile, aufsteigend). Kein from/to (Format ungemessen).
+  { name: 'verkaeufe_juengste_1000', re: /^\/api\/\d+\/sales\?page=1&page_size=1000&order_by=timeSold&order_direction=DESC$/ },
+  { name: 'verkaeufe_aeltester', re: /^\/api\/\d+\/sales\?page=1&page_size=1&order_by=timeSold&order_direction=ASC$/ },
+  { name: 'verkauf_rezepte_100', re: /^\/api\/\d+\/sales\/\d+\/recipe-sale\?page=1&page_size=100$/ },
+  // Warenkorb-LISTE (19.11.2026; `/api/carts/active?page=1&limit=5` am 18.11. mit 200 gemessen, `all` am 19.11.).
+  // Der Detail-GET `/api/shop/{shopId}/cart/{typ}/{cartId}` steht NICHT hier: er schreibt (GESPERRTE_TEILE).
+  { name: 'warenkorb_liste_all', re: /^\/api\/carts\/all\?page=1&limit=50$/ },
+  { name: 'warenkorb_liste_active', re: /^\/api\/carts\/active\?page=1&limit=50$/ },
   { name: 'foodwaste_kostenanalyse', re: /^\/api\/analytics\/reports\/cost-analysis\/ingredients\/food-waste$/ },
   { name: 'foodwaste_liste', re: /^\/api\/erp\/food-waste\?erpId=\d+&limit=5&page=1$/ },
   { name: 'foodwaste_summen', re: /^\/api\/erp\/food-waste-alpha\/totals\?erpId=\d+$/ },
@@ -108,7 +135,7 @@ export const ERLAUBTE_MUSTER: { name: string; re: RegExp }[] = [
 /**
  * Zweite Sicherung, unabhängig von der Erlaubtliste: Teile, die in KEINEM
  * aufgerufenen Pfad vorkommen dürfen. Sie decken die 14 GETs mit Wirkung aus
- * §6 ab (`/app/lang`, `/app/switch-design-mode`, Abmelden, `last-used`,
+ * §6 ab (und seit 19.11.2026 den Warenkorb-Detail-GET) (`/app/lang`, `/app/switch-design-mode`, Abmelden, `last-used`,
  * `unlink`, `sync/reload`, `businessData`, `finish`, `generate-embedded-url`,
  * Import/Upload/Bild entfernen) und alles mit sync/export/reload.
  * `/api/analytics` und `/api/v2/analytics` geben ein Tableau-Ticket heraus.
@@ -117,6 +144,9 @@ export const GESPERRTE_TEILE: RegExp[] = [
   /^\/app\//, /logout/i, /last-used/i, /unlink/i, /sync/i, /reload/i, /export/i,
   /businessData/i, /\/finish(\/|\?|$)/i, /generate-embedded-url/i, /cancel-import/i,
   /upload/i, /\/remove/i, /^\/shops\//, /^\/api\/(v2\/)?analytics(\?|$)/,
+  // Der FÜNFZEHNTE GET mit Wirkung (gemessen 19.11.2026, docs/fehlerkatalog.md): das Lesen eines Warenkorbs setzt
+  // `timeUpdated` auf den Lesezeitpunkt und verschiebt den gewählten Liefertermin (`deliveryDateUpdated`).
+  /\/shop\/\d+\/cart\//i,
 ]
 
 export type Pruefung = { ok: true; muster: string } | { ok: false; grund: string }
@@ -582,6 +612,422 @@ export function rezeptVerkaufAuswerten(roh: unknown): RezeptVerkaufAuswertung {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Warenkorb (Messung 19.11.2026) — die Liste wird gelesen, der Detail-GET ist gesperrt
+// ---------------------------------------------------------------------------
+
+const BERLIN_TAG = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit' })
+export const WOCHENTAGE = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'] as const
+
+/** Kalendertag 'YYYY-MM-DD' aus `{date: '…'}` (PHP), ISO-Text oder Unix-Zeit (Sekunden/Millisekunden, dann Berliner Tag). */
+export function tagAus(x: unknown): string | null {
+  const v = istObjekt(x) ? (x.date ?? null) : x
+  if (typeof v === 'string') return /^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10) : null
+  if (typeof v === 'number' && Number.isFinite(v)) return BERLIN_TAG.format(new Date(v < 1e11 ? v * 1000 : v))
+  return null
+}
+export const wochentag = (tag: string): string => WOCHENTAGE[new Date(`${tag}T12:00:00Z`).getUTCDay()]!
+
+/** Das Objekt, das `schluessel` trägt — gesucht durch Objekte (nicht Arrays), höchstens fünf Ebenen tief. */
+function finde(x: unknown, schluessel: string, tiefe = 0): Record<string, any> | null {
+  if (!istObjekt(x) || tiefe > 5) return null
+  if (schluessel in x) return x
+  for (const v of Object.values(x)) { const r = finde(v, schluessel, tiefe + 1); if (r) return r }
+  return null
+}
+
+/** Form eines Werts: Ziffern → 9, Buchstaben → A, Objekte rekursiv. Nie der Wert selbst. */
+export function formVon(x: unknown, tiefe = 0): unknown {
+  if (x === null || x === undefined) return null
+  if (typeof x === 'boolean') return x
+  if (typeof x === 'number') return pluForm(String(x))
+  if (typeof x === 'string') return pluForm(x)
+  if (Array.isArray(x)) return tiefe > 3 ? '[…]' : x.slice(0, 1).map(v => formVon(v, tiefe + 1))
+  if (istObjekt(x)) {
+    if (tiefe > 3) return '{…}'
+    return Object.fromEntries(Object.entries(x).filter(([k]) => !PERSONENFELD.test(k)).map(([k, v]) => [k, formVon(v, tiefe + 1)]))
+  }
+  return '?'
+}
+
+export type WarenkorbEintrag = {
+  cartId: number | null
+  shopId: number | null
+  shopName: string | null
+  restaurantName: string | null
+  costCenterId: number | null
+  costCenterName: string | null
+  type: string | null
+  timeUpdated: string | null
+  productCount: number | null
+  cartTotal: string | number | null
+  /** „test" in Kostenstellen-, Restaurant- oder Lieferantenname — wird nie gelesen. */
+  test: boolean
+}
+
+export type WarenkorbListeAuswertung = {
+  anzahl: number
+  gesamt: number | null
+  seiten: number | null
+  nachTyp: Record<string, number>
+  /** Felder der Listeneinträge (ohne Personenfelder). */
+  felder: string[]
+  /** Felder der Liste, die nach Konditionen aussehen (`minimal…`, `delivery…`, `cutoff…`, `preorder…`) — leer heißt: die Liste trägt keine. */
+  konditionsfelder: string[]
+  eintraege: WarenkorbEintrag[]
+  test: number
+  /** Ältester Entwurf (`draft`) ohne Testname nach `timeUpdated`; fehlt es an Entwürfen, null. */
+  vorschlag: WarenkorbEintrag | null
+}
+
+const textOderNull = (x: unknown): string | null => (typeof x === 'string' && x.trim() !== '' ? x : null)
+
+/** `GET /api/carts/{all|active}`: `{isError, data: {carts[], totalPages, totalResults, currentPage}}`. */
+export function warenkorbListeAuswerten(roh: unknown): WarenkorbListeAuswertung {
+  const kern = finde(roh, 'carts')
+  const zeilen = liste(kern?.carts).filter(istObjekt)
+  const eintraege: WarenkorbEintrag[] = zeilen.map(z => ({
+    cartId: zahl(z.cartId), shopId: zahl(z.shopId),
+    shopName: textOderNull(z.shopName), restaurantName: textOderNull(z.restaurantName),
+    costCenterId: zahl(z.costCenterId), costCenterName: textOderNull(z.costCenterName),
+    type: textOderNull(z.type), timeUpdated: zeitText(z.timeUpdated),
+    productCount: zahl(z.productCount), cartTotal: typeof z.cartTotal === 'number' || typeof z.cartTotal === 'string' ? z.cartTotal : null,
+    test: istTestName(textOderNull(z.costCenterName), textOderNull(z.restaurantName), textOderNull(z.shopName)),
+  }))
+  const nachTyp: Record<string, number> = {}
+  for (const e of eintraege) nachTyp[e.type ?? '(ohne)'] = (nachTyp[e.type ?? '(ohne)'] ?? 0) + 1
+  const felder = feldpfade(zeilen)
+  const entwuerfe = eintraege.filter(e => !e.test && e.type === 'draft')
+    .sort((a, b) => (a.timeUpdated ?? '9999').localeCompare(b.timeUpdated ?? '9999'))
+  return {
+    anzahl: eintraege.length, gesamt: zahl(kern?.totalResults), seiten: zahl(kern?.totalPages), nachTyp, felder,
+    konditionsfelder: felder.filter(f => /minimal|delivery|cutoff|preorder/i.test(f)),
+    eintraege, test: eintraege.filter(e => e.test).length, vorschlag: entwuerfe[0] ?? null,
+  }
+}
+
+export type TermineAuswertung = {
+  anzahl: number
+  von: string | null
+  bis: string | null
+  jeWochentag: Record<string, number>
+  tage: string[]
+}
+
+export function termineAuswerten(x: unknown): TermineAuswertung {
+  const tage = liste(x).map(t => tagAus(t)).filter((t): t is string => t !== null).sort()
+  const je: Record<string, number> = Object.fromEntries(WOCHENTAGE.map(w => [w, 0]))
+  for (const t of tage) je[wochentag(t)] = (je[wochentag(t)] ?? 0) + 1
+  return { anzahl: liste(x).length, von: tage[0] ?? null, bis: tage[tage.length - 1] ?? null, jeWochentag: je, tage }
+}
+
+export type WarenkorbAuswertung = {
+  /** Ein Objekt mit `minimalOrderSum` oder `deliveryDates` war in der Antwort zu finden. */
+  gefunden: boolean
+  /** Felder des Kopfes (oberste Ebene, ohne `products` und ohne Personenfelder). */
+  felder: string[]
+  minimalOrderSum: number | null
+  currency: string | null
+  deliveryDate: string | null
+  deliveryDateUpdated: boolean | null
+  liefertermine: TermineAuswertung
+  gesperrteTermine: TermineAuswertung
+  produkte: number
+  mitPreorderDays: number
+  preorderPassed: number
+  /** Je Feld von `preorderDays`: bei wie vielen Produkten gefüllt. */
+  preorderFuellgrad: Record<string, number>
+  /** Form (nie Wert) des ersten `preorderDays`. */
+  preorderForm: unknown
+  produktFelder: string[]
+  noteGefuellt: boolean | null
+}
+
+/**
+ * `GET /api/shop/{shopId}/cart/{typ}/{cartId}`: Konditionen — Positionen und Preise werden nur gezählt.
+ *
+ * DER AUFRUF IST GESPERRT (`GESPERRTE_TEILE`): am 19.11.2026 hat ein einziges Lesen den Warenkorb verändert
+ * (`timeUpdated`, Liefertermin). Die Funktion bleibt, um die einmal gemessene Rohantwort
+ * (`belege/fn-probe-2026-11-19-0909-2/`) auszuwerten — nicht, um ihn erneut aufzurufen.
+ */
+export function warenkorbAuswerten(roh: unknown): WarenkorbAuswertung {
+  const kern = finde(roh, 'minimalOrderSum') ?? finde(roh, 'deliveryDates') ?? finde(roh, 'products')
+  const k = kern ?? {}
+  const produkte = liste(k.products).filter(istObjekt)
+  const mitPre = produkte.filter(p => istObjekt(p.preorderDays) && Object.keys(p.preorderDays).length > 0)
+  const preFelder = new Set<string>()
+  for (const p of mitPre) for (const f of Object.keys(p.preorderDays)) preFelder.add(f)
+  const fuell: Record<string, number> = {}
+  for (const f of [...preFelder].sort()) fuell[f] = mitPre.filter(p => gefuellt(istObjekt(p.preorderDays[f]) ? JSON.stringify(p.preorderDays[f]) : p.preorderDays[f])).length
+  return {
+    gefunden: kern !== null,
+    felder: Object.keys(k).filter(f => f !== 'products' && !PERSONENFELD.test(f)).sort(),
+    minimalOrderSum: zahl(k.minimalOrderSum), currency: textOderNull(k.currency),
+    deliveryDate: istObjekt(k.deliveryDate) || typeof k.deliveryDate === 'string' || typeof k.deliveryDate === 'number' ? (tagAus(k.deliveryDate) ?? zeitText(k.deliveryDate)) : null,
+    deliveryDateUpdated: typeof k.deliveryDateUpdated === 'boolean' ? k.deliveryDateUpdated : null,
+    liefertermine: termineAuswerten(k.deliveryDates), gesperrteTermine: termineAuswerten(k.unavailableDeliveryDates),
+    produkte: produkte.length, mitPreorderDays: mitPre.length,
+    preorderPassed: mitPre.filter(p => p.preorderDays.passed === true).length,
+    preorderFuellgrad: fuell, preorderForm: mitPre[0] ? formVon(mitPre[0].preorderDays) : null,
+    produktFelder: feldpfade(produkte),
+    noteGefuellt: 'note' in k ? gefuellt(k.note) : null,
+  }
+}
+
+export type WarenkorbErgebnis = {
+  listePfad: string
+  liste: WarenkorbListeAuswertung | null
+}
+
+// ---------------------------------------------------------------------------
+// Verkaufstiefe (Messung 19.11.2026)
+// ---------------------------------------------------------------------------
+
+const quantil = (a: number[], q: number): number | null => {
+  if (!a.length) return null
+  const s = [...a].sort((x, y) => x - y)
+  return s[Math.min(s.length - 1, Math.floor(q * s.length))]!
+}
+const zeitMs = (x: unknown): number | null => {
+  const t = zeitText(x)
+  const ms = t ? Date.parse(`${t.slice(0, 10)}T${t.slice(11, 19) || '00:00:00'}Z`) : NaN
+  return Number.isFinite(ms) ? ms : null
+}
+
+export type VerkaufsTiefeAuswertung = {
+  zeilen: number
+  gesamt: number | null
+  seitenZahl: number | null
+  seitengroesseGemeldet: number | null
+  orderByGemeldet: string | null
+  orderDirectionGemeldet: string | null
+  /** Je Kalendertag (Berliner Verkaufszeit), älteste zuerst. `vollstaendig` = Tag ist weder heute noch der angeschnittene Rand der Seite. */
+  jeTag: { tag: string; wochentag: string; anzahl: number; summe: number; vollstaendig: boolean }[]
+  tageVollstaendig: number
+  /** Kalendertage zwischen dem ältesten und jüngsten vollständigen Tag, an denen es keinen Verkauf gab. */
+  tageOhneVerkauf: string[]
+  /** Die vollständigen Tage reichen 14 Tage zurück (ab `jetzt`)? */
+  deckt14Tage: boolean
+  verkaeufeLetzte14Tage: number
+  medianJeTag: number | null
+  maxJeTag: number | null
+  saleStatus: Record<string, number>
+  saleType: Record<string, number>
+  finishErrorGesetzt: number
+  summeGesamt: number
+  negativ: number
+  nullSumme: number
+  sumPriceMin: number | null
+  sumPriceMedian: number | null
+  sumPriceMax: number | null
+  /** Anteil der Verkäufe mit Verkaufszeit vor 08:00 (Geschäftstag beginnt 08:00). */
+  anteilVor8UhrPct: number | null
+  /** `timeCreated` − `timeSold` in Minuten: wann FoodNotify den Verkauf anlegt, nachdem er an der Kasse war. */
+  verzugMinuten: { median: number | null; p90: number | null; max: number | null }
+  /** Verschiedene `timeCreated` (auf die Sekunde): wie viele Anlage-Schübe die Seite enthält, und je Tag im Median. */
+  anlageSchuebe: { verschiedene: number; jeTagMedian: number | null }
+  idVon: number | null
+  idBis: number | null
+  felder: string[]
+  /** Zwei Verkäufe für die Positionsabfrage: der jüngste und der mit der größten Summe (beide `finish`). */
+  auswahl: { id: number; summe: number | null }[]
+}
+
+/** /api/{erpId}/sales?page_size=1000 nach `timeSold`: die jüngsten Verkäufe in der Tiefe. */
+export function verkaufsTiefeAuswerten(roh: unknown, jetzt: Date): VerkaufsTiefeAuswertung {
+  const a = auspacken(roh)
+  const zeilen = liste(a.daten).filter(istObjekt)
+  const gesamt = a.seiten?.gesamt ?? null
+  const rand = gesamt !== null && zeilen.length < gesamt   // Seite schneidet die Historie ab → ältester Tag angeschnitten
+  const heute = BERLIN_TAG.format(jetzt)
+  const je = new Map<string, { n: number; summe: number }>()
+  const status: Record<string, number> = {}, typ: Record<string, number> = {}
+  const summen: number[] = [], verzug: number[] = []
+  const schuebe = new Set<string>(), schuebeJeTag = new Map<string, Set<string>>()
+  let fehler = 0, vor8 = 0, mitZeit = 0, ohneTag = 0
+  for (const z of zeilen) {
+    const s = istObjekt(z.saleStatus) ? String(z.saleStatus.name ?? '(ohne)') : String(z.saleStatus ?? '(ohne)')
+    status[s] = (status[s] ?? 0) + 1
+    const t = istObjekt(z.saleType) ? String(z.saleType.name ?? '(ohne)') : String(z.saleType ?? '(ohne)')
+    typ[t] = (typ[t] ?? 0) + 1
+    if (z.finishError !== null && z.finishError !== undefined) fehler++
+    const sum = zahl(z.sumPrice)
+    if (sum !== null) summen.push(sum)
+    const tag = tagAus(z.timeSold)
+    if (!tag) { ohneTag++; continue }
+    const e = je.get(tag) ?? { n: 0, summe: 0 }
+    e.n++; e.summe += sum ?? 0; je.set(tag, e)
+    const uhr = zeitText(z.timeSold)
+    if (uhr && uhr.length >= 13) { mitZeit++; if (Number(uhr.slice(11, 13)) < 8) vor8++ }
+    const erstellt = zeitText(z.timeCreated)
+    if (erstellt) {
+      schuebe.add(erstellt.slice(0, 19))
+      const m = schuebeJeTag.get(tag) ?? new Set<string>(); m.add(erstellt.slice(0, 19)); schuebeJeTag.set(tag, m)
+    }
+    const c = zeitMs(z.timeCreated), v = zeitMs(z.timeSold)
+    if (c !== null && v !== null) verzug.push(Math.round((c - v) / 60_000))
+  }
+  const tage = [...je.keys()].sort()
+  const aeltester = tage[0]
+  const jeTag = tage.map(tag => ({
+    tag, wochentag: wochentag(tag), anzahl: je.get(tag)!.n, summe: Math.round(je.get(tag)!.summe * 100) / 100,
+    vollstaendig: tag !== heute && !(rand && tag === aeltester),
+  }))
+  const voll = jeTag.filter(t => t.vollstaendig)
+  const tageOhne: string[] = []
+  if (voll.length > 1) {
+    const [von, bis] = [voll[0]!.tag, voll[voll.length - 1]!.tag]
+    const vorhanden = new Set(voll.map(t => t.tag))
+    for (let d = new Date(`${von}T12:00:00Z`); d.toISOString().slice(0, 10) <= bis; d = new Date(d.getTime() + 86_400_000)) {
+      const t = d.toISOString().slice(0, 10)
+      if (!vorhanden.has(t)) tageOhne.push(t)
+    }
+  }
+  const letzte14 = letzteTage(jetzt, 15).slice(0, 14)   // ab 14 Tagen vor heute bis gestern (heute läuft noch)
+  const vollSet = new Map(voll.map(t => [t.tag, t.anzahl]))
+  const ids = zeilen.map(z => zahl(z.id)).filter((n): n is number => n !== null)
+  const fertig = zeilen.filter(z => (istObjekt(z.saleStatus) ? z.saleStatus.name : z.saleStatus) === 'finish' && zahl(z.id) !== null)
+  const groesster = [...fertig].sort((x, y) => (zahl(y.sumPrice) ?? -Infinity) - (zahl(x.sumPrice) ?? -Infinity))[0]
+  const juengster = [...fertig].sort((x, y) => (zeitText(y.timeSold) ?? '').localeCompare(zeitText(x.timeSold) ?? ''))[0]
+  const auswahl = [juengster, groesster].filter((z, i, arr) => z && arr.findIndex(q => q && zahl(q.id) === zahl(z.id)) === i)
+    .map(z => ({ id: zahl(z!.id)!, summe: zahl(z!.sumPrice) }))
+  const roh0 = istObjekt(roh) ? (finde(roh, 'order_by') ?? {}) : {}
+  return {
+    zeilen: zeilen.length, gesamt, seitenZahl: a.seiten?.gesamtSeiten ?? null,
+    seitengroesseGemeldet: gemeldeteSeitengroesse(roh),
+    orderByGemeldet: textOderNull(roh0.order_by), orderDirectionGemeldet: textOderNull(roh0.order_direction),
+    jeTag, tageVollstaendig: voll.length, tageOhneVerkauf: tageOhne,
+    deckt14Tage: letzte14.every(t => vollSet.has(t)) || (voll.length > 0 && voll[0]!.tag <= letzte14[0]!),
+    verkaeufeLetzte14Tage: letzte14.reduce((n, t) => n + (vollSet.get(t) ?? 0), 0),
+    medianJeTag: quantil(voll.map(t => t.anzahl), 0.5), maxJeTag: voll.length ? Math.max(...voll.map(t => t.anzahl)) : null,
+    saleStatus: status, saleType: typ, finishErrorGesetzt: fehler,
+    summeGesamt: Math.round(summen.reduce((x, y) => x + y, 0) * 100) / 100,
+    negativ: summen.filter(x => x < 0).length, nullSumme: summen.filter(x => x === 0).length,
+    sumPriceMin: summen.length ? Math.min(...summen) : null, sumPriceMedian: quantil(summen, 0.5),
+    sumPriceMax: summen.length ? Math.max(...summen) : null,
+    anteilVor8UhrPct: pct(vor8, mitZeit),
+    verzugMinuten: { median: quantil(verzug, 0.5), p90: quantil(verzug, 0.9), max: verzug.length ? Math.max(...verzug) : null },
+    anlageSchuebe: { verschiedene: schuebe.size, jeTagMedian: quantil([...schuebeJeTag.values()].map(s => s.size), 0.5) },
+    idVon: ids.length ? Math.min(...ids) : null, idBis: ids.length ? Math.max(...ids) : null,
+    felder: feldpfade(zeilen), auswahl,
+  }
+}
+
+export type AeltesterVerkauf = { id: number | null; timeSold: string | null; timeCreated: string | null; saleStatus: string | null; gesamt: number | null; gemeldeteSeitengroesse: number | null }
+
+/** /api/{erpId}/sales?page_size=1&order_by=timeSold&order_direction=ASC: die erste Zeile ist der älteste Verkauf. */
+export function aeltesterVerkaufAuswerten(roh: unknown): AeltesterVerkauf {
+  const a = auspacken(roh)
+  const z = liste(a.daten).filter(istObjekt)[0]
+  return {
+    id: z ? zahl(z.id) : null, timeSold: z ? zeitText(z.timeSold) : null, timeCreated: z ? zeitText(z.timeCreated) : null,
+    saleStatus: z ? (istObjekt(z.saleStatus) ? textOderNull(z.saleStatus.name) : textOderNull(z.saleStatus)) : null,
+    gesamt: a.seiten?.gesamt ?? null, gemeldeteSeitengroesse: gemeldeteSeitengroesse(roh),
+  }
+}
+
+export type PositionenAuswertung = RezeptVerkaufAuswertung & {
+  seitenZahl: number | null
+  summePositionen: number
+  /** Summe der Positionen minus `sumPrice` des Verkaufs (aus der Liste), gerundet auf Cent; null = Summe unbekannt. */
+  abweichungZurListe: number | null
+  rezeptIds: number
+  zutatenJePosition: { min: number | null; median: number | null; max: number | null }
+  zutatFelder: string[]
+  /** Einheiten der Zutaten: `g`, `ml`, `cu_…` (Stückangabe je Rezept) — nur die Form. */
+  einheiten: Record<string, number>
+  /** Felder in Position, Rezept oder Zutat, die nach Kassen- oder Artikelnummer aussehen (plu, artikel, nummer, ean, sku, number). */
+  nummernFelder: string[]
+  zutatenAufgeloest: number
+  zutatenGeloescht: number
+  zutatenUnaufloesbar: number
+  mitStornogrund: number
+  negativeMengen: number
+  /** Positionen, deren Rezeptname auf „(Kasse)" endet — FoodNotify legt Kassenartikel als Rezept mit diesem Zusatz an. */
+  rezeptnameMitKasse: number
+}
+
+/** .../recipe-sale (Positionen eines Verkaufs) in der Tiefe: Summen, Zutaten, Nummernfelder. Keine Namen, kein staff*. */
+export function positionenAuswerten(roh: unknown, verkaufSumme: number | null): PositionenAuswertung {
+  const basis = rezeptVerkaufAuswerten(roh)
+  const a = auspacken(roh)
+  const zeilen = liste(a.daten).filter(istObjekt)
+  const zutaten = zeilen.flatMap(z => liste(z.recipe?.recipeIngredients).filter(istObjekt))
+  const summe = Math.round(zeilen.reduce((x, z) => x + (zahl(z.sumPrice) ?? 0), 0) * 100) / 100
+  const je = zeilen.map(z => liste(z.recipe?.recipeIngredients).length)
+  const einheiten: Record<string, number> = {}
+  for (const z of zutaten) { const u = pluForm(String(z.unitName ?? '(ohne)')).replace(/9+/g, '9'); einheiten[u] = (einheiten[u] ?? 0) + 1 }
+  const alleFelder = new Set([
+    ...feldpfade(zeilen).filter(f => !f.startsWith('recipe.')),
+    ...feldpfade(zeilen.map(z => z.recipe).filter(istObjekt)).map(f => `recipe.${f}`),
+    ...feldpfade(zutaten).map(f => `zutat.${f}`),
+  ])
+  return {
+    ...basis,
+    seitenZahl: a.seiten?.gesamtSeiten ?? null, summePositionen: summe,
+    abweichungZurListe: verkaufSumme === null ? null : Math.round((summe - verkaufSumme) * 100) / 100,
+    rezeptIds: new Set(zeilen.map(z => z.recipe?.id).filter(gefuellt).map(String)).size,
+    zutatenJePosition: { min: je.length ? Math.min(...je) : null, median: quantil(je, 0.5), max: je.length ? Math.max(...je) : null },
+    zutatFelder: feldpfade(zutaten),
+    einheiten,
+    nummernFelder: [...alleFelder].filter(f => /plu|artikel|article|nummer|number|ean|sku/i.test(f)).sort(),
+    zutatenAufgeloest: zutaten.filter(z => z.isRecipe === true).length,
+    zutatenGeloescht: zutaten.filter(z => z.deleted === true).length,
+    zutatenUnaufloesbar: zutaten.filter(z => z.unresolvable === true).length,
+    mitStornogrund: zeilen.filter(z => gefuellt(z.voidReason)).length,
+    negativeMengen: zeilen.filter(z => (zahl(z.amount) ?? 0) < 0).length,
+    rezeptnameMitKasse: zeilen.filter(z => typeof z.recipe?.name === 'string' && /\(Kasse\)\s*$/.test(z.recipe.name)).length,
+  }
+}
+
+export type TiefeKosten = {
+  /** Verkäufe je Tag: Median der vollständigen Tage; null = nicht messbar. */
+  verkaeufeJeTag: number | null
+  /** Täglicher Import: Listenseiten (1.000 je Seite) + ein Positionsaufruf je Verkauf. */
+  aufrufeJeTag: number | null
+  /** … für 35 Kostenstellen, wenn alle so wären wie diese. */
+  aufrufeJeTag35: number | null
+  /** Rückblick 12 Monate aus `verkaeufeJeTag` × 365: Listenseiten + Positionsaufrufe. */
+  rueckblick12Monate: { verkaeufe: number; listenaufrufe: number; detailaufrufe: number; aufrufe: number } | null
+  /** Aus Gesamtzahl und ältestem Verkauf: Verkäufe je Kalendertag über die ganze Historie. */
+  verkaeufeJeTagGesamt: number | null
+  /** Sekunden je Aufruf bei dem eingestellten Takt (Mitte von FN_TAKT_MIN/MAX, mindestens die Pause). */
+  sekundenJeAufruf: number
+  stundenJeTag35: number | null
+  stundenRueckblick12Monate: number | null
+}
+
+export function tiefeKosten(t: VerkaufsTiefeAuswertung, aeltester: AeltesterVerkauf | null, jetzt: Date, sekundenJeAufruf: number): TiefeKosten {
+  const je = t.medianJeTag
+  const listeJeTag = je === null ? null : Math.max(1, Math.ceil(je / 1000))
+  const aufrufe = je === null || listeJeTag === null ? null : listeJeTag + je
+  const rueck = je === null ? null : (() => {
+    const v = Math.round(je * 365)
+    const l = Math.ceil(v / 1000)
+    return { verkaeufe: v, listenaufrufe: l, detailaufrufe: v, aufrufe: l + v }
+  })()
+  const seit = aeltester?.timeSold ? tagAus(aeltester.timeSold) : null
+  const tageHistorie = seit ? Math.max(1, Math.round((Date.parse(`${BERLIN_TAG.format(jetzt)}T12:00:00Z`) - Date.parse(`${seit}T12:00:00Z`)) / 86_400_000)) : null
+  const h = (n: number | null) => (n === null ? null : Math.round((n * sekundenJeAufruf) / 360) / 10)
+  return {
+    verkaeufeJeTag: je, aufrufeJeTag: aufrufe, aufrufeJeTag35: aufrufe === null ? null : aufrufe * 35,
+    rueckblick12Monate: rueck,
+    verkaeufeJeTagGesamt: t.gesamt !== null && tageHistorie !== null ? Math.round((t.gesamt / tageHistorie) * 10) / 10 : null,
+    sekundenJeAufruf, stundenJeTag35: h(aufrufe === null ? null : aufrufe * 35), stundenRueckblick12Monate: h(rueck?.aufrufe ?? null),
+  }
+}
+
+export type VerkaufsTiefeErgebnis = {
+  erpId: number
+  name: string
+  liste: VerkaufsTiefeAuswertung | null
+  listeBytes: number | null
+  listeDauerMs: number | null
+  aeltester: AeltesterVerkauf | null
+  positionen: ({ verkaufId: number; bytes: number | null; dauerMs: number | null } & PositionenAuswertung)[]
+  kosten: TiefeKosten | null
+}
+
 export type FoodWasteKostenanalyse = {
   zeilen: number
   felder: string[]
@@ -674,6 +1120,10 @@ export type MarkenErgebnis = {
     liste: ({ erpId: number } & FoodWasteListe) | null
     summen: ({ erpId: number } & FoodWasteSummen) | null
   }
+  /** Warenkorb-Liste (19.11.2026), nur mit `--nur warenkorb`. */
+  warenkorb: WarenkorbErgebnis | null
+  /** Messung Verkaufstiefe (19.11.2026), nur mit `--nur verkaeufe-tiefe --erps …`. */
+  verkaufsTiefe: VerkaufsTiefeErgebnis[]
 }
 
 export type ProbeOptionen = {
@@ -690,10 +1140,29 @@ export type ProbeOptionen = {
   erp?: number
   /** Warenstamm der ersten Kostenstelle zusätzlich mit page_size=100 und page_size=1000. */
   seitengroessen?: boolean
+  /** Welche Warenkorbliste die Frage `warenkorb` holt: `all` (Standard, mit Entwürfen) oder `active`. */
+  warenkorbListe?: 'all' | 'active'
+  /** Kostenstellen (erpId) der Verkaufstiefe, höchstens `MAX_ERPS_TIEFE`. */
+  erps?: number[]
   /** Nur für Tests kleiner als PAUSE_MS. */
   pauseMs?: number
   jetzt?: Date
   ausgabe?: (zeile: string) => void
+}
+
+/**
+ * Die Verkaufstiefe verlangt ihre ausdrücklichen Kostenstellen — VOR dem ersten Aufruf (auch im --dry-run).
+ * Wirft bei jeder Unstimmigkeit.
+ */
+export function freigabeOptionenPruefen(fragen: readonly Frage[], o: Pick<ProbeOptionen, 'erps'>): void {
+  const will = (f: Frage) => fragen.includes(f)
+  if (will('verkaeufe-tiefe')) {
+    const erps = o.erps ?? []
+    if (erps.length < 1 || erps.length > MAX_ERPS_TIEFE) throw new Error(`Frage verkaeufe-tiefe braucht --erps mit ein bis ${MAX_ERPS_TIEFE} Kostenstellen (höchstens ${MAX_ERPS_TIEFE})`)
+    if (erps.some(x => !Number.isInteger(x) || x <= 0)) throw new Error('--erps braucht positive ganze Zahlen')
+  } else if (o.erps?.length) {
+    throw new Error('--erps gehört zur Frage verkaeufe-tiefe (--nur verkaeufe-tiefe)')
+  }
 }
 
 const schlaf = (ms: number) => new Promise(r => setTimeout(r, ms))
@@ -710,6 +1179,7 @@ function leeresErgebnis(marke: string, jetzt: Date, grenze: number, fragen: Frag
     artikel: [], linkTargets: null,
     rezeptliste: null, abgleichRezeptzahl: null, warenstamm: [], verkaeufe: [], rezeptVerkaeufe: [],
     foodWaste: { kostenanalyse: null, liste: null, summen: null },
+    warenkorb: null, verkaufsTiefe: [],
   }
 }
 
@@ -722,13 +1192,14 @@ export async function fnProbe(o: ProbeOptionen): Promise<{ ergebnisse: MarkenErg
   const jetzt = o.jetzt ?? new Date()
   const zugaenge = fnZugaenge()
   const marken = o.marken?.length ? o.marken : [...MARKEN]
-  const fragen: Frage[] = o.nur?.length ? [...new Set(o.nur)] : [...FRAGEN]
+  const fragen: Frage[] = o.nur?.length ? [...new Set(o.nur)] : [...FRAGEN_STANDARD]
   const falscheFragen = fragen.filter(f => !(FRAGEN as readonly string[]).includes(f))
   if (falscheFragen.length) throw new Error(`Unbekannte Frage: ${falscheFragen.join(', ')} (erlaubt: ${FRAGEN.join(', ')})`)
   for (const [n, v] of [['anbindung', o.anbindung], ['erp', o.erp]] as const) {
     if (v !== undefined && (!Number.isInteger(v) || v <= 0)) throw new Error(`--${n} braucht eine positive ganze Zahl`)
   }
   const will = (f: Frage) => fragen.includes(f)
+  freigabeOptionenPruefen(fragen, o)
   const unbekannt = marken.filter(m => !(MARKEN as readonly string[]).includes(m))
   if (unbekannt.length) throw new Error(`Unbekannte Marke: ${unbekannt.join(', ')} (erlaubt: ${MARKEN.join(', ')})`)
 
@@ -852,7 +1323,8 @@ export async function fnProbe(o: ProbeOptionen): Promise<{ ergebnisse: MarkenErg
     // Messung am Testrestaurant fiel nur auf, weil jemand den Namen nachschlug (docs/fehlerkatalog.md).
     const braucheAnbindung = will('bruecke') || will('link-targets')
     const braucheKs = will('warenstamm') || will('verkaeufe') || will('foodwaste')
-    const ksRoh = braucheKs ? await holenRoh('erp_all', '/api/erp/all') : null
+    // Die Verkaufstiefe holt /api/erp/all nur für den Namen (Testkostenstellen nie, Name in die Zusammenfassung).
+    const ksRoh = braucheKs || will('verkaeufe-tiefe') ? await holenRoh('erp_all', '/api/erp/all') : null
     const ks: KostenstelleZeile[] = ksRoh === null ? [] : kostenstellen(ksRoh)
     const stRoh = braucheAnbindung || braucheKs ? await holenRoh('pos_standorte', '/api/pos/locations') : null
     const standorte = stRoh === null ? [] : posStandorte(stRoh)
@@ -863,7 +1335,7 @@ export async function fnProbe(o: ProbeOptionen): Promise<{ ergebnisse: MarkenErg
         e.uebersprungenTest.push(`Anbindung ${a.connectionId} (${a.namen.join(', ') || 'ohne Namen'})`)
       }
     }
-    if (o.erp === undefined) {
+    if (o.erp === undefined && braucheKs) {
       for (const k of ks.filter(x => istTestName(x.name, x.restaurantName))) {
         e.uebersprungenTest.push(`Kostenstelle ${k.erpId} (${[k.restaurantName, k.name].filter(Boolean).join(' — ')})`)
       }
@@ -876,14 +1348,15 @@ export async function fnProbe(o: ProbeOptionen): Promise<{ ergebnisse: MarkenErg
       connectionId: a.connectionId, kassensystem: a.kassensystem,
       name: a.namen.length ? a.namen.join(', ') : stRoh === null ? null : '(nicht in /api/pos/locations)',
     }))
-    const erpIds = o.erp !== undefined ? [o.erp] : kostenstellenWaehlen(ks, standorte, maxKs)
-    e.gewaehlteKostenstellen = erpIds
-    e.kostenstellenNamen = erpIds.map(id => {
+    const erpIds = !braucheKs ? [] : o.erp !== undefined ? [o.erp] : kostenstellenWaehlen(ks, standorte, maxKs)
+    const tiefeErps = will('verkaeufe-tiefe') ? [...new Set(o.erps ?? [])] : []
+    e.gewaehlteKostenstellen = [...new Set([...erpIds, ...tiefeErps])]
+    e.kostenstellenNamen = e.gewaehlteKostenstellen.map(id => {
       const k = ks.find(x => x.erpId === id)
       return { erpId: id, name: k ? [k.restaurantName, k.name].filter(Boolean).join(' — ') : '(nicht in /api/erp/all)' }
     })
     if (stRoh !== null && braucheAnbindung && anbindungen.length === 0) e.befunde.push('keine Kassenanbindung in /api/pos/locations — Brücke und link-targets nicht messbar')
-    if (ksRoh !== null && erpIds.length === 0) e.befunde.push('keine Kostenstelle in /api/erp/all — Warenstamm, Verkäufe, Food Waste nicht messbar')
+    if (ksRoh !== null && braucheKs && erpIds.length === 0) e.befunde.push('keine Kostenstelle in /api/erp/all — Warenstamm, Verkäufe, Food Waste nicht messbar')
 
     // --- 1. Brücke Kassenartikel → Rezept ---------------------------------
     if (will('bruecke')) {
@@ -966,6 +1439,50 @@ export async function fnProbe(o: ProbeOptionen): Promise<{ ergebnisse: MarkenErg
       }
     }
 
+    // --- 7. Warenkorb-LISTE ------------------------------------------------------
+    // Nur die Liste. Der Detail-GET mit den Konditionen ist gesperrt: Lesen verändert den Warenkorb (19.11.2026).
+    if (will('warenkorb')) {
+      const listePfad = `/api/carts/${o.warenkorbListe ?? 'all'}?page=1&limit=50`
+      const w: WarenkorbErgebnis = { listePfad, liste: null }
+      e.warenkorb = w
+      const roh = await holenRoh('warenkorb_liste', listePfad)
+      if (roh !== null) {
+        w.liste = warenkorbListeAuswerten(roh)
+        if (w.liste.anzahl === 0) e.befunde.push('Warenkorbliste ohne Einträge')
+      }
+    }
+
+    // --- 8. Verkaufstiefe: jüngste 1.000, ältester Verkauf, zwei Verkäufe mit Positionen --------
+    if (will('verkaeufe-tiefe')) {
+      const { taktMin, taktMax } = fnGrenzen()
+      const sekundenJeAufruf = Math.max(pause, (taktMin + taktMax) / 2) / 1000
+      for (const erpId of tiefeErps) {
+        const gefunden = ks.find(x => x.erpId === erpId)
+        const name = gefunden ? [gefunden.restaurantName, gefunden.name].filter(Boolean).join(' — ') : '(nicht in /api/erp/all)'
+        if (!gefunden || istTestName(gefunden.name, gefunden.restaurantName)) {
+          e.befunde.push(`Verkaufstiefe ${erpId} (${name}): ${gefunden ? 'Testkostenstelle' : 'nicht in /api/erp/all, Name nicht prüfbar'} — nicht gelesen`)
+          continue
+        }
+        const erg: VerkaufsTiefeErgebnis = { erpId, name, liste: null, listeBytes: null, listeDauerMs: null, aeltester: null, positionen: [], kosten: null }
+        e.verkaufsTiefe.push(erg)
+        const neu = await holenRoh(`sales_tiefe_${erpId}`, `/api/${erpId}/sales?page=1&page_size=1000&order_by=timeSold&order_direction=DESC`)
+        if (neu !== null) {
+          const l = e.aufrufe[e.aufrufe.length - 1]!
+          erg.liste = verkaufsTiefeAuswerten(neu, jetzt); erg.listeBytes = l.bytes; erg.listeDauerMs = l.dauerMs
+        }
+        const alt = await holenRoh(`sales_aeltester_${erpId}`, `/api/${erpId}/sales?page=1&page_size=1&order_by=timeSold&order_direction=ASC`)
+        if (alt !== null) erg.aeltester = aeltesterVerkaufAuswerten(alt)
+        for (const pick of erg.liste?.auswahl ?? []) {
+          const roh = await holenRoh(`recipe_sale_tiefe_${erpId}_${pick.id}`, `/api/${erpId}/sales/${pick.id}/recipe-sale?page=1&page_size=100`)
+          if (roh !== null) {
+            const l = e.aufrufe[e.aufrufe.length - 1]!
+            erg.positionen.push({ verkaufId: pick.id, bytes: l.bytes, dauerMs: l.dauerMs, ...positionenAuswerten(roh, pick.summe) })
+          }
+        }
+        if (erg.liste) erg.kosten = tiefeKosten(erg.liste, erg.aeltester, jetzt, sekundenJeAufruf)
+      }
+    }
+
     zusammenfassungSchreiben(verzeichnis, e)
     konsole(aus, e)
   }
@@ -991,6 +1508,14 @@ function konsole(aus: (z: string) => void, e: MarkenErgebnis) {
   for (const v of e.verkaeufe) aus(`  Verkäufe ${v.erpId}: ${v.zeilen} (gesamt ${v.gesamt ?? '—'}), Status ${JSON.stringify(v.saleStatus)}, finishError ${v.finishErrorGesetzt}, ${v.datumVon ?? '—'} bis ${v.datumBis ?? '—'}`)
   for (const r of e.rezeptVerkaeufe) aus(`  recipe-sale ${r.erpId}/${r.verkaufId}: ${r.positionen} Positionen, mit Rezept ${r.mitRezept}`)
   if (e.foodWaste.kostenanalyse) aus(`  Food Waste (Kostenanalyse): ${e.foodWaste.kostenanalyse.zeilen} Zeilen, ${e.foodWaste.kostenanalyse.datumVon ?? '—'} bis ${e.foodWaste.kostenanalyse.datumBis ?? '—'}`)
+  if (e.warenkorb) {
+    const l = e.warenkorb.liste
+    aus(`  Warenkorb-Liste: ${l ? `${l.anzahl} von ${l.gesamt ?? '—'}, nach Typ ${JSON.stringify(l.nachTyp)}, Test ${l.test}, Konditionsfelder ${l.konditionsfelder.join(', ') || 'keine'}` : 'nicht geholt'}`)
+  }
+  for (const t of e.verkaufsTiefe) {
+    const l = t.liste
+    aus(`  Verkaufstiefe ${t.erpId} (${t.name}): ${l ? `${l.zeilen} von ${l.gesamt ?? '—'} Zeilen, ${l.tageVollstaendig} volle Tage, Median ${l.medianJeTag ?? '—'} je Tag, 14 Tage gedeckt ${l.deckt14Tage}` : 'Liste nicht geholt'}; ältester ${t.aeltester?.timeSold ?? '—'}; ${t.positionen.length} Verkäufe mit Positionen`)
+  }
   for (const b of e.befunde) aus(`  Befund: ${b}`)
   for (const n of e.nichtGeholt) aus(`  Nicht geholt: ${n}`)
 }
@@ -1074,12 +1599,54 @@ export function zusammenfassungMarkdown(e: MarkenErgebnis): string {
   if (fw.liste) z.push(`Liste (\`erp/food-waste?erpId=${fw.liste.erpId}&limit=5&page=1\`): ${fw.liste.zeilen} Zeilen, totalItems ${zahlOderStrich(fw.liste.totalItems)}. Felder: ${fw.liste.felder.join(', ') || '—'}.`, '')
   if (fw.summen) z.push(`Summen (\`erp/food-waste-alpha/totals?erpId=${fw.summen.erpId}\`): totalPrice ${zahlOderStrich(fw.summen.totalPrice)}, totalProducts ${zahlOderStrich(fw.summen.totalProducts)}, Mengenzeilen ${fw.summen.mengenzeilen}. Felder: ${fw.summen.felder.join(', ')}.`, '')
   if (!fw.kostenanalyse && !fw.liste && !fw.summen) z.push('nicht geholt', '')
+
+  if (e.warenkorb) warenkorbMarkdown(z, t, e.warenkorb)
+  if (e.verkaufsTiefe.length) tiefeMarkdown(z, t, e.verkaufsTiefe)
   return z.join('\n')
 }
 
 function zusammenfassungSchreiben(verzeichnis: string, e: MarkenErgebnis) {
   writeFileSync(join(verzeichnis, 'zusammenfassung.json'), JSON.stringify(e, null, 1))
   writeFileSync(join(verzeichnis, 'zusammenfassung.md'), zusammenfassungMarkdown(e))
+}
+
+type TabelleFn = (kopf: string[], zeilen: unknown[][]) => void
+
+function warenkorbMarkdown(z: string[], t: TabelleFn, w: WarenkorbErgebnis) {
+  z.push('## 7. Warenkorb-Liste', '')
+  z.push(`Liste: \`${w.listePfad}\`. Der Detail-GET mit den Konditionen ist gesperrt — Lesen verändert den Warenkorb (docs/fehlerkatalog.md, 19.11.2026).`, '')
+  if (!w.liste) { z.push('nicht geholt', ''); return }
+  const l = w.liste
+  z.push(`Warenkörbe in der Liste: ${l.anzahl} (totalResults ${zahlOderStrich(l.gesamt)}, Seiten ${zahlOderStrich(l.seiten)}), nach Typ ${JSON.stringify(l.nachTyp)}, davon Test ${l.test}. `
+    + `Felder: ${l.felder.join(', ') || '—'}. Konditionsfelder in der Liste: ${l.konditionsfelder.join(', ') || 'keine'}.`, '')
+  t(['cartId', 'shopId', 'Lieferant', 'Kostenstelle', 'Restaurant', 'Typ', 'timeUpdated', 'Produkte', 'Summe', 'Test'],
+    l.eintraege.map(x => [x.cartId, x.shopId, x.shopName, x.costCenterName, x.restaurantName, x.type, x.timeUpdated, x.productCount, x.cartTotal, x.test ? 'ja' : '']))
+}
+
+function tiefeMarkdown(z: string[], t: TabelleFn, ts: VerkaufsTiefeErgebnis[]) {
+  z.push('## 8. Verkaufstiefe', '')
+  for (const x of ts) {
+    const l = x.liste
+    z.push(`### ${x.erpId} — ${x.name}`, '')
+    if (!l) { z.push('Liste nicht geholt', ''); continue }
+    z.push(`Jüngste ${l.zeilen} Verkäufe nach \`timeSold\` (gemeldet: Seitengröße ${zahlOderStrich(l.seitengroesseGemeldet)}, \`order_by\` ${zahlOderStrich(l.orderByGemeldet)} ${zahlOderStrich(l.orderDirectionGemeldet)}), insgesamt ${zahlOderStrich(l.gesamt)} Verkäufe, ${zahlOderStrich(l.seitenZahl)} Seiten. ${x.listeBytes ?? '—'} B in ${x.listeDauerMs ?? '—'} ms.`, '',
+      `Ältester Verkauf (\`order_direction=ASC\`): ${x.aeltester ? `\`timeSold\` ${zahlOderStrich(x.aeltester.timeSold)}, \`timeCreated\` ${zahlOderStrich(x.aeltester.timeCreated)}, Status ${zahlOderStrich(x.aeltester.saleStatus)}, Gesamtzahl ${zahlOderStrich(x.aeltester.gesamt)}` : 'nicht geholt'}.`, '',
+      `Status ${JSON.stringify(l.saleStatus)}, Typ ${JSON.stringify(l.saleType)}, \`finishError\` gesetzt ${l.finishErrorGesetzt}. \`sumPrice\`: Summe ${l.summeGesamt}, negativ ${l.negativ}, null ${l.nullSumme}, min ${zahlOderStrich(l.sumPriceMin)}, Median ${zahlOderStrich(l.sumPriceMedian)}, max ${zahlOderStrich(l.sumPriceMax)}. `
+      + `Verkaufszeit vor 08:00: ${zahlOderStrich(l.anteilVor8UhrPct)} %. Verzug \`timeCreated\` − \`timeSold\` (Minuten): Median ${zahlOderStrich(l.verzugMinuten.median)}, p90 ${zahlOderStrich(l.verzugMinuten.p90)}, max ${zahlOderStrich(l.verzugMinuten.max)}. `
+      + `Anlage-Schübe (verschiedene \`timeCreated\`): ${l.anlageSchuebe.verschiedene}, je Tag im Median ${zahlOderStrich(l.anlageSchuebe.jeTagMedian)}. IDs ${zahlOderStrich(l.idVon)}–${zahlOderStrich(l.idBis)}. Felder: ${l.felder.join(', ')}.`, '',
+      `Vollständige Tage: ${l.tageVollstaendig}, Median ${zahlOderStrich(l.medianJeTag)} je Tag, Maximum ${zahlOderStrich(l.maxJeTag)}. Tage ohne Verkauf zwischen den vollständigen: ${l.tageOhneVerkauf.join(', ') || 'keine'}. `
+      + `Die Seite deckt die letzten 14 Tage: **${l.deckt14Tage ? 'ja' : 'nein'}**, Verkäufe in den vollständigen Tagen davon: ${l.verkaeufeLetzte14Tage}.`, '')
+    t(['Tag', 'Wochentag', 'Verkäufe', 'Summe sumPrice', 'vollständig'], l.jeTag.map(d => [d.tag, d.wochentag, d.anzahl, d.summe, d.vollstaendig ? 'ja' : 'nein (angeschnitten oder heute)']))
+    for (const p of x.positionen) {
+      z.push(`Positionen von Verkauf ${p.verkaufId}: ${p.positionen} (gesamt ${zahlOderStrich(p.gesamt)}, Seiten ${zahlOderStrich(p.seitenZahl)}), mit Rezept ${p.mitRezept}, verschiedene Rezepte ${p.rezeptIds}, Zutaten je Position min/Median/max ${zahlOderStrich(p.zutatenJePosition.min)}/${zahlOderStrich(p.zutatenJePosition.median)}/${zahlOderStrich(p.zutatenJePosition.max)}. `
+        + `Summe der Positionen ${p.summePositionen}, Abweichung zu \`sumPrice\` des Verkaufs ${zahlOderStrich(p.abweichungZurListe)}. ${p.bytes ?? '—'} B in ${p.dauerMs ?? '—'} ms. `
+        + `Nummernfelder (plu/artikel/nummer/ean/sku): ${p.nummernFelder.join(', ') || 'KEINE'}. Rezeptname endet auf „(Kasse)": ${p.rezeptnameMitKasse} von ${p.positionen}. Stornogrund gesetzt ${p.mitStornogrund}, negative Menge ${p.negativeMengen}. `
+        + `Zutaten: aufgelöst ${p.zutatenAufgeloest}, gelöscht ${p.zutatenGeloescht}, unauflösbar ${p.zutatenUnaufloesbar}, Einheiten ${JSON.stringify(p.einheiten)}. Positionsfelder: ${p.felder.join(', ')}. Zutatfelder: ${p.zutatFelder.join(', ')}.`, '')
+    }
+    const k = x.kosten
+    if (k) z.push(`**Kostenrechnung** (Median ${zahlOderStrich(k.verkaeufeJeTag)} Verkäufe je Tag; 1 Listenaufruf je 1.000 + 1 Positionsaufruf je Verkauf): ${zahlOderStrich(k.aufrufeJeTag)} Aufrufe je Tag und Kostenstelle, bei 35 Kostenstellen ${zahlOderStrich(k.aufrufeJeTag35)} (${zahlOderStrich(k.stundenJeTag35)} h bei ${k.sekundenJeAufruf} s je Aufruf). `
+      + `Rückblick 12 Monate: ${k.rueckblick12Monate ? `${k.rueckblick12Monate.verkaeufe} Verkäufe, ${k.rueckblick12Monate.listenaufrufe} Listen- + ${k.rueckblick12Monate.detailaufrufe} Positionsaufrufe = ${k.rueckblick12Monate.aufrufe} (${zahlOderStrich(k.stundenRueckblick12Monate)} h)` : '—'}. Über die ganze Historie ${zahlOderStrich(k.verkaeufeJeTagGesamt)} Verkäufe je Kalendertag.`, '')
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1091,27 +1658,30 @@ export type PlanOptionen = {
   anbindung?: number
   erp?: number
   seitengroessen?: boolean
+  /** Anzahl der mit `--erps` genannten Kostenstellen. */
+  erpsAnzahl?: number
 }
 
 /**
  * Der Plan je Marke als Vorlagen — die konkreten IDs kennt erst die Antwort.
- * Standardfall: 1+1+3+1+1+2+2+2+3 = 16. Mit `--nur`/`--anbindung`/`--erp`/`--seitengroessen` entsprechend weniger oder mehr.
+ * Standardfall: 1+1+3+1+1+2+2+2+3 = 16 (ohne `warenkorb` und `verkaeufe-tiefe`, die nur ausdrücklich laufen). Mit `--nur`/`--anbindung`/`--erp`/`--seitengroessen` entsprechend weniger oder mehr.
  */
 export function aufrufplan(
   maxAnbindungen = MAX_ANBINDUNGEN, maxKostenstellen = MAX_KOSTENSTELLEN, opt: PlanOptionen = {},
 ): { vorlage: string; anzahl: number }[] {
-  const fragen: Frage[] = opt.nur?.length ? opt.nur : [...FRAGEN]
+  const fragen: Frage[] = opt.nur?.length ? opt.nur : [...FRAGEN_STANDARD]
   const will = (f: Frage) => fragen.includes(f)
   const anbFest = opt.anbindung !== undefined
   const ksFest = opt.erp !== undefined
   // Die Grundaufrufe laufen seit 19.11.2026 auch bei festen IDs mit: sie liefern die Namen fuer die
   // Zusammenfassung (Testrestaurant-Fehler, docs/fehlerkatalog.md).
   const brauchtAnb = will('bruecke') || will('link-targets')
-  const brauchtKs = will('warenstamm') || will('verkaeufe') || will('foodwaste')
+  const brauchtKsAuswahl = will('warenstamm') || will('verkaeufe') || will('foodwaste')
+  const brauchtKs = brauchtKsAuswahl
   const anb = anbFest ? 1 : maxAnbindungen
   const ks = ksFest ? 1 : maxKostenstellen
   const plan: { vorlage: string; anzahl: number }[] = [
-    { vorlage: '/api/erp/all', anzahl: brauchtKs ? 1 : 0 },
+    { vorlage: '/api/erp/all', anzahl: brauchtKs || will('verkaeufe-tiefe') ? 1 : 0 },
     { vorlage: '/api/pos/locations', anzahl: brauchtAnb || brauchtKs ? 1 : 0 },
     { vorlage: '/api/pos/mapping/{connectionId}/articles', anzahl: will('bruecke') ? anb : 0 },
     { vorlage: '/api/pos/mapping/{connectionId}/link-targets', anzahl: will('link-targets') && anb > 0 ? 1 : 0 },
@@ -1123,6 +1693,11 @@ export function aufrufplan(
     { vorlage: '/api/analytics/reports/cost-analysis/ingredients/food-waste', anzahl: will('foodwaste') ? 1 : 0 },
     { vorlage: '/api/erp/food-waste?erpId={erpId}&limit=5&page=1', anzahl: will('foodwaste') && ks > 0 ? 1 : 0 },
     { vorlage: '/api/erp/food-waste-alpha/totals?erpId={erpId}', anzahl: will('foodwaste') && ks > 0 ? 1 : 0 },
+    { vorlage: '/api/carts/{all|active}?page=1&limit=50', anzahl: will('warenkorb') ? 1 : 0 },
+    // Verkaufstiefe je Kostenstelle: 1.000 jüngste, ältester, bis zu zwei Positionsabrufe.
+    { vorlage: '/api/{erpId}/sales?page=1&page_size=1000&order_by=timeSold&order_direction=DESC', anzahl: will('verkaeufe-tiefe') ? (opt.erpsAnzahl ?? 1) : 0 },
+    { vorlage: '/api/{erpId}/sales?page=1&page_size=1&order_by=timeSold&order_direction=ASC', anzahl: will('verkaeufe-tiefe') ? (opt.erpsAnzahl ?? 1) : 0 },
+    { vorlage: '/api/{erpId}/sales/{id}/recipe-sale?page=1&page_size=100', anzahl: will('verkaeufe-tiefe') ? 2 * (opt.erpsAnzahl ?? 1) : 0 },
   ]
   return plan.filter(p => p.anzahl > 0)
 }
@@ -1160,19 +1735,27 @@ if (import.meta.main) {
   const nur = nurText ? nurText.split(',').map(x => x.trim()).filter(Boolean) : undefined
   const falsch = (nur ?? []).filter(f => !(FRAGEN as readonly string[]).includes(f))
   if (falsch.length) { console.error(`Unbekannte Frage: ${falsch.join(', ')} (erlaubt: ${FRAGEN.join(', ')})`); process.exit(64) }
-  const opt: PlanOptionen = {
+  const listeText = arg('warenkorb-liste')
+  if (listeText !== undefined && listeText !== 'all' && listeText !== 'active') { console.error('--warenkorb-liste: all|active'); process.exit(64) }
+  const erpsText = arg('erps')
+  const erps = erpsText ? erpsText.split(',').map(x => Number(x.trim())) : undefined
+  if (erps?.some(x => !Number.isInteger(x) || x <= 0)) { console.error('--erps braucht positive ganze Zahlen, Komma getrennt'); process.exit(64) }
+  const opt: PlanOptionen & Omit<ProbeOptionen, 'aus'> = {
     nur: nur as Frage[] | undefined, anbindung: idArg('anbindung'), erp: idArg('erp'),
     seitengroessen: process.argv.includes('--seitengroessen'),
+    warenkorbListe: listeText as 'all' | 'active' | undefined,
+    erps, erpsAnzahl: erps?.length,
   }
 
   if (process.argv.includes('--dry-run')) {
     // Kein Netz, keine Anmeldung: nur die Muster, der Plan und wer überhaupt einen Zugang hat.
+    try { freigabeOptionenPruefen(opt.nur?.length ? opt.nur : [...FRAGEN_STANDARD], opt) } catch (x) { console.error((x as Error).message); process.exit(64) }
     const plan = aufrufplan(maxAnbindungen, maxKostenstellen, opt)
     console.log('Erlaubtliste (nur GET, vollständig verankert):')
     for (const m of ERLAUBTE_MUSTER) console.log(`  ${m.name.padEnd(24)} ${m.re}`)
     console.log('\nSperrliste (darf in keinem Pfad vorkommen):')
     for (const s of GESPERRTE_TEILE) console.log(`  ${s}`)
-    console.log(`\nFragen: ${(opt.nur ?? [...FRAGEN]).join(', ')}; feste Anbindung ${opt.anbindung ?? '—'}, feste Kostenstelle ${opt.erp ?? '—'}, Seitengrößen ${opt.seitengroessen ? SEITENGROESSEN.join('/') : 'aus'}`)
+    console.log(`\nFragen: ${(opt.nur ?? [...FRAGEN_STANDARD]).join(', ')}; feste Anbindung ${opt.anbindung ?? '—'}, feste Kostenstelle ${opt.erp ?? '—'}, Seitengrößen ${opt.seitengroessen ? SEITENGROESSEN.join('/') : 'aus'}`)
     console.log(`Aufrufplan je Marke (höchstens ${maxAufrufe}; ohne Anmeldung und /api/profile):`)
     for (const p of plan) console.log(`  ${String(p.anzahl).padStart(2)}×  ${p.vorlage}`)
     console.log(`  = ${plan.reduce((s, p) => s + p.anzahl, 0)} Aufrufe`)
