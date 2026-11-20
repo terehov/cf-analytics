@@ -207,6 +207,21 @@ Betrieb. Geladen ist davon nichts. Bundle-Analyse (`payloads/foodnotify-2026-11/
 
 ### Soll-Verbrauch: nach dem Deploy zuerst nachmessen (gebaut 19.11.2026, `0159`)
 
+> **Nachgemessen am 20.11.2026 nach Lauf 208** (`docs/payloads/foodnotify-2026-11/erste-nacht-2026-11-20.md`):
+> Punkt 1 erledigt (13 Wilma-Betriebe `ok`, Abdeckung 70,1–96,8 %), Punkt 4 erledigt (25 von 8.323 uneindeutig),
+> Punkt 3 **mit Befund**: `mart.soll_verbrauch_tag` braucht für einen Tag 82 s (Klon 0,05 s) — vor einer Karte je Tag
+> und für den MCP-Zugang zu beheben. Punkt 5 wieder vorgelegt: an `ru_16`/`ru_66`/„Stück"/Unterrezept ohne Gewicht
+> hängen zusammen rund 2 % des Umsatzes; Empfehlung nicht schätzen, Entscheidung Eugene steht aus. Die Einheit
+> „Portionierer" kommt bei Wilma Wunder als unübersetzter Schlüssel `ru_16`. Offen: Punkte 2, 6, 7, 8.
+> Ebenfalls nachgemessen: Brücke `0155` (32 Anbindungen, Umsatz mit Rezept 68,5–95,2 %; Biergarten Ballplatz und
+> Bar Düsseldorf ohne ein Rezept), Warenstamm `0157` (16.419 Waren, 33 Kostenstellen), Lieferdatum `0156`
+> (Sonntagslieferungen 36 von rund 23.800).
+>
+> **Neu offen (20.11.2026): der Nachtlauf kann sich selbst überspringen.** Lauf 206 lud bis 19.11. 04:30 Uhr nach
+> (`NACHLADEN_BIS`), der Start von Lauf 207 um 04:00 Uhr traf auf den laufenden Vorgänger → `uebersprungen`, ein Tag
+> ohne Tagesgeschäft, im Status „28 Quellen werden gar nicht mehr abgefragt". Seit der Zeitumstellung liegt der Start
+> (04:00 MEZ) vor der Grenze. Vorschlag: `NACHLADEN_BIS` auf 03:30; Entscheidung Eugene.
+
 Gebaut und geprüft am Klon mit dem echten Enchilada-Einzelabzug (Köln) und synthetischen Rezepten; **in Produktion
 nicht gelaufen**, Wilma Wunder an echten Rezepten **nicht** geprüft, keine Brücke mit zwei Anbindungen gesehen.
 
@@ -239,6 +254,31 @@ nicht gelaufen**, Wilma Wunder an echten Rezepten **nicht** geprüft, keine Brü
    `mcp/test/katalog.json` stammen aus dem Klon und sind von Hand eingefügt (nur Neues übernommen).
 8. **Vor `uebernehmen.ts`:** Metabase die acht neuen Sichten synchronisieren lassen, `beziehungen.ts --setzen`
    (neue Sichten mit `betrieb_key`). Durch Eugene.
+
+### FoodNotify-Token: nach dem Deploy von `0160` nachsehen (gebaut 19.11.2026)
+
+Gebaut gegen die Attrappe und am Klon geprüft; **in Produktion nicht gelaufen**. Der Vergleich Sitzung gegen Token
+ist gemessen (23 von 24 Abrufpaaren gleich), der Token-Weg im Nachtlauf nicht.
+
+1. **Vor dem Deploy: `FN_API_TOKENS` in Dokploy setzen** (Importer-Anwendung, einzeilig in einfachen
+   Anführungszeichen, `{"wilma_wunder":"…","aposto":"…","enchilada":"…","deutsche_konzepte":"…"}`). Fehlt die
+   Variable, läuft alles wie vor `0160` über die Sitzung — **sichtbar**, nicht still: `mart.fn_zugang_stand` steht
+   dann auf `rueckfall kein token`. Der Startlog nennt unter `fnApiTokens` die Marken mit Token und den Host.
+2. **Nach der ersten Nacht:** `SELECT marke, endpunkt, befund, zugang_letzter_lauf, abrufe, rueckfall_grund_letzter_lauf
+   FROM mart.fn_zugang_stand WHERE befund <> 'nie gefragt' ORDER BY 1, 2`. Erwartung: `ok` bei allen Rezepteinträgen
+   der vier Marken und bei Kassenartikeln/Warenstamm von Wilma Wunder; `nie gefragt` bei Kassenartikeln/Warenstamm
+   der drei anderen Marken (Schalter). `rueckfall abgewiesen` heißt: das Token trägt dort im Nachtlauf nicht, was es
+   in der Probe trug — Grund lesen, Token in FoodNotify prüfen. Die Prüfzeile „FoodNotify: Token abgewiesen oder
+   ausgefallen" in `mart.pruefung_uebersicht` muss auf 0 stehen.
+3. **Dauer der Kassenartikel** mit Token im Nachtlauf (`SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY dauer_ms),
+   max(dauer_ms) FROM sync.aufgabe WHERE endpunkt = 'fn:pos_artikel' AND zugang = 'token'`) gegen die 19–39 s mit
+   Sitzung. Erst nach mehreren Nächten unter 30 s über eine kürzere `FN_ZEITGRENZE_LANG_MS` nachdenken — am Abend des
+   19.11. war auch die Sitzung schnell.
+4. **Rezeptliste über `recipe-viewer`, Folgeseiten:** gemessen ist nur Seite 1. Nach der ersten vollen Listenrunde
+   (`fn:rezepte` mit `runde = voll`) in `core.rezept_liste_stand` nachsehen, ob die Seitenzahl je Marke zur
+   Sitzungszeit passt (`mart.rezept_stand`).
+5. **MCP-Katalogabzug aus Produktion** (`cd mcp && bun run katalog:abzug`): `mart.fn_zugang_stand` ist von Hand
+   aus dem Klon in `mcp/test/katalog.json` eingefügt.
 
 ## Strategisch
 

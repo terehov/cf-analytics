@@ -268,7 +268,7 @@ Je Zelle ein Aufruf. „Sitzung" aus `messung-sitzung-2026-11-18.md`, „Token" 
 | `fn:rezept_zutaten` | `/api/recipes/{id}/ingredients` | 200 (3 Rezepte) | **200**, 6 Zutaten, `artikelId` bei 5 von 6 | derselbe Pfad | ein Rezept mit Token; dieselben zwölf Felder wie mit der Sitzung |
 | `fn:rezept_meta` | `/api/recipes/{id}/meta` | 200 | **200** | derselbe Pfad | — |
 
-**Ergebnis (Endstand):** Mit der Sitzung antworten **13 von 14** Einträgen (die Bestellansicht ist nicht gemessen). Mit dem Token tragen **sechs** (`fn:betriebe`, `fn:bestellungen`, `fn:bestellung`, `fn:rezept`, `fn:rezept_zutaten`, `fn:rezept_meta`), **zwei** über einen anderen Pfad (`fn:rezepte`, `fn:kostenstellen`), **vier** sind abgewiesen (`fn:profil`, `fn:pos_standorte`, `fn:bestellpositionen`, `fn:inventuren`), `fn:inventurpositionen` ist mit Token nicht gemessen und `fn:bestellansicht` gar nicht. **Die Rezepte ließen sich vollständig über das Token holen** (Liste über `recipe-viewer`, Kopf, Zutaten mit `artikelId`, Meta) — belegt an je einem Aufruf eines Kontos. **Bestellpositionen und Inventuren gehen nur mit der Sitzung**, und ohne `/api/profile` und `/api/pos/locations` fehlen dem Token Benutzer-ID und Anbindungsliste. Das Token ersetzt die Sitzung deshalb nicht; ein gemischter Betrieb wäre möglich, ist aber nicht entschieden.
+**Ergebnis (Endstand):** Mit der Sitzung antworten **13 von 14** Einträgen (die Bestellansicht ist nicht gemessen). Mit dem Token tragen **sechs** (`fn:betriebe`, `fn:bestellungen`, `fn:bestellung`, `fn:rezept`, `fn:rezept_zutaten`, `fn:rezept_meta`), **zwei** über einen anderen Pfad (`fn:rezepte`, `fn:kostenstellen`), **vier** sind abgewiesen (`fn:profil`, `fn:pos_standorte`, `fn:bestellpositionen`, `fn:inventuren`), `fn:inventurpositionen` ist mit Token nicht gemessen und `fn:bestellansicht` gar nicht. **Die Rezepte ließen sich vollständig über das Token holen** (Liste über `recipe-viewer`, Kopf, Zutaten mit `artikelId`, Meta) — belegt an je einem Aufruf eines Kontos. **Bestellpositionen und Inventuren gehen nur mit der Sitzung**, und ohne `/api/profile` und `/api/pos/locations` fehlen dem Token Benutzer-ID und Anbindungsliste. Das Token ersetzt die Sitzung deshalb nicht; ~~ein gemischter Betrieb wäre möglich, ist aber nicht entschieden~~ — seit `0160` (19.11.2026) läuft er (Nachtrag „Sitzung gegen Token auf Zeilenebene“ unten).
 
 ### Nachtrag: alle vier Marken, 19.11.2026
 
@@ -319,9 +319,26 @@ Jede 403 lautet „This endpoint does not support scope-limited tokens.". **Kein
   Anbindungsliste fehlt dem Token (die `connectionId` muss aus der Sitzung oder dem Bestand kommen,
   `core.kostenstelle`). Die Kassenartikel kamen mit Token in 0,4–1,3 s statt 19–39 s mit der Sitzung — eine Messung,
   nicht geklärt.
-* ~~Was offen bleibt: dieselbe Messung für die drei anderen Marken~~ erledigt. **Weiter offen:** Token gegen Sitzung
-  auf Zeilenebene; die Differenz Rezeptliste gegen `link-targets` (Enchilada 2.079 gegen 1.972 — archivierte?);
+* ~~Was offen bleibt: dieselbe Messung für die drei anderen Marken~~ erledigt. **Weiter offen:** ~~Token gegen Sitzung
+  auf Zeilenebene~~ (gemessen, Nachtrag unten); die Differenz Rezeptliste gegen `link-targets` (Enchilada 2.079 gegen 1.972 — archivierte?);
   Inventurpositionen und Bestellansicht mit Token.
+
+### Nachtrag: Sitzung gegen Token auf Zeilenebene, 19.11.2026 — und was der Importer seitdem tut
+
+**Gemessen am 19.11.2026, 19:03–19:06 UTC** mit `bun run fn-token-probe --vergleich`, an denselben Zielen wie
+oben, je Abruf einmal Sitzung und einmal Token (14 GET je Marke). **23 von 24 Abrufpaaren sind nach
+Schlüsselsortierung byteweise gleich** — Rezeptliste Seite 1 (`/api/recipes` gegen `/api/recipe-viewer/recipes`,
+samt `pagination`), Rezeptkopf, Zutaten, Meta, Kassenartikel und Warenstamm bei allen vier Marken. Das 24. Paar
+(Warenstamm Deutsche Konzepte, 12011) wich nur in `cartProductQuantity` **einer** Ware ab, der Warenkorbmenge, die
+zwischen den beiden Aufrufen geändert wurde und die der Lader nicht liest. Die Kassenartikel kamen diesmal auch mit
+der Sitzung in unter einer Sekunde. Bericht: `payloads/foodnotify-2026-11/fn-token-probe-2026-11-19.md`,
+Abschnitt „Vergleich Sitzung gegen Token".
+
+**Folge (`0160`, Entscheidung Eugene 19.11.2026, gemischter Betrieb):** `fn:rezepte` (über `recipe-viewer`),
+`fn:rezept`, `fn:rezept_zutaten`, `fn:rezept_meta`, `fn:pos_artikel` und `fn:warenstamm` laufen **über das Token**,
+mit der Sitzung als dauerhaftem Rückfall je Posten; alles andere bleibt bei der Sitzung. ~~Ein gemischter Betrieb
+wäre möglich, ist aber nicht entschieden.~~ Regel und Sichtbarkeit: `docs/importer.md`, Abschnitt „FoodNotify: zwei
+Zugänge, eine Spur".
 
 ### Zwischenstand vor der Sitzungsmessung (überholt)
 

@@ -78,6 +78,10 @@ lauf('Ende-zu-Ende', () => {
      */
     fnMock = fnMockStarten({ leerAb: { '/api/10483/shop-order/paginate': 4 } })
     process.env.FN_BASE_URL = fnMock.url
+    // Token-Weg (0160) aus: Bun lädt die .env auch hier, mit den echten Tokens. Ohne
+    // Token läuft alles über die Sitzung (Rückfall kein_token) — wie vor 0160.
+    delete process.env.FN_API_TOKENS
+    delete process.env.FN_TOKEN_BASE_URL
     process.env.FN_APOSTO_USER = 'test@aposto.eu'
     process.env.FN_APOSTO_PASSWORD = 'geheim'
     process.env.FN_ENCHILADA_USER = 'zfa@aposto.eu'

@@ -12,6 +12,7 @@ import {
   ERLAUBT_SITZUNG, ERLAUBT_TOKEN, MAX_AUFRUFE, TOKEN_BASIS, TOKEN_PFADE, ausgabeVerzeichnis, fehlermeldung, fnTokenProbe,
   geheimnisPruefen, grenzePruefen, kostenstelleWaehlen, pfadErlaubtFuer, registerPfad, rezeptWaehlen, schwaerzen, trockenlauf,
   typForm, zutatenAuswerten, type SitzungLike,
+  MAX_AUFRUFE_VERGLEICH, VERGLEICH_ZIELE, antwortenVergleichen, fnTokenVergleich, pfadErlaubtVergleich, vergleichsPaare,
 } from './fn_token_probe'
 
 // Die 15 GETs mit Wirkung (docs/foodnotify-api-inventar-intern-2026-11.md §6), mit Beispiel-IDs.
@@ -352,5 +353,101 @@ describe('fn-token-probe gegen die Attrappe', () => {
     expect(e.kostenstelle).toMatchObject({ erpId: 7984, quelle: 'sitzung' })
     expect(e.aufrufe.length).toBe(16)
     expect(e.pfade.find(p => p.key === 'pos_artikel')?.urteil).toBe('nicht gemessen')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// --vergleich (19.11.2026): Sitzung gegen Token, dieselben Abrufe
+// ---------------------------------------------------------------------------
+
+describe('--vergleich', () => {
+  test('antwortenVergleichen: gleich, nur Reihenfolge, ungleich mit Feldpfaden und IDs — keine Werte', () => {
+    const a = { data: [{ id: 1, name: 'A', x: { y: 1 } }, { id: 2, name: 'B', x: { y: 2 } }], pagination: { totalItems: 2 } }
+    expect(antwortenVergleichen(a, JSON.parse(JSON.stringify(a))).urteil).toBe('gleich')
+    // Schlüsselreihenfolge zählt nicht.
+    expect(antwortenVergleichen({ b: 1, a: 2 }, { a: 2, b: 1 }).urteil).toBe('gleich')
+    const umgedreht = { ...a, data: [...a.data].reverse() }
+    expect(antwortenVergleichen(a, umgedreht).urteil).toBe('gleich bis auf Reihenfolge')
+    const anders = { data: [{ id: 1, name: 'GEHEIMWERT', x: { y: 1 } }, { id: 3, name: 'C', x: { y: 3 } }], pagination: { totalItems: 2 }, extra: true }
+    const v = antwortenVergleichen(a, anders)
+    expect(v.urteil).toBe('ungleich')
+    expect(v.abweichungen).toContainEqual({ pfad: 'data[].name', art: 'wert', anzahl: 1 })
+    expect(v.abweichungen).toContainEqual({ pfad: 'extra', art: 'nur token', anzahl: 1 })
+    expect(v.mengen[0]).toMatchObject({ pfad: 'data[]', schluessel: 'id', nurSitzung: [2], nurToken: [3] })
+    expect(JSON.stringify(v)).not.toContain('GEHEIMWERT')
+  })
+
+  test('Erlaubtliste des Vergleichs: nur die Registerformen, keiner der 15 GETs mit Wirkung', () => {
+    for (const p of GETS_MIT_WIRKUNG) for (const h of ['sitzung', 'token'] as const) expect(pfadErlaubtVergleich(h, p).ok).toBe(false)
+    for (const z of Object.values(VERGLEICH_ZIELE)) for (const p of vergleichsPaare(z)) {
+      expect(pfadErlaubtVergleich('sitzung', p.sitzung).ok).toBe(true)
+      expect(pfadErlaubtVergleich('token', p.token).ok).toBe(true)
+    }
+    expect(pfadErlaubtVergleich('sitzung', '/api/pos/locations').ok).toBe(false)
+    expect(pfadErlaubtVergleich('sitzung', '/api/7984/shop-order/1/change?order_by=name').ok).toBe(false)
+  })
+
+  async function vergleichLauf(sonder: (host: 'sitzung' | 'token', pfad: string) => Fall | undefined = () => undefined) {
+    const aus = mkdtempSync(join(tmpdir(), 'fn-token-vergleich-'))
+    verzeichnisse.push(aus)
+    const aufrufe: { url: string; auth: string | null; methode: string }[] = []
+    const echo = `Bearer ${TOKEN} / ${PASSWORT}`
+    const z = VERGLEICH_ZIELE.wilma_wunder
+    const basis: Record<string, Fall> = {
+      [`/api/erp/core/10616/erps`]: { body: { data: [{ id: z.erpId, costCenter: { id: 3, name: 'Bar Ballplatz', restaurant: { id: 3, name: 'Wilma Mainz' } } }] } },
+      '/api/recipes?page=1': { body: { data: [{ id: 1 }, { id: 2 }], pagination: { totalItems: 2 } } },
+      '/api/recipe-viewer/recipes?page=1': { body: { data: [{ id: 2 }, { id: 1 }], pagination: { totalItems: 2 } } },
+      [`/api/recipes/${z.rezeptId}`]: { body: { data: { id: z.rezeptId, name: 'R' } } },
+      [`/api/recipes/${z.rezeptId}/ingredients`]: { body: { data: [{ id: 5, artikelId: '1' }] } },
+      [`/api/recipes/${z.rezeptId}/meta`]: { body: { data: { weight: { total: 1 } } } },
+      [`/api/pos/mapping/${z.connectionId}/articles`]: { body: { items: [{ remoteProductId: 9, recipeId: 1 }], ingestIssues: [] } },
+      [`/api/${z.erpId}/products?page=1&page_size=1000`]: { body: { payload: { total_count: 1, data: [{ id: 1, unitPrice: 2 }] } } },
+    }
+    const fetchFn = (async (url: string | URL | Request, init?: RequestInit) => {
+      const u = String(url)
+      const h = (init?.headers ?? {}) as Record<string, string>
+      aufrufe.push({ url: u, auth: h.authorization ?? null, methode: init?.method ?? 'GET' })
+      const host = u.startsWith(TOKEN_BASIS) ? 'token' as const : 'sitzung' as const
+      const pfad = u.replace(/^https?:\/\/[^/]+/, '')
+      const f = sonder(host, pfad) ?? basis[pfad]
+      if (!f) return new Response(JSON.stringify({ message: `unbekannt ${echo}` }), { status: 404 })
+      if (f.wirf) throw new Error(`${f.wirf} ${echo}`)
+      return new Response(JSON.stringify(f.body), { status: f.status ?? 200 })
+    }) as unknown as typeof fetch
+    const r = await fnTokenVergleich({ marken: ['wilma_wunder'], aus, tokens: { wilma_wunder: TOKEN }, zugaenge: ZUGAENGE,
+      sitzungFabrik: sitzung(), fetchFn, pauseMs: 0, ohneTakt: true, jetzt: new Date('2026-11-19T20:00:00Z'), ausgabe: () => {} })
+    return { ...r, aus, aufrufe }
+  }
+
+  test('Regelfall: 14 GET (13 über fetch), nur GET, Token nur gegen api3, Urteile je Abruf', async () => {
+    const r = await vergleichLauf()
+    const e = r.ergebnisse[0]!
+    expect(e.aufrufe.length).toBe(MAX_AUFRUFE_VERGLEICH)
+    expect(r.aufrufe.length).toBe(13)
+    expect(r.aufrufe.every(a => a.methode === 'GET')).toBe(true)
+    for (const a of r.aufrufe) expect(a.auth !== null).toBe(a.url.startsWith(TOKEN_BASIS))
+    expect(e.kostenstelleLive).toContain('Bar Ballplatz')
+    const u = Object.fromEntries(e.paare.map(p => [p.key, p.urteil]))
+    expect(u).toEqual({ rezeptliste: 'gleich bis auf Reihenfolge', rezept: 'gleich', rezept_zutaten: 'gleich', rezept_meta: 'gleich', pos_artikel: 'gleich', warenstamm: 'gleich' })
+    expect(r.exitCode).toBe(0)
+  })
+
+  test('Sitzungs-Kassenartikel in der Zeitgrenze: „nicht gemessen", nicht „ungleich"; Geheimnisse nirgends', async () => {
+    const z = VERGLEICH_ZIELE.wilma_wunder
+    const r = await vergleichLauf((host, pfad) => {
+      if (host === 'sitzung' && pfad === `/api/pos/mapping/${z.connectionId}/articles`) return { body: null, wirf: 'TimeoutError' }
+      if (host === 'token' && pfad === `/api/recipes/${z.rezeptId}/ingredients`) return { body: { data: [{ id: 5, artikelId: '2' }] } }
+      return undefined
+    })
+    const e = r.ergebnisse[0]!
+    const pos = e.paare.find(p => p.key === 'pos_artikel')!
+    expect(pos.urteil).toBe('nicht gemessen')
+    expect(pos.grund).toContain('Sitzung ohne verwertbare Antwort')
+    const zt = e.paare.find(p => p.key === 'rezept_zutaten')!
+    expect(zt.urteil).toBe('ungleich')
+    expect(zt.abweichungen).toContainEqual({ pfad: 'data[].artikelId', art: 'wert', anzahl: 1 })
+    expect(r.exitCode).toBe(2)
+    const alles = `${alleDateien(r.aus)}\n${JSON.stringify(r.ergebnisse)}`
+    for (const g of [TOKEN, PASSWORT]) expect(alles).not.toContain(g)
   })
 })

@@ -31,6 +31,7 @@ import * as ws from './warenstamm'
 import { bestellansichtLesen } from './bestellansicht'
 import type { FnEndpunkt } from './endpunkte'
 import { config } from '../config'
+import { fnStrukturFehler } from './form'
 
 type FnKontext = {
   ep: FnEndpunkt
@@ -45,6 +46,8 @@ type FnKontext = {
   laufId: string
   /** sync.warteschlange.nachladen des Postens — Rezepturen reihen ihre Folgeposten im selben Weg ein. */
   nachladen?: boolean
+  /** Über welchen Zugang die Antwort kam (0160) — steht in raw.api_antwort.zugang. Ohne Angabe: sitzung. */
+  zugang?: 'sitzung' | 'token'
 }
 
 /** Wie viele fachliche Zeilen stecken in der Antwort? */
@@ -79,14 +82,8 @@ export async function fnLaden(k: FnKontext): Promise<number> {
    * Posten scheitert sichtbar (Wiedervorlage, später mart.posten_aufgegeben),
    * core bleibt unberührt.
    */
-  let struktur = k.ep.key.startsWith('fn:rezept') ? rz.rezeptStrukturFehler(k.ep.key, k.daten)
-    // Kassenartikel (0155): eine fremde Form sähe sonst aus wie „kein Artikel
-    // hat ein Rezept" oder „alle Artikel fehlen seit heute".
-    : k.ep.key === 'fn:pos_artikel' ? pa.posArtikelStrukturFehler(k.daten)
-    // Warenstamm (0157): ein umbenanntes unitPrice sähe sonst aus wie „alle
-    // Preise entfallen", eine fremde Hülle wie „das Sortiment ist gestrichen".
-    : k.ep.key === 'fn:warenstamm' ? ws.warenstammStrukturFehler(k.daten)
-    : null
+  // Dieselbe Prüfung wie auf dem Token-Weg im Client (src/foodnotify/form.ts, 0160).
+  let struktur = fnStrukturFehler(k.ep.key, k.daten)
 
   const ergebnis = await inTransaktion(async c => {
     await c.query(
@@ -95,15 +92,15 @@ export async function fnLaden(k: FnKontext): Promise<number> {
     const roh = await c.query<{ id: string }>(
       `INSERT INTO raw.api_antwort
          (quelle, endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis, parameter,
-          http_status, payload, payload_hash, payload_bytes, lauf_id)
-       VALUES ('foodnotify',$1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+          http_status, payload, payload_hash, payload_bytes, lauf_id, zugang)
+       VALUES ('foodnotify',$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
        RETURNING id`,
       // quelle explizit setzen — der Spalten-Default ist 'lina'.
       // Die Marke steht im parameter-JSON mit drin: raw.api_antwort hat keine
       // Mandantenspalte, und die Antwort selbst verrät ihren Mandanten nicht.
       [k.ep.key, null, k.von, k.bis,
        JSON.stringify({ ...k.parameter, markeKey: k.markeKey }),
-       k.httpStatus, JSON.stringify(k.daten), k.hash, k.bytes, k.laufId])
+       k.httpStatus, JSON.stringify(k.daten), k.hash, k.bytes, k.laufId, k.zugang ?? 'sitzung'])
 
     if (struktur) {
       await c.query(

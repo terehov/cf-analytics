@@ -30,6 +30,11 @@ describe('Rezept-Probe gegen die Attrappe', () => {
       cfg[k] = undefined
     }
     cfg.FN_BASE_URL = mock.url
+    // Token-Weg (0160) aus: die .env-Tokens sollen nicht einmal die Attrappe erreichen.
+    alt.FN_API_TOKEN = cfg.FN_API_TOKEN
+    alt.FN_TOKEN_BASE_URL = cfg.FN_TOKEN_BASE_URL
+    cfg.FN_API_TOKEN = {}
+    cfg.FN_TOKEN_BASE_URL = undefined
     cfg.FN_TAKT_MIN_MS = 0
     cfg.FN_TAKT_MAX_MS = 0
     cfg.FN_ENCHILADA_USER = 'test@aposto.eu'

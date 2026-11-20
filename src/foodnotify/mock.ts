@@ -39,7 +39,9 @@ const REZEPTE = JSON.parse(readFileSync(
 const REZEPTLISTE: Record<number, string[]> = { 1: ['1032008', '1048034'], 2: ['1030679'] }
 
 function rezeptAntwort(pfad: string, url: URL, fremd = false): unknown | null {
-  if (pfad === '/api/recipes') {
+  // recipe-viewer ist der Token-Pfad der Rezeptliste (0160) — dieselbe Antwort
+  // wie /api/recipes, gemessen am 19.11.2026 bei allen vier Marken.
+  if (pfad === '/api/recipes' || pfad === '/api/recipe-viewer/recipes') {
     const seite = Number(url.searchParams.get('page') ?? 1)
     const ids = REZEPTLISTE[seite] ?? []
     return {
@@ -104,6 +106,30 @@ export type FnMockOptionen = {
    */
   verboten?: number[]
 }
+
+/**
+ * DER TOKEN-WEG (0160). Die Attrappe ist zugleich `FN_BASE_URL` und
+ * `FN_TOKEN_BASE_URL` (der Host des Token-Wegs folgt in Tests der
+ * Sitzungsbasis, src/config.ts). Ein Aufruf mit `Authorization: Bearer …`
+ * wird wie im Original behandelt (gemessen 18./19.11.2026):
+ *   * gültiges Token und ein Pfad, den das Token trägt → dieselbe Antwort wie
+ *     mit Sitzung (Rezeptliste nur über recipe-viewer);
+ *   * gültiges Token, Pfad trägt es nicht (Bestellpositionen, Inventuren,
+ *     /api/recipes?page=N, Profil, Standorte …) → 403 „This endpoint does not
+ *     support scope-limited tokens.";
+ *   * unbekanntes Token → 401;
+ *   * `tokenModus('abgewiesen')` → 403 scope-limited auf JEDEM Pfad (Scope
+ *     entzogen), `'kaputt'` → 502, `'fremd'` → 200 mit fremder Form.
+ * Token-Aufrufe zählen in `tokenZaehler`, NICHT in `zaehler` — sonst
+ * verschöbe ein Test, der Tokens aus der .env erbt, jede Zählung der
+ * Sitzungspfade.
+ */
+const TOKEN_TRAEGT: RegExp[] = [
+  /^\/api\/recipe-viewer\/recipes$/, /^\/api\/recipes\/\d+(\/ingredients|\/meta)?$/,
+  /^\/api\/pos\/mapping\/\d+\/articles$/, /^\/api\/\d+\/products$/,
+  /^\/api\/core\/business\/\d+\/restaurants$/, /^\/api\/erp\/core\/\d+\/erps$/,
+  /^\/api\/\d+\/shop-order\/paginate$/, /^\/api\/\d+\/shop-order\/[^/]+$/,
+]
 
 /**
  * Zwei Benutzer, zwei Verhalten:
@@ -177,6 +203,10 @@ export function fnMockStarten(opt: FnMockOptionen = {}) {
   const wsKatalog = new Map<number, number | null>()
   let wsForm: 'echt' | 'fremd' | 'leer' | 'gekappt' = 'echt'
   let wsSeitenMax = Infinity
+  /** Token-Weg (0160), zur Laufzeit umstellbar wie `verbieten()`. */
+  const gueltigeTokens = new Set<string>()
+  let tokenModus: 'ok' | 'abgewiesen' | 'kaputt' | 'fremd' = 'ok'
+  const tokenZaehler: Record<string, number> = {}
 
   const json =(body: unknown, init: ResponseInit = {}) =>
     new Response(JSON.stringify(body), {
@@ -188,7 +218,9 @@ export function fnMockStarten(opt: FnMockOptionen = {}) {
     async fetch(req) {
       const url = new URL(req.url)
       const pfad = url.pathname
-      zaehler[pfad] = (zaehler[pfad] ?? 0) + 1
+      const bearer = (req.headers.get('authorization') ?? '').match(/^Bearer (.+)$/)?.[1] ?? null
+      if (bearer !== null) tokenZaehler[pfad] = (tokenZaehler[pfad] ?? 0) + 1
+      else zaehler[pfad] = (zaehler[pfad] ?? 0) + 1
       if (langsamMs) await Bun.sleep(langsamMs)
       const pfadVerzoegerung = verzoegert.get(pfad)
       if (pfadVerzoegerung) await Bun.sleep(pfadVerzoegerung)
@@ -211,10 +243,19 @@ export function fnMockStarten(opt: FnMockOptionen = {}) {
         })
       }
 
-      // Alles andere braucht die Sitzung.
-      const cookie = req.headers.get('cookie') ?? ''
-      const angemeldet = [...sessions].some(s => cookie.includes(s))
-      if (!angemeldet) return json({ message: 'Unauthenticated' }, { status: 401 })
+      // Token-Weg (0160): Prüfung wie im Original, danach dieselben Antworten wie mit Sitzung.
+      if (bearer !== null) {
+        if (!gueltigeTokens.has(bearer)) return json({ code: 401, message: 'Invalid JWT Token' }, { status: 401 })
+        const scope = { message: 'This endpoint does not support scope-limited tokens.' }
+        if (tokenModus === 'abgewiesen' || !TOKEN_TRAEGT.some(r => r.test(pfad))) return json(scope, { status: 403 })
+        if (tokenModus === 'kaputt') return json({ message: 'Bad Gateway' }, { status: 502 })
+        if (tokenModus === 'fremd') return json({ ganzAnders: true })
+      } else {
+        // Alles andere braucht die Sitzung.
+        const cookie = req.headers.get('cookie') ?? ''
+        const angemeldet = [...sessions].some(s => cookie.includes(s))
+        if (!angemeldet) return json({ message: 'Unauthenticated' }, { status: 401 })
+      }
 
       /**
        * Die verbotene Ressource. Steht VOR `leerAb` und vor dem Router:
@@ -562,6 +603,12 @@ export function fnMockStarten(opt: FnMockOptionen = {}) {
   return {
     url: `http://localhost:${server.port}`,
     zaehler,
+    /** Aufrufe mit Bearer-Token je Pfad (0160) — getrennt von `zaehler`. */
+    tokenZaehler,
+    /** Ein Token gültig machen bzw. alle zurücknehmen (null). */
+    tokenGueltig: (t: string | null) => { if (t === null) gueltigeTokens.clear(); else gueltigeTokens.add(t) },
+    /** 'abgewiesen' = 403 scope-limited überall, 'kaputt' = 502, 'fremd' = 200 in fremder Form, 'ok' = wie gemessen. */
+    tokenModus: (m: 'ok' | 'abgewiesen' | 'kaputt' | 'fremd') => { tokenModus = m },
     get anmeldungen() { return anmeldungen },
     /**
      * Eine Ressource im Lauf verbieten bzw. wieder freigeben.

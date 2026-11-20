@@ -138,17 +138,20 @@ export async function rezeptePraxis(o: {
       const res = await client.holen(ep, marke, p)
       const aufgabe = (status: string, fehler: string | null, zeilen: number | null, http: number | null) => query(
         `INSERT INTO sync.aufgabe (lauf_id, endpunkt, zeitraum_von, zeitraum_bis, versuch, status,
-                                   http_status, zeilen, dauer_ms, wartezeit_ms, fehler, marke_key, parameter)
-         VALUES ($1,$2,$3,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+                                   http_status, zeilen, dauer_ms, wartezeit_ms, fehler, marke_key, parameter,
+                                   zugang, zugang_bevorzugt, zugang_rueckfall, zugang_rueckfall_grund)
+         VALUES ($1,$2,$3,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
         [laufId, posten.endpunkt, tag, posten.versuche, status, http, zeilen, res.dauerMs,
-         client.letzteWartezeitMs, fehler, posten.marke_key, JSON.stringify(p)])
+         client.letzteWartezeitMs, fehler, posten.marke_key, JSON.stringify(p),
+         // Über welchen Zugang (0160) — wie im Worker.
+         res.zugangInfo.zugang, res.zugangInfo.bevorzugt, res.zugangInfo.rueckfall, res.zugangInfo.rueckfallGrund])
 
       if (res.art === 'ok') {
         try {
           const zeilen = await fnLaden({
             ep, markeKey: Number(posten.marke_key), von: tag, bis: tag, parameter: p,
             daten: res.daten, httpStatus: res.status, bytes: res.bytes, hash: res.hash, laufId,
-            nachladen: posten.nachladen === true,
+            nachladen: posten.nachladen === true, zugang: res.zugangInfo.zugang,
           })
           await query(`UPDATE sync.warteschlange SET erledigt_am = now(), in_arbeit_seit = NULL, ergebnis = 'ok',
                               letzter_fehler = NULL WHERE posten_id = $1`, [posten.posten_id])

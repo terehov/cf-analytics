@@ -108,7 +108,8 @@ ist **nicht geprüft**. Eine Messung je Anbindung, kein Grund, die Zeitgrenze zu
 
 ## Was nicht gemessen ist
 
-* **Kein Zeilenvergleich Token gegen Sitzung.** Status, Form und Zählwerte, nicht dieselben Zeilen.
+* ~~**Kein Zeilenvergleich Token gegen Sitzung.** Status, Form und Zählwerte, nicht dieselben Zeilen.~~ Gemessen
+  um 19:03 UTC, Abschnitt „Vergleich Sitzung gegen Token" unten.
 * `/api/profile` und `/api/pos/locations` mit Token — nicht erneut (am 18.11.2026 bei Wilma 403). Ohne sie fehlen
   dem Token weiterhin Benutzer-ID und Anbindungsliste; die Probe hat beide aus der Sitzung genommen.
 * `fn:inventurpositionen` (keine Inventur-ID, weil die Inventurliste abgewiesen wird) und `fn:bestellansicht`.
@@ -116,3 +117,43 @@ ist **nicht geprüft**. Eine Messung je Anbindung, kein Grund, die Zeitgrenze zu
   Folgeseiten der Rezeptliste über `recipe-viewer` sind nicht gemessen (nur `page=1` steht auf der Erlaubtliste).
 * Ob die Tokens aller Marken dieselben Scopes tragen, ist nicht abgefragt (`grantable-scopes` nicht aufgerufen);
   gleiche Ergebnisse an 14 Pfaden sprechen dafür, belegen es nicht.
+
+## Vergleich Sitzung gegen Token (19.11.2026, 19:03–19:06 UTC)
+
+**Gemessen** mit `bun run fn-token-probe --vergleich` (`src/fn_token_probe.ts`, Abschnitt „--vergleich"), aus der
+Agentenumgebung. Je Marke **14 GET** (die Benutzer-ID in der Anmeldung mitgezählt), insgesamt 56, dazu je Marke ein
+Anmelde-POST. Kein 401, kein 429, keine Zeitüberschreitung, kein zweiter Versuch. Ziele **genau die der Matrix
+oben** (fest im Code, `VERGLEICH_ZIELE`): Anbindung, Kostenstelle, Rezept je Marke. Der Kostenstellenname wurde
+live über die Token-Antwort `/api/erp/core/{userId}/erps` gegengeprüft, bei keiner steht „test" im Namen. Je
+Abruf erst die Sitzung (`my.foodnotify.com`), direkt danach das Token (`api3`), ≥ 1,2 s Abstand. Verglichen in
+kanonischer JSON-Form (Schlüssel sortiert); Listen von Objekten mit eindeutiger `id`/`remoteProductId`/`recipeId`
+als Menge. Rohantworten und `vergleich.md`/`vergleich.json` unter `belege/fn-token-probe-2026-11-19-1903/`
+(git-ignoriert). Die Zusammenfassung nennt nur Feldpfade, Zählungen und IDs.
+
+| Abruf | Sitzungspfad / Tokenpfad | aposto | enchilada | deutsche_konzepte | wilma_wunder |
+|---|---|---|---|---|---|
+| `fn:rezepte` Seite 1 | `/api/recipes?page=1` / `/api/recipe-viewer/recipes?page=1` | **gleich** (25) | **gleich** (25) | **gleich** (25) | **gleich** (25) |
+| `fn:rezept` | `/api/recipes/{id}` | **gleich** | **gleich** | **gleich** | **gleich** |
+| `fn:rezept_zutaten` | `…/ingredients` | **gleich** (10) | **gleich** (5) | **gleich** (7) | **gleich** (1) |
+| `fn:rezept_meta` | `…/meta` | **gleich** | **gleich** | **gleich** | **gleich** |
+| `fn:pos_artikel` | `/api/pos/mapping/{connectionId}/articles` | **gleich** (1.157) | **gleich** (1.357) | **gleich** (438) | **gleich** (895) |
+| `fn:warenstamm` | `/api/{erpId}/products?page=1&page_size=1000` | **gleich** (145) | **gleich** (627) | ungleich, **ein Feld einer Zeile** (333) | **gleich** (206) |
+
+„gleich" heißt **byteweise gleich nach Schlüsselsortierung** — nicht einmal die Reihenfolge wich ab; auch die
+Rezeptliste samt `pagination` ist über beide Pfade dieselbe Antwort.
+
+**Die eine Abweichung:** Warenstamm Würzburger Hofbräu Küche (12011), Ware **973438**, Feld
+`payload.data[].cartProductQuantity`. Das Feld ist die **Menge der Ware im laufenden Warenkorb** der Kostenstelle:
+bei 50 der 333 Waren gefüllt, 49 davon in beiden Antworten gleich. Die beiden Aufrufe lagen rund acht Sekunden
+auseinander; dazwischen hat jemand diese eine Menge im Warenkorb geändert. Das ist **Live-Zustand, kein
+Unterschied der Zugänge**, und der Lader liest das Feld nicht (`core.warenstamm_laden`, `0157`). Gewertet als
+flüchtiges Feld; `fn:warenstamm` ist mit `0160` umgestellt (`docs/entscheidungen.md`, 19.11.2026).
+
+**Nebenbefund Dauer:** Die Kassenartikel kamen diesmal **auch mit der Sitzung** in 0,3–0,6 s (Token 0,3–0,5 s) — am
+selben Tag waren es mit der Sitzung 19–39 s. Der Geschwindigkeitsunterschied aus der Matrix oben ist also **nicht**
+Token gegen Sitzung, sondern etwas anderes (Tageszeit, Zwischenspeicher, Last). Die Zeitgrenze von 180 s
+(`FN_ZEITGRENZE_LANG_MS`) bleibt.
+
+**Was nicht gemessen ist:** Je Marke ein Rezept, eine Seite der Rezeptliste, eine Kostenstelle, eine Anbindung.
+Folgeseiten der Rezeptliste über `recipe-viewer` nicht. Ob zwei Zugänge an einem Tag mit vielen Änderungen
+(Rezeptpflege) ebenfalls gleich liefern, ist eine Annahme — `raw.api_antwort.zugang` (`0160`) macht es nachprüfbar.

@@ -3548,6 +3548,48 @@
    "fallstricke": []
   },
   {
+   "sicht": "mart.fn_zugang_stand",
+   "koernung": "FoodNotify-Marke × Registereintrag mit Token-Weg (Rezepte, Kassenartikel, Warenstamm) — Zugang im letzten Lauf",
+   "thema": "pruefung",
+   "summen_erlaubt": false,
+   "kommentar": "Je FoodNotify-Marke und Eintrag, der das Scope-Token bevorzugt (Rezeptliste, Rezeptkopf, Zutaten, Meta,\nKassenartikel, Warenstamm): ueber welchen Zugang lief der letzte Lauf, und fiel er auf die Sitzung zurueck\n(0160, Regel 10)? befund: ok / rueckfall kein token (Zustand, kein Fehler) / rueckfall abgewiesen (401/403)\n/ rueckfall ausfall (Netz, Zeitgrenze, 429, 5xx, fremde Antwort) / nicht gefragt seit 48 h / nie gefragt.\nEin Rueckfall verliert keine Daten — die Sitzung liefert dieselben Zeilen (gemessen 19.11.2026) —, aber er\nheisst, dass der Token-Weg nicht traegt. Ob Daten ankommen, sagt mart.quelle_zulauf, nicht diese Sicht.\n\nKoernung: FoodNotify-Marke × Registereintrag mit Token-Weg (Rezepte, Kassenartikel, Warenstamm) — Zugang im letzten Lauf",
+   "spalten": [
+    "marke",
+    "marke_key",
+    "endpunkt",
+    "zugang_bevorzugt",
+    "zugang_letzter_lauf",
+    "letzter_lauf_id",
+    "letzter_abruf_am",
+    "abrufe",
+    "ueber_token",
+    "ueber_sitzung",
+    "rueckfall_kein_token",
+    "rueckfall_abgewiesen",
+    "rueckfall_ausfall",
+    "erfolgreich",
+    "rueckfall_letzter_lauf",
+    "rueckfall_grund_letzter_lauf",
+    "letzter_rueckfall_am",
+    "letzter_rueckfall",
+    "befund",
+    "befund_text"
+   ],
+   "achsen": [
+    "endpunkt",
+    "marke"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "abrufe",
+     "einheit": "anzahl",
+     "hinweis": "Aufgaben im letzten Lauf je Marke und Eintrag; die Laeufe der Zeilen koennen verschieden sein."
+    }
+   ],
+   "fallstricke": []
+  },
+  {
    "sicht": "mart.fremdeinkauf",
    "koernung": "Betrieb, Monat, Lieferant UND Quelle — ohne Filter auf genau eine Quelle wird doppelt gezaehlt",
    "thema": "einkauf",

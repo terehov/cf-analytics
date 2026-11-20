@@ -5898,3 +5898,22 @@ kommt. Das ist Regel 10 in neuer Form: ein Lauf ohne Tagesgeschäft sah aus wie 
 **Allgemeine Lehre.** Eine Uhrzeit, die „vor dem nächsten Lauf" liegen soll, ist nur so gut wie die Zeitzone des
 Zeitplans. Dokploys Zeitplan kennt keine Sommerzeit; jede Frist in Ortszeit muss gegen den **Winterstart** geprüft werden.
 
+
+## Ein Test schickte echte Tokens an das echte FoodNotify (19.11.2026)
+
+**Symptom:** Beim Bau von `0160` lief `src/foodnotify/fehler404.test.ts` rot: „Validierungs-404 auf ein vorhandenes
+Rezept" bekam `ok` statt des erwarteten 404 der Attrappe. Die Antwort kam nicht von der Attrappe, sondern vom echten
+`api3.foodnotify.com` — mit dem echten Enchilada-Token aus der `.env`. Zwei Testläufe, je zwei GET auf
+`/api/recipes/{id}/ingredients` (999998 und 1032008), also **vier lesende Aufrufe** gegen das echte FoodNotify, ohne
+dass sie jemand beauftragt hatte. Nichts geschrieben, kein Pfad mit Wirkung.
+
+**Ursache:** Der Token-Host wurde zuerst **beim Laden** von `config` abgeleitet (`FN_BASE_URL` = `my.foodnotify.com`
+aus der `.env` → `api3`). Drei Tests stellen `config.FN_BASE_URL` erst **zur Laufzeit** auf die Attrappe um
+(`fehler404`, `rezepte_probe`, `fn_probe`) — der Token-Host blieb dabei auf `api3` stehen. Und Bun lädt die `.env`
+auch in `bun test`, mit `FN_API_TOKENS`. Die Sitzung landete bei der Attrappe, das Token beim Original.
+
+**Was es künftig verhindert:** `fnTokenBasis()` rechnet den Host **zur Aufrufzeit** und folgt jeder Umstellung von
+`FN_BASE_URL` (`src/config.ts`; Test in `config.test.ts`). Die Tests, die `config` umstellen, leeren zusätzlich
+`FN_API_TOKEN`, die DB-Tests mit Attrappe löschen `FN_API_TOKENS` vor dem ersten Import, und die Attrappe zählt
+Token-Aufrufe getrennt (`tokenZaehler`). **Die Lehre:** Jeder neue Host, den der Importer anspricht, gehört an
+dieselbe Umbiegung wie die alten — ein zweiter Host, der beim Laden feststeht, ist für Tests ein Weg ins Echte.

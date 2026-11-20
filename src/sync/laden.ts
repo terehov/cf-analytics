@@ -167,6 +167,8 @@ export async function rohNachLadefehlerSichern(k: {
   laufId: string
   postenId: number | string
   fehler: string
+  /** FoodNotify (0160): über welchen Zugang die Antwort kam. LINA: weglassen (NULL). */
+  zugang?: 'sitzung' | 'token' | null
 }): Promise<boolean> {
   if (istLadenakte(k.endpunkt)) return false
   try {
@@ -179,10 +181,10 @@ export async function rohNachLadefehlerSichern(k: {
     await query(
       `INSERT INTO raw.api_antwort
          (quelle, endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis, parameter,
-          http_status, payload, payload_hash, payload_bytes, lauf_id, ladefehler)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+          http_status, payload, payload_hash, payload_bytes, lauf_id, ladefehler, zugang)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
       [k.quelle, k.endpunkt, k.betriebEncId, k.von, k.bis, JSON.stringify(k.parameter),
-       k.httpStatus, JSON.stringify(k.daten), k.hash, k.bytes, k.laufId, k.fehler])
+       k.httpStatus, JSON.stringify(k.daten), k.hash, k.bytes, k.laufId, k.fehler, k.zugang ?? null])
     return true
   } catch (e) {
     log.warn('rohantwort nach ladefehler nicht gesichert', { endpunkt: k.endpunkt, fehler: String(e) })

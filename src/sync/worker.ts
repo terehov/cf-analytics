@@ -32,7 +32,7 @@ import { log } from '../lib/log'
 import { LinaClient, strukturPruefen } from '../lina/client'
 import { endpunkt } from '../lina/endpunkte'
 import { istBetriebsbericht } from '../lina/betriebsberichte'
-import { FnClient } from '../foodnotify/client'
+import { FnClient, type FnZugangInfo } from '../foodnotify/client'
 import { fnEndpunkt, alsNichtGefundenVerbuchen } from '../foodnotify/endpunkte'
 import { fnLaden, rezeptNichtGefunden } from '../foodnotify/laden'
 import { laden, rohNachLadefehlerSichern } from './laden'
@@ -1296,6 +1296,7 @@ async function sitzungOeffnen(
                 ep: quelle.ep, markeKey: quelle.markeKey, von, bis, parameter: extra,
                 daten: res.daten, httpStatus: res.status, bytes: res.bytes, hash: res.hash, laufId,
                 nachladen: posten.nachladen === true,
+                zugang: (res as { zugangInfo?: FnZugangInfo }).zugangInfo?.zugang ?? 'sitzung',
               })
             : await laden({
                 ep: quelle.ep, von, bis, parameter, daten: res.daten,
@@ -1315,6 +1316,7 @@ async function sitzungOeffnen(
             parameter: quelle.art === 'fn' ? { ...extra, markeKey: quelle.markeKey } : parameter,
             httpStatus: res.status, daten: res.daten, hash: res.hash, bytes: res.bytes, laufId,
             postenId: posten.posten_id, fehler: meldung,
+            zugang: quelle.art === 'fn' ? (res as { zugangInfo?: FnZugangInfo }).zugangInfo?.zugang ?? null : null,
           })
           /*
            * NACH LADEFEHLER_MAX_VERSUCHEN ABBRECHEN (0136). Ein Ladefehler
@@ -2092,18 +2094,22 @@ async function protokoll(
   laufId: string, endpunktKey: string, posten: any,
   status: 'ok' | 'keine_daten' | 'fehler' | 'uebersprungen',
   // Nur die Wartezeit wird gebraucht — so passt jeder Quellclient.
-  res: { status?: number | null; dauerMs: number }, client: { letzteWartezeitMs: number },
+  res: { status?: number | null; dauerMs: number; zugangInfo?: FnZugangInfo }, client: { letzteWartezeitMs: number },
   fehler: string | null = null, zeilen: number | null = null,
 ) {
+  // Über welchen Zugang (0160) — nur FoodNotify trägt zugangInfo; LINA bleibt NULL.
+  const z = res.zugangInfo ?? null
   await query(
     `INSERT INTO sync.aufgabe
        (lauf_id, endpunkt, betrieb_enc_id, zeitraum_von, zeitraum_bis, versuch,
-        status, http_status, zeilen, dauer_ms, wartezeit_ms, fehler, marke_key, parameter)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+        status, http_status, zeilen, dauer_ms, wartezeit_ms, fehler, marke_key, parameter,
+        zugang, zugang_bevorzugt, zugang_rueckfall, zugang_rueckfall_grund)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
     [laufId, endpunktKey, posten.betrieb_enc_id ?? null, posten.zeitraum_von,
      posten.zeitraum_bis, posten.versuche, status, res.status ?? null, zeilen,
      res.dauerMs, client.letzteWartezeitMs, fehler,
      // Mandant und Parameter (Migration 0032): die Kombination, über die die
      // Leere-200er-Prüfung "kam hier früher etwas?" beantwortet.
-     posten.marke_key ?? null, JSON.stringify(posten.parameter ?? {})])
+     posten.marke_key ?? null, JSON.stringify(posten.parameter ?? {}),
+     z?.zugang ?? null, z?.bevorzugt ?? null, z?.rueckfall ?? null, z?.rueckfallGrund ?? null])
 }

@@ -38,6 +38,23 @@ export type FnEndpunkt = {
    * statt ANFRAGE_TIMEOUT_MS (seit 0155 nur fn:pos_artikel, 19–39 s je Antwort).
    */
   zeitgrenze?: 'lang'
+  /**
+   * Gesetzt = dieser Eintrag läuft BEVORZUGT ÜBER DAS SCOPE-TOKEN (Bearer,
+   * Host `FN_TOKEN_BASE_URL`), mit der Cookie-Sitzung als dauerhaftem
+   * Rückfall je Posten (0160, Entscheidung Eugene 19.11.2026). Fehlt das
+   * Feld, läuft der Eintrag nur über die Sitzung.
+   *
+   * `pfad`: nur wo der Token-Weg einen ANDEREN Pfad braucht (fn:rezepte —
+   * `/api/recipes?page=N` antwortet dem Token mit 403, `/api/recipe-viewer/
+   * recipes?page=N` trägt und lieferte am 19.11.2026 bei allen vier Marken
+   * dieselbe Antwort wie der Sitzungspfad). Sonst der Pfad oben. Die
+   * Benutzer-ID gibt es auf dem Token-Weg nicht (sie kommt aus der Sitzung);
+   * ein Eintrag, der sie braucht, kann nicht über das Token laufen.
+   *
+   * Wann zurückgefallen wird, entscheidet `FnClient` an EINER Stelle — hier
+   * steht nur, wer was bevorzugt.
+   */
+  token?: { pfad?: (p: Record<string, string>) => string }
 }
 
 /**
@@ -105,6 +122,8 @@ export const FN_ENDPUNKTE: FnEndpunkt[] = [
     // fn:pos_standorte der Vornacht; eine neue Anbindung kommt einen Tag später.
     prioritaet: 30,
     zeitgrenze: 'lang',
+    // Token (0160): am 19.11.2026 an allen vier Marken zeilengleich mit der Sitzung.
+    token: {},
     pfad: p => {
       const id = pflicht(p, 'connectionId')
       // Eine Zahl, sonst ist es ein Einreihungsfehler — kein Pfad an FoodNotify.
@@ -124,6 +143,10 @@ export const FN_ENDPUNKTE: FnEndpunkt[] = [
     // ein Aufruf je Kostenstelle. Folgeseiten (nur wenn FoodNotify mehr als
     // eine Seite meldet) tragen dieselbe Priorität.
     prioritaet: 32,
+    // Token (0160): am 19.11.2026 bei drei Marken zeilengleich; bei Deutsche
+    // Konzepte wich nur cartProductQuantity einer Ware ab (Warenkorbmenge,
+    // live, vom Lader nicht gelesen).
+    token: {},
     pfad: p => {
       const erpId = pflicht(p, 'erpId')
       const seite = pflicht(p, 'seite')
@@ -273,6 +296,10 @@ export const FN_ENDPUNKTE: FnEndpunkt[] = [
     zweck: 'Rezeptliste einer Marke, seitenweise (25 je Seite, fest)',
     prioritaet: 40,
     pfad: p => `/api/recipes?${new URLSearchParams({ page: pflicht(p, 'seite') })}`,
+    // Token (0160): /api/recipes?page=N antwortet dem Token mit 403 („scope-limited"),
+    // recipe-viewer trägt und war am 19.11.2026 bei allen vier Marken antwortgleich
+    // (Seite 1, samt pagination).
+    token: { pfad: p => `/api/recipe-viewer/recipes?${new URLSearchParams({ page: pflicht(p, 'seite') })}` },
     hinweis: 'NICHT STABIL SORTIERT (createdAt-Gleichstaende: 21 Doppelte an Seitengrenzen) und '
       + 'KEINE VOLLSTAENDIGE AUFZAEHLUNG (56 Enchilada-Rezepte nur ueber Verweise). perPage wird '
       + 'ignoriert. Huelle {data, pagination}. Deshalb taeglich alle Seiten plus Verweise einzeln '
@@ -283,6 +310,7 @@ export const FN_ENDPUNKTE: FnEndpunkt[] = [
     zweck: 'Rezeptkopf einzeln — fuer Rezepte, die nur ueber einen Verweis (subRecipeId) bekannt sind',
     prioritaet: 41,
     pfad: p => `/api/recipes/${rezeptId(p)}`,
+    token: {},
     hinweis: 'Dieselbe Form wie ein Listeneintrag: id, name, imagePath, createdAt, groups[], tags[].',
   },
   {
@@ -290,6 +318,7 @@ export const FN_ENDPUNKTE: FnEndpunkt[] = [
     zweck: 'Zutaten eines Rezepts — Lieferanten-Artikelnummer, Menge, Einheit, Unterrezept',
     prioritaet: 41,
     pfad: p => `/api/recipes/${rezeptId(p)}/ingredients`,
+    token: {},
     hinweis: 'artikelId ist die LIEFERANTEN-Artikelnummer (= core.bestellposition.lieferanten_nr), '
       + 'nicht core.ware.fn_id und nicht die LINA-Artikelnummer. kind: ingredient / sub_recipe / '
       + 'product_group. Hoechstens 13 Zeilen je Rezept gemessen — eine zweite Seite waere neu und '
@@ -300,6 +329,7 @@ export const FN_ENDPUNKTE: FnEndpunkt[] = [
     zweck: 'Gewicht, Portion, Verlust (roh) eines Rezepts',
     prioritaet: 41,
     pfad: p => `/api/recipes/${rezeptId(p)}/meta`,
+    token: {},
     hinweis: 'weight.loss ist ungedeutet (0, 100, krumme Werte) und wird roh abgelegt.',
   },
 ]
@@ -347,6 +377,19 @@ export function fnEndpunkt(key: string): FnEndpunkt {
   const e = register.get(key as FnEndpunkt['key'])
   if (!e) throw new Error(`Unbekannter FoodNotify-Endpunkt: ${key}`)
   return e
+}
+
+/**
+ * Die Einträge, die das Token bevorzugen — abgeleitet aus dem Register, nie
+ * abgeschrieben. Die Migration 0160 führt dieselbe Liste für
+ * mart.fn_zugang_stand; ein Test hält beide zusammen.
+ */
+export const FN_TOKEN_ENDPUNKTE: readonly string[] = FN_ENDPUNKTE.filter(e => e.token).map(e => e.key)
+
+/** Der Pfad auf dem Token-Weg: der eigene, wo es einen gibt, sonst der des Eintrags. */
+export function fnTokenPfad(ep: FnEndpunkt, p: Record<string, string>): string {
+  if (!ep.token) throw new Error(`${ep.key} hat keinen Token-Weg`)
+  return ep.token.pfad ? ep.token.pfad(p) : ep.pfad(p, null)
 }
 
 /** Ist dieser Warteschlangen-Endpunkt ein FoodNotify-Posten? */

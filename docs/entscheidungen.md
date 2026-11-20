@@ -5388,3 +5388,38 @@ irgendwann ausbleibt (`AGENTS.md`, „Betrieb ohne Handbefehl"). Die Frist aus d
 dass der Code den Zeitplan kennt, und der steht in Dokploy. **Preis:** im Sommer anderthalb Stunden Nachladen je Nacht
 weniger. Dazu misst der Ausfallwächter seitdem ab dem Ende des Tagesgeschäfts statt ab dem Laufende.
 
+
+## 19.11.2026 — FoodNotify im gemischten Betrieb: Rezepte, Kassenartikel, Warenstamm über das Token, die Sitzung bleibt (`0160`)
+
+**Entscheidung (Eugene):** `fn:rezepte`, `fn:rezept`, `fn:rezept_zutaten`, `fn:rezept_meta`, `fn:pos_artikel` und
+`fn:warenstamm` laufen über das Scope-Token, mit der Cookie-Sitzung als Rückfall. Alles andere bleibt bei der
+Sitzung. **Ergänzt am selben Tag**, Vorgabe Eugene wörtlich: *„Behalte immer den Fallback, falls es mal mit einem
+Token nicht klappen sollte oder ein Token fehlen sollte."* ~~Ein 404/500/Timeout ist kein Grund für den Rückfall~~ —
+ersetzt: der Rückfall greift bei fehlendem Token, bei Abweisung (401/403) und bei jedem technischen Ausfall des
+Token-Wegs (Netz, Zeitgrenze, 429, 5xx, unlesbare oder fremde Antwort); nur der fachliche 404 ist eine Antwort.
+Regel im Einzelnen: `importer.md`, „FoodNotify: zwei Zugänge, eine Spur".
+
+**Begründung:**
+* **Der offizielle Zugang für den größten Brocken.** Rezepte sind mit rund 17.700 Rezepten und drei Einzelabrufen je
+  Rezept der größte Teil des FoodNotify-Verkehrs. Das Token ist ein Zugang, den FoodNotify für Automatisierung
+  vorsieht (`api3`, Scope-Tokens); die Sitzung ist der Weg der Oberfläche.
+* **Gleich gemessen, nicht angenommen.** Vor dem Umbau verglichen (19.11.2026, `fn-token-probe --vergleich`): 23
+  von 24 Abrufpaaren byteweise gleich, das 24. nur in der Warenkorbmenge einer Ware, die der Lader nicht liest. Die
+  Umstellung ändert keine Zahl.
+* **Kassenartikel schnell.** Am Nachmittag mit Sitzung 19–39 s und ein Abbruch je Lauf, mit Token unter 1,5 s. Am
+  Abend war auch die Sitzung schnell — der Grund ist ungeklärt; der Token-Weg schadet nicht und kann nützen.
+* **Die Sitzung bleibt nötig.** Bestellpositionen und Inventuren weist das Token bei allen vier Marken ab, Profil
+  und Standorte (Benutzer-ID, Anbindungsliste) ebenfalls. Ein reiner Token-Betrieb ist nicht möglich.
+* **Warum der Rückfall dauerhaft bleibt:** Ein Token kann ablaufen, entzogen oder in Dokploy vergessen werden; api3
+  kann ausfallen, während `my` läuft. Ohne Rückfall hieße das: keine Rezepte, Kassenartikel, Warenstamm — mit
+  Rückfall nur langsamer und sichtbar (`mart.fn_zugang_stand`). Daten vor Eleganz.
+* **Warum die Schwelle drei Ausfälle in Folge je Marke:** ohne sie kostete bei einem ausgefallenen api3 jeder der
+  Tausenden Rezeptposten zwei Aufrufe — doppeltes Tempo gegen einen Anbieter, der gerade nicht kann (Regel 3).
+  Einer kann Zufall sein, drei sind ein Zustand.
+* **Warum Abweisung je Marke UND Eintrag sperrt, Ausfall je Marke:** eine Abweisung ist eine Aussage über einen
+  Endpunkt (scope-limited ist eine Eigenschaft des Pfads); ein Ausfall eine über den Host.
+
+**Verworfen:** *Ganz auf das Token umstellen* — geht nicht (Bestellpositionen, Inventuren). *Erst eine Nacht
+nebeneinander laufen lassen und vergleichen* — doppelte Aufrufe über Tausende Rezepte; die Vergleichsmessung
+und `raw.api_antwort.zugang` leisten dasselbe ohne doppelten Verkehr. *Rückfall nur bei Abweisung* — zuerst so
+beauftragt, durch Eugenes Vorgabe ersetzt (oben).

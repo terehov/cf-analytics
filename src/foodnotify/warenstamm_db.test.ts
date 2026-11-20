@@ -69,6 +69,10 @@ lauf('Warenstamm mit Datenbank', () => {
     process.env.FN_TAKT_MIN_MS = '0'
     process.env.FN_TAKT_MAX_MS = '0'
     process.env.FN_BASE_URL = fn.url
+    // Token-Weg (0160) aus: Bun lädt die .env auch hier, mit den echten Tokens. Ohne
+    // Token läuft alles über die Sitzung (Rückfall kein_token) — wie vor 0160.
+    delete process.env.FN_API_TOKENS
+    delete process.env.FN_TOKEN_BASE_URL
     // Kurze Zeitgrenze, damit der Abbruch im Test Sekunden statt Minuten dauert.
     process.env.ANFRAGE_TIMEOUT_MS = '1000'
     delete process.env.WARENSTAMM_MARKEN   // die Vorgabe: nur wilma_wunder

@@ -116,4 +116,25 @@ describe('FN_API_TOKENS', () => {
       expect(meldung).not.toContain(geheim)
     }
   })
+  test('Token-Host (0160): api3 nur zur echten Sitzungsbasis, sonst folgt er ihr; gesetzt gewinnt', async () => {
+    const { fnTokenBasis } = await import('./config')
+    expect(fnTokenBasis({ FN_BASE_URL: 'https://my.foodnotify.com', FN_TOKEN_BASE_URL: undefined })).toBe('https://api3.foodnotify.com')
+    expect(fnTokenBasis({ FN_BASE_URL: 'https://my.foodnotify.com/', FN_TOKEN_BASE_URL: '' })).toBe('https://api3.foodnotify.com')
+    // Eine Attrappe: der Token-Weg landet dort, wo auch die Sitzung landet — nie beim echten api3.
+    expect(fnTokenBasis({ FN_BASE_URL: 'http://localhost:4321', FN_TOKEN_BASE_URL: undefined })).toBe('http://localhost:4321')
+    expect(fnTokenBasis({ FN_BASE_URL: 'https://my.foodnotify.com', FN_TOKEN_BASE_URL: 'https://api4.example/' })).toBe('https://api4.example')
+  })
+
+  test('der Token-Host wird zur Aufrufzeit gerechnet: eine Umstellung von config.FN_BASE_URL nimmt ihn mit', async () => {
+    const { config, fnTokenBasis } = await import('./config')
+    const alt = { b: config.FN_BASE_URL, t: config.FN_TOKEN_BASE_URL }
+    try {
+      config.FN_TOKEN_BASE_URL = undefined
+      config.FN_BASE_URL = 'http://localhost:9'
+      expect(fnTokenBasis()).toBe('http://localhost:9')
+    } finally {
+      config.FN_BASE_URL = alt.b
+      config.FN_TOKEN_BASE_URL = alt.t
+    }
+  })
 })

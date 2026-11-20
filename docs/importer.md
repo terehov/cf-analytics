@@ -2818,3 +2818,61 @@ nach `core.gebinde_vereinheitlichen()`.
 1,5 s am Klon mit 14.777 Rezepten). Hier und nicht im Round-Table-Nachlauf, weil Rezepte FoodNotify-Ware sind. Was Phase C
 an Rezepten nachlädt, steht ab dem nächsten Lauf in der Stückliste — kein Refresh nach Phase C. Kein neuer Abruf, kein
 neuer Schalter.
+
+## FoodNotify: zwei Zugänge, eine Spur (`0160`, 19.11.2026)
+
+**Was über welchen Zugang läuft.** Das Register (`src/foodnotify/endpunkte.ts`) sagt es mit dem Feld `token`: gesetzt
+bei `fn:rezepte`, `fn:rezept`, `fn:rezept_zutaten`, `fn:rezept_meta`, `fn:pos_artikel` und `fn:warenstamm` — diese
+gehen zuerst **über das Scope-Token** (`Authorization: Bearer`, Host `FN_TOKEN_BASE_URL`, ungesetzt `api3`). Nur
+`fn:rezepte` hat einen eigenen Token-Pfad (`/api/recipe-viewer/recipes?page=N`; `/api/recipes?page=N` weist das Token
+mit 403 ab). Alles andere — Profil, Betriebe, Kostenstellen, Standorte, Bestellungen, Bestellpositionen,
+Bestellansicht, Inventuren — bleibt bei der Cookie-Sitzung. Die Liste `FN_TOKEN_ENDPUNKTE` wird aus dem Register
+abgeleitet; die Sicht `mart.fn_zugang_stand` führt sie ein zweites Mal, `src/foodnotify/zugang.test.ts` hält beide
+zusammen.
+
+**Ein Client, ein Takt, ein Budget (Regel 3).** Der Token-Weg sitzt in `FnClient`, nicht daneben: derselbe
+`letzterRequest`, dieselbe Wartezeit vor jedem Aufruf, dasselbe `FN_TAGESBUDGET`. Ein Rückfall kostet zwei Aufrufe
+(Token, dann Sitzung), beide warten den Takt ab und zählen.
+
+**Die Rückfallregel — immer eingebaut.** Vorgabe Eugene, 19.11.2026, wörtlich: *„Behalte immer den Fallback, falls
+es mal mit einem Token nicht klappen sollte oder ein Token fehlen sollte."* Je Posten holt der Client denselben
+Abruf **einmal über die Sitzung**, wenn
+
+| Grund (`zugang_rueckfall`) | Wann | Danach im selben Lauf |
+|---|---|---|
+| `kein_token` | für die Marke steht kein Token in `FN_API_TOKENS` | jeder Posten der Marke direkt über die Sitzung (kein Token-Aufruf) |
+| `abgewiesen` | 401 oder 403 vom Token-Weg | diese Marke **und dieser Eintrag** nicht mehr mit Token — keine Serie von 403 je Posten |
+| `ausfall` | Netzfehler, Zeitgrenze, 429, 5xx, 404 mit Validierungs-/Routentext, jeder andere Nicht-2xx, Antwort kein JSON, Hüllenfehler, fremde Form (`fnStrukturFehler`, dieselbe Prüfung wie im Lader) | nach `FN_TOKEN_AUSFAELLE_BIS_SITZUNG` (3) Ausfällen **in Folge** geht die ganze Marke auf die Sitzung; ein Token-Erfolg setzt den Zähler zurück |
+
+Erst wenn auch die Sitzung scheitert, greift die gewöhnliche Fehlerbehandlung des Workers (Wiedervorlage,
+Aufgeben, Sperre). **Kein Rückfall beim fachlichen 404** (Rezept gelöscht, ohne Validierungs- oder Routentext,
+`f0fd82a`): das ist eine Antwort; sie kommt in derselben Form wie auf dem Sitzungsweg zurück, und
+`alsNichtGefundenVerbuchen()` entscheidet gleich. Der nächste Lauf ist ein neuer Prozess mit neuem Client und
+versucht das Token wieder. Ein Abbruch ändert `core` weiterhin nie: geladen wird nur eine vollständige 2xx-Antwort,
+gleich über welchen Zugang.
+
+**Warum eine fremde Form auf dem Token-Weg ein Ausfall ist und kein Ladefehler:** Eugene will den Rückfall, „falls
+es mal mit einem Token nicht klappen sollte". Liefert api3 eine andere Hülle als `my`, ist das genau dieser Fall —
+die Sitzung holt die gemessene Form, und `sync.schema_abweichung` bleibt für den Fall, dass auch sie fremd ist.
+
+**Sichtbar (Regel 10).** `sync.aufgabe` trägt je Aufruf `zugang`, `zugang_bevorzugt`, `zugang_rueckfall` und
+`zugang_rueckfall_grund`; `raw.api_antwort.zugang` sagt, über welchen Weg die gesicherte Antwort kam.
+`mart.fn_zugang_stand` (je Marke × Eintrag: bevorzugt, im letzten Lauf benutzt, Anzahl, Rückfallgrund, `befund`) und
+eine Zeile in `mart.pruefung_uebersicht` (nur `abgewiesen` und `ausfall`; `kein_token` ist ein Zustand). Im Log steht
+je Rückfall eine Warnung — gelesen wird die Sicht.
+
+**Der Tokenwert erscheint nirgends.** Er steht nur im Header, nie im Pfad; jeder Text vom Token-Weg läuft durch
+`ohneToken()`, auch wenn der Server den Header echot; geprüft in `zugang.test.ts` und gegen die Datenbank in
+`zugang_db.test.ts` (`sync.*`, `raw.api_antwort`).
+
+**Der Token-Host wird zur Aufrufzeit gerechnet** (`fnTokenBasis()` in `src/config.ts`): `api3` nur, solange
+`FN_BASE_URL` auf `https://my.foodnotify.com` steht, sonst derselbe Host wie die Sitzung. Grund: Tests biegen
+`FN_BASE_URL` auf die Attrappe um (teils zur Laufzeit am `config`-Objekt), und Bun lädt die `.env` mit den echten
+Tokens auch in `bun test`. Ein beim Laden festgelegter Host schickte echte Tokens an das echte api3
+(`fehlerkatalog.md`, 19.11.2026). Die DB-Tests mit Attrappe löschen `FN_API_TOKENS` zusätzlich.
+
+**Zeitgrenze:** `fn:pos_artikel` behält `FN_ZEITGRENZE_LANG_MS` (180 s) auf beiden Wegen. Die schnellen Antworten
+vom 19.11.2026 kamen am Abend auch über die Sitzung — kein Grund, die Grenze zu senken.
+
+**Die Probe-Werkzeuge** (`rezepte-probe`, `rezepte-praxis`) nutzen `FnClient` und gehen damit ebenfalls zuerst über
+das Token, mit demselben Rückfall; `rezepte-praxis` schreibt die Zugangsspalten mit.

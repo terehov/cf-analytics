@@ -236,11 +236,16 @@ const Schema = z.object({
    * wilma_wunder) — dieselben Namen wie bei `FN_<MARKE>_USER`.
    *
    * Bearer-Token, NUR gegen `https://api3.foodnotify.com` (gemessen
-   * 18.11.2026, `docs/foodnotify-api-inventar-offiziell.md`): trägt Rezepte
-   * samt Zutaten und Pos 2.0, NICHT Bestellpositionen und Inventuren. Der
-   * Importer arbeitet deshalb weiter mit der Cookie-Sitzung; **noch liest
-   * kein Code diese Tokens** — die Variable ist die Ablage, damit sie an
-   * einer Stelle liegen, bevor der erste Abruf darauf gebaut wird.
+   * 18./19.11.2026, `docs/foodnotify-api-inventar-offiziell.md`): trägt Rezepte
+   * samt Zutaten, Kassenartikel und Warenstamm, NICHT Bestellpositionen und
+   * Inventuren. ~~Noch liest kein Code diese Tokens~~ — seit 0160 (19.11.2026)
+   * holt der Importer `fn:rezepte`, `fn:rezept`, `fn:rezept_zutaten`,
+   * `fn:rezept_meta`, `fn:pos_artikel` und `fn:warenstamm` ÜBER DAS TOKEN, mit
+   * der Cookie-Sitzung als dauerhaftem Rückfall je Posten (kein Token für die
+   * Marke, Token abgewiesen, Token-Weg ausgefallen — `FnClient`, `token` im
+   * Register `src/foodnotify/endpunkte.ts`). Alles andere bleibt bei der
+   * Sitzung. Fehlt ein Token, läuft der Eintrag über die Sitzung und
+   * `mart.fn_zugang_stand` zeigt „rueckfall kein token".
    *
    * Behandelt wie `LINA_API_SCHLUESSEL`: der Rohtext bleibt nicht im
    * Konfigurationsobjekt (Ergebnis: `config.FN_API_TOKEN`), keine Meldung
@@ -248,6 +253,18 @@ const Schema = z.object({
    * heißt: keine Tokens hinterlegt.
    */
   FN_API_TOKENS: z.string().optional(),
+  /**
+   * Host des Token-Wegs (0160). Ungesetzt: `https://api3.foodnotify.com`,
+   * solange `FN_BASE_URL` auf `https://my.foodnotify.com` steht — sonst
+   * DERSELBE Wert wie `FN_BASE_URL`. Gelesen nur über `fnTokenBasis()`.
+   *
+   * WARUM ABGELEITET UND NICHT FEST: Tests biegen `FN_BASE_URL` auf die
+   * Attrappe um, und Bun lädt die `.env` auch in `bun test` — mit den echten
+   * Tokens darin. Ein fester Standard schickte dann aus jedem Test, der die
+   * Variable nicht kennt, echte Tokens an das echte api3. Abgeleitet landet
+   * der Token-Weg dort, wo auch die Sitzung landet.
+   */
+  FN_TOKEN_BASE_URL: z.string().optional(),
   /** Nur ändern, wenn Gastro-MIS die Basis verlegt (alt: https://app.lina.de). */
   LINA_API_BASIS: z.string().default('https://api.lina.de'),
 
@@ -1490,6 +1507,21 @@ function laden() {
 }
 
 /**
+ * Der Host des Token-Wegs (Begründung bei FN_TOKEN_BASE_URL) — ZUR AUFRUFZEIT
+ * gerechnet, nicht beim Laden. Drei Tests stellen `config.FN_BASE_URL` zur
+ * Laufzeit auf eine Attrappe um (fehler404, rezepte_probe, fn_probe); ein
+ * beim Laden festgelegter Token-Host blieb dabei auf dem echten api3 stehen,
+ * und der Token-Weg schickte echte Tokens an das echte FoodNotify (so am
+ * 19.11.2026 beim Bau von 0160 passiert, docs/fehlerkatalog.md). Abgeleitet
+ * folgt er jeder Umstellung der Sitzungsbasis.
+ */
+export function fnTokenBasis(c: Pick<Config, 'FN_BASE_URL' | 'FN_TOKEN_BASE_URL'> = config): string {
+  const gesetzt = c.FN_TOKEN_BASE_URL
+  if (gesetzt && gesetzt.trim()) return gesetzt.trim().replace(/\/+$/, '')
+  return c.FN_BASE_URL.replace(/\/+$/, '') === 'https://my.foodnotify.com' ? 'https://api3.foodnotify.com' : c.FN_BASE_URL
+}
+
+/**
  * `FN_API_TOKENS` → `{ marke: Token }`. Wirft beim Start, nie später.
  *
  * Wie bei `tpapiSchluesselParsen`: KEINE MELDUNG ENTHÄLT EINEN WERT, auch
@@ -1722,7 +1754,7 @@ export function konfigZumLoggen(c: Config = config) {
       : 'nicht konfiguriert',
     /** Nur die Marken mit hinterlegtem Token, nie ein Wert. */
     fnApiTokens: Object.keys(c.FN_API_TOKEN).length > 0
-      ? Object.keys(c.FN_API_TOKEN).sort().join(', ')
-      : 'keine hinterlegt',
+      ? `${Object.keys(c.FN_API_TOKEN).sort().join(', ')} (gegen ${fnTokenBasis(c)})`
+      : 'keine hinterlegt — Rezepte, Kassenartikel und Warenstamm laufen über die Sitzung',
   }
 }

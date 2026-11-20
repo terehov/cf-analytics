@@ -985,8 +985,8 @@ antworten; `/api/profile`, `/api/erp/all`, `/api/pos/locations`, `/api/recipes` 
 `/api/{erpId}/shop-order/{id}/change`, `/api/erp/stocktakings` und jedes `/api/1.0/…` nicht. **Zwei Schlüssel neu
 belegt:** `accountIdentifier` der öffentlichen API 2.0 ist die `connectionId` (`core.kostenstelle.connection_id`);
 `/api/erp/core/{userId}/erps` liefert die Kostenstellen über die Benutzer-ID. Einzelheiten und Vorbehalte:
-`foodnotify-api-inventar-offiziell.md`. Kein Endpunkt des Registers ist umgestellt; ~~die Messung derselben Pfade mit
-der Cookie-Sitzung im Browser läuft.~~
+`foodnotify-api-inventar-offiziell.md`. ~~Kein Endpunkt des Registers ist umgestellt~~ (seit `0160` sind es sechs, Absatz
+unten); ~~die Messung derselben Pfade mit der Cookie-Sitzung im Browser läuft.~~
 
 **Sitzung gegen Token (gemessen 18.11.2026, `payloads/foodnotify-2026-11/messung-sitzung-2026-11-18.md`):** Mit der
 Cookie-Sitzung antworten 129 von 204 Pfaden (Detailpfade: 45 von 55), mit dem Token 41 von 189; alle Registerpfade
@@ -1000,6 +1000,19 @@ kein Ersatz für `/change`. Die Zutaten tragen auch mit Token `artikelId` (ein R
 17 verschiedene `restaurantId`, `updatedAt` von 19.10.2022 bis 17.11.2026, eine Antwort ohne Seiten, rund 11 s.
 Das ist die einzige Stelle mit einem Datum je Rezept. Ob `updatedAt` sich bei jeder Änderung an den Zutaten bewegt,
 ist **nicht geprüft** (`offene-punkte.md`, 18.11.2026).
+
+**Seit `0160` (19.11.2026): welcher Eintrag über welchen Zugang.**
+
+| Zugang | Einträge |
+|---|---|
+| **Token** (`api3`, Bearer), Sitzung als Rückfall je Posten | `fn:rezepte` (Pfad `/api/recipe-viewer/recipes?page=N`), `fn:rezept`, `fn:rezept_zutaten`, `fn:rezept_meta`, `fn:pos_artikel`, `fn:warenstamm` |
+| **Sitzung** (`my`, Cookie) | `fn:profil`, `fn:betriebe`, `fn:kostenstellen`, `fn:pos_standorte`, `fn:bestellungen`, `fn:bestellung`, `fn:bestellpositionen`, `fn:bestellansicht`, `fn:inventuren`, `fn:inventurpositionen` |
+
+Am 19.11.2026 lieferten beide Zugänge bei allen vier Marken dieselben Zeilen (23 von 24 Abrufpaaren byteweise gleich,
+das 24. nur in der Warenkorbmenge einer Ware, `payloads/foodnotify-2026-11/fn-token-probe-2026-11-19.md`). **Eine
+Zahl hängt deshalb nicht am Zugang** — nachprüfbar ist es trotzdem: `raw.api_antwort.zugang` je Antwort,
+`sync.aufgabe.zugang`/`zugang_rueckfall` je Aufruf, `mart.fn_zugang_stand` je Marke und Eintrag. Vor `0160` ist
+`zugang` NULL und es war immer die Sitzung. Die Rückfallregel: `importer.md`, „FoodNotify: zwei Zugänge, eine Spur".
 
 ## FoodNotify: Rezepturen (seit `0132`, 15.10.2026)
 

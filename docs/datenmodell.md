@@ -2018,3 +2018,23 @@ den Zustand eines Rezepts über den Index lesen statt über eine Gruppierung.
 **Was das Modell nicht hat:** eine Rezepthistorie (FoodNotify führt keine Fassungen; auf frühere Monate wird der heutige
 Stand angewendet), einen Lagerbestand (deshalb kein Schwund) und einen Betriebsbezug am Rezept (der kommt über die
 Kassenzuordnung).
+
+## Zugang je FoodNotify-Aufruf: `sync.aufgabe.zugang*`, `raw.api_antwort.zugang` (`0160`, 19.11.2026)
+
+Seit `0160` holen sechs FoodNotify-Einträge über das Scope-Token, mit der Sitzung als Rückfall (`importer.md`,
+„FoodNotify: zwei Zugänge, eine Spur"). Damit ein Rückfall nicht wie ein gelungener Lauf aussieht (Regel 10), steht
+der Zugang **in der Datenbank**:
+
+* **`sync.aufgabe`**: `zugang` (`token`/`sitzung`), `zugang_bevorzugt` (was das Register will), `zugang_rueckfall`
+  (`kein_token`/`abgewiesen`/`ausfall`, sonst NULL) und `zugang_rueckfall_grund` (Status und Meldung, nie ein
+  Tokenwert). An `sync.aufgabe` und nicht in einer eigenen Tabelle, weil dort schon die eine Zeile je Posten und
+  Lauf steht, die alle Prüfsichten lesen. CHECK als `NOT VALID` (Altbestand ist NULL), Teilindex
+  `aufgabe_fn_zugang` auf `(marke_key, endpunkt, lauf_id DESC) WHERE zugang_bevorzugt IS NOT NULL`. NULL heißt
+  LINA oder FoodNotify vor `0160` (damals immer Sitzung).
+* **`raw.api_antwort.zugang`**: über welchen Weg die gesicherte Antwort kam. Nur eine neue, leere Spalte — kein
+  UPDATE alter Zeilen (Regel 4). Auch die nach einem Ladefehler gesicherte Antwort trägt sie.
+* **`mart.fn_zugang_stand`**: je Marke × Token-Eintrag (4 × 6 Zeilen, auch „nie gefragt"). Gezählt wird im
+  **letzten Lauf** mit dieser Kombination; `letzter_rueckfall_am` hält den jüngsten Rückfall überhaupt.
+
+Die Sicht kennt die sechs Einträge als feste Liste (`VALUES`), weil sie den Code nicht lesen kann;
+`src/foodnotify/zugang.test.ts` vergleicht sie mit `FN_TOKEN_ENDPUNKTE` aus dem Register.

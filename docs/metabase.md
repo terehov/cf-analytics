@@ -2662,3 +2662,19 @@ Zeile über den Index gesucht). Karten auf `db_rezept`: alle unter 0,25 s außer
 Zwei Planfallen sind dabei behoben: `row_number() = 1` in der Zuordnung schätzte der Planer auf eine Handvoll Zeilen
 (Nested Loops, 2,7 s für einen Monat Abdeckung → `DISTINCT ON`, 0,06 s), und ein zweimal gelesener CTE in der
 Tagessicht gab den Tagesfilter nicht nach innen (7,2 s → `NOT MATERIALIZED`, 0,1 s).
+
+
+## FoodNotify: über welchen Zugang? `mart.fn_zugang_stand` (Migration `0160`, 19.11.2026)
+
+Eine Prüfsicht, keine Auswertung: je FoodNotify-Marke und Eintrag mit Token-Weg (Rezeptliste, Rezeptkopf, Zutaten,
+Meta, Kassenartikel, Warenstamm) eine Zeile — ob der letzte Lauf über das Token ging oder auf die Sitzung zurückfiel,
+und warum. `befund`: `ok` / `rueckfall kein token` (kein Token hinterlegt — ein Zustand, kein Fehler) /
+`rueckfall abgewiesen` (401/403, Token prüfen) / `rueckfall ausfall` (api3 technisch ausgefallen) / `nicht gefragt
+seit 48 h` / `nie gefragt` (bei Kassenartikeln und Warenstamm: Marke nicht im Schalter). Eine Zeile in
+`mart.pruefung_uebersicht` zählt nur Abweisung und Ausfall.
+
+**Die Falle:** Ein Rückfall verliert keine Daten — die Sitzung liefert dieselben Zeilen (gemessen 19.11.2026). Ob
+Daten **ankommen**, sagt `mart.quelle_zulauf`, nicht diese Sicht. `abrufe` sind Aufgaben (Posten), nicht Aufrufe: ein
+Rückfall ist ein Posten mit zwei Aufrufen; über Zeilen nicht summieren (die Läufe der Zeilen können verschieden
+sein). Keine Karte (bewusst: die Prüfzeile steht auf der Prüfübersicht). MCP-Katalog: `thema = pruefung`, von Hand in
+`mcp/test/katalog.json` ergänzt; der Abzug aus Produktion steht aus.

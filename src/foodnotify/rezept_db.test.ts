@@ -54,6 +54,10 @@ lauf('Rezepturen mit Datenbank', () => {
     process.env.FN_TAKT_MIN_MS = '0'
     process.env.FN_TAKT_MAX_MS = '0'
     process.env.FN_BASE_URL = fn.url
+    // Token-Weg (0160) aus: Bun lädt die .env auch hier, mit den echten Tokens. Ohne
+    // Token läuft alles über die Sitzung (Rückfall kein_token) — wie vor 0160.
+    delete process.env.FN_API_TOKENS
+    delete process.env.FN_TOKEN_BASE_URL
     // NUR Enchilada, und nur mit dem Attrappen-Benutzer. Die echten Zugaenge
     // aus der .env werden entfernt, BEVOR config geladen wird.
     for (const m of ['APOSTO', 'ENCHILADA', 'DEUTSCHE_KONZEPTE', 'WILMA_WUNDER']) {
