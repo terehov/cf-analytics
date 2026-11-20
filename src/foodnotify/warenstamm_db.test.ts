@@ -75,8 +75,8 @@ lauf('Warenstamm mit Datenbank', () => {
     delete process.env.FN_TOKEN_BASE_URL
     // Kurze Zeitgrenze, damit der Abbruch im Test Sekunden statt Minuten dauert.
     process.env.ANFRAGE_TIMEOUT_MS = '1000'
-    delete process.env.WARENSTAMM_MARKEN   // die Vorgabe: nur wilma_wunder
-    delete process.env.POS_ARTIKEL_MARKEN
+    process.env.WARENSTAMM_MARKEN = 'wilma_wunder'   // der Test des Schalters: nur eine Marke aktiv
+    process.env.POS_ARTIKEL_MARKEN = 'wilma_wunder'
     // Wilma Wunder UND Aposto mit Attrappen-Zugang: Aposto hat Zugangsdaten und
     // eine Kostenstelle, steht aber nicht im Schalter — der Test des Schalters.
     for (const m of ['APOSTO', 'ENCHILADA', 'DEUTSCHE_KONZEPTE', 'WILMA_WUNDER']) {

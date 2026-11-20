@@ -211,13 +211,14 @@ Betrieb. Geladen ist davon nichts. Bundle-Analyse (`payloads/foodnotify-2026-11/
 > Punkt 1 erledigt (13 Wilma-Betriebe `ok`, Abdeckung 70,1–96,8 %), Punkt 4 erledigt (25 von 8.323 uneindeutig),
 > Punkt 3 **mit Befund**: `mart.soll_verbrauch_tag` braucht für einen Tag 82 s (Klon 0,05 s) — vor einer Karte je Tag
 > und für den MCP-Zugang zu beheben. Punkt 5 wieder vorgelegt: an `ru_16`/`ru_66`/„Stück"/Unterrezept ohne Gewicht
-> hängen zusammen rund 2 % des Umsatzes; Empfehlung nicht schätzen, Entscheidung Eugene steht aus. Die Einheit
+> hängen zusammen rund 2 % des Umsatzes; **entschieden 20.11.2026 (Eugene): nicht schätzen** (`docs/entscheidungen.md`). Die Einheit
 > „Portionierer" kommt bei Wilma Wunder als unübersetzter Schlüssel `ru_16`. Offen: Punkte 2, 6, 7, 8.
 > Ebenfalls nachgemessen: Brücke `0155` (32 Anbindungen, Umsatz mit Rezept 68,5–95,2 %; Biergarten Ballplatz und
 > Bar Düsseldorf ohne ein Rezept), Warenstamm `0157` (16.419 Waren, 33 Kostenstellen), Lieferdatum `0156`
 > (Sonntagslieferungen 36 von rund 23.800).
 >
-> **Neu offen (20.11.2026): der Nachtlauf kann sich selbst überspringen.** Lauf 206 lud bis 19.11. 04:30 Uhr nach
+> ~~**Neu offen (20.11.2026): der Nachtlauf kann sich selbst überspringen.**~~ **Schon behoben** (Commit `c5b925d`,
+> `NACHLADEN_BIS` 03:30, `docs/fehlerkatalog.md`); beim Schreiben dieses Absatzes übersehen. Der Hergang bleibt stehen: Lauf 206 lud bis 19.11. 04:30 Uhr nach
 > (`NACHLADEN_BIS`), der Start von Lauf 207 um 04:00 Uhr traf auf den laufenden Vorgänger → `uebersprungen`, ein Tag
 > ohne Tagesgeschäft, im Status „28 Quellen werden gar nicht mehr abgefragt". Seit der Zeitumstellung liegt der Start
 > (04:00 MEZ) vor der Grenze. Vorschlag: `NACHLADEN_BIS` auf 03:30; Entscheidung Eugene.

@@ -82,6 +82,9 @@ lauf('Ende-zu-Ende', () => {
     // Token läuft alles über die Sitzung (Rückfall kein_token) — wie vor 0160.
     delete process.env.FN_API_TOKENS
     delete process.env.FN_TOKEN_BASE_URL
+    // Die Erwartungen dieses Tests stammen aus der Zeit mit einer aktiven Marke (0155/0157).
+    process.env.POS_ARTIKEL_MARKEN = 'wilma_wunder'
+    process.env.WARENSTAMM_MARKEN = 'wilma_wunder'
     process.env.FN_APOSTO_USER = 'test@aposto.eu'
     process.env.FN_APOSTO_PASSWORD = 'geheim'
     process.env.FN_ENCHILADA_USER = 'zfa@aposto.eu'

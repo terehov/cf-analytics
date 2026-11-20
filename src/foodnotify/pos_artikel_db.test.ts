@@ -68,7 +68,7 @@ lauf('Kassenartikel mit Datenbank', () => {
     // gewöhnliche Pfade 1 s, der lange Pfad 1,5 s.
     process.env.ANFRAGE_TIMEOUT_MS = '1000'
     process.env.FN_ZEITGRENZE_LANG_MS = '1500'
-    delete process.env.POS_ARTIKEL_MARKEN   // die Vorgabe: nur wilma_wunder
+    process.env.POS_ARTIKEL_MARKEN = 'wilma_wunder'   // der Test des Schalters: nur eine Marke aktiv
     // Wilma Wunder UND Aposto mit Attrappen-Zugang: Aposto hat Zugangsdaten und
     // eine Anbindung, steht aber nicht im Schalter — der Test des Schalters.
     for (const m of ['APOSTO', 'ENCHILADA', 'DEUTSCHE_KONZEPTE', 'WILMA_WUNDER']) {

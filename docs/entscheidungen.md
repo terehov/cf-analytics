@@ -5423,3 +5423,23 @@ Regel im Einzelnen: `importer.md`, „FoodNotify: zwei Zugänge, eine Spur".
 nebeneinander laufen lassen und vergleichen* — doppelte Aufrufe über Tausende Rezepte; die Vergleichsmessung
 und `raw.api_antwort.zugang` leisten dasselbe ohne doppelten Verkehr. *Rückfall nur bei Abweisung* — zuerst so
 beauftragt, durch Eugenes Vorgabe ersetzt (oben).
+
+## 20.11.2026 — Nach der ersten Nacht: alle vier Marken, keine Schätzung für „Portionierer"
+
+Entschieden von Eugene am 20.11.2026, nach der Messung der ersten Nacht
+(`docs/payloads/foodnotify-2026-11/erste-nacht-2026-11-20.md`).
+
+1. **Kassenartikel → Rezept und Warenstamm für alle vier Marken.** `POS_ARTIKEL_MARKEN` und `WARENSTAMM_MARKEN`
+   stehen als Vorgabe auf `aposto,enchilada,deutsche_konzepte,wilma_wunder` (~~nur `wilma_wunder`~~, 19.–20.11.2026).
+   Begründung: bei Wilma Wunder luden alle 32 Anbindungen und 33 Kostenstellen in der ersten Nacht ohne Ausfall; die
+   anderen drei Marken sind am 19.11.2026 je an einer Anbindung und einer Kostenstelle gemessen (`fn-token-probe`),
+   Form und Größe wie bei Wilma Wunder. **Nicht in der Breite gemessen** — die erste Nacht ist die Messung
+   (`mart.pos_artikel_abdeckung`, `mart.warenstamm_stand`). Die PLU-Brücke gilt weiter nur bei `amadeus`; für andere
+   Kassensysteme bleibt der Join leer (`plu_bruecke = false`). Damit rechnet auch der Soll-Verbrauch (`0159`) für
+   alle Marken — mit der Abdeckung als Pflichtangabe; bei Enchilada Köln lag sie am Einzelabzug bei 3 %.
+2. **„Portionierer" und „Stück" werden nicht geschätzt.** An den nicht umrechenbaren Einheiten (`ru_16`, `ru_66`,
+   „Stück", Unterrezept ohne Gewicht) hängen bei Wilma Wunder im Oktober 2026 rund 2 % des Umsatzes, und diese Rezepte
+   gehen überwiegend teilweise ein. Der größere Hebel sind 9,7 % Umsatz ohne Rezeptzuordnung, und das ist Pflege bei
+   FoodNotify. Eine Schätzung aus veraltenden Kosten wäre eine fast richtige Zahl. Wieder aufzugreifen, wenn eine
+   andere Marke einen deutlich höheren Anteil zeigt.
+3. **`NACHLADEN_BIS` 03:30** — bestätigt; der Eintrag vom 19.11.2026 darüber ist die Umsetzung.

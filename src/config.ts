@@ -1326,7 +1326,15 @@ const Schema = z.object({
    * in sync.merker (`pos_artikel_marken`), damit mart.pos_artikel_abdeckung
    * eine bewusst abgeschaltete Marke von einer ausgefallenen unterscheidet.
    */
-  POS_ARTIKEL_MARKEN: z.string().default('wilma_wunder'),
+  /*
+   * Alle vier Marken seit 20.11.2026 (Entscheidung Eugene, nach der ersten
+   * Nacht bei Wilma Wunder: 32 Anbindungen geladen, Umsatz mit Rezept
+   * 68,5–95,2 Prozent). ~~Nur wilma_wunder~~ (19.–20.11.2026). Die anderen drei
+   * sind je an EINER Anbindung gemessen (fn-token-probe 19.11.2026: Aposto Aalen
+   * 1.157 Artikel, Enchilada Köln 1.357, Würzburger Hofbräu 438), nicht in der
+   * Breite; die PLU-Brücke gilt weiter nur bei amadeus (plu_bruecke).
+   */
+  POS_ARTIKEL_MARKEN: z.string().default('aposto,enchilada,deutsche_konzepte,wilma_wunder'),
 
   /**
    * Warenstamm mit Listenpreis (0157, `fn:warenstamm`): für welche Marken der
@@ -1346,7 +1354,14 @@ const Schema = z.object({
    * steht nach jedem Lauf in sync.merker (`warenstamm_marken`), damit
    * mart.warenstamm_stand „Marke abgeschaltet" von „ausgefallen" trennt.
    */
-  WARENSTAMM_MARKEN: z.string().default('wilma_wunder'),
+  /*
+   * Alle vier Marken seit 20.11.2026 (Entscheidung Eugene; erste Nacht bei
+   * Wilma Wunder: 16.419 Waren an 33 Kostenstellen). ~~Nur wilma_wunder~~
+   * (19.–20.11.2026). Gemessen je eine Kostenstelle der anderen Marken
+   * (fn-token-probe 19.11.2026: 145, 627 und 333 Produkte in einem Aufruf,
+   * 5,5–14,8 s, bis 1,8 MB). Rund 120 Kostenstellen mehr je Nacht.
+   */
+  WARENSTAMM_MARKEN: z.string().default('aposto,enchilada,deutsche_konzepte,wilma_wunder'),
 
   /**
    * Zeitgrenze für FoodNotify-Pfade, die als langsam gemessen sind

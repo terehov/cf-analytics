@@ -68,7 +68,8 @@ lauf('Token und Sitzung mit Datenbank', () => {
     process.env.FN_API_TOKENS = JSON.stringify({ wilma_wunder: TOKEN })
     process.env.ANFRAGE_TIMEOUT_MS = '1000'
     process.env.FN_ZEITGRENZE_LANG_MS = '1500'
-    delete process.env.POS_ARTIKEL_MARKEN
+    process.env.POS_ARTIKEL_MARKEN = 'wilma_wunder'
+    process.env.WARENSTAMM_MARKEN = 'wilma_wunder'
     for (const m of ['APOSTO', 'ENCHILADA', 'DEUTSCHE_KONZEPTE', 'WILMA_WUNDER']) {
       delete process.env[`FN_${m}_USER`]
       delete process.env[`FN_${m}_PASSWORD`]
