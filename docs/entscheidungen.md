@@ -5459,3 +5459,17 @@ Personal je Tag 528 bei drei Betrieben, die alle HTTP 500 liefern (Wilsdruffer S
 Datenbank sind eine Falle für jeden Vergleich. Geholtes vor 2018 löschen: raw ist append-only (Regel 4), und der
 Platz (4,8 GB) entscheidet nichts.
 
+## 21.11.2026 — Fehltage im TPAPI-Nachladen: drei Nächte, dann aufgegeben (`0162`)
+
+**Anlass.** Eugene: „Die Tage, die bei LINA nicht geladen werden konnten — werden diese nachgeladen? Wenn nicht,
+bitte tun." Sie wurden es nicht (`fehlerkatalog.md`, 21.11.2026).
+
+**Entscheidung.** Jeder Tag, an dem LINA mit 5xx antwortet, wird jede Nacht einmal erneut gefragt, am Ende der
+Arbeitsliste; nach **drei Nächten** mit Fehler ist er aufgegeben und fällt aus dem Rückstand — wie die Null- und
+Lochtage (`0100`, `0101`). Ein 5xx zählt nur dann als Fehltag, wenn dasselbe Modul im selben Lauf schon geliefert
+hat; sonst bleibt es ein möglicher Ausfall (drei in Folge, Modul aus). Bremse 200 Fehltage je Betrieb, Modul und
+Nacht.
+
+**Verworfen.** Fehltage unbegrenzt weiter versuchen: der Rückstand ginge nie auf null, `stockt` stünde für immer —
+eine Warnung, die nie verschwindet, liest niemand (`0071`). Fehltage sofort aufgeben: eine einzelne schlechte Nacht
+bei LINA kostete dann Tage, die am nächsten Morgen da wären.

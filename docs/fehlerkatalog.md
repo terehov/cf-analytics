@@ -5946,3 +5946,24 @@ anzeigt, den niemand aufruft, ist Regel 10 in anderer Form.
 **Allgemeine Lehre.** Eine Spalte, die LINA umbenennt, ist kein Formatfehler, sondern eine Aussage über LINA: in
 `feld_alias.ts` festhalten, nicht im Spaltenplan überschreiben — sonst lädt die Historie nicht mehr.
 
+## Drei Tage, die LINA nicht liefert, hielten jeden älteren Tag fest (21.11.2026)
+
+**Symptom.** Nach dem TPAPI-Vollabzug blieben 528 Tage Personal (je Tag und je Stunde) bei drei Betrieben offen
+— Wilsdruffer Straße 391 (2018-11 bis 2019-11), Freiburg 136, Gera 1 —, `mart.tpapi_rueckstand` stand auf
+`stockt`. Jede Nacht wurden genau drei Tage je Betrieb gefragt, keiner davon geholt.
+
+**Ursache.** Das Nachladen geht neueste zuerst, und drei Fehler in Folge schalten ein Modul für den Lauf ab
+(`FEHLER_IN_FOLGE`, gedacht gegen einen Serverausfall). Liefert LINA für einen ganzen Zeitraum HTTP 500, sind die
+drei jüngsten offenen Tage jede Nacht dieselben, und kein älterer kommt je dran. Der Kommentar an
+`FEHLER_IN_FOLGE` hatte genau diesen Fall beschrieben und mit „drei statt einer" für gelöst gehalten — drei
+kaputte Tage am Stück blockieren genauso wie einer.
+
+**Was ihn künftig verhindert.** `0162` und `zaehltAlsFehltag()` in `src/tpapi/rohabzug.ts`: ein 5xx an einem
+Tag im Nachladen, während das Modul im selben Lauf geliefert hat, ist ein **Fehltag** (`sync.tpapi_fehltag`),
+kein Ausfall — er schaltet nichts ab (Bremse `TPAPI_FEHLTAGE_JE_LAUF`, 200), kommt ans Ende der Arbeitsliste und
+ist nach drei Nächten aufgegeben, sichtbar in `mart.tpapi_fehltag` und `mart.tpapi_rueckstand.tage_aufgegeben`.
+Test `src/tpapi/fehltag.test.ts`.
+
+**Allgemeine Lehre.** Eine Abbruchregel „n Fehler in Folge" in einer Liste, die immer in derselben Reihenfolge
+läuft, trifft jede Nacht dieselben n Einträge. Wer abbricht, muss die Reihenfolge ändern, sonst wird aus dem
+Schutz eine Blockade.

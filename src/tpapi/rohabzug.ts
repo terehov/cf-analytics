@@ -82,6 +82,35 @@ const EIGENE_MODULE: TpapiModul[] = ['revenue', 'artikel']
  */
 const FEHLER_IN_FOLGE = 3
 
+/**
+ * FEHLTAGE IM NACHLADEN (0162, 21.11.2026).
+ *
+ * Der Rückstand läuft neueste zuerst, und drei Fehler in Folge schalten das
+ * Modul für den Lauf ab. Liefert LINA für einen ZEITRAUM dauerhaft HTTP 500
+ * (gemessen 21.11.: Wilsdruffer Straße, Freiburg, Gera — Personal je Tag und je
+ * Stunde), probierte jede Nacht dieselben drei jüngsten Tage und nie einen
+ * älteren: der Rückstand stand, „stockt" sagte es, aber nichts löste es.
+ *
+ * Seitdem:
+ *   - ein Tag, an dem LINA im Nachladen mit 5xx antwortet, steht in
+ *     `sync.tpapi_fehltag` (Versuche, Nächte, letzter Status);
+ *   - bekannte Fehltage kommen ans ENDE der Arbeitsliste — die übrigen Tage
+ *     werden zuerst geholt;
+ *   - hat das Modul in DIESEM Lauf schon einen Erfolg (Phase A oder C), ist ein
+ *     5xx an einem Tag kein Serverausfall, sondern ein Tag, den LINA nicht hat:
+ *     er zählt nicht für FEHLER_IN_FOLGE, sondern gegen `TPAPI_FEHLTAGE_JE_LAUF`
+ *     je Betrieb und Modul. Ohne Erfolg im Lauf bleibt es bei drei in Folge;
+ *   - nach `FEHLTAG_NAECHTE` Nächten mit Fehler ist der Tag aufgegeben: er fällt
+ *     aus der Arbeitsliste und dem Rückstand und steht in `mart.tpapi_fehltag`
+ *     (und als `tage_aufgegeben` in `mart.tpapi_rueckstand`) — sichtbar, nicht
+ *     still (Regel 10). Die Grenze steht in der Sicht (`mart.tpapi_fehltag_naechte()`).
+ */
+export function zaehltAlsFehltag(o: {
+  phase: Laufstand['phase']; tag: string | undefined; status: number; modulLebt: boolean
+}): boolean {
+  return o.phase === 'nachladen' && o.tag !== undefined && o.status >= 500 && o.modulLebt
+}
+
 /** Wie lange höchstens am Stück gewartet wird, wenn alle Betriebe an der Grenze stehen. */
 const WARTEN_HOECHSTENS_MS = 30_000
 
@@ -97,6 +126,8 @@ type Auftrag = {
   /** Nur Bereichsabrufe (Prognose): YYYY-MM-DD. */
   von?: string
   bis?: string
+  /** Der Tag steht schon in sync.tpapi_fehltag (0162). */
+  bekannt?: boolean
 }
 
 /**
@@ -144,6 +175,10 @@ type Laufstand = {
   /** `${betrieb_key}:${modul}` → Grund. */
   modulAus: Map<string, 'nicht_lizenziert' | 'fehler'>
   fehlerFolge: Map<string, number>
+  /** Module (`${betrieb_key}:${modul}`) mit mindestens einem Erfolg in diesem Lauf (0162). */
+  modulLebt: Set<string>
+  /** Fehltage je Modul in diesem Lauf, gegen TPAPI_FEHLTAGE_JE_LAUF (0162). */
+  fehltage: Map<string, number>
   gruppen: Record<Gruppe, Gruppenstand>
   /** Zeitgrenze erreicht oder Obergrenze — kein Zustand, nur fürs Log. */
   abbruch: string | null
@@ -244,6 +279,13 @@ async function ausfuehren(s: Laufstand, x: Auftrag): Promise<void> {
     if (r.zeilen === 0) g.leer++
     if (r.tage) s.listdaysNichtMitternacht += r.tage.nichtBerlinerMitternacht
     s.fehlerFolge.delete(modulSchluessel(b, ep.modul))
+    s.modulLebt.add(modulSchluessel(b, ep.modul))
+    if (x.bekannt && x.tag) {
+      // Ein Fehltag, den LINA jetzt doch liefert: aus der Liste, er ist geholt.
+      await query(`DELETE FROM sync.tpapi_fehltag WHERE betrieb_key = $1 AND endpunkt = $2 AND geschaeftstag = $3::date`,
+        [b.betriebKey, ep.endpunkt, x.tag])
+        .catch(e => log.warn('tpapi: Fehltag nicht geloescht', { fehler: sauber(String(e)).slice(0, 200) }))
+    }
     await fortschreiben('ok', null)
     return
   }
@@ -279,6 +321,30 @@ async function ausfuehren(s: Laufstand, x: Auftrag): Promise<void> {
     })
   }
   const k = modulSchluessel(b, ep.modul)
+  if (!ladeFehler && zaehltAlsFehltag({ phase: s.phase, tag: x.tag, status: a.status, modulLebt: s.modulLebt.has(k) })) {
+    // Ein Tag, den LINA nicht liefert, während das Modul sonst antwortet (0162).
+    await query(
+      `INSERT INTO sync.tpapi_fehltag AS f
+              (betrieb_key, endpunkt, geschaeftstag, letzter_http, meldung, letzte_nacht)
+       VALUES ($1, $2, $3::date, $4, $5, (now() AT TIME ZONE core.geschaefts_zeitzone())::date)
+       ON CONFLICT (betrieb_key, endpunkt, geschaeftstag) DO UPDATE
+          SET versuche = f.versuche + 1,
+              naechte = f.naechte + CASE WHEN f.letzte_nacht < excluded.letzte_nacht THEN 1 ELSE 0 END,
+              letzte_nacht = excluded.letzte_nacht,
+              letzter_fehler_am = now(),
+              letzter_http = excluded.letzter_http,
+              meldung = excluded.meldung`,
+      [b.betriebKey, ep.endpunkt, x.tag, a.status, sauber(fehler).slice(0, 300)])
+      .catch(e => log.warn('tpapi: Fehltag nicht festgehalten', { fehler: sauber(String(e)).slice(0, 200) }))
+    const n = (s.fehltage.get(k) ?? 0) + 1
+    s.fehltage.set(k, n)
+    if (n >= config.TPAPI_FEHLTAGE_JE_LAUF) {
+      g.fehler++
+      s.modulAus.set(k, 'fehler')
+    }
+    await fortschreiben('fehler', fehler)
+    return
+  }
   const n = (s.fehlerFolge.get(k) ?? 0) + 1
   s.fehlerFolge.set(k, n)
   if (n >= FEHLER_IN_FOLGE) {
@@ -396,6 +462,7 @@ async function abschliessen(s: Laufstand, extra: Record<string, unknown>): Promi
 function neuerStand(phase: Laufstand['phase'], client: TpapiClient, laufId: string | null): Laufstand {
   return {
     phase, client, laufId, betriebAus: new Map(), modulAus: new Map(), fehlerFolge: new Map(),
+    modulLebt: new Set(), fehltage: new Map(),
     gruppen: { revenue: leererStand(), personal: leererStand(), artikel: leererStand(), stunde: leererStand() },
     abbruch: null, listdaysNichtMitternacht: 0,
   }
@@ -539,6 +606,18 @@ export async function tpapiNachladen(opt: TpapiNachladenOptionen = {}): Promise<
 
     const betriebe = await betriebeHeute(client, encIds)
     const nachKey = new Map(betriebe.map(b => [b.betriebKey, b]))
+    /*
+     * Module mit einem Erfolg in DIESEM Lauf (Phase A ist schon durch) — dort
+     * ist ein 5xx im Nachladen ein Tag, den LINA nicht hat, kein Ausfall (0162).
+     * Ohne laufenden Lauf (Handaufruf, Test): die letzten zwölf Stunden.
+     */
+    const lebt = await query<{ betrieb_key: number; modul: string }>(
+      `SELECT z.betrieb_key, z.modul
+         FROM sync.tpapi_zugang z
+        WHERE z.zuletzt_erfolg_am >= coalesce(
+                (SELECT gestartet_am FROM sync.lauf WHERE lauf_id = $1::bigint), now() - interval '12 hours')`,
+      [s.laufId])
+    for (const z of lebt) s.modulLebt.add(`${Number(z.betrieb_key)}:${z.modul}`)
     const tagesEp = aktiveTagesendpunkte()
     const nachEndpunkt = new Map(tagesEp.map(e => [e.endpunkt, e]))
     let auftraege: Auftrag[] = []
@@ -570,7 +649,7 @@ export async function tpapiNachladen(opt: TpapiNachladenOptionen = {}): Promise<
        *           holt) — gemeinsam neueste zuerst, Tag außen, Betrieb innen
        */
       const paare = betriebe.flatMap(b => [...b.module].map(m => [b.betriebKey, m] as const))
-      const liste = await query<{ betrieb_key: number; endpunkt: string; tag: string | null; von: string | null; bis: string | null }>(
+      const liste = await query<{ betrieb_key: number; endpunkt: string; tag: string | null; von: string | null; bis: string | null; bekannt: boolean }>(
         `WITH p(betrieb_key, modul) AS (SELECT * FROM unnest($2::int[], $3::text[])),
          arbeit AS (
            SELECT 1 AS rang, r.geschaeftstag AS sortiert, r.betrieb_key, r.endpunkt,
@@ -589,15 +668,21 @@ export async function tpapiNachladen(opt: TpapiNachladenOptionen = {}): Promise<
              JOIN p ON p.betrieb_key = r.betrieb_key AND p.modul = 'revenue'
             WHERE $6::text IS NOT NULL
          )
-         SELECT betrieb_key, endpunkt, tag, von, bis FROM arbeit
-          ORDER BY rang, sortiert DESC, betrieb_key, endpunkt
+         SELECT a.betrieb_key, a.endpunkt, a.tag, a.von, a.bis, (f.betrieb_key IS NOT NULL) AS bekannt
+           FROM arbeit a
+           LEFT JOIN sync.tpapi_fehltag f
+             ON f.betrieb_key = a.betrieb_key AND f.endpunkt = a.endpunkt AND f.geschaeftstag = a.tag::date
+          -- bekannte Fehltage ans Ende (0162): sonst halten drei Tage, die LINA
+          -- nicht liefert, jeden aelteren Tag des Betriebs fest
+          ORDER BY a.rang, (f.betrieb_key IS NOT NULL), f.versuche NULLS FIRST, a.sortiert DESC,
+                   a.betrieb_key, a.endpunkt
           LIMIT $1`,
         [config.TPAPI_NACHLADEN_JE_LAUF, paare.map(p => p[0]), paare.map(p => p[1]),
          tagesEp.map(e => e.endpunkt), stunde?.endpunkt ?? null, prognose?.endpunkt ?? null])
       auftraege = liste.flatMap((z, i) => {
         const b = nachKey.get(Number(z.betrieb_key))
         const ep = nachEndpunkt.get(z.endpunkt)
-        return b && ep ? [{ nr: i, betrieb: b, ep, tag: z.tag ?? undefined, von: z.von ?? undefined, bis: z.bis ?? undefined }] : []
+        return b && ep ? [{ nr: i, betrieb: b, ep, tag: z.tag ?? undefined, von: z.von ?? undefined, bis: z.bis ?? undefined, bekannt: z.bekannt }] : []
       })
     }
 

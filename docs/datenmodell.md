@@ -2038,3 +2038,11 @@ der Zugang **in der Datenbank**:
 
 Die Sicht kennt die sechs Einträge als feste Liste (`VALUES`), weil sie den Code nicht lesen kann;
 `src/foodnotify/zugang.test.ts` vergleicht sie mit `FN_TOKEN_ENDPUNKTE` aus dem Register.
+
+## Fehltage des TPAPI-Nachladens: `sync.tpapi_fehltag` (`0162`, 21.11.2026)
+
+Eine Zeile je Betrieb, Endpunkt und Geschäftstag, an dem LINA im Nachladen mit 5xx antwortete, während das Modul
+im selben Lauf geliefert hat: `versuche` (Aufrufe), `naechte` (Berliner Kalendertage mit Fehlversuch),
+`letzter_http`, `meldung`. In `sync`, nicht in `core`: es ist Betriebszustand des Importers, keine Aussage über die
+Daten — deshalb darf ein Erfolg die Zeile löschen. Ab `mart.tpapi_fehltag_naechte()` (3) Nächten ist der Tag
+aufgegeben; die Arbeitslisten schließen ihn aus. Lesbar über `mart.tpapi_fehltag`.

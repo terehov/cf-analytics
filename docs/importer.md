@@ -2513,6 +2513,21 @@ Tests: `src/sync/speicher.test.ts` (Prognose an synthetischen Messreihen gegen
 Nachrichtenzeile).
 
 
+### Fehltage im Nachladen (`0162`, 21.11.2026)
+
+Liefert LINA einen Tag mit HTTP 5xx, während dasselbe Modul im Lauf schon geliefert hat, ist das ein **Fehltag**
+(`zaehltAlsFehltag()`): er kommt nach `sync.tpapi_fehltag`, zählt nicht für die drei Fehler in Folge, sondern gegen
+`TPAPI_FEHLTAGE_JE_LAUF` (200 je Betrieb und Modul), und steht in der nächsten Nacht am **Ende** der Arbeitsliste.
+Nach drei Nächten mit Fehler fällt er aus `mart.tpapi_rueckstand_tag` und `mart.personal_rueckstand`
+(`mart.tpapi_fehltag_naechte()`), sichtbar in `mart.tpapi_fehltag`. Ein späterer Erfolg löscht die Zeile. Vorher
+hielten drei solche Tage jede Nacht alle älteren Tage eines Betriebs fest (`fehlerkatalog.md`, 21.11.2026).
+Seit `0161` holt das Nachladen nur Tage ab 2018 (`mart.tpapi_historie_ab()`).
+
+| Variable | Bedeutung |
+|---|---|
+| `TPAPI_FEHLTAGE_JE_LAUF` | Höchstens so viele Fehltage je Betrieb und Modul in einem Nachladen, danach ist das Modul für den Lauf aus. Vorgabe 200, 0 = sofort aus |
+
+
 ## TPAPI-Dienst, Stufe 2b: der Lader raw → core (`0153`, 12.11.2026)
 
 Plan, Entscheidungen B1–B16 und die Abweichungen 18–25: `plan-tpapi-stufe2.md` §5 und §8. **Gebaut und

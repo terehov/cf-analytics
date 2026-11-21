@@ -412,6 +412,25 @@ const Schema = z.object({
   TPAPI_NACHLADEN_JE_LAUF: z.coerce.number().int().min(0).default(50_000),
 
   /**
+   * Höchstens so viele Fehltage je Betrieb und Modul in einem Nachladen (0162).
+   *
+   * Ein Fehltag ist ein Tag, an dem LINA im Nachladen mit 5xx antwortet,
+   * während dasselbe Modul in diesem Lauf schon geliefert hat — kein
+   * Serverausfall, sondern ein Tag, den LINA nicht hat (gemessen 21.11.2026:
+   * 528 Tage Personal bei drei Betrieben). Solche Tage stehen in
+   * `sync.tpapi_fehltag`, kommen ans Ende der Arbeitsliste und sind nach drei
+   * Nächten mit Fehler aufgegeben (`mart.tpapi_fehltag`).
+   *
+   * Die Grenze ist die Bremse für den Fall, dass es DOCH ein Ausfall ist, der
+   * erst nach dem ersten Erfolg beginnt: 200 Aufrufe je Betrieb und Modul
+   * gehen dann ins Leere, mehr nicht — und unter der gleitenden Grenze von
+   * 60 je 15 Minuten (Regel 3). 200 reicht, damit Wilsdruffer Straße (391 Tage,
+   * zwei Endpunkte) in wenigen Nächten durch ist. 0 = Fehltage schalten das
+   * Modul sofort ab (wie vor 0162 nach drei in Folge).
+   */
+  TPAPI_FEHLTAGE_JE_LAUF: z.coerce.number().int().min(0).default(200),
+
+  /**
    * Artikelstamm (13 Listen `merchandiseman/*`) je Betrieb höchstens alle so
    * viele Tage (Plan S11: wöchentlich). Stammdaten ohne Tagesbezug; ein
    * Artikel, der am Mittwoch neu angelegt wird, steht spätestens nach einer
