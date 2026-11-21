@@ -5967,3 +5967,21 @@ Test `src/tpapi/fehltag.test.ts`.
 **Allgemeine Lehre.** Eine Abbruchregel „n Fehler in Folge" in einer Liste, die immer in derselben Reihenfolge
 läuft, trifft jede Nacht dieselben n Einträge. Wer abbricht, muss die Reihenfolge ändern, sonst wird aus dem
 Schutz eine Blockade.
+
+## Zwei Migrationen ohne Katalogschritt — eine neue Sicht ohne Körnung, drei Kommentare ohne Anhang (21.11.2026)
+
+**Symptom.** Beim Katalogabzug aus Produktion nach dem Deploy von `0161`/`0162` fehlte `mart.tpapi_fehltag` in
+`mcp/test/katalog.json`, und bei `mart.tpapi_rueckstand`, `mart.tpapi_rueckstand_tag` und
+`mart.personal_rueckstand` war der Anhang „Koernung: …" aus dem Kommentar verschwunden. Kein Fehler, kein Test
+rot — die Leserolle durfte die neue Sicht über die Standardrechte des Schemas schon lesen.
+
+**Ursache.** Beide Migrationen legten Sichten an bzw. schrieben ihre Kommentare neu (`COMMENT ON VIEW`
+ersetzt den ganzen Text, also auch den Anhang aus `mcp.koernung_in_kommentare()`), aber ohne den Katalogschritt,
+den jede Migration mit neuer oder neu kommentierter `mart`-Sicht seit `0129` trägt: `mcp.achsen_ableiten()`,
+Körnung und Thema in `mcp.sicht`, `mcp.koernung_in_kommentare()`, `mcp.rechte_auffrischen()`, Gegenprobe als
+`mcp_leser`.
+
+**Was ihn künftig verhindert.** `0163` holt den Schritt nach und bricht ab, wenn eine der vier Sichten danach
+ohne Körnungsanhang dasteht. Dauerhaft fängt es nur der Katalogabzug nach dem Deploy (Dokumentationspflicht in
+`AGENTS.md`) — **ihn ziehen und den Unterschied lesen**, nicht nur committen: ein entfernter „Koernung:"-Anhang
+ist dort die einzige Spur.
