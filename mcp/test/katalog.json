@@ -5664,7 +5664,7 @@
    "koernung": "Betrieb × fehlender Geschaeftstag — Arbeitsliste fuer Personal je Stunde bis zur Tiefe von listdays, muss auf 0 fallen",
    "thema": "import",
    "summen_erlaubt": false,
-   "kommentar": "Arbeitsliste fuer Personal je Stunde (0149, seit 0153 mit der Tiefe von listdays): je Betrieb mit\nSchluessel die Geschaeftstage, die noch nie erfolgreich geholt wurden — die letzten 365 Tage und\ndazu jeder aeltere Tag, den LINAs listdays fuer den Betrieb fuehrt (Aposto Aalen bis Oktober 2019).\nEin leerer Tag zaehlt als erledigt. Phase A holt davon die letzten 365 Tage (feste Grenze je\nBetrieb), Phase C den Rest unter TPAPI_NACHLADEN_JE_LAUF. Die Zeilenzahl MUSS von Nacht zu Nacht\nfallen und 0 erreichen. Betriebe, deren Modul nicht lizenziert ist, fehlen hier — sie stehen in\nmart.tpapi_zugang.\n\nKoernung: Betrieb × fehlender Geschaeftstag — Arbeitsliste fuer Personal je Stunde bis zur Tiefe von listdays, muss auf 0 fallen",
+   "kommentar": "Arbeitsliste fuer Personal je Stunde (0149, seit 0153 mit der Tiefe von listdays, seit 0161 nicht\nvor mart.tpapi_historie_ab(), 2018-01-01): je Betrieb mit Schluessel die Geschaeftstage, die noch\nnie erfolgreich geholt wurden — die letzten 365 Tage und dazu jeder aeltere Tag ab 2018, den LINAs\nlistdays fuer den Betrieb fuehrt. Ein leerer Tag zaehlt als erledigt. Phase A holt davon die\nletzten 365 Tage (feste Grenze je Betrieb), Phase C den Rest unter TPAPI_NACHLADEN_JE_LAUF. Die\nZeilenzahl MUSS von Nacht zu Nacht fallen und 0 erreichen. Betriebe, deren Modul nicht lizenziert\nist, fehlen hier — sie stehen in mart.tpapi_zugang.\n\nKoernung: Betrieb × fehlender Geschaeftstag — Arbeitsliste fuer Personal je Stunde bis zur Tiefe von listdays, muss auf 0 fallen",
    "spalten": [
     "betrieb_key",
     "enc_id",
@@ -8147,11 +8147,52 @@
    "fallstricke": []
   },
   {
+   "sicht": "mart.tpapi_fehltag",
+   "koernung": "Betrieb × TPAPI-Endpunkt × Geschaeftstag, den LINA mit HTTP 5xx verweigert — wird erneut versucht oder aufgegeben",
+   "thema": "import",
+   "summen_erlaubt": false,
+   "kommentar": "TPAPI-Tage, die LINA im Nachladen nicht liefert (HTTP 5xx, waehrend das Modul sonst antwortet;\n0162). zustand: wird erneut versucht (jede Nacht einmal, am Ende der Arbeitsliste) | aufgegeben\n(nach mart.tpapi_fehltag_naechte() Naechten — faellt aus dem Rueckstand, hier bleibt er stehen).\nZaehlen je Betrieb und Endpunkt; eine Summe ueber Endpunkte zaehlt denselben Tag mehrfach.\nErneut versuchen: die Zeile in sync.tpapi_fehltag loeschen.\n\nKoernung: Betrieb × TPAPI-Endpunkt × Geschaeftstag, den LINA mit HTTP 5xx verweigert — wird erneut versucht oder aufgegeben",
+   "spalten": [
+    "betrieb_key",
+    "betrieb",
+    "endpunkt",
+    "geschaeftstag",
+    "zustand",
+    "versuche",
+    "naechte",
+    "letzter_http",
+    "meldung",
+    "erster_fehler_am",
+    "letzter_fehler_am",
+    "vor_historie"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "endpunkt",
+    "geschaeftstag"
+   ],
+   "kennzahlen": [
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "naechte",
+     "einheit": "anzahl",
+     "hinweis": "In wie vielen Naechten der Tag scheiterte; ab mart.tpapi_fehltag_naechte() (3) gilt er als aufgegeben."
+    },
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "versuche",
+     "einheit": "anzahl",
+     "hinweis": "Fehlversuche fuer diesen einen Tag, ueber alle Naechte. Eine Summe sagt nichts; Tage je Betrieb zaehlen."
+    }
+   ],
+   "fallstricke": []
+  },
+  {
    "sicht": "mart.tpapi_rueckstand",
    "koernung": "Betrieb × TPAPI-Tagesendpunkt — Tage laut listdays, geholt, fehlend, stockt",
    "thema": "import",
    "summen_erlaubt": false,
-   "kommentar": "TPAPI-Rohabzug je Betrieb und Tagesendpunkt (0151): wie viele Geschaeftstage LINA fuehrt\n(tage_liste), wie viele geholt sind und wie viele fehlen — die Zahl, die Nacht fuer Nacht FALLEN\nmuss. stockt = es fehlt etwas, und seit 48 Stunden kam kein Tag aus dem Nachladen dazu (Pruefzeile\nin mart.pruefung_uebersicht). Ein Betrieb, der fehlt, hat keinen Schluessel oder das Modul nicht\ngebucht — siehe mart.tpapi_zugang_modul. Geholt heisst roh gesichert; ob ein Tag schon in den\nAuswertungen steht, sagt mart.tpapi_abruf_stand (in_core).\n\nKoernung: Betrieb × TPAPI-Tagesendpunkt — Tage laut listdays, geholt, fehlend, stockt",
+   "kommentar": "TPAPI-Rohabzug je Betrieb und Tagesendpunkt (0151, ab 0161 nur Tage ab mart.tpapi_historie_ab(),\n2018-01-01): wie viele Geschaeftstage LINA in diesem Zeitraum fuehrt (tage_liste), wie viele geholt\nsind und wie viele fehlen — die Zahl, die Nacht fuer Nacht FALLEN muss. Aeltere Tage, die vor 0161\ngeholt wurden, liegen weiter in raw und zaehlen hier nicht. stockt = es fehlt etwas, und seit 48\nStunden kam kein Tag aus dem Nachladen dazu (Pruefzeile in mart.pruefung_uebersicht). Ein Betrieb,\nder fehlt, hat keinen Schluessel oder das Modul nicht gebucht — siehe mart.tpapi_zugang_modul.\nGeholt heisst roh gesichert; ob ein Tag schon in den Auswertungen steht, sagt\nmart.tpapi_abruf_stand (in_core).\n\nKoernung: Betrieb × TPAPI-Tagesendpunkt — Tage laut listdays, geholt, fehlend, stockt",
    "spalten": [
     "betrieb_key",
     "betrieb",
@@ -8169,13 +8210,21 @@
     "letzter_abruf",
     "letzter_nachladen",
     "bekannt_seit",
-    "stockt"
+    "stockt",
+    "tage_aufgegeben"
    ],
    "achsen": [
     "betrieb_key",
     "endpunkt"
    ],
-   "kennzahlen": [],
+   "kennzahlen": [
+    {
+     "regel": "nicht_aggregieren",
+     "spalte": "tage_aufgegeben",
+     "einheit": "anzahl",
+     "hinweis": "Tage, die LINA in drei Naechten mit HTTP 5xx verweigert hat — kein Rueckstand des Importers, sondern ein Befund ueber LINA. Je Betrieb und Endpunkt lesen."
+    }
+   ],
    "fallstricke": []
   },
   {
@@ -8183,7 +8232,7 @@
    "koernung": "Betrieb × TPAPI-Tagesendpunkt × fehlender Geschaeftstag — Arbeitsliste des Nachladens, muss auf 0 fallen",
    "thema": "import",
    "summen_erlaubt": false,
-   "kommentar": "Arbeitsliste des TPAPI-Nachladens (0151): je Betrieb mit Schluessel, Tagesendpunkt (Journal, Bons,\nPersonalkosten je Tag) und Geschaeftstag, der laut LINAs listdays existiert und noch nie\nerfolgreich geholt wurde. Phase C holt daraus die neuesten Tage zuerst. Die Zeilenzahl MUSS fallen\nund 0 erreichen; die verdichtete Zahl je Betrieb steht in mart.tpapi_rueckstand. Betriebe ohne\nSales Data API haben keine listdays — fuer Personalkosten je Tag gelten dort die letzten 365 Tage\n(arbeitsliste = horizont 365). Nicht lizenzierte Module fehlen hier und stehen in\nmart.tpapi_zugang_modul.\n\nKoernung: Betrieb × TPAPI-Tagesendpunkt × fehlender Geschaeftstag — Arbeitsliste des Nachladens, muss auf 0 fallen",
+   "kommentar": "Arbeitsliste des TPAPI-Nachladens (0151, Grenze seit 0161): je Betrieb mit Schluessel,\nTagesendpunkt (Journal, Bons, Personalkosten je Tag) und Geschaeftstag, der laut LINAs listdays\nexistiert, nicht vor mart.tpapi_historie_ab() (2018-01-01) liegt und noch nie erfolgreich geholt\nwurde. Phase C holt daraus die neuesten Tage zuerst. Die Zeilenzahl MUSS fallen und 0 erreichen;\ndie verdichtete Zahl je Betrieb steht in mart.tpapi_rueckstand. Betriebe ohne Sales Data API haben\nkeine listdays — fuer Personalkosten je Tag gelten dort die letzten 365 Tage (arbeitsliste =\nhorizont 365). Nicht lizenzierte Module fehlen hier und stehen in mart.tpapi_zugang_modul.\n\nKoernung: Betrieb × TPAPI-Tagesendpunkt × fehlender Geschaeftstag — Arbeitsliste des Nachladens, muss auf 0 fallen",
    "spalten": [
     "betrieb_key",
     "enc_id",
