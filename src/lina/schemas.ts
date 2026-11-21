@@ -11,6 +11,7 @@
  * bei fehlenden Vergleichszeiträumen null liefert.
  */
 import { z } from 'zod'
+import { feldNamen } from './feld_alias'
 import { betriebsbericht } from './betriebsberichte'
 
 const zahl = z.number().nullable().optional()
@@ -197,12 +198,14 @@ export function betriebsberichtSchema(
 ): z.ZodTypeAny {
   return BetriebsReportSchema.superRefine((d, ctx) => {
     const vorhanden = new Set(d.tableHead.flat().map(h => h.field))
+    // Ein früherer Name einer umbenannten Spalte zählt als vorhanden
+    // (src/lina/feld_alias.ts) — sonst wäre jede alte Rohantwort eine Abweichung.
     for (const f of felder) {
-      if (!vorhanden.has(f)) {
+      if (!feldNamen(f).some(n => vorhanden.has(n))) {
         ctx.addIssue({ code: 'custom', path: ['tableHead'], message: `Spalte fehlt: ${f}` })
       }
     }
-    const erwartet = new Set(felder)
+    const erwartet = new Set(felder.flatMap(f => [...feldNamen(f)]))
     for (const f of vorhanden) {
       if (!erwartet.has(f) && !(dynamisch && dynamisch.test(f))) {
         ctx.addIssue({ code: 'custom', path: ['tableHead'], message: `unbekannte Spalte: ${f}` })

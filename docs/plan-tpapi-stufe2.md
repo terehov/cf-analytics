@@ -354,3 +354,9 @@ müsste die Historie später ein zweites Mal geholt und gegen den ersten Abzug v
 die letzten 120 Tage mit je sechs Werten): `mart.umsatzprognose_vorlauf` für 30 Tage 0,25 s,
 `mart.umsatzprognose_guete` für einen Monat 0,95 s, über alles gruppiert 0,8 s, Horizont und Nachher
 unter 0,1 s. Keine Materialisierung.
+
+**Nachtrag 21.11.2026 (`0161`): der Rohabzug holt nur Tage ab 2018** (Entscheidung Eugene, `entscheidungen.md`).
+`mart.tpapi_historie_ab()` begrenzt beide Arbeitslisten; was vorher an 2014–2017 geholt wurde, bleibt in raw und
+zählt im Rückstand nicht mehr. Danach offen: 528 Tage Personal je Tag bei drei Betrieben mit HTTP 500
+(`stockt = true`) — ein Befund über LINA, kein Rückstand des Importers.
+

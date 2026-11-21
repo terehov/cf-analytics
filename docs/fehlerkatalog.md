@@ -5917,3 +5917,32 @@ auch in `bun test`, mit `FN_API_TOKENS`. Die Sitzung landete bei der Attrappe, d
 `FN_API_TOKEN`, die DB-Tests mit Attrappe löschen `FN_API_TOKENS` vor dem ersten Import, und die Attrappe zählt
 Token-Aufrufe getrennt (`tokenZaehler`). **Die Lehre:** Jeder neue Host, den der Importer anspricht, gehört an
 dieselbe Umbiegung wie die alten — ein zweiter Host, der beim Laden feststeht, ist für Tests ein Weg ins Echte.
+
+## LINA hat eine Spalte umbenannt — die Bon-Art stand fünf Wochen auf NULL (21.11.2026)
+
+**Symptom.** Ab dem Geschäftstag 18.10.2026 trug jeder Bon in `core.bon` (Bericht 96) und `core.tischtransfer_bon`
+(113) `art = NULL` — am 21.11. je 223.097 Zeilen bei 55 Betrieben, davor keine einzige. Die Bon-Sichten aus `0117`
+zählen nur `art = 'Rechnung'` (Bons, Bonumsatz, Median, Artikel je Bon) und zeigten für diese Wochen **null Bons**.
+Kein Fehler, kein Abbruch, eine plausible Null.
+
+**Ursache.** LINA hat den Tippfehler in der Spaltenüberschrift berichtigt: „Rechnung/Butschrift" heißt jetzt
+„Rechnung/Gutschrift" (Rohantworten seit dem 09.11.2026, 219 je Bericht). Der Lader las den alten Namen und bekam
+`undefined`.
+
+**Warum es fünf Wochen dauerte.** Die Prüfung hat funktioniert: jede Antwort stand in `sync.schema_abweichung`
+(„Spalte fehlt: Rechnung/Butschrift", 438 Zeilen), `/status` stand auf Warnung. Gelesen hat es niemand, bis die
+erste Statusmeldung in kChat am 21.11. die 442 offenen Abweichungen nannte. Eine Wache, die nur ein Endpunkt
+anzeigt, den niemand aufruft, ist Regel 10 in anderer Form.
+
+**Was ihn behebt und künftig verhindert.**
+* `src/lina/feld_alias.ts`: je aktueller Spaltenname die früheren. Die Schemaprüfung nimmt beide an, der Lader
+  (`feld()`) liest unter beiden — alte Rohantworten laden weiter (Regel 4), neue auch. 96 und 113 führen den neuen
+  Namen; Test in `src/transform/betriebsbericht.test.ts`.
+* Migration `0161` trägt die Art aus raw nach (Zeilenschlüssel des Laders nachgerechnet, Rechnungsnummer als
+  Gegenprobe, Abbruch, wenn mehr als 1 % offen bleibt) und quittiert die 438 Abweichungen. Am Klon gegen die
+  Originalwerte geprüft: 1.557 von 1.557 Bons, 2 von 2 Tischbons, aus alten und umbenannten Antworten.
+* Die Statusmeldung nach jedem Lauf (`src/meldung.ts`, seit 19.11.) bringt offene Schemaabweichungen in den Channel.
+
+**Allgemeine Lehre.** Eine Spalte, die LINA umbenennt, ist kein Formatfehler, sondern eine Aussage über LINA: in
+`feld_alias.ts` festhalten, nicht im Spaltenplan überschreiben — sonst lädt die Historie nicht mehr.
+

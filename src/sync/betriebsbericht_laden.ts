@@ -233,7 +233,7 @@ export const SPALTENPLAENE: Record<string, bt.Spaltenplan> = {
     spalten: [
       { feld: 'Rechnungsnummer', spalte: 'rechnungsnummer', typ: 'ganz' },
       { feld: 'TischId', spalte: 'tisch_id', typ: 'ganz' },
-      { feld: 'Rechnung/Butschrift', spalte: 'art', typ: 'text' },
+      { feld: 'Rechnung/Gutschrift', spalte: 'art', typ: 'text' },  // früher „Butschrift“, feld_alias.ts
       { feld: 'Anzahl_Artikel', spalte: 'anzahl_artikel', typ: 'ganz' },
       { feld: 'Finanzwege', spalte: 'finanzwege', typ: 'liste' },
       { feld: 'Brutto', spalte: 'brutto', typ: GELD },
@@ -559,7 +559,7 @@ export async function betriebsberichtSchreiben(c: PoolClient, k: Kontext): Promi
       await c.query(
         `DELETE FROM core.bon WHERE betrieb_key = $1 AND geschaeftstag BETWEEN $2::date AND $3::date`,
         [betriebKey, von, bis])
-      const liste = bt.bons(h, 'Rechnung/Butschrift')
+      const liste = bt.bons(h, 'Rechnung/Gutschrift')  // früher „Butschrift“, feld_alias.ts
       const fremd = liste.filter(z => z.geschaeftstag < von || z.geschaeftstag > bis).length
       if (fremd > 0) {
         // Ein Bon ausserhalb des angefragten Fensters haette in einem anderen

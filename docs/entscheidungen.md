@@ -5443,3 +5443,19 @@ Entschieden von Eugene am 20.11.2026, nach der Messung der ersten Nacht
    FoodNotify. Eine Schätzung aus veraltenden Kosten wäre eine fast richtige Zahl. Wieder aufzugreifen, wenn eine
    andere Marke einen deutlich höheren Anteil zeigt.
 3. **`NACHLADEN_BIS` 03:30** — bestätigt; der Eintrag vom 19.11.2026 darüber ist die Umsetzung.
+
+## 21.11.2026 — Der TPAPI-Rohabzug holt nur Tage ab 2018
+
+**Anlass.** Nach dem Vollabzug war der Rest fast nur noch 2014–2017 (bis zu 4.466 Listtage je Betrieb), dazu
+4,8 GB roh vor 2018 schon geholt. Eugene: „Wir brauchen nur Daten bis 2018, max. 2020 wäre auch okay."
+
+**Entscheidung.** Grenze 2018-01-01, dieselbe wie `HISTORIE_AB` beim LINA-Backfill, als `mart.tpapi_historie_ab()`
+an einer Stelle (`0161`). Die Arbeitslisten `mart.tpapi_rueckstand_tag` und `mart.personal_rueckstand` und die
+Zählung in `mart.tpapi_rueckstand` lesen sie; der Importer nimmt seine Arbeit aus diesen Sichten und bleibt
+unverändert. Gemessen vor dem Deploy (21.11., Sichtrumpf lesend gegen Produktion): Journal und Bons 0 offen,
+Personal je Tag 528 bei drei Betrieben, die alle HTTP 500 liefern (Wilsdruffer Straße 391, Freiburg 136, Gera 1).
+
+**Verworfen.** 2020 als Grenze: der LINA-Backfill reicht bis 2018, zwei verschiedene Grenzen in einer
+Datenbank sind eine Falle für jeden Vergleich. Geholtes vor 2018 löschen: raw ist append-only (Regel 4), und der
+Platz (4,8 GB) entscheidet nichts.
+

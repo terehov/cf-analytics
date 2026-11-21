@@ -166,9 +166,11 @@ export const BETRIEBSBERICHTE: Betriebsbericht[] = [
   bb({
     bericht: 96, klasse: 'W', stufe: 'A',
     zweck: 'Rechnungsausgangsbuch: eine Zeile je Bon (ohne Uhrzeit, ohne Nachlaesse)',
-    felder: ['Datum', 'Rechnungsnummer', 'Rechnung/Butschrift', 'Anzahl_Artikel', 'Finanzwege',
+    felder: ['Datum', 'Rechnungsnummer', 'Rechnung/Gutschrift', 'Anzahl_Artikel', 'Finanzwege',
              'Brutto', 'Debitor_-_Anschrift', 'Debitor'],
     tabellen: ['core.bon'],
+    hinweis: 'Bis Geschaeftstag 17.10.2026 hiess die Spalte „Rechnung/Butschrift" (Tippfehler bei LINA, '
+           + 'berichtigt) — beide Namen gelten, src/lina/feld_alias.ts.',
   }),
   bb({
     bericht: 97, klasse: 'M-Tag', intervall: 3, stufe: 'A', laufenderMonat: true,
@@ -290,9 +292,11 @@ export const BETRIEBSBERICHTE: Betriebsbericht[] = [
   bb({
     bericht: 113, klasse: 'W', stufe: 'B',
     zweck: 'Tischtransfer: eine Zeile je Bon mit TischId',
-    felder: ['Datum', 'Rechnungsnummer', 'TischId', 'Rechnung/Butschrift', 'Anzahl_Artikel',
+    felder: ['Datum', 'Rechnungsnummer', 'TischId', 'Rechnung/Gutschrift', 'Anzahl_Artikel',
              'Finanzwege', 'Brutto', 'Status', 'Versuche', 'Antwort'],
     tabellen: ['core.tischtransfer_bon'],
+    hinweis: 'Bis Geschaeftstag 17.10.2026 hiess die Spalte „Rechnung/Butschrift" — beide Namen gelten, '
+           + 'src/lina/feld_alias.ts.',
   }),
 
   // --- Registriert, aber aus: kein Posten, kein Backfill -------------------

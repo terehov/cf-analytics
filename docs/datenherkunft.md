@@ -82,7 +82,7 @@ Umsatzbericht (`core.betrieb.enc_id`), alle 141 Betriebe mit einer Sitzung. Regi
 |---|---|---|---|
 | 92 Rabattbericht | Tag | `core.rabatt_artikel_tag` | Nachlass je Finanzweg (Hausbon/Rabatt) und Artikel**name** |
 | ~~88 Finanzwege~~ | ~~Tag~~ | `core.finanzweg_tag` (`bericht = 88`), `core.finanzweg`, `core.finanzweg_stand` | ~~Umsatz und Vorgänge je Finanzweg~~ **Abgeschaltet 23.09.2026** (`0119`): dieselbe Tabelle kommt aus 97. Was bis dahin geladen war, bleibt in `core` und ist Rückfall in `mart.finanzweg_tag` |
-| 96 Rechnungsausgangsbuch | Woche | `core.bon` | eine Zeile je Bon: Art, Artikelzahl, Zahlarten, Brutto, Debitor |
+| 96 Rechnungsausgangsbuch | Woche | `core.bon` | eine Zeile je Bon: Art, Artikelzahl, Zahlarten, Brutto, Debitor. Die Art steht in der Spalte „Rechnung/Gutschrift“, bis Geschäftstag 17.10.2026 „Rechnung/Butschrift“ (LINA hat den Tippfehler berichtigt, ebenso in 113) — beide Namen gelten (`src/lina/feld_alias.ts`, `0161`) |
 | 97 Tagesabschluss | Monat, Tageszeilen | `core.tagesabschluss_tag`, `core.finanzweg_tag` (`bericht = 97`), `core.finanzweg`, `core.finanzweg_stand` | je Tag Hauptsparte × Steuersatz **und** die volle Finanzwegtabelle — **seit 23.09.2026 die einzige laufende Quelle der Finanzwege**. ~~Ein Monat steht erst ab Monatsende + 7 Tagen da~~ Der laufende Monat kommt jede Nacht bis zum Vortag, **vorläufig** (`core.betriebsbericht_abruf.vorlaeufig`, `0120`); endgültig ab Monatsende + 7 |
 | 39, 90, 108, 99, 60, 61, 53, 57, 68, 69, 112, 71, 75, 76 | Monat | je eine Tabelle, `datenmodell.md` | Stufe B |
 | 86, 113 | Woche | `core.debitor_bon`, `core.tischtransfer_bon` | Bons mit Debitor- bzw. Tischfeldern |

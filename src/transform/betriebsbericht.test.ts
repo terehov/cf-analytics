@@ -297,6 +297,46 @@ describe('Stufe B: Spaltenpläne gegen die Stichproben der Vermessung', () => {
   })
 })
 
+describe('Umbenannte Spalte „Rechnung/Butschrift" → „Rechnung/Gutschrift" (96, 113; 21.11.2026)', () => {
+  // LINA hat den Tippfehler zum Geschäftstag 18.10.2026 berichtigt; der Lader las
+  // den alten Namen weiter und schrieb art = NULL (223.097 Bons). Beide Namen gelten.
+  const alt = fixture('report96-duesseldorf-2026-08-15.json').antwort as any
+  const neu = structuredClone(alt)
+  for (const kopf of neu.tableHead) for (const h of kopf) {
+    if (h.field === 'Rechnung/Butschrift') { h.field = 'Rechnung/Gutschrift'; h.header = 'Rechnung/Gutschrift' }
+  }
+  for (const block of neu.table) for (const [k, z] of Object.entries<any>(block)) {
+    if (/^\d+$/.test(k) && z && 'Rechnung/Butschrift' in z) {
+      z['Rechnung/Gutschrift'] = z['Rechnung/Butschrift']; delete z['Rechnung/Butschrift']
+    }
+  }
+  const e96 = endpunkt('getReport:96') as any
+
+  test('der neue Name trägt die Art wie der alte: 493 / 13 / 13', () => {
+    for (const antwort of [alt, neu]) {
+      const bons = bt.bons(bt.berichtEntpacken(antwort))
+      const art = (a: string) => bons.filter(b => b.art === a).length
+      expect([art('Rechnung'), art('Stornierte Rechnung'), art('Gutschrift')]).toEqual([493, 13, 13])
+      expect(bons.some(b => b.art === null)).toBe(false)
+    }
+  })
+
+  test('die Schemaprüfung nimmt beide Namen an — und meldet keine unbekannte Spalte', () => {
+    for (const antwort of [alt, neu]) {
+      const r = betriebsberichtSchema(e96.felder, e96.dynamisch, e96.intervall).safeParse(antwort)
+      expect(r.success ? '' : JSON.stringify(r.error!.issues)).toBe('')
+    }
+  })
+
+  test('der Spaltenplan von 113 liest die Art unter beiden Namen', () => {
+    const plan = (SPALTENPLAENE as any)['getReport:113']
+    for (const antwort of [alt, neu]) {
+      const zeilen = bt.nachPlan(bt.berichtEntpacken(antwort), plan)
+      expect(zeilen.filter(z => z.art === 'Rechnung')).toHaveLength(493)
+    }
+  })
+})
+
 describe('Schema je Bericht', () => {
   const e92 = endpunkt('getReport:92') as any
   const b = r92.betriebe[1]!.antwort as any

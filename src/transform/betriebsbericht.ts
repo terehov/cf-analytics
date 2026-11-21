@@ -24,6 +24,7 @@
  *     In UTC ist das der 14.08. um 22:00 — wer UTC nimmt, verschiebt jeden Tag.
  */
 import { linaEpochAlsDatum } from '../lib/time'
+import { feldNamen } from '../lina/feld_alias'
 
 export type Block = {
   /** `tableHead[].field` in Reihenfolge. */
@@ -145,8 +146,11 @@ export function text(v: unknown): string | null {
  * Spaltenüberschrift, ist es keine Angabe.
  */
 export function feld(b: Block, zeile: Record<string, unknown>, f: string): unknown {
-  const v = roh(zeile[f])
-  if (typeof v === 'string' && (v === b.kopf[f] || v === f)) return null
+  // Umbenannte Spalten (src/lina/feld_alias.ts): erst der aktuelle Name, dann
+  // die früheren — alte Rohantworten laden so mit demselben Spaltenplan.
+  const name = feldNamen(f).find(n => zeile[n] !== undefined) ?? f
+  const v = roh(zeile[name])
+  if (typeof v === 'string' && (v === b.kopf[name] || v === name)) return null
   return v
 }
 
@@ -404,7 +408,7 @@ export type BonZeile = {
  *
  * Die Summenzeile (ohne gültiges Datum) fällt weg.
  */
-export function bons(h: Huelle, artFeld = 'Rechnung/Butschrift'): BonZeile[] {
+export function bons(h: Huelle, artFeld = 'Rechnung/Gutschrift'): BonZeile[] {
   const out: BonZeile[] = []
   const lauf = new Map<string, number>()
   for (const b of h.bloecke) {
