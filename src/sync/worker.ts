@@ -35,6 +35,7 @@ import { istBetriebsbericht } from '../lina/betriebsberichte'
 import { FnClient, type FnZugangInfo } from '../foodnotify/client'
 import { fnEndpunkt, alsNichtGefundenVerbuchen } from '../foodnotify/endpunkte'
 import { fnLaden, rezeptNichtGefunden } from '../foodnotify/laden'
+import { erpFehltAufheben, erpFehltVerbuchen, istErpFehlt } from '../foodnotify/erp_fehlt'
 import { laden, rohNachLadefehlerSichern } from './laden'
 import { alsIsoDatum, kalendertagInGeschaeftszeitzone, minuteDesTagesInGeschaeftszeitzone, tagDanach } from '../lib/time'
 
@@ -1366,6 +1367,10 @@ async function sitzungOeffnen(
                   letzter_fehler = NULL, gesperrt_seit = NULL
             WHERE posten_id = $1`, [posten.posten_id])
         await protokoll(laufId, epKey, posten, 'ok', res, quellClient, null, zeilen)
+        // Eine Kostenstelle, die wieder antwortet, ist nicht mehr „ohne
+        // Warenwirtschaft" (0164) — die Probe je FN_ERP_FEHLT_PROBE_TAGE
+        // findet das, und hier fällt die Markierung.
+        if (quelle.art === 'fn') await erpFehltAufheben(quelle.markeKey, extra)
         log.debug('geladen', { endpunkt: epKey, von, zeilen, dauerMs: res.dauerMs })
         await fortschritt(anbieter, epKey, von, zeilen, res.dauerMs)
         await standSchreiben(epKey, posten.betrieb_enc_id ?? null, bis, true, null)
@@ -1708,6 +1713,24 @@ async function sitzungOeffnen(
         await rezeptNichtGefunden(posten.posten_id, quelle.markeKey, extra.rezeptId, res.fehler)
         log.warn('rezept bei foodnotify nicht gefunden (404) — posten geschlossen', {
           endpunkt: epKey, rezeptId: extra.rezeptId, markeKey: quelle.markeKey,
+        })
+        await protokoll(laufId, epKey, posten, 'uebersprungen', res, quellClient, res.fehler)
+        continue
+      }
+
+      /**
+       * „No Erp Found!" (0164): die Kostenstelle hat bei FoodNotify keine
+       * Warenwirtschaft mehr. Eine Antwort, kein Fehler des Abrufs — als
+       * 'aufgegeben' stand sie nach drei Wiederbelebungen als „fehlt
+       * dauerhaft" in der Nachtmeldung (neun Kostenstellen seit 12./13.11.2026).
+       * Zaehlt NICHT als Erstfehler. Die Kostenstelle wird markiert und nur
+       * noch je FN_ERP_FEHLT_PROBE_TAGE eingereiht (src/foodnotify/erp_fehlt.ts).
+       */
+      if (quelle.art === 'fn' && istErpFehlt(res.fehler)
+          && await erpFehltVerbuchen(posten.posten_id, quelle.markeKey, extra, res.fehler)) {
+        uebersprungen++
+        log.warn('foodnotify: kostenstelle ohne warenwirtschaft — posten geschlossen', {
+          endpunkt: epKey, erpId: extra.erpId, markeKey: quelle.markeKey, sicht: 'mart.kostenstelle_ohne_erp',
         })
         await protokoll(laufId, epKey, posten, 'uebersprungen', res, quellClient, res.fehler)
         continue

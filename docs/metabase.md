@@ -2531,7 +2531,8 @@ je kg/l, der bezahlte je Gebinde.
   Kostenstellen überhaupt auseinanderlaufen, ist nicht gemessen** — die beiden ersten Kostenstellen (11035, 12066)
   waren das Testrestaurant ohne gemeinsame Ware, die echte 7984 ist allein. Die Spalten sind ein Angebot.
 * **`zustand`** in `mart.warenstamm_stand`, in dieser Reihenfolge: `marke nicht aktiv`, `kein zugriff` (letzter
-  Posten `kein_zugriff`, `0075`), `nie geladen`, `unvollstaendig` (eine Folgeseite meldete eine andere
+  Posten `kein_zugriff`, `0075`), `erp fehlt` (seit `0164`: FoodNotify kennt die Warenwirtschaft der Kostenstelle
+  nicht mehr, siehe `mart.kostenstelle_ohne_erp` — kein Befund, nicht auffällig), `nie geladen`, `unvollstaendig` (eine Folgeseite meldete eine andere
   Gesamtzahl), `veraltet` (letzter **vollständiger** Abzug älter als 36 h), `leer`, `ohne betrieb`, `ok`.
 * **Prüfzeile** „FoodNotify-Warenstamm: Kostenstelle einer aktiven Marke ohne vollstaendigen Abzug (36 h) oder
   leer": geprüft = Kostenstellen aktiver Marken mit Zugriff, auffällig = `nie geladen`, `unvollstaendig`,
@@ -2679,3 +2680,20 @@ Daten **ankommen**, sagt `mart.quelle_zulauf`, nicht diese Sicht. `abrufe` sind 
 Rückfall ist ein Posten mit zwei Aufrufen; über Zeilen nicht summieren (die Läufe der Zeilen können verschieden
 sein). Keine Karte (bewusst: die Prüfzeile steht auf der Prüfübersicht). MCP-Katalog: `thema = pruefung`, von Hand in
 `mcp/test/katalog.json` ergänzt; der Abzug aus Produktion steht aus.
+
+
+## Die Nachtmeldung ohne Rauschen (`0164`, 25.11.2026)
+
+Die Meldungen der Läufe 209–213 standen jede Nacht auf Warnung, und drei der Gründe waren keine. Was sich an den
+Sichten geändert hat:
+
+| Sicht | Was neu ist |
+|---|---|
+| `mart.posten_aufgegeben` | `zustand = 'ueberholt'`: aufgegeben, aber die Daten sind da — derselbe Posten ist **später** gelungen, oder (`fn:bestellung`/`fn:bestellpositionen`) die Bestellung steht in `core`, ihr Detail passt zum jüngsten Listeneintrag (Fingerabdruck, `0098`), und bei Positionen hat sie welche. Die Prüfzeile „Warteschlange: endgueltig aufgegeben" und `src/status.ts` zählen nur noch `endgueltig`. Am 25.11.2026: die zehn „endgültigen" Posten (10262, `fn:bestellpositionen`, 06.09.2026) waren alle überholt |
+| `mart.kostenstelle_ohne_erp` | **Neu.** FoodNotify-Kostenstellen, deren erpId nur noch „No Erp Found!" liefert: seit wann, letzte Bestellung, nächste Probe. Kein Befund, sondern eine Arbeitsliste — **steht hier ein laufender Betrieb, fehlen dessen Einkauf und Warenstamm**. Am 25.11.2026 neun Zeilen: Aposto Augsburg Küche/Bar, Aposto Aachen Alte Post (2), Riegele Wirtshaus (2), Aposto Münster (2), Service Enchilada Rosenheim. MCP: `thema = einkauf` |
+| `mart.warenstamm_stand` | Zustand `erp fehlt` (oben) |
+
+**Die Falle:** Eine Kostenstelle in `mart.kostenstelle_ohne_erp` hat keine Bestellungen mehr, weil FoodNotify sie
+nicht mehr führt — nicht, weil der Betrieb nichts einkauft. Wer Einkaufsmengen je Betrieb vergleicht, sieht bei
+Service Enchilada Rosenheim seit dem 20.11.2026 null; ob Rosenheim über eine andere Kostenstelle bestellt, sagt die
+Sicht nicht.

@@ -176,11 +176,17 @@ export async function statusErheben(): Promise<Statusbericht> {
    */
   // 'ladefehler' (0136) ist immer endgueltig: nach LADEFEHLER_MAX_VERSUCHEN
   // abgebrochen und nicht wiederbelebt.
+  //
+  // SEIT 0164 AUS mart.posten_aufgegeben, nicht mehr aus der Schlange: die
+  // Sicht kennt 'ueberholt' — aufgegeben, aber die Daten sind da. Zehn
+  // Positionsabrufe von 10262 standen bis 25.11.2026 jede Nacht als „fehlen
+  // dauerhaft" in der Meldung, obwohl alle zehn Bestellungen vollstaendig
+  // geladen waren. Die Grenze 3 steht in der Sicht fest (config.test.ts haelt
+  // MAX_WIEDERBELEBUNGEN darauf), deshalb hier kein Parameter mehr.
   const aufgegeben = await eine<{ endgueltig: number; offen: number }>(
-    `SELECT count(*) FILTER (WHERE ergebnis = 'ladefehler' OR wiederbelebt >= $1)::int AS endgueltig,
-            count(*) FILTER (WHERE ergebnis = 'aufgegeben' AND wiederbelebt < $1)::int AS offen
-       FROM sync.warteschlange WHERE ergebnis IN ('aufgegeben', 'ladefehler')`,
-    [config.MAX_WIEDERBELEBUNGEN])
+    `SELECT count(*) FILTER (WHERE zustand = 'endgueltig')::int AS endgueltig,
+            count(*) FILTER (WHERE zustand = 'wird erneut versucht')::int AS offen
+       FROM mart.posten_aufgegeben`)
   const endgueltig = Number(aufgegeben?.endgueltig ?? 0)
   const nochOffen = Number(aufgegeben?.offen ?? 0)
   p.push(endgueltig > 0

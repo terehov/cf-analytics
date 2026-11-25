@@ -922,6 +922,17 @@ const Schema = z.object({
   SPERRE_AUFGEBEN_TAGE: z.coerce.number().int().min(1).default(14),
 
   /**
+   * Wie oft eine FoodNotify-Kostenstelle ohne Warenwirtschaft („No Erp
+   * Found!", 0164) noch gefragt wird: einmal je so viele Tage, je Bestellliste
+   * und Warenstamm. Liefert sie wieder, faellt die Markierung von selbst
+   * (src/foodnotify/erp_fehlt.ts). Neun Kostenstellen am 25.11.2026 — vorher
+   * jede Nacht rund 50 Posten, die nach drei Wiederbelebungen als „fehlt
+   * dauerhaft" in der Nachtmeldung standen. mart.kostenstelle_ohne_erp rechnet
+   * naechste_probe_ab mit 7; wer den Wert aendert, aendert dort mit.
+   */
+  FN_ERP_FEHLT_PROBE_TAGE: z.coerce.number().int().min(1).default(7),
+
+  /**
    * Nach wie vielen Tagen der Yext-Nachlauf das volle Fenster holt statt der
    * drei laufenden Monate — und die Zuordnung neu abgleicht.
    *

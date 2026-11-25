@@ -2046,3 +2046,17 @@ im selben Lauf geliefert hat: `versuche` (Aufrufe), `naechte` (Berliner Kalender
 `letzter_http`, `meldung`. In `sync`, nicht in `core`: es ist Betriebszustand des Importers, keine Aussage über die
 Daten — deshalb darf ein Erfolg die Zeile löschen. Ab `mart.tpapi_fehltag_naechte()` (3) Nächten ist der Tag
 aufgegeben; die Arbeitslisten schließen ihn aus. Lesbar über `mart.tpapi_fehltag`.
+
+
+## Kostenstellen ohne Warenwirtschaft und überholte Posten (`0164`, 25.11.2026)
+
+* `core.kostenstelle.erp_fehlt_seit` / `erp_fehlt_zuletzt`: seit wann und zuletzt antwortet FoodNotify für die
+  erpId mit „No Erp Found!". Gesetzt und gelöscht vom Worker (`src/foodnotify/erp_fehlt.ts`), beim Deploy aus
+  `sync.aufgabe` der letzten 60 Tage nachgetragen (neun Kostenstellen). Keine Historie — die steht in
+  `sync.aufgabe`.
+* `sync.warteschlange.ergebnis = 'erp_fehlt'`: beantwortet, nicht gescheitert; nicht wiederbelebt, nicht in
+  `mart.posten_aufgegeben`.
+* `sync.aufgabe.zugang_rueckfall = 'ressource'`: das Token-403 „does not support scope-limited tokens" an einer
+  einzelnen Ressource (Constraint `NOT VALID` wie in `0160`).
+* `mart.posten_aufgegeben.zustand = 'ueberholt'` ist eine Ableitung, kein gespeicherter Zustand: die Zeile steht
+  weiter auf `ergebnis = 'aufgegeben'`.

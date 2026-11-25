@@ -303,6 +303,38 @@ async function einfuegen(
   return r.rowCount ?? 0
 }
 
+/**
+ * Die Bon-Summe eines Fensters weicht von LINAs balanceSumBrutto ab — aber
+ * nur EINMAL je Betrieb, Fenster und Zahlenpaar (0164).
+ *
+ * Das Nachzügler-Fenster holt dieselbe Woche immer wieder; bis 0164 schrieb
+ * jeder Neuabruf eine neue Abweichung mit denselben Zahlen (Betrieb 55, Woche
+ * 26.10.–01.11.2026: am 09., 16. und 24.11. je eine), und eine quittierte kam
+ * eine Woche später zurück. Neu ist eine Abweichung erst, wenn sich eine der
+ * beiden Summen um mindestens einen halben Cent ändert. Quittiert oder nicht,
+ * spielt dabei keine Rolle: wer sie quittiert hat, hat genau diese Zahlen
+ * gesehen.
+ */
+async function bonsummeAbweichungMelden(
+  c: PoolClient, key: string,
+  t: { betrieb_key: number; von: string; bis: string; raw_id: number | string; summe: number; balance: number },
+) {
+  const erwartet = { hinweis: 'Summe der Bons = balanceSumBrutto' }
+  await c.query(
+    `INSERT INTO sync.schema_abweichung (endpunkt, erwartet, tatsaechlich)
+     SELECT $1, $2::jsonb, $3::jsonb
+      WHERE NOT EXISTS (
+            SELECT 1 FROM sync.schema_abweichung a
+             WHERE a.endpunkt = $1
+               AND a.erwartet->>'hinweis' = $2::jsonb->>'hinweis'
+               AND a.tatsaechlich->>'betrieb_key' = $3::jsonb->>'betrieb_key'
+               AND a.tatsaechlich->>'von' = $3::jsonb->>'von'
+               AND a.tatsaechlich->>'bis' = $3::jsonb->>'bis'
+               AND abs((a.tatsaechlich->>'summe')::numeric - ($3::jsonb->>'summe')::numeric) < 0.005
+               AND abs((a.tatsaechlich->>'balance')::numeric - ($3::jsonb->>'balance')::numeric) < 0.005)`,
+    [key, JSON.stringify(erwartet), JSON.stringify(t)])
+}
+
 async function abweichungMelden(c: PoolClient, key: string, erwartet: unknown, tatsaechlich: unknown) {
   await c.query(
     `INSERT INTO sync.schema_abweichung (endpunkt, erwartet, tatsaechlich) VALUES ($1, $2, $3)`,
@@ -580,7 +612,7 @@ export async function betriebsberichtSchreiben(c: PoolClient, k: Kontext): Promi
       // (15.08.2026: 519 Bons, 15.920,61 EUR = balanceSumBrutto).
       const summe = liste.reduce((s, z) => s + (z.brutto ?? 0), 0)
       if (h.balanceBrutto !== null && Math.abs(summe - h.balanceBrutto) > 0.01 * liste.length + 0.01) {
-        await abweichungMelden(c, k.key, { hinweis: 'Summe der Bons = balanceSumBrutto' },
+        await bonsummeAbweichungMelden(c, k.key,
           { betrieb_key: betriebKey, von, bis, raw_id: rawId, summe, balance: h.balanceBrutto })
       }
       break

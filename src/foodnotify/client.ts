@@ -74,7 +74,15 @@ import type { Ergebnis } from '../lina/client'
  * nicht im Log.
  */
 export type FnZugangArt = 'sitzung' | 'token'
-export type FnRueckfall = 'kein_token' | 'abgewiesen' | 'ausfall'
+/**
+ * 'ressource' (0164): 403 „This endpoint does not support scope-limited
+ * tokens" — gemessen (23.–25.11.2026) nur an Kostenstellen, deren
+ * Warenwirtschaft verschwunden ist („No Erp Found!" über die Sitzung). Es gilt
+ * der einen Ressource; das Token bleibt für den Rest der Marke. Bis dahin
+ * kippte die erste solche Kostenstelle den Eintrag der ganzen Marke für den
+ * Lauf auf die Sitzung, und mart.fn_zugang_stand riet „Token prüfen".
+ */
+export type FnRueckfall = 'kein_token' | 'abgewiesen' | 'ausfall' | 'ressource'
 export type FnZugangInfo = {
   zugang: FnZugangArt
   bevorzugt: FnZugangArt
@@ -91,6 +99,9 @@ export type FnErgebnis = Ergebnis & { zugangInfo: FnZugangInfo }
  * hieße mehr doppelte Aufrufe gegen einen Anbieter, der gerade nicht kann.
  */
 export const FN_TOKEN_AUSFAELLE_BIS_SITZUNG = 3
+
+/** Nach so vielen 'ressource'-Abweisungen in Folge (je Marke × Eintrag) gilt der Eintrag als abgewiesen (0164). */
+export const FN_TOKEN_RESSOURCE_BIS_SPERRE = 3
 
 /** Jeden Tokenwert aus einem Text entfernen — ein Server, der den Header echot, darf ihn nicht in sync.* tragen. */
 export function ohneToken(text: string, tokens: readonly string[] = Object.values(config.FN_API_TOKEN)): string {
@@ -109,9 +120,14 @@ export type FnSitzungLike = {
 
 type TokenVersuch =
   | { art: 'antwort'; ergebnis: Ergebnis }
-  | { art: 'abgewiesen' | 'ausfall'; grund: string }
+  | { art: 'abgewiesen' | 'ausfall' | 'ressource'; grund: string }
 
 const schlaf = (ms: number) => new Promise(r => setTimeout(r, ms))
+
+/** Das 403, das einer Ressource gilt und nicht dem Token (0164, siehe FnRueckfall). */
+export function istRessourcenAbweisung(text: string): boolean {
+  return /does not support scope-limited tokens/i.test(text)
+}
 
 function retryAfter(header: string | null): Date | null {
   if (!header) return null
@@ -127,6 +143,8 @@ export class FnClient {
   private anmeldungGescheitert = new Set<string>()
   /** `marke|endpunkt` → Grund: in diesem Lauf abgewiesen, nicht mehr mit Token fragen. */
   private tokenAbgewiesen = new Map<string, string>()
+  /** 'ressource'-Abweisungen in Folge je Marke × Eintrag, ohne Token-Erfolg dazwischen (0164). */
+  private tokenRessourceInFolge = new Map<string, number>()
   /** Je Marke: Ausfälle des Token-Wegs in Folge (ein Erfolg setzt zurück). */
   private tokenAusfaelle = new Map<string, number>()
   /** Je Marke: der letzte Ausfallgrund — für den Rückfallgrund, sobald die Schwelle greift. */
@@ -254,12 +272,30 @@ export class FnClient {
       const v = await this.tokenHolen(ep, token, parameter)
       if (v.art === 'antwort') {
         this.tokenAusfaelle.set(marke, 0)
+        this.tokenRessourceInFolge.delete(sperrSchluessel)
         return { ...v.ergebnis, zugangInfo: { zugang: 'token', bevorzugt: 'token', rueckfall: null, rueckfallGrund: null } }
       }
       rueckfall = v.art
       grund = v.grund
       if (v.art === 'abgewiesen') {
         this.tokenAbgewiesen.set(sperrSchluessel, v.grund)
+      } else if (v.art === 'ressource') {
+        /*
+         * Einzeln gilt es der Ressource (eine Kostenstelle ohne
+         * Warenwirtschaft zwischen lauter lebenden). Dieselbe Meldung kommt
+         * aber auch, wenn ein Endpunkt das Token GAR NICHT trägt (19.11.2026:
+         * Bestellpositionen, Inventuren) — dann wäre jeder Posten ein 403
+         * plus Sitzung. Drei in Folge ohne Token-Erfolg dazwischen sind
+         * deshalb keine Ressource mehr, sondern der Eintrag: gesperrt wie
+         * 'abgewiesen'.
+         */
+        const n = (this.tokenRessourceInFolge.get(sperrSchluessel) ?? 0) + 1
+        this.tokenRessourceInFolge.set(sperrSchluessel, n)
+        if (n >= FN_TOKEN_RESSOURCE_BIS_SPERRE) {
+          rueckfall = 'abgewiesen'
+          grund = `${n} Abweisungen in Folge ohne Token-Erfolg — Eintrag der Marke gesperrt; zuletzt: ${v.grund}`
+          this.tokenAbgewiesen.set(sperrSchluessel, grund)
+        }
       } else {
         this.tokenAusfaelle.set(marke, ausfaelle + 1)
         this.tokenLetzterAusfall.set(marke, v.grund)
@@ -313,6 +349,7 @@ export class FnClient {
     if (!res.ok) {
       const { meldung, anfrageFehler } = fehlerAusAntwort(text)
       const kurz = this.ohneToken(`HTTP ${res.status}${meldung ? ` — ${meldung}` : ''}`).slice(0, 300)
+      if (res.status === 403 && istRessourcenAbweisung(text)) return { art: 'ressource', grund: kurz }
       if (res.status === 401 || res.status === 403) return { art: 'abgewiesen', grund: kurz }
       /*
        * Der fachliche 404: das Rezept (die Kostenstelle, die Anbindung) gibt

@@ -5985,3 +5985,41 @@ Körnung und Thema in `mcp.sicht`, `mcp.koernung_in_kommentare()`, `mcp.rechte_a
 ohne Körnungsanhang dasteht. Dauerhaft fängt es nur der Katalogabzug nach dem Deploy (Dokumentationspflicht in
 `AGENTS.md`) — **ihn ziehen und den Unterschied lesen**, nicht nur committen: ein entfernter „Koernung:"-Anhang
 ist dort die einzige Spur.
+
+
+## Die Nachtmeldung war jede Nacht gelb, und drei der Gründe stimmten nicht (25.11.2026)
+
+**Symptom.** Die Statusmeldungen der Läufe 209–213 standen alle auf Warnung: „10 Posten endgültig aufgegeben —
+diese Zeiträume fehlen dauerhaft, 222 weitere werden noch erneut versucht", offene Schemaabweichungen, dazu in
+`mart.fn_zugang_stand` bei drei Marken „Token abgewiesen — Token in FoodNotify prüfen". Nichts davon war ein
+Datenverlust.
+
+**Ursachen.** Drei getrennte:
+
+1. **Überholte Posten.** Die zehn „endgültigen" waren Positionsabrufe der Kostenstelle 10262 vom 06.09.2026. Alle
+   zehn Bestellungen standen vollständig in `core` (geholt 24./25.08.2026, Fingerabdruck von Liste und Detail bis
+   heute gleich) — gescheitert war ein späterer Nachabruf. Die Zählung kannte nur „aufgegeben" und „wiederbelebt",
+   nicht „die Daten sind trotzdem da".
+2. **Kostenstellen ohne Warenwirtschaft.** 218 der 222 Posten stammten von neun FoodNotify-Kostenstellen, die seit
+   dem 12./13.11.2026 (13131 seit 20.11.) mit HTTP 200 und „No Erp Found!" antworten — Aposto Augsburg, Aposto Aachen
+   Alte Post, Riegele Wirtshaus, Aposto Münster, Service Enchilada Rosenheim. Der Hüllenfehler lief in den
+   gewöhnlichen Fehlerpfad: jede Nacht neue Posten, nach drei Wiederbelebungen „fehlt dauerhaft". Dieselben
+   Kostenstellen antworten dem **Token** beim Warenstamm mit 403 „does not support scope-limited tokens" — und
+   `0160` sperrte nach dem ersten 403 das Token für den ganzen Eintrag der Marke. Daher „Token prüfen", obwohl das
+   Token bei allen lebenden Kostenstellen lieferte.
+3. **Dieselbe Abweichung, jede Woche neu.** Bericht 96, Betrieb 55, Woche 26.10.–01.11.2026: Bon-Summe 21.109,40
+   gegen `balanceSumBrutto` 21.505,30. Das Nachzügler-Fenster holt die Woche wieder, und jeder Abruf schrieb eine
+   neue Zeile (09., 16., 24.11.). Am 21.11. war entschieden, sie stehen zu lassen — quittieren hätte eine Woche
+   gehalten.
+
+**Was es künftig verhindert.** `0164`: `zustand = 'ueberholt'` in `mart.posten_aufgegeben`, `src/status.ts` zählt
+aus der Sicht. „No Erp Found!" schließt den Posten als `erp_fehlt` und markiert die Kostenstelle
+(`core.kostenstelle.erp_fehlt_seit`); der Einreihweg fragt sie nur noch je `FN_ERP_FEHLT_PROBE_TAGE`, ein Erfolg
+hebt die Markierung auf, sichtbar in `mart.kostenstelle_ohne_erp`. Das Token-403 mit genau dieser Meldung ist
+Rückfallgrund `ressource` und sperrt erst nach drei in Folge (dieselbe Meldung kommt auch, wenn ein Endpunkt das
+Token gar nicht trägt). Der Lader von 96 meldet eine Bon-Summen-Abweichung nur, wenn Betrieb, Fenster oder eine der
+Summen neu sind. Tests: `src/foodnotify/erp_fehlt.test.ts`, `src/foodnotify/zugang.test.ts`.
+
+**Allgemeine Lehre.** Eine Warnung, die jede Nacht kommt, liest nach einer Woche niemand mehr — auch nicht an dem
+Tag, an dem sie stimmt. Jeder Zweig, der „nicht geklappt" zählt, muss auch „ist trotzdem da" und „Quelle hat
+geantwortet: gibt es nicht" kennen.

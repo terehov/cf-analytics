@@ -150,23 +150,44 @@ describe('Rückfall auf die Sitzung', () => {
     expect(t.aufrufe.map(a => a.weg)).toEqual(['sitzung'])
   })
 
-  test('(b) 403 scope-limited: Rückfall, danach für Marke UND Eintrag kein Token mehr — keine Serie von 403', async () => {
+  test('(b) 403 scope-limited dreimal in Folge: danach für Marke UND Eintrag kein Token mehr — keine Serie von 403', async () => {
     const t = aufbau({ token: p => (p.includes('/articles') ? SCOPE : undefined) })
-    const r1 = await holen(t.client, 'fn:pos_artikel')
-    expect(r1.art).toBe('ok')
-    expect(r1.zugangInfo).toMatchObject({ zugang: 'sitzung', rueckfall: 'abgewiesen' })
-    expect(r1.zugangInfo.rueckfallGrund).toContain('HTTP 403')
-    expect(r1.zugangInfo.rueckfallGrund).toContain('scope-limited')
+    // Die ersten zwei gelten der Ressource (0164) — das Token wird weiter versucht.
+    for (let i = 0; i < 2; i++) {
+      const r = await holen(t.client, 'fn:pos_artikel')
+      expect(r.art).toBe('ok')
+      expect(r.zugangInfo).toMatchObject({ zugang: 'sitzung', rueckfall: 'ressource' })
+      expect(r.zugangInfo.rueckfallGrund).toContain('HTTP 403')
+      expect(r.zugangInfo.rueckfallGrund).toContain('scope-limited')
+    }
+    // Die dritte in Folge ohne Token-Erfolg: der Eintrag ist es, nicht die Ressource.
+    const r3 = await holen(t.client, 'fn:pos_artikel')
+    expect(r3.zugangInfo).toMatchObject({ zugang: 'sitzung', rueckfall: 'abgewiesen' })
+    expect(r3.zugangInfo.rueckfallGrund).toContain('3 Abweisungen in Folge')
     for (let i = 0; i < 5; i++) {
       const r = await holen(t.client, 'fn:pos_artikel')
       expect(r.zugangInfo).toMatchObject({ zugang: 'sitzung', rueckfall: 'abgewiesen' })
       expect(r.zugangInfo.rueckfallGrund).toContain('schon abgewiesen')
     }
-    expect(t.aufrufe.filter(a => a.weg === 'token').length).toBe(1)
-    expect(t.aufrufe.filter(a => a.weg === 'sitzung').length).toBe(6)
+    expect(t.aufrufe.filter(a => a.weg === 'token').length).toBe(3)
+    expect(t.aufrufe.filter(a => a.weg === 'sitzung').length).toBe(8)
     // Ein anderer Eintrag derselben Marke fragt weiter mit Token.
     const w = await holen(t.client, 'fn:warenstamm')
     expect(w.zugangInfo.zugang).toBe('token')
+  })
+
+  test('(b) eine einzelne 403 scope-limited zwischen Erfolgen gilt der Ressource — das Token bleibt (0164)', async () => {
+    // Gemessen 23.–25.11.2026: Kostenstellen ohne Warenwirtschaft antworten dem
+    // Token beim Warenstamm so, alle anderen liefern. Vorher kippte die erste
+    // davon den Warenstamm der ganzen Marke auf die Sitzung.
+    const t = aufbau({ token: p => (p.includes('10272') ? SCOPE : undefined) })
+    for (let i = 0; i < 4; i++) {
+      const gut = await holen(t.client, 'fn:warenstamm', 'wilma_wunder', { erpId: '7984', seite: '1' })
+      expect(gut.zugangInfo).toMatchObject({ zugang: 'token', rueckfall: null })
+      const tot = await holen(t.client, 'fn:warenstamm', 'wilma_wunder', { erpId: '10272', seite: '1' })
+      expect(tot.zugangInfo).toMatchObject({ zugang: 'sitzung', rueckfall: 'ressource' })
+    }
+    expect(t.aufrufe.filter(a => a.weg === 'token').length).toBe(8)
   })
 
   test('(b) 401 ebenso — und eine andere Marke ist nicht betroffen', async () => {

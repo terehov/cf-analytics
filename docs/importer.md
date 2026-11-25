@@ -2891,3 +2891,22 @@ vom 19.11.2026 kamen am Abend auch über die Sitzung — kein Grund, die Grenze 
 
 **Die Probe-Werkzeuge** (`rezepte-probe`, `rezepte-praxis`) nutzen `FnClient` und gehen damit ebenfalls zuerst über
 das Token, mit demselben Rückfall; `rezepte-praxis` schreibt die Zugangsspalten mit.
+
+
+## FoodNotify: Kostenstelle ohne Warenwirtschaft (`0164`, 25.11.2026)
+
+„No Erp Found!" (HTTP 200, Hüllenfehler) ist eine Antwort, kein Fehler: der Worker schließt den Posten als
+`erp_fehlt`, markiert die Kostenstelle und zählt es **nicht** als Erstfehler. Bestellliste und Warenstamm reihen eine
+markierte Kostenstelle nur noch ein, wenn ihre letzte „No Erp Found"-Antwort älter als `FN_ERP_FEHLT_PROBE_TAGE` (7)
+ist — die Probe; die Inventuren (ein Sammelaufruf über alle erpIds der Marke) lassen sie ganz weg. Jeder
+erfolgreiche FoodNotify-Abruf mit einer erpId hebt deren Markierung auf. Vorher: rund 50 neue Posten je Nacht, die
+nach drei Wiederbelebungen als „fehlt dauerhaft" in der Nachtmeldung standen.
+
+**Token-Weg:** Ein 403 mit „does not support scope-limited tokens" ist Rückfallgrund `ressource` — die Sitzung
+übernimmt diesen einen Posten, das Token bleibt für die Marke. Drei solche Abweisungen in Folge ohne Token-Erfolg
+dazwischen (je Marke × Eintrag) sperren den Eintrag wie `abgewiesen`: dieselbe Meldung kommt, wenn ein Endpunkt das
+Token gar nicht trägt (19.11.2026: Bestellpositionen, Inventuren), und dann wäre jeder Posten ein 403 plus Sitzung
+(`FN_TOKEN_RESSOURCE_BIS_SPERRE`, `src/foodnotify/client.ts`).
+
+**Bericht 96, Bon-Summe:** `bonsummeAbweichungMelden()` schreibt eine Abweichung nur, wenn es für Betrieb und
+Fenster noch keine mit denselben beiden Summen (± 0,5 Cent) gibt — quittiert oder nicht.

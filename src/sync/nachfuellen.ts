@@ -977,8 +977,11 @@ export async function foodnotifyNachfuellen(): Promise<number> {
                  AND s.payload->'payload'->>'page_count' IS NOT NULL
                ORDER BY s.abgerufen_am DESC
                LIMIT 1) a ON true
-        WHERE k.marke_key = $1 AND k.erp_id IS NOT NULL`,
-      [marke.marke_key])
+        WHERE k.marke_key = $1 AND k.erp_id IS NOT NULL
+          -- Ohne Warenwirtschaft (0164) nur einmal je FN_ERP_FEHLT_PROBE_TAGE.
+          AND (k.erp_fehlt_seit IS NULL
+               OR k.erp_fehlt_zuletzt < now() - make_interval(days => $2::int))`,
+      [marke.marke_key, config.FN_ERP_FEHLT_PROBE_TAGE])
 
     /*
      * DIE LETZTEN N SEITEN, NICHT NUR DIE LETZTE — seit Migration 0098.
@@ -1142,6 +1145,9 @@ export async function warenstammNachfuellen(): Promise<number> {
        JOIN core.marke m USING (marke_key)
       WHERE m.schluessel = ANY($2::text[])
         AND k.erp_id IS NOT NULL
+        -- Ohne Warenwirtschaft (0164) nur einmal je FN_ERP_FEHLT_PROBE_TAGE.
+        AND (k.erp_fehlt_seit IS NULL
+             OR k.erp_fehlt_zuletzt < now() - make_interval(days => $4::int))
         AND NOT EXISTS (
             SELECT 1 FROM sync.warteschlange w
              WHERE w.endpunkt = 'fn:warenstamm' AND w.marke_key = k.marke_key
@@ -1155,7 +1161,7 @@ export async function warenstammNachfuellen(): Promise<number> {
                  ORDER BY w.erledigt_am DESC LIMIT 1) letzter
              WHERE letzter.ergebnis = 'kein_zugriff')
      RETURNING posten_id`,
-    [heute, zugaenge, fnEndpunkt('fn:warenstamm').prioritaet])
+    [heute, zugaenge, fnEndpunkt('fn:warenstamm').prioritaet, config.FN_ERP_FEHLT_PROBE_TAGE])
   return r.length
 }
 
@@ -1626,7 +1632,11 @@ export async function inventurenNachfuellen(
                LIMIT 1), 1) AS letzte_seite,
             (SELECT string_agg(k.erp_id::text, ',' ORDER BY k.erp_id)
                FROM core.kostenstelle k
-              WHERE k.marke_key = $1 AND k.erp_id IS NOT NULL) AS erp_ids`,
+              WHERE k.marke_key = $1 AND k.erp_id IS NOT NULL
+                -- Ohne Warenwirtschaft (0164) nicht im Sammelaufruf: eine
+                -- tote erpId gehoert nicht in die Liste der lebenden. Ob sie
+                -- wieder antwortet, proben Bestellungen und Warenstamm.
+                AND k.erp_fehlt_seit IS NULL) AS erp_ids`,
     [markeKey])
 
   // Ohne Kostenstellen gäbe es keine erpIds — der Pfadbau würfe beim

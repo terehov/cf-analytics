@@ -5473,3 +5473,21 @@ Nacht.
 **Verworfen.** Fehltage unbegrenzt weiter versuchen: der Rückstand ginge nie auf null, `stockt` stünde für immer —
 eine Warnung, die nie verschwindet, liest niemand (`0071`). Fehltage sofort aufgeben: eine einzelne schlechte Nacht
 bei LINA kostete dann Tage, die am nächsten Morgen da wären.
+
+
+## 25.11.2026 — Die Nachtmeldung meldet nur, was jemand tun muss (`0164`)
+
+Auftrag Eugene: „alles umsetzen, fixen, … dass es heute Nacht gleich sauber läuft." Entschieden, mit Begründung:
+
+* **Tote FoodNotify-Kostenstellen werden nicht still gelegt, sondern gedrosselt:** eine Probe je Woche statt jeder
+  Nacht, und ein Erfolg nimmt sie von selbst zurück. Eine endgültige Stilllegung bräuchte jemanden, der sie wieder
+  aufhebt — und wäre der Zweig ohne Zulauf, den Regel 10 verbietet. Sichtbar bleiben sie in
+  `mart.kostenstelle_ohne_erp`, nicht in der Nachtmeldung: ob ein Betrieb seine Warenwirtschaft bei FoodNotify
+  abgemeldet hat, entscheidet niemand bei uns.
+* **„Überholt" wird abgeleitet, nicht gesetzt.** Kein Aufräumen in `sync.warteschlange`: die Sicht erkennt es jede
+  Nacht neu, auch für Fälle, die es heute noch nicht gibt.
+* **Die Bon-Summen-Abweichungen von 96 werden quittiert** (Entscheidung 21.11.: stehen lassen) und nicht mehr
+  wiederholt gemeldet. Ändert LINA die Zahlen, ist es eine neue Abweichung.
+* **Nicht geändert:** die Bounti-Warnung (24 aktive Mitarbeitende ohne Standort — Pflege in Bounti, nicht im Code)
+  und der Warenstamm von 10262 (HTTP 500 `NonUniqueResultException` bei FoodNotify — echte fehlende Daten; er wird in
+  einigen Nächten zu Recht „endgültig").
