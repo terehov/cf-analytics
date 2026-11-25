@@ -4957,6 +4957,33 @@
    "fallstricke": []
   },
   {
+   "sicht": "mart.kostenstelle_ohne_erp",
+   "koernung": "FoodNotify-Kostenstelle ohne Warenwirtschaft („No Erp Found\") — seit wann, letzte Bestellung, naechste Probe",
+   "thema": "einkauf",
+   "summen_erlaubt": false,
+   "kommentar": "FoodNotify-Kostenstellen, deren Warenwirtschaft verschwunden ist: jede Anfrage mit ihrer erpId kommt mit\n„No Erp Found!\" zurueck (0164). Der Importer fragt sie nur noch einmal je FN_ERP_FEHLT_PROBE_TAGE (7) ab —\nBestellungen, Inventuren, Warenstamm; naechste_probe_ab ist geschaetzt aus dieser Frist. Liefert eine Probe\nwieder, verschwindet die Zeile von selbst. Erwartung: geschlossene oder abgegebene Betriebe, Testkostenstellen.\nSteht hier ein laufender Betrieb, fehlen dessen Einkauf und Warenstamm — eine Frage an FoodNotify bzw. an den\nBetrieb, kein Importfehler. Am 25.11.2026: neun Kostenstellen (Aposto Augsburg, Aposto Aachen Alte Post,\nRiegele Wirtshaus, Aposto Muenster, Service Enchilada Rosenheim).\n\nKoernung: FoodNotify-Kostenstelle ohne Warenwirtschaft („No Erp Found\") — seit wann, letzte Bestellung, naechste Probe",
+   "spalten": [
+    "marke",
+    "kostenstelle_key",
+    "kostenstelle_id",
+    "kostenstelle",
+    "erp_id",
+    "betrieb_key",
+    "betrieb",
+    "erp_fehlt_seit",
+    "erp_fehlt_zuletzt",
+    "naechste_probe_ab",
+    "letzte_bestellung"
+   ],
+   "achsen": [
+    "betrieb_key",
+    "kostenstelle",
+    "marke"
+   ],
+   "kennzahlen": [],
+   "fallstricke": []
+  },
+  {
    "sicht": "mart.kreditor_betrieb_monat",
    "koernung": "Betrieb, Monat und Kreditor",
    "thema": "einkauf",
@@ -6495,7 +6522,7 @@
    "koernung": "endgueltig aufgegebenem Posten",
    "thema": "import",
    "summen_erlaubt": false,
-   "kommentar": "Posten, die der Worker aufgegeben hat. ERWARTUNG: leer, oder nur Zeilen mit\nzustand = endgueltig und einer Begruendung, die jemand gelesen hat.\n\n  wird erneut versucht  der naechtliche Lauf holt ihn zurueck, solange\n                        quelle_antwortet true ist. Hoechstens dreimal.\n  endgueltig            der Vorrat ist aufgebraucht — oder das Laden ist\n                        LADEFEHLER_MAX_VERSUCHE mal gescheitert (0136): die\n                        Antwort kam, aber sie liess sich nicht nach core\n                        schreiben. Die Antwort steht in raw.api_antwort\n                        (ladefehler). Das ist ein Baufehler oder Unsinn in der\n                        Quelle, und er gehoert geprueft, nicht ignoriert.\n\nDIE 3 STEHT HIER FEST VERDRAHTET UND MUSS ZU config.MAX_WIEDERBELEBUNGEN PASSEN.\nEine Sicht kann keine Umgebungsvariable lesen; eine Einstellungstabelle waere mehr\nBau, als das Problem verdient. Wer MAX_WIEDERBELEBUNGEN aendert, aendert damit still\ndie Bedeutung dieser Spalte — und die von src/status.ts, das die Umgebung liest.\nDeshalb haelt src/config.test.ts den Vorgabewert auf 3 fest: der rote Test fuehrt zu\ndieser Zeile. Geaendert wird also beides oder keines.\n\nAm 13.08.2026 standen hier 275 Zeilen, ausnahmslos fn:bestellpositionen mit HTTP 500\naus dem Backfill vom 02. bis 04.08.2026 — und mit ihnen 322 Bestellungen ueber\n686.535,93 EUR, die einen Kopf hatten und keine einzige Position. Nach dem ersten Lauf\nmit der Wiederbelebung (0070) waren es 0 von 66.966; die Bestellungen ohne Position\nsind auf 47 gefallen.\n\nwiederbelebt ist NICHT versuche: versuche zaehlt die Anlaeufe innerhalb eines Lebens\nund faengt nach dem Wiederbeleben bei 0 an, wiederbelebt zaehlt die Leben.\n\nKoernung: endgueltig aufgegebenem Posten",
+   "kommentar": "Posten, die der Worker aufgegeben hat. ERWARTUNG: leer, oder nur Zeilen mit\nzustand = endgueltig und einer Begruendung, die jemand gelesen hat.\n\n  wird erneut versucht  der naechtliche Lauf holt ihn zurueck, solange\n                        quelle_antwortet true ist. Hoechstens dreimal.\n  endgueltig            der Vorrat ist aufgebraucht — oder das Laden ist\n                        LADEFEHLER_MAX_VERSUCHE mal gescheitert (0136): die\n                        Antwort kam, aber sie liess sich nicht nach core\n                        schreiben. Die Antwort steht in raw.api_antwort\n                        (ladefehler). Das ist ein Baufehler oder Unsinn in der\n                        Quelle, und er gehoert geprueft, nicht ignoriert.\n  ueberholt (0164)      aufgegeben, aber die Daten sind da: derselbe Posten ist\n                        spaeter gelungen, oder (fn:bestellung/-positionen) die\n                        Bestellung steht in core und ihr Detail passt zum\n                        juengsten Listeneintrag. Kein Befund. Anlass: zehn\n                        Positionsabrufe von 10262 vom 06.09.2026 meldeten\n                        bis 25.11.2026 jede Nacht „fehlen dauerhaft\", obwohl\n                        alle zehn Bestellungen vollstaendig in core standen.\n\nDIE 3 STEHT HIER FEST VERDRAHTET UND MUSS ZU config.MAX_WIEDERBELEBUNGEN PASSEN.\nEine Sicht kann keine Umgebungsvariable lesen; eine Einstellungstabelle waere mehr\nBau, als das Problem verdient. Wer MAX_WIEDERBELEBUNGEN aendert, aendert damit still\ndie Bedeutung dieser Spalte — und die von src/status.ts, das seit 0164 diese Sicht\nliest. Deshalb haelt src/config.test.ts den Vorgabewert auf 3 fest: der rote Test\nfuehrt zu dieser Zeile. Geaendert wird also beides oder keines.\n\nAm 13.08.2026 standen hier 275 Zeilen, ausnahmslos fn:bestellpositionen mit HTTP 500\naus dem Backfill vom 02. bis 04.08.2026 — und mit ihnen 322 Bestellungen ueber\n686.535,93 EUR, die einen Kopf hatten und keine einzige Position. Nach dem ersten Lauf\nmit der Wiederbelebung (0070) waren es 0 von 66.966; die Bestellungen ohne Position\nsind auf 47 gefallen.\n\nwiederbelebt ist NICHT versuche: versuche zaehlt die Anlaeufe innerhalb eines Lebens\nund faengt nach dem Wiederbeleben bei 0 an, wiederbelebt zaehlt die Leben.\n\nKoernung: endgueltig aufgegebenem Posten",
    "spalten": [
     "posten_id",
     "endpunkt",
@@ -9290,7 +9317,7 @@
    "koernung": "eine Kostenstelle mit Warenwirtschaft (erpId) — Zulauf des Warenstamms",
    "thema": "pruefung",
    "summen_erlaubt": false,
-   "kommentar": "Je Kostenstelle mit Warenwirtschaft (erpId): kommt der Warenstamm an (0157, Regel 10)? zustand: ok / marke nicht\naktiv (WARENSTAMM_MARKEN, vorerst nur Wilma Wunder) / kein zugriff (FoodNotify verweigert die Kostenstelle\ndauerhaft, 0075) / nie geladen / unvollstaendig (eine Folgeseite meldete eine andere Gesamtzahl) / veraltet\n(letzter VOLLSTAENDIGER Abzug aelter als 36 h) / leer / ohne betrieb (Kostenstelle keinem Betrieb zugeordnet —\ndarunter die Testkostenstellen \"AAA Testrestaurant\", \"… TESTBETRIEB\", die mit geladen werden).\nDazu die Zahl der Produkte der letzten Antwort, ohne Preis, ohne Artikelnummer, Eigenproduktion, und reihe_ab:\nab diesem Tag gibt es fuer die Kostenstelle eine Preisreihe — davor nicht.\n\nKoernung: eine Kostenstelle mit Warenwirtschaft (erpId) — Zulauf des Warenstamms",
+   "kommentar": "Je Kostenstelle mit Warenwirtschaft (erpId): kommt der Warenstamm an (0157, Regel 10)? zustand: ok / marke nicht\naktiv (nicht in WARENSTAMM_MARKEN) / kein zugriff (FoodNotify verweigert die Kostenstelle dauerhaft, 0075) /\nerp fehlt (0164: FoodNotify kennt die Warenwirtschaft der Kostenstelle nicht mehr, „No Erp Found!\" — siehe\nmart.kostenstelle_ohne_erp) / nie geladen / unvollstaendig (eine Folgeseite meldete eine andere Gesamtzahl) /\nveraltet (letzter VOLLSTAENDIGER Abzug aelter als 36 h) / leer / ohne betrieb (Kostenstelle keinem Betrieb\nzugeordnet — darunter die Testkostenstellen \"AAA Testrestaurant\", \"… TESTBETRIEB\", die mit geladen werden).\nDazu die Zahl der Produkte der letzten Antwort, ohne Preis, ohne Artikelnummer, Eigenproduktion, und reihe_ab:\nab diesem Tag gibt es fuer die Kostenstelle eine Preisreihe — davor nicht.\n\nKoernung: eine Kostenstelle mit Warenwirtschaft (erpId) — Zulauf des Warenstamms",
    "spalten": [
     "marke",
     "marke_aktiv",
