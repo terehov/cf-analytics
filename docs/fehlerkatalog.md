@@ -6023,3 +6023,25 @@ Summen neu sind. Tests: `src/foodnotify/erp_fehlt.test.ts`, `src/foodnotify/zuga
 **Allgemeine Lehre.** Eine Warnung, die jede Nacht kommt, liest nach einer Woche niemand mehr — auch nicht an dem
 Tag, an dem sie stimmt. Jeder Zweig, der „nicht geklappt" zählt, muss auch „ist trotzdem da" und „Quelle hat
 geantwortet: gibt es nicht" kennen.
+
+## Die Reparatur vom Vortag legte einen zweiten Rückfall frei: Enchilada ganz auf der Sitzung (26.11.2026)
+
+**Symptom.** In Lauf 214, dem ersten nach `0164`, lief bei Enchilada ab 04:16 alles über die Sitzung statt über
+das Token — auch Rezepte, Zutaten und Meta mit je rund 140 Abrufen. `mart.fn_zugang_stand` zeigte für alle
+Enchilada-Einträge „rueckfall ausfall". Kein Datenverlust: die Sitzung liefert dieselben Zeilen.
+
+**Ursache.** Der Warenstamm von 10262 (Bar Enchilada Augsburg) antwortet seit Wochen mit HTTP 500
+„NonUniqueResultException", über beide Wege. `0160` wertet jeden 5xx des Token-Wegs als Ausfall, und drei Ausfälle in
+Folge schalten die **ganze Marke** für den Lauf auf die Sitzung. Die Wiederholungen desselben Postens kamen
+hintereinander (04:07, 04:11, 04:16) — das reichte. Bis `0164` war es verdeckt: die tote Kostenstelle 13131 hatte den
+Warenstamm-Eintrag der Marke vorher schon gesperrt, so dass 10262 gar nicht erst über das Token ging.
+
+**Was es künftig verhindert.** `istRessourcenFehler()` in `src/foodnotify/client.ts`: ein 500 mit
+„NonUniqueResultException" ist wie das 403 „scope-limited" Rückfallgrund `ressource` — zählt nicht als Ausfall der
+Marke. Gesperrt wird ein Eintrag erst nach drei **verschiedenen** Ressourcen in Folge ohne Token-Erfolg; Wiederholungen
+desselben kaputten Postens zählen einmal. Test `src/foodnotify/zugang.test.ts` („500 NonUniqueResultException an
+einer Kostenstelle").
+
+**Allgemeine Lehre.** Wer eine Sperre lockert, muss nachsehen, was sie bisher verdeckt hat. Und: ein Zähler „n in
+Folge" muss Wiederholungen derselben Sache von verschiedenen Sachen unterscheiden — sonst zählt er die eigene
+Wiedervorlage.

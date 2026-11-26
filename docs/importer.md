@@ -2902,9 +2902,11 @@ ist — die Probe; die Inventuren (ein Sammelaufruf über alle erpIds der Marke)
 erfolgreiche FoodNotify-Abruf mit einer erpId hebt deren Markierung auf. Vorher: rund 50 neue Posten je Nacht, die
 nach drei Wiederbelebungen als „fehlt dauerhaft" in der Nachtmeldung standen.
 
-**Token-Weg:** Ein 403 mit „does not support scope-limited tokens" ist Rückfallgrund `ressource` — die Sitzung
-übernimmt diesen einen Posten, das Token bleibt für die Marke. Drei solche Abweisungen in Folge ohne Token-Erfolg
-dazwischen (je Marke × Eintrag) sperren den Eintrag wie `abgewiesen`: dieselbe Meldung kommt, wenn ein Endpunkt das
+**Token-Weg:** Ein 403 mit „does not support scope-limited tokens" und (seit 26.11.2026) ein 500 mit
+„NonUniqueResultException" sind Rückfallgrund `ressource` (`istRessourcenFehler()`) — die Sitzung übernimmt diesen
+einen Posten, das Token bleibt für die Marke, und kein Ausfall wird gezählt. Drei **verschiedene** Ressourcen in Folge
+ohne Token-Erfolg dazwischen (je Marke × Eintrag; Wiederholungen desselben Postens zählen einmal) sperren den Eintrag
+wie `abgewiesen`: dieselbe Meldung kommt, wenn ein Endpunkt das
 Token gar nicht trägt (19.11.2026: Bestellpositionen, Inventuren), und dann wäre jeder Posten ein 403 plus Sitzung
 (`FN_TOKEN_RESSOURCE_BIS_SPERRE`, `src/foodnotify/client.ts`).
 

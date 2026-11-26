@@ -6,7 +6,7 @@
 import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { istErpFehlt } from './erp_fehlt'
-import { istRessourcenAbweisung } from './client'
+import { istRessourcenAbweisung, istRessourcenFehler } from './client'
 
 describe('istErpFehlt', () => {
   test('die gemessene Meldung, so wie der Client sie weiterreicht', () => {
@@ -28,6 +28,18 @@ describe('istRessourcenAbweisung', () => {
   test('ein gewöhnliches 403 bleibt eine Abweisung', () => {
     expect(istRessourcenAbweisung('{"message":"Access Denied."}')).toBe(false)
     expect(istRessourcenAbweisung('{"message":"Invalid JWT Token"}')).toBe(false)
+  })
+})
+
+describe('istRessourcenFehler', () => {
+  test('403 scope-limited und 500 NonUniqueResultException gelten der Ressource', () => {
+    expect(istRessourcenFehler(403, 'This endpoint does not support scope-limited tokens.')).toBe(true)
+    expect(istRessourcenFehler(500, '{"message":"NonUniqueResultException: More than one result"}')).toBe(true)
+  })
+  test('jeder andere 5xx bleibt ein Ausfall, jedes andere 403 eine Abweisung', () => {
+    expect(istRessourcenFehler(500, 'Internal Server Error')).toBe(false)
+    expect(istRessourcenFehler(502, 'NonUniqueResultException')).toBe(false)
+    expect(istRessourcenFehler(403, 'Access Denied.')).toBe(false)
   })
 })
 

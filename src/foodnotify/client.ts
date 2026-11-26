@@ -100,7 +100,7 @@ export type FnErgebnis = Ergebnis & { zugangInfo: FnZugangInfo }
  */
 export const FN_TOKEN_AUSFAELLE_BIS_SITZUNG = 3
 
-/** Nach so vielen 'ressource'-Abweisungen in Folge (je Marke × Eintrag) gilt der Eintrag als abgewiesen (0164). */
+/** Nach so vielen VERSCHIEDENEN Ressourcen mit 'ressource' in Folge (je Marke × Eintrag) gilt der Eintrag als abgewiesen (0164). */
 export const FN_TOKEN_RESSOURCE_BIS_SPERRE = 3
 
 /** Jeden Tokenwert aus einem Text entfernen — ein Server, der den Header echot, darf ihn nicht in sync.* tragen. */
@@ -129,6 +129,23 @@ export function istRessourcenAbweisung(text: string): boolean {
   return /does not support scope-limited tokens/i.test(text)
 }
 
+/**
+ * Antworten des Token-Wegs, die einer Ressource gelten und nichts über das
+ * Token sagen (Rückfallgrund 'ressource'):
+ *   403 „does not support scope-limited tokens" — Kostenstelle ohne
+ *       Warenwirtschaft (0164);
+ *   500 „NonUniqueResultException" — FoodNotifys Datenfehler an EINER
+ *       Kostenstelle (10262 seit 31.08.2026, docs/foodnotify-http500.md). Bis
+ *       26.11.2026 ein 'ausfall': drei Wiederholungen desselben Warenstamms
+ *       hintereinander schalteten die ganze Marke Enchilada für den Rest des
+ *       Laufs auf die Sitzung, Rezepte eingeschlossen (Lauf 214, ab 04:16).
+ *       Die Sitzung liefert dort denselben 500 — es ist die Ressource.
+ */
+export function istRessourcenFehler(status: number, text: string): boolean {
+  return (status === 403 && istRessourcenAbweisung(text))
+      || (status === 500 && /NonUniqueResultException/.test(text))
+}
+
 function retryAfter(header: string | null): Date | null {
   if (!header) return null
   const sekunden = Number(header.trim())
@@ -143,8 +160,13 @@ export class FnClient {
   private anmeldungGescheitert = new Set<string>()
   /** `marke|endpunkt` → Grund: in diesem Lauf abgewiesen, nicht mehr mit Token fragen. */
   private tokenAbgewiesen = new Map<string, string>()
-  /** 'ressource'-Abweisungen in Folge je Marke × Eintrag, ohne Token-Erfolg dazwischen (0164). */
-  private tokenRessourceInFolge = new Map<string, number>()
+  /**
+   * Je Marke × Eintrag: die VERSCHIEDENEN Ressourcen (Parameter), die seit dem
+   * letzten Token-Erfolg 'ressource' gemeldet haben (0164, seit 26.11.2026
+   * verschiedene statt Anzahl — Wiederholungen desselben kaputten Postens
+   * sagen nichts Neues über den Eintrag).
+   */
+  private tokenRessourceInFolge = new Map<string, Set<string>>()
   /** Je Marke: Ausfälle des Token-Wegs in Folge (ein Erfolg setzt zurück). */
   private tokenAusfaelle = new Map<string, number>()
   /** Je Marke: der letzte Ausfallgrund — für den Rückfallgrund, sobald die Schwelle greift. */
@@ -289,11 +311,13 @@ export class FnClient {
          * deshalb keine Ressource mehr, sondern der Eintrag: gesperrt wie
          * 'abgewiesen'.
          */
-        const n = (this.tokenRessourceInFolge.get(sperrSchluessel) ?? 0) + 1
-        this.tokenRessourceInFolge.set(sperrSchluessel, n)
+        const gesehen = this.tokenRessourceInFolge.get(sperrSchluessel) ?? new Set<string>()
+        gesehen.add(JSON.stringify(parameter))
+        this.tokenRessourceInFolge.set(sperrSchluessel, gesehen)
+        const n = gesehen.size
         if (n >= FN_TOKEN_RESSOURCE_BIS_SPERRE) {
           rueckfall = 'abgewiesen'
-          grund = `${n} Abweisungen in Folge ohne Token-Erfolg — Eintrag der Marke gesperrt; zuletzt: ${v.grund}`
+          grund = `${n} Ressourcen in Folge ohne Token-Erfolg abgewiesen — Eintrag der Marke gesperrt; zuletzt: ${v.grund}`
           this.tokenAbgewiesen.set(sperrSchluessel, grund)
         }
       } else {
@@ -349,7 +373,7 @@ export class FnClient {
     if (!res.ok) {
       const { meldung, anfrageFehler } = fehlerAusAntwort(text)
       const kurz = this.ohneToken(`HTTP ${res.status}${meldung ? ` — ${meldung}` : ''}`).slice(0, 300)
-      if (res.status === 403 && istRessourcenAbweisung(text)) return { art: 'ressource', grund: kurz }
+      if (istRessourcenFehler(res.status, text)) return { art: 'ressource', grund: kurz }
       if (res.status === 401 || res.status === 403) return { art: 'abgewiesen', grund: kurz }
       /*
        * Der fachliche 404: das Rezept (die Kostenstelle, die Anbindung) gibt

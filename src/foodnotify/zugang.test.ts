@@ -150,30 +150,49 @@ describe('Rückfall auf die Sitzung', () => {
     expect(t.aufrufe.map(a => a.weg)).toEqual(['sitzung'])
   })
 
-  test('(b) 403 scope-limited dreimal in Folge: danach für Marke UND Eintrag kein Token mehr — keine Serie von 403', async () => {
+  test('(b) 403 scope-limited an drei verschiedenen Ressourcen in Folge: danach für Marke UND Eintrag kein Token mehr', async () => {
     const t = aufbau({ token: p => (p.includes('/articles') ? SCOPE : undefined) })
-    // Die ersten zwei gelten der Ressource (0164) — das Token wird weiter versucht.
-    for (let i = 0; i < 2; i++) {
-      const r = await holen(t.client, 'fn:pos_artikel')
+    const anbindung = (id: string) => holen(t.client, 'fn:pos_artikel', 'wilma_wunder', { connectionId: id })
+    // Dieselbe Ressource wiederholt sagt nichts Neues über den Eintrag (26.11.2026).
+    for (let i = 0; i < 3; i++) {
+      const r = await anbindung('2052')
       expect(r.art).toBe('ok')
       expect(r.zugangInfo).toMatchObject({ zugang: 'sitzung', rueckfall: 'ressource' })
       expect(r.zugangInfo.rueckfallGrund).toContain('HTTP 403')
       expect(r.zugangInfo.rueckfallGrund).toContain('scope-limited')
     }
-    // Die dritte in Folge ohne Token-Erfolg: der Eintrag ist es, nicht die Ressource.
-    const r3 = await holen(t.client, 'fn:pos_artikel')
+    expect((await anbindung('2053')).zugangInfo.rueckfall).toBe('ressource')
+    // Die dritte VERSCHIEDENE ohne Token-Erfolg dazwischen: der Eintrag ist es, nicht die Ressource.
+    const r3 = await anbindung('2054')
     expect(r3.zugangInfo).toMatchObject({ zugang: 'sitzung', rueckfall: 'abgewiesen' })
-    expect(r3.zugangInfo.rueckfallGrund).toContain('3 Abweisungen in Folge')
+    expect(r3.zugangInfo.rueckfallGrund).toContain('3 Ressourcen in Folge')
     for (let i = 0; i < 5; i++) {
-      const r = await holen(t.client, 'fn:pos_artikel')
+      const r = await anbindung(String(3000 + i))
       expect(r.zugangInfo).toMatchObject({ zugang: 'sitzung', rueckfall: 'abgewiesen' })
       expect(r.zugangInfo.rueckfallGrund).toContain('schon abgewiesen')
     }
-    expect(t.aufrufe.filter(a => a.weg === 'token').length).toBe(3)
-    expect(t.aufrufe.filter(a => a.weg === 'sitzung').length).toBe(8)
+    expect(t.aufrufe.filter(a => a.weg === 'token').length).toBe(5)
+    expect(t.aufrufe.filter(a => a.weg === 'sitzung').length).toBe(10)
     // Ein anderer Eintrag derselben Marke fragt weiter mit Token.
     const w = await holen(t.client, 'fn:warenstamm')
     expect(w.zugangInfo.zugang).toBe('token')
+  })
+
+  test('(b) 500 NonUniqueResultException an einer Kostenstelle: Ressource, kein Ausfall — die Marke bleibt beim Token (26.11.2026)', async () => {
+    // Lauf 214: 10262 scheiterte so dreimal hintereinander, und als 'ausfall'
+    // schaltete das die ganze Marke auf die Sitzung, Rezepte eingeschlossen.
+    const KAPUTT = { status: 500, body: { message: 'NonUniqueResultException: More than one result was found for query although one row or none was expected.' } }
+    const t = aufbau({ token: p => (p.includes('10262') ? KAPUTT : undefined),
+                       sitzung: p => (p.includes('10262') ? KAPUTT : undefined) })
+    for (let i = 0; i < FN_TOKEN_AUSFAELLE_BIS_SITZUNG + 2; i++) {
+      const r = await holen(t.client, 'fn:warenstamm', 'wilma_wunder', { erpId: '10262', seite: '1' })
+      expect(r.art).toBe('fehler')
+      expect(r.zugangInfo).toMatchObject({ zugang: 'sitzung', rueckfall: 'ressource' })
+    }
+    // Weder der Eintrag noch die Marke sind gesperrt.
+    expect((await holen(t.client, 'fn:warenstamm', 'wilma_wunder', { erpId: '7984', seite: '1' })).zugangInfo)
+      .toMatchObject({ zugang: 'token', rueckfall: null })
+    expect((await holen(t.client, 'fn:rezept')).zugangInfo).toMatchObject({ zugang: 'token', rueckfall: null })
   })
 
   test('(b) eine einzelne 403 scope-limited zwischen Erfolgen gilt der Ressource — das Token bleibt (0164)', async () => {
